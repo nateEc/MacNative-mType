@@ -441,7 +441,12 @@ enum TimeWarningPolicy {
 /// stall instead of silently skipping them based on the recovery instant.
 enum ClockTickPolicy {
   static func dueSeconds(after previousSecond: Int, startedAt: Date, now: Date) -> [Int] {
-    let elapsedSecond = max(0, Int(now.timeIntervalSince(startedAt).rounded(.down)))
+    dueSeconds(after: previousSecond, elapsed: now.timeIntervalSince(startedAt))
+  }
+
+  static func dueSeconds(after previousSecond: Int, elapsed: TimeInterval) -> [Int] {
+    guard elapsed.isFinite, elapsed < Double(Int.max) else { return [] }
+    let elapsedSecond = max(0, Int(max(0, elapsed).rounded(.down)))
     let lastDeliveredSecond = max(0, previousSecond)
     guard elapsedSecond > lastDeliveredSecond else { return [] }
     return Array((lastDeliveredSecond + 1)...elapsedSecond)

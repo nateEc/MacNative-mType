@@ -967,7 +967,7 @@ private struct ContentView: View {
   @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var savedPresets:
     [TestPresetRecord]
   @State private var session = TestSessionFactory.make(
-    configuration: TypebarInitialTestSelection.configuration)
+    configuration: TypebarInitialTestSelection.configuration).withElapsedClock()
   @State private var noQuitConfigurationLockOwnerID = UUID()
   @State private var mode: TestMode = .time
   @State private var language: TypingLanguage = .english
@@ -1890,13 +1890,13 @@ private struct ContentView: View {
     synchronizeLiveInputRules()
     capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
     verifyChallengeFontAvailability()
-    if let startedAt = session.startedAt {
+    if session.hasStarted {
+      let elapsed = session.elapsedSeconds(at: now)
       let dueSeconds = ClockTickPolicy.dueSeconds(
-        after: lastClockTickSecond, startedAt: startedAt, now: now)
+        after: lastClockTickSecond, elapsed: elapsed)
       if let firstDueSecond = dueSeconds.first {
-        let expectedTick = startedAt.addingTimeInterval(Double(firstDueSecond))
         timerHealth.observe(
-          drift: now.timeIntervalSince(expectedTick), configuration: session.configuration)
+          drift: elapsed - Double(firstDueSecond), configuration: session.configuration)
         if timerHealth.shouldFail {
           session.failForTimerHealth(at: now)
           return
@@ -3782,6 +3782,7 @@ private struct ContentView: View {
       wordDecorationState: wordDecorationState,
       showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off
     )
+    session = session.withElapsedClock()
     if session.configuration.language == .mixedLanguages {
       polyglotReturnLanguage = session.configuration.polyglotBaseLanguage
     }
@@ -3845,6 +3846,7 @@ private struct ContentView: View {
         weakSpotScores: session.liveWeakSpotScores,
         wordDecorationState: session.liveWordDecorationState,
         showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
+      session = session.withElapsedClock()
       liveContentMessage = "已载入\(content.attribution)。"
       if configuration.modifiers.contains(.listening) {
         NativeSpeech.shared.speak(session.prompt, language: configuration.language)
@@ -4026,7 +4028,7 @@ private struct ContentView: View {
     TypingFeedbackSound.shared.beginPracticeAttempt()
     absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
-    session = repeatedSession.withWeakSpotScores(weakSpotScores).withWordDecorationState(wordDecorationState)
+    session = repeatedSession.withWeakSpotScores(weakSpotScores).withWordDecorationState(wordDecorationState).withElapsedClock()
     isSamePromptRepeatAttempt = true
     isRepeatedPaceAttempt = settings.repeatedPace
     let shouldUseRepeatedPace = isRepeatedPaceAttempt && settings.paceGuideMode == .off

@@ -4465,10 +4465,15 @@ struct TypingSession {
   private var stoppedPromptCandidate: StoppedPromptInput?
   private var stoppedPromptInput: StoppedPromptInput?
   let automaticInputAttemptID = UUID()
-  private var queuedCodeInputDates: [Date] = []
+  private struct QueuedCodeInput {
+    let calendar: Date
+    let timing: Date
+  }
+  private var queuedCodeInputDates: [QueuedCodeInput] = []
   private var queuedCodeInputHead = 0
   private var applyingAutomaticCodeInput = false
   private var automaticInputExecutionDate: Date?
+  private var automaticInputExecutionTimingDate: Date?
   /// Input/deletion/composition UI publishes hundredths, but a real-second
   /// timer update publishes the unrounded live cache. Neither alters scoring.
   private var roundsLiveAccuracyForInputDisplay = true
@@ -4509,6 +4514,60 @@ struct TypingSession {
   private var physicalKeyTiming = PhysicalKeyTiming()
   private var terminalPhysicalActivity = TerminalPhysicalActivity()
   private var terminalTiming: ResultTerminalTiming?
+  private var elapsedClock: SessionElapsedClock?
+  // Date is only an adapter for existing private interval algorithms here.
+  // These process-local coordinates are never calendar stamps or persisted.
+  private var measuredStartedAt: Date?
+  private var measuredFinishedAt: Date?
+  private var activeTimingDate: Date?
+
+  private var timingStartedAt: Date? { elapsedClock == nil ? startedAt : measuredStartedAt }
+  private var timingFinishedAt: Date? { elapsedClock == nil ? finishedAt : measuredFinishedAt }
+
+  private func timingDate(at calendarDate: Date) -> Date {
+    if let activeTimingDate { return activeTimingDate }
+    guard let elapsedClock else { return calendarDate }
+    return Date(timeIntervalSinceReferenceDate: elapsedClock.now())
+  }
+
+  /// Nested input/automatic callbacks keep their owner's captured sample.
+  private mutating func beginTimingOperation(at calendarDate: Date) -> Bool {
+    guard elapsedClock != nil, activeTimingDate == nil else { return false }
+    activeTimingDate = timingDate(at: calendarDate)
+    return true
+  }
+
+  private mutating func endTimingOperation(_ ownsSample: Bool) {
+    if ownsSample { activeTimingDate = nil }
+  }
+
+  private mutating func captureFinishTime(at date: Date) {
+    finishedAt = automaticInputExecutionDate ?? date
+    if elapsedClock != nil {
+      measuredFinishedAt = automaticInputExecutionTimingDate ?? timingDate(at: date)
+    }
+  }
+
+  func elapsedSeconds(at date: Date = .now) -> TimeInterval {
+    guard let start = timingStartedAt else { return 0 }
+    return max(0, (timingFinishedAt ?? timingDate(at: date)).timeIntervalSince(start))
+  }
+
+  private func scoringDuration(at date: Date) -> TimeInterval {
+    if let terminalTiming { return terminalTiming.duration(mode: configuration.mode) }
+    let raw = elapsedSeconds(at: date)
+    return elapsedClock != nil && isFinished ? ResultElapsedTime(seconds: raw).duration(mode: configuration.mode) : raw
+  }
+
+  /// Attach only to an untouched attempt; changing time domains after a
+  /// physical edge or input would invalidate every retained timing sample.
+  func withElapsedClock(_ clock: SessionElapsedClock = .system) -> Self {
+    var copy = self
+    if !hasStarted, !terminalPhysicalActivity.wasObserved, elapsedClock == nil {
+      copy.elapsedClock = clock
+    }
+    return copy
+  }
   private(set) var startedAt: Date?
   private(set) var finishedAt: Date?
   private(set) var outcome: TestOutcome = .active
@@ -4530,8 +4589,9 @@ struct TypingSession {
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
     repeatingNoSpaceTargetWords: [String] = [], generationNotice: String? = nil,
     initializationFailure: String? = nil, weakSpotScores: WeakSpotScores = .init(),
-    wordDecorationState: PoolWordDecorationState = .init()
+    wordDecorationState: PoolWordDecorationState = .init(), elapsedClock: SessionElapsedClock? = nil
   ) {
+    self.elapsedClock = elapsedClock
     self.currentWeakSpotScores = weakSpotScores
     self.currentWordDecorationState = generatedCodeContinuation?.decorationState ?? wordDecorationState
     self.configuration = configuration
@@ -4631,11 +4691,11 @@ struct TypingSession {
         return .init(configuration: configuration, prompt: batch.text, quoteWordStream: stream,
           noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: batch.noSpaceWordLengths),
           noSpaceTargetWords: batch.noSpaceTargetWords, generationNotice: initialGenerationNotice,
-          weakSpotScores: currentWeakSpotScores, wordDecorationState: liveWordDecorationState)
+          weakSpotScores: currentWeakSpotScores, wordDecorationState: liveWordDecorationState, elapsedClock: elapsedClock)
       } catch {
         return .init(configuration: configuration, prompt: "",
           initializationFailure: "引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换拼写设置。",
-          weakSpotScores: currentWeakSpotScores, wordDecorationState: liveWordDecorationState)
+          weakSpotScores: currentWeakSpotScores, wordDecorationState: liveWordDecorationState, elapsedClock: elapsedClock)
       }
     }
     return TypingSession(
@@ -4659,7 +4719,7 @@ struct TypingSession {
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
       repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords, generationNotice: initialGenerationNotice,
       initializationFailure: initializationFailure, weakSpotScores: currentWeakSpotScores,
-      wordDecorationState: liveWordDecorationState)
+      wordDecorationState: liveWordDecorationState, elapsedClock: elapsedClock)
   }
 
   var isFinished: Bool { outcome != .active }
@@ -4752,7 +4812,7 @@ struct TypingSession {
 
   var typedCharacterCount: Int { typed.count }
   var afkDuration: TimeInterval {
-    guard let startedAt, let finishedAt else { return 0 }
+    guard let startedAt = timingStartedAt, let finishedAt = timingFinishedAt else { return 0 }
     if let terminalTiming {
       let offsets = terminalPhysicalActivity.offsets(startedAt: startedAt, finishedAt: finishedAt)
         + replayEvents.map { ResultTerminalTiming.round($0.offset * 1_000) }
@@ -4768,9 +4828,9 @@ struct TypingSession {
   /// This lets a restart account for only engaged time while leaving the view's
   /// result observer untouched.
   func activeEngagedDuration(at date: Date = .now) -> TimeInterval {
-    guard let startedAt, !isFinished else { return 0 }
-    let endedAt = max(startedAt, date)
-    if let timing = capturedTerminalTiming(at: endedAt) {
+    guard let startedAt = timingStartedAt, !isFinished else { return 0 }
+    let endedAt = max(startedAt, timingDate(at: date))
+    if configuration.mode == .zen, let timing = terminalPhysicalActivity.snapshot(startedAt: startedAt, finishedAt: endedAt) {
       let offsets = terminalPhysicalActivity.offsets(startedAt: startedAt, finishedAt: endedAt)
         + replayEvents.map { ResultTerminalTiming.round($0.offset * 1_000) }
       let inactive = TerminalInactivity.counts(offsets: offsets, timing: timing,
@@ -4785,8 +4845,10 @@ struct TypingSession {
   }
 
   mutating func recordKeyboardActivity(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished, startedAt != nil else { return }
-    keyboardActivityDates.append(date)
+    keyboardActivityDates.append(timingDate(at: date))
   }
 
   /// Records anonymous physical presses for the terminal timing snapshot.
@@ -4794,10 +4856,13 @@ struct TypingSession {
   mutating func recordPhysicalKeyEvent(
     keyCode: UInt16, isKeyDown: Bool, isRepeat: Bool, at date: Date = .now
   ) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return }
-    physicalKeyTiming.record(code: keyCode, down: isKeyDown, isRepeat: isRepeat, at: date)
+    let measured = timingDate(at: date)
+    physicalKeyTiming.record(code: keyCode, down: isKeyDown, isRepeat: isRepeat, at: measured)
     terminalPhysicalActivity.record(code: keyCode, down: isKeyDown, isRepeat: isRepeat,
-      at: date, modifiers: configuration.modifiers)
+      at: measured, modifiers: configuration.modifiers)
   }
 
   var sectionProgress: (completed: Int, total: Int)? {
@@ -5233,37 +5298,33 @@ struct TypingSession {
   }
 
   func wpm(at date: Date) -> Int {
-    guard let startedAt else { return 0 }
-    if terminalTiming != nil { return Int(preciseWpm(at: date).rounded()) }
-    let end = finishedAt ?? date
+    guard hasStarted else { return 0 }
+    if terminalTiming != nil || elapsedClock != nil && isFinished { return Int(preciseWpm(at: date).rounded()) }
     let credit = referenceWordCredit(countPartialLastWord: finishedAt == nil || resultCreditsPartialLastWord)
     return wpm(characters: credit.inputUnits,
-      seconds: terminalTiming?.duration(mode: configuration.mode) ?? end.timeIntervalSince(startedAt))
+      seconds: scoringDuration(at: date))
   }
 
   func preciseWpm(at date: Date) -> Double {
-    guard let startedAt else { return 0 }
-    let end = finishedAt ?? date
+    guard hasStarted else { return 0 }
     let credit = referenceWordCredit(countPartialLastWord: finishedAt == nil || resultCreditsPartialLastWord)
     let value = wpmValue(characters: credit.inputUnits,
-      seconds: terminalTiming?.duration(mode: configuration.mode) ?? end.timeIntervalSince(startedAt))
-    return terminalTiming == nil ? value : ResultTerminalTiming.round(value)
+      seconds: scoringDuration(at: date))
+    return terminalTiming == nil && !(elapsedClock != nil && isFinished) ? value : ResultTerminalTiming.round(value)
   }
 
   func rawWpm(at date: Date) -> Int {
-    guard let startedAt else { return 0 }
-    if terminalTiming != nil { return Int(preciseRawWpm(at: date).rounded()) }
-    let end = finishedAt ?? date
+    guard hasStarted else { return 0 }
+    if terminalTiming != nil || elapsedClock != nil && isFinished { return Int(preciseRawWpm(at: date).rounded()) }
     return wpm(characters: rawSpeedInputUnitCount,
-      seconds: terminalTiming?.duration(mode: configuration.mode) ?? end.timeIntervalSince(startedAt))
+      seconds: scoringDuration(at: date))
   }
 
   func preciseRawWpm(at date: Date) -> Double {
-    guard let startedAt else { return 0 }
-    let end = finishedAt ?? date
+    guard hasStarted else { return 0 }
     let value = wpmValue(characters: rawSpeedInputUnitCount,
-      seconds: terminalTiming?.duration(mode: configuration.mode) ?? end.timeIntervalSince(startedAt))
-    return terminalTiming == nil ? value : ResultTerminalTiming.round(value)
+      seconds: scoringDuration(at: date))
+    return terminalTiming == nil && !(elapsedClock != nil && isFinished) ? value : ResultTerminalTiming.round(value)
   }
 
   private var rawSpeedInputUnitCount: Int {
@@ -5480,10 +5541,10 @@ struct TypingSession {
 
   func remainingSeconds(at date: Date) -> Int? {
     guard configuration.duration != 0 else { return nil }
-    guard let duration = configuration.duration, let startedAt else {
+    guard let duration = configuration.duration, hasStarted else {
       return configuration.duration.map { Int($0) }
     }
-    return max(0, Int(ceil(duration - date.timeIntervalSince(startedAt))))
+    return max(0, Int(ceil(duration - elapsedSeconds(at: date))))
   }
 
   /// Live counter text for limited tests. Timed tests retain a countdown;
@@ -5498,8 +5559,8 @@ struct TypingSession {
       return sections.total == 0 ? "\(sections.completed)" : "\(sections.completed)/\(sections.total)"
     }
     if configuration.duration == 0 {
-      guard let startedAt else { return "0s" }
-      return "\(max(0, Int(date.timeIntervalSince(startedAt).rounded(.down))))s"
+      guard hasStarted else { return "0s" }
+      return "\(max(0, Int(elapsedSeconds(at: date).rounded(.down))))s"
     }
     if configuration.wordLimit == 0 { return "\(completedWordCount)" }
     if let remaining = remainingSeconds(at: date) { return "\(remaining)s" }
@@ -5532,8 +5593,8 @@ struct TypingSession {
       // test begins it is full; once started it targets the following one
       // second of the countdown so its linear animation continues shrinking.
       // This only informs the native bar and never affects timer or scoring.
-      guard let startedAt else { return 1 }
-      let elapsedSeconds = max(0, Int(date.timeIntervalSince(startedAt).rounded(.down)))
+      guard hasStarted else { return 1 }
+      let elapsedSeconds = max(0, Int(self.elapsedSeconds(at: date).rounded(.down)))
       return (1 - Double(elapsedSeconds + 1) / duration).clamped(to: 0...1)
     }
     guard let wordLimit = configuration.wordLimit,
@@ -5618,7 +5679,7 @@ struct TypingSession {
     challengePresentation: ChallengePresentationSnapshot? = nil
   ) -> CompletedTestResult? {
     guard let startedAt, let finishedAt else { return nil }
-    let keyTiming = physicalKeyTiming.snapshot(startedAt: startedAt, finishedAt: finishedAt)
+    let keyTiming = physicalKeyTiming.snapshot(startedAt: timingStartedAt!, finishedAt: timingFinishedAt!)
     let credit = referenceWordCredit(countPartialLastWord: resultCreditsPartialLastWord)
     let nativeCount = unitTargets.noSpace
       ? recordedFieldStats.counts(targets: unitTargets, creditsActivePrefix: false).rawCharacters : typed.count
@@ -5637,6 +5698,7 @@ struct TypingSession {
       finishedAt: finishedAt,
       afkDuration: afkDuration,
       terminalTiming: terminalTiming,
+      elapsedTime: elapsedClock == nil ? nil : .init(seconds: elapsedSeconds(at: date)),
       typedCharacterCount: nativeCount,
       correctCharacterCount: scoredCorrectCharacters,
       errorCount: errors,
@@ -5666,6 +5728,8 @@ struct TypingSession {
   }
 
   mutating func insert(_ text: String, forceError: Bool = false, at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     liveInsertionFeedback.removeAll()
     insertText(
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: false)
@@ -5681,6 +5745,8 @@ struct TypingSession {
     _ text: String, forceError: Bool = false, at date: Date = .now,
     origin: TypingInputOrigin = .physicalKeyboard, defersAutomaticInput: Bool = false
   ) -> [Bool] {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     liveInsertionFeedback.removeAll()
     insertText(
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: true,
@@ -5704,15 +5770,23 @@ struct TypingSession {
     guard attemptID == automaticInputAttemptID else { return [] }
     guard !isFinished else { cancelAutomaticInput(); return [] }
     guard hasPendingAutomaticInput else { return [] }
-    let date = queuedCodeInputDates[queuedCodeInputHead]
+    let queued = queuedCodeInputDates[queuedCodeInputHead]
+    let date = queued.calendar
     queuedCodeInputHead += 1
     if !hasPendingAutomaticInput { cancelAutomaticInput() }
     liveInsertionFeedback.removeAll()
     applyingAutomaticCodeInput = true
     automaticInputExecutionDate = executedAt
+    let previousTimingDate = activeTimingDate
+    if elapsedClock != nil {
+      automaticInputExecutionTimingDate = executedAt.map { timingDate(at: $0) } ?? previousTimingDate ?? queued.timing
+      activeTimingDate = queued.timing
+    }
     defer {
       applyingAutomaticCodeInput = false
       automaticInputExecutionDate = nil
+      automaticInputExecutionTimingDate = nil
+      activeTimingDate = previousTimingDate
     }
     insertText("\t", forceError: false, at: date,
       evaluatesTerminalRulesOnLastCharacterOnly: true, defersAutomaticInput: true)
@@ -5731,6 +5805,8 @@ struct TypingSession {
   /// committed. It intentionally leaves scoring and replay untouched until
   /// the text input system confirms the composition through `insertBatch`.
   mutating func beginComposition(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return }
     beginIfNeeded(at: date)
     recordKeyboardActivity(at: date)
@@ -5828,10 +5904,10 @@ struct TypingSession {
     // attempt exists, rejected keys still count as local activity, but an
     // entirely rejected first event must not begin the timer.
     if startedAt != nil {
-      keyboardActivityDates.append(date)
+      keyboardActivityDates.append(timingDate(at: date))
       // A key rejected by the pre-insertion guard is still local keyboard
       // activity, but it has no insertText event for the trailing AFK check.
-      if inputAttemptCount > attemptsBeforeEvent { insertionActivityDates.append(date) }
+      if inputAttemptCount > attemptsBeforeEvent { insertionActivityDates.append(timingDate(at: date)) }
     }
     if inputAttemptCount > attemptsBeforeEvent { roundsLiveAccuracyForInputDisplay = true }
     if usesIncrementalPromptExtension,
@@ -5859,6 +5935,8 @@ struct TypingSession {
   }
 
   mutating func deleteBackward(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return }
     recordKeyboardActivity(at: date)
     guard !typed.isEmpty else { return }
@@ -5881,6 +5959,8 @@ struct TypingSession {
   /// without bypassing the same confidence and committed-word protections as
   /// ordinary backspace. Each removed character stays visible to replay.
   mutating func deleteWordBackward(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return }
     recordKeyboardActivity(at: date)
     guard !typed.isEmpty else { return }
@@ -5954,6 +6034,8 @@ struct TypingSession {
   }
 
   mutating func replaceInput(with value: String, at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return }
     if value.count < typed.count {
       stoppedPromptInput = nil
@@ -5966,16 +6048,20 @@ struct TypingSession {
   }
 
   mutating func tick(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return }
     paceCaretProgress?.advance(blind: configuration.rules.blindMode)
-    guard !isFinished, let duration = configuration.duration, let startedAt else { return }
+    guard !isFinished, let duration = configuration.duration, hasStarted else { return }
     guard duration > 0 else { return }
-    if date.timeIntervalSince(startedAt) >= duration { complete(at: date) }
+    if elapsedSeconds(at: date) >= duration { complete(at: date) }
   }
 
   /// Mirrors the reference's once-per-real-second threshold evaluation. Speed
   /// is intentionally deferred until the fifth active word; accuracy is not.
   mutating func enforceLivePracticeThresholds(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished, startedAt != nil else { return }
     roundsLiveAccuracyForInputDisplay = false
     guard let reason = livePracticeThresholdFailure(at: date) else { return }
@@ -5986,14 +6072,18 @@ struct TypingSession {
   /// to trust a short-test result. It intentionally uses the ordinary failed
   /// outcome so result saving, statistics, sync, and publication stay off.
   mutating func failForTimerHealth(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished, startedAt != nil else { return }
     fail(at: date, reason: .timerHealth)
   }
 
   mutating func abandon(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished, startedAt != nil else { return }
     outcome = .abandoned
-    finishedAt = date
+    captureFinishTime(at: date)
   }
 
   /// Ends a long test through the same result path as the reference's
@@ -6001,10 +6091,12 @@ struct TypingSession {
   /// abandonment: callers can present its local result. Its existing blanket
   /// persistence/publication rejection is a separately tracked parity gap.
   mutating func bailOut(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard !isFinished, startedAt != nil else { return }
+    captureFinishTime(at: date)
     terminalTiming = capturedTerminalTiming(at: date, bailedOut: true)
     outcome = .bailedOut
-    finishedAt = date
   }
 
   /// Infinite timed challenges need an intentional successful finish. A normal
@@ -6019,6 +6111,8 @@ struct TypingSession {
   }
 
   mutating func finishInfiniteChallenge(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard canFinishInfiniteChallenge else { return }
     complete(at: date)
   }
@@ -6026,6 +6120,8 @@ struct TypingSession {
   /// Zen has no automatic terminal condition. It completes only through its
   /// explicit Shift+Enter command after the user has begun entering text.
   mutating func finishZen(at date: Date = .now) {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
     guard configuration.mode == .zen, !isFinished, startedAt != nil else { return }
     complete(at: date)
   }
@@ -6033,6 +6129,7 @@ struct TypingSession {
   private mutating func beginIfNeeded(at date: Date) {
     if startedAt == nil {
       startedAt = date
+      if elapsedClock != nil { measuredStartedAt = timingDate(at: date) }
       paceCaretProgress?.start(blind: configuration.rules.blindMode)
     }
   }
@@ -6418,9 +6515,10 @@ struct TypingSession {
   private mutating func recordWeakSpotInput(
     _ character: Character, isCorrect: Bool, at date: Date
   ) {
-    defer { weakSpotLastInputDate = date }
+    let measured = timingDate(at: date)
+    defer { weakSpotLastInputDate = measured }
     guard let previous = weakSpotLastInputDate else { return }
-    let interval = date.timeIntervalSince(previous)
+    let interval = measured.timeIntervalSince(previous)
     guard interval.isFinite, interval >= 0 else { return }
     // The reference live cache rounds the millisecond gap to two decimal
     // places before weakspot consumes it, which also avoids Date's binary
@@ -6661,7 +6759,7 @@ struct TypingSession {
     at date: Date
   )
   {
-    guard let startedAt else { return }
+    guard let startedAt = timingStartedAt else { return }
     if kind == .insert, inputStopped { discardTerminalElementIfNeeded() }
     let field = replayInputField(kind: kind, inputStopped: inputStopped)
     if paceCaretProgress != nil, kind == .insert, !inputStopped, lastInputCommitsWord, let field {
@@ -6681,7 +6779,7 @@ struct TypingSession {
     } ?? retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
     replayEvents.append(
       .init(
-        offset: max(0, date.timeIntervalSince(startedAt)), kind: kind, text: text,
+        offset: max(0, timingDate(at: date).timeIntervalSince(startedAt)), kind: kind, text: text,
         forceError: forceError, automatic: automatic || applyingAutomaticCodeInput,
         commitsWord: kind == .insert && retainsSeparator
           ? false : nil, inputStopped: inputStopped ? true : nil,
@@ -7255,7 +7353,7 @@ struct TypingSession {
       typedTargetIndices[typedIndex - 1] = targetIndex ?? typedTargetIndices[typedIndex - 1]
     } else {
       typedTargetIndices.append(targetIndex)
-      typedCharacterDates.append(date)
+      typedCharacterDates.append(timingDate(at: date))
     }
     if forceError, let targetIndex { forcedErrorIndices.insert(targetIndex) }
     if countsAsExtraError { extraErrorTypedIndices.insert(joinsBMP ? typedIndex - 1 : typedIndex) }
@@ -7324,7 +7422,7 @@ struct TypingSession {
     let advances = !(unitTargets.noSpace || hasOrdinarySourceFields && unit == 32)
       || acceptedUnits!.fieldIndex < unitTargets.fields.count - 1
       || usesIncrementalPromptExtension
-    acceptedUnits!.append(.init(unit: unit, target: targetIndex, date: date,
+    acceptedUnits!.append(.init(unit: unit, target: targetIndex, date: timingDate(at: date),
       forced: forceError, extra: countsAsExtraError,
       commits: commits ?? ((unit == 32 || unit == 10) && !retained)),
       advances: advances)
@@ -7553,7 +7651,7 @@ struct TypingSession {
     let target = Array(codeTargetFieldText.utf16)
     let offset = codeInputFieldText.utf16.count
     guard target.first == 9, target.indices.contains(offset), target[offset] == 9 else { return }
-    queuedCodeInputDates.append(date)
+    queuedCodeInputDates.append(.init(calendar: date, timing: timingDate(at: date)))
   }
 
   private mutating func removeCodeIndentationBeforeField(
@@ -8201,7 +8299,7 @@ struct TypingSession {
 
   private mutating func complete(at date: Date) {
     let end = automaticInputExecutionDate ?? date
-    finishedAt = end
+    captureFinishTime(at: date)
     terminalTiming = capturedTerminalTiming(at: end)
     outcome = hasTrailingInactivity(endingAt: end) ? .invalidAFK : .completed
   }
@@ -8230,7 +8328,7 @@ struct TypingSession {
   }
 
   private func hasTrailingInactivity(endingAt date: Date) -> Bool {
-    guard let startedAt else { return false }
+    guard let startedAt = timingStartedAt else { return false }
     if let terminalTiming {
       let offsets = replayEvents.filter { $0.kind == .insert }
         .map { ResultTerminalTiming.round($0.offset * 1_000) }
@@ -8239,20 +8337,20 @@ struct TypingSession {
         .allSatisfy { $0 == 0 }
     }
     return TestInactivityPolicy.hasTrailingInactivity(
-      insertionDates: insertionActivityDates, startedAt: startedAt, endedAt: date,
+      insertionDates: insertionActivityDates, startedAt: startedAt, endedAt: timingFinishedAt ?? timingDate(at: date),
       includesFractionalTail: configuration.duration == nil)
   }
 
   private mutating func fail(at date: Date, reason: TestFailureReason? = nil) {
     failureReason = reason
     outcome = .failed
-    finishedAt = automaticInputExecutionDate ?? date
+    captureFinishTime(at: date)
     if let finishedAt { terminalTiming = capturedTerminalTiming(at: finishedAt) }
   }
 
   private func capturedTerminalTiming(at date: Date, bailedOut: Bool = false) -> ResultTerminalTiming? {
-    guard configuration.mode == .zen || bailedOut, let startedAt else { return nil }
-    return terminalPhysicalActivity.snapshot(startedAt: startedAt, finishedAt: date)
+    guard configuration.mode == .zen || bailedOut, let startedAt = timingStartedAt else { return nil }
+    return terminalPhysicalActivity.snapshot(startedAt: startedAt, finishedAt: timingFinishedAt ?? timingDate(at: date))
   }
 }
 

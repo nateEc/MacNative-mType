@@ -16,6 +16,7 @@ enum ResultEligibility: Equatable {
 }
 
 enum ResultIneligibilityReason: Equatable {
+  case inconsistentDuration
   case tooShort
   case samePromptRepeat
   case typingSpeed
@@ -24,6 +25,7 @@ enum ResultIneligibilityReason: Equatable {
 
   var resultSummary: String {
     switch self {
+    case .inconsistentDuration: "测试时长与日期不一致"
     case .tooShort: "测试时长或题量过短"
     case .samePromptRepeat: "使用同一提示词重测"
     case .typingSpeed: "速度超出可保存范围"
@@ -53,6 +55,13 @@ enum ResultEligibilityPolicy {
   ) -> ResultEligibility {
     // Terminal failures have their own result presentation and saving rules.
     guard result.outcome == .completed || result.outcome == .bailedOut else { return .eligible }
+    if result.elapsedTime != nil, result.outcome != .bailedOut,
+      result.configuration.mode == .time, result.elapsedDuration <= 120 {
+      let calendarSeconds = result.finishedAt.timeIntervalSince(result.startedAt)
+      if result.elapsedDuration < calendarSeconds - 0.1 || result.elapsedDuration > calendarSeconds + 0.1 {
+        return .ineligible(.inconsistentDuration)
+      }
+    }
     guard !isTooShort(result) else { return .ineligible(.tooShort) }
     if samePromptRepeat, result.configuration.mode != .quote {
       return .ineligible(.samePromptRepeat)
