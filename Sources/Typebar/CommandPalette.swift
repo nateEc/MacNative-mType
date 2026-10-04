@@ -2107,7 +2107,8 @@ enum CompletedResultCommandAction: String, Equatable {
 
 /// Exposes completed-result actions only when the current result has the data
 /// needed to perform them. The actions themselves stay owned by the result
-/// screen so toolbar buttons and command selection cannot diverge.
+/// screen. Entry-point restrictions can differ: the reference's Zen repeat
+/// button shows a notice while its repeatTest command remains available.
 enum CompletedResultCommandCatalog {
     static func action(for identifier: String) -> CompletedResultCommandAction? {
         let prefix = "result."

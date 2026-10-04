@@ -5674,6 +5674,7 @@ private struct CompletedResultView: View {
   let onPracticeMissedAndSlowWords: ([String], Int) -> Void
   let onPracticeContextualMissedAndSlowWords: ([String], Int) -> Void
   @State private var exportStatus: String?
+  @State private var repeatNotice: String?
   @State private var wpmConsistencyLoader = ResultWPMConsistencyLoader()
   @State private var communityRating: RemoteQuoteRatingResponse?
   @State private var quoteFeedbackStatus: String?
@@ -5952,9 +5953,15 @@ private struct CompletedResultView: View {
             Button("保存结果图片…", action: saveResultImage)
           }
           Spacer()
-          Button("重复本轮", action: onRepeat)
+          Button("重复本轮") { repeatResult(from: .button) }
           Button("再来一次", action: onRestart)
             .buttonStyle(.borderedProminent)
+        }
+        if let repeatNotice {
+          Text(repeatNotice)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         if !missedWords.isEmpty || slowWordPractice != nil {
           HStack {
@@ -6095,7 +6102,7 @@ private struct CompletedResultView: View {
     case .next:
       leaveCommandPalette(then: onRestart)
     case .repeatTest:
-      leaveCommandPalette(then: onRepeat)
+      leaveCommandPalette { repeatResult(from: .command) }
     case .practiceMissed:
       leaveCommandPalette { runResultPractice(.missed) }
     case .practiceSlow:
@@ -6114,6 +6121,14 @@ private struct CompletedResultView: View {
     case .saveImage:
       leaveCommandPalette(then: saveResultImage)
     }
+  }
+
+  private func repeatResult(from origin: CompletedResultRepeatOrigin) {
+    CompletedResultRepeatPolicy.perform(
+      mode: result.configuration.mode,
+      origin: origin,
+      showNotice: { repeatNotice = $0 },
+      repeatAttempt: onRepeat)
   }
 
   private func runResultPractice(_ route: CompletedResultPracticeRoute) {
