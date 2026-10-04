@@ -129,7 +129,7 @@ final class ResultConsistencyPublicationTests: XCTestCase {
       let fields = Dictionary(uniqueKeysWithValues: zip(RemoteResultCSVExport.columns, row))
       XCTAssertEqual(fields["key_consistency_percent"], physical == nil ? "" : "66.67")
       XCTAssertEqual(fields["consistency_percent"], "71.50")
-      XCTAssertEqual(RemoteResultCSVExport.columns.last, "key_consistency_percent")
+      XCTAssertTrue(RemoteResultCSVExport.columns.contains("key_consistency_percent"))
       XCTAssertNil(fields["wpm_consistency_percent"])
     }
   }

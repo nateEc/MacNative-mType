@@ -384,12 +384,13 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     /// Older services omit it, so historical exports preserve their original
     /// wall-clock semantics instead of inventing an AFK estimate.
     let practiceTiming: RemoteResultPracticeTiming?
+    let terminalTiming: ResultTerminalTiming?
     let startedAt: Date
     let finishedAt: Date
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, tags, practiceTiming, preciseAccuracy, keyConsistency, startedAt, finishedAt
+            errorCount, eventCount, tags, practiceTiming, preciseAccuracy, keyConsistency, terminalTiming, startedAt, finishedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -415,7 +416,17 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         practiceTiming = try values.decodeIfPresent(RemoteResultPracticeTiming.self, forKey: .practiceTiming)
         startedAt = try values.decode(Date.self, forKey: .startedAt)
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+        terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
+        if let terminalTiming, !terminalTiming.isValid(wallClockDuration: wallClockDuration,
+            mode: .zen, outcome: .completed, wallClockToleranceMilliseconds: 1_000.011)
+            || mode != "zen" || !(15...3_600).contains(terminalTiming.duration(mode: .zen)) {
+            throw DecodingError.dataCorruptedError(forKey: .terminalTiming, in: values,
+                debugDescription: "Remote terminal clock must remain valid; never silently fall back to wall time")
+        }
     }
+
+    var wallClockDuration: TimeInterval { max(0, finishedAt.timeIntervalSince(startedAt)) }
+    var elapsedDuration: TimeInterval { terminalTiming?.duration(mode: .zen) ?? wallClockDuration }
 }
 
 struct RemoteAccountResultPage: Codable, Sendable {
@@ -787,6 +798,7 @@ struct RemoteResultSubmission: Codable, Sendable {
     let inputMetrics: ResultInputMetrics?
     let startedAt: Date
     let finishedAt: Date
+    let terminalTiming: ResultTerminalTiming?
 
     init(
         result: CompletedTestResult, includesTimingEvidence: Bool = false,
@@ -803,7 +815,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         rawWpm = result.rawWpm
         accuracy = result.accuracy
         consistency = ResultConsistencyPolicy.metrics(
-            events: result.replayEvents, duration: result.elapsedDuration,
+            events: result.replayEvents, duration: result.chartDuration,
             configuration: result.configuration, keySpacingSamples: result.keySpacingSamples
         ).typing
         errorCount = result.errorCount
@@ -821,6 +833,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         }
         startedAt = result.startedAt
         finishedAt = result.finishedAt
+        terminalTiming = result.terminalTiming
     }
 }
 
@@ -851,6 +864,11 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
             && capabilities["resultInputMetricsV2"] == "available"
     }
 
+    var supportsResultTerminalTiming: Bool {
+        apiVersion == "v1" && service == "typebar"
+            && capabilities["resultTerminalTiming"] == "available"
+    }
+
     var supportsResultConsistency: Bool {
         apiVersion == "v1" && service == "typebar"
             && capabilities["resultConsistency"] == "available"
@@ -876,8 +894,8 @@ struct RemoteResultTimingEvidence: Codable, Equatable, Sendable {
     init?(result: CompletedTestResult) {
         let durationSamples = result.keyDurationSamples
         let spacingSamples = result.keySpacingSamples
-        let maximumSample = result.elapsedDuration + 1
-        guard (0...Self.maximumDuration).contains(result.elapsedDuration),
+        let maximumSample = result.wallClockDuration + 1
+        guard (0...Self.maximumDuration).contains(result.wallClockDuration),
             !durationSamples.isEmpty || !spacingSamples.isEmpty,
             durationSamples.count + spacingSamples.count <= Self.maximumSamples,
             durationSamples.allSatisfy({ (0...maximumSample).contains($0) }),

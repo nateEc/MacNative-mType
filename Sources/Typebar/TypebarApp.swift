@@ -5831,7 +5831,7 @@ private struct CompletedResultView: View {
       ResultPerformanceChart(
         prompt: result.prompt,
         events: result.replayEvents,
-        duration: result.elapsedDuration,
+        duration: result.chartDuration,
         configuration: result.configuration,
         targetWordDirectory: result.targetWordDirectory,
         sourceScoringBasis: result.characterStats.sourceUnitBasis,
@@ -6030,7 +6030,7 @@ private struct CompletedResultView: View {
     }
     .task(id: result.id) {
       let input = try? ResultWPMConsistencyInput(prompt: result.prompt, events: result.replayEvents,
-        duration: result.elapsedDuration, configuration: result.configuration,
+        duration: result.chartDuration, configuration: result.configuration,
         targetWordDirectory: result.targetWordDirectory, sourceScoringBasis: result.characterStats.sourceUnitBasis)
       await wpmConsistencyLoader.load(input)
     }
@@ -6387,7 +6387,7 @@ private struct CompletedResultView: View {
 
   private var consistency: ResultConsistency {
     ResultConsistencyPolicy.metrics(
-      events: result.replayEvents, duration: result.elapsedDuration,
+      events: result.replayEvents, duration: result.chartDuration,
       configuration: result.configuration, keySpacingSamples: result.keySpacingSamples)
   }
 
@@ -8897,6 +8897,7 @@ private struct ResultWPMConsistencyRecordIdentity: Hashable {
   let replayEventsData: Data?
   let targetWordDirectoryData: Data?
   let characterStatsData: Data?
+  let terminalTimingData: Data?
 }
 
 private struct ResultDetailView: View {
@@ -8996,7 +8997,7 @@ private struct ResultDetailView: View {
         }
         GridRow {
           Text("总用时")
-          Text("\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
+          Text("\(Int(result.elapsedDuration)) 秒")
         }
         GridRow {
           Text("稳定度 / 按键稳定度")
@@ -9073,7 +9074,7 @@ private struct ResultDetailView: View {
   }
 
   private var elapsedDuration: TimeInterval {
-    max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+    result.chartDuration
   }
 
   private var hasPerformanceChart: Bool {
@@ -9096,7 +9097,7 @@ private struct ResultDetailView: View {
   private var consistency: ResultConsistency {
     ResultConsistencyPolicy.metrics(
       events: result.replayEvents,
-      duration: result.finishedAt.timeIntervalSince(result.startedAt),
+      duration: result.chartDuration,
       configuration: result.configuration, keySpacingSamples: result.keySpacingSamples
     )
   }
@@ -9108,7 +9109,8 @@ private struct ResultDetailView: View {
   private var wpmConsistencyIdentity: ResultWPMConsistencyRecordIdentity {
     .init(id: result.id, prompt: result.prompt, startedAt: result.startedAt, finishedAt: result.finishedAt,
       configurationData: result.configurationData, replayEventsData: result.replayEventsData,
-      targetWordDirectoryData: result.targetWordDirectoryData, characterStatsData: result.characterStatsData)
+      targetWordDirectoryData: result.targetWordDirectoryData, characterStatsData: result.characterStatsData,
+      terminalTimingData: result.terminalTimingData)
   }
 
   private var wpmConsistencyText: String {
@@ -9142,7 +9144,7 @@ private struct HistoricalResultPerformanceChart: View {
   let settings: AppSettings
 
   private var elapsedDuration: TimeInterval {
-    max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+    result.chartDuration
   }
 
   var body: some View {

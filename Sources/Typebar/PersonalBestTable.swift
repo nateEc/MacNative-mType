@@ -104,7 +104,7 @@ enum LocalPersonalBestTablePolicy {
   private static func makeRow(_ result: CompletedTestResult) -> LocalPersonalBestRow {
     let configuration = result.configuration
     let consistency = ResultConsistencyPolicy.metrics(
-      events: result.replayEvents, duration: result.elapsedDuration,
+      events: result.replayEvents, duration: result.chartDuration,
       configuration: result.configuration, keySpacingSamples: result.keySpacingSamples).typing
     return .init(
       id: result.id, mode: configuration.mode,

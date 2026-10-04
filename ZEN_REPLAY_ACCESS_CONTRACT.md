@@ -32,6 +32,6 @@ Scripts/check-source-zen-replay.mjs 在内存加载 replay-ui、stats、helpers�
 
 ## 剩余验收
 
-后续完整结束链路已确认未剪裁的原生计时／AFK 网格，以及一律拒绝 Bail Out 保存均存在差异，见 [终止计时和保存缺口](TERMINAL_TIMING_GAPS.md)。本合同的“中止保存规则不变”仅描述回放增量没有更改原生行为，不证明那条旧规则符合原版。
+后续完整结束链路曾确认原生计时／AFK 网格和 BailOut 保存均存在差异，见 [历史取证](TERMINAL_TIMING_GAPS.md)。计时现已接入 [独立原生证据](TERMINAL_TIMING_CONTRACT.md)，保存资格仍开放。本合同的“中止保存规则不变”仅描述回放增量没有更改原生行为，不证明那条旧规则符合原版。
 
 本轮不启动 Typebar 图形实例、不写真实成绩库或部署服务。完成／历史入口的实际显示、点击／拖动／暂停／重置、焦点与 VoiceOver、真实声音、长时间内存和全部 IME／Unicode 组合仍需单实例设备验收。Zen 正常结束与 Bail Out 的物理首尾剪裁、图表／保存资格及其他消费者继续单独核对；完整词库／主题、服务与总体功能等价未完成，goal active。

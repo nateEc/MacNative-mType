@@ -166,7 +166,8 @@ final class SourceUnitCharacterStatsTests: XCTestCase {
     let scoringColumns = ["source_matched_scoring_units", "source_credited_scoring_units",
       "source_incorrect_scoring_units", "source_extra_scoring_units", "source_missed_scoring_units"]
     XCTAssertEqual(row.count, ResultCSVExport.columns.count)
-    XCTAssertEqual(Array(ResultCSVExport.columns.dropLast().suffix(5)), scoringColumns)
+    let firstScoringColumn = try XCTUnwrap(ResultCSVExport.columns.firstIndex(of: scoringColumns[0]))
+    XCTAssertEqual(Array(ResultCSVExport.columns.dropFirst(firstScoringColumn).prefix(5)), scoringColumns)
     let scoringValues = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns, row))
     XCTAssertEqual(scoringColumns.map { scoringValues[$0] ?? "missing" }, ["3", "2", "0", "0", "1"])
     let values = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns, row))
@@ -178,7 +179,10 @@ final class SourceUnitCharacterStatsTests: XCTestCase {
     let old = CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .completed,
       startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 1,
       correctCharacterCount: 1, errorCount: 0, wpm: 6, rawWpm: 6, accuracy: 100)
-    XCTAssertTrue(ResultCSVExport.csvString(for: [old]).hasSuffix(",,,,,\r\n"))
+    let oldRow = ResultCSVExport.csvString(for: [old]).components(separatedBy: "\r\n")[1].components(separatedBy: ",")
+    let oldValues = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns, oldRow))
+    for column in scoringColumns { XCTAssertEqual(oldValues[column], "") }
+    XCTAssertEqual(oldValues["source_scoring_unit_basis"], "")
   }
 
   func testInvalidClassificationPayloadsCannotOverflowOrClaimUnenteredCredit() throws {

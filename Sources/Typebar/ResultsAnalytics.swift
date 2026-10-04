@@ -166,10 +166,10 @@ struct ResultMetric: Equatable, Identifiable {
             accuracy: record.accuracy,
             preciseAccuracy: record.preciseAccuracy,
             typingSeconds: record.totalEngagedDuration,
-            elapsedSeconds: max(0, record.finishedAt.timeIntervalSince(record.startedAt)),
+            elapsedSeconds: record.elapsedDuration,
             consistency: ResultConsistencyPolicy.metrics(
                 events: record.replayEvents,
-                duration: record.finishedAt.timeIntervalSince(record.startedAt),
+                duration: record.chartDuration,
                 configuration: record.configuration, keySpacingSamples: record.keySpacingSamples
             ).typing,
             restartCount: record.restartCount

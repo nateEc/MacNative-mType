@@ -55,6 +55,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let timingEvidence: ResultTimingEvidence?
     public let practiceTiming: ResultPracticeTiming?
     public let inputMetrics: ResultInputMetrics?
+    public let terminalTiming: ResultTerminalTiming?
     public let startedAt: Date
     public let finishedAt: Date
 
@@ -64,6 +65,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         restartCount: Int = 0, tags: [String] = [], timingEvidence: ResultTimingEvidence? = nil,
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         resultConsistency: ResultConsistencyMetrics? = nil,
+        terminalTiming: ResultTerminalTiming? = nil,
         startedAt: Date, finishedAt: Date
     ) {
         self.id = id
@@ -83,6 +85,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.timingEvidence = timingEvidence
         self.practiceTiming = practiceTiming
         self.inputMetrics = inputMetrics
+        self.terminalTiming = terminalTiming
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }
@@ -94,6 +97,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case practiceTiming
         case inputMetrics
         case resultConsistency
+        case terminalTiming
     }
 
     public init(from decoder: Decoder) throws {
@@ -115,6 +119,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         timingEvidence = try values.decodeIfPresent(ResultTimingEvidence.self, forKey: .timingEvidence)
         practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
         inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
+        terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
         startedAt = try values.decode(Date.self, forKey: .startedAt)
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
     }
@@ -148,6 +153,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public let eventCount: Int
     public let tags: [String]
     public let practiceTiming: ResultPracticeTiming?
+    public let terminalTiming: ResultTerminalTiming?
     public let startedAt: Date
     public let finishedAt: Date
 
@@ -156,6 +162,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         rawWpm: Int, accuracy: Int, consistency: Double, errorCount: Int, eventCount: Int,
         tags: [String], practiceTiming: ResultPracticeTiming? = nil, preciseAccuracy: Double? = nil,
         keyConsistency: Double? = nil,
+        terminalTiming: ResultTerminalTiming? = nil,
         startedAt: Date, finishedAt: Date
     ) {
         self.id = id
@@ -173,6 +180,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.eventCount = eventCount
         self.tags = tags
         self.practiceTiming = practiceTiming
+        self.terminalTiming = terminalTiming
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }

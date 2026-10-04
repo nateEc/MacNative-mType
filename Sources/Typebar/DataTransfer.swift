@@ -59,6 +59,8 @@ enum ResultCSVExport {
         "source_extra_scoring_units",
         "source_missed_scoring_units",
         "wpm_consistency_percent",
+        "wall_clock_seconds",
+        "terminal_timing_version",
     ]
 
     static func data(for results: [CompletedTestResult]) -> Data {
@@ -77,7 +79,7 @@ enum ResultCSVExport {
 
     private static func row(for result: CompletedTestResult) -> [String] {
         let consistency = ResultConsistencyPolicy.metrics(
-            events: result.replayEvents, duration: result.elapsedDuration,
+            events: result.replayEvents, duration: result.chartDuration,
             configuration: result.configuration, keySpacingSamples: result.keySpacingSamples)
         let configuration = result.configuration
         let keyDurationStats = result.keyDurationStats
@@ -135,9 +137,11 @@ enum ResultCSVExport {
             units.map { String($0.extra) } ?? "",
             units.map { String($0.missed) } ?? "",
             ResultPerformanceTrace.wpmConsistency(prompt: result.prompt, events: result.replayEvents,
-                duration: result.elapsedDuration, configuration: result.configuration,
+                duration: result.chartDuration, configuration: result.configuration,
                 targetWordDirectory: result.targetWordDirectory,
                 sourceScoringBasis: result.characterStats.sourceUnitBasis).map(decimal) ?? "",
+            decimal(result.wallClockDuration),
+            result.terminalTiming.map { String($0.version) } ?? "",
         ]
     }
 
@@ -189,6 +193,7 @@ enum RemoteResultCSVExport {
         "terminal_engaged_seconds", "prior_attempt_engaged_seconds", "total_engaged_seconds",
         "started_at", "finished_at",
         "key_consistency_percent",
+        "elapsed_seconds", "wall_clock_seconds", "terminal_timing_version",
     ]
 
     @MainActor
@@ -267,6 +272,8 @@ enum RemoteResultCSVExport {
             iso8601Date(result.startedAt),
             iso8601Date(result.finishedAt),
             result.keyConsistency.map(decimal) ?? "",
+            decimal(result.elapsedDuration), decimal(result.wallClockDuration),
+            result.terminalTiming.map { String($0.version) } ?? "",
         ]
     }
 
@@ -302,9 +309,9 @@ struct TypebarArchive: Codable, Equatable {
     // Older readers lack stopped-input, field-local/unit metadata, target
     // directories, pre-validation positions, explicit unit contractions and
     // next-word abandonment markers, explicit unit classifications and
-    // logical deletion positions.
+    // logical deletion positions and independent terminal clock evidence.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 22
+    static let currentVersion = 23
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -348,7 +355,8 @@ struct TypebarArchive: Codable, Equatable {
         let hasDeletionPositions = results.contains { $0.replayEvents.contains { $0.deletionCharIndex != nil } }
         let hasVersionedMetrics = results.contains { ($0.inputMetrics?.version ?? 1) >= 2 }
         let hasUnitBasis = results.contains { $0.characterStats.sourceUnitBasis != nil }
-        self.version = hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        let hasTerminalTiming = results.contains { $0.terminalTiming != nil }
+        self.version = hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
         let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
@@ -934,6 +942,9 @@ enum TypebarDataTransfer {
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         guard archive.version >= 22 || !archive.results.contains(where: {
             $0.characterStats.sourceUnitBasis != nil
+        }) else { throw DataTransferError.unsupportedVersion(archive.version) }
+        guard archive.version >= 23 || !archive.results.contains(where: {
+            $0.terminalTiming != nil
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         return archive
     }

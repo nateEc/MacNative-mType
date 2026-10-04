@@ -434,6 +434,7 @@ final class TestResultRecord {
   var startedAt: Date
   var finishedAt: Date
   var afkDuration: TimeInterval = 0
+  var terminalTimingData: Data?
   var typedCharacterCount: Int
   var correctCharacterCount: Int
   var errorCount: Int
@@ -467,6 +468,7 @@ final class TestResultRecord {
     startedAt = result.startedAt
     finishedAt = result.finishedAt
     afkDuration = result.afkDuration
+    terminalTimingData = result.terminalTiming.flatMap { try? JSONEncoder().encode($0) }
     typedCharacterCount = result.typedCharacterCount
     correctCharacterCount = result.correctCharacterCount
     errorCount = result.errorCount
@@ -550,15 +552,27 @@ final class TestResultRecord {
   }
 
   var engagedDuration: TimeInterval {
-    max(0, finishedAt.timeIntervalSince(startedAt) - afkDuration)
+    max(0, elapsedDuration - afkDuration)
   }
+
+  var terminalTiming: ResultTerminalTiming? {
+    guard let terminalTimingData,
+      let timing = try? JSONDecoder().decode(ResultTerminalTiming.self, from: terminalTimingData),
+      let configuration, let outcome = TestOutcome(rawValue: outcome),
+      timing.isValid(wallClockDuration: wallClockDuration, mode: configuration.mode, outcome: outcome)
+    else { return nil }
+    return timing
+  }
+
+  var wallClockDuration: TimeInterval { max(0, finishedAt.timeIntervalSince(startedAt)) }
+  var elapsedDuration: TimeInterval { terminalTiming?.duration(mode: configuration?.mode ?? .zen) ?? wallClockDuration }
+  var chartDuration: TimeInterval { terminalTiming?.boundaryDuration ?? wallClockDuration }
 
   var totalEngagedDuration: TimeInterval {
     engagedDuration + priorAttemptEngagedDuration
   }
 
   var afkPercentage: Double {
-    let elapsedDuration = max(0, finishedAt.timeIntervalSince(startedAt))
     guard elapsedDuration > 0 else { return 0 }
     return afkDuration / elapsedDuration * 100
   }
@@ -573,6 +587,7 @@ final class TestResultRecord {
 
   var portableResult: CompletedTestResult? {
     guard let configuration, let parsedOutcome = TestOutcome(rawValue: outcome) else { return nil }
+    guard terminalTimingData == nil || terminalTiming != nil else { return nil }
     return CompletedTestResult(
       id: id,
       configuration: configuration,
@@ -580,6 +595,7 @@ final class TestResultRecord {
       startedAt: startedAt,
       finishedAt: finishedAt,
       afkDuration: afkDuration,
+      terminalTiming: terminalTiming,
       typedCharacterCount: typedCharacterCount,
       correctCharacterCount: correctCharacterCount,
       errorCount: errorCount,

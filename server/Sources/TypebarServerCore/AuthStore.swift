@@ -949,13 +949,17 @@ public actor AuthStore {
     let eventCount: Int
     var tags: [String]
     let practiceTiming: ResultPracticeTiming?
+    let terminalTiming: ResultTerminalTiming?
+    var elapsedDuration: Double {
+      terminalTiming?.measuredSeconds ?? max(0, finishedAt.timeIntervalSince(startedAt))
+    }
     let startedAt: Date
     let finishedAt: Date
     let acceptedAt: Date?
 
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-        errorCount, eventCount, tags, practiceTiming, inputMetrics, keyConsistency, startedAt, finishedAt, acceptedAt
+        errorCount, eventCount, tags, practiceTiming, inputMetrics, keyConsistency, terminalTiming, startedAt, finishedAt, acceptedAt
     }
 
     init(
@@ -963,6 +967,7 @@ public actor AuthStore {
       wordLimit: Int?, wpm: Int, rawWpm: Int, accuracy: Int, consistency: Double,
       errorCount: Int, eventCount: Int, tags: [String], practiceTiming: ResultPracticeTiming? = nil,
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
+      terminalTiming: ResultTerminalTiming? = nil,
       startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil
     ) {
       self.id = id
@@ -981,6 +986,7 @@ public actor AuthStore {
       self.eventCount = eventCount
       self.tags = tags
       self.practiceTiming = practiceTiming
+      self.terminalTiming = terminalTiming
       self.startedAt = startedAt
       self.finishedAt = finishedAt
       self.acceptedAt = acceptedAt
@@ -1016,6 +1022,12 @@ public actor AuthStore {
         try values.decodeIfPresent(Date.self, forKey: .startedAt)
         ?? finishedAt.addingTimeInterval(-legacyDuration)
       acceptedAt = try values.decodeIfPresent(Date.self, forKey: .acceptedAt)
+      terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
+      if let terminalTiming, !terminalTiming.isValid(
+        wallClockSeconds: finishedAt.timeIntervalSince(startedAt), mode: mode) {
+        throw DecodingError.dataCorruptedError(forKey: .terminalTiming, in: values,
+          debugDescription: "Stored terminal clock must remain valid; it cannot silently become wall time")
+      }
     }
 
     func response() -> AccountResultResponse {
@@ -1026,6 +1038,7 @@ public actor AuthStore {
         practiceTiming: practiceTiming,
         preciseAccuracy: inputMetrics?.preciseAccuracy,
         keyConsistency: keyConsistency,
+        terminalTiming: terminalTiming,
         startedAt: startedAt, finishedAt: finishedAt)
     }
   }
@@ -2892,12 +2905,12 @@ public actor AuthStore {
   private func availablePublicBadges(for userID: UUID) -> [PublicProfileBadge] {
     let results = state.results.filter { $0.userID == userID && $0.eventCount > 0 }
     let accurateRunExists = results.contains {
-      $0.effectiveAccuracy >= 98 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 15
+      $0.effectiveAccuracy >= 98 && $0.elapsedDuration >= 15
     }
     let bestWPM = results.map(\.wpm).max() ?? 0
     let totalTypingSeconds = totalTypingSeconds(from: results)
     let perfectMinuteExists = results.contains {
-      $0.effectiveAccuracy == 100 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 60
+      $0.effectiveAccuracy == 100 && $0.elapsedDuration >= 60
     }
     let practicedLanguages = Set(results.map(\.language)).count
     let practicedModes = Set(results.map(\.mode)).count
@@ -2999,7 +3012,7 @@ public actor AuthStore {
 
   private func effectiveTypingSeconds(for result: StoredResult) -> Double {
     guard let timing = result.practiceTiming else {
-      return max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+      return result.elapsedDuration
     }
     return Double(timing.terminalEngagedMilliseconds + timing.priorAttemptEngagedMilliseconds) / 1_000
   }
@@ -3017,7 +3030,7 @@ public actor AuthStore {
 
   private func totalTypingSecondsByUser() -> [UUID: Double] {
     state.results.reduce(into: [:]) { totals, result in
-      totals[result.userID, default: 0] += max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+      totals[result.userID, default: 0] += result.elapsedDuration
     }
   }
 
@@ -3143,6 +3156,7 @@ public actor AuthStore {
       errorCount: record.errorCount,
       eventCount: record.eventCount, tags: record.tags, inputMetrics: record.inputMetrics,
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
+      terminalTiming: record.terminalTiming,
       startedAt: record.startedAt,
       finishedAt: record.finishedAt)
   }
@@ -3282,6 +3296,7 @@ public actor AuthStore {
         consistency: request.consistency, errorCount: request.errorCount, eventCount: request.eventCount,
         tags: tags, practiceTiming: request.practiceTiming, inputMetrics: request.inputMetrics,
         keyConsistency: request.resultConsistency?.keyConsistency,
+        terminalTiming: request.terminalTiming,
         startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now
       ))
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
@@ -4012,12 +4027,17 @@ public actor AuthStore {
 
     let elapsed = result.finishedAt.timeIntervalSince(result.startedAt)
     guard (1...3600).contains(elapsed) else { throw ResultStoreError.invalidResult }
+    if let terminalTiming = result.terminalTiming,
+      !terminalTiming.isValid(wallClockSeconds: elapsed, mode: result.mode) {
+      throw ResultStoreError.invalidResult
+    }
+    let measured = result.terminalTiming?.measuredSeconds ?? elapsed
     if let metrics = result.resultConsistency, !metrics.isValid { throw ResultStoreError.invalidResult }
     if let evidence = result.timingEvidence {
       try validate(timingEvidence: evidence, elapsed: elapsed)
     }
     if let practiceTiming = result.practiceTiming {
-      try validate(practiceTiming: practiceTiming, elapsed: elapsed, restartCount: result.restartCount)
+      try validate(practiceTiming: practiceTiming, elapsed: measured, restartCount: result.restartCount)
     }
     if result.mode == "time", let configuredDuration = result.durationSeconds {
       guard abs(elapsed - Double(configuredDuration)) <= 1 else {
@@ -4036,13 +4056,13 @@ public actor AuthStore {
         throw ResultStoreError.invalidResult
       }
       expectedAccuracy = Int(metrics.accuracyPercentage.rounded())
-      expectedWPM = Int((Double(metrics.creditedUnits) / 5 / elapsed * 60).rounded())
-      expectedRawWPM = Int((Double(metrics.retainedUnits) / 5 / elapsed * 60).rounded())
+      expectedWPM = Int((Double(metrics.creditedUnits) / 5 / measured * 60).rounded())
+      expectedRawWPM = Int((Double(metrics.retainedUnits) / 5 / measured * 60).rounded())
     } else {
       expectedAccuracy = result.eventCount == 0 ? 100
         : Int((Double(correctCharacters) / Double(result.eventCount) * 100).rounded())
-      expectedWPM = Int((Double(correctCharacters) / 5 / elapsed * 60).rounded())
-      expectedRawWPM = Int((Double(result.eventCount) / 5 / elapsed * 60).rounded())
+      expectedWPM = Int((Double(correctCharacters) / 5 / measured * 60).rounded())
+      expectedRawWPM = Int((Double(result.eventCount) / 5 / measured * 60).rounded())
     }
     guard result.accuracy == expectedAccuracy,
       abs(result.wpm - expectedWPM) <= 1,

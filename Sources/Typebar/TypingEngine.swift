@@ -4031,6 +4031,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let startedAt: Date
   let finishedAt: Date
   let afkDuration: TimeInterval
+  let terminalTiming: ResultTerminalTiming?
   let typedCharacterCount: Int
   let correctCharacterCount: Int
   let errorCount: Int
@@ -4064,6 +4065,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     startedAt: Date,
     finishedAt: Date,
     afkDuration: TimeInterval = 0,
+    terminalTiming: ResultTerminalTiming? = nil,
     typedCharacterCount: Int,
     correctCharacterCount: Int,
     errorCount: Int,
@@ -4093,6 +4095,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.startedAt = startedAt
     self.finishedAt = finishedAt
     self.afkDuration = max(0, afkDuration)
+    self.terminalTiming = terminalTiming
     self.typedCharacterCount = typedCharacterCount
     self.correctCharacterCount = correctCharacterCount
     self.errorCount = errorCount
@@ -4120,8 +4123,11 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   }
 
   var elapsedDuration: TimeInterval {
-    max(0, finishedAt.timeIntervalSince(startedAt))
+    terminalTiming?.duration(mode: configuration.mode) ?? wallClockDuration
   }
+
+  var wallClockDuration: TimeInterval { max(0, finishedAt.timeIntervalSince(startedAt)) }
+  var chartDuration: TimeInterval { terminalTiming?.boundaryDuration ?? wallClockDuration }
 
   var engagedDuration: TimeInterval {
     max(0, elapsedDuration - afkDuration)
@@ -4149,7 +4155,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
       preciseWpm, preciseRawWpm, preciseAccuracy, inputMetrics, restartCount, keyDurationSamples,
       priorAttemptEngagedDuration, keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
-      challengePresentation, targetWordDirectory
+      challengePresentation, targetWordDirectory, terminalTiming
     case startedAtReferenceTime, finishedAtReferenceTime
   }
 
@@ -4163,6 +4169,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     try CompatibleDatePrecision.encode(finishedAt, into: &values,
       legacyKey: .finishedAt, precisionKey: .finishedAtReferenceTime)
     try values.encode(afkDuration, forKey: .afkDuration)
+    try values.encodeIfPresent(terminalTiming, forKey: .terminalTiming)
     try values.encode(typedCharacterCount, forKey: .typedCharacterCount)
     try values.encode(correctCharacterCount, forKey: .correctCharacterCount)
     try values.encode(errorCount, forKey: .errorCount)
@@ -4197,6 +4204,12 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     finishedAt = try CompatibleDatePrecision.decode(from: values,
       legacyKey: .finishedAt, precisionKey: .finishedAtReferenceTime)
     afkDuration = max(0, try values.decodeIfPresent(TimeInterval.self, forKey: .afkDuration) ?? 0)
+    terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
+    if let terminalTiming, !terminalTiming.isValid(
+      wallClockDuration: max(0, finishedAt.timeIntervalSince(startedAt)), mode: configuration.mode, outcome: outcome) {
+      throw DecodingError.dataCorruptedError(forKey: .terminalTiming, in: values,
+        debugDescription: "Terminal timing must match the captured clock and Zen/bailout outcome")
+    }
     typedCharacterCount = try values.decode(Int.self, forKey: .typedCharacterCount)
     correctCharacterCount = try values.decode(Int.self, forKey: .correctCharacterCount)
     errorCount = try values.decode(Int.self, forKey: .errorCount)
@@ -4480,6 +4493,8 @@ struct TypingSession {
   private var currentWordDecorationState = PoolWordDecorationState()
   private var weakSpotLastInputDate: Date?
   private var physicalKeyTiming = PhysicalKeyTiming()
+  private var terminalPhysicalActivity = TerminalPhysicalActivity()
+  private var terminalTiming: ResultTerminalTiming?
   private(set) var startedAt: Date?
   private(set) var finishedAt: Date?
   private(set) var outcome: TestOutcome = .active
@@ -4691,6 +4706,12 @@ struct TypingSession {
   var typedCharacterCount: Int { typed.count }
   var afkDuration: TimeInterval {
     guard let startedAt, let finishedAt else { return 0 }
+    if let terminalTiming {
+      let offsets = terminalPhysicalActivity.offsets(startedAt: startedAt, finishedAt: finishedAt)
+        + replayEvents.map { ResultTerminalTiming.round($0.offset * 1_000) }
+      return Double(TerminalInactivity.counts(offsets: offsets, timing: terminalTiming,
+        configuration: configuration).filter { $0 == 0 }.count)
+    }
     return TestInactivityPolicy.inactiveDuration(
       activityDates: keyboardActivityDates, startedAt: startedAt, endedAt: finishedAt,
       includesFractionalTail: configuration.duration == nil)
@@ -4702,6 +4723,13 @@ struct TypingSession {
   func activeEngagedDuration(at date: Date = .now) -> TimeInterval {
     guard let startedAt, !isFinished else { return 0 }
     let endedAt = max(startedAt, date)
+    if let timing = capturedTerminalTiming(at: endedAt) {
+      let offsets = terminalPhysicalActivity.offsets(startedAt: startedAt, finishedAt: endedAt)
+        + replayEvents.map { ResultTerminalTiming.round($0.offset * 1_000) }
+      let inactive = TerminalInactivity.counts(offsets: offsets, timing: timing,
+        configuration: configuration).filter { $0 == 0 }.count
+      return max(0, ResultTerminalTiming.round(timing.duration(mode: configuration.mode) - Double(inactive)))
+    }
     let elapsed = max(0, endedAt.timeIntervalSince(startedAt))
     let inactive = TestInactivityPolicy.inactiveDuration(
       activityDates: keyboardActivityDates, startedAt: startedAt, endedAt: endedAt,
@@ -4721,6 +4749,8 @@ struct TypingSession {
   ) {
     guard !isFinished else { return }
     physicalKeyTiming.record(code: keyCode, down: isKeyDown, isRepeat: isRepeat, at: date)
+    terminalPhysicalActivity.record(code: keyCode, down: isKeyDown, isRepeat: isRepeat,
+      at: date, modifiers: configuration.modifiers)
   }
 
   var sectionProgress: (completed: Int, total: Int)? {
@@ -5157,28 +5187,36 @@ struct TypingSession {
 
   func wpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
+    if terminalTiming != nil { return Int(preciseWpm(at: date).rounded()) }
     let end = finishedAt ?? date
     let credit = referenceWordCredit(countPartialLastWord: finishedAt == nil || resultCreditsPartialLastWord)
-    return wpm(characters: credit.inputUnits, seconds: end.timeIntervalSince(startedAt))
+    return wpm(characters: credit.inputUnits,
+      seconds: terminalTiming?.duration(mode: configuration.mode) ?? end.timeIntervalSince(startedAt))
   }
 
   func preciseWpm(at date: Date) -> Double {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
     let credit = referenceWordCredit(countPartialLastWord: finishedAt == nil || resultCreditsPartialLastWord)
-    return wpmValue(characters: credit.inputUnits, seconds: end.timeIntervalSince(startedAt))
+    let value = wpmValue(characters: credit.inputUnits,
+      seconds: terminalTiming?.duration(mode: configuration.mode) ?? end.timeIntervalSince(startedAt))
+    return terminalTiming == nil ? value : ResultTerminalTiming.round(value)
   }
 
   func rawWpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
+    if terminalTiming != nil { return Int(preciseRawWpm(at: date).rounded()) }
     let end = finishedAt ?? date
-    return wpm(characters: rawSpeedInputUnitCount, seconds: end.timeIntervalSince(startedAt))
+    return wpm(characters: rawSpeedInputUnitCount,
+      seconds: terminalTiming?.duration(mode: configuration.mode) ?? end.timeIntervalSince(startedAt))
   }
 
   func preciseRawWpm(at date: Date) -> Double {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    return wpmValue(characters: rawSpeedInputUnitCount, seconds: end.timeIntervalSince(startedAt))
+    let value = wpmValue(characters: rawSpeedInputUnitCount,
+      seconds: terminalTiming?.duration(mode: configuration.mode) ?? end.timeIntervalSince(startedAt))
+    return terminalTiming == nil ? value : ResultTerminalTiming.round(value)
   }
 
   private var rawSpeedInputUnitCount: Int {
@@ -5551,6 +5589,7 @@ struct TypingSession {
       startedAt: startedAt,
       finishedAt: finishedAt,
       afkDuration: afkDuration,
+      terminalTiming: terminalTiming,
       typedCharacterCount: nativeCount,
       correctCharacterCount: scoredCorrectCharacters,
       errorCount: errors,
@@ -5910,10 +5949,11 @@ struct TypingSession {
 
   /// Ends a long test through the same result path as the reference's
   /// double Shift+Enter bailout. It is deliberately distinct from a manual
-  /// abandonment: callers can present its local result, while persistence
-  /// and publication policies continue to reject it.
+  /// abandonment: callers can present its local result. Its existing blanket
+  /// persistence/publication rejection is a separately tracked parity gap.
   mutating func bailOut(at date: Date = .now) {
     guard !isFinished, startedAt != nil else { return }
+    terminalTiming = capturedTerminalTiming(at: date, bailedOut: true)
     outcome = .bailedOut
     finishedAt = date
   }
@@ -8105,6 +8145,7 @@ struct TypingSession {
   private mutating func complete(at date: Date) {
     let end = automaticInputExecutionDate ?? date
     finishedAt = end
+    terminalTiming = capturedTerminalTiming(at: end)
     outcome = hasTrailingInactivity(endingAt: end) ? .invalidAFK : .completed
   }
 
@@ -8133,6 +8174,13 @@ struct TypingSession {
 
   private func hasTrailingInactivity(endingAt date: Date) -> Bool {
     guard let startedAt else { return false }
+    if let terminalTiming {
+      let offsets = replayEvents.filter { $0.kind == .insert }
+        .map { ResultTerminalTiming.round($0.offset * 1_000) }
+      return TerminalInactivity.counts(offsets: offsets, timing: terminalTiming,
+        configuration: configuration).suffix(TestInactivityPolicy.trailingInactiveIntervals)
+        .allSatisfy { $0 == 0 }
+    }
     return TestInactivityPolicy.hasTrailingInactivity(
       insertionDates: insertionActivityDates, startedAt: startedAt, endedAt: date,
       includesFractionalTail: configuration.duration == nil)
@@ -8142,6 +8190,12 @@ struct TypingSession {
     failureReason = reason
     outcome = .failed
     finishedAt = automaticInputExecutionDate ?? date
+    if let finishedAt { terminalTiming = capturedTerminalTiming(at: finishedAt) }
+  }
+
+  private func capturedTerminalTiming(at date: Date, bailedOut: Bool = false) -> ResultTerminalTiming? {
+    guard configuration.mode == .zen || bailedOut, let startedAt else { return nil }
+    return terminalPhysicalActivity.snapshot(startedAt: startedAt, finishedAt: date)
   }
 }
 

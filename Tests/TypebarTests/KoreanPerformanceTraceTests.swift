@@ -169,7 +169,7 @@ final class KoreanPerformanceTraceTests: XCTestCase {
     let saved = try XCTUnwrap(session.result())
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [saved], presets: [], at: start))
-    XCTAssertEqual(archive.version, 22)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     let container = try ModelContainer(for: TestResultRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     container.mainContext.insert(TestResultRecord(result: saved)); try container.mainContext.save()

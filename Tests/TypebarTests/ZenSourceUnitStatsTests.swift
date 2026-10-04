@@ -187,7 +187,8 @@ final class ZenSourceUnitStatsTests: XCTestCase {
     XCTAssertEqual(row.count, ResultCSVExport.columns.count)
     let scoringColumns = ["source_matched_scoring_units", "source_credited_scoring_units",
       "source_incorrect_scoring_units", "source_extra_scoring_units", "source_missed_scoring_units"]
-    XCTAssertEqual(Array(ResultCSVExport.columns.dropLast().suffix(5)), scoringColumns)
+    let firstScoringColumn = try XCTUnwrap(ResultCSVExport.columns.firstIndex(of: scoringColumns[0]))
+    XCTAssertEqual(Array(ResultCSVExport.columns.dropFirst(firstScoringColumn).prefix(5)), scoringColumns)
     let scoringValues = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns, row))
     XCTAssertEqual(scoringColumns.map { scoringValues[$0] ?? "missing" }, ["5", "5", "0", "0", "0"])
     XCTAssertFalse(row.joined().contains("🙂"))

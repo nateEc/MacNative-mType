@@ -17602,10 +17602,10 @@ final class TypingEngineTests: XCTestCase {
       "source_incorrect_utf16_units", "source_extra_utf16_units", "source_missed_utf16_units",
       "source_scoring_unit_basis", "source_matched_scoring_units", "source_credited_scoring_units",
       "source_incorrect_scoring_units", "source_extra_scoring_units", "source_missed_scoring_units"]
-    XCTAssertEqual(Array(ResultCSVExport.columns.suffix(unknownUnitColumns.count + 1)),
-      unknownUnitColumns + ["wpm_consistency_percent"])
+    XCTAssertEqual(Array(ResultCSVExport.columns.suffix(unknownUnitColumns.count + 3)),
+      unknownUnitColumns + ["wpm_consistency_percent", "wall_clock_seconds", "terminal_timing_version"])
     XCTAssertTrue(csv.hasSuffix("2.50,0.50,2.00,3,4.25"
-      + String(repeating: ",", count: unknownUnitColumns.count + 1) + "\r\n"))
+      + String(repeating: ",", count: unknownUnitColumns.count + 1) + ",2.50,\r\n"))
     XCTAssertFalse(csv.contains("private prompt"))
     XCTAssertTrue(csv.hasSuffix("\r\n"))
     XCTAssertEqual(ResultCSVExport.csvString(for: []), ResultCSVExport.columns.joined(separator: ",") + "\r\n")

@@ -233,6 +233,6 @@ final class ResultWPMConsistencyTests: XCTestCase {
       wpm: old.wpm, rawWpm: old.rawWpm, accuracy: old.accuracy, prompt: old.prompt,
       replayEvents: [.init(offset: 0, kind: .insert, text: "a")])
     XCTAssertEqual(fields(old)["wpm_consistency_percent"], "")
-    XCTAssertEqual(ResultCSVExport.columns.last, "wpm_consistency_percent")
+    XCTAssertTrue(ResultCSVExport.columns.contains("wpm_consistency_percent"))
   }
 }
