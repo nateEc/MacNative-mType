@@ -2,8 +2,8 @@ import Foundation
 
 /// Anonymous XP evidence, independent of the legacy practice-time aggregate.
 /// Absence means unknown history; an empty snapshot means explicitly no history.
-struct ResultIncompletePractice: Codable, Equatable {
-  struct Attempt: Codable, Equatable {
+struct ResultIncompletePractice: Codable, Equatable, Sendable {
+  struct Attempt: Codable, Equatable, Sendable {
     let accuracy: Double
     let seconds: TimeInterval
 

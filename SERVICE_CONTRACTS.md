@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-04 新扩展见 [逐次未完成练习投稿与远程历史](INCOMPLETE_PRACTICE_PUBLICATION_CONTRACT.md)：v1 新能力 resultIncompletePractice，严格匿名数组、原始次数和聚合毫秒绑定，可选存储及私有历史；旧字段缺失不补造，重复不覆盖，XP 旧公式不切换。归档 26／设置 4，旧 writer 混写／降级未验证；零 GUI／真实库／部署。下方为既有及历史协议。
+
 当前 BailOut 服务 v1 新增 resultBailout=available、可选 bailedOut 和匿名 customLimit。客户端严格协商，支持服务可上传和重试；服务独立检查长度、准确率与速度，保存中止状态但排除 PB／速度榜，保留累计练习和非 Zen XP。远程历史／CSV 保留语义，旧无字段成绩不改；能力查询暂时失败保留重试，不冒充“不支持”。见 [保存与服务资格合同](BAILOUT_LOCAL_SAVING_CONTRACT.md)。新增客户端八项／服务十项，相关 54 项与服务全量 162 项通过；完整串行门禁客户端 2746／服务端 162 项零失败，819 场景结构与未开窗应用包检查通过。没有部署、真实账户或 GUI，精确 XP、实机／降级和整体服务等价仍开放。
 
 结束计时仍使用 resultTerminalTiming=available 与 version=1 匿名证据；服务接受 Zen，或另经 resultBailout 协商的明确中止。普通非 Zen 完成不得混入计时证据。custom 中止保留原始测量精度，其他模式按秒两位小数；真实日期绑定容差仍为 1000.011 毫秒。旧无证据成绩保留原值、归档仍 23；服务先升级、客户端后升级，不静默回退。原计时阶段完整门禁客户端 2718／服务端 152 项通过，其详细记录见 [结束计时合同](TERMINAL_TIMING_CONTRACT.md)；不代表本阶段完整门禁或混合二进制降级已验收。

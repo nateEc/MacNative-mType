@@ -1,5 +1,7 @@
 # XP 原生计算规则与接入边界
 
+2026-10-04 最新 [逐次未完成证据投稿合同](INCOMPLETE_PRACTICE_PUBLICATION_CONTRACT.md) 已将数组与原始次数经能力协商保存到服务并贯通私有远程历史。它不是奖励快照或原版 XP 生产切换；下方本机阶段“尚未接入投稿”仅为历史状态，当前奖励消费者仍未切换。
+
 2026-10-04：Typebar 已有独立 Swift XP 计算模块及固定源码差分验证，最新增量见 [未完成练习证据合同](INCOMPLETE_PRACTICE_EVIDENCE_CONTRACT.md)：逐次准确率与活动秒数贯通本机结果、可选 SwiftData 列及归档 26。尚未切换生产提交、账户累计、排行榜或结果 UI；这些消费者继续使用 `TypebarExperiencePolicy` 的简化规则，旧成绩不回算。下方计算模块阶段的测试及格式描述为历史证据，不是当前 schema。原生重写 goal 仍 active。
 
 ## 固定源码与计算合同

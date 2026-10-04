@@ -949,6 +949,8 @@ public actor AuthStore {
     let eventCount: Int
     var tags: [String]
     let practiceTiming: ResultPracticeTiming?
+    let incompletePractice: ResultIncompletePractice?
+    let restartCount: Int?
     let terminalTiming: ResultTerminalTiming?
     let elapsedTime: ResultElapsedTime?
     let startedAtReferenceTime: Double?
@@ -965,7 +967,7 @@ public actor AuthStore {
 
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-        errorCount, eventCount, tags, practiceTiming, inputMetrics, keyConsistency, terminalTiming, elapsedTime,
+        errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, inputMetrics, keyConsistency, terminalTiming, elapsedTime,
         bailedOut, customLimit, startedAt, finishedAt, acceptedAt, startedAtReferenceTime, finishedAtReferenceTime
     }
 
@@ -973,6 +975,7 @@ public actor AuthStore {
       id: UUID, userID: UUID, mode: String, language: String, durationSeconds: Int?,
       wordLimit: Int?, wpm: Int, rawWpm: Int, accuracy: Int, consistency: Double,
       errorCount: Int, eventCount: Int, tags: [String], practiceTiming: ResultPracticeTiming? = nil,
+      incompletePractice: ResultIncompletePractice? = nil, restartCount: Int? = nil,
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       terminalTiming: ResultTerminalTiming? = nil,
       elapsedTime: ResultElapsedTime? = nil,
@@ -995,6 +998,8 @@ public actor AuthStore {
       self.eventCount = eventCount
       self.tags = tags
       self.practiceTiming = practiceTiming
+      self.incompletePractice = incompletePractice
+      self.restartCount = restartCount
       self.terminalTiming = terminalTiming
       self.elapsedTime = elapsedTime
       self.startedAtReferenceTime = elapsedTime == nil ? nil : startedAt.timeIntervalSinceReferenceDate
@@ -1028,6 +1033,14 @@ public actor AuthStore {
       eventCount = try values.decode(Int.self, forKey: .eventCount)
       tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
       practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
+      incompletePractice = values.contains(.incompletePractice)
+        ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
+      restartCount = try values.decodeIfPresent(Int.self, forKey: .restartCount)
+      if let incompletePractice, restartCount == nil
+        || !incompletePractice.isValid(restartCount: restartCount!, practiceTiming: practiceTiming) {
+        throw DecodingError.dataCorruptedError(forKey: .incompletePractice, in: values,
+          debugDescription: "Stored incomplete evidence must keep original count and carried time")
+      }
       elapsedTime = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
       startedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
       finishedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
@@ -1065,6 +1078,12 @@ public actor AuthStore {
         throw DecodingError.dataCorruptedError(forKey: .terminalTiming, in: values,
           debugDescription: "Stored terminal clock must remain valid; it cannot silently become wall time")
       }
+      if incompletePractice != nil, let timing = practiceTiming,
+        !elapsedDuration.isFinite || !(0...3_600).contains(elapsedDuration)
+          || timing.terminalEngagedMilliseconds > Int((elapsedDuration * 1_000).rounded()) {
+        throw DecodingError.dataCorruptedError(forKey: .incompletePractice, in: values,
+          debugDescription: "Stored incomplete evidence needs valid terminal practice timing")
+      }
     }
 
     func response() -> AccountResultResponse {
@@ -1074,6 +1093,7 @@ public actor AuthStore {
         consistency: consistency, errorCount: errorCount, eventCount: eventCount, tags: tags,
         practiceTiming: practiceTiming,
         preciseAccuracy: inputMetrics?.preciseAccuracy,
+        incompletePractice: incompletePractice, restartCount: restartCount,
         keyConsistency: keyConsistency,
         terminalTiming: terminalTiming,
         elapsedTime: elapsedTime,
@@ -3195,7 +3215,8 @@ public actor AuthStore {
       durationSeconds: record.durationSeconds, wordLimit: record.wordLimit, wpm: record.wpm,
       rawWpm: record.rawWpm, accuracy: record.accuracy, consistency: record.consistency,
       errorCount: record.errorCount,
-      eventCount: record.eventCount, tags: record.tags, inputMetrics: record.inputMetrics,
+      eventCount: record.eventCount, restartCount: record.restartCount ?? 0, tags: record.tags,
+      incompletePractice: record.incompletePractice, practiceTiming: record.practiceTiming, inputMetrics: record.inputMetrics,
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       terminalTiming: record.terminalTiming,
       elapsedTime: record.elapsedTime,
@@ -3338,7 +3359,10 @@ public actor AuthStore {
         durationSeconds: request.durationSeconds, wordLimit: request.wordLimit,
         wpm: request.wpm, rawWpm: request.rawWpm, accuracy: request.accuracy,
         consistency: request.consistency, errorCount: request.errorCount, eventCount: request.eventCount,
-        tags: tags, practiceTiming: request.practiceTiming, inputMetrics: request.inputMetrics,
+        tags: tags, practiceTiming: request.practiceTiming,
+        incompletePractice: request.incompletePractice,
+        restartCount: request.incompletePractice == nil ? nil : request.restartCount,
+        inputMetrics: request.inputMetrics,
         keyConsistency: request.resultConsistency?.keyConsistency,
         terminalTiming: request.terminalTiming,
         elapsedTime: request.elapsedTime,
@@ -4109,6 +4133,10 @@ public actor AuthStore {
     }
     if let practiceTiming = result.practiceTiming {
       try validate(practiceTiming: practiceTiming, elapsed: measured, restartCount: result.restartCount)
+    }
+    if let incomplete = result.incompletePractice,
+      !incomplete.isValid(restartCount: result.restartCount, practiceTiming: result.practiceTiming) {
+      throw ResultStoreError.invalidResult
     }
     if !isBailout, result.mode == "time", let configuredDuration = result.durationSeconds {
       guard abs(elapsed - Double(configuredDuration)) <= 1 else {

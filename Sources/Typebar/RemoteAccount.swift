@@ -384,6 +384,8 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     /// Older services omit it, so historical exports preserve their original
     /// wall-clock semantics instead of inventing an AFK estimate.
     let practiceTiming: RemoteResultPracticeTiming?
+    let incompletePractice: ResultIncompletePractice?
+    let restartCount: Int?
     let terminalTiming: ResultTerminalTiming?
     let elapsedTime: ResultElapsedTime?
     let bailedOut: Bool?
@@ -396,7 +398,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, tags, practiceTiming, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
+            errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
             bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime
     }
 
@@ -421,6 +423,14 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         eventCount = try values.decode(Int.self, forKey: .eventCount)
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         practiceTiming = try values.decodeIfPresent(RemoteResultPracticeTiming.self, forKey: .practiceTiming)
+        restartCount = try values.decodeIfPresent(Int.self, forKey: .restartCount)
+        incompletePractice = values.contains(.incompletePractice)
+            ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
+        if let incompletePractice, !RemoteIncompletePracticePolicy.isValid(
+            incompletePractice, count: restartCount, timing: practiceTiming) {
+            throw DecodingError.dataCorruptedError(forKey: .incompletePractice, in: values,
+                debugDescription: "Remote incomplete practice requires raw count and carried timing")
+        }
         elapsedTime = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
         startedAtReferenceTime = elapsedTime == nil ? nil : try values.decode(Double.self, forKey: .startedAtReferenceTime)
         finishedAtReferenceTime = elapsedTime == nil ? nil : try values.decode(Double.self, forKey: .finishedAtReferenceTime)
@@ -454,6 +464,12 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
                 throw DecodingError.dataCorruptedError(forKey: .terminalTiming, in: values,
                     debugDescription: "Remote terminal clock must remain valid; never silently fall back to wall time")
             }
+        }
+        if incompletePractice != nil, let timing = practiceTiming,
+            !elapsedDuration.isFinite || !(0...3_600).contains(elapsedDuration)
+                || timing.terminalEngagedMilliseconds > Int((elapsedDuration * 1_000).rounded()) {
+            throw DecodingError.dataCorruptedError(forKey: .incompletePractice, in: values,
+                debugDescription: "Incomplete history needs valid terminal practice timing")
         }
     }
 
@@ -829,6 +845,7 @@ struct RemoteResultSubmission: Codable, Sendable {
     let eventCount: Int
     let restartCount: Int
     let tags: [String]
+    let incompletePractice: ResultIncompletePractice?
     let timingEvidence: RemoteResultTimingEvidence?
     let practiceTiming: RemoteResultPracticeTiming?
     let inputMetrics: ResultInputMetrics?
@@ -865,6 +882,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         tags = result.tags
         timingEvidence = includesTimingEvidence ? RemoteResultTimingEvidence(result: result) : nil
         practiceTiming = includesPracticeTiming ? RemoteResultPracticeTiming(result: result) : nil
+        incompletePractice = result.incompletePractice
         switch result.inputMetrics?.publicationVersion(nativeCharacterCount: result.typedCharacterCount) {
         case 1:
             inputMetrics = includesInputMetrics ? result.inputMetrics
@@ -919,6 +937,11 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     var supportsResultElapsedTime: Bool {
         apiVersion == "v1" && service == "typebar"
             && capabilities["resultElapsedTime"] == "available"
+    }
+
+    var supportsResultIncompletePractice: Bool {
+        apiVersion == "v1" && service == "typebar"
+            && capabilities["resultIncompletePractice"] == "available"
     }
 
     var supportsResultBailout: Bool {
@@ -997,8 +1020,9 @@ struct RemoteResultPracticeTiming: Codable, Equatable, Sendable {
     private static func milliseconds(_ duration: TimeInterval) -> Int? {
         guard duration.isFinite, duration >= 0 else { return nil }
         let milliseconds = (duration * 1_000).rounded()
-        guard milliseconds <= Double(Int.max) else { return nil }
-        return Int(milliseconds)
+        // Double(Int.max) rounds upward on 64-bit platforms; an inclusive
+        // floating bound does not make a trapping integer cast safe.
+        return Int(exactly: milliseconds)
     }
 }
 
@@ -2809,7 +2833,8 @@ final class AccountSession {
         let requestEndpoint = endpoint
         let requestScope = ResultPublicationScope(endpoint: requestEndpoint, userID: requestingUser.id)
         let capabilities = try await RemoteResultBailoutPolicy.capabilities(for: result.outcome,
-            requiresElapsedTime: result.elapsedTime != nil) {
+            requiresElapsedTime: result.elapsedTime != nil,
+            requiresIncompletePractice: result.incompletePractice != nil) {
             try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                 path: "v1/capabilities",
                 method: "GET",

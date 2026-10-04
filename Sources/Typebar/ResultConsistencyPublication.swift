@@ -14,6 +14,7 @@ enum ResultConsistencyPublication {
     calculation: @escaping @Sendable (ResultWPMConsistencyInput) async -> Double? = { $0.calculate() }
   ) async throws -> RemoteResultSubmission {
     try Task.checkCancellation()
+    try RemoteIncompletePracticePolicy.validate(result, capabilities: capabilities)
     if let elapsedTime = result.elapsedTime, !elapsedTime.isServiceCompatible(
       mode: result.configuration.mode, bailedOut: result.outcome == .bailedOut,
       calendarSeconds: result.finishedAt.timeIntervalSince(result.startedAt)) {
