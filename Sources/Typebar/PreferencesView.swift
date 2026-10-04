@@ -176,7 +176,7 @@ struct PreferencesView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("保存有效成绩", isOn: $settings.saveCompletedResults)
-          Text("开启后，合格的完成或中止结果写入本机历史；中止不计入 PB 或挑战，服务发布尚未兼容。关闭后不保存，但当前练习时间仍显示。")
+          Text("开启后，合格的完成或中止结果写入本机历史；中止不计入 PB 或挑战，发布需服务支持中止协议。关闭后不保存，但当前练习时间仍显示。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("完成后自动展开单词历史", isOn: $settings.alwaysShowWordsHistory)
@@ -2881,6 +2881,7 @@ private struct RemoteAccountResultRow: View {
     VStack(alignment: .leading, spacing: 4) {
       HStack {
         Text("\(result.wpm) WPM").font(.subheadline.weight(.semibold))
+        if result.bailedOut == true { Label("中止", systemImage: "stop.circle").font(.caption) }
         Text("准确率 \(ResultMetricPresentation.accuracy(result.preciseAccuracy ?? Double(result.accuracy), alwaysShowDecimalPlaces: result.preciseAccuracy != nil))")
         Spacer()
         Text(result.finishedAt.formatted(date: .abbreviated, time: .shortened))

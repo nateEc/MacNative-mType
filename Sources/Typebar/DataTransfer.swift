@@ -194,6 +194,7 @@ enum RemoteResultCSVExport {
         "started_at", "finished_at",
         "key_consistency_percent",
         "elapsed_seconds", "wall_clock_seconds", "terminal_timing_version",
+        "bailed_out", "custom_limit_mode", "custom_limit_value",
     ]
 
     @MainActor
@@ -274,6 +275,8 @@ enum RemoteResultCSVExport {
             result.keyConsistency.map(decimal) ?? "",
             decimal(result.elapsedDuration), decimal(result.wallClockDuration),
             result.terminalTiming.map { String($0.version) } ?? "",
+            result.bailedOut.map { String($0) } ?? "",
+            result.customLimit?.mode ?? "", result.customLimit.map { String($0.value) } ?? "",
         ]
     }
 

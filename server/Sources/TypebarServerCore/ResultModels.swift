@@ -56,6 +56,8 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let practiceTiming: ResultPracticeTiming?
     public let inputMetrics: ResultInputMetrics?
     public let terminalTiming: ResultTerminalTiming?
+    public let bailedOut: Bool?
+    public let customLimit: ResultCustomLimit?
     public let startedAt: Date
     public let finishedAt: Date
 
@@ -66,6 +68,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         resultConsistency: ResultConsistencyMetrics? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
+        bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
         startedAt: Date, finishedAt: Date
     ) {
         self.id = id
@@ -86,6 +89,8 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.practiceTiming = practiceTiming
         self.inputMetrics = inputMetrics
         self.terminalTiming = terminalTiming
+        self.bailedOut = bailedOut
+        self.customLimit = customLimit
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }
@@ -98,6 +103,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case inputMetrics
         case resultConsistency
         case terminalTiming
+        case bailedOut, customLimit
     }
 
     public init(from decoder: Decoder) throws {
@@ -120,6 +126,8 @@ public struct ResultSubmissionRequest: Content, Equatable {
         practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
         inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
         terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
+        bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
+        customLimit = try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit)
         startedAt = try values.decode(Date.self, forKey: .startedAt)
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
     }
@@ -154,6 +162,8 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public let tags: [String]
     public let practiceTiming: ResultPracticeTiming?
     public let terminalTiming: ResultTerminalTiming?
+    public let bailedOut: Bool?
+    public let customLimit: ResultCustomLimit?
     public let startedAt: Date
     public let finishedAt: Date
 
@@ -163,6 +173,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         tags: [String], practiceTiming: ResultPracticeTiming? = nil, preciseAccuracy: Double? = nil,
         keyConsistency: Double? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
+        bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
         startedAt: Date, finishedAt: Date
     ) {
         self.id = id
@@ -181,6 +192,8 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.tags = tags
         self.practiceTiming = practiceTiming
         self.terminalTiming = terminalTiming
+        self.bailedOut = bailedOut
+        self.customLimit = customLimit
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }
@@ -415,7 +428,12 @@ public enum TypebarExperiencePolicy {
     public static func points(for result: ResultSubmissionRequest) -> Int {
         guard result.mode != "zen" else { return 0 }
         let seconds: Double
-        if let duration = result.durationSeconds {
+        if result.bailedOut == true {
+            // A sixty-second configuration is not sixty seconds of practice
+            // when the user stops early. Keep the legacy completed XP formula.
+            seconds = result.terminalTiming?.duration(mode: result.mode)
+                ?? result.finishedAt.timeIntervalSince(result.startedAt)
+        } else if let duration = result.durationSeconds {
             seconds = Double(duration)
         } else {
             let charactersPerMinute = max(result.rawWpm, 1) * 5

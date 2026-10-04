@@ -1659,7 +1659,7 @@ private struct ContentView: View {
         session.bailOut()
       }
     } message: {
-      Text("符合保存资格且开启保存时，中止结果会进入本机历史；不计入 PB 或挑战，服务发布尚未兼容。")
+      Text("符合保存资格且开启保存时，中止结果会进入本机历史；不计入 PB 或挑战，发布需服务支持中止协议并通过独立校验。")
     }
     .sheet(isPresented: $showingTestShare, onDismiss: {
       presentQueuedReferenceScriptImport()
@@ -5462,7 +5462,8 @@ private struct ContentView: View {
     let recordsByID = Dictionary(uniqueKeysWithValues: savedResults.map { ($0.id, $0) })
     var retryableResults: [CompletedTestResult] = []
     for resultID in resultIDs {
-      guard let result = recordsByID[resultID]?.portableResult, result.outcome == .completed else {
+      guard let result = recordsByID[resultID]?.portableResult,
+        result.outcome == .completed || result.outcome == .bailedOut else {
         pendingPublications.remove(resultID, for: scope)
         continue
       }
@@ -6374,7 +6375,7 @@ private struct CompletedResultView: View {
       }
       guard savesResult else { return "中止结果未保存：保存已关闭" }
       return localResultSaveState.isSaved
-        ? "中止结果已保存到这台 Mac；不计入 PB 或挑战，服务发布尚未兼容"
+        ? "中止结果已保存到这台 Mac；不计入 PB 或挑战，发布需服务支持中止协议"
         : "中止结果尚未保存到这台 Mac，可重试本机保存"
     case .invalidAFK: return "结束前连续约 5 秒没有文本输入；结果只在当前窗口显示，不保存成绩"
     case .failed:

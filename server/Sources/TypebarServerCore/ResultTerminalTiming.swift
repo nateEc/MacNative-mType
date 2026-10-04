@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 
-/// Anonymous clock evidence for new Zen submissions, not text or competitive
+/// Anonymous clock evidence for new Zen/BailOut submissions, not text or competitive
 /// proof. Legacy records without it keep their original wall-clock denominator.
 public struct ResultTerminalTiming: Content, Equatable, Sendable {
   public let version: Int
@@ -15,15 +15,23 @@ public struct ResultTerminalTiming: Content, Equatable, Sendable {
   }
 
   public var measuredSeconds: Double {
-    let gap = lastKeypressMilliseconds.map { rounded(endMilliseconds - $0) }
-    let clipped = gap.map { $0 < 7_000 ? max(0, $0) : 0 } ?? 0
-    return rounded(max(0, endMilliseconds - clipped) / 1_000)
+    rounded(boundarySeconds)
   }
 
-  func isValid(wallClockSeconds: Double, mode: String) -> Bool {
+  public func duration(mode: String) -> Double {
+    mode == "custom" ? boundarySeconds : measuredSeconds
+  }
+
+  private var boundarySeconds: Double {
+    let gap = lastKeypressMilliseconds.map { rounded(endMilliseconds - $0) }
+    let clipped = gap.map { $0 < 7_000 ? max(0, $0) : 0 } ?? 0
+    return max(0, endMilliseconds - clipped) / 1_000
+  }
+
+  func isValid(wallClockSeconds: Double, mode: String, bailedOut: Bool = false) -> Bool {
     // The existing native HTTP and store codecs truncate each Date to whole
     // seconds. Two truncated endpoints can change the difference by < 1 s.
-    guard version == 1, mode == "zen", wallClockSeconds.isFinite,
+    guard version == 1, mode == "zen" || bailedOut, wallClockSeconds.isFinite,
       (1...3_600).contains(wallClockSeconds), endMilliseconds.isFinite,
       (0...3_600_000).contains(endMilliseconds),
       abs(endMilliseconds - wallClockSeconds * 1_000) <= 1_000.011
@@ -32,7 +40,7 @@ public struct ResultTerminalTiming: Content, Equatable, Sendable {
       guard lastKeypressMilliseconds.isFinite, lastKeypressMilliseconds <= endMilliseconds,
         (endMilliseconds - lastKeypressMilliseconds).isFinite else { return false }
     }
-    return (15...3_600).contains(measuredSeconds)
+    return ((bailedOut ? 1.0 : 15.0)...3_600).contains(duration(mode: mode))
   }
 
   private func rounded(_ value: Double) -> Double {

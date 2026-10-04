@@ -950,8 +950,10 @@ public actor AuthStore {
     var tags: [String]
     let practiceTiming: ResultPracticeTiming?
     let terminalTiming: ResultTerminalTiming?
+    let bailedOut: Bool?
+    let customLimit: ResultCustomLimit?
     var elapsedDuration: Double {
-      terminalTiming?.measuredSeconds ?? max(0, finishedAt.timeIntervalSince(startedAt))
+      terminalTiming?.duration(mode: mode) ?? max(0, finishedAt.timeIntervalSince(startedAt))
     }
     let startedAt: Date
     let finishedAt: Date
@@ -959,7 +961,7 @@ public actor AuthStore {
 
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-        errorCount, eventCount, tags, practiceTiming, inputMetrics, keyConsistency, terminalTiming, startedAt, finishedAt, acceptedAt
+        errorCount, eventCount, tags, practiceTiming, inputMetrics, keyConsistency, terminalTiming, bailedOut, customLimit, startedAt, finishedAt, acceptedAt
     }
 
     init(
@@ -968,6 +970,7 @@ public actor AuthStore {
       errorCount: Int, eventCount: Int, tags: [String], practiceTiming: ResultPracticeTiming? = nil,
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       terminalTiming: ResultTerminalTiming? = nil,
+      bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
       startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil
     ) {
       self.id = id
@@ -987,6 +990,8 @@ public actor AuthStore {
       self.tags = tags
       self.practiceTiming = practiceTiming
       self.terminalTiming = terminalTiming
+      self.bailedOut = bailedOut
+      self.customLimit = customLimit
       self.startedAt = startedAt
       self.finishedAt = finishedAt
       self.acceptedAt = acceptedAt
@@ -1023,8 +1028,18 @@ public actor AuthStore {
         ?? finishedAt.addingTimeInterval(-legacyDuration)
       acceptedAt = try values.decodeIfPresent(Date.self, forKey: .acceptedAt)
       terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
+      bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
+      customLimit = try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit)
+      guard ResultBailoutPolicy.hasValidContext(bailedOut: bailedOut, mode: mode,
+        duration: durationSeconds, words: wordLimit, custom: customLimit),
+        bailedOut != true || ResultBailoutPolicy.isLongEnough(mode: mode,
+          duration: durationSeconds, words: wordLimit, custom: customLimit, measured: elapsedDuration)
+      else {
+        throw DecodingError.dataCorruptedError(forKey: .bailedOut, in: values,
+          debugDescription: "Stored BailOut context must not silently become a completed result")
+      }
       if let terminalTiming, !terminalTiming.isValid(
-        wallClockSeconds: finishedAt.timeIntervalSince(startedAt), mode: mode) {
+        wallClockSeconds: finishedAt.timeIntervalSince(startedAt), mode: mode, bailedOut: bailedOut == true) {
         throw DecodingError.dataCorruptedError(forKey: .terminalTiming, in: values,
           debugDescription: "Stored terminal clock must remain valid; it cannot silently become wall time")
       }
@@ -1039,6 +1054,7 @@ public actor AuthStore {
         preciseAccuracy: inputMetrics?.preciseAccuracy,
         keyConsistency: keyConsistency,
         terminalTiming: terminalTiming,
+        bailedOut: bailedOut, customLimit: customLimit,
         startedAt: startedAt, finishedAt: finishedAt)
     }
   }
@@ -2895,8 +2911,9 @@ public actor AuthStore {
   }
 
   private func personalBestResults(for userID: UUID, from results: [StoredResult]) -> [StoredResult] {
-    guard let resetAt = state.personalBestResetDates[userID] else { return results }
-    return results.filter { result in
+    let completed = results.filter { $0.bailedOut != true }
+    guard let resetAt = state.personalBestResetDates[userID] else { return completed }
+    return completed.filter { result in
       guard let acceptedAt = result.acceptedAt else { return false }
       return acceptedAt > resetAt
     }
@@ -2904,21 +2921,22 @@ public actor AuthStore {
 
   private func availablePublicBadges(for userID: UUID) -> [PublicProfileBadge] {
     let results = state.results.filter { $0.userID == userID && $0.eventCount > 0 }
-    let accurateRunExists = results.contains {
+    let completed = results.filter { $0.bailedOut != true }
+    let accurateRunExists = completed.contains {
       $0.effectiveAccuracy >= 98 && $0.elapsedDuration >= 15
     }
-    let bestWPM = results.map(\.wpm).max() ?? 0
+    let bestWPM = completed.map(\.wpm).max() ?? 0
     let totalTypingSeconds = totalTypingSeconds(from: results)
-    let perfectMinuteExists = results.contains {
+    let perfectMinuteExists = completed.contains {
       $0.effectiveAccuracy == 100 && $0.elapsedDuration >= 60
     }
     let practicedLanguages = Set(results.map(\.language)).count
     let practicedModes = Set(results.map(\.mode)).count
     var badgeIDs: [String] = []
-    if !results.isEmpty {
+    if !completed.isEmpty {
       badgeIDs.append("first-finish")
     }
-    if results.count >= 10 {
+    if completed.count >= 10 {
       badgeIDs.append("ten-finishes")
     }
     if accurateRunExists {
@@ -3157,6 +3175,7 @@ public actor AuthStore {
       eventCount: record.eventCount, tags: record.tags, inputMetrics: record.inputMetrics,
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       terminalTiming: record.terminalTiming,
+      bailedOut: record.bailedOut, customLimit: record.customLimit,
       startedAt: record.startedAt,
       finishedAt: record.finishedAt)
   }
@@ -3169,7 +3188,8 @@ public actor AuthStore {
       && leaderboardEligibility(for: user).isEligible
     let weeklyEntries = experienceLeaderboardEntries(now: now)
     let isToday = request.finishedAt >= Calendar.current.startOfDay(for: now)
-    let dailyRank = isLeaderboardEligible && isToday
+    let isSpeedEligible = isLeaderboardEligible && request.bailedOut != true
+    let dailyRank = isSpeedEligible && isToday
       ? try leaderboardEntries(
         .init(
           mode: request.mode, language: request.language, period: "day",
@@ -3182,7 +3202,7 @@ public actor AuthStore {
     return .init(
       id: request.id,
       accepted: true,
-      leaderboardEligible: isLeaderboardEligible,
+      leaderboardEligible: isSpeedEligible,
       dailyLeaderboardRank: dailyRank,
       experienceGained: TypebarExperiencePolicy.points(for: request),
       totalExperience: experience(for: userID),
@@ -3281,7 +3301,7 @@ public actor AuthStore {
     guard !user.displayNameChangeRequired else {
       throw AuthStoreError.displayNameChangeRequired
     }
-    try validate(result: request, now: now)
+    try validate(result: request, leaderboardOptedOut: user.leaderboardOptedOut, now: now)
     let tags = try validatedResultTags(request.tags)
     if let existing = state.results.first(where: { $0.userID == user.id && $0.id == request.id }) {
       return try resultSubmissionResponse(
@@ -3297,6 +3317,7 @@ public actor AuthStore {
         tags: tags, practiceTiming: request.practiceTiming, inputMetrics: request.inputMetrics,
         keyConsistency: request.resultConsistency?.keyConsistency,
         terminalTiming: request.terminalTiming,
+        bailedOut: request.bailedOut, customLimit: request.customLimit,
         startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now
       ))
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
@@ -3338,6 +3359,7 @@ public actor AuthStore {
     let userIDs = Set(publiclyAggregatedUsers().map(\.id))
     let candidates = state.results.filter {
       userIDs.contains($0.userID)
+        && $0.bailedOut != true
         && $0.mode == "time"
         && $0.language == "english"
         && $0.durationSeconds == 60
@@ -3664,6 +3686,7 @@ public actor AuthStore {
     let typingSecondsByUser = totalTypingSecondsByUser()
     let records = state.results.filter { result in
       (eligibleUserIDs == nil || eligibleUserIDs!.contains(result.userID))
+        && result.bailedOut != true
         && users[result.userID]?.leaderboardOptedOut == false
         && users[result.userID].map {
           leaderboardEligibility(for: $0, typingSeconds: typingSecondsByUser[$0.id] ?? 0).isEligible
@@ -4007,10 +4030,11 @@ public actor AuthStore {
     guard (12...72).contains(value.utf8.count) else { throw AuthStoreError.weakPassword }
   }
 
-  private func validate(result: ResultSubmissionRequest, now: Date) throws {
+  private func validate(result: ResultSubmissionRequest, leaderboardOptedOut: Bool, now: Date) throws {
+    let isBailout = result.bailedOut == true
     guard Set(["time", "words", "quote", "zen", "custom"]).contains(result.mode),
       Self.supportedResultLanguageIDs.contains(result.language),
-      (0...400).contains(result.wpm), (0...500).contains(result.rawWpm),
+      (0...(isBailout ? 420 : 400)).contains(result.wpm), (0...(isBailout ? 420 : 500)).contains(result.rawWpm),
       (0...100).contains(result.accuracy), (0...100).contains(result.consistency),
       result.errorCount >= 0, (0...1_800_000).contains(result.eventCount),
       (0...1_000).contains(result.restartCount),
@@ -4021,17 +4045,29 @@ public actor AuthStore {
     else { throw ResultStoreError.invalidResult }
     let timeIsValid = result.durationSeconds.map { (5...3600).contains($0) } ?? false
     let wordsAreValid = result.wordLimit.map { (1...1000).contains($0) } ?? false
-    guard timeIsValid || wordsAreValid || ["quote", "zen", "custom"].contains(result.mode) else {
+    guard ResultBailoutPolicy.hasValidContext(bailedOut: result.bailedOut, mode: result.mode,
+      duration: result.durationSeconds, words: result.wordLimit, custom: result.customLimit),
+      isBailout || timeIsValid || wordsAreValid || ["quote", "zen", "custom"].contains(result.mode) else {
       throw ResultStoreError.invalidResult
     }
 
     let elapsed = result.finishedAt.timeIntervalSince(result.startedAt)
     guard (1...3600).contains(elapsed) else { throw ResultStoreError.invalidResult }
     if let terminalTiming = result.terminalTiming,
-      !terminalTiming.isValid(wallClockSeconds: elapsed, mode: result.mode) {
+      !terminalTiming.isValid(wallClockSeconds: elapsed, mode: result.mode, bailedOut: isBailout) {
       throw ResultStoreError.invalidResult
     }
-    let measured = result.terminalTiming?.measuredSeconds ?? elapsed
+    let measured = result.terminalTiming?.duration(mode: result.mode) ?? elapsed
+    if isBailout {
+      let countAccuracy = result.eventCount == 0 ? 100
+        : Double(result.eventCount - result.errorCount) / Double(result.eventCount) * 100
+      let preciseAccuracy = result.inputMetrics?.preciseAccuracy
+        ?? ((countAccuracy + Double.ulpOfOne) * 100).rounded() / 100
+      guard ResultBailoutPolicy.isLongEnough(mode: result.mode, duration: result.durationSeconds,
+        words: result.wordLimit, custom: result.customLimit, measured: measured),
+        leaderboardOptedOut || preciseAccuracy >= 75
+      else { throw ResultStoreError.invalidResult }
+    }
     if let metrics = result.resultConsistency, !metrics.isValid { throw ResultStoreError.invalidResult }
     if let evidence = result.timingEvidence {
       try validate(timingEvidence: evidence, elapsed: elapsed)
@@ -4039,7 +4075,7 @@ public actor AuthStore {
     if let practiceTiming = result.practiceTiming {
       try validate(practiceTiming: practiceTiming, elapsed: measured, restartCount: result.restartCount)
     }
-    if result.mode == "time", let configuredDuration = result.durationSeconds {
+    if !isBailout, result.mode == "time", let configuredDuration = result.durationSeconds {
       guard abs(elapsed - Double(configuredDuration)) <= 1 else {
         throw ResultStoreError.invalidResult
       }

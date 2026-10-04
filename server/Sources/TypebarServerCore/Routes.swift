@@ -73,6 +73,7 @@ public func configure(
                 "resultInputMetrics": .available,
                 "resultInputMetricsV2": .available,
                 "resultTerminalTiming": .available,
+                "resultBailout": .available,
                 "resultConsistency": .available,
                 "resultHistory": .partial,
                 "leaderboards": .partial,
