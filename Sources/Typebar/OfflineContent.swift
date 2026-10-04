@@ -6352,6 +6352,7 @@ struct TestSessionFactory {
     // Only fresh generation changes Dockerfile's historical input behavior.
     // Import and original-target repeat retain the captured configuration.
     if configuration.language == .dockerFile { configuration.dockerfileUsesLiteralIndentation = true }
+    if configuration.mode == .zen { configuration.zenUsesSourceInputAdmission = true }
     let prompt: String
     var sectionEndIndices: [Int] = []
     var noSpaceBoundarySource: String?
@@ -6389,7 +6390,7 @@ struct TestSessionFactory {
     var generatedCodeChunk: GeneratedWordChunk?
     var currentDecorationState = wordDecorationState
     let streamWordCount = streamWordCount(for: configuration, showAllLines: showAllLines)
-    if configuration.mode != .custom, let streamPrompt {
+    if configuration.mode != .custom, configuration.mode != .zen, let streamPrompt {
       prompt = streamPrompt
       noSpaceBoundarySource = streamNoSpaceBoundarySource
     } else if let streamWordCount,

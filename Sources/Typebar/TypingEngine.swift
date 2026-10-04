@@ -2249,6 +2249,9 @@ struct TestConfiguration: Codable, Equatable {
   /// Fresh Dockerfile attempts follow the source's non-code-prefix input.
   /// Nil preserves automatic indentation in historical native snapshots.
   var dockerfileUsesLiteralIndentation: Bool?
+  /// Fresh Zen attempts apply source admission before judging input. Missing
+  /// markers preserve historical freeform spelling and rejected-key events.
+  var zenUsesSourceInputAdmission: Bool?
   var modifiers: [TestModifier]
   var contentOptions: ContentOptions
   var challengeID: String?
@@ -2350,6 +2353,7 @@ struct TestConfiguration: Codable, Equatable {
     self.polyglotUsesPrimaryCodeInput = nil
     self.polyglotUsesPrimaryInputNormalization = nil
     self.dockerfileUsesLiteralIndentation = nil
+    self.zenUsesSourceInputAdmission = nil
     let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
       modifiers, language: language, mixedLanguageComponents: normalizedMixedLanguageComponents)
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
@@ -2418,6 +2422,7 @@ struct TestConfiguration: Codable, Equatable {
       requested: copy.mode, modifiers: normalizedModifiers)
     if effectiveMode != copy.mode {
       copy.mode = effectiveMode
+      copy.zenUsesSourceInputAdmission = nil
       copy.duration = nil
       copy.wordLimit = copy.wordLimit ?? MemoryFunboxModePolicy.fallbackWordLimit
     }
@@ -2460,7 +2465,7 @@ struct TestConfiguration: Codable, Equatable {
       quoteLengths, quoteSelectionMode, customTextCompletion, customTextSectionLimit,
       customTextOrdering, customTextPipeDelimiter, mixedLanguageComponents, polyglotBaseLanguage,
       polyglotUsesPrimaryDirection, polyglotUsesPrimaryCodeInput,
-      polyglotUsesPrimaryInputNormalization, dockerfileUsesLiteralIndentation,
+      polyglotUsesPrimaryInputNormalization, dockerfileUsesLiteralIndentation, zenUsesSourceInputAdmission,
       modifiers, contentOptions, challengeID
   }
 
@@ -2511,6 +2516,8 @@ struct TestConfiguration: Codable, Equatable {
       duration = nil
       wordLimit = wordLimit ?? MemoryFunboxModePolicy.fallbackWordLimit
     }
+    zenUsesSourceInputAdmission = mode == .zen
+      ? try values.decodeIfPresent(Bool.self, forKey: .zenUsesSourceInputAdmission) : nil
     let modeCompatibleModifiers = TestModifierPolicy.modifiersCompatibleWithMode(
       normalizedModifiers, mode: mode)
     modifiers = Self.usesInfiniteLimit(
@@ -5965,6 +5972,18 @@ struct TypingSession {
     // reference behavior of immediately rejecting its text.
     let rejectsOppositeShiftInput = forceError && configuration.rules.oppositeShiftMode != .off
     if configuration.mode == .zen {
+      var character = character
+      if configuration.zenUsesSourceInputAdmission == true {
+        if isReferenceInputSpace(character) {
+          guard !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) else { return false }
+          character = " "
+          if currentInputUnit != nil { currentInputUnit = 32 }
+        }
+        // Source before-insert admission runs before opposite Shift can start
+        // a test or count a rejected attempt. Zen has no target substitutions.
+        guard acceptsZenCharacter(character) else { return false }
+        latestReplayInputPosition = .init(charIndex: zenActiveWordLength, lastWord: false)
+      }
       // The reference still starts a Zen test when opposite Shift rejects a
       // key, but Zen has no target character to score as incorrect. The key
       // therefore leaves no accepted text or replay action, but still has a
@@ -6411,15 +6430,22 @@ struct TypingSession {
   private mutating func insertZenCharacter(
     _ character: Character, at date: Date, evaluatesTerminalRules: Bool
   ) -> Bool {
-    let commitsWord = isZenWordCommit(character)
-    let activeLength = zenActiveWordLength
-    if activeLength >= 30 && !commitsWord { return false }
-    if character == " " && activeLength == 0 { return false }
+    guard acceptsZenCharacter(character) else { return false }
 
     beginIfNeeded(at: date)
     appendTypedCharacter(character, targetIndex: nil, at: date)
     recordZenWordBurstIfCommitted(after: character)
     if evaluatesTerminalRules, shouldFailMinimumWordBurst(after: character) { fail(at: date) }
+    return true
+  }
+
+  private func acceptsZenCharacter(_ character: Character) -> Bool {
+    let activeLength = zenActiveWordLength
+    if activeLength >= 30 && !isZenWordCommit(character) { return false }
+    if character == " " && activeLength == 0 {
+      return configuration.zenUsesSourceInputAdmission == true
+        && (configuration.rules.strictSpace || configuration.difficulty != .normal)
+    }
     return true
   }
 

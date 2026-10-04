@@ -1,5 +1,7 @@
 # Zen 无目标字段单位统计
 
+2026-10-04 新 Zen 输入准入、平台空格、字段位置和历史规则保护见 ZEN_INPUT_ADMISSION_CONTRACT.md。下方是单位统计历史证据，不代表旧会话会被升级，也不代表实机或所有命令已经等价。
+
 后续普通已知源字段捕获、最终计分与末 SPACE 重入已另行实现；当前范围与证据见 ORDINARY_SOURCE_UNIT_STATS_CONTRACT.md。下方 ordinary 待办及门禁数字保留为 Zen 历史阶段，不代表新的覆盖已经通过设备或所有消费者验收。
 
 固定只读参考 91bd24bb8513785c7364cbea29296ff7adafac41。独立 Swift 实现，不复制官方实现、主题或词库；完整重写 goal 仍 active，本增量只覆盖新 Zen 结果分类。

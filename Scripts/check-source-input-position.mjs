@@ -370,3 +370,95 @@ try {
 } finally {
  globalThis.setTimeout=originalSetTimeout;
 }
+
+// Zen generates no target words (generator limit 0, addWord only appends an
+// empty UI element). Load the complete actual Words module and keep it empty,
+// rather than feed an owned target that would falsely normalize free input.
+const zenWordsModule=new vm.SourceTextModule(stripTypeScriptTypes(
+ fs.readFileSync(path.join(root,'test/test-words.ts'),'utf8'),{mode:'transform'}),
+ {identifier:'test/test-words'});
+await zenWordsModule.link(linkModule);await zenWordsModule.evaluate();
+const zenWords=zenWordsModule.namespace.words;
+modules.get('test/test-words').setExport('words',zenWords);
+modules.get('test/words-generator').setExport('areAllWordsGenerated',()=>false);
+let zenScenarios=0;
+const zenSpaces=[' ','\u2002','\u2003','\u2009','\u3000','\u00a0','\u1680',
+ '\u202f','\ufeff','\u2007','\u2008','\u2004','\u200a','\u200b'];
+function resetZen({strict=false,difficulty='normal',noSpace=false,shift=false,language='english'}={}) {
+ resetOrdinary([],{mode:'zen',strict});zenWords.reset();noSpaceDelete=noSpace;
+ Object.assign(Config,{difficulty,language,funbox:noSpace?['nospace']:[],oppositeShiftMode:shift?'on':'off'});
+ modules.get('input/state').setExport('isCorrectShiftUsed',()=>!shift);
+}
+for(const space of zenSpaces) {
+ resetZen();await main.namespace.emulateInsertText({data:'a'+space+'b',now:0});
+ assert.equal(wordIndex,1);assert.equal(element,'b');assert.equal(zenWords.length,0);
+ assert.deepEqual(inputEvents().map(e=>[e.data,e.wordIndex,e.charIndex,e.correct]),
+  [['a',0,0,true],[' ',0,1,true],['b',1,0,true]]);
+ assert.ok(inputEvents().every(e=>e.lastWord!==true));assert.equal(completed,false);zenScenarios++;
+}
+for(const strict of [false,true])for(const difficulty of ['normal','expert','master']) {
+ resetZen({strict,difficulty});await main.namespace.emulateInsertText({data:'\u3000',now:0});
+ const allowed=strict||difficulty!=='normal';assert.equal(active,allowed);
+ assert.equal(wordIndex,allowed?1:0);assert.equal(inputEvents().length,allowed?1:0);
+ assert.equal(failed,false);assert.equal(completed,false);zenScenarios++;
+}
+for(const mode of ['letter_hard','word_hard']) {
+ resetZen();Config.deleteOnError=mode;
+ await main.namespace.emulateInsertText({data:' ',now:0});
+ assert.equal(inputEvents().length,0);assert.equal(active,false);zenScenarios++;
+}
+for(const space of zenSpaces) {
+ resetZen({shift:true});await main.namespace.emulateInsertText({data:space,now:0});
+ assert.equal(inputEvents().length,0);assert.equal(active,false);zenScenarios++;
+}
+for(const commit of ['\u3000',' ','\n']) {
+ resetZen();await main.namespace.emulateInsertText({data:'a'.repeat(30)+'z'+commit+'b',now:0});
+ assert.equal(wordIndex,1);assert.equal(element,'b');assert.equal(inputEvents().length,32);
+ assert.equal(inputEvents()[30].data,commit==='\n'?'\n':' ');zenScenarios++;
+}
+resetZen();await main.namespace.emulateInsertText({data:'🙂'.repeat(15),now:0});
+Config.oppositeShiftMode='on';modules.get('input/state').setExport('isCorrectShiftUsed',()=>false);
+await main.namespace.emulateInsertText({data:'x',now:1});
+assert.equal(element.length,30);assert.equal(inputEvents().length,30);zenScenarios++;
+for(const language of ['russian','dutch','english']) {
+ resetZen({language});await main.namespace.emulateInsertText({data:'ёеe’—',now:0});
+ assert.equal(element,'ёеe’—');assert.ok(inputEvents().every(e=>e.correct===true));zenScenarios++;
+}
+// Source config validation rejects Zen + nospace. This is an explicit
+// low-level bypass fixture only, not an accepted UI or generation scenario.
+resetZen({noSpace:true});await main.namespace.emulateInsertText({data:zenSpaces.join(''),now:0});
+assert.equal(inputEvents().length,0);assert.equal(active,false);
+await main.namespace.emulateInsertText({data:'a\nb',now:0});
+assert.deepEqual(inputEvents().map(e=>e.data),['a','\n','b']);zenScenarios++;
+resetZen();await main.namespace.emulateInsertText({data:'🙂 a\n',now:0});
+assert.deepEqual(positions(),[0,1,2,0,1]);assert.equal(wordIndex,2);zenScenarios++;
+resetZen({strict:true});await main.namespace.emulateInsertText({data:'  \n\tb',now:0});
+assert.deepEqual(inputEvents().map(e=>e.wordIndex),[0,1,2,3,3]);
+assert.deepEqual(positions(),[0,0,0,0,1]);zenScenarios++;
+resetZen();await main.namespace.emulateInsertText({data:'\n\nx',now:0});
+assert.deepEqual(inputEvents().map(e=>e.wordIndex),[0,1,2]);zenScenarios++;
+resetZen();await main.namespace.emulateInsertText({data:'a\u3000b',now:0});
+deleteInput({now:1});deleteInput({now:2});assert.equal(wordIndex,0);assert.equal(element,'a');
+await main.namespace.emulateInsertText({data:'\u2003c',now:3});
+assert.equal(wordIndex,1);assert.equal(element,'c');assert.equal(inputEvents().at(-1).charIndex,0);zenScenarios++;
+for(const text of ['a\u2005b','a\rb','a\tb','a\r\nb']) {
+ resetZen();await main.namespace.emulateInsertText({data:text,now:0});
+ const retained=Array.from({length:wordIndex+1},(_,index)=>eventData.getInputForWord(index)).join('');
+ assert.equal(retained,text);
+ assert.equal(eventData.getCurrentInput(),text.includes('\n')?'b':text);
+ assert.equal(inputEvents().length,text.length);assert.equal(wordIndex,text.includes('\n')?1:0);zenScenarios++;
+}
+for(const [language,entered,retained] of [['dutch','ĳ','ij'],['english','ĳ','ĳ'],['english','…','...']]) {
+ resetZen({language});await main.namespace.emulateInsertText({data:entered,now:0});
+ assert.equal(element,retained);assert.equal(inputEvents().length,retained.length);zenScenarios++;
+}
+for(const [language,entered,last] of [['dutch','ĳ','i'],['english','…','.']]) {
+ resetZen({language});await main.namespace.emulateInsertText({data:'a'.repeat(29)+entered,now:0});
+ assert.equal(element,'a'.repeat(29)+last);assert.equal(inputEvents().length,30);zenScenarios++;
+}
+resetZen({strict:true,shift:true});await main.namespace.emulateInsertText({data:'\u3000',now:0});
+assert.equal(active,true);assert.equal(element,'');assert.equal(wordIndex,0);
+assert.equal(inputEvents()[0].data,' ');assert.equal(inputEvents()[0].correct,true);
+assert.equal(inputEvents()[0].inputStopped,true);assert.equal(inputEvents()[0].charIndex,0);zenScenarios++;
+assert.equal(zenScenarios,58);
+console.log(`${zenScenarios} pinned-source empty-target Zen admission scenarios passed (14 complete actual modules; empty Words, Config/lifecycle/DOM adapters, no generator/UI/IME/device equivalence claim).`);
