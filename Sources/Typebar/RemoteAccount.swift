@@ -386,6 +386,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let practiceTiming: RemoteResultPracticeTiming?
     let incompletePractice: ResultIncompletePractice?
     let restartCount: Int?
+    let experienceEvidence: RemoteExperienceEvidence?
     let terminalTiming: ResultTerminalTiming?
     let elapsedTime: ResultElapsedTime?
     let bailedOut: Bool?
@@ -398,7 +399,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
+            errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
             bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime
     }
 
@@ -424,6 +425,8 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         practiceTiming = try values.decodeIfPresent(RemoteResultPracticeTiming.self, forKey: .practiceTiming)
         restartCount = try values.decodeIfPresent(Int.self, forKey: .restartCount)
+        experienceEvidence = values.contains(.experienceEvidence)
+            ? try values.decode(RemoteExperienceEvidence.self, forKey: .experienceEvidence) : nil
         incompletePractice = values.contains(.incompletePractice)
             ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
         if let incompletePractice, !RemoteIncompletePracticePolicy.isValid(
@@ -470,6 +473,12 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
                 || timing.terminalEngagedMilliseconds > Int((elapsedDuration * 1_000).rounded()) {
             throw DecodingError.dataCorruptedError(forKey: .incompletePractice, in: values,
                 debugDescription: "Incomplete history needs valid terminal practice timing")
+        }
+        if let experienceEvidence, !experienceEvidence.matchesTiming(duration: elapsedDuration,
+            practiceTiming: practiceTiming, restartCount: restartCount)
+            || experienceEvidence.modifiers.contains("polyglot") != (language == "mixedLanguages") {
+            throw DecodingError.dataCorruptedError(forKey: .experienceEvidence, in: values,
+                debugDescription: "Experience history must keep its terminal timing binding")
         }
     }
 
@@ -846,6 +855,7 @@ struct RemoteResultSubmission: Codable, Sendable {
     let restartCount: Int
     let tags: [String]
     let incompletePractice: ResultIncompletePractice?
+    let experienceEvidence: RemoteExperienceEvidence?
     let timingEvidence: RemoteResultTimingEvidence?
     let practiceTiming: RemoteResultPracticeTiming?
     let inputMetrics: ResultInputMetrics?
@@ -861,7 +871,8 @@ struct RemoteResultSubmission: Codable, Sendable {
     init(
         result: CompletedTestResult, includesTimingEvidence: Bool = false,
         includesPracticeTiming: Bool = false, includesInputMetrics: Bool = false,
-        includesInputMetricsV2: Bool = false, resultConsistency: RemoteResultConsistency? = nil
+        includesInputMetricsV2: Bool = false, resultConsistency: RemoteResultConsistency? = nil,
+        experienceEvidence: RemoteExperienceEvidence? = nil
     ) {
         id = result.id
         self.resultConsistency = resultConsistency
@@ -883,6 +894,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         timingEvidence = includesTimingEvidence ? RemoteResultTimingEvidence(result: result) : nil
         practiceTiming = includesPracticeTiming ? RemoteResultPracticeTiming(result: result) : nil
         incompletePractice = result.incompletePractice
+        self.experienceEvidence = experienceEvidence
         switch result.inputMetrics?.publicationVersion(nativeCharacterCount: result.typedCharacterCount) {
         case 1:
             inputMetrics = includesInputMetrics ? result.inputMetrics
@@ -942,6 +954,11 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     var supportsResultIncompletePractice: Bool {
         apiVersion == "v1" && service == "typebar"
             && capabilities["resultIncompletePractice"] == "available"
+    }
+
+    var supportsResultExperienceEvidence: Bool {
+        apiVersion == "v1" && service == "typebar"
+            && capabilities["resultExperienceEvidence"] == "available"
     }
 
     var supportsResultBailout: Bool {

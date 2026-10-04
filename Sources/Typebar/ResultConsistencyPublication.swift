@@ -15,6 +15,7 @@ enum ResultConsistencyPublication {
   ) async throws -> RemoteResultSubmission {
     try Task.checkCancellation()
     try RemoteIncompletePracticePolicy.validate(result, capabilities: capabilities)
+    let experienceEvidence = try RemoteExperienceEvidencePolicy.prepare(result, capabilities: capabilities)
     if let elapsedTime = result.elapsedTime, !elapsedTime.isServiceCompatible(
       mode: result.configuration.mode, bailedOut: result.outcome == .bailedOut,
       calendarSeconds: result.finishedAt.timeIntervalSince(result.startedAt)) {
@@ -51,6 +52,6 @@ enum ResultConsistencyPublication {
       includesPracticeTiming: capabilities?.supportsResultPracticeTiming == true,
       includesInputMetrics: capabilities?.supportsResultInputMetrics == true,
       includesInputMetricsV2: capabilities?.supportsResultInputMetricsV2 == true,
-      resultConsistency: metrics)
+      resultConsistency: metrics, experienceEvidence: experienceEvidence)
   }
 }

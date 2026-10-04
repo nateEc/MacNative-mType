@@ -71,6 +71,7 @@ public func configure(
                 "resultTimingEvidence": .available,
                 "resultPracticeTiming": .available,
                 "resultIncompletePractice": .available,
+                "resultExperienceEvidence": .available,
                 "resultInputMetrics": .available,
                 "resultInputMetricsV2": .available,
                 "resultTerminalTiming": .available,

@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-05 新扩展见 [终止 XP 计量与服务解析](EXPERIENCE_EVIDENCE_CONTRACT.md)：resultExperienceEvidence 为加法能力，严格匿名四项计数、基础、时长／AFK、内容开关和修饰器身份保存至私有历史，服务独立解析数值目录。没有采用客户端 XP 或改现有奖励，不改本机列、归档 26／设置 4、依赖或部署；旧 writer 混写／降级和全功能等价未验证。下方为历史协议。
+
 2026-10-04 新扩展见 [逐次未完成练习投稿与远程历史](INCOMPLETE_PRACTICE_PUBLICATION_CONTRACT.md)：v1 新能力 resultIncompletePractice，严格匿名数组、原始次数和聚合毫秒绑定，可选存储及私有历史；旧字段缺失不补造，重复不覆盖，XP 旧公式不切换。归档 26／设置 4，旧 writer 混写／降级未验证；零 GUI／真实库／部署。下方为既有及历史协议。
 
 当前 BailOut 服务 v1 新增 resultBailout=available、可选 bailedOut 和匿名 customLimit。客户端严格协商，支持服务可上传和重试；服务独立检查长度、准确率与速度，保存中止状态但排除 PB／速度榜，保留累计练习和非 Zen XP。远程历史／CSV 保留语义，旧无字段成绩不改；能力查询暂时失败保留重试，不冒充“不支持”。见 [保存与服务资格合同](BAILOUT_LOCAL_SAVING_CONTRACT.md)。新增客户端八项／服务十项，相关 54 项与服务全量 162 项通过；完整串行门禁客户端 2746／服务端 162 项零失败，819 场景结构与未开窗应用包检查通过。没有部署、真实账户或 GUI，精确 XP、实机／降级和整体服务等价仍开放。

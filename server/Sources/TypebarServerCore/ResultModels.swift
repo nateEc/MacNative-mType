@@ -52,6 +52,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let eventCount: Int
     public let restartCount: Int
     public let incompletePractice: ResultIncompletePractice?
+    public let experienceEvidence: ResultExperienceEvidence?
     public let tags: [String]
     public let timingEvidence: ResultTimingEvidence?
     public let practiceTiming: ResultPracticeTiming?
@@ -70,6 +71,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         rawWpm: Int, accuracy: Int, consistency: Double = 0, errorCount: Int, eventCount: Int,
         restartCount: Int = 0, tags: [String] = [], timingEvidence: ResultTimingEvidence? = nil,
         incompletePractice: ResultIncompletePractice? = nil,
+        experienceEvidence: ResultExperienceEvidence? = nil,
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         resultConsistency: ResultConsistencyMetrics? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
@@ -91,6 +93,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.eventCount = eventCount
         self.restartCount = restartCount
         self.incompletePractice = incompletePractice
+        self.experienceEvidence = experienceEvidence
         self.tags = tags
         self.timingEvidence = timingEvidence
         self.practiceTiming = practiceTiming
@@ -111,6 +114,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case timingEvidence
         case practiceTiming
         case incompletePractice
+        case experienceEvidence
         case inputMetrics
         case resultConsistency
         case terminalTiming
@@ -132,10 +136,12 @@ public struct ResultSubmissionRequest: Content, Equatable {
         resultConsistency = try values.decodeIfPresent(ResultConsistencyMetrics.self, forKey: .resultConsistency)
         errorCount = try values.decode(Int.self, forKey: .errorCount)
         eventCount = try values.decode(Int.self, forKey: .eventCount)
-        restartCount = values.contains(.incompletePractice) ? try values.decode(Int.self, forKey: .restartCount)
+        restartCount = values.contains(.incompletePractice) || values.contains(.experienceEvidence) ? try values.decode(Int.self, forKey: .restartCount)
             : try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0
         incompletePractice = values.contains(.incompletePractice)
             ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
+        experienceEvidence = values.contains(.experienceEvidence)
+            ? try values.decode(ResultExperienceEvidence.self, forKey: .experienceEvidence) : nil
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         timingEvidence = try values.decodeIfPresent(ResultTimingEvidence.self, forKey: .timingEvidence)
         practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
@@ -184,6 +190,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public let tags: [String]
     public let practiceTiming: ResultPracticeTiming?
     public let incompletePractice: ResultIncompletePractice?
+    public let experienceEvidence: ResultExperienceEvidence?
     public let restartCount: Int?
     public let terminalTiming: ResultTerminalTiming?
     public let elapsedTime: ResultElapsedTime?
@@ -199,6 +206,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         rawWpm: Int, accuracy: Int, consistency: Double, errorCount: Int, eventCount: Int,
         tags: [String], practiceTiming: ResultPracticeTiming? = nil, preciseAccuracy: Double? = nil,
         incompletePractice: ResultIncompletePractice? = nil, restartCount: Int? = nil,
+        experienceEvidence: ResultExperienceEvidence? = nil,
         keyConsistency: Double? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
         elapsedTime: ResultElapsedTime? = nil,
@@ -221,6 +229,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.tags = tags
         self.practiceTiming = practiceTiming
         self.incompletePractice = incompletePractice
+        self.experienceEvidence = experienceEvidence
         self.restartCount = restartCount
         self.terminalTiming = terminalTiming
         self.elapsedTime = elapsedTime
@@ -234,7 +243,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, preciseAccuracy,
-            consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, terminalTiming,
+            consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, terminalTiming,
             elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime
     }
 
@@ -243,6 +252,8 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         let elapsed = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
         let incomplete = values.contains(.incompletePractice)
             ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
+        let experience = values.contains(.experienceEvidence)
+            ? try values.decode(ResultExperienceEvidence.self, forKey: .experienceEvidence) : nil
         let restarts = try values.decodeIfPresent(Int.self, forKey: .restartCount)
         let practice = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
         if let incomplete, restarts == nil || !incomplete.isValid(restartCount: restarts!, practiceTiming: practice) {
@@ -268,10 +279,18 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             practiceTiming: practice,
             preciseAccuracy: try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy),
             incompletePractice: incomplete, restartCount: restarts,
+            experienceEvidence: experience,
             keyConsistency: try values.decodeIfPresent(Double.self, forKey: .keyConsistency),
             terminalTiming: try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming), elapsedTime: elapsed,
             bailedOut: try values.decodeIfPresent(Bool.self, forKey: .bailedOut),
             customLimit: try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit), startedAt: start, finishedAt: end)
+        let measured = terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
+            ?? finishedAt.timeIntervalSince(startedAt)
+        if let experience, !experience.matchesTiming(duration: measured, practiceTiming: practice, restartCount: restarts)
+            || experience.modifiers.contains("polyglot") != (language == "mixedLanguages") {
+            throw DecodingError.dataCorruptedError(forKey: .experienceEvidence, in: values,
+                debugDescription: "Experience history needs terminal timing and language identity bindings")
+        }
     }
 }
 

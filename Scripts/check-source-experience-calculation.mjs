@@ -9,8 +9,9 @@ import {stripTypeScriptTypes} from 'node:module';
 
 const root = path.resolve(process.argv[2] ?? '');
 const emit = process.argv[3] === '--emit-fixtures';
+const emitCatalog = process.argv[3] === '--emit-catalog';
 assert.ok(process.argv[2], 'Pinned reference checkout required');
-assert.ok(!process.argv[3] || emit, 'Only --emit-fixtures is supported');
+assert.ok(!process.argv[3] || emit || emitCatalog, 'Only --emit-fixtures or --emit-catalog is supported');
 const pin = '91bd24bb8513785c7364cbea29296ff7adafac41';
 const verify = () => {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(), pin);
@@ -40,6 +41,12 @@ const load = async relative => {
 const numbers = await load('packages/util/src/numbers.ts');
 const dates = await load('packages/util/src/date-and-time.ts');
 const funboxes = await load('packages/funbox/src/list.ts');
+if (emitCatalog) {
+  const catalog = funboxes.getFunboxNames().map(name => ({name, difficulty: funboxes.getFunbox(name).difficultyLevel}));
+  verify();
+  process.stdout.write(JSON.stringify({referenceCommit: pin, catalog}));
+  process.exit(0);
+}
 Object.assign(context, {mapRange: numbers.mapRange, isSafeNumber: numbers.isSafeNumber,
   getStartOfDayTimestamp: dates.getStartOfDayTimestamp, getCurrentDayTimestamp: dates.getCurrentDayTimestamp,
   getFunbox: funboxes.getFunbox});
