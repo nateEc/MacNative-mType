@@ -1217,7 +1217,6 @@ private struct ContentView: View {
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
-    .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.inputRules) { _, rules in session.synchronizeLiveInputRules(rules) }
     .onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }
@@ -2828,13 +2827,15 @@ private struct ContentView: View {
                 mainCharacterOffset: settings.caretStyle.drawsMarker
                   ? rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex) : nil,
                 mainStyle: settings.caretStyle,
-                paceCharacterOffset: paceCaretCharacterOffset(in: rendering),
+                paceCharacterOffset: nil,
                 paceStyle: settings.paceCaretStyle,
                 font: practicePromptNSFont(size: settings.fontSize),
                 lineSpacing: usesJoiningScript ? 8 : 12,
                 isRightToLeft: isRightToLeft,
                 accent: activeTheme.caret,
-                motion: settings.smoothCaretMotion)
+                motion: settings.smoothCaretMotion,
+                paceFrame: paceCaretFrameProvider(in: rendering),
+                reducesPaceMotion: settings.reducePracticeMotion)
             }
           }
       }
@@ -2968,11 +2969,18 @@ private struct ContentView: View {
       || session.configuration.usesRightToLeftPrompt
   }
 
-  private func paceCaretCharacterOffset(in rendering: PromptRendering) -> Int? {
-    guard settings.paceCaretStyle.drawsMarker, paceGuideIndex != currentPromptGlyphIndex else {
-      return nil
-    }
-    return rendering.characterOffset(forGlyphAt: paceGuideIndex)
+  private func paceCaretInterpolation(in rendering: PromptRendering, at date: Date) -> PromptPaceCaretInterpolation? {
+    guard let frame = session.paceCaretFrame(at: date) else { return nil }
+    let from = session.paceCaretGlyphAnchor(for: frame.from)
+    let target = session.paceCaretGlyphAnchor(for: frame.target)
+    return .init(fromCharacterOffset: rendering.characterOffset(forGlyphAt: from?.glyphIndex),
+      targetCharacterOffset: rendering.characterOffset(forGlyphAt: target?.glyphIndex),
+      fromAfter: from?.after ?? false, targetAfter: target?.after ?? false, fraction: frame.fraction)
+  }
+
+  private func paceCaretFrameProvider(in rendering: PromptRendering) -> ((Date) -> PromptPaceCaretInterpolation?)? {
+    guard settings.paceCaretStyle.drawsMarker, session.paceCaretFrame(at: .now) != nil else { return nil }
+    return { date in paceCaretInterpolation(in: rendering, at: date) }
   }
 
   private var renderedPrompt: PromptRendering {
@@ -3786,6 +3794,7 @@ private struct ContentView: View {
     isSamePromptRepeatAttempt = false
     isRepeatedPaceAttempt = false
     activePaceTargetWpm = paceGuideTarget()
+    session.configurePace(wpm: activePaceTargetWpm)
     if session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
@@ -3800,6 +3809,7 @@ private struct ContentView: View {
       restorePersistedTestSelection()
     }
     refreshZipfNotice()
+    if !session.hasStarted { refreshPaceTarget() }
   }
 
   private func synchronizeNoQuitConfigurationLock() {
@@ -4022,6 +4032,7 @@ private struct ContentView: View {
     let shouldUseRepeatedPace = isRepeatedPaceAttempt && settings.paceGuideMode == .off
     activePaceTargetWpm = paceGuideTarget(
       usingRepeatedPace: shouldUseRepeatedPace ? lastFinishedWpm : nil)
+    session.configurePace(wpm: activePaceTargetWpm)
     if session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
@@ -4035,6 +4046,7 @@ private struct ContentView: View {
 
   private func refreshPaceTarget() {
     activePaceTargetWpm = paceGuideTarget()
+    session.configurePace(wpm: activePaceTargetWpm)
   }
 
   private func requestTypingFocus() {
@@ -4141,16 +4153,8 @@ private struct ContentView: View {
   }
 
   private var paceGuideIndex: Int? {
-    guard
-      let targetWpm = activePaceTargetWpm,
-      let startedAt = session.startedAt,
-      !session.isFinished
-    else { return nil }
-    return PaceGuidePolicy.expectedCharacterIndex(
-      elapsed: Date.now.timeIntervalSince(startedAt),
-      targetWpm: targetWpm,
-      promptLength: session.prompt.count
-    )
+    guard let frame = session.paceCaretFrame(at: .now) else { return nil }
+    return session.paceCaretGlyphIndex(for: frame.target)
   }
 
   private var paceGuideProgressDescription: String {

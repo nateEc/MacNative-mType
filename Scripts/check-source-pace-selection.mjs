@@ -67,18 +67,22 @@ class Query {
     return this.single ? selected[0] : selected;
   }
 }
+let active = false, resultVisible = false, activeWord = 0, clock = 1000;
+let hidden = true, moves = [], nextTimer = 0;
+const timers = new Map();
 class OwnedCaret {
-  hide() {} stopAllAnimations() {} clearMargins() {} goTo() {} setStyle() {}
+  hide() { hidden = true; } show() { hidden = false; } isHidden() { return hidden; }
+  stopAllAnimations() {} clearMargins() {} setStyle() {}
+  goTo(options) { moves.push(structuredClone(options)); }
 }
 class OwnedDate extends Date { static now() { return now; } }
 const bindings = new Map([
   [local('config/store'), {Config: config, getConfig: config}],
   [local('states/test'), {isPaceRepeat: () => repeat, setPaceCaretWpm: speed => { observed = speed; },
-    getCurrentQuote: () => quote, getActiveWordIndex: () => 0,
-    isTestActive: () => false, getResultVisible: () => false,
+    getCurrentQuote: () => quote, getActiveWordIndex: () => activeWord,
+    isTestActive: () => active, getResultVisible: () => resultVisible,
     isLanguageRightToLeft: () => false, isDirectionReversed: () => false}],
   [local('states/core'), {isAuthenticated: () => authenticated}],
-  [local('test/test-words'), {words: {get: unexpected('word animation')}}],
   [local('utils/misc'), {getMode2: c => c.mode === 'time' ? String(c.time) :
     c.mode === 'words' ? String(c.words) : c.mode === 'quote' ? quote.id : c.mode}],
   [local('test/funbox/list'), {getActiveFunboxes: () => config.funbox}],
@@ -108,10 +112,12 @@ const dormant = new Set(['ape', 'states/notifications', 'elements/test-activity-
   '@tanstack/solid-query', 'solid-js', '@monkeytype/schemas/users',
   '@monkeytype/schemas/configs', '@monkeytype/schemas/shared',
   '@monkeytype/schemas/languages', '@monkeytype/schemas/results', '@monkeytype/funbox']));
-const actualIDs = ['test/pace-caret', 'collections/results', 'db'].map(local);
+const actualIDs = ['test/pace-caret', 'collections/results', 'db', 'test/test-words'].map(local);
 const modules = new Map(), importedNames = new Map();
-const context = vm.createContext({console, Date: OwnedDate,
-  setTimeout: unexpected('animation timer'), clearTimeout: unexpected('animation cleanup')});
+const context = vm.createContext({console, Date: OwnedDate, performance: {now: () => clock},
+  setTimeout: (callback, delay) => {
+    const id = ++nextTimer; timers.set(id, {callback, due: clock + delay}); return id;
+  }, clearTimeout: id => timers.delete(id)});
 for (const id of actualIDs) {
   const code = stripTypeScriptTypes(fs.readFileSync(id + '.ts', 'utf8'), {mode: 'transform'});
   modules.set(id, new vm.SourceTextModule(code, {identifier: id, context}));
@@ -139,6 +145,7 @@ await module.link((id, importer) => moduleFor(resolve(id, importer.identifier)))
 await module.evaluate();
 const pace = module.namespace, db = modules.get(local('db')).namespace;
 const queries = modules.get(local('collections/results')).namespace;
+const words = modules.get(local('test/test-words')).namespace.words;
 let fixtures = 0;
 async function target(mode, expected) {
   config.paceCaret = mode; await pace.init(); assert.equal(observed, expected); fixtures++;
@@ -199,6 +206,68 @@ for (const [key, setting] of [['punctuation', true], ['numbers', true], ['langua
   ['difficulty', 'expert'], ['lazyMode', true]]) {
   const original = config[key]; config[key] = setting; await target('pb', undefined); config[key] = original;
 }
+let animationFixtures = 0;
+async function prepare(rawWords = ['ab ', 'cd ', 'efg']) {
+  pace.reset(); timers.clear(); moves = []; clock = 1000; activeWord = 0;
+  active = true; resultVisible = false; config.blindMode = false;
+  config.paceCaret = 'custom'; config.paceCaretCustomSpeed = 60;
+  words.reset(); rawWords.forEach(word => words.push(word, 0));
+  await pace.init(); pace.start();
+}
+async function deliver(at) {
+  clock = at;
+  for (let count = 0; ; count++) {
+    assert.ok(count < 1000, 'Owned timer delivery bound');
+    const ready = [...timers].filter(([, timer]) => timer.due <= clock)
+      .sort((a, b) => a[1].due - b[1].due)[0];
+    if (!ready) break;
+    timers.delete(ready[0]); ready[1].callback(); await Promise.resolve();
+  }
+}
+function position(wordIndex, letterIndex, duration) {
+  const move = moves.at(-1);
+  assert.equal(move.wordIndex, wordIndex); assert.equal(move.letterIndex, letterIndex);
+  if (duration !== undefined) assert.ok(Math.abs(move.animationOptions.duration - duration) < 1e-8);
+}
+await prepare(); position(0, 1, 200); animationFixtures++;
+await deliver(1200); position(0, 2, 200);
+await deliver(1400); position(1, 0, 200); animationFixtures++;
+await prepare(); pace.handleSpace(false, words.get(0).textWithCommit);
+pace.handleSpace(false, words.get(0).textWithCommit);
+await deliver(1200); position(1, 2); animationFixtures++;
+pace.handleSpace(true, words.get(0).textWithCommit);
+pace.handleSpace(true, words.get(0).textWithCommit);
+await deliver(1400); position(1, 0); animationFixtures++;
+await prepare(); pace.handleSpace(false, words.get(0).textWithCommit);
+config.blindMode = true; await deliver(1200); position(0, 2);
+await deliver(1400); position(1, 0);
+config.blindMode = false; await deliver(1600); position(2, 1); animationFixtures++;
+await prepare(); config.blindMode = true; pace.handleSpace(false, words.get(0).textWithCommit);
+config.blindMode = false; pace.handleSpace(true, words.get(0).textWithCommit);
+await deliver(1200); position(0, 2); animationFixtures++;
+await prepare(['😀 ', 'x ', 'abcd']);
+pace.handleSpace(false, words.get(0).textWithCommit);
+await deliver(1200); position(2, 0); animationFixtures++;
+await prepare(['ab', 'cd', 'efg']); pace.handleSpace(false, words.get(0).textWithCommit);
+await deliver(1200); position(1, 1); animationFixtures++;
+await prepare(['ab\n', 'cd ', 'efg']); pace.handleSpace(false, words.get(0).textWithCommit);
+await deliver(1200); position(1, 2); animationFixtures++;
+await prepare(); await deliver(1250); position(0, 2, 150); animationFixtures++;
+await prepare(); await deliver(1400); position(1, 0, 200); animationFixtures++;
+await prepare(['ab']); await deliver(1400); position(1, 0);
+await deliver(1600); assert.equal(hidden, true); animationFixtures++;
+await prepare(); const beforeReset = moves.length; pace.reset();
+await deliver(1200); assert.equal(moves.length, beforeReset); animationFixtures++;
+await prepare(); const beforeInit = moves.length; await pace.init();
+await deliver(1200); assert.equal(moves.length, beforeInit); assert.equal(hidden, true); animationFixtures++;
+await prepare(); resultVisible = true; const beforeResult = moves.length;
+await deliver(1200); assert.equal(moves.length, beforeResult); animationFixtures++;
+await prepare(); active = false; const beforeInactive = moves.length;
+await deliver(1200); assert.equal(moves.length, beforeInactive); animationFixtures++;
+await prepare(); config.paceCaretCustomSpeed = 120;
+await deliver(1200); position(0, 2, 200); animationFixtures++;
+pace.reset();
 assert.equal(execFileSync('git', ['-C', root, 'status', '--porcelain'], {encoding: 'utf8'}).trim(), '');
-console.log('pace selection source probe passed: ' + fixtures + ' fixtures; 3 complete source modules; '
-  + 'bounded Query DSL, tag PB, clock and caret adapters; no browser, GUI, live account or copied assets');
+console.log('pace source probe passed: ' + fixtures + ' selection and ' + animationFixtures
+  + ' progression fixtures; 4 complete source modules; bounded Query DSL, tag PB, monotonic timer '
+  + 'and caret adapters; no browser, GUI, live account or copied assets');

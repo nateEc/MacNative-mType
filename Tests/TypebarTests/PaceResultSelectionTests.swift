@@ -132,14 +132,16 @@ final class PaceResultSelectionTests: XCTestCase {
       XCTAssertNil(PaceGuidePolicy.validTarget(speed))
     }
     XCTAssertEqual(PaceGuidePolicy.validTarget(1.25), 1.25)
-    XCTAssertEqual(PaceGuidePolicy.expectedCharacterIndex(elapsed: 12,
-      targetWpm: 60.5, promptLength: 100), 60)
-    XCTAssertEqual(PaceGuidePolicy.expectedCharacterIndex(elapsed: .greatestFiniteMagnitude,
-      targetWpm: .greatestFiniteMagnitude, promptLength: 100), 99)
-    XCTAssertEqual(PaceGuidePolicy.expectedCharacterIndex(elapsed: .nan,
-      targetWpm: 60, promptLength: 100), 0)
-    XCTAssertEqual(PaceGuidePolicy.expectedCharacterIndex(elapsed: 1,
-      targetWpm: .infinity, promptLength: 100), 0)
+    let catalog = PaceCaretCatalog(prompt: String(repeating: "a", count: 100))
+    let date = Date(timeIntervalSinceReferenceDate: 0)
+    var pace = PaceCaretProgress(wpm: 60.5, catalog: catalog)!
+    pace.start(at: date, blind: false)
+    XCTAssertEqual(pace.frame(at: date.addingTimeInterval(12), blind: false)?.target.letter, 61)
+    var huge = PaceCaretProgress(wpm: .greatestFiniteMagnitude, catalog: catalog)!
+    huge.start(at: date, blind: false)
+    XCTAssertNil(huge.frame(at: date.addingTimeInterval(.greatestFiniteMagnitude), blind: false))
+    XCTAssertEqual(pace.frame(at: Date(timeIntervalSinceReferenceDate: .nan), blind: false)?.target.letter, 1)
+    XCTAssertNil(PaceCaretProgress(wpm: .infinity, catalog: catalog))
   }
 
   func testRepeatRawNaNComparisonMatchesSetterAndMissingPreviousUsesZero() {

@@ -4333,6 +4333,7 @@ struct TypingSession {
     didSet { refreshUnitTargets() }
   }
   private var unitTargets = UnitInputTargets("")
+  private var paceCaretProgress: PaceCaretProgress?
   /// Source initialization selects this once; input or later prompt growth
   /// cannot switch the scoring basis. It is not a language-menu preference.
   private let initialKoreanScoring: Bool
@@ -4388,6 +4389,11 @@ struct TypingSession {
           .first { noSpaceTargetWords[$0].isEmpty }
       }
       refreshUnitTargets()
+      if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), paceCaretProgress != nil {
+        if noSpaceTargetWords.count >= oldValue.count {
+          paceCaretProgress?.appendWords(Array(noSpaceTargetWords.dropFirst(oldValue.count)))
+        } else { paceCaretProgress = nil }
+      }
     }
   }
   private var firstEmptyNoSpaceWordIndex: Int?
@@ -4572,6 +4578,39 @@ struct TypingSession {
     unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: acceptedUnits != nil,
       noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil,
       asciiSeparatorCount: promptSeparatorUnitCount)
+  }
+
+  mutating func configurePace(wpm: Double?) {
+    guard configuration.mode != .zen, let wpm,
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) || hasNoSpaceWordSegmentation
+    else { paceCaretProgress = nil; return }
+    paceCaretProgress = .init(wpm: wpm, catalog: .init(prompt: prompt,
+      noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil))
+  }
+
+  func paceCaretFrame(at date: Date) -> PaceCaretFrame? {
+    guard !isFinished else { return nil }
+    return paceCaretProgress?.frame(at: date, blind: configuration.rules.blindMode)
+  }
+
+  func paceCaretGlyphIndex(for position: PaceCaretPosition) -> Int? {
+    paceCaretProgress?.catalog.glyphIndex(at: position)
+  }
+
+  func paceCaretGlyphAnchor(for position: PaceCaretPosition) -> PaceCaretGlyphAnchor? {
+    paceCaretProgress?.catalog.glyphAnchor(at: position)
+  }
+
+  private func paceCommittedFieldIsCorrect(_ field: TypingReplayInputField) -> Bool {
+    guard let catalog = paceCaretProgress?.catalog, catalog.words.indices.contains(field.index) else { return false }
+    let target = catalog.words[field.index].raw
+    let matches = field.valueUTF16.map { $0.elementsEqual(target.utf16) }
+      ?? InputTextIdentity.matches(field.value, target)
+    guard matches else { return false }
+    if let acceptedUnits {
+      return !acceptedUnits.entries[acceptedUnits.range(field.index)].contains(where: \.forced)
+    }
+    return forcedErrorIndices.isEmpty || !hasForcedError(inWord: field.index)
   }
 
   /// Restarts from the original source: owned quotes regenerate sampled targets,
@@ -5919,6 +5958,8 @@ struct TypingSession {
   }
 
   mutating func tick(at date: Date = .now) {
+    guard !isFinished else { return }
+    paceCaretProgress?.advance(to: date, blind: configuration.rules.blindMode)
     guard !isFinished, let duration = configuration.duration, let startedAt else { return }
     guard duration > 0 else { return }
     if date.timeIntervalSince(startedAt) >= duration { complete(at: date) }
@@ -5984,6 +6025,7 @@ struct TypingSession {
   private mutating func beginIfNeeded(at date: Date) {
     if startedAt == nil {
       startedAt = date
+      paceCaretProgress?.start(at: date, blind: configuration.rules.blindMode)
     }
   }
 
@@ -6614,6 +6656,12 @@ struct TypingSession {
     guard let startedAt else { return }
     if kind == .insert, inputStopped { discardTerminalElementIfNeeded() }
     let field = replayInputField(kind: kind, inputStopped: inputStopped)
+    if paceCaretProgress != nil, kind == .insert, !inputStopped, lastInputCommitsWord, let field {
+      paceCaretProgress?.advance(to: date, blind: configuration.rules.blindMode)
+      let correct = paceCommittedFieldIsCorrect(field)
+      paceCaretProgress?.handleCommit(word: field.index, correct: correct,
+        blind: configuration.rules.blindMode)
+    }
     // A converted session preserves actual units, including lone surrogates;
     // no-space/legacy primitives retain their distinct archive contracts.
     let raw = acceptedUnits != nil || (kind == .insert ? recordsBMPUnits : lastDeletionWasBMPUnit)
@@ -7964,6 +8012,7 @@ struct TypingSession {
   }
 
   private mutating func appendPrompt(_ chunk: String) {
+    if !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) { paceCaretProgress?.append(chunk) }
     let startsWithSeparator = chunk.first.map(isPromptWordSeparator) == true
       && !(prompt.last == "\r" && chunk.first == "\n")
     let followsStableSeparator: Bool

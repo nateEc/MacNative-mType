@@ -143,16 +143,6 @@ enum PaceGuidePolicy {
         return speed
     }
 
-    static func expectedCharacterIndex(elapsed: TimeInterval, targetWpm: Double, promptLength: Int) -> Int {
-        guard elapsed.isFinite, elapsed > 0, targetWpm.isFinite, targetWpm > 0,
-            promptLength > 0 else { return 0 }
-        let position = (elapsed * targetWpm * 5 / 60).rounded(.down)
-        // Clamp before conversion: finite inputs may overflow their product.
-        let lastIndex = promptLength - 1
-        guard position < Double(lastIndex) else { return lastIndex }
-        return Int(position)
-    }
-
     private static func matching(configuration: TestConfiguration, samples: [PaceGuideSample]) -> [PaceGuideSample] {
         samples.filter {
             ($0.outcome == .completed || $0.outcome == .bailedOut)

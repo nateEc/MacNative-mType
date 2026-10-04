@@ -28146,10 +28146,11 @@ final class TypingEngineTests: XCTestCase {
       PaceGuidePolicy.targetWpm(
         mode: .off, customWpm: 60, configuration: configuration, samples: samples, now: today,
         calendar: calendar))
-    XCTAssertEqual(
-      PaceGuidePolicy.expectedCharacterIndex(elapsed: 2, targetWpm: 60, promptLength: 40), 10)
-    XCTAssertEqual(
-      PaceGuidePolicy.expectedCharacterIndex(elapsed: 120, targetWpm: 300, promptLength: 40), 39)
+    var pace = PaceCaretProgress(wpm: 60,
+      catalog: .init(prompt: String(repeating: "a", count: 40)))!
+    pace.start(at: start, blind: false)
+    XCTAssertEqual(pace.frame(at: start.addingTimeInterval(2), blind: false)?.target.letter, 11)
+    XCTAssertNil(pace.frame(at: start.addingTimeInterval(120), blind: false))
   }
 
   func testActiveTagPersonalBestPaceGuideUsesOnlyMatchingCompletedResults() {

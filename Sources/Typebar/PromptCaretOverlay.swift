@@ -137,6 +137,35 @@ private struct PromptCaretPlacement: Identifiable {
   var id: String { marker.id }
 }
 
+struct PromptPaceCaretInterpolation {
+  let fromCharacterOffset: Int?
+  let targetCharacterOffset: Int?
+  let fromAfter: Bool
+  let targetAfter: Bool
+  let fraction: Double
+}
+
+enum PromptPaceCaretGeometry {
+  static func rect(from: CGRect, to: CGRect, fromAfter: Bool, toAfter: Bool,
+    style: TypingCaretStyle, rightToLeft: Bool, fraction: Double, reducesMotion: Bool,
+    afterWidth: CGFloat = 8) -> CGRect {
+    func endpoint(_ rect: CGRect, after: Bool) -> CGRect {
+      guard after else { return rect }
+      if style.usesFullGlyphWidth {
+        return CGRect(x: rightToLeft ? rect.minX - afterWidth : rect.maxX,
+          y: rect.minY, width: afterWidth, height: rect.height)
+      }
+      return rect.offsetBy(dx: rightToLeft ? -rect.width : rect.width, dy: 0)
+    }
+    let start = endpoint(from, after: fromAfter), end = endpoint(to, after: toAfter)
+    let t = CGFloat(reducesMotion ? 1 : min(1, max(0, fraction.isFinite ? fraction : 1)))
+    return CGRect(x: start.minX + (end.minX - start.minX) * t,
+      y: start.minY + (end.minY - start.minY) * t,
+      width: start.width + (end.width - start.width) * t,
+      height: start.height + (end.height - start.height) * t)
+  }
+}
+
 /// The reference caret enters an RTL target glyph from its trailing visual
 /// edge. Full-width markers still center on the glyph in either direction.
 enum PromptCaretPlacementPolicy {
@@ -244,11 +273,25 @@ struct PromptCaretOverlay: View {
   let isRightToLeft: Bool
   let accent: Color
   let motion: SmoothCaretMotion
+  var paceFrame: ((Date) -> PromptPaceCaretInterpolation?)? = nil
+  var reducesPaceMotion = false
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
     GeometryReader { proxy in
-      let placements = markerPlacements(in: proxy.size)
-      ZStack(alignment: .topLeading) {
+      if let paceFrame {
+        TimelineView(.animation(minimumInterval: reducesPaceMotion || systemReduceMotion
+          ? 0.1 : AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))) { timeline in
+          markerLayer(in: proxy.size, interpolation: paceFrame(timeline.date), dynamicPace: true)
+        }
+      } else { markerLayer(in: proxy.size, interpolation: nil, dynamicPace: false) }
+    }
+  }
+
+  private func markerLayer(in size: CGSize, interpolation: PromptPaceCaretInterpolation?, dynamicPace: Bool) -> some View {
+    let placements = markerPlacements(in: size, interpolation: interpolation, dynamicPace: dynamicPace)
+    return ZStack(alignment: .topLeading) {
         ForEach(placements) { placement in
           PromptCaretMarkerView(
             style: placement.marker.style,
@@ -260,17 +303,17 @@ struct PromptCaretOverlay: View {
               isRightToLeft: isRightToLeft),
             y: placement.rect.midY)
           .animation(
-            motion.duration.map { .easeInOut(duration: $0) }, value: placement.rect)
+            placement.id == "main" ? motion.duration.map { .easeInOut(duration: $0) } : nil,
+            value: placement.rect)
         }
       }
       .allowsHitTesting(false)
       .accessibilityHidden(true)
-    }
   }
 
-  private func markerPlacements(in size: CGSize) -> [PromptCaretPlacement] {
+  private func markerPlacements(in size: CGSize, interpolation: PromptPaceCaretInterpolation?, dynamicPace: Bool) -> [PromptCaretPlacement] {
     let markers = [
-      paceCharacterOffset.map {
+      (dynamicPace ? nil : paceCharacterOffset).map {
         PromptCaretMarker(id: "pace", characterOffset: $0, style: paceStyle, opacity: 0.72)
       },
       mainCharacterOffset.map {
@@ -278,13 +321,29 @@ struct PromptCaretOverlay: View {
       },
     ].compactMap { $0 }.filter { $0.style != .off }
 
-    return markers.compactMap { marker in
+    var placements = markers.compactMap { marker -> PromptCaretPlacement? in
       guard let rect = PromptCaretLayout.rect(
         in: text, characterOffset: marker.characterOffset, containerSize: size,
         font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
       else { return nil }
       return PromptCaretPlacement(marker: marker, rect: rect)
     }
+    if paceStyle.drawsMarker, let interpolation, let target = interpolation.targetCharacterOffset,
+      let to = PromptCaretLayout.rect(in: text, characterOffset: target, containerSize: size,
+        font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft) {
+      let from = interpolation.fromCharacterOffset.flatMap {
+        PromptCaretLayout.rect(in: text, characterOffset: $0, containerSize: size,
+          font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
+      } ?? to
+      let rect = PromptPaceCaretGeometry.rect(from: from, to: to,
+        fromAfter: interpolation.fromAfter, toAfter: interpolation.targetAfter,
+        style: paceStyle, rightToLeft: isRightToLeft, fraction: interpolation.fraction,
+        reducesMotion: reducesPaceMotion || systemReduceMotion,
+        afterWidth: (" " as NSString).size(withAttributes: [.font: font]).width)
+      placements.insert(.init(marker: .init(id: "pace", characterOffset: target, style: paceStyle,
+        opacity: 0.72), rect: rect), at: 0)
+    }
+    return placements
   }
 }
 
