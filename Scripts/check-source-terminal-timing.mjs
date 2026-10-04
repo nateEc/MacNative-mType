@@ -22,7 +22,7 @@ const actualFiles = new Map([
   ['@monkeytype/util/numbers', path.join(root, 'packages/util/src/numbers.ts')],
   ['owned/backend-validation', path.join(root, 'backend/src/utils/validation.ts')],
 ]);
-let state, now = 0;
+let state, now = 0, wallEnd = null;
 const config = {mode: 'zen', language: 'english', funbox: [], oppositeShiftMode: 'off', layout: 'default',
   words: 100, time: 60, punctuation: false, numbers: false, lazyMode: false, difficulty: 'normal',
   blindMode: false, stopOnError: 'off', resultSaving: false};
@@ -50,7 +50,7 @@ const bindings = new Map([
   [local('test/test-timer'), {clear: (ended, end) => {
     assert.equal(ended, true);
     modules.get(local('test/events/data')).namespace.logTestEvent('timer', end,
-      {event: 'end', time: Math.floor(end / 1000), date: end});
+      {event: 'end', time: Math.floor(end / 1000), date: wallEnd ?? end});
   }}],
   [local('test/test-ui'), {onTestFinish() {}}],
   [local('utils/misc'), {promiseAnimate: async () => {}, applyReducedMotion: x => x,
@@ -146,13 +146,14 @@ const keydown = modules.get(local('input/handlers/keydown')).namespace;
 const backend = modules.get('owned/backend-validation').namespace;
 let count = 0;
 function reset({mode = 'zen', bailedOut = false, repeated = false, targets = [], signedIn = false,
-  lbOptOut = false, words = 100, time = 60, customLimit = {mode: 'none', value: 1}} = {}) {
+  lbOptOut = false, words = 100, time = 60, customLimit = {mode: 'none', value: 1},
+  startDate = 0, endDate = null} = {}) {
   state = {active: true, calculating: false, repeated, bailedOut, targets, invalid: false,
     signedIn, notices: [], analytics: [], signedOut: null, update: null,
     requests: [], challengeCalls: [], spinner: [], incompleteResets: 0, incompleteAttempts: [], lbOptOut, customLimit};
   config.mode = mode; config.words = words; config.time = time;
-  config.resultSaving = signedIn; data.resetTestEvents(); now = 0;
-  data.logTestEvent('timer', 0, {event: 'start', date: 0});
+  config.resultSaving = signedIn; data.resetTestEvents(); now = 0; wallEnd = endDate;
+  data.logTestEvent('timer', 0, {event: 'start', date: startDate});
 }
 function press(ms, code = 'KeyA') { data.logTestEvent('keydown', ms, {code}); }
 function input(ms, value = 'a', text = 'a', extra = {}) {
@@ -327,5 +328,29 @@ for (const [options,characters,retained] of [
   press(15000,'Enter'); result=await finish(16000);
   assert.equal(result.wpm,Math.round(characters*80)/100);
   assert.equal(state.signedOut !== null,retained,JSON.stringify(options)); count++;
+}
+// Measured event time is distinct from real calendar dates. The actual finish
+// policy additionally rejects ordinary <=120s timed results when they disagree;
+// separating duration is NOT permission to remove that qualification check.
+for (const options of [{mode:'time',time:15}, {mode:'words',words:25},
+  {mode:'zen'}, {mode:'time',time:15,bailedOut:true}]) {
+  for (const wallGap of [-3_600_000, 3_600_000]) {
+    const startDate = 1_800_000_000_000;
+    reset({...options, targets:['ab'], startDate, endDate:startDate+wallGap});
+    press(0); input(0); press(15000,'KeyB'); input(15000,'ab','b');
+    const live = modules.get(local('test/events/live-cache')).namespace;
+    assert.equal(live.getLiveCachedTestDurationMs(16000),16000);
+    const result = await finish(16000), tape = state.eventLog;
+    const trimmed = options.mode === 'zen' || options.bailedOut === true;
+    assert.equal(result.testDuration,trimmed ? 15 : 16);
+    assert.equal(stats.getDateBasedTestDurationMs(tape),wallGap);
+    assert.equal(tape.events.find(e=>e.type==='timer'&&e.data.event==='start').data.date,startDate);
+    assert.equal(tape.events.find(e=>e.type==='timer'&&e.data.event==='end').data.date,startDate+wallGap);
+    const inconsistent = options.mode === 'time' && !options.bailedOut;
+    assert.equal(state.invalid,inconsistent);
+    assert.equal(state.notices.includes('Test invalid - inconsistent test duration'),inconsistent);
+    assert.equal(state.signedOut !== null,!inconsistent);
+    count++;
+  }
 }
 console.log(`${count} owned terminal timing/finish fixtures passed (${actualFiles.size} complete actual modules; real event storage/cleanup/key handling/stats/finish/backend length check and authenticated save prefix, synthetic 503 transport/hash/identity/UI/timer-end, no success-save/browser/IME/native parity claim).`);

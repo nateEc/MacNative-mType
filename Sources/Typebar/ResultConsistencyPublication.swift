@@ -14,6 +14,11 @@ enum ResultConsistencyPublication {
     calculation: @escaping @Sendable (ResultWPMConsistencyInput) async -> Double? = { $0.calculate() }
   ) async throws -> RemoteResultSubmission {
     try Task.checkCancellation()
+    // Expand local persistence before the service cutover. No service yet
+    // implements this contract, even if an unknown capability claims it.
+    guard result.elapsedTime == nil else {
+      throw RemoteAccountError.serverMessage("独立时长成绩的服务协议尚未迁移，暂不能发布；本机成绩和归档不受影响。")
+    }
     guard result.outcome != .bailedOut || capabilities?.supportsResultBailout == true else {
       // Timing support alone cannot authorize a completed-looking BailOut.
       throw RemoteAccountError.serverMessage("当前服务不支持 BailOut 中止成绩协议。请先升级自建服务；本机成绩不受影响。")

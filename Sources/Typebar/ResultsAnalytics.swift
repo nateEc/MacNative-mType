@@ -1132,7 +1132,7 @@ enum ResultImageExport {
 enum ResultInputText {
   static func make(for result: CompletedTestResult) -> String? {
     guard !result.replayEvents.isEmpty else { return nil }
-    let elapsed = max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+    let elapsed = result.capturedDuration
     let typed = TypingReplay.typedText(events: result.replayEvents, through: elapsed)
     return typed.isEmpty ? nil : typed
   }

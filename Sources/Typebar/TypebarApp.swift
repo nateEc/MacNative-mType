@@ -8916,6 +8916,7 @@ private struct ResultWPMConsistencyRecordIdentity: Hashable {
   let targetWordDirectoryData: Data?
   let characterStatsData: Data?
   let terminalTimingData: Data?
+  let elapsedTimeData: Data?
 }
 
 private struct ResultDetailView: View {
@@ -9133,7 +9134,7 @@ private struct ResultDetailView: View {
     .init(id: result.id, prompt: result.prompt, startedAt: result.startedAt, finishedAt: result.finishedAt,
       configurationData: result.configurationData, replayEventsData: result.replayEventsData,
       targetWordDirectoryData: result.targetWordDirectoryData, characterStatsData: result.characterStatsData,
-      terminalTimingData: result.terminalTimingData)
+      terminalTimingData: result.terminalTimingData, elapsedTimeData: result.elapsedTimeData)
   }
 
   private var wpmConsistencyText: String {

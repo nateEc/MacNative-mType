@@ -445,6 +445,8 @@ final class TestResultRecord {
   var finishedAt: Date
   var afkDuration: TimeInterval = 0
   var terminalTimingData: Data?
+  /// Additive optional metadata; old rows keep their original date semantics.
+  var elapsedTimeData: Data?
   var typedCharacterCount: Int
   var correctCharacterCount: Int
   var errorCount: Int
@@ -479,6 +481,8 @@ final class TestResultRecord {
     finishedAt = result.finishedAt
     afkDuration = result.afkDuration
     terminalTimingData = result.terminalTiming.flatMap { try? JSONEncoder().encode($0) }
+    // Preserve an invalid explicit marker rather than silently dropping it.
+    elapsedTimeData = result.elapsedTime.map { (try? JSONEncoder().encode($0)) ?? Data() }
     typedCharacterCount = result.typedCharacterCount
     correctCharacterCount = result.correctCharacterCount
     errorCount = result.errorCount
@@ -566,17 +570,26 @@ final class TestResultRecord {
   }
 
   var terminalTiming: ResultTerminalTiming? {
+    guard elapsedTimeData == nil || elapsedTime != nil else { return nil }
     guard let terminalTimingData,
       let timing = try? JSONDecoder().decode(ResultTerminalTiming.self, from: terminalTimingData),
       let configuration, let outcome = TestOutcome(rawValue: outcome),
-      timing.isValid(wallClockDuration: wallClockDuration, mode: configuration.mode, outcome: outcome)
+      timing.isValid(wallClockDuration: capturedDuration, mode: configuration.mode, outcome: outcome)
     else { return nil }
     return timing
   }
 
   var wallClockDuration: TimeInterval { max(0, finishedAt.timeIntervalSince(startedAt)) }
-  var elapsedDuration: TimeInterval { terminalTiming?.duration(mode: configuration?.mode ?? .zen) ?? wallClockDuration }
-  var chartDuration: TimeInterval { terminalTiming?.boundaryDuration ?? wallClockDuration }
+  var elapsedTime: ResultElapsedTime? {
+    elapsedTimeData.flatMap { try? JSONDecoder().decode(ResultElapsedTime.self, from: $0) }
+  }
+  var capturedDuration: TimeInterval {
+    // Corrupt explicit evidence is not legacy absence. Keep the raw bytes;
+    // suppress derived time and refuse portable export until repaired.
+    elapsedTimeData == nil ? wallClockDuration : elapsedTime?.seconds ?? 0
+  }
+  var elapsedDuration: TimeInterval { terminalTiming?.duration(mode: configuration?.mode ?? .zen) ?? capturedDuration }
+  var chartDuration: TimeInterval { terminalTiming?.boundaryDuration ?? capturedDuration }
 
   var totalEngagedDuration: TimeInterval {
     engagedDuration + priorAttemptEngagedDuration
@@ -598,6 +611,7 @@ final class TestResultRecord {
   var portableResult: CompletedTestResult? {
     guard let configuration, let parsedOutcome = TestOutcome(rawValue: outcome) else { return nil }
     guard terminalTimingData == nil || terminalTiming != nil else { return nil }
+    guard elapsedTimeData == nil || elapsedTime != nil else { return nil }
     return CompletedTestResult(
       id: id,
       configuration: configuration,
@@ -606,6 +620,7 @@ final class TestResultRecord {
       finishedAt: finishedAt,
       afkDuration: afkDuration,
       terminalTiming: terminalTiming,
+      elapsedTime: elapsedTime,
       typedCharacterCount: typedCharacterCount,
       correctCharacterCount: correctCharacterCount,
       errorCount: errorCount,

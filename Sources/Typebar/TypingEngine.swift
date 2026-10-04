@@ -4032,6 +4032,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let finishedAt: Date
   let afkDuration: TimeInterval
   let terminalTiming: ResultTerminalTiming?
+  let elapsedTime: ResultElapsedTime?
   let typedCharacterCount: Int
   let correctCharacterCount: Int
   let errorCount: Int
@@ -4066,6 +4067,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     finishedAt: Date,
     afkDuration: TimeInterval = 0,
     terminalTiming: ResultTerminalTiming? = nil,
+    elapsedTime: ResultElapsedTime? = nil,
     typedCharacterCount: Int,
     correctCharacterCount: Int,
     errorCount: Int,
@@ -4096,6 +4098,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.finishedAt = finishedAt
     self.afkDuration = max(0, afkDuration)
     self.terminalTiming = terminalTiming
+    self.elapsedTime = elapsedTime
     self.typedCharacterCount = typedCharacterCount
     self.correctCharacterCount = correctCharacterCount
     self.errorCount = errorCount
@@ -4123,11 +4126,12 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   }
 
   var elapsedDuration: TimeInterval {
-    terminalTiming?.duration(mode: configuration.mode) ?? wallClockDuration
+    terminalTiming?.duration(mode: configuration.mode) ?? capturedDuration
   }
 
   var wallClockDuration: TimeInterval { max(0, finishedAt.timeIntervalSince(startedAt)) }
-  var chartDuration: TimeInterval { terminalTiming?.boundaryDuration ?? wallClockDuration }
+  var capturedDuration: TimeInterval { elapsedTime?.seconds ?? wallClockDuration }
+  var chartDuration: TimeInterval { terminalTiming?.boundaryDuration ?? capturedDuration }
 
   var engagedDuration: TimeInterval {
     max(0, elapsedDuration - afkDuration)
@@ -4155,7 +4159,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
       preciseWpm, preciseRawWpm, preciseAccuracy, inputMetrics, restartCount, keyDurationSamples,
       priorAttemptEngagedDuration, keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
-      challengePresentation, targetWordDirectory, terminalTiming
+      challengePresentation, targetWordDirectory, terminalTiming, elapsedTime
     case startedAtReferenceTime, finishedAtReferenceTime
   }
 
@@ -4170,6 +4174,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       legacyKey: .finishedAt, precisionKey: .finishedAtReferenceTime)
     try values.encode(afkDuration, forKey: .afkDuration)
     try values.encodeIfPresent(terminalTiming, forKey: .terminalTiming)
+    try values.encodeIfPresent(elapsedTime, forKey: .elapsedTime)
     try values.encode(typedCharacterCount, forKey: .typedCharacterCount)
     try values.encode(correctCharacterCount, forKey: .correctCharacterCount)
     try values.encode(errorCount, forKey: .errorCount)
@@ -4204,9 +4209,11 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     finishedAt = try CompatibleDatePrecision.decode(from: values,
       legacyKey: .finishedAt, precisionKey: .finishedAtReferenceTime)
     afkDuration = max(0, try values.decodeIfPresent(TimeInterval.self, forKey: .afkDuration) ?? 0)
+    elapsedTime = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
     terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
     if let terminalTiming, !terminalTiming.isValid(
-      wallClockDuration: max(0, finishedAt.timeIntervalSince(startedAt)), mode: configuration.mode, outcome: outcome) {
+      wallClockDuration: elapsedTime?.seconds ?? max(0, finishedAt.timeIntervalSince(startedAt)),
+      mode: configuration.mode, outcome: outcome) {
       throw DecodingError.dataCorruptedError(forKey: .terminalTiming, in: values,
         debugDescription: "Terminal timing must match the captured clock and Zen/bailout outcome")
     }
