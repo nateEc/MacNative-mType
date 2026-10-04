@@ -312,9 +312,10 @@ struct TypebarArchive: Codable, Equatable {
     // Older readers lack stopped-input, field-local/unit metadata, target
     // directories, pre-validation positions, explicit unit contractions and
     // next-word abandonment markers, explicit unit classifications and
-    // logical deletion positions and independent terminal clock evidence.
+    // logical deletion positions, independent terminal clock evidence and
+    // custom pace speeds beyond the legacy integer editor domain.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 23
+    static let currentVersion = 24
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -359,31 +360,33 @@ struct TypebarArchive: Codable, Equatable {
         let hasVersionedMetrics = results.contains { ($0.inputMetrics?.version ?? 1) >= 2 }
         let hasUnitBasis = results.contains { $0.characterStats.sourceUnitBasis != nil }
         let hasTerminalTiming = results.contains { $0.terminalTiming != nil }
-        self.version = hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        let hasExpandedPace = Self.requiresExpandedPaceFormat(settings: settings, presets: presets)
+        self.version = hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
-        let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
-        let deletedKeyboardLayouts = version >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
+        let payloadVersion = hasExpandedPace ? self.version : version
+        let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
+        let deletedKeyboardLayouts = payloadVersion >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
         self.deletedCustomThemeIDs = deletedThemes.sorted { $0.uuidString < $1.uuidString }
         self.deletedCustomKeyboardLayoutIDs = deletedKeyboardLayouts.sorted {
             $0.uuidString < $1.uuidString
         }
         self.settings = Self.sanitizedSettings(
             settings, deletedThemeIDs: deletedThemes, deletedKeyboardLayoutIDs: deletedKeyboardLayouts)
-        let deletedResults = version >= 6 ? Set(deletedResultIDs) : []
+        let deletedResults = payloadVersion >= 6 ? Set(deletedResultIDs) : []
         self.deletedResultIDs = deletedResults.sorted { $0.uuidString < $1.uuidString }
         self.results = results.filter { !deletedResults.contains($0.id) }
-        let deletedPresets = version >= 7 ? Set(deletedPresetIDs) : []
+        let deletedPresets = payloadVersion >= 7 ? Set(deletedPresetIDs) : []
         self.deletedPresetIDs = deletedPresets.sorted { $0.uuidString < $1.uuidString }
-        self.presets = version >= 7
+        self.presets = payloadVersion >= 7
             ? presets.filter { preset in
                 guard let id = preset.id else { return true }
                 return !deletedPresets.contains(id)
             }
             : presets.map { .init(name: $0.name, definition: $0.definition) }
-        let deletedSavedTexts = version >= 8 ? Set(deletedSavedTextIDs) : []
+        let deletedSavedTexts = payloadVersion >= 8 ? Set(deletedSavedTextIDs) : []
         self.deletedSavedTextIDs = deletedSavedTexts.sorted { $0.uuidString < $1.uuidString }
-        self.savedTexts = version >= 8
+        self.savedTexts = payloadVersion >= 8
             ? savedTexts.filter { savedText in
                 guard let id = savedText.id else { return true }
                 return !deletedSavedTexts.contains(id)
@@ -391,12 +394,12 @@ struct TypebarArchive: Codable, Equatable {
             : savedTexts.map {
                 .init(title: $0.title, text: $0.text, longProgress: $0.longProgress)
             }
-        let deletedIDs = version >= 5 ? Set(deletedResultFilterPresetIDs) : []
+        let deletedIDs = payloadVersion >= 5 ? Set(deletedResultFilterPresetIDs) : []
         self.deletedResultFilterPresetIDs = deletedIDs.sorted { $0.uuidString < $1.uuidString }
-        self.resultFilterPresets = version >= 4
+        self.resultFilterPresets = payloadVersion >= 4
             ? resultFilterPresets.filter { $0.isValid && !deletedIDs.contains($0.id) }
             : []
-        self.activeTestSelection = version >= 3
+        self.activeTestSelection = payloadVersion >= 3
             ? activeTestSelection.flatMap(ActiveTestSelectionPolicy.validated)
             : nil
     }
@@ -452,6 +455,11 @@ struct TypebarArchive: Codable, Equatable {
         deletedResultIDs = deletedResults.sorted { $0.uuidString < $1.uuidString }
         results = decodedResults.filter { !deletedResults.contains($0.id) }
         let decodedPresets = try values.decode([NamedPreset].self, forKey: .presets)
+        // Check raw snapshots before tombstones hide an expanded value from
+        // old readers, which must decode those records before filtering too.
+        guard version >= 24 || !Self.requiresExpandedPaceFormat(
+            settings: decodedSettings, presets: decodedPresets)
+        else { throw DataTransferError.unsupportedVersion(version) }
         let deletedPresets = version >= 7
             ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedPresetIDs) ?? [])
             : []
@@ -488,6 +496,15 @@ struct TypebarArchive: Codable, Equatable {
                 .decodeIfPresent(ActiveTestSelectionDocument.self, forKey: .activeTestSelection)
                 .flatMap(ActiveTestSelectionPolicy.validated)
             : nil
+    }
+
+    static func requiresExpandedPaceFormat(settings: AppSettingsSnapshot, presets: [NamedPreset]) -> Bool {
+        !PaceCustomSpeedPolicy.isLegacyRepresentable(settings.paceGuideCustomWpm)
+            || presets.contains { preset in
+                preset.definition.settingsSnapshot.map {
+                    !PaceCustomSpeedPolicy.isLegacyRepresentable($0.paceGuideCustomWpm)
+                } ?? false
+            }
     }
 
     static func sanitizedSettings(
@@ -690,7 +707,7 @@ struct TypebarTestParameterMemory: Codable, Equatable {
 }
 
 struct TypebarSettingsDocument: Codable, Equatable {
-    static let currentVersion = 3
+    static let currentVersion = 4
 
     let version: Int
     let settings: AppSettingsSnapshot
@@ -705,7 +722,8 @@ struct TypebarSettingsDocument: Codable, Equatable {
         layoutFluidLayouts: [KeyboardLayout],
         testParameterMemory: TypebarTestParameterMemory
     ) {
-        self.version = version
+        self.version = PaceCustomSpeedPolicy.isLegacyRepresentable(settings.paceGuideCustomWpm)
+            ? version : max(4, version)
         self.settings = settings
         self.configuration = configuration.with(challengeID: nil)
         self.layoutFluidLayouts = LayoutFluidPolicy.normalizedLayouts(layoutFluidLayouts)
@@ -796,6 +814,9 @@ enum SettingsJSONCommandCodec {
         else {
             throw SettingsJSONCommandError.invalidConfiguration
         }
+        guard decoded.version >= 4 || PaceCustomSpeedPolicy.isLegacyRepresentable(
+            decoded.settings.paceGuideCustomWpm)
+        else { throw SettingsJSONCommandError.unsupportedVersion(decoded.version) }
         return TypebarSettingsDocument(
             version: decoded.version,
             settings: decoded.settings,

@@ -187,7 +187,15 @@ final class CustomDelimiterTests: XCTestCase {
     XCTAssertEqual(payload["version"] as? Int, 2)
     let json = try SettingsJSONCommandCodec.export(settings: .init(), configuration: config,
       layoutFluidLayouts: [.ansiQwerty], testParameterMemory: .legacyDefaults(configuration: config))
-    XCTAssertEqual(try SettingsJSONCommandCodec.decode(json).version, 3)
+    let document = try SettingsJSONCommandCodec.decode(json)
+    XCTAssertEqual(document.version, TypebarSettingsDocument.currentVersion)
+    XCTAssertEqual(try encodedDelimiter(document.configuration), true)
+    let legacyDocument = TypebarSettingsDocument(version: 3, settings: .init(), configuration: config,
+      layoutFluidLayouts: [.ansiQwerty], testParameterMemory: .legacyDefaults(configuration: config))
+    let legacyJSON = String(decoding: try JSONEncoder().encode(legacyDocument), as: UTF8.self)
+    let legacy = try SettingsJSONCommandCodec.decode(legacyJSON)
+    XCTAssertEqual(legacy.version, 3)
+    XCTAssertEqual(try encodedDelimiter(legacy.configuration), true)
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [], presets: [], at: start))
     XCTAssertEqual(archive.version, TypebarArchive.currentVersion)

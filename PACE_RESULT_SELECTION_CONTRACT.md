@@ -37,7 +37,7 @@ Scripts/check-source-terminal-timing.mjs 的十个完整模块、64 组结束夹
 
 ## 尚未完成
 
-自定义编辑器、设置快照和归档仍是 Int、10–300；原版 [schema](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/packages/schemas/src/configs.ts#L353) 允许非负小数且无这个上限。这里没有扩大持久化类型，应单独设计迁移和回退测试。
+本合同上轮未扩大自定义编辑器的 Int、10–300 持久化；后续增量已经接入非负有限 Double、v2 偏好和归档 24／设置 4，当前证据及回退限制见 [自定义 Pace 合同](CUSTOM_PACE_SPEED_CONTRACT.md)。上文 23 版本和 36 组探针是上一阶段历史证据，不代表当前格式或本轮完整门禁。
 
 引语 mode2 原版用 quote.id，原生成绩仍按提示文字匹配；ResultQuoteSource 只有来源类别和标题，不能拿标题伪造唯一 ID。原生标签按本机规范化名称匹配，原版按 ID；原版一次性成绩查询未认证时返回零，原生离线历史可用。PB 从本机历史推导，不是官方 PB 快照，官方删除／快照时序未证明相同。
 

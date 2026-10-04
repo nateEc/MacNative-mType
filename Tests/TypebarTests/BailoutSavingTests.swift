@@ -227,7 +227,7 @@ final class BailoutSavingTests: XCTestCase {
     XCTAssertEqual(record.elapsedDuration, 15)
     XCTAssertEqual(record.finishedAt, start.addingTimeInterval(16))
     let archive = TypebarArchive(exportedAt: start, settings: .init(), results: [attempt], presets: [])
-    XCTAssertEqual(archive.version, 23)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     let restored = try JSONDecoder().decode(TypebarArchive.self, from: JSONEncoder().encode(archive))
     XCTAssertEqual(restored.results.first?.terminalTiming, attempt.terminalTiming)
     XCTAssertEqual(restored.results.first?.outcome, .bailedOut)

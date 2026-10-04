@@ -1588,8 +1588,7 @@ private struct ContentView: View {
         unit: settings.typingSpeedUnit, initialWpm: settings.paceGuideCustomWpm
       ) { wpm in
         activeChallengeID = nil
-        settings.paceGuideCustomWpm = wpm
-        settings.paceGuideMode = .custom
+        _ = PaceCustomSpeedPolicy.apply(wpm, to: settings, activateCustom: true)
       }
     }
     .sheet(isPresented: $showingKeyboardGuideScaleEditor) {

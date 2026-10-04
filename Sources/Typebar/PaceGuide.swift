@@ -81,13 +81,9 @@ enum LastTestPacePolicy {
 }
 
 enum PaceGuidePolicy {
-    // Persisted custom editor limits, not limits on PB or last-finish targets.
-    static let minimumWpm = 10
-    static let maximumWpm = 300
-
     static func targetWpm(
         mode: PaceGuideMode,
-        customWpm: Int,
+        customWpm: Double,
         configuration: TestConfiguration,
         samples: [PaceGuideSample],
         activeTags: [String] = [],
@@ -100,7 +96,7 @@ enum PaceGuidePolicy {
         case .off:
             return nil
         case .custom:
-            return validTarget(Double(customWpm))
+            return validTarget(customWpm)
         case .personalBest:
             guard CurrentPersonalBestPolicy.isConfigurationEligible(configuration) else { return nil }
             return validTarget(personalBest(configuration: configuration,

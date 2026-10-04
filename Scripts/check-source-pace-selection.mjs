@@ -155,6 +155,13 @@ pace.setLastTestWpm(80); repeat = true;
 pace.setLastTestWpm(120.25); await target('last', 120.25);
 pace.setLastTestWpm(60); await target('off', 120.25);
 config.paceCaretCustomSpeed = 11.25; await target('custom', 11.25);
+for (const speed of [0, 0.25, 0.99, 1, 9, 60.123456789, 350, 1e100, Number.MAX_VALUE]) {
+  config.paceCaretCustomSpeed = speed;
+  await target('custom', speed < 1 ? undefined : speed);
+}
+// Raw invalid state may still admit infinity; native finite-input validation
+// deliberately excludes it. This is not a schema or browser-input probe.
+config.paceCaretCustomSpeed = Infinity; await target('custom', Infinity);
 repeat = false; await target('off', undefined);
 for (const speed of [0, 0.99, -1, NaN]) { pace.setLastTestWpm(speed); await target('last', undefined); }
 pace.setLastTestWpm(NaN); repeat = true; pace.setLastTestWpm(120);

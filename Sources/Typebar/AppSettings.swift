@@ -645,7 +645,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var soundVolume: Double = 0.5
   var globalHotkeyEnabled = false
   var paceGuideMode: PaceGuideMode = .off
-  var paceGuideCustomWpm = 100
+  var paceGuideCustomWpm: Double = 100
   var paceCaretStyle: TypingCaretStyle = .bar
   var repeatedPace = true
   var streakDayBoundaryOffsetHours = 0.0
@@ -752,7 +752,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     soundVolume: Double = 0.5,
     globalHotkeyEnabled: Bool = false,
     paceGuideMode: PaceGuideMode = .off,
-    paceGuideCustomWpm: Int = 100,
+    paceGuideCustomWpm: Double = 100,
     paceCaretStyle: TypingCaretStyle = .bar,
     repeatedPace: Bool = true,
     streakDayBoundaryOffsetHours: Double = 0,
@@ -874,8 +874,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.soundVolume = soundVolume.clamped(to: 0...1)
     self.globalHotkeyEnabled = globalHotkeyEnabled
     self.paceGuideMode = paceGuideMode
-    self.paceGuideCustomWpm = paceGuideCustomWpm.clamped(
-      to: PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm)
+    self.paceGuideCustomWpm = PaceCustomSpeedPolicy.normalized(paceGuideCustomWpm)
     self.paceCaretStyle = paceCaretStyle
     self.repeatedPace = repeatedPace
     self.streakDayBoundaryOffsetHours = StreakDayBoundaryPolicy.normalized(
@@ -1098,8 +1097,11 @@ struct AppSettingsSnapshot: Codable, Equatable {
     globalHotkeyEnabled =
       try values.decodeIfPresent(Bool.self, forKey: .globalHotkeyEnabled) ?? false
     paceGuideMode = try values.decodeIfPresent(PaceGuideMode.self, forKey: .paceGuideMode) ?? .off
-    paceGuideCustomWpm = (try values.decodeIfPresent(Int.self, forKey: .paceGuideCustomWpm) ?? 100)
-      .clamped(to: PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm)
+    paceGuideCustomWpm = try values.decodeIfPresent(Double.self, forKey: .paceGuideCustomWpm) ?? 100
+    guard PaceCustomSpeedPolicy.isValid(paceGuideCustomWpm) else {
+      throw DecodingError.dataCorruptedError(forKey: .paceGuideCustomWpm, in: values,
+        debugDescription: "Custom pace must be a finite nonnegative speed")
+    }
     paceCaretStyle = try values.decodeIfPresent(TypingCaretStyle.self, forKey: .paceCaretStyle) ?? .bar
     repeatedPace = try values.decodeIfPresent(Bool.self, forKey: .repeatedPace) ?? true
     streakDayBoundaryOffsetHours = StreakDayBoundaryPolicy.normalized(
@@ -1120,7 +1122,12 @@ final class AppSettings {
   @ObservationIgnored private let feedbackSound: TypingFeedbackSound
   @ObservationIgnored private var batchingClickSoundConfiguration = true
   @ObservationIgnored private var initializingSettings = true
-  @ObservationIgnored private let storageKey = "appSettings.v1"
+  @ObservationIgnored private var usingExpandedPaceStorage = false
+  static let legacyStorageKey = "appSettings.v1"
+  static let expandedPaceStorageKey = "appSettings.v2"
+  private var storageKey: String {
+    usingExpandedPaceStorage ? Self.expandedPaceStorageKey : Self.legacyStorageKey
+  }
   @ObservationIgnored private let layoutFluidStorageKey = "layoutFluidLayouts.v1"
   @ObservationIgnored private var randomThemeBag: [RandomThemeTarget] = []
   @ObservationIgnored private var randomThemeBagSignature: [RandomThemeTarget] = []
@@ -1499,7 +1506,12 @@ final class AppSettings {
   }
   var globalHotkeyEnabled = false { didSet { persist() } }
   var paceGuideMode: PaceGuideMode = .off { didSet { persist() } }
-  var paceGuideCustomWpm = 100 { didSet { persist() } }
+  var paceGuideCustomWpm: Double = 100 {
+    didSet {
+      if !PaceCustomSpeedPolicy.isValid(paceGuideCustomWpm) { paceGuideCustomWpm = 100 }
+      persist()
+    }
+  }
   var paceCaretStyle: TypingCaretStyle = .bar { didSet { persist() } }
   var repeatedPace = true { didSet { persist() } }
   private(set) var streakDayBoundaryOffsetHours = 0.0 { didSet { persist() } }
@@ -1508,6 +1520,7 @@ final class AppSettings {
   init(defaults: UserDefaults = .standard, feedbackSound: TypingFeedbackSound = .shared) {
     self.defaults = defaults
     self.feedbackSound = feedbackSound
+    usingExpandedPaceStorage = defaults.object(forKey: Self.expandedPaceStorageKey) != nil
     defer {
       initializingSettings = false
       batchingClickSoundConfiguration = false
@@ -1961,6 +1974,12 @@ final class AppSettings {
   }
 
   func apply(_ snapshot: AppSettingsSnapshot) {
+    // Select the fork before any intermediate preference writes. Never merge
+    // subsequent legacy-writer changes back over the new settings generation.
+    if !PaceCustomSpeedPolicy.isLegacyRepresentable(
+      PaceCustomSpeedPolicy.normalized(snapshot.paceGuideCustomWpm)) {
+      usingExpandedPaceStorage = true
+    }
     batchingClickSoundConfiguration = true
     defer {
       batchingClickSoundConfiguration = false
@@ -2487,7 +2506,11 @@ final class AppSettings {
       streakDayBoundaryOffsetHours: streakDayBoundaryOffsetHours,
       hasSetStreakDayBoundary: hasSetStreakDayBoundary
     )
-    defaults.set(try? JSONEncoder().encode(snapshot), forKey: storageKey)
+    if !PaceCustomSpeedPolicy.isLegacyRepresentable(snapshot.paceGuideCustomWpm) {
+      usingExpandedPaceStorage = true
+    }
+    guard let data = try? JSONEncoder().encode(snapshot) else { return }
+    defaults.set(data, forKey: storageKey)
   }
 
   func isFavoriteQuote(_ id: String) -> Bool {

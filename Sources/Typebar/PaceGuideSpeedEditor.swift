@@ -3,38 +3,38 @@ import SwiftUI
 struct PaceGuideSpeedEditor: View {
   @Environment(\.dismiss) private var dismiss
   let unit: TypingSpeedUnit
-  let onApply: (Int) -> Void
-  @State private var displayedSpeed: Double
+  let onApply: (Double) -> Void
+  private let initialWpm: Double
+  private let initialDraft: String
+  @State private var draft: String
   @FocusState private var speedFocused: Bool
 
-  init(unit: TypingSpeedUnit, initialWpm: Int, onApply: @escaping (Int) -> Void) {
-    self.unit = unit
+  init(unit: TypingSpeedUnit, initialWpm: Double, onApply: @escaping (Double) -> Void) {
+    // Preserve an enormous canonical target even when its displayed unit
+    // multiplication would overflow. The editor then explicitly labels WPM.
+    self.unit = PaceCustomSpeedPolicy.displayedValue(wpm: initialWpm, unit: unit) != nil ? unit : .wpm
     self.onApply = onApply
-    _displayedSpeed = State(initialValue: unit.converted(wpm: initialWpm))
+    self.initialWpm = initialWpm
+    self.initialDraft = String(PaceCustomSpeedPolicy.displayedValue(wpm: initialWpm, unit: self.unit) ?? initialWpm)
+    _draft = State(initialValue: initialDraft)
   }
 
-  private var canonicalWpm: Int {
-    unit.canonicalWpm(fromDisplayedValue: displayedSpeed)
-  }
-
-  private var isValid: Bool {
-    displayedSpeed.isFinite
-      && PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm ~= canonicalWpm
+  private var canonicalWpm: Double? {
+    if draft == initialDraft, PaceCustomSpeedPolicy.isValid(initialWpm) { return initialWpm }
+    return PaceCustomSpeedPolicy.parse(draft, unit: unit)
   }
 
   var body: some View {
     NavigationStack {
       Form {
         Section("目标速度") {
-          TextField(
-            unit.displayName, value: $displayedSpeed,
-            format: .number.precision(.fractionLength(0...2)))
+          TextField(unit.displayName, text: $draft)
             .focused($speedFocused)
-          LabeledContent("换算后", value: "\(canonicalWpm) WPM")
-            .foregroundStyle(isValid ? Color.secondary : Color.red)
+          LabeledContent("换算后", value: canonicalWpm.map { "\($0) WPM" } ?? "请输入非负有限数字")
+            .foregroundStyle(canonicalWpm != nil ? Color.secondary : Color.red)
         }
         Section {
-          Text("允许范围为 \(PaceGuidePolicy.minimumWpm)–\(PaceGuidePolicy.maximumWpm) WPM；应用后会用当前配置重新生成练习。")
+          Text("可输入非负小数，没有 300 WPM 上限；低于 1 WPM 时不显示节奏目标。应用只更新节奏，不清空本轮输入。")
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -48,11 +48,12 @@ struct PaceGuideSpeedEditor: View {
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("应用") {
+            guard let canonicalWpm else { return }
             onApply(canonicalWpm)
             dismiss()
           }
           .keyboardShortcut(.defaultAction)
-          .disabled(!isValid)
+          .disabled(canonicalWpm == nil)
         }
       }
     }

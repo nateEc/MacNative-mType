@@ -30,6 +30,7 @@ struct PreferencesView: View {
   @State private var profileSelectedBadgeID = ""
   @State private var publicStreakDayBoundaryOffsetHours = 0.0
   @State private var showingPublicStreakDayBoundaryConfirmation = false
+  @State private var showingPaceSpeedEditor = false
   @State private var developerAccessKeyName = ""
   @State private var newlyCreatedDeveloperAccessKey: String?
   @State private var remoteResultsDeletionPassword = ""
@@ -751,13 +752,9 @@ struct PreferencesView: View {
               Text(mode.displayName).tag(mode)
             }
           }
-          if settings.paceGuideMode == .custom {
-            Stepper(
-              value: $settings.paceGuideCustomWpm,
-              in: PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm, step: 5
-            ) {
-              LabeledContent("目标速度", value: "\(settings.paceGuideCustomWpm) WPM")
-            }
+          HStack {
+            LabeledContent("自定义速度", value: "\(settings.paceGuideCustomWpm) WPM")
+            Button("编辑…") { showingPaceSpeedEditor = true }
           }
           Picker("节奏光标样式", selection: $settings.paceCaretStyle) {
             ForEach(TypingCaretStyle.allCases) { style in
@@ -2188,6 +2185,11 @@ struct PreferencesView: View {
       switch result {
       case .success(let url): importLocalPracticeFont(from: url)
       case .failure(let error): localPracticeFontMessage = error.localizedDescription
+      }
+    }
+    .sheet(isPresented: $showingPaceSpeedEditor) {
+      PaceGuideSpeedEditor(unit: settings.typingSpeedUnit, initialWpm: settings.paceGuideCustomWpm) { wpm in
+        _ = PaceCustomSpeedPolicy.apply(wpm, to: settings, activateCustom: false)
       }
     }
     .sheet(isPresented: $showingInstalledFontPicker) {
