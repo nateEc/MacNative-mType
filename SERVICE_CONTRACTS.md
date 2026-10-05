@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+当前新增 [日榜接受日缓存合同](DAILY_LEADERBOARD_CACHE_CONTRACT.md)：TYPEBAR_DAILY_LEADERBOARD_CONFIGURATION 控制正式服务的独立日榜，time／words 投稿及日榜四个查询端点已接通；禁用返回 404，历史、XP 和回执不重算。文件新增托管标记与首次快照，旧数据只初始化空缓存，旧 writer 禁止混写，单 writer 保存失败回滚。日榜任务／发奖尚未运行，不冒报完整奖励或原协议兼容；下方旧历史日榜说明为旧构造入口的兼容行为。
+
 当前新增 [奖励收件箱与周任务交付](REWARD_INBOX_CONTRACT.md)：GET／PATCH v1/inbox、rewardInbox 能力及部署者只读任务状态；TYPEBAR_INBOX_CONFIGURATION 显式控制开关和容量。任务与邮件一起保存，领取后账户回执刷新，不将领取 XP 写回周榜；异步生命周期只支持单 writer。托管字段缺失拒绝、旧缺字段不回填，禁止旧 writer 混写。下面“无运行任务或领取接口”为历史阶段，整体功能等价仍开放。
 
 2026-10-05 最新 [周 XP 结算准备合同](WEEKLY_XP_SETTLEMENT_CONTRACT.md)：TYPEBAR_WEEKLY_XP_CONFIGURATION 新增可选 xpRewardBrackets；旧缺字段为空，新首次配置快照保留档位，不重算旧奖励。仅有调度描述和候选计算，没有新 HTTP 路由、运行任务、邮件持久化或领取，能力不冒报；未来结算须采用当时配置而非投稿快照。原生格式不改，旧 writer 禁止混写；完整功能仍未完成。下方为历史阶段。

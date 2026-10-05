@@ -212,10 +212,10 @@ struct CloudSyncView: View {
                                 .foregroundStyle(.secondary)
                         } else if let leaderboardRank {
                             let standing = LeaderboardRankStanding(
-                                rank: leaderboardRank.rank, total: leaderboardPage?.total)
+                                rank: leaderboardRank.rank(in: leaderboardScope), total: leaderboardPage?.total)
                             VStack(alignment: .leading, spacing: 3) {
                                 Label(
-                                    "你的排名 #\(leaderboardRank.rank) · \(leaderboardRank.wpm) WPM\(standing.map { " · \($0.displayName)" } ?? "")",
+                                    "你的排名 \(leaderboardRank.rankLabel(in: leaderboardScope)) · \(leaderboardRank.wpm) WPM\(standing.map { " · \($0.displayName)" } ?? "")",
                                     systemImage: "person.fill")
                                     .font(.caption.weight(.medium))
                                 if let leaderboardRankChange {
@@ -239,7 +239,7 @@ struct CloudSyncView: View {
                             isLoading: isLoadingLeaderboard,
                             myPageIndex: leaderboardRank.flatMap {
                                 LeaderboardPaginationPolicy.pageIndex(
-                                    containingRank: $0.rank, total: leaderboardPage.total,
+                                    containingRank: $0.rank(in: leaderboardScope), total: leaderboardPage.total,
                                     pageSize: leaderboardPage.pageSize)
                             },
                             onLoadPage: { loadLeaderboard(pageIndex: $0) })
@@ -249,7 +249,7 @@ struct CloudSyncView: View {
                     }
                     ForEach(leaderboard) { entry in
                         HStack {
-                            Text("#\(entry.rank)").monospacedDigit().foregroundStyle(.secondary)
+                            Text(entry.rankLabel(in: leaderboardScope)).monospacedDigit().foregroundStyle(.secondary)
                             LeaderboardAvatar(avatar: entry.discordAvatar)
                             if let badge = entry.selectedBadge {
                                 Image(systemName: badge.systemImage)
@@ -598,7 +598,7 @@ struct CloudSyncView: View {
                         loadedLeaderboardRank = true
                         if let rank = rankStatus.entry, page.rankMemorySupported == true {
                             leaderboardRankChange = try? await account.recordSpeedLeaderboardRankMemory(
-                                rank: rank.rank, mode: selection.mode, language: selection.language,
+                                rank: rank.rank(in: scope), mode: selection.mode, language: selection.language,
                                 period: selection.period, durationSeconds: selection.durationSeconds,
                                 wordLimit: selection.wordLimit, scope: scope)
                             guard requestGeneration == leaderboardRequestGeneration,

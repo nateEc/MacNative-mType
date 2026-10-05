@@ -1105,6 +1105,7 @@ struct RemoteResultSubmissionResponse: Codable, Sendable {
 struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
     let id: UUID
     let rank: Int
+    let friendsRank: Int?
     let userID: UUID
     let displayName: String
     let mode: String
@@ -1118,13 +1119,17 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
     let discordAvatar: RemoteDiscordAvatar?
 
     private enum CodingKeys: String, CodingKey {
-        case id, rank, userID, displayName, mode, language, wpm, accuracy, preciseAccuracy, consistency, finishedAt, selectedBadge, discordAvatar
+        case id, rank, friendsRank, userID, displayName, mode, language, wpm, accuracy, preciseAccuracy, consistency, finishedAt, selectedBadge, discordAvatar
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
         rank = try values.decode(Int.self, forKey: .rank)
+        friendsRank = try values.decodeIfPresent(Int.self, forKey: .friendsRank)
+        guard rank > 0, friendsRank.map({ $0 > 0 }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey:.rank,in:values,debugDescription:"Invalid leaderboard rank")
+        }
         userID = try values.decode(UUID.self, forKey: .userID)
         displayName = try values.decode(String.self, forKey: .displayName)
         mode = try values.decode(String.self, forKey: .mode)
@@ -1136,6 +1141,13 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
         selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
         discordAvatar = try values.decodeIfPresent(RemoteDiscordAvatar.self, forKey: .discordAvatar)
+    }
+    func rank(in scope: RemoteLeaderboardScope) -> Int {
+        scope == .friends ? friendsRank ?? rank : rank
+    }
+    func rankLabel(in scope: RemoteLeaderboardScope) -> String {
+        if scope == .friends, let friendsRank { return "好友 #\(friendsRank) · 全局 #\(rank)" }
+        return "#\(rank)"
     }
 }
 

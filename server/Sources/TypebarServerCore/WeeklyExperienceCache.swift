@@ -78,7 +78,7 @@ extension WeeklyExperienceCacheReceipt {
 }
 
 /// A known-empty snapshot differs from a pre-snapshot entry with unknown origin.
-struct WeeklyExperienceProfileSnapshot: Codable {
+struct WeeklyExperienceProfileSnapshot: Codable, Equatable {
   let version: Int
   let selectedBadge: PublicProfileBadge?
   let discordAvatar: PublicDiscordAvatarResponse?

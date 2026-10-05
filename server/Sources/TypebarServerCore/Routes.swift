@@ -47,7 +47,8 @@ public func configure(
             weeklyExperienceTimeZone: try WeeklyExperiencePartition.configuredTimeZone(
                 Environment.get("TYPEBAR_WEEKLY_XP_TIME_ZONE")),
             weeklyExperienceConfiguration: try .fromJSON(Environment.get("TYPEBAR_WEEKLY_XP_CONFIGURATION")),
-            rewardInboxConfiguration: try .fromJSON(Environment.get("TYPEBAR_INBOX_CONFIGURATION")))
+            rewardInboxConfiguration: try .fromJSON(Environment.get("TYPEBAR_INBOX_CONFIGURATION")),
+            dailyLeaderboardConfiguration: try .fromJSON(Environment.get("TYPEBAR_DAILY_LEADERBOARD_CONFIGURATION")))
     }
     let authStore = resolvedAuthStore
     if app.environment != .testing {
@@ -984,6 +985,8 @@ public func configure(
             return try await authStore.leaderboardRank(
                 request.query.decode(LeaderboardQuery.self), accessToken: try request.accessToken()
             )
+        } catch DailyLeaderboardCacheError.unavailable {
+            throw Abort(.notFound, reason: "Daily leaderboard is disabled.")
         } catch let error as AuthStoreError {
             throw error.abort
         } catch is ResultStoreError {
@@ -996,6 +999,8 @@ public func configure(
             return try await authStore.friendLeaderboardRank(
                 request.query.decode(LeaderboardQuery.self), accessToken: try request.accessToken()
             )
+        } catch DailyLeaderboardCacheError.unavailable {
+            throw Abort(.notFound, reason: "Daily leaderboard is disabled.")
         } catch let error as AuthStoreError {
             throw error.abort
         } catch is ResultStoreError {
@@ -1009,6 +1014,8 @@ public func configure(
                 request.query.decode(LeaderboardQuery.self),
                 accessToken: try request.accessToken()
             )
+        } catch DailyLeaderboardCacheError.unavailable {
+            throw Abort(.notFound, reason: "Daily leaderboard is disabled.")
         } catch let error as AuthStoreError {
             throw error.abort
         } catch is ResultStoreError {
@@ -1019,6 +1026,8 @@ public func configure(
     app.get("v1", "leaderboards") { request async throws -> LeaderboardResponse in
         do {
             return try await authStore.leaderboard(request.query.decode(LeaderboardQuery.self))
+        } catch DailyLeaderboardCacheError.unavailable {
+            throw Abort(.notFound, reason: "Daily leaderboard is disabled.")
         } catch is ResultStoreError {
             throw Abort(.badRequest, reason: "The leaderboard filters were invalid.")
         }

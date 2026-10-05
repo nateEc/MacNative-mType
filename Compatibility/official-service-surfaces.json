@@ -69,6 +69,8 @@
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
     ],
     "leaderboards": [
+      "server/Sources/TypebarServerCore/DailyLeaderboardCache.swift",
+      "server/Tests/TypebarServerCoreTests/DailyLeaderboardCacheTests.swift",
       "server/Sources/TypebarServerCore/WeeklyExperienceRewardJobs.swift",
       "server/Tests/TypebarServerCoreTests/WeeklyExperienceRewardJobTests.swift",
       "Sources/Typebar/CloudSyncView.swift",

@@ -665,6 +665,8 @@ public actor AuthStore {
     // Missing means a pre-ledger file; explicit null is corruption, not a migration.
     var experienceAwards: [ExperienceAwardRecord]? = []
     var weeklyExperienceCache: WeeklyExperienceCache? = .init()
+    var dailyLeaderboardCache: DailyLeaderboardCache? = .init()
+    var dailyLeaderboardCacheManaged = true
     var rewardInbox: RewardInboxState = .init()
     var rewardInboxManaged = true
     var weeklyRewardJobs: WeeklyExperienceRewardJobs? = .init()
@@ -687,7 +689,8 @@ public actor AuthStore {
     private enum CodingKeys: String, CodingKey {
       case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, experienceAwards, accountPractice, leaderboardRankMemories, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
-        nextSyncCursor, weeklyExperienceCache, rewardInbox, rewardInboxManaged, weeklyRewardJobs, weeklyRewardJobsManaged
+        nextSyncCursor, weeklyExperienceCache, rewardInbox, rewardInboxManaged, weeklyRewardJobs, weeklyRewardJobsManaged,
+        dailyLeaderboardCache, dailyLeaderboardCacheManaged
     }
 
     init() {}
@@ -714,6 +717,11 @@ public actor AuthStore {
         ? try values.decode([ExperienceAwardRecord].self, forKey: .experienceAwards) : nil
       weeklyExperienceCache = values.contains(.weeklyExperienceCache)
         ? try values.decode(WeeklyExperienceCache.self, forKey: .weeklyExperienceCache) : nil
+      dailyLeaderboardCache = values.contains(.dailyLeaderboardCache)
+        ? try values.decode(DailyLeaderboardCache.self,forKey:.dailyLeaderboardCache) : nil
+      dailyLeaderboardCacheManaged = values.contains(.dailyLeaderboardCacheManaged)
+        ? try values.decode(Bool.self,forKey:.dailyLeaderboardCacheManaged) : false
+      guard !dailyLeaderboardCacheManaged || dailyLeaderboardCache != nil else { throw DailyLeaderboardCacheError.invalidState }
       rewardInbox = values.contains(.rewardInbox) ? try values.decode(RewardInboxState.self,forKey:.rewardInbox) : .init()
       rewardInboxManaged = values.contains(.rewardInboxManaged) ? try values.decode(Bool.self,forKey:.rewardInboxManaged) : false
       guard !rewardInboxManaged || values.contains(.rewardInbox) else { throw RewardInboxError.invalidState }
@@ -1299,6 +1307,7 @@ public actor AuthStore {
   private let experienceConfiguration: ExperienceCalculationConfiguration?
   private let weeklyExperienceTimeZone: TimeZone
   private let weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration
+  private let dailyLeaderboardConfiguration: DailyLeaderboardConfiguration?
   public nonisolated let rewardInboxConfiguration: RewardInboxConfiguration
 
   public init(
@@ -1307,7 +1316,8 @@ public actor AuthStore {
     rankingEnvironment: RankingEnvironment = .production,
     weeklyExperienceTimeZone: TimeZone = .current,
     weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration = .typebarDefault,
-    rewardInboxConfiguration: RewardInboxConfiguration = .typebarDefault
+    rewardInboxConfiguration: RewardInboxConfiguration = .typebarDefault,
+    dailyLeaderboardConfiguration: DailyLeaderboardConfiguration? = nil
   ) throws {
     guard (0...TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds).contains(
       minimumLeaderboardTypingSeconds)
@@ -1323,6 +1333,8 @@ public actor AuthStore {
     self.weeklyExperienceConfiguration = weeklyExperienceConfiguration
     try rewardInboxConfiguration.validate()
     self.rewardInboxConfiguration = rewardInboxConfiguration
+    try dailyLeaderboardConfiguration?.validate()
+    self.dailyLeaderboardConfiguration = dailyLeaderboardConfiguration
     guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
       state = .init()
       committedState = state
@@ -1340,6 +1352,14 @@ public actor AuthStore {
       state.weeklyExperienceCache = .init()
     }
     try state.weeklyExperienceCache!.validate(users:Set(state.users.map(\.id)),awards:state.experienceAwards!)
+    if state.dailyLeaderboardCache == nil {
+      guard !state.experienceAwards!.contains(where: { $0.dailyCacheReceipt != nil }) else {
+        throw DailyLeaderboardCacheError.invalidState
+      }
+      state.dailyLeaderboardCache = .init()
+    }
+    state.dailyLeaderboardCacheManaged = true
+    try state.dailyLeaderboardCache!.validate(users:Set(state.users.map(\.id)),awards:state.experienceAwards!)
     try state.rewardInbox.validate(users:Set(state.users.map(\.id)))
     if state.weeklyRewardJobs == nil {
       guard !state.experienceAwards!.contains(where: { $0.weeklyCacheReceipt?.settlementScheduled == true }) else {
@@ -2299,6 +2319,7 @@ public actor AuthStore {
     state.experienceAwards?.removeAll { $0.userID == userID }
     state.rewardInbox.purge(userID:userID)
     state.weeklyExperienceCache?.purge(userID:userID)
+    state.dailyLeaderboardCache?.purge(userID:userID)
     state.accountPractice?.removeValue(forKey: userID)
     state.personalBestResetDates.removeValue(forKey: userID)
     try persist()
@@ -2341,6 +2362,7 @@ public actor AuthStore {
     state.experienceAwards?.removeAll { $0.userID == user.id }
     state.rewardInbox.purge(userID:user.id)
     state.weeklyExperienceCache?.purge(userID:user.id)
+    state.dailyLeaderboardCache?.purge(userID:user.id)
     state.accountPractice?[user.id] = .init()
     state.leaderboardRankMemories.removeAll { $0.userID == user.id }
     state.notifications.removeAll { $0.recipientID == user.id }
@@ -2389,6 +2411,9 @@ public actor AuthStore {
     state.users[index] = updatedUser
     if weeklyExperienceConfiguration.enabled, !user.leaderboardOptedOut && updatedUser.leaderboardOptedOut {
       state.weeklyExperienceCache?.purge(userID:user.id)
+    }
+    if dailyLeaderboardConfiguration?.enabled == true, !user.leaderboardOptedOut && updatedUser.leaderboardOptedOut {
+      state.dailyLeaderboardCache?.purge(userID:user.id)
     }
     try persist()
     return userResponse(for: updatedUser)
@@ -2909,6 +2934,7 @@ public actor AuthStore {
     if state.users[index].accountSuspended != suspended {
       state.users[index].accountSuspended = suspended
       if suspended && weeklyExperienceConfiguration.enabled { state.weeklyExperienceCache?.purge(userID:userID) }
+      if suspended && dailyLeaderboardConfiguration?.enabled == true { state.dailyLeaderboardCache?.purge(userID:userID) }
       if !suspended {
         // Monkeytype removes Redis-backed daily and weekly XP entries on ban.
         // Keep the compatibility boundary for old derived rows and daily WPM;
@@ -3519,7 +3545,7 @@ public actor AuthStore {
     let isToday = request.finishedAt >= Calendar.current.startOfDay(for: now)
     let isSpeedEligible = isLeaderboardEligible
       && (reward.rankingAdmission?.decision.speedEligible ?? (request.bailedOut != true))
-    let dailyRank = isSpeedEligible && isToday
+    let legacyDailyRank = reward.dailyCacheReceipt == nil && isSpeedEligible && isToday
       ? try leaderboardEntries(
         .init(
           mode: request.mode, language: request.language, period: "day",
@@ -3529,6 +3555,11 @@ public actor AuthStore {
         eligibleUserIDs: nil, now: now
       ).first(where: { $0.userID == userID })?.rank
       : nil
+    let dailyRank = reward.dailyCacheReceipt != nil
+      ? (dailyLeaderboardConfiguration?.enabled == true && !user.leaderboardOptedOut
+        && !user.accountSuspended && !user.leaderboardRestricted && !user.displayNameChangeRequired
+        ? reward.dailyCacheReceipt!.rank : nil)
+      : legacyDailyRank
     return .init(
       id: request.id,
       accepted: true,
@@ -3678,6 +3709,25 @@ public actor AuthStore {
     } else { cacheRank = nil }
     reward.weeklyCacheReceipt = .init(version:1,configuration:weeklyExperienceConfiguration,
       timeTypedSeconds:seconds,rank:cacheRank,settlementScheduled:cacheRank != nil)
+    var dailyCache = state.dailyLeaderboardCache!
+    if let configuration = dailyLeaderboardConfiguration {
+      var entry: DailyLeaderboardCache.Entry?
+      var rank: Int?
+      if configuration.enabled, reward.rankingAdmission!.decision.speedEligible,
+        ["time","words"].contains(request.mode),
+        let limit = request.mode == "time" ? request.durationSeconds : request.wordLimit {
+        let candidate = DailyLeaderboardCache.Entry(userID:user.id,resultID:request.id,displayName:user.displayName,
+          language:request.language,mode:request.mode,mode2:String(limit),wpm:request.wpm,accuracy:request.accuracy,
+          preciseAccuracy:request.inputMetrics?.preciseAccuracy,consistency:request.consistency,finishedAt:admissionDate,
+          profileSnapshot:.init(version:1,selectedBadge:selectedPublicBadge(for:state.users[userIndex]),
+            discordAvatar:publicDiscordAvatar(for:state.users[userIndex])))
+        if configuration.accepts(candidate) {
+          entry = candidate; rank = try dailyCache.add(candidate,configuration:configuration,now:now)
+        }
+      }
+      reward.dailyCacheReceipt = .init(version:1,configuration:configuration,
+        keyMilliseconds:try DailyLeaderboardCache.key(at:now),entry:entry,rank:rank)
+    }
     try reward.validate()
     var jobs = state.weeklyRewardJobs!
     if cacheRank != nil { try jobs.schedule(key:reward.weeklyPartition!.keyMilliseconds) }
@@ -3703,6 +3753,7 @@ public actor AuthStore {
     state.accountPractice![user.id] = practice
     state.experienceAwards!.append(reward)
     state.weeklyExperienceCache = cache
+    state.dailyLeaderboardCache = dailyCache
     state.weeklyRewardJobs = jobs
     for badge in availablePublicBadges(for: user.id) where !existingBadgeIDs.contains(badge.id) {
       appendNotification(
@@ -4084,6 +4135,36 @@ public actor AuthStore {
     let period = query.period ?? "all"
     guard periods.contains(period) else { throw ResultStoreError.invalidResult }
     let usesDailyLeaderboardCache = period == "day" || period == "yesterday"
+    if usesDailyLeaderboardCache, let configuration = dailyLeaderboardConfiguration {
+      guard configuration.enabled else { throw DailyLeaderboardCacheError.unavailable }
+      state.dailyLeaderboardCache!.expire(at:now)
+      committedState.dailyLeaderboardCache = state.dailyLeaderboardCache
+      let key = try DailyLeaderboardCache.key(at:now) - (period == "yesterday" ? 86_400_000 : 0)
+      let users = Dictionary(uniqueKeysWithValues:state.users.map { ($0.id,$0) })
+      let entries = state.dailyLeaderboardCache!.buckets.filter { bucket in
+        bucket.keyMilliseconds == key && (query.mode == nil || bucket.mode == query.mode)
+          && (query.language == nil || bucket.language == query.language)
+          && (query.durationSeconds == nil || bucket.mode2 == String(query.durationSeconds!))
+          && (query.wordLimit == nil || bucket.mode2 == String(query.wordLimit!))
+      }.flatMap(\.entries).filter { entry in
+        users[entry.userID].map { !$0.leaderboardOptedOut && !$0.accountSuspended
+          && !$0.leaderboardRestricted && !$0.displayNameChangeRequired } == true
+      }
+      var seen = Set<UUID>()
+      let global = DailyLeaderboardCache.ordered(entries).filter { seen.insert($0.userID).inserted }
+      var friendPosition = 0
+      return global.enumerated().compactMap { offset, entry in
+        guard eligibleUserIDs == nil || eligibleUserIDs!.contains(entry.userID) else { return nil }
+        friendPosition += 1
+        let user = users[entry.userID]!
+        return .init(id:entry.resultID,rank:offset + 1,userID:entry.userID,displayName:entry.displayName,
+          mode:entry.mode,language:entry.language,wpm:entry.wpm,accuracy:entry.accuracy,
+          preciseAccuracy:entry.preciseAccuracy,consistency:entry.consistency,finishedAt:entry.finishedAt,
+          selectedBadge:entry.profileSnapshot.selectedBadge,
+          discordAvatar:publicDiscordAvatar(for:user) == nil ? nil : entry.profileSnapshot.discordAvatar,
+          friendsRank:eligibleUserIDs == nil ? nil : friendPosition)
+      }
+    }
     let calendar = Calendar.current
     let todayStart = calendar.startOfDay(for: now)
     let lowerBound: Date?
@@ -4107,8 +4188,11 @@ public actor AuthStore {
       entry.rankingAdmission.map { ("\(entry.userID)/\(entry.resultID)", $0) }
     })
     let typingSecondsByUser = totalTypingSecondsByUser()
+    let managedDailyResults = Set(state.experienceAwards!.filter { $0.dailyCacheReceipt != nil }
+      .map { "\($0.userID)/\($0.resultID)" })
     let records = state.results.filter { result in
       (eligibleUserIDs == nil || eligibleUserIDs!.contains(result.userID))
+        && (!usesDailyLeaderboardCache || !managedDailyResults.contains("\(result.userID)/\(result.id)"))
         && result.bailedOut != true
         && rankingAdmissions["\(result.userID)/\(result.id)"].map {
           usesDailyLeaderboardCache ? $0.decision.speedEligible : $0.decision.personalBestEligible

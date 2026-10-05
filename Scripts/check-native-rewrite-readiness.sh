@@ -118,6 +118,11 @@ run_logged_check "executing pinned weekly XP service with isolated Redis 6.2.6" 
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-weekly-xp-read.mjs" "$reference_root"
 
+run_logged_check "executing pinned daily cache service and isolated Redis 6.2.6" \
+  "$temporary_directory/daily-cache-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-daily-cache.mjs" "$reference_root"
+
 run_logged_check "executing pinned weekly XP date and controller partition selection" \
   "$temporary_directory/weekly-xp-partition-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \

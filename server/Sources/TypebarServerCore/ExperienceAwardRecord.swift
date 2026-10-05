@@ -16,6 +16,7 @@ struct ExperienceAwardRecord: Codable {
   var rankingAdmission: RankingAdmission? = nil
   var weeklyPartition: WeeklyExperiencePartition? = nil
   var weeklyCacheReceipt: WeeklyExperienceCacheReceipt? = nil
+  var dailyCacheReceipt: DailyLeaderboardCacheReceipt? = nil
 
   static func legacy(userID: UUID, request: ResultSubmissionRequest, acceptedAt: Date?) -> Self {
     let xp = TypebarExperiencePolicy.points(for: request)
@@ -38,6 +39,7 @@ struct ExperienceAwardRecord: Codable {
     try rankingAdmission?.validate()
     try weeklyPartition?.validate(acceptedAt: acceptedAt)
     try weeklyCacheReceipt?.validate(reward: self)
+    try dailyCacheReceipt?.validate(reward: self)
     guard version == 1, finishedAt.timeIntervalSince1970.isFinite,
       acceptedAt.map({ $0.timeIntervalSince1970.isFinite }) ?? true,
       award.xp.isFinite, (0...9_007_199_254_740_991).contains(award.xp), accountCredit >= 0 else {
@@ -66,7 +68,7 @@ struct ExperienceAwardRecord: Codable {
 extension ExperienceAwardRecord {
   private enum CodingKeys: String, CodingKey {
     case version, userID, resultID, finishedAt, acceptedAt, award, accountCredit,
-      input, configuration, context, rankingAdmission, weeklyPartition, weeklyCacheReceipt
+      input, configuration, context, rankingAdmission, weeklyPartition, weeklyCacheReceipt, dailyCacheReceipt
   }
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -86,5 +88,7 @@ extension ExperienceAwardRecord {
       ? try values.decode(WeeklyExperiencePartition.self, forKey: .weeklyPartition) : nil
     weeklyCacheReceipt = values.contains(.weeklyCacheReceipt)
       ? try values.decode(WeeklyExperienceCacheReceipt.self, forKey: .weeklyCacheReceipt) : nil
+    dailyCacheReceipt = values.contains(.dailyCacheReceipt)
+      ? try values.decode(DailyLeaderboardCacheReceipt.self, forKey: .dailyCacheReceipt) : nil
   }
 }

@@ -399,6 +399,7 @@ public struct LeaderboardEntry: Content, Equatable, Identifiable {
     public let finishedAt: Date
     public let selectedBadge: PublicProfileBadge?
     public let discordAvatar: PublicDiscordAvatarResponse?
+    public var friendsRank: Int? = nil
 }
 
 public struct LeaderboardResponse: Content, Equatable {
