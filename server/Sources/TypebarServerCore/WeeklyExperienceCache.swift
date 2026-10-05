@@ -53,14 +53,27 @@ struct WeeklyExperienceCacheReceipt: Codable {
   let configuration: WeeklyExperienceLeaderboardConfiguration
   let timeTypedSeconds: Double
   let rank: Int?
+  var settlementScheduled: Bool? = nil
   func validate(reward: ExperienceAwardRecord) throws {
     try configuration.validate()
     guard version == 1, reward.weeklyPartition != nil,
       timeTypedSeconds.isFinite, (0...9_007_199_254_740_991).contains(timeTypedSeconds),
       rank.map({ $0 > 0 }) ?? true,
       (rank != nil) == (configuration.enabled && reward.award.xp > 0
-        && reward.rankingAdmission?.decision.weeklyExperienceEligible == true)
+        && reward.rankingAdmission?.decision.weeklyExperienceEligible == true),
+      settlementScheduled.map({ $0 == (rank != nil) }) ?? true
     else { throw WeeklyExperienceCacheError.invalidState }
+  }
+}
+
+extension WeeklyExperienceCacheReceipt {
+  private enum CodingKeys: String, CodingKey { case version, configuration, timeTypedSeconds, rank, settlementScheduled }
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy:CodingKeys.self)
+    self.init(version:try values.decode(Int.self,forKey:.version),
+      configuration:try values.decode(WeeklyExperienceLeaderboardConfiguration.self,forKey:.configuration),
+      timeTypedSeconds:try values.decode(Double.self,forKey:.timeTypedSeconds),rank:try values.decodeIfPresent(Int.self,forKey:.rank),
+      settlementScheduled:values.contains(.settlementScheduled) ? try values.decode(Bool.self,forKey:.settlementScheduled) : nil)
   }
 }
 

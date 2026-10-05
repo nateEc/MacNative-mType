@@ -665,6 +665,10 @@ public actor AuthStore {
     // Missing means a pre-ledger file; explicit null is corruption, not a migration.
     var experienceAwards: [ExperienceAwardRecord]? = []
     var weeklyExperienceCache: WeeklyExperienceCache? = .init()
+    var rewardInbox: RewardInboxState = .init()
+    var rewardInboxManaged = true
+    var weeklyRewardJobs: WeeklyExperienceRewardJobs? = .init()
+    var weeklyRewardJobsManaged = true
     var accountPractice: [UUID: AccountPracticeRecord]? = [:]
     var leaderboardRankMemories: [StoredLeaderboardRankMemory] = []
     var connections: [StoredConnection] = []
@@ -683,7 +687,7 @@ public actor AuthStore {
     private enum CodingKeys: String, CodingKey {
       case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, experienceAwards, accountPractice, leaderboardRankMemories, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
-        nextSyncCursor, weeklyExperienceCache
+        nextSyncCursor, weeklyExperienceCache, rewardInbox, rewardInboxManaged, weeklyRewardJobs, weeklyRewardJobsManaged
     }
 
     init() {}
@@ -710,6 +714,13 @@ public actor AuthStore {
         ? try values.decode([ExperienceAwardRecord].self, forKey: .experienceAwards) : nil
       weeklyExperienceCache = values.contains(.weeklyExperienceCache)
         ? try values.decode(WeeklyExperienceCache.self, forKey: .weeklyExperienceCache) : nil
+      rewardInbox = values.contains(.rewardInbox) ? try values.decode(RewardInboxState.self,forKey:.rewardInbox) : .init()
+      rewardInboxManaged = values.contains(.rewardInboxManaged) ? try values.decode(Bool.self,forKey:.rewardInboxManaged) : false
+      guard !rewardInboxManaged || values.contains(.rewardInbox) else { throw RewardInboxError.invalidState }
+      weeklyRewardJobs = values.contains(.weeklyRewardJobs) ? try values.decode(WeeklyExperienceRewardJobs.self,forKey:.weeklyRewardJobs) : nil
+      weeklyRewardJobsManaged = values.contains(.weeklyRewardJobsManaged)
+        ? try values.decode(Bool.self,forKey:.weeklyRewardJobsManaged) : false
+      guard !weeklyRewardJobsManaged || values.contains(.weeklyRewardJobs) else { throw RewardInboxError.invalidState }
       if values.contains(.accountPractice) {
         // UUID dictionaries encode as alternating key/value arrays. Reject a
         // duplicate explicitly rather than let Dictionary silently keep one.
@@ -1288,13 +1299,15 @@ public actor AuthStore {
   private let experienceConfiguration: ExperienceCalculationConfiguration?
   private let weeklyExperienceTimeZone: TimeZone
   private let weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration
+  public nonisolated let rewardInboxConfiguration: RewardInboxConfiguration
 
   public init(
     fileURL: URL?, bcryptCost: Int = 12, minimumLeaderboardTypingSeconds: Int = 0,
     experienceConfiguration: ExperienceCalculationConfiguration? = .typebarDefault,
     rankingEnvironment: RankingEnvironment = .production,
     weeklyExperienceTimeZone: TimeZone = .current,
-    weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration = .typebarDefault
+    weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration = .typebarDefault,
+    rewardInboxConfiguration: RewardInboxConfiguration = .typebarDefault
   ) throws {
     guard (0...TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds).contains(
       minimumLeaderboardTypingSeconds)
@@ -1308,6 +1321,8 @@ public actor AuthStore {
     self.weeklyExperienceTimeZone = weeklyExperienceTimeZone
     try weeklyExperienceConfiguration.validate()
     self.weeklyExperienceConfiguration = weeklyExperienceConfiguration
+    try rewardInboxConfiguration.validate()
+    self.rewardInboxConfiguration = rewardInboxConfiguration
     guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
       state = .init()
       committedState = state
@@ -1325,6 +1340,18 @@ public actor AuthStore {
       state.weeklyExperienceCache = .init()
     }
     try state.weeklyExperienceCache!.validate(users:Set(state.users.map(\.id)),awards:state.experienceAwards!)
+    try state.rewardInbox.validate(users:Set(state.users.map(\.id)))
+    if state.weeklyRewardJobs == nil {
+      guard !state.experienceAwards!.contains(where: { $0.weeklyCacheReceipt?.settlementScheduled == true }) else {
+        throw RewardInboxError.invalidState
+      }
+      state.weeklyRewardJobs = .init()
+    }
+    try state.weeklyRewardJobs!.validate(awards:state.experienceAwards!)
+    for user in state.users {
+      _ = try RewardInboxState.adding(state.experienceAwards!.filter { $0.userID == user.id }.reduce(0) { $0 + $1.accountCredit },
+        state.rewardInbox.experience(for:user.id))
+    }
     legacyExperienceAwards = state.experienceAwards!.filter { $0.weeklyCacheReceipt == nil }
     committedState = state
   }
@@ -2270,6 +2297,7 @@ public actor AuthStore {
     }
     state.streakDayBoundaryOffsets.removeValue(forKey: userID)
     state.experienceAwards?.removeAll { $0.userID == userID }
+    state.rewardInbox.purge(userID:userID)
     state.weeklyExperienceCache?.purge(userID:userID)
     state.accountPractice?.removeValue(forKey: userID)
     state.personalBestResetDates.removeValue(forKey: userID)
@@ -2311,6 +2339,7 @@ public actor AuthStore {
     state.syncRecords.removeAll { $0.userID == user.id }
     state.results.removeAll { $0.userID == user.id }
     state.experienceAwards?.removeAll { $0.userID == user.id }
+    state.rewardInbox.purge(userID:user.id)
     state.weeklyExperienceCache?.purge(userID:user.id)
     state.accountPractice?[user.id] = .init()
     state.leaderboardRankMemories.removeAll { $0.userID == user.id }
@@ -2588,6 +2617,81 @@ public actor AuthStore {
       notifications: notifications,
       unreadCount: notifications.lazy.filter { $0.readAt == nil }.count,
       maxCount: Self.maxNotificationsPerUser)
+  }
+
+  public func rewardInbox(accessToken: String, now: Date = .now) throws -> RewardInboxResponse {
+    let user = try authenticatedUser(for:accessToken,now:now)
+    guard rewardInboxConfiguration.enabled else { throw RewardInboxError.disabled }
+    return .init(inbox:state.rewardInbox.inbox(for:user.id),maxMail:rewardInboxConfiguration.maxMail)
+  }
+
+  public func updateRewardInbox(_ request: RewardInboxUpdateRequest, accessToken: String, now: Date = .now) throws -> RewardInboxUpdateResponse {
+    let user = try authenticatedUser(for:accessToken,now:now)
+    guard rewardInboxConfiguration.enabled else { throw RewardInboxError.disabled }
+    var inbox = state.rewardInbox
+    try inbox.update(request,for:user.id,totalExperience:experience(for:user.id),
+      existingBadges:availablePublicBadges(for:user.id),now:now)
+    state.rewardInbox = inbox
+    try persist()
+    return .init(inbox:state.rewardInbox.inbox(for:user.id),maxMail:rewardInboxConfiguration.maxMail,
+      user:try userResponse(for:user.id))
+  }
+
+  /// Trusted producer boundary, deliberately not exposed as an owner HTTP endpoint.
+  @discardableResult
+  func deliverRewardMail(_ mail: RewardMail, userID: UUID) throws -> Bool {
+    guard state.users.contains(where: { $0.id == userID }) else { throw AuthStoreError.profileNotFound }
+    var inbox = state.rewardInbox
+    guard try inbox.insert(mail,for:userID,configuration:rewardInboxConfiguration) else { return false }
+    state.rewardInbox = inbox
+    try persist(); return true
+  }
+
+  public func weeklyExperienceRewardJobs() -> [WeeklyExperienceRewardJob] { state.weeklyRewardJobs!.jobs }
+
+  /// Each task's delivery and completion share one atomic file commit. Failed
+  /// calculation keeps the mail unchanged and persists a bounded retry record.
+  @discardableResult
+  public func processDueWeeklyExperienceRewards(now: Date = .now, maximumJobs: Int = 10) throws -> [WeeklyExperienceRewardJob] {
+    guard (1...100).contains(maximumJobs) else { throw RewardInboxError.invalidRequest }
+    let timestamp = try RewardInboxState.timestamp(now)
+    state.weeklyExperienceCache!.expire(at:now)
+    committedState.weeklyExperienceCache = state.weeklyExperienceCache
+    let due = state.weeklyRewardJobs!.jobs.filter { $0.status == .pending && $0.nextAttempt <= timestamp }
+      .sorted { $0.nextAttempt == $1.nextAttempt ? $0.key < $1.key : $0.nextAttempt < $1.nextAttempt }.prefix(maximumJobs)
+    var processed: [WeeklyExperienceRewardJob] = []
+    for pending in due {
+      let before = state
+      var changes = state, job = pending
+      job.attempts += 1
+      do {
+        let entries = changes.weeklyExperienceCache!.buckets.first { $0.keyMilliseconds == job.key }?.entries ?? []
+        let candidates = try WeeklyExperienceSettlementPlanner.prepare(entries:entries,
+          configuration:weeklyExperienceConfiguration,inboxEnabled:rewardInboxConfiguration.enabled)
+        for candidate in candidates {
+          guard let entry = entries.first(where: { $0.userID == candidate.userID }),
+            changes.users.contains(where: { $0.id == candidate.userID }) else { continue }
+          let mail = RewardMail(subject:"每周练习奖励",
+            body:"\(entry.displayName)，上周排名第 \(candidate.rank)，周榜显示 \(Int(candidate.totalExperience)) XP，实际键入 \(candidate.timeTypedSeconds) 秒。领取可获得 \(candidate.rewardExperience) XP。",
+            timestamp:timestamp,rewards:[.xp(candidate.rewardExperience)])
+          try changes.rewardInbox.insert(mail,for:candidate.userID,configuration:rewardInboxConfiguration)
+        }
+        job.status = .complete; job.lastFailure = nil
+      } catch {
+        changes = before
+        job.lastFailure = (error as? WeeklyExperienceSettlementError) == .emptyRewardBrackets
+          ? "emptyRewardBrackets" : "invalidRewardState"
+        job.nextAttempt = try RewardInboxState.adding(timestamp,WeeklyExperienceRewardSchedule.retryDelayMilliseconds)
+        if job.attempts == WeeklyExperienceRewardSchedule.maximumAttempts { job.status = .failed }
+      }
+      try job.validate()
+      let index = changes.weeklyRewardJobs!.jobs.firstIndex { $0.key == job.key }!
+      changes.weeklyRewardJobs!.jobs[index] = job
+      state = changes
+      try persist()
+      processed.append(job)
+    }
+    return processed
   }
 
   public func markNotificationRead(_ id: UUID, accessToken: String, now: Date = .now) throws
@@ -3204,7 +3308,9 @@ public actor AuthStore {
     if practicedModes >= 4 {
       badgeIDs.append("mode-explorer")
     }
-    return badgeIDs.compactMap(Self.publicBadge)
+    var badges = state.rewardInbox.inventory(for:userID), owned = Set(badges.map(\.id))
+    for badge in badgeIDs.compactMap(Self.publicBadge) where owned.insert(badge.id).inserted { badges.append(badge) }
+    return badges
   }
 
   private static func publicBadge(id: String) -> PublicProfileBadge? {
@@ -3324,6 +3430,7 @@ public actor AuthStore {
 
   private func experience(for userID: UUID) -> Int {
     state.experienceAwards!.filter { $0.userID == userID }.reduce(0) { $0 + $1.accountCredit }
+      + state.rewardInbox.experience(for:userID)
   }
 
   private func legacyWeeklyExperience(partitionKey: Int, since: Date, before: Date?,
@@ -3570,8 +3677,10 @@ public actor AuthStore {
           discordAvatar:publicDiscordAvatar(for:state.users[userIndex])))
     } else { cacheRank = nil }
     reward.weeklyCacheReceipt = .init(version:1,configuration:weeklyExperienceConfiguration,
-      timeTypedSeconds:seconds,rank:cacheRank)
+      timeTypedSeconds:seconds,rank:cacheRank,settlementScheduled:cacheRank != nil)
     try reward.validate()
+    var jobs = state.weeklyRewardJobs!
+    if cacheRank != nil { try jobs.schedule(key:reward.weeklyPartition!.keyMilliseconds) }
     let existingBadgeIDs = Set(availablePublicBadges(for: user.id).map(\.id))
     state.results.append(
       .init(
@@ -3594,6 +3703,7 @@ public actor AuthStore {
     state.accountPractice![user.id] = practice
     state.experienceAwards!.append(reward)
     state.weeklyExperienceCache = cache
+    state.weeklyRewardJobs = jobs
     for badge in availablePublicBadges(for: user.id) where !existingBadgeIDs.contains(badge.id) {
       appendNotification(
         .init(
@@ -4182,6 +4292,8 @@ public actor AuthStore {
 
   private func persist() throws {
     defer { legacyExperienceAwards = state.experienceAwards?.filter { $0.weeklyCacheReceipt == nil } ?? [] }
+    state.rewardInboxManaged = true
+    state.weeklyRewardJobsManaged = true
     guard let fileURL else {
       committedState = state
       return

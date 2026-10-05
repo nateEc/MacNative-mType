@@ -933,6 +933,10 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     let service: String
     let capabilities: [String: String]
 
+    var supportsRewardInbox: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["rewardInbox"] == "available"
+    }
+
     var supportsResultTimingEvidence: Bool {
         apiVersion == "v1"
             && service == "typebar"
@@ -1754,6 +1758,8 @@ enum RemoteAccountError: LocalizedError {
     case oauthAuthorizationCancelled
     case oauthAuthorizationInProgress
     case accountScopeChanged
+    case rewardInboxUnavailable
+    case rewardInboxScopeChanged
     case archiveSyncConflict(serverVersion: Int)
     case serverMessage(String)
     case serverResponse(statusCode: Int, message: String)
@@ -1768,6 +1774,8 @@ enum RemoteAccountError: LocalizedError {
         case .oauthAuthorizationCancelled: "第三方登录已取消。"
         case .oauthAuthorizationInProgress: "已有一个第三方登录正在进行。"
         case .accountScopeChanged: "服务地址或登录账户已改变；未发送成绩。"
+        case .rewardInboxUnavailable: "此服务未启用奖励收件箱。请联系部署者确认版本和收件箱配置。"
+        case .rewardInboxScopeChanged: "服务地址或登录账户已改变；未使用旧账户的收件箱响应。"
         case .archiveSyncConflict: "服务器存在更新冲突；正在保留双方内容并重新合并。"
         case .serverMessage(let message): message
         case .serverResponse(_, let message): message
@@ -3235,6 +3243,44 @@ final class AccountSession {
         return .init(
             notifications: response.notifications, unreadCount: response.unreadCount,
             maxCount: response.maxCount)
+    }
+
+    func rewardInbox() async throws -> RemoteRewardInbox {
+        let requestEndpoint = endpoint, token = try accessToken(), scope = resultPublicationScope
+        let api = RemoteAccountAPI(endpoint: requestEndpoint)
+        let capabilities = try await api.request(path: "v1/capabilities", method: "GET", token: nil,
+            body: Optional<String>.none, response: RemoteServiceCapabilities.self)
+        try guardRewardInboxScope(endpoint: requestEndpoint, token: token, scope: scope)
+        guard capabilities.supportsRewardInbox else { throw RemoteAccountError.rewardInboxUnavailable }
+        let response = try await api.request(path: "v1/inbox", method: "GET", token: token,
+            body: Optional<String>.none, response: RemoteRewardInbox.self)
+        try guardRewardInboxScope(endpoint: requestEndpoint, token: token, scope: scope)
+        return response
+    }
+
+    func updateRewardInbox(_ update: RemoteRewardInboxUpdate) async throws -> RemoteRewardInbox {
+        guard update.mailIdsToMarkRead?.isEmpty != true, update.mailIdsToDelete?.isEmpty != true else {
+            throw RemoteAccountError.unexpectedResponse
+        }
+        let requestEndpoint = endpoint, token = try accessToken(), scope = resultPublicationScope
+        let api = RemoteAccountAPI(endpoint: requestEndpoint)
+        let capabilities = try await api.request(path: "v1/capabilities", method: "GET", token: nil,
+            body: Optional<String>.none, response: RemoteServiceCapabilities.self)
+        try guardRewardInboxScope(endpoint: requestEndpoint, token: token, scope: scope)
+        guard capabilities.supportsRewardInbox else { throw RemoteAccountError.rewardInboxUnavailable }
+        let response = try await api.request(path: "v1/inbox", method: "PATCH", token: token,
+            body: update, response: RemoteRewardInboxUpdateResponse.self)
+        try guardRewardInboxScope(endpoint: requestEndpoint, token: token, scope: scope,
+            returnedUserID: response.user.id)
+        currentUser = response.user
+        return response.mailbox
+    }
+
+    private func guardRewardInboxScope(endpoint requestedEndpoint: String, token: String,
+        scope: ResultPublicationScope?, returnedUserID: UUID? = nil) throws {
+        guard endpoint == requestedEndpoint, (try? accessToken()) == token,
+            RewardInboxScopePolicy.accepts(requested: scope, current: resultPublicationScope,
+                returnedUserID: returnedUserID) else { throw RemoteAccountError.rewardInboxScopeChanged }
     }
 
     func publicAnnouncements() async throws -> [RemoteAnnouncement] {

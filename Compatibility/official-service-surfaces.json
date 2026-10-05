@@ -28,12 +28,14 @@
     "leaderboards": "全局、好友、日/周 WPM 与 XP 榜",
     "results": "成绩提交、读取、标签与删除",
     "configuration": "服务能力、维护状态与人机验证协商",
-    "users": "身份、资料、连续天数、通知与举报",
+    "users": "身份、资料、连续天数、奖励收件箱、通知与举报",
     "quotes": "社区引语的浏览、提交、审核、评分与举报",
     "connections": "好友、屏蔽、关系通知与受控私信"
   },
   "nativeEvidenceFiles": {
     "admin": [
+      "server/Sources/TypebarServerCore/WeeklyExperienceRewardJobs.swift",
+      "server/Tests/TypebarServerCoreTests/RewardInboxRouteTests.swift",
       "Sources/Typebar/ProfileReportView.swift",
       "Sources/Typebar/RemoteAccount.swift",
       "server/Sources/TypebarServerCore/AuthStore.swift",
@@ -67,6 +69,8 @@
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
     ],
     "leaderboards": [
+      "server/Sources/TypebarServerCore/WeeklyExperienceRewardJobs.swift",
+      "server/Tests/TypebarServerCoreTests/WeeklyExperienceRewardJobTests.swift",
       "Sources/Typebar/CloudSyncView.swift",
       "server/Sources/TypebarServerCore/AuthStore.swift",
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift",
@@ -96,6 +100,11 @@
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
     ],
     "users": [
+      "Sources/Typebar/RewardInboxView.swift",
+      "Sources/Typebar/RemoteRewardInbox.swift",
+      "server/Sources/TypebarServerCore/RewardInbox.swift",
+      "server/Tests/TypebarServerCoreTests/RewardInboxTests.swift",
+      "server/Tests/TypebarServerCoreTests/RewardInboxRouteTests.swift",
       "Sources/Typebar/RemoteAccount.swift",
       "Sources/Typebar/ConnectionsView.swift",
       "server/Sources/TypebarServerCore/AuthStore.swift",

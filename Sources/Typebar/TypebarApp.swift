@@ -1030,6 +1030,7 @@ private struct ContentView: View {
   @State private var syncInitialLeaderboard: RemoteLeaderboardSelection?
   @State private var showingConnections = false
   @State private var showingNotifications = false
+  @State private var showingRewardInbox = false
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
   @State private var themeQuickPickerScope: ThemeQuickPickerScope?
@@ -1450,6 +1451,10 @@ private struct ContentView: View {
         guard acceptsLeavingPracticeNavigation() else { return }
         showingConnections = true
       }
+      Button("收件箱", systemImage: "tray") {
+        guard acceptsLeavingPracticeNavigation() else { return }
+        showingRewardInbox = true
+      }
       Button { showingNotifications = true } label: {
         HStack(spacing: 4) {
           Label("通知", systemImage: "bell")
@@ -1522,6 +1527,7 @@ private struct ContentView: View {
     }) {
       NotificationsView(account: account) { unreadNotificationCount = $0 }
     }
+    .sheet(isPresented: $showingRewardInbox) { RewardInboxView(account:account) }
     .sheet(item: $signedOutResultClaimSheetState) { state in
       SignedOutResultClaimView(
         result: state.result,
@@ -4228,6 +4234,9 @@ private struct ContentView: View {
       .init(
         id: "notifications", title: "打开通知", subtitle: "查看好友请求和接受事件", systemImage: "bell",
         keywords: ["notification", "通知", "好友请求"], group: .connections),
+      .init(
+        id: "reward-inbox", title: "打开奖励收件箱", subtitle: "查看邮件并领取 XP 或徽章奖励", systemImage: "tray",
+        keywords: ["inbox", "收件箱", "奖励", "xp"], group: .connections),
       ReleaseHistoryCommand.item,
     ]
     items.append(contentsOf: NoStressResultCommandCatalog.items)
@@ -4672,6 +4681,9 @@ private struct ContentView: View {
       guard acceptsLeavingPracticeNavigation() else { return }
       showingConnections = true
     case "notifications": showingNotifications = true
+    case "reward-inbox":
+      guard acceptsLeavingPracticeNavigation() else { return }
+      showingRewardInbox = true
     case ReleaseHistoryCommand.identifier: openWindow(id: "release-history")
     case "bailout": showingCommandBailoutConfirmation = true
     case QuoteFavoriteCommand.identifier:

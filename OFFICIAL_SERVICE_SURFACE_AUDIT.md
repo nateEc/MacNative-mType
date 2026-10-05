@@ -1,5 +1,7 @@
 # 官方服务面审计
 
+当前 [奖励收件箱与周任务交付](REWARD_INBOX_CONTRACT.md) 增加 users 的真实 inbox 路由／原生入口、leaderboards 的持久周任务和 admin 的只读状态证据，相关路径已进入服务矩阵。领取源码、HTTP 和恢复自动化不升级模块计数或 partial 状态，不证明原 HTTP、徽章目录、真实 Mongo／BullMQ 或完整功能等价；人工验收仍待单窗口执行。
+
 2026-10-03 完成统计增量见 [完成统计提交与历史边界](RESULT_CONSISTENCY_SERVICE_CONTRACT.md)：实际运行固定完整 buildDbResult 确认原版只保存输入节奏与按键稳定度，WPM 仅属完成请求。自有能力协商、匿名校验、按键历史保存与读取的新增回归已接入；不要求官方 URL／payload 身份，不增加官方模块覆盖或把 partial 改为全等价。本机归档 22 不变，真实部署／账户切换／旧二进制和完整反作弊仍未验。
 
 ## 范围与证据

@@ -46,9 +46,13 @@ public func configure(
             rankingEnvironment: try .fromEnvironment(Environment.get("TYPEBAR_RANKING_ENVIRONMENT")),
             weeklyExperienceTimeZone: try WeeklyExperiencePartition.configuredTimeZone(
                 Environment.get("TYPEBAR_WEEKLY_XP_TIME_ZONE")),
-            weeklyExperienceConfiguration: try .fromJSON(Environment.get("TYPEBAR_WEEKLY_XP_CONFIGURATION")))
+            weeklyExperienceConfiguration: try .fromJSON(Environment.get("TYPEBAR_WEEKLY_XP_CONFIGURATION")),
+            rewardInboxConfiguration: try .fromJSON(Environment.get("TYPEBAR_INBOX_CONFIGURATION")))
     }
     let authStore = resolvedAuthStore
+    if app.environment != .testing {
+        app.lifecycle.use(WeeklyExperienceRewardWorker(store:authStore,logger:app.logger))
+    }
     app.middleware.use(TypebarMaintenanceMiddleware(isEnabled: maintenanceMode))
     app.middleware.use(TypebarRateLimitMiddleware(limiter: RequestRateLimiter()))
 
@@ -92,6 +96,7 @@ public func configure(
                 "connections": .partial,
                 "quoteFivePointRatings": .available,
                 "notifications": .partial,
+                "rewardInbox": authStore.rewardInboxConfiguration.enabled ? .available : .planned,
                 "profileReports": .partial,
                 "directMessages": .partial,
                 "experience": .partial,
@@ -576,6 +581,22 @@ public func configure(
         } catch let error as AuthStoreError { throw error.abort }
     }
 
+    app.get("v1", "inbox") { request async throws -> RewardInboxResponse in
+        do { return try await authStore.rewardInbox(accessToken:try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+        catch let error as RewardInboxError { throw error.abort }
+    }
+    app.patch("v1", "inbox") { request async throws -> RewardInboxUpdateResponse in
+        do {
+            let token = try request.accessToken()
+            _ = try await authStore.authenticatedUser(for:token)
+            guard authStore.rewardInboxConfiguration.enabled else { throw RewardInboxError.disabled }
+            let update = try request.content.decode(RewardInboxUpdateRequest.self)
+            return try await authStore.updateRewardInbox(update,accessToken:token)
+        } catch let error as AuthStoreError { throw error.abort }
+        catch let error as RewardInboxError { throw error.abort }
+    }
+
     app.get("v1", "notifications") { request async throws -> TypebarNotificationsResponse in
         do { return try await authStore.notifications(accessToken: try request.accessToken()) }
         catch let error as AuthStoreError { throw error.abort }
@@ -629,6 +650,14 @@ public func configure(
 
     app.get("v1", "announcements") { _ in
         await authStore.publicAnnouncements()
+    }
+
+    app.get("v1", "moderation", "weekly-rewards") { request async throws -> [WeeklyExperienceRewardJob] in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name:"X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden,reason:"A configured Typebar moderation key is required.")
+        }
+        return await authStore.weeklyExperienceRewardJobs()
     }
 
     app.post("v1", "moderation", "announcements") { request async throws -> PublicAnnouncementResponse in
@@ -1090,6 +1119,17 @@ public enum ServiceCapabilityStatus: String, Content, Equatable {
     case available
     case partial
     case planned
+}
+
+private extension RewardInboxError {
+    var abort: Abort {
+        switch self {
+        case .disabled: Abort(.serviceUnavailable,reason:"The reward inbox is disabled for this Typebar service.")
+        case .invalidRequest: Abort(.badRequest,reason:"The requested inbox update was invalid.")
+        case .unsafeArithmetic: Abort(.conflict,reason:"This inbox update would exceed the supported XP range.")
+        case .invalidConfiguration, .invalidState: Abort(.internalServerError,reason:"The reward inbox state is invalid.")
+        }
+    }
 }
 
 private extension AuthStoreError {

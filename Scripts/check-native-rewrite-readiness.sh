@@ -151,6 +151,22 @@ run_logged_check "executing pinned weekly reward worker and scheduling observati
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-weekly-xp-rewards.mjs" "$reference_root"
 
+run_logged_check "executing pinned inbox claim function and repeated requests" \
+  "$temporary_directory/inbox-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-inbox-claims.mjs" "$reference_root"
+
+inbox_source_package="${TYPEBAR_INBOX_SOURCE_PACKAGE:-$temporary_directory/inbox-source-runtime/node_modules/@tanstack/db}"
+if [[ ! -f "$inbox_source_package/package.json" ]]; then
+  run_logged_check "preparing pinned QA-only inbox sorting dependency" "$temporary_directory/inbox-source-runtime.log" \
+    npm install --prefix "$temporary_directory/inbox-source-runtime" --ignore-scripts --no-save --package-lock=false \
+    @tanstack/db@0.6.8
+fi
+run_logged_check "executing pinned inbox dependency title ordering" "$temporary_directory/inbox-order-source-check.log" \
+  env TYPEBAR_INBOX_SOURCE_PACKAGE="$inbox_source_package" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-inbox-order.mjs" "$reference_root"
+
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
@@ -158,6 +174,7 @@ require_no_conflicting_processes || fail "stop the listed process before running
 run_logged_check "running native client test suite" "$temporary_directory/client-tests.log" \
   env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_REFERENCE_ROOT="$reference_root" \
   TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
+  TYPEBAR_INBOX_SOURCE_PACKAGE="$inbox_source_package" \
   TYPEBAR_DISK_FIXTURE_ROOT="$temporary_directory/disk-model-fixtures" swift test
 
 require_no_conflicting_processes || fail "stop the listed process before running service tests"

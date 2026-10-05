@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+当前新增 [奖励收件箱与周任务交付](REWARD_INBOX_CONTRACT.md)：GET／PATCH v1/inbox、rewardInbox 能力及部署者只读任务状态；TYPEBAR_INBOX_CONFIGURATION 显式控制开关和容量。任务与邮件一起保存，领取后账户回执刷新，不将领取 XP 写回周榜；异步生命周期只支持单 writer。托管字段缺失拒绝、旧缺字段不回填，禁止旧 writer 混写。下面“无运行任务或领取接口”为历史阶段，整体功能等价仍开放。
+
 2026-10-05 最新 [周 XP 结算准备合同](WEEKLY_XP_SETTLEMENT_CONTRACT.md)：TYPEBAR_WEEKLY_XP_CONFIGURATION 新增可选 xpRewardBrackets；旧缺字段为空，新首次配置快照保留档位，不重算旧奖励。仅有调度描述和候选计算，没有新 HTTP 路由、运行任务、邮件持久化或领取，能力不冒报；未来结算须采用当时配置而非投稿快照。原生格式不改，旧 writer 禁止混写；完整功能仍未完成。下方为历史阶段。
 
 2026-10-05 最新 [周 XP metadata 合同](WEEKLY_XP_METADATA_CONTRACT.md)：四个列表／名次响应添加可选 timeTypedSeconds 与 lastActivityTimestamp，缺失表示未知；新缓存投稿保存 version=1 资料快照。读榜不刷新徽章／头像，当前头像隐私及解除绑定仍立即隐藏；混合旧来源不发布部分全周时长。旧 writer 禁止混写，完整备份恢复；premium、真实渲染与整体等价仍开放。下方为历史阶段。
