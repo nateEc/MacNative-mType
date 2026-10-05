@@ -62,6 +62,7 @@ try {
     'ioredis':synthetic({default:undefined}),
     '@monkeytype/schemas/configuration':synthetic({Configuration:undefined,ValidModeRule:undefined,RewardBracket:undefined}),
     '@monkeytype/schemas/users':synthetic({MonkeyMail:undefined}),
+    '@monkeytype/schemas/shared':synthetic({Mode:undefined,Mode2:undefined}),
   };
   const load = async (module,imports = {}) => {
     await module.link(id => {
@@ -93,6 +94,7 @@ try {
   assert.equal(queueOptions[0].options.defaultJobOptions.removeOnComplete,true);
   assert.equal(queueOptions[0].options.defaultJobOptions.removeOnFail,true);
   const queueFixtures = [];
+  const dailyQueueFixtures = [];
   for (const zone of ['UTC','Asia/Shanghai','America/New_York','Pacific/Apia']) {
     process.env.TZ = zone;
     for (const delta of [-1,0,12*3_600_000]) {
@@ -105,6 +107,13 @@ try {
       assert.equal(job.options.attempts,23); assert.equal(job.options.backoff,3_600_000);
       queueFixtures.push({zone,timestamp:milliseconds,key:job.data.ctx.lastWeekTimestamp,
         delay:job.options.delay,attempts:job.options.attempts,backoff:job.options.backoff});
+      const rule = {language:'english',mode:'words',mode2:'25'};
+      await queue.scheduleForTomorrow('daily-leaderboard-results',taskID,rule);
+      await queue.scheduleForTomorrow('daily-leaderboard-results',taskID,rule);
+      assert.equal(jobs.length,before+2,'Daily identity also uses the actual LRU');
+      const dailyJob = jobs.at(-1);
+      dailyQueueFixtures.push({zone,timestamp:milliseconds,key:dailyJob.data.ctx.yesterdayTimestamp,
+        delay:dailyJob.options.delay,attempts:dailyJob.options.attempts,backoff:dailyJob.options.backoff});
     }
   }
   process.env.TZ = 'UTC'; milliseconds = Date.UTC(2030,9,7,12);
@@ -130,6 +139,25 @@ try {
     '@monkeytype/schemas/leaderboards':synthetic({RedisXpLeaderboardEntrySchema:{parse:value => value},
       RedisXpLeaderboardEntry:undefined,RedisXpLeaderboardScore:undefined,XpLeaderboardEntry:undefined}),
   });
+  const miscSource = read('backend/src/utils/misc.ts');
+  const extract = name => {
+    const start = miscSource.indexOf('export function '+name), end = miscSource.indexOf('\nexport ',start+1);
+    assert.ok(start >= 0 && end > start); return miscSource.slice(start,end);
+  };
+  const scoreAndRules = await load(new vm.SourceTextModule(stripTypeScriptTypes(
+    'const MILLISECONDS_IN_DAY = 86400000;\n'+['kogascore','matchesAPattern','omit'].map(extract).join('\n'),
+    {mode:'transform'}),{context}));
+  const daily = await load(source('backend/src/utils/daily-leaderboards.ts'),{
+    '../init/redis':synthetic({getConnection:() => connection}),'../queues/later-queue':synthetic({default:queue}),
+    './misc':scoreAndRules,'@monkeytype/util/json':synthetic({parseWithSchema:value => JSON.parse(value)}),
+    '@monkeytype/schemas/leaderboards':synthetic({LeaderboardEntry:undefined,RedisDailyLeaderboardEntry:undefined,
+      RedisDailyLeaderboardEntrySchema:{parse:value => value}}),'./error':synthetic({default:Error}),
+    '@monkeytype/util/date-and-time':dates,
+  });
+  const george = await load(source('backend/src/queues/george-queue.ts'),{
+    './monkey-queue':monkeyQueue,'@monkeytype/schemas/leaderboards':synthetic({LeaderboardEntry:undefined}),
+  });
+  george.namespace.default.init({});
   let pushes = [], executions = 0;
   const dalSource = read('backend/src/dal/user.ts');
   const start = dalSource.indexOf('export async function addToInboxBulk(');
@@ -144,8 +172,8 @@ try {
   const mail = await load(source('backend/src/utils/monkey-mail.ts'),{'uuid':synthetic({v4:() => 'qa-mail-'+(++mailCounter)})});
   const worker = await load(source('backend/src/workers/later-worker.ts'),{
     'bullmq':bullmq,'../utils/logger':logger,'../dal/user':synthetic({addToInboxBulk:context.addToInboxBulk}),
-    '../queues/george-queue':synthetic({default:{}}),'../utils/monkey-mail':mail,
-    '../utils/daily-leaderboards':synthetic({DailyLeaderboard:class {}}),
+    '../queues/george-queue':george,'../utils/monkey-mail':mail,
+    '../utils/daily-leaderboards':daily,
     '../init/configuration':synthetic({getCachedConfiguration:async () => configuration}),
     '../utils/misc':misc,'../queues/later-queue':synthetic({default:queue}),
     '../utils/prometheus':synthetic({recordTimeToCompleteJob() {}}),
@@ -194,10 +222,45 @@ try {
   configuration.leaderboards.weeklyXp.enabled = false; pushes = [];
   await handler.handler({data:{taskName:'weekly-xp-leaderboard-results',ctx:{lastWeekTimestamp:key}}});
   assert.equal(pushes.length,0);
+  const dailyKey = dates.namespace.getCurrentDayTimestamp(), rule = {language:'english',mode:'words',mode2:'25'};
+  const dailyEntries = entries.map((entry,index) => ({uid:entry.uid,wpm:80-index*10,acc:100,
+    timestamp:Math.floor(milliseconds/1000)*1000,name:'Daily QA'}));
+  for (const entry of dailyEntries) {
+    cli('ZADD','monkeytype:dailyleaderboard:scores:english:words:25:'+dailyKey,
+      scoreAndRules.namespace.kogascore(entry.wpm,entry.acc,entry.timestamp),entry.uid);
+    cli('HSET','monkeytype:dailyleaderboard:results:english:words:25:'+dailyKey,entry.uid,JSON.stringify(entry));
+  }
+  const dailyWorkerFixtures = [];
+  const dailyRun = async (brackets,inboxEnabled,enabled=true,empty=false) => {
+    configuration = {dailyLeaderboards:{enabled,maxResults:1000,topResultsToAnnounce:2,xpRewardBrackets:brackets},
+      users:{inbox:{enabled:inboxEnabled,maxMail:2}}};
+    pushes = []; executions = 0; const before = jobs.length;
+    await handler.handler({data:{taskName:'daily-leaderboard-results',ctx:{modeRule:rule,
+      yesterdayTimestamp:dailyKey+(empty ? 86400000 : 0)}}});
+    const announced = jobs.slice(before).filter(job => job.name === 'announceDailyLeaderboardTopResults');
+    assert.equal(announced.length,enabled && !empty ? 1 : 0);
+    if (announced.length) {
+      assert.equal(announced[0].data.args[0],'words 25 english');
+      assert.equal(announced[0].data.args[1],dailyKey);
+    }
+    const mails = pushes.map(({uid,operation}) => {
+      const value = operation.$push.inbox.$each[0];
+      assert.equal(value.read,false); assert.equal(value.timestamp,milliseconds);
+      assert.equal(value.rewards[0].type,'xp'); return {uid,reward:value.rewards[0].item};
+    });
+    dailyWorkerFixtures.push({brackets,inboxEnabled,enabled,empty,mails,
+      announced:announced.flatMap(job => Array.from(job.data.args[2],entry => entry.uid))});
+  };
+  for (const brackets of bracketGroups) for (const inboxEnabled of [true,false]) await dailyRun(brackets,inboxEnabled);
+  await dailyRun(bracketGroups[0],true,false); await dailyRun(bracketGroups[0],true,true,true);
+  assert.equal(dailyWorkerFixtures.length,18);
+  assert.deepEqual(dailyWorkerFixtures[14].announced,dailyEntries.slice(0,2).map(entry => entry.uid),
+    'Daily empty brackets still announce; they do not have the weekly empty-page error');
+  assert.equal(dailyWorkerFixtures[14].mails.length,0);
   verify();
   process.stdout.write(emit ? JSON.stringify({referenceCommit:pin,lruVersion,redisVersion,queueFixtures,rewardFixtures,entries,workerFixtures,
-    uninitializedQueueCached:true,evictionEnqueues:102})
-    : `Weekly XP reward source passed (${queueFixtures.length} queue clocks, ${rewardFixtures.length} arithmetic, ${workerFixtures.length} worker cases; Redis ${redisVersion}, LRU ${lruVersion}; BullMQ/Mongo observation only; no GUI)\n`);
+    dailyQueueFixtures,dailyEntries,dailyWorkerFixtures,uninitializedQueueCached:true,evictionEnqueues:102})
+    : `Reward source passed (weekly ${queueFixtures.length} clocks/${workerFixtures.length} workers; daily ${dailyQueueFixtures.length} clocks/${dailyWorkerFixtures.length} workers; ${rewardFixtures.length} arithmetic; Redis ${redisVersion}, LRU ${lruVersion}; BullMQ/Mongo observation only; no GUI)\n`);
 } finally {
   if (previousTZ === undefined) delete process.env.TZ; else process.env.TZ = previousTZ;
   if (server.pid && !spawnError && server.exitCode === null && server.signalCode === null) {

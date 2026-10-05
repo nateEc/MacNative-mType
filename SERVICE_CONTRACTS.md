@@ -1,6 +1,6 @@
 # 服务端契约 v1（草案）
 
-当前新增 [日榜接受日缓存合同](DAILY_LEADERBOARD_CACHE_CONTRACT.md)：TYPEBAR_DAILY_LEADERBOARD_CONFIGURATION 控制正式服务的独立日榜，time／words 投稿及日榜四个查询端点已接通；禁用返回 404，历史、XP 和回执不重算。文件新增托管标记与首次快照，旧数据只初始化空缓存，旧 writer 禁止混写，单 writer 保存失败回滚。日榜任务／发奖尚未运行，不冒报完整奖励或原协议兼容；下方旧历史日榜说明为旧构造入口的兼容行为。
+当前新增 [日榜任务与交付合同](DAILY_LEADERBOARD_SETTLEMENT_CONTRACT.md)：TYPEBAR_DAILY_LEADERBOARD_CONFIGURATION 新增奖励规则、公告人数和 XP 档位，匹配的新 time／words 投稿安排持久任务；唯一生命周期使用结算配置，邮件及原生公告与完成状态同次提交。新增受部署者密钥保护的只读 daily-rewards 状态，领取沿用 inbox；旧来源不补发、单 writer、禁止旧 writer 混写。原版 Discord 公告渠道和完整协议仍未实现，不冒报整体兼容；旧历史日榜说明是旧构造入口行为。
 
 当前新增 [奖励收件箱与周任务交付](REWARD_INBOX_CONTRACT.md)：GET／PATCH v1/inbox、rewardInbox 能力及部署者只读任务状态；TYPEBAR_INBOX_CONFIGURATION 显式控制开关和容量。任务与邮件一起保存，领取后账户回执刷新，不将领取 XP 写回周榜；异步生命周期只支持单 writer。托管字段缺失拒绝、旧缺字段不回填，禁止旧 writer 混写。下面“无运行任务或领取接口”为历史阶段，整体功能等价仍开放。
 

@@ -671,6 +671,8 @@ public actor AuthStore {
     var rewardInboxManaged = true
     var weeklyRewardJobs: WeeklyExperienceRewardJobs? = .init()
     var weeklyRewardJobsManaged = true
+    var dailyRewardJobs: DailyLeaderboardRewardJobs? = .init()
+    var dailyRewardJobsManaged = true
     var accountPractice: [UUID: AccountPracticeRecord]? = [:]
     var leaderboardRankMemories: [StoredLeaderboardRankMemory] = []
     var connections: [StoredConnection] = []
@@ -690,7 +692,7 @@ public actor AuthStore {
       case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, experienceAwards, accountPractice, leaderboardRankMemories, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
         nextSyncCursor, weeklyExperienceCache, rewardInbox, rewardInboxManaged, weeklyRewardJobs, weeklyRewardJobsManaged,
-        dailyLeaderboardCache, dailyLeaderboardCacheManaged
+        dailyLeaderboardCache, dailyLeaderboardCacheManaged, dailyRewardJobs, dailyRewardJobsManaged
     }
 
     init() {}
@@ -729,6 +731,10 @@ public actor AuthStore {
       weeklyRewardJobsManaged = values.contains(.weeklyRewardJobsManaged)
         ? try values.decode(Bool.self,forKey:.weeklyRewardJobsManaged) : false
       guard !weeklyRewardJobsManaged || values.contains(.weeklyRewardJobs) else { throw RewardInboxError.invalidState }
+      dailyRewardJobs = values.contains(.dailyRewardJobs) ? try values.decode(DailyLeaderboardRewardJobs.self,forKey:.dailyRewardJobs) : nil
+      dailyRewardJobsManaged = values.contains(.dailyRewardJobsManaged)
+        ? try values.decode(Bool.self,forKey:.dailyRewardJobsManaged) : false
+      guard !dailyRewardJobsManaged || dailyRewardJobs != nil else { throw RewardInboxError.invalidState }
       if values.contains(.accountPractice) {
         // UUID dictionaries encode as alternating key/value arrays. Reject a
         // duplicate explicitly rather than let Dictionary silently keep one.
@@ -1368,6 +1374,13 @@ public actor AuthStore {
       state.weeklyRewardJobs = .init()
     }
     try state.weeklyRewardJobs!.validate(awards:state.experienceAwards!)
+    if state.dailyRewardJobs == nil {
+      guard !state.experienceAwards!.contains(where: { $0.dailyCacheReceipt?.settlementScheduled == true }) else {
+        throw RewardInboxError.invalidState
+      }
+      state.dailyRewardJobs = .init()
+    }
+    try state.dailyRewardJobs!.validate(awards:state.experienceAwards!)
     for user in state.users {
       _ = try RewardInboxState.adding(state.experienceAwards!.filter { $0.userID == user.id }.reduce(0) { $0 + $1.accountCredit },
         state.rewardInbox.experience(for:user.id))
@@ -2674,6 +2687,67 @@ public actor AuthStore {
 
   public func weeklyExperienceRewardJobs() -> [WeeklyExperienceRewardJob] { state.weeklyRewardJobs!.jobs }
 
+  public func dailyLeaderboardRewardJobs() -> [DailyLeaderboardRewardJob] { state.dailyRewardJobs!.jobs }
+
+  /// Mail, native winner announcements and task completion share one file commit.
+  /// No private historical result is used to reconstruct an expired daily board.
+  @discardableResult
+  public func processDueDailyLeaderboardRewards(now: Date = .now, maximumJobs: Int = 10) throws -> [DailyLeaderboardRewardJob] {
+    guard (1...100).contains(maximumJobs) else { throw RewardInboxError.invalidRequest }
+    let timestamp = try RewardInboxState.timestamp(now)
+    state.dailyLeaderboardCache!.expire(at:now)
+    committedState.dailyLeaderboardCache = state.dailyLeaderboardCache
+    let due = state.dailyRewardJobs!.jobs.filter { $0.status == .pending && $0.nextAttempt <= timestamp }
+      .sorted { $0.nextAttempt == $1.nextAttempt ? $0.identity < $1.identity : $0.nextAttempt < $1.nextAttempt }.prefix(maximumJobs)
+    var processed: [DailyLeaderboardRewardJob] = []
+    for pending in due {
+      let before = state
+      var changes = state, job = pending
+      job.attempts += 1
+      do {
+        if let configuration = dailyLeaderboardConfiguration {
+          let entries = changes.dailyLeaderboardCache!.buckets.first {
+            $0.keyMilliseconds == job.key && $0.language == job.modeRule.language
+              && $0.mode == job.modeRule.mode && $0.mode2 == job.modeRule.mode2
+          }?.entries ?? []
+          let placements = try DailyLeaderboardSettlementPlanner.prepare(entries:entries,
+            configuration:configuration,inboxEnabled:rewardInboxConfiguration.enabled)
+          for placement in placements {
+            let entry = placement.entry
+            guard let user = changes.users.first(where: { $0.id == entry.userID }) else { continue }
+            if let xp = placement.rewardExperience {
+              let mail = RewardMail(subject:"每日打字榜奖励",
+                body:"\(entry.displayName)，你在 \(entry.language) · \(entry.mode) \(entry.mode2) 日榜排名第 \(placement.rank)，成绩 \(entry.wpm) WPM。领取可获得 \(xp) XP。",
+                timestamp:timestamp,rewards:[.xp(xp)])
+              try changes.rewardInbox.insert(mail,for:entry.userID,configuration:rewardInboxConfiguration)
+            }
+            // A source Discord task becomes native public text, never a new
+            // outbound connection. Preserve current public-visibility guards.
+            if placement.announce, !user.leaderboardOptedOut, !user.accountSuspended,
+              !user.leaderboardRestricted, !user.displayNameChangeRequired {
+              let day = ISO8601DateFormatter().string(from:Date(timeIntervalSince1970:Double(job.key)/1_000)).prefix(10)
+              changes.announcements.append(.init(id:UUID(),
+                message:"日榜 \(day) UTC · \(entry.language) · \(entry.mode) \(entry.mode2)：第 \(placement.rank) 名 \(entry.displayName)，\(entry.wpm) WPM。",
+                level:.success,sticky:false,scheduledAt:nil,publishedAt:now))
+            }
+          }
+        }
+        job.status = .complete; job.lastFailure = nil
+      } catch {
+        changes = before; job.lastFailure = "invalidRewardState"
+        job.nextAttempt = try RewardInboxState.adding(timestamp,DailyLeaderboardRewardJob.retryDelayMilliseconds)
+        if job.attempts == DailyLeaderboardRewardJob.maximumAttempts { job.status = .failed }
+      }
+      try job.validate()
+      let index = changes.dailyRewardJobs!.jobs.firstIndex { $0.identity == job.identity }!
+      changes.dailyRewardJobs!.jobs[index] = job
+      state = changes
+      try persist()
+      processed.append(job)
+    }
+    return processed
+  }
+
   /// Each task's delivery and completion share one atomic file commit. Failed
   /// calculation keeps the mail unchanged and persists a bounded retry record.
   @discardableResult
@@ -3726,11 +3800,16 @@ public actor AuthStore {
         }
       }
       reward.dailyCacheReceipt = .init(version:1,configuration:configuration,
-        keyMilliseconds:try DailyLeaderboardCache.key(at:now),entry:entry,rank:rank)
+        keyMilliseconds:try DailyLeaderboardCache.key(at:now),entry:entry,rank:rank,
+        settlementScheduled:entry.map(configuration.schedulesRewards) ?? false)
     }
     try reward.validate()
     var jobs = state.weeklyRewardJobs!
     if cacheRank != nil { try jobs.schedule(key:reward.weeklyPartition!.keyMilliseconds) }
+    var dailyJobs = state.dailyRewardJobs!
+    if let receipt = reward.dailyCacheReceipt, receipt.settlementScheduled == true, let entry = receipt.entry {
+      try dailyJobs.schedule(key:receipt.keyMilliseconds,entry:entry)
+    }
     let existingBadgeIDs = Set(availablePublicBadges(for: user.id).map(\.id))
     state.results.append(
       .init(
@@ -3755,6 +3834,7 @@ public actor AuthStore {
     state.weeklyExperienceCache = cache
     state.dailyLeaderboardCache = dailyCache
     state.weeklyRewardJobs = jobs
+    state.dailyRewardJobs = dailyJobs
     for badge in availablePublicBadges(for: user.id) where !existingBadgeIDs.contains(badge.id) {
       appendNotification(
         .init(
@@ -4378,6 +4458,7 @@ public actor AuthStore {
     defer { legacyExperienceAwards = state.experienceAwards?.filter { $0.weeklyCacheReceipt == nil } ?? [] }
     state.rewardInboxManaged = true
     state.weeklyRewardJobsManaged = true
+    state.dailyRewardJobsManaged = true
     guard let fileURL else {
       committedState = state
       return

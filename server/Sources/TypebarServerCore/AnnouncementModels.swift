@@ -1,8 +1,8 @@
 import Foundation
 import Vapor
 
-/// A small, public deployment message. Announcements never contain account,
-/// practice, or device-specific data.
+/// A small, deliberate public deployment or leaderboard-winner message.
+/// Announcements never contain private account, history or device data.
 public enum TypebarAnnouncementLevel: String, CaseIterable, Content, Equatable {
   case notice
   case success

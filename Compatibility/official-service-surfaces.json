@@ -34,6 +34,8 @@
   },
   "nativeEvidenceFiles": {
     "admin": [
+      "server/Sources/TypebarServerCore/DailyLeaderboardRewardJobs.swift",
+      "server/Tests/TypebarServerCoreTests/DailyLeaderboardRewardJobTests.swift",
       "server/Sources/TypebarServerCore/WeeklyExperienceRewardJobs.swift",
       "server/Tests/TypebarServerCoreTests/RewardInboxRouteTests.swift",
       "Sources/Typebar/ProfileReportView.swift",
@@ -59,6 +61,7 @@
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
     ],
     "psas": [
+      "server/Tests/TypebarServerCoreTests/DailyLeaderboardRewardJobTests.swift",
       "Sources/Typebar/RemoteAnnouncements.swift",
       "server/Sources/TypebarServerCore/Routes.swift",
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
@@ -69,6 +72,8 @@
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
     ],
     "leaderboards": [
+      "server/Sources/TypebarServerCore/DailyLeaderboardRewardJobs.swift",
+      "server/Tests/TypebarServerCoreTests/DailyLeaderboardRewardJobTests.swift",
       "server/Sources/TypebarServerCore/DailyLeaderboardCache.swift",
       "server/Tests/TypebarServerCoreTests/DailyLeaderboardCacheTests.swift",
       "server/Sources/TypebarServerCore/WeeklyExperienceRewardJobs.swift",

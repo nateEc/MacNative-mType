@@ -25,8 +25,21 @@ actual_commit="$(git -C "$reference_root" rev-parse HEAD)"
   "reference commit is $actual_commit; expected $expected_commit"
 
 temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/typebar-native-rewrite-readiness.XXXXXX")"
+readiness_log_directory="${TYPEBAR_READINESS_LOG_DIRECTORY:-}"
+if [[ -n "$readiness_log_directory" ]]; then
+  [[ "$readiness_log_directory" = /* && -d "$readiness_log_directory" && -w "$readiness_log_directory" ]] || \
+    fail "log destination must be an existing writable absolute directory"
+  retained_log_entries=("$readiness_log_directory"/*(DN))
+  (( ${#retained_log_entries} == 0 )) || fail "log destination must be empty; never overwrite previous evidence"
+fi
 
 cleanup() {
+  if [[ -n "$readiness_log_directory" ]]; then
+    local logs=("$temporary_directory"/*.log(N))
+    if (( ${#logs} > 0 )); then
+      cp -- "${logs[@]}" "$readiness_log_directory/"
+    fi
+  fi
   rm -rf -- "$temporary_directory"
 }
 trap cleanup EXIT
@@ -150,7 +163,7 @@ if [[ ! -f "$weekly_reward_source_dependencies/node_modules/lru-cache/package.js
     npm install --prefix "$weekly_reward_source_dependencies" --ignore-scripts --no-save --package-lock=false \
     lru-cache@11.5.1
 fi
-run_logged_check "executing pinned weekly reward worker and scheduling observations" \
+run_logged_check "executing pinned weekly and daily reward workers, schedules and announcement selection" \
   "$temporary_directory/weekly-xp-reward-source-check.log" \
   env TYPEBAR_WEEKLY_REWARD_SOURCE_DEPENDENCIES="$weekly_reward_source_dependencies" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \

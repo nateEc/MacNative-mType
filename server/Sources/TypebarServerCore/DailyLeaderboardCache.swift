@@ -23,10 +23,16 @@ public struct DailyLeaderboardConfiguration: Codable, Equatable, Sendable {
   public let expirationTimeInDays: Double
   public let maxResults: Int
   public let validModeRules: [DailyLeaderboardModeRule]
+  public let scheduleRewardsModeRules: [DailyLeaderboardModeRule]
+  public let topResultsToAnnounce: Int
+  public let xpRewardBrackets: [WeeklyExperienceRewardBracket]
   public init(enabled: Bool, expirationTimeInDays: Double, maxResults: Int,
-    validModeRules: [DailyLeaderboardModeRule]) {
+    validModeRules: [DailyLeaderboardModeRule], scheduleRewardsModeRules: [DailyLeaderboardModeRule] = [],
+    topResultsToAnnounce: Int = 1, xpRewardBrackets: [WeeklyExperienceRewardBracket] = []) {
     self.enabled = enabled; self.expirationTimeInDays = expirationTimeInDays
     self.maxResults = maxResults; self.validModeRules = validModeRules
+    self.scheduleRewardsModeRules = scheduleRewardsModeRules
+    self.topResultsToAnnounce = topResultsToAnnounce; self.xpRewardBrackets = xpRewardBrackets
   }
   /// Our deployment default, not an assertion about Monkeytype's live settings.
   public static let typebarDefault = Self(enabled:true,expirationTimeInDays:2,maxResults:1_000,
@@ -39,10 +45,12 @@ public struct DailyLeaderboardConfiguration: Codable, Equatable, Sendable {
   func validate() throws {
     guard expirationTimeInDays.isFinite, expirationTimeInDays >= 0,
       expirationTimeInDays <= 9_007_199_254_740_991 / 86_400_000,
-      (0...1_000_000).contains(maxResults), validModeRules.count <= 1_000 else {
+      (0...1_000_000).contains(maxResults), (1...9_007_199_254_740_991).contains(topResultsToAnnounce),
+      validModeRules.count <= 1_000, scheduleRewardsModeRules.count <= 1_000 else {
       throw DailyLeaderboardCacheError.invalidConfiguration
     }
-    for rule in validModeRules {
+    for bracket in xpRewardBrackets { try bracket.validate() }
+    for rule in validModeRules + scheduleRewardsModeRules {
       for pattern in [rule.language,rule.mode,rule.mode2] {
         guard pattern.utf8.count <= 1_024 else { throw DailyLeaderboardCacheError.invalidConfiguration }
         do { _ = try NSRegularExpression(pattern:"^" + pattern + "$") }
@@ -61,6 +69,26 @@ public struct DailyLeaderboardConfiguration: Codable, Equatable, Sendable {
   func accepts(_ entry: DailyLeaderboardCache.Entry) -> Bool {
     validModeRules.contains { $0.matches(language:entry.language,mode:entry.mode,mode2:entry.mode2) }
   }
+  func schedulesRewards(for entry: DailyLeaderboardCache.Entry) -> Bool {
+    enabled && scheduleRewardsModeRules.contains { $0.matches(language:entry.language,mode:entry.mode,mode2:entry.mode2) }
+  }
+}
+
+extension DailyLeaderboardConfiguration {
+  private enum CodingKeys: String, CodingKey {
+    case enabled, expirationTimeInDays, maxResults, validModeRules, scheduleRewardsModeRules, topResultsToAnnounce, xpRewardBrackets
+  }
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy:CodingKeys.self)
+    self.init(enabled:try values.decode(Bool.self,forKey:.enabled),
+      expirationTimeInDays:try values.decode(Double.self,forKey:.expirationTimeInDays),
+      maxResults:try values.decode(Int.self,forKey:.maxResults),
+      validModeRules:try values.decode([DailyLeaderboardModeRule].self,forKey:.validModeRules),
+      scheduleRewardsModeRules:values.contains(.scheduleRewardsModeRules)
+        ? try values.decode([DailyLeaderboardModeRule].self,forKey:.scheduleRewardsModeRules) : [],
+      topResultsToAnnounce:values.contains(.topResultsToAnnounce) ? try values.decode(Int.self,forKey:.topResultsToAnnounce) : 1,
+      xpRewardBrackets:values.contains(.xpRewardBrackets) ? try values.decode([WeeklyExperienceRewardBracket].self,forKey:.xpRewardBrackets) : [])
+  }
 }
 
 struct DailyLeaderboardCacheReceipt: Codable {
@@ -69,11 +97,14 @@ struct DailyLeaderboardCacheReceipt: Codable {
   let keyMilliseconds: Int
   let entry: DailyLeaderboardCache.Entry?
   let rank: Int?
+  var settlementScheduled: Bool? = nil
   func validate(reward: ExperienceAwardRecord) throws {
     try configuration.validate()
     guard version == 1, let acceptedAt = reward.acceptedAt,
       keyMilliseconds == (try DailyLeaderboardCache.key(at:acceptedAt)),
-      rank.map({ $0 > 0 && entry != nil }) ?? true else { throw DailyLeaderboardCacheError.invalidState }
+      rank.map({ $0 > 0 && entry != nil }) ?? true,
+      settlementScheduled.map({ $0 == (entry.map(configuration.schedulesRewards) ?? false) }) ?? true
+    else { throw DailyLeaderboardCacheError.invalidState }
     if let entry {
       try entry.validate()
       guard configuration.enabled, configuration.accepts(entry),
@@ -87,14 +118,15 @@ struct DailyLeaderboardCacheReceipt: Codable {
 }
 
 extension DailyLeaderboardCacheReceipt {
-  private enum CodingKeys: String, CodingKey { case version, configuration, keyMilliseconds, entry, rank }
+  private enum CodingKeys: String, CodingKey { case version, configuration, keyMilliseconds, entry, rank, settlementScheduled }
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy:CodingKeys.self)
     self.init(version:try values.decode(Int.self,forKey:.version),
       configuration:try values.decode(DailyLeaderboardConfiguration.self,forKey:.configuration),
       keyMilliseconds:try values.decode(Int.self,forKey:.keyMilliseconds),
       entry:values.contains(.entry) ? try values.decode(DailyLeaderboardCache.Entry.self,forKey:.entry) : nil,
-      rank:values.contains(.rank) ? try values.decode(Int.self,forKey:.rank) : nil)
+      rank:values.contains(.rank) ? try values.decode(Int.self,forKey:.rank) : nil,
+      settlementScheduled:values.contains(.settlementScheduled) ? try values.decode(Bool.self,forKey:.settlementScheduled) : nil)
   }
 }
 

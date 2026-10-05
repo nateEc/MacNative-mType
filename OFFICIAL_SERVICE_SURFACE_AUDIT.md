@@ -1,6 +1,6 @@
 # 官方服务面审计
 
-当前 [日榜缓存合同](DAILY_LEADERBOARD_CACHE_CONTRACT.md) 将 time／words 接受日与获准成绩快照、好友双重名次及原生分页／百分位／记忆消费者纳入 leaderboards 证据。未升级映射计数或 partial 状态；日榜任务／奖励、全部模式、小数 WPM、原协议及真实窗口仍开放。
+当前 [日榜任务与交付合同](DAILY_LEADERBOARD_SETTLEMENT_CONTRACT.md) 增加 leaderboards 的实际持久任务与邮件、admin 的只读状态及 psas 的原生榜首公告证据。未升级映射计数或 partial 状态；原版 Discord 渠道、全部模式、小数 WPM、原协议及真实窗口仍开放，原生公告不充当 Discord 验收。
 
 当前 [奖励收件箱与周任务交付](REWARD_INBOX_CONTRACT.md) 增加 users 的真实 inbox 路由／原生入口、leaderboards 的持久周任务和 admin 的只读状态证据，相关路径已进入服务矩阵。领取源码、HTTP 和恢复自动化不升级模块计数或 partial 状态，不证明原 HTTP、徽章目录、真实 Mongo／BullMQ 或完整功能等价；人工验收仍待单窗口执行。
 

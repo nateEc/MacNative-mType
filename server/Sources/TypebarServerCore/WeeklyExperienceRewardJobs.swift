@@ -46,7 +46,8 @@ struct WeeklyExperienceRewardJobs: Codable {
   }
 }
 
-/// A single-service actor worker, not a distributed BullMQ replacement.
+/// One lifecycle loop serves weekly and daily jobs; no second GUI or writer.
+/// This is not a distributed BullMQ replacement.
 public actor WeeklyExperienceRewardWorker: LifecycleHandler {
   private let store: AuthStore
   private let intervalNanoseconds: UInt64
@@ -82,6 +83,13 @@ public actor WeeklyExperienceRewardWorker: LifecycleHandler {
           "failure":"\(job.lastFailure ?? "unknown")"])
       }
     } catch { logger.error("Weekly reward persistence failed; pending state retained") }
+    do {
+      let jobs = try await store.processDueDailyLeaderboardRewards()
+      for job in jobs where job.lastFailure != nil {
+        logger.error("Daily reward task failed",metadata:["key":"\(job.identity)","attempt":"\(job.attempts)",
+          "failure":"\(job.lastFailure ?? "unknown")"])
+      }
+    } catch { logger.error("Daily reward persistence failed; pending state retained") }
   }
   public func didBootAsync(_ application: Application) async throws { start() }
   public func shutdownAsync(_ application: Application) async { await stop() }

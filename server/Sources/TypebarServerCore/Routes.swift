@@ -661,6 +661,14 @@ public func configure(
         return await authStore.weeklyExperienceRewardJobs()
     }
 
+    app.get("v1", "moderation", "daily-rewards") { request async throws -> [DailyLeaderboardRewardJob] in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name:"X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden,reason:"A configured Typebar moderation key is required.")
+        }
+        return await authStore.dailyLeaderboardRewardJobs()
+    }
+
     app.post("v1", "moderation", "announcements") { request async throws -> PublicAnnouncementResponse in
         guard let expectedKey = moderationKey, !expectedKey.isEmpty,
               request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
