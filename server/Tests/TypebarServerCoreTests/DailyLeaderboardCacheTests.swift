@@ -266,14 +266,37 @@ final class DailyLeaderboardCacheTests: XCTestCase {
       let entries:[Entry]; let expiresAtMilliseconds:Int?
     }
     struct Fixture: Decodable { let label:String; let key:Int; let operations:[Operation] }
+    struct Mode2: Decodable { let mode:String; let duration:Int?; let words:Int?; let sourceMode2:String; let nativeMode2:String? }
+    struct Partition: Decodable { let mode:String; let nativeMode2:String; let rank:Int?; let total:Int }
     struct Document: Decodable {
       let referenceCommit:String; let redisVersion:String; let scoreFixtures:[Score]; let ruleFixtures:[Rule]; let fixtures:[Fixture]
+      let mode2Fixtures:[Mode2]; let partitionFixtures:[Partition]
     }
     let document = try JSONDecoder().decode(Document.self,from:bytes)
     XCTAssertEqual(document.referenceCommit,"91bd24bb8513785c7364cbea29296ff7adafac41")
     XCTAssertEqual(document.redisVersion,"6.2.6"); XCTAssertEqual(document.scoreFixtures.count,120)
     XCTAssertEqual(document.ruleFixtures.count,36)
     XCTAssertEqual(document.fixtures.reduce(0) { $0 + $1.operations.count },16)
+    XCTAssertEqual(document.mode2Fixtures.count,15)
+    for fixture in document.mode2Fixtures {
+      let explicit = fixture.mode == "quote" ? fixture.nativeMode2 : nil
+      XCTAssertEqual(ResultMode2Policy.resolved(mode:fixture.mode,explicit:explicit,
+        duration:fixture.duration,words:fixture.words),fixture.nativeMode2)
+      if fixture.mode != "quote" { XCTAssertEqual(fixture.nativeMode2,fixture.sourceMode2) }
+    }
+    var partitionCache = DailyLeaderboardCache()
+    let partitionDate = Date(timeIntervalSince1970:1_917_604_800)
+    let partitionConfiguration = DailyLeaderboardConfiguration(enabled:true,expirationTimeInDays:2,maxResults:3,
+      validModeRules:[.init(language:".*",mode:".*",mode2:".*")])
+    let uid = UUID()
+    for fixture in document.partitionFixtures {
+      let entry = DailyLeaderboardCache.Entry(userID:uid,resultID:UUID(),displayName:"Owned " + fixture.mode,
+        language:"english",mode:fixture.mode,mode2:fixture.nativeMode2,wpm:60,accuracy:100,preciseAccuracy:nil,
+        consistency:0,finishedAt:partitionDate,profileSnapshot:.init(version:1,selectedBadge:nil,discordAvatar:nil))
+      XCTAssertEqual(try partitionCache.add(entry,configuration:partitionConfiguration,now:partitionDate),fixture.rank)
+      XCTAssertEqual(partitionCache.buckets.first { $0.mode == fixture.mode && $0.mode2 == fixture.nativeMode2 }?.entries.count,fixture.total)
+    }
+    XCTAssertEqual(partitionCache.buckets.count,6)
     for fixture in document.scoreFixtures {
       XCTAssertEqual(DailyLeaderboardCache.Entry.score(wpm:fixture.wpm,accuracy:fixture.acc,timestamp:fixture.timestamp),fixture.score)
     }

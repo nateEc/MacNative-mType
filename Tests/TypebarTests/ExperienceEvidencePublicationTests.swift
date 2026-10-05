@@ -173,7 +173,7 @@ final class ExperienceEvidencePublicationTests: XCTestCase {
     let record = try XCTUnwrap(TestResultRecord(result: saved).portableResult)
     let data = try TypebarDataTransfer.exportArchive(settings: .init(), results: [saved], presets: [], at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(archive.version, 26, "No new local field or backfill is introduced")
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion, "Export uses the current format without changing experience evidence")
     let expected = try await ResultConsistencyPublication.prepare(result: saved, capabilities: capabilities).experienceEvidence
     for value in [record, try XCTUnwrap(archive.results.first)] {
       let wire = try await ResultConsistencyPublication.prepare(result: value, capabilities: capabilities)

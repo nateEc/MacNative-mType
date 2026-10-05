@@ -90,6 +90,7 @@ public func configure(
                 "resultElapsedTime": .available,
                 "resultBailout": .available,
                 "resultConsistency": .available,
+                "resultMode2": .available,
                 "resultHistory": .partial,
                 "leaderboards": .partial,
                 "leaderboardRankMemory": .available,

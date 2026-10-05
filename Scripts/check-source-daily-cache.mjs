@@ -163,9 +163,49 @@ try {
   assert.equal(fixtures[3].operations[1].entries[0].uid,ids[1]);
   assert.equal(fixtures[3].operations[2].rank,null);
   assert.equal(scheduled,13,'Enabled unchanged/evicted/expired attempts still schedule in the original service');
+  // Execute the entire selected frontend function; no implementation copied
+  // into the app. Synthetic IDs are QA-only, not upstream catalogue assets.
+  const frontend = read('frontend/src/ts/utils/misc.ts');
+  const mode2Start = frontend.indexOf('export function getMode2<');
+  const mode2End = frontend.indexOf('\nexport async function downloadResultsCSV',mode2Start);
+  assert.ok(mode2Start >= 0 && mode2End > mode2Start);
+  const mode2Module = load(frontend.slice(mode2Start,mode2End));
+  await mode2Module.link(() => { throw new Error('Unexpected mode2 import'); }); await mode2Module.evaluate();
+  const mode2Fixtures = [];
+  for (const mode of ['time','words','custom','zen','quote']) {
+    for (const variant of [0,1,2]) {
+      const config = {mode,time:[15,30,60][variant],words:[10,25,50][variant],
+        customText:{mode:['none','time','word'][variant],limit:variant*15}};
+      const quote = mode === 'quote' && variant !== 2 ? {id:100+variant} : null;
+      const sourceMode2 = mode2Module.namespace.getMode2(config,quote);
+      const nativeMode2 = mode === 'quote' ? (quote ? 'typebar:owned-'+quote.id : null) : sourceMode2;
+      assert.equal(sourceMode2, mode === 'time' ? String(config.time) : mode === 'words'
+        ? String(config.words) : mode === 'quote' ? String(quote?.id ?? -1) : mode);
+      mode2Fixtures.push({mode,duration:mode === 'time' ? config.time : null,
+        words:mode === 'words' ? config.words : null,sourceMode2,nativeMode2});
+    }
+  }
+  // Same member can win each separate source partition. The schema adapter
+  // remains explicit; numeric upstream quote keys map to owned native keys.
+  cli('FLUSHDB'); clockMilliseconds = Date.UTC(2030,9,7,12);
+  const partitionConfiguration = {...configuration,
+    validModeRules:[{language:'.*',mode:'.*',mode2:'.*'}],scheduleRewardsModeRules:[]};
+  const partitions = mode2Fixtures.filter(f => f.nativeMode2 !== null &&
+    (['custom','zen'].includes(f.mode) || f.mode === 'quote' || f === mode2Fixtures[0] || f === mode2Fixtures[3]));
+  const partitionFixtures = [];
+  for (const fixture of partitions) {
+    const board = daily.namespace.getDailyLeaderboard('english',fixture.mode,fixture.sourceMode2,partitionConfiguration);
+    assert.ok(board);
+    const rank = await board.addResult({uid:ids[0],name:'Owned '+fixture.mode,wpm:60,raw:60,
+      acc:100,consistency:0,timestamp:clockMilliseconds},partitionConfiguration);
+    const page = await board.getResults(0,10,partitionConfiguration,false);
+    partitionFixtures.push({...fixture,rank:rank === -1 ? null : rank,total:page.entries.length});
+  }
+  assert.equal(new Set(partitionFixtures.map(f => f.mode+'/'+f.sourceMode2)).size,6);
+  assert.ok(partitionFixtures.every(f => f.total === 1));
   verify();
-  process.stdout.write(emit ? JSON.stringify({referenceCommit:pin,redisVersion,scoreFixtures,ruleFixtures,fixtures})
-    : `Daily cache source passed (${scoreFixtures.length} packed scores, ${ruleFixtures.length} patterns, ${fixtures.reduce((sum,f)=>sum+f.operations.length,0)} real Redis lifecycle operations; complete service, QA schema/queue adapters; no GUI)\n`);
+  process.stdout.write(emit ? JSON.stringify({referenceCommit:pin,redisVersion,scoreFixtures,ruleFixtures,fixtures,mode2Fixtures,partitionFixtures})
+    : `Daily cache source passed (${scoreFixtures.length} packed scores, ${ruleFixtures.length} patterns, ${fixtures.reduce((sum,f)=>sum+f.operations.length,0)} lifecycle operations, ${mode2Fixtures.length} getMode2 fixtures, ${partitionFixtures.length} writes across 6 source partitions; complete service, QA schema/queue adapters; no GUI)\n`);
 } finally {
   if (server.pid && !spawnError && server.exitCode === null && server.signalCode === null) {
     try { cli('SHUTDOWN','NOSAVE'); } catch { server.kill('SIGTERM'); }

@@ -366,6 +366,7 @@ private struct RemoteDeveloperAccessKeyDeletionResponse: Codable, Sendable {
 }
 
 struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
+    let mode2: String?
     let id: UUID
     let mode: String
     let language: String
@@ -401,7 +402,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
             errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
-            bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime
+            bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
     }
 
     init(from decoder: Decoder) throws {
@@ -411,6 +412,10 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         language = try values.decode(String.self, forKey: .language)
         durationSeconds = try values.decodeIfPresent(Int.self, forKey: .durationSeconds)
         wordLimit = try values.decodeIfPresent(Int.self, forKey: .wordLimit)
+        mode2 = values.contains(.mode2) ? try values.decode(String.self, forKey: .mode2) : nil
+        if let mode2, !ResultMode2Policy.agrees(mode2, mode: mode, duration: durationSeconds, words: wordLimit) {
+            throw DecodingError.dataCorruptedError(forKey: .mode2, in: values, debugDescription: "Invalid mode2 identity")
+        }
         wpm = try values.decode(Int.self, forKey: .wpm)
         rawWpm = try values.decode(Int.self, forKey: .rawWpm)
         accuracy = try values.decode(Int.self, forKey: .accuracy)
@@ -852,6 +857,7 @@ struct RemoteArchivePull {
 }
 
 struct RemoteResultSubmission: Codable, Sendable {
+    let mode2: String?
     let id: UUID
     let mode: String
     let language: String
@@ -885,9 +891,11 @@ struct RemoteResultSubmission: Codable, Sendable {
         result: CompletedTestResult, includesTimingEvidence: Bool = false,
         includesPracticeTiming: Bool = false, includesInputMetrics: Bool = false,
         includesInputMetricsV2: Bool = false, resultConsistency: RemoteResultConsistency? = nil,
-        experienceEvidence: RemoteExperienceEvidence? = nil, rankingEvidence: RemoteRankingEvidence? = nil
+        experienceEvidence: RemoteExperienceEvidence? = nil, rankingEvidence: RemoteRankingEvidence? = nil,
+        includesMode2: Bool = false
     ) {
         id = result.id
+        mode2 = includesMode2 && result.configuration.mode == .quote ? result.quoteSource?.mode2 : nil
         self.resultConsistency = resultConsistency
         mode = result.configuration.mode.rawValue
         language = result.configuration.language.rawValue
@@ -992,6 +1000,9 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     var supportsResultConsistency: Bool {
         apiVersion == "v1" && service == "typebar"
             && capabilities["resultConsistency"] == "available"
+    }
+    var supportsResultMode2: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["resultMode2"] == "available"
     }
 
     var supportsHumanVerification: Bool {
@@ -1103,6 +1114,7 @@ struct RemoteResultSubmissionResponse: Codable, Sendable {
 }
 
 struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
+    let mode2: String?
     let id: UUID
     let rank: Int
     let friendsRank: Int?
@@ -1119,7 +1131,7 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
     let discordAvatar: RemoteDiscordAvatar?
 
     private enum CodingKeys: String, CodingKey {
-        case id, rank, friendsRank, userID, displayName, mode, language, wpm, accuracy, preciseAccuracy, consistency, finishedAt, selectedBadge, discordAvatar
+        case id, rank, friendsRank, userID, displayName, mode, language, wpm, accuracy, preciseAccuracy, consistency, finishedAt, selectedBadge, discordAvatar, mode2
     }
 
     init(from decoder: Decoder) throws {
@@ -1133,6 +1145,10 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
         userID = try values.decode(UUID.self, forKey: .userID)
         displayName = try values.decode(String.self, forKey: .displayName)
         mode = try values.decode(String.self, forKey: .mode)
+        mode2 = values.contains(.mode2) ? try values.decode(String.self, forKey: .mode2) : nil
+        if let mode2, !ResultMode2Policy.isValid(mode2, mode: mode) {
+            throw DecodingError.dataCorruptedError(forKey: .mode2, in: values, debugDescription: "Invalid leaderboard partition")
+        }
         language = try values.decode(String.self, forKey: .language)
         wpm = try values.decode(Int.self, forKey: .wpm)
         accuracy = try values.decode(Int.self, forKey: .accuracy)
@@ -1152,6 +1168,7 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
 }
 
 struct RemoteLeaderboardPage: Codable, Sendable {
+    let mode2FilterSupported: Bool?
     let entries: [RemoteLeaderboardEntry]
     /// Nil means an older self-hosted server returned the historical
     /// entries-only payload. The UI must keep pagination disabled in that case.
@@ -1165,7 +1182,7 @@ struct RemoteLeaderboardPage: Codable, Sendable {
     let rankMemorySupported: Bool?
 
     private enum CodingKeys: String, CodingKey {
-        case entries, total, offset, pageSize, parameterFilterSupported, rankMemorySupported
+        case entries, total, offset, pageSize, parameterFilterSupported, rankMemorySupported, mode2FilterSupported
     }
 
     init(from decoder: Decoder) throws {
@@ -1177,6 +1194,7 @@ struct RemoteLeaderboardPage: Codable, Sendable {
         parameterFilterSupported = try values.decodeIfPresent(
             Bool.self, forKey: .parameterFilterSupported)
         rankMemorySupported = try values.decodeIfPresent(Bool.self, forKey: .rankMemorySupported)
+        mode2FilterSupported = try values.decodeIfPresent(Bool.self, forKey: .mode2FilterSupported)
     }
 }
 
@@ -1228,6 +1246,7 @@ struct RemoteLeaderboardEligibility: Codable, Equatable, Sendable {
 }
 
 private struct RemoteLeaderboardRankMemoryRequest: Codable, Sendable {
+    var mode2: String? = nil
     let kind: String
     let scope: String
     let period: String
@@ -1716,6 +1735,7 @@ enum RemoteLeaderboardPeriod: String, CaseIterable {
 }
 
 struct RemoteLeaderboardSelection: Equatable {
+    let mode2: String?
     let mode: TestMode?
     let language: TypingLanguage?
     let period: RemoteLeaderboardPeriod
@@ -1724,13 +1744,14 @@ struct RemoteLeaderboardSelection: Equatable {
 
     init(
         mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
-        durationSeconds: Int? = nil, wordLimit: Int? = nil
+        durationSeconds: Int? = nil, wordLimit: Int? = nil, mode2: String? = nil
     ) {
         self.mode = mode
         self.language = language
         self.period = period
         self.durationSeconds = durationSeconds
         self.wordLimit = wordLimit
+        self.mode2 = mode2
     }
 }
 
@@ -2956,7 +2977,8 @@ final class AccountSession {
         let requestScope = ResultPublicationScope(endpoint: requestEndpoint, userID: requestingUser.id)
         let capabilities = try await RemoteResultBailoutPolicy.capabilities(for: result.outcome,
             requiresElapsedTime: result.elapsedTime != nil,
-            requiresIncompletePractice: result.incompletePractice != nil) {
+            requiresIncompletePractice: result.incompletePractice != nil,
+            requiresMode2: result.quoteSource?.quoteID != nil) {
             try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                 path: "v1/capabilities",
                 method: "GET",
@@ -3009,7 +3031,7 @@ final class AccountSession {
 
     func leaderboardPage(
         mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
-        durationSeconds: Int? = nil, wordLimit: Int? = nil,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil, mode2: String? = nil,
         scope: RemoteLeaderboardScope = .global, offset: Int = 0,
         limit: Int = LeaderboardPaginationPolicy.preferredPageSize
     ) async throws -> RemoteLeaderboardPage {
@@ -3024,7 +3046,8 @@ final class AccountSession {
             queryItems.append(.init(name: "durationSeconds", value: "\(durationSeconds)"))
         }
         if let wordLimit { queryItems.append(.init(name: "wordLimit", value: "\(wordLimit)")) }
-        return try await RemoteAccountAPI(endpoint: endpoint).request(
+        if let mode2 { queryItems.append(.init(name: "mode2", value: mode2)) }
+        let page = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: scope == .friends ? "v1/leaderboards/friends" : "v1/leaderboards",
             method: "GET",
             token: scope == .friends ? try accessToken() : nil,
@@ -3032,31 +3055,33 @@ final class AccountSession {
             queryItems: queryItems,
             response: RemoteLeaderboardPage.self
         )
+        try RemoteLeaderboardPartitionPolicy.validate(page, mode2: mode2)
+        return page
     }
 
     func leaderboard(
         mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
-        durationSeconds: Int? = nil, wordLimit: Int? = nil,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil, mode2: String? = nil,
         scope: RemoteLeaderboardScope = .global, limit: Int = 25
     ) async throws -> [RemoteLeaderboardEntry] {
         (try await leaderboardPage(
             mode: mode, language: language, period: period, durationSeconds: durationSeconds,
-            wordLimit: wordLimit, scope: scope, limit: limit)).entries
+            wordLimit: wordLimit, mode2: mode2, scope: scope, limit: limit)).entries
     }
 
     func leaderboardRank(
         mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
-        durationSeconds: Int? = nil, wordLimit: Int? = nil,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil, mode2: String? = nil,
         scope: RemoteLeaderboardScope = .global
     ) async throws -> RemoteLeaderboardEntry? {
         try await leaderboardRankStatus(
             mode: mode, language: language, period: period, durationSeconds: durationSeconds,
-            wordLimit: wordLimit, scope: scope).entry
+            wordLimit: wordLimit, mode2: mode2, scope: scope).entry
     }
 
     func leaderboardRankStatus(
         mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
-        durationSeconds: Int? = nil, wordLimit: Int? = nil,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil, mode2: String? = nil,
         scope: RemoteLeaderboardScope = .global
     ) async throws -> RemoteLeaderboardRankResponse {
         var queryItems = [URLQueryItem(name: "period", value: period.rawValue)]
@@ -3066,6 +3091,7 @@ final class AccountSession {
             queryItems.append(.init(name: "durationSeconds", value: "\(durationSeconds)"))
         }
         if let wordLimit { queryItems.append(.init(name: "wordLimit", value: "\(wordLimit)")) }
+        if let mode2 { queryItems.append(.init(name: "mode2", value: mode2)) }
         let response = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: scope == .friends ? "v1/leaderboards/friends/rank" : "v1/leaderboards/rank",
             method: "GET",
@@ -3074,15 +3100,18 @@ final class AccountSession {
             queryItems: queryItems,
             response: RemoteLeaderboardRankResponse.self
         )
+        if let mode2, let entry = response.entry, entry.mode2 != mode2 {
+            throw RemoteAccountError.serverMessage("服务返回了其他引语的名次。")
+        }
         return response
     }
 
     func recordSpeedLeaderboardRankMemory(
         rank: Int, mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
-        durationSeconds: Int?, wordLimit: Int?, scope: RemoteLeaderboardScope
+        durationSeconds: Int?, wordLimit: Int?, scope: RemoteLeaderboardScope, mode2: String? = nil
     ) async throws -> LeaderboardRankChange? {
         try await recordLeaderboardRankMemory(.init(
-            kind: "speed", scope: scope.rawValue, period: period.rawValue,
+            mode2: mode2, kind: "speed", scope: scope.rawValue, period: period.rawValue,
             mode: mode?.rawValue, language: language?.rawValue,
             durationSeconds: durationSeconds, wordLimit: wordLimit, rank: rank))
     }

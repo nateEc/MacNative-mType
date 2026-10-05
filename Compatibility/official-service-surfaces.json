@@ -72,6 +72,9 @@
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
     ],
     "leaderboards": [
+      "Sources/Typebar/ResultMode2.swift",
+      "server/Sources/TypebarServerCore/ResultMode2.swift",
+      "server/Tests/TypebarServerCoreTests/ResultMode2Tests.swift",
       "server/Sources/TypebarServerCore/DailyLeaderboardRewardJobs.swift",
       "server/Tests/TypebarServerCoreTests/DailyLeaderboardRewardJobTests.swift",
       "server/Sources/TypebarServerCore/DailyLeaderboardCache.swift",
@@ -95,6 +98,8 @@
       "Sources/Typebar/RemoteAccount.swift"
     ],
     "results": [
+      "Sources/Typebar/QuoteResultFeedback.swift",
+      "server/Tests/TypebarServerCoreTests/ResultMode2Tests.swift",
       "Sources/Typebar/ResultPersistence.swift",
       "Sources/Typebar/RemoteAccount.swift",
       "server/Sources/TypebarServerCore/AuthStore.swift",

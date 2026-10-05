@@ -39,6 +39,7 @@ struct CloudSyncView: View {
     @State private var leaderboardDurationSeconds: Int?
     @State private var leaderboardWordLimit: Int?
     @State private var leaderboardSupportsParameterFilter = false
+    @State private var leaderboardQuoteKey = ""
     @State private var leaderboardParameterEditor: LeaderboardParameterEditorTarget?
     @State private var experienceLeaderboard: [RemoteExperienceLeaderboardEntry] = []
     @State private var experiencePeriod: RemoteExperienceLeaderboardPeriod = .week
@@ -72,6 +73,7 @@ struct CloudSyncView: View {
         _leaderboardPeriod = State(initialValue: initialLeaderboard?.period ?? .all)
         _leaderboardDurationSeconds = State(initialValue: initialParameter.durationSeconds)
         _leaderboardWordLimit = State(initialValue: initialParameter.wordLimit)
+        _leaderboardQuoteKey = State(initialValue: initialLeaderboard?.mode2 ?? "")
     }
 
     var body: some View {
@@ -187,6 +189,13 @@ struct CloudSyncView: View {
                             .foregroundStyle(.secondary)
                     }
                     WPMLeaderboardRefreshCountdown(period: leaderboardPeriod)
+                    if leaderboardMode == .quote {
+                        TextField("引语 ID（留空查看全部）", text: $leaderboardQuoteKey)
+                            .textFieldStyle(.roundedBorder)
+                            .help("Typebar 自有引语使用 typebar:编号，社区引语使用 community:UUID。旧成绩没有编号，不能归入某条引语。")
+                        Text("按独立引语身份分桶；相同标题不代表相同引语。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Button("刷新\(leaderboardScope.displayName)", action: loadLeaderboard)
                         .disabled(isLoadingLeaderboard || (leaderboardScope == .friends && account.currentUser == nil))
                     if isLoadingLeaderboard { ProgressView() }
@@ -406,6 +415,7 @@ struct CloudSyncView: View {
         .onChange(of: leaderboardPeriod) { _, _ in resetLeaderboardPagination() }
         .onChange(of: leaderboardDurationSeconds) { _, _ in resetLeaderboardPagination() }
         .onChange(of: leaderboardWordLimit) { _, _ in resetLeaderboardPagination() }
+        .onChange(of: leaderboardQuoteKey) { _, _ in resetLeaderboardPagination() }
         .onChange(of: experienceScope) { _, _ in resetExperiencePagination() }
         .onChange(of: experiencePeriod) { _, _ in resetExperiencePagination() }
         .sheet(item: $selectedProfile) { profile in
@@ -537,12 +547,19 @@ struct CloudSyncView: View {
 
     private func loadLeaderboard(pageIndex: Int) {
         guard !isLoadingLeaderboard else { return }
+        let quoteKey = leaderboardMode == .quote ? leaderboardQuoteKey.trimmingCharacters(in: .whitespacesAndNewlines) : ""
+        guard quoteKey.isEmpty || ResultMode2Policy.isValid(quoteKey, mode: "quote") else {
+            resetLeaderboardPagination()
+            leaderboardMessage = "引语 ID 无效；请输入 typebar:编号或 community:UUID。"
+            return
+        }
         let normalizedPageIndex = max(0, pageIndex)
         let requestGeneration = leaderboardRequestGeneration
         let parameterFilter = leaderboardParameterFilter
         let selection = RemoteLeaderboardSelection(
             mode: leaderboardMode, language: leaderboardLanguage, period: leaderboardPeriod,
-            durationSeconds: parameterFilter.durationSeconds, wordLimit: parameterFilter.wordLimit)
+            durationSeconds: parameterFilter.durationSeconds, wordLimit: parameterFilter.wordLimit,
+            mode2: quoteKey.isEmpty ? nil : quoteKey)
         let scope = leaderboardScope
         let accountScope = account.resultPublicationScope
         leaderboardPageIndex = normalizedPageIndex
@@ -558,7 +575,7 @@ struct CloudSyncView: View {
                 let page = try await account.leaderboardPage(
                     mode: selection.mode, language: selection.language,
                     period: selection.period, durationSeconds: selection.durationSeconds,
-                    wordLimit: selection.wordLimit, scope: scope,
+                    wordLimit: selection.wordLimit, mode2: selection.mode2, scope: scope,
                     offset: normalizedPageIndex * LeaderboardPaginationPolicy.preferredPageSize,
                     limit: LeaderboardPaginationPolicy.preferredPageSize)
                 guard requestGeneration == leaderboardRequestGeneration,
@@ -589,7 +606,7 @@ struct CloudSyncView: View {
                         let rankStatus = try await account.leaderboardRankStatus(
                             mode: selection.mode, language: selection.language,
                             period: selection.period, durationSeconds: selection.durationSeconds,
-                            wordLimit: selection.wordLimit, scope: scope)
+                            wordLimit: selection.wordLimit, mode2: selection.mode2, scope: scope)
                         guard requestGeneration == leaderboardRequestGeneration,
                             account.resultPublicationScope == accountScope
                         else { return }
@@ -600,7 +617,7 @@ struct CloudSyncView: View {
                             leaderboardRankChange = try? await account.recordSpeedLeaderboardRankMemory(
                                 rank: rank.rank(in: scope), mode: selection.mode, language: selection.language,
                                 period: selection.period, durationSeconds: selection.durationSeconds,
-                                wordLimit: selection.wordLimit, scope: scope)
+                                wordLimit: selection.wordLimit, scope: scope, mode2: selection.mode2)
                             guard requestGeneration == leaderboardRequestGeneration,
                                 account.resultPublicationScope == accountScope
                             else { return }

@@ -660,6 +660,7 @@ final class TestResultRecord {
     guard terminalTimingData == nil || terminalTiming != nil else { return nil }
     guard elapsedTimeData == nil || elapsedTime != nil else { return nil }
     guard incompletePracticeData == nil || incompletePractice != nil else { return nil }
+    guard quoteSourceData == nil || quoteSource != nil else { return nil }
     return CompletedTestResult(
       id: id,
       configuration: configuration,

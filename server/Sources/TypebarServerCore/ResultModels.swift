@@ -38,6 +38,7 @@ public struct ResultPracticeTiming: Content, Equatable, Sendable {
 }
 
 public struct ResultSubmissionRequest: Content, Equatable {
+    public let mode2: String?
     public let id: UUID
     public let mode: String
     public let language: String
@@ -79,9 +80,10 @@ public struct ResultSubmissionRequest: Content, Equatable {
         terminalTiming: ResultTerminalTiming? = nil,
         elapsedTime: ResultElapsedTime? = nil,
         bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
-        startedAt: Date, finishedAt: Date
+        startedAt: Date, finishedAt: Date, mode2: String? = nil
     ) {
         self.id = id
+        self.mode2 = mode2
         self.mode = mode
         self.language = language
         self.durationSeconds = durationSeconds
@@ -124,12 +126,14 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case terminalTiming
         case elapsedTime, startedAtReferenceTime, finishedAtReferenceTime
         case bailedOut, customLimit
+        case mode2
     }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
         mode = try values.decode(String.self, forKey: .mode)
+        mode2 = values.contains(.mode2) ? try values.decode(String.self, forKey: .mode2) : nil
         language = try values.decode(String.self, forKey: .language)
         durationSeconds = try values.decodeIfPresent(Int.self, forKey: .durationSeconds)
         wordLimit = try values.decodeIfPresent(Int.self, forKey: .wordLimit)
@@ -195,6 +199,7 @@ public struct ResultSubmissionResponse: Content, Equatable {
 /// A compact, account-scoped view of a submitted result. It deliberately
 /// excludes prompt text, input replay, and every profile or credential field.
 public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable {
+    public var mode2: String? = nil
     public var rankingEvidence: ResultRankingEvidence? = nil
     public let id: UUID
     public let mode: String
@@ -266,7 +271,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, preciseAccuracy,
             consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, terminalTiming,
-            elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime
+            elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
     }
 
     public init(from decoder: Decoder) throws {
@@ -308,6 +313,10 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             customLimit: try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit), startedAt: start, finishedAt: end)
         let measured = terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
             ?? finishedAt.timeIntervalSince(startedAt)
+        mode2 = values.contains(.mode2) ? try values.decode(String.self, forKey: .mode2) : nil
+        if let mode2, !ResultMode2Policy.agrees(mode2, mode: mode, duration: durationSeconds, words: wordLimit) {
+            throw DecodingError.dataCorruptedError(forKey: .mode2, in: values, debugDescription: "Invalid mode2 context")
+        }
         rankingEvidence = values.contains(.rankingEvidence)
             ? try values.decode(ResultRankingEvidence.self, forKey: .rankingEvidence) : nil
         if let rankingEvidence, rankingEvidence.modifiers.contains("polyglot") != (language == "mixedLanguages") {
@@ -360,6 +369,7 @@ public struct UpdateResultTagsRequest: Content, Equatable, Sendable {
 }
 
 public struct LeaderboardQuery: Content {
+    public let mode2: String?
     public let mode: String?
     public let language: String?
     public let period: String?
@@ -373,7 +383,7 @@ public struct LeaderboardQuery: Content {
     public init(
         mode: String? = nil, language: String? = nil, period: String? = nil,
         durationSeconds: Int? = nil, wordLimit: Int? = nil,
-        limit: Int? = nil, offset: Int? = nil
+        limit: Int? = nil, offset: Int? = nil, mode2: String? = nil
     ) {
         self.mode = mode
         self.language = language
@@ -382,6 +392,7 @@ public struct LeaderboardQuery: Content {
         self.wordLimit = wordLimit
         self.limit = limit
         self.offset = offset
+        self.mode2 = mode2
     }
 }
 
@@ -400,9 +411,11 @@ public struct LeaderboardEntry: Content, Equatable, Identifiable {
     public let selectedBadge: PublicProfileBadge?
     public let discordAvatar: PublicDiscordAvatarResponse?
     public var friendsRank: Int? = nil
+    public var mode2: String? = nil
 }
 
 public struct LeaderboardResponse: Content, Equatable {
+    public let mode2FilterSupported: Bool
     public let entries: [LeaderboardEntry]
     public let total: Int
     public let offset: Int
@@ -424,6 +437,7 @@ public struct LeaderboardResponse: Content, Equatable {
         self.pageSize = pageSize
         self.parameterFilterSupported = parameterFilterSupported
         self.rankMemorySupported = rankMemorySupported
+        self.mode2FilterSupported = true
     }
 }
 

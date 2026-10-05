@@ -109,6 +109,7 @@ struct DailyLeaderboardCacheReceipt: Codable {
       try entry.validate()
       guard configuration.enabled, configuration.accepts(entry),
         reward.rankingAdmission?.decision.speedEligible == true,
+        entry.mode == reward.rankingAdmission?.input.mode,
         entry.userID == reward.userID, entry.resultID == reward.resultID,
         entry.finishedAt.timeIntervalSince1970 == floor(acceptedAt.timeIntervalSince1970),
         (entry.preciseAccuracy ?? Double(entry.accuracy)) == reward.rankingAdmission?.input.accuracy
@@ -158,8 +159,7 @@ struct DailyLeaderboardCache: Codable {
     func validate() throws {
       try profileSnapshot.validate()
       guard !displayName.isEmpty, displayName.count <= 40, !language.isEmpty, language.count <= 100,
-        ["time","words"].contains(mode), let limit = Int(mode2),
-        (mode == "time" ? 5...3_600 : 1...1_000).contains(limit),
+        ResultMode2Policy.isValid(mode2, mode: mode),
         (0...600).contains(wpm), (0...100).contains(accuracy),
         preciseAccuracy.map({ $0.isFinite && (0...100).contains($0) }) ?? true,
         consistency.isFinite, consistency >= 0,

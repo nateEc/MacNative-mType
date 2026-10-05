@@ -25,8 +25,7 @@ public struct DailyLeaderboardRewardJob: Content, Equatable, Sendable {
   func validate() throws {
     let due = try Self.due(key:key)
     guard !modeRule.language.isEmpty, modeRule.language.count <= 100,
-      ["time","words"].contains(modeRule.mode), let limit = Int(modeRule.mode2),
-      (modeRule.mode == "time" ? 5...3_600 : 1...1_000).contains(limit),
+      ResultMode2Policy.isValid(modeRule.mode2, mode: modeRule.mode),
       (0...Self.maximumAttempts).contains(attempts), nextAttempt >= due,
       nextAttempt <= 9_007_199_254_740_991 else { throw RewardInboxError.invalidState }
     switch status {

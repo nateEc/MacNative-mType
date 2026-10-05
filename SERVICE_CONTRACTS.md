@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-06 新增 [模式分区与引语身份合同](RESULT_MODE2_CONTRACT.md)：resultMode2=available 协商可选投稿／历史身份；列表新增 mode2FilterSupported，mode2 查询与名次记忆贯通 quote／custom／zen 日榜。引语使用自有命名空间，不兼容原数字内容目录；缺失保持未知、显式损坏拒绝，不上传提示或回放。归档 27／设置 4、无新 SwiftData 列；默认仍仅 time／words 且无奖励规则。单 writer、完整备份、禁止旧 writer 混写，整体服务仍 partial。
+
 当前新增 [日榜任务与交付合同](DAILY_LEADERBOARD_SETTLEMENT_CONTRACT.md)：TYPEBAR_DAILY_LEADERBOARD_CONFIGURATION 新增奖励规则、公告人数和 XP 档位，匹配的新 time／words 投稿安排持久任务；唯一生命周期使用结算配置，邮件及原生公告与完成状态同次提交。新增受部署者密钥保护的只读 daily-rewards 状态，领取沿用 inbox；旧来源不补发、单 writer、禁止旧 writer 混写。原版 Discord 公告渠道和完整协议仍未实现，不冒报整体兼容；旧历史日榜说明是旧构造入口行为。
 
 当前新增 [奖励收件箱与周任务交付](REWARD_INBOX_CONTRACT.md)：GET／PATCH v1/inbox、rewardInbox 能力及部署者只读任务状态；TYPEBAR_INBOX_CONFIGURATION 显式控制开关和容量。任务与邮件一起保存，领取后账户回执刷新，不将领取 XP 写回周榜；异步生命周期只支持单 writer。托管字段缺失拒绝、旧缺字段不回填，禁止旧 writer 混写。下面“无运行任务或领取接口”为历史阶段，整体功能等价仍开放。

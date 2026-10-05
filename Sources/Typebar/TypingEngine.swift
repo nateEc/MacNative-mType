@@ -4269,9 +4269,18 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     keyOverlapDuration = decodedKeyOverlapDuration.isFinite
       ? max(0, decodedKeyOverlapDuration) : 0
     tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
-    quoteSource = configuration.mode == .quote
-      ? (try? values.decodeIfPresent(ResultQuoteSource.self, forKey: .quoteSource)) ?? nil
-      : nil
+    if let source = try? values.nestedContainer(keyedBy: ResultQuoteSource.CodingKeys.self, forKey: .quoteSource),
+      source.contains(.quoteID) {
+      guard configuration.mode == .quote else {
+        throw DecodingError.dataCorruptedError(forKey: .quoteSource, in: values,
+          debugDescription: "Quote identity cannot belong to another mode")
+      }
+      // New identity-bearing records must not silently lose corrupt identity.
+      quoteSource = try values.decode(ResultQuoteSource.self, forKey: .quoteSource)
+    } else {
+      quoteSource = configuration.mode == .quote
+        ? (try? values.decodeIfPresent(ResultQuoteSource.self, forKey: .quoteSource)) ?? nil : nil
+    }
     prompt = try values.decodeIfPresent(String.self, forKey: .prompt) ?? ""
     replayEvents = TypingReplay.chronologicalEvents(
       try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? [])

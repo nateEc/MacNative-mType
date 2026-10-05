@@ -36,8 +36,11 @@ final class IncompletePracticeEvidenceTests: XCTestCase {
     }
   }
 
-  func testArchiveHasAnExplicitNewFormatBoundaryForIncompleteEvidence() {
-    XCTAssertEqual(TypebarArchive.currentVersion, 26)
+  func testArchiveHasAnExplicitNewFormatBoundaryForIncompleteEvidence() throws {
+    let archive = TypebarArchive(version: 1, exportedAt: start, settings: .init(),
+      results: [try evidence()], presets: [])
+    XCTAssertEqual(archive.version, 26, "Incomplete evidence alone still requires the version 26 boundary")
+    XCTAssertGreaterThanOrEqual(TypebarArchive.currentVersion, archive.version)
   }
 
   private func evidence(_ value: CompletedTestResult? = nil, accuracy: Double = 66.67,

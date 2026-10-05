@@ -19,42 +19,58 @@ enum ResultQuoteSourceKind: String, Codable, Equatable {
   }
 }
 
-/// Minimal, local-only source metadata captured when a quote session starts.
+/// Minimal source metadata captured when a quote session starts.
 /// It deliberately excludes quote text, author account IDs and network state.
 struct ResultQuoteSource: Codable, Equatable {
   static let maximumTitleLength = 80
 
   let kind: ResultQuoteSourceKind
   let title: String
+  let quoteID: String?
+  var mode2: String? { quoteID.flatMap { ResultMode2Policy.quoteKey(kind: kind, id: $0) } }
 
-  init?(kind: ResultQuoteSourceKind, title: String) {
+  init?(kind: ResultQuoteSourceKind, title: String, quoteID: String? = nil) {
     let normalized = title
       .components(separatedBy: .whitespacesAndNewlines)
       .filter { !$0.isEmpty }
       .joined(separator: " ")
     guard !normalized.isEmpty else { return nil }
+    guard quoteID.map({ ResultMode2Policy.quoteKey(kind: kind, id: $0) != nil }) ?? true else { return nil }
     self.kind = kind
     self.title = String(normalized.prefix(Self.maximumTitleLength))
+    self.quoteID = quoteID
   }
 
-  private enum CodingKeys: String, CodingKey { case kind, title }
+  enum CodingKeys: String, CodingKey { case kind, title, quoteID }
 
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
     let kind = try values.decode(ResultQuoteSourceKind.self, forKey: .kind)
     let title = try values.decode(String.self, forKey: .title)
-    guard let normalized = Self(kind: kind, title: title) else {
+    let id = values.contains(.quoteID) ? try values.decode(String.self, forKey: .quoteID) : nil
+    guard let normalized = Self(kind: kind, title: title, quoteID: id) else {
       throw DecodingError.dataCorruptedError(
-        forKey: .title, in: values, debugDescription: "Quote source title is empty")
+        forKey: .title, in: values, debugDescription: "Quote source title or identity is invalid")
     }
     self = normalized
   }
 
   static func make(
-    mode: TestMode, sourceIsCommunity: Bool, title: String?
+    mode: TestMode, sourceIsCommunity: Bool, title: String?, selectedQuoteID: String? = nil
   ) -> ResultQuoteSource? {
     guard mode == .quote, let title else { return nil }
-    return .init(kind: sourceIsCommunity ? .community : .typebar, title: title)
+    let kind: ResultQuoteSourceKind = sourceIsCommunity ? .community : .typebar
+    if let selectedQuoteID {
+      guard let target = QuoteResultFeedbackTarget.make(mode: mode, sourceIsCommunity: sourceIsCommunity,
+        selectedQuoteID: selectedQuoteID) else { return nil }
+      let id: String
+      switch target {
+      case .builtIn(let quoteID): id = quoteID
+      case .community(let quoteID): id = quoteID.uuidString.lowercased()
+      }
+      return .init(kind: kind, title: title, quoteID: id)
+    }
+    return .init(kind: kind, title: title)
   }
 
   var displayText: String { "\(kind.displayName) · \(title)" }

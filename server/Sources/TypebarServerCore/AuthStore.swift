@@ -859,6 +859,7 @@ public actor AuthStore {
   /// only filter identifiers and one ordinal rank, making it safe to persist
   /// independently of results, authentication tokens, and public profiles.
   private struct StoredLeaderboardRankMemory: Codable {
+    var mode2: String? = nil
     let userID: UUID
     let kind: String
     let scope: String
@@ -880,6 +881,7 @@ public actor AuthStore {
       durationSeconds = request.durationSeconds
       wordLimit = request.wordLimit
       rank = request.rank
+      mode2 = request.mode2
       self.updatedAt = updatedAt
     }
 
@@ -892,6 +894,29 @@ public actor AuthStore {
         && language == request.language
         && durationSeconds == request.durationSeconds
         && wordLimit == request.wordLimit
+        && mode2 == request.mode2
+    }
+    private enum CodingKeys: String, CodingKey {
+      case userID, kind, scope, period, mode, language, durationSeconds, wordLimit, rank, updatedAt, mode2
+    }
+    init(from decoder: Decoder) throws {
+      let values = try decoder.container(keyedBy: CodingKeys.self)
+      userID = try values.decode(UUID.self, forKey: .userID)
+      kind = try values.decode(String.self, forKey: .kind)
+      scope = try values.decode(String.self, forKey: .scope)
+      period = try values.decode(String.self, forKey: .period)
+      mode = try values.decodeIfPresent(String.self, forKey: .mode)
+      language = try values.decodeIfPresent(String.self, forKey: .language)
+      durationSeconds = try values.decodeIfPresent(Int.self, forKey: .durationSeconds)
+      wordLimit = try values.decodeIfPresent(Int.self, forKey: .wordLimit)
+      rank = try values.decode(Int.self, forKey: .rank)
+      updatedAt = try values.decode(Date.self, forKey: .updatedAt)
+      mode2 = values.contains(.mode2) ? try values.decode(String.self, forKey: .mode2) : nil
+      if let mode2, kind != "speed" || mode == nil || !ResultMode2Policy.isValid(mode2, mode: mode!)
+        || (durationSeconds.map { mode2 == String($0) } == false)
+        || (wordLimit.map { mode2 == String($0) } == false) {
+        throw DecodingError.dataCorruptedError(forKey: .mode2, in: values, debugDescription: "Invalid rank memory partition")
+      }
     }
   }
 
@@ -978,6 +1003,7 @@ public actor AuthStore {
   }
 
   private struct StoredResult: Codable {
+    let mode2: String?
     let id: UUID
     let userID: UUID
     let mode: String
@@ -1015,7 +1041,7 @@ public actor AuthStore {
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
         errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, inputMetrics, keyConsistency, terminalTiming, elapsedTime,
-        bailedOut, customLimit, startedAt, finishedAt, acceptedAt, startedAtReferenceTime, finishedAtReferenceTime
+        bailedOut, customLimit, startedAt, finishedAt, acceptedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
     }
 
     init(
@@ -1028,7 +1054,7 @@ public actor AuthStore {
       terminalTiming: ResultTerminalTiming? = nil,
       elapsedTime: ResultElapsedTime? = nil,
       bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
-      startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil
+      startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil, mode2: String? = nil
     ) {
       self.id = id
       self.userID = userID
@@ -1058,6 +1084,7 @@ public actor AuthStore {
       self.startedAt = startedAt
       self.finishedAt = finishedAt
       self.acceptedAt = acceptedAt
+      self.mode2 = mode2
     }
 
     init(from decoder: Decoder) throws {
@@ -1068,6 +1095,10 @@ public actor AuthStore {
       language = try values.decode(String.self, forKey: .language)
       durationSeconds = try values.decodeIfPresent(Int.self, forKey: .durationSeconds)
       wordLimit = try values.decodeIfPresent(Int.self, forKey: .wordLimit)
+      mode2 = values.contains(.mode2) ? try values.decode(String.self, forKey: .mode2) : nil
+      if let mode2, !ResultMode2Policy.agrees(mode2, mode: mode, duration: durationSeconds, words: wordLimit) {
+        throw DecodingError.dataCorruptedError(forKey: .mode2, in: values, debugDescription: "Stored mode2 context is invalid")
+      }
       wpm = try values.decode(Int.self, forKey: .wpm)
       rawWpm = try values.decode(Int.self, forKey: .rawWpm)
       accuracy = try values.decode(Int.self, forKey: .accuracy)
@@ -1151,7 +1182,7 @@ public actor AuthStore {
     }
 
     func response() -> AccountResultResponse {
-      .init(
+      var response = AccountResultResponse(
         id: id, mode: mode, language: language, durationSeconds: durationSeconds,
         wordLimit: wordLimit, wpm: wpm, rawWpm: rawWpm, accuracy: accuracy,
         consistency: consistency, errorCount: errorCount, eventCount: eventCount, tags: tags,
@@ -1164,6 +1195,8 @@ public actor AuthStore {
         elapsedTime: elapsedTime,
         bailedOut: bailedOut, customLimit: customLimit,
         startedAt: startedAt, finishedAt: finishedAt)
+      response.mode2 = mode2
+      return response
     }
   }
 
@@ -1366,6 +1399,16 @@ public actor AuthStore {
     }
     state.dailyLeaderboardCacheManaged = true
     try state.dailyLeaderboardCache!.validate(users:Set(state.users.map(\.id)),awards:state.experienceAwards!)
+    let dailyEntries = Dictionary(uniqueKeysWithValues: state.experienceAwards!.compactMap { award in
+      award.dailyCacheReceipt?.entry.map { ("\(award.userID)/\(award.resultID)", $0) }
+    })
+    for record in state.results {
+      if let entry = dailyEntries["\(record.userID)/\(record.id)"],
+        entry.mode != record.mode || entry.mode2 != ResultMode2Policy.resolved(mode: record.mode,
+          explicit: record.mode2, duration: record.durationSeconds, words: record.wordLimit) {
+        throw DailyLeaderboardCacheError.invalidState
+      }
+    }
     try state.rewardInbox.validate(users:Set(state.users.map(\.id)))
     if state.weeklyRewardJobs == nil {
       guard !state.experienceAwards!.contains(where: { $0.weeklyCacheReceipt?.settlementScheduled == true }) else {
@@ -3602,7 +3645,7 @@ public actor AuthStore {
       elapsedTime: record.elapsedTime,
       bailedOut: record.bailedOut, customLimit: record.customLimit,
       startedAt: record.startedAt,
-      finishedAt: record.finishedAt)
+      finishedAt: record.finishedAt, mode2: record.mode2)
   }
 
   private func resultSubmissionResponse(
@@ -3788,10 +3831,10 @@ public actor AuthStore {
       var entry: DailyLeaderboardCache.Entry?
       var rank: Int?
       if configuration.enabled, reward.rankingAdmission!.decision.speedEligible,
-        ["time","words"].contains(request.mode),
-        let limit = request.mode == "time" ? request.durationSeconds : request.wordLimit {
+        let mode2 = ResultMode2Policy.resolved(mode: request.mode, explicit: request.mode2,
+          duration: request.durationSeconds, words: request.wordLimit) {
         let candidate = DailyLeaderboardCache.Entry(userID:user.id,resultID:request.id,displayName:user.displayName,
-          language:request.language,mode:request.mode,mode2:String(limit),wpm:request.wpm,accuracy:request.accuracy,
+          language:request.language,mode:request.mode,mode2:mode2,wpm:request.wpm,accuracy:request.accuracy,
           preciseAccuracy:request.inputMetrics?.preciseAccuracy,consistency:request.consistency,finishedAt:admissionDate,
           profileSnapshot:.init(version:1,selectedBadge:selectedPublicBadge(for:state.users[userIndex]),
             discordAvatar:publicDiscordAvatar(for:state.users[userIndex])))
@@ -3826,7 +3869,7 @@ public actor AuthStore {
         terminalTiming: request.terminalTiming,
         elapsedTime: request.elapsedTime,
         bailedOut: request.bailedOut, customLimit: request.customLimit,
-        startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now
+        startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now, mode2: request.mode2
       ))
     state.users[userIndex].startedTestCount = practice.startedTests
     state.accountPractice![user.id] = practice
@@ -4209,6 +4252,12 @@ public actor AuthStore {
       guard query.mode == "words", query.durationSeconds == nil, (1...1_000).contains(wordLimit)
       else { throw ResultStoreError.invalidResult }
     }
+    if let mode2 = query.mode2 {
+      guard let mode = query.mode, ResultMode2Policy.isValid(mode2, mode: mode),
+        query.durationSeconds.map({ mode2 == String($0) }) ?? true,
+        query.wordLimit.map({ mode2 == String($0) }) ?? true
+      else { throw ResultStoreError.invalidResult }
+    }
     if let language = query.language, !Self.supportedResultLanguageIDs.contains(language) {
       throw ResultStoreError.invalidResult
     }
@@ -4226,6 +4275,7 @@ public actor AuthStore {
           && (query.language == nil || bucket.language == query.language)
           && (query.durationSeconds == nil || bucket.mode2 == String(query.durationSeconds!))
           && (query.wordLimit == nil || bucket.mode2 == String(query.wordLimit!))
+          && (query.mode2 == nil || bucket.mode2 == query.mode2)
       }.flatMap(\.entries).filter { entry in
         users[entry.userID].map { !$0.leaderboardOptedOut && !$0.accountSuspended
           && !$0.leaderboardRestricted && !$0.displayNameChangeRequired } == true
@@ -4242,7 +4292,7 @@ public actor AuthStore {
           preciseAccuracy:entry.preciseAccuracy,consistency:entry.consistency,finishedAt:entry.finishedAt,
           selectedBadge:entry.profileSnapshot.selectedBadge,
           discordAvatar:publicDiscordAvatar(for:user) == nil ? nil : entry.profileSnapshot.discordAvatar,
-          friendsRank:eligibleUserIDs == nil ? nil : friendPosition)
+          friendsRank:eligibleUserIDs == nil ? nil : friendPosition, mode2: entry.mode2)
       }
     }
     let calendar = Calendar.current
@@ -4290,6 +4340,8 @@ public actor AuthStore {
         && (query.language == nil || result.language == query.language)
         && (query.durationSeconds == nil || result.durationSeconds == query.durationSeconds)
         && (query.wordLimit == nil || result.wordLimit == query.wordLimit)
+        && (query.mode2 == nil || ResultMode2Policy.resolved(mode: result.mode, explicit: result.mode2,
+          duration: result.durationSeconds, words: result.wordLimit) == query.mode2)
         && (lowerBound == nil || result.finishedAt >= lowerBound!)
         && (upperBound == nil || result.finishedAt < upperBound!)
     }.sorted {
@@ -4307,7 +4359,9 @@ public actor AuthStore {
         mode: result.mode, language: result.language, wpm: result.wpm,
         accuracy: result.accuracy, preciseAccuracy: result.inputMetrics?.preciseAccuracy,
         consistency: result.consistency, finishedAt: result.finishedAt,
-        selectedBadge: selectedPublicBadge(for: user), discordAvatar: publicDiscordAvatar(for: user))
+        selectedBadge: selectedPublicBadge(for: user), discordAvatar: publicDiscordAvatar(for: user),
+        mode2: ResultMode2Policy.resolved(mode: result.mode, explicit: result.mode2,
+          duration: result.durationSeconds, words: result.wordLimit))
     }
   }
 
@@ -4320,11 +4374,11 @@ public actor AuthStore {
       _ = try leaderboardEntries(
         .init(
           mode: request.mode, language: request.language, period: request.period,
-          durationSeconds: request.durationSeconds, wordLimit: request.wordLimit),
+          durationSeconds: request.durationSeconds, wordLimit: request.wordLimit, mode2: request.mode2),
         eligibleUserIDs: nil, now: now)
     case "experience":
       guard request.mode == nil, request.language == nil, request.durationSeconds == nil,
-        request.wordLimit == nil, Set(["week", "lastWeek"]).contains(request.period)
+        request.wordLimit == nil, request.mode2 == nil, Set(["week", "lastWeek"]).contains(request.period)
       else { throw ResultStoreError.invalidResult }
     default:
       throw ResultStoreError.invalidResult
@@ -4639,6 +4693,8 @@ public actor AuthStore {
       result.finishedAt <= now.addingTimeInterval(60 * 5),
       result.finishedAt >= now.addingTimeInterval(-60 * 60 * 24 * 365 * 2)
     else { throw ResultStoreError.invalidResult }
+    if let mode2 = result.mode2, !ResultMode2Policy.agrees(mode2, mode: result.mode,
+      duration: result.durationSeconds, words: result.wordLimit) { throw ResultStoreError.invalidResult }
     let timeIsValid = result.durationSeconds.map { (5...3600).contains($0) } ?? false
     let wordsAreValid = result.wordLimit.map { (1...1000).contains($0) } ?? false
     guard ResultBailoutPolicy.hasValidContext(bailedOut: result.bailedOut, mode: result.mode,

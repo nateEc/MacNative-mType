@@ -1841,7 +1841,7 @@ private struct ContentView: View {
               : nil,
             wordLimit: result.result.configuration.mode == .words
               ? result.result.configuration.wordLimit
-              : nil)
+              : nil, mode2: result.result.quoteSource?.mode2)
           showingSync = true
         },
         onPracticeMissedWords: {
@@ -3779,7 +3779,8 @@ private struct ContentView: View {
       mode: mode, sourceIsCommunity: quoteSource == .community,
       selectedQuoteID: selectedQuote?.id ?? "")
     activeQuoteSource = ResultQuoteSource.make(
-      mode: mode, sourceIsCommunity: quoteSource == .community, title: selectedQuote?.title)
+      mode: mode, sourceIsCommunity: quoteSource == .community, title: selectedQuote?.title,
+      selectedQuoteID: selectedQuote?.id)
     activeSessionTags = settings.activeResultTags
     session = TestSessionFactory.make(
       configuration: configuration,

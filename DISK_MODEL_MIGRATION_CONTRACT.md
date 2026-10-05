@@ -1,5 +1,7 @@
 # 原生磁盘模型升级与备份验证合同
 
+2026-10-06 当前 [引语身份合同](RESULT_MODE2_CONTRACT.md) 提高归档至 27，设置仍为 4；身份存于既有 quoteSourceData，不新增 SwiftData 列，四 writer 及 current 31 列投影不变。坏显式来源不能作为旧来源导出，原字节保留；本批内存验证和完整门禁九项隔离磁盘迁移通过（3.365 秒），原生全量 2975 项零失败、零跳过。不把旧阶段归档 26 或自动化当成实际用户库／旧发行升级承诺，goal 未完成。
+
 2026-10-04 最新增量见 [未完成练习证据合同](INCOMPLETE_PRACTICE_EVIDENCE_CONTRACT.md)：新增可选 incompletePracticeData，归档 26／设置 4；四 writer 包括第三代 before-incomplete 30 列和 current 31 列，九项真实磁盘测试已定向通过。迁移策略仍使用现有自动路径。本页下方两代历史、三 writer、current 30 列及七项测试描述保留为原阶段证据，不是当前 schema。完整 Monkeytype 原生重写 goal 仍 active；不是实际用户库、旧发行二进制、旧 SDK 或 macOS 14 的升级承诺。
 
 ## 被验证的模型

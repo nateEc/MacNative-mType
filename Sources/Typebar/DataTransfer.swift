@@ -314,9 +314,10 @@ struct TypebarArchive: Codable, Equatable {
     // next-word abandonment markers, explicit unit classifications and
     // logical deletion positions, independent terminal clock evidence and
     // custom pace speeds beyond the legacy integer editor domain, and
-    // measured elapsed time independent of calendar dates.
+    // measured elapsed time independent of calendar dates and captured quote
+    // identity independent of titles or a later selected quote.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 26
+    static let currentVersion = 27
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -363,11 +364,12 @@ struct TypebarArchive: Codable, Equatable {
         let hasTerminalTiming = results.contains { $0.terminalTiming != nil }
         let hasElapsedTime = results.contains { $0.elapsedTime != nil }
         let hasIncompletePractice = results.contains { $0.incompletePractice != nil }
+        let hasQuoteIdentity = results.contains { $0.quoteSource?.quoteID != nil }
         let hasExpandedPace = Self.requiresExpandedPaceFormat(settings: settings, presets: presets)
-        self.version = hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        self.version = hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
-        let payloadVersion = hasExpandedPace || hasElapsedTime || hasIncompletePractice ? self.version : version
+        let payloadVersion = hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
         let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = payloadVersion >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
         self.deletedCustomThemeIDs = deletedThemes.sorted { $0.uuidString < $1.uuidString }
@@ -453,6 +455,8 @@ struct TypebarArchive: Codable, Equatable {
             decodedSettings, deletedThemeIDs: deletedThemes, deletedKeyboardLayoutIDs: deletedKeyboardLayouts)
         let decodedResults = try values.decode([CompletedTestResult].self, forKey: .results)
         // Inspect the raw payload before tombstones can hide new evidence.
+        guard version >= 27 || !decodedResults.contains(where: { $0.quoteSource?.quoteID != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 26 || !decodedResults.contains(where: { $0.incompletePractice != nil })
         else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 25 || !decodedResults.contains(where: { $0.elapsedTime != nil })

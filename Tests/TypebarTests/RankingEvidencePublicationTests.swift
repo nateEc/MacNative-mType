@@ -70,7 +70,7 @@ final class RankingEvidencePublicationTests: XCTestCase {
     let record = try XCTUnwrap(TestResultRecord(result: saved).portableResult)
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [saved], presets: [], at: saved.finishedAt))
-    XCTAssertEqual(archive.version,26)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     for restored in [record,try XCTUnwrap(archive.results.first)] {
       let wire = try await ResultConsistencyPublication.prepare(result: restored, capabilities: capabilities)
       XCTAssertEqual(wire.rankingEvidence, .init(stopOnLetter: true, modifiers: ["uppercase"]))
