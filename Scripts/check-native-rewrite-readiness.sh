@@ -203,6 +203,10 @@ run_logged_check "executing pinned stable tag PB getter and pace initialization"
 run_logged_check "executing pinned history tag edits and complete cached PB replacement" \
   "$temporary_directory/account-tag-history-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-tag-history.mjs" "$reference_root"
+run_logged_check "executing pinned tag edit controller and separate PB awards" \
+  "$temporary_directory/account-tag-edit-awards-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-account-tag-edit-awards.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

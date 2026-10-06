@@ -18,7 +18,7 @@ struct AccountTagManagerView: View {
         Spacer()
         Button("刷新") { run { try await reload() } }
       }
-      Text("最多 15 个稳定 ID 标签，与本机文字标签独立。测试完成时保存勾选的标签；之后改选不会改变已完成或待发成绩。历史编辑不会重授服务端标签 PB。")
+      Text("最多 15 个稳定 ID 标签，与本机文字标签独立。测试完成时保存勾选的标签；之后改选不会改变已完成或待发成绩。显式历史编辑会检查服务端标签 PB，不重新奖励 XP。")
         .font(.caption).foregroundStyle(.secondary)
       if !account.hasAccountTagDirectory {
         Text("账户标签尚未加载；请刷新。").foregroundStyle(.secondary)
@@ -116,7 +116,7 @@ struct RemoteAccountResultTagPicker: View {
           .disabled(busy || account.isEditingAccountTags || !account.isAccountTagHistoryReady)
       }
       if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
-      Text("按 ID 编辑并按完整缓存历史重建本机标签 PB；不重授服务端 PB，也不改变完成快照。")
+      Text("按 ID 编辑并按已载入缓存重建本机标签 PB；服务端另检查是否授予标签 PB，不改变完成快照或 XP 回执。")
         .font(.caption).foregroundStyle(.secondary)
     }
   }

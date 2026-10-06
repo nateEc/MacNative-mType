@@ -1455,6 +1455,10 @@ public actor AuthStore {
       state.accountTagDirectory = .init()
     }
     try state.accountTagDirectory!.validate(users: Set(state.users.map(\.id)), awards: state.experienceAwards!)
+    for proof in state.accountTagDirectory!.historyEditAwards {
+      if let result = state.results.first(where: { $0.userID == proof.source.userID && $0.id == proof.source.resultID }),
+        !proof.source.matches(Self.resultRequest(from: result)) { throw AccountTagError.invalidState }
+    }
     state.accountTagDirectoryManaged = true
     try Self.initializeAccountPractice(state: &state)
     if state.weeklyExperienceCache == nil {
@@ -2483,7 +2487,7 @@ public actor AuthStore {
     state.accountPractice?.removeValue(forKey: userID)
     state.personalBestResetDates.removeValue(forKey: userID)
     state.personalBestLedger!.clear(userID:userID)
-    state.accountTagDirectory!.tags.removeAll { $0.userID == userID }
+    state.accountTagDirectory!.purge(userID: userID)
     try persist()
   }
 
@@ -2530,7 +2534,7 @@ public actor AuthStore {
     state.notifications.removeAll { $0.recipientID == user.id }
     state.personalBestResetDates.removeValue(forKey: user.id)
     state.personalBestLedger!.clear(userID:user.id)
-    state.accountTagDirectory!.tags.removeAll { $0.userID == user.id }
+    state.accountTagDirectory!.purge(userID: user.id)
     try persist()
     return userResponse(for: resetUser)
   }
@@ -4145,21 +4149,31 @@ public actor AuthStore {
     guard let index = state.accountTagDirectory!.tags.firstIndex(where: { $0.id == id && $0.userID == user.id }) else {
       throw Abort(.notFound, reason: "Account tag not found.")
     }
-    if clearPersonalBestsOnly { state.accountTagDirectory!.tags[index].personalBests = [] }
-    else { state.accountTagDirectory!.tags.remove(at: index) }
+    state.accountTagDirectory!.remove(id: state.accountTagDirectory!.tags[index].id, clearOnly: clearPersonalBestsOnly)
     try persist()
   }
 
-  public func updateAccountResultTagIDs(id: UUID, request: AccountResultTagIDsRequest, accessToken: String, now: Date = .now) throws -> AccountResultResponse {
+  public func updateAccountResultTagIDs(id: UUID, request: AccountResultTagIDsRequest, accessToken: String, now: Date = .now) throws -> AccountResultTagEditResponse {
     let user = try authenticatedUser(for: accessToken, now: now)
     let ids = try state.accountTagDirectory!.validatedIDs(request.tagIDs, userID: user.id)
     guard let index = state.results.firstIndex(where: { $0.id == id && $0.userID == user.id }) else {
       throw AuthStoreError.resultNotFound
     }
+    let record = state.results[index]
+    var awarded: [UUID] = []
+    if let receipt = state.experienceAwards!.first(where: { $0.userID == user.id && $0.resultID == id }),
+      let input = receipt.rankingAdmission?.input, let acceptedAt = receipt.acceptedAt,
+      AccountTagEditAdmission.isEligible(input), !ids.isEmpty {
+      let source = try receipt.personalBestReceipt?.candidate ?? PersonalBestSnapshot.make(Self.resultRequest(from: record), userID: user.id,
+        acceptedAt: acceptedAt, origin: .accepted)
+      let clock = (now.timeIntervalSince1970 * 1_000).rounded(.down)
+      guard clock.isFinite, (0...8_640_000_000_000_000).contains(clock) else { throw AccountTagError.invalidState }
+      awarded = try state.accountTagDirectory!.acceptHistoryEdit(source, at: Int(clock), tagIDs: ids)
+    }
     state.results[index].accountTagIDs = ids
     try persist()
-    // History editing does not re-award server tag PBs.
-    return resultResponse(for: state.results[index])
+    // The edit can award tag PBs, never XP or the completion-time PB receipt.
+    return .init(result: resultResponse(for: state.results[index]), tagPbs: awarded)
   }
 
   public func updateResultTags(

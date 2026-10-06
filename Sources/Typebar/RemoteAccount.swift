@@ -2904,13 +2904,14 @@ final class AccountSession {
         }
     }
 
-    private func accountTagAPI() async throws -> (RemoteAccountAPI, String, ResultPublicationScope) {
+    private func accountTagAPI(requiresEditPersonalBests: Bool = false) async throws -> (RemoteAccountAPI, String, ResultPublicationScope) {
         guard let scope = resultPublicationScope else { throw RemoteAccountError.accountScopeChanged }
         let api = RemoteAccountAPI(endpoint: endpoint), token = try accessToken()
         let capabilities = try await api.request(path: "v1/capabilities", method: "GET", token: nil,
             body: Optional<String>.none, response: RemoteServiceCapabilities.self)
         guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
         guard capabilities.supportsAccountTags else { throw RemoteAccountError.serverMessage("当前服务未提供稳定账户标签，请先升级自建服务。") }
+        if requiresEditPersonalBests { try RemoteAccountTagEditPolicy.requireCapabilities(capabilities) }
         return (api, token, scope)
     }
 
@@ -3041,16 +3042,18 @@ final class AccountSession {
         accountTagHistoryEditNonce = nonce
         accountTagHistoryGeneration &+= 1
         defer { if accountTagHistoryEditNonce == nonce { accountTagHistoryEditNonce = nil } }
-        let (api, token, scope) = try await accountTagAPI()
+        let (api, token, scope) = try await accountTagAPI(requiresEditPersonalBests: true)
         guard scope == editScope, accountTagHistoryEditNonce == nonce,
             hasAccountTagDirectory, Set(tagIDs).isSubset(of: Set(accountTags.map(\.id)))
         else { throw RemoteAccountError.accountScopeChanged }
-        let result = try await api.request(path: "v1/results/\(id)/account-tags", method: "PATCH", token: token,
-            body: RemoteAccountResultTagIDsRequest(tagIDs: tagIDs), response: RemoteAccountResult.self)
+        let response = try await api.request(path: "v1/results/\(id)/account-tags", method: "PATCH", token: token,
+            body: RemoteAccountResultTagIDsRequest(tagIDs: tagIDs), response: RemoteAccountTagEditResponse.self)
+        let result = response.result
         guard resultPublicationScope == scope, accountTagHistoryEditNonce == nonce else { throw RemoteAccountError.accountScopeChanged }
         do {
             guard result.id == id, Set(result.accountTagIDs ?? []) == Set(tagIDs) else { throw RemoteAccountError.unexpectedResponse }
             try applyAccountTagHistoryEdit(result, scope: scope, at: Int64((Date.now.timeIntervalSince1970 * 1_000).rounded(.down)))
+            statusMessage = "标签更改已保存，服务端新授予 \(response.tagPbs.count) 个标签 PB；缓存重建与完成快照独立。"
         } catch {
             invalidateAccountTagHistory()
             statusMessage = "标签更改已保存，缓存重建失败，请刷新完整历史：" + error.localizedDescription

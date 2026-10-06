@@ -76,17 +76,34 @@ final class AccountTagIdentityTests: XCTestCase {
     let history = try await store.results(.init(), credential: .accessToken(owner.accessToken), now: now)
     XCTAssertEqual(history.total, 0)
   }
-  func testEditingHistoryDoesNotRetroactivelyAwardTagPBAndDeletionLeavesServerHistory() async throws {
+  func testEditingHistoryAwardsTagPBAtEditTimeAndDeletionLeavesServerHistory() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development), owner = try await account(store)
     let identity = try await tag(store, owner), input = result()
     _ = try await store.submitResult(input, accessToken: owner.accessToken, now: now)
-    let edited = try await store.updateAccountResultTagIDs(id: input.id, request: .init(tagIDs: [identity.id]), accessToken: owner.accessToken, now: now)
+    let edited = try await store.updateAccountResultTagIDs(id: input.id, request: .init(tagIDs: [identity.id]), accessToken: owner.accessToken, now: now.addingTimeInterval(2))
     XCTAssertEqual(edited.accountTagIDs, [identity.id])
-    let unchanged = try await store.accountTags(accessToken: owner.accessToken, now: now)
-    XCTAssertTrue(try XCTUnwrap(unchanged.tags.first).personalBests.isEmpty)
+    let changed = try await store.accountTags(accessToken: owner.accessToken, now: now)
+    XCTAssertEqual(changed.tags.first?.personalBests.first?.id, input.id)
+    XCTAssertEqual(changed.tags.first?.personalBests.first?.preciseWpm, 60.49)
+    XCTAssertEqual(changed.tags.first?.personalBests.first?.acceptedAtMilliseconds, 1_800_000_002_875)
     try await store.deleteAccountTag(id: identity.id, accessToken: owner.accessToken, now: now)
     let history = try await store.results(.init(), credential: .accessToken(owner.accessToken), now: now)
     XCTAssertEqual(history.total, 1); XCTAssertEqual(history.results.first?.accountTagIDs, [identity.id])
+  }
+  func testExplicitHistoryEditAfterTagClearCanAwardAgainButPOSTRetryCannot() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development), owner = try await account(store)
+    let identity = try await tag(store, owner), input = result(ids: [identity.id])
+    let initial = try await store.submitResult(input, accessToken: owner.accessToken, now: now)
+    try await store.deleteAccountTag(id: identity.id, clearPersonalBestsOnly: true, accessToken: owner.accessToken, now: now)
+    _ = try await store.submitResult(input, accessToken: owner.accessToken, now: now)
+    let cleared = try await store.accountTags(accessToken: owner.accessToken, now: now)
+    XCTAssertTrue(try XCTUnwrap(cleared.tags.first).personalBests.isEmpty)
+    _ = try await store.updateAccountResultTagIDs(id: input.id, request: .init(tagIDs: [identity.id]), accessToken: owner.accessToken, now: now.addingTimeInterval(1))
+    let restored = try await store.accountTags(accessToken: owner.accessToken, now: now)
+    XCTAssertEqual(restored.tags.first?.personalBests.first?.id, input.id)
+    let retry = try await store.submitResult(input, accessToken: owner.accessToken, now: now)
+    XCTAssertEqual(retry.experienceGained, initial.experienceGained)
+    XCTAssertEqual(retry.totalExperience, initial.totalExperience)
   }
   func testDiskReloadValidationAndSaveFailureRollback() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-tags-\(UUID())")
@@ -115,6 +132,35 @@ final class AccountTagIdentityTests: XCTestCase {
     XCTAssertEqual(restored.tags.first?.name, "desk")
     try FileManager.default.removeItem(at: file); try FileManager.default.moveItem(at: backup, to: file)
     XCTAssertEqual(try Data(contentsOf: file), bytes)
+  }
+  func testEditedPBColdReloadRetainsExactSourceAndDoesNotRewriteAcceptanceReceipts() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-tag-edit-reload-\(UUID())")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("state.json")
+    let store = try AuthStore(fileURL: file, bcryptCost: 4, rankingEnvironment: .development), owner = try await account(store)
+    let identity = try await tag(store, owner), input = result(ids: [])
+    _ = try await store.submitResult(input, accessToken: owner.accessToken, now: now)
+    let backup = try Data(contentsOf: file)
+    let before = try XCTUnwrap(JSONSerialization.jsonObject(with: backup) as? [String: Any])
+    _ = try await store.updateAccountResultTagIDs(id: input.id, request: .init(tagIDs: [identity.id]), accessToken: owner.accessToken, now: now.addingTimeInterval(2))
+    let after = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+    for key in ["experienceAwards", "personalBestLedger", "accountPractice", "weeklyExperienceCache", "dailyLeaderboardCache", "rewardInbox"] {
+      XCTAssertEqual(try JSONSerialization.data(withJSONObject: XCTUnwrap(before[key]), options: [.sortedKeys]),
+        try JSONSerialization.data(withJSONObject: XCTUnwrap(after[key]), options: [.sortedKeys]), key)
+    }
+    let reloaded = try AuthStore(fileURL: file, bcryptCost: 4, rankingEnvironment: .development)
+    let repeated = try await reloaded.updateAccountResultTagIDs(id: input.id, request: .init(tagIDs: [identity.id]), accessToken: owner.accessToken, now: now.addingTimeInterval(3))
+    XCTAssertTrue(repeated.tagPbs.isEmpty)
+    _ = try await reloaded.deleteResults(.init(currentPassword: "a secure password"), accessToken: owner.accessToken, now: now)
+    let cold = try AuthStore(fileURL: file, bcryptCost: 4, rankingEnvironment: .development)
+    let directory = try await cold.accountTags(accessToken: owner.accessToken, now: now)
+    XCTAssertEqual(directory.tags.first?.personalBests.first?.acceptedAtMilliseconds, 1_800_000_002_875)
+    XCTAssertEqual(directory.tags.first?.personalBests.first?.preciseWpm, 60.49)
+    let oldFile = root.appendingPathComponent("before.json"); try backup.write(to: oldFile)
+    let old = try AuthStore(fileURL: oldFile, bcryptCost: 4)
+    let oldDirectory = try await old.accountTags(accessToken: owner.accessToken, now: now)
+    XCTAssertTrue(try XCTUnwrap(oldDirectory.tags.first).personalBests.isEmpty)
   }
   func testLegacyDirectoryAbsencePreservesTextWithoutInventingIDs() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-tags-legacy-\(UUID())")
@@ -179,6 +225,7 @@ final class AccountTagIdentityTests: XCTestCase {
       }, afterResponse: { response async throws in
         XCTAssertEqual(response.status, .ok)
         XCTAssertEqual(try response.content.decode(AccountResultResponse.self).accountTagIDs, [identity.id])
+        XCTAssertEqual(try response.content.decode(AccountResultTagEditResponse.self).tagPbs, [identity.id])
       })
       try await app.test(.GET, "v1/results/\(input.id)", beforeRequest: { request async in
         request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
@@ -206,7 +253,9 @@ final class AccountTagIdentityTests: XCTestCase {
     do {
       try configure(app, authStore: store)
       try await app.test(.GET, "v1/capabilities") { response async throws in
-        XCTAssertEqual(try response.content.decode(ServiceCapabilitiesResponse.self).capabilities["accountTags"], .available)
+        let capabilities = try response.content.decode(ServiceCapabilitiesResponse.self).capabilities
+        XCTAssertEqual(capabilities["accountTags"], .available)
+        XCTAssertEqual(capabilities["accountTagEditPersonalBests"], .available)
       }
       try await app.test(.GET, "v1/tags") { response async in XCTAssertEqual(response.status, .unauthorized) }
       try await app.test(.POST, "v1/tags", beforeRequest: { request async throws in

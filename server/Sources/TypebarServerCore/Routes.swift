@@ -87,6 +87,7 @@ public func configure(
                 "resultPersonalBestConfiguration": .available,
                 "accountPersonalBestLedger": .available,
                 "accountTags": .available,
+                "accountTagEditPersonalBests": .available,
                 "resultSpeedPrecision": .available,
                 "resultInputMetrics": .available,
                 "resultInputMetricsV2": .available,
@@ -962,7 +963,7 @@ public func configure(
         do { try await authStore.deleteAccountTag(id: id, clearPersonalBestsOnly: true, accessToken: request.accessToken()); return .init(deleted: true) }
         catch let error as AuthStoreError { throw error.abort }
     }
-    app.patch("v1", "results", ":id", "account-tags") { request async throws -> AccountResultResponse in
+    app.patch("v1", "results", ":id", "account-tags") { request async throws -> AccountResultTagEditResponse in
         guard let id = request.parameters.get("id").flatMap(UUID.init(uuidString:)) else { throw Abort(.badRequest) }
         do { return try await authStore.updateAccountResultTagIDs(id: id,
             request: request.content.decode(AccountResultTagIDsRequest.self), accessToken: request.accessToken()) }
