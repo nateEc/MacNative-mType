@@ -5963,7 +5963,7 @@ private struct CompletedResultView: View {
       tagPersonalBestFeedbackView
 
       if let accepted = account.editableAccountTagResult(id: result.id) {
-        RemoteAccountResultTagPicker(result: accepted, account: account)
+        RemoteAccountResultTagPicker(result: accepted, account: account, fromResultPage: true)
       }
 
       if let savedResultRecord {

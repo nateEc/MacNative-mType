@@ -210,6 +210,10 @@ run_logged_check "executing pinned tag edit controller and separate PB awards" \
 run_logged_check "executing pinned unloaded last-result tag edits and award-only PB writes" \
   "$temporary_directory/account-tag-last-result-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-tag-last-result.mjs" "$reference_root"
+
+run_logged_check "executing pinned result-tag draft/save callbacks and retained crown display" \
+  "$temporary_directory/account-tag-result-editor-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-tag-result-editor.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

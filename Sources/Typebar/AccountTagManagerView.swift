@@ -96,34 +96,77 @@ struct AccountTagManagerView: View {
 struct RemoteAccountResultTagPicker: View {
   let result: RemoteAccountResult
   let account: AccountSession
+  var fromResultPage = false
   @State private var message: String?
   @State private var busy = false
+  @State private var expanded = false
+  @State private var draft: AccountTagResultEditDraft?
   private var knownIDs: Set<UUID> { Set(account.accountTags.map(\.id)) }
   private var current: RemoteAccountResult { account.editableAccountTagResult(id: result.id) ?? result }
+  private var feedback: AccountTagResultEditFeedback? {
+    fromResultPage && account.lastAccountResult?.id == result.id ? account.lastAccountResultEditFeedback : nil
+  }
   var body: some View {
-    DisclosureGroup("账户标签（\(Set(current.accountTagIDs ?? []).intersection(knownIDs).count) 个）") {
-      ForEach(account.accountTags) { tag in
-        Toggle("\(tag.displayName) · \(tag.id.uuidString.prefix(8))", isOn: Binding(
-          get: { current.accountTagIDs?.contains(tag.id) == true },
-          set: { enabled in
-            guard !busy else { return }
-            var ids = Set(current.accountTagIDs ?? []).intersection(knownIDs)
-            if enabled { ids.insert(tag.id) } else { ids.remove(tag.id) }
-            busy = true; message = nil
-            Task { defer { busy = false }
-              do { try await account.updateRemoteAccountResultTagIDs(id: result.id, tagIDs: ids.sorted { $0.uuidString < $1.uuidString }) }
-              catch { message = error.localizedDescription } }
-          }))
-          .disabled(busy || account.isEditingAccountTags || account.editableAccountTagResult(id: result.id) == nil)
-        if account.lastAccountResult?.id == result.id, account.lastAccountResultEditAwardIDs.contains(tag.id) {
-          Label("\(tag.displayName) 新标签 PB", systemImage: "crown.fill").font(.caption)
+    VStack(alignment: .leading, spacing: 8) {
+      let displayed = feedback?.displayedIDs ?? current.accountTagIDs ?? []
+      if displayed.allSatisfy({ !knownIDs.contains($0) }) {
+        Text("无账户标签").font(.caption).foregroundStyle(.secondary)
+      }
+      ForEach(displayed.filter { knownIDs.contains($0) }, id: \.self) { id in
+        if let tag = account.accountTags.first(where: { $0.id == id }) {
+          HStack {
+            Text("\(tag.displayName) · \(id.uuidString.prefix(8))")
+            if feedback?.crownedIDs.contains(id) == true {
+              Label("标签 PB", systemImage: "crown.fill")
+            }
+          }.font(.caption)
         }
       }
+      DisclosureGroup("账户标签（\(Set(current.accountTagIDs ?? []).intersection(knownIDs).count) 个）",
+        isExpanded: Binding(get: { expanded }, set: { value in
+          guard !busy else { return }
+          if value {
+            do { draft = try account.accountTagResultEditDraft(id: result.id); expanded = true; message = nil }
+            catch { message = error.localizedDescription }
+          } else { draft = nil; expanded = false }
+        })) {
+        if draft != nil {
+          ForEach(account.accountTags) { tag in
+            Toggle("\(tag.displayName) · \(tag.id.uuidString.prefix(8))", isOn: Binding(
+              get: { draft?.selectedIDs.contains(tag.id) == true },
+              set: { enabled in guard !busy else { return }; draft?.set(tag.id, enabled: enabled) }))
+          }
+          Text("已选 \(draft?.selectedIDs.count ?? 0) 个；按保存后统一提交。")
+            .font(.caption).foregroundStyle(.secondary)
+          HStack {
+            Button(busy ? "保存中…" : "保存") { save() }
+            Button("取消") { draft = nil; expanded = false }
+          }
+          .disabled(busy || account.isEditingAccountTags)
+        }
+      }.disabled(busy || account.isEditingAccountTags || account.editableAccountTagResult(id: result.id) == nil)
+        .onExitCommand { if !busy { draft = nil; expanded = false } }
       if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
       Text(account.isAccountTagHistoryReady
         ? "按已加载历史重建本机标签 PB；服务端另检查授予。完成快照和 XP 不变。"
         : "只编辑最后成绩，不加载历史；本机仅保存服务返回的标签 PB。完成快照和 XP 不变。")
         .font(.caption).foregroundStyle(.secondary)
+    }
+    .onChange(of: account.accountTagRevision) { _, _ in
+      guard !busy, draft != nil else { return }
+      draft = nil; expanded = false; message = "账户、目录或成绩已更新，请重新选择标签。"
+    }
+    .onChange(of: result.id) { _, _ in draft = nil; expanded = false }
+  }
+  private func save() {
+    guard !busy, let draft else { return }
+    busy = true; message = nil
+    Task {
+      defer { busy = false; self.draft = nil; expanded = false }
+      do {
+        let disposition = try await account.saveAccountTagResultEdit(draft, fromResultPage: fromResultPage)
+        message = disposition == .unchanged ? "选择未改变，未发送请求。" : "账户标签已保存。"
+      } catch { message = error.localizedDescription }
     }
   }
 }
