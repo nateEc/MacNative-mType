@@ -482,6 +482,8 @@ final class TestResultRecord {
   var elapsedTimeData: Data?
   /// Additive optional XP history. Old records remain absent, never backfilled.
   var incompletePracticeData: Data?
+  /// Completion-time account identity; old rows stay unknown, never backfilled.
+  var accountTagSnapshotData: Data?
   var typedCharacterCount: Int
   var correctCharacterCount: Int
   var errorCount: Int
@@ -519,6 +521,7 @@ final class TestResultRecord {
     // Preserve an invalid explicit marker rather than silently dropping it.
     elapsedTimeData = result.elapsedTime.map { (try? JSONEncoder().encode($0)) ?? Data() }
     incompletePracticeData = result.incompletePractice.map { (try? JSONEncoder().encode($0)) ?? Data() }
+    accountTagSnapshotData = result.accountTagSnapshot.map { (try? JSONEncoder().encode($0)) ?? Data() }
     typedCharacterCount = result.typedCharacterCount
     correctCharacterCount = result.correctCharacterCount
     errorCount = result.errorCount
@@ -661,6 +664,7 @@ final class TestResultRecord {
     guard elapsedTimeData == nil || elapsedTime != nil else { return nil }
     guard incompletePracticeData == nil || incompletePractice != nil else { return nil }
     guard quoteSourceData == nil || quoteSource != nil else { return nil }
+    guard accountTagSnapshotData == nil || accountTagSnapshot != nil else { return nil }
     return CompletedTestResult(
       id: id,
       configuration: configuration,
@@ -688,12 +692,17 @@ final class TestResultRecord {
       keySpacingSamples: keySpacingSamples,
       keyOverlapDuration: keyOverlapDuration ?? 0,
       tags: tags,
+      accountTagSnapshot: accountTagSnapshot,
       quoteSource: quoteSource,
       prompt: prompt,
       replayEvents: replayEvents,
       targetWordDirectory: targetWordDirectory,
       challengePresentation: challengePresentation
     )
+  }
+
+  var accountTagSnapshot: ResultAccountTagSnapshot? {
+    accountTagSnapshotData.flatMap { try? JSONDecoder().decode(ResultAccountTagSnapshot.self, from: $0) }
   }
 }
 

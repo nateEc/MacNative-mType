@@ -18,7 +18,7 @@ struct AccountTagManagerView: View {
         Spacer()
         Button("刷新") { run { try await reload() } }
       }
-      Text("最多 15 个稳定 ID 标签，与本机文字标签独立。勾选仅应用于下一次联网投稿；历史编辑不会重授服务端标签 PB。")
+      Text("最多 15 个稳定 ID 标签，与本机文字标签独立。测试完成时保存勾选的标签；之后改选不会改变已完成或待发成绩。历史编辑不会重授服务端标签 PB。")
         .font(.caption).foregroundStyle(.secondary)
       if account.accountTags.isEmpty { Text("尚无账户标签；先添加一个标签。").foregroundStyle(.secondary) }
       ForEach(account.accountTags) { tag in
@@ -32,7 +32,7 @@ struct AccountTagManagerView: View {
                 selected = updated
               } catch { message = error.localizedDescription }
             }))
-            .accessibilityLabel("下次投稿标签 \(tag.displayName)，ID \(tag.id)")
+            .accessibilityLabel("完成时捕获的标签 \(tag.displayName)，ID \(tag.id)")
             Button("重命名") { editing = tag; renamed = tag.displayName }
             Button("清 PB…", role: .destructive) { pending = tag; clearOnly = true }
             Button("删除…", role: .destructive) { pending = tag; clearOnly = false }

@@ -65,6 +65,66 @@ final class DiskModelMigrationTests: XCTestCase {
     try exerciseUpgrade("before-elapsed")
   }
 
+  func testPreviousFiveEntityStoreAddsTagSnapshotWithoutBackfillingOldResults() throws {
+    try withDirectory { root in
+      let fixture = try createLegacy("before-account-tags", root: root)
+      let rows = try XCTUnwrap(fixture.receipt["rows"] as? [String: [[String: Any]]])
+      var candidate = newResult()
+      candidate.accountTagSnapshot = .init(
+        scope: .init(endpoint: "https://owned.example", userID: UUID()), tagIDs: [UUID()])
+      var saved: Data?
+      try autoreleasepool {
+        let container = try open(fixture.store); defer { withExtendedLifetime(container) {} }
+        try assertLegacy(container.mainContext, expected: rows, version: "before-account-tags")
+        let old = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).first)
+        XCTAssertNil(old.accountTagSnapshotData)
+        XCTAssertNil(old.portableResult?.accountTagSnapshot)
+        let book = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<LocalPersonalBestLedgerRecord>()).first)
+        XCTAssertEqual(book.ledgerData.base64EncodedString(), rows["LocalPersonalBestLedgerRecord"]?.first?["ledgerData"] as? String)
+        let fresh = TestResultRecord(result: candidate); saved = fresh.accountTagSnapshotData
+        container.mainContext.insert(fresh); try container.mainContext.save()
+      }
+      let receipt = root.appendingPathComponent("cold-tags.json")
+      try runWriter("current", ["inspect", fixture.store.path, "-", receipt.path], root: root)
+      let cold = try XCTUnwrap(try object(receipt)["rows"] as? [String: [[String: Any]]])
+      let fresh = try XCTUnwrap(cold["TestResultRecord"]?.first { $0["id"] as? String == candidate.id.uuidString })
+      XCTAssertEqual(fresh["accountTagSnapshotData"] as? String, try XCTUnwrap(saved).base64EncodedString())
+      try autoreleasepool {
+        let container = try open(fixture.store); defer { withExtendedLifetime(container) {} }
+        let records = try container.mainContext.fetch(FetchDescriptor<TestResultRecord>())
+        let old = try XCTUnwrap(records.first { $0.id == resultID })
+        try assertStored(old, expected: XCTUnwrap(rows["TestResultRecord"]?.first))
+        XCTAssertNil(old.accountTagSnapshotData)
+        XCTAssertEqual(records.first { $0.id == candidate.id }?.portableResult, candidate)
+        try assertOtherEntities(container.mainContext, expected: rows, version: "before-account-tags")
+        let book = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<LocalPersonalBestLedgerRecord>()).first)
+        XCTAssertEqual(book.ledgerData.base64EncodedString(), rows["LocalPersonalBestLedgerRecord"]?.first?["ledgerData"] as? String)
+      }
+    }
+  }
+
+  func testBrokenTagSnapshotStaysExplicitAfterColdReloadAndUnrelatedLabelSave() throws {
+    try withDirectory { root in
+      let url = root.appendingPathComponent("store.sqlite"), bytes = Data("{\"version\":2}".utf8)
+      let candidate = newResult()
+      try autoreleasepool {
+        let container = try open(url); defer { withExtendedLifetime(container) {} }
+        let record = TestResultRecord(result: candidate); record.accountTagSnapshotData = bytes
+        container.mainContext.insert(record); try container.mainContext.save()
+      }
+      for _ in 0..<2 {
+        try autoreleasepool {
+          let container = try open(url); defer { withExtendedLifetime(container) {} }
+          let record = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).first)
+          XCTAssertEqual(record.accountTagSnapshotData, bytes)
+          XCTAssertNil(record.accountTagSnapshot); XCTAssertNil(record.portableResult)
+          XCTAssertEqual(record.wpm, candidate.wpm)
+          record.addTag("owned"); try container.mainContext.save()
+        }
+      }
+    }
+  }
+
   func testPreviousDiskSchemaAddsIncompleteEvidenceWithoutBackfillingOldAccuracy() throws {
     try withDirectory { root in
       let timing = ResultElapsedTime(seconds: 16.125)
@@ -315,7 +375,7 @@ final class DiskModelMigrationTests: XCTestCase {
       "replayEventsData": try blob([TypingReplayEvent(offset: 0, kind: .insert, text: "a"),
         TypingReplayEvent(offset: 1.125, kind: .insert, text: "b")])]
     row.merge(overrides) { _, new in new }
-    let rows: [String: [[String: Any]]] = [
+    var rows: [String: [[String: Any]]] = [
       "TestResultRecord": [row],
       "TestPresetRecord": [["id": presetID.uuidString, "name": "旧预设",
         "definitionData": try blob(SavedTestPreset(configuration: configuration)),
@@ -324,6 +384,11 @@ final class DiskModelMigrationTests: XCTestCase {
         "longProgress": 3, "createdAt": start.timeIntervalSinceReferenceDate]],
       "ResultFilterPresetRecord": [["id": filterID.uuidString, "name": "旧筛选",
         "filterData": try blob(ResultHistoryFilter()), "createdAt": start.timeIntervalSinceReferenceDate]]]
+    if version == "before-account-tags" {
+      let book = try LocalPersonalBestLedgerRecord(ledger: LocalPersonalBestLedger())
+      rows["LocalPersonalBestLedgerRecord"] = [["id": book.id.uuidString,
+        "ledgerData": book.ledgerData.base64EncodedString()]]
+    }
     try JSONSerialization.data(withJSONObject: rows, options: [.sortedKeys]).write(to: payload)
     let store = directory.appendingPathComponent("store.sqlite")
     let receipt = root.appendingPathComponent("old.json")
@@ -380,6 +445,7 @@ final class DiskModelMigrationTests: XCTestCase {
       "tagsData": row.tagsData.base64EncodedString(), "prompt": row.prompt,
       "terminalTimingData": encoded(row.terminalTimingData), "elapsedTimeData": encoded(row.elapsedTimeData),
       "incompletePracticeData": encoded(row.incompletePracticeData),
+      "accountTagSnapshotData": encoded(row.accountTagSnapshotData),
       "inputMetricsData": encoded(row.inputMetricsData), "characterStatsData": encoded(row.characterStatsData),
       "keyDurationSamplesData": encoded(row.keyDurationSamplesData), "keySpacingSamplesData": encoded(row.keySpacingSamplesData),
       "quoteSourceData": encoded(row.quoteSourceData), "replayEventsData": encoded(row.replayEventsData),

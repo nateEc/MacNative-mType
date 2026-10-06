@@ -1313,7 +1313,7 @@ private struct ContentView: View {
               ? oneHandedChallengeSelection : nil,
             completedWords: activeChallengeID == "one-handed-bandit"
               ? session.completedWordCount : nil)
-        guard let result = session.result(
+        guard var result = session.result(
           tags: activeSessionTags,
           restartCount: resultPriorAttemptLedger.restartCount,
           priorAttemptEngagedDuration: resultPriorAttemptLedger.priorAttemptEngagedDuration,
@@ -1321,6 +1321,7 @@ private struct ContentView: View {
           quoteSource: activeQuoteSource,
           challengePresentation: challengePresentation
         ) else { return }
+        result.accountTagSnapshot = account.captureCompletedResultTags()
         let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
         lastFinishedWpm = LastTestPacePolicy.updatedWpm(
           previousWpm: lastFinishedWpm,

@@ -4025,6 +4025,7 @@ enum TypingInputOrigin {
 }
 
 struct CompletedTestResult: Codable, Equatable, Identifiable {
+  var accountTagSnapshot: ResultAccountTagSnapshot? = nil
   let id: UUID
   let configuration: TestConfiguration
   let outcome: TestOutcome
@@ -4053,7 +4054,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let keyDurationSamples: [TimeInterval]
   let keySpacingSamples: [TimeInterval]
   let keyOverlapDuration: TimeInterval
-  let tags: [String]
+  var tags: [String]
   let quoteSource: ResultQuoteSource?
   let prompt: String
   let replayEvents: [TypingReplayEvent]
@@ -4087,6 +4088,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     keySpacingSamples: [TimeInterval] = [],
     keyOverlapDuration: TimeInterval = 0,
     tags: [String] = [],
+    accountTagSnapshot: ResultAccountTagSnapshot? = nil,
     quoteSource: ResultQuoteSource? = nil,
     prompt: String = "",
     replayEvents: [TypingReplayEvent] = [],
@@ -4121,6 +4123,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.keySpacingSamples = keySpacingSamples.filter { $0.isFinite && $0 >= 0 }
     self.keyOverlapDuration = keyOverlapDuration.isFinite ? max(0, keyOverlapDuration) : 0
     self.tags = tags
+    self.accountTagSnapshot = accountTagSnapshot
     self.quoteSource = configuration.mode == .quote ? quoteSource : nil
     self.prompt = prompt
     self.replayEvents = TypingReplay.chronologicalEvents(replayEvents)
@@ -4165,6 +4168,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       priorAttemptEngagedDuration, keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
       challengePresentation, targetWordDirectory, terminalTiming, elapsedTime, incompletePractice
     case startedAtReferenceTime, finishedAtReferenceTime
+    case accountTagSnapshot
   }
 
   func encode(to encoder: Encoder) throws {
@@ -4202,6 +4206,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     try values.encode(keySpacingSamples, forKey: .keySpacingSamples)
     try values.encode(keyOverlapDuration, forKey: .keyOverlapDuration)
     try values.encode(tags, forKey: .tags)
+    try values.encodeIfPresent(accountTagSnapshot, forKey: .accountTagSnapshot)
     try values.encodeIfPresent(quoteSource, forKey: .quoteSource)
     try values.encode(prompt, forKey: .prompt)
     try values.encode(replayEvents, forKey: .replayEvents)
@@ -4269,6 +4274,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     keyOverlapDuration = decodedKeyOverlapDuration.isFinite
       ? max(0, decodedKeyOverlapDuration) : 0
     tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+    accountTagSnapshot = values.contains(.accountTagSnapshot)
+      ? try values.decode(ResultAccountTagSnapshot.self, forKey: .accountTagSnapshot) : nil
     if let source = try? values.nestedContainer(keyedBy: ResultQuoteSource.CodingKeys.self, forKey: .quoteSource),
       source.contains(.quoteID) {
       guard configuration.mode == .quote else {

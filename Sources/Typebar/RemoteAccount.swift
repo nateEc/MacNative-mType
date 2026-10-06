@@ -2795,6 +2795,16 @@ final class AccountSession {
         return try RemoteAccountTagSelectionStore(defaults: defaults).ids(for: scope)
     }
 
+    func captureCompletedResultTags() -> ResultAccountTagSnapshot {
+        guard let scope = resultPublicationScope else {
+            return ResultAccountTagSnapshotPolicy.capture(scope: nil, selectedIDs: [])
+        }
+        do {
+            return ResultAccountTagSnapshotPolicy.capture(scope: scope,
+                selectedIDs: try RemoteAccountTagSelectionStore(defaults: defaults).ids(for: scope))
+        } catch { return .unavailable }
+    }
+
     func setAccountTagPostingSelection(_ ids: [UUID]) throws {
         guard let scope = resultPublicationScope, Set(ids).isSubset(of: Set(accountTags.map(\.id))) else {
             throw RemoteAccountError.accountScopeChanged
@@ -3224,12 +3234,12 @@ final class AccountSession {
         }
         let requestEndpoint = endpoint
         let requestScope = ResultPublicationScope(endpoint: requestEndpoint, userID: requestingUser.id)
-        let selectedTagIDs = try RemoteAccountTagSelectionStore(defaults: defaults).ids(for: requestScope)
+        let selectedTagIDs = try ResultAccountTagSnapshotPolicy.ids(result.accountTagSnapshot, for: requestScope)
         let capabilities = try await RemoteResultBailoutPolicy.capabilities(for: result.outcome,
             requiresElapsedTime: result.elapsedTime != nil,
             requiresIncompletePractice: result.incompletePractice != nil,
             requiresMode2: result.quoteSource?.quoteID != nil,
-            requiresAccountTags: !selectedTagIDs.isEmpty) {
+            requiresAccountTags: !(selectedTagIDs ?? []).isEmpty) {
             try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                 path: "v1/capabilities",
                 method: "GET",
@@ -3243,7 +3253,8 @@ final class AccountSession {
         }
         try ResultInputMetricsPublicationPolicy.validate(result, capabilities: capabilities)
         var submission = try await ResultConsistencyPublication.prepare(result: result, capabilities: capabilities)
-        submission.accountTagIDs = try RemoteAccountTagPolicy.prepare(ids: selectedTagIDs, capabilities: capabilities)
+        submission.accountTagIDs = try ResultAccountTagSnapshotPolicy.prepare(result.accountTagSnapshot,
+            for: requestScope, capabilities: capabilities)
         try Task.checkCancellation()
         // Background computation is another suspension point: credentials
         // captured for a previous account must not authorize a late POST.

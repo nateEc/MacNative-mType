@@ -194,6 +194,9 @@ require_no_conflicting_processes || fail "stop the listed process before running
 run_logged_check "executing pinned speed calculation and two-decimal rounding" "$temporary_directory/speed-precision-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-speed-precision.mjs" "$reference_root"
+run_logged_check "executing pinned completion tags, failed save retries and signed-out claim" \
+  "$temporary_directory/account-tag-capture-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-tag-capture.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

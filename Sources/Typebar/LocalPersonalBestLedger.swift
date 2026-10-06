@@ -278,6 +278,7 @@ enum LocalPersonalBestStore {
   @discardableResult
   static func save(_ result: CompletedTestResult, in context: ModelContext,
     acceptedAt: Date = .now, save: (() throws -> Void)? = nil) throws -> TestResultRecord {
+    try result.accountTagSnapshot?.validate()
     let checkpoint = try checkpoint(in: context)
     let id = result.id
     if let old = try context.fetch(FetchDescriptor<TestResultRecord>(predicate: #Predicate { $0.id == id })).first {
@@ -299,6 +300,7 @@ enum LocalPersonalBestStore {
   static func stage(_ results: [CompletedTestResult], in context: ModelContext,
     at date: Date? = nil, origin: LocalPersonalBestSnapshot.Origin = .importedHistory
   ) throws -> LocalPersonalBestLedgerRecord {
+    for result in results { try result.accountTagSnapshot?.validate() }
     let record: LocalPersonalBestLedgerRecord
     if let old = try existing(in: context) { record = old }
     else { record = try baseline(in: context); context.insert(record) }

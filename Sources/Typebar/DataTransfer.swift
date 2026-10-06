@@ -324,9 +324,10 @@ struct TypebarArchive: Codable, Equatable {
     // custom pace speeds beyond the legacy integer editor domain, and
     // measured elapsed time independent of calendar dates and captured quote
     // identity independent of titles or a later selected quote, and an
-    // independent numeric PB ledger that cannot be recovered from history.
+    // independent numeric PB ledger that cannot be recovered from history,
+    // and account tag identities captured at completion rather than retry.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 28
+    static let currentVersion = 29
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -376,11 +377,12 @@ struct TypebarArchive: Codable, Equatable {
         let hasElapsedTime = results.contains { $0.elapsedTime != nil }
         let hasIncompletePractice = results.contains { $0.incompletePractice != nil }
         let hasQuoteIdentity = results.contains { $0.quoteSource?.quoteID != nil }
+        let hasAccountTagSnapshot = results.contains { $0.accountTagSnapshot != nil }
         let hasExpandedPace = Self.requiresExpandedPaceFormat(settings: settings, presets: presets)
-        self.version = localPersonalBestLedger != nil ? max(28, version) : hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        self.version = hasAccountTagSnapshot ? max(29, version) : localPersonalBestLedger != nil ? max(28, version) : hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
-        let payloadVersion = localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
+        let payloadVersion = hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
         self.localPersonalBestLedger = localPersonalBestLedger
         let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = payloadVersion >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
@@ -431,6 +433,9 @@ struct TypebarArchive: Codable, Equatable {
 
     func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
+        try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(results)
+        guard version >= 29 || !results.contains(where: { $0.accountTagSnapshot != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         if let ledger = localPersonalBestLedger {
             guard version >= 28 else { throw DataTransferError.unsupportedVersion(version) }
             try ledger.validate()
@@ -481,7 +486,10 @@ struct TypebarArchive: Codable, Equatable {
         settings = Self.sanitizedSettings(
             decodedSettings, deletedThemeIDs: deletedThemes, deletedKeyboardLayoutIDs: deletedKeyboardLayouts)
         let decodedResults = try values.decode([CompletedTestResult].self, forKey: .results)
+        try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(decodedResults)
         // Inspect the raw payload before tombstones can hide new evidence.
+        guard version >= 29 || !decodedResults.contains(where: { $0.accountTagSnapshot != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 27 || !decodedResults.contains(where: { $0.quoteSource?.quoteID != nil })
         else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 26 || !decodedResults.contains(where: { $0.incompletePractice != nil })
@@ -1211,6 +1219,13 @@ enum TypebarArchiveConflictMerge {
         remote: TypebarArchive,
         makeID: () -> UUID = UUID.init
     ) throws -> TypebarArchiveConflictMergeResult {
+        try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(local.results)
+        try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(remote.results)
+        let remoteByID = Dictionary(remote.results.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let mergedResultIdentities = try local.results.map { value in
+            try remoteByID[value.id].map { try ResultAccountTagSnapshotPolicy.merged(local: value, remote: $0) } ?? value
+        }
+        try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(mergedResultIdentities)
         let ledger: LocalPersonalBestLedger?
         func recoverHistory(_ archive: TypebarArchive) throws -> LocalPersonalBestLedger {
             var baseline = LocalPersonalBestLedger()
@@ -1401,12 +1416,14 @@ enum TypebarArchiveConflictMerge {
 
         return .init(
             archive: .init(
-                version: max(local.version, remote.version),
+                version: mergedResultIdentities.contains(where: { $0.accountTagSnapshot != nil })
+                  || remote.results.contains(where: { $0.accountTagSnapshot != nil })
+                  ? max(29, max(local.version, remote.version)) : max(local.version, remote.version),
                 exportedAt: max(local.exportedAt, remote.exportedAt),
                 settings: settings,
                 deletedCustomThemeIDs: Array(deletedCustomThemeIDs),
                 deletedCustomKeyboardLayoutIDs: Array(deletedCustomKeyboardLayoutIDs),
-                results: (local.results + remote.results.filter { remoteResult in
+                results: (mergedResultIdentities + remote.results.filter { remoteResult in
                     !local.results.contains(where: { $0.id == remoteResult.id })
                 }).filter { !deletedResultIDs.contains($0.id) },
                 deletedResultIDs: Array(deletedResultIDs),
@@ -1546,6 +1563,7 @@ enum LocalArchiveImport {
         source: ArchiveImportSource = .localFile,
         modelContext: ModelContext
     ) throws -> ArchiveImportSummary {
+        try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(archive.results)
         guard settings.allowsRestartingConfigurationChange else {
             throw LocalArchiveImportError.noQuitConfigurationLocked
         }
@@ -1599,6 +1617,18 @@ enum LocalArchiveImport {
             from: archive,
             existingIDs: Set(results.map(\.id)),
             deletedIDs: effectiveDeletedResultIDs)
+        let existingByID = Dictionary(results.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var tagSnapshotUpdates: [(record: TestResultRecord, old: Data?, new: Data)] = []
+        for value in archive.results where !effectiveDeletedResultIDs.contains(value.id) {
+            try value.accountTagSnapshot?.validate()
+            guard let record = existingByID[value.id],
+              record.accountTagSnapshotData != nil || value.accountTagSnapshot != nil else { continue }
+            guard let local = record.portableResult else { throw ResultAccountTagSnapshotError.invalid }
+            let merged = try ResultAccountTagSnapshotPolicy.merged(local: local, remote: value)
+            if record.accountTagSnapshotData == nil, let snapshot = merged.accountTagSnapshot {
+                tagSnapshotUpdates.append((record, nil, try JSONEncoder().encode(snapshot)))
+            }
+        }
         let storedDeletedPresetIDs = Set(presetTombstoneStore.deletedIDs)
         let archiveDeletedPresetIDs = Set(archive.deletedPresetIDs)
         let resultingDeletedPresetIDs: Set<UUID>
@@ -1680,6 +1710,7 @@ enum LocalArchiveImport {
         }
         catch { LocalPersonalBestStore.restore(personalBestCheckpoint, in: modelContext); throw error }
         for result in newResults { modelContext.insert(TestResultRecord(result: result)) }
+        for update in tagSnapshotUpdates { update.record.accountTagSnapshotData = update.new }
         for result in resultRecordsToDelete { modelContext.delete(result) }
         for preset in newPresets {
             modelContext.insert(TestPresetRecord(
@@ -1702,6 +1733,7 @@ enum LocalArchiveImport {
             try modelContext.save()
         } catch {
             LocalPersonalBestStore.restore(personalBestCheckpoint, in: modelContext)
+            for update in tagSnapshotUpdates { update.record.accountTagSnapshotData = update.old }
             throw error
         }
         resultTombstoneStore.replaceDeletedIDs(resultingDeletedResultIDs)

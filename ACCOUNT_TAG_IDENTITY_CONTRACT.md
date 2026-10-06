@@ -4,7 +4,7 @@ Typebar 自建服务以账户目录中的 UUID 标识标签，原生账户设置
 
 ## 固定参考与兼容边界
 
-参考为只读 Monkeytype `91bd24bb8513785c7364cbea29296ff7adafac41` 的 `frontend/src/ts/collections/tags.ts`、`frontend/src/ts/components/pages/settings/custom-setting/Tags.tsx`、`frontend/src/ts/components/modals/AddTagModal.tsx`、`frontend/src/ts/utils/results.ts`、`backend/src/dal/{user,result}.ts`、`packages/contracts/src/users.ts`、`packages/schemas/src/{users,util}.ts`。源码用于核对行为，不进入生产运行时。
+参考为只读 Monkeytype `91bd24bb8513785c7364cbea29296ff7adafac41` 的 `frontend/src/ts/collections/tags.ts`、`frontend/src/ts/components/pages/settings/custom-setting/Tags.tsx`、`frontend/src/ts/components/modals/AddTagModal.tsx`、`frontend/src/ts/collections/results.ts`、`backend/src/dal/{user,result}.ts`、`packages/contracts/src/users.ts`、`packages/schemas/src/{users,util}.ts`。源码用于核对行为，不进入生产运行时。
 
 原版目录最多十五项，名称允许重复，身份与名称独立；名称规范化空白为下划线，规范名称为 1–16 个 ASCII 字母／数字和分隔符，分隔符不能相邻或位于首尾。重命名只改名称。Typebar 独立实现这些规则，但使用 UUID 和自有 HTTP 字段，不兼容原版 ObjectID、ApeKey 或官方服务协议。
 
@@ -24,7 +24,7 @@ Typebar 自建服务以账户目录中的 UUID 标识标签，原生账户设置
 
 原生选择只在本设备按规范化服务地址和账户 UUID 存储，不缓存名称、PB 或凭据；刷新会清除已删除的选择，损坏选择报错而不当成空。账户切换后不展示另一作用域的目录，异步响应提交前重新核对作用域。
 
-选择在每次联网投稿开始时读取，当前尚未冻结到测试启动快照或离线重试队列。用户改选后重试可能使用新选择，这不是原版测试标签快照等价。客户端要求准确的 `v1/typebar/accountTags=available` 能力；已选 ID 遇到旧服务会在 POST 前拒绝，临时网络失败仍可重试，不静默降级为文字标签。
+选择在测试完成时捕获并存入成绩，保存／离线投稿重试读取原快照，不读取新选择；原版也是完成时而不是启动时捕获。已知空和旧未知分开，带作用域的空数组不可跨账户认领，规则见 RESULT_ACCOUNT_TAG_SNAPSHOT_CONTRACT.md。客户端要求准确的 `v1/typebar/accountTags=available` 能力；已选 ID 遇到旧服务会在 POST 前拒绝，临时网络失败仍可重试，不静默降级为文字标签。
 
 ## 独立 PB 与持久化
 
@@ -36,13 +36,13 @@ Typebar 自建服务以账户目录中的 UUID 标识标签，原生账户设置
 
 部署仍要求单 writer：停旧服务、保留完整备份、升级后冷加载，再开放写入。不能让旧二进制忽略新字段后写同一文件；它可能剥离全部新字段，标记无法保证发现这种降级。回退使用升级前完整备份，不剥离字段伪造兼容。
 
-本次不改变五实体 SwiftData、31 列成绩模型、原生归档 28 或设置 4。账户目录／标签 PB 不进入本机归档，不能用本机文件或云归档恢复它们；CSV 是关联 ID 导出而不是目录备份。
+目录增量当时不改变五实体 SwiftData、31 列、归档 28／设置 4；后续完成快照新增第 32 列及归档 29，五实体／设置 4 不变。归档只运输每条成绩的完成身份，不运输目录、服务标签 PB 或当前勾选。账户目录／标签 PB 不进入本机归档，不能用本机文件或云归档恢复它们；CSV 是关联 ID 导出而不是目录备份。
 
 ## 验证与剩余工作
 
 先行 HTTP 测试在未实现时有五个失败断言；独立实现后目录身份、上限、所有者隔离、改名、PB 生命周期、严格同速、分组、冷加载、保存回滚、旧文件、HTTP ID 往返和只读密钥护栏由服务测试覆盖。原生测试覆盖名称、能力、暂时失败、选择作用域、严格 DTO、历史 ID 和 CSV；原生表单只经编译与代码审查，窗口与 VoiceOver 仍待验收。
 
-完整源码标签生命周期动态对照、测试启动／离线队列冻结、原生标签 Pace／测试区消费者、前端缓存历史 PB 重建、原版目录和历史迁移、目录备份／跨设备选择以及正式设备验收仍开放。`MET-43`、`ACC-11`、`SYN-01` 保持部分兼容，整体重写 goal active。
+完成捕获、失败重试和未登录认领已由四个完整有界源码函数对照；完整标签生命周期动态对照、原生标签 Pace／测试区消费者、前端缓存历史 PB 重建、原版目录和历史迁移、目录备份／跨设备选择以及正式设备验收仍开放。`MET-43`、`ACC-11`、`SYN-01` 保持部分兼容，整体重写 goal active。
 
 第一轮完整门禁的原生 3065 项有一项失败（700.964 秒），十万词通过（150.263 秒），该轮未继续服务及打包。混合词池来源夹具误用了去标点的 `typingOfTheDeadWords`，实际输入来自原创 `typingOfTheDeadSections`，因此合法 `breathing!` 被误判。新增确定性生成断言通过，同时来源断言稳定失败；将夹具换为实际短句目录后，相关 34 项通过（0.774 秒）。仍保留未知词拒绝与会话完成断言，生产生成代码未改，不将第一轮失败记录为成功。
 
