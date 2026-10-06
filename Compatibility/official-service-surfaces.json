@@ -72,6 +72,8 @@
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
     ],
     "leaderboards": [
+      "Sources/Typebar/LeaderboardMinimumSpeed.swift",
+      "server/Tests/TypebarServerCoreTests/LeaderboardMinimumSpeedTests.swift",
       "Sources/Typebar/ResultMode2.swift",
       "server/Sources/TypebarServerCore/ResultMode2.swift",
       "server/Tests/TypebarServerCoreTests/ResultMode2Tests.swift",

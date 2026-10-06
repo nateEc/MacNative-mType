@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-06 新增 [日榜榜尾速度合同](DAILY_LEADERBOARD_MINIMUM_SPEED_CONTRACT.md)：公开和好友 day／yesterday 缓存列表返回可选 minWpm，来自完整所选人口而非当前页，空缓存为 0；历史回退、all／week 不造字段。旧客户端可忽略，旧服务缺失在新客户端仍未知；显式坏值拒绝。它不是投稿门槛，不新增能力请求、持久化字段、归档版本或部署要求。
+
 2026-10-06 新增 [模式分区与引语身份合同](RESULT_MODE2_CONTRACT.md)：resultMode2=available 协商可选投稿／历史身份；列表新增 mode2FilterSupported，mode2 查询与名次记忆贯通 quote／custom／zen 日榜。引语使用自有命名空间，不兼容原数字内容目录；缺失保持未知、显式损坏拒绝，不上传提示或回放。归档 27／设置 4、无新 SwiftData 列；默认仍仅 time／words 且无奖励规则。单 writer、完整备份、禁止旧 writer 混写，整体服务仍 partial。
 
 当前新增 [日榜任务与交付合同](DAILY_LEADERBOARD_SETTLEMENT_CONTRACT.md)：TYPEBAR_DAILY_LEADERBOARD_CONFIGURATION 新增奖励规则、公告人数和 XP 档位，匹配的新 time／words 投稿安排持久任务；唯一生命周期使用结算配置，邮件及原生公告与完成状态同次提交。新增受部署者密钥保护的只读 daily-rewards 状态，领取沿用 inbox；旧来源不补发、单 writer、禁止旧 writer 混写。原版 Discord 公告渠道和完整协议仍未实现，不冒报整体兼容；旧历史日榜说明是旧构造入口行为。

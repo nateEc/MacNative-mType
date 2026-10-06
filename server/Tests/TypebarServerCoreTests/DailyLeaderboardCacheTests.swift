@@ -268,9 +268,14 @@ final class DailyLeaderboardCacheTests: XCTestCase {
     struct Fixture: Decodable { let label:String; let key:Int; let operations:[Operation] }
     struct Mode2: Decodable { let mode:String; let duration:Int?; let words:Int?; let sourceMode2:String; let nativeMode2:String? }
     struct Partition: Decodable { let mode:String; let nativeMode2:String; let rank:Int?; let total:Int }
+    struct Minimum: Decodable {
+      let page:Int; let pageSize:Int; let userIds:[UUID]?; let purgedIds:[UUID]
+      let minWpm:Double; let count:Int; let entryIds:[UUID]
+    }
     struct Document: Decodable {
       let referenceCommit:String; let redisVersion:String; let scoreFixtures:[Score]; let ruleFixtures:[Rule]; let fixtures:[Fixture]
       let mode2Fixtures:[Mode2]; let partitionFixtures:[Partition]
+      let minimumFixtures:[Minimum]
     }
     let document = try JSONDecoder().decode(Document.self,from:bytes)
     XCTAssertEqual(document.referenceCommit,"91bd24bb8513785c7364cbea29296ff7adafac41")
@@ -297,6 +302,24 @@ final class DailyLeaderboardCacheTests: XCTestCase {
       XCTAssertEqual(partitionCache.buckets.first { $0.mode == fixture.mode && $0.mode2 == fixture.nativeMode2 }?.entries.count,fixture.total)
     }
     XCTAssertEqual(partitionCache.buckets.count,6)
+    XCTAssertEqual(document.minimumFixtures.count,9)
+    let members = (10...12).map { UUID(uuidString:String(format:"00000000-0000-0000-0000-%012X",$0))! }
+    for fixture in document.minimumFixtures {
+      var cache = DailyLeaderboardCache()
+      for (index, speed) in [80,60,40].enumerated() {
+        let entry = DailyLeaderboardCache.Entry(userID:members[index],resultID:UUID(),displayName:"Owned minimum",
+          language:"english",mode:"words",mode2:"25",wpm:speed,accuracy:100,preciseAccuracy:nil,
+          consistency:0,finishedAt:partitionDate,profileSnapshot:.init(version:1,selectedBadge:nil,discordAvatar:nil))
+        _ = try cache.add(entry,configuration:partitionConfiguration,now:partitionDate)
+      }
+      for id in fixture.purgedIds { cache.purge(userID:id) }
+      let population = DailyLeaderboardCache.ordered(cache.buckets.flatMap(\.entries)).filter {
+        fixture.userIds == nil || fixture.userIds!.contains($0.userID)
+      }
+      XCTAssertEqual(population.map { Double($0.wpm) }.min() ?? 0,fixture.minWpm)
+      XCTAssertEqual(population.count,fixture.count)
+      XCTAssertEqual(Array(population.dropFirst(fixture.page*fixture.pageSize).prefix(fixture.pageSize)).map(\.userID),fixture.entryIds)
+    }
     for fixture in document.scoreFixtures {
       XCTAssertEqual(DailyLeaderboardCache.Entry.score(wpm:fixture.wpm,accuracy:fixture.acc,timestamp:fixture.timestamp),fixture.score)
     }

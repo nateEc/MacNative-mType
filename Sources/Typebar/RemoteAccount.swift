@@ -1168,6 +1168,8 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
 }
 
 struct RemoteLeaderboardPage: Codable, Sendable {
+    /// Missing means an older service did not report the daily population tail.
+    let minWpm: Double?
     let mode2FilterSupported: Bool?
     let entries: [RemoteLeaderboardEntry]
     /// Nil means an older self-hosted server returned the historical
@@ -1182,11 +1184,16 @@ struct RemoteLeaderboardPage: Codable, Sendable {
     let rankMemorySupported: Bool?
 
     private enum CodingKeys: String, CodingKey {
-        case entries, total, offset, pageSize, parameterFilterSupported, rankMemorySupported, mode2FilterSupported
+        case entries, total, offset, pageSize, parameterFilterSupported, rankMemorySupported, mode2FilterSupported, minWpm
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        minWpm = values.contains(.minWpm) ? try values.decode(Double.self, forKey: .minWpm) : nil
+        if let minWpm, !minWpm.isFinite || minWpm < 0 {
+            throw DecodingError.dataCorruptedError(forKey: .minWpm, in: values,
+                debugDescription: "Daily minimum speed must be finite and nonnegative")
+        }
         entries = try values.decode([RemoteLeaderboardEntry].self, forKey: .entries)
         total = try values.decodeIfPresent(Int.self, forKey: .total)
         offset = max(0, try values.decodeIfPresent(Int.self, forKey: .offset) ?? 0)

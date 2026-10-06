@@ -415,6 +415,7 @@ public struct LeaderboardEntry: Content, Equatable, Identifiable {
 }
 
 public struct LeaderboardResponse: Content, Equatable {
+    public let minWpm: Double?
     public let mode2FilterSupported: Bool
     public let entries: [LeaderboardEntry]
     public let total: Int
@@ -429,7 +430,7 @@ public struct LeaderboardResponse: Content, Equatable {
 
     public init(
         entries: [LeaderboardEntry], total: Int, offset: Int, pageSize: Int,
-        parameterFilterSupported: Bool = true, rankMemorySupported: Bool = true
+        parameterFilterSupported: Bool = true, rankMemorySupported: Bool = true, minWpm: Double? = nil
     ) {
         self.entries = entries
         self.total = total
@@ -438,6 +439,7 @@ public struct LeaderboardResponse: Content, Equatable {
         self.parameterFilterSupported = parameterFilterSupported
         self.rankMemorySupported = rankMemorySupported
         self.mode2FilterSupported = true
+        self.minWpm = minWpm
     }
 }
 

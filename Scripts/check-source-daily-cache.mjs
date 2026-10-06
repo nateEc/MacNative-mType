@@ -203,9 +203,35 @@ try {
   }
   assert.equal(new Set(partitionFixtures.map(f => f.mode+'/'+f.sourceMode2)).size,6);
   assert.ok(partitionFixtures.every(f => f.total === 1));
+  cli('FLUSHDB'); clockMilliseconds = Date.UTC(2030,9,7,12);
+  const minimumBoard = daily.namespace.getDailyLeaderboard('english','words','25',configuration);
+  for (const [index,wpm] of [80,60,40].entries()) {
+    await minimumBoard.addResult({uid:ids[index],name:'Owned minimum '+index,wpm,raw:wpm,
+      acc:100,consistency:0,timestamp:clockMilliseconds},configuration);
+  }
+  const minimumFixtures = [];
+  const captureMinimum = async (page,pageSize,userIds=null,purgedIds=[]) => {
+    const result = await minimumBoard.getResults(page,pageSize,configuration,false,userIds ?? undefined);
+    minimumFixtures.push({page,pageSize,userIds,purgedIds,minWpm:result.minWpm,count:result.count,
+      entryIds:Array.from(result.entries,entry => entry.uid)});
+  };
+  await captureMinimum(0,1); await captureMinimum(1,1); await captureMinimum(9,1);
+  await captureMinimum(0,1,[ids[0],ids[1]]); await captureMinimum(0,1,[ids[0]]);
+  await captureMinimum(0,1,['00000000-0000-0000-0000-00000000000D']); await captureMinimum(0,1,[]);
+  await daily.namespace.purgeUserFromDailyLeaderboards(ids[2],configuration);
+  await captureMinimum(0,1,null,[ids[2]]);
+  for (const id of ids.slice(0,2)) await daily.namespace.purgeUserFromDailyLeaderboards(id,configuration);
+  await captureMinimum(0,1,null,ids);
+  assert.deepEqual(minimumFixtures.map(f => f.minWpm),[40,40,40,60,80,0,0,60,0]);
+  cli('FLUSHDB');
+  await minimumBoard.addResult({uid:ids[0],name:'Owned fractional tail',wpm:59.995,raw:59.995,
+    acc:100,consistency:0,timestamp:clockMilliseconds},configuration);
+  const fractionalMinimum = await minimumBoard.getResults(0,1,configuration,false);
+  assert.equal(fractionalMinimum.minWpm,60,'Source unpacks rounded score, not the unrounded entry WPM');
+  assert.equal(fractionalMinimum.entries[0].wpm,59.995);
   verify();
-  process.stdout.write(emit ? JSON.stringify({referenceCommit:pin,redisVersion,scoreFixtures,ruleFixtures,fixtures,mode2Fixtures,partitionFixtures})
-    : `Daily cache source passed (${scoreFixtures.length} packed scores, ${ruleFixtures.length} patterns, ${fixtures.reduce((sum,f)=>sum+f.operations.length,0)} lifecycle operations, ${mode2Fixtures.length} getMode2 fixtures, ${partitionFixtures.length} writes across 6 source partitions; complete service, QA schema/queue adapters; no GUI)\n`);
+  process.stdout.write(emit ? JSON.stringify({referenceCommit:pin,redisVersion,scoreFixtures,ruleFixtures,fixtures,mode2Fixtures,partitionFixtures,minimumFixtures})
+    : `Daily cache source passed (${scoreFixtures.length} packed scores, ${ruleFixtures.length} patterns, ${fixtures.reduce((sum,f)=>sum+f.operations.length,0)} lifecycle operations, ${mode2Fixtures.length} getMode2 fixtures, ${partitionFixtures.length} writes across 6 source partitions, ${minimumFixtures.length} minimum reads and one fractional packed tail; complete service, QA schema/queue adapters; no GUI)\n`);
 } finally {
   if (server.pid && !spawnError && server.exitCode === null && server.signalCode === null) {
     try { cli('SHUTDOWN','NOSAVE'); } catch { server.kill('SIGTERM'); }

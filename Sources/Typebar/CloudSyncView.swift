@@ -234,9 +234,15 @@ struct CloudSyncView: View {
                         } else if let leaderboardEligibility, !leaderboardEligibility.isEligible {
                             LeaderboardEligibilityLabel(eligibility: leaderboardEligibility)
                         } else if loadedLeaderboardRank {
-                            Text("当前筛选没有你的有效成绩。")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("当前筛选没有你的有效成绩。")
+                                if let minimumSpeed = LeaderboardMinimumSpeedPresentation.message(
+                                    minWpm: leaderboardPage?.minWpm, period: leaderboardPeriod,
+                                    scope: leaderboardScope, unit: settings.typingSpeedUnit) {
+                                    Text(minimumSpeed).monospacedDigit()
+                                }
+                            }
+                            .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     if let leaderboardPage {

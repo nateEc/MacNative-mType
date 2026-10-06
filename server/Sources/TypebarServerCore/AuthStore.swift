@@ -4052,7 +4052,7 @@ public actor AuthStore {
     return .init(
       entries: Array(entries.dropFirst(pagination.offset).prefix(pagination.pageSize)),
       total: entries.count, offset: pagination.offset, pageSize: pagination.pageSize,
-      parameterFilterSupported: true)
+      parameterFilterSupported: true, minWpm: dailyLeaderboardMinimumSpeed(entries, query: query))
   }
 
   public func leaderboardRank(
@@ -4078,7 +4078,7 @@ public actor AuthStore {
     return .init(
       entries: Array(entries.dropFirst(pagination.offset).prefix(pagination.pageSize)),
       total: entries.count, offset: pagination.offset, pageSize: pagination.pageSize,
-      parameterFilterSupported: true)
+      parameterFilterSupported: true, minWpm: dailyLeaderboardMinimumSpeed(entries, query: query))
   }
 
   public func friendLeaderboardRank(
@@ -4149,6 +4149,13 @@ public actor AuthStore {
       if connection.requesterID == userID { ids.insert(connection.recipientID) }
       if connection.recipientID == userID { ids.insert(connection.requesterID) }
     }
+  }
+
+  /// The complete selected population, before page slicing. Historical daily
+  /// fallback has no authoritative cache tail and must not fabricate one.
+  private func dailyLeaderboardMinimumSpeed(_ entries: [LeaderboardEntry], query: LeaderboardQuery) -> Double? {
+    guard dailyLeaderboardConfiguration != nil, ["day", "yesterday"].contains(query.period ?? "all") else { return nil }
+    return entries.lazy.map { Double($0.wpm) }.min() ?? 0
   }
 
   private enum ExperienceLeaderboardPeriod: String {
