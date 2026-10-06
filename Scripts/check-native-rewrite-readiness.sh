@@ -220,6 +220,9 @@ run_logged_check "executing pinned initial tag crowns, client PB writes and char
 run_logged_check "executing pinned stable-ID result queries, directory transitions and current-settings tags" \
   "$temporary_directory/account-tag-filter-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-tag-filter.mjs" "$reference_root"
+run_logged_check "executing pinned filtered account all/recent-ten/daily statistics" \
+  "$temporary_directory/account-history-stats-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-history-stats.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

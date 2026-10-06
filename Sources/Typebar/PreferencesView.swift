@@ -50,6 +50,7 @@ struct PreferencesView: View {
   @State private var showingAccountDeletionConfirmation = false
   @State private var showingAccountResetConfirmation = false
   @State private var showingRemoteResultsDeletionConfirmation = false
+  @State private var showingAccountHistory = false
   @State private var showingRemotePersonalBestResetConfirmation = false
   @State private var showingSessionRevocationConfirmation = false
   @State private var showingRestoreDefaultsConfirmation = false
@@ -1368,6 +1369,10 @@ struct PreferencesView: View {
               HStack {
                 Text("服务端近期成绩").font(.headline)
                 Spacer()
+                Button("筛选与统计…") { showingAccountHistory = true }
+                  .sheet(isPresented: $showingAccountHistory) {
+                    AccountHistoryView(settings: settings, account: account)
+                  }
                 Button("导出全部 CSV…") { exportRemoteResultsCSV() }
                   .disabled(account.isWorking)
                 Button("刷新") { Task { await account.refreshRemoteResults() } }

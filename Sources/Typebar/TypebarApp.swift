@@ -7482,6 +7482,7 @@ private struct ResultPerformanceChart: View {
 private struct ResultsHistoryView: View {
   let settings: AppSettings
   let currentConfiguration: TestConfiguration
+  @State private var showingAccountHistory = false
   let account: AccountSession
   fileprivate enum ActivityChartMeasure: String, CaseIterable, Identifiable {
     case completedTests
@@ -7892,6 +7893,9 @@ private struct ResultsHistoryView: View {
           Button("个人最佳表…") { showingPersonalBestTable = true }
         }
         ToolbarItem(placement: .primaryAction) {
+          Button("账户历史…") { showingAccountHistory = true }
+        }
+        ToolbarItem(placement: .primaryAction) {
           Button("导出 CSV…", action: exportFilteredResultsCSV)
             .disabled(filteredResults.isEmpty)
         }
@@ -7907,6 +7911,9 @@ private struct ResultsHistoryView: View {
     .sheet(isPresented: $showingPersonalBestTable) {
       LocalPersonalBestTableView(
         speedUnit: settings.typingSpeedUnit, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces)
+    }
+    .sheet(isPresented: $showingAccountHistory) {
+      AccountHistoryView(settings: settings, account: account, currentConfiguration: currentConfiguration)
     }
     .onChange(of: activeFilter) {
       visibleResultLimit = ResultHistoryPagePolicy.pageSize

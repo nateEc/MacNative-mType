@@ -3,6 +3,7 @@ import SwiftUI
 struct AccountTagHistoryFilterControls: View {
   let account: AccountSession
   @Binding var filter: ResultHistoryAccountTagFilter?
+  var usesCompletionSnapshots = true
 
   private var canSelect: Bool {
     account.hasAccountTagDirectory && (filter == nil || filter?.scope == account.resultPublicationScope)
@@ -32,7 +33,9 @@ struct AccountTagHistoryFilterControls: View {
         }
       }
       if filter != nil {
-        Text("按当前账户的已确认关联筛选；尚未载入的记录使用同账户完成快照。本机文字标签独立筛选。")
+        Text(usesCompletionSnapshots
+          ? "按当前账户的已确认关联筛选；尚未载入的记录使用同账户完成快照。本机文字标签独立筛选。"
+          : "只筛选当前账户已载入的服务端关联，不读取本机完成快照。文字标签独立筛选。")
           .font(.caption).foregroundStyle(.secondary)
       }
     }

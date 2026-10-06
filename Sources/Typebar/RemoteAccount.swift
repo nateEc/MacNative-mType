@@ -2032,6 +2032,13 @@ final class AccountSession {
     var isAccountTagHistoryReady: Bool {
         accountTagHistoryCache?.scope == resultPublicationScope && accountTagHistoryCache?.isComplete == true
     }
+    /// All loaded account rows, never the 20-row settings projection or local history.
+    /// A legacy service without a tag directory has only the explicitly labelled recent subset.
+    var accountHistoryLoadedResults: [RemoteAccountResult] {
+        guard let scope = resultPublicationScope else { return [] }
+        if let cache = accountTagHistoryCache, cache.scope == scope { return cache.results }
+        return remoteResults
+    }
     var accountTagHistoryPersonalBests: [AccountTagHistoryPersonalBest] {
         guard let scope = resultPublicationScope, hasAccountTagDirectory else { return [] }
         let history = accountTagHistoryCache?.scope == scope ? accountTagHistoryCache?.personalBests ?? [] : []
