@@ -118,6 +118,12 @@ struct AccountTagHistoryCache {
     }
   }
 
+  /// Text labels do not change stable tag associations or rebuild their PBs.
+  mutating func updateTextTags(id: UUID, tags: [String]) {
+    guard let index = results.firstIndex(where: { $0.id == id }) else { return }
+    results[index].tags = tags
+  }
+
   mutating func replaceResults(_ rows: [RemoteAccountResult], knownIDs: Set<UUID>) throws {
     results = try Self(scope: scope, results: rows, knownIDs: knownIDs, directory: acceptedDirectory).results
     isComplete = true

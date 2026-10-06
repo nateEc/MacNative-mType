@@ -2914,14 +2914,14 @@ private struct RemoteAccountResultRow: View {
               Button {
                 Task {
                   await account.updateRemoteResultTags(
-                    id: result.id, tags: result.tags.filter { $0 != tag })
+                    id: result.id, tags: result.tags.filter { $0 != tag }, expectedTextTags: result.tags)
                 }
               } label: {
                 Label(tag, systemImage: "xmark")
                   .font(.caption)
               }
               .buttonStyle(.bordered)
-              .disabled(account.isWorking)
+              .disabled(account.isWorking || account.isEditingAccountTags)
             }
           }
         }
@@ -2932,7 +2932,7 @@ private struct RemoteAccountResultRow: View {
           .onSubmit(addTag)
         Button("添加", action: addTag)
           .disabled(
-            account.isWorking || newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            account.isWorking || account.isEditingAccountTags || newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
               || result.tags.count >= ResultTagPolicy.maximumCount)
       }
       Text("最多 \(ResultTagPolicy.maximumCount) 个标签，每个不超过 \(ResultTagPolicy.maximumLength) 个字符。")
@@ -2946,9 +2946,10 @@ private struct RemoteAccountResultRow: View {
   private func addTag() {
     let tags = ResultTagPolicy.appending(newTag, to: result.tags)
     guard tags != result.tags else { return }
+    let submittedText = newTag
     Task {
-      await account.updateRemoteResultTags(id: result.id, tags: tags)
-      newTag = ""
+      let saved = await account.updateRemoteResultTags(id: result.id, tags: tags, expectedTextTags: result.tags)
+      if saved, newTag == submittedText { newTag = "" }
     }
   }
 }

@@ -246,6 +246,62 @@ final class AccountTagIdentityTests: XCTestCase {
       try await app.asyncShutdown()
     } catch { try? await app.asyncShutdown(); throw error }
   }
+  func testHTTPTextAndStableTagEditsPreserveScoresPBsAndAcceptanceXP() async throws {
+    let stamp = Date(), speed = 60.49, units = 76
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
+    let owner = try await store.register(.init(email: "cross-tags@example.invalid", password: "a secure password", displayName: "Cross"), now: stamp)
+    let first = try await store.createAccountTag(.init(name: "first"), accessToken: owner.accessToken, now: stamp)
+    let second = try await store.createAccountTag(.init(name: "second"), accessToken: owner.accessToken, now: stamp)
+    let input = ResultSubmissionRequest(id: UUID(), mode: "time", language: "english",
+      durationSeconds: 15, wordLimit: nil, wpm: 60, rawWpm: 60, accuracy: 100,
+      consistency: 80, errorCount: 0, eventCount: units,
+      personalBestConfiguration: .init(difficulty: "normal", punctuation: false, numbers: false, lazyMode: false),
+      speedPrecision: .init(wpm: speed, rawWpm: speed), accountTagIDs: [first.id],
+      startedAt: stamp.addingTimeInterval(-Double(units) * 12 / speed), finishedAt: stamp)
+    let receipt = try await store.submitResult(input, accessToken: owner.accessToken, now: stamp)
+    let baseline = try await store.result(id: input.id, credential: .accessToken(owner.accessToken), now: stamp)
+    let before = try await store.accountTags(accessToken: owner.accessToken, now: stamp)
+    func immutableBytes(_ row: AccountResultResponse) throws -> Data {
+      var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: Any])
+      object.removeValue(forKey: "tags")
+      return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+    let expected = try immutableBytes(baseline), app = try await Application.make(.testing)
+    do {
+      try configure(app, authStore: store)
+      try await app.test(.PATCH, "v1/results/\(input.id)/tags", beforeRequest: { request async throws in
+        request.headers.add(name: "Authorization", value: "Bearer \(owner.accessToken)")
+        try request.content.encode(UpdateResultTagsRequest(tags: [" café ","中文"]))
+      }, afterResponse: { response async throws in
+        XCTAssertEqual(response.status, .ok)
+        let row = try response.content.decode(AccountResultResponse.self)
+        XCTAssertEqual(row.tags,["café","中文"]); XCTAssertEqual(try immutableBytes(row),expected)
+      })
+      let unchanged = try await store.accountTags(accessToken: owner.accessToken)
+      XCTAssertEqual(unchanged.version,before.version); XCTAssertEqual(unchanged.tags,before.tags)
+      try await app.test(.PATCH, "v1/results/\(input.id)/account-tags", beforeRequest: { request async throws in
+        request.headers.add(name: "Authorization", value: "Bearer \(owner.accessToken)")
+        try request.content.encode(AccountResultTagIDsRequest(tagIDs: [first.id,second.id]))
+      }, afterResponse: { response async throws in
+        XCTAssertEqual(response.status,.ok)
+        let edited = try response.content.decode(AccountResultTagEditResponse.self)
+        XCTAssertEqual(edited.result.tags,["café","中文"]); XCTAssertEqual(edited.accountTagIDs,[first.id,second.id])
+        XCTAssertEqual(edited.tagPbs,[second.id]); XCTAssertEqual(edited.result.effectiveWpm,speed)
+      })
+      try await app.test(.PATCH, "v1/results/\(input.id)/tags", beforeRequest: { request async throws in
+        request.headers.add(name: "Authorization", value: "Bearer \(owner.accessToken)")
+        try request.content.encode(UpdateResultTagsRequest(tags: ["café","CAFE"]))
+      }, afterResponse: { response async in XCTAssertEqual(response.status,.badRequest) })
+      let current = try await store.result(id: input.id, credential: .accessToken(owner.accessToken))
+      XCTAssertEqual(current.tags,["café","中文"]); XCTAssertEqual(current.accountTagIDs,[first.id,second.id])
+      let repeated = try await store.submitResult(input, accessToken: owner.accessToken)
+      XCTAssertEqual(repeated.experienceGained,receipt.experienceGained); XCTAssertEqual(repeated.totalExperience,receipt.totalExperience)
+      let after = try await store.accountTags(accessToken: owner.accessToken)
+      XCTAssertEqual(after.tags.first { $0.id == first.id }?.personalBests, before.tags.first { $0.id == first.id }?.personalBests)
+      XCTAssertEqual(after.tags.first { $0.id == second.id }?.personalBests.first?.preciseWpm,speed)
+      try await app.asyncShutdown()
+    } catch { try? await app.asyncShutdown(); throw error }
+  }
   func testHTTPAdvertisesAndAuthenticatesStableDirectory() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let owner = try await store.register(.init(email: "tags@example.com", password: "a secure password", displayName: "Tags"))

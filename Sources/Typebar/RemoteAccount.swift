@@ -386,7 +386,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let keyConsistency: Double?
     let errorCount: Int
     let eventCount: Int
-    let tags: [String]
+    var tags: [String]
     /// Optional effective-time metadata added by newer self-hosted servers.
     /// Older services omit it, so historical exports preserve their original
     /// wall-clock semantics instead of inventing an AFK estimate.
@@ -3180,27 +3180,78 @@ final class AccountSession {
         }
     }
 
-    func updateRemoteResultTags(id: UUID, tags: [String]) async {
+    func beginResultTextTagEdit(id: UUID) throws -> ResultTextTagEditRead {
+        try Task.checkCancellation()
+        guard !isEditingAccountTags, let scope = resultPublicationScope else { throw RemoteAccountError.accountScopeChanged }
+        let previous: RemoteAccountResult?
+        if isAccountTagHistoryReady { previous = accountTagHistoryCache?.results.first { $0.id == id } }
+        else if lastAccountResultScope == scope, lastAccountResult?.id == id { previous = lastAccountResult }
+        else { previous = remoteResults.first { $0.id == id } }
+        guard let previous else { throw RemoteAccountError.unexpectedResponse }
+        let nonce = UUID()
+        accountTagHistoryEditNonce = nonce; accountTagHistoryGeneration &+= 1
+        return .init(scope: scope, revision: accountTagRevision, lastGeneration: lastAccountResultGeneration,
+            nonce: nonce, previous: previous)
+    }
+
+    func finishResultTextTagEdit(_ read: ResultTextTagEditRead) {
+        if accountTagHistoryEditNonce == read.nonce { accountTagHistoryEditNonce = nil }
+    }
+
+    func applyConfirmedResultTextTagEdit(_ result: RemoteAccountResult, requestedTags: [String],
+        read: ResultTextTagEditRead) throws {
+        guard !Task.isCancelled, resultPublicationScope == read.scope, accountTagRevision == read.revision,
+            accountTagHistoryEditNonce == read.nonce, lastAccountResultGeneration == read.lastGeneration
+        else { throw RemoteAccountError.accountScopeChanged }
+        let normalized = try RemoteResultTextTagEditPolicy.confirmedMetadata(result, previous: read.previous,
+            requestedTags: requestedTags, knownIDs: hasAccountTagDirectory ? Set(accountTags.map(\.id)) : nil)
+        if accountTagHistoryCache?.scope == read.scope {
+            accountTagHistoryCache?.updateTextTags(id: normalized.id, tags: normalized.tags)
+            remoteResults = accountTagHistoryCache?.recentResults(limit: accountTagHistoryDisplayLimit) ?? []
+        } else if let index = remoteResults.firstIndex(where: { $0.id == normalized.id }) {
+            remoteResults[index] = normalized
+        }
+        if lastAccountResultScope == read.scope, var last = lastAccountResult, last.id == normalized.id {
+            last.tags = normalized.tags; lastAccountResult = last
+        }
+        accountTagHistoryGeneration &+= 1
+        accountTagRevision &+= 1
+    }
+
+    func editRemoteResultTextTags(id: UUID, tags: [String], expectedTextTags: [String]? = nil,
+        request: @MainActor (ResultTextTagEditRead, [String]) async throws -> RemoteAccountResult) async throws {
+        let canonicalTags = try RemoteResultTextTagEditPolicy.requestedTags(tags)
+        let read = try beginResultTextTagEdit(id: id)
+        defer { finishResultTextTagEdit(read) }
+        guard expectedTextTags == nil || expectedTextTags == read.previous.tags else { throw RemoteAccountError.accountScopeChanged }
+        let result = try await request(read, canonicalTags)
+        do { try applyConfirmedResultTextTagEdit(result, requestedTags: canonicalTags, read: read) }
+        catch {
+            throw RemoteAccountError.serverMessage("服务端已保存文字标签，但本机状态未能确认，请刷新对应账户历史：" + error.localizedDescription)
+        }
+    }
+
+    @discardableResult
+    func updateRemoteResultTags(id: UUID, tags: [String], expectedTextTags: [String]? = nil) async -> Bool {
+        guard !isWorking, !isEditingAccountTags else { return false }
         guard let token = tokenStore.load(), currentUser != nil else {
             statusMessage = "请先登录自建 Typebar 服务。"
-            return
+            return false
         }
+        let requestEndpoint = endpoint, requestScope = resultPublicationScope, revision = accountTagRevision
         isWorking = true
         defer { isWorking = false }
         do {
-            let result = try await RemoteAccountAPI(endpoint: endpoint).request(
-                path: "v1/results/\(id.uuidString)/tags",
-                method: "PATCH",
-                token: token,
-                body: RemoteUpdateResultTagsRequest(tags: tags),
-                response: RemoteAccountResult.self
-            )
-            if let index = remoteResults.firstIndex(where: { $0.id == id }) {
-                remoteResults[index] = result
+            try await editRemoteResultTextTags(id: id, tags: tags, expectedTextTags: expectedTextTags) { _, canonicalTags in
+                try await RemoteAccountAPI(endpoint: requestEndpoint).request(
+                    path: "v1/results/\(id.uuidString)/tags", method: "PATCH", token: token,
+                    body: RemoteUpdateResultTagsRequest(tags: canonicalTags), response: RemoteAccountResult.self)
             }
             statusMessage = "服务端成绩标签已更新。"
+            return true
         } catch {
-            statusMessage = error.localizedDescription
+            if resultPublicationScope == requestScope, accountTagRevision == revision { statusMessage = error.localizedDescription }
+            return false
         }
     }
 
