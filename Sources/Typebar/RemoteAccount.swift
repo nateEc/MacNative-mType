@@ -2020,13 +2020,21 @@ final class AccountSession {
     private var accountTagHistoryGeneration: UInt64 = 0
     private var accountTagHistoryDisplayLimit = 20
     private var accountTagHistoryEditNonce: UUID?
+    private(set) var lastAccountResult: RemoteAccountResult?
+    private(set) var lastAccountResultEditAwardIDs: [UUID] = []
+    private var lastAccountResultScope: ResultPublicationScope?
+    private var lastAccountResultGeneration: UInt64 = 0
+    private var pendingLastAccountResult: (id: UUID, finishedAt: Date)?
+    private var lastAccountResultAwards: AccountTagLastResultAwards?
     var isEditingAccountTags: Bool { accountTagHistoryEditNonce != nil }
     var isAccountTagHistoryReady: Bool {
         accountTagHistoryCache?.scope == resultPublicationScope && accountTagHistoryCache?.isComplete == true
     }
     var accountTagHistoryPersonalBests: [AccountTagHistoryPersonalBest] {
-        guard let scope = resultPublicationScope, accountTagHistoryCache?.scope == scope else { return [] }
-        return accountTagHistoryCache?.personalBests ?? []
+        guard let scope = resultPublicationScope, hasAccountTagDirectory else { return [] }
+        let history = accountTagHistoryCache?.scope == scope ? accountTagHistoryCache?.personalBests ?? [] : []
+        let awards = lastAccountResultAwards?.scope == scope ? lastAccountResultAwards?.personalBests ?? [] : []
+        return history + awards.filter { award in !history.contains { $0.tagID == award.tagID && $0.group == award.group } }
     }
     private var cachedAccountTags: [RemoteAccountTag] = []
     private var cachedAccountTagsScope: ResultPublicationScope?
@@ -2714,12 +2722,81 @@ final class AccountSession {
         accountTagHistoryCache = cache
         accountTagHistoryDisplayLimit = nextDisplayLimit
         remoteResults = cache.recentResults(limit: accountTagHistoryDisplayLimit)
+        if lastAccountResult == nil, pendingLastAccountResult == nil,
+            let latest = cache.results.max(by: { $0.finishedAt < $1.finishedAt }) {
+            lastAccountResult = latest; lastAccountResultScope = read.scope
+            lastAccountResultGeneration &+= 1
+        }
         accountTagRevision &+= 1
     }
 
-    func invalidateAccountTagHistory() {
+    func invalidateAccountTagHistory(clearLastResult: Bool = true) {
         accountTagHistoryGeneration &+= 1
         accountTagHistoryCache = nil; remoteResults = []; accountTagHistoryEditNonce = nil
+        if clearLastResult {
+            lastAccountResult = nil; lastAccountResultScope = nil; pendingLastAccountResult = nil
+            lastAccountResultEditAwardIDs = []; lastAccountResultAwards = nil
+            lastAccountResultGeneration &+= 1
+        }
+        accountTagRevision &+= 1
+    }
+
+    func beginLastAccountResultRead(id: UUID, finishedAt: Date, scope: ResultPublicationScope) -> AccountTagLastResultRead? {
+        guard resultPublicationScope == scope,
+            (lastAccountResult?.finishedAt ?? .distantPast) <= finishedAt,
+            (pendingLastAccountResult?.finishedAt ?? .distantPast) <= finishedAt else { return nil }
+        lastAccountResultGeneration &+= 1
+        lastAccountResult = nil; lastAccountResultEditAwardIDs = []
+        lastAccountResultScope = scope; pendingLastAccountResult = (id, finishedAt)
+        return .init(scope: scope, generation: lastAccountResultGeneration, id: id)
+    }
+
+    func applyLastAccountResult(_ result: RemoteAccountResult, read: AccountTagLastResultRead) throws {
+        guard resultPublicationScope == read.scope, lastAccountResultScope == read.scope,
+            lastAccountResultGeneration == read.generation, pendingLastAccountResult?.id == read.id,
+            result.id == read.id, hasAccountTagDirectory else { throw RemoteAccountError.accountScopeChanged }
+        let normalized = try AccountTagHistoryCache(scope: read.scope, results: [result],
+            knownIDs: Set(accountTags.map(\.id))).results[0]
+        lastAccountResult = normalized; pendingLastAccountResult = nil
+        accountTagRevision &+= 1
+    }
+
+    func failLastAccountResultRead(_ read: AccountTagLastResultRead) {
+        guard resultPublicationScope == read.scope, lastAccountResultGeneration == read.generation else { return }
+        pendingLastAccountResult = nil
+    }
+
+    func editableAccountTagResult(id: UUID) -> RemoteAccountResult? {
+        guard let scope = resultPublicationScope, hasAccountTagDirectory else { return nil }
+        return try? RemoteAccountTagEditPolicy.editableResult(id: id,
+            history: accountTagHistoryCache?.scope == scope ? accountTagHistoryCache : nil,
+            lastResult: lastAccountResultScope == scope ? lastAccountResult : nil)
+    }
+
+    func applyAccountTagEditResponse(_ response: RemoteAccountTagEditResponse, requestedIDs: [UUID],
+        scope: ResultPublicationScope, at milliseconds: Int64) throws {
+        try RemoteAccountTagPolicy.validateIDs(requestedIDs)
+        guard resultPublicationScope == scope, hasAccountTagDirectory,
+            Set(requestedIDs).isSubset(of: Set(accountTags.map(\.id))),
+            let previous = editableAccountTagResult(id: response.result.id),
+            Set(response.result.accountTagIDs ?? []) == Set(requestedIDs) else { throw RemoteAccountError.unexpectedResponse }
+        var expected = previous; expected.accountTagIDs = response.result.accountTagIDs
+        guard expected == response.result else { throw RemoteAccountError.unexpectedResponse }
+        if isAccountTagHistoryReady {
+            try applyAccountTagHistoryEdit(response.result, scope: scope, at: milliseconds)
+        } else {
+            var awards = lastAccountResultAwards ?? .init(scope: scope, directory: accountTags)
+            try awards.save(response.tagPbs, from: previous, at: milliseconds)
+            lastAccountResultAwards = awards
+            if let group = AccountTagHistoryGroup(previous) {
+                accountTagHistoryCache?.discardPersonalBestOverrides(tagIDs: response.tagPbs, group: group)
+            }
+            // A delayed bulk read must not undo the confirmed last-result edit.
+            accountTagHistoryGeneration &+= 1
+        }
+        if lastAccountResultScope == scope, lastAccountResult?.id == response.result.id {
+            lastAccountResult = response.result; lastAccountResultEditAwardIDs = response.tagPbs
+        }
         accountTagRevision &+= 1
     }
 
@@ -2728,6 +2805,8 @@ final class AccountSession {
         else { throw RemoteAccountError.accountScopeChanged }
         remoteResults = []
         accountTagHistoryCache?.clearResults()
+        lastAccountResult = nil; pendingLastAccountResult = nil; lastAccountResultEditAwardIDs = []
+        lastAccountResultGeneration &+= 1
         accountTagHistoryGeneration &+= 1
         accountTagRevision &+= 1
     }
@@ -2742,6 +2821,9 @@ final class AccountSession {
         guard expected == result else { throw RemoteAccountError.unexpectedResponse }
         try cache.edit(id: result.id, tagIDs: ids, knownIDs: Set(accountTags.map(\.id)), at: milliseconds)
         accountTagHistoryCache = cache
+        var awards = lastAccountResultAwards ?? .init(scope: scope, directory: accountTags)
+        awards.replaceOverrides(cache.personalBests)
+        lastAccountResultAwards = awards
         remoteResults = cache.recentResults(limit: accountTagHistoryDisplayLimit)
         accountTagHistoryGeneration &+= 1
         accountTagRevision &+= 1
@@ -2946,6 +3028,13 @@ final class AccountSession {
         try selection.set(selection.ids(for: scope).filter { owned.contains($0) }, for: scope)
         cachedAccountTags = list.tags.sorted { $0.name == $1.name ? $0.id.uuidString < $1.id.uuidString : $0.name < $1.name }
         cachedAccountTagsScope = scope
+        if lastAccountResultAwards?.scope == scope { lastAccountResultAwards?.adoptDirectory(list.tags) }
+        else { lastAccountResultAwards = .init(scope: scope, directory: list.tags) }
+        if var last = lastAccountResult {
+            last.accountTagIDs = last.accountTagIDs?.filter { owned.contains($0) }
+            lastAccountResult = last
+        }
+        lastAccountResultEditAwardIDs.removeAll { !owned.contains($0) }
         if accountTagHistoryCache?.scope == scope {
             accountTagHistoryCache?.adoptDirectory(list.tags)
             remoteResults = accountTagHistoryCache?.recentResults(limit: accountTagHistoryDisplayLimit) ?? []
@@ -3023,6 +3112,9 @@ final class AccountSession {
 
     func applyConfirmedAccountTagDeletion(id: UUID, personalBestsOnly: Bool, scope: ResultPublicationScope) throws {
         guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        lastAccountResultAwards?.removeTag(id)
+        lastAccountResultEditAwardIDs.removeAll { $0 == id }
+        if !personalBestsOnly { lastAccountResult?.accountTagIDs?.removeAll { $0 == id } }
         if accountTagHistoryCache?.scope == scope {
             accountTagHistoryCache?.removeTag(id, clearOnly: personalBestsOnly)
             remoteResults = accountTagHistoryCache?.recentResults(limit: accountTagHistoryDisplayLimit) ?? []
@@ -3034,29 +3126,38 @@ final class AccountSession {
     func updateRemoteAccountResultTagIDs(id: UUID, tagIDs: [UUID]) async throws {
         try RemoteAccountTagPolicy.validateIDs(tagIDs)
         guard !isEditingAccountTags, let editScope = resultPublicationScope,
-            accountTagHistoryCache?.scope == editScope, isAccountTagHistoryReady,
-            accountTagHistoryCache?.results.contains(where: { $0.id == id }) == true else {
-            throw RemoteAccountError.serverMessage("请先加载完整账户历史，或等待当前标签更改完成。未发送更改请求。")
+            editableAccountTagResult(id: id) != nil else {
+            throw RemoteAccountError.serverMessage("请等待最后成绩或账户历史就绪，或等待当前标签更改完成。未发送更改请求。")
         }
+        let editsLastWithoutHistory = !isAccountTagHistoryReady
+        let lastGeneration = lastAccountResultGeneration
         let nonce = UUID()
         accountTagHistoryEditNonce = nonce
         accountTagHistoryGeneration &+= 1
         defer { if accountTagHistoryEditNonce == nonce { accountTagHistoryEditNonce = nil } }
         let (api, token, scope) = try await accountTagAPI(requiresEditPersonalBests: true)
         guard scope == editScope, accountTagHistoryEditNonce == nonce,
+            !editsLastWithoutHistory || lastAccountResultGeneration == lastGeneration,
+            isAccountTagHistoryReady == !editsLastWithoutHistory,
             hasAccountTagDirectory, Set(tagIDs).isSubset(of: Set(accountTags.map(\.id)))
         else { throw RemoteAccountError.accountScopeChanged }
         let response = try await api.request(path: "v1/results/\(id)/account-tags", method: "PATCH", token: token,
             body: RemoteAccountResultTagIDsRequest(tagIDs: tagIDs), response: RemoteAccountTagEditResponse.self)
-        let result = response.result
-        guard resultPublicationScope == scope, accountTagHistoryEditNonce == nonce else { throw RemoteAccountError.accountScopeChanged }
+        guard resultPublicationScope == scope, accountTagHistoryEditNonce == nonce,
+            !editsLastWithoutHistory || lastAccountResultGeneration == lastGeneration else { throw RemoteAccountError.accountScopeChanged }
+        guard isAccountTagHistoryReady == !editsLastWithoutHistory else {
+            throw RemoteAccountError.serverMessage("服务端已保存，但历史就绪状态已改变，请刷新账户历史。")
+        }
         do {
-            guard result.id == id, Set(result.accountTagIDs ?? []) == Set(tagIDs) else { throw RemoteAccountError.unexpectedResponse }
-            try applyAccountTagHistoryEdit(result, scope: scope, at: Int64((Date.now.timeIntervalSince1970 * 1_000).rounded(.down)))
-            statusMessage = "标签更改已保存，服务端新授予 \(response.tagPbs.count) 个标签 PB；缓存重建与完成快照独立。"
+            guard response.result.id == id else { throw RemoteAccountError.unexpectedResponse }
+            try applyAccountTagEditResponse(response, requestedIDs: tagIDs, scope: scope,
+                at: Int64((Date.now.timeIntervalSince1970 * 1_000).rounded(.down)))
+            statusMessage = "标签更改已保存，服务端新授予 \(response.tagPbs.count) 个标签 PB；完成快照和 XP 不变。"
         } catch {
-            invalidateAccountTagHistory()
-            statusMessage = "标签更改已保存，缓存重建失败，请刷新完整历史：" + error.localizedDescription
+            invalidateAccountTagHistory(clearLastResult: false)
+            let message = "服务端已保存，但本机标签状态未能确认，请刷新账户历史：" + error.localizedDescription
+            statusMessage = message
+            throw RemoteAccountError.serverMessage(message)
         }
     }
 
@@ -3506,25 +3607,31 @@ final class AccountSession {
                 personalBestResetAt: user.personalBestResetAt
             )
         }
-        if resultPublicationScope == requestScope, capabilities?.supportsAccountTags == true {
+        if resultPublicationScope == requestScope, (capabilities?.supportsAccountTags == true || hasAccountTagDirectory) {
             // Update the accepted account response before this extra suspension.
             // A failed read must not enqueue an accepted result or manufacture PBs.
             let historyRead = beginAcceptedAccountTagHistoryInsertion(id: result.id, scope: requestScope)
+            let lastRead = beginLastAccountResultRead(id: result.id, finishedAt: result.finishedAt, scope: requestScope)
             invalidateAccountTagDirectory()
             await refreshAccountTagsForPractice(errorPrefix: "成绩已接受，标签刷新失败：")
-            if let historyRead, resultPublicationScope == requestScope,
-                accountTagHistoryGeneration == historyRead.generation {
+            if (lastRead != nil || historyRead != nil), resultPublicationScope == requestScope {
                 do {
                     let accepted = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                         path: "v1/results/\(result.id)", method: "GET", token: token,
                         body: Optional<String>.none, response: RemoteAccountResult.self)
                     guard accepted.id == result.id else { throw RemoteAccountError.unexpectedResponse }
-                    try applyAcceptedAccountTagHistoryResult(accepted, read: historyRead)
+                    if let lastRead { try applyLastAccountResult(accepted, read: lastRead) }
+                    if let historyRead, accountTagHistoryGeneration == historyRead.generation {
+                        try applyAcceptedAccountTagHistoryResult(accepted, read: historyRead)
+                    }
                 } catch {
-                    if resultPublicationScope == requestScope, accountTagHistoryGeneration == historyRead.generation {
-                        accountTagHistoryCache?.markIncomplete()
+                    let ownsLastRead = lastRead?.generation == lastAccountResultGeneration
+                    if let lastRead { failLastAccountResultRead(lastRead) }
+                    if resultPublicationScope == requestScope,
+                        ownsLastRead || historyRead?.generation == accountTagHistoryGeneration {
+                        if let historyRead, accountTagHistoryGeneration == historyRead.generation { accountTagHistoryCache?.markIncomplete() }
                         accountTagRevision &+= 1
-                        statusMessage = "成绩已接受，完整历史缓存待刷新：" + error.localizedDescription
+                        statusMessage = "成绩已接受，标签成绩元数据待刷新：" + error.localizedDescription
                     }
                 }
             }

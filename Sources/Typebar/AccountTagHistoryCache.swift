@@ -39,6 +39,24 @@ struct AccountTagHistoryPersonalBest: Equatable {
   let accuracy: Double
   let consistency: Double
   let rebuiltAtMilliseconds: Int64
+
+  static func retained(_ snapshots: [Self], before: [RemoteAccountTag], after: [RemoteAccountTag]) -> [Self] {
+    snapshots.filter { snapshot in
+      guard let tag = after.first(where: { $0.id == snapshot.tagID }) else { return false }
+      let old = before.first { $0.id == snapshot.tagID }?.personalBests.first { AccountTagHistoryGroup($0) == snapshot.group }
+      let new = tag.personalBests.first { AccountTagHistoryGroup($0) == snapshot.group }
+      switch (old, new) {
+      case (nil, nil): return true
+      case let (old?, new?):
+        return old.id == new.id && old.acceptedAtMilliseconds == new.acceptedAtMilliseconds
+          && old.effectiveWpm == new.effectiveWpm && old.preciseRawWpm == new.preciseRawWpm
+          && old.rawWpm == new.rawWpm && old.accuracy == new.accuracy
+          && old.preciseAccuracy == new.preciseAccuracy && old.consistency == new.consistency
+          && old.finishedAt == new.finishedAt
+      default: return false
+      }
+    }
+  }
 }
 
 struct AccountTagHistoryCache {
@@ -125,6 +143,10 @@ struct AccountTagHistoryCache {
 
   mutating func markIncomplete() { isComplete = false }
 
+  mutating func discardPersonalBestOverrides(tagIDs: [UUID], group: AccountTagHistoryGroup) {
+    personalBests.removeAll { tagIDs.contains($0.tagID) && $0.group == group }
+  }
+
   func recentResults(limit: Int) -> [RemoteAccountResult] {
     Array(results.enumerated().sorted {
       $0.element.finishedAt == $1.element.finishedAt ? $0.offset < $1.offset
@@ -134,25 +156,7 @@ struct AccountTagHistoryCache {
 
   mutating func adoptDirectory(_ tags: [RemoteAccountTag]) {
     let owned = Set(tags.map(\.id))
-    personalBests.removeAll { snapshot in
-      guard owned.contains(snapshot.tagID) else { return true }
-      let before = acceptedDirectory.first { $0.id == snapshot.tagID }?.personalBests.first {
-        AccountTagHistoryGroup($0) == snapshot.group
-      }
-      let after = tags.first { $0.id == snapshot.tagID }?.personalBests.first {
-        AccountTagHistoryGroup($0) == snapshot.group
-      }
-      switch (before, after) {
-      case (nil, nil): return false
-      case let (old?, new?):
-        return old.id != new.id || old.acceptedAtMilliseconds != new.acceptedAtMilliseconds
-          || old.effectiveWpm != new.effectiveWpm || old.preciseRawWpm != new.preciseRawWpm
-          || old.rawWpm != new.rawWpm || old.accuracy != new.accuracy
-          || old.preciseAccuracy != new.preciseAccuracy || old.consistency != new.consistency
-          || old.finishedAt != new.finishedAt
-      default: return true
-      }
-    }
+    personalBests = AccountTagHistoryPersonalBest.retained(personalBests, before: acceptedDirectory, after: tags)
     for index in results.indices {
       results[index].accountTagIDs = results[index].accountTagIDs?.filter { owned.contains($0) }
     }

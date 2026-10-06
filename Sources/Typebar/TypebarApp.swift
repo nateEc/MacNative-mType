@@ -1798,6 +1798,7 @@ private struct ContentView: View {
         resultPersonalBestFeedback: result.resultPersonalBestFeedback,
         tagPersonalBestFeedback: result.tagPersonalBestFeedback,
         settings: settings,
+        account: account,
         quoteRatings: quoteRatings,
         isSignedIn: account.currentUser != nil,
         initialCommunityRating: result.quoteFeedback?.communityQuoteID.flatMap {
@@ -5699,6 +5700,7 @@ private struct CompletedResultView: View {
   let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   let tagPersonalBestFeedback: [TagPersonalBestFeedback]
   let settings: AppSettings
+  let account: AccountSession
   let quoteRatings: QuoteRatingStore
   let isSignedIn: Bool
   let initialCommunityRating: RemoteQuoteRatingResponse?
@@ -5959,6 +5961,10 @@ private struct CompletedResultView: View {
       resultPersonalBestFeedbackView
 
       tagPersonalBestFeedbackView
+
+      if let accepted = account.editableAccountTagResult(id: result.id) {
+        RemoteAccountResultTagPicker(result: accepted, account: account)
+      }
 
       if let savedResultRecord {
         ResultTagEditor(result: savedResultRecord)

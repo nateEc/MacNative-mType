@@ -99,24 +99,30 @@ struct RemoteAccountResultTagPicker: View {
   @State private var message: String?
   @State private var busy = false
   private var knownIDs: Set<UUID> { Set(account.accountTags.map(\.id)) }
+  private var current: RemoteAccountResult { account.editableAccountTagResult(id: result.id) ?? result }
   var body: some View {
-    DisclosureGroup("账户标签（\(Set(result.accountTagIDs ?? []).intersection(knownIDs).count) 个）") {
+    DisclosureGroup("账户标签（\(Set(current.accountTagIDs ?? []).intersection(knownIDs).count) 个）") {
       ForEach(account.accountTags) { tag in
         Toggle("\(tag.displayName) · \(tag.id.uuidString.prefix(8))", isOn: Binding(
-          get: { result.accountTagIDs?.contains(tag.id) == true },
+          get: { current.accountTagIDs?.contains(tag.id) == true },
           set: { enabled in
             guard !busy else { return }
-            var ids = Set(result.accountTagIDs ?? []).intersection(knownIDs)
+            var ids = Set(current.accountTagIDs ?? []).intersection(knownIDs)
             if enabled { ids.insert(tag.id) } else { ids.remove(tag.id) }
             busy = true; message = nil
             Task { defer { busy = false }
               do { try await account.updateRemoteAccountResultTagIDs(id: result.id, tagIDs: ids.sorted { $0.uuidString < $1.uuidString }) }
               catch { message = error.localizedDescription } }
           }))
-          .disabled(busy || account.isEditingAccountTags || !account.isAccountTagHistoryReady)
+          .disabled(busy || account.isEditingAccountTags || account.editableAccountTagResult(id: result.id) == nil)
+        if account.lastAccountResult?.id == result.id, account.lastAccountResultEditAwardIDs.contains(tag.id) {
+          Label("\(tag.displayName) 新标签 PB", systemImage: "crown.fill").font(.caption)
+        }
       }
       if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
-      Text("按 ID 编辑并按已载入缓存重建本机标签 PB；服务端另检查是否授予标签 PB，不改变完成快照或 XP 回执。")
+      Text(account.isAccountTagHistoryReady
+        ? "按已加载历史重建本机标签 PB；服务端另检查授予。完成快照和 XP 不变。"
+        : "只编辑最后成绩，不加载历史；本机仅保存服务返回的标签 PB。完成快照和 XP 不变。")
         .font(.caption).foregroundStyle(.secondary)
     }
   }

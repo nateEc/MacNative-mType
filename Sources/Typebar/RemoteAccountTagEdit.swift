@@ -13,6 +13,18 @@ struct RemoteAccountTagEditResponse: Decodable {
 }
 
 enum RemoteAccountTagEditPolicy {
+  static func editableResult(id: UUID, history: AccountTagHistoryCache?,
+    lastResult: RemoteAccountResult?) throws -> RemoteAccountResult {
+    if let history, history.isComplete {
+      guard let result = history.results.first(where: { $0.id == id }) else { throw RemoteAccountError.unexpectedResponse }
+      return result
+    }
+    guard let lastResult, lastResult.id == id else {
+      throw RemoteAccountError.serverMessage("最后成绩尚未就绪，或不是这条成绩。未发送更改请求。")
+    }
+    return lastResult
+  }
+
   static func requireCapabilities(_ capabilities: RemoteServiceCapabilities) throws {
     guard capabilities.supportsAccountTags,
       capabilities.capabilities["accountTagEditPersonalBests"] == "available" else {
