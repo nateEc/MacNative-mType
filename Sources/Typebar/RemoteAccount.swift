@@ -366,6 +366,8 @@ private struct RemoteDeveloperAccessKeyDeletionResponse: Codable, Sendable {
 }
 
 struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
+    let historicalPersonalBest: Bool?
+    let quoteLength: QuoteLength?
     var accountTagIDs: [UUID]? = nil
     let speedPrecision: RemoteSpeedPrecision?
     var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
@@ -407,6 +409,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let finishedAtReferenceTime: Double?
 
     private enum CodingKeys: String, CodingKey {
+        case historicalPersonalBest, quoteLength
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
             errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
             bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
@@ -419,6 +422,12 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
         mode = try values.decode(String.self, forKey: .mode)
+        historicalPersonalBest = values.contains(.historicalPersonalBest)
+            ? try values.decode(Bool.self, forKey: .historicalPersonalBest) : nil
+        quoteLength = values.contains(.quoteLength) ? try values.decode(QuoteLength.self, forKey: .quoteLength) : nil
+        if let quoteLength, mode != "quote" || quoteLength == .all {
+            throw DecodingError.dataCorruptedError(forKey: .quoteLength, in: values, debugDescription: "Invalid actual quote classification")
+        }
         language = try values.decode(String.self, forKey: .language)
         durationSeconds = try values.decodeIfPresent(Int.self, forKey: .durationSeconds)
         wordLimit = try values.decodeIfPresent(Int.self, forKey: .wordLimit)
@@ -884,6 +893,7 @@ struct RemoteArchivePull {
 }
 
 struct RemoteResultSubmission: Codable, Sendable {
+    let quoteLength: QuoteLength?
     var accountTagIDs: [UUID]? = nil
     let speedPrecision: RemoteSpeedPrecision?
     let mode2: String?
@@ -924,10 +934,12 @@ struct RemoteResultSubmission: Codable, Sendable {
         experienceEvidence: RemoteExperienceEvidence? = nil, rankingEvidence: RemoteRankingEvidence? = nil,
         personalBestConfiguration: RemotePersonalBestConfiguration? = nil,
         speedPrecision: RemoteSpeedPrecision? = nil,
-        includesMode2: Bool = false
+        includesMode2: Bool = false,
+        includesHistoryMetadata: Bool = false
     ) {
         id = result.id
         mode2 = includesMode2 && result.configuration.mode == .quote ? result.quoteSource?.mode2 : nil
+        quoteLength = includesHistoryMetadata && result.configuration.mode == .quote ? result.quoteSource?.actualLength : nil
         self.resultConsistency = resultConsistency
         mode = result.configuration.mode.rawValue
         language = result.configuration.language.rawValue
@@ -974,6 +986,10 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     let apiVersion: String
     let service: String
     let capabilities: [String: String]
+
+    var supportsResultHistoryMetadata: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["resultHistoryMetadata"] == "available"
+    }
 
     var supportsPersonalBestLedger: Bool {
         apiVersion == "v1" && service == "typebar" && capabilities["accountPersonalBestLedger"] == "available"

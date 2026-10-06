@@ -27,28 +27,32 @@ struct ResultQuoteSource: Codable, Equatable {
   let kind: ResultQuoteSourceKind
   let title: String
   let quoteID: String?
+  let actualLength: QuoteLength?
   var mode2: String? { quoteID.flatMap { ResultMode2Policy.quoteKey(kind: kind, id: $0) } }
 
-  init?(kind: ResultQuoteSourceKind, title: String, quoteID: String? = nil) {
+  init?(kind: ResultQuoteSourceKind, title: String, quoteID: String? = nil, actualLength: QuoteLength? = nil) {
     let normalized = title
       .components(separatedBy: .whitespacesAndNewlines)
       .filter { !$0.isEmpty }
       .joined(separator: " ")
     guard !normalized.isEmpty else { return nil }
     guard quoteID.map({ ResultMode2Policy.quoteKey(kind: kind, id: $0) != nil }) ?? true else { return nil }
+    guard actualLength != .all else { return nil }
     self.kind = kind
     self.title = String(normalized.prefix(Self.maximumTitleLength))
     self.quoteID = quoteID
+    self.actualLength = actualLength
   }
 
-  enum CodingKeys: String, CodingKey { case kind, title, quoteID }
+  enum CodingKeys: String, CodingKey { case kind, title, quoteID, actualLength }
 
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
     let kind = try values.decode(ResultQuoteSourceKind.self, forKey: .kind)
     let title = try values.decode(String.self, forKey: .title)
     let id = values.contains(.quoteID) ? try values.decode(String.self, forKey: .quoteID) : nil
-    guard let normalized = Self(kind: kind, title: title, quoteID: id) else {
+    let length = values.contains(.actualLength) ? try values.decode(QuoteLength.self, forKey: .actualLength) : nil
+    guard let normalized = Self(kind: kind, title: title, quoteID: id, actualLength: length) else {
       throw DecodingError.dataCorruptedError(
         forKey: .title, in: values, debugDescription: "Quote source title or identity is invalid")
     }
@@ -56,7 +60,8 @@ struct ResultQuoteSource: Codable, Equatable {
   }
 
   static func make(
-    mode: TestMode, sourceIsCommunity: Bool, title: String?, selectedQuoteID: String? = nil
+    mode: TestMode, sourceIsCommunity: Bool, title: String?, selectedQuoteID: String? = nil,
+    actualLength: QuoteLength? = nil
   ) -> ResultQuoteSource? {
     guard mode == .quote, let title else { return nil }
     let kind: ResultQuoteSourceKind = sourceIsCommunity ? .community : .typebar
@@ -68,9 +73,9 @@ struct ResultQuoteSource: Codable, Equatable {
       case .builtIn(let quoteID): id = quoteID
       case .community(let quoteID): id = quoteID.uuidString.lowercased()
       }
-      return .init(kind: kind, title: title, quoteID: id)
+      return .init(kind: kind, title: title, quoteID: id, actualLength: actualLength)
     }
-    return .init(kind: kind, title: title)
+    return .init(kind: kind, title: title, actualLength: actualLength)
   }
 
   var displayText: String { "\(kind.displayName) · \(title)" }

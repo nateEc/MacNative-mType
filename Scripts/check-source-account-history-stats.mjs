@@ -74,7 +74,7 @@ new vm.Script(stripTypeScriptTypes(code,{mode:'transform'})).runInContext(contex
 assert.equal(context.useResultStatsLiveQuery(()=>undefined),undefined);
 context.authenticated=false;assert.equal(context.useResultStatsLiveQuery(()=>({})),undefined);context.authenticated=true;
 const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222'];
-const fixtures=[],dayFixtures=[],modifierFixtures=[];
+const fixtures=[],dayFixtures=[],modifierFixtures=[],metadataFixtures=[];
 for(const size of [0,9,11,25]) for(let bits=0;bits<8;bits++) for(const mode of ['all','time','words']) {
   const input=Array.from({length:size},(_,index)=>{
     const rowMode=['time','words','quote','zen','custom'][index%5];
@@ -85,6 +85,7 @@ for(const size of [0,9,11,25]) for(let bits=0;bits<8;bits++) for(const mode of [
       mode:rowMode,mode2:rowMode==='time'?String(duration):rowMode==='words'?'25':rowMode==='quote'?'owned-quote':rowMode,
       timestamp,testDuration:duration,wpm,rawWpm,acc:98.31-index/100,consistency:80.11-index/100,
       difficulty:index%2?'expert':'normal',punctuation:!!(index%2),numbers:false,funbox:[],
+      isPb:index%3===0,quoteLength:rowMode==='quote'?index%4:-1,
       language:'english',restartCount:index%3,incompleteTestSeconds:[0,1.25,2.35][index%3],
       tags:index%4===0?[]:index%4===1?[ids[0]]:index%4===2?[ids[1]]:ids};
   });
@@ -108,6 +109,8 @@ for(const size of [0,9,11,25]) for(let bits=0;bits<8;bits++) for(const mode of [
         priorAttemptEngagedMilliseconds:Math.round(row.incompleteTestSeconds*1000)},
       personalBestConfiguration:{version:1,difficulty:row.difficulty,punctuation:row.punctuation,numbers:row.numbers,lazyMode:false},
       rankingEvidence:{version:1,stopOnLetter:false,modifiers:[]}};
+    wire.historicalPersonalBest=row.isPb;
+    if(row.mode==='quote') wire.quoteLength=['short','medium','long','extended'][row.quoteLength];
     if(row.mode==='time') {wire.mode2=row.mode2;wire.durationSeconds=Number(row.mode2);}
     if(row.mode==='words') {wire.mode2=row.mode2;wire.wordLimit=25;}
     if(['custom','zen'].includes(row.mode)) wire.mode2=row.mode;
@@ -115,6 +118,39 @@ for(const size of [0,9,11,25]) for(let bits=0;bits<8;bits++) for(const mode of [
   });
   fixtures.push({wireRows,selectedIDs,includesNoTags,mode,matchedIDs,all,recent,days});
 }
+const metadataRows=fixtures.find(f=>f.wireRows.length===25&&f.mode==='all'&&f.includesNoTags&&f.selectedIDs.length===2).wireRows;
+context.resultsCollection=metadataRows.map(row=>context.normalizeResult({
+  _id:row.id,timestamp:(row.finishedAt+978307200)*1000,mode:row.mode,mode2:row.mode2,
+  testDuration:15,wpm:row.wpm,rawWpm:row.rawWpm,acc:row.accuracy,consistency:row.consistency,
+  isPb:row.historicalPersonalBest||undefined, // original false compression, normalized by the complete source function
+  quoteLength:row.quoteLength?['short','medium','long','extended'].indexOf(row.quoteLength):-1,
+  difficulty:row.personalBestConfiguration.difficulty,punctuation:row.personalBestConfiguration.punctuation,
+  numbers:row.personalBestConfiguration.numbers,language:row.language,tags:row.accountTagIDs,funbox:[]
+},new Set(ids)));
+const names=['short','medium','long','extended'];
+for(const pb of ['all','only','excluded','noMatches']) for(let mask=0;mask<16;mask++) for(const mode of ['all','quote','time']) {
+  const lengths=names.filter((_,index)=>mask&(1<<index));
+  // Exercise the complete source filter-to-query mapping, including its -1 non-quote fallback.
+  const filters={difficulty:{normal:true,expert:true,master:true},pb:{yes:pb==='all'||pb==='only',no:pb==='all'||pb==='excluded'},
+    mode:Object.fromEntries(['time','words','quote','zen','custom'].map(value=>[value,mode==='all'||mode===value])),
+    words:{10:true,25:true,50:true,100:true,custom:true},time:{15:true,30:true,60:true,120:true,custom:true},
+    punctuation:{on:true,off:true},numbers:{on:true,off:true},date:{all:true},
+    quoteLength:Object.fromEntries(names.map((name,index)=>[index===3?'thicc':name,lengths.includes(name)])),
+    tags:{none:true,[ids[0]]:true,[ids[1]]:true},funbox:{none:true},language:{english:true}};
+  const state=context.createResultsQueryState(filters);
+  metadataFixtures.push({pb,lengths,mode,matchedIDs:context.buildResultsQuery(state).evaluate().map(row=>row._id)});
+}
+// Full quote-controller class against owned catalogue metadata, not original quote assets.
+const quoteSource=fs.readFileSync(path.join(root,'frontend/src/ts/controllers/quotes-controller.ts'),'utf8');
+const ownedQuotes=[120,121,240,241,480,481].map((length,id)=>({id,text:'owned partial text',source:'Owned',length}));
+const quoteContext=vm.createContext({defaultQuoteCollection:{quotes:[],length:0,language:null,groups:[]},
+  removeLanguageSize:value=>value,cachedFetchJson:async()=>({language:'english',groups:[[0,120],[121,240],[241,480],[481,1000]],quotes:ownedQuotes}),
+  tryCatch:async promise=>{try{return {data:await promise};}catch(error){return {error};}}});
+new vm.Script(stripTypeScriptTypes(bounded(quoteSource,'class QuotesController {','const quoteController ='),{mode:'transform'})
+  +'\nglobalThis.controller = new QuotesController();').runInContext(quoteContext);
+const collection=await quoteContext.controller.getQuotes('english');
+const quoteFixtures=Array.from(collection.quotes,quote=>({length:quote.length,group:quote.group,classification:names[quote.group]}));
+assert.deepEqual(quoteFixtures.map(q=>q.group),[0,1,1,2,2,3]);
 for(const controls of [[],['polyglot'],['polyglot','memory']]) for(const selection of ['none','memory','all']) {
   context.resultsCollection=[context.normalizeResult({_id:'owned',timestamp:1800000000000,
     mode:'time',mode2:'15',testDuration:15,wpm:80,rawWpm:90,acc:98,consistency:80,funbox:controls})];
@@ -134,6 +170,7 @@ for(const timeZone of ['UTC','America/Los_Angeles','Europe/Berlin','Asia/Shangha
 process.env.TZ='UTC';
 assert.equal(context.calcTimeTyping({mode:'time',mode2:'15',restartCount:2}),22.5);
 assert.equal(context.normalizeResult({mode:'time',mode2:'15',restartCount:2,timestamp:0,wpm:80}).timeTyping,15);
-assert.equal(fixtures.length,96);assert.equal(dayFixtures.length,4);assert.equal(modifierFixtures.length,9);verify();
-console.log(emit?JSON.stringify({referenceCommit:pin,ids,fixtures,dayFixtures,modifierFixtures}):
-  'Account history statistics source passed (96 five-mode filtered collections, all/recent-ten/daily aggregates, 4 timezone samples, 9 polyglot/companion queries and legacy precedence; complete pinned functions; owned eager query/aggregate adapters and empty convention, no TanStack/DOM/HTTP/GUI)');
+assert.equal(fixtures.length,96);assert.equal(dayFixtures.length,4);assert.equal(modifierFixtures.length,9);
+assert.equal(metadataFixtures.length,192);assert.equal(quoteFixtures.length,6);verify();
+console.log(emit?JSON.stringify({referenceCommit:pin,ids,fixtures,dayFixtures,modifierFixtures,metadataRows,metadataFixtures,quoteFixtures}):
+  'Account history statistics source passed (96 collections, all/recent-ten/daily aggregates, 4 timezones, 9 polyglot queries, 192 PB/quote-length queries and 6 owned quote-classification boundaries; complete pinned functions/class; owned eager adapters, no TanStack/DOM/HTTP/GUI)');

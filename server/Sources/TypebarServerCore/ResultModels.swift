@@ -1,6 +1,11 @@
 import Foundation
 import Vapor
 
+/// Client-reported classification of the selected quote, never ranking proof.
+public enum ResultQuoteLength: String, Codable, Sendable {
+    case short, medium, long, extended
+}
+
 public struct ResultTimingEvidence: Content, Equatable, Sendable {
     public let version: Int
     public let keyDurationMilliseconds: [Int]
@@ -38,6 +43,7 @@ public struct ResultPracticeTiming: Content, Equatable, Sendable {
 }
 
 public struct ResultSubmissionRequest: Content, Equatable {
+    public let quoteLength: ResultQuoteLength?
     public let accountTagIDs: [UUID]?
     public let speedPrecision: ResultSpeedPrecision?
     public var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
@@ -83,6 +89,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         personalBestConfiguration: ResultPersonalBestConfiguration? = nil,
         speedPrecision: ResultSpeedPrecision? = nil,
         accountTagIDs: [UUID]? = nil,
+        quoteLength: ResultQuoteLength? = nil,
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         resultConsistency: ResultConsistencyMetrics? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
@@ -92,6 +99,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     ) {
         self.id = id
         self.accountTagIDs = accountTagIDs
+        self.quoteLength = quoteLength
         self.mode2 = mode2
         self.mode = mode
         self.language = language
@@ -141,6 +149,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case bailedOut, customLimit
         case mode2
         case accountTagIDs
+        case quoteLength
     }
 
     public init(from decoder: Decoder) throws {
@@ -148,6 +157,10 @@ public struct ResultSubmissionRequest: Content, Equatable {
         id = try values.decode(UUID.self, forKey: .id)
         accountTagIDs = values.contains(.accountTagIDs) ? try values.decode([UUID].self, forKey: .accountTagIDs) : nil
         mode = try values.decode(String.self, forKey: .mode)
+        quoteLength = values.contains(.quoteLength) ? try values.decode(ResultQuoteLength.self, forKey: .quoteLength) : nil
+        if quoteLength != nil, mode != "quote" {
+            throw DecodingError.dataCorruptedError(forKey: .quoteLength, in: values, debugDescription: "Quote classification requires quote mode")
+        }
         mode2 = values.contains(.mode2) ? try values.decode(String.self, forKey: .mode2) : nil
         language = try values.decode(String.self, forKey: .language)
         durationSeconds = try values.decodeIfPresent(Int.self, forKey: .durationSeconds)
@@ -227,6 +240,8 @@ public struct ResultSubmissionResponse: Content, Equatable {
 /// A compact, account-scoped view of a submitted result. It deliberately
 /// excludes prompt text, input replay, and every profile or credential field.
 public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable {
+    public var historicalPersonalBest: Bool? = nil
+    public var quoteLength: ResultQuoteLength? = nil
     public var accountTagIDs: [UUID]? = nil
     public var speedPrecision: ResultSpeedPrecision? = nil
     public var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
@@ -304,6 +319,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     }
 
     private enum CodingKeys: String, CodingKey {
+        case historicalPersonalBest, quoteLength
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, preciseAccuracy,
             consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, terminalTiming,
             elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
@@ -354,6 +370,12 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             customLimit: try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit), startedAt: start, finishedAt: end)
         let measured = terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
             ?? finishedAt.timeIntervalSince(startedAt)
+        historicalPersonalBest = values.contains(.historicalPersonalBest)
+            ? try values.decode(Bool.self, forKey: .historicalPersonalBest) : nil
+        quoteLength = values.contains(.quoteLength) ? try values.decode(ResultQuoteLength.self, forKey: .quoteLength) : nil
+        if quoteLength != nil, mode != "quote" {
+            throw DecodingError.dataCorruptedError(forKey: .quoteLength, in: values, debugDescription: "Quote classification requires quote mode")
+        }
         accountTagIDs = values.contains(.accountTagIDs) ? try values.decode([UUID].self, forKey: .accountTagIDs) : nil
         guard accountTagIDs.map({ $0.count <= 15 && Set($0).count == $0.count }) ?? true else {
             throw AccountTagError.invalidState

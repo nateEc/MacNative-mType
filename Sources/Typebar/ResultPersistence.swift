@@ -664,6 +664,7 @@ final class TestResultRecord {
     guard elapsedTimeData == nil || elapsedTime != nil else { return nil }
     guard incompletePracticeData == nil || incompletePractice != nil else { return nil }
     guard quoteSourceData == nil || quoteSource != nil else { return nil }
+    guard quoteSource?.actualLength == nil || configuration.mode == .quote else { return nil }
     guard accountTagSnapshotData == nil || accountTagSnapshot != nil else { return nil }
     return CompletedTestResult(
       id: id,

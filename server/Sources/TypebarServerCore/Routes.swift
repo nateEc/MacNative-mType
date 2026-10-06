@@ -85,6 +85,7 @@ public func configure(
                 "resultExperienceAwards": .available,
                 "resultRankingEvidence": .available,
                 "resultPersonalBestConfiguration": .available,
+                "resultHistoryMetadata": .available,
                 "accountPersonalBestLedger": .available,
                 "accountTags": .available,
                 "accountTagEditPersonalBests": .available,

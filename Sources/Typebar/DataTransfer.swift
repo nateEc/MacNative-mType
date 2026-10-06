@@ -197,6 +197,7 @@ enum RemoteResultCSVExport {
         "bailed_out", "custom_limit_mode", "custom_limit_value",
         "personal_best_configuration_version", "difficulty", "punctuation", "numbers", "lazy_mode",
         "account_tag_ids",
+        "historical_personal_best", "quote_length",
     ]
 
     @MainActor
@@ -285,6 +286,8 @@ enum RemoteResultCSVExport {
             result.personalBestConfiguration.map { String($0.numbers) } ?? "",
             result.personalBestConfiguration.map { String($0.lazyMode) } ?? "",
             result.accountTagIDs?.map(\.uuidString).joined(separator: ";") ?? "",
+            result.historicalPersonalBest.map(String.init) ?? "",
+            result.quoteLength?.rawValue ?? "",
         ]
     }
 
@@ -325,9 +328,10 @@ struct TypebarArchive: Codable, Equatable {
     // measured elapsed time independent of calendar dates and captured quote
     // identity independent of titles or a later selected quote, and an
     // independent numeric PB ledger that cannot be recovered from history,
-    // and account tag identities captured at completion rather than retry.
+    // and account tag identities captured at completion rather than retry,
+    // and the selected quote classification, not its streamed prompt length.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 31
+    static let currentVersion = 32
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -377,6 +381,7 @@ struct TypebarArchive: Codable, Equatable {
         let hasElapsedTime = results.contains { $0.elapsedTime != nil }
         let hasIncompletePractice = results.contains { $0.incompletePractice != nil }
         let hasQuoteIdentity = results.contains { $0.quoteSource?.quoteID != nil }
+        let hasQuoteLength = results.contains { $0.quoteSource?.actualLength != nil }
         let hasAccountTagSnapshot = results.contains { $0.accountTagSnapshot != nil }
         let hasAccountTagFilters = resultFilterPresets.contains { $0.filter.accountTagFilter != nil }
         let hasExpandedPace = Self.requiresExpandedPaceFormat(settings: settings, presets: presets)
@@ -384,9 +389,10 @@ struct TypebarArchive: Codable, Equatable {
         let baseVersion = hasAccountTagSnapshot ? max(29, version) : localPersonalBestLedger != nil ? max(28, version) : hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         let paceVersion = hasAccountPace ? max(30, baseVersion) : baseVersion
-        self.version = hasAccountTagFilters ? max(31, paceVersion) : paceVersion
+        let filterVersion = hasAccountTagFilters ? max(31, paceVersion) : paceVersion
+        self.version = hasQuoteLength ? max(32, filterVersion) : filterVersion
         self.exportedAt = exportedAt
-        let payloadVersion = hasAccountTagFilters || hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
+        let payloadVersion = hasQuoteLength || hasAccountTagFilters || hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
         self.localPersonalBestLedger = localPersonalBestLedger
         let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = payloadVersion >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
@@ -496,6 +502,8 @@ struct TypebarArchive: Codable, Equatable {
         let decodedResults = try values.decode([CompletedTestResult].self, forKey: .results)
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(decodedResults)
         // Inspect the raw payload before tombstones can hide new evidence.
+        guard version >= 32 || !decodedResults.contains(where: { $0.quoteSource?.actualLength != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 29 || !decodedResults.contains(where: { $0.accountTagSnapshot != nil })
         else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 27 || !decodedResults.contains(where: { $0.quoteSource?.quoteID != nil })

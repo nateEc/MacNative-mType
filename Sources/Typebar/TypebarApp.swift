@@ -1836,6 +1836,7 @@ private struct ContentView: View {
         todayPractice: result.todayPractice,
         onRepeat: {
           completedResult = nil
+          activeQuoteSource = result.result.quoteSource
           startRepeatedAttempt(result.repeatedSession, tags: result.result.tags)
         },
         challengeEvaluation: result.challengeEvaluation,
@@ -3806,7 +3807,7 @@ private struct ContentView: View {
       selectedQuoteID: selectedQuote?.id ?? "")
     activeQuoteSource = ResultQuoteSource.make(
       mode: mode, sourceIsCommunity: quoteSource == .community, title: selectedQuote?.title,
-      selectedQuoteID: selectedQuote?.id)
+      selectedQuoteID: selectedQuote?.id, actualLength: selectedQuote?.length)
     activeSessionTags = settings.activeResultTags
     session = TestSessionFactory.make(
       configuration: configuration,
@@ -7570,7 +7571,8 @@ private struct ResultsHistoryView: View {
         includesNumbers: configuration?.contentOptions.includeNumbers,
         quoteLength: configuration.flatMap { configuration -> QuoteLength? in
           guard configuration.mode == .quote else { return nil }
-          return QuoteLengthPolicy.actualLength(for: result.prompt, language: configuration.language)
+          return result.quoteSource?.actualLength
+            ?? QuoteLengthPolicy.actualLength(for: result.prompt, language: configuration.language)
         },
         duration: configuration?.duration,
         wordLimit: configuration?.wordLimit,

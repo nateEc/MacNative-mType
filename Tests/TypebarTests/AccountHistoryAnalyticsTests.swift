@@ -229,6 +229,19 @@ final class AccountHistoryAnalyticsTests: XCTestCase {
     }
   }
 
+  func testAcceptedLegacyRawAbovePrecisionDomainStillAggregates() throws {
+    let original = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(row())) as? [String: Any])
+    for raw in [421, 500] {
+      var object = original; object.removeValue(forKey: "speedPrecision"); object["rawWpm"] = raw
+      let result = try JSONDecoder().decode(RemoteAccountResult.self, from: JSONSerialization.data(withJSONObject: object))
+      XCTAssertEqual(AccountHistoryStatistics([result]).maximumRaw, Double(raw))
+      XCTAssertEqual(AccountHistoryStatistics([result]).averageRaw, Double(raw))
+    }
+    var invalid = original; invalid.removeValue(forKey: "speedPrecision"); invalid["rawWpm"] = 501
+    let result = try JSONDecoder().decode(RemoteAccountResult.self, from: JSONSerialization.data(withJSONObject: invalid))
+    XCTAssertNil(AccountHistoryStatistics([result]).maximumRaw)
+  }
+
   func testStatisticsAgainstCompletePinnedQueryNormalizationAndAggregationFunctions() throws {
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_REFERENCE_ROOT"] else {
       throw XCTSkip("Readiness supplies the pinned reference")
@@ -255,14 +268,30 @@ final class AccountHistoryAnalyticsTests: XCTestCase {
     }
     struct Day: Decodable { let timeZone: String; let timestamps: [Double]; let expected: [Double] }
     struct Modifier: Decodable { let controls: [String]; let selection: String; let matches: Bool }
+    struct Metadata: Decodable { let pb: ResultHistoryPersonalBestFilter; let lengths: Set<QuoteLength>; let mode: String; let matchedIDs: [UUID] }
+    struct Quote: Decodable { let length: Int; let group: Int; let classification: QuoteLength }
     struct Document: Decodable {
       let referenceCommit: String; let ids: Set<UUID>; let fixtures: [Fixture]
       let dayFixtures: [Day]; let modifierFixtures: [Modifier]
+      let metadataRows: [RemoteAccountResult]; let metadataFixtures: [Metadata]; let quoteFixtures: [Quote]
     }
     let document = try JSONDecoder().decode(Document.self, from: bytes)
     XCTAssertEqual(document.referenceCommit,"91bd24bb8513785c7364cbea29296ff7adafac41")
     XCTAssertEqual(document.fixtures.count,96); XCTAssertEqual(document.dayFixtures.count,4)
     XCTAssertEqual(document.modifierFixtures.count,9)
+    XCTAssertEqual(document.metadataFixtures.count,192); XCTAssertEqual(document.quoteFixtures.count,6)
+    for fixture in document.metadataFixtures {
+      let filter = ResultHistoryFilter(modes: fixture.mode == "all" ? nil : [try XCTUnwrap(TestMode(rawValue: fixture.mode))],
+        personalBestFilter: fixture.pb, quoteLengths: fixture.lengths)
+      XCTAssertEqual(AccountHistoryQuery.matching(document.metadataRows, scope: scope, filter: filter).map(\.id), fixture.matchedIDs,
+        "\(fixture.pb)/\(fixture.lengths)/\(fixture.mode)")
+    }
+    for quote in document.quoteFixtures {
+      XCTAssertEqual(quote.classification.compatibilityValue, String(quote.group))
+      let selected = try XCTUnwrap(ResultQuoteSource.make(mode: .quote, sourceIsCommunity: true,
+        title: "Owned partial text", actualLength: quote.classification))
+      XCTAssertEqual(selected.actualLength, quote.classification)
+    }
     func compare(_ native: AccountHistoryStatistics, _ source: Stats) throws {
       XCTAssertEqual(native.completed, source.completed); XCTAssertEqual(native.restarted, source.restarted)
       XCTAssertEqual(try XCTUnwrap(native.timeTyping), source.timeTyping, accuracy: 1e-8)

@@ -1032,6 +1032,7 @@ public actor AuthStore {
   }
 
   private struct StoredResult: Codable {
+    let quoteLength: ResultQuoteLength?
     var accountTagIDs: [UUID]?
     let speedPrecision: ResultSpeedPrecision?
     var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
@@ -1078,6 +1079,7 @@ public actor AuthStore {
       case personalBestConfiguration
       case speedPrecision
       case accountTagIDs
+      case quoteLength
     }
 
     init(
@@ -1089,6 +1091,7 @@ public actor AuthStore {
       personalBestConfiguration: ResultPersonalBestConfiguration? = nil,
       speedPrecision: ResultSpeedPrecision? = nil,
       accountTagIDs: [UUID]? = nil,
+      quoteLength: ResultQuoteLength? = nil,
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       terminalTiming: ResultTerminalTiming? = nil,
       elapsedTime: ResultElapsedTime? = nil,
@@ -1097,6 +1100,7 @@ public actor AuthStore {
     ) {
       self.id = id
       self.accountTagIDs = accountTagIDs
+      self.quoteLength = quoteLength
       self.userID = userID
       self.mode = mode
       self.language = language
@@ -1134,6 +1138,10 @@ public actor AuthStore {
       id = try values.decode(UUID.self, forKey: .id)
       userID = try values.decode(UUID.self, forKey: .userID)
       mode = try values.decode(String.self, forKey: .mode)
+      quoteLength = values.contains(.quoteLength) ? try values.decode(ResultQuoteLength.self, forKey: .quoteLength) : nil
+      if quoteLength != nil, mode != "quote" {
+        throw DecodingError.dataCorruptedError(forKey: .quoteLength, in: values, debugDescription: "Stored quote classification requires quote mode")
+      }
       language = try values.decode(String.self, forKey: .language)
       durationSeconds = try values.decodeIfPresent(Int.self, forKey: .durationSeconds)
       wordLimit = try values.decodeIfPresent(Int.self, forKey: .wordLimit)
@@ -1259,6 +1267,7 @@ public actor AuthStore {
         bailedOut: bailedOut, customLimit: customLimit,
         startedAt: startedAt, finishedAt: finishedAt)
       response.mode2 = mode2
+      response.quoteLength = quoteLength
       response.personalBestConfiguration = personalBestConfiguration
       response.accountTagIDs = accountTagIDs
       return response
@@ -3748,6 +3757,7 @@ public actor AuthStore {
       personalBestConfiguration: record.personalBestConfiguration,
       speedPrecision: record.speedPrecision,
       accountTagIDs: record.accountTagIDs,
+      quoteLength: record.quoteLength,
       practiceTiming: record.practiceTiming, inputMetrics: record.inputMetrics,
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       terminalTiming: record.terminalTiming,
@@ -3989,6 +3999,7 @@ public actor AuthStore {
         personalBestConfiguration: request.personalBestConfiguration,
         speedPrecision: request.speedPrecision,
         accountTagIDs: accountTagIDs,
+        quoteLength: request.quoteLength,
         inputMetrics: request.inputMetrics,
         keyConsistency: request.resultConsistency?.keyConsistency,
         terminalTiming: request.terminalTiming,
@@ -4208,13 +4219,14 @@ public actor AuthStore {
           ? $0.id.uuidString > $1.id.uuidString
           : $0.finishedAt > $1.finishedAt
       }
-    let controls = Dictionary(uniqueKeysWithValues: state.experienceAwards!
-      .filter { $0.userID == user.id }.compactMap { entry in
-        entry.rankingAdmission?.input.evidence.map { (entry.resultID, $0) }
-      })
+    let receipts = Dictionary(uniqueKeysWithValues: state.experienceAwards!
+      .filter { $0.userID == user.id }.map { ($0.resultID, $0) })
     return .init(
       results: Array(records.dropFirst(offset).prefix(limit)).map {
-        var response = $0.response(); response.rankingEvidence = controls[$0.id]; return response
+        var response = $0.response()
+        response.rankingEvidence = receipts[$0.id]?.rankingAdmission?.input.evidence
+        response.historicalPersonalBest = receipts[$0.id]?.personalBestReceipt?.isPersonalBest
+        return response
       },
       total: records.count)
   }
@@ -4231,9 +4243,11 @@ public actor AuthStore {
 
   private func resultResponse(for record: StoredResult) -> AccountResultResponse {
     var response = record.response()
-    response.rankingEvidence = state.experienceAwards!.first {
+    let receipt = state.experienceAwards!.first {
       $0.userID == record.userID && $0.resultID == record.id
-    }?.rankingAdmission?.input.evidence
+    }
+    response.rankingEvidence = receipt?.rankingAdmission?.input.evidence
+    response.historicalPersonalBest = receipt?.personalBestReceipt?.isPersonalBest
     return response
   }
 
@@ -4909,6 +4923,7 @@ public actor AuthStore {
   }
 
   private func validate(result: ResultSubmissionRequest, leaderboardOptedOut: Bool, now: Date) throws {
+    guard result.quoteLength == nil || result.mode == "quote" else { throw ResultStoreError.invalidResult }
     let isBailout = result.bailedOut == true
     guard Set(["time", "words", "quote", "zen", "custom"]).contains(result.mode),
       Self.supportedResultLanguageIDs.contains(result.language),

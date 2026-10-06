@@ -4277,12 +4277,12 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     accountTagSnapshot = values.contains(.accountTagSnapshot)
       ? try values.decode(ResultAccountTagSnapshot.self, forKey: .accountTagSnapshot) : nil
     if let source = try? values.nestedContainer(keyedBy: ResultQuoteSource.CodingKeys.self, forKey: .quoteSource),
-      source.contains(.quoteID) {
+      source.contains(.quoteID) || source.contains(.actualLength) {
       guard configuration.mode == .quote else {
         throw DecodingError.dataCorruptedError(forKey: .quoteSource, in: values,
           debugDescription: "Quote identity cannot belong to another mode")
       }
-      // New identity-bearing records must not silently lose corrupt identity.
+      // New identity/classification records must not silently lose corrupt metadata.
       quoteSource = try values.decode(ResultQuoteSource.self, forKey: .quoteSource)
     } else {
       quoteSource = configuration.mode == .quote

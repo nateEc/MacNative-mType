@@ -97,6 +97,59 @@ final class DiskModelMigrationTests: XCTestCase {
     }
   }
 
+  func testSelectedQuoteClassificationColdReloadKeepsSnapshotAndLegacyBytes() throws {
+    try withDirectory { root in
+      let fixture = try createLegacy("before-account-tags", root: root)
+      let rows = try XCTUnwrap(fixture.receipt["rows"] as? [String: [[String: Any]]])
+      let source = try XCTUnwrap(ResultQuoteSource(kind: .community, title: "Owned quote", actualLength: .extended))
+      let candidate = CompletedTestResult(id: UUID(), configuration: .init(mode: .quote, duration: nil, wordLimit: nil,
+        difficulty: .normal, rules: .init()), outcome: .completed, startedAt: start,
+        finishedAt: start.addingTimeInterval(15), typedCharacterCount: 75, correctCharacterCount: 75,
+        errorCount: 0, wpm: 60, rawWpm: 60, accuracy: 100, quoteSource: source, prompt: "partial", replayEvents: [])
+      var saved: Data?
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        try assertLegacy(container.mainContext, expected: rows, version: "before-account-tags")
+        let fresh = TestResultRecord(result: candidate); saved = fresh.quoteSourceData
+        container.mainContext.insert(fresh); try container.mainContext.save()
+      }
+      let receipt = root.appendingPathComponent("cold-quote-length.json")
+      try runWriter("current", ["inspect", fixture.store.path, "-", receipt.path], root: root)
+      let cold = try XCTUnwrap(try object(receipt)["rows"] as? [String: [[String: Any]]])
+      XCTAssertEqual(cold["TestResultRecord"]?.first { $0["id"] as? String == candidate.id.uuidString }?["quoteSourceData"] as? String,
+        try XCTUnwrap(saved).base64EncodedString())
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        let records = try container.mainContext.fetch(FetchDescriptor<TestResultRecord>())
+        XCTAssertEqual(records.first { $0.id == candidate.id }?.portableResult, candidate)
+        let old = try XCTUnwrap(records.first { $0.id == resultID })
+        try assertStored(old, expected: XCTUnwrap(rows["TestResultRecord"]?.first))
+        XCTAssertNil(old.quoteSource?.actualLength)
+        try assertOtherEntities(container.mainContext, expected: rows, version: "before-account-tags")
+      }
+    }
+  }
+
+  func testCorruptQuoteClassificationRemainsExplicitAfterColdReadAndUnrelatedSave() throws {
+    try withDirectory { root in
+      let file = root.appendingPathComponent("store.sqlite")
+      let bytes = Data(#"{"kind":"community","title":"Owned","actualLength":"all"}"#.utf8)
+      try autoreleasepool {
+        let container = try open(file), record = TestResultRecord(result: newResult())
+        record.quoteSourceData = bytes
+        container.mainContext.insert(record); try container.mainContext.save()
+      }
+      for _ in 0..<2 {
+        try autoreleasepool {
+          let container = try open(file)
+          let row = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).first)
+          XCTAssertEqual(row.quoteSourceData, bytes); XCTAssertNil(row.portableResult)
+          row.addTag("owned"); try container.mainContext.save()
+        }
+      }
+    }
+  }
+
   func testPreElapsedDiskSchemaRetainsOldBlobsAndPersistsIndependentNewTime() throws {
     try exerciseUpgrade("before-elapsed")
   }

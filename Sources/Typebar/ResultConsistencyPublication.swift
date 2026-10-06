@@ -61,6 +61,7 @@ enum ResultConsistencyPublication {
       resultConsistency: metrics, experienceEvidence: experienceEvidence, rankingEvidence: rankingEvidence,
       personalBestConfiguration: personalBestConfiguration,
       speedPrecision: speedPrecision,
-      includesMode2: capabilities?.supportsResultMode2 == true)
+      includesMode2: capabilities?.supportsResultMode2 == true,
+      includesHistoryMetadata: capabilities?.supportsResultHistoryMetadata == true)
   }
 }

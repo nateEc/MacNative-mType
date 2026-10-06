@@ -116,7 +116,7 @@ struct AccountHistoryView: View {
       } else {
         Text("当前服务没有可用的账户标签历史缓存，仅展示已载入的近期子集。请刷新；不会声称拥有完整历史。")
       }
-      Text("服务尚未保存原版历史 PB 标记及引语长度，相关筛选不能还原；缺少重启或计时证据时，相应总计显示“未知”，不以零代替。")
+      Text("历史 PB 表示提交当时获得纪录，不是当前纪录。限制 PB 或引语长度时排除相应字段未知的旧记录；缺少重启或计时证据时，总计显示“未知”。")
     }.font(.caption).foregroundStyle(.secondary)
   }
 
@@ -189,6 +189,8 @@ struct AccountHistoryView: View {
       }
       Text("\(row.mode) · \(row.mode2 ?? "未知参数") · \(row.language)\(row.bailedOut == true ? " · 中止" : "")")
         .font(.caption).foregroundStyle(.secondary)
+      Text("历史 PB：\(row.historicalPersonalBest.map { $0 ? "是" : "否" } ?? "未知")\(row.mode == "quote" ? " · 引语长度：\(row.quoteLength?.displayName ?? "未知")" : "")")
+        .font(.caption).foregroundStyle(.secondary)
       Text(row.accountTagIDs.map { ids in
         ids.isEmpty ? "无账户标签" : ids.map { id in
           "\(account.accountTags.first { $0.id == id }?.displayName ?? "未知标签") · \(id.uuidString.prefix(8))"
@@ -253,9 +255,14 @@ private struct AccountHistoryFilterEditor: View {
       Picker("数字", selection: $filter.numbers) {
         ForEach(ResultHistoryBinaryFilter.allCases, id: \.self) { Text($0.displayName).tag($0) }
       }
+      Picker("历史个人最佳", selection: Binding(get: { filter.effectivePersonalBestFilter }, set: {
+        filter.personalBestFilter = $0; filter.personalBestOnly = false
+      })) {
+        ForEach(ResultHistoryPersonalBestFilter.allCases, id: \.self) { Text($0.displayName).tag($0) }
+      }
       choices("时长", ResultHistoryTimeLimit.allCases, selection: $filter.timeLimits, name: { $0.displayName })
       choices("字数", ResultHistoryWordLimit.allCases, selection: $filter.wordLimits, name: { $0.displayName })
-      choices("引语长度（服务尚未保存；限制时排除未知引语）", QuoteLength.allCases.filter { $0 != .all },
+      choices("实际引语长度（限制时排除未知引语）", QuoteLength.allCases.filter { $0 != .all },
         selection: Binding(get: { filter.quoteLengthSelections }, set: { filter.quoteLengths = $0; filter.quoteLength = nil }), name: { $0.displayName })
       DisclosureGroup("修饰器：\(filter.modifierFilter.selectionSummary)") {
         Toggle("无修饰器", isOn: $filter.modifierFilter.includesNoModifiers).toggleStyle(.checkbox)

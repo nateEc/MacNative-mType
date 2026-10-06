@@ -3,13 +3,14 @@ import Foundation
 enum AccountHistoryQuery {
   static func matching(_ rows: [RemoteAccountResult], scope: ResultPublicationScope,
     filter: ResultHistoryFilter, now: Date = .now) -> [RemoteAccountResult] {
-    // The service does not carry the original historical isPb or quoteLength.
-    // A present-day crown cannot reconstruct the former, nor mode2 the latter.
-    guard filter.effectivePersonalBestFilter == .all else { return [] }
+    // Only the admission receipt knows historical PB; a current crown does not.
+    let personalBestIDs = Set(rows.filter { $0.historicalPersonalBest == true }.map(\.id))
     let entries = rows.compactMap { row -> ResultHistoryEntry? in
+      if filter.effectivePersonalBestFilter != .all, row.historicalPersonalBest == nil { return nil }
       let mode = TestMode(rawValue: row.mode)
-      if mode == .quote, filter.quoteLength != nil
-        || (filter.quoteLengths != nil && filter.quoteLengthSelections != ResultHistoryFilter.filterableQuoteLengths) {
+      if mode == .quote, row.quoteLength == nil,
+        filter.quoteLength != nil || (filter.quoteLengths != nil
+          && filter.quoteLengthSelections != ResultHistoryFilter.filterableQuoteLengths) {
         return nil
       }
       let duration = row.durationSeconds.flatMap { (1...3_600).contains($0) ? Double($0) : nil }
@@ -32,10 +33,10 @@ enum AccountHistoryQuery {
         finishedAt: row.finishedAt, difficulty: options.flatMap { Difficulty(rawValue: $0.difficulty) },
         includesPunctuation: options?.punctuation ?? row.experienceEvidence?.punctuation,
         includesNumbers: options?.numbers ?? row.experienceEvidence?.numbers,
-        duration: duration, wordLimit: words, modifiers: modifiers,
+        quoteLength: row.quoteLength, duration: duration, wordLimit: words, modifiers: modifiers,
         accountTags: .init(scope: scope, tagIDs: row.accountTagIDs))
     }
-    let ids = filter.matchingIDs(entries: entries, personalBestIDs: [], now: now)
+    let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs, now: now)
     return rows.filter { ids.contains($0.id) }
   }
 
@@ -112,7 +113,8 @@ struct AccountHistoryStatistics: Equatable {
       return (values.reduce(0, +) / Double(values.count), values.max())
     }
     (averageWpm, maximumWpm) = metrics(rows.map(\.effectiveWpm), maximum: 420)
-    (averageRaw, maximumRaw) = metrics(rows.map(\.effectiveRawWpm), maximum: 420)
+    // Legacy service results allow raw 500; precise speed remains decoder-bounded at 420.
+    (averageRaw, maximumRaw) = metrics(rows.map(\.effectiveRawWpm), maximum: 500)
     (averageAccuracy, maximumAccuracy) = metrics(rows.map { $0.preciseAccuracy ?? Double($0.accuracy) }, maximum: 100)
     (averageConsistency, maximumConsistency) = metrics(rows.map(\.consistency), maximum: 100)
     let restarts = rows.compactMap(Self.knownRestartCount)
