@@ -349,12 +349,14 @@ final class SessionElapsedClockTests: XCTestCase {
     let restored = try XCTUnwrap(TypebarDataTransfer.importArchive(from: archive).results.first)
     let capabilities = RemoteServiceCapabilities(apiVersion: "v1", service: "typebar",
       capabilities: ["resultElapsedTime": "available", "resultTimingEvidence": "available",
-        "resultPracticeTiming": "available"])
+        "resultPracticeTiming": "available", "resultSpeedPrecision": "available", "resultInputMetricsV2": "available"])
     let wire = try await ResultConsistencyPublication.prepare(result: restored, capabilities: capabilities)
     let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(wire)) as? [String: Any])
     XCTAssertEqual(json["elapsedTime"] as? NSDictionary, ["version": 1, "seconds": 16.125] as NSDictionary)
     XCTAssertEqual(json["finishedAtReferenceTime"] as? Double, start.addingTimeInterval(-3_600).timeIntervalSinceReferenceDate)
     XCTAssertNotNil(json["timingEvidence"])
+    XCTAssertEqual(wire.speedPrecision?.wpm, ResultTerminalTiming.round(restored.preciseWpm))
+    XCTAssertNotNil(wire.inputMetrics)
     for key in ["prompt", "replayEvents", "clockOrigin", "measuredStartedAt"] { XCTAssertNil(json[key]) }
   }
 }

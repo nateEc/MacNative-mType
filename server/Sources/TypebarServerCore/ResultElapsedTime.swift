@@ -48,7 +48,7 @@ public struct ResultElapsedTime: Content, Equatable, Sendable {
   }
 }
 
-/// Only the explicit new timing contract restores Date precision. The
+/// Explicit timing or speed reports restore Date precision. The
 /// supplement may restore an ISO-lost fraction, never replace a date or epoch.
 enum ResultDatePrecision {
   static func restore<Key: CodingKey>(_ date: Date, referenceTime: Double?, required: Bool,
@@ -57,7 +57,7 @@ enum ResultDatePrecision {
     guard let referenceTime, referenceTime.isFinite, date.timeIntervalSinceReferenceDate.isFinite,
       abs(referenceTime - date.timeIntervalSinceReferenceDate) < 1 else {
       throw DecodingError.dataCorruptedError(forKey: key, in: values,
-        debugDescription: "Independent elapsed time requires finite date precision matching each real date")
+        debugDescription: "Precision reports require finite date supplements matching each real date")
     }
     return Date(timeIntervalSinceReferenceDate: referenceTime)
   }

@@ -262,7 +262,7 @@ enum RemoteResultCSVExport {
         [
             result.id.uuidString.lowercased(), result.mode,
             result.durationSeconds.map(String.init) ?? "", result.wordLimit.map(String.init) ?? "",
-            result.language, String(result.wpm), String(result.rawWpm),
+            result.language, result.speedText, result.rawSpeedText,
             ResultCSVExport.accuracyValue(result.preciseAccuracy ?? Double(result.accuracy)),
             decimal(result.consistency), String(result.errorCount), String(result.eventCount),
             result.tags.joined(separator: ";"),

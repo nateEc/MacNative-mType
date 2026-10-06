@@ -21,6 +21,7 @@ final class ExperienceEvidencePublicationTests: XCTestCase {
     .init(apiVersion: "v1", service: "typebar", capabilities: [
       "resultExperienceEvidence": "available", "resultInputMetrics": "available",
       "resultPersonalBestConfiguration": "available",
+      "resultSpeedPrecision": "available",
       "resultInputMetricsV2": "available", "resultPracticeTiming": "available",
       "resultBailout": "available", "resultTerminalTiming": "available"])
   }

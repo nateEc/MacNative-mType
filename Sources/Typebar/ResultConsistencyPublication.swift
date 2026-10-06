@@ -40,6 +40,7 @@ enum ResultConsistencyPublication {
     guard result.terminalTiming == nil || capabilities?.supportsResultTerminalTiming == true else {
       throw RemoteAccountError.serverMessage("当前服务不支持结束计时证据。请先升级自建服务；本机成绩不受影响。")
     }
+    let speedPrecision = try RemoteSpeedPrecisionPolicy.prepare(result, capabilities: capabilities)
     var metrics: RemoteResultConsistency?
     if capabilities?.supportsResultConsistency == true {
       let input = try ResultWPMConsistencyInput(prompt: result.prompt, events: result.replayEvents,
@@ -59,6 +60,7 @@ enum ResultConsistencyPublication {
       includesInputMetricsV2: capabilities?.supportsResultInputMetricsV2 == true,
       resultConsistency: metrics, experienceEvidence: experienceEvidence, rankingEvidence: rankingEvidence,
       personalBestConfiguration: personalBestConfiguration,
+      speedPrecision: speedPrecision,
       includesMode2: capabilities?.supportsResultMode2 == true)
   }
 }

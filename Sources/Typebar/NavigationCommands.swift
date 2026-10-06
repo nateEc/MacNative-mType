@@ -132,7 +132,7 @@ struct ProfileSearchCommandView: View {
               HStack {
                 VStack(alignment: .leading, spacing: 3) {
                   Text(profile.displayName)
-                  Text("最佳 \(profile.bestWPM) WPM · \(profile.completedResultCount) 次完成")
+                  Text("最佳 \(profile.bestSpeedText) WPM · \(profile.completedResultCount) 次完成")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }

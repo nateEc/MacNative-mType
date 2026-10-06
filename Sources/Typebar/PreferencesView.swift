@@ -1978,7 +1978,7 @@ struct PreferencesView: View {
                 .font(.caption)
                 .foregroundStyle(.orange)
               Text(
-                "公开资料：\(report.profile.completedResultCount) 次完成 · 最佳 \(report.profile.bestWPM) WPM · \(ExperiencePresentation.compact(report.profile.totalExperience)) XP"
+                "公开资料：\(report.profile.completedResultCount) 次完成 · 最佳 \(report.profile.bestSpeedText) WPM · \(ExperiencePresentation.compact(report.profile.totalExperience)) XP"
               )
               .font(.caption2)
               .foregroundStyle(.secondary)
@@ -2885,14 +2885,14 @@ private struct RemoteAccountResultRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack {
-        Text("\(result.wpm) WPM").font(.subheadline.weight(.semibold))
+        Text("\(result.speedText) WPM").font(.subheadline.weight(.semibold))
         if result.bailedOut == true { Label("中止", systemImage: "stop.circle").font(.caption) }
         Text("准确率 \(ResultMetricPresentation.accuracy(result.preciseAccuracy ?? Double(result.accuracy), alwaysShowDecimalPlaces: result.preciseAccuracy != nil))")
         Spacer()
         Text(result.finishedAt.formatted(date: .abbreviated, time: .shortened))
           .foregroundStyle(.secondary)
       }
-      Text("\(result.mode) · \(result.language) · Raw \(result.rawWpm) · 一致性 \(Int(result.consistency.rounded()))%")
+      Text("\(result.mode) · \(result.language) · Raw \(result.rawSpeedText) · 一致性 \(Int(result.consistency.rounded()))%")
         .font(.caption)
         .foregroundStyle(.secondary)
       Text("按键稳定度 \(result.keyConsistency.map { ResultMetricPresentation.percentage($0, alwaysShowDecimalPlaces: true) } ?? "不可用")")

@@ -1,6 +1,8 @@
 # 服务端契约 v1（草案）
 
-2026-10-06 [PB 比较与生命周期边界](PERSONAL_BEST_COMPARISON_CONTRACT.md) 修复本机消费者，不增加服务字段。固定源公开 clearPb 清两类 PB 并清日榜，内部 resetPb 只清个人 PB，删历史不清任何 PB；现有服务公开 PB 纪元和历史派生全部榜不等价。独立账本及明确 difficulty／lazyMode 投稿仍待实现，旧数据不能补造分组；服务整体保持 partial。
+2026-10-06 [远程小数速度合同](RESULT_SPEED_PRECISION_CONTRACT.md) 定义 resultSpeedPrecision=available 和可选 speedPrecision v1。已有整数作为兼容视图；请求、首次记录、历史和日榜冻结保留两位值及日期／计数绑定，公开最佳和速度榜消费精确值。旧报告缺失不回填，有损旧服务投稿明确拒绝。完整 PB 分组和独立账本、原协议、部署及整体验收仍开放。
+
+2026-10-06 [PB 比较与生命周期边界](PERSONAL_BEST_COMPARISON_CONTRACT.md) 修复本机消费者，不增加服务字段。固定源公开 clearPb 清两类 PB 并清日榜，内部 resetPb 只清个人 PB，删历史不清任何 PB；现有服务公开 PB 纪元和历史派生全部榜不等价。后续 [PB 配置保存合同](PERSONAL_BEST_CONFIGURATION_CONTRACT.md) 已接通明确 difficulty／lazyMode 投稿；独立账本仍待实现，旧数据不能补造分组，服务整体保持 partial。
 
 2026-10-06 新增 [日榜榜尾速度合同](DAILY_LEADERBOARD_MINIMUM_SPEED_CONTRACT.md)：公开和好友 day／yesterday 缓存列表返回可选 minWpm，来自完整所选人口而非当前页，空缓存为 0；历史回退、all／week 不造字段。旧客户端可忽略，旧服务缺失在新客户端仍未知；显式坏值拒绝。它不是投稿门槛，不新增能力请求、持久化字段、归档版本或部署要求。
 

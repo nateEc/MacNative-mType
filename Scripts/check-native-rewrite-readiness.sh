@@ -191,6 +191,9 @@ run_logged_check "executing pinned inbox dependency title ordering" "$temporary_
   "$project_root/Scripts/check-source-inbox-order.mjs" "$reference_root"
 
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
+run_logged_check "executing pinned speed calculation and two-decimal rounding" "$temporary_directory/speed-precision-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-speed-precision.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

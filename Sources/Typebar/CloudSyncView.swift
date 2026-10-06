@@ -224,7 +224,7 @@ struct CloudSyncView: View {
                                 rank: leaderboardRank.rank(in: leaderboardScope), total: leaderboardPage?.total)
                             VStack(alignment: .leading, spacing: 3) {
                                 Label(
-                                    "你的排名 \(leaderboardRank.rankLabel(in: leaderboardScope)) · \(leaderboardRank.wpm) WPM\(standing.map { " · \($0.displayName)" } ?? "")",
+                                    "你的排名 \(leaderboardRank.rankLabel(in: leaderboardScope)) · \(leaderboardRank.speedText) WPM\(standing.map { " · \($0.displayName)" } ?? "")",
                                     systemImage: "person.fill")
                                     .font(.caption.weight(.medium))
                                 if let leaderboardRankChange {
@@ -276,7 +276,7 @@ struct CloudSyncView: View {
                                 .buttonStyle(.plain)
                                 .lineLimit(1)
                             Spacer()
-                            Text("\(entry.wpm) WPM").monospacedDigit()
+                            Text("\(entry.speedText) WPM").monospacedDigit()
                             Text(ResultMetricPresentation.accuracy(
                                 entry.preciseAccuracy ?? Double(entry.accuracy),
                                 alwaysShowDecimalPlaces: entry.preciseAccuracy != nil))
@@ -1111,7 +1111,7 @@ struct PublicProfileView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             Grid(horizontalSpacing: 28, verticalSpacing: 12) {
-                GridRow { metric("完成成绩", "\(profile.completedResultCount)"); metric("最佳 WPM", "\(profile.bestWPM)") }
+                GridRow { metric("完成成绩", "\(profile.completedResultCount)"); metric("最佳 WPM", profile.bestSpeedText) }
                 GridRow {
                     metric("最高稳定度", "\(profile.highestConsistency.formatted(.number.precision(.fractionLength(0...2))))%")
                     metric("总 XP", ExperiencePresentation.compact(profile.totalExperience))
@@ -1185,7 +1185,7 @@ struct PublicProfileView: View {
                                 Text(best.configurationLabel)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("\(best.wpm) WPM")
+                                Text("\(best.speedText) WPM")
                                     .font(.headline.monospacedDigit())
                                 Text("\(ResultMetricPresentation.accuracy(best.preciseAccuracy ?? Double(best.accuracy), alwaysShowDecimalPlaces: best.preciseAccuracy != nil)) 准确 · \(best.consistency.formatted(.number.precision(.fractionLength(0...2))))% 稳定")
                                     .font(.caption2)

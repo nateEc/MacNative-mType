@@ -15,6 +15,7 @@ struct ExperienceAwardRecord: Codable {
   let context: ExperienceCalculationContext?
   var rankingAdmission: RankingAdmission? = nil
   var personalBestConfiguration: ResultPersonalBestConfiguration? = nil
+  var speedPrecision: ResultSpeedPrecision? = nil
   var weeklyPartition: WeeklyExperiencePartition? = nil
   var weeklyCacheReceipt: WeeklyExperienceCacheReceipt? = nil
   var dailyCacheReceipt: DailyLeaderboardCacheReceipt? = nil
@@ -25,6 +26,7 @@ struct ExperienceAwardRecord: Codable {
       acceptedAt: acceptedAt, award: .init(xp: Double(xp), dailyBonus: nil, breakdown: nil),
       accountCredit: xp, input: nil, configuration: nil, context: nil)
     record.personalBestConfiguration = request.personalBestConfiguration
+    record.speedPrecision = request.speedPrecision
     return record
   }
 
@@ -39,6 +41,14 @@ struct ExperienceAwardRecord: Codable {
   }
 
   func validate() throws {
+    if let speedPrecision {
+      guard speedPrecision.isValid else { throw ExperienceCalculationError.invalidInput }
+      if let input {
+        guard input.characterCounts.count == 4, input.durationSeconds > 0,
+          abs(speedPrecision.wpm - ResultSpeedPrecision.round(Double(input.characterCounts[0]) / 5 / input.durationSeconds * 60)) <= 0.005001
+        else { throw ExperienceCalculationError.invalidInput }
+      }
+    }
     if let personalBestConfiguration {
       guard personalBestConfiguration.isValid else { throw ExperienceCalculationError.invalidInput }
       if let input, personalBestConfiguration.punctuation != input.punctuation
@@ -78,6 +88,7 @@ extension ExperienceAwardRecord {
     case version, userID, resultID, finishedAt, acceptedAt, award, accountCredit,
       input, configuration, context, rankingAdmission, weeklyPartition, weeklyCacheReceipt, dailyCacheReceipt
     case personalBestConfiguration
+    case speedPrecision
   }
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -95,6 +106,7 @@ extension ExperienceAwardRecord {
       ? try values.decode(RankingAdmission.self, forKey: .rankingAdmission) : nil
     personalBestConfiguration = values.contains(.personalBestConfiguration)
       ? try values.decode(ResultPersonalBestConfiguration.self, forKey: .personalBestConfiguration) : nil
+    speedPrecision = values.contains(.speedPrecision) ? try values.decode(ResultSpeedPrecision.self,forKey:.speedPrecision) : nil
     weeklyPartition = values.contains(.weeklyPartition)
       ? try values.decode(WeeklyExperiencePartition.self, forKey: .weeklyPartition) : nil
     weeklyCacheReceipt = values.contains(.weeklyCacheReceipt)

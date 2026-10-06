@@ -418,6 +418,7 @@ public struct AuthUserResponse: Content, Equatable {
 }
 
 public struct PublicProfileResponse: Content, Equatable {
+  public var effectiveBestWPM: Double { preciseBestWPM ?? Double(bestWPM) }
   public let id: UUID
   public let displayName: String
   /// Publicly marks a profile whose expanded presentation is intentionally
@@ -439,6 +440,7 @@ public struct PublicProfileResponse: Content, Equatable {
   /// Typebar-owned earned badges, returned only after the owner opts in.
   public let earnedBadges: [PublicProfileBadge]
   public var practiceHistoryComplete: Bool? = nil
+  public var preciseBestWPM: Double? = nil
 }
 
 /// A Typebar-owned badge that can be selected for public profiles and
@@ -459,6 +461,7 @@ public struct PublicDiscordAvatarResponse: Content, Equatable {
 /// A public, per-standard-mode best. It intentionally excludes the prompt,
 /// input replay, email, and any account-scoped data.
 public struct PublicProfileBestResponse: Content, Equatable, Identifiable {
+  public var effectiveWpm: Double { preciseWpm ?? Double(wpm) }
   public let id: UUID
   public let mode: String
   public let durationSeconds: Int?
@@ -469,6 +472,7 @@ public struct PublicProfileBestResponse: Content, Equatable, Identifiable {
   public var preciseAccuracy: Double? = nil
   public let consistency: Double
   public let finishedAt: Date
+  public var preciseWpm: Double? = nil
 }
 
 /// A 12-month activity timeline grouped by the account's fixed day boundary.
@@ -1003,6 +1007,8 @@ public actor AuthStore {
   }
 
   private struct StoredResult: Codable {
+    let speedPrecision: ResultSpeedPrecision?
+    var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
     let mode2: String?
     let id: UUID
     let userID: UUID
@@ -1044,6 +1050,7 @@ public actor AuthStore {
         errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, inputMetrics, keyConsistency, terminalTiming, elapsedTime,
         bailedOut, customLimit, startedAt, finishedAt, acceptedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
       case personalBestConfiguration
+      case speedPrecision
     }
 
     init(
@@ -1053,6 +1060,7 @@ public actor AuthStore {
       incompletePractice: ResultIncompletePractice? = nil, restartCount: Int? = nil,
       experienceEvidence: ResultExperienceEvidence? = nil,
       personalBestConfiguration: ResultPersonalBestConfiguration? = nil,
+      speedPrecision: ResultSpeedPrecision? = nil,
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       terminalTiming: ResultTerminalTiming? = nil,
       elapsedTime: ResultElapsedTime? = nil,
@@ -1078,11 +1086,12 @@ public actor AuthStore {
       self.incompletePractice = incompletePractice
       self.experienceEvidence = experienceEvidence
       self.personalBestConfiguration = personalBestConfiguration
+      self.speedPrecision = speedPrecision
       self.restartCount = restartCount
       self.terminalTiming = terminalTiming
       self.elapsedTime = elapsedTime
-      self.startedAtReferenceTime = elapsedTime == nil ? nil : startedAt.timeIntervalSinceReferenceDate
-      self.finishedAtReferenceTime = elapsedTime == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
+      self.startedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : startedAt.timeIntervalSinceReferenceDate
+      self.finishedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
       self.bailedOut = bailedOut
       self.customLimit = customLimit
       self.startedAt = startedAt
@@ -1105,6 +1114,10 @@ public actor AuthStore {
       }
       wpm = try values.decode(Int.self, forKey: .wpm)
       rawWpm = try values.decode(Int.self, forKey: .rawWpm)
+      speedPrecision = values.contains(.speedPrecision) ? try values.decode(ResultSpeedPrecision.self,forKey:.speedPrecision) : nil
+      if let speedPrecision, !speedPrecision.matches(wpm:wpm,rawWpm:rawWpm) {
+        throw DecodingError.dataCorruptedError(forKey:.speedPrecision,in:values,debugDescription:"Stored speed precision disagrees with legacy view")
+      }
       accuracy = try values.decode(Int.self, forKey: .accuracy)
       inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
       consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
@@ -1144,19 +1157,20 @@ public actor AuthStore {
           debugDescription: "Stored incomplete evidence must keep original count and carried time")
       }
       elapsedTime = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
-      startedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
-      finishedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
+      let preciseDates = elapsedTime != nil || speedPrecision != nil
+      startedAtReferenceTime = !preciseDates ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
+      finishedAtReferenceTime = !preciseDates ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
       finishedAt = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .finishedAt),
-        referenceTime: finishedAtReferenceTime, required: elapsedTime != nil,
+        referenceTime: finishedAtReferenceTime, required: preciseDates,
         key: .finishedAtReferenceTime, values: values)
       let legacyDuration =
         durationSeconds.map(TimeInterval.init)
         ?? max(1, Double(eventCount) / Double(max(rawWpm, 1) * 5) * 60)
-      let rawStart = elapsedTime == nil
+      let rawStart = !preciseDates
         ? try values.decodeIfPresent(Date.self, forKey: .startedAt) ?? finishedAt.addingTimeInterval(-legacyDuration)
         : try values.decode(Date.self, forKey: .startedAt)
       startedAt = try ResultDatePrecision.restore(rawStart, referenceTime: startedAtReferenceTime,
-        required: elapsedTime != nil, key: .startedAtReferenceTime, values: values)
+        required: preciseDates, key: .startedAtReferenceTime, values: values)
       acceptedAt = try values.decodeIfPresent(Date.self, forKey: .acceptedAt)
       terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
       bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
@@ -1191,6 +1205,9 @@ public actor AuthStore {
         throw DecodingError.dataCorruptedError(forKey: .experienceEvidence, in: values,
           debugDescription: "Stored complete XP evidence must keep counter, basis and timing bindings")
       }
+      if let speedPrecision, !speedPrecision.matchesCounters(inputMetrics, duration: elapsedDuration, events:eventCount, errors:errorCount) {
+        throw DecodingError.dataCorruptedError(forKey:.speedPrecision,in:values,debugDescription:"Stored speed precision must keep counter and duration bindings")
+      }
     }
 
     func response() -> AccountResultResponse {
@@ -1202,6 +1219,7 @@ public actor AuthStore {
         preciseAccuracy: inputMetrics?.preciseAccuracy,
         incompletePractice: incompletePractice, restartCount: restartCount,
         experienceEvidence: experienceEvidence,
+        speedPrecision: speedPrecision,
         keyConsistency: keyConsistency,
         terminalTiming: terminalTiming,
         elapsedTime: elapsedTime,
@@ -1549,6 +1567,7 @@ public actor AuthStore {
         guard result.personalBestConfiguration == entry.personalBestConfiguration else {
           throw ExperienceCalculationError.invalidInput
         }
+        guard result.speedPrecision == entry.speedPrecision else { throw ExperienceCalculationError.invalidInput }
         if let input = entry.input,
           try ExperienceEvidenceAdapter.input(for: Self.resultRequest(from: result)) != input {
           throw ExperienceCalculationError.invalidInput
@@ -2776,7 +2795,7 @@ public actor AuthStore {
             guard let user = changes.users.first(where: { $0.id == entry.userID }) else { continue }
             if let xp = placement.rewardExperience {
               let mail = RewardMail(subject:"每日打字榜奖励",
-                body:"\(entry.displayName)，你在 \(entry.language) · \(entry.mode) \(entry.mode2) 日榜排名第 \(placement.rank)，成绩 \(entry.wpm) WPM。领取可获得 \(xp) XP。",
+                body:"\(entry.displayName)，你在 \(entry.language) · \(entry.mode) \(entry.mode2) 日榜排名第 \(placement.rank)，成绩 \(entry.speedText) WPM。领取可获得 \(xp) XP。",
                 timestamp:timestamp,rewards:[.xp(xp)])
               try changes.rewardInbox.insert(mail,for:entry.userID,configuration:rewardInboxConfiguration)
             }
@@ -2786,7 +2805,7 @@ public actor AuthStore {
               !user.leaderboardRestricted, !user.displayNameChangeRequired {
               let day = ISO8601DateFormatter().string(from:Date(timeIntervalSince1970:Double(job.key)/1_000)).prefix(10)
               changes.announcements.append(.init(id:UUID(),
-                message:"日榜 \(day) UTC · \(entry.language) · \(entry.mode) \(entry.mode2)：第 \(placement.rank) 名 \(entry.displayName)，\(entry.wpm) WPM。",
+                message:"日榜 \(day) UTC · \(entry.language) · \(entry.mode) \(entry.mode2)：第 \(placement.rank) 名 \(entry.displayName)，\(entry.speedText) WPM。",
                 level:.success,sticky:false,scheduledAt:nil,publishedAt:now))
             }
           }
@@ -3386,6 +3405,7 @@ public actor AuthStore {
     streak: PublicProfileStreakResponse?
   ) -> PublicProfileResponse {
     let personalBestResults = personalBestResults(for: user.id, from: results)
+    let fastest = personalBestResults.max { $0.effectiveWpm < $1.effectiveWpm }
     let practice = state.accountPractice![user.id] ?? .init()
     return .init(
       id: user.id,
@@ -3395,7 +3415,7 @@ public actor AuthStore {
       completedResultCount: practice.completedTests,
       startedTestCount: practice.startedTests,
       totalTypingSeconds: practice.typingSeconds,
-      bestWPM: personalBestResults.map(\.wpm).max() ?? 0,
+      bestWPM: Int((personalBestResults.map(\.effectiveWpm).max() ?? 0).rounded()),
       highestConsistency: personalBestResults.map(\.consistency).max() ?? 0,
       personalBests: publicPersonalBests(from: personalBestResults),
       activity: activity,
@@ -3406,7 +3426,8 @@ public actor AuthStore {
       selectedBadge: user.accountSuspended ? nil : selectedPublicBadge(for: user),
       earnedBadges: user.accountSuspended || !user.showAllBadges
         ? [] : availablePublicBadges(for: user.id),
-      practiceHistoryComplete: practice.historyComplete
+      practiceHistoryComplete: practice.historyComplete,
+      preciseBestWPM: fastest?.speedPrecision?.wpm
     )
   }
 
@@ -3429,7 +3450,7 @@ public actor AuthStore {
     let accurateRunExists = completed.contains {
       $0.effectiveAccuracy >= 98 && $0.elapsedDuration >= 15
     }
-    let bestWPM = completed.map(\.wpm).max() ?? 0
+    let bestWPM = completed.map(\.effectiveWpm).max() ?? 0
     let totalTypingSeconds = totalTypingSeconds(from: results)
     let perfectMinuteExists = completed.contains {
       $0.effectiveAccuracy == 100 && $0.elapsedDuration >= 60
@@ -3575,15 +3596,15 @@ public actor AuthStore {
           && $0.wordLimit == standard.wordLimit
       }
       guard let best = candidates.max(by: { candidate, currentBest in
-        candidate.wpm == currentBest.wpm
+        candidate.effectiveWpm == currentBest.effectiveWpm
           ? candidate.finishedAt < currentBest.finishedAt
-          : candidate.wpm < currentBest.wpm
+          : candidate.effectiveWpm < currentBest.effectiveWpm
       }) else { return nil }
       return .init(
         id: best.id, mode: best.mode, durationSeconds: best.durationSeconds,
         wordLimit: best.wordLimit, language: best.language, wpm: best.wpm,
         accuracy: best.accuracy, preciseAccuracy: best.inputMetrics?.preciseAccuracy,
-        consistency: best.consistency, finishedAt: best.finishedAt)
+        consistency: best.consistency, finishedAt: best.finishedAt, preciseWpm: best.speedPrecision?.wpm)
     }
   }
 
@@ -3656,6 +3677,7 @@ public actor AuthStore {
       eventCount: record.eventCount, restartCount: record.restartCount ?? 0, tags: record.tags,
       incompletePractice: record.incompletePractice, experienceEvidence: record.experienceEvidence,
       personalBestConfiguration: record.personalBestConfiguration,
+      speedPrecision: record.speedPrecision,
       practiceTiming: record.practiceTiming, inputMetrics: record.inputMetrics,
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       terminalTiming: record.terminalTiming,
@@ -3830,6 +3852,7 @@ public actor AuthStore {
     var reward = try prepareExperienceAward(for: request, userID: user.id, now: now,
       streakDays: practice.streakLength)
     reward.personalBestConfiguration = request.personalBestConfiguration
+    reward.speedPrecision = request.speedPrecision
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
@@ -3855,7 +3878,7 @@ public actor AuthStore {
           language:request.language,mode:request.mode,mode2:mode2,wpm:request.wpm,accuracy:request.accuracy,
           preciseAccuracy:request.inputMetrics?.preciseAccuracy,consistency:request.consistency,finishedAt:admissionDate,
           profileSnapshot:.init(version:1,selectedBadge:selectedPublicBadge(for:state.users[userIndex]),
-            discordAvatar:publicDiscordAvatar(for:state.users[userIndex])))
+            discordAvatar:publicDiscordAvatar(for:state.users[userIndex])), preciseWpm: request.speedPrecision?.wpm)
         if configuration.accepts(candidate) {
           entry = candidate; rank = try dailyCache.add(candidate,configuration:configuration,now:now)
         }
@@ -3883,6 +3906,7 @@ public actor AuthStore {
         restartCount: request.incompletePractice == nil && request.experienceEvidence == nil ? nil : request.restartCount,
         experienceEvidence: request.experienceEvidence,
         personalBestConfiguration: request.personalBestConfiguration,
+        speedPrecision: request.speedPrecision,
         inputMetrics: request.inputMetrics,
         keyConsistency: request.resultConsistency?.keyConsistency,
         terminalTiming: request.terminalTiming,
@@ -3937,13 +3961,13 @@ public actor AuthStore {
         && $0.durationSeconds == 60
         && $0.eventCount > 0
     }
-    var personalBests: [UUID: Int] = [:]
+    var personalBests: [UUID: Double] = [:]
     for result in candidates {
-      personalBests[result.userID] = max(personalBests[result.userID] ?? result.wpm, result.wpm)
+      personalBests[result.userID] = max(personalBests[result.userID] ?? result.effectiveWpm, result.effectiveWpm)
     }
     var counts: [Int: Int] = [:]
     for wpm in personalBests.values {
-      let lowerBound = wpm / Self.publicSpeedDistributionBucketSize
+      let lowerBound = Int(wpm) / Self.publicSpeedDistributionBucketSize
         * Self.publicSpeedDistributionBucketSize
       counts[lowerBound, default: 0] += 1
     }
@@ -4174,7 +4198,7 @@ public actor AuthStore {
   /// fallback has no authoritative cache tail and must not fabricate one.
   private func dailyLeaderboardMinimumSpeed(_ entries: [LeaderboardEntry], query: LeaderboardQuery) -> Double? {
     guard dailyLeaderboardConfiguration != nil, ["day", "yesterday"].contains(query.period ?? "all") else { return nil }
-    return entries.lazy.map { Double($0.wpm) }.min() ?? 0
+    return entries.lazy.map(\.effectiveWpm).min() ?? 0
   }
 
   private enum ExperienceLeaderboardPeriod: String {
@@ -4318,7 +4342,7 @@ public actor AuthStore {
           preciseAccuracy:entry.preciseAccuracy,consistency:entry.consistency,finishedAt:entry.finishedAt,
           selectedBadge:entry.profileSnapshot.selectedBadge,
           discordAvatar:publicDiscordAvatar(for:user) == nil ? nil : entry.profileSnapshot.discordAvatar,
-          friendsRank:eligibleUserIDs == nil ? nil : friendPosition, mode2: entry.mode2)
+          friendsRank:eligibleUserIDs == nil ? nil : friendPosition, mode2: entry.mode2, preciseWpm: entry.preciseWpm)
       }
     }
     let calendar = Calendar.current
@@ -4371,7 +4395,7 @@ public actor AuthStore {
         && (lowerBound == nil || result.finishedAt >= lowerBound!)
         && (upperBound == nil || result.finishedAt < upperBound!)
     }.sorted {
-      if $0.wpm != $1.wpm { return $0.wpm > $1.wpm }
+      if $0.effectiveWpm != $1.effectiveWpm { return $0.effectiveWpm > $1.effectiveWpm }
       if $0.effectiveAccuracy != $1.effectiveAccuracy { return $0.effectiveAccuracy > $1.effectiveAccuracy }
       return $0.finishedAt > $1.finishedAt
     }
@@ -4387,7 +4411,7 @@ public actor AuthStore {
         consistency: result.consistency, finishedAt: result.finishedAt,
         selectedBadge: selectedPublicBadge(for: user), discordAvatar: publicDiscordAvatar(for: user),
         mode2: ResultMode2Policy.resolved(mode: result.mode, explicit: result.mode2,
-          duration: result.durationSeconds, words: result.wordLimit))
+          duration: result.durationSeconds, words: result.wordLimit), preciseWpm: result.speedPrecision?.wpm)
     }
   }
 
@@ -4708,7 +4732,8 @@ public actor AuthStore {
     let isBailout = result.bailedOut == true
     guard Set(["time", "words", "quote", "zen", "custom"]).contains(result.mode),
       Self.supportedResultLanguageIDs.contains(result.language),
-      (0...(isBailout ? 420 : 400)).contains(result.wpm), (0...(isBailout ? 420 : 500)).contains(result.rawWpm),
+      (0...(result.speedPrecision != nil || isBailout ? 420 : 400)).contains(result.wpm),
+      (0...(result.speedPrecision != nil || isBailout ? 420 : 500)).contains(result.rawWpm),
       (0...100).contains(result.accuracy), (0...100).contains(result.consistency),
       result.errorCount >= 0, (0...1_800_000).contains(result.eventCount),
       (0...1_000).contains(result.restartCount),
@@ -4719,6 +4744,9 @@ public actor AuthStore {
       result.finishedAt <= now.addingTimeInterval(60 * 5),
       result.finishedAt >= now.addingTimeInterval(-60 * 60 * 24 * 365 * 2)
     else { throw ResultStoreError.invalidResult }
+    if let speed = result.speedPrecision, !speed.matches(wpm:result.wpm,rawWpm:result.rawWpm) {
+      throw ResultStoreError.invalidResult
+    }
     if let mode2 = result.mode2, !ResultMode2Policy.agrees(mode2, mode: result.mode,
       duration: result.durationSeconds, words: result.wordLimit) { throw ResultStoreError.invalidResult }
     let timeIsValid = result.durationSeconds.map { (5...3600).contains($0) } ?? false
@@ -4802,6 +4830,10 @@ public actor AuthStore {
       abs(result.wpm - expectedWPM) <= 1,
       abs(result.rawWpm - expectedRawWPM) <= 1
     else { throw ResultStoreError.invalidResult }
+    if let speed = result.speedPrecision {
+      guard speed.matchesCounters(result.inputMetrics,duration:measured,events:result.eventCount,errors:result.errorCount)
+      else { throw ResultStoreError.invalidResult }
+    }
   }
 
   private func validate(timingEvidence: ResultTimingEvidence, elapsed: TimeInterval) throws {

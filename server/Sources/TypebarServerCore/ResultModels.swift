@@ -38,6 +38,9 @@ public struct ResultPracticeTiming: Content, Equatable, Sendable {
 }
 
 public struct ResultSubmissionRequest: Content, Equatable {
+    public let speedPrecision: ResultSpeedPrecision?
+    public var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
+    public var effectiveRawWpm: Double { speedPrecision?.rawWpm ?? Double(rawWpm) }
     public let mode2: String?
     public let id: UUID
     public let mode: String
@@ -77,6 +80,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         experienceEvidence: ResultExperienceEvidence? = nil,
         rankingEvidence: ResultRankingEvidence? = nil,
         personalBestConfiguration: ResultPersonalBestConfiguration? = nil,
+        speedPrecision: ResultSpeedPrecision? = nil,
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         resultConsistency: ResultConsistencyMetrics? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
@@ -102,14 +106,15 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.experienceEvidence = experienceEvidence
         self.rankingEvidence = rankingEvidence
         self.personalBestConfiguration = personalBestConfiguration
+        self.speedPrecision = speedPrecision
         self.tags = tags
         self.timingEvidence = timingEvidence
         self.practiceTiming = practiceTiming
         self.inputMetrics = inputMetrics
         self.terminalTiming = terminalTiming
         self.elapsedTime = elapsedTime
-        self.startedAtReferenceTime = elapsedTime == nil ? nil : startedAt.timeIntervalSinceReferenceDate
-        self.finishedAtReferenceTime = elapsedTime == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
+        self.startedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : startedAt.timeIntervalSinceReferenceDate
+        self.finishedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
         self.bailedOut = bailedOut
         self.customLimit = customLimit
         self.startedAt = startedAt
@@ -125,6 +130,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case experienceEvidence
         case rankingEvidence
         case personalBestConfiguration
+        case speedPrecision
         case inputMetrics
         case resultConsistency
         case terminalTiming
@@ -143,6 +149,10 @@ public struct ResultSubmissionRequest: Content, Equatable {
         wordLimit = try values.decodeIfPresent(Int.self, forKey: .wordLimit)
         wpm = try values.decode(Int.self, forKey: .wpm)
         rawWpm = try values.decode(Int.self, forKey: .rawWpm)
+        speedPrecision = values.contains(.speedPrecision) ? try values.decode(ResultSpeedPrecision.self,forKey:.speedPrecision) : nil
+        if let speedPrecision, !speedPrecision.matches(wpm:wpm,rawWpm:rawWpm) {
+            throw DecodingError.dataCorruptedError(forKey:.speedPrecision,in:values,debugDescription:"Speed precision disagrees with legacy view")
+        }
         accuracy = try values.decode(Int.self, forKey: .accuracy)
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
         resultConsistency = try values.decodeIfPresent(ResultConsistencyMetrics.self, forKey: .resultConsistency)
@@ -174,15 +184,16 @@ public struct ResultSubmissionRequest: Content, Equatable {
         inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
         terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
         elapsedTime = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
-        startedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
-        finishedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
+        let preciseDates = elapsedTime != nil || speedPrecision != nil
+        startedAtReferenceTime = !preciseDates ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
+        finishedAtReferenceTime = !preciseDates ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
         bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
         customLimit = try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit)
         startedAt = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .startedAt),
-            referenceTime: startedAtReferenceTime, required: elapsedTime != nil,
+            referenceTime: startedAtReferenceTime, required: preciseDates,
             key: .startedAtReferenceTime, values: values)
         finishedAt = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .finishedAt),
-            referenceTime: finishedAtReferenceTime, required: elapsedTime != nil,
+            referenceTime: finishedAtReferenceTime, required: preciseDates,
             key: .finishedAtReferenceTime, values: values)
     }
 }
@@ -211,6 +222,9 @@ public struct ResultSubmissionResponse: Content, Equatable {
 /// A compact, account-scoped view of a submitted result. It deliberately
 /// excludes prompt text, input replay, and every profile or credential field.
 public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable {
+    public var speedPrecision: ResultSpeedPrecision? = nil
+    public var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
+    public var effectiveRawWpm: Double { speedPrecision?.rawWpm ?? Double(rawWpm) }
     public var mode2: String? = nil
     public var rankingEvidence: ResultRankingEvidence? = nil
     public var personalBestConfiguration: ResultPersonalBestConfiguration? = nil
@@ -247,6 +261,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         tags: [String], practiceTiming: ResultPracticeTiming? = nil, preciseAccuracy: Double? = nil,
         incompletePractice: ResultIncompletePractice? = nil, restartCount: Int? = nil,
         experienceEvidence: ResultExperienceEvidence? = nil,
+        speedPrecision: ResultSpeedPrecision? = nil,
         keyConsistency: Double? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
         elapsedTime: ResultElapsedTime? = nil,
@@ -270,11 +285,12 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.practiceTiming = practiceTiming
         self.incompletePractice = incompletePractice
         self.experienceEvidence = experienceEvidence
+        self.speedPrecision = speedPrecision
         self.restartCount = restartCount
         self.terminalTiming = terminalTiming
         self.elapsedTime = elapsedTime
-        self.startedAtReferenceTime = elapsedTime == nil ? nil : startedAt.timeIntervalSinceReferenceDate
-        self.finishedAtReferenceTime = elapsedTime == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
+        self.startedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : startedAt.timeIntervalSinceReferenceDate
+        self.finishedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
         self.bailedOut = bailedOut
         self.customLimit = customLimit
         self.startedAt = startedAt
@@ -286,11 +302,14 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, terminalTiming,
             elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
         case personalBestConfiguration
+        case speedPrecision
     }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         let elapsed = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
+        let speed = values.contains(.speedPrecision) ? try values.decode(ResultSpeedPrecision.self,forKey:.speedPrecision) : nil
+        let preciseDates = elapsed != nil || speed != nil
         let incomplete = values.contains(.incompletePractice)
             ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
         let experience = values.contains(.experienceEvidence)
@@ -301,14 +320,14 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             throw DecodingError.dataCorruptedError(forKey: .incompletePractice, in: values,
                 debugDescription: "Incomplete history needs its original count and carried timing")
         }
-        let startReference = elapsed == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
-        let endReference = elapsed == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
+        let startReference = !preciseDates ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
+        let endReference = !preciseDates ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
         let start = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .startedAt),
             referenceTime: startReference,
-            required: elapsed != nil, key: .startedAtReferenceTime, values: values)
+            required: preciseDates, key: .startedAtReferenceTime, values: values)
         let end = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .finishedAt),
             referenceTime: endReference,
-            required: elapsed != nil, key: .finishedAtReferenceTime, values: values)
+            required: preciseDates, key: .finishedAtReferenceTime, values: values)
         self.init(id: try values.decode(UUID.self, forKey: .id), mode: try values.decode(String.self, forKey: .mode),
             language: try values.decode(String.self, forKey: .language),
             durationSeconds: try values.decodeIfPresent(Int.self, forKey: .durationSeconds),
@@ -321,12 +340,16 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             preciseAccuracy: try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy),
             incompletePractice: incomplete, restartCount: restarts,
             experienceEvidence: experience,
+            speedPrecision: speed,
             keyConsistency: try values.decodeIfPresent(Double.self, forKey: .keyConsistency),
             terminalTiming: try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming), elapsedTime: elapsed,
             bailedOut: try values.decodeIfPresent(Bool.self, forKey: .bailedOut),
             customLimit: try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit), startedAt: start, finishedAt: end)
         let measured = terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
             ?? finishedAt.timeIntervalSince(startedAt)
+        if let speedPrecision, !speedPrecision.matches(wpm:wpm,rawWpm:rawWpm) {
+            throw DecodingError.dataCorruptedError(forKey:.speedPrecision,in:values,debugDescription:"Speed precision disagrees with legacy view")
+        }
         mode2 = values.contains(.mode2) ? try values.decode(String.self, forKey: .mode2) : nil
         if let mode2, !ResultMode2Policy.agrees(mode2, mode: mode, duration: durationSeconds, words: wordLimit) {
             throw DecodingError.dataCorruptedError(forKey: .mode2, in: values, debugDescription: "Invalid mode2 context")
@@ -419,6 +442,7 @@ public struct LeaderboardQuery: Content {
 }
 
 public struct LeaderboardEntry: Content, Equatable, Identifiable {
+    public var effectiveWpm: Double { preciseWpm ?? Double(wpm) }
     public let id: UUID
     public let rank: Int
     public let userID: UUID
@@ -434,6 +458,7 @@ public struct LeaderboardEntry: Content, Equatable, Identifiable {
     public let discordAvatar: PublicDiscordAvatarResponse?
     public var friendsRank: Int? = nil
     public var mode2: String? = nil
+    public var preciseWpm: Double? = nil
 }
 
 public struct LeaderboardResponse: Content, Equatable {

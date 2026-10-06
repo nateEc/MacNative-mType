@@ -1,5 +1,7 @@
 # 官方服务面审计
 
+2026-10-06 [远程小数速度合同](RESULT_SPEED_PRECISION_CONTRACT.md) 贯通 results 的已知精度、users 的公开最佳投影和 leaderboards 的比较／日分数／奖励文本。resultSpeedPrecision=available 仅描述自有报告，不代表原版 PB 独立账本、完整分组或全部原协议等价；映射数与 partial 状态不变。旧记录保持整数且精度未知。
+
 2026-10-06 [PB 配置保存合同](PERSONAL_BEST_CONFIGURATION_CONTRACT.md) 为 results 的真实投稿、首次接受记录和私有历史补充完整配置证据。resultPersonalBestConfiguration 的 available 仅声明自有字段可保存和读取，不代表 users 的独立 PB 或 leaderboards 全等价；既有模块映射数和 partial 状态不变。旧数据无配置仍未知。
 
 2026-10-06 [PB 比较与生命周期合同](PERSONAL_BEST_COMPARISON_CONTRACT.md) 明确 users／leaderboards 的剩余语义差异：当前公开 PB 新纪元不是原版公开 clearPb，历史派生 PB／全部榜尚未改为独立账本，旧成绩缺少完整分组证据。模块映射只代表原生入口与自有服务面，不代表上述功能等价；状态继续 partial，不提升映射数量。

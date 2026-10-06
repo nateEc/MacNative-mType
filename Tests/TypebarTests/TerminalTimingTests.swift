@@ -285,9 +285,12 @@ final class TerminalTimingTests: XCTestCase {
         XCTFail("Missing support must never silently drop the new denominator")
       } catch is RemoteAccountError {}
     }
-    let supported = RemoteServiceCapabilities(apiVersion: "v1", service: "typebar", capabilities: ["resultTerminalTiming":"available"])
+    let supported = RemoteServiceCapabilities(apiVersion: "v1", service: "typebar", capabilities: [
+      "resultTerminalTiming":"available", "resultSpeedPrecision":"available", "resultInputMetricsV2":"available"])
     let wire = try await ResultConsistencyPublication.prepare(result: result, capabilities: supported)
     XCTAssertEqual(wire.terminalTiming, result.terminalTiming)
+    XCTAssertEqual(wire.speedPrecision?.wpm, 1.6)
+    XCTAssertNotNil(wire.inputMetrics)
     let json = try object(wire)
     for privateKey in ["prompt", "replayEvents", "keyCode", "characters", "lastKey"] { XCTAssertNil(json[privateKey]) }
     let old = try await ResultConsistencyPublication.prepare(result: legacy(), capabilities: nil)

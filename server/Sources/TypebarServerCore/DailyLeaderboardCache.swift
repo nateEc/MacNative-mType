@@ -112,6 +112,7 @@ struct DailyLeaderboardCacheReceipt: Codable {
         entry.mode == reward.rankingAdmission?.input.mode,
         entry.userID == reward.userID, entry.resultID == reward.resultID,
         entry.finishedAt.timeIntervalSince1970 == floor(acceptedAt.timeIntervalSince1970),
+        entry.preciseWpm == reward.speedPrecision?.wpm,
         (entry.preciseAccuracy ?? Double(entry.accuracy)) == reward.rankingAdmission?.input.accuracy
       else { throw DailyLeaderboardCacheError.invalidState }
     }
@@ -131,6 +132,21 @@ extension DailyLeaderboardCacheReceipt {
   }
 }
 
+extension DailyLeaderboardCache.Entry {
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy:CodingKeys.self)
+    self.init(userID:try values.decode(UUID.self,forKey:.userID),resultID:try values.decode(UUID.self,forKey:.resultID),
+      displayName:try values.decode(String.self,forKey:.displayName),language:try values.decode(String.self,forKey:.language),
+      mode:try values.decode(String.self,forKey:.mode),mode2:try values.decode(String.self,forKey:.mode2),
+      wpm:try values.decode(Int.self,forKey:.wpm),accuracy:try values.decode(Int.self,forKey:.accuracy),
+      preciseAccuracy:try values.decodeIfPresent(Double.self,forKey:.preciseAccuracy),
+      consistency:try values.decode(Double.self,forKey:.consistency),finishedAt:try values.decode(Date.self,forKey:.finishedAt),
+      profileSnapshot:try values.decode(WeeklyExperienceProfileSnapshot.self,forKey:.profileSnapshot),
+      preciseWpm:values.contains(.preciseWpm) ? try values.decode(Double.self,forKey:.preciseWpm) : nil)
+    try validate()
+  }
+}
+
 /// Acceptance-day scores and immutable winning snapshots, not a history query.
 struct DailyLeaderboardCache: Codable {
   struct Entry: Codable, Equatable {
@@ -146,8 +162,13 @@ struct DailyLeaderboardCache: Codable {
     let consistency: Double
     let finishedAt: Date
     let profileSnapshot: WeeklyExperienceProfileSnapshot
+    var preciseWpm: Double? = nil
+    var effectiveWpm: Double { preciseWpm ?? Double(wpm) }
+    var speedText: String {
+      preciseWpm.map { String(format:"%.2f",locale:Locale(identifier:"en_US_POSIX"),$0) } ?? String(wpm)
+    }
     var score: Double {
-      Self.score(wpm:Double(wpm),accuracy:preciseAccuracy ?? Double(accuracy),
+      Self.score(wpm:effectiveWpm,accuracy:preciseAccuracy ?? Double(accuracy),
         timestamp:finishedAt.timeIntervalSince1970 * 1_000)
     }
     static func score(wpm: Double, accuracy: Double, timestamp: Double) -> Double {
@@ -161,12 +182,16 @@ struct DailyLeaderboardCache: Codable {
       guard !displayName.isEmpty, displayName.count <= 40, !language.isEmpty, language.count <= 100,
         ResultMode2Policy.isValid(mode2, mode: mode),
         (0...600).contains(wpm), (0...100).contains(accuracy),
+        preciseWpm.map({ ResultSpeedPrecision.isCanonical($0) && Int($0.rounded()) == wpm }) ?? true,
         preciseAccuracy.map({ $0.isFinite && (0...100).contains($0) }) ?? true,
         consistency.isFinite, consistency >= 0,
         finishedAt.timeIntervalSince1970.isFinite,
         (0...8_640_000_000_000_000).contains(finishedAt.timeIntervalSince1970 * 1_000),
         score.isFinite, score <= 9_007_199_254_740_991
       else { throw DailyLeaderboardCacheError.invalidState }
+    }
+    private enum CodingKeys: String, CodingKey {
+      case userID,resultID,displayName,language,mode,mode2,wpm,accuracy,preciseAccuracy,consistency,finishedAt,profileSnapshot,preciseWpm
     }
   }
   struct Bucket: Codable {

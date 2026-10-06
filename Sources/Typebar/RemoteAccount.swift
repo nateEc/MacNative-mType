@@ -366,6 +366,11 @@ private struct RemoteDeveloperAccessKeyDeletionResponse: Codable, Sendable {
 }
 
 struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
+    let speedPrecision: RemoteSpeedPrecision?
+    var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
+    var effectiveRawWpm: Double { speedPrecision?.rawWpm ?? Double(rawWpm) }
+    var speedText: String { speedPrecision.map { RemoteSpeedPresentation.text($0.wpm, precise: true) } ?? String(wpm) }
+    var rawSpeedText: String { speedPrecision.map { RemoteSpeedPresentation.text($0.rawWpm, precise: true) } ?? String(rawWpm) }
     let mode2: String?
     let id: UUID
     let mode: String
@@ -405,6 +410,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
             errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
             bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
         case personalBestConfiguration
+        case speedPrecision
     }
 
     init(from decoder: Decoder) throws {
@@ -420,6 +426,10 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         }
         wpm = try values.decode(Int.self, forKey: .wpm)
         rawWpm = try values.decode(Int.self, forKey: .rawWpm)
+        speedPrecision = values.contains(.speedPrecision) ? try values.decode(RemoteSpeedPrecision.self,forKey:.speedPrecision) : nil
+        if let speedPrecision, !speedPrecision.matches(wpm:wpm,rawWpm:rawWpm) {
+            throw DecodingError.dataCorruptedError(forKey:.speedPrecision,in:values,debugDescription:"Speed precision disagrees with legacy view")
+        }
         accuracy = try values.decode(Int.self, forKey: .accuracy)
         preciseAccuracy = try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy)
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
@@ -462,11 +472,12 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
                 debugDescription: "Remote incomplete practice requires raw count and carried timing")
         }
         elapsedTime = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
-        startedAtReferenceTime = elapsedTime == nil ? nil : try values.decode(Double.self, forKey: .startedAtReferenceTime)
-        finishedAtReferenceTime = elapsedTime == nil ? nil : try values.decode(Double.self, forKey: .finishedAtReferenceTime)
-        startedAt = elapsedTime == nil ? try values.decode(Date.self, forKey: .startedAt)
+        let preciseDates = elapsedTime != nil || speedPrecision != nil
+        startedAtReferenceTime = !preciseDates ? nil : try values.decode(Double.self, forKey: .startedAtReferenceTime)
+        finishedAtReferenceTime = !preciseDates ? nil : try values.decode(Double.self, forKey: .finishedAtReferenceTime)
+        startedAt = !preciseDates ? try values.decode(Date.self, forKey: .startedAt)
             : try CompatibleDatePrecision.decode(from: values, legacyKey: .startedAt, precisionKey: .startedAtReferenceTime)
-        finishedAt = elapsedTime == nil ? try values.decode(Date.self, forKey: .finishedAt)
+        finishedAt = !preciseDates ? try values.decode(Date.self, forKey: .finishedAt)
             : try CompatibleDatePrecision.decode(from: values, legacyKey: .finishedAt, precisionKey: .finishedAtReferenceTime)
         terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
         bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
@@ -867,6 +878,7 @@ struct RemoteArchivePull {
 }
 
 struct RemoteResultSubmission: Codable, Sendable {
+    let speedPrecision: RemoteSpeedPrecision?
     let mode2: String?
     let id: UUID
     let mode: String
@@ -904,6 +916,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         includesInputMetricsV2: Bool = false, resultConsistency: RemoteResultConsistency? = nil,
         experienceEvidence: RemoteExperienceEvidence? = nil, rankingEvidence: RemoteRankingEvidence? = nil,
         personalBestConfiguration: RemotePersonalBestConfiguration? = nil,
+        speedPrecision: RemoteSpeedPrecision? = nil,
         includesMode2: Bool = false
     ) {
         id = result.id
@@ -913,8 +926,9 @@ struct RemoteResultSubmission: Codable, Sendable {
         language = result.configuration.language.rawValue
         durationSeconds = result.configuration.duration.map { Int($0) }
         wordLimit = result.configuration.wordLimit
-        wpm = result.wpm
-        rawWpm = result.rawWpm
+        self.speedPrecision = speedPrecision
+        wpm = speedPrecision.map { Int($0.wpm.rounded()) } ?? result.wpm
+        rawWpm = speedPrecision.map { Int($0.rawWpm.rounded()) } ?? result.rawWpm
         accuracy = result.accuracy
         consistency = ResultConsistencyPolicy.metrics(
             events: result.replayEvents, duration: result.chartDuration,
@@ -941,8 +955,8 @@ struct RemoteResultSubmission: Codable, Sendable {
         finishedAt = result.finishedAt
         terminalTiming = result.terminalTiming
         elapsedTime = result.elapsedTime
-        startedAtReferenceTime = result.elapsedTime == nil ? nil : result.startedAt.timeIntervalSinceReferenceDate
-        finishedAtReferenceTime = result.elapsedTime == nil ? nil : result.finishedAt.timeIntervalSinceReferenceDate
+        startedAtReferenceTime = result.elapsedTime == nil && speedPrecision == nil ? nil : result.startedAt.timeIntervalSinceReferenceDate
+        finishedAtReferenceTime = result.elapsedTime == nil && speedPrecision == nil ? nil : result.finishedAt.timeIntervalSinceReferenceDate
         bailedOut = result.outcome == .bailedOut ? true : nil
         customLimit = result.outcome == .bailedOut && result.configuration.mode == .custom
             ? .init(configuration: result.configuration) : nil
@@ -956,6 +970,9 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
 
     var supportsResultPersonalBestConfiguration: Bool {
         apiVersion == "v1" && service == "typebar" && capabilities["resultPersonalBestConfiguration"] == "available"
+    }
+    var supportsResultSpeedPrecision: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["resultSpeedPrecision"] == "available"
     }
 
     var supportsRewardInbox: Bool {
@@ -1131,6 +1148,9 @@ struct RemoteResultSubmissionResponse: Codable, Sendable {
 }
 
 struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
+    let preciseWpm: Double?
+    var effectiveWpm: Double { preciseWpm ?? Double(wpm) }
+    var speedText: String { preciseWpm.map { RemoteSpeedPresentation.text($0, precise: true) } ?? String(wpm) }
     let mode2: String?
     let id: UUID
     let rank: Int
@@ -1148,7 +1168,7 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
     let discordAvatar: RemoteDiscordAvatar?
 
     private enum CodingKeys: String, CodingKey {
-        case id, rank, friendsRank, userID, displayName, mode, language, wpm, accuracy, preciseAccuracy, consistency, finishedAt, selectedBadge, discordAvatar, mode2
+        case id, rank, friendsRank, userID, displayName, mode, language, wpm, accuracy, preciseAccuracy, consistency, finishedAt, selectedBadge, discordAvatar, mode2, preciseWpm
     }
 
     init(from decoder: Decoder) throws {
@@ -1168,6 +1188,10 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
         }
         language = try values.decode(String.self, forKey: .language)
         wpm = try values.decode(Int.self, forKey: .wpm)
+        preciseWpm = values.contains(.preciseWpm) ? try values.decode(Double.self,forKey:.preciseWpm) : nil
+        if let preciseWpm, !RemoteSpeedPrecision.isCanonical(preciseWpm) || Int(preciseWpm.rounded()) != wpm {
+            throw DecodingError.dataCorruptedError(forKey:.preciseWpm,in:values,debugDescription:"Invalid leaderboard speed precision")
+        }
         accuracy = try values.decode(Int.self, forKey: .accuracy)
         preciseAccuracy = try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy)
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
@@ -1371,6 +1395,9 @@ struct RemoteExperienceLeaderboardRankResponse: Codable, Sendable {
 }
 
 struct RemotePublicProfile: Codable, Identifiable, Sendable {
+    let preciseBestWPM: Double?
+    var effectiveBestWPM: Double { preciseBestWPM ?? Double(bestWPM) }
+    var bestSpeedText: String { preciseBestWPM.map { RemoteSpeedPresentation.text($0, precise: true) } ?? String(bestWPM) }
     let id: UUID
     let displayName: String
     let accountSuspended: Bool
@@ -1394,6 +1421,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         case id, displayName, accountSuspended, joinedAt, completedResultCount, startedTestCount, totalTypingSeconds, bestWPM, highestConsistency, personalBests,
             activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge,
             earnedBadges, practiceHistoryComplete
+        case preciseBestWPM
     }
 
     init(from decoder: Decoder) throws {
@@ -1406,6 +1434,10 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         startedTestCount = try values.decodeIfPresent(Int.self, forKey: .startedTestCount) ?? 0
         totalTypingSeconds = try values.decodeIfPresent(Double.self, forKey: .totalTypingSeconds) ?? 0
         bestWPM = try values.decode(Int.self, forKey: .bestWPM)
+        preciseBestWPM = values.contains(.preciseBestWPM) ? try values.decode(Double.self,forKey:.preciseBestWPM) : nil
+        if let preciseBestWPM, !RemoteSpeedPrecision.isCanonical(preciseBestWPM) || Int(preciseBestWPM.rounded()) != bestWPM {
+            throw DecodingError.dataCorruptedError(forKey:.preciseBestWPM,in:values,debugDescription:"Invalid public best speed precision")
+        }
         highestConsistency = try values.decodeIfPresent(Double.self, forKey: .highestConsistency) ?? 0
         personalBests = try values.decodeIfPresent([RemotePublicProfileBest].self, forKey: .personalBests) ?? []
         activity = try values.decodeIfPresent(RemotePublicProfileActivity.self, forKey: .activity)
@@ -1456,6 +1488,9 @@ struct RemoteDiscordAvatar: Codable, Equatable, Sendable {
 }
 
 struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
+    let preciseWpm: Double?
+    var effectiveWpm: Double { preciseWpm ?? Double(wpm) }
+    var speedText: String { preciseWpm.map { RemoteSpeedPresentation.text($0, precise: true) } ?? String(wpm) }
     let id: UUID
     let mode: String
     let durationSeconds: Int?
@@ -1466,6 +1501,24 @@ struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
     let preciseAccuracy: Double?
     let consistency: Double
     let finishedAt: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case id,mode,durationSeconds,wordLimit,language,wpm,accuracy,preciseAccuracy,consistency,finishedAt,preciseWpm
+    }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy:CodingKeys.self)
+        id = try values.decode(UUID.self,forKey:.id); mode = try values.decode(String.self,forKey:.mode)
+        durationSeconds = try values.decodeIfPresent(Int.self,forKey:.durationSeconds)
+        wordLimit = try values.decodeIfPresent(Int.self,forKey:.wordLimit)
+        language = try values.decode(String.self,forKey:.language); wpm = try values.decode(Int.self,forKey:.wpm)
+        accuracy = try values.decode(Int.self,forKey:.accuracy)
+        preciseAccuracy = try values.decodeIfPresent(Double.self,forKey:.preciseAccuracy)
+        consistency = try values.decode(Double.self,forKey:.consistency); finishedAt = try values.decode(Date.self,forKey:.finishedAt)
+        preciseWpm = values.contains(.preciseWpm) ? try values.decode(Double.self,forKey:.preciseWpm) : nil
+        if let preciseWpm, !RemoteSpeedPrecision.isCanonical(preciseWpm) || Int(preciseWpm.rounded()) != wpm {
+            throw DecodingError.dataCorruptedError(forKey:.preciseWpm,in:values,debugDescription:"Invalid public PB speed precision")
+        }
+    }
 
     var configurationLabel: String {
         if mode == "time", let durationSeconds { return "\(durationSeconds) 秒" }

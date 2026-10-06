@@ -8,7 +8,7 @@
 
 [控制器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/backend/src/api/controllers/leaderboard.ts#L129) 将该字段随列表返回；[原生参照的用户名次组件](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/leaderboard/UserRank.tsx#L67) 在退出排行榜、封禁及练习时长不足之后显示最低速度说明。读取字段与设置中的最低练习速度不是同一功能，也不能用这个字段重新判定成绩准入。
 
-源实现先将 WPM 打包舍入，再解出榜尾，小数条目 59.995 对应 minWpm 60，而不是照搬条目 WPM。Typebar 现有成绩与缓存生产仍使用整数 WPM，所以在当前整数域中从完整可见人口取得最低 WPM 与解分数结果一致。本轮客户端保留 Double 元数据并按现有五种单位转换，不宣称已接通小数 WPM 投稿、缓存或整个源参数域。
+源实现先将 WPM 打包舍入，再解出榜尾，小数条目 59.995 对应 minWpm 60，而不是照搬条目 WPM。本合同初始阶段只使用整数生产；后续 [远程小数速度合同](RESULT_SPEED_PRECISION_CONTRACT.md) 将已知两位报告接通缓存与榜尾，从完整可见人口取得最低 effectiveWpm。报告先限制为规范两位值，因此不把未经舍入的任意 Double 当作解码分数结果；旧缓存继续使用整数。
 
 ## 原生生产链路
 
