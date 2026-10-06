@@ -31,7 +31,7 @@ struct ArchiveManagementView: View {
                     LabeledContent(
                         "当前测试选择",
                         value: settings.activeTestSelection == nil ? "尚未生成" : "会迁移")
-                    Text("导出文件包含当前测试选择，但不含账户或远程服务数据，可用于迁移到另一台 Mac。")
+                    Text("导出文件包含当前测试选择和本机个人／标签最佳账本，但不含账户或远程服务数据，可用于迁移到另一台 Mac。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -80,30 +80,34 @@ struct ArchiveManagementView: View {
     }
 
     private func beginExport() {
-        let portableResults = results.compactMap(\.portableResult)
-        let namedPresets = presets.compactMap { record in
-            record.definition.map { NamedPreset(id: record.id, name: record.name, definition: $0) }
-        }
-        let namedSavedTexts = savedTexts.map {
-            NamedSavedText(id: $0.id, title: $0.title, text: $0.text, longProgress: $0.longProgress)
-        }
-        let namedResultFilterPresets = resultFilterPresets.compactMap(\.portablePreset)
-        exportDocument = TypebarArchiveDocument(archive: .init(
-            version: TypebarArchive.currentVersion,
-            exportedAt: .now,
-            settings: settings.snapshot,
-            deletedCustomThemeIDs: customizationTombstones.deletedThemeIDs,
-            deletedCustomKeyboardLayoutIDs: customizationTombstones.deletedKeyboardLayoutIDs,
-            results: portableResults,
-            deletedResultIDs: resultTombstones.deletedIDs,
-            presets: namedPresets,
-            deletedPresetIDs: presetTombstones.deletedIDs,
-            savedTexts: namedSavedTexts,
-            deletedSavedTextIDs: savedTextTombstones.deletedIDs,
-            resultFilterPresets: namedResultFilterPresets,
-            deletedResultFilterPresetIDs: resultFilterPresetTombstones.deletedIDs,
-            activeTestSelection: settings.activeTestSelection
-        ))
+        do {
+            let ledger = try LocalPersonalBestStore.exportLedger(in: modelContext)
+            let portableResults = results.compactMap(\.portableResult)
+            let namedPresets = presets.compactMap { record in
+                record.definition.map { NamedPreset(id: record.id, name: record.name, definition: $0) }
+            }
+            let namedSavedTexts = savedTexts.map {
+                NamedSavedText(id: $0.id, title: $0.title, text: $0.text, longProgress: $0.longProgress)
+            }
+            let namedResultFilterPresets = resultFilterPresets.compactMap(\.portablePreset)
+            exportDocument = TypebarArchiveDocument(archive: .init(
+                version: TypebarArchive.currentVersion,
+                exportedAt: .now,
+                settings: settings.snapshot,
+                deletedCustomThemeIDs: customizationTombstones.deletedThemeIDs,
+                deletedCustomKeyboardLayoutIDs: customizationTombstones.deletedKeyboardLayoutIDs,
+                results: portableResults,
+                deletedResultIDs: resultTombstones.deletedIDs,
+                presets: namedPresets,
+                deletedPresetIDs: presetTombstones.deletedIDs,
+                savedTexts: namedSavedTexts,
+                deletedSavedTextIDs: savedTextTombstones.deletedIDs,
+                resultFilterPresets: namedResultFilterPresets,
+                deletedResultFilterPresetIDs: resultFilterPresetTombstones.deletedIDs,
+                activeTestSelection: settings.activeTestSelection,
+                localPersonalBestLedger: ledger
+            ))
+        } catch { message = .init(title: "无法导出", detail: error.localizedDescription) }
     }
 
     private func importArchive(at url: URL) {

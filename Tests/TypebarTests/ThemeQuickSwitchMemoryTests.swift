@@ -148,7 +148,7 @@ final class ThemeQuickSwitchMemoryTests: XCTestCase {
         deletedCustomThemeIDs: [themes[0].id], results: [], presets: [])
       let remote = TypebarArchive(
         exportedAt: Date(timeIntervalSince1970: 101), settings: beforeRemoval, results: [], presets: [])
-      let merged = TypebarArchiveConflictMerge.merge(local: local, remote: remote)
+      let merged = try TypebarArchiveConflictMerge.merge(local: local, remote: remote)
       XCTAssertNil(merged.settings.lastCustomThemeID)
       XCTAssertEqual(merged.settings.customThemes.map(\.id), [themes[1].id])
       XCTAssertEqual(merged.deletedCustomThemeIDs, [themes[0].id])

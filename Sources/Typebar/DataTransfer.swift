@@ -321,9 +321,10 @@ struct TypebarArchive: Codable, Equatable {
     // logical deletion positions, independent terminal clock evidence and
     // custom pace speeds beyond the legacy integer editor domain, and
     // measured elapsed time independent of calendar dates and captured quote
-    // identity independent of titles or a later selected quote.
+    // identity independent of titles or a later selected quote, and an
+    // independent numeric PB ledger that cannot be recovered from history.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 27
+    static let currentVersion = 28
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -338,6 +339,7 @@ struct TypebarArchive: Codable, Equatable {
     let resultFilterPresets: [NamedResultFilterPreset]
     let deletedResultFilterPresetIDs: [UUID]
     let activeTestSelection: ActiveTestSelectionDocument?
+    let localPersonalBestLedger: LocalPersonalBestLedger?
 
     init(
         version: Int = TypebarArchive.currentVersion,
@@ -353,7 +355,8 @@ struct TypebarArchive: Codable, Equatable {
         deletedSavedTextIDs: [UUID] = [],
         resultFilterPresets: [NamedResultFilterPreset] = [],
         deletedResultFilterPresetIDs: [UUID] = [],
-        activeTestSelection: ActiveTestSelectionDocument? = nil
+        activeTestSelection: ActiveTestSelectionDocument? = nil,
+        localPersonalBestLedger: LocalPersonalBestLedger? = nil
     ) {
         let hasFields = results.contains { $0.replayEvents.contains { $0.inputField != nil } }
         let hasJudgments = results.contains { $0.replayEvents.contains { $0.inputCorrectness != nil } }
@@ -372,10 +375,11 @@ struct TypebarArchive: Codable, Equatable {
         let hasIncompletePractice = results.contains { $0.incompletePractice != nil }
         let hasQuoteIdentity = results.contains { $0.quoteSource?.quoteID != nil }
         let hasExpandedPace = Self.requiresExpandedPaceFormat(settings: settings, presets: presets)
-        self.version = hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        self.version = localPersonalBestLedger != nil ? max(28, version) : hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
-        let payloadVersion = hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
+        let payloadVersion = localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
+        self.localPersonalBestLedger = localPersonalBestLedger
         let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = payloadVersion >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
         self.deletedCustomThemeIDs = deletedThemes.sorted { $0.uuidString < $1.uuidString }
@@ -420,10 +424,18 @@ struct TypebarArchive: Codable, Equatable {
             results, deletedResultIDs, presets, deletedPresetIDs, savedTexts, deletedSavedTextIDs, resultFilterPresets,
             deletedResultFilterPresetIDs, activeTestSelection
         case exportedAtReferenceTime
+        case localPersonalBestLedgerData
     }
 
     func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
+        if let ledger = localPersonalBestLedger {
+            guard version >= 28 else { throw DataTransferError.unsupportedVersion(version) }
+            try ledger.validate()
+            // Standalone default date coding retains milliseconds under ISO8601
+            // file and remote encoders. This is a native, versioned wire format.
+            try values.encode(JSONEncoder().encode(ledger), forKey: .localPersonalBestLedgerData)
+        }
         try values.encode(version, forKey: .version)
         try CompatibleDatePrecision.encode(exportedAt, into: &values,
             legacyKey: .exportedAt, precisionKey: .exportedAtReferenceTime)
@@ -444,6 +456,13 @@ struct TypebarArchive: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decode(Int.self, forKey: .version)
+        if values.contains(.localPersonalBestLedgerData) {
+            guard version >= 28 else { throw DataTransferError.unsupportedVersion(version) }
+            let data = try values.decode(Data.self, forKey: .localPersonalBestLedgerData)
+            let ledger = try JSONDecoder().decode(LocalPersonalBestLedger.self, from: data)
+            try ledger.validate()
+            localPersonalBestLedger = ledger
+        } else { localPersonalBestLedger = nil }
         exportedAt = try CompatibleDatePrecision.decode(from: values,
             legacyKey: .exportedAt, precisionKey: .exportedAtReferenceTime)
         let decodedSettings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
@@ -927,6 +946,7 @@ enum TypebarDataTransfer {
         resultFilterPresets: [NamedResultFilterPreset] = [],
         deletedResultFilterPresetIDs: [UUID] = [],
         activeTestSelection: ActiveTestSelectionDocument? = nil,
+        localPersonalBestLedger: LocalPersonalBestLedger? = nil,
         at date: Date = .now
     ) throws -> Data {
         try JSONEncoder.typebar.encode(TypebarArchive(
@@ -943,7 +963,8 @@ enum TypebarDataTransfer {
             deletedSavedTextIDs: deletedSavedTextIDs,
             resultFilterPresets: resultFilterPresets,
             deletedResultFilterPresetIDs: deletedResultFilterPresetIDs,
-            activeTestSelection: activeTestSelection))
+            activeTestSelection: activeTestSelection,
+            localPersonalBestLedger: localPersonalBestLedger))
     }
 
     static func importArchive(from data: Data) throws -> TypebarArchive {
@@ -1179,15 +1200,30 @@ enum TypebarArchiveConflictMerge {
         local: TypebarArchive,
         remote: TypebarArchive,
         makeID: () -> UUID = UUID.init
-    ) -> TypebarArchive {
-        mergeWithReport(local: local, remote: remote, makeID: makeID).archive
+    ) throws -> TypebarArchive {
+        try mergeWithReport(local: local, remote: remote, makeID: makeID).archive
     }
 
     static func mergeWithReport(
         local: TypebarArchive,
         remote: TypebarArchive,
         makeID: () -> UUID = UUID.init
-    ) -> TypebarArchiveConflictMergeResult {
+    ) throws -> TypebarArchiveConflictMergeResult {
+        let ledger: LocalPersonalBestLedger?
+        func recoverHistory(_ archive: TypebarArchive) throws -> LocalPersonalBestLedger {
+            var baseline = LocalPersonalBestLedger()
+            baseline.historyComplete = false
+            for result in archive.results.sorted(by: {
+                $0.finishedAt == $1.finishedAt ? $0.id.uuidString < $1.id.uuidString : $0.finishedAt < $1.finishedAt
+            }) { try baseline.accept(result, at: nil, origin: .importedHistory) }
+            return baseline
+        }
+        switch (local.localPersonalBestLedger, remote.localPersonalBestLedger) {
+        case let (left?, right?): ledger = try left.merged(with: right)
+        case let (value?, nil): ledger = try value.merged(with: recoverHistory(remote))
+        case let (nil, value?): ledger = try recoverHistory(local).merged(with: value)
+        case (nil, nil): ledger = nil
+        }
         let deletedCustomThemeIDs = Set(local.deletedCustomThemeIDs)
             .union(remote.deletedCustomThemeIDs)
         let deletedCustomKeyboardLayoutIDs = Set(local.deletedCustomKeyboardLayoutIDs)
@@ -1378,7 +1414,8 @@ enum TypebarArchiveConflictMerge {
                 deletedSavedTextIDs: Array(deletedSavedTextIDs),
                 resultFilterPresets: resultFilterPresets,
                 deletedResultFilterPresetIDs: Array(deletedResultFilterPresetIDs),
-                activeTestSelection: local.activeTestSelection),
+                activeTestSelection: local.activeTestSelection,
+                localPersonalBestLedger: ledger),
             conflicts: conflicts)
     }
 
@@ -1634,7 +1671,11 @@ enum LocalArchiveImport {
         ).compactMap(ResultFilterPresetRecord.init(portablePreset:))
 
         let personalBestCheckpoint = try LocalPersonalBestStore.checkpoint(in: modelContext)
-        do { try LocalPersonalBestStore.stage(newResults, in: modelContext) }
+        do {
+            if let ledger = archive.localPersonalBestLedger {
+                try LocalPersonalBestStore.stageImportedLedger(ledger, in: modelContext)
+            } else { try LocalPersonalBestStore.stage(newResults, in: modelContext) }
+        }
         catch { LocalPersonalBestStore.restore(personalBestCheckpoint, in: modelContext); throw error }
         for result in newResults { modelContext.insert(TestResultRecord(result: result)) }
         for result in resultRecordsToDelete { modelContext.delete(result) }
@@ -1700,7 +1741,11 @@ struct TypebarArchiveDocument: FileDocument {
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: try TypebarDataTransfer.exportArchive(
+        FileWrapper(regularFileWithContents: try archiveData())
+    }
+
+    func archiveData() throws -> Data {
+        try TypebarDataTransfer.exportArchive(
             settings: archive.settings,
             deletedCustomThemeIDs: archive.deletedCustomThemeIDs,
             deletedCustomKeyboardLayoutIDs: archive.deletedCustomKeyboardLayoutIDs,
@@ -1713,8 +1758,9 @@ struct TypebarArchiveDocument: FileDocument {
             resultFilterPresets: archive.resultFilterPresets,
             deletedResultFilterPresetIDs: archive.deletedResultFilterPresetIDs,
             activeTestSelection: archive.activeTestSelection,
+            localPersonalBestLedger: archive.localPersonalBestLedger,
             at: archive.exportedAt
-        ))
+        )
     }
 }
 

@@ -26465,7 +26465,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.definition, definition)
   }
 
-  func testArchiveConflictMergeKeepsPresetDeletionOverAnOlderActiveSnapshot() {
+  func testArchiveConflictMergeKeepsPresetDeletionOverAnOlderActiveSnapshot() throws {
     let presetID = UUID(uuidString: "00000000-0000-0000-0000-000000000741")!
     let preset = NamedPreset(
       id: presetID, name: "Morning", definition: .init(
@@ -26476,7 +26476,7 @@ final class TypingEngineTests: XCTestCase {
     let remote = TypebarArchive(
       exportedAt: start, settings: .init(), results: [], presets: [preset])
 
-    let merged = TypebarArchiveConflictMerge.merge(local: local, remote: remote)
+    let merged = try TypebarArchiveConflictMerge.merge(local: local, remote: remote)
 
     XCTAssertTrue(merged.presets.isEmpty)
     XCTAssertEqual(merged.deletedPresetIDs, [presetID])
@@ -26527,7 +26527,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.text, existing.text)
   }
 
-  func testArchiveConflictMergeKeepsSavedTextDeletionOverAnOlderActiveSnapshot() {
+  func testArchiveConflictMergeKeepsSavedTextDeletionOverAnOlderActiveSnapshot() throws {
     let textID = UUID(uuidString: "00000000-0000-0000-0000-000000000841")!
     let savedText = NamedSavedText(id: textID, title: "Focus", text: "steady words")
     let local = TypebarArchive(
@@ -26536,7 +26536,7 @@ final class TypingEngineTests: XCTestCase {
     let remote = TypebarArchive(
       exportedAt: start, settings: .init(), results: [], presets: [], savedTexts: [savedText])
 
-    let merged = TypebarArchiveConflictMerge.merge(local: local, remote: remote)
+    let merged = try TypebarArchiveConflictMerge.merge(local: local, remote: remote)
 
     XCTAssertTrue(merged.savedTexts.isEmpty)
     XCTAssertEqual(merged.deletedSavedTextIDs, [textID])
@@ -26785,7 +26785,7 @@ final class TypingEngineTests: XCTestCase {
       resultFilterPresets: [remoteFilterPreset],
       activeTestSelection: remoteSelection)
 
-    let merged = TypebarArchiveConflictMerge.merge(
+    let merged = try TypebarArchiveConflictMerge.merge(
       local: local, remote: remote, makeID: { clonedThemeID })
 
     XCTAssertEqual(merged.settings.fontSize, 31)
@@ -26804,7 +26804,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(merged.activeTestSelection, localSelection)
   }
 
-  func testArchiveConflictMergeKeepsCustomizationDeletionOverAnOlderActiveSnapshot() {
+  func testArchiveConflictMergeKeepsCustomizationDeletionOverAnOlderActiveSnapshot() throws {
     let theme = CustomThemeDefinition(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000000921")!,
       name: "Harbour", background: .init(red: 0.1, green: 0.2, blue: 0.3),
@@ -26826,7 +26826,7 @@ final class TypingEngineTests: XCTestCase {
       exportedAt: start.addingTimeInterval(1), settings: olderActiveSettings,
       results: [], presets: [])
 
-    let merged = TypebarArchiveConflictMerge.merge(
+    let merged = try TypebarArchiveConflictMerge.merge(
       local: localDeletion, remote: remoteOlderSnapshot)
 
     XCTAssertTrue(merged.settings.customThemes.isEmpty)
@@ -26891,7 +26891,7 @@ final class TypingEngineTests: XCTestCase {
       ])
     var generatedIDs = [clonedThemeID, clonedLayoutID].makeIterator()
 
-    let result = TypebarArchiveConflictMerge.mergeWithReport(
+    let result = try TypebarArchiveConflictMerge.mergeWithReport(
       local: local, remote: remote, makeID: { generatedIDs.next()! })
 
     XCTAssertEqual(result.archive.presets.map(\.name), ["Daily", "Daily（同步冲突）", "Unique"])
@@ -26953,7 +26953,7 @@ final class TypingEngineTests: XCTestCase {
       exportedAt: start, settings: .init(), results: [], presets: [],
       savedTexts: [.init(title: title, text: "remote")])
 
-    let merged = TypebarArchiveConflictMerge.merge(local: local, remote: remote)
+    let merged = try TypebarArchiveConflictMerge.merge(local: local, remote: remote)
     let conflict = try XCTUnwrap(merged.savedTexts.last)
 
     XCTAssertLessThanOrEqual(conflict.title.count, CustomTextPolicy.maximumTitleLength)

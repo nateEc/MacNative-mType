@@ -441,7 +441,9 @@ struct CloudSyncView: View {
     }
 
     private func push() {
-        let archive = localArchive
+        let archive: TypebarArchive
+        do { archive = try localArchive() }
+        catch { message = error.localizedDescription; return }
         Task {
             do {
                 let cursor = try await account.pushArchive(archive)
@@ -455,7 +457,7 @@ struct CloudSyncView: View {
                     else {
                         throw RemoteAccountError.serverMessage("无法取得服务器最新归档，未自动覆盖本机内容。")
                     }
-                    let mergeResult = TypebarArchiveConflictMerge.mergeWithReport(
+                    let mergeResult = try TypebarArchiveConflictMerge.mergeWithReport(
                         local: archive, remote: remoteArchive)
                     let summary = try LocalArchiveImport.apply(
                         mergeResult.archive, settings: settings, results: results, presets: presets,
@@ -754,7 +756,8 @@ struct CloudSyncView: View {
         }
     }
 
-    private var localArchive: TypebarArchive {
+    private func localArchive() throws -> TypebarArchive {
+        let ledger = try LocalPersonalBestStore.exportLedger(in: modelContext)
         let portableResults = results.compactMap(\.portableResult)
         let namedPresets = presets.compactMap { record in
             record.definition.map { NamedPreset(id: record.id, name: record.name, definition: $0) }
@@ -776,7 +779,8 @@ struct CloudSyncView: View {
             deletedSavedTextIDs: savedTextTombstones.deletedIDs,
             resultFilterPresets: namedResultFilterPresets,
             deletedResultFilterPresetIDs: resultFilterPresetTombstones.deletedIDs,
-            activeTestSelection: settings.activeTestSelection)
+            activeTestSelection: settings.activeTestSelection,
+            localPersonalBestLedger: ledger)
     }
 }
 

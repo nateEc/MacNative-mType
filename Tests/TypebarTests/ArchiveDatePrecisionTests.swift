@@ -157,7 +157,7 @@ final class ArchiveDatePrecisionTests: XCTestCase {
     let older = try imported(at: start.addingTimeInterval(0.25))
     let newer = try imported(at: start.addingTimeInterval(0.5))
     XCTAssertLessThan(older.exportedAt, newer.exportedAt)
-    XCTAssertEqual(TypebarArchiveConflictMerge.merge(local: older, remote: newer).exportedAt,
+    XCTAssertEqual(try TypebarArchiveConflictMerge.merge(local: older, remote: newer).exportedAt,
       start.addingTimeInterval(0.5))
   }
 

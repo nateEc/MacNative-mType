@@ -120,6 +120,13 @@ struct LocalPersonalBestLedger: Codable, Equatable {
 
   func validate() throws {
     guard version == 1 else { throw LocalPersonalBestStoreError.invalidLedger }
+    var identities: [UUID: LocalPersonalBestRow] = [:]
+    for snapshot in entries + tagEntries.map(\.snapshot) {
+      if let old = identities[snapshot.row.id], old != snapshot.row {
+        throw LocalPersonalBestStoreError.conflictingResult
+      }
+      identities[snapshot.row.id] = snapshot.row
+    }
     var groups = Set<LocalPersonalBestGroup>()
     for entry in entries {
       try Self.validate(entry)
@@ -154,6 +161,56 @@ struct LocalPersonalBestLedger: Codable, Equatable {
       (snapshot.origin == .accepted
         ? snapshot.recordedAt?.timeIntervalSinceReferenceDate.isFinite == true : snapshot.recordedAt == nil)
     else { throw LocalPersonalBestStoreError.invalidLedger }
+  }
+
+  /// Offline union has no global acceptance order. Prefer faster whole snapshots,
+  /// then the earlier known acceptance clock, then UUID; never combine metrics.
+  func merged(with other: Self) throws -> Self {
+    try validate(); try other.validate()
+    var identities: [UUID: LocalPersonalBestRow] = [:]
+    for snapshot in entries + other.entries + (tagEntries + other.tagEntries).map(\.snapshot) {
+      if let old = identities[snapshot.row.id], old != snapshot.row {
+        throw LocalPersonalBestStoreError.conflictingResult
+      }
+      identities[snapshot.row.id] = snapshot.row
+    }
+    func winner(_ left: LocalPersonalBestSnapshot, _ right: LocalPersonalBestSnapshot) -> LocalPersonalBestSnapshot {
+      if left.row.wpm != right.row.wpm { return left.row.wpm > right.row.wpm ? left : right }
+      if left.recordedAt != right.recordedAt {
+        guard let l = left.recordedAt else { return right }
+        guard let r = right.recordedAt else { return left }
+        return l < r ? left : right
+      }
+      if left.row.id != right.row.id {
+        return left.row.id.uuidString < right.row.id.uuidString ? left : right
+      }
+      return left.origin.rawValue <= right.origin.rawValue ? left : right
+    }
+    var groups: [LocalPersonalBestGroup: LocalPersonalBestSnapshot] = [:]
+    for candidate in entries + other.entries {
+      let group = LocalPersonalBestGroup(candidate.row)
+      groups[group] = groups[group].map { winner($0, candidate) } ?? candidate
+    }
+    struct TagGroup: Hashable { let tag: String; let group: LocalPersonalBestGroup }
+    var tags: [TagGroup: LocalTagPersonalBestSnapshot] = [:]
+    for candidate in tagEntries + other.tagEntries {
+      let key = TagGroup(tag: Self.tagKey(candidate.tag), group: .init(candidate.snapshot.row))
+      if let old = tags[key] {
+        let selected = winner(old.snapshot, candidate.snapshot)
+        if old.snapshot == candidate.snapshot {
+          tags[key] = old.tag <= candidate.tag ? old : candidate
+        } else { tags[key] = selected == old.snapshot ? old : candidate }
+      } else { tags[key] = candidate }
+    }
+    var result = Self()
+    result.historyComplete = historyComplete && other.historyComplete
+    result.entries = groups.values.sorted { $0.row.id.uuidString < $1.row.id.uuidString }
+    result.tagEntries = tags.values.sorted {
+      let l = Self.tagKey($0.tag), r = Self.tagKey($1.tag)
+      return l == r ? $0.snapshot.row.id.uuidString < $1.snapshot.row.id.uuidString : l < r
+    }
+    try result.validate()
+    return result
   }
 }
 
@@ -258,6 +315,21 @@ enum LocalPersonalBestStore {
       records.first.map({ $0.id == UUID(uuidString: "A6E40891-BCF0-4C7A-A218-29135E040101")! }) ?? true
     else { throw LocalPersonalBestStoreError.invalidLedger }
     return records.first
+  }
+
+  static func exportLedger(in context: ModelContext) throws -> LocalPersonalBestLedger {
+    guard let record = try existing(in: context) else { throw LocalPersonalBestStoreError.invalidLedger }
+    return try record.decodedLedger()
+  }
+
+  /// A captured empty book is authoritative: history must not rebuild it.
+  static func stageImportedLedger(_ incoming: LocalPersonalBestLedger, in context: ModelContext) throws {
+    try incoming.validate()
+    let record: LocalPersonalBestLedgerRecord
+    if let old = try existing(in: context) { record = old }
+    else { record = try baseline(in: context); context.insert(record) }
+    let merged = try record.decodedLedger().merged(with: incoming)
+    record.ledgerData = try JSONEncoder().encode(merged)
   }
 
   private static func baseline(in context: ModelContext, legacyStorePresent: Bool = false) throws -> LocalPersonalBestLedgerRecord {
