@@ -97,6 +97,7 @@ struct RemoteAccountResultTagPicker: View {
   let result: RemoteAccountResult
   let account: AccountSession
   var fromResultPage = false
+  var completionRows: [AccountTagCompletionRow] = []
   @State private var message: String?
   @State private var busy = false
   @State private var expanded = false
@@ -120,6 +121,7 @@ struct RemoteAccountResultTagPicker: View {
               Label("标签 PB", systemImage: "crown.fill")
             }
           }.font(.caption)
+            .help(completionRows.first { $0.id == id }?.hint ?? "账户标签 \(tag.displayName)")
         }
       }
       DisclosureGroup("账户标签（\(Set(current.accountTagIDs ?? []).intersection(knownIDs).count) 个）",

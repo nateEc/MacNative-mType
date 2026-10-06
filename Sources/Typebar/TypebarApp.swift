@@ -1342,6 +1342,8 @@ private struct ContentView: View {
           allowsReducedAccuracyThreshold: account.currentUser?.leaderboardOptedOut == true)
         let savesResult = ResultSavingPolicy.shouldPersist(
           outcome: result.outcome, enabled: settings.saveCompletedResults, eligibility: eligibility)
+        let accountTagCompletionFeedback = account.recordAccountTagCompletion(result, eligibility: eligibility,
+          at: Int64(floor(Date().timeIntervalSince1970 * 1000)))
         let resultPersonalBestFeedback = savesResult
           ? personalBestLedgers.first?.ledger?.feedback(for: result)
           : nil
@@ -1385,6 +1387,7 @@ private struct ContentView: View {
           quoteFeedback: activeQuoteFeedback,
           resultPersonalBestFeedback: resultPersonalBestFeedback,
           tagPersonalBestFeedback: tagPersonalBestFeedback,
+          accountTagCompletionFeedback: accountTagCompletionFeedback,
           missedWords: missedWordPractice?.selectedWords ?? [],
           missedWordPracticeWords: missedWordPractice?.exerciseWords ?? [],
           wordReviews: wordReviews,
@@ -1797,6 +1800,7 @@ private struct ContentView: View {
         quoteFeedback: result.quoteFeedback,
         resultPersonalBestFeedback: result.resultPersonalBestFeedback,
         tagPersonalBestFeedback: result.tagPersonalBestFeedback,
+        accountTagCompletionFeedback: result.accountTagCompletionFeedback,
         settings: settings,
         account: account,
         quoteRatings: quoteRatings,
@@ -5619,6 +5623,7 @@ private struct CompletedResultPresentation: Identifiable {
   let quoteFeedback: QuoteResultFeedbackTarget?
   let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   let tagPersonalBestFeedback: [TagPersonalBestFeedback]
+  let accountTagCompletionFeedback: AccountTagCompletionFeedback?
   let missedWords: [String]
   let missedWordPracticeWords: [String]
   let wordReviews: [TypedWordReview]
@@ -5699,6 +5704,7 @@ private struct CompletedResultView: View {
   let quoteFeedback: QuoteResultFeedbackTarget?
   let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   let tagPersonalBestFeedback: [TagPersonalBestFeedback]
+  let accountTagCompletionFeedback: AccountTagCompletionFeedback?
   let settings: AppSettings
   let account: AccountSession
   let quoteRatings: QuoteRatingStore
@@ -5899,6 +5905,7 @@ private struct CompletedResultView: View {
           ? resultPersonalBestFeedback : nil,
         tagPersonalBestFeedback: localResultSaveState.isSaved
           ? tagPersonalBestFeedback : [],
+        accountTagCompletionRows: visibleAccountTagCompletion?.rows ?? [],
         onVisibilityChange: onResultPerformanceVisibilityChange,
         onScaleChange: onResultGraphScaleChange,
         onInspectionChange: { inspectedResultWordIndexes = Set($0) },
@@ -5963,7 +5970,10 @@ private struct CompletedResultView: View {
       tagPersonalBestFeedbackView
 
       if let accepted = account.editableAccountTagResult(id: result.id) {
-        RemoteAccountResultTagPicker(result: accepted, account: account, fromResultPage: true)
+        RemoteAccountResultTagPicker(result: accepted, account: account, fromResultPage: true,
+          completionRows: visibleAccountTagCompletion?.rows ?? [])
+      } else if let feedback = visibleAccountTagCompletion {
+        AccountTagCompletionFeedbackView(feedback: feedback)
       }
 
       if let savedResultRecord {
@@ -6247,6 +6257,13 @@ private struct CompletedResultView: View {
       .foregroundStyle(.yellow)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+  }
+
+  private var visibleAccountTagCompletion: AccountTagCompletionFeedback? {
+    guard accountTagCompletionFeedback?.scope == account.resultPublicationScope,
+      account.lastAccountTagCompletionFeedback?.resultID == result.id,
+      accountTagCompletionFeedback?.resultID == result.id else { return nil }
+    return accountTagCompletionFeedback
   }
 
   @ViewBuilder
@@ -7183,6 +7200,7 @@ private struct ResultPerformanceChart: View {
   @State private var selectedElapsed: TimeInterval?
   private let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   private let tagPersonalBestFeedback: [TagPersonalBestFeedback]
+  private let accountTagCompletionRows: [AccountTagCompletionRow]
 
   init(
     prompt: String,
@@ -7197,6 +7215,7 @@ private struct ResultPerformanceChart: View {
     visibility: ResultPerformanceVisibility,
     resultPersonalBestFeedback: ResultPersonalBestFeedback?,
     tagPersonalBestFeedback: [TagPersonalBestFeedback],
+    accountTagCompletionRows: [AccountTagCompletionRow] = [],
     onVisibilityChange: @escaping (ResultPerformanceVisibility) -> Void,
     onScaleChange: @escaping (Bool) -> Void,
     onInspectionChange: @escaping ([Int]) -> Void,
@@ -7217,6 +7236,7 @@ private struct ResultPerformanceChart: View {
     self.resultPersonalBestFeedback = resultPersonalBestFeedback?.showsPreviousBestLine == true
       ? resultPersonalBestFeedback : nil
     self.tagPersonalBestFeedback = tagPersonalBestFeedback.filter(\.showsPreviousBestLine)
+    self.accountTagCompletionRows = accountTagCompletionRows.filter(\.showsPreviousBestLine)
     self.accent = accent
   }
 
@@ -7258,7 +7278,7 @@ private struct ResultPerformanceChart: View {
           if resultPersonalBestFeedback != nil {
             traceToggle("本机 PB", isOn: visibilityBinding(\.personalBestLine), color: .secondary)
           }
-          if !tagPersonalBestFeedback.isEmpty {
+          if !tagPersonalBestFeedback.isEmpty || !accountTagCompletionRows.isEmpty {
             traceToggle("标签 PB", isOn: visibilityBinding(\.tagPersonalBestLine), color: .secondary)
           }
           Spacer()
@@ -7302,6 +7322,16 @@ private struct ResultPerformanceChart: View {
               }
           }
           if visibility.tagPersonalBestLine {
+            ForEach(Array(accountTagCompletionRows.enumerated()), id: \.element.id) { index, row in
+              RuleMark(y: .value("账户标签 PB", typingSpeedUnit.converted(wpm: row.previousBestWpm)))
+                .foregroundStyle(.secondary.opacity(0.6))
+                .lineStyle(.init(lineWidth: 1, dash: [1, 4]))
+                .annotation(position: .top, alignment: index.isMultiple(of: 2) ? .leading : .trailing) {
+                  Text("\(row.name) PB \(typingSpeedUnit.formatted(wpm: row.previousBestWpm))")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .offset(x: index.isMultiple(of: 2) ? 15 : -15)
+                }
+            }
             ForEach(tagPersonalBestFeedback) { feedback in
               if let previousBestWpm = feedback.previousBestWpm {
                 RuleMark(
@@ -7433,6 +7463,7 @@ private struct ResultPerformanceChart: View {
     var description = "强调色为 WPM，灰虚线为 Raw，橙色为\(visibility.smoothBurst ? "平滑" : "原始") Burst"
     if resultPersonalBestFeedback != nil { description += "；灰横线为本机 PB" }
     if !tagPersonalBestFeedback.isEmpty { description += "；灰点划线为已有标签 PB" }
+    if !accountTagCompletionRows.isEmpty { description += "；账户标签 PB 按完成时的客户端基线显示" }
     return "\(description)；数据仅由本机输入回放重建。"
   }
 

@@ -2023,6 +2023,7 @@ final class AccountSession {
     private(set) var lastAccountResult: RemoteAccountResult?
     private(set) var lastAccountResultEditAwardIDs: [UUID] = []
     private(set) var lastAccountResultEditFeedback: AccountTagResultEditFeedback?
+    private(set) var lastAccountTagCompletionFeedback: AccountTagCompletionFeedback?
     private var lastAccountResultScope: ResultPublicationScope?
     private var lastAccountResultGeneration: UInt64 = 0
     private var pendingLastAccountResult: (id: UUID, finishedAt: Date)?
@@ -2726,7 +2727,7 @@ final class AccountSession {
         if lastAccountResult == nil, pendingLastAccountResult == nil,
             let latest = cache.results.max(by: { $0.finishedAt < $1.finishedAt }) {
             lastAccountResult = latest; lastAccountResultScope = read.scope
-            lastAccountResultEditFeedback = .init(ids: latest.accountTagIDs ?? [])
+            lastAccountResultEditFeedback = initialAccountTagEditFeedback(for: latest)
             lastAccountResultGeneration &+= 1
         }
         accountTagRevision &+= 1
@@ -2739,6 +2740,7 @@ final class AccountSession {
             lastAccountResult = nil; lastAccountResultScope = nil; pendingLastAccountResult = nil
             lastAccountResultEditAwardIDs = []; lastAccountResultAwards = nil
             lastAccountResultEditFeedback = nil
+            lastAccountTagCompletionFeedback = nil
             lastAccountResultGeneration &+= 1
         }
         accountTagRevision &+= 1
@@ -2762,13 +2764,44 @@ final class AccountSession {
         let normalized = try AccountTagHistoryCache(scope: read.scope, results: [result],
             knownIDs: Set(accountTags.map(\.id))).results[0]
         lastAccountResult = normalized; pendingLastAccountResult = nil
-        lastAccountResultEditFeedback = .init(ids: normalized.accountTagIDs ?? [])
+        lastAccountResultEditFeedback = initialAccountTagEditFeedback(for: normalized)
         accountTagRevision &+= 1
     }
 
     func failLastAccountResultRead(_ read: AccountTagLastResultRead) {
         guard resultPublicationScope == read.scope, lastAccountResultGeneration == read.generation else { return }
         pendingLastAccountResult = nil
+    }
+
+    func applyAccountTagCompletionFeedback(_ feedback: AccountTagCompletionFeedback,
+        result: CompletedTestResult, at milliseconds: Int64) {
+        guard feedback.scope == resultPublicationScope, feedback.resultID == result.id else { return }
+        let winners = feedback.rows.filter(\.isNewPersonalBest)
+        if let group = AccountTagHistoryGroup(result.configuration), !winners.isEmpty {
+            let consistency = ResultConsistencyPolicy.metrics(events: result.replayEvents, duration: result.chartDuration,
+                configuration: result.configuration, keySpacingSamples: result.keySpacingSamples).typing
+            let snapshots = winners.map { AccountTagHistoryPersonalBest(tagID: $0.id, group: group,
+                wpm: result.preciseWpm, rawWpm: result.preciseRawWpm, accuracy: result.preciseAccuracy,
+                consistency: consistency, rebuiltAtMilliseconds: milliseconds) }
+            var book = lastAccountResultAwards ?? .init(scope: feedback.scope, directory: accountTags)
+            book.replaceOverrides(snapshots)
+            lastAccountResultAwards = book
+            // A rebuilt lower or explicit-zero history PB must not mask the new client winner.
+            accountTagHistoryCache?.discardPersonalBestOverrides(tagIDs: winners.map(\.id), group: group)
+        }
+        lastAccountTagCompletionFeedback = feedback
+        accountTagHistoryGeneration &+= 1
+        accountTagRevision &+= 1
+    }
+
+    private func initialAccountTagEditFeedback(for result: RemoteAccountResult) -> AccountTagResultEditFeedback {
+        if let completion = lastAccountTagCompletionFeedback, completion.scope == resultPublicationScope,
+            completion.resultID == result.id {
+            var feedback = completion.editFeedback
+            feedback.retain(knownIDs: Set(result.accountTagIDs ?? []))
+            return feedback
+        }
+        return .init(ids: result.accountTagIDs ?? [])
     }
 
     func editableAccountTagResult(id: UUID) -> RemoteAccountResult? {
