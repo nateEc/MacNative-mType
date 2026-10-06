@@ -190,7 +190,7 @@ final class ResultConsistencySourceTests: XCTestCase {
     ], duration: 1.5, configuration: configuration)
     let row = try XCTUnwrap(LocalPersonalBestTablePolicy.rows(results: [result]).first)
     XCTAssertEqual(row.id, result.id)
-    XCTAssertEqual(row.wpm, result.wpm)
+    XCTAssertEqual(row.wpm, result.preciseWpm)
     XCTAssertEqual(row.consistency, 100)
     let challenge = TypebarChallenge(id: "native-consistency-test", title: "节奏测试",
       description: "自有规则夹具", preset: .init(configuration: configuration, quoteID: nil, customText: nil),

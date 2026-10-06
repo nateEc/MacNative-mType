@@ -4120,12 +4120,11 @@ private struct ContentView: View {
       return .init(result: result)
     }
     guard let personalBest = CurrentPersonalBestPolicy.personalBest(
-      currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples,
-      activeTags: activeSessionTags)
+      currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples)
     else {
       return "本机个人最佳：暂无符合资格的同类成绩"
     }
-    return "本机个人最佳：\(settings.typingSpeedUnit.formatted(wpm: personalBest.wpm)) \(settings.typingSpeedUnit.displayName) · \(ResultMetricPresentation.accuracy(personalBest.accuracy, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces)) 准确率"
+    return "本机个人最佳：\(settings.typingSpeedUnit.formatted(wpm: personalBest.wpm, alwaysShowDecimalPlaces: true)) \(settings.typingSpeedUnit.displayName) · \(ResultMetricPresentation.accuracy(personalBest.accuracy, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces)) 准确率"
   }
 
   private func startWeakSpotPractice() {
@@ -6209,9 +6208,7 @@ private struct CompletedResultView: View {
       let feedback = resultPersonalBestFeedback, feedback.isNewPersonalBest
     {
       Label(
-        feedback.previousBestWpm == nil
-          ? "本机个人最佳 · 首次 PB \(feedback.currentWpm) WPM"
-          : "本机个人最佳 · +\(feedback.improvement ?? 0) WPM",
+        "本机个人最佳 · \(PersonalBestFeedbackPresentation.text(previousBestWpm: feedback.previousBestWpm, currentWpm: feedback.currentWpm, speedUnit: typingSpeedUnit))",
         systemImage: "crown.fill"
       )
       .font(.subheadline.weight(.semibold))
@@ -6232,15 +6229,9 @@ private struct CompletedResultView: View {
               .foregroundStyle(feedback.isNewPersonalBest ? .yellow : .secondary)
             Text(feedback.tag)
             Spacer()
-            if let improvement = feedback.improvement {
-              Text(feedback.previousBestWpm == nil
-                ? "首次 PB · \(feedback.currentWpm) WPM"
-                : "+\(improvement) WPM")
-                .foregroundStyle(accent)
-            } else if let previousBestWpm = feedback.previousBestWpm {
-              Text("PB \(previousBestWpm) WPM")
-                .foregroundStyle(.secondary)
-            }
+            Text(PersonalBestFeedbackPresentation.text(previousBestWpm: feedback.previousBestWpm,
+              currentWpm: feedback.currentWpm, speedUnit: typingSpeedUnit))
+              .foregroundStyle(feedback.isNewPersonalBest ? accent : .secondary)
           }
           .font(.caption)
         }

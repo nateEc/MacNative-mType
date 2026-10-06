@@ -126,6 +126,11 @@ run_logged_check "executing actual pinned ranking admission branches" "$temporar
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-ranking-admission.mjs" "$reference_root"
 
+run_logged_check "executing pinned PB replacement, grouping and bounded DAL lifecycle" \
+  "$temporary_directory/personal-best-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-personal-best.mjs" "$reference_root"
+
 run_logged_check "executing pinned weekly XP service with isolated Redis 6.2.6" \
   "$temporary_directory/weekly-xp-read-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \

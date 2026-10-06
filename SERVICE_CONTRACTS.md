@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-06 [PB 比较与生命周期边界](PERSONAL_BEST_COMPARISON_CONTRACT.md) 修复本机消费者，不增加服务字段。固定源公开 clearPb 清两类 PB 并清日榜，内部 resetPb 只清个人 PB，删历史不清任何 PB；现有服务公开 PB 纪元和历史派生全部榜不等价。独立账本及明确 difficulty／lazyMode 投稿仍待实现，旧数据不能补造分组；服务整体保持 partial。
+
 2026-10-06 新增 [日榜榜尾速度合同](DAILY_LEADERBOARD_MINIMUM_SPEED_CONTRACT.md)：公开和好友 day／yesterday 缓存列表返回可选 minWpm，来自完整所选人口而非当前页，空缓存为 0；历史回退、all／week 不造字段。旧客户端可忽略，旧服务缺失在新客户端仍未知；显式坏值拒绝。它不是投稿门槛，不新增能力请求、持久化字段、归档版本或部署要求。
 
 2026-10-06 新增 [模式分区与引语身份合同](RESULT_MODE2_CONTRACT.md)：resultMode2=available 协商可选投稿／历史身份；列表新增 mode2FilterSupported，mode2 查询与名次记忆贯通 quote／custom／zen 日榜。引语使用自有命名空间，不兼容原数字内容目录；缺失保持未知、显式损坏拒绝，不上传提示或回放。归档 27／设置 4、无新 SwiftData 列；默认仍仅 time／words 且无奖励规则。单 writer、完整备份、禁止旧 writer 混写，整体服务仍 partial。

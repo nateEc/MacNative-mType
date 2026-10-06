@@ -4294,7 +4294,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       ChallengePresentationSnapshot.self, forKey: .challengePresentation)
   }
 
-  private static func normalizedMetricPrecision(_ value: Double?, fallback: Int) -> Double {
+  static func normalizedMetricPrecision(_ value: Double?, fallback: Int) -> Double {
     guard let value, value.isFinite, value >= 0 else { return Double(fallback) }
     return value
   }

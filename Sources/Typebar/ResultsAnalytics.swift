@@ -612,6 +612,7 @@ struct RecentAverageSample: Equatable {
   let prompt: String
   let finishedAt: Date
   let wpm: Int
+  let preciseWpm: Double
   let accuracy: Double
   let tags: [String]
   let outcome: TestOutcome
@@ -623,12 +624,14 @@ struct RecentAverageSample: Equatable {
     wpm: Int,
     accuracy: Int,
     preciseAccuracy: Double? = nil,
+    preciseWpm: Double? = nil,
     tags: [String] = [], outcome: TestOutcome = .completed
   ) {
     self.configuration = configuration
     self.prompt = prompt
     self.finishedAt = finishedAt
     self.wpm = wpm
+    self.preciseWpm = CompletedTestResult.normalizedMetricPrecision(preciseWpm, fallback: wpm)
     self.accuracy = CompletedTestResult.normalizedAccuracyPrecision(preciseAccuracy, fallback: accuracy)
     self.tags = tags
     self.outcome = outcome
@@ -637,7 +640,8 @@ struct RecentAverageSample: Equatable {
   init(result: CompletedTestResult) {
     self.init(configuration: result.configuration, prompt: result.prompt,
       finishedAt: result.finishedAt, wpm: result.wpm, accuracy: result.accuracy,
-      preciseAccuracy: result.preciseAccuracy, tags: result.tags, outcome: result.outcome)
+      preciseAccuracy: result.preciseAccuracy, preciseWpm: result.preciseWpm,
+      tags: result.tags, outcome: result.outcome)
   }
 }
 
@@ -648,7 +652,7 @@ struct RecentTestAverage: Equatable {
 }
 
 struct CurrentPersonalBest: Equatable {
-  let wpm: Int
+  let wpm: Double
   let accuracy: Double
 }
 
@@ -2063,12 +2067,12 @@ enum CurrentPersonalBestPolicy {
       activeTags: activeTags)
       .filter { $0.outcome == .completed
         && isResultEligible(configuration: $0.configuration, accuracy: $0.accuracy) }
-    guard let highestWpm = matching.map(\.wpm).max(),
-      let best = matching.filter({ $0.wpm == highestWpm }).min(by: { $0.finishedAt < $1.finishedAt })
+    guard let highestWpm = matching.map(\.preciseWpm).max(),
+      let best = matching.filter({ $0.preciseWpm == highestWpm }).min(by: { $0.finishedAt < $1.finishedAt })
     else {
       return nil
     }
-    return .init(wpm: best.wpm, accuracy: best.accuracy)
+    return .init(wpm: best.preciseWpm, accuracy: best.accuracy)
   }
 
   static func isConfigurationEligible(_ configuration: TestConfiguration) -> Bool {
@@ -2102,18 +2106,31 @@ enum CurrentPersonalBestPolicy {
 }
 
 struct ResultPersonalBestFeedback: Equatable {
-  let previousBestWpm: Int?
-  let currentWpm: Int
+  let previousBestWpm: Double?
+  let currentWpm: Double
 
   var isNewPersonalBest: Bool {
     previousBestWpm.map { currentWpm > $0 } ?? true
   }
-  var improvement: Int? {
+  var improvement: Double? {
     guard let previousBestWpm, currentWpm > previousBestWpm else { return nil }
     return currentWpm - previousBestWpm
   }
   var showsPreviousBestLine: Bool {
     previousBestWpm != nil && !isNewPersonalBest
+  }
+}
+
+/// PB labels always retain two decimals after converting the canonical speed.
+/// This is presentation only; neither comparison nor saved scores are rounded.
+enum PersonalBestFeedbackPresentation {
+  static func text(previousBestWpm: Double?, currentWpm: Double, speedUnit: TypingSpeedUnit) -> String {
+    func speed(_ value: Double) -> String {
+      "\(speedUnit.formatted(wpm: value, alwaysShowDecimalPlaces: true)) \(speedUnit.displayName)"
+    }
+    guard let previousBestWpm else { return "首次 PB · \(speed(currentWpm))" }
+    if currentWpm > previousBestWpm { return "+\(speed(currentWpm - previousBestWpm))" }
+    return "PB \(speed(previousBestWpm))"
   }
 }
 
@@ -2130,27 +2147,24 @@ enum ResultPersonalBestPolicy {
 
     let samples = previousResults.compactMap { previous -> RecentAverageSample? in
       guard previous.id != result.id, previous.outcome == .completed else { return nil }
-      return .init(
-        configuration: previous.configuration, prompt: previous.prompt,
-        finishedAt: previous.finishedAt, wpm: previous.wpm, accuracy: previous.accuracy,
-        preciseAccuracy: previous.preciseAccuracy)
+      return .init(result: previous)
     }
     let previousBest = CurrentPersonalBestPolicy.personalBest(
       currentConfiguration: result.configuration, currentPrompt: result.prompt, samples: samples)
-    return .init(previousBestWpm: previousBest?.wpm, currentWpm: result.wpm)
+    return .init(previousBestWpm: previousBest?.wpm, currentWpm: result.preciseWpm)
   }
 }
 
 struct TagPersonalBestFeedback: Equatable, Identifiable {
   let tag: String
-  let previousBestWpm: Int?
-  let currentWpm: Int
+  let previousBestWpm: Double?
+  let currentWpm: Double
 
   var id: String { tag }
   var isNewPersonalBest: Bool {
     previousBestWpm.map { currentWpm > $0 } ?? true
   }
-  var improvement: Int? {
+  var improvement: Double? {
     guard let previousBestWpm, currentWpm > previousBestWpm else { return nil }
     return currentWpm - previousBestWpm
   }
@@ -2180,16 +2194,16 @@ enum TagPersonalBestPolicy {
             && configurationsMatch($0.configuration, result.configuration)
             && hasTag(tag, in: $0.tags)
         }
-        .map(\.wpm)
+        .map(\.preciseWpm)
         .max()
-      return .init(tag: tag, previousBestWpm: previousBest, currentWpm: result.wpm)
+      return .init(tag: tag, previousBestWpm: previousBest, currentWpm: result.preciseWpm)
     }
   }
 
   private static func configurationsMatch(_ lhs: TestConfiguration, _ rhs: TestConfiguration) -> Bool {
     lhs.mode == rhs.mode
-      && lhs.duration == rhs.duration
-      && lhs.wordLimit == rhs.wordLimit
+      && (lhs.mode != .time || lhs.duration == rhs.duration)
+      && (lhs.mode != .words || lhs.wordLimit == rhs.wordLimit)
       && lhs.contentOptions == rhs.contentOptions
       && lhs.language == rhs.language
       && lhs.difficulty == rhs.difficulty

@@ -7,8 +7,8 @@ struct LocalPersonalBestRow: Equatable, Identifiable {
   let id: UUID
   let mode: TestMode
   let parameter: Int
-  let wpm: Int
-  let rawWpm: Int
+  let wpm: Double
+  let rawWpm: Double
   let accuracy: Double
   let consistency: Double
   let difficulty: Difficulty
@@ -96,7 +96,7 @@ enum LocalPersonalBestTablePolicy {
   }
 
   private static func isBetter(_ candidate: CompletedTestResult, than current: CompletedTestResult) -> Bool {
-    if candidate.wpm != current.wpm { return candidate.wpm > current.wpm }
+    if candidate.preciseWpm != current.preciseWpm { return candidate.preciseWpm > current.preciseWpm }
     if candidate.finishedAt != current.finishedAt { return candidate.finishedAt < current.finishedAt }
     return candidate.id.uuidString < current.id.uuidString
   }
@@ -109,7 +109,7 @@ enum LocalPersonalBestTablePolicy {
     return .init(
       id: result.id, mode: configuration.mode,
       parameter: configuration.mode == .time ? Int(configuration.duration ?? 0) : configuration.wordLimit ?? 0,
-      wpm: result.wpm, rawWpm: result.rawWpm, accuracy: result.preciseAccuracy,
+      wpm: result.preciseWpm, rawWpm: result.preciseRawWpm, accuracy: result.preciseAccuracy,
       consistency: consistency, difficulty: configuration.difficulty, language: configuration.language,
       includesPunctuation: configuration.contentOptions.includePunctuation,
       includesNumbers: configuration.contentOptions.includeNumbers,
@@ -156,10 +156,10 @@ struct LocalPersonalBestTableView: View {
                   .frame(width: 56, alignment: .trailing)
                 VStack(alignment: .leading, spacing: 3) {
                   Text(
-                    "\(speedUnit.converted(wpm: Double(row.wpm)).formatted(.number.precision(.fractionLength(0)))) \(speedUnit.displayName) · \(ResultMetricPresentation.accuracy(row.accuracy, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))"
+                    "\(speedUnit.formatted(wpm: row.wpm, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces)) \(speedUnit.displayName) · \(ResultMetricPresentation.accuracy(row.accuracy, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))"
                   )
                   Text(
-                    "Raw \(speedUnit.converted(wpm: Double(row.rawWpm)).formatted(.number.precision(.fractionLength(0)))) · \(row.consistency.formatted(.number.precision(.fractionLength(0))))% 稳定"
+                    "Raw \(speedUnit.formatted(wpm: row.rawWpm, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces)) · \(row.consistency.formatted(.number.precision(.fractionLength(0))))% 稳定"
                   )
                   .font(.caption)
                   .foregroundStyle(.secondary)
