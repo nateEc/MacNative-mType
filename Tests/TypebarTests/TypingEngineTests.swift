@@ -18645,7 +18645,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.loremIpsumWords,
       StarterLexicon.gitWords,
       StarterLexicon.twitchEmoteWords,
-      StarterLexicon.typingOfTheDeadWords,
+      StarterLexicon.typingOfTheDeadSections,
       StarterLexicon.friulianWords,
       StarterLexicon.malagasyWords,
       StarterLexicon.welshWords,
@@ -18749,6 +18749,8 @@ final class TypingEngineTests: XCTestCase {
     // This checks owned provenance, not literal presentation: Polyglot now applies
     // the source's per-word ASCII-capital-triggered lowercase stage. Exact casing
     // exemptions and punctuation-on behavior have deterministic candidate tests.
+    // The union uses original horror sections, not their punctuation-stripped
+    // standalone word index; emitted section components retain owned symbols.
     var ownedTargets: Set<String> = []
     for corpus in corpora {
       for entry in corpus {
@@ -18761,6 +18763,8 @@ final class TypingEngineTests: XCTestCase {
         }
       }
     }
+    XCTAssertTrue(ownedTargets.contains("breathing!"), "The union includes original section components, not only the flattened word index")
+    XCTAssertFalse(ownedTargets.contains("not-in-any-owned-section!"))
     XCTAssertTrue(tokens.allSatisfy { ownedTargets.contains($0) },
       "Outside owned presentation targets: \(tokens.filter { !ownedTargets.contains($0) })")
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)

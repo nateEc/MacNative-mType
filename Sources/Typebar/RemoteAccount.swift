@@ -366,6 +366,7 @@ private struct RemoteDeveloperAccessKeyDeletionResponse: Codable, Sendable {
 }
 
 struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
+    var accountTagIDs: [UUID]? = nil
     let speedPrecision: RemoteSpeedPrecision?
     var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
     var effectiveRawWpm: Double { speedPrecision?.rawWpm ?? Double(rawWpm) }
@@ -411,6 +412,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
             bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
         case personalBestConfiguration
         case speedPrecision
+        case accountTagIDs
     }
 
     init(from decoder: Decoder) throws {
@@ -441,6 +443,10 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         errorCount = try values.decode(Int.self, forKey: .errorCount)
         eventCount = try values.decode(Int.self, forKey: .eventCount)
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+        if values.contains(.accountTagIDs) {
+            accountTagIDs = try values.decode([UUID].self, forKey: .accountTagIDs)
+            try RemoteAccountTagPolicy.validateIDs(accountTagIDs!)
+        }
         practiceTiming = try values.decodeIfPresent(RemoteResultPracticeTiming.self, forKey: .practiceTiming)
         restartCount = try values.decodeIfPresent(Int.self, forKey: .restartCount)
         experienceEvidence = values.contains(.experienceEvidence)
@@ -878,6 +884,7 @@ struct RemoteArchivePull {
 }
 
 struct RemoteResultSubmission: Codable, Sendable {
+    var accountTagIDs: [UUID]? = nil
     let speedPrecision: RemoteSpeedPrecision?
     let mode2: String?
     let id: UUID
@@ -993,6 +1000,10 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
         apiVersion == "v1"
             && service == "typebar"
             && capabilities["resultPracticeTiming"] == "available"
+    }
+
+    var supportsAccountTags: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["accountTags"] == "available"
     }
 
     var supportsResultInputMetrics: Bool {
@@ -2001,6 +2012,12 @@ final class AccountSession {
     }
     var developerAccessKeys: [RemoteDeveloperAccessKey] = []
     var remoteResults: [RemoteAccountResult] = []
+    private var cachedAccountTags: [RemoteAccountTag] = []
+    private var cachedAccountTagsScope: ResultPublicationScope?
+    var accountTags: [RemoteAccountTag] {
+        guard let scope = resultPublicationScope, cachedAccountTagsScope == scope else { return [] }
+        return cachedAccountTags
+    }
     var pendingOAuthRegistration: PendingRemoteOAuthRegistration?
     var isWorking = false
     var statusMessage: String?
@@ -2751,6 +2768,71 @@ final class AccountSession {
         }
     }
 
+    private func accountTagAPI() async throws -> (RemoteAccountAPI, String, ResultPublicationScope) {
+        guard let scope = resultPublicationScope else { throw RemoteAccountError.accountScopeChanged }
+        let api = RemoteAccountAPI(endpoint: endpoint), token = try accessToken()
+        let capabilities = try await api.request(path: "v1/capabilities", method: "GET", token: nil,
+            body: Optional<String>.none, response: RemoteServiceCapabilities.self)
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        guard capabilities.supportsAccountTags else { throw RemoteAccountError.serverMessage("当前服务未提供稳定账户标签，请先升级自建服务。") }
+        return (api, token, scope)
+    }
+
+    func reloadAccountTags() async throws {
+        let (api, token, scope) = try await accountTagAPI()
+        let list = try await api.request(path: "v1/tags", method: "GET", token: token,
+            body: Optional<String>.none, response: RemoteAccountTagList.self)
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        let selection = RemoteAccountTagSelectionStore(defaults: defaults)
+        let owned = Set(list.tags.map(\.id))
+        try selection.set(selection.ids(for: scope).filter { owned.contains($0) }, for: scope)
+        cachedAccountTags = list.tags.sorted { $0.name == $1.name ? $0.id.uuidString < $1.id.uuidString : $0.name < $1.name }
+        cachedAccountTagsScope = scope
+    }
+
+    func accountTagPostingSelection() throws -> [UUID] {
+        guard let scope = resultPublicationScope else { return [] }
+        return try RemoteAccountTagSelectionStore(defaults: defaults).ids(for: scope)
+    }
+
+    func setAccountTagPostingSelection(_ ids: [UUID]) throws {
+        guard let scope = resultPublicationScope, Set(ids).isSubset(of: Set(accountTags.map(\.id))) else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        try RemoteAccountTagSelectionStore(defaults: defaults).set(ids, for: scope)
+    }
+
+    func saveAccountTagName(id: UUID?, name: String) async throws {
+        let normalized = RemoteAccountTagPolicy.normalizedName(name)
+        guard RemoteAccountTagPolicy.isValidName(normalized) else {
+            throw RemoteAccountError.serverMessage("标签名须为 1–16 个英文字母、数字及单个分隔符；分隔符不能在首尾。")
+        }
+        let (api, token, scope) = try await accountTagAPI()
+        let _: RemoteAccountTag = try await api.request(path: id.map { "v1/tags/\($0)" } ?? "v1/tags",
+            method: id == nil ? "POST" : "PATCH", token: token,
+            body: RemoteAccountTagNameRequest(name: normalized), response: RemoteAccountTag.self)
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        try await reloadAccountTags()
+    }
+
+    func deleteAccountTag(id: UUID, personalBestsOnly: Bool) async throws {
+        let (api, token, scope) = try await accountTagAPI()
+        let response = try await api.request(path: "v1/tags/\(id)" + (personalBestsOnly ? "/personal-bests" : ""),
+            method: "DELETE", token: token, body: Optional<String>.none, response: RemoteAccountTagDeletion.self)
+        guard response.deleted else { throw RemoteAccountError.unexpectedResponse }
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        try await reloadAccountTags()
+    }
+
+    func updateRemoteAccountResultTagIDs(id: UUID, tagIDs: [UUID]) async throws {
+        try RemoteAccountTagPolicy.validateIDs(tagIDs)
+        let (api, token, scope) = try await accountTagAPI()
+        let result = try await api.request(path: "v1/results/\(id)/account-tags", method: "PATCH", token: token,
+            body: RemoteAccountResultTagIDsRequest(tagIDs: tagIDs), response: RemoteAccountResult.self)
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        if let index = remoteResults.firstIndex(where: { $0.id == id }) { remoteResults[index] = result }
+    }
+
     func updateRemoteResultTags(id: UUID, tags: [String]) async {
         guard let token = tokenStore.load(), currentUser != nil else {
             statusMessage = "请先登录自建 Typebar 服务。"
@@ -3142,10 +3224,12 @@ final class AccountSession {
         }
         let requestEndpoint = endpoint
         let requestScope = ResultPublicationScope(endpoint: requestEndpoint, userID: requestingUser.id)
+        let selectedTagIDs = try RemoteAccountTagSelectionStore(defaults: defaults).ids(for: requestScope)
         let capabilities = try await RemoteResultBailoutPolicy.capabilities(for: result.outcome,
             requiresElapsedTime: result.elapsedTime != nil,
             requiresIncompletePractice: result.incompletePractice != nil,
-            requiresMode2: result.quoteSource?.quoteID != nil) {
+            requiresMode2: result.quoteSource?.quoteID != nil,
+            requiresAccountTags: !selectedTagIDs.isEmpty) {
             try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                 path: "v1/capabilities",
                 method: "GET",
@@ -3158,7 +3242,8 @@ final class AccountSession {
             throw RemoteAccountError.accountScopeChanged
         }
         try ResultInputMetricsPublicationPolicy.validate(result, capabilities: capabilities)
-        let submission = try await ResultConsistencyPublication.prepare(result: result, capabilities: capabilities)
+        var submission = try await ResultConsistencyPublication.prepare(result: result, capabilities: capabilities)
+        submission.accountTagIDs = try RemoteAccountTagPolicy.prepare(ids: selectedTagIDs, capabilities: capabilities)
         try Task.checkCancellation()
         // Background computation is another suspension point: credentials
         // captured for a previous account must not authorize a late POST.

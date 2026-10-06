@@ -1373,6 +1373,7 @@ struct PreferencesView: View {
                 Button("刷新") { Task { await account.refreshRemoteResults() } }
                   .disabled(account.isWorking)
               }
+              AccountTagManagerView(account: account)
               Text("只显示当前账户已提交到自建服务的成绩元数据，不包含提示、输入回放或本机历史。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -2917,6 +2918,7 @@ private struct RemoteAccountResultRow: View {
           }
         }
       }
+      RemoteAccountResultTagPicker(result: result, account: account)
       HStack {
         TextField("添加服务端标签", text: $newTag)
           .onSubmit(addTag)

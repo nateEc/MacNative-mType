@@ -17,6 +17,7 @@ struct ExperienceAwardRecord: Codable {
   var personalBestConfiguration: ResultPersonalBestConfiguration? = nil
   var speedPrecision: ResultSpeedPrecision? = nil
   var personalBestReceipt: PersonalBestReceipt? = nil
+  var accountTagIDs: [UUID]? = nil
   var weeklyPartition: WeeklyExperiencePartition? = nil
   var weeklyCacheReceipt: WeeklyExperienceCacheReceipt? = nil
   var dailyCacheReceipt: DailyLeaderboardCacheReceipt? = nil
@@ -42,6 +43,9 @@ struct ExperienceAwardRecord: Codable {
   }
 
   func validate() throws {
+    guard accountTagIDs.map({ $0.count <= 15 && Set($0).count == $0.count }) ?? true else {
+      throw AccountTagError.invalidState
+    }
     try personalBestReceipt?.validate(reward:self)
     if let speedPrecision {
       guard speedPrecision.isValid else { throw ExperienceCalculationError.invalidInput }
@@ -92,6 +96,7 @@ extension ExperienceAwardRecord {
     case personalBestConfiguration
     case speedPrecision
     case personalBestReceipt
+    case accountTagIDs
   }
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -105,6 +110,7 @@ extension ExperienceAwardRecord {
       input: try values.decodeIfPresent(ExperienceCalculationInput.self, forKey: .input),
       configuration: try values.decodeIfPresent(ExperienceCalculationConfiguration.self, forKey: .configuration),
       context: try values.decodeIfPresent(ExperienceCalculationContext.self, forKey: .context))
+    accountTagIDs = values.contains(.accountTagIDs) ? try values.decode([UUID].self, forKey: .accountTagIDs) : nil
     rankingAdmission = values.contains(.rankingAdmission)
       ? try values.decode(RankingAdmission.self, forKey: .rankingAdmission) : nil
     personalBestConfiguration = values.contains(.personalBestConfiguration)

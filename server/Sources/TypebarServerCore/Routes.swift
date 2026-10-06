@@ -86,6 +86,7 @@ public func configure(
                 "resultRankingEvidence": .available,
                 "resultPersonalBestConfiguration": .available,
                 "accountPersonalBestLedger": .available,
+                "accountTags": .available,
                 "resultSpeedPrecision": .available,
                 "resultInputMetrics": .available,
                 "resultInputMetricsV2": .available,
@@ -936,6 +937,36 @@ public func configure(
         } catch let error as AuthStoreError {
             throw error.abort
         }
+    }
+
+    app.get("v1", "tags") { request async throws -> AccountTagListResponse in
+        do { return try await authStore.accountTags(credential: request.resultCredential()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+    app.post("v1", "tags") { request async throws -> AccountTagResponse in
+        do { return try await authStore.createAccountTag(request.content.decode(AccountTagNameRequest.self), accessToken: request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+    app.patch("v1", "tags", ":id") { request async throws -> AccountTagResponse in
+        guard let id = request.parameters.get("id").flatMap(UUID.init(uuidString:)) else { throw Abort(.badRequest) }
+        do { return try await authStore.editAccountTag(id: id, request: request.content.decode(AccountTagNameRequest.self), accessToken: request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+    app.delete("v1", "tags", ":id") { request async throws -> AccountTagDeletionResponse in
+        guard let id = request.parameters.get("id").flatMap(UUID.init(uuidString:)) else { throw Abort(.badRequest) }
+        do { try await authStore.deleteAccountTag(id: id, accessToken: request.accessToken()); return .init(deleted: true) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+    app.delete("v1", "tags", ":id", "personal-bests") { request async throws -> AccountTagDeletionResponse in
+        guard let id = request.parameters.get("id").flatMap(UUID.init(uuidString:)) else { throw Abort(.badRequest) }
+        do { try await authStore.deleteAccountTag(id: id, clearPersonalBestsOnly: true, accessToken: request.accessToken()); return .init(deleted: true) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+    app.patch("v1", "results", ":id", "account-tags") { request async throws -> AccountResultResponse in
+        guard let id = request.parameters.get("id").flatMap(UUID.init(uuidString:)) else { throw Abort(.badRequest) }
+        do { return try await authStore.updateAccountResultTagIDs(id: id,
+            request: request.content.decode(AccountResultTagIDsRequest.self), accessToken: request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
     }
 
     app.patch("v1", "results", ":id", "tags") { request async throws -> AccountResultResponse in

@@ -694,6 +694,8 @@ public actor AuthStore {
     var personalBestResetDates: [UUID: Date] = [:]
     var personalBestLedger: PersonalBestLedger? = .init()
     var personalBestLedgerManaged = true
+    var accountTagDirectory: AccountTagDirectory? = .init()
+    var accountTagDirectoryManaged = true
     var quoteSubmissions: [StoredQuoteSubmission] = []
     var quoteRatings: [StoredQuoteRating] = []
     var notifications: [StoredNotification] = []
@@ -709,6 +711,7 @@ public actor AuthStore {
         nextSyncCursor, weeklyExperienceCache, rewardInbox, rewardInboxManaged, weeklyRewardJobs, weeklyRewardJobsManaged,
         dailyLeaderboardCache, dailyLeaderboardCacheManaged, dailyRewardJobs, dailyRewardJobsManaged
       case personalBestLedger, personalBestLedgerManaged
+      case accountTagDirectory, accountTagDirectoryManaged
     }
 
     init() {}
@@ -779,6 +782,11 @@ public actor AuthStore {
       personalBestLedgerManaged = values.contains(.personalBestLedgerManaged)
         ? try values.decode(Bool.self,forKey:.personalBestLedgerManaged) : false
       guard !personalBestLedgerManaged || personalBestLedger != nil else { throw PersonalBestLedgerError.invalidState }
+      accountTagDirectory = values.contains(.accountTagDirectory)
+        ? try values.decode(AccountTagDirectory.self, forKey: .accountTagDirectory) : nil
+      accountTagDirectoryManaged = values.contains(.accountTagDirectoryManaged)
+        ? try values.decode(Bool.self, forKey: .accountTagDirectoryManaged) : false
+      guard !accountTagDirectoryManaged || accountTagDirectory != nil else { throw AccountTagError.invalidState }
       quoteSubmissions =
         try values.decodeIfPresent([StoredQuoteSubmission].self, forKey: .quoteSubmissions) ?? []
       quoteRatings =
@@ -1024,6 +1032,7 @@ public actor AuthStore {
   }
 
   private struct StoredResult: Codable {
+    var accountTagIDs: [UUID]?
     let speedPrecision: ResultSpeedPrecision?
     var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
     let mode2: String?
@@ -1068,6 +1077,7 @@ public actor AuthStore {
         bailedOut, customLimit, startedAt, finishedAt, acceptedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
       case personalBestConfiguration
       case speedPrecision
+      case accountTagIDs
     }
 
     init(
@@ -1078,6 +1088,7 @@ public actor AuthStore {
       experienceEvidence: ResultExperienceEvidence? = nil,
       personalBestConfiguration: ResultPersonalBestConfiguration? = nil,
       speedPrecision: ResultSpeedPrecision? = nil,
+      accountTagIDs: [UUID]? = nil,
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       terminalTiming: ResultTerminalTiming? = nil,
       elapsedTime: ResultElapsedTime? = nil,
@@ -1085,6 +1096,7 @@ public actor AuthStore {
       startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil, mode2: String? = nil
     ) {
       self.id = id
+      self.accountTagIDs = accountTagIDs
       self.userID = userID
       self.mode = mode
       self.language = language
@@ -1154,6 +1166,10 @@ public actor AuthStore {
           debugDescription: "Stored legacy scoring inputs must retain bounded arithmetic")
       }
       tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+      accountTagIDs = values.contains(.accountTagIDs) ? try values.decode([UUID].self, forKey: .accountTagIDs) : nil
+      guard accountTagIDs.map({ $0.count <= 15 && Set($0).count == $0.count }) ?? true else {
+        throw AccountTagError.invalidState
+      }
       practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
       incompletePractice = values.contains(.incompletePractice)
         ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
@@ -1244,6 +1260,7 @@ public actor AuthStore {
         startedAt: startedAt, finishedAt: finishedAt)
       response.mode2 = mode2
       response.personalBestConfiguration = personalBestConfiguration
+      response.accountTagIDs = accountTagIDs
       return response
     }
   }
@@ -1432,6 +1449,13 @@ public actor AuthStore {
     committedState = state
     try Self.initializeExperienceAwards(state: &state)
     try Self.initializePersonalBests(state: &state)
+    if state.accountTagDirectory == nil {
+      guard !state.experienceAwards!.contains(where: { $0.accountTagIDs != nil }),
+        !state.results.contains(where: { $0.accountTagIDs != nil }) else { throw AccountTagError.invalidState }
+      state.accountTagDirectory = .init()
+    }
+    try state.accountTagDirectory!.validate(users: Set(state.users.map(\.id)), awards: state.experienceAwards!)
+    state.accountTagDirectoryManaged = true
     try Self.initializeAccountPractice(state: &state)
     if state.weeklyExperienceCache == nil {
       guard !state.experienceAwards!.contains(where: { $0.weeklyCacheReceipt != nil }) else {
@@ -2459,6 +2483,7 @@ public actor AuthStore {
     state.accountPractice?.removeValue(forKey: userID)
     state.personalBestResetDates.removeValue(forKey: userID)
     state.personalBestLedger!.clear(userID:userID)
+    state.accountTagDirectory!.tags.removeAll { $0.userID == userID }
     try persist()
   }
 
@@ -2505,6 +2530,7 @@ public actor AuthStore {
     state.notifications.removeAll { $0.recipientID == user.id }
     state.personalBestResetDates.removeValue(forKey: user.id)
     state.personalBestLedger!.clear(userID:user.id)
+    state.accountTagDirectory!.tags.removeAll { $0.userID == user.id }
     try persist()
     return userResponse(for: resetUser)
   }
@@ -3717,6 +3743,7 @@ public actor AuthStore {
       incompletePractice: record.incompletePractice, experienceEvidence: record.experienceEvidence,
       personalBestConfiguration: record.personalBestConfiguration,
       speedPrecision: record.speedPrecision,
+      accountTagIDs: record.accountTagIDs,
       practiceTiming: record.practiceTiming, inputMetrics: record.inputMetrics,
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       terminalTiming: record.terminalTiming,
@@ -3871,6 +3898,9 @@ public actor AuthStore {
     if state.experienceAwards!.contains(where: { $0.userID == user.id && $0.resultID == request.id }) {
       return try resultSubmissionResponse(for: request, userID: user.id, now: now)
     }
+    // Validate only new admissions. A deleted tag must not break an immutable
+    // accepted-result retry or cause its original receipt to award PB again.
+    let accountTagIDs = try request.accountTagIDs.map { try state.accountTagDirectory!.validatedIDs($0, userID: user.id) }
     var practice = state.accountPractice![user.id] ?? .init()
     let seconds: Double
     if request.experienceEvidence != nil {
@@ -3892,11 +3922,14 @@ public actor AuthStore {
       streakDays: practice.streakLength)
     reward.personalBestConfiguration = request.personalBestConfiguration
     reward.speedPrecision = request.speedPrecision
+    reward.accountTagIDs = accountTagIDs
     var personalBests = state.personalBestLedger!
     let pbCandidate = reward.rankingAdmission!.decision.personalBestEligible
       ? try PersonalBestSnapshot.make(request,userID:user.id,acceptedAt:now,origin:.accepted) : nil
     let isPB = pbCandidate.map { personalBests.accept($0) } ?? false
     reward.personalBestReceipt = .init(version:1,candidate:pbCandidate,isPersonalBest:isPB)
+    var tagDirectory = state.accountTagDirectory!
+    if let pbCandidate { tagDirectory.accept(pbCandidate, tagIDs: accountTagIDs ?? []) }
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
@@ -3951,6 +3984,7 @@ public actor AuthStore {
         experienceEvidence: request.experienceEvidence,
         personalBestConfiguration: request.personalBestConfiguration,
         speedPrecision: request.speedPrecision,
+        accountTagIDs: accountTagIDs,
         inputMetrics: request.inputMetrics,
         keyConsistency: request.resultConsistency?.keyConsistency,
         terminalTiming: request.terminalTiming,
@@ -3962,6 +3996,7 @@ public actor AuthStore {
     state.accountPractice![user.id] = practice
     state.experienceAwards!.append(reward)
     state.personalBestLedger = personalBests
+    state.accountTagDirectory = tagDirectory
     state.weeklyExperienceCache = cache
     state.dailyLeaderboardCache = dailyCache
     state.weeklyRewardJobs = jobs
@@ -4071,6 +4106,60 @@ public actor AuthStore {
     state.dailyLeaderboardCache!.purge(userID:user.id)
     try persist()
     return .init(resetAt: now)
+  }
+
+  public func accountTags(accessToken: String, now: Date = .now) throws -> AccountTagListResponse {
+    try accountTags(credential: .accessToken(accessToken), now: now)
+  }
+
+  public func accountTags(credential: ResultServiceCredential, now: Date = .now) throws -> AccountTagListResponse {
+    let user = try authenticatedUser(for: credential, now: now)
+    return .init(version: 1, tags: state.accountTagDirectory!.tags.filter { $0.userID == user.id }.map(\.response))
+  }
+
+  public func createAccountTag(_ request: AccountTagNameRequest, accessToken: String, now: Date = .now) throws -> AccountTagResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    guard AccountTagNamePolicy.isValid(request.name) else { throw Abort(.unprocessableEntity, reason: "Invalid tag name.") }
+    guard state.accountTagDirectory!.tags.filter({ $0.userID == user.id }).count < 15 else {
+      throw Abort(.badRequest, reason: "Maximum number of account tags reached.")
+    }
+    let tag = AccountTagDirectory.Tag(id: UUID(), userID: user.id, name: request.name)
+    state.accountTagDirectory!.tags.append(tag)
+    try persist()
+    return tag.response
+  }
+
+  public func editAccountTag(id: UUID, request: AccountTagNameRequest, accessToken: String, now: Date = .now) throws -> AccountTagResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    guard AccountTagNamePolicy.isValid(request.name) else { throw Abort(.unprocessableEntity, reason: "Invalid tag name.") }
+    guard let index = state.accountTagDirectory!.tags.firstIndex(where: { $0.id == id && $0.userID == user.id }) else {
+      throw Abort(.notFound, reason: "Account tag not found.")
+    }
+    state.accountTagDirectory!.tags[index].name = request.name
+    try persist()
+    return state.accountTagDirectory!.tags[index].response
+  }
+
+  public func deleteAccountTag(id: UUID, clearPersonalBestsOnly: Bool = false, accessToken: String, now: Date = .now) throws {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    guard let index = state.accountTagDirectory!.tags.firstIndex(where: { $0.id == id && $0.userID == user.id }) else {
+      throw Abort(.notFound, reason: "Account tag not found.")
+    }
+    if clearPersonalBestsOnly { state.accountTagDirectory!.tags[index].personalBests = [] }
+    else { state.accountTagDirectory!.tags.remove(at: index) }
+    try persist()
+  }
+
+  public func updateAccountResultTagIDs(id: UUID, request: AccountResultTagIDsRequest, accessToken: String, now: Date = .now) throws -> AccountResultResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    let ids = try state.accountTagDirectory!.validatedIDs(request.tagIDs, userID: user.id)
+    guard let index = state.results.firstIndex(where: { $0.id == id && $0.userID == user.id }) else {
+      throw AuthStoreError.resultNotFound
+    }
+    state.results[index].accountTagIDs = ids
+    try persist()
+    // History editing does not re-award server tag PBs.
+    return resultResponse(for: state.results[index])
   }
 
   public func updateResultTags(

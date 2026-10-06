@@ -25,11 +25,11 @@ enum RemoteResultBailoutPolicy {
   /// Capability absence is not the same as a temporary transport failure.
   /// Completed legacy submissions retain their existing optional lookup.
   @MainActor static func capabilities(for outcome: TestOutcome, requiresElapsedTime: Bool = false,
-    requiresIncompletePractice: Bool = false, requiresMode2: Bool = false,
+    requiresIncompletePractice: Bool = false, requiresMode2: Bool = false, requiresAccountTags: Bool = false,
     load: () async throws -> RemoteServiceCapabilities) async throws -> RemoteServiceCapabilities? {
     do { return try await load() }
     catch {
-      if outcome == .bailedOut || requiresElapsedTime || requiresIncompletePractice || requiresMode2,
+      if outcome == .bailedOut || requiresElapsedTime || requiresIncompletePractice || requiresMode2 || requiresAccountTags,
         error is CancellationError || ResultPublicationRetryPolicy.shouldQueue(error) { throw error }
       return nil
     }

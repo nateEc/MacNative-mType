@@ -2,6 +2,12 @@ import XCTest
 @testable import Typebar
 
 final class PolyglotCandidateTests: XCTestCase {
+  func testOwnedSectionExclamationSurvivesPunctuationOffDeterministically() {
+    let section = StarterLexicon.typingOfTheDeadSections[0]
+    XCTAssertEqual(section, "The hallway is breathing!")
+    var generator = cursor(config(4), [(.typingOfTheDead, [section]), (.german, ["oak"])], count: 4)
+    XCTAssertEqual(generator.nextChunk(nextRandomWordIndex: { 0 }).transformed, "the hallway is breathing!")
+  }
   private func config(_ count: Int = 0, base: TypingLanguage = .english,
     punctuation: Bool = false, numbers: Bool = false, modifiers: [TestModifier] = []) -> TestConfiguration {
     TestConfiguration.words(count, language: .mixedLanguages, mixedLanguageComponents: [.english, .german],

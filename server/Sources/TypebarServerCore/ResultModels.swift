@@ -38,6 +38,7 @@ public struct ResultPracticeTiming: Content, Equatable, Sendable {
 }
 
 public struct ResultSubmissionRequest: Content, Equatable {
+    public let accountTagIDs: [UUID]?
     public let speedPrecision: ResultSpeedPrecision?
     public var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
     public var effectiveRawWpm: Double { speedPrecision?.rawWpm ?? Double(rawWpm) }
@@ -81,6 +82,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         rankingEvidence: ResultRankingEvidence? = nil,
         personalBestConfiguration: ResultPersonalBestConfiguration? = nil,
         speedPrecision: ResultSpeedPrecision? = nil,
+        accountTagIDs: [UUID]? = nil,
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         resultConsistency: ResultConsistencyMetrics? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
@@ -89,6 +91,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         startedAt: Date, finishedAt: Date, mode2: String? = nil
     ) {
         self.id = id
+        self.accountTagIDs = accountTagIDs
         self.mode2 = mode2
         self.mode = mode
         self.language = language
@@ -137,11 +140,13 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case elapsedTime, startedAtReferenceTime, finishedAtReferenceTime
         case bailedOut, customLimit
         case mode2
+        case accountTagIDs
     }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
+        accountTagIDs = values.contains(.accountTagIDs) ? try values.decode([UUID].self, forKey: .accountTagIDs) : nil
         mode = try values.decode(String.self, forKey: .mode)
         mode2 = values.contains(.mode2) ? try values.decode(String.self, forKey: .mode2) : nil
         language = try values.decode(String.self, forKey: .language)
@@ -222,6 +227,7 @@ public struct ResultSubmissionResponse: Content, Equatable {
 /// A compact, account-scoped view of a submitted result. It deliberately
 /// excludes prompt text, input replay, and every profile or credential field.
 public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable {
+    public var accountTagIDs: [UUID]? = nil
     public var speedPrecision: ResultSpeedPrecision? = nil
     public var effectiveWpm: Double { speedPrecision?.wpm ?? Double(wpm) }
     public var effectiveRawWpm: Double { speedPrecision?.rawWpm ?? Double(rawWpm) }
@@ -301,6 +307,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, preciseAccuracy,
             consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, terminalTiming,
             elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
+        case accountTagIDs
         case personalBestConfiguration
         case speedPrecision
     }
@@ -347,6 +354,10 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             customLimit: try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit), startedAt: start, finishedAt: end)
         let measured = terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
             ?? finishedAt.timeIntervalSince(startedAt)
+        accountTagIDs = values.contains(.accountTagIDs) ? try values.decode([UUID].self, forKey: .accountTagIDs) : nil
+        guard accountTagIDs.map({ $0.count <= 15 && Set($0).count == $0.count }) ?? true else {
+            throw AccountTagError.invalidState
+        }
         if let speedPrecision, !speedPrecision.matches(wpm:wpm,rawWpm:rawWpm) {
             throw DecodingError.dataCorruptedError(forKey:.speedPrecision,in:values,debugDescription:"Speed precision disagrees with legacy view")
         }

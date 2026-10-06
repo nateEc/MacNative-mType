@@ -1,0 +1,51 @@
+# 稳定账户标签与独立标签 PB
+
+Typebar 自建服务以账户目录中的 UUID 标识标签，原生账户设置可创建、重命名、删除和清空标签 PB，并为联网投稿选择标签。私有历史按 ID 编辑，CSV 追加 `account_tag_ids` 列。该目录与现有五项本机文字标签及其本机 PB 分开，不按名称猜测身份。
+
+## 固定参考与兼容边界
+
+参考为只读 Monkeytype `91bd24bb8513785c7364cbea29296ff7adafac41` 的 `frontend/src/ts/collections/tags.ts`、`frontend/src/ts/components/pages/settings/custom-setting/Tags.tsx`、`frontend/src/ts/components/modals/AddTagModal.tsx`、`frontend/src/ts/utils/results.ts`、`backend/src/dal/{user,result}.ts`、`packages/contracts/src/users.ts`、`packages/schemas/src/{users,util}.ts`。源码用于核对行为，不进入生产运行时。
+
+原版目录最多十五项，名称允许重复，身份与名称独立；名称规范化空白为下划线，规范名称为 1–16 个 ASCII 字母／数字和分隔符，分隔符不能相邻或位于首尾。重命名只改名称。Typebar 独立实现这些规则，但使用 UUID 和自有 HTTP 字段，不兼容原版 ObjectID、ApeKey 或官方服务协议。
+
+原版服务端历史改标签不重新授予标签 PB；前端另有按缓存历史重建本地标签 PB 的流程，删除目录也会清理本地历史关联。Typebar 当前只实现前一种服务规则，没有用本机文字标签账本冒充后一种流程。
+
+## 目录与投稿
+
+| 操作 | Typebar v1 路径 | 授权与结果 |
+| --- | --- | --- |
+| 读目录 | `GET /v1/tags` | Bearer 或已有 `X-Typebar-Access-Key`，仅本人目录 |
+| 创建／改名 | `POST /v1/tags`、`PATCH /v1/tags/:id` | Bearer；名称校验，创建最多十五项，改名保持 UUID |
+| 删除／清 PB | `DELETE /v1/tags/:id`、`DELETE /v1/tags/:id/personal-bests` | Bearer；明确确认后移除目录或只清该 PB |
+| 编辑私有历史 | `PATCH /v1/results/:id/account-tags` | Bearer；仅当前拥有的唯一 ID，不重授 PB |
+| 成绩投稿 | 已有 `POST /v1/results` 的可选 `accountTagIDs` | 缺失保留未知旧状态；已知数组最多十五个唯一、本人拥有的 ID |
+
+新成绩在接受前校验 ID，成绩、奖励回执与标签 PB 同次保存。目录删除后服务端历史仍保留原 ID；同名重建是新身份，不接管旧历史。客户端编辑列表只显示现存目录项，保存时去掉已删除的关联。旧成绩 UUID 重试沿用首次奖励，不因删除的目录项再次授予 PB。
+
+原生选择只在本设备按规范化服务地址和账户 UUID 存储，不缓存名称、PB 或凭据；刷新会清除已删除的选择，损坏选择报错而不当成空。账户切换后不展示另一作用域的目录，异步响应提交前重新核对作用域。
+
+选择在每次联网投稿开始时读取，当前尚未冻结到测试启动快照或离线重试队列。用户改选后重试可能使用新选择，这不是原版测试标签快照等价。客户端要求准确的 `v1/typebar/accountTags=available` 能力；已选 ID 遇到旧服务会在 POST 前拒绝，临时网络失败仍可重试，不静默降级为文字标签。
+
+## 独立 PB 与持久化
+
+标签 PB 使用已有准入判定与完整 PB 快照，按模式、mode2、语言、难度、标点、数字和 lazy 分组。标签的较高 WPM 替换整条快照，即使它不是账户个人 PB；同速保留首次整条快照。Raw、准确率、稳定性、完成日期及接受毫秒保留，不从剩余历史推断。
+
+删远端历史和清公开个人／排行榜 PB 不清标签 PB。单独清标签 PB 后旧 UUID 重试不会恢复它；删除标签会删除它的目录 PB。删除账户或重置全部账户数据才移除本人目录。历史标签编辑不改变首次接受的奖励回执关联。
+
+服务状态保存 `accountTagDirectory` 版本 1 和 managed 标记。只有旧文件缺失目录、标记和所有 ID 证据时初始化空目录，保留旧文字标签。显式 null、未知版本、重复身份、非法名称、错误所有者、重复 PB 分组或没有对应接受回执的 PB 都拒绝加载。managed=true 却无目录，或成绩／回执已有 ID 却丢目录，也拒绝加载。原子文件保存失败恢复 actor 旧状态和原文件。
+
+部署仍要求单 writer：停旧服务、保留完整备份、升级后冷加载，再开放写入。不能让旧二进制忽略新字段后写同一文件；它可能剥离全部新字段，标记无法保证发现这种降级。回退使用升级前完整备份，不剥离字段伪造兼容。
+
+本次不改变五实体 SwiftData、31 列成绩模型、原生归档 28 或设置 4。账户目录／标签 PB 不进入本机归档，不能用本机文件或云归档恢复它们；CSV 是关联 ID 导出而不是目录备份。
+
+## 验证与剩余工作
+
+先行 HTTP 测试在未实现时有五个失败断言；独立实现后目录身份、上限、所有者隔离、改名、PB 生命周期、严格同速、分组、冷加载、保存回滚、旧文件、HTTP ID 往返和只读密钥护栏由服务测试覆盖。原生测试覆盖名称、能力、暂时失败、选择作用域、严格 DTO、历史 ID 和 CSV；原生表单只经编译与代码审查，窗口与 VoiceOver 仍待验收。
+
+完整源码标签生命周期动态对照、测试启动／离线队列冻结、原生标签 Pace／测试区消费者、前端缓存历史 PB 重建、原版目录和历史迁移、目录备份／跨设备选择以及正式设备验收仍开放。`MET-43`、`ACC-11`、`SYN-01` 保持部分兼容，整体重写 goal active。
+
+第一轮完整门禁的原生 3065 项有一项失败（700.964 秒），十万词通过（150.263 秒），该轮未继续服务及打包。混合词池来源夹具误用了去标点的 `typingOfTheDeadWords`，实际输入来自原创 `typingOfTheDeadSections`，因此合法 `breathing!` 被误判。新增确定性生成断言通过，同时来源断言稳定失败；将夹具换为实际短句目录后，相关 34 项通过（0.774 秒）。仍保留未知词拒绝与会话完成断言，生产生成代码未改，不将第一轮失败记录为成功。
+
+第二轮完整串行门禁原生 3066 项／服务 432 项零失败、零跳过（696.965／9.845 秒），实际十万词 149.981 秒、十项磁盘迁移 4.412 秒，920 场景仅结构、固定源码／原创性审计与未开窗包／签名／资源边界通过。新增原生八项（七项标签及一项短句确定性回归）／服务十项。原生自动化不替代 UI、真实网络、macOS 14／Intel 或双机验收；零 Typebar GUI、无部署，五实体／归档 28／设置 4 不变。
+
+最终十五份日志保留在 `/tmp/typebar-account-tags-readiness-logs-2.0AD1AX`，汇总为 `/tmp/typebar-account-tags-readiness-2.log`；首轮十三份日志在 `/tmp/typebar-account-tags-readiness-logs.AKpmwp`，确定性先行／通过日志为 `/tmp/typebar-account-tags-provenance-{red,green}.log`。目录 HTTP 先行日志为 `/tmp/typebar-account-tags-red.log`，最新标签定向日志为 `/tmp/typebar-account-tags-{native-focused-2,server-focused-4}.log`。临时日志不是仓库构建前提；可按 readiness 脚本以固定参考重新执行。

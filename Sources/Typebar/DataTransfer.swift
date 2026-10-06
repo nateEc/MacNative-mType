@@ -196,6 +196,7 @@ enum RemoteResultCSVExport {
         "elapsed_seconds", "wall_clock_seconds", "terminal_timing_version",
         "bailed_out", "custom_limit_mode", "custom_limit_value",
         "personal_best_configuration_version", "difficulty", "punctuation", "numbers", "lazy_mode",
+        "account_tag_ids",
     ]
 
     @MainActor
@@ -283,6 +284,7 @@ enum RemoteResultCSVExport {
             result.personalBestConfiguration.map { String($0.punctuation) } ?? "",
             result.personalBestConfiguration.map { String($0.numbers) } ?? "",
             result.personalBestConfiguration.map { String($0.lazyMode) } ?? "",
+            result.accountTagIDs?.map(\.uuidString).joined(separator: ";") ?? "",
         ]
     }
 
