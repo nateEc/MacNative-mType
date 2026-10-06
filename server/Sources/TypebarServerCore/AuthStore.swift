@@ -1023,6 +1023,7 @@ public actor AuthStore {
     let practiceTiming: ResultPracticeTiming?
     let incompletePractice: ResultIncompletePractice?
     let experienceEvidence: ResultExperienceEvidence?
+    let personalBestConfiguration: ResultPersonalBestConfiguration?
     let restartCount: Int?
     let terminalTiming: ResultTerminalTiming?
     let elapsedTime: ResultElapsedTime?
@@ -1042,6 +1043,7 @@ public actor AuthStore {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
         errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, inputMetrics, keyConsistency, terminalTiming, elapsedTime,
         bailedOut, customLimit, startedAt, finishedAt, acceptedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
+      case personalBestConfiguration
     }
 
     init(
@@ -1050,6 +1052,7 @@ public actor AuthStore {
       errorCount: Int, eventCount: Int, tags: [String], practiceTiming: ResultPracticeTiming? = nil,
       incompletePractice: ResultIncompletePractice? = nil, restartCount: Int? = nil,
       experienceEvidence: ResultExperienceEvidence? = nil,
+      personalBestConfiguration: ResultPersonalBestConfiguration? = nil,
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       terminalTiming: ResultTerminalTiming? = nil,
       elapsedTime: ResultElapsedTime? = nil,
@@ -1074,6 +1077,7 @@ public actor AuthStore {
       self.practiceTiming = practiceTiming
       self.incompletePractice = incompletePractice
       self.experienceEvidence = experienceEvidence
+      self.personalBestConfiguration = personalBestConfiguration
       self.restartCount = restartCount
       self.terminalTiming = terminalTiming
       self.elapsedTime = elapsedTime
@@ -1126,6 +1130,14 @@ public actor AuthStore {
       restartCount = try values.decodeIfPresent(Int.self, forKey: .restartCount)
       experienceEvidence = values.contains(.experienceEvidence)
         ? try values.decode(ResultExperienceEvidence.self, forKey: .experienceEvidence) : nil
+      personalBestConfiguration = values.contains(.personalBestConfiguration)
+        ? try values.decode(ResultPersonalBestConfiguration.self, forKey: .personalBestConfiguration) : nil
+      if let personalBestConfiguration, let experienceEvidence,
+        personalBestConfiguration.punctuation != experienceEvidence.punctuation
+          || personalBestConfiguration.numbers != experienceEvidence.numbers {
+        throw DecodingError.dataCorruptedError(forKey: .personalBestConfiguration, in: values,
+          debugDescription: "Stored PB and XP content flags must agree")
+      }
       if let incompletePractice, restartCount == nil
         || !incompletePractice.isValid(restartCount: restartCount!, practiceTiming: practiceTiming) {
         throw DecodingError.dataCorruptedError(forKey: .incompletePractice, in: values,
@@ -1196,6 +1208,7 @@ public actor AuthStore {
         bailedOut: bailedOut, customLimit: customLimit,
         startedAt: startedAt, finishedAt: finishedAt)
       response.mode2 = mode2
+      response.personalBestConfiguration = personalBestConfiguration
       return response
     }
   }
@@ -1531,6 +1544,9 @@ public actor AuthStore {
       })
       for result in state.results {
         guard let entry = entriesByKey["\(result.userID)/\(result.id)"] else {
+          throw ExperienceCalculationError.invalidInput
+        }
+        guard result.personalBestConfiguration == entry.personalBestConfiguration else {
           throw ExperienceCalculationError.invalidInput
         }
         if let input = entry.input,
@@ -3639,6 +3655,7 @@ public actor AuthStore {
       errorCount: record.errorCount,
       eventCount: record.eventCount, restartCount: record.restartCount ?? 0, tags: record.tags,
       incompletePractice: record.incompletePractice, experienceEvidence: record.experienceEvidence,
+      personalBestConfiguration: record.personalBestConfiguration,
       practiceTiming: record.practiceTiming, inputMetrics: record.inputMetrics,
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       terminalTiming: record.terminalTiming,
@@ -3812,6 +3829,7 @@ public actor AuthStore {
       offsetHours: state.streakDayBoundaryOffsets[user.id] ?? 0)
     var reward = try prepareExperienceAward(for: request, userID: user.id, now: now,
       streakDays: practice.streakLength)
+    reward.personalBestConfiguration = request.personalBestConfiguration
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
@@ -3864,6 +3882,7 @@ public actor AuthStore {
         incompletePractice: request.incompletePractice,
         restartCount: request.incompletePractice == nil && request.experienceEvidence == nil ? nil : request.restartCount,
         experienceEvidence: request.experienceEvidence,
+        personalBestConfiguration: request.personalBestConfiguration,
         inputMetrics: request.inputMetrics,
         keyConsistency: request.resultConsistency?.keyConsistency,
         terminalTiming: request.terminalTiming,
@@ -4749,6 +4768,11 @@ public actor AuthStore {
     if let experience = result.experienceEvidence, !experience.isBound(to: result.inputMetrics,
       duration: measured, practiceTiming: result.practiceTiming, language: result.language,
       restartCount: result.restartCount) { throw ResultStoreError.invalidResult }
+    if let configuration = result.personalBestConfiguration {
+      guard configuration.isValid else { throw ResultStoreError.invalidResult }
+      if let experience = result.experienceEvidence, configuration.punctuation != experience.punctuation
+        || configuration.numbers != experience.numbers { throw ResultStoreError.invalidResult }
+    }
     if !isBailout, result.mode == "time", let configuredDuration = result.durationSeconds {
       guard abs(elapsed - Double(configuredDuration)) <= 1 else {
         throw ResultStoreError.invalidResult

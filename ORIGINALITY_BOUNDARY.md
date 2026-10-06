@@ -1,5 +1,7 @@
 # 原创性边界与验证
 
+2026-10-06 [PB 配置保存](PERSONAL_BEST_CONFIGURATION_CONTRACT.md) 使用独立 Swift 投影、严格解码与自有可选 JSON 字段，夹具只用自造配置、成绩、账户和隔离文件，不复制源码或资产。归档 27／设置 4 不变，新增服务证据不声称 PB 账本、内容身份或整体功能等价；零 GUI、未部署服务。
+
 2026-10-06 [本机 PB 比较](PERSONAL_BEST_COMPARISON_CONTRACT.md) 生产为独立 Swift 选择与展示，仅 QA 动态执行固定完整 PB／Funbox 模块和有界 DAL 函数；夹具使用自造速度、选项、时钟和集合适配器，不复制参考源码或资产。无新存储格式、服务依赖或 GUI，独立 PB 生命周期与完整重写尚未实现，官方覆盖不升级。
 
 2026-10-06 最新 [日榜榜尾速度](DAILY_LEADERBOARD_MINIMUM_SPEED_CONTRACT.md) 仅在 QA 执行固定完整日榜服务及 Redis Lua；新增夹具均为自造账户、速度及页面。生产使用独立 Swift 读取投影和原生提示，不打包源脚本、引语、主题或前端资产。字段只读，归档仍 27／设置 4，完整目标未完成，零 GUI。

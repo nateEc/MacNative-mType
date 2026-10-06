@@ -1,5 +1,7 @@
 # 官方服务面审计
 
+2026-10-06 [PB 配置保存合同](PERSONAL_BEST_CONFIGURATION_CONTRACT.md) 为 results 的真实投稿、首次接受记录和私有历史补充完整配置证据。resultPersonalBestConfiguration 的 available 仅声明自有字段可保存和读取，不代表 users 的独立 PB 或 leaderboards 全等价；既有模块映射数和 partial 状态不变。旧数据无配置仍未知。
+
 2026-10-06 [PB 比较与生命周期合同](PERSONAL_BEST_COMPARISON_CONTRACT.md) 明确 users／leaderboards 的剩余语义差异：当前公开 PB 新纪元不是原版公开 clearPb，历史派生 PB／全部榜尚未改为独立账本，旧成绩缺少完整分组证据。模块映射只代表原生入口与自有服务面，不代表上述功能等价；状态继续 partial，不提升映射数量。
 
 当前 [日榜任务与交付合同](DAILY_LEADERBOARD_SETTLEMENT_CONTRACT.md) 增加 leaderboards 的实际持久任务与邮件、admin 的只读状态及 psas 的原生榜首公告证据。未升级映射计数或 partial 状态；原版 Discord 渠道、全部模式、小数 WPM、原协议及真实窗口仍开放，原生公告不充当 Discord 验收。

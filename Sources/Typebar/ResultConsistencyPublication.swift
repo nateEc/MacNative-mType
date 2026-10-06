@@ -18,6 +18,7 @@ enum ResultConsistencyPublication {
       throw RemoteAccountError.serverMessage("当前服务不支持引语身份分桶。请先升级自建服务；本机成绩保留。")
     }
     try RemoteIncompletePracticePolicy.validate(result, capabilities: capabilities)
+    let personalBestConfiguration = try RemotePersonalBestConfigurationPolicy.prepare(result, capabilities: capabilities)
     let rankingEvidence = try RemoteRankingEvidencePolicy.prepare(result, capabilities: capabilities)
     let experienceEvidence = try RemoteExperienceEvidencePolicy.prepare(result, capabilities: capabilities)
     if let elapsedTime = result.elapsedTime, !elapsedTime.isServiceCompatible(
@@ -57,6 +58,7 @@ enum ResultConsistencyPublication {
       includesInputMetrics: capabilities?.supportsResultInputMetrics == true,
       includesInputMetricsV2: capabilities?.supportsResultInputMetricsV2 == true,
       resultConsistency: metrics, experienceEvidence: experienceEvidence, rankingEvidence: rankingEvidence,
+      personalBestConfiguration: personalBestConfiguration,
       includesMode2: capabilities?.supportsResultMode2 == true)
   }
 }

@@ -195,6 +195,7 @@ enum RemoteResultCSVExport {
         "key_consistency_percent",
         "elapsed_seconds", "wall_clock_seconds", "terminal_timing_version",
         "bailed_out", "custom_limit_mode", "custom_limit_value",
+        "personal_best_configuration_version", "difficulty", "punctuation", "numbers", "lazy_mode",
     ]
 
     @MainActor
@@ -277,6 +278,11 @@ enum RemoteResultCSVExport {
             result.terminalTiming.map { String($0.version) } ?? "",
             result.bailedOut.map { String($0) } ?? "",
             result.customLimit?.mode ?? "", result.customLimit.map { String($0.value) } ?? "",
+            result.personalBestConfiguration.map { String($0.version) } ?? "",
+            result.personalBestConfiguration?.difficulty ?? "",
+            result.personalBestConfiguration.map { String($0.punctuation) } ?? "",
+            result.personalBestConfiguration.map { String($0.numbers) } ?? "",
+            result.personalBestConfiguration.map { String($0.lazyMode) } ?? "",
         ]
     }
 

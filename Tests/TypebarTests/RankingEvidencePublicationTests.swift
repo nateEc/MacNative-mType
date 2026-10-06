@@ -13,7 +13,7 @@ final class RankingEvidencePublicationTests: XCTestCase {
       prompt: "private prompt", replayEvents: [])
   }
   private var capabilities: RemoteServiceCapabilities {
-    .init(apiVersion: "v1", service: "typebar", capabilities: ["resultRankingEvidence":"available"])
+    .init(apiVersion: "v1", service: "typebar", capabilities: ["resultRankingEvidence":"available", "resultPersonalBestConfiguration":"available"])
   }
   func testWordStopDoesNotRejectAnImperfectPersonalBest() {
     let configuration = TestConfiguration.words(25, rules: .init(stopOnErrorMode: .word))

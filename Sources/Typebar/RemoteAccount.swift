@@ -389,6 +389,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let restartCount: Int?
     let experienceEvidence: RemoteExperienceEvidence?
     let rankingEvidence: RemoteRankingEvidence?
+    let personalBestConfiguration: RemotePersonalBestConfiguration?
     let terminalTiming: ResultTerminalTiming?
     let elapsedTime: ResultElapsedTime?
     let bailedOut: Bool?
@@ -403,6 +404,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
             errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
             bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
+        case personalBestConfiguration
     }
 
     init(from decoder: Decoder) throws {
@@ -435,6 +437,14 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
             ? try values.decode(RemoteExperienceEvidence.self, forKey: .experienceEvidence) : nil
         rankingEvidence = values.contains(.rankingEvidence)
             ? try values.decode(RemoteRankingEvidence.self, forKey: .rankingEvidence) : nil
+        personalBestConfiguration = values.contains(.personalBestConfiguration)
+            ? try values.decode(RemotePersonalBestConfiguration.self, forKey: .personalBestConfiguration) : nil
+        if let personalBestConfiguration, let experienceEvidence,
+            personalBestConfiguration.punctuation != experienceEvidence.punctuation
+              || personalBestConfiguration.numbers != experienceEvidence.numbers {
+            throw DecodingError.dataCorruptedError(forKey: .personalBestConfiguration, in: values,
+                debugDescription: "PB and XP content flags must agree")
+        }
         if let rankingEvidence, rankingEvidence.modifiers.contains("polyglot") != (language == "mixedLanguages") {
             throw DecodingError.dataCorruptedError(forKey: .rankingEvidence, in: values,
                 debugDescription: "Ranking modifier and language identities must agree")
@@ -875,6 +885,7 @@ struct RemoteResultSubmission: Codable, Sendable {
     let incompletePractice: ResultIncompletePractice?
     let experienceEvidence: RemoteExperienceEvidence?
     let rankingEvidence: RemoteRankingEvidence?
+    let personalBestConfiguration: RemotePersonalBestConfiguration?
     let timingEvidence: RemoteResultTimingEvidence?
     let practiceTiming: RemoteResultPracticeTiming?
     let inputMetrics: ResultInputMetrics?
@@ -892,6 +903,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         includesPracticeTiming: Bool = false, includesInputMetrics: Bool = false,
         includesInputMetricsV2: Bool = false, resultConsistency: RemoteResultConsistency? = nil,
         experienceEvidence: RemoteExperienceEvidence? = nil, rankingEvidence: RemoteRankingEvidence? = nil,
+        personalBestConfiguration: RemotePersonalBestConfiguration? = nil,
         includesMode2: Bool = false
     ) {
         id = result.id
@@ -917,6 +929,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         incompletePractice = result.incompletePractice
         self.experienceEvidence = experienceEvidence
         self.rankingEvidence = rankingEvidence
+        self.personalBestConfiguration = personalBestConfiguration
         switch result.inputMetrics?.publicationVersion(nativeCharacterCount: result.typedCharacterCount) {
         case 1:
             inputMetrics = includesInputMetrics ? result.inputMetrics
@@ -940,6 +953,10 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     let apiVersion: String
     let service: String
     let capabilities: [String: String]
+
+    var supportsResultPersonalBestConfiguration: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["resultPersonalBestConfiguration"] == "available"
+    }
 
     var supportsRewardInbox: Bool {
         apiVersion == "v1" && service == "typebar" && capabilities["rewardInbox"] == "available"

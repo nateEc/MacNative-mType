@@ -4,9 +4,9 @@ import XCTest
 
 final class ExperienceEvidencePublicationTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 900_000_000)
-  private func result() -> CompletedTestResult {
+  private func result(contentOptions: ContentOptions = .init(includePunctuation: true, includeNumbers: true)) -> CompletedTestResult {
     .init(id: UUID(), configuration: .words(25, contentOptions:
-      .init(includePunctuation: true, includeNumbers: true)).with(modifiers: [.mirrorVisual]),
+      contentOptions).with(modifiers: [.mirrorVisual]),
       outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(15),
       afkDuration: 2.25, typedCharacterCount: 75, correctCharacterCount: 75,
       errorCount: 0, wpm: 60, rawWpm: 60, accuracy: 100,
@@ -20,6 +20,7 @@ final class ExperienceEvidencePublicationTests: XCTestCase {
   private var capabilities: RemoteServiceCapabilities {
     .init(apiVersion: "v1", service: "typebar", capabilities: [
       "resultExperienceEvidence": "available", "resultInputMetrics": "available",
+      "resultPersonalBestConfiguration": "available",
       "resultInputMetricsV2": "available", "resultPracticeTiming": "available",
       "resultBailout": "available", "resultTerminalTiming": "available"])
   }
@@ -36,7 +37,7 @@ final class ExperienceEvidencePublicationTests: XCTestCase {
   @MainActor func testEvidenceCapabilityCannotDiscardItsRequiredInputCounters() async {
     do {
       _ = try await ResultConsistencyPublication.prepare(result: result(), capabilities:
-        .init(apiVersion: "v1", service: "typebar", capabilities: ["resultExperienceEvidence": "available"]))
+        .init(apiVersion: "v1", service: "typebar", capabilities: ["resultExperienceEvidence": "available", "resultPersonalBestConfiguration": "available"]))
       XCTFail("A negotiated complete report needs the matching counter contract")
     } catch { XCTAssertTrue(error is RemoteAccountError) }
   }
@@ -44,7 +45,7 @@ final class ExperienceEvidencePublicationTests: XCTestCase {
   @MainActor func testPreRewardCapabilityIsAdditiveAndExact() async throws {
     for (api, service, status) in [("v1", "typebar", "planned"), ("v1", "typebar", "partial"),
       ("v2", "typebar", "available"), ("v1", "other", "available"), ("v1", "typebar", "")] {
-      let wire = try await ResultConsistencyPublication.prepare(result: result(), capabilities:
+      let wire = try await ResultConsistencyPublication.prepare(result: result(contentOptions: .init()), capabilities:
         .init(apiVersion: api, service: service, capabilities: ["resultExperienceEvidence": status]))
       XCTAssertNil(wire.experienceEvidence, "Do not imply the service has switched XP rules")
     }

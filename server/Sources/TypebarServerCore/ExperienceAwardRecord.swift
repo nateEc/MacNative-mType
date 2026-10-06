@@ -14,15 +14,18 @@ struct ExperienceAwardRecord: Codable {
   let configuration: ExperienceCalculationConfiguration?
   let context: ExperienceCalculationContext?
   var rankingAdmission: RankingAdmission? = nil
+  var personalBestConfiguration: ResultPersonalBestConfiguration? = nil
   var weeklyPartition: WeeklyExperiencePartition? = nil
   var weeklyCacheReceipt: WeeklyExperienceCacheReceipt? = nil
   var dailyCacheReceipt: DailyLeaderboardCacheReceipt? = nil
 
   static func legacy(userID: UUID, request: ResultSubmissionRequest, acceptedAt: Date?) -> Self {
     let xp = TypebarExperiencePolicy.points(for: request)
-    return .init(version: 1, userID: userID, resultID: request.id, finishedAt: request.finishedAt,
+    var record = Self(version: 1, userID: userID, resultID: request.id, finishedAt: request.finishedAt,
       acceptedAt: acceptedAt, award: .init(xp: Double(xp), dailyBonus: nil, breakdown: nil),
       accountCredit: xp, input: nil, configuration: nil, context: nil)
+    record.personalBestConfiguration = request.personalBestConfiguration
+    return record
   }
 
   /// The pinned backend uses BSON 6.8's numeric Long constructor (high=0),
@@ -36,6 +39,11 @@ struct ExperienceAwardRecord: Codable {
   }
 
   func validate() throws {
+    if let personalBestConfiguration {
+      guard personalBestConfiguration.isValid else { throw ExperienceCalculationError.invalidInput }
+      if let input, personalBestConfiguration.punctuation != input.punctuation
+        || personalBestConfiguration.numbers != input.numbers { throw ExperienceCalculationError.invalidInput }
+    }
     try rankingAdmission?.validate()
     try weeklyPartition?.validate(acceptedAt: acceptedAt)
     try weeklyCacheReceipt?.validate(reward: self)
@@ -69,6 +77,7 @@ extension ExperienceAwardRecord {
   private enum CodingKeys: String, CodingKey {
     case version, userID, resultID, finishedAt, acceptedAt, award, accountCredit,
       input, configuration, context, rankingAdmission, weeklyPartition, weeklyCacheReceipt, dailyCacheReceipt
+    case personalBestConfiguration
   }
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -84,6 +93,8 @@ extension ExperienceAwardRecord {
       context: try values.decodeIfPresent(ExperienceCalculationContext.self, forKey: .context))
     rankingAdmission = values.contains(.rankingAdmission)
       ? try values.decode(RankingAdmission.self, forKey: .rankingAdmission) : nil
+    personalBestConfiguration = values.contains(.personalBestConfiguration)
+      ? try values.decode(ResultPersonalBestConfiguration.self, forKey: .personalBestConfiguration) : nil
     weeklyPartition = values.contains(.weeklyPartition)
       ? try values.decode(WeeklyExperiencePartition.self, forKey: .weeklyPartition) : nil
     weeklyCacheReceipt = values.contains(.weeklyCacheReceipt)
