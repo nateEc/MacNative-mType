@@ -87,6 +87,7 @@ enum PaceGuidePolicy {
         configuration: TestConfiguration,
         samples: [PaceGuideSample],
         activeTags: [String] = [],
+        personalBestLedger: LocalPersonalBestLedger? = nil,
         lastTestWpm: Double? = nil,
         currentPrompt: String = "",
         now: Date = .now,
@@ -99,10 +100,17 @@ enum PaceGuidePolicy {
             return validTarget(customWpm)
         case .personalBest:
             guard CurrentPersonalBestPolicy.isConfigurationEligible(configuration) else { return nil }
+            if let personalBestLedger {
+                return validTarget(personalBestLedger.best(configuration: configuration)?.row.wpm)
+            }
             return validTarget(personalBest(configuration: configuration,
                 currentPrompt: currentPrompt, samples: samples))
         case .activeTagPersonalBest:
             guard !activeTags.isEmpty else { return nil }
+            if let personalBestLedger {
+                return validTarget(personalBestLedger.best(configuration: configuration,
+                    activeTags: activeTags, requiresCurrentEligibility: false)?.row.wpm)
+            }
             // Reference tag PB has no current-funbox guard. Stored candidates
             // must still have qualified when their result was recorded.
             return validTarget(personalBest(configuration: configuration,

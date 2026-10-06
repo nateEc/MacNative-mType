@@ -30,12 +30,14 @@ models = {
   "TestResultRecord" => "Sources/Typebar/ResultPersistence.swift",
   "TestPresetRecord" => "Sources/Typebar/TestPresets.swift",
   "SavedCustomTextRecord" => "Sources/Typebar/SavedTexts.swift",
-  "ResultFilterPresetRecord" => "Sources/Typebar/ResultPersistence.swift"
+  "ResultFilterPresetRecord" => "Sources/Typebar/ResultPersistence.swift",
+  "LocalPersonalBestLedgerRecord" => "Sources/Typebar/LocalPersonalBestLedger.swift"
 }
 versions = {
   "initial" => "bdbfae291c7a20a706a100c62a7c323681dfbf8f",
   "before-elapsed" => "9c5b477c6cd1a2ef5b4d34afbc3ef4013dc21cc7",
   "before-incomplete" => "da972ecfaa6e7109932b9ccd96fcfecdb6b7a92c",
+  "before-local-pb" => "5f9e090723fc4be52bc9dee6148d7d14e66554ea",
   "current" => command!("git", "-C", project, "rev-parse", "HEAD").strip
 }
 FileUtils.mkdir(destination)
@@ -44,6 +46,7 @@ manifest = {}
 versions.each do |label, commit|
   declarations = {}
   models.each do |name, file|
+    next if name == "LocalPersonalBestLedgerRecord" && label != "current"
     source = label == "current" ? File.read(File.join(project, file)) :
       command!("git", "-C", project, "show", "#{commit}:#{file}")
     block = source.match(/@Model\s+final class #{name} \{(.*?)\n\s*init/m)&.captures&.first
@@ -58,10 +61,10 @@ versions.each do |label, commit|
     declarations[name] = fields
   end
   has_elapsed = declarations.fetch("TestResultRecord").any? { |field| field[:name] == "elapsedTimeData" }
-  expects_elapsed = ["before-incomplete", "current"].include?(label)
+  expects_elapsed = ["before-incomplete", "before-local-pb", "current"].include?(label)
   abort "elapsed field presence does not match version #{label}" unless has_elapsed == expects_elapsed
   has_incomplete = declarations.fetch("TestResultRecord").any? { |field| field[:name] == "incompletePracticeData" }
-  abort "incomplete field presence does not match version #{label}" unless has_incomplete == (label == "current")
+  abort "incomplete field presence does not match version #{label}" unless has_incomplete == ["before-local-pb", "current"].include?(label)
 
   code = "import Foundation\nimport SwiftData\n\n"
   declarations.each do |name, fields|
@@ -89,6 +92,8 @@ versions.each do |label, commit|
     code += "    ] },\n"
   end
   code += "  ]\n}\n"
+  code += "@MainActor func diskFixtureSchema() -> Schema { Schema([" +
+    declarations.keys.map { |name| "#{name}.self" }.join(", ") + "]) }\n"
   source_path = File.join(destination, "#{label}-models.swift")
   File.write(source_path, code)
   writer = File.join(destination, "#{label}-fixture-writer")
@@ -99,4 +104,4 @@ versions.each do |label, commit|
     fields: declarations.transform_values { |fields| fields.map { |field| field[:name] } }}
 end
 File.write(File.join(destination, "manifest.json"), JSON.pretty_generate(manifest))
-puts "disk model fixture writers prepared serially (initial, before-elapsed, before-incomplete, current; no GUI/store opened)"
+puts "disk model fixture writers prepared serially (initial, before-elapsed, before-incomplete, before-local-pb, current; no GUI/store opened)"

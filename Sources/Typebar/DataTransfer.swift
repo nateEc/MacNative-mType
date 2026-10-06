@@ -1633,6 +1633,9 @@ enum LocalArchiveImport {
             deletedIDs: effectiveDeletedFilterPresetIDs
         ).compactMap(ResultFilterPresetRecord.init(portablePreset:))
 
+        let personalBestCheckpoint = try LocalPersonalBestStore.checkpoint(in: modelContext)
+        do { try LocalPersonalBestStore.stage(newResults, in: modelContext) }
+        catch { LocalPersonalBestStore.restore(personalBestCheckpoint, in: modelContext); throw error }
         for result in newResults { modelContext.insert(TestResultRecord(result: result)) }
         for result in resultRecordsToDelete { modelContext.delete(result) }
         for preset in newPresets {
@@ -1655,7 +1658,7 @@ enum LocalArchiveImport {
         do {
             try modelContext.save()
         } catch {
-            modelContext.rollback()
+            LocalPersonalBestStore.restore(personalBestCheckpoint, in: modelContext)
             throw error
         }
         resultTombstoneStore.replaceDeletedIDs(resultingDeletedResultIDs)

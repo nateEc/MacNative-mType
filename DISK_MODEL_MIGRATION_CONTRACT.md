@@ -1,5 +1,7 @@
 # 原生磁盘模型升级与备份验证合同
 
+2026-10-06 当前 [本机 PB 账本](LOCAL_PERSONAL_BEST_LEDGER_CONTRACT.md) 新增第五实体，归档 27／设置 4 不变。第五个 writer 投影前一版 5f9e090723fc4be52bc9dee6148d7d14e66554ea 的四实体 schema，新增升级及删除历史后账本的独立进程／生产冷读取。current 为五实体，TestResultRecord 仍 31 列；完整串行门禁原生 3044／服务 420 项零失败、零跳过（700.056／9.767 秒），十万词 151.073 秒、十项磁盘迁移 4.671 秒、914 场景仅结构及未开窗包／原创性通过。下方四实体、三／四 writer 和七／九项数字均属历史阶段，不是当前 schema 或旧发行证明。
+
 2026-10-06 当前 [引语身份合同](RESULT_MODE2_CONTRACT.md) 提高归档至 27，设置仍为 4；身份存于既有 quoteSourceData，不新增 SwiftData 列，四 writer 及 current 31 列投影不变。坏显式来源不能作为旧来源导出，原字节保留；本批内存验证和完整门禁九项隔离磁盘迁移通过（3.365 秒），原生全量 2975 项零失败、零跳过。不把旧阶段归档 26 或自动化当成实际用户库／旧发行升级承诺，goal 未完成。
 
 2026-10-04 最新增量见 [未完成练习证据合同](INCOMPLETE_PRACTICE_EVIDENCE_CONTRACT.md)：新增可选 incompletePracticeData，归档 26／设置 4；四 writer 包括第三代 before-incomplete 30 列和 current 31 列，九项真实磁盘测试已定向通过。迁移策略仍使用现有自动路径。本页下方两代历史、三 writer、current 30 列及七项测试描述保留为原阶段证据，不是当前 schema。完整 Monkeytype 原生重写 goal 仍 active；不是实际用户库、旧发行二进制、旧 SDK 或 macOS 14 的升级承诺。

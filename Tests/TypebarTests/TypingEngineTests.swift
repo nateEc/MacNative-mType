@@ -16622,7 +16622,7 @@ final class TypingEngineTests: XCTestCase {
     tombstones.markDeleted(deletedFilterPresetID)
 
     let container = try ModelContainer(
-      for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
+      for: TestResultRecord.self, LocalPersonalBestLedgerRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
       ResultFilterPresetRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
@@ -24324,7 +24324,7 @@ final class TypingEngineTests: XCTestCase {
       ).quoteSource)
 
     let container = try ModelContainer(
-      for: TestResultRecord.self,
+      for: TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     container.mainContext.insert(TestResultRecord(result: result))
     try container.mainContext.save()
@@ -24525,7 +24525,7 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testPresetRoundTripsWithAllSessionInputs() throws {
     let container = try ModelContainer(
-      for: TestPresetRecord.self,
+      for: TestPresetRecord.self, TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     var rules = InputRules()
@@ -26288,7 +26288,7 @@ final class TypingEngineTests: XCTestCase {
     defer { defaults.removePersistentDomain(forName: suiteName) }
     let settings = AppSettings(defaults: defaults)
     let container = try ModelContainer(
-      for: ResultFilterPresetRecord.self,
+      for: ResultFilterPresetRecord.self, TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let existing = try XCTUnwrap(ResultFilterPresetRecord(
       name: "Existing", filter: .init(modes: [.quote])))
@@ -26329,7 +26329,7 @@ final class TypingEngineTests: XCTestCase {
     let settings = AppSettings(defaults: defaults)
     let tombstones = ResultFilterPresetTombstoneStore(defaults: defaults)
     let container = try ModelContainer(
-      for: ResultFilterPresetRecord.self,
+      for: ResultFilterPresetRecord.self, TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let portable = NamedResultFilterPreset(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000000403")!,
@@ -26380,7 +26380,7 @@ final class TypingEngineTests: XCTestCase {
     let settings = AppSettings(defaults: defaults)
     let tombstones = ResultTombstoneStore(defaults: defaults)
     let container = try ModelContainer(
-      for: TestResultRecord.self,
+      for: TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let portable = CompletedTestResult(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000000404")!,
@@ -26427,7 +26427,7 @@ final class TypingEngineTests: XCTestCase {
     let settings = AppSettings(defaults: defaults)
     let tombstones = PresetTombstoneStore(defaults: defaults)
     let container = try ModelContainer(
-      for: TestPresetRecord.self,
+      for: TestPresetRecord.self, TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let definition = SavedTestPreset(configuration: .words(10), quoteID: nil, customText: nil)
     let existing = TestPresetRecord(name: "Daily", definition: definition)
@@ -26490,7 +26490,7 @@ final class TypingEngineTests: XCTestCase {
     let settings = AppSettings(defaults: defaults)
     let tombstones = SavedTextTombstoneStore(defaults: defaults)
     let container = try ModelContainer(
-      for: SavedCustomTextRecord.self,
+      for: SavedCustomTextRecord.self, TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let existing = SavedCustomTextRecord(title: "Morning", text: "A deliberate beginning.")
     container.mainContext.insert(existing)
@@ -26566,7 +26566,7 @@ final class TypingEngineTests: XCTestCase {
     settings.keyboardGuideLayoutSource = .custom
     let activeSnapshot = settings.snapshot
     let container = try ModelContainer(
-      for: TestResultRecord.self,
+      for: TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let deletionArchive = TypebarArchive(
       exportedAt: start, settings: activeSnapshot,
@@ -26619,7 +26619,7 @@ final class TypingEngineTests: XCTestCase {
         duration: 47, wordLimit: 83, customTextDuration: 61,
         customTextWordLimit: 73, customTextSectionLimit: 4))
     let container = try ModelContainer(
-      for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
+      for: TestResultRecord.self, LocalPersonalBestLedgerRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
 
     let unchangedSummary = try LocalArchiveImport.apply(
@@ -26663,7 +26663,7 @@ final class TypingEngineTests: XCTestCase {
     defer { defaults.removePersistentDomain(forName: suiteName) }
     let settings = AppSettings(defaults: defaults)
     let container = try ModelContainer(
-      for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
+      for: TestResultRecord.self, LocalPersonalBestLedgerRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let imported = ActiveTestSelectionDocument(
       preset: .init(configuration: .words(83, language: .german)),
@@ -28363,7 +28363,7 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testResultRecordRoundTripsThroughSwiftData() throws {
     let container = try ModelContainer(
-      for: TestResultRecord.self,
+      for: TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     var session = TypingSession(
@@ -28474,7 +28474,7 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testResultFilterPresetPersistsACompleteFilter() throws {
     let container = try ModelContainer(
-      for: ResultFilterPresetRecord.self,
+      for: ResultFilterPresetRecord.self, TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     let filter = ResultHistoryFilter(
@@ -28499,7 +28499,7 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testSavedCustomTextRoundTripsThroughSwiftData() throws {
     let container = try ModelContainer(
-      for: SavedCustomTextRecord.self,
+      for: SavedCustomTextRecord.self, TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     container.mainContext.insert(

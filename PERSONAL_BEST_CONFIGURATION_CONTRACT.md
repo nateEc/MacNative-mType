@@ -1,6 +1,6 @@
 # 个人最佳配置保存合同
 
-后续 [账户 PB 账本](PERSONAL_BEST_LEDGER_CONTRACT.md) 已接通服务完整分组、独立个人／排行榜快照、删除保留与公开清空；[远程小数速度](RESULT_SPEED_PRECISION_CONTRACT.md) 提供其数值证据。下述配置保存阶段的验证记录保留；本机／标签账本与全消费者等价仍开放。
+后续 [账户 PB 账本](PERSONAL_BEST_LEDGER_CONTRACT.md) 和 [本机／标签账本](LOCAL_PERSONAL_BEST_LEDGER_CONTRACT.md) 已接通完整分组与删除保留；[远程小数速度](RESULT_SPEED_PRECISION_CONTRACT.md) 提供投稿数值证据。下述配置保存阶段的数字与范围保留；原版标签 ID、独立账本跨设备传输和全消费者等价仍开放。
 
 2026-10-06，完成时的 difficulty、punctuation、numbers、lazyMode 已从原生保存快照接通能力协商、服务接受记录、私有历史和远程 CSV。它补齐后续 PB 分组所需的明确配置，不改变当前 PB 选择、XP、速度榜或公开资料算法；独立个人、标签和榜单 PB 账本仍未接入，整个重写目标未完成。
 

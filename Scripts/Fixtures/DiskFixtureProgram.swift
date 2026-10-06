@@ -52,8 +52,7 @@ func diskSchemaDescription(_ schema: Schema) -> [String: Any] {
 enum DiskFixtureProgram {
   static func main() throws {
     let arguments = Array(CommandLine.arguments.dropFirst())
-    let schema = Schema([TestResultRecord.self, TestPresetRecord.self,
-      SavedCustomTextRecord.self, ResultFilterPresetRecord.self])
+    let schema = diskFixtureSchema()
     if arguments.count == 2, arguments[0] == "schema" {
       try write(["schema": diskSchemaDescription(schema)], to: arguments[1]); return
     }

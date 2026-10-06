@@ -83,10 +83,14 @@ struct TypebarApp: App {
 
   private static let dataStore: Result<ModelContainer, DataStoreStartupRecovery> =
     DataStoreStartupPolicy.attempt(storeURL: modelConfiguration.url) {
-      try ModelContainer(
+      let legacyStorePresent = !modelConfiguration.isStoredInMemoryOnly
+        && FileManager.default.fileExists(atPath: modelConfiguration.url.path)
+      let container = try ModelContainer(
         for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
-        ResultFilterPresetRecord.self,
+        ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
         configurations: modelConfiguration)
+      try LocalPersonalBestStore.initialize(in: container.mainContext, legacyStorePresent: legacyStorePresent)
+      return container
     }
 }
 
@@ -964,6 +968,7 @@ private struct ContentView: View {
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var savedResults:
     [TestResultRecord]
+  @Query private var personalBestLedgers: [LocalPersonalBestLedgerRecord]
   @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var savedPresets:
     [TestPresetRecord]
   @State private var session = TestSessionFactory.make(
@@ -1328,12 +1333,10 @@ private struct ContentView: View {
         let savesResult = ResultSavingPolicy.shouldPersist(
           outcome: result.outcome, enabled: settings.saveCompletedResults, eligibility: eligibility)
         let resultPersonalBestFeedback = savesResult
-          ? ResultPersonalBestPolicy.feedback(
-            for: result, previousResults: savedResults.compactMap(\.portableResult))
+          ? personalBestLedgers.first?.ledger?.feedback(for: result)
           : nil
         let tagPersonalBestFeedback = savesResult
-          ? TagPersonalBestPolicy.feedback(
-            for: result, previousResults: savedResults.compactMap(\.portableResult))
+          ? personalBestLedgers.first?.ledger?.tagFeedback(for: result) ?? []
           : []
         let wordReviews = session.wordReviews
         let wordBursts = session.wordBurstHistory
@@ -2493,9 +2496,13 @@ private struct ContentView: View {
     .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
   }
 
+  private var knownHistoricalResultTags: [String] {
+    savedResults.flatMap(\.tags) + (personalBestLedgers.first?.ledger?.tagEntries.map(\.tag) ?? [])
+  }
+
   private var inactiveKnownResultTags: [String] {
     var tags: [String] = []
-    for rawTag in savedResults.flatMap(\.tags) {
+    for rawTag in knownHistoricalResultTags {
       guard let tag = ResultTagPolicy.normalized([rawTag]).first else { continue }
       guard !containsEquivalentResultTag(tag, in: settings.activeResultTags) else { continue }
       guard !containsEquivalentResultTag(tag, in: tags) else { continue }
@@ -4115,12 +4122,10 @@ private struct ContentView: View {
     guard CurrentPersonalBestPolicy.isConfigurationEligible(configuration) else {
       return "本机个人最佳：当前测试不计入 PB"
     }
-    let samples = savedResults.compactMap { record -> RecentAverageSample? in
-      guard let result = record.portableResult else { return nil }
-      return .init(result: result)
+    guard let ledger = personalBestLedgers.first?.ledger else {
+      return "本机个人最佳：账本不可用，请备份数据库后修复"
     }
-    guard let personalBest = CurrentPersonalBestPolicy.personalBest(
-      currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples)
+    guard let personalBest = ledger.best(configuration: configuration)?.row
     else {
       return "本机个人最佳：暂无符合资格的同类成绩"
     }
@@ -4150,6 +4155,9 @@ private struct ContentView: View {
     if settings.paceGuideMode == .off, let repeatedWpm {
       return PaceGuidePolicy.validTarget(repeatedWpm)
     }
+    if settings.paceGuideMode == .personalBest || settings.paceGuideMode == .activeTagPersonalBest {
+      guard personalBestLedgers.first?.ledger != nil else { return nil }
+    }
     let samples = savedResults.compactMap { record -> PaceGuideSample? in
       guard let result = record.portableResult else { return nil }
       return .init(result: result)
@@ -4160,6 +4168,7 @@ private struct ContentView: View {
       configuration: configuration,
       samples: samples,
       activeTags: activeSessionTags,
+      personalBestLedger: personalBestLedgers.first?.ledger,
       lastTestWpm: repeatedWpm ?? lastFinishedWpm,
       currentPrompt: session.prompt
     )
@@ -4256,7 +4265,7 @@ private struct ContentView: View {
     items.append(contentsOf: PracticeThresholdCommandCatalog.items)
     items.append(contentsOf: FunboxCommandCatalog.items)
     items.append(contentsOf: ResultTagCommandCatalog.items(
-      active: settings.activeResultTags, historical: savedResults.flatMap(\.tags)))
+      active: settings.activeResultTags, historical: knownHistoricalResultTags))
     items.append(contentsOf: InputRuleCommandCatalog.items)
     items.append(contentsOf: OfficialLayoutCommandCatalog.items)
     items.append(contentsOf: SoundCommandCatalog.items)
@@ -4491,7 +4500,7 @@ private struct ContentView: View {
       return
     }
     let knownResultTags = ResultTagCommandCatalog.knownTags(
-      active: settings.activeResultTags, historical: savedResults.flatMap(\.tags))
+      active: settings.activeResultTags, historical: knownHistoricalResultTags)
     if let target = ResultTagCommandCatalog.target(for: item.id, knownTags: knownResultTags) {
       if target == .create {
         showingActiveResultTagEditor = true
@@ -5446,9 +5455,10 @@ private struct ContentView: View {
   }
 
   private func saveCompletedResultLocally(_ result: CompletedTestResult) {
-    let record = TestResultRecord(result: result)
-    modelContext.insert(record)
-    localResultSaveState = LocalResultSaveAttempt.perform { try modelContext.save() }
+    var record: TestResultRecord?
+    localResultSaveState = LocalResultSaveAttempt.perform {
+      record = try LocalPersonalBestStore.save(result, in: modelContext)
+    }
     if localResultSaveState.isSaved {
       savedResultRecord = record
       priorAttemptLedger.clearAfterPersistingResult()
@@ -5458,7 +5468,6 @@ private struct ContentView: View {
         signedOutResultClaimStore.record(result.id)
       }
     } else {
-      modelContext.delete(record)
       savedResultRecord = nil
     }
   }
@@ -7460,6 +7469,7 @@ private struct ResultsHistoryView: View {
   @Environment(\.modelContext) private var modelContext
   @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var results:
     [TestResultRecord]
+  @Query private var personalBestLedgers: [LocalPersonalBestLedgerRecord]
   @Query(sort: \ResultFilterPresetRecord.createdAt, order: .reverse) private var filterPresets:
     [ResultFilterPresetRecord]
   private let resultTombstones = ResultTombstoneStore()
@@ -7578,7 +7588,7 @@ private struct ResultsHistoryView: View {
   }
 
   private var personalBestIDs: Set<UUID> {
-    Set(LocalPersonalBestTablePolicy.rows(results: results.compactMap(\.portableResult)).map(\.id))
+    Set(personalBestLedgers.first?.ledger?.entries.map(\.row.id) ?? [])
   }
 
   var body: some View {

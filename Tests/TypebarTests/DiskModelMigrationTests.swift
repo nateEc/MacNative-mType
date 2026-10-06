@@ -16,14 +16,49 @@ final class DiskModelMigrationTests: XCTestCase {
       let receipt = root.appendingPathComponent("schema.json")
       try runWriter("current", ["schema", receipt.path], root: root)
       let actual = schemaDescription(Schema([TestResultRecord.self, TestPresetRecord.self,
-        SavedCustomTextRecord.self, ResultFilterPresetRecord.self]))
+        SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self]))
       XCTAssertEqual(try object(receipt)["schema"] as? NSDictionary, actual as NSDictionary)
-      XCTAssertEqual(actual.count, 4)
+      XCTAssertEqual(actual.count, 5)
     }
   }
 
   func testInitialDiskSchemaUpgradesWithoutRescoringOrLosingOtherEntities() throws {
     try exerciseUpgrade("initial")
+  }
+
+  func testPreviousFourEntityStoreAddsIndependentPBAndColdReloadKeepsItAfterDeletion() throws {
+    try withDirectory { root in
+      let fixture = try createLegacy("before-local-pb", root: root)
+      let rows = try XCTUnwrap(fixture.receipt["rows"] as? [String: [[String: Any]]])
+      var snapshot: LocalPersonalBestLedger?
+      try autoreleasepool {
+        let store = try open(fixture.store)
+        defer { withExtendedLifetime(store) {} }
+        let context = store.mainContext
+        try assertLegacy(context, expected: rows, version: "before-local-pb")
+        try LocalPersonalBestStore.initialize(in: context)
+        snapshot = try XCTUnwrap(context.fetch(FetchDescriptor<LocalPersonalBestLedgerRecord>()).first).decodedLedger()
+        XCTAssertEqual(snapshot?.entries.first?.row.id, resultID)
+        XCTAssertEqual(snapshot?.entries.first?.row.wpm, 17.25)
+        XCTAssertEqual(snapshot?.entries.first?.row.rawWpm, 29.125)
+        XCTAssertFalse(try XCTUnwrap(snapshot).historyComplete)
+        XCTAssertNil(snapshot?.entries.first?.recordedAt)
+        try context.delete(model: TestResultRecord.self); try context.save()
+      }
+      let receipt = root.appendingPathComponent("cold-pb.json")
+      try runWriter("current", ["inspect", fixture.store.path, "-", receipt.path], root: root)
+      let cold = try XCTUnwrap(try object(receipt)["rows"] as? [String: [[String: Any]]])
+      XCTAssertEqual(cold["TestResultRecord"]?.count, 0)
+      XCTAssertEqual(cold["LocalPersonalBestLedgerRecord"]?.count, 1)
+      try autoreleasepool {
+        let store = try open(fixture.store)
+        defer { withExtendedLifetime(store) {} }
+        let context = store.mainContext
+        try LocalPersonalBestStore.initialize(in: context)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<LocalPersonalBestLedgerRecord>()).first?.decodedLedger(), snapshot)
+        try assertOtherEntities(context, expected: rows, version: "before-local-pb")
+      }
+    }
   }
 
   func testPreElapsedDiskSchemaRetainsOldBlobsAndPersistsIndependentNewTime() throws {
@@ -245,7 +280,7 @@ final class DiskModelMigrationTests: XCTestCase {
 
   private func open(_ store: URL) throws -> ModelContainer {
     let container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
-      SavedCustomTextRecord.self, ResultFilterPresetRecord.self,
+      SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(url: store, cloudKitDatabase: .none))
     container.mainContext.autosaveEnabled = false
     return container

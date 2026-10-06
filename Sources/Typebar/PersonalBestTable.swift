@@ -2,8 +2,8 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-/// One locally stored best result for a time or word-count configuration.
-struct LocalPersonalBestRow: Equatable, Identifiable {
+/// One numeric best snapshot for a non-quote configuration.
+struct LocalPersonalBestRow: Codable, Equatable, Identifiable {
   let id: UUID
   let mode: TestMode
   let parameter: Int
@@ -20,9 +20,10 @@ struct LocalPersonalBestRow: Equatable, Identifiable {
 
   var parameterLabel: String {
     switch mode {
-    case .time: "\(parameter) 秒"
-    case .words: "\(parameter) 词"
-    case .quote, .zen, .custom: ""
+    case .time: parameter == 0 ? "无限时" : "\(parameter) 秒"
+    case .words: parameter == 0 ? "无限词" : "\(parameter) 词"
+    case .zen, .custom: mode.displayName
+    case .quote: ""
     }
   }
 
@@ -35,8 +36,8 @@ struct LocalPersonalBestRow: Equatable, Identifiable {
   }
 }
 
-/// Builds a local equivalent of the personal-best table from completed results.
-/// It uses the same comparison fields as the practice-screen PB indicator.
+/// Legacy history projection retained for compatibility checks. Production
+/// consumers read the independent ledger, not this deletable-history view.
 enum LocalPersonalBestTablePolicy {
   static func rows(results: [CompletedTestResult]) -> [LocalPersonalBestRow] {
     var bestByConfiguration: [ConfigurationKey: CompletedTestResult] = [:]
@@ -77,15 +78,18 @@ enum LocalPersonalBestTablePolicy {
     init?(_ configuration: TestConfiguration) {
       switch configuration.mode {
       case .time:
-        guard let duration = configuration.duration, duration > 0 else { return nil }
+        guard let duration = configuration.duration, duration.isFinite, duration >= 0,
+          duration < Double(Int.max), duration.rounded(.towardZero) == duration else { return nil }
         mode = .time
         parameter = Int(duration)
       case .words:
-        guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return nil }
+        guard let wordLimit = configuration.wordLimit, wordLimit >= 0 else { return nil }
         mode = .words
         parameter = wordLimit
-      case .quote, .zen, .custom:
-        return nil
+      case .zen, .custom:
+        mode = configuration.mode
+        parameter = 0
+      case .quote: return nil
       }
       language = configuration.language
       difficulty = configuration.difficulty
@@ -108,7 +112,7 @@ enum LocalPersonalBestTablePolicy {
       configuration: result.configuration, keySpacingSamples: result.keySpacingSamples).typing
     return .init(
       id: result.id, mode: configuration.mode,
-      parameter: configuration.mode == .time ? Int(configuration.duration ?? 0) : configuration.wordLimit ?? 0,
+      parameter: ConfigurationKey(configuration)?.parameter ?? 0,
       wpm: result.preciseWpm, rawWpm: result.preciseRawWpm, accuracy: result.preciseAccuracy,
       consistency: consistency, difficulty: configuration.difficulty, language: configuration.language,
       includesPunctuation: configuration.contentOptions.includePunctuation,
@@ -119,13 +123,17 @@ enum LocalPersonalBestTablePolicy {
 
 struct LocalPersonalBestTableView: View {
   @Environment(\.dismiss) private var dismiss
-  @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var results: [TestResultRecord]
+  @Query private var ledgers: [LocalPersonalBestLedgerRecord]
   @State private var selectedMode: TestMode = .time
   let speedUnit: TypingSpeedUnit
   let alwaysShowDecimalPlaces: Bool
 
   private var rows: [LocalPersonalBestRow] {
-    LocalPersonalBestTablePolicy.rows(results: results.compactMap(\.portableResult))
+    (ledgers.first?.ledger?.entries.map(\.row) ?? []).sorted {
+      if $0.parameter != $1.parameter { return $0.parameter < $1.parameter }
+      if $0.wpm != $1.wpm { return $0.wpm > $1.wpm }
+      return $0.id.uuidString < $1.id.uuidString
+    }
       .filter { $0.mode == selectedMode }
   }
 
@@ -136,14 +144,23 @@ struct LocalPersonalBestTableView: View {
           Picker("测试类型", selection: $selectedMode) {
             Text(TestMode.time.displayName).tag(TestMode.time)
             Text(TestMode.words.displayName).tag(TestMode.words)
+            Text(TestMode.custom.displayName).tag(TestMode.custom)
+            Text(TestMode.zen.displayName).tag(TestMode.zen)
           }
           .pickerStyle(.segmented)
-          Text("只显示这台 Mac 上同类设置的已完成最佳成绩；不读取账户或网络数据。")
+          Text("只显示这台 Mac 的个人最佳；删除历史不会删除纪录，不读取账户或网络数据。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          if ledgers.first?.ledger?.historyComplete == false {
+            Text("旧历史或导入仅恢复可用基线，已删除的旧纪录无法恢复。")
+              .font(.caption).foregroundStyle(.secondary)
+          }
         }
 
-        if rows.isEmpty {
+        if ledgers.first?.ledger == nil {
+          ContentUnavailableView("个人最佳账本不可用", systemImage: "exclamationmark.triangle",
+            description: Text("请备份数据库后修复；不会用历史覆盖损坏账本。"))
+        } else if rows.isEmpty {
           ContentUnavailableView(
             "还没有可用的个人最佳", systemImage: "trophy",
             description: Text("完成符合条件的\(selectedMode.displayName)练习后会显示在这里。"))
@@ -168,7 +185,9 @@ struct LocalPersonalBestTableView: View {
                 VStack(alignment: .trailing, spacing: 3) {
                   Text("\(row.language.displayName) · \(row.difficulty.displayName)")
                   Text(row.optionsLabel)
-                  Text(row.finishedAt, format: .dateTime.year().month().day())
+                  let snapshot = ledgers.first?.ledger?.entries.first { $0.row.id == row.id }
+                  Text(snapshot?.recordedAt ?? row.finishedAt, format: .dateTime.year().month().day())
+                  if snapshot?.recordedAt == nil { Text("旧历史日期") }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
