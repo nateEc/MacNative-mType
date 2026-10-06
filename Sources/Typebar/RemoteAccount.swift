@@ -968,6 +968,10 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     let service: String
     let capabilities: [String: String]
 
+    var supportsPersonalBestLedger: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["accountPersonalBestLedger"] == "available"
+    }
+
     var supportsResultPersonalBestConfiguration: Bool {
         apiVersion == "v1" && service == "typebar" && capabilities["resultPersonalBestConfiguration"] == "available"
     }
@@ -1395,6 +1399,10 @@ struct RemoteExperienceLeaderboardRankResponse: Codable, Sendable {
 }
 
 struct RemotePublicProfile: Codable, Identifiable, Sendable {
+    let personalBestLedgerVersion: Int?
+    let personalBestHistoryComplete: Bool?
+    let personalBestSnapshots: [RemotePublicProfileBest]?
+    var displayPersonalBests: [RemotePublicProfileBest] { personalBestSnapshots ?? personalBests }
     let preciseBestWPM: Double?
     var effectiveBestWPM: Double { preciseBestWPM ?? Double(bestWPM) }
     var bestSpeedText: String { preciseBestWPM.map { RemoteSpeedPresentation.text($0, precise: true) } ?? String(bestWPM) }
@@ -1422,6 +1430,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
             activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge,
             earnedBadges, practiceHistoryComplete
         case preciseBestWPM
+        case personalBestLedgerVersion, personalBestHistoryComplete, personalBestSnapshots
     }
 
     init(from decoder: Decoder) throws {
@@ -1448,6 +1457,23 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
         earnedBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .earnedBadges) ?? []
         practiceHistoryComplete = try values.decodeIfPresent(Bool.self, forKey: .practiceHistoryComplete)
+        if [.personalBestLedgerVersion,.personalBestHistoryComplete,.personalBestSnapshots].contains(where:values.contains) {
+            personalBestLedgerVersion = try values.decode(Int.self,forKey:.personalBestLedgerVersion)
+            personalBestHistoryComplete = try values.decode(Bool.self,forKey:.personalBestHistoryComplete)
+            personalBestSnapshots = try values.decode([RemotePublicProfileBest].self,forKey:.personalBestSnapshots)
+            var groups = Set<String>(), ids = Set<UUID>()
+            guard personalBestLedgerVersion == 1 else {
+                throw DecodingError.dataCorruptedError(forKey:.personalBestLedgerVersion,in:values,debugDescription:"Unsupported PB ledger")
+            }
+            for snapshot in personalBestSnapshots! {
+                try snapshot.validateLedgerSnapshot()
+                guard groups.insert(snapshot.groupKey).inserted, ids.insert(snapshot.id).inserted else {
+                    throw DecodingError.dataCorruptedError(forKey:.personalBestSnapshots,in:values,debugDescription:"Duplicate PB snapshot")
+                }
+            }
+        } else {
+            personalBestLedgerVersion = nil; personalBestHistoryComplete = nil; personalBestSnapshots = nil
+        }
     }
 }
 
@@ -1488,6 +1514,23 @@ struct RemoteDiscordAvatar: Codable, Equatable, Sendable {
 }
 
 struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
+    let mode2: String?
+    let rawWpm: Int?
+    let preciseRawWpm: Double?
+    let personalBestConfiguration: RemotePersonalBestConfiguration?
+    let acceptedAtMilliseconds: Int?
+    let personalBestOrigin: String?
+    var recordedAt: Date { acceptedAtMilliseconds.map { Date(timeIntervalSince1970:Double($0)/1_000) } ?? finishedAt }
+    var rawSpeedText: String? { preciseRawWpm.map { RemoteSpeedPresentation.text($0,precise:true) } ?? rawWpm.map(String.init) }
+    var groupKey: String {
+        let config = personalBestConfiguration.map { "\($0.difficulty)/\($0.punctuation)/\($0.numbers)/\($0.lazyMode)" } ?? "unknown"
+        return "\(mode)/\(mode2 ?? configurationLabel)/\(language)/\(config)"
+    }
+    var groupingLabel: String {
+        guard let config = personalBestConfiguration else { return "选项未知" }
+        let difficulty = config.difficulty == "expert" ? "专家" : config.difficulty == "master" ? "大师" : "普通"
+        return "\(difficulty) · 标点\(config.punctuation ? "开" : "关") · 数字\(config.numbers ? "开" : "关") · lazy\(config.lazyMode ? "开" : "关")"
+    }
     let preciseWpm: Double?
     var effectiveWpm: Double { preciseWpm ?? Double(wpm) }
     var speedText: String { preciseWpm.map { RemoteSpeedPresentation.text($0, precise: true) } ?? String(wpm) }
@@ -1504,6 +1547,7 @@ struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id,mode,durationSeconds,wordLimit,language,wpm,accuracy,preciseAccuracy,consistency,finishedAt,preciseWpm
+        case mode2,rawWpm,preciseRawWpm,personalBestConfiguration,acceptedAtMilliseconds,personalBestOrigin
     }
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy:CodingKeys.self)
@@ -1518,11 +1562,41 @@ struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
         if let preciseWpm, !RemoteSpeedPrecision.isCanonical(preciseWpm) || Int(preciseWpm.rounded()) != wpm {
             throw DecodingError.dataCorruptedError(forKey:.preciseWpm,in:values,debugDescription:"Invalid public PB speed precision")
         }
+        mode2 = values.contains(.mode2) ? try values.decode(String.self,forKey:.mode2) : nil
+        rawWpm = values.contains(.rawWpm) ? try values.decode(Int.self,forKey:.rawWpm) : nil
+        preciseRawWpm = values.contains(.preciseRawWpm) ? try values.decode(Double.self,forKey:.preciseRawWpm) : nil
+        personalBestConfiguration = values.contains(.personalBestConfiguration)
+            ? try values.decode(RemotePersonalBestConfiguration.self,forKey:.personalBestConfiguration) : nil
+        acceptedAtMilliseconds = values.contains(.acceptedAtMilliseconds) ? try values.decode(Int.self,forKey:.acceptedAtMilliseconds) : nil
+        personalBestOrigin = values.contains(.personalBestOrigin) ? try values.decode(String.self,forKey:.personalBestOrigin) : nil
+    }
+
+    func validateLedgerSnapshot() throws {
+        guard let mode2, let rawWpm, let personalBestOrigin,
+            ["time","words","custom","zen"].contains(mode),
+            ResultMode2Policy.agrees(mode2,mode:mode,duration:durationSeconds,words:wordLimit)
+              || (mode2 == "unknown" && ["time","words"].contains(mode) && durationSeconds == nil
+                && wordLimit == nil && personalBestConfiguration == nil),
+            !language.isEmpty, language.count <= 100, !language.contains("/"),
+            (0...420).contains(wpm), (wpm...500).contains(rawWpm), (0...100).contains(accuracy),
+            preciseAccuracy.map({ $0.isFinite && (0...100).contains($0) && Int($0.rounded()) == accuracy }) ?? true,
+            consistency.isFinite, (0...100).contains(consistency), finishedAt.timeIntervalSince1970.isFinite,
+            ["accepted","legacyHistory"].contains(personalBestOrigin),
+            personalBestOrigin != "accepted" || acceptedAtMilliseconds != nil,
+            personalBestOrigin != "legacyHistory" || acceptedAtMilliseconds == nil,
+            acceptedAtMilliseconds.map({ (0...8_640_000_000_000_000).contains($0) }) ?? true,
+            (preciseWpm == nil) == (preciseRawWpm == nil),
+            preciseRawWpm.map({ RemoteSpeedPrecision.isCanonical($0) && $0 >= effectiveWpm && Int($0.rounded()) == rawWpm }) ?? true
+        else { throw DecodingError.dataCorrupted(.init(codingPath:[],debugDescription:"Invalid complete PB snapshot")) }
     }
 
     var configurationLabel: String {
         if mode == "time", let durationSeconds { return "\(durationSeconds) 秒" }
         if mode == "words", let wordLimit { return "\(wordLimit) 词" }
+        if mode == "time" { return "时间未知" }
+        if mode == "words" { return "词数未知" }
+        if mode == "custom" { return "自定义" }
+        if mode == "zen" { return "自由" }
         return mode
     }
 
@@ -2627,12 +2701,25 @@ final class AccountSession {
         isWorking = true
         defer { isWorking = false }
         do {
+            let targetEndpoint = endpoint
+            let api = RemoteAccountAPI(endpoint: targetEndpoint)
+            let capabilities = try await api.request(path:"v1/capabilities",method:"GET",token:nil,
+                body:Optional<String>.none,response:RemoteServiceCapabilities.self)
+            guard capabilities.supportsPersonalBestLedger else {
+                throw RemoteAccountError.serverMessage("请先升级自建服务：旧版本不能完整清空两套个人最佳和日榜。未发送清空请求。")
+            }
+            guard endpoint == targetEndpoint, currentUser?.id == user.id, tokenStore.load() == token else {
+                throw RemoteAccountError.serverMessage("账户或服务地址已改变，未发送清空请求。")
+            }
             let usesPassword = user.authenticationMethods.contains(.password)
             let freshReauthenticationToken = usesPassword
                 ? nil
                 : try await reauthenticationToken(
                     for: user, accessToken: token, excluding: nil, currentPassword: nil)
-            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            guard endpoint == targetEndpoint, currentUser?.id == user.id, tokenStore.load() == token else {
+                throw RemoteAccountError.serverMessage("账户或服务地址已改变，未发送清空请求。")
+            }
+            let response = try await api.request(
                 path: "v1/personal-bests",
                 method: "DELETE",
                 token: token,
@@ -2640,6 +2727,9 @@ final class AccountSession {
                 headers: freshReauthenticationToken.map { ["X-Typebar-Reauthentication": $0] } ?? [:],
                 response: RemotePersonalBestResetResponse.self
             )
+            guard endpoint == targetEndpoint, currentUser?.id == user.id, tokenStore.load() == token else {
+                throw RemoteAccountError.serverMessage("服务已完成清空，但账户或地址已改变，请刷新相应账户。")
+            }
             currentUser = .init(
                 id: user.id, email: user.email, emailVerified: user.emailVerified,
                 displayName: user.displayName, totalExperience: user.totalExperience,
@@ -2653,7 +2743,7 @@ final class AccountSession {
                 showAllBadges: user.showAllBadges,
                 streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
                 personalBestResetAt: response.resetAt)
-            statusMessage = "服务端公开个人最佳已重置；成绩、XP、徽章和本机历史未受影响。"
+            statusMessage = "服务端个人最佳、排行榜个人最佳和日榜已清空；成绩、周 XP、徽章和本机历史保留。"
             return true
         } catch {
             statusMessage = error.localizedDescription

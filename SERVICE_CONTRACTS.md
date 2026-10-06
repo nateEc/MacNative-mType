@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-06 [账户 PB 账本合同](PERSONAL_BEST_LEDGER_CONTRACT.md) 定义 accountPersonalBestLedger=available；公开资料用三个原子存在的新版字段返回完整分组快照。个人与排行榜 PB 不再依赖可删除历史，清空两套 PB 和日榜、不清周 XP；新客户端拒绝旧服务的旧纪元清空。未知旧配置／参数保留，原协议、标签／本机账本和整体服务仍 partial。下方增量为历史阶段。
+
 2026-10-06 [远程小数速度合同](RESULT_SPEED_PRECISION_CONTRACT.md) 定义 resultSpeedPrecision=available 和可选 speedPrecision v1。已有整数作为兼容视图；请求、首次记录、历史和日榜冻结保留两位值及日期／计数绑定，公开最佳和速度榜消费精确值。旧报告缺失不回填，有损旧服务投稿明确拒绝。完整 PB 分组和独立账本、原协议、部署及整体验收仍开放。
 
 2026-10-06 [PB 比较与生命周期边界](PERSONAL_BEST_COMPARISON_CONTRACT.md) 修复本机消费者，不增加服务字段。固定源公开 clearPb 清两类 PB 并清日榜，内部 resetPb 只清个人 PB，删历史不清任何 PB；现有服务公开 PB 纪元和历史派生全部榜不等价。后续 [PB 配置保存合同](PERSONAL_BEST_CONFIGURATION_CONTRACT.md) 已接通明确 difficulty／lazyMode 投稿；独立账本仍待实现，旧数据不能补造分组，服务整体保持 partial。
@@ -80,8 +82,8 @@
 | 同步推送 | `POST /v1/sync` | 带 UUID、版本和删除标记的变更 → 接受/冲突结果（已实现服务端基础） |
 | 私有成绩 | `GET /v1/results`、`GET /v1/results/{id}` | 接受 Bearer 令牌或 `X-Typebar-Access-Key`；只返回认证账户已提交成绩的最小元数据，不含提示、输入回放、邮箱或资料。列表按完成时间倒序，可用 UTC 秒级 `finishedOnOrAfter`、`offset` 和最多 1,000 条的 `limit` 过滤分页（部分实现） |
 | 私有成绩标签 | `PATCH /v1/results/{id}/tags` | 仅接受 Bearer 令牌，且只可修改当前账户自己的成绩；标签为最多五个非空、去首尾空白后最长 24 个字符的字符串，不允许大小写或重音差异的重复项。旧服务或旧数据未提供标签时客户端安全回退为空数组，开发者密钥无此权限（部分实现） |
-| 清除私有成绩 | `DELETE /v1/results` | 仅接受 Bearer 令牌；密码账户必须提交当前密码，纯第三方账户必须携带一次性 `X-Typebar-Reauthentication`。只删除当前账户的远端成绩与相应 XP，返回删除数量；本机历史、同步和其他账户不受影响。每令牌每小时最多 10 次（部分实现） |
-| 重置公开个人最佳 | `DELETE /v1/personal-bests` | 仅接受 Bearer 令牌；密码账户提交当前密码，纯第三方账户使用一次性 `X-Typebar-Reauthentication`。成功后返回新的 `resetAt`，从此时开始计算公开资料的个人最佳；既有服务端成绩、XP、徽章、排行榜、本机历史和本机个人最佳均保留。重新认证证明只能消费一次，旧服务缺少 `personalBestResetAt` 时客户端安全显示为从未重置（已实现；固定来源与本机边界见 [OFFICIAL_PERSONAL_BEST_RESET_AUDIT.md](OFFICIAL_PERSONAL_BEST_RESET_AUDIT.md)） |
+| 清除私有成绩 | `DELETE /v1/results` | Bearer 加当前密码或一次性重新认证；只删当前账户远端成绩，返回删除数量。XP、累计练习、独立 PB、日榜快照、本机历史、同步和其他账户保留；重试不重建历史或再入账（部分实现） |
+| 清空账户个人最佳 | `DELETE /v1/personal-bests` | Bearer 加当前密码或一次性重新认证，原子清两套 PB 与日榜，保留成绩、XP／周榜、徽章及本机历史。resetAt 仅显示清空时间，不再用日期截断新 PB；新 UUID 与清空同毫秒也可建立最佳，旧 UUID 不复活。新客户端先确认 accountPersonalBestLedger=available，旧服务明确提示升级。见 [清空审计](OFFICIAL_PERSONAL_BEST_RESET_AUDIT.md)（部分兼容） |
 | 提交结果 | `POST /v1/results` | 接受 Bearer 令牌或 `X-Typebar-Access-Key`；保存具 UUID 的结果，基本范围/时间校验与重复提交幂等；响应包含服务端重算的本次 XP、总 XP、可选本周 XP 名次，以及当天且未退出榜单时同模式同语言的可选全局 WPM 名次。重复 UUID 的回执始终从首次保存记录生成，不信任重试正文（部分实现） |
 | 匿名公开练习统计 | `GET /v1/public/practice-stats`、`GET /v1/public/speed-distribution` | 两者均为无认证只读接口。前者只返回完成成绩数、开始测试数和完成成绩的实际累计秒数；后者固定为 English、60 秒、time 成绩，每个允许公开统计的账户只取一个最高 WPM，并以十 WPM 非空桶返回。隐身、排行榜限制、显示名整改和账户封禁均即时排除贡献。响应绝不包含账户身份、邮箱、提示、输入、回放、令牌、单条时间戳或单条成绩；客户端只在 About 打开或用户主动重读时调用，旧服务不可用时不回退为本机统计（已实现） |
 | 排行榜 | `GET /v1/leaderboards`、`GET /v1/leaderboards/friends` | 前者为公开全局结果榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者都可按模式、语言与 `all`/`day`/`yesterday`/`week` 周期筛选；`yesterday` 是服务端当前日历日前的完整一天。每位用户仅保留该筛选下的最佳一条成绩，按此成绩排名，最多返回 100 位用户（部分实现） |

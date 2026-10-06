@@ -1,5 +1,7 @@
 # 本机个人最佳比较与生命周期边界
 
+后续 [账户 PB 账本](PERSONAL_BEST_LEDGER_CONTRACT.md) 已完成服务个人／排行榜独立快照、完整分组、删除保留与公开清空。下述本机比较阶段的验证数字保留；本机、标签、反馈及 Pace 仍是可删除历史派生，不表示全消费者完成。
+
 2026-10-06，本机 PB 的选择、完成反馈、标签反馈、计时／字数 PB 表和历史奖杯使用已保存的精确 WPM，不再先取整数。60.41 → 60.49 是提升，同速或更低速度不会因准确率、Raw 或稳定度较高成为新 PB。旧成绩没有精确值时继续使用其保存的整数，不从回放重算。本轮不实现独立 PB 存储，整体重写目标仍未完成。
 
 ## 固定源码规则
@@ -22,7 +24,7 @@ PB 表和普通提示仍从本机历史派生。同速历史仍按既有完成�
 
 原版的[删除全部历史](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/backend/src/api/controllers/result.ts) 只删除结果集合，个人 PB 与榜单 PB 保留。用户 DAL 的内部 `resetPb` 仅清个人 PB；`clearPb` 则清两类 PB。[公开 clearPb 控制器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/backend/src/api/controllers/user.ts) 还清理日榜。不得把现有原生“开启公开 PB 新纪元”描述为这个公开入口的等价实现。
 
-当前本机 PB 和服务端公开 PB／全部时间速度榜仍依赖可删除历史，删历史可能使其消失。后续 [PB 配置保存增量](PERSONAL_BEST_CONFIGURATION_CONTRACT.md) 已将 difficulty／lazyMode 等明确证据接通投稿、首次接受记录和私有历史，但旧记录仍不能按默认值补造分组。[远程小数速度](RESULT_SPEED_PRECISION_CONTRACT.md) 已接通服务的精确比较、计分和展示，PB 消费者尚未切换到独立账本。后续仍需独立个人／标签／榜单 PB 账本、最佳快照、清除语义与消费者切换，并验证历史删除、同 UUID 重试、重载、写入失败回滚、隐私和账户重置。未接入的缓存不能计为功能完成。
+服务公开资料与全部榜现已使用 [独立账户账本](PERSONAL_BEST_LEDGER_CONTRACT.md)，删历史、重试、重载、真实保存失败和清空均有隔离验证。旧记录不按默认值补分组。本机与标签 PB 仍依赖可删除历史，后续需独立存储并切换提示、反馈、表格、Pace 和其他消费者；不能把服务账户账本计为本机或标签功能完成。
 
 ## 验证
 

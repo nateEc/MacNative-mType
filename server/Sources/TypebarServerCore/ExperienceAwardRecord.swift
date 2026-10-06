@@ -16,6 +16,7 @@ struct ExperienceAwardRecord: Codable {
   var rankingAdmission: RankingAdmission? = nil
   var personalBestConfiguration: ResultPersonalBestConfiguration? = nil
   var speedPrecision: ResultSpeedPrecision? = nil
+  var personalBestReceipt: PersonalBestReceipt? = nil
   var weeklyPartition: WeeklyExperiencePartition? = nil
   var weeklyCacheReceipt: WeeklyExperienceCacheReceipt? = nil
   var dailyCacheReceipt: DailyLeaderboardCacheReceipt? = nil
@@ -41,6 +42,7 @@ struct ExperienceAwardRecord: Codable {
   }
 
   func validate() throws {
+    try personalBestReceipt?.validate(reward:self)
     if let speedPrecision {
       guard speedPrecision.isValid else { throw ExperienceCalculationError.invalidInput }
       if let input {
@@ -89,6 +91,7 @@ extension ExperienceAwardRecord {
       input, configuration, context, rankingAdmission, weeklyPartition, weeklyCacheReceipt, dailyCacheReceipt
     case personalBestConfiguration
     case speedPrecision
+    case personalBestReceipt
   }
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -107,6 +110,8 @@ extension ExperienceAwardRecord {
     personalBestConfiguration = values.contains(.personalBestConfiguration)
       ? try values.decode(ResultPersonalBestConfiguration.self, forKey: .personalBestConfiguration) : nil
     speedPrecision = values.contains(.speedPrecision) ? try values.decode(ResultSpeedPrecision.self,forKey:.speedPrecision) : nil
+    personalBestReceipt = values.contains(.personalBestReceipt)
+      ? try values.decode(PersonalBestReceipt.self,forKey:.personalBestReceipt) : nil
     weeklyPartition = values.contains(.weeklyPartition)
       ? try values.decode(WeeklyExperiencePartition.self, forKey: .weeklyPartition) : nil
     weeklyCacheReceipt = values.contains(.weeklyCacheReceipt)

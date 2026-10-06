@@ -1400,7 +1400,7 @@ struct PreferencesView: View {
               .disabled(
                 account.isWorking || (user.authenticationMethods.contains(.password)
                   && remotePersonalBestResetPassword.isEmpty))
-              Text("只清空服务端公开资料中的个人最佳纪元；服务端成绩、XP、徽章、排行榜以及本机历史和本机个人最佳都会保留。下一条新接收成绩会建立新的公开个人最佳。")
+              Text("清空服务端个人最佳、排行榜个人最佳和日榜记录；服务端成绩、周 XP、徽章以及本机历史和本机个人最佳保留。下一条新接收成绩可以建立新的个人最佳。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
               if user.authenticationMethods.contains(.password) {
@@ -2094,7 +2094,7 @@ struct PreferencesView: View {
         }
       }
     } message: {
-      Text("旧成绩仍保留，但不再参与服务端公开个人最佳；此纪元不能撤销。本机历史和个人最佳不受影响。")
+      Text("清空服务端个人最佳、排行榜个人最佳和日榜，不能撤销。成绩、周 XP、徽章和本机历史保留；重试旧成绩不会恢复已清空的最佳。")
     }
     .confirmationDialog(
       "清除所有服务端成绩？", isPresented: $showingRemoteResultsDeletionConfirmation,

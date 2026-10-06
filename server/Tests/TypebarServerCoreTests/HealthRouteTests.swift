@@ -4988,7 +4988,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(currentOwner.id, owner.user.id)
   }
 
-  func testResettingPersonalBestsStartsANewEpochWithoutDeletingResultsOrRewards() async throws {
+  func testClearingPersonalBestsKeepsResultsAndRewardsButRemovesOwnBoardEntry() async throws {
     let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
       .appendingPathComponent("typebar-personal-best-reset-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: fileURL) }
@@ -5051,7 +5051,8 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(resetProfile.highestConsistency, 0)
     XCTAssertTrue(resetProfile.personalBests.isEmpty)
     XCTAssertEqual(otherProfile.bestWPM, 100)
-    XCTAssertTrue(leaderboard.entries.contains { $0.userID == owner.user.id && $0.wpm == 90 })
+    XCTAssertFalse(leaderboard.entries.contains { $0.userID == owner.user.id })
+    XCTAssertTrue(leaderboard.entries.contains { $0.userID == other.user.id && $0.wpm == 100 })
 
     let passwordReauthentication = try await store.reauthenticateWithPassword(
       .init(currentPassword: "a secure password"), accessToken: owner.accessToken,

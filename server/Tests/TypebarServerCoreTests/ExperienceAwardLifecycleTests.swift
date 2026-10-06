@@ -147,6 +147,8 @@ final class ExperienceAwardLifecycleTests: XCTestCase {
     var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
     json.removeValue(forKey: "experienceAwards")
     json.removeValue(forKey: "weeklyExperienceCache")
+    json.removeValue(forKey: "personalBestLedger")
+    json.removeValue(forKey: "personalBestLedgerManaged")
     let bytes = try JSONSerialization.data(withJSONObject: json); try bytes.write(to: file, options: .atomic)
     let new = try AuthStore(fileURL: file, bcryptCost: 4, experienceConfiguration: config(gain: 100))
     XCTAssertEqual(try Data(contentsOf: file), bytes, "Loading must not mutate the old backup")

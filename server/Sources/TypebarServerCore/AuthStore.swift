@@ -441,6 +441,9 @@ public struct PublicProfileResponse: Content, Equatable {
   public let earnedBadges: [PublicProfileBadge]
   public var practiceHistoryComplete: Bool? = nil
   public var preciseBestWPM: Double? = nil
+  public var personalBestLedgerVersion: Int? = nil
+  public var personalBestHistoryComplete: Bool? = nil
+  public var personalBestSnapshots: [PublicProfileBestResponse]? = nil
 }
 
 /// A Typebar-owned badge that can be selected for public profiles and
@@ -473,6 +476,12 @@ public struct PublicProfileBestResponse: Content, Equatable, Identifiable {
   public let consistency: Double
   public let finishedAt: Date
   public var preciseWpm: Double? = nil
+  public var mode2: String? = nil
+  public var rawWpm: Int? = nil
+  public var preciseRawWpm: Double? = nil
+  public var personalBestConfiguration: ResultPersonalBestConfiguration? = nil
+  public var acceptedAtMilliseconds: Int? = nil
+  public var personalBestOrigin: String? = nil
 }
 
 /// A 12-month activity timeline grouped by the account's fixed day boundary.
@@ -683,6 +692,8 @@ public actor AuthStore {
     var blockedUserIDs: [UUID: [UUID]] = [:]
     var streakDayBoundaryOffsets: [UUID: Double] = [:]
     var personalBestResetDates: [UUID: Date] = [:]
+    var personalBestLedger: PersonalBestLedger? = .init()
+    var personalBestLedgerManaged = true
     var quoteSubmissions: [StoredQuoteSubmission] = []
     var quoteRatings: [StoredQuoteRating] = []
     var notifications: [StoredNotification] = []
@@ -697,6 +708,7 @@ public actor AuthStore {
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
         nextSyncCursor, weeklyExperienceCache, rewardInbox, rewardInboxManaged, weeklyRewardJobs, weeklyRewardJobsManaged,
         dailyLeaderboardCache, dailyLeaderboardCacheManaged, dailyRewardJobs, dailyRewardJobsManaged
+      case personalBestLedger, personalBestLedgerManaged
     }
 
     init() {}
@@ -762,6 +774,11 @@ public actor AuthStore {
         try values.decodeIfPresent([UUID: Double].self, forKey: .streakDayBoundaryOffsets) ?? [:]
       personalBestResetDates =
         try values.decodeIfPresent([UUID: Date].self, forKey: .personalBestResetDates) ?? [:]
+      personalBestLedger = values.contains(.personalBestLedger)
+        ? try values.decode(PersonalBestLedger.self,forKey:.personalBestLedger) : nil
+      personalBestLedgerManaged = values.contains(.personalBestLedgerManaged)
+        ? try values.decode(Bool.self,forKey:.personalBestLedgerManaged) : false
+      guard !personalBestLedgerManaged || personalBestLedger != nil else { throw PersonalBestLedgerError.invalidState }
       quoteSubmissions =
         try values.decodeIfPresent([StoredQuoteSubmission].self, forKey: .quoteSubmissions) ?? []
       quoteRatings =
@@ -1414,6 +1431,7 @@ public actor AuthStore {
     state.notifications = Self.cappedNotifications(state.notifications)
     committedState = state
     try Self.initializeExperienceAwards(state: &state)
+    try Self.initializePersonalBests(state: &state)
     try Self.initializeAccountPractice(state: &state)
     if state.weeklyExperienceCache == nil {
       guard !state.experienceAwards!.contains(where: { $0.weeklyCacheReceipt != nil }) else {
@@ -1568,6 +1586,9 @@ public actor AuthStore {
           throw ExperienceCalculationError.invalidInput
         }
         guard result.speedPrecision == entry.speedPrecision else { throw ExperienceCalculationError.invalidInput }
+        if let candidate = entry.personalBestReceipt?.candidate, !candidate.matches(Self.resultRequest(from:result)) {
+          throw PersonalBestLedgerError.invalidState
+        }
         if let input = entry.input,
           try ExperienceEvidenceAdapter.input(for: Self.resultRequest(from: result)) != input {
           throw ExperienceCalculationError.invalidInput
@@ -1582,6 +1603,30 @@ public actor AuthStore {
         debugDescription: "Experience award ledger is inconsistent; original file is not modified",
         underlyingError: error))
     }
+  }
+
+  private static func initializePersonalBests(state: inout PersistedState) throws {
+    if state.personalBestLedger == nil {
+      guard !state.experienceAwards!.contains(where: { $0.personalBestReceipt != nil }) else {
+        throw PersonalBestLedgerError.invalidState
+      }
+      var ledger = PersonalBestLedger()
+      ledger.legacyUsers = Set(state.users.map(\.id))
+      let awards = Dictionary(uniqueKeysWithValues:state.experienceAwards!.map { ("\($0.userID)/\($0.resultID)",$0) })
+      for result in state.results where result.bailedOut != true && result.mode != "quote" {
+        guard awards["\(result.userID)/\(result.id)"]?.rankingAdmission?.decision.personalBestEligible != false else { continue }
+        let value = try PersonalBestSnapshot.make(Self.resultRequest(from:result),userID:result.userID,
+          acceptedAt:nil,origin:.legacyHistory)
+        // Preserve the old native all-time view as a labelled baseline, not a
+        // fabricated non-lazy source admission. Old resets did not clear it.
+        if value.isOfficialLeaderboardMode { ledger.retainLeaderboard(value) }
+        if let reset = state.personalBestResetDates[result.userID], result.acceptedAt.map({ $0 > reset }) != true { continue }
+        _ = ledger.accept(value)
+      }
+      state.personalBestLedger = ledger
+    }
+    try state.personalBestLedger!.validate(users:Set(state.users.map(\.id)),awards:state.experienceAwards!)
+    state.personalBestLedgerManaged = true
   }
 
   private static func cappedNotifications(_ notifications: [StoredNotification])
@@ -2413,6 +2458,7 @@ public actor AuthStore {
     state.dailyLeaderboardCache?.purge(userID:userID)
     state.accountPractice?.removeValue(forKey: userID)
     state.personalBestResetDates.removeValue(forKey: userID)
+    state.personalBestLedger!.clear(userID:userID)
     try persist()
   }
 
@@ -2458,6 +2504,7 @@ public actor AuthStore {
     state.leaderboardRankMemories.removeAll { $0.userID == user.id }
     state.notifications.removeAll { $0.recipientID == user.id }
     state.personalBestResetDates.removeValue(forKey: user.id)
+    state.personalBestLedger!.clear(userID:user.id)
     try persist()
     return userResponse(for: resetUser)
   }
@@ -2502,6 +2549,9 @@ public actor AuthStore {
     state.users[index] = updatedUser
     if weeklyExperienceConfiguration.enabled, !user.leaderboardOptedOut && updatedUser.leaderboardOptedOut {
       state.weeklyExperienceCache?.purge(userID:user.id)
+    }
+    if !user.leaderboardOptedOut && updatedUser.leaderboardOptedOut {
+      state.personalBestLedger!.clearLeaderboard(userID:user.id)
     }
     if dailyLeaderboardConfiguration?.enabled == true, !user.leaderboardOptedOut && updatedUser.leaderboardOptedOut {
       state.dailyLeaderboardCache?.purge(userID:user.id)
@@ -3404,8 +3454,14 @@ public actor AuthStore {
     for user: StoredUser, results: [StoredResult], activity: PublicProfileActivityResponse?,
     streak: PublicProfileStreakResponse?
   ) -> PublicProfileResponse {
-    let personalBestResults = personalBestResults(for: user.id, from: results)
+    let personalBestResults = state.personalBestLedger!.entries.filter { $0.userID == user.id }
     let fastest = personalBestResults.max { $0.effectiveWpm < $1.effectiveWpm }
+    let admissions = Dictionary(uniqueKeysWithValues:state.experienceAwards!
+      .filter { $0.userID == user.id }.map { ($0.resultID,$0.rankingAdmission?.decision.personalBestEligible != false) })
+    let consistencyCandidates = results.filter { result in
+      result.bailedOut != true && admissions[result.id] == true
+        && (state.personalBestResetDates[user.id].map { reset in result.acceptedAt.map { $0 > reset } == true } ?? true)
+    }
     let practice = state.accountPractice![user.id] ?? .init()
     return .init(
       id: user.id,
@@ -3416,7 +3472,7 @@ public actor AuthStore {
       startedTestCount: practice.startedTests,
       totalTypingSeconds: practice.typingSeconds,
       bestWPM: Int((personalBestResults.map(\.effectiveWpm).max() ?? 0).rounded()),
-      highestConsistency: personalBestResults.map(\.consistency).max() ?? 0,
+      highestConsistency: max(personalBestResults.map(\.consistency).max() ?? 0,consistencyCandidates.map(\.consistency).max() ?? 0),
       personalBests: publicPersonalBests(from: personalBestResults),
       activity: activity,
       streak: streak,
@@ -3427,21 +3483,11 @@ public actor AuthStore {
       earnedBadges: user.accountSuspended || !user.showAllBadges
         ? [] : availablePublicBadges(for: user.id),
       practiceHistoryComplete: practice.historyComplete,
-      preciseBestWPM: fastest?.speedPrecision?.wpm
+      preciseBestWPM: fastest?.speedPrecision?.wpm,
+      personalBestLedgerVersion:1,
+      personalBestHistoryComplete:!state.personalBestLedger!.legacyUsers.contains(user.id),
+      personalBestSnapshots:personalBestResults.map(\.response)
     )
-  }
-
-  private func personalBestResults(for userID: UUID, from results: [StoredResult]) -> [StoredResult] {
-    let admissions = Dictionary(uniqueKeysWithValues: state.experienceAwards!
-      .filter { $0.userID == userID }.compactMap { entry in
-        entry.rankingAdmission.map { (entry.resultID, $0) }
-      })
-    let completed = results.filter { $0.bailedOut != true && admissions[$0.id]?.decision.personalBestEligible != false }
-    guard let resetAt = state.personalBestResetDates[userID] else { return completed }
-    return completed.filter { result in
-      guard let acceptedAt = result.acceptedAt else { return false }
-      return acceptedAt > resetAt
-    }
   }
 
   private func availablePublicBadges(for userID: UUID) -> [PublicProfileBadge] {
@@ -3583,7 +3629,7 @@ public actor AuthStore {
     return .init(currentDays: practice.streakLength, longestDays: practice.maximumStreakLength)
   }
 
-  private func publicPersonalBests(from results: [StoredResult]) -> [PublicProfileBestResponse] {
+  private func publicPersonalBests(from results: [PersonalBestSnapshot]) -> [PublicProfileBestResponse] {
     let standardModes: [(mode: String, durationSeconds: Int?, wordLimit: Int?)] = [
       ("time", 15, nil), ("time", 30, nil), ("time", 60, nil), ("time", 120, nil),
       ("words", nil, 10), ("words", nil, 25), ("words", nil, 50), ("words", nil, 100),
@@ -3592,19 +3638,12 @@ public actor AuthStore {
     return standardModes.compactMap { standard in
       let candidates = results.filter {
         $0.mode == standard.mode
-          && $0.durationSeconds == standard.durationSeconds
-          && $0.wordLimit == standard.wordLimit
+          && $0.mode2 == String(standard.durationSeconds ?? standard.wordLimit!)
       }
       guard let best = candidates.max(by: { candidate, currentBest in
-        candidate.effectiveWpm == currentBest.effectiveWpm
-          ? candidate.finishedAt < currentBest.finishedAt
-          : candidate.effectiveWpm < currentBest.effectiveWpm
+        candidate.effectiveWpm < currentBest.effectiveWpm
       }) else { return nil }
-      return .init(
-        id: best.id, mode: best.mode, durationSeconds: best.durationSeconds,
-        wordLimit: best.wordLimit, language: best.language, wpm: best.wpm,
-        accuracy: best.accuracy, preciseAccuracy: best.inputMetrics?.preciseAccuracy,
-        consistency: best.consistency, finishedAt: best.finishedAt, preciseWpm: best.speedPrecision?.wpm)
+      return best.response
     }
   }
 
@@ -3853,6 +3892,11 @@ public actor AuthStore {
       streakDays: practice.streakLength)
     reward.personalBestConfiguration = request.personalBestConfiguration
     reward.speedPrecision = request.speedPrecision
+    var personalBests = state.personalBestLedger!
+    let pbCandidate = reward.rankingAdmission!.decision.personalBestEligible
+      ? try PersonalBestSnapshot.make(request,userID:user.id,acceptedAt:now,origin:.accepted) : nil
+    let isPB = pbCandidate.map { personalBests.accept($0) } ?? false
+    reward.personalBestReceipt = .init(version:1,candidate:pbCandidate,isPersonalBest:isPB)
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
@@ -3917,6 +3961,7 @@ public actor AuthStore {
     state.users[userIndex].startedTestCount = practice.startedTests
     state.accountPractice![user.id] = practice
     state.experienceAwards!.append(reward)
+    state.personalBestLedger = personalBests
     state.weeklyExperienceCache = cache
     state.dailyLeaderboardCache = dailyCache
     state.weeklyRewardJobs = jobs
@@ -3953,13 +3998,11 @@ public actor AuthStore {
   /// sixty-second time configuration shown by the native About window.
   public func publicEnglishMinuteSpeedDistribution() -> PublicSpeedDistributionResponse {
     let userIDs = Set(publiclyAggregatedUsers().map(\.id))
-    let candidates = state.results.filter {
+    let candidates = state.personalBestLedger!.entries.filter {
       userIDs.contains($0.userID)
-        && $0.bailedOut != true
         && $0.mode == "time"
         && $0.language == "english"
-        && $0.durationSeconds == 60
-        && $0.eventCount > 0
+        && $0.mode2 == "60"
     }
     var personalBests: [UUID: Double] = [:]
     for result in candidates {
@@ -4003,8 +4046,8 @@ public actor AuthStore {
     return .init(deleted: true, removedCount: removedCount)
   }
 
-  /// Starts a new public personal-best epoch without deleting account results,
-  /// experience, badges, or leaderboard entries.
+  /// Source public clear: both PB books and daily speed caches, not history,
+  /// weekly XP, badges, or local app records.
   public func resetPersonalBests(
     _ request: ResetPersonalBestsRequest, accessToken: String,
     reauthenticationToken: String? = nil, now: Date = .now
@@ -4022,6 +4065,10 @@ public actor AuthStore {
       try consumeReauthenticationToken(reauthenticationToken, for: user.id, now: now)
     }
     state.personalBestResetDates[user.id] = now
+    state.personalBestLedger!.clear(userID:user.id)
+    state.personalBestLedger!.dailyClearResultKeys.formUnion(state.experienceAwards!
+      .filter { $0.userID == user.id }.map { "\($0.userID)/\($0.resultID)" })
+    state.dailyLeaderboardCache!.purge(userID:user.id)
     try persist()
     return .init(resetAt: now)
   }
@@ -4313,6 +4360,35 @@ public actor AuthStore {
     }
     let period = query.period ?? "all"
     guard periods.contains(period) else { throw ResultStoreError.invalidResult }
+    if period == "all" {
+      let users = Dictionary(uniqueKeysWithValues:state.users.map { ($0.id,$0) })
+      let typingSeconds = totalTypingSecondsByUser()
+      let values = (state.personalBestLedger!.leaderboardEntries
+        + state.personalBestLedger!.entries.filter { !$0.isOfficialLeaderboardMode }).filter { value in
+        guard let user = users[value.userID] else { return false }
+        return !user.leaderboardOptedOut
+          && leaderboardEligibility(for:user,typingSeconds:typingSeconds[user.id] ?? 0).isEligible
+          && (eligibleUserIDs == nil || eligibleUserIDs!.contains(user.id))
+          && (query.mode == nil || value.mode == query.mode)
+          && (query.language == nil || value.language == query.language)
+          && (query.mode2 == nil || value.mode2 == query.mode2)
+          && (query.durationSeconds == nil || value.mode2 == String(query.durationSeconds!))
+          && (query.wordLimit == nil || value.mode2 == String(query.wordLimit!))
+      }.sorted {
+        if $0.effectiveWpm != $1.effectiveWpm { return $0.effectiveWpm > $1.effectiveWpm }
+        if $0.effectiveAccuracy != $1.effectiveAccuracy { return $0.effectiveAccuracy > $1.effectiveAccuracy }
+        return $0.finishedAt > $1.finishedAt
+      }
+      var seen = Set<UUID>()
+      return values.filter { seen.insert($0.userID).inserted }.enumerated().map { offset, value in
+        let user = users[value.userID]!
+        return .init(id:value.resultID,rank:offset + 1,userID:user.id,displayName:user.displayName,
+          mode:value.mode,language:value.language,wpm:value.wpm,accuracy:value.accuracy,
+          preciseAccuracy:value.preciseAccuracy,consistency:value.consistency,finishedAt:value.finishedAt,
+          selectedBadge:selectedPublicBadge(for:user),discordAvatar:publicDiscordAvatar(for:user),
+          mode2:value.mode2,preciseWpm:value.speedPrecision?.wpm)
+      }
+    }
     let usesDailyLeaderboardCache = period == "day" || period == "yesterday"
     if usesDailyLeaderboardCache, let configuration = dailyLeaderboardConfiguration {
       guard configuration.enabled else { throw DailyLeaderboardCacheError.unavailable }
@@ -4383,6 +4459,7 @@ public actor AuthStore {
         } == true
         && (!usesDailyLeaderboardCache
           || users[result.userID].map {
+            if state.personalBestLedger!.dailyClearResultKeys.contains("\(result.userID)/\(result.id)") { return false }
             guard let resumedAt = $0.rollingLeaderboardResumedAt else { return true }
             return result.acceptedAt.map { $0 >= resumedAt } == true
           } == true)

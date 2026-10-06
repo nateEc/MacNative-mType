@@ -165,7 +165,9 @@ final class RankingAdmissionTests: XCTestCase {
     }
     var old = base
     var awards = try XCTUnwrap(old["experienceAwards"] as? [[String: Any]])
-    awards[0].removeValue(forKey: "rankingAdmission"); old["experienceAwards"] = awards
+    awards[0].removeValue(forKey: "rankingAdmission")
+    awards[0].removeValue(forKey: "personalBestReceipt"); old["experienceAwards"] = awards
+    old.removeValue(forKey: "personalBestLedger"); old.removeValue(forKey: "personalBestLedgerManaged")
     let legacy = try JSONSerialization.data(withJSONObject: old); try legacy.write(to: file)
     let loaded = try AuthStore(fileURL: file, bcryptCost: 4)
     XCTAssertEqual(try Data(contentsOf: file), legacy)

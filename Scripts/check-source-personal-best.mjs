@@ -7,7 +7,9 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 
-assert.equal(process.argv.length, 3, 'One read-only reference checkout required');
+const emit = process.argv[3] === '--emit-fixtures';
+assert.ok(process.argv.length === 3 || process.argv.length === 4 && emit,
+  'One read-only reference checkout and optional --emit-fixtures required');
 const root = path.resolve(process.argv[2]);
 const pin = '91bd24bb8513785c7364cbea29296ff7adafac41';
 function verify() {
@@ -131,5 +133,51 @@ assert.equal(persisted.lbPersonalBests.time['15'].english.wpm, 90.49);
 await context.owned_clearPb('owned-user');
 assert.equal(Object.keys(persisted.personalBests.time).length, 0);
 assert.equal(Object.keys(persisted.lbPersonalBests.time).length, 0);
+
+// A second owned trace captures actual persisted DAL outputs after every
+// operation. Swift compares its own ledger to these values, not to an owned
+// reimplementation of the source algorithm.
+persisted = {personalBests: empty(), lbPersonalBests: {time: {}}};
+clock = 1_800_000_000_000;
+const trace = [];
+function projection() {
+  const personal = [], leaderboard = [];
+  for (const [mode, buckets] of Object.entries(persisted.personalBests)) {
+    for (const [mode2, values] of Object.entries(buckets)) {
+      for (const value of values) personal.push({mode, mode2, ...value});
+    }
+  }
+  for (const [mode2, languages] of Object.entries(persisted.lbPersonalBests.time)) {
+    for (const value of Object.values(languages)) leaderboard.push({mode: 'time', mode2, ...value});
+  }
+  return structuredClone({personal, leaderboard});
+}
+async function step(action, overrides) {
+  clock++;
+  const input = action === 'submit' ? result(overrides) : null;
+  let isPb = null;
+  if (action === 'submit') isPb = await submit(overrides);
+  else if (action === 'deleteHistory') await context.owned_deleteAll('owned-user');
+  else if (action === 'resetPersonal') await context.owned_resetPb('owned-user');
+  else if (action === 'clear') await context.owned_clearPb('owned-user');
+  else assert.fail('Unknown owned action');
+  trace.push({action, input, clock, isPb, ...projection()});
+}
+for (const mode of ['time', 'words', 'custom', 'zen']) {
+  const mode2 = mode === 'time' ? '15' : mode === 'words' ? '25' : mode;
+  for (const override of [{}, {acc: 100, rawWpm: 99.99}, {wpm: 60.40}, {wpm: 60.49},
+    {difficulty: 'expert', wpm: 50.49}, {language: 'spanish', wpm: 55.49},
+    {punctuation: true, wpm: 40.49}, {numbers: true, wpm: 30.49}, {lazyMode: true, wpm: 90.49, rawWpm: 100}]) {
+    await step('submit', {mode, mode2, ...override});
+  }
+}
+await step('submit', {wpm: 60.60});
+await step('submit', {wpm: 60.60, acc: 100, rawWpm: 100});
+await step('deleteHistory');
+await step('resetPersonal');
+await step('submit', {wpm: 45.49});
+await step('clear');
+assert.equal(trace.length, 42);
 verify();
-process.stdout.write(`PB source probe passed (${replacementFixtures} replacement fixtures, ${groupingFixtures} grouping fixtures, 7 DAL lifecycle steps; owned collection adapters, no MongoDB/controller/queue/GUI)\n`);
+process.stdout.write(emit ? JSON.stringify({referenceCommit: pin, trace})
+  : `PB source probe passed (${replacementFixtures} replacement fixtures, ${groupingFixtures} grouping fixtures, 7 DAL lifecycle steps, 42 comparison steps; owned collection adapters, no MongoDB/controller/queue/GUI)\n`);
