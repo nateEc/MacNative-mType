@@ -252,7 +252,7 @@ final class CustomPaceSpeedMigrationTests: XCTestCase {
       let json = try SettingsJSONCommandCodec.export(settings: settings, configuration: configuration,
         layoutFluidLayouts: [], testParameterMemory: .defaults)
       let decoded = try SettingsJSONCommandCodec.decode(json)
-      XCTAssertEqual(decoded.version, 4)
+      XCTAssertEqual(decoded.version, TypebarSettingsDocument.currentVersion)
       XCTAssertEqual(decoded.settings.paceGuideCustomWpm, speed)
     }
     let document = TypebarSettingsDocument(version: 3, settings: .init(paceGuideCustomWpm: 95),

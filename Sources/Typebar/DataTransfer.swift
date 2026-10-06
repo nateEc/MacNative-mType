@@ -327,7 +327,7 @@ struct TypebarArchive: Codable, Equatable {
     // independent numeric PB ledger that cannot be recovered from history,
     // and account tag identities captured at completion rather than retry.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 29
+    static let currentVersion = 30
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -379,10 +379,12 @@ struct TypebarArchive: Codable, Equatable {
         let hasQuoteIdentity = results.contains { $0.quoteSource?.quoteID != nil }
         let hasAccountTagSnapshot = results.contains { $0.accountTagSnapshot != nil }
         let hasExpandedPace = Self.requiresExpandedPaceFormat(settings: settings, presets: presets)
-        self.version = hasAccountTagSnapshot ? max(29, version) : localPersonalBestLedger != nil ? max(28, version) : hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        let hasAccountPace = Self.requiresAccountPaceFormat(settings: settings, presets: presets)
+        let baseVersion = hasAccountTagSnapshot ? max(29, version) : localPersonalBestLedger != nil ? max(28, version) : hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
+        self.version = hasAccountPace ? max(30, baseVersion) : baseVersion
         self.exportedAt = exportedAt
-        let payloadVersion = hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
+        let payloadVersion = hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
         self.localPersonalBestLedger = localPersonalBestLedger
         let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = payloadVersion >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
@@ -434,6 +436,8 @@ struct TypebarArchive: Codable, Equatable {
     func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(results)
+        guard version >= 30 || !Self.requiresAccountPaceFormat(settings: settings, presets: presets)
+        else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 29 || !results.contains(where: { $0.accountTagSnapshot != nil })
         else { throw DataTransferError.unsupportedVersion(version) }
         if let ledger = localPersonalBestLedger {
@@ -502,6 +506,8 @@ struct TypebarArchive: Codable, Equatable {
         deletedResultIDs = deletedResults.sorted { $0.uuidString < $1.uuidString }
         results = decodedResults.filter { !deletedResults.contains($0.id) }
         let decodedPresets = try values.decode([NamedPreset].self, forKey: .presets)
+        guard version >= 30 || !Self.requiresAccountPaceFormat(settings: decodedSettings, presets: decodedPresets)
+        else { throw DataTransferError.unsupportedVersion(version) }
         // Check raw snapshots before tombstones hide an expanded value from
         // old readers, which must decode those records before filtering too.
         guard version >= 24 || !Self.requiresExpandedPaceFormat(
@@ -552,6 +558,12 @@ struct TypebarArchive: Codable, Equatable {
                     !PaceCustomSpeedPolicy.isLegacyRepresentable($0.paceGuideCustomWpm)
                 } ?? false
             }
+    }
+
+    static func requiresAccountPaceFormat(settings: AppSettingsSnapshot, presets: [NamedPreset]) -> Bool {
+        settings.paceGuideMode == .accountTagPersonalBest || presets.contains {
+            $0.definition.settingsSnapshot?.paceGuideMode == .accountTagPersonalBest
+        }
     }
 
     static func sanitizedSettings(
@@ -754,7 +766,7 @@ struct TypebarTestParameterMemory: Codable, Equatable {
 }
 
 struct TypebarSettingsDocument: Codable, Equatable {
-    static let currentVersion = 4
+    static let currentVersion = 5
 
     let version: Int
     let settings: AppSettingsSnapshot
@@ -769,7 +781,8 @@ struct TypebarSettingsDocument: Codable, Equatable {
         layoutFluidLayouts: [KeyboardLayout],
         testParameterMemory: TypebarTestParameterMemory
     ) {
-        self.version = PaceCustomSpeedPolicy.isLegacyRepresentable(settings.paceGuideCustomWpm)
+        self.version = settings.paceGuideMode == .accountTagPersonalBest ? max(5, version)
+            : PaceCustomSpeedPolicy.isLegacyRepresentable(settings.paceGuideCustomWpm)
             ? version : max(4, version)
         self.settings = settings
         self.configuration = configuration.with(challengeID: nil)
@@ -785,6 +798,8 @@ struct TypebarSettingsDocument: Codable, Equatable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decode(Int.self, forKey: .version)
         settings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
+        guard version >= 5 || settings.paceGuideMode != .accountTagPersonalBest
+        else { throw SettingsJSONCommandError.unsupportedVersion(version) }
         configuration = try values.decode(TestConfiguration.self, forKey: .configuration)
         layoutFluidLayouts = try values.decode([KeyboardLayout].self, forKey: .layoutFluidLayouts)
         if version >= 2 {
@@ -853,6 +868,8 @@ enum SettingsJSONCommandCodec {
         let decoded: TypebarSettingsDocument
         do {
             decoded = try JSONDecoder.typebar.decode(TypebarSettingsDocument.self, from: data)
+        } catch let error as SettingsJSONCommandError {
+            throw error
         } catch {
             throw SettingsJSONCommandError.invalidDocument
         }
@@ -863,6 +880,8 @@ enum SettingsJSONCommandCodec {
         }
         guard decoded.version >= 4 || PaceCustomSpeedPolicy.isLegacyRepresentable(
             decoded.settings.paceGuideCustomWpm)
+        else { throw SettingsJSONCommandError.unsupportedVersion(decoded.version) }
+        guard decoded.version >= 5 || decoded.settings.paceGuideMode != .accountTagPersonalBest
         else { throw SettingsJSONCommandError.unsupportedVersion(decoded.version) }
         return TypebarSettingsDocument(
             version: decoded.version,

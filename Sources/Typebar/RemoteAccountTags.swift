@@ -45,6 +45,7 @@ struct RemoteAccountTag: Codable, Identifiable, Sendable {
       Set(personalBests.map(\.groupKey)).count == personalBests.count,
       personalBests.allSatisfy({ $0.mode != "quote" && $0.personalBestOrigin == "accepted" && $0.acceptedAtMilliseconds != nil })
     else { throw RemoteAccountError.unexpectedResponse }
+    for best in personalBests { try best.validateLedgerSnapshot() }
   }
 }
 struct RemoteAccountTagList: Decodable, Sendable {

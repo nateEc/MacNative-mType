@@ -20,7 +20,9 @@ struct AccountTagManagerView: View {
       }
       Text("最多 15 个稳定 ID 标签，与本机文字标签独立。测试完成时保存勾选的标签；之后改选不会改变已完成或待发成绩。历史编辑不会重授服务端标签 PB。")
         .font(.caption).foregroundStyle(.secondary)
-      if account.accountTags.isEmpty { Text("尚无账户标签；先添加一个标签。").foregroundStyle(.secondary) }
+      if !account.hasAccountTagDirectory {
+        Text("账户标签尚未加载；请刷新。").foregroundStyle(.secondary)
+      } else if account.accountTags.isEmpty { Text("尚无账户标签；先添加一个标签。").foregroundStyle(.secondary) }
       ForEach(account.accountTags) { tag in
         VStack(alignment: .leading, spacing: 5) {
           HStack {
@@ -53,12 +55,12 @@ struct AccountTagManagerView: View {
       }
       HStack {
         TextField("新账户标签（1–16 字符）", text: $draft)
-        Button("添加") { run { try await account.saveAccountTagName(id: nil, name: draft); draft = ""; try await reload() } }
+        Button("添加") { run { try await account.saveAccountTagName(id: nil, name: draft); draft = ""; selected = Set(try account.accountTagPostingSelection()) } }
           .disabled(account.accountTags.count >= 15 || !RemoteAccountTagPolicy.isValidName(RemoteAccountTagPolicy.normalizedName(draft)))
       }
       Text("英文字母、数字、单个空格／下划线／连字符；允许重名，ID 始终不同。")
         .font(.caption).foregroundStyle(.secondary)
-      if let message { Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+      if let message = message ?? account.accountTagDirectoryMessage { Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
     }
     .disabled(busy || account.currentUser == nil)
     .task(id: account.resultPublicationScope) {
@@ -67,13 +69,13 @@ struct AccountTagManagerView: View {
     }
     .alert("重命名账户标签", isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })) {
       TextField("标签名称", text: $renamed)
-      Button("保存") { if let id = editing?.id { run { try await account.saveAccountTagName(id: id, name: renamed); try await reload() } }; editing = nil }
+      Button("保存") { if let id = editing?.id { run { try await account.saveAccountTagName(id: id, name: renamed); selected = Set(try account.accountTagPostingSelection()) } }; editing = nil }
       Button("取消", role: .cancel) { editing = nil }
     } message: { Text("只修改名称，历史关联和标签 PB 的 ID 保持不变。") }
     .confirmationDialog(clearOnly ? "清空此标签的个人最佳？" : "删除此账户标签？",
       isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } })) {
         Button(clearOnly ? "清空标签 PB" : "删除标签", role: .destructive) {
-          if let id = pending?.id { let clear = clearOnly; run { try await account.deleteAccountTag(id: id, personalBestsOnly: clear); try await reload() } }
+          if let id = pending?.id { let clear = clearOnly; run { try await account.deleteAccountTag(id: id, personalBestsOnly: clear); selected = Set(try account.accountTagPostingSelection()) } }
           pending = nil
         }
       } message: {

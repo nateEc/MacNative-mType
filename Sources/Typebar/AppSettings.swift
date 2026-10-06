@@ -1123,10 +1123,13 @@ final class AppSettings {
   @ObservationIgnored private var batchingClickSoundConfiguration = true
   @ObservationIgnored private var initializingSettings = true
   @ObservationIgnored private var usingExpandedPaceStorage = false
+  @ObservationIgnored private var usingAccountPaceStorage = false
   static let legacyStorageKey = "appSettings.v1"
   static let expandedPaceStorageKey = "appSettings.v2"
+  static let accountPaceStorageKey = "appSettings.v3"
   private var storageKey: String {
-    usingExpandedPaceStorage ? Self.expandedPaceStorageKey : Self.legacyStorageKey
+    usingAccountPaceStorage ? Self.accountPaceStorageKey
+      : usingExpandedPaceStorage ? Self.expandedPaceStorageKey : Self.legacyStorageKey
   }
   @ObservationIgnored private let layoutFluidStorageKey = "layoutFluidLayouts.v1"
   @ObservationIgnored private var randomThemeBag: [RandomThemeTarget] = []
@@ -1521,6 +1524,7 @@ final class AppSettings {
     self.defaults = defaults
     self.feedbackSound = feedbackSound
     usingExpandedPaceStorage = defaults.object(forKey: Self.expandedPaceStorageKey) != nil
+    usingAccountPaceStorage = defaults.object(forKey: Self.accountPaceStorageKey) != nil
     defer {
       initializingSettings = false
       batchingClickSoundConfiguration = false
@@ -1974,6 +1978,7 @@ final class AppSettings {
   }
 
   func apply(_ snapshot: AppSettingsSnapshot) {
+    if snapshot.paceGuideMode == .accountTagPersonalBest { usingAccountPaceStorage = true }
     // Select the fork before any intermediate preference writes. Never merge
     // subsequent legacy-writer changes back over the new settings generation.
     if !PaceCustomSpeedPolicy.isLegacyRepresentable(
@@ -2509,6 +2514,7 @@ final class AppSettings {
     if !PaceCustomSpeedPolicy.isLegacyRepresentable(snapshot.paceGuideCustomWpm) {
       usingExpandedPaceStorage = true
     }
+    if snapshot.paceGuideMode == .accountTagPersonalBest { usingAccountPaceStorage = true }
     guard let data = try? JSONEncoder().encode(snapshot) else { return }
     defaults.set(data, forKey: storageKey)
   }

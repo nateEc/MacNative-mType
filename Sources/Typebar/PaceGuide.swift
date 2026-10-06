@@ -5,6 +5,7 @@ enum PaceGuideMode: String, CaseIterable, Codable, Equatable, Identifiable {
     case custom
     case personalBest
     case activeTagPersonalBest
+    case accountTagPersonalBest
     case average
     case dailyAverage
     case recentAverage
@@ -18,7 +19,8 @@ enum PaceGuideMode: String, CaseIterable, Codable, Equatable, Identifiable {
         case .off: "关闭"
         case .custom: "自定义速度"
         case .personalBest: "同类个人最佳"
-        case .activeTagPersonalBest: "活动标签个人最佳"
+        case .activeTagPersonalBest: "本机文字标签个人最佳"
+        case .accountTagPersonalBest: "账户标签个人最佳"
         case .average: "同类平均"
         case .dailyAverage: "今日同类平均"
         case .recentAverage: "最近 10 次同类平均"
@@ -88,6 +90,8 @@ enum PaceGuidePolicy {
         samples: [PaceGuideSample],
         activeTags: [String] = [],
         personalBestLedger: LocalPersonalBestLedger? = nil,
+        accountTags: [RemoteAccountTag]? = nil,
+        selectedAccountTagIDs: [UUID] = [],
         lastTestWpm: Double? = nil,
         currentPrompt: String = "",
         now: Date = .now,
@@ -115,6 +119,10 @@ enum PaceGuidePolicy {
             // must still have qualified when their result was recorded.
             return validTarget(personalBest(configuration: configuration,
                 currentPrompt: currentPrompt, samples: samples, activeTags: activeTags))
+        case .accountTagPersonalBest:
+            guard let accountTags else { return nil }
+            return AccountTagPacePolicy.targetWpm(configuration: configuration,
+                tags: accountTags, selectedIDs: selectedAccountTagIDs)
         case .average:
             return averageWpm(matching(configuration: configuration, samples: samples).map(\.preciseWpm))
         case .dailyAverage:

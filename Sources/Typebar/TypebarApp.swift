@@ -1223,6 +1223,12 @@ private struct ContentView: View {
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
+    .onChange(of: account.accountTagRevision) { _, _ in
+      if !session.hasStarted, settings.paceGuideMode == .accountTagPersonalBest { refreshPaceTarget() }
+    }
+    .onChange(of: account.resultPublicationScope) { _, _ in
+      if settings.paceGuideMode == .accountTagPersonalBest { refreshPaceTarget() }
+    }
     .onChange(of: settings.inputRules) { _, rules in session.synchronizeLiveInputRules(rules) }
     .onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }
@@ -1267,7 +1273,10 @@ private struct ContentView: View {
     configuredPracticeContent
     .task { await runClock() }
     .task(id: pendingPublicationRetryTrigger) { retryPendingPublicationsIfPossible() }
-    .task(id: account.resultPublicationScope) { presentSignedOutResultClaimIfPossible() }
+    .task(id: account.resultPublicationScope) {
+      presentSignedOutResultClaimIfPossible()
+      await account.refreshAccountTagsForPractice()
+    }
     .onChange(of: savedResults.map(\.id)) { _, _ in
       presentSignedOutResultClaimIfPossible()
     }
@@ -2100,6 +2109,10 @@ private struct ContentView: View {
         }
 
         activeResultTagControls
+        if account.currentUser != nil {
+          AccountTagPracticeControls(account: account, settings: settings,
+            configuration: configuration, hasStarted: session.hasStarted)
+        }
 
         if let generationNotice = session.generationNotice {
           Label(generationNotice, systemImage: "exclamationmark.triangle")
@@ -2444,7 +2457,7 @@ private struct ContentView: View {
 
   private var activeResultTagControls: some View {
     VStack(alignment: .leading, spacing: 7) {
-      Label("活动标签", systemImage: "tag")
+      Label("本机文字标签", systemImage: "tag")
         .font(.headline)
       Text("活动标签会写入之后开始的每轮已保存成绩；只有符合 PB 资格的完成成绩可用于“活动标签个人最佳”节奏引导。")
         .font(.caption)
@@ -4170,6 +4183,8 @@ private struct ContentView: View {
       samples: samples,
       activeTags: activeSessionTags,
       personalBestLedger: personalBestLedgers.first?.ledger,
+      accountTags: account.hasAccountTagDirectory ? account.accountTags : nil,
+      selectedAccountTagIDs: (try? account.accountTagPostingSelection()) ?? [],
       lastTestWpm: repeatedWpm ?? lastFinishedWpm,
       currentPrompt: session.prompt
     )

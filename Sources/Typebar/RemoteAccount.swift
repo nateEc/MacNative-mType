@@ -2004,6 +2004,7 @@ final class AccountSession {
     }
     var currentUser: RemoteAccountUser? {
         didSet {
+            if currentUser?.id != oldValue?.id { invalidateAccountTagDirectory() }
             if currentUser == nil {
                 developerAccessKeys = []
                 remoteResults = []
@@ -2014,6 +2015,12 @@ final class AccountSession {
     var remoteResults: [RemoteAccountResult] = []
     private var cachedAccountTags: [RemoteAccountTag] = []
     private var cachedAccountTagsScope: ResultPublicationScope?
+    private var accountTagDirectoryGeneration: UInt64 = 0
+    private(set) var accountTagRevision: UInt64 = 0
+    private(set) var accountTagDirectoryMessage: String?
+    var hasAccountTagDirectory: Bool {
+        resultPublicationScope != nil && cachedAccountTagsScope == resultPublicationScope
+    }
     var accountTags: [RemoteAccountTag] {
         guard let scope = resultPublicationScope, cachedAccountTagsScope == scope else { return [] }
         return cachedAccountTags
@@ -2435,6 +2442,10 @@ final class AccountSession {
                 response: RemoteAccountUser.self
             )
             currentUser = resetUser
+            invalidateAccountTagDirectory()
+            if let scope = resultPublicationScope {
+                try RemoteAccountTagSelectionStore(defaults: defaults).set([], for: scope)
+            }
             developerAccessKeys = []
             remoteResults = []
             RemoteSyncStateScope(endpoint: endpoint, userID: user.id).clear(in: defaults)
@@ -2779,15 +2790,57 @@ final class AccountSession {
     }
 
     func reloadAccountTags() async throws {
+        try Task.checkCancellation()
+        let read = try beginAccountTagDirectoryRead()
+        try await loadAccountTagDirectory(read: read)
+    }
+
+    private func loadAccountTagDirectory(read: AccountTagDirectoryRead) async throws {
         let (api, token, scope) = try await accountTagAPI()
+        guard read.scope == scope, accountTagDirectoryGeneration == read.generation else { throw CancellationError() }
         let list = try await api.request(path: "v1/tags", method: "GET", token: token,
             body: Optional<String>.none, response: RemoteAccountTagList.self)
-        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        guard read.scope == scope else { throw RemoteAccountError.accountScopeChanged }
+        try applyAccountTagDirectory(list, read: read)
+    }
+
+    func beginAccountTagDirectoryRead() throws -> AccountTagDirectoryRead {
+        guard let scope = resultPublicationScope else { throw RemoteAccountError.accountScopeChanged }
+        accountTagDirectoryGeneration &+= 1
+        return .init(scope: scope, generation: accountTagDirectoryGeneration)
+    }
+
+    func applyAccountTagDirectory(_ list: RemoteAccountTagList, read: AccountTagDirectoryRead) throws {
+        try Task.checkCancellation()
+        guard resultPublicationScope == read.scope, accountTagDirectoryGeneration == read.generation
+        else { throw CancellationError() }
+        let scope = read.scope
         let selection = RemoteAccountTagSelectionStore(defaults: defaults)
         let owned = Set(list.tags.map(\.id))
         try selection.set(selection.ids(for: scope).filter { owned.contains($0) }, for: scope)
         cachedAccountTags = list.tags.sorted { $0.name == $1.name ? $0.id.uuidString < $1.id.uuidString : $0.name < $1.name }
         cachedAccountTagsScope = scope
+        accountTagDirectoryMessage = nil
+        accountTagRevision &+= 1
+    }
+
+    func invalidateAccountTagDirectory() {
+        accountTagDirectoryGeneration &+= 1
+        cachedAccountTags = []; cachedAccountTagsScope = nil
+        accountTagDirectoryMessage = nil
+        accountTagRevision &+= 1
+    }
+
+    func refreshAccountTagsForPractice(errorPrefix: String = "") async {
+        guard !Task.isCancelled else { return }
+        guard let read = try? beginAccountTagDirectoryRead() else { return }
+        do { try await loadAccountTagDirectory(read: read) }
+        catch is CancellationError { }
+        catch {
+            if resultPublicationScope == read.scope, accountTagDirectoryGeneration == read.generation {
+                accountTagDirectoryMessage = errorPrefix + error.localizedDescription
+            }
+        }
     }
 
     func accountTagPostingSelection() throws -> [UUID] {
@@ -2810,6 +2863,7 @@ final class AccountSession {
             throw RemoteAccountError.accountScopeChanged
         }
         try RemoteAccountTagSelectionStore(defaults: defaults).set(ids, for: scope)
+        accountTagRevision &+= 1
     }
 
     func saveAccountTagName(id: UUID?, name: String) async throws {
@@ -2822,7 +2876,8 @@ final class AccountSession {
             method: id == nil ? "POST" : "PATCH", token: token,
             body: RemoteAccountTagNameRequest(name: normalized), response: RemoteAccountTag.self)
         guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
-        try await reloadAccountTags()
+        invalidateAccountTagDirectory()
+        await refreshAccountTagsForPractice(errorPrefix: "更改已保存，标签刷新失败：")
     }
 
     func deleteAccountTag(id: UUID, personalBestsOnly: Bool) async throws {
@@ -2831,7 +2886,8 @@ final class AccountSession {
             method: "DELETE", token: token, body: Optional<String>.none, response: RemoteAccountTagDeletion.self)
         guard response.deleted else { throw RemoteAccountError.unexpectedResponse }
         guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
-        try await reloadAccountTags()
+        invalidateAccountTagDirectory()
+        await refreshAccountTagsForPractice(errorPrefix: "更改已保存，标签刷新失败：")
     }
 
     func updateRemoteAccountResultTagIDs(id: UUID, tagIDs: [UUID]) async throws {
@@ -3288,6 +3344,12 @@ final class AccountSession {
                 streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
                 personalBestResetAt: user.personalBestResetAt
             )
+        }
+        if resultPublicationScope == requestScope, capabilities?.supportsAccountTags == true {
+            // Update the accepted account response before this extra suspension.
+            // A failed read must not enqueue an accepted result or manufacture PBs.
+            invalidateAccountTagDirectory()
+            await refreshAccountTagsForPractice(errorPrefix: "成绩已接受，标签刷新失败：")
         }
         return response
     }
