@@ -696,6 +696,8 @@ public actor AuthStore {
     var personalBestLedgerManaged = true
     var accountTagDirectory: AccountTagDirectory? = .init()
     var accountTagDirectoryManaged = true
+    var accountFilterPresets: [StoredAccountFilterPreset] = []
+    var accountFilterPresetsManaged = true
     var quoteSubmissions: [StoredQuoteSubmission] = []
     var quoteRatings: [StoredQuoteRating] = []
     var notifications: [StoredNotification] = []
@@ -712,6 +714,7 @@ public actor AuthStore {
         dailyLeaderboardCache, dailyLeaderboardCacheManaged, dailyRewardJobs, dailyRewardJobsManaged
       case personalBestLedger, personalBestLedgerManaged
       case accountTagDirectory, accountTagDirectoryManaged
+      case accountFilterPresets, accountFilterPresetsManaged
     }
 
     init() {}
@@ -787,6 +790,11 @@ public actor AuthStore {
       accountTagDirectoryManaged = values.contains(.accountTagDirectoryManaged)
         ? try values.decode(Bool.self, forKey: .accountTagDirectoryManaged) : false
       guard !accountTagDirectoryManaged || accountTagDirectory != nil else { throw AccountTagError.invalidState }
+      accountFilterPresetsManaged = values.contains(.accountFilterPresetsManaged)
+        ? try values.decode(Bool.self, forKey: .accountFilterPresetsManaged) : false
+      accountFilterPresets = values.contains(.accountFilterPresets)
+        ? try values.decode([StoredAccountFilterPreset].self, forKey: .accountFilterPresets) : []
+      guard !accountFilterPresetsManaged || values.contains(.accountFilterPresets) else { throw AccountTagError.invalidState }
       quoteSubmissions =
         try values.decodeIfPresent([StoredQuoteSubmission].self, forKey: .quoteSubmissions) ?? []
       quoteRatings =
@@ -1422,6 +1430,7 @@ public actor AuthStore {
   private let weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration
   private let dailyLeaderboardConfiguration: DailyLeaderboardConfiguration?
   public nonisolated let rewardInboxConfiguration: RewardInboxConfiguration
+  public nonisolated let maximumAccountFilterPresets: Int
 
   public init(
     fileURL: URL?, bcryptCost: Int = 12, minimumLeaderboardTypingSeconds: Int = 0,
@@ -1430,8 +1439,11 @@ public actor AuthStore {
     weeklyExperienceTimeZone: TimeZone = .current,
     weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration = .typebarDefault,
     rewardInboxConfiguration: RewardInboxConfiguration = .typebarDefault,
-    dailyLeaderboardConfiguration: DailyLeaderboardConfiguration? = nil
+    dailyLeaderboardConfiguration: DailyLeaderboardConfiguration? = nil,
+    maximumAccountFilterPresets: Int = 20
   ) throws {
+    guard (0...100).contains(maximumAccountFilterPresets) else { throw Abort(.unprocessableEntity) }
+    self.maximumAccountFilterPresets = maximumAccountFilterPresets
     guard (0...TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds).contains(
       minimumLeaderboardTypingSeconds)
     else { throw TypebarLeaderboardEligibilityConfigurationError.invalidMinimumPracticeSeconds }
@@ -1469,6 +1481,20 @@ public actor AuthStore {
         !proof.source.matches(Self.resultRequest(from: result)) { throw AccountTagError.invalidState }
     }
     state.accountTagDirectoryManaged = true
+    let presetOwners = Set(state.users.map(\.id))
+    guard Set(state.accountFilterPresets.map { $0.preset.id }).count == state.accountFilterPresets.count,
+      state.accountFilterPresets.allSatisfy({ presetOwners.contains($0.userID) }),
+      Dictionary(grouping: state.accountFilterPresets, by: \.userID).values.allSatisfy({ $0.count <= 100 })
+    else { throw AccountTagError.invalidState }
+    let liveTagOwners = Dictionary(uniqueKeysWithValues: state.accountTagDirectory!.tags.map { ($0.id, $0.userID) })
+    for entry in state.accountFilterPresets {
+      try entry.preset.document.validate()
+      // Deleted IDs may remain as historical choices, but live foreign IDs cannot.
+      guard entry.preset.document.accountTags?.knownIDs.allSatisfy({
+        liveTagOwners[$0] == nil || liveTagOwners[$0] == entry.userID
+      }) ?? true else { throw AccountTagError.invalidState }
+    }
+    state.accountFilterPresetsManaged = true
     try Self.initializeAccountPractice(state: &state)
     if state.weeklyExperienceCache == nil {
       guard !state.experienceAwards!.contains(where: { $0.weeklyCacheReceipt != nil }) else {
@@ -2497,6 +2523,7 @@ public actor AuthStore {
     state.personalBestResetDates.removeValue(forKey: userID)
     state.personalBestLedger!.clear(userID:userID)
     state.accountTagDirectory!.purge(userID: userID)
+    state.accountFilterPresets.removeAll { $0.userID == userID }
     try persist()
   }
 
@@ -2544,6 +2571,7 @@ public actor AuthStore {
     state.personalBestResetDates.removeValue(forKey: user.id)
     state.personalBestLedger!.clear(userID:user.id)
     state.accountTagDirectory!.purge(userID: user.id)
+    state.accountFilterPresets.removeAll { $0.userID == user.id }
     try persist()
     return userResponse(for: resetUser)
   }
@@ -4121,6 +4149,34 @@ public actor AuthStore {
     state.dailyLeaderboardCache!.purge(userID:user.id)
     try persist()
     return .init(resetAt: now)
+  }
+
+  public func accountFilterPresets(accessToken: String, now: Date = .now) throws -> AccountFilterPresetList {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    return .init(version: 1, maximumPresets: maximumAccountFilterPresets,
+      presets: state.accountFilterPresets.filter { $0.userID == user.id }.map(\.preset))
+  }
+
+  public func createAccountFilterPreset(_ request: AccountFilterPresetRequest, accessToken: String, now: Date = .now) throws -> AccountFilterPresetResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    try request.validate()
+    if let tags = request.accountTags { _ = try state.accountTagDirectory!.validatedIDs(tags.knownIDs, userID: user.id) }
+    guard state.accountFilterPresets.filter({ $0.userID == user.id }).count < maximumAccountFilterPresets else {
+      throw Abort(.conflict, reason: "Maximum number of filter presets reached.")
+    }
+    let preset = AccountFilterPresetResponse(id: UUID(), document: request)
+    state.accountFilterPresets.append(.init(userID: user.id, preset: preset))
+    try persist()
+    return preset
+  }
+
+  public func deleteAccountFilterPreset(id: UUID, accessToken: String, now: Date = .now) throws {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    guard let index = state.accountFilterPresets.firstIndex(where: { $0.userID == user.id && $0.preset.id == id }) else {
+      throw Abort(.notFound, reason: "Filter preset not found.")
+    }
+    state.accountFilterPresets.remove(at: index)
+    try persist()
   }
 
   public func accountTags(accessToken: String, now: Date = .now) throws -> AccountTagListResponse {

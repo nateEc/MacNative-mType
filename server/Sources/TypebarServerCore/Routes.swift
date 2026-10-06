@@ -48,7 +48,9 @@ public func configure(
                 Environment.get("TYPEBAR_WEEKLY_XP_TIME_ZONE")),
             weeklyExperienceConfiguration: try .fromJSON(Environment.get("TYPEBAR_WEEKLY_XP_CONFIGURATION")),
             rewardInboxConfiguration: try .fromJSON(Environment.get("TYPEBAR_INBOX_CONFIGURATION")),
-            dailyLeaderboardConfiguration: try .fromJSON(Environment.get("TYPEBAR_DAILY_LEADERBOARD_CONFIGURATION")))
+            dailyLeaderboardConfiguration: try .fromJSON(Environment.get("TYPEBAR_DAILY_LEADERBOARD_CONFIGURATION")),
+            maximumAccountFilterPresets: try AccountFilterPresetConfiguration.maximum(
+                from: Environment.get("TYPEBAR_MAX_ACCOUNT_FILTER_PRESETS")))
     }
     let authStore = resolvedAuthStore
     if app.environment != .testing {
@@ -86,6 +88,7 @@ public func configure(
                 "resultRankingEvidence": .available,
                 "resultPersonalBestConfiguration": .available,
                 "resultHistoryMetadata": .available,
+                "accountFilterPresets": .available,
                 "accountPersonalBestLedger": .available,
                 "accountTags": .available,
                 "accountTagEditPersonalBests": .available,
@@ -939,6 +942,20 @@ public func configure(
         } catch let error as AuthStoreError {
             throw error.abort
         }
+    }
+
+    app.get("v1", "result-filter-presets") { request async throws -> AccountFilterPresetList in
+        do { return try await authStore.accountFilterPresets(accessToken: request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+    app.on(.POST, "v1", "result-filter-presets", body: .collect(maxSize: "128kb")) { request async throws -> AccountFilterPresetResponse in
+        do { return try await authStore.createAccountFilterPreset(request.content.decode(AccountFilterPresetRequest.self), accessToken: request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+    app.delete("v1", "result-filter-presets", ":id") { request async throws -> AccountTagDeletionResponse in
+        guard let id = request.parameters.get("id").flatMap(UUID.init(uuidString:)) else { throw Abort(.badRequest) }
+        do { try await authStore.deleteAccountFilterPreset(id: id, accessToken: request.accessToken()); return .init(deleted: true) }
+        catch let error as AuthStoreError { throw error.abort }
     }
 
     app.get("v1", "tags") { request async throws -> AccountTagListResponse in

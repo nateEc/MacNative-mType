@@ -991,6 +991,10 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
         apiVersion == "v1" && service == "typebar" && capabilities["resultHistoryMetadata"] == "available"
     }
 
+    var supportsAccountFilterPresets: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["accountFilterPresets"] == "available"
+    }
+
     var supportsPersonalBestLedger: Bool {
         apiVersion == "v1" && service == "typebar" && capabilities["accountPersonalBestLedger"] == "available"
     }
@@ -2023,6 +2027,7 @@ final class AccountSession {
             if currentUser?.id != oldValue?.id {
                 invalidateAccountTagDirectory()
                 invalidateAccountTagHistory()
+                invalidateAccountFilterPresets()
             }
             if currentUser == nil {
                 developerAccessKeys = []
@@ -2032,6 +2037,15 @@ final class AccountSession {
     }
     var developerAccessKeys: [RemoteDeveloperAccessKey] = []
     var remoteResults: [RemoteAccountResult] = []
+    private(set) var accountFilterPresetCache: AccountFilterPresetCache?
+    private var accountFilterPresetGeneration: UInt64 = 0
+    private var accountFilterPresetMutation: UUID?
+    private(set) var isLoadingAccountFilterPresets = false
+    private(set) var accountFilterPresetMessage: String?
+    var isEditingAccountFilterPresets: Bool { accountFilterPresetMutation != nil }
+    var accountFilterPresets: [RemoteAccountFilterPreset] {
+        accountFilterPresetCache?.scope == resultPublicationScope ? accountFilterPresetCache?.list.presets ?? [] : []
+    }
     private(set) var accountTagHistoryCache: AccountTagHistoryCache?
     private var accountTagHistoryGeneration: UInt64 = 0
     private var accountTagHistoryDisplayLimit = 20
@@ -3065,6 +3079,112 @@ final class AccountSession {
         } catch {
             statusMessage = error.localizedDescription
             return false
+        }
+    }
+
+    func invalidateAccountFilterPresets() {
+        accountFilterPresetGeneration &+= 1; accountFilterPresetMutation = nil
+        accountFilterPresetCache = nil; accountFilterPresetMessage = nil; isLoadingAccountFilterPresets = false
+    }
+
+    func beginAccountFilterPresetRead() throws -> AccountFilterPresetRead {
+        guard let scope = resultPublicationScope, !isEditingAccountFilterPresets else { throw CancellationError() }
+        accountFilterPresetGeneration &+= 1
+        return .init(scope: scope, generation: accountFilterPresetGeneration)
+    }
+
+    func applyAccountFilterPresets(_ list: RemoteAccountFilterPresetList, read: AccountFilterPresetRead) throws {
+        try Task.checkCancellation(); try list.validate()
+        guard resultPublicationScope == read.scope, accountFilterPresetGeneration == read.generation,
+            !isEditingAccountFilterPresets else { throw CancellationError() }
+        accountFilterPresetCache = .init(scope: read.scope, list: list); accountFilterPresetMessage = nil
+    }
+
+    private func accountFilterPresetAPI(scope: ResultPublicationScope) async throws -> (RemoteAccountAPI, String) {
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        let api = RemoteAccountAPI(endpoint: endpoint), token = try accessToken()
+        let capabilities = try await api.request(path: "v1/capabilities", method: "GET", token: nil,
+            body: Optional<String>.none, response: RemoteServiceCapabilities.self)
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        guard capabilities.supportsAccountFilterPresets else {
+            throw RemoteAccountError.serverMessage("当前服务不支持账户筛选预设；请升级自建服务。本机预设不受影响。")
+        }
+        return (api, token)
+    }
+
+    func refreshAccountFilterPresets() async {
+        guard let read = try? beginAccountFilterPresetRead() else { return }
+        isLoadingAccountFilterPresets = true
+        defer { if accountFilterPresetGeneration == read.generation { isLoadingAccountFilterPresets = false } }
+        do {
+            let (api, token) = try await accountFilterPresetAPI(scope: read.scope)
+            guard accountFilterPresetGeneration == read.generation else { throw CancellationError() }
+            let list = try await api.request(path: "v1/result-filter-presets", method: "GET", token: token,
+                body: Optional<String>.none, response: RemoteAccountFilterPresetList.self)
+            try applyAccountFilterPresets(list, read: read)
+        } catch is CancellationError { }
+        catch {
+            if resultPublicationScope == read.scope, accountFilterPresetGeneration == read.generation {
+                accountFilterPresetMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func accountFilterPreset(id: UUID, scope: ResultPublicationScope) throws -> ResultHistoryFilter {
+        guard resultPublicationScope == scope, let cache = accountFilterPresetCache, cache.scope == scope,
+            let preset = cache.list.presets.first(where: { $0.id == id }) else { throw RemoteAccountError.accountScopeChanged }
+        return try preset.document.restored(scope: scope, knownTagIDs: hasAccountTagDirectory ? Set(accountTags.map(\.id)) : nil)
+    }
+
+    func saveAccountFilterPreset(name: String, filter: ResultHistoryFilter, scope: ResultPublicationScope) async throws {
+        let document = try AccountFilterPresetDocument(name: name, filter: filter, scope: scope)
+        guard resultPublicationScope == scope, let cache = accountFilterPresetCache, cache.scope == scope,
+            !isEditingAccountFilterPresets, !isLoadingAccountFilterPresets,
+            cache.list.presets.count < cache.list.maximumPresets else { throw RemoteAccountError.serverMessage("请先刷新预设，或删除不再使用的预设后再保存。") }
+        if let tags = document.accountTags {
+            guard hasAccountTagDirectory, Set(tags.knownIDs).isSubset(of: Set(accountTags.map(\.id))) else { throw RemoteAccountError.unexpectedResponse }
+        }
+        let mutation = UUID(); accountFilterPresetMutation = mutation; accountFilterPresetGeneration &+= 1
+        defer { if accountFilterPresetMutation == mutation { accountFilterPresetMutation = nil } }
+        do {
+            let (api, token) = try await accountFilterPresetAPI(scope: scope)
+            guard accountFilterPresetMutation == mutation else { throw CancellationError() }
+            let preset = try await api.request(path: "v1/result-filter-presets", method: "POST", token: token,
+                body: document, response: RemoteAccountFilterPreset.self)
+            guard resultPublicationScope == scope, accountFilterPresetMutation == mutation else { throw RemoteAccountError.accountScopeChanged }
+            guard preset.document == document, !cache.list.presets.contains(where: { $0.id == preset.id }) else { throw RemoteAccountError.unexpectedResponse }
+            accountFilterPresetCache = .init(scope: scope, list: .init(version: 1, maximumPresets: cache.list.maximumPresets,
+                presets: cache.list.presets + [preset]))
+            accountFilterPresetMessage = "账户筛选预设已保存。"
+        } catch {
+            if resultPublicationScope == scope, accountFilterPresetMutation == mutation {
+                accountFilterPresetCache = nil; accountFilterPresetMessage = "保存未确认，请刷新预设后检查；不会自动重试。"
+            }
+            throw error
+        }
+    }
+
+    func deleteAccountFilterPreset(id: UUID, scope: ResultPublicationScope) async throws {
+        guard resultPublicationScope == scope, let cache = accountFilterPresetCache, cache.scope == scope,
+            cache.list.presets.contains(where: { $0.id == id }), !isEditingAccountFilterPresets,
+            !isLoadingAccountFilterPresets else { throw RemoteAccountError.accountScopeChanged }
+        let mutation = UUID(); accountFilterPresetMutation = mutation; accountFilterPresetGeneration &+= 1
+        defer { if accountFilterPresetMutation == mutation { accountFilterPresetMutation = nil } }
+        do {
+            let (api, token) = try await accountFilterPresetAPI(scope: scope)
+            guard accountFilterPresetMutation == mutation else { throw CancellationError() }
+            let response = try await api.request(path: "v1/result-filter-presets/\(id)", method: "DELETE", token: token,
+                body: Optional<String>.none, response: RemoteAccountTagDeletion.self)
+            guard resultPublicationScope == scope, accountFilterPresetMutation == mutation else { throw RemoteAccountError.accountScopeChanged }
+            guard response.deleted else { throw RemoteAccountError.unexpectedResponse }
+            accountFilterPresetCache = .init(scope: scope, list: .init(version: 1, maximumPresets: cache.list.maximumPresets,
+                presets: cache.list.presets.filter { $0.id != id }))
+            accountFilterPresetMessage = "账户筛选预设已删除。"
+        } catch {
+            if resultPublicationScope == scope, accountFilterPresetMutation == mutation {
+                accountFilterPresetCache = nil; accountFilterPresetMessage = "删除未确认，请刷新后检查；当前筛选保持不变。"
+            }
+            throw error
         }
     }
 

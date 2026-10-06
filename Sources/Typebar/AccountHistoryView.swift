@@ -3,7 +3,7 @@ import Charts
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Account metadata only. No local-history merge, score reconstruction or network writes.
+/// Account metadata only. Preset writes never mutate local or remote results.
 struct AccountHistoryView: View {
   let settings: AppSettings
   let account: AccountSession
@@ -15,6 +15,9 @@ struct AccountHistoryView: View {
   @State private var visibleLimit = ResultHistoryPagePolicy.pageSize
   @State private var selectedDay: Date?
   @State private var message: String?
+  @State private var presetName = ""
+  @State private var deletingPreset: PresetDeletion?
+  private struct PresetDeletion { let id: UUID; let name: String; let scope: ResultPublicationScope }
 
   private var matched: [RemoteAccountResult] {
     guard let scope = account.resultPublicationScope else { return [] }
@@ -34,6 +37,7 @@ struct AccountHistoryView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 20) {
           scopeNotice
+          presetControls
           DisclosureGroup("筛选 · \(rows.count) 条匹配") {
             AccountHistoryFilterEditor(account: account, filter: $filter)
             HStack {
@@ -81,7 +85,8 @@ struct AccountHistoryView: View {
       .navigationTitle("账户历史")
       .toolbar {
         ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } }
-        ToolbarItem { Button("刷新") { Task { await account.refreshRemoteResults() } }.disabled(account.isWorking) }
+        ToolbarItem { Button("刷新") { Task { await account.refreshRemoteResults(); await account.refreshAccountFilterPresets() } }
+          .disabled(account.isWorking || account.isEditingAccountFilterPresets || account.isLoadingAccountFilterPresets) }
         ToolbarItem { Button("导出筛选后的 CSV…", action: exportCSV).disabled(rows.isEmpty) }
       }
     }
@@ -91,16 +96,72 @@ struct AccountHistoryView: View {
         !account.isWorking, !account.isEditingAccountTags {
         await account.refreshRemoteResults()
       }
+      if account.resultPublicationScope != nil { await account.refreshAccountFilterPresets() }
     }
     .onChange(of: filter) { resetPage() }
     .onChange(of: sortField) { resetPage() }
     .onChange(of: sortDirection) { resetPage() }
-    .onChange(of: account.resultPublicationScope) { filter = .init(); message = nil; resetPage() }
+    .onChange(of: account.resultPublicationScope) { filter = .init(); message = nil; presetName = ""; deletingPreset = nil; resetPage() }
     .onChange(of: account.accountTagRevision) {
       if let scope = account.resultPublicationScope, account.hasAccountTagDirectory {
         filter.accountTagFilter?.reconcile(scope: scope, knownIDs: Set(account.accountTags.map(\.id)))
       }
       resetPage()
+    }
+    .confirmationDialog("删除账户筛选预设？", isPresented: Binding(get: { deletingPreset != nil },
+      set: { if !$0 { deletingPreset = nil } }), presenting: deletingPreset) { draft in
+      Button("删除“\(draft.name)”", role: .destructive) {
+        Task {
+          do { try await account.deleteAccountFilterPreset(id: draft.id, scope: draft.scope) }
+          catch { if account.resultPublicationScope == draft.scope { message = error.localizedDescription } }
+        }
+      }
+      Button("取消", role: .cancel) { }
+    } message: { _ in Text("从当前账户删除，其他设备刷新后也会移除；当前筛选和成绩不变。") }
+  }
+
+  private var presetControls: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Text("账户筛选预设").font(.headline)
+        Spacer()
+        Button("刷新预设") { Task { await account.refreshAccountFilterPresets() } }
+          .disabled(account.isEditingAccountFilterPresets || account.isLoadingAccountFilterPresets)
+      }
+      Text("保存到当前账户，可在其他设备读取；与本机历史预设分开。应用预设只替换筛选，不改成绩。")
+        .font(.caption).foregroundStyle(.secondary)
+      ForEach(account.accountFilterPresets) { preset in
+        HStack {
+          Button(preset.displayName) {
+            guard let scope = account.resultPublicationScope else { return }
+            do { filter = try account.accountFilterPreset(id: preset.id, scope: scope); message = nil }
+            catch { message = error.localizedDescription }
+          }
+          Spacer()
+          Button("删除…", role: .destructive) {
+            if let scope = account.resultPublicationScope { deletingPreset = .init(id: preset.id, name: preset.displayName, scope: scope) }
+          }.accessibilityLabel("删除账户筛选预设 \(preset.displayName)")
+        }.disabled(account.isEditingAccountFilterPresets || account.isLoadingAccountFilterPresets)
+      }
+      HStack {
+        TextField("预设名称", text: $presetName).frame(maxWidth: 250)
+        Button("保存当前筛选") {
+          guard let scope = account.resultPublicationScope else { return }
+          let snapshot = filter, name = presetName
+          Task {
+            do {
+              try await account.saveAccountFilterPreset(name: name, filter: snapshot, scope: scope)
+              if account.resultPublicationScope == scope, presetName == name { presetName = ""; message = nil }
+            } catch { if account.resultPublicationScope == scope { message = error.localizedDescription } }
+          }
+        }.disabled(!AccountFilterPresetDocument.isValidName(AccountFilterPresetDocument.normalizedName(presetName))
+          || account.accountFilterPresetCache == nil || account.isEditingAccountFilterPresets || account.isLoadingAccountFilterPresets
+          || (account.accountFilterPresetCache.map { $0.list.presets.count >= $0.list.maximumPresets } ?? true))
+        if let cache = account.accountFilterPresetCache { Text("\(cache.list.presets.count) / \(cache.list.maximumPresets)").font(.caption).monospacedDigit() }
+      }
+      Text("名称最多 16 个字母、数字、下划线、点或短横线，不能以点开头；空白自动转为下划线。")
+        .font(.caption).foregroundStyle(.secondary)
+      if let status = account.accountFilterPresetMessage { Text(status).font(.caption).foregroundStyle(.secondary) }
     }
   }
 
