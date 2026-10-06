@@ -327,7 +327,7 @@ struct TypebarArchive: Codable, Equatable {
     // independent numeric PB ledger that cannot be recovered from history,
     // and account tag identities captured at completion rather than retry.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 30
+    static let currentVersion = 31
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -378,13 +378,15 @@ struct TypebarArchive: Codable, Equatable {
         let hasIncompletePractice = results.contains { $0.incompletePractice != nil }
         let hasQuoteIdentity = results.contains { $0.quoteSource?.quoteID != nil }
         let hasAccountTagSnapshot = results.contains { $0.accountTagSnapshot != nil }
+        let hasAccountTagFilters = resultFilterPresets.contains { $0.filter.accountTagFilter != nil }
         let hasExpandedPace = Self.requiresExpandedPaceFormat(settings: settings, presets: presets)
         let hasAccountPace = Self.requiresAccountPaceFormat(settings: settings, presets: presets)
         let baseVersion = hasAccountTagSnapshot ? max(29, version) : localPersonalBestLedger != nil ? max(28, version) : hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
-        self.version = hasAccountPace ? max(30, baseVersion) : baseVersion
+        let paceVersion = hasAccountPace ? max(30, baseVersion) : baseVersion
+        self.version = hasAccountTagFilters ? max(31, paceVersion) : paceVersion
         self.exportedAt = exportedAt
-        let payloadVersion = hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
+        let payloadVersion = hasAccountTagFilters || hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
         self.localPersonalBestLedger = localPersonalBestLedger
         let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = payloadVersion >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
@@ -436,6 +438,8 @@ struct TypebarArchive: Codable, Equatable {
     func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(results)
+        guard version >= 31 || !resultFilterPresets.contains(where: { $0.filter.accountTagFilter != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 30 || !Self.requiresAccountPaceFormat(settings: settings, presets: presets)
         else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 29 || !results.contains(where: { $0.accountTagSnapshot != nil })
@@ -540,8 +544,11 @@ struct TypebarArchive: Codable, Equatable {
             ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedResultFilterPresetIDs) ?? [])
             : []
         deletedResultFilterPresetIDs = deletedIDs.sorted { $0.uuidString < $1.uuidString }
+        let decodedFilterPresets = try values.decodeIfPresent([NamedResultFilterPreset].self, forKey: .resultFilterPresets) ?? []
+        guard version >= 31 || !decodedFilterPresets.contains(where: { $0.filter.accountTagFilter != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         resultFilterPresets = version >= 4
-            ? (try values.decodeIfPresent([NamedResultFilterPreset].self, forKey: .resultFilterPresets) ?? [])
+            ? decodedFilterPresets
                 .filter { $0.isValid && !deletedIDs.contains($0.id) }
             : []
         activeTestSelection = version >= 3
@@ -999,6 +1006,8 @@ enum TypebarDataTransfer {
     static func importArchive(from data: Data) throws -> TypebarArchive {
         let archive = try JSONDecoder.typebar.decode(TypebarArchive.self, from: data)
         guard (1...TypebarArchive.currentVersion).contains(archive.version) else { throw DataTransferError.unsupportedVersion(archive.version) }
+        guard archive.version >= 31 || !archive.resultFilterPresets.contains(where: { $0.filter.accountTagFilter != nil })
+        else { throw DataTransferError.unsupportedVersion(archive.version) }
         guard archive.version >= 11 || !archive.results.contains(where: {
             $0.replayEvents.contains(where: \.isStoppedInsertion)
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }

@@ -1487,7 +1487,7 @@ private struct ContentView: View {
       .accessibilityLabel(notificationAccessibilityLabel)
     }
     .sheet(isPresented: $showingHistory) {
-      ResultsHistoryView(settings: settings, currentConfiguration: configuration)
+      ResultsHistoryView(settings: settings, currentConfiguration: configuration, account: account)
     }
     .sheet(isPresented: $showingWeakSpots) {
       WeakSpotHistoryView(
@@ -7482,6 +7482,7 @@ private struct ResultPerformanceChart: View {
 private struct ResultsHistoryView: View {
   let settings: AppSettings
   let currentConfiguration: TestConfiguration
+  let account: AccountSession
   fileprivate enum ActivityChartMeasure: String, CaseIterable, Identifiable {
     case completedTests
     case typingMinutes
@@ -7532,6 +7533,8 @@ private struct ResultsHistoryView: View {
   @State private var modeFilter = Set(TestMode.allCases)
   @State private var languageFilter = Set(TypingLanguage.allCases)
   @State private var selectedTagFilter = ResultHistoryTagFilter()
+  @State private var selectedAccountTagFilter: ResultHistoryAccountTagFilter?
+  @State private var currentSettingsFilterMessage: String?
   @State private var difficultyFilter = Set(Difficulty.allCases)
   @State private var personalBestFilter: ResultHistoryPersonalBestFilter = .all
   @State private var dateRangeFilter: ResultHistoryDateRange = .all
@@ -7553,20 +7556,10 @@ private struct ResultsHistoryView: View {
   @State private var showingPersonalBestTable = false
 
   private var filteredResults: [TestResultRecord] {
-    let filter = ResultHistoryFilter(
-      modes: modeFilter,
-      languages: languageFilter,
-      tagFilter: selectedTagFilter,
-      personalBestFilter: personalBestFilter,
-      difficulties: difficultyFilter,
-      dateRange: dateRangeFilter,
-      punctuation: punctuationFilter,
-      numbers: numbersFilter,
-      quoteLengths: quoteLengthFilter,
-      timeLimits: timeLimitFilter,
-      wordLimits: wordLimitFilter,
-      modifierFilter: activeModifierFilter
-    )
+    let filter = activeFilter
+    let canonical = account.historyAccountTagMetadata
+    let scope = account.hasAccountTagDirectory ? account.resultPublicationScope : nil
+    let knownIDs = Set(account.accountTags.map(\.id))
     let entries = results.map { result in
       let configuration = result.configuration
       return ResultHistoryEntry(
@@ -7580,7 +7573,10 @@ private struct ResultsHistoryView: View {
         },
         duration: configuration?.duration,
         wordLimit: configuration?.wordLimit,
-        modifiers: configuration?.modifiers
+        modifiers: configuration?.modifiers,
+        accountTags: AccountTagHistoryFilterPolicy.metadata(id: result.id,
+          snapshot: AccountTagHistoryFilterPolicy.snapshot(from: result.accountTagSnapshotData),
+          scope: scope, knownIDs: knownIDs, canonical: canonical)
       )
     }
     let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs)
@@ -7800,7 +7796,7 @@ private struct ResultsHistoryView: View {
                   }
                 }
                 if !availableTags.isEmpty {
-                  DisclosureGroup("标签：\(selectedTagFilter.selectionSummary)") {
+                  DisclosureGroup("本机文字标签：\(selectedTagFilter.selectionSummary)") {
                     Toggle("无标签", isOn: noTagBinding)
                       .toggleStyle(.checkbox)
                     ForEach(availableTags, id: \.self) { tag in
@@ -7808,6 +7804,10 @@ private struct ResultsHistoryView: View {
                         .toggleStyle(.checkbox)
                     }
                   }
+                }
+                AccountTagHistoryFilterControls(account: account, filter: $selectedAccountTagFilter)
+                if let currentSettingsFilterMessage {
+                  Text(currentSettingsFilterMessage).font(.caption).foregroundStyle(.secondary)
                 }
                 Picker("个人最佳", selection: $personalBestFilter) {
                   ForEach(ResultHistoryPersonalBestFilter.allCases, id: \.self) { filter in
@@ -7913,6 +7913,7 @@ private struct ResultsHistoryView: View {
       selectedHistoryDate = nil
       historyListScrollTarget = nil
     }
+    .onChange(of: account.accountTagRevision) { reconcileAccountTagFilter() }
     .onChange(of: selectedHistoryDate) { revealSelectedHistoryResult() }
     .onChange(of: historySortField) { resetHistoryPagination() }
     .onChange(of: historySortDirection) { resetHistoryPagination() }
@@ -8232,6 +8233,7 @@ private struct ResultsHistoryView: View {
   private var activeFilter: ResultHistoryFilter {
     .init(
       modes: modeFilter, languages: languageFilter, tagFilter: selectedTagFilter,
+      accountTagFilter: selectedAccountTagFilter,
       personalBestFilter: personalBestFilter, difficulties: difficultyFilter, dateRange: dateRangeFilter,
       punctuation: punctuationFilter, numbers: numbersFilter, quoteLengths: quoteLengthFilter,
       timeLimits: timeLimitFilter, wordLimits: wordLimitFilter, modifierFilter: activeModifierFilter
@@ -8260,13 +8262,31 @@ private struct ResultsHistoryView: View {
   }
 
   private func applyCurrentSettingsFilter() {
-    apply(.currentSettings(currentConfiguration, activeTags: settings.activeResultTags))
+    guard let scope = account.resultPublicationScope else {
+      apply(.currentSettings(currentConfiguration, activeTags: settings.activeResultTags))
+      return
+    }
+    guard account.hasAccountTagDirectory else {
+      currentSettingsFilterMessage = "账户标签尚未加载。请在账户设置刷新后使用当前设置筛选。"
+      return
+    }
+    do {
+      let ids = Set(try account.accountTagPostingSelection()), known = Set(account.accountTags.map(\.id))
+      guard ids.isSubset(of: known) else { throw RemoteAccountError.unexpectedResponse }
+      apply(.currentSettings(currentConfiguration, accountTagFilter:
+        .init(scope: scope, knownIDs: known, selectedIDs: ids, includesNoTags: ids.isEmpty)))
+    } catch {
+      currentSettingsFilterMessage = "账户标签选择无法读取，请重新选择；原筛选保持不变。"
+    }
   }
 
   private func apply(_ filter: ResultHistoryFilter) {
     modeFilter = filter.modeSelections
     languageFilter = filter.languageSelections
     selectedTagFilter = filter.effectiveTagFilter
+    selectedAccountTagFilter = filter.accountTagFilter
+    currentSettingsFilterMessage = nil
+    reconcileAccountTagFilter()
     difficultyFilter = filter.difficultySelections
     personalBestFilter = filter.effectivePersonalBestFilter
     dateRangeFilter = filter.dateRange
@@ -8277,6 +8297,11 @@ private struct ResultsHistoryView: View {
     wordLimitFilter = filter.wordLimits
     includesNoModifierFilter = filter.modifierFilter.includesNoModifiers
     modifierFilter = filter.modifierFilter.modifiers
+  }
+
+  private func reconcileAccountTagFilter() {
+    guard account.hasAccountTagDirectory, let scope = account.resultPublicationScope else { return }
+    selectedAccountTagFilter?.reconcile(scope: scope, knownIDs: Set(account.accountTags.map(\.id)))
   }
 
   private func timeLimitBinding(for limit: ResultHistoryTimeLimit) -> Binding<Bool> {

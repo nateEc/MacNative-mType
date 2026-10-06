@@ -574,6 +574,7 @@ struct ResultHistoryEntry: Equatable, Identifiable {
     let mode: TestMode?
     let language: TypingLanguage?
     let tags: [String]
+    let accountTags: ResultHistoryAccountTagMetadata?
     let finishedAt: Date
     let difficulty: Difficulty?
     let includesPunctuation: Bool?
@@ -588,12 +589,14 @@ struct ResultHistoryEntry: Equatable, Identifiable {
         finishedAt: Date = .distantPast, difficulty: Difficulty? = nil,
         includesPunctuation: Bool? = nil, includesNumbers: Bool? = nil,
         quoteLength: QuoteLength? = nil, duration: TimeInterval? = nil, wordLimit: Int? = nil,
-        modifiers: [TestModifier]? = nil
+        modifiers: [TestModifier]? = nil,
+        accountTags: ResultHistoryAccountTagMetadata? = nil
     ) {
         self.id = id
         self.mode = mode
         self.language = language
         self.tags = tags
+        self.accountTags = accountTags
         self.finishedAt = finishedAt
         self.difficulty = difficulty
         self.includesPunctuation = includesPunctuation
@@ -2461,6 +2464,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     var languages: Set<TypingLanguage>?
     var tag: String?
     var tagFilter: ResultHistoryTagFilter?
+    var accountTagFilter: ResultHistoryAccountTagFilter?
     var difficulty: Difficulty?
     var difficulties: Set<Difficulty>?
     var personalBestOnly: Bool
@@ -2479,6 +2483,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         modes: Set<TestMode>? = nil,
         languages: Set<TypingLanguage>? = nil, tag: String? = nil,
         tagFilter: ResultHistoryTagFilter? = nil,
+        accountTagFilter: ResultHistoryAccountTagFilter? = nil,
         personalBestOnly: Bool = false,
         personalBestFilter: ResultHistoryPersonalBestFilter? = nil,
         difficulty: Difficulty? = nil,
@@ -2497,6 +2502,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.languages = languages
         self.tag = tag
         self.tagFilter = tagFilter
+        self.accountTagFilter = accountTagFilter
         self.difficulty = difficulty
         self.difficulties = difficulties
         self.personalBestOnly = personalBestOnly
@@ -2545,6 +2551,15 @@ struct ResultHistoryFilter: Codable, Equatable {
                 modifiers: selectedModifiers
             )
         )
+    }
+
+    static func currentSettings(
+        _ configuration: TestConfiguration, accountTagFilter: ResultHistoryAccountTagFilter
+    ) -> Self {
+        var filter = currentSettings(configuration)
+        filter.tagFilter = nil
+        filter.accountTagFilter = accountTagFilter
+        return filter
     }
 
     var languageSelections: Set<TypingLanguage> {
@@ -2614,7 +2629,7 @@ struct ResultHistoryFilter: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case mode, modes, language, languages, tag, tagFilter, difficulty, difficulties, personalBestOnly, personalBestFilter, dateRange, punctuation, numbers, quoteLength,
-          quoteLengths, timeLimits, wordLimits, modifierFilter
+          quoteLengths, timeLimits, wordLimits, modifierFilter, accountTagFilter
     }
 
     init(from decoder: Decoder) throws {
@@ -2625,6 +2640,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         languages = try values.decodeIfPresent(Set<TypingLanguage>.self, forKey: .languages)
         tag = try values.decodeIfPresent(String.self, forKey: .tag)
         tagFilter = try values.decodeIfPresent(ResultHistoryTagFilter.self, forKey: .tagFilter)
+        accountTagFilter = try values.decodeIfPresent(ResultHistoryAccountTagFilter.self, forKey: .accountTagFilter)
         difficulty = try values.decodeIfPresent(Difficulty.self, forKey: .difficulty)
         difficulties = try values.decodeIfPresent(Set<Difficulty>.self, forKey: .difficulties)
         personalBestOnly = try values.decodeIfPresent(Bool.self, forKey: .personalBestOnly) ?? false
@@ -2651,6 +2667,7 @@ struct ResultHistoryFilter: Codable, Equatable {
             matchesMode(entry.mode)
                 && matchesLanguage(entry.language)
                 && effectiveTagFilter.matches(entry.tags)
+                && (accountTagFilter?.matches(entry.accountTags) ?? true)
                 && matchesDifficulty(entry.difficulty)
                 && effectivePersonalBestFilter.matches(id: entry.id, personalBestIDs: personalBestIDs)
                 && (cutoff.map { entry.finishedAt >= $0 } ?? true)
@@ -2752,6 +2769,9 @@ enum ResultHistoryFilterSummaryPolicy {
         let tagFilter = filter.effectiveTagFilter
         if !tagFilter.isUnrestricted {
             items.append(.init(category: "标签", value: tagFilter.selectionSummary))
+        }
+        if let accountTagFilter = filter.accountTagFilter {
+            items.append(.init(category: "账户标签", value: accountTagFilter.selectionSummary))
         }
         let personalBestFilter = filter.effectivePersonalBestFilter
         if personalBestFilter != .all {

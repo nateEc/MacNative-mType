@@ -26,6 +26,42 @@ final class DiskModelMigrationTests: XCTestCase {
     try exerciseUpgrade("initial")
   }
 
+  func testScopedAccountFilterColdReloadPreservesLegacyFilterAndCompletionBytes() throws {
+    try withDirectory { root in
+      let fixture = try createLegacy("before-account-tags", root: root)
+      let rows = try XCTUnwrap(fixture.receipt["rows"] as? [String: [[String: Any]]])
+      let scope = ResultPublicationScope(endpoint: "https://owned.invalid", userID: UUID()), tagID = UUID()
+      let preset = NamedResultFilterPreset(id: UUID(), name: "Owned account filter",
+        filter: .init(accountTagFilter: .init(scope: scope, knownIDs: [tagID], selectedIDs: [tagID], includesNoTags: false)),
+        createdAt: start)
+      var saved: Data?
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        try assertLegacy(container.mainContext, expected: rows, version: "before-account-tags")
+        let record = try XCTUnwrap(ResultFilterPresetRecord(portablePreset: preset)); saved = record.filterData
+        container.mainContext.insert(record); try container.mainContext.save()
+      }
+      let receipt = root.appendingPathComponent("cold-account-filter.json")
+      try runWriter("current", ["inspect", fixture.store.path, "-", receipt.path], root: root)
+      let cold = try XCTUnwrap(try object(receipt)["rows"] as? [String: [[String: Any]]])
+      let filters = try XCTUnwrap(cold["ResultFilterPresetRecord"])
+      XCTAssertEqual(filters.count,2)
+      XCTAssertEqual(filters.first { $0["id"] as? String == preset.id.uuidString }?["filterData"] as? String,
+        try XCTUnwrap(saved).base64EncodedString())
+      XCTAssertEqual(filters.first { $0["id"] as? String == filterID.uuidString }?["filterData"] as? String,
+        rows["ResultFilterPresetRecord"]?.first?["filterData"] as? String)
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        let stored = try container.mainContext.fetch(FetchDescriptor<ResultFilterPresetRecord>())
+        XCTAssertEqual(stored.first { $0.id == preset.id }?.portablePreset,preset)
+        let result = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).first)
+        try assertStored(result, expected: XCTUnwrap(rows["TestResultRecord"]?.first))
+        let ledger = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<LocalPersonalBestLedgerRecord>()).first)
+        XCTAssertEqual(ledger.ledgerData.base64EncodedString(), rows["LocalPersonalBestLedgerRecord"]?.first?["ledgerData"] as? String)
+      }
+    }
+  }
+
   func testPreviousFourEntityStoreAddsIndependentPBAndColdReloadKeepsItAfterDeletion() throws {
     try withDirectory { root in
       let fixture = try createLegacy("before-local-pb", root: root)

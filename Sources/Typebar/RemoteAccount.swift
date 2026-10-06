@@ -2811,6 +2811,21 @@ final class AccountSession {
             lastResult: lastAccountResultScope == scope ? lastAccountResult : nil)
     }
 
+    var historyAccountTagMetadata: [UUID: ResultHistoryAccountTagMetadata] {
+        guard let scope = resultPublicationScope, hasAccountTagDirectory else { return [:] }
+        var rows: [UUID: ResultHistoryAccountTagMetadata] = [:]
+        if let cache = accountTagHistoryCache, cache.scope == scope {
+            for row in cache.results { rows[row.id] = .init(scope: scope, tagIDs: row.accountTagIDs) }
+        }
+        // Unloaded/incomplete history edits use the independently confirmed last
+        // row. Ready history edits can be newer than that projection instead.
+        if lastAccountResultScope == scope, let row = lastAccountResult,
+            !isAccountTagHistoryReady || rows[row.id] == nil {
+            rows[row.id] = .init(scope: scope, tagIDs: row.accountTagIDs)
+        }
+        return rows
+    }
+
     func applyAccountTagEditResponse(_ response: RemoteAccountTagEditResponse, requestedIDs: [UUID],
         scope: ResultPublicationScope, at milliseconds: Int64, fromResultPage: Bool = false) throws {
         try RemoteAccountTagPolicy.validateIDs(requestedIDs)

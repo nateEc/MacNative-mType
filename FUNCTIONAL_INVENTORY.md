@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-07 [账户标签历史筛选](ACCOUNT_TAG_HISTORY_FILTER_CONTRACT.md)：本机历史接入稳定 UUID、多选／无标签、当前设置和绑定作用域的预设，确认编辑优先，坏字节不压成未知；旧文字筛选保留，完成快照不改。定向 83 项、完整原生 3172／服务 442 项零失败零跳过，664 个源标签分支对照、13 项磁盘冷读通过；949 场景仅结构，23 份日志及未开窗包通过，零 GUI。归档 31／设置 5，表结构、偏好和服务协议不变；旧应用回退须恢复升级前库。服务端历史统计、官方协议与实机仍开放，MET-36／MET-38 部分兼容，goal active；下方为历史阶段。
+
 2026-10-07 [完成账户标签皇冠](ACCOUNT_TAG_COMPLETION_CONTRACT.md)：按客户端完整 PB 分组和严格小数提速，在完成回调产生初始皇冠／提升与旧 PB 图表线，不等待接受或本机保存；继承至匹配 UUID 的编辑控件，服务编辑奖项仍独立。新增十二项，最终相关 76 项零失败零跳过；6,912 函数案例含 5,184 可选状态对照及 1,728 配置拒绝边界。完整门禁原生 3156／服务 441 项零失败零跳过，944 场景仅结构、22 份日志及未开窗包通过，零 GUI，存储／协议不变；持久离线目录／PB、备份、官方迁移／协议和实机仍开放，goal active；下方为历史阶段。
 
 2026-10-07 [两种成绩标签的元数据一致性](RESULT_TEXT_TAG_METADATA_CONTRACT.md)：修复文字 PATCH 仅更新列表造成后续稳定 ID 编辑误拒绝的问题，同步已有最后成绩／缓存／近期投影；不加载历史、不重建 PB、不改皇冠、完成快照、当前选择或 XP。两种写入共享 nonce，revision／代次与显示基线拒绝过期提交，失败保留输入。新增原生十四项／服务一项，最终定向 55／13 项零失败零跳过；完整门禁原生 3144／服务 441 项零失败零跳过，941 场景仅结构、21 份日志及未开窗包通过，零 GUI，存储／协议不变。初始皇冠、持久目录／备份、原协议和实机仍开放，完整 goal active；下方为历史阶段。
@@ -1373,9 +1375,9 @@ INP-04 的“按键位图”档用所选 Typebar 布局的原创映射，将 QMK
 | MET-56 | 每日练习分钟趋势线 | `components/pages/account/DailyActivityChart.tsx` | AnalyticsDomain | 已实现：近 28 日活动切换到练习分钟时，会以次要色原生虚线显示筛选结果中每日练习时长的最小二乘趋势。拟合只使用实际存在完成成绩的日期，按真实日历间隔计算，不把为保持连续横轴而补出的空白日误作零分钟；线段仅覆盖首个到最后一个有效练习日。少于两个有效日期、同日数据或非有限导入值会安全隐藏趋势。切换到其他活动指标时不显示该线；计算只派生本机筛选结果，不新增设置、存储、同步或网络。 |
 2026-09-21 `MET-51` 审计更正：其中“Typebar 采用单指标菜单”的早期描述已被当前实现取代。每日图的“分钟 + 平均速度”原生选项现在在同一 Swift Charts 图内保留练习分钟柱、分钟最小二乘趋势和平均速度折线；左轴显示分钟，右轴以当前 WPM/CPM/WPS/CPS/WPH 单位还原速度。点选后的既有日期详情继续显示完成次数、重开比、最高/平均速度、准确率和稳定度；其余每日指标仍可单独切换。该双轴映射、空值边界和 WPM/CPM 换算由 `testDailyActivityOverviewScaleAlignsMinutesAndAverageSpeedOnSeparateAxes` 覆盖，完整固定路径对照见 `OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md`。
 | MET-57 | 历史行模式、字符与标签摘要 | `components/pages/account/Table.tsx` | ResultsDomain, AnalyticsDomain | 已实现：本机历史每行在大号速度主值旁直接显示模式及计时/字数参数、准确率、完成时间、匹配/错位/额外/跳过四元字符统计和现有结果标签，同时保留 Raw、稳定度及个人最佳标记。无限计时/字数明确显示“无限”，旧记录缺少配置时显示“未知”而不从完成时长猜测；标签沿用已有规范化规则，大小写与重音无关去重但保留首次输入的显示形式。长元数据在 520 点窗口单行截断并提供完整悬停文本，VoiceOver 会展开朗读四个字符类别及标签；整行仍可打开现有详情与标签编辑器。该摘要只读取已有本机成绩，不改排序、分页、删除、存储、同步或网络。 |
-| MET-36 | 历史“全部/当前设置”快捷筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：可恢复全部或按当前测试配置带入模式、语言、难度、标点、数字、时长／词数档、引语长度及任一命中修饰器。当前标签条件仍使用本机文字集合，ResultsHistoryView 未接入稳定账户目录和当前 UUID 选择；无独立活动标签的旧说明已过时，不能据此宣称原版 current-settings 标签语义已实现。 |
+| MET-36 | 历史“全部/当前设置”快捷筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：恢复全部及配置维度筛选保留；已登录时按当前稳定 UUID／已知无账户标签筛选，目录或选择读取失败保持原条件，未登录时保留本机文字方案。仅筛本机历史，服务端独有历史／官方协议／实机未完成；见 ACCOUNT_TAG_HISTORY_FILTER_CONTRACT.md。 |
 | MET-37 | 历史多选语言筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 已实现：历史“语言”筛选可任意多选、全选或全部取消，命中任一所选语言；全选保持不限制语言的旧行为并保留无法解码语言的既有成绩。旧筛选预设仅有单个语言字段时仍按该一项解释，新预设保存完整选择。 |
-| MET-38 | 历史多选标签筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：本机文字标签支持多选、全选、全取消及无文字标签，按任一命中；新旧文字筛选预设保留。原版此处按稳定目录 ID 及 none 进行查询，并随目录加入／删除调整选项；本机历史仍仅匹配 entry.tags，尚未使用账户标签 UUID 或已确认编辑元数据，不能把同名文字当作稳定标签等价。 |
+| MET-38 | 历史多选标签筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：独立账户 UUID 多选、全选／全不选、none、目录增删和作用域预设已接入；就绪历史或未就绪最后确认优先于不可变完成快照，显式坏字节不能变未知，同名文字不替代 ID。旧文字预设保留，新账户预设归档最低 31，664 次源标签分支对照通过。服务端历史、官方 API／身份、Shift 单选及实机仍开放。 |
 | MET-39 | 历史个人最佳四态筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 已实现：历史个人最佳条件支持全部、仅个人最佳、排除个人最佳和无匹配项（参考实现的两项同时取消）。新预设存储四态；旧预设的 `personalBestOnly: true` 保持“仅个人最佳”，缺失或 `false` 保持全部。 |
 | MET-40 | 历史多选模式筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 已实现：模式条件可任选计时、字数、引语、禅和自定义模式，按任一命中；全选保留无法解码模式的历史记录，全部取消明确显示无匹配项。新预设持久化完整集合，旧单模式预设保持原语义。 |
 | MET-41 | 历史多选难度筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 已实现：难度条件可任选普通、专家和大师，按任一命中；全选保留无法解码难度的历史记录，全部取消明确显示无匹配项。新预设持久化完整集合，旧单难度预设保持原语义。 |
