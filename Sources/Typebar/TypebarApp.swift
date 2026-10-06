@@ -4185,6 +4185,7 @@ private struct ContentView: View {
       personalBestLedger: personalBestLedgers.first?.ledger,
       accountTags: account.hasAccountTagDirectory ? account.accountTags : nil,
       selectedAccountTagIDs: (try? account.accountTagPostingSelection()) ?? [],
+      accountTagHistoryPersonalBests: account.accountTagHistoryPersonalBests,
       lastTestWpm: repeatedWpm ?? lastFinishedWpm,
       currentPrompt: session.prompt
     )

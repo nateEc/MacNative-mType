@@ -2004,7 +2004,10 @@ final class AccountSession {
     }
     var currentUser: RemoteAccountUser? {
         didSet {
-            if currentUser?.id != oldValue?.id { invalidateAccountTagDirectory() }
+            if currentUser?.id != oldValue?.id {
+                invalidateAccountTagDirectory()
+                invalidateAccountTagHistory()
+            }
             if currentUser == nil {
                 developerAccessKeys = []
                 remoteResults = []
@@ -2013,6 +2016,18 @@ final class AccountSession {
     }
     var developerAccessKeys: [RemoteDeveloperAccessKey] = []
     var remoteResults: [RemoteAccountResult] = []
+    private(set) var accountTagHistoryCache: AccountTagHistoryCache?
+    private var accountTagHistoryGeneration: UInt64 = 0
+    private var accountTagHistoryDisplayLimit = 20
+    private var accountTagHistoryEditNonce: UUID?
+    var isEditingAccountTags: Bool { accountTagHistoryEditNonce != nil }
+    var isAccountTagHistoryReady: Bool {
+        accountTagHistoryCache?.scope == resultPublicationScope && accountTagHistoryCache?.isComplete == true
+    }
+    var accountTagHistoryPersonalBests: [AccountTagHistoryPersonalBest] {
+        guard let scope = resultPublicationScope, accountTagHistoryCache?.scope == scope else { return [] }
+        return accountTagHistoryCache?.personalBests ?? []
+    }
     private var cachedAccountTags: [RemoteAccountTag] = []
     private var cachedAccountTagsScope: ResultPublicationScope?
     private var accountTagDirectoryGeneration: UInt64 = 0
@@ -2443,6 +2458,7 @@ final class AccountSession {
             )
             currentUser = resetUser
             invalidateAccountTagDirectory()
+            invalidateAccountTagHistory()
             if let scope = resultPublicationScope {
                 try RemoteAccountTagSelectionStore(defaults: defaults).set([], for: scope)
             }
@@ -2633,22 +2649,121 @@ final class AccountSession {
     }
 
     func refreshRemoteResults(limit: Int = 20) async {
-        guard let token = tokenStore.load(), currentUser != nil else {
-            remoteResults = []
+        guard !Task.isCancelled else { return }
+        guard let token = tokenStore.load(), let scope = resultPublicationScope else {
+            invalidateAccountTagHistory()
             return
         }
+        guard !isEditingAccountTags else { return }
+        let api = RemoteAccountAPI(endpoint: endpoint)
         isWorking = true
         defer { isWorking = false }
+        var read: AccountTagHistoryRead?
         do {
-            remoteResults = try await RemoteAccountAPI(endpoint: endpoint).request(
-                path: "v1/results", method: "GET", token: token,
+            // Unknown directory identities cannot normalize a ready cache.
+            let request = try beginAccountTagHistoryRead()
+            read = request
+            if !hasAccountTagDirectory { await refreshAccountTagsForPractice() }
+            guard resultPublicationScope == scope, accountTagHistoryGeneration == request.generation else { throw CancellationError() }
+            let usesTagCache = hasAccountTagDirectory
+            // The pinned frontend's first cache is one default batch, not CSV pagination.
+            let requestedLimit = usesTagCache ? AccountTagHistoryLoadingPolicy.initialResultLimit : min(max(limit, 1), 100)
+            let page = try await api.request(path: "v1/results", method: "GET", token: token,
                 body: Optional<String>.none,
-                queryItems: [URLQueryItem(name: "limit", value: "\(min(max(limit, 1), 100))")],
-                response: RemoteAccountResultPage.self
-            ).results
+                queryItems: [URLQueryItem(name: "limit", value: "\(requestedLimit)")],
+                response: RemoteAccountResultPage.self)
+            guard usesTagCache == hasAccountTagDirectory else { throw CancellationError() }
+            let results = usesTagCache ? try AccountTagHistoryLoadingPolicy.initialResults(page) : page.results
+            try applyAccountTagHistory(results, read: request, displayLimit: limit)
+        } catch is CancellationError {
         } catch {
-            statusMessage = error.localizedDescription
+            if resultPublicationScope == scope, read?.generation == accountTagHistoryGeneration {
+                statusMessage = "历史加载失败，旧缓存保留：" + error.localizedDescription
+            }
         }
+    }
+
+    func beginAccountTagHistoryRead() throws -> AccountTagHistoryRead {
+        try Task.checkCancellation()
+        guard let scope = resultPublicationScope, !isEditingAccountTags else { throw CancellationError() }
+        accountTagHistoryGeneration &+= 1
+        return .init(scope: scope, generation: accountTagHistoryGeneration)
+    }
+
+    func applyAccountTagHistory(_ results: [RemoteAccountResult], read: AccountTagHistoryRead,
+        displayLimit: Int = 20) throws {
+        try Task.checkCancellation()
+        guard resultPublicationScope == read.scope, accountTagHistoryGeneration == read.generation,
+            !isEditingAccountTags else { throw CancellationError() }
+        let nextDisplayLimit = min(max(displayLimit, 1), 100)
+        guard hasAccountTagDirectory else {
+            accountTagHistoryCache = nil
+            accountTagHistoryDisplayLimit = nextDisplayLimit
+            remoteResults = Array(results.prefix(nextDisplayLimit))
+            accountTagRevision &+= 1
+            return
+        }
+        let cache: AccountTagHistoryCache
+        if var old = accountTagHistoryCache, old.scope == read.scope {
+            try old.replaceResults(results, knownIDs: Set(accountTags.map(\.id)))
+            cache = old
+        } else {
+            cache = try AccountTagHistoryCache(scope: read.scope, results: results,
+                knownIDs: Set(accountTags.map(\.id)), directory: accountTags)
+        }
+        accountTagHistoryCache = cache
+        accountTagHistoryDisplayLimit = nextDisplayLimit
+        remoteResults = cache.recentResults(limit: accountTagHistoryDisplayLimit)
+        accountTagRevision &+= 1
+    }
+
+    func invalidateAccountTagHistory() {
+        accountTagHistoryGeneration &+= 1
+        accountTagHistoryCache = nil; remoteResults = []; accountTagHistoryEditNonce = nil
+        accountTagRevision &+= 1
+    }
+
+    func applyConfirmedAccountHistoryDeletion(read: AccountTagHistoryRead) throws {
+        guard resultPublicationScope == read.scope, accountTagHistoryGeneration == read.generation
+        else { throw RemoteAccountError.accountScopeChanged }
+        remoteResults = []
+        accountTagHistoryCache?.clearResults()
+        accountTagHistoryGeneration &+= 1
+        accountTagRevision &+= 1
+    }
+
+    func applyAccountTagHistoryEdit(_ result: RemoteAccountResult, scope: ResultPublicationScope,
+        at milliseconds: Int64) throws {
+        guard resultPublicationScope == scope, var cache = accountTagHistoryCache,
+            cache.scope == scope, cache.isComplete, hasAccountTagDirectory,
+            let previous = cache.results.first(where: { $0.id == result.id }), let ids = result.accountTagIDs
+        else { throw RemoteAccountError.accountScopeChanged }
+        var expected = previous; expected.accountTagIDs = ids
+        guard expected == result else { throw RemoteAccountError.unexpectedResponse }
+        try cache.edit(id: result.id, tagIDs: ids, knownIDs: Set(accountTags.map(\.id)), at: milliseconds)
+        accountTagHistoryCache = cache
+        remoteResults = cache.recentResults(limit: accountTagHistoryDisplayLimit)
+        accountTagHistoryGeneration &+= 1
+        accountTagRevision &+= 1
+    }
+
+    func beginAcceptedAccountTagHistoryInsertion(id: UUID, scope: ResultPublicationScope) -> AccountTagHistoryRead? {
+        guard resultPublicationScope == scope, accountTagHistoryCache?.scope == scope else { return nil }
+        accountTagHistoryCache?.noteAccepted(id)
+        accountTagHistoryGeneration &+= 1
+        accountTagRevision &+= 1
+        return .init(scope: scope, generation: accountTagHistoryGeneration)
+    }
+
+    func applyAcceptedAccountTagHistoryResult(_ result: RemoteAccountResult, read: AccountTagHistoryRead) throws {
+        guard resultPublicationScope == read.scope, accountTagHistoryGeneration == read.generation,
+            var cache = accountTagHistoryCache, cache.scope == read.scope, hasAccountTagDirectory
+        else { throw RemoteAccountError.accountScopeChanged }
+        try cache.insertAcceptedResult(result, knownIDs: Set(accountTags.map(\.id)))
+        accountTagHistoryCache = cache
+        remoteResults = cache.recentResults(limit: accountTagHistoryDisplayLimit)
+        accountTagHistoryGeneration &+= 1
+        accountTagRevision &+= 1
     }
 
     func remoteResultsForExport() async -> [RemoteAccountResult]? {
@@ -2685,13 +2800,19 @@ final class AccountSession {
         }
         isWorking = true
         defer { isWorking = false }
+        let requestEndpoint = endpoint
+        let historyRead = AccountTagHistoryRead(scope: .init(endpoint: requestEndpoint, userID: user.id),
+            generation: accountTagHistoryGeneration)
         do {
             let usesPassword = user.authenticationMethods.contains(.password)
             let freshReauthenticationToken = usesPassword
                 ? nil
                 : try await reauthenticationToken(
                     for: user, accessToken: token, excluding: nil, currentPassword: nil)
-            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            guard resultPublicationScope == historyRead.scope, tokenStore.load() == token else {
+                throw RemoteAccountError.accountScopeChanged
+            }
+            let response = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                 path: "v1/results",
                 method: "DELETE",
                 token: token,
@@ -2700,7 +2821,11 @@ final class AccountSession {
                 response: RemoteResultDeletionResponse.self
             )
             guard response.deleted else { throw RemoteAccountError.unexpectedResponse }
-            remoteResults = []
+            guard tokenStore.load() == token else {
+                throw RemoteAccountError.serverMessage("服务端已清空，但会话已改变，请刷新对应账户。")
+            }
+            do { try applyConfirmedAccountHistoryDeletion(read: historyRead) }
+            catch { throw RemoteAccountError.serverMessage("服务端已清空，但历史作用域或代次已改变，请刷新对应账户。") }
             currentUser = .init(
                 id: user.id, email: user.email, emailVerified: user.emailVerified,
                 displayName: user.displayName, totalExperience: 0,
@@ -2820,6 +2945,10 @@ final class AccountSession {
         try selection.set(selection.ids(for: scope).filter { owned.contains($0) }, for: scope)
         cachedAccountTags = list.tags.sorted { $0.name == $1.name ? $0.id.uuidString < $1.id.uuidString : $0.name < $1.name }
         cachedAccountTagsScope = scope
+        if accountTagHistoryCache?.scope == scope {
+            accountTagHistoryCache?.adoptDirectory(list.tags)
+            remoteResults = accountTagHistoryCache?.recentResults(limit: accountTagHistoryDisplayLimit) ?? []
+        }
         accountTagDirectoryMessage = nil
         accountTagRevision &+= 1
     }
@@ -2886,17 +3015,46 @@ final class AccountSession {
             method: "DELETE", token: token, body: Optional<String>.none, response: RemoteAccountTagDeletion.self)
         guard response.deleted else { throw RemoteAccountError.unexpectedResponse }
         guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        try applyConfirmedAccountTagDeletion(id: id, personalBestsOnly: personalBestsOnly, scope: scope)
         invalidateAccountTagDirectory()
         await refreshAccountTagsForPractice(errorPrefix: "更改已保存，标签刷新失败：")
     }
 
+    func applyConfirmedAccountTagDeletion(id: UUID, personalBestsOnly: Bool, scope: ResultPublicationScope) throws {
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        if accountTagHistoryCache?.scope == scope {
+            accountTagHistoryCache?.removeTag(id, clearOnly: personalBestsOnly)
+            remoteResults = accountTagHistoryCache?.recentResults(limit: accountTagHistoryDisplayLimit) ?? []
+        }
+        accountTagHistoryGeneration &+= 1
+        accountTagRevision &+= 1
+    }
+
     func updateRemoteAccountResultTagIDs(id: UUID, tagIDs: [UUID]) async throws {
         try RemoteAccountTagPolicy.validateIDs(tagIDs)
+        guard !isEditingAccountTags, let editScope = resultPublicationScope,
+            accountTagHistoryCache?.scope == editScope, isAccountTagHistoryReady,
+            accountTagHistoryCache?.results.contains(where: { $0.id == id }) == true else {
+            throw RemoteAccountError.serverMessage("请先加载完整账户历史，或等待当前标签更改完成。未发送更改请求。")
+        }
+        let nonce = UUID()
+        accountTagHistoryEditNonce = nonce
+        accountTagHistoryGeneration &+= 1
+        defer { if accountTagHistoryEditNonce == nonce { accountTagHistoryEditNonce = nil } }
         let (api, token, scope) = try await accountTagAPI()
+        guard scope == editScope, accountTagHistoryEditNonce == nonce,
+            hasAccountTagDirectory, Set(tagIDs).isSubset(of: Set(accountTags.map(\.id)))
+        else { throw RemoteAccountError.accountScopeChanged }
         let result = try await api.request(path: "v1/results/\(id)/account-tags", method: "PATCH", token: token,
             body: RemoteAccountResultTagIDsRequest(tagIDs: tagIDs), response: RemoteAccountResult.self)
-        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
-        if let index = remoteResults.firstIndex(where: { $0.id == id }) { remoteResults[index] = result }
+        guard resultPublicationScope == scope, accountTagHistoryEditNonce == nonce else { throw RemoteAccountError.accountScopeChanged }
+        do {
+            guard result.id == id, Set(result.accountTagIDs ?? []) == Set(tagIDs) else { throw RemoteAccountError.unexpectedResponse }
+            try applyAccountTagHistoryEdit(result, scope: scope, at: Int64((Date.now.timeIntervalSince1970 * 1_000).rounded(.down)))
+        } catch {
+            invalidateAccountTagHistory()
+            statusMessage = "标签更改已保存，缓存重建失败，请刷新完整历史：" + error.localizedDescription
+        }
     }
 
     func updateRemoteResultTags(id: UUID, tags: [String]) async {
@@ -3348,8 +3506,25 @@ final class AccountSession {
         if resultPublicationScope == requestScope, capabilities?.supportsAccountTags == true {
             // Update the accepted account response before this extra suspension.
             // A failed read must not enqueue an accepted result or manufacture PBs.
+            let historyRead = beginAcceptedAccountTagHistoryInsertion(id: result.id, scope: requestScope)
             invalidateAccountTagDirectory()
             await refreshAccountTagsForPractice(errorPrefix: "成绩已接受，标签刷新失败：")
+            if let historyRead, resultPublicationScope == requestScope,
+                accountTagHistoryGeneration == historyRead.generation {
+                do {
+                    let accepted = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
+                        path: "v1/results/\(result.id)", method: "GET", token: token,
+                        body: Optional<String>.none, response: RemoteAccountResult.self)
+                    guard accepted.id == result.id else { throw RemoteAccountError.unexpectedResponse }
+                    try applyAcceptedAccountTagHistoryResult(accepted, read: historyRead)
+                } catch {
+                    if resultPublicationScope == requestScope, accountTagHistoryGeneration == historyRead.generation {
+                        accountTagHistoryCache?.markIncomplete()
+                        accountTagRevision &+= 1
+                        statusMessage = "成绩已接受，完整历史缓存待刷新：" + error.localizedDescription
+                    }
+                }
+            }
         }
         return response
     }

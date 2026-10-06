@@ -4,13 +4,17 @@ import Foundation
 /// Current funboxes do not gate an existing tag PB. Unknown options stay unknown.
 enum AccountTagPacePolicy {
   static func targetWpm(configuration: TestConfiguration, tags: [RemoteAccountTag],
-    selectedIDs: [UUID]) -> Double? {
+    selectedIDs: [UUID], historyPersonalBests: [AccountTagHistoryPersonalBest] = []) -> Double? {
     guard let group = LocalPersonalBestGroup(configuration), selectedIDs.count <= 15,
       Set(selectedIDs).count == selectedIDs.count else { return nil }
     let mode2 = [.time, .words].contains(group.mode) ? String(group.parameter) : group.mode.rawValue
     let selected = Set(selectedIDs)
     let speeds = tags.filter { selected.contains($0.id) }.compactMap { tag in
-      tag.personalBests.first { best in
+      if let historyGroup = AccountTagHistoryGroup(configuration),
+        let cached = historyPersonalBests.first(where: { $0.tagID == tag.id && $0.group == historyGroup }) {
+        return cached.wpm
+      }
+      return tag.personalBests.first { best in
         guard let options = best.personalBestConfiguration else { return false }
         return best.mode == group.mode.rawValue && best.mode2 == mode2
           && best.language == group.language.rawValue && options.difficulty == group.difficulty.rawValue

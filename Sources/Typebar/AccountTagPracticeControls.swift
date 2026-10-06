@@ -55,10 +55,15 @@ struct AccountTagPracticeControls: View {
         .controlSize(.small)
       if settings.paceGuideMode == .accountTagPersonalBest {
         let target = account.hasAccountTagDirectory
-          ? AccountTagPacePolicy.targetWpm(configuration: configuration, tags: account.accountTags, selectedIDs: selected) : nil
+          ? AccountTagPacePolicy.targetWpm(configuration: configuration, tags: account.accountTags,
+            selectedIDs: selected, historyPersonalBests: account.accountTagHistoryPersonalBests) : nil
         Text(target.map { "当前勾选同类最高 PB：\($0.formatted(.number.precision(.fractionLength(0...2)))) WPM" }
           ?? "当前勾选暂无匹配的账户标签 PB；不会猜测未知分组选项。")
           .font(.caption).foregroundStyle(.secondary)
+        if !account.accountTagHistoryPersonalBests.isEmpty {
+          Text("历史标签编辑后的 PB 是本机缓存重建，不是服务端重授；不会改写完成成绩快照。")
+            .font(.caption).foregroundStyle(.secondary)
+        }
         if hasStarted {
           Text("切换节奏来源时初始化速度；之后改选影响完成标签及下一轮节奏，不改变已完成成绩。")
             .font(.caption).foregroundStyle(.secondary)

@@ -1377,6 +1377,14 @@ struct PreferencesView: View {
               Text("只显示当前账户已提交到自建服务的成绩元数据，不包含提示、输入回放或本机历史。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+              if let count = account.accountTagHistoryCache?.results.count {
+                Text("缓存已载入 \(count) 条元数据；初始为最近 1,000 条或全部较少记录，新接受成绩随后补入。近期列表最多显示 20 条；重建不改写服务端 PB 或完成快照。")
+                  .font(.caption).foregroundStyle(.secondary)
+                if !account.isAccountTagHistoryReady {
+                  Text("缓存尚不完整，请刷新历史后再编辑账户标签；已接受成绩不会重新投稿。")
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+              }
               if account.remoteResults.isEmpty {
                 Text("服务端还没有可显示的已提交成绩。")
                   .font(.caption)

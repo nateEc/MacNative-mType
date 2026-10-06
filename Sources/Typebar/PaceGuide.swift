@@ -92,6 +92,7 @@ enum PaceGuidePolicy {
         personalBestLedger: LocalPersonalBestLedger? = nil,
         accountTags: [RemoteAccountTag]? = nil,
         selectedAccountTagIDs: [UUID] = [],
+        accountTagHistoryPersonalBests: [AccountTagHistoryPersonalBest] = [],
         lastTestWpm: Double? = nil,
         currentPrompt: String = "",
         now: Date = .now,
@@ -122,7 +123,8 @@ enum PaceGuidePolicy {
         case .accountTagPersonalBest:
             guard let accountTags else { return nil }
             return AccountTagPacePolicy.targetWpm(configuration: configuration,
-                tags: accountTags, selectedIDs: selectedAccountTagIDs)
+                tags: accountTags, selectedIDs: selectedAccountTagIDs,
+                historyPersonalBests: accountTagHistoryPersonalBests)
         case .average:
             return averageWpm(matching(configuration: configuration, samples: samples).map(\.preciseWpm))
         case .dailyAverage:

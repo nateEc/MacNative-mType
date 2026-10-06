@@ -113,10 +113,10 @@ struct RemoteAccountResultTagPicker: View {
               do { try await account.updateRemoteAccountResultTagIDs(id: result.id, tagIDs: ids.sorted { $0.uuidString < $1.uuidString }) }
               catch { message = error.localizedDescription } }
           }))
-          .disabled(busy)
+          .disabled(busy || account.isEditingAccountTags || !account.isAccountTagHistoryReady)
       }
       if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
-      Text("按 ID 编辑，不重授服务端标签 PB；已删除的目录标签不显示。")
+      Text("按 ID 编辑并按完整缓存历史重建本机标签 PB；不重授服务端 PB，也不改变完成快照。")
         .font(.caption).foregroundStyle(.secondary)
     }
   }
