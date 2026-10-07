@@ -70,8 +70,20 @@ import XCTest
     XCTAssertEqual(scroll.contentView.bounds.minY, 0)
     XCTAssertTrue(retired.isEmpty)
     RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-    XCTAssertEqual(retired, [.init(attemptID: attempt, firstRetainedWordIndex: 1)])
+    XCTAssertEqual(retired, [.init(attemptID: attempt, firstRetainedWordIndex: 1)],
+      animationDiagnostic(follower))
     XCTAssertEqual(scroll.contentView.bounds.minY, 0)
+  }
+
+  // Failure-only bounded scheduling state, no input text, account or storage
+  // content. Keep the outcome assertion and its existing timing unchanged.
+  private func animationDiagnostic(_ follower: PromptAutoScrollView) -> String {
+    let fields: Set<String> = ["lastWidth", "lineJumpCount", "previousTargetTop",
+      "isFollowScheduled", "lineScrollAnimation"]
+    return Mirror(reflecting: follower).children.compactMap { child in
+      guard let label = child.label, fields.contains(label) else { return nil }
+      return "\(label)=\(String(reflecting: child.value))"
+    }.joined(separator: ", ")
   }
 
   func testReducedOrDisabledMotionRetiresImmediatelyAndDoesNotKeepAnOverlap() {
