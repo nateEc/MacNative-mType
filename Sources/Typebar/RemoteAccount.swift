@@ -2075,6 +2075,7 @@ final class AccountSession {
     var developerAccessKeys: [RemoteDeveloperAccessKey] = []
     var remoteResults: [RemoteAccountResult] = []
     private var accountResultExportGeneration: UInt64 = 0
+    var accountPersonalBestSessionRevision: UInt64 { accountResultExportGeneration }
     private(set) var accountFilterPresetCache: AccountFilterPresetCache?
     private var accountFilterPresetGeneration: UInt64 = 0
     private var accountFilterPresetMutation: UUID?
@@ -4188,6 +4189,30 @@ final class AccountSession {
             throw RemoteAccountError.accountScopeChanged
         }
         return .init(previousRank: response.previousRank, currentRank: request.rank)
+    }
+
+    /// Shared session revision rejects logout/login ABA as well as server changes.
+    /// Does not publish, read credentials, or replace result/tag/XP caches.
+    func loadAccountPersonalBestProfile(scope: ResultPublicationScope,
+        load: () async throws -> RemotePublicProfile) async throws -> RemotePublicProfile {
+        try Task.checkCancellation()
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        let generation = accountResultExportGeneration
+        let profile = try await load()
+        try Task.checkCancellation()
+        guard resultPublicationScope == scope, accountResultExportGeneration == generation else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        guard profile.id == scope.userID else { throw RemoteAccountError.unexpectedResponse }
+        return profile
+    }
+
+    func fetchAccountPersonalBestProfile(scope: ResultPublicationScope) async throws -> RemotePublicProfile {
+        let api = RemoteAccountAPI(endpoint: endpoint)
+        return try await loadAccountPersonalBestProfile(scope: scope) {
+            try await api.request(path: "v1/profiles/\(scope.userID.uuidString)", method: "GET", token: nil,
+                body: Optional<String>.none, response: RemotePublicProfile.self)
+        }
     }
 
     func publicProfile(id: UUID) async throws -> RemotePublicProfile {

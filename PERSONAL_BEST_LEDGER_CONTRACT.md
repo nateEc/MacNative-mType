@@ -1,6 +1,26 @@
 # 账户个人最佳账本与公开清空
 
+## 原生账户个人最佳表
+
+账户历史新增“账户个人最佳…”入口，按计时／字数／自定义／禅切换，展示该账户独立 PB 快照的全部配置，不受已载入一千条历史、近期二十条、当前筛选或历史删除影响。既有本机最佳表和公开资料卡保留；账户表不混入本机账本、标签 PB、排行榜 PB 或当前设置。它读取现有公开资料端点中当前账户的 `personalBestSnapshots`，不重算、投稿、授奖或改写任何缓存；端点仍是用户连接的 Typebar 服务，不使用官方账号协议。
+
+固定参考 [PbTablesModal.buildRows](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/modals/PbTablesModal.tsx) 按 mode2 分组，遵循 JavaScript Object.keys 的整数键顺序，每组按保存 WPM 降序且同速稳定，首行标记组开始。[UserProfile](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/UserProfile.tsx) 仅在账户页提供完整表入口。原生独立实现这些行为；额外提供四种模式切换，不复制 TSX、样式或资产。Raw、准确率、稳定度、语言、难度、标点、数字、lazy 与接受日期都保留，速度／Raw 使用已有五单位和小数偏好；日期含本地时分，完整快照取服务器接受毫秒，旧基线保留已知完成日期并标记旧历史。旧服务标准档摘要明确标为不完整，缺 Raw／配置保持未知；已知空账本不复活旧摘要。旧响应只有明确 duration／wordLimit 时可建立数值分组，不反推未知参数。
+
+请求固定调用时的 API 地址，开始和返回均检查取消、账户／服务器与共享会话代次，并验证响应用户 UUID；注销重登同账户或地址离开再返回也拒绝旧响应。视图真实 task identity 和缓存可见性同时包含代次与刷新 UUID，旧任务的迟到成功／失败不能覆盖新视图，也不能清除新任务忙状态。普通同账户资料刷新不使表失效。关闭 sheet 由 SwiftUI 取消 task，真实窗口生命周期和 URLSession 仍待验收。
+
+界面采用现有系统字体和动态语义颜色，组首参数作为导航锚点，速度等宽突出、配置与时间次要，原生 List 延迟行、模式分段和明确刷新；无图像、动画或新依赖。没有有效的无窗口 UI 先行红测，因此以固定完整源码函数、模型、实际 AccountSession 和编译取证；不将缺类型编译错误计作产品红灯。SDK 的既有 List／task／Picker 路径和 macOS 14 目标编译通过，不等于最低设备或 VoiceOver 验收。
+
+新增十一项测试，相关 66 项零失败零跳过（4.061 秒），日志 `/tmp/typebar-account-pb-table-final-focused.log`。真实视图任务标识的原表达式提取后，一项一个失败断言复现同账户 ABA，见 `/tmp/typebar-account-pb-table-identity-red.log`；旧参数排序先行一项四断言失败，见 `/tmp/typebar-account-pb-table-legacy-red.log`，随后两处均修正。另覆盖失败重试、错误 UUID、过期点击无请求、取消忽略替身、服务地址 ABA、缓存／XP 不变、分数与同速伴随字段。首次编译因 TestMode 没有 Identifiable 失败，明确 id 修正；初次两个夹具把零／超大参数伪装成完整服务 PB，单独复现于 `/tmp/typebar-account-pb-table-fixture-repro.log` 后按实际协议修正，未放宽生产准入。该夹具错误不算功能红灯。
+
+QA 仅动态执行只读固定源码的完整 buildRows，在自有 DB.getSnapshot 适配器上进行 24 组模式／规模／旧响应对照，包含 0／1／8／25 条、不同配置、精确速度／同速、整数键与超大旧键顺序、旧响应缺 mode2；缺快照／缺模式返回空也验证。不是完整 Solid、DataTable、DOM、真实 HTTP 或官方 schema 准入，假数据不包含原版正文。源码／测试脚本不随产品打包；现有格式仍归档 33、设置 5、偏好 v3、五实体／32 成绩列、CSV 41 列，服务协议／数据文件不变，无迁移、回填或旧 writer 改动。回退只移除新只读入口，不改变成绩或账本。
+
+首轮完整门禁原生 3,470 项／两处断言失败（750.953 秒）：新十一项均通过，页面／弹窗证据审计仍硬编码只读 TypingEngineTests 与 HealthRouteTests，故误判新文件的两个已存在测试符号缺失。命令行审计本来就扫描完整测试目录；XCTest 现按相同两个测试根递归读取 Swift 文件，原有分区、数量、路径和缺符号拒绝断言不变。修正后相关 67 项零失败零跳过（9.024 秒），见 `/tmp/typebar-account-pb-table-audit-focused.log`。失败轮没有进入服务测试或打包，不算最终结果；总日志 `/tmp/typebar-account-pb-table-final-readiness.log`，41 份分项从确切自有临时目录单独复制到原空目录 `/tmp/typebar-account-pb-table-final-logs.SDQ02i` 保留。修正只在运行终止后进行，随后另行冻结并完整重跑。
+
+源码驱动、行为先行、原生设计、迁移边界与同会话有界决策／风险复核影响该实现；不是独立评审。MET-43 与整体功能等价仍部分兼容，真实网络、布局、焦点、键盘、VoiceOver、旧发行和设备仍开放，完整 goal active。本轮零 Typebar 图形启动；下方是此前账本阶段记录。
+
 2026-10-06，服务账户的个人 PB 与排行榜 PB 已从可删除历史分离，接入首次接受、公开／好友资料、全部时间速度榜及 English 60 秒分布。原生资料卡显示完整分组、Raw 和记录日期；后续 [本机与标签账本](LOCAL_PERSONAL_BEST_LEDGER_CONTRACT.md) 也已独立保存并接通原生归档 28 传输，真实双机、官方协议与原版标签 ID 仍开放。完整 Monkeytype 重写目标仍 active。
+
+本阶段最终完整串行门禁退出码 0：原生 3,470 项／服务 477 项零失败、零跳过，分别 751.818／10.841 秒；十万词耐久 151.148 秒，16 项隔离磁盘冷读 6.369 秒。1,029 个唯一人工场景仅结构通过，状态未升级。固定源码、原创性、未开窗应用包及签名检查通过，八个冻结文件哈希一致，参考仓库仍为上述固定提交且干净。主记录 `/tmp/typebar-account-pb-table-final2-readiness.log`，43 份分项日志保留于 `/tmp/typebar-account-pb-table-final2-logs.U6U6Ow`。先前失败轮不计入最终通过证据；完整命令终止后只补文档，不再改变代码、测试、脚本或机器矩阵。本轮无真实账户写入、部署或 Typebar GUI 启动，完整 goal 保持 active。
 
 ## 固定源码规则
 

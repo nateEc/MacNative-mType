@@ -14,6 +14,7 @@ struct AccountHistoryView: View {
   @State private var visibleLimit = ResultHistoryPagePolicy.pageSize
   @State private var selectedDay: Date?
   @State private var selectedChart: AccountResultChartSelection?
+  @State private var showingPersonalBests = false
   @State private var selectedGraphResult: UUID?
   @State private var selectedGraphScope: ResultPublicationScope?
   @State private var message: String?
@@ -43,6 +44,8 @@ struct AccountHistoryView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 20) {
           scopeNotice
+          Button("账户个人最佳…") { showingPersonalBests = true }
+            .disabled(scope == nil)
           presetControls
           DisclosureGroup("筛选 · \(rows.count) 条匹配") {
             AccountHistoryFilterEditor(account: account, filter: $filter)
@@ -148,6 +151,9 @@ struct AccountHistoryView: View {
     }
     .sheet(item: $selectedChart) { selection in
       AccountResultChartDetail(selection: selection, account: account, settings: settings)
+    }
+    .sheet(isPresented: $showingPersonalBests) {
+      AccountPersonalBestTableView(account: account, settings: settings)
     }
     .confirmationDialog("删除账户筛选预设？", isPresented: Binding(get: { deletingPreset != nil },
       set: { if !$0 { deletingPreset = nil } }), presenting: deletingPreset) { draft in

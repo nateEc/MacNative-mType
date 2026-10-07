@@ -491,15 +491,13 @@ final class OfficialLayoutCoverageTests: XCTestCase {
           "\(surface) 声明的原生证据文件不存在：\(path)")
       }
     }
-    let clientTests = try String(
-      contentsOf: repositoryRoot.appendingPathComponent(
-        "Tests/TypebarTests/TypingEngineTests.swift"),
-      encoding: .utf8)
-    let serverTests = try String(
-      contentsOf: repositoryRoot.appendingPathComponent(
-        "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"),
-      encoding: .utf8)
-    let nativeTests = clientTests + "\n" + serverTests
+    let testFiles = try ["Tests/TypebarTests", "server/Tests"].flatMap { path -> [URL] in
+      let files = try XCTUnwrap(FileManager.default.enumerator(
+        at: repositoryRoot.appendingPathComponent(path), includingPropertiesForKeys: nil,
+        options: [.skipsHiddenFiles]))
+      return files.allObjects.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
+    }
+    let nativeTests = try testFiles.map { try String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
     for (surface, symbols) in fixture.nativeTestSymbols {
       XCTAssertFalse(symbols.isEmpty, "\(surface) 缺少可执行的原生测试符号")
       for symbol in symbols {

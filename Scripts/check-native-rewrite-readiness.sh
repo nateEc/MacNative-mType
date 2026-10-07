@@ -226,6 +226,9 @@ run_logged_check "executing pinned history filter Shift and ordinary choices" \
 run_logged_check "executing pinned filtered account all/recent-ten/daily statistics" \
   "$temporary_directory/account-history-stats-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-history-stats.mjs" "$reference_root"
+run_logged_check "executing pinned complete account PB table grouping" \
+  "$temporary_directory/account-personal-bests-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-personal-bests.mjs" "$reference_root"
 run_logged_check "executing pinned account filter preset lifecycle and names" \
   "$temporary_directory/account-filter-presets-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-filter-presets.mjs" "$reference_root"
