@@ -286,6 +286,10 @@ run_logged_check "executing pinned before-input wrap admission and real helper m
   "$temporary_directory/input-wrap-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-input-wrap.mjs" "$reference_root"
+run_logged_check "executing pinned complete word-update reflow and RAF debounce" \
+  "$temporary_directory/word-reflow-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-word-reflow.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

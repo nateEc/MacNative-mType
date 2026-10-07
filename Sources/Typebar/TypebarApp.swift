@@ -2872,7 +2872,9 @@ private struct ContentView: View {
                   words: session.promptWordPresentations.enumerated().map {
                     .init(index: $0.offset, glyphID: $0.element.range.lowerBound)
                   }, firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
-                  onRetire: { session.retirePromptWords($0) }))
+                  onRetire: { session.retirePromptWords($0) },
+                  followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
+                    slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines)))
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }

@@ -22,6 +22,29 @@ struct PromptLineScrollContext {
   var words: [PromptLineScrollWord] = []
   var firstRetainedWordIndex = 0
   var onRetire: ((PromptWordRetirement) -> Void)? = nil
+  var followsWordReflow = false
+}
+
+struct PromptWordReflowState {
+  private(set) var baselineTop: CGFloat?
+  private(set) var transitionStartTop: CGFloat = 0
+
+  mutating func anchor(at top: CGFloat) { baselineTop = top }
+
+  mutating func jumpFromTop(afterUpdate top: CGFloat, enabled: Bool, transitioning: Bool) -> CGFloat? {
+    guard enabled, let baselineTop, top > baselineTop else { return nil }
+    if !transitioning {
+      transitionStartTop = top
+      return baselineTop
+    }
+    return top > transitionStartTop ? baselineTop : nil
+  }
+}
+
+enum PromptWordReflowPolicy {
+  static func isEnabled(mode: TestMode, slowTimer: Bool, showAllLines: Bool) -> Bool {
+    !showAllLines && (mode == .zen || slowTimer)
+  }
 }
 
 enum PromptLineScrollMotion {
@@ -88,8 +111,8 @@ struct PromptLineScrollGeometry {
       caretBottom: caretBottom, wordTops: wordTops)
   }
 
-  func retirementBoundary(before activeWordIndex: Int) -> Int? {
-    guard let previousWordTop, activeTop > previousWordTop else { return nil }
+  func retirementBoundary(before activeWordIndex: Int, hideBound: CGFloat? = nil) -> Int? {
+    guard let previousWordTop = hideBound ?? previousWordTop, activeTop > previousWordTop else { return nil }
     // Browser offsetTop is integral; normalize native fractional row metrics
     // on both sides so words sharing one row cannot retire each other.
     return wordTops.filter { $0.key < activeWordIndex
