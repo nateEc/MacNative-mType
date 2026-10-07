@@ -225,6 +225,7 @@ final class PromptAutoScrollView: NSView {
   private var previousTargetTop: CGFloat = 0
   private var recentersLine = true
   private var resetsAttempt = false
+  private var resetsRetainedPrefix = false
   private var lineScrollTimer: Timer?
   private var animatedTarget: CGPoint?
   private var lineScrollAnimation: (from: CGPoint, target: CGPoint, started: TimeInterval)?
@@ -261,6 +262,7 @@ final class PromptAutoScrollView: NSView {
       previousWordID = nil
       previousTargetTop = 0
       resetsAttempt = true
+      resetsRetainedPrefix = false
       lineJumpCount = (lineScroll?.firstRetainedWordIndex ?? 0) > 0 ? 1 : 0
       wordReflow = .init()
       latestActiveTop = nil
@@ -270,11 +272,13 @@ final class PromptAutoScrollView: NSView {
       stopLineScroll()
       previousTargetTop = 0
       resetsAttempt = true
-      wordReflow = .init()
+      // Source lineJump keeps the immediate anchor, or the smooth anchor
+      // sampled before deletion. Rebuilding visible text is not a new word.
+      resetsRetainedPrefix = true
       hasPendingWordUpdate = false
     }
     if layoutChanged { stopLineScroll(); wordReflow = .init() }
-    recentersLine = recentersLine || layoutChanged || attemptChanged || prefixChanged
+    recentersLine = recentersLine || layoutChanged || attemptChanged
     self.lineScroll = lineScroll
     self.text = text
     self.characterOffset = characterOffset
@@ -283,7 +287,7 @@ final class PromptAutoScrollView: NSView {
     self.isRightToLeft = isRightToLeft
     // Preserve a real text update across coalesced settings/layout callbacks.
     // Turning Slow Timer on alone must not simulate updateWordLetters.
-    hasPendingWordUpdate = hasPendingWordUpdate || textChanged
+    hasPendingWordUpdate = hasPendingWordUpdate || (textChanged && !prefixChanged)
     if needsFollow { scheduleFollow() }
   }
 
@@ -345,8 +349,12 @@ final class PromptAutoScrollView: NSView {
   }
 
   private func followActiveWord(_ context: PromptLineScrollContext) {
-    let wordWasUpdated = hasPendingWordUpdate
-    hasPendingWordUpdate = false
+    let prefixWasRebuilt = resetsRetainedPrefix
+    resetsRetainedPrefix = false
+    // Apply the prefix's coordinate reset first, then process any real text
+    // update that arrived in the same run-loop turn against the retained anchor.
+    let wordWasUpdated = hasPendingWordUpdate && !prefixWasRebuilt
+    if !prefixWasRebuilt { hasPendingWordUpdate = false }
     guard let scroll = enclosingScrollView, let document = scroll.documentView,
       let wordID = context.activeWordID, let offset = context.characterOffsets[wordID],
       let geometry = PromptLineScrollGeometry.measure(in: text, activeOffset: offset,
@@ -361,18 +369,19 @@ final class PromptAutoScrollView: NSView {
     let documentOrigin = convert(CGPoint.zero, to: document).y
     let activeVisibleTop = documentOrigin + geometry.activeTop - scroll.contentView.bounds.minY
     latestActiveTop = geometry.activeTop
-    if context.activeWordID != previousWordID || recentersLine || wordReflow.baselineTop == nil {
+    let wordDidChange = context.activeWordID != previousWordID
+    if !prefixWasRebuilt && (wordDidChange || recentersLine || wordReflow.baselineTop == nil) {
       wordReflow.anchor(at: activeVisibleTop)
     }
     let reflowFrom = wordReflow.jumpFromTop(afterUpdate: activeVisibleTop,
       enabled: wordWasUpdated && context.followsWordReflow
-        && context.activeWordID == previousWordID && !recentersLine,
+        && context.activeWordID == previousWordID && !recentersLine && !prefixWasRebuilt,
       transitioning: lineScrollAnimation != nil)
     let reflowHideBound = reflowFrom.map { $0 + scroll.contentView.bounds.minY - documentOrigin }
     var retirement: PromptWordRetirement?
     var reflowCanAdvance = false
-    if reflowHideBound != nil || context.activeWordID != previousWordID
-      && geometry.previousWordTop.map({ geometry.activeTop > $0 }) == true {
+    if !prefixWasRebuilt && (reflowHideBound != nil || context.activeWordID != previousWordID
+      && geometry.previousWordTop.map({ geometry.activeTop > $0 }) == true) {
       if lineJumpCount > 0,
         let active = context.words.first(where: { $0.glyphID == wordID }),
         let boundary = geometry.retirementBoundary(before: active.index, hideBound: reflowHideBound),
@@ -394,8 +403,14 @@ final class PromptAutoScrollView: NSView {
     }
     // SwiftUI can wrap a single long token across multiple native rows. Keep
     // its caret reachable without the legacy extra-margin early advance.
-    if let bottom = geometry.caretBottom { top = max(top, bottom - scroll.contentView.bounds.height) }
-    previousWordID = wordID
+    if prefixWasRebuilt {
+      // The source resets words.marginTop to zero after deleting the prefix;
+      // it does not center the remaining active row, even after multirow reflow.
+      top = 0
+    } else if let bottom = geometry.caretBottom {
+      top = max(top, bottom - scroll.contentView.bounds.height)
+    }
+    if !prefixWasRebuilt { previousWordID = wordID }
     previousTargetTop = top
     recentersLine = false
     let region = convert(CGRect(x: 0, y: top, width: 1, height: scroll.contentView.bounds.height), to: document)
@@ -405,11 +420,16 @@ final class PromptAutoScrollView: NSView {
     let immediate = resetsAttempt || !context.smoothScroll || context.reducesMotion
     resetsAttempt = false
     move(scroll, to: target, immediately: immediate, frameRate: context.frameRate,
-      retirement: retirement, onRetire: context.onRetire, startsJump: startsJump)
+      retirement: retirement, onRetire: context.onRetire, startsJump: startsJump,
+      preservesReflowAnchor: startsJump || prefixWasRebuilt)
+    if prefixWasRebuilt && (hasPendingWordUpdate || wordDidChange || wordReflow.baselineTop == nil) {
+      scheduleFollow()
+    }
   }
 
   private func move(_ scroll: NSScrollView, to target: CGPoint, immediately: Bool, frameRate: Int,
-    retirement: PromptWordRetirement?, onRetire: ((PromptWordRetirement) -> Void)?, startsJump: Bool) {
+    retirement: PromptWordRetirement?, onRetire: ((PromptWordRetirement) -> Void)?, startsJump: Bool,
+    preservesReflowAnchor: Bool) {
     let interval = PromptLineScrollMotion.frameInterval(frameRate: frameRate,
       displayFrameRate: window?.screen?.maximumFramesPerSecond ?? 60)
     // A new word animation replaces the old one. Its canceled promise never
@@ -435,7 +455,7 @@ final class PromptAutoScrollView: NSView {
     if immediately {
       clip.scroll(to: target)
       scroll.reflectScrolledClipView(clip)
-      anchorWordReflow()
+      if !preservesReflowAnchor { anchorWordReflow() }
       lineScrollOverlap = .init()
       completeRetirement()
       return
