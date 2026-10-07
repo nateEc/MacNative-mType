@@ -489,7 +489,6 @@ struct PreferencesView: View {
             Button("使用原生刷新率") {
               settings.animationFrameRate = AnimationFrameRatePolicy.nativeFrameRate
             }
-            .disabled(settings.animationFrameRate == AnimationFrameRatePolicy.nativeFrameRate)
             Spacer()
           }
           Text("可设为 15–1000 FPS；“原生”会让 Typebar 的连续原创动效按显示器节奏绘制。该项只影响呈现，不改变输入、计分、回放或网络请求。")

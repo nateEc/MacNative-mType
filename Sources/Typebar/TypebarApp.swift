@@ -1116,12 +1116,6 @@ private struct ContentView: View {
   @State private var didRestoreActiveTestSelection = false
   @State private var restoringLockedLayoutFluidSelection = false
 
-  private var effectiveAnimationFrameRate: Int {
-    timerHealth.usesLowFrameRate
-      ? min(settings.animationFrameRate, TimerHealthPolicy.reducedFrameRate)
-      : settings.animationFrameRate
-  }
-
   private var practiceLayout: some View {
     VStack(spacing: 30) {
       header
@@ -1204,7 +1198,7 @@ private struct ContentView: View {
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     )
-    .environment(\.typebarAnimationFrameRate, effectiveAnimationFrameRate)
+    .modifier(PracticeAnimationFrameRate(settings: settings, timerHealth: timerHealth))
     .overlay(alignment: .top) {
       if network.showsOfflineBanner, !session.hasStarted {
         NetworkConnectivityNotice(kind: .offline)
@@ -1924,7 +1918,8 @@ private struct ContentView: View {
         after: lastClockTickSecond, elapsed: elapsed)
       if let firstDueSecond = dueSeconds.first {
         timerHealth.observe(
-          drift: elapsed - Double(firstDueSecond), configuration: session.configuration)
+          drift: elapsed - Double(firstDueSecond), configuration: session.configuration,
+          animationSettingsRevision: settings.animationFrameRateRevision)
         if timerHealth.shouldFail {
           session.failForTimerHealth(at: now)
           return

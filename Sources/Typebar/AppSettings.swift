@@ -1375,8 +1375,12 @@ final class AppSettings {
   private(set) var localPracticeFontRevision = 0
   var practiceBackdrop: PracticeBackdropStyle = .solid { didSet { persist() } }
   var reducePracticeMotion = false { didSet { persist() } }
+  /// A repeated native-rate selection also reapplies the animation setting.
+  /// Runtime-only: do not archive this event counter as a user preference.
+  private(set) var animationFrameRateRevision = 0
   var animationFrameRate = AnimationFrameRatePolicy.nativeFrameRate {
     didSet {
+      animationFrameRateRevision &+= 1
       let normalized = AnimationFrameRatePolicy.normalized(animationFrameRate)
       if animationFrameRate != normalized {
         animationFrameRate = normalized

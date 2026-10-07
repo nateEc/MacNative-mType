@@ -2658,19 +2658,33 @@ enum TimerHealthPolicy {
 }
 
 struct TimerHealthState: Equatable {
-  private(set) var usesLowFrameRate = false
+  // A settings write supersedes older overrides, but not drift observed after
+  // that write in the same SwiftUI render pass. No deferred clearing callback.
+  private var lowFrameRateSettingsRevision: Int?
+  var usesLowFrameRate: Bool { lowFrameRateSettingsRevision != nil }
   private(set) var severeDriftCount = 0
   private(set) var shouldFail = false
 
-  mutating func observe(drift: TimeInterval, configuration: TestConfiguration) {
+  func animationFrameRate(requested: Int, settingsRevision: Int = 0) -> Int {
+    lowFrameRateSettingsRevision == settingsRevision ? TimerHealthPolicy.reducedFrameRate : requested
+  }
+
+  mutating func restoreAnimationFrameRate() {
+    lowFrameRateSettingsRevision = nil
+  }
+
+  mutating func observe(drift: TimeInterval, configuration: TestConfiguration,
+    animationSettingsRevision: Int = 0) {
     guard TimerHealthPolicy.monitors(configuration), !shouldFail else { return }
     guard drift.isFinite else {
-      usesLowFrameRate = true
+      lowFrameRateSettingsRevision = animationSettingsRevision
       shouldFail = true
       return
     }
     let lateness = max(0, drift)
-    if lateness > TimerHealthPolicy.lowFrameRateDrift { usesLowFrameRate = true }
+    if lateness > TimerHealthPolicy.lowFrameRateDrift {
+      lowFrameRateSettingsRevision = animationSettingsRevision
+    }
     if lateness > TimerHealthPolicy.severeDrift { severeDriftCount += 1 }
     if lateness > TimerHealthPolicy.fatalDrift
       || severeDriftCount > TimerHealthPolicy.allowedSevereDrifts

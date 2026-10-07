@@ -28,3 +28,14 @@ extension EnvironmentValues {
     set { self[TypebarAnimationFrameRateKey.self] = AnimationFrameRatePolicy.normalized(newValue) }
   }
 }
+
+struct PracticeAnimationFrameRate: ViewModifier {
+  let settings: AppSettings
+  let timerHealth: TimerHealthState
+
+  func body(content: Content) -> some View {
+    content.environment(\.typebarAnimationFrameRate,
+      timerHealth.animationFrameRate(requested: settings.animationFrameRate,
+        settingsRevision: settings.animationFrameRateRevision))
+  }
+}
