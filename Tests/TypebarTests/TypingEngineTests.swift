@@ -15431,22 +15431,22 @@ final class TypingEngineTests: XCTestCase {
 
   func testPracticeLineDisplayPolicyMatchesSupportedModes() {
     XCTAssertTrue(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: true, tapeMode: .off, testMode: .words, hasTimeLimit: false))
+      settingEnabled: true, tapeMode: .off, configuration: .words(25)))
     XCTAssertTrue(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: true, tapeMode: .off, testMode: .quote, hasTimeLimit: false))
+      settingEnabled: true, tapeMode: .off, configuration: .init(mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init())))
     XCTAssertTrue(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: true, tapeMode: .off, testMode: .custom, hasTimeLimit: false))
+      settingEnabled: true, tapeMode: .off, configuration: .init(mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init())))
 
     XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: false, tapeMode: .off, testMode: .words, hasTimeLimit: false))
+      settingEnabled: false, tapeMode: .off, configuration: .words(25)))
     XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: true, tapeMode: .letter, testMode: .words, hasTimeLimit: false))
+      settingEnabled: true, tapeMode: .letter, configuration: .words(25)))
     XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: true, tapeMode: .off, testMode: .time, hasTimeLimit: true))
+      settingEnabled: true, tapeMode: .off, configuration: .timed(seconds: 30)))
+    XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
+      settingEnabled: true, tapeMode: .off, configuration: .init(mode: .custom, duration: 30, wordLimit: nil, difficulty: .normal, rules: .init(), customTextCompletion: .time)))
     XCTAssertTrue(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: true, tapeMode: .off, testMode: .custom, hasTimeLimit: true))
-    XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: true, tapeMode: .off, testMode: .zen, hasTimeLimit: false))
+      settingEnabled: true, tapeMode: .off, configuration: .init(mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init())))
   }
 
   func testKeyboardMirrorTransformsOnlyAsciiPhysicalRowsAndPreservesComposedText() {

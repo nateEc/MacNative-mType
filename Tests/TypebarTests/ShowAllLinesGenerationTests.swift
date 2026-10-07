@@ -99,11 +99,11 @@ final class ShowAllLinesGenerationTests: XCTestCase {
       sourceWordCount: 500, showAllLines: true), 100)
   }
 
-  func testTimedCustomLineDisplayStillSupportsAllGeneratedLines() {
-    XCTAssertTrue(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: true, tapeMode: .off, testMode: .custom, hasTimeLimit: true))
+  func testTimedCustomLineDisplayKeepsItsBoundedScrollingViewport() {
     XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: true, tapeMode: .off, testMode: .time, hasTimeLimit: true))
+      settingEnabled: true, tapeMode: .off, configuration: .init(mode: .custom, duration: 30, wordLimit: nil, difficulty: .normal, rules: .init(), customTextCompletion: .time)))
+    XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
+      settingEnabled: true, tapeMode: .off, configuration: .timed(seconds: 30)))
   }
 
   @MainActor

@@ -3142,8 +3142,7 @@ private struct ContentView: View {
     PracticeLineDisplayPolicy.shouldShowAllLines(
       settingEnabled: settings.showAllPracticeLines,
       tapeMode: settings.practiceTapeMode,
-      testMode: session.configuration.mode,
-      hasTimeLimit: session.configuration.duration != nil)
+      configuration: session.configuration)
   }
 
   private func applyCaret(to character: inout AttributedString) {
