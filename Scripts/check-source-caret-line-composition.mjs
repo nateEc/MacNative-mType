@@ -10,8 +10,9 @@ import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 
 const [argument, option] = process.argv.slice(2);
-assert.ok(argument && (!option || ['--emit-fixtures', '--emit-sparse-fixtures'].includes(option)));
-const frameIntervals = option === '--emit-sparse-fixtures' ? [16, 33, 100] : [1];
+assert.ok(argument && (!option || ['--emit-fixtures', '--emit-sparse-fixtures', '--emit-late-fixtures'].includes(option)));
+const late = option === '--emit-late-fixtures';
+const frameIntervals = option === '--emit-sparse-fixtures' ? [16, 33, 100] : late ? [16] : [1];
 const root = path.resolve(argument);
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -41,8 +42,11 @@ assert.ok(promiseStart >= 0 && promiseEnd > promiseStart);
 const adapter = stripTypeScriptTypes('class Adapter {\n' + dom.slice(promiseStart, promiseEnd) + '\n}', {mode: 'transform'});
 const fixtures = [];
 for (const frameInterval of frameIntervals)
-for (const smooth of [false, true]) for (const motion of ['off', 'slow', 'medium', 'fast'])
-for (const style of ['default', 'block', 'underline']) for (const overlap of [false, true]) {
+for (const delivery of late ? ['separate', 'coalesced'] : ['regular'])
+for (const resumeTime of late ? [80, 175, 245] : [null])
+for (const smooth of late ? [false] : [false, true])
+for (const motion of late ? ['off'] : ['off', 'slow', 'medium', 'fast'])
+for (const style of ['default', 'block', 'underline']) for (const overlap of late ? [false] : [false, true]) {
   let clock = 10_000, active = 1, input = '', frameID = 0, timeoutID = 0;
   const frames = new Map(), timeouts = new Map(), animations = [], writes = [], trace = [];
   const Config = {mode: 'words', smoothCaret: motion, smoothLineScroll: smooth,
@@ -172,6 +176,14 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
   // Geometry is captured before source margin folding, not reconstructed from
   // the rendered result that the native replay is supposed to verify.
   for (const [caret, element] of [[Caret.caret, mainElement], [PaceCaret.caret, paceElement]]) {
+    if (late && element === paceElement) {
+      const goTo = caret.goTo.bind(caret);
+      caret.goTo = options => {
+        trace.push({type: 'request', time: clock - 10_000, word: options.wordIndex,
+          letter: options.letterIndex, duration: options.animationOptions?.duration});
+        return goTo(options);
+      };
+    }
     let target;
     const geometry = caret.getTargetPositionAndWidth.bind(caret);
     caret.getTargetPositionAndWidth = options => { target = geometry(options); return target; };
@@ -247,6 +259,37 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
     activeTop: words[active].getOffsetTop(), main: marker(mainElement, Caret.caret),
     pace: marker(paceElement, PaceCaret.caret), lineTransition: context.lineTransition}; }
   Caret.updatePosition(true); await PaceCaret.init(); PaceCaret.start(); await flush();
+  if (late) {
+    // A blocked loop has neither animation frames nor timer callbacks. Resume
+    // at a fixed clock; explicitly vary RAF delivery between overdue timers.
+    await tickTo(25);
+    clock = 10_000 + resumeTime;
+    trace.push({type: 'sample', ...snapshot(resumeTime)});
+    let callbacks = 0;
+    while ([...timeouts.values()].some(timeout => timeout.at <= clock)) {
+      assert.ok(++callbacks <= 16, 'Bound the controlled catch-up drain');
+      const [id, timeout] = [...timeouts].find(([, timeout]) => timeout.at <= clock);
+      timeouts.delete(id); timeout.callback(); await drain();
+      if (delivery === 'separate') {
+        await flush();
+        trace.push({type: 'sample', ...snapshot(resumeTime)});
+      }
+    }
+    await flush();
+    trace.push({type: 'sample', ...snapshot(resumeTime)});
+    const requests = trace.filter(event => event.type === 'request' && event.time === resumeTime);
+    const steps = Array.from({length: Math.floor(resumeTime / 40)}, (_, index) => index + 2);
+    assert.deepEqual(requests.map(event => event.duration), steps.map(step => step * 40 - resumeTime));
+    assert.deepEqual(requests.map(event => [event.word, event.letter]), steps.map(step => [Math.floor(step / 3), step % 3]));
+    const resolved = trace.filter(event => event.type === 'position' && event.id === 'paceCaret' && event.time === resumeTime);
+    assert.equal(resolved.length, delivery === 'separate' ? steps.length : 1);
+    await tickTo(resumeTime + 35);
+    fixtures.push({frameInterval, delivery, resumeTime, smooth, motion, style, overlap, trace,
+      animations: animations.map(({animation, ...item}) => ({...item, completed: animation.completed}))});
+    Caret.caret.stopAllAnimations(); PaceCaret.caret.stopAllAnimations(); PaceCaret.reset();
+    for (const {animation} of animations) animation.cancel();
+    continue;
+  }
   active = 2; await context.afterTestWordChange('forward'); await flush();
   const samples = [snapshot(0)];
   trace.push({type: 'sample', ...samples[0]});

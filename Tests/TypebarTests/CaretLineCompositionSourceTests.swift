@@ -26,6 +26,7 @@ import XCTest
     let linear: Bool?
     let rendered: Bool?
     let main: Marker?, pace: Marker?
+    let word: Int?, letter: Int?
   }
   private struct Fixture: Decodable {
     let frameInterval: Int
@@ -34,10 +35,30 @@ import XCTest
     let resets: [Write], animations: [Animation]
     let trace: [Trace]
   }
-  private static var cachedFixtures: [Bool: [Fixture]] = [:]
+  private struct LateFixture: Decodable {
+    let delivery: String, resumeTime: Int, style: String
+    let trace: [Trace]
+  }
+  private static var cachedFixtures: [String: [Fixture]] = [:]
+  private static var cachedLateFixtures: [LateFixture]?
 
-  private func evidence(sparse: Bool = false) throws -> [Fixture] {
-    if let fixtures = Self.cachedFixtures[sparse] { return fixtures }
+  private func evidence(_ option: String = "--emit-fixtures") throws -> [Fixture] {
+    if let fixtures = Self.cachedFixtures[option] { return fixtures }
+    let fixtures = try JSONDecoder().decode([Fixture].self, from: sourceData(option))
+    XCTAssertEqual(fixtures.count, option == "--emit-sparse-fixtures" ? 144 : 48)
+    Self.cachedFixtures[option] = fixtures
+    return fixtures
+  }
+
+  private func lateEvidence() throws -> [LateFixture] {
+    if let fixtures = Self.cachedLateFixtures { return fixtures }
+    let fixtures = try JSONDecoder().decode([LateFixture].self, from: sourceData("--emit-late-fixtures"))
+    XCTAssertEqual(fixtures.count, 18)
+    Self.cachedLateFixtures = fixtures
+    return fixtures
+  }
+
+  private func sourceData(_ option: String) throws -> Data {
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_REFERENCE_ROOT"] else {
       throw XCTSkip("Requires pinned reference checkout")
     }
@@ -47,16 +68,13 @@ import XCTest
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = ["node", "--experimental-vm-modules",
       project.appendingPathComponent("Scripts/check-source-caret-line-composition.mjs").path,
-      reference, sparse ? "--emit-sparse-fixtures" : "--emit-fixtures"]
+      reference, option]
     process.standardOutput = output
     try process.run()
     let data = output.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus, 0)
-    let fixtures = try JSONDecoder().decode([Fixture].self, from: data)
-    XCTAssertEqual(fixtures.count, sparse ? 144 : 48)
-    Self.cachedFixtures[sparse] = fixtures
-    return fixtures
+    return data
   }
 
   func testCompleteSourcePositionChannelsUseNativeSpeedChoicesButDifferentEasings() throws {
@@ -112,7 +130,84 @@ import XCTest
   }
 
   func testIndependentSourceRequestsBetweenSparseFramesPreserveRenderedState() throws {
-    for fixture in try evidence(sparse: true) { try replay(fixture) }
+    for fixture in try evidence("--emit-sparse-fixtures") { try replay(fixture) }
+  }
+
+  func testLateSourceTimersCatchUpButRAFDeterminesWhichRequestsResolve() throws {
+    for fixture in try lateEvidence() {
+      let resume = fixture.resumeTime
+      let requests = fixture.trace.filter { $0.type == "request" && $0.time == Double(resume) }
+      let steps = Array(2...(resume / 40 + 1))
+      XCTAssertEqual(requests.count, steps.count)
+      for (request, step) in zip(requests, steps) {
+        XCTAssertEqual(request.word, step / 3)
+        XCTAssertEqual(request.letter, step % 3)
+        XCTAssertEqual(request.duration, Double(step * 40 - resume))
+      }
+      let resolved = fixture.trace.filter { $0.type == "position" && $0.id == "paceCaret" && $0.time == Double(resume) }
+      XCTAssertEqual(resolved.count, fixture.delivery == "separate" ? steps.count : 1)
+      XCTAssertEqual(resolved.last?.duration, requests.last?.duration)
+    }
+  }
+
+  func testNegativeOverdueSourceAnimationsDoNotSnapButZeroDurationCan() throws {
+    for fixture in try lateEvidence() where fixture.delivery == "separate" {
+      let resume = Double(fixture.resumeTime)
+      let samples = fixture.trace.filter { $0.type == "sample" && $0.time == resume }
+      let before = try XCTUnwrap(samples.first?.pace)
+      if resume == 80 {
+        let zeroTarget = try XCTUnwrap(fixture.trace.first {
+          $0.type == "position" && $0.id == "paceCaret" && $0.time == resume && $0.duration == 0
+        })
+        let afterZero = try XCTUnwrap(samples.dropFirst().first?.pace)
+        XCTAssertEqual(afterZero.left, zeroTarget.left)
+        XCTAssertEqual(afterZero.top, zeroTarget.top)
+        XCTAssertNotEqual(afterZero.left, before.left)
+      } else {
+        for sample in samples.dropFirst() {
+          let pace = try XCTUnwrap(sample.pace)
+          XCTAssertEqual(pace.left, before.left)
+          XCTAssertEqual(pace.top, before.top)
+          XCTAssertEqual(pace.width, before.width)
+        }
+      }
+    }
+  }
+
+  func testBoundedProductionProjectionMatchesCoalescedLateFramesWithSharedGeometry() throws {
+    for fixture in try lateEvidence() where fixture.delivery == "coalesced" {
+      var progress = try XCTUnwrap(PaceCaretProgress(wpm: 300,
+        catalog: .init(prompt: String(repeating: "aa ", count: 12))))
+      progress.start(at: 0, blind: false)
+      var channel = PromptCaretChannel()
+      channel.goTo(.init(x: 0, y: 0, width: 2, height: fixture.style == "underline" ? 2 : 33), at: 0, duration: 0)
+      var latestRequest: Trace?
+      for event in fixture.trace {
+        let time = event.time / 1000
+        switch event.type {
+        case "request": latestRequest = event
+        case "position" where event.id == "paceCaret":
+          // The production model independently selects the latest logical
+          // target and remaining deadline. Only resolved geometry is shared;
+          // this is not native TextKit/browser box or arbitrary RAF parity.
+          let frame = try XCTUnwrap(progress.frame(at: time, blind: false))
+          XCTAssertEqual(frame.target.word, latestRequest?.word)
+          XCTAssertEqual(frame.target.letter, latestRequest?.letter)
+          XCTAssertEqual(frame.sequence, Double(try XCTUnwrap(latestRequest?.word) * 3
+            + XCTUnwrap(latestRequest?.letter)))
+          let remaining = (1 - frame.fraction) * frame.stepDuration
+          XCTAssertEqual(remaining, try XCTUnwrap(event.duration) / 1000, accuracy: 1e-9)
+          let rect = CGRect(x: try XCTUnwrap(event.left), y: try XCTUnwrap(event.top),
+            width: try XCTUnwrap(event.width), height: try XCTUnwrap(event.height))
+          channel.goTo(rect, at: time, duration: remaining, curve: .linear)
+        case "frame": if event.rendered == true { channel.sample(at: time) }
+        case "sample":
+          try compare(channel, source: XCTUnwrap(event.pace),
+            label: "coalesced \(fixture.resumeTime)ms/\(fixture.style) @\(event.time)")
+        default: break
+        }
+      }
+    }
   }
 
   private func replay(_ fixture: Fixture) throws {
