@@ -1085,6 +1085,7 @@ private struct ContentView: View {
   @State private var lastTimeWarningSecond: Int?
   @State private var lastClockTickSecond = 0
   @State private var timerHealth = TimerHealthState()
+  @State private var promptInputWrapLayout = PromptInputWrapLayout()
   @State private var restartLockMessage: String?
   @State private var modeCompatibilityMessage: String?
   @State private var funboxConfigurationMessage: String?
@@ -2851,6 +2852,11 @@ private struct ContentView: View {
               fontSize: settings.fontSize, customColumns: settings.customPracticeLineColumns),
             alignment: isRightToLeft ? .trailing : .leading)
           .overlay {
+            PromptInputWrapOverlay(layout: promptInputWrapLayout)
+              .allowsHitTesting(false)
+              .accessibilityHidden(true)
+          }
+          .overlay {
             if !showsAllPracticeLines {
               PromptAutoScrollOverlay(
                 text: rendering.text,
@@ -3035,10 +3041,14 @@ private struct ContentView: View {
   }
 
   private var renderedPrompt: PromptRendering {
+    renderedPrompt(for: session)
+  }
+
+  private func renderedPrompt(for session: TypingSession) -> PromptRendering {
     let completedCharacterIndices = session.completedPromptCharacterIndices
     let promptHighlightMode = effectivePromptHighlightMode
     let glyphs = session.promptGlyphs
-    let caretIndex = currentPromptGlyphIndex
+    let caretIndex = session.promptCaretGlyphIndex
     let targetGlyphCount = session.prompt.count
     let words = session.promptWordPresentations
     let indices = PromptGlyphLayout.indices(
@@ -3328,7 +3338,8 @@ private struct ContentView: View {
     let typedCountBefore = session.typed.count
     let feedback = TypingLiveInputFeedback.insertBatch(
       effectiveInsertedText(text), into: &session,
-      forceError: forceError, origin: origin, defersAutomaticInput: true)
+      forceError: forceError, origin: origin, defersAutomaticInput: true,
+      wrapAdmission: promptInputWrapAdmission)
     verifyChallengeFontAvailability()
     emitTypingPowerEffect(
       isCorrect: session.errors == errorsBefore,
@@ -3352,7 +3363,8 @@ private struct ContentView: View {
       synchronizeLiveInputRules()
       let errorsBefore = session.errors
       let countBefore = session.typed.count
-      let feedback = session.processNextAutomaticInput(for: attemptID, executedAt: .now)
+      let feedback = session.processNextAutomaticInput(for: attemptID, executedAt: .now,
+        wrapAdmission: promptInputWrapAdmission)
       verifyChallengeFontAvailability()
       emitTypingPowerEffect(isCorrect: feedback.last == true,
         acceptedCharacters: session.typed.count - countBefore)
@@ -3370,6 +3382,18 @@ private struct ContentView: View {
     synchronizeLiveInputRules()
     let feedback = TypingLiveInputFeedback.delete(from: &session, wholeWord: deletesWord)
     for correct in feedback { playInputFeedback(inputWasCorrect: correct) }
+  }
+
+  private var promptInputWrapAdmission: TypingInputWrapAdmission? {
+    guard !usesTapePractice, !practiceVisualEffect.usesASL, !practiceVisualEffect.usesChoo,
+      let width = promptInputWrapLayout.width else { return nil }
+    let font = practicePromptNSFont(size: settings.fontSize)
+    return .init(slowTimer: timerHealth.usesSlowTimer) { current, candidate in
+      PromptInputWrapGeometry.rejects(session: current, candidate: candidate,
+        rendering: renderedPrompt(for: current), width: width, font: font,
+        lineSpacing: current.configuration.usesJoiningScriptPrompt ? 8 : 12,
+        isRightToLeft: current.configuration.usesRightToLeftPrompt)
+    }
   }
 
   private func playInputFeedback(inputWasCorrect: Bool?) {

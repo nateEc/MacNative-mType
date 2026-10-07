@@ -4401,6 +4401,7 @@ enum PromptHighlightPolicy {
 }
 
 struct TypingSession {
+  private var inputWrapAdmission: TypingInputWrapAdmission?
   private(set) var firstRetainedPromptWordIndex = 0
 
   mutating func retirePromptWords(_ retirement: PromptWordRetirement) {
@@ -5808,7 +5809,11 @@ struct TypingSession {
     )
   }
 
-  mutating func insert(_ text: String, forceError: Bool = false, at date: Date = .now) {
+  mutating func insert(_ text: String, forceError: Bool = false, at date: Date = .now,
+    wrapAdmission: TypingInputWrapAdmission? = nil) {
+    let previousAdmission = inputWrapAdmission
+    inputWrapAdmission = wrapAdmission ?? previousAdmission
+    defer { inputWrapAdmission = previousAdmission }
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }
     liveInsertionFeedback.removeAll()
@@ -5824,8 +5829,12 @@ struct TypingSession {
   /// spelling replacements; it is deliberately separate from persisted replay.
   @discardableResult mutating func insertBatch(
     _ text: String, forceError: Bool = false, at date: Date = .now,
-    origin: TypingInputOrigin = .physicalKeyboard, defersAutomaticInput: Bool = false
+    origin: TypingInputOrigin = .physicalKeyboard, defersAutomaticInput: Bool = false,
+    wrapAdmission: TypingInputWrapAdmission? = nil
   ) -> [Bool] {
+    let previousAdmission = inputWrapAdmission
+    inputWrapAdmission = wrapAdmission ?? previousAdmission
+    defer { inputWrapAdmission = previousAdmission }
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }
     liveInsertionFeedback.removeAll()
@@ -5847,7 +5856,11 @@ struct TypingSession {
   /// current rules and field. A schedule-time match is not an execution guard.
   /// Live callers supply the execution clock for terminal results; nil keeps
   /// pure-engine simulations deterministic without changing replay timestamps.
-  mutating func processNextAutomaticInput(for attemptID: UUID, executedAt: Date? = nil) -> [Bool] {
+  mutating func processNextAutomaticInput(for attemptID: UUID, executedAt: Date? = nil,
+    wrapAdmission: TypingInputWrapAdmission? = nil) -> [Bool] {
+    let previousAdmission = inputWrapAdmission
+    inputWrapAdmission = wrapAdmission ?? previousAdmission
+    defer { inputWrapAdmission = previousAdmission }
     guard attemptID == automaticInputAttemptID else { return [] }
     guard !isFinished else { cancelAutomaticInput(); return [] }
     guard hasPendingAutomaticInput else { return [] }
@@ -6360,6 +6373,7 @@ struct TypingSession {
     {
       return false
     }
+    if rejectsInputWrapping(inputCharacter, at: currentTargetIndex) { return false }
     if retainsStoppedSeparator {
       beginIfNeeded(at: date)
       let units = inputAccuracyUnits(for: inputCharacter,
@@ -7257,6 +7271,45 @@ struct TypingSession {
   private var activeInputWordUTF16Length: Int {
     if let acceptedUnits { return acceptedUnits.activeCount }
     return inputWordText().utf16.count
+  }
+
+  /// The source display owns Return as a target letter even when the native
+  /// renderer keeps its structural marker beside a mistyped extra. Count
+  /// field letters, not the renderer's additional control glyph or hints.
+  var promptInputWrapLetterUnitCount: Int {
+    let target = inputAccuracyTarget(at: nextTargetIndex).units
+    let displayLength = target.count - (target.last == 32 ? 1 : 0)
+    let previewLength = stoppedPromptInput.map {
+      $0.targetIndex == nil ? String($0.character).utf16.count : 0
+    } ?? 0
+    return max(displayLength, activeInputWordUTF16Length) + previewLength
+  }
+
+  /// Admission precedes attempts, stopped-input presentation, and replay.
+  /// Commit classification intentionally ignores forced-shift correctness,
+  /// just as the reference's before-input validation does.
+  private func rejectsInputWrapping(_ character: Character, at targetIndex: Int) -> Bool {
+    guard let admission = inputWrapAdmission, !admission.slowTimer,
+      configuration.mode != .zen, !configuration.rules.blindMode,
+      !configuration.rules.hideExtraLetters,
+      !configuration.rules.deleteOnErrorMode.returnsToPreviousWordAtStart
+    else { return false }
+    let comparison = inputAccuracyTarget(at: targetIndex)
+    let target = comparison.units
+    let displayLength = target.count - (target.last == 32 ? 1 : 0)
+    guard comparison.position >= displayLength else { return false }
+    let input = acceptedUnits.map { $0.field($0.fieldIndex) } ?? Array(inputWordText().utf16)
+    let data = currentInputUnit.map { [$0] } ?? Array(String(character).utf16)
+    let candidate = input + data
+    let separator = isPromptWordSeparator(character)
+    let commit = separator || unitTargets.noSpace && candidate.count == target.count
+    let leadingBlocked = input.isEmpty && separator
+      && (configuration.rules.strictSpace || configuration.difficulty != .normal)
+    let needsCorrect = configuration.rules.stopOnErrorMode != .off
+      || configuration.rules.deleteOnErrorMode.isEnabled
+    let goesToNextWord = commit && !leadingBlocked && (!needsCorrect || candidate == target)
+    guard !goesToNextWord else { return false }
+    return admission.rejects(self, candidate)
   }
 
   /// Inspect only the current field, even after an older stopped separator

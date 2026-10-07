@@ -26,6 +26,8 @@
 
 ## 仍开放的输入与时序范围
 
+后续 [额外输入换行保护](INPUT_WRAP_ADMISSION_CONTRACT.md) 已接通普通 Text 的逐字符准入与 Slow Timer 绕过。下段“尚未接通”保留为本阶段历史证据；特殊布局、浏览器事件／几何等价及同词重排仍开放，不因此关闭完整词更新缺口。
+
 `input/handlers/before-insert-text.ts` 还有普通状态下阻止额外字母使整词或词内字母换行的布局检查，Slow Timer 时跳过；原生尚未接通该完整检查。`test-ui.ts` 的 `updateWordLetters` 在 Zen／Slow Timer 下处理同一活动词重排，含 `lineTransition` 与 `wordTopBeforeLineJump` 顺序，仍未全量对齐。此次独立标志与效果抑制不关闭这些词更新缺口，也不以光标可达性替代原规则。
 
 原版 RAF 回调在排队后才遇到慢计时、已有粒子寿命、完整结束调度、重叠换行队列、混合字体、特殊渲染、实体键盘／IME／VoiceOver 和显示器仍待对照。会话内决策与风险复核检查独立状态、结果捕获早于健康重置、两种结果页接线、适用结束路径和持久数据边界，不是独立审计。两个人工场景保持待验收，不缩减完整目标。
