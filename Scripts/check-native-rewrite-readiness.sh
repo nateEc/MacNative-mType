@@ -226,6 +226,9 @@ run_logged_check "executing pinned filtered account all/recent-ten/daily statist
 run_logged_check "executing pinned account filter preset lifecycle and names" \
   "$temporary_directory/account-filter-presets-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-filter-presets.mjs" "$reference_root"
+run_logged_check "executing pinned account history chart numeric functions" \
+  "$temporary_directory/account-history-graphs-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-history-graphs.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

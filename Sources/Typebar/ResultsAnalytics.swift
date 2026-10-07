@@ -410,18 +410,11 @@ struct HistoryChartVisibility: Codable, Equatable {
   var average10 = true
   var average100 = true
 
-  /// Applies a user-visible chart toggle while retaining at least one primary
-  /// trace. Moving-average traces remain independent presentation choices.
+  /// The reference permits both primary traces to be off. Average preferences
+  /// survive that state so re-enabling a primary trace restores its overlays.
   func applying(_ update: (inout HistoryChartVisibility) -> Void) -> HistoryChartVisibility {
     var updated = self
     update(&updated)
-    if !updated.speed && !updated.accuracy {
-      if updated.speed == speed {
-        updated.speed = true
-      } else {
-        updated.accuracy = true
-      }
-    }
     return updated
   }
 }

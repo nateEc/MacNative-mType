@@ -14,6 +14,8 @@ struct AccountHistoryView: View {
   @State private var sortDirection = ResultHistorySortDirection.descending
   @State private var visibleLimit = ResultHistoryPagePolicy.pageSize
   @State private var selectedDay: Date?
+  @State private var selectedGraphResult: UUID?
+  @State private var selectedGraphScope: ResultPublicationScope?
   @State private var message: String?
   @State private var presetName = ""
   @State private var deletingPreset: PresetDeletion?
@@ -33,7 +35,10 @@ struct AccountHistoryView: View {
     let all = AccountHistoryStatistics(rows)
     let recent = AccountHistoryStatistics(AccountHistoryQuery.latestTen(rows))
     let days = AccountHistoryQuery.days(rows)
+    let graph = AccountHistoryGraphs(rows)
+    let scope = account.resultPublicationScope
     NavigationStack {
+      ScrollViewReader { scroll in
       ScrollView {
         VStack(alignment: .leading, spacing: 20) {
           scopeNotice
@@ -54,6 +59,16 @@ struct AccountHistoryView: View {
             .map { "\($0.category)：\($0.value)" }.joined(separator: " · "))
             .font(.caption).foregroundStyle(.secondary)
           statistics(all: all, recent: recent)
+          if !rows.isEmpty {
+            AccountHistoryGraphView(graph: graph, settings: settings,
+              selectedID: selectedGraphScope == scope ? selectedGraphResult : nil) { id in
+              guard account.resultPublicationScope == scope else { return }
+              selectedGraphResult = id; selectedGraphScope = scope
+              if let id, let limit = AccountHistoryGraphs.visibleLimit(for: id, in: sorted, current: visibleLimit) {
+                visibleLimit = limit
+              }
+            }.id(scope)
+          }
           if !days.isEmpty { activity(days) }
           HStack {
             Text("成绩 · 已显示 \(min(visibleLimit, rows.count)) / \(rows.count)").font(.headline)
@@ -70,7 +85,11 @@ struct AccountHistoryView: View {
               description: Text("刷新服务端历史或调整筛选；未知配置不会被当成默认值。"))
           } else {
             LazyVStack(alignment: .leading, spacing: 12) {
-              ForEach(sorted.prefix(visibleLimit)) { row in resultRow(row) }
+              ForEach(sorted.prefix(visibleLimit)) { row in
+                resultRow(row).id(row.id)
+                  .overlay(RoundedRectangle(cornerRadius: 6).stroke(
+                    selectedGraphResult == row.id && selectedGraphScope == scope ? Color.accentColor : .clear, lineWidth: 2))
+              }
             }
             if visibleLimit < rows.count {
               Button("再显示 \(min(ResultHistoryPagePolicy.pageSize, rows.count - visibleLimit)) 条") {
@@ -81,6 +100,14 @@ struct AccountHistoryView: View {
           if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
           if let status = account.statusMessage { Text(status).font(.caption).foregroundStyle(.secondary) }
         }.padding(24)
+      }
+      .task(id: selectedGraphResult) {
+        let id = selectedGraphResult, selectionScope = selectedGraphScope
+        await Task.yield()
+        guard !Task.isCancelled, let id, selectedGraphResult == id,
+          selectionScope == account.resultPublicationScope, matched.contains(where: { $0.id == id }) else { return }
+        withAnimation { scroll.scrollTo(id, anchor: .center) }
+      }
       }
       .navigationTitle("账户历史")
       .toolbar {
@@ -107,6 +134,9 @@ struct AccountHistoryView: View {
         filter.accountTagFilter?.reconcile(scope: scope, knownIDs: Set(account.accountTags.map(\.id)))
       }
       resetPage()
+    }
+    .onChange(of: rows.map(\.id)) {
+      if let selectedGraphResult, !rows.contains(where: { $0.id == selectedGraphResult }) { resetPage() }
     }
     .confirmationDialog("删除账户筛选预设？", isPresented: Binding(get: { deletingPreset != nil },
       set: { if !$0 { deletingPreset = nil } }), presenting: deletingPreset) { draft in
@@ -193,7 +223,7 @@ struct AccountHistoryView: View {
         metricRow("一致性 %", all.maximumConsistency, all.averageConsistency, recent.averageConsistency)
       }.monospacedDigit()
       Text("完成 \(all.completed) · 开始 \(all.started.map(String.init) ?? "未知") · 重启 \(all.restarted.map(String.init) ?? "未知") · 完成率 \(all.completionPercentage.map { "\($0)%" } ?? "未知")")
-      Text("每条重启 \(number(all.restartsPerCompleted)) · 练习秒数 \(number(all.timeTyping)) · 估计词数 \(number(all.estimatedWords))")
+      Text("每条重启 \(AccountHistoryNumberPresentation.restartRatio(all.restartsPerCompleted)) · 练习秒数 \(number(all.timeTyping)) · 估计词数 \(number(all.estimatedWords))")
       Text("估计词数逐条四舍五入后求和；练习秒数为终次测试时长加已记录的未完成练习秒数，不在此再次扣除 AFK。最近十条按完成时间选取。")
         .font(.caption).foregroundStyle(.secondary)
     }
@@ -233,7 +263,7 @@ struct AccountHistoryView: View {
       if let selectedDay, let point = days.min(by: {
         abs($0.day.timeIntervalSince(selectedDay)) < abs($1.day.timeIntervalSince(selectedDay))
       }) {
-        Text("\(point.day.formatted(date: .abbreviated, time: .omitted)) · 完成 \(point.statistics.completed) · 练习 \(number(point.statistics.timeTyping)) 秒 · 最高 \(number(point.statistics.maximumWpm, speed: true)) · 平均 \(number(point.statistics.averageWpm, speed: true)) \(settings.typingSpeedUnit.displayName) · 准确率 \(number(point.statistics.averageAccuracy))% · 一致性 \(number(point.statistics.averageConsistency))% · 每条重启 \(number(point.statistics.restartsPerCompleted))")
+        Text("\(point.day.formatted(date: .abbreviated, time: .omitted)) · 完成 \(point.statistics.completed) · 练习 \(number(point.statistics.timeTyping)) 秒 · 最高 \(number(point.statistics.maximumWpm, speed: true, forceDecimals: true)) · 平均 \(number(point.statistics.averageWpm, speed: true, forceDecimals: true)) \(settings.typingSpeedUnit.displayName) · 准确率 \(number(point.statistics.averageAccuracy, forceDecimals: true))% · 一致性 \(number(point.statistics.averageConsistency, forceDecimals: true))% · 每条重启 \(number(point.statistics.restartsPerCompleted, forceDecimals: true))")
           .font(.caption).monospacedDigit()
       }
     }
@@ -242,8 +272,8 @@ struct AccountHistoryView: View {
   private func resultRow(_ row: RemoteAccountResult) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack {
-        Text("\(number(row.effectiveWpm, speed: true)) \(settings.typingSpeedUnit.displayName)").font(.headline)
-        Text("Raw \(number(row.effectiveRawWpm, speed: true)) · 准确率 \(number(row.preciseAccuracy ?? Double(row.accuracy)))% · 一致性 \(number(row.consistency))%")
+        Text("\(number(row.effectiveWpm, speed: true, forceDecimals: true)) \(settings.typingSpeedUnit.displayName)").font(.headline)
+        Text("Raw \(number(row.effectiveRawWpm, speed: true, forceDecimals: true)) · 准确率 \(number(row.preciseAccuracy ?? Double(row.accuracy), forceDecimals: true))% · 一致性 \(number(row.consistency, forceDecimals: true))%")
           .font(.caption).monospacedDigit()
         Spacer()
         Text(row.finishedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption)
@@ -261,13 +291,15 @@ struct AccountHistoryView: View {
     }.padding(10).background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
   }
 
-  private func number(_ value: Double?, speed: Bool = false) -> String {
-    guard let value else { return "未知" }
-    return (speed ? settings.typingSpeedUnit.converted(wpm: value) : value)
-      .formatted(.number.precision(.fractionLength(0...2)))
+  private func number(_ value: Double?, speed: Bool = false, forceDecimals: Bool = false) -> String {
+    AccountHistoryNumberPresentation.text(value, unit: speed ? settings.typingSpeedUnit : nil,
+      decimals: settings.alwaysShowDecimalPlaces, forceDecimals: forceDecimals)
   }
 
-  private func resetPage() { visibleLimit = ResultHistoryPagePolicy.pageSize; selectedDay = nil }
+  private func resetPage() {
+    visibleLimit = ResultHistoryPagePolicy.pageSize; selectedDay = nil
+    selectedGraphResult = nil; selectedGraphScope = nil
+  }
 
   private func useCurrentSettings() {
     guard let currentConfiguration, let scope = account.resultPublicationScope, account.hasAccountTagDirectory else { return }
@@ -344,7 +376,7 @@ private struct AccountHistoryFilterEditor: View {
           })).toggleStyle(.checkbox)
         }
       }
-      Text("历史 PB 筛选尚不可用；不会用当前 PB 或本机 PB 冒充原版 isPb。")
+      Text("历史 PB 只使用接受当时的标记，未知旧记录不会冒充默认值。")
         .font(.caption).foregroundStyle(.secondary)
     }.padding(.vertical, 8)
   }
