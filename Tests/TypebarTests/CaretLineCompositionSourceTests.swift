@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import XCTest
 @testable import Typebar
 
@@ -19,10 +19,19 @@ import XCTest
   private struct Write: Decodable {
     let time: Int, id: String, top: String?
   }
+  private struct Trace: Decodable {
+    let type: String, time: Double
+    let id: String?
+    let left: Double?, top: Double?, width: Double?, height: Double?, duration: Double?, margin: Double?
+    let linear: Bool?
+    let rendered: Bool?
+    let main: Marker?, pace: Marker?
+  }
   private struct Fixture: Decodable {
     let smooth: Bool, motion: SmoothCaretMotion, style: String, overlap: Bool
     let samples: [Sample], beforeRefresh: Sample, afterRefresh: Sample, settled: Sample
     let resets: [Write], animations: [Animation]
+    let trace: [Trace]
   }
   private static var cachedFixtures: [Fixture]?
 
@@ -95,6 +104,59 @@ import XCTest
       XCTAssertEqual(caret.margin, source.main.margin, accuracy: 1e-8)
       XCTAssertEqual(try XCTUnwrap(caret.visibleRect).minY, source.main.visibleTop, accuracy: 1e-8)
     }
+  }
+
+  func testNativeChannelsReplayEveryRecordedSourceFrameAndResolvedRequest() throws {
+    for fixture in try evidence() {
+      var main = PromptCaretChannel(), pace = PromptCaretChannel()
+      let height: CGFloat = fixture.style == "underline" ? 2 : 33
+      let initial = CGRect(x: 0, y: 0, width: 2, height: height)
+      main.goTo(initial, at: 0, duration: 0); pace.goTo(initial, at: 0, duration: 0)
+      var samples = 0
+      for event in fixture.trace {
+        let time = event.time / 1000
+        switch event.type {
+        case "frame":
+          if event.rendered == true { main.sample(at: time); pace.sample(at: time) }
+        case "position":
+          let target = CGRect(x: try XCTUnwrap(event.left), y: try XCTUnwrap(event.top),
+            width: try XCTUnwrap(event.width), height: try XCTUnwrap(event.height))
+          let duration = try XCTUnwrap(event.duration) / 1000
+          if event.id == "caret" { main.goTo(target, at: time, duration: duration) }
+          else { pace.goTo(target, at: time, duration: duration, curve: event.linear == true ? .linear : .position) }
+        case "margin":
+          if event.id == "caret" {
+            main.lineJump(to: try XCTUnwrap(event.margin), at: time,
+              duration: try XCTUnwrap(event.duration) / 1000, isPace: false)
+          } else {
+            pace.lineJump(to: try XCTUnwrap(event.margin), at: time,
+              duration: try XCTUnwrap(event.duration) / 1000, isPace: true)
+          }
+        case "sample":
+          samples += 1
+          let label = "\(fixture.smooth)/\(fixture.motion)/\(fixture.style)/\(fixture.overlap) @\(event.time)"
+          try compare(main, source: XCTUnwrap(event.main), label: "main \(label)")
+          try compare(pace, source: XCTUnwrap(event.pace), label: "pace \(label)")
+        default: XCTFail("Unknown source event \(event.type)")
+        }
+      }
+      XCTAssertEqual(samples, fixture.overlap ? 403 : 402)
+    }
+  }
+
+  private func compare(_ native: PromptCaretChannel, source: Marker, label: String) throws {
+    let rect = try XCTUnwrap(native.position)
+    // Stop at the first differing coordinate in a replay, retaining a bounded
+    // diagnostic instead of flooding thousands of derivative assertions.
+    let values: [(String, Double, Double)] = [("left", rect.minX, source.left),
+      ("top", rect.minY, source.top), ("width", rect.width, source.width),
+      ("margin", native.margin, source.margin),
+      ("visibleTop", try XCTUnwrap(native.visibleRect).minY, source.visibleTop)]
+    for (name, actual, expected) in values where abs(actual - expected) > 1e-6 {
+      XCTFail("\(label) \(name): native \(actual), source \(expected)")
+      throw NSError(domain: "CaretTraceMismatch", code: 1)
+    }
+    XCTAssertEqual(native.marginReady, source.ready, label)
   }
 
   func testImmediateLineJumpSkipsMainMarginButRetainsPaceMarginUntilItsOwnGoTo() throws {

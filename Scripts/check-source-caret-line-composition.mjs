@@ -42,7 +42,7 @@ const fixtures = [];
 for (const smooth of [false, true]) for (const motion of ['off', 'slow', 'medium', 'fast'])
 for (const style of ['default', 'block', 'underline']) for (const overlap of [false, true]) {
   let clock = 10_000, active = 1, input = '', frameID = 0, timeoutID = 0;
-  const frames = new Map(), timeouts = new Map(), animations = [], writes = [];
+  const frames = new Map(), timeouts = new Map(), animations = [], writes = [], trace = [];
   const Config = {mode: 'words', smoothCaret: motion, smoothLineScroll: smooth,
     caretStyle: style, paceCaretStyle: style, paceCaret: 'custom', paceCaretCustomSpeed: 300,
     tapeMode: 'off', tapeMargin: 50, blindMode: false, hideExtraLetters: false,
@@ -62,6 +62,13 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
   anime.namespace.engine.useDefaultMainLoop = false;
   anime.namespace.engine.fps = 1000;
   anime.namespace.engine.defaults.frameRate = 1000;
+  let inEngineUpdate = false, engineRendered = false;
+  const requestTick = anime.namespace.engine.requestTick.bind(anime.namespace.engine);
+  anime.namespace.engine.requestTick = time => {
+    const result = requestTick(time);
+    if (inEngineUpdate) engineRendered = !!result;
+    return result;
+  };
   class Element {
     constructor(id) {
       this.native = {id, left: 0, top: 0, marginTop: 0, marginLeft: 0, width: 2, isConnected: true};
@@ -159,6 +166,33 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
     const module = moduleFor(id); await module.link(resolve); await module.evaluate();
   }
   const Caret = modules.get('test/caret').namespace, PaceCaret = modules.get('test/pace-caret').namespace;
+  // Observe complete source entry points without substituting their behavior.
+  // Geometry is captured before source margin folding, not reconstructed from
+  // the rendered result that the native replay is supposed to verify.
+  for (const [caret, element] of [[Caret.caret, mainElement], [PaceCaret.caret, paceElement]]) {
+    let target;
+    const geometry = caret.getTargetPositionAndWidth.bind(caret);
+    caret.getTargetPositionAndWidth = options => { target = geometry(options); return target; };
+    for (const method of ['setPosition', 'animatePosition']) {
+      const original = caret[method].bind(caret);
+      caret[method] = options => {
+        assert.ok(target, 'Position must follow actual source geometry');
+        trace.push({type: 'position', id: element.native.id, time: clock - 10_000,
+          left: target.left, top: target.top,
+          width: caret.isFullWidth() ? target.width : element.native.width,
+          height: element.getOffsetHeight(),
+          duration: method === 'setPosition' ? 0 : options.duration ?? {off: 0, slow: 150, medium: 100, fast: 85}[motion],
+          linear: options.easing === 'linear'});
+        return original(options);
+      };
+    }
+    const lineJump = caret.handleLineJump.bind(caret);
+    caret.handleLineJump = options => {
+      trace.push({type: 'margin', id: element.native.id, time: clock - 10_000,
+        margin: options.newMarginTop, duration: options.duration});
+      return lineJump(options);
+    };
+  }
   const TestWords = modules.get('test/test-words').namespace;
   for (let i = 0; i < words.length; i++) TestWords.words.push('aa ', 0);
   Object.assign(context, {Config, Caret, PaceCaret, currentTestLine: 1,
@@ -184,13 +218,19 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
   }
   async function tickTo(time) {
     while (clock < 10_000 + time) {
-      clock++; anime.namespace.engine.update(); await drain();
+      clock++;
+      inEngineUpdate = true; engineRendered = false;
+      anime.namespace.engine.update();
+      inEngineUpdate = false;
+      trace.push({type: 'frame', time: clock - 10_000, rendered: engineRendered});
+      await drain();
       for (const [id, timeout] of [...timeouts]) if (timeout.at <= clock) {
         timeouts.delete(id); timeout.callback(); await drain();
       }
       // Controlled 1ms RAF cadence. Real debounce cancellation/key ownership,
       // not a browser display-rate or arbitrary callback-order claim.
       await flush();
+      trace.push({type: 'sample', ...snapshot(clock - 10_000)});
     }
   }
   function marker(element, caret) {
@@ -207,6 +247,7 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
   Caret.updatePosition(true); await PaceCaret.init(); PaceCaret.start(); await flush();
   active = 2; await context.afterTestWordChange('forward'); await flush();
   const samples = [snapshot(0)];
+  trace.push({type: 'sample', ...samples[0]});
   if (!smooth) {
     assert.equal(samples[0].main.margin, 0);
     assert.equal(samples[0].main.ready, false);
@@ -215,12 +256,16 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
   }
   for (const time of [10, 25, 40, 50, 75, 100, 112, 113, 125, 150, 153, 175, 199]) {
     await tickTo(time);
-    if (time === 40 && overlap) { active = 3; await context.afterTestWordChange('forward'); await flush(); }
+    if (time === 40 && overlap) {
+      active = 3; await context.afterTestWordChange('forward'); await flush();
+      trace.push({type: 'sample', ...snapshot(time)});
+    }
     samples.push(snapshot(time));
   }
   const beforeRefresh = snapshot(199);
   input = 'a'; Caret.updatePosition(); await flush();
   const afterRefresh = snapshot(199);
+  trace.push({type: 'sample', ...afterRefresh});
   await tickTo(400);
   const settled = snapshot(400);
   assert.equal(settled.first, overlap ? 2 : 1);
@@ -265,7 +310,8 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
     const target = (smooth ? 90 : 45) + (style === 'underline' ? 33 : 0);
     assert.ok(Math.abs(sample.main.top - (start + (target - start) * curve)) < 1e-6);
   }
-  fixtures.push({smooth, motion, style, overlap, samples, beforeRefresh, afterRefresh, settled,
+  assert.equal(trace.filter(item => item.type === 'sample').length, overlap ? 403 : 402);
+  fixtures.push({smooth, motion, style, overlap, samples, beforeRefresh, afterRefresh, settled, trace,
     resets: writes.filter(item => item.marginTop === '0px'),
     animations: animations.map(({animation, ...item}) => ({...item, completed: animation.completed}))});
   Caret.caret.stopAllAnimations(); PaceCaret.caret.stopAllAnimations(); PaceCaret.reset();

@@ -87,4 +87,42 @@ final class PromptCaretMotionTests: XCTestCase {
     XCTAssertEqual(caret.visibleRect, frozen)
     XCTAssertFalse(caret.marginReady)
   }
+
+  func testOverlappedMarginCompletesAtItsAbsoluteDeadlineWithoutAnExtraFrame() {
+    for isPace in [false, true] {
+      var caret = PromptCaretChannel()
+      caret.goTo(rect(135), at: 0, duration: 0)
+      caret.lineJump(to: -45, at: 0, duration: 0.125, isPace: isPace)
+      caret.sample(at: 0.04)
+      caret.lineJump(to: -90, at: 0.04, duration: 0.125, isPace: isPace)
+      caret.sample(at: 0.153 - 0.000001)
+      XCTAssertFalse(caret.marginReady, "A real frame before the deadline must not finish early")
+      caret.sample(at: 0.153)
+      XCTAssertTrue(caret.marginReady, "Floating subtraction must not postpone completion one frame")
+      XCTAssertEqual(caret.margin, -90)
+      caret.lineJump(to: -45, at: 0.153, duration: 0.125, isPace: isPace)
+      XCTAssertEqual(caret.margin, 0, "A jump on the completion frame resets the ready margin")
+    }
+  }
+
+  func testAbsoluteCompletionAcrossSpeedsAndLargeMonotonicClockOrigins() {
+    for origin in [0.0, 0.04, 1_000_000.0] {
+      for duration in [0.085, 0.1, 0.125, 0.15] {
+        for curve: PromptCaretChannel.Curve in [.position, .linear] {
+          var caret = PromptCaretChannel()
+          caret.goTo(rect(45), at: origin, duration: 0)
+          caret.goTo(rect(90, x: 12), at: origin, duration: duration, curve: curve)
+          caret.lineJump(to: -45, at: origin, duration: duration, isPace: false)
+          let deadline = origin + (duration - PromptLineScrollMotion.autoplayLead)
+          caret.sample(at: deadline - 0.000001)
+          XCTAssertFalse(caret.marginReady)
+          XCTAssertNotEqual(caret.position, rect(90, x: 12))
+          caret.sample(at: deadline)
+          XCTAssertTrue(caret.marginReady)
+          XCTAssertEqual(caret.margin, -45)
+          XCTAssertEqual(caret.position, rect(90, x: 12))
+        }
+      }
+    }
+  }
 }

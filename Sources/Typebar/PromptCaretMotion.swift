@@ -18,8 +18,12 @@ struct PromptCaretChannel {
     let curve: Curve
     func fraction(at time: TimeInterval) -> Double {
       // A request does not advance itself until the next presentation tick.
-      time <= started ? 0 : min(1, max(0,
-        (time - started + PromptLineScrollMotion.autoplayLead) / duration))
+      if time <= started { return 0 }
+      // Test the absolute endpoint before subtracting elapsed time. Otherwise
+      // an exact 153ms overlap deadline can become 0.9999999999999999 and
+      // postpone the ready flag (and a consecutive jump's reset) one frame.
+      if time >= started + (duration - PromptLineScrollMotion.autoplayLead) { return 1 }
+      return min(1, max(0, (time - started + PromptLineScrollMotion.autoplayLead) / duration))
     }
     func value(at time: TimeInterval) -> CGRect {
       let t = curve.value(fraction(at: time))
