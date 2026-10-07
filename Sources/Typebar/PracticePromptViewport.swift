@@ -28,6 +28,10 @@ struct PracticePromptViewport<Content: View>: View {
           }
         }
       }
+      // Keep a final active row movable even when fewer than three rows remain.
+      .padding(.bottom, measuresTextRows
+        ? measuredHeight ?? PromptViewportLayout.fallbackHeight(font: font, lineSpacing: lineSpacing, lineCount: lineCount)
+        : 0)
     }
     .frame(height: measuresTextRows
       ? measuredHeight ?? PromptViewportLayout.fallbackHeight(font: font, lineSpacing: lineSpacing, lineCount: lineCount)

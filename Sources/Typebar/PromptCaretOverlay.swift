@@ -186,15 +186,27 @@ struct PromptAutoScrollOverlay: NSViewRepresentable {
   let font: NSFont
   let lineSpacing: CGFloat
   let isRightToLeft: Bool
+  var lineScroll: PromptLineScrollContext? = nil
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarAnimationFrameRate) private var lineScrollFrameRate
 
   func makeNSView(context: Context) -> PromptAutoScrollView {
     PromptAutoScrollView()
   }
 
   func updateNSView(_ nsView: PromptAutoScrollView, context: Context) {
+    let lineScroll = lineScroll.map {
+      PromptLineScrollContext(attemptID: $0.attemptID, activeWordID: $0.activeWordID,
+        characterOffsets: $0.characterOffsets, smoothScroll: $0.smoothScroll,
+        reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: lineScrollFrameRate)
+    }
     nsView.update(
       text: text, characterOffset: characterOffset, font: font,
-      lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
+      lineSpacing: lineSpacing, isRightToLeft: isRightToLeft, lineScroll: lineScroll)
+  }
+
+  static func dismantleNSView(_ nsView: PromptAutoScrollView, coordinator: ()) {
+    nsView.stopLineScroll()
   }
 }
 
@@ -206,17 +218,41 @@ final class PromptAutoScrollView: NSView {
   private var isRightToLeft = false
   private var lastWidth: CGFloat = 0
   private var isFollowScheduled = false
+  private var lineScroll: PromptLineScrollContext?
+  private var previousWordID: Int?
+  private var previousTargetTop: CGFloat = 0
+  private var recentersLine = true
+  private var resetsAttempt = false
+  private var lineScrollTimer: Timer?
+  private var animatedTarget: CGPoint?
+  private var lineScrollAnimation: (from: CGPoint, target: CGPoint, started: TimeInterval)?
+  private weak var animatedScrollView: NSScrollView?
 
   override var isFlipped: Bool { true }
 
   func update(
     text: AttributedString, characterOffset: Int?, font: NSFont,
-    lineSpacing: CGFloat, isRightToLeft: Bool
+    lineSpacing: CGFloat, isRightToLeft: Bool, lineScroll: PromptLineScrollContext? = nil
   ) {
+    let attemptChanged = self.lineScroll?.attemptID != lineScroll?.attemptID
+    let layoutChanged = self.font != font || self.lineSpacing != lineSpacing
+      || self.isRightToLeft != isRightToLeft
     let needsFollow = self.characterOffset != characterOffset
       || self.text.characters.count != text.characters.count
       || self.font != font || self.lineSpacing != lineSpacing
       || self.isRightToLeft != isRightToLeft
+      || attemptChanged || self.lineScroll?.activeWordID != lineScroll?.activeWordID
+      || self.lineScroll?.smoothScroll != lineScroll?.smoothScroll
+      || self.lineScroll?.reducesMotion != lineScroll?.reducesMotion
+      || self.lineScroll?.frameRate != lineScroll?.frameRate
+    if attemptChanged {
+      stopLineScroll()
+      previousWordID = nil
+      previousTargetTop = 0
+      resetsAttempt = true
+    }
+    recentersLine = recentersLine || layoutChanged || attemptChanged
+    self.lineScroll = lineScroll
     self.text = text
     self.characterOffset = characterOffset
     self.font = font
@@ -229,8 +265,22 @@ final class PromptAutoScrollView: NSView {
     super.layout()
     if bounds.width != lastWidth {
       lastWidth = bounds.width
+      recentersLine = true
       scheduleFollow()
     }
+  }
+
+  override func viewWillMove(toSuperview newSuperview: NSView?) {
+    if newSuperview == nil { stopLineScroll() }
+    super.viewWillMove(toSuperview: newSuperview)
+  }
+
+  func stopLineScroll() {
+    lineScrollTimer?.invalidate()
+    lineScrollTimer = nil
+    animatedTarget = nil
+    lineScrollAnimation = nil
+    animatedScrollView = nil
   }
 
   private func scheduleFollow() {
@@ -244,6 +294,7 @@ final class PromptAutoScrollView: NSView {
   }
 
   private func followCurrentGlyph() {
+    if let lineScroll { followActiveWord(lineScroll); return }
     guard let characterOffset, bounds.width > 0, let scrollView = enclosingScrollView,
       let documentView = scrollView.documentView,
       let rect = PromptCaretLayout.rect(
@@ -257,6 +308,82 @@ final class PromptAutoScrollView: NSView {
     guard !scrollView.contentView.documentVisibleRect.contains(convert(target, to: documentView))
     else { return }
     _ = scrollToVisible(target)
+  }
+
+  private func followActiveWord(_ context: PromptLineScrollContext) {
+    guard let scroll = enclosingScrollView, let document = scroll.documentView,
+      let wordID = context.activeWordID, let offset = context.characterOffsets[wordID],
+      let geometry = PromptLineScrollGeometry.measure(in: text, activeOffset: offset,
+        previousOffset: previousWordID.flatMap { context.characterOffsets[$0] },
+        width: bounds.width, font: font, lineSpacing: lineSpacing, rightToLeft: isRightToLeft,
+        caretOffset: characterOffset)
+    else { stopLineScroll(); return }
+    var top = geometry.targetTop(previousTarget: previousTargetTop, recenter: recentersLine)
+    // SwiftUI can wrap a single long token across multiple native rows. Keep
+    // its caret reachable without the legacy extra-margin early advance.
+    if let bottom = geometry.caretBottom { top = max(top, bottom - scroll.contentView.bounds.height) }
+    previousWordID = wordID
+    previousTargetTop = top
+    recentersLine = false
+    let region = convert(CGRect(x: 0, y: top, width: 1, height: scroll.contentView.bounds.height), to: document)
+    var proposed = scroll.contentView.bounds
+    proposed.origin.y = region.minY
+    let target = scroll.contentView.constrainBoundsRect(proposed).origin
+    let immediate = resetsAttempt || !context.smoothScroll || context.reducesMotion
+    resetsAttempt = false
+    move(scroll, to: target, immediately: immediate, frameRate: context.frameRate)
+  }
+
+  private func move(_ scroll: NSScrollView, to target: CGPoint, immediately: Bool, frameRate: Int) {
+    let interval = PromptLineScrollMotion.frameInterval(frameRate: frameRate,
+      displayFrameRate: window?.screen?.maximumFramesPerSecond ?? 60)
+    if !immediately, animatedTarget == target {
+      if lineScrollTimer?.timeInterval != interval { scheduleLineScrollTimer(interval: interval) }
+      return
+    }
+    stopLineScroll()
+    let clip = scroll.contentView
+    let from = clip.bounds.origin
+    guard from != target else { return }
+    if immediately {
+      clip.scroll(to: target)
+      scroll.reflectScrolledClipView(clip)
+      return
+    }
+    animatedTarget = target
+    animatedScrollView = scroll
+    lineScrollAnimation = (from, target, ProcessInfo.processInfo.systemUptime)
+    scheduleLineScrollTimer(interval: interval)
+  }
+
+  private func scheduleLineScrollTimer(interval: TimeInterval) {
+    lineScrollTimer?.invalidate()
+    let timer = Timer(timeInterval: interval, target: PromptLineScrollTimerTarget(owner: self),
+      selector: #selector(PromptLineScrollTimerTarget.tick(_:)), userInfo: nil, repeats: true)
+    lineScrollTimer = timer
+    RunLoop.main.add(timer, forMode: .common)
+  }
+
+  fileprivate func advanceLineScroll(_ timer: Timer) {
+    guard timer === lineScrollTimer, let animation = lineScrollAnimation,
+      let scroll = animatedScrollView, enclosingScrollView === scroll
+    else { timer.invalidate(); return }
+    let elapsed = ProcessInfo.processInfo.systemUptime - animation.started
+    let progress = PromptLineScrollMotion.progress(elapsed: elapsed)
+    let clip = scroll.contentView
+    clip.scroll(to: .init(x: animation.from.x + (animation.target.x - animation.from.x) * progress,
+      y: animation.from.y + (animation.target.y - animation.from.y) * progress))
+    scroll.reflectScrolledClipView(clip)
+    if elapsed >= PromptLineScrollMotion.duration { stopLineScroll() }
+  }
+}
+
+@MainActor private final class PromptLineScrollTimerTarget: NSObject {
+  private weak var owner: PromptAutoScrollView?
+  init(owner: PromptAutoScrollView) { self.owner = owner }
+  @objc func tick(_ timer: Timer) {
+    guard let owner else { timer.invalidate(); return }
+    owner.advanceLineScroll(timer)
   }
 }
 

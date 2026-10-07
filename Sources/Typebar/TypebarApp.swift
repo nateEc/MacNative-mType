@@ -2858,7 +2858,12 @@ private struct ContentView: View {
                 characterOffset: rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex),
                 font: practicePromptNSFont(size: settings.fontSize),
                 lineSpacing: usesJoiningScript ? 8 : 12,
-                isRightToLeft: isRightToLeft)
+                isRightToLeft: isRightToLeft,
+                lineScroll: .init(attemptID: session.automaticInputAttemptID,
+                  activeWordID: session.promptWordPresentations.first(where: { $0.phase == .active })?.range.lowerBound,
+                  characterOffsets: rendering.glyphCharacterOffsets,
+                  smoothScroll: settings.smoothPracticeLineScroll,
+                  reducesMotion: settings.reducePracticeMotion))
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }

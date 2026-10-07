@@ -259,6 +259,16 @@ run_logged_check "executing pinned WebAudio sample group seek, slot selection an
 run_logged_check "executing pinned whole-line wrapper mode and limit decisions" \
   "$temporary_directory/line-display-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-line-display.mjs" "$reference_root"
+line_scroll_anime_archive="${TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE:-$temporary_directory/animejs-4.2.2.tgz}"
+if [[ ! -f "$line_scroll_anime_archive" ]]; then
+  run_logged_check "preparing pinned QA-only line scroll animation archive" "$temporary_directory/line-scroll-source-runtime.log" \
+    npm pack --ignore-scripts --pack-destination "$temporary_directory" animejs@4.2.2
+fi
+[[ -f "$line_scroll_anime_archive" ]] || fail "missing QA-only line scroll animation archive"
+run_logged_check "executing pinned line jump and complete animation curve" \
+  "$temporary_directory/line-scroll-source-check.log" \
+  env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-line-scroll.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
@@ -268,6 +278,7 @@ run_logged_check "running native client test suite" "$temporary_directory/client
   TYPEBAR_INBOX_SOURCE_PACKAGE="$inbox_source_package" \
   TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE="$daily_trend_source_archive" \
   TYPEBAR_HOWLER_SOURCE_ARCHIVE="$howler_source_archive" \
+  TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
   TYPEBAR_DISK_FIXTURE_ROOT="$temporary_directory/disk-model-fixtures" swift test
 
 require_no_conflicting_processes || fail "stop the listed process before running service tests"
