@@ -109,11 +109,13 @@ struct RemoteAccountResultTagPicker: View {
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      let displayed = feedback?.displayedIDs ?? current.accountTagIDs ?? []
-      if displayed.allSatisfy({ !knownIDs.contains($0) }) {
-        Text("无账户标签").font(.caption).foregroundStyle(.secondary)
+      let presentation = AccountTagAssociationPresentation(
+        ids: current.accountTagIDs == nil ? nil : feedback?.displayedIDs ?? current.accountTagIDs,
+        knownIDs: knownIDs)
+      if let emptyMessage = presentation.emptyMessage {
+        Text(emptyMessage).font(.caption).foregroundStyle(.secondary)
       }
-      ForEach(displayed.filter { knownIDs.contains($0) }, id: \.self) { id in
+      ForEach(presentation.displayedIDs, id: \.self) { id in
         if let tag = account.accountTags.first(where: { $0.id == id }) {
           HStack {
             Text("\(tag.displayName) · \(id.uuidString.prefix(8))")
@@ -124,7 +126,7 @@ struct RemoteAccountResultTagPicker: View {
             .help(completionRows.first { $0.id == id }?.hint ?? "账户标签 \(tag.displayName)")
         }
       }
-      DisclosureGroup("账户标签（\(Set(current.accountTagIDs ?? []).intersection(knownIDs).count) 个）",
+      DisclosureGroup("账户标签（\(AccountTagAssociationPresentation(ids: current.accountTagIDs, knownIDs: knownIDs).summary)）",
         isExpanded: Binding(get: { expanded }, set: { value in
           guard !busy else { return }
           if value {

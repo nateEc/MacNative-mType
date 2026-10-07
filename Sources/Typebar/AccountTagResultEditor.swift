@@ -1,5 +1,18 @@
 import Foundation
 
+/// The picker display is separate from its deliberately empty initial draft.
+struct AccountTagAssociationPresentation: Equatable {
+  let displayedIDs: [UUID]
+  let summary: String
+  let emptyMessage: String?
+
+  init(ids: [UUID]?, knownIDs: Set<UUID>) {
+    displayedIDs = (ids ?? []).filter { knownIDs.contains($0) }
+    summary = ids == nil ? "关联未知" : "\(Set(displayedIDs).count) 个"
+    emptyMessage = ids == nil ? "账户标签关联未知" : displayedIDs.isEmpty ? "无账户标签" : nil
+  }
+}
+
 /// An ephemeral editor, never an immutable completion receipt or posting selection.
 struct AccountTagResultEditDraft: Equatable {
   let scope: ResultPublicationScope

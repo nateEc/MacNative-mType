@@ -202,6 +202,11 @@ const csvContext=vm.createContext({Blob,download:options=>{capturedDownload=opti
 const miscSource=fs.readFileSync(path.join(root,'frontend/src/ts/utils/misc.ts'),'utf8');
 new vm.Script(stripTypeScriptTypes(bounded(miscSource,'export async function downloadResultsCSV(',
   'export function download(options:'),{mode:'transform'})).runInContext(csvContext);
+const tableSource=fs.readFileSync(path.join(root,'frontend/src/ts/components/pages/account/Table.tsx'),'utf8');
+const characterColumn=bounded(tableSource,'    defineColumn("charStats", {','    defineColumn("mode", {');
+const characterCallbacks=[...characterColumn.matchAll(/cell:\s*(\(info\) =>\s*`[^`]+`),/g)];
+assert.equal(characterCallbacks.length,1,'One complete non-JSX character-count cell callback');
+new vm.Script(`globalThis.tableCharacters = ${characterCallbacks[0][1]};`).runInContext(csvContext);
 const csvFixtures=[];
 for(const mode of ['time','words','quote','zen','custom']) for(const basis of ['utf16','koreanJamo']) for(const blind of [false,true]) {
   const index=csvFixtures.length,duration=mode==='custom'?12.345678:15;
@@ -228,11 +233,13 @@ for(const mode of ['time','words','quote','zen','custom']) for(const basis of ['
     experienceEvidence:{version:1,characterCounts:sourceRow.charStats,scoringUnitBasis:basis,durationSeconds:duration,
       afkSeconds:1.234,punctuation:true,numbers:false,modifiers:[blind?'memory':'mirrorVisual']}};
   if(mode==='time') wire.durationSeconds=15;if(mode==='words') wire.wordLimit=25;if(mode==='quote') wire.quoteLength='long';
-  csvFixtures.push({wire,columns,cells,nativeMode2});
+  const tableCharacters=csvContext.tableCharacters({row:{original:sourceRow}});
+  assert.equal(typeof tableCharacters,'string');
+  csvFixtures.push({wire,columns,cells,nativeMode2,tableCharacters});
 }
 await csvContext.downloadResultsCSV([{_id:'owned',charStats:[1,0,0,0],funbox:['mirror','memory']}]);
 assert.equal((await capturedDownload.data.text()).split('\n')[1].split(',').length,25,
   'Pinned formatter spreads a multi-Funbox array over extra CSV columns; native export keeps a single RFC 4180 cell');
 assert.equal(csvFixtures.length,20);verify();
 console.log(emit?JSON.stringify({referenceCommit:pin,ids,fixtures,dayFixtures,modifierFixtures,polyglotFixtures,metadataRows,metadataFixtures,quoteFixtures,csvFixtures}):
-  'Account history statistics source passed (96 collections, 960 full export orders, 20 complete 24-field CSV projections and multi-Funbox delimiter boundary, all/recent-ten/daily aggregates, 4 timezones, 9 legacy and 32 independent polyglot queries, 192 PB/quote-length queries and 6 owned quote-classification boundaries; complete pinned functions/class; owned eager/download adapters, no TanStack/DOM/HTTP/GUI)');
+  'Account history statistics source passed (96 collections, 960 full export orders, 20 complete 24-field CSV projections and complete Table character-cell callbacks, multi-Funbox delimiter boundary, all/recent-ten/daily aggregates, 4 timezones, 9 legacy and 32 independent polyglot queries, 192 PB/quote-length queries and 6 owned quote-classification boundaries; complete pinned functions/class/callback; owned eager/download adapters, no TanStack/Solid/DOM/HTTP/GUI)');

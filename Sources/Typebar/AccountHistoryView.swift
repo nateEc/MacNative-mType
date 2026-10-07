@@ -257,7 +257,8 @@ struct AccountHistoryView: View {
 
 
   private func resultRow(_ row: RemoteAccountResult) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
+    let information = AccountHistoryResultInformation(row)
+    return VStack(alignment: .leading, spacing: 4) {
       HStack {
         Text("\(number(row.effectiveWpm, speed: true, forceDecimals: true)) \(settings.typingSpeedUnit.displayName)").font(.headline)
         Text("Raw \(number(row.effectiveRawWpm, speed: true, forceDecimals: true)) · 准确率 \(number(row.preciseAccuracy ?? Double(row.accuracy), forceDecimals: true))% · 一致性 \(number(row.consistency, forceDecimals: true))%")
@@ -269,18 +270,48 @@ struct AccountHistoryView: View {
         .font(.caption).foregroundStyle(.secondary)
       Text("历史 PB：\(row.historicalPersonalBest.map { $0 ? "是" : "否" } ?? "未知")\(row.mode == "quote" ? " · 引语长度：\(row.quoteLength?.displayName ?? "未知")" : "")")
         .font(.caption).foregroundStyle(.secondary)
+      Text("字符 · \(information.characterCounts)").font(.caption.monospacedDigit())
+        .accessibilityLabel(information.characterCountsDescription)
+        .help("正确词信用／错误／额外／遗漏；单位见成绩信息。不是可见字符数或准确率尝试数。")
       Text(row.accountTagIDs.map { ids in
         ids.isEmpty ? "无账户标签" : ids.map { id in
           "\(account.accountTags.first { $0.id == id }?.displayName ?? "未知标签") · \(id.uuidString.prefix(8))"
         }.joined(separator: "、")
       } ?? "账户标签关联未知").font(.caption).foregroundStyle(.secondary)
       if !row.tags.isEmpty { Text("独立文字标签：\(row.tags.joined(separator: "、"))").font(.caption) }
+      DisclosureGroup("成绩信息与账户标签") {
+        VStack(alignment: .leading, spacing: 8) {
+          Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 5) {
+            informationRow("计分单位", information.scoringUnitBasis)
+            informationRow("难度", information.difficulty)
+            informationRow("标点", information.punctuation)
+            informationRow("数字", information.numbers)
+            informationRow("盲打", information.blindMode)
+            informationRow("简化输入", information.lazyMode)
+            informationRow("修饰器", information.modifiers)
+          }.font(.caption).textSelection(.enabled)
+          if account.hasAccountTagDirectory, !account.accountTags.isEmpty {
+            RemoteAccountResultTagPicker(result: row, account: account)
+          } else {
+            Text(account.hasAccountTagDirectory
+              ? "尚无账户标签；请到账户设置添加后再编辑。"
+              : "账户标签目录尚未就绪；请刷新后再编辑。")
+              .font(.caption).foregroundStyle(.secondary)
+          }
+        }.padding(.vertical, 6)
+      }
+      .id(account.resultPublicationScope)
       Button("查看速度图", systemImage: "chart.xyaxis.line") {
         if let scope = account.resultPublicationScope { selectedChart = .init(id: row.id, scope: scope) }
       }.disabled(!row.canViewPerformanceChart)
         .help(row.canViewPerformanceChart ? "按需读取这条账户成绩的匿名速度、Burst 和错误轨迹"
           : "没有保存的轨迹或超过 122 秒；不会从总成绩补造速度图")
     }.padding(10).background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+  }
+
+  private func informationRow(_ label: String, _ value: String) -> some View {
+    GridRow { Text(label).foregroundStyle(.secondary); Text(value) }
+      .accessibilityElement(children: .combine)
   }
 
   private func number(_ value: Double?, speed: Bool = false, forceDecimals: Bool = false) -> String {

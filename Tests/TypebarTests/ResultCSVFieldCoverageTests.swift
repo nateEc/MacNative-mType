@@ -139,6 +139,9 @@ final class ResultCSVFieldCoverageTests: XCTestCase {
     let row = try JSONDecoder().decode(RemoteAccountResult.self, from: JSONEncoder().encode(wire)), csv = fields(row)
     XCTAssertEqual(csv["character_stats"], "0;1;0;0"); XCTAssertEqual(csv["scoring_unit_basis"], "utf16")
     XCTAssertEqual(csv["blind_mode"], "true"); XCTAssertEqual(csv["funbox"], "[]")
+    let information = AccountHistoryResultInformation(row)
+    XCTAssertEqual(information.characterCounts, "0/1/0/0")
+    XCTAssertEqual(information.blindMode, "开启"); XCTAssertEqual(information.scoringUnitBasis, "UTF-16 单位")
     XCTAssertEqual(try XCTUnwrap(csv["afk_seconds"].flatMap(Double.init)), saved.afkDuration, accuracy: 1e-9)
     XCTAssertEqual(restored.preciseAccuracy, 66.67)
     XCTAssertEqual(wire.inputMetrics?.correctAttempts, 2)
@@ -181,7 +184,12 @@ final class ResultCSVFieldCoverageTests: XCTestCase {
         case "mode2":
           XCTAssertEqual(value, fixture.nativeMode2) // Owned quote namespace replaces upstream catalogue IDs.
           if fixture.wire.mode != "quote" { XCTAssertEqual(value, expected) }
-        case "quoteLength": XCTAssertEqual(fixture.wire.quoteLength?.compatibilityValue ?? "-1", expected)
+        case "quoteLength":
+          if value.isEmpty {
+            XCTAssertNotEqual(fixture.wire.mode, "quote"); XCTAssertEqual(expected, "-1")
+          } else {
+            XCTAssertEqual(try XCTUnwrap(QuoteLength(rawValue: value)).compatibilityValue, expected)
+          }
         case "funbox":
           XCTAssertEqual(try JSONDecoder().decode([String].self, from: Data(value.utf8)).joined(separator: ","), expected)
         case "timestamp":
