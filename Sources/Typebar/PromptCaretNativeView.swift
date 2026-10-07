@@ -132,7 +132,7 @@ final class PromptCaretNativeView: NSView {
   fileprivate func advancePace(_ timer: Timer) {
     guard timer === paceTimer else { timer.invalidate(); return }
     paceTimer = nil
-    requestPacePosition(at: ProcessInfo.processInfo.systemUptime)
+    requestPacePosition(at: ProcessInfo.processInfo.systemUptime, fromDeadline: true)
   }
 
   /// Also permits deterministic component testing without launching the app.
@@ -165,7 +165,8 @@ final class PromptCaretNativeView: NSView {
 
   /// Requests do not sample or paint. The deadline callback can run between
   /// presentation frames, reading the same fresh providers as the draw path.
-  @discardableResult func requestPacePosition(at time: TimeInterval) -> PromptPaceCaretInterpolation? {
+  @discardableResult func requestPacePosition(at time: TimeInterval,
+    fromDeadline: Bool = false) -> PromptPaceCaretInterpolation? {
     guard let config = configuration, bounds.width > 0, config.paceStyle.drawsMarker else { return nil }
     let attempt = config.latestInput?().attemptID ?? config.attemptID
     if paceAttemptID != attempt { paceSequence = nil; paceAttemptID = attempt }
@@ -183,14 +184,29 @@ final class PromptCaretNativeView: NSView {
       if changed {
         // A missing/pruned target preserves the old position and folding flag.
         let rendering = config.latestRendering?()
-        let offset = frame.targetGlyphID.flatMap { rendering?.characterOffset(forGlyphAt: $0) }
-          ?? (frame.targetGlyphID == nil ? frame.targetCharacterOffset : nil)
-        if let to = measure(offset, text: rendering?.text ?? config.text, config: config) {
-          let endpoint = PromptPaceCaretGeometry.rect(from: to, to: to,
-            fromAfter: frame.targetAfter, toAfter: frame.targetAfter, style: config.paceStyle,
+        func endpoint(_ offset: Int?, after: Bool) -> CGRect? {
+          guard let rect = measure(offset, text: rendering?.text ?? config.text, config: config) else { return nil }
+          return PromptPaceCaretGeometry.rect(from: rect, to: rect,
+            fromAfter: after, toAfter: after, style: config.paceStyle,
             rightToLeft: config.rightToLeft, fraction: 1, reducesMotion: true,
             afterWidth: (" " as NSString).size(withAttributes: [.font: config.font]).width)
-          coordinator.positionPace(at: endpoint, time: time,
+        }
+        // At an exact deadline, a skipped predecessor has zero (not negative)
+        // duration. A resolved timer request writes it before starting the
+        // latest tween; a coalesced draw read must not invent that write.
+        if fromDeadline, !lostGeometry, !config.reducesMotion, frame.fraction == 0,
+          remaining > 0, let previous = paceSequence, frame.sequence.isFinite,
+          frame.sequence > previous + 1 {
+          let predecessor = frame.zeroDeadlinePredecessor
+          let offset = predecessor.flatMap { rendering?.characterOffset(forGlyphAt: $0.glyphIndex) }
+            ?? (predecessor == nil ? frame.fromCharacterOffset : nil)
+          coordinator.positionPace(at: endpoint(offset, after: predecessor?.after ?? frame.fromAfter),
+            time: time, duration: 0)
+        }
+        let offset = frame.targetGlyphID.flatMap { rendering?.characterOffset(forGlyphAt: $0) }
+          ?? (frame.targetGlyphID == nil ? frame.targetCharacterOffset : nil)
+        if let target = endpoint(offset, after: frame.targetAfter) {
+          coordinator.positionPace(at: target, time: time,
             duration: config.reducesMotion ? 0 : remaining)
         }
         paceSequence = frame.sequence

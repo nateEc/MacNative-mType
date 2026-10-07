@@ -37,10 +37,11 @@ import XCTest
   }
   private struct LateFixture: Decodable {
     let delivery: String, resumeTime: Int, style: String
+    let correction: Bool
     let trace: [Trace]
   }
   private static var cachedFixtures: [String: [Fixture]] = [:]
-  private static var cachedLateFixtures: [LateFixture]?
+  private static var cachedLateFixtures: [Bool: [LateFixture]] = [:]
 
   private func evidence(_ option: String = "--emit-fixtures") throws -> [Fixture] {
     if let fixtures = Self.cachedFixtures[option] { return fixtures }
@@ -50,11 +51,12 @@ import XCTest
     return fixtures
   }
 
-  private func lateEvidence() throws -> [LateFixture] {
-    if let fixtures = Self.cachedLateFixtures { return fixtures }
-    let fixtures = try JSONDecoder().decode([LateFixture].self, from: sourceData("--emit-late-fixtures"))
+  private func lateEvidence(correction: Bool = false) throws -> [LateFixture] {
+    if let fixtures = Self.cachedLateFixtures[correction] { return fixtures }
+    let option = correction ? "--emit-late-correction-fixtures" : "--emit-late-fixtures"
+    let fixtures = try JSONDecoder().decode([LateFixture].self, from: sourceData(option))
     XCTAssertEqual(fixtures.count, 18)
-    Self.cachedLateFixtures = fixtures
+    Self.cachedLateFixtures[correction] = fixtures
     return fixtures
   }
 
@@ -175,7 +177,7 @@ import XCTest
   }
 
   func testBoundedProductionProjectionMatchesCoalescedLateFramesWithSharedGeometry() throws {
-    for fixture in try lateEvidence() where fixture.delivery == "coalesced" {
+    for fixture in try lateEvidence() + lateEvidence(correction: true) where fixture.delivery == "coalesced" {
       var progress = try XCTUnwrap(PaceCaretProgress(wpm: 300,
         catalog: .init(prompt: String(repeating: "aa ", count: 12))))
       progress.start(at: 0, blind: false)
@@ -185,6 +187,9 @@ import XCTest
       for event in fixture.trace {
         let time = event.time / 1000
         switch event.type {
+        case "correction":
+          progress.advance(to: time, blind: false)
+          progress.handleCommit(word: 0, correct: false, blind: false)
         case "request": latestRequest = event
         case "position" where event.id == "paceCaret":
           // The production model independently selects the latest logical
@@ -193,8 +198,11 @@ import XCTest
           let frame = try XCTUnwrap(progress.frame(at: time, blind: false))
           XCTAssertEqual(frame.target.word, latestRequest?.word)
           XCTAssertEqual(frame.target.letter, latestRequest?.letter)
-          XCTAssertEqual(frame.sequence, Double(try XCTUnwrap(latestRequest?.word) * 3
-            + XCTUnwrap(latestRequest?.letter)))
+          if !fixture.correction {
+            XCTAssertEqual(frame.sequence, Double(try XCTUnwrap(latestRequest?.word) * 3
+              + XCTUnwrap(latestRequest?.letter)))
+          }
+          XCTAssertEqual(frame.sequence, (event.time + (try XCTUnwrap(event.duration))) / 40, accuracy: 1e-9)
           let remaining = (1 - frame.fraction) * frame.stepDuration
           XCTAssertEqual(remaining, try XCTUnwrap(event.duration) / 1000, accuracy: 1e-9)
           let rect = CGRect(x: try XCTUnwrap(event.left), y: try XCTUnwrap(event.top),
@@ -204,6 +212,54 @@ import XCTest
         case "sample":
           try compare(channel, source: XCTUnwrap(event.pace),
             label: "coalesced \(fixture.resumeTime)ms/\(fixture.style) @\(event.time)")
+        default: break
+        }
+      }
+    }
+  }
+
+  func testZeroPredecessorAndLatestProjectionMatchSeparateRAFWithSharedGeometry() throws {
+    for fixture in try lateEvidence() + lateEvidence(correction: true) where fixture.delivery == "separate" {
+      var progress = try XCTUnwrap(PaceCaretProgress(wpm: 300,
+        catalog: .init(prompt: String(repeating: "aa ", count: 12))))
+      progress.start(at: 0, blind: false)
+      var channel = PromptCaretChannel(), latestRequest: Trace?
+      channel.goTo(.init(x: 0, y: 0, width: 2, height: fixture.style == "underline" ? 2 : 33), at: 0, duration: 0)
+      var previousSequence: Double?
+      for event in fixture.trace {
+        let time = event.time / 1000
+        switch event.type {
+        case "correction":
+          progress.advance(to: time, blind: false)
+          progress.handleCommit(word: 0, correct: false, blind: false)
+        case "request": latestRequest = event
+        case "position" where event.id == "paceCaret":
+          let duration = try XCTUnwrap(event.duration) / 1000
+          // No engine presentation occurs between these overdue requests.
+          // The source tests separately establish that negative animations
+          // do not immediately write, while exactly zero duration does.
+          guard duration >= 0 else { continue }
+          let frame = try XCTUnwrap(progress.frame(at: time, blind: false))
+          if duration == 0 {
+            XCTAssertEqual(frame.fraction, 0)
+            XCTAssertGreaterThan(frame.sequence, try XCTUnwrap(previousSequence) + 1)
+            let sourceTarget = PaceCaretPosition(word: try XCTUnwrap(latestRequest?.word),
+              letter: try XCTUnwrap(latestRequest?.letter))
+            XCTAssertEqual(progress.catalog.predecessorAnchor(before: frame.target),
+              progress.catalog.glyphAnchor(at: sourceTarget))
+          } else {
+            XCTAssertEqual(frame.target.word, latestRequest?.word)
+            XCTAssertEqual(frame.target.letter, latestRequest?.letter)
+            XCTAssertEqual((1 - frame.fraction) * frame.stepDuration, duration, accuracy: 1e-9)
+            previousSequence = frame.sequence
+          }
+          let target = CGRect(x: try XCTUnwrap(event.left), y: try XCTUnwrap(event.top),
+            width: try XCTUnwrap(event.width), height: try XCTUnwrap(event.height))
+          channel.goTo(target, at: time, duration: duration, curve: .linear)
+        case "frame": if event.rendered == true { channel.sample(at: time) }
+        case "sample":
+          try compare(channel, source: XCTUnwrap(event.pace),
+            label: "separate \(fixture.resumeTime)ms/\(fixture.style) @\(event.time)")
         default: break
         }
       }

@@ -3042,7 +3042,8 @@ private struct ContentView: View {
     let target = session.paceCaretGlyphAnchor(for: frame.target)
     return .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
       fromAfter: from?.after ?? false, targetAfter: target?.after ?? false, fraction: frame.fraction,
-      stepDuration: frame.stepDuration, sequence: frame.sequence, targetGlyphID: target?.glyphIndex)
+      stepDuration: frame.stepDuration, sequence: frame.sequence, targetGlyphID: target?.glyphIndex,
+      zeroDeadlinePredecessor: session.paceCaretPredecessorAnchor(before: frame.target))
   }
 
   private var paceCaretFrameProvider: (() -> PromptPaceCaretInterpolation?)? {

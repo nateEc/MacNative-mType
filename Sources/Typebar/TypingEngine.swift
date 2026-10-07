@@ -4749,6 +4749,10 @@ struct TypingSession {
     paceCaretProgress?.catalog.glyphAnchor(at: position)
   }
 
+  func paceCaretPredecessorAnchor(before position: PaceCaretPosition) -> PaceCaretGlyphAnchor? {
+    paceCaretProgress?.catalog.predecessorAnchor(before: position)
+  }
+
   private func paceCommittedFieldIsCorrect(_ field: TypingReplayInputField) -> Bool {
     guard let catalog = paceCaretProgress?.catalog, catalog.words.indices.contains(field.index) else { return false }
     let target = catalog.words[field.index].raw

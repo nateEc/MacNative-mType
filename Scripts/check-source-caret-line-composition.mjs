@@ -10,8 +10,9 @@ import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 
 const [argument, option] = process.argv.slice(2);
-assert.ok(argument && (!option || ['--emit-fixtures', '--emit-sparse-fixtures', '--emit-late-fixtures'].includes(option)));
-const late = option === '--emit-late-fixtures';
+assert.ok(argument && (!option || ['--emit-fixtures', '--emit-sparse-fixtures', '--emit-late-fixtures', '--emit-late-correction-fixtures'].includes(option)));
+const correction = option === '--emit-late-correction-fixtures';
+const late = option === '--emit-late-fixtures' || correction;
 const frameIntervals = option === '--emit-sparse-fixtures' ? [16, 33, 100] : late ? [16] : [1];
 const root = path.resolve(argument);
 function verify() {
@@ -263,6 +264,11 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of lat
     // A blocked loop has neither animation frames nor timer callbacks. Resume
     // at a fixed clock; explicitly vary RAF delivery between overdue timers.
     await tickTo(25);
+    if (correction) {
+      clock = 10_060; active = 0;
+      PaceCaret.handleSpace(false, 'aa ');
+      trace.push({type: 'correction', time: 60});
+    }
     clock = 10_000 + resumeTime;
     trace.push({type: 'sample', ...snapshot(resumeTime)});
     let callbacks = 0;
@@ -280,11 +286,14 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of lat
     const requests = trace.filter(event => event.type === 'request' && event.time === resumeTime);
     const steps = Array.from({length: Math.floor(resumeTime / 40)}, (_, index) => index + 2);
     assert.deepEqual(requests.map(event => event.duration), steps.map(step => step * 40 - resumeTime));
-    assert.deepEqual(requests.map(event => [event.word, event.letter]), steps.map(step => [Math.floor(step / 3), step % 3]));
+    assert.deepEqual(requests.map(event => [event.word, event.letter]), steps.map(step => {
+      const target = step + (correction ? 3 : 0);
+      return [Math.floor(target / 3), target % 3];
+    }));
     const resolved = trace.filter(event => event.type === 'position' && event.id === 'paceCaret' && event.time === resumeTime);
     assert.equal(resolved.length, delivery === 'separate' ? steps.length : 1);
     await tickTo(resumeTime + 35);
-    fixtures.push({frameInterval, delivery, resumeTime, smooth, motion, style, overlap, trace,
+    fixtures.push({frameInterval, delivery, resumeTime, correction, smooth, motion, style, overlap, trace,
       animations: animations.map(({animation, ...item}) => ({...item, completed: animation.completed}))});
     Caret.caret.stopAllAnimations(); PaceCaret.caret.stopAllAnimations(); PaceCaret.reset();
     for (const {animation} of animations) animation.cancel();

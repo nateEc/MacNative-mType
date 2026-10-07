@@ -120,6 +120,16 @@ struct PaceCaretCatalog {
     }
     return .init(glyphIndex: word.boundaries[position.letter], after: false)
   }
+
+  /// The previous logical target, not the previous rendered position. A
+  /// pending correction can make a frame's interpolation start differ.
+  func predecessorAnchor(before position: PaceCaretPosition) -> PaceCaretGlyphAnchor? {
+    guard words.indices.contains(position.word), position.letter >= 0,
+      position.letter <= words[position.word].length else { return nil }
+    let step = steps[position.word] + position.letter
+    guard step > 0 else { return nil }
+    return glyphAnchor(at: self.position(at: step - 1))
+  }
 }
 
 /// Absolute deadlines, not a chain of elapsed-time additions. Fast-forward

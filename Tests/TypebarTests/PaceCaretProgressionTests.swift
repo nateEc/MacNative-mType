@@ -19,6 +19,18 @@ final class PaceCaretProgressionTests: XCTestCase {
     XCTAssertEqual(frame(session, at: start)?.fraction, 0)
   }
 
+  func testPredecessorAnchorRespectsUTF16AndVirtualWordBoundaries() {
+    let catalog = PaceCaretCatalog(prompt: "😀 ab")
+    XCTAssertNil(catalog.predecessorAnchor(before: .init(word: 0, letter: 0)))
+    XCTAssertNil(catalog.predecessorAnchor(before: .init(word: -1, letter: 0)))
+    XCTAssertNil(catalog.predecessorAnchor(before: .init(word: 2, letter: 0)))
+    XCTAssertNil(catalog.predecessorAnchor(before: .init(word: 0, letter: 3)))
+    XCTAssertEqual(catalog.predecessorAnchor(before: .init(word: 0, letter: 1)), .init(glyphIndex: 0, after: false))
+    XCTAssertEqual(catalog.predecessorAnchor(before: .init(word: 0, letter: 2)), .init(glyphIndex: 0, after: false))
+    XCTAssertEqual(catalog.predecessorAnchor(before: .init(word: 1, letter: 0)), .init(glyphIndex: 0, after: true))
+    XCTAssertEqual(catalog.predecessorAnchor(before: .init(word: 1, letter: 1)), .init(glyphIndex: 2, after: false))
+  }
+
   func testExhaustedPaceDoesNotStayPinnedToLastGlyph() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "ab")
     session.configurePace(wpm: 60, clock: clock.source)
