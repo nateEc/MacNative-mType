@@ -1,5 +1,4 @@
 import AppKit
-import Charts
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -69,7 +68,10 @@ struct AccountHistoryView: View {
               }
             }.id(scope)
           }
-          if !days.isEmpty { activity(days) }
+          if !days.isEmpty {
+            AccountDailyActivityView(activity: .init(days: days, unit: settings.typingSpeedUnit,
+              startsAtZero: settings.startGraphsAtZero), selectedDate: $selectedDay).id(scope)
+          }
           HStack {
             Text("成绩 · 已显示 \(min(visibleLimit, rows.count)) / \(rows.count)").font(.headline)
             Spacer()
@@ -238,36 +240,6 @@ struct AccountHistoryView: View {
     }
   }
 
-  private func activity(_ days: [AccountHistoryDay]) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text("每日练习 · 当前本地时区").font(.headline)
-      Text("分钟与速度分图显示；未知时长的日期不绘制分钟柱。点按或拖动查看当天统计。")
-        .font(.caption).foregroundStyle(.secondary)
-      Chart(days) { point in
-        if let seconds = point.statistics.timeTyping {
-          BarMark(x: .value("日期", point.day, unit: .day), y: .value("练习分钟", seconds / 60))
-            .accessibilityLabel(point.day.formatted(date: .abbreviated, time: .omitted))
-            .accessibilityValue("\(number(seconds / 60)) 分钟")
-        }
-      }.chartYAxisLabel("练习分钟").chartXSelection(value: $selectedDay).frame(height: 130)
-      Chart(days) { point in
-        if let wpm = point.statistics.averageWpm {
-          LineMark(x: .value("日期", point.day, unit: .day),
-            y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: wpm)))
-          PointMark(x: .value("日期", point.day, unit: .day),
-            y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: wpm)))
-            .accessibilityLabel(point.day.formatted(date: .abbreviated, time: .omitted))
-            .accessibilityValue("平均 \(number(wpm, speed: true)) \(settings.typingSpeedUnit.displayName)")
-        }
-      }.chartYAxisLabel(settings.typingSpeedUnit.displayName).chartXSelection(value: $selectedDay).frame(height: 130)
-      if let selectedDay, let point = days.min(by: {
-        abs($0.day.timeIntervalSince(selectedDay)) < abs($1.day.timeIntervalSince(selectedDay))
-      }) {
-        Text("\(point.day.formatted(date: .abbreviated, time: .omitted)) · 完成 \(point.statistics.completed) · 练习 \(number(point.statistics.timeTyping)) 秒 · 最高 \(number(point.statistics.maximumWpm, speed: true, forceDecimals: true)) · 平均 \(number(point.statistics.averageWpm, speed: true, forceDecimals: true)) \(settings.typingSpeedUnit.displayName) · 准确率 \(number(point.statistics.averageAccuracy, forceDecimals: true))% · 一致性 \(number(point.statistics.averageConsistency, forceDecimals: true))% · 每条重启 \(number(point.statistics.restartsPerCompleted, forceDecimals: true))")
-          .font(.caption).monospacedDigit()
-      }
-    }
-  }
 
   private func resultRow(_ row: RemoteAccountResult) -> some View {
     VStack(alignment: .leading, spacing: 4) {

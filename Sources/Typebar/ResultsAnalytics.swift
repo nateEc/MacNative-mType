@@ -2970,9 +2970,17 @@ struct ActivityTypingMinutesTrendPoint: Equatable, Identifiable {
 
 enum ActivityTypingMinutesTrendPolicy {
     static func points(for points: [ActivityBarPoint]) -> [ActivityTypingMinutesTrendPoint] {
+        let fitted = fitted(for: points)
+        let maximum = points.filter { $0.completedTests > 0 && $0.typingSeconds.isFinite && $0.typingSeconds >= 0
+            && $0.day.timeIntervalSinceReferenceDate.isFinite }
+            .map { $0.typingSeconds / 60 }.max() ?? 0
+        return clipped(fitted, upper: DailyActivityOverviewScale.niceUpperBound(for: maximum))
+    }
+
+    static func fitted(for points: [ActivityBarPoint]) -> [ActivityTypingMinutesTrendPoint] {
         let observed = points
             .filter {
-                $0.completedTests > 0 && $0.typingSeconds.isFinite
+                $0.completedTests > 0 && $0.typingSeconds.isFinite && $0.typingSeconds >= 0
                     && $0.day.timeIntervalSinceReferenceDate.isFinite
             }
             .sorted { $0.day < $1.day }
@@ -2997,12 +3005,31 @@ enum ActivityTypingMinutesTrendPolicy {
         let slope = numerator / denominator
         let intercept = meanY - slope * meanX
         guard slope.isFinite, intercept.isFinite else { return [] }
-        let fitted: (Double) -> Double = { max(0, intercept + slope * $0) }
+        let fitted: (Double) -> Double = { intercept + slope * $0 }
 
         return [
             .init(day: first.day, minutes: fitted(xValues[0])),
             .init(day: last.day, minutes: fitted(xValues[xValues.count - 1])),
         ]
+    }
+
+    /// Intersect the fitted segment with the minute range. Moving an endpoint
+    /// to zero without moving its date would change the regression slope.
+    static func clipped(_ fitted: [ActivityTypingMinutesTrendPoint], upper: Double) -> [ActivityTypingMinutesTrendPoint] {
+        guard fitted.count == 2, upper.isFinite, upper > 0,
+            let first = fitted.first, let last = fitted.last,
+            first.minutes.isFinite, last.minutes.isFinite,
+            first.day.timeIntervalSinceReferenceDate.isFinite, last.day.timeIntervalSinceReferenceDate.isFinite,
+            last.day > first.day else { return [] }
+        let change = last.minutes - first.minutes
+        if change == 0 { return (0...upper).contains(first.minutes) ? fitted : [] }
+        let zero = -first.minutes / change, ceiling = (upper - first.minutes) / change
+        let start = max(0, min(zero, ceiling)), end = min(1, max(zero, ceiling))
+        guard start < end else { return [] }
+        return [start, end].map { fraction in
+            .init(day: first.day.addingTimeInterval(last.day.timeIntervalSince(first.day) * fraction),
+                minutes: min(upper, max(0, first.minutes + change * fraction)))
+        }
     }
 }
 
@@ -3063,7 +3090,7 @@ struct DailyActivityOverviewScale: Equatable {
         (0...4).map { Double($0) / 4 * minutesUpperBound }
     }
 
-    private static func niceUpperBound(for value: Double) -> Double {
+    static func niceUpperBound(for value: Double) -> Double {
         guard value.isFinite, value > 0 else { return 1 }
         let magnitude = pow(10, floor(log10(value)))
         let normalized = value / magnitude
@@ -3077,7 +3104,7 @@ struct DailyActivityOverviewScale: Equatable {
         return leading * magnitude
     }
 
-    private static func niceLowerBound(for value: Double) -> Double {
+    static func niceLowerBound(for value: Double) -> Double {
         guard value.isFinite, value > 0 else { return 0 }
         let magnitude = pow(10, floor(log10(value)))
         return floor(value / magnitude) * magnitude

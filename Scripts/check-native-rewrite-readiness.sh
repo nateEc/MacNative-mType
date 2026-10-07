@@ -229,6 +229,15 @@ run_logged_check "executing pinned account filter preset lifecycle and names" \
 run_logged_check "executing pinned account history chart numeric functions" \
   "$temporary_directory/account-history-graphs-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-history-graphs.mjs" "$reference_root"
+daily_trend_source_archive="${TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE:-$temporary_directory/chartjs-plugin-trendline-3.2.4.tgz}"
+if [[ -z "${TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE:-}" ]]; then
+  run_logged_check "preparing pinned QA-only daily trendline archive" "$temporary_directory/daily-trend-source-runtime.log" \
+    npm pack --ignore-scripts --pack-destination "$temporary_directory" chartjs-plugin-trendline@3.2.4
+fi
+[[ -f "$daily_trend_source_archive" ]] || fail "missing QA-only daily trendline archive"
+run_logged_check "executing pinned daily minute fit and complete trend clipping" \
+  "$temporary_directory/account-daily-activity-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-daily-activity.mjs" "$reference_root" "$daily_trend_source_archive"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
@@ -236,6 +245,7 @@ run_logged_check "running native client test suite" "$temporary_directory/client
   env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_REFERENCE_ROOT="$reference_root" \
   TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   TYPEBAR_INBOX_SOURCE_PACKAGE="$inbox_source_package" \
+  TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE="$daily_trend_source_archive" \
   TYPEBAR_DISK_FIXTURE_ROOT="$temporary_directory/disk-model-fixtures" swift test
 
 require_no_conflicting_processes || fail "stop the listed process before running service tests"

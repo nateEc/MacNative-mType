@@ -8579,7 +8579,7 @@ private struct ActivityBarChartView: View {
         ForEach(points) { point in
           if let value = value(for: point) {
             BarMark(
-              x: .value("日期", point.day, unit: .day),
+              x: .value("日期", point.day),
               y: .value(yTitle, value)
             )
             .foregroundStyle(Color.accentColor.gradient)
@@ -8589,8 +8589,9 @@ private struct ActivityBarChartView: View {
         }
         ForEach(typingMinutesTrend) { point in
           LineMark(
-            x: .value("日期", point.day, unit: .day),
-            y: .value("练习分钟趋势", point.minutes)
+            x: .value("日期", point.day),
+            y: .value("练习分钟趋势", point.minutes),
+            series: .value("曲线", "minutes-trend")
           )
           .foregroundStyle(.secondary)
           .lineStyle(.init(lineWidth: 2, dash: [4, 3]))
@@ -8599,7 +8600,7 @@ private struct ActivityBarChartView: View {
             "\(point.day.formatted(date: .abbreviated, time: .omitted))，\(point.minutes.formatted(.number.precision(.fractionLength(0...2)))) 分钟")
         }
         if let selectedPoint {
-          RuleMark(x: .value("所选日期", selectedPoint.day, unit: .day))
+          RuleMark(x: .value("所选日期", selectedPoint.day))
             .foregroundStyle(.secondary)
             .lineStyle(.init(lineWidth: 1, dash: [3, 3]))
         }
@@ -8611,6 +8612,8 @@ private struct ActivityBarChartView: View {
         }
       }
       .chartYScale(domain: .automatic(includesZero: includesZero))
+      .chartXScale(range: .plotDimension(startPadding: 12, endPadding: 12))
+      .chartPlotStyle { $0.clipped() }
       .chartXSelection(value: $selectedDate)
       .frame(height: 110)
   }
@@ -8641,6 +8644,8 @@ private struct ActivityBarChartView: View {
       }
     }
     .chartYScale(domain: 0...scale.minutesUpperBound)
+    .chartXScale(range: .plotDimension(startPadding: 12, endPadding: 12))
+    .chartPlotStyle { $0.clipped() }
     .chartXSelection(value: $selectedDate)
     .chartYAxisLabel("左：练习分钟 · 右：平均 \(speedUnit.displayName)")
     .frame(height: 150)
@@ -8657,15 +8662,16 @@ private struct ActivityBarChartView: View {
     }
     ForEach(typingMinutesTrend) { point in
       LineMark(
-        x: .value("日期", point.day, unit: .day),
-        y: .value("练习分钟趋势", point.minutes)
+        x: .value("日期", point.day),
+        y: .value("练习分钟趋势", point.minutes),
+        series: .value("曲线", "minutes-trend")
       )
       .foregroundStyle(.secondary.opacity(0.65))
       .lineStyle(.init(lineWidth: 2, dash: [4, 3]))
       .accessibilityLabel("练习分钟趋势")
     }
     if let selectedPoint {
-      RuleMark(x: .value("所选日期", selectedPoint.day, unit: .day))
+      RuleMark(x: .value("所选日期", selectedPoint.day))
         .foregroundStyle(.secondary)
         .lineStyle(.init(lineWidth: 1, dash: [3, 3]))
     }
@@ -8677,7 +8683,7 @@ private struct ActivityBarChartView: View {
   ) -> some ChartContent {
     let minutes = point.typingSeconds / 60
     BarMark(
-      x: .value("日期", point.day, unit: .day),
+      x: .value("日期", point.day),
       y: .value("练习分钟", minutes)
     )
     .foregroundStyle(Color.accentColor.gradient)
@@ -8689,13 +8695,14 @@ private struct ActivityBarChartView: View {
         + " " + speedUnit.displayName)
 
     LineMark(
-      x: .value("日期", point.day, unit: .day),
-      y: .value("平均速度（右轴）", scale.ordinate(forAverageWPM: point.averageWPM))
+      x: .value("日期", point.day),
+      y: .value("平均速度（右轴）", scale.ordinate(forAverageWPM: point.averageWPM)),
+      series: .value("曲线", "average-speed")
     )
     .foregroundStyle(.secondary)
     .lineStyle(.init(lineWidth: 2))
     PointMark(
-      x: .value("日期", point.day, unit: .day),
+      x: .value("日期", point.day),
       y: .value("平均速度（右轴）", scale.ordinate(forAverageWPM: point.averageWPM))
     )
     .foregroundStyle(.secondary)

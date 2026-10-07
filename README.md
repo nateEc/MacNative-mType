@@ -1,6 +1,8 @@
 # Typebar
 
-当前增量：[账户历史走势和速度分布](ACCOUNT_HISTORY_GRAPHS_CONTRACT.md) 接通双轴散点、10／100 次均线、包络、趋势、单位感知直方图和 UUID 列表定位，复用持久偏好并修正舍入边界。每日合并双轴／分钟趋势和实机仍开放，整体部分兼容；零 GUI，下方为历史阶段。
+当前增量：[账户每日双轴图与分钟趋势](ACCOUNT_DAILY_ACTIVITY_CONTRACT.md) 接通同图分钟柱／平均速度线、独立双轴、真实日期拟合和交点裁剪；未知数据不补零，本机图共用裁剪修正。设备与完整功能等价仍开放，整体部分兼容、goal active，零 GUI；下方为历史阶段。
+
+此前增量：[账户历史走势和速度分布](ACCOUNT_HISTORY_GRAPHS_CONTRACT.md) 接通双轴散点、10／100 次均线、包络、趋势、单位感知直方图和 UUID 列表定位，复用持久偏好并修正舍入边界。每日图进展见上方合同，实机仍开放；下方为历史阶段。
 
 当前增量：[账户历史筛选预设](ACCOUNT_FILTER_PRESETS_CONTRACT.md) 已接通原生保存、读取、应用、确认删除和自建服务持久化；完整快照与稳定标签 ID 独立于本机预设。整体仍部分兼容，零 GUI；下方为历史阶段。
 
@@ -684,6 +686,8 @@ zsh Scripts/check-macos-app-package.sh --reference /absolute/path/to/monkeytype-
 ```
 
 对固定参考源码执行串行的重写验收总门禁：它会检查原创性与兼容矩阵、完整运行原生客户端和自建服务测试、再无启动地验签并扫描临时应用包。它在每个编译或测试步骤前拒绝已有的 Typebar、测试或 Swift 编译进程，且自身绝不启动 Typebar：
+
+每日趋势源对照会下载 QA 专用 `chartjs-plugin-trendline@3.2.4` npm 归档并核验锁文件完整性，不安装产品依赖。已有归档可通过 `TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE` 指定；详情见 [每日图合同](ACCOUNT_DAILY_ACTIVITY_CONTRACT.md)。
 
 ```zsh
 zsh Scripts/check-native-rewrite-readiness.sh /absolute/path/to/monkeytype-reference
