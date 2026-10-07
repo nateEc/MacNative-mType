@@ -342,8 +342,13 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     XCTAssertEqual(trace.stops, 0)
     XCTAssertEqual(Set(trace.voices.compactMap { $0.value.map(ObjectIdentifier.init) }).count, 256)
     for index in trace.voices.indices.reversed() { trace.voices[index].value?.finish(true) }
-    XCTAssertEqual(trace.voices.filter { $0.value != nil }.count,5)
+    XCTAssertEqual(trace.voices.filter { $0.value != nil }.count,256)
     XCTAssertTrue(trace.voices.compactMap(\.value).allSatisfy { !$0.started })
+    player.playClick(style:.quartz,volume:0.5)
+    XCTAssertEqual(Set(trace.voices.compactMap { $0.value.map(ObjectIdentifier.init) }).count,256,"First idle seek reserves the slot before a drain")
+    player.playClick(style:.quartz,volume:0.5)
+    XCTAssertEqual(Set(trace.voices.compactMap { $0.value.map(ObjectIdentifier.init) }).count,6,"One active plus five idle at drain, then second play")
+    XCTAssertEqual(trace.starts,258)
   }
 
   @MainActor func testActualSynthesizedNSSoundCopiesAreDistinctAndResetPlaybackWithoutPlaying() throws {

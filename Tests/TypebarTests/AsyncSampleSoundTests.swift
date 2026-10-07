@@ -49,7 +49,7 @@ import XCTest
     XCTAssertTrue(prototype.copies.isEmpty)
     loader.finish(.system("Tink"),prototype); await settle()
     XCTAssertEqual(prototype.copies.flatMap(\.startedVolumes),[0.2,0.8])
-    XCTAssertEqual(prototype.copies.map(\.rewinds),[1,1])
+    XCTAssertEqual(prototype.copies.map(\.rewinds),[2,1])
     loader.finishAll(); await settle()
   }
 
@@ -249,7 +249,8 @@ import XCTest
       XCTAssertEqual(loader.calls.filter { $0 == .system("Tink") }.count,1)
       loader.finish(.system("Tink"),prototype); await settle()
       XCTAssertEqual(prototype.copies.count,fixture.requests)
-      XCTAssertTrue(prototype.copies.allSatisfy { $0.rewinds == 1 && $0.startedVolumes == [0.5] })
+      XCTAssertEqual(prototype.copies.map(\.rewinds),[fixture.requests]+Array(repeating:1,count:fixture.requests-1))
+      XCTAssertTrue(prototype.copies.allSatisfy { $0.startedVolumes == [0.5] })
       loader.finishAll(); await settle()
     }
   }

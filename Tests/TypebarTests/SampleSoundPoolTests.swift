@@ -19,7 +19,7 @@ import XCTest
     }
     func rewind() { position = 0; rewinds += 1 }
     func play(onFinish: @escaping () -> Void) -> Bool {
-      starts += 1; completions.append(onFinish); position = 0.25; isPlaying = true
+      starts += 1; completions.append(onFinish); position = 0; isPlaying = true
       if finishesDuringStart { onFinish() }
       return startsSuccessfully
     }
@@ -53,7 +53,7 @@ import XCTest
     XCTAssertEqual(voice.starts,2)
   }
 
-  func testBurstNeverStealsActiveVoicesAndRetainsAtMostFiveIdlePerResource() {
+  func testBurstNeverStealsActiveVoicesAndDrainsAfterTheFirstIdleSeekReservation() {
     let prototype = Voice()
     let player = TypingFeedbackSound(loadSound:{ _ in prototype },beep:{},randomUnit:{ 0 })
     for _ in 0..<32 { player.playClick(style:.tink,volume:0.2) }
@@ -61,8 +61,8 @@ import XCTest
     XCTAssertTrue(prototype.copies.allSatisfy { $0.stops == 0 && $0.starts == 1 })
     for voice in prototype.copies { voice.finish() }
     for _ in 0..<6 { player.playClick(style:.tink,volume:0.8) }
-    XCTAssertEqual(prototype.copies.count,33,"Five idle resources, not an active voice limit")
-    XCTAssertEqual(prototype.copies.filter { $0.starts == 2 }.count,5)
+    XCTAssertEqual(prototype.copies.count,32,"The first idle slot is reserved before the five-idle drain")
+    XCTAssertEqual(prototype.copies.filter { $0.starts == 2 }.count,6)
     player.setVolume(0.4)
     XCTAssertEqual(prototype.copies.filter { $0.volume == 0.4 }.count,6)
   }
@@ -151,45 +151,56 @@ import XCTest
     XCTAssertFalse(copy.isPlaying); XCTAssertFalse(voice.canReuseAfterCompletion)
   }
 
-  func testPinnedHowlerPlayEndResetAndPoolDrainSequencesMatchNativeAllocationBehavior() throws {
+  func testPinnedWebAudioSeekPlayAndDrainMatchNativeSlotsAndPositions() throws {
     let environment = ProcessInfo.processInfo.environment
     guard let reference = environment["TYPEBAR_REFERENCE_ROOT"], let archive = environment["TYPEBAR_HOWLER_SOURCE_ARCHIVE"] else {
       throw XCTSkip("Requires pinned reference and verified QA-only Howler archive")
     }
-    struct Step: Decodable { let kind:String; let source:String?; let index:Int?; let reused:Bool?; let seek:Double?; let active:Int }
-    struct Fixture: Decodable { let steps:[Step]; let allocations:Int }
+    struct Operation: Decodable { let kind:String; let source:String?; let preview:Bool?; let amount:Double?; let slot:Int? }
+    struct Snapshot: Decodable, Equatable { let source:String; let slot:Int; let position:Double }
+    struct Fixture: Decodable { let operations:[Operation]; let snapshots:[[Snapshot]]; let allocations:[String:Int] }
     let project = URL(fileURLWithPath:#filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let process = Process(), output = Pipe()
     process.executableURL = URL(fileURLWithPath:"/usr/bin/env")
-    process.arguments = ["node",project.appendingPathComponent("Scripts/check-source-sample-sound-pool.mjs").path,reference,archive,"--emit-fixtures"]
+    process.arguments = ["node",project.appendingPathComponent("Scripts/check-source-sample-seek.mjs").path,reference,archive,"--emit-fixtures"]
     process.standardOutput = output; try process.run()
     let data = output.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit(); XCTAssertEqual(process.terminationStatus,0)
     let fixtures = try JSONDecoder().decode([Fixture].self,from:data)
-    XCTAssertEqual(fixtures.count,5)
+    XCTAssertEqual(fixtures.count,7)
     for fixture in fixtures {
-      var prototypes: [Voice] = [], played: [Voice] = []
-      let player = TypingFeedbackSound(loadSound:{ _ in
-        let value = Voice(); prototypes.append(value); return value
+      var prototypes: [TypingClickPlaybackSource:Voice] = [:]
+      let player = TypingFeedbackSound(loadSound:{ source in
+        let value = Voice(); prototypes[source] = value; return value
       },beep:{ XCTFail("source fixture should not fail") },randomUnit:{ 0 })
-      for step in fixture.steps {
-        if step.kind == "play" {
-          let before = Dictionary(uniqueKeysWithValues:prototypes.flatMap(\.copies).map { (ObjectIdentifier($0),$0.starts) })
-          switch step.source {
-          case "click": player.playClick(style:.tink,volume:0.5)
-          case "error": player.playError(style:.basso,volume:0.5)
-          case "warning": player.playTimeWarning(style:.glass,volume:0.5)
-          case "finish": player.playFinishReverb(volume:0.5)
-          default: XCTFail("unexpected fixture source")
+      let sources: [(String,TypingClickPlaybackSource)] = [("click",.system("Tink")),("error",.system("Basso"))]
+      for (index,operation) in fixture.operations.enumerated() {
+        switch operation.kind {
+        case "play":
+          if operation.source == "error" { player.playError(style:.basso,volume:0.5) }
+          else if operation.preview == true { player.previewClick(style:.tink,volume:0.5) }
+          else { player.playClick(style:.tink,volume:0.5) }
+        case "advance":
+          for voice in prototypes.values.flatMap(\.copies) where voice.isPlaying { voice.position += try XCTUnwrap(operation.amount) }
+        case "finish":
+          let source = try XCTUnwrap(sources.first { $0.0 == operation.source }?.1)
+          let prototype = try XCTUnwrap(prototypes[source]), slot = try XCTUnwrap(operation.slot)
+          guard prototype.copies.indices.contains(slot) else { XCTFail("missing fixture slot"); continue }
+          prototype.copies[slot].finish()
+        default: XCTFail("unexpected source operation")
+        }
+        var snapshots: [Snapshot] = []
+        for (name,source) in sources {
+          for (slot,voice) in (prototypes[source]?.copies ?? []).enumerated() where voice.isPlaying {
+            snapshots.append(.init(source:name,slot:slot,position:(voice.position*1_000_000).rounded()/1_000_000))
           }
-          let voice = try XCTUnwrap(prototypes.flatMap(\.copies).first { $0.starts > (before[ObjectIdentifier($0)] ?? 0) })
-          XCTAssertEqual(before[ObjectIdentifier(voice)] != nil,step.reused)
-          XCTAssertEqual(voice.rewinds,voice.starts)
-          XCTAssertEqual(step.seek,0); played.append(voice)
-        } else { played[try XCTUnwrap(step.index)].finish() }
-        XCTAssertEqual(prototypes.flatMap(\.copies).filter(\.isPlaying).count,step.active)
+        }
+        XCTAssertEqual(snapshots,fixture.snapshots[index],"transition \(index)")
       }
-      XCTAssertEqual(prototypes.flatMap(\.copies).count,fixture.allocations)
+      for (name,count) in fixture.allocations {
+        let source = try XCTUnwrap(sources.first { $0.0 == name }?.1)
+        XCTAssertEqual(prototypes[source]?.copies.count,count)
+      }
     }
   }
 }

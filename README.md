@@ -1,5 +1,9 @@
 # Typebar
 
+本轮完整串行门禁：原生 3,268 项／服务 465 项零失败零跳过，十万词耐久、15 项迁移冷读、981 场景结构及未开窗包／原创性检查通过；七个冻结文件哈希一致，31 份日志见 [样本组验证记录](SAMPLE_GROUP_SEEK_CONTRACT.md)。人工听感和设备验收仍开放，goal active，零 GUI。
+
+当前增量：[样本声音组归零与声部选择](SAMPLE_GROUP_SEEK_CONTRACT.md) 修正同资源首声部 seek、按创建顺序复用和延迟裁池。默认 WebAudio 七组 123 步逐项比较原生位置／槽位／分配，相关 120 项通过；冷加载、播放锁和实际设备仍开放，CFG-02 部分兼容、goal active，零 GUI。下方声音池上限与仅新声部归零的描述为历史阶段。
+
 当前增量：[样本声音异步准备与等待请求](ASYNC_SAMPLE_SOUND_CONTRACT.md) 将自有 PCM 生成移到独立串行 actor，同资源合并准备并保留等待请求，重开拒绝旧声音，音乐独立。NSSound 创建仍在主线程，Howler 内部 seek 重启／playLock／设备听感不宣称等价；CFG-02 部分兼容、goal active，本轮零 GUI，下方为历史阶段。
 
 当前增量：[样本声音闲置复用与播放起点](SAMPLE_SOUND_POOL_CONTRACT.md) 接通逐资源五闲置声部池、每次 rewind 和播放代次保护，活动声部不抢占，音乐独立。异步加载和真实设备听感仍开放，CFG-02 部分兼容、goal active；本轮零 GUI，下方为历史阶段。

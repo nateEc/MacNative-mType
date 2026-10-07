@@ -560,10 +560,12 @@ final class TypingFeedbackSound {
   private struct SamplePlayback {
     let voice: any TypingSoundVoice
     let token: UUID
+    let source: TypingClickPlaybackSource
   }
   private var activeVoices: [ObjectIdentifier: SamplePlayback] = [:]
-  private var idleVoices: [TypingClickPlaybackSource: [SamplePlayback]] = [:]
-  static let maximumIdleVoicesPerSource = 5
+  // Creation order is observable: seek targets the first retained resource slot.
+  private var sampleVoices: [TypingClickPlaybackSource: [SamplePlayback]] = [:]
+  static let idleVoiceDrainLimit = 5
   private var musicalVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
   private var currentKeyCode: UInt16 = 0
   private var currentModifierFlags: NSEvent.ModifierFlags = []
@@ -646,6 +648,10 @@ final class TypingFeedbackSound {
     warningRequest = nil
     finishRequest = nil
     let voices = activeVoices.values.map(\.voice)
+    let stopped = Set(activeVoices.keys)
+    for source in Array(sampleVoices.keys) {
+      sampleVoices[source]?.removeAll { stopped.contains(ObjectIdentifier($0.voice)) }
+    }
     activeVoices.removeAll(keepingCapacity: true)
     warningVoice = nil
     finishVoice = nil
@@ -838,9 +844,23 @@ final class TypingFeedbackSound {
 
   private func play(source: TypingClickPlaybackSource, volume: Double,
     restarting: RestartingSampleChannel? = nil) -> Bool {
+    let generation = sampleGeneration
     guard let effectiveVolume = playbackVolume(volume) else { return false }
-    guard let prototype = prototype(for: source),
-      let voice = idleVoices[source]?.popLast()?.voice ?? prototype.copyForPlayback(),
+    guard let prototype = prototype(for: source), generation == sampleGeneration else { return false }
+    if restarting == nil, let first = sampleVoices[source]?.first,
+      activeVoices[ObjectIdentifier(first.voice)] != nil { first.voice.rewind() }
+    guard generation == sampleGeneration else { return false }
+
+    // Seeking an idle first slot reserves it before play's inactive-pool drain.
+    // Otherwise play drains excess idle slots backwards, then takes the oldest.
+    let reusable: (any TypingSoundVoice)?
+    if let first = sampleVoices[source]?.first, activeVoices[ObjectIdentifier(first.voice)] == nil {
+      reusable = first.voice
+    } else {
+      drainIdleVoices(source:source)
+      reusable = sampleVoices[source]?.first { activeVoices[ObjectIdentifier($0.voice)] == nil }?.voice
+    }
+    guard let voice = reusable ?? prototype.copyForPlayback(), generation == sampleGeneration,
       voice !== prototype, activeVoices[ObjectIdentifier(voice)] == nil else {
       return false
     }
@@ -854,11 +874,15 @@ final class TypingFeedbackSound {
     case nil: previous = nil
     }
     if let previous {
-      activeVoices.removeValue(forKey: ObjectIdentifier(previous))
+      if let stopped = activeVoices.removeValue(forKey:ObjectIdentifier(previous)) { removeSampleSlot(stopped) }
       previous.stop()
     }
+    guard generation == sampleGeneration else { return false }
     let identity = ObjectIdentifier(voice)
-    let playback = SamplePlayback(voice:voice,token:UUID())
+    let playback = SamplePlayback(voice:voice,token:UUID(),source:source)
+    if let index = sampleVoices[source]?.firstIndex(where:{ $0.voice === voice }) {
+      sampleVoices[source]?[index] = playback
+    } else { sampleVoices[source,default:[]].append(playback) }
     activeVoices[identity] = playback
     switch restarting {
     case .timeWarning: warningVoice = voice
@@ -866,7 +890,9 @@ final class TypingFeedbackSound {
     case nil: break
     }
     voice.volume = Float(effectiveVolume)
+    guard generation == sampleGeneration, activeVoices[identity]?.token == playback.token else { return false }
     voice.rewind()
+    guard generation == sampleGeneration, activeVoices[identity]?.token == playback.token else { return false }
     let token = playback.token
     let started = voice.play { [weak self, weak voice] in
       guard let self, let voice, let current = self.activeVoices[identity],
@@ -874,9 +900,7 @@ final class TypingFeedbackSound {
       self.activeVoices.removeValue(forKey: identity)
       if self.warningVoice === voice { self.warningVoice = nil }
       if self.finishVoice === voice { self.finishVoice = nil }
-      if voice.canReuseAfterCompletion, self.idleVoices[source,default:[]].count < Self.maximumIdleVoicesPerSource {
-        self.idleVoices[source,default:[]].append(current)
-      }
+      if !voice.canReuseAfterCompletion { self.removeSampleSlot(current) }
     }
     if !started {
       if activeVoices[identity] == nil || activeVoices[identity]?.token == token {
@@ -886,8 +910,24 @@ final class TypingFeedbackSound {
       }
       // A device can complete synchronously and then report failed start.
       // Do not retain that failure, or remove a newer play of the same voice.
-      idleVoices[source]?.removeAll { $0.token == token }
+      removeSampleSlot(playback)
     }
     return started
+  }
+
+  private func removeSampleSlot(_ playback: SamplePlayback) {
+    sampleVoices[playback.source]?.removeAll { $0.voice === playback.voice && $0.token == playback.token }
+  }
+
+  private func drainIdleVoices(source: TypingClickPlaybackSource) {
+    guard var voices = sampleVoices[source] else { return }
+    var idleCount = voices.filter { activeVoices[ObjectIdentifier($0.voice)] == nil }.count
+    for index in voices.indices.reversed() {
+      guard idleCount > Self.idleVoiceDrainLimit else { break }
+      if activeVoices[ObjectIdentifier(voices[index].voice)] == nil {
+        voices.remove(at:index); idleCount -= 1
+      }
+    }
+    sampleVoices[source] = voices
   }
 }

@@ -253,6 +253,9 @@ run_logged_check "executing pinned sample sound playback and pool lifecycle" \
 run_logged_check "executing pinned delayed sample readiness and queued seeks" \
   "$temporary_directory/sample-loading-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-sample-loading.mjs" "$reference_root" "$howler_source_archive"
+run_logged_check "executing pinned WebAudio sample group seek, slot selection and deferred drain" \
+  "$temporary_directory/sample-seek-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-sample-seek.mjs" "$reference_root" "$howler_source_archive"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
