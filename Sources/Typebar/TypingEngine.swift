@@ -4383,6 +4383,17 @@ enum PromptHighlightPolicy {
 }
 
 struct TypingSession {
+  private(set) var firstRetainedPromptWordIndex = 0
+
+  mutating func retirePromptWords(_ retirement: PromptWordRetirement) {
+    guard retirement.attemptID == automaticInputAttemptID, !isFinished,
+      retirement.firstRetainedWordIndex > firstRetainedPromptWordIndex,
+      let field = replayInputField(kind: .delete, inputStopped: false),
+      retirement.firstRetainedWordIndex <= field.index
+    else { return }
+    firstRetainedPromptWordIndex = retirement.firstRetainedWordIndex
+  }
+
   private(set) var configuration: TestConfiguration
   private(set) var generationNotice: String?
   private let initialGenerationNotice: String?
@@ -6060,6 +6071,9 @@ struct TypingSession {
   }
 
   private var canDeleteBackward: Bool {
+    if firstRetainedPromptWordIndex > 0,
+      let field = replayInputField(kind: .delete, inputStopped: false),
+      field.index <= firstRetainedPromptWordIndex, field.units.isEmpty { return false }
     if let acceptedUnits, acceptedUnits.terminalElementCleared, acceptedUnits.fieldIndex == 0 { return false }
     if configuration.rules.confidenceMode == .maximum { return false }
     if configuration.rules.freedomMode { return true }
@@ -6780,6 +6794,9 @@ struct TypingSession {
   private mutating func removePreviousWordForHardDelete(
     clearingWord: Bool, automatic: Bool = false, at date: Date
   ) {
+    if automatic, firstRetainedPromptWordIndex > 0,
+      let field = replayInputField(kind: .delete, inputStopped: false),
+      field.index <= firstRetainedPromptWordIndex { return }
     let deletionStart = replayEvents.count
     defer { if clearingWord { markDeletion(since: deletionStart) } }
     if tracksNoSpaceWordBursts, acceptedUnits == nil,

@@ -198,7 +198,8 @@ struct PromptAutoScrollOverlay: NSViewRepresentable {
     let lineScroll = lineScroll.map {
       PromptLineScrollContext(attemptID: $0.attemptID, activeWordID: $0.activeWordID,
         characterOffsets: $0.characterOffsets, smoothScroll: $0.smoothScroll,
-        reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: lineScrollFrameRate)
+        reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: lineScrollFrameRate,
+        words: $0.words, firstRetainedWordIndex: $0.firstRetainedWordIndex, onRetire: $0.onRetire)
     }
     nsView.update(
       text: text, characterOffset: characterOffset, font: font,
@@ -227,6 +228,8 @@ final class PromptAutoScrollView: NSView {
   private var animatedTarget: CGPoint?
   private var lineScrollAnimation: (from: CGPoint, target: CGPoint, started: TimeInterval)?
   private weak var animatedScrollView: NSScrollView?
+  private var lineJumpCount = 0
+  private var pendingRetirement: (value: PromptWordRetirement, notify: (PromptWordRetirement) -> Void)?
 
   override var isFlipped: Bool { true }
 
@@ -235,13 +238,14 @@ final class PromptAutoScrollView: NSView {
     lineSpacing: CGFloat, isRightToLeft: Bool, lineScroll: PromptLineScrollContext? = nil
   ) {
     let attemptChanged = self.lineScroll?.attemptID != lineScroll?.attemptID
+    let prefixChanged = self.lineScroll?.firstRetainedWordIndex != lineScroll?.firstRetainedWordIndex
     let layoutChanged = self.font != font || self.lineSpacing != lineSpacing
       || self.isRightToLeft != isRightToLeft
     let needsFollow = self.characterOffset != characterOffset
       || self.text.characters.count != text.characters.count
       || self.font != font || self.lineSpacing != lineSpacing
       || self.isRightToLeft != isRightToLeft
-      || attemptChanged || self.lineScroll?.activeWordID != lineScroll?.activeWordID
+      || attemptChanged || prefixChanged || self.lineScroll?.activeWordID != lineScroll?.activeWordID
       || self.lineScroll?.smoothScroll != lineScroll?.smoothScroll
       || self.lineScroll?.reducesMotion != lineScroll?.reducesMotion
       || self.lineScroll?.frameRate != lineScroll?.frameRate
@@ -250,8 +254,14 @@ final class PromptAutoScrollView: NSView {
       previousWordID = nil
       previousTargetTop = 0
       resetsAttempt = true
+      lineJumpCount = (lineScroll?.firstRetainedWordIndex ?? 0) > 0 ? 1 : 0
     }
-    recentersLine = recentersLine || layoutChanged || attemptChanged
+    if prefixChanged, !attemptChanged {
+      stopLineScroll()
+      previousTargetTop = 0
+      resetsAttempt = true
+    }
+    recentersLine = recentersLine || layoutChanged || attemptChanged || prefixChanged
     self.lineScroll = lineScroll
     self.text = text
     self.characterOffset = characterOffset
@@ -281,6 +291,7 @@ final class PromptAutoScrollView: NSView {
     animatedTarget = nil
     lineScrollAnimation = nil
     animatedScrollView = nil
+    pendingRetirement = nil
   }
 
   private func scheduleFollow() {
@@ -316,8 +327,21 @@ final class PromptAutoScrollView: NSView {
       let geometry = PromptLineScrollGeometry.measure(in: text, activeOffset: offset,
         previousOffset: previousWordID.flatMap { context.characterOffsets[$0] },
         width: bounds.width, font: font, lineSpacing: lineSpacing, rightToLeft: isRightToLeft,
-        caretOffset: characterOffset)
+        caretOffset: characterOffset,
+        words: context.onRetire == nil || context.activeWordID == previousWordID ? [] : context.words,
+        characterOffsets: context.characterOffsets)
     else { stopLineScroll(); return }
+    var retirement: PromptWordRetirement?
+    if context.activeWordID != previousWordID,
+      let previousTop = geometry.previousWordTop, geometry.activeTop > previousTop {
+      if lineJumpCount > 0,
+        let active = context.words.first(where: { $0.glyphID == wordID }),
+        let boundary = geometry.retirementBoundary(before: active.index),
+        boundary > context.firstRetainedWordIndex {
+        retirement = .init(attemptID: context.attemptID, firstRetainedWordIndex: boundary)
+      }
+      lineJumpCount += 1
+    }
     var top = geometry.targetTop(previousTarget: previousTargetTop, recenter: recentersLine)
     // SwiftUI can wrap a single long token across multiple native rows. Keep
     // its caret reachable without the legacy extra-margin early advance.
@@ -331,23 +355,33 @@ final class PromptAutoScrollView: NSView {
     let target = scroll.contentView.constrainBoundsRect(proposed).origin
     let immediate = resetsAttempt || !context.smoothScroll || context.reducesMotion
     resetsAttempt = false
-    move(scroll, to: target, immediately: immediate, frameRate: context.frameRate)
+    move(scroll, to: target, immediately: immediate, frameRate: context.frameRate,
+      retirement: retirement, onRetire: context.onRetire)
   }
 
-  private func move(_ scroll: NSScrollView, to target: CGPoint, immediately: Bool, frameRate: Int) {
+  private func move(_ scroll: NSScrollView, to target: CGPoint, immediately: Bool, frameRate: Int,
+    retirement: PromptWordRetirement?, onRetire: ((PromptWordRetirement) -> Void)?) {
     let interval = PromptLineScrollMotion.frameInterval(frameRate: frameRate,
       displayFrameRate: window?.screen?.maximumFramesPerSecond ?? 60)
+    var completion = pendingRetirement
+    if let retirement, let onRetire,
+      retirement.firstRetainedWordIndex > (completion?.value.firstRetainedWordIndex ?? 0) {
+      completion = (retirement, onRetire)
+    }
     if !immediately, animatedTarget == target {
+      pendingRetirement = completion
       if lineScrollTimer?.timeInterval != interval { scheduleLineScrollTimer(interval: interval) }
       return
     }
     stopLineScroll()
+    pendingRetirement = completion
     let clip = scroll.contentView
     let from = clip.bounds.origin
-    guard from != target else { return }
+    guard from != target else { completeRetirement(); return }
     if immediately {
       clip.scroll(to: target)
       scroll.reflectScrolledClipView(clip)
+      completeRetirement()
       return
     }
     animatedTarget = target
@@ -374,7 +408,17 @@ final class PromptAutoScrollView: NSView {
     clip.scroll(to: .init(x: animation.from.x + (animation.target.x - animation.from.x) * progress,
       y: animation.from.y + (animation.target.y - animation.from.y) * progress))
     scroll.reflectScrolledClipView(clip)
-    if elapsed >= PromptLineScrollMotion.duration { stopLineScroll() }
+    if elapsed >= PromptLineScrollMotion.duration {
+      let completion = pendingRetirement
+      stopLineScroll()
+      if let completion { completion.notify(completion.value) }
+    }
+  }
+
+  private func completeRetirement() {
+    let completion = pendingRetirement
+    pendingRetirement = nil
+    if let completion { completion.notify(completion.value) }
   }
 }
 

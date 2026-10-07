@@ -1,5 +1,15 @@
 import AppKit
 
+struct PromptLineScrollWord {
+  let index: Int
+  let glyphID: Int
+}
+
+struct PromptWordRetirement: Equatable {
+  let attemptID: UUID
+  let firstRetainedWordIndex: Int
+}
+
 /// Stable target IDs let a word keep its identity when preceding hints or
 /// extra glyphs change its rendered character offset.
 struct PromptLineScrollContext {
@@ -9,6 +19,9 @@ struct PromptLineScrollContext {
   let smoothScroll: Bool
   let reducesMotion: Bool
   var frameRate = AnimationFrameRatePolicy.nativeFrameRate
+  var words: [PromptLineScrollWord] = []
+  var firstRetainedWordIndex = 0
+  var onRetire: ((PromptWordRetirement) -> Void)? = nil
 }
 
 enum PromptLineScrollMotion {
@@ -30,10 +43,12 @@ struct PromptLineScrollGeometry {
   let previousWordTop: CGFloat?
   let previousLineTop: CGFloat
   var caretBottom: CGFloat? = nil
+  var wordTops: [Int: CGFloat] = [:]
 
   static func measure(in text: AttributedString, activeOffset: Int, previousOffset: Int?,
     width: CGFloat, font: NSFont, lineSpacing: CGFloat, rightToLeft: Bool,
-    caretOffset: Int? = nil) -> Self? {
+    caretOffset: Int? = nil, words: [PromptLineScrollWord] = [],
+    characterOffsets: [Int: Int] = [:]) -> Self? {
     guard width > 0, activeOffset >= 0, activeOffset < text.characters.count else { return nil }
     let storage = PromptCaretLayout.preparedStorage(in: text, font: font,
       lineSpacing: lineSpacing, isRightToLeft: rightToLeft)
@@ -42,9 +57,15 @@ struct PromptLineScrollGeometry {
     container.lineFragmentPadding = 0
     manager.addTextContainer(container)
     storage.addLayoutManager(manager)
+    var utf16Offsets = [0]
+    if !words.isEmpty {
+      for character in text.characters {
+        utf16Offsets.append(utf16Offsets.last! + String(character).utf16.count)
+      }
+    }
     func line(at offset: Int, range: inout NSRange) -> CGRect? {
       guard offset >= 0, offset < text.characters.count else { return nil }
-      let utf16 = String(text.characters.prefix(offset)).utf16.count
+      let utf16 = words.isEmpty ? String(text.characters.prefix(offset)).utf16.count : utf16Offsets[offset]
       let glyph = manager.glyphIndexForCharacter(at: utf16)
       return manager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: &range)
     }
@@ -56,8 +77,23 @@ struct PromptLineScrollGeometry {
     let previous = previousOffset.flatMap { line(at: $0, range: &previousRange)?.minY }
     var caretRange = NSRange()
     let caretBottom = caretOffset.flatMap { line(at: $0, range: &caretRange)?.maxY }
+    var wordTops: [Int: CGFloat] = [:]
+    for word in words {
+      var range = NSRange()
+      if let offset = characterOffsets[word.glyphID], let rect = line(at: offset, range: &range) {
+        wordTops[word.index] = rect.minY
+      }
+    }
     return .init(activeTop: active.minY, previousWordTop: previous, previousLineTop: previousLine,
-      caretBottom: caretBottom)
+      caretBottom: caretBottom, wordTops: wordTops)
+  }
+
+  func retirementBoundary(before activeWordIndex: Int) -> Int? {
+    guard let previousWordTop, activeTop > previousWordTop else { return nil }
+    // Browser offsetTop is integral; normalize native fractional row metrics
+    // on both sides so words sharing one row cannot retire each other.
+    return wordTops.filter { $0.key < activeWordIndex
+      && $0.value.rounded(.down) < previousWordTop.rounded(.down) }.keys.max().map { $0 + 1 }
   }
 
   func targetTop(previousTarget: CGFloat, recenter: Bool) -> CGFloat {

@@ -2858,7 +2858,11 @@ private struct ContentView: View {
                   activeWordID: session.promptWordPresentations.first(where: { $0.phase == .active })?.range.lowerBound,
                   characterOffsets: rendering.glyphCharacterOffsets,
                   smoothScroll: settings.smoothPracticeLineScroll,
-                  reducesMotion: settings.reducePracticeMotion))
+                  reducesMotion: settings.reducePracticeMotion,
+                  words: session.promptWordPresentations.enumerated().map {
+                    .init(index: $0.offset, glyphID: $0.element.range.lowerBound)
+                  }, firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
+                  onRetire: { session.retirePromptWords($0) }))
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }
@@ -3034,7 +3038,8 @@ private struct ContentView: View {
     let targetGlyphCount = session.prompt.count
     let words = session.promptWordPresentations
     let indices = PromptGlyphLayout.indices(
-      glyphs: glyphs, words: words, hideExtraLetters: session.configuration.rules.hideExtraLetters)
+      glyphs: glyphs, words: words, hideExtraLetters: session.configuration.rules.hideExtraLetters,
+      firstRetainedWordIndex: session.firstRetainedPromptWordIndex)
     let appearances = PromptGlyphAppearance.plan(
       glyphs: glyphs, words: words,
       mode: promptHighlightMode, blindMode: session.configuration.rules.blindMode,

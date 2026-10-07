@@ -2,10 +2,16 @@
 /// Only the presentation traversal may change their order or omit extras.
 enum PromptGlyphLayout {
   static func indices(
-    glyphs: [TypingPromptGlyph], words: [TypingPromptWordPresentation], hideExtraLetters: Bool
+    glyphs: [TypingPromptGlyph], words: [TypingPromptWordPresentation], hideExtraLetters: Bool,
+    firstRetainedWordIndex: Int = 0
   ) -> [Int] {
+    let firstRetained = max(0, firstRetainedWordIndex)
+    let lowerBound = firstRetained == 0 ? 0
+      : words.indices.contains(firstRetained) ? words[firstRetained].range.lowerBound : glyphs.count
+    let retiredExtras = Set(words.prefix(firstRetained).flatMap(\.extraGlyphIndices))
+    func retained(_ index: Int) -> Bool { index >= lowerBound && !retiredExtras.contains(index) }
     guard words.contains(where: { !$0.extraGlyphIndices.isEmpty }) else {
-      return Array(glyphs.indices)
+      return firstRetained == 0 ? Array(glyphs.indices) : glyphs.indices.filter(retained)
     }
     var extras = Set<Int>()
     var insertions: [Int: [Int]] = [:]
@@ -21,6 +27,6 @@ enum PromptGlyphLayout {
       if let inserted = insertions[index] { output += inserted }
       if glyphs.indices.contains(index), !extras.contains(index) { output.append(index) }
     }
-    return output
+    return firstRetained == 0 ? output : output.filter(retained)
   }
 }
