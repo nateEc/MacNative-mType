@@ -7794,6 +7794,7 @@ private struct ResultsHistoryView: View {
                   ForEach(Difficulty.allCases, id: \.self) { difficulty in
                     Toggle(difficulty.displayName, isOn: difficultyBinding(for: difficulty))
                       .toggleStyle(.checkbox)
+                      .help("按住 Shift 点击可只保留这一项。")
                   }
                 }
                 Picker("标点", selection: $punctuationFilter) {
@@ -7812,6 +7813,7 @@ private struct ResultsHistoryView: View {
                   ForEach(TestMode.allCases, id: \.self) { mode in
                     Toggle(modeName(mode), isOn: modeBinding(for: mode))
                       .toggleStyle(.checkbox)
+                      .help("按住 Shift 点击可只保留这一项。")
                   }
                 }
                 DisclosureGroup(
@@ -7820,6 +7822,7 @@ private struct ResultsHistoryView: View {
                   ForEach(QuoteLength.allCases.filter { $0 != .all }, id: \.self) { length in
                     Toggle(length.displayName, isOn: quoteLengthBinding(for: length))
                       .toggleStyle(.checkbox)
+                      .help("按住 Shift 点击可只保留这一项。")
                   }
                 }
                 DisclosureGroup(
@@ -7828,6 +7831,7 @@ private struct ResultsHistoryView: View {
                   ForEach(ResultHistoryTimeLimit.allCases, id: \.self) { limit in
                     Toggle(limit.displayName, isOn: timeLimitBinding(for: limit))
                       .toggleStyle(.checkbox)
+                      .help("按住 Shift 点击可只保留这一项。")
                   }
                 }
                 DisclosureGroup(
@@ -7836,6 +7840,7 @@ private struct ResultsHistoryView: View {
                   ForEach(ResultHistoryWordLimit.allCases, id: \.self) { limit in
                     Toggle(limit.displayName, isOn: wordLimitBinding(for: limit))
                       .toggleStyle(.checkbox)
+                      .help("按住 Shift 点击可只保留这一项。")
                   }
                 }
                 DisclosureGroup("修饰器：\(activeModifierFilter.selectionSummary)") {
@@ -8370,43 +8375,23 @@ private struct ResultsHistoryView: View {
   }
 
   private func timeLimitBinding(for limit: ResultHistoryTimeLimit) -> Binding<Bool> {
-    Binding(
-      get: { timeLimitFilter.contains(limit) },
-      set: { selected in
-        if selected { timeLimitFilter.insert(limit) } else { timeLimitFilter.remove(limit) }
-      })
+    ResultHistoryFilterChoice.binding(for: limit, selection: $timeLimitFilter)
   }
 
   private func modeBinding(for mode: TestMode) -> Binding<Bool> {
-    Binding(
-      get: { modeFilter.contains(mode) },
-      set: { selected in
-        if selected { modeFilter.insert(mode) } else { modeFilter.remove(mode) }
-      })
+    ResultHistoryFilterChoice.binding(for: mode, selection: $modeFilter)
   }
 
   private func difficultyBinding(for difficulty: Difficulty) -> Binding<Bool> {
-    Binding(
-      get: { difficultyFilter.contains(difficulty) },
-      set: { selected in
-        if selected { difficultyFilter.insert(difficulty) } else { difficultyFilter.remove(difficulty) }
-      })
+    ResultHistoryFilterChoice.binding(for: difficulty, selection: $difficultyFilter)
   }
 
   private func quoteLengthBinding(for length: QuoteLength) -> Binding<Bool> {
-    Binding(
-      get: { quoteLengthFilter.contains(length) },
-      set: { selected in
-        if selected { quoteLengthFilter.insert(length) } else { quoteLengthFilter.remove(length) }
-      })
+    ResultHistoryFilterChoice.binding(for: length, selection: $quoteLengthFilter)
   }
 
   private func wordLimitBinding(for limit: ResultHistoryWordLimit) -> Binding<Bool> {
-    Binding(
-      get: { wordLimitFilter.contains(limit) },
-      set: { selected in
-        if selected { wordLimitFilter.insert(limit) } else { wordLimitFilter.remove(limit) }
-      })
+    ResultHistoryFilterChoice.binding(for: limit, selection: $wordLimitFilter)
   }
 
   private func modifierBinding(for modifier: TestModifier) -> Binding<Bool> {

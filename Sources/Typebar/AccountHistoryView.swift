@@ -323,7 +323,7 @@ private struct AccountHistoryFilterEditor: View {
         ForEach(ResultHistoryDateRange.allCases, id: \.self) { Text($0.displayName).tag($0) }
       }
       choices("模式", TestMode.allCases, selection: Binding(get: { filter.modeSelections }, set: { filter.modes = $0 }), name: { $0.displayName })
-      choices("语言", TypingLanguage.allCases, selection: Binding(get: { filter.languageSelections }, set: { filter.languages = $0 }), name: { $0.displayName })
+      choices("语言", TypingLanguage.allCases, selection: Binding(get: { filter.languageSelections }, set: { filter.languages = $0 }), allowsExclusiveSelection: false, name: { $0.displayName })
       choices("难度", Difficulty.allCases, selection: Binding(get: { filter.difficultySelections }, set: { filter.difficulties = $0 }), name: { $0.displayName })
       Picker("标点", selection: $filter.punctuation) {
         ForEach(ResultHistoryBinaryFilter.allCases, id: \.self) { Text($0.displayName).tag($0) }
@@ -342,7 +342,7 @@ private struct AccountHistoryFilterEditor: View {
         selection: Binding(get: { filter.quoteLengthSelections }, set: { filter.quoteLengths = $0; filter.quoteLength = nil }), name: { $0.displayName })
       DisclosureGroup("修饰器：\(filter.modifierFilter.selectionSummary)") {
         Toggle("无修饰器", isOn: $filter.modifierFilter.includesNoModifiers).toggleStyle(.checkbox)
-        choices("选择修饰器", TestModifier.allCases, selection: $filter.modifierFilter.modifiers, name: { $0.displayName })
+        choices("选择修饰器", TestModifier.allCases, selection: $filter.modifierFilter.modifiers, allowsExclusiveSelection: false, name: { $0.displayName })
       }
       AccountTagHistoryFilterControls(account: account, filter: $filter.accountTagFilter, usesCompletionSnapshots: false)
       DisclosureGroup("独立文字标签：\(filter.effectiveTagFilter.selectionSummary)") {
@@ -365,6 +365,7 @@ private struct AccountHistoryFilterEditor: View {
   }
 
   private func choices<T: Hashable>(_ title: String, _ values: [T], selection: Binding<Set<T>>,
+    allowsExclusiveSelection: Bool = true,
     name: @escaping (T) -> String) -> some View {
     DisclosureGroup("\(title)：已选 \(selection.wrappedValue.count) / \(values.count)") {
       HStack {
@@ -372,9 +373,9 @@ private struct AccountHistoryFilterEditor: View {
         Button("全不选") { selection.wrappedValue = [] }
       }
       ForEach(values, id: \.self) { value in
-        Toggle(name(value), isOn: Binding(get: { selection.wrappedValue.contains(value) }, set: { selected in
-          if selected { selection.wrappedValue.insert(value) } else { selection.wrappedValue.remove(value) }
-        })).toggleStyle(.checkbox)
+        Toggle(name(value), isOn: ResultHistoryFilterChoice.binding(for: value, selection: selection,
+          allowsExclusiveSelection: allowsExclusiveSelection)).toggleStyle(.checkbox)
+          .help(allowsExclusiveSelection ? "按住 Shift 点击可只保留这一项。" : "点击可加入或移除此项。")
       }
     }
   }

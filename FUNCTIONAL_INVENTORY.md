@@ -1,5 +1,9 @@
 # 功能盘点与追踪表
 
+当前 [历史筛选 Shift 单选](HISTORY_FILTER_CHOICE_CONTRACT.md) 接通本机和账户历史五个有限多选组；普通点击、其他组、账户作用域和预设格式保留。新增八项、相关 66 项及 1,136 组固定源码回调对照通过。原版标签是 Dropdown 而非 ButtonGroup，不把其 Shift 行为混为待实现按钮规则。设备／VoiceOver 及整体功能等价仍开放，goal active、零 GUI；下方为历史阶段。
+
+当前冻结版本完整门禁通过：客户端 3,420／服务 465 项零失败零跳过，十万词耐久、15 项磁盘冷读、1,013 场景结构及未开窗应用包通过；六哈希一致，42 份日志见上述合同。矩阵与人工兼容状态不升级。
+
 当前零时长追赶定位见 [光标组合合同](CARET_LINE_COMPOSITION_CONTRACT.md)：截止回调补前一目标，绘制保持合并，负时长不瞬移；错词修正使用逻辑目录，而非普通插值起点。新增九项、相关 112 项和 36 组共享几何轨迹通过。追赶之间的呈现、所有修正顺序、真实词盒／浏览器／特殊分支及设备未关闭，CFG-02／MET-67 保持部分兼容，goal active、零 GUI。
 
 本轮冻结版本完整门禁通过：客户端 3,412／服务 465 项零失败零跳过，十万词耐久、15 项冷读、1,011 场景结构及未开窗包通过；九哈希一致、41 份日志见上述合同。下方为历史验证，人工和整体功能等价状态不升级。
@@ -1435,7 +1439,7 @@ INP-04 的“按键位图”档用所选 Typebar 布局的原创映射，将 QMK
 | MET-57 | 历史行模式、字符与标签摘要 | `components/pages/account/Table.tsx` | ResultsDomain, AnalyticsDomain | 已实现：本机历史每行在大号速度主值旁直接显示模式及计时/字数参数、准确率、完成时间、匹配/错位/额外/跳过四元字符统计和现有结果标签，同时保留 Raw、稳定度及个人最佳标记。无限计时/字数明确显示“无限”，旧记录缺少配置时显示“未知”而不从完成时长猜测；标签沿用已有规范化规则，大小写与重音无关去重但保留首次输入的显示形式。长元数据在 520 点窗口单行截断并提供完整悬停文本，VoiceOver 会展开朗读四个字符类别及标签；整行仍可打开现有详情与标签编辑器。该摘要只读取已有本机成绩，不改排序、分页、删除、存储、同步或网络。 |
 | MET-36 | 历史“全部/当前设置”快捷筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：本机历史保留全部／当前配置快捷筛选、稳定活动 UUID 与作用域预设；账户历史新增整个已载入服务集合的临时筛选、统计与 CSV，从练习历史入口取得当前配置，设置页不猜测配置。目录或选择未知时保持原条件，旧文字方案独立。历史 PB／实际引语分类已接通，旧未知不猜；账户预设已接通自建服务，官方协议、离线备份与实机未完成；见 ACCOUNT_FILTER_PRESETS_CONTRACT.md。 |
 | MET-37 | 历史多选语言筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 已实现：历史“语言”筛选可任意多选、全选或全部取消，命中任一所选语言；全选保持不限制语言的旧行为并保留无法解码语言的既有成绩。旧筛选预设仅有单个语言字段时仍按该一项解释，新预设保存完整选择。 |
-| MET-38 | 历史多选标签筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：本机历史稳定 UUID 多选／none、目录增删、已确认关联优先及作用域预设保留，旧文字预设不变，新账户预设归档最低 31；664 次源标签分支对照通过。独立账户历史窗口新增服务端整个已载入集合的 UUID 任一／none 筛选及统计／CSV，不混本机完成快照，缺目录不匹配；本窗口完整筛选现可保存为账户服务预设，并按当前目录应用／确认删除；官方 API／身份、离线备份、Shift 单选及实机仍开放，见 ACCOUNT_FILTER_PRESETS_CONTRACT.md。 |
+| MET-38 | 历史多选标签筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：本机历史稳定 UUID 多选／none、目录增删、已确认关联优先及作用域预设保留，旧文字预设不变，新账户预设归档最低 31；664 次源标签分支对照通过。独立账户历史窗口新增服务端整个已载入集合的 UUID 任一／none 筛选及统计／CSV，不混本机完成快照，缺目录不匹配；本窗口完整筛选现可保存为账户服务预设，并按当前目录应用／确认删除；官方 API／身份、离线备份及实机仍开放，见 ACCOUNT_FILTER_PRESETS_CONTRACT.md。有限按钮组的 Shift 单选另见 HISTORY_FILTER_CHOICE_CONTRACT.md；原版标签为 Dropdown，不套用该按钮规则。 |
 | MET-39 | 历史个人最佳四态筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：本机历史与旧布尔预设保留；独立账户历史新增四态控件，使用按账户／成绩 UUID 绑定的服务不可变接受回执，不拿当前 PB 或本机皇冠重建。旧未知不归负项，重置、编辑、重试和冷读保留当时标记，CSV 明确区分 false／未知。原版缺字段压缩默认值不套用到旧 Typebar 数据；账户预设已接通自建服务，官方协议、离线备份和实机仍开放，见 ACCOUNT_FILTER_PRESETS_CONTRACT.md。 |
 | MET-40 | 历史多选模式筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 已实现：模式条件可任选计时、字数、引语、禅和自定义模式，按任一命中；全选保留无法解码模式的历史记录，全部取消明确显示无匹配项。新预设持久化完整集合，旧单模式预设保持原语义。 |
 | MET-41 | 历史多选难度筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 已实现：难度条件可任选普通、专家和大师，按任一命中；全选保留无法解码难度的历史记录，全部取消明确显示无匹配项。新预设持久化完整集合，旧单难度预设保持原语义。 |

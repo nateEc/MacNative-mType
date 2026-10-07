@@ -220,6 +220,9 @@ run_logged_check "executing pinned initial tag crowns, client PB writes and char
 run_logged_check "executing pinned stable-ID result queries, directory transitions and current-settings tags" \
   "$temporary_directory/account-tag-filter-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-tag-filter.mjs" "$reference_root"
+run_logged_check "executing pinned history filter Shift and ordinary choices" \
+  "$temporary_directory/history-filter-choice-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-history-filter-choice.mjs" "$reference_root"
 run_logged_check "executing pinned filtered account all/recent-ten/daily statistics" \
   "$temporary_directory/account-history-stats-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-history-stats.mjs" "$reference_root"
