@@ -8,8 +8,8 @@ struct PromptCaretInputIdentity: Equatable {
   let glyphID: Int?
 }
 
-/// One bounded native clock drives both independent caret channels. TextKit
-/// runs on target changes, not on every animation frame.
+/// Presentation and pace deadlines have separate, bounded native timers.
+/// TextKit runs on target changes, not on every animation frame.
 final class PromptCaretNativeView: NSView {
   struct Configuration {
     let text: AttributedString
@@ -35,9 +35,11 @@ final class PromptCaretNativeView: NSView {
   private var mainHost: NSHostingView<PromptCaretMarkerView>?
   private var paceHost: NSHostingView<PromptCaretMarkerView>?
   private var timer: Timer?
+  private var paceTimer: Timer?
   private var input: PromptCaretInputIdentity?
   private var mainOffset: Int?
   private var paceSequence: Double?
+  private var paceAttemptID: UUID?
   private var measuredWidth: CGFloat = 0
   private var needsPosition = true
   private var needsSnap = true
@@ -67,6 +69,7 @@ final class PromptCaretNativeView: NSView {
     }
     configuration = next
     if timer == nil || old?.frameRate != next.frameRate { scheduleTimer() }
+    schedulePaceTimer(after: 0)
     // Defer to the next run-loop presentation: prefix deletion and a real
     // input may be coalesced in one SwiftUI update. Providers read latest state.
     needsLayout = true
@@ -78,12 +81,14 @@ final class PromptCaretNativeView: NSView {
       if measuredWidth > 0 { configuration?.coordinator.resetLayout() }
       measuredWidth = bounds.width
       needsPosition = true; needsSnap = true; paceSequence = nil
+      schedulePaceTimer(after: 0)
     }
   }
 
   override func viewDidMoveToSuperview() {
     super.viewDidMoveToSuperview()
     if superview != nil, configuration != nil, timer == nil { scheduleTimer() }
+    if superview != nil, paceTimer == nil { schedulePaceTimer(after: 0) }
   }
 
   override func viewWillMove(toSuperview newSuperview: NSView?) {
@@ -93,6 +98,7 @@ final class PromptCaretNativeView: NSView {
 
   func stop() {
     timer?.invalidate(); timer = nil
+    paceTimer?.invalidate(); paceTimer = nil
     configuration?.coordinator.cancelCarets(at: ProcessInfo.processInfo.systemUptime)
     configuration = nil
   }
@@ -113,12 +119,27 @@ final class PromptCaretNativeView: NSView {
     present(at: ProcessInfo.processInfo.systemUptime)
   }
 
+  private func schedulePaceTimer(after delay: TimeInterval) {
+    paceTimer?.invalidate(); paceTimer = nil
+    guard let config = configuration, config.paceStyle.drawsMarker, config.paceFrame != nil,
+      bounds.width > 0, delay.isFinite, delay >= 0 else { return }
+    let timer = Timer(timeInterval: delay, target: PromptCaretTimerTarget(owner: self),
+      selector: #selector(PromptCaretTimerTarget.paceTick(_:)), userInfo: nil, repeats: false)
+    paceTimer = timer
+    RunLoop.main.add(timer, forMode: .common)
+  }
+
+  fileprivate func advancePace(_ timer: Timer) {
+    guard timer === paceTimer else { timer.invalidate(); return }
+    paceTimer = nil
+    requestPacePosition(at: ProcessInfo.processInfo.systemUptime)
+  }
+
   /// Also permits deterministic component testing without launching the app.
   func present(at time: TimeInterval) {
     guard let config = configuration, bounds.width > 0 else { return }
     let coordinator = config.coordinator
     let latest = config.latestInput?()
-    if let latest, input?.attemptID != latest.attemptID { paceSequence = nil }
     coordinator.prepare(attemptID: latest?.attemptID ?? config.attemptID)
     coordinator.sample(at: time)
     let changed = latest.map { $0 != input } ?? (config.mainOffset != mainOffset)
@@ -134,12 +155,32 @@ final class PromptCaretNativeView: NSView {
       input = latest; mainOffset = config.mainOffset
       needsPosition = false; needsSnap = false
     }
-    let paceFrame = config.paceFrame?()
-    if config.paceStyle.drawsMarker {
-      if coordinator.pace.position == nil {
-        coordinator.positionPace(at: measure(0, text: config.text, config: config), time: time, duration: 0)
-      }
-      if let frame = paceFrame, frame.sequence != paceSequence {
+    let paceFrame = requestPacePosition(at: time)
+    paint(coordinator.documentRect(isPace: false), style: config.mainStyle,
+      accent: config.accent, rightToLeft: config.rightToLeft, isPace: false, host: &mainHost)
+    paint(paceFrame == nil && config.paceOffset == nil ? nil : coordinator.documentRect(isPace: true),
+      style: config.paceStyle, accent: config.accent.opacity(0.72), rightToLeft: config.rightToLeft,
+      isPace: true, host: &paceHost)
+  }
+
+  /// Requests do not sample or paint. The deadline callback can run between
+  /// presentation frames, reading the same fresh providers as the draw path.
+  @discardableResult func requestPacePosition(at time: TimeInterval) -> PromptPaceCaretInterpolation? {
+    guard let config = configuration, bounds.width > 0, config.paceStyle.drawsMarker else { return nil }
+    let attempt = config.latestInput?().attemptID ?? config.attemptID
+    if paceAttemptID != attempt { paceSequence = nil; paceAttemptID = attempt }
+    let coordinator = config.coordinator
+    coordinator.prepare(attemptID: attempt)
+    let frame = config.paceFrame?()
+    let lostGeometry = coordinator.pace.position == nil
+    if lostGeometry {
+      coordinator.positionPace(at: measure(0, text: config.text, config: config), time: time, duration: 0)
+    }
+    if let frame {
+      let rawRemaining = (1 - frame.fraction) * frame.stepDuration
+      let remaining = rawRemaining.isFinite ? max(0, rawRemaining) : 0
+      let changed = frame.sequence != paceSequence || lostGeometry
+      if changed {
         // A missing/pruned target preserves the old position and folding flag.
         let rendering = config.latestRendering?()
         let offset = frame.targetGlyphID.flatMap { rendering?.characterOffset(forGlyphAt: $0) }
@@ -150,18 +191,21 @@ final class PromptCaretNativeView: NSView {
             rightToLeft: config.rightToLeft, fraction: 1, reducesMotion: true,
             afterWidth: (" " as NSString).size(withAttributes: [.font: config.font]).width)
           coordinator.positionPace(at: endpoint, time: time,
-            duration: config.reducesMotion ? 0 : max(0, (1 - frame.fraction) * frame.stepDuration))
+            duration: config.reducesMotion ? 0 : remaining)
         }
         paceSequence = frame.sequence
-      } else if config.paceFrame == nil, let offset = config.paceOffset {
-        coordinator.positionPace(at: measure(offset, text: config.text, config: config), time: time, duration: 0)
       }
+      if changed || paceTimer == nil {
+        if remaining > 0 { schedulePaceTimer(after: remaining) }
+        else { paceTimer?.invalidate(); paceTimer = nil }
+      }
+    } else {
+      paceTimer?.invalidate(); paceTimer = nil
+      if config.paceFrame == nil, let offset = config.paceOffset {
+        coordinator.positionPace(at: measure(offset, text: config.text, config: config), time: time, duration: 0)
+      } else if config.paceOffset == nil { paceHost?.isHidden = true }
     }
-    paint(coordinator.documentRect(isPace: false), style: config.mainStyle,
-      accent: config.accent, rightToLeft: config.rightToLeft, isPace: false, host: &mainHost)
-    paint(paceFrame == nil && config.paceOffset == nil ? nil : coordinator.documentRect(isPace: true),
-      style: config.paceStyle, accent: config.accent.opacity(0.72), rightToLeft: config.rightToLeft,
-      isPace: true, host: &paceHost)
+    return frame
   }
 
   private func measure(_ offset: Int?, text: AttributedString, config: Configuration) -> CGRect? {
@@ -197,5 +241,9 @@ final class PromptCaretNativeView: NSView {
   @objc func tick(_ timer: Timer) {
     guard let owner else { timer.invalidate(); return }
     owner.advance(timer)
+  }
+  @objc func paceTick(_ timer: Timer) {
+    guard let owner else { timer.invalidate(); return }
+    owner.advancePace(timer)
   }
 }
