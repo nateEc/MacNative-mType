@@ -1,5 +1,7 @@
 # Typebar
 
+当前增量：[样本声音闲置复用与播放起点](SAMPLE_SOUND_POOL_CONTRACT.md) 接通逐资源五闲置声部池、每次 rewind 和播放代次保护，活动声部不抢占，音乐独立。异步加载和真实设备听感仍开放，CFG-02 部分兼容、goal active；本轮零 GUI，下方为历史阶段。
+
 当前增量：[账户单条成绩速度图](ACCOUNT_RESULT_CHART_CONTRACT.md) 接通匿名数值发布、私有单条懒读取和原生三轨图；列表不携带样本，旧缺失不补造，跨账户／刷新响应不回写。整体仍部分兼容、goal active，窗口未验，本轮零 GUI；下方为历史阶段。
 
 当前增量：[账户每日双轴图与分钟趋势](ACCOUNT_DAILY_ACTIVITY_CONTRACT.md) 接通同图分钟柱／平均速度线、独立双轴、真实日期拟合和交点裁剪；未知数据不补零，本机图共用裁剪修正。设备与完整功能等价仍开放，整体部分兼容、goal active，零 GUI；下方为历史阶段。

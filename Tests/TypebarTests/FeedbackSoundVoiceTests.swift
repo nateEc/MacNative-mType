@@ -48,6 +48,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
       didSet { if started, trace.finishesOnVolumeChange { finish(true) } }
     }
     var started = false
+    var canReuseAfterCompletion = false
     var playCount = 0
     private var onFinish: (() -> Void)?
 
@@ -77,6 +78,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
 
     func finish(_ success: Bool) {
       started = false
+      canReuseAfterCompletion = success
       let finished = onFinish
       onFinish = nil
       finished?()
@@ -136,18 +138,21 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     XCTAssertTrue(voices.allSatisfy { $0.started })
   }
 
-  @MainActor func testSuccessfulCompletionReleasesOnlyTheFinishedVoice() {
+  @MainActor func testSuccessfulCompletionCachesOnlyTheFinishedVoiceWithoutAffectingActivePlayback() {
     let trace = Trace()
     let prototype = RecordingSound(trace)
     let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {}, randomUnit: { 0 })
     player.playClick(style: .quartz, volume: 0.5)
     player.playClick(style: .quartz, volume: 0.5)
     trace.voices[1].value?.finish(true)
-    XCTAssertNil(trace.voices[1].value)
+    XCTAssertFalse(trace.voices[1].value?.started ?? true)
     XCTAssertNotNil(trace.voices[0].value)
     XCTAssertTrue(trace.voices[0].value?.started == true)
     trace.voices[0].value?.finish(true)
-    XCTAssertNil(trace.voices[0].value)
+    XCTAssertFalse(trace.voices[0].value?.started ?? true)
+    player.playClick(style: .quartz, volume: 0.7)
+    XCTAssertEqual(trace.copies,2)
+    XCTAssertEqual(trace.starts,3)
     XCTAssertEqual(trace.stops, 0)
   }
 
@@ -337,7 +342,8 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     XCTAssertEqual(trace.stops, 0)
     XCTAssertEqual(Set(trace.voices.compactMap { $0.value.map(ObjectIdentifier.init) }).count, 256)
     for index in trace.voices.indices.reversed() { trace.voices[index].value?.finish(true) }
-    XCTAssertTrue(trace.voices.allSatisfy { $0.value == nil })
+    XCTAssertEqual(trace.voices.filter { $0.value != nil }.count,5)
+    XCTAssertTrue(trace.voices.compactMap(\.value).allSatisfy { !$0.started })
   }
 
   @MainActor func testActualSynthesizedNSSoundCopiesAreDistinctAndResetPlaybackWithoutPlaying() throws {
@@ -674,7 +680,8 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     for _ in 0..<4 { player.playClick(style: .tink, volume: 0.5) }
     trace.finishesOnVolumeChange = true
     player.setVolume(0.1)
-    XCTAssertTrue(trace.voices.allSatisfy { $0.value == nil })
+    XCTAssertEqual(trace.voices.filter { $0.value != nil }.count,4)
+    XCTAssertTrue(trace.voices.compactMap(\.value).allSatisfy { !$0.started })
     XCTAssertEqual(trace.stops, 0)
     trace.finishesOnVolumeChange = false
     player.playClick(style: .tink, volume: 0.9)

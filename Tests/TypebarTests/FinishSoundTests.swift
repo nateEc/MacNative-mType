@@ -292,7 +292,7 @@ final class FinishSoundTests: XCTestCase {
     XCTAssertEqual(prototype.copies.last?.volume, 0.7)
   }
 
-  func testFinishCompletionResetAndControllerDeallocationReleaseVoicesDespiteLateCallbacks() throws {
+  func testFinishCompletionReusesIdleVoiceButResetAndDeallocationReleaseActiveVoices() throws {
     let trace = LifecycleTrace()
     var loads = 0
     var player: TypingFeedbackSound? = TypingFeedbackSound(loadSound: { _ in
@@ -302,16 +302,18 @@ final class FinishSoundTests: XCTestCase {
     player?.playFinishReverb(volume: 0.5)
     XCTAssertNotNil(trace.voices[0].value)
     trace.completions[0]()
-    XCTAssertNil(trace.voices[0].value)
+    XCTAssertNotNil(trace.voices[0].value)
     player?.playFinishReverb(volume: 0.5)
     trace.completions[0]()
-    XCTAssertNotNil(trace.voices[1].value)
+    XCTAssertEqual(trace.voices.count,1)
+    XCTAssertEqual(trace.completions.count,2)
+    XCTAssertNotNil(trace.voices[0].value)
     player?.beginPracticeAttempt()
-    XCTAssertNil(trace.voices[1].value)
+    XCTAssertNil(trace.voices[0].value)
     XCTAssertEqual(trace.stops, 1)
     player?.playFinishReverb(volume: 0.5)
     trace.completions[1]()
-    XCTAssertNotNil(trace.voices[2].value)
+    XCTAssertNotNil(trace.voices[1].value)
     XCTAssertEqual(loads, 1)
     player = nil
     XCTAssertNil(controller.value)
@@ -319,7 +321,7 @@ final class FinishSoundTests: XCTestCase {
     for callback in trace.completions { callback() }
   }
 
-  func testSynchronousFinishAndFailedStartNeverRetainFinishVoicesOrResurrectThem() {
+  func testSynchronousFinishCachesIdleVoiceButFailedStartNeverRetainsIt() {
     for synchronousFinish in [false, true] {
       let trace = LifecycleTrace()
       trace.finishesDuringStart = synchronousFinish
@@ -327,11 +329,11 @@ final class FinishSoundTests: XCTestCase {
       let player = TypingFeedbackSound(loadSound: { _ in LifecycleVoice(trace) }, beep: {}, randomUnit: { 0 })
       player.playFinishReverb(volume: 0.5)
       XCTAssertEqual(trace.voices.count, 1)
-      XCTAssertNil(trace.voices.first?.value)
+      XCTAssertEqual(trace.voices.first?.value != nil,synchronousFinish)
       player.clearAllSounds()
       XCTAssertEqual(trace.stops, 0)
       for callback in trace.completions { callback() }
-      XCTAssertNil(trace.voices.first?.value)
+      XCTAssertEqual(trace.voices.first?.value != nil,synchronousFinish)
     }
   }
 }

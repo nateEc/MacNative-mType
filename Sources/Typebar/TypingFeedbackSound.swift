@@ -461,15 +461,38 @@ enum ClockTickPolicy {
 @MainActor
 protocol TypingSoundVoice: AnyObject {
   var volume: Float { get set }
+  var canReuseAfterCompletion: Bool { get }
   func copyForPlayback() -> (any TypingSoundVoice)?
+  func rewind()
   func play(onFinish: @escaping () -> Void) -> Bool
   func stop()
 }
 
+// Inert device doubles need no seek; the native voice implements actual rewind.
+extension TypingSoundVoice {
+  var canReuseAfterCompletion: Bool { true }
+  func rewind() {}
+}
+
+/// A callback belongs to one playback, never to a reusable sound's latest play.
+@MainActor final class NativeTypingSoundCompletion: NSObject, NSSoundDelegate {
+  private weak var expectedSound: NSSound?
+  private var callback: ((Bool) -> Void)?
+  init(sound: NSSound, _ callback: @escaping (Bool) -> Void) {
+    expectedSound = sound; self.callback = callback
+  }
+  func invalidate() { callback = nil }
+  func sound(_ sound: NSSound, didFinishPlaying flag: Bool) {
+    guard sound === expectedSound else { return }
+    let finished = callback; callback = nil; finished?(flag)
+  }
+}
+
 @MainActor
-final class NativeTypingSoundVoice: NSObject, TypingSoundVoice, NSSoundDelegate {
+final class NativeTypingSoundVoice: NSObject, TypingSoundVoice {
   let sound: NSSound
-  private var onFinish: (() -> Void)?
+  private var completion: NativeTypingSoundCompletion?
+  private(set) var canReuseAfterCompletion = false
 
   init(sound: NSSound) {
     self.sound = sound
@@ -487,21 +510,26 @@ final class NativeTypingSoundVoice: NSObject, TypingSoundVoice, NSSoundDelegate 
     return NativeTypingSoundVoice(sound: copy)
   }
 
+  func rewind() { sound.currentTime = 0 }
+
   func play(onFinish: @escaping () -> Void) -> Bool {
-    self.onFinish = onFinish
-    sound.delegate = self
+    completion?.invalidate()
+    canReuseAfterCompletion = false
+    let callback = NativeTypingSoundCompletion(sound:sound) { [weak self] success in
+      self?.canReuseAfterCompletion = success
+      onFinish()
+    }
+    completion = callback
+    sound.delegate = callback
     let started = sound.play()
-    if !started { self.onFinish = nil }
+    if !started { callback.invalidate() }
     return started
   }
 
-  func stop() { _ = sound.stop() }
-
-  func sound(_ sound: NSSound, didFinishPlaying flag: Bool) {
-    guard sound === self.sound else { return }
-    let finished = onFinish
-    onFinish = nil
-    finished?()
+  func stop() {
+    completion?.invalidate()
+    canReuseAfterCompletion = false
+    _ = sound.stop()
   }
 }
 
@@ -523,7 +551,13 @@ final class TypingFeedbackSound {
   private var cachedSources: [TypingClickPlaybackSource: any TypingSoundVoice] = [:]
   private var loadingSources: Set<TypingClickPlaybackSource> = []
   private var configuredClickStyle: TypingClickSoundStyle?
-  private var activeVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
+  private struct SamplePlayback {
+    let voice: any TypingSoundVoice
+    let token: UUID
+  }
+  private var activeVoices: [ObjectIdentifier: SamplePlayback] = [:]
+  private var idleVoices: [TypingClickPlaybackSource: [SamplePlayback]] = [:]
+  static let maximumIdleVoicesPerSource = 5
   private var musicalVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
   private var currentKeyCode: UInt16 = 0
   private var currentModifierFlags: NSEvent.ModifierFlags = []
@@ -550,7 +584,7 @@ final class TypingFeedbackSound {
   func setVolume(_ volume: Double) {
     guard volume.isFinite, (0...1).contains(volume) else { return }
     configuredVolume = volume
-    let voices = Array(activeVoices.values)
+    let voices = activeVoices.values.map(\.voice)
     for voice in voices { voice.volume = Float(volume) }
   }
 
@@ -589,7 +623,7 @@ final class TypingFeedbackSound {
   }
 
   func clearAllSounds() {
-    let voices = Array(activeVoices.values)
+    let voices = activeVoices.values.map(\.voice)
     activeVoices.removeAll(keepingCapacity: true)
     warningVoice = nil
     finishVoice = nil
@@ -740,7 +774,8 @@ final class TypingFeedbackSound {
     restarting: RestartingSampleChannel? = nil) -> Bool {
     guard let effectiveVolume = playbackVolume(volume) else { return false }
     guard let prototype = prototype(for: source),
-      let voice = prototype.copyForPlayback(), voice !== prototype else {
+      let voice = idleVoices[source]?.popLast()?.voice ?? prototype.copyForPlayback(),
+      voice !== prototype, activeVoices[ObjectIdentifier(voice)] == nil else {
       return false
     }
 
@@ -757,18 +792,36 @@ final class TypingFeedbackSound {
       previous.stop()
     }
     let identity = ObjectIdentifier(voice)
-    activeVoices[identity] = voice
+    let playback = SamplePlayback(voice:voice,token:UUID())
+    activeVoices[identity] = playback
     switch restarting {
     case .timeWarning: warningVoice = voice
     case .finishReverb: finishVoice = voice
     case nil: break
     }
     voice.volume = Float(effectiveVolume)
+    voice.rewind()
+    let token = playback.token
     let started = voice.play { [weak self, weak voice] in
-      guard let self, let voice, self.activeVoices[identity] === voice else { return }
+      guard let self, let voice, let current = self.activeVoices[identity],
+        current.voice === voice, current.token == token else { return }
       self.activeVoices.removeValue(forKey: identity)
+      if self.warningVoice === voice { self.warningVoice = nil }
+      if self.finishVoice === voice { self.finishVoice = nil }
+      if voice.canReuseAfterCompletion, self.idleVoices[source,default:[]].count < Self.maximumIdleVoicesPerSource {
+        self.idleVoices[source,default:[]].append(current)
+      }
     }
-    if !started { activeVoices.removeValue(forKey: identity) }
+    if !started {
+      if activeVoices[identity] == nil || activeVoices[identity]?.token == token {
+        activeVoices.removeValue(forKey: identity)
+        if warningVoice === voice { warningVoice = nil }
+        if finishVoice === voice { finishVoice = nil }
+      }
+      // A device can complete synchronously and then report failed start.
+      // Do not retain that failure, or remove a newer play of the same voice.
+      idleVoices[source]?.removeAll { $0.token == token }
+    }
     return started
   }
 }
