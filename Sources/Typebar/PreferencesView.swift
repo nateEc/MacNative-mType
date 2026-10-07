@@ -51,6 +51,7 @@ struct PreferencesView: View {
   @State private var showingAccountResetConfirmation = false
   @State private var showingRemoteResultsDeletionConfirmation = false
   @State private var showingAccountHistory = false
+  @State private var accountResultExportTask: Task<Void, Never>?
   @State private var showingRemotePersonalBestResetConfirmation = false
   @State private var showingSessionRevocationConfirmation = false
   @State private var showingRestoreDefaultsConfirmation = false
@@ -1373,7 +1374,7 @@ struct PreferencesView: View {
                     AccountHistoryView(settings: settings, account: account)
                   }
                 Button("导出全部 CSV…") { exportRemoteResultsCSV() }
-                  .disabled(account.isWorking)
+                  .disabled(account.isWorking || accountResultExportTask != nil)
                 Button("刷新") { Task { await account.refreshRemoteResults() } }
                   .disabled(account.isWorking)
               }
@@ -2219,6 +2220,8 @@ struct PreferencesView: View {
         families: installedFontFamilies)
     }
     .onAppear { customBackgroundURLDraft = settings.customBackgroundURL }
+    .onDisappear { accountResultExportTask?.cancel() }
+    .onChange(of: account.resultPublicationScope) { accountResultExportTask?.cancel() }
     .frame(width: 440)
     .padding()
   }
@@ -2235,20 +2238,25 @@ struct PreferencesView: View {
   }
 
   private func exportRemoteResultsCSV() {
-    Task {
-      guard let results = await account.remoteResultsForExport() else { return }
-      guard !results.isEmpty else {
-        account.statusMessage = "没有可导出的服务端成绩。"
-        return
-      }
+    guard accountResultExportTask == nil else { return }
+    let request: AccountHistoryExportRequest
+    do { request = try account.beginAccountResultExport() }
+    catch { account.statusMessage = error.localizedDescription; return }
+    accountResultExportTask = Task {
+      defer { accountResultExportTask = nil }
+      guard let snapshot = await account.remoteResultsForExport(request),
+        account.isCurrentAccountResultExport(snapshot) else { return }
       let panel = NSSavePanel()
       panel.allowedContentTypes = [.commaSeparatedText]
       panel.nameFieldStringValue = RemoteResultCSVExport.filename(for: .now)
       panel.canCreateDirectories = true
       guard panel.runModal() == .OK, let url = panel.url else { return }
+      guard let data = account.accountResultExportData(snapshot) else {
+        account.statusMessage = "账户或服务器已切换，未导出。"; return
+      }
       do {
-        try RemoteResultCSVExport.data(for: results).write(to: url, options: .atomic)
-        account.statusMessage = "已导出 \(results.count) 条服务端成绩；不含提示或输入回放。"
+        try data.write(to: url, options: .atomic)
+        account.statusMessage = "已导出 \(snapshot.rows.count) 条服务端成绩；不含提示或输入回放。"
       } catch {
         account.statusMessage = "无法保存服务端成绩 CSV 文件。"
       }

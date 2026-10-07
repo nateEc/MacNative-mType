@@ -77,10 +77,27 @@ struct AccountHistoryDay: Equatable, Identifiable {
 
 struct AccountHistoryExportSnapshot {
   let scope: ResultPublicationScope
+  let generation: UInt64
   let rows: [RemoteAccountResult]
-  func data(currentScope: ResultPublicationScope?) -> Data? {
-    guard scope == currentScope else { return nil }
+  func data(currentScope: ResultPublicationScope?, generation: UInt64) -> Data? {
+    guard scope == currentScope, self.generation == generation else { return nil }
     return Data(RemoteResultCSVExport.csvString(for: rows).utf8)
+  }
+}
+
+/// Conditions are captured at the click, independently of list/cache pagination.
+struct AccountHistoryExportRequest {
+  let scope: ResultPublicationScope
+  let generation: UInt64
+  let filter: ResultHistoryFilter
+  let sortField: ResultHistorySortField
+  let sortDirection: ResultHistorySortDirection
+  let now: Date
+
+  func snapshot(_ rows: [RemoteAccountResult]) -> AccountHistoryExportSnapshot {
+    .init(scope: scope, generation: generation, rows: AccountHistoryQuery.sorted(
+      AccountHistoryQuery.matching(rows, scope: scope, filter: filter, now: now),
+      by: sortField, direction: sortDirection))
   }
 }
 

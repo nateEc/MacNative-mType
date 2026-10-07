@@ -2043,6 +2043,7 @@ final class AccountSession {
             defaults.set(endpoint, forKey: endpointKey)
             tokenStore.setEndpoint(endpoint)
             guard changedServer else { return }
+            accountResultExportGeneration &+= 1
             currentUser = nil
             pendingOAuthRegistration = nil
             statusMessage = nil
@@ -2051,6 +2052,7 @@ final class AccountSession {
     var currentUser: RemoteAccountUser? {
         didSet {
             if currentUser?.id != oldValue?.id {
+                accountResultExportGeneration &+= 1
                 invalidateAccountTagDirectory()
                 invalidateAccountTagHistory()
                 invalidateAccountFilterPresets()
@@ -2063,6 +2065,7 @@ final class AccountSession {
     }
     var developerAccessKeys: [RemoteDeveloperAccessKey] = []
     var remoteResults: [RemoteAccountResult] = []
+    private var accountResultExportGeneration: UInt64 = 0
     private(set) var accountFilterPresetCache: AccountFilterPresetCache?
     private var accountFilterPresetGeneration: UInt64 = 0
     private var accountFilterPresetMutation: UUID?
@@ -2994,16 +2997,67 @@ final class AccountSession {
         accountTagRevision &+= 1
     }
 
-    func remoteResultsForExport() async -> [RemoteAccountResult]? {
+    func beginAccountResultExport(filter: ResultHistoryFilter = .init(),
+        sortField: ResultHistorySortField = .finishedAt,
+        sortDirection: ResultHistorySortDirection = .descending, now: Date = .now
+    ) throws -> AccountHistoryExportRequest {
+        guard let scope = resultPublicationScope else { throw RemoteAccountError.accountScopeChanged }
+        if let tags = filter.accountTagFilter {
+            guard tags.scope == scope, hasAccountTagDirectory else { throw RemoteAccountError.accountScopeChanged }
+        }
+        return .init(scope: scope, generation: accountResultExportGeneration, filter: filter,
+            sortField: sortField, sortDirection: sortDirection, now: now)
+    }
+
+    private func validateAccountResultExport(_ request: AccountHistoryExportRequest) throws {
+        try Task.checkCancellation()
+        guard resultPublicationScope == request.scope, accountResultExportGeneration == request.generation else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+    }
+
+    /// The injected page operation is also used by isolated tests; no keychain or HTTP required.
+    func loadAccountResultsForExport(_ request: AccountHistoryExportRequest, pageSize: Int = 1_000,
+        loadPage: (_ offset: Int, _ limit: Int) async throws -> RemoteAccountResultPage
+    ) async throws -> AccountHistoryExportSnapshot {
+        try validateAccountResultExport(request)
+        let rows = try await RemoteResultCSVExport.loadAll(pageSize: pageSize) { offset, limit in
+            try self.validateAccountResultExport(request)
+            let page = try await loadPage(offset, limit)
+            try self.validateAccountResultExport(request)
+            return page
+        }
+        try validateAccountResultExport(request)
+        return request.snapshot(rows)
+    }
+
+    func accountResultExportData(_ snapshot: AccountHistoryExportSnapshot) -> Data? {
+        guard !Task.isCancelled else { return nil }
+        return snapshot.data(currentScope: resultPublicationScope, generation: accountResultExportGeneration)
+    }
+
+    func isCurrentAccountResultExport(_ snapshot: AccountHistoryExportSnapshot) -> Bool {
+        !Task.isCancelled && resultPublicationScope == snapshot.scope && accountResultExportGeneration == snapshot.generation
+    }
+
+    func remoteResultsForExport(_ request: AccountHistoryExportRequest) async -> AccountHistoryExportSnapshot? {
+        do { try validateAccountResultExport(request) }
+        catch { return nil } // An old click must not read credentials or replace a new session's status.
+        guard !isWorking else {
+            statusMessage = "请等待当前服务请求完成后再导出。"
+            return nil
+        }
         guard let token = tokenStore.load(), currentUser != nil else {
             statusMessage = "请先登录自建 Typebar 服务。"
             return nil
         }
         isWorking = true
         defer { isWorking = false }
+        let requestEndpoint = endpoint
         do {
-            return try await RemoteResultCSVExport.loadAll { offset, limit in
-                try await RemoteAccountAPI(endpoint: endpoint).request(
+            return try await loadAccountResultsForExport(request) { offset, limit in
+                guard self.tokenStore.load() == token else { throw RemoteAccountError.accountScopeChanged }
+                return try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                     path: "v1/results", method: "GET", token: token,
                     body: Optional<String>.none,
                     queryItems: [
@@ -3013,10 +3067,14 @@ final class AccountSession {
                     response: RemoteAccountResultPage.self)
             }
         } catch let error as RemoteResultCSVExportError where error == .changedDuringExport {
-            statusMessage = "导出期间服务端成绩发生变化，请稍后重试。"
+            if resultPublicationScope == request.scope, accountResultExportGeneration == request.generation {
+                statusMessage = "导出期间服务端成绩发生变化，请稍后重试。"
+            }
             return nil
         } catch {
-            statusMessage = error.localizedDescription
+            if resultPublicationScope == request.scope, accountResultExportGeneration == request.generation {
+                statusMessage = error is CancellationError ? "导出已取消，未保存文件。" : error.localizedDescription
+            }
             return nil
         }
     }

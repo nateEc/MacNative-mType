@@ -60,18 +60,21 @@ class OwnedQuery {
 const aggregate=name=>field=>({...field,aggregate:name});
 const context=vm.createContext({Date,Query:OwnedQuery,resultsCollection:[],authenticated:true,
   isAuthenticated:()=>context.authenticated,useLiveQuery:callback=>callback(new OwnedQuery())?.evaluate(),
+  queryOnce:async callback=>callback(new OwnedQuery())?.evaluate(),
   sum:aggregate('sum'),count:aggregate('count'),avg:aggregate('avg'),max:aggregate('max'),
   eq:(a,b)=>a===b,gte:(a,b)=>a>=b,inArray:(value,array)=>array.includes(value),length:array=>array.length,
   not:value=>!value,or:(...values)=>values.some(Boolean)});
 const source=fs.readFileSync(path.join(root,'frontend/src/ts/collections/results.ts'),'utf8');
 const code=[bounded(source,'export function useResultStatsLiveQuery(',
     '// oxlint-disable-next-line typescript/explicit-function-return-type\nexport async function getResultsQueryOnce'),
+  bounded(source,'export async function getResultsQueryOnce(','/**\n * get list of SnapshotResults'),
   bounded(source,'export function buildResultsQuery(','function calcTimeTyping('),
   bounded(source,'function calcTimeTyping(',
     '// oxlint-disable-next-line typescript/explicit-function-return-type\nexport const getSingleResultQueryOptions'),
   bounded(source,'function normalizeResult(','const resultsCollection =')].join('\n');
 new vm.Script(stripTypeScriptTypes(code,{mode:'transform'})).runInContext(context);
 assert.equal(context.useResultStatsLiveQuery(()=>undefined),undefined);
+assert.equal(await context.getResultsQueryOnce({queryState:()=>undefined,sorting:()=>{throw new Error('Missing state must return first');}}),undefined);
 context.authenticated=false;assert.equal(context.useResultStatsLiveQuery(()=>({})),undefined);context.authenticated=true;
 const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222'];
 const fixtures=[],dayFixtures=[],modifierFixtures=[],metadataFixtures=[],polyglotFixtures=[];
@@ -116,7 +119,16 @@ for(const size of [0,9,11,25]) for(let bits=0;bits<8;bits++) for(const mode of [
     if(['custom','zen'].includes(row.mode)) wire.mode2=row.mode;
     return wire;
   });
-  fixtures.push({wireRows,selectedIDs,includesNoTags,mode,matchedIDs,all,recent,days});
+  const exports=[];
+  for(const [field,nativeField] of [['timestamp','finishedAt'],['wpm','wpm'],['rawWpm','rawWpm'],['acc','accuracy'],['consistency','consistency']]) {
+    for(const direction of ['asc','desc']) {
+      // Execute the actual export query, not a reimplementation or the limited live table query.
+      const rows=await context.getResultsQueryOnce({queryState:()=>state,sorting:()=>({field,direction})});
+      assert.equal(rows.length,matchedIDs.length);
+      exports.push({field:nativeField,direction:direction==='asc'?'ascending':'descending',ids:rows.map(row=>row._id)});
+    }
+  }
+  fixtures.push({wireRows,selectedIDs,includesNoTags,mode,matchedIDs,all,recent,days,exports});
 }
 const metadataRows=fixtures.find(f=>f.wireRows.length===25&&f.mode==='all'&&f.includesNoTags&&f.selectedIDs.length===2).wireRows;
 context.resultsCollection=metadataRows.map(row=>context.normalizeResult({
@@ -185,4 +197,4 @@ assert.equal(fixtures.length,96);assert.equal(dayFixtures.length,4);assert.equal
 assert.equal(metadataFixtures.length,192);assert.equal(quoteFixtures.length,6);verify();
 assert.equal(polyglotFixtures.length,32);
 console.log(emit?JSON.stringify({referenceCommit:pin,ids,fixtures,dayFixtures,modifierFixtures,polyglotFixtures,metadataRows,metadataFixtures,quoteFixtures}):
-  'Account history statistics source passed (96 collections, all/recent-ten/daily aggregates, 4 timezones, 9 legacy and 32 independent polyglot queries, 192 PB/quote-length queries and 6 owned quote-classification boundaries; complete pinned functions/class; owned eager adapters, no TanStack/DOM/HTTP/GUI)');
+  'Account history statistics source passed (96 collections, 960 full export orders, all/recent-ten/daily aggregates, 4 timezones, 9 legacy and 32 independent polyglot queries, 192 PB/quote-length queries and 6 owned quote-classification boundaries; complete pinned functions/class; owned eager adapters, no TanStack/DOM/HTTP/GUI)');

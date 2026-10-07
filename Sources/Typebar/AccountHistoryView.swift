@@ -17,6 +17,7 @@ struct AccountHistoryView: View {
   @State private var selectedGraphResult: UUID?
   @State private var selectedGraphScope: ResultPublicationScope?
   @State private var message: String?
+  @State private var exportTask: Task<Void, Never>?
   @State private var presetName = ""
   @State private var deletingPreset: PresetDeletion?
   private struct PresetDeletion { let id: UUID; let name: String; let scope: ResultPublicationScope }
@@ -117,7 +118,9 @@ struct AccountHistoryView: View {
         ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } }
         ToolbarItem { Button("刷新") { Task { await account.refreshRemoteResults(); await account.refreshAccountFilterPresets() } }
           .disabled(account.isWorking || account.isEditingAccountFilterPresets || account.isLoadingAccountFilterPresets) }
-        ToolbarItem { Button("导出筛选后的 CSV…", action: exportCSV).disabled(rows.isEmpty) }
+        ToolbarItem { Button("导出全部匹配 CSV…", action: exportCSV)
+          .disabled(scope == nil || account.isWorking || exportTask != nil
+            || (filter.accountTagFilter != nil && !account.hasAccountTagDirectory)) }
       }
     }
     .frame(minWidth: 700, idealWidth: 850, minHeight: 520, idealHeight: 700)
@@ -131,7 +134,8 @@ struct AccountHistoryView: View {
     .onChange(of: filter) { resetPage() }
     .onChange(of: sortField) { resetPage() }
     .onChange(of: sortDirection) { resetPage() }
-    .onChange(of: account.resultPublicationScope) { filter = .init(); message = nil; presetName = ""; deletingPreset = nil; resetPage() }
+    .onDisappear { exportTask?.cancel() }
+    .onChange(of: account.resultPublicationScope) { exportTask?.cancel(); filter = .init(); message = nil; presetName = ""; deletingPreset = nil; resetPage() }
     .onChange(of: account.accountTagRevision) {
       if let scope = account.resultPublicationScope, account.hasAccountTagDirectory {
         filter.accountTagFilter?.reconcile(scope: scope, knownIDs: Set(account.accountTags.map(\.id)))
@@ -211,7 +215,7 @@ struct AccountHistoryView: View {
   private var scopeNotice: some View {
     VStack(alignment: .leading, spacing: 5) {
       Text(account.currentUser?.displayName ?? "未登录").font(.title2.weight(.semibold))
-      Text("仅当前账户与服务器的已载入元数据，不含本机历史。筛选、统计、最近十条和 CSV 使用整个已载入集合，不受列表分页或排序限制。")
+      Text("仅当前账户与服务器的已载入元数据，不含本机历史。筛选、统计和最近十条使用整个已载入集合。CSV 另从服务分页读取全部成绩，再按点击时的筛选与排序导出，不受已载入数量或列表分页限制。")
       if let cache = account.accountTagHistoryCache, cache.scope == account.resultPublicationScope {
         Text("已载入 \(account.accountHistoryLoadedResults.count) 条；初始最多最近 1,000 条，新接受成绩随后补入。这不是服务端全部历史或账户总计。")
         if !account.isAccountTagHistoryReady {
@@ -302,20 +306,27 @@ struct AccountHistoryView: View {
   }
 
   private func exportCSV() {
-    guard let scope = account.resultPublicationScope else { return }
-    let snapshot = AccountHistoryExportSnapshot(scope: scope, rows: sorted)
-    let panel = NSSavePanel()
-    panel.allowedContentTypes = [.commaSeparatedText]
-    panel.nameFieldStringValue = RemoteResultCSVExport.filename(for: .now)
-    panel.canCreateDirectories = true
-    guard panel.runModal() == .OK, let url = panel.url else { return }
-    guard let data = snapshot.data(currentScope: account.resultPublicationScope) else {
-      message = "账户或服务器已切换，未导出。"; return
-    }
+    guard exportTask == nil else { return }
     do {
-      try data.write(to: url, options: .atomic)
-      message = "已导出筛选后的 \(snapshot.rows.count) 条已载入元数据，不含提示或回放；不是服务端全部历史。"
-    } catch { message = "无法保存 CSV 文件。" }
+      let request = try account.beginAccountResultExport(filter: filter, sortField: sortField, sortDirection: sortDirection)
+      exportTask = Task {
+        defer { exportTask = nil }
+        guard let snapshot = await account.remoteResultsForExport(request),
+          account.isCurrentAccountResultExport(snapshot) else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.nameFieldStringValue = RemoteResultCSVExport.filename(for: .now)
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let data = account.accountResultExportData(snapshot) else {
+          message = "账户或服务器已切换，未导出。"; return
+        }
+        do {
+          try data.write(to: url, options: .atomic)
+          message = "已从服务完整读取并导出 \(snapshot.rows.count) 条匹配元数据；使用点击时的筛选和排序，不含提示或回放。"
+        } catch { message = "无法保存 CSV 文件。" }
+      }
+    } catch { message = error.localizedDescription }
   }
 }
 

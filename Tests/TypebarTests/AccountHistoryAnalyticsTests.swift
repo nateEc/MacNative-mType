@@ -3,6 +3,182 @@ import XCTest
 @testable import Typebar
 
 final class AccountHistoryAnalyticsTests: XCTestCase {
+  @MainActor private func isolatedExportSession(_ body: (AccountSession) async throws -> Void) async throws {
+    let suite = "TypebarTests.full-export.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let account = AccountSession(defaults: defaults)
+    account.currentUser = .init(id: UUID(), email: "owned@example.invalid", displayName: "Owned", totalExperience: 0)
+    try await body(account)
+  }
+
+  @MainActor func testCompleteExportReadsBeyondOneThousandAndIgnoresTheRecentCache() async throws {
+    try await isolatedExportSession { account in
+      let rows = try (0..<1_005).map { try self.row(speed: 40 + Double($0 % 100), raw: 160, time: Double($0) + 115) }
+      account.remoteResults = Array(rows.prefix(20))
+      let now = Date(timeIntervalSinceReferenceDate: 115 + 1_000 + 86_400)
+      var filter = ResultHistoryFilter(dateRange: .lastDay)
+      let request = try account.beginAccountResultExport(filter: filter, sortField: .wpm, sortDirection: .ascending, now: now)
+      filter.dateRange = .all // Editing controls after the click must not change this request.
+      var offsets: [Int] = []
+      let snapshot = try await account.loadAccountResultsForExport(request) { offset, limit in
+        offsets.append(offset)
+        XCTAssertEqual(limit, 1_000)
+        return .init(results: Array(rows.dropFirst(offset).prefix(limit)), total: rows.count)
+      }
+      XCTAssertEqual(offsets, [0, 1_000])
+      XCTAssertEqual(snapshot.rows.map(\.id), Array(rows.suffix(5)).map(\.id))
+      XCTAssertEqual(account.remoteResults.map(\.id), Array(rows.prefix(20)).map(\.id), "Export must not replace the displayed cache")
+      let csv = String(decoding: try XCTUnwrap(account.accountResultExportData(snapshot)), as: UTF8.self)
+      XCTAssertEqual(csv.components(separatedBy: "\r\n").count, 7)
+      XCTAssertEqual(RemoteResultCSVExport.columns.count, 32)
+    }
+  }
+
+  @MainActor func testCapturedAccountTagSelectionFiltersAllPagesWithoutRequiringALoadedMatch() async throws {
+    try await isolatedExportSession { account in
+      let scope = try XCTUnwrap(account.resultPublicationScope)
+      let directory = try JSONDecoder().decode(RemoteAccountTagList.self, from: Data(#"{"version":1,"tags":[]}"#.utf8))
+      let filter = ResultHistoryFilter(accountTagFilter: .init(scope: scope, knownIDs: [], selectedIDs: [], includesNoTags: true))
+      XCTAssertThrowsError(try account.beginAccountResultExport(filter: filter), "Unknown directory must not become an all filter")
+      try account.applyAccountTagDirectory(directory, read: account.beginAccountTagDirectoryRead())
+      let rows = try [self.row(tags: nil), self.row(speed: 70, raw: 100, tags: []), self.row(speed: 80, raw: 100, tags: [])]
+      let request = try account.beginAccountResultExport(filter: filter, sortField: .wpm, sortDirection: .descending)
+      let snapshot = try await account.loadAccountResultsForExport(request, pageSize: 1) { offset, limit in
+        .init(results: Array(rows.dropFirst(offset).prefix(limit)), total: rows.count)
+      }
+      XCTAssertTrue(account.accountHistoryLoadedResults.isEmpty)
+      XCTAssertEqual(snapshot.rows.map(\.id), [rows[2].id, rows[1].id])
+      let emptyRequest = try account.beginAccountResultExport(filter: .init(modes: []))
+      let empty = try await account.loadAccountResultsForExport(emptyRequest) { _, _ in .init(results: rows, total: rows.count) }
+      XCTAssertTrue(empty.rows.isEmpty)
+      XCTAssertEqual(account.accountResultExportData(empty), Data((RemoteResultCSVExport.columns.joined(separator: ",") + "\r\n").utf8))
+    }
+  }
+
+  @MainActor func testPageCompletionAfterLogoutAndSameAccountLoginStopsBeforeAnotherPage() async throws {
+    try await isolatedExportSession { account in
+      let user = try XCTUnwrap(account.currentUser), request = try account.beginAccountResultExport()
+      let row = try self.row()
+      var calls = 0
+      do {
+        _ = try await account.loadAccountResultsForExport(request, pageSize: 1) { _, _ in
+          calls += 1
+          await Task.yield()
+          account.currentUser = nil; account.currentUser = user
+          return .init(results: [row], total: 2)
+        }
+        XCTFail("An obsolete page must never produce a snapshot")
+      } catch let error as RemoteAccountError {
+        guard case .accountScopeChanged = error else { return XCTFail("Unexpected error: \(error)") }
+      }
+      XCTAssertEqual(calls, 1)
+      do {
+        _ = try await account.loadAccountResultsForExport(request) { _, _ in
+          XCTFail("Stale requests must fail before loading a page"); return .init(results: [], total: 0)
+        }
+        XCTFail("A stale request must not revive")
+      } catch let error as RemoteAccountError {
+        guard case .accountScopeChanged = error else { return XCTFail("Unexpected error: \(error)") }
+      }
+    }
+  }
+
+  @MainActor func testExportSnapshotRejectsEndpointABAAndOtherAccountButKeepsProfileRefresh() async throws {
+    try await isolatedExportSession { account in
+      let user = try XCTUnwrap(account.currentUser), endpoint = account.endpoint
+      let snapshot = try account.beginAccountResultExport().snapshot(try [self.row()])
+      account.currentUser = user
+      XCTAssertTrue(account.isCurrentAccountResultExport(snapshot), "Same-user profile updates must not invalidate export")
+      XCTAssertTrue(account.updateEndpoint(endpoint + "/"))
+      XCTAssertTrue(account.isCurrentAccountResultExport(snapshot), "Equivalent server spelling is not a switch")
+      account.currentUser = .init(id: UUID(), email: "other@example.invalid", displayName: "Other", totalExperience: 0)
+      XCTAssertNil(account.accountResultExportData(snapshot))
+      account.currentUser = user
+      XCTAssertNil(account.accountResultExportData(snapshot))
+      let next = try account.beginAccountResultExport().snapshot(try [self.row()])
+      XCTAssertTrue(account.updateEndpoint("https://other.invalid"))
+      XCTAssertTrue(account.updateEndpoint(endpoint))
+      account.currentUser = user
+      XCTAssertNil(account.accountResultExportData(next))
+    }
+  }
+
+  @MainActor func testFailedOrChangingLaterPageCannotExportTheSuccessfulPrefix() async throws {
+    try await isolatedExportSession { account in
+      enum OwnedFailure: Error { case page }
+      let rows = try [self.row(), self.row()], request = try account.beginAccountResultExport()
+      for changesTotal in [false, true] {
+        var calls = 0
+        do {
+          _ = try await account.loadAccountResultsForExport(request, pageSize: 1) { offset, _ in
+            calls += 1
+            if offset == 1, !changesTotal { throw OwnedFailure.page }
+            return .init(results: [rows[offset]], total: offset == 1 ? 3 : 2)
+          }
+          XCTFail("No partial export is allowed")
+        } catch {
+          if changesTotal { XCTAssertEqual(error as? RemoteResultCSVExportError, .changedDuringExport) }
+          else { XCTAssertTrue(error is OwnedFailure) }
+        }
+        XCTAssertEqual(calls, 2)
+      }
+      XCTAssertTrue(account.remoteResults.isEmpty)
+      let recovered = try await account.loadAccountResultsForExport(request) { _, _ in .init(results: rows, total: 2) }
+      XCTAssertEqual(recovered.rows.count, 2, "A failed read must not poison a subsequent export")
+    }
+  }
+
+  @MainActor func testCancellationDuringPageAwaitRejectsTheReturnedPageAndStopsPagination() async throws {
+    try await isolatedExportSession { account in
+      let request = try account.beginAccountResultExport(), row = try self.row()
+      let (started, signal) = AsyncStream<Void>.makeStream()
+      var completion: CheckedContinuation<RemoteAccountResultPage, Never>?
+      var calls = 0
+      let task = Task { @MainActor in
+        try await account.loadAccountResultsForExport(request, pageSize: 1) { _, _ in
+          calls += 1
+          return await withCheckedContinuation { continuation in
+            completion = continuation; signal.yield(())
+          }
+        }
+      }
+      for await _ in started { break }
+      task.cancel()
+      try XCTUnwrap(completion).resume(returning: .init(results: [row], total: 2))
+      signal.finish()
+      do { _ = try await task.value; XCTFail("Cancelled page must not become a snapshot") }
+      catch { XCTAssertTrue(error is CancellationError) }
+      XCTAssertEqual(calls, 1)
+    }
+  }
+
+  @MainActor func testExportCannotSurviveLogoutAndSignInToTheSameScope() throws {
+    let suite = "TypebarTests.export-aba.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let account = AccountSession(defaults: defaults)
+    let user = RemoteAccountUser(id: UUID(), email: "owned@example.invalid", displayName: "Owned", totalExperience: 0)
+    account.currentUser = user
+    let active = try XCTUnwrap(account.resultPublicationScope)
+    let snapshot = try account.beginAccountResultExport().snapshot(try [row()])
+    XCTAssertNotNil(account.accountResultExportData(snapshot))
+    account.currentUser = nil
+    account.currentUser = user
+    XCTAssertEqual(account.resultPublicationScope, active)
+    XCTAssertNil(account.accountResultExportData(snapshot), "A previous login's pending export must not revive")
+  }
+
+  @MainActor func testObsoleteClickReturnsBeforeCredentialsBusyStateOrStatusChanges() async throws {
+    try await isolatedExportSession { account in
+      let request = try account.beginAccountResultExport()
+      account.currentUser = nil
+      account.isWorking = true
+      account.statusMessage = "New session status"
+      let result = await account.remoteResultsForExport(request)
+      XCTAssertNil(result)
+      XCTAssertEqual(account.statusMessage, "New session status")
+      XCTAssertTrue(account.isWorking, "An obsolete task must not release another operation's busy state")
+    }
+  }
   private let scope = ResultPublicationScope(endpoint: "https://owned.invalid", userID: UUID())
   private func row(speed: Double = 80.49, raw: Double = 90.31, time: Double = 115,
     tags: [UUID]? = [], restartCount: Int? = 0, prior: Int? = 0,
@@ -150,14 +326,15 @@ final class AccountHistoryAnalyticsTests: XCTestCase {
   func testCSVExportsWholeSortedFilterSnapshotAndRejectsAccountEndpointLogoutChanges() throws {
     let rows = try (0..<25).map { try row(time: Double($0) + 115) }
     let sorted = AccountHistoryQuery.sorted(rows)
-    let snapshot = AccountHistoryExportSnapshot(scope: scope, rows: sorted)
-    let csv = String(decoding: try XCTUnwrap(snapshot.data(currentScope: scope)), as: UTF8.self)
+    let snapshot = AccountHistoryExportSnapshot(scope: scope, generation: 7, rows: sorted)
+    let csv = String(decoding: try XCTUnwrap(snapshot.data(currentScope: scope, generation: 7)), as: UTF8.self)
     XCTAssertEqual(csv.components(separatedBy: "\r\n").count, 27)
     XCTAssertTrue(csv.components(separatedBy: "\r\n")[1].hasPrefix(sorted[0].id.uuidString.lowercased()))
     XCTAssertTrue(csv.contains("80.49")); XCTAssertFalse(csv.contains("prompt")); XCTAssertFalse(csv.contains("replay"))
-    XCTAssertNil(snapshot.data(currentScope: nil))
-    XCTAssertNil(snapshot.data(currentScope: .init(endpoint: "https://owned.invalid", userID: UUID())))
-    XCTAssertNil(snapshot.data(currentScope: .init(endpoint: "https://other.invalid", userID: scope.userID)))
+    XCTAssertNil(snapshot.data(currentScope: nil, generation: 7))
+    XCTAssertNil(snapshot.data(currentScope: .init(endpoint: "https://owned.invalid", userID: UUID()), generation: 7))
+    XCTAssertNil(snapshot.data(currentScope: .init(endpoint: "https://other.invalid", userID: scope.userID), generation: 7))
+    XCTAssertNil(snapshot.data(currentScope: scope, generation: 8))
   }
 
   @MainActor func testRealSessionExposesLoadedRowsBeyondTwentyAndInvalidatesAtScopeChange() throws {
@@ -278,6 +455,8 @@ final class AccountHistoryAnalyticsTests: XCTestCase {
     struct Fixture: Decodable {
       let wireRows: [RemoteAccountResult]; let selectedIDs: Set<UUID>; let includesNoTags: Bool
       let mode: String; let matchedIDs: [UUID]; let all: Stats; let recent: Stats; let days: [Stats]
+      struct Export: Decodable { let field: String; let direction: String; let ids: [UUID] }
+      let exports: [Export]
     }
     struct Day: Decodable { let timeZone: String; let timestamps: [Double]; let expected: [Double] }
     struct Modifier: Decodable { let controls: [String]; let selection: String; let matches: Bool }
@@ -329,6 +508,14 @@ final class AccountHistoryAnalyticsTests: XCTestCase {
           selectedIDs: fixture.selectedIDs, includesNoTags: fixture.includesNoTags))
       let rows = AccountHistoryQuery.matching(fixture.wireRows, scope: scope, filter: filter)
       XCTAssertEqual(rows.map(\.id), fixture.matchedIDs)
+      XCTAssertEqual(fixture.exports.count, 10)
+      for export in fixture.exports {
+        let request = AccountHistoryExportRequest(scope: scope, generation: 7, filter: filter,
+          sortField: try XCTUnwrap(ResultHistorySortField(rawValue: export.field)),
+          sortDirection: try XCTUnwrap(ResultHistorySortDirection(rawValue: export.direction)), now: .now)
+        XCTAssertEqual(request.snapshot(fixture.wireRows).rows.map(\.id), export.ids,
+          "Complete export: \(fixture.mode)/\(export.field)/\(export.direction)")
+      }
       try compare(AccountHistoryStatistics(rows), fixture.all)
       try compare(AccountHistoryStatistics(AccountHistoryQuery.latestTen(rows)), fixture.recent)
       let days = AccountHistoryQuery.days(rows, calendar: calendar)
