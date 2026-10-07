@@ -440,30 +440,9 @@ enum PromptCaretLayout {
     isRightToLeft: Bool = false
   ) -> CGRect? {
     guard containerSize.width > 0, characterOffset >= 0 else { return nil }
-    let storage = NSTextStorage(attributedString: NSAttributedString(attributedText))
+    let storage = preparedStorage(in: attributedText, font: font,
+      lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
     guard storage.length > 0 else { return nil }
-
-    let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.lineSpacing = lineSpacing
-    paragraphStyle.lineBreakMode = .byWordWrapping
-    paragraphStyle.alignment = isRightToLeft ? .right : .left
-    paragraphStyle.baseWritingDirection = isRightToLeft ? .rightToLeft : .leftToRight
-    let fullRange = NSRange(location: 0, length: storage.length)
-    // AttributedString's AppKit bridge supplies a 12 pt fallback even when
-    // the SwiftUI Text has a larger environment font. That fallback must not
-    // determine wrapping or the caret will point at the wrong line.
-    let swiftUIFontKey = NSAttributedString.Key("SwiftUI.Font")
-    var hintFontRanges: [NSRange] = []
-    storage.enumerateAttribute(swiftUIFontKey, in: fullRange) { explicitFont, range, _ in
-      if explicitFont != nil { hintFontRanges.append(range) }
-    }
-    storage.addAttribute(.font, value: font, range: fullRange)
-    let hintFont = NSFont.monospacedSystemFont(
-      ofSize: max(9, font.pointSize * 0.48), weight: .semibold)
-    for range in hintFontRanges {
-      storage.addAttribute(.font, value: hintFont, range: range)
-    }
-    storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
 
     let layoutManager = NSLayoutManager()
     let container = NSTextContainer(
@@ -494,6 +473,30 @@ enum PromptCaretLayout {
       return nextRect
     }
     return rect
+  }
+
+  /// Shared font and paragraph preparation keeps viewport and caret wrapping aligned.
+  static func preparedStorage(in attributedText: AttributedString, font: NSFont,
+    lineSpacing: CGFloat, isRightToLeft: Bool) -> NSTextStorage {
+    let storage = NSTextStorage(attributedString: NSAttributedString(attributedText))
+    let paragraphStyle = NSMutableParagraphStyle()
+    paragraphStyle.lineSpacing = lineSpacing
+    paragraphStyle.lineBreakMode = .byWordWrapping
+    paragraphStyle.alignment = isRightToLeft ? .right : .left
+    paragraphStyle.baseWritingDirection = isRightToLeft ? .rightToLeft : .leftToRight
+    let fullRange = NSRange(location: 0, length: storage.length)
+    // The AppKit bridge supplies a 12 pt fallback for SwiftUI's environment font.
+    let swiftUIFontKey = NSAttributedString.Key("SwiftUI.Font")
+    var hintFontRanges: [NSRange] = []
+    storage.enumerateAttribute(swiftUIFontKey, in: fullRange) { explicitFont, range, _ in
+      if explicitFont != nil { hintFontRanges.append(range) }
+    }
+    storage.addAttribute(.font, value: font, range: fullRange)
+    let hintFont = NSFont.monospacedSystemFont(
+      ofSize: max(9, font.pointSize * 0.48), weight: .semibold)
+    for range in hintFontRanges { storage.addAttribute(.font, value: hintFont, range: range) }
+    storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
+    return storage
   }
 }
 

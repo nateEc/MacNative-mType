@@ -2574,7 +2574,16 @@ private struct ContentView: View {
               if showsAllPracticeLines {
                 practicePrompt
               } else {
-                ScrollView {
+                PracticePromptViewport(
+                  text: renderedPrompt.text, font: practicePromptNSFont(size: settings.fontSize),
+                  lineSpacing: session.configuration.usesJoiningScriptPrompt ? 8 : 12,
+                  isRightToLeft: session.configuration.usesRightToLeftPrompt,
+                  lineCount: session.configuration.mode == .zen ? 2 : 3,
+                  maximumTextWidth: settings.practiceLineWidth.maximumWidth(
+                    fontSize: settings.fontSize, customColumns: settings.customPracticeLineColumns),
+                  horizontalTextInset: 4,
+                  measuresTextRows: !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
+                ) {
                   practicePrompt
                 }
               }
@@ -2696,9 +2705,7 @@ private struct ContentView: View {
       }
     }
     .padding(28)
-    .frame(
-      maxWidth: .infinity, minHeight: 240,
-      maxHeight: showsAllPracticeLines ? nil : 240, alignment: .topLeading)
+    .frame(maxWidth: .infinity, alignment: .topLeading)
     .background(activeTheme.panel, in: RoundedRectangle(cornerRadius: 20))
     .overlay {
       if settings.typingPowerMode.isEnabled, !typingPowerParticles.isEmpty {

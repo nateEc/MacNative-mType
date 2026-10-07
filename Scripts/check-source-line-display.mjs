@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 
 const [argument,option]=process.argv.slice(2);
-assert.ok(argument&&(!option||option==='--emit-fixtures'));
+assert.ok(argument&&(!option||['--emit-fixtures','--emit-height-fixtures'].includes(option)));
 const root=path.resolve(argument);
 function verify(){
   assert.equal(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),
@@ -25,12 +25,14 @@ const code=stripTypeScriptTypes(source.slice(start,end),{mode:'transform'})
 let mode='words',limit=25,completion='word',height=null,shown=0,focusHeight=null;
 let activePage='test',resultVisible=false,hasActiveWord=true;
 const config={mode,showAllLines:false,tapeMode:'off'};
-const word={native:{},getOffsetHeight:()=>20};
+let rowHeights=[25,25,25,25];
+const word={native:{},getOffsetHeight:()=>rowHeights[0]-5};
 const context=vm.createContext({Config:config,CustomText:{getLimitMode:()=>completion,getLimitValue:()=>limit},
   getActivePage:()=>activePage,getResultVisible:()=>resultVisible,
   getActiveWordElement:()=>hasActiveWord?word:null,
   wordsWrapperEl:{show(){shown++;},setStyle(style){height=style.height;}},
-  wordsEl:{qsa:()=>[10,35,60,85].map(top=>({...word,getOffsetTop:()=>top})),getOffsetHeight:()=>25},
+  wordsEl:{qsa:()=>rowHeights.map((height,index)=>({...word,
+    getOffsetTop:()=>10+index*100,getOffsetHeight:()=>height-5})),getOffsetHeight:()=>25},
   wordsHaveNewline:()=>false,window:{getComputedStyle:()=>({marginTop:'2px',marginBottom:'3px'})},
   setOutOfFocusMaxHeight:value=>{focusHeight=value;}});
 new vm.Script(code).runInContext(context,{timeout:1000});
@@ -63,6 +65,21 @@ for(const guardCase of ['page','result','word']){
   activePage=guardCase==='page'?'account':'test';resultVisible=guardCase==='result';hasActiveWord=guardCase!=='word';
   height=null;shown=0;invoke.runInContext(context,{timeout:1000});assert.equal(height,null);assert.equal(shown,0);
 }
+activePage='test';resultVisible=false;hasActiveWord=true;
+config.showAllLines=false;config.tapeMode='off';
+const heights=[];
+for(const mode of ['words','time','custom','zen']){
+  config.mode=mode;completion='time';limit=30;
+  for(const rows of [[25],[20,40],[20,40,30,100],[33,33,33,33]]){
+    // Zen uses the ACTIVE word height, not the average of heterogeneous rows.
+    // Only uniform Zen rows are comparable with this native row reducer.
+    if(mode==='zen'&&rows.some(value=>value!==rows[0]))continue;
+    rowHeights=rows;height=null;invoke.runInContext(context,{timeout:1000});
+    assert.match(height,/^\d+(\.\d+)?px$/);
+    heights.push({mode,rows,lineCount:mode==='zen'?2:3,height:Number.parseFloat(height)});
+  }
+}
+assert.equal(heights.length,14);
 verify();
-if(option)console.log(JSON.stringify(fixtures));
-else console.log('Line display source passed (52 valid mode/limit/setting/tape combinations and 3 guards; complete pinned wrapper-height function, owned DOM metrics; no browser/layout/scroll/GUI)');
+if(option)console.log(JSON.stringify(option==='--emit-fixtures'?fixtures:heights));
+else console.log('Line display source passed (52 valid mode/limit/setting/tape combinations, 3 guards and 14 row-height cases; complete pinned wrapper-height function, owned DOM metrics; no browser/layout/scroll/GUI; mixed-height Zen excluded)');
