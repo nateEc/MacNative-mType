@@ -49,6 +49,7 @@ enum PromptWordReflowPolicy {
 
 enum PromptLineScrollMotion {
   static let duration: TimeInterval = 0.125
+  static let autoplayLead: TimeInterval = 0.012
 
   static func frameInterval(frameRate: Int, displayFrameRate: Int) -> TimeInterval {
     let displayLimit = displayFrameRate > 0 ? displayFrameRate : 60
@@ -61,12 +62,25 @@ enum PromptLineScrollMotion {
   }
 }
 
+struct PromptLineScrollOverlap {
+  private(set) var pendingJumps = 0
+  private var baselineTop: CGFloat?
+
+  mutating func begin(from baselineTop: CGFloat, rowHeight: CGFloat) -> CGFloat {
+    pendingJumps += 1
+    let origin = self.baselineTop ?? baselineTop
+    self.baselineTop = origin
+    return origin + rowHeight * CGFloat(pendingJumps)
+  }
+}
+
 struct PromptLineScrollGeometry {
   let activeTop: CGFloat
   let previousWordTop: CGFloat?
   let previousLineTop: CGFloat
   var caretBottom: CGFloat? = nil
   var wordTops: [Int: CGFloat] = [:]
+  var activeRowHeight: CGFloat = 0
 
   static func measure(in text: AttributedString, activeOffset: Int, previousOffset: Int?,
     width: CGFloat, font: NSFont, lineSpacing: CGFloat, rightToLeft: Bool,
@@ -108,7 +122,8 @@ struct PromptLineScrollGeometry {
       }
     }
     return .init(activeTop: active.minY, previousWordTop: previous, previousLineTop: previousLine,
-      caretBottom: caretBottom, wordTops: wordTops)
+      caretBottom: caretBottom, wordTops: wordTops,
+      activeRowHeight: active.height + (NSMaxRange(activeRange) == manager.numberOfGlyphs ? lineSpacing : 0))
   }
 
   func retirementBoundary(before activeWordIndex: Int, hideBound: CGFloat? = nil) -> Int? {

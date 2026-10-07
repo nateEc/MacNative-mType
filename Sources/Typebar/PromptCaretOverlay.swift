@@ -230,6 +230,7 @@ final class PromptAutoScrollView: NSView {
   private var lineScrollAnimation: (from: CGPoint, target: CGPoint, started: TimeInterval)?
   private weak var animatedScrollView: NSScrollView?
   private var lineJumpCount = 0
+  private var lineScrollOverlap = PromptLineScrollOverlap()
   private var wordReflow = PromptWordReflowState()
   private var latestActiveTop: CGFloat?
   private var hasPendingWordUpdate = false
@@ -272,7 +273,7 @@ final class PromptAutoScrollView: NSView {
       wordReflow = .init()
       hasPendingWordUpdate = false
     }
-    if layoutChanged { wordReflow = .init() }
+    if layoutChanged { stopLineScroll(); wordReflow = .init() }
     recentersLine = recentersLine || layoutChanged || attemptChanged || prefixChanged
     self.lineScroll = lineScroll
     self.text = text
@@ -290,6 +291,7 @@ final class PromptAutoScrollView: NSView {
     super.layout()
     if bounds.width != lastWidth {
       lastWidth = bounds.width
+      stopLineScroll()
       recentersLine = true
       scheduleFollow()
     }
@@ -305,13 +307,14 @@ final class PromptAutoScrollView: NSView {
     super.viewWillMove(toSuperview: newSuperview)
   }
 
-  func stopLineScroll() {
+  func stopLineScroll(resetOverlap: Bool = true) {
     lineScrollTimer?.invalidate()
     lineScrollTimer = nil
     animatedTarget = nil
     lineScrollAnimation = nil
     animatedScrollView = nil
     pendingRetirement = nil
+    if resetOverlap { lineScrollOverlap = .init() }
   }
 
   private func scheduleFollow() {
@@ -385,6 +388,10 @@ final class PromptAutoScrollView: NSView {
       // only advance its line counter. They do not start a scroll animation.
       top = reflowCanAdvance ? max(previousTargetTop, reflowHideBound) : previousTargetTop
     }
+    let startsJump = retirement != nil
+    if startsJump {
+      top = lineScrollOverlap.begin(from: previousTargetTop, rowHeight: geometry.activeRowHeight)
+    }
     // SwiftUI can wrap a single long token across multiple native rows. Keep
     // its caret reachable without the legacy extra-margin early advance.
     if let bottom = geometry.caretBottom { top = max(top, bottom - scroll.contentView.bounds.height) }
@@ -398,38 +405,45 @@ final class PromptAutoScrollView: NSView {
     let immediate = resetsAttempt || !context.smoothScroll || context.reducesMotion
     resetsAttempt = false
     move(scroll, to: target, immediately: immediate, frameRate: context.frameRate,
-      retirement: retirement, onRetire: context.onRetire)
+      retirement: retirement, onRetire: context.onRetire, startsJump: startsJump)
   }
 
   private func move(_ scroll: NSScrollView, to target: CGPoint, immediately: Bool, frameRate: Int,
-    retirement: PromptWordRetirement?, onRetire: ((PromptWordRetirement) -> Void)?) {
+    retirement: PromptWordRetirement?, onRetire: ((PromptWordRetirement) -> Void)?, startsJump: Bool) {
     let interval = PromptLineScrollMotion.frameInterval(frameRate: frameRate,
       displayFrameRate: window?.screen?.maximumFramesPerSecond ?? 60)
-    var completion = pendingRetirement
+    // A new word animation replaces the old one. Its canceled promise never
+    // completes; only this jump's captured prefix owns the eventual callback.
+    var completion = startsJump ? nil : pendingRetirement
     if let retirement, let onRetire,
       retirement.firstRetainedWordIndex > (completion?.value.firstRetainedWordIndex ?? 0) {
       completion = (retirement, onRetire)
     }
-    if !immediately, animatedTarget == target {
+    if !immediately, !startsJump, animatedTarget == target {
       pendingRetirement = completion
       if lineScrollTimer?.timeInterval != interval { scheduleLineScrollTimer(interval: interval) }
       return
     }
-    stopLineScroll()
+    stopLineScroll(resetOverlap: false)
     pendingRetirement = completion
     let clip = scroll.contentView
     let from = clip.bounds.origin
-    guard from != target else { completeRetirement(); return }
+    guard from != target || startsJump && !immediately else {
+      lineScrollOverlap = .init()
+      completeRetirement(); return
+    }
     if immediately {
       clip.scroll(to: target)
       scroll.reflectScrolledClipView(clip)
       anchorWordReflow()
+      lineScrollOverlap = .init()
       completeRetirement()
       return
     }
     animatedTarget = target
     animatedScrollView = scroll
-    lineScrollAnimation = (from, target, ProcessInfo.processInfo.systemUptime)
+    lineScrollAnimation = (from, target,
+      ProcessInfo.processInfo.systemUptime - PromptLineScrollMotion.autoplayLead)
     scheduleLineScrollTimer(interval: interval)
   }
 
