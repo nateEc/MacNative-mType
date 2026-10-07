@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+独立 Polyglot 预设新增 accountFilterPolyglot=available；账户文档 v2 必须包含 includesPolyglot 布尔值，v1 继续读取但禁止携带新字段，列表封套仍 v1。保存 v2 前需两项预设能力同时 available；唯一 writer 升级、备份与回退见 [Polyglot 历史合同](POLYGLOT_HISTORY_FILTER_CONTRACT.md)。整体服务仍 partial，下方为历史阶段。
+
 账户筛选预设新增 `accountFilterPresets=available` 及私有列表／新增／删除接口，容量、文档 v1、认证和旧库边界见 [账户历史筛选预设](ACCOUNT_FILTER_PRESETS_CONTRACT.md)。自建协议不冒充官方 API，整体服务仍 partial；下方为历史阶段。
 
 2026-10-06 [账户 PB 账本合同](PERSONAL_BEST_LEDGER_CONTRACT.md) 定义 accountPersonalBestLedger=available；公开资料用三个原子存在的新版字段返回完整分组快照。个人与排行榜 PB 不再依赖可删除历史，清空两套 PB 和日榜、不清周 XP；新客户端拒绝旧服务的旧纪元清空。未知旧配置／参数保留，原协议、标签／本机账本和整体服务仍 partial。下方增量为历史阶段。

@@ -7602,6 +7602,7 @@ private struct ResultsHistoryView: View {
   @State private var timeLimitFilter = Set(ResultHistoryTimeLimit.allCases)
   @State private var wordLimitFilter = Set(ResultHistoryWordLimit.allCases)
   @State private var includesNoModifierFilter = true
+  @State private var includesPolyglotFilter: Bool?
   @State private var modifierFilter = Set(TestModifier.allCases)
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
@@ -7633,6 +7634,7 @@ private struct ResultsHistoryView: View {
         duration: configuration?.duration,
         wordLimit: configuration?.wordLimit,
         modifiers: configuration?.modifiers,
+        isPolyglot: configuration.map { $0.language == .mixedLanguages },
         accountTags: AccountTagHistoryFilterPolicy.metadata(id: result.id,
           snapshot: AccountTagHistoryFilterPolicy.snapshot(from: result.accountTagSnapshotData),
           scope: scope, knownIDs: knownIDs, canonical: canonical)
@@ -7844,8 +7846,13 @@ private struct ResultsHistoryView: View {
                   }
                 }
                 DisclosureGroup("修饰器：\(activeModifierFilter.selectionSummary)") {
-                  Toggle("无修饰器", isOn: $includesNoModifierFilter)
+                  Toggle("无修饰器", isOn: Binding(get: { includesNoModifierFilter }, set: { selected in
+                    updateModifierFilter { $0.setNoModifiersSelected(selected) }
+                  }))
                     .toggleStyle(.checkbox)
+                  Toggle("Polyglot 多语混排", isOn: Binding(get: { activeModifierFilter.effectiveIncludesPolyglot }, set: { selected in
+                    includesPolyglotFilter = selected
+                  })).toggleStyle(.checkbox)
                   ForEach(TestModifier.allCases, id: \.self) { modifier in
                     Toggle(modifier.displayName, isOn: modifierBinding(for: modifier))
                       .toggleStyle(.checkbox)
@@ -8311,7 +8318,16 @@ private struct ResultsHistoryView: View {
   }
 
   private var activeModifierFilter: ResultHistoryModifierFilter {
-    .init(includesNoModifiers: includesNoModifierFilter, modifiers: modifierFilter)
+    .init(includesNoModifiers: includesNoModifierFilter, modifiers: modifierFilter,
+      includesPolyglot: includesPolyglotFilter)
+  }
+
+  private func updateModifierFilter(_ update: (inout ResultHistoryModifierFilter) -> Void) {
+    var filter = activeModifierFilter
+    update(&filter)
+    includesNoModifierFilter = filter.includesNoModifiers
+    modifierFilter = filter.modifiers
+    includesPolyglotFilter = filter.includesPolyglot
   }
 
   private func saveFilterPreset() {
@@ -8367,6 +8383,7 @@ private struct ResultsHistoryView: View {
     wordLimitFilter = filter.wordLimits
     includesNoModifierFilter = filter.modifierFilter.includesNoModifiers
     modifierFilter = filter.modifierFilter.modifiers
+    includesPolyglotFilter = filter.modifierFilter.includesPolyglot
   }
 
   private func reconcileAccountTagFilter() {
@@ -8398,7 +8415,11 @@ private struct ResultsHistoryView: View {
     Binding(
       get: { modifierFilter.contains(modifier) },
       set: { selected in
-        if selected { modifierFilter.insert(modifier) } else { modifierFilter.remove(modifier) }
+        updateModifierFilter { filter in
+          var modifiers = filter.modifiers
+          if selected { modifiers.insert(modifier) } else { modifiers.remove(modifier) }
+          filter.setModifiers(modifiers)
+        }
       })
   }
 

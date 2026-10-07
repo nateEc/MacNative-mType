@@ -24,9 +24,8 @@ enum AccountHistoryQuery {
         guard let options else { return nil }
         let represented = controls.compactMap(TestModifier.init(rawValue:))
           + (options.lazyMode ? [.lazyLatin] : [])
-        // Polyglot is represented by native language, not a TestModifier.
-        // Retain known companions for OR matches, but never invent an empty set.
-        if represented.isEmpty, !controls.isEmpty { return nil }
+        // Polyglot is a separate filter identity, never a typing modifier.
+        if represented.isEmpty, controls.contains(where: { $0 != "polyglot" }) { return nil }
         return represented
       }
       return .init(id: row.id, mode: mode, language: TypingLanguage(rawValue: row.language), tags: row.tags,
@@ -34,6 +33,7 @@ enum AccountHistoryQuery {
         includesPunctuation: options?.punctuation ?? row.experienceEvidence?.punctuation,
         includesNumbers: options?.numbers ?? row.experienceEvidence?.numbers,
         quoteLength: row.quoteLength, duration: duration, wordLimit: words, modifiers: modifiers,
+        isPolyglot: controls.map { $0.contains("polyglot") },
         accountTags: .init(scope: scope, tagIDs: row.accountTagIDs))
     }
     let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs, now: now)

@@ -31,7 +31,7 @@ public struct AccountFilterPresetRequest: Content, Equatable, Sendable {
     try validate()
   }
   func validate() throws {
-    guard version == 1, Self.validName(name), filterData.count <= 65_536,
+    guard (1...2).contains(version), Self.validName(name), filterData.count <= 65_536,
       let object = (try? JSONSerialization.jsonObject(with: filterData)) as? [String: Any] else { throw Abort(.unprocessableEntity) }
     let required: Set<String> = ["personalBestOnly", "dateRange", "punctuation", "numbers", "timeLimits", "wordLimits", "modifierFilter"]
     let allowed = required.union(["mode", "modes", "language", "languages", "tag", "tagFilter", "difficulty", "difficulties", "personalBestFilter", "quoteLength", "quoteLengths"])
@@ -50,10 +50,16 @@ public struct AccountFilterPresetRequest: Content, Equatable, Sendable {
       if let map = value as? [String: Any] { return map.count <= 4 && map.values.allSatisfy { inspect($0, depth: depth + 1) } }
       return false
     }
+    let modifierKeys: Set<String> = version == 1
+      ? ["includesNoModifiers", "modifiers"] : ["includesNoModifiers", "modifiers", "includesPolyglot"]
     guard object.values.allSatisfy({ inspect($0, depth: 0) }),
-      let modifiers = object["modifierFilter"] as? [String: Any], Set(modifiers.keys) == ["includesNoModifiers", "modifiers"],
+      let modifiers = object["modifierFilter"] as? [String: Any], Set(modifiers.keys) == modifierKeys,
       let flag = modifiers["includesNoModifiers"] as? NSNumber, CFGetTypeID(flag) == CFBooleanGetTypeID(),
       modifiers["modifiers"] is [String] else { throw Abort(.unprocessableEntity) }
+    if version == 2 {
+      guard let value = modifiers["includesPolyglot"] as? NSNumber,
+        CFGetTypeID(value) == CFBooleanGetTypeID() else { throw Abort(.unprocessableEntity) }
+    }
     if let tags = object["tagFilter"] as? [String: Any] {
       guard Set(tags.keys) == ["isUnrestricted", "includesNoTags", "tags"], tags["tags"] is [String],
         ["isUnrestricted", "includesNoTags"].allSatisfy({ key in

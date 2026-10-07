@@ -26,7 +26,8 @@ struct AccountFilterPresetDocument: Codable, Equatable, Sendable {
     }
   }
   init(name: String, filter: ResultHistoryFilter, scope: ResultPublicationScope) throws {
-    version = 1; self.name = Self.normalizedName(name)
+    version = filter.modifierFilter.includesPolyglot == nil ? 1 : 2
+    self.name = Self.normalizedName(name)
     var portable = filter
     if let tags = filter.accountTagFilter {
       guard tags.scope == scope else { throw RemoteAccountError.accountScopeChanged }
@@ -46,7 +47,7 @@ struct AccountFilterPresetDocument: Codable, Equatable, Sendable {
     try validate()
   }
   func validate() throws {
-    guard version == 1, Self.isValidName(name), filterData.count <= 65_536,
+    guard (1...2).contains(version), Self.isValidName(name), filterData.count <= 65_536,
       let object = try JSONSerialization.jsonObject(with: filterData) as? [String: Any] else { throw RemoteAccountError.unexpectedResponse }
     let required: Set<String> = ["personalBestOnly", "dateRange", "punctuation", "numbers", "timeLimits", "wordLimits", "modifierFilter"]
     let allowed = required.union(["mode", "modes", "language", "languages", "tag", "tagFilter", "difficulty", "difficulties", "personalBestFilter", "quoteLength", "quoteLengths"])
@@ -55,7 +56,9 @@ struct AccountFilterPresetDocument: Codable, Equatable, Sendable {
       if value is NSNull { throw RemoteAccountError.unexpectedResponse }
       if let values = value as? [String], Set(values).count != values.count { throw RemoteAccountError.unexpectedResponse }
     }
-    guard let modifiers = object["modifierFilter"] as? [String: Any], Set(modifiers.keys) == ["includesNoModifiers", "modifiers"],
+    let modifierKeys: Set<String> = version == 1
+      ? ["includesNoModifiers", "modifiers"] : ["includesNoModifiers", "modifiers", "includesPolyglot"]
+    guard let modifiers = object["modifierFilter"] as? [String: Any], Set(modifiers.keys) == modifierKeys,
       let modifierIDs = modifiers["modifiers"] as? [String], Set(modifierIDs).count == modifierIDs.count else { throw RemoteAccountError.unexpectedResponse }
     if let tags = object["tagFilter"] as? [String: Any] {
       guard Set(tags.keys) == ["isUnrestricted", "includesNoTags", "tags"], let names = tags["tags"] as? [String],

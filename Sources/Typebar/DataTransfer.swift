@@ -329,9 +329,10 @@ struct TypebarArchive: Codable, Equatable {
     // identity independent of titles or a later selected quote, and an
     // independent numeric PB ledger that cannot be recovered from history,
     // and account tag identities captured at completion rather than retry,
-    // and the selected quote classification, not its streamed prompt length.
+    // and the selected quote classification, not its streamed prompt length,
+    // and independent Polyglot filter choices, including explicit exclusion.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 32
+    static let currentVersion = 33
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -384,15 +385,17 @@ struct TypebarArchive: Codable, Equatable {
         let hasQuoteLength = results.contains { $0.quoteSource?.actualLength != nil }
         let hasAccountTagSnapshot = results.contains { $0.accountTagSnapshot != nil }
         let hasAccountTagFilters = resultFilterPresets.contains { $0.filter.accountTagFilter != nil }
+        let hasPolyglotFilters = resultFilterPresets.contains { $0.filter.modifierFilter.includesPolyglot != nil }
         let hasExpandedPace = Self.requiresExpandedPaceFormat(settings: settings, presets: presets)
         let hasAccountPace = Self.requiresAccountPaceFormat(settings: settings, presets: presets)
         let baseVersion = hasAccountTagSnapshot ? max(29, version) : localPersonalBestLedger != nil ? max(28, version) : hasQuoteIdentity ? max(27, version) : hasIncompletePractice ? max(26, version) : hasElapsedTime ? max(25, version) : hasExpandedPace ? max(24, version) : hasTerminalTiming ? max(23, version) : hasUnitBasis ? max(22, version) : hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         let paceVersion = hasAccountPace ? max(30, baseVersion) : baseVersion
         let filterVersion = hasAccountTagFilters ? max(31, paceVersion) : paceVersion
-        self.version = hasQuoteLength ? max(32, filterVersion) : filterVersion
+        let quoteVersion = hasQuoteLength ? max(32, filterVersion) : filterVersion
+        self.version = hasPolyglotFilters ? max(33, quoteVersion) : quoteVersion
         self.exportedAt = exportedAt
-        let payloadVersion = hasQuoteLength || hasAccountTagFilters || hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
+        let payloadVersion = hasPolyglotFilters || hasQuoteLength || hasAccountTagFilters || hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
         self.localPersonalBestLedger = localPersonalBestLedger
         let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = payloadVersion >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
@@ -553,6 +556,8 @@ struct TypebarArchive: Codable, Equatable {
             : []
         deletedResultFilterPresetIDs = deletedIDs.sorted { $0.uuidString < $1.uuidString }
         let decodedFilterPresets = try values.decodeIfPresent([NamedResultFilterPreset].self, forKey: .resultFilterPresets) ?? []
+        guard version >= 33 || !decodedFilterPresets.contains(where: { $0.filter.modifierFilter.includesPolyglot != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 31 || !decodedFilterPresets.contains(where: { $0.filter.accountTagFilter != nil })
         else { throw DataTransferError.unsupportedVersion(version) }
         resultFilterPresets = version >= 4

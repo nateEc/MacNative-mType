@@ -576,6 +576,7 @@ struct ResultHistoryEntry: Equatable, Identifiable {
     let duration: TimeInterval?
     let wordLimit: Int?
     let modifiers: [TestModifier]?
+    let isPolyglot: Bool?
 
     init(
         id: UUID, mode: TestMode?, language: TypingLanguage?, tags: [String],
@@ -583,6 +584,7 @@ struct ResultHistoryEntry: Equatable, Identifiable {
         includesPunctuation: Bool? = nil, includesNumbers: Bool? = nil,
         quoteLength: QuoteLength? = nil, duration: TimeInterval? = nil, wordLimit: Int? = nil,
         modifiers: [TestModifier]? = nil,
+        isPolyglot: Bool? = false,
         accountTags: ResultHistoryAccountTagMetadata? = nil
     ) {
         self.id = id
@@ -598,6 +600,7 @@ struct ResultHistoryEntry: Equatable, Identifiable {
         self.duration = duration
         self.wordLimit = wordLimit
         self.modifiers = modifiers
+        self.isPolyglot = isPolyglot
     }
 }
 
@@ -2367,32 +2370,67 @@ enum ResultHistoryWordLimit: String, CaseIterable, Codable, Hashable {
 struct ResultHistoryModifierFilter: Codable, Equatable {
     var includesNoModifiers: Bool
     var modifiers: Set<TestModifier>
+    /// Nil preserves the pre-Polyglot filter's exact meaning and JSON shape.
+    var includesPolyglot: Bool?
 
     init(
         includesNoModifiers: Bool = true,
-        modifiers: Set<TestModifier> = Set(TestModifier.allCases)
+        modifiers: Set<TestModifier> = Set(TestModifier.allCases),
+        includesPolyglot: Bool? = nil
     ) {
         self.includesNoModifiers = includesNoModifiers
         self.modifiers = modifiers
+        self.includesPolyglot = includesPolyglot
+    }
+
+    var effectiveIncludesPolyglot: Bool {
+        includesPolyglot ?? (includesNoModifiers && modifiers == Set(TestModifier.allCases))
+    }
+
+    mutating func setModifiers(_ selected: Set<TestModifier>) {
+        includesPolyglot = effectiveIncludesPolyglot
+        modifiers = selected
+    }
+
+    mutating func setNoModifiersSelected(_ selected: Bool) {
+        includesPolyglot = effectiveIncludesPolyglot
+        includesNoModifiers = selected
     }
 
     var isUnfiltered: Bool {
-        includesNoModifiers && modifiers == Set(TestModifier.allCases)
+        includesNoModifiers && modifiers == Set(TestModifier.allCases) && effectiveIncludesPolyglot
     }
 
-    func matches(_ entryModifiers: [TestModifier]?) -> Bool {
+    func matches(_ entryModifiers: [TestModifier]?, isPolyglot: Bool? = false) -> Bool {
         guard !isUnfiltered else { return true }
+        if effectiveIncludesPolyglot && isPolyglot == true { return true }
         guard let entryModifiers else { return false }
-        return (includesNoModifiers && entryModifiers.isEmpty)
+        return (includesNoModifiers && entryModifiers.isEmpty && isPolyglot == false)
             || !modifiers.isDisjoint(with: entryModifiers)
     }
 
     var selectionSummary: String {
-        guard !includesNoModifiers || !modifiers.isEmpty else { return "无匹配修饰器" }
         guard !isUnfiltered else { return "全部" }
         let selected = TestModifier.allCases.filter(modifiers.contains).map(\.displayName)
-        let labels = (includesNoModifiers ? ["无修饰器"] : []) + selected
+        let labels = (includesNoModifiers ? ["无修饰器"] : [])
+            + (effectiveIncludesPolyglot ? ["Polyglot 多语混排"] : []) + selected
+        guard !labels.isEmpty else { return "无匹配修饰器" }
         return labels.count <= 3 ? labels.joined(separator: "、") : "已选 \(labels.count) 项"
+    }
+
+    private enum CodingKeys: String, CodingKey { case includesNoModifiers, modifiers, includesPolyglot }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        includesNoModifiers = try values.decode(Bool.self, forKey: .includesNoModifiers)
+        modifiers = try values.decode(Set<TestModifier>.self, forKey: .modifiers)
+        includesPolyglot = values.contains(.includesPolyglot)
+            ? try values.decode(Bool.self, forKey: .includesPolyglot) : nil
+    }
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(includesNoModifiers, forKey: .includesNoModifiers)
+        try values.encode(modifiers, forKey: .modifiers)
+        try values.encodeIfPresent(includesPolyglot, forKey: .includesPolyglot)
     }
 }
 
@@ -2540,8 +2578,9 @@ struct ResultHistoryFilter: Codable, Equatable {
             timeLimits: timeLimits,
             wordLimits: wordLimits,
             modifierFilter: .init(
-                includesNoModifiers: selectedModifiers.isEmpty,
-                modifiers: selectedModifiers
+                includesNoModifiers: selectedModifiers.isEmpty && configuration.language != .mixedLanguages,
+                modifiers: selectedModifiers,
+                includesPolyglot: configuration.language == .mixedLanguages ? true : nil
             )
         )
     }
@@ -2669,7 +2708,7 @@ struct ResultHistoryFilter: Codable, Equatable {
                 && matchesQuoteLength(entry.quoteLength)
                 && matchesTimeLimit(entry)
                 && matchesWordLimit(entry)
-                && modifierFilter.matches(entry.modifiers)
+                && modifierFilter.matches(entry.modifiers, isPolyglot: entry.isPolyglot)
         }.map(\.id))
     }
 

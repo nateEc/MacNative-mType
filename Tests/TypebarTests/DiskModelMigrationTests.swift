@@ -62,6 +62,39 @@ final class DiskModelMigrationTests: XCTestCase {
     }
   }
 
+  func testPolyglotPresetColdReloadKeepsExplicitFalseAndLegacyOpaqueBytes() throws {
+    try withDirectory { root in
+      let fixture = try createLegacy("before-account-tags", root: root)
+      let rows = try XCTUnwrap(fixture.receipt["rows"] as? [String: [[String: Any]]])
+      let preset = NamedResultFilterPreset(id: UUID(), name: "Exclude Polyglot",
+        filter: .init(modifierFilter: .init(includesPolyglot: false)), createdAt: start)
+      var saved: Data?
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        try assertLegacy(container.mainContext, expected: rows, version: "before-account-tags")
+        let record = try XCTUnwrap(ResultFilterPresetRecord(portablePreset: preset)); saved = record.filterData
+        container.mainContext.insert(record); try container.mainContext.save()
+      }
+      let receipt = root.appendingPathComponent("cold-polyglot-filter.json")
+      try runWriter("current", ["inspect", fixture.store.path, "-", receipt.path], root: root)
+      let cold = try XCTUnwrap(try object(receipt)["rows"] as? [String: [[String: Any]]])
+      let filters = try XCTUnwrap(cold["ResultFilterPresetRecord"])
+      XCTAssertEqual(filters.count, 2)
+      XCTAssertEqual(filters.first { $0["id"] as? String == preset.id.uuidString }?["filterData"] as? String,
+        try XCTUnwrap(saved).base64EncodedString())
+      XCTAssertEqual(filters.first { $0["id"] as? String == filterID.uuidString }?["filterData"] as? String,
+        rows["ResultFilterPresetRecord"]?.first?["filterData"] as? String)
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        let context = container.mainContext
+        let stored = try context.fetch(FetchDescriptor<ResultFilterPresetRecord>())
+        XCTAssertEqual(stored.first { $0.id == preset.id }?.portablePreset, preset)
+        try assertStored(XCTUnwrap(context.fetch(FetchDescriptor<TestResultRecord>()).first),
+          expected: XCTUnwrap(rows["TestResultRecord"]?.first))
+      }
+    }
+  }
+
   func testPreviousFourEntityStoreAddsIndependentPBAndColdReloadKeepsItAfterDeletion() throws {
     try withDirectory { root in
       let fixture = try createLegacy("before-local-pb", root: root)

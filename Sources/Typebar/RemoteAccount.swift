@@ -1017,6 +1017,10 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
         apiVersion == "v1" && service == "typebar" && capabilities["accountFilterPresets"] == "available"
     }
 
+    var supportsAccountFilterPolyglot: Bool {
+        supportsAccountFilterPresets && capabilities["accountFilterPolyglot"] == "available"
+    }
+
     var supportsPersonalBestLedger: Bool {
         apiVersion == "v1" && service == "typebar" && capabilities["accountPersonalBestLedger"] == "available"
     }
@@ -3146,7 +3150,7 @@ final class AccountSession {
         accountFilterPresetCache = .init(scope: read.scope, list: list); accountFilterPresetMessage = nil
     }
 
-    private func accountFilterPresetAPI(scope: ResultPublicationScope) async throws -> (RemoteAccountAPI, String) {
+    private func accountFilterPresetAPI(scope: ResultPublicationScope, documentVersion: Int = 1) async throws -> (RemoteAccountAPI, String) {
         guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
         let api = RemoteAccountAPI(endpoint: endpoint), token = try accessToken()
         let capabilities = try await api.request(path: "v1/capabilities", method: "GET", token: nil,
@@ -3154,6 +3158,9 @@ final class AccountSession {
         guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
         guard capabilities.supportsAccountFilterPresets else {
             throw RemoteAccountError.serverMessage("当前服务不支持账户筛选预设；请升级自建服务。本机预设不受影响。")
+        }
+        guard documentVersion < 2 || capabilities.supportsAccountFilterPolyglot else {
+            throw RemoteAccountError.serverMessage("当前服务不支持独立 Polyglot 筛选预设；请升级自建服务。筛选选择未发送。")
         }
         return (api, token)
     }
@@ -3193,7 +3200,7 @@ final class AccountSession {
         let mutation = UUID(); accountFilterPresetMutation = mutation; accountFilterPresetGeneration &+= 1
         defer { if accountFilterPresetMutation == mutation { accountFilterPresetMutation = nil } }
         do {
-            let (api, token) = try await accountFilterPresetAPI(scope: scope)
+            let (api, token) = try await accountFilterPresetAPI(scope: scope, documentVersion: document.version)
             guard accountFilterPresetMutation == mutation else { throw CancellationError() }
             let preset = try await api.request(path: "v1/result-filter-presets", method: "POST", token: token,
                 body: document, response: RemoteAccountFilterPreset.self)

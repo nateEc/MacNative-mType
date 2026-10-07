@@ -90,6 +90,7 @@ public func configure(
                 "resultHistoryMetadata": .available,
                 "resultPerformanceChart": .available,
                 "accountFilterPresets": .available,
+                "accountFilterPolyglot": .available,
                 "accountPersonalBestLedger": .available,
                 "accountTags": .available,
                 "accountTagEditPersonalBests": .available,

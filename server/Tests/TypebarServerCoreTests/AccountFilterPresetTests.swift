@@ -8,6 +8,68 @@ final class AccountFilterPresetTests: XCTestCase {
   private func register(_ store: AuthStore, name: String) async throws -> AuthSessionResponse {
     try await store.register(.init(email: "\(name)@example.invalid", password: "a secure password", displayName: name))
   }
+  func testVersionTwoPolyglotPresetCanBeSavedAndReadWithoutLosingItsFlag() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4), owner = try await register(store, name: "Owner")
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: snapshot) as? [String: Any])
+    object["modifierFilter"] = ["includesNoModifiers": false, "modifiers": [], "includesPolyglot": true]
+    let document = AccountFilterPresetRequest(version: 2, name: "Polyglot", filterData: try JSONSerialization.data(withJSONObject: object))
+    do {
+      let preset = try await store.createAccountFilterPreset(document, accessToken: owner.accessToken)
+      let list = try await store.accountFilterPresets(accessToken: owner.accessToken)
+      XCTAssertEqual(list.presets.first, preset)
+      XCTAssertEqual(preset.document, document)
+    } catch { XCTFail("Version-two Polyglot choice must survive save/read: \(error)") }
+  }
+
+  func testPolyglotPresetHTTPUsesCapabilityAndStrictVersionedBoolean() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4), owner = try await register(store, name: "Owner")
+    let app = try await Application.make(.testing)
+    do {
+      try configure(app, authStore: store)
+      try await app.test(.GET, "v1/capabilities", afterResponse: { response async throws in
+        XCTAssertEqual(try response.content.decode(ServiceCapabilitiesResponse.self).capabilities["accountFilterPolyglot"], .available)
+      })
+      for (version, value, expected): (Int, Any, HTTPResponseStatus) in [
+        (2, true, .ok), (2, false, .ok), (1, true, .unprocessableEntity),
+        (2, NSNull(), .unprocessableEntity), (2, 1, .unprocessableEntity),
+        (2, "true", .unprocessableEntity), (3, true, .unprocessableEntity)] {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: snapshot) as? [String: Any])
+        object["modifierFilter"] = ["includesNoModifiers": false, "modifiers": [], "includesPolyglot": value]
+        let input = AccountFilterPresetRequest(version: version, name: "Polyglot", filterData: try JSONSerialization.data(withJSONObject: object))
+        try await app.test(.POST, "v1/result-filter-presets", beforeRequest: { request async throws in
+          request.headers.bearerAuthorization = .init(token: owner.accessToken); try request.content.encode(input)
+        }, afterResponse: { response async throws in
+          XCTAssertEqual(response.status, expected)
+          if expected == .ok { XCTAssertEqual(try response.content.decode(AccountFilterPresetResponse.self).document, input) }
+        })
+      }
+      let saved = try await store.accountFilterPresets(accessToken: owner.accessToken)
+      XCTAssertEqual(saved.presets.count, 2)
+      try await app.asyncShutdown()
+    } catch { try? await app.asyncShutdown(); throw error }
+  }
+
+  func testMixedLegacyAndPolyglotDocumentsColdLoadWithoutRewritingBytes() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-polyglot-presets-\(UUID())")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let file = directory.appendingPathComponent("store.json"), store = try AuthStore(fileURL: file, bcryptCost: 4)
+    let owner = try await register(store, name: "Owner")
+    let old = try await store.createAccountFilterPreset(.init(name: "Legacy", filterData: snapshot), accessToken: owner.accessToken)
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: snapshot) as? [String: Any])
+    object["modifierFilter"] = ["includesNoModifiers": true, "modifiers": [], "includesPolyglot": false]
+    let input = AccountFilterPresetRequest(version: 2, name: "Polyglot", filterData: try JSONSerialization.data(withJSONObject: object))
+    let new = try await store.createAccountFilterPreset(input, accessToken: owner.accessToken)
+    let bytes = try Data(contentsOf: file), loaded = try AuthStore(fileURL: file, bcryptCost: 4)
+    let list = try await loaded.accountFilterPresets(accessToken: owner.accessToken)
+    XCTAssertEqual(list.presets, [old, new]); XCTAssertEqual(try Data(contentsOf: file), bytes)
+    var bad = input
+    object["modifierFilter"] = ["includesNoModifiers": true, "modifiers": []]
+    bad = .init(version: 2, name: "Missing", filterData: try JSONSerialization.data(withJSONObject: object))
+    do { _ = try await loaded.createAccountFilterPreset(bad, accessToken: owner.accessToken); XCTFail("missing flag") }
+    catch let error as Abort { XCTAssertEqual(error.status, .unprocessableEntity) }
+    XCTAssertEqual(try Data(contentsOf: file), bytes)
+  }
   func testDeploymentLimitRejectsMalformedValues() throws {
     XCTAssertEqual(try AccountFilterPresetConfiguration.maximum(from: nil), 20)
     for value in ["0", "1", "20", "100"] { XCTAssertEqual(try AccountFilterPresetConfiguration.maximum(from: value), Int(value)) }

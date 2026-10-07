@@ -229,6 +229,19 @@ final class AccountHistoryAnalyticsTests: XCTestCase {
     }
   }
 
+  func testExplicitPolyglotChoiceMatchesAndSurvivesEncoding() throws {
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(ResultHistoryFilter())) as? [String: Any])
+    object["modifierFilter"] = ["includesNoModifiers": false, "modifiers": [], "includesPolyglot": true]
+    let filter = try JSONDecoder().decode(ResultHistoryFilter.self, from: JSONSerialization.data(withJSONObject: object))
+    var remote = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(row())) as? [String: Any])
+    remote["language"] = TypingLanguage.mixedLanguages.rawValue
+    remote["rankingEvidence"] = ["version": 1, "stopOnLetter": false, "modifiers": ["polyglot"]]
+    let result = try JSONDecoder().decode(RemoteAccountResult.self, from: JSONSerialization.data(withJSONObject: remote))
+    XCTAssertEqual(AccountHistoryQuery.matching([result], scope: scope, filter: filter).map(\.id), [result.id])
+    let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(filter)) as? [String: Any])
+    XCTAssertEqual((encoded["modifierFilter"] as? [String: Any])?["includesPolyglot"] as? Bool, true)
+  }
+
   func testAcceptedLegacyRawAbovePrecisionDomainStillAggregates() throws {
     let original = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(row())) as? [String: Any])
     for raw in [421, 500] {
@@ -268,17 +281,22 @@ final class AccountHistoryAnalyticsTests: XCTestCase {
     }
     struct Day: Decodable { let timeZone: String; let timestamps: [Double]; let expected: [Double] }
     struct Modifier: Decodable { let controls: [String]; let selection: String; let matches: Bool }
+    struct Polyglot: Decodable {
+      let controls: [String]; let includesNoModifiers, includesPolyglot, includesMemory, matches: Bool
+    }
     struct Metadata: Decodable { let pb: ResultHistoryPersonalBestFilter; let lengths: Set<QuoteLength>; let mode: String; let matchedIDs: [UUID] }
     struct Quote: Decodable { let length: Int; let group: Int; let classification: QuoteLength }
     struct Document: Decodable {
       let referenceCommit: String; let ids: Set<UUID>; let fixtures: [Fixture]
       let dayFixtures: [Day]; let modifierFixtures: [Modifier]
+      let polyglotFixtures: [Polyglot]
       let metadataRows: [RemoteAccountResult]; let metadataFixtures: [Metadata]; let quoteFixtures: [Quote]
     }
     let document = try JSONDecoder().decode(Document.self, from: bytes)
     XCTAssertEqual(document.referenceCommit,"91bd24bb8513785c7364cbea29296ff7adafac41")
     XCTAssertEqual(document.fixtures.count,96); XCTAssertEqual(document.dayFixtures.count,4)
     XCTAssertEqual(document.modifierFixtures.count,9)
+    XCTAssertEqual(document.polyglotFixtures.count,32)
     XCTAssertEqual(document.metadataFixtures.count,192); XCTAssertEqual(document.quoteFixtures.count,6)
     for fixture in document.metadataFixtures {
       let filter = ResultHistoryFilter(modes: fixture.mode == "all" ? nil : [try XCTUnwrap(TestMode(rawValue: fixture.mode))],
@@ -342,6 +360,15 @@ final class AccountHistoryAnalyticsTests: XCTestCase {
       }
       XCTAssertEqual(!AccountHistoryQuery.matching([remote], scope: scope,
         filter: .init(modifierFilter: modifiers)).isEmpty, fixture.matches)
+    }
+    for fixture in document.polyglotFixtures {
+      var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(row())) as? [String: Any])
+      object["language"] = fixture.controls.contains("polyglot") ? TypingLanguage.mixedLanguages.rawValue : "english"
+      object["rankingEvidence"] = ["version": 1, "stopOnLetter": false, "modifiers": fixture.controls]
+      let remote = try JSONDecoder().decode(RemoteAccountResult.self, from: JSONSerialization.data(withJSONObject: object))
+      let filter = ResultHistoryFilter(modifierFilter: .init(includesNoModifiers: fixture.includesNoModifiers,
+        modifiers: fixture.includesMemory ? [.memory] : [], includesPolyglot: fixture.includesPolyglot))
+      XCTAssertEqual(!AccountHistoryQuery.matching([remote], scope: scope, filter: filter).isEmpty, fixture.matches)
     }
   }
 }

@@ -74,7 +74,7 @@ new vm.Script(stripTypeScriptTypes(code,{mode:'transform'})).runInContext(contex
 assert.equal(context.useResultStatsLiveQuery(()=>undefined),undefined);
 context.authenticated=false;assert.equal(context.useResultStatsLiveQuery(()=>({})),undefined);context.authenticated=true;
 const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222'];
-const fixtures=[],dayFixtures=[],modifierFixtures=[],metadataFixtures=[];
+const fixtures=[],dayFixtures=[],modifierFixtures=[],metadataFixtures=[],polyglotFixtures=[];
 for(const size of [0,9,11,25]) for(let bits=0;bits<8;bits++) for(const mode of ['all','time','words']) {
   const input=Array.from({length:size},(_,index)=>{
     const rowMode=['time','words','quote','zen','custom'][index%5];
@@ -167,10 +167,22 @@ for(const timeZone of ['UTC','America/Los_Angeles','Europe/Berlin','Asia/Shangha
   const expected=timestamps.map(timestamp=>context.normalizeResult({timestamp,testDuration:15,wpm:80}).dayTimestamp);
   dayFixtures.push({timeZone,timestamps,expected});
 }
+for(const controls of [[],['memory'],['polyglot'],['polyglot','memory']]) for(let bits=0;bits<8;bits++) {
+  context.resultsCollection=[context.normalizeResult({_id:'owned',timestamp:1800000000000,
+    mode:'time',mode2:'15',testDuration:15,wpm:80,rawWpm:90,acc:98,consistency:80,funbox:controls})];
+  const includesNoModifiers=!!(bits&1),includesPolyglot=!!(bits&2),includesMemory=!!(bits&4);
+  const state={timestamp:0,difficulty:['normal'],pb:[true,false],mode:['time'],punctuation:[true,false],
+    numbers:[true,false],quoteLength:[-1,0,1,2,3],language:['english'],tags:['none'],
+    funbox:[...(includesNoModifiers?['none']:[]),...(includesPolyglot?['polyglot']:[]),...(includesMemory?['memory']:[])],
+    time:['15','30','60','120','custom'],words:['10','25','50','100','custom']};
+  polyglotFixtures.push({controls,includesNoModifiers,includesPolyglot,includesMemory,
+    matches:context.buildResultsQuery(state).evaluate().length===1});
+}
 process.env.TZ='UTC';
 assert.equal(context.calcTimeTyping({mode:'time',mode2:'15',restartCount:2}),22.5);
 assert.equal(context.normalizeResult({mode:'time',mode2:'15',restartCount:2,timestamp:0,wpm:80}).timeTyping,15);
 assert.equal(fixtures.length,96);assert.equal(dayFixtures.length,4);assert.equal(modifierFixtures.length,9);
 assert.equal(metadataFixtures.length,192);assert.equal(quoteFixtures.length,6);verify();
-console.log(emit?JSON.stringify({referenceCommit:pin,ids,fixtures,dayFixtures,modifierFixtures,metadataRows,metadataFixtures,quoteFixtures}):
-  'Account history statistics source passed (96 collections, all/recent-ten/daily aggregates, 4 timezones, 9 polyglot queries, 192 PB/quote-length queries and 6 owned quote-classification boundaries; complete pinned functions/class; owned eager adapters, no TanStack/DOM/HTTP/GUI)');
+assert.equal(polyglotFixtures.length,32);
+console.log(emit?JSON.stringify({referenceCommit:pin,ids,fixtures,dayFixtures,modifierFixtures,polyglotFixtures,metadataRows,metadataFixtures,quoteFixtures}):
+  'Account history statistics source passed (96 collections, all/recent-ten/daily aggregates, 4 timezones, 9 legacy and 32 independent polyglot queries, 192 PB/quote-length queries and 6 owned quote-classification boundaries; complete pinned functions/class; owned eager adapters, no TanStack/DOM/HTTP/GUI)');

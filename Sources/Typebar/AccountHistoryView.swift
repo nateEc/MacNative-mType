@@ -341,8 +341,15 @@ private struct AccountHistoryFilterEditor: View {
       choices("实际引语长度（限制时排除未知引语）", QuoteLength.allCases.filter { $0 != .all },
         selection: Binding(get: { filter.quoteLengthSelections }, set: { filter.quoteLengths = $0; filter.quoteLength = nil }), name: { $0.displayName })
       DisclosureGroup("修饰器：\(filter.modifierFilter.selectionSummary)") {
-        Toggle("无修饰器", isOn: $filter.modifierFilter.includesNoModifiers).toggleStyle(.checkbox)
-        choices("选择修饰器", TestModifier.allCases, selection: $filter.modifierFilter.modifiers, allowsExclusiveSelection: false, name: { $0.displayName })
+        Toggle("无修饰器", isOn: Binding(get: { filter.modifierFilter.includesNoModifiers }, set: {
+          filter.modifierFilter.setNoModifiersSelected($0)
+        })).toggleStyle(.checkbox)
+        Toggle("Polyglot 多语混排", isOn: Binding(get: { filter.modifierFilter.effectiveIncludesPolyglot }, set: {
+          filter.modifierFilter.includesPolyglot = $0
+        })).toggleStyle(.checkbox)
+        choices("选择修饰器", TestModifier.allCases, selection: Binding(get: { filter.modifierFilter.modifiers }, set: {
+          filter.modifierFilter.setModifiers($0)
+        }), allowsExclusiveSelection: false, name: { $0.displayName })
       }
       AccountTagHistoryFilterControls(account: account, filter: $filter.accountTagFilter, usesCompletionSnapshots: false)
       DisclosureGroup("独立文字标签：\(filter.effectiveTagFilter.selectionSummary)") {
