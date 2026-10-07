@@ -259,8 +259,8 @@ enum TypingFinishSoundPolicy {
   }
 }
 
-struct TypingClickToneProfile: Hashable {
-  enum Waveform: Hashable {
+struct TypingClickToneProfile: Hashable, Sendable {
+  enum Waveform: Hashable, Sendable {
     case sine
     case triangle
     case softSquare
@@ -538,19 +538,25 @@ final class NativeTypingSoundVoice: NSObject, TypingSoundVoice {
 @MainActor
 final class TypingFeedbackSound {
   static let shared = TypingFeedbackSound(loadSound: { source in
-    let sound: NSSound?
-    switch source {
-    case .system(let name): sound = NSSound(named: NSSound.Name(name))
-    case .synthesized(let profile): sound = NSSound(data: profile.renderedWAVData())
-    case .musical(_, let tone): sound = NSSound(data: tone.renderedWAVData())
-    case .finishReverb: sound = NSSound(data: TypingFinishReverbSound.renderedWAVData())
-    }
-    return sound.map { NativeTypingSoundVoice(sound: $0) }
-  }, beep: { NSSound.beep() })
+    guard case .musical(_, let tone) = source else { return nil }
+    return NSSound(data:tone.renderedWAVData()).map { NativeTypingSoundVoice(sound:$0) }
+  }, beep: { NSSound.beep() }, loadSampleSound: { await NativeSampleSoundPreparation.load($0) })
 
   private var cachedSources: [TypingClickPlaybackSource: any TypingSoundVoice] = [:]
   private var loadingSources: Set<TypingClickPlaybackSource> = []
   private var configuredClickStyle: TypingClickSoundStyle?
+  private struct PendingSample {
+    let volume: Double
+    let restarting: RestartingSampleChannel?
+    let beepOnFailure: Bool
+    let generation: UUID
+    let channelRequest: UUID?
+  }
+  private var samplePreparationTasks: [TypingClickPlaybackSource:Task<Void,Never>] = [:]
+  private var pendingSamples: [TypingClickPlaybackSource:[PendingSample]] = [:]
+  private var drainingSamples: Set<TypingClickPlaybackSource> = []
+  private var sampleGeneration = UUID()
+  private var warningRequest: UUID?, finishRequest: UUID?
   private struct SamplePlayback {
     let voice: any TypingSoundVoice
     let token: UUID
@@ -569,12 +575,15 @@ final class TypingFeedbackSound {
   private weak var finishVoice: (any TypingSoundVoice)?
   private enum RestartingSampleChannel { case timeWarning, finishReverb }
   private let loadSound: (TypingClickPlaybackSource) -> (any TypingSoundVoice)?
+  private let loadSampleSound: (@MainActor (TypingClickPlaybackSource) async -> (any TypingSoundVoice)?)?
   private let beep: () -> Void
   private let randomUnit: () -> Double
 
   init(loadSound: @escaping (TypingClickPlaybackSource) -> (any TypingSoundVoice)?,
-    beep: @escaping () -> Void, randomUnit: @escaping () -> Double = { Double.random(in: 0..<1) }) {
+    beep: @escaping () -> Void, randomUnit: @escaping () -> Double = { Double.random(in: 0..<1) },
+    loadSampleSound: (@MainActor (TypingClickPlaybackSource) async -> (any TypingSoundVoice)?)? = nil) {
     self.loadSound = loadSound
+    self.loadSampleSound = loadSampleSound
     self.beep = beep
     self.randomUnit = randomUnit
   }
@@ -613,6 +622,15 @@ final class TypingFeedbackSound {
 
   private func prototype(for source: TypingClickPlaybackSource) -> (any TypingSoundVoice)? {
     if let cached = cachedSources[source] { return cached }
+    if let loadSampleSound {
+      if samplePreparationTasks[source] == nil {
+        samplePreparationTasks[source] = Task { @MainActor [weak self] in
+          let loaded = await loadSampleSound(source)
+          self?.finishSamplePreparation(source:source,prototype:loaded)
+        }
+      }
+      return nil
+    }
     // The synchronous native loader can be injected/reentered. Never load
     // the same resource recursively; failed loads remain retryable.
     guard loadingSources.insert(source).inserted else { return nil }
@@ -623,6 +641,10 @@ final class TypingFeedbackSound {
   }
 
   func clearAllSounds() {
+    sampleGeneration = UUID()
+    pendingSamples.removeAll(keepingCapacity:true)
+    warningRequest = nil
+    finishRequest = nil
     let voices = activeVoices.values.map(\.voice)
     activeVoices.removeAll(keepingCapacity: true)
     warningVoice = nil
@@ -657,7 +679,7 @@ final class TypingFeedbackSound {
     }
     prepareClickSamples(style: style)
     guard let source = style.sampleSource(variantIndex: randomSampleIndex(count: style.sampleVariantCount)) else { return }
-    _ = play(source: source, volume: volume)
+    requestSample(source: source, volume: volume)
   }
 
   func recordKeyDown(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
@@ -696,7 +718,7 @@ final class TypingFeedbackSound {
       playMusic(mode: mode, requestedVolume: volume, isPreview: true, usesPracticeShift: usesPracticeShift)
     } else {
       prepareClickSamples(style: configuredClickStyle)
-      _ = play(source: style.playbackSource, volume: volume)
+      requestSample(source: style.playbackSource, volume: volume)
     }
   }
 
@@ -733,14 +755,12 @@ final class TypingFeedbackSound {
   func playError(style: TypingErrorSoundStyle, volume: Double) {
     prepareErrorSamples()
     guard let source = style.sampleSource(variantIndex: randomSampleIndex(count: style.sampleVariantCount)) else { return }
-    if !play(source: source, volume: volume), (playbackVolume(volume) ?? 0) > 0 {
-      beep()
-    }
+    requestSample(source: source, volume: volume, beepOnFailure:true)
   }
 
   func previewError(style: TypingErrorSoundStyle, volume: Double) {
     prepareErrorSamples()
-    if !play(source: .system(style.systemSoundName), volume: volume), (playbackVolume(volume) ?? 0) > 0 { beep() }
+    requestSample(source: .system(style.systemSoundName), volume: volume, beepOnFailure:true)
   }
 
   private func randomSampleIndex(count: Int) -> Int {
@@ -752,14 +772,11 @@ final class TypingFeedbackSound {
   }
 
   func playTimeWarning(style: TimeWarningSoundStyle, volume: Double) {
-    if !play(source: .system(style.systemSoundName), volume: volume, restarting: .timeWarning),
-      (playbackVolume(volume) ?? 0) > 0 {
-      beep()
-    }
+    requestSample(source: .system(style.systemSoundName), volume: volume, restarting:.timeWarning, beepOnFailure:true)
   }
 
   func playFinishReverb(volume: Double) {
-    _ = play(source: .finishReverb, volume: volume, restarting: .finishReverb)
+    requestSample(source: .finishReverb, volume: volume, restarting:.finishReverb)
   }
 
   func playPracticeFinish(previousOutcome: TestOutcome, outcome: TestOutcome, hasStarted: Bool,
@@ -769,7 +786,56 @@ final class TypingFeedbackSound {
     playFinishReverb(volume: volume)
   }
 
-  @discardableResult
+  private func requestSample(source: TypingClickPlaybackSource, volume: Double,
+    restarting: RestartingSampleChannel? = nil, beepOnFailure: Bool = false) {
+    guard playbackVolume(volume) != nil else { return }
+    let channelRequest: UUID?
+    switch restarting {
+    case .timeWarning: channelRequest = UUID(); warningRequest = channelRequest
+    case .finishReverb: channelRequest = UUID(); finishRequest = channelRequest
+    case nil: channelRequest = nil
+    }
+    let request = PendingSample(volume:volume,restarting:restarting,beepOnFailure:beepOnFailure,
+      generation:sampleGeneration,channelRequest:channelRequest)
+    if loadSampleSound != nil, cachedSources[source] == nil || drainingSamples.contains(source) {
+      pendingSamples[source,default:[]].append(request)
+      _ = prototype(for:source)
+    } else { performSample(request,source:source) }
+  }
+
+  private func isCurrent(_ request: PendingSample) -> Bool {
+    guard request.generation == sampleGeneration else { return false }
+    switch request.restarting {
+    case .timeWarning: return request.channelRequest == warningRequest
+    case .finishReverb: return request.channelRequest == finishRequest
+    case nil: return true
+    }
+  }
+
+  private func performSample(_ request: PendingSample, source: TypingClickPlaybackSource) {
+    guard isCurrent(request) else { return }
+    if !play(source:source,volume:request.volume,restarting:request.restarting),
+      isCurrent(request), request.beepOnFailure, (playbackVolume(request.volume) ?? 0) > 0 { beep() }
+  }
+
+  private func finishSamplePreparation(source: TypingClickPlaybackSource, prototype: (any TypingSoundVoice)?) {
+    samplePreparationTasks.removeValue(forKey:source)
+    if let prototype {
+      cachedSources[source] = prototype
+      drainingSamples.insert(source)
+      defer { drainingSamples.remove(source) }
+      // Reentrant arrivals join the next batch instead of jumping the FIFO.
+      while let requests = pendingSamples.removeValue(forKey:source) {
+        for request in requests { performSample(request,source:source) }
+      }
+    } else {
+      let requests = pendingSamples.removeValue(forKey:source) ?? []
+      for request in requests where isCurrent(request) {
+        if request.beepOnFailure, (playbackVolume(request.volume) ?? 0) > 0 { beep() }
+      }
+    }
+  }
+
   private func play(source: TypingClickPlaybackSource, volume: Double,
     restarting: RestartingSampleChannel? = nil) -> Bool {
     guard let effectiveVolume = playbackVolume(volume) else { return false }

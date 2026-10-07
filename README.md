@@ -1,5 +1,7 @@
 # Typebar
 
+当前增量：[样本声音异步准备与等待请求](ASYNC_SAMPLE_SOUND_CONTRACT.md) 将自有 PCM 生成移到独立串行 actor，同资源合并准备并保留等待请求，重开拒绝旧声音，音乐独立。NSSound 创建仍在主线程，Howler 内部 seek 重启／playLock／设备听感不宣称等价；CFG-02 部分兼容、goal active，本轮零 GUI，下方为历史阶段。
+
 当前增量：[样本声音闲置复用与播放起点](SAMPLE_SOUND_POOL_CONTRACT.md) 接通逐资源五闲置声部池、每次 rewind 和播放代次保护，活动声部不抢占，音乐独立。异步加载和真实设备听感仍开放，CFG-02 部分兼容、goal active；本轮零 GUI，下方为历史阶段。
 
 当前增量：[账户单条成绩速度图](ACCOUNT_RESULT_CHART_CONTRACT.md) 接通匿名数值发布、私有单条懒读取和原生三轨图；列表不携带样本，旧缺失不补造，跨账户／刷新响应不回写。整体仍部分兼容、goal active，窗口未验，本轮零 GUI；下方为历史阶段。
