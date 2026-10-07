@@ -1040,6 +1040,7 @@ public actor AuthStore {
   }
 
   private struct StoredResult: Codable {
+    let performanceChart: ResultPerformanceChart?
     let quoteLength: ResultQuoteLength?
     var accountTagIDs: [UUID]?
     let speedPrecision: ResultSpeedPrecision?
@@ -1087,7 +1088,7 @@ public actor AuthStore {
       case personalBestConfiguration
       case speedPrecision
       case accountTagIDs
-      case quoteLength
+      case quoteLength, performanceChart
     }
 
     init(
@@ -1100,6 +1101,7 @@ public actor AuthStore {
       speedPrecision: ResultSpeedPrecision? = nil,
       accountTagIDs: [UUID]? = nil,
       quoteLength: ResultQuoteLength? = nil,
+      performanceChart: ResultPerformanceChart? = nil,
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       terminalTiming: ResultTerminalTiming? = nil,
       elapsedTime: ResultElapsedTime? = nil,
@@ -1109,6 +1111,7 @@ public actor AuthStore {
       self.id = id
       self.accountTagIDs = accountTagIDs
       self.quoteLength = quoteLength
+      self.performanceChart = performanceChart
       self.userID = userID
       self.mode = mode
       self.language = language
@@ -1145,6 +1148,7 @@ public actor AuthStore {
       let values = try decoder.container(keyedBy: CodingKeys.self)
       id = try values.decode(UUID.self, forKey: .id)
       userID = try values.decode(UUID.self, forKey: .userID)
+      performanceChart = values.contains(.performanceChart) ? try values.decode(ResultPerformanceChart.self, forKey: .performanceChart) : nil
       mode = try values.decode(String.self, forKey: .mode)
       quoteLength = values.contains(.quoteLength) ? try values.decode(ResultQuoteLength.self, forKey: .quoteLength) : nil
       if quoteLength != nil, mode != "quote" {
@@ -1254,6 +1258,9 @@ public actor AuthStore {
         throw DecodingError.dataCorruptedError(forKey: .experienceEvidence, in: values,
           debugDescription: "Stored complete XP evidence must keep counter, basis and timing bindings")
       }
+      if let performanceChart, !performanceChart.matches(duration: elapsedDuration) {
+        throw DecodingError.dataCorruptedError(forKey: .performanceChart, in: values, debugDescription: "Stored chart duration mismatch")
+      }
       if let speedPrecision, !speedPrecision.matchesCounters(inputMetrics, duration: elapsedDuration, events:eventCount, errors:errorCount) {
         throw DecodingError.dataCorruptedError(forKey:.speedPrecision,in:values,debugDescription:"Stored speed precision must keep counter and duration bindings")
       }
@@ -1278,6 +1285,7 @@ public actor AuthStore {
       response.quoteLength = quoteLength
       response.personalBestConfiguration = personalBestConfiguration
       response.accountTagIDs = accountTagIDs
+      response.hasPerformanceChart = performanceChart != nil
       return response
     }
   }
@@ -3786,6 +3794,7 @@ public actor AuthStore {
       speedPrecision: record.speedPrecision,
       accountTagIDs: record.accountTagIDs,
       quoteLength: record.quoteLength,
+      performanceChart: record.performanceChart,
       practiceTiming: record.practiceTiming, inputMetrics: record.inputMetrics,
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       terminalTiming: record.terminalTiming,
@@ -4028,6 +4037,7 @@ public actor AuthStore {
         speedPrecision: request.speedPrecision,
         accountTagIDs: accountTagIDs,
         quoteLength: request.quoteLength,
+        performanceChart: request.performanceChart,
         inputMetrics: request.inputMetrics,
         keyConsistency: request.resultConsistency?.keyConsistency,
         terminalTiming: request.terminalTiming,
@@ -4299,6 +4309,7 @@ public actor AuthStore {
 
   private func resultResponse(for record: StoredResult) -> AccountResultResponse {
     var response = record.response()
+    response.performanceChart = record.performanceChart
     let receipt = state.experienceAwards!.first {
       $0.userID == record.userID && $0.resultID == record.id
     }
@@ -5023,6 +5034,7 @@ public actor AuthStore {
     }
     let measured = result.terminalTiming?.duration(mode: result.mode)
       ?? result.elapsedTime?.duration(mode: result.mode) ?? elapsed
+    if let chart = result.performanceChart, !chart.matches(duration: measured) { throw ResultStoreError.invalidResult }
     if isBailout {
       let countAccuracy = result.eventCount == 0 ? 100
         : Double(result.eventCount - result.errorCount) / Double(result.eventCount) * 100

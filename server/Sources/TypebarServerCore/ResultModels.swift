@@ -43,6 +43,7 @@ public struct ResultPracticeTiming: Content, Equatable, Sendable {
 }
 
 public struct ResultSubmissionRequest: Content, Equatable {
+    public let performanceChart: ResultPerformanceChart?
     public let quoteLength: ResultQuoteLength?
     public let accountTagIDs: [UUID]?
     public let speedPrecision: ResultSpeedPrecision?
@@ -90,6 +91,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         speedPrecision: ResultSpeedPrecision? = nil,
         accountTagIDs: [UUID]? = nil,
         quoteLength: ResultQuoteLength? = nil,
+        performanceChart: ResultPerformanceChart? = nil,
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         resultConsistency: ResultConsistencyMetrics? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
@@ -100,6 +102,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.id = id
         self.accountTagIDs = accountTagIDs
         self.quoteLength = quoteLength
+        self.performanceChart = performanceChart
         self.mode2 = mode2
         self.mode = mode
         self.language = language
@@ -149,11 +152,12 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case bailedOut, customLimit
         case mode2
         case accountTagIDs
-        case quoteLength
+        case quoteLength, performanceChart
     }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        performanceChart = values.contains(.performanceChart) ? try values.decode(ResultPerformanceChart.self, forKey: .performanceChart) : nil
         id = try values.decode(UUID.self, forKey: .id)
         accountTagIDs = values.contains(.accountTagIDs) ? try values.decode([UUID].self, forKey: .accountTagIDs) : nil
         mode = try values.decode(String.self, forKey: .mode)
@@ -240,6 +244,8 @@ public struct ResultSubmissionResponse: Content, Equatable {
 /// A compact, account-scoped view of a submitted result. It deliberately
 /// excludes prompt text, input replay, and every profile or credential field.
 public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable {
+    public var performanceChart: ResultPerformanceChart? = nil
+    public var hasPerformanceChart: Bool? = nil
     public var historicalPersonalBest: Bool? = nil
     public var quoteLength: ResultQuoteLength? = nil
     public var accountTagIDs: [UUID]? = nil
@@ -319,7 +325,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     }
 
     private enum CodingKeys: String, CodingKey {
-        case historicalPersonalBest, quoteLength
+        case historicalPersonalBest, quoteLength, performanceChart, hasPerformanceChart
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, preciseAccuracy,
             consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, terminalTiming,
             elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
@@ -370,6 +376,11 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             customLimit: try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit), startedAt: start, finishedAt: end)
         let measured = terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
             ?? finishedAt.timeIntervalSince(startedAt)
+        performanceChart = values.contains(.performanceChart) ? try values.decode(ResultPerformanceChart.self, forKey: .performanceChart) : nil
+        hasPerformanceChart = values.contains(.hasPerformanceChart) ? try values.decode(Bool.self, forKey: .hasPerformanceChart) : nil
+        if let performanceChart, !performanceChart.matches(duration: measured) || hasPerformanceChart == false {
+            throw DecodingError.dataCorruptedError(forKey: .performanceChart, in: values, debugDescription: "Invalid chart duration or availability")
+        }
         historicalPersonalBest = values.contains(.historicalPersonalBest)
             ? try values.decode(Bool.self, forKey: .historicalPersonalBest) : nil
         quoteLength = values.contains(.quoteLength) ? try values.decode(ResultQuoteLength.self, forKey: .quoteLength) : nil

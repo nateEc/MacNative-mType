@@ -238,6 +238,9 @@ fi
 run_logged_check "executing pinned daily minute fit and complete trend clipping" \
   "$temporary_directory/account-daily-activity-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-daily-activity.mjs" "$reference_root" "$daily_trend_source_archive"
+run_logged_check "executing pinned account result chart data, options and callbacks" \
+  "$temporary_directory/account-result-chart-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-result-chart.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

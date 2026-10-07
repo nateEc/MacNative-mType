@@ -53,6 +53,9 @@ enum ResultConsistencyPublication {
         configuration: result.configuration, keySpacingSamples: result.keySpacingSamples).key,
         wpmConsistency: wpm)
     }
+    let chart = capabilities?.supportsResultPerformanceChart == true
+      ? try await AccountResultChartInput(result).value() : nil
+    try Task.checkCancellation()
     return RemoteResultSubmission(result: result,
       includesTimingEvidence: capabilities?.supportsResultTimingEvidence == true,
       includesPracticeTiming: capabilities?.supportsResultPracticeTiming == true,
@@ -62,6 +65,7 @@ enum ResultConsistencyPublication {
       personalBestConfiguration: personalBestConfiguration,
       speedPrecision: speedPrecision,
       includesMode2: capabilities?.supportsResultMode2 == true,
-      includesHistoryMetadata: capabilities?.supportsResultHistoryMetadata == true)
+      includesHistoryMetadata: capabilities?.supportsResultHistoryMetadata == true,
+      performanceChart: chart)
   }
 }

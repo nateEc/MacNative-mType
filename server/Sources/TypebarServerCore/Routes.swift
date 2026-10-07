@@ -88,6 +88,7 @@ public func configure(
                 "resultRankingEvidence": .available,
                 "resultPersonalBestConfiguration": .available,
                 "resultHistoryMetadata": .available,
+                "resultPerformanceChart": .available,
                 "accountFilterPresets": .available,
                 "accountPersonalBestLedger": .available,
                 "accountTags": .available,

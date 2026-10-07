@@ -13,6 +13,7 @@ struct AccountHistoryView: View {
   @State private var sortDirection = ResultHistorySortDirection.descending
   @State private var visibleLimit = ResultHistoryPagePolicy.pageSize
   @State private var selectedDay: Date?
+  @State private var selectedChart: AccountResultChartSelection?
   @State private var selectedGraphResult: UUID?
   @State private var selectedGraphScope: ResultPublicationScope?
   @State private var message: String?
@@ -139,6 +140,10 @@ struct AccountHistoryView: View {
     }
     .onChange(of: rows.map(\.id)) {
       if let selectedGraphResult, !rows.contains(where: { $0.id == selectedGraphResult }) { resetPage() }
+      if let selectedChart, !rows.contains(where: { $0.id == selectedChart.id }) { self.selectedChart = nil }
+    }
+    .sheet(item: $selectedChart) { selection in
+      AccountResultChartDetail(selection: selection, account: account, settings: settings)
     }
     .confirmationDialog("删除账户筛选预设？", isPresented: Binding(get: { deletingPreset != nil },
       set: { if !$0 { deletingPreset = nil } }), presenting: deletingPreset) { draft in
@@ -260,6 +265,11 @@ struct AccountHistoryView: View {
         }.joined(separator: "、")
       } ?? "账户标签关联未知").font(.caption).foregroundStyle(.secondary)
       if !row.tags.isEmpty { Text("独立文字标签：\(row.tags.joined(separator: "、"))").font(.caption) }
+      Button("查看速度图", systemImage: "chart.xyaxis.line") {
+        if let scope = account.resultPublicationScope { selectedChart = .init(id: row.id, scope: scope) }
+      }.disabled(!row.canViewPerformanceChart)
+        .help(row.canViewPerformanceChart ? "按需读取这条账户成绩的匿名速度、Burst 和错误轨迹"
+          : "没有保存的轨迹或超过 122 秒；不会从总成绩补造速度图")
     }.padding(10).background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
   }
 
@@ -270,6 +280,7 @@ struct AccountHistoryView: View {
 
   private func resetPage() {
     visibleLimit = ResultHistoryPagePolicy.pageSize; selectedDay = nil
+    selectedChart = nil
     selectedGraphResult = nil; selectedGraphScope = nil
   }
 

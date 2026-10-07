@@ -366,6 +366,8 @@ private struct RemoteDeveloperAccessKeyDeletionResponse: Codable, Sendable {
 }
 
 struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
+    let performanceChart: AccountResultChartData?
+    let hasPerformanceChart: Bool?
     let historicalPersonalBest: Bool?
     let quoteLength: QuoteLength?
     var accountTagIDs: [UUID]? = nil
@@ -409,6 +411,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let finishedAtReferenceTime: Double?
 
     private enum CodingKeys: String, CodingKey {
+        case performanceChart, hasPerformanceChart
         case historicalPersonalBest, quoteLength
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
             errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
@@ -420,6 +423,8 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        performanceChart = values.contains(.performanceChart) ? try values.decode(AccountResultChartData.self, forKey: .performanceChart) : nil
+        hasPerformanceChart = values.contains(.hasPerformanceChart) ? try values.decode(Bool.self, forKey: .hasPerformanceChart) : nil
         id = try values.decode(UUID.self, forKey: .id)
         mode = try values.decode(String.self, forKey: .mode)
         historicalPersonalBest = values.contains(.historicalPersonalBest)
@@ -533,8 +538,18 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
             throw DecodingError.dataCorruptedError(forKey: .experienceEvidence, in: values,
                 debugDescription: "Experience history must keep its terminal timing binding")
         }
+        try validatePerformanceChart()
     }
 
+    private func validatePerformanceChart() throws {
+        if let performanceChart, !performanceChart.matches(duration: elapsedDuration) || hasPerformanceChart == false {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Chart must retain duration and availability binding"))
+        }
+    }
+    var canViewPerformanceChart: Bool {
+        elapsedDuration.isFinite && elapsedDuration > 0 && elapsedDuration <= 122
+            && (hasPerformanceChart ?? (performanceChart != nil))
+    }
     var wallClockDuration: TimeInterval { max(0, finishedAt.timeIntervalSince(startedAt)) }
     var capturedDuration: TimeInterval { elapsedTime?.seconds ?? wallClockDuration }
     var elapsedDuration: TimeInterval {
@@ -893,6 +908,7 @@ struct RemoteArchivePull {
 }
 
 struct RemoteResultSubmission: Codable, Sendable {
+    let performanceChart: AccountResultChartData?
     let quoteLength: QuoteLength?
     var accountTagIDs: [UUID]? = nil
     let speedPrecision: RemoteSpeedPrecision?
@@ -935,8 +951,10 @@ struct RemoteResultSubmission: Codable, Sendable {
         personalBestConfiguration: RemotePersonalBestConfiguration? = nil,
         speedPrecision: RemoteSpeedPrecision? = nil,
         includesMode2: Bool = false,
-        includesHistoryMetadata: Bool = false
+        includesHistoryMetadata: Bool = false,
+        performanceChart: AccountResultChartData? = nil
     ) {
+        self.performanceChart = performanceChart
         id = result.id
         mode2 = includesMode2 && result.configuration.mode == .quote ? result.quoteSource?.mode2 : nil
         quoteLength = includesHistoryMetadata && result.configuration.mode == .quote ? result.quoteSource?.actualLength : nil
@@ -986,6 +1004,10 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     let apiVersion: String
     let service: String
     let capabilities: [String: String]
+
+    var supportsResultPerformanceChart: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["resultPerformanceChart"] == "available"
+    }
 
     var supportsResultHistoryMetadata: Bool {
         apiVersion == "v1" && service == "typebar" && capabilities["resultHistoryMetadata"] == "available"
@@ -2728,6 +2750,30 @@ final class AccountSession {
                 statusMessage = "历史加载失败，旧缓存保留：" + error.localizedDescription
             }
         }
+    }
+
+    func beginAccountResultChartRead(id: UUID, scope: ResultPublicationScope) throws -> AccountResultChartRead {
+        try Task.checkCancellation()
+        guard resultPublicationScope == scope, accountHistoryLoadedResults.contains(where: { $0.id == id && $0.canViewPerformanceChart }) else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        return .init(scope: scope, generation: accountTagHistoryGeneration, id: id)
+    }
+
+    func acceptAccountResultChart(_ result: RemoteAccountResult, read: AccountResultChartRead) throws -> AccountResultChartData? {
+        try Task.checkCancellation()
+        guard resultPublicationScope == read.scope, accountTagHistoryGeneration == read.generation,
+            result.id == read.id, accountHistoryLoadedResults.contains(where: { $0.id == read.id && $0.canViewPerformanceChart }) else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        return result.canViewPerformanceChart ? result.performanceChart : nil
+    }
+
+    func fetchAccountResultChart(id: UUID, scope: ResultPublicationScope) async throws -> AccountResultChartData? {
+        let read = try beginAccountResultChartRead(id: id, scope: scope), token = try accessToken()
+        let result = try await RemoteAccountAPI(endpoint: endpoint).request(path: "v1/results/\(id)", method: "GET", token: token,
+            body: Optional<String>.none, response: RemoteAccountResult.self)
+        return try acceptAccountResultChart(result, read: read)
     }
 
     func beginAccountTagHistoryRead() throws -> AccountTagHistoryRead {
