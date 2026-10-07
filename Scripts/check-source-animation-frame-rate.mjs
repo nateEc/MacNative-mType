@@ -43,12 +43,12 @@ for (const initial of [15, 24, 30, 120, 1_000]) {
     {mode: 'words', limit: 250}, {mode: 'words', limit: 0},
     {mode: 'custom', limit: 15}, {mode: 'quote', limit: 0}, {mode: 'zen', limit: 0}];
   for (const config of configs) {
-    let requested = initial, signal, slow = false, failed = false;
+    let requested = initial, signal, failed = false;
     const schema = {int: () => schema, min: () => schema, max: () => schema};
     const context = vm.createContext({Config: {mode: config.mode, time: config.limit, words: config.limit},
       slowTimerFailEnabled: true, slowTimerCount: 0, slowTimerNotifIds: [], stopped: false,
       newTimer: {reset() {}}, timer: null, clearTimeout() {}, performance: {now: () => 0},
-      SlowTimer: {set: () => { slow = true; }},
+      console: {error() {}},
       showNoticeNotification() {}, showErrorNotification: () => 1,
       timerEvent: {dispatch: event => { assert.equal(event.value, 'slow timer'); failed = true; }}});
     const adapters = new Map([
@@ -70,8 +70,14 @@ for (const initial of [15, 24, 30, 120, 1_000]) {
       }, {identifier: id, context});
     });
     await module.evaluate();
+    const slowFile = path.join(root, 'frontend/src/ts/legacy-states/slow-timer.ts');
+    const slowModule = new vm.SourceTextModule(stripTypeScriptTypes(fs.readFileSync(slowFile, 'utf8'),
+      {mode: 'transform'}), {identifier: slowFile, context});
+    await slowModule.link(() => { throw new Error('Unexpected SlowTimer dependency'); });
+    await slowModule.evaluate();
     const api = module.namespace;
-    Object.assign(context, {setLowFpsMode: api.setLowFpsMode, clearLowFpsMode: api.clearLowFpsMode});
+    Object.assign(context, {setLowFpsMode: api.setLowFpsMode, clearLowFpsMode: api.clearLowFpsMode,
+      SlowTimer: slowModule.namespace});
     new vm.Script(timerCode).runInContext(context, {timeout: 1_000});
     api.applyEngineSettings();
     const actions = [{kind: 'observe', value: 125}, {kind: 'observe', value: 125.01},
@@ -87,7 +93,8 @@ for (const initial of [15, 24, 30, 120, 1_000]) {
         new vm.Script('checkIfTimerIsSlow(drift)').runInContext(context, {timeout: 1_000}); }
       assert.equal(engine.fps, engine.defaults.frameRate);
       assert.equal(api.getfpsLimit(), requested);
-      steps.push({action, frameRate: engine.fps, requested, severeDrifts: context.slowTimerCount, failed});
+      steps.push({action, frameRate: engine.fps, requested, severeDrifts: context.slowTimerCount,
+        failed, slowTimer: slowModule.namespace.get()});
     }
     assert.equal(steps[0].frameRate, initial);
     if ((config.mode === 'time' && config.limit > 0 && config.limit < 130)
@@ -95,8 +102,8 @@ for (const initial of [15, 24, 30, 120, 1_000]) {
       assert.equal(steps[1].frameRate, 30);
       assert.equal(steps[2].frameRate, 30);
       assert.equal(steps[9].failed, true);
-      assert.equal(slow, true);
-    } else { assert.equal(steps[1].frameRate, initial); assert.equal(slow, false); }
+      assert.equal(slowModule.namespace.get(), true);
+    } else { assert.equal(steps[1].frameRate, initial); assert.equal(slowModule.namespace.get(), false); }
     assert.equal(steps[3].frameRate, 60);
     assert.equal(steps[8].frameRate, 1_000, 'Repeated native selection reapplies the setting');
     assert.equal(steps.at(-1).frameRate, requested);

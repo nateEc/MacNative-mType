@@ -1374,6 +1374,8 @@ private struct ContentView: View {
           wpm: result.wpm, elapsedDuration: result.elapsedDuration, outcome: result.outcome)
         completedResult = .init(
           result: result,
+          suppressesCelebrationForSlowTimer: timerHealth.suppressesResultCelebration(
+            configuration: session.configuration, outcome: outcome, failureReason: failureReason),
           savesResult: savesResult,
           eligibility: eligibility,
           failureReason: failureReason,
@@ -1764,6 +1766,7 @@ private struct ContentView: View {
         isNewPersonalBest: result.savesResult && result.resultPersonalBestFeedback?.isNewPersonalBest == true,
         hasZeroSpeedFeedback: result.zeroSpeedFeedback != nil,
         reducesMotion: settings.reducePracticeMotion,
+        slowTimer: result.suppressesCelebrationForSlowTimer,
         accent: activeTheme.accent,
         onRestart: {
           completedResult = nil
@@ -1773,6 +1776,7 @@ private struct ContentView: View {
     } else {
       CompletedResultView(
         result: result.result,
+        slowTimer: result.suppressesCelebrationForSlowTimer,
         savesResult: result.savesResult,
         eligibility: result.eligibility,
         failureReason: result.failureReason,
@@ -3699,7 +3703,8 @@ private struct ContentView: View {
     guard
       TypingPowerPolicy.shouldEmit(
         mode: mode, acceptedCharacters: acceptedCharacters,
-        reducesMotion: systemReduceMotion || settings.reducePracticeMotion)
+        reducesMotion: systemReduceMotion || settings.reducePracticeMotion,
+        slowTimer: timerHealth.usesSlowTimer)
     else { return }
 
     let now = Date.now
@@ -5628,6 +5633,7 @@ extension TestOutcome {
 
 private struct CompletedResultPresentation: Identifiable {
   let result: CompletedTestResult
+  let suppressesCelebrationForSlowTimer: Bool
   let savesResult: Bool
   let eligibility: ResultEligibility
   let failureReason: TestFailureReason?
@@ -5654,6 +5660,7 @@ private struct NoStressResultView: View {
   let isNewPersonalBest: Bool
   let hasZeroSpeedFeedback: Bool
   let reducesMotion: Bool
+  let slowTimer: Bool
   let accent: Color
   let onRestart: () -> Void
   @Environment(\.dismiss) private var dismiss
@@ -5684,6 +5691,7 @@ private struct NoStressResultView: View {
         isNewPersonalBest: isNewPersonalBest,
         hasZeroSpeedFeedback: hasZeroSpeedFeedback,
         reducesMotion: reducesMotion,
+        slowTimer: slowTimer,
         accent: accent,
         text: .primary,
         subduedText: .secondary)
@@ -5695,6 +5703,7 @@ private struct NoStressResultView: View {
 
 private struct CompletedResultView: View {
   let result: CompletedTestResult
+  let slowTimer: Bool
   let savesResult: Bool
   let eligibility: ResultEligibility
   let failureReason: TestFailureReason?
@@ -6102,6 +6111,7 @@ private struct CompletedResultView: View {
         isNewPersonalBest: savesResult && resultPersonalBestFeedback?.isNewPersonalBest == true,
         hasZeroSpeedFeedback: zeroSpeedFeedback != nil,
         reducesMotion: settings.reducePracticeMotion,
+        slowTimer: slowTimer,
         accent: accent,
         text: .primary,
         subduedText: .secondary)

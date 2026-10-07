@@ -135,7 +135,7 @@ import XCTest
     }
     struct Action: Decodable { let kind: String, value: Double }
     struct Step: Decodable {
-      let action: Action, frameRate: Int, requested: Int, severeDrifts: Int, failed: Bool
+      let action: Action, frameRate: Int, requested: Int, severeDrifts: Int, failed: Bool, slowTimer: Bool
     }
     struct Fixture: Decodable { let initial: Int, mode: String, limit: Int, steps: [Step] }
     let project = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -172,6 +172,7 @@ import XCTest
         XCTAssertEqual(requested, step.requested, context)
         XCTAssertEqual(health.severeDriftCount, step.severeDrifts, context)
         XCTAssertEqual(health.shouldFail, step.failed, context)
+        XCTAssertEqual(health.usesSlowTimer, step.slowTimer, context)
       }
     }
   }

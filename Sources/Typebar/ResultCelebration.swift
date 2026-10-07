@@ -10,9 +10,9 @@ enum ResultCelebrationPolicy {
   static let maximumParticles = 160
 
   static func shouldEmit(
-    isNewPersonalBest: Bool, hasZeroSpeedFeedback: Bool, reducesMotion: Bool
+    isNewPersonalBest: Bool, hasZeroSpeedFeedback: Bool, reducesMotion: Bool, slowTimer: Bool = false
   ) -> Bool {
-    !reducesMotion && (isNewPersonalBest || hasZeroSpeedFeedback)
+    !reducesMotion && !slowTimer && (isNewPersonalBest || hasZeroSpeedFeedback)
   }
 
   static func particles(at date: Date) -> [ResultCelebrationParticle] {
@@ -73,6 +73,7 @@ struct ResultCelebrationView: View {
   let isNewPersonalBest: Bool
   let hasZeroSpeedFeedback: Bool
   let reducesMotion: Bool
+  var slowTimer = false
   let accent: Color
   let text: Color
   let subduedText: Color
@@ -113,7 +114,7 @@ struct ResultCelebrationView: View {
     ResultCelebrationPolicy.shouldEmit(
       isNewPersonalBest: isNewPersonalBest,
       hasZeroSpeedFeedback: hasZeroSpeedFeedback,
-      reducesMotion: reducesMotion || systemReduceMotion)
+      reducesMotion: reducesMotion || systemReduceMotion, slowTimer: slowTimer)
   }
 
   private func playIfNeeded() {

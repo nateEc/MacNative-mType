@@ -278,6 +278,10 @@ run_logged_check "executing pinned old-word deletion timing and backspace bounda
   "$temporary_directory/word-retirement-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-word-retirement.mjs" "$reference_root"
+run_logged_check "executing pinned SlowTimer lifecycle and effect gates" \
+  "$temporary_directory/slow-timer-effects-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-slow-timer-effects.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

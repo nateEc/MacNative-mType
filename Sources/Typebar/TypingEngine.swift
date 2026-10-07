@@ -2658,6 +2658,8 @@ enum TimerHealthPolicy {
 }
 
 struct TimerHealthState: Equatable {
+  // Restoring animation FPS does not clear the independent slow-timer latch.
+  private(set) var usesSlowTimer = false
   // A settings write supersedes older overrides, but not drift observed after
   // that write in the same SwiftUI render pass. No deferred clearing callback.
   private var lowFrameRateSettingsRevision: Int?
@@ -2673,16 +2675,32 @@ struct TimerHealthState: Equatable {
     lowFrameRateSettingsRevision = nil
   }
 
+  func suppressesResultCelebration(configuration: TestConfiguration, outcome: TestOutcome,
+    failureReason: TestFailureReason?) -> Bool {
+    // Capture before the UI resets this attempt's health. Timer expiry and
+    // live threshold failure clear the source latch; ordinary timer clear does not.
+    guard usesSlowTimer else { return false }
+    if outcome == .failed, failureReason == .minimumWpm || failureReason == .minimumAccuracy {
+      return false
+    }
+    if configuration.mode == .time || configuration.mode == .custom,
+      let duration = configuration.duration, duration > 0,
+      outcome == .completed || outcome == .invalidAFK { return false }
+    return true
+  }
+
   mutating func observe(drift: TimeInterval, configuration: TestConfiguration,
     animationSettingsRevision: Int = 0) {
     guard TimerHealthPolicy.monitors(configuration), !shouldFail else { return }
     guard drift.isFinite else {
+      usesSlowTimer = true
       lowFrameRateSettingsRevision = animationSettingsRevision
       shouldFail = true
       return
     }
     let lateness = max(0, drift)
     if lateness > TimerHealthPolicy.lowFrameRateDrift {
+      usesSlowTimer = true
       lowFrameRateSettingsRevision = animationSettingsRevision
     }
     if lateness > TimerHealthPolicy.severeDrift { severeDriftCount += 1 }

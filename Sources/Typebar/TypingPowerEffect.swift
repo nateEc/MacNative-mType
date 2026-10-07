@@ -59,9 +59,9 @@ enum TypingPowerPolicy {
   static let particleLifetime: TimeInterval = 0.9
 
   static func shouldEmit(
-    mode: TypingPowerMode, acceptedCharacters: Int, reducesMotion: Bool
+    mode: TypingPowerMode, acceptedCharacters: Int, reducesMotion: Bool, slowTimer: Bool = false
   ) -> Bool {
-    mode.isEnabled && acceptedCharacters > 0 && !reducesMotion
+    mode.isEnabled && acceptedCharacters > 0 && !reducesMotion && !slowTimer
   }
 
   static func particleCount(randomUnit: Double) -> Int {
