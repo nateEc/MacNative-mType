@@ -102,7 +102,23 @@ struct RemoteAccountFilterPreset: Codable, Identifiable, Equatable, Sendable {
 struct RemoteAccountFilterPresetList: Codable, Sendable {
   let version: Int
   let maximumPresets: Int
+  let mutationsEnabled: Bool
   let presets: [RemoteAccountFilterPreset]
+  init(version: Int, maximumPresets: Int, mutationsEnabled: Bool = true, presets: [RemoteAccountFilterPreset]) {
+    self.version = version; self.maximumPresets = maximumPresets
+    self.mutationsEnabled = mutationsEnabled; self.presets = presets
+  }
+  private enum CodingKeys: String, CodingKey { case version, maximumPresets, mutationsEnabled, presets }
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    version = try values.decode(Int.self, forKey: .version)
+    maximumPresets = try values.decode(Int.self, forKey: .maximumPresets)
+    mutationsEnabled = values.contains(.mutationsEnabled) ? try values.decode(Bool.self, forKey: .mutationsEnabled) : true
+    presets = try values.decode([RemoteAccountFilterPreset].self, forKey: .presets)
+  }
+  func requireMutationsEnabled() throws {
+    guard mutationsEnabled else { throw RemoteAccountError.serverMessage("账户筛选预设修改已暂停；已有预设仍可应用，请刷新后重试。") }
+  }
   func validate() throws {
     guard version == 1, (0...100).contains(maximumPresets), presets.count <= 100,
       Set(presets.map(\.id)).count == presets.count else { throw RemoteAccountError.unexpectedResponse }

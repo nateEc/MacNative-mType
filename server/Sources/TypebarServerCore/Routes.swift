@@ -50,7 +50,9 @@ public func configure(
             rewardInboxConfiguration: try .fromJSON(Environment.get("TYPEBAR_INBOX_CONFIGURATION")),
             dailyLeaderboardConfiguration: try .fromJSON(Environment.get("TYPEBAR_DAILY_LEADERBOARD_CONFIGURATION")),
             maximumAccountFilterPresets: try AccountFilterPresetConfiguration.maximum(
-                from: Environment.get("TYPEBAR_MAX_ACCOUNT_FILTER_PRESETS")))
+                from: Environment.get("TYPEBAR_MAX_ACCOUNT_FILTER_PRESETS")),
+            accountFilterPresetsEnabled: try AccountFilterPresetConfiguration.enabled(
+                from: Environment.get("TYPEBAR_ACCOUNT_FILTER_PRESETS_ENABLED")))
     }
     let authStore = resolvedAuthStore
     if app.environment != .testing {
@@ -951,12 +953,21 @@ public func configure(
         catch let error as AuthStoreError { throw error.abort }
     }
     app.on(.POST, "v1", "result-filter-presets", body: .collect(maxSize: "128kb")) { request async throws -> AccountFilterPresetResponse in
-        do { return try await authStore.createAccountFilterPreset(request.content.decode(AccountFilterPresetRequest.self), accessToken: request.accessToken()) }
+        do {
+            let token = try request.accessToken()
+            _ = try await authStore.authorizeAccountFilterPresetMutation(accessToken: token)
+            return try await authStore.createAccountFilterPreset(request.content.decode(AccountFilterPresetRequest.self), accessToken: token)
+        }
         catch let error as AuthStoreError { throw error.abort }
     }
     app.delete("v1", "result-filter-presets", ":id") { request async throws -> AccountTagDeletionResponse in
-        guard let id = request.parameters.get("id").flatMap(UUID.init(uuidString:)) else { throw Abort(.badRequest) }
-        do { try await authStore.deleteAccountFilterPreset(id: id, accessToken: request.accessToken()); return .init(deleted: true) }
+        do {
+            let token = try request.accessToken()
+            _ = try await authStore.authorizeAccountFilterPresetMutation(accessToken: token)
+            guard let id = request.parameters.get("id").flatMap(UUID.init(uuidString:)) else { throw Abort(.badRequest) }
+            try await authStore.deleteAccountFilterPreset(id: id, accessToken: token)
+            return .init(deleted: true)
+        }
         catch let error as AuthStoreError { throw error.abort }
     }
 

@@ -178,6 +178,7 @@ struct AccountHistoryView: View {
           Button("删除…", role: .destructive) {
             if let scope = account.resultPublicationScope { deletingPreset = .init(id: preset.id, name: preset.displayName, scope: scope) }
           }.accessibilityLabel("删除账户筛选预设 \(preset.displayName)")
+            .disabled(account.accountFilterPresetCache?.list.mutationsEnabled != true)
         }.disabled(account.isEditingAccountFilterPresets || account.isLoadingAccountFilterPresets)
       }
       HStack {
@@ -193,11 +194,16 @@ struct AccountHistoryView: View {
           }
         }.disabled(!AccountFilterPresetDocument.isValidName(AccountFilterPresetDocument.normalizedName(presetName))
           || account.accountFilterPresetCache == nil || account.isEditingAccountFilterPresets || account.isLoadingAccountFilterPresets
+          || account.accountFilterPresetCache?.list.mutationsEnabled != true
           || (account.accountFilterPresetCache.map { $0.list.presets.count >= $0.list.maximumPresets } ?? true))
         if let cache = account.accountFilterPresetCache { Text("\(cache.list.presets.count) / \(cache.list.maximumPresets)").font(.caption).monospacedDigit() }
       }
       Text("名称最多 16 个字母、数字、下划线、点或短横线，不能以点开头；空白自动转为下划线。")
         .font(.caption).foregroundStyle(.secondary)
+      if account.accountFilterPresetCache?.list.mutationsEnabled == false {
+        Text("服务已暂停预设修改；已有预设仍可应用。重新启用后刷新预设即可恢复。")
+          .font(.caption).foregroundStyle(.secondary)
+      }
       if let status = account.accountFilterPresetMessage { Text(status).font(.caption).foregroundStyle(.secondary) }
     }
   }

@@ -4,6 +4,62 @@ import XCTest
 
 final class AccountFilterPresetTests: XCTestCase {
   private let scope = ResultPublicationScope(endpoint: "https://owned.invalid", userID: UUID())
+  func testDisabledMutationStateSurvivesListRoundTripWithoutHidingPresets() throws {
+    let doc = try AccountFilterPresetDocument(name: "Study", filter: .init(), scope: scope)
+    let preset = RemoteAccountFilterPreset(id: UUID(), document: doc)
+    var wire = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(
+      RemoteAccountFilterPresetList(version: 1, maximumPresets: 20, presets: [preset]))) as? [String: Any])
+    wire["mutationsEnabled"] = false
+    let list = try JSONDecoder().decode(RemoteAccountFilterPresetList.self, from: JSONSerialization.data(withJSONObject: wire))
+    try list.validate()
+    XCTAssertEqual(list.presets, [preset])
+    let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(list)) as? [String: Any])
+    XCTAssertEqual(encoded["mutationsEnabled"] as? Bool, false)
+  }
+
+  func testInvalidMutationStateNeverDefaultsToEnabled() throws {
+    let list = RemoteAccountFilterPresetList(version: 1, maximumPresets: 20, presets: [])
+    let wire = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(list)) as? [String: Any])
+    for value: Any in [NSNull(), 1, "false"] {
+      var bad = wire; bad["mutationsEnabled"] = value
+      XCTAssertThrowsError(try JSONDecoder().decode(RemoteAccountFilterPresetList.self, from: JSONSerialization.data(withJSONObject: bad)))
+    }
+  }
+  func testLegacyListAllowsMutationsWithoutInventingCapacity() throws {
+    let bytes = Data(#"{"version":1,"maximumPresets":0,"presets":[]}"#.utf8)
+    let list = try JSONDecoder().decode(RemoteAccountFilterPresetList.self, from: bytes)
+    try list.validate(); XCTAssertTrue(list.mutationsEnabled); XCTAssertEqual(list.maximumPresets, 0)
+    XCTAssertNoThrow(try list.requireMutationsEnabled())
+  }
+
+  @MainActor func testDisabledCacheAllowsApplyButRejectsBothMutationsBeforeSessionStateChanges() async throws {
+    let suite = "typebar-disabled-filter-presets-\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let account = AccountSession(defaults: defaults)
+    account.currentUser = .init(id: scope.userID, email: "owner@example.invalid", displayName: "Owner", totalExperience: 0)
+    let active = try XCTUnwrap(account.resultPublicationScope)
+    let doc = try AccountFilterPresetDocument(name: "Study", filter: .init(personalBestFilter: .only), scope: active)
+    let preset = RemoteAccountFilterPreset(id: UUID(), document: doc)
+    let read = try account.beginAccountFilterPresetRead()
+    try account.applyAccountFilterPresets(.init(version: 1, maximumPresets: 20, mutationsEnabled: false, presets: [preset]), read: read)
+    for deleting in [false, true] {
+      do {
+        if deleting { try await account.deleteAccountFilterPreset(id: preset.id, scope: active) }
+        else { try await account.saveAccountFilterPreset(name: "Study", filter: .init(), scope: active) }
+        XCTFail("Disabled cache must reject before token lookup or a request")
+      } catch { XCTAssertTrue(error.localizedDescription.contains("修改已暂停")) }
+      XCTAssertFalse(account.isEditingAccountFilterPresets)
+      XCTAssertNotNil(account.accountFilterPresetCache)
+      XCTAssertEqual(account.accountFilterPresets, [preset])
+      XCTAssertEqual(try account.accountFilterPreset(id: preset.id, scope: active).effectivePersonalBestFilter, .only)
+    }
+    let refreshed = try account.beginAccountFilterPresetRead()
+    try account.applyAccountFilterPresets(.init(version: 1, maximumPresets: 20, presets: [preset]), read: refreshed)
+    XCTAssertNoThrow(try account.accountFilterPresetCache?.list.requireMutationsEnabled())
+    XCTAssertThrowsError(try account.applyAccountFilterPresets(.init(version: 1, maximumPresets: 20, mutationsEnabled: false, presets: [preset]), read: read))
+    account.currentUser = nil
+    XCTAssertNil(account.accountFilterPresetCache)
+  }
   func testSnapshotRoundTripsEveryChoiceAndDoesNotPublishScopeOrResults() throws {
     let selected = UUID(), off = UUID()
     let filter = ResultHistoryFilter(modes: [.time, .quote], languages: [.english],

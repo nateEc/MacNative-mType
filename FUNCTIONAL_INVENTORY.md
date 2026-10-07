@@ -1,5 +1,9 @@
 # 功能盘点与追踪表
 
+当前 [账户预设独立修改开关](ACCOUNT_FILTER_PRESETS_CONTRACT.md) 将禁用修改与零容量分开：认证后新增／删除 503，读取／应用保留，客户端暂停提示与会话提前拒绝接通。原生 43 项／服务 17 项、八组源开关对照和混合文档冷读通过；存储不改，MET-04／MET-36 仍部分兼容，热配置、真实网络／窗口及整体等价开放，goal active、零 GUI。下方为历史阶段。
+
+当前冻结版本完整门禁通过：客户端 3,433／服务 472 项零失败零跳过，十万词耐久、16 项磁盘冷读、1,018 场景结构及未开窗应用包通过；九哈希一致，42 份日志见上述合同。矩阵与人工状态不升级。
+
 当前 [独立 Polyglot 历史筛选](POLYGLOT_HISTORY_FILTER_CONTRACT.md) 补齐本机和账户的独立选择、任一修饰器匹配、当前设置、本机归档及账户预设。旧缺字段保持旧含义，未知成绩不补 none；显式选择要求归档 33／账户文档 v2 和新能力协商。相关原生 55 项、服务 13 项、32 组新增源查询及 16 项磁盘冷读通过；MET-04／MET-36 仍部分兼容，真实窗口／网络、官方协议及完整功能等价开放，goal active、零 GUI。下方为历史阶段。
 
 当前冻结版本完整门禁通过：客户端 3,429／服务 468 项零失败零跳过，十万词耐久、16 项磁盘冷读、1,016 场景结构及未开窗应用包通过；14 哈希一致，42 份日志见上述合同。矩阵与人工状态不升级。
@@ -1441,7 +1445,7 @@ INP-04 的“按键位图”档用所选 Typebar 布局的原创映射，将 QMK
 | MET-56 | 每日练习分钟趋势线 | `components/pages/account/DailyActivityChart.tsx` | AnalyticsDomain | 已实现：近 28 日活动切换到练习分钟时，会以次要色原生虚线显示筛选结果中每日练习时长的最小二乘趋势。拟合只使用实际存在完成成绩的日期，按真实日历间隔计算，不把为保持连续横轴而补出的空白日误作零分钟；线段仅覆盖首个到最后一个有效练习日。少于两个有效日期、同日数据或非有限导入值会安全隐藏趋势。切换到其他活动指标时不显示该线；计算只派生本机筛选结果，不新增设置、存储、同步或网络。 |
 2026-09-21 `MET-51` 审计更正：其中“Typebar 采用单指标菜单”的早期描述已被当前实现取代。每日图的“分钟 + 平均速度”原生选项现在在同一 Swift Charts 图内保留练习分钟柱、分钟最小二乘趋势和平均速度折线；左轴显示分钟，右轴以当前 WPM/CPM/WPS/CPS/WPH 单位还原速度。点选后的既有日期详情继续显示完成次数、重开比、最高/平均速度、准确率和稳定度；其余每日指标仍可单独切换。该双轴映射、空值边界和 WPM/CPM 换算由 `testDailyActivityOverviewScaleAlignsMinutesAndAverageSpeedOnSeparateAxes` 覆盖，完整固定路径对照见 `OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md`。
 | MET-57 | 历史行模式、字符与标签摘要 | `components/pages/account/Table.tsx` | ResultsDomain, AnalyticsDomain | 已实现：本机历史每行在大号速度主值旁直接显示模式及计时/字数参数、准确率、完成时间、匹配/错位/额外/跳过四元字符统计和现有结果标签，同时保留 Raw、稳定度及个人最佳标记。无限计时/字数明确显示“无限”，旧记录缺少配置时显示“未知”而不从完成时长猜测；标签沿用已有规范化规则，大小写与重音无关去重但保留首次输入的显示形式。长元数据在 520 点窗口单行截断并提供完整悬停文本，VoiceOver 会展开朗读四个字符类别及标签；整行仍可打开现有详情与标签编辑器。该摘要只读取已有本机成绩，不改排序、分页、删除、存储、同步或网络。 |
-| MET-36 | 历史“全部/当前设置”快捷筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：本机历史保留全部／当前配置快捷筛选、稳定活动 UUID 与作用域预设；账户历史新增整个已载入服务集合的临时筛选、统计与 CSV，从练习历史入口取得当前配置，设置页不猜测配置。目录或选择未知时保持原条件，旧文字方案独立。历史 PB／实际引语分类已接通，旧未知不猜；账户预设已接通自建服务，官方协议、离线备份与实机未完成；见 ACCOUNT_FILTER_PRESETS_CONTRACT.md。 |
+| MET-36 | 历史“全部/当前设置”快捷筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：本机历史保留全部／当前配置快捷筛选、稳定活动 UUID 与作用域预设；账户历史读取整个已载入服务集合，不猜设置页配置。目录或选择未知时保持原条件，旧文字方案独立。历史 PB／实际引语分类与独立 Polyglot 选择已接通；账户预设支持自建服务、独立修改开关，禁用不妨碍应用，零容量不禁删除。官方协议、热配置、离线备份与实机未完成；见 ACCOUNT_FILTER_PRESETS_CONTRACT.md、POLYGLOT_HISTORY_FILTER_CONTRACT.md。 |
 | MET-37 | 历史多选语言筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 已实现：历史“语言”筛选可任意多选、全选或全部取消，命中任一所选语言；全选保持不限制语言的旧行为并保留无法解码语言的既有成绩。旧筛选预设仅有单个语言字段时仍按该一项解释，新预设保存完整选择。 |
 | MET-38 | 历史多选标签筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：本机历史稳定 UUID 多选／none、目录增删、已确认关联优先及作用域预设保留，旧文字预设不变，新账户预设归档最低 31；664 次源标签分支对照通过。独立账户历史窗口新增服务端整个已载入集合的 UUID 任一／none 筛选及统计／CSV，不混本机完成快照，缺目录不匹配；本窗口完整筛选现可保存为账户服务预设，并按当前目录应用／确认删除；官方 API／身份、离线备份及实机仍开放，见 ACCOUNT_FILTER_PRESETS_CONTRACT.md。有限按钮组的 Shift 单选另见 HISTORY_FILTER_CHOICE_CONTRACT.md；原版标签为 Dropdown，不套用该按钮规则。 |
 | MET-39 | 历史个人最佳四态筛选 | `components/pages/account/Filters.tsx`, `collections/results.ts` | AnalyticsDomain | 部分兼容：本机历史与旧布尔预设保留；独立账户历史新增四态控件，使用按账户／成绩 UUID 绑定的服务不可变接受回执，不拿当前 PB 或本机皇冠重建。旧未知不归负项，重置、编辑、重试和冷读保留当时标记，CSV 明确区分 false／未知。原版缺字段压缩默认值不套用到旧 Typebar 数据；账户预设已接通自建服务，官方协议、离线备份和实机仍开放，见 ACCOUNT_FILTER_PRESETS_CONTRACT.md。 |

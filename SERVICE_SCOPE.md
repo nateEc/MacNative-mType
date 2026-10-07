@@ -1,5 +1,7 @@
 # 自建服务范围
 
+账户预设修改可由 TYPEBAR_ACCOUNT_FILTER_PRESETS_ENABLED=false 暂停，精确 true／false，缺失默认开启；变更需重启唯一 writer。禁用后已有预设仍可读取／应用，新增和删除均 503，容量零仍只阻止新增。客户端刷新后显示暂停状态，旧客户端仍受服务护栏约束；原版热配置及整体服务仍 partial，见 [账户预设合同](ACCOUNT_FILTER_PRESETS_CONTRACT.md)。
+
 2026-10-03 当前完成统计范围见 [完成统计提交与历史边界](RESULT_CONSISTENCY_SERVICE_CONTRACT.md)。新增自有明确能力协商的匿名百分比，后台准备后再核对账户范围；只保存按键稳定度，WPM 不进入服务历史或文件。旧服务不收到扩展，旧服务记录缺值不补零；本机格式仍 22，无真实部署或账户投稿，不升级整个 resultSubmission／resultHistory 的 partial 状态。下方保留历史阶段。
 
 2026-10-03 当前阶段：[韩文会话计分与归档 22](KOREAN_SESSION_SCORING_CONTRACT.md) 已接入已知字段的实时／最终 WPM、Raw、明确分类基础、历史及辅助功能标签、CSV 和 v2 匿名计量；原始回放、尝试准确率及旧成绩不回算。默认归档 22，显式分类基础最低 22，旧 v2 最低仍 21；十三项新增测试和固定源有界对照已覆盖。真实 IME／设备、活动曲线与其他消费者、旧库／降级、部署及完整功能等价仍开放，官方覆盖不升级，完整 goal active。下方保留历史阶段，当前生产与格式状态以本合同为准。

@@ -1,4 +1,4 @@
-// QA only: complete pinned DAL/name functions with owned Mongo/Zod adapters.
+// QA only: complete pinned DAL/name/configuration functions with owned adapters.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
@@ -45,6 +45,8 @@ const code=[
   bounded('backend/src/dal/user.ts','export async function addResultFilterPreset(','export async function addTag('),
   bounded('frontend/src/ts/utils/strings.ts','export function normalizeName(','export function splitByAndKeep('),
   bounded('packages/schemas/src/util.ts','export const slug =','export const nameWithSeparators ='),
+  fs.readFileSync(path.join(root,'backend/src/middlewares/configuration.ts'),'utf8')
+    .replace(/^import\b[\s\S]*?from ["'][^"']+["'];\n/gm,'').replace(/^export /gm,''),
 ].join('\n')+'\nglobalThis.presetNameSchema=slug().max(16);';
 new vm.Script(stripTypeScriptTypes(code,{mode:'transform'})).runInContext(context);
 const accepted=['a','Study_set','a..b','a--','_','-','1234567890123456'];
@@ -67,5 +69,31 @@ await context.removeResultFilterPreset('owner',first.value);
 await assert.rejects(()=>context.removeResultFilterPreset('owner',first.value),e=>e.status===404);
 assert.equal(rows.get('owner').length,1);assert.equal(rows.get('other').length,1);
 await context.addResultFilterPreset('owner',owned,2);assert.equal(rows.get('owner').length,2);
+context.getMetadata=req=>req.metadata;
+const contracts=fs.readFileSync(path.join(root,'packages/contracts/src/users.ts'),'utf8');
+let switchCases=0;
+for(const [start,end] of [['    addResultFilterPreset: {','    removeResultFilterPreset: {'],
+  ['    removeResultFilterPreset: {','    getTags: {']]) {
+  assert.equal(contracts.split(start).length,2);
+  const section=contracts.slice(contracts.indexOf(start),contracts.indexOf(end,contracts.indexOf(start)+start.length));
+  const fields=[...section.matchAll(/requireConfiguration: \{\s*path: "([^"]+)",\s*invalidMessage:\s*"([^"]+)",\s*\}/g)];
+  assert.equal(fields.length,1);assert.equal(fields[0][1],'results.filterPresets.enabled');
+  for(const enabled of [false,true]) for(const maxPresetsPerUser of [0,20]) {
+    let calls=0,error;
+    await context.verifyRequiredConfiguration()({metadata:{requireConfiguration:{path:fields[0][1],invalidMessage:fields[0][2]}},
+      ctx:{configuration:{results:{filterPresets:{enabled,maxPresetsPerUser}}}}},{},failure=>{calls++;error=failure;});
+    assert.equal(calls,1);assert.equal(error?.status,enabled?undefined:503);switchCases++;
+  }
+}
+assert.equal(switchCases,8);
+for(const value of [undefined,null,0,'false']) {
+  let error;
+  await context.verifyRequiredConfiguration()({metadata:{requireConfiguration:{path:'results.filterPresets.enabled'}},
+    ctx:{configuration:{results:{filterPresets:{enabled:value}}}}},{},failure=>{error=failure;});
+  assert.equal(error?.status,500);
+}
+let unguarded=false;
+await context.verifyRequiredConfiguration()({metadata:undefined},{},()=>{unguarded=true;});
+assert.equal(unguarded,true);
 verify();
-console.log('Account filter presets source passed (13 slug boundaries, 3 normalizations, duplicate names, bounded owner-scoped DAL add/delete; 4 complete functions; owned Mongo/Zod adapters, no HTTP/TanStack/GUI)');
+console.log('Account filter presets source passed (13 slug boundaries, 3 normalizations, duplicate names, bounded owner-scoped DAL add/delete; 8 enabled/capacity mutation gates and 4 invalid configuration cases from both contract paths; 7 complete functions; owned Mongo/Zod/request adapters, no full Express/HTTP/TanStack/GUI)');

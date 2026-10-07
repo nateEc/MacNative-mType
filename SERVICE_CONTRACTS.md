@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+账户预设新增 TYPEBAR_ACCOUNT_FILTER_PRESETS_ENABLED 启动开关和列表 mutationsEnabled 布尔状态；禁用时认证后的新增／删除返回 503，读取仍可用，零容量 409 不变。缺环境变量默认开启，严格 true／false，不改库格式。旧服务不认识此护栏，回退需停写核对；热配置仍开放，见 [账户预设合同](ACCOUNT_FILTER_PRESETS_CONTRACT.md)。
+
 独立 Polyglot 预设新增 accountFilterPolyglot=available；账户文档 v2 必须包含 includesPolyglot 布尔值，v1 继续读取但禁止携带新字段，列表封套仍 v1。保存 v2 前需两项预设能力同时 available；唯一 writer 升级、备份与回退见 [Polyglot 历史合同](POLYGLOT_HISTORY_FILTER_CONTRACT.md)。整体服务仍 partial，下方为历史阶段。
 
 账户筛选预设新增 `accountFilterPresets=available` 及私有列表／新增／删除接口，容量、文档 v1、认证和旧库边界见 [账户历史筛选预设](ACCOUNT_FILTER_PRESETS_CONTRACT.md)。自建协议不冒充官方 API，整体服务仍 partial；下方为历史阶段。

@@ -1439,6 +1439,7 @@ public actor AuthStore {
   private let dailyLeaderboardConfiguration: DailyLeaderboardConfiguration?
   public nonisolated let rewardInboxConfiguration: RewardInboxConfiguration
   public nonisolated let maximumAccountFilterPresets: Int
+  public nonisolated let accountFilterPresetsEnabled: Bool
 
   public init(
     fileURL: URL?, bcryptCost: Int = 12, minimumLeaderboardTypingSeconds: Int = 0,
@@ -1448,10 +1449,12 @@ public actor AuthStore {
     weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration = .typebarDefault,
     rewardInboxConfiguration: RewardInboxConfiguration = .typebarDefault,
     dailyLeaderboardConfiguration: DailyLeaderboardConfiguration? = nil,
-    maximumAccountFilterPresets: Int = 20
+    maximumAccountFilterPresets: Int = 20,
+    accountFilterPresetsEnabled: Bool = true
   ) throws {
     guard (0...100).contains(maximumAccountFilterPresets) else { throw Abort(.unprocessableEntity) }
     self.maximumAccountFilterPresets = maximumAccountFilterPresets
+    self.accountFilterPresetsEnabled = accountFilterPresetsEnabled
     guard (0...TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds).contains(
       minimumLeaderboardTypingSeconds)
     else { throw TypebarLeaderboardEligibilityConfigurationError.invalidMinimumPracticeSeconds }
@@ -4163,12 +4166,21 @@ public actor AuthStore {
 
   public func accountFilterPresets(accessToken: String, now: Date = .now) throws -> AccountFilterPresetList {
     let user = try authenticatedUser(for: accessToken, now: now)
-    return .init(version: 1, maximumPresets: maximumAccountFilterPresets,
+    return .init(version: 1, maximumPresets: maximumAccountFilterPresets, mutationsEnabled: accountFilterPresetsEnabled,
       presets: state.accountFilterPresets.filter { $0.userID == user.id }.map(\.preset))
   }
 
-  public func createAccountFilterPreset(_ request: AccountFilterPresetRequest, accessToken: String, now: Date = .now) throws -> AccountFilterPresetResponse {
+  /// Also checked before HTTP body/path decoding; store callers cannot bypass it.
+  public func authorizeAccountFilterPresetMutation(accessToken: String, now: Date = .now) throws -> AuthUserResponse {
     let user = try authenticatedUser(for: accessToken, now: now)
+    guard accountFilterPresetsEnabled else {
+      throw Abort(.serviceUnavailable, reason: "Account filter preset changes are temporarily disabled. Saved presets remain readable.")
+    }
+    return user
+  }
+
+  public func createAccountFilterPreset(_ request: AccountFilterPresetRequest, accessToken: String, now: Date = .now) throws -> AccountFilterPresetResponse {
+    let user = try authorizeAccountFilterPresetMutation(accessToken: accessToken, now: now)
     try request.validate()
     if let tags = request.accountTags { _ = try state.accountTagDirectory!.validatedIDs(tags.knownIDs, userID: user.id) }
     guard state.accountFilterPresets.filter({ $0.userID == user.id }).count < maximumAccountFilterPresets else {
@@ -4181,7 +4193,7 @@ public actor AuthStore {
   }
 
   public func deleteAccountFilterPreset(id: UUID, accessToken: String, now: Date = .now) throws {
-    let user = try authenticatedUser(for: accessToken, now: now)
+    let user = try authorizeAccountFilterPresetMutation(accessToken: accessToken, now: now)
     guard let index = state.accountFilterPresets.firstIndex(where: { $0.userID == user.id && $0.preset.id == id }) else {
       throw Abort(.notFound, reason: "Filter preset not found.")
     }

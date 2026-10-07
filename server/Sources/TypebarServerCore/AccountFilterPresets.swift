@@ -3,6 +3,13 @@ import CoreFoundation
 import Vapor
 
 public enum AccountFilterPresetConfiguration {
+  public static func enabled(from raw: String?) throws -> Bool {
+    switch raw {
+    case nil, "true": return true
+    case "false": return false
+    default: throw Abort(.unprocessableEntity, reason: "TYPEBAR_ACCOUNT_FILTER_PRESETS_ENABLED must be true or false.")
+    }
+  }
   public static func maximum(from raw: String?) throws -> Int {
     guard let raw else { return 20 }
     guard !raw.isEmpty, raw.utf8.allSatisfy({ (48...57).contains($0) }),
@@ -112,6 +119,7 @@ public struct AccountFilterPresetResponse: Content, Equatable, Identifiable, Sen
 public struct AccountFilterPresetList: Content, Sendable {
   public let version: Int
   public let maximumPresets: Int
+  public let mutationsEnabled: Bool
   public let presets: [AccountFilterPresetResponse]
 }
 struct StoredAccountFilterPreset: Codable {

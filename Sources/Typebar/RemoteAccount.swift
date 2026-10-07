@@ -3194,6 +3194,7 @@ final class AccountSession {
         guard resultPublicationScope == scope, let cache = accountFilterPresetCache, cache.scope == scope,
             !isEditingAccountFilterPresets, !isLoadingAccountFilterPresets,
             cache.list.presets.count < cache.list.maximumPresets else { throw RemoteAccountError.serverMessage("请先刷新预设，或删除不再使用的预设后再保存。") }
+        try cache.list.requireMutationsEnabled()
         if let tags = document.accountTags {
             guard hasAccountTagDirectory, Set(tags.knownIDs).isSubset(of: Set(accountTags.map(\.id))) else { throw RemoteAccountError.unexpectedResponse }
         }
@@ -3207,7 +3208,7 @@ final class AccountSession {
             guard resultPublicationScope == scope, accountFilterPresetMutation == mutation else { throw RemoteAccountError.accountScopeChanged }
             guard preset.document == document, !cache.list.presets.contains(where: { $0.id == preset.id }) else { throw RemoteAccountError.unexpectedResponse }
             accountFilterPresetCache = .init(scope: scope, list: .init(version: 1, maximumPresets: cache.list.maximumPresets,
-                presets: cache.list.presets + [preset]))
+                mutationsEnabled: cache.list.mutationsEnabled, presets: cache.list.presets + [preset]))
             accountFilterPresetMessage = "账户筛选预设已保存。"
         } catch {
             if resultPublicationScope == scope, accountFilterPresetMutation == mutation {
@@ -3221,6 +3222,7 @@ final class AccountSession {
         guard resultPublicationScope == scope, let cache = accountFilterPresetCache, cache.scope == scope,
             cache.list.presets.contains(where: { $0.id == id }), !isEditingAccountFilterPresets,
             !isLoadingAccountFilterPresets else { throw RemoteAccountError.accountScopeChanged }
+        try cache.list.requireMutationsEnabled()
         let mutation = UUID(); accountFilterPresetMutation = mutation; accountFilterPresetGeneration &+= 1
         defer { if accountFilterPresetMutation == mutation { accountFilterPresetMutation = nil } }
         do {
@@ -3231,7 +3233,7 @@ final class AccountSession {
             guard resultPublicationScope == scope, accountFilterPresetMutation == mutation else { throw RemoteAccountError.accountScopeChanged }
             guard response.deleted else { throw RemoteAccountError.unexpectedResponse }
             accountFilterPresetCache = .init(scope: scope, list: .init(version: 1, maximumPresets: cache.list.maximumPresets,
-                presets: cache.list.presets.filter { $0.id != id }))
+                mutationsEnabled: cache.list.mutationsEnabled, presets: cache.list.presets.filter { $0.id != id }))
             accountFilterPresetMessage = "账户筛选预设已删除。"
         } catch {
             if resultPublicationScope == scope, accountFilterPresetMutation == mutation {

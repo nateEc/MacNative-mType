@@ -8,6 +8,95 @@ final class AccountFilterPresetTests: XCTestCase {
   private func register(_ store: AuthStore, name: String) async throws -> AuthSessionResponse {
     try await store.register(.init(email: "\(name)@example.invalid", password: "a secure password", displayName: name))
   }
+  func testHTTPListAdvertisesIndependentMutationState() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4), owner = try await register(store, name: "Owner")
+    let app = try await Application.make(.testing)
+    do {
+      try configure(app, authStore: store)
+      try await app.test(.GET, "v1/result-filter-presets", beforeRequest: { request async in
+        request.headers.bearerAuthorization = .init(token: owner.accessToken)
+      }, afterResponse: { response async throws in
+        XCTAssertEqual(response.status, .ok)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(buffer: response.body)) as? [String: Any])
+        XCTAssertEqual(object["mutationsEnabled"] as? Bool, true)
+      })
+      try await app.asyncShutdown()
+    } catch { try? await app.asyncShutdown(); throw error }
+  }
+  func testIndependentSwitchConfigurationIsStrictAndPreservesExistingDefault() throws {
+    XCTAssertTrue(try AccountFilterPresetConfiguration.enabled(from: nil))
+    XCTAssertTrue(try AccountFilterPresetConfiguration.enabled(from: "true"))
+    XCTAssertFalse(try AccountFilterPresetConfiguration.enabled(from: "false"))
+    for value in ["", "0", "1", "FALSE", " true", "false\n", "off"] {
+      XCTAssertThrowsError(try AccountFilterPresetConfiguration.enabled(from: value))
+    }
+  }
+
+  func testDisabledHTTPPreservesReadsAndRejectsMutationsAfterAuthenticationBeforeDecoding() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, accountFilterPresetsEnabled: false)
+    let owner = try await register(store, name: "Owner")
+    let app = try await Application.make(.testing)
+    do {
+      try configure(app, authStore: store)
+      try await app.test(.GET, "v1/capabilities", afterResponse: { response async throws in
+        let flags = try response.content.decode(ServiceCapabilitiesResponse.self).capabilities
+        XCTAssertEqual(flags["accountFilterPresets"], .available)
+        XCTAssertEqual(flags["accountFilterPolyglot"], .available)
+      })
+      for token in [Optional<String>.none, "invalid", owner.accessToken] {
+        let expected: HTTPResponseStatus = token == owner.accessToken ? .serviceUnavailable : .unauthorized
+        for (method, path) in [(HTTPMethod.POST, "v1/result-filter-presets"), (.DELETE, "v1/result-filter-presets/not-a-uuid")] {
+          try await app.test(method, path, beforeRequest: { request async in
+            if let token { request.headers.bearerAuthorization = .init(token: token) }
+            if method == .POST { request.headers.contentType = .json; request.body = .init(string: "not json") }
+          }, afterResponse: { response async in XCTAssertEqual(response.status, expected) })
+        }
+      }
+      try await app.test(.GET, "v1/result-filter-presets", beforeRequest: { request async in
+        request.headers.bearerAuthorization = .init(token: owner.accessToken)
+      }, afterResponse: { response async throws in
+        XCTAssertEqual(response.status, .ok)
+        let list = try response.content.decode(AccountFilterPresetList.self)
+        XCTAssertFalse(list.mutationsEnabled); XCTAssertEqual(list.maximumPresets, 20); XCTAssertTrue(list.presets.isEmpty)
+      })
+      try await app.asyncShutdown()
+    } catch { try? await app.asyncShutdown(); throw error }
+  }
+
+  func testDisabledColdStoreKeepsBothDocumentVersionsAndReenableRestoresMutations() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-preset-switch-\(UUID())")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let file = directory.appendingPathComponent("store.json"), initial = try AuthStore(fileURL: file, bcryptCost: 4)
+    let owner = try await register(initial, name: "Owner"), other = try await register(initial, name: "Other")
+    let input = AccountFilterPresetRequest(name: "Legacy", filterData: snapshot)
+    let legacy = try await initial.createAccountFilterPreset(input, accessToken: owner.accessToken)
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: snapshot) as? [String: Any])
+    object["modifierFilter"] = ["includesNoModifiers": false, "modifiers": [], "includesPolyglot": true]
+    let modern = try await initial.createAccountFilterPreset(.init(version: 2, name: "Polyglot", filterData: JSONSerialization.data(withJSONObject: object)), accessToken: owner.accessToken)
+    let bytes = try Data(contentsOf: file)
+    for maximum in [0, 20] {
+      let disabled = try AuthStore(fileURL: file, bcryptCost: 4, maximumAccountFilterPresets: maximum, accountFilterPresetsEnabled: false)
+      let list = try await disabled.accountFilterPresets(accessToken: owner.accessToken)
+      XCTAssertFalse(list.mutationsEnabled); XCTAssertEqual(list.maximumPresets, maximum); XCTAssertEqual(list.presets, [legacy, modern])
+      for token in [owner.accessToken, other.accessToken] {
+        do { _ = try await disabled.createAccountFilterPreset(input, accessToken: token); XCTFail("disabled create") }
+        catch let error as Abort { XCTAssertEqual(error.status, .serviceUnavailable) }
+        for id in [legacy.id, UUID()] {
+          do { try await disabled.deleteAccountFilterPreset(id: id, accessToken: token); XCTFail("disabled delete") }
+          catch let error as Abort { XCTAssertEqual(error.status, .serviceUnavailable) }
+        }
+      }
+      XCTAssertEqual(try Data(contentsOf: file), bytes)
+    }
+    let enabled = try AuthStore(fileURL: file, bcryptCost: 4)
+    let restored = try await enabled.accountFilterPresets(accessToken: owner.accessToken)
+    XCTAssertTrue(restored.mutationsEnabled); XCTAssertEqual(restored.presets, [legacy, modern])
+    try await enabled.deleteAccountFilterPreset(id: legacy.id, accessToken: owner.accessToken)
+    _ = try await enabled.createAccountFilterPreset(input, accessToken: owner.accessToken)
+    let final = try await AuthStore(fileURL: file, bcryptCost: 4).accountFilterPresets(accessToken: owner.accessToken)
+    XCTAssertEqual(final.presets.count, 2); XCTAssertTrue(final.presets.contains(modern)); XCTAssertFalse(final.presets.contains(legacy))
+  }
   func testVersionTwoPolyglotPresetCanBeSavedAndReadWithoutLosingItsFlag() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4), owner = try await register(store, name: "Owner")
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: snapshot) as? [String: Any])
