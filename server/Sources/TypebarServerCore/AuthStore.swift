@@ -1072,6 +1072,7 @@ public actor AuthStore {
     let startedAtReferenceTime: Double?
     let finishedAtReferenceTime: Double?
     let bailedOut: Bool?
+    let blindMode: Bool?
     let customLimit: ResultCustomLimit?
     var elapsedDuration: Double {
       terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
@@ -1084,7 +1085,7 @@ public actor AuthStore {
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
         errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, inputMetrics, keyConsistency, terminalTiming, elapsedTime,
-        bailedOut, customLimit, startedAt, finishedAt, acceptedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
+        bailedOut, blindMode, customLimit, startedAt, finishedAt, acceptedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
       case personalBestConfiguration
       case speedPrecision
       case accountTagIDs
@@ -1105,7 +1106,7 @@ public actor AuthStore {
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       terminalTiming: ResultTerminalTiming? = nil,
       elapsedTime: ResultElapsedTime? = nil,
-      bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
+      bailedOut: Bool? = nil, blindMode: Bool? = nil, customLimit: ResultCustomLimit? = nil,
       startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil, mode2: String? = nil
     ) {
       self.id = id
@@ -1137,6 +1138,7 @@ public actor AuthStore {
       self.startedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : startedAt.timeIntervalSinceReferenceDate
       self.finishedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
       self.bailedOut = bailedOut
+      self.blindMode = blindMode
       self.customLimit = customLimit
       self.startedAt = startedAt
       self.finishedAt = finishedAt
@@ -1227,6 +1229,7 @@ public actor AuthStore {
       acceptedAt = try values.decodeIfPresent(Date.self, forKey: .acceptedAt)
       terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
       bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
+      blindMode = values.contains(.blindMode) ? try values.decode(Bool.self, forKey: .blindMode) : nil
       customLimit = try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit)
       if let elapsedTime, !elapsedTime.isDateConsistent(mode: mode, bailedOut: bailedOut == true,
         calendarSeconds: finishedAt.timeIntervalSince(startedAt)) {
@@ -1279,7 +1282,7 @@ public actor AuthStore {
         keyConsistency: keyConsistency,
         terminalTiming: terminalTiming,
         elapsedTime: elapsedTime,
-        bailedOut: bailedOut, customLimit: customLimit,
+        bailedOut: bailedOut, blindMode: blindMode, customLimit: customLimit,
         startedAt: startedAt, finishedAt: finishedAt)
       response.mode2 = mode2
       response.quoteLength = quoteLength
@@ -3802,7 +3805,7 @@ public actor AuthStore {
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       terminalTiming: record.terminalTiming,
       elapsedTime: record.elapsedTime,
-      bailedOut: record.bailedOut, customLimit: record.customLimit,
+      bailedOut: record.bailedOut, blindMode: record.blindMode, customLimit: record.customLimit,
       startedAt: record.startedAt,
       finishedAt: record.finishedAt, mode2: record.mode2)
   }
@@ -4045,7 +4048,7 @@ public actor AuthStore {
         keyConsistency: request.resultConsistency?.keyConsistency,
         terminalTiming: request.terminalTiming,
         elapsedTime: request.elapsedTime,
-        bailedOut: request.bailedOut, customLimit: request.customLimit,
+        bailedOut: request.bailedOut, blindMode: request.blindMode, customLimit: request.customLimit,
         startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now, mode2: request.mode2
       ))
     state.users[userIndex].startedTestCount = practice.startedTests

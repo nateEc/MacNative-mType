@@ -113,9 +113,10 @@ final class AccountHistoryMetadataTests: XCTestCase {
   func testCSVAppendsMetadataPreservingFalseAndUnknownWithoutPrompt() throws {
     let rows = try [row(pb: true, length: "short"), row(pb: false, length: "long"), row(pb: nil)]
     let lines = RemoteResultCSVExport.csvString(for: rows).components(separatedBy: "\r\n")
-    XCTAssertTrue(lines[0].hasSuffix(",historical_personal_best,quote_length"))
-    XCTAssertTrue(lines[1].hasSuffix(",true,short")); XCTAssertTrue(lines[2].hasSuffix(",false,long"))
-    XCTAssertTrue(lines[3].hasSuffix(",,"))
+    XCTAssertEqual(Array(RemoteResultCSVExport.columns[30..<32]), ["historical_personal_best", "quote_length"])
+    XCTAssertEqual(Array(lines[1].components(separatedBy: ",")[30..<32]), ["true", "short"])
+    XCTAssertEqual(Array(lines[2].components(separatedBy: ",")[30..<32]), ["false", "long"])
+    XCTAssertEqual(Array(lines[3].components(separatedBy: ",")[30..<32]), ["", ""])
   }
 
   @MainActor func testPortableQuoteContextCannotBeSilentlyDiscarded() throws {

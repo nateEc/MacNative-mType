@@ -196,5 +196,43 @@ assert.equal(context.normalizeResult({mode:'time',mode2:'15',restartCount:2,time
 assert.equal(fixtures.length,96);assert.equal(dayFixtures.length,4);assert.equal(modifierFixtures.length,9);
 assert.equal(metadataFixtures.length,192);assert.equal(quoteFixtures.length,6);verify();
 assert.equal(polyglotFixtures.length,32);
-console.log(emit?JSON.stringify({referenceCommit:pin,ids,fixtures,dayFixtures,modifierFixtures,polyglotFixtures,metadataRows,metadataFixtures,quoteFixtures}):
-  'Account history statistics source passed (96 collections, 960 full export orders, all/recent-ten/daily aggregates, 4 timezones, 9 legacy and 32 independent polyglot queries, 192 PB/quote-length queries and 6 owned quote-classification boundaries; complete pinned functions/class; owned eager adapters, no TanStack/DOM/HTTP/GUI)');
+// Execute the whole original CSV formatter with an owned download sink, never DOM or disk.
+let capturedDownload;
+const csvContext=vm.createContext({Blob,download:options=>{capturedDownload=options;}});
+const miscSource=fs.readFileSync(path.join(root,'frontend/src/ts/utils/misc.ts'),'utf8');
+new vm.Script(stripTypeScriptTypes(bounded(miscSource,'export async function downloadResultsCSV(',
+  'export function download(options:'),{mode:'transform'})).runInContext(csvContext);
+const csvFixtures=[];
+for(const mode of ['time','words','quote','zen','custom']) for(const basis of ['utf16','koreanJamo']) for(const blind of [false,true]) {
+  const index=csvFixtures.length,duration=mode==='custom'?12.345678:15;
+  const timestamp=Date.parse('2026-10-07T08:00:00Z')+index*17000;
+  const nativeMode2=mode==='time'?'15':mode==='words'?'25':mode==='quote'?'typebar:owned-quote':mode;
+  const sourceRow={_id:`00000000-0000-4000-8000-${String(index+1).padStart(12,'0')}`,isPb:!blind,
+    wpm:80.49,acc:98.31,rawWpm:90.31,consistency:80.11,charStats:basis==='utf16'?[60,3,4,8]:[75,1,2,3],
+    mode,mode2:mode==='quote'?42:nativeMode2,quoteLength:mode==='quote'?2:-1,restartCount:2,
+    testDuration:duration,afkDuration:1.234,incompleteTestSeconds:9.876,punctuation:true,numbers:false,
+    language:'english',funbox:[blind?'memory':'mirror'],difficulty:'expert',lazyMode:true,blindMode:blind,
+    bailedOut:false,tags:ids,timestamp};
+  await csvContext.downloadResultsCSV([sourceRow]);
+  assert.equal(capturedDownload.filename,'results.csv');assert.equal(capturedDownload.data.type,'text/csv');
+  const lines=(await capturedDownload.data.text()).split('\n'),columns=lines[0].split(','),cells=lines[1].split(',');
+  assert.equal(columns.length,24);assert.equal(cells.length,24);
+  const finished=timestamp/1000-978307200,started=finished-duration;
+  const wire={id:sourceRow._id,mode,mode2:nativeMode2,language:'english',wpm:80,rawWpm:90,accuracy:98,
+    preciseAccuracy:98.31,consistency:80.11,errorCount:3,eventCount:75,tags:['independent text tag'],
+    speedPrecision:{version:1,wpm:80.49,rawWpm:90.31},historicalPersonalBest:sourceRow.isPb,blindMode:blind,
+    bailedOut:false,accountTagIDs:ids,restartCount:2,elapsedTime:{version:1,seconds:duration},
+    startedAt:started,finishedAt:finished,startedAtReferenceTime:started,finishedAtReferenceTime:finished,
+    personalBestConfiguration:{version:1,difficulty:'expert',punctuation:true,numbers:false,lazyMode:true},
+    practiceTiming:{version:1,terminalEngagedMilliseconds:Math.round((duration-1.234)*1000),priorAttemptEngagedMilliseconds:9876},
+    experienceEvidence:{version:1,characterCounts:sourceRow.charStats,scoringUnitBasis:basis,durationSeconds:duration,
+      afkSeconds:1.234,punctuation:true,numbers:false,modifiers:[blind?'memory':'mirrorVisual']}};
+  if(mode==='time') wire.durationSeconds=15;if(mode==='words') wire.wordLimit=25;if(mode==='quote') wire.quoteLength='long';
+  csvFixtures.push({wire,columns,cells,nativeMode2});
+}
+await csvContext.downloadResultsCSV([{_id:'owned',charStats:[1,0,0,0],funbox:['mirror','memory']}]);
+assert.equal((await capturedDownload.data.text()).split('\n')[1].split(',').length,25,
+  'Pinned formatter spreads a multi-Funbox array over extra CSV columns; native export keeps a single RFC 4180 cell');
+assert.equal(csvFixtures.length,20);verify();
+console.log(emit?JSON.stringify({referenceCommit:pin,ids,fixtures,dayFixtures,modifierFixtures,polyglotFixtures,metadataRows,metadataFixtures,quoteFixtures,csvFixtures}):
+  'Account history statistics source passed (96 collections, 960 full export orders, 20 complete 24-field CSV projections and multi-Funbox delimiter boundary, all/recent-ten/daily aggregates, 4 timezones, 9 legacy and 32 independent polyglot queries, 192 PB/quote-length queries and 6 owned quote-classification boundaries; complete pinned functions/class; owned eager/download adapters, no TanStack/DOM/HTTP/GUI)');

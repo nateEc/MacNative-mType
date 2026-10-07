@@ -198,6 +198,8 @@ enum RemoteResultCSVExport {
         "personal_best_configuration_version", "difficulty", "punctuation", "numbers", "lazy_mode",
         "account_tag_ids",
         "historical_personal_best", "quote_length",
+        "mode2", "restart_count", "test_duration_seconds", "afk_seconds", "incomplete_test_seconds",
+        "character_stats", "scoring_unit_basis", "funbox", "blind_mode",
     ]
 
     @MainActor
@@ -261,7 +263,18 @@ enum RemoteResultCSVExport {
     }
 
     private static func row(for result: RemoteAccountResult) -> [String] {
-        [
+        let duration = result.experienceEvidence?.durationSeconds
+            ?? (result.terminalTiming != nil || result.elapsedTime != nil ? result.elapsedDuration : nil)
+        let count = result.restartCount.flatMap {
+            (0...RemoteResultPracticeTiming.maximumRestartCount).contains($0) ? $0 : nil
+        }
+        let prior: Double? = result.practiceTiming.flatMap { timing in
+            guard timing.version == 1, let count,
+                (0...(count * RemoteResultPracticeTiming.maximumTerminalEngagedMilliseconds)).contains(timing.priorAttemptEngagedMilliseconds)
+            else { return nil }
+            return Double(timing.priorAttemptEngagedMilliseconds) / 1_000
+        }
+        return [
             result.id.uuidString.lowercased(), result.mode,
             result.durationSeconds.map(String.init) ?? "", result.wordLimit.map(String.init) ?? "",
             result.language, result.speedText, result.rawSpeedText,
@@ -288,7 +301,27 @@ enum RemoteResultCSVExport {
             result.accountTagIDs?.map(\.uuidString).joined(separator: ";") ?? "",
             result.historicalPersonalBest.map(String.init) ?? "",
             result.quoteLength?.rawValue ?? "",
+            result.mode2 ?? "", count.map(String.init) ?? "", duration.map { String($0) } ?? "",
+            result.experienceEvidence.map { String($0.afkSeconds) } ?? "", prior.map { String($0) } ?? "",
+            result.experienceEvidence?.characterCounts.map(String.init).joined(separator: ";") ?? "",
+            result.experienceEvidence?.scoringUnitBasis.rawValue ?? "",
+            funbox(result.rankingEvidence?.modifiers ?? result.experienceEvidence?.modifiers),
+            result.blindMode.map(String.init) ?? "",
         ]
+    }
+
+    private static let sourceFunboxNames: [String: String] = Dictionary(uniqueKeysWithValues:
+        zip(FunboxCommandCatalog.officialNames, FunboxCommandCatalog.targets).compactMap { name, target in
+            if case .modifier(let modifier) = target { return (modifier.rawValue, name) }
+            return nil
+        })
+
+    private static func funbox(_ modifiers: [String]?) -> String {
+        guard let modifiers else { return "" }
+        let names = modifiers.map { $0 == "polyglot" ? $0 : sourceFunboxNames[$0] ?? "typebar:\($0)" }
+        // JSON distinguishes a known empty list from missing evidence and
+        // preserves multiple identities inside one correctly escaped CSV cell.
+        return String(decoding: try! JSONEncoder().encode(names), as: UTF8.self)
     }
 
     private static func escaped(_ value: String) -> String {

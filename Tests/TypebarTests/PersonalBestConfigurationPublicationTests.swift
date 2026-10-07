@@ -90,10 +90,10 @@ final class PersonalBestConfigurationPublicationTests: XCTestCase {
     let unknown = try JSONDecoder().decode(RemoteAccountResult.self,
       from: JSONEncoder().encode(RemoteResultSubmission(result: result())))
     let lines = RemoteResultCSVExport.csvString(for: [known, unknown]).components(separatedBy: "\r\n")
-    XCTAssertEqual(RemoteResultCSVExport.columns.count, 32)
-    XCTAssertTrue(lines[0].hasSuffix("personal_best_configuration_version,difficulty,punctuation,numbers,lazy_mode,account_tag_ids,historical_personal_best,quote_length"))
-    XCTAssertTrue(lines[1].hasSuffix(",1,normal,false,false,false,,,"))
-    XCTAssertTrue(lines[2].hasSuffix(",,,,,,,,"))
+    XCTAssertEqual(RemoteResultCSVExport.columns.count, 41)
+    XCTAssertEqual(Array(RemoteResultCSVExport.columns[24..<32]).joined(separator: ","), "personal_best_configuration_version,difficulty,punctuation,numbers,lazy_mode,account_tag_ids,historical_personal_best,quote_length")
+    XCTAssertEqual(Array(lines[1].components(separatedBy: ",")[24..<32]), ["1", "normal", "false", "false", "false", "", "", ""])
+    XCTAssertEqual(Array(lines[2].components(separatedBy: ",")[24..<32]), Array(repeating: "", count: 8))
     for forbidden in ["prompt", "replay", "token", "password"] { XCTAssertFalse(lines.joined().contains(forbidden)) }
   }
 

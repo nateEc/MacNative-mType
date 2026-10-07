@@ -90,6 +90,7 @@ public func configure(
                 "resultRankingEvidence": .available,
                 "resultPersonalBestConfiguration": .available,
                 "resultHistoryMetadata": .available,
+                "resultBlindMode": .available,
                 "resultPerformanceChart": .available,
                 "accountFilterPresets": .available,
                 "accountFilterPolyglot": .available,

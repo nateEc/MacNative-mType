@@ -403,6 +403,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let terminalTiming: ResultTerminalTiming?
     let elapsedTime: ResultElapsedTime?
     let bailedOut: Bool?
+    let blindMode: Bool?
     let customLimit: RemoteResultCustomLimit?
     let startedAt: Date
     let finishedAt: Date
@@ -415,7 +416,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         case historicalPersonalBest, quoteLength
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
             errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
-            bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
+            bailedOut, blindMode, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
         case personalBestConfiguration
         case speedPrecision
         case accountTagIDs
@@ -501,6 +502,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
             : try CompatibleDatePrecision.decode(from: values, legacyKey: .finishedAt, precisionKey: .finishedAtReferenceTime)
         terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
         bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
+        blindMode = values.contains(.blindMode) ? try values.decode(Bool.self, forKey: .blindMode) : nil
         customLimit = try values.decodeIfPresent(RemoteResultCustomLimit.self, forKey: .customLimit)
         if let elapsedTime {
             guard let testMode = TestMode(rawValue: mode), elapsedTime.isServiceCompatible(mode: testMode,
@@ -941,6 +943,7 @@ struct RemoteResultSubmission: Codable, Sendable {
     let startedAtReferenceTime: Double?
     let finishedAtReferenceTime: Double?
     let bailedOut: Bool?
+    let blindMode: Bool?
     let customLimit: RemoteResultCustomLimit?
 
     init(
@@ -952,6 +955,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         speedPrecision: RemoteSpeedPrecision? = nil,
         includesMode2: Bool = false,
         includesHistoryMetadata: Bool = false,
+        includesBlindMode: Bool = false,
         performanceChart: AccountResultChartData? = nil
     ) {
         self.performanceChart = performanceChart
@@ -995,6 +999,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         startedAtReferenceTime = result.elapsedTime == nil && speedPrecision == nil ? nil : result.startedAt.timeIntervalSinceReferenceDate
         finishedAtReferenceTime = result.elapsedTime == nil && speedPrecision == nil ? nil : result.finishedAt.timeIntervalSinceReferenceDate
         bailedOut = result.outcome == .bailedOut ? true : nil
+        blindMode = includesBlindMode ? result.configuration.rules.blindMode : nil
         customLimit = result.outcome == .bailedOut && result.configuration.mode == .custom
             ? .init(configuration: result.configuration) : nil
     }
@@ -1011,6 +1016,10 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
 
     var supportsResultHistoryMetadata: Bool {
         apiVersion == "v1" && service == "typebar" && capabilities["resultHistoryMetadata"] == "available"
+    }
+
+    var supportsResultBlindMode: Bool {
+        apiVersion == "v1" && service == "typebar" && capabilities["resultBlindMode"] == "available"
     }
 
     var supportsAccountFilterPresets: Bool {

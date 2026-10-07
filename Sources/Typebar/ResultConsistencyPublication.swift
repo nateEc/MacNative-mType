@@ -14,6 +14,9 @@ enum ResultConsistencyPublication {
     calculation: @escaping @Sendable (ResultWPMConsistencyInput) async -> Double? = { $0.calculate() }
   ) async throws -> RemoteResultSubmission {
     try Task.checkCancellation()
+    guard !result.configuration.rules.blindMode || capabilities?.supportsResultBlindMode == true else {
+      throw RemoteAccountError.serverMessage("当前服务不支持保存盲打状态。请先升级自建服务；本机成绩保留。")
+    }
     guard result.quoteSource?.quoteID == nil || capabilities?.supportsResultMode2 == true else {
       throw RemoteAccountError.serverMessage("当前服务不支持引语身份分桶。请先升级自建服务；本机成绩保留。")
     }
@@ -66,6 +69,7 @@ enum ResultConsistencyPublication {
       speedPrecision: speedPrecision,
       includesMode2: capabilities?.supportsResultMode2 == true,
       includesHistoryMetadata: capabilities?.supportsResultHistoryMetadata == true,
+      includesBlindMode: capabilities?.supportsResultBlindMode == true,
       performanceChart: chart)
   }
 }

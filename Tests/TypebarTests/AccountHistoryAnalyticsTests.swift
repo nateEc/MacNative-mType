@@ -30,7 +30,7 @@ final class AccountHistoryAnalyticsTests: XCTestCase {
       XCTAssertEqual(account.remoteResults.map(\.id), Array(rows.prefix(20)).map(\.id), "Export must not replace the displayed cache")
       let csv = String(decoding: try XCTUnwrap(account.accountResultExportData(snapshot)), as: UTF8.self)
       XCTAssertEqual(csv.components(separatedBy: "\r\n").count, 7)
-      XCTAssertEqual(RemoteResultCSVExport.columns.count, 32)
+      XCTAssertEqual(RemoteResultCSVExport.columns.count, 41)
     }
   }
 

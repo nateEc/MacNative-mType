@@ -76,6 +76,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let startedAtReferenceTime: Double?
     public let finishedAtReferenceTime: Double?
     public let bailedOut: Bool?
+    public let blindMode: Bool?
     public let customLimit: ResultCustomLimit?
     public let startedAt: Date
     public let finishedAt: Date
@@ -96,7 +97,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         resultConsistency: ResultConsistencyMetrics? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
         elapsedTime: ResultElapsedTime? = nil,
-        bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
+        bailedOut: Bool? = nil, blindMode: Bool? = nil, customLimit: ResultCustomLimit? = nil,
         startedAt: Date, finishedAt: Date, mode2: String? = nil
     ) {
         self.id = id
@@ -130,6 +131,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.startedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : startedAt.timeIntervalSinceReferenceDate
         self.finishedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
         self.bailedOut = bailedOut
+        self.blindMode = blindMode
         self.customLimit = customLimit
         self.startedAt = startedAt
         self.finishedAt = finishedAt
@@ -149,7 +151,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case resultConsistency
         case terminalTiming
         case elapsedTime, startedAtReferenceTime, finishedAtReferenceTime
-        case bailedOut, customLimit
+        case bailedOut, blindMode, customLimit
         case mode2
         case accountTagIDs
         case quoteLength, performanceChart
@@ -210,6 +212,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         startedAtReferenceTime = !preciseDates ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
         finishedAtReferenceTime = !preciseDates ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
         bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
+        blindMode = values.contains(.blindMode) ? try values.decode(Bool.self, forKey: .blindMode) : nil
         customLimit = try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit)
         startedAt = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .startedAt),
             referenceTime: startedAtReferenceTime, required: preciseDates,
@@ -278,6 +281,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public let startedAtReferenceTime: Double?
     public let finishedAtReferenceTime: Double?
     public let bailedOut: Bool?
+    public let blindMode: Bool?
     public let customLimit: ResultCustomLimit?
     public let startedAt: Date
     public let finishedAt: Date
@@ -292,7 +296,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         keyConsistency: Double? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
         elapsedTime: ResultElapsedTime? = nil,
-        bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
+        bailedOut: Bool? = nil, blindMode: Bool? = nil, customLimit: ResultCustomLimit? = nil,
         startedAt: Date, finishedAt: Date
     ) {
         self.id = id
@@ -319,6 +323,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.startedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : startedAt.timeIntervalSinceReferenceDate
         self.finishedAtReferenceTime = elapsedTime == nil && speedPrecision == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
         self.bailedOut = bailedOut
+        self.blindMode = blindMode
         self.customLimit = customLimit
         self.startedAt = startedAt
         self.finishedAt = finishedAt
@@ -328,7 +333,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         case historicalPersonalBest, quoteLength, performanceChart, hasPerformanceChart
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, preciseAccuracy,
             consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, terminalTiming,
-            elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
+            elapsedTime, bailedOut, blindMode, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime, mode2
         case accountTagIDs
         case personalBestConfiguration
         case speedPrecision
@@ -373,6 +378,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             keyConsistency: try values.decodeIfPresent(Double.self, forKey: .keyConsistency),
             terminalTiming: try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming), elapsedTime: elapsed,
             bailedOut: try values.decodeIfPresent(Bool.self, forKey: .bailedOut),
+            blindMode: values.contains(.blindMode) ? try values.decode(Bool.self, forKey: .blindMode) : nil,
             customLimit: try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit), startedAt: start, finishedAt: end)
         let measured = terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
             ?? finishedAt.timeIntervalSince(startedAt)
