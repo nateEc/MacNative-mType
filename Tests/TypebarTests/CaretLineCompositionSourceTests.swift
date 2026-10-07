@@ -2,7 +2,7 @@ import AppKit
 import XCTest
 @testable import Typebar
 
-/// Complete-source contract plus a native first-jump sample comparison.
+/// Complete-source contract and shared-input native channel trace comparison.
 /// This does not prove all native queue orders or browser pixel equivalence.
 @MainActor final class CaretLineCompositionSourceTests: XCTestCase {
   private struct Marker: Decodable {
@@ -28,15 +28,16 @@ import XCTest
     let main: Marker?, pace: Marker?
   }
   private struct Fixture: Decodable {
+    let frameInterval: Int
     let smooth: Bool, motion: SmoothCaretMotion, style: String, overlap: Bool
     let samples: [Sample], beforeRefresh: Sample, afterRefresh: Sample, settled: Sample
     let resets: [Write], animations: [Animation]
     let trace: [Trace]
   }
-  private static var cachedFixtures: [Fixture]?
+  private static var cachedFixtures: [Bool: [Fixture]] = [:]
 
-  private func evidence() throws -> [Fixture] {
-    if let fixtures = Self.cachedFixtures { return fixtures }
+  private func evidence(sparse: Bool = false) throws -> [Fixture] {
+    if let fixtures = Self.cachedFixtures[sparse] { return fixtures }
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_REFERENCE_ROOT"] else {
       throw XCTSkip("Requires pinned reference checkout")
     }
@@ -46,15 +47,15 @@ import XCTest
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = ["node", "--experimental-vm-modules",
       project.appendingPathComponent("Scripts/check-source-caret-line-composition.mjs").path,
-      reference, "--emit-fixtures"]
+      reference, sparse ? "--emit-sparse-fixtures" : "--emit-fixtures"]
     process.standardOutput = output
     try process.run()
     let data = output.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus, 0)
     let fixtures = try JSONDecoder().decode([Fixture].self, from: data)
-    XCTAssertEqual(fixtures.count, 48)
-    Self.cachedFixtures = fixtures
+    XCTAssertEqual(fixtures.count, sparse ? 144 : 48)
+    Self.cachedFixtures[sparse] = fixtures
     return fixtures
   }
 
@@ -107,41 +108,47 @@ import XCTest
   }
 
   func testNativeChannelsReplayEveryRecordedSourceFrameAndResolvedRequest() throws {
-    for fixture in try evidence() {
-      var main = PromptCaretChannel(), pace = PromptCaretChannel()
-      let height: CGFloat = fixture.style == "underline" ? 2 : 33
-      let initial = CGRect(x: 0, y: 0, width: 2, height: height)
-      main.goTo(initial, at: 0, duration: 0); pace.goTo(initial, at: 0, duration: 0)
-      var samples = 0
-      for event in fixture.trace {
-        let time = event.time / 1000
-        switch event.type {
-        case "frame":
-          if event.rendered == true { main.sample(at: time); pace.sample(at: time) }
-        case "position":
-          let target = CGRect(x: try XCTUnwrap(event.left), y: try XCTUnwrap(event.top),
-            width: try XCTUnwrap(event.width), height: try XCTUnwrap(event.height))
-          let duration = try XCTUnwrap(event.duration) / 1000
-          if event.id == "caret" { main.goTo(target, at: time, duration: duration) }
-          else { pace.goTo(target, at: time, duration: duration, curve: event.linear == true ? .linear : .position) }
-        case "margin":
-          if event.id == "caret" {
-            main.lineJump(to: try XCTUnwrap(event.margin), at: time,
-              duration: try XCTUnwrap(event.duration) / 1000, isPace: false)
-          } else {
-            pace.lineJump(to: try XCTUnwrap(event.margin), at: time,
-              duration: try XCTUnwrap(event.duration) / 1000, isPace: true)
-          }
-        case "sample":
-          samples += 1
-          let label = "\(fixture.smooth)/\(fixture.motion)/\(fixture.style)/\(fixture.overlap) @\(event.time)"
-          try compare(main, source: XCTUnwrap(event.main), label: "main \(label)")
-          try compare(pace, source: XCTUnwrap(event.pace), label: "pace \(label)")
-        default: XCTFail("Unknown source event \(event.type)")
+    for fixture in try evidence() { try replay(fixture) }
+  }
+
+  func testIndependentSourceRequestsBetweenSparseFramesPreserveRenderedState() throws {
+    for fixture in try evidence(sparse: true) { try replay(fixture) }
+  }
+
+  private func replay(_ fixture: Fixture) throws {
+    var main = PromptCaretChannel(), pace = PromptCaretChannel()
+    let height: CGFloat = fixture.style == "underline" ? 2 : 33
+    let initial = CGRect(x: 0, y: 0, width: 2, height: height)
+    main.goTo(initial, at: 0, duration: 0); pace.goTo(initial, at: 0, duration: 0)
+    var samples = 0
+    for event in fixture.trace {
+      let time = event.time / 1000
+      switch event.type {
+      case "frame":
+        if event.rendered == true { main.sample(at: time); pace.sample(at: time) }
+      case "position":
+        let target = CGRect(x: try XCTUnwrap(event.left), y: try XCTUnwrap(event.top),
+          width: try XCTUnwrap(event.width), height: try XCTUnwrap(event.height))
+        let duration = try XCTUnwrap(event.duration) / 1000
+        if event.id == "caret" { main.goTo(target, at: time, duration: duration) }
+        else { pace.goTo(target, at: time, duration: duration, curve: event.linear == true ? .linear : .position) }
+      case "margin":
+        if event.id == "caret" {
+          main.lineJump(to: try XCTUnwrap(event.margin), at: time,
+            duration: try XCTUnwrap(event.duration) / 1000, isPace: false)
+        } else {
+          pace.lineJump(to: try XCTUnwrap(event.margin), at: time,
+            duration: try XCTUnwrap(event.duration) / 1000, isPace: true)
         }
+      case "sample":
+        samples += 1
+        let label = "\(fixture.frameInterval)ms/\(fixture.smooth)/\(fixture.motion)/\(fixture.style)/\(fixture.overlap) @\(event.time)"
+        try compare(main, source: XCTUnwrap(event.main), label: "main \(label)")
+        try compare(pace, source: XCTUnwrap(event.pace), label: "pace \(label)")
+      default: XCTFail("Unknown source event \(event.type)")
       }
-      XCTAssertEqual(samples, fixture.overlap ? 403 : 402)
     }
+    XCTAssertEqual(samples, fixture.overlap ? 403 : 402)
   }
 
   private func compare(_ native: PromptCaretChannel, source: Marker, label: String) throws {
@@ -152,9 +159,11 @@ import XCTest
       ("top", rect.minY, source.top), ("width", rect.width, source.width),
       ("margin", native.margin, source.margin),
       ("visibleTop", try XCTUnwrap(native.visibleRect).minY, source.visibleTop)]
-    for (name, actual, expected) in values where abs(actual - expected) > 1e-6 {
-      XCTFail("\(label) \(name): native \(actual), source \(expected)")
-      throw NSError(domain: "CaretTraceMismatch", code: 1)
+    for (name, actual, expected) in values {
+      guard actual.isFinite, expected.isFinite, abs(actual - expected) <= 1e-6 else {
+        XCTFail("\(label) \(name): native \(actual), source \(expected)")
+        throw NSError(domain: "CaretTraceMismatch", code: 1)
+      }
     }
     XCTAssertEqual(native.marginReady, source.ready, label)
   }

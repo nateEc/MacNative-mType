@@ -210,4 +210,30 @@ import XCTest
       "The translucent pace layer stays below the main marker, including late creation")
     view.stop()
   }
+
+  func testCoordinatorRequestsAndWordsCompletionDoNotPresentSiblingChannels() {
+    let motion = PromptCaretMotionCoordinator()
+    motion.prepare(attemptID: UUID())
+    let rect = CGRect(x: 0, y: 90, width: 12, height: 33)
+    motion.positionMain(at: rect, time: 0, duration: 0)
+    motion.positionPace(at: rect, time: 0, duration: 0)
+    motion.lineJump(to: -45, duration: 0.125, at: 0)
+    motion.sample(at: 0.025)
+    let main = motion.main.visibleRect, pace = motion.pace.visibleRect, words = motion.wordsMargin
+    motion.positionMain(at: nil, time: 0.2, duration: 0.15)
+    motion.positionPace(at: rect, time: 0.2, duration: 0.15)
+    XCTAssertEqual(motion.main.visibleRect, main)
+    XCTAssertEqual(motion.pace.visibleRect, pace)
+    XCTAssertEqual(motion.wordsMargin, words)
+    motion.wordsDidFinish(at: 0.2)
+    XCTAssertEqual(motion.wordsMargin, 0)
+    XCTAssertEqual(motion.main.visibleRect, main)
+    XCTAssertEqual(motion.pace.visibleRect, pace)
+    motion.cancelCarets(at: 0.3)
+    motion.sample(at: 1)
+    XCTAssertEqual(motion.main.visibleRect, main)
+    XCTAssertEqual(motion.pace.visibleRect, pace)
+    XCTAssertFalse(motion.main.marginReady)
+    XCTAssertFalse(motion.pace.marginReady)
+  }
 }

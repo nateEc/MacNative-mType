@@ -10,7 +10,8 @@ import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 
 const [argument, option] = process.argv.slice(2);
-assert.ok(argument && (!option || option === '--emit-fixtures'));
+assert.ok(argument && (!option || ['--emit-fixtures', '--emit-sparse-fixtures'].includes(option)));
+const frameIntervals = option === '--emit-sparse-fixtures' ? [16, 33, 100] : [1];
 const root = path.resolve(argument);
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -39,6 +40,7 @@ const promiseStart = dom.indexOf('  async promiseAnimate('), promiseEnd = dom.in
 assert.ok(promiseStart >= 0 && promiseEnd > promiseStart);
 const adapter = stripTypeScriptTypes('class Adapter {\n' + dom.slice(promiseStart, promiseEnd) + '\n}', {mode: 'transform'});
 const fixtures = [];
+for (const frameInterval of frameIntervals)
 for (const smooth of [false, true]) for (const motion of ['off', 'slow', 'medium', 'fast'])
 for (const style of ['default', 'block', 'underline']) for (const overlap of [false, true]) {
   let clock = 10_000, active = 1, input = '', frameID = 0, timeoutID = 0;
@@ -220,7 +222,7 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
     while (clock < 10_000 + time) {
       clock++;
       inEngineUpdate = true; engineRendered = false;
-      anime.namespace.engine.update();
+      if ((clock - 10_000) % frameInterval === 0) anime.namespace.engine.update();
       inEngineUpdate = false;
       trace.push({type: 'frame', time: clock - 10_000, rendered: engineRendered});
       await drain();
@@ -271,12 +273,22 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
   assert.equal(settled.first, overlap ? 2 : 1);
   assert.equal(settled.wordMargin, 0);
   assert.equal(settled.lineTransition, false);
-  assert.equal(settled.main.margin, 0);
-  assert.equal(settled.main.ready, false);
-  assert.equal(settled.main.visibleTop, 45 + (style === 'underline' ? 33 : 0));
+  // With sparse rendering, the 199ms input can precede margin completion.
+  // Keep the original 1ms contract; sparse traces retain the actual ready
+  // margin until another source request instead of inventing a final fold.
+  const delayedFold = smooth && frameInterval === 100;
+  assert.equal(settled.main.margin, delayedFold ? overlap ? -90 : -45 : 0);
+  assert.equal(settled.main.ready, delayedFold);
+  if (frameInterval === 1) {
+    assert.equal(settled.main.visibleTop, 45 + (style === 'underline' ? 33 : 0));
+  }
   assert.equal(settled.main.left, style === 'default' ? 11 : 12);
-  assert.equal(beforeRefresh.main.ready, smooth);
-  if (smooth) {
+  assert.equal(beforeRefresh.main.ready, smooth && !delayedFold);
+  if (delayedFold) {
+    assert.equal(afterRefresh.main.margin, beforeRefresh.main.margin);
+    assert.equal(afterRefresh.main.ready, false);
+  }
+  if (smooth && beforeRefresh.main.ready) {
     assert.equal(beforeRefresh.main.margin, overlap ? -90 : -45);
     assert.equal(afterRefresh.main.margin, 0);
     const fold = writes.findLast(item => item.id === 'caret' && item.time === 199
@@ -284,7 +296,7 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
     assert.ok(fold);
     assert.ok(Math.abs(parseFloat(fold.top) - beforeRefresh.main.visibleTop) < 1e-6,
       'The folding write preserves the display coordinate, before goTo corrects its target');
-  } else {
+  } else if (!smooth) {
     assert.equal(beforeRefresh.main.margin, 0, 'Main duration-zero line jump returns without a margin animation');
   }
   const mainMargins = animations.filter(item => item.id === 'caret' && item.channel === 'margin');
@@ -311,7 +323,7 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of [fa
     assert.ok(Math.abs(sample.main.top - (start + (target - start) * curve)) < 1e-6);
   }
   assert.equal(trace.filter(item => item.type === 'sample').length, overlap ? 403 : 402);
-  fixtures.push({smooth, motion, style, overlap, samples, beforeRefresh, afterRefresh, settled, trace,
+  fixtures.push({frameInterval, smooth, motion, style, overlap, samples, beforeRefresh, afterRefresh, settled, trace,
     resets: writes.filter(item => item.marginTop === '0px'),
     animations: animations.map(({animation, ...item}) => ({...item, completed: animation.completed}))});
   Caret.caret.stopAllAnimations(); PaceCaret.caret.stopAllAnimations(); PaceCaret.reset();

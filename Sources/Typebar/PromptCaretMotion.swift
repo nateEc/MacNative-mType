@@ -52,7 +52,9 @@ struct PromptCaretChannel {
   mutating func goTo(_ target: CGRect?, at time: TimeInterval,
     duration: TimeInterval, curve: Curve = .position) {
     guard let target else { return }
-    sample(at: time)
+    // Requests replace animation targets from the last presented state. A
+    // timer/input callback between frames must not render either channel or
+    // complete a sibling margin that the display has not presented yet.
     if marginReady {
       position = position?.offsetBy(dx: 0, dy: margin)
       margin = 0
@@ -67,7 +69,6 @@ struct PromptCaretChannel {
   mutating func lineJump(to margin: CGFloat, at time: TimeInterval,
     duration: TimeInterval, isPace: Bool) {
     guard duration > 0 || isPace else { return }
-    sample(at: time)
     if marginReady { self.margin = 0 }
     marginReady = false
     if duration > 0 {
@@ -76,8 +77,7 @@ struct PromptCaretChannel {
         duration: duration, curve: .line)
     } else { marginTween = nil; self.margin = margin; marginReady = true }
   }
-  mutating func cancel(at time: TimeInterval) {
-    sample(at: time)
+  mutating func cancel(at _: TimeInterval) {
     positionTween = nil
     marginTween = nil
   }
@@ -117,20 +117,18 @@ struct PromptCaretChannel {
     if duration > 0 { words.lineJump(to: margin, at: time, duration: duration, isPace: true) }
   }
 
-  func wordsDidFinish(at time: TimeInterval) {
-    sample(at: time)
+  func wordsDidFinish(at _: TimeInterval) {
+    // The follower owns words completion, not a presentation of the carets.
     words = .init()
   }
 
   func reportProgrammaticScroll(_ offset: CGFloat) { programmaticScroll = offset }
 
   func positionMain(at rect: CGRect?, time: TimeInterval, duration: TimeInterval) {
-    sample(at: time)
     main.goTo(rect?.offsetBy(dx: 0, dy: words.margin), at: time, duration: duration)
   }
 
   func positionPace(at rect: CGRect?, time: TimeInterval, duration: TimeInterval) {
-    sample(at: time)
     pace.goTo(rect?.offsetBy(dx: 0, dy: words.margin), at: time, duration: duration, curve: .linear)
   }
 

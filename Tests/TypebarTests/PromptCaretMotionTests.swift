@@ -125,4 +125,46 @@ final class PromptCaretMotionTests: XCTestCase {
       }
     }
   }
+
+  func testPositionRequestBetweenFramesDoesNotAdvanceEitherChannelOrFinishAMargin() {
+    var caret = PromptCaretChannel()
+    caret.goTo(rect(90), at: 0, duration: 0)
+    caret.lineJump(to: -45, at: 0, duration: 0.125, isPace: true)
+    caret.goTo(rect(135), at: 0, duration: 0.15)
+    caret.sample(at: 0.025)
+    let position = caret.position, margin = caret.margin, visible = caret.visibleRect
+    caret.goTo(rect(180), at: 0.2, duration: 0.15)
+    XCTAssertEqual(caret.position, position)
+    XCTAssertEqual(caret.margin, margin)
+    XCTAssertEqual(caret.visibleRect, visible)
+    XCTAssertFalse(caret.marginReady, "Elapsed time without a presentation is not completion")
+  }
+
+  func testLineReplacementBetweenFramesStartsAtTheLastRenderedMargin() {
+    var caret = PromptCaretChannel()
+    caret.goTo(rect(135), at: 0, duration: 0)
+    caret.lineJump(to: -45, at: 0, duration: 0.125, isPace: false)
+    caret.sample(at: 0.025)
+    let margin = caret.margin
+    caret.lineJump(to: -90, at: 0.04, duration: 0.125, isPace: false)
+    XCTAssertEqual(caret.margin, margin)
+    caret.sample(at: 0.065)
+    XCTAssertEqual(caret.margin,
+      margin + (-90 - margin) * PromptLineScrollMotion.progress(elapsed: 0.037), accuracy: 1e-8)
+  }
+
+  func testCancellationBetweenFramesFreezesWithoutPresentingOrCompleting() {
+    var caret = PromptCaretChannel()
+    caret.goTo(rect(90), at: 0, duration: 0)
+    caret.lineJump(to: -45, at: 0, duration: 0.125, isPace: true)
+    caret.goTo(rect(135), at: 0, duration: 0.15)
+    caret.sample(at: 0.025)
+    let position = caret.position, margin = caret.margin, visible = caret.visibleRect
+    caret.cancel(at: 0.2)
+    caret.sample(at: 1)
+    XCTAssertEqual(caret.position, position)
+    XCTAssertEqual(caret.margin, margin)
+    XCTAssertEqual(caret.visibleRect, visible)
+    XCTAssertFalse(caret.marginReady)
+  }
 }
