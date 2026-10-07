@@ -35,6 +35,7 @@ import XCTest
 
   private func update(_ follower: PromptAutoScrollView, row: Int, attempt: UUID,
     caret: Int? = nil, reduced: Bool = false, smooth: Bool = true, retained: Int = 0,
+    caretMotion: PromptCaretMotionCoordinator? = nil,
     notify: @escaping (PromptWordRetirement) -> Void) {
     let starts = [0, 6, 12, 18, 24, 30]
     follower.update(text: AttributedString("amber\nbirch\ncedar\ndelta\nelder\nflint"),
@@ -43,7 +44,7 @@ import XCTest
         activeWordID: starts[row], characterOffsets: Dictionary(uniqueKeysWithValues: starts.map { ($0, $0) }),
         smoothScroll: smooth, reducesMotion: reduced,
         words: starts.enumerated().map { .init(index: $0.offset, glyphID: $0.element) },
-        firstRetainedWordIndex: retained, onRetire: notify))
+        firstRetainedWordIndex: retained, onRetire: notify, caretMotion: caretMotion))
     RunLoop.main.run(until: Date().addingTimeInterval(0.005))
   }
 
@@ -101,6 +102,39 @@ import XCTest
     }
   }
 
+  func testNativeFollowerDrivesBothCaretMarginsAndCompletesWordsBeforeRetirement() throws {
+    for smooth in [false, true] {
+      let (scroll, follower) = fixture(), attempt = UUID(), motion = PromptCaretMotionCoordinator()
+      var retired: [PromptWordRetirement] = []
+      for row in 0...2 {
+        update(follower, row: row, attempt: attempt, smooth: smooth, caretMotion: motion) {
+          XCTAssertEqual(motion.wordsMargin, 0, "Deletion cannot precede the words margin reset")
+          retired.append($0)
+        }
+      }
+      motion.sample(at: ProcessInfo.processInfo.systemUptime)
+      if smooth {
+        XCTAssertLessThan(motion.main.margin, 0)
+        XCTAssertEqual(motion.main.margin, motion.pace.margin, accuracy: 1e-7)
+        XCTAssertTrue(retired.isEmpty)
+      } else {
+        XCTAssertEqual(motion.main.margin, 0)
+        XCTAssertFalse(motion.main.marginReady)
+        XCTAssertEqual(motion.pace.margin, -45, accuracy: 0.5)
+        XCTAssertTrue(motion.pace.marginReady)
+      }
+      RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+      motion.sample(at: ProcessInfo.processInfo.systemUptime)
+      XCTAssertEqual(retired.map(\.firstRetainedWordIndex), [1])
+      XCTAssertEqual(motion.wordsMargin, 0)
+      XCTAssertEqual(motion.main.marginReady, smooth)
+      XCTAssertEqual(motion.main.margin, smooth ? -45 : 0, accuracy: 0.5)
+      XCTAssertEqual(motion.programmaticScroll, 45, accuracy: 0.5)
+      XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 0.5)
+      follower.removeFromSuperview()
+    }
+  }
+
   func testRestartDetachAndWidthChangeCancelTheLatestOverlapWithoutAnOldCallback() {
     for action in ["restart", "detach", "width"] {
       let (scroll, follower) = fixture(), attempt = UUID()
@@ -128,6 +162,7 @@ import XCTest
   }
 
   @Observable final class Model {
+    let caretMotion = PromptCaretMotionCoordinator()
     var session = TypingSession(configuration: .words(6), prompt: "amber\nbirch\ncedar\ndelta\nelder\nflint")
     var rendering: PromptRendering {
       let glyphs = session.promptGlyphs
@@ -157,7 +192,18 @@ import XCTest
                 characterOffsets: rendering.glyphCharacterOffsets, smoothScroll: true, reducesMotion: false,
                 words: words.enumerated().map { .init(index: $0.offset, glyphID: $0.element.range.lowerBound) },
                 firstRetainedWordIndex: model.session.firstRetainedPromptWordIndex,
-                onRetire: { model.session.retirePromptWords($0) }))
+                onRetire: { model.session.retirePromptWords($0) }, caretMotion: model.caretMotion))
+          }
+          .overlay {
+            PromptCaretOverlay(text: rendering.text,
+              mainCharacterOffset: rendering.characterOffset(forGlyphAt: model.session.promptCaretGlyphIndex),
+              mainStyle: .bar, paceCharacterOffset: nil, paceStyle: .off, font: font,
+              lineSpacing: 12, isRightToLeft: false, accent: .yellow, motion: .medium,
+              coordinator: model.caretMotion, attemptID: model.session.automaticInputAttemptID,
+              firstRetainedWordIndex: model.session.firstRetainedPromptWordIndex,
+              latestInput: { .init(attemptID: model.session.automaticInputAttemptID,
+                typed: model.session.typed, composition: "", glyphID: nil) },
+              latestGlyphID: { model.session.promptCaretGlyphIndex }, latestRendering: { model.rendering })
           }
       }.frame(width: 360)
     }
@@ -185,6 +231,9 @@ import XCTest
     func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
     let scroll = try XCTUnwrap(descendants(host).compactMap { $0 as? NSScrollView }.first)
     XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 1)
+    XCTAssertEqual(model.caretMotion.main.margin, -90, accuracy: 1)
+    XCTAssertTrue(model.caretMotion.main.marginReady)
+    XCTAssertNotNil(descendants(host).compactMap { $0 as? PromptCaretNativeView }.first)
     XCTAssertFalse(window.isVisible)
     model.session.insertBatch("delta\nelder\nflint", at: start.addingTimeInterval(3)); pump(0.2)
     let result = try XCTUnwrap(model.session.result())

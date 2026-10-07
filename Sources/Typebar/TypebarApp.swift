@@ -974,6 +974,7 @@ private struct ContentView: View {
   @State private var session = TestSessionFactory.make(
     configuration: TypebarInitialTestSelection.configuration).withElapsedClock()
   @State private var noQuitConfigurationLockOwnerID = UUID()
+  @State private var promptCaretMotion = PromptCaretMotionCoordinator()
   @State private var mode: TestMode = .time
   @State private var language: TypingLanguage = .english
   @State private var polyglotReturnLanguage: TypingLanguage?
@@ -2874,7 +2875,8 @@ private struct ContentView: View {
                   }, firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
                   onRetire: { session.retirePromptWords($0) },
                   followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
-                    slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines)))
+                    slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines),
+                  caretMotion: promptCaretMotion))
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }
@@ -2893,8 +2895,14 @@ private struct ContentView: View {
                 isRightToLeft: isRightToLeft,
                 accent: activeTheme.caret,
                 motion: settings.smoothCaretMotion,
-                paceFrame: paceCaretFrameProvider(in: rendering),
-                reducesPaceMotion: settings.reducePracticeMotion)
+                paceFrame: paceCaretFrameProvider,
+                reducesPaceMotion: settings.reducePracticeMotion,
+                coordinator: promptCaretMotion, attemptID: session.automaticInputAttemptID,
+                firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
+                latestInput: { .init(attemptID: session.automaticInputAttemptID,
+                  typed: session.typed, composition: compositionText, glyphID: nil) },
+                latestGlyphID: { currentPromptGlyphIndex },
+                latestRendering: { renderedPrompt })
             }
           }
       }
@@ -3028,18 +3036,18 @@ private struct ContentView: View {
       || session.configuration.usesRightToLeftPrompt
   }
 
-  private func paceCaretInterpolation(in rendering: PromptRendering) -> PromptPaceCaretInterpolation? {
+  private func paceCaretInterpolation() -> PromptPaceCaretInterpolation? {
     guard let frame = session.paceCaretFrame() else { return nil }
     let from = session.paceCaretGlyphAnchor(for: frame.from)
     let target = session.paceCaretGlyphAnchor(for: frame.target)
-    return .init(fromCharacterOffset: rendering.characterOffset(forGlyphAt: from?.glyphIndex),
-      targetCharacterOffset: rendering.characterOffset(forGlyphAt: target?.glyphIndex),
-      fromAfter: from?.after ?? false, targetAfter: target?.after ?? false, fraction: frame.fraction)
+    return .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: from?.after ?? false, targetAfter: target?.after ?? false, fraction: frame.fraction,
+      stepDuration: frame.stepDuration, sequence: frame.sequence, targetGlyphID: target?.glyphIndex)
   }
 
-  private func paceCaretFrameProvider(in rendering: PromptRendering) -> (() -> PromptPaceCaretInterpolation?)? {
-    guard settings.paceCaretStyle.drawsMarker, session.paceCaretFrame() != nil else { return nil }
-    return { paceCaretInterpolation(in: rendering) }
+  private var paceCaretFrameProvider: (() -> PromptPaceCaretInterpolation?)? {
+    guard settings.paceCaretStyle.drawsMarker else { return nil }
+    return { paceCaretInterpolation() }
   }
 
   private var renderedPrompt: PromptRendering {

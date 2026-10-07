@@ -38,13 +38,6 @@ extension TypingCaretStyle {
   }
 }
 
-private struct PromptCaretMarker: Identifiable {
-  let id: String
-  let characterOffset: Int
-  let style: TypingCaretStyle
-  let opacity: Double
-}
-
 struct PromptRendering {
   let text: AttributedString
   let glyphCharacterOffsets: [Int: Int]
@@ -130,19 +123,15 @@ enum PromptControlCharacterPresentation {
   }
 }
 
-private struct PromptCaretPlacement: Identifiable {
-  let marker: PromptCaretMarker
-  let rect: CGRect
-
-  var id: String { marker.id }
-}
-
 struct PromptPaceCaretInterpolation {
   let fromCharacterOffset: Int?
   let targetCharacterOffset: Int?
   let fromAfter: Bool
   let targetAfter: Bool
   let fraction: Double
+  var stepDuration: TimeInterval = 0
+  var sequence: Double = 0
+  var targetGlyphID: Int? = nil
 }
 
 enum PromptPaceCaretGeometry {
@@ -200,7 +189,7 @@ struct PromptAutoScrollOverlay: NSViewRepresentable {
         characterOffsets: $0.characterOffsets, smoothScroll: $0.smoothScroll,
         reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: lineScrollFrameRate,
         words: $0.words, firstRetainedWordIndex: $0.firstRetainedWordIndex, onRetire: $0.onRetire,
-        followsWordReflow: $0.followsWordReflow)
+        followsWordReflow: $0.followsWordReflow, caretMotion: $0.caretMotion)
     }
     nsView.update(
       text: text, characterOffset: characterOffset, font: font,
@@ -208,6 +197,7 @@ struct PromptAutoScrollOverlay: NSViewRepresentable {
   }
 
   static func dismantleNSView(_ nsView: PromptAutoScrollView, coordinator: ()) {
+    nsView.cancelCaretMotion()
     nsView.stopLineScroll()
   }
 }
@@ -267,6 +257,7 @@ final class PromptAutoScrollView: NSView {
       wordReflow = .init()
       latestActiveTop = nil
       hasPendingWordUpdate = false
+      if let lineScroll { lineScroll.caretMotion?.prepare(attemptID: lineScroll.attemptID) }
     }
     if prefixChanged, !attemptChanged {
       stopLineScroll()
@@ -277,7 +268,10 @@ final class PromptAutoScrollView: NSView {
       resetsRetainedPrefix = true
       hasPendingWordUpdate = false
     }
-    if layoutChanged { stopLineScroll(); wordReflow = .init() }
+    if layoutChanged {
+      stopLineScroll(); wordReflow = .init()
+      lineScroll?.caretMotion?.resetLayout()
+    }
     recentersLine = recentersLine || layoutChanged || attemptChanged
     self.lineScroll = lineScroll
     self.text = text
@@ -296,6 +290,7 @@ final class PromptAutoScrollView: NSView {
     if bounds.width != lastWidth {
       lastWidth = bounds.width
       stopLineScroll()
+      lineScroll?.caretMotion?.resetLayout()
       recentersLine = true
       scheduleFollow()
     }
@@ -303,6 +298,7 @@ final class PromptAutoScrollView: NSView {
 
   override func viewWillMove(toSuperview newSuperview: NSView?) {
     if newSuperview == nil {
+      cancelCaretMotion()
       stopLineScroll()
       wordReflow = .init()
       latestActiveTop = nil
@@ -319,6 +315,10 @@ final class PromptAutoScrollView: NSView {
     animatedScrollView = nil
     pendingRetirement = nil
     if resetOverlap { lineScrollOverlap = .init() }
+  }
+
+  func cancelCaretMotion() {
+    lineScroll?.caretMotion?.cancel(at: ProcessInfo.processInfo.systemUptime)
   }
 
   private func scheduleFollow() {
@@ -419,6 +419,11 @@ final class PromptAutoScrollView: NSView {
     let target = scroll.contentView.constrainBoundsRect(proposed).origin
     let immediate = resetsAttempt || !context.smoothScroll || context.reducesMotion
     resetsAttempt = false
+    if startsJump {
+      context.caretMotion?.lineJump(to: -geometry.activeRowHeight * CGFloat(lineScrollOverlap.pendingJumps),
+        duration: immediate ? 0 : PromptLineScrollMotion.duration,
+        at: ProcessInfo.processInfo.systemUptime)
+    }
     move(scroll, to: target, immediately: immediate, frameRate: context.frameRate,
       retirement: retirement, onRetire: context.onRetire, startsJump: startsJump,
       preservesReflowAnchor: startsJump || prefixWasRebuilt)
@@ -449,12 +454,14 @@ final class PromptAutoScrollView: NSView {
     let clip = scroll.contentView
     let from = clip.bounds.origin
     guard from != target || startsJump && !immediately else {
+      reportCaretScroll(scroll)
       lineScrollOverlap = .init()
       completeRetirement(); return
     }
     if immediately {
       clip.scroll(to: target)
       scroll.reflectScrolledClipView(clip)
+      reportCaretScroll(scroll)
       if !preservesReflowAnchor { anchorWordReflow() }
       lineScrollOverlap = .init()
       completeRetirement()
@@ -485,8 +492,10 @@ final class PromptAutoScrollView: NSView {
     clip.scroll(to: .init(x: animation.from.x + (animation.target.x - animation.from.x) * progress,
       y: animation.from.y + (animation.target.y - animation.from.y) * progress))
     scroll.reflectScrolledClipView(clip)
+    reportCaretScroll(scroll)
     if elapsed >= PromptLineScrollMotion.duration {
       let completion = pendingRetirement
+      lineScroll?.caretMotion?.wordsDidFinish(at: ProcessInfo.processInfo.systemUptime)
       stopLineScroll()
       anchorWordReflow()
       if let completion { completion.notify(completion.value) }
@@ -496,7 +505,16 @@ final class PromptAutoScrollView: NSView {
   private func completeRetirement() {
     let completion = pendingRetirement
     pendingRetirement = nil
-    if let completion { completion.notify(completion.value) }
+    if let completion {
+      lineScroll?.caretMotion?.wordsDidFinish(at: ProcessInfo.processInfo.systemUptime)
+      completion.notify(completion.value)
+    }
+  }
+
+  private func reportCaretScroll(_ scroll: NSScrollView) {
+    guard let document = scroll.documentView else { return }
+    lineScroll?.caretMotion?.reportProgrammaticScroll(
+      scroll.contentView.bounds.minY - convert(CGPoint.zero, to: document).y)
   }
 
   private func anchorWordReflow() {
@@ -517,7 +535,7 @@ final class PromptAutoScrollView: NSView {
 
 /// A separate, code-drawn caret layer. TextKit computes each target glyph's
 /// frame from the same attributed text and wrapping width shown by SwiftUI.
-struct PromptCaretOverlay: View {
+struct PromptCaretOverlay: NSViewRepresentable {
   let text: AttributedString
   let mainCharacterOffset: Int?
   let mainStyle: TypingCaretStyle
@@ -530,79 +548,34 @@ struct PromptCaretOverlay: View {
   let motion: SmoothCaretMotion
   var paceFrame: (() -> PromptPaceCaretInterpolation?)? = nil
   var reducesPaceMotion = false
+  let coordinator: PromptCaretMotionCoordinator
+  let attemptID: UUID
+  var firstRetainedWordIndex = 0
+  var latestInput: (() -> PromptCaretInputIdentity)? = nil
+  var latestGlyphID: (() -> Int?)? = nil
+  var latestRendering: (() -> PromptRendering)? = nil
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
-  var body: some View {
-    GeometryReader { proxy in
-      if let paceFrame {
-        TimelineView(.animation(minimumInterval: reducesPaceMotion || systemReduceMotion
-          ? 0.1 : AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))) { _ in
-          markerLayer(in: proxy.size, interpolation: paceFrame(), dynamicPace: true)
-        }
-      } else { markerLayer(in: proxy.size, interpolation: nil, dynamicPace: false) }
-    }
+  func makeNSView(context: Context) -> PromptCaretNativeView { PromptCaretNativeView() }
+
+  func updateNSView(_ view: PromptCaretNativeView, context: Context) {
+    view.update(.init(text: text, mainOffset: mainCharacterOffset, paceOffset: paceCharacterOffset,
+      mainStyle: mainStyle, paceStyle: paceStyle, font: font, lineSpacing: lineSpacing,
+      rightToLeft: isRightToLeft, accent: accent, motion: motion,
+      reducesMotion: reducesPaceMotion || systemReduceMotion,
+      frameRate: animationFrameRate, attemptID: attemptID, coordinator: coordinator,
+      firstRetainedWordIndex: firstRetainedWordIndex,
+      latestInput: latestInput, latestGlyphID: latestGlyphID,
+      latestRendering: latestRendering, paceFrame: paceFrame))
   }
 
-  private func markerLayer(in size: CGSize, interpolation: PromptPaceCaretInterpolation?, dynamicPace: Bool) -> some View {
-    let placements = markerPlacements(in: size, interpolation: interpolation, dynamicPace: dynamicPace)
-    return ZStack(alignment: .topLeading) {
-        ForEach(placements) { placement in
-          PromptCaretMarkerView(
-            style: placement.marker.style,
-            accent: accent.opacity(placement.marker.opacity),
-            rect: placement.rect)
-          .position(
-            x: PromptCaretPlacementPolicy.horizontalAnchor(
-              for: placement.rect, style: placement.marker.style,
-              isRightToLeft: isRightToLeft),
-            y: placement.rect.midY)
-          .animation(
-            placement.id == "main" ? motion.duration.map { .easeInOut(duration: $0) } : nil,
-            value: placement.rect)
-        }
-      }
-      .allowsHitTesting(false)
-      .accessibilityHidden(true)
-  }
-
-  private func markerPlacements(in size: CGSize, interpolation: PromptPaceCaretInterpolation?, dynamicPace: Bool) -> [PromptCaretPlacement] {
-    let markers = [
-      (dynamicPace ? nil : paceCharacterOffset).map {
-        PromptCaretMarker(id: "pace", characterOffset: $0, style: paceStyle, opacity: 0.72)
-      },
-      mainCharacterOffset.map {
-        PromptCaretMarker(id: "main", characterOffset: $0, style: mainStyle, opacity: 1)
-      },
-    ].compactMap { $0 }.filter { $0.style != .off }
-
-    var placements = markers.compactMap { marker -> PromptCaretPlacement? in
-      guard let rect = PromptCaretLayout.rect(
-        in: text, characterOffset: marker.characterOffset, containerSize: size,
-        font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
-      else { return nil }
-      return PromptCaretPlacement(marker: marker, rect: rect)
-    }
-    if paceStyle.drawsMarker, let interpolation, let target = interpolation.targetCharacterOffset,
-      let to = PromptCaretLayout.rect(in: text, characterOffset: target, containerSize: size,
-        font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft) {
-      let from = interpolation.fromCharacterOffset.flatMap {
-        PromptCaretLayout.rect(in: text, characterOffset: $0, containerSize: size,
-          font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
-      } ?? to
-      let rect = PromptPaceCaretGeometry.rect(from: from, to: to,
-        fromAfter: interpolation.fromAfter, toAfter: interpolation.targetAfter,
-        style: paceStyle, rightToLeft: isRightToLeft, fraction: interpolation.fraction,
-        reducesMotion: reducesPaceMotion || systemReduceMotion,
-        afterWidth: (" " as NSString).size(withAttributes: [.font: font]).width)
-      placements.insert(.init(marker: .init(id: "pace", characterOffset: target, style: paceStyle,
-        opacity: 0.72), rect: rect), at: 0)
-    }
-    return placements
+  static func dismantleNSView(_ view: PromptCaretNativeView, coordinator: ()) {
+    view.stop()
   }
 }
 
-private struct PromptCaretMarkerView: View {
+struct PromptCaretMarkerView: View {
   let style: TypingCaretStyle
   let accent: Color
   let rect: CGRect
@@ -645,6 +618,8 @@ private struct PromptCaretMarkerView: View {
       }
     }
     .frame(width: width, height: height)
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
   }
 }
 

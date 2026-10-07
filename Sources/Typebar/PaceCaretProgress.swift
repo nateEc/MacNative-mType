@@ -23,6 +23,8 @@ struct PaceCaretFrame: Equatable {
   let from: PaceCaretPosition
   let target: PaceCaretPosition
   let fraction: Double
+  var stepDuration: TimeInterval = 0
+  var sequence: Double = 0
 }
 
 struct PaceCaretGlyphAnchor: Equatable {
@@ -195,6 +197,7 @@ struct PaceCaretProgress {
     let duration = stepEnd - stepStart
     let fraction = duration > 0 ? min(1, max(0, (observedAt - stepStart) / duration)) : 1
     return .init(from: projection.catalog.position(at: projection.fromStep),
-      target: projection.catalog.position(at: projection.currentStep), fraction: fraction)
+      target: projection.catalog.position(at: projection.currentStep), fraction: fraction,
+      stepDuration: duration, sequence: projection.processedSteps)
   }
 }

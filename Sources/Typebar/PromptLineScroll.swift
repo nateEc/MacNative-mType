@@ -23,6 +23,7 @@ struct PromptLineScrollContext {
   var firstRetainedWordIndex = 0
   var onRetire: ((PromptWordRetirement) -> Void)? = nil
   var followsWordReflow = false
+  var caretMotion: PromptCaretMotionCoordinator? = nil
 }
 
 struct PromptWordReflowState {

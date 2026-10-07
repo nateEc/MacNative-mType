@@ -2,8 +2,8 @@ import Foundation
 import XCTest
 @testable import Typebar
 
-/// Source-oracle contract, not a native caret queue parity test. Product
-/// position animation and margin-folding integration remain explicit gaps.
+/// Complete-source contract plus a native first-jump sample comparison.
+/// This does not prove all native queue orders or browser pixel equivalence.
 @MainActor final class CaretLineCompositionSourceTests: XCTestCase {
   private struct Marker: Decodable {
     let left: Double, top: Double, width: Double, margin: Double, visibleTop: Double
@@ -78,6 +78,22 @@ import XCTest
         XCTAssertGreaterThan(sample.main.top, 45 + (fixture.style == "underline" ? 33 : 0))
         XCTAssertLessThan(sample.main.top, 90 + (fixture.style == "underline" ? 33 : 0))
       }
+    }
+  }
+
+  func testNativeMainChannelsMatchCompleteSourceBeforeOverlapAcrossAllFixtureChoices() throws {
+    for fixture in try evidence() {
+      var caret = PromptCaretChannel()
+      let underline: CGFloat = fixture.style == "underline" ? 33 : 0
+      caret.goTo(.init(x: 0, y: 45 + underline, width: 12, height: 33), at: 0, duration: 0)
+      caret.lineJump(to: -45, at: 0, duration: fixture.smooth ? 0.125 : 0, isPace: false)
+      caret.goTo(.init(x: 0, y: (fixture.smooth ? 90 : 45) + underline, width: 12, height: 33),
+        at: 0, duration: fixture.motion.duration ?? 0)
+      caret.sample(at: 0.025)
+      let source = try XCTUnwrap(fixture.samples.first { $0.time == 25 })
+      XCTAssertEqual(try XCTUnwrap(caret.position).minY, source.main.top, accuracy: 1e-8)
+      XCTAssertEqual(caret.margin, source.main.margin, accuracy: 1e-8)
+      XCTAssertEqual(try XCTUnwrap(caret.visibleRect).minY, source.main.visibleTop, accuracy: 1e-8)
     }
   }
 
