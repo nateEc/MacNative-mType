@@ -4,6 +4,17 @@ import AppKit
 /// separate from the typing engine: tape presentation never changes prompt
 /// text, accepted input, scoring, or replay.
 enum PracticeTapePolicy {
+  static func wordStartCharacterOffsets(session: TypingSession, rendering: PromptRendering) -> [Int: Int] {
+    var starts: [Int: Int] = [:]
+    for word in session.promptWordPresentations {
+      guard let start = rendering.characterOffset(forGlyphAt: word.range.lowerBound) else { continue }
+      for id in Array(word.range) + word.extraGlyphIndices {
+        if let offset = rendering.characterOffset(forGlyphAt: id) { starts[offset] = start }
+      }
+    }
+    return starts
+  }
+
   static func anchorCharacterIndex(
     session: TypingSession, rendering: PromptRendering, mode: PracticeTapeMode
   ) -> Int {
@@ -28,7 +39,7 @@ enum PracticeTapePolicy {
         containerSize: CGSize(width: .greatestFiniteMagnitude, height: font.pointSize * 2),
         font: font, lineSpacing: 0)
     else { return 0 }
-    return max(0, rect.minX - containerWidth * margin.clamped(to: 0...1))
+    return rect.minX - containerWidth * margin.clamped(to: 0...1)
   }
 
   static func anchorCharacterIndex(typed: String, mode: PracticeTapeMode) -> Int {
@@ -56,6 +67,6 @@ enum PracticeTapePolicy {
   ) -> Double {
     guard mode != .off, glyphWidth > 0, containerWidth > 0 else { return 0 }
     let anchor = Double(anchorCharacterIndex) * glyphWidth
-    return max(0, anchor - containerWidth * margin.clamped(to: 0...1))
+    return anchor - containerWidth * margin.clamped(to: 0...1)
   }
 }

@@ -79,10 +79,10 @@ final class PracticeTapeDisplayAnchorTests: XCTestCase {
       font: font, lineSpacing: 0))
     XCTAssertEqual(PracticeTapePolicy.horizontalOffset(
       prompt: text, anchorCharacterIndex: 5, mode: .letter, margin: 0.1, font: font,
-      containerWidth: 100), max(0, rect.minX - 10), accuracy: 0.001)
+      containerWidth: 100), rect.minX - 10, accuracy: 0.001)
     XCTAssertEqual(PracticeTapePolicy.horizontalOffset(
       prompt: text, anchorCharacterIndex: 5, mode: .letter, margin: 2, font: font,
-      containerWidth: 800), 0)
+      containerWidth: 800), rect.minX - 800, accuracy: 0.001)
     XCTAssertEqual(PracticeTapePolicy.horizontalOffset(
       prompt: text, anchorCharacterIndex: 5, mode: .off, margin: 0, font: font,
       containerWidth: 800), 0)

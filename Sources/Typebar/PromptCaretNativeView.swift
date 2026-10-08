@@ -36,6 +36,8 @@ final class PromptCaretNativeView: NSView {
     var firstGlyphID = 0
     var glyphRect: ((Int) -> CGRect?)? = nil
     var geometryRevision: UInt64 = 0
+    var mainGlyphRect: ((Int) -> CGRect?)? = nil
+    var automaticallyPresents = true
   }
 
   private var configuration: Configuration?
@@ -61,7 +63,8 @@ final class PromptCaretNativeView: NSView {
     let old = configuration
     let layoutChanged = old.map { $0.font != next.font || $0.lineSpacing != next.lineSpacing
       || $0.rightToLeft != next.rightToLeft
-      || ($0.glyphRect != nil) != (next.glyphRect != nil) } ?? false
+      || ($0.glyphRect != nil) != (next.glyphRect != nil)
+      || ($0.mainGlyphRect != nil) != (next.mainGlyphRect != nil) } ?? false
     let styleChanged = old?.mainStyle != next.mainStyle || old?.paceStyle != next.paceStyle
     let restarted = old?.attemptID != next.attemptID || old?.coordinator !== next.coordinator
     next.coordinator.prepare(attemptID: next.attemptID)
@@ -85,7 +88,8 @@ final class PromptCaretNativeView: NSView {
       needsPosition = true
     }
     configuration = next
-    if timer == nil || old?.frameRate != next.frameRate { scheduleTimer() }
+    if !next.automaticallyPresents { timer?.invalidate(); timer = nil }
+    else if timer == nil || old?.frameRate != next.frameRate { scheduleTimer() }
     schedulePaceTimer(after: 0)
     // Defer to the next run-loop presentation: prefix deletion and a real
     // input may be coalesced in one SwiftUI update. Providers read latest state.
@@ -124,7 +128,7 @@ final class PromptCaretNativeView: NSView {
 
   private func scheduleTimer() {
     timer?.invalidate()
-    guard let configuration else { return }
+    guard let configuration, configuration.automaticallyPresents else { return }
     let interval = PromptLineScrollMotion.frameInterval(frameRate: configuration.frameRate,
       displayFrameRate: window?.screen?.maximumFramesPerSecond ?? 60)
     let timer = Timer(timeInterval: interval, target: PromptCaretTimerTarget(owner: self),
@@ -168,7 +172,10 @@ final class PromptCaretNativeView: NSView {
       let offset = latest.flatMap { _ in rendering?.characterOffset(forGlyphAt: glyphID) }
         ?? (latest == nil ? config.mainOffset : nil)
       if config.mainStyle.drawsMarker {
-        coordinator.positionMain(at: measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID),
+        let mainRect: CGRect?
+        if let resolver = config.mainGlyphRect { mainRect = glyphID.flatMap(resolver) }
+        else { mainRect = measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID) }
+        coordinator.positionMain(at: mainRect,
           time: time, duration: needsSnap || config.reducesMotion ? 0 : config.motion.duration ?? 0)
       }
       input = latest; mainOffset = config.mainOffset

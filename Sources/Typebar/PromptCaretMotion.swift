@@ -36,8 +36,14 @@ struct PromptCaretChannel {
   private(set) var position: CGRect?
   private(set) var margin: CGFloat = 0
   private(set) var marginReady = false
+  private(set) var tapeMargin: CGFloat = 0
+  private(set) var tapeMarginReady = false
+  private(set) var cumulativeTapeCorrection: CGFloat = 0
   private var positionTween: Tween?
   private var marginTween: Tween?
+  private var tapeTween: Tween?
+
+  var isAnimatingTape: Bool { tapeTween != nil }
 
   mutating func sample(at time: TimeInterval) {
     if let tween = positionTween {
@@ -47,6 +53,10 @@ struct PromptCaretChannel {
     if let tween = marginTween {
       margin = tween.value(at: time).minY
       if tween.fraction(at: time) == 1 { marginTween = nil; marginReady = true }
+    }
+    if let tween = tapeTween {
+      tapeMargin = tween.value(at: time).minX
+      if tween.fraction(at: time) == 1 { tapeTween = nil; tapeMarginReady = true }
     }
   }
   mutating func goTo(_ target: CGRect?, at time: TimeInterval,
@@ -60,12 +70,27 @@ struct PromptCaretChannel {
       margin = 0
       marginReady = false
     }
-    let destination = target.offsetBy(dx: 0, dy: -margin)
+    if tapeMarginReady {
+      position = position?.offsetBy(dx: tapeMargin, dy: 0)
+      cumulativeTapeCorrection += tapeMargin
+      tapeMargin = 0; tapeMarginReady = false
+    }
+    let destination = target.offsetBy(dx: -tapeMargin, dy: -margin)
     if duration > 0, let position {
       positionTween = .init(from: position, to: destination, started: time,
         duration: duration, curve: curve)
     } else { positionTween = nil; position = destination }
   }
+  mutating func tapeScroll(to value: CGFloat, at time: TimeInterval, duration: TimeInterval) {
+    tapeMarginReady = false
+    let destination = value - cumulativeTapeCorrection
+    if duration > 0 {
+      tapeTween = .init(from: .init(x: tapeMargin, y: 0, width: 0, height: 0),
+        to: .init(x: destination, y: 0, width: 0, height: 0), started: time,
+        duration: duration, curve: .position)
+    } else { tapeTween = nil; tapeMargin = destination; tapeMarginReady = true }
+  }
+  mutating func tapeWordsRemoved(width: CGFloat) { cumulativeTapeCorrection += width }
   mutating func lineJump(to margin: CGFloat, at time: TimeInterval,
     duration: TimeInterval, isPace: Bool) {
     guard duration > 0 || isPace else { return }
@@ -80,8 +105,9 @@ struct PromptCaretChannel {
   mutating func cancel(at _: TimeInterval) {
     positionTween = nil
     marginTween = nil
+    tapeTween = nil
   }
-  var visibleRect: CGRect? { position?.offsetBy(dx: 0, dy: margin) }
+  var visibleRect: CGRect? { position?.offsetBy(dx: tapeMargin, dy: margin) }
 }
 
 /// Shared by the native follower and marker layer. No callbacks or timers:
@@ -94,6 +120,8 @@ struct PromptCaretChannel {
   private var attemptID: UUID?
 
   var wordsMargin: CGFloat { words.margin }
+  var wordsTapeMargin: CGFloat { words.tapeMargin }
+  var isAnimatingTape: Bool { words.isAnimatingTape }
 
   func prepare(attemptID: UUID) {
     guard self.attemptID != attemptID else { return }
@@ -124,12 +152,22 @@ struct PromptCaretChannel {
 
   func reportProgrammaticScroll(_ offset: CGFloat) { programmaticScroll = offset }
 
+  func tapeScroll(to value: CGFloat, duration: TimeInterval, at time: TimeInterval) {
+    // The source main caret is locked. Only words and pace receive tape margins.
+    words.tapeScroll(to: value, at: time, duration: duration)
+    pace.tapeScroll(to: value, at: time, duration: duration)
+  }
+
+  func tapeWordsRemoved(width: CGFloat) {
+    main.tapeWordsRemoved(width: width); pace.tapeWordsRemoved(width: width)
+  }
+
   func positionMain(at rect: CGRect?, time: TimeInterval, duration: TimeInterval) {
     main.goTo(rect?.offsetBy(dx: 0, dy: words.margin), at: time, duration: duration)
   }
 
   func positionPace(at rect: CGRect?, time: TimeInterval, duration: TimeInterval) {
-    pace.goTo(rect?.offsetBy(dx: 0, dy: words.margin), at: time, duration: duration, curve: .linear)
+    pace.goTo(rect?.offsetBy(dx: words.tapeMargin, dy: words.margin), at: time, duration: duration, curve: .linear)
   }
 
   func cancel(at time: TimeInterval) {

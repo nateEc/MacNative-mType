@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 enum PromptGlyphColor: Equatable {
   case completed, future, error, extra, hidden
@@ -33,7 +34,10 @@ struct PromptGlyphAppearance: Equatable {
   var hasErrorUnderline = false
 
   func applyErrorUnderline(to text: inout AttributedString, errorColor: Color) {
-    if hasErrorUnderline { text.underlineStyle = Text.LineStyle(color: errorColor) }
+    if hasErrorUnderline {
+      text.underlineStyle = Text.LineStyle(color: errorColor)
+      text.appKit.underlineColor = NSColor(errorColor)
+    }
   }
 
   func applyVisibility(to text: inout AttributedString) {

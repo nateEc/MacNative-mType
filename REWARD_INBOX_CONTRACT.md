@@ -1,5 +1,25 @@
 # 原生奖励收件箱与周任务交付
 
+## Tape 单行 LTR 原生文字与独立横向通道增量
+
+固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`、只读清洁。完整读取 [Caret 类](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/elements/caret.ts)、实际 getNlCharWidth／scrollTape 函数与相关初始化／更新调用，以及完整 RAF 模块。起始文字应在 wrapper × tapeMargin 处，不能将有符号 offset 截为零；letter 主光标固定在该边距，word 主光标保留词内偏移。原版主光标不接受 Tape margin，pace 则有独立 marginLeft、ready 折叠和累计修正；文字卷带名义时长 125 ms、inOut(1.25)，与位置及纵向通道分别处理。
+
+原创 TapePromptNativeView 使用单一原生文字 storage／layout manager 绘制、测量与字形映射，不再以 SwiftUI Text 的字符颜色／背景假充主光标。主光标读取独立锁定框；pace 读取未卷动的实际字形框，coordinator 合成已呈现 words margin 与自身横向 margin。新增水平 channel 与纵向状态共存，完成的横向 margin 仅下次 goTo 折入 position 并累计 correction；字宽删除修正原语有直接测试，但场景前缀删除尚未接入。父组件拥有唯一呈现 Timer，关闭子光标重复呈现 Timer，仍保留独立 pace 截止计时器；两光标关闭且文字动效完成时停止呈现，拆卸／弱闭包退休。配置请求不推进帧，重复未变更新不重启动画；尝试／几何配置重锚，减少动态直接定位并保持主光标固显。原版任意异步队列／配置交错不据此认定等价。
+
+实际显示顺序与 logical word ranges 提供 Character offset，包含 extras 的归属，不由扁平字符串空格猜词。零宽字形只在所属词内回找；目标在词首时不借用前词空格。实际测量 advance 变化也触发重锚，不只比较逻辑索引。颜色桥接使用当前 SDK 的公开 AppKit／SwiftUI API：Foundation 保留 SwiftUI.* 属性，原生 glyph drawer 需要显式 NSColor／单线 underline／baseline／kern；错误下划线保留原生颜色元数据。没有读取私有 Text.LineStyle 字段。字符／提示字体准备沿用既有 helper；Unicode UTF-16 run 范围、背景、隐藏文字及错误下划线分别测试，未修改成绩、回放、归档、SwiftData 或账户协议。设计技能维持已有字体、配色与布局，只将文字和光标真正分层。
+
+QA-only `check-source-tape-presentation.mjs` 完整执行实际 getNlCharWidth／scrollTape、Caret 类和 RAF 模块，使用锁定 Anime.js 4.2.2 完整 bundle（实际 lockfile integrity 校验），32 组逐事件夹具涵盖 letter／word、四样式、立即／平滑、重叠输入、完成后折叠。DOM／方向／字体尺寸／时钟为自有单行 LTR 边界；主张为实际函数及原生 coordinator 横向通道对照，不是浏览器 CSS、完整原版控制器或实际 NSView 的逐帧同一证明。名义曲线和既有 8 ms autoplay lead 分开建模。产品不携带参考源码、JS 运行时或字体／资产；探针纳入完整门禁。
+
+先行 `/tmp/typebar-tape-presentation-red.log` 两项四处预期失败（0.703 秒）。首轮编译尺寸常量歧义保留 first-focused.log；后续实际词模式未失效重算与全文件静态断言误涉无关过渡均定位修正。帧间测试最初更换目标不构成反例，保留 frame-request-red.log；真正同目标更新 unchanged-red.log 一项两处失败，再修复配置请求抢先 sample。三图最初只有黑色文字／光标，对照“图片不同”不足，`text-pixels-red.log` 一项三处失败证实灰色像素为零但有不透明文字。明确转换原生属性后像素守卫与截图通过；新增 fixture 错用不存在的 apply API 导致的编译失败保留 native-colors-verified.log，只修测试调用。实际字宽变化 `metric-reanchor-red.log` 一项两处预期失败（17.30859375 未变为 32），随后按测量值失效修复。共同日志前缀 `/tmp/typebar-tape-`，不删失败、不用跳过换绿灯。
+
+最终定向 `presentation-final-focused.log` 107 项零失败零跳过（7.673 秒），含新增 17 项、已有纵向／位置／闪烁／专用字层／高亮与 32 组横向源码对照。三张实际文字＋主／pace 组件图在 `/tmp/typebar-tape-presentation-focused-render.QGAhnL` 逐张复查：起始边距、文字保留而主 bar 消失、滚动中间文字／pace 左移而主 bar 固定。像素守卫按实际 backing scale 换算坐标，不能因只捕到 markers 而通过。唯一组件窗口从不显示或激活，测试后关闭；不是完整练习窗口／真实输入或流畅度验收。
+
+最终冻结完整门禁 `/tmp/typebar-tape-presentation-complete-readiness.log` 退出 0：原生 3,708 项零失败零跳过（805.195 秒），服务 501 项零失败零跳过（11.934 秒）；新增 17 项在全量中实际通过（0.852 秒）。实际十万词耐久 151.354 秒，16 项隔离磁盘冷读 6.273 秒；固定参考／元数据、53 表面／生产文件／测试符号、1,083 人工结构及未启动应用包／scheme／严格签名／原创边界通过。11 个冻结实现／测试／脚本／矩阵哈希 `/tmp/typebar-tape-presentation-frozen.sha256` 前后一致，完整门禁运行期间无文件编辑，终态后仅补本轮结果和 ASL 审计更正。62 份完整日志在 `/tmp/typebar-tape-presentation-complete-logs.JXVeM4`，86 张组件图在 `/tmp/typebar-tape-presentation-complete-render.hxCj6Q`；本轮三张 Tape 图已再次逐张复查。CoreData／AddressBook XPC、隔离只读 SwiftData 513、Node 实验性警告与早期失败均保留；不声称这些既有诊断已修复，不删断言或跳过换绿灯。
+
+只读复核还证实 ASL 历史“等价实现”不成立：ASLHandshapePolicy 的 A／D／I 返回同一 mask 且无 motion cue，ASLHandshapeGlyph 只据 mask／cue 绘制，同状态同大小时三者完全相同；C／E／M／N／O／S／T 也共用零 mask。已有测试只证明可返回 mask 与 J／Z cue，不证明手形语义。OFFICIAL_FUNBOX_AUDIT.md 将 ASL 明确降为部分覆盖，并修正未纳入 Weakspot／Polyglot 的旧汇总；本轮没有修改 ASL 产品代码、复制官方字体或宣称已解决。下一增量须先建立可靠手形语义与独立矢量证据，再接光标，不能只给错误手形补装饰。
+
+同会话有界风险／决策复核（非独立）检查锁定框与布局坐标、水平与垂直 ready／累计修正、配置抢帧、属性桥接和资源生命周期；根因调试以像素／实际字宽反例定位而不是猜修复。Tape 换行／RTL／混合方向仍保留原有普通回退；长卷带前缀裁剪及其场景修正、no-space／复杂 scalar 几何、真实 SwiftUI 渲染拆卸顺序、任意 RAF 交错、长期性能与设备／IME／VoiceOver 仍开放。ASL、系统鼠标光标与完整周边也未完成。53 表面分类不升级，新增三个人工项保持待验收，零 Typebar 主程序启动、无真实库／Keychain／账户／部署；整体无损纯重写 goal active，下方为历史阶段。
+
 ## Choo 实际字形框与普通听写独立光标增量
 
 固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41` 保持只读清洁。完整读取 Caret 类／包装器、Choo／tts／ASL CSS 及相关 Funbox 元数据，核对 test.scss 的正确、错误、多余字母和 highlight-off 选择器。Choo 只旋转字形，光标读取未旋转布局框；零宽目标回找前一可见字形。tts 只令 untyped 色透明，不应把全部已输入文字和独立光标一并隐藏。

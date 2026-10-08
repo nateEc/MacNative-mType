@@ -458,31 +458,43 @@ private struct PromptFlowLayout: Layout {
 }
 
 private struct TapePracticePrompt: View {
-  let prompt: AttributedString
+  let rendering: PromptRendering
   let anchorCharacterIndex: Int
+  let wordAnchorCharacterIndex: Int
+  let wordStartCharacterOffsets: [Int: Int]
   let mode: PracticeTapeMode
   let margin: Double
-  let font: NSFont
   let fontSize: Double
   let animatesScroll: Bool
+  let carets: PromptCaretNativeView.Configuration
 
   var body: some View {
-    GeometryReader { proxy in
-      let offset = PracticeTapePolicy.horizontalOffset(
-        prompt: prompt, anchorCharacterIndex: anchorCharacterIndex,
-        mode: mode, margin: margin, font: font,
-        containerWidth: proxy.size.width)
-      Text(prompt)
-        .font(Font(font))
-        .lineLimit(1)
-        .fixedSize(horizontal: true, vertical: false)
-        .offset(x: -offset)
-        .animation(animatesScroll ? .easeOut(duration: 0.16) : nil, value: offset)
-    }
-    .frame(height: fontSize * 1.7)
-    .clipped()
-    .accessibilityLabel("卷带练习提示")
+    TapePromptBridge(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
+      wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
+      mode: mode, margin: margin,
+      smoothScroll: animatesScroll, carets: carets)
+      .frame(height: fontSize * 1.7)
+      .clipped()
+      .accessibilityLabel("卷带练习提示")
   }
+}
+
+private struct TapePromptBridge: NSViewRepresentable {
+  let rendering: PromptRendering
+  let anchorCharacterIndex: Int, wordAnchorCharacterIndex: Int
+  let wordStartCharacterOffsets: [Int: Int]
+  let mode: PracticeTapeMode
+  let margin: Double
+  let smoothScroll: Bool
+  let carets: PromptCaretNativeView.Configuration
+  func makeNSView(context: Context) -> TapePromptNativeView { TapePromptNativeView() }
+  func updateNSView(_ view: TapePromptNativeView, context: Context) {
+    view.configure(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
+      wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
+      mode: mode, margin: margin,
+      smoothScroll: smoothScroll, carets: carets)
+  }
+  static func dismantleNSView(_ view: TapePromptNativeView, coordinator: ()) { view.stop() }
 }
 
 /// Resolve the same practice theme roles as the ordinary prompt before handing
@@ -2958,13 +2970,16 @@ private struct ContentView: View {
           glyphIDs: specialPromptGlyphIDs, carets: specialPromptCaretConfiguration)
       } else if usesTapePractice {
         TapePracticePrompt(
-          prompt: rendering.text,
+          rendering: rendering,
           anchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(
             session: session, rendering: rendering, mode: settings.practiceTapeMode),
+          wordAnchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(
+            session: session, rendering: rendering, mode: .word),
+          wordStartCharacterOffsets: PracticeTapePolicy.wordStartCharacterOffsets(session: session, rendering: rendering),
           mode: settings.practiceTapeMode,
           margin: settings.practiceTapeMargin,
-          font: practicePromptNSFont(size: settings.fontSize),
-          fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll)
+          fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll,
+          carets: makeSpecialPromptCaretConfiguration())
       } else {
         Text(rendering.text)
           .lineSpacing(usesJoiningScript ? 8 : 12)
@@ -3162,6 +3177,10 @@ private struct ContentView: View {
 
   private var specialPromptCaretConfiguration: PromptCaretNativeView.Configuration? {
     guard settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker else { return nil }
+    return makeSpecialPromptCaretConfiguration()
+  }
+
+  private func makeSpecialPromptCaretConfiguration() -> PromptCaretNativeView.Configuration {
     return .init(text: AttributedString(), mainOffset: nil, paceOffset: nil,
       mainStyle: settings.caretStyle, paceStyle: settings.paceCaretStyle,
       font: practicePromptNSFont(size: settings.fontSize), lineSpacing: 12,
@@ -3188,6 +3207,8 @@ private struct ContentView: View {
     return !session.configuration.containsRightToLeftPromptRun
       || session.configuration.usesRightToLeftPrompt
   }
+
+  private var usesIndependentPromptCarets: Bool { usesNativeCaretOverlay || usesTapePractice || practiceVisualEffect.usesChoo }
 
   private func paceCaretInterpolation() -> PromptPaceCaretInterpolation? {
     guard let frame = session.paceCaretFrame() else { return nil }
@@ -3241,7 +3262,7 @@ private struct ContentView: View {
         displayedText = textPlan.text
       }
       var character = AttributedString(displayedText)
-      if !usesNativeCaretOverlay, index == paceGuideIndex, index != caretIndex {
+      if !usesIndependentPromptCarets, index == paceGuideIndex, index != caretIndex {
         applyPaceCaret(to: &character)
       }
       let appearance = appearances[index]
@@ -3268,7 +3289,7 @@ private struct ContentView: View {
       case .incorrect, .pending, .hidden, .extra: break
       }
       if index == caretIndex, promptHighlightMode != .off,
-        settings.caretStyle.drawsMarker && !usesNativeCaretOverlay {
+        settings.caretStyle.drawsMarker && !usesIndependentPromptCarets {
         applyCaret(to: &character)
       }
       appearance.applyVisibility(to: &character)

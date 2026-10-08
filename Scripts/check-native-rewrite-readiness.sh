@@ -319,6 +319,11 @@ if [[ ! -f "$line_scroll_anime_archive" ]]; then
     npm pack --ignore-scripts --pack-destination "$temporary_directory" animejs@4.2.2
 fi
 [[ -f "$line_scroll_anime_archive" ]] || fail "missing QA-only line scroll animation archive"
+run_logged_check "executing complete pinned tape scrolling and caret composition" \
+  "$temporary_directory/tape-presentation-source-check.log" \
+  env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-tape-presentation.mjs" "$reference_root"
 run_logged_check "executing pinned line jump and complete animation curve" \
   "$temporary_directory/line-scroll-source-check.log" \
   env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
