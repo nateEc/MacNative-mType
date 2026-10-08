@@ -35,7 +35,7 @@ struct ASLPromptWordPlan {
   func measuredWords(frames: [Int: CGRect], glyphs: [TypingPromptGlyph], ids: [Int]) -> [Int: CGRect] {
     var words: [Int: CGRect] = [:]
     for (index, glyph) in glyphs.enumerated() where ids.indices.contains(index) {
-      guard glyph.character != "\n", !(glyph.character == " " && glyph.state != .extra),
+      guard !(glyph.character == " " && glyph.state != .extra),
         let owner = wordByGlyphID[ids[index]], let frame = frames[ids[index]],
         frame.width > 0, frame.height > 0 else { continue }
       words[owner] = words[owner].map { $0.union(frame) } ?? frame
@@ -68,13 +68,11 @@ struct ASLPromptFlowGeometry {
     var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maximumX: CGFloat = 0
     var start = 0
     while start < cells.count {
-      if cells[start].isLineBreak {
-        positions[start] = .init(x: x, y: y)
-        maximumX = max(maximumX, x); x = 0; y += rowHeight + rowSpacing; rowHeight = 0
-        start += 1; continue
-      }
       var end = start + 1
-      while end < cells.count, !cells[end].isLineBreak, cells[end].wordID == cells[start].wordID { end += 1 }
+      // Return is the final measured cell of its word, not a zero-size node
+      // preceding it. A newline-only word therefore has a full line height.
+      while !cells[end - 1].isLineBreak, end < cells.count,
+        cells[end].wordID == cells[start].wordID { end += 1 }
       let natural = cells[start..<end].reduce(CGFloat.zero) { $0 + $1.size.width }
       let allocated = min(natural, limit)
       if x > 0 && x + allocated > limit {
@@ -91,6 +89,9 @@ struct ASLPromptFlowGeometry {
         innerX += cell.size.width; innerHeight = max(innerHeight, cell.size.height)
       }
       x += allocated; rowHeight = max(rowHeight, innerY + innerHeight)
+      if cells[end - 1].isLineBreak {
+        maximumX = max(maximumX, x); x = 0; y += rowHeight + rowSpacing; rowHeight = 0
+      }
       start = end
     }
     self.positions = positions

@@ -179,7 +179,7 @@ import XCTest
     XCTAssertFalse(window.isVisible)
   }
 
-  func testActualZeroWidthNewlineUsesPreviousHandButHiddenInkRetainsItsOwnBox() throws {
+  func testActualReturnUsesItsOwnPositiveBoxAndHiddenHandRetainsItsOwnBox() throws {
     let ids = [5, 23, 11], glyphs: [TypingPromptGlyph] = [.init(character: "a", state: .pending),
       .init(character: "\n", state: .pending), .init(character: "z", state: .hidden)]
     let coordinator = PromptCaretMotionCoordinator()
@@ -189,7 +189,9 @@ import XCTest
     let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
     let child = try XCTUnwrap(descendants(host, PromptCaretNativeView.self).first)
     child.layout(); child.present(at: 0)
-    XCTAssertEqual(coordinator.main.position, container.rect(for: 5))
+    XCTAssertEqual(coordinator.main.position, container.rect(for: 23))
+    XCTAssertGreaterThan(try XCTUnwrap(container.measuredRect(for: 23)).width, 0)
+    XCTAssertNotEqual(coordinator.main.position, container.rect(for: 5))
     let hidden = try XCTUnwrap(container.rect(for: 11))
     let visible = try XCTUnwrap(container.rect(for: 5))
     XCTAssertEqual(hidden.width, visible.width)
@@ -301,7 +303,7 @@ import XCTest
     defer { window.contentView = nil; window.close() }
     let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
     let frames = try ids.map { try XCTUnwrap(container.measuredRect(for: $0)) }
-    XCTAssertEqual(frames[1].width, 0)
+    XCTAssertGreaterThan(frames[1].width, 0, "Return now owns its real marker box; zero-width fallback stays covered by direct fixtures")
     let metrics = frames.map { ["x": Double($0.minX), "y": Double($0.minY),
       "width": Double($0.width), "height": Double($0.height)] }
     let json = String(decoding: try JSONSerialization.data(withJSONObject: metrics), as: UTF8.self)

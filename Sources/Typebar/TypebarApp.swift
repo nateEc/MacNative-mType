@@ -805,14 +805,11 @@ struct ASLPracticePrompt: View {
       ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
         if rendering != nil && rendering?.glyphCharacterOffsets[ids[index]] == nil {
           EmptyView()
-        } else if glyph.character == "\n" {
-          Color.clear.frame(width: 0, height: 0)
-            .layoutValue(key: ASLPromptLineBreakKey.self, value: true)
-            .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [ids[index]: $0] }
         } else {
           ASLPromptGlyphCell(content: contents[index], size: fontSize,
             font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
             .layoutValue(key: ASLPromptWordIDKey.self, value: wordPlan.wordByGlyphID[ids[index]] ?? ids[index])
+            .layoutValue(key: ASLPromptLineBreakKey.self, value: contents[index].ownsLineBreak)
             .layoutValue(key: ASLPromptSeparatorKey.self, value: glyph.character == " " && glyph.state != .extra)
             .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [ids[index]: $0] }
         }

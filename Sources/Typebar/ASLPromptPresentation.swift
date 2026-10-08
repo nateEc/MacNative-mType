@@ -5,18 +5,22 @@ import SwiftUI
 /// correctness, highlighting, typo replacement, composition or saved input.
 struct ASLPromptGlyphContent {
   let text: AttributedString
+  let ownsLineBreak: Bool
 
   init(glyph: TypingPromptGlyph, text: AttributedString? = nil) {
+    ownsLineBreak = glyph.character == "\n" && glyph.state != .extra
     if let text {
       self.text = text
     } else {
-      var value = AttributedString(String(glyph.typedCharacter ?? glyph.character))
+      let plan = PromptControlCharacterPresentation.plan(for: glyph, style: .replace)
+      var value = AttributedString(plan.text)
       switch glyph.state {
       case .correct: value.foregroundColor = .primary
       case .incorrect, .extra: value.foregroundColor = .red
       case .current, .pending: value.foregroundColor = .secondary.opacity(0.55)
       case .hidden: value.foregroundColor = .clear
       }
+      if plan.opacity != 1 { value.foregroundColor = value.foregroundColor?.opacity(plan.opacity) }
       self.text = value
     }
   }
@@ -41,8 +45,21 @@ struct ASLPromptGlyphContent {
   }
 
   var main: AttributedString {
-    guard let hint = text.runs.first(where: { ($0.baselineOffset ?? 0) < 0 }) else { return text }
-    return AttributedString(text[..<hint.range.lowerBound])
+    let hint = text.runs.first(where: { ($0.baselineOffset ?? 0) < 0 })
+    var main = hint.map { AttributedString(text[..<$0.range.lowerBound]) } ?? text
+    // The Layout owns the structural break; Text must retain only its marker
+    // or replacement, otherwise it creates a second internal text line.
+    if ownsLineBreak, main.characters.last == "\n" {
+      let last = main.characters.index(before: main.endIndex)
+      let attributes = main[last..<main.endIndex].runs.first?.attributes ?? .init()
+      main.removeSubrange(last..<main.endIndex)
+      // Zen's hidden Return still reserves an actual control cell.
+      if main.characters.isEmpty { main = AttributedString("↵", attributes: attributes) }
+    }
+    if main.characters.count == 1, main.characters.first == "\t" {
+      main = AttributedString("→", attributes: main.runs.first?.attributes ?? .init())
+    }
+    return main
   }
   var hint: AttributedString? {
     guard let hint = text.runs.first(where: { ($0.baselineOffset ?? 0) < 0 }) else { return nil }

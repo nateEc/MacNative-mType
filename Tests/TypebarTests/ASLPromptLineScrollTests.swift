@@ -21,7 +21,8 @@ import XCTest
       PromptRendering.make(glyphs: session.promptGlyphs,
         indices: PromptGlyphLayout.indices(glyphs: session.promptGlyphs, words: session.promptWordPresentations,
           hideExtraLetters: false, firstRetainedWordIndex: session.firstRetainedPromptWordIndex)) { _, glyph in
-        var value = AttributedString(String(glyph.character)); value.foregroundColor = .primary; return value
+        let plan = PromptControlCharacterPresentation.plan(for: glyph, style: .off)
+        var value = AttributedString(plan.text); value.foregroundColor = .primary.opacity(plan.opacity); return value
       }
     }
   }
@@ -99,20 +100,14 @@ import XCTest
   }
 
   func testASLViewportMeasuresActualHandRowsRatherThanFixed184Points() throws {
-    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 240, height: 250),
-      styleMask: .borderless, backing: .buffered, defer: false)
-    window.isReleasedWhenClosed = false
+    let (window, host) = mount(Model())
     defer { window.contentView = nil; window.close() }
-    let prompt = ASLPracticePrompt(glyphs: "a\nb\nc\nd".map { .init(character: $0, state: .pending) },
-      fontSize: 28, accent: .blue, viewportLineCount: 3)
-    let host = NSHostingView(rootView: PracticePromptViewport(text: AttributedString("a\nb\nc\nd"),
-      font: font, lineSpacing: 12, isRightToLeft: false, lineCount: 3,
-      measuresTextRows: false, measuresCustomRows: true) { prompt })
-    host.frame = .init(x: 0, y: 0, width: 240, height: 250); window.contentView = host
-    host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.08))
     let scroll = try XCTUnwrap(descendants(host, NSScrollView.self).first)
+    let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
+    let first = try XCTUnwrap(container.measuredRect(for: 0)), fourth = try XCTUnwrap(container.measuredRect(for: 6))
     XCTAssertNotEqual(scroll.contentView.bounds.height, 184, "The ASL viewport must use measured hand rows")
-    XCTAssertEqual(scroll.contentView.bounds.height, ceil((28 * 1.10 + 12) * 3), accuracy: 1)
+    XCTAssertEqual(scroll.contentView.bounds.height, ceil(fourth.minY - first.minY), accuracy: 1)
+    XCTAssertGreaterThan(try XCTUnwrap(container.measuredRect(for: 1)).width, 0)
     XCTAssertFalse(window.isVisible)
   }
 
@@ -126,12 +121,14 @@ import XCTest
     XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 0)
     model.session.insertBatch("b\n", at: start.addingTimeInterval(1)); pump(host); pump(host)
     XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 1)
-    XCTAssertEqual(String(model.rendering.text.characters), "b\nc\nd\ne")
+    XCTAssertEqual(String(model.rendering.text.characters), "b↵\nc↵\nd↵\ne")
     XCTAssertNil(container.measuredRect(for: 0)); XCTAssertNil(container.measuredRect(for: 1))
     let scroll = try XCTUnwrap(descendants(host, NSScrollView.self).first)
     XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 1)
     XCTAssertEqual(try XCTUnwrap(container.measuredRect(for: 2)).minY, 0, accuracy: 1)
-    XCTAssertEqual(try XCTUnwrap(container.measuredRect(for: 4)).minY, 28 * 1.1 + 12, accuracy: 1)
+    let retainedHeight = max(try XCTUnwrap(container.measuredRect(for: 2)).height,
+      try XCTUnwrap(container.measuredRect(for: 3)).height)
+    XCTAssertEqual(try XCTUnwrap(container.measuredRect(for: 4)).minY, retainedHeight + 12, accuracy: 1)
     try capture(host, "asl-scroll-retired-no-markers")
     model.session.deleteWordBackward(at: start.addingTimeInterval(2))
     model.session.deleteBackward(at: start.addingTimeInterval(3)); pump(host)
@@ -155,7 +152,7 @@ import XCTest
     model.session.insertBatch("d\n", at: start.addingTimeInterval(3)); pump(host, 0.22); pump(host)
     XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 3)
     XCTAssertEqual(model.session.typed, "a\nb\nc\nd\n")
-    XCTAssertEqual(String(model.rendering.text.characters), "d\ne")
+    XCTAssertEqual(String(model.rendering.text.characters), "d↵\ne")
     let scroll = try XCTUnwrap(descendants(host, NSScrollView.self).first)
     XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 1)
     let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
@@ -207,7 +204,9 @@ import XCTest
     defer { window.contentView = nil; window.close() }
     model.fontSize = 40; model.lineCount = 2; pump(host); pump(host)
     let scroll = try XCTUnwrap(descendants(host, NSScrollView.self).first)
-    XCTAssertEqual(scroll.contentView.bounds.height, ceil((40 * 1.1 + 12) * 2), accuracy: 1)
+    let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
+    XCTAssertEqual(scroll.contentView.bounds.height,
+      ceil(try XCTUnwrap(container.measuredRect(for: 4)).minY - XCTUnwrap(container.measuredRect(for: 0)).minY), accuracy: 1)
     try capture(host, "asl-scroll-two-large-rows")
   }
 
@@ -316,8 +315,8 @@ import XCTest
       ($0, try XCTUnwrap(container.measuredRect(for: $0)))
     })
     let measured = ASLPromptLineGeometry(frames: frames)
-    // SwiftUI rounds each placement to backing pixels (43, 86, 128, 171),
-    // not five identical 43-point steps. The owned uniform source fixture uses
+    // SwiftUI rounds each placement to backing pixels, not five identical
+    // fractional steps. The owned uniform source fixture uses
     // the measured cumulative step; individual anchors still stay within 0.5pt.
     let rowHeight = (try XCTUnwrap(frames[8]).minY - XCTUnwrap(frames[0]).minY) / 4
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -369,7 +368,7 @@ import XCTest
     let (window, host) = mount(model)
     defer { window.contentView = nil; window.close() }
     let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
-    let frames = try Dictionary(uniqueKeysWithValues: [0, 1, 3, 4, 6, 7, 9, 10].map {
+    let frames = try Dictionary(uniqueKeysWithValues: Array(0...10).map {
       ($0, try XCTUnwrap(container.measuredRect(for: $0)))
     })
     let actual = ASLPromptLineGeometry(frames: frames)
@@ -378,5 +377,34 @@ import XCTest
       try XCTUnwrap(PromptViewportLayout.height(forRowHeights: actual.rowHeights, lineCount: 3)), accuracy: 1)
     XCTAssertGreaterThan(try XCTUnwrap(frames[3]).height, 0)
     try capture(host, "asl-scroll-mixed-fallback")
+  }
+
+  func testLeadingBlankWordAndConsecutiveReturnsScrollRetireAndKeepOriginalInput() throws {
+    let model = Model(); model.smooth = false
+    let prompt = "\na\n\nb\nc"
+    model.session = TypingSession(configuration: .words(5, rules: .init(freedomMode: true)), prompt: prompt)
+    let (window, host) = mount(model)
+    defer { window.contentView = nil; window.close() }
+    let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
+    XCTAssertGreaterThan(try XCTUnwrap(container.measuredWordRect(for: 0)).height, 0)
+    XCTAssertGreaterThan(try XCTUnwrap(container.measuredWordRect(for: 3)).height, 0)
+    model.session.insertBatch("\n", at: start); pump(host)
+    XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 0)
+    model.session.insertBatch("a\n", at: start.addingTimeInterval(1)); pump(host); pump(host)
+    XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 1)
+    model.session.insertBatch("\n", at: start.addingTimeInterval(2)); pump(host); pump(host)
+    XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 2)
+    XCTAssertNil(container.measuredRect(for: 0)); XCTAssertNil(container.measuredRect(for: 1))
+    XCTAssertEqual(try XCTUnwrap(container.measuredWordRect(for: 3)).minY, 0, accuracy: 1)
+    model.session.insertBatch("b\n", at: start.addingTimeInterval(3)); pump(host); pump(host)
+    XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 3)
+    XCTAssertEqual(model.session.typed, "\na\n\nb\n"); XCTAssertEqual(model.session.prompt, prompt)
+    XCTAssertNil(container.measuredRect(for: 3))
+    try capture(host, "asl-control-blank-word-retired")
+    model.session.deleteWordBackward(at: start.addingTimeInterval(4))
+    model.session.deleteBackward(at: start.addingTimeInterval(5)); pump(host)
+    XCTAssertEqual(model.session.typed, "\na\n\n")
+    XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 3)
+    XCTAssertFalse(window.isVisible)
   }
 }

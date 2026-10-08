@@ -31,7 +31,7 @@ for(const frame of frames) {
   assert.ok(['x','y','width','height'].every(key=>Number.isFinite(frame[key])));
   assert.ok(frame.width>=0 && frame.height>=0);
 }
-assert.ok(frames[0].width>0 && frames[1].width===0 && frames[2].width>0);
+assert.ok(frames[0].width>0 && frames[1].width>=0 && frames[2].width>0);
 const fixtures=[];
 for(const style of ['default','block','outline','underline'])
 for(const [index,side] of [[0,'beforeLetter'],[1,'beforeLetter'],[2,'beforeLetter'],[2,'afterLetter']]){

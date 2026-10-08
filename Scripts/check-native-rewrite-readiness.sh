@@ -192,6 +192,8 @@ run_logged_check "executing composed pinned caret blink and input effects" "$tem
 
 run_logged_check "executing pinned special caret geometry and listening declarations" "$temporary_directory/special-caret-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-special-caret.mjs" "$reference_root"
+run_logged_check "executing pinned ASL control-word building and updating" "$temporary_directory/asl-controls-source-check.log" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-asl-controls.mjs" "$reference_root"
 
 config_link_source_dependencies="${TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES:-$temporary_directory/config-link-source-runtime}"
 if [[ ! -f "$config_link_source_dependencies/node_modules/lz-ts/package.json" ]]; then

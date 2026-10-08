@@ -1,5 +1,21 @@
 # 原生奖励收件箱与周任务交付
 
+## ASL 控制字符格、连续空行与空词退休增量
+
+2026-10-09，固定只读参考仍 `91bd24bb8513785c7364cbea29296ff7adafac41`。核对完整 `buildWordHTML`／`updateWordLetters`、`Words`／`Strings` 和 `test.scss`：Return 是前词末尾的真实 `nlChar`，其后才有换行 helpers；前导／连续 Return 也有控制格，不是零尺寸节点。误输或额外 Return 只是当前格的错误标记，不拥有目标换行。ASL CSS 仅替换字体；没有读取、提取或复用 Gallaudet、FontAwesome、图片或官方产品代码／资产。Swift 6.2.4、SDK 26.2、macOS 14；AttributedString 的切片、removeSubrange 和属性容器依安装 SDK 的公开声明核验。
+
+ASL 现用已有 `PromptControlCharacterPresentation` 的原生 →／↵ 与最终共用属性。`ASLPromptGlyphContent.ownsLineBreak` 由真实目标与 extra 状态确定，不由显示替换推断；先拆 hint 再只移除主格末尾那一个结构换行，保留错误替换、Unicode、颜色／下划线和 hint。Zen 的隐藏原始 Tab／Return 转为带原属性的单个控制 marker，仍无墨迹但不采用 Text 的 tab stop 或额外内部文本行。缺失／退休格没有文字则不造 placeholder。Layout 将 Return 的实际尺寸纳入词宽／内部折行，在词末才强制换行；leading／连续 Return 因而保留完整行高，实际词框也包含控制格，空词能滚动／退休。没有改原始输入、计分、回放或存储格式，无新增 Timer，普通／Choo／Tape 路径不变。
+
+新增 QA 探针 `check-source-asl-controls.mjs` 执行完整固定建词／更新函数及真实 Words／Strings 模块，共 36 组 ordinary／Zen、off／replace、future／correct／wrong／extra 的自有输入；仅 DOM、hint、RAF 和 CSS 尺寸是适配边界。原生横向逐格对照 marker／extra／隐藏／换行归属；Zen 空输入 invisible sentinel 不冒充控制格对照。CSS 规则静态核对，**不是浏览器布局、字体宽度、真实 RAF 或 hints 布局证明**。既有 special-caret 探针默认零宽夹具仍在；允许传入真实正宽 Return，原生 mounted 断言已从旧的零宽借前格改为必须拥有自身正宽格，不删除零宽回退测试。
+
+测试先行：`/tmp/typebar-asl-control-layout-red.log` 三项 14 处预期失败，复现 Return 零尺寸／额外输入误换行／结构换行和原始 Tab 未转换。`first-green.log` 三项零失败（0.229 秒）；`source-first.log` 36 组完整源码通过。`expanded.log` 63 项只有两处旧 fixture 渲染字符串失败：同款共用控制策略加入 ↵，旧期望仍不含 marker；修正完整显示期望为带 marker 字符串，保留 typed／prompt 原文与纠正边界断言，未改产品或放宽容限。最终 `focused-verified.log` 84 项零失败零跳过（7.285 秒）：13 新控制布局、17 滚动、21 独立光标、12 词布局、21 共用控制策略；净增 14 项。全部日志共同前缀 `/tmp/typebar-asl-control-layout-`，失败不删除。
+
+六张新组件图在 `/tmp/typebar-asl-control-layout-focused-render.ckpXSk` 已逐张检查：leading／连续 Return、extra Return、错误替换、全隐藏 Zen、独立主 pace、空词退休。所有测试窗口从不显示且逐一关闭，零 Typebar 主程序启动。设计遵循既有原创线描／主题／原生间距；不复制原版 helper DOM 或 CSS margin。保留浏览器数值／精确字体与间距、空格-only 字段、复杂控制／hint 混排、全部回流交错、长提示可见有界渲染、专业 ASL 与真实设备等剩余验收；六部分／42 历史有界分类不升级，goal active。
+
+最终完整冻结门禁 `/tmp/typebar-asl-control-layout-complete-readiness.log` 终态退出 0：原生 3,787 项零失败零跳过（835.484 秒），服务 501 项零失败零跳过（12.541 秒）；实际十万词耐久 158.077 秒、16 项隔离磁盘冷读 5.246 秒、53 表面、1,095 唯一人工结构与元数据无漂移通过。未启动应用包的资源／URL scheme／严格签名／原创边界通过；13 控制布局为 0.913 秒、17 滚动为 4.351 秒。11 文件清单 `/tmp/typebar-asl-control-layout-frozen.sha256` 门禁前后完全一致；62 份分阶段日志保存于 `/tmp/typebar-asl-control-layout-complete-logs.LY2ldF`，140 张组件图于 `/tmp/typebar-asl-control-layout-complete-render.hbQrbr`，其中六张新图已再次逐张复查。CoreData／XPC 系统诊断、Node 实验性警告和既有编译警告保留，未声称修复；冻结输入未改动，没有并行验收任务或 Typebar 主程序启动。
+
+同会话决策／风险审查的主要反例为隐藏 Return 变零尺寸、替换字母丢掉目标行界、extra Return 虚造行、pruned 格恢复答案、控制格增高而视口仍用手形常数，以及 leading 空词无法退休；对应真实 mounted 测试、源码对照和数据保持断言已检验。这不是独立人工评审，组件图不升级人工状态。
+
 ## ASL 词级换行与完整词框滚动增量
 
 2026-10-09，固定只读源码仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。核对完整 `buildWordHTML`、`updateWordLetters` 与 `test.scss`：原版以 `.word` 为 flex item，能放进新行的词不拆进上一行余隙，过长词在词容器内折行，后词不能填其最后一条内部行。[CSS Flexbox 收集行算法](https://www.w3.org/TR/css-flexbox-1/#algo-line-break) 支持这个词容器边界；ASL CSS 仅替换字体，不另定义逐字流。SwiftUI Layout／LayoutValueKey／place 依安装的 SDK 26.2 公开接口实现，目标仍 macOS 14；没有复制原版产品代码、字体或其他资产。
