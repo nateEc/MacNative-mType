@@ -1,5 +1,5 @@
 // QA only: complete pinned scrollTape/getNlCharWidth, Caret, RAF and locked Anime.js.
-// Single-line LTR/RTL owned DOM boxes/clock; not browser CSS or complete Tape/removal proof.
+// Single-line LTR/RTL owned DOM boxes/clock, including prefix retirement; not browser CSS or newline proof.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -30,11 +30,13 @@ const caretModule = plain(fs.readFileSync(path.join(root,'frontend/src/ts/elemen
 const rafModule = plain(fs.readFileSync(path.join(root,'frontend/src/ts/utils/debounced-animation-frame.ts'),'utf8'));
 const strings = fs.readFileSync(path.join(root,'frontend/src/ts/utils/strings.ts'),'utf8');
 const directionModule = plain(strings.slice(strings.indexOf('function hasRTLCharacters('), strings.indexOf('\nexport const CHAR_EQUIVALENCE_SETS')));
-const fixtures = [];
+const fixtures = [], retirements = [];
+for (const removes of [false,true])
 for (const rtl of [false,true])
 for (const wordRTL of [false,true])
 for (const mode of ['letter','word']) for (const style of ['default','block','outline','underline'])
 for (const smooth of [false,true]) for (const overlap of [false,true]) {
+  if(removes && (wordRTL!==rtl || overlap))continue;
   let clock=10000, frameID=0, active=0, input='';
   const frames=new Map(), animations=[], trace=[];
   class ControlledDate extends Date { static now(){return clock;} }
@@ -51,7 +53,8 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
   const requestTick=anime.namespace.engine.requestTick.bind(anime.namespace.engine);
   anime.namespace.engine.requestTick=time=>{const result=requestTick(time);if(inFrame)rendered=!!result;return result;};
   class Element {
-    constructor(id){this.native={id,left:0,top:0,width:2,marginLeft:0,marginTop:0};this.classes=new Set();}
+    constructor(id){this.native={id,left:0,top:0,width:2,marginLeft:0,marginTop:0};this.classes=new Set();
+      Object.defineProperty(this.native,'style',{get:()=>this.getStyle()});}
     addClass(v){for(const c of Array.isArray(v)?v:[v])this.classes.add(c);}
     removeClass(v){for(const c of Array.isArray(v)?v:[v])this.classes.delete(c);}
     hasClass(v){return this.classes.has(v);}
@@ -65,16 +68,19 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
   wordsEl.getOffsetWidth=()=>400;
   const words=Array.from({length:5},(_,index)=>{
     const word=new Element('word'+index);word.addClass('word');word.index=index;
-    word.getOffsetLeft=()=> (rtl?400-36-12-index*48:index*48)+wordsEl.native.marginLeft;
+    word.getOffsetLeft=()=> {
+      const retainedIndex=words.filter(w=>!w.removed).indexOf(word);
+      return (rtl?400-36-12-retainedIndex*48:retainedIndex*48)+wordsEl.native.marginLeft;
+    };
     word.getOffsetTop=()=>0;word.getOffsetWidth=()=>36;word.getOuterWidth=()=>48;
     word.qsa=selector=>{assert.equal(selector,'letter');return [0,1,2].map(i=>({native:{textContent:wordRTL?'א':'a'},
       getOffsetLeft:()=> (wordRTL?2-i:i)*12,getOffsetTop:()=>0,getOffsetWidth:()=>12,getOffsetHeight:()=>32,hasClass:()=>false}));};
-    word.remove=()=>{throw new Error('These bounded fixtures must not remove words');};return word;
+    word.remove=()=>{assert.ok(removes,'Non-retirement fixtures must not remove words');word.removed=true;};return word;
   });
-  wordsEl.getChildren=()=>words;wordsEl.qsa=selector=>{assert.equal(selector,'.afterNewline');return [];};
+  wordsEl.getChildren=()=>words.filter(w=>!w.removed);wordsEl.qsa=selector=>{assert.equal(selector,'.afterNewline');return [];};
   wordsEl.qs=selector=>{
     const match=/^\.word\[data-wordindex="(\d+)"\]$/.exec(selector);assert.ok(match,selector);
-    return words[Number(match[1])]??null;
+    const word=words[Number(match[1])];return word&&!word.removed?word:null;
   };
   const Config={mode:'words',funbox:[],tapeMode:mode,tapeMargin:25,smoothLineScroll:smooth,
     smoothCaret:'medium',blindMode:false,hideExtraLetters:false};
@@ -94,6 +100,8 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
   vm.runInContext(callbacks,context);
   const scroll=pace.handleTapeScroll.bind(pace);
   pace.handleTapeScroll=options=>{trace.push({type:'scroll',time:clock-10000,value:options.newValue,duration:options.duration});return scroll(options);};
+  const removed=pace.handleTapeWordsRemoved.bind(pace);
+  pace.handleTapeWordsRemoved=width=>{trace.push({type:'retire',time:clock-10000,value:width});return removed(width);};
   for(const [caret,element] of [[main,mainElement],[pace,paceElement]]){
     let target;
     const geometry=caret.getTargetPositionAndWidth.bind(caret);
@@ -136,7 +144,17 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
   assert.equal(main.cumulativeTapeMarginCorrection,0);
   assert.equal(wordsEl.native.marginLeft,rtl?(mode==='letter'?-28:-40):(mode==='letter'?40:52));
   assert.equal(trace.filter(item=>item.type==='scroll').length,overlap?4:3);
-  fixtures.push({rtl,wordRTL,mode,style,smooth,overlap,trace});
+  if(removes){
+    for(const [word,time] of [[2,600],[3,750],[4,900]]){
+      active=word;input='a';await context.scrollTape();go(1,4,1,100);sample();tickTo(time);
+    }
+    assert.deepEqual(words.filter(w=>w.removed).map(w=>w.index),[0]);
+    assert.equal(main.cumulativeTapeMarginCorrection,rtl?-48:48);
+    assert.equal(trace.filter(item=>item.type==='retire').length,1);
+    // A removed source node is genuinely unavailable to navigation/pace.
+    assert.equal(wordsEl.qs('.word[data-wordindex="0"]'),null);
+    retirements.push({rtl,wordRTL,mode,style,smooth,overlap,trace});
+  }else fixtures.push({rtl,wordRTL,mode,style,smooth,overlap,trace});
   main.stopAllAnimations();pace.stopAllAnimations();for(const animation of animations)animation.cancel();
 }
 const context=vm.createContext({});vm.runInContext(directionModule,context);
@@ -144,5 +162,6 @@ const directions=[];
 for(const text of ['', 'אבג', 'abc', '123', '؟', '،אבג؟', 'word؟', '🙂', 'aא', '\u200b', 'أهلاً', 'الله', '،', 'א1'])
 for(const fallback of [false,true]) directions.push({text,fallback,rtl:context.isWordRightToLeft(text,fallback,false)[0]});
 verify();assert.equal(fixtures.length,128);assert.equal(directions.length,28);
-if(option)process.stdout.write(JSON.stringify({pin,fixtures,directions}));
-else console.log('Tape presentation source passed: 128 complete scrollTape/Caret/RAF sequences and 28 complete direction-helper cases with real locked Anime.js, independent LTR/RTL test and word flow, single-line owned boxes/clock, four styles, immediate/smooth/overlap/folding; not browser CSS, removal, newline, reverse-direction or arbitrary scheduling proof');
+assert.equal(retirements.length,32);
+if(option)process.stdout.write(JSON.stringify({pin,fixtures,directions,retirements}));
+else console.log('Tape presentation source passed: 128 complete scrollTape/Caret/RAF sequences, 32 prefix-removal sequences and 28 complete direction-helper cases with real locked Anime.js, independent LTR/RTL test and word flow, single-line owned boxes/clock, four styles, immediate/smooth/overlap/folding; not browser CSS, newline, reverse-direction or arbitrary scheduling proof');

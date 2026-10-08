@@ -4,6 +4,11 @@ import AppKit
 /// separate from the typing engine: tape presentation never changes prompt
 /// text, accepted input, scoring, or replay.
 enum PracticeTapePolicy {
+  static func isOverflowing(wordLeft: CGFloat, wordWidth: CGFloat,
+    viewportWidth: CGFloat, rightToLeft: Bool) -> Bool {
+    rightToLeft ? floor(wordLeft) > viewportWidth : floor(wordLeft) < -floor(wordWidth)
+  }
+
   static func isRightToLeft(_ text: String, fallback: Bool) -> Bool {
     // Foundation's whitespace set also includes U+200B; the reference's
     // punctuation/symbol/ECMAScript-space trim deliberately does not.

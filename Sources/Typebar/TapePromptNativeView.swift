@@ -22,6 +22,10 @@ final class TapePromptNativeView: NSView {
   private var needsScroll = false
   private var snapsScroll = true
   private var lastScrollAdvance: CGFloat?
+  private var retirement: PromptLineScrollContext?
+  private var retirementRevision: UInt64 = 0
+  private var notifiedRetirementIndex = 0
+  private var pendingRetirement: PromptWordRetirement?
 
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -38,6 +42,7 @@ final class TapePromptNativeView: NSView {
     wordStartCharacterOffsets: [Int: Int] = [:],
     checksDirectionPerGlyph: Bool = false,
     mode: PracticeTapeMode, margin: Double, smoothScroll: Bool,
+    retirement: PromptLineScrollContext? = nil,
     carets: PromptCaretNativeView.Configuration, at time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
     let nextInput = carets.latestInput?()
     let resets = configuration == nil || configuration?.attemptID != carets.attemptID
@@ -45,6 +50,23 @@ final class TapePromptNativeView: NSView {
       || self.mode != mode || self.margin != margin || self.smoothScroll != smoothScroll
       || configuration?.reducesMotion != carets.reducesMotion
       || configuration?.rightToLeft != carets.rightToLeft || self.checksDirectionPerGlyph != checksDirectionPerGlyph
+    retirementRevision &+= 1
+    if resets {
+      notifiedRetirementIndex = retirement?.firstRetainedWordIndex ?? 0
+      pendingRetirement = nil
+    }
+    let removedWidth: CGFloat?
+    if !resets, let old = self.retirement, let next = retirement,
+      old.attemptID == next.attemptID, next.firstRetainedWordIndex > old.firstRetainedWordIndex,
+      let word = old.words.first(where: { $0.index == next.firstRetainedWordIndex }),
+      let offset = self.rendering.characterOffset(forGlyphAt: word.glyphID) {
+      let advance = textView.advance(at: offset, wordStart: offset, mode: .word, rightToLeft: carets.rightToLeft)
+      removedWidth = carets.rightToLeft ? -advance : advance
+      needsScroll = true
+    } else { removedWidth = nil }
+    let onlyAcknowledgesPrefix = removedWidth != nil && nextInput == lastInput
+      && self.retirement?.activeWordID == retirement?.activeWordID
+      && configuration?.mainGlyphID == carets.mainGlyphID
     needsScroll = needsScroll || resets || self.anchorCharacterIndex != anchorCharacterIndex
       || nextInput != lastInput
     snapsScroll = snapsScroll || resets
@@ -53,6 +75,7 @@ final class TapePromptNativeView: NSView {
       geometryRevision &+= 1
     }
     configuration = carets; self.rendering = rendering
+    self.retirement = retirement
     self.anchorCharacterIndex = anchorCharacterIndex; self.wordAnchorCharacterIndex = wordAnchorCharacterIndex
     self.wordStartCharacterOffsets = wordStartCharacterOffsets
     self.checksDirectionPerGlyph = checksDirectionPerGlyph
@@ -60,9 +83,11 @@ final class TapePromptNativeView: NSView {
     lastInput = nextInput
     carets.coordinator.prepare(attemptID: carets.attemptID)
     if resets { carets.coordinator.resetLayout() }
+    else if let removedWidth { carets.coordinator.tapeWordsRemoved(width: removedWidth) }
     textView.configure(text: rendering.text, font: carets.font, rightToLeft: carets.rightToLeft)
     setAccessibilityLabel(String(rendering.text.characters))
-    updateGeometry(at: time)
+    updateGeometry(at: time, retiresWords: !onlyAcknowledgesPrefix)
+    deliverRetirement()
     // Input/configuration requests do not advance animations between frames.
     // Initial/re-anchored geometry has no running layout to preserve.
     if resets { present(at: time) }
@@ -72,13 +97,15 @@ final class TapePromptNativeView: NSView {
   override func layout() {
     super.layout()
     guard configuration != nil, lastWidth != bounds.width else { return }
+    retirementRevision &+= 1
     needsScroll = true; snapsScroll = true
     updateGeometry(at: ProcessInfo.processInfo.systemUptime)
+    deliverRetirement()
     present(at: ProcessInfo.processInfo.systemUptime)
     schedulePresentation()
   }
 
-  private func updateGeometry(at time: TimeInterval) {
+  private func updateGeometry(at time: TimeInterval, retiresWords: Bool = true) {
     guard var config = configuration, bounds.width > 0 else { return }
     if lastWidth != bounds.width {
       lastWidth = bounds.width; geometryRevision &+= 1
@@ -96,10 +123,46 @@ final class TapePromptNativeView: NSView {
     let advance = textView.advance(at: anchorCharacterIndex,
       wordStart: wordStartCharacterOffsets[anchorCharacterIndex], mode: mode, rightToLeft: config.rightToLeft)
     if needsScroll || advance != lastScrollAdvance {
+      if retiresWords { prepareRetirement(rightToLeft: config.rightToLeft) }
       config.coordinator.tapeScroll(to: config.rightToLeft ? advance : -advance,
         duration: snapsScroll || !smoothScroll || config.reducesMotion ? 0 : 0.125, at: time)
       needsScroll = false; snapsScroll = false
       lastScrollAdvance = advance
+    }
+  }
+
+  private func prepareRetirement(rightToLeft: Bool) {
+    pendingRetirement = nil
+    guard let context = retirement, context.onRetire != nil,
+      context.attemptID == configuration?.attemptID,
+      let active = context.words.first(where: { $0.glyphID == context.activeWordID })?.index else { return }
+    var boundary = max(context.firstRetainedWordIndex, notifiedRetirementIndex)
+    // Inspect the last presented words margin, not the destination requested
+    // by this input. Single-line word boxes are ordered along the tape.
+    for word in context.words where word.index >= boundary && word.index < active {
+      guard let offset = rendering.characterOffset(forGlyphAt: word.glyphID),
+        let rect = textView.wordRect(at: offset, start: offset),
+        PracticeTapePolicy.isOverflowing(wordLeft: rect.minX + textOrigin +
+          (configuration?.coordinator.wordsTapeMargin ?? 0), wordWidth: rect.width,
+          viewportWidth: bounds.width, rightToLeft: rightToLeft) else { break }
+      boundary = word.index + 1
+    }
+    guard boundary > max(context.firstRetainedWordIndex, notifiedRetirementIndex) else { return }
+    pendingRetirement = .init(attemptID: context.attemptID, firstRetainedWordIndex: boundary)
+  }
+
+  private func deliverRetirement() {
+    guard let value = pendingRetirement, let context = retirement, let notify = context.onRetire,
+      value.firstRetainedWordIndex > context.firstRetainedWordIndex else { return }
+    let revision = retirementRevision
+    // NSViewRepresentable updates cannot publish session mutations. The
+    // generation check also invalidates input/restart/layout/detach races.
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.retirementRevision == revision,
+        self.configuration?.attemptID == value.attemptID else { return }
+      self.notifiedRetirementIndex = value.firstRetainedWordIndex
+      self.pendingRetirement = nil
+      notify(value)
     }
   }
 
@@ -156,6 +219,8 @@ final class TapePromptNativeView: NSView {
   }
 
   func stop() {
+    retirementRevision &+= 1
+    retirement = nil; notifiedRetirementIndex = 0; pendingRetirement = nil
     timer?.invalidate(); timer = nil
     caretView.stop()
     configuration?.coordinator.cancel(at: ProcessInfo.processInfo.systemUptime)

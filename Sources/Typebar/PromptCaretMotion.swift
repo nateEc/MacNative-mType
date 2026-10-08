@@ -19,10 +19,10 @@ struct PromptCaretChannel {
     func fraction(at time: TimeInterval) -> Double {
       // A request does not advance itself until the next presentation tick.
       if time <= started { return 0 }
-      // Test the absolute endpoint before subtracting elapsed time. Otherwise
-      // an exact 153ms overlap deadline can become 0.9999999999999999 and
-      // postpone the ready flag (and a consecutive jump's reset) one frame.
-      if time >= started + (duration - PromptLineScrollMotion.autoplayLead) { return 1 }
+      // Addition/subtraction can round an exact endpoint (e.g. 153/563ms)
+      // one ULP above its clock value. Admit that representational neighbor,
+      // not an earlier real frame, before computing the elapsed fraction.
+      if time >= (started + (duration - PromptLineScrollMotion.autoplayLead)).nextDown { return 1 }
       return min(1, max(0, (time - started + PromptLineScrollMotion.autoplayLead) / duration))
     }
     func value(at time: TimeInterval) -> CGRect {
@@ -91,6 +91,12 @@ struct PromptCaretChannel {
     } else { tapeTween = nil; tapeMargin = destination; tapeMarginReady = true }
   }
   mutating func tapeWordsRemoved(width: CGFloat) { cumulativeTapeCorrection += width }
+  mutating func shiftTapeOrigin(by width: CGFloat) {
+    // Prefix removal changes the words origin immediately, before replacing
+    // its scroll tween. Marker corrections are owned separately.
+    tapeMargin += width
+    tapeTween = nil
+  }
   mutating func lineJump(to margin: CGFloat, at time: TimeInterval,
     duration: TimeInterval, isPace: Bool) {
     guard duration > 0 || isPace else { return }
@@ -159,6 +165,7 @@ struct PromptCaretChannel {
   }
 
   func tapeWordsRemoved(width: CGFloat) {
+    words.shiftTapeOrigin(by: width)
     main.tapeWordsRemoved(width: width); pace.tapeWordsRemoved(width: width)
   }
 

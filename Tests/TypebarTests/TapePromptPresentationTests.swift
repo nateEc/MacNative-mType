@@ -226,7 +226,7 @@ import XCTest
     }
     struct Fixture: Decodable { let mode, style: String; let smooth, overlap: Bool; let trace: [Event] }
     struct Direction: Decodable { let text: String; let fallback, rtl: Bool }
-    struct Output: Decodable { let pin: String; let fixtures: [Fixture]; let directions: [Direction] }
+    struct Output: Decodable { let pin: String; let fixtures, retirements: [Fixture]; let directions: [Direction] }
     let process = Process(), output = Pipe(), errors = Pipe()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = ["node", "--experimental-vm-modules",
@@ -240,15 +240,17 @@ import XCTest
     let source = try JSONDecoder().decode(Output.self, from: data)
     XCTAssertEqual(source.pin, "91bd24bb8513785c7364cbea29296ff7adafac41")
     XCTAssertEqual(source.fixtures.count, 128)
+    XCTAssertEqual(source.retirements.count, 32)
     XCTAssertEqual(source.directions.count, 28)
     for direction in source.directions {
       XCTAssertEqual(PracticeTapePolicy.isRightToLeft(direction.text, fallback: direction.fallback), direction.rtl, direction.text)
     }
-    for (index, fixture) in source.fixtures.enumerated() {
+    for (index, fixture) in (source.fixtures + source.retirements).enumerated() {
       let coordinator = PromptCaretMotionCoordinator(); coordinator.prepare(attemptID: UUID())
       for event in fixture.trace {
         let time = event.time / 1000
         switch event.type {
+        case "retire": coordinator.tapeWordsRemoved(width: try XCTUnwrap(event.value))
         case "scroll": coordinator.tapeScroll(to: try XCTUnwrap(event.value),
           duration: try XCTUnwrap(event.duration) / 1000, at: time)
         case "position":

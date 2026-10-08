@@ -406,13 +406,14 @@ private struct TapePracticePrompt: View {
   let fontSize: Double
   let animatesScroll: Bool
   let carets: PromptCaretNativeView.Configuration
+  let retirement: PromptLineScrollContext
 
   var body: some View {
     TapePromptBridge(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
       wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
       checksDirectionPerGlyph: checksDirectionPerGlyph,
       mode: mode, margin: margin,
-      smoothScroll: animatesScroll, carets: carets)
+      smoothScroll: animatesScroll, carets: carets, retirement: retirement)
       .frame(height: fontSize * 1.7)
       .clipped()
       .accessibilityLabel("卷带练习提示")
@@ -428,13 +429,14 @@ private struct TapePromptBridge: NSViewRepresentable {
   let margin: Double
   let smoothScroll: Bool
   let carets: PromptCaretNativeView.Configuration
+  let retirement: PromptLineScrollContext
   func makeNSView(context: Context) -> TapePromptNativeView { TapePromptNativeView() }
   func updateNSView(_ view: TapePromptNativeView, context: Context) {
     view.configure(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
       wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
       checksDirectionPerGlyph: checksDirectionPerGlyph,
       mode: mode, margin: margin,
-      smoothScroll: smoothScroll, carets: carets)
+      smoothScroll: smoothScroll, retirement: retirement, carets: carets)
   }
   static func dismantleNSView(_ view: TapePromptNativeView, coordinator: ()) { view.stop() }
 }
@@ -2897,7 +2899,8 @@ private struct ContentView: View {
           mode: settings.practiceTapeMode,
           margin: settings.practiceTapeMargin,
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll,
-          carets: makeSpecialPromptCaretConfiguration(rightToLeft: session.configuration.usesRightToLeftPrompt))
+          carets: makeSpecialPromptCaretConfiguration(rightToLeft: session.configuration.usesRightToLeftPrompt),
+          retirement: practiceLineScrollContext(rendering))
       } else {
         Text(rendering.text)
           .lineSpacing(usesJoiningScript ? 8 : 12)

@@ -1,5 +1,21 @@
 # 原生奖励收件箱与周任务交付
 
+## Tape 横向旧词退休增量
+
+最终冻结门禁 `/tmp/typebar-tape-retirement-final-readiness.log` 终态退出 0：原生 3,865 项零失败零跳过（835.952 秒），服务 501 项（12.147 秒）；十万词耐久 154.005 秒、16 项隔离磁盘冷读 4.514 秒、53 表面、1,107 唯一人工场景结构、90／3／1 配置元数据和未启动应用包资源／URL scheme／严格签名／原创边界通过。12 新增在全量中 0.318 秒，128 原有轨迹／32 新增退休轨迹／28 方向案例通过。13 文件 `/tmp/typebar-tape-retirement-final-frozen.sha256` 门禁前中后完全一致，64 原始日志 `/tmp/typebar-tape-retirement-final-logs.RbJf6z` 和 163 图 `/tmp/typebar-tape-retirement-final-images.1fYhpi` 保留；最终四张 tape-retirement-{ltr,rtl}-{before,after}.png 已再次逐张检查。既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。终态后仅补交付文档，没有运行中编辑或并行验收；零主程序启动，无残留测试／编译／主程序进程，参考仍干净，未操作真实账户、Keychain、成绩库或部署。完整 goal active，下方为阶段证据。
+
+2026-10-09，固定干净参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `scrollTape` 在请求新滚动之前，以既有呈现位置检查先前词：LTR 的 floor(left) 严格小于负 floor(width)，RTL 的 floor(left) 严格大于 wrapperWidth。删除后立即修正 words margin，并以反向符号修正 RTL 主／pace 累计补偿；这不是等待动画结束的普通换行退休。完整 `before-delete.ts` 在 freedom 前检查前一节点存在，hard 恢复也依赖节点仍存在。
+
+原生复用 canonical 词 ID、`PromptLineScrollContext` 和会话单调退休边界，读取同一 TextKit 词框及最后呈现横向位移。通知推迟到主队列，避免在 SwiftUI 更新中发布会话变更；代次／尝试身份使重开、拆卸、布局和较新输入失效旧回调。确认裁前缀时从旧布局测量位移，立即重定 words 原点并修正两个 marker owner，再请求剩余提示的滚动。纯确认和无变化重绘不再次退休；合并真实新输入仍重新计算。缺失 pace 目标保留既有位置／折叠状态，保留目标重测而不跳动。没有增加定时器、持久字段、依赖或官方产品代码／资产；完整提示、输入、统计与归档仍保留。
+
+QA 执行完整固定 `scrollTape`／`Caret`／RAF 和校验完整性后的 Anime.js 4.2.2，保留原 128 条轨迹／28 个方向案例，增加 32 条 LTR／RTL × letter／word × 四类 marker × 即时／平滑的实际删除轨迹。词节点真正从自有 DOM 边界中移除，逐帧对照 words、两个 marker 的位置／margin／累计修正／完成标记；不是浏览器 CSS、换行、反向模式或任意调度证明。
+
+先行 `/tmp/typebar-tape-retirement-red.log` 四项 9 个有效失败，接口仅接收未使用的 context，不提前实现行为。`first-focused.log` 43 项中两项缺环境跳过及一处测试错误（RTL 流中的英文仍 LTR），不是最终证据。`source.log` 保留新删除分支首次触及自有 DOM style 缺失的失败；补齐该边界。`expanded.log` 保留测试误访问私有 replay 的编译错误，改为副本 bailout 后的真实 result 回放，不拓宽产品可见性。`expanded-built.log` 49 项 18 处失败定位到重复重绘二次退休、确认再次退休，以及 563ms 终点的一 ULP 舍入。前两者分开真实请求与确认；共享 tween 只允许终点的一个可表示邻点，不放宽实际较早帧。`fixed.log` 77 项仅剩确认反例，修复后 `final-focused.log` 119 项通过。以上短日志名均使用 `/tmp/typebar-tape-retirement-` 前缀。
+
+最终 `/tmp/typebar-tape-retirement-handoff-focused.log` 120 项零失败零跳过（40.321 秒），其中 12 新增 0.313 秒。覆盖阈值、前一呈现帧、平滑中退休、重复确认、重开／停止／回退取消、真实 freedom 删除边界／回放、丢失及保留 pace 目标和生产接线。`/tmp/typebar-tape-retirement-images.6Hlpk5/tape-retirement-{ltr,rtl}-{before,after}.png` 四张已逐张复查；两方向各自裁前后可见 PNG 完全相同。窗口从不显示且关闭，零主程序启动；透明留白／边缘裁剪为实际组件，不是完整应用或实机验收。
+
+同会话风险／决策复核检查了重复请求、确认与新输入合并、取消身份、前缀几何、反向符号、共享动画终点、pace 缺失和原始数据保留，不是独立评审。`tapeMode` 保持部分、配置 90／3／1 和 53 表面分类不升级。明确换行／afterNewline、复杂控制／hint／no-space／全部 joining 与混排、任意异步设备顺序和视口虚拟化仍开放；完整重写 goal active，未以定向结果替代全量。
+
 ## Tape RTL 与独立词方向增量
 
 最终完整冻结门禁 `/tmp/typebar-tape-direction-final-readiness.log` 终态退出 0：原生 3,853 项零失败零跳过（851.233 秒），服务 501 项（12.327 秒）；十万词耐久 153.047 秒、16 项隔离磁盘冷读 5.216 秒、53 表面、1,105 唯一人工场景结构、90／3／1 配置元数据及未启动应用包资源／URL scheme／严格签名／原创边界通过。十二新增在全量中 0.314 秒，128 条完整源码轨迹和 28 方向案例通过。13 文件 `/tmp/typebar-tape-direction-final-frozen.sha256` 门禁前中后完全一致；64 原始日志 `/tmp/typebar-tape-direction-final-logs.EhiXHn`、159 图 `/tmp/typebar-tape-direction-final-images.rvafDV` 保留，最终三张 rtl-tape-{initial,moving,word}.png 已逐张复查，是实际原生文字／独立 marker 组件而非完整应用窗口。既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复；无断言失败或跳过。终态后才更新交付文档，无运行中编辑或并行验收；零主程序启动，无残留测试／编译／主程序进程，参考仍干净，未操作真实账户、Keychain、成绩库或部署。完整 goal active，以下为阶段证据。
