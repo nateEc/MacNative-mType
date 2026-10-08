@@ -49,7 +49,8 @@ import XCTest
         fontSize: model.fontSize, accent: .blue,
         glyphIDs: PromptGlyphLayout.indices(glyphs: model.session.promptGlyphs, words: words, hideExtraLetters: false),
         rendering: rendering, carets: carets, font: font, lineScroll: model.showsAll ? nil : context,
-        caretGlyphID: model.session.promptCaretGlyphIndex, viewportLineCount: model.showsAll ? nil : model.lineCount)
+        caretGlyphID: model.session.promptCaretGlyphIndex, viewportLineCount: model.showsAll ? nil : model.lineCount,
+        words: words)
       Group {
         if model.showsAll { prompt }
         else {
@@ -93,6 +94,8 @@ import XCTest
     let end = try XCTUnwrap(app.range(of: "} else if practiceVisualEffect.usesChoo {", range: start.upperBound..<app.endIndex))
     XCTAssertTrue(app[start.upperBound..<end.lowerBound].contains("lineScroll:"),
       "ASL must receive the same attempt/word-retirement policy as ordinary prompts")
+    XCTAssertTrue(app[start.upperBound..<end.lowerBound].contains("words: session.promptWordPresentations"),
+      "Production word ownership must come from session metadata, not rendered replacements")
   }
 
   func testASLViewportMeasuresActualHandRowsRatherThanFixed184Points() throws {
@@ -159,6 +162,32 @@ import XCTest
     XCTAssertLessThan(try XCTUnwrap(container.measuredRect(for: 8)).maxY, scroll.contentView.bounds.height)
     XCTAssertEqual(descendants(host, PromptCaretNativeView.self).count, 1)
     try capture(host, "asl-scroll-short-final-markers")
+    XCTAssertFalse(window.isVisible)
+  }
+
+  func testOversizedWordContainerRetiresAsOneUnitWithoutLosingOriginalInput() throws {
+    let prompt = "aaaaaaaaaaaaaaaaa bbbbbbb ccccccc ddddddd eeeeeee"
+    let model = Model(); model.smooth = false
+    model.session = TypingSession(configuration: .words(5, rules: .init(freedomMode: true)), prompt: prompt)
+    let (window, host) = mount(model)
+    defer { window.contentView = nil; window.close() }
+    let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
+    let word = try XCTUnwrap(container.measuredWordRect(for: 0))
+    XCTAssertGreaterThan(word.height, try XCTUnwrap(container.measuredRect(for: 0)).height * 2)
+    XCTAssertGreaterThan(try XCTUnwrap(container.measuredWordRect(for: 18)).minY, word.maxY)
+    model.session.insertBatch("aaaaaaaaaaaaaaaaa ", at: start); pump(host)
+    XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 0)
+    model.session.insertBatch("bbbbbbb ", at: start.addingTimeInterval(1)); pump(host); pump(host)
+    XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 1)
+    XCTAssertNil(container.measuredWordRect(for: 0)); XCTAssertNil(container.measuredRect(for: 16))
+    XCTAssertEqual(try XCTUnwrap(container.measuredWordRect(for: 18)).minY, 0, accuracy: 1)
+    XCTAssertEqual(model.session.typed, "aaaaaaaaaaaaaaaaa bbbbbbb ")
+    XCTAssertEqual(model.session.prompt, prompt)
+    try capture(host, "asl-word-oversized-retired")
+    model.session.deleteWordBackward(at: start.addingTimeInterval(2))
+    model.session.deleteBackward(at: start.addingTimeInterval(3)); pump(host)
+    XCTAssertEqual(model.session.typed, "aaaaaaaaaaaaaaaaa ")
+    XCTAssertEqual(model.session.firstRetainedPromptWordIndex, 1)
     XCTAssertFalse(window.isVisible)
   }
 

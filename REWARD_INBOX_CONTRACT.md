@@ -1,5 +1,21 @@
 # 原生奖励收件箱与周任务交付
 
+## ASL 词级换行与完整词框滚动增量
+
+2026-10-09，固定只读源码仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。核对完整 `buildWordHTML`、`updateWordLetters` 与 `test.scss`：原版以 `.word` 为 flex item，能放进新行的词不拆进上一行余隙，过长词在词容器内折行，后词不能填其最后一条内部行。[CSS Flexbox 收集行算法](https://www.w3.org/TR/css-flexbox-1/#algo-line-break) 支持这个词容器边界；ASL CSS 仅替换字体，不另定义逐字流。SwiftUI Layout／LayoutValueKey／place 依安装的 SDK 26.2 公开接口实现，目标仍 macOS 14；没有复制原版产品代码、字体或其他资产。
+
+新增原创 `ASLPromptWordPlan`／`ASLPromptFlowGeometry`／`ASLPromptFlowLayout`：外层按词分配完整宽度，内层格级折行，尾随原生间隔不制造空内行。生产词归属直接读取会话 canonical target ranges／extras，无空格词界保持独立，错误替换文字不重分组；没有真实 separator 的末尾索引不得覆盖 extra ID。退休或隐藏后缺失的格不重建，实际词框由仍存在的手形／fallback 格联合；滚动读取完整词框行高，光标及视口仍读实际内部格行，不用拉丁 TextKit 猜手形。普通／Choo／Tape、计分、回放与磁盘格式不变，包装器无新增 Timer。
+
+本增量保留既有原生手形、配色和 12 点行距；词间距使用原生 separator cell，不复制 CSS margins 或字体宽度，不宣称逐像素等价。`about:blank` 中自有浏览器夹具的 `data:` 导航被策略阻止，已关闭，未用 localhost／其他浏览器绕过；浏览器实际排版数值、连续空行／Return helpers、全部控制混排、精确 hint／所有回流交错、长提示可见有界渲染、专业 ASL 与真实设备仍未验。ASL 六部分／42 历史有界分类不升级，完整 goal active。
+
+行为日志共同前缀 `/tmp/typebar-asl-word-wrap-`：`red.log` 两项三处失败复现整词被拆及后词进入长词末行；`first.log` 38 项零失败但两项缺参考跳过，只是初测；`word-metrics.log` 38 项零失败零跳过。`boundaries-red.log` 12 项三处失败，定位真实 extra ID 被末词结束位置覆盖和两条末行行距硬编码；`focused-green.log` 保留 Swift 初始化闭包先捕获未初始化属性的编译错误，改为局部测量结果后 `focused-verified.log` 49 项零失败零跳过（6.254 秒）。`proposal-red.log` 一项两处失败复现无限／负宽的无效 size，已规范化提案宽度；最终 focused／冻结完整门禁另记。新增 12 项词布局测试加一项超长词实际退休，净增 13 项；现有滚动 fixture 接入生产同款词元数据，未削弱断言。离屏窗口始终不显示、逐一关闭，本轮零 Typebar 主程序启动。
+
+最终 `final-focused.log` 49 项零失败零跳过（5.927 秒），含 12 项新词布局／16 项滚动／21 项光标；三张新组件图在 `/tmp/typebar-asl-word-wrap-focused-render.HHZxiy` 逐张复查，未显示窗口。53 表面、1,093 唯一人工场景结构和配置／语言元数据无漂移审计通过，人工状态不升级。
+
+最终冻结完整门禁 `/tmp/typebar-asl-word-wrap-complete-readiness.log` 终态退出 0：原生 3,773 项零失败零跳过（832.061 秒），服务 501 项零失败零跳过（12.708 秒）；实际十万词耐久 157.339 秒，16 项隔离磁盘冷读 5.143 秒，53 表面、1,093 唯一人工结构、元数据无漂移及未启动应用包／URL scheme／严格签名／原创边界全部通过。新增词布局 12 项为 0.277 秒、滚动 16 项为 3.996 秒；源码探针不变，未伪造浏览器布局证据。八文件冻结清单 `/tmp/typebar-asl-word-wrap-frozen.sha256` 在门禁前后完全一致；61 份分阶段日志保存于 `/tmp/typebar-asl-word-wrap-complete-logs.uT2eLl`，134 张组件图于 `/tmp/typebar-asl-word-wrap-complete-render.GYIprY`，其中三张新图已再次逐张复查。CoreData／XPC 系统诊断、Node 实验性警告和既有编译警告完整保留，未声称修复；全过程无文件变动或并发编译／测试，零 Typebar 主程序启动。
+
+同会话决策／风险审查重点为 extra ID 与目标结束碰撞、词内外行分离、退休后 anchor 缺失、主 pace 随 resize 更新及无效提案尺寸；红测分别检验因果而非只静态搜名字。这不是独立人工评审，也不以离屏图冒充真实输入／设备验收。两项新增人工场景仍待验收。
+
 ## ASL 实测整行滚动与旧词退休增量
 
 2026-10-09，固定只读参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。核对完整 test-ui.ts 的 updateActiveElement／lineJump／removeTestElements、ASL CSS、test.scss 的 flex 词分组及 dom.ts 的 getOffsetTop；没有提取 Gallaudet 或复用产品代码／资产。AppKit 滚动入口以安装的 SDK 26.2 公开头文件核验，目标仍 macOS 14。原版 getOffsetTop 直接返回 native.offsetTop；[CSSOM View 的 HTMLElement 定义](https://drafts.csswg.org/cssom-view/#dom-htmlelement-offsettop) 为 long，不能在自有 DOM 夹具中当成未取整 DOMRect。

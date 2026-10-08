@@ -395,68 +395,6 @@ private struct RoundPracticeContent<Content: View>: View {
   }
 }
 
-private struct PromptLineBreakKey: LayoutValueKey {
-  static let defaultValue = false
-}
-
-private struct PromptFlowLayout: Layout {
-  var rowSpacing: CGFloat = 12
-
-  func sizeThatFits(
-    proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
-  ) -> CGSize {
-    let availableWidth = proposal.width ?? .greatestFiniteMagnitude
-    var width = 0.0
-    var height = 0.0
-    var rowWidth = 0.0
-    var rowHeight = 0.0
-    for subview in subviews {
-      if subview[PromptLineBreakKey.self] {
-        width = max(width, rowWidth)
-        height += rowHeight + rowSpacing
-        rowWidth = 0
-        rowHeight = 0
-        continue
-      }
-      let size = subview.sizeThatFits(.unspecified)
-      if rowWidth > 0 && rowWidth + size.width > availableWidth {
-        width = max(width, rowWidth)
-        height += rowHeight + rowSpacing
-        rowWidth = 0
-        rowHeight = 0
-      }
-      rowWidth += size.width
-      rowHeight = max(rowHeight, size.height)
-    }
-    return .init(width: proposal.width ?? max(width, rowWidth), height: height + rowHeight)
-  }
-
-  func placeSubviews(
-    in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
-  ) {
-    var x = bounds.minX
-    var y = bounds.minY
-    var rowHeight = 0.0
-    for subview in subviews {
-      if subview[PromptLineBreakKey.self] {
-        x = bounds.minX
-        y += rowHeight + rowSpacing
-        rowHeight = 0
-        continue
-      }
-      let size = subview.sizeThatFits(.unspecified)
-      if x > bounds.minX && x + size.width > bounds.maxX {
-        x = bounds.minX
-        y += rowHeight + rowSpacing
-        rowHeight = 0
-      }
-      subview.place(at: .init(x: x, y: y), anchor: .topLeading, proposal: .unspecified)
-      x += size.width
-      rowHeight = max(rowHeight, size.height)
-    }
-  }
-}
-
 private struct TapePracticePrompt: View {
   let rendering: PromptRendering
   let anchorCharacterIndex: Int
@@ -855,23 +793,27 @@ struct ASLPracticePrompt: View {
   var lineScroll: PromptLineScrollContext? = nil
   var caretGlyphID: Int? = nil
   var viewportLineCount: Int? = nil
+  var words: [TypingPromptWordPresentation]? = nil
 
   private var ids: [Int] { glyphIDs.count == glyphs.count ? glyphIDs : Array(glyphs.indices) }
 
   var body: some View {
     let ids = ids
     let contents = ASLPromptGlyphContent.make(glyphs: glyphs, ids: ids, rendering: rendering)
-    return PromptFlowLayout {
+    let wordPlan = ASLPromptWordPlan(glyphs: glyphs, ids: ids, words: words)
+    return ASLPromptFlowLayout {
       ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
         if rendering != nil && rendering?.glyphCharacterOffsets[ids[index]] == nil {
           EmptyView()
         } else if glyph.character == "\n" {
           Color.clear.frame(width: 0, height: 0)
-            .layoutValue(key: PromptLineBreakKey.self, value: true)
+            .layoutValue(key: ASLPromptLineBreakKey.self, value: true)
             .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [ids[index]: $0] }
         } else {
           ASLPromptGlyphCell(content: contents[index], size: fontSize,
             font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
+            .layoutValue(key: ASLPromptWordIDKey.self, value: wordPlan.wordByGlyphID[ids[index]] ?? ids[index])
+            .layoutValue(key: ASLPromptSeparatorKey.self, value: glyph.character == " " && glyph.state != .extra)
             .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [ids[index]: $0] }
         }
       }
@@ -879,6 +821,7 @@ struct ASLPracticePrompt: View {
     .overlayPreferenceValue(ASLPromptBoundsKey.self) { anchors in
       GeometryReader { proxy in
         let frames = anchors.mapValues { proxy[$0] }
+        let wordFrames = wordPlan.measuredWords(frames: frames, glyphs: glyphs, ids: ids)
         let rowHeights = ASLPromptLineGeometry(frames: frames).rowHeights
         ZStack {
           Color.clear.preference(key: PracticeViewportHeightKey.self,
@@ -887,7 +830,7 @@ struct ASLPracticePrompt: View {
             ASLPromptCaretBridge(configuration: carets,
               frames: frames, glyphIDs: ids, lineScroll: lineScroll, caretGlyphID: caretGlyphID,
               text: rendering?.text ?? AttributedString(),
-              font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
+              font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular), wordFrames: wordFrames)
               .allowsHitTesting(false).accessibilityHidden(true)
           }
         }
@@ -2919,7 +2862,8 @@ private struct ContentView: View {
           font: practicePromptNSFont(size: settings.fontSize),
           lineScroll: showsAllPracticeLines ? nil : practiceLineScrollContext(rendering),
           caretGlyphID: currentPromptGlyphIndex,
-          viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3))
+          viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3),
+          words: session.promptWordPresentations)
       } else if practiceVisualEffect.usesChoo {
         ChooPracticePrompt(
           glyphs: session.promptGlyphsInDisplayOrder,
