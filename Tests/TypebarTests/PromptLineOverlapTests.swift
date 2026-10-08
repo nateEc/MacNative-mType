@@ -139,15 +139,21 @@ import XCTest
     for action in ["restart", "detach", "width"] {
       let (scroll, follower) = fixture(), attempt = UUID()
       var retired: [PromptWordRetirement] = []
+      var replacementRetired: [PromptWordRetirement] = []
       for row in 0...3 { update(follower, row: row, attempt: attempt, notify: { retired.append($0) }) }
       XCTAssertTrue(retired.isEmpty)
       switch action {
       case "restart": update(follower, row: 0, attempt: UUID(), notify: { retired.append($0) })
       case "detach": follower.removeFromSuperview()
-      default: follower.frame.size.width = 380; follower.layout()
+      default:
+        // A resize cancels the old animation but source centerActiveLine then
+        // owns a new forced jump. Distinguish its callback from the old one.
+        update(follower, row: 3, attempt: attempt, notify: { replacementRetired.append($0) })
+        follower.frame.size.width = 380; follower.layout()
       }
       RunLoop.main.run(until: Date().addingTimeInterval(0.2))
       XCTAssertTrue(retired.isEmpty)
+      if action == "width" { XCTAssertEqual(replacementRetired.map(\.firstRetainedWordIndex), [2]) }
       if action == "restart" { XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 0.5) }
     }
   }

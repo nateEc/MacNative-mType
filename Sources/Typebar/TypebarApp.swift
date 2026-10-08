@@ -2841,7 +2841,7 @@ private struct ContentView: View {
       onRetire: { session.retirePromptWords($0) },
       followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
         slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines),
-      caretMotion: promptCaretMotion)
+      caretMotion: promptCaretMotion, centersActiveLine: !settings.showAllPracticeLines)
   }
 
   private var practicePrompt: some View {

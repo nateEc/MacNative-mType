@@ -1,5 +1,23 @@
 # 原生奖励收件箱与周任务交付
 
+## 活动行重新居中与强制退休增量
+
+2026-10-09，固定只读源码 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `centerActiveLine` 从活动词向前扫描词容器，找到较早行后调用 `lineJump(previousLineTop, true)`，即使首跳也可退休；窗口 resize 的 250ms debounce 与 wrapper 配置更新分别调用它。原始 `Config.showAllLines` 为 true 就直接返回，与计时模式仍使用有限视口的有效高度策略不同。本轮只重写原生重新布局／全行返回有限行的行为，不复制函数或资产。既有 QA 脚本新增执行完整 center 函数、完整 lineJump／removal 的 48 组自有整数词框／缺失词／长词／首跳／平滑组合，原有 12 序列／60 行、32 before-delete、八 hard-recovery 不变；DOM 和 promise 完成由适配器提供，不是浏览器数值或真实 resize 调度证据。
+
+共用 PromptAutoScrollView 在重新布局时测量旧词，按前一个词容器而非长词内物理行确定清理边界；强制首跳沿用现有动画、光标协调器和退休回调，平滑完成才裁前缀，减少动态立即完成，无新 Timer。全行关闭后的新有限行 owner 同样生效；普通与 ASL 桥接层必须保留原始开关。前缀重建不再强制重复退休，原文、已接受输入、纠正边界、结果和 replay 不删；无可清理前缀的强制调用仍计跳行。原始开关抑制布局居中与退休，正常逐词跳行、输入回流策略和原生长词光标可达边界仍分别处理。
+
+红测 `/tmp/typebar-line-recenter-red.log` 两项四处失败（0.744 秒）复现漏退休及跳到远行；第一次修复日志 `first-green.log` 留下一项失败，固定 135 点夹具没有随 40 点字体增加到三行高度。只修夹具尺寸、不改容限后 `second-green.log` 两项零失败 0.084 秒。扩大轮 `focused.log`／`focused-runtime.log`／`focused-compiled.log` 保留 Observation 私有嵌套类及 timed 构造名／标签编译错误；`focused-built.log` 随后抓出两桥接层漏传开关，以及旧 overlap／reflow 测试没有区分布局强制调用。修复桥接；overlap 保留旧回调必须取消的断言，另测新的 resize 回调；reflow 首跳夹具显式隔离没有 wrapper／resize center 调用的函数路径，不删结果断言。`raw-gate-red.log` 为测试回调变量误放作用域的编译失败，修正后 `raw-gate-red-runtime.log` 初次绿只是文档高度不能滚动的弱夹具；增加可滚动高度后 `raw-gate-red-scrollable.log` 一项两处真实失败（90／118 而非 0），再修原始开关的定位路径。所有日志保留，不把编译失败或弱夹具算行为红测。
+
+最终 `focused-green.log` 相关 90 项零失败零跳过（29.829 秒），其中 15 新增为 4.063 秒；包括首强制平滑、减少动态、字号／宽度、原始开关、无前缀首跳、长词词框、重开／拆卸、48 源码对照、生产接线，普通与 ASL 的 finite／timed 实际 SwiftUI 会话、裁前缀坐标、退格及完整回放。四图 `/tmp/typebar-line-recenter-focused-images.nlqgID/recenter-{text,asl}-{finite,timed}.png` 逐张检查，组件窗口始终不显示并逐一关闭，零 Typebar 主程序启动。源码单测日志 `/tmp/typebar-line-recenter-source.log` 亦通过。行为优先／源码驱动／最小改动与根因调试约束实施；同会话决策／风险审查重点为强制首跳、桥接开关、旧回调替换、长词边界和原文不变，不是独立人工评审。既有原创手形／颜色／原生间距不改，Swift 6.2.4／SDK 26.2／最低 macOS 14，无新版本敏感 API 或依赖。
+
+首轮完整门禁 `/tmp/typebar-line-recenter-complete-readiness.log` 终态退出 0：原生 3,819 项零失败零跳过（837.516 秒），服务 501 项（11.264 秒）；实际十万词耐久 159.283 秒、53 表面／1,099 唯一人工结构、元数据和未启动应用包资源／签名／原创边界通过。10 文件 `/tmp/typebar-line-recenter-frozen.sha256` 在该轮前中后完全一致；62 日志 `/tmp/typebar-line-recenter-complete-logs.ywIi2g`、149 图 `/tmp/typebar-line-recenter-complete-images.GDLfMp` 保留。该轮尚不含下面的最后长词修复，不能冒充最终代码的完整验收。
+
+只读审查进一步发现：无可退休前缀时，前一个长词的内部行仍被当作居中目标。首轮门禁终态后才补测，`/tmp/typebar-line-recenter-long-prefix-red.log` 两项四处真实失败（1.791 秒），TextKit 实测及自定义几何 × 立即／平滑都移到 180 而非 0；56 组扩展源码对照本身通过。修复为无可移除词时只计跳行并保持原目标，不新建动画。最终相关 `/tmp/typebar-line-recenter-final-focused.log` 91 项零失败零跳过（30.812 秒），其中 16 新增为 4.844 秒；原 90 项／48 组是阶段证据，最终增为 16 项／56 组。四张组件图重新生成后仍需在最终完整轮复查。该反例完成本轮同会话审查闭环，不宣称覆盖任意布局交错。
+
+配置 showAllLines／fontFamily 仍部分覆盖；十万以上全量预览、全部未来词／视口虚拟化、fontFamily 独立订阅例外与所有 wrapper 配置触发、resize 调度／回流交错、浏览器精确尺寸、专业 ASL／真实键盘／IME／设备等未完成。本轮验证字号／窗口宽度／全行开关，不声称所有字体家族与配置生命周期已等价。六部分／42 历史有界分类不升级，两新增人工场景待验收，完整 goal active。
+
+最终完整冻结门禁 `/tmp/typebar-line-recenter-final-readiness.log` 终态退出 0：原生 3,820 项零失败零跳过（816.292 秒），服务 501 项（11.553 秒）；实际十万词耐久 151.922 秒、16 项隔离磁盘冷读 4.677 秒、53 表面、1,099 唯一人工结构、元数据与未启动应用包资源／URL scheme／严格签名／原创边界全部通过。16 项新回归为 4.828 秒，56 组 center／forced source 与原有退休／退格检查通过；四张新组件图已再次逐张检查，仍不代替实机验收。10 文件 `/tmp/typebar-line-recenter-final-frozen.sha256` 门禁前中后完全一致；62 原始日志 `/tmp/typebar-line-recenter-final-logs.kyWfFq`、149 图 `/tmp/typebar-line-recenter-final-images.lvzflO` 完整保留。全量测试无断言失败／跳过；CoreData／AddressBook XPC、隔离只读 SwiftData 513、既有编译／Node 警告保留，不宣称修复。无并行编译／验收或残留测试进程，零 Typebar 主程序启动，没有操作真实账户、Keychain、成绩库或部署。以下是历史阶段。
+
 ## ASL 退休前缀渲染物化与稳定字形 ID 增量
 
 2026-10-09，固定只读参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `lineJump`／`removeTestElements` 在跳行动画完成后物理移除旧 DOM 词格，但不删除原始词目录或输入；完整 before-delete／hard-recovery 另根据词元素是否存在限制回退。既有 QA 探针重新执行 12 序列／60 行转移、32 before-delete 与八 hard-recovery，全部通过；DOM 尺寸、动画完成和输入状态仍为自有适配，不冒充浏览器。未读取／提取任何字体或官方产品资产。

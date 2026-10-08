@@ -197,7 +197,8 @@ struct PromptAutoScrollOverlay: NSViewRepresentable {
         characterOffsets: $0.characterOffsets, smoothScroll: $0.smoothScroll,
         reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: lineScrollFrameRate,
         words: $0.words, firstRetainedWordIndex: $0.firstRetainedWordIndex, onRetire: $0.onRetire,
-        followsWordReflow: $0.followsWordReflow, caretMotion: $0.caretMotion)
+        followsWordReflow: $0.followsWordReflow, caretMotion: $0.caretMotion,
+        centersActiveLine: $0.centersActiveLine)
     }
     nsView.update(
       text: text, characterOffset: characterOffset, font: font,
@@ -258,6 +259,7 @@ final class PromptAutoScrollView: NSView {
       || self.lineScroll?.reducesMotion != lineScroll?.reducesMotion
       || self.lineScroll?.frameRate != lineScroll?.frameRate
       || self.lineScroll?.followsWordReflow != lineScroll?.followsWordReflow
+      || self.lineScroll?.centersActiveLine != lineScroll?.centersActiveLine
       || self.customGeometry?.revision != customGeometry?.revision
       || self.customGeometry?.caretGlyphID != customGeometry?.caretGlyphID
     if attemptChanged {
@@ -286,6 +288,7 @@ final class PromptAutoScrollView: NSView {
       lineScroll?.caretMotion?.resetLayout()
     }
     recentersLine = recentersLine || layoutChanged || attemptChanged
+      || (self.lineScroll?.centersActiveLine == false && lineScroll?.centersActiveLine == true)
     self.lineScroll = lineScroll
     self.customGeometry = customGeometry
     self.text = text
@@ -372,7 +375,8 @@ final class PromptAutoScrollView: NSView {
     if !prefixWasRebuilt { hasPendingWordUpdate = false }
     guard let scroll = enclosingScrollView, let document = scroll.documentView,
       let wordID = context.activeWordID else { stopLineScroll(); return }
-    let words = context.activeWordID == previousWordID
+    let requestsCenter = recentersLine && context.centersActiveLine && !prefixWasRebuilt
+    let words = requestsCenter && context.onRetire != nil ? context.words : context.activeWordID == previousWordID
       ? (wordWasUpdated && context.followsWordReflow ? context.words : [])
       : (context.onRetire == nil ? [] : context.words)
     let measured: PromptLineScrollGeometry?
@@ -399,20 +403,24 @@ final class PromptAutoScrollView: NSView {
         && context.activeWordID == previousWordID && !recentersLine && !prefixWasRebuilt,
       transitioning: lineScrollAnimation != nil)
     let reflowHideBound = reflowFrom.map { $0 + scroll.contentView.bounds.minY - documentOrigin }
+    let activeWordIndex = context.words.first(where: { $0.glyphID == wordID })?.index
+    let centerHideBound = requestsCenter
+      ? activeWordIndex.flatMap { geometry.recenterHideBound(before: $0) } : nil
     var retirement: PromptWordRetirement?
     var reflowCanAdvance = false
-    if !prefixWasRebuilt && (reflowHideBound != nil || context.activeWordID != previousWordID
+    if !prefixWasRebuilt && (centerHideBound != nil || reflowHideBound != nil || context.activeWordID != previousWordID
       && geometry.previousWordTop.map({ geometry.activeTop > $0 }) == true) {
-      if lineJumpCount > 0,
-        let active = context.words.first(where: { $0.glyphID == wordID }),
-        let boundary = geometry.retirementBoundary(before: active.index, hideBound: reflowHideBound),
+      if lineJumpCount > 0 || centerHideBound != nil,
+        let activeWordIndex,
+        let boundary = geometry.retirementBoundary(before: activeWordIndex, hideBound: centerHideBound ?? reflowHideBound),
         boundary > context.firstRetainedWordIndex {
         retirement = .init(attemptID: context.attemptID, firstRetainedWordIndex: boundary)
         reflowCanAdvance = true
       }
       lineJumpCount += 1
     }
-    var top = geometry.targetTop(previousTarget: previousTargetTop, recenter: recentersLine)
+    var top = recentersLine && !context.centersActiveLine ? previousTargetTop
+      : geometry.targetTop(previousTarget: previousTargetTop, recenter: recentersLine)
     if let reflowHideBound {
       // The source's first jump, and later jumps without a removable prefix,
       // only advance its line counter. They do not start a scroll animation.
@@ -420,7 +428,12 @@ final class PromptAutoScrollView: NSView {
     }
     let startsJump = retirement != nil
     if startsJump {
-      top = lineScrollOverlap.begin(from: previousTargetTop, rowHeight: geometry.activeRowHeight)
+      top = lineScrollOverlap.begin(from: centerHideBound == nil ? previousTargetTop : 0,
+        rowHeight: geometry.activeRowHeight)
+    } else if centerHideBound != nil {
+      // Forced centering with no removable prefix only increments the source
+      // line counter. A previous token's internal rows must not cause motion.
+      top = previousTargetTop
     }
     // SwiftUI can wrap a single long token across multiple native rows. Keep
     // its caret reachable without the legacy extra-margin early advance.
@@ -428,7 +441,7 @@ final class PromptAutoScrollView: NSView {
       // The source resets words.marginTop to zero after deleting the prefix;
       // it does not center the remaining active row, even after multirow reflow.
       top = 0
-    } else if let bottom = geometry.caretBottom {
+    } else if centerHideBound == nil, let bottom = geometry.caretBottom {
       top = max(top, bottom - scroll.contentView.bounds.height)
     }
     if !prefixWasRebuilt { previousWordID = wordID }
@@ -438,7 +451,7 @@ final class PromptAutoScrollView: NSView {
     var proposed = scroll.contentView.bounds
     proposed.origin.y = region.minY
     let target = scroll.contentView.constrainBoundsRect(proposed).origin
-    let immediate = resetsAttempt || !context.smoothScroll || context.reducesMotion
+    let immediate = (resetsAttempt && centerHideBound == nil) || !context.smoothScroll || context.reducesMotion
     resetsAttempt = false
     if startsJump {
       context.caretMotion?.lineJump(to: -geometry.activeRowHeight * CGFloat(lineScrollOverlap.pendingJumps),

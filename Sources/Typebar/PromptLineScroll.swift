@@ -24,6 +24,8 @@ struct PromptLineScrollContext {
   var onRetire: ((PromptWordRetirement) -> Void)? = nil
   var followsWordReflow = false
   var caretMotion: PromptCaretMotionCoordinator? = nil
+  // Mirrors the raw showAllLines gate, not the effective bounded-height policy.
+  var centersActiveLine = true
 }
 
 /// Alternate layouts provide measured canonical glyph bounds, never Latin
@@ -141,6 +143,13 @@ struct PromptLineScrollGeometry {
     // on both sides so words sharing one row cannot retire each other.
     return wordTops.filter { $0.key < activeWordIndex
       && $0.value.rounded(.down) < previousWordTop.rounded(.down) }.keys.max().map { $0 + 1 }
+  }
+
+  func recenterHideBound(before activeWordIndex: Int) -> CGFloat? {
+    // Source centerActiveLine scans previous word containers, not the physical
+    // row immediately above the active word (which may be inside a long token).
+    wordTops.filter { $0.key < activeWordIndex && $0.value < activeTop }
+      .max(by: { $0.key < $1.key })?.value
   }
 
   func targetTop(previousTarget: CGFloat, recenter: Bool) -> CGFloat {

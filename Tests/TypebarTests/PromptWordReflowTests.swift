@@ -33,14 +33,14 @@ import XCTest
 
   private func update(_ follower: PromptAutoScrollView, text: String, word: Int, attempt: UUID,
     font: NSFont? = nil, follows: Bool = true, smooth: Bool = false, pump: Bool = true,
-    onRetire: ((PromptWordRetirement) -> Void)? = nil) {
+    onRetire: ((PromptWordRetirement) -> Void)? = nil, centers: Bool = true) {
     follower.update(text: AttributedString(text), characterOffset: word, font: font ?? self.font,
       lineSpacing: 12, isRightToLeft: false, lineScroll: .init(attemptID: attempt,
         activeWordID: word, characterOffsets: [0: 0, 3: 3, 6: 6, 9: text.count - 2],
         smoothScroll: smooth, reducesMotion: false,
         words: [.init(index: 0, glyphID: 0), .init(index: 1, glyphID: 3),
           .init(index: 2, glyphID: 6), .init(index: 3, glyphID: 9)],
-        onRetire: onRetire, followsWordReflow: follows))
+        onRetire: onRetire, followsWordReflow: follows, centersActiveLine: centers))
     if pump { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
   }
 
@@ -101,11 +101,12 @@ import XCTest
     let unit = ("a" as NSString).size(withAttributes: [.font: font]).width
     let (scroll, follower) = fixture(width: unit * 6.2), attempt = UUID()
     var retired: [PromptWordRetirement] = []
-    update(follower, text: "aa\nbb cc dd", word: 6, attempt: attempt, onRetire: { retired.append($0) })
-    update(follower, text: "aa\nbb ccxx dd", word: 6, attempt: attempt, onRetire: { retired.append($0) })
+    // Isolate updateWordLetters with no prior wrapper/resize centerActiveLine call.
+    update(follower, text: "aa\nbb cc dd", word: 6, attempt: attempt, onRetire: { retired.append($0) }, centers: false)
+    update(follower, text: "aa\nbb ccxx dd", word: 6, attempt: attempt, onRetire: { retired.append($0) }, centers: false)
     XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 0.5)
     XCTAssertTrue(retired.isEmpty)
-    update(follower, text: "aa\nbb ccxy dd", word: 6, attempt: attempt, onRetire: { retired.append($0) })
+    update(follower, text: "aa\nbb ccxy dd", word: 6, attempt: attempt, onRetire: { retired.append($0) }, centers: false)
     XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 0.5)
     XCTAssertEqual(retired, [.init(attemptID: attempt, firstRetainedWordIndex: 1)])
   }

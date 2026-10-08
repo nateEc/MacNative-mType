@@ -21,6 +21,52 @@ const start = source.indexOf('function removeTestElements(');
 const end = source.indexOf('\nexport function setJoiningClass(', start);
 assert.ok(start >= 0 && end > start);
 const code = stripTypeScriptTypes(source.slice(start, end), {mode: 'transform'});
+const centerStart = source.indexOf('export async function centerActiveLine(');
+const centerEnd = source.indexOf('\nexport function updateWordsWrapperHeight(', centerStart);
+assert.ok(centerStart >= 0 && centerEnd > centerStart);
+const centerCode = stripTypeScriptTypes(source.slice(centerStart, centerEnd), {mode: 'transform'})
+  .replace(/^export async function /, 'async function ');
+const centers = [];
+// Word-container offsets, including a long previous token whose internal rows
+// must not be mistaken for the previous word's offsetTop. Owned DOM only.
+const layouts = [[0, 45, 90, 135], [0, 0, 45, 45], [0, 45, 225], [0, 0, 0], [0], [0, null, 90, 135], [0, 225]];
+for (const tops of layouts) for (const showAllLines of [false, true])
+  for (const smooth of [false, true]) for (const initialLine of [0, 2]) {
+    const active = tops.length - 1;
+    let finishAnimation, jumps = 0;
+    const words = tops.map((top, index) => top === null ? null : ({
+      index, native: {isConnected: true}, hasClass: name => name === 'word',
+      getOffsetTop: () => top, getOuterHeight: () => 45, getOffsetHeight: () => 33,
+      remove() { this.native.isConnected = false; },
+    }));
+    const connected = () => words.filter(word => word?.native.isConnected);
+    const context = vm.createContext({currentTestLine: initialLine, lineTransition: false,
+      activeWordTop: 0, activeWordHeight: 0, centeringActiveLine: Promise.resolve(),
+      Config: {showAllLines, smoothLineScroll: smooth},
+      Misc: {promiseWithResolvers: () => {
+        let resolve; const promise = new Promise(done => { resolve = done; }); return {promise, resolve};
+      }},
+      getActiveWordIndex: () => active, getActiveWordElement: () => words[active],
+      getWordElement: index => words[index]?.native.isConnected ? words[index] : null,
+      wordsEl: {getChildren: connected, setStyle() {}, promiseAnimate: options => {
+        assert.equal(options.marginTop, -45); assert.equal(options.duration, 125);
+        return new Promise(resolve => { finishAnimation = resolve; });
+      }}, Caret: {caret: {handleLineJump() { jumps++; }}}, PaceCaret: {caret: {handleLineJump() {}}},
+      updateWordsWrapperHeight() {},
+    });
+    new vm.Script(code + '\n' + centerCode).runInContext(context, {timeout: 1_000});
+    const pending = new vm.Script('centerActiveLine()').runInContext(context, {timeout: 1_000});
+    const during = connected().map(word => word.index);
+    if (finishAnimation) { assert.deepEqual(during, tops.flatMap((top, i) => top === null ? [] : [i])); finishAnimation(); }
+    await pending;
+    const previous = tops.slice(0, active).findLast(top => top !== null && top < tops[active]) ?? null;
+    const boundary = showAllLines || previous === null ? 0
+      : tops.slice(0, active).findLastIndex(top => top !== null && top < previous) + 1;
+    assert.deepEqual(connected().map(word => word.index), tops.flatMap((top, i) => top !== null && i >= boundary ? [i] : []));
+    assert.equal(jumps, boundary > 0 ? 1 : 0);
+    assert.equal(context.currentTestLine, initialLine + (!showAllLines && previous !== null ? 1 : 0));
+    centers.push({tops, showAllLines, smooth, initialLine, during, boundary, jumps, lineAfter: context.currentTestLine});
+  }
 const sequences = [];
 for (const smooth of [false, true]) for (const perRow of [1, 2]) for (const rowHeight of [25, 45, 59]) {
   let active = 0, finishAnimation;
@@ -118,5 +164,6 @@ for (const mode of ['letter', 'word', 'letter_hard', 'word_hard']) for (const pr
 }
 verify();
 assert.equal(sequences.length, 12); assert.equal(cases.length, 32);
-if (option) console.log(JSON.stringify({sequences, cases, hardCases}));
-else console.log('Word retirement source passed: 12 sequences / 60 row transitions with controlled pre/post-animation deletion; 32 complete before-delete module cases; 8 complete hard-recovery function cases; owned DOM/input/animation/navigation boundaries, no browser/mixed fonts/overlap/code-unindent claim');
+assert.equal(centers.length, 56);
+if (option) console.log(JSON.stringify({sequences, cases, hardCases, centers}));
+else console.log('Word retirement source passed: 56 complete centerActiveLine + forced lineJump cases; 12 sequences / 60 row transitions with controlled pre/post-animation deletion; 32 complete before-delete module cases; 8 complete hard-recovery function cases; owned DOM/input/animation/navigation boundaries, no browser/mixed fonts/overlap/code-unindent claim');
