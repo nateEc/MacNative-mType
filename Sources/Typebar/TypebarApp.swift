@@ -1568,7 +1568,7 @@ private struct ContentView: View {
         onPreview: { quickPickerThemePreviewTarget = $0 })
     }
     .sheet(isPresented: $showingProfileSearchCommandEditor) {
-      ProfileSearchCommandView(account: account)
+      ProfileSearchCommandView(account: account, settings: settings)
     }
     .sheet(isPresented: $showingActiveResultTagEditor) {
       ActiveResultTagEditor(currentTags: settings.activeResultTags) { tag in

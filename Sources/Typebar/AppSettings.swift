@@ -251,8 +251,10 @@ enum TypingSpeedUnit: String, CaseIterable, Codable, Equatable, Identifiable {
     switch self {
     case .wpm: wpm
     case .cpm: wpm * 5
-    case .wps: wpm / 60
-    case .cps: wpm * 5 / 60
+    // Keep the reference's multiplication order: division is mathematically
+    // equivalent but can change the displayed hundredth at a binary midpoint.
+    case .wps: wpm * (1.0 / 60.0)
+    case .cps: wpm * (5.0 / 60.0)
     case .wph: wpm * 60
     }
   }

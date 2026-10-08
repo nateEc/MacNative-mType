@@ -425,7 +425,7 @@ struct CloudSyncView: View {
         .onChange(of: experienceScope) { _, _ in resetExperiencePagination() }
         .onChange(of: experiencePeriod) { _, _ in resetExperiencePagination() }
         .sheet(item: $selectedProfile) { profile in
-            PublicProfileView(profile: profile, account: account)
+            PublicProfileView(profile: profile, account: account, settings: settings)
         }
         .sheet(item: $leaderboardParameterEditor) { target in
             LeaderboardParameterEditor(
@@ -1047,6 +1047,7 @@ struct PublicProfileView: View {
     @Environment(\.dismiss) private var dismiss
     let profile: RemotePublicProfile
     let account: AccountSession
+    let settings: AppSettings
     @State private var connectionMessage: String?
     @State private var isSendingRequest = false
     @State private var showingReport = false
@@ -1115,7 +1116,11 @@ struct PublicProfileView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             Grid(horizontalSpacing: 28, verticalSpacing: 12) {
-                GridRow { metric("完成成绩", "\(profile.completedResultCount)"); metric("最佳 WPM", profile.bestSpeedText) }
+                GridRow {
+                    metric("完成成绩", "\(profile.completedResultCount)")
+                    metric("最佳 \(settings.typingSpeedUnit.displayName)", PublicProfilePersonalBestPresentation.speed(
+                        profile.effectiveBestWPM, unit: settings.typingSpeedUnit, decimals: settings.alwaysShowDecimalPlaces))
+                }
                 GridRow {
                     metric("最高稳定度", "\(profile.highestConsistency.formatted(.number.precision(.fractionLength(0...2))))%")
                     metric("总 XP", ExperiencePresentation.compact(profile.totalExperience))
@@ -1177,42 +1182,8 @@ struct PublicProfileView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if profile.personalBestHistoryComplete == false {
-                Text("旧个人最佳仅保留迁移时可见的历史，已删除记录无法恢复；缺失选项仍为未知。")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            if !profile.displayPersonalBests.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("公开个人最佳")
-                        .font(.headline)
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], spacing: 10
-                    ) {
-                        ForEach(profile.displayPersonalBests) { best in
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(best.configurationLabel)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(best.groupingLabel).font(.caption2).foregroundStyle(.secondary)
-                                Text("\(best.speedText) WPM")
-                                    .font(.headline.monospacedDigit())
-                                if let raw = best.rawSpeedText { Text("Raw \(raw)").font(.caption2.monospacedDigit()) }
-                                Text("\(ResultMetricPresentation.accuracy(best.preciseAccuracy ?? Double(best.accuracy), alwaysShowDecimalPlaces: best.preciseAccuracy != nil)) 准确 · \(best.consistency.formatted(.number.precision(.fractionLength(0...2))))% 稳定")
-                                    .font(.caption2)
-                                Text("\(best.languageLabel) · \(best.recordedAt.formatted(date: .abbreviated, time: .omitted))")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                if best.personalBestOrigin == "legacyHistory" {
-                                    Text("旧历史基线").font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(8)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if !profile.accountSuspended {
+                PublicProfilePersonalBestsView(profile: profile, settings: settings)
             }
             if let activity = profile.activity {
                 PublicProfileActivityCalendar(activity: activity)

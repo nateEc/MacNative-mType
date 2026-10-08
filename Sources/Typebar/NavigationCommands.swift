@@ -91,6 +91,7 @@ enum ProfileSearchCommandPolicy {
 struct ProfileSearchCommandView: View {
   @Environment(\.dismiss) private var dismiss
   let account: AccountSession
+  let settings: AppSettings
   @State private var query = ""
   @State private var results: [RemotePublicProfile] = []
   @State private var isSearching = false
@@ -161,7 +162,7 @@ struct ProfileSearchCommandView: View {
     .frame(width: 520, height: 440)
     .onAppear { inputFocused = true }
     .sheet(item: $selectedProfile) { profile in
-      PublicProfileView(profile: profile, account: account)
+      PublicProfileView(profile: profile, account: account, settings: settings)
     }
   }
 
