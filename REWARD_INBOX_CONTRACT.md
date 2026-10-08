@@ -1,5 +1,31 @@
 # 原生奖励收件箱与周任务交付
 
+## 本机会话通知与历史增量
+
+固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`：只读核对完整 [通知状态模块](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/states/notifications.ts)、error utility、Notifications overlay、NotificationHistory／AlertsPopup 和收件箱 claimRewards。原版临时通知最新在前，历史保留最后 25 条并逆序显示；notice／success 默认 3,000 ms、error 默认不自动关闭，正时长加 250 ms 退出余量，关闭原因 click／timeout／clear。临时关闭不删历史，专注时只留 important，两条以上可见零时长通知才有全部关闭，截图隐藏，详情复制 title／message／details JSON。这不是现有社交通知列表或奖励邮件的另一名称。
+
+原创 `LocalNoticeCenter`／`LocalNoticeStack`／`LocalNoticeHistoryView` 以 Swift 6.2.4、macOS 14 目标原生实现三种级别、可选标题／系统图标、类型化结构详情、响应状态／422 验证详情和错误消息组合、计时器与回调、有限历史、重要性过滤及 JSON 复制反馈。历史最旧在前保存、显示反序，UUID 不复用；计时器弱持有中心、释放取消，延迟取消后的完成不能删除别的通知，超大时长不溢出。清除先退休旧批次再调回调，回调重入新增通知保留。复制详情不制造新历史，失败只在工作表提示；显式 null 与缺省分开，非法非有限数字拒绝编码而非静默改 null。
+
+实际入口：工具栏“通知”菜单区分会话／社交通知，`notification-history` 命令和完成页导出菜单可打开历史；原社交通知与奖励收件箱功能保留，服务公告继续走原公告入口。主练习、完成页和奖励页挂接真实生产通知卡，完成页覆盖层不受庆祝 Canvas 命中拦截（原庆祝层禁 hit testing）；导出图片只渲染既有 ResultSnapshotCard，不含通知堆栈。六类结果复制保留原 exportStatus，同时按真实写入结果发布成功／错误；缺回放／提示、无慢词及坏阈值也可回看，不把已复制的提示／输入正文放入历史。AppKit SDK 26.2 的 NSPasteboard.h 明确 setString／writeObjects 返回 BOOL，原有无条件成功已改为检查实际返回值；测试注入写入器，不接触用户剪贴板。
+
+奖励更新只在既有当前操作／账户范围确认后发布徽章名，邮件中明确选择的未领取徽章才进入提示，5,000 ms／奖励标题／gift；删除、已读或 XP-only 不伪造解锁提醒。读取／更新失败只追加通用错误，不自动捕获响应、Error 对象、邮箱、令牌或输入。原领取／能力／认证／库存与服务真值逻辑不变；模型与静态接线不证明真实 HTTP 领取或 UI 回调已人工执行。
+
+同会话有界决策／风险复核（非独立审查）选择由现有 AccountSession 持有中心，应用窗口共享同一会话；账户 UUID 或原始地址变化清空计时器和历史，相同用户资料／XP 刷新保留。退役账户的回调不执行，防旧回调跨身份副作用。这是比原版全局会话历史更严格的明确隐私适配，不冒称原版也会清空。只在内存中保存，不新增 SwiftData／归档／偏好／服务字段、网络接口、凭据访问、迁移、部署或后台任务；回退无需数据恢复，系统剪贴板是用户主动复制的独立外部效果。
+
+设计技能促使采用系统材质通知卡、三种语义级别和同时可读的 SF Symbol，窄侧栏表达真实级别而非装饰；历史用原生可选择正文、明确复制动作和本机会话说明，无上游字体／图标／CSS／动画资产。明确未完成：当前只接结果复制与奖励页生产者，不是全部原版通知调用点；原版 HTML 富文本／链接目前保留原始文本并标注，未声称格式等价；原生按输入／窗口焦点及活动测试过滤，未重写原版鼠标移动三像素的专注控制器；动画、完整 Alerts 同屏布局、真实多窗口、键盘／VoiceOver／计时与剪贴板、全功能无损仍待验。53 表面仅包括原 52 页面／模态加本次实际 AlertsPopup，不代表其他 popup 已穷尽盘点；整体 goal active。
+
+行为先行 `/tmp/typebar-local-notices-red.log` 实际一项测试三个预期失败（0.818 秒）证明展示／历史／复制入口缺失，静态接线只是接线证据。核心首轮 21 项零失败但一项 QA 依赖测试跳过；`/tmp/typebar-local-notices-source-focused.log` 保留一次性计时器适配器未出队的失败，按实际事件循环先出队后回调修正，生产逻辑不改、断言未放松。合并首次 `/tmp/typebar-local-notices-render-focused.log` 40 项中两处失败／一处 unexpected，均由命令遗漏 TYPEBAR_INBOX_SOURCE_PACKAGE 造成；在隔离 `/tmp/typebar-local-notices-source-runtime.Wf5MVh` 准备锁定 TanStack DB 0.6.8 后原样复跑。最终 `/tmp/typebar-local-notices-render-verified.log` 41 项零失败／零跳过（36.602 秒），含实际等待 continuation、最大时长／释放取消／回调重入／范围退休、真实剪贴板 helper 结果与私密正文不保存、徽章选择及生产离屏表单；五张新增图在不可见隔离窗口生成，不激活、不联网、不调用用户剪贴板。
+
+`check-source-local-notices.mjs` 只在 QA 执行完整实际通知模块／错误工具及实际完整 copyDetails 回调，43 次状态变化逐步与原生对照（仅默认标题本地化），另执行真实 timeout callback 和详情复制成功／失败。store 为自有数组适配、时钟与剪贴板为明确捕获器，不运行 Solid 响应追踪、浏览器、动画、真实计时或设备。探针纳入完整串行门禁，前后检查固定 SHA／干净参考；产品没有 TS／JS 运行时或上游实现／资产。页面矩阵新增真实 AlertsPopup 并登记生产路径／测试符号，三个人工项增至 1,068，仅结构盘点。零 Typebar 应用启动，最终冻结完整门禁另记。
+
+首轮冻结完整门禁 `/tmp/typebar-local-notices-complete-readiness.log` 客户端执行 3,626 项，三处失败全部来自同一旧盘点测试的 52／46 数量与 sourceFiles 精确断言（793.600 秒），不是零失败；服务与打包尚未执行。原日志保存在 `/tmp/typebar-local-notices-complete-logs.wj3TKv`，保留系统 XPC 与隔离只读库诊断。按实际新增 AlertsPopup 更新为 53／47、登记其精确路径，另断言该表面实际存在且有原生映射，未删除守恒／互斥／证据路径／测试符号检查。单项复验 `/tmp/typebar-local-notices-surface-recovery.log` 通过（9.083 秒），随后重新冻结完整门禁；最终结果另记。
+
+修正精确盘点测试后重新冻结的完整门禁 `/tmp/typebar-local-notices-final-readiness.log` 退出 0：客户端 3,626 项零失败／零跳过（819.638 秒），服务 501 项零失败／零跳过（12.994 秒）；十万词耐久实际执行 155.471 秒，16 项隔离磁盘冷读 5.406 秒。固定参考／元数据、53 表面／生产文件／测试符号、1,068 人工结构、未启动应用包／scheme／严格签名／原创资源边界全部通过。15 项冻结实现／测试／脚本／矩阵哈希 `/tmp/typebar-local-notices-verified-frozen.sha256` 前后一致，结果只补本文及人工／页面审计文档，不更改已测代码。
+
+最终 57 份日志保存在 `/tmp/typebar-local-notices-final-logs.oUd2z3`，75 张图在 `/tmp/typebar-local-notices-final-render.RXyJJV`；本次新增五张空历史／长详情浅深色窄组件／完整与专注通知堆栈逐张复查。不可见串行隔离窗口不激活、不联网、不读写用户剪贴板、不打开真实库；360 宽历史仅测试内容组件，不冒称外层 minWidth=420 工作表。已知 macOS CoreData／AddressBook XPC、隔离只读 SwiftData 513 与 Node 实验性诊断保留，没有修复这些系统诊断；首轮与早期失败仍按上文保留。真实点击／滚动／键盘／计时／多窗口／HTTP／VoiceOver 未验，三项新增人工状态不升级；零 Typebar 应用启动，整体 goal active。
+
+只读已知通知 API 名称加左括号文本扫描，在固定 `frontend/src/ts`（排除通知状态模块和测试文件）找到 85 个文件、303 个匹配。它不是 AST 或运行时穷尽盘点，别名／动态调用／包装器未证明覆盖，不作为已完成比例；用于后续生产者补齐，当前只声明结果复制和奖励页入口。
+
 Typebar 已独立接通周任务、持久邮件、一次性领取及 SwiftUI 收件箱。送达不会增加账户 XP；领取才入账，领取 XP 不写回周练习榜。此增量不是完整 Monkeytype 重写完成声明，整个 goal 保持 active。生产代码与文案为自有实现，固定参考只供只读 QA 动态执行，不进入应用包。
 
 [日榜任务与交付](DAILY_LEADERBOARD_SETTLEMENT_CONTRACT.md) 也已沿用此原生收件箱及领取链路；日榜生产与恢复的新增证据见该合同，不将本文件的上一阶段测试汇总当作日榜全量结果。

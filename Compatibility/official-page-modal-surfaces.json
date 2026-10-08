@@ -1,7 +1,7 @@
 {
   "referenceRepository": "monkeytypegame/monkeytype",
   "referenceCommit": "91bd24bb8513785c7364cbea29296ff7adafac41",
-  "officialCount": 52,
+  "officialCount": 53,
   "officialSurfaces": [
     "TestSurface",
     "SettingsPage",
@@ -14,6 +14,7 @@
     "ProfileSearchPage",
     "AboutPage",
     "404Page",
+    "AlertsPopup",
     "AddTagModal",
     "ContactModal",
     "CookiesModal",
@@ -57,6 +58,7 @@
     "FullOrPartial"
   ],
   "mapped": {
+    "AlertsPopup": "LocalNotices.swift、LocalNoticeViews.swift、TypebarApp.swift、RemoteRewardInbox.swift、RewardInboxView.swift、RemoteAnnouncements.swift、NotificationsView.swift（通知生产者／富文本／专注控制器仍部分覆盖）",
     "TestSurface": "TypingEngine.swift、TypebarApp.swift、NativeTypingInput.swift",
     "SettingsPage": "PreferencesView.swift、SettingsSearch.swift、CommandPalette.swift",
     "AccountPage": "AccountHistoryView.swift、AccountProfileOverview.swift、AccountProfileEditor.swift、AccountActivityCalendar.swift、CloudSyncView.swift、ProfileProgress.swift、ProfileProgressView.swift、RemoteAccount.swift、ArchiveManagementView.swift、ResultsAnalytics.swift、PersonalBestTable.swift、SharedPublicProfile.swift、SharedPublicProfileView.swift",
@@ -105,6 +107,7 @@
     "FullOrPartial": "TestPresets.swift、ActiveTestSelectionStore.swift"
   },
   "nativeEvidenceFiles": {
+    "AlertsPopup": ["Sources/Typebar/LocalNotices.swift", "Sources/Typebar/LocalNoticeViews.swift", "Sources/Typebar/TypebarApp.swift", "Sources/Typebar/RemoteRewardInbox.swift", "Sources/Typebar/RewardInboxView.swift", "Sources/Typebar/RemoteAnnouncements.swift", "Sources/Typebar/NotificationsView.swift"],
     "TestSurface": ["Sources/Typebar/TypingEngine.swift", "Sources/Typebar/TypebarApp.swift", "Sources/Typebar/NativeTypingInput.swift"],
     "SettingsPage": ["Sources/Typebar/PreferencesView.swift", "Sources/Typebar/SettingsSearch.swift", "Sources/Typebar/CommandPalette.swift"],
     "AccountPage": ["Sources/Typebar/AccountHistoryView.swift", "Sources/Typebar/AccountProfileOverview.swift", "Sources/Typebar/AccountProfileEditor.swift", "Sources/Typebar/AccountActivityCalendar.swift", "Sources/Typebar/CloudSyncView.swift", "Sources/Typebar/ProfileProgress.swift", "Sources/Typebar/ProfileProgressView.swift", "Sources/Typebar/RemoteAccount.swift", "Sources/Typebar/ArchiveManagementView.swift", "Sources/Typebar/ResultsAnalytics.swift", "Sources/Typebar/PersonalBestTable.swift", "Sources/Typebar/SharedPublicProfile.swift", "Sources/Typebar/SharedPublicProfileView.swift"],
@@ -153,6 +156,7 @@
     "FullOrPartial": ["Sources/Typebar/TestPresets.swift", "Sources/Typebar/PresetApplicationPolicy.swift"]
   },
   "nativeTestSymbols": {
+    "AlertsPopup": ["testNativeSessionNotificationHistoryAndLiveOverlayAreConnected", "testNativeStateAgainstCompletePinnedNotificationModuleTransitions", "testHistoryIsLastTwentyFiveOldestFirstButLiveNoticesAreNewestFirst", "testActualTimerTimeoutPreservesHistoryAndScopeRetirementSkipsOldCallbacks", "testClickAndClearCallbacksAreOnceOnlyAndReentrantPostsSurviveClear", "testAccountAndServerChangesRetireHistoryButSameUserProfileRefreshDoesNot", "testResponseCompositionAndDetailsCopyKeepStructuredDataWithoutCapturingObjects", "testProductionClipboardHelperUsesActualWriteOutcomeAndDoesNotStoreCopiedContent", "testBadgeNoticeNamesOnlyComeFromExplicitlyClaimedUnclaimedBadgeMail", "testProductionLocalNoticesRenderHistoryAndFocusedStackWithoutClipboardOrWindowActivation"],
     "TestSurface": ["testTimedTestCompletesAtDeadline", "testNativeInputBridgeReportsPhysicalKeyDownRepeatAndKeyUp"],
     "SettingsPage": ["testPracticePreferenceCommandsCoverReferenceChoicesAndRejectMalformedIDs"],
     "AccountPage": ["testResultHistoryFilterCombinesModeLanguageTagContentOptionsAndPersonalBest", "testCurrentStreakOnlyCountsConsecutiveDaysEndingToday", "testAccountOverviewIsIntegratedBeforeFilteredHistoryControls", "testAuthenticatedOverviewKeepsOwnersHiddenActivityPrivateAndUsesTokenIdentity", "testOverviewRequiresAuthenticationAndRejectsInvalidToken", "testOwnerReadPreservesLifetimeAndPersonalBestsAfterHistoryDeletionWithoutWriting", "testOwnerLifetimeFormattingMatchesCompletePinnedProfileFunctions", "testProductionOwnerOverviewRendersWholeProfileWithoutPublicSheetFrameOrNetwork", "testAnnualActivityIsAuthenticatedPrivateAndIndependentOfPublicVisibility", "testAnnualLedgerSurvivesHistoryDeletionAndDiskReloadWithoutReadWrites", "testActualLoaderCachesOnlyCurrentViewScopeAndRecentDoesNotFetch", "testYearProjectionMatchesCompletePinnedCalendarAndRecordsHistoricalGetterDefect", "testProductionAnnualActivityRendersLeapSparseEmptyAndIncompleteWithoutNetwork", "testShareCodecRoundTripsNormalizedServersWithoutIdentityOrCredentials", "testAnonymousTransportStripsInjectedHeadersStorageAndDecodesFullProfile", "testIncomingLinksQueueDeduplicateAndIgnoreOAuthWithoutInterruptingProtectedPractice", "testProductionSharedProfileConfirmationAndReadonlyPagesRenderWithoutNetworkOrActivation", "testNativeProgressAndClaimsAgainstCompletePinnedSourceWithRecordedCorrections", "testProductionLevelAndOwnerStreakStatesRenderSeriallyWithoutActivatingAWindow", "testStreakClaimMetadataIsOwnerOnlyEvenWhenPublicActivityIsHidden", "testPrivateClaimSurvivesHistoryDeletionReloadAndReadWithoutPersistentWrites"],
@@ -210,6 +214,7 @@
   },
   "unimplemented": {},
   "sourceFiles": [
+    "frontend/src/ts/components/popups/alerts/AlertsPopup.tsx",
     "frontend/src/ts/components/pages",
     "frontend/src/ts/components/modals",
     "OFFICIAL_PAGE_MODAL_AUDIT.md"

@@ -101,6 +101,7 @@ struct RewardInboxView: View {
       if account.currentUser != nil { await load() }
     }
     .onDisappear { operationID = UUID() }
+    .overlay(alignment: .topTrailing) { LocalNoticeStack(center: account.localNotices, focused: false).padding(12) }
     .confirmationDialog("删除全部邮件？",isPresented:$confirmingDeleteAll,titleVisibility:.visible) {
       Button("删除全部邮件",role:.destructive) {
         let ids = RewardInboxPresentation.deletable(mails)
@@ -120,12 +121,16 @@ struct RewardInboxView: View {
       guard operationID == operation, RewardInboxScopePolicy.accepts(requested:scope,current:account.resultPublicationScope) else { return }
       mails = response.inbox; maxMail = response.maxMail; message = nil
     } catch {
-      if operationID == operation, account.resultPublicationScope == scope { message = error.localizedDescription }
+      if operationID == operation, account.resultPublicationScope == scope {
+        message = error.localizedDescription
+        account.localNotices.post("无法读取奖励收件箱，请重试。", level: .error)
+      }
     }
   }
   private func update(_ request: RemoteRewardInboxUpdate) {
     guard !isLoading else { return }
     let operation = UUID(), scope = account.resultPublicationScope
+    let badgeNames = RewardInboxPresentation.badgeNamesToClaim(mails, request: request)
     operationID = operation; isLoading = true
     Task {
       defer { if operationID == operation { isLoading = false } }
@@ -133,8 +138,15 @@ struct RewardInboxView: View {
         let response = try await account.updateRewardInbox(request)
         guard operationID == operation, RewardInboxScopePolicy.accepts(requested:scope,current:account.resultPublicationScope) else { return }
         mails = response.inbox; maxMail = response.maxMail; message = "收件箱已更新。"
+        if !badgeNames.isEmpty {
+          account.localNotices.post("已领取徽章：" + badgeNames.joined(separator: "、"), level: .success,
+            options: .init(durationMilliseconds: 5000, title: "奖励", systemImage: "gift"))
+        }
       } catch {
-        if operationID == operation, account.resultPublicationScope == scope { message = error.localizedDescription }
+        if operationID == operation, account.resultPublicationScope == scope {
+          message = error.localizedDescription
+          account.localNotices.post("奖励收件箱操作未确认，请刷新后核对。", level: .error)
+        }
       }
     }
   }

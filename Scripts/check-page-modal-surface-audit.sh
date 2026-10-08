@@ -60,6 +60,7 @@ add_required_page "frontend/src/ts/components/pages/login/LoginPage.tsx" "LoginP
 add_required_page "frontend/src/ts/components/pages/profile/ProfilePage.tsx" "ProfilePage"
 add_required_page "frontend/src/ts/components/pages/profile/ProfileSearchPage.tsx" "ProfileSearchPage"
 add_required_page "frontend/src/ts/components/pages/settings/SettingsPage.tsx" "SettingsPage"
+add_required_page "frontend/src/ts/components/popups/alerts/AlertsPopup.tsx" "AlertsPopup"
 [[ -d "$reference_root/frontend/src/ts/components/pages/test" ]] || fail "missing reference test surface"
 print -- "TestSurface" >> "$expected_surfaces"
 

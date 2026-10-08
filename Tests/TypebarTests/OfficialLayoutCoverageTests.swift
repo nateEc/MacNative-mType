@@ -465,10 +465,12 @@ final class OfficialLayoutCoverageTests: XCTestCase {
 
     XCTAssertEqual(fixture.referenceRepository, "monkeytypegame/monkeytype")
     XCTAssertEqual(fixture.referenceCommit, "91bd24bb8513785c7364cbea29296ff7adafac41")
-    XCTAssertEqual(fixture.officialCount, 52)
+    XCTAssertEqual(fixture.officialCount, 53)
     XCTAssertEqual(fixture.officialSurfaces.count, fixture.officialCount)
     XCTAssertEqual(officialSurfaces.count, fixture.officialCount)
-    XCTAssertEqual(fixture.mapped.count, 46)
+    XCTAssertEqual(fixture.mapped.count, 47)
+    XCTAssertTrue(officialSurfaces.contains("AlertsPopup"))
+    XCTAssertTrue(mappedSurfaces.contains("AlertsPopup"))
     XCTAssertEqual(fixture.notApplicable.count, 6)
     XCTAssertEqual(Set(fixture.nativeEvidenceFiles.keys), mappedSurfaces)
     XCTAssertEqual(Set(fixture.nativeTestSymbols.keys), mappedSurfaces)
@@ -510,6 +512,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(
       fixture.sourceFiles,
       [
+        "frontend/src/ts/components/popups/alerts/AlertsPopup.tsx",
         "frontend/src/ts/components/pages",
         "frontend/src/ts/components/modals",
         "OFFICIAL_PAGE_MODAL_AUDIT.md",

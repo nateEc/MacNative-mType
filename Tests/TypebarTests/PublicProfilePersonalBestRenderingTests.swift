@@ -222,6 +222,39 @@ import XCTest
     }
   }
 
+  func testProductionLocalNoticesRenderHistoryAndFocusedStackWithoutClipboardOrWindowActivation() throws {
+    try withMount { window, host in
+      for (name, empty, dark, width) in [
+        ("notice-history-empty-light", true, false, CGFloat(420)),
+        ("notice-history-mixed-narrow-dark", false, true, 360),
+        ("notice-history-mixed-light", false, false, 520)
+      ] {
+        let center = LocalNoticeCenter(); defer { center.clearAll() }
+        if !empty {
+          center.post("自有测试复制完成。", level: .success, options: .init(durationMilliseconds: 0))
+          center.post(String(repeating: "自有长错误文字。", count: 10), level: .error,
+            options: .init(durationMilliseconds: 0, title: "自有错误详情", details: .object(["owned": .bool(true)])))
+          center.post("<b>自有网页格式</b>", options: .init(durationMilliseconds: 0, containsHTML: true))
+        }
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        var calls = 0
+        host.rootView = root(LocalNoticeHistoryContent(entries: Array(center.history.reversed()), copy: { _ in calls += 1 }),
+          width: width, padding: 0, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: width, dark: dark)
+        XCTAssertEqual(calls, 0)
+      }
+      let center = LocalNoticeCenter(); defer { center.clearAll() }
+      center.post("自有普通错误，专注时隐藏。", level: .error)
+      center.post("自有重要提示，专注时仍然可见。", level: .notice, options: .init(important: true, durationMilliseconds: 0))
+      for (name, focused, dark) in [("notice-stack-all-dark", false, true), ("notice-stack-focused-light", true, false)] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        host.rootView = root(LocalNoticeStack(center: center, focused: focused), width: 360, padding: 10, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: 360, dark: dark)
+        XCTAssertEqual(center.history.count, 2); XCTAssertFalse(window.isVisible)
+      }
+    }
+  }
+
   func testProductionFriendComparisonRendersWideNarrowAndLegacyWithoutRequestsOrWindowActivation() throws {
     func rich(_ name: String, legacy: Bool = false) throws -> RemotePublicProfile {
       var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(profile())) as? [String: Any])

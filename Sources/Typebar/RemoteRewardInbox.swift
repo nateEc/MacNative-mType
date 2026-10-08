@@ -93,6 +93,12 @@ struct RemoteRewardInboxUpdateResponse: Decodable, Sendable {
 }
 
 enum RewardInboxPresentation {
+  static func badgeNamesToClaim(_ inbox: [RemoteRewardMail], request: RemoteRewardInboxUpdate) -> [String] {
+    let ids = Set(request.mailIdsToMarkRead ?? [])
+    return inbox.filter { $0.unclaimed && ids.contains($0.id) }.flatMap { mail in
+      mail.rewards.compactMap { reward in if case .badge(let badge) = reward { badge.title } else { nil } }
+    }
+  }
   static func ordered(_ inbox: [RemoteRewardMail], locale: Locale = .current) -> [RemoteRewardMail] {
     let comparisonLocale = locale as NSLocale
     return inbox.enumerated().sorted { lhs,rhs in

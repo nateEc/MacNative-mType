@@ -3,6 +3,14 @@ import XCTest
 @testable import Typebar
 
 final class RewardInboxPresentationTests: XCTestCase {
+  func testBadgeNoticeNamesOnlyComeFromExplicitlyClaimedUnclaimedBadgeMail() throws {
+    let badge: [String: Any] = ["type": "badge", "item": ["id": "owned", "title": "Owned badge", "systemImage": "star"]]
+    let reward = try mail(object(rewards: [badge, ["type": "xp", "item": 25]])), xp = try mail(object())
+    let read = try mail(object(read: true, rewards: []))
+    XCTAssertEqual(RewardInboxPresentation.badgeNamesToClaim([reward, xp, read], request: .init(mailIdsToMarkRead: [reward.id, xp.id, read.id])), ["Owned badge"])
+    XCTAssertTrue(RewardInboxPresentation.badgeNamesToClaim([reward], request: .init(mailIdsToDelete: [reward.id])).isEmpty)
+    XCTAssertTrue(RewardInboxPresentation.badgeNamesToClaim([reward, xp], request: .init(mailIdsToMarkRead: [xp.id])).isEmpty)
+  }
   private func object(subject: String = "奖励", read: Bool = false, rewards: [[String:Any]] = [["type":"xp","item":0]], timestamp: Int = 20) -> [String:Any] {
     ["id":UUID().uuidString,"subject":subject,"body":"独立练习奖励","timestamp":timestamp,"read":read,"rewards":rewards]
   }

@@ -1037,6 +1037,7 @@ private struct ContentView: View {
   @State private var syncInitialLeaderboard: RemoteLeaderboardSelection?
   @State private var showingConnections = false
   @State private var showingNotifications = false
+  @State private var showingLocalNoticeHistory = false
   @State private var showingRewardInbox = false
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
@@ -1212,6 +1213,11 @@ private struct ContentView: View {
         NetworkConnectivityNotice(kind: .restored)
           .padding(.top, 12)
       }
+    }
+    .overlay(alignment: .topTrailing) {
+      LocalNoticeStack(center: account.localNotices,
+        focused: inputHasFocus && typingWindowHasFocus && session.hasStarted && !session.isFinished)
+        .padding(12)
     }
     .tint(activeTheme.accent)
     .preferredColorScheme(themePreviewPresentation.preferredColorScheme)
@@ -1495,7 +1501,10 @@ private struct ContentView: View {
         guard acceptsLeavingPracticeNavigation() else { return }
         showingRewardInbox = true
       }
-      Button { showingNotifications = true } label: {
+      Menu {
+        Button("会话通知") { showingLocalNoticeHistory = true }
+        Button("社交通知") { showingNotifications = true }
+      } label: {
         HStack(spacing: 4) {
           Label("通知", systemImage: "bell")
           if let unreadNotificationCount, unreadNotificationCount > 0 {
@@ -1568,6 +1577,7 @@ private struct ContentView: View {
       NotificationsView(account: account) { unreadNotificationCount = $0 }
     }
     .sheet(isPresented: $showingRewardInbox) { RewardInboxView(account:account) }
+    .sheet(isPresented: $showingLocalNoticeHistory) { LocalNoticeHistoryView(center: account.localNotices) }
     .sheet(item: $signedOutResultClaimSheetState) { state in
       SignedOutResultClaimView(
         result: state.result,
@@ -4347,6 +4357,9 @@ private struct ContentView: View {
         id: "notifications", title: "打开通知", subtitle: "查看好友请求和接受事件", systemImage: "bell",
         keywords: ["notification", "通知", "好友请求"], group: .connections),
       .init(
+        id: "notification-history", title: "打开会话通知", subtitle: "最近 25 条本机提示和错误详情", systemImage: "bell.badge",
+        keywords: ["notification", "history", "通知历史", "会话", "详情"], group: .library),
+      .init(
         id: "reward-inbox", title: "打开奖励收件箱", subtitle: "查看邮件并领取 XP 或徽章奖励", systemImage: "tray",
         keywords: ["inbox", "收件箱", "奖励", "xp"], group: .connections),
       ReleaseHistoryCommand.item,
@@ -4793,6 +4806,7 @@ private struct ContentView: View {
       guard acceptsLeavingPracticeNavigation() else { return }
       showingConnections = true
     case "notifications": showingNotifications = true
+    case "notification-history": showingLocalNoticeHistory = true
     case "reward-inbox":
       guard acceptsLeavingPracticeNavigation() else { return }
       showingRewardInbox = true
@@ -5821,6 +5835,7 @@ private struct CompletedResultView: View {
   let onPracticeMissedAndSlowWords: ([String], Int) -> Void
   let onPracticeContextualMissedAndSlowWords: ([String], Int) -> Void
   @State private var exportStatus: String?
+  @State private var showingLocalNoticeHistory = false
   @State private var repeatNotice: String?
   @State private var wpmConsistencyLoader = ResultWPMConsistencyLoader()
   @State private var communityRating: RemoteQuoteRatingResponse?
@@ -6107,6 +6122,8 @@ private struct CompletedResultView: View {
             Button("复制结果图片", action: copyResultImage)
             Divider()
             Button("保存结果图片…", action: saveResultImage)
+            Divider()
+            Button("会话通知") { showingLocalNoticeHistory = true }
           }
           Spacer()
           Button("重复本轮") { repeatResult(from: .button) }
@@ -6170,6 +6187,9 @@ private struct CompletedResultView: View {
     }
     .frame(width: 390, height: min(720, (NSScreen.main?.visibleFrame.height ?? 800) * 0.75))
     .scrollIndicators(.visible)
+    .overlay(alignment: .topTrailing) {
+      LocalNoticeStack(center: account.localNotices, focused: false).padding(12)
+    }
     .overlay {
       ResultCelebrationView(
         isNewPersonalBest: savesResult && resultPersonalBestFeedback?.isNewPersonalBest == true,
@@ -6196,6 +6216,7 @@ private struct CompletedResultView: View {
         listMode: settings.commandPaletteListMode,
         onSelect: runResultCommand)
     }
+    .sheet(isPresented: $showingLocalNoticeHistory) { LocalNoticeHistoryView(center: account.localNotices) }
     .sheet(isPresented: $showingPracticeOptions) {
       CompletedResultPracticeOptionsView(
         availability: resultPracticeAvailability,
@@ -6584,35 +6605,27 @@ private struct CompletedResultView: View {
   }
 
   private func copyResultText() {
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(ResultShareText.make(for: result), forType: .string)
-    exportStatus = "结果文字已复制"
+    copyTextToClipboard(ResultShareText.make(for: result), success: "结果文字已复制")
   }
 
   private func copyResultInput() {
     guard let input = ResultInputText.make(for: result) else {
-      exportStatus = "没有可复制的输入回放"
+      exportNotice("没有可复制的输入回放", level: .notice)
       return
     }
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(input, forType: .string)
-    exportStatus = "实际输入已复制"
+    copyTextToClipboard(input, success: "实际输入已复制")
   }
 
   private func copyResultPrompt() {
     guard let prompt = ResultPromptText.make(for: result, reviews: wordReviews) else {
-      exportStatus = "没有可复制的已练习提示"
+      exportNotice("没有可复制的已练习提示", level: .notice)
       return
     }
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(prompt, forType: .string)
-    exportStatus = "已练习提示已复制"
+    copyTextToClipboard(prompt, success: "已练习提示已复制")
   }
 
   private func copyMissedWords() {
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(MissedWordCopyText.make(words: missedWords), forType: .string)
-    exportStatus = "错词列表已复制"
+    copyTextToClipboard(MissedWordCopyText.make(words: missedWords), success: "错词列表已复制")
   }
 
   private func prepareSlowWordCopy() {
@@ -6623,28 +6636,36 @@ private struct CompletedResultView: View {
 
   private func copySlowWords() {
     guard let threshold = Double(slowWordThresholdText), threshold.isFinite, threshold > 0 else {
-      exportStatus = "请输入大于 0 的 WPM 阈值"
+      exportNotice("请输入大于 0 的 WPM 阈值", level: .error)
       return
     }
     let words = SlowWordCopyPolicy.words(
       reviews: wordReviews, bursts: wordBursts, below: threshold)
     guard !words.isEmpty else {
-      exportStatus = "没有低于 \(slowWordThresholdText) WPM 的已输入词"
+      exportNotice("没有低于 \(slowWordThresholdText) WPM 的已输入词", level: .notice)
       return
     }
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(words.joined(separator: " "), forType: .string)
-    exportStatus = "已复制 \(words.count) 个慢词"
+    copyTextToClipboard(words.joined(separator: " "), success: "已复制 \(words.count) 个慢词")
   }
 
   private func copyResultImage() {
     guard let image = resultImage else {
-      exportStatus = "无法生成结果图片"
+      exportNotice("无法生成结果图片", level: .error)
       return
     }
     NSPasteboard.general.clearContents()
-    NSPasteboard.general.writeObjects([image])
-    exportStatus = "结果图片已复制"
+    let copied = NSPasteboard.general.writeObjects([image])
+    exportNotice(copied ? "结果图片已复制" : "无法写入剪贴板，请重试。", level: copied ? .success : .error)
+  }
+
+  private func copyTextToClipboard(_ text: String, success: String) {
+    exportStatus = LocalNoticeClipboard.copyText(text, center: account.localNotices, success: success) { value in
+      NSPasteboard.general.clearContents()
+      return NSPasteboard.general.setString(value, forType: .string)
+    }
+  }
+  private func exportNotice(_ message: String, level: LocalNoticeLevel) {
+    exportStatus = message; account.localNotices.post(message, level: level)
   }
 
   private func saveResultImage() {

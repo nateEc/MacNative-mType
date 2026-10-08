@@ -2079,6 +2079,7 @@ final class AccountSession {
 
     private(set) var endpoint = "http://127.0.0.1:8080" {
         didSet {
+            if endpoint != oldValue { localNotices.clearForAccountChange() }
             let changedServer = RemoteServerScope(endpoint: oldValue)
                 != RemoteServerScope(endpoint: endpoint)
             defaults.set(endpoint, forKey: endpointKey)
@@ -2093,6 +2094,7 @@ final class AccountSession {
     var currentUser: RemoteAccountUser? {
         didSet {
             if currentUser?.id != oldValue?.id {
+                localNotices.clearForAccountChange()
                 accountResultExportGeneration &+= 1
                 invalidateAccountTagDirectory()
                 invalidateAccountTagHistory()
@@ -2104,6 +2106,7 @@ final class AccountSession {
             }
         }
     }
+    let localNotices = LocalNoticeCenter()
     var developerAccessKeys: [RemoteDeveloperAccessKey] = []
     var remoteResults: [RemoteAccountResult] = []
     private var accountResultExportGeneration: UInt64 = 0
