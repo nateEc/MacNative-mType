@@ -194,4 +194,36 @@ import XCTest
       }
     }
   }
+
+  func testProductionOwnerOverviewRendersWholeProfileWithoutPublicSheetFrameOrNetwork() throws {
+    try withSettings { settings in try withMount { window, host in
+      let suite = "TypebarTests.owner-render.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+      defer { defaults.removePersistentDomain(forName: suite) }
+      let account = AccountSession(defaults: defaults)
+      for (name, dark, suspended, isOwner) in [("owner-overview-light", false, false, true),
+        ("owner-overview-suspended-dark", true, true, true),
+        ("public-profile-sheet-light", false, false, false), ("public-profile-suspended-dark", true, true, false)] {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(profile())) as? [String: Any])
+        object["completedResultCount"] = 20; object["startedTestCount"] = 25
+        object["totalTypingSeconds"] = 3599.5; object["accountSuspended"] = suspended
+        object["bestWPM"] = 60; object["highestConsistency"] = 80.25
+        object["profileDetails"] = ["showActivity": false]
+        object["activity"] = ["lastDay": 100, "testsByDays": [10, 10], "dayBoundaryOffsetHours": 0]
+        object["allTimeLbs"] = ["time": ["15": ["english": ["rank": 2, "count": 3]]]]
+        if !isOwner { object.removeValue(forKey: "activity") }
+        if suspended { object.removeValue(forKey: "allTimeLbs") }
+        let model = try JSONDecoder().decode(RemotePublicProfile.self, from: JSONSerialization.data(withJSONObject: object))
+        account.currentUser = .init(id: model.id, email: "owned@example.invalid", displayName: model.displayName, totalExperience: 0)
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        host.rootView = root(PublicProfileView(profile: model, account: account, settings: settings, isAccountOverview: isOwner),
+          width: isOwner ? 700 : 420, padding: isOwner ? 24 : 0, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: isOwner ? 700 : 420, dark: dark)
+        if isOwner {
+          XCTAssertGreaterThan(host.bounds.height, 620, "Owner content must scroll with the account page, not be trapped in the public sheet")
+        } else {
+          XCTAssertEqual(host.bounds.height, 620, accuracy: 1, "Public profile must retain its existing sheet frame")
+        }
+      }
+    } }
+  }
 }

@@ -52,11 +52,12 @@ enum PublicProfilePersonalBestPresentation {
 struct PublicProfilePersonalBestsView: View {
   let profile: RemotePublicProfile
   let settings: AppSettings
+  var isAccountOverview = false
 
   var body: some View {
     let cards = PublicProfilePersonalBestPolicy.cards(profile)
     VStack(alignment: .leading, spacing: 12) {
-      Text("公开个人最佳").font(.headline)
+      Text(isAccountOverview ? "账户个人最佳" : "公开个人最佳").font(.headline)
       Text(AccountPersonalBestTablePolicy.coverageNotice(profile))
         .font(.caption).foregroundStyle(.secondary)
       ForEach([TestMode.time, .words], id: \.self) { mode in
@@ -86,7 +87,7 @@ struct PublicProfilePersonalBestsView: View {
         }
       }
       if !profile.displayPersonalBests.isEmpty {
-        DisclosureGroup("全部公开纪录 · \(profile.displayPersonalBests.count) 条") {
+      DisclosureGroup("全部\(isAccountOverview ? "账户" : "公开")纪录 · \(profile.displayPersonalBests.count) 条") {
           LazyVStack(alignment: .leading, spacing: 12) {
             ForEach(PublicProfilePersonalBestPolicy.records(profile)) { record in
               VStack(alignment: .leading, spacing: 4) {

@@ -1048,6 +1048,7 @@ struct PublicProfileView: View {
     let profile: RemotePublicProfile
     let account: AccountSession
     let settings: AppSettings
+    var isAccountOverview = false
     @State private var connectionMessage: String?
     @State private var isSendingRequest = false
     @State private var showingReport = false
@@ -1060,7 +1061,20 @@ struct PublicProfileView: View {
     }
 
     var body: some View {
-        ScrollView {
+        Group {
+            if isAccountOverview {
+                profileContent
+            } else {
+                ScrollView { profileContent.padding(32) }
+                    .frame(width: 420, height: 620)
+            }
+        }
+        .sheet(isPresented: $showingReport) {
+            ProfileReportView(profile: profile, account: account)
+        }
+    }
+
+    private var profileContent: some View {
           VStack(spacing: 20) {
             if let avatarURL = profile.discordAvatar?.cdnURL {
                 AsyncImage(url: avatarURL) { phase in
@@ -1084,7 +1098,9 @@ struct PublicProfileView: View {
             Text(profile.displayName).font(.title2.weight(.semibold))
             if profile.accountSuspended {
                 Label(
-                    "此账户处于部署方封禁状态；公开详情、活动、徽章和头像已隐藏。",
+                    isAccountOverview
+                        ? "此账户处于部署方封禁状态；公开详情、徽章和头像已隐藏，本人的 PB 与活动仍可读取。"
+                        : "此账户处于部署方封禁状态；公开详情、活动、徽章和头像已隐藏。",
                     systemImage: "lock.shield")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1133,10 +1149,14 @@ struct PublicProfileView: View {
                 }
             }
             Label(
-                "服务端累计练习 \(totalTypingDuration) · \(profile.startedTestCount) 次开始",
+                "服务端累计练习 \(isAccountOverview ? AccountProfileLifetimePresentation.duration(profile.totalTypingSeconds) : totalTypingDuration) · \(profile.startedTestCount) 次开始",
                 systemImage: "timer")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if isAccountOverview {
+                Text("累计完成率 \(AccountProfileLifetimePresentation.completion(profile)) · 每次完成重启 \(AccountProfileLifetimePresentation.restartRatio(profile)) 次")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
             if profile.practiceHistoryComplete == false {
                 Text("旧账户累计统计仅包含可确认的记录；已丢失的历史未补造。")
                     .font(.caption)
@@ -1182,17 +1202,19 @@ struct PublicProfileView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if !profile.accountSuspended {
+            if !profile.accountSuspended || isAccountOverview {
                 PublicProfileLeaderboardsView(profile: profile)
-                PublicProfilePersonalBestsView(profile: profile, settings: settings)
+                PublicProfilePersonalBestsView(profile: profile, settings: settings, isAccountOverview: isAccountOverview)
             }
             if let activity = profile.activity {
-                PublicProfileActivityCalendar(activity: activity)
+                PublicProfileActivityCalendar(activity: activity, isAccountOverview: isAccountOverview)
             }
-            Text("公开资料不会包含邮箱、令牌或本地练习内容。")
+            Text(isAccountOverview
+                ? "自己的账户概览不受公开活动开关或下方成绩筛选影响；不包含本机练习。"
+                : "公开资料不会包含邮箱、令牌或本地练习内容。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if profile.id != account.currentUser?.id {
+            if !isAccountOverview, profile.id != account.currentUser?.id {
                 HStack {
                     Button("发送好友请求") { sendRequest() }
                         .disabled(account.currentUser == nil || isSendingRequest)
@@ -1203,15 +1225,11 @@ struct PublicProfileView: View {
                     Text(connectionMessage).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Button("完成") { dismiss() }
-                .buttonStyle(.borderedProminent)
+            if !isAccountOverview {
+                Button("完成") { dismiss() }
+                    .buttonStyle(.borderedProminent)
+            }
           }
-          .padding(32)
-        }
-        .frame(width: 420, height: 620)
-        .sheet(isPresented: $showingReport) {
-            ProfileReportView(profile: profile, account: account)
-        }
     }
 
     private func metric(_ title: String, _ value: String) -> some View {
@@ -1259,6 +1277,7 @@ struct PublicProfileView: View {
 
 private struct PublicProfileActivityCalendar: View {
     let activity: RemotePublicProfileActivity
+    var isAccountOverview = false
 
     private static let dayLabelFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -1319,7 +1338,7 @@ private struct PublicProfileActivityCalendar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("近 12 个月公开活动 · \(completedTestCount) 次完成")
+                Text("近 12 个月\(isAccountOverview ? "账户" : "公开")活动 · \(completedTestCount) 次完成")
                     .font(.headline)
                 Spacer()
                 Text(dayBoundaryLabel)
@@ -1338,7 +1357,7 @@ private struct PublicProfileActivityCalendar: View {
             .font(.caption2)
             .foregroundStyle(.secondary)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("公开完成次数强度图例")
+            .accessibilityLabel("\(isAccountOverview ? "账户" : "公开")完成次数强度图例")
             .accessibilityValue("由少到多；近 12 个月共 \(completedTestCount) 次完成")
             HStack(alignment: .top, spacing: 6) {
                 VStack(spacing: 3) {

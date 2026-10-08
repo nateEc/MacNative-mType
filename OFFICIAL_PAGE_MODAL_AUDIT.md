@@ -1,5 +1,9 @@
 # 官方页面与模态能力审计
 
+账户本人概览增量：AccountPage 证据现覆盖 AccountHistoryView 中与筛选集合分离的身份／累计／PB／英语榜／私有近期活动，以及认证 `/v1/profiles/me/overview`。公开隐私开关不隐藏本人日历，公开入口仍受限；新增范围／取消／metadata 刷新、真实 HTTP 身份／无缓存及生产组件取证映射。见 [累计练习合同](ACCOUNT_PRACTICE_LIFETIME_CONTRACT.md)。这不是完整账户页或年度活动／本人动作／实机等价证明，`nativeTestSymbols` 仅登记实际自动化证据，整体 goal active。
+
+该增量最终门禁原生 3,507／服务 487 项零失败零跳过，52 表面证据与 1,041 人工项结构通过；四张新增本人／公开整卡离屏图已检查，12 冻结哈希一致，未启动应用包与原创审计通过。本人年度活动选择、编辑／分享入口、私有徽章披露与连续提示仍缺；实机辅助功能、网络和设备仍待验收，不提升 AccountPage 为完整等价。
+
 2026-10-02 音乐 Shift 页面／窗口作用域增量（最终门禁已通过）：固定 [modifier effect](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/states/modifiers.ts) 只在 test 页注册左右 Shift／Alt 的 keydown/up，切页先清逻辑状态；[PageName](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/pages/page.ts#L8-L20) 与测试页的弹层不是同一概念。本增量用独立弱窗口／视图 owner 注册表显式标记主练习与结果窗口；历史、弱项、同步账户／榜单／资料和好友展示期间为非测试页，设置／关于／版本窗口未标记，命令／挑战／配置等测试页 sheet 继承 sheetParent 宿主。标记 false 的 sheet 可显式阻断继承。不是按窗口标题猜测，不借用长测试关闭保护注册表，不改关闭／退出授权。
 
 监听器继续全 app 更新最后键码／Caps，并识别所有物理修饰键按下／释放；仅选中的练习作用域能更新逻辑 Shift。切到非测试页、返回或换到另一练习窗口只 resetPracticeShift，不停样本／音乐，不清音阶、主音量或最后键码；物理侧键记录保留，非测试页按住 Shift 不能在回来后的普通 Q 上复活逻辑状态。相同页面的 sheet／key 通知不清 Shift；没有监听 resign-key，暂离 app 本身不是切页。注册／拆除和 willClose 发布同步通知，didBecomeKey 与每次键事件同步校正选中作用域，鼠标切页后无需等下次按键才清状态；安装回调重入时返回前再校正。stop 先退休 generation 并移除自身通知，再卸载监听。注册表弱持有窗口，视图 owner UUID 独立移除；作用域用独立 UUID，不把可复用对象地址当活动页身份，全部 owner 退出后的重新注册有新身份，未强迫测试分配器复用地址。同步 NSView 挂接／拆除避免旧异步注册；元数据视图不命中鼠标，SwiftUI 禁用其 hit testing／辅助功能呈现，没有新增交互元素。
@@ -23,7 +27,7 @@
 | --- | --- | --- |
 | `test`（模式、提示、输入、实时统计、计时条、大小写／失焦提示、结果提示） | `TypingCompanion.swift`、`TypingEngine.swift`、`LivePracticeContent.swift`、`NativeTypingInput.swift`、`PaceGuide.swift`、`KeyboardGuide.swift` | 已覆盖。配置语义由固定 schema 测试守护；本机输入、提示和结果不是网页 DOM 的移植。 |
 | `settings`（可搜索设置、快捷导航和自定义设置编辑器） | `PreferencesView.swift`、`SettingsSearch.swift`、`CommandPalette.swift` 及各设置编辑器 | 已覆盖。94 个参考配置键的 92 项映射、1 项原生字体适配和 1 项无广告不适用由 `OfficialLayoutCoverageTests` 守护。 |
-| `account`（历史、统计、图表、个人最佳、资料） | `ArchiveManagementView.swift`、`ResultsAnalytics.swift`、`PersonalBestTable.swift`、`RemoteAccount.swift` | 已覆盖。本机成绩是权威副本；远端服务是显式可选发布与同步目标。固定官方路径与速度／准确率、10／100 次均值、PB 轨迹、单局分析、直方图及日活动的原生等价实现见 [OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md](OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md)。 |
+| `account`（历史、统计、图表、个人最佳、资料） | `ArchiveManagementView.swift`、`ResultsAnalytics.swift`、`PersonalBestTable.swift`、`AccountHistoryView.swift`、`AccountProfileOverview.swift`、`RemoteAccount.swift` | 部分覆盖，非完整账户页等价。本机成绩是权威副本；远端服务是显式可选发布与同步目标。本人累计／PB／英语榜／私有近期活动与筛选集合分离，年度选择、本人动作及实机等缺口见本文顶部。固定官方路径与速度／准确率、10／100 次均值、PB 轨迹、单局分析、直方图及日活动的原生实现见 [OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md](OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md)。 |
 | `account settings`（身份方法、邮箱／密码／显示名、密钥、拉黑、危险操作） | `PreferencesView.swift`、`RemoteAccount.swift`、`LocalAccountReset.swift` | 已覆盖。密码、OAuth、邮箱验证、密码重置、账号删除、开发者密钥及展示名预检均有自建契约；显示名实际写入仍由服务端权威校验。官方“重置个人最佳但保留成绩”的入口以受重新认证保护的服务端公开 PB 新纪元实现，详见 [OFFICIAL_PERSONAL_BEST_RESET_AUDIT.md](OFFICIAL_PERSONAL_BEST_RESET_AUDIT.md)。 |
 | `profile`／`profile search` | `RemoteAccount.swift`、`CloudSyncView.swift`、`ConnectionsView.swift`、`ProfileReportView.swift` | 已覆盖。公开资料只暴露最小公开字段；固定源码的资料页可呈现拥有但未选中的徽章，Typebar 以默认关闭、账户所有者明确开启的“公开显示全部已获得徽章”作隐私等价，资料卡会去重所选徽章，榜单仍只呈现所选一枚。搜索、关系、屏蔽与举报均通过自建服务。 |
 | `friends` | `ConnectionsView.swift`、`DirectConversationView.swift`、`NotificationsView.swift` | 已覆盖。好友请求、接受、解除、屏蔽、通知和已接受好友间受控私信由自建 API 提供。 |

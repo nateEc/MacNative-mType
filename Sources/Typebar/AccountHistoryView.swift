@@ -15,6 +15,7 @@ struct AccountHistoryView: View {
   @State private var selectedDay: Date?
   @State private var selectedChart: AccountResultChartSelection?
   @State private var showingPersonalBests = false
+  @State private var profileOverviewRevision = UUID()
   @State private var selectedGraphResult: UUID?
   @State private var selectedGraphScope: ResultPublicationScope?
   @State private var message: String?
@@ -43,6 +44,7 @@ struct AccountHistoryView: View {
       ScrollViewReader { scroll in
       ScrollView {
         VStack(alignment: .leading, spacing: 20) {
+          AccountProfileOverviewView(account: account, settings: settings, revision: $profileOverviewRevision)
           scopeNotice
           Button("账户个人最佳…") { showingPersonalBests = true }
             .disabled(scope == nil)
@@ -119,7 +121,10 @@ struct AccountHistoryView: View {
       .navigationTitle("账户历史")
       .toolbar {
         ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } }
-        ToolbarItem { Button("刷新") { Task { await account.refreshRemoteResults(); await account.refreshAccountFilterPresets() } }
+        ToolbarItem { Button("刷新") {
+          profileOverviewRevision = UUID()
+          Task { await account.refreshRemoteResults(); await account.refreshAccountFilterPresets() }
+        }
           .disabled(account.isWorking || account.isEditingAccountFilterPresets || account.isLoadingAccountFilterPresets) }
         ToolbarItem { Button("导出全部匹配 CSV…", action: exportCSV)
           .disabled(scope == nil || account.isWorking || exportTask != nil
@@ -220,7 +225,7 @@ struct AccountHistoryView: View {
 
   private var scopeNotice: some View {
     VStack(alignment: .leading, spacing: 5) {
-      Text(account.currentUser?.displayName ?? "未登录").font(.title2.weight(.semibold))
+      Text("已载入成绩 · \(account.currentUser?.displayName ?? "未登录")").font(.title2.weight(.semibold))
       Text("仅当前账户与服务器的已载入元数据，不含本机历史。筛选、统计和最近十条使用整个已载入集合。CSV 另从服务分页读取全部成绩，再按点击时的筛选与排序导出，不受已载入数量或列表分页限制。")
       if let cache = account.accountTagHistoryCache, cache.scope == account.resultPublicationScope {
         Text("已载入 \(account.accountHistoryLoadedResults.count) 条；初始最多最近 1,000 条，新接受成绩随后补入。这不是服务端全部历史或账户总计。")

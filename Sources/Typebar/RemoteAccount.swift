@@ -4237,6 +4237,19 @@ final class AccountSession {
         }
     }
 
+    func loadAccountProfileOverview(scope: ResultPublicationScope,
+        load: () async throws -> RemotePublicProfile) async throws -> RemotePublicProfile {
+        try await loadAccountPersonalBestProfile(scope: scope, load: load)
+    }
+
+    func fetchAccountProfileOverview(scope: ResultPublicationScope) async throws -> RemotePublicProfile {
+        let api = RemoteAccountAPI(endpoint: endpoint)
+        return try await loadAccountProfileOverview(scope: scope) {
+            try await api.request(path: "v1/profiles/me/overview", method: "GET", token: try accessToken(),
+                body: Optional<String>.none, response: RemotePublicProfile.self)
+        }
+    }
+
     func publicProfile(id: UUID) async throws -> RemotePublicProfile {
         let api = RemoteAccountAPI(endpoint: endpoint)
         return try await loadPublicProfile(id: id) {

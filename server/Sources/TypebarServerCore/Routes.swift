@@ -471,6 +471,18 @@ public func configure(
         }
     }
 
+    app.get("v1", "profiles", "me", "overview") { request async throws -> Response in
+        do {
+            let profile = try await authStore.accountProfileOverview(accessToken: try request.accessToken())
+            let response = Response(status: .ok)
+            try response.content.encode(profile)
+            response.headers.replaceOrAdd(name: .cacheControl, value: "private, no-store")
+            return response
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.patch("v1", "profiles", "me") { request async throws -> AuthUserResponse in
         do {
             return try await authStore.updateProfile(

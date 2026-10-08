@@ -2729,6 +2729,16 @@ public actor AuthStore {
     return try detailedPublicProfile(for: user, now: now)
   }
 
+  /// Owner-only snapshot. Public visibility preferences never hide the owner's
+  /// own activity; identity comes exclusively from the authenticated session.
+  public func accountProfileOverview(accessToken: String, now: Date = .now) throws -> PublicProfileResponse {
+    let current = try authenticatedUser(for: accessToken, now: now)
+    guard let user = state.users.first(where: { $0.id == current.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    return try detailedPublicProfile(for: user, now: now, includePrivateActivity: true)
+  }
+
   public func searchPublicProfiles(query: String?, limit: Int?) throws
     -> PublicProfileSearchResponse
   {
@@ -3530,9 +3540,10 @@ public actor AuthStore {
     return publicProfile(for: user, results: results, activity: nil, streak: publicStreak(for: user.id))
   }
 
-  private func detailedPublicProfile(for user: StoredUser, now: Date) throws -> PublicProfileResponse {
+  private func detailedPublicProfile(for user: StoredUser, now: Date,
+    includePrivateActivity: Bool = false) throws -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
-    let shouldShowActivity = !user.accountSuspended && user.profileDetails.showActivity
+    let shouldShowActivity = includePrivateActivity || (!user.accountSuspended && user.profileDetails.showActivity)
     var profile = publicProfile(
       for: user, results: results,
       activity: shouldShowActivity

@@ -59,7 +59,7 @@
   "mapped": {
     "TestSurface": "TypingEngine.swift、TypebarApp.swift、NativeTypingInput.swift",
     "SettingsPage": "PreferencesView.swift、SettingsSearch.swift、CommandPalette.swift",
-    "AccountPage": "ArchiveManagementView.swift、ResultsAnalytics.swift、PersonalBestTable.swift",
+    "AccountPage": "AccountHistoryView.swift、AccountProfileOverview.swift、CloudSyncView.swift、RemoteAccount.swift、ArchiveManagementView.swift、ResultsAnalytics.swift、PersonalBestTable.swift",
     "AccountSettingsPage": "PreferencesView.swift、RemoteAccount.swift、LocalAccountReset.swift",
     "FriendsPage": "ConnectionsView.swift、DirectConversationView.swift、NotificationsView.swift",
     "LeaderboardPage": "CloudSyncView.swift、LeaderboardParameterFilter.swift、LeaderboardPagination.swift",
@@ -107,7 +107,7 @@
   "nativeEvidenceFiles": {
     "TestSurface": ["Sources/Typebar/TypingEngine.swift", "Sources/Typebar/TypebarApp.swift", "Sources/Typebar/NativeTypingInput.swift"],
     "SettingsPage": ["Sources/Typebar/PreferencesView.swift", "Sources/Typebar/SettingsSearch.swift", "Sources/Typebar/CommandPalette.swift"],
-    "AccountPage": ["Sources/Typebar/ArchiveManagementView.swift", "Sources/Typebar/ResultsAnalytics.swift", "Sources/Typebar/PersonalBestTable.swift"],
+    "AccountPage": ["Sources/Typebar/AccountHistoryView.swift", "Sources/Typebar/AccountProfileOverview.swift", "Sources/Typebar/CloudSyncView.swift", "Sources/Typebar/RemoteAccount.swift", "Sources/Typebar/ArchiveManagementView.swift", "Sources/Typebar/ResultsAnalytics.swift", "Sources/Typebar/PersonalBestTable.swift"],
     "AccountSettingsPage": ["Sources/Typebar/PreferencesView.swift", "Sources/Typebar/RemoteAccount.swift", "Sources/Typebar/LocalAccountReset.swift"],
     "FriendsPage": ["Sources/Typebar/ConnectionsView.swift", "Sources/Typebar/DirectConversationView.swift", "Sources/Typebar/NotificationsView.swift"],
     "LeaderboardPage": ["Sources/Typebar/CloudSyncView.swift", "Sources/Typebar/LeaderboardParameterFilter.swift", "Sources/Typebar/LeaderboardPagination.swift"],
@@ -155,7 +155,7 @@
   "nativeTestSymbols": {
     "TestSurface": ["testTimedTestCompletesAtDeadline", "testNativeInputBridgeReportsPhysicalKeyDownRepeatAndKeyUp"],
     "SettingsPage": ["testPracticePreferenceCommandsCoverReferenceChoicesAndRejectMalformedIDs"],
-    "AccountPage": ["testResultHistoryFilterCombinesModeLanguageTagContentOptionsAndPersonalBest", "testCurrentStreakOnlyCountsConsecutiveDaysEndingToday"],
+    "AccountPage": ["testResultHistoryFilterCombinesModeLanguageTagContentOptionsAndPersonalBest", "testCurrentStreakOnlyCountsConsecutiveDaysEndingToday", "testAccountOverviewIsIntegratedBeforeFilteredHistoryControls", "testAuthenticatedOverviewKeepsOwnersHiddenActivityPrivateAndUsesTokenIdentity", "testOverviewRequiresAuthenticationAndRejectsInvalidToken", "testOwnerReadPreservesLifetimeAndPersonalBestsAfterHistoryDeletionWithoutWriting", "testOwnerLifetimeFormattingMatchesCompletePinnedProfileFunctions", "testProductionOwnerOverviewRendersWholeProfileWithoutPublicSheetFrameOrNetwork"],
     "AccountSettingsPage": ["testPasswordChangeVerifiesCurrentPasswordAndRevokesExistingSessions", "testRemoteAccountUserDefaultsLegacyServersToPasswordAndDecodesOAuthMethods"],
     "FriendsPage": ["testConnectionsSupportRequestsAcceptanceAndUserScopedLists", "testNotificationInboxDecodesServerUnreadCountAndLegacyFallback"],
     "LeaderboardPage": ["testLeaderboardPageCompatibilityGatesPaginationForLegacyResponses", "testLeaderboardsExposeStablePagesWithTotalsAndOffsets"],
