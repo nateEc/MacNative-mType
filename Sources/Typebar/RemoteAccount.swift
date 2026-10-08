@@ -4238,13 +4238,24 @@ final class AccountSession {
     }
 
     func publicProfile(id: UUID) async throws -> RemotePublicProfile {
-        try await RemoteAccountAPI(endpoint: endpoint).request(
-            path: "v1/profiles/\(id.uuidString)",
-            method: "GET",
-            token: nil,
-            body: Optional<String>.none,
-            response: RemotePublicProfile.self
-        )
+        let api = RemoteAccountAPI(endpoint: endpoint)
+        return try await loadPublicProfile(id: id) {
+            try await api.request(path: "v1/profiles/\(id.uuidString)", method: "GET", token: nil,
+                body: Optional<String>.none, response: RemotePublicProfile.self)
+        }
+    }
+
+    /// Public reads require no credentials, but a late response from an old
+    /// server/session must not be presented in the current session (including ABA).
+    func loadPublicProfile(id: UUID,
+        load: () async throws -> RemotePublicProfile) async throws -> RemotePublicProfile {
+        try Task.checkCancellation()
+        let generation = accountResultExportGeneration
+        let profile = try await load()
+        try Task.checkCancellation()
+        guard accountResultExportGeneration == generation else { throw RemoteAccountError.accountScopeChanged }
+        guard profile.id == id else { throw RemoteAccountError.unexpectedResponse }
+        return profile
     }
 
     func searchPublicProfiles(query: String) async throws -> [RemotePublicProfile] {

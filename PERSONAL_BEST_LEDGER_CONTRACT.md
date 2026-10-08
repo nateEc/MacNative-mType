@@ -1,5 +1,21 @@
 # 账户个人最佳账本与公开清空
 
+## 搜索结果进入完整公开资料
+
+固定 [ProfileSearchPage](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/ProfileSearchPage.tsx) 路由到资料页，[ProfilePage](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/ProfilePage.tsx) 通过 [getUserProfile](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/queries/profile.ts) 加载完整资料后才显示。原生原先直接展示搜索列表的轻量响应；这些响应有意不附活动和排名，故搜索入口漏显示，不能把下方八档／排名组件测试误作整个入口已经正确的证据。
+
+本轮选择结果后只传稳定用户 ID 到原生加载 sheet，单独匿名 GET 自建服务详细资料，成功后交给现有 PublicProfileView；不扩大搜索列表每行的查询成本，不用摘要替代失败或缺失字段。加载可关闭、失败明确重试，长服务错误可滚动而按钮固定可达。沿用 420×620 资料窗口、系统字体与语义色，不重新设计已存在页面。任务身份包含目标用户、共享会话代数和重试 UUID；显示前核对身份，服务切换或同一账户退出重登（含 ABA）隐藏旧内容并重新加载。同一用户的普通刷新不误触发代数变化。真实 AccountSession 只读帮助函数校验取消、会话代数和响应 UUID，不读 Keychain、不更新 XP／成绩／标签／最后成绩缓存。该帮助函数也保护原有详细资料请求调用方，但未重写其他入口的选择排序或搜索列表请求竞态。
+
+先行测试是实际搜索 sheet 源码接线的静态回归，不是已执行的真实点击：一项一断言按预期失败（0.609 秒，`/tmp/typebar-profile-search-red.log`）。新增实际加载状态／账户读取行为用例覆盖匿名完整活动与名次、失败／重试、错用户、迟到成功／失败、取消以及服务器／账户 ABA；首轮八项零失败（0.042 秒，`/tmp/typebar-profile-search-focused.log`）。并非浏览器原版或真实原生 sheet 交互等价证明，官方一小时查询缓存／自动重试时序未重写为同等机制；本轮按用户动作读取新自建资料快照，不增缓存或迁移。
+
+原版固定 checkout 干净，未复制其实现或资产；归档／设置／数据库／服务协议均不变。本轮使用源码驱动、行为先行、原生设计和同会话有界决策／风险审查约束只读身份边界；没有独立审查、真实账户调用、部署或 Typebar 应用启动。复核反例包括错 UUID、取消后仍返回、旧成功／失败覆盖新请求、服务器／账户 ABA 和长错误挤掉按钮，分别以实际读取／状态测试、可观察任务身份及生产占位组件取证约束；未发现本改动的剩余阻断问题。搜索列表自身竞态、其他入口排序、完整 sheet／设备及官方缓存时序仍开放。PROFILE-LOAD-01／02／03 保持待验，完整 goal active；下方完整 3,489／483 门禁属于前一冻结版本，不冒充本轮全量运行。
+
+本轮最终相关原生 120 项零失败零跳过（24.974 秒，`/tmp/typebar-profile-search-related.log`），含新增八项读取／接线和一项离屏渲染；服务八项含原有搜索／详细资料 HTTP 契约零失败零跳过（0.057 秒，`/tmp/typebar-profile-search-server.log`），没有服务产品修改。渲染六项通过（9.423 秒），四张新生产占位组件浅深色／404／长错误图已逐张检查，按钮未被长文挤掉；所有 21 张输出位于 `/tmp/typebar-profile-search-render.l27TrR`。仅挂载生产占位组件，不启动真实 sheet 的联网任务；每个测试窗口从不显示并关闭，未执行滚轮、键盘、VoiceOver 或原版像素对照。
+
+52 个页面／弹窗证据、1,038 条唯一人工场景结构、diff 空白检查通过。未开窗应用包、严格签名及源码／包内原创性检查退出码 0（`/tmp/typebar-profile-search-package.log`），六个代码／测试／矩阵冻结哈希全部保持一致（`/tmp/typebar-profile-search-frozen.sha256`）。编译、测试、包检查串行，运行期间不改文件，门禁结束后只补文档；进程检查无 Typebar 图形应用。本轮没有重跑全量／十万词耐力或真实磁盘迁移，不能把相关回归等同全量发布验收。
+
+另对前轮慢速做未改代码复现：单独挪威语案例一项通过 15.226 秒（`/tmp/typebar-norwegian-performance-repro.log`），渲染→长词→挪威语同进程顺序七项通过 22.726 秒，其中长词 0.881 秒、挪威语 14.875 秒（`/tmp/typebar-norwegian-render-order-repro.log`）。没有重现前轮 896.409／164.486 秒异常；采样时进程已退出，未取得栈，不据此确定根因或宣称性能问题解决，未做猜测性性能修改。
+
 ## 公开资料英语全部时间榜名次
 
 固定 [UserProfile.LeaderboardPosition](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/UserProfile.tsx) 显示英语 15／60 秒的全部时间榜名次，第一名显示 GOAT，其余由 [formatTopPercentage](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/utils/misc.ts) 计算两位舍入、无强制尾零的百分位。此前原生资料只有 PB 卡，没有排名区域。本阶段原生独立实现，中文名次与“前…%”是显示本地化，不复制 JSX／样式／源码或资产。

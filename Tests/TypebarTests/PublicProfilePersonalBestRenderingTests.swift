@@ -177,4 +177,21 @@ import XCTest
       }
     }
   }
+
+  func testProductionProfileLoadStatesRenderInOneNeverVisibleWindowWithoutNetwork() throws {
+    try withMount { window, host in
+      for (name, dark, message) in [
+        ("profile-loading-light", false, Optional<String>.none),
+        ("profile-loading-dark", true, Optional<String>.none),
+        ("profile-load-error-light", false, "资料读取失败，请重试：服务请求失败（HTTP 404）。"),
+        ("profile-load-long-error-dark", true, String(repeating: "资料读取失败，请检查自建服务地址与网络连接。", count: 24))
+      ] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        host.rootView = root(PublicProfileLoadPlaceholder(message: message, retry: {}, close: {}),
+          padding: 0, dark: dark)
+        _ = try snapshot(host, window: window, name: name, dark: dark)
+        XCTAssertEqual(host.bounds.height, 620, accuracy: 1)
+      }
+    }
+  }
 }

@@ -162,7 +162,7 @@ struct ProfileSearchCommandView: View {
     .frame(width: 520, height: 440)
     .onAppear { inputFocused = true }
     .sheet(item: $selectedProfile) { profile in
-      PublicProfileView(profile: profile, account: account, settings: settings)
+      PublicProfileLoadingView(profileID: profile.id, account: account, settings: settings)
     }
   }
 
