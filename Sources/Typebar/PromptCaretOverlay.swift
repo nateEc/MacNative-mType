@@ -41,9 +41,10 @@ extension TypingCaretStyle {
 struct PromptRendering {
   let text: AttributedString
   let glyphCharacterOffsets: [Int: Int]
+  var emptyWordPlaceholderGlyphID: Int? = nil
 
   static func make(
-    glyphs: [TypingPromptGlyph], indices: [Int],
+    glyphs: [TypingPromptGlyph], indices: [Int], emptyWordPlaceholderGlyphID: Int? = nil,
     renderGlyph: (Int, TypingPromptGlyph) -> AttributedString
   ) -> Self {
     var text = AttributedString()
@@ -52,7 +53,8 @@ struct PromptRendering {
       offsets[index] = text.characters.count
       text += renderGlyph(index, glyphs[index])
     }
-    return Self(text: text, glyphCharacterOffsets: offsets)
+    return Self(text: text, glyphCharacterOffsets: offsets,
+      emptyWordPlaceholderGlyphID: emptyWordPlaceholderGlyphID.flatMap { offsets[$0] == nil ? nil : $0 })
   }
 
   func characterOffset(forGlyphAt index: Int?) -> Int? {
@@ -77,7 +79,8 @@ enum PromptControlCharacterPresentation {
 
   static func plan(
     for glyph: TypingPromptGlyph, style: TypoIndicatorStyle,
-    isZen: Bool = false, isExtra: Bool = false, compositionReplacement: String? = nil
+    isZen: Bool = false, isExtra: Bool = false, compositionReplacement: String? = nil,
+    isEmptyWordPlaceholder: Bool = false
   ) -> PromptGlyphTextPlan {
     let extra = isExtra || glyph.state == .extra
     if let compositionReplacement {
@@ -91,6 +94,9 @@ enum PromptControlCharacterPresentation {
     }
     let isControl = glyph.character == "\t" || glyph.character == "\n"
     if isZen {
+      if isEmptyWordPlaceholder, glyph.state == .current, glyph.character == " " {
+        return .init(text: "_", hint: nil, opacity: 0)
+      }
       return .init(text: String(glyph.character), hint: nil, opacity: isControl ? 0 : 1)
     }
     let replaces = glyph.typedCharacter != nil && style.replacesTarget

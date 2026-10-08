@@ -26,7 +26,10 @@ function completeSpan(startMarker, endMarker) {
 }
 const build = completeSpan('function buildWordHTML(', 'function updateWordWrapperClasses(');
 const update = completeSpan('export let pendingWordData:', '// this is needed in tape mode');
+const appendEmpty = completeSpan('export function appendEmptyWordElement(', 'export function updateWordsInputPosition(');
 const css = fs.readFileSync(path.join(root, 'frontend/src/styles/test.scss'), 'utf8');
+const indexCSS = fs.readFileSync(path.join(root, 'frontend/src/styles/index.scss'), 'utf8');
+assert.match(indexCSS, /\.invisible\s*\{[^}]*opacity: 0;[^}]*visibility: hidden;/);
 assert.match(css, /\.newline\s*\{\s*width: inherit;/);
 assert.match(css, /\.beforeNewline\s*\{[^}]*height: 1em;/);
 assert.match(css, /&\.tabChar,\s*&\.nlChar\s*\{[^}]*opacity: 0\.2;/);
@@ -36,13 +39,19 @@ assert.ok(!asl.includes('nlChar') && !asl.includes('tabChar'));
 function letters(html) {
   return Array.from(html.matchAll(/<letter\b([^>]*)>([\s\S]*?)<\/letter>/g), ([, attributes, body]) => ({
     text: body.includes('fa-level-down-alt') ? '↵' : body.includes('fa-long-arrow-alt-right') ? '→' : body,
-    isExtra: /\bextra\b/.test(attributes), hidden: /opacity:\s*0(?:[;'"\s]|$)/.test(attributes),
+    isExtra: /\bextra\b/.test(attributes), hidden: /\binvisible\b|opacity:\s*0(?:[;'"\s]|$)/.test(attributes),
     isTab: /\btabChar\b/.test(attributes), isReturn: /\bnlChar\b/.test(attributes),
   }));
 }
+let emptyMarkup = '';
+vm.runInNewContext(appendEmpty + '\nappendEmptyWordElement(7);',
+  {wordsEl: {appendHtml(value) { emptyMarkup = value; }}}, {timeout: 1000});
+assert.ok(emptyMarkup.includes("data-wordindex='7'"));
+assert.deepEqual(letters(emptyMarkup).map(({text, hidden}) => ({text, hidden})), [{text: '_', hidden: true}]);
 const samples = [
   ['a\n', ''], ['a\n', 'a\n'], ['\n', '\n'], ['\ta', '\ta'], ['a\t', 'a\t'],
   ['\n', 'X'], ['a', '\n'], ['a', 'a\n'], ['a\n', 'aX'],
+  ['', ''], ['\t', ''],
 ];
 const fixtures = [];
 for (const mode of ['words', 'zen']) for (const style of ['off', 'replace'])
@@ -62,6 +71,9 @@ for (const [original, input] of samples) {
   const display = vm.runInContext('words.get(0).display', context);
   await vm.runInContext('updateWordLetters({wordIndex: 0, input, compositionData: ""})', context);
   const initialLetters = letters(initial), updated = letters(markup);
+  if (mode === 'zen' && input === '') {
+    assert.deepEqual(updated.map(({text, hidden}) => ({text, hidden})), [{text: '_', hidden: true}]);
+  }
   const helpers = (initial.match(/class='(?:beforeNewline|newline|afterNewline)'/g) ?? []).length;
   assert.equal(helpers, display.includes('\n') ? 3 : 0);
   assert.equal(initialLetters.filter(letter => letter.isReturn).length, Array.from(display).filter(char => char === '\n').length);
@@ -72,6 +84,6 @@ for (const [original, input] of samples) {
   if (mode === 'zen' && input.includes('\n')) assert.ok(adjacent.includes("class='newline'"));
   fixtures.push({mode, style, original, input, display, initial: initialLetters, updated, helpers});
 }
-assert.equal(fixtures.length, 36); verify();
+assert.equal(fixtures.length, 44); verify();
 if (option) process.stdout.write(JSON.stringify({pin, fixtures}));
-else console.log('ASL controls source passed (36 complete build/update cases; real Words/Strings, target/extra Return and Zen controls; CSS rules static, owned DOM/hints/RAF, no browser metrics or font assets)');
+else console.log('ASL controls source passed (44 complete build/update cases; real Words/Strings, target/extra Return and Zen controls/empty sentinel; CSS rules static, owned DOM/hints/RAF, no browser metrics or font assets)');

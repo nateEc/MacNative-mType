@@ -1,5 +1,17 @@
 # 原生奖励收件箱与周任务交付
 
+## Zen 空活动词占位与 ASL 实测词框增量
+
+2026-10-09，固定只读参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `appendEmptyWordElement`／`updateWordLetters` 都为 Zen 空活动词生成不可见 `_` 格；`index.scss` 明确 opacity 0／visibility hidden，不是 display none。ASL CSS 仅换字体。本轮 QA 执行完整 append 函数及完整建词／更新与真实 Words／Strings，共 44 组自有输入，不再跳过 Zen 空输入 sentinel。DOM、hint、RAF 与 CSS 数值仍是适配边界，不声称浏览器字体／尺寸或真实输入链路已执行。
+
+真实 `TypingSession` mounted 红测一项两处失败（0.926 秒），证明初始与 Return 后活动空词无词框；首绿 0.248 秒。新增呈现-only 占位 ID，由共用渲染生成隐藏下划线并交给 ASL 词框／布局，不把它当尾部分隔空格。占位文字不写入接受输入、结果、回放或存储；完成后消失，组合 replacement 优先，裁掉的 ID 不恢复。普通分隔空格不变；无新 timer 或依赖。当前／pace 都使用实际框，空活动词连续滚动退休后仍保留原文。Swift 6.2.4、macOS 14；本轮没有引入新的版本敏感 API，既有安装 SDK 的 AttributedString／SwiftUI 布局路径不变。
+
+净增八项：五个会话／共用策略／缺失格测试、两个实际 Zen 滚动会话和一个隐藏占位／双光标／字号组件测试。最初扩大测试因新测试错误引用 `CompletedTestResult.typed` 编译失败，核对实际模型后改查真实会话输入与已保存 replayEvents；第二轮 134 项只有一处命令遗漏固定 Anime 归档环境的源码对照失败，补齐环境不改产品／断言。134 项转绿 11.685 秒，最终 135 项零失败零跳过 11.815 秒。日志完整保留在 `/tmp/typebar-zen-placeholder-{red,first-green,focused,focused-verified,focused-complete,focused-final,source}.log`；不将失败轮计作最终通过。
+
+三张新图 `/tmp/typebar-zen-placeholder-focused-render.60etUT/asl-zen-{empty-after-return,empty-retired-markers,invisible-placeholder}.png` 已逐张检查：实际 Return 后空活动行、退休后独立框、全白隐藏占位。组件窗口从不显示并逐一关闭；零 Typebar 主程序启动。frontend-design 限定为延续原创线描／原生间距，行为优先、源码驱动、最小改动、根因调试及同会话决策／风险复核影响实现，非独立评审。剩余严格空格／已提交空字段、全部组合与回流交错、长提示可见有界渲染、专业手形、真实设备／IME／VoiceOver、浏览器精确字体／间距均开放。六部分／42 历史有界分类不升级，goal active。
+
+最终完整冻结门禁 `/tmp/typebar-zen-placeholder-complete-readiness.log` 终态退出 0：原生 3,795 项零失败零跳过（827.882 秒），服务 501 项零失败零跳过（11.350 秒）；实际十万词耐久 155.767 秒、16 项隔离磁盘迁移冷读 4.794 秒、53 表面、1,096 唯一人工结构、固定元数据／原创边界及未启动应用包资源／URL scheme／严格签名检查全部通过。14 控制布局为 1.096 秒、19 滚动为 4.971 秒、五个占位策略为 0.003 秒。十文件清单 `/tmp/typebar-zen-placeholder-frozen.sha256` 门禁前中后完全一致；62 份原始日志保留 `/tmp/typebar-zen-placeholder-complete-logs.vTFcok`，143 张组件图保留 `/tmp/typebar-zen-placeholder-complete-render.KYgmSp`，三张新图已再次逐张检查。测试日志全文无失败／跳过；CoreData／AddressBook XPC、只读 SwiftData 513 和已有编译／Node 实验警告原样保留，不宣称修复。没有操作真实库／账户／登录／部署，零主程序启动。下面是历史阶段证据。
+
 ## ASL 控制字符格、连续空行与空词退休增量
 
 2026-10-09，固定只读参考仍 `91bd24bb8513785c7364cbea29296ff7adafac41`。核对完整 `buildWordHTML`／`updateWordLetters`、`Words`／`Strings` 和 `test.scss`：Return 是前词末尾的真实 `nlChar`，其后才有换行 helpers；前导／连续 Return 也有控制格，不是零尺寸节点。误输或额外 Return 只是当前格的错误标记，不拥有目标换行。ASL CSS 仅替换字体；没有读取、提取或复用 Gallaudet、FontAwesome、图片或官方产品代码／资产。Swift 6.2.4、SDK 26.2、macOS 14；AttributedString 的切片、removeSubrange 和属性容器依安装 SDK 的公开声明核验。

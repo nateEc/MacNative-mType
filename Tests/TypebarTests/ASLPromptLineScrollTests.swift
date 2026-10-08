@@ -20,8 +20,11 @@ import XCTest
     var rendering: PromptRendering {
       PromptRendering.make(glyphs: session.promptGlyphs,
         indices: PromptGlyphLayout.indices(glyphs: session.promptGlyphs, words: session.promptWordPresentations,
-          hideExtraLetters: false, firstRetainedWordIndex: session.firstRetainedPromptWordIndex)) { _, glyph in
-        let plan = PromptControlCharacterPresentation.plan(for: glyph, style: .off)
+          hideExtraLetters: false, firstRetainedWordIndex: session.firstRetainedPromptWordIndex),
+        emptyWordPlaceholderGlyphID: session.zenEmptyWordPlaceholderGlyphIndex) { index, glyph in
+        let plan = PromptControlCharacterPresentation.plan(for: glyph, style: .off,
+          isZen: session.configuration.mode == .zen,
+          isEmptyWordPlaceholder: index == session.zenEmptyWordPlaceholderGlyphIndex)
         var value = AttributedString(plan.text); value.foregroundColor = .primary.opacity(plan.opacity); return value
       }
     }
@@ -37,7 +40,9 @@ import XCTest
         characterOffsets: rendering.glyphCharacterOffsets, smoothScroll: model.smooth, reducesMotion: model.reduced,
         words: words.enumerated().map { .init(index: $0.offset, glyphID: $0.element.range.lowerBound) },
         firstRetainedWordIndex: model.session.firstRetainedPromptWordIndex,
-        onRetire: { model.retired.append($0); model.session.retirePromptWords($0) }, caretMotion: model.motion)
+        onRetire: { model.retired.append($0); model.session.retirePromptWords($0) },
+        followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: model.session.configuration.mode,
+          slowTimer: false, showAllLines: model.showsAll), caretMotion: model.motion)
       let carets: PromptCaretNativeView.Configuration? = model.markers ? .init(text: AttributedString(),
         mainOffset: nil, paceOffset: nil, mainStyle: .bar, paceStyle: .outline,
         font: font, lineSpacing: 12, rightToLeft: false, accent: .blue, motion: .off,
@@ -97,6 +102,56 @@ import XCTest
       "ASL must receive the same attempt/word-retirement policy as ordinary prompts")
     XCTAssertTrue(app[start.upperBound..<end.lowerBound].contains("words: session.promptWordPresentations"),
       "Production word ownership must come from session metadata, not rendered replacements")
+    XCTAssertTrue(app.contains("emptyWordPlaceholderGlyphID: emptyWordPlaceholder"))
+    XCTAssertTrue(app.contains("isEmptyWordPlaceholder: index == emptyWordPlaceholder"))
+  }
+
+  func testRealZenEmptyActiveWordRetainsItsMeasuredBoxAfterReturn() throws {
+    let model = Model(); model.smooth = false; model.lineCount = 2
+    model.session = TypingSession(configuration: .init(mode: .zen, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init()), prompt: "")
+    let (window, host) = mount(model)
+    defer { window.contentView = nil; window.close() }
+    let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
+    XCTAssertNotNil(container.measuredWordRect(for: 0), "The initial empty Zen word must own a positive placeholder box")
+    model.session.insertBatch("a\n", at: start); pump(host); pump(host)
+    let active = try XCTUnwrap(model.session.promptWordPresentations.first { $0.phase == .active })
+    XCTAssertTrue(active.range.isEmpty); XCTAssertEqual(active.range.lowerBound, 2)
+    let glyph = try XCTUnwrap(container.measuredRect(for: 2))
+    let word = try XCTUnwrap(container.measuredWordRect(for: 2), "The empty active word cannot disappear from word scroll geometry")
+    XCTAssertEqual(word, glyph); XCTAssertGreaterThan(word.width, 0); XCTAssertGreaterThan(word.height, 0)
+    XCTAssertGreaterThan(word.minY, try XCTUnwrap(container.measuredRect(for: 1)).maxY)
+    XCTAssertEqual(model.session.typed, "a\n"); XCTAssertEqual(model.session.prompt, "")
+    XCTAssertEqual(String(model.rendering.text.characters), "a\n_")
+    XCTAssertEqual(model.rendering.emptyWordPlaceholderGlyphID, 2)
+    try capture(host, "asl-zen-empty-after-return")
+    XCTAssertFalse(window.isVisible)
+  }
+
+  func testRealZenEmptyWordScrollRetiresPriorRowsWithoutErasingInput() throws {
+    let model = Model(); model.smooth = false; model.lineCount = 2; model.markers = true
+    model.session = TypingSession(configuration: .init(mode: .zen, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(freedomMode: true)), prompt: "")
+    let (window, host) = mount(model)
+    defer { window.contentView = nil; window.close() }
+    let container = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
+    for (index, word) in ["a\n", "b\n", "c\n"].enumerated() {
+      model.session.insertBatch(word, at: start.addingTimeInterval(Double(index))); pump(host); pump(host)
+      let id = try XCTUnwrap(model.session.zenEmptyWordPlaceholderGlyphIndex)
+      XCTAssertNotNil(container.measuredWordRect(for: id))
+      XCTAssertEqual(model.rendering.emptyWordPlaceholderGlyphID, id)
+    }
+    XCTAssertGreaterThan(model.session.firstRetainedPromptWordIndex, 0)
+    XCTAssertNil(container.measuredRect(for: 0))
+    XCTAssertEqual(model.session.typed, "a\nb\nc\n"); XCTAssertEqual(model.session.prompt, "")
+    let scroll = try XCTUnwrap(descendants(host, NSScrollView.self).first)
+    let active = try XCTUnwrap(container.measuredRect(for: 6))
+    XCTAssertLessThanOrEqual(active.maxY, scroll.contentView.bounds.maxY + 1)
+    try capture(host, "asl-zen-empty-retired-markers")
+    model.session.deleteBackward(at: start.addingTimeInterval(4)); pump(host); pump(host)
+    XCTAssertNil(model.session.zenEmptyWordPlaceholderGlyphIndex)
+    XCTAssertEqual(model.session.typed, "a\nb\nc")
+    XCTAssertFalse(window.isVisible)
   }
 
   func testASLViewportMeasuresActualHandRowsRatherThanFixed184Points() throws {

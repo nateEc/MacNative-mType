@@ -4977,6 +4977,14 @@ struct TypingSession {
     return glyphs.firstIndex { $0.state == .current }
   }
 
+  /// Zen's empty active field has a presentation-only cell. It is never an
+  /// accepted underscore or a separator owned by the preceding word.
+  var zenEmptyWordPlaceholderGlyphIndex: Int? {
+    guard configuration.mode == .zen, !isFinished,
+      typed.isEmpty || typed.last.map(isPromptWordSeparator) == true else { return nil }
+    return typed.count
+  }
+
   private var acceptedPromptGlyphs: [TypingPromptGlyph] {
     if configuration.mode == .zen {
       return TypingPromptPresentation.zenGlyphs(

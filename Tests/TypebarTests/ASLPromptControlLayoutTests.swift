@@ -183,12 +183,18 @@ import XCTest
     XCTAssertEqual(process.terminationStatus, 0, String(decoding: diagnostics, as: UTF8.self))
     guard process.terminationStatus == 0 else { return }
     let evidence = try JSONDecoder().decode(Evidence.self, from: data)
-    XCTAssertEqual(evidence.pin, "91bd24bb8513785c7364cbea29296ff7adafac41"); XCTAssertEqual(evidence.fixtures.count, 36)
+    XCTAssertEqual(evidence.pin, "91bd24bb8513785c7364cbea29296ff7adafac41"); XCTAssertEqual(evidence.fixtures.count, 44)
     for fixture in evidence.fixtures {
       let target = Array(fixture.display), input = Array(fixture.input), zen = fixture.mode == "zen"
       for (index, letter) in fixture.updated.enumerated() {
-        // Zen's empty-input invisible underscore is a separate layout sentinel.
-        if zen && input.isEmpty { continue }
+        if zen && input.isEmpty {
+          let glyph = TypingPromptGlyph(character: " ", state: .current)
+          let plan = PromptControlCharacterPresentation.plan(for: glyph, style: .off,
+            isZen: true, isEmptyWordPlaceholder: true)
+          XCTAssertEqual(plan.text, letter.text); XCTAssertEqual(plan.opacity == 0, letter.hidden)
+          XCTAssertFalse(letter.isExtra); XCTAssertEqual(fixture.updated.count, 1)
+          continue
+        }
         let extra = !zen && index >= target.count
         let character = zen || extra ? input[index] : target[index]
         let state: TypingPromptCharacterState = extra ? .extra
@@ -204,5 +210,26 @@ import XCTest
         XCTAssertEqual(content.ownsLineBreak, character == "\n" && !extra)
       }
     }
+  }
+
+  func testEmptyZenPlaceholderReservesAHiddenUnderscoreBoxAndIndependentCarets() throws {
+    let glyphs = [TypingPromptGlyph(character: " ", state: .current)]
+    let rendering = PromptRendering.make(glyphs: glyphs, indices: [0], emptyWordPlaceholderGlyphID: 0) { _, glyph in
+      let plan = PromptControlCharacterPresentation.plan(for: glyph, style: .both,
+        isZen: true, isEmptyWordPlaceholder: true)
+      var text = AttributedString(plan.text); text.foregroundColor = .clear; return text
+    }
+    let content = ASLPromptGlyphContent.make(glyphs: glyphs, ids: [0], rendering: rendering)[0]
+    XCTAssertEqual(String(content.main.characters), "_"); XCTAssertEqual(content.main.foregroundColor, .clear)
+    XCTAssertFalse(content.ownsLineBreak)
+    let hidden = try measure(glyphs, rendering: rendering, image: "asl-zen-invisible-placeholder")
+    let frame = try XCTUnwrap(hidden.frames[0])
+    XCTAssertGreaterThan(frame.width, 0); XCTAssertGreaterThan(frame.height, 0)
+    XCTAssertEqual(hidden.words[0], frame)
+    let markers = try measure(glyphs, rendering: rendering, mainID: 0, paceID: 0)
+    XCTAssertEqual(markers.main, markers.frames[0]); XCTAssertEqual(markers.pace, markers.frames[0])
+    let large = try measure(glyphs, rendering: rendering, fontSize: 40)
+    XCTAssertGreaterThan(try XCTUnwrap(large.frames[0]).width, frame.width)
+    XCTAssertGreaterThan(try XCTUnwrap(large.frames[0]).height, frame.height)
   }
 }

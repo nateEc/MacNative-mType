@@ -800,7 +800,8 @@ struct ASLPracticePrompt: View {
   var body: some View {
     let ids = ids
     let contents = ASLPromptGlyphContent.make(glyphs: glyphs, ids: ids, rendering: rendering)
-    let wordPlan = ASLPromptWordPlan(glyphs: glyphs, ids: ids, words: words)
+    let wordPlan = ASLPromptWordPlan(glyphs: glyphs, ids: ids, words: words,
+      placeholderGlyphID: rendering?.emptyWordPlaceholderGlyphID)
     return ASLPromptFlowLayout {
       ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
         if rendering != nil && rendering?.glyphCharacterOffsets[ids[index]] == nil {
@@ -810,7 +811,8 @@ struct ASLPracticePrompt: View {
             font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
             .layoutValue(key: ASLPromptWordIDKey.self, value: wordPlan.wordByGlyphID[ids[index]] ?? ids[index])
             .layoutValue(key: ASLPromptLineBreakKey.self, value: contents[index].ownsLineBreak)
-            .layoutValue(key: ASLPromptSeparatorKey.self, value: glyph.character == " " && glyph.state != .extra)
+            .layoutValue(key: ASLPromptSeparatorKey.self,
+              value: glyph.character == " " && glyph.state != .extra && ids[index] != wordPlan.placeholderGlyphID)
             .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [ids[index]: $0] }
         }
       }
@@ -3139,7 +3141,9 @@ private struct ContentView: View {
       mode: promptHighlightMode, blindMode: session.configuration.rules.blindMode,
       typedEffect: settings.typedCharacterEffect,
       hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
-    return PromptRendering.make(glyphs: glyphs, indices: indices) { index, glyph in
+    let emptyWordPlaceholder = session.zenEmptyWordPlaceholderGlyphIndex
+    return PromptRendering.make(glyphs: glyphs, indices: indices,
+      emptyWordPlaceholderGlyphID: emptyWordPlaceholder) { index, glyph in
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
         isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
         effect: settings.typedCharacterEffect)
@@ -3149,7 +3153,8 @@ private struct ContentView: View {
       let textPlan = PromptControlCharacterPresentation.plan(
         for: glyph, style: settings.typoIndicatorStyle,
         isZen: session.configuration.mode == .zen, isExtra: index >= targetGlyphCount,
-        compositionReplacement: replacesCurrentWithComposition ? compositionText : nil)
+        compositionReplacement: replacesCurrentWithComposition ? compositionText : nil,
+        isEmptyWordPlaceholder: index == emptyWordPlaceholder)
       let displayedText: String
       if turnsIntoDot {
         displayedText = "•"

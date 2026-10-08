@@ -4,8 +4,10 @@ import SwiftUI
 /// string. IDs survive reordered extras and retirement of the visible prefix.
 struct ASLPromptWordPlan {
   let wordByGlyphID: [Int: Int]
+  let placeholderGlyphID: Int?
 
-  init(glyphs: [TypingPromptGlyph], ids: [Int], words: [TypingPromptWordPresentation]?) {
+  init(glyphs: [TypingPromptGlyph], ids: [Int], words: [TypingPromptWordPresentation]?, placeholderGlyphID: Int? = nil) {
+    self.placeholderGlyphID = placeholderGlyphID
     var owners: [Int: Int] = [:]
     if let words {
       let separators = Set(glyphs.enumerated().compactMap { index, glyph in
@@ -35,7 +37,7 @@ struct ASLPromptWordPlan {
   func measuredWords(frames: [Int: CGRect], glyphs: [TypingPromptGlyph], ids: [Int]) -> [Int: CGRect] {
     var words: [Int: CGRect] = [:]
     for (index, glyph) in glyphs.enumerated() where ids.indices.contains(index) {
-      guard !(glyph.character == " " && glyph.state != .extra),
+      guard !(glyph.character == " " && glyph.state != .extra && ids[index] != placeholderGlyphID),
         let owner = wordByGlyphID[ids[index]], let frame = frames[ids[index]],
         frame.width > 0, frame.height > 0 else { continue }
       words[owner] = words[owner].map { $0.union(frame) } ?? frame
