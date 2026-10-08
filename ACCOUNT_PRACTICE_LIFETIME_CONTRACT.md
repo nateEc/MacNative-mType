@@ -1,5 +1,27 @@
 # 账户累计练习、活动与连续天数
 
+## 公开资料关系与重复请求抑制增量
+
+固定源码 [ActionButtons／AvatarAndName](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/UserDetails.tsx)、[connections 集合](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/collections/connections.ts) 和 user-flag-controller 表明：只有已认证、非本人、没有任何已知关系时显示添加入口；已接受关系才显示好友标记，待处理或 blocked 不冒充好友。原生此前无条件显示发送按钮，本增量以独立 Swift 状态／系统 Label 和 Button 补齐。待处理方向分开显示，并指引既有好友页接受／拒绝；已有好友、自己已屏蔽、加载／未知／失败不提供重复发送。举报入口继续保留。本人概览、本人公开页、未登录及匿名只读分享不读取登录关系；匿名分享仍不构造这一组件，不借当前令牌跨服读取。
+
+`ProfileRelationshipIdentity` 固定目标 UUID、原始 endpoint、标准化账户范围、登录／服务器 ABA 代次、关系修订号和重试身份。认证 GET 沿用 `/v1/connections` 与 `/v1/blocks`，同一捕获 endpoint／令牌串行读取；每次挂起前后检查取消和当前范围。只保留视图内目标状态，不把好友／屏蔽列表写入公开 DTO、全局缓存、默认偏好、SwiftData 或磁盘。两次 GET 不是事务快照，已知本人屏蔽优先于旧关系；读失败明确未知，不推断无关系。对方是否屏蔽本人仍由服务泛化错误保护，不从本人屏蔽列表反推对方私有状态。
+
+资料页 POST 同样绑定点击时范围，发送前要求最新关系修订；成功回应必须是目标 UUID 的 outgoingRequest，之后允许自己的成功使关系修订失效。双击、过期范围与已知关系在提供者／凭据读取前拒绝。请求取消或网络失败不代表服务端回滚：状态明确“可能已收到”，需显式刷新后才可重发，不自动重试。关闭／身份变化取消本地等待；操作 nonce 防止旧任务清理新任务或回写状态。加载 nonce 还防同一请求身份的迟到成功／失败覆盖新读取；错账户状态立即隐藏。
+
+同应用六条成功好友操作（新资料页发送、既有发送／接受／解除／屏蔽／解除屏蔽）发布仅内存 `profileRelationshipRevision`。只有原作用域仍有效才发布，已打开资料页的实际 task 身份随之变化并重读；旧登录的迟到成功不刷新新用户。关系新鲜度与认证代次分开，既能拒绝读过程中发生变化的旧快照，也不会把自己的成功发送误判成账户切换。不宣称已全面改写既有好友管理页其他网络生命周期；该页面自己的加载／写入作用域仍需另行审查。没有后台轮询、持久缓存或新应用实例。
+
+产品外 `check-source-profile-relationship.mjs` 只读执行完整实际 hasConnection、实际本人／添加按钮谓词及完整用户标记模块的好友投影；20 组认证／本人／无关系／双向 pending／accepted／blocked 与原生发送可用性、好友状态逐组对照。集合、身份、props 为明确自有适配器，不运行 TanStack DB、Solid、浏览器、HTTP、原版乐观事务或五分钟缓存。探针加入串行门禁，原实现／资产没有进入产品。原生稳定 UUID／显式新鲜读取与原版展示名、全局实时集合不是逐控制器同构；跨设备更新仍需刷新，不据有界探针宣称全部等价。
+
+兼容性与回退：既有自建接口／请求体／响应／存储均不变，旧客户端不受影响；旧服务缺关系／屏蔽读取时显示失败和刷新，不回退为可写的“无关系”。回退代码不需数据迁移，但已发送的服务器请求仍保留。本轮不部署、不修改凭据或任何真实关系。设计沿用原生字体、语义色和状态文字，好友标记不是官方图标／品牌资产；源码驱动、行为先行、设计、迁移安全及同会话有界决策／风险复核促使补同应用刷新、写入不确定状态和双代次守卫，非独立评审。
+
+先行接线测试一项四处预期失败（0.587 秒，`/tmp/typebar-profile-relationship-red.log`）。首轮聚焦编译因测试将 async 放入 XCTest 同步闭包而失败，保留 `/tmp/typebar-profile-relationship-focused.log`；按 root-cause-debugging 只改测试等待位置，并把取消测试放入独立子任务，不放宽生产协议。修正后相关 46 项零失败零跳过（25.534 秒，`/tmp/typebar-profile-relationship-verified.log`）；补同应用失效后相关 48 项零失败零跳过（24.799 秒，`/tmp/typebar-profile-relationship-final-focused.log`）。最后发送前新鲜度与成功自失效修订后，14 项关系模型／读取／写入／取消／迟到／源码对照零失败零跳过（0.422 秒，`/tmp/typebar-profile-relationship-scope-verified.log`）；使用自有提供者，不触碰真实 Keychain 或网络。源码 20 组通过日志 `/tmp/typebar-profile-relationship-source.log`。最终冻结门禁与图像结果另记。
+
+最终冻结完整串行门禁退出 0：原生 3,574 项零失败／零跳过（809.670 秒），服务 495 项零失败／零跳过（10.980 秒）；实际十万词耐久 156.514 秒、16 项隔离磁盘冷读 7.477 秒通过。52 页面证据、1,056 人工清单结构、固定源码／原创边界、未启动应用包／scheme／严格签名通过。主日志 `/tmp/typebar-profile-relationship-complete-readiness.log`，55 份分项日志 `/tmp/typebar-profile-relationship-complete-logs.rJSvTR`；9 份生产／测试／脚本／矩阵冻结哈希前后一致（`/tmp/typebar-profile-relationship-frozen.sha256`），运行中未编辑，结束后仅补三份文档结果。此前独立补充的等级控件绑定测试本轮已包含在同一全量套件内。
+
+最终 53 张图位于 `/tmp/typebar-profile-relationship-complete-render.uCISJQ`，新增八张关系状态图逐张检查，浅深色、禁用按钮和长失败文字均无明显裁切；组件渲染不发请求、不点击按钮、不激活窗口。系统 AddressBook／CoreData XPC 警告仍在，日志亦保留隔离临时只读 PB／归档 store 的保存失败诊断；不声称这些诊断根因已消除，也不把单轮耗时当成性能离群已解决。等级进度轨道的实际可见窗口绘制仍待验，未为截图替换系统控件。同会话有界风险复核未发现本增量其他阻断项，非独立评审。
+
+新增三个人工项全部待验收，整体清单 1,056 项仅结构盘点。实际多窗口同步、按钮／关闭交互、VoiceOver／键盘、真实网络／后台恢复／目标设备与完整功能无损仍未证明；加入时长提示、主题精确身份、离线目录备份等缺口继续追踪，goal active。零 Typebar 应用启动，编译／测试串行，无真实 Typebar 数据库／Keychain／账户读取或部署。
+
 ## 等级进度与本人连续提示增量
 
 只读核对固定 UserDetails、完整 levels／数字格式函数、完整 date-and-time 模块、Bar 百分比以及现有 snapshot／保存路径。公开和本人资料新增原生等级、两位小数百分比、当前等级 XP／所需 XP／升级差值和可展开精确整数详情；保留从等级 1 开始、首级 100 XP、之后每级递增 49 XP 的曲线。独立整数阈值二分避免平方根逆函数在大安全整数处提前升级；不修改奖励、总 XP 或排行榜。超出 JavaScript 安全整数域明确不可用，不补造等级。

@@ -159,6 +159,28 @@ import XCTest
     }
   }
 
+  func testProductionRelationshipStatesRenderWithoutRequestsOrWindowActivation() throws {
+    try withMount { window, host in
+      for (name, status, sending, dark) in [
+        ("relationship-unavailable-light", ProfileRelationshipStatus.unavailable, false, false),
+        ("relationship-ready-light", .notConnected, false, false),
+        ("relationship-sending-dark", .notConnected, true, true),
+        ("relationship-outgoing-light", .outgoingRequest, false, false),
+        ("relationship-incoming-dark", .incomingRequest, false, true),
+        ("relationship-friend-light", .friend, false, false),
+        ("relationship-blocked-dark", .blocked, false, true),
+        ("relationship-failed-narrow", .failed("发送未确认，服务端可能已收到；请刷新关系后再操作。" + String(repeating: "隔离测试中的网络失败详情。", count: 6)), false, false)
+      ] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        var calls = 0
+        host.rootView = root(ProfileRelationshipContent(status: status, isSending: sending,
+          refresh: { calls += 1 }, send: { calls += 1 }), width: 360, padding: 16, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: 360, dark: dark)
+        XCTAssertEqual(calls, 0); XCTAssertFalse(window.isVisible)
+      }
+    }
+  }
+
   func testProductionAnnualActivityRendersLeapSparseEmptyAndIncompleteWithoutNetwork() throws {
     try withMount { window, host in
       var leap = Array<Int?>(repeating: nil, count: 366); leap[0] = 3; leap[59] = 7; leap[365] = 9

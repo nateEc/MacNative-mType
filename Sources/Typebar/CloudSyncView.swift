@@ -1052,8 +1052,6 @@ struct PublicProfileView: View {
     var allowsAccountActions = true
     var usesAnonymousMedia = false
     var editProfile: (() -> Void)? = nil
-    @State private var connectionMessage: String?
-    @State private var isSendingRequest = false
     @State private var showingReport = false
 
     private var badges: AccountProfileBadgePresentation {
@@ -1241,15 +1239,9 @@ struct PublicProfileView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if allowsAccountActions, !isAccountOverview, profile.id != account.currentUser?.id {
-                HStack {
-                    Button("发送好友请求") { sendRequest() }
-                        .disabled(account.currentUser == nil || isSendingRequest)
-                    Button("举报资料") { showingReport = true }
-                        .disabled(account.currentUser == nil)
-                }
-                if let connectionMessage {
-                    Text(connectionMessage).font(.caption).foregroundStyle(.secondary)
-                }
+                ProfileRelationshipView(profileID: profile.id, account: account)
+                Button("举报资料") { showingReport = true }
+                    .disabled(account.currentUser == nil)
             }
             if !isAccountOverview {
                 Button("完成") { dismiss() }
@@ -1287,18 +1279,6 @@ struct PublicProfileView: View {
         return website
     }
 
-    private func sendRequest() {
-        Task {
-            isSendingRequest = true
-            defer { isSendingRequest = false }
-            do {
-                _ = try await account.sendConnection(to: profile.id)
-                connectionMessage = "好友请求已发送。"
-            } catch {
-                connectionMessage = error.localizedDescription
-            }
-        }
-    }
 }
 
 struct PublicProfileActivityCalendar: View {
