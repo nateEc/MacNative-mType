@@ -105,7 +105,7 @@ struct PublicProfilePersonalBestsView: View {
   }
 }
 
-private struct PublicProfilePersonalBestDetails: View {
+struct PublicProfilePersonalBestDetails: View {
   let best: RemotePublicProfileBest
   let settings: AppSettings
   var body: some View {
