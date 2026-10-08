@@ -773,9 +773,11 @@ enum PromptCaretLayout {
 
 extension PracticeFont {
   func nsFont(
-    size: CGFloat, installedFontName: String = "", language: TypingLanguage = .english
+    size: CGFloat, installedFontName: String = "", language: TypingLanguage = .english,
+    resolver: NativePracticeFont.Resolver = .init(), purpose: NativePracticeFont.Resolver.Purpose = .practice
   ) -> NSFont {
-    if let font = NativePracticeFont.nsFont(named: installedFontName, size: size) {
+    if let name = resolver.postScriptName(for: installedFontName, purpose: purpose),
+      let font = NSFont(name: name, size: size) {
       return LanguagePracticeFontFallback.applying(to: font, language: language)
     }
     let systemFont: NSFont = switch self {

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -10,6 +11,62 @@ enum FontFamilyCommandTarget: Equatable {
   case localFile
   case useLocalFile
   case removeLocalFile
+}
+
+enum FontFamilyCommandPreviewPolicy {
+  static func savedName(challengeID: String?, installedName: String) -> String {
+    challengeID == "ten-words-of-pain" ? WingdingsChallengeFont.familyName : installedName
+  }
+
+  static func target(for item: CommandPaletteItem?) -> FontFamilyCommandTarget? {
+    guard let item, let target = FontFamilyCommandCatalog.target(for: item.id) else { return nil }
+    switch target {
+    case .systemDesign, .knownIdentifier, .installedName: return target
+    default: return nil
+    }
+  }
+
+  static func font(for target: FontFamilyCommandTarget?, size: CGFloat, fallback: PracticeFont,
+    resolver: NativePracticeFont.Resolver = .init()) -> NSFont? {
+    let design: PracticeFont, name: String
+    switch target {
+    case .systemDesign(let selected): design = selected; name = ""
+    case .knownIdentifier(let identifier):
+      guard FontFamilyCommandCatalog.fixedKnownFontIDs.contains(identifier) else { return nil }
+      design = fallback; name = identifier
+    case .installedName(let selected): design = fallback; name = selected
+    default: return nil
+    }
+    return design.nsFont(size: size, installedFontName: name,
+      resolver: resolver, purpose: .catalogPreview)
+  }
+}
+
+/// A reference preview/clear changes presentation only. Clearing uses the
+/// latest saved family (not the opening snapshot or imported-file cascade).
+struct FontFamilyCommandPreviewState {
+  private(set) var target: FontFamilyCommandTarget?
+  private(set) var isPreviewing = false
+
+  mutating func select(_ item: CommandPaletteItem?, savedFont: PracticeFont, savedName: String) {
+    clear(savedFont: savedFont, savedName: savedName)
+    if let selected = FontFamilyCommandPreviewPolicy.target(for: item) {
+      target = selected
+      isPreviewing = true
+    }
+  }
+
+  mutating func clear(savedFont: PracticeFont, savedName: String) {
+    guard isPreviewing else { return }
+    target = savedName.isEmpty ? .systemDesign(savedFont) : .installedName(savedName)
+    isPreviewing = false
+  }
+
+  mutating func appliedFontFamily() {
+    target = nil
+    // Like applyFontFamily, a saved application does not itself clear the
+    // source's preview flag; a later dismissal still restores the saved name.
+  }
 }
 
 enum FontFamilyCommandCatalog {

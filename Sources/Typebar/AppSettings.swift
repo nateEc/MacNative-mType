@@ -1141,6 +1141,7 @@ final class AppSettings {
   private(set) var activeTestSelectionGeneration = 0
   // Presentation event identity only; never part of a saved settings snapshot.
   private(set) var practiceWrapperRevision: UInt64 = 0
+  private(set) var practiceFontApplicationRevision: UInt64 = 0
 
   var activeTestSelection: ActiveTestSelectionDocument? {
     ActiveTestSelectionStore(defaults: defaults).load()
@@ -1235,14 +1236,14 @@ final class AppSettings {
       }
     }
   }
-  var practiceFont: PracticeFont = .monospaced { didSet { persist() } }
+  var practiceFont: PracticeFont = .monospaced { didSet { persistPracticeFontApplication() } }
   var installedPracticeFontName = "" {
     didSet {
       let normalized = NativePracticeFont.normalizedName(installedPracticeFontName)
       if installedPracticeFontName != normalized {
         installedPracticeFontName = normalized
       } else {
-        persist()
+        persistPracticeFontApplication()
       }
     }
   }
@@ -2425,6 +2426,11 @@ final class AppSettings {
     // A successful source setter dispatches even when its value is unchanged.
     // Keep ABA/repeated events visible without adding a persisted setting.
     practiceWrapperRevision &+= 1
+    persist()
+  }
+
+  private func persistPracticeFontApplication() {
+    practiceFontApplicationRevision &+= 1
     persist()
   }
 

@@ -1,5 +1,17 @@
 # 原生奖励收件箱与周任务交付
 
+## 字体命令临时预览与清除生命周期增量
+
+最终完整冻结门禁 `/tmp/typebar-font-command-preview-final-readiness.log` 终态退出 0：原生 3,841 项零失败零跳过（828.316 秒），服务 501 项（11.414 秒）；十万词耐久 155.429 秒、16 项隔离磁盘冷读 4.740 秒、53 表面、1,103 唯一人工场景结构、元数据及未启动应用包资源／URL scheme／严格签名／原创边界通过。11 新增在全量中 0.686 秒；12 条完整字体预览轨迹及既有配置／居中回归通过。九文件 `/tmp/typebar-font-command-preview-final-frozen.sha256` 门禁前中后完全一致，64 原始日志 `/tmp/typebar-font-command-preview-final-logs.5dzdLf`、156 图 `/tmp/typebar-font-command-preview-final-images.7Vdg73` 保留；最终三张 font-command-preview-{initial,active,restored}.png 已逐张复查，显示实际文字宽度／换行变化和恢复，透明留白不是完整应用窗口。无断言失败／跳过，既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告原样保留，不宣称修复。终态后才更新交付文档，没有运行中编辑或并行验收；零 Typebar 主程序启动，无残留测试／编译／主程序进程。未操作真实账户、Keychain、成绩库或部署；完整 goal active，以下为阶段证据。
+
+2026-10-09，固定干净参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。原版 fontFamily subgroup 的 hover 回调调用 previewFontFamily；完整 updateActiveCommand 先清旧预览，再执行新命令 hover，空结果／非字体／hide 也清除。完整 preview／apply／clear 有重要差异：preview 不读本地字体文件，clear 以当前 Config.fontFamily 重设 CSS，不重新执行本地文件及语言 preferred-font 的 apply；apply 本身不清 isPreviewingFont。新 QA 脚本执行完整上述函数、完整 active-command／hide 和实际 hover 回调，12 条含 store／chain／legacy、local／preferred、空与非字体、期间改保存名、重复清除的轨迹通过。DOM、modal、文件／语言读取与保存名变更是自有边界，不是实际浏览器、完整 setter／异步文件调度或字体像素对照。
+
+原生新增独立临时预览状态，复用命令面板既有鼠标／键盘活动项回调和关闭生命周期。固定 43 项与系统设计可预览，文件／导航动作不预览；共用 practicePromptNSFont 同时服务提示文字、视口、普通／ASL／Tape／Choo 与光标测量，预览和按名称恢复都绕过本地文件覆盖／preferred 级联，不停用、删除或注册字体。恢复读取当前保存名而非旧快照；真正应用字体清临时覆盖，但保留原版 preview flag 至后续 clear。新增不持久化的字体应用代次，使同值和归一化名称事件不被 onChange 值相等吞掉，与 wrapper revision 分开，不引发强制旧词清理。语言／本地文件应用及挑战切换清覆盖，Wingdings 挑战的保存名取挑战有效名，不误用普通设置或离开后残留。
+
+红测 `/tmp/typebar-font-command-preview-red.log` 四项 52 处真实失败（0.701 秒），验证缺预览／解析／生产接线；首绿 `first-green.log` 相关八项零失败 0.141 秒。扩大轮 `focused.log` 保留测试里值类型 session 误用 let 与嵌套 Model actor 编译错误，不当作行为红测；修正测试声明后 `focused-built.log` 相关 54 项零失败零跳过（10.310 秒）。收尾补挑战离开时清覆盖，最终 `final-focused.log` 54 项零失败零跳过（10.309 秒），其中 11 新增 0.758 秒；source.log 的 12 条完整函数轨迹通过。真实 CommandPaletteView 出现／消失回调、保存状态不变、原始输入／会话／回放、同值／归一化、当前名恢复、本地 resolver 不被读取、挑战有效名及生产共用字体接线有回归。三图 `/tmp/typebar-font-command-preview-images.upjeVS/font-command-preview-{initial,active,restored}.png` 已逐张检查，是带透明留白的隔离组件位图而非完整应用窗口；窗口从不显示并逐一关闭，零主程序启动。
+
+行为优先／源码驱动／最小改动、根因调试及同会话有界决策／风险审查影响上述边界，不是独立评审。frontend-design 保持已有原生面板配色、字号层级和布局，只补字体交互；Swift 6.2.4／SDK 26.2／最低 macOS 14，无新依赖／Timer／持久化字段或存储迁移。SettingsPage nativeTestSymbols 与两人工待验项补证，94 配置仍 91 映射／2 部分／1 不适用，字体和其他分类不升级。全部周边页面字体、真实 hover／键盘、文件异步／字体加载与排版竞态、全部字体资产／joining／IME、Tape RTL／换行／退休、长预览与视口虚拟化、设备仍开放；完整 goal active。最终冻结结果见本节首段，以下为历史阶段。
+
 ## Wrapper 配置事件与 fontFamily 例外增量
 
 最终完整冻结门禁 `/tmp/typebar-wrapper-config-final-readiness.log` 终态退出 0：原生 3,830 项零失败零跳过（823.735 秒），服务 501 项（12.613 秒）；十万词耐久 153.530 秒、16 项隔离磁盘冷读 4.890 秒、53 表面、1,101 唯一人工场景结构、元数据及未启动应用包资源／URL scheme／严格签名／原创边界通过。十新增在全量中 4.560 秒，64 源码链路及既有 56 center／退休路径通过；四张最终组件图已再次逐张检查。10 文件 `/tmp/typebar-wrapper-config-final-frozen.sha256` 门禁前中后完全一致；63 原始日志 `/tmp/typebar-wrapper-config-final-logs.lCodvg`、153 图 `/tmp/typebar-wrapper-config-final-images.rW5apb` 保留。无断言失败／跳过，既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。终态后才更新交付文档，没有运行中编辑或并行验收；零主程序启动，无残留测试／编译／主程序进程，没有操作真实账户、Keychain、成绩库或部署。完整 goal active，下方记录阶段证据。

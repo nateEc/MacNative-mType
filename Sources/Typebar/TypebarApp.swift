@@ -990,6 +990,7 @@ private struct ContentView: View {
   @State private var themeQuickPickerScope: ThemeQuickPickerScope?
   @State private var themeQuickSwitchMessage: String?
   @State private var commandThemePreviewTarget: ThemeCommandTarget?
+  @State private var commandFontPreview = FontFamilyCommandPreviewState()
   @State private var quickPickerThemePreviewTarget: ThemeCommandTarget?
   @State private var showingProfileSearchCommandEditor = false
   @State private var sharedProfileInbox = SharedProfileLinkInbox()
@@ -1183,7 +1184,12 @@ private struct ContentView: View {
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: showingCommandPalette) { _, showing in
       if showing { visualFocus.retire() }
+      else { clearCommandFontPreview() }
     }
+    .onChange(of: settings.practiceFontApplicationRevision) { _, _ in commandFontPreview.appliedFontFamily() }
+    .onChange(of: settings.localPracticeFontRevision) { _, _ in commandFontPreview.appliedFontFamily() }
+    .onChange(of: session.configuration.language) { _, _ in commandFontPreview.appliedFontFamily() }
+    .onChange(of: activeChallengeID) { _, _ in commandFontPreview.appliedFontFamily() }
     .onChange(of: session.hasStarted) { _, started in
       if started, !session.isFinished { visualFocus.set(true) }
     }
@@ -1555,6 +1561,7 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingCommandPalette, onDismiss: {
       commandThemePreviewTarget = nil
+      clearCommandFontPreview()
       presentQueuedReferenceScriptImport()
     }) {
       CommandPaletteView(
@@ -1562,6 +1569,8 @@ private struct ContentView: View {
         onSelect: runCommand,
         onPreview: { item in
           commandThemePreviewTarget = ThemeCommandPreviewPolicy.target(for: item)
+          commandFontPreview.select(item, savedFont: settings.practiceFont,
+            savedName: commandFontFamilyName)
         })
     }
     .sheet(item: $themeQuickPickerScope, onDismiss: { quickPickerThemePreviewTarget = nil }) { scope in
@@ -2962,6 +2971,10 @@ private struct ContentView: View {
   }
 
   private func practicePromptNSFont(size: CGFloat) -> NSFont {
+    if let font = FontFamilyCommandPreviewPolicy.font(
+        for: commandFontPreview.target, size: size, fallback: settings.practiceFont) {
+      return font
+    }
     if activeChallengeID == "ten-words-of-pain",
       let font = WingdingsChallengeFont.resolve(size: size)
     {
@@ -2970,6 +2983,16 @@ private struct ContentView: View {
     return settings.practiceFont.nsFont(
       size: size, installedFontName: settings.installedPracticeFontName,
       language: session.configuration.language)
+  }
+
+  private func clearCommandFontPreview() {
+    commandFontPreview.clear(savedFont: settings.practiceFont,
+      savedName: commandFontFamilyName)
+  }
+
+  private var commandFontFamilyName: String {
+    FontFamilyCommandPreviewPolicy.savedName(challengeID: activeChallengeID,
+      installedName: settings.installedPracticeFontName)
   }
 
   private func verifyChallengeFontAvailability() {
