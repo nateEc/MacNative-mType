@@ -35,6 +35,7 @@ final class PromptCaretNativeView: NSView {
     var mainGlyphID: Int? = nil
     var firstGlyphID = 0
     var glyphRect: ((Int) -> CGRect?)? = nil
+    var glyphIsRightToLeft: ((Int) -> Bool)? = nil
     var geometryRevision: UInt64 = 0
     var mainGlyphRect: ((Int) -> CGRect?)? = nil
     var automaticallyPresents = true
@@ -55,6 +56,8 @@ final class PromptCaretNativeView: NSView {
   private var blinkClock = PromptCaretBlinkClock()
   private var paceGeometryNeedsUpdate = false
   private var paceTargetRect: CGRect?
+  private var mainRightToLeft: Bool?
+  private var paceRightToLeft: Bool?
 
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -76,6 +79,7 @@ final class PromptCaretNativeView: NSView {
       input = nil; mainOffset = nil; paceSequence = nil
       needsPosition = true; needsSnap = true
       paceTargetRect = nil
+      mainRightToLeft = nil; paceRightToLeft = nil
     }
     if old?.geometryRevision != next.geometryRevision {
       needsPosition = true; paceGeometryNeedsUpdate = true
@@ -172,6 +176,7 @@ final class PromptCaretNativeView: NSView {
       let offset = latest.flatMap { _ in rendering?.characterOffset(forGlyphAt: glyphID) }
         ?? (latest == nil ? config.mainOffset : nil)
       if config.mainStyle.drawsMarker {
+        mainRightToLeft = glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
         let mainRect: CGRect?
         if let resolver = config.mainGlyphRect { mainRect = glyphID.flatMap(resolver) }
         else { mainRect = measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID) }
@@ -185,10 +190,10 @@ final class PromptCaretNativeView: NSView {
     let opacity = blinkClock.opacity(at: time, presentation: config.mainPresentation?() ?? .init(),
       motion: config.motion, reducesMotion: config.reducesMotion)
     paint(coordinator.documentRect(isPace: false), style: config.mainStyle,
-      accent: config.accent, rightToLeft: config.rightToLeft, isPace: false, host: &mainHost)
+      accent: config.accent, rightToLeft: mainRightToLeft ?? config.rightToLeft, isPace: false, host: &mainHost)
     mainHost?.alphaValue = opacity
     paint(paceFrame == nil && config.paceOffset == nil ? nil : coordinator.documentRect(isPace: true),
-      style: config.paceStyle, accent: config.accent.opacity(0.72), rightToLeft: config.rightToLeft,
+      style: config.paceStyle, accent: config.accent.opacity(0.72), rightToLeft: paceRightToLeft ?? config.rightToLeft,
       isPace: true, host: &paceHost)
   }
 
@@ -204,6 +209,7 @@ final class PromptCaretNativeView: NSView {
     let frame = config.paceFrame?()
     let lostGeometry = coordinator.pace.position == nil
     if lostGeometry {
+      paceRightToLeft = config.glyphIsRightToLeft?(config.firstGlyphID) ?? config.rightToLeft
       coordinator.positionPace(at: measure(0, text: config.text, config: config, glyphID: config.firstGlyphID), time: time, duration: 0)
     }
     if let frame {
@@ -217,7 +223,8 @@ final class PromptCaretNativeView: NSView {
           guard let rect = measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID) else { return nil }
           return PromptPaceCaretGeometry.rect(from: rect, to: rect,
             fromAfter: after, toAfter: after, style: config.paceStyle,
-            rightToLeft: config.rightToLeft, fraction: 1, reducesMotion: true,
+            rightToLeft: glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft,
+            fraction: 1, reducesMotion: true,
             afterWidth: (" " as NSString).size(withAttributes: [.font: config.font]).width)
         }
         // At an exact deadline, a skipped predecessor has zero (not negative)
@@ -236,6 +243,7 @@ final class PromptCaretNativeView: NSView {
         let offset = frame.targetGlyphID.flatMap { rendering?.characterOffset(forGlyphAt: $0) }
           ?? (frame.targetGlyphID == nil ? frame.targetCharacterOffset : nil)
         if let target = endpoint(offset, glyphID: frame.targetGlyphID, after: frame.targetAfter) {
+          paceRightToLeft = frame.targetGlyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
           if changed || target != paceTargetRect {
             coordinator.positionPace(at: target, time: time,
               duration: config.reducesMotion ? 0 : remaining)

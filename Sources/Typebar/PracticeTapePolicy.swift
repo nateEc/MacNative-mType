@@ -4,6 +4,29 @@ import AppKit
 /// separate from the typing engine: tape presentation never changes prompt
 /// text, accepted input, scoring, or replay.
 enum PracticeTapePolicy {
+  static func isRightToLeft(_ text: String, fallback: Bool) -> Bool {
+    // Foundation's whitespace set also includes U+200B; the reference's
+    // punctuation/symbol/ECMAScript-space trim deliberately does not.
+    func decoration(_ scalar: Unicode.Scalar) -> Bool {
+      switch scalar.properties.generalCategory {
+      case .connectorPunctuation, .dashPunctuation, .openPunctuation, .closePunctuation,
+           .initialPunctuation, .finalPunctuation, .otherPunctuation,
+           .mathSymbol, .currencySymbol, .modifierSymbol, .otherSymbol,
+           .spaceSeparator, .lineSeparator, .paragraphSeparator: true
+      default: (0x09...0x0D).contains(scalar.value) || scalar.value == 0xFEFF
+      }
+    }
+    let core = text.unicodeScalars.drop(while: decoration).reversed().drop(while: decoration)
+    guard !core.isEmpty else { return fallback }
+    return core.contains { scalar in
+      switch scalar.value {
+      case 0x0590...0x06FF, 0x0750...0x077F, 0x08A0...0x08FF,
+           0xFB50...0xFDFF, 0xFE70...0xFEFF: true
+      default: false
+      }
+    }
+  }
+
   static func wordStartCharacterOffsets(session: TypingSession, rendering: PromptRendering) -> [Int: Int] {
     var starts: [Int: Int] = [:]
     for word in session.promptWordPresentations {

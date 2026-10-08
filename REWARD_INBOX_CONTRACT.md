@@ -1,5 +1,19 @@
 # 原生奖励收件箱与周任务交付
 
+## Tape RTL 与独立词方向增量
+
+最终完整冻结门禁 `/tmp/typebar-tape-direction-final-readiness.log` 终态退出 0：原生 3,853 项零失败零跳过（851.233 秒），服务 501 项（12.327 秒）；十万词耐久 153.047 秒、16 项隔离磁盘冷读 5.216 秒、53 表面、1,105 唯一人工场景结构、90／3／1 配置元数据及未启动应用包资源／URL scheme／严格签名／原创边界通过。十二新增在全量中 0.314 秒，128 条完整源码轨迹和 28 方向案例通过。13 文件 `/tmp/typebar-tape-direction-final-frozen.sha256` 门禁前中后完全一致；64 原始日志 `/tmp/typebar-tape-direction-final-logs.EhiXHn`、159 图 `/tmp/typebar-tape-direction-final-images.rvafDV` 保留，最终三张 rtl-tape-{initial,moving,word}.png 已逐张复查，是实际原生文字／独立 marker 组件而非完整应用窗口。既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复；无断言失败或跳过。终态后才更新交付文档，无运行中编辑或并行验收；零主程序启动，无残留测试／编译／主程序进程，参考仍干净，未操作真实账户、Keychain、成绩库或部署。完整 goal active，以下为阶段证据。
+
+审计分区更新后 `/tmp/typebar-tape-direction-audit-focused.log` 为相关 140 项零失败零跳过（20.964 秒）；缓存固定行起点避免每帧 TextKit 测量后 `frozen-focused.log` 为 140 项（21.153 秒）。随后将 RTL 参数限制到实际 Tape 调用，ASL／Choo 继续默认 false，生产接线断言同步；最终 `handoff-focused.log` 的 140 项零失败零跳过（20.420 秒），十二新项 0.302 秒及完整原版对照通过。实际完整门禁已冻结源、测试、元数据生成器／总账、配置审计和人工清单，终态之前没有修改，结果见首段。
+
+2026-10-09，固定干净参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 scrollTape 按测试全局方向反转文字／pace 横向补偿；完整 Caret.getTargetPositionAndWidth 则按词方向选择锁定边缘，custom／Zen／Polyglot 改按当前字母判断，不能整体镜像。完整 strings 的检测／裁边／缓存模块也执行。既有实际 Anime.js 4.2.2、RAF 与完整 Caret／scrollTape QA 扩为 128 条测试方向 × 词方向 × letter／word × 四类 marker × 即时／平滑／重叠／折叠轨迹，另对照 28 个方向案例；数字、标点、符号和 U+200B 有覆盖。所有词框、CSS margin、时钟、页面状态均为自有边界，不是浏览器 CSS／真实字体数值、reverse-direction、换行／裁词或任意调度证明。
+
+原生 Tape 不再因 RTL 回退普通提示，仍对明确换行保留未完成回退。TextKit 保留有界自然原点和测试基方向，以逐词 writingDirection embedding 模拟独立 inline 词框，不向显示字符串／原文／输入／回放插入控制字符；使用同一布局管理器的占位框而非含字形外伸的墨迹包围框。文字滚动读取测试方向和实测词／词内宽度；主 marker 按词／字符方向选左右 margin，word 模式保留词内位置，pace after 和 marker 绘制按自己的目标方向。自定义／Zen／混合语言接通逐字符策略。共用光标缓存已解析的方向，不每帧额外调用 fresh glyph provider；普通／ASL／Choo 未指定 resolver 时沿用旧逻辑。方向切换、新尝试、停止／拆卸沿用既有 coordinator 与计时器，没有新依赖／Timer／持久字段或存储迁移。
+
+红测 `/tmp/typebar-tape-direction-red.log` 四项 17 处真实失败（0.852 秒）；`first-green.log` 九项仅剩一处前进距离失败。`glyph-diagnostic.log`／`enclosing-diagnostic.log` 证明 Hebrew 首字墨迹宽 33.38671875 而占位宽 17.74609375；按 SDK 26.2 NSLayoutManager／NSAttributedString 头文件的 enclosingRects 与 writingDirection 契约修正。`focused.log` 28 项两处失败另抓出 Foundation 空白集吞掉 U+200B，以及测试错把上下文 kerning 宽当独字宽；用原版 Unicode 裁边规则和实际 glyph 位置差／总 advance 回归，不放宽容差。`focused-green.log` 28 项零失败零跳过（1.550 秒）。`expanded.log` 132 项两处失败抓出新增方向绘制重复读取原生 glyph provider，已缓存解析方向；`word-order-red.log` 两项两处真实失败（0.679 秒），相邻反向词第二词进度为负，普通 provider 回归已绿；逐词嵌入后 `final-focused.log` 133 项零失败零跳过（5.942 秒），其中十二新增 0.296 秒。三图 `/tmp/typebar-tape-direction-images.otedHz/rtl-tape-{initial,moving,word}.png` 已逐张检查，实际文字／锁定 marker 与词内 marker 可见，是隔离原生组件而非完整窗口；所有组件窗口从不显示并逐一关闭，零主程序启动。
+
+行为优先、源码驱动、最小改动、根因调试及同会话有界决策／风险审查影响上述反例，不是独立评审。frontend-design 保留既有字体、配色、间距和 marker 设计，仅纠正方向／文字测量。Swift 6.2.4／SDK 26.2／最低 macOS 14，新增使用的原生接口由已安装 SDK 头文件核实，兼容最低版本。审计发现 tapeMode 原先只按可保存配置标为映射，但换行／横向退休尚缺，现下调部分覆盖；94 配置变为 90 映射／3 部分／1 不适用，生成器、固定总账与原生分区断言同步。53 表面和 Funbox 分类不升级，两新增人工项仍待验。Tape 换行／afterNewline／前缀退休、全部混排与 joining／hint／零宽组合、真实逐帧／键盘／IME、字体资源及视口虚拟化继续开放；完整 goal active。最终冻结结果见本节首段，以下为历史阶段。
+
 ## 字体命令临时预览与清除生命周期增量
 
 最终完整冻结门禁 `/tmp/typebar-font-command-preview-final-readiness.log` 终态退出 0：原生 3,841 项零失败零跳过（828.316 秒），服务 501 项（11.414 秒）；十万词耐久 155.429 秒、16 项隔离磁盘冷读 4.740 秒、53 表面、1,103 唯一人工场景结构、元数据及未启动应用包资源／URL scheme／严格签名／原创边界通过。11 新增在全量中 0.686 秒；12 条完整字体预览轨迹及既有配置／居中回归通过。九文件 `/tmp/typebar-font-command-preview-final-frozen.sha256` 门禁前中后完全一致，64 原始日志 `/tmp/typebar-font-command-preview-final-logs.5dzdLf`、156 图 `/tmp/typebar-font-command-preview-final-images.7Vdg73` 保留；最终三张 font-command-preview-{initial,active,restored}.png 已逐张复查，显示实际文字宽度／换行变化和恢复，透明留白不是完整应用窗口。无断言失败／跳过，既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告原样保留，不宣称修复。终态后才更新交付文档，没有运行中编辑或并行验收；零 Typebar 主程序启动，无残留测试／编译／主程序进程。未操作真实账户、Keychain、成绩库或部署；完整 goal active，以下为阶段证据。

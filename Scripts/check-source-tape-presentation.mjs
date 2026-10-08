@@ -1,5 +1,5 @@
 // QA only: complete pinned scrollTape/getNlCharWidth, Caret, RAF and locked Anime.js.
-// Single-line LTR owned DOM boxes/clock; not a browser or complete Tape/removal proof.
+// Single-line LTR/RTL owned DOM boxes/clock; not browser CSS or complete Tape/removal proof.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -28,7 +28,11 @@ function plain(source) { return stripTypeScriptTypes(source.replace(/^import [\s
 const callbacks = plain(ui.slice(begin,end));
 const caretModule = plain(fs.readFileSync(path.join(root,'frontend/src/ts/elements/caret.ts'),'utf8'));
 const rafModule = plain(fs.readFileSync(path.join(root,'frontend/src/ts/utils/debounced-animation-frame.ts'),'utf8'));
+const strings = fs.readFileSync(path.join(root,'frontend/src/ts/utils/strings.ts'),'utf8');
+const directionModule = plain(strings.slice(strings.indexOf('function hasRTLCharacters('), strings.indexOf('\nexport const CHAR_EQUIVALENCE_SETS')));
 const fixtures = [];
+for (const rtl of [false,true])
+for (const wordRTL of [false,true])
 for (const mode of ['letter','word']) for (const style of ['default','block','outline','underline'])
 for (const smooth of [false,true]) for (const overlap of [false,true]) {
   let clock=10000, frameID=0, active=0, input='';
@@ -61,10 +65,10 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
   wordsEl.getOffsetWidth=()=>400;
   const words=Array.from({length:5},(_,index)=>{
     const word=new Element('word'+index);word.addClass('word');word.index=index;
-    word.getOffsetLeft=()=>index*48+wordsEl.native.marginLeft;
+    word.getOffsetLeft=()=> (rtl?400-36-12-index*48:index*48)+wordsEl.native.marginLeft;
     word.getOffsetTop=()=>0;word.getOffsetWidth=()=>36;word.getOuterWidth=()=>48;
-    word.qsa=selector=>{assert.equal(selector,'letter');return [0,1,2].map(i=>({native:{textContent:'a'},
-      getOffsetLeft:()=>i*12,getOffsetTop:()=>0,getOffsetWidth:()=>12,getOffsetHeight:()=>32,hasClass:()=>false}));};
+    word.qsa=selector=>{assert.equal(selector,'letter');return [0,1,2].map(i=>({native:{textContent:wordRTL?'א':'a'},
+      getOffsetLeft:()=> (wordRTL?2-i:i)*12,getOffsetTop:()=>0,getOffsetWidth:()=>12,getOffsetHeight:()=>32,hasClass:()=>false}));};
     word.remove=()=>{throw new Error('These bounded fixtures must not remove words');};return word;
   });
   wordsEl.getChildren=()=>words;wordsEl.qsa=selector=>{assert.equal(selector,'.afterNewline');return [];};
@@ -76,13 +80,14 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
     smoothCaret:'medium',blindMode:false,hideExtraLetters:false};
   Object.assign(context,{Config,wordsEl,wordsWrapperEl:{getOffsetWidth:()=>400},
     qsr:selector=>selector==='#words'?wordsEl:{getOffsetWidth:()=>400},
-    getTotalInlineMargin:()=>12,isWordRightToLeft:()=>[false,true],
-    TestWords:{words:{get:()=>({display:'aaa'})}},
+    getTotalInlineMargin:()=>12,
+    TestWords:{words:{get:()=>({display:wordRTL?'אאא':'aaa'})}},
     getActivePage:()=>'test',getResultVisible:()=>false,centeringActiveLine:Promise.resolve(),
-    isDirectionReversed:()=>false,isLanguageRightToLeft:()=>false,getActiveWordElement:()=>words[active],
+    isDirectionReversed:()=>false,isLanguageRightToLeft:()=>rtl,getActiveWordElement:()=>words[active],
     getCurrentInput:()=>input,window:{getComputedStyle:()=>({marginRight:'12'})},
   });
   vm.runInContext(rafModule,context);
+  vm.runInContext(directionModule,context);
   vm.runInContext('{'+caretModule+'\nglobalThis.SourceCaret = Caret;}',context);
   const main=new context.SourceCaret(mainElement,style), pace=new context.SourceCaret(paceElement,style);
   Object.assign(context,{Caret:{caret:main},PaceCaret:{caret:pace}});
@@ -99,7 +104,7 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
         // Record the resolved un-folded geometry, not the final animation value.
         trace.push({type:'position',id:element.native.id,time:clock-10000,
           x:target.left+(style==='default'?1:0),width:target.width,
-          words:wordsEl.native.marginLeft-100,
+          words:wordsEl.native.marginLeft-(rtl?-88:100),
           duration:method==='setPosition'?0:options.duration??100,linear:options.easing==='linear'});
         return original(options);
       };
@@ -108,18 +113,18 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
   function marker(element,caret){return {x:element.native.left+(style==='default'?1:0),
     margin:element.native.marginLeft,visible:element.native.left+element.native.marginLeft+(style==='default'?1:0),
     ready:caret.readyToResetMarginLeft,correction:caret.cumulativeTapeMarginCorrection};}
-  function sample(){trace.push({type:'sample',time:clock-10000,words:wordsEl.native.marginLeft-100,
+  function sample(){trace.push({type:'sample',time:clock-10000,words:wordsEl.native.marginLeft-(rtl?-88:100),
     main:marker(mainElement,main),pace:marker(paceElement,pace)});}
   function flush(){for(const [id,callback] of [...frames]){frames.delete(id);callback();}}
   function go(letter,paceWord=1,paceLetter=1,duration=200,initial=false){
-    main.goTo({wordIndex:active,letterIndex:letter,isLanguageRightToLeft:false,isDirectionReversed:false,animate:!initial});
-    pace.goTo({wordIndex:paceWord,letterIndex:paceLetter,isLanguageRightToLeft:false,isDirectionReversed:false,
+    main.goTo({wordIndex:active,letterIndex:letter,isLanguageRightToLeft:rtl,isDirectionReversed:false,animate:!initial});
+    pace.goTo({wordIndex:paceWord,letterIndex:paceLetter,isLanguageRightToLeft:rtl,isDirectionReversed:false,
       animate:true,animationOptions:{duration,easing:'linear'}});flush();
   }
   function tickTo(time){while(clock<10000+time){clock++;inFrame=true;rendered=false;anime.namespace.engine.update();inFrame=false;
     trace.push({type:'frame',time:clock-10000,rendered});flush();sample();}}
   await context.scrollTape(true);go(0,1,0,0,true);sample();
-  assert.equal(wordsEl.native.marginLeft,100,'Initial tape margin must be positive');
+  assert.equal(wordsEl.native.marginLeft,rtl?-88:100,'Initial tape margin follows test flow and CSS word-right margin');
   input='a';await context.scrollTape();go(1);sample();
   tickTo(25);
   if(overlap){input='aa';await context.scrollTape();go(2,2,0,150);sample();}
@@ -129,11 +134,15 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
   tickTo(450);go(1,3,1,0);sample();
   assert.equal(mainElement.native.marginLeft,0,'Locked main never receives a tape margin');
   assert.equal(main.cumulativeTapeMarginCorrection,0);
-  assert.equal(wordsEl.native.marginLeft,mode==='letter'?40:52);
+  assert.equal(wordsEl.native.marginLeft,rtl?(mode==='letter'?-28:-40):(mode==='letter'?40:52));
   assert.equal(trace.filter(item=>item.type==='scroll').length,overlap?4:3);
-  fixtures.push({mode,style,smooth,overlap,trace});
+  fixtures.push({rtl,wordRTL,mode,style,smooth,overlap,trace});
   main.stopAllAnimations();pace.stopAllAnimations();for(const animation of animations)animation.cancel();
 }
-verify();assert.equal(fixtures.length,32);
-if(option)process.stdout.write(JSON.stringify({pin,fixtures}));
-else console.log('Tape presentation source passed: 32 complete scrollTape/Caret/RAF sequences with real locked Anime.js, LTR single-line owned boxes/clock, four styles, immediate/smooth/overlap/folding; not browser CSS, removal, newline, RTL or arbitrary scheduling proof');
+const context=vm.createContext({});vm.runInContext(directionModule,context);
+const directions=[];
+for(const text of ['', 'אבג', 'abc', '123', '؟', '،אבג؟', 'word؟', '🙂', 'aא', '\u200b', 'أهلاً', 'الله', '،', 'א1'])
+for(const fallback of [false,true]) directions.push({text,fallback,rtl:context.isWordRightToLeft(text,fallback,false)[0]});
+verify();assert.equal(fixtures.length,128);assert.equal(directions.length,28);
+if(option)process.stdout.write(JSON.stringify({pin,fixtures,directions}));
+else console.log('Tape presentation source passed: 128 complete scrollTape/Caret/RAF sequences and 28 complete direction-helper cases with real locked Anime.js, independent LTR/RTL test and word flow, single-line owned boxes/clock, four styles, immediate/smooth/overlap/folding; not browser CSS, removal, newline, reverse-direction or arbitrary scheduling proof');

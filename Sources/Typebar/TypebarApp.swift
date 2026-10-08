@@ -400,6 +400,7 @@ private struct TapePracticePrompt: View {
   let anchorCharacterIndex: Int
   let wordAnchorCharacterIndex: Int
   let wordStartCharacterOffsets: [Int: Int]
+  let checksDirectionPerGlyph: Bool
   let mode: PracticeTapeMode
   let margin: Double
   let fontSize: Double
@@ -409,6 +410,7 @@ private struct TapePracticePrompt: View {
   var body: some View {
     TapePromptBridge(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
       wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
+      checksDirectionPerGlyph: checksDirectionPerGlyph,
       mode: mode, margin: margin,
       smoothScroll: animatesScroll, carets: carets)
       .frame(height: fontSize * 1.7)
@@ -421,6 +423,7 @@ private struct TapePromptBridge: NSViewRepresentable {
   let rendering: PromptRendering
   let anchorCharacterIndex: Int, wordAnchorCharacterIndex: Int
   let wordStartCharacterOffsets: [Int: Int]
+  let checksDirectionPerGlyph: Bool
   let mode: PracticeTapeMode
   let margin: Double
   let smoothScroll: Bool
@@ -429,6 +432,7 @@ private struct TapePromptBridge: NSViewRepresentable {
   func updateNSView(_ view: TapePromptNativeView, context: Context) {
     view.configure(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
       wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
+      checksDirectionPerGlyph: checksDirectionPerGlyph,
       mode: mode, margin: margin,
       smoothScroll: smoothScroll, carets: carets)
   }
@@ -2888,10 +2892,12 @@ private struct ContentView: View {
           wordAnchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(
             session: session, rendering: rendering, mode: .word),
           wordStartCharacterOffsets: PracticeTapePolicy.wordStartCharacterOffsets(session: session, rendering: rendering),
+          checksDirectionPerGlyph: session.configuration.mode == .custom || session.configuration.mode == .zen
+            || session.configuration.language == .mixedLanguages,
           mode: settings.practiceTapeMode,
           margin: settings.practiceTapeMargin,
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll,
-          carets: makeSpecialPromptCaretConfiguration())
+          carets: makeSpecialPromptCaretConfiguration(rightToLeft: session.configuration.usesRightToLeftPrompt))
       } else {
         Text(rendering.text)
           .lineSpacing(usesJoiningScript ? 8 : 12)
@@ -3095,11 +3101,12 @@ private struct ContentView: View {
     return makeSpecialPromptCaretConfiguration()
   }
 
-  private func makeSpecialPromptCaretConfiguration() -> PromptCaretNativeView.Configuration {
+  private func makeSpecialPromptCaretConfiguration(rightToLeft: Bool = false) -> PromptCaretNativeView.Configuration {
     return .init(text: AttributedString(), mainOffset: nil, paceOffset: nil,
       mainStyle: settings.caretStyle, paceStyle: settings.paceCaretStyle,
       font: practicePromptNSFont(size: settings.fontSize), lineSpacing: 12,
-      rightToLeft: false, accent: activeTheme.caret, motion: settings.smoothCaretMotion,
+      rightToLeft: rightToLeft,
+      accent: activeTheme.caret, motion: settings.smoothCaretMotion,
       reducesMotion: settings.reducePracticeMotion || systemReduceMotion,
       frameRate: timerHealth.animationFrameRate(requested: settings.animationFrameRate,
         settingsRevision: settings.animationFrameRateRevision),
@@ -3264,7 +3271,6 @@ private struct ContentView: View {
 
   private var usesTapePractice: Bool {
     settings.practiceTapeMode != .off && !session.hasPracticeNewlineContent
-      && !session.configuration.containsRightToLeftPromptRun
   }
 
   private var showsAllPracticeLines: Bool {

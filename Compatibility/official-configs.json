@@ -155,7 +155,6 @@
     "timerOpacity": "`liveStatsOpacity`",
     "highlightMode": "`promptHighlightMode`",
     "typedEffect": "`typedCharacterEffect`",
-    "tapeMode": "`practiceTapeMode`",
     "tapeMargin": "`practiceTapeMargin`",
     "smoothLineScroll": "`smoothPracticeLineScroll`",
     "alwaysShowDecimalPlaces": "`alwaysShowDecimalPlaces`",
@@ -192,6 +191,7 @@
     "monkeyPowerLevel": "`typingPowerMode`"
   },
   "partial": {
+    "tapeMode": "`practiceTapeMode`",
     "showAllLines": "`showAllPracticeLines`",
     "fontFamily": "`practiceFont`、可搜索的本机字体目录、名称/导入"
   },
