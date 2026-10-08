@@ -184,6 +184,9 @@ run_logged_check "executing pinned add-friend modal and complete remote validato
 run_logged_check "executing complete pinned notification state and timeout callback" "$temporary_directory/local-notices-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-local-notices.mjs" "$reference_root"
 
+run_logged_check "executing complete pinned visual focus and RAF debounce" "$temporary_directory/visual-focus-source-check.log" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-visual-focus.mjs" "$reference_root"
+
 config_link_source_dependencies="${TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES:-$temporary_directory/config-link-source-runtime}"
 if [[ ! -f "$config_link_source_dependencies/node_modules/lz-ts/package.json" ]]; then
   run_logged_check "preparing pinned QA-only configuration link compression" "$temporary_directory/config-link-source-runtime.log" \

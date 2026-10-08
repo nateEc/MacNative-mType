@@ -1082,6 +1082,7 @@ private struct ContentView: View {
   @State private var wingdingsFontStayedAvailable = true
   @State private var focusRequest = 0
   @State private var inputHasFocus = false
+  @State private var visualFocus = TypingVisualFocus()
   @State private var typingWindowHasFocus = true
   @State private var typingWindowFocusTracker = TypingWindowFocusTracker()
   @State private var focusWarningDelayElapsed = false
@@ -1127,6 +1128,11 @@ private struct ContentView: View {
       header
       RemoteAnnouncementBannerStack(center: announcements)
       configurationPanel
+        .opacity(visualFocus.isFocused ? 0 : 1)
+        .allowsHitTesting(!visualFocus.isFocused)
+        .disabled(visualFocus.isFocused)
+        .accessibilityHidden(visualFocus.isFocused)
+        .animation(systemReduceMotion || settings.reducePracticeMotion ? nil : .easeInOut(duration: 0.125), value: visualFocus.isFocused)
       if let zipfNotice {
         Label(zipfNotice, systemImage: "exclamationmark.triangle")
           .font(.caption.weight(.medium))
@@ -1205,6 +1211,9 @@ private struct ContentView: View {
         .accessibilityHidden(true)
     )
     .modifier(PracticeAnimationFrameRate(settings: settings, timerHealth: timerHealth))
+    .background(TypingVisualFocusMouseBridge(onMovement: { x, y in
+      visualFocus.mouseMoved(x: x, y: y)
+    }).accessibilityHidden(true))
     .overlay(alignment: .top) {
       if network.showsOfflineBanner, !session.hasStarted {
         NetworkConnectivityNotice(kind: .offline)
@@ -1216,7 +1225,7 @@ private struct ContentView: View {
     }
     .overlay(alignment: .topTrailing) {
       LocalNoticeStack(center: account.localNotices,
-        focused: inputHasFocus && typingWindowHasFocus && session.hasStarted && !session.isFinished)
+        focused: visualFocus.isFocused)
         .padding(12)
     }
     .tint(activeTheme.accent)
@@ -1226,6 +1235,12 @@ private struct ContentView: View {
   private var configuredPracticeContent: some View {
     practiceLayout
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
+    .onChange(of: showingCommandPalette) { _, showing in
+      if showing { visualFocus.retire() }
+    }
+    .onChange(of: session.hasStarted) { _, started in
+      if started, !session.isFinished { visualFocus.set(true) }
+    }
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: account.accountTagRevision) { _, _ in
@@ -1311,6 +1326,7 @@ private struct ContentView: View {
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear(perform: contentAppeared)
     .onDisappear {
+      visualFocus.retire()
       automaticInputScheduler.cancel()
       session.cancelAutomaticInput()
     }
@@ -1318,6 +1334,7 @@ private struct ContentView: View {
       restorePersistedTestSelection()
     }
     .onChange(of: session.outcome) { previousOutcome, outcome in
+      if outcome != .active { visualFocus.retire() }
       TypingFeedbackSound.shared.playPracticeFinish(
         previousOutcome: previousOutcome, outcome: outcome, hasStarted: session.hasStarted,
         clickEnabled: settings.playKeyclickSound, style: settings.clickSoundStyle,
@@ -2703,6 +2720,7 @@ private struct ContentView: View {
             synchronizeLiveInputRules()
             session.refreshLiveAccuracyAfterComposition(
               hadMarkedText: hadMarkedText, hasMarkedText: !$0.isEmpty)
+            if !session.isFinished, hadMarkedText || !$0.isEmpty { visualFocus.set(true) }
             if playsCompositionClick { playInputFeedback(inputWasCorrect: true) }
           }
         },
@@ -3394,10 +3412,13 @@ private struct ContentView: View {
     synchronizeLiveInputRules()
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
+    let typedBefore = session.typed
     let feedback = TypingLiveInputFeedback.insertBatch(
       effectiveInsertedText(text), into: &session,
       forceError: forceError, origin: origin, defersAutomaticInput: true,
       wrapAdmission: promptInputWrapAdmission)
+    visualFocus.inputDidUpdate(hasFeedback: !feedback.isEmpty,
+      textChanged: session.typed != typedBefore, isFinished: session.isFinished)
     verifyChallengeFontAvailability()
     emitTypingPowerEffect(
       isCorrect: session.errors == errorsBefore,
@@ -3423,6 +3444,8 @@ private struct ContentView: View {
       let countBefore = session.typed.count
       let feedback = session.processNextAutomaticInput(for: attemptID, executedAt: .now,
         wrapAdmission: promptInputWrapAdmission)
+      visualFocus.inputDidUpdate(hasFeedback: !feedback.isEmpty,
+        textChanged: session.typed.count != countBefore, isFinished: session.isFinished)
       verifyChallengeFontAvailability()
       emitTypingPowerEffect(isCorrect: feedback.last == true,
         acceptedCharacters: session.typed.count - countBefore)
@@ -3439,6 +3462,8 @@ private struct ContentView: View {
   private func handleDeletedText(deletesWord: Bool) {
     synchronizeLiveInputRules()
     let feedback = TypingLiveInputFeedback.delete(from: &session, wholeWord: deletesWord)
+    visualFocus.inputDidUpdate(hasFeedback: !feedback.isEmpty,
+      textChanged: false, isFinished: session.isFinished)
     for correct in feedback { playInputFeedback(inputWasCorrect: correct) }
   }
 
@@ -3729,9 +3754,9 @@ private struct ContentView: View {
       }
       .font(.caption)
       .foregroundStyle(.secondary)
-      .opacity(inputHasFocus ? 0 : 1)
-      .accessibilityHidden(inputHasFocus)
-      .animation(.easeInOut(duration: 0.2), value: inputHasFocus)
+      .opacity(visualFocus.isFocused ? 0 : 1)
+      .accessibilityHidden(visualFocus.isFocused)
+      .animation(systemReduceMotion || settings.reducePracticeMotion ? nil : .easeInOut(duration: 0.2), value: visualFocus.isFocused)
     }
   }
 
@@ -3766,6 +3791,7 @@ private struct ContentView: View {
       resultIsVisible: completedResult != nil,
       mode: session.configuration.mode)
     typingWindowHasFocus = hasFocus
+    if !hasFocus || hasAttachedSheet { visualFocus.retire() }
     if shouldRestart { attemptRestart() }
     updateFocusWarningDelay()
   }
@@ -3854,6 +3880,7 @@ private struct ContentView: View {
 
   private func reset(restarting: Bool = false) {
     guard acceptsRestartingConfigurationChange() else { return }
+    visualFocus.retire()
     if let activeVerifiedScript,
       activeChallenge?.requirements.referenceScriptSpecification
         != activeVerifiedScript.specification
@@ -3952,6 +3979,7 @@ private struct ContentView: View {
     if !didRestoreActiveTestSelection {
       didRestoreActiveTestSelection = true
       restorePersistedTestSelection()
+      visualFocus.set(true)
     }
     refreshZipfNotice()
     if !session.hasStarted { refreshPaceTarget() }

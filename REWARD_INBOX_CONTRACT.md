@@ -1,5 +1,21 @@
 # 原生奖励收件箱与周任务交付
 
+## 独立视觉专注、鼠标退出与通知过滤增量
+
+固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`，只读清洁。完整读取 [focus.ts](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/focus.ts)、RAF debounce、test caret 包装器，核对 afterAnyTestInput／start／restart／result／commandline／page 的相关函数或调用上下文，以及 TestConfig／Keytips／Footer／Header 和 getFocus 消费位置。原版视觉 focus 与 testFocusState 的一秒失焦警告不同。实际 mousemove 比较单轴正向 `>3`，不是注释的 5，也不是绝对值；PageTransition 时忽略。set 在请求时先比较已提交状态再排 RAF，因此同轮相反请求未必取消前一次。
+
+原创 TypingVisualFocus／MouseBridge 仅补有界部分：每练习视图独立状态、下一主线程轮次合并提交、严格阈值及窗口／终止退休；通知过滤不再借用 first responder + hasStarted，普通通知暂藏不删除历史；配置栏保留布局但隐藏、禁用鼠标和键盘编辑并从辅助功能隐藏，快捷提示同读视觉状态。设计技能促使保留现有字体／间距／颜色，不重设计页面；过渡遵守系统及用户减少动态设置。输入、自动输入和删除看实际反馈／文本变化，IME 与 test start 也接入；实际 `a\n` 部分批量输入改文本但最终返回空声音反馈，不能仅由声音数组判定。既有失焦警告、窗口返回重开、no_quit 预检、公告／社交通知／奖励及持久化结构不变。
+
+原生安全适配不等于完全浏览器等价：成功重开、终止、命令面板、onDisappear 与窗口不 key／有 sheet 同步 retire 并失效旧回调，不使用浏览器 RAF 时钟。重复请求每轮只排一次弱回调，无新增全局／local 事件监听。NSTrackingArea 限于练习内容可见区域和所属 key window，挂接／拆除先移除旧区域，hitTest 为 nil，不修改 acceptsMouseMovedEvents、不抢输入、不吞事件。直接 AppKit 测试用未显示窗口和明确 isKeyWindow／attachedSheet 替身，验证单区域、旧窗口／背景／sheet／拆除隔离；不是 sendEvent、真实 tracking routing 或实际 key-window 证明。Native deltaX/Y 保留方向和阈值，CSS 像素／设备缩放未证明。
+
+同会话有界决策／风险复核（非独立）推翻声音反馈唯一入场与重复排队假设；另补隐形配置栏 disabled，退休位于重开拒绝预检之后。静态红测 `/tmp/typebar-visual-focus-red.log` 一项四处预期失败（0.706 秒），只证明入口缺失。`/tmp/typebar-visual-focus-focused.log` 因新增测试夹具 actor 隔离和参数顺序编译失败；修正后 `/tmp/typebar-visual-focus-focused-verified.log` 44 项零失败零跳过（2.681 秒）。第二红测 `/tmp/typebar-visual-focus-admission-red.log` 两项三处预期失败（0.708 秒），含实际 100 请求排 100 回调而非 1。修正后集中 61 项仅既有配置探针因漏传 QA 依赖失败（4.491 秒），保留 `/tmp/typebar-visual-focus-final-focused.log`；完整环境复跑 `/tmp/typebar-visual-focus-admission-verified.log` 62 项零失败零跳过（3.929 秒）。随后仅补配置栏 disabled 与静态守卫，最终冻结门禁另记。
+
+QA 脚本完整执行实际 focus／debounced-animation-frame 模块，12 组共 47 个逐步 focus 状态与原生对照，另断言原版 cursor／caret effects。signal、DOM、caret、过渡及帧队列为自有边界，不执行 Solid／浏览器／CSS；原生状态对照不声称已重写 cursor／caret effects。探针前后核对固定 SHA／clean 并纳入门禁；产品无 JS／TS 运行时或参考源码／资产。53 表面既有分类不变，仅扩充 TestSurface 证据与部分描述；新增三项人工记录仍待验收。鼠标光标隐藏及初次保留例外、主光标闪烁、完整页眉／页脚／模式说明、菜单／设备／真实多窗口／VoiceOver 仍未完成或未验证。零 Typebar 主程序启动，不读真实库、Keychain、凭据或账户；整体 goal active。
+
+视觉专注最终冻结门禁 `/tmp/typebar-visual-focus-complete-readiness.log` 退出 0：原生 3,656 项零失败零跳过（823.688 秒），服务 501 项零失败零跳过（11.214 秒）；新增模型 10／AppKit 3／静态接线 2 项全部执行。实际十万词耐久 156.026 秒，16 项隔离磁盘冷读 4.851 秒；固定参考、元数据、53 表面／文件／测试符号、1,074 人工结构与未启动应用包／scheme／严格签名／原创边界通过。8 个实现／测试／脚本／矩阵冻结哈希 `/tmp/typebar-visual-focus-frozen.sha256` 前后一致，门禁后仅补结果文档。
+
+完整 59 份日志保存在 `/tmp/typebar-visual-focus-complete-logs.WBjDE5`，79 张既有组件图在 `/tmp/typebar-visual-focus-complete-render.yBo8xY`；本轮逐张复查普通／专注两张通知堆栈，未制造或冒称新的主练习视觉专注 GUI 图。CoreData／AddressBook XPC、隔离只读 SwiftData 与 Node 实验性诊断保留，早期红测／夹具／环境失败亦保留；没有用删断言／跳过换取通过。系统 SDK 的 NSTrackingArea／NSEvent 头文件已核对。三项人工状态不升级，鼠标光标／闪烁／完整周边与真实设备剩余项保持开放；零 Typebar 主程序启动，goal active。
+
 ## 配置通知、已知换行格式与应用确认增量
 
 固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整读取通知状态／两处展示、[URL 配置加载函数](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/controllers/url-handler.tsx)、[配置 setters](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/config/setters.ts)、escapeHTML／字符串帮助函数及开发通知回调。固定版本 `useInnerHtml: true` 文本盘点仅三处：URL 配置摘要、趣味拒绝、开发通知；实际格式是转义文字加 br。不是一般富文本链接需求的穷尽证明，动态／未来调用仍开放。
