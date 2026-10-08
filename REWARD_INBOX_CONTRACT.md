@@ -1,5 +1,21 @@
 # 原生奖励收件箱与周任务交付
 
+## ASL 手形语义与原创矢量增量
+
+固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`，只读清洁。完整读取 `frontend/static/funbox/asl.css` 与 Funbox 元数据：它只替换 wordsWrapper 的显示字体，不变换目标或计分，保留 noJoiningScript 准入。没有打开、提取、复制或描摹 Gallaudet 字体轮廓。语义核验使用 [HandSpeak 字母表](https://www.handspeak.com/topic/408/)、[A](https://www.handspeak.com/word/2460/)、[F](https://www.handspeak.com/word/2465/)、[K](https://www.handspeak.com/word/2470/)、[M](https://www.handspeak.com/word/2472/)、[N](https://www.handspeak.com/word/2473/)、[T](https://www.handspeak.com/word/2479/) 与 [Lifeprint 手形备注](https://www.lifeprint.com/asl101/topics/signingnotes.htm)。这些来源说明手指姿态、拇指位置、接触和朝向不能被同一个伸直位掩码替代；仅观察教学参考，没有下载媒体或把其图片、路径、文字纳入产品。原生坐标与绘图逻辑独立构建，不以照片采样／描摹生成。
+
+原创 ASLHandshape 明确四指 folded／extended／curved／hooked、拇指 alongside／across／underFingers／contact／parallel、joined／spread／crossed／angled 与四种方向，并独立保留 J／Z motion cue。A／S 区别在拇指，M／N／T 分别穿过三／二／一指；D 伸食指、F 伸其余三指，弯指与拇指接触不同；C 留开口、O 指尖接拇指，E 指尖弯向横放拇指；G／Q、H／U、K／P 维持相关配置但方向不同。只接受单个 ASCII 字母，大小写同形，ß／连字／重音 grapheme／全角等不因大写展开变成错误 ASL。实际 ASLPracticePrompt 对不支持的错误输入显示所输入文字，而非空 mask 假拳或原目标。
+
+ASLHandshapeDrawing 使用独立标准化 palm、指节／手指曲线、拇指与方向变换；没有暗藏拉丁字母、编号或字符专属装饰以制造不同图像。原生 Canvas 先绘远层，穿过手指的拇指位于后方；公开 GraphicsContext `.copy` 替换覆盖区域连同 alpha，再描边，避免透明线穿透，且不假造窗口／主题底色。握拳指节改为紧凑轮廓，E 不使用自交管线；J／Z 保留静态方向轨迹，不增加 Timer 或循环。当前字形尺寸、布局、状态颜色和辅助功能提示保留，不借此宣称 ASL 全部主题／高亮／光标或无障碍已等价。设计技能选择安静的原生线描手形，只把辨识度用在实际姿态而非页面重设计。
+
+先行 `/tmp/typebar-asl-handshape-red.log` 一项四处预期失败（0.658 秒）复现 A／D、A／I、M／N、S／T 无法区别；旧 mask 与 cue 不再是生产表示，耐久守卫升级为实际完整绘图比较，而不是给旧 mask 填不同数字。更正上一轮文档：旧 C 的 mask 为 2，并非零；真正零 mask 组为 E／M／N／O／S／T，C／E 那一对未产生红测失败。第一轮 11 项通过（2.117 秒）并不证明视觉正确，实际图发现透明描边穿透和握拳自交；`/tmp/typebar-asl-knuckle-red.log` 一项四处预期失败（1.027 秒）证实轮廓高度 34.673 超过紧凑指节上界 24。修复后 12 项通过（2.093 秒）。扩大夹具先因 SwiftUI 闭包漏写 self、后因配置 helper 需要数组而非 Set 编译失败，分别保留 final-focused.log／score-focused.log，不把编译错误计作产品红测。
+
+最终定向 `/tmp/typebar-asl-handshape-final-verified.log` 83 项零失败零跳过（4.073 秒），含新增 16 项和既有 Choo／Tape／主光标／文字状态回归。26 字母各自实际 Canvas 栅格无标签且不为空、不重复；两张全字母图包含 QA-only 标签用于人工定位，不据标签证明手形区别。28／52 点字母表与错误数字／ß、其对应纯 Text 期望、hidden／empty 共八图已逐张检查，26 个单字图也分轮检查；34 张 ASL 图最终重跑在 `/tmp/typebar-asl-handshape-verified-render.tZeie9`，此前同实现图在 `/tmp/typebar-asl-handshape-final-focused-render.8T4MPc`。实际未显示窗口的错误输入图与纯 Text 全 RGBA 像素相同，hidden 与空白相同。输入／成绩／回放不变性用相同时间、错误／删除／完成输入及实际绘图调用直接对照，速度及精度断言亦通过，不回算历史或修改 SwiftData／账户协议。完整冻结结果另记，不能借上轮门禁证明此轮。
+
+最终冻结完整门禁 `/tmp/typebar-asl-handshape-complete-readiness.log` 退出 0：原生 3,724 项零失败零跳过（816.262 秒），服务 501 项零失败零跳过（11.957 秒）；新增 ASL 16 项在全量中实际通过（2.807 秒）。实际十万词耐久 157.683 秒，16 项隔离磁盘冷读 5.550 秒；固定参考／元数据、53 表面／生产文件／测试符号、1,086 人工清单结构及未启动应用包／scheme／严格签名／原创边界通过。七个冻结实现／测试／矩阵哈希 `/tmp/typebar-asl-handshape-frozen.sha256` 前后一致，门禁运行期间未编辑文件，终态后只补结果文档及历史误记更正。62 份日志保留在 `/tmp/typebar-asl-handshape-complete-logs.nNefLR`，120 张组件图在 `/tmp/typebar-asl-handshape-complete-render.wUMBZr`，含本轮 34 张 ASL 图；最终两张字母表和错误数字／ß／期望／hidden／empty 八图已再次逐张复查。已有 CoreData／AddressBook XPC、隔离只读 SwiftData 513 和 Node 实验性诊断保留，不声称修复；不覆盖早期失败日志、不删断言或跳过换绿灯。
+
+同会话有界决策／风险复核（非独立）拒绝“26 图不同即可验收”的假设，检查接触／方向、ASCII 大写展开、错误输入回退、遮挡与无调度新增。手形可辨识和语义夹具不等于熟练 ASL 使用者认可所有简化图，也不复现字体轮廓／字宽或连贯动作。专业核验、独立主／节奏光标、主题／完整错误高亮、混排布局、真实 SwiftUI 生命周期、键盘／VoiceOver 仍开放。ASL 继续部分覆盖；历史 FUN-17 的 QA37 只证明 J／Z cue 和键盘计分，当前完整手形验收降回待验收。53 表面分类和整体 goal 不升级，零 Typebar 主程序启动，无主动访问真实库／Keychain／账户或部署。下方为历史阶段。
+
 ## Tape 单行 LTR 原生文字与独立横向通道增量
 
 固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`、只读清洁。完整读取 [Caret 类](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/elements/caret.ts)、实际 getNlCharWidth／scrollTape 函数与相关初始化／更新调用，以及完整 RAF 模块。起始文字应在 wrapper × tapeMargin 处，不能将有符号 offset 截为零；letter 主光标固定在该边距，word 主光标保留词内偏移。原版主光标不接受 Tape margin，pace 则有独立 marginLeft、ready 折叠和累计修正；文字卷带名义时长 125 ms、inOut(1.25)，与位置及纵向通道分别处理。
@@ -16,7 +32,7 @@ QA-only `check-source-tape-presentation.mjs` 完整执行实际 getNlCharWidth�
 
 最终冻结完整门禁 `/tmp/typebar-tape-presentation-complete-readiness.log` 退出 0：原生 3,708 项零失败零跳过（805.195 秒），服务 501 项零失败零跳过（11.934 秒）；新增 17 项在全量中实际通过（0.852 秒）。实际十万词耐久 151.354 秒，16 项隔离磁盘冷读 6.273 秒；固定参考／元数据、53 表面／生产文件／测试符号、1,083 人工结构及未启动应用包／scheme／严格签名／原创边界通过。11 个冻结实现／测试／脚本／矩阵哈希 `/tmp/typebar-tape-presentation-frozen.sha256` 前后一致，完整门禁运行期间无文件编辑，终态后仅补本轮结果和 ASL 审计更正。62 份完整日志在 `/tmp/typebar-tape-presentation-complete-logs.JXVeM4`，86 张组件图在 `/tmp/typebar-tape-presentation-complete-render.hxCj6Q`；本轮三张 Tape 图已再次逐张复查。CoreData／AddressBook XPC、隔离只读 SwiftData 513、Node 实验性警告与早期失败均保留；不声称这些既有诊断已修复，不删断言或跳过换绿灯。
 
-只读复核还证实 ASL 历史“等价实现”不成立：ASLHandshapePolicy 的 A／D／I 返回同一 mask 且无 motion cue，ASLHandshapeGlyph 只据 mask／cue 绘制，同状态同大小时三者完全相同；C／E／M／N／O／S／T 也共用零 mask。已有测试只证明可返回 mask 与 J／Z cue，不证明手形语义。OFFICIAL_FUNBOX_AUDIT.md 将 ASL 明确降为部分覆盖，并修正未纳入 Weakspot／Polyglot 的旧汇总；本轮没有修改 ASL 产品代码、复制官方字体或宣称已解决。下一增量须先建立可靠手形语义与独立矢量证据，再接光标，不能只给错误手形补装饰。
+只读复核还证实 ASL 历史“等价实现”不成立：ASLHandshapePolicy 的 A／D／I 返回同一 mask 且无 motion cue，ASLHandshapeGlyph 只据 mask／cue 绘制，同状态同大小时三者完全相同；E／M／N／O／S／T 也共用零 mask（后续更正：C 为 2，不属于零组）。已有测试只证明可返回 mask 与 J／Z cue，不证明手形语义。OFFICIAL_FUNBOX_AUDIT.md 将 ASL 明确降为部分覆盖，并修正未纳入 Weakspot／Polyglot 的旧汇总；该轮没有修改 ASL 产品代码、复制官方字体或宣称已解决。下一增量须先建立可靠手形语义与独立矢量证据，再接光标，不能只给错误手形补装饰。
 
 同会话有界风险／决策复核（非独立）检查锁定框与布局坐标、水平与垂直 ready／累计修正、配置抢帧、属性桥接和资源生命周期；根因调试以像素／实际字宽反例定位而不是猜修复。Tape 换行／RTL／混合方向仍保留原有普通回退；长卷带前缀裁剪及其场景修正、no-space／复杂 scalar 几何、真实 SwiftUI 渲染拆卸顺序、任意 RAF 交错、长期性能与设备／IME／VoiceOver 仍开放。ASL、系统鼠标光标与完整周边也未完成。53 表面分类不升级，新增三个人工项保持待验收，零 Typebar 主程序启动、无真实库／Keychain／账户／部署；整体无损纯重写 goal active，下方为历史阶段。
 

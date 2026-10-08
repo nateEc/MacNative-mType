@@ -21586,8 +21586,8 @@ final class TypingEngineTests: XCTestCase {
       LayoutFluidPolicy.upcomingLayout(
         completedWords: 8, wordLimit: 30, layouts: [.ansiQwerty, .ansiColemak, .ansiDvorak])?.layout,
       .ansiColemak)
-    XCTAssertNotNil(ASLHandshapePolicy.fingerMask(for: "A"))
-    XCTAssertNil(ASLHandshapePolicy.fingerMask(for: "7"))
+    XCTAssertNotNil(ASLHandshapePolicy.handshape(for: "A"))
+    XCTAssertNil(ASLHandshapePolicy.handshape(for: "7"))
     XCTAssertEqual(ASLHandshapePolicy.motionCue(for: "J"), .jCurve)
     XCTAssertEqual(ASLHandshapePolicy.motionCue(for: "z"), .zZigzag)
     XCTAssertTrue(ASLHandshapePolicy.usesMotionCue(for: "J"))

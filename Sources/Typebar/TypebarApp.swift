@@ -844,72 +844,7 @@ final class ChooLayerView: NSView {
   }
 }
 
-private struct ASLHandshapeGlyph: View {
-  let character: Character
-  let color: Color
-  let background: Color
-  let size: CGFloat
-
-  var body: some View {
-    Canvas { context, canvasSize in
-      let mask = ASLHandshapePolicy.fingerMask(for: character) ?? 0
-      let palm = CGRect(
-        x: canvasSize.width * 0.24, y: canvasSize.height * 0.42,
-        width: canvasSize.width * 0.52, height: canvasSize.height * 0.39)
-      context.fill(Path(roundedRect: palm, cornerRadius: size * 0.15), with: .color(color.opacity(0.78)))
-      for finger in 0..<5 {
-        let x = canvasSize.width * (0.30 + Double(finger) * 0.10)
-        let raised = mask & (1 << UInt8(finger)) != 0
-        if raised {
-          let height = finger == 0 ? canvasSize.height * 0.30 : canvasSize.height * 0.39
-          let rect = CGRect(x: x, y: palm.minY - height + size * 0.04, width: size * 0.08, height: height)
-          context.fill(Path(roundedRect: rect, cornerRadius: size * 0.04), with: .color(color))
-        } else {
-          context.fill(
-            Path(ellipseIn: CGRect(x: x, y: palm.minY - size * 0.05, width: size * 0.075, height: size * 0.075)),
-            with: .color(color.opacity(0.48)))
-        }
-      }
-      if let motionCue = ASLHandshapePolicy.motionCue(for: character) {
-        let lineWidth = max(1.8, size * 0.06)
-        var cue = Path()
-        switch motionCue {
-        case .jCurve:
-          cue.move(to: .init(x: canvasSize.width * 0.16, y: canvasSize.height * 0.14))
-          cue.addCurve(
-            to: .init(x: canvasSize.width * 0.57, y: canvasSize.height * 0.28),
-            control1: .init(x: canvasSize.width * 0.47, y: canvasSize.height * 0.04),
-            control2: .init(x: canvasSize.width * 0.73, y: canvasSize.height * 0.19))
-          cue.addLine(to: .init(x: canvasSize.width * 0.49, y: canvasSize.height * 0.13))
-          cue.move(to: .init(x: canvasSize.width * 0.57, y: canvasSize.height * 0.28))
-          cue.addLine(to: .init(x: canvasSize.width * 0.43, y: canvasSize.height * 0.30))
-        case .zZigzag:
-          cue.move(to: .init(x: canvasSize.width * 0.13, y: canvasSize.height * 0.12))
-          cue.addLine(to: .init(x: canvasSize.width * 0.70, y: canvasSize.height * 0.12))
-          cue.addLine(to: .init(x: canvasSize.width * 0.23, y: canvasSize.height * 0.31))
-          cue.addLine(to: .init(x: canvasSize.width * 0.79, y: canvasSize.height * 0.31))
-          cue.addLine(to: .init(x: canvasSize.width * 0.65, y: canvasSize.height * 0.21))
-          cue.move(to: .init(x: canvasSize.width * 0.79, y: canvasSize.height * 0.31))
-          cue.addLine(to: .init(x: canvasSize.width * 0.64, y: canvasSize.height * 0.39))
-        }
-        context.stroke(cue, with: .color(color), lineWidth: lineWidth)
-      }
-    }
-    .frame(width: size * 1.02, height: size * 1.10)
-    .background(background, in: RoundedRectangle(cornerRadius: size * 0.12))
-    .accessibilityLabel(aslAccessibilityLabel)
-  }
-
-  private var aslAccessibilityLabel: String {
-    switch ASLHandshapePolicy.motionCue(for: character) {
-    case .jCurve: "ASL 指语字形，J 弧线运动轨迹"
-    case .zZigzag: "ASL 指语字形，Z 折线运动轨迹"
-    case nil: "ASL 指语字形"
-    }
-  }
-}
-
-private struct ASLPracticePrompt: View {
+struct ASLPracticePrompt: View {
   let glyphs: [TypingPromptGlyph]
   let fontSize: Double
   let accent: Color
@@ -920,12 +855,12 @@ private struct ASLPracticePrompt: View {
         if glyph.character == "\n" {
           Color.clear.frame(width: 0, height: 0)
             .layoutValue(key: PromptLineBreakKey.self, value: true)
-        } else if ASLHandshapePolicy.fingerMask(for: glyph.character) != nil {
+        } else if ASLHandshapePolicy.handshape(for: glyph.typedCharacter ?? glyph.character) != nil {
           ASLHandshapeGlyph(
             character: glyph.typedCharacter ?? glyph.character,
             color: color(for: glyph), background: background(for: glyph), size: fontSize)
         } else {
-          Text(String(glyph.character))
+          Text(String(glyph.typedCharacter ?? glyph.character))
             .font(.system(size: fontSize, design: .monospaced))
             .foregroundStyle(color(for: glyph))
         }

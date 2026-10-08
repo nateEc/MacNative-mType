@@ -1684,40 +1684,6 @@ enum ChooVisualPolicy {
   }
 }
 
-enum ASLMotionCue: Equatable {
-  case jCurve
-  case zZigzag
-}
-
-enum ASLHandshapePolicy {
-  /// Original handshape categories used solely to draw Typebar's own vector
-  /// prompts. They intentionally do not embed or depend on a third-party font.
-  static func fingerMask(for character: Character) -> UInt8? {
-    guard let scalar = character.uppercased().unicodeScalars.first, scalar.isASCII,
-      (65...90).contains(scalar.value)
-    else { return nil }
-    let masks: [UInt8] = [
-      0b00001, 0b11110, 0b00010, 0b00001, 0b00000, 0b00110, 0b00011,
-      0b00011, 0b00001, 0b00001, 0b00110, 0b10010, 0b00000, 0b00000,
-      0b00000, 0b00110, 0b00010, 0b00110, 0b00000, 0b00000, 0b00110,
-      0b00110, 0b01110, 0b00010, 0b10001, 0b00010,
-    ]
-    return masks[Int(scalar.value - 65)]
-  }
-
-  static func motionCue(for character: Character) -> ASLMotionCue? {
-    switch character.uppercased() {
-    case "J": .jCurve
-    case "Z": .zZigzag
-    default: nil
-    }
-  }
-
-  static func usesMotionCue(for character: Character) -> Bool {
-    motionCue(for: character) != nil
-  }
-}
-
 enum LayoutFluidPolicy {
   static let defaultLayouts: [KeyboardLayout] = [.ansiQwerty, .ansiColemak, .ansiDvorak]
   /// The reference configuration permits up to fifteen unique layouts. The
