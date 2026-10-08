@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
-const [argument, option, requestedSpaceWidth] = process.argv.slice(2);
+const [argument, option, requestedSpaceWidth, requestedFrames] = process.argv.slice(2);
 assert.ok(argument && (!option || option === '--emit-fixtures'));
 const root=path.resolve(argument), pin='91bd24bb8513785c7364cbea29296ff7adafac41';
 const spaceWidth=Number(requestedSpaceWidth ?? 8);
@@ -24,7 +24,14 @@ assert.ok(!tts.includes('caret'), 'The pinned listening stylesheet does not hide
 const css=fs.readFileSync(path.join(root,'frontend/src/styles/test.scss'),'utf8');
 for(const token of ['&.correct {','color: var(--correct-letter-color);','&.incorrect {','color: var(--incorrect-letter-color);',
   '&.incorrect.extra {','color: var(--extra-letter-color);','&.highlight-off {'])assert.ok(css.includes(token));
-const frames=[{x:10,y:3,width:20,height:32},{x:30,y:3,width:0,height:32},{x:30,y:3,width:24,height:32}];
+const frames=requestedFrames ? JSON.parse(requestedFrames) :
+  [{x:10,y:3,width:20,height:32},{x:30,y:3,width:0,height:32},{x:30,y:3,width:24,height:32}];
+assert.equal(frames.length,3);
+for(const frame of frames) {
+  assert.ok(['x','y','width','height'].every(key=>Number.isFinite(frame[key])));
+  assert.ok(frame.width>=0 && frame.height>=0);
+}
+assert.ok(frames[0].width>0 && frames[1].width===0 && frames[2].width>0);
 const fixtures=[];
 for(const style of ['default','block','outline','underline'])
 for(const [index,side] of [[0,'beforeLetter'],[1,'beforeLetter'],[2,'beforeLetter'],[2,'afterLetter']]){

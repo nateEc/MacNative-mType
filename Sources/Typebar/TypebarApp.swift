@@ -848,42 +848,39 @@ struct ASLPracticePrompt: View {
   let glyphs: [TypingPromptGlyph]
   let fontSize: Double
   let accent: Color
+  var glyphIDs: [Int] = []
+  var rendering: PromptRendering? = nil
+  var carets: PromptCaretNativeView.Configuration? = nil
+  var font: NSFont? = nil
+
+  private var ids: [Int] { glyphIDs.count == glyphs.count ? glyphIDs : Array(glyphs.indices) }
 
   var body: some View {
-    PromptFlowLayout {
-      ForEach(Array(glyphs.enumerated()), id: \.offset) { _, glyph in
-        if glyph.character == "\n" {
+    let ids = ids
+    let contents = ASLPromptGlyphContent.make(glyphs: glyphs, ids: ids, rendering: rendering)
+    return PromptFlowLayout {
+      ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
+        if rendering != nil && rendering?.glyphCharacterOffsets[ids[index]] == nil {
+          EmptyView()
+        } else if glyph.character == "\n" {
           Color.clear.frame(width: 0, height: 0)
             .layoutValue(key: PromptLineBreakKey.self, value: true)
-        } else if ASLHandshapePolicy.handshape(for: glyph.typedCharacter ?? glyph.character) != nil {
-          ASLHandshapeGlyph(
-            character: glyph.typedCharacter ?? glyph.character,
-            color: color(for: glyph), background: background(for: glyph), size: fontSize)
+            .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [ids[index]: $0] }
         } else {
-          Text(String(glyph.typedCharacter ?? glyph.character))
-            .font(.system(size: fontSize, design: .monospaced))
-            .foregroundStyle(color(for: glyph))
+          ASLPromptGlyphCell(content: contents[index], size: fontSize,
+            font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
+            .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [ids[index]: $0] }
         }
       }
     }
-  }
-
-  private func color(for glyph: TypingPromptGlyph) -> Color {
-    switch glyph.state {
-    case .correct: .primary
-    case .incorrect, .extra: .red
-    case .current: accent
-    case .pending: .secondary.opacity(0.55)
-    case .hidden: .clear
-    }
-  }
-
-  private func background(for glyph: TypingPromptGlyph) -> Color {
-    switch glyph.state {
-    case .incorrect: .red.opacity(0.16)
-    case .extra: .red.opacity(0.12)
-    case .current: accent.opacity(0.18)
-    default: .clear
+    .overlayPreferenceValue(ASLPromptBoundsKey.self) { anchors in
+      if let carets {
+        GeometryReader { proxy in
+          ASLPromptCaretBridge(configuration: carets,
+            frames: anchors.mapValues { proxy[$0] }, glyphIDs: ids)
+            .allowsHitTesting(false).accessibilityHidden(true)
+        }
+      }
     }
   }
 }
@@ -2891,7 +2888,9 @@ private struct ContentView: View {
     return Group {
       if practiceVisualEffect.usesASL {
         ASLPracticePrompt(
-          glyphs: session.promptGlyphsInDisplayOrder, fontSize: settings.fontSize, accent: activeTheme.accent)
+          glyphs: session.promptGlyphsInDisplayOrder, fontSize: settings.fontSize, accent: activeTheme.accent,
+          glyphIDs: specialPromptGlyphIDs, rendering: rendering, carets: specialPromptCaretConfiguration,
+          font: practicePromptNSFont(size: settings.fontSize))
       } else if practiceVisualEffect.usesChoo {
         ChooPracticePrompt(
           glyphs: session.promptGlyphsInDisplayOrder,
@@ -3143,7 +3142,9 @@ private struct ContentView: View {
       || session.configuration.usesRightToLeftPrompt
   }
 
-  private var usesIndependentPromptCarets: Bool { usesNativeCaretOverlay || usesTapePractice || practiceVisualEffect.usesChoo }
+  private var usesIndependentPromptCarets: Bool {
+    usesNativeCaretOverlay || usesTapePractice || practiceVisualEffect.usesChoo || practiceVisualEffect.usesASL
+  }
 
   private func paceCaretInterpolation() -> PromptPaceCaretInterpolation? {
     guard let frame = session.paceCaretFrame() else { return nil }

@@ -1,5 +1,25 @@
 # 原生奖励收件箱与周任务交付
 
+## ASL 共用文字状态与实际布局独立光标增量
+
+2026-10-09，固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`、只读清洁。只读核对完整 ASL CSS、Caret 目标解析与相关位置／闪烁通道，以及 test.scss 的默认／flipped／colorful／highlight-off／词高亮／blind／typed effects：ASL 只替换显示字体，不能另造一套当前字符颜色、错误背景或计分规则。没有打开、复制、提取或描摹 Gallaudet 字体；SwiftUI Anchor／GeometryProxy／anchorPreference／overlayPreferenceValue 使用已安装 SDK 26.2 的公开接口，以 macOS 14 目标实际编译。
+
+ASLPracticePrompt 现在读取共用 renderedPrompt 的最终属性、canonical ID 和选定原生字体，而不是固定系统 primary／secondary／red 或 current accent 背景。ASLPromptGlyphContent 按 Character 范围切分每格，保留目标／错误替换、组合文字、隐藏／淡化／点替换、前景／背景与错误下划线；字母主体与字母 typo hint 仍绘原创手形，多字组合、非 ASCII／非换行控制符及点使用原生 Text。目标换行仍沿用已有零宽换行格，Return 图示及该格错字显示不在本轮完成范围。显示哪个字符由共用 typo 设置决定：关闭替换时保留目标，替换时显示实际输入，并非上一轮无条件显示 typedCharacter；原始输入与成绩不改。常规角色规划本身的已有局限不据此宣称修复，hint 精确基线／字宽与完整组合仍待验。
+
+每格通过真实 SwiftUI bounds anchor 提供框，专用无计时器 ASLPromptCaretContainer 将它们映射到已有 PromptCaretNativeView 的主／pace 独立通道；不把 canonical ID 当 TextKit offset，也不用普通拉丁字体估算手形。实际布局、换行、缩放、文字替换或 ID 变化递增几何版本；隐藏只去墨迹不删框，实际零宽格可回找，缺失／已裁格拒绝假借前格或恢复旧目标。共用渲染未包含的格连换行也不参与布局，firstGlyphID 取首个实际框。移除旧 current／error／extra 假背景，配置继续使用已有专注／输入／窗口／完成／减少动态 provider 与有界呈现／pace timer，包装器没有新增循环或全局监听。真实 SwiftUI 移除／恢复覆盖层只恢复一个新 owner，旧 child 即使被测试持有也不再呈现。
+
+范围边界一次建立 Character 索引并按 offset 排序，不为每格重扫整个提示；一万格纯模型切片实际约 0.185 秒，不是十万手形窗口或长期性能验收。设计技能维持现有原生线描、字号和布局，仅把手形颜色与光标职责分离，不重设计页面。同会话有界决策／风险／代码复核（非独立）重点反证实际坐标、旧目标泄露、缺失框、共同 coordinator 与资源退休；未修改 SwiftData、设置／归档格式、输入或账户协议。
+
+先行 `/tmp/typebar-asl-caret-red.log` 两项四处预期失败（1.260 秒）证明假 current 墨迹／背景与缺失生产接线；接线检查仅静态证据，后续真实组件另证。`first-focused.log` 18 项通过（2.730 秒）。扩大回归 `expanded-focused.log` 保留三处夹具失败：真实 anchor 与独立 NSHostingView fittingSize 都是 29×31，而非未对齐 28.56；AppKit 自动释放池排空后容器确实释放。`geometry-retirement-red.log` 四项三处失败还真正复现了旧目标回退和缺失框借位，随后修生产边界。`source-render-focused.log` 74 项唯一失败为高度 31.000000000000007 与 31 的浮点精确比较；改成分量 1e-9 精度，不修改实际几何。
+
+`source-render-verified.log` 79 项两处失败、`fixture-diagnostics.log` 两项两处失败保留：原点对齐 -0.1 不能冒充插入空行，用同一 host 的仅保留格布局逐框对照；夹具换了 attempt 后未呈现导致 nil，改为保持原 attempt 并显式呈现。细线强红仅 28 像素，抗锯齿红 243、红通道质量 86.428；像素守卫改成同时要求实线、抗锯齿与超过单条下划线的颜色质量，不把纯红阈值当所有线条。`final-verified.log` 79 项零失败零跳过（4.988 秒），最终 `/tmp/typebar-asl-caret-lifecycle-final-verified.log` 80 项零失败零跳过（5.137 秒），含新增 21 项与既有手形／Choo／普通听写／主光标回归。日志共同前缀 `/tmp/typebar-asl-caret-`，不删早期失败或以跳过换绿灯。
+
+QA-only 既有 check-source-special-caret.mjs 可额外接受三个实际 ASL anchor 框；完整执行锁定 Caret 模块的 16 组四样式／零宽／字前字后解析，对照原生独立 marker 的横向位置／全宽。默认探针行为与原夹具不变；word origin、DOM、方向、space advance 为明确自有边界，不是浏览器 CSS、字体基线、连写／RTL 或完整控制器动画等价。六张新组件图在 `/tmp/typebar-asl-caret-final-render.EQpJhU`（on／off／wrapped／shared-theme／shared-hidden／hint-underline）；前五张此前同实现图与最终 hint 图已逐张检查，完整门禁后再复查。真实 mounted SwiftUI 验证非连续 ID、换行／缩放／字体、主闪烁而 pace 保留、主关闭而 pace 可见、隐藏仅留蓝色光标无原手形彩墨、缺失格与拆卸恢复；测试窗口从不显示或激活，串行关闭，零 Typebar 主程序启动。完整冻结门禁结果另记，不借上一轮全绿证明此轮。
+
+最终冻结完整门禁 `/tmp/typebar-asl-caret-complete-readiness.log` 退出 0：原生 3,745 项零失败零跳过（816.252 秒），服务 501 项零失败零跳过（11.517 秒）；新增 21 项在全量中实际通过（1.824 秒）。十万词耐久实际执行 161.751 秒，16 项隔离磁盘冷读 5.471 秒；固定参考／元数据、53 表面／生产文件／测试符号、1,089 人工清单结构及未启动应用包／scheme／严格签名／原创边界全部通过。八个冻结实现／测试／探针／矩阵哈希 `/tmp/typebar-asl-caret-frozen.sha256` 前后一致，门禁运行期间未编辑文件，终态后仅补结果和范围说明。62 份完整日志在 `/tmp/typebar-asl-caret-complete-logs.MvfozS`，126 张组件图在 `/tmp/typebar-asl-caret-complete-render.CyYP9g`；本轮六张 ASL 图已逐张复查。已有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、Node 实验性诊断与早期夹具失败保留，不声称修复；不删断言、不跳过或重复启动门禁换绿灯。
+
+ASL 仍部分覆盖：专业手形核验、自动整行滚动／旧词退休、长提示有界可见渲染、精确 hint／混排／控制换行布局、全部主题动效／typed fade 时序、任意共享 coordinator 分支切换、真实键盘／IME／VoiceOver／显示器尚未完成；未声称字体轮廓／字宽或连贯动作等价。53 表面分类不升级，三个新增人工项待验收，无主动访问真实库／Keychain／账户或部署，整体 goal active。下方为历史阶段。
+
 ## ASL 手形语义与原创矢量增量
 
 固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`，只读清洁。完整读取 `frontend/static/funbox/asl.css` 与 Funbox 元数据：它只替换 wordsWrapper 的显示字体，不变换目标或计分，保留 noJoiningScript 准入。没有打开、提取、复制或描摹 Gallaudet 字体轮廓。语义核验使用 [HandSpeak 字母表](https://www.handspeak.com/topic/408/)、[A](https://www.handspeak.com/word/2460/)、[F](https://www.handspeak.com/word/2465/)、[K](https://www.handspeak.com/word/2470/)、[M](https://www.handspeak.com/word/2472/)、[N](https://www.handspeak.com/word/2473/)、[T](https://www.handspeak.com/word/2479/) 与 [Lifeprint 手形备注](https://www.lifeprint.com/asl101/topics/signingnotes.htm)。这些来源说明手指姿态、拇指位置、接触和朝向不能被同一个伸直位掩码替代；仅观察教学参考，没有下载媒体或把其图片、路径、文字纳入产品。原生坐标与绘图逻辑独立构建，不以照片采样／描摹生成。
