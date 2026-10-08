@@ -798,29 +798,25 @@ struct ASLPracticePrompt: View {
   private var ids: [Int] { glyphIDs.count == glyphs.count ? glyphIDs : Array(glyphs.indices) }
 
   var body: some View {
-    let ids = ids
-    let contents = ASLPromptGlyphContent.make(glyphs: glyphs, ids: ids, rendering: rendering)
-    let wordPlan = ASLPromptWordPlan(glyphs: glyphs, ids: ids, words: words,
+    let cells = ASLPromptCellPlan(glyphs: glyphs, ids: ids, rendering: rendering).cells
+    let visibleGlyphs = cells.map(\.glyph), ids = cells.map(\.id)
+    let wordPlan = ASLPromptWordPlan(glyphs: visibleGlyphs, ids: ids, words: words,
       placeholderGlyphID: rendering?.emptyWordPlaceholderGlyphID)
     return ASLPromptFlowLayout {
-      ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
-        if rendering != nil && rendering?.glyphCharacterOffsets[ids[index]] == nil {
-          EmptyView()
-        } else {
-          ASLPromptGlyphCell(content: contents[index], size: fontSize,
-            font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
-            .layoutValue(key: ASLPromptWordIDKey.self, value: wordPlan.wordByGlyphID[ids[index]] ?? ids[index])
-            .layoutValue(key: ASLPromptLineBreakKey.self, value: contents[index].ownsLineBreak)
-            .layoutValue(key: ASLPromptSeparatorKey.self,
-              value: glyph.character == " " && glyph.state != .extra && ids[index] != wordPlan.placeholderGlyphID)
-            .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [ids[index]: $0] }
-        }
+      ForEach(cells) { cell in
+        ASLPromptGlyphCell(content: cell.content, size: fontSize,
+          font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
+          .layoutValue(key: ASLPromptWordIDKey.self, value: wordPlan.wordByGlyphID[cell.id] ?? cell.id)
+          .layoutValue(key: ASLPromptLineBreakKey.self, value: cell.content.ownsLineBreak)
+          .layoutValue(key: ASLPromptSeparatorKey.self,
+            value: cell.glyph.character == " " && cell.glyph.state != .extra && cell.id != wordPlan.placeholderGlyphID)
+          .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [cell.id: $0] }
       }
     }
     .overlayPreferenceValue(ASLPromptBoundsKey.self) { anchors in
       GeometryReader { proxy in
         let frames = anchors.mapValues { proxy[$0] }
-        let wordFrames = wordPlan.measuredWords(frames: frames, glyphs: glyphs, ids: ids)
+        let wordFrames = wordPlan.measuredWords(frames: frames, glyphs: visibleGlyphs, ids: ids)
         let rowHeights = ASLPromptLineGeometry(frames: frames).rowHeights
         ZStack {
           Color.clear.preference(key: PracticeViewportHeightKey.self,

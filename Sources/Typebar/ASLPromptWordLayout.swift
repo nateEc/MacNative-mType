@@ -10,14 +10,21 @@ struct ASLPromptWordPlan {
     self.placeholderGlyphID = placeholderGlyphID
     var owners: [Int: Int] = [:]
     if let words {
+      let visibleIDs = Set(ids)
+      let firstID = ids.min(), lastID = ids.max()
       let separators = Set(glyphs.enumerated().compactMap { index, glyph in
         ids.indices.contains(index) && glyph.state != .extra && (glyph.character == " " || glyph.character == "\n")
           ? ids[index] : nil
       })
       for word in words {
         let owner = word.range.lowerBound
-        for id in word.range { owners[id] = owner }
-        for id in word.extraGlyphIndices { owners[id] = owner }
+        if !word.range.isEmpty, let firstID, let lastID {
+          let lower = max(word.range.lowerBound, firstID), upper = min(word.range.upperBound - 1, lastID)
+          if lower <= upper {
+            for id in lower...upper where visibleIDs.contains(id) { owners[id] = owner }
+          }
+        }
+        for id in word.extraGlyphIndices where visibleIDs.contains(id) { owners[id] = owner }
         // End positions without a real separator may instead be an extra ID.
         // Adjacent no-space words already have their own target ranges.
         if separators.contains(word.range.upperBound) { owners[word.range.upperBound] = owner }

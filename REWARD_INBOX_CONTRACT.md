@@ -1,5 +1,17 @@
 # 原生奖励收件箱与周任务交付
 
+## ASL 退休前缀渲染物化与稳定字形 ID 增量
+
+2026-10-09，固定只读参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `lineJump`／`removeTestElements` 在跳行动画完成后物理移除旧 DOM 词格，但不删除原始词目录或输入；完整 before-delete／hard-recovery 另根据词元素是否存在限制回退。既有 QA 探针重新执行 12 序列／60 行转移、32 before-delete 与八 hard-recovery，全部通过；DOM 尺寸、动画完成和输入状态仍为自有适配，不冒充浏览器。未读取／提取任何字体或官方产品资产。
+
+红测两项一处失败（1.493 秒）：给 ASLWordPlan 四个保留 ID，仍为两万个历史格分配归属。真实 never-visible 组件已有正确三格画面，却仍在字形内容与 SwiftUI ForEach 前遍历／物化全部历史位置；基线两万退休／三格保留 mounted 0.489033 秒。新 ASLPromptCellPlan 先筛共用渲染的保留 ID，再构建 attributed 格与 SwiftUI 子节点；ForEach 使用 canonical Identifiable，而非会随前缀改变的数组位置。词归属只为实际保留 ID 分配，并夹住可见目标范围；所有框、word union 和独立光标都使用保留格数据。隐藏墨迹不是缺失；显式空渲染不走 legacy 恢复，nil 渲染仍保留既有 fallback；Zen 占位和 Unicode／hint 不变。没有新增未来词数量上限或提前退休，没有修改输入、计分、存储、回放、服务或 Timer。
+
+首绿两项零失败 0.164 秒，mounted 0.071479 秒；最终相关 154 项零失败零跳过 19.771 秒，mounted 0.058089 秒。时间只属同机夹具观测，包含系统／字体／编译缓存影响，不作跨机器倍数或帧率保证。九项新增覆盖：两万退休仅三格物化、真实 extras 重排／归属和 Unicode hint、隐藏与缺失、空与 nil／ID fallback、Zen 占位、五千未来格无新截断、生产接线、归属表边界、实际二次裁前缀保持同一 caret owner。失败与通过日志保留 `/tmp/typebar-asl-retained-render-{red,first-green,focused,source}.log`，两张新组件图 `/tmp/typebar-asl-retained-render-focused-images.dQAGfz/asl-retained-{long-prefix,next-prefix}.png` 已逐张检查。组件窗口从不显示并逐一关闭，零主程序启动。
+
+Swift 6.2.4／SDK 26.2／最低 macOS 14；安装 SDK 的 ForEach Identifiable initializer 明确支持 macOS 10.15，不引入仅新版系统 API。行为优先、源码驱动、最小改动及同会话决策／风险复核限定实现，非独立评审；frontend-design 保持既有原创线描、颜色和原生间距，不改视觉设计。该增量只界定**退休前缀不再物化为字形与列表节点**：仍扫描入参 canonical IDs／词目录，输入引擎及共用渲染快照的全历史扫描、所有未来／show-all 视口虚拟化、长会话真实逐帧性能均未证明有界。严格空格空词、所有混排／回流、专业手形、浏览器精确数值、真实设备／IME／VoiceOver 等差距继续开放；ASL 六部分／42 历史有界分类不升级，完整 goal active。
+
+最终完整冻结门禁 `/tmp/typebar-asl-retained-render-complete-readiness.log` 终态退出 0：原生 3,804 项零失败零跳过（837.183 秒），服务 501 项零失败零跳过（11.971 秒）；实际十万词耐久 155.101 秒、16 项隔离磁盘迁移冷读 4.842 秒、53 表面、1,097 唯一人工结构、固定元数据／原创边界与未启动应用包资源／URL scheme／严格签名检查全部通过。九新增测试为 0.237 秒，当前完整轮两万退休／三格 mounted 观测为 0.057617 秒，仍不作为跨机器性能承诺。八文件清单 `/tmp/typebar-asl-retained-render-frozen.sha256` 门禁前中后完全一致；62 份原始日志保留 `/tmp/typebar-asl-retained-render-complete-logs.dJOMY0`，145 张组件图保留 `/tmp/typebar-asl-retained-render-complete-images.u29hYh`，两张新图已再次逐张检查。测试日志全文无失败／跳过；CoreData／AddressBook XPC、只读 SwiftData 513 及既有编译／Node 警告原样保留，不宣称修复。零 Typebar 主程序启动，无残留测试／编译进程，没有操作真实账户／成绩库或部署。下面是历史阶段证据。
+
 ## Zen 空活动词占位与 ASL 实测词框增量
 
 2026-10-09，固定只读参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `appendEmptyWordElement`／`updateWordLetters` 都为 Zen 空活动词生成不可见 `_` 格；`index.scss` 明确 opacity 0／visibility hidden，不是 display none。ASL CSS 仅换字体。本轮 QA 执行完整 append 函数及完整建词／更新与真实 Words／Strings，共 44 组自有输入，不再跳过 Zen 空输入 sentinel。DOM、hint、RAF 与 CSS 数值仍是适配边界，不声称浏览器字体／尺寸或真实输入链路已执行。

@@ -1,6 +1,25 @@
 import AppKit
 import SwiftUI
 
+/// Filter retired/missing IDs before materializing attributed cells or SwiftUI
+/// children. IDs remain canonical even when extras reorder the traversal.
+struct ASLPromptCellPlan {
+  struct Cell: Identifiable {
+    let id: Int
+    let glyph: TypingPromptGlyph
+    let content: ASLPromptGlyphContent
+  }
+  let cells: [Cell]
+
+  init(glyphs: [TypingPromptGlyph], ids: [Int], rendering: PromptRendering?) {
+    let ids = ids.count == glyphs.count ? ids : Array(glyphs.indices)
+    let retained = glyphs.indices.filter { rendering == nil || rendering?.glyphCharacterOffsets[ids[$0]] != nil }
+    let visibleGlyphs = retained.map { glyphs[$0] }, visibleIDs = retained.map { ids[$0] }
+    let contents = ASLPromptGlyphContent.make(glyphs: visibleGlyphs, ids: visibleIDs, rendering: rendering)
+    cells = visibleGlyphs.indices.map { .init(id: visibleIDs[$0], glyph: visibleGlyphs[$0], content: contents[$0]) }
+  }
+}
+
 /// A cell consumes the common prompt's final attributes. It never decides
 /// correctness, highlighting, typo replacement, composition or saved input.
 struct ASLPromptGlyphContent {
