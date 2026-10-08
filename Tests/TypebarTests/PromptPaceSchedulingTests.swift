@@ -239,10 +239,15 @@ import XCTest
     var config = configuration(motion)
     config.paceFrame = { .init(fromCharacterOffset: 0, targetCharacterOffset: 1,
       fromAfter: false, targetAfter: false, fraction: 0, stepDuration: 0.2, sequence: 1) }
+    // Isolate deadline requests from the independent 15 FPS draw timer. A
+    // run-loop wait can overrun 60ms under load; it is not a no-paint barrier.
+    config.automaticallyPresents = false
     view.update(config); view.layout()
-    RunLoop.main.run(until: Date().addingTimeInterval(0.06))
+    RunLoop.main.run(until: Date().addingTimeInterval(0.12))
     XCTAssertNotNil(motion.pace.position)
     XCTAssertTrue(view.subviews.isEmpty, "A pace request must not draw either marker layer")
+    view.present(at: ProcessInfo.processInfo.systemUptime)
+    XCTAssertFalse(view.subviews.isEmpty, "The explicit presentation path must still paint the requested target")
   }
 
   func testLateModelStepUsesRemainingDurationAndRepeatedReadsDoNotRestartIt() throws {

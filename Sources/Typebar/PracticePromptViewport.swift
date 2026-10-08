@@ -11,6 +11,7 @@ struct PracticePromptViewport<Content: View>: View {
   var maximumTextWidth: CGFloat? = nil
   var horizontalTextInset: CGFloat = 0
   var measuresTextRows = true
+  var measuresCustomRows = false
   @ViewBuilder var content: () -> Content
   @State private var measuredHeight: CGFloat?
 
@@ -29,11 +30,11 @@ struct PracticePromptViewport<Content: View>: View {
         }
       }
       // Keep a final active row movable even when fewer than three rows remain.
-      .padding(.bottom, measuresTextRows
+      .padding(.bottom, measuresTextRows || measuresCustomRows
         ? measuredHeight ?? PromptViewportLayout.fallbackHeight(font: font, lineSpacing: lineSpacing, lineCount: lineCount)
         : 0)
     }
-    .frame(height: measuresTextRows
+    .frame(height: measuresTextRows || measuresCustomRows
       ? measuredHeight ?? PromptViewportLayout.fallbackHeight(font: font, lineSpacing: lineSpacing, lineCount: lineCount)
       : 184)
     .onPreferenceChange(PracticeViewportHeightKey.self) { height in
@@ -42,7 +43,7 @@ struct PracticePromptViewport<Content: View>: View {
   }
 }
 
-private struct PracticeViewportHeightKey: PreferenceKey {
+struct PracticeViewportHeightKey: PreferenceKey {
   static let defaultValue: CGFloat? = nil
   static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
     if let next = nextValue() { value = next }

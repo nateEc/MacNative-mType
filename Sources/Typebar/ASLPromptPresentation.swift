@@ -89,17 +89,31 @@ struct ASLPromptBoundsKey: PreferenceKey {
 }
 
 struct ASLPromptCaretBridge: NSViewRepresentable {
-  let configuration: PromptCaretNativeView.Configuration
+  let configuration: PromptCaretNativeView.Configuration?
   let frames: [Int: CGRect]
   let glyphIDs: [Int]
+  var lineScroll: PromptLineScrollContext? = nil
+  var caretGlyphID: Int? = nil
+  var text = AttributedString()
+  var font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarAnimationFrameRate) private var frameRate
   func makeNSView(context: Context) -> ASLPromptCaretContainer { ASLPromptCaretContainer() }
   func updateNSView(_ view: ASLPromptCaretContainer, context: Context) {
-    view.configure(configuration, frames: frames, glyphIDs: glyphIDs)
+    let lineScroll = lineScroll.map {
+      PromptLineScrollContext(attemptID: $0.attemptID, activeWordID: $0.activeWordID,
+        characterOffsets: $0.characterOffsets, smoothScroll: $0.smoothScroll,
+        reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: frameRate,
+        words: $0.words, firstRetainedWordIndex: $0.firstRetainedWordIndex,
+        onRetire: $0.onRetire, followsWordReflow: $0.followsWordReflow, caretMotion: $0.caretMotion)
+    }
+    view.configure(configuration, frames: frames, glyphIDs: glyphIDs,
+      lineScroll: lineScroll, caretGlyphID: caretGlyphID, text: text, font: font)
   }
   static func dismantleNSView(_ view: ASLPromptCaretContainer, coordinator: ()) { view.stop() }
 }
 
-/// Owns no timer. Both markers use the shared native caret controller, with
+/// Owns no timer. Its children use the shared scroll and caret controllers, with
 /// actual SwiftUI cell bounds rather than a Latin-font TextKit approximation.
 final class ASLPromptCaretContainer: NSView {
   private var frames: [Int: CGRect] = [:]
@@ -107,6 +121,8 @@ final class ASLPromptCaretContainer: NSView {
   private var indexByID: [Int: Int] = [:]
   private var revision: UInt64 = 0
   private let caret = PromptCaretNativeView()
+  private let follower = PromptAutoScrollView()
+  private var lineGeometry = ASLPromptLineGeometry(frames: [:])
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -114,24 +130,38 @@ final class ASLPromptCaretContainer: NSView {
     super.init(frame: frameRect)
     caret.autoresizingMask = [.width, .height]
     addSubview(caret)
+    follower.autoresizingMask = [.width, .height]
+    addSubview(follower, positioned: .below, relativeTo: caret)
     setAccessibilityElement(false)
   }
   required init?(coder: NSCoder) { fatalError("ASLPromptCaretContainer is created in code") }
 
-  func configure(_ config: PromptCaretNativeView.Configuration, frames: [Int: CGRect], glyphIDs: [Int]) {
+  func configure(_ config: PromptCaretNativeView.Configuration?, frames: [Int: CGRect], glyphIDs: [Int],
+    lineScroll: PromptLineScrollContext? = nil, caretGlyphID: Int? = nil,
+    text: AttributedString = AttributedString(), font: NSFont = .monospacedSystemFont(ofSize: 28, weight: .regular)) {
     if self.frames != frames || self.glyphIDs != glyphIDs {
       if self.glyphIDs != glyphIDs {
         indexByID = Dictionary(glyphIDs.enumerated().map { ($0.element, $0.offset) },
           uniquingKeysWith: { first, _ in first })
       }
       self.frames = frames; self.glyphIDs = glyphIDs; revision &+= 1
+      lineGeometry = ASLPromptLineGeometry(frames: frames)
     }
-    var config = config
-    config.geometryRevision = revision
-    config.firstGlyphID = glyphIDs.first(where: { frames[$0] != nil }) ?? 0
-    config.glyphRect = { [weak self] id in self?.rect(for: id) }
     caret.frame = bounds
-    caret.update(config)
+    caret.isHidden = config == nil
+    if var config {
+      config.geometryRevision = revision
+      config.firstGlyphID = glyphIDs.first(where: { frames[$0] != nil }) ?? 0
+      config.glyphRect = { [weak self] id in self?.rect(for: id) }
+      caret.update(config)
+    } else { caret.stop() }
+    follower.frame = bounds
+    follower.update(text: text, characterOffset: nil, font: font, lineSpacing: 12,
+      isRightToLeft: false, lineScroll: lineScroll,
+      customGeometry: .init(revision: revision, caretGlyphID: caretGlyphID,
+        measure: { [weak self] active, previous, caret, words in
+          self?.lineGeometry.measure(active: active, previous: previous, caret: caret, words: words)
+        }))
   }
 
   func rect(for id: Int) -> CGRect? {
@@ -144,10 +174,46 @@ final class ASLPromptCaretContainer: NSView {
 
   func measuredRect(for id: Int) -> CGRect? { frames[id] }
 
-  override func layout() { super.layout(); caret.frame = bounds }
+  override func layout() { super.layout(); caret.frame = bounds; follower.frame = bounds }
   override func viewWillMove(toSuperview newSuperview: NSView?) {
     if newSuperview == nil { stop() }
     super.viewWillMove(toSuperview: newSuperview)
   }
-  func stop() { caret.stop() }
+  func stop() { caret.stop(); follower.cancelCaretMotion(); follower.stopLineScroll() }
+}
+
+/// Cached once per anchor revision. Mixed fallback glyphs may be taller than
+/// hands; row steps come from placement, not an assumed font line height.
+struct ASLPromptLineGeometry {
+  let frames: [Int: CGRect]
+  private let rows: [CGRect]
+  private let rowByID: [Int: Int]
+  let rowHeights: [CGFloat]
+
+  init(frames: [Int: CGRect], rowSpacing: CGFloat = 12) {
+    self.frames = frames
+    var rows: [CGRect] = [], indices: [Int: Int] = [:]
+    for (id, frame) in frames.sorted(by: { $0.value.minY < $1.value.minY })
+      where frame.width > 0 && frame.height > 0 && frame.minY.isFinite && frame.maxY.isFinite {
+      if let last = rows.last, abs(last.minY - frame.minY) < 0.5 {
+        rows[rows.count - 1] = last.union(frame)
+      } else { rows.append(frame) }
+      indices[id] = rows.count - 1
+    }
+    self.rows = rows; rowByID = indices
+    rowHeights = rows.indices.map { index in
+      index + 1 < rows.count ? rows[index + 1].minY - rows[index].minY : rows[index].height + rowSpacing
+    }
+  }
+
+  func measure(active: Int, previous: Int?, caret: Int?, words: [PromptLineScrollWord]) -> PromptLineScrollGeometry? {
+    guard let row = rowByID[active] else { return nil }
+    return .init(activeTop: rows[row].minY,
+      previousWordTop: previous.flatMap { rowByID[$0] }.map { rows[$0].minY },
+      previousLineTop: row > 0 ? rows[row - 1].minY : 0,
+      caretBottom: caret.flatMap { rowByID[$0] }.map { rows[$0].maxY },
+      wordTops: Dictionary(words.compactMap { word in
+        rowByID[word.glyphID].map { (word.index, rows[$0].minY) }
+      }, uniquingKeysWith: { first, _ in first }), activeRowHeight: rowHeights[row])
+  }
 }

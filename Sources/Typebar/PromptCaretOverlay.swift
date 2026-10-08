@@ -213,6 +213,7 @@ final class PromptAutoScrollView: NSView {
   private var lastWidth: CGFloat = 0
   private var isFollowScheduled = false
   private var lineScroll: PromptLineScrollContext?
+  private var customGeometry: PromptLineScrollCustomGeometry?
   private var previousWordID: Int?
   private var previousTargetTop: CGFloat = 0
   private var recentersLine = true
@@ -233,12 +234,14 @@ final class PromptAutoScrollView: NSView {
 
   func update(
     text: AttributedString, characterOffset: Int?, font: NSFont,
-    lineSpacing: CGFloat, isRightToLeft: Bool, lineScroll: PromptLineScrollContext? = nil
+    lineSpacing: CGFloat, isRightToLeft: Bool, lineScroll: PromptLineScrollContext? = nil,
+    customGeometry: PromptLineScrollCustomGeometry? = nil
   ) {
     let attemptChanged = self.lineScroll?.attemptID != lineScroll?.attemptID
     let prefixChanged = self.lineScroll?.firstRetainedWordIndex != lineScroll?.firstRetainedWordIndex
     let layoutChanged = self.font != font || self.lineSpacing != lineSpacing
       || self.isRightToLeft != isRightToLeft
+      || (self.customGeometry == nil) != (customGeometry == nil)
     let textChanged = self.text != text
     let needsFollow = self.characterOffset != characterOffset
       || textChanged
@@ -249,6 +252,8 @@ final class PromptAutoScrollView: NSView {
       || self.lineScroll?.reducesMotion != lineScroll?.reducesMotion
       || self.lineScroll?.frameRate != lineScroll?.frameRate
       || self.lineScroll?.followsWordReflow != lineScroll?.followsWordReflow
+      || self.customGeometry?.revision != customGeometry?.revision
+      || self.customGeometry?.caretGlyphID != customGeometry?.caretGlyphID
     if attemptChanged {
       stopLineScroll()
       previousWordID = nil
@@ -276,6 +281,7 @@ final class PromptAutoScrollView: NSView {
     }
     recentersLine = recentersLine || layoutChanged || attemptChanged
     self.lineScroll = lineScroll
+    self.customGeometry = customGeometry
     self.text = text
     self.characterOffset = characterOffset
     self.font = font
@@ -335,6 +341,7 @@ final class PromptAutoScrollView: NSView {
 
   private func followCurrentGlyph() {
     if let lineScroll { followActiveWord(lineScroll); return }
+    guard customGeometry == nil else { return }
     guard let characterOffset, bounds.width > 0, let scrollView = enclosingScrollView,
       let documentView = scrollView.documentView,
       let rect = PromptCaretLayout.rect(
@@ -358,15 +365,21 @@ final class PromptAutoScrollView: NSView {
     let wordWasUpdated = hasPendingWordUpdate && !prefixWasRebuilt
     if !prefixWasRebuilt { hasPendingWordUpdate = false }
     guard let scroll = enclosingScrollView, let document = scroll.documentView,
-      let wordID = context.activeWordID, let offset = context.characterOffsets[wordID],
-      let geometry = PromptLineScrollGeometry.measure(in: text, activeOffset: offset,
+      let wordID = context.activeWordID else { stopLineScroll(); return }
+    let words = context.activeWordID == previousWordID
+      ? (wordWasUpdated && context.followsWordReflow ? context.words : [])
+      : (context.onRetire == nil ? [] : context.words)
+    let measured: PromptLineScrollGeometry?
+    if let customGeometry {
+      measured = customGeometry.measure(wordID, previousWordID, customGeometry.caretGlyphID, words)
+    } else if let offset = context.characterOffsets[wordID] {
+      measured = PromptLineScrollGeometry.measure(in: text, activeOffset: offset,
         previousOffset: previousWordID.flatMap { context.characterOffsets[$0] },
         width: bounds.width, font: font, lineSpacing: lineSpacing, rightToLeft: isRightToLeft,
-        caretOffset: characterOffset,
-        words: context.activeWordID == previousWordID
-          ? (wordWasUpdated && context.followsWordReflow ? context.words : [])
-          : (context.onRetire == nil ? [] : context.words),
+        caretOffset: characterOffset, words: words,
         characterOffsets: context.characterOffsets)
+    } else { measured = nil }
+    guard let geometry = measured
     else { stopLineScroll(); wordReflow = .init(); latestActiveTop = nil; return }
     let documentOrigin = convert(CGPoint.zero, to: document).y
     let activeVisibleTop = documentOrigin + geometry.activeTop - scroll.contentView.bounds.minY

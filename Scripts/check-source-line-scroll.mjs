@@ -7,8 +7,11 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 
-const [argument,option]=process.argv.slice(2);
+const [argument,option,requestedRowHeights]=process.argv.slice(2);
 assert.ok(argument&&(!option||option==='--emit-fixtures'));
+const extraRowHeights=requestedRowHeights===undefined?[]:JSON.parse(requestedRowHeights);
+assert.ok(Array.isArray(extraRowHeights)&&extraRowHeights.length<=8);
+assert.ok(extraRowHeights.every(value=>Number.isFinite(value)&&value>0&&value<10000));
 const root=path.resolve(argument);
 function verify(){
   assert.equal(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),
@@ -57,11 +60,13 @@ const end=source.indexOf('\nexport function setJoiningClass(',start);
 assert.ok(start>=0&&end>start);
 const code=stripTypeScriptTypes(source.slice(start,end),{mode:'transform'});
 const fixtures=[];
-for(const smooth of [false,true])for(const rowHeight of [25,45,59]){
+for(const smooth of [false,true])for(const rowHeight of [25,45,59,...extraRowHeights]){
   let activeRow=0,firstRow=0;
   const words=Array.from({length:6},(_,row)=>({
     native:{isConnected:true},hasClass:name=>name==='word',
-    getOffsetTop:()=>10+(row-firstRow)*rowHeight,
+    // The pinned wrapper returns native.offsetTop (CSSOM long), not a
+    // fractional DOMRect. Rounding is our explicit owned-fixture boundary.
+    getOffsetTop:()=>Math.round(10+(row-firstRow)*rowHeight),
     getOuterHeight:()=>rowHeight,getOffsetHeight:()=>rowHeight-5,
     remove(){this.native.isConnected=false;firstRow=Math.max(firstRow,row+1);},
   }));
@@ -93,4 +98,4 @@ for(const smooth of [false,true])for(const rowHeight of [25,45,59]){
 }
 verify();
 if(option)console.log(JSON.stringify({fixtures,curve,frameRates}));
-else console.log('Line scroll source passed (6 sequences / 30 forward row transitions, actual removal and 125ms caret/word options; 6 full Anime.js 4.2.2 seek samples; 5 complete engine-settings FPS cases; owned DOM/storage and immediate animation boundary, no browser/GUI/real scheduling/mixed fonts/overlap/low-FPS mode)');
+else console.log(`Line scroll source passed (${fixtures.length} sequences / ${fixtures.length*5} forward row transitions, actual removal and 125ms caret/word options; 6 full Anime.js 4.2.2 seek samples; 5 complete engine-settings FPS cases; owned DOM/storage and immediate animation boundary, no browser/GUI/real scheduling/mixed fonts/overlap/low-FPS mode)`);

@@ -852,6 +852,9 @@ struct ASLPracticePrompt: View {
   var rendering: PromptRendering? = nil
   var carets: PromptCaretNativeView.Configuration? = nil
   var font: NSFont? = nil
+  var lineScroll: PromptLineScrollContext? = nil
+  var caretGlyphID: Int? = nil
+  var viewportLineCount: Int? = nil
 
   private var ids: [Int] { glyphIDs.count == glyphs.count ? glyphIDs : Array(glyphs.indices) }
 
@@ -874,11 +877,19 @@ struct ASLPracticePrompt: View {
       }
     }
     .overlayPreferenceValue(ASLPromptBoundsKey.self) { anchors in
-      if let carets {
-        GeometryReader { proxy in
-          ASLPromptCaretBridge(configuration: carets,
-            frames: anchors.mapValues { proxy[$0] }, glyphIDs: ids)
-            .allowsHitTesting(false).accessibilityHidden(true)
+      GeometryReader { proxy in
+        let frames = anchors.mapValues { proxy[$0] }
+        let rowHeights = ASLPromptLineGeometry(frames: frames).rowHeights
+        ZStack {
+          Color.clear.preference(key: PracticeViewportHeightKey.self,
+            value: viewportLineCount.flatMap { PromptViewportLayout.height(forRowHeights: rowHeights, lineCount: $0) })
+          if carets != nil || lineScroll != nil {
+            ASLPromptCaretBridge(configuration: carets,
+              frames: frames, glyphIDs: ids, lineScroll: lineScroll, caretGlyphID: caretGlyphID,
+              text: rendering?.text ?? AttributedString(),
+              font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
+              .allowsHitTesting(false).accessibilityHidden(true)
+          }
         }
       }
     }
@@ -2649,7 +2660,8 @@ private struct ContentView: View {
                   maximumTextWidth: settings.practiceLineWidth.maximumWidth(
                     fontSize: settings.fontSize, customColumns: settings.customPracticeLineColumns),
                   horizontalTextInset: 4,
-                  measuresTextRows: !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
+                  measuresTextRows: !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo,
+                  measuresCustomRows: practiceVisualEffect.usesASL
                 ) {
                   practicePrompt
                 }
@@ -2880,6 +2892,20 @@ private struct ContentView: View {
     .onTapGesture { requestTypingFocus() }
   }
 
+  private func practiceLineScrollContext(_ rendering: PromptRendering) -> PromptLineScrollContext {
+    .init(attemptID: session.automaticInputAttemptID,
+      activeWordID: session.promptWordPresentations.first(where: { $0.phase == .active })?.range.lowerBound,
+      characterOffsets: rendering.glyphCharacterOffsets,
+      smoothScroll: settings.smoothPracticeLineScroll, reducesMotion: settings.reducePracticeMotion,
+      words: session.promptWordPresentations.enumerated().map {
+        .init(index: $0.offset, glyphID: $0.element.range.lowerBound)
+      }, firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
+      onRetire: { session.retirePromptWords($0) },
+      followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
+        slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines),
+      caretMotion: promptCaretMotion)
+  }
+
   private var practicePrompt: some View {
     let _ = settings.localPracticeFontRevision
     let rendering = renderedPrompt
@@ -2890,7 +2916,10 @@ private struct ContentView: View {
         ASLPracticePrompt(
           glyphs: session.promptGlyphsInDisplayOrder, fontSize: settings.fontSize, accent: activeTheme.accent,
           glyphIDs: specialPromptGlyphIDs, rendering: rendering, carets: specialPromptCaretConfiguration,
-          font: practicePromptNSFont(size: settings.fontSize))
+          font: practicePromptNSFont(size: settings.fontSize),
+          lineScroll: showsAllPracticeLines ? nil : practiceLineScrollContext(rendering),
+          caretGlyphID: currentPromptGlyphIndex,
+          viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3))
       } else if practiceVisualEffect.usesChoo {
         ChooPracticePrompt(
           glyphs: session.promptGlyphsInDisplayOrder,
@@ -2939,18 +2968,7 @@ private struct ContentView: View {
                 font: practicePromptNSFont(size: settings.fontSize),
                 lineSpacing: usesJoiningScript ? 8 : 12,
                 isRightToLeft: isRightToLeft,
-                lineScroll: .init(attemptID: session.automaticInputAttemptID,
-                  activeWordID: session.promptWordPresentations.first(where: { $0.phase == .active })?.range.lowerBound,
-                  characterOffsets: rendering.glyphCharacterOffsets,
-                  smoothScroll: settings.smoothPracticeLineScroll,
-                  reducesMotion: settings.reducePracticeMotion,
-                  words: session.promptWordPresentations.enumerated().map {
-                    .init(index: $0.offset, glyphID: $0.element.range.lowerBound)
-                  }, firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
-                  onRetire: { session.retirePromptWords($0) },
-                  followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
-                    slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines),
-                  caretMotion: promptCaretMotion))
+                lineScroll: practiceLineScrollContext(rendering))
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }

@@ -1,5 +1,23 @@
 # 原生奖励收件箱与周任务交付
 
+## ASL 实测整行滚动与旧词退休增量
+
+2026-10-09，固定只读参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。核对完整 test-ui.ts 的 updateActiveElement／lineJump／removeTestElements、ASL CSS、test.scss 的 flex 词分组及 dom.ts 的 getOffsetTop；没有提取 Gallaudet 或复用产品代码／资产。AppKit 滚动入口以安装的 SDK 26.2 公开头文件核验，目标仍 macOS 14。原版 getOffsetTop 直接返回 native.offsetTop；[CSSOM View 的 HTMLElement 定义](https://drafts.csswg.org/cssom-view/#dom-htmlelement-offsettop) 为 long，不能在自有 DOM 夹具中当成未取整 DOMRect。
+
+ASL 现在把实际 SwiftUI anchor 行框接入已有 PromptAutoScrollView，而不是另写滚动／退休状态机或用拉丁字体测量。ASLPromptLineGeometry 缓存实际行顶、混排最大高度／行距及 canonical ID，几何缺失不走普通 TextKit 回退；普通提示的默认测量路径不变。生产两分支共用上下文工厂，含 attempt、活动词、保留前缀、减少动态、FPS、回流策略和光标运动协调器。实际三行／Zen 两行视口使用测量高度并保留底部空行，短末尾与单个跨行长词的光标可达；关闭两个光标仍保留滚动 owner。第一次跳行不退休，后续平滑完成才通知；前缀裁剪重置滚动坐标而不删原始输入、回放或放开已退休词的退格边界。包装器无新增 Timer，使用现有子控制器；修复保留滚动层时关闭光标仅停调度却留下旧图像的问题。
+
+行为证据：`/tmp/typebar-asl-scroll-red.log` 两项两处预期失败，复现无滚动上下文与固定 184 点视口。`first.log` 初步 49 项零失败但三项缺参考跳过，不算最终验证；`expanded.log` 为夹具 Observation 私有类型与参数顺序编译错误，修正后 `expanded-runtime.log` 82 项零失败零跳过（21.132 秒）。`marker-off-red.log` 一项一处失败真正复现旧 marker 残留，随后修生产隐藏状态。`source-marker-verified.log` 84 项八处失败来自将第一行 43 点直接乘成全部行（实际顶为 43／86／128／171）；夹具改用实测累计平均步长 42.75，保持 0.5 点容限。`final-focused.log` 86 项唯一失败来自自有 getOffsetTop 返回小数，使原版 floor 检查误删前一词；夹具显式取整后通过，未改官方函数或放宽断言。以上日志共同前缀 `/tmp/typebar-asl-scroll-`，全部保留。
+
+最终聚焦 `/tmp/typebar-asl-scroll-final-verified.log` 86 项零失败零跳过（21.792 秒），含新增 15 项：真实 SwiftUI 退休／重排、隐藏光标仍滚动、平滑／减少动态、短末尾、两行大字号、长单词／混排、全行模式不退休、缺失框拒绝回退、重启／拆卸取消、重叠只完成最新边界与完整固定源码对照。QA-only check-source-line-scroll.mjs 可额外接受实测平均行距，默认六序列不变；ASL 调用执行八序列／40 次源转换，其中两序列／十次源转换使用 ASL 实测值，原生按前四个实际行迁移对照。DOM／行距取整／动画立即 Promise 是明确自有边界，不证明浏览器排版、专业字宽或真实帧。五张新组件图在 `/tmp/typebar-asl-scroll-render.MD9SnK`（retired-no-markers／short-final-markers／two-large-rows／long-token／mixed-fallback），已逐张检查；窗口从不显示，串行关闭，零 Typebar 主程序启动。
+
+首轮冻结完整门禁 `/tmp/typebar-asl-scroll-complete-readiness.log` 退出 1：原生 3,760 项唯一失败（813.446 秒）为既有 PromptPaceSchedulingTests 的首次目标不绘制夹具；新增 ASL 15 项 3.628 秒通过，十万词 152.838 秒、磁盘冷读 16 项 6.064 秒通过，没有跳过。59 份完整日志人工保存在 `/tmp/typebar-asl-scroll-complete-logs.9BBQaY`（失败退出未自动归档，原临时目录仍保留），不丢原失败；八冻结哈希一致，服务／打包尚未执行。该夹具默认开启 15 FPS 绘制，却用 60ms RunLoop 等待充当无绘制屏障，实际耗时 112ms 已跨 66.7ms。`/tmp/typebar-asl-scroll-pace-race-red.log` 将等待延至 120ms 单项稳定复现。只在该测试设置已有 automaticallyPresents=false，仍保留 pace deadline Timer，并延长等待及追加显式 present 必须绘制断言；未修改产品计时器或去掉原断言。`/tmp/typebar-asl-scroll-pace-isolation-verified.log` 相关 102 项零失败零跳过（22.546 秒）。随后九文件重新冻结并重跑完整门禁，结果另记。
+
+最终重新冻结完整门禁 `/tmp/typebar-asl-scroll-final-complete-readiness.log` 退出 0：原生 3,760 项零失败零跳过（821.519 秒），服务 501 项零失败零跳过（13.559 秒）；新增 ASL 15 项实际 3.661 秒、十万词耐久 157.207 秒、16 项隔离磁盘冷读 5.774 秒通过。53 表面／生产文件／测试符号、1,091 人工结构、未启动应用包／scheme／严格签名／原创边界全部通过。九个冻结实现／测试／探针／矩阵哈希 `/tmp/typebar-asl-scroll-final-frozen.sha256` 前后一致；运行期间未编辑，终态后仅补结果与边界文档。61 份完整日志在 `/tmp/typebar-asl-scroll-final-complete-logs.iYoePg`（使用既有锁定 Anime archive，较前次少一个准备下载日志），131 张组件图在 `/tmp/typebar-asl-scroll-final-complete-render.IpyikS`；五张新 ASL 滚动图逐张复查。既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、Node 实验性及编译警告保留，不声称修复。首轮失败和确定性红测不被覆盖；零 Typebar 主程序启动。
+
+同会话有界风险复核以“特殊布局只提供测量、状态与计时器仍共享”为合同，反例覆盖缺失框、同轮重启、重叠回调、关闭 marker 及短文档坐标重置；不是独立审查。设计技能保持既有原创手形、颜色和原生布局，仅接通视口测量与滚动。不能用自动化或组件图代替真实设备验收。
+
+ASL 仍部分覆盖：当前 PromptFlowLayout 逐格换行，尚未复现原版 flex 按词分组／空白边界；空行／控制换行、精确 hint／完整混排／主题动效、全部 Slow Timer／Zen 回流交错、任意共享 coordinator 分支切换、长提示有界可见渲染、专业手形和真实键盘／IME／VoiceOver／显示器仍待验。实测滚动／退休是有界增量，不是所有布局等价。没有存储／协议迁移，没有主动操作真实库／Keychain／账户或部署；53 表面、六部分／42 历史有界分类不升级，新增两项人工仍待验收，goal active。下方为历史阶段。
+
 ## ASL 共用文字状态与实际布局独立光标增量
 
 2026-10-09，固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`、只读清洁。只读核对完整 ASL CSS、Caret 目标解析与相关位置／闪烁通道，以及 test.scss 的默认／flipped／colorful／highlight-off／词高亮／blind／typed effects：ASL 只替换显示字体，不能另造一套当前字符颜色、错误背景或计分规则。没有打开、复制、提取或描摹 Gallaudet 字体；SwiftUI Anchor／GeometryProxy／anchorPreference／overlayPreferenceValue 使用已安装 SDK 26.2 的公开接口，以 macOS 14 目标实际编译。

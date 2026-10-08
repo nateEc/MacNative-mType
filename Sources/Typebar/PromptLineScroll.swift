@@ -26,6 +26,14 @@ struct PromptLineScrollContext {
   var caretMotion: PromptCaretMotionCoordinator? = nil
 }
 
+/// Alternate layouts provide measured canonical glyph bounds, never Latin
+/// character offsets masquerading as their geometry. The state machine stays shared.
+struct PromptLineScrollCustomGeometry {
+  let revision: UInt64
+  let caretGlyphID: Int?
+  let measure: (Int, Int?, Int?, [PromptLineScrollWord]) -> PromptLineScrollGeometry?
+}
+
 struct PromptWordReflowState {
   private(set) var baselineTop: CGFloat?
   private(set) var transitionStartTop: CGFloat = 0
