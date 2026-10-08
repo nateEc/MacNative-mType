@@ -1,5 +1,25 @@
 # 原生奖励收件箱与周任务交付
 
+## Choo 实际字形框与普通听写独立光标增量
+
+固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41` 保持只读清洁。完整读取 Caret 类／包装器、Choo／tts／ASL CSS 及相关 Funbox 元数据，核对 test.scss 的正确、错误、多余字母和 highlight-off 选择器。Choo 只旋转字形，光标读取未旋转布局框；零宽目标回找前一可见字形。tts 只令 untyped 色透明，不应把全部已输入文字和独立光标一并隐藏。
+
+原创 ChooLayerView 将 canonical glyph ID 映射到自己的实际 glyphFrames，独立子 PromptCaretNativeView 共用现有主／节奏渲染器和 blink 状态；不把 ID 伪装为 TextKit 文本偏移，不测量旋转边界。几何版本变化重新解析目标，仅真实目的框变化才重定向剩余节奏时长，避免每次输入重新开始同一个 tween。零宽回找、换行／缩放、空格末端宽度、非连续 ID、缺失目标不回落虚构文本框、弱闭包和拆卸停止分别验证。主光标闪烁不影响 pace 或旋转字层；移除旧 current 字符假背景／强调色。继续使用有界 presentation／pace 计时器，没有全局监听或新增后台循环。
+
+普通听写不再排除独立光标；PromptGlyphAppearance 在既有高亮／blind／typed effect 规划后只隐藏 future 角色，正确、错误、多余字符沿用相应颜色。最终 applyVisibility 在 legacy caret 和文字效果改色后执行，仅清前景，不删文字、布局、背景或下划线，避免回退样式重新泄露目标；普通听写闪烁覆盖不等于 Tape＋听写全部完成。设计技能促使维持现有原生字体／布局／颜色，仅分离光标与文字，不重设计页面。
+
+QA-only `check-source-special-caret.mjs` 执行完整实际 Caret 模块的目标解析器，16 个 LTR 自有布局夹具覆盖四样式、字前／字后和零宽回找，并将真实原生字体的空格 advance 传入对照。主张限于横向位置／全宽，不声称 CSS 与 AppKit 基线／形状高度或浏览器动画等价；DOM／方向／尺寸为明确自有边界。tts／文字选择器为静态核查，不是浏览器 CSS 引擎执行。探针已加入完整门禁，产品不包含参考代码、CSS、字体、资产或 JS 运行时。
+
+行为先行静态红测 `/tmp/typebar-special-caret-red.log` 一项三处预期失败；实际 NSView 目标切换 `/tmp/typebar-special-caret-target-red.log` 一项一处预期失败，旧框未跟随 canonical ID 更新，修正主目标失效判断。`expanded-verified.log` 81 项中唯一失败定位到 concealment 位于 legacy 改色之前，移到末端并加共享生产 helper 后 `visibility-verified.log` 82 项零失败零跳过（1.321 秒）。日志共同前缀 `/tmp/typebar-special-caret-`；早期漏传参考的 40 项／1 跳过、夹具 API／类型编译错误和所有失败保留，不作为最终证据。最终 `source-render-verified.log` 84 项零失败零跳过（1.647 秒），含新增 20 项；完整门禁结果另记，不能借上一轮完整绿灯证明此轮。
+
+同会话有界决策／风险复核（非独立）检查 ID／偏移分离、未旋转几何、重复几何版本不重启 pace、文字效果泄露及子视图生命周期。两张实际 Choo 字层＋光标组件图在 `/tmp/typebar-special-caret-focused-render.tAOEIg` 已逐张检查，on／off 只有主 bar 消失，非空文字保留；唯一组件窗口从不显示／激活，测试后关闭，动画层时钟仅 QA 冻结以复现。不是旋转逐帧流畅度、完整练习 UI 或真实输入设备证明。没有 Typebar 主程序启动，没有真实库／Keychain／账户／部署操作，成绩／回放／归档／SwiftData／账户协议不变。
+
+Tape 锁定／原版 margin 动画、ASL 手形几何与混合方向 inline 回退闪烁、渲染切换与共享 coordinator 的真实 SwiftUI 拆卸顺序、任意配置／输入／RAF 交错、系统鼠标光标／完整页眉页脚和设备／IME／VoiceOver 仍开放。53 表面分类不升级；新增三个手工项仍待验收。下方为历史增量，不把普通＋Choo＋普通听写覆盖等同完整特殊分支或整体无损重写，goal active。
+
+本轮最终冻结完整门禁 `/tmp/typebar-special-caret-complete-readiness.log` 退出 0：原生 3,691 项零失败零跳过（793.875 秒），服务 501 项零失败零跳过（9.790 秒）；新增 20 项在全量实际通过（0.295 秒）。十万词实际耐久 155.712 秒、16 项隔离磁盘冷读 5.245 秒，固定参考／元数据、53 表面／生产文件／测试符号、1,080 人工结构与未启动应用包／scheme／严格签名／原创边界通过。8 个冻结哈希 `/tmp/typebar-special-caret-frozen.sha256` 前后一致，门禁运行期间无文件编辑，终态后仅补本文与摘要文档。
+
+61 份完整日志在 `/tmp/typebar-special-caret-complete-logs.XBLkab`，83 张组件图在 `/tmp/typebar-special-caret-complete-render.ooyPdr`。本次新 Choo on／off 两图再次逐张检查，文字保留、主 bar 消失；仍只是实际组件在 QA 冻结图层时钟下的两相位，不是旋转逐帧或完整主窗口。CoreData／AddressBook XPC、隔离只读 SwiftData 513 和 Node 实验性诊断完整保留；早期红测与夹具编译失败不删除、不替代最终证据。无 Typebar 主程序启动，结束后进程仍为零；人工／剩余特殊渲染与整个 goal 均保持开放。
+
 ## 普通原生光标层闪烁与输入停止增量
 
 固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`、只读清洁。完整读取 test/caret、elements/caret、focus、RAF debounce、caret.scss、两个关键帧及 afterAnyTestInput，核对首次输入／开始／重开／完成／输入框 focus 与配置 setter 上下文。输入回调即使视觉专注已经提交也直接 stopAnimation，不能只依赖 Focus.set 的状态变化。配置 smoothCaret 变化会重新设动画，即使仍在视觉专注；下一次输入再停止。原版 inline 动画名可覆盖 outline 类的 none，不能笼统豁免该样式。

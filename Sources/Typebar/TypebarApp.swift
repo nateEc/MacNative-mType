@@ -518,7 +518,7 @@ struct ChooGlyphPalette: Equatable {
     case .correct: completed
     case .incorrect: error
     case .extra: extra
-    case .current: accent
+    case .current: future
     case .pending: future
     case .hidden: .clear
     }
@@ -528,7 +528,7 @@ struct ChooGlyphPalette: Equatable {
     switch state {
     case .incorrect: error.withAlphaComponent(error.alphaComponent * 0.16)
     case .extra: extra.withAlphaComponent(extra.alphaComponent * 0.12)
-    case .current: accent.withAlphaComponent(accent.alphaComponent * 0.18)
+    case .current: nil
     default: nil
     }
   }
@@ -541,6 +541,8 @@ private struct ChooPracticePrompt: View {
   let isEnabled: Bool
   let reducesMotion: Bool
   let ignoresSystemReducedMotion: Bool
+  var glyphIDs: [Int] = []
+  var carets: PromptCaretNativeView.Configuration? = nil
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
@@ -550,7 +552,8 @@ private struct ChooPracticePrompt: View {
       systemReducedMotion: systemReduceMotion,
       ignoresSystemReducedMotion: ignoresSystemReducedMotion)
     return ChooLayerPrompt(glyphs: glyphs, font: font, palette: palette,
-                           animates: animates, frameRate: animationFrameRate)
+                           animates: animates, frameRate: animationFrameRate,
+                           glyphIDs: glyphIDs, carets: carets)
       .accessibilityLabel("旋转文字练习提示")
   }
 }
@@ -561,13 +564,18 @@ private struct ChooLayerPrompt: NSViewRepresentable {
   let palette: ChooGlyphPalette
   let animates: Bool
   let frameRate: Int
+  let glyphIDs: [Int]
+  let carets: PromptCaretNativeView.Configuration?
 
   func makeNSView(context: Context) -> ChooLayerView { ChooLayerView() }
 
   func updateNSView(_ view: ChooLayerView, context: Context) {
     view.configure(glyphs: glyphs, font: font, palette: palette,
                    animates: animates, frameRate: frameRate)
+    view.configureCarets(carets, glyphIDs: glyphIDs)
   }
+
+  static func dismantleNSView(_ view: ChooLayerView, coordinator: ()) { view.stopCarets() }
 
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: ChooLayerView, context: Context) -> CGSize? {
     let width = max(1, proposal.width ?? nsView.bounds.width)
@@ -588,6 +596,10 @@ final class ChooLayerView: NSView {
   private var frameRate = AnimationFrameRatePolicy.nativeFrameRate
   private var animationStartTime = CACurrentMediaTime()
   private weak var observedClipView: NSClipView?
+  private var caretView: PromptCaretNativeView?
+  private var caretConfiguration: PromptCaretNativeView.Configuration?
+  private var glyphIndexByID: [Int: Int] = [:]
+  private var geometryRevision: UInt64 = 0
 
   override var isFlipped: Bool { true }
 
@@ -613,6 +625,11 @@ final class ChooLayerView: NSView {
     super.viewDidMoveToWindow()
     observeScrollClip()
     refreshVisibleLayers()
+  }
+
+  override func viewWillMove(toSuperview newSuperview: NSView?) {
+    if newSuperview == nil { stopCarets() }
+    super.viewWillMove(toSuperview: newSuperview)
   }
 
   private func observeScrollClip() {
@@ -655,6 +672,41 @@ final class ChooLayerView: NSView {
   override func layout() {
     super.layout()
     refreshVisibleLayers()
+    refreshCarets()
+  }
+
+  func configureCarets(_ configuration: PromptCaretNativeView.Configuration?, glyphIDs: [Int]) {
+    let next = Dictionary(glyphIDs.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { first, _ in first })
+    if next != glyphIndexByID { glyphIndexByID = next; geometryRevision &+= 1 }
+    caretConfiguration = configuration
+    refreshCarets()
+  }
+
+  func stopCarets() {
+    caretView?.stop(); caretView?.removeFromSuperview(); caretView = nil
+    caretConfiguration = nil
+  }
+
+  private func refreshCarets() {
+    guard var configuration = caretConfiguration else { stopCarets(); return }
+    if caretView == nil {
+      let view = PromptCaretNativeView(frame: bounds)
+      addSubview(view); caretView = view
+    }
+    caretView?.frame = bounds
+    configuration.glyphRect = { [weak self] id in self?.caretRect(forGlyphID: id) }
+    configuration.geometryRevision = geometryRevision
+    configuration.firstGlyphID = glyphIndexByID.min { $0.value < $1.value }?.key ?? 0
+    caretView?.update(configuration)
+  }
+
+  private func caretRect(forGlyphID id: Int) -> CGRect? {
+    guard let index = glyphIndexByID[id], glyphFrames.indices.contains(index) else { return nil }
+    for position in stride(from: index, through: 0, by: -1) {
+      let frame = glyphFrames[position]
+      if frame.width > 0, frame.height > 0 { return frame }
+    }
+    return nil
   }
 
   static func measure(glyphs: [TypingPromptGlyph], font: NSFont, width: CGFloat) -> CGFloat {
@@ -672,6 +724,7 @@ final class ChooLayerView: NSView {
     if glyphFrames.count != glyphs.count || laidOutWidth != width {
       glyphFrames = Self.layoutFrames(glyphs: glyphs, font: promptFont, width: width).frames
       laidOutWidth = width
+      geometryRevision &+= 1
     }
     // SwiftUI's prompt scroll area clips this document view. Keeping a small
     // overscan means scrolls do not expose empty rows between notifications.
@@ -2901,7 +2954,8 @@ private struct ContentView: View {
             usesColorfulMode: settings.colorfulMode),
           isEnabled: true, reducesMotion: settings.reducePracticeMotion,
           ignoresSystemReducedMotion: !VisualFunboxReducedMotionPolicy
-            .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers))
+            .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers),
+          glyphIDs: specialPromptGlyphIDs, carets: specialPromptCaretConfiguration)
       } else if usesTapePractice {
         TapePracticePrompt(
           prompt: rendering.text,
@@ -3100,13 +3154,37 @@ private struct ContentView: View {
     session.promptCaretGlyphIndex
   }
 
+  private var specialPromptGlyphIDs: [Int] {
+    let glyphs = session.promptGlyphs
+    return PromptGlyphLayout.indices(glyphs: glyphs, words: session.promptWordPresentations,
+      hideExtraLetters: session.configuration.rules.hideExtraLetters)
+  }
+
+  private var specialPromptCaretConfiguration: PromptCaretNativeView.Configuration? {
+    guard settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker else { return nil }
+    return .init(text: AttributedString(), mainOffset: nil, paceOffset: nil,
+      mainStyle: settings.caretStyle, paceStyle: settings.paceCaretStyle,
+      font: practicePromptNSFont(size: settings.fontSize), lineSpacing: 12,
+      rightToLeft: false, accent: activeTheme.caret, motion: settings.smoothCaretMotion,
+      reducesMotion: settings.reducePracticeMotion || systemReduceMotion,
+      frameRate: timerHealth.animationFrameRate(requested: settings.animationFrameRate,
+        settingsRevision: settings.animationFrameRateRevision),
+      attemptID: session.automaticInputAttemptID, coordinator: promptCaretMotion,
+      latestInput: { .init(attemptID: session.automaticInputAttemptID,
+        typed: session.typed, composition: compositionText, glyphID: nil) },
+      latestGlyphID: { currentPromptGlyphIndex }, paceFrame: paceCaretFrameProvider,
+      mainPresentation: { .init(
+        isVisible: (inputHasFocus || showsVirtualKeyboard) && typingWindowHasFocus && !session.isFinished,
+        isBlinking: visualFocus.caretIsBlinking, revision: visualFocus.caretBlinkRevision) },
+      mainGlyphID: currentPromptGlyphIndex)
+  }
+
   private var usesNativeCaretOverlay: Bool {
     guard settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker else { return false }
     guard !usesTapePractice, !practiceVisualEffect.usesASL, !practiceVisualEffect.usesChoo
     else {
       return false
     }
-    guard !session.configuration.modifiers.contains(.listening) else { return false }
     return !session.configuration.containsRightToLeftPromptRun
       || session.configuration.usesRightToLeftPrompt
   }
@@ -3118,7 +3196,7 @@ private struct ContentView: View {
     return .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
       fromAfter: from?.after ?? false, targetAfter: target?.after ?? false, fraction: frame.fraction,
       stepDuration: frame.stepDuration, sequence: frame.sequence, targetGlyphID: target?.glyphIndex,
-      zeroDeadlinePredecessor: session.paceCaretPredecessorAnchor(before: frame.target))
+      zeroDeadlinePredecessor: session.paceCaretPredecessorAnchor(before: frame.target), fromGlyphID: from?.glyphIndex)
   }
 
   private var paceCaretFrameProvider: (() -> PromptPaceCaretInterpolation?)? {
@@ -3143,7 +3221,8 @@ private struct ContentView: View {
     let appearances = PromptGlyphAppearance.plan(
       glyphs: glyphs, words: words,
       mode: promptHighlightMode, blindMode: session.configuration.rules.blindMode,
-      typedEffect: settings.typedCharacterEffect)
+      typedEffect: settings.typedCharacterEffect,
+      hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
     return PromptRendering.make(glyphs: glyphs, indices: indices) { index, glyph in
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
         isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
@@ -3162,10 +3241,6 @@ private struct ContentView: View {
         displayedText = textPlan.text
       }
       var character = AttributedString(displayedText)
-      if session.configuration.modifiers.contains(.listening) {
-        character.foregroundColor = .clear
-        return character
-      }
       if !usesNativeCaretOverlay, index == paceGuideIndex, index != caretIndex {
         applyPaceCaret(to: &character)
       }
@@ -3196,6 +3271,7 @@ private struct ContentView: View {
         settings.caretStyle.drawsMarker && !usesNativeCaretOverlay {
         applyCaret(to: &character)
       }
+      appearance.applyVisibility(to: &character)
       if let color = character.foregroundColor {
         character.foregroundColor = color.opacity(textPlan.opacity)
       }

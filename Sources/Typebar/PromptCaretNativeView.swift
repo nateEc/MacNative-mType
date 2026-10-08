@@ -30,6 +30,12 @@ final class PromptCaretNativeView: NSView {
     var latestRendering: (() -> PromptRendering)? = nil
     var paceFrame: (() -> PromptPaceCaretInterpolation?)? = nil
     var mainPresentation: (() -> PromptCaretBlinkPresentation)? = nil
+    // Custom renderers supply their actual untransformed glyph boxes by
+    // canonical ID. Never reinterpret those IDs as text-character offsets.
+    var mainGlyphID: Int? = nil
+    var firstGlyphID = 0
+    var glyphRect: ((Int) -> CGRect?)? = nil
+    var geometryRevision: UInt64 = 0
   }
 
   private var configuration: Configuration?
@@ -45,6 +51,8 @@ final class PromptCaretNativeView: NSView {
   private var needsPosition = true
   private var needsSnap = true
   private var blinkClock = PromptCaretBlinkClock()
+  private var paceGeometryNeedsUpdate = false
+  private var paceTargetRect: CGRect?
 
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -52,7 +60,8 @@ final class PromptCaretNativeView: NSView {
   func update(_ next: Configuration) {
     let old = configuration
     let layoutChanged = old.map { $0.font != next.font || $0.lineSpacing != next.lineSpacing
-      || $0.rightToLeft != next.rightToLeft } ?? false
+      || $0.rightToLeft != next.rightToLeft
+      || ($0.glyphRect != nil) != (next.glyphRect != nil) } ?? false
     let styleChanged = old?.mainStyle != next.mainStyle || old?.paceStyle != next.paceStyle
     let restarted = old?.attemptID != next.attemptID || old?.coordinator !== next.coordinator
     next.coordinator.prepare(attemptID: next.attemptID)
@@ -63,7 +72,12 @@ final class PromptCaretNativeView: NSView {
       if layoutChanged { next.coordinator.resetLayout() }
       input = nil; mainOffset = nil; paceSequence = nil
       needsPosition = true; needsSnap = true
+      paceTargetRect = nil
     }
+    if old?.geometryRevision != next.geometryRevision {
+      needsPosition = true; paceGeometryNeedsUpdate = true
+    }
+    if old?.mainGlyphID != next.mainGlyphID { needsPosition = true }
     if old?.reducesMotion != next.reducesMotion || old?.motion != next.motion {
       needsPosition = true; needsSnap = true
     }
@@ -105,6 +119,7 @@ final class PromptCaretNativeView: NSView {
     configuration?.coordinator.cancelCarets(at: ProcessInfo.processInfo.systemUptime)
     configuration = nil
     blinkClock = .init()
+    paceTargetRect = nil; paceGeometryNeedsUpdate = false
   }
 
   private func scheduleTimer() {
@@ -149,11 +164,11 @@ final class PromptCaretNativeView: NSView {
     let changed = latest.map { $0 != input } ?? (config.mainOffset != mainOffset)
     if changed || needsPosition || config.mainStyle.drawsMarker && coordinator.main.position == nil {
       let rendering = config.latestRendering?()
-      let glyphID = config.latestGlyphID?() ?? latest?.glyphID
+      let glyphID = config.latestGlyphID?() ?? latest?.glyphID ?? config.mainGlyphID
       let offset = latest.flatMap { _ in rendering?.characterOffset(forGlyphAt: glyphID) }
         ?? (latest == nil ? config.mainOffset : nil)
       if config.mainStyle.drawsMarker {
-        coordinator.positionMain(at: measure(offset, text: rendering?.text ?? config.text, config: config),
+        coordinator.positionMain(at: measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID),
           time: time, duration: needsSnap || config.reducesMotion ? 0 : config.motion.duration ?? 0)
       }
       input = latest; mainOffset = config.mainOffset
@@ -182,17 +197,17 @@ final class PromptCaretNativeView: NSView {
     let frame = config.paceFrame?()
     let lostGeometry = coordinator.pace.position == nil
     if lostGeometry {
-      coordinator.positionPace(at: measure(0, text: config.text, config: config), time: time, duration: 0)
+      coordinator.positionPace(at: measure(0, text: config.text, config: config, glyphID: config.firstGlyphID), time: time, duration: 0)
     }
     if let frame {
       let rawRemaining = (1 - frame.fraction) * frame.stepDuration
       let remaining = rawRemaining.isFinite ? max(0, rawRemaining) : 0
       let changed = frame.sequence != paceSequence || lostGeometry
-      if changed {
+      if changed || paceGeometryNeedsUpdate {
         // A missing/pruned target preserves the old position and folding flag.
         let rendering = config.latestRendering?()
-        func endpoint(_ offset: Int?, after: Bool) -> CGRect? {
-          guard let rect = measure(offset, text: rendering?.text ?? config.text, config: config) else { return nil }
+        func endpoint(_ offset: Int?, glyphID: Int?, after: Bool) -> CGRect? {
+          guard let rect = measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID) else { return nil }
           return PromptPaceCaretGeometry.rect(from: rect, to: rect,
             fromAfter: after, toAfter: after, style: config.paceStyle,
             rightToLeft: config.rightToLeft, fraction: 1, reducesMotion: true,
@@ -207,16 +222,21 @@ final class PromptCaretNativeView: NSView {
           let predecessor = frame.zeroDeadlinePredecessor
           let offset = predecessor.flatMap { rendering?.characterOffset(forGlyphAt: $0.glyphIndex) }
             ?? (predecessor == nil ? frame.fromCharacterOffset : nil)
-          coordinator.positionPace(at: endpoint(offset, after: predecessor?.after ?? frame.fromAfter),
+          coordinator.positionPace(at: endpoint(offset, glyphID: predecessor?.glyphIndex ?? frame.fromGlyphID,
+            after: predecessor?.after ?? frame.fromAfter),
             time: time, duration: 0)
         }
         let offset = frame.targetGlyphID.flatMap { rendering?.characterOffset(forGlyphAt: $0) }
           ?? (frame.targetGlyphID == nil ? frame.targetCharacterOffset : nil)
-        if let target = endpoint(offset, after: frame.targetAfter) {
-          coordinator.positionPace(at: target, time: time,
-            duration: config.reducesMotion ? 0 : remaining)
+        if let target = endpoint(offset, glyphID: frame.targetGlyphID, after: frame.targetAfter) {
+          if changed || target != paceTargetRect {
+            coordinator.positionPace(at: target, time: time,
+              duration: config.reducesMotion ? 0 : remaining)
+          }
+          paceTargetRect = target
         }
         paceSequence = frame.sequence
+        paceGeometryNeedsUpdate = false
       }
       if changed || paceTimer == nil {
         if remaining > 0 { schedulePaceTimer(after: remaining) }
@@ -231,8 +251,9 @@ final class PromptCaretNativeView: NSView {
     return frame
   }
 
-  private func measure(_ offset: Int?, text: AttributedString, config: Configuration) -> CGRect? {
-    offset.flatMap { PromptCaretLayout.rect(in: text, characterOffset: $0, containerSize: bounds.size,
+  private func measure(_ offset: Int?, text: AttributedString, config: Configuration, glyphID: Int? = nil) -> CGRect? {
+    if let glyphRect = config.glyphRect { return glyphID.flatMap(glyphRect) }
+    return offset.flatMap { PromptCaretLayout.rect(in: text, characterOffset: $0, containerSize: bounds.size,
       font: config.font, lineSpacing: config.lineSpacing, isRightToLeft: config.rightToLeft) }
   }
 

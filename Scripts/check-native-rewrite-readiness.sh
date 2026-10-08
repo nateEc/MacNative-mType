@@ -190,6 +190,9 @@ run_logged_check "executing complete pinned visual focus and RAF debounce" "$tem
 run_logged_check "executing composed pinned caret blink and input effects" "$temporary_directory/caret-blink-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-caret-blink.mjs" "$reference_root"
 
+run_logged_check "executing pinned special caret geometry and listening declarations" "$temporary_directory/special-caret-source-check.log" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-special-caret.mjs" "$reference_root"
+
 config_link_source_dependencies="${TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES:-$temporary_directory/config-link-source-runtime}"
 if [[ ! -f "$config_link_source_dependencies/node_modules/lz-ts/package.json" ]]; then
   run_logged_check "preparing pinned QA-only configuration link compression" "$temporary_directory/config-link-source-runtime.log" \

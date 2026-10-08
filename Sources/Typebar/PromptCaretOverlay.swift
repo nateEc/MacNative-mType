@@ -133,6 +133,7 @@ struct PromptPaceCaretInterpolation {
   var sequence: Double = 0
   var targetGlyphID: Int? = nil
   var zeroDeadlinePredecessor: PaceCaretGlyphAnchor? = nil
+  var fromGlyphID: Int? = nil
 }
 
 enum PromptPaceCaretGeometry {

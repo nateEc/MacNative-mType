@@ -36,9 +36,14 @@ struct PromptGlyphAppearance: Equatable {
     if hasErrorUnderline { text.underlineStyle = Text.LineStyle(color: errorColor) }
   }
 
+  func applyVisibility(to text: inout AttributedString) {
+    if color == .hidden { text.foregroundColor = .clear }
+  }
+
   static func plan(
     glyphs: [TypingPromptGlyph], words: [TypingPromptWordPresentation],
-    mode: PromptHighlightMode, blindMode: Bool, typedEffect: TypedCharacterEffect = .keep
+    mode: PromptHighlightMode, blindMode: Bool, typedEffect: TypedCharacterEffect = .keep,
+    hidesUntypedGlyphs: Bool = false
   ) -> [Self] {
     var output = glyphs.map { glyph in
       let color: PromptGlyphColor
@@ -72,6 +77,9 @@ struct PromptGlyphAppearance: Equatable {
         if let wordColor { output[index].color = wordColor }
         output[index].hasErrorUnderline = word.phase == .committed && word.hasCommitError && !blindMode
       }
+    }
+    if hidesUntypedGlyphs {
+      for index in output.indices where output[index].color == .future { output[index].color = .hidden }
     }
     return output
   }
