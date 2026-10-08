@@ -1,5 +1,23 @@
 # 原生奖励收件箱与周任务交付
 
+## Tape 换行累计布局组件增量
+
+最终冻结门禁 `/tmp/typebar-tape-newlines-final-readiness.log` 终态退出 0：原生 3,879 项零失败零跳过（845.780 秒），服务 501 项（12.229 秒）；十万词耐久 155.792 秒、16 项隔离磁盘冷读 4.794 秒、53 表面、1,109 唯一人工场景结构、90／3／1 配置元数据和未启动应用包资源／URL scheme／严格签名／原创边界通过。14 新增在全量中合计 0.987 秒；60 组／300 新检查点及既有 128 原卷带轨迹／32 退休轨迹／28 方向案例通过。17 文件 `/tmp/typebar-tape-newlines-final-frozen.sha256` 门禁前中后完全一致，65 原始日志 `/tmp/typebar-tape-newlines-final-logs.ZyXFXg`、167 图 `/tmp/typebar-tape-newlines-final-images.yHXKzL` 保留，四张 tape-newlines-{ltr,rtl}-{initial,moved}.png 已逐张检查。既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。终态后仅补 README／本合同，没有运行中编辑或并行验收；零主程序启动，无残留主程序／测试／编译进程，参考仍固定且干净，未操作真实账户、Keychain、成绩库或部署。生产换行仍回退、tapeMode 部分、完整 goal active。
+
+2026-10-09，固定干净参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。本增量只完成可组合的原生布局核心，**没有取消生产含明确换行提示的普通布局回退**。完整原版 `updateActiveElement` 对新行先 await `lineJump` 再 `scrollTape`，而 `updateWordLetters` 也能单独请求 `scrollTape`；旧行删除可能留下 leading afterNewline。它们的组合／清理尚未证明，禁止组件沿用单行横向退休。tapeMode 仍部分，94 配置 90 映射／3 部分／1 不适用、53 表面分类不升级，完整 goal active。
+
+`TapeNewlinePlan` 按原版实际扫描范围累计词宽／词距：正确 Return 去除控制格和词距，错误 Return 只去词距；只更新活动词后的最多两个换行填充，保留远方既有值，达到三倍 viewport 宽即截断并设置下一填充上限。`TapeNewlineTextLayout` 用独立 native TextKit 词框和显式 canonical 词／控制偏移绘制，结构 LF 不是输入字形；词中额外 Return 不新建目标行。复用字体／原生富文本桥和既有 `PromptCaretChannel`，填充动画只由已有 Tape 呈现时钟采样，不新建 timer／窗口／持久字段／产品依赖。RTL 用有限正本地原点避免 AppKit 先裁掉负坐标，再与卷带变换抵消。main 保持锁定、pace 使用自己的真实框，尺寸回调推迟主队列且按代次取消、合并。
+
+新增 QA 前后核验干净参考与提交，执行完整 `getNlCharWidth`／`scrollTape`，校验锁定 Anime.js 4.2.2 archive 完整性并使用真实库和受控时钟。60 组 LTR／RTL × 即时／平滑 × 活动位置包括连续空行、错误 Return、lookahead 和两种超宽上限；原生规则及复用动画通道逐项对照 0／31／62／113／150ms 共 300 检查点。DOM 词框／样式是自有边界，并刻意排除 overflow／vertical，不是浏览器 CSS／真实 RAF 证明。
+
+先行日志 `/tmp/typebar-tape-newlines-red.log` 为可选 CGFloat 转换编译失败，不算行为红灯；`behavior-red.log` 为零布局 stub 的有效失败，但含自有探针给 Return 错用词右距的问题。`native-red.log` 保留累计测量与普通段落起点／缺失尺寸回调的失败；修正 marker 样式替身后 `policy.log` 两项通过。`native-green.log` 实际退出 1：真实词框 34px 而默认字体 API 为 33px，测试改为独立 TextKit 实测，不把字体默认值当实际行框。`second-focused.log` 33 项通过；`expanded-focused.log` 72 项中的两处失败是 Return-only 行与含字母行高度不同，再用独立实测各词框修正。以上短日志均用 `/tmp/typebar-tape-newlines-` 前缀，全部终态后才编辑，没有并行测试。
+
+`/tmp/typebar-tape-newlines-final-focused.log` 14 新增／相关 99 项零失败零跳过（5.344 秒）。覆盖实际累计行首、RTL 正绘制坐标、错误 Return 无输入变化时更新、连续空行、额外 Return、emoji／组合字素偏移、平滑中间帧、letter 当前词推进、异步尺寸取消／合并及显式生产回退保护。`/tmp/typebar-tape-newlines-focused-images.hV1y4w/tape-newlines-{ltr,rtl}-{initial,moved}.png` 四张逐张检查；关闭 marker 后逐行测非背景墨迹，防止光标掩盖文字裁空，窗口始终不显示并关闭。最终全量结果见本节首段，不以定向绿灯替代全量。
+
+下步接入需先执行完整 updateActiveElement／lineJump／scrollTape 的组合轨迹：现有原生 follower 结束时调用 wordsDidFinish，会重置整个 words 通道，尚不能直接用于同时保留横向位移的 Tape。须验证纵向结束、前缀确认、leading filler 移除和并发独立 scrollTape 的顺序，再开放入口；该观察不是本轮已实现的修复。
+
+同会话源码驱动／行为优先／根因／设计及决策／风险技能限定了“实测词框 + 既有呈现时钟 + 显式未接线”边界，不是独立评审。原生行距明确沿用 12pt，不冒充 CSS 行盒／系统字体像素复刻；Zen／隐藏控制／hint／no-space／全部 joining、混合行高／尾随 Return 空行、真正可见范围物化与大提示性能、原版溢出／纵向组合和真实设备仍待完成。没有改输入、计分、归档、SwiftData 实体、Keychain、真实账户／成绩库或部署；零主程序启动，下方为阶段历史。
+
 ## Tape 横向旧词退休增量
 
 最终冻结门禁 `/tmp/typebar-tape-retirement-final-readiness.log` 终态退出 0：原生 3,865 项零失败零跳过（835.952 秒），服务 501 项（12.147 秒）；十万词耐久 154.005 秒、16 项隔离磁盘冷读 4.514 秒、53 表面、1,107 唯一人工场景结构、90／3／1 配置元数据和未启动应用包资源／URL scheme／严格签名／原创边界通过。12 新增在全量中 0.318 秒，128 原有轨迹／32 新增退休轨迹／28 方向案例通过。13 文件 `/tmp/typebar-tape-retirement-final-frozen.sha256` 门禁前中后完全一致，64 原始日志 `/tmp/typebar-tape-retirement-final-logs.RbJf6z` 和 163 图 `/tmp/typebar-tape-retirement-final-images.1fYhpi` 保留；最终四张 tape-retirement-{ltr,rtl}-{before,after}.png 已再次逐张检查。既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。终态后仅补交付文档，没有运行中编辑或并行验收；零主程序启动，无残留测试／编译／主程序进程，参考仍干净，未操作真实账户、Keychain、成绩库或部署。完整 goal active，下方为阶段证据。

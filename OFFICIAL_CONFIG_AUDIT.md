@@ -1,5 +1,7 @@
 # 官方配置兼容性审计
 
+2026-10-09 Tape 换行布局组件：固定完整 scrollTape／getNlCharWidth 的 60 组轨迹及 300 个实际 Anime.js 呈现检查点，对照累计缩进、正确／错误 Return、连续空行、两处 lookahead 与三倍宽上限；14 新测试／相关 99 项零失败零跳过，四张 never-visible 原生 LTR／RTL 三行图已检查。生产换行回退未取消，纵横 await 顺序／leading-filler 清理、Zen／hint／复杂控制和可见范围性能仍待接入验证；tapeMode 仍部分、90／3／1 不变，完整冻结结果另见合同，零主程序启动、goal active。下方为阶段历史。
+
 2026-10-09 Tape 横向退休增量：单行 LTR／RTL 旧词从显示／回删范围退休，按新滚动前已呈现位置判断并补偿三个横向 owner；输入、完整原文和回放保留。12 新增／相关 120 项及 32 条新增完整实际动画源码轨迹通过，四张前后组件图已检查，完整冻结结果见 [合同](REWARD_INBOX_CONTRACT.md)。tapeMode 仍部分，90 映射／3 部分／1 不适用不变；明确换行、复杂控制／全部 joining／设备与整体功能等价仍未完成，零主程序启动、goal active。下方为阶段历史。
 
 2026-10-09 Tape RTL 增量：单行卷带已分离测试方向与词／字符方向，接通逐词原生嵌入、占位宽度、主／pace 独立边缘、混排和方向重置；12 新增及 128 条完整源码轨迹／28 方向案例通过。包含分区审计的相关 140 项零失败零跳过，三张 never-visible 组件图已检查；最终冻结结果见 [合同](REWARD_INBOX_CONTRACT.md)。因明确换行仍回退且横向词退休尚缺，tapeMode 从映射下调部分，94 键变为 90 映射／3 部分／1 不适用，生成器与固定总账同步不丢键。真实 joining／数字标点／设备／IME、换行／退休、全部字体与视口虚拟化仍开放，零主程序启动、goal active。下方为历史阶段。
@@ -748,7 +750,7 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `timerOpacity` | `liveStatsOpacity` | 已映射；四档 25/50/75/100%。 |
 | `highlightMode` | `promptHighlightMode` | 已映射。 |
 | `typedEffect` | `typedCharacterEffect` | 已映射。 |
-| `tapeMode` | `practiceTapeMode` | 部分；启用关闭完整行，关闭卷带不恢复完整行，命令与偏好页遵守相同互斥规则。单行 LTR／RTL 原生文字、逐词混排、锁定主光标、独立 pace 和横向旧词退休／位移补偿已接通；明确换行仍回退普通提示，原版 afterNewline 布局、复杂控制／全部连写与真实设备顺序未完成，不以配置可保存冒充完整功能等价。 |
+| `tapeMode` | `practiceTapeMode` | 部分；启用关闭完整行，关闭卷带不恢复完整行，命令与偏好页遵守相同互斥规则。单行 LTR／RTL 原生文字、逐词混排、锁定主光标、独立 pace 和横向旧词退休／位移补偿已接通；afterNewline 累计布局与独立动画已有有界组件证据，但生产明确换行仍回退普通提示。纵横 await 组合／leading-filler 清理、Zen／hint／复杂控制／全部连写与真实设备顺序未完成，不以配置可保存冒充完整功能等价。 |
 | `tapeMargin` | `practiceTapeMargin` | 已映射；以 0–1 原生比例保存。 |
 | `smoothLineScroll` | `smoothPracticeLineScroll` | 已映射。 |
 | `showAllLines` | `showAllPracticeLines` | 部分映射：词／引语／自定义（含计时自定义）展开，不重开，下一轮生成读取；有限 1–100,000 词完整预览，无限／自定义 bound 遵守覆盖。自有引语默认首批 100、开启全量，toPush 窗口 1–4 优先覆盖。卷带内拒绝启用；更大预算与外部短词源保持可练习并提示未完整预览，仍有差异；实际布局与设备仍待验收。 |
