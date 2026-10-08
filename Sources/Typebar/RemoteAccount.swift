@@ -1702,6 +1702,12 @@ struct RemotePublicProfileActivity: Codable, Sendable {
         case lastDay, testsByDays, dayBoundaryOffsetHours
     }
 
+    init(lastDay: Date, testsByDays: [Int?], dayBoundaryOffsetHours: Double = 0) {
+        self.lastDay = lastDay
+        self.testsByDays = testsByDays
+        self.dayBoundaryOffsetHours = dayBoundaryOffsetHours
+    }
+
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         lastDay = try values.decode(Date.self, forKey: .lastDay)
@@ -4247,6 +4253,28 @@ final class AccountSession {
         return try await loadAccountProfileOverview(scope: scope) {
             try await api.request(path: "v1/profiles/me/overview", method: "GET", token: try accessToken(),
                 body: Optional<String>.none, response: RemotePublicProfile.self)
+        }
+    }
+
+    func loadAccountActivityYears(scope: ResultPublicationScope,
+        load: () async throws -> RemoteAccountActivityYears) async throws -> RemoteAccountActivityYears {
+        try Task.checkCancellation()
+        guard resultPublicationScope == scope else { throw RemoteAccountError.accountScopeChanged }
+        let generation = accountResultExportGeneration
+        let activity = try await load()
+        try Task.checkCancellation()
+        guard resultPublicationScope == scope, accountResultExportGeneration == generation else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        guard activity.id == scope.userID else { throw RemoteAccountError.unexpectedResponse }
+        return activity
+    }
+
+    func fetchAccountActivityYears(scope: ResultPublicationScope) async throws -> RemoteAccountActivityYears {
+        let api = RemoteAccountAPI(endpoint: endpoint)
+        return try await loadAccountActivityYears(scope: scope) {
+            try await api.request(path: "v1/profiles/me/activity", method: "GET", token: try accessToken(),
+                body: Optional<String>.none, response: RemoteAccountActivityYears.self)
         }
     }
 

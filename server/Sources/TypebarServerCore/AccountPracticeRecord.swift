@@ -1,4 +1,11 @@
 import Foundation
+import Vapor
+
+public struct AccountActivityYearsResponse: Content, Equatable {
+  public let id: UUID
+  public let activityByYear: [String: [Int?]]
+  public let practiceHistoryComplete: Bool
+}
 
 /// Account lifetime state, deliberately independent of deletable result history.
 /// Missing historical evidence is disclosed, never reconstructed from XP.

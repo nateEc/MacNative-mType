@@ -1206,8 +1206,10 @@ struct PublicProfileView: View {
                 PublicProfileLeaderboardsView(profile: profile)
                 PublicProfilePersonalBestsView(profile: profile, settings: settings, isAccountOverview: isAccountOverview)
             }
-            if let activity = profile.activity {
-                PublicProfileActivityCalendar(activity: activity, isAccountOverview: isAccountOverview)
+            if isAccountOverview {
+                AccountActivityCalendarView(profile: profile, account: account)
+            } else if let activity = profile.activity {
+                PublicProfileActivityCalendar(activity: activity)
             }
             Text(isAccountOverview
                 ? "自己的账户概览不受公开活动开关或下方成绩筛选影响；不包含本机练习。"
@@ -1275,9 +1277,10 @@ struct PublicProfileView: View {
     }
 }
 
-private struct PublicProfileActivityCalendar: View {
+struct PublicProfileActivityCalendar: View {
     let activity: RemotePublicProfileActivity
     var isAccountOverview = false
+    var periodLabel = "近 12 个月"
 
     private static let dayLabelFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -1304,7 +1307,9 @@ private struct PublicProfileActivityCalendar: View {
     }
 
     private var displayCells: [ActivityHeatmapDisplayCell] {
-        ActivityHeatmap.displayCells(for: cells)
+        zip(cells, ProfileActivityCalendarPresentation.levels(activity.testsByDays)).map {
+            .init(cell: $0.0, intensity: $0.1)
+        }
     }
 
     private var weekdaySymbols: [String] {
@@ -1338,7 +1343,7 @@ private struct PublicProfileActivityCalendar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("近 12 个月\(isAccountOverview ? "账户" : "公开")活动 · \(completedTestCount) 次完成")
+                Text("\(periodLabel)\(isAccountOverview ? "账户" : "公开")活动 · \(completedTestCount) 次完成")
                     .font(.headline)
                 Spacer()
                 Text(dayBoundaryLabel)
@@ -1358,9 +1363,10 @@ private struct PublicProfileActivityCalendar: View {
             .foregroundStyle(.secondary)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(isAccountOverview ? "账户" : "公开")完成次数强度图例")
-            .accessibilityValue("由少到多；近 12 个月共 \(completedTestCount) 次完成")
+            .accessibilityValue("由少到多；\(periodLabel)共 \(completedTestCount) 次完成")
             HStack(alignment: .top, spacing: 6) {
                 VStack(spacing: 3) {
+                    Color.clear.frame(width: 10, height: 10)
                     ForEach(weekdaySymbols, id: \.self) { symbol in
                         Text(symbol)
                             .font(.caption2)

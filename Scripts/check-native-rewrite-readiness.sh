@@ -157,6 +157,11 @@ run_logged_check "executing actual pinned account functions" "$temporary_directo
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-account-practice.mjs" "$reference_root"
 
+run_logged_check "executing pinned full-year activity calendar and DB getter" "$temporary_directory/account-activity-years-source-check.log" \
+  env TZ=UTC TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-account-activity-years.mjs" "$reference_root"
+
 run_logged_check "executing pinned frontend weekly time formatting" "$temporary_directory/weekly-xp-presentation-source-check.log" \
   env TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \

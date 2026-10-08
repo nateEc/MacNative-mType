@@ -1,5 +1,9 @@
 # 官方页面与模态能力审计
 
+本人年度活动增量：AccountPage 现登记 `AccountActivityCalendar.swift` 的系统年份选择、认证私有年度账本、当前视图缓存、失效／失败重试与空年／不完整说明。完整固定日历／DB getter 探针明确记录历史错日与满年跨年反例，原生不复制该日期错误；公开仍是近期卡片。见 [累计练习合同](ACCOUNT_PRACTICE_LIFETIME_CONTRACT.md)。本人编辑／分享、徽章披露、连续提示及实机交互／辅助功能仍开放，账户页维持部分覆盖、goal active；以下“年度尚缺”是先前历史范围。
+
+最终冻结完整门禁原生 3,520／服务 491 项零失败零跳过，46 年度／四本年源码对照、52 表面证据、1,044 人工项结构、12 哈希与未启动应用包／原创审计通过。当前年与近期沿用快照、不发年度请求，旧年只在当前视图缓存。修正共用星期列对齐和空日不参与强度阈值；四张新增最终年度组件图已检查，不代替年份交互与辅助功能。完整结果与源差异见上述合同。
+
 账户本人概览增量：AccountPage 证据现覆盖 AccountHistoryView 中与筛选集合分离的身份／累计／PB／英语榜／私有近期活动，以及认证 `/v1/profiles/me/overview`。公开隐私开关不隐藏本人日历，公开入口仍受限；新增范围／取消／metadata 刷新、真实 HTTP 身份／无缓存及生产组件取证映射。见 [累计练习合同](ACCOUNT_PRACTICE_LIFETIME_CONTRACT.md)。这不是完整账户页或年度活动／本人动作／实机等价证明，`nativeTestSymbols` 仅登记实际自动化证据，整体 goal active。
 
 该增量最终门禁原生 3,507／服务 487 项零失败零跳过，52 表面证据与 1,041 人工项结构通过；四张新增本人／公开整卡离屏图已检查，12 冻结哈希一致，未启动应用包与原创审计通过。本人年度活动选择、编辑／分享入口、私有徽章披露与连续提示仍缺；实机辅助功能、网络和设备仍待验收，不提升 AccountPage 为完整等价。
@@ -27,7 +31,7 @@
 | --- | --- | --- |
 | `test`（模式、提示、输入、实时统计、计时条、大小写／失焦提示、结果提示） | `TypingCompanion.swift`、`TypingEngine.swift`、`LivePracticeContent.swift`、`NativeTypingInput.swift`、`PaceGuide.swift`、`KeyboardGuide.swift` | 已覆盖。配置语义由固定 schema 测试守护；本机输入、提示和结果不是网页 DOM 的移植。 |
 | `settings`（可搜索设置、快捷导航和自定义设置编辑器） | `PreferencesView.swift`、`SettingsSearch.swift`、`CommandPalette.swift` 及各设置编辑器 | 已覆盖。94 个参考配置键的 92 项映射、1 项原生字体适配和 1 项无广告不适用由 `OfficialLayoutCoverageTests` 守护。 |
-| `account`（历史、统计、图表、个人最佳、资料） | `ArchiveManagementView.swift`、`ResultsAnalytics.swift`、`PersonalBestTable.swift`、`AccountHistoryView.swift`、`AccountProfileOverview.swift`、`RemoteAccount.swift` | 部分覆盖，非完整账户页等价。本机成绩是权威副本；远端服务是显式可选发布与同步目标。本人累计／PB／英语榜／私有近期活动与筛选集合分离，年度选择、本人动作及实机等缺口见本文顶部。固定官方路径与速度／准确率、10／100 次均值、PB 轨迹、单局分析、直方图及日活动的原生实现见 [OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md](OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md)。 |
+| `account`（历史、统计、图表、个人最佳、资料） | `ArchiveManagementView.swift`、`ResultsAnalytics.swift`、`PersonalBestTable.swift`、`AccountHistoryView.swift`、`AccountProfileOverview.swift`、`AccountActivityCalendar.swift`、`RemoteAccount.swift` | 部分覆盖，非完整账户页等价。本机成绩是权威副本；远端服务是显式可选发布与同步目标。本人累计／PB／英语榜／近期及年度私有活动与筛选集合分离；年度日期修正、本年快照、本人动作及实机等剩余边界见本文顶部。固定官方路径与速度／准确率、10／100 次均值、PB 轨迹、单局分析、直方图及日活动的原生实现见 [OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md](OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md)。 |
 | `account settings`（身份方法、邮箱／密码／显示名、密钥、拉黑、危险操作） | `PreferencesView.swift`、`RemoteAccount.swift`、`LocalAccountReset.swift` | 已覆盖。密码、OAuth、邮箱验证、密码重置、账号删除、开发者密钥及展示名预检均有自建契约；显示名实际写入仍由服务端权威校验。官方“重置个人最佳但保留成绩”的入口以受重新认证保护的服务端公开 PB 新纪元实现，详见 [OFFICIAL_PERSONAL_BEST_RESET_AUDIT.md](OFFICIAL_PERSONAL_BEST_RESET_AUDIT.md)。 |
 | `profile`／`profile search` | `RemoteAccount.swift`、`CloudSyncView.swift`、`ConnectionsView.swift`、`ProfileReportView.swift` | 已覆盖。公开资料只暴露最小公开字段；固定源码的资料页可呈现拥有但未选中的徽章，Typebar 以默认关闭、账户所有者明确开启的“公开显示全部已获得徽章”作隐私等价，资料卡会去重所选徽章，榜单仍只呈现所选一枚。搜索、关系、屏蔽与举报均通过自建服务。 |
 | `friends` | `ConnectionsView.swift`、`DirectConversationView.swift`、`NotificationsView.swift` | 已覆盖。好友请求、接受、解除、屏蔽、通知和已接受好友间受控私信由自建 API 提供。 |

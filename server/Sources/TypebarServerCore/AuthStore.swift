@@ -2739,6 +2739,13 @@ public actor AuthStore {
     return try detailedPublicProfile(for: user, now: now, includePrivateActivity: true)
   }
 
+  public func accountActivityYears(accessToken: String, now: Date = .now) throws -> AccountActivityYearsResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    let practice = state.accountPractice![user.id] ?? .init()
+    return .init(id: user.id, activityByYear: practice.activityByYear,
+      practiceHistoryComplete: practice.historyComplete)
+  }
+
   public func searchPublicProfiles(query: String?, limit: Int?) throws
     -> PublicProfileSearchResponse
   {

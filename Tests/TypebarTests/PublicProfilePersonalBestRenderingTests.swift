@@ -110,6 +110,25 @@ import XCTest
     } }
   }
 
+  func testProductionAnnualActivityRendersLeapSparseEmptyAndIncompleteWithoutNetwork() throws {
+    try withMount { window, host in
+      var leap = Array<Int?>(repeating: nil, count: 366); leap[0] = 3; leap[59] = 7; leap[365] = 9
+      for (name, years, year, complete, width, dark) in [
+        ("annual-leap-light", ["2024": leap], 2024, true, 700.0, false),
+        ("annual-sparse-dark", ["2025": [Int?(7)]], 2025, true, 360.0, true),
+        ("annual-empty-light", [String: [Int?]](), 2023, true, 420.0, false),
+        ("annual-incomplete-light", ["2024": leap], 2024, false, 700.0, false)
+      ] {
+        struct Fixture: Encodable { let id: UUID; let activityByYear: [String: [Int?]]; let practiceHistoryComplete: Bool }
+        let value = try JSONDecoder().decode(RemoteAccountActivityYears.self, from: JSONEncoder().encode(
+          Fixture(id: UUID(), activityByYear: years, practiceHistoryComplete: complete)))
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        host.rootView = root(AccountActivityYearContent(response: value, year: year), width: width, padding: 16, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: width, dark: dark)
+      }
+    }
+  }
+
   func testSameMountedSummaryObservesUnitChangesWhilePrimaryValuesStayInteger() throws {
     try withSettings { settings in try withMount { window, host in
       settings.typingSpeedUnit = .wpm; settings.alwaysShowDecimalPlaces = false

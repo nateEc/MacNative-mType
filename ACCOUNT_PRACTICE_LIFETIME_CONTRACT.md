@@ -1,5 +1,27 @@
 # 账户累计练习、活动与连续天数
 
+## 本人年度活动增量
+
+固定 [ActivityCalendar](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/ActivityCalendar.tsx)、[完整日历类](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/elements/test-activity-calendar.ts)、[DB 年份 getter](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/db.ts) 与 [认证年度控制器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/backend/src/api/controllers/user.ts) 已实际读取。原版近期与当前年度使用 snapshot，旧年份单次认证读取后缓存；旧年入口受 premium 开关／资格限制。Typebar 沿用无付费设计，开放从加入年到当前年的年份，不引入付费资格、第三方服务或广告。
+
+新增认证只读 `GET /v1/profiles/me/activity`，以 token 决定身份，返回本人稀疏年度账本及历史完整性，不接受任意用户 ID。成功响应 `private, no-store`；公开资料 DTO／接口不新增年度字典，隐藏公开活动或封禁不阻止本人查看。账本已独立于可删除成绩保存，读取不改文件、不回填、不重新计算 XP／连续天数。无新持久字段或迁移，SwiftData／归档／CSV 不变；旧客户端不调用新入口，新客户端配旧服务只在选年后明确失败可重试，近期和历史功能不回退成伪造年度数据。回退此增量无需恢复数据，既有旧 writer 降级限制仍适用；无部署或真实账户操作。
+
+原生本人日历增加系统年份 Picker、刷新、错误重试、空年份与不完整历史提示。近期和本年不读年度接口，本年从已载入 snapshot 按 UTC 年内索引截取并补未来空日；旧年份成功响应只缓存在当前视图，切旧年份复用，手动刷新／新累计次数改变请求身份；服务器／退出重登 ABA、错 UUID、取消、旧年份迟到回调均守卫。年份列表也用 UTC 加入年与当前年，避免本地跨年标签与 UTC 日历冲突；这是对原版本地年选项的明确边界修正，不冒称时区完全同构。公开卡仍只显示近期日历。视觉继续使用系统字体、语义色、等宽日历格与横向滚动，不增加资产；共用资料日历强度改为仅用非 null 日期计算截尾分布，明确零仍参与，符合完整参考类而不是把未知空日补进阈值。
+
+产品外 `check-source-account-activity-years.mjs` 执行完整固定日历类、数值工具及 DB getter，真实 date-fns 3.6.0／@date-fns/utc 1.2.0、隔离 UTC 时钟／认证／传输适配器；46 组年度日期／计数／强度投影覆盖平闰年、三种周首日、短数组、满年、全空与 9／10／11 个已知值的截尾边界。它还执行近期／本年无 HTTP、旧年份缓存一次、缺年与未认证路径，不运行浏览器、Solid 或真实账户 HTTP；已登记完整门禁。首次探针把满年错误推测成丢掉末日，实际执行反驳：短历史数组错后一日，完整 365 天数组的末日变成次年一月一日，日历跨年且丢掉原年早期值。最终探针保留这两条真实反例。原生按 DAL 的 UTC 年内零起日索引保留原日期与所有计数，明确修正而不复制参考历史 getter 的日期错误；不能把它宣传为逐 bug 一致。日历布局、时区与浏览器像素仍非完整等价证据。
+
+有效服务先行两项产生三处预期 404 失败（0.625 秒，`/tmp/typebar-activity-year-server-red.log`）；原生本人接线静态先行一项失败（0.541 秒，`/tmp/typebar-activity-year-native-red.log`），不是点击验收。服务首轮相关 20 项通过（0.171 秒，`/tmp/typebar-activity-year-server-focused.log`），包括身份／隐私／认证、跨年闰日／末日、删除成绩后隔离磁盘重载及读取字节不变。源码探针日志 `/tmp/typebar-activity-year-source.log`（错误预期）及 `/tmp/typebar-activity-year-source-final.log`（修正反例后通过）；后续强度对照、原生及完整验证以最终实际结果另记。
+
+本轮使用源码驱动、行为先行、简化实现、原生设计、迁移安全、根因定位和有界同会话决策／风险复核，非独立审查。本人编辑／复制公开链接入口、私有徽章全部披露、连续状态提示、实机年份交互／键盘／VoiceOver、网络与目标设备、整体重写等仍未验收，goal active。以下“年度活动尚缺”等为上一阶段历史记录，由本增量部分取代，不表示新人工项已执行。
+
+本年快照补证前相关原生 55 项零失败／零跳过（28.785 秒，`/tmp/typebar-activity-year-native-final-focused.log`），其中年度模型／实际加载器 10 项、共用生产渲染 8 项；首轮 54 项通过后，截图确认星期列与月份头齐顶而高于日格一行，生产星期列补同高月份占位后重跑。该阶段 29 张图保留 `/tmp/typebar-activity-year-verified-render.nvEgWF`，四张新增年度浅／深／窄／空／不完整组件图已逐张检查，星期与日格已对齐；该测试一个从不显示的 NSWindow 串行复用并清理，不发网络请求。首轮图 `/tmp/typebar-activity-year-render.pCKVEg` 与日志 `/tmp/typebar-activity-year-native-focused.log` 不替代后续最终取证。界面不会因图像检查而获得真实年份选择／VoiceOver／设备验收；最后修订由下列完整门禁覆盖。
+
+随后同会话决策复核发现本年仍依赖年度接口，会损失原版已载入快照的离线能力；补一项实际加载器先行回归产生两处预期失败（0.709 秒，`/tmp/typebar-activity-year-current-snapshot-red.log`），先中止正在跑的首轮完整门禁，再补实现，未在编译／测试期间编辑。该中止运行 `/tmp/typebar-activity-year-final-readiness.log`／`/tmp/typebar-activity-year-final-logs.CpEURl` 不算完整通过。修正本年快照、未来空日、上一年不带入本年与 UTC 选项后，年度 12 项零失败零跳过（0.393 秒，`/tmp/typebar-activity-year-snapshot-focused.log`），新增四组实际 ModifiableTestActivityCalendar.getFullYearCalendar 对照与无年度请求回归。本年不显示会误导的年度 API 刷新按钮，改用已有账户概览刷新；后续最终门禁覆盖此修订，不以上述 55 项证明最后修订。
+
+最后冻结修订完整串行门禁退出 0：原生 3,520 项（848.310 秒）、服务 491 项（11.433 秒）零失败／零跳过。十万词耐久实际执行并通过（174.368 秒），16 项隔离磁盘冷读通过（6.592 秒）；52 页面证据、1,044 条唯一人工场景仅结构核对，固定参考／原创边界、未启动应用包及严格签名校验通过。46 份分项日志 `/tmp/typebar-activity-year-complete-logs.bXdxP7`，主日志 `/tmp/typebar-activity-year-complete-readiness.log`，46 年度／四本年源码证据也在该日志目录；12 冻结生产／测试／QA／映射哈希门禁前后一致（`/tmp/typebar-activity-year-final-frozen.sha256`），运行期间没有编辑，之后只补文档证据。最终完整套件重绘 29 张图 `/tmp/typebar-activity-year-complete-render.TV6UCO`，四张新增年度图再次逐张检查；并非只复用前轮截图。
+
+零 Typebar 应用启动、零部署，没有读取真实 Typebar 数据库或 Keychain 凭据。系统 AddressBook/CoreData XPC 警告仍在，未据此改系统权限或检查通讯录；来源与性能不确定性继续沿用下节记录。本轮挪威语大词库 15.184 秒，单轮未复现旧离群耗时不等于已解决性能问题。固定 clone 仍干净。同会话有界风险复核已修正本年离线退化及星期视觉错位，未发现本增量其他阻断问题；真实 Picker／网络／键盘／VoiceOver／目标设备仍缺证。完整 goal active，不能把这次通过解释为原版全功能无损已经证明。
+
 ## 原生账户页独立概览
 
 固定 [MyProfile](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/account/MyProfile.tsx) 在账户页把自己的 snapshot 交给 UserProfile，而不是筛选后的成绩集合；[UserProfile](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/UserProfile.tsx) 展示本人资料、累计统计、英语榜名次、PB 和私有活动。[ActivityCalendar](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/ActivityCalendar.tsx) 的账户分支使用本人 snapshot，不受公开 showActivity 限制；原版年度选择与私有历史请求是另外一条尚待对齐的路径，不以最近十二个月代替年度功能完成。
