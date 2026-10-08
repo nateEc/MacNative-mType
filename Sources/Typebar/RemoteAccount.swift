@@ -1465,6 +1465,7 @@ struct RemoteExperienceLeaderboardRankResponse: Codable, Sendable {
 }
 
 struct RemotePublicProfile: Codable, Identifiable, Sendable {
+    let accountStreakClaim: RemoteAccountStreakClaim?
     let personalBestLedgerVersion: Int?
     let personalBestHistoryComplete: Bool?
     let personalBestSnapshots: [RemotePublicProfileBest]?
@@ -1499,10 +1500,12 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
             earnedBadges, practiceHistoryComplete, leaderboardOptedOut, allTimeLbs
         case preciseBestWPM
         case personalBestLedgerVersion, personalBestHistoryComplete, personalBestSnapshots
+        case accountStreakClaim
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        accountStreakClaim = try values.decodeIfPresent(RemoteAccountStreakClaim.self, forKey: .accountStreakClaim)
         id = try values.decode(UUID.self, forKey: .id)
         displayName = try values.decode(String.self, forKey: .displayName)
         accountSuspended = try values.decodeIfPresent(Bool.self, forKey: .accountSuspended) ?? false

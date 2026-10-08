@@ -446,6 +446,8 @@ public struct PublicProfileResponse: Content, Equatable {
   public var personalBestSnapshots: [PublicProfileBestResponse]? = nil
   public var leaderboardOptedOut: Bool? = nil
   public var allTimeLbs: PublicProfileAllTimeLeaderboards? = nil
+  /// Set exclusively by the authenticated owner overview, never public lists.
+  public var accountStreakClaim: AccountStreakClaimResponse? = nil
 }
 
 public struct PublicProfileAllTimeLeaderboards: Content, Equatable {
@@ -2736,7 +2738,19 @@ public actor AuthStore {
     guard let user = state.users.first(where: { $0.id == current.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
-    return try detailedPublicProfile(for: user, now: now, includePrivateActivity: true)
+    var profile = try detailedPublicProfile(for: user, now: now, includePrivateActivity: true)
+    let practice = state.accountPractice![user.id] ?? .init()
+    let lastSave = state.experienceAwards!.filter { $0.userID == user.id }.map { award in
+      // Modern admissions use whole seconds; historical initialization retains
+      // its original precise timestamp. Offset selection is not a result save.
+      award.acceptedAt.map { $0.timeIntervalSince1970.rounded(.down) * 1_000 }
+        ?? award.finishedAt.timeIntervalSince1970 * 1_000
+    }.max()
+    let offset = state.streakDayBoundaryOffsets[user.id]
+    profile.accountStreakClaim = .init(version: 1, lastResultMilliseconds: lastSave,
+      streakReferenceMilliseconds: practice.completedTests > 0 || offset != nil ? practice.lastResultMilliseconds : nil,
+      dayBoundaryOffsetHours: offset)
+    return profile
   }
 
   public func accountActivityYears(accessToken: String, now: Date = .now) throws -> AccountActivityYearsResponse {

@@ -1167,6 +1167,11 @@ struct PublicProfileView: View {
                     }
                 }
             }
+            ProfileLevelProgressView(totalXP: profile.totalExperience)
+            if AccountStreakClaimPresentation.isVisible(profileID: profile.id,
+                isAccountOverview: isAccountOverview, userID: account.currentUser?.id) {
+                AccountStreakClaimView(claim: profile.accountStreakClaim)
+            }
             Label(
                 "服务端累计练习 \(isAccountOverview ? AccountProfileLifetimePresentation.duration(profile.totalTypingSeconds) : totalTypingDuration) · \(profile.startedTestCount) 次开始",
                 systemImage: "timer")

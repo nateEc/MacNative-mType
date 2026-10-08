@@ -1,6 +1,14 @@
 import Foundation
 import Vapor
 
+/// Owner-only read projection; no new persisted state or activity disclosure.
+public struct AccountStreakClaimResponse: Content, Equatable {
+  public let version: Int
+  public let lastResultMilliseconds: Double?
+  public let streakReferenceMilliseconds: Double?
+  public let dayBoundaryOffsetHours: Double?
+}
+
 public struct AccountActivityYearsResponse: Content, Equatable {
   public let id: UUID
   public let activityByYear: [String: [Int?]]

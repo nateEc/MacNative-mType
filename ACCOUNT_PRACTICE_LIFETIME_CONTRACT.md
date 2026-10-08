@@ -1,5 +1,27 @@
 # 账户累计练习、活动与连续天数
 
+## 等级进度与本人连续提示增量
+
+只读核对固定 UserDetails、完整 levels／数字格式函数、完整 date-and-time 模块、Bar 百分比以及现有 snapshot／保存路径。公开和本人资料新增原生等级、两位小数百分比、当前等级 XP／所需 XP／升级差值和可展开精确整数详情；保留从等级 1 开始、首级 100 XP、之后每级递增 49 XP 的曲线。独立整数阈值二分避免平方根逆函数在大安全整数处提前升级；不修改奖励、总 XP 或排行榜。超出 JavaScript 安全整数域明确不可用，不补造等级。
+
+本人认证概览追加可选 version 1 `accountStreakClaim`，最后保存时刻从不可删除的奖励记录投影，连续参考时刻从既有累计账本读取，未设置偏移与显式零分开。两种时刻不能合并：既有一次性日界线设置会更新时间，却不代表保存新成绩；历史筛选、可删除成绩、公开活动或本次客户端 lastAccountResult 均不能作为真值。现代保存沿用服务入账整秒，旧奖励保留原 finishedAt。只有 `/v1/profiles/me/overview` 设置该字段；公开详情、匿名搜索和好友列表默认不返回，既有 `private, no-store` 和认证 UUID 边界不变。
+
+原生只在本人概览且登录 UUID 匹配时显示连续日状态、是否真正保存、下个日界线倒计时和过期时长。TimelineView 使用本机时钟纯计算，不按秒请求网络、不更新持久账本；连续天数仍按原服务规则在下次保存时更新。覆盖未保存、今日、昨日、过期、设置参考变化、半小时偏移、午夜切换、旧服务缺字段和设备时钟落后。未保存却设置过日界线仍显示“尚无已保存成绩”；参考时间不冒充实际保存。原版在未来记录时误报过期，原生明确时钟不一致，不推断领取。
+
+产品外 `check-source-profile-progress.mjs` 执行固定原文件的完整等级／格式函数、完整日期模块与完整 extraStreakText 回调，使用真实固定 date-fns 3.6.0，自有 props／snapshot／时钟，不运行 Solid、浏览器、真实 HTTP 或上游测试。33 组等级／格式和 144 组连续日回调夹具与原生逐组核对；记录一个实际负等级内 XP 的提前升级反例，并以独立 BigInt 曲线验证修正。另证明原版上午六时对前两天成绩显示“18 hours ago”，实际应从失效日界线算六小时；原生不复制这一错误。不是全控制器／UI 同构或完整功能无损证明。
+
+迁移只涉及认证只读响应的可选字段，无存储实体／SwiftData／归档变化、无新 endpoint、重放或奖励写入。旧客户端忽略新字段，新客户端连接旧服务显示不可用；非法新字段按协议报错，不默默忽略。代码回退不需数据回滚。服务测试涵盖空账户、偏移选择、删除历史后磁盘重读、读取前后文件字节不变、封禁本人及公开 HTTP 不披露。可见性守卫与既有账户概览会话／服务器 ABA 守卫共同防止错账户内容；不改变此前其他账户操作的并发模式。
+
+行为先行：原生接线一项三个预期失败、服务 HTTP 一项两处预期解包失败，日志 `/tmp/typebar-profile-progress-native-red.log`、`/tmp/typebar-profile-progress-server-red.log`。补服务投影后相关 17 项通过，再补持久／封禁／空状态为 20 项零失败零跳过（0.142 秒，`/tmp/typebar-profile-progress-server-verified.log`）。固定源码探针通过，日志 `/tmp/typebar-profile-progress-source-verified.log`。原生首轮新旧资料 fixture 漏既有必填成绩数，已保留 `/tmp/typebar-profile-progress-native-focused.log`；仅补 fixture 的成绩数和 bestWPM，不放宽生产协议，最终重跑另记。
+
+源码驱动、行为先行、原生设计、迁移安全及同会话有界决策／风险复核促使分离保存／参考时刻、记录并修正原版数值与过期错误；非独立外部评审。新增三项人工验收仍待唯一隔离候选；离屏渲染不证明键盘／VoiceOver、完整窗口、实际后台恢复／时钟变化或目标设备。原版加入时长提示、主题精确身份、离线目录备份、整个功能覆盖仍开放，goal active。零 Typebar 应用启动、零部署，不读真实账户数据库／Keychain。
+
+最终冻结完整串行门禁退出 0：原生 3,558 项零失败／零跳过（809.219 秒），服务 495 项零失败／零跳过（11.040 秒）；本轮实际十万词耐久 154.456 秒、16 项隔离磁盘冷读 6.291 秒通过。52 页面证据、1,053 人工结构、固定源码／原创边界与未启动应用包／scheme／严格签名检查通过。主日志 `/tmp/typebar-profile-progress-complete-readiness.log`，54 份分项日志 `/tmp/typebar-profile-progress-complete-logs.Z51diB`；门禁前后 12 文件哈希全部一致（`/tmp/typebar-profile-progress-frozen.sha256`），运行中未编辑。最终 45 张图位于 `/tmp/typebar-profile-progress-complete-render.184uH4`；六张新增连续状态／等级图与两张本人整卡已逐张检查，长文换行和累计／PB／活动内容保留。
+
+图像检查发现系统 ProgressView 的轨道没有出现在离屏缓存图里，不能以这些图宣称轨道绘制已验收。门禁终止后仅追加一项 QA 测试，不修改任何生产实现／脚本／矩阵：直接从实际生产组件查到唯一 NSProgressIndicator，确认未隐藏、非不定进度、尺寸正常，0／50／99／100／174 XP 的归一数值均匹配模型（包含升级归零）。该补充一项零失败零跳过（0.689 秒，`/tmp/typebar-profile-progress-control-binding.log`）；不把它合并为同轮全量 3,559 项。原冻结的其余 11 文件保持一致，新增测试后的哈希另存 `/tmp/typebar-profile-progress-binding-qa.sha256`。这证明系统控件绑定，不证明可见窗口绘制或真实 VoiceOver；未为截图替换系统控件，轨道实际外观仍待唯一隔离候选验收。
+
+修复必填字段 fixture 后的相关 54 项零失败零跳过（23.330 秒，`/tmp/typebar-profile-progress-native-verified.log`）；首轮 54 项中两处 fixture 解码失败保留，不能冒称首轮通过。系统 AddressBook／CoreData XPC 警告仍存在，未读取通讯录内容、真实 Typebar 数据库或 Keychain，也未修改系统权限；一次通过不证明历史性能离群已解决。上述设计／决策／迁移／风险检查均为同会话有界检查，非独立评审；纯原生增量已验证但全功能无损、原版加入时长提示、主题精确身份、离线目录备份、真实网络／后台时钟／键盘／VoiceOver／最低设备仍有缺口。零 Typebar 应用启动、零部署，整个 goal active。
+
 ## 原生公开资料分享增量
 
 固定 UserDetails 的完整复制回调按当前站点 origin 与展示名生成公开网页链接，成功通知、失败直接提供原链接；固定 route-controller 的资料 load 强制进入资料页，queries/profile 的完整查询模块按展示名读取、缓存一小时，未找到不重试，其他失败最多三次。产品外 `check-source-profile-share.mjs` 只读执行这些实际回调／路由对象／查询模块，以明确自有剪贴板、导航、查询和 HTTP 适配器覆盖八组复制成功／失败、完整资料成功及三种 HTTP 错误、缓存与重试选择；不运行浏览器、Solid、真实剪贴板或 HTTP。首次探针的独立对象解析失败已保留，包装为表达式后执行通过，没有改参考代码。原生代码和资产仍独立编写，不带入参考实现。

@@ -168,6 +168,10 @@ run_logged_check "executing pinned profile editor defaults and complete submit c
 run_logged_check "executing pinned profile share copy, route and query" "$temporary_directory/profile-share-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-profile-share.mjs" "$reference_root"
 
+run_logged_check "executing pinned profile level and owner streak hints" "$temporary_directory/profile-progress-source-check.log" \
+  env TZ=UTC TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules "$project_root/Scripts/check-source-profile-progress.mjs" "$reference_root"
+
 run_logged_check "executing pinned frontend weekly time formatting" "$temporary_directory/weekly-xp-presentation-source-check.log" \
   env TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \

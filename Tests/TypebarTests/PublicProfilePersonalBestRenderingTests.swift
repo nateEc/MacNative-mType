@@ -110,6 +110,55 @@ import XCTest
     } }
   }
 
+  func testProductionLevelAndOwnerStreakStatesRenderSeriallyWithoutActivatingAWindow() throws {
+    let today = 1_799_971_200_000.0, day = 86_400_000.0
+    try withMount { window, host in
+      for (name, xp, last, reference, offset, dark) in [
+        ("progress-claimed-light", 249, Optional(today), Optional(today), Optional(0.0), false),
+        ("progress-available-dark", 9_007_199_254_740_991, today - day, today - day, -0.5, true),
+        ("progress-expired-narrow", 99, today - 3 * day, today - 3 * day, 12.0, false),
+        ("progress-reset-dark", 100, today - 3 * day, today, 0.5, true),
+        ("progress-empty-light", 0, nil, today, 0.0, false)
+      ] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        let claim = RemoteAccountStreakClaim(lastResultMilliseconds: last, streakReferenceMilliseconds: reference, dayBoundaryOffsetHours: offset)
+        host.rootView = root(VStack(alignment: .leading, spacing: 16) {
+          ProfileLevelProgressView(totalXP: xp)
+          AccountStreakClaimContent(claim: claim, now: Date(timeIntervalSince1970: (today + 6 * 3_600_000) / 1000))
+        }, width: 360, padding: 16, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: 360, dark: dark)
+      }
+      window.appearance = NSAppearance(named: .aqua)
+      host.rootView = root(VStack(alignment: .leading, spacing: 16) {
+        ProfileLevelProgressView(totalXP: -1)
+        AccountStreakClaimContent(claim: nil, now: .now)
+        AccountStreakClaimContent(claim: .init(lastResultMilliseconds: today + day,
+          streakReferenceMilliseconds: nil, dayBoundaryOffsetHours: nil), now: Date(timeIntervalSince1970: today / 1000))
+      }, width: 360, padding: 16)
+      _ = try snapshot(host, window: window, name: "progress-unavailable-and-clock-light", width: 360)
+      XCTAssertFalse(window.isVisible)
+    }
+  }
+
+  func testActualNativeProgressIndicatorTracksLevelResetsWithoutShowingAWindow() throws {
+    func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+    try withMount { window, host in
+      for xp in [0, 50, 99, 100, 174] {
+        host.rootView = root(ProfileLevelProgressView(totalXP: xp), width: 360, padding: 16)
+        settle(host)
+        let indicators = descendants(host).compactMap { $0 as? NSProgressIndicator }
+        print("LEVEL CONTROL xp=\(xp) nativeIndicators=\(indicators.count) views=\(descendants(host).map { String(describing: type(of: $0)) })")
+        XCTAssertEqual(indicators.count, 1)
+        let control = try XCTUnwrap(indicators.first), progress = try XCTUnwrap(ProfileLevelProgress(totalXP: xp))
+        XCTAssertFalse(control.isIndeterminate); XCTAssertFalse(control.isHiddenOrHasHiddenAncestor)
+        XCTAssertGreaterThan(control.maxValue, control.minValue)
+        XCTAssertEqual((control.doubleValue - control.minValue) / (control.maxValue - control.minValue), progress.fraction, accuracy: 0.000_001)
+        XCTAssertGreaterThan(control.bounds.width, 100)
+        XCTAssertFalse(window.isVisible)
+      }
+    }
+  }
+
   func testProductionAnnualActivityRendersLeapSparseEmptyAndIncompleteWithoutNetwork() throws {
     try withMount { window, host in
       var leap = Array<Int?>(repeating: nil, count: 366); leap[0] = 3; leap[59] = 7; leap[365] = 9
