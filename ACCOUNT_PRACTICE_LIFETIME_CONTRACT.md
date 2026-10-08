@@ -1,5 +1,25 @@
 # 账户累计练习、活动与连续天数
 
+## 完整名称添加好友增量
+
+固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`：只读核对 [FriendsList 的实际添加表单](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/connections/FriendsList.tsx)、完整 findConnectionToUser、remoteValidation 和 UserNameSchema。原版先排除本人／既有关系，再检查名称是否存在，配置 1,000 ms 防抖，提交 receiverName；这是 FriendsPage 内联 simple modal，不凭空增加独立官方模态身份。
+
+原创 `AddFriendView`／`FriendNameValidationState` 保留既有模糊搜索，另提供完整名字添加、停止输入一秒后读取、本人／双向请求／好友／本人屏蔽／不存在／服务不可用反馈和显式重试。输入绑定同步退休旧结果，校验按输入、重试、展示名、账户／服务器／关系修订、刷新和快照可用性绑定；nonce 拒绝相同输入 ABA 的迟到成功／错误。校验前后检查当前身份、取消、关系已知及无操作进行；返回 UUID 再与当前关系匹配，改名不能绕过既有关系。提交复核当前输入和 UUID，沿用既有全页写入互斥和认证作用域；关闭取消等待不承诺撤回服务写入，不确定结果退休快照、要求后续刷新，不自动重发。
+
+迁移安全与同会话有界决策／风险复核（非独立审查）选择增补匿名只读 `GET /v1/profiles/resolve-name?name=…`，version 1、轻量公开投影和 `no-store`，不复用最多 20 人的模糊查询来猜精确存在性。服务完整名字匹配沿用现有大小写／变音折叠唯一性，读取不写盘、不保留名称、不返回私密 activity／accountStreakClaim／邮件／令牌。原生实际入口用既有独立临时有界读取器，清除附加认证头、Cookie、凭据和缓存，禁重定向，8 MiB 上限及 15／30 秒超时；前后验证账户，版本／名字／私密字段不符拒绝。URL 中字面 `+` 编为 `%2B`，依据本机 Vapor 4.122.1 的实际 URLEncodedFormParser（裸 `+` 会变空格），客户端 URLProtocol 与实际服务路由均回归验证。新增接口不改关系 UUID 写入、存储或数据版本；旧客户端无变化，新客户端连缺此接口的旧服务显示不可用，可退回原模糊搜索，不把错误当不存在。无部署、真实账户或凭据操作；代码回退无需数据回滚，已提交请求不撤销。
+
+明确适配／缺口：现有原生账户展示名允许 Unicode、2–32 字符，查找接受 1–32 且禁止控制／换行，保留可查已有名字；原版 UserNameSchema 为 1–16 slug 并过滤禁词。本轮没有复制原版禁词资产，也没有修正原生注册单字符缺口或声称 schema 等价。已解析目标随后按 UUID 发送，不因发送时改名把请求转给另一个同名用户；这不同于原版按名字提交。预检只解释本人已知屏蔽，不泄露或猜测对方私密屏蔽，最终服务仍可拒绝。跨设备关系更新需要刷新，校验不是写入授权或名称预留。
+
+`check-source-add-friend.mjs` 只在 QA 中读取实际完整查找／远程校验与实际模态声明，50 组自有本人／五种关系／五种服务结果对照可用性和调用数，另检查实际防抖配置及提交回调。schema、集合、HTTP 提供者和模态捕获是明确适配器，不运行 Zod／TanStack／Solid／浏览器，也不把注入的等待 continuation 当真实一秒计时证据。原生模型验证等待完成前零调用、UUID 就绪、清空／ABA／改名／旧身份／未知写入退休；URLProtocol 在实际入口验证匿名请求、编码、版本／错误拒绝，全程无真实 HTTP。
+
+先行服务 RED `/tmp/typebar-friend-name-red.log` 一项预期失败，复现 25 个模糊候选遮住精确 Target，旧动态路由返回 400。探针先后因泛型终点和两个 showSimpleModal 的提取范围失败，保留 `/tmp/typebar-friend-name-render-focused.log`、`/tmp/typebar-add-friend-source-verified.log`，按实际完整 FriendsList 函数边界修正后 `/tmp/typebar-add-friend-source-final-verified.log` 50 组通过；没有放松唯一性断言。`/tmp/typebar-friend-name-plus-red.log` 一项预期失败证明裸加号编码缺陷；编码修正曾触发 Swift 可选结构读写独占编译错误，拆成局部值后复验。最终定向 `/tmp/typebar-friend-name-final-focused.log` 原生 57 项零失败／零跳过（35.802 秒），`/tmp/typebar-friend-name-server-final-focused.log` 服务 6 项零失败／零跳过（0.101 秒）。此前运行结果不冒充最终执行。
+
+设计技能促使使用系统表单、明确文字状态与单一主操作；无上游字体／图标／样式资产或新装饰动画。生产 account-free 表单覆盖浅深色、360 窄宽、等待／就绪／既有关系／错误／发送六种离屏图，never-visible 隔离窗口不激活、回调零调用。FriendsPage 矩阵登记实际生产路径／测试符号，新增三个人工项后 1,065 项仅结构盘点；真实防抖时钟、输入／发送／关闭、sheet 生命周期、键盘／VoiceOver／真实网络与全功能无损仍待验收。零 Typebar 应用启动；整体 goal active，最终冻结门禁另记。
+
+最终冻结完整串行门禁退出 0：原生 3,611 项零失败／零跳过（853.272 秒），服务 501 项零失败／零跳过（13.113 秒）；实际十万词耐久 154.898 秒、16 项隔离磁盘冷读 6.440 秒通过。52 页面证据、1,065 人工结构、固定源码／原创边界和未启动应用包／scheme／严格签名通过。主日志 `/tmp/typebar-friend-name-complete-readiness.log`，57 份分项日志 `/tmp/typebar-friend-name-complete-logs.JDmiuB`，70 最终图 `/tmp/typebar-friend-name-complete-render.WlS3Cw`；六张新增添加表单图已逐张检查。14 份生产／测试／脚本／矩阵冻结哈希前后一致（`/tmp/typebar-friend-name-frozen.sha256`），运行期间无编辑，结束后仅补三份结果文档；固定参考仍干净且提交一致。
+
+保留既有 AddressBook／CoreData XPC 诊断和隔离只读 SwiftData store 的 513 保存诊断，不据零断言失败声称系统警告修复。没有启动 Typebar 应用、读取真实 Typebar 库／凭据、发真实关系请求或部署服务；图片／模型／拦截传输不代替真实时钟、完整 sheet 输入与提交、网络／TLS、键盘／VoiceOver 或全功能等价。原始失败、名称 schema 和原版私密屏蔽提示差异继续公开记录，人工状态不升级，整体 goal active。
+
 ## 好友统计对照、排序与资料入口增量
 
 固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`：只读核对完整 [FriendsList](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/connections/FriendsList.tsx)、DataTable、friends 查询、FriendSchema、getFriends DAL 与 aggregateWithAcceptedConnections。八列为姓名、关系修改时刻对应的时长、XP 等级、完成／开始、练习时长、连续天数、15／60 秒 PB；原版聚合加入本人对照，无 connectionId 的本人没有解除入口。好友 PB 在所有语言／配置中选最高规范 WPM，`>=` 同速取后一个完整对象，零速纪录仍可选；不是资料页摘要的严格正速／同速取先策略。

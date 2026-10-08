@@ -178,6 +178,9 @@ run_logged_check "executing pinned profile relationship and friend flag predicat
 run_logged_check "executing pinned friend comparison PB expressions and display helpers" "$temporary_directory/friend-comparison-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-friend-comparison.mjs" "$reference_root"
 
+run_logged_check "executing pinned add-friend modal and complete remote validator" "$temporary_directory/add-friend-source-check.log" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-add-friend.mjs" "$reference_root"
+
 run_logged_check "executing pinned frontend weekly time formatting" "$temporary_directory/weekly-xp-presentation-source-check.log" \
   env TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \

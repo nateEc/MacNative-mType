@@ -549,6 +549,17 @@ public func configure(
         }
     }
 
+    app.get("v1", "profiles", "resolve-name") { request async throws -> Response in
+        do {
+            let query = try request.query.decode(ProfileNameLookupQuery.self)
+            let value = try await authStore.publicProfileByDisplayName(query.name)
+            let response = Response(status: .ok)
+            try response.content.encode(value)
+            response.headers.replaceOrAdd(name: .cacheControl, value: "no-store")
+            return response
+        } catch let error as AuthStoreError { throw error.abort }
+    }
+
     app.get("v1", "profiles", ":id") { request async throws -> PublicProfileResponse in
         guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
             throw Abort(.badRequest, reason: "The profile identifier was invalid.")

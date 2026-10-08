@@ -200,6 +200,28 @@ import XCTest
     }
   }
 
+  func testProductionAddFriendFormRendersValidationFailureAndBusyWithoutRequestsOrWindowActivation() throws {
+    let target = try profile()
+    try withMount { window, host in
+      for (name, status, sending, ready, dark, width) in [
+        ("add-friend-empty-light", FriendNameStatus.idle, false, false, false, CGFloat(440)),
+        ("add-friend-checking-dark", .checking, false, false, true, 440),
+        ("add-friend-ready-light", .ready(target), false, true, false, 440),
+        ("add-friend-existing-narrow", .existing(.incomingRequest), false, false, false, 360),
+        ("add-friend-unavailable-dark", .failed(String(repeating: "隔离测试服务错误。", count: 12)), false, false, true, 360),
+        ("add-friend-sending-dark", .ready(target), true, false, true, 440)
+      ] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        var calls = 0
+        host.rootView = root(AddFriendForm(name: .constant("Owned target"), status: status, isSubmitting: sending,
+          canSubmit: ready, message: "关系读取状态来自隔离 fixture。", retry: { calls += 1 },
+          submit: { calls += 1 }, close: { calls += 1 }), width: width, padding: 0, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: width, dark: dark)
+        XCTAssertEqual(calls, 0); XCTAssertFalse(window.isVisible)
+      }
+    }
+  }
+
   func testProductionFriendComparisonRendersWideNarrowAndLegacyWithoutRequestsOrWindowActivation() throws {
     func rich(_ name: String, legacy: Bool = false) throws -> RemotePublicProfile {
       var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(profile())) as? [String: Any])

@@ -57,6 +57,9 @@ private struct ConnectionsSessionView: View {
       .navigationTitle("好友")
       .toolbar {
         ToolbarItem(placement: .primaryAction) {
+          Button("添加好友", systemImage: "person.badge.plus") { destination = .addFriend }
+            .disabled(!request.isCurrent(account) || state.isLoading || state.isMutating
+              || state.displayedSnapshot(request: request, account: account) == nil)
           Button("刷新") { refresh = UUID() }
             .disabled(!owner.isCurrent(account) || state.isLoading || state.isMutating)
         }
@@ -67,6 +70,7 @@ private struct ConnectionsSessionView: View {
     .sheet(item: $destination) { selected in
       if owner.isCurrent(account) {
         switch selected {
+        case .addFriend: AddFriendView(account: account, management: state, read: request, sent: { refresh = UUID() })
         case .conversation(let profile): DirectConversationView(profile: profile, account: account)
         case .profile(let profile): PublicProfileLoadingView(profileID: profile.id, account: account, settings: settings)
         }
@@ -109,9 +113,11 @@ private struct ConnectionsSessionView: View {
 }
 
 private enum ConnectionsDestination: Identifiable {
+  case addFriend
   case profile(RemotePublicProfile), conversation(RemotePublicProfile)
   var id: String {
     switch self {
+    case .addFriend: "addFriend"
     case .profile(let value): "profile/\(value.id)"
     case .conversation(let value): "conversation/\(value.id)"
     }

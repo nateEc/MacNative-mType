@@ -4418,6 +4418,32 @@ final class AccountSession {
         return value
     }
 
+    func resolveFriendName(_ name: String, identity: ConnectionsOwnerIdentity,
+        client: SharedProfileReadClient = .init()) async throws -> RemotePublicProfile? {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self), let name = FriendNamePolicy.normalized(name) else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        guard let base = URL(string: identity.endpoint), let scheme = base.scheme?.lowercased(),
+            ["https", "http"].contains(scheme), base.host != nil, base.user == nil, base.password == nil,
+            base.query == nil, base.fragment == nil else { throw RemoteAccountError.invalidServerURL }
+        var components = URLComponents(url: base.appendingPathComponent("v1/profiles/resolve-name"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "name", value: name)]
+        // Vapor's form query parser treats a bare plus as a space.
+        let encodedQuery = components?.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        components?.percentEncodedQuery = encodedQuery
+        guard let url = components?.url else { throw RemoteAccountError.invalidServerURL }
+        let data = try await client.data(from: url)
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        let response = try JSONDecoder.remote.decode(RemoteProfileNameLookupResponse.self, from: data)
+        guard response.version == 1, response.profile.map({ FriendNamePolicy.key($0.displayName) == FriendNamePolicy.key(name)
+            && $0.activity == nil && $0.accountStreakClaim == nil }) ?? true else {
+            throw RemoteAccountError.unexpectedResponse
+        }
+        return response.profile
+    }
+
     func loadConnectionsSearch(identity: ConnectionsOwnerIdentity,
         fetch: () async throws -> [RemotePublicProfile]) async throws -> [RemotePublicProfile] {
         try Task.checkCancellation()

@@ -2778,6 +2778,17 @@ public actor AuthStore {
     return .init(profiles: profiles)
   }
 
+  /// Exact public identity resolution, independent of substring search limits.
+  /// It neither reserves a name nor discloses private relationship information.
+  public func publicProfileByDisplayName(_ rawName: String) throws -> ProfileNameLookupResponse {
+    let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard (1...32).contains(name.count), name.rangeOfCharacter(from: .controlCharacters.union(.newlines)) == nil else {
+      throw AuthStoreError.invalidProfileSearch
+    }
+    let key = displayNameComparisonKey(name)
+    return .init(version: 1, profile: state.users.first { displayNameComparisonKey($0.displayName) == key }.map(publicProfile(for:)))
+  }
+
   public func sendConnection(_ request: ConnectionRequest, accessToken: String, now: Date = .now)
     throws -> ConnectionResponse
   {
