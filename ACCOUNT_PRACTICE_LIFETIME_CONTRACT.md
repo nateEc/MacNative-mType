@@ -1,5 +1,27 @@
 # 账户累计练习、活动与连续天数
 
+## 原生公开资料分享增量
+
+固定 UserDetails 的完整复制回调按当前站点 origin 与展示名生成公开网页链接，成功通知、失败直接提供原链接；固定 route-controller 的资料 load 强制进入资料页，queries/profile 的完整查询模块按展示名读取、缓存一小时，未找到不重试，其他失败最多三次。产品外 `check-source-profile-share.mjs` 只读执行这些实际回调／路由对象／查询模块，以明确自有剪贴板、导航、查询和 HTTP 适配器覆盖八组复制成功／失败、完整资料成功及三种 HTTP 错误、缓存与重试选择；不运行浏览器、Solid、真实剪贴板或 HTTP。首次探针的独立对象解析失败已保留，包装为表达式后执行通过，没有改参考代码。原生代码和资产仍独立编写，不带入参考实现。
+
+本人概览增加“复制公开资料链接”，包括封禁本人；只携带 HTTP(S) 服务地址和稳定 UUID，不携带姓名、邮箱、令牌或私有资料。`typebar://profile` 版本 1 严格校验字段、长度、凭据、端口、编码主机与路径；规范化主机大小写、默认端口、末尾斜线，保留反向代理前缀。这里明确适配为原生已安装应用链接，不是 Monkeytype 网站链接，也不提供未安装应用时的网页降级；稳定 UUID 避免改名失效。包含 Unicode／空格等不可分享的服务地址明确禁用复制，不偷偷换服务器。
+
+主场景使用既有 `typebar` 注册与 SwiftUI onOpenURL、已有场景 external-events 优先处理，忽略 OAuth 等非资料主机；不主动创建、激活或显示应用窗口。保护中练习或已有工作表时延后呈现，仅保留一个最新待处理链接，相同有效目标去重；现有搜索资料工作表另有手动粘贴导入，不自动读剪贴板。确认页先显示目标服务器和 UUID，用户明确确认才发匿名请求；HTTP 允许自建局域网，但警告和取消／确认固定可见，长地址正文可滚动。此接线和隔离队列测试不证明 LaunchServices、真实多窗口／sheet 通知顺序或 OAuth 回调已实机验收。
+
+分享读取与当前 AccountSession／Keychain 完全分开：临时 URLSession，清除注入的附加头、Cookie、凭据和缓存存储，GET 无认证，不跟随任何重定向，拒绝密码／客户端证书等认证挑战，系统 TLS 信任仍按默认验证，不绕过证书错误。响应字节流上限 8 MiB、请求／资源超时 15／30 秒，要求响应 URL 和 UUID 匹配；错误保留关闭及显式重试，不把搜索摘要伪装成完整资料，不自动缓存一小时或三次重试，这是显式原生网络边界而非逐控制器同构。关闭取消请求，代次守卫阻止迟到成功／错误回写。资料好友／举报入口禁用，不能借当前账户向链接内服务器发写操作；正文沿用完整公开 DTO。Discord 头像保留，以同一匿名读取器、256,000 字节上限和 image/png 请求 CDN，确认页提前披露；失败用原头像占位，不降级到共享带凭据会话。
+
+无 SwiftData／归档／服务器持久字段、接口或迁移变化，不自动切换登录或改变账户发布设置，回退只移除新入口，无数据回滚。HTTP 仅指链接解析／确认流程允许；未添加全局 ATS 例外，系统策略拒绝不安全连接时仍显示网络失败，不宣称所有局域网 HTTP 实机可用。行为先行接线一项产生六处预期失败（`/tmp/typebar-profile-share-red.log`）；第一轮实际模型／内存 URLProtocol 传输 11 项通过（0.132 秒），之后相关 41 项零失败／零跳过（19.990 秒，`/tmp/typebar-profile-share-focused.log`），其中新增会话／任务认证挑战回调检查；之后补匿名图片 Accept、预取消与固定警告，最终结果另记，不用旧绿灯证明修订。URLProtocol 不开 socket，重定向／认证委托使用未恢复任务显式调用，不冒充系统实际网络链路。
+
+最终聚焦首轮 50 项中四项失败（`/tmp/typebar-profile-share-final-focused.log`）：新完整网络 fixture 把 activity.lastDay 错写为数字，与既有服务 ISO-8601 编码不符。核对真实模型／服务编码器后只修 fixture，14 项分享模型／内存传输／委托零失败零跳过（0.131 秒，`/tmp/typebar-profile-share-fixture-verified.log`），未放宽生产契约。该 50 项运行的 39 张图保留 `/tmp/typebar-profile-share-final-focused-render.Jsy4gR`，五张新增 HTTPS／HTTP／长地址／无效／只读组件图均检查过，长地址警告已固定；不能把这次图像成功写成 50 项全通过。最终完整门禁结果另记。
+
+源码驱动、行为先行、原生设计、迁移安全及有界同会话决策／风险复核促使补齐头像匿名边界和固定警告，不是独立审查。新增三个人工项全部待验收，整体 goal active；原生链接仅完成这一增量，不代表原版全部功能已经无损。
+
+最终冻结完整串行门禁退出 0：原生 3,547 项零失败／零跳过（803.531 秒），服务 491 项零失败／零跳过（18.406 秒）。十万词耐久本轮实际执行通过（151.742 秒），16 项隔离磁盘冷读通过（6.854 秒），52 页面证据、1,050 项人工清单结构、固定参考／原创性边界、未启动的应用包、既有 `typebar` scheme 及严格签名检查通过。主日志 `/tmp/typebar-profile-share-complete-readiness.log`，54 份保留分项日志 `/tmp/typebar-profile-share-complete-logs.Dw55ks`；11 份生产／测试／QA／映射冻结哈希前后一致（`/tmp/typebar-profile-share-frozen.sha256`），门禁运行期间未编辑，结束后仅补三份文档结果。新增源码复制／路由／查询探针也包含在完整门禁中。
+
+全量套件重绘 39 张图到 `/tmp/typebar-profile-share-complete-render.uKUqxH`；五张新增分享图，以及新增复制按钮的本人浅色／封禁深色概览再次逐张检查，封禁编辑禁用但复制保留、HTTP 警告固定可见。每个渲染测试串行使用从不显示的隔离窗口并清理，无真实剪贴板、账户网络或应用激活；没有把离屏图升级为 LaunchServices／真实 sheet／辅助功能验收。之前的源码适配器解析失败与日期 fixture 失败日志均保留，不计为最终通过证据。
+
+本轮零 Typebar 应用启动、零部署、未读取真实 Typebar 数据库或 Keychain。已有系统 AddressBook／CoreData XPC 警告仍在，未检查通讯录内容或修改系统权限；不把测试通过当成该警告根因已消除。挪威大词库两项本轮分别 14.780／11.662 秒，单轮耗时不证明历史性能离群已解决。固定参考 clone 仍干净。同会话有界风险复核未发现本增量其他阻断问题；实际 URL 唤起、多窗口／工作表顺序、TLS／ATS／代理、键盘／VoiceOver／目标设备与全功能无损仍缺证，整个 goal 保持 active。
+
 ## 本人资料编辑与私有徽章增量
 
 实际读取固定 [UserDetails](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/UserDetails.tsx) 和 [EditProfileModal](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/modals/EditProfileModal.tsx)：本人页直接编辑简介、键盘、社交链接、选定徽章及公开活动，保存成功更新 snapshot／失效本人资料查询；失败不关闭或重置表单。名称／头像管理仍导向账户设置。本人徽章读取完整 inventory，而非访客披露后的子集，封禁阻止编辑而不抹掉本人库存。本增量独立实现这些用户路径，不复制 TSX、品牌徽章、图标资产或官方 ID。

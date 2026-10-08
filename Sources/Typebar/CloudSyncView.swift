@@ -1049,6 +1049,8 @@ struct PublicProfileView: View {
     let account: AccountSession
     let settings: AppSettings
     var isAccountOverview = false
+    var allowsAccountActions = true
+    var usesAnonymousMedia = false
     var editProfile: (() -> Void)? = nil
     @State private var connectionMessage: String?
     @State private var isSendingRequest = false
@@ -1080,6 +1082,10 @@ struct PublicProfileView: View {
     private var profileContent: some View {
           VStack(spacing: 20) {
             if let avatarURL = profile.discordAvatar?.cdnURL {
+              if usesAnonymousMedia {
+                SharedProfileAvatarImage(url: avatarURL)
+                  .frame(width: 54, height: 54).clipShape(Circle()).accessibilityLabel("Discord 头像")
+              } else {
                 AsyncImage(url: avatarURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
@@ -1093,6 +1099,7 @@ struct PublicProfileView: View {
                 .frame(width: 54, height: 54)
                 .clipShape(Circle())
                 .accessibilityLabel("Discord 头像")
+              }
             } else {
                 Image(systemName: "person.crop.circle.fill")
                     .font(.system(size: 54))
@@ -1104,6 +1111,7 @@ struct PublicProfileView: View {
                     editProfile?()
                 }
                 .disabled(editProfile == nil || account.isWorking || profile.accountSuspended || account.currentUser?.accountSuspended == true)
+                ProfileShareCopyButton(profileID: profile.id, account: account)
             }
             if profile.accountSuspended {
                 Label(
@@ -1227,7 +1235,7 @@ struct PublicProfileView: View {
                 : "公开资料不会包含邮箱、令牌或本地练习内容。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if !isAccountOverview, profile.id != account.currentUser?.id {
+            if allowsAccountActions, !isAccountOverview, profile.id != account.currentUser?.id {
                 HStack {
                     Button("发送好友请求") { sendRequest() }
                         .disabled(account.currentUser == nil || isSendingRequest)

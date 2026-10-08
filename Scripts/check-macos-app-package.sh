@@ -52,6 +52,8 @@ bundle_value() {
   || { print -u2 -- "package check failed: unexpected minimum macOS version"; exit 1; }
 [[ "$(bundle_value TypebarQAInMemoryStore)" == "true" ]] \
   || { print -u2 -- "package check failed: QA store marker missing"; exit 1; }
+[[ "$(bundle_value CFBundleURLTypes:0:CFBundleURLSchemes:0)" == "typebar" ]] \
+  || fail "native OAuth/profile URL scheme is missing"
 
 codesign --verify --deep --strict "$app_path"
 if [[ -n "$reference_root" ]]; then

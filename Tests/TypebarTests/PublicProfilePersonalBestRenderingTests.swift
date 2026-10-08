@@ -252,6 +252,30 @@ import XCTest
     }
   }
 
+  func testProductionSharedProfileConfirmationAndReadonlyPagesRenderWithoutNetworkOrActivation() throws {
+    try withSettings { settings in try withMount { window, host in
+      let suite = "TypebarTests.share-render.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+      defer { defaults.removePersistentDomain(forName: suite) }
+      let account = AccountSession(defaults: defaults), id = UUID()
+      for (name, server, dark) in [("profile-share-confirm-light", "https://owned.invalid/base", false),
+        ("profile-share-http-dark", "http://lan.invalid:9876/base", true),
+        ("profile-share-http-long-dark", "http://lan.invalid:9876/" + String(repeating: "long-server-prefix/", count: 70), true)] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        host.rootView = root(SharedProfileConfirmation(target: try .init(server: server, profileID: id), confirm: {}, close: {}),
+          width: 500, padding: 0, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: 500, dark: dark)
+        XCTAssertEqual(host.bounds.height, 420, accuracy: 1)
+      }
+      window.appearance = NSAppearance(named: .aqua)
+      host.rootView = root(SharedProfileLinkView(route: .init(link: "typebar://profile?bad=1"), account: account, settings: settings), width: 500, padding: 0)
+      _ = try snapshot(host, window: window, name: "profile-share-invalid-light", width: 500)
+      host.rootView = root(PublicProfileView(profile: try profile(), account: account, settings: settings,
+        allowsAccountActions: false, usesAnonymousMedia: true), padding: 0)
+      _ = try snapshot(host, window: window, name: "profile-share-readonly-light")
+      XCTAssertNil(account.currentUser); XCTAssertNil(account.statusMessage); XCTAssertFalse(account.isWorking)
+    } }
+  }
+
   func testProductionOwnerOverviewRendersWholeProfileWithoutPublicSheetFrameOrNetwork() throws {
     try withSettings { settings in try withMount { window, host in
       let suite = "TypebarTests.owner-render.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

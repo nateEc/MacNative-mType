@@ -97,6 +97,7 @@ struct ProfileSearchCommandView: View {
   @State private var isSearching = false
   @State private var message: String?
   @State private var selectedProfile: RemotePublicProfile?
+  @State private var showingProfileLinkImport = false
   @FocusState private var inputFocused: Bool
 
   private var normalizedQuery: String? { ProfileSearchCommandPolicy.normalized(query) }
@@ -117,6 +118,7 @@ struct ProfileSearchCommandView: View {
             Text("搜索会请求你已连接的自建 Typebar 服务；查询内容不会发往其他服务。")
               .font(.caption)
               .foregroundStyle(.secondary)
+            Button("打开分享的资料链接") { showingProfileLinkImport = true }
           }
         }
         .formStyle(.grouped)
@@ -163,6 +165,9 @@ struct ProfileSearchCommandView: View {
     .onAppear { inputFocused = true }
     .sheet(item: $selectedProfile) { profile in
       PublicProfileLoadingView(profileID: profile.id, account: account, settings: settings)
+    }
+    .sheet(isPresented: $showingProfileLinkImport) {
+      SharedProfileImportView(account: account, settings: settings)
     }
   }
 

@@ -19,6 +19,7 @@ struct TypebarApp: App {
   var body: some Scene {
     WindowGroup("Typebar") {
       dataStoreContent
+        .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
     }
     .windowResizability(.contentMinSize)
     .commands {
@@ -1044,6 +1045,8 @@ private struct ContentView: View {
   @State private var commandThemePreviewTarget: ThemeCommandTarget?
   @State private var quickPickerThemePreviewTarget: ThemeCommandTarget?
   @State private var showingProfileSearchCommandEditor = false
+  @State private var sharedProfileInbox = SharedProfileLinkInbox()
+  @State private var sharedProfileWindow = SharedProfileWindowHost()
   @State private var showingActiveResultTagEditor = false
   @State private var showingFontFamilyNameCommandEditor = false
   @State private var showingInstalledFontCommandPicker = false
@@ -1265,8 +1268,31 @@ private struct ContentView: View {
         session: session, settings: settings, ownerID: noQuitConfigurationLockOwnerID))
   }
 
+  private var sharedProfilePresentationAllowed: Bool {
+    settings.allowsRestartingConfigurationChange && sharedProfileWindow.canPresent
+  }
+
+  private func presentSharedProfileIfPossible() {
+    sharedProfileInbox.presentNext(allowed: sharedProfilePresentationAllowed)
+  }
+
   private var lifecycleContent: some View {
     configuredPracticeContent
+    .background(SharedProfileWindowProbe(host: sharedProfileWindow, didAttach: presentSharedProfileIfPossible)
+      .frame(width: 0, height: 0).allowsHitTesting(false).accessibilityHidden(true))
+    .onOpenURL { sharedProfileInbox.receive($0, allowed: sharedProfilePresentationAllowed) }
+    .onChange(of: settings.allowsRestartingConfigurationChange) { presentSharedProfileIfPossible() }
+    .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { notification in
+      guard notification.object as? NSWindow === sharedProfileWindow.window else { return }
+      Task { @MainActor in
+        await Task.yield()
+        presentSharedProfileIfPossible()
+      }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
+      guard notification.object as? NSWindow === sharedProfileWindow.window else { return }
+      presentSharedProfileIfPossible()
+    }
     .task { await runClock() }
     .task(id: pendingPublicationRetryTrigger) { retryPendingPublicationsIfPossible() }
     .task(id: account.resultPublicationScope) {
@@ -1569,6 +1595,9 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingProfileSearchCommandEditor) {
       ProfileSearchCommandView(account: account, settings: settings)
+    }
+    .sheet(item: $sharedProfileInbox.presented, onDismiss: presentSharedProfileIfPossible) { route in
+      SharedProfileLinkView(route: route, account: account, settings: settings)
     }
     .sheet(isPresented: $showingActiveResultTagEditor) {
       ActiveResultTagEditor(currentTags: settings.activeResultTags) { tag in

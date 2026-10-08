@@ -1,6 +1,10 @@
 # 官方页面与模态能力审计
 
-本人资料编辑增量：AccountPage 的编辑入口与 AccountSettingsPage 共用 `AccountProfileEditor.swift`，EditProfileModal 现在登记实际草稿／保存／会话／失败／生产输入保留证据，不再只借显示名测试代替编辑器。本人全部徽章来自匹配登录 UUID 的私有库存，访客仍只读取公开 DTO。见 [资料编辑合同](ACCOUNT_PRACTICE_LIFETIME_CONTRACT.md)。分享接收与服务器确认、连续提示／等级细节、真实 sheet／网络／VoiceOver 仍缺，整个账户页与 goal 保持部分覆盖／active。以下“本人编辑／徽章尚缺”为历史范围，不能据本次增量宣称整体完成。
+本阶段补本人公开资料分享：复制成功／失败备用链接、既有原生 URL 注册的接收与手动导入、保护中练习／已有工作表延后、显式确认服务器后独立匿名读取、同边界 Discord 头像和只读动作限制。固定源码完整复制回调、实际资料路由与完整查询模块已在自有适配器下执行，不冒称浏览器／Solid；稳定 UUID 原生链接、手动重试而非一小时缓存／三次自动重试是明确适配，不提供未安装应用的网页降级。正文／头像不读取当前令牌，不切服务，不跟随重定向；持久化结构与服务接口未变。详见 [原生公开资料分享增量](ACCOUNT_PRACTICE_LIFETIME_CONTRACT.md)。52 页面矩阵为 AccountPage／ProfilePage／ProfileSearchPage 补生产路径与实际测试符号；新增三个人工项后 1,050 项仍仅结构盘点。LaunchServices、完整窗口、真实网络／TLS／代理、键盘／VoiceOver／设备仍待验收，零应用启动，整体 goal active。
+
+分享增量最终完整串行门禁通过：原生 3,547／服务 491 项零失败零跳过，本轮实际十万词耐久 151.742 秒通过；16 磁盘冷读、52 页面证据、1,050 人工项结构与未启动应用包／scheme／签名／原创边界通过，11 冻结哈希一致。54 分项日志、39 最终图（新增五张及本人复制入口两张均复查）、已修正探针／fixture 失败与遗留系统警告见分享合同。人工状态不升级，整体 goal active。
+
+本人资料编辑增量：AccountPage 的编辑入口与 AccountSettingsPage 共用 `AccountProfileEditor.swift`，EditProfileModal 现在登记实际草稿／保存／会话／失败／生产输入保留证据，不再只借显示名测试代替编辑器。本人全部徽章来自匹配登录 UUID 的私有库存，访客仍只读取公开 DTO。见 [资料编辑合同](ACCOUNT_PRACTICE_LIFETIME_CONTRACT.md)。分享接收与服务器确认由本次增量补齐接线及隔离证据，实际系统接收仍待验；连续提示／等级细节、真实 sheet／网络／VoiceOver 仍缺，整个账户页与 goal 保持部分覆盖／active。以下“本人编辑／徽章尚缺”为历史范围，不能据本次增量宣称整体完成。
 
 本增量最终相关 36 项零失败零跳过，完整门禁原生 3,532 项零失败／一个可选耐久跳过、服务 491 项零失败零跳过，随后同一冻结代码的显式十万词耐久一项通过（145.616 秒）。52 页面证据和 1,047 人工项仅结构核对；34 张最终组件图中新增五张编辑图已检查，十个实现／测试／门禁哈希一致，53 份日志、未启动应用包／签名和原创边界通过。源码对照仅实际表单配置及完整提交回调，不冒称 Solid／表单验证器／浏览器等价；人工状态不升级。
 
@@ -42,7 +46,7 @@
 | `leaderboards` | `CloudSyncView.swift`、`LeaderboardParameterFilter.swift`、`LeaderboardPagination.swift`、`LeaderboardRankStanding.swift` | 已覆盖。全局／好友 WPM 和 XP 范围、个人名次与隐身选择均是原生界面与自建 API。 |
 | `about`／版本历史 | `AboutTypebar.swift`、`ReleaseHistory.swift`、`PublicPracticeStatistics.swift` | 已覆盖，以 Typebar 自己的产品资料、许可和版本信息取代参考品牌内容；About 打开时还可无令牌读取自建服务的匿名全局练习总览与 English 60 秒个人最佳速度分布。旧服务不可用时明确降级，不使用本机成绩伪造全局数据；完整来源、隐私与验收见 [OFFICIAL_PUBLIC_PRACTICE_STATISTICS_AUDIT.md](OFFICIAL_PUBLIC_PRACTICE_STATISTICS_AUDIT.md)。 |
 | `login` | `PreferencesView.swift`、`OAuthWebAuthenticationSession.swift`、`RemoteHumanVerification.swift` | 已覆盖。完整配置自建 Turnstile 后，密码注册、OAuth 新用户注册及密码重置请求会通过系统认证会话完成一次性验证；未配置旧服务保留已有请求契约并如实报告能力未启用。 |
-| `404` | 无 URL 路由 | 不适用。原生应用没有用户可访问的网页路由；导航错误由本机命令和工作表状态处理。 |
+| `404` | 无网页路由；原生资料链接有独立校验 | 网页 404 不适用。原生资料链接错误由本机工作表显示关闭／重试，不伪造网页导航。 |
 
 固定参考还会在活动长测试离开网页前阻止关闭。Typebar 以 `WindowCloseProtection.swift` 的 AppKit 窗口代理和应用退出状态机表达相同的用户保护：仅活动、未完成且达到既有长测试阈值的练习会显示原生确认；取消保留当前窗口和输入，确认才关闭或退出。代理会转发 SwiftUI 已安装的窗口委托；应用委托则按 AppKit 的 `terminateLater`／回复协议以一个工作表汇总任一主窗口的活动长测试，确认退出不会再触发窗口级工作表；若没有可见的受保护窗口，改用应用级确认以避免确认不可见。短、未开始、完成和放弃的练习照常关闭或退出。实际窗口代理、应用退出与工作表交互列为 `TST-WIN-CLOSE-01` 的手工验收。
 
