@@ -19,13 +19,13 @@ struct LocalNoticeStack: View {
           VStack(alignment: .leading, spacing: 6) {
             Label(notice.entry.title, systemImage: notice.systemImage)
               .font(.caption.weight(.semibold)).foregroundStyle(notice.entry.level.color)
-            Text(verbatim: notice.entry.message).font(.callout).fixedSize(horizontal: false, vertical: true)
+            LocalNoticeMessageView(entry: notice.entry).font(.callout)
           }
           .frame(maxWidth: .infinity, alignment: .leading).padding(14)
           .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
           .overlay(alignment: .leading) { Capsule().fill(notice.entry.level.color).frame(width: 3).padding(.vertical, 10) }
         }.buttonStyle(.plain).help("关闭这条临时通知；历史仍保留")
-          .accessibilityLabel("\(notice.entry.title)：\(notice.entry.message)。关闭通知。")
+          .accessibilityLabel("\(notice.entry.title)：\(LocalNoticeMessagePresentation.make(notice.entry.message, containsHTML: notice.entry.containsHTML).text)。关闭通知。")
       }
     }.frame(width: 340)
   }
@@ -71,8 +71,7 @@ struct LocalNoticeHistoryContent: View {
             Image(systemName: entry.level.systemImage).foregroundStyle(entry.level.color)
             VStack(alignment: .leading, spacing: 6) {
               Text(verbatim: entry.title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-              Text(verbatim: entry.message).font(.body).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-              if entry.containsHTML { Text("包含网页格式，按原始文本显示。").font(.caption).foregroundStyle(.secondary) }
+              LocalNoticeMessageView(entry: entry).font(.body).textSelection(.enabled)
             }.frame(maxWidth: .infinity, alignment: .leading)
             if entry.details != nil {
               Button("复制详情", systemImage: "doc.on.doc") { copy(entry) }

@@ -117,8 +117,9 @@ struct TestConfigurationShareView: View {
   let currentPreset: SavedTestPreset
   let legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback?
   let challengeLibrary: [TypebarChallenge]
-  let onLoadChallenge: (TypebarChallenge) -> Void
-  let onApply: (SavedTestPreset) -> Void
+  let notices: LocalNoticeCenter
+  let onLoadChallenge: (TypebarChallenge) -> TestConfigurationApplyOutcome
+  let onApply: (SavedTestPreset) -> SavedTestPreset?
     @State private var pastedLink = ""
     @State private var status: String?
 
@@ -128,12 +129,14 @@ struct TestConfigurationShareView: View {
     currentPreset: SavedTestPreset,
     legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback? = nil,
     challengeLibrary: [TypebarChallenge] = [],
-    onLoadChallenge: @escaping (TypebarChallenge) -> Void = { _ in },
-    onApply: @escaping (SavedTestPreset) -> Void
+    notices: LocalNoticeCenter,
+    onLoadChallenge: @escaping (TypebarChallenge) -> TestConfigurationApplyOutcome = { _ in .rejected },
+    onApply: @escaping (SavedTestPreset) -> SavedTestPreset?
   ) {
     self.currentPreset = currentPreset
     self.legacyCustomTextFallback = legacyCustomTextFallback
     self.challengeLibrary = challengeLibrary
+    self.notices = notices
     self.onLoadChallenge = onLoadChallenge
     self.onApply = onApply
   }
@@ -176,33 +179,17 @@ struct TestConfigurationShareView: View {
 
     private func copyCurrentLink() {
         guard let currentLink else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(currentLink, forType: .string)
-        status = "测试链接已复制。"
+        status = TestConfigurationShareActions.copy(currentLink, notices: notices) { value in
+            NSPasteboard.general.clearContents()
+            return NSPasteboard.general.setString(value, forType: .string)
+        }
     }
 
     private func applyPastedLink() {
-        do {
-            let trimmed = pastedLink.trimmingCharacters(in: .whitespacesAndNewlines)
-            let preset: SavedTestPreset
-            if URLComponents(string: trimmed)?.scheme?.lowercased() == "typebar" {
-                preset = try TestConfigurationShare.preset(from: trimmed)
-            } else {
-                if let challenge = try LegacyChallengeLinkImporter.challenge(
-                    from: trimmed, challenges: challengeLibrary)
-                {
-                    onLoadChallenge(challenge)
-                    dismiss()
-                    return
-                }
-                preset = try LegacyTestSettingsLinkImporter.preset(
-                    from: trimmed, current: currentPreset,
-                    customTextFallback: legacyCustomTextFallback)
-            }
-            onApply(preset)
-            dismiss()
-        } catch {
-            status = (error as? LocalizedError)?.errorDescription ?? "无法导入该测试链接。"
-        }
+        let result = TestConfigurationShareActions.apply(pastedLink, current: currentPreset,
+            customTextFallback: legacyCustomTextFallback, challenges: challengeLibrary,
+            notices: notices, applyPreset: onApply, loadChallenge: onLoadChallenge)
+        status = result.status
+        if result.shouldDismiss { dismiss() }
     }
 }

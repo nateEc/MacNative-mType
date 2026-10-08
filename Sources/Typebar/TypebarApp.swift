@@ -1537,7 +1537,7 @@ private struct ContentView: View {
       }
       presentQueuedReferenceScriptImport()
     }) {
-      ChallengeLibraryView(onSelect: loadChallenge)
+      ChallengeLibraryView(onSelect: { _ = loadChallenge($0) })
     }
     .sheet(isPresented: $showingReferenceScriptImport, onDismiss: {
       pendingReferenceScriptChallenge = nil
@@ -1722,6 +1722,10 @@ private struct ContentView: View {
       Text("符合保存资格且开启保存时，中止结果会进入本机历史；不计入 PB 或挑战，发布需服务支持中止协议并通过独立校验。")
     }
     .sheet(isPresented: $showingTestShare, onDismiss: {
+      if queuedOneHandedChallengeSetup {
+        queuedOneHandedChallengeSetup = false
+        showingOneHandedChallengeSetup = true
+      }
       presentQueuedReferenceScriptImport()
     }) {
       TestConfigurationShareView(
@@ -1734,8 +1738,12 @@ private struct ContentView: View {
             ? customTextSectionLimit : nil,
           ordering: customTextOrdering, pipeDelimiter: customTextPipeDelimiter),
         challengeLibrary: TypebarChallengeLibrary.all,
+        notices: account.localNotices,
         onLoadChallenge: loadChallenge
-      ) { apply($0) }
+      ) { preset in
+        guard apply(preset) else { return nil }
+        return presetDefinition
+      }
     }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
@@ -3637,7 +3645,9 @@ private struct ContentView: View {
   private func selectMode(_ requested: TestMode) -> Bool {
     guard acceptsRestartingConfigurationChange() else { return false }
     guard TestModifierPolicy.acceptsModeSelection(requested, modifiers: settings.testModifiers) else {
-      modeCompatibilityMessage = "当前修饰器不支持“\(requested.displayName)”模式；请先关闭不兼容的趣味模式。"
+      let message = "当前修饰器不支持“\(requested.displayName)”模式；请先关闭不兼容的趣味模式。"
+      modeCompatibilityMessage = message
+      ConfigurationNoticeFeedback.conflict(message, notices: account.localNotices)
       return false
     }
     modeCompatibilityMessage = nil
@@ -3651,7 +3661,7 @@ private struct ContentView: View {
     guard FunboxForcedContentOptionsPolicy.accepts(
       requested, modifiers: settings.testModifiers)
     else {
-      funboxConfigurationMessage = "当前趣味模式要求关闭标点或数字；请先关闭对应选项。"
+      reportFunboxConfigurationConflict("当前趣味模式要求关闭标点或数字；请先关闭对应选项。")
       return false
     }
     funboxConfigurationMessage = nil
@@ -3671,21 +3681,26 @@ private struct ContentView: View {
 
   private func acceptsFunboxConfiguration(_ modifiers: [TestModifier]) -> Bool {
     guard TestModifierPolicy.acceptsModeSelection(mode, modifiers: modifiers) else {
-      funboxConfigurationMessage = "当前模式不支持这个趣味模式；请先切换到兼容模式。"
+      reportFunboxConfigurationConflict("当前模式不支持这个趣味模式；请先切换到兼容模式。")
       return false
     }
     guard FunboxForcedContentOptionsPolicy.accepts(contentOptions, modifiers: modifiers) else {
-      funboxConfigurationMessage = "当前标点或数字设置不支持这个趣味模式；请先关闭对应选项。"
+      reportFunboxConfigurationConflict("当前标点或数字设置不支持这个趣味模式；请先关闭对应选项。")
       return false
     }
     guard FunboxForcedContentOptionsPolicy.accepts(
       promptHighlightMode: settings.promptHighlightMode, modifiers: modifiers)
     else {
-      funboxConfigurationMessage = "当前提示高亮范围不支持这个趣味模式；请改为“当前字符”或“关闭”。"
+      reportFunboxConfigurationConflict("当前提示高亮范围不支持这个趣味模式；请改为“当前字符”或“关闭”。")
       return false
     }
     funboxConfigurationMessage = nil
     return true
+  }
+
+  private func reportFunboxConfigurationConflict(_ message: String) {
+    funboxConfigurationMessage = message
+    ConfigurationNoticeFeedback.conflict(message, notices: account.localNotices)
   }
 
   private var restartInstruction: String {
@@ -4570,7 +4585,11 @@ private struct ContentView: View {
       return
     }
     if let target = FunboxCommandCatalog.target(for: item.id) {
-      guard acceptsRestartingConfigurationChange() else { return }
+      guard acceptsRestartingConfigurationChange() else {
+        ConfigurationNoticeFeedback.conflict("锁定重开已开启：请完成或放弃本次测试。",
+          notices: account.localNotices, locked: true)
+        return
+      }
       switch target {
       case .polyglot:
         activeChallengeID = nil
@@ -4590,8 +4609,8 @@ private struct ContentView: View {
            !TestModifierPolicy.acceptsInteractiveModifierAddition(
              modifier, to: settings.testModifiers)
         {
-          funboxConfigurationMessage =
-            "\(modifier.displayName) 与当前趣味修饰器组合不兼容；已保留现有选择。"
+          reportFunboxConfigurationConflict(
+            "\(modifier.displayName) 与当前趣味修饰器组合不兼容；已保留现有选择。")
           return
         }
         guard let updated = FunboxCommandPolicy.updatedModifiers(
@@ -4975,15 +4994,14 @@ private struct ContentView: View {
     )
   }
 
-  private func apply(
+  @discardableResult private func apply(
     _ preset: SavedTestPreset,
     overwritesParameterMemory: Bool = true,
     appliesGlobalSettings: Bool = true,
     polyglotReturnLanguage: TypingLanguage? = nil
-  ) {
-    guard acceptsRestartingConfigurationChange() else { return }
-    guard preset.settingGroups?.isEmpty != true else { return }
-    practiceReturnPreset = nil
+  ) -> Bool {
+    guard acceptsRestartingConfigurationChange() else { return false }
+    guard preset.settingGroups?.isEmpty != true else { return false }
     let appliesTest = !preset.isPartial || (preset.settingGroups?.contains(.test) == true)
     let appliedPreset = PresetApplicationPolicy.applying(current: presetDefinition, preset: preset)
     let challenge = appliesTest
@@ -4992,14 +5010,15 @@ private struct ContentView: View {
       WingdingsChallengeFont.resolve(size: 12) == nil
     {
       fontFamilyCommandMessage = "此 Mac 未提供 Wingdings 字体，无法开始该挑战。"
-      return
+      return false
     }
     if let specification = challenge?.requirements.referenceScriptSpecification,
       activeVerifiedScript?.specification != specification
     {
       referenceScriptMessage = "请从挑战库选择脚本并重新导入固定版本文本。"
-      return
+      return false
     }
+    practiceReturnPreset = nil
     referenceScriptMessage = nil
     if let activeVerifiedScript,
       challenge?.requirements.referenceScriptSpecification
@@ -5086,6 +5105,7 @@ private struct ContentView: View {
       ensureSelectedQuote()
     }
     reset()
+    return true
   }
 
   private func restoreActiveTestSelection(_ document: ActiveTestSelectionDocument) {
@@ -5176,8 +5196,8 @@ private struct ContentView: View {
     self.activeVerifiedScript = nil
   }
 
-  private func loadChallenge(_ challenge: TypebarChallenge) {
-    guard acceptsRestartingConfigurationChange() else { return }
+  @discardableResult private func loadChallenge(_ challenge: TypebarChallenge) -> TestConfigurationApplyOutcome {
+    guard acceptsRestartingConfigurationChange() else { return .rejected }
     if challenge.requirements.referenceScriptSpecification != nil {
       pendingReferenceScriptChallenge = challenge
       if showingChallenges || showingTestShare || showingCommandPalette {
@@ -5185,19 +5205,19 @@ private struct ContentView: View {
       } else {
         showingReferenceScriptImport = true
       }
-      return
+      return .requiresSetup
     }
     if challenge.id == "one-handed-bandit" {
-      if showingChallenges {
+      if showingChallenges || showingTestShare {
         queuedOneHandedChallengeSetup = true
       } else {
         showingOneHandedChallengeSetup = true
       }
-      return
+      return .requiresSetup
     }
     var preset = challenge.preset
     preset.configuration = preset.configuration.with(challengeID: challenge.id)
-    apply(preset)
+    return apply(preset) ? .applied : .rejected
   }
 
   private func presentQueuedReferenceScriptImport() {

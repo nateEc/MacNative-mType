@@ -64,6 +64,17 @@ enum LegacyTestSettingsLinkImporter {
   static func preset(
     from link: String, current: SavedTestPreset, customTextFallback: CustomTextFallback? = nil
   ) throws -> SavedTestPreset {
+    try importedPreset(from: link, current: current, customTextFallback: customTextFallback).preset
+  }
+
+  struct ImportedPreset {
+    let preset: SavedTestPreset
+    let noticeFields: [TestConfigurationNoticeField]
+  }
+
+  static func importedPreset(
+    from link: String, current: SavedTestPreset, customTextFallback: CustomTextFallback? = nil
+  ) throws -> ImportedPreset {
     let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.count <= maximumURLLength,
           let components = URLComponents(string: trimmed),
@@ -80,7 +91,8 @@ enum LegacyTestSettingsLinkImporter {
     else { throw ImportError.invalidLink }
 
     let payload = try parse(array, current: current)
-    return try apply(payload, to: current, customTextFallback: customTextFallback)
+    let fields = TestConfigurationNoticeField.allCases.filter { !(array[$0.rawValue] is NSNull) }
+    return .init(preset: try apply(payload, to: current, customTextFallback: customTextFallback), noticeFields: fields)
   }
 
   private static func parse(_ values: [Any], current: SavedTestPreset) throws -> Payload {

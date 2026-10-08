@@ -255,6 +255,28 @@ import XCTest
     }
   }
 
+  func testProductionKnownHTMLAndConfigurationNoticesRenderWithoutOpeningLinksOrWindows() throws {
+    try withMount { window, host in
+      let center = LocalNoticeCenter(); defer { center.clearAll() }
+      center.post("已应用自有配置：<br /><br />模式：words<br />标点：关闭<br />文字：&lt;br&gt; &amp; &#39; &#x2F; &#x60;",
+        level: .success, options: .init(durationMilliseconds: 0, containsHTML: true))
+      center.post("自有未支持格式：<b>保持原始文本</b>", options: .init(durationMilliseconds: 0, containsHTML: true))
+      var calls = 0
+      for (name, dark) in [("notice-format-history-light", false), ("notice-format-history-narrow-dark", true)] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        host.rootView = root(LocalNoticeHistoryContent(entries: Array(center.history.reversed()), copy: { _ in calls += 1 }),
+          width: 360, padding: 0, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: 360, dark: dark)
+      }
+      for (name, dark) in [("notice-format-stack-light", false), ("notice-format-stack-dark", true)] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        host.rootView = root(LocalNoticeStack(center: center, focused: false), width: 360, padding: 10, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: 360, dark: dark)
+      }
+      XCTAssertEqual(calls, 0); XCTAssertFalse(window.isVisible)
+    }
+  }
+
   func testProductionFriendComparisonRendersWideNarrowAndLegacyWithoutRequestsOrWindowActivation() throws {
     func rich(_ name: String, legacy: Bool = false) throws -> RemotePublicProfile {
       var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(profile())) as? [String: Any])

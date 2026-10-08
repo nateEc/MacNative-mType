@@ -1,5 +1,29 @@
 # 原生奖励收件箱与周任务交付
 
+## 配置通知、已知换行格式与应用确认增量
+
+固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整读取通知状态／两处展示、[URL 配置加载函数](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/controllers/url-handler.tsx)、[配置 setters](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/config/setters.ts)、escapeHTML／字符串帮助函数及开发通知回调。固定版本 `useInnerHtml: true` 文本盘点仅三处：URL 配置摘要、趣味拒绝、开发通知；实际格式是转义文字加 br。不是一般富文本链接需求的穷尽证明，动态／未来调用仍开放。
+
+原创 LocalNoticeMessagePresentation／View 在主堆栈和历史共用：br／br/／br / 转原生换行，大小写 BR 可识别；按固定 escapeHTML 的七种输出一次解码，转义出的尖括号不二次解释，原始消息／JSON 复制不变。未标记保持 Text(verbatim:) 纯文本；未知标签、属性或未闭合标签整条原样回退并说明，不半解析、不解释 Markdown、不执行脚本、样式、URL、附件或资源，也不使用 WebView／HTML document importer。它补齐已知生产格式，不声称支持所有 HTML 实体、空白折叠、标签或浏览器布局。设计技能选择保持既有系统材质／文字层级，真正的换行承载摘要结构，不添装饰和外部字体／CSS／资产。
+
+TestConfigurationShareActions 是分享工作表实际使用的同步生产动作：复制检查真实 BOOL；导入继续用现有自有／网页离线解码器，原生 apply 返回确认 Bool，挑战返回 applied／requiresSetup／rejected。只确认应用后发 10 秒成功摘要；拒绝保留窗口并重要提示，格式错误只发固定本地化消息。摘要只保留选择元数据，不记录链接、主机、压缩数据、自定义正文、令牌或 Error 对象。网页全空字段仍执行应用／重开但不制造摘要，部分字段按八槽位原序列举；解码仍原子，旧 preset API 转发新增本机字段掩码，不改变 Codable／归档／偏好／SwiftData／网络协议或真实数据。
+
+原版 loadTestSettingsFromUrl 不检查各 setConfig Bool，可能描述尝试的字段；QA 显式执行返回 false 的适配器证明该函数仍发布成功。原生主窗口 apply 确认 Bool 后，分享回调返回实际应用快照或 nil，成功摘要只读取实际快照而非请求值；这是明确的真实性适配，不冒称逐项错误处理与原版完全相同。第二轮有界审查的请求 60 秒／实际规范化 30 秒反例，在 `/tmp/typebar-configuration-notices-canonical-red.log` 一项两处预期失败（0.645 秒），已改用实际快照并保留反例。自有链接摘要列完整本机测试选择，网页摘要只列非 null 字段；数值／标签为原生本地化，外部引语身份、原有严格接纳与 LZ 格式兼容限制仍沿用既有合同。
+
+趣味组合、模式、标点／数字与高亮拒绝保留原内联说明，并由实际 ConfigurationNoticeFeedback 发 5 秒普通通知；趣味命令遇锁定发 3 秒重要通知，专注时可见。挑战选择不冒称已经开始：脚本和单手后续设置给 requiresSetup，分享关闭后排队展示，普通挑战以实际 apply 结果为准。此次同会话有界决策／风险复核（非独立）发现旧 apply 在字体／脚本拒绝前清掉 practiceReturnPreset，已移到全部拒绝预检之后；静态顺序守卫只证明代码排序，不冒称主窗口状态／工作表已经人工运行。
+
+行为先行 `/tmp/typebar-configuration-notices-red.log` 一项三处预期失败（0.738 秒）仅证明三个生产入口缺失；编译后接线两项通过。新行为用实际 helper、原生链接和网页 LZ 解码器、应用／拒绝／后续设置回调、隐私与原始详情等断言验证。原生 48 项首轮中一个 unexpected 是 QA 自定义文本给成 string，固定 results.ts:54–58 要求非空 string[]；改夹具而不改产品解码，失败保存在 `/tmp/typebar-configuration-notices-focused.log`。改后模型相关 30 项零失败零跳过（0.474 秒）；新增反馈 helper／预检顺序后的最终集中验证另记。
+
+QA-only check-source-configuration-notices.mjs 从只读固定源码执行完整 loadTestSettingsFromUrl、toggleFunbox、开发通知回调以及完整 findGetParameter／escapeHTML／camelCaseToWords／capitalizeFirstLetter。8 组原 URL 分支、拒绝 setter 分支、锁定／冲突分支和 9 组格式化消息与原生对照；真实 lz-ts 1.1.2 来自固定锁文件，仅安装隔离 QA 路径、禁生命周期脚本、不入产品。配置、schema、事件、重开和通知收集仍为自有适配器，不运行实际 Zod、Solid、DOM、HTTP、计时、设备剪贴板或上游整套构建。首轮跨 vm 原型严格比较、函数名前缀误选和回调闭合边界三次 QA 失败分别保留 source.log／source-verified.log／source-final-verified.log（共同前缀 `/tmp/typebar-configuration-notices-`）；修正适配器精确边界，不改生产逻辑或放宽字段断言，最终 source-final.log 通过。Swift 6.2.4／SDK 26.2、Node v22.22.1 已实测；不把执行源码测试等同复用上游实现进产品。
+
+实际快照修正前 `/tmp/typebar-configuration-notices-verified.log` 集中 50 项零失败零跳过（38.084 秒），18 项离屏 37.529 秒；四张新增浅深色堆栈／窄内容历史已逐张检查。它仅是前一修订结果，不用旧绿灯支持新代码。最终快照回调修订后 `/tmp/typebar-configuration-notices-canonical-verified.log` 集中 51 项零失败零跳过（38.628 秒），含配置通知 12、接线／顺序 3、原通知 12、离屏 18、旧链接／趣味回归 6；离屏 38.093 秒。完整冻结门禁另记。
+
+最终冻结完整门禁 `/tmp/typebar-configuration-notices-complete-readiness.log` 退出 0：客户端 3,641 项零失败零跳过（827.896 秒）、服务 501 项零失败零跳过（12.623 秒），十万词耐久实际执行 150.767 秒，16 隔离磁盘冷读 7.231 秒。固定参考／元数据、53 有界表面／原生文件／测试符号、1,071 人工结构与未启动应用包／scheme／严格签名／原创资源边界全部通过。12 个实现／测试／脚本／矩阵冻结哈希 `/tmp/typebar-configuration-notices-frozen.sha256` 前后一致，之后只补三份结果文档，不更改已测代码。
+
+最终 58 日志保存在 `/tmp/typebar-configuration-notices-complete-logs.1ooJv5`，79 张图在 `/tmp/typebar-configuration-notices-complete-render.LoR3V5`；四张新增浅深色堆栈／窄内容历史已逐张复查。不可见串行隔离窗口不激活；历史 360 宽仅是内容组件，不冒称外层 minWidth=420 的真实工作表。已知 macOS CoreData／AddressBook XPC、隔离只读 SwiftData 513、Node 实验性诊断及早期编译 actor-isolation 警告保留，没有声称修复；红测和 QA 失败记录不覆盖。真实点击／关闭／滚动／剪贴板、锁定／字体拒绝、脚本／单手工作表排队、主窗口返回状态、多窗口、键盘／VoiceOver 与 HTTP 仍未人工验收，三项状态不升级。零 Typebar 应用启动，工作区未触及真实账户／库／凭据或部署。
+
+53 表面分类不变，仅扩充 AlertsPopup 生产路径与测试符号；新增三个人工项后 1,071 仍仅结构盘点。全部通知生产者、通用 HTML／链接、原版鼠标专注控制器、动画、完整 Alerts 同屏、多窗口、真实字体／脚本／工作表、网络、键盘／VoiceOver 仍待补齐或验证。无凭据读取、真实账户／数据库访问、部署、后台任务或 Typebar 应用启动；整体 goal active。
+
 ## 本机会话通知与历史增量
 
 固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`：只读核对完整 [通知状态模块](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/states/notifications.ts)、error utility、Notifications overlay、NotificationHistory／AlertsPopup 和收件箱 claimRewards。原版临时通知最新在前，历史保留最后 25 条并逆序显示；notice／success 默认 3,000 ms、error 默认不自动关闭，正时长加 250 ms 退出余量，关闭原因 click／timeout／clear。临时关闭不删历史，专注时只留 important，两条以上可见零时长通知才有全部关闭，截图隐藏，详情复制 title／message／details JSON。这不是现有社交通知列表或奖励邮件的另一名称。

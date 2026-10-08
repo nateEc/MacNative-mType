@@ -184,6 +184,15 @@ run_logged_check "executing pinned add-friend modal and complete remote validato
 run_logged_check "executing complete pinned notification state and timeout callback" "$temporary_directory/local-notices-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-local-notices.mjs" "$reference_root"
 
+config_link_source_dependencies="${TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES:-$temporary_directory/config-link-source-runtime}"
+if [[ ! -f "$config_link_source_dependencies/node_modules/lz-ts/package.json" ]]; then
+  run_logged_check "preparing pinned QA-only configuration link compression" "$temporary_directory/config-link-source-runtime.log" \
+    npm install --prefix "$config_link_source_dependencies" --ignore-scripts --no-save --package-lock=false lz-ts@1.1.2
+fi
+run_logged_check "executing complete pinned configuration notification producers" "$temporary_directory/configuration-notices-source-check.log" \
+  env TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES="$config_link_source_dependencies" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-configuration-notices.mjs" "$reference_root"
+
 run_logged_check "executing pinned frontend weekly time formatting" "$temporary_directory/weekly-xp-presentation-source-check.log" \
   env TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \
@@ -350,6 +359,7 @@ run_logged_check "preparing isolated historical disk model writers" "$temporary_
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
 run_logged_check "running native client test suite" "$temporary_directory/client-tests.log" \
   env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_REFERENCE_ROOT="$reference_root" \
+  TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES="$config_link_source_dependencies" \
   TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   TYPEBAR_INBOX_SOURCE_PACKAGE="$inbox_source_package" \
   TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE="$daily_trend_source_archive" \
