@@ -4389,68 +4389,150 @@ final class AccountSession {
         return response
     }
 
-    func connections() async throws -> [RemoteConnection] {
-        let token = try accessToken()
-        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
-            path: "v1/connections", method: "GET", token: token,
-            body: Optional<String>.none, response: RemoteConnectionsResponse.self
-        )
-        return response.connections
+    func fetchConnectionsSnapshot(identity: ConnectionsReadIdentity) async throws -> ConnectionsSnapshot {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        let token = try accessToken(), api = RemoteAccountAPI(endpoint: identity.owner.endpoint)
+        let rows = try await api.request(path: "v1/connections", method: "GET", token: token,
+            body: Optional<String>.none, response: RemoteConnectionsResponse.self)
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        let blocks = try await api.request(path: "v1/blocks", method: "GET", token: token,
+            body: Optional<String>.none, response: RemoteBlockedUsersResponse.self)
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        return .init(connections: rows.connections, blockedProfiles: blocks.profiles)
     }
 
-    func sendConnection(to recipientID: UUID) async throws -> RemoteConnection {
-        let owner = AccountProfileEditIdentity(account: self)
+    func loadConnectionsSnapshot(identity: ConnectionsReadIdentity,
+        fetch: () async throws -> ConnectionsSnapshot) async throws -> ConnectionsSnapshot {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self), let ownerID = identity.owner.owner.scope?.userID else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        let value = try await fetch()
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        try value.validate(ownerID: ownerID)
+        return value
+    }
+
+    func loadConnectionsSearch(identity: ConnectionsOwnerIdentity,
+        fetch: () async throws -> [RemotePublicProfile]) async throws -> [RemotePublicProfile] {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        let values = try await fetch()
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        return values
+    }
+
+    func searchConnectionsProfiles(query: String, identity: ConnectionsOwnerIdentity) async throws -> [RemotePublicProfile] {
+        try await loadConnectionsSearch(identity: identity) {
+            try Task.checkCancellation()
+            guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+            let response = try await RemoteAccountAPI(endpoint: identity.endpoint).request(
+                path: "v1/profiles", method: "GET", token: nil, body: Optional<String>.none,
+                queryItems: [URLQueryItem(name: "query", value: query), URLQueryItem(name: "limit", value: "20")],
+                response: RemotePublicProfileSearchResponse.self)
+            return response.profiles
+        }
+    }
+
+    func loadConnectionsMutation(identity: ConnectionsReadIdentity,
+        submit: () async throws -> Void) async throws {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        try await submit()
+        try Task.checkCancellation()
+        // Successful mutations themselves update the relationship revision.
+        guard identity.owner.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+    }
+
+    func performConnectionsMutation(_ action: ConnectionsMutation, identity: ConnectionsReadIdentity) async throws {
+        try await loadConnectionsMutation(identity: identity) {
+            switch action {
+            case .send(let id): _ = try await sendConnection(to: id, identity: identity)
+            case .accept(let id): _ = try await acceptConnection(from: id, identity: identity)
+            case .remove(let id): try await removeConnection(with: id, identity: identity)
+            case .block(let id): try await blockUser(id, identity: identity)
+            case .unblock(let id): try await unblockUser(id, identity: identity)
+            }
+        }
+    }
+
+    func sendConnection(to recipientID: UUID, identity: ConnectionsReadIdentity) async throws -> RemoteConnection {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        let owner = identity.owner.owner
         let token = try accessToken()
-        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+        let response = try await RemoteAccountAPI(endpoint: identity.owner.endpoint).request(
             path: "v1/connections", method: "POST", token: token,
             body: RemoteConnectionRequest(recipientID: recipientID), response: RemoteConnection.self
         )
+        try Task.checkCancellation()
+        guard identity.owner.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        guard response.id == recipientID, response.profile.id == recipientID,
+            response.relation == .outgoingRequest else { throw RemoteAccountError.unexpectedResponse }
         noteProfileRelationshipsChanged(identity: owner)
         return response
     }
 
-    func acceptConnection(from requesterID: UUID) async throws -> RemoteConnection {
-        let owner = AccountProfileEditIdentity(account: self)
+    func acceptConnection(from requesterID: UUID, identity: ConnectionsReadIdentity) async throws -> RemoteConnection {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        let owner = identity.owner.owner
         let token = try accessToken()
-        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+        let response = try await RemoteAccountAPI(endpoint: identity.owner.endpoint).request(
             path: "v1/connections/\(requesterID.uuidString)/accept", method: "POST", token: token,
             body: Optional<String>.none, response: RemoteConnection.self
         )
+        try Task.checkCancellation()
+        guard identity.owner.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        guard response.id == requesterID, response.profile.id == requesterID,
+            response.relation == .friend else { throw RemoteAccountError.unexpectedResponse }
         noteProfileRelationshipsChanged(identity: owner)
         return response
     }
 
-    func removeConnection(with otherUserID: UUID) async throws {
-        let owner = AccountProfileEditIdentity(account: self)
+    func removeConnection(with otherUserID: UUID, identity: ConnectionsReadIdentity) async throws {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        let owner = identity.owner.owner
         let token = try accessToken()
-        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+        let response = try await RemoteAccountAPI(endpoint: identity.owner.endpoint).request(
             path: "v1/connections/\(otherUserID.uuidString)", method: "DELETE", token: token,
             body: Optional<String>.none, response: RemoteConnectionRemovalResponse.self
         )
+        try Task.checkCancellation()
+        guard identity.owner.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
         guard response.removed else { throw RemoteAccountError.unexpectedResponse }
         noteProfileRelationshipsChanged(identity: owner)
     }
 
-    func blockUser(_ otherUserID: UUID) async throws {
-        let owner = AccountProfileEditIdentity(account: self)
+    func blockUser(_ otherUserID: UUID, identity: ConnectionsReadIdentity) async throws {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        let owner = identity.owner.owner
         let token = try accessToken()
-        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+        let response = try await RemoteAccountAPI(endpoint: identity.owner.endpoint).request(
             path: "v1/blocks/\(otherUserID.uuidString)", method: "POST", token: token,
             body: Optional<String>.none, response: RemoteConnectionRemovalResponse.self
         )
+        try Task.checkCancellation()
+        guard identity.owner.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
         guard response.removed else { throw RemoteAccountError.unexpectedResponse }
         noteProfileRelationshipsChanged(identity: owner)
     }
 
-    func blockedUsers() async throws -> [RemotePublicProfile] {
+    func unblockUser(_ otherUserID: UUID, identity: ConnectionsReadIdentity) async throws {
+        try Task.checkCancellation()
+        guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
+        let owner = identity.owner.owner
         let token = try accessToken()
-        return try await RemoteAccountAPI(endpoint: endpoint).request(path: "v1/blocks", method: "GET", token: token, body: Optional<String>.none, response: RemoteBlockedUsersResponse.self).profiles
-    }
-
-    func unblockUser(_ otherUserID: UUID) async throws {
-        let owner = AccountProfileEditIdentity(account: self)
-        let token = try accessToken()
-        let response = try await RemoteAccountAPI(endpoint: endpoint).request(path: "v1/blocks/\(otherUserID.uuidString)", method: "DELETE", token: token, body: Optional<String>.none, response: RemoteConnectionRemovalResponse.self)
+        let response = try await RemoteAccountAPI(endpoint: identity.owner.endpoint).request(path: "v1/blocks/\(otherUserID.uuidString)", method: "DELETE", token: token, body: Optional<String>.none, response: RemoteConnectionRemovalResponse.self)
+        try Task.checkCancellation()
+        guard identity.owner.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
         guard response.removed else { throw RemoteAccountError.unexpectedResponse }
         noteProfileRelationshipsChanged(identity: owner)
     }

@@ -159,6 +159,42 @@ import XCTest
     }
   }
 
+  func testProductionFriendsManagerRendersRelationsUnknownAndBusyWithoutRequestsOrWindowActivation() throws {
+    func profile(_ name: String) throws -> RemotePublicProfile {
+      try JSONDecoder().decode(RemotePublicProfile.self, from: JSONSerialization.data(withJSONObject: [
+        "id": UUID().uuidString, "displayName": name, "joinedAt": 0, "completedResultCount": 12, "bestWPM": 80]))
+    }
+    let incoming = try profile("收到请求 · 自有测试"), outgoing = try profile("已发送 · 自有测试"),
+      friend = try profile("已有好友 · 自有测试"), blocked = try profile("已屏蔽 · 自有测试"), new = try profile("新用户 · 自有测试")
+    let full = ConnectionsSnapshot(connections: [(incoming, RemoteConnectionRelation.incomingRequest),
+      (outgoing, .outgoingRequest), (friend, .friend)].map {
+        .init(id: $0.0.id, profile: $0.0, relation: $0.1, updatedAt: .init(timeIntervalSince1970: 1))
+      }, blockedProfiles: [blocked])
+    let empty = ConnectionsSnapshot(connections: [], blockedProfiles: [])
+    try withMount { window, host in
+      for (name, value, searchResults, loading, sending, dark, height) in [
+        ("manager-empty-light", Optional(empty), [RemotePublicProfile](), false, false, false, CGFloat(760)),
+        ("manager-relations-light", full, [], false, false, false, 1050),
+        ("manager-relations-dark", full, [], false, false, true, 1050),
+        ("manager-loading-dark", nil, [], true, false, true, 420),
+        ("manager-unknown-narrow", nil, [new], false, false, false, 620),
+        ("manager-sending-dark", empty, [new], false, true, true, 900),
+        ("manager-search-known-light", full, [incoming, outgoing, friend, blocked, new], false, false, false, 1600)
+      ] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        var calls = 0
+        host.rootView = root(ConnectionsManagementContent(ownerID: UUID(), snapshot: value, searchResults: searchResults,
+          isLoading: loading, isSearching: false, isMutating: sending,
+          message: name == "manager-unknown-narrow" ? "操作未确认，服务端可能已收到；请刷新关系后再操作。" + String(repeating: "隔离测试中的长网络错误。", count: 8) : nil,
+          searchMessage: searchResults.isEmpty ? "没有匹配的公开展示名。" : "找到 \(searchResults.count) 位用户。",
+          query: .constant("自有测试"), search: { calls += 1 }, action: { _ in calls += 1 }, conversation: { _ in calls += 1 })
+          .frame(height: height), width: 440, padding: 8, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: 440, dark: dark)
+        XCTAssertEqual(calls, 0); XCTAssertFalse(window.isVisible)
+      }
+    }
+  }
+
   func testProductionRelationshipStatesRenderWithoutRequestsOrWindowActivation() throws {
     try withMount { window, host in
       for (name, status, sending, dark) in [

@@ -1,5 +1,27 @@
 # 账户累计练习、活动与连续天数
 
+## 好友管理作用域与操作生命周期增量
+
+只读核对固定 [FriendsPage／PendingRequests／FriendsList](https://github.com/monkeytypegame/monkeytype/tree/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/connections)、完整 connections 集合、friends 查询和后端 connections 控制器。原版收到请求可接受／拒绝／屏蔽，添加前排除本人和既有 pending／accepted／blocked，解除好友需确认；原生此前搜索结果无条件可添加，读取与任务没有账户生命周期保护。本增量保留收到、已发、好友、本人屏蔽四区以及全部已有操作和消息入口，补添加可用性、解除确认和私有状态边界，不复制上游代码／图标／资产。
+
+`ConnectionsOwnerIdentity` 固定原始 endpoint、标准化账户范围和会话／服务器 ABA 代次；关系读取另固定内存关系修订和显式刷新 UUID。实际页面按 owner 身份重建私有状态；读取 `.task(id:)` 随关系操作更新，搜索输入改变取消旧等待并退休搜索 nonce；关闭取消页面拥有的搜索／提交等待。任务 nonce 防旧清理影响新任务，读取 generation 防同一 request 的迟到成功／失败覆盖较新读取。展示只接受当前范围和读身份，旧账户好友、屏蔽、搜索及提示不用于新页面。普通相同用户资料刷新不重建草稿／页面。
+
+实际认证 GET 在一次捕获 endpoint／令牌下串行读取既有 connections／blocks；两次读取不是事务快照，本人屏蔽优先于旧关系，重复身份／本人关系行等非法快照报错。部分失败、旧服务缺接口和未知响应不显示为空关系，不保留可写旧列表。搜索沿用公开展示名查询，独立捕获服务器，不带认证；规范化使用现有 2–40 字符策略，无结果、重复结果和失败不伪造成员关系。本人和已知屏蔽不出现在可操作搜索结果，其他已知关系显示方向／好友说明，不重复添加。
+
+五类提交按当前快照校验方向和对象，并在页面内互斥；未知、加载中、过期读身份或另一个提交时，提供者不被调用。真实网络方法自身在凭据读取前检查完整 read 身份，捕获该 endpoint，返回后检查取消与 owner 范围；send／accept 还要求回应为目标 UUID 和预期方向。成功仍通过既有 scoped 关系修订通知其他资料页，并刷新当前页；自己的成功改关系修订不是账户切换。取消／超时／丢失响应明确“可能已收到”，退休结果确认前开始的读取，必须后续刷新才恢复操作，不自动重试、不声称服务器回滚。跨页面或跨设备同时操作最终仍由自建服务裁决，不宣称本机互斥是分布式事务或幂等提交。
+
+接口路径、请求／响应体、服务数据、SwiftData 和归档格式均不变；核对原生所有调用者后移除不再被页面使用的两条无作用域读方法，五条内部写方法要求显式读身份，防未来漏传守卫。旧客户端／服务契约不变，代码回退无数据迁移，但已提交的服务操作不回滚。本轮不部署、不读写真实关系／Keychain／Typebar 数据库。源码驱动、行为先行、原生设计、迁移安全及三轮有界同会话决策／风险复核促使下沉实际请求守卫、区分认证与关系修订并退休不确定结果前的读取；非独立审查。设计沿用系统字体、语义色和分组表单，以关系方向作为结构；窄窗把资料与动作分行，未知错误提供刷新方向，不另造品牌资产或装饰动效。
+
+先行静态接线一项四处预期失败（0.570 秒，`/tmp/typebar-connections-management-red.log`）；旧 SwiftUI 私有状态无可注入提供者，故不把这项冒称旧运行时复现。新状态随后用实际 Swift 模型和自有异步提供者覆盖作用域／ABA、迟到成功与失败、双击／冲突操作、五类动作、取消和提交不确定性、搜索变更。首次编译因测试数组夹具漏 `try` 失败，保留 `/tmp/typebar-connections-management-focused.log`；仅修语法后 27 项两处失败源于切服务器按既有逻辑退出登录、后续夹具漏恢复用户，保留 `/tmp/typebar-connections-management-fixture-verified.log`。核对真实 setter 后只修 fixture，27 项零失败零跳过（0.504 秒，`/tmp/typebar-connections-management-verified.log`），未放宽生产守卫。下沉请求守卫后 43 项零失败零跳过（30.453 秒，`/tmp/typebar-connections-management-final-focused.log`）；最后真实写方法要求 read 修订后结果另记，旧绿灯不替代最终修订。
+
+复用固定完整 hasConnection／按钮谓词／好友标记探针的 20 组实际输出，与管理页添加可用性逐组对照；适配器边界仍是自有集合／认证／props，不执行 TanStack DB／Solid／浏览器／上游乐观事务／HTTP。七张生产表单图只证明隔离离屏布局，无请求、点击、显示或激活窗口，解除确认弹层本轮未真实点击。新增三个场景均待验收，总 1,059 人工项仅结构盘点。好友完整列（时长、等级、连续、15／60 秒 PB、关系日期）、排序和资料跳转仍缺，原版自己行／状态的展示适配也需继续核对；消息页面内部网络生命周期、真实跨窗口／网络／VoiceOver／目标设备、主题精确身份及离线备份等仍开放。后文关于好友页守卫缺口为历史阶段，本增量只补上述作用域路径，绝不据此宣称 FriendsPage 或全功能无损完成，goal active。
+
+真实写方法要求 read 修订后的相关 44 项零失败零跳过（30.475 秒，`/tmp/typebar-connections-management-scope-verified.log`）。随后对照旧页补回搜索“无匹配／找到数量”，与关系警告分开保存／展示，避免搜索成功或错误覆盖提交不确定警告；输入／身份变化仍退休旧反馈。增加回归后相关 45 项零失败零跳过（30.302 秒，`/tmp/typebar-connections-management-feedback-verified.log`），其中 17 项管理模型／实际入口提前拒绝／固定源码对照、14 项既有资料关系及 14 项生产组件渲染。七张新增图已查看，最终完整门禁另记。Swift 6.2.4／已安装 SwiftUICore 接口核对双参数 onChange 自 macOS 14 可用，平台下限保持 14；不根据最新网络文档改写既有 SwiftUI 路径。
+
+最终冻结完整串行门禁退出 0：原生 3,592 项零失败／零跳过（811.409 秒），服务 495 项零失败／零跳过（12.121 秒）；实际十万词耐久 158.545 秒、16 项隔离磁盘冷读 3.320 秒通过。52 页面证据、1,059 人工结构、固定源码／原创边界及未启动应用包／scheme／严格签名通过。主日志 `/tmp/typebar-connections-management-complete-readiness.log`，55 份分项日志 `/tmp/typebar-connections-management-complete-logs.QsVlqk`，60 最终图 `/tmp/typebar-connections-management-complete-render.K6Jaij`；七张新增表单图已逐张复查，包括补回后的搜索反馈和不确定操作警告。6 份生产／测试／矩阵冻结哈希前后一致（`/tmp/typebar-connections-management-frozen.sha256`），运行中未编辑，结束后仅补三份结果文档。
+
+源码 20 组对照执行的是完整实际资料页按钮／hasConnection／好友标记模块；不能冒称已执行完整 FriendsList 添加模态、展示名远程验证或上游 UI。既有服务接受／移除／屏蔽边界测试为 AuthStore 级证据，不升级成客户端实际 HTTP 链路验收。系统 AddressBook／CoreData XPC 警告及临时隔离只读 PB／归档 store 的保存诊断仍保留，不声称根因消失；单次耗时也不证明性能离群已解决。同会话有界风险复核未发现本增量其他阻断项，非独立评审。真实 SwiftUI scope 重建、确认弹层、跨页／网络／键盘／VoiceOver／设备与完整朋友表列／排序／资料跳转、消息内部生命周期和全功能无损仍缺证，人工项不升级、goal active。零 Typebar 应用启动、零部署，无真实 Typebar 数据库／Keychain／账户读取或修改。
+
 ## 公开资料关系与重复请求抑制增量
 
 固定源码 [ActionButtons／AvatarAndName](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/UserDetails.tsx)、[connections 集合](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/collections/connections.ts) 和 user-flag-controller 表明：只有已认证、非本人、没有任何已知关系时显示添加入口；已接受关系才显示好友标记，待处理或 blocked 不冒充好友。原生此前无条件显示发送按钮，本增量以独立 Swift 状态／系统 Label 和 Button 补齐。待处理方向分开显示，并指引既有好友页接受／拒绝；已有好友、自己已屏蔽、加载／未知／失败不提供重复发送。举报入口继续保留。本人概览、本人公开页、未登录及匿名只读分享不读取登录关系；匿名分享仍不构造这一组件，不借当前令牌跨服读取。

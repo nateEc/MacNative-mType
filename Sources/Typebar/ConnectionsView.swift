@@ -1,204 +1,214 @@
 import SwiftUI
 
 enum ConnectionActionPolicy {
-    static func canReject(_ relation: RemoteConnectionRelation) -> Bool {
-        relation == .incomingRequest
-    }
+  static func canReject(_ relation: RemoteConnectionRelation) -> Bool { relation == .incomingRequest }
 }
 
 struct ConnectionsView: View {
-    @Environment(\.dismiss) private var dismiss
-    let account: AccountSession
-    @State private var connections: [RemoteConnection] = []
-    @State private var blockedProfiles: [RemotePublicProfile] = []
-    @State private var isLoading = false
-    @State private var message: String?
-    @State private var searchQuery = ""
-    @State private var searchResults: [RemotePublicProfile] = []
-    @State private var isSearching = false
-    @State private var selectedConversation: RemotePublicProfile?
+  let account: AccountSession
+  var body: some View {
+    let owner = ConnectionsOwnerIdentity(account: account)
+    ConnectionsSessionView(account: account, owner: owner).id(owner)
+  }
+}
 
-    private var incoming: [RemoteConnection] { connections.filter { $0.relation == .incomingRequest } }
-    private var outgoing: [RemoteConnection] { connections.filter { $0.relation == .outgoingRequest } }
-    private var friends: [RemoteConnection] { connections.filter { $0.relation == .friend } }
-    private var visibleSearchResults: [RemotePublicProfile] {
-        let blockedIDs = Set(blockedProfiles.map(\.id))
-        return searchResults.filter { $0.id != account.currentUser?.id && !blockedIDs.contains($0.id) }
-    }
+private struct ConnectionsSessionView: View {
+  @Environment(\.dismiss) private var dismiss
+  let account: AccountSession
+  let owner: ConnectionsOwnerIdentity
+  @State private var state = ConnectionsManagementState()
+  @State private var refresh = UUID()
+  @State private var searchQuery = ""
+  @State private var searchTask: Task<Void, Never>?
+  @State private var searchTaskID: UUID?
+  @State private var mutationTask: Task<Void, Never>?
+  @State private var mutationTaskID: UUID?
+  @State private var selectedConversation: RemotePublicProfile?
+  private var readIdentity: ConnectionsReadIdentity { .init(owner: owner, account: account, refresh: refresh) }
 
-    var body: some View {
-        NavigationStack {
-            Form {
-                if account.currentUser == nil {
-                    Text("请先在“设置 → 自建账户”中登录，才能管理好友关系。")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Section("寻找用户") {
-                        TextField("按公开展示名搜索（至少 2 个字符）", text: $searchQuery)
-                        Button("搜索用户", action: search)
-                            .disabled(isSearching || searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
-                        if isSearching { ProgressView() }
-                        ForEach(visibleSearchResults) { profile in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(profile.displayName)
-                                    Text(profileSummary(profile))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Button("添加好友") { sendRequest(to: profile) }
-                                Button("屏蔽", role: .destructive) { block(profile) }
-                            }
-                        }
-                    }
-                    Section("收到的请求") {
-                        rows(incoming, empty: "没有待处理的好友请求。", buttonTitle: "接受", action: accept)
-                    }
-                    Section("已发送") {
-                        rows(outgoing, empty: "没有已发送的好友请求。", buttonTitle: "取消", action: remove)
-                    }
-                    Section("好友") {
-                        rows(friends, empty: "还没有好友。可在排行榜的资料卡中发送请求。", buttonTitle: "解除", action: remove)
-                    }
-                    Section("已屏蔽") {
-                        if blockedProfiles.isEmpty {
-                            Text("没有已屏蔽用户。") .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(blockedProfiles) { profile in
-                                HStack {
-                                    Text(profile.displayName)
-                                    Spacer()
-                                    Button("解除屏蔽") { unblock(profile) }
-                                }
-                            }
-                        }
-                    }
-                    if isLoading { ProgressView() }
-                    if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
-                }
-            }
-            .navigationTitle("好友")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("刷新", action: load).disabled(account.currentUser == nil || isLoading)
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("完成") { dismiss() }
-                }
-            }
-        }
-        .frame(minWidth: 440, minHeight: 360)
-        .sheet(item: $selectedConversation) { profile in
-            DirectConversationView(profile: profile, account: account)
-        }
-        .task { if account.currentUser != nil { await loadAsync() } }
-    }
-
-    @ViewBuilder
-    private func rows(_ values: [RemoteConnection], empty: String, buttonTitle: String, action: @escaping (RemoteConnection) -> Void) -> some View {
-        if values.isEmpty {
-            Text(empty).foregroundStyle(.secondary)
+  var body: some View {
+    let request = readIdentity
+    NavigationStack {
+      Group {
+        if owner.isCurrent(account), let ownerID = owner.owner.scope?.userID {
+          ConnectionsManagementContent(ownerID: ownerID,
+            snapshot: state.displayedSnapshot(request: request, account: account),
+            searchResults: state.displayedSearch(owner: owner, account: account),
+            isLoading: state.request != request || state.isLoading,
+            isSearching: state.isSearching, isMutating: state.isMutating,
+            message: state.request == request ? state.message : nil,
+            searchMessage: state.displayedSearchMessage(owner: owner, account: account), query: $searchQuery,
+            search: { search() }, action: { mutate($0, request: request) },
+            conversation: { profile in
+              guard state.canPerform(.remove(profile.id), request: request, account: account),
+                state.displayedSnapshot(request: request, account: account)?.status(for: profile.id) == .friend else { return }
+              selectedConversation = profile
+            })
         } else {
-            ForEach(values) { connection in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(connection.profile.displayName)
-                        Text(profileSummary(connection.profile))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(buttonTitle) { action(connection) }
-                    if ConnectionActionPolicy.canReject(connection.relation) {
-                        Button("拒绝", role: .destructive) { remove(connection) }
-                    }
-                    if connection.relation == .friend {
-                        Button("消息") { selectedConversation = connection.profile }
-                    }
-                    Button("屏蔽", role: .destructive) { block(connection.profile) }
-                }
+          Text("请先在“设置 → 自建账户”中登录，才能管理好友关系。")
+            .foregroundStyle(.secondary).padding()
+        }
+      }
+      .navigationTitle("好友")
+      .toolbar {
+        ToolbarItem(placement: .primaryAction) {
+          Button("刷新") { refresh = UUID() }
+            .disabled(!owner.isCurrent(account) || state.isLoading || state.isMutating)
+        }
+        ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } }
+      }
+    }
+    .frame(minWidth: 440, minHeight: 360)
+    .sheet(item: $selectedConversation) { profile in
+      if owner.isCurrent(account) { DirectConversationView(profile: profile, account: account) }
+    }
+    .task(id: request) {
+      await state.load(request: request, account: account) { try await account.fetchConnectionsSnapshot(identity: request) }
+    }
+    .onChange(of: searchQuery) { _, _ in
+      searchTask?.cancel(); searchTask = nil; searchTaskID = nil; state.clearSearch()
+    }
+    .onDisappear { cancelTasks() }
+  }
+
+  private func search() {
+    guard searchTask == nil, owner.isCurrent(account) else { return }
+    let token = UUID(), query = searchQuery; searchTaskID = token
+    searchTask = Task { @MainActor in
+      defer { if searchTaskID == token { searchTask = nil; searchTaskID = nil } }
+      await state.search(query: query, owner: owner, account: account) {
+        try await account.searchConnectionsProfiles(query: $0, identity: owner)
+      }
+    }
+  }
+  private func mutate(_ action: ConnectionsMutation, request: ConnectionsReadIdentity) {
+    guard mutationTask == nil else { return }
+    let token = UUID(); mutationTaskID = token
+    mutationTask = Task { @MainActor in
+      defer { if mutationTaskID == token { mutationTask = nil; mutationTaskID = nil } }
+      let confirmed = await state.perform(action, request: request, account: account) {
+        try await account.performConnectionsMutation(action, identity: request)
+      }
+      if confirmed, owner.isCurrent(account) { refresh = UUID() }
+    }
+  }
+  private func cancelTasks() {
+    searchTask?.cancel(); searchTask = nil; searchTaskID = nil
+    mutationTask?.cancel(); mutationTask = nil; mutationTaskID = nil
+  }
+}
+
+/// Production form without account/network ownership, for isolated layout QA.
+struct ConnectionsManagementContent: View {
+  let ownerID: UUID
+  let snapshot: ConnectionsSnapshot?
+  let searchResults: [RemotePublicProfile]
+  let isLoading: Bool
+  let isSearching: Bool
+  let isMutating: Bool
+  let message: String?
+  var searchMessage: String? = nil
+  @Binding var query: String
+  let search: () -> Void
+  let action: (ConnectionsMutation) -> Void
+  let conversation: (RemotePublicProfile) -> Void
+  @State private var pendingRemoval: UUID?
+
+  private func can(_ action: ConnectionsMutation) -> Bool {
+    !isLoading && !isMutating && snapshot?.allows(action, ownerID: ownerID) == true
+  }
+  var body: some View {
+    Form {
+      Section("寻找用户") {
+        TextField("按公开展示名搜索（2–40 个字符）", text: $query)
+        Button("搜索用户", action: search)
+          .disabled(isSearching || isMutating || ProfileSearchCommandPolicy.normalized(query) == nil)
+        if isSearching { ProgressView("正在搜索用户…") }
+        if let searchMessage { Text(searchMessage).font(.caption).foregroundStyle(.secondary) }
+        ForEach(searchResults.filter { $0.id != ownerID && snapshot?.blockedIDs.contains($0.id) != true }) { profile in
+          VStack(alignment: .leading, spacing: 6) {
+            profileSummary(profile)
+            HStack {
+              if let status = snapshot?.status(for: profile.id), status != .notConnected {
+                Text(statusText(status)).font(.caption).foregroundStyle(.secondary)
+              } else {
+                Button("添加好友") { action(.send(profile.id)) }.disabled(!can(.send(profile.id)))
+              }
+              Spacer()
+              Button("屏蔽", role: .destructive) { action(.block(profile.id)) }.disabled(!can(.block(profile.id)))
             }
+          }
         }
-    }
-
-    private func load() { Task { await loadAsync() } }
-
-    private func profileSummary(_ profile: RemotePublicProfile) -> String {
-        let consistency = profile.highestConsistency.formatted(
-            .number.precision(.fractionLength(0...2)))
-        return "最佳 \(profile.bestSpeedText) WPM · \(consistency)% 稳定 · \(profile.completedResultCount) 次完成 · \(profile.startedTestCount) 次开始"
-    }
-
-    private func loadAsync() async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            connections = try await account.connections()
-            blockedProfiles = try await account.blockedUsers()
-            message = connections.isEmpty ? "没有好友关系。" : "已加载 \(connections.count) 条好友关系。"
-        } catch {
-            message = error.localizedDescription
+      }
+      if let snapshot {
+        Section("收到的请求") { rows(snapshot, relation: .incomingRequest, empty: "没有待处理的好友请求。") }
+        Section("已发送") { rows(snapshot, relation: .outgoingRequest, empty: "没有已发送的好友请求。") }
+        Section("好友") { rows(snapshot, relation: .friend, empty: "还没有好友。可搜索公开展示名发送请求。") }
+        Section("已屏蔽") {
+          if snapshot.blockedProfiles.isEmpty { Text("没有已屏蔽用户。").foregroundStyle(.secondary) }
+          ForEach(snapshot.blockedProfiles) { profile in
+            HStack {
+              Text(profile.displayName)
+              Spacer()
+              Button("解除屏蔽") { action(.unblock(profile.id)) }.disabled(!can(.unblock(profile.id)))
+            }
+          }
         }
+      } else if !isLoading {
+        Text("当前好友关系未知。请刷新后再管理请求、好友或屏蔽。").foregroundStyle(.secondary)
+      }
+      if isLoading { ProgressView("正在读取好友关系…") }
+      if isMutating {
+        Text("正在提交。关闭只会取消等待，服务端可能已收到操作；重新打开后请刷新确认。")
+          .font(.caption).foregroundStyle(.secondary)
+      }
+      if let message { Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
     }
-
-    private func accept(_ connection: RemoteConnection) {
-        Task {
-            do {
-                _ = try await account.acceptConnection(from: connection.profile.id)
-                await loadAsync()
-            } catch { message = error.localizedDescription }
+    .formStyle(.grouped)
+    .confirmationDialog("解除好友关系？", isPresented: Binding(get: { pendingRemoval != nil },
+      set: { if !$0 { pendingRemoval = nil } })) {
+      if let id = pendingRemoval {
+        Button("解除好友关系", role: .destructive) { if can(.remove(id)) { action(.remove(id)) }; pendingRemoval = nil }
+      }
+      Button("取消", role: .cancel) { pendingRemoval = nil }
+    }
+  }
+  @ViewBuilder private func rows(_ snapshot: ConnectionsSnapshot, relation: RemoteConnectionRelation, empty: String) -> some View {
+    let values = snapshot.visibleConnections.filter { $0.relation == relation }
+    if values.isEmpty { Text(empty).foregroundStyle(.secondary) }
+    ForEach(values) { row in
+      VStack(alignment: .leading, spacing: 6) {
+        profileSummary(row.profile)
+        HStack {
+          if relation == .incomingRequest {
+            Button("接受") { action(.accept(row.profile.id)) }.disabled(!can(.accept(row.profile.id)))
+            Button("拒绝", role: .destructive) { action(.remove(row.profile.id)) }.disabled(!can(.remove(row.profile.id)))
+          } else if relation == .outgoingRequest {
+            Button("取消请求") { action(.remove(row.profile.id)) }.disabled(!can(.remove(row.profile.id)))
+          } else {
+            Button("解除") { pendingRemoval = row.profile.id }.disabled(!can(.remove(row.profile.id)))
+            Button("消息") { conversation(row.profile) }.disabled(!can(.remove(row.profile.id)))
+          }
+          Spacer()
+          Button("屏蔽", role: .destructive) { action(.block(row.profile.id)) }.disabled(!can(.block(row.profile.id)))
         }
+      }
     }
-
-    private func remove(_ connection: RemoteConnection) {
-        Task {
-            do {
-                try await account.removeConnection(with: connection.profile.id)
-                await loadAsync()
-            } catch { message = error.localizedDescription }
-        }
+  }
+  private func profileSummary(_ profile: RemotePublicProfile) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(profile.displayName)
+      Text("最佳 \(profile.bestSpeedText) WPM · \(profile.highestConsistency.formatted(.number.precision(.fractionLength(0...2))))% 稳定 · \(profile.completedResultCount) 次完成 · \(profile.startedTestCount) 次开始")
+        .font(.caption).foregroundStyle(.secondary)
     }
-
-    private func search() {
-        Task {
-            isSearching = true
-            defer { isSearching = false }
-            do {
-                searchResults = try await account.searchPublicProfiles(query: searchQuery)
-                message = searchResults.isEmpty ? "没有匹配的公开展示名。" : "找到 \(searchResults.count) 位用户。"
-            } catch { message = error.localizedDescription }
-        }
+  }
+  private func statusText(_ status: ProfileRelationshipStatus) -> String {
+    switch status {
+    case .outgoingRequest: "已发送请求，等待对方接受"
+    case .incomingRequest: "已收到请求，可在下方接受或拒绝"
+    case .friend: "你们已是好友"
+    case .blocked: "你已屏蔽此用户"
+    default: "当前关系未知，请刷新"
     }
-
-    private func sendRequest(to profile: RemotePublicProfile) {
-        Task {
-            do {
-                _ = try await account.sendConnection(to: profile.id)
-                message = "已向 \(profile.displayName) 发送好友请求。"
-                await loadAsync()
-            } catch { message = error.localizedDescription }
-        }
-    }
-
-    private func block(_ profile: RemotePublicProfile) {
-        Task {
-            do {
-                try await account.blockUser(profile.id)
-                searchResults.removeAll { $0.id == profile.id }
-                message = "已屏蔽 \(profile.displayName)，并移除了已有好友关系或请求。"
-                await loadAsync()
-            } catch { message = error.localizedDescription }
-        }
-    }
-
-    private func unblock(_ profile: RemotePublicProfile) {
-        Task {
-            do {
-                try await account.unblockUser(profile.id)
-                await loadAsync()
-                message = "已解除对 \(profile.displayName) 的屏蔽。"
-            } catch { message = error.localizedDescription }
-        }
-    }
+  }
 }
