@@ -1,0 +1,8 @@
+{
+  "referenceCommit": "91bd24bb8513785c7364cbea29296ff7adafac41",
+  "cssHash": "b4caa684bfc4e265f463be27942fcf0989bbfaf8dd6f3ad0a4e94d9741e38bd9",
+  "method": "2026-10-08 hidden IAB Chromium 154 local QA page; actual pinned keyframes and animation shorthand, paused CSSAnimation.currentTime and computed opacity; no original assets, no product web runtime",
+  "timesMilliseconds": [0,100,250,499,500,501,505,509,510,750,999,1000,1250,1505,1750,2000],
+  "smooth": [0,0.295244,0.802403,0.999998,1,0.999181,0.995512,0.991199,0.990018,0.197597,0.00000213589,0,0.802403,0.995512,0.197597,0],
+  "hard": [1,1,1,1,1,0.905204,0.197597,0.00568352,0,0,0,1,1,0.197597,0,1]
+}

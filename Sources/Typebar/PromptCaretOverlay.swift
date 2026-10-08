@@ -555,6 +555,7 @@ struct PromptCaretOverlay: NSViewRepresentable {
   var latestInput: (() -> PromptCaretInputIdentity)? = nil
   var latestGlyphID: (() -> Int?)? = nil
   var latestRendering: (() -> PromptRendering)? = nil
+  var mainPresentation: (() -> PromptCaretBlinkPresentation)? = nil
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
@@ -568,7 +569,7 @@ struct PromptCaretOverlay: NSViewRepresentable {
       frameRate: animationFrameRate, attemptID: attemptID, coordinator: coordinator,
       firstRetainedWordIndex: firstRetainedWordIndex,
       latestInput: latestInput, latestGlyphID: latestGlyphID,
-      latestRendering: latestRendering, paceFrame: paceFrame))
+      latestRendering: latestRendering, paceFrame: paceFrame, mainPresentation: mainPresentation))
   }
 
   static func dismantleNSView(_ view: PromptCaretNativeView, coordinator: ()) {

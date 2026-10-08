@@ -29,6 +29,7 @@ final class PromptCaretNativeView: NSView {
     var latestGlyphID: (() -> Int?)? = nil
     var latestRendering: (() -> PromptRendering)? = nil
     var paceFrame: (() -> PromptPaceCaretInterpolation?)? = nil
+    var mainPresentation: (() -> PromptCaretBlinkPresentation)? = nil
   }
 
   private var configuration: Configuration?
@@ -43,6 +44,7 @@ final class PromptCaretNativeView: NSView {
   private var measuredWidth: CGFloat = 0
   private var needsPosition = true
   private var needsSnap = true
+  private var blinkClock = PromptCaretBlinkClock()
 
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -55,6 +57,7 @@ final class PromptCaretNativeView: NSView {
     let restarted = old?.attemptID != next.attemptID || old?.coordinator !== next.coordinator
     next.coordinator.prepare(attemptID: next.attemptID)
     if layoutChanged || restarted || styleChanged {
+      if restarted { blinkClock = .init() }
       // A new marker or style does not own the sibling's running words tween.
       // prepare handles real attempt changes; only geometry invalidates both.
       if layoutChanged { next.coordinator.resetLayout() }
@@ -101,6 +104,7 @@ final class PromptCaretNativeView: NSView {
     paceTimer?.invalidate(); paceTimer = nil
     configuration?.coordinator.cancelCarets(at: ProcessInfo.processInfo.systemUptime)
     configuration = nil
+    blinkClock = .init()
   }
 
   private func scheduleTimer() {
@@ -156,8 +160,11 @@ final class PromptCaretNativeView: NSView {
       needsPosition = false; needsSnap = false
     }
     let paceFrame = requestPacePosition(at: time)
+    let opacity = blinkClock.opacity(at: time, presentation: config.mainPresentation?() ?? .init(),
+      motion: config.motion, reducesMotion: config.reducesMotion)
     paint(coordinator.documentRect(isPace: false), style: config.mainStyle,
       accent: config.accent, rightToLeft: config.rightToLeft, isPace: false, host: &mainHost)
+    mainHost?.alphaValue = opacity
     paint(paceFrame == nil && config.paceOffset == nil ? nil : coordinator.documentRect(isPace: true),
       style: config.paceStyle, accent: config.accent.opacity(0.72), rightToLeft: config.rightToLeft,
       isPace: true, host: &paceHost)

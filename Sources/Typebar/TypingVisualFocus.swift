@@ -5,6 +5,8 @@ import Observation
 /// The scheduler is a native next-turn boundary, not a browser frame clock.
 @MainActor @Observable final class TypingVisualFocus {
   private(set) var isFocused = false
+  private(set) var caretIsBlinking = true
+  private(set) var caretBlinkRevision: UInt64 = 0
   @ObservationIgnored private var generation: UInt64 = 0
   @ObservationIgnored private var hasQueuedCommit = false
   @ObservationIgnored private let schedule: (@escaping @MainActor () -> Void) -> Void
@@ -27,12 +29,33 @@ import Observation
       guard let self, self.generation == ticket else { return }
       self.hasQueuedCommit = false
       self.isFocused = value
+      if value { self.stopCaretBlinking() } else { self.startCaretBlinking() }
     }
   }
 
   func inputDidUpdate(hasFeedback: Bool, textChanged: Bool, isFinished: Bool) {
     guard !isFinished, hasFeedback || textChanged else { return }
     set(true)
+    stopCaretBlinking()
+  }
+
+  func startCaretBlinking() {
+    guard !caretIsBlinking else { return }
+    caretIsBlinking = true
+    caretBlinkRevision &+= 1
+  }
+
+  /// A hide/show pair may happen between native presentation frames.
+  /// Re-entry explicitly starts a new epoch even if blinking was already on.
+  func caretDidBecomeVisible() {
+    caretIsBlinking = true
+    caretBlinkRevision &+= 1
+  }
+
+  func stopCaretBlinking() {
+    guard caretIsBlinking else { return }
+    caretIsBlinking = false
+    caretBlinkRevision &+= 1
   }
 
   func mouseMoved(x: Double, y: Double, transitioning: Bool = false) {
@@ -46,5 +69,6 @@ import Observation
     generation &+= 1
     hasQueuedCommit = false
     isFocused = false
+    startCaretBlinking()
   }
 }

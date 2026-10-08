@@ -1232,7 +1232,7 @@ private struct ContentView: View {
     .preferredColorScheme(themePreviewPresentation.preferredColorScheme)
   }
 
-  private var configuredPracticeContent: some View {
+  private var focusedPracticeContent: some View {
     practiceLayout
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: showingCommandPalette) { _, showing in
@@ -1252,6 +1252,11 @@ private struct ContentView: View {
     .onChange(of: settings.inputRules) { _, rules in session.synchronizeLiveInputRules(rules) }
     .onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }
+    .onChange(of: settings.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }
+  }
+
+  private var configuredPracticeContent: some View {
+    focusedPracticeContent
     .onChange(of: settings.promptHighlightMode) { previous, selected in
       if restoringPromptHighlightAfterFunboxConflict {
         restoringPromptHighlightAfterFunboxConflict = false
@@ -2720,7 +2725,8 @@ private struct ContentView: View {
             synchronizeLiveInputRules()
             session.refreshLiveAccuracyAfterComposition(
               hadMarkedText: hadMarkedText, hasMarkedText: !$0.isEmpty)
-            if !session.isFinished, hadMarkedText || !$0.isEmpty { visualFocus.set(true) }
+            visualFocus.inputDidUpdate(hasFeedback: hadMarkedText || !$0.isEmpty,
+              textChanged: false, isFinished: session.isFinished)
             if playsCompositionClick { playInputFeedback(inputWasCorrect: true) }
           }
         },
@@ -2967,7 +2973,11 @@ private struct ContentView: View {
                 latestInput: { .init(attemptID: session.automaticInputAttemptID,
                   typed: session.typed, composition: compositionText, glyphID: nil) },
                 latestGlyphID: { currentPromptGlyphIndex },
-                latestRendering: { renderedPrompt })
+                latestRendering: { renderedPrompt },
+                mainPresentation: { .init(
+                  isVisible: (inputHasFocus || showsVirtualKeyboard) && typingWindowHasFocus && !session.isFinished,
+                  isBlinking: visualFocus.caretIsBlinking,
+                  revision: visualFocus.caretBlinkRevision) })
             }
           }
       }
@@ -3778,6 +3788,7 @@ private struct ContentView: View {
   }
 
   private func handleTypingFocusChange(_ hasFocus: Bool) {
+    if hasFocus, !inputHasFocus { visualFocus.caretDidBecomeVisible() }
     inputHasFocus = hasFocus
     updateFocusWarningDelay()
   }
@@ -3790,6 +3801,7 @@ private struct ContentView: View {
       isFinished: session.isFinished,
       resultIsVisible: completedResult != nil,
       mode: session.configuration.mode)
+    if hasFocus, !typingWindowHasFocus { visualFocus.caretDidBecomeVisible() }
     typingWindowHasFocus = hasFocus
     if !hasFocus || hasAttachedSheet { visualFocus.retire() }
     if shouldRestart { attemptRestart() }

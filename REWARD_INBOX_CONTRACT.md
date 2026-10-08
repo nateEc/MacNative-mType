@@ -1,5 +1,23 @@
 # 原生奖励收件箱与周任务交付
 
+## 普通原生光标层闪烁与输入停止增量
+
+固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`、只读清洁。完整读取 test/caret、elements/caret、focus、RAF debounce、caret.scss、两个关键帧及 afterAnyTestInput，核对首次输入／开始／重开／完成／输入框 focus 与配置 setter 上下文。输入回调即使视觉专注已经提交也直接 stopAnimation，不能只依赖 Focus.set 的状态变化。配置 smoothCaret 变化会重新设动画，即使仍在视觉专注；下一次输入再停止。原版 inline 动画名可覆盖 outline 类的 none，不能笼统豁免该样式。
+
+原创 PromptCaretBlinkCurve／Clock 以一秒周期、每关键帧段分别的 CSS ease 求值；smooth 为 0→1→0，hard 在 50%–51% 短暂淡出而非方波。同动画名的 slow／medium／fast 保持相位，hard／smooth 切换重启，revision 保留帧间 stop→start；隐藏、尝试更换、stop 和系统／用户减少动态效果分别退休或固显。实际规范依据为 [CSS Animations](https://www.w3.org/TR/css-animations/#animation-timing-function) 与 [CSS Easing](https://www.w3.org/TR/css-easing-1/#cubic-bezier-easing-functions)。不把横移平滑时长当闪烁周期，不更改节奏光标透明度、几何或既有截止计时器，不新增 Timer／后台循环。
+
+TypingVisualFocus 单独维护 blink 状态与版本：下一主线程轮次提交专注时 stop／start，实际输入／删除／候选更新立即 stop，配置变化和输入框重新取得焦点 start。focus 或 key-window 在两次绘制间失去并恢复仍显式重启版本，退休失效旧专注提交。普通 PromptCaretNativeView 每帧从实际视图闭包读取可见性／blink／版本，不要求 SwiftUI 每帧重新构造提示；只更新主 marker alpha，既有 TextKit 目标变化规则不变。设计技能选择维持既有字体、形状、颜色和布局，仅恢复原版语义所需动画，并保留减少动态效果。
+
+QA-only 脚本执行完整实际 Caret 类、focus／RAF 模块及 blink 包装器、afterAnyTestInput，四组共 28 状态与原生组合对照；DOM、几何、声音、signal 和帧队列是自有边界，不冒称完整浏览器事件或上游整套 Vitest。另将固定关键帧和 animation shorthand 仅在内存载入本机 loopback QA 页，用隐藏 IAB Chromium 154 的真实 CSSAnimation.currentTime／computed opacity 采集两周期 32 个数值。页面无外部资源、账户或 cookie 操作，采样后关闭唯一 QA tab 并停止自有服务器。仓库仅保留数值及 CSS 哈希，不保存原版 CSS／字体／图片或在产品内使用 WebView、JS／TS。Swift 曲线逐值误差上限 0.00001；浏览器样本与源码哈希也由探针核对。
+
+行为先行 `/tmp/typebar-caret-blink-red.log` 一项一处预期失败（0.756 秒）：旧生产 NSView 在 0.75 秒仍为不透明。探针最初 class 名与包装器 namespace 在 VM 内冲突失败保留 `/tmp/typebar-caret-blink-source.log`；隔离完整 class 的词法作用域修正，没有改实际模块逻辑。`/tmp/typebar-caret-blink-focused.log` 失败于 SwiftUI 长表达式类型检查；只将同序修饰链拆为两个 computed view，未删行为。之后 50 项零失败零跳过（1.037 秒），复核帧间重新可见并补版本后 53 项零失败零跳过（1.062 秒），日志分别为 focused-verified.log／refocus-verified.log（共同前缀 `/tmp/typebar-caret-blink-`）。最终组件图与完整冻结门禁结果另记。
+
+同会话有界决策／风险复核（非独立）排除 hard 方波、已专注不再 stop、outline 不闪、slow→fast 无条件重启、帧间重新可见未退休相位等假设。当前只接通已有普通原生独立光标层；Tape、ASL／Choo、listening 与混合方向 inline 回退尚未接通等价闪烁。任意配置／输入／窗口事件在原 RAF 与原生轮次间的交错、鼠标光标隐藏／首次保留、完整页眉／页脚、实际设备／IME／VoiceOver 仍开放。矩阵仍 53 表面既有分类，扩充证据不升级整体完成；新增三人工项保持待验收。成绩／回放／归档／SwiftData／账户协议不变，零 Typebar 主程序启动，不触及真实 Typebar 库、Keychain、账户或部署，整体 goal active。下方为历史增量，不用旧绿灯证明新实现。
+
+最终扩展定向 `/tmp/typebar-caret-blink-final-focused.log` 61 项零失败零跳过（11.675 秒），含新增 15 项、相关光标／专注与页面矩阵回归。完整冻结门禁 `/tmp/typebar-caret-blink-complete-readiness.log` 退出 0：原生 3,671 项零失败零跳过（841.587 秒），服务 501 项零失败零跳过（11.180 秒）；新增 15 项在全量中实际通过（0.394 秒）。十万词耐久实际通过 161.422 秒、16 项隔离磁盘冷读 5.638 秒，固定参考／元数据、53 表面／生产文件／测试符号、1,077 人工结构与未启动应用包／scheme／严格签名／原创边界全部通过。10 个冻结哈希 `/tmp/typebar-caret-blink-frozen.sha256` 前后一致，门禁期间无文件编辑，终态后仅补结果文档与旧人工剩余描述。
+
+60 份完整日志保存在 `/tmp/typebar-caret-blink-complete-logs.YAFmdr`，81 张组件图在 `/tmp/typebar-caret-blink-complete-render.ZMPbru`。新主光标 on／off 两图已逐张复查：主 bar 消失、pace outline 保留；它们仅透明背景的光标层，不是完整提示／主窗口或真实逐帧设备验收。唯一组件窗口从不显示、不激活并在测试后关闭；无新增 Typebar 主程序。CoreData／AddressBook XPC 系统诊断、隔离只读 SwiftData 513、Node 实验性警告和早期红测／编译／探针失败保留，不声称已修复或以删断言、跳过换绿灯。三项人工状态仍待验收、特殊分支与完整 goal 均保持开放。
+
 ## 独立视觉专注、鼠标退出与通知过滤增量
 
 固定参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`，只读清洁。完整读取 [focus.ts](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/focus.ts)、RAF debounce、test caret 包装器，核对 afterAnyTestInput／start／restart／result／commandline／page 的相关函数或调用上下文，以及 TestConfig／Keytips／Footer／Header 和 getFocus 消费位置。原版视觉 focus 与 testFocusState 的一秒失焦警告不同。实际 mousemove 比较单轴正向 `>3`，不是注释的 5，也不是绝对值；PageTransition 时忽略。set 在请求时先比较已提交状态再排 RAF，因此同轮相反请求未必取消前一次。
