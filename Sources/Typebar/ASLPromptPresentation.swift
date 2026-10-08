@@ -143,7 +143,7 @@ struct ASLPromptCaretBridge: NSViewRepresentable {
         reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: frameRate,
         words: $0.words, firstRetainedWordIndex: $0.firstRetainedWordIndex,
         onRetire: $0.onRetire, followsWordReflow: $0.followsWordReflow, caretMotion: $0.caretMotion,
-        centersActiveLine: $0.centersActiveLine)
+        centersActiveLine: $0.centersActiveLine, wrapperRevision: $0.wrapperRevision)
     }
     view.configure(configuration, frames: frames, glyphIDs: glyphIDs,
       lineScroll: lineScroll, caretGlyphID: caretGlyphID, text: text, font: font, wordFrames: wordFrames)

@@ -1,5 +1,17 @@
 # 原生奖励收件箱与周任务交付
 
+## Wrapper 配置事件与 fontFamily 例外增量
+
+最终完整冻结门禁 `/tmp/typebar-wrapper-config-final-readiness.log` 终态退出 0：原生 3,830 项零失败零跳过（823.735 秒），服务 501 项（12.613 秒）；十万词耐久 153.530 秒、16 项隔离磁盘冷读 4.890 秒、53 表面、1,101 唯一人工场景结构、元数据及未启动应用包资源／URL scheme／严格签名／原创边界通过。十新增在全量中 4.560 秒，64 源码链路及既有 56 center／退休路径通过；四张最终组件图已再次逐张检查。10 文件 `/tmp/typebar-wrapper-config-final-frozen.sha256` 门禁前中后完全一致；63 原始日志 `/tmp/typebar-wrapper-config-final-logs.lCodvg`、153 图 `/tmp/typebar-wrapper-config-final-images.rW5apb` 保留。无断言失败／跳过，既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。终态后才更新交付文档，没有运行中编辑或并行验收；零主程序启动，无残留测试／编译／主程序进程，没有操作真实账户、Keychain、成绩库或部署。完整 goal active，下方记录阶段证据。
+
+2026-10-09，继续基于干净固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 setConfig 在成功时即使值未变也派发；test-ui EOF 订阅有 12 个 wrapper 键，fontFamily 明确例外，只更新 hints／joining。元数据另为 tapeMode、tapeMargin、maxLineWidth、fontSize、keymapSize 触发 resize；完整 UI 250ms debounce 在非 Tape 测试页调用 center，raw showAllLines 仍抑制退休。QA 新脚本执行完整 setter 模块、createEvent 模块、完整订阅／wrapper／center／lineJump／removal、resize 回调与 triggerResize，并读取实际选定元数据对象。64 组含 raw gate／nosave、四次重复同值／ABA 和拒绝设置通过；validation、DOM 整数尺寸与 debounce drain 是自有边界，Joining 模块仅非 joining 路径，不冒充浏览器、CSS、实际 250ms 调度或专业文字排版。
+
+原生 AppSettings 增加不持久化的 wrapper revision，映射 12 类 wrapper 设置及 keymapSize resize，宽度预设和自定义值共用事件；同值／ABA 不丢事件，字体家族、主题和滚动平滑开关不虚构 wrapper。生产 factory 和普通／ASL 两桥接层传递 revision，滚动 owner 区分字体重测与强制居中，沿用既有动画、raw gate 和退休回调，不新增 Timer 或存储字段。现有 funbox UI 恢复流程的拒绝选择／恢复均不派发；原始输入、prompt、退格边界、结果与 replay 不删。
+
+行为红测 `/tmp/typebar-wrapper-config-red.log` 为三项 15 处真实失败（0.786 秒），复现漏配置事件、fontFamily 误退休及后续纯配置不居中；首绿四项 0.157 秒。拒绝设置补测 `rejection-red.log` 一项三处真实失败（0.659 秒），补保护后通过。扩大轮 `focused.log` 保留嵌套函数 actor 编译失败；`focused-built.log` 的普通标点夹具失败不是产品丢事件：TextKit 允许感叹号内部断行，没有所声称的第三词行，ASL 同夹具通过。普通改用字母词并增加实测行高断言，ASL 保留标点 fallback，不放宽边界断言。`focused-green.log` 的 121 项七处失败来自调用方漏传既有 Anime.js QA 归档，十项中的当时九项新测试已通过；最终带归档的 `final-focused.log` 为 122 项零失败零跳过（36.558 秒），十新增 4.617 秒。`normalization-red.log` 名虽为 red，实际一项首次即绿（0.014 秒），仅补归一化／持久化回归，不作为红测证据。
+
+四张 `/tmp/typebar-wrapper-config-images.idihoo/wrapper-{text,asl}-{font,event}.png` 已逐张检查；组件窗口从不显示且逐一关闭，零 Typebar 主程序启动。行为优先、源码驱动、最小改动、根因调试与同会话有界决策／风险审查用于上述反例，不是独立评审。保留既有原创颜色、手形和原生间距，无视觉改版；Swift 6.2.4／SDK 26.2／最低 macOS 14，无新版本敏感 API、依赖或存储迁移。新增 nativeTestSymbols 与两个人工待验项；配置 showAllLines／fontFamily 和 ASL 部分分类不升级。原生交互对照 32 组；nosave 的另外 32 组仅原版探针，预览／导入／全部 UI 入口、真实 resize 调度／回流交错、joining、全量预览／视口虚拟化与设备／IME 继续开放，完整 goal active。完整冻结门禁待本轮终态记录；以下为历史阶段。
+
 ## 活动行重新居中与强制退休增量
 
 2026-10-09，固定只读源码 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `centerActiveLine` 从活动词向前扫描词容器，找到较早行后调用 `lineJump(previousLineTop, true)`，即使首跳也可退休；窗口 resize 的 250ms debounce 与 wrapper 配置更新分别调用它。原始 `Config.showAllLines` 为 true 就直接返回，与计时模式仍使用有限视口的有效高度策略不同。本轮只重写原生重新布局／全行返回有限行的行为，不复制函数或资产。既有 QA 脚本新增执行完整 center 函数、完整 lineJump／removal 的 48 组自有整数词框／缺失词／长词／首跳／平滑组合，原有 12 序列／60 行、32 before-delete、八 hard-recovery 不变；DOM 和 promise 完成由适配器提供，不是浏览器数值或真实 resize 调度证据。

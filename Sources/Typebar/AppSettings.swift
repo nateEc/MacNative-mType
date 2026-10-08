@@ -1139,6 +1139,8 @@ final class AppSettings {
   private var noQuitConfigurationLocks = NoQuitConfigurationLockRegistry()
   private var randomThemeTarget: RandomThemeTarget?
   private(set) var activeTestSelectionGeneration = 0
+  // Presentation event identity only; never part of a saved settings snapshot.
+  private(set) var practiceWrapperRevision: UInt64 = 0
 
   var activeTestSelection: ActiveTestSelectionDocument? {
     ActiveTestSelectionStore(defaults: defaults).load()
@@ -1221,15 +1223,15 @@ final class AppSettings {
       persist()
     }
   }
-  var hideExtraLetters = false { didSet { persist() } }
-  var blindMode = false { didSet { persist() } }
+  var hideExtraLetters = false { didSet { persistPracticeWrapperEvent() } }
+  var blindMode = false { didSet { persistPracticeWrapperEvent() } }
   var fontSize: Double = PracticeFontSizePolicy.defaultSize {
     didSet {
       let normalized = PracticeFontSizePolicy.normalized(fontSize)
       if fontSize != normalized {
         fontSize = normalized
       } else {
-        persist()
+        persistPracticeWrapperEvent()
       }
     }
   }
@@ -1287,7 +1289,7 @@ final class AppSettings {
         keyboardGuideScale = normalized
         return
       }
-      persist()
+      persistPracticeWrapperEvent()
     }
   }
   var keyboardGuideLegendStyle: KeyboardGuideLegendStyle = .lowercase { didSet { persist() } }
@@ -1350,8 +1352,8 @@ final class AppSettings {
       persist()
     }
   }
-  var flipTestColors = false { didSet { persist() } }
-  var colorfulMode = false { didSet { persist() } }
+  var flipTestColors = false { didSet { persistPracticeWrapperEvent() } }
+  var colorfulMode = false { didSet { persistPracticeWrapperEvent() } }
   var customBackgroundURL = "" {
     didSet {
       let normalized = CustomBackgroundURLPolicy.normalizedRemoteURL(customBackgroundURL) ?? ""
@@ -1471,15 +1473,15 @@ final class AppSettings {
       persist()
     }
   }
-  var practiceLineWidth: PracticeLineWidth = .fluid { didSet { persist() } }
-  var customPracticeLineColumns = 60 { didSet { persist() } }
-  var practiceTapeMode: PracticeTapeMode = .off { didSet { persist() } }
-  var practiceTapeMargin: Double = 0.5 { didSet { persist() } }
+  var practiceLineWidth: PracticeLineWidth = .fluid { didSet { persistPracticeWrapperEvent() } }
+  var customPracticeLineColumns = 60 { didSet { persistPracticeWrapperEvent() } }
+  var practiceTapeMode: PracticeTapeMode = .off { didSet { persistPracticeWrapperEvent() } }
+  var practiceTapeMargin: Double = 0.5 { didSet { persistPracticeWrapperEvent() } }
   var smoothPracticeLineScroll = false { didSet { persist() } }
-  var showAllPracticeLines = false { didSet { persist() } }
+  var showAllPracticeLines = false { didSet { persistPracticeWrapperEvent() } }
   var smoothCaretMotion: SmoothCaretMotion = .medium { didSet { persist() } }
   var caretStyle: TypingCaretStyle = .bar { didSet { persist() } }
-  var typoIndicatorStyle: TypoIndicatorStyle = .off { didSet { persist() } }
+  var typoIndicatorStyle: TypoIndicatorStyle = .off { didSet { persistPracticeWrapperEvent() } }
   var compositionDisplayStyle: CompositionDisplayStyle = .replace { didSet { persist() } }
   var typingSpeedUnit: TypingSpeedUnit = .wpm { didSet { persist() } }
   var alwaysShowDecimalPlaces = false { didSet { persist() } }
@@ -1490,14 +1492,25 @@ final class AppSettings {
   var historyChartVisibility = HistoryChartVisibility() { didSet { persist() } }
   var showAverage: AverageNoticeDisplay = .off { didSet { persist() } }
   var showPersonalBest = false { didSet { persist() } }
-  var typedCharacterEffect: TypedCharacterEffect = .keep { didSet { persist() } }
+  var typedCharacterEffect: TypedCharacterEffect = .keep { didSet { persistPracticeWrapperEvent() } }
   var liveSpeedStyle: LiveMetricStyle = .off { didSet { persist() } }
   var liveAccuracyStyle: LiveMetricStyle = .off { didSet { persist() } }
   var liveBurstStyle: LiveMetricStyle = .off { didSet { persist() } }
   var liveProgressStyle: LiveProgressStyle = .mini { didSet { persist() } }
   var liveStatsColor: LiveStatsColor = .accent { didSet { persist() } }
   var liveStatsOpacity: LiveStatsOpacity = .full { didSet { persist() } }
-  var promptHighlightMode: PromptHighlightMode = .letter { didSet { persist() } }
+  var promptHighlightMode: PromptHighlightMode = .letter {
+    didSet {
+      // The view restores rejected funbox selections to oldValue. Neither
+      // the rejected selection nor that restoration is a source config event.
+      if FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: promptHighlightMode, modifiers: testModifiers),
+        FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: oldValue, modifiers: testModifiers) {
+        persistPracticeWrapperEvent()
+      } else {
+        persist()
+      }
+    }
+  }
   var testModifiers: [TestModifier] = [] { didSet { persist() } }
   var showFocusWarning = true { didSet { persist() } }
   var showCapsLockWarning = true { didSet { persist() } }
@@ -2406,6 +2419,13 @@ final class AppSettings {
     playKeyclickSound = style != nil
     batchingClickSoundConfiguration = false
     synchronizeClickSoundConfiguration()
+  }
+
+  private func persistPracticeWrapperEvent() {
+    // A successful source setter dispatches even when its value is unchanged.
+    // Keep ABA/repeated events visible without adding a persisted setting.
+    practiceWrapperRevision &+= 1
+    persist()
   }
 
   private func persist() {

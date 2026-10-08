@@ -26,6 +26,9 @@ struct PromptLineScrollContext {
   var caretMotion: PromptCaretMotionCoordinator? = nil
   // Mirrors the raw showAllLines gate, not the effective bounded-height policy.
   var centersActiveLine = true
+  // A host with config events can distinguish font measurement from a wrapper
+  // update. Nil preserves geometry-driven behavior for standalone followers.
+  var wrapperRevision: UInt64? = nil
 }
 
 /// Alternate layouts provide measured canonical glyph bounds, never Latin

@@ -198,7 +198,7 @@ struct PromptAutoScrollOverlay: NSViewRepresentable {
         reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: lineScrollFrameRate,
         words: $0.words, firstRetainedWordIndex: $0.firstRetainedWordIndex, onRetire: $0.onRetire,
         followsWordReflow: $0.followsWordReflow, caretMotion: $0.caretMotion,
-        centersActiveLine: $0.centersActiveLine)
+        centersActiveLine: $0.centersActiveLine, wrapperRevision: $0.wrapperRevision)
     }
     nsView.update(
       text: text, characterOffset: characterOffset, font: font,
@@ -246,9 +246,11 @@ final class PromptAutoScrollView: NSView {
   ) {
     let attemptChanged = self.lineScroll?.attemptID != lineScroll?.attemptID
     let prefixChanged = self.lineScroll?.firstRetainedWordIndex != lineScroll?.firstRetainedWordIndex
-    let layoutChanged = self.font != font || self.lineSpacing != lineSpacing
+    let wrapperChanged = self.lineScroll?.wrapperRevision != lineScroll?.wrapperRevision
+    let structuralLayoutChanged = self.lineSpacing != lineSpacing
       || self.isRightToLeft != isRightToLeft
       || (self.customGeometry == nil) != (customGeometry == nil)
+    let layoutChanged = self.font != font || structuralLayoutChanged
     let textChanged = self.text != text
     let needsFollow = self.characterOffset != characterOffset
       || textChanged
@@ -260,6 +262,7 @@ final class PromptAutoScrollView: NSView {
       || self.lineScroll?.frameRate != lineScroll?.frameRate
       || self.lineScroll?.followsWordReflow != lineScroll?.followsWordReflow
       || self.lineScroll?.centersActiveLine != lineScroll?.centersActiveLine
+      || wrapperChanged
       || self.customGeometry?.revision != customGeometry?.revision
       || self.customGeometry?.caretGlyphID != customGeometry?.caretGlyphID
     if attemptChanged {
@@ -283,11 +286,14 @@ final class PromptAutoScrollView: NSView {
       resetsRetainedPrefix = true
       hasPendingWordUpdate = false
     }
-    if layoutChanged {
+    if layoutChanged || (wrapperChanged && lineScroll?.centersActiveLine == true) {
       stopLineScroll(); wordReflow = .init()
       lineScroll?.caretMotion?.resetLayout()
     }
-    recentersLine = recentersLine || layoutChanged || attemptChanged
+    // Font-family application only remeasures. Source wrapper/config events,
+    // font size and actual viewport width changes own forced centering.
+    recentersLine = recentersLine || structuralLayoutChanged || wrapperChanged || attemptChanged
+      || (self.font != font && lineScroll?.wrapperRevision == nil)
       || (self.lineScroll?.centersActiveLine == false && lineScroll?.centersActiveLine == true)
     self.lineScroll = lineScroll
     self.customGeometry = customGeometry

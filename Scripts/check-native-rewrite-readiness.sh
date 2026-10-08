@@ -339,6 +339,10 @@ run_logged_check "executing pinned old-word deletion timing and backspace bounda
   "$temporary_directory/word-retirement-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-word-retirement.mjs" "$reference_root"
+run_logged_check "executing pinned configuration events, wrapper centering and resize chain" \
+  "$temporary_directory/wrapper-configuration-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-wrapper-configuration.mjs" "$reference_root"
 run_logged_check "executing pinned SlowTimer lifecycle and effect gates" \
   "$temporary_directory/slow-timer-effects-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
