@@ -315,6 +315,9 @@ run_logged_check "executing complete caret controllers and independent line/posi
   env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-caret-line-composition.mjs" "$reference_root"
+run_logged_check "executing pinned complete public-profile leaderboard projection and percentages" \
+  "$temporary_directory/profile-ranks-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-profile-ranks.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"

@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+详细公开资料新增可选 `allTimeLbs.time.{15,60}.english` 的 rank／count 和公开 `leaderboardOptedOut`，来自同次完整英语全部时间榜，不受历史删除或分页影响。退榜／封禁不附排名，轻量搜索／嵌套资料不扫描全榜；旧客户端忽略，新客户端缺字段隐藏，不新增落盘字段、写入协商或迁移，见 [资料排名合同](PERSONAL_BEST_LEDGER_CONTRACT.md)。官方 Mongo 刷新时序和整页／设备仍未等价证明，整体服务 partial。
+
 新增 `resultBlindMode=available`，投稿／持久记录／私有历史可选 `blindMode` 严格保留 true／false，旧缺字段为未知，显式 null 或错误类型拒绝。新客户端不向缺能力服务静默发布真实盲打，默认普通成绩仍可使用旧协议；旗标不新增 XP／PB／排名条件。打开旧服务文件不回填，旧 writer 保存会丢新字段，须备份关闭后的完整文件、唯一 writer 协调升级，回退恢复升级前备份，禁止混写。CSV 尾部追加九列至 41 列，非官方文件直接互换，详见 [账户 CSV 字段语义](ACCOUNT_HISTORY_STATISTICS_CONTRACT.md)；未部署，整体服务仍 partial，下方为历史阶段。
 
 账户预设新增 TYPEBAR_ACCOUNT_FILTER_PRESETS_ENABLED 启动开关和列表 mutationsEnabled 布尔状态；禁用时认证后的新增／删除返回 503，读取仍可用，零容量 409 不变。缺环境变量默认开启，严格 true／false，不改库格式。旧服务不认识此护栏，回退需停写核对；热配置仍开放，见 [账户预设合同](ACCOUNT_FILTER_PRESETS_CONTRACT.md)。

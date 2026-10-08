@@ -444,6 +444,16 @@ public struct PublicProfileResponse: Content, Equatable {
   public var personalBestLedgerVersion: Int? = nil
   public var personalBestHistoryComplete: Bool? = nil
   public var personalBestSnapshots: [PublicProfileBestResponse]? = nil
+  public var leaderboardOptedOut: Bool? = nil
+  public var allTimeLbs: PublicProfileAllTimeLeaderboards? = nil
+}
+
+public struct PublicProfileAllTimeLeaderboards: Content, Equatable {
+  public struct Position: Content, Equatable {
+    public let rank: Int
+    public let count: Int
+  }
+  public let time: [String: [String: Position]]
 }
 
 /// A Typebar-owned badge that can be selected for public profiles and
@@ -2716,7 +2726,7 @@ public actor AuthStore {
     guard let user = state.users.first(where: { $0.id == id }) else {
       throw AuthStoreError.profileNotFound
     }
-    return detailedPublicProfile(for: user, now: now)
+    return try detailedPublicProfile(for: user, now: now)
   }
 
   public func searchPublicProfiles(query: String?, limit: Int?) throws
@@ -3520,15 +3530,27 @@ public actor AuthStore {
     return publicProfile(for: user, results: results, activity: nil, streak: publicStreak(for: user.id))
   }
 
-  private func detailedPublicProfile(for user: StoredUser, now: Date) -> PublicProfileResponse {
+  private func detailedPublicProfile(for user: StoredUser, now: Date) throws -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
     let shouldShowActivity = !user.accountSuspended && user.profileDetails.showActivity
-    return publicProfile(
+    var profile = publicProfile(
       for: user, results: results,
       activity: shouldShowActivity
         ? (state.accountPractice![user.id] ?? .init()).activity(endingAt: now)
         : nil,
       streak: publicStreak(for: user.id))
+    if !user.accountSuspended && !user.leaderboardOptedOut {
+      var positions: [String: [String: PublicProfileAllTimeLeaderboards.Position]] = [:]
+      for seconds in [15, 60] {
+        let entries = try leaderboardEntries(.init(mode: "time", language: "english", period: "all",
+          durationSeconds: seconds), eligibleUserIDs: nil, now: now)
+        positions[String(seconds)] = entries.first(where: { $0.userID == user.id }).map {
+          ["english": .init(rank: $0.rank, count: entries.count)]
+        } ?? [:]
+      }
+      profile.allTimeLbs = .init(time: positions)
+    }
+    return profile
   }
 
   private func publicProfile(
@@ -3567,7 +3589,8 @@ public actor AuthStore {
       preciseBestWPM: fastest?.speedPrecision?.wpm,
       personalBestLedgerVersion:1,
       personalBestHistoryComplete:!state.personalBestLedger!.legacyUsers.contains(user.id),
-      personalBestSnapshots:personalBestResults.map(\.response)
+      personalBestSnapshots:personalBestResults.map(\.response),
+      leaderboardOptedOut: user.leaderboardOptedOut
     )
   }
 

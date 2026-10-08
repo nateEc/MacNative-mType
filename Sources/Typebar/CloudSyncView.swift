@@ -1183,6 +1183,7 @@ struct PublicProfileView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             if !profile.accountSuspended {
+                PublicProfileLeaderboardsView(profile: profile)
                 PublicProfilePersonalBestsView(profile: profile, settings: settings)
             }
             if let activity = profile.activity {

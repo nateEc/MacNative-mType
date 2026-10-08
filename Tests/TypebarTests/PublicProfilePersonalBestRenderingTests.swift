@@ -158,4 +158,23 @@ import XCTest
       }
     } }
   }
+
+  func testProductionLeaderboardCardsRenderWithoutShowingAWindow() throws {
+    try withMount { window, host in
+      for (name, dark, optedOut, position) in [
+        ("rank-normal-light", false, false, ["rank": 2, "count": 3]),
+        ("rank-large-dark", true, false, ["rank": 999_999_999, "count": 1_000_000_000]),
+        ("rank-unknown-light", false, false, ["count": 0]),
+        ("rank-optout-light", false, true, ["rank": 2, "count": 3])
+      ] {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(profile())) as? [String: Any])
+        object["leaderboardOptedOut"] = optedOut
+        object["allTimeLbs"] = ["time": ["15": ["english": position], "60": ["english": ["rank": 1, "count": 3]]]]
+        let model = try JSONDecoder().decode(RemotePublicProfile.self, from: JSONSerialization.data(withJSONObject: object))
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        host.rootView = root(PublicProfileLeaderboardsView(profile: model), dark: dark)
+        _ = try snapshot(host, window: window, name: name, dark: dark)
+      }
+    }
+  }
 }

@@ -1490,11 +1490,13 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let selectedBadge: RemotePublicProfileBadge?
     let earnedBadges: [RemotePublicProfileBadge]
     let practiceHistoryComplete: Bool?
+    let leaderboardOptedOut: Bool?
+    let allTimeLbs: RemotePublicProfileAllTimeLeaderboards?
 
     private enum CodingKeys: String, CodingKey {
         case id, displayName, accountSuspended, joinedAt, completedResultCount, startedTestCount, totalTypingSeconds, bestWPM, highestConsistency, personalBests,
             activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge,
-            earnedBadges, practiceHistoryComplete
+            earnedBadges, practiceHistoryComplete, leaderboardOptedOut, allTimeLbs
         case preciseBestWPM
         case personalBestLedgerVersion, personalBestHistoryComplete, personalBestSnapshots
     }
@@ -1523,6 +1525,8 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
         earnedBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .earnedBadges) ?? []
         practiceHistoryComplete = try values.decodeIfPresent(Bool.self, forKey: .practiceHistoryComplete)
+        leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut)
+        allTimeLbs = try values.decodeIfPresent(RemotePublicProfileAllTimeLeaderboards.self, forKey: .allTimeLbs)
         if [.personalBestLedgerVersion,.personalBestHistoryComplete,.personalBestSnapshots].contains(where:values.contains) {
             personalBestLedgerVersion = try values.decode(Int.self,forKey:.personalBestLedgerVersion)
             personalBestHistoryComplete = try values.decode(Bool.self,forKey:.personalBestHistoryComplete)
@@ -1541,6 +1545,24 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
             personalBestLedgerVersion = nil; personalBestHistoryComplete = nil; personalBestSnapshots = nil
         }
     }
+}
+
+struct RemotePublicProfileAllTimeLeaderboards: Codable, Equatable, Sendable {
+    struct Position: Codable, Equatable, Sendable {
+        let rank: Int?
+        let count: Int
+        private enum CodingKeys: String, CodingKey { case rank, count }
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            rank = try values.decodeIfPresent(Int.self, forKey: .rank)
+            count = try values.decode(Int.self, forKey: .count)
+            guard count >= 0, rank.map({ $0 >= 0 }) ?? true else {
+                throw DecodingError.dataCorruptedError(forKey: .count, in: values,
+                    debugDescription: "Negative public leaderboard position or count")
+            }
+        }
+    }
+    let time: [String: [String: Position]]
 }
 
 struct RemotePublicProfileBadge: Codable, Equatable, Identifiable, Sendable {

@@ -1,5 +1,23 @@
 # 账户个人最佳账本与公开清空
 
+## 公开资料英语全部时间榜名次
+
+固定 [UserProfile.LeaderboardPosition](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/UserProfile.tsx) 显示英语 15／60 秒的全部时间榜名次，第一名显示 GOAT，其余由 [formatTopPercentage](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/utils/misc.ts) 计算两位舍入、无强制尾零的百分位。此前原生资料只有 PB 卡，没有排名区域。本阶段原生独立实现，中文名次与“前…%”是显示本地化，不复制 JSX／样式／源码或资产。
+
+自建服务详细 `GET /v1/profiles/{id}` 新增可选 `allTimeLbs.time.{15,60}.english`，每个存在项只含 rank／count；公开资料另提供可选 `leaderboardOptedOut`。复用现有全部时间英语榜的完整独立排行榜 PB、资格筛选与排序，不从可删除历史、个人 PB 最大值、分页或好友榜推名次，两个档独立计算。函数在同一个 AuthStore actor 调用内无 await，名次与人数来自同一组记录；没有另建缓存、奖项或写入。搜索、通知、好友／审核等轻量资料不附排名，不对每条嵌套资料扫描全榜。原版 Mongo 排名刷新／缓存时序尚未等价证明，不把自建即时快照冒充原版服务。
+
+退榜／封禁不附排名，原生也显式防止这两个标记下的排名显示；退榜显示提示，封禁不显示新区域。其他用户的退榜、限制及最低练习时长资格会同时改变名次和人数。退榜清除排行榜 PB，重新入榜不复活旧名次；只有后续合格新 PB 才能重新建立。个人 PB 存在、英语之外的成绩、30 秒或未触发榜单的 lazy PB 都不能冒充英语 15／60 名次。无名次不发送零，已知空的两个桶与旧服务完全缺字段保持可区分。客户端按固定 schema 接受非负整数 count 和可缺 rank，不接受负数／小数／坏类型；零 count 且非冠军的异常来源保留未知百分位，不绘制 NaN／Infinity，服务自身不生成这种排名项。
+
+界面沿用系统字体、等宽名次、语义颜色和既有二列卡片，两个档保持顺序、缺档不补名次，静态内容合并辅助功能读取。四张实际生产组件离屏图（正常浅色、大名次深色、未知名次、退榜提示）已逐张检查，见 `/tmp/typebar-profile-rank-render.K8bmPx`；五项渲染回归包括已有 PB 的 13 张图，所有测试窗口始终不可见。本阶段不启动 Typebar 应用，真实完整资料窗口、VoiceOver、设备、账户页专属入口与官方协议仍需后续验证，SOC-01／RANK-01 保持部分兼容，完整 goal active。
+
+服务有效先行两项／四断言失败（0 unexpected，0.661 秒，`/tmp/typebar-profile-rank-server-valid-red.log`），原生实际解码先行一项／两断言失败（0.516 秒，`/tmp/typebar-profile-rank-native-red.log`）。第一轮服务测试调用签名编译错误不算产品红测。首轮实现回归的一处失败是测试错误地要求重新入榜复活旧名次；根因确认已有退榜清账逻辑后，改为断言不复活并提交新的更好成绩，未改旧生产语义，见 `/tmp/typebar-profile-rank-server-focused.log` 和 `/tmp/typebar-profile-rank-server-fixed.log`。新增原生五项模型／源码回归和一项渲染、服务六项含真实 HTTP；服务六项零失败（0.042 秒），原生五项零失败（0.354 秒），渲染五项零失败（5.039 秒）。QA 动态执行固定完整 getAllTimeLbs／formatTopPercentage／roundTo2，25 组自有 DAL 查询和 24 个格式案例；并未执行 MongoDB、Solid、JSX、DOM、官方 HTTP 或全页。脚本只在产品外读取参考 checkout，已接入完整门禁。
+
+这是只读响应加法：旧客户端忽略新字段，新客户端缺字段隐藏排名、退榜状态保持未知；新客户端／旧服务和旧客户端／新服务不需要写入协商。归档 33、设置 5、偏好 v3、五实体／32 成绩列、CSV 41 列及服务持久文件不变，无回填、旧 writer 变化、部署或真实账户调用。回退只移除新界面和响应派生，不清成绩／PB／目录，不承诺已有其他迁移的降级安全。源码驱动、行为先行、兼容迁移、原生设计、根因排查及同会话有界决策／风险复核影响本轮；不是独立审查。剩余风险包括大榜全排序的成本、原版缓存刷新时序、真实窗口和正式设备，不能用少量夹具升级整体功能等价结论。
+
+排名阶段最终相关 111 项零失败零跳过（18.543 秒），见 `/tmp/typebar-profile-rank-related.log`。随后完整串行门禁退出码 0：原生 3,489／服务 483 项零失败零跳过（1,816.584／10.938 秒），十万词耐久 150.975 秒，16 项隔离磁盘迁移／冷读 7.374 秒；1,035 条唯一人工场景仅结构通过，三条新人工场景保持待验。原版固定源码、原创性、未开窗应用包及严格签名／资源检查通过，十个冻结代码／测试／脚本／矩阵文件哈希全部一致。主日志 `/tmp/typebar-profile-rank-final-readiness.log`，45 份分项保留于 `/tmp/typebar-profile-rank-final-logs.sa2O5E`，参考 checkout 仍干净且固定于上述提交；零 Typebar 应用启动。
+
+门禁等待期间对话中断但原进程未停止，续接同一执行句柄后正常完成，没有重启或并行构建。原生本轮耗时明显较长，日志中 `testNorwegianBokmalScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes` 为 896.409 秒，是长耗时主要部分；采样命令到达时进程已正常退出，没有取得调用栈，根因未定位，不据全绿宣称性能已达标。完整命令结束后仅补文档，不再改冻结代码／测试／脚本／矩阵。整体功能、原版缓存时序、性能热点、实机和辅助功能仍开放，完整 goal active。
+
 ## 公开资料原生离屏渲染取证
 
 本阶段没有新增产品行为：仅将已有 `PublicProfilePersonalBestDetails` 从文件私有改为模块内可测试，四项新测试挂载真实生产摘要／详情 SwiftUI 组件，而不是另造静态界面。每个测试独占一个从不显示的 NSWindow，结束解除内容并关闭；隔离 UserDefaults 使用唯一 suite 并清理，反馈声音注入无声替身，不使用真实账户、网络、Keychain 或用户数据库，不启动 Typebar 应用。
