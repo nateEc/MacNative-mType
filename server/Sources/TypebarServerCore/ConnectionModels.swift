@@ -20,6 +20,7 @@ public struct ConnectionResponse: Content, Equatable, Identifiable {
 
 public struct ConnectionsResponse: Content, Equatable {
     public let connections: [ConnectionResponse]
+    public var ownerProfile: PublicProfileResponse? = nil
 }
 
 public struct ConnectionRemovalResponse: Content, Equatable {

@@ -560,9 +560,13 @@ public func configure(
         }
     }
 
-    app.get("v1", "connections") { request async throws -> ConnectionsResponse in
+    app.get("v1", "connections") { request async throws -> Response in
         do {
-            return try await authStore.connections(accessToken: try request.accessToken())
+            let value = try await authStore.connections(accessToken: try request.accessToken())
+            let response = Response(status: .ok)
+            try response.content.encode(value)
+            response.headers.replaceOrAdd(name: .cacheControl, value: "private, no-store")
+            return response
         } catch let error as AuthStoreError {
             throw error.abort
         }

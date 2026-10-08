@@ -36,6 +36,7 @@ enum ConnectionsMutation: Equatable {
 struct ConnectionsSnapshot {
   let connections: [RemoteConnection]
   let blockedProfiles: [RemotePublicProfile]
+  var ownerProfile: RemotePublicProfile? = nil
   var blockedIDs: Set<UUID> { Set(blockedProfiles.map(\.id)) }
   var visibleConnections: [RemoteConnection] {
     let blocked = blockedIDs
@@ -44,6 +45,9 @@ struct ConnectionsSnapshot {
     }
   }
   func validate(ownerID: UUID) throws {
+    guard ownerProfile.map({ $0.id == ownerID && $0.activity == nil && $0.accountStreakClaim == nil }) ?? true else {
+      throw RemoteAccountError.unexpectedResponse
+    }
     guard blockedIDs.count == blockedProfiles.count, !blockedIDs.contains(ownerID) else {
       throw RemoteAccountError.unexpectedResponse
     }

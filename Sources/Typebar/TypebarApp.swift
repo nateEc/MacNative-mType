@@ -1560,7 +1560,7 @@ private struct ContentView: View {
         settings: settings, account: account, initialLeaderboard: syncInitialLeaderboard)
     }
     .sheet(isPresented: $showingConnections) {
-      ConnectionsView(account: account)
+            ConnectionsView(account: account, settings: settings)
     }
     .sheet(isPresented: $showingNotifications, onDismiss: {
       Task { await refreshNotificationSummary() }

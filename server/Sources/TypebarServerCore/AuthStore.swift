@@ -3536,6 +3536,7 @@ public actor AuthStore {
 
   public func connections(accessToken: String, now: Date = .now) throws -> ConnectionsResponse {
     let current = try authenticatedUser(for: accessToken, now: now)
+    guard let owner = state.users.first(where: { $0.id == current.id }) else { throw AuthStoreError.invalidAccessToken }
     let values = state.connections.compactMap { connection -> ConnectionResponse? in
       let otherID: UUID
       let relation: ConnectionRelation
@@ -3553,7 +3554,7 @@ public actor AuthStore {
         id: other.id, profile: publicProfile(for: other), relation: relation,
         updatedAt: connection.updatedAt)
     }
-    return .init(connections: values.sorted { $0.updatedAt > $1.updatedAt })
+    return .init(connections: values.sorted { $0.updatedAt > $1.updatedAt }, ownerProfile: publicProfile(for: owner))
   }
 
   private func publicProfile(for user: StoredUser) -> PublicProfileResponse {

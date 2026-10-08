@@ -175,6 +175,9 @@ run_logged_check "executing pinned profile level and owner streak hints" "$tempo
 run_logged_check "executing pinned profile relationship and friend flag predicates" "$temporary_directory/profile-relationship-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-profile-relationship.mjs" "$reference_root"
 
+run_logged_check "executing pinned friend comparison PB expressions and display helpers" "$temporary_directory/friend-comparison-source-check.log" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-friend-comparison.mjs" "$reference_root"
+
 run_logged_check "executing pinned frontend weekly time formatting" "$temporary_directory/weekly-xp-presentation-source-check.log" \
   env TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \

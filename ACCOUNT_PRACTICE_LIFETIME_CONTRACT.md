@@ -1,5 +1,25 @@
 # 账户累计练习、活动与连续天数
 
+## 好友统计对照、排序与资料入口增量
+
+固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`：只读核对完整 [FriendsList](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/connections/FriendsList.tsx)、DataTable、friends 查询、FriendSchema、getFriends DAL 与 aggregateWithAcceptedConnections。八列为姓名、关系修改时刻对应的时长、XP 等级、完成／开始、练习时长、连续天数、15／60 秒 PB；原版聚合加入本人对照，无 connectionId 的本人没有解除入口。好友 PB 在所有语言／配置中选最高规范 WPM，`>=` 同速取后一个完整对象，零速纪录仍可选；不是资料页摘要的严格正速／同速取先策略。
+
+原创 `FriendComparisonRow` 每次建行只选择一次两档 PB，比较器不反复扫描纪录；排序用原始 XP、完成数、规范 WPM，而非展示等级／单位转换值。支持八列三态、多列 Shift 排序、稳定同值顺序、只保存排序描述的本机偏好和恢复默认。未知统计不冒充零、两个方向均置后，这是明确的原生适配，不宣称 TanStack 的动态首行类型推断／缺值排序完全等价。完整快照优先于旧 personalBests；`unknown` 参数不猜档。原版连续 1 天显示占位符，0 天保留；完成比例向下取整，零完成的无限重启比用 `∞` 本地化。
+
+生产分组表单现在包含横向对照表、本人行和独立动作区，440 窄窗不删除列；等级附累计 XP、完成数附比例／重启比、连续附最长天数，PB 两位小数且遵守五种速度单位，点击查看语言／速度／Raw／准确率／稳定度／日期／配置。姓名打开既有 `PublicProfileLoadingView` 重读完整公开 DTO，不把轻量列表当完整资料；本人同样是公开资料，不展示私密概览。请求行补日期；消息入口保留为不同 destination，解除仍经既有确认和当前关系守卫。头像复用既有有界匿名 CDN 客户端，不用共享认证会话；离屏 fixture 无头像 URL，因此不联网。
+
+设计技能促使采用围绕统计比较的单一横向表而非卡片堆叠；沿用系统文字／语义色／单宽数字，箭头与排序优先级编码真实状态，普通正文和数据分层，没有品牌资产或新装饰动效。SDK 本机 Swift 6.2.4／macOS 26.2 的 SwiftUI swiftinterface 与 NSEvent.h 确认 macOS 14 目标所需横向 ScrollView 和 class modifierFlags 签名；Apple 网页取 Markdown 时工具不支持其 content-type，未把未取得正文当 API 证据。组件编译／离屏运行通过，不代替真实键盘、Shift、滚动、弹层或 VoiceOver。
+
+迁移安全与有界同会话决策复核（非独立审查）选择在既有认证 `GET /v1/connections` **增补可选 `ownerProfile`**：由令牌定位内部用户，复用与好友相同的公开轻量投影，不走私密 overview，不计算排行榜，不增加逐好友请求。回复 `private, no-store`；私密 activity／accountStreakClaim 不在投影中，原生快照还拒绝错本人 UUID 或意外私密 owner 数据。旧客户端忽略新增字段；新客户端连旧服务缺本人数据明确降级，旧统计缺 lifetime 标记显示未知。没有删除接口、数据回填、服务／SwiftData／归档迁移、部署或真实账户操作；回退客户端／服务无需数据回滚，但既有已提交关系操作不回滚。关系仍沿用上一增量的两次认证读取和全部守卫，不宣称事务快照。服务没有上游 Premium 资格，不伪造 Premium 标记。
+
+行为先行 RED：`/tmp/typebar-friends-comparison-red.log` 实际编译成功、1 项预期失败，原响应确实缺 ownerProfile。原生初次定向 23 项通过（0.660 秒）；加生产图后第一次 `/tmp/typebar-friends-comparison-render-focused.log` 因命令未创建图片目录而写文件失败，保留该证据，不归咎生产代码；新隔离目录重跑 `/tmp/typebar-friends-comparison-render-verified.log` 38 项零失败／零跳过（32.644 秒），四张新增宽／窄／浅深色图 `/tmp/typebar-friends-comparison-focused-render.wf4vpR` 已逐张查看。服务首次 `/tmp/typebar-friends-comparison-server-focused.log` 暴露 AuthUserResponse 与 StoredUser 类型误用，按认证后实际用户查找修正；重跑 `/tmp/typebar-friends-comparison-server-verified.log` 7 项零失败／零跳过（0.070 秒），覆盖令牌身份、无缓存、未认证拒绝和历史删除后累计／PB／磁盘读取无写入。随后补旧客户端解码、私密 owner 拒绝／排除请求与屏蔽／多级排序和 PB 选择预计算，最终完整门禁另记，不把前次结果冒充后次执行。
+
+QA 脚本 `check-source-friend-comparison.mjs` 执行完整实际 getFriends 以取得 PB 投影表达式，在有限自有 `$reduce/$cond/$gte` 解释器上跑 18 组新／旧快照，另执行完整实际 formatStreak／formatTypingStatsRatio；原生测试逐项对照选择的 UUID，脚本纳入完整门禁。解释器只处理声明的有限数值 fixture，未知操作直接失败，不冒称 MongoDB、BSON 一般排序、TanStack、Solid、浏览器或 HTTP 等价；格式化复用既有全域小数源码对照。52 页面矩阵补生产路径／测试符号；新增三项后 1,062 人工项仍仅结构盘点。完整好友模态／Premium／真实滚动与 VoiceOver、私信内部生命周期、其他全功能无损与主题身份等缺口保持开放；本轮零 Typebar 应用启动，整体 goal active。
+
+最终冻结完整串行门禁退出 0：原生 3,600 项零失败／零跳过（816.710 秒），服务 498 项零失败／零跳过（11.249 秒）；实际十万词耐久 154.206 秒、16 项隔离磁盘冷读 4.937 秒通过。52 页面证据、1,062 人工结构、固定源码／原创边界及未启动应用包／scheme／严格签名通过。主日志 `/tmp/typebar-friends-comparison-complete-readiness.log`，56 份分项日志 `/tmp/typebar-friends-comparison-complete-logs.udRMUP`，64 最终图 `/tmp/typebar-friends-comparison-complete-render.4tNDSH`；四张新增对照图与更新后的管理深色表单已复查。15 份生产／测试／脚本／矩阵冻结哈希前后一致（`/tmp/typebar-friends-comparison-frozen.sha256`），运行期间没有编辑，结束后仅补三份结果文档。固定参考仍干净且提交一致。
+
+日志继续保留既有 macOS AddressBook／CoreData XPC 连接诊断，以及隔离只读 SwiftData store 的 513 保存诊断；不把零断言失败当作系统警告修复。前述失败命令、局部提供者／源码适配器、模型与离屏图片均不代替实际滚动、Shift／持久化、确认／PB／资料弹层、真实网络与辅助功能；人工状态不升级，消息内部生命周期、旧服务统计完整性和整个无损重写继续待完成。零 Typebar 应用启动、goal active。
+
 ## 好友管理作用域与操作生命周期增量
 
 只读核对固定 [FriendsPage／PendingRequests／FriendsList](https://github.com/monkeytypegame/monkeytype/tree/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/connections)、完整 connections 集合、friends 查询和后端 connections 控制器。原版收到请求可接受／拒绝／屏蔽，添加前排除本人和既有 pending／accepted／blocked，解除好友需确认；原生此前搜索结果无条件可添加，读取与任务没有账户生命周期保护。本增量保留收到、已发、好友、本人屏蔽四区以及全部已有操作和消息入口，补添加可用性、解除确认和私有状态边界，不复制上游代码／图标／资产。

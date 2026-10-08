@@ -4,6 +4,7 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class PublicProfilePersonalBestRenderingTests: XCTestCase {
+  private var mountDefaults: UserDefaults?
   private func profile(empty: Bool = false, maximum: Bool = false, legacy: Bool = false) throws -> RemotePublicProfile {
     var rows: [[String: Any]] = empty ? [] : [("time", [15, 30, 60, 120]), ("words", [10, 25, 50, 100])].flatMap { mode, parameters in
       parameters.map { parameter in
@@ -46,6 +47,9 @@ import XCTest
     try body(settings)
   }
   private func withMount(_ body: (NSWindow, NSHostingView<AnyView>) throws -> Void) throws {
+    let suite = "TypebarTests.profile-render-mount.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    mountDefaults = defaults
+    defer { mountDefaults = nil; defaults.removePersistentDomain(forName: suite) }
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 420, height: 900),
       styleMask: [.titled], backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
@@ -57,6 +61,7 @@ import XCTest
   }
   private func root(_ content: some View, width: CGFloat = 420, padding: CGFloat = 32, dark: Bool = false) -> AnyView {
     AnyView(content.padding(padding).frame(width: width, alignment: .topLeading)
+      .defaultAppStorage(mountDefaults!)
       .fixedSize(horizontal: false, vertical: true)
       .environment(\.colorScheme, dark ? .dark : .light)
       .background(Color(nsColor: .windowBackgroundColor)))
@@ -190,6 +195,39 @@ import XCTest
           query: .constant("自有测试"), search: { calls += 1 }, action: { _ in calls += 1 }, conversation: { _ in calls += 1 })
           .frame(height: height), width: 440, padding: 8, dark: dark)
         _ = try snapshot(host, window: window, name: name, width: 440, dark: dark)
+        XCTAssertEqual(calls, 0); XCTAssertFalse(window.isVisible)
+      }
+    }
+  }
+
+  func testProductionFriendComparisonRendersWideNarrowAndLegacyWithoutRequestsOrWindowActivation() throws {
+    func rich(_ name: String, legacy: Bool = false) throws -> RemotePublicProfile {
+      var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(profile())) as? [String: Any])
+      json["id"] = UUID().uuidString; json["displayName"] = name
+      json["startedTestCount"] = 300; json["completedResultCount"] = 123
+      json["totalTypingSeconds"] = 123456.78; json["totalExperience"] = 123456
+      json["streak"] = ["currentDays": 12, "longestDays": 42]
+      if !legacy { json["practiceHistoryComplete"] = true }
+      return try JSONDecoder().decode(RemotePublicProfile.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+    let owner = try rich("本人对照 · 自有测试"), friend = try rich("好友统计与完整公开资料入口"), old = try rich("旧服务统计未知", legacy: true)
+    let full = ConnectionsSnapshot(connections: [friend, old].map {
+      .init(id: $0.id, profile: $0, relation: .friend, updatedAt: .init(timeIntervalSince1970: 1_800_000_000))
+    }, blockedProfiles: [], ownerProfile: owner)
+    let legacy = ConnectionsSnapshot(connections: [.init(id: old.id, profile: old, relation: .friend, updatedAt: .now)], blockedProfiles: [])
+    try withMount { window, host in
+      for (name, value, unit, width, dark) in [
+        ("friends-comparison-wide-light", full, TypingSpeedUnit.wpm, CGFloat(1320), false),
+        ("friends-comparison-wide-dark", full, .cpm, 1320, true),
+        ("friends-comparison-narrow-light", full, .cps, 440, false),
+        ("friends-comparison-legacy-dark", legacy, .wpm, 440, true)
+      ] {
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        var calls = 0
+        host.rootView = root(FriendComparisonView(snapshot: value, unit: unit, openProfile: { _ in calls += 1 }, actions: { _ in
+          AnyView(VStack { Button("解除好友") { calls += 1 }; Button("消息") { calls += 1 }; Button("屏蔽") { calls += 1 } })
+        }), width: width, padding: 16, dark: dark)
+        _ = try snapshot(host, window: window, name: name, width: width, dark: dark)
         XCTAssertEqual(calls, 0); XCTAssertFalse(window.isVisible)
       }
     }

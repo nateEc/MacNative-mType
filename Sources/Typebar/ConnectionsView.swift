@@ -6,15 +6,17 @@ enum ConnectionActionPolicy {
 
 struct ConnectionsView: View {
   let account: AccountSession
+  let settings: AppSettings
   var body: some View {
     let owner = ConnectionsOwnerIdentity(account: account)
-    ConnectionsSessionView(account: account, owner: owner).id(owner)
+    ConnectionsSessionView(account: account, settings: settings, owner: owner).id(owner)
   }
 }
 
 private struct ConnectionsSessionView: View {
   @Environment(\.dismiss) private var dismiss
   let account: AccountSession
+  let settings: AppSettings
   let owner: ConnectionsOwnerIdentity
   @State private var state = ConnectionsManagementState()
   @State private var refresh = UUID()
@@ -23,7 +25,7 @@ private struct ConnectionsSessionView: View {
   @State private var searchTaskID: UUID?
   @State private var mutationTask: Task<Void, Never>?
   @State private var mutationTaskID: UUID?
-  @State private var selectedConversation: RemotePublicProfile?
+  @State private var destination: ConnectionsDestination?
   private var readIdentity: ConnectionsReadIdentity { .init(owner: owner, account: account, refresh: refresh) }
 
   var body: some View {
@@ -42,7 +44,10 @@ private struct ConnectionsSessionView: View {
             conversation: { profile in
               guard state.canPerform(.remove(profile.id), request: request, account: account),
                 state.displayedSnapshot(request: request, account: account)?.status(for: profile.id) == .friend else { return }
-              selectedConversation = profile
+              destination = .conversation(profile)
+            }, unit: settings.typingSpeedUnit, openProfile: { profile in
+              guard request.isCurrent(account) else { return }
+              destination = .profile(profile)
             })
         } else {
           Text("请先在“设置 → 自建账户”中登录，才能管理好友关系。")
@@ -59,8 +64,13 @@ private struct ConnectionsSessionView: View {
       }
     }
     .frame(minWidth: 440, minHeight: 360)
-    .sheet(item: $selectedConversation) { profile in
-      if owner.isCurrent(account) { DirectConversationView(profile: profile, account: account) }
+    .sheet(item: $destination) { selected in
+      if owner.isCurrent(account) {
+        switch selected {
+        case .conversation(let profile): DirectConversationView(profile: profile, account: account)
+        case .profile(let profile): PublicProfileLoadingView(profileID: profile.id, account: account, settings: settings)
+        }
+      }
     }
     .task(id: request) {
       await state.load(request: request, account: account) { try await account.fetchConnectionsSnapshot(identity: request) }
@@ -98,6 +108,16 @@ private struct ConnectionsSessionView: View {
   }
 }
 
+private enum ConnectionsDestination: Identifiable {
+  case profile(RemotePublicProfile), conversation(RemotePublicProfile)
+  var id: String {
+    switch self {
+    case .profile(let value): "profile/\(value.id)"
+    case .conversation(let value): "conversation/\(value.id)"
+    }
+  }
+}
+
 /// Production form without account/network ownership, for isolated layout QA.
 struct ConnectionsManagementContent: View {
   let ownerID: UUID
@@ -112,6 +132,8 @@ struct ConnectionsManagementContent: View {
   let search: () -> Void
   let action: (ConnectionsMutation) -> Void
   let conversation: (RemotePublicProfile) -> Void
+  var unit: TypingSpeedUnit = .wpm
+  var openProfile: (RemotePublicProfile) -> Void = { _ in }
   @State private var pendingRemoval: UUID?
 
   private func can(_ action: ConnectionsMutation) -> Bool {
@@ -143,7 +165,18 @@ struct ConnectionsManagementContent: View {
       if let snapshot {
         Section("收到的请求") { rows(snapshot, relation: .incomingRequest, empty: "没有待处理的好友请求。") }
         Section("已发送") { rows(snapshot, relation: .outgoingRequest, empty: "没有已发送的好友请求。") }
-        Section("好友") { rows(snapshot, relation: .friend, empty: "还没有好友。可搜索公开展示名发送请求。") }
+        Section("好友对照") {
+          if !snapshot.visibleConnections.contains(where: { $0.relation == .friend }) {
+            Text("还没有好友。可搜索公开展示名发送请求。").foregroundStyle(.secondary)
+          }
+          FriendComparisonView(snapshot: snapshot, unit: unit, openProfile: openProfile, actions: { profile in
+            AnyView(VStack(alignment: .leading, spacing: 5) {
+              Button("解除好友") { pendingRemoval = profile.id }.disabled(!can(.remove(profile.id)))
+              Button("消息") { conversation(profile) }.disabled(!can(.remove(profile.id)))
+              Button("屏蔽", role: .destructive) { action(.block(profile.id)) }.disabled(!can(.block(profile.id)))
+            })
+          })
+        }
         Section("已屏蔽") {
           if snapshot.blockedProfiles.isEmpty { Text("没有已屏蔽用户。").foregroundStyle(.secondary) }
           ForEach(snapshot.blockedProfiles) { profile in
@@ -179,6 +212,8 @@ struct ConnectionsManagementContent: View {
     ForEach(values) { row in
       VStack(alignment: .leading, spacing: 6) {
         profileSummary(row.profile)
+        Text(row.updatedAt, format: .dateTime.year().month().day().hour().minute())
+          .font(.caption2).foregroundStyle(.secondary)
         HStack {
           if relation == .incomingRequest {
             Button("接受") { action(.accept(row.profile.id)) }.disabled(!can(.accept(row.profile.id)))
@@ -197,7 +232,7 @@ struct ConnectionsManagementContent: View {
   }
   private func profileSummary(_ profile: RemotePublicProfile) -> some View {
     VStack(alignment: .leading, spacing: 2) {
-      Text(profile.displayName)
+      Button(profile.displayName) { openProfile(profile) }.buttonStyle(.link)
       Text("最佳 \(profile.bestSpeedText) WPM · \(profile.highestConsistency.formatted(.number.precision(.fractionLength(0...2))))% 稳定 · \(profile.completedResultCount) 次完成 · \(profile.startedTestCount) 次开始")
         .font(.caption).foregroundStyle(.secondary)
     }

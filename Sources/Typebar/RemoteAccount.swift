@@ -1867,8 +1867,9 @@ struct RemoteConnection: Codable, Identifiable, Sendable {
     let updatedAt: Date
 }
 
-private struct RemoteConnectionsResponse: Codable, Sendable {
+struct RemoteConnectionsResponse: Codable, Sendable {
     let connections: [RemoteConnection]
+    let ownerProfile: RemotePublicProfile?
 }
 
 private struct RemoteConnectionRemovalResponse: Codable, Sendable {
@@ -4401,7 +4402,7 @@ final class AccountSession {
             body: Optional<String>.none, response: RemoteBlockedUsersResponse.self)
         try Task.checkCancellation()
         guard identity.isCurrent(self) else { throw RemoteAccountError.accountScopeChanged }
-        return .init(connections: rows.connections, blockedProfiles: blocks.profiles)
+        return .init(connections: rows.connections, blockedProfiles: blocks.profiles, ownerProfile: rows.ownerProfile)
     }
 
     func loadConnectionsSnapshot(identity: ConnectionsReadIdentity,
