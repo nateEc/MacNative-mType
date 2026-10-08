@@ -41,6 +41,7 @@ struct AccountProfileOverviewView: View {
   @Binding var revision: UUID
   @State private var loaded: (request: AccountProfileOverviewLoadID, profile: RemotePublicProfile)?
   @State private var failure: (request: AccountProfileOverviewLoadID, message: String)?
+  @State private var editingIdentity: AccountProfileEditIdentity?
   private var loadID: AccountProfileOverviewLoadID { .init(account: account, revision: revision) }
 
   var body: some View {
@@ -54,7 +55,10 @@ struct AccountProfileOverviewView: View {
         Text("请先登录自建 Typebar 服务。")
           .font(.caption).foregroundStyle(.secondary)
       } else if let loaded, loaded.request == loadID {
-        PublicProfileView(profile: loaded.profile, account: account, settings: settings, isAccountOverview: true)
+        PublicProfileView(profile: loaded.profile, account: account, settings: settings,
+          isAccountOverview: true, editProfile: {
+            editingIdentity = AccountProfileEditIdentity(account: account)
+          })
       } else if let failure, failure.request == loadID {
         Text(failure.message).font(.caption).foregroundStyle(.secondary)
         Button("重试读取概览") { revision = UUID() }
@@ -64,6 +68,13 @@ struct AccountProfileOverviewView: View {
       Divider()
     }
     .task(id: loadID) { await load() }
+    // Keep presentation outside the loaded snapshot branch: an immediate badge
+    // preference update reloads the overview but must not destroy unsaved fields.
+    .sheet(isPresented: Binding(get: { editingIdentity != nil }, set: { if !$0 { editingIdentity = nil } })) {
+      if let editingIdentity {
+        AccountProfileEditorSheet(account: account, identity: editingIdentity)
+      }
+    }
   }
 
   @MainActor private func load() async {

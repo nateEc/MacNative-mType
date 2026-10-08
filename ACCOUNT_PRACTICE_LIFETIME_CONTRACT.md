@@ -1,5 +1,25 @@
 # 账户累计练习、活动与连续天数
 
+## 本人资料编辑与私有徽章增量
+
+实际读取固定 [UserDetails](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/UserDetails.tsx) 和 [EditProfileModal](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/modals/EditProfileModal.tsx)：本人页直接编辑简介、键盘、社交链接、选定徽章及公开活动，保存成功更新 snapshot／失效本人资料查询；失败不关闭或重置表单。名称／头像管理仍导向账户设置。本人徽章读取完整 inventory，而非访客披露后的子集，封禁阻止编辑而不抹掉本人库存。本增量独立实现这些用户路径，不复制 TSX、品牌徽章、图标资产或官方 ID。
+
+`AccountProfileEditor.swift` 提取原有设置表单为唯一共享实现，设置与账户页使用相同字段、服务器校验与保存接口；常驻字段名、简介计数、进度、失败文字、可选空徽章和 Discord 头像开关保留。账户页打开独立可取消编辑 sheet，成功关闭并由实际账户快照身份变化触发重读；设置内保存留在原处。徽章公开开关沿用立即保存，不自动重置其他未保存字段，文字明确区分两种提交；sheet 挂在稳定概览层，不随加载分支销毁。本人私有徽章投影同时要求本人页与登录 UUID 匹配，不受 showAllBadges 或封禁过滤；公开页始终只用服务器公开 DTO，排行榜不变。
+
+会话／服务器与退出重登 ABA 代次固定到编辑器，失效草稿在传输／凭据读取前拒绝；迟到成功、错误 UUID、取消和新会话错误不得覆盖新用户／状态。保存期间同账户资料若另行刷新，不覆盖新值，并明确提示服务端可能已保存、需刷新核对。独立忙碌状态代次只让本次资料请求释放自身占用，不清掉后来操作的忙碌标志；既有其他账户方法的全局并发模式不据此宣称全面重写。关闭时取消本地任务，但已到达服务器的 PATCH 可能已提交，取消不是网络事务回滚；徽章开关已立即保存的变更也不会因取消其他字段而撤销。普通字段草稿保留到明确保存／关闭，不持久保存草稿。
+
+迁移边界：沿用 `PATCH /v1/profiles/me`，两个请求体仍分别只更新资料／选定徽章与 showAllBadges；不改变任何服务 DTO、存储字段、SwiftData 实体、归档、CSV、部署或凭据。旧服务错误保留草稿，旧客户端不受影响；回退代码不需数据回滚。保留 Typebar 现有字符长度与服务格式校验，没有把它冒称为 Zod UTF-16／社交用户名规则完全一致；原版全部校验、徽章目录和协议仍需另行对照。
+
+行为先行接线一项产生四处预期失败（0.648 秒，`/tmp/typebar-owner-editor-red.log`）。首次相关 25 项零失败但一项缺参考环境跳过，不作完整证据；配置固定参考后，相关 35 项零失败零跳过（18.469 秒，`/tmp/typebar-owner-editor-render-focused.log`），包含九项生产组件渲染／实际 NSTextView 输入保留，初版 34 张图位于 `/tmp/typebar-owner-editor-focused-render.EtjBCF`。检查浅深色图后补充常驻字段标签；后续验证见最终记录，初版图片不作最终外观证据。会话内风险复核另以一项确定性失败证明旧资料操作会清除新操作忙碌状态（0.537 秒，`/tmp/typebar-owner-editor-busy-red.log`）；按 root-cause-debugging 定位到无所有权的 defer，增加本地代次守卫，不改所有其他操作的生命周期。
+
+产品外 `check-source-account-profile-editor.mjs` 从固定原文件读取实际 createForm 配置与完整 onSubmit 回调；包装只增加返回配置供取证，form／snapshot／传输／通知为明确自有适配器。32 组字段／选定徽章／活动开关对照，四种 HTTP 状态失败、不完整默认值、缺 snapshot 与服务规范化返回通过；原生草稿逐组核对自己的字段映射。未运行 Solid、TSX UI、TanStack Form 验证器、Zod、真实 HTTP 或浏览器，不以这份有界证据宣称整个编辑器等价；探针登记串行门禁。
+
+最终标签与并发守卫修订后，相关 36 项零失败零跳过（17.928 秒，`/tmp/typebar-owner-editor-final-focused.log`）；新增编辑测试共 11 项，生产渲染类共九项。冻结十个实现／测试／门禁文件的哈希（不含随后补记的三份说明文档），完整门禁退出 0：原生 3,532 项零失败、一个可选耐久跳过（606.210 秒），服务 491 项零失败零跳过（9.976 秒），16 项隔离磁盘冷读 6.676 秒。随后同一冻结代码显式 `TYPEBAR_ENDURANCE_TESTS=1 swift test --skip-build --filter CustomSequentialStreamingTests.testOptionalHundredThousandWordEndurance`，该一项零失败零跳过、145.616 秒。不能把这两次运行合写成同轮全量零跳过。
+
+最终主日志 `/tmp/typebar-owner-editor-verified-readiness.log`，53 份保留日志 `/tmp/typebar-owner-editor-verified-logs.FjCNuD`，耐久 `/tmp/typebar-owner-editor-endurance.log`，冻结清单 `/tmp/typebar-owner-editor-frozen.sha256`。第一次门禁在原生测试前因默认 Redis 8.6.1 不符固定 6.2.6 停止，记录 `/tmp/typebar-owner-editor-complete-readiness.log` 和 `/tmp/typebar-owner-editor-complete-logs.B5NZsm`；重跑只指定既有隔离 6.2.6 服务端二进制，CLI 仍用支持 JSON 的当前版本，不改源码或版本断言，不访问默认 Redis 实例。完整门禁中的有界编辑探针、52 页面证据、1,047 人工项结构、未开窗包／严格签名／原创边界通过；最终 34 张组件图位于 `/tmp/typebar-owner-editor-verified-render.UF2UCC`，新增五张浅深色／未保存刷新／封禁／失效编辑图逐张检查。十个冻结哈希在门禁及耐久后保持一致。既有系统框架警告和真实设备／性能边界不由一次通过证明消失。
+
+设计／决策／迁移／风险复核均在本会话内完成，非外部独立评审。真实账户保存／取消、稳定 sheet 与概览重读、VoiceOver／键盘、最低 macOS／Intel、网络和完整窗口仍待唯一隔离候选验收。分享接收／服务器确认、连续提示／等级细节、主题精确身份、离线目录备份及整个原版功能覆盖仍开放；AccountPage 与完整 goal 保持 active／部分覆盖，不把本轮共享编辑与私有徽章当作完成整个重写。未启动 Typebar 应用或使用真实账户／数据库／Keychain。
+
 ## 本人年度活动增量
 
 固定 [ActivityCalendar](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/profile/ActivityCalendar.tsx)、[完整日历类](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/elements/test-activity-calendar.ts)、[DB 年份 getter](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/db.ts) 与 [认证年度控制器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/backend/src/api/controllers/user.ts) 已实际读取。原版近期与当前年度使用 snapshot，旧年份单次认证读取后缓存；旧年入口受 premium 开关／资格限制。Typebar 沿用无付费设计，开放从加入年到当前年的年份，不引入付费资格、第三方服务或广告。

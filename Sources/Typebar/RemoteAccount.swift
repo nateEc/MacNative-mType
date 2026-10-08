@@ -2155,7 +2155,10 @@ final class AccountSession {
         return cachedAccountTags
     }
     var pendingOAuthRegistration: PendingRemoteOAuthRegistration?
-    var isWorking = false
+    @ObservationIgnored private var accountWorkRevision: UInt64 = 0
+    var isWorking = false {
+        didSet { accountWorkRevision &+= 1 }
+    }
     var statusMessage: String?
 
     init(defaults: UserDefaults = .standard) {
@@ -2668,15 +2671,49 @@ final class AccountSession {
         }
     }
 
-    func updateProfileDetails(_ details: RemoteProfileDetails, selectedBadgeID: String) async -> Bool {
-        guard let token = tokenStore.load(), currentUser != nil else {
-            statusMessage = "请先登录自建 Typebar 服务。"
+    /// The transport is injected by focused tests; the same guard/apply path is
+    /// used by both editor saves and the independent badge-disclosure toggle.
+    func performAccountProfileEdit(
+        identity: AccountProfileEditIdentity, successMessage: String,
+        load: () async throws -> RemoteAccountUser
+    ) async -> Bool {
+        guard !Task.isCancelled, identity.isCurrent(self) else { return false }
+        guard !isWorking else { return false }
+        guard currentUser?.accountSuspended == false else {
+            statusMessage = "此账户已被封禁，不能更改公开资料。"
             return false
         }
+        let originalUser = currentUser
         isWorking = true
-        defer { isWorking = false }
+        let workRevision = accountWorkRevision
+        defer { if accountWorkRevision == workRevision { isWorking = false } }
         do {
-            currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+            let user = try await load()
+            try Task.checkCancellation()
+            guard identity.isCurrent(self) else { return false }
+            guard user.id == identity.scope?.userID else { throw RemoteAccountError.unexpectedResponse }
+            guard currentUser == originalUser else {
+                statusMessage = "保存期间账户资料已刷新，未覆盖新资料；服务端可能已保存，请刷新核对后重试。"
+                return false
+            }
+            currentUser = user
+            statusMessage = successMessage
+            return true
+        } catch {
+            guard !Task.isCancelled, identity.isCurrent(self) else { return false }
+            statusMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func updateProfileDetails(_ details: RemoteProfileDetails, selectedBadgeID: String,
+        identity: AccountProfileEditIdentity? = nil) async -> Bool {
+        let identity = identity ?? AccountProfileEditIdentity(account: self)
+        return await performAccountProfileEdit(identity: identity, successMessage: "公开资料已更新。") {
+            guard let token = tokenStore.load() else {
+                throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
+            }
+            return try await RemoteAccountAPI(endpoint: endpoint).request(
                 path: "v1/profiles/me",
                 method: "PATCH",
                 token: token,
@@ -2685,23 +2722,19 @@ final class AccountSession {
                     selectedBadgeID: selectedBadgeID, showAllBadges: nil),
                 response: RemoteAccountUser.self
             )
-            statusMessage = "公开资料已更新。"
-            return true
-        } catch {
-            statusMessage = error.localizedDescription
-            return false
         }
     }
 
-    func setShowAllBadges(_ showAllBadges: Bool) async {
-        guard let token = tokenStore.load(), currentUser != nil else {
-            statusMessage = "请先登录自建 Typebar 服务。"
-            return
-        }
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+    @discardableResult
+    func setShowAllBadges(_ showAllBadges: Bool, identity: AccountProfileEditIdentity? = nil) async -> Bool {
+        let identity = identity ?? AccountProfileEditIdentity(account: self)
+        return await performAccountProfileEdit(identity: identity, successMessage: showAllBadges
+            ? "已允许公开资料显示全部已获得的 Typebar 徽章。"
+            : "公开资料将只显示你选定的一枚徽章。") {
+            guard let token = tokenStore.load() else {
+                throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
+            }
+            return try await RemoteAccountAPI(endpoint: endpoint).request(
                 path: "v1/profiles/me",
                 method: "PATCH",
                 token: token,
@@ -2710,11 +2743,6 @@ final class AccountSession {
                     selectedBadgeID: nil, showAllBadges: showAllBadges),
                 response: RemoteAccountUser.self
             )
-            statusMessage = showAllBadges
-                ? "已允许公开资料显示全部已获得的 Typebar 徽章。"
-                : "公开资料将只显示你选定的一枚徽章。"
-        } catch {
-            statusMessage = error.localizedDescription
         }
     }
 

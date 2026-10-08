@@ -129,6 +129,44 @@ import XCTest
     }
   }
 
+  func testProductionProfileEditorRendersAndPreservesActualTextEntryAcrossAccountRefresh() throws {
+    try withMount { window, host in
+      let suite = "TypebarTests.editor-render.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+      defer { defaults.removePersistentDomain(forName: suite) }
+      let account = AccountSession(defaults: defaults), id = UUID()
+      let badge = RemotePublicProfileBadge(id: "owned", title: "原创练习徽章", systemImage: "keyboard")
+      func user(bio: String, suspended: Bool = false, showAll: Bool = false) -> RemoteAccountUser {
+        .init(id: id, email: "owned@example.invalid", displayName: "Owned", totalExperience: 0,
+          accountSuspended: suspended, profileDetails: .init(bio: bio, keyboard: "我的键盘",
+            github: "owned", socialHandle: "owned_x", websiteURL: "https://owned.invalid", showActivity: false),
+          authenticationMethods: [.password, .discord], availableBadges: [badge], selectedBadgeID: badge.id,
+          showAllBadges: showAll)
+      }
+      func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+      account.currentUser = user(bio: "初始简介")
+      let identity = AccountProfileEditIdentity(account: account)
+      host.rootView = root(AccountProfileEditor(account: account, user: try XCTUnwrap(account.currentUser), identity: identity), width: 480, padding: 24)
+      _ = try snapshot(host, window: window, name: "profile-editor-light", width: 480)
+      let input = try XCTUnwrap(descendants(host).compactMap { $0 as? NSTextView }.first)
+      XCTAssertEqual(input.string, "初始简介")
+      input.string = "还没有保存的简介"; input.didChangeText()
+      settle(host)
+      account.currentUser = user(bio: "另一次刷新中的简介", showAll: true)
+      _ = try snapshot(host, window: window, name: "profile-editor-unsaved-refresh-light", width: 480)
+      XCTAssertEqual(try XCTUnwrap(descendants(host).compactMap { $0 as? NSTextView }.first).string, "还没有保存的简介")
+      XCTAssertEqual(account.currentUser?.profileDetails.bio, "另一次刷新中的简介")
+      XCTAssertTrue(identity.isCurrent(account)); XCTAssertFalse(window.isVisible)
+      window.appearance = NSAppearance(named: .darkAqua)
+      host.rootView = root(AccountProfileEditor(account: account, user: try XCTUnwrap(account.currentUser), identity: identity), width: 480, padding: 24, dark: true)
+      _ = try snapshot(host, window: window, name: "profile-editor-dark", width: 480, dark: true)
+      account.currentUser = user(bio: "被封禁账户的已有简介", suspended: true)
+      _ = try snapshot(host, window: window, name: "profile-editor-suspended-dark", width: 480, dark: true)
+      account.currentUser = nil
+      _ = try snapshot(host, window: window, name: "profile-editor-expired-dark", width: 480, dark: true)
+      XCTAssertNil(account.currentUser); XCTAssertNil(account.statusMessage); XCTAssertFalse(account.isWorking)
+    }
+  }
+
   func testSameMountedSummaryObservesUnitChangesWhilePrimaryValuesStayInteger() throws {
     try withSettings { settings in try withMount { window, host in
       settings.typingSpeedUnit = .wpm; settings.alwaysShowDecimalPlaces = false
@@ -232,9 +270,13 @@ import XCTest
         if !isOwner { object.removeValue(forKey: "activity") }
         if suspended { object.removeValue(forKey: "allTimeLbs") }
         let model = try JSONDecoder().decode(RemotePublicProfile.self, from: JSONSerialization.data(withJSONObject: object))
-        account.currentUser = .init(id: model.id, email: "owned@example.invalid", displayName: model.displayName, totalExperience: 0)
+        account.currentUser = .init(id: model.id, email: "owned@example.invalid", displayName: model.displayName,
+          totalExperience: 0, accountSuspended: suspended, availableBadges: [
+            .init(id: "owned-1", title: "原创首个练习徽章", systemImage: "keyboard"),
+            .init(id: "owned-2", title: "原创连续练习徽章", systemImage: "flame")], selectedBadgeID: "owned-1")
         window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-        host.rootView = root(PublicProfileView(profile: model, account: account, settings: settings, isAccountOverview: isOwner),
+        host.rootView = root(PublicProfileView(profile: model, account: account, settings: settings,
+          isAccountOverview: isOwner, editProfile: isOwner ? {} : nil),
           width: isOwner ? 700 : 420, padding: isOwner ? 24 : 0, dark: dark)
         _ = try snapshot(host, window: window, name: name, width: isOwner ? 700 : 420, dark: dark)
         if isOwner {

@@ -1049,15 +1049,18 @@ struct PublicProfileView: View {
     let account: AccountSession
     let settings: AppSettings
     var isAccountOverview = false
+    var editProfile: (() -> Void)? = nil
     @State private var connectionMessage: String?
     @State private var isSendingRequest = false
     @State private var showingReport = false
 
+    private var badges: AccountProfileBadgePresentation {
+        AccountProfileBadgePresentation(profile: profile,
+            isAccountOverview: isAccountOverview, user: account.currentUser)
+    }
+
     private var additionalEarnedBadges: [RemotePublicProfileBadge] {
-        PublicBadgeDisclosurePolicy.additionalBadges(
-            earnedBadges: profile.earnedBadges,
-            selectedBadge: profile.selectedBadge
-        )
+        badges.additional
     }
 
     var body: some View {
@@ -1096,25 +1099,33 @@ struct PublicProfileView: View {
                     .foregroundStyle(.secondary)
             }
             Text(profile.displayName).font(.title2.weight(.semibold))
+            if isAccountOverview, profile.id == account.currentUser?.id {
+                Button("编辑资料", systemImage: "pencil") {
+                    editProfile?()
+                }
+                .disabled(editProfile == nil || account.isWorking || profile.accountSuspended || account.currentUser?.accountSuspended == true)
+            }
             if profile.accountSuspended {
                 Label(
                     isAccountOverview
-                        ? "此账户处于部署方封禁状态；公开详情、徽章和头像已隐藏，本人的 PB 与活动仍可读取。"
+                        ? "此账户处于部署方封禁状态；访客不能查看公开详情、徽章和头像，本人的徽章、PB 与活动仍可读取。"
                         : "此账户处于部署方封禁状态；公开详情、活动、徽章和头像已隐藏。",
                     systemImage: "lock.shield")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-            if let badge = profile.selectedBadge {
+            if let badge = badges.selected {
                 Label(badge.title, systemImage: badge.systemImage)
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.tint)
-                    .accessibilityLabel("公开徽章：\(badge.title)")
+                    .accessibilityLabel("\(badges.isPrivateInventory ? "选定徽章" : "公开徽章")：\(badge.title)")
             }
             if !additionalEarnedBadges.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("已获得徽章")
+                    Text(badges.isPrivateInventory
+                        ? (badges.selected == nil ? "我的徽章（仅本人）" : "我的其他徽章（仅本人）")
+                        : "已获得徽章")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                     LazyVGrid(

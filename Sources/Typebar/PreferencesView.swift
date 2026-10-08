@@ -20,14 +20,6 @@ struct PreferencesView: View {
   @State private var registrationDisplayNameAvailability: DisplayNameAvailabilityState = .idle
   @State private var oauthDisplayNameAvailability: DisplayNameAvailabilityState = .idle
   @State private var updatedDisplayNameAvailability: DisplayNameAvailabilityState = .idle
-  @State private var profileBio = ""
-  @State private var profileKeyboard = ""
-  @State private var profileGitHub = ""
-  @State private var profileSocialHandle = ""
-  @State private var profileWebsiteURL = ""
-  @State private var profileShowsActivity = true
-  @State private var profileShowsDiscordAvatar = false
-  @State private var profileSelectedBadgeID = ""
   @State private var publicStreakDayBoundaryOffsetHours = 0.0
   @State private var showingPublicStreakDayBoundaryConfirmation = false
   @State private var showingPaceSpeedEditor = false
@@ -1225,98 +1217,9 @@ struct PreferencesView: View {
               Text("将固定为 \(streakDayBoundaryLabel(for: publicStreakDayBoundaryOffsetHours))，并从现在起判断下一次提交的连续天数。不会重算既有连续天数、活动日历或成绩时间；这个账户之后不能再次更改。")
             }
             Divider()
-            VStack(alignment: .leading, spacing: 9) {
-              Text("公开资料").font(.headline)
-              TextEditor(text: $profileBio)
-                .font(.body)
-                .frame(minHeight: 72)
-                .overlay(alignment: .topLeading) {
-                  if profileBio.isEmpty {
-                    Text("简介（可选，最多 250 个字符）")
-                      .foregroundStyle(.tertiary)
-                      .padding(.horizontal, 5)
-                      .padding(.vertical, 8)
-                      .allowsHitTesting(false)
-                  }
-                }
-              HStack {
-                Spacer()
-                Text("\(profileBio.count)/250")
-                  .font(.caption.monospacedDigit())
-                  .foregroundStyle(.secondary)
-              }
-              TextField("使用的键盘或布局（可选，最多 75 个字符）", text: $profileKeyboard)
-              TextField("GitHub 用户名（可选）", text: $profileGitHub)
-              TextField("X / Twitter 用户名（可选）", text: $profileSocialHandle)
-              TextField("个人网站（https://，可选）", text: $profileWebsiteURL)
-                .textContentType(.URL)
-              Toggle("在公开资料显示活动日历", isOn: $profileShowsActivity)
-              Text("此选项只隐藏日历；累计统计与连续天数仍属于公开基础资料。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-              if user.authenticationMethods.contains(.discord) {
-                Toggle("在公开资料显示 Discord 头像", isOn: $profileShowsDiscordAvatar)
-              } else {
-                Text("关联 Discord 后，可选择在公开资料显示该账户的头像。")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              }
-              Picker("公开资料徽章", selection: $profileSelectedBadgeID) {
-                Text("不显示").tag("")
-                ForEach(user.availableBadges) { badge in
-                  Label(badge.title, systemImage: badge.systemImage).tag(badge.id)
-                }
-              }
-              Toggle(
-                "公开显示全部已获得徽章",
-                isOn: Binding(
-                  get: { user.showAllBadges },
-                  set: { value in Task { await account.setShowAllBadges(value) } }
-                )
-              )
-              .disabled(account.isWorking || user.accountSuspended || user.availableBadges.isEmpty)
-              if user.availableBadges.isEmpty {
-                Text("完成并同步服务端接受的练习后，可在这里选择公开展示的原创徽章。")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              } else {
-                Text("默认只公开上方选定的一枚。开启后，资料页会额外显示其他已获得的 Typebar 原创徽章；排行榜仍只显示选定的一枚。")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              }
-              Button("更新公开资料") {
-                Task {
-                  if await account.updateProfileDetails(
-                    .init(
-                      bio: profileBio, keyboard: profileKeyboard, github: profileGitHub,
-                      socialHandle: profileSocialHandle, websiteURL: profileWebsiteURL,
-                      showActivity: profileShowsActivity,
-                      showDiscordAvatar: profileShowsDiscordAvatar),
-                    selectedBadgeID: profileSelectedBadgeID)
-                  {
-                    profileBio = account.currentUser?.profileDetails.bio ?? profileBio
-                    profileKeyboard = account.currentUser?.profileDetails.keyboard ?? profileKeyboard
-                    profileGitHub = account.currentUser?.profileDetails.github ?? profileGitHub
-                    profileSocialHandle = account.currentUser?.profileDetails.socialHandle ?? profileSocialHandle
-                    profileWebsiteURL = account.currentUser?.profileDetails.websiteURL ?? profileWebsiteURL
-                    profileShowsActivity = account.currentUser?.profileDetails.showActivity ?? profileShowsActivity
-                    profileShowsDiscordAvatar = account.currentUser?.profileDetails.showDiscordAvatar
-                      ?? profileShowsDiscordAvatar
-                    profileSelectedBadgeID = account.currentUser?.selectedBadgeID
-                      ?? profileSelectedBadgeID
-                  }
-                }
-              }
-              .disabled(
-                account.isWorking || user.accountSuspended || profileBio.count > 250 || profileKeyboard.count > 75
-                  || profileGitHub.count > 39 || profileSocialHandle.count > 15
-                  || profileWebsiteURL.count > 200)
-              Text("简介、键盘说明与链接会出现在公开资料；邮箱、令牌和本机练习内容永不公开。关闭活动后，资料页不再展示每日练习日历；Discord 头像仅在你主动开启后显示。公开徽章只来自服务端已接受的成绩。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            .onAppear { loadProfileDetails(user.profileDetails) }
-            .onChange(of: user.profileDetails) { _, details in loadProfileDetails(details) }
+            AccountProfileEditor(account: account, user: user,
+              identity: AccountProfileEditIdentity(account: account))
+              .id(AccountProfileEditIdentity(account: account))
             Divider()
             VStack(alignment: .leading, spacing: 9) {
               Text("开发者密钥").font(.headline)
@@ -2224,17 +2127,6 @@ struct PreferencesView: View {
     .onChange(of: account.resultPublicationScope) { accountResultExportTask?.cancel() }
     .frame(width: 440)
     .padding()
-  }
-
-  private func loadProfileDetails(_ details: RemoteProfileDetails) {
-    profileBio = details.bio
-    profileKeyboard = details.keyboard
-    profileGitHub = details.github
-    profileSocialHandle = details.socialHandle
-    profileWebsiteURL = details.websiteURL
-    profileShowsActivity = details.showActivity
-    profileShowsDiscordAvatar = details.showDiscordAvatar
-    profileSelectedBadgeID = account.currentUser?.selectedBadgeID ?? ""
   }
 
   private func exportRemoteResultsCSV() {
