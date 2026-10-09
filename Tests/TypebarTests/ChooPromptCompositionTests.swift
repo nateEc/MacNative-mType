@@ -13,7 +13,7 @@ import XCTest
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     XCTAssertTrue(source.contains("ChooLayerView.viewportHeight("), "Choo must measure the same independent-layer layout as its displayed prompt")
-    XCTAssertTrue(source.contains("|| renderedPrompt.compositionTextMap != nil"), "Projected Choo must not retain the fixed 184-point viewport")
+    XCTAssertTrue(source.contains("|| rendering.compositionTextMap != nil"), "Projected Choo must not retain the fixed 184-point viewport")
   }
 
   private func render(_ session: TypingSession, _ marked: String = "",

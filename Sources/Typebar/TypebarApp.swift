@@ -2865,6 +2865,9 @@ private struct ContentView: View {
   }
 
   private var typingPanel: some View {
+    // Reuse only within this synchronous view construction. Timer/input
+    // providers below still render their freshly captured session on demand.
+    let rendering = renderedPrompt
     let ignoresSystemReducedMotion = !VisualFunboxReducedMotionPolicy
       .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers)
     return ZStack(alignment: .topLeading) {
@@ -2886,10 +2889,10 @@ private struct ContentView: View {
             Group {
               if !PracticeLineDisplayPolicy.needsOuterViewport(showsAllLines: showsAllPracticeLines,
                 usesTape: usesTapePractice, usesASL: practiceVisualEffect.usesASL, usesChoo: practiceVisualEffect.usesChoo) {
-                practicePrompt
+                practicePrompt(rendering: rendering)
               } else {
                 PracticePromptViewport(
-                  text: renderedPrompt.text, font: practicePromptNSFont(size: settings.fontSize),
+                  text: rendering.text, font: practicePromptNSFont(size: settings.fontSize),
                   lineSpacing: session.configuration.usesJoiningScriptPrompt ? 8 : 12,
                   isRightToLeft: session.configuration.usesRightToLeftPrompt,
                   lineCount: session.configuration.mode == .zen ? 2 : 3,
@@ -2897,11 +2900,11 @@ private struct ContentView: View {
                     fontSize: settings.fontSize, customColumns: settings.customPracticeLineColumns),
                   horizontalTextInset: 4,
                   measuresTextRows: !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
-                    && renderedPrompt.compositionTextMap == nil,
+                    && rendering.compositionTextMap == nil,
                   measuresCustomRows: practiceVisualEffect.usesASL
-                    || renderedPrompt.compositionTextMap != nil
+                    || rendering.compositionTextMap != nil
                 ) {
-                  practicePrompt
+                  practicePrompt(rendering: rendering)
                 }
               }
             }
@@ -3159,9 +3162,8 @@ private struct ContentView: View {
       wrapperRevision: settings.practiceWrapperRevision)
   }
 
-  private var practicePrompt: some View {
+  private func practicePrompt(rendering: PromptRendering) -> some View {
     let _ = settings.localPracticeFontRevision
-    let rendering = renderedPrompt
     let isRightToLeft = session.configuration.usesRightToLeftPrompt
     let usesJoiningScript = session.configuration.usesJoiningScriptPrompt
     return Group {

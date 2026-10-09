@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 同步面板渲染复用与后续输入反例（2026-10-10）
+
+先建立独立组件基线而非猜测性改字符计数。新增 PromptRenderingAssemblyTests 对比逐段原生 AttributedString 前缀偏移 oracle，覆盖空段、组合附标、CR/LF 跨段合并、区域指示旗帜、ZWJ、阿拉伯及候选字符串，逐字属性、渲染顺序和空词身份不变。prompt-assembly-baseline.log 两项通过；100／500／2000 个简单双字符 ASCII 单元组装约 0.44／2.35／9.69ms，没有支持秒级组装假说。prompt-assembly-host-baseline.log 三项通过；离屏 NSHostingView 的 60／300／1200 字形首次布局约 108.13／0.80／0.99ms，颜色更新约 0.89／0.35／0.49ms。首次包含框架冷启动，不能直接作长度比值；简单固定文本、无窗口／完整 ContentView、无自动化输入／IME，不能代表实际应用性能。时间仅输出证据，无脆弱墙钟性能通过阈值。
+
+源码发现一次普通 typingPanel 构建中 viewport 的 text、两个组合字段条件及 practicePrompt 各自调用 renderedPrompt。改为一次同步 let rendering，并显式传给 practicePrompt(rendering:)；无跨帧缓存、会话写入或规则变化。异步主光标 latestRendering、Tape／ASL／Choo 的最新会话投影仍按请求读取当前状态。字体 revision 依赖保留。panel-render-snapshot-red.log 源码门禁一项七个预期失败，不是实际计时行为红测。首轮 panel-render-snapshot-verified.log 348 项有四失败一跳过：两处旧变量名检查，以及缺 Anime.js 固定归档的参考探针。只更新同含义检查中的局部变量名，补 TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE，原始失败日志保留。panel-render-snapshot-pinned.log 权威退出 0：348 项零失败零跳过，31.285 秒（墙钟 31.325）。原创边界 panel-render-snapshot-originality.log 退出 0。同会话风险复核未发现跨异步复用；不是独立审计或全量验收。
+
+构建新隔离包 ../../work/Typebar-Panel-Snapshot-20261010.app，独立域 app.typebar.qa.panelsnapshot20261010、内存记录，panel-render-snapshot-package.log 退出 0。原始运行句柄的日志 panel-render-snapshot-runtime.log：普通 30 秒题首次 l 处理 0.000819 秒，首次交付间隔 1.262959、elapsed=1.229689、drift=0.229689、severe=0、failed=0，之后到第 16 秒未失败。这比此前样本不同，但题文／环境不同，不给出确定性能提升比例。继续 typeText 输入 antern canyon voyage 后，第 17 秒 drift=0.430164、severe=1；第 18 秒交付间隔 1.254772、drift=0.684953、severe=2、failed=1。实际结果为计时失败、不保存、22/0/0/0、3/3 词正确。它明确证明同步复用未消除全部计时故障；不能只凭首次暂未失败宣称修复。没有单次慢重建记录。
+
+退出操作原始主进程正常退出 0，但同一工具调用随后读取 AX 意外重新唤起应用，出现由 launchd 托管的 PID 39735（PPID 1）；原始日志不覆盖这个重启进程。立即只发 ⌘Q、不再读取 AX，随后 pgrep 无 Typebar。两次实例先后存在，无证据表明并发运行，但本轮不能写“总共只启动一个实例”。没有 TERM；记录并改进退出验证流程：主进程权威终态后只查进程，不调用可能唤起应用的 UI 状态读取。真实用户域未改，测试包数据仍隔离。未重跑完整 readiness／实际设备 IME，完整 goal active。
+
 ## 固定字数模式的题长反向对照（2026-10-10）
 
 本轮仅启动一个已有隔离 QA 包 Typebar-Render-Duration-20261010.app，二进制对应 b7ca8d6；当前仓库 6cca172 仅增加文档，无产品差异。独立偏好域 app.typebar.qa.renderduration20261010、内存记录，屏幕键盘全程关闭，English／字数模式／正确首字母物理输入，按 10 → 200 → 10 词执行。每次通过同一自定义字数编辑器应用并重开，题文随机生成，不声称逐字相同；没有切换健康策略或模式。完整数值证据为 ../../work/word-length-timer-runtime.log。
