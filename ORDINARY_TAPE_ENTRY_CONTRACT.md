@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 固定光标宿主尺寸协商局部反证（2026-10-10）
+
+沿失败前布局采样检查 PromptCaretNativeView.paint：光标由原生 frame 定位，其内容是独立 NSHostingView。按源码驱动技能读取已安装 Xcode macOS SDK 的 SwiftUI.swiftinterface，确认 NSHostingView.sizingOptions 与 NSHostingSizingOptions 在 macOS 13 起可用，低于项目最低 macOS 14；接口仅证明签名和可用性，不据此推断框架内部耗时或默认行为。
+
+新增探索性 CaretHostingSizingProbeTests，不先制造失败，因为目的为检验假设而非已知缺陷修复。真实不可见 NSWindow 中挂载生产 PromptCaretMarkerView 的 block 样式，分别保留默认 sizingOptions 和设为空；20 次替换尺寸／原生位置后逐项确认 frame 不被改写，并实际缓存绘制、确认中心红色非透明像素。caret-host-sizing-probe.log 一项通过（0.264s）：默认 invalidations=2、0.075282s，空选项 invalidations=3、0.064689s。计时含交付窗口及冷启动，固定顺序，不能当作公平性能提升证明。
+
+caret-host-sizing-regression.log 与原生光标、pace 调度和统计观察范围共 33 项零失败零跳过（1.364s，墙钟 1.370）；再次局部记录为 0.061045／0.058450s。没有复现秒级停顿或尺寸失效显著减少，故不将空 sizingOptions 写入生产。局部小宿主不排除完整父页面约束传播，但目前不足以支持它是主要责任边界；后续继续检查完整练习图的更新范围和实际尺寸路径，不通过猜测性框架配置修改来宣称修复。本轮零 Typebar 主程序启动、无产品行为改变、无全量门禁，完整 goal 继续开放。
+
 ## 首键触发的失败前短采样（2026-10-10）
 
 复用 80e090e Release QA 包，不重建／改产品；唯一 PID 46648、主会话 38242。首次尝试先启动一秒 sample 再通过工具按 planet 的 p，采样会话 6592 退出 0 后立即读取的运行日志还没有 input-started，故 stats-scope-pre-result-sample.txt 仅为输入前基线，不能声称覆盖首键。其主线程 854 样本、797 个事件等待样本。随后 stats-scope-short-sample-runtime.log 记录输入 0.000636s、首次 deliveryGap=1.273300、elapsed=1.229440、drift=0.229440、failed=0，提示三次合计 0.030217s；第二个迟交 0.659039s 后交付恢复约 100ms。活动状态 AX 实际显示 13s，后续日志到 23 秒仍 failed=0，再用 ⌘R 重置；不是完成或有效成绩，但新增生产倒计时能前进的实机证据。
