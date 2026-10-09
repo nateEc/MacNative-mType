@@ -1,5 +1,7 @@
 # Typebar
 
+当前 [单行退休字段身份](ORDINARY_TAPE_ENTRY_CONTRACT.md#单行退休字段身份增量2026-10-10)修正共享 glyph ID 时漏发前缀移除；十六组合与 188 项 Tape 回归零失败零跳过，原创性通过。零主程序启动，应用快照构造／入口启用、方向和真实 IME 仍开放，完整门禁未重跑、goal active。
+
 当前 [Tape SwiftUI 投影桥接](ORDINARY_TAPE_ENTRY_CONTRACT.md#swiftui-投影桥接增量2026-10-10)传递显式字段、隐藏规则和最新快照 provider；实际不可见宿主中的高度／光标及免模型更新刷新已验证。188 项 Tape 回归零失败零跳过、原创性通过，零主程序启动。应用层保护尚未解除，退休上下文／方向及真实 IME 仍开放，完整门禁未重跑、goal active。
 
 当前 [完整事务的独立 pace 验证](ORDINARY_TAPE_ENTRY_CONTRACT.md#完整事务的独立-pace-验证2026-10-10)覆盖多行跨字段候选刷新、canonical 目标位置及不呈现主光标；187 项 Tape 回归零失败零跳过、原创性通过。本轮只新增测试，初次参照漏执行 filler 重排的失败已保留并校正。零主程序启动，应用接线／复杂队列／方向与实机仍开放，goal active。

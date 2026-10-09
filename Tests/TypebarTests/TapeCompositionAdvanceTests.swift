@@ -14,7 +14,7 @@ import XCTest
   }
 
   func testProjectedCrossWordRetirementUsesFieldBoxesAndAcknowledgesPrefixWithoutJump() throws {
-    for rtl in [false, true] { for mode in [PracticeTapeMode.letter, .word] { for legacyOffsets in [false, true] {
+    for rtl in [false, true] { for mode in [PracticeTapeMode.letter, .word] { for legacyOffsets in [false, true] { for sharedIDs in [false, true] {
       var session = TypingSession(configuration: .words(7), prompt: "aaa bbb ccc ddd eee fff ggg")
       session.insertBatch("aaa bbb ", at: start)
       let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
@@ -35,9 +35,9 @@ import XCTest
           mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
         view.configure(rendering: rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
           compositionField: field, mode: mode, margin: 0.25, smoothScroll: false,
-          retirement: .init(attemptID: session.automaticInputAttemptID, activeWordID: session.promptWordPresentations[field.index].range.lowerBound,
+          retirement: .init(attemptID: session.automaticInputAttemptID, activeWordID: sharedIDs ? 0 : session.promptWordPresentations[field.index].range.lowerBound,
             characterOffsets: rendering.glyphCharacterOffsets, smoothScroll: false, reducesMotion: true,
-            words: session.promptWordPresentations.enumerated().map { .init(index: $0.offset, glyphID: $0.element.range.lowerBound) },
+            words: session.promptWordPresentations.enumerated().map { .init(index: $0.offset, glyphID: sharedIDs ? 0 : $0.element.range.lowerBound) },
             firstRetainedWordIndex: session.firstRetainedPromptWordIndex, onRetire: { retired.append($0) }),
           carets: config, at: time)
         view.present(at: time)
@@ -60,7 +60,7 @@ import XCTest
       RunLoop.main.run(until: Date().addingTimeInterval(0.01))
       XCTAssertEqual(retired.count, 1)
       XCTAssertEqual(coordinator.main.cumulativeTapeCorrection, rtl ? -width : width, accuracy: 0.001)
-    } } }
+    } } } }
   }
 
   func testAcceptedPrefixDoesNotAdvanceToMarkedCandidateEnd() throws {

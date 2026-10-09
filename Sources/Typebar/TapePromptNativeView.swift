@@ -367,7 +367,8 @@ final class TapePromptNativeView: NSView {
     pendingRetirement = nil
     guard let context = retirement, context.onRetire != nil,
       context.attemptID == configuration?.attemptID,
-      let active = context.words.first(where: { $0.glyphID == context.activeWordID })?.index else { return }
+      let active = textView.usesFieldProjection ? compositionField?.index
+        : context.words.first(where: { $0.glyphID == context.activeWordID })?.index else { return }
     var boundary = max(context.firstRetainedWordIndex, notifiedRetirementIndex)
     // Inspect the last presented words margin, not the destination requested
     // by this input. Single-line word boxes are ordered along the tape.

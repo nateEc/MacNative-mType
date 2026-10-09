@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 单行退休字段身份增量（2026-10-10）
+
+prepareRetirement 在字段投影路径使用 compositionField.index 作为活动索引；旧非投影路径继续通过上下文 glyph ID 查找。此前投影词框虽按字段索引读取，活动字段仍依赖 glyph ID，共享 ID 时错认首词并漏发前缀移除。改动不新增退休状态机，也不改通知／补偿规则。
+
+既有跨词退休测试增加共享上下文 glyph ID 维度，共方向 × letter／word × 旧偏移目录有无 × 独立／共享 ID 十六组合；检查实际移除、确认后的主光标稳定、一次补偿与重复确认。共享 ID 是主动构造边界，不是实际部分 canonical 字素或 IME 可达性证明。`../../work/tape-single-field-identity-red.log` 单项八处漏通知失败；修复后 `../../work/tape-single-field-identity-verified.log` 188 项零失败零跳过，24.597 秒（wall 24.620 秒），进程退出 0。`../../work/tape-single-field-identity-originality.log` 原创性检查退出 0；范围内差异审查无其他待修正项。
+
+零主程序启动，无新增截图；应用实时 snapshot 构造、入口启用、初始新鲜配置、复杂队列、连接塑形／方向和真实设备仍开放。完整冻结门禁未重跑，整体兼容分类不升级，完整 goal active。
+
 ## SwiftUI 投影桥接增量（2026-10-10）
 
 TapePracticePrompt 与私有 TapePromptBridge 传递 compositionField、hidesCompositionExtras 和 latestProjection。session 初始化器仅在 rendering 含 map 时绑定实际字段，从 session 读取 hideExtraLetters，provider 默认 nil；旧调用保留默认值和旧布局。没有改动应用层 `!usesTapePractice` 渲染保护，也没有声称用户已能通过应用入口使用该功能。
