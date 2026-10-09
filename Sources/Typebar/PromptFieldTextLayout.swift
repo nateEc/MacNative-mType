@@ -122,17 +122,19 @@ struct PromptFieldTextRun: Equatable {
         boxes.append(box); groups.append(group)
       }
       var pending: [PromptFieldTextRun.Cell] = []
-      for cell in field.cells {
-        let breaks = cell.glyph.character == "\n" && cell.glyph.state != .extra
+      // A Return icon is a letter inside the word. The structural boundary
+      // follows the entire container, including accepted/marked extras.
+      let breaksAfterField = field.cells.contains { $0.glyph.character == "\n" && $0.glyph.state != .extra }
+      for (index, cell) in field.cells.enumerated() {
+        let breaks = breaksAfterField && index == field.cells.count - 1
         if joinsLetters && !cell.isGap {
           pending.append(cell)
-          if breaks { append(pending, breaks: true); pending = [] }
         } else {
           if !pending.isEmpty { append(pending); pending = [] }
           append([cell], breaks: breaks)
         }
       }
-      if !pending.isEmpty { append(pending) }
+      if !pending.isEmpty { append(pending, breaks: breaksAfterField) }
       for _ in 0..<field.removedReturns { append([], breaks: true) }
     }
     let geometry = ASLPromptFlowGeometry(cells: boxes.enumerated().map { index, box in

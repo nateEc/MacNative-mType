@@ -5064,11 +5064,55 @@ struct TypingSession {
       }
     }
     let placeholder = configuration.mode == .zen ? promptCaretGlyphIndex : nil
-    let indices = glyphs.indices.filter { $0 < targetCount || $0 == placeholder || !configuration.rules.hideExtraLetters }
+    let returns = promptCompositionReturnCorrections(field: field, glyphs: glyphs, owners: owners)
+    let indices = glyphs.indices.filter { !returns.suppressed.contains($0)
+      && ($0 < targetCount || $0 == placeholder || !configuration.rules.hideExtraLetters) }
+    let caret = promptCaretGlyphIndex.flatMap { returns.overrides[$0] != nil || returns.suppressed.contains($0) ? nil : $0 }
     return .init(glyphs: glyphs, indices: indices, targetGlyphCount: targetCount, field: field,
-      composition: composition, style: style, canonicalCaret: promptCaretGlyphIndex,
+      composition: composition, style: style, canonicalCaret: caret,
       zenPlaceholder: placeholder, extraOwners: owners,
-      firstRetainedFieldIndex: firstRetainedPromptWordIndex, removedFieldIndices: removedTapePromptWordIndices)
+      firstRetainedFieldIndex: firstRetainedPromptWordIndex, removedFieldIndices: removedTapePromptWordIndices,
+      glyphOverrides: returns.overrides)
+  }
+
+  /// Source Return is a displayed target letter, although legacy navigation
+  /// may leave that target unassigned and classify its wrong input as extra.
+  /// Reconcile only the read-only projection using actual field snapshots.
+  private func promptCompositionReturnCorrections(field: PromptCompositionField,
+    glyphs: [TypingPromptGlyph], owners: [Int: Int])
+    -> (overrides: [Int: TypingPromptGlyph], suppressed: Set<Int>) {
+    guard field.boundary == .separated, field.sourceTargetUTF16.contains(10) else { return ([:], []) }
+    var inputs = acceptedUnits.map { buffer in
+      buffer.starts.indices.map { buffer.field($0, withoutCommit: true) }
+    } ?? retainedInputWords(omittingEmptySubsequences: false).map { Array($0.utf16) }
+    while inputs.count <= field.index { inputs.append([]) }
+    inputs[field.index] = field.inputUTF16
+    var returnIDs: [Int: Int] = [:], unit = 0
+    for (id, character) in promptCharacters.enumerated() {
+      if character == "\n" { returnIDs[unit] = id }
+      unit += String(character).utf16.count
+    }
+    var extras: [Int: [Int]] = [:]
+    for (id, owner) in owners { extras[owner, default: []].append(id) }
+    var overrides: [Int: TypingPromptGlyph] = [:], suppressed: Set<Int> = []
+    for (owner, range) in field.sourceFieldUTF16Ranges.enumerated() {
+      guard !range.isEmpty, inputs.indices.contains(owner),
+        let id = returnIDs[range.upperBound - 1], glyphs.indices.contains(id),
+        glyphs[id].state != .correct || configuration.rules.blindMode else { continue }
+      let target = String(decoding: field.sourceTargetUTF16[range], as: UTF16.self).unicodeScalars
+      let input = Array(String(decoding: inputs[owner], as: UTF16.self).unicodeScalars)
+      let position = target.count - 1
+      guard position >= 0, input.indices.contains(position), input[position] != "\n" else { continue }
+      let entered = Character(String(input[position]))
+      let extra = extras[owner]?.sorted().first
+      // Do not infer scalar ownership inside a fused legacy extra grapheme.
+      if let extra, glyphs.indices.contains(extra), glyphs[extra].character != entered { continue }
+      overrides[id] = .init(character: "\n",
+        state: glyphs[id].state == .hidden ? .hidden : configuration.rules.blindMode ? .correct : .incorrect,
+        typedCharacter: entered)
+      if let extra { suppressed.insert(extra) }
+    }
+    return (overrides, suppressed)
   }
 
   /// A split target can be correct even when its fused canonical glyph is

@@ -48,8 +48,9 @@ function letters(html) {
     placeholder: /\binvisible\b/.test(attributes),
   }));
 }
-const fixtures = [], unicodeFixtures = [];
-for (const [collection, values] of [[fixtures, samples], [unicodeFixtures, unicodeSamples]])
+const returnSamples = [['aa\n', 'aax', ''], ['aa\n', 'aaxy', ''], ['aa\n', 'aa', 'XY'], ['aa\n', 'aax', 'Y']];
+const fixtures = [], unicodeFixtures = [], returnFixtures = [];
+for (const [collection, values] of [[fixtures, samples], [unicodeFixtures, unicodeSamples], [returnFixtures, returnSamples]])
 for (const mode of ['words', 'zen']) for (const style of ['off', 'below', 'replace'])
 for (const [original, input, composition] of values) {
   let html = '', position;
@@ -75,9 +76,10 @@ for (const [original, input, composition] of values) {
   const cells = letters(html), tail = cells.slice(Array.from(input).length);
   if (mode === 'words') assert.equal(tail.filter(value => value.marked).length, composition.length);
   if (mode === 'zen' && composition !== '') assert.ok(!cells.some(value => value.placeholder));
-  collection.push({mode, style, display, input, composition, tail, letterIndex: position.letterIndex});
+  collection.push({mode, style, display, input, composition, cells, tail, letterIndex: position.letterIndex});
 }
 assert.equal(fixtures.length, 132); assert.equal(unicodeFixtures.length, 36);
+assert.equal(returnFixtures.length, 24);
 const emoji = unicodeFixtures.find(value => value.mode === 'words' && value.style === 'replace'
   && value.input === 'a' && value.composition === '😀');
 assert.deepEqual(emoji.tail.slice(0, 2).map(value => value.textUnits), [[0xD83D], [0xDE00]],
@@ -141,5 +143,5 @@ for (const sample of fieldSamples) {
 assert.equal(fieldFixtures.length, 15);
 assert.deepEqual(fieldFixtures[8].inputUnits, [55357], 'Never decode a retained lone surrogate into a replacement unit');
 verify();
-if (option) process.stdout.write(JSON.stringify({pin, fixtures, unicodeFixtures, fieldFixtures}));
-else console.log('Composition projection source passed (132 complete word-update/caret cases, 36 explicit Unicode cases and 15 complete Words/event-getter/update/caret field cases; seeded snapshots and owned DOM/RAF/cache bindings, no insertion/navigation/browser/IME parity; source mixed UTF-16/scalar defects retained)');
+if (option) process.stdout.write(JSON.stringify({pin, fixtures, unicodeFixtures, fieldFixtures, returnFixtures}));
+else console.log('Composition projection source passed (132 complete word-update/caret cases, 36 explicit Unicode cases, 24 Return cases and 15 complete Words/event-getter/update/caret field cases; seeded snapshots and owned DOM/RAF/cache bindings, no insertion/navigation/browser/IME parity; source mixed UTF-16/scalar defects retained)');

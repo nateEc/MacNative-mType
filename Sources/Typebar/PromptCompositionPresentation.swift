@@ -38,7 +38,7 @@ struct PromptCompositionPresentation {
           : session.promptCompositionFragmentGlyph(cell, source: source, field: field)
         if !pending, completed.contains(cell.sourceSlices[0].glyphID) { completedIndices.insert(index) }
       } else {
-        glyph = original[cell.id]
+        glyph = cell.sourceGlyphOverride ?? original[cell.id]
         if completed.contains(cell.id) { completedIndices.insert(index) }
       }
       glyphs.append(glyph)

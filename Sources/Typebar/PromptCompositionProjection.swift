@@ -20,6 +20,7 @@ struct PromptCompositionProjection {
     let sourceFieldIndex: Int?
     let targetUTF16Range: Range<Int>?
     let role: Role
+    var sourceGlyphOverride: TypingPromptGlyph? = nil
     var text: String { String(decoding: displayUTF16, as: UTF16.self) }
     var compositionIndex: Int? {
       if case .composition(let index, _) = role { return index }
@@ -53,7 +54,8 @@ struct PromptCompositionProjection {
   init(glyphs: [TypingPromptGlyph], indices: [Int], targetGlyphCount: Int,
     field: PromptCompositionField, composition: String, style: CompositionDisplayStyle,
     canonicalCaret: Int?, zenPlaceholder: Int? = nil, extraOwners: [Int: Int] = [:],
-    firstRetainedFieldIndex: Int = 0, removedFieldIndices: Set<Int> = []) {
+    firstRetainedFieldIndex: Int = 0, removedFieldIndices: Set<Int> = [],
+    glyphOverrides: [Int: TypingPromptGlyph] = [:]) {
     let plan = PromptCompositionPlan(field: field, composition: composition, style: style)
     referenceLetterUnitIndex = plan.referenceLetterUnitIndex
     let ranges = field.sourceFieldUTF16Ranges
@@ -157,7 +159,8 @@ struct PromptCompositionProjection {
         let whole = local == units.indices
         output.append(.init(id: whole ? id : virtualID(), displayUTF16: Array(units[local]),
           sourceSlices: [.init(glyphID: id, glyphUTF16Range: local, glyphUTF16Count: units.count)],
-          sourceFieldIndex: sourceOwner, targetUTF16Range: span, role: whole ? .original : .fragment))
+          sourceFieldIndex: sourceOwner, targetUTF16Range: span, role: whole ? .original : .fragment,
+          sourceGlyphOverride: whole ? glyphOverrides[id] : nil))
       }
     }
     emitEvents(through: Int.max)

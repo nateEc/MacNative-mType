@@ -246,6 +246,50 @@ import XCTest
       Color.green.opacity(0))
   }
 
+  func testReturnContainerBreaksAfterItsExtrasRatherThanImmediatelyAfterTheIcon() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "aa\nbb")
+    session.insertBatch("aaxy", at: start)
+    let result = try render(session), map = try XCTUnwrap(result.compositionTextMap)
+    let cells = try XCTUnwrap(map.fieldRuns.first { $0.fieldID == 0 }).cells
+    XCTAssertEqual(cells.map(\.glyph.character), ["a", "a", "\n", "y"])
+    for rtl in [false, true] {
+      for joins in [false, true] {
+        let layout = PromptFieldTextLayout(map: map, width: 400, font: font, rightToLeft: rtl, joinsLetters: joins)
+        let first = try XCTUnwrap(layout.cellFrames[cells[0].id])
+        for cell in cells { XCTAssertEqual(layout.cellFrames[cell.id]?.minY, first.minY) }
+        XCTAssertGreaterThan(try XCTUnwrap(layout.fieldFrames[1]).minY, try XCTUnwrap(layout.fieldFrames[0]).maxY)
+      }
+    }
+  }
+
+  func testReturnProjectionKeepsTrueExtrasAndCommittedHistory() throws {
+    for accepted in ["aaxy", "aaxy ", "aa\nb"] {
+      var session = TypingSession(configuration: .words(2), prompt: "aa\nbb")
+      session.insertBatch(accepted, at: start)
+      let before = session.typed
+      let result = try render(session)
+      let first = try XCTUnwrap(result.compositionTextMap?.fieldRuns.first { $0.fieldID == 0 })
+      XCTAssertEqual(first.cells.map { $0.glyph.character }, accepted.hasPrefix("aaxy") ? ["a", "a", "\n", "y"] : ["a", "a", "\n"], accepted)
+      XCTAssertEqual(session.typed, before)
+      XCTAssertEqual(first.cells[2].glyph.state, accepted.hasPrefix("aaxy") ? .incorrect : .correct, accepted)
+    }
+  }
+
+  func testWrongInputAtTheReturnTargetDoesNotAlsoBecomeAnExtraSlot() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "aa\nbb")
+    session.insertBatch("aax", at: start)
+    let field = try XCTUnwrap(session.promptCompositionField)
+    XCTAssertEqual(field.targetUTF16, Array("aa\n".utf16))
+    XCTAssertEqual(field.inputUTF16, Array("aax".utf16))
+    // The pinned updateWordLetters iterates three input scalars here. Its
+    // third letter is the incorrect Return target, not Return plus extra x.
+    let cells = try XCTUnwrap(render(session).compositionTextMap?.fieldRuns.first { $0.fieldID == 0 }).cells
+    XCTAssertEqual(cells.count, 3)
+    let target = try XCTUnwrap(cells.first { $0.glyph.character == "\n" })
+    XCTAssertEqual(target.glyph.state, .incorrect)
+    XCTAssertEqual(target.glyph.typedCharacter, "x")
+  }
+
   func testPendingViewportCallbackCannotFireAfterStopOrRetainTheView() throws {
     let result = try render(TypingSession(configuration: .words(2), prompt: "ab cd"))
     weak var released: PromptFieldNativeView?

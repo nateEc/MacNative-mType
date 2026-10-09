@@ -96,14 +96,23 @@ import XCTest
     XCTAssertTrue(try rejects(session, candidate: "ccxxxx", columns: 5.2))
   }
 
-  func testExtraFollowingTargetReturnKeepsTheActualExistingStructuralRow() throws {
+  func testWrongReturnTargetAndActualExtrasShareOneContainer() throws {
     var session = TypingSession(configuration: .words(2), prompt: "aa\nbb")
     session.insertBatch("aax", at: start)
     let current = try XCTUnwrap(rendering(session).compositionTextMap)
-    XCTAssertEqual(current.fieldRuns.filter { $0.fieldID == 0 }.flatMap(\.cells).map(\.glyph.character), ["a", "a", "\n", "x"])
-    XCTAssertFalse(try rejects(session, candidate: "aaxy", columns: 3.2))
+    XCTAssertEqual(current.fieldRuns.filter { $0.fieldID == 0 }.flatMap(\.cells).map(\.glyph.character), ["a", "a", "\n"])
+    XCTAssertTrue(try rejects(session, candidate: "aaxy", columns: 3.2))
     XCTAssertTrue(try rejects(session, candidate: "aaxyyy", columns: 3.2))
     XCTAssertFalse(try rejects(session, candidate: "aaxy", columns: 8.2))
+  }
+
+  func testReturnFieldAdmissionCountsExtrasBeforeTheContainerBreak() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "aa\nbb")
+    session.insertBatch("aaxy", at: start)
+    // Four slots fit on the first row. A fifth must not be admitted into an
+    // invented row after the Return icon: the break follows the whole word.
+    XCTAssertTrue(try rejects(session, candidate: "aaxyz", columns: 4.2))
+    XCTAssertFalse(try rejects(session, candidate: "aaxyz", columns: 5.2))
   }
 
   func testRTLAndJoiningFlagsDoNotReintroduceGlobalWordReflow() throws {
