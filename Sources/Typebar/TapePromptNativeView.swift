@@ -85,6 +85,7 @@ final class TapePromptNativeView: NSView {
       newlineWords: newlineWords, rightToLeft: carets.rightToLeft))
     let inputChanged = nextInput != lastInput
     let previousWordID = self.retirement?.activeWordID
+    let previousFieldIndex = self.compositionField?.index
     let previousWordTop = previousWordID.flatMap { retirementWordRect($0)?.minY }
     let resets = configuration == nil || configuration?.attemptID != carets.attemptID
       || configuration?.coordinator !== carets.coordinator || configuration?.font != carets.font
@@ -125,6 +126,7 @@ final class TapePromptNativeView: NSView {
     } else { removedWidth = nil }
     let onlyAcknowledgesPrefix = (removedWidth != nil || acknowledgesNativePrefix || acknowledgesNativeWords) && nextInput == lastInput
       && self.retirement?.activeWordID == retirement?.activeWordID
+      && self.compositionField?.index == compositionField?.index
       && configuration?.mainGlyphID == carets.mainGlyphID
     needsScroll = needsScroll || resets || (!onlyAcknowledgesPrefix && (self.anchorCharacterIndex != anchorCharacterIndex
       || nextInput != lastInput
@@ -158,7 +160,9 @@ final class TapePromptNativeView: NSView {
     textView.configure(text: rendering.text, font: carets.font, rightToLeft: carets.rightToLeft,
       newlineWords: newlineWords, resets: resets,
       compositionMap: nextMap)
-    if !resets, previousWordID != retirement?.activeWordID {
+    let changedWord = textView.usesMultilineProjection
+      ? previousFieldIndex != compositionField?.index : previousWordID != retirement?.activeWordID
+    if !resets, changedWord {
       beginNewlineTransition(previousTop: previousWordTop, at: time)
     } else if inputChanged {
       // Same-word input owns an independent scrollTape, even while the
@@ -368,7 +372,7 @@ final class TapePromptNativeView: NSView {
     }
     defer { newlineJumpCount += 1 }
     guard newlineJumpCount > 0,
-      let boundary = textView.retirementBoundary(before: active, hideBound: previousTop),
+      let boundary = textView.retirementBoundary(before: active, fieldIndex: compositionField?.index, hideBound: previousTop),
       boundary > textView.firstRetainedNewlineIndex else { return }
     pendingNewlineJumps += 1
     awaitsWordScroll = true
@@ -382,7 +386,7 @@ final class TapePromptNativeView: NSView {
 
   private func retirementWordRect(_ glyphID: Int) -> CGRect? {
     if textView.usesMultilineProjection {
-      guard let index = retirement?.words.first(where: { $0.glyphID == glyphID })?.index else { return nil }
+      guard let index = compositionField?.index else { return nil }
       return textView.projectedFieldRect(index)
     }
     return rendering.characterOffset(forGlyphAt: glyphID)
@@ -396,7 +400,9 @@ final class TapePromptNativeView: NSView {
     config.coordinator.wordsDidFinish(at: time)
     // Input stays available during the await. If it moved back into the
     // captured prefix, never discard the currently active native word.
-    if let active = retirement?.words.first(where: { $0.glyphID == retirement?.activeWordID })?.index,
+    let activeIndex = textView.usesMultilineProjection ? compositionField?.index
+      : retirement?.words.first(where: { $0.glyphID == retirement?.activeWordID })?.index
+    if let active = activeIndex,
       active >= pending.retirement.firstRetainedWordIndex,
       let width = textView.retireNewlinePrefix(before: pending.retirement.firstRetainedWordIndex) {
       config.coordinator.tapeWordsRemoved(width: config.rightToLeft ? -width : width)
@@ -753,7 +759,11 @@ private final class TapePromptTextView: NSView {
     guard let newlineLayout else { return }
     newlineLayout.sample(at: time); needsDisplay = true
   }
-  func retirementBoundary(before activeGlyphID: Int, hideBound: CGFloat) -> Int? {
+  func retirementBoundary(before activeGlyphID: Int, fieldIndex: Int? = nil, hideBound: CGFloat) -> Int? {
+    if usesMultilineProjection {
+      guard let fieldIndex else { return nil }
+      return newlineLayout?.retirementBoundary(before: fieldIndex, hideBound: hideBound)
+    }
     guard let layout = newlineLayout, let active = newlineWords.first(where: { $0.glyphID == activeGlyphID }) else { return nil }
     return layout.retirementBoundary(before: active.index, hideBound: hideBound)
   }

@@ -1,5 +1,7 @@
 # Typebar
 
+当前 [多行字段身份与 filler 隔离](ORDINARY_TAPE_ENTRY_CONTRACT.md#多行投影字段身份与-filler-隔离增量2026-10-10)消除共享 glyph ID 对跨行事务和缩进通道的影响；十六组合加 filler 反例、最终 185 项相关回归零失败零跳过，原创性通过。一次未复现通知失败及事件等待修正均保留。零主程序启动，完整门禁未重跑；真实部分字素／复杂队列／实时快照和应用入口／IME 仍开放，goal active。
+
 当前 [多行投影纵向退休事务](ORDINARY_TAPE_ENTRY_CONTRACT.md#多行投影纵向退休事务增量2026-10-10)接通字段框跨行检测和保留 map 的前缀重建；新增八组合确认／停止反例，184 项 Tape 回归零失败零跳过、原创性通过，零主程序启动。完整门禁未重跑；共享 canonical 字段、复杂队列、多行实时快照与生产入口／IME 仍开放，goal active。
 
 当前 [多行投影 owner 与双光标](ORDINARY_TAPE_ENTRY_CONTRACT.md#多行投影-owner-与双光标几何增量2026-10-10)接通实际文字层、字段接受推进和主／canonical pace 几何；新增无旧偏移目录的四组合反例，183 项 Tape 相关回归零失败零跳过，四张实际 owner 图及原创性通过。零主程序启动；仅固定配置快照，纵向退休／多行实时刷新／应用入口及方向／IME 仍开放，完整门禁未重跑、goal active。

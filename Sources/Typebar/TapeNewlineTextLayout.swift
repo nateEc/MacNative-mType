@@ -166,10 +166,10 @@ import AppKit
       rowHeight = max(rowHeight, word.bounds.height)
       inline += word.bounds.width + gap
       if descriptor.ownsNewline {
-        row += 1; inline = 0; precedingBreak = descriptor.glyphID
+        row += 1; inline = 0; precedingBreak = descriptor.index
       }
     }
-    let liveBreaks = Set(descriptors.filter(\.ownsNewline).map(\.glyphID))
+    let liveBreaks = Set(descriptors.filter(\.ownsNewline).map(\.index))
     indents = indents.filter { liveBreaks.contains($0.key) }
     rowHeight += 12
     let rows = (words.last?.row ?? -1) + 1
@@ -221,20 +221,20 @@ import AppKit
     duration: TimeInterval, time: TimeInterval, overflowing: (Int, CGRect) -> Bool)
     -> (advance: CGFloat, compensation: CGFloat, removedWords: Set<Int>)? {
     let frames = Dictionary(uniqueKeysWithValues: words.map { ($0.descriptor.index, frame($0)) })
-    let glyphIDs = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.index, $0.glyphID) })
-    let margins = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.index, indents[$0.glyphID]?.tapeMargin ?? 0) })
+    let knownIndices = Set(descriptors.map(\.index))
+    let margins = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.index, indents[$0.index]?.tapeMargin ?? 0) })
     guard let pass = flow.scroll(active: active.descriptor.index, viewportWidth: viewportWidth,
       overflowing: { index in frames[index].map { overflowing(index, $0) } ?? false },
       fillerMargin: { margins[$0] ?? 0 }) else { return nil }
-    let liveFillers = Set(flow.nodes.filter { $0.kind == .afterNewline }.compactMap { glyphIDs[$0.index] })
+    let liveFillers = Set(flow.nodes.filter { $0.kind == .afterNewline }.map(\.index))
     indents = indents.filter { liveFillers.contains($0.key) }
     for (index, target) in pass.indents {
-      guard let id = glyphIDs[index] else { continue }
-      var channel = indents[id] ?? .init()
+      guard knownIndices.contains(index) else { continue }
+      var channel = indents[index] ?? .init()
       let correction = (pass.fillerCorrections[index] ?? 0) + pendingPrefixCorrection
       if correction != 0 { channel.shiftTapeOrigin(by: -correction) }
       channel.tapeScroll(to: target, at: time, duration: duration)
-      indents[id] = channel
+      indents[index] = channel
     }
     pendingPrefixCorrection = 0
     reflowConnectedBoxes(); updateOrigin()
@@ -243,7 +243,6 @@ import AppKit
 
   private func reflowConnectedBoxes() {
     let byIndex = Dictionary(uniqueKeysWithValues: words.map { ($0.descriptor.index, $0) })
-    let glyphIDs = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.index, $0.glyphID) })
     let gaps = Dictionary(uniqueKeysWithValues: wordMetrics.map { ($0.index, $0.gap) })
     words = []; wordByOffset = [:]; rowsByNode = [:]
     var row = 0, occupiedRow = -1, inline: CGFloat = 0, preceding: Int?
@@ -259,7 +258,7 @@ import AppKit
         occupiedRow = max(occupiedRow, row)
       case .beforeNewline: occupiedRow = max(occupiedRow, row)
       case .newline: row += 1; inline = 0; preceding = nil
-      case .afterNewline: preceding = glyphIDs[node.index]
+      case .afterNewline: preceding = node.index
       }
     }
     metrics = .init(contentHeight: CGFloat(occupiedRow + 1) * metrics.rowHeight, rowHeight: metrics.rowHeight)
@@ -278,14 +277,14 @@ import AppKit
   func request(_ plan: TapeNewlinePlan, duration: TimeInterval, at time: TimeInterval) {
     for word in words {
       guard let target = plan.indents[word.descriptor.index] else { continue }
-      var channel = indents[word.descriptor.glyphID] ?? .init()
+      var channel = indents[word.descriptor.index] ?? .init()
       if pendingPrefixCorrection != 0 {
         // Only the fillers visited by this scroll request are rebased. Far
         // future fillers keep their old values until their own lookahead.
         channel.shiftTapeOrigin(by: -pendingPrefixCorrection)
       }
       channel.tapeScroll(to: target, at: time, duration: duration)
-      indents[word.descriptor.glyphID] = channel
+      indents[word.descriptor.index] = channel
     }
     pendingPrefixCorrection = 0
     updateOrigin()

@@ -151,13 +151,14 @@ import XCTest
   }
 
   func testProjectedVerticalRetirementKeepsMapAndAcknowledgesPrefixOnce() throws {
-    for rtl in [false, true] { for smooth in [false, true] { for cancels in [false, true] {
+    for rtl in [false, true] { for smooth in [false, true] { for cancels in [false, true] { for sharedID in [false, true] {
       var session = TypingSession(configuration: .words(4), prompt: "a\nb\nc\ntail")
       let coordinator = PromptCaretMotionCoordinator()
       let owner = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 160))
       defer { owner.stop() }
       let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
       var retired: [PromptWordRetirement] = []
+      let delivered = XCTestExpectation(description: "Retirement rtl=\(rtl), smooth=\(smooth), shared=\(sharedID)")
       func configure(at time: Double) throws {
         let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: "XYZ😀", style: .replace))
         let original = presentation.render { _, glyph, cell in AttributedString(cell?.text ?? String(glyph.character)) }
@@ -177,10 +178,10 @@ import XCTest
         owner.configure(rendering: rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
           compositionField: field, mode: .letter, margin: 0.25, smoothScroll: smooth,
           retirement: .init(attemptID: session.automaticInputAttemptID,
-            activeWordID: session.promptWordPresentations[field.index].range.lowerBound,
+            activeWordID: sharedID ? 0 : session.promptWordPresentations[field.index].range.lowerBound,
             characterOffsets: [:], smoothScroll: smooth, reducesMotion: false,
-            words: session.promptWordPresentations.enumerated().map { .init(index: $0.offset, glyphID: $0.element.range.lowerBound) },
-            firstRetainedWordIndex: session.firstRetainedPromptWordIndex, onRetire: { retired.append($0) }),
+            words: session.promptWordPresentations.enumerated().map { .init(index: $0.offset, glyphID: sharedID ? 0 : $0.element.range.lowerBound) },
+            firstRetainedWordIndex: session.firstRetainedPromptWordIndex, onRetire: { retired.append($0); delivered.fulfill() }),
           newlineWords: descriptors, carets: config, at: time)
       }
       try configure(at: 0)
@@ -197,8 +198,8 @@ import XCTest
       owner.present(at: 1.05)
       if smooth { XCTAssertLessThan(coordinator.wordsMargin, 0) }
       owner.present(at: 1.113)
-      RunLoop.main.run(until: Date().addingTimeInterval(0.002))
-      XCTAssertEqual(retired.map(\.firstRetainedWordIndex), [1])
+      wait(for: [delivered], timeout: 1)
+      XCTAssertEqual(retired.map(\.firstRetainedWordIndex), [1], "rtl=\(rtl), smooth=\(smooth), shared=\(sharedID)")
       guard let removal = retired.first else { continue }
       let main = try XCTUnwrap(coordinator.main.position), pace = try XCTUnwrap(coordinator.pace.position)
       let correction = coordinator.pace.cumulativeTapeCorrection
@@ -211,6 +212,36 @@ import XCTest
       RunLoop.main.run(until: Date().addingTimeInterval(0.002))
       XCTAssertEqual(retired.count, 1)
       XCTAssertEqual(session.typed, "a\nb\n")
-    } } }
+    } } } }
+  }
+
+  func testSharedCanonicalIDsDoNotMergeDistinctReturnFillerChannels() throws {
+    let session = TypingSession(configuration: .words(4), prompt: "a\nbbbb\ncc\ntail")
+    let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: "X", style: .replace))
+    let rendering = presentation.render { _, glyph, cell in AttributedString(cell?.text ?? String(glyph.character)) }
+    let original = TapePromptProjection.words(session: session, rendering: rendering)
+    let shared = original.map { word in
+      TapePromptWord(index: word.index, glyphID: 0, characters: word.characters,
+        newlineCharacterOffset: word.newlineCharacterOffset, incorrectNewline: word.incorrectNewline,
+        hasStructuralNewline: word.hasStructuralNewline, isRemoved: word.isRemoved,
+        controlCharacterOffsets: word.controlCharacterOffsets)
+    }
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    for rtl in [false, true] {
+      let reference = TapeNewlineTextLayout(), aliased = TapeNewlineTextLayout()
+      for (native, descriptors) in [(reference, original), (aliased, shared)] {
+        native.configure(text: rendering.text, words: descriptors, font: font, rightToLeft: rtl,
+          resets: true, compositionMap: rendering.compositionTextMap)
+        _ = try XCTUnwrap(native.requestProjectedScroll(fieldID: 1, acceptedUTF16Count: 0,
+          mode: .word, hidesExtras: false, viewportWidth: 400, duration: 0.125, time: 0,
+          overflowing: { _, _ in false }))
+      }
+      for time in [0.0, 0.06, 0.125] {
+        reference.sample(at: time); aliased.sample(at: time)
+        for id in 0..<4 {
+          XCTAssertEqual(aliased.projectedFieldRect(id), reference.projectedFieldRect(id), "field=\(id), time=\(time), rtl=\(rtl)")
+        }
+      }
+    }
   }
 }

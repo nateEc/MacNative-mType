@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 多行投影字段身份与 filler 隔离增量（2026-10-10）
+
+多行投影 owner 的跨词判定、活动词框、纵向退休边界和完成时活动字段保护改用 compositionField.index；canonical glyph ID 不再充当字段唯一身份。前缀纯确认也要求字段索引不变。TapeNewlineTextLayout 的 precedingBreak、存活 filler 过滤、动画 channel、重排及计划请求统一按稳定词／字段索引存储；canonical alias 仍仅负责字形关联。旧非投影 owner 的字符查找逻辑保留。
+
+退休测试扩展为方向 × 动效 × 确认／停止 × 退休上下文共享／独立 glyph ID，共十六组合；另新增 Return 描述共享 ID 的 filler 隔离测试，对照独立 ID 在 0／60／125ms 的真实字段框。两者主动构造身份冲突，不是实际 IME 或共享 canonical 字素的可达性证明。`../../work/tape-field-identity-red.log` 一项六处失败，修复字段事务后 verified.log 184 项仍有一次异步退休通知缺失；加入组合标签后的 diagnostic.log 单项未复现。原测试只运行主队列 2ms，而产品回调没有该时限约定，故改为等待实际事件（1 秒上限），没有改产品通知或重试。那次失败的具体触发原因仍未证明，不宣称已确定根因。
+
+`../../work/tape-filler-identity-red.log` 一项八处失败准确暴露 filler 通道合并；修复后 `../../work/tape-field-identity-final.log` 185 项 Tape 相关回归零失败零跳过（24.334 秒，墙钟 24.356 秒），originality.log 通过（同目录 tape-field-identity- 前缀）。行为先行、有界会话内三轮决策／风险检查及根因排查为本会话工作，不是独立审计。零 Typebar 主程序启动、终态零测试／编译残留，无新图或完整门禁复跑。
+
+真实部分字素字段、其余仍使用 canonical 词身份的路径、复杂异步队列、实际 RTL／连接塑形、多行／跨词实时快照、生产入口和 IME／设备仍开放；通知失败保留为待观察证据。应用保护、配置与整体兼容分类不升级，goal active。
+
 ## 多行投影纵向退休事务增量（2026-10-10）
 
 跨行检测改为通过退休上下文的词身份读取真实投影字段框，不再要求旧字符偏移。原生前缀移除按存活字段框与已展示 leading edge 计算补偿；newlineSource 保留 compositionMap，在退休后的原生重建中继续使用投影词盒，避免退回旧 Character 目录。原有首跳策略、独立横纵动画与异步通知 revision 保护保持。
