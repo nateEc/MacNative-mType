@@ -270,4 +270,147 @@ import XCTest
       XCTAssertEqual(session.typed, "אבג ד")
     }
   }
+
+  func testFreshSnapshotUpdatesAcceptedAdvanceBeforeRepresentableConfiguration() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "abcd next")
+    let attempt = session.automaticInputAttemptID
+    func snapshot(_ marked: String) throws -> TapePromptProjectionSnapshot {
+      .init(input: .init(attemptID: attempt, typed: session.typed, composition: marked,
+        glyphID: session.promptCaretGlyphIndex), field: try XCTUnwrap(session.promptCompositionField),
+        rendering: try render(session, marked: marked))
+    }
+    var current = try snapshot("")
+    var reads = 0
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    let coordinator = PromptCaretMotionCoordinator()
+    let config = PromptCaretNativeView.Configuration(text: current.rendering.text, mainOffset: nil, paceOffset: nil,
+      mainStyle: .bar, paceStyle: .off, font: font, lineSpacing: 0, rightToLeft: false,
+      accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+      attemptID: attempt, coordinator: coordinator, mainGlyphID: 0, automaticallyPresents: false)
+    let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 80))
+    defer { view.stop() }
+    view.configure(rendering: current.rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+      compositionField: current.field, latestProjection: { reads += 1; return current },
+      mode: .letter, margin: 0.25, smoothScroll: false, carets: config, at: 0)
+    session.insertBatch("a", at: start); current = try snapshot("XYZ")
+    let before = reads
+    view.present(at: 1)
+    XCTAssertEqual(reads - before, 1, "One immutable snapshot per owner presentation")
+    XCTAssertEqual(-coordinator.wordsTapeMargin, ("a" as NSString).size(withAttributes: [.font: font]).width, accuracy: 0.001)
+    XCTAssertEqual(view.accessibilityLabel(), String(current.rendering.text.characters))
+    XCTAssertEqual(try XCTUnwrap(coordinator.main.position).minX, 100, accuracy: 0.001)
+    XCTAssertEqual(session.typed, "a")
+  }
+
+  private func freshView(_ initial: TapePromptProjectionSnapshot,
+    provider: @escaping () -> TapePromptProjectionSnapshot?)
+    -> (TapePromptNativeView, PromptCaretMotionCoordinator) {
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    let coordinator = PromptCaretMotionCoordinator()
+    var config = PromptCaretNativeView.Configuration(text: initial.rendering.text, mainOffset: nil, paceOffset: nil,
+      mainStyle: .bar, paceStyle: .outline, font: font, lineSpacing: 0, rightToLeft: false,
+      accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+      attemptID: initial.input.attemptID, coordinator: coordinator,
+      mainGlyphID: initial.input.glyphID, automaticallyPresents: false)
+    config.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: false, targetAfter: false, fraction: 1, targetGlyphID: 5) }
+    let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 80))
+    view.configure(rendering: initial.rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+      compositionField: initial.field, latestProjection: provider, mode: .word,
+      margin: 0.25, smoothScroll: false, carets: config, at: 0)
+    return (view, coordinator)
+  }
+
+  private func snapshot(_ session: TypingSession, marked: String, attempt: UUID? = nil) throws -> TapePromptProjectionSnapshot {
+    .init(input: .init(attemptID: attempt ?? session.automaticInputAttemptID, typed: session.typed,
+      composition: marked, glyphID: session.promptCaretGlyphIndex), field: try XCTUnwrap(session.promptCompositionField),
+      rendering: try render(session, marked: marked))
+  }
+
+  func testIndependentPaceRequestRefreshesCandidateGeometryBeforePresentation() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "abcd next")
+    session.insertBatch("a", at: start)
+    var current = try snapshot(session, marked: "X")
+    var reads = 0
+    let (view, coordinator) = freshView(current, provider: { reads += 1; return current })
+    defer { view.stop() }
+    let caret = try XCTUnwrap(view.subviews.compactMap { $0 as? PromptCaretNativeView }.first)
+    _ = caret.requestPacePosition(at: 0)
+    let oldPace = try XCTUnwrap(coordinator.pace.position)
+    let oldMain = try XCTUnwrap(coordinator.main.position)
+    current = try snapshot(session, marked: "XYZ123")
+    let before = reads
+    _ = caret.requestPacePosition(at: 1, fromDeadline: true)
+    XCTAssertEqual(reads - before, 1)
+    XCTAssertGreaterThan(try XCTUnwrap(coordinator.pace.position).minX, oldPace.minX + 1)
+    XCTAssertEqual(coordinator.main.position, oldMain, "A pace deadline must not paint or position main")
+    XCTAssertEqual(view.accessibilityLabel(), String(current.rendering.text.characters))
+    view.present(at: 1)
+    XCTAssertGreaterThan(try XCTUnwrap(coordinator.main.position).minX, oldMain.minX + 1)
+    XCTAssertEqual(coordinator.wordsTapeMargin, 0)
+  }
+
+  func testUnavailableOldAttemptAndCrossFieldSnapshotsCannotReplaceCurrentLayout() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "abcd next")
+    session.insertBatch("a", at: start)
+    let initial = try snapshot(session, marked: "X")
+    var current: TapePromptProjectionSnapshot? = initial
+    var reads = 0
+    let (view, coordinator) = freshView(initial, provider: { reads += 1; return current })
+    defer { view.stop() }
+    let label = view.accessibilityLabel(), main = coordinator.main.position
+    current = nil; view.present(at: 1)
+    XCTAssertEqual(view.accessibilityLabel(), label); XCTAssertEqual(coordinator.main.position, main)
+    current = try snapshot(session, marked: "ZZZ", attempt: UUID()); view.present(at: 2)
+    XCTAssertEqual(view.accessibilityLabel(), label); XCTAssertEqual(coordinator.main.position, main)
+    session.insertBatch("bcd ", at: start)
+    current = try snapshot(session, marked: "ZZZ"); view.present(at: 3)
+    XCTAssertNotEqual(current?.field.index, initial.field.index)
+    XCTAssertEqual(view.accessibilityLabel(), label, "Cross-field retirement needs a complete transaction")
+    view.stop(); let before = reads; view.present(at: 4)
+    XCTAssertEqual(reads, before, "Detached owners must not read a retained provider")
+  }
+
+  func testReentrantSnapshotReadCannotStartAnotherProviderRead() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "abcd next")
+    let current = try snapshot(session, marked: "XY")
+    var owner: TapePromptNativeView?, reenter = false, reads = 0
+    let (view, _) = freshView(current, provider: {
+      reads += 1
+      if reenter { reenter = false; owner?.present(at: 1) }
+      return current
+    })
+    owner = view; defer { view.stop(); owner = nil }
+    reenter = true; let before = reads; view.present(at: 1)
+    XCTAssertEqual(reads - before, 1, "A bounded reentry must reuse the last coherent snapshot")
+  }
+
+  func testStoppingDuringProviderReadDiscardsTheReturnedSnapshot() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "abcd next")
+    let initial = try snapshot(session, marked: "X"), next = try snapshot(session, marked: "XYZ123")
+    var owner: TapePromptNativeView?, stopOnRead = false
+    let (view, coordinator) = freshView(initial, provider: {
+      if stopOnRead { owner?.stop(); return next }
+      return initial
+    })
+    owner = view; defer { view.stop(); owner = nil }
+    let old = view.accessibilityLabel()
+    stopOnRead = true; view.present(at: 1)
+    XCTAssertEqual(view.accessibilityLabel(), old, "A cancelled callback must not install new text")
+    XCTAssertFalse(coordinator.isAnimatingTape)
+  }
+
+  func testPaceDeadlineStopsWhenItsFreshProviderDetachesTheOwner() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "abcd next")
+    let initial = try snapshot(session, marked: "X")
+    var owner: TapePromptNativeView?, stopOnRead = false
+    let (view, _) = freshView(initial, provider: {
+      if stopOnRead { owner?.stop() }
+      return initial
+    })
+    owner = view; defer { view.stop(); owner = nil }
+    let caret = try XCTUnwrap(view.subviews.compactMap { $0 as? PromptCaretNativeView }.first)
+    stopOnRead = true
+    XCTAssertNil(caret.requestPacePosition(at: 1, fromDeadline: true), "An in-flight cancelled deadline must not continue with captured configuration")
+  }
 }

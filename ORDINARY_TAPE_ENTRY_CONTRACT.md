@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 同字段 fresh snapshot 与取消边界增量（2026-10-10）
+
+TapePromptProjectionSnapshot 一次主线程读取绑定 input identity、原始字段和最终渲染。实际投影 owner 在展示前、独立 pace 请求读取同字段快照，更新文字、实测槽框、接受推进与主／pace；同次 owner 展示复用缓存，不重复调用 provider。缺失、旧 attempt、跨字段或结构行变化不覆盖当前模型；完整跨词退休事务仍交给后续配置。停止释放 provider；回调返回后复核 generation／attempt／协调器，不能让已停止或被替换 owner 安装快照。
+
+六新增验证接受推进无需下一次配置、独立 pace 截止点先刷新候选而不定位主光标、缺失／旧 attempt／跨词拒绝及停止后不读 provider、有限重入、回调中停止、pace 回调中停止。共享 PromptCaretNativeView 在读取 latestInput 后确认配置仍有效，修正停止后的旧局部配置继续执行；无新时钟或产品依赖，不改输入、计分、回放和存储。
+
+`../../work/tape-projection-fresh-red.log` 为快照类型／接口缺失；first.log 一项通过，expanded.log 三项一处失败发现重入读取两次，将保护移至回调前后 fixed.log 十五项通过。这三个成功／扩展日志亦位于 `../../work/`，前缀 tape-projection-fresh-。持久证据 `../../work/tape-projection-fresh.QRh0qZ/` 的 verified.log 131 项通过；stop-red.log 一项失败准确暴露停止后仍安装新文字，修正 generation 后 final.log 132 项通过；pace-stop-red.log 一项失败暴露共享 pace 继续返回旧 frame，修正共享入口后 terminal.log 最终 151 项零失败零跳过（6.746 秒，墙钟 6.763 秒），固定参考／动画归档环境齐备。
+
+行为先行、决策复核及风险复核为本会话有界检查，不是独立审计。三轮反例为重入、owner 停止与独立 pace 停止，保留失败证据；跨词／多行、混合方向、连接塑形及任意异步顺序仍开放。独立 pace 量测使用原生 uptime，确定性测试采用即时动效，不据此宣称平滑队列／任意 RAF 等价。本轮无新增持久组件图，组件窗口不可见并关闭，零 Typebar 主程序启动。应用层保护未解除，完整门禁另行冻结验证，兼容分类不升级、goal active。
+
 ## RTL 投影与有限自然坐标增量（2026-10-10）
 
 实际单行投影组件支持同向 RTL：共享 PromptFieldTextLayout 新增显式 unbounded，外层使用实测自然总宽、内部连接字段不因测量提案折行，RTL 镜像不再依赖十亿点提案；默认有界排版、复用隔离与普通生产路径保持不变。Tape 接受推进按 leading edge 与活动字段右边界计算，主 letter 光标右端锁定边距、word 按活动词右端平移；pace 别名使用同一有限坐标。投影方向查询不再读旧文字 storage，而按逐槽文本／原始字段目标及既有方向策略解析。

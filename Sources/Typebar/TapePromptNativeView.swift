@@ -12,6 +12,10 @@ final class TapePromptNativeView: NSView {
   private var wordAnchorCharacterIndex = 0
   private var compositionField: PromptCompositionField?
   private var hidesCompositionExtras = false
+  private var latestProjection: (() -> TapePromptProjectionSnapshot?)?
+  private var projectionInput: PromptCaretInputIdentity?
+  private var refreshingProjection = false
+  private var presentingProjection = false
   private var wordStartCharacterOffsets: [Int: Int] = [:]
   private var checksDirectionPerGlyph = false
   private var mode: PracticeTapeMode = .off
@@ -53,13 +57,29 @@ final class TapePromptNativeView: NSView {
   func configure(rendering: PromptRendering, anchorCharacterIndex: Int, wordAnchorCharacterIndex: Int,
     wordStartCharacterOffsets: [Int: Int] = [:],
     compositionField: PromptCompositionField? = nil, hidesCompositionExtras: Bool = false,
+    latestProjection: (() -> TapePromptProjectionSnapshot?)? = nil,
     checksDirectionPerGlyph: Bool = false,
     mode: PracticeTapeMode, margin: Double, smoothScroll: Bool,
     retirement: PromptLineScrollContext? = nil,
     newlineWords: [TapePromptWord] = [], onMetrics: ((TapePromptLayoutMetrics) -> Void)? = nil,
     onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil,
     carets: PromptCaretNativeView.Configuration, at time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
-    let nextInput = carets.latestInput?()
+    let candidate: TapePromptProjectionSnapshot? = {
+      guard !refreshingProjection else { return nil }
+      refreshingProjection = true
+      defer { refreshingProjection = false }
+      return latestProjection?()
+    }()
+    let initial = candidate.flatMap { value -> TapePromptProjectionSnapshot? in
+      guard value.input.attemptID == carets.attemptID,
+        value.field.index == compositionField?.index,
+        TapePromptTextView.supportsProjection(value.rendering.compositionTextMap,
+          newlineWords: newlineWords, rightToLeft: carets.rightToLeft) else { return nil }
+      return value
+    }
+    let rendering = initial?.rendering ?? rendering
+    let compositionField = initial?.field ?? compositionField
+    let nextInput = initial?.input ?? carets.latestInput?()
     let nextMap = compositionField == nil ? nil : rendering.compositionTextMap
     let nextUsesProjection = TapePromptTextView.supportsProjection(nextMap,
       newlineWords: newlineWords, rightToLeft: carets.rightToLeft)
@@ -119,6 +139,7 @@ final class TapePromptNativeView: NSView {
     }
     self.anchorCharacterIndex = anchorCharacterIndex; self.wordAnchorCharacterIndex = wordAnchorCharacterIndex
     self.compositionField = compositionField; self.hidesCompositionExtras = hidesCompositionExtras
+    self.latestProjection = latestProjection; projectionInput = nextInput
     self.wordStartCharacterOffsets = wordStartCharacterOffsets
     self.checksDirectionPerGlyph = checksDirectionPerGlyph
     self.onMetrics = onMetrics
@@ -203,6 +224,16 @@ final class TapePromptNativeView: NSView {
     config.glyphRect = { [weak self] id in self?.glyphRect(id, main: false) }
     config.mainGlyphRect = { [weak self] id in self?.glyphRect(id, main: true) }
     if textView.projectedLayout != nil {
+      if latestProjection != nil {
+        let fallback = projectionInput ?? .init(attemptID: config.attemptID, typed: "", composition: "", glyphID: config.mainGlyphID)
+        config.latestInput = { [weak self] in
+          self?.refreshProjection(at: ProcessInfo.processInfo.systemUptime)
+          return self?.projectionInput ?? fallback
+        }
+        config.latestGlyphID = { [weak self] in self?.projectionInput?.glyphID }
+        let fallbackRendering = rendering
+        config.latestRendering = { [weak self] in self?.rendering ?? fallbackRendering }
+      }
       config.fieldMainRect = { [weak self] style in self?.projectedMainRect(style: style) }
       config.fieldPaceRect = { [weak self] id, after in
         guard let self, let rect = self.textView.projectedLayout?.canonicalRect(id, after: after) else { return nil }
@@ -226,6 +257,36 @@ final class TapePromptNativeView: NSView {
       lastScrollAdvance = projectedAdvance() ?? textView.advance(at: anchorCharacterIndex,
         wordStart: wordStartCharacterOffsets[anchorCharacterIndex], mode: mode, rightToLeft: config.rightToLeft)
     }
+  }
+
+  private func refreshProjection(at time: TimeInterval) {
+    guard !presentingProjection, !refreshingProjection, let config = configuration,
+      textView.projectedLayout != nil, let oldField = compositionField else { return }
+    // Guard the callback itself, not only the model rebuild following it.
+    let revision = retirementRevision
+    refreshingProjection = true
+    defer { refreshingProjection = false }
+    guard let next = latestProjection?(), retirementRevision == revision,
+      configuration?.attemptID == config.attemptID, configuration?.coordinator === config.coordinator,
+      next.input.attemptID == config.attemptID,
+      next.field.index == oldField.index,
+      TapePromptTextView.supportsProjection(next.rendering.compositionTextMap,
+        newlineWords: textView.newlineWords, rightToLeft: config.rightToLeft) else { return }
+    guard projectionInput != next.input || oldField.inputUTF16 != next.field.inputUTF16
+      || rendering.text != next.rendering.text
+      || rendering.compositionTextMap?.fieldRuns != next.rendering.compositionTextMap?.fieldRuns
+      || rendering.compositionTextMap?.canonicalAliases != next.rendering.compositionTextMap?.canonicalAliases
+      || rendering.compositionTextMap?.caret != next.rendering.compositionTextMap?.caret else { return }
+    projectionInput = next.input; lastInput = next.input
+    compositionField = next.field; rendering = next.rendering
+    textView.configure(text: rendering.text, font: config.font, rightToLeft: config.rightToLeft,
+      newlineWords: [], resets: false, compositionMap: rendering.compositionTextMap)
+    geometryRevision &+= 1; needsScroll = true
+    // Prefix retirement and structural transitions still belong to the full
+    // representable transaction. A same-field refresh cannot acknowledge them.
+    updateGeometry(at: time, retiresWords: false)
+    caretView.invalidateGeometry()
+    setAccessibilityLabel(String(rendering.text.characters))
   }
 
   private func projectedAdvance() -> CGFloat? {
@@ -408,7 +469,10 @@ final class TapePromptNativeView: NSView {
 
   /// Deterministic component entry point; also used by the bounded native timer.
   func present(at time: TimeInterval) {
+    refreshProjection(at: time)
     guard let config = configuration else { return }
+    presentingProjection = true
+    defer { presentingProjection = false }
     config.coordinator.sample(at: time)
     textView.sampleNewlines(at: time)
     if let pendingNewline, time >= pendingNewline.deadline.nextDown {
@@ -447,6 +511,7 @@ final class TapePromptNativeView: NSView {
   }
 
   func stop() {
+    latestProjection = nil; projectionInput = nil
     retirementRevision &+= 1
     metricsRevision &+= 1; onMetrics = nil; reportedMetrics = nil
     textView.stopNewlines()

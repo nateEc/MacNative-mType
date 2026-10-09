@@ -1,5 +1,7 @@
 # Typebar
 
+当前 [Tape 同字段快照](ORDINARY_TAPE_ENTRY_CONTRACT.md#同字段-fresh-snapshot-与取消边界增量2026-10-10)在下一次配置前同步文字、接受推进与光标，独立 pace 也读取新快照；拒绝旧 attempt／跨词，修复重入及停止后的旧回调。151 项相关回归零失败零跳过，失败证据保留，零主程序启动。应用层保护与跨词／多行／方向／退休／实机边界保留，完整门禁另行冻结验证，goal active。
+
 当前 [Tape RTL 投影组件](ORDINARY_TAPE_ENTRY_CONTRACT.md#rtl-投影与有限自然坐标增量2026-10-10)支持同向 RTL 接受推进、右边距主光标与有限坐标 pace；无界字段量测不改变默认有界排版。相关 111 项零失败零跳过，两张不可见组件图已查看，零主程序启动。应用层保护未解除，多行／混合方向／fresh provider／退休及实机仍开放，完整门禁未重跑、goal active。
 
 当前 [Tape 投影组件](ORDINARY_TAPE_ENTRY_CONTRACT.md#实际-tape-owner-投影组件增量2026-10-10)已在实际原生 owner 支持显式字段的单行 LTR 绘制、虚拟槽主光标与 canonical pace，已提交推进独立于候选终点。相关 96 项零失败零跳过，两张不可见窗口组件图已检查；切回旧布局漏滚的失败与修复记录保留。零主程序启动；应用层保护尚未解除，多行／方向／fresh provider／退休／实机仍待完成，完整门禁未重跑、goal active。

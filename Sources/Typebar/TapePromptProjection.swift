@@ -1,5 +1,13 @@
 import Foundation
 
+/// One main-actor read binds input identity, raw field units and final slots.
+/// It does not mutate the typing session or replace a representable transaction.
+struct TapePromptProjectionSnapshot {
+  let input: PromptCaretInputIdentity
+  let field: PromptCompositionField
+  let rendering: PromptRendering
+}
+
 /// Word identity and structural ownership come from the session, never from
 /// splitting the displayed string (which can contain replacement/hint text).
 enum TapePromptProjection {

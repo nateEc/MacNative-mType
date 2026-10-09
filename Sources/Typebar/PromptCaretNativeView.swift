@@ -178,6 +178,8 @@ final class PromptCaretNativeView: NSView {
     guard let config = configuration, bounds.width > 0 else { return }
     let coordinator = config.coordinator
     let latest = config.latestInput?()
+    guard configuration?.attemptID == config.attemptID,
+      configuration?.coordinator === coordinator else { return }
     coordinator.prepare(attemptID: latest?.attemptID ?? config.attemptID)
     coordinator.sample(at: time)
     let changed = latest.map { $0 != input } ?? (config.mainOffset != mainOffset)
@@ -226,6 +228,8 @@ final class PromptCaretNativeView: NSView {
     fromDeadline: Bool = false) -> PromptPaceCaretInterpolation? {
     guard let config = configuration, bounds.width > 0, config.paceStyle.drawsMarker else { return nil }
     let attempt = config.latestInput?().attemptID ?? config.attemptID
+    guard configuration?.attemptID == config.attemptID,
+      configuration?.coordinator === config.coordinator else { return nil }
     if paceAttemptID != attempt { paceSequence = nil; paceAttemptID = attempt }
     let coordinator = config.coordinator
     coordinator.prepare(attemptID: attempt)

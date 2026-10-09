@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+当前 [Tape 同字段实时快照](ORDINARY_TAPE_ENTRY_CONTRACT.md#同字段-fresh-snapshot-与取消边界增量2026-10-10)完成实际组件与独立 pace 的新鲜几何读取，重入／旧 attempt／停止边界有回归；151 项零失败零跳过，零主程序启动。应用层保护未解除，跨词／多行／混合方向／连接塑形及退休仍开放；人工新增一项待验，94 配置 89／4／1 不升级，完整门禁另行冻结验证、goal active。
+
 当前 [Tape RTL 投影组件](ORDINARY_TAPE_ENTRY_CONTRACT.md#rtl-投影与有限自然坐标增量2026-10-10)完成同向 RTL 的有限自然宽度、letter／word 接受推进及主／pace 几何；111 项相关回归零失败零跳过，两张组件图已查看。应用层保护保留，多行／混合方向／连接塑形／新鲜输入／退休与实机待验，人工新增一项待验，兼容分类不升级，零主程序启动、goal active。下方为历史阶段。
 
 当前 [实际 Tape 投影组件](ORDINARY_TAPE_ENTRY_CONTRACT.md#实际-tape-owner-投影组件增量2026-10-10)完成显式单行 LTR 槽绘制、主 before／after 与 canonical pace、接受推进分离，相关 96 项零失败零跳过，两张真实组件图已查看。应用层投影保护未解除，完整生产功能／多行／方向／实时 provider／退休与实机仍开放；人工新增一项待验，兼容分类不升级。零主程序启动，完整门禁未重跑、goal active。下方为历史阶段。
