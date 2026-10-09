@@ -147,7 +147,10 @@ struct NativeTypingInput: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> TypingInputView {
-        TypingInputView()
+        let view = TypingInputView()
+        // Establish the receiver before attachment can publish initial focus.
+        view.onWindowFocusChanged = onWindowFocusChanged
+        return view
     }
 
     func updateNSView(_ view: TypingInputView, context: Context) {
@@ -226,6 +229,12 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     private var pendingForcedError = false
     private var lastBailoutAttempt: Date?
     private weak var observedWindow: NSWindow?
+    private struct WindowFocusState: Equatable {
+      let window: ObjectIdentifier
+      let isKey: Bool
+      let hasAttachedSheet: Bool
+    }
+    private var lastWindowFocusState: WindowFocusState?
     private var localKeyDownMonitor: Any?
     var bailoutClock: () -> Date = { .now }
 
@@ -239,6 +248,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     required init?(coder: NSCoder) { nil }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
+      if window !== newWindow { lastWindowFocusState = nil }
       removeWindowFocusObservers()
       removeLocalKeyDownMonitor()
       super.viewWillMove(toWindow: newWindow)
@@ -258,14 +268,24 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         name: NSWindow.didResignKeyNotification, object: window)
       observedWindow = window
       installLocalKeyDownMonitor(for: window)
-      onWindowFocusChanged(window.isKeyWindow, window.attachedSheet != nil)
+      reportWindowFocus(isKey: window.isKeyWindow, hasAttachedSheet: window.attachedSheet != nil)
     }
 
     override var acceptsFirstResponder: Bool { true }
 
     func refreshWindowFocusState() {
       guard let window else { return }
-      onWindowFocusChanged(window.isKeyWindow, window.attachedSheet != nil)
+      reportWindowFocus(isKey: window.isKeyWindow, hasAttachedSheet: window.attachedSheet != nil)
+    }
+
+    private func reportWindowFocus(isKey: Bool, hasAttachedSheet: Bool) {
+      guard let window else { return }
+      let state = WindowFocusState(window: ObjectIdentifier(window), isKey: isKey,
+        hasAttachedSheet: hasAttachedSheet)
+      guard state != lastWindowFocusState else { return }
+      // Commit before the callback: it may synchronously refresh this view.
+      lastWindowFocusState = state
+      onWindowFocusChanged(isKey, hasAttachedSheet)
     }
 
     private func removeWindowFocusObservers() {
@@ -311,11 +331,11 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     @objc private func windowDidBecomeKey(_ notification: Notification) {
-      onWindowFocusChanged(true, window?.attachedSheet != nil)
+      reportWindowFocus(isKey: true, hasAttachedSheet: window?.attachedSheet != nil)
     }
 
     @objc private func windowDidResignKey(_ notification: Notification) {
-      onWindowFocusChanged(false, window?.attachedSheet != nil)
+      reportWindowFocus(isKey: false, hasAttachedSheet: window?.attachedSheet != nil)
     }
 
     override func becomeFirstResponder() -> Bool {

@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 原生窗口焦点交付去重（2026-10-10）
+
+基于 8bf86c5 核查完整入口：NativeTypingInput.updateNSView 每次刷新都会报告窗口焦点，ContentView.handleTypingWindowFocusChange 最后无条件调用 updateFocusWarningDelay，递增 @State focusWarningSequence。重复报告存在形成视图更新反馈的路径，但尚未证明这是既有普通计时故障的完整根因。window-focus-delivery-red.log 两项测试出现五次预期断言失败：初次挂载加二十次无变化刷新产生二十一次相同报告，通知与刷新也重复交付。
+
+TypingInputView 现在按窗口身份、键窗口状态、是否附有 sheet 去重；回调前提交状态，防止同步 refresh 重入。真实窗口移动／卸载清除状态，重新挂载仍建立初始焦点。makeNSView 提前安装接收者，避免初次挂载报告被默认空回调消耗。保留既有观察者清退、输入解释、首响应者、计分、时钟及健康阈值；不将每次 SwiftUI 更新视为一次真实焦点变化。
+
+四项原生组件测试覆盖重复刷新、键窗口通知、sheet 状态、同状态窗口迁移／重新挂载、同步回调重入和旧窗口通知清退。窗口从未显示；sheet／key 属性由测试窗口控制，并非系统实际弹窗或人工切换窗口验收。首次广泛回归漏配锁定 Anime.js 归档，251 项出现 24 次失败及两项跳过；补测新增测试时另有一次闭包参数编译错误，已修正，没有把上述运行记为通过。最终 window-focus-delivery-pinned-final.log 权威退出 0：253 项零失败零跳过，16.444 秒（墙钟 16.471），包含组合投影、原生输入、运行期规则、焦点、计时和结果退出组件回归。
+
+按风险审查技能复核了初始接收者时机、迁移失效、回调重入和观察者生命周期；window-focus-delivery-originality.log 原创边界通过。此轮零 Typebar 主程序启动，未执行完整应用 GUI、设备 IME、全量 readiness，亦未升级人工验收状态。下一步须以一个隔离 QA 实例检查连续输入与普通计时；当前不宣称首次计时延迟已解决，完整重写 goal 保持 active。
+
 ## 无变化时钟操作的 SwiftUI 重算对照（2026-10-10）
 
 基于 5380f87 核查实际 advanceClock：每次 100ms 交付先同步规则、读取 Caps Lock、核验挑战字体，再检查终态、整秒健康／阈值，最后 session.tick；tick 的单调计时采样只在操作内保存并清除，另推进 pace 状态及检查计时完成。方法是 mutating 不足以证明每次都使 SwiftUI 重算，不能据此擅自减少频率、跳过 pace 或 live rules。
