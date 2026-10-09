@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 统计秒级刷新 Release 验证未通过（2026-10-10）
+
+50fbde4 独立内存 QA 包 Typebar-Stats-Clock-20261010.app 构建 447.15s，stats-clock-qa-package.log 权威退出 0。只启动一个实例／会话 7443；第一轮对首词 harbor 输入 h 并读取 AX，计时健康失败，1/0/0/0。stats-clock-qa-runtime.log 输入处理 0.000720s、deliveryGap=1.554999、preflight=0.000038、elapsed=1.535388、首秒 drift=0.535388、failed=1；提示渲染三次累计 0.028854s。未能在活动状态核实倒计时可见刷新。
+
+在同一实例点重复本轮，仍输入 h，但输入后先等待五秒不读取 AX。首秒 deliveryGap=1.289072、drift=0.227002、failed=0；第二秒 deliveryGap=1.278197、preflight=0.000040、elapsed=2.505191、drift=0.505191、failed=1，对应窗口仅一次提示渲染 0.009688s。等待后的 AX 确认第二轮计时健康失败，1/0/0/0、约三秒。该轮否定“只有实时 AX 查询才会造成失败”，并提示每秒刷新引发的整页求值／布局范围需要定位；单次不同运行不能量化与旧包的回归差异，不能直接归因于新状态依赖。局部刷新机制仍有宿主证据，Release 接受性尚未通过，不将其视为已交付完整修复。正常 ⌘Q 后会话 7443 权威退出 0，pgrep 确认零 Typebar，无退出后 AX 查询、无第二实例。
+
 ## 实时统计秒级刷新依赖修正（2026-10-10）
 
 针对上一轮 AX 倒计时滞后，源码核查 stats 用 Date.now 和 SessionElapsedClock 计算实时数值，却未直接读取 lastClockTickSecond；无布局流动等其他读取时，时钟写入该 State 不一定使统计子树重新求值。新增 LiveStatsClockDependencyTests，用真实 SwiftUI State、不可见 NSHostingView 窗口和独立可控 SessionElapsedClock 比较未读取／读取交付秒状态：无输入续写，时间依次推进 1、10、20 秒；未读取分支一直 30s，读取分支正确为 29s、20s、10s。此为宿主行为对照，不是对实际 AX 缓存行为的完全归因。
