@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 首次输入返回后的计时延迟定位（2026-10-10）
+
+被测 96f8c30，唯一隔离包 `../../work/Typebar-Phase-20261010.app`，独立域 app.typebar.qa.phase20261010、内存数据及显式阶段诊断。timer-phase-package.log 退出 0。唯一主进程 PID 34067 两轮普通时间练习，各输入一个正确首字母；同一实例通过再来一次重开，没有第二次启动。
+
+timer-phase-runtime.log 第一轮 input-started=6.675791、input-finished=6.676755，处理时长 0.000967 秒；下一 late-delivery=8.579436、间隔 1.942206 秒、preflight=0.000081、drift=0.903418，failed=1。第二轮 input-started=39.159082、input-finished=39.159725，处理时长 0.000645 秒；下一交付间隔 2.274043 秒、preflight=0.000070、drift=1.198413，failed=1。两轮结果弹窗确认失败且不保存。这反驳“handleInsertedText 同步执行本身耗时约两秒”，但不排除处理器外原生输入、排版、观测或调度影响；未开始时也有迟到记录。两轮间没有 clock-stopped／clock-started，未出现已记录的计时任务重启；没有记录不证明任意生命周期组合。
+
+第二轮同时运行系统 /usr/bin/sample 12 秒，timer-phase-sample-native.log 权威退出 0，timer-phase-main-sample.txt 主线程 9527 个样本，其中 1750 个落在 PromptCaretTimerTarget.tick → PromptCaretNativeView.advance → present → ContentView 的 latestRendering 回调 → renderedPrompt；3495 个落在主循环 mach_msg2_trap。源码对应 PromptCaretNativeView.present 在输入身份变化、needsPosition 或缺少主光标位置时重新请求 rendering，生产回调为完整 renderedPrompt。这个证据将下一步检查聚焦到输入返回后的普通主光标投影／排版路径，不证明所有样本都处于首次延迟窗口，不把聚合占比当作连续耗时或唯一根因。先前每字形主题解析优化没有消除实际失败，不能用绿色测试替代该反例。
+
+第一次裸 sample 命令命中 Anaconda 同名工具，缺少 Python 模块，退出 1；原日志 timer-phase-sample-command.log 保留，随后明确使用系统工具，没有因超时重启采样。最终结果弹窗内 ⌘Q，唯一主进程权威正常退出 0，随后 pgrep 无 Typebar；无 TERM。运行日志保留上一轮 Charts 尺寸回退诊断。本轮仅采证及记录，没有改变产品或阈值，没有重跑全量测试、设备 IME 或全部人工验收，goal 继续 active。
+
 ## 结果弹窗实际退出复验与阶段诊断（2026-10-10）
 
 被测提交 7eab44f，唯一隔离包 `../../work/Typebar-Result-Quit-20261010.app`（app.typebar.qa.resultquit20261010），内存数据及独立偏好域。打包日志 result-quit-package.log 退出 0；初始读取后输入一个 c，普通计时练习仍失败。result-quit-runtime.log 记录 deliveryGap=1.849543、preflight=0.000064、drift=0.808253、severe=1、failed=1，并保留 Charts 固定尺寸回退诊断。在失败结果弹窗保持打开时按 ⌘Q，唯一主进程句柄正常退出 0，随后无 Typebar 残留；没有 TERM 或第二实例。这实际验证了失败结果弹窗的快捷键退出修正，不代表菜单退出、成功结果、NoStress、多窗口长测试确认或真实 IME 已验收。
