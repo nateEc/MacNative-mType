@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 实际 Tape owner 投影组件增量（2026-10-10）
+
+TapePromptNativeView 新增显式 compositionField／hidesCompositionExtras 输入，支持单行 LTR 无结构 Return 的实际组件投影。文字绘制复用 PromptFieldTextLayout 独立槽框，主光标经真实 before／after 锚点解析，canonical pace 保留首末别名；letter 主光标锁定边距，word 按活动字段原点平移。推进使用原始接受单位前缀与实测槽宽，不随候选主光标终点推进。缺少显式字段时不自动启用新布局；多行／RTL 仍走旧路径，应用层 Tape 投影保护未解除，尚未接通完整生产功能。
+
+风险复核修正两处边界：十亿点仅是无换行测量上限，实际 NSView 宽度取有限槽框范围；投影／旧布局切换显式重置并重提交滚动，避免光标组件清空协调器后外层因距离相同漏滚。`../../work/tape-owner-projection-red.log` 为新增组件 API 不存在；first.log 七项通过。broad.log 72 项一处失败，准确暴露回到旧布局后的推进归零，根因是布局 resolver 切换清空协调器而外层未重提交；fixed.log 八项通过。以上 first／broad／fixed 文件均位于 `../../work/`，前缀 `tape-owner-projection-`。
+
+证据 `../../work/tape-owner-projection.MkeS4c/verified.log`：96 项零失败零跳过（5.811 秒，墙钟 5.822 秒）；最后收紧缺失投影 ID 返回 nil 而非落回旧字符目录，final.log 再验 96 项零失败零跳过（5.781 秒，墙钟 5.792 秒），固定参考及 Anime 归档齐备。两新增覆盖实际 letter／word、emoji 接受单位与虚拟槽、候选更新／取消及返回旧布局、canonical pace、有限视图尺寸；两张 tape-projection-letter／word.png 为真实组件，已逐张查看。窗口始终不可见并关闭，零 Typebar 主程序启动、终态无 xctest 残留。字体量测诊断仅配置计时，不是设备 FPS。originality.log 因相对参考路径拒绝执行，改绝对路径后 originality-verified.log 通过；manual-audit.log 1,145 唯一人工场景仅结构检查通过。
+
+行为先行、根因调试与风险复核约束本增量；没有新时钟、产品依赖、输入／计分／回放／存储修改。完整冻结门禁尚未重跑。fresh provider、字段退休／多行拓扑、RTL／连接塑形、隐藏 extra 完整组合、字体／设备与真实 IME 仍开放。94 配置 89／4／1、主题精确 0／187、挑战一项待映射均不升级，完整 goal active。
+
 ## 投影实测推进距离增量（2026-10-10）
 
 推进槽接口新增 inlineAdvance：按实际槽 ID 的 allocation 宽度顺序求和，不以 canonical offsets 或墨迹并集代替；hidesExtras 跳过 .extra，下一槽明确为零宽时扣除最近正宽，缺失下一槽不误判为零宽。直接复核固定参考 test-ui.ts 的完整 scrollTape 当前词宽计算段；调用者仍须提供真实下一槽以及 blind／hideExtra 设置，字段前缀、方向和退休补偿不在此函数中。

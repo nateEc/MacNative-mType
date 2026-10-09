@@ -10,6 +10,8 @@ final class TapePromptNativeView: NSView {
   private var rendering = PromptRendering(text: AttributedString(), glyphCharacterOffsets: [:])
   private var anchorCharacterIndex = 0
   private var wordAnchorCharacterIndex = 0
+  private var compositionField: PromptCompositionField?
+  private var hidesCompositionExtras = false
   private var wordStartCharacterOffsets: [Int: Int] = [:]
   private var checksDirectionPerGlyph = false
   private var mode: PracticeTapeMode = .off
@@ -50,6 +52,7 @@ final class TapePromptNativeView: NSView {
 
   func configure(rendering: PromptRendering, anchorCharacterIndex: Int, wordAnchorCharacterIndex: Int,
     wordStartCharacterOffsets: [Int: Int] = [:],
+    compositionField: PromptCompositionField? = nil, hidesCompositionExtras: Bool = false,
     checksDirectionPerGlyph: Bool = false,
     mode: PracticeTapeMode, margin: Double, smoothScroll: Bool,
     retirement: PromptLineScrollContext? = nil,
@@ -57,6 +60,9 @@ final class TapePromptNativeView: NSView {
     onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil,
     carets: PromptCaretNativeView.Configuration, at time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
     let nextInput = carets.latestInput?()
+    let nextMap = compositionField == nil ? nil : rendering.compositionTextMap
+    let nextUsesProjection = TapePromptTextView.supportsProjection(nextMap,
+      newlineWords: newlineWords, rightToLeft: carets.rightToLeft)
     let inputChanged = nextInput != lastInput
     let previousWordID = self.retirement?.activeWordID
     let previousWordTop = previousWordID.flatMap { self.rendering.characterOffset(forGlyphAt: $0) }
@@ -66,6 +72,7 @@ final class TapePromptNativeView: NSView {
       || self.mode != mode || self.margin != margin || self.smoothScroll != smoothScroll
       || configuration?.reducesMotion != carets.reducesMotion
       || configuration?.rightToLeft != carets.rightToLeft || self.checksDirectionPerGlyph != checksDirectionPerGlyph
+      || (textView.projectedLayout != nil) != nextUsesProjection
     retirementRevision &+= 1
     metricsRevision &+= 1
     if resets {
@@ -99,6 +106,9 @@ final class TapePromptNativeView: NSView {
       || (!newlineWords.isEmpty && (textView.newlineWords != newlineWords || self.rendering.text != rendering.text))))
     snapsScroll = snapsScroll || resets
     if resets || self.rendering.text != rendering.text || self.rendering.glyphCharacterOffsets != rendering.glyphCharacterOffsets
+      || self.rendering.compositionTextMap?.fieldRuns != rendering.compositionTextMap?.fieldRuns
+      || self.rendering.compositionTextMap?.canonicalAliases != rendering.compositionTextMap?.canonicalAliases
+      || self.rendering.compositionTextMap?.caret != rendering.compositionTextMap?.caret
       || self.wordStartCharacterOffsets != wordStartCharacterOffsets || textView.newlineWords != newlineWords {
       geometryRevision &+= 1
     }
@@ -108,6 +118,7 @@ final class TapePromptNativeView: NSView {
       self.pendingRetirement = nil
     }
     self.anchorCharacterIndex = anchorCharacterIndex; self.wordAnchorCharacterIndex = wordAnchorCharacterIndex
+    self.compositionField = compositionField; self.hidesCompositionExtras = hidesCompositionExtras
     self.wordStartCharacterOffsets = wordStartCharacterOffsets
     self.checksDirectionPerGlyph = checksDirectionPerGlyph
     self.onMetrics = onMetrics
@@ -119,7 +130,8 @@ final class TapePromptNativeView: NSView {
     if resets { carets.coordinator.resetLayout() }
     else if let removedWidth { carets.coordinator.tapeWordsRemoved(width: removedWidth) }
     textView.configure(text: rendering.text, font: carets.font, rightToLeft: carets.rightToLeft,
-      newlineWords: newlineWords, resets: resets)
+      newlineWords: newlineWords, resets: resets,
+      compositionMap: nextMap)
     if !resets, previousWordID != retirement?.activeWordID {
       beginNewlineTransition(previousTop: previousWordTop, at: time)
     } else if inputChanged {
@@ -159,7 +171,7 @@ final class TapePromptNativeView: NSView {
       config.coordinator.resetLayout()
     }
     textView.viewportWidth = bounds.width
-    var advance = textView.advance(at: anchorCharacterIndex,
+    var advance = projectedAdvance() ?? textView.advance(at: anchorCharacterIndex,
       wordStart: wordStartCharacterOffsets[anchorCharacterIndex], mode: mode, rightToLeft: config.rightToLeft)
     let scrollRequested = !awaitsWordScroll && (needsScroll || advance != lastScrollAdvance)
     let duration = snapsScroll || !smoothScroll || config.reducesMotion ? 0.0 : 0.125
@@ -190,6 +202,13 @@ final class TapePromptNativeView: NSView {
     caretView.frame = bounds
     config.glyphRect = { [weak self] id in self?.glyphRect(id, main: false) }
     config.mainGlyphRect = { [weak self] id in self?.glyphRect(id, main: true) }
+    if textView.projectedLayout != nil {
+      config.fieldMainRect = { [weak self] style in self?.projectedMainRect(style: style) }
+      config.fieldPaceRect = { [weak self] id, after in
+        guard let self, let rect = self.textView.projectedLayout?.canonicalRect(id, after: after) else { return nil }
+        return rect.offsetBy(dx: self.textOrigin, dy: 0)
+      }
+    }
     config.glyphIsRightToLeft = { [weak self] id in self?.isRightToLeft(id) ?? false }
     config.geometryRevision = geometryRevision
     config.firstRetainedWordIndex = textView.newlineWords.isEmpty
@@ -204,9 +223,30 @@ final class TapePromptNativeView: NSView {
       // Removing a word changes future marker adjacency. Cache the resulting
       // measurement, not the pre-deletion request target, so an unchanged
       // representable update cannot manufacture a second scrollTape call.
-      lastScrollAdvance = textView.advance(at: anchorCharacterIndex,
+      lastScrollAdvance = projectedAdvance() ?? textView.advance(at: anchorCharacterIndex,
         wordStart: wordStartCharacterOffsets[anchorCharacterIndex], mode: mode, rightToLeft: config.rightToLeft)
     }
+  }
+
+  private func projectedAdvance() -> CGFloat? {
+    guard let layout = textView.projectedLayout, let field = compositionField,
+      let map = rendering.compositionTextMap, let frame = layout.fieldFrames[field.index] else { return nil }
+    if mode == .off { return 0 }
+    guard mode == .letter else { return frame.minX }
+    let cells = map.fieldRuns.filter { $0.fieldID == field.index }.flatMap(\.cells).filter { !$0.isGap }
+    let count = field.inputUTF16.count
+    let next = count < cells.count ? cells[count].id : nil
+    return frame.minX + TapePromptProjection.inlineAdvance(cells: Array(cells.prefix(count)), nextCellID: next,
+      frames: layout.cellFrames, hidesExtras: hidesCompositionExtras)
+  }
+
+  private func projectedMainRect(style: TypingCaretStyle) -> CGRect? {
+    guard let layout = textView.projectedLayout, var rect = layout.mainRect(style: style) else { return nil }
+    let base = bounds.width * margin
+    if mode == .word, let field = compositionField, let word = layout.fieldFrames[field.index] {
+      rect.origin.x += base - word.minX
+    } else { rect.origin.x = base }
+    return rect
   }
 
   private func prepareRetirement(rightToLeft: Bool) {
@@ -318,6 +358,11 @@ final class TapePromptNativeView: NSView {
   }
 
   private func glyphRect(_ id: Int, main: Bool) -> CGRect? {
+    if let layout = textView.projectedLayout {
+      guard var rect = layout.canonicalRect(id, after: false) else { return nil }
+      rect.origin.x += main ? bounds.width * margin : textOrigin
+      return rect
+    }
     guard let offset = rendering.characterOffset(forGlyphAt: id),
       var rect = textView.glyphRect(at: offset, minimumOffset: wordStartCharacterOffsets[offset] ?? offset) else { return nil }
     if main {
@@ -414,6 +459,13 @@ final class TapePromptNativeView: NSView {
 /// Drawing and measuring share this one prepared native text storage. Colors,
 /// hint metrics and hidden listening text are not approximated by fixed widths.
 private final class TapePromptTextView: NSView {
+  private(set) var projectedLayout: PromptFieldTextLayout?
+  static func supportsProjection(_ map: PromptCompositionTextMap?,
+    newlineWords: [TapePromptWord], rightToLeft: Bool) -> Bool {
+    guard let map else { return false }
+    return newlineWords.isEmpty && !rightToLeft
+      && !map.fieldRuns.contains { $0.endsWithReturn || $0.removedReturns > 0 }
+  }
   private let layoutManager = NSLayoutManager()
   private let container = NSTextContainer(size: .init(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude))
   private var storage = NSTextStorage()
@@ -432,7 +484,12 @@ private final class TapePromptTextView: NSView {
   var newlineMetrics: TapePromptLayoutMetrics? { newlineLayout?.metrics }
   var removedNewlineWordIndices: Set<Int> { newlineLayout?.removedWordIndices ?? [] }
   var isAnimatingNewlines: Bool { newlineLayout?.isAnimating ?? false }
-  var contentWidth: CGFloat { newlineLayout?.contentWidth ?? layoutManager.usedRect(for: container).maxX }
+  var contentWidth: CGFloat {
+    // The unbounded proposal is only a no-wrap measurement limit, never an
+    // AppKit view size. Allocate the actual finite native slot extent.
+    if let projectedLayout { return projectedLayout.cellFrames.values.map(\.maxX).max() ?? 0 }
+    return newlineLayout?.contentWidth ?? layoutManager.usedRect(for: container).maxX
+  }
   override var isFlipped: Bool { true }
 
   override init(frame frameRect: NSRect) {
@@ -444,7 +501,18 @@ private final class TapePromptTextView: NSView {
   required init?(coder: NSCoder) { fatalError("TapePromptTextView is created in code") }
 
   func configure(text: AttributedString, font: NSFont, rightToLeft: Bool,
-    newlineWords: [TapePromptWord], resets: Bool) {
+    newlineWords: [TapePromptWord], resets: Bool, compositionMap: PromptCompositionTextMap? = nil) {
+    // The multiline flow owner still needs a field-aware topology adapter.
+    // Never flatten virtual slots into its legacy Character directory.
+    if let map = compositionMap, Self.supportsProjection(map, newlineWords: newlineWords, rightToLeft: rightToLeft) {
+      stopNewlines()
+      projectedLayout = PromptFieldTextLayout(map: map, width: 1_000_000_000,
+        font: font, lineSpacing: 0, reusing: projectedLayout)
+      needsDisplay = true
+      return
+    }
+    let wasProjected = projectedLayout != nil
+    projectedLayout = nil
     if !newlineWords.isEmpty {
       if newlineLayout == nil { newlineLayout = TapeNewlineTextLayout() }
       if resets { firstRetainedNewlineIndex = newlineWords.first?.index ?? 0 }
@@ -457,7 +525,7 @@ private final class TapePromptTextView: NSView {
       return
     }
     stopNewlines()
-    guard self.text != text || self.font != font || self.rightToLeft != rightToLeft else { return }
+    guard wasProjected || self.text != text || self.font != font || self.rightToLeft != rightToLeft else { return }
     self.text = text; self.font = font; self.rightToLeft = rightToLeft
     let prepared = TapePromptTextStorage.prepare(text, font: font, rightToLeft: rightToLeft)
     storage.setAttributedString(prepared)
@@ -508,6 +576,7 @@ private final class TapePromptTextView: NSView {
   }
 
   func leadingEdge(rightToLeft: Bool) -> CGFloat {
+    if projectedLayout != nil { return 0 }
     if let newlineLayout { return newlineLayout.leadingEdge }
     return rightToLeft ? leadingRight : leadingLeft
   }
@@ -545,6 +614,7 @@ private final class TapePromptTextView: NSView {
   }
 
   override func draw(_ dirtyRect: NSRect) {
+    if let projectedLayout { projectedLayout.draw(in: dirtyRect); return }
     if let newlineLayout { newlineLayout.draw(in: dirtyRect); return }
     let range = layoutManager.glyphRange(forBoundingRect: dirtyRect, in: container)
     layoutManager.drawBackground(forGlyphRange: range, at: .zero)

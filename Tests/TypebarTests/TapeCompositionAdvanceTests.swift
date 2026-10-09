@@ -88,4 +88,91 @@ import XCTest
     XCTAssertEqual(TapePromptProjection.inlineAdvance(cells: [], nextCellID: -3,
       frames: frames, hidesExtras: false), 0)
   }
+
+  func testActualTapeOwnerUsesProjectedBoxesAndSeparatesMarkedCaretFromAdvance() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "😀 next")
+    session.insertBatch("😀", at: start)
+    let rendering = try render(session, marked: "XY")
+    let map = try XCTUnwrap(rendering.compositionTextMap)
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    let layout = PromptFieldTextLayout(map: map, width: 1_000_000_000, font: font, lineSpacing: 0)
+    let cells = TapePromptProjection.advanceCells(session: session, rendering: rendering, mode: .letter)
+    let run = try XCTUnwrap(map.fieldRuns.first { $0.fieldID == 0 })
+    let next = run.cells.filter { !$0.isGap }.dropFirst(2).first?.id
+    let expected = TapePromptProjection.inlineAdvance(cells: cells, nextCellID: next,
+      frames: layout.cellFrames, hidesExtras: false)
+    for mode in [PracticeTapeMode.letter, .word] {
+      let coordinator = PromptCaretMotionCoordinator()
+      var config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
+        mainStyle: .bar, paceStyle: .outline, font: font, lineSpacing: 0, rightToLeft: false,
+        accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+        attemptID: session.automaticInputAttemptID, coordinator: coordinator,
+        mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
+      config.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+        fromAfter: false, targetAfter: false, fraction: 1, targetGlyphID: 2) }
+      let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 80))
+      let window = NSWindow(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: false)
+      window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .aqua)
+      window.contentView = view
+      view.layer?.backgroundColor = NSColor.white.cgColor
+      defer { view.stop(); window.contentView = nil; window.close() }
+      view.configure(rendering: rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+        compositionField: session.promptCompositionField, mode: mode, margin: 0.25,
+        smoothScroll: false, carets: config, at: 0)
+      view.present(at: 0)
+      XCTAssertEqual(coordinator.wordsTapeMargin, mode == .letter ? -expected : 0, accuracy: 0.001)
+      let main = try XCTUnwrap(coordinator.main.position)
+      let projectedMain = try XCTUnwrap(layout.mainRect(style: .bar))
+      XCTAssertEqual(main.minX, mode == .letter ? 100 : 100 + projectedMain.minX, accuracy: 0.001)
+      XCTAssertNotNil(coordinator.pace.position)
+      let textView = try XCTUnwrap(view.subviews.first { !($0 is PromptCaretNativeView) })
+      XCTAssertLessThan(textView.frame.width, 1000, "The no-wrap proposal must not create a billion-point NSView")
+      view.layoutSubtreeIfNeeded(); view.displayIfNeeded()
+      let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+      view.cacheDisplay(in: view.bounds, to: bitmap)
+      let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+      XCTAssertGreaterThan(png.count, 500)
+      if let directory = ProcessInfo.processInfo.environment["TYPEBAR_PROFILE_PB_QA_IMAGE_DIRECTORY"] {
+        let name = mode == .letter ? "letter" : "word"
+        try png.write(to: URL(fileURLWithPath: directory).appendingPathComponent("tape-projection-\(name).png"))
+      }
+      XCTAssertFalse(window.isVisible)
+      XCTAssertEqual(session.typed, "😀")
+    }
+  }
+
+  func testProjectedOwnerCanCancelCandidatesAndReturnToLegacyGeometry() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "ab next")
+    session.insertBatch("a", at: start)
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    let coordinator = PromptCaretMotionCoordinator()
+    let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 80))
+    defer { view.stop() }
+    var config = PromptCaretNativeView.Configuration(text: AttributedString(), mainOffset: nil, paceOffset: nil,
+      mainStyle: .bar, paceStyle: .outline, font: font, lineSpacing: 0, rightToLeft: false,
+      accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+      attemptID: session.automaticInputAttemptID, coordinator: coordinator,
+      mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
+    config.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: false, targetAfter: true, fraction: 1, targetGlyphID: 0) }
+    for marked in ["XYZ", "", "e\u{301}"] {
+      let rendering = try render(session, marked: marked)
+      view.configure(rendering: rendering, anchorCharacterIndex: 1, wordAnchorCharacterIndex: 0,
+        compositionField: session.promptCompositionField, mode: .letter, margin: 0.25,
+        smoothScroll: false, carets: config, at: 0)
+      view.present(at: 0)
+      XCTAssertEqual(try XCTUnwrap(coordinator.main.position).minX, 100, accuracy: 0.001)
+      XCTAssertEqual(-coordinator.wordsTapeMargin,
+        ("a" as NSString).size(withAttributes: [.font: font]).width, accuracy: 0.001)
+      XCTAssertNotNil(coordinator.pace.position)
+    }
+    let projected = try render(session, marked: "")
+    let legacy = PromptRendering(text: projected.text, glyphCharacterOffsets: projected.glyphCharacterOffsets)
+    view.configure(rendering: legacy, anchorCharacterIndex: 1, wordAnchorCharacterIndex: 0,
+      mode: .letter, margin: 0.25, smoothScroll: false, carets: config, at: 0)
+    view.present(at: 0)
+    XCTAssertNotNil(coordinator.main.position)
+    XCTAssertEqual(-coordinator.wordsTapeMargin,
+      ("a" as NSString).size(withAttributes: [.font: font]).width, accuracy: 0.001)
+  }
 }
