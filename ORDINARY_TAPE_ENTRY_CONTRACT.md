@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 秒级观察范围宿主对照（2026-10-10）
+
+按行为优先测试与会话内决策审查，先验证“统计子视图观察秒级数据能避免父页面重新求值”，而非直接大拆生产 ContentView。新增 LiveStatsClockScopeTests，使用现有平台 Observation、真实 NSHostingView 和不可见窗口：两种情况均让子视图显示每次秒值，只有一组父视图也读取该值。三个交付后父读取组 body 1→4，子视图独读组 1→1；两组真实父 caption 变化均重新求值并正确传到子视图，原有秒值保留。此为局部求值范围，不是布局或调度耗时基准。
+
+首个 live-stats-clock-scope.log 因嵌套 private Observable 类型宏可见性编译失败，修正测试类型访问级别后 live-stats-clock-scope-verified.log 权威退出 0，与倒计时依赖测试共三项零失败，0.824s（墙钟 0.826）。探索性对照没有故意失败阶段，生产代码未改、零 Typebar 主程序启动。决策审查反例为子视图数据陈旧、父真实输入更新丢失、其他功能仍在父层读取时钟：前两个由本地 caption／秒值对照部分约束，生产输入、主题、重置和 layoutFluid／pace 依赖仍需实现时验证。不声称独立审查或根因修复；下一步建立生产统计子树观察边界，保留已有全局时钟语义。
+
 ## 统计秒级刷新 Release 验证未通过（2026-10-10）
 
 50fbde4 独立内存 QA 包 Typebar-Stats-Clock-20261010.app 构建 447.15s，stats-clock-qa-package.log 权威退出 0。只启动一个实例／会话 7443；第一轮对首词 harbor 输入 h 并读取 AX，计时健康失败，1/0/0/0。stats-clock-qa-runtime.log 输入处理 0.000720s、deliveryGap=1.554999、preflight=0.000038、elapsed=1.535388、首秒 drift=0.535388、failed=1；提示渲染三次累计 0.028854s。未能在活动状态核实倒计时可见刷新。
