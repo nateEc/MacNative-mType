@@ -2186,6 +2186,9 @@ private struct ContentView: View {
       guard !Task.isCancelled else { return }
       let delivery = ProcessInfo.processInfo.systemUptime
       let deliveryGap = delivery - previousDelivery
+      if TimerDeliveryDiagnostics.enabled {
+        TimerDeliveryDiagnostics.finishRenderWindow(deliveryGap: deliveryGap)
+      }
       if TimerDeliveryDiagnostics.enabled, !session.isFinished, deliveryGap > 0.25 {
         TimerDeliveryDiagnostics.trace(.lateDelivery, duration: deliveryGap,
           hasStarted: session.hasStarted, isFinished: session.isFinished)
@@ -3475,6 +3478,7 @@ private struct ContentView: View {
     defer {
       if TimerDeliveryDiagnostics.enabled {
         let duration = ProcessInfo.processInfo.systemUptime - diagnosticStart
+        TimerDeliveryDiagnostics.observeRender(duration: duration)
         if duration > 0.125 {
           TimerDeliveryDiagnostics.trace(.promptRenderFinished, duration: duration,
             hasStarted: session.hasStarted, isFinished: session.isFinished)

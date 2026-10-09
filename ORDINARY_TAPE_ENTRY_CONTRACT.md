@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## QA 交付窗口累计渲染诊断（2026-10-10）
+
+最新 Release 仍失败，而现有提示渲染诊断只输出超过 125ms 的单次调用，无法区分大量短调用与渲染之外的调度占用。新增 RenderWindow 数值累计器，记录 count/total/maximum，并在每次时钟交付时清零；仅交付间隔超过 250ms 时输出一行 typebar-render-window。统计明确标记 scope=process，多窗口共享累计量，不声称属于单一窗口；总耗时不代表全部布局或主线程工作，也不代替调用栈。累计与输出均受原有 QA 内存标记加环境变量双开关保护，在 MainActor 串行访问，不写 SwiftUI 状态、不缓存提示内容、不改变输入、评分、健康阈值或时钟调度。
+
+按行为优先测试，render-window-red.log 因尚无 RenderWindow 类型编译失败；实现后 render-window-verified.log 七项零失败。测试计入 100 个 4ms 短调用和一个 20ms 调用，拒绝非有限或负时间，验证 drain 清空。补充生产接线顺序与启用保护检查后，render-window-final.log 权威退出 0，累计诊断和空闲探针共九项零失败，3.355s（墙钟 3.358）。本轮零 Typebar 主程序启动、未跑新的完整门禁或 Release 包；需新二进制实际运行才能得到累计数据，尚不能据此归因或宣称普通计时故障修复。
+
 ## 最新光标内容复用 Release 实例验证（2026-10-10）
 
 在干净 7f99e8f 工作树打包 Typebar-Caret-Content-20261010.app，独立 bundle app.typebar.qa.caretcontent20261010，QA 内存存储与显式计时诊断双开关；复用当前 Release 构建 0.34s，包含 c5417e4 的光标本地内容复用生产代码。caret-content-qa-package.log 权威退出 0。启动前确认零 Typebar/xctest，只启动一个 QA 主程序（会话 28535）。普通时间 30 秒界面通过原生输入输入六个当前目标词 ripple orchard canyon quiet violet signal，结果明确显示计时健康失败、42/0/0/0、6/6 正确，不保存成绩。

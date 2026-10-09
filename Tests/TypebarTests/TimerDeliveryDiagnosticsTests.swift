@@ -2,6 +2,42 @@ import XCTest
 @testable import Typebar
 
 final class TimerDeliveryDiagnosticsTests: XCTestCase {
+  func testRenderWindowIncludesShortCallsAndDrainResetsWithoutRetainingInputs() {
+    var window = TimerDeliveryDiagnostics.RenderWindow()
+    for _ in 0..<100 { window.observe(duration: 0.004) }
+    window.observe(duration: 0.02)
+    window.observe(duration: -.infinity)
+    window.observe(duration: .nan)
+    let first = window.drain()
+    XCTAssertEqual(first.count, 101)
+    XCTAssertEqual(first.total, 0.42, accuracy: 1e-9)
+    XCTAssertEqual(first.maximum, 0.02)
+    let empty = window.drain()
+    XCTAssertEqual(empty.count, 0)
+    XCTAssertEqual(empty.total, 0)
+    XCTAssertEqual(empty.maximum, 0)
+  }
+
+  func testRenderWindowWritersRemainDoubleOptInAndClockDrainsBeforePreflight() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let diagnostics = try String(contentsOf: root.appendingPathComponent(
+      "Sources/Typebar/TimerDeliveryDiagnostics.swift"), encoding: .utf8)
+    let observe = try XCTUnwrap(diagnostics.range(of: "static func observeRender("))
+    let finish = try XCTUnwrap(diagnostics.range(of: "static func finishRenderWindow("))
+    XCTAssertTrue(diagnostics[observe.lowerBound..<finish.lowerBound].contains(
+      "guard enabled else { return }"))
+    let writer = String(diagnostics[finish.lowerBound...])
+    XCTAssertLessThan(try XCTUnwrap(writer.range(of: "guard enabled else { return }")).lowerBound,
+      try XCTUnwrap(writer.range(of: "renderWindow.drain()")).lowerBound)
+    let source = try String(contentsOf: root.appendingPathComponent(
+      "Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    XCTAssertLessThan(try XCTUnwrap(source.range(of:
+      "TimerDeliveryDiagnostics.finishRenderWindow(deliveryGap: deliveryGap)")).lowerBound,
+      try XCTUnwrap(source.range(of: "advanceClock(at: .now, deliveryGap: deliveryGap)")).lowerBound)
+    XCTAssertTrue(source.contains("TimerDeliveryDiagnostics.observeRender(duration: duration)"))
+  }
+
   func testSlowPromptRenderUsesDoubleOptInWithoutRecordingPromptContents() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()

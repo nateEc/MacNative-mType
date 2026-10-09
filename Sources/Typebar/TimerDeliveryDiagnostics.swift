@@ -3,6 +3,41 @@ import Foundation
 /// Opt-in timing-only evidence for isolated QA packages. Never includes text,
 /// account identifiers, calendar dates, or practice result payloads.
 enum TimerDeliveryDiagnostics {
+  /// Process-wide QA work between clock deliveries; no prompt or identity data.
+  struct RenderWindow {
+    private var count = 0
+    private var total: TimeInterval = 0
+    private var maximum: TimeInterval = 0
+
+    mutating func observe(duration: TimeInterval) {
+      guard duration.isFinite, duration >= 0 else { return }
+      count += 1
+      total += duration
+      maximum = max(maximum, duration)
+    }
+
+    mutating func drain() -> (count: Int, total: TimeInterval, maximum: TimeInterval) {
+      defer { self = .init() }
+      return (count, total, maximum)
+    }
+  }
+
+  @MainActor private static var renderWindow = RenderWindow()
+
+  @MainActor static func observeRender(duration: TimeInterval) {
+    guard enabled else { return }
+    renderWindow.observe(duration: duration)
+  }
+
+  @MainActor static func finishRenderWindow(deliveryGap: TimeInterval) {
+    guard enabled else { return }
+    let work = renderWindow.drain()
+    guard deliveryGap > 0.25 else { return }
+    let line = String(format: "typebar-render-window scope=process deliveryGap=%.6f count=%d total=%.6f maximum=%.6f\n",
+      locale: Locale(identifier: "en_US_POSIX"), deliveryGap, work.count, work.total, work.maximum)
+    try? FileHandle.standardError.write(contentsOf: Data(line.utf8))
+  }
+
   enum Phase: String, CaseIterable {
     case clockStarted = "clock-started"
     case clockStopped = "clock-stopped"
