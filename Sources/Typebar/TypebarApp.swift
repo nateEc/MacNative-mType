@@ -3436,9 +3436,9 @@ private struct ContentView: View {
   }
 
   private func renderedPrompt(for session: TypingSession, composition: String?) -> PromptRendering {
-    // ASL and Choo resolve projected cells against their actual native boxes.
-    // Tape still needs its own projected geometry adapter.
-    let usesCompositionProjection = composition != nil && !usesTapePractice
+    // Native ordinary, ASL, Choo and Tape adapters resolve projected cells.
+    // Mixed-direction prompts retain the existing fallback until verified.
+    let usesCompositionProjection = composition != nil
       && (!session.configuration.containsRightToLeftPromptRun || session.configuration.usesRightToLeftPrompt)
     let presentation = usesCompositionProjection
       ? PromptCompositionPresentation(session: session, composition: composition ?? "", style: settings.compositionDisplayStyle) : nil

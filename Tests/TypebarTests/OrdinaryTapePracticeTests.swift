@@ -103,6 +103,17 @@ import XCTest
     return CGFloat(model.fontSize * 1.7)
   }
 
+  func testProductionCompositionGateAllowsTapeWithExistingDirectionFallback() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    let start = try XCTUnwrap(source.range(of: "let usesCompositionProjection ="))
+    let end = try XCTUnwrap(source.range(of: "let presentation =", range: start.upperBound..<source.endIndex))
+    let gate = source[start.lowerBound..<end.lowerBound]
+    XCTAssertFalse(gate.contains("!usesTapePractice"))
+    XCTAssertTrue(gate.contains("composition != nil"))
+    XCTAssertTrue(gate.contains("!session.configuration.containsRightToLeftPromptRun || session.configuration.usesRightToLeftPrompt"))
+  }
+
   func testSwiftUIBridgeUsesExplicitProjectedFieldInsteadOfLegacyCaretOffset() throws {
     var session = TypingSession(configuration: .words(3), prompt: "a\nbc tail")
     session.insertBatch("a\nb", at: start)

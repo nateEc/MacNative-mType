@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 应用投影入口启用增量（2026-10-10）
+
+renderedPrompt 的 usesCompositionProjection 移除 `!usesTapePractice`；composition 非 nil 及既有方向条件保持不变。已有 Tape 字段、双光标、退休、完整新鲜快照、首次配置和连接塑形适配器现在可由应用渲染路径使用。混合方向回退尚未解决，不将它隐式移除；整体目标范围不变。
+
+新增源码门禁测试，检查 Tape 排除消失且 composition／方向条件保留。`../../work/tape-production-gate-red.log` 单项一处预期失败；启用后 `../../work/tape-production-gate-verified.log` 318 项零失败零跳过，28.059 秒（wall 28.095 秒），进程退出 0，筛选为 Tape／ASLPromptComposition／ChooPromptComposition／CompositionProjection／PromptComposition／PromptField。`../../work/tape-production-gate-originality.log` 原创性检查退出 0。
+
+本轮有限会话内决策审查（非独立评审）检查首次新鲜事务、旧 attempt／stop、canonical pace、字段退休、连接策略和旧方向回退。决定启用已接通的适配器，不将源码条件测试冒充实际 ContentView 全流程；已有真实宿主／原生组件回归支持桥接和几何，但应用实际输入操作与 IME 仍缺证据。新旧 representable／确认队列交错、策略改变时未确认移除、混合方向及设备是待验风险。完整冻结门禁待复验，整体功能兼容分类不升级。
+
+零主程序启动，无新截图。下方历史章节“应用保护未解除”是此前阶段状态；本节只替代该入口状态，不撤销其余未完成项。完整 goal active。
+
 ## 连接文字策略增量（2026-10-10）
 
 Tape 投影此前默认逐槽排版，未传共享字段布局已有的 joinsLetters。现在该参数从 session 的 usesJoiningScriptPrompt 经 TapePracticePrompt／桥接传入 owner；单行 PromptFieldTextLayout 与多行每字段词盒都使用该策略。多行布局变更检测及复用检查纳入策略，owner 变化触发重配置；同字段刷新、完整事务刷新和前缀重建保留参数，newlineSource 保存它。默认 false 保持既有调用兼容，不引入新的字体或上游资产。
