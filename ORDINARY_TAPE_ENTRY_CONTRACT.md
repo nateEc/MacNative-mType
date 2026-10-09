@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 首键触发的失败前短采样（2026-10-10）
+
+复用 80e090e Release QA 包，不重建／改产品；唯一 PID 46648、主会话 38242。首次尝试先启动一秒 sample 再通过工具按 planet 的 p，采样会话 6592 退出 0 后立即读取的运行日志还没有 input-started，故 stats-scope-pre-result-sample.txt 仅为输入前基线，不能声称覆盖首键。其主线程 854 样本、797 个事件等待样本。随后 stats-scope-short-sample-runtime.log 记录输入 0.000636s、首次 deliveryGap=1.273300、elapsed=1.229440、drift=0.229440、failed=0，提示三次合计 0.030217s；第二个迟交 0.659039s 后交付恢复约 100ms。活动状态 AX 实际显示 13s，后续日志到 23 秒仍 failed=0，再用 ⌘R 重置；不是完成或有效成绩，但新增生产倒计时能前进的实机证据。
+
+第二轮 AX 确认新题首词 moss、未开始。先启动只读日志监听，发现第二个 input-started 才对同一 PID 执行一秒 sample；按 m 后不读 AX。采样会话 34063 退出 0，紧接着的日志快照只有 input-started（offset=44.887747）和 input-finished（44.888307），尚无本轮首次 timer 或 failed 记录。其后首次交付 offset=46.672746、deliveryGap=1.861920、preflight=0.000042、elapsed=1.784670、drift=0.784670、failed=1。三次提示渲染累计 0.032804s、最长 0.012044s，输入处理 0.000562s；之后 AX 确认计时失败／1/0/0/0。
+
+stats-scope-input-triggered-sample.txt 主线程 806 样本；窗口布局分支 531，其下 NSHostingView.layout 的 450、render 375、flushTransactions 245 均嵌套，不相加。此窗口在首次失败交付之前，排除了“这些布局样本全部来自失败后结果页”的解释。实际包含 SwiftUI 图更新、尺寸约束、PromptFieldTextRun 比较及渲染，但不能由单一分支直接锁定特定控件，样本亦不是精确耗时或公平基准。下一步围绕练习页首键时的图更新／尺寸传播做可证伪的局部对照，而不是调整健康阈值或继续归因于统计秒刷新。
+
+正常 ⌘Q 后主会话 38242 权威退出 0、pgrep 零 Typebar；本轮仅一个图形实例，退出后无界面查询。按根因调试技能保留错过输入的首次采样及成功对齐的第二次采样，未隐去反例。无产品修改、全量门禁或持续键入验收；完整 goal 与兼容缺口保持开放。
+
 ## 统计子树 Release 首键采样仍失败（2026-10-10）
 
 冻结 80e090e 的生产代码，独立内存包 Typebar-Stats-Scope-20261010.app、bundle app.typebar.qa.statsscope20261010；stats-scope-qa-package.log 构建 453.67s、终态退出 0。只启动唯一 PID 46080／会话 38635，普通 30 秒模式，首词 signal。第一轮只按 s，随后等待五秒不读 AX；日志确认首次交付前已失败，之后 AX 确认计时健康失败、1/0/0/0。stats-scope-qa-runtime.log：输入处理 0.000772s，deliveryGap=1.680081、preflight=0.000048、elapsed=1.645473、drift=0.645473、failed=1；提示渲染三次合计 0.030948s，最长 0.010871s。统计观察隔离没有消除首键失败，不能当作完整性能修复。
