@@ -1,5 +1,17 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## TextKit 范围排版实验未采用（2026-10-10）
+
+基于 bf13df5 检查普通光标几何：两个 PromptCaretLayout.rect 入口都显式 ensureLayout(for: container)，再读取目标矩形。核验本机 macOS 26.2 SDK 主来源 `/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSLayoutManager.h:168–174,278–291`：支持 ensureLayoutForCharacterRange，TextKit 仍可扩大生成／布局范围，连续布局会扩至文首；glyphRange 对连写／组合字符可扩张，boundingRect 返回容器坐标。这不承诺范围请求一定更快，编译面向最低 macOS 14 也不等于在 macOS 14 设备执行。
+
+新增 PromptCaretRangeLayoutTests，使用独立 NSLayoutManager 全量布局 oracle 对比现有生产字符偏移及 UTF-16 范围入口，再在测试内部对比目标范围请求。三种宽度、双方向、每个目标字符覆盖普通词、换行／空行、Tab、组合附标、emoji／ZWJ／旗帜、阿拉伯／混合方向、CR/LF；另有 123／2403／12003 字符长题首部、中部、尾部及显式小字体、baseline、负 kern 提示，保留无效范围 nil 检查。它验证本机原生几何一致，不验证实体 IME 候选、浏览器像素或完整应用 FPS。
+
+先前 caret-range-layout-red.log 两项有两次预期源码门禁失败，几何对照通过；随后短暂将两个产品入口改为请求目标范围，caret-range-layout-verified.log 148 项零失败但一项缺参考而跳过。补齐参考与动画归档并增加长题后，caret-range-layout-pinned.log 275 项零失败零跳过（26.260 秒，墙钟 26.298）。这些结果不能证明性能优势；初次耗时比较一侧还包含字符索引转换，不能直接作公平速度比。因此撤回全部产品改动及临时必须采用范围 API 的源码断言，保留实验在测试内，最终产品源码与 bf13df5 相同。
+
+公平对照使用同一测试函数、相同已算好的 UTF-16 范围、相同存储／字体准备，仅切换 ensureLayout 请求：caret-range-layout-rejected-final.log 权威退出 0，274 项零失败零跳过（27.400 秒，墙钟 27.433）。12003 字符首部全量／范围约 5.70／6.11ms，中部 6.13／5.65ms，尾部 5.36／6.06ms；这是单次、固定先全量后范围的原始观察，不统计显著性或可靠提升。范围请求没有显示稳定优势，也未复现应用秒级交付问题，故不作为修复交付。后续应继续检查完整应用累计工作／任务交付，不能从这一局部反证排除所有 TextKit 或主线程问题。
+
+caret-range-layout-originality.log 退出 0，固定参考 pin 的原创边界通过。风险复核的结论是保留现有产品路径、只增加几何与实验守卫；没有新依赖、缓存、阈值、输入、计分或持久化修改。原始实验日志保留，本轮零 Typebar 主程序启动、最终无残留；不重跑完整 readiness 或升级人工验收，首次延迟与完整重写 goal 仍 active。
+
 ## 同步面板渲染复用与后续输入反例（2026-10-10）
 
 先建立独立组件基线而非猜测性改字符计数。新增 PromptRenderingAssemblyTests 对比逐段原生 AttributedString 前缀偏移 oracle，覆盖空段、组合附标、CR/LF 跨段合并、区域指示旗帜、ZWJ、阿拉伯及候选字符串，逐字属性、渲染顺序和空词身份不变。prompt-assembly-baseline.log 两项通过；100／500／2000 个简单双字符 ASCII 单元组装约 0.44／2.35／9.69ms，没有支持秒级组装假说。prompt-assembly-host-baseline.log 三项通过；离屏 NSHostingView 的 60／300／1200 字形首次布局约 108.13／0.80／0.99ms，颜色更新约 0.89／0.35／0.49ms。首次包含框架冷启动，不能直接作长度比值；简单固定文本、无窗口／完整 ContentView、无自动化输入／IME，不能代表实际应用性能。时间仅输出证据，无脆弱墙钟性能通过阈值。
