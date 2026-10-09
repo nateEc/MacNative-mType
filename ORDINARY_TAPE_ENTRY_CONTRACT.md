@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 多行投影迁移前基线与所有权（2026-10-10）
+
+在 `f6d6cf596c47f1e5dca49f7ddc96cc22a0773e7d` 实测 TapeNewlineLayoutTests、TapeNewlineFlowTests、TapeNewlineTransitionTests、TapeNewlinePrefixTests、TapeWordVisibilityTests：37 项零失败零跳过（8.115 秒，墙钟 8.120 秒），固定参考与 animejs 4.2.2 归档齐备；证据 `../../work/tape-multiline-baseline.log`。零主程序启动、终态零测试／编译残留。仅建立迁移基线，未实现多行组合投影。
+
+有界会话内决策复核核对固定原版 test-ui.ts 的完整 scrollTape（958–1161）及原生 TapeNewlineTextLayout／TapeNewlineFlow。不可替换的行为是：根据已展示框移除词；保留词移除后的三个 Return 结构节点；清理 leading afterNewline 时只补偿最后一个 filler；只访问活动词之后至多两个 filler，三倍视口封顶；对存活 filler 与主／pace 同步补偿；横向通道 125ms 且不接管独立纵向退休。普通 PromptFieldTextLayout 的段落排版不包含这些持久状态，不能直接作为多行 Tape 的整个 owner。
+
+后续修改点应是现有持久流内的 Word 原生盒和身份查找：最终字段槽／opaque cell ID 用于文字、主 after 与 canonical pace；真实字段索引用于词框与拓扑；raw UTF-16 接受单位用于 letter 推进；旧 Character offset 仅留旧路径。不得由拼接文字拆词，也不得把候选末端算成接受推进。必须用实际候选溢出／跨字段融合、Return 后 extras、隐藏额外槽、同向 RTL、前缀确认与重复／取消反例验证。匿名结构行、多个 Return 的可达性、连接塑形、混合方向和跨词快照事务仍需额外证据；本决策不是独立审计，也未解除应用层保护。
+
 ## 单行投影跨词前缀移除增量（2026-10-10）
 
 后续身份隔离反例主动清空旧 glyphCharacterOffsets、保留真实 session 的完整 compositionTextMap，扩展为方向 × 模式 × 有无旧偏移八组合；这不是实际 IME 产生该快照的证明。`../../work/tape-prefix-identity-red.log` 一项十二处断言失败，暴露前缀确认仍被旧偏移准入阻挡，累计补偿为零且重复通知。现将投影补偿完全按字段身份读取，缺失投影字段返回未知，不回退借用旧字符框；只有非投影路径读取旧偏移。verified.log 59 项零失败零跳过（4.619 秒，墙钟 4.626 秒），originality.log 通过，三份日志均以 tape-prefix-identity- 为前缀。行为先行、有界决策和风险复核为本会话检查，无独立审计；零主程序启动、终态零残留，无新增图或完整门禁复跑。
