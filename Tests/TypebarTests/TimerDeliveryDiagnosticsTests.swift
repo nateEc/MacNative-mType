@@ -2,6 +2,21 @@ import XCTest
 @testable import Typebar
 
 final class TimerDeliveryDiagnosticsTests: XCTestCase {
+  func testSlowPromptRenderUsesDoubleOptInWithoutRecordingPromptContents() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    let begin = try XCTUnwrap(source.range(of: "private func renderedPrompt(for session:"))
+    let end = try XCTUnwrap(source.range(of: "// These values are invariant", range: begin.upperBound..<source.endIndex))
+    let body = String(source[begin.lowerBound..<end.lowerBound])
+    XCTAssertTrue(body.contains("TimerDeliveryDiagnostics.enabled ? ProcessInfo.processInfo.systemUptime : 0"))
+    XCTAssertTrue(body.contains("if TimerDeliveryDiagnostics.enabled"))
+    XCTAssertTrue(body.contains("duration > 0.125"))
+    XCTAssertTrue(body.contains("trace(.promptRenderFinished, duration: duration,"))
+    XCTAssertFalse(body.contains("session.prompt"))
+    XCTAssertFalse(body.contains("session.typed"))
+  }
+
   func testPhaseRecordsUseFixedLabelsAndOnlyRelativeTimeAndState() {
     for phase in TimerDeliveryDiagnostics.Phase.allCases {
       XCTAssertEqual(TimerDeliveryDiagnostics.phaseRecord(phase: phase, offset: 12.345,

@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 单次完整重建耗时的反证（2026-10-10）
+
+在 293f277 后新增 QA 固定阶段 prompt-render-finished：仅双重启用诊断时测量 renderedPrompt(for:composition:) 整段同步执行，超过 0.125 秒才记录相对时间、耗时及会话状态。没有文本、身份、跨帧缓存、输入／计时健康阈值或调度改变。源码门禁先红：prompt-render-duration-red.log 一项四个预期断言失败，退出 1；它验证诊断接线，不是设备性能行为测试。prompt-render-duration-verified.log 权威退出 0：51 项零失败零跳过，7.233 秒（墙钟 7.240），含主光标、闪烁、渲染快照、Choo 与退休词检查；原创边界 prompt-render-duration-originality.log 退出 0。
+
+唯一隔离包 ../../work/Typebar-Render-Duration-20261010.app，独立域 app.typebar.qa.renderduration20261010、内存数据；prompt-render-duration-package.log 退出 0。初始 AX 后单键 l，普通时间练习再次失败。prompt-render-duration-runtime.log 首次输入处理 0.000852 秒，之后交付间隔 1.844371 秒、preflight=0.000058、elapsed=1.794059、drift=0.794059、failed=1；实际结果弹窗显示 1/0/0/0 且不保存。全部日志没有 prompt-render-finished：在已启用诊断的这次运行中，没有记录到单次同步完整重建超过 125ms。这反驳“某一次完整重建自身耗时约两秒”，不能排除多个短重建／排版积累、处理器外输入回调、框架或自动化观测影响；也不代表 125ms 内重建足够快，更不能据此确定唯一根因。
+
+结果弹窗保持打开时 ⌘Q，唯一主进程句柄正常退出 0，随后无 Typebar。无 TERM、第二实例或用户偏好数据改动；新增诊断本身可能扰动时序。未重跑全量 readiness 或设备 IME，首次延迟尚未解决，完整 goal 继续 active。
+
 ## 首次输入返回后的计时延迟定位（2026-10-10）
 
 被测 96f8c30，唯一隔离包 `../../work/Typebar-Phase-20261010.app`，独立域 app.typebar.qa.phase20261010、内存数据及显式阶段诊断。timer-phase-package.log 退出 0。唯一主进程 PID 34067 两轮普通时间练习，各输入一个正确首字母；同一实例通过再来一次重开，没有第二次启动。

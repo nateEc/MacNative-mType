@@ -9,6 +9,7 @@ enum TimerDeliveryDiagnostics {
     case lateDelivery = "late-delivery"
     case inputStarted = "input-started"
     case inputFinished = "input-finished"
+    case promptRenderFinished = "prompt-render-finished"
   }
 
   private static let phaseOrigin = ProcessInfo.processInfo.systemUptime

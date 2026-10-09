@@ -3469,6 +3469,16 @@ private struct ContentView: View {
   }
 
   private func renderedPrompt(for session: TypingSession, composition: String?) -> PromptRendering {
+    let diagnosticStart = TimerDeliveryDiagnostics.enabled ? ProcessInfo.processInfo.systemUptime : 0
+    defer {
+      if TimerDeliveryDiagnostics.enabled {
+        let duration = ProcessInfo.processInfo.systemUptime - diagnosticStart
+        if duration > 0.125 {
+          TimerDeliveryDiagnostics.trace(.promptRenderFinished, duration: duration,
+            hasStarted: session.hasStarted, isFinished: session.isFinished)
+        }
+      }
+    }
     // These values are invariant across this synchronous render. Resolving
     // them per glyph repeats theme-preview and prompt-direction work on every
     // native presentation tick; do not cache them across subsequent renders.
