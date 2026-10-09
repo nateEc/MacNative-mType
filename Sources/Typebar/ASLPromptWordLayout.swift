@@ -5,9 +5,20 @@ import SwiftUI
 struct ASLPromptWordPlan {
   let wordByGlyphID: [Int: Int]
   let placeholderGlyphID: Int?
+  let lineBreakGlyphIDs: Set<Int>
+  let separatorGlyphIDs: Set<Int>
 
-  init(glyphs: [TypingPromptGlyph], ids: [Int], words: [TypingPromptWordPresentation]?, placeholderGlyphID: Int? = nil) {
+  init(glyphs: [TypingPromptGlyph], ids: [Int], words: [TypingPromptWordPresentation]?, placeholderGlyphID: Int? = nil,
+    compositionMap: PromptCompositionTextMap? = nil) {
     self.placeholderGlyphID = placeholderGlyphID
+    if let map = compositionMap {
+      wordByGlyphID = Dictionary(map.fieldRuns.flatMap { field in
+        field.cells.map { ($0.id, field.fieldID ?? $0.id) }
+      }, uniquingKeysWith: { first, _ in first })
+      lineBreakGlyphIDs = Set(map.fieldRuns.filter(\.endsWithReturn).compactMap { $0.cells.last?.id })
+      separatorGlyphIDs = Set(map.fieldRuns.flatMap(\.cells).filter(\.isGap).map(\.id))
+      return
+    }
     var owners: [Int: Int] = [:]
     if let words {
       let visibleIDs = Set(ids)
@@ -39,12 +50,18 @@ struct ASLPromptWordPlan {
       }
     }
     wordByGlyphID = owners
+    lineBreakGlyphIDs = Set(glyphs.enumerated().compactMap { index, glyph in
+      ids.indices.contains(index) && glyph.character == "\n" && glyph.state != .extra ? ids[index] : nil
+    })
+    separatorGlyphIDs = Set(glyphs.enumerated().compactMap { index, glyph in
+      ids.indices.contains(index) && glyph.character == " " && glyph.state != .extra && ids[index] != placeholderGlyphID ? ids[index] : nil
+    })
   }
 
   func measuredWords(frames: [Int: CGRect], glyphs: [TypingPromptGlyph], ids: [Int]) -> [Int: CGRect] {
     var words: [Int: CGRect] = [:]
-    for (index, glyph) in glyphs.enumerated() where ids.indices.contains(index) {
-      guard !(glyph.character == " " && glyph.state != .extra && ids[index] != placeholderGlyphID),
+    for index in glyphs.indices where ids.indices.contains(index) {
+      guard !separatorGlyphIDs.contains(ids[index]),
         let owner = wordByGlyphID[ids[index]], let frame = frames[ids[index]],
         frame.width > 0, frame.height > 0 else { continue }
       words[owner] = words[owner].map { $0.union(frame) } ?? frame

@@ -12,6 +12,12 @@ struct ASLPromptCellPlan {
   let cells: [Cell]
 
   init(glyphs: [TypingPromptGlyph], ids: [Int], rendering: PromptRendering?) {
+    if let map = rendering?.compositionTextMap {
+      cells = map.fieldRuns.flatMap(\.cells).map {
+        .init(id: $0.id, glyph: $0.glyph, content: .init(glyph: $0.glyph, text: $0.text))
+      }
+      return
+    }
     let ids = ids.count == glyphs.count ? ids : Array(glyphs.indices)
     let retained = glyphs.indices.filter { rendering == nil || rendering?.glyphCharacterOffsets[ids[$0]] != nil }
     let visibleGlyphs = retained.map { glyphs[$0] }, visibleIDs = retained.map { ids[$0] }
@@ -46,6 +52,11 @@ struct ASLPromptGlyphContent {
 
   static func make(glyphs: [TypingPromptGlyph], ids: [Int], rendering: PromptRendering?) -> [Self] {
     guard let rendering else { return glyphs.map { .init(glyph: $0) } }
+    if let map = rendering.compositionTextMap {
+      return glyphs.enumerated().map { index, glyph in
+        .init(glyph: glyph, text: ids.indices.contains(index) ? map.cellTexts[ids[index]] ?? AttributedString() : AttributedString())
+      }
+    }
     let texts = rendering.glyphTexts()
     return glyphs.enumerated().map { index, glyph in
       let text = ids.indices.contains(index)
@@ -124,6 +135,7 @@ struct ASLPromptCaretBridge: NSViewRepresentable {
   var text = AttributedString()
   var font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   var wordFrames: [Int: CGRect] = [:]
+  var compositionMap: PromptCompositionTextMap? = nil
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var frameRate
   func makeNSView(context: Context) -> ASLPromptCaretContainer { ASLPromptCaretContainer() }
@@ -137,7 +149,8 @@ struct ASLPromptCaretBridge: NSViewRepresentable {
         centersActiveLine: $0.centersActiveLine, wrapperRevision: $0.wrapperRevision)
     }
     view.configure(configuration, frames: frames, glyphIDs: glyphIDs,
-      lineScroll: lineScroll, caretGlyphID: caretGlyphID, text: text, font: font, wordFrames: wordFrames)
+      lineScroll: lineScroll, caretGlyphID: caretGlyphID, text: text, font: font, wordFrames: wordFrames,
+      compositionMap: compositionMap)
   }
   static func dismantleNSView(_ view: ASLPromptCaretContainer, coordinator: ()) { view.stop() }
 }
@@ -149,6 +162,8 @@ final class ASLPromptCaretContainer: NSView {
   private var wordFrames: [Int: CGRect] = [:]
   private var glyphIDs: [Int] = []
   private var indexByID: [Int: Int] = [:]
+  private var compositionMap: PromptCompositionTextMap?
+  private var separators: Set<Int> = []
   private var revision: UInt64 = 0
   private let caret = PromptCaretNativeView()
   private let follower = PromptAutoScrollView()
@@ -169,8 +184,10 @@ final class ASLPromptCaretContainer: NSView {
   func configure(_ config: PromptCaretNativeView.Configuration?, frames: [Int: CGRect], glyphIDs: [Int],
     lineScroll: PromptLineScrollContext? = nil, caretGlyphID: Int? = nil,
     text: AttributedString = AttributedString(), font: NSFont = .monospacedSystemFont(ofSize: 28, weight: .regular),
-    wordFrames: [Int: CGRect] = [:]) {
-    if self.frames != frames || self.glyphIDs != glyphIDs || self.wordFrames != wordFrames {
+    wordFrames: [Int: CGRect] = [:], compositionMap: PromptCompositionTextMap? = nil) {
+    if self.frames != frames || self.glyphIDs != glyphIDs || self.wordFrames != wordFrames
+      || self.compositionMap?.caret != compositionMap?.caret
+      || self.compositionMap?.canonicalAliases != compositionMap?.canonicalAliases {
       if self.glyphIDs != glyphIDs {
         indexByID = Dictionary(glyphIDs.enumerated().map { ($0.element, $0.offset) },
           uniquingKeysWith: { first, _ in first })
@@ -179,24 +196,36 @@ final class ASLPromptCaretContainer: NSView {
       self.wordFrames = wordFrames
       lineGeometry = ASLPromptLineGeometry(frames: frames, wordFrames: wordFrames)
     }
+    self.compositionMap = compositionMap
+    separators = Set(compositionMap?.fieldRuns.flatMap(\.cells).filter(\.isGap).map(\.id) ?? [])
     caret.frame = bounds
     caret.isHidden = config == nil
     if var config {
       config.geometryRevision = revision
       config.firstGlyphID = glyphIDs.first(where: { frames[$0] != nil }) ?? 0
       config.glyphRect = { [weak self] id in self?.rect(for: id) }
+      if compositionMap != nil {
+        let direction = config.rightToLeft
+        config.fieldMainRect = { [weak self] style in
+          self?.mainRect(style: style, font: font, rightToLeft: direction)
+        }
+        config.fieldPaceRect = { [weak self] id, after in self?.canonicalRect(id, after: after) }
+      }
       caret.update(config)
     } else { caret.stop() }
     follower.frame = bounds
     follower.update(text: text, characterOffset: nil, font: font, lineSpacing: 12,
       isRightToLeft: false, lineScroll: lineScroll,
-      customGeometry: .init(revision: revision, caretGlyphID: caretGlyphID,
+      customGeometry: .init(revision: revision, caretGlyphID: compositionMap == nil ? caretGlyphID : compositionMap?.caret?.cellID,
         measure: { [weak self] active, previous, caret, words in
           self?.lineGeometry.measure(active: active, previous: previous, caret: caret, words: words)
         }))
   }
 
   func rect(for id: Int) -> CGRect? {
+    // Projected fragments own their actual box, including a zero-advance
+    // combining mark. Legacy backward fallback must not cross field/row IDs.
+    if compositionMap != nil { return frames[id] }
     guard frames[id] != nil, let index = indexByID[id] else { return nil }
     for position in stride(from: index, through: 0, by: -1) {
       if let frame = frames[glyphIDs[position]], frame.width > 0, frame.height > 0 { return frame }
@@ -206,6 +235,23 @@ final class ASLPromptCaretContainer: NSView {
 
   func measuredRect(for id: Int) -> CGRect? { frames[id] }
   func measuredWordRect(for id: Int) -> CGRect? { wordFrames[id] }
+
+  private func presentationRect(_ id: Int, after: Bool) -> CGRect? {
+    guard let rect = rect(for: id) else { return nil }
+    if !after, separators.contains(id), let index = indexByID[id], index + 1 < glyphIDs.count,
+      let next = frames[glyphIDs[index + 1]], next.minY > rect.minY { return next }
+    return rect
+  }
+  private func canonicalRect(_ id: Int, after: Bool) -> CGRect? {
+    let ids = compositionMap?.canonicalAliases[id] ?? (frames[id] == nil ? [] : [id])
+    return (after ? ids.last : ids.first).flatMap { presentationRect($0, after: after) }
+  }
+  private func mainRect(style: TypingCaretStyle, font: NSFont, rightToLeft: Bool) -> CGRect? {
+    guard let anchor = compositionMap?.caret, let rect = presentationRect(anchor.cellID, after: anchor.after) else { return nil }
+    return PromptPaceCaretGeometry.rect(from: rect, to: rect, fromAfter: anchor.after, toAfter: anchor.after,
+      style: style, rightToLeft: rightToLeft, fraction: 1, reducesMotion: true,
+      afterWidth: (" " as NSString).size(withAttributes: [.font: font]).width)
+  }
 
   override func layout() { super.layout(); caret.frame = bounds; follower.frame = bounds }
   override func viewWillMove(toSuperview newSuperview: NSView?) {

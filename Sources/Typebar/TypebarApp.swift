@@ -905,15 +905,14 @@ struct ASLPracticePrompt: View {
     let cells = ASLPromptCellPlan(glyphs: glyphs, ids: ids, rendering: rendering).cells
     let visibleGlyphs = cells.map(\.glyph), ids = cells.map(\.id)
     let wordPlan = ASLPromptWordPlan(glyphs: visibleGlyphs, ids: ids, words: words,
-      placeholderGlyphID: rendering?.emptyWordPlaceholderGlyphID)
+      placeholderGlyphID: rendering?.emptyWordPlaceholderGlyphID, compositionMap: rendering?.compositionTextMap)
     return ASLPromptFlowLayout {
       ForEach(cells) { cell in
         ASLPromptGlyphCell(content: cell.content, size: fontSize,
           font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
           .layoutValue(key: ASLPromptWordIDKey.self, value: wordPlan.wordByGlyphID[cell.id] ?? cell.id)
-          .layoutValue(key: ASLPromptLineBreakKey.self, value: cell.content.ownsLineBreak)
-          .layoutValue(key: ASLPromptSeparatorKey.self,
-            value: cell.glyph.character == " " && cell.glyph.state != .extra && cell.id != wordPlan.placeholderGlyphID)
+          .layoutValue(key: ASLPromptLineBreakKey.self, value: wordPlan.lineBreakGlyphIDs.contains(cell.id))
+          .layoutValue(key: ASLPromptSeparatorKey.self, value: wordPlan.separatorGlyphIDs.contains(cell.id))
           .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [cell.id: $0] }
       }
     }
@@ -929,7 +928,8 @@ struct ASLPracticePrompt: View {
             ASLPromptCaretBridge(configuration: carets,
               frames: frames, glyphIDs: ids, lineScroll: lineScroll, caretGlyphID: caretGlyphID,
               text: rendering?.text ?? AttributedString(),
-              font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular), wordFrames: wordFrames)
+              font: font ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular), wordFrames: wordFrames,
+              compositionMap: rendering?.compositionTextMap)
               .allowsHitTesting(false).accessibilityHidden(true)
           }
         }
@@ -3275,9 +3275,9 @@ private struct ContentView: View {
   }
 
   private func renderedPrompt(for session: TypingSession, composition: String?) -> PromptRendering {
-    // Custom word-box renderers need their own projected geometry adapter.
-    // Keep their existing shared rendering until that adapter is connected.
-    let usesCompositionProjection = composition != nil && !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
+    // ASL resolves projected cells against its actual hand/fallback boxes.
+    // Tape and Choo still need their own projected geometry adapters.
+    let usesCompositionProjection = composition != nil && !usesTapePractice && !practiceVisualEffect.usesChoo
       && (!session.configuration.containsRightToLeftPromptRun || session.configuration.usesRightToLeftPrompt)
     let presentation = usesCompositionProjection
       ? PromptCompositionPresentation(session: session, composition: composition ?? "", style: settings.compositionDisplayStyle) : nil

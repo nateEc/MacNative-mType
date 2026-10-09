@@ -97,7 +97,12 @@ struct PromptCompositionPresentation {
       if let last = fieldRuns.indices.last, fieldRuns[last].fieldID == cell.sourceFieldIndex,
         fieldRuns[last].removedReturns == 0 {
         fieldRuns[last].cells.append(entry)
-      } else { fieldRuns.append(.init(fieldID: cell.sourceFieldIndex, cells: [entry])) }
+      } else { fieldRuns.append(.init(fieldID: cell.sourceFieldIndex, cells: [entry],
+        // Zen's empty next-word placeholder owns the field after the last
+        // target range. It has no target structure, not an inferred Return.
+        structuralReturn: cell.sourceFieldIndex.map {
+          projection.fields.indices.contains($0) && projection.fields[$0].hasStructuralReturn
+        })) }
       ranges[cell.id] = NSRange(location: unit, length: String(value.characters).utf16.count)
       let hint = value.runs.first { ($0.baselineOffset ?? 0) < 0 }
       let body = hint.map { AttributedString(value[..<$0.range.lowerBound]) } ?? value

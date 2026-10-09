@@ -13,6 +13,10 @@ struct PromptFieldTextRun: Equatable {
   let fieldID: Int?
   var cells: [Cell]
   var removedReturns = 0
+  var structuralReturn: Bool? = nil
+  var endsWithReturn: Bool {
+    structuralReturn ?? cells.contains { $0.glyph.character == "\n" && $0.glyph.state != .extra }
+  }
 }
 
 /// Ordinary letters are independent boxes. Joining scripts shape within a
@@ -124,7 +128,7 @@ struct PromptFieldTextRun: Equatable {
       var pending: [PromptFieldTextRun.Cell] = []
       // A Return icon is a letter inside the word. The structural boundary
       // follows the entire container, including accepted/marked extras.
-      let breaksAfterField = field.cells.contains { $0.glyph.character == "\n" && $0.glyph.state != .extra }
+      let breaksAfterField = field.endsWithReturn
       for (index, cell) in field.cells.enumerated() {
         let breaks = breaksAfterField && index == field.cells.count - 1
         if joinsLetters && !cell.isGap {

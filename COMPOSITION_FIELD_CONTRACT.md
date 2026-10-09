@@ -1,5 +1,19 @@
 # 组合投影的真实字段与部分字形归属
 
+## ASL 组合投影适配增量（2026-10-10）
+
+普通 ASL 生产分支不再排除共享组合投影。实际 SwiftUI 手形／回退文字组件读取最终 `fieldRuns`，保留虚拟负 ID、分裂 canonical 关联、候选下划线和独立提示属性；词框、提交空白、退休字段及主 before／after 与 canonical pace 由实际槽框驱动。投影零宽槽保持自己的行／字段框，不借用前字段；投影显式缺失 caret 不恢复旧 canonical 跟随位置。无投影的既有路径保留。
+
+结构 Return 来自原始字段元数据，边界位于整个容器（包括真实 extras）之后，不从显示字符推断；marked 溢出 Return 不产生目标结构换行。共用布局同步修复。Zen 最后空词占位可以位于目标范围数组之后，明确没有目标结构，不直接越界取数组元素。未改输入、计分、历史、持久化、pace 时钟或动画队列；没有新增计时器和产品依赖。
+
+固定只读参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。核对完整更新／caret 函数及 ASL 配置和 CSS：上游仅更换字体、关闭 joining，没有独立 ASL 候选更新算法。本实现沿用原创原生手形，未复制 Gallaudet 字体、CSS、实现或资源，不宣称专业手形或像素等价。行为先行、源码核对、决策复核和根因调试约束了本次字段元数据／独立几何修复；本会话风险复核不等于独立审计。
+
+持久证据 `../../work/asl-composition.OOXGsz/`：`red.log` 六测试十五处失败、`marked-return-red.log` 一测试两处失败；`first.log` 七新增通过后，既有 Zen 空占位测试真实越界崩溃（signal 5），修复后 `second.log` 52 项零失败；`zero-red.log` 一测试一处失败证明组合符借用前字段框。最终 `broad.log` session 99010 退出 0，820 项零失败（183.616 秒，墙钟 183.712 秒），其中九项新增 0.566 秒；没有跳过测试或隐藏失败重试。`originality.log` 边界检查退出 0。
+
+三张 `asl-composition-overflow.png`、`asl-composition-cancelled.png`、`asl-composition-return-extras.png` 经离屏真实组件挂载后逐张检查，窗口始终不可见并关闭；不是完整 ContentView、系统 IME 或真机验收。候选溢出、取消的跨字段组合符、Return 后真实 extras 均保留各自槽；既有组件捕获同目录保留。零 Typebar 主程序启动。
+
+本增量尚未执行完整冻结发布门禁，不能沿用下方 4,072／501 项结果代表当前修改。Tape／Choo 的全局投影适配、混合方向、ASL 组合 Tape 删除产生的匿名结构行、整体 RTL 排版、专业手形、真实 IME／VoiceOver／设备／字体和 UI 性能仍开放；配置 89 映射／4 部分／1 不适用不升级，主题与挑战缺口不变，完整 goal active。
+
 ## Return 与 Unicode 增量的完整冻结复验（2026-10-10）
 
 对 `e349198829e0b60929b0b3fd2c07d6b5e24a8c40`（含前一 Return 增量）执行唯一完整串行门禁，session 57271 终态退出 0。持久证据为 `../../work/unicode-readiness.MknL9P/readiness.log`、`frozen.sha256`、`logs/`（75 份日志）及 `images/`（222 张既有组件图，不计新画面或实机 IME 验收）。十四文件在启动前、中途及终态哈希一致，门禁全程没有修改输入；终态后只在本合同、README、规范、功能盘点补结果，十个代码／测试／QA 冻结输入不变。
