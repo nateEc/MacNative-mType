@@ -1,5 +1,17 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 优化构建对照与显式打包配置（2026-10-10）
+
+核查 bbd5e1f 的打包脚本，两次 swift build 都未传配置，此前 GUI 样本均来自默认 debug。新增 TYPEBAR_BUILD_CONFIGURATION，默认 release，显式 debug／release 均可；非法值在构建及创建应用前拒绝，构建和 --show-bin-path 使用同一个已校验值。保留既有输出拒绝覆盖、QA 内存容器、标识定制及 ad-hoc 签名，不改客户端计时／输入实现或保护阈值。README 补充调试配置及已知计时故障边界。
+
+PackagingConfigurationTests 启动实际打包脚本，但以临时 swift／codesign 替身记录调用和提供占位二进制：默认、两种显式值、非法值四组，核查构建／查找参数一致、文件拷贝、非法值零构建／零应用目录。packaging-configuration-red.log 一项六次预期断言失败；修正后 packaging-configuration-verified.log 权威退出 0，一项零失败零跳过，1.488s（墙钟 1.490）。该测试不是优化器或真实签名证据。选择遵循行为优先测试技能；风险审查另查了包自检没有固定 debug 二进制路径。
+
+实际 release-comparison-package.log 句柄 14001 持续轮询直到权威退出 0，未因日志暂未更新而重开；首次优化构建 474.36s，日志明确 Building for production。生成 Typebar-Release-20261010.app、bundle app.typebar.qa.release20261010；codesign --verify --deep --strict 退出 0，TypebarQAInMemoryStore=true。临时编译冻结期间未修改输入文件。
+
+本轮只启动一个 release 主程序，句柄 39020，经 ⌘Q 正常退出 0，最终 pgrep -x Typebar 无匹配；退出后不再调用 GUI 观察。release-comparison-runtime.log 第一轮时间 30 秒输入 bright meadow tangent summer orchard planet，AX 确认 44/0/0/0 UTF-16、6/6 正确，但结果计时失败且不保存；首键处理 0.652ms，交付间隔 2.232127s、preflight 0.037ms、elapsed 2.207684、drift 1.207684、failed=1。同一实例重开，正确首键 s，AX 确认 1/0/0/0，处理 0.258ms，交付间隔 1.654356s、preflight 0.041ms、elapsed 1.544048、drift 0.544048、failed=1。Charts 固定尺寸诊断保留，不把环境提示算成测试断言失败。
+
+两种输入在优化构建中仍失败，反驳“debug 配置是故障的唯一原因”；词序、时序不同，且 GUI 自动化／AX 仍存在，不能据此统计优化收益、断定优化无影响或排除观察扰动。release 打包是正常交付配置改进，不宣称计时根因已解决；普通计时人工验收不升级。release-package-boundary-check.log 权威退出 0，实际 release 包的签名、关键元数据、资源边界及固定参考原创检查通过（复用构建 0.35s）；人工文档结构审计保持 1151 个唯一场景，git diff --check 通过。未执行全量 readiness、release 全量 XCTest、设备 IME、所有配置／主题等完整功能验收，完整 goal 保持 active。
+
 ## 隐藏主光标延后几何与分时段采样（2026-10-10）
 
 基于 e0dd241 的空定位探针修正已证实的隐藏主光标浪费：PromptCaretNativeView.present 先读取最新可见性，只在主样式绘制标记且可见时解析主光标几何。隐藏期间不消耗 input／needsPosition／needsSnap，恢复可见时仍读取最新输入、组合和字形定位；主光标关闭后重新启用也重新定位。pace 请求、插值、计时器及独立绘制继续执行，blink 时钟仍由同一个最新可见性快照更新。没有调整健康阈值、调度频率、输入规则或成绩处理，也没有持久跨帧缓存旧 rendering。

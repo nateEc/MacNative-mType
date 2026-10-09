@@ -897,6 +897,11 @@ swift run
 zsh Scripts/package-macos-app.sh
 ```
 
+默认使用优化的 `release` 构建。需要调试版时显式设置
+`TYPEBAR_BUILD_CONFIGURATION=debug`；仅接受 `debug` 或 `release`，构建和二进制查找使用同一配置。
+脚本仍拒绝覆盖已有应用包，可用 `TYPEBAR_APP_PATH` 指定新的输出路径。
+release 不代表功能验收通过：普通计时延迟在优化构建中仍有复现，详见 [普通入口合同](ORDINARY_TAPE_ENTRY_CONTRACT.md)。
+
 无启动地构建、验签并检查应用包的关键元数据：
 
 ```sh

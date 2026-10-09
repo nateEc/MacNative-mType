@@ -6,6 +6,12 @@ app_path="${TYPEBAR_APP_PATH:-$project_root/Typebar.app}"
 bundle_identifier="${TYPEBAR_BUNDLE_IDENTIFIER:-}"
 app_name="${TYPEBAR_APP_NAME:-}"
 qa_in_memory_store="${TYPEBAR_QA_IN_MEMORY_STORE:-0}"
+build_configuration="${TYPEBAR_BUILD_CONFIGURATION:-release}"
+
+if [[ "$build_configuration" != "debug" && "$build_configuration" != "release" ]]; then
+  print -u2 "TYPEBAR_BUILD_CONFIGURATION must be debug or release"
+  exit 1
+fi
 
 if [[ "$qa_in_memory_store" != "0" && "$qa_in_memory_store" != "1" ]]; then
   print -u2 "TYPEBAR_QA_IN_MEMORY_STORE must be 0 or 1"
@@ -18,8 +24,8 @@ if [[ -e "$app_path" ]]; then
 fi
 
 cd "$project_root"
-swift build
-binary_dir="$(swift build --show-bin-path)"
+swift build --configuration "$build_configuration"
+binary_dir="$(swift build --configuration "$build_configuration" --show-bin-path)"
 mkdir -p "$app_path/Contents/MacOS"
 cp "$binary_dir/Typebar" "$app_path/Contents/MacOS/Typebar"
 cp "$project_root/Resources/Info.plist" "$app_path/Contents/Info.plist"
