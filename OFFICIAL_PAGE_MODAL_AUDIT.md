@@ -1,5 +1,7 @@
 # 官方页面与模态能力审计
 
+换行 Tape 实际 owner 增量：TestSurface 新增十项实际纵向等待／内部删行／异步确认去重、独立输入、最新重叠与生命周期取消及非空位图证据；128 条完整源码轨迹按真实 native 字宽／词框行高归一化驱动组件，不是共用源码指令驱动 motion 模型，也不是浏览器 CSS 数值或完整 pace／输入调度等价。相关 175 项通过，六张组件图已检查。生产换行回退保持，53 表面及 tapeMode 部分不升级；完整冻结结果见合同，零主程序启动、goal active，下方为阶段历史。
+
 换行 Tape 前缀组件增量：TestSurface 增补九项已呈现 leading-filler／cap 补偿、扫描范围内保留 filler 重定、重复确认／同轮新输入、停止／全新 owner 和实际保留行位图证据；64 组完整源码使用实际 TextKit 共享测量，四张 never-visible 图已检查。生产换行仍回退、实际纵向 await／退休通知接线未完成，53 表面及 tapeMode 部分分类不升级；完整冻结结果见合同，零主程序启动、goal active，下方为阶段历史。
 
 Tape 纵横通道增量：TestSurface 新增七项完整源码／共享几何、纵向结束保留横向状态、真实容器重叠／重开证据；相关 160 项通过，128 条实际 Anime.js／RAF／promise 轨迹覆盖双向、两模式、四 marker、即时／平滑、等待期间独立 scrollTape 与重叠行跳。只修正共用 owner 的纵向完成，不接通生产换行 Tape 或冒充浏览器／native 几何等价。53 表面、tapeMode 部分和全部待验分类不升级，零主程序启动，完整冻结结果见合同、goal active；下方为阶段历史。

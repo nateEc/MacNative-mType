@@ -1,5 +1,23 @@
 # 原生奖励收件箱与周任务交付
 
+## 换行 Tape 实际纵向 owner、内部删除与会话确认增量
+
+最终冻结门禁 `/tmp/typebar-tape-native-transition-final-readiness.log` 终态退出 0：原生 3,905 项零失败零跳过（2088.733 秒），服务 501 项（11.807 秒）；十万词耐久 1383.664 秒、16 项隔离磁盘冷读 6.289 秒、53 表面、1,115 唯一人工场景结构、90／3／1 配置元数据和未启动应用包资源／URL scheme／严格签名／原创边界通过。十新增在全量中 4.612 秒，128 条完整源码归一化实际 owner 轨迹和全部既有源码检查通过。20 文件 `/tmp/typebar-tape-native-transition-final-frozen.sha256` 门禁前中后一致；67 原始日志 `/tmp/typebar-tape-native-transition-final-logs.hFPd8I`、177 图 `/tmp/typebar-tape-native-transition-final-images.lt3R3l` 保留，最终六张新图已逐张复查，完成／确认全幅像素一致且非空。窗口从不显示并关闭，零主程序启动，无残留主程序／测试／编译进程；既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。门禁运行中发生对话中断，但按同一已确认活跃句柄续等，未重跑或并行验收、未编辑冻结文件；终态后才补 README／本合同。电源日志 `/tmp/typebar-tape-native-transition-sleep-evidence.log` 记录该耐久用例期间多次 Sleep／DarkWake，含 09:32:08 起 1022 秒维护睡眠，09:49:54 完整唤醒；保留实际长耗时，不扣除睡眠推算性能，也不把本次当清醒基准或性能等价证明。参考仍固定且干净，未操作真实账户、Keychain、成绩库或部署。生产换行回退、tapeMode 部分及完整 goal active 保持，下方为阶段证据。
+
+2026-10-09，固定干净参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `updateActiveElement` 在前进跨行时等待 `lineJump`，再调用 `scrollTape`；独立同词输入可在等待期间另外滚动，反向输入没有 lineTransition 闸门。此次直接接通 `TapePromptNativeView` 的真实 owner，而非新增仅测试的策略模型：首次跨行只记次数；后续按实际 native 词框选择上一活动行之前的边界，平滑路径由既有唯一呈现 timer 等待最新纵向请求完成，即时路径不赋 words 纵向 margin。
+
+完成帧内先缩减 `TapePromptTextView` 的保留 descriptors，保持完整渲染文本及 canonical 偏移直到会话确认；原生实际 leading filler 位移同步补偿 words／marker，并重定 lookahead filler，再释放横向请求。旧行在 words.marginTop 归零时已经不再物化，不等待下一次 SwiftUI rebuild；会话通知仍异步且受尝试／修订代次保护。返回的纯前缀确认只更新渲染偏移与几何，不重复补偿、不采样或取消／重启已运行的横向 tween。同词真实新输入可以独立请求，重叠纵向仅最新 owner 完成，尺寸／字体／尝试重置及拆卸取消旧等待；两个 marker 关闭也保留待完成纵向 timer。没有新产品依赖、新 timer、WebView 或产品内原版代码／资产，完整原文、输入、成绩、回放和存储格式不变。
+
+10 新测试覆盖实际双向纵向等待、内部删行先于异步通知、同词输入独立横向、纯确认不重启 tween、最新重叠、即时路径、停止／新尝试、窗口尺寸取消、反向输入安全和非空实际绘制。复用完整 `check-source-tape-line-composition.mjs` 的 128 条真实锁定 Anime.js／promiseAnimate／RAF 源码轨迹，仅把外部输入事件交给实际 native view，不再把原版 line／scroll／retire 指令直接交给 motion coordinator；每个完整帧比较两个 words margin、原生文本 Y 与删除后内容高度。测试使用等长自有单词，并将原版自有 36px 字宽／45px 行高按实际原生字宽／词框行高归一化；这是有界时序／归一化运动证据，不是浏览器 CSS 数值、完整 pace controller、全部 updateWordLetters 或任意异步队列等价，也不重复宣称 128 条为新增独立源码案例。
+
+行为基线 `/tmp/typebar-tape-native-transition-baseline.log` 六项 22 处失败（0.742 秒）确认缺少等待、通知与确认去重；此前 `red.log` 有两处误用过高视口造成内容高度判据无效，已在基线前修正。`first.log` 22 项零失败但缺环境跳过三项，只作早期局部证据。新增源码驱动测试的 `source.log` 首次编译因测试误用类型名失败，修正实际 `TypingCaretStyle` 后 `source-fixed.log` 七项产生 79,424 处失败，全部为测试假定默认行高 45pt，而真实 glyph bounds 产生 46pt；横向全部吻合。改读独立实际 TextKit 词框而非默认字体行高，未改产品或放宽 1e-6 容限，`measured.log` 七项零失败零跳过（4.308 秒）。
+
+`regression.log` 159 项剩一处旧断言失败：旧组件用例要求换行永不退休，已被本次功能替代。更新为第一行不走单行溢出退休、后续仅退休纵向旧行，并保留实际生产回退源码闸门；不是删除用例或放宽功能要求。最终 `/tmp/typebar-tape-native-transition-final-regression.log` 相关 175 项零失败零跳过（24.387 秒），十新增 4.633 秒，完整 pinned source／归一化实际组件 128 条通过。以上日志均完整保留，未在测试／编译运行中编辑。
+
+六张 `/tmp/typebar-tape-native-transition-focused-images.x3Iui3/tape-newline-transition-{ltr,rtl}-{pending,complete,acknowledged}.png` 已逐张检查：真实 native 文本在纵向等待中移动，完成帧删除旧行，会话确认后不重复裁删或跳动。关闭两种 marker，完成／确认全幅逐像素差异为零且强制非空墨迹；NSWindow 从不显示并关闭，零主程序启动。完整冻结结果见本节首段。
+
+本会话行为优先、源码驱动与有界决策／风险复核约束实际 owner 的时序、重叠／确认幂等和生命周期；根因技能区分测试行高与陈旧要求，不是独立评审。反向返回捕获待删前缀时，组件拒绝删当前活动词，属于明确防丢策略，尚无原版完整反向异步队列等价证据。生产 `TapePracticePrompt` 仍不传 newlineWords，明确换行仍走普通回退；换行原版 scrollTape 的横向溢出退休组合尚未接通，不能套单行算法当作完成。Zen／hint／joining／复杂控制／混合行高／尾随 Return、可见物化性能、完整会话／真实设备／IME 仍待验证。53 表面、94 配置 90 映射／3 部分／1 不适用不升级；新增两个人工待验项，完整重写 goal active，下方为阶段历史。
+
 ## 换行 Tape 已呈现前缀与保留 filler 重定增量
 
 最终冻结门禁 `/tmp/typebar-tape-newline-prefix-final-readiness.log` 终态退出 0：原生 3,895 项零失败零跳过（848.121 秒），服务 501 项（11.387 秒）；十万词耐久 154.984 秒、16 项隔离磁盘冷读 8.304 秒、53 表面、1,113 唯一人工场景结构、90／3／1 配置元数据和未启动应用包资源／URL scheme／严格签名／原创边界通过。九新增在全量中 1.013 秒，64 组新完整源码／320 共享 native 度量时点及全部既有源码对照通过。17 文件 `/tmp/typebar-tape-newline-prefix-final-frozen.sha256` 门禁前中后完全一致；67 原始日志 `/tmp/typebar-tape-newline-prefix-final-logs.RI3S88`、171 图 `/tmp/typebar-tape-newline-prefix-final-images.hKU7da` 保留，最终四张 tape-newline-prefix-{ltr,rtl}-{before,after}.png 已逐张复查，保留两行逐像素差异零且非空。窗口从不显示并关闭，零主程序启动，无残留主程序／测试／编译进程；既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。终态后才补 README／本合同，没有运行中编辑或并行验收；参考仍固定且干净，未操作真实账户、Keychain、成绩库或部署。生产换行回退、tapeMode 部分及完整 goal active 保持，下方为阶段证据。

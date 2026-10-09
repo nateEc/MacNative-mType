@@ -236,7 +236,7 @@ import XCTest
     }
   }
 
-  func testRendererDoesNotApplySingleLineRetirementOrRemoveProductionNewlineFallback() throws {
+  func testRendererUsesVerticalRetirementWithoutSingleLineOverflowOrRemovingProductionFallback() throws {
     let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 160)); defer { view.stop() }
     let (rendering, words) = fixture(), coordinator = PromptCaretMotionCoordinator(), attempt = UUID()
     var retirements: [PromptWordRetirement] = []
@@ -249,8 +249,9 @@ import XCTest
           onRetire: { retirements.append($0) }), newlineWords: words, carets: config(coordinator, attempt: attempt), at: Double(active))
       view.present(at: Double(active))
       RunLoop.main.run(until: Date().addingTimeInterval(0.003))
+      if active < 10 { XCTAssertTrue(retirements.isEmpty, "First line must not retire via single-line overflow") }
     }
-    XCTAssertTrue(retirements.isEmpty, "Leading-filler cleanup/vertical await order is not covered by single-line retirement")
+    XCTAssertEqual(retirements.map(\.firstRetainedWordIndex), [1], "Only the vertical owner's older row retires")
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     XCTAssertTrue(app.contains("settings.practiceTapeMode != .off && !session.hasPracticeNewlineContent"))

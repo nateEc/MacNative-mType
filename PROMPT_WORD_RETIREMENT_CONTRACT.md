@@ -1,5 +1,7 @@
 # 原生旧词移除与回删边界
 
+2026-10-09 换行 Tape 实际 owner：现已接通 native 纵向等待、完成帧内部删行、leading-filler 补偿与异步会话确认去重；新词横向请求等待完成，同词输入仍独立滚动，重叠只由最新 owner 完成，尺寸／重启／拆卸取消。10 新增／相关 175 项、128 条归一化完整源码轨迹与六张 never-visible 实际组件图补证；完成与确认像素一致且非空。生产工厂仍不传 newlineWords，明确换行仍回退；换行横向溢出退休组合、反向异步等价、控制／Zen／hint／joining／混合行高／尾随 Return 与设备仍开放。回到待删前缀时拒绝删当前活动词，属防丢策略而非原版任意反向队列等价证明。完整冻结结果见 [交付合同](REWARD_INBOX_CONTRACT.md)，tapeMode 部分、goal active，下方为阶段历史。
+
 2026-10-09 换行 Tape 前缀组件：确认移除旧行后，真实 native 词框读取已呈现的 leading-filler／行内前缀位移，不用可能超 cap 的数学词宽；保留 filler 在本次 lookahead 范围先重定再续动，重复确认不二次补偿、同轮新输入不被吞掉。九项回归与 64 组完整源码／TextKit 共享测量、四张实际裁前后图补证，保留两行像素一致。仍未接通实际纵向 owner 的 await／通知和生产含换行 Tape，单行退休禁用及生产回退保持。完整冻结结果见 [交付合同](REWARD_INBOX_CONTRACT.md)，tapeMode 部分、goal active；下方为阶段历史。
 
 2026-10-09 Tape 纵横通道：修正 wordsDidFinish 清整个 words 的缺陷，纵向结束只清纵向 margin／ready／tween；运行中横向状态及其原时钟、独立 marker 和滚动原点保留。7 新增／相关 160 项通过，128 条完整源码／共享几何轨迹证明有界等待、重叠、leading filler 删除和退休补偿顺序；真实 follower 的重叠／重开无窗口回归通过。此处没有把源码 leading-filler 证明升级为实际 native Tape 前缀接线，生产回退与单行退休禁用保持。完整冻结结果见 [交付合同](REWARD_INBOX_CONTRACT.md)，tapeMode 部分、goal active，下方为阶段历史。
