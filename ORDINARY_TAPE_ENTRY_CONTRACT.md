@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 应用快照构造增量（2026-10-10）
+
+TapePromptProjection.snapshot 从传入的同一 session 值绑定输入身份、原始字段、最终渲染、按 Zen／声明换行／生成换行选择的拓扑和退休上下文。拒绝 attempt 不匹配、退休前缀不一致、缺少活动字段 map 或退休词目录。构造器不重新读取 live session；调用者负责用同一捕获值生成 rendering，字段存在检查不能证明任意外部 rendering 的新鲜性。
+
+应用 TapePracticePrompt 调用加入 latestProjection：捕获 session 与 compositionText，渲染该捕获值，并显式传入 practiceLineScrollContext。辅助函数新增可选捕获 session 参数，旧调用默认读取当前状态；两条退休回调明确写 self.session，不修改捕获副本。应用 `!usesTapePractice` 投影渲染保护尚未解除，当前 provider 在无 map 时拒绝构造；因此不能声称应用用户路径已经启用投影。
+
+新增单行／多行两场景，验证输入、候选、活动字段、canonical caret、拓扑与退休元数据，拒绝旧 attempt、前缀不一致及无 map。`../../work/tape-session-snapshot-red.log` 保留缺接口编译失败；`verified.log` 初版 189 项零失败，24.651 秒（wall 24.673 秒）。显式捕获后 `captured.log` 因局部 let session 遮蔽应用状态导致回调编译失败；明确 self.session 后最终 `../../work/tape-session-snapshot-final.log` 189 项零失败零跳过，24.892 秒（wall 24.914 秒），进程退出 0。上述 verified.log／captured.log 均使用相同 tape-session-snapshot- 前缀。`../../work/tape-session-snapshot-originality.log` 原创性检查退出 0。
+
+零主程序启动，无新增截图。应用 provider 仅编译接通，构造器行为有测试，但应用实际用户流程未验；初始新鲜配置、入口启用、方向／连接塑形、复杂队列和真实 IME 仍开放。完整冻结门禁未重跑，整体兼容分类不升级，完整 goal active。
+
 ## 单行退休字段身份增量（2026-10-10）
 
 prepareRetirement 在字段投影路径使用 compositionField.index 作为活动索引；旧非投影路径继续通过上下文 glyph ID 查找。此前投影词框虽按字段索引读取，活动字段仍依赖 glyph ID，共享 ID 时错认首词并漏发前缀移除。改动不新增退休状态机，也不改通知／补偿规则。

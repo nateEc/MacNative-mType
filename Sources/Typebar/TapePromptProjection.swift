@@ -20,6 +20,23 @@ struct TapePromptProjectionSnapshot {
 /// Word identity and structural ownership come from the session, never from
 /// splitting the displayed string (which can contain replacement/hint text).
 enum TapePromptProjection {
+  /// The caller captures the session and renders it on the main actor before
+  /// invoking this builder; no second live-session read belongs in this step.
+  static func snapshot(session: TypingSession, composition: String, rendering: PromptRendering,
+    retirement: PromptLineScrollContext) -> TapePromptProjectionSnapshot? {
+    guard retirement.attemptID == session.automaticInputAttemptID,
+      retirement.firstRetainedWordIndex == session.firstRetainedPromptWordIndex,
+      let field = session.promptCompositionField,
+      rendering.compositionTextMap?.fieldRuns.contains(where: { $0.fieldID == field.index }) == true,
+      retirement.words.contains(where: { $0.index == field.index }) else { return nil }
+    let multiline = session.configuration.mode == .zen || session.hasPracticeNewlineContent
+      || session.prompt.contains("\n")
+    return .init(input: .init(attemptID: session.automaticInputAttemptID, typed: session.typed,
+        composition: composition, glyphID: session.promptCaretGlyphIndex),
+      field: field, rendering: rendering,
+      newlineWords: multiline ? words(session: session, rendering: rendering) : [], retirement: retirement)
+  }
+
   /// Sum the measured letter allocations in source order. This is not the
   /// union of their ink bounds: joining, zero-width and virtual slots retain
   /// their own allocation semantics. A missing next slot is not zero-width.

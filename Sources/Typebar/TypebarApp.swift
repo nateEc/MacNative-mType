@@ -3092,14 +3092,16 @@ private struct ContentView: View {
     .onTapGesture { requestTypingFocus() }
   }
 
-  private func practiceLineScrollContext(_ rendering: PromptRendering) -> PromptLineScrollContext {
+  private func practiceLineScrollContext(_ rendering: PromptRendering,
+    session capturedSession: TypingSession? = nil) -> PromptLineScrollContext {
+    let session = capturedSession ?? self.session
     if let offsets = rendering.compositionTextMap?.fieldCharacterOffsets {
       let field = session.promptCompositionField
       return .init(attemptID: session.automaticInputAttemptID,
         activeWordID: field?.index, characterOffsets: offsets,
         smoothScroll: settings.smoothPracticeLineScroll, reducesMotion: settings.reducePracticeMotion,
         words: PromptLineScrollWord.compositionFields(field), firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
-        onRetire: { session.retirePromptWords($0) },
+        onRetire: { self.session.retirePromptWords($0) },
         followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
           slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines),
         caretMotion: promptCaretMotion, centersActiveLine: !settings.showAllPracticeLines,
@@ -3112,7 +3114,7 @@ private struct ContentView: View {
       words: session.promptWordPresentations.enumerated().map {
         .init(index: $0.offset, glyphID: $0.element.range.lowerBound)
       }, firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
-      onRetire: { session.retirePromptWords($0) },
+      onRetire: { self.session.retirePromptWords($0) },
       followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
         slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines),
       caretMotion: promptCaretMotion, centersActiveLine: !settings.showAllPracticeLines,
@@ -3155,6 +3157,12 @@ private struct ContentView: View {
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll,
           carets: makeSpecialPromptCaretConfiguration(rightToLeft: session.configuration.usesRightToLeftPrompt),
           retirement: practiceLineScrollContext(rendering),
+          latestProjection: {
+            let current = session, marked = compositionText
+            let latest = renderedPrompt(for: current, composition: marked)
+            return TapePromptProjection.snapshot(session: current, composition: marked, rendering: latest,
+              retirement: practiceLineScrollContext(latest, session: current))
+          },
           onTapeWordsRemoved: { session.removeTapePromptWords($0) })
       } else if rendering.compositionTextMap != nil {
         PromptFieldPracticePrompt(rendering: rendering,

@@ -249,6 +249,38 @@ import XCTest
     try verifyCompleteFreshSnapshot(independentPace: false)
   }
 
+  func testSessionSnapshotBindsTopologyAndRejectsStaleRetirementAttempt() throws {
+    for prompt in ["abcd next", "a\nbc tail"] {
+      var session = TypingSession(configuration: .words(3), prompt: prompt)
+      session.insertBatch(prompt.contains("\n") ? "a\nb" : "a", at: Date(timeIntervalSinceReferenceDate: 917_100_000))
+      let marked = "候选😀"
+      let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: marked, style: .replace))
+      let rendering = presentation.render { _, glyph, cell in AttributedString(cell?.text ?? String(glyph.character)) }
+      func context(_ attempt: UUID, prefix: Int? = nil) -> PromptLineScrollContext {
+        .init(attemptID: attempt, activeWordID: session.promptCompositionField?.index,
+          characterOffsets: rendering.compositionTextMap?.fieldCharacterOffsets ?? [:],
+          smoothScroll: false, reducesMotion: true,
+          words: PromptLineScrollWord.compositionFields(session.promptCompositionField),
+          firstRetainedWordIndex: prefix ?? session.firstRetainedPromptWordIndex, onRetire: { _ in })
+      }
+      let value = try XCTUnwrap(TapePromptProjection.snapshot(session: session, composition: marked,
+        rendering: rendering, retirement: context(session.automaticInputAttemptID)))
+      XCTAssertEqual(value.input.typed, session.typed)
+      XCTAssertEqual(value.input.composition, marked)
+      XCTAssertEqual(value.field.index, session.promptCompositionField?.index)
+      XCTAssertEqual(value.input.glyphID, session.promptCaretGlyphIndex)
+      XCTAssertEqual(value.newlineWords, prompt.contains("\n") ? TapePromptProjection.words(session: session, rendering: rendering) : [])
+      XCTAssertNotNil(value.retirement)
+      XCTAssertNil(TapePromptProjection.snapshot(session: session, composition: marked,
+        rendering: rendering, retirement: context(UUID())))
+      XCTAssertNil(TapePromptProjection.snapshot(session: session, composition: marked,
+        rendering: rendering, retirement: context(session.automaticInputAttemptID, prefix: session.firstRetainedPromptWordIndex + 1)))
+      XCTAssertNil(TapePromptProjection.snapshot(session: session, composition: marked,
+        rendering: .init(text: rendering.text, glyphCharacterOffsets: [:]),
+        retirement: context(session.automaticInputAttemptID)))
+    }
+  }
+
   func testIndependentPaceRefreshesCompleteCrossFieldTransactionWithoutPresentingMain() throws {
     try verifyCompleteFreshSnapshot(independentPace: true)
   }

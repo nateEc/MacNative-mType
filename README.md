@@ -1,5 +1,7 @@
 # Typebar
 
+当前 [Tape 应用快照构造](ORDINARY_TAPE_ENTRY_CONTRACT.md#应用快照构造增量2026-10-10)绑定捕获的 session、候选、渲染和退休上下文，应用 provider 已接桥接；189 项相关测试零失败零跳过、原创性通过。零主程序启动，渲染保护仍保留；入口启用、方向／复杂队列和真实 IME 未完成，完整门禁未重跑、goal active。
+
 当前 [单行退休字段身份](ORDINARY_TAPE_ENTRY_CONTRACT.md#单行退休字段身份增量2026-10-10)修正共享 glyph ID 时漏发前缀移除；十六组合与 188 项 Tape 回归零失败零跳过，原创性通过。零主程序启动，应用快照构造／入口启用、方向和真实 IME 仍开放，完整门禁未重跑、goal active。
 
 当前 [Tape SwiftUI 投影桥接](ORDINARY_TAPE_ENTRY_CONTRACT.md#swiftui-投影桥接增量2026-10-10)传递显式字段、隐藏规则和最新快照 provider；实际不可见宿主中的高度／光标及免模型更新刷新已验证。188 项 Tape 回归零失败零跳过、原创性通过，零主程序启动。应用层保护尚未解除，退休上下文／方向及真实 IME 仍开放，完整门禁未重跑、goal active。
