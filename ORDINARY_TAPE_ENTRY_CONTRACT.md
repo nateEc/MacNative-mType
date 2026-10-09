@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 最新光标内容复用 Release 实例验证（2026-10-10）
+
+在干净 7f99e8f 工作树打包 Typebar-Caret-Content-20261010.app，独立 bundle app.typebar.qa.caretcontent20261010，QA 内存存储与显式计时诊断双开关；复用当前 Release 构建 0.34s，包含 c5417e4 的光标本地内容复用生产代码。caret-content-qa-package.log 权威退出 0。启动前确认零 Typebar/xctest，只启动一个 QA 主程序（会话 28535）。普通时间 30 秒界面通过原生输入输入六个当前目标词 ripple orchard canyon quiet violet signal，结果明确显示计时健康失败、42/0/0/0、6/6 正确，不保存成绩。
+
+caret-content-qa-runtime.log：首次输入处理 0.000711s；后续 deliveryGap=2.230042、preflight=0.000040、elapsed=2.201440、首个到期秒 1、drift=1.201440、severe=1、failed=1。输入前也记录 0.902941s 的调度间隔，说明不能将全部延迟直接归因于首次输入。没有超过 125ms 的单次提示渲染记录，不排除大量短调用或 SwiftUI/AppKit 布局；原生界面自动化仍可能扰动调度，此轮无调用栈采样。实测否定“现有光标内容复用已解决普通计时故障”，不作量化性能比较。正常 ⌘Q 后会话 28535 权威退出 0，pgrep 确认零 Typebar；退出后没有再次查询 AX 或截图，未启动第二实例。实际普通计时故障与完整功能验收继续开放。
+
 ## Caps Lock 同值写入局部对照（2026-10-10）
 
 完整门禁后继续排查普通计时延迟。生产 advanceClock 每 100ms 写入 capsLockEnabled，先前 ClockIdleInvalidationTests 未覆盖 Bool 状态同值赋值。按根因调试及行为优先测试技能扩展探索性探针，不预设失败或修改生产代码：在真实 SwiftUI @State、NSHostingView 和不可见窗口中，比较规则同步／tick 四种组合与是否重复写入 Caps Lock 的八种组合；增加真实 Caps Lock 变化的正对照，保留真实输入正对照与窗口不可见检查。测试不读取或改变系统 Caps Lock，只使用确定性的 Bool 状态。
