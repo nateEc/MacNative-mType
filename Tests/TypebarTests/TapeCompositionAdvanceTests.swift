@@ -14,7 +14,7 @@ import XCTest
   }
 
   func testProjectedCrossWordRetirementUsesFieldBoxesAndAcknowledgesPrefixWithoutJump() throws {
-    for rtl in [false, true] { for mode in [PracticeTapeMode.letter, .word] {
+    for rtl in [false, true] { for mode in [PracticeTapeMode.letter, .word] { for legacyOffsets in [false, true] {
       var session = TypingSession(configuration: .words(7), prompt: "aaa bbb ccc ddd eee fff ggg")
       session.insertBatch("aaa bbb ", at: start)
       let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
@@ -23,7 +23,10 @@ import XCTest
       defer { view.stop() }
       var retired: [PromptWordRetirement] = []
       func configure(at time: Double) throws {
-        let rendering = try render(session, marked: "XYZ")
+        let original = try render(session, marked: "XYZ")
+        let rendering = PromptRendering(text: original.text,
+          glyphCharacterOffsets: legacyOffsets ? original.glyphCharacterOffsets : [:],
+          compositionTextMap: original.compositionTextMap)
         let field = try XCTUnwrap(session.promptCompositionField)
         let config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
           mainStyle: .bar, paceStyle: .off, font: font, lineSpacing: 0, rightToLeft: rtl,
@@ -57,7 +60,7 @@ import XCTest
       RunLoop.main.run(until: Date().addingTimeInterval(0.01))
       XCTAssertEqual(retired.count, 1)
       XCTAssertEqual(coordinator.main.cumulativeTapeCorrection, rtl ? -width : width, accuracy: 0.001)
-    } }
+    } } }
   }
 
   func testAcceptedPrefixDoesNotAdvanceToMarkedCandidateEnd() throws {

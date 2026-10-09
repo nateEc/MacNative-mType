@@ -112,16 +112,17 @@ final class TapePromptNativeView: NSView {
     let removedWidth: CGFloat?
     if !resets, !acknowledgesNativePrefix, let old = self.retirement, let next = retirement,
       old.attemptID == next.attemptID, next.firstRetainedWordIndex > old.firstRetainedWordIndex,
-      let word = old.words.first(where: { $0.index == next.firstRetainedWordIndex }),
-      let offset = self.rendering.characterOffset(forGlyphAt: word.glyphID) {
-      let advance: CGFloat
-      if let layout = textView.projectedLayout, let frame = layout.fieldFrames[word.index] {
-        advance = carets.rightToLeft ? layout.size.width - frame.maxX : frame.minX
-      } else {
+      let word = old.words.first(where: { $0.index == next.firstRetainedWordIndex }) {
+      let advance: CGFloat?
+      if let layout = textView.projectedLayout {
+        advance = layout.fieldFrames[word.index].map {
+          carets.rightToLeft ? layout.size.width - $0.maxX : $0.minX
+        }
+      } else if let offset = self.rendering.characterOffset(forGlyphAt: word.glyphID) {
         advance = textView.prefixCompensation(at: offset, rightToLeft: carets.rightToLeft)
-      }
-      removedWidth = carets.rightToLeft ? -advance : advance
-      needsScroll = true
+      } else { advance = nil }
+      removedWidth = advance.map { carets.rightToLeft ? -$0 : $0 }
+      if removedWidth != nil { needsScroll = true }
     } else { removedWidth = nil }
     let onlyAcknowledgesPrefix = (removedWidth != nil || acknowledgesNativePrefix || acknowledgesNativeWords) && nextInput == lastInput
       && self.retirement?.activeWordID == retirement?.activeWordID

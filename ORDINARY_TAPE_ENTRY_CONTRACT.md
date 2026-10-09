@@ -2,6 +2,8 @@
 
 ## 单行投影跨词前缀移除增量（2026-10-10）
 
+后续身份隔离反例主动清空旧 glyphCharacterOffsets、保留真实 session 的完整 compositionTextMap，扩展为方向 × 模式 × 有无旧偏移八组合；这不是实际 IME 产生该快照的证明。`../../work/tape-prefix-identity-red.log` 一项十二处断言失败，暴露前缀确认仍被旧偏移准入阻挡，累计补偿为零且重复通知。现将投影补偿完全按字段身份读取，缺失投影字段返回未知，不回退借用旧字符框；只有非投影路径读取旧偏移。verified.log 59 项零失败零跳过（4.619 秒，墙钟 4.626 秒），originality.log 通过，三份日志均以 tape-prefix-identity- 为前缀。行为先行、有界决策和风险复核为本会话检查，无独立审计；零主程序启动、终态零残留，无新增图或完整门禁复跑。
+
 固定源码 scrollTape 使用最后已展示的位置判断离屏词，而不是下一动画目标。原生投影 owner 原先仍向未准备的旧 Character 目录读取词框，导致单行跨词不移除前缀；现改为实际 projectedLayout.fieldFrames[word.index]，确认前缀时以旧字段的真实前缘计算有符号补偿。旧字符路径保持原逻辑，缺失投影字段不借用旧词框。未改输入、计分、回放、异步通知取消机制或时钟。
 
 新增真实 session／owner 测试覆盖 LTR／RTL、letter／word 四组合：第 2 词跳第 3 词只移除完全离屏的第 0 词；确认后主光标不跳、文字 margin 与累计补偿方向正确；重复确认不重复通知或补偿。`../../work/tape-projection-retirement-red.log` 保留测试字段属性名编译错误，red-verified.log 修正后两方向均失败（缺失移除通知），first.log 修复后一项通过，verified.log 扩大 59 项零失败零跳过（4.455 秒，墙钟 4.463 秒）。这些日志均使用 tape-projection-retirement- 前缀；originality.log 原创性检查通过。
