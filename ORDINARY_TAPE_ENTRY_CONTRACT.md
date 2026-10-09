@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 空闲 AX 观察边界对照（2026-10-10）
+
+复用 5f797f2 的同一个 Release QA 包，只启动一个实例（PID 40026，会话 99404），保持未输入、未开始状态。先用系统 /usr/bin/sample 采样五秒，无界面查询；然后另取五秒采样并在其中执行一次 getApp 的 AX 树读取。ax-boundary-quiet-sample.txt 和 ax-boundary-observed-sample.txt 的采样会话均退出 0。前者主线程 3715 个样本，其中事件等待 mach_msg2_trap 分支 3435；后者主线程 4197 个样本，对应等待分支 3526，并出现 208 个无障碍数组计数调用样本、其下 189 个 NSHostingView 无障碍节点生成样本。调用树有嵌套，不将这些数相加为耗时，也不将采样计数视作精确性能基准。
+
+ax-boundary-qa-runtime.log 所有记录均 started=0，观察期有 0.347482s 延迟窗口且无提示渲染；退出阶段另有 0.810595s，不把它归因于活动输入。窗口焦点在两阶段并非严格受控，采样本身也可能扰动调度；该对照只证明读取 AX 会走额外框架路径，没有复现普通计时失败，更不证明 AX 是唯一根因。下一步需要活动输入期间的布局／观察边界证据。正常 ⌘Q 后会话 99404 权威退出 0，pgrep 确认零 Typebar，无退出后 AX 查询、无第二实例、无产品改动。
+
 ## 累计诊断 Release 单实例首轮（2026-10-10）
 
 5f797f2 Release QA 包 Typebar-Render-Window-20261010.app 构建 451.75s，render-window-qa-package.log 权威退出 0；独立 bundle app.typebar.qa.renderwindow20261010、内存存储与显式诊断开关。只启动一次（会话 67743），普通 30 秒当前六词 copper paper orchard voyage summer orchard 全正确，43/0/0/0。输入及首次 AX 观察后停止输入、等待自然结束，最终界面为闲置无效而非计时健康失败，故不能当作有效成绩或持续键入验收。
