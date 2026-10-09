@@ -407,7 +407,9 @@ import XCTest
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     XCTAssertTrue(source.contains("PromptFieldPracticePrompt(rendering: rendering"))
-    XCTAssertTrue(source.contains("measuresCustomRows: practiceVisualEffect.usesASL || renderedPrompt.compositionTextMap != nil"))
+    XCTAssertTrue(source.contains("measuresCustomRows: practiceVisualEffect.usesASL"))
+    XCTAssertTrue(source.contains("|| (renderedPrompt.compositionTextMap != nil && !practiceVisualEffect.usesChoo)"),
+      "Ordinary projected fields measure their rows; Choo keeps its existing viewport until it supplies its own row height")
     XCTAssertTrue(source.contains("joinsLetters: usesJoiningScript"))
   }
 }

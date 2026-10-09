@@ -1,5 +1,27 @@
 # Choo 接入共享属性文本
 
+## 组合投影与字段几何增量
+
+2026-10-10，普通非 Tape 的 Choo 生产入口接通共享全局组合投影；下方旧“未接入生产”仅为历史阶段。虚拟候选与拆片保留独立 ID、最终属性与字母旋转层，不再依赖 canonical convenience offsets。实际字段容器统一分配整词／超长词，目标 Return 的结构边界位于整个字段（包括真实 extras）之后；marked 额外 Return 不创造结构行。删除字段的匿名多 Return 按原始计数保留，不从拼接字符 offset 猜测。没有改动接受输入、计分、回放、存储或服务协议。
+
+主 before／after 与 canonical pace 首／末关联使用真实未旋转布局框。两点 CATextLayer 绘制余量与字母 advance 分离，不能推进 after 光标或扩大 block 框。canonical 关联或 caret 变化即使文字／ID／框未变，也推进几何 revision；缺失投影目标按原版保持上次通道位置，不猜测其他 canonical 格。复用文字层与既有旋转时钟，取消候选不重启旋转，提示仍为独立同级层。提交 SPACE 查询预计算为集合，不在每次光标查询扫描全题。
+
+固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41` 干净不变；核对 funbox 清单、完整 Choo CSS、`buildWordHTML`／`updateWordLetters` 和 `caret.goTo`／目标定位。Choo 是独立字母旋转且关闭 joining，没有自有候选更新算法；缺失词直接返回，after 使用字母布局宽度。原生沿用自有 AppKit／Core Animation／字段流布局，不复制代码、CSS 或资源。Swift 6.2.4、SDK 26.2、最低 macOS 14；未使用新 API／产品依赖。
+
+持久证据 `../../work/choo-composition.ZNRFHy/`：
+
+- `red.log` 六项六处失败，确认虚拟 after、canonical 拆片、整词／Return 与入口缺口；`first.log` 17 项零失败。
+- `broad.log` 842 项两处失败，`verified.log` 842 项一处失败。前者包括错误的新 nil-position 预期：完整固定源和既有通道测试要求缺失目标保持旧位置，已更正为精确旧位置且不得跳到其他 canonical 框。另一处为旧接线检查强制所有投影使用自测视口；更正后明确普通／ASL 使用实际高度、Choo 保留原有视口，未关闭或跳过测试。`final.log` 842 项零失败（183.878 秒）保留，但它早于下面的绘制余量修正，不代表最终版本。
+- `ink-red.log` 一项一处真实失败：after 为 x=92，原生字母 advance 末端 x=90。分离墨迹余量后，`ink-verified.log` session 61712 终态退出 0，843 项零失败零跳过（184.360 秒，墙钟 184.462 秒）；十一新增 0.133 秒。宽度断言从原生属性文字独立量测，不把带余量的绘制层当布局 oracle。
+- `originality.log` 边界检查退出 0。三张 `choo-composition-overflow.png`、`choo-composition-cancelled.png`、`choo-composition-return-extras.png` 逐张检查，实际 Choo 组件窗口不可见并关闭，捕获时暂停旋转；不代表运行中动画或实际 IME。
+- `manual-audit.log` 1,141 个唯一场景结构检查通过，新增两项仍为待验收；不是 1,141 场景已人工执行。
+
+行为先行、源码核对、根因调试及有界本会话风险复核影响了身份／几何失效、缺失目标 oracle 与墨迹／布局分离，不宣称独立审计。零 Typebar 主程序启动；原测试诊断保留。本增量尚未执行完整冻结发布门禁，不能沿用此前全套原生／服务数量作为当前结果。
+
+**仍开放**：Choo 的实际行跟随／退休与自测视口高度尚未接通，继续保留既有 184 点外层视口；Tape 仍排除全局投影，Choo 与 Tape／ASL 等完整组合、整体 RTL／混合方向、fresh provider 与任意 RAF／队列、源精确字体／CSS／提示合并、实机 IME／VoiceOver／字体恢复及大题目 UI 性能均未完成。配置仍 89 映射／4 部分／1 不适用，主题／挑战缺口不升级；人工清单仅登记未执行，完整 goal active。
+
+## 先前共享属性阶段（历史）
+
 固定只读参考 `91bd24bb8513785c7364cbea29296ff7adafac41`；独立 Swift／AppKit 实现，不复制网页代码、CSS、字体或资源。Swift 6.2.4／macOS SDK 26.2，最低 macOS 14。本增量推进完整原生重写，不替代 [字段桥接](COMPOSITION_FIELD_CONTRACT.md) 或 [全局组合投影](COMPOSITION_PROJECTION_CONTRACT.md) 的剩余工作。
 
 ## 实际生产路径与边界

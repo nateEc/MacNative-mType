@@ -665,11 +665,17 @@ final class ChooLayerView: NSView {
     let presentation = rendering.map { ChooPromptPresentation(glyphs: glyphs, ids: glyphIDs, rendering: $0) }
     let visibleGlyphs = presentation?.cells.map(\.glyph) ?? glyphs
     let changesLayout = self.glyphs != visibleGlyphs || promptFont != font
+      || self.presentation?.cells.map(\.id) != presentation?.cells.map(\.id)
       || self.presentation?.cells.map { $0.content.text } != presentation?.cells.map { $0.content.text }
+      || self.presentation?.compositionMap?.fieldRuns != presentation?.compositionMap?.fieldRuns
       || self.presentation?.structuralBreaksBefore != presentation?.structuralBreaksBefore
       || self.presentation?.trailingStructuralBreaks != presentation?.trailingStructuralBreaks
     let changesStyle = changesLayout || self.palette != palette
     let changesAnimation = self.animates != animates || self.frameRate != frameRate
+    if self.presentation?.compositionMap?.caret != presentation?.compositionMap?.caret
+      || self.presentation?.compositionMap?.canonicalAliases != presentation?.compositionMap?.canonicalAliases {
+      geometryRevision &+= 1
+    }
     self.glyphs = visibleGlyphs
     self.presentation = presentation
     promptFont = font
@@ -713,10 +719,44 @@ final class ChooLayerView: NSView {
     configuration.glyphRect = { [weak self] id in self?.caretRect(forGlyphID: id) }
     configuration.geometryRevision = geometryRevision
     configuration.firstGlyphID = glyphIndexByID.min { $0.value < $1.value }?.key ?? 0
+    if presentation?.compositionMap != nil {
+      let direction = configuration.rightToLeft
+      configuration.fieldMainRect = { [weak self] style in self?.projectedMainRect(style: style, rightToLeft: direction) }
+      configuration.fieldPaceRect = { [weak self] id, after in self?.projectedCanonicalRect(id, after: after) }
+    }
     caretView?.update(configuration)
   }
 
+  private func projectedRect(_ id: Int, after: Bool) -> CGRect? {
+    guard let index = glyphIndexByID[id], glyphFrames.indices.contains(index) else { return nil }
+    func allocation(_ index: Int) -> CGRect {
+      var rect = glyphFrames[index]
+      rect.size.width -= ChooPromptFieldLayout.inkOverhang
+      return rect
+    }
+    let rect = allocation(index)
+    if !after, presentation?.projectedSeparators.contains(id) == true,
+      glyphFrames.indices.contains(index + 1), glyphFrames[index + 1].minY > rect.minY {
+      return allocation(index + 1)
+    }
+    return rect
+  }
+
+  private func projectedCanonicalRect(_ id: Int, after: Bool) -> CGRect? {
+    let ids = presentation?.compositionMap?.canonicalAliases[id] ?? (glyphIndexByID[id] == nil ? [] : [id])
+    return (after ? ids.last : ids.first).flatMap { projectedRect($0, after: after) }
+  }
+
+  private func projectedMainRect(style: TypingCaretStyle, rightToLeft: Bool) -> CGRect? {
+    guard let anchor = presentation?.compositionMap?.caret,
+      let rect = projectedRect(anchor.cellID, after: anchor.after) else { return nil }
+    return PromptPaceCaretGeometry.rect(from: rect, to: rect, fromAfter: anchor.after, toAfter: anchor.after,
+      style: style, rightToLeft: rightToLeft, fraction: 1, reducesMotion: true,
+      afterWidth: (" " as NSString).size(withAttributes: [.font: promptFont]).width)
+  }
+
   private func caretRect(forGlyphID id: Int) -> CGRect? {
+    if presentation?.compositionMap != nil { return projectedRect(id, after: false) }
     guard let index = glyphIndexByID[id], glyphFrames.indices.contains(index) else { return nil }
     for position in stride(from: index, through: 0, by: -1) {
       let frame = glyphFrames[position]
@@ -827,6 +867,10 @@ final class ChooLayerView: NSView {
 
   private static func layoutFrames(glyphs: [TypingPromptGlyph], presentation: ChooPromptPresentation?, font: NSFont, width: CGFloat)
     -> (frames: [CGRect], height: CGFloat) {
+    if let presentation, presentation.compositionMap != nil {
+      let layout = ChooPromptFieldLayout(presentation: presentation, font: font, width: width)
+      return (layout.frames, layout.height)
+    }
     let lineHeight = ceil(font.ascender - font.descender + font.leading)
     var x: CGFloat = 0
     var y: CGFloat = 0
@@ -2714,7 +2758,8 @@ private struct ContentView: View {
                   horizontalTextInset: 4,
                   measuresTextRows: !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
                     && renderedPrompt.compositionTextMap == nil,
-                  measuresCustomRows: practiceVisualEffect.usesASL || renderedPrompt.compositionTextMap != nil
+                  measuresCustomRows: practiceVisualEffect.usesASL
+                    || (renderedPrompt.compositionTextMap != nil && !practiceVisualEffect.usesChoo)
                 ) {
                   practicePrompt
                 }
@@ -3275,9 +3320,9 @@ private struct ContentView: View {
   }
 
   private func renderedPrompt(for session: TypingSession, composition: String?) -> PromptRendering {
-    // ASL resolves projected cells against its actual hand/fallback boxes.
-    // Tape and Choo still need their own projected geometry adapters.
-    let usesCompositionProjection = composition != nil && !usesTapePractice && !practiceVisualEffect.usesChoo
+    // ASL and Choo resolve projected cells against their actual native boxes.
+    // Tape still needs its own projected geometry adapter.
+    let usesCompositionProjection = composition != nil && !usesTapePractice
       && (!session.configuration.containsRightToLeftPromptRun || session.configuration.usesRightToLeftPrompt)
     let presentation = usesCompositionProjection
       ? PromptCompositionPresentation(session: session, composition: composition ?? "", style: settings.compositionDisplayStyle) : nil

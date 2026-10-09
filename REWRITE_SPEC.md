@@ -1,5 +1,7 @@
 # Typebar — Monkeytype 功能兼容重写规范
 
+当前 [Choo 组合投影与字段几何](CHOO_SHARED_RENDERING_CONTRACT.md#组合投影与字段几何增量)：独立旋转层保留虚拟槽及最终属性，字段容器拥有整词／Return／匿名行，主 before／after 与 pace 用布局 advance 而非绘制余量。十一新增／843 项相关测试零失败零跳过，三图与原创性通过；缺失目标按固定源保留旧通道。Choo 自测视口／自动跟随、Tape／方向与完整组合、实际 IME 仍开放；完整门禁未重跑，配置 89／4／1 不升级，零主程序启动、goal active。下方为历史阶段。
+
 Return／Unicode 增量的 [十四文件完整冻结复验](COMPOSITION_FIELD_CONTRACT.md#return-与-unicode-增量的完整冻结复验2026-10-10) 通过：原生 4,072／服务 501 项零失败零跳过，十万词耐久、十六磁盘迁移、53 表面、1,139 人工结构及未启动包／签名／原创性通过。75 日志与 222 既有组件图持久保留；零主程序启动、终态零残留。真实设备、全部 Unicode／其余呈现与四项部分配置不计完成，goal active；下方专项阶段“待补／未重跑”仅为历史记录。
 
 当前 [Unicode 准入探针合同](COMPOSITION_FIELD_CONTRACT.md#准入探针的-scalar-槽数与-utf-16-临时单位) 要求分离 scalar 已有槽数与 UTF-16 临时单位，不得用最终接受渲染替代原版探针，旧回退不得重组临时 surrogate。48 完整原版例、96 原生对照、专项 32 项及扩大回归 798 项零失败零跳过，原创性通过；完整门禁未重跑。真实 RAF／DOM、事件批次、全部 Unicode 排版与实机仍未验证，零主程序启动，兼容分类不升级、goal active。下方为历史阶段。
