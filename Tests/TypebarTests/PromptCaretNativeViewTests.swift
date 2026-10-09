@@ -47,6 +47,35 @@ import XCTest
     view.stop()
   }
 
+  func testUnresolvedFreshGlyphRecoversWithoutConfigurationUpdate() throws {
+    for unresolvedGlyph: Int? in [nil, 999] {
+      let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+      let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 360, height: 400))
+      defer { view.stop() }
+      var glyph = unresolvedGlyph, reads = 0
+      var config = configuration(motion, attempt: attempt)
+      config.automaticallyPresents = false
+      config.latestInput = { .init(attemptID: attempt, typed: "", composition: "", glyphID: nil) }
+      config.latestGlyphID = { glyph }
+      config.latestRendering = {
+        reads += 1
+        return .init(text: AttributedString("amber"), glyphCharacterOffsets: [0: 0])
+      }
+      view.update(config); view.layout()
+      for frame in 0..<11 { view.present(at: Double(frame) / 60) }
+      XCTAssertNil(motion.main.position)
+      // Exploratory observation, not a requirement to keep rebuilding an
+      // unresolved target on every frame. Recovery below is the contract.
+      print("caret-unresolved glyph=\(unresolvedGlyph == nil ? "nil" : "missing") frames=11 renderingReads=\(reads)")
+      glyph = 0
+      view.present(at: 0.2)
+      XCTAssertNotNil(try XCTUnwrap(motion.main.position))
+      let recoveredReads = reads
+      for frame in 13..<24 { view.present(at: Double(frame) / 60) }
+      XCTAssertEqual(reads, recoveredReads, "Resolved unchanged geometry must not rebuild each frame")
+    }
+  }
+
   func testPrefixRebuildKeepsReadyMarginAndProgrammaticScrollIsNotAppliedTwice() throws {
     let motion = PromptCaretMotionCoordinator(), attempt = UUID()
     let scroll = NSScrollView(frame: .init(x: 0, y: 0, width: 360, height: 135))

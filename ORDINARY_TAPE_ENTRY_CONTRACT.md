@@ -1,5 +1,19 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 焦点去重后的完整应用反例与空定位对照（2026-10-10）
+
+实际运行 14e29a9，隔离应用 Typebar-Focus-Delivery-20261010.app、bundle app.typebar.qa.focusdelivery20261010、内存成绩容器，QA 计时诊断双门控开启。本轮仅启动一个主程序，句柄 96600 正常退出 0，未重启或强杀；退出后只检查进程，没有再调用可能拉起应用的 GUI 观察接口，最终 pgrep -x Typebar 无匹配。
+
+window-focus-delivery-runtime.log 第一轮时间 30 秒：物理路径首键 v 的处理 0.850ms，首个整秒交付间隔 1.338037s、elapsed 1.284930、drift 0.284930、severe=1、failed=0；随后输入完整 violet thunder canyon，22/0/0/0 UTF-16、3/3 单词正确，但交付间隔 1.322272s、elapsed 6.741227、drift 0.741227、severe=2、failed=1。原生结果页明确显示计时调度持续延迟、停止且不保存成绩。因此焦点去重不是完整故障修复，不升级普通计时验收。
+
+同一实例点“再来一次”，输入 orchard willow lantern，23/0/0/0、3/3 正确；首键处理 0.481ms，随后间隔 2.726640s、preflight 0.174ms、elapsed 2.703937、drift 1.703937、failed=1。此轮同时执行 /usr/bin/sample 53592 12 1，句柄 62793 退出 0，日志 window-focus-delivery-main-sample.txt；采样本身也可能扰动时序，不能把第二轮用于无扰动性能比较。
+
+主线程 9456 个样本中，1769 个进入原生光标定时器，1717 个经 present → latestRendering → renderedPrompt。聚合样本包含失败前与失败后，不能将比例换算为失败前耗时或直接判定因果。源码 present 的重建条件是输入变化、needsPosition 或主光标位置为空；TypingSession.promptCaretGlyphIndex 在 isFinished 时直接返回 nil。这意味着终态也可能产生同一个采样热点，须先区分时段，不能把失败的后果误认为原因。
+
+新增原生组件探针 testUnresolvedFreshGlyphRecoversWithoutConfigurationUpdate：固定输入身份，分别以 nil 与字形 ID 不在映射内作为无法定位条件，11 次 present 均观察到 11 次 rendering 读取；改为有效字形后无需配置更新即可恢复位置，之后 11 帧不再重建。探针只输出重试次数，不把当前逐帧重建冻结为必须保留的行为；断言保护空定位与后续恢复及稳定帧不重建。这是探索性对照而非已选定的产品修复，因此按行为优先测试技能不制造预期失败，产品源码未改。
+
+首次聚焦回归 28 项零失败但一项因缺少固定参考跳过；补齐参考与锁定归档后 window-focus-caret-unresolved-pinned.log 权威退出 0，28 项零失败零跳过，0.489s（墙钟 0.493）。window-focus-caret-probe-originality.log 原创边界通过，人工文档结构审计保持 1151 个唯一场景。未重跑全量 readiness、设备 IME 或人工验收。下一步应对终态空定位及失败前重建触发条件分别建立有界观测，保留真实输入／组合变化时的新鲜几何语义；不能以禁用计时保护、放宽阈值或永久缓存替代根因修复。完整 goal 保持 active。
+
 ## 原生窗口焦点交付去重（2026-10-10）
 
 基于 8bf86c5 核查完整入口：NativeTypingInput.updateNSView 每次刷新都会报告窗口焦点，ContentView.handleTypingWindowFocusChange 最后无条件调用 updateFocusWarningDelay，递增 @State focusWarningSequence。重复报告存在形成视图更新反馈的路径，但尚未证明这是既有普通计时故障的完整根因。window-focus-delivery-red.log 两项测试出现五次预期断言失败：初次挂载加二十次无变化刷新产生二十一次相同报告，通知与刷新也重复交付。
