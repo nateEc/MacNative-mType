@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 物理输入与屏幕键盘的同实例对照（2026-10-10）
+
+被测 b7ca8d6，复用已签名 QA 包 Typebar-Render-Duration-20261010.app（独立偏好域、内存记录），本轮仅启动一个主进程。virtual-input-timer-runtime.log 保存完整数值记录。第一轮普通时间 30 秒，物理单键 m：input duration=0.000702、deliveryGap=1.809123、preflight=0.000077、drift=0.793643、failed=1。点击再来一次，展开屏幕键盘，在新题 orchard 首字上点击原生“输入 o”按钮：input duration=0.000535、deliveryGap=1.797622、preflight=0.000063、drift=0.782622、failed=1。两次 AX 结果均为失败且不保存、1/0/0/0。生产 VirtualKeyboard.onInsert 直接调用 handleInsertedText(origin: .virtualKeyboard)，不经过 NativeTypingInput.keyDown 的 interpretKeyEvents；因此该物理键盘解释路径不是复现的必要条件，但两次都使用自动化 UI 操作及 AX 观测，未排除其共同扰动。
+
+同一实例再次重开，保留屏幕键盘，切换默认 50 词题并点击首字 m。input duration=0.000426，首次交付间隔 1.456375、elapsed=1.415457、drift=0.415457、severe=1、failed=0；随后第二次 drift=0.094222，从第三秒到第 21 秒 drift 均低于 0.1 秒，没有 failed=1。源码 TimerHealthPolicy.monitors 对 0<wordLimit<250 启用，同一 0.500 秒致命漂移阈值，因此不是字数模式关闭健康检查。首次严重漂移仍发生，且只输入一个字母，不能当作完整有效完成或性能通过。模式、提示长度及开始时可见控件同时变化，不能从一次对照推断长度是唯一原因；下一步需要固定模式与可见控件的长度对照或更精确的累计主线程证据。
+
+此运行没有 prompt-render-finished，不能据此排除短重建累积。末尾保留 Charts 固定尺寸回退诊断。第 21 秒后直接 ⌘Q，唯一主进程权威退出 0，随后无 Typebar；没有 TERM、第二实例或真实用户数据改动。本轮只采证与补合同，没有实现猜测性修复，也没有重跑原生测试或全量 readiness。人工验收保持待验收，完整 goal active。
+
 ## 单次完整重建耗时的反证（2026-10-10）
 
 在 293f277 后新增 QA 固定阶段 prompt-render-finished：仅双重启用诊断时测量 renderedPrompt(for:composition:) 整段同步执行，超过 0.125 秒才记录相对时间、耗时及会话状态。没有文本、身份、跨帧缓存、输入／计时健康阈值或调度改变。源码门禁先红：prompt-render-duration-red.log 一项四个预期断言失败，退出 1；它验证诊断接线，不是设备性能行为测试。prompt-render-duration-verified.log 权威退出 0：51 项零失败零跳过，7.233 秒（墙钟 7.240），含主光标、闪烁、渲染快照、Choo 与退休词检查；原创边界 prompt-render-duration-originality.log 退出 0。
