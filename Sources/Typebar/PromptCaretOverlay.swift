@@ -85,6 +85,20 @@ struct PromptRendering {
     guard let index else { return nil }
     return glyphCharacterOffsets[index]
   }
+
+  /// Anonymous structural rows are boundaries, not part of a neighboring
+  /// glyph's ink. Build indices once for all attributed-cell consumers.
+  func glyphTexts() -> [Int: AttributedString] {
+    let indices = Array(text.characters.indices) + [text.endIndex]
+    let starts = Set(glyphCharacterOffsets.values).union(structuralNewlineOffsets.values).sorted()
+    var texts: [Int: AttributedString] = [:]
+    for (index, start) in starts.enumerated() {
+      let end = index + 1 < starts.count ? starts[index + 1] : indices.count - 1
+      guard start >= 0, end >= start, end < indices.count else { continue }
+      texts[start] = AttributedString(text[indices[start]..<indices[end]])
+    }
+    return texts
+  }
 }
 
 struct PromptGlyphTextPlan: Equatable {

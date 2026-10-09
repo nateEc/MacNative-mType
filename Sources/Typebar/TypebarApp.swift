@@ -538,6 +538,7 @@ struct ChooGlyphPalette: Equatable {
 
 private struct ChooPracticePrompt: View {
   let glyphs: [TypingPromptGlyph]
+  let rendering: PromptRendering
   let font: NSFont
   let palette: ChooGlyphPalette
   let isEnabled: Bool
@@ -555,7 +556,7 @@ private struct ChooPracticePrompt: View {
       ignoresSystemReducedMotion: ignoresSystemReducedMotion)
     return ChooLayerPrompt(glyphs: glyphs, font: font, palette: palette,
                            animates: animates, frameRate: animationFrameRate,
-                           glyphIDs: glyphIDs, carets: carets)
+                           glyphIDs: glyphIDs, rendering: rendering, carets: carets)
       .accessibilityLabel("旋转文字练习提示")
   }
 }
@@ -567,13 +568,15 @@ private struct ChooLayerPrompt: NSViewRepresentable {
   let animates: Bool
   let frameRate: Int
   let glyphIDs: [Int]
+  let rendering: PromptRendering
   let carets: PromptCaretNativeView.Configuration?
 
   func makeNSView(context: Context) -> ChooLayerView { ChooLayerView() }
 
   func updateNSView(_ view: ChooLayerView, context: Context) {
     view.configure(glyphs: glyphs, font: font, palette: palette,
-                   animates: animates, frameRate: frameRate)
+                   animates: animates, frameRate: frameRate,
+                   glyphIDs: glyphIDs, rendering: rendering)
     view.configureCarets(carets, glyphIDs: glyphIDs)
   }
 
@@ -581,13 +584,16 @@ private struct ChooLayerPrompt: NSViewRepresentable {
 
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: ChooLayerView, context: Context) -> CGSize? {
     let width = max(1, proposal.width ?? nsView.bounds.width)
-    return CGSize(width: width, height: ChooLayerView.measure(glyphs: glyphs, font: font, width: width))
+    return CGSize(width: width, height: ChooLayerView.measure(glyphs: glyphs, font: font, width: width,
+      glyphIDs: glyphIDs, rendering: rendering))
   }
 }
 
 final class ChooLayerView: NSView {
   private var glyphs: [TypingPromptGlyph] = []
+  private var presentation: ChooPromptPresentation?
   private var glyphLayers: [Int: CATextLayer] = [:]
+  private var hintLayers: [Int: (layer: CATextLayer, top: CGFloat)] = [:]
   private var glyphFrames: [CGRect] = []
   private var laidOutWidth: CGFloat = 0
   private var promptFont = NSFont.monospacedSystemFont(ofSize: 18, weight: .regular)
@@ -655,11 +661,17 @@ final class ChooLayerView: NSView {
   }
 
   func configure(glyphs: [TypingPromptGlyph], font: NSFont, palette: ChooGlyphPalette,
-                 animates: Bool, frameRate: Int) {
-    let changesLayout = self.glyphs != glyphs || promptFont != font
+                 animates: Bool, frameRate: Int, glyphIDs: [Int] = [], rendering: PromptRendering? = nil) {
+    let presentation = rendering.map { ChooPromptPresentation(glyphs: glyphs, ids: glyphIDs, rendering: $0) }
+    let visibleGlyphs = presentation?.cells.map(\.glyph) ?? glyphs
+    let changesLayout = self.glyphs != visibleGlyphs || promptFont != font
+      || self.presentation?.cells.map { $0.content.text } != presentation?.cells.map { $0.content.text }
+      || self.presentation?.structuralBreaksBefore != presentation?.structuralBreaksBefore
+      || self.presentation?.trailingStructuralBreaks != presentation?.trailingStructuralBreaks
     let changesStyle = changesLayout || self.palette != palette
     let changesAnimation = self.animates != animates || self.frameRate != frameRate
-    self.glyphs = glyphs
+    self.glyphs = visibleGlyphs
+    self.presentation = presentation
     promptFont = font
     self.palette = palette
     self.animates = animates
@@ -668,7 +680,8 @@ final class ChooLayerView: NSView {
     if changesAnimation { animationStartTime = CACurrentMediaTime() }
     refreshVisibleLayers(forceStyle: changesStyle)
     if changesAnimation { updateAnimations() }
-    setAccessibilityLabel(glyphs.map { String($0.typedCharacter ?? $0.character) }.joined())
+    setAccessibilityLabel(rendering.map { String($0.text.characters) }
+      ?? glyphs.map { String($0.typedCharacter ?? $0.character) }.joined())
   }
 
   override func layout() {
@@ -678,7 +691,8 @@ final class ChooLayerView: NSView {
   }
 
   func configureCarets(_ configuration: PromptCaretNativeView.Configuration?, glyphIDs: [Int]) {
-    let next = Dictionary(glyphIDs.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { first, _ in first })
+    let ids = presentation?.cells.map(\.id) ?? glyphIDs
+    let next = Dictionary(ids.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { first, _ in first })
     if next != glyphIndexByID { glyphIndexByID = next; geometryRevision &+= 1 }
     caretConfiguration = configuration
     refreshCarets()
@@ -711,20 +725,25 @@ final class ChooLayerView: NSView {
     return nil
   }
 
-  static func measure(glyphs: [TypingPromptGlyph], font: NSFont, width: CGFloat) -> CGFloat {
-    layoutFrames(glyphs: glyphs, font: font, width: width).height
+  static func measure(glyphs: [TypingPromptGlyph], font: NSFont, width: CGFloat,
+    glyphIDs: [Int] = [], rendering: PromptRendering? = nil) -> CGFloat {
+    let presentation = rendering.map { ChooPromptPresentation(glyphs: glyphs, ids: glyphIDs, rendering: $0) }
+    return layoutFrames(glyphs: presentation?.cells.map(\.glyph) ?? glyphs,
+      presentation: presentation, font: font, width: width).height
   }
 
   private func refreshVisibleLayers(forceStyle: Bool = false) {
     guard !glyphs.isEmpty else {
       glyphLayers.values.forEach { $0.removeFromSuperlayer() }
       glyphLayers.removeAll()
+      hintLayers.values.forEach { $0.layer.removeFromSuperlayer() }
+      hintLayers.removeAll()
       glyphFrames.removeAll()
       return
     }
     let width = max(1, bounds.width)
     if glyphFrames.count != glyphs.count || laidOutWidth != width {
-      glyphFrames = Self.layoutFrames(glyphs: glyphs, font: promptFont, width: width).frames
+      glyphFrames = Self.layoutFrames(glyphs: glyphs, presentation: presentation, font: promptFont, width: width).frames
       laidOutWidth = width
       geometryRevision &+= 1
     }
@@ -747,7 +766,7 @@ final class ChooLayerView: NSView {
     var desired: [Int] = []
     var index = low
     while index < glyphFrames.count, glyphFrames[index].minY <= window.maxY {
-      if glyphs[index].character != "\n" { desired.append(index) }
+      if presentation != nil || glyphs[index].character != "\n" { desired.append(index) }
       index += 1
     }
     let desiredSet = Set(desired)
@@ -755,6 +774,7 @@ final class ChooLayerView: NSView {
     CATransaction.setDisableActions(true)
     for index in Array(glyphLayers.keys) where !desiredSet.contains(index) {
       glyphLayers.removeValue(forKey: index)?.removeFromSuperlayer()
+      hintLayers.removeValue(forKey: index)?.layer.removeFromSuperlayer()
     }
     for index in desired {
       if let text = glyphLayers[index] {
@@ -771,11 +791,32 @@ final class ChooLayerView: NSView {
         glyphLayers[index] = text
         addRotation(to: text)
       }
+      if let hint = hintLayers[index] {
+        hint.layer.frame.origin = .init(x: glyphFrames[index].midX - hint.layer.frame.width / 2,
+          y: glyphFrames[index].minY + hint.top)
+      }
     }
     CATransaction.commit()
   }
 
   private func style(_ text: CATextLayer, at index: Int) {
+    hintLayers.removeValue(forKey: index)?.layer.removeFromSuperlayer()
+    if let content = presentation?.cells[index].content {
+      text.string = ChooPromptPresentation.nativeText(content.main, font: promptFont)
+      text.foregroundColor = nil; text.backgroundColor = nil
+      if let hint = content.hint {
+        let value = ChooPromptPresentation.nativeHint(hint, font: promptFont)
+        let layer = CATextLayer()
+        layer.name = "chooHint"
+        layer.contentsScale = text.contentsScale; layer.alignmentMode = .left
+        layer.string = value.text
+        layer.frame = .init(x: 0, y: value.top, width: max(1, ceil(value.text.size().width) + 2), height: value.height)
+        self.layer?.addSublayer(layer)
+        hintLayers[index] = (layer, value.top)
+        addRotation(to: layer)
+      }
+      return
+    }
     let glyph = glyphs[index]
     text.string = String(glyph.typedCharacter ?? glyph.character)
     text.font = promptFont
@@ -784,34 +825,45 @@ final class ChooLayerView: NSView {
     text.backgroundColor = palette.background(for: glyph.state)?.cgColor
   }
 
-  private static func layoutFrames(glyphs: [TypingPromptGlyph], font: NSFont, width: CGFloat)
+  private static func layoutFrames(glyphs: [TypingPromptGlyph], presentation: ChooPromptPresentation?, font: NSFont, width: CGFloat)
     -> (frames: [CGRect], height: CGFloat) {
     let lineHeight = ceil(font.ascender - font.descender + font.leading)
     var x: CGFloat = 0
     var y: CGFloat = 0
+    var inkBottom: CGFloat = 0
     var frames: [CGRect] = []
     frames.reserveCapacity(glyphs.count)
-    for glyph in glyphs {
-      if glyph.character == "\n" {
+    for (index, glyph) in glyphs.enumerated() {
+      if let count = presentation?.structuralBreaksBefore[index] {
+        x = 0; y += CGFloat(count) * (lineHeight + 12)
+      }
+      let content = presentation?.cells[index].content
+      if content == nil && glyph.character == "\n" {
         x = 0
         y += lineHeight + 12
         frames.append(CGRect(x: 0, y: y, width: 0, height: 0))
         continue
       }
-      let value = String(glyph.typedCharacter ?? glyph.character) as NSString
-      let advance = max(1, ceil(value.size(withAttributes: [.font: font]).width))
+      let advance = max(1, ceil(content.map { ChooPromptPresentation.nativeText($0.main, font: font).size().width }
+        ?? (String(glyph.typedCharacter ?? glyph.character) as NSString).size(withAttributes: [.font: font]).width))
       if x > 0 && x + advance > width {
         x = 0
         y += lineHeight + 12
       }
       frames.append(CGRect(x: x, y: y, width: advance + 2, height: lineHeight))
+      if let hint = content?.hint {
+        let value = ChooPromptPresentation.nativeHint(hint, font: font)
+        inkBottom = max(inkBottom, y + value.top + value.height)
+      }
       x += advance
+      if content?.ownsLineBreak == true { x = 0; y += lineHeight + 12 }
     }
-    return (frames, y + lineHeight)
+    y += CGFloat(presentation?.trailingStructuralBreaks ?? 0) * (lineHeight + 12)
+    return (frames, max(y + lineHeight, inkBottom))
   }
 
   private func updateAnimations() {
-    for text in glyphLayers.values {
+    for text in Array(glyphLayers.values) + hintLayers.values.map(\.layer) {
       text.removeAnimation(forKey: "chooRotation")
       addRotation(to: text)
     }
@@ -2925,6 +2977,7 @@ private struct ContentView: View {
       } else if practiceVisualEffect.usesChoo {
         ChooPracticePrompt(
           glyphs: session.promptGlyphsInDisplayOrder,
+          rendering: rendering,
           font: practicePromptNSFont(size: settings.fontSize),
           palette: ChooGlyphPalette(
             theme: activeTheme, flipsCompletionAndFuture: settings.flipTestColors,

@@ -46,16 +46,7 @@ struct ASLPromptGlyphContent {
 
   static func make(glyphs: [TypingPromptGlyph], ids: [Int], rendering: PromptRendering?) -> [Self] {
     guard let rendering else { return glyphs.map { .init(glyph: $0) } }
-    // Build Character indices and range boundaries once, not a scan from the
-    // beginning of the whole prompt for every cell (quadratic on long text).
-    let indices = Array(rendering.text.characters.indices) + [rendering.text.endIndex]
-    let starts = Set(rendering.glyphCharacterOffsets.values).sorted()
-    var texts: [Int: AttributedString] = [:]
-    for (index, start) in starts.enumerated() {
-      let end = index + 1 < starts.count ? starts[index + 1] : indices.count - 1
-      guard start >= 0, end >= start, end < indices.count else { continue }
-      texts[start] = AttributedString(rendering.text[indices[start]..<indices[end]])
-    }
+    let texts = rendering.glyphTexts()
     return glyphs.enumerated().map { index, glyph in
       let text = ids.indices.contains(index)
         ? rendering.glyphCharacterOffsets[ids[index]].flatMap { texts[$0] } : nil
