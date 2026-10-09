@@ -1,5 +1,21 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 隐藏主光标延后几何与分时段采样（2026-10-10）
+
+基于 e0dd241 的空定位探针修正已证实的隐藏主光标浪费：PromptCaretNativeView.present 先读取最新可见性，只在主样式绘制标记且可见时解析主光标几何。隐藏期间不消耗 input／needsPosition／needsSnap，恢复可见时仍读取最新输入、组合和字形定位；主光标关闭后重新启用也重新定位。pace 请求、插值、计时器及独立绘制继续执行，blink 时钟仍由同一个最新可见性快照更新。没有调整健康阈值、调度频率、输入规则或成绩处理，也没有持久跨帧缓存旧 rendering。
+
+按行为优先测试技能先运行 caret-hidden-render-red.log：两项、七次预期断言失败，旧实现隐藏期间十一帧仍读取十一遍 rendering。修正后新增覆盖隐藏组合输入变化、布局 reset／invalidate、恢复新位置、隐藏主光标时独立 pace 步进，以及关闭／重新启用主标记。风险审查发现提前读取展示回调需保留最新输入回调后的退役守卫；caret-hidden-retirement-red.log 一项两次预期失败，证明同步 stop 后仍会读一次旧展示回调。现在在输入与展示 provider 返回后分别检查配置 attempt／coordinator，退役后不继续读取旧展示或解析几何。弱捕获退役测试覆盖两种回调，避免引入视图持有环。
+
+中间 caret-hidden-render-pinned.log 321 项通过；补充关闭主标记测试后 caret-hidden-render-final.log 322 项通过。最后 caret-hidden-render-retirement-final.log 权威退出 0：323 项零失败零跳过，18.060s（墙钟 18.094），带固定参考与 Anime.js 归档，包含原生光标、blink、pace、组合投影、焦点、运行期规则及相关健康回归。caret-hidden-render-originality.log 原创边界通过，人工文档结构审计保持 1151 个唯一场景，git diff --check 通过。当前更改无新增依赖；代码风险审查未发现未处理的阻断项，但组件测试不是设备 IME 或浏览器视觉一致性验收。
+
+本轮只启动一个隔离 Typebar-Hidden-Caret-20261010.app（bundle app.typebar.qa.hiddencaret20261010、内存成绩容器、诊断双门控），主句柄 62830 通过 ⌘Q 正常退出 0，最终无 Typebar 残留，退出后没有再观察 GUI。GUI 二进制包含可见性修正，但不含之后增加的 provider 退役守卫；最终守卫由上述组件回归验证，未为它再启动主程序。
+
+caret-hidden-render-runtime.log 普通时间 30 秒首轮输入 window tangent canyon thunder copper planet，44/0/0/0 UTF-16、6/6 正确。首键处理 0.971ms，首个整秒交付间隔 1.405462s、drift 0.361439、failed=0；最终间隔 1.393809s、elapsed 7.678507、drift 0.678507、severe=3、failed=1，原生结果页仍显示保护停止、不保存。可见性修正不解决失败前的整个计时故障，普通计时人工验收仍未通过。
+
+在失败结果页已经显示后单独 /usr/bin/sample 57321 8 1，caret-hidden-terminal-sample.txt 6404 个主线程样本，29 个进入光标定时器，未采到 ContentView.renderedPrompt 或 PromptRendering.make。然后同一实例点“再来一次”，保持尚未输入状态，caret-hidden-preinput-sample.txt 八秒采样 6785 个主线程样本，51 个进入光标定时器，也未采到上述整段重建。两个 sample 句柄 64180／34061 均正常退出 0。这比上轮混合终态的采样边界更清晰，但采样未命中不是“从未执行”的证明，也不能与旧混合采样比例作统计性能对比。
+
+最后同一未开始轮次启动十秒 caret-hidden-input-sample.txt（句柄 7691 退出 0），按正确首键 d；输入处理 0.850ms，随后交付间隔 2.114539s、elapsed 2.070129、drift 1.070129、failed=1，AX 确认 1/0/0/0、计时失败。此采样跨输入及失败后，8272 个主线程样本含 AppKit／SwiftUI 布局、显示与无障碍路径，未采到上述整段 rendering 重建；不能直接将这些框架调用聚合归因于计时故障，也不能忽略 sample／AX 的观测扰动。下一步应限定失败前的窗口，区分 SwiftUI 布局／显示交付与其他主线程工作，不能继续用终态空定位热点作为唯一根因。未执行全量 readiness、设备 IME 或升级人工验收，完整重写 goal 保持 active。
+
 ## 焦点去重后的完整应用反例与空定位对照（2026-10-10）
 
 实际运行 14e29a9，隔离应用 Typebar-Focus-Delivery-20261010.app、bundle app.typebar.qa.focusdelivery20261010、内存成绩容器，QA 计时诊断双门控开启。本轮仅启动一个主程序，句柄 96600 正常退出 0，未重启或强杀；退出后只检查进程，没有再调用可能拉起应用的 GUI 观察接口，最终 pgrep -x Typebar 无匹配。

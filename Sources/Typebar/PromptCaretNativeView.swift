@@ -180,10 +180,17 @@ final class PromptCaretNativeView: NSView {
     let latest = config.latestInput?()
     guard configuration?.attemptID == config.attemptID,
       configuration?.coordinator === coordinator else { return }
+    let presentation = config.mainPresentation?() ?? .init()
+    guard configuration?.attemptID == config.attemptID,
+      configuration?.coordinator === coordinator else { return }
     coordinator.prepare(attemptID: latest?.attemptID ?? config.attemptID)
     coordinator.sample(at: time)
     let changed = latest.map { $0 != input } ?? (config.mainOffset != mainOffset)
-    if changed || needsPosition || config.mainStyle.drawsMarker && coordinator.main.position == nil {
+    // Hidden/disabled main markers do not need text geometry. Leave their
+    // input and invalidation pending so a fresh visible frame still resolves
+    // current composition, rather than reusing a stale hidden snapshot.
+    if presentation.isVisible, config.mainStyle.drawsMarker,
+      changed || needsPosition || coordinator.main.position == nil {
       let rendering = config.latestRendering?()
       let glyphID = config.latestGlyphID?() ?? latest?.glyphID ?? config.mainGlyphID
       let offset = latest.flatMap { _ in rendering?.characterOffset(forGlyphAt: glyphID) }
@@ -212,7 +219,7 @@ final class PromptCaretNativeView: NSView {
       needsPosition = false; needsSnap = false
     }
     let paceFrame = requestPacePosition(at: time)
-    let opacity = blinkClock.opacity(at: time, presentation: config.mainPresentation?() ?? .init(),
+    let opacity = blinkClock.opacity(at: time, presentation: presentation,
       motion: config.motion, reducesMotion: config.reducesMotion)
     paint(coordinator.documentRect(isPace: false), style: config.mainStyle,
       accent: config.accent, rightToLeft: mainRightToLeft ?? config.rightToLeft, isPace: false, host: &mainHost)

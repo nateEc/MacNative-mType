@@ -76,6 +76,123 @@ import XCTest
     }
   }
 
+  func testHiddenMainDefersRenderingButResumesWithFreshComposedInput() throws {
+    let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+    let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 360, height: 400))
+    defer { view.stop() }
+    var visible = false, typed = "", composition = "", glyph: Int? = nil, reads = 0
+    var config = configuration(motion, attempt: attempt)
+    config.automaticallyPresents = false
+    config.mainPresentation = { .init(isVisible: visible, isBlinking: false) }
+    config.latestInput = { .init(attemptID: attempt, typed: typed, composition: composition, glyphID: nil) }
+    config.latestGlyphID = { glyph }
+    config.latestRendering = {
+      reads += 1
+      return .init(text: AttributedString("amber\nbirch"), glyphCharacterOffsets: [0: 0, 1: 6])
+    }
+    view.update(config); view.layout()
+    for frame in 0..<11 { view.present(at: Double(frame) / 60) }
+    XCTAssertEqual(reads, 0, "A hidden unresolved main marker does not need text geometry")
+    typed = "amber "; composition = "中"; glyph = 1
+    view.present(at: 0.2)
+    XCTAssertEqual(reads, 0)
+    visible = true
+    view.present(at: 0.3)
+    XCTAssertEqual(reads, 1)
+    XCTAssertGreaterThan(try XCTUnwrap(motion.main.position).minY, 40)
+    visible = false
+    typed = ""; composition = ""; glyph = 0
+    motion.resetLayout()
+    view.invalidateGeometry()
+    view.present(at: 0.4)
+    XCTAssertEqual(reads, 1, "Hidden invalidation remains pending rather than eagerly rebuilding")
+    visible = true
+    view.present(at: 0.5)
+    XCTAssertEqual(reads, 2)
+    XCTAssertLessThan(try XCTUnwrap(motion.main.position).minY, 10)
+  }
+
+  func testHiddenMainDoesNotSuspendIndependentPaceSteps() throws {
+    let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+    let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 360, height: 400))
+    defer { view.stop() }
+    var sequence = 1.0, target = 0, reads = 0
+    var config = configuration(motion, attempt: attempt, paceStyle: .block)
+    config.automaticallyPresents = false
+    config.mainPresentation = { .init(isVisible: false) }
+    config.latestInput = { .init(attemptID: attempt, typed: "", composition: "", glyphID: nil) }
+    config.latestGlyphID = { nil }
+    config.latestRendering = {
+      reads += 1
+      return .init(text: AttributedString("amber\nbirch"), glyphCharacterOffsets: [0: 0, 1: 6])
+    }
+    config.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: false, targetAfter: false, fraction: 0, stepDuration: 0.1,
+      sequence: sequence, targetGlyphID: target) }
+    view.update(config); view.layout(); view.present(at: 0)
+    let first = try XCTUnwrap(motion.pace.position)
+    XCTAssertNil(motion.main.position)
+    XCTAssertEqual(reads, 1, "Only the independent pace request needs rendering")
+    sequence = 2; target = 1
+    view.present(at: 0.2); view.present(at: 0.4)
+    XCTAssertGreaterThan(try XCTUnwrap(motion.pace.position).minY, first.minY + 40)
+    XCTAssertEqual(reads, 2)
+  }
+
+  func testDisabledMainDefersGeometryUntilMarkerIsEnabled() throws {
+    let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+    let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 360, height: 400))
+    defer { view.stop() }
+    var reads = 0
+    func config(_ style: TypingCaretStyle) -> PromptCaretNativeView.Configuration {
+      var value = configuration(motion, attempt: attempt, style: style)
+      value.automaticallyPresents = false
+      value.latestInput = { .init(attemptID: attempt, typed: "a", composition: "", glyphID: 0) }
+      value.latestRendering = {
+        reads += 1
+        return .init(text: AttributedString("amber"), glyphCharacterOffsets: [0: 1])
+      }
+      return value
+    }
+    view.update(config(.off)); view.layout()
+    for frame in 0..<11 { view.present(at: Double(frame) / 60) }
+    XCTAssertEqual(reads, 0)
+    XCTAssertNil(motion.main.position)
+    view.update(config(.bar)); view.present(at: 0.2)
+    XCTAssertEqual(reads, 1)
+    XCTAssertGreaterThan(try XCTUnwrap(motion.main.position).minX, 0)
+  }
+
+  func testFreshProviderRetirementStopsSubsequentGeometryAndPresentationReads() {
+    for retiresFromInput in [true, false] {
+      let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+      let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 360, height: 400))
+      defer { view.stop() }
+      var presentations = 0, renderings = 0
+      var config = configuration(motion, attempt: attempt)
+      config.automaticallyPresents = false
+      config.latestInput = { [weak view] in
+        if retiresFromInput { view?.stop() }
+        return .init(attemptID: attempt, typed: "a", composition: "", glyphID: 0)
+      }
+      config.mainPresentation = { [weak view] in
+        presentations += 1
+        if !retiresFromInput { view?.stop() }
+        return .init()
+      }
+      config.latestRendering = {
+        renderings += 1
+        return .init(text: AttributedString("amber"), glyphCharacterOffsets: [0: 0])
+      }
+      view.update(config); view.layout(); view.present(at: 0)
+      XCTAssertEqual(presentations, retiresFromInput ? 0 : 1)
+      XCTAssertEqual(renderings, 0)
+      XCTAssertNil(motion.main.position)
+      view.present(at: 0.1)
+      XCTAssertEqual(presentations, retiresFromInput ? 0 : 1)
+    }
+  }
+
   func testPrefixRebuildKeepsReadyMarginAndProgrammaticScrollIsNotAppliedTwice() throws {
     let motion = PromptCaretMotionCoordinator(), attempt = UUID()
     let scroll = NSScrollView(frame: .init(x: 0, y: 0, width: 360, height: 135))
