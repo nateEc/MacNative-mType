@@ -23,6 +23,10 @@ const ui = source('test/test-ui'), begin = ui.indexOf('export let pendingWordDat
 const end = ui.indexOf('// this is needed in tape mode', begin);
 assert.ok(begin >= 0 && end > begin);
 const update = javascript(ui.slice(begin, end));
+const probeBegin = ui.indexOf('export function getActiveWordTopAndHeightWithDifferentData(');
+const probeEnd = ui.indexOf('// this means input, delete or composition', probeBegin);
+assert.ok(probeBegin >= 0 && probeEnd > probeBegin);
+const probe = javascript(ui.slice(probeBegin, probeEnd));
 const caret = javascript(source('test/caret'));
 const css = fs.readFileSync(path.join(root, 'frontend/src/styles/test.scss'), 'utf8');
 assert.match(css, /&\.dead\s*\{[^}]*border-bottom-color: var\(--untyped-letter-color\);/);
@@ -49,15 +53,34 @@ function letters(html) {
   }));
 }
 const returnSamples = [['aa\n', 'aax', ''], ['aa\n', 'aaxy', ''], ['aa\n', 'aa', 'XY'], ['aa\n', 'aax', 'Y']];
-const fixtures = [], unicodeFixtures = [], returnFixtures = [];
-for (const [collection, values] of [[fixtures, samples], [unicodeFixtures, unicodeSamples], [returnFixtures, returnSamples]])
+const probeSamples = [
+  ['😀a', '😀a', '', '😀ax'], ['ab', 'ab', '', 'ab😀'],
+  ['a👩‍💻b', 'a👩‍💻b', '', 'a👩‍💻bx'], ['e\u0301', 'e\u0301', '', 'e\u0301x'],
+  ['ab', 'ab😀', '', 'ab😀x'], ['aa\n', 'aax', '', 'aaxy'],
+  ['abcdef', 'a', '', 'ax'], ['ab', 'ab', '', 'ab '],
+];
+const fixtures = [], unicodeFixtures = [], returnFixtures = [], probeFixtures = [];
+for (const [collection, values] of [[fixtures, samples], [unicodeFixtures, unicodeSamples], [returnFixtures, returnSamples], [probeFixtures, probeSamples]])
 for (const mode of ['words', 'zen']) for (const style of ['off', 'below', 'replace'])
-for (const [original, input, composition] of values) {
+for (const [original, input, composition, candidate] of values) {
   let html = '', position;
-  const word = {setHtml(value) { html = value; }, qsa: () => [], appendHtml() { assert.fail('Unexpected hints'); },
+  const nodes = [], appended = [];
+  const word = {setHtml(value) { html = value; },
+    qsa: () => letters(html).map(() => ({native: {after(...values) {
+      nodes.push(...values); appended.push(...values.map(value => units(value.textContent)));
+    }}})), appendHtml() { assert.fail('Unexpected hints'); },
+    getOffsetTop: () => 20, getOffsetHeight: () => 30 + nodes.length,
     native: {insertAdjacentHTML() {}, getElementsByTagName: () => []}};
   class ObservedCaret { goTo(value) { position = value; } }
-  const context = vm.createContext({original, input, composition,
+  const context = vm.createContext({original, input, composition, candidate,
+    getActiveWordElement: () => word,
+    document: {createElement(tag) {
+      assert.equal(tag, 'letter');
+      const node = {textContent: '', remove() {
+        const index = nodes.indexOf(node); assert.ok(index >= 0); nodes.splice(index, 1);
+      }};
+      return node;
+    }},
     Config: {mode, indicateTypos: 'off', compositionDisplay: style, tapeMode: 'off', showAllLines: true,
       caretStyle: 'bar', smoothCaret: 'off'},
     findSingleActiveFunboxWithFunction: () => undefined,
@@ -76,10 +99,20 @@ for (const [original, input, composition] of values) {
   const cells = letters(html), tail = cells.slice(Array.from(input).length);
   if (mode === 'words') assert.equal(tail.filter(value => value.marked).length, composition.length);
   if (mode === 'zen' && composition !== '') assert.ok(!cells.some(value => value.placeholder));
-  collection.push({mode, style, display, input, composition, cells, tail, letterIndex: position.letterIndex});
+  let probeResult;
+  if (candidate !== undefined) {
+    new vm.Script(probe).runInContext(context, {timeout: 1000});
+    probeResult = vm.runInContext('getActiveWordTopAndHeightWithDifferentData(candidate)', context);
+    assert.equal(nodes.length, 0, 'All temporary letters must be removed');
+    assert.equal(appended.length, Math.max(0, candidate.length - cells.length));
+    assert.equal(probeResult.height, 30 + appended.length);
+  }
+  collection.push({mode, style, display, input, composition, cells, tail, letterIndex: position.letterIndex,
+    candidate, sourceLetterCount: cells.length, appended, probeResult});
 }
 assert.equal(fixtures.length, 132); assert.equal(unicodeFixtures.length, 36);
 assert.equal(returnFixtures.length, 24);
+assert.equal(probeFixtures.length, 48);
 const emoji = unicodeFixtures.find(value => value.mode === 'words' && value.style === 'replace'
   && value.input === 'a' && value.composition === '😀');
 assert.deepEqual(emoji.tail.slice(0, 2).map(value => value.textUnits), [[0xD83D], [0xDE00]],
@@ -143,5 +176,5 @@ for (const sample of fieldSamples) {
 assert.equal(fieldFixtures.length, 15);
 assert.deepEqual(fieldFixtures[8].inputUnits, [55357], 'Never decode a retained lone surrogate into a replacement unit');
 verify();
-if (option) process.stdout.write(JSON.stringify({pin, fixtures, unicodeFixtures, fieldFixtures, returnFixtures}));
-else console.log('Composition projection source passed (132 complete word-update/caret cases, 36 explicit Unicode cases, 24 Return cases and 15 complete Words/event-getter/update/caret field cases; seeded snapshots and owned DOM/RAF/cache bindings, no insertion/navigation/browser/IME parity; source mixed UTF-16/scalar defects retained)');
+if (option) process.stdout.write(JSON.stringify({pin, fixtures, unicodeFixtures, fieldFixtures, returnFixtures, probeFixtures}));
+else console.log('Composition projection source passed (132 complete word-update/caret cases, 36 explicit Unicode cases, 24 Return cases, 48 complete update/temporary-letter probe cases and 15 complete Words/event-getter/update/caret field cases; seeded snapshots and owned DOM/RAF/cache bindings, controlled probe geometry, no insertion/navigation/browser/IME parity; source mixed UTF-16/scalar defects retained)');

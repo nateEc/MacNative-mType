@@ -158,10 +158,11 @@ import XCTest
   }
 
   func testProbeAgreesWithActuallyRenderedUnrestrictedInputCopiesAcrossNativeWidths() throws {
+    // Astral input deliberately differs: the source probe starts at a scalar
+    // node count but slices UTF-16. Its separate regression is below.
     let cases: [(String, String, String, String, Bool)] = [
       ("aa bb cc", "aa bb", "bb", "x", false),
       ("aa\nbb", "aax", "aax", "y", false),
-      ("😀a tail", "😀a", "😀a", "x", false),
       ("e\u{301} tail", "e\u{301}", "e\u{301}", "\u{301}", false),
       ("سلام عالم", "سلام", "سلام", "س", true),
       ("سلام عالم", "سلام", "سلام", "x", true),
@@ -186,6 +187,25 @@ import XCTest
             "\(prompt.debugDescription) + \(extra.debugDescription), width \(columns), RTL \(rtl)")
         }
       }
+    }
+  }
+
+  func testAstralSourceProbeCanGrowEvenWhenFinalAcceptedRenderingWouldFit() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "😀a tail")
+    session.insertBatch("😀a", at: start)
+    XCTAssertEqual(session.promptInputWrapSourceLetterCount, 2)
+    var accepted = session; accepted.insertBatch("x", at: start.addingTimeInterval(1))
+    for rtl in [false, true] {
+      let before = PromptFieldTextLayout(map: try XCTUnwrap(rendering(session).compositionTextMap),
+        width: width(4.2), font: font, rightToLeft: rtl)
+      let after = PromptFieldTextLayout(map: try XCTUnwrap(rendering(accepted).compositionTextMap),
+        width: width(4.2), font: font, rightToLeft: rtl)
+      let first = try XCTUnwrap(before.fieldFrames[0]), last = try XCTUnwrap(after.fieldFrames[0])
+      XCTAssertEqual(last.minY, first.minY)
+      XCTAssertEqual(last.height, first.height)
+      // The complete source helper appends candidate[2] and candidate[3]
+      // (a, x), not only the new x. Never "correct" that into final rendering.
+      XCTAssertTrue(try rejects(session, candidate: "😀ax", columns: 4.2, rtl: rtl))
     }
   }
 }

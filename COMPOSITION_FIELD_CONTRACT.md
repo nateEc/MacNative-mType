@@ -1,5 +1,17 @@
 # 组合投影的真实字段与部分字形归属
 
+## 准入探针的 scalar 槽数与 UTF-16 临时单位
+
+固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41` 的完整 `updateWordLetters` 按 `Strings.splitIntoCharacters`（for-of scalar）生成已输入／待输入 letter，完整 `getActiveWordTopAndHeightWithDifferentData` 却从实际 DOM letter 数开始索引候选 UTF-16 单位。这两个单位不能合并为 UTF-16 长度或原生 grapheme 数。原生准入现按活动字段目标／接受输入的 scalar 数计算已有槽数，仍逐 UTF-16 单位追加临时槽；旧单 Text 回退也逐单位解码，不能把两临时 surrogate 槽重新融合为 emoji。控制换行／SPACE 插入点、候选隔离、接受／计分／回放／归档协议不变，没有新增运行时依赖。
+
+QA 只读执行完整原版更新、caret 与上述探针；八输入×两模式×三组合风格的 48 例，实际源槽数、临时节点 textContent UTF-16、追加顺序及全部移除均有断言，几何为自有受控绑定，不宣称浏览器字体／像素。原生对照限定普通模式 replace 组合风格、typo off 的八例，六宽度×两方向共 96 组，使用真实原生布局和原版给出的临时单位；组合／ZWJ 的原生 baseline 仍不是原版 scalar 排版。上一批 72 组实际接受副本几何对照中，emoji 例移入独立测试：现在明确断言最终接受渲染可容纳，但原版临时探针仍增高拒绝；其余五例 60 组继续对照，未删除 emoji 覆盖或放宽原版断言。
+
+持久证据 `../../work/unicode-probe.lxVnkO`：`red.log` 一项 17 断言失败，证实 emoji／ZWJ／已有 astral extra 的槽数及几何错误；`first.log` 30 项四失败，仅为旧“探针等于最终渲染”的 emoji 假设。`legacy-red.log` 与 `legacy-emoji-baseline-red.log` 是不能区分旧／新的成功夹具，不算 red；实际字体单独检查后，用两种文字宽度的中点构造 `legacy-derived-width-red.log`，一项一失败证实回退路径 surrogate 融合。`verified-focused.log` 最终 32 项零失败零跳过（4.355 秒，墙钟 4.359 秒）。扩大回归／原创性结果待补，完整门禁未重跑；本批零主程序启动，无新截图。
+
+最终 `broad.log`：798 项零失败零跳过（189.352 秒，墙钟 189.456 秒），使用上一批持久 QA 动画归档，含本批三个新增测试。`frozen.sha256` 十文件在启动前、中途及终态复核一致；终态后仅四文档补结果，六个代码／测试／QA 输入未变化。`originality.log` 退出 0；零 Typebar 主程序启动、终态零测试／编译残留。1,249 槽量测 0.136242 秒、候选改变配置 0.015218 秒，仅诊断，不代表 UI FPS。首轮失败与不能区分的夹具均保留；上述“待补”由本段取代，但完整门禁仍未重跑。
+
+有界本会话复核保留源混合单位的可观察行为，不以较自然的最终排版替代原版探针；只有活动字段只读计数改变，没有改输入事件顺序或持久化。仍开放：真实 DOM／RAF 尚未刷新时的节点数、非 BMP 事件整批与原生逐单位准入的边界、融合／ZWJ／孤立 surrogate 的全部源排版、隐藏词界与 stopped preview 全组合、混合方向和其余呈现、实机 IME／字体／VoiceOver／性能。94 配置 89／4／1、主题与挑战缺口、人工验收不升级，完整 goal active；下方为历史。
+
 ## Return 字段容器与错误输入归属增量
 
 依据固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41` 的 `buildWordHTML` 与完整 `updateWordLetters`：Return 是词容器内的 letter，结构换行在整个容器之后，不能把后续 extras 提前移到下一行。普通原生字段现将边界放在最后一个槽之后，独立槽／连接文字及整体 RTL 共用该规则；移除字段的既有结构行计数不变。

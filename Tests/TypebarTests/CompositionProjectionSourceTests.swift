@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import SwiftUI
 import XCTest
 @testable import Typebar
@@ -20,6 +21,7 @@ import XCTest
     let pin: String
     let fixtures: [Fixture], unicodeFixtures: [Fixture]
     let returnFixtures: [Fixture]
+    let probeFixtures: [ProbeFixture]
     let fieldFixtures: [FieldFixture]
   }
   private struct FieldFixture: Decodable {
@@ -29,6 +31,12 @@ import XCTest
     let index: Int, letterIndex: Int
     let targetUnits: [UInt16], inputUnits: [UInt16]
     let marked: [Cell]
+  }
+  private struct ProbeFixture: Decodable {
+    let mode: String, style: CompositionDisplayStyle
+    let display: String, input: String, candidate: String
+    let sourceLetterCount: Int
+    let appended: [[UInt16]]
   }
   private static var cachedEvidence: Evidence?
 
@@ -53,6 +61,7 @@ import XCTest
     XCTAssertEqual(value.fixtures.count, 132); XCTAssertEqual(value.unicodeFixtures.count, 36)
     XCTAssertEqual(value.fieldFixtures.count, 15)
     XCTAssertEqual(value.returnFixtures.count, 24)
+    XCTAssertEqual(value.probeFixtures.count, 48)
     Self.cachedEvidence = value
     return value
   }
@@ -105,6 +114,49 @@ import XCTest
         XCTAssertEqual(cell.glyph.state == .correct, expected.correct, message)
       }
       XCTAssertEqual(session.typed, before, "Projection must not mutate accepted input")
+    }
+  }
+
+  func testSourceProbeCountsScalarLettersButAppendsIndividualUTF16Units() throws {
+    let fixtures = try evidence().probeFixtures.filter { $0.mode == "words" && $0.style == .replace }
+    XCTAssertEqual(fixtures.count, 8)
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .medium)
+    let advance = ("a" as NSString).size(withAttributes: [.font: font]).width
+    for fixture in fixtures {
+      var session = TypingSession(configuration: .words(2),
+        prompt: fixture.display + (fixture.display.hasSuffix("\n") ? "tail" : " tail"))
+      session.insertBatch(fixture.input, at: Date(timeIntervalSinceReferenceDate: 915_100_000))
+      XCTAssertEqual(session.typed, fixture.input)
+      XCTAssertEqual(session.promptInputWrapSourceLetterCount, fixture.sourceLetterCount, fixture.input)
+      let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: "", style: .replace))
+      let rendering = presentation.render { _, glyph, _ in
+        AttributedString(PromptControlCharacterPresentation.plan(for: glyph, style: .off).text)
+      }
+      let map = try XCTUnwrap(rendering.compositionTextMap)
+      let owner = try XCTUnwrap(session.promptCompositionField?.index)
+      let index = try XCTUnwrap(map.fieldRuns.firstIndex { $0.fieldID == owner })
+      var fields = map.fieldRuns
+      var id = (fields.flatMap { $0.cells.map(\.id) }.max() ?? -1) + 1
+      let probes: [PromptFieldTextRun.Cell] = fixture.appended.map { units in
+        let glyph = TypingPromptGlyph(character: String(decoding: units, as: UTF16.self).first!, state: .extra)
+        defer { id += 1 }
+        return .init(id: id, glyph: glyph,
+          text: AttributedString(PromptControlCharacterPresentation.plan(for: glyph, style: .off).text), isGap: false)
+      }
+      fields[index].cells.insert(contentsOf: probes,
+        at: fields[index].cells.firstIndex { $0.isGap } ?? fields[index].cells.endIndex)
+      for rtl in [false, true] {
+        for columns: CGFloat in [2.2, 3.2, 4.2, 5.2, 8.2, 30] {
+          let width = advance * columns
+          let before = PromptFieldTextLayout(map: map, width: width, font: font, rightToLeft: rtl)
+          let after = PromptFieldTextLayout(fieldRuns: fields, width: width, font: font, rightToLeft: rtl)
+          let first = try XCTUnwrap(before.fieldFrames[owner]), last = try XCTUnwrap(after.fieldFrames[owner])
+          XCTAssertEqual(PromptInputWrapGeometry.rejects(session: session, candidate: Array(fixture.candidate.utf16),
+            rendering: rendering, width: width, font: font, lineSpacing: 12, isRightToLeft: rtl),
+            last.minY > first.minY || last.height > first.height,
+            "\(fixture.input) -> \(fixture.candidate), columns \(columns), RTL \(rtl)")
+        }
+      }
     }
   }
 

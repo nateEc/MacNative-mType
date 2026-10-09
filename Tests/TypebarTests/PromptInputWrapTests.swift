@@ -74,6 +74,18 @@ import XCTest
     }
   }
 
+  func testLegacyProbeDoesNotFuseTwoTemporarySurrogateLettersIntoOneEmoji() {
+    var session = TypingSession(configuration: .words(2), prompt: "😀ab tail")
+    session.insertBatch("😀ab", at: start)
+    XCTAssertEqual(session.promptInputWrapSourceLetterCount, 3)
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .medium)
+    let fused = ("😀abb😀" as NSString).size(withAttributes: [.font: font]).width
+    let separate = ("😀abb\u{FFFD}\u{FFFD}" as NSString).size(withAttributes: [.font: font]).width
+    let advance = ("a" as NSString).size(withAttributes: [.font: font]).width
+    XCTAssertGreaterThan(separate, fused)
+    XCTAssertTrue(geometry(session, candidate: "😀ab😀", columns: (fused + separate) / 2 / advance))
+  }
+
   func testActualGeometryFeedsBatchAdmissionAndRetiredPrefixCoordinates() {
     var session = TypingSession(configuration: .words(4), prompt: "aa bb cc dd")
     session.insertBatch("aa bb cc", at: start)

@@ -47,7 +47,7 @@ enum PromptInputWrapGeometry {
   @MainActor private static func rejectsFieldGrowth(session: TypingSession, candidate: [UInt16],
     fields: [PromptFieldTextRun], width: CGFloat, font: NSFont, lineSpacing: CGFloat,
     rightToLeft: Bool, joinsLetters: Bool) -> Bool {
-    let missing = candidate.count - session.promptInputWrapLetterUnitCount
+    let missing = candidate.count - session.promptInputWrapSourceLetterCount
     guard width.isFinite, width > 0, missing > 0,
       let owner = session.promptCompositionField?.index,
       let index = fields.firstIndex(where: { $0.fieldID == owner && !$0.cells.isEmpty }) else { return false }
@@ -62,8 +62,8 @@ enum PromptInputWrapGeometry {
       defer { id += 1 }
       return .init(id: id, glyph: glyph, text: text, isGap: false)
     }
-    // Preserve this adapter's actual Return/extra order, including an extra
-    // row already following Return; only commit SPACE stays outside the ink.
+    // The structural Return follows the whole container, including probes;
+    // only commit SPACE stays outside the word ink.
     let insertion = extended[index].cells.firstIndex { $0.isGap }
       ?? extended[index].cells.endIndex
     extended[index].cells.insert(contentsOf: cells, at: insertion)
@@ -90,11 +90,13 @@ enum PromptInputWrapGeometry {
     guard let start = offsets.min(), let last = offsets.max() else { return false }
     let end = rendering.glyphCharacterOffsets.values.filter { $0 > last }.min()
       ?? rendering.text.characters.count
-    let missing = candidate.count - session.promptInputWrapLetterUnitCount
+    let missing = candidate.count - session.promptInputWrapSourceLetterCount
     guard missing > 0 else { return false }
-    let suffix = String(decoding: candidate.suffix(missing), as: UTF16.self)
-    let append = suffix.map {
-      PromptControlCharacterPresentation.plan(for: .init(character: $0, state: .extra), style: .off).text
+    // Each source temporary letter owns one indexed UTF-16 unit. Decoding
+    // the whole suffix would fuse a surrogate pair into a different glyph.
+    let append = candidate.suffix(missing).map { unit in
+      let character = String(decoding: [unit], as: UTF16.self).first!
+      return PromptControlCharacterPresentation.plan(for: .init(character: character, state: .extra), style: .off).text
     }.joined()
     var extended = rendering.text
     // Native extras precede the structural Return marker, so the probe must

@@ -7430,16 +7430,19 @@ struct TypingSession {
     return inputWordText().utf16.count
   }
 
-  /// The source display owns Return as a target letter even when the native
-  /// renderer keeps its structural marker beside a mistyped extra. Count
-  /// field letters, not the renderer's additional control glyph or hints.
-  var promptInputWrapLetterUnitCount: Int {
+  /// Source updateWordLetters emits one letter per scalar in accepted input
+  /// and target, while its later probe indexes candidate UTF-16 units. Keep
+  /// those deliberately different units; hints and native grapheme boxes
+  /// are not source letter nodes. Return remains a displayed target letter.
+  var promptInputWrapSourceLetterCount: Int {
     let target = inputAccuracyTarget(at: nextTargetIndex).units
-    let displayLength = target.count - (target.last == 32 ? 1 : 0)
+    let display = target.last == 32 ? target.dropLast() : target[...]
+    let input = acceptedUnits.map { $0.field($0.fieldIndex) } ?? Array(inputWordText().utf16)
     let previewLength = stoppedPromptInput.map {
-      $0.targetIndex == nil ? String($0.character).utf16.count : 0
+      $0.targetIndex == nil ? String($0.character).unicodeScalars.count : 0
     } ?? 0
-    return max(displayLength, activeInputWordUTF16Length) + previewLength
+    return max(String(decoding: display, as: UTF16.self).unicodeScalars.count,
+      String(decoding: input, as: UTF16.self).unicodeScalars.count) + previewLength
   }
 
   /// Admission precedes attempts, stopped-input presentation, and replay.
