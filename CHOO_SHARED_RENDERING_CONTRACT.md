@@ -1,5 +1,17 @@
 # Choo 接入共享属性文本
 
+## 组合投影视口行高增量（2026-10-10）
+
+Choo 组合投影不再固定使用 184 点视口。生产组件从同一 ChooPromptFieldLayout 字段槽框报告原生行高，经共享 Preference 交给 PracticePromptViewport，普通预留三行、Zen 两行；showAllLines 不请求有界行高。只对已有组合 map 启用，无 map 的旧路径保留。旋转不改变布局 advance／行高，不以 TextKit 普通文字排版代替独立字层；输入、计分、回放、存储、协议和动画时钟不变，没有新增定时器或产品依赖。
+
+已直接核对固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41` 的完整 updateWordsWrapperHeight、lineJump、buildWordHTML 与 Choo CSS。既有完整源探针 52 模式／设置组合、3 守卫及 14 行高例通过，几何为自有 DOM 指标，不代表浏览器／字体等价，混合高度 Zen 不纳入对照。Swift 6.2.4／macOS 14 最低目标及现有 AppKit／SwiftUI 接口保持不变。
+
+证据 `../../work/choo-viewport.3CAOdP/`：red.log 一项两处接线断言失败；first.log 十六项通过；broad.log 因新增挂载测试闭包缺显式 self 编译失败，修复仅该测试引用。verified.log 78 项零失败但两项因未设置参考环境跳过，不计完整成功；补齐固定参考及既有 Anime.js 归档后 verified-source.log 最终 78 项零失败零跳过（15.739 秒，墙钟 15.750 秒），其中五项新增覆盖字号／行数、候选／宽度变化、无 map／非法几何和真实组件挂载。三个代码／测试输入的 frozen.sha256 终态一致；source-line-display.log、originality.log 保留。
+
+实际 ChooPracticePrompt 与共享视口挂载在同一不可见窗口，切字号及两／三行后检查真实 NSScrollView 高度，窗口关闭。字号与宽度例另核对真实字层框；不是完整 ContentView、真实系统 IME／VoiceOver、运行中旋转、像素或设备性能验收，本轮无新增截图、零 Typebar 主程序启动。行为先行、源码核对、根因调试及本会话有界风险复核约束本增量，不是独立审计。
+
+完整冻结发布门禁尚未重跑，上一完整 4,092／501 只适用于此前提交。Choo 行跟随／退休、无 map 旧布局、混合高度与匿名结构空行的完整源排版、Tape 投影、方向／完整组合、实机与长文本 UI 性能仍开放；额外字段行高量测的开销未作性能等价承诺。人工新增一项待验，94 配置仍 89／4／1、主题精确 0／187、挑战一项待映射，完整 goal active。下方为历史阶段。
+
 ## ASL 与 Choo 完整冻结复验（2026-10-10）
 
 对原生提交 `a2235a1843fd3e7bd7da83e524c6d9f9982b0b1f` 执行唯一完整串行门禁，session 4802 终态退出 0；只读参考固定为 `91bd24bb8513785c7364cbea29296ff7adafac41`，保持干净。持久证据 `../../work/special-projection-readiness.Ijmz2B/` 保留 readiness.log、16 输入 frozen.sha256、中途与终态哈希检查、75 份日志及 228 张组件图。启动前、中途、末期与终态十六输入一致；终态后仅五份结果文档补记，不改变代码、测试、人工清单或门禁。

@@ -408,8 +408,8 @@ import XCTest
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     XCTAssertTrue(source.contains("PromptFieldPracticePrompt(rendering: rendering"))
     XCTAssertTrue(source.contains("measuresCustomRows: practiceVisualEffect.usesASL"))
-    XCTAssertTrue(source.contains("|| (renderedPrompt.compositionTextMap != nil && !practiceVisualEffect.usesChoo)"),
-      "Ordinary projected fields measure their rows; Choo keeps its existing viewport until it supplies its own row height")
+    XCTAssertTrue(source.contains("|| renderedPrompt.compositionTextMap != nil"),
+      "Ordinary and Choo projected fields provide their own measured row heights")
     XCTAssertTrue(source.contains("joinsLetters: usesJoiningScript"))
   }
 }

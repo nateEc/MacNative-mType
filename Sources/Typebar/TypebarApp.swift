@@ -536,7 +536,7 @@ struct ChooGlyphPalette: Equatable {
   }
 }
 
-private struct ChooPracticePrompt: View {
+struct ChooPracticePrompt: View {
   let glyphs: [TypingPromptGlyph]
   let rendering: PromptRendering
   let font: NSFont
@@ -546,6 +546,7 @@ private struct ChooPracticePrompt: View {
   let ignoresSystemReducedMotion: Bool
   var glyphIDs: [Int] = []
   var carets: PromptCaretNativeView.Configuration? = nil
+  var viewportLineCount: Int? = nil
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
@@ -557,6 +558,15 @@ private struct ChooPracticePrompt: View {
     return ChooLayerPrompt(glyphs: glyphs, font: font, palette: palette,
                            animates: animates, frameRate: animationFrameRate,
                            glyphIDs: glyphIDs, rendering: rendering, carets: carets)
+      .background {
+        GeometryReader { proxy in
+          Color.clear.preference(key: PracticeViewportHeightKey.self,
+            value: viewportLineCount.flatMap { count in
+              ChooLayerView.viewportHeight(glyphs: glyphs, font: font, width: proxy.size.width,
+                glyphIDs: glyphIDs, rendering: rendering, lineCount: count)
+            })
+        }
+      }
       .accessibilityLabel("旋转文字练习提示")
   }
 }
@@ -770,6 +780,19 @@ final class ChooLayerView: NSView {
     let presentation = rendering.map { ChooPromptPresentation(glyphs: glyphs, ids: glyphIDs, rendering: $0) }
     return layoutFrames(glyphs: presentation?.cells.map(\.glyph) ?? glyphs,
       presentation: presentation, font: font, width: width).height
+  }
+
+  /// Rotation changes ink only. Report rows from the exact untransformed
+  /// field allocations used by layoutFrames, never from a TextKit substitute.
+  static func viewportHeight(glyphs: [TypingPromptGlyph], font: NSFont, width: CGFloat,
+    glyphIDs: [Int], rendering: PromptRendering, lineCount: Int) -> CGFloat? {
+    guard rendering.compositionTextMap != nil, width.isFinite, width > 0, lineCount > 0 else { return nil }
+    let presentation = ChooPromptPresentation(glyphs: glyphs, ids: glyphIDs, rendering: rendering)
+    let layout = ChooPromptFieldLayout(presentation: presentation, font: font, width: width)
+    let frames = Dictionary(presentation.cells.enumerated().map { ($0.element.id, layout.frames[$0.offset]) },
+      uniquingKeysWith: { first, _ in first })
+    return PromptViewportLayout.height(forRowHeights: ASLPromptLineGeometry(frames: frames).rowHeights,
+      lineCount: lineCount)
   }
 
   private func refreshVisibleLayers(forceStyle: Bool = false) {
@@ -2759,7 +2782,7 @@ private struct ContentView: View {
                   measuresTextRows: !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
                     && renderedPrompt.compositionTextMap == nil,
                   measuresCustomRows: practiceVisualEffect.usesASL
-                    || (renderedPrompt.compositionTextMap != nil && !practiceVisualEffect.usesChoo)
+                    || renderedPrompt.compositionTextMap != nil
                 ) {
                   practicePrompt
                 }
@@ -3044,7 +3067,8 @@ private struct ContentView: View {
           isEnabled: true, reducesMotion: settings.reducePracticeMotion,
           ignoresSystemReducedMotion: !VisualFunboxReducedMotionPolicy
             .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers),
-          glyphIDs: specialPromptGlyphIDs, carets: specialPromptCaretConfiguration)
+          glyphIDs: specialPromptGlyphIDs, carets: specialPromptCaretConfiguration,
+          viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3))
       } else if usesTapePractice {
         TapePracticePrompt(session: session, rendering: rendering,
           mode: settings.practiceTapeMode,

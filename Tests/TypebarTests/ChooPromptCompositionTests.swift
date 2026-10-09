@@ -9,6 +9,13 @@ import XCTest
   private let palette = ChooGlyphPalette(theme: AppTheme.paper.resolvedTheme,
     flipsCompletionAndFuture: false, usesColorfulMode: false)
 
+  func testProductionProjectedChooReportsItsOwnViewportRows() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    XCTAssertTrue(source.contains("ChooLayerView.viewportHeight("), "Choo must measure the same independent-layer layout as its displayed prompt")
+    XCTAssertTrue(source.contains("|| renderedPrompt.compositionTextMap != nil"), "Projected Choo must not retain the fixed 184-point viewport")
+  }
+
   private func render(_ session: TypingSession, _ marked: String = "",
     style: CompositionDisplayStyle = .replace) throws -> PromptRendering {
     let value = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: marked, style: style))
@@ -54,6 +61,79 @@ import XCTest
   private func present(_ view: ChooLayerView, time: TimeInterval = 0) throws {
     let caret = try XCTUnwrap(view.subviews.compactMap { $0 as? PromptCaretNativeView }.first)
     caret.layout(); caret.present(at: time)
+  }
+
+  func testProjectedViewportUsesActualFontRowsAndZenReservesTwoRows() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "ab cd")
+    let rendering = try render(session), ids = Array(session.promptGlyphs.indices)
+    for size in [14.0, 28.0, 56.0] {
+      let font = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+      let row = ceil(font.ascender - font.descender + font.leading) + 12
+      for count in [2, 3] {
+        let height = try XCTUnwrap(ChooLayerView.viewportHeight(glyphs: session.promptGlyphs,
+          font: font, width: 400, glyphIDs: ids, rendering: rendering, lineCount: count))
+        XCTAssertEqual(height, (row * CGFloat(count)).rounded(.up))
+      }
+    }
+  }
+
+  func testProjectedViewportMatchesRealLayerRowsAfterMarkedOverflowAndResize() throws {
+    var session = TypingSession(configuration: .words(4), prompt: "ab cd ef gh")
+    session.insertBatch("a", at: start)
+    let rendering = try render(session, "bXYZ"), map = try XCTUnwrap(rendering.compositionTextMap)
+    for width in [CGFloat(65), 120, 400] {
+      let view = make(session, rendering: rendering, width: width); defer { view.stopCarets() }
+      let values = layers(view), cells = map.fieldRuns.flatMap(\.cells)
+      XCTAssertEqual(values.count, cells.count)
+      let frames = Dictionary(uniqueKeysWithValues: zip(cells.map(\.id), values.map(\.frame)))
+      let expected = PromptViewportLayout.height(forRowHeights: ASLPromptLineGeometry(frames: frames).rowHeights, lineCount: 3)
+      XCTAssertEqual(ChooLayerView.viewportHeight(glyphs: session.promptGlyphs, font: font, width: width,
+        glyphIDs: Array(session.promptGlyphs.indices), rendering: rendering, lineCount: 3), expected)
+    }
+    XCTAssertEqual(session.typed, "a", "Viewport measurement must not accept marked input")
+  }
+
+  func testViewportDoesNotInventRowsForLegacyOrInvalidGeometry() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "ab cd"), rendering = try render(session)
+    let legacy = PromptRendering(text: rendering.text, glyphCharacterOffsets: rendering.glyphCharacterOffsets)
+    let ids = Array(session.promptGlyphs.indices)
+    XCTAssertNil(ChooLayerView.viewportHeight(glyphs: session.promptGlyphs, font: font, width: 400,
+      glyphIDs: ids, rendering: legacy, lineCount: 3))
+    for width in [CGFloat.zero, -.infinity, .infinity, .nan] {
+      XCTAssertNil(ChooLayerView.viewportHeight(glyphs: session.promptGlyphs, font: font, width: width,
+        glyphIDs: ids, rendering: rendering, lineCount: 3))
+    }
+    XCTAssertNil(ChooLayerView.viewportHeight(glyphs: session.promptGlyphs, font: font, width: 400,
+      glyphIDs: ids, rendering: rendering, lineCount: 0))
+  }
+
+  func testMountedChooPreferenceReachesTheRealScrollViewportAfterFontAndModeChange() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "ab cd"), rendering = try render(session)
+    func root(size: CGFloat, count: Int) -> some View {
+      let font = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+      return PracticePromptViewport(text: rendering.text, font: font, lineSpacing: 12,
+        isRightToLeft: false, lineCount: count, measuresTextRows: false, measuresCustomRows: true) {
+          ChooPracticePrompt(glyphs: session.promptGlyphs, rendering: rendering, font: font, palette: self.palette,
+            isEnabled: true, reducesMotion: true, ignoresSystemReducedMotion: false,
+            glyphIDs: Array(session.promptGlyphs.indices), viewportLineCount: count)
+        }.frame(width: 360)
+    }
+    func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+    let host = NSHostingView(rootView: root(size: 14, count: 3))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 360, height: 400),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { window.close() }
+    for (size, count) in [(CGFloat(14), 3), (56, 2)] {
+      host.rootView = root(size: size, count: count)
+      host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.15)); host.layoutSubtreeIfNeeded()
+      let scroll = try XCTUnwrap(descendants(host).compactMap { $0 as? NSScrollView }.first)
+      let font = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+      let expected = (ceil(font.ascender - font.descender + font.leading) + 12) * CGFloat(count)
+      XCTAssertEqual(scroll.bounds.height, expected, accuracy: 1)
+      XCTAssertFalse(window.isVisible)
+      XCTAssertNotNil(descendants(host).first { $0 is ChooLayerView })
+    }
   }
 
   func testOverflowMainCaretUsesTheLastVirtualCellAndPaceUsesCanonicalTarget() throws {
