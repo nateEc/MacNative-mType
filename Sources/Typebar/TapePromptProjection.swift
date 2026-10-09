@@ -28,6 +28,11 @@ enum TapePromptProjection {
       let newlineID = targetIDs.first { glyphs.indices.contains($0)
         && glyphs[$0].character == "\n" && glyphs[$0].state != .extra }
       let offsets = ids.compactMap { rendering.characterOffset(forGlyphAt: $0) }
+      // Separator-based navigation exposes a future tail at target.count;
+      // unlike a real empty field, no source word or glyph has been generated.
+      if session.configuration.mode != .zen, !session.usesHiddenPromptWordBoundaries,
+        word.phase == .future, word.range.isEmpty, word.range.lowerBound == targetCount,
+        offsets.isEmpty, newlineID == nil, !session.removedTapePromptWordIndices.contains(index) { return nil }
       if session.configuration.mode == .zen, word.phase == .future, offsets.isEmpty,
         newlineID == nil, !session.removedTapePromptWordIndices.contains(index) { return nil }
       let lower = offsets.min() ?? rendering.structuralNewlineOffsets[index] ?? cursor

@@ -298,7 +298,5 @@ import XCTest
     let branch = app[start.upperBound..<end.lowerBound]
     XCTAssertTrue(branch.contains("TapePracticePrompt(session: session"))
     XCTAssertFalse(branch.contains("session.hasPracticeNewlineContent ?"))
-    XCTAssertTrue(app.contains("settings.practiceTapeMode != .off && !session.hasPracticeNewlineContent"),
-      "Ordinary generated multiline fallback is not silently removed by the Zen change")
   }
 }

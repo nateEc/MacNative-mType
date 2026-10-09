@@ -5070,12 +5070,16 @@ struct TypingSession {
       hideExtraLetters: configuration.rules.hideExtraLetters).map { glyphs[$0] }
   }
 
+  var usesHiddenPromptWordBoundaries: Bool {
+    configuration.mode != .zen && hasNoSpaceWordSegmentation
+  }
+
   /// A linear snapshot of word ownership for presentation, including retained
   /// no-space boundaries and extra letters that have no target position.
   var promptWordPresentations: [TypingPromptWordPresentation] {
     let isZen = configuration.mode == .zen
     let characters = isZen ? Array(typed + " ") : promptCharacters
-    let usesHiddenBoundaries = !isZen && hasNoSpaceWordSegmentation
+    let usesHiddenBoundaries = usesHiddenPromptWordBoundaries
     let ranges = usesHiddenBoundaries ? noSpaceWordRanges
       : TypingPromptWordPresentation.ranges(in: characters)
     let cursor = isZen ? typed.count : nextTargetIndex

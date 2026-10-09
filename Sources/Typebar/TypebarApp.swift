@@ -410,12 +410,14 @@ struct TapePracticePrompt: View {
   var newlineWords: [TapePromptWord] = []
   var viewportLineCount = 3
   var reservesViewportLineCount = false
+  var expandsToContentHeight = false
   var onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil
   @State private var metrics: TapePromptLayoutMetrics?
 
   private var viewportHeight: CGFloat {
     let fallback = CGFloat(fontSize * 1.7)
     guard !newlineWords.isEmpty else { return fallback }
+    if expandsToContentHeight { return metrics?.contentHeight ?? fallback }
     let limit = (metrics?.rowHeight ?? fallback) * CGFloat(viewportLineCount)
     return reservesViewportLineCount ? limit : min(metrics?.contentHeight ?? fallback, limit)
   }
@@ -436,11 +438,14 @@ struct TapePracticePrompt: View {
 extension TapePracticePrompt {
   /// Zen owns measured word boxes from its initial hidden placeholder onward.
   /// Its empty target cannot signal the controls that the user later enters.
+  /// Quote input capability stays frozen even if later generation adds rows.
   init(session: TypingSession, rendering: PromptRendering, mode: PracticeTapeMode,
     margin: Double, fontSize: Double, animatesScroll: Bool,
     carets: PromptCaretNativeView.Configuration, retirement: PromptLineScrollContext,
     onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil) {
     let zen = session.configuration.mode == .zen
+    let declaredNewlines = session.hasPracticeNewlineContent
+    let generatedNewlines = session.prompt.contains("\n")
     self.init(rendering: rendering,
       anchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(session: session, rendering: rendering, mode: mode),
       wordAnchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(session: session, rendering: rendering, mode: .word),
@@ -449,9 +454,10 @@ extension TapePracticePrompt {
         || session.configuration.language == .mixedLanguages,
       mode: mode, margin: margin, fontSize: fontSize, animatesScroll: animatesScroll,
       carets: carets, retirement: retirement,
-      newlineWords: zen || session.hasPracticeNewlineContent
+      newlineWords: zen || declaredNewlines || generatedNewlines
         ? TapePromptProjection.words(session: session, rendering: rendering) : [],
-      viewportLineCount: zen ? 2 : 3, reservesViewportLineCount: zen,
+      viewportLineCount: zen ? 2 : 3, reservesViewportLineCount: zen || declaredNewlines,
+      expandsToContentHeight: !zen && !declaredNewlines && generatedNewlines,
       onTapeWordsRemoved: onTapeWordsRemoved)
   }
 }
@@ -2642,7 +2648,8 @@ private struct ContentView: View {
             ignoresSystemReducedMotion: ignoresSystemReducedMotion
           ) {
             Group {
-              if showsAllPracticeLines {
+              if !PracticeLineDisplayPolicy.needsOuterViewport(showsAllLines: showsAllPracticeLines,
+                usesTape: usesTapePractice, usesASL: practiceVisualEffect.usesASL, usesChoo: practiceVisualEffect.usesChoo) {
                 practicePrompt
               } else {
                 PracticePromptViewport(
@@ -3307,7 +3314,7 @@ private struct ContentView: View {
   }
 
   private var usesTapePractice: Bool {
-    settings.practiceTapeMode != .off && !session.hasPracticeNewlineContent
+    settings.practiceTapeMode != .off
   }
 
   private var showsAllPracticeLines: Bool {

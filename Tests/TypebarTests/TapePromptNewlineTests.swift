@@ -236,7 +236,7 @@ import XCTest
     }
   }
 
-  func testRendererUsesVerticalRetirementWithoutSingleLineOverflowOrRemovingProductionFallback() throws {
+  func testRendererUsesVerticalRetirementWithoutSingleLineOverflow() throws {
     let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 160)); defer { view.stop() }
     let (rendering, words) = fixture(), coordinator = PromptCaretMotionCoordinator(), attempt = UUID()
     var retirements: [PromptWordRetirement] = []
@@ -252,8 +252,5 @@ import XCTest
       if active < 10 { XCTAssertTrue(retirements.isEmpty, "First line must not retire via single-line overflow") }
     }
     XCTAssertEqual(retirements.map(\.firstRetainedWordIndex), [1], "Only the vertical owner's older row retires")
-    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    XCTAssertTrue(app.contains("settings.practiceTapeMode != .off && !session.hasPracticeNewlineContent"))
   }
 }

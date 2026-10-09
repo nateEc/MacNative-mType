@@ -1,6 +1,11 @@
 import Foundation
 
 enum PracticeLineDisplayPolicy {
+  static func needsOuterViewport(showsAllLines: Bool, usesTape: Bool,
+    usesASL: Bool, usesChoo: Bool) -> Bool {
+    !showsAllLines && (!usesTape || usesASL || usesChoo)
+  }
+
   static func shouldShowAllLines(
     settingEnabled: Bool, tapeMode: PracticeTapeMode, configuration: TestConfiguration
   ) -> Bool {

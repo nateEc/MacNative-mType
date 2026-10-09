@@ -1,0 +1,41 @@
+# 普通多行 Tape 生产入口与高度所有权
+
+本轮解除普通目标含换行时的 Tape 生产回退，复用既有 SwiftUI／AppKit 词框，不复制 Monkeytype 产品代码、字体或资产。固定只读参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。这是完整原生重写的一个增量，不是功能等价完成声明。
+
+## 行为与源码依据
+
+生产 `ContentView` 与实际挂载测试共用 `TapePracticePrompt(session:...)`。目标初始声明换行时，从尚未生成 Return 的引语首词起就预留三个原生实测行高；Zen 仍为两行。引语初始控制字符能力与后来生成的文本拓扑分开：messagingStyle 后来生成 LF、初始能力仍为 false 时，按已生成词框自然高度呈现，四行不误截成三行，也不因此准入 Return。普通无换行仍单行。
+
+固定源 `frontend/src/ts/test/test-ui.ts` 完整 `updateWordsWrapperHeight` 的普通 Tape 分支，声明换行选三行，否则选实际 words 高度／当前词高度；raw showAllLines、计时／无限、自定义、force、页面／结果／缺失活动词仍有各自门禁。`test-logic.ts` 初次生成保存控制字符能力，`input/handlers/before-insert-text.ts` 按该能力准入；未修改原生对应输入能力。QA 探针执行完整固定函数的 768 组自有测量，并以 24 组有效夹具对照挂载组件的三行比例。CSSOM 是受控边界，不宣称浏览器排版或字体像素等价。
+
+Tape 自己拥有高度和滚动，不能再嵌入生产父层的独立 184 点 `PracticePromptViewport`。抽取并共用 `PracticeLineDisplayPolicy.needsOuterViewport`，普通非 Tape／ASL／Choo 保留原外层，Tape 直接呈现；16 组策略组合及实际挂载的无 NSScrollView 检查覆盖该边界。静态生产路由断言加共用策略／初始化器挂载，不等于完整 ContentView 运行期或实体键盘证明。
+
+完整固定 `test/test-words.ts`、`utils/strings.ts` 与 `buildWordHTML` 的八组实际建词证明：末尾分隔符不会另生成未来空词。原生导航的 target.count 空尾仅在未物化 future、无字形／Return／缺口且非隐藏边界时过滤；真正的中间空词、活动空词、连续 Return 空行及隐藏边界空目标保留。隐藏边界直接复用会话既有事实，不根据语言或当前修饰器猜测；`TypingEngine` 只提取同一呈现条件，无输入接受、计分、持久化或服务协议改动。
+
+真实会话挂载覆盖 word／letter、四种模式短题、引语按需生成、错误 Return replacement 与纠正、连续退休及完整成绩／可移植记录／回放、RTL／emoji／组合字符、字号、狭窄独立缺口和平滑重开。所有窗口从未显示，defer 中 stop／close；本轮零 Typebar 主程序启动，没有新 timer、依赖、设置字段或迁移。
+
+## 先行证据与修正
+
+- `/tmp/typebar-ordinary-tape-entry-red.log` 最初夹具字段／参数顺序编译错误，不算行为红测；修正后 `entry-behavior-red.log` 七项有 27 个预期失败（10.636 秒），随后 `entry-first.log` 28 项零失败（8.553 秒）。此处简写文件均位于 `/tmp/typebar-ordinary-tape-` 前缀。
+- `/tmp/typebar-ordinary-tape-outer-viewport-red.log` 一项两失败（1.119 秒），实际 Tape 外层确有独立滚动容器；修正共用父层策略，而非只修测试根视图。
+- `/tmp/typebar-ordinary-tape-entry-expanded.log` 41 项四失败（13.494 秒）：自然四行错误变成五行。完整源码建词后，`tail-red.log` 两项 15 失败（1.681 秒）确认多余末尾词是产品缺陷；保留四行期望，修正投影。`entry-corrected.log` 52 项零失败（11.879 秒），`entry-regression.log` 304 项零失败零跳过（51.413 秒）。
+- `/tmp/typebar-ordinary-tape-boundary-red.log` 同时暴露真实隐藏空词误删与一个错误测试假设（中文不走空格提交）。读取实际语言策略后纠正后者，`captured-boundary-red.log` 一项仅剩真实空词误删失败（0.763 秒）；改为会话实际隐藏边界条件。未修改输入策略来迎合错误假设。
+- `/tmp/typebar-ordinary-tape-entry-final-regression.log` 304 项零失败但 15 跳过（27.593 秒），因漏传参考路径，不能算完整对照成功。补齐固定参考／锁定 Anime.js 后，`entry-pinned-regression.log` 304 项零失败零跳过（50.186 秒），其中十二个普通入口测试通过（6.737 秒）。
+
+十一张定向图位于 `/tmp/typebar-ordinary-tape-focused-images.WA8xid/ordinary-tape-*.png`，主代理已逐张查看。非空断言要求灰色文字像素，不允许只凭蓝色光标通过；短题三行、后来两行／四行、退休与纠错另有实际几何断言。窄图裁剪是预期，不据此宣称完整设备可读性。
+
+## 有界风险复核与未完成项
+
+同会话三轮复核分别检查初始能力／拓扑／高度分离、生产外层所有权、空尾与真实隐藏边界身份。反例先失败再修正；不是独立审计。两个旧静态测试只删除与本次新生产行为矛盾的“必须保留回退”断言，原几何／退休断言不变，新入口测试明确断言解除保护。
+
+任意 IME／组合 replacement、hint、no-space 内部 LF 完整导航、零偏移别名、未来缺失目标激活、反向纵横队列及字体重建确认时序、可见范围性能、原版字体／主题资源、ASL／Choo 全部组合与实体设备仍开放。CFG-02／MET-67 与 tapeMode 仍部分兼容；94 配置的 90 映射／3 部分／1 不适用不代表功能全通过。此前普通换行生产回退的历史结论仅在本合同范围更新，其余缺口不升级，完整 goal active。
+
+## 最终冻结验收
+
+首轮十五文件冻结哈希始终一致；`/tmp/typebar-ordinary-tape-final-readiness.log` 终态退出 1，在页面证据审计发现旧测试符号引用，尚未执行原生全量／服务／打包，不计成功。修正页面证据矩阵的重命名符号，登记本轮十三项真实测试，不提升兼容分类；原始失败日志保留，之后重新冻结运行。
+
+最终重新冻结十六个文件，`/tmp/typebar-ordinary-tape-verified-frozen.sha256` 在启动、中途与终态逐项一致。`/tmp/typebar-ordinary-tape-verified-readiness.log` 终态退出 0：原生 3,953 项零失败零跳过（978.921 秒），服务 501 项零失败零跳过（11.730 秒）。十二项普通入口测试 7.026 秒，十一项控制投影测试 0.037 秒、九项 Zen 入口 2.807 秒；十万词耐久 177.552 秒，16 项隔离磁盘迁移 5.589 秒。原生全量中实际只读失败／损坏存储夹具和系统 Contacts／CoreData 诊断均保留，不能当作 XCTest 失败，也不据此宣称设备环境无诊断。
+
+固定源码门禁（含本轮 768 组／八组实际建词）、53 页面／modal 表面、1,126 唯一人工场景结构、94 配置的 90 映射／3 部分／1 不适用、未启动应用包／签名／资源及原创长文字边界检查全部通过。人工结构检查不是实际人工验收，原创边界检查不证明全部功能、字体或设备等价。73 份原始日志位于 `/tmp/typebar-ordinary-tape-verified-logs.7Ob20I`，210 张图位于 `/tmp/typebar-ordinary-tape-verified-images.ayvvel`。主代理终态后逐张复查十一张 `ordinary-tape-*.png` 与八张 `zen-tape-*.png`；普通图有灰色文字像素，Zen 黑字／透明背景限制沿用旧合同。退休 pace 开／关整张 PNG 仍精确一致。
+
+终态确认无测试、编译、门禁或 Typebar 主程序残留，再仅补本合同、README、规范和盘点的验收记录；其余十二个冻结文件保持一致。参考始终为干净固定 pin，本轮零主程序启动，完整 goal 继续 active。

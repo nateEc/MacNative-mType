@@ -61,6 +61,42 @@ import XCTest
     XCTAssertGreaterThan(native.wordMetrics[1].gap, 0)
   }
 
+  func testUnmaterializedFutureTailIsNotAWordButRealEmptyFieldsRemain() {
+    for (target, expected, rows) in [("a\nb\n", [0, 1], 2), ("a  b ", [0, 1, 2], 1), ("a\n\n", [0, 1], 2)] {
+      let session = TypingSession(configuration: .words(4), prompt: target)
+      let tail = session.promptWordPresentations.last!
+      XCTAssertEqual(tail.phase, .future); XCTAssertTrue(tail.range.isEmpty)
+      XCTAssertEqual(tail.range.lowerBound, session.prompt.count)
+      let (_, words, native) = layout(session)
+      XCTAssertEqual(words.map(\.index), expected)
+      XCTAssertEqual(native.metrics.contentHeight / native.metrics.rowHeight, CGFloat(rows), accuracy: 0.01)
+    }
+    var activeEmpty = TypingSession(configuration: .words(2), prompt: "a ")
+    activeEmpty.insertBatch("a ", at: start)
+    XCTAssertEqual(activeEmpty.promptWordPresentations.last?.phase, .active)
+    XCTAssertEqual(layout(activeEmpty).1.map(\.index), [0, 1], "An active empty field is not a future-tail sentinel")
+    let noSpace = TypingSession(configuration: .init(mode: .quote, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), modifiers: [.noSpaces]), prompt: "a\n",
+      noSpaceWordEndIndices: [2, 2], noSpaceTargetWords: ["a\n", ""])
+    XCTAssertEqual(noSpace.promptWordPresentations.last?.phase, .future)
+    XCTAssertEqual(layout(noSpace).1.map(\.index), [0, 1], "A captured no-space empty target is a real word")
+    let captured = TypingSession(configuration: .init(mode: .quote, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init()), prompt: "a\n",
+      noSpaceWordEndIndices: [2, 2], noSpaceTargetWords: ["a\n", ""])
+    XCTAssertEqual(layout(captured).1.map(\.index), [0, 1],
+      "Captured boundary identity does not depend on a modifier flag")
+    let chinese = TypingSession(configuration: .init(mode: .quote, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), language: .simplifiedChinese), prompt: "中\n文\n")
+    XCTAssertTrue(chinese.usesWordCommitInput)
+    XCTAssertEqual(layout(chinese).1.map(\.index), [0, 1],
+      "Language input policy does not turn a separator tail into a generated word")
+    let morse = TestSessionFactory.make(configuration: .init(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), modifiers: [.morseStream]), customText: "e 中")
+    XCTAssertTrue(morse.promptWordPresentations.last!.range.isEmpty)
+    XCTAssertEqual(layout(morse).1.count, morse.promptWordPresentations.count,
+      "No-space-producing modifiers also retain their real empty fields")
+  }
+
   func testHiddenRetainedExtraReturnCannotReplaceTheCanonicalNewlineOwner() throws {
     var session = TypingSession(configuration: .words(4,
       rules: .init(strictSpace: true, hideExtraLetters: true)), prompt: "\n\n\nx")
