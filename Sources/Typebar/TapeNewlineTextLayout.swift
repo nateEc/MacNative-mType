@@ -4,7 +4,7 @@ import AppKit
 /// indentation is independent of both the words tape and the pace marker.
 /// This component deliberately does not own vertical retirement or a clock.
 @MainActor final class TapeNewlineTextLayout {
-  private final class Word {
+  @MainActor private final class Word {
     let descriptor: TapePromptWord
     let manager = NSLayoutManager()
     let container = NSTextContainer(size: .init(width: CGFloat.greatestFiniteMagnitude,
@@ -15,6 +15,23 @@ import AppKit
     var inline: CGFloat
     var precedingBreak: Int?
     let bounds: CGRect
+    var projected: PromptFieldTextLayout?
+    var projectedCells: [PromptFieldTextRun.Cell] = []
+
+    init(descriptor: TapePromptWord, cells: [PromptFieldTextRun.Cell],
+      map: PromptCompositionTextMap, font: NSFont, rightToLeft: Bool,
+      row: Int, inline: CGFloat, precedingBreak: Int?, reusing previous: PromptFieldTextLayout?) {
+      self.descriptor = descriptor; self.row = row; self.inline = inline
+      self.precedingBreak = precedingBreak; characterRanges = [:]
+      projectedCells = cells.filter { !$0.isGap }
+      let run = PromptFieldTextRun(fieldID: descriptor.index, cells: projectedCells,
+        structuralReturn: false)
+      let layout = PromptFieldTextLayout(fieldRuns: [run], aliases: map.canonicalAliases,
+        anchor: map.caret, width: 1_000_000_000, font: font, lineSpacing: 0,
+        rightToLeft: rightToLeft, unbounded: true, reusing: previous)
+      projected = layout
+      bounds = .init(origin: .zero, size: layout.size)
+    }
 
     init(descriptor: TapePromptWord, prepared: NSAttributedString,
       ranges: [NSRange], characters: [Character], row: Int, inline: CGFloat, precedingBreak: Int?) {
@@ -70,6 +87,7 @@ import AppKit
   private var wordByOffset: [Int: Int] = [:]
   private var text = AttributedString()
   private var descriptors: [TapePromptWord] = []
+  private var compositionMap: PromptCompositionTextMap?
   private var font: NSFont?
   private var rightToLeft = false
   private var indents: [Int: PromptCaretChannel] = [:]
@@ -87,10 +105,13 @@ import AppKit
   var contentWidth: CGFloat { rightToLeft ? leadingEdge : (words.map { frame($0).maxX }.max() ?? 0) }
 
   func configure(text: AttributedString, words descriptors: [TapePromptWord], font: NSFont,
-    rightToLeft: Bool, resets: Bool) {
+    rightToLeft: Bool, resets: Bool, compositionMap: PromptCompositionTextMap? = nil) {
     if resets { indents = [:]; pendingPrefixCorrection = 0 }
     guard resets || self.text != text || self.descriptors != descriptors || self.font != font
-      || self.rightToLeft != rightToLeft else { return }
+      || self.rightToLeft != rightToLeft
+      || self.compositionMap?.fieldRuns != compositionMap?.fieldRuns
+      || self.compositionMap?.canonicalAliases != compositionMap?.canonicalAliases
+      || self.compositionMap?.caret != compositionMap?.caret else { return }
     if !resets, let first = descriptors.first, let oldFirst = self.descriptors.first,
       first.index > oldFirst.index,
       let retained = words.first(where: { $0.descriptor.index >= first.index }) {
@@ -100,10 +121,18 @@ import AppKit
       pendingPrefixCorrection = self.rightToLeft ? leadingEdge - oldFrame.maxX : oldFrame.minX
     }
     self.text = text; self.descriptors = descriptors; self.font = font; self.rightToLeft = rightToLeft
+    self.compositionMap = compositionMap
     let prepared = TapePromptTextStorage.prepare(text, font: font, rightToLeft: rightToLeft)
     let string = prepared.string
     characters = Array(string)
     let ranges = string.indices.map { NSRange($0..<string.index(after: $0), in: string) }
+    let previousLayouts = Dictionary(uniqueKeysWithValues: words.compactMap { word in
+      word.projected.map { (word.descriptor.index, $0) }
+    })
+    var cellsByField: [Int: [PromptFieldTextRun.Cell]] = [:]
+    for run in compositionMap?.fieldRuns ?? [] {
+      if let id = run.fieldID { cellsByField[id, default: []].append(contentsOf: run.cells) }
+    }
     words = []; wordMetrics = []; wordByOffset = [:]
     var row = 0, inline: CGFloat = 0, precedingBreak: Int?
     // Native spacing is kept explicit. CSS pixel/line-box equivalence remains
@@ -111,14 +140,28 @@ import AppKit
     let gap = font.pointSize * 0.6
     var rowHeight = NSLayoutManager().defaultLineHeight(for: font)
     for descriptor in descriptors {
-      let word = Word(descriptor: descriptor, prepared: prepared, ranges: ranges,
-        characters: characters, row: row, inline: inline, precedingBreak: precedingBreak)
+      let word: Word
+      if let compositionMap {
+        let cells = cellsByField[descriptor.index] ?? []
+        word = Word(descriptor: descriptor, cells: cells, map: compositionMap, font: font,
+          rightToLeft: rightToLeft, row: row, inline: inline, precedingBreak: precedingBreak,
+          reusing: resets ? nil : previousLayouts[descriptor.index])
+      } else {
+        word = Word(descriptor: descriptor, prepared: prepared, ranges: ranges,
+          characters: characters, row: row, inline: inline, precedingBreak: precedingBreak)
+      }
       let slot = words.count
       words.append(word)
       for offset in word.characterRanges.keys { wordByOffset[offset] = slot }
-      let markerWidth: CGFloat? = descriptor.ownsNewline ? descriptor.newlineCharacterOffset.map {
-        descriptor.incorrectNewline ? 0 : (word.rect($0, minimum: $0)?.width ?? 0)
-      } ?? 0 : nil
+      let markerWidth: CGFloat?
+      if descriptor.ownsNewline, let layout = word.projected {
+        let marker = word.projectedCells.first { $0.glyph.character == "\n" && $0.glyph.state != .extra }
+        markerWidth = marker.map { $0.glyph.state == .incorrect ? 0 : layout.cellFrames[$0.id]?.width ?? 0 } ?? 0
+      } else {
+        markerWidth = descriptor.ownsNewline ? descriptor.newlineCharacterOffset.map {
+          descriptor.incorrectNewline ? 0 : (word.rect($0, minimum: $0)?.width ?? 0)
+        } ?? 0 : nil
+      }
       wordMetrics.append(.init(index: descriptor.index, width: word.bounds.width, gap: gap, newlineWidth: markerWidth))
       rowHeight = max(rowHeight, word.bounds.height)
       inline += word.bounds.width + gap
@@ -156,6 +199,27 @@ import AppKit
     -> (advance: CGFloat, compensation: CGFloat, removedWords: Set<Int>)? {
     guard let active = word(at: offset) else { return nil }
     let within = mode == .letter ? inlineAdvance(in: active, before: offset) : 0
+    return requestScroll(active: active, within: within, viewportWidth: viewportWidth,
+      duration: duration, time: time, overflowing: overflowing)
+  }
+
+  func requestProjectedScroll(fieldID: Int, acceptedUTF16Count: Int, mode: PracticeTapeMode,
+    hidesExtras: Bool, viewportWidth: CGFloat, duration: TimeInterval, time: TimeInterval,
+    overflowing: (Int, CGRect) -> Bool)
+    -> (advance: CGFloat, compensation: CGFloat, removedWords: Set<Int>)? {
+    guard let active = words.first(where: { $0.descriptor.index == fieldID }),
+      let layout = active.projected else { return nil }
+    let count = max(0, acceptedUTF16Count), cells = active.projectedCells
+    let within = mode == .letter ? TapePromptProjection.inlineAdvance(
+      cells: Array(cells.prefix(count)), nextCellID: count < cells.count ? cells[count].id : nil,
+      frames: layout.cellFrames, hidesExtras: hidesExtras) : 0
+    return requestScroll(active: active, within: within, viewportWidth: viewportWidth,
+      duration: duration, time: time, overflowing: overflowing)
+  }
+
+  private func requestScroll(active: Word, within: CGFloat, viewportWidth: CGFloat,
+    duration: TimeInterval, time: TimeInterval, overflowing: (Int, CGRect) -> Bool)
+    -> (advance: CGFloat, compensation: CGFloat, removedWords: Set<Int>)? {
     let frames = Dictionary(uniqueKeysWithValues: words.map { ($0.descriptor.index, frame($0)) })
     let glyphIDs = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.index, $0.glyphID) })
     let margins = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.index, indents[$0.glyphID]?.tapeMargin ?? 0) })
@@ -248,6 +312,22 @@ import AppKit
       y: CGFloat(word.row) * metrics.rowHeight, width: word.bounds.width, height: word.bounds.height)
   }
   func wordRect(at offset: Int) -> CGRect? { word(at: offset).map { frame($0) } }
+  func projectedFieldRect(_ id: Int) -> CGRect? {
+    words.first { $0.descriptor.index == id && $0.projected != nil }.map { frame($0) }
+  }
+  func projectedCellRect(_ id: Int) -> CGRect? {
+    for word in words {
+      if let rect = word.projected?.cellFrames[id] {
+        let origin = frame(word).origin
+        return rect.offsetBy(dx: origin.x, dy: origin.y)
+      }
+    }
+    return nil
+  }
+  func projectedCanonicalRect(_ id: Int, after: Bool) -> CGRect? {
+    let ids = compositionMap?.canonicalAliases[id] ?? [id]
+    return (after ? ids.last : ids.first).flatMap { projectedCellRect($0) }
+  }
   func prefixCompensation(at offset: Int) -> CGFloat? {
     guard let word = word(at: offset) else { return nil }
     let rect = frame(word)
@@ -283,6 +363,14 @@ import AppKit
       let frame = frame(word)
       guard frame.intersects(dirtyRect) else { continue }
       let origin = CGPoint(x: frame.minX - word.bounds.minX, y: frame.minY - word.bounds.minY)
+      if let projected = word.projected {
+        NSGraphicsContext.saveGraphicsState()
+        let transform = NSAffineTransform()
+        transform.translateX(by: origin.x, yBy: origin.y); transform.concat()
+        projected.draw(in: dirtyRect.offsetBy(dx: -origin.x, dy: -origin.y))
+        NSGraphicsContext.restoreGraphicsState()
+        continue
+      }
       let range = NSRange(location: 0, length: word.manager.numberOfGlyphs)
       word.manager.drawBackground(forGlyphRange: range, at: origin)
       word.manager.drawGlyphs(forGlyphRange: range, at: origin)

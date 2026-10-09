@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 多行持久流投影词盒增量（2026-10-10）
+
+TapeNewlineTextLayout 增加显式 compositionMap 入口，在现有 TapeNewlineFlow 内按字段索引建立独立原生槽盒；不把虚拟候选槽转换成旧 Character offset。字段盒去除提交 gap、关闭普通段落的结构换行，Return 拓扑仍由原有描述与持久流拥有；native 文字绘制使用同一投影盒。增加字段框、opaque cell 框、canonical 首／末 alias 框及按 raw UTF-16 接受数请求滚动的入口，推进继续复用隐藏 extras／零宽槽规则。旧入口默认 nil 保持原路径。字段一次分组，未变化文字盒复用，不加入新时钟。
+
+两项新增验证实际 session 的候选溢出／emoji 虚拟槽、两种流方向、接受推进与候选末端隔离、缺失身份返回 nil、canonical alias，以及横向移除 Return 词后多次候选重建不会复活词或丢失结构行。两张不可见测试画布组件图已逐张查看，窗口均关闭；测试使用 Latin 内容切流方向，不据此声称真实 Hebrew／Arabic 或混合方向塑形完成。主／pace owner 与纵向退休尚未使用新入口，应用层保护未解除。
+
+`../../work/tape-multiline-projection-red.log` 为缺失接口的预期编译失败；first.log 暴露嵌套词盒遗漏主线程隔离，actor-fixed.log 一项通过（均为同目录 tape-multiline-projection- 前缀）。持久 `../../work/tape-multiline-projection.fJbDTk/` 的 verified.log 50 项通过，分组／复用与 alias 验证后 final.log 80 项零失败零跳过（8.953 秒，墙钟 8.963 秒），固定源与动画归档齐备，originality.log 通过。行为先行、有界会话内决策与风险复核关注结构所有权、候选重建和二次复杂度，不是独立审计。
+
+零 Typebar 主程序启动、终态零测试／编译残留，无完整门禁复跑。多行 owner 接线、主 after／独立 pace、行跳与前缀确认事务、匿名结构行、连接塑形／混合方向、跨词实时快照与实机仍开放。此为实际持久流组件的实现增量，不是完整生产功能；配置／整体兼容分类不升级，goal active。
+
 ## 多行投影迁移前基线与所有权（2026-10-10）
 
 在 `f6d6cf596c47f1e5dca49f7ddc96cc22a0773e7d` 实测 TapeNewlineLayoutTests、TapeNewlineFlowTests、TapeNewlineTransitionTests、TapeNewlinePrefixTests、TapeWordVisibilityTests：37 项零失败零跳过（8.115 秒，墙钟 8.120 秒），固定参考与 animejs 4.2.2 归档齐备；证据 `../../work/tape-multiline-baseline.log`。零主程序启动、终态零测试／编译残留。仅建立迁移基线，未实现多行组合投影。
