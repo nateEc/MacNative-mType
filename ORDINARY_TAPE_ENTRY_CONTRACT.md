@@ -1,5 +1,21 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 延后观测反证与结果弹窗退出边界（2026-10-10）
+
+被测 81b2f51，构建唯一 Debug 隔离包 `../../work/Typebar-Timer-Observation-20261010.app`，独立域 app.typebar.qa.timerobservation20261010、内存记录／令牌、显式数值诊断。`../../work/timer-observation-package.log` 退出 0。原生输入和应用层代码检查未找到显式睡眠／等待；这不排除隐式框架阻塞。为区分观测扰动，初始 AX 读取后只发送一个 `r` 按键，不立即读取 AX，然后等待同一运行句柄并读取独立 stderr 文件。
+
+`../../work/timer-observation-runtime.log` 在之后读取 AX 之前就有唯一一行：deliveryGap=1.939312、preflight=0.000066、elapsed=1.892334、previous=0、due=1、drift=0.892334、severe=1、failed=1。后续 AX 确认计时失败、1/0/0/0、100% 准确率；它反驳“输入后立即读取 AX 才会失败”，但不排除自动化输入本身或其他运行环境影响。停留及后续退出检查期间文件始终只有一条，实际验证 81b2f51 在这一失败终态不重复交付；其他终态／重开组合仍未全验。首次延迟仍待输入／唤醒阶段计时，未放宽阈值，也未把本次失败当作通过。
+
+同一实例 PID 25939，在结果 sheet 中从应用菜单点 Quit 后，句柄仍活跃、AX 仍为结果 sheet。点击再来一次关闭 sheet，回到未开始练习，再按 ⌘Q 后句柄权威退出 0，随后无 Typebar。没有 TERM、额外启动或真实用户数据改动。该对照定位了结果 sheet 存在与退出被阻的边界；尚不能仅凭对照确定所有 AppKit 内部因果。
+
+本机 Xcode macOS 26.2 SDK 的 `System/Library/Frameworks/AppKit.framework/Headers/NSWindow.h:466–470` 定义 preventsApplicationTerminationWhenModal：模态窗口可阻止应用退出，常规默认 YES，框架创建的窗口可能另有默认；API 自 macOS 10.6 可用，覆盖项目最低 macOS 14。源码完整位置为 `/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWindow.h`。据此新增 ResultSheetTerminationBridge，仅挂在本次 completedResult 的 sheet 内容，设置所属窗口标志为 false；移动、移除或 dismantle 恢复原值。不替换代理、不调用 terminate、不修改长测试注册表或其他 sheet；应用级长测试确认继续由原委托负责。历史结果／其他模态页面不在本次改动内。
+
+会话内决策复核反例包括原值 false、多次更新／移除、移到另一窗口、另一个受保护长测试窗口和生命周期残留。桥无异步 attach，弱引用所属窗口并恢复两种原值；另一窗口标志和保护注册表保持不变。范围内风险复核无其他待修正项，均非独立审计。真实多窗口 Quit、SwiftUI 实际 sheet 后续覆盖属性及修正后菜单／⌘Q 仍需实机验证，不将 SDK 默认解释或组件通过视为原问题已关闭。
+
+`../../work/result-sheet-termination-red.log` 新 API 缺失时编译失败，非动态行为反例；原有实机菜单退出失败为问题证据。`result-sheet-termination-verified.log`：原生属性／迁移／生产接线、长测试关闭／退出、计时、结束优先级及官方挑战共 46 项零失败零跳过，87.190 秒（wall 87.195 秒），退出 0。新增实际不可见 NSHostingView 背景桥之后，`result-sheet-termination-host.log` 四项零失败零跳过，0.235 秒（wall 0.237 秒），退出 0，证明 SwiftUI 挂载与移除确实设置／恢复所属窗口属性；不可见组件不等于实际模态退出。源码核验及行为测试技能促成窄范围、可恢复桥接，没有去掉整应用退出保护。
+
+MANUAL_ACCEPTANCE 新增首次计时、终态交付、本次结果退出及多窗口确认四场景，均待验收；result-sheet-termination-manual-audit.log 确认 1,151 唯一场景结构通过，不替代人工执行。result-sheet-termination-originality-final.log 原创性检查退出 0。完整门禁与修正后主程序未运行；本轮仅上述一个主程序，正常退出且无残留，整体分类不升级，goal active。
+
 ## 优化后实机反证与终态时钟入口（2026-10-10）
 
 对 07a4ae6 构建 Debug 隔离包 `../../work/Typebar-Timer-Optimized-20261010.app`（独立域 app.typebar.qa.timeroptimized20261010、内存记录／令牌、诊断显式开启），`../../work/timer-optimized-package.log` 退出 0。唯一实例 PID 23034；未改真实用户偏好、字体、背景或输入源。优化不足以关闭计时缺陷：普通模式两次批量输入及一次单键输入均失败，Tape 按字符模式也失败，全部保留不保存成绩策略。

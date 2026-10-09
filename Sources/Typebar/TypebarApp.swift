@@ -2030,6 +2030,8 @@ private struct ContentView: View {
     }
     .sheet(item: $completedResult) { result in
       completedResultSheet(result)
+        .background(ResultSheetTerminationBridge()
+          .frame(width: 0, height: 0).accessibilityHidden(true))
     }
     .alert(item: $terminalNotice) { notice in
       Alert(
