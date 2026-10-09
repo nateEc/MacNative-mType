@@ -1,5 +1,19 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 实机诊断对照与渲染热路径增量（2026-10-10）
+
+被测 b86125a，以 `../../work/Typebar-Timer-Diagnostic-20261010.app` 独立域 app.typebar.qa.timer20261010、内存记录／令牌及显式 TYPEBAR_QA_TIMER_DIAGNOSTICS=1 直接运行唯一实例 PID 19526。打包日志 `../../work/timer-gui-package.log` 退出 0；默认 swift build 为 Debug，不推断 Release 性能。启动前无 Typebar；本轮未修改用户域偏好、字体、背景或输入源。
+
+普通模式输入 `meadow tangent willow `，实际结果为计时失败、3/3 单词正确、22/0/0/0、100% 准确率。`../../work/timer-gui-runtime.log` 首行：deliveryGap=2.721748、preflight=0.000065、elapsed=2.656103、due=1、drift=1.656103、failed=1。由此排除“仅 Tape 才触发”的假设，且本次同步预处理不解释秒级间隔。普通模式失败后继续出现 78 条检查记录，显示终态仍被时钟循环检查；这是后续需处理的生命周期问题，不在本增量中隐式修改。
+
+同一实例点击再来一次，通过真实设置窗口将卷带改为按字符，再输入 `lantern window copper ` 和稍后的 `pocket marble paper `。日志第 79 行起为该轮：首两个回调间隔 1.345796／1.071246 秒、drift 0.345289／0.416546、severe=2、failed=0；随后整秒检查直到 30 秒共 30 条，没有 failed=1。实际结束页为末尾持续闲置无效、6/6 单词正确、42/0/0/0、100% 准确率、30 秒，不保存成绩。它证明这一轮没有计时失败，不等于合格练习或原有失败已修复；未操作真实 IME。
+
+`../../work/timer-gui-sample.txt` 是上述 Tape 运行中 5 秒采样；主线程 3,711 个样本中 1,823 个处于 Tape 定时呈现，1,555 个进入 refreshProjection，其中可见逐字符 renderGlyph 经 futurePromptColor／promptTextColor 反复解析 ThemePreviewPresentation。这是重复工作的直接栈证据，但采样发生在后续 Tape 轮次，不能证明普通模式首次 2.72 秒间隔的根因。退出快捷键后仍有进程，仅向已核验确切 PID 19526 发送 TERM；运行句柄权威退出 143，随后无 Typebar 进程。未再次启动应用。
+
+据热路径证据，将主题、完成／未来／错误／额外颜色、独立光标策略及所需节奏索引提升到每次同步 renderedPrompt 调用的局部值；两个兼容光标绘制函数显式接收同一主题。不缓存到下一次 render，不更改角色规则、遮挡顺序、组合投影、布局、计时阈值或失败策略。新增生产接线源码门禁 `PromptRenderSnapshotTests`，`../../work/prompt-render-snapshot-red.log` 一项九处预期断言失败；这是静态重复求值防回归，不冒称可执行性能或实际属性验证。既有听写遮挡顺序门禁只更新调用签名，顺序断言保留。
+
+`../../work/prompt-render-snapshot-verified.log`：Tape、组合渲染、特殊光标、单词外观、主题预览、文字色策略和诊断共 263 项零失败零跳过，25.611 秒（wall 25.641 秒），退出 0。`prompt-render-snapshot-originality.log` 原创性检查退出 0。范围内风险复核确认局部主题每次重算、两个光标与错误提示沿用原规则，无其他待修正项，非独立审计。未对优化后的主程序做 GUI 或性能复验，不能报告提速幅度或关闭计时缺陷；完整门禁未为本增量重跑，整体分类不升级，goal active。
+
 ## 计时失败诊断准备（2026-10-10）
 
 已追踪实际入口 `runClock → advanceClock → TimerHealthState.observe → failForTimerHealth`。固定参考 `frontend/src/ts/test/test-timer.ts:319` 的短测试范围、125／250／500 ms 和严重延迟超过五次边界与当前策略一致。上轮失败只有最终界面证据，不能据此判断是主线程调度、同步预处理、Tape 渲染还是自动化环境造成。

@@ -320,7 +320,7 @@ import XCTest
 
   func testListeningConcealmentRunsAfterLegacyCaretAndTypedEffects() throws {
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    let caret = try XCTUnwrap(app.range(of: "applyCaret(to: &character)"))
+    let caret = try XCTUnwrap(app.range(of: "applyCaret(to: &character, theme: activeTheme)"))
     let concealment = try XCTUnwrap(app.range(of: "appearance.applyVisibility(to: &character)")
       ?? app.range(of: "if appearance.color == .hidden { character.foregroundColor = .clear }"))
     XCTAssertGreaterThan(concealment.lowerBound, caret.lowerBound,

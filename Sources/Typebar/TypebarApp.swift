@@ -3449,6 +3449,16 @@ private struct ContentView: View {
   }
 
   private func renderedPrompt(for session: TypingSession, composition: String?) -> PromptRendering {
+    // These values are invariant across this synchronous render. Resolving
+    // them per glyph repeats theme-preview and prompt-direction work on every
+    // native presentation tick; do not cache them across subsequent renders.
+    let activeTheme = self.activeTheme
+    let completedPromptColor = promptTextColor(for: .completed, theme: activeTheme)
+    let futurePromptColor = promptTextColor(for: .future, theme: activeTheme)
+    let errorFeedbackColor = activeTheme.errorColor(usesColorfulMode: settings.colorfulMode)
+    let extraInputFeedbackColor = activeTheme.extraInputColor(usesColorfulMode: settings.colorfulMode)
+    let usesIndependentPromptCarets = self.usesIndependentPromptCarets
+    let paceGuideIndex = usesIndependentPromptCarets ? nil : self.paceGuideIndex
     // Native ordinary, ASL, Choo and Tape adapters resolve projected cells.
     // Mixed-direction prompts retain the existing fallback until verified.
     let usesCompositionProjection = composition != nil
@@ -3495,7 +3505,7 @@ private struct ContentView: View {
       }
       var character = AttributedString(displayedText)
       if !usesIndependentPromptCarets, index == paceGuideIndex, index != caretIndex {
-        applyPaceCaret(to: &character)
+        applyPaceCaret(to: &character, theme: activeTheme)
       }
       let appearance = appearances[index]
       switch appearance.color {
@@ -3522,7 +3532,7 @@ private struct ContentView: View {
       }
       if index == caretIndex, promptHighlightMode != .off,
         settings.caretStyle.drawsMarker && !usesIndependentPromptCarets {
-        applyCaret(to: &character)
+        applyCaret(to: &character, theme: activeTheme)
       }
       appearance.applyVisibility(to: &character)
       if let color = character.foregroundColor {
@@ -3574,8 +3584,9 @@ private struct ContentView: View {
     promptTextColor(for: .future)
   }
 
-  private func promptTextColor(for role: PromptTextRole) -> Color {
-    switch PromptTextColorPolicy.tone(
+  private func promptTextColor(for role: PromptTextRole, theme suppliedTheme: ResolvedTheme? = nil) -> Color {
+    let activeTheme = suppliedTheme ?? self.activeTheme
+    return switch PromptTextColorPolicy.tone(
       for: role, flipsCompletionAndFuture: settings.flipTestColors,
       usesAccentForCompleted: settings.colorfulMode)
     {
@@ -3596,7 +3607,7 @@ private struct ContentView: View {
       configuration: session.configuration)
   }
 
-  private func applyCaret(to character: inout AttributedString) {
+  private func applyCaret(to character: inout AttributedString, theme activeTheme: ResolvedTheme) {
     switch settings.caretStyle {
     case .off:
       break
@@ -3615,7 +3626,7 @@ private struct ContentView: View {
     }
   }
 
-  private func applyPaceCaret(to character: inout AttributedString) {
+  private func applyPaceCaret(to character: inout AttributedString, theme activeTheme: ResolvedTheme) {
     switch settings.paceCaretStyle {
     case .off:
       break
