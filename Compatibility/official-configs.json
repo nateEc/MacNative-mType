@@ -132,7 +132,6 @@
     "confidenceMode": "`confidenceMode`",
     "quickEnd": "`quickEnd`",
     "indicateTypos": "`typoIndicatorStyle`",
-    "compositionDisplay": "`compositionDisplayStyle`",
     "hideExtraLetters": "`hideExtraLetters`",
     "lazyMode": "`TestModifier.lazyLatin`、Arabic 快速输入偏好",
     "layout": "`KeyboardInputLayout`",
@@ -191,6 +190,7 @@
     "monkeyPowerLevel": "`typingPowerMode`"
   },
   "partial": {
+    "compositionDisplay": "`compositionDisplayStyle`",
     "tapeMode": "`practiceTapeMode`",
     "showAllLines": "`showAllPracticeLines`",
     "fontFamily": "`practiceFont`、可搜索的本机字体目录、名称/导入"

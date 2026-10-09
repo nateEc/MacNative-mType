@@ -1,5 +1,7 @@
 # 官方配置兼容性审计
 
+当前组合显示源码核对见 [投影合同](COMPOSITION_PROJECTION_CONTRACT.md)：原版完整更新／caret 函数的 132 组常规与 36 组 Unicode 案例证明，组合占据活动词内多个目标并保留溢出／独立光标。现有生产仍是一个字形内替换整串候选，统一原生模型尚待接入所有呈现分支；`compositionDisplay` 从已映射更正为部分。94 配置现在为 89 映射／4 部分／1 不适用，不表示功能完成；下方为历史阶段。
+
 2026-10-09 Tape 独立词可见性增量：会话用尝试内独立集合记录缺口，普通回删／hard 自动恢复检查上一词是否仍存在；共享投影去掉词墨迹、extra／hint 和 canonical ID，同时保留无 ID 的结构换行。原生工厂、异步确认去重、字体重建与实际 SwiftUI 桥接已有十项新回归及相关 318 项零失败零跳过（52.255 秒）。固定完整删除函数的 32／8 案例复用既有探针，不冒充新源码案例。生产明确换行仍回退，未来缺失词激活策略、复杂内容／纵横队列与设备未完成；tapeMode 部分及 90／3／1 不升级。最终冻结结果见合同，下方为历史阶段。
 
 2026-10-09 换行 Tape word-only 增量：实际原生布局接通横向缺口、保留结构行、独立身份事件和普通重绘去重；六新增／相关 181 项与 120 组两次完整函数对照通过，四图已检查。横向词集合与会话回删／共享投影及生产入口仍未接通，不能用既有连续前缀下界替代；tapeMode 部分与 90／3／1 不变。完整冻结结果见合同，零主程序启动、goal active，下方为阶段历史。
@@ -735,7 +737,7 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `confidenceMode` | `confidenceMode` | 已映射；off／on／max 活动同步，开启关闭自由回退、停止输入和自动删除，不恢复旧规则。 |
 | `quickEnd` | `quickEnd` | 已映射；活动同步不直接结束。普通有限路径与代码词流共用最终词 UTF-16 长度及词输入上限，保留最终词／全部生成、错误恢复限制和候选不误确认的边界。`QuickEndUnicodeTests` 与 `CodeWordContractTests` 覆盖；无空格专用完成及完整 Unicode 恢复仍待单独补证。 |
 | `indicateTypos` | `typoIndicatorStyle` | 已映射。 |
-| `compositionDisplay` | `compositionDisplayStyle` | 已映射。 |
+| `compositionDisplay` | `compositionDisplayStyle` | 部分；off／below／replace 选择可保存，但生产仍只替换当前单个字形，未按完整候选跨度消耗目标或移动主光标；Zen、超词候选及普通／Tape／ASL／Choo 统一投影尚未接线。独立原生组合模型与完整固定源码更新／caret 对照已建立，不将模型测试当作生产实现或真实 IME 验收；UTF-16／scalar 与原生 grapheme 的差异明确保留。 |
 | `hideExtraLetters` | `hideExtraLetters` | 已映射。 |
 | `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 已映射；设置页以独立“简化输入”开关呈现并持久保存，不再混入趣味修饰器列表。它用现有 Unicode 归一化简化重音、变音、常见连字和可省略的阿拉伯语标记；遇到固定参考标记 `noLazyMode` 的非自定义语言时只在当前练习临时过滤，切回支持语言会恢复用户选择，自定义文本保持可用。多语练习在至少一个组成语言支持时启用；Arabic 另保留默认开启、可持久化关闭的快捷偏好。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
@@ -760,7 +762,7 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `timerOpacity` | `liveStatsOpacity` | 已映射；四档 25/50/75/100%。 |
 | `highlightMode` | `promptHighlightMode` | 已映射。 |
 | `typedEffect` | `typedCharacterEffect` | 已映射。 |
-| `tapeMode` | `practiceTapeMode` | 部分；启用关闭完整行，关闭卷带不恢复完整行，命令与偏好页遵守相同互斥规则。单行 LTR／RTL 原生文字、逐词混排、锁定主光标、独立 pace 和横向旧词退休／位移补偿已接通；换行累计布局、leading-filler 补偿、纵向 owner await／内部删行／确认去重及 word-only 缺口已有有界原生组件和完整源码对照。独立集合现接入会话回删／共享投影／结构行工厂、字体恢复及实际 SwiftUI 桥接，但生产明确换行仍回退普通提示。未来缺失词激活、生产完整接线、任意纵横／反向异步等价、Zen／hint／复杂控制／全部连写与真实设备顺序未完成，不以配置可保存冒充完整功能等价。 |
+| `tapeMode` | `practiceTapeMode` | 部分；启用关闭完整行，关闭卷带不恢复完整行，命令与偏好页遵守相同互斥规则。单行 LTR／RTL、混排、独立主／pace、横向退休与 word-only 缺口、换行累计布局及纵向 owner／确认去重已有原生组件与完整源码对照；独立集合接入会话回删、共享投影、结构行工厂及字体恢复。普通 LF 与 Zen 生产入口已在各自合同范围接通，唯一隔离窗口有限确认自定义三行 Return 推进。复杂组合候选／hint、内部 LF 全导航、未来缺失词激活、任意纵横／反向队列、全部连写与真实设备仍开放，不以配置可保存或限定窗口检查冒充完整等价。 |
 | `tapeMargin` | `practiceTapeMargin` | 已映射；以 0–1 原生比例保存。 |
 | `smoothLineScroll` | `smoothPracticeLineScroll` | 已映射。 |
 | `showAllLines` | `showAllPracticeLines` | 部分映射：词／引语／自定义（含计时自定义）展开，不重开，下一轮生成读取；有限 1–100,000 词完整预览，无限／自定义 bound 遵守覆盖。自有引语默认首批 100、开启全量，toPush 窗口 1–4 优先覆盖。卷带内拒绝启用；更大预算与外部短词源保持可练习并提示未完整预览，仍有差异；实际布局与设备仍待验收。 |

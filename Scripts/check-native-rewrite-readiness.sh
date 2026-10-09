@@ -194,6 +194,8 @@ run_logged_check "executing pinned special caret geometry and listening declarat
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-special-caret.mjs" "$reference_root"
 run_logged_check "executing pinned ASL control-word building and updating" "$temporary_directory/asl-controls-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-asl-controls.mjs" "$reference_root"
+run_logged_check "executing pinned complete marked-word update and caret projection" "$temporary_directory/composition-projection-source-check.log" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-composition-projection.mjs" "$reference_root"
 run_logged_check "executing pinned Zen tape wrapper height and entry gates" "$temporary_directory/zen-tape-viewport-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-zen-tape-viewport.mjs" "$reference_root"
 run_logged_check "executing pinned ordinary tape wrapper height and content-signal separation" "$temporary_directory/ordinary-tape-viewport-source-check.log" \
