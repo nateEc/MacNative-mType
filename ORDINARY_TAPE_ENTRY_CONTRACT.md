@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## SwiftUI 投影桥接增量（2026-10-10）
+
+TapePracticePrompt 与私有 TapePromptBridge 传递 compositionField、hidesCompositionExtras 和 latestProjection。session 初始化器仅在 rendering 含 map 时绑定实际字段，从 session 读取 hideExtraLetters，provider 默认 nil；旧调用保留默认值和旧布局。没有改动应用层 `!usesTapePractice` 渲染保护，也没有声称用户已能通过应用入口使用该功能。
+
+新增真实 NSHostingView 测试：跨行已提交输入加 emoji 候选，比较实际高度、接受推进、主光标宽度与纵坐标；随后只替换 provider 返回快照为中文候选，保持 SwiftUI 模型不变，确认实际 owner 一次读取和新文字。NSWindow 不显示且关闭，owner stop；无主程序启动，无新增截图。参照量测明确传入 compositionMap。
+
+`../../work/tape-bridge-field-red.log` 单项两处失败，分别为旧布局高度 138 对投影 135、光标纵坐标 46 对 45；传递显式字段后 `../../work/tape-bridge-field-first.log` 单项零失败，0.203 秒（wall 0.205 秒）。加入 provider 桥接断言后的 `../../work/tape-bridge-field-verified.log` 188 项零失败零跳过，24.772 秒（wall 24.794 秒），进程退出 0。`../../work/tape-bridge-field-originality.log` 原创性检查退出 0；差异审查未发现本轮范围内待修正的问题。
+
+这只证明桥接接线与固定 LTR／letter 场景；应用调用的实时 snapshot 构造、Tape 退休上下文身份、初始新鲜配置、多方向／连接塑形、复杂队列和实际 IME 仍开放。完整冻结门禁未重跑，功能分类不升级，完整 goal active。
+
 ## 完整事务的独立 pace 验证（2026-10-10）
 
 完整快照测试抽取共享场景并新增独立 `requestPacePosition(fromDeadline: true)` 路径：在不更新 representable 的跨字段输入后依次切换 emoji／空／中文候选，验证单次 provider 读取、最新文字、接受推进、canonical pace 目标横纵坐标，以及 deadline 不改变主光标。随后正常 present 验证主光标纵坐标；既有无效快照／停止边界仍执行。配置为 LTR、letter、关闭动效，不外推到平滑／RTL／混合方向／实际 IME。

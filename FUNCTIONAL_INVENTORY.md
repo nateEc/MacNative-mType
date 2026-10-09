@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+当前 [Tape SwiftUI 投影桥接](ORDINARY_TAPE_ENTRY_CONTRACT.md#swiftui-投影桥接增量2026-10-10)补齐显式字段、额外字符隐藏规则和快照 provider 传递；一新增／188 项 Tape 回归零失败零跳过、原创性通过。实际宿主不可见并关闭，零主程序启动；生产渲染保护、退休上下文身份、方向与实机未完成，完整门禁未重跑，配置 89／4／1 不升级、goal active。
+
 当前 [完整事务的独立 pace 验证](ORDINARY_TAPE_ENTRY_CONTRACT.md#完整事务的独立-pace-验证2026-10-10)新增真实独立 deadline 跨字段测试，检查文字与 canonical 目标更新、不呈现主光标；187 项 Tape 回归零失败零跳过、原创性通过，零主程序启动。仅验证 LTR／letter／关闭动效的固定候选场景；应用入口、复杂队列与真实 IME 未完成，完整门禁未重跑，配置 89／4／1 不升级、goal active。
 
 当前 [Tape 完整实时事务](ORDINARY_TAPE_ENTRY_CONTRACT.md#完整实时投影事务增量2026-10-10)新增同一快照的拓扑／退休元数据，跨字段候选更新不依赖 representable 刷新；旧三字段快照仍仅允许同字段。186 项相关回归零失败零跳过、原创性通过，零主程序启动。应用入口未接线，独立 pace 完整事务、复杂队列和真实 IME 未验，完整门禁未重跑；94 配置 89／4／1 与整体兼容分类不升级，goal active。

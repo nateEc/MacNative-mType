@@ -397,6 +397,9 @@ private struct RoundPracticeContent<Content: View>: View {
 
 struct TapePracticePrompt: View {
   let rendering: PromptRendering
+  var compositionField: PromptCompositionField? = nil
+  var hidesCompositionExtras = false
+  var latestProjection: (() -> TapePromptProjectionSnapshot?)? = nil
   let anchorCharacterIndex: Int
   let wordAnchorCharacterIndex: Int
   let wordStartCharacterOffsets: [Int: Int]
@@ -425,6 +428,8 @@ struct TapePracticePrompt: View {
   var body: some View {
     TapePromptBridge(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
       wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
+      compositionField: compositionField, hidesCompositionExtras: hidesCompositionExtras,
+      latestProjection: latestProjection,
       checksDirectionPerGlyph: checksDirectionPerGlyph,
       mode: mode, margin: margin,
       smoothScroll: animatesScroll, carets: carets, retirement: retirement,
@@ -442,11 +447,15 @@ extension TapePracticePrompt {
   init(session: TypingSession, rendering: PromptRendering, mode: PracticeTapeMode,
     margin: Double, fontSize: Double, animatesScroll: Bool,
     carets: PromptCaretNativeView.Configuration, retirement: PromptLineScrollContext,
+    latestProjection: (() -> TapePromptProjectionSnapshot?)? = nil,
     onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil) {
     let zen = session.configuration.mode == .zen
     let declaredNewlines = session.hasPracticeNewlineContent
     let generatedNewlines = session.prompt.contains("\n")
     self.init(rendering: rendering,
+      compositionField: rendering.compositionTextMap == nil ? nil : session.promptCompositionField,
+      hidesCompositionExtras: session.configuration.rules.hideExtraLetters,
+      latestProjection: latestProjection,
       anchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(session: session, rendering: rendering, mode: mode),
       wordAnchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(session: session, rendering: rendering, mode: .word),
       wordStartCharacterOffsets: PracticeTapePolicy.wordStartCharacterOffsets(session: session, rendering: rendering),
@@ -466,6 +475,9 @@ private struct TapePromptBridge: NSViewRepresentable {
   let rendering: PromptRendering
   let anchorCharacterIndex: Int, wordAnchorCharacterIndex: Int
   let wordStartCharacterOffsets: [Int: Int]
+  let compositionField: PromptCompositionField?
+  let hidesCompositionExtras: Bool
+  let latestProjection: (() -> TapePromptProjectionSnapshot?)?
   let checksDirectionPerGlyph: Bool
   let mode: PracticeTapeMode
   let margin: Double
@@ -479,6 +491,8 @@ private struct TapePromptBridge: NSViewRepresentable {
   func updateNSView(_ view: TapePromptNativeView, context: Context) {
     view.configure(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
       wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
+      compositionField: compositionField, hidesCompositionExtras: hidesCompositionExtras,
+      latestProjection: latestProjection,
       checksDirectionPerGlyph: checksDirectionPerGlyph,
       mode: mode, margin: margin,
       smoothScroll: smoothScroll, retirement: retirement, newlineWords: newlineWords,

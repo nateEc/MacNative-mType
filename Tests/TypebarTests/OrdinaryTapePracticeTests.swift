@@ -13,12 +13,17 @@ import XCTest
     var style = TypoIndicatorStyle.off
     var smooth = false
     var reduced = true
+    var marked: String? = nil
+    var latestProjection: (() -> TapePromptProjectionSnapshot?)? = nil
     let motion = PromptCaretMotionCoordinator()
     var retirements: [PromptWordRetirement] = []
     var removals: [PromptTapeWordRemoval] = []
     var onRemoval: ((PromptTapeWordRemoval) -> Void)? = nil
     init(_ session: TypingSession) { self.session = session }
     var rendering: PromptRendering {
+      if let marked, let presentation = PromptCompositionPresentation(session: session, composition: marked, style: .replace) {
+        return presentation.render { _, glyph, cell in AttributedString(cell?.text ?? String(glyph.character)) }
+      }
       let glyphs = session.promptGlyphs, words = session.promptWordPresentations
       return .make(glyphs: glyphs, indices: PromptGlyphLayout.indices(glyphs: glyphs,
         words: words, hideExtraLetters: session.configuration.rules.hideExtraLetters,
@@ -56,6 +61,7 @@ import XCTest
       let prompt = TapePracticePrompt(session: session, rendering: rendering, mode: model.mode,
         margin: 0.25, fontSize: model.fontSize, animatesScroll: model.smooth,
         carets: carets, retirement: retirement,
+        latestProjection: model.latestProjection,
         onTapeWordsRemoved: { model.removals.append($0); model.session.removeTapePromptWords($0); model.onRemoval?($0) })
       return Group {
         if PracticeLineDisplayPolicy.needsOuterViewport(showsAllLines: false,
@@ -87,13 +93,53 @@ import XCTest
     layout.configure(text: model.rendering.text,
       words: TapePromptProjection.words(session: model.session, rendering: model.rendering),
       font: .monospacedSystemFont(ofSize: model.fontSize, weight: .medium),
-      rightToLeft: model.session.configuration.usesRightToLeftPrompt, resets: true)
+      rightToLeft: model.session.configuration.usesRightToLeftPrompt, resets: true,
+      compositionMap: model.rendering.compositionTextMap)
     return layout.metrics
   }
   private func expectedHeight(_ model: Model) -> CGFloat {
     if model.session.hasPracticeNewlineContent { return geometry(model).rowHeight * 3 }
     if model.session.prompt.contains("\n") { return geometry(model).contentHeight }
     return CGFloat(model.fontSize * 1.7)
+  }
+
+  func testSwiftUIBridgeUsesExplicitProjectedFieldInsteadOfLegacyCaretOffset() throws {
+    var session = TypingSession(configuration: .words(3), prompt: "a\nbc tail")
+    session.insertBatch("a\nb", at: start)
+    let model = Model(session); model.marked = "XYZ😀"
+    var latest: TapePromptProjectionSnapshot?
+    var reads = 0
+    model.latestProjection = { reads += 1; return latest }
+    let (window, host) = mount(model)
+    defer { close(window, host) }
+    let owner = try settle(host, model)
+    let field = try XCTUnwrap(session.promptCompositionField)
+    let native = TapeNewlineTextLayout()
+    native.configure(text: model.rendering.text,
+      words: TapePromptProjection.words(session: session, rendering: model.rendering),
+      font: .monospacedSystemFont(ofSize: model.fontSize, weight: .medium), rightToLeft: false,
+      resets: true, compositionMap: model.rendering.compositionTextMap)
+    let advance = try XCTUnwrap(native.projectedAdvance(fieldID: field.index,
+      acceptedUTF16Count: field.inputUTF16.count, mode: .letter, hidesExtras: false, viewportWidth: 400))
+    XCTAssertEqual(model.motion.wordsTapeMargin, -advance, accuracy: 0.001)
+    let main = try XCTUnwrap(model.motion.main.position)
+    let projected = try XCTUnwrap(native.projectedMainRect(style: .outline))
+    XCTAssertEqual(main.width, projected.width, accuracy: 0.001)
+    XCTAssertEqual(main.minY, try XCTUnwrap(native.projectedFieldRect(field.index)).minY, accuracy: 0.001)
+    let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: "候选", style: .replace))
+    let rendering = presentation.render { _, glyph, cell in AttributedString(cell?.text ?? String(glyph.character)) }
+    latest = .init(input: .init(attemptID: session.automaticInputAttemptID, typed: session.typed,
+      composition: "候选", glyphID: session.promptCaretGlyphIndex), field: field, rendering: rendering,
+      newlineWords: TapePromptProjection.words(session: session, rendering: rendering),
+      retirement: .init(attemptID: session.automaticInputAttemptID,
+        activeWordID: session.promptWordPresentations[field.index].range.lowerBound,
+        characterOffsets: rendering.glyphCharacterOffsets, smoothScroll: false, reducesMotion: true,
+        words: session.promptWordPresentations.enumerated().map { .init(index: $0.offset, glyphID: $0.element.range.lowerBound) },
+        firstRetainedWordIndex: session.firstRetainedPromptWordIndex, onRetire: { _ in }))
+    reads = 0; owner.present(at: ProcessInfo.processInfo.systemUptime)
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(owner.accessibilityLabel(), String(rendering.text.characters))
+    XCTAssertEqual(model.marked, "XYZ😀", "Provider refresh must not require a SwiftUI model update")
   }
   @discardableResult private func settle(_ host: NSView, _ model: Model,
     retained: Int? = nil) throws -> TapePromptNativeView {
