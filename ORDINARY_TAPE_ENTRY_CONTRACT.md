@@ -1,5 +1,17 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 无变化时钟操作的 SwiftUI 重算对照（2026-10-10）
+
+基于 5380f87 核查实际 advanceClock：每次 100ms 交付先同步规则、读取 Caps Lock、核验挑战字体，再检查终态、整秒健康／阈值，最后 session.tick；tick 的单调计时采样只在操作内保存并清除，另推进 pace 状态及检查计时完成。方法是 mutating 不足以证明每次都使 SwiftUI 重算，不能据此擅自减少频率、跳过 pace 或 live rules。
+
+新增 ClockIdleInvalidationTests，以真实 TypingSession.withElapsedClock(.system)、SwiftUI @State、NSHostingView 和从未显示的 NSWindow 组件记录 body 求值。四种组合为无操作、规则同步、tick、同步加 tick；分别执行四次操作并刷新布局／主循环，每次 30ms 刷新只是测试交付窗口，不是生产调度改动。初始 clock-idle-invalidation-baseline.log 一项通过：无操作 1→1、仅同步 1→2、仅 tick 1→1、组合 1→1；这是一次原始观察，不把一次初始化重算当作持续重绘，也不固定 OS 内部求值次数作为契约。
+
+随后加入真实 insert("a") 的正向控制以及开始后四次操作，避免把未交付视图更新误判为没有 invalidation。clock-idle-invalidation-controlled.log 权威退出 0：69 项零失败零跳过，2.470 秒（墙钟 2.478），含运行期规则、单调时钟、pace clock、整秒及慢计时回归。四种组合未开始时均 1→1；真实输入均触发重算并显示 typed=a／hasStarted=true，开始后无额外输入的四次操作均 2→2。断言保证真实输入会触发更新、规则／输入状态正确、窗口不可见；无变化操作的次数只输出证据，不采用脆弱的框架内部次数硬断言。最初规则同步单独出现一次重算未在第二次运行复现，原始日志均保留。
+
+这反驳最小组件中的“无变化同步／tick 必然持续重绘”假说，不证明完整 ContentView 的 Caps Lock、焦点、组合、视觉效果、原生计时器及物理输入回调也不重绘。没有故意失败测试：本轮是建立可证伪机制的探索性组件探针，产品实现未改。后续应继续核查完整输入事件与焦点／组合变化、主线程总工作和计时任务交付，不能凭该局部结果排除完整应用问题。
+
+按风险审查技能复核，探针回调在 defer 清除、窗口卸载关闭，避免 State 捕获环与组件残留；不创建真实账户、成绩、偏好或可见窗口。clock-idle-invalidation-originality.log 原创边界通过，退出 0；本轮零 Typebar 主程序启动，最终无残留。未重跑全量 readiness、设备 IME 或人工验收，首次计时故障及完整 goal 仍 active。
+
 ## TextKit 范围排版实验未采用（2026-10-10）
 
 基于 bf13df5 检查普通光标几何：两个 PromptCaretLayout.rect 入口都显式 ensureLayout(for: container)，再读取目标矩形。核验本机 macOS 26.2 SDK 主来源 `/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSLayoutManager.h:168–174,278–291`：支持 ensureLayoutForCharacterRange，TextKit 仍可扩大生成／布局范围，连续布局会扩至文首；glyphRange 对连写／组合字符可扩张，boundingRect 返回容器坐标。这不承诺范围请求一定更快，编译面向最低 macOS 14 也不等于在 macOS 14 设备执行。
