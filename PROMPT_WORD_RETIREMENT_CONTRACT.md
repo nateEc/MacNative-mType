@@ -1,5 +1,7 @@
 # 原生旧词移除与回删边界
 
+2026-10-09 Tape 纵横通道：修正 wordsDidFinish 清整个 words 的缺陷，纵向结束只清纵向 margin／ready／tween；运行中横向状态及其原时钟、独立 marker 和滚动原点保留。7 新增／相关 160 项通过，128 条完整源码／共享几何轨迹证明有界等待、重叠、leading filler 删除和退休补偿顺序；真实 follower 的重叠／重开无窗口回归通过。此处没有把源码 leading-filler 证明升级为实际 native Tape 前缀接线，生产回退与单行退休禁用保持。完整冻结结果见 [交付合同](REWARD_INBOX_CONTRACT.md)，tapeMode 部分、goal active，下方为阶段历史。
+
 2026-10-09 换行 Tape 布局组件新增：累计缩进、Return 宽度与独立 filler 动画已有源码／原生框对照，但未接通生产换行退休。明确禁止该组件套用单行退休；生产普通换行回退保持，原版 lineJump 后的 leading-afterNewline 清理及纵横 await 顺序需另行组合取证。14 新测试／相关 99 项通过，完整冻结结果见 [交付合同](REWARD_INBOX_CONTRACT.md)，tapeMode 部分、goal active。
 
 2026-10-09 当前 Tape 增量见 [交付合同](REWARD_INBOX_CONTRACT.md)：单行 LTR／RTL 接通独立横向退休，按新请求前已呈现词框和严格整数阈值判断，不等待动画结束。确认裁前缀补偿 words 原点和 main／pace 累计位移；无变化重绘／纯确认不额外退休，异步通知有身份与代次取消，完整会话不删。12 新增／相关 120 项、32 条新增完整实际动画源码轨迹及四张前后图通过。下方普通换行与早期未覆盖说明为历史阶段；Tape 换行、复杂控制与任意设备调度仍未证明，完整 goal active。

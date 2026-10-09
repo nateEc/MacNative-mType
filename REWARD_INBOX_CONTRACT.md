@@ -1,5 +1,19 @@
 # 原生奖励收件箱与周任务交付
 
+## Tape 纵横完成所有权增量
+
+最终冻结门禁 `/tmp/typebar-tape-line-motion-final-readiness.log` 终态退出 0：原生 3,886 项零失败零跳过（841.381 秒），服务 501 项（11.729 秒）；十万词耐久 155.038 秒、16 项隔离磁盘冷读 4.777 秒、53 表面、1,111 唯一人工场景结构、90／3／1 配置元数据和未启动应用包资源／URL scheme／严格签名／原创边界通过。七新增在全量中 4.426 秒，128 条新纵横轨迹及全部既有源码对照通过。17 文件 `/tmp/typebar-tape-line-motion-final-frozen.sha256` 门禁前中后完全一致；66 原始日志 `/tmp/typebar-tape-line-motion-final-logs.PLtyOG`、167 既有组件验收生成图 `/tmp/typebar-tape-line-motion-final-images.nKL7l5` 保留，本轮无新视觉场景或视觉等价宣称。既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复；终态后才补 README／本合同，没有运行中编辑或并行验收。零主程序启动，无残留主程序／测试／编译进程，参考仍固定且干净；未操作真实账户、Keychain、成绩库或部署。tapeMode 部分、生产换行回退与完整 goal active 保持，下方为阶段证据。
+
+2026-10-09，固定干净参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `updateActiveElement` 等待 `lineJump` 才继续 `scrollTape`；输入更新可另外请求横向动画。原生 `wordsDidFinish` 原先替换整个 words 通道，错误地清掉已完成或正在运行的横向状态。本轮只把结束范围缩到纵向 margin／ready／tween，不采样或重启横向时钟，不改独立 main／pace 通道、原始数据或存储格式；尝试／布局重置和拆卸取消仍按既有规则清两轴。没有新 Timer、依赖或产品内 JavaScript／WebView／原版代码资产。
+
+新 QA 执行完整 `updateActiveElement`／`afterTestWordChange`／`getNlCharWidth`／`scrollTape`／`removeTestElements`／`lineJump`、完整 Caret／main controller／debounced RAF 和源码 promiseAnimate 方法，使用校验锁文件完整性的真实 Anime.js 4.2.2。128 条轨迹为 LTR／RTL × letter／word × 即时／平滑 × 四种 marker × 等待期间独立横向请求开关 × 第二次重叠行跳；记录真实请求／呈现／promise／退休／leading-filler 清理顺序，逐帧对照共用已解析几何下的原生 words／main／pace、两轴 ready 和累计修正。pace 目标及独立输入请求由 QA 发出，不是完整 pace controller 或完整 updateWordLetters 调度。每词一行、45pt 行高与尺寸／DOM 都是自有边界，不证明浏览器 CSS、native TextKit 数值或任意异步队列等价。
+
+行为红测 `/tmp/typebar-tape-line-motion-red.log` 三项 19 处真实失败（0.676 秒）；首次 64 轨迹七项通过（`first-focused.log`，2.491 秒）。扩大到 128 时 `expanded.log` 的 181 项中四处失败／两次 JSON 解码来自探针自有 offsetTop 用了小数，原生 follower 测试通过；单独源码 CLI 复现相同 3 而非 2 的删行边界。固定参考 dom.ts 实际读取 HTMLElement.offsetTop，CSSOM 的 offsetTop／offsetLeft 是整数 long，见 [接口规范](https://drafts.csswg.org/cssom-view/#extensions-to-the-htmlelement-interface)；适配器改成已有行组合探针一致的整数测量，不放宽首保留词、删除序列或补偿断言。仅改 top 后独立 128 轨迹通过，再同步 left 并让探针失败直接报状态而不解码空输出。以上短日志均在 `/tmp/typebar-tape-line-motion-` 前缀下保留；它是探针边界修正，不算产品行为红测或浏览器舍入实测。
+
+修正后 `corrected.log` 相关 66 项零失败零跳过（12.799 秒），最终 `/tmp/typebar-tape-line-motion-final-focused.log` 相关 160 项零失败零跳过（30.834 秒），其中七新增 4.593 秒。原生实际 NSScrollView／PromptAutoScrollView 用 TextKit 三行执行双向横向动画与两种重叠状态，验证只有最新边界提交、纵向结束不推进／取消横向动画；重开取消旧退休，旧回调不得清掉新尝试的横向值。该测试不创建 NSWindow 或启动 Typebar。共用几何对照不冒充 native Tape renderer／filler 前缀集成；生产含换行提示的普通布局回退、newline 组件禁用单行退休都保持。
+
+同会话决策／风险复核分三组反例：已定值与运行中横向通道、完整源码等待期间独立请求及重叠、真实 follower 最新边界与重开取消，均有回归；不是独立评审。行为优先和源码驱动约束了最小修改，根因调试限定了失败归属。53 表面与 94 配置 90 映射／3 部分／1 不适用不升级，新增两个人工待验项。无视觉改版，不新增视觉验收场景；本轮全量冻结结果见本节首段。后续必须接通实际原生换行前缀及 leading-filler 清理、renderer／follower await 组合再开放生产；Zen／hint／复杂控制／全部 joining、混合行高／尾随 Return、真正可见范围物化及真实设备／IME 仍开放，完整 goal active，零主程序启动。
+
 ## Tape 换行累计布局组件增量
 
 最终冻结门禁 `/tmp/typebar-tape-newlines-final-readiness.log` 终态退出 0：原生 3,879 项零失败零跳过（845.780 秒），服务 501 项（12.229 秒）；十万词耐久 155.792 秒、16 项隔离磁盘冷读 4.794 秒、53 表面、1,109 唯一人工场景结构、90／3／1 配置元数据和未启动应用包资源／URL scheme／严格签名／原创边界通过。14 新增在全量中合计 0.987 秒；60 组／300 新检查点及既有 128 原卷带轨迹／32 退休轨迹／28 方向案例通过。17 文件 `/tmp/typebar-tape-newlines-final-frozen.sha256` 门禁前中后完全一致，65 原始日志 `/tmp/typebar-tape-newlines-final-logs.ZyXFXg`、167 图 `/tmp/typebar-tape-newlines-final-images.yHXKzL` 保留，四张 tape-newlines-{ltr,rtl}-{initial,moved}.png 已逐张检查。既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。终态后仅补 README／本合同，没有运行中编辑或并行验收；零主程序启动，无残留主程序／测试／编译进程，参考仍固定且干净，未操作真实账户、Keychain、成绩库或部署。生产换行仍回退、tapeMode 部分、完整 goal active。

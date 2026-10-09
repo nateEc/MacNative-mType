@@ -113,6 +113,9 @@ struct PromptCaretChannel {
     marginTween = nil
     tapeTween = nil
   }
+  mutating func finishLine() {
+    margin = 0; marginReady = false; marginTween = nil
+  }
   var visibleRect: CGRect? { position?.offsetBy(dx: tapeMargin, dy: margin) }
 }
 
@@ -153,7 +156,9 @@ struct PromptCaretChannel {
 
   func wordsDidFinish(at _: TimeInterval) {
     // The follower owns words completion, not a presentation of the carets.
-    words = .init()
+    // Source lineJump resets only words.marginTop. An independent scrollTape
+    // may still own marginLeft (including a running tween) at this instant.
+    words.finishLine()
   }
 
   func reportProgrammaticScroll(_ offset: CGFloat) { programmaticScroll = offset }
