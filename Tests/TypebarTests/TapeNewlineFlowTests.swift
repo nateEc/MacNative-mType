@@ -74,28 +74,38 @@ import XCTest
       let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 160))
       let motion = PromptCaretMotionCoordinator(), attempt = UUID()
       var vertical: [PromptWordRetirement] = [], horizontal: [PromptTapeWordRemoval] = []
+      let delivered = expectation(description: "Horizontal identities delivered asynchronously, RTL=\(rtl)")
+      delivered.assertForOverFulfill = true
+      let receive: (PromptTapeWordRemoval) -> Void = { horizontal.append($0); delivered.fulfill() }
       defer { view.stop() }
       updateNative(view, motion, attempt: attempt, typed: "", rtl: rtl, time: 0,
-        vertical: { vertical.append($0) }, horizontal: { horizontal.append($0) })
+        vertical: { vertical.append($0) }, horizontal: receive)
       let height = view.subviews[0].frame.height
       updateNative(view, motion, attempt: attempt, typed: "m", rtl: rtl, time: 1,
-        vertical: { vertical.append($0) }, horizontal: { horizontal.append($0) })
+        vertical: { vertical.append($0) }, horizontal: receive)
       XCTAssertTrue(horizontal.isEmpty, "Native configure cannot mutate a SwiftUI session synchronously")
-      view.present(at: 1); RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.002))
+      view.present(at: 1)
+      wait(for: [delivered], timeout: 1)
       XCTAssertEqual(horizontal, [.init(attemptID: attempt, wordIndices: [0, 1, 2])])
       XCTAssertTrue(vertical.isEmpty)
       XCTAssertEqual(view.subviews[0].frame.height, height)
       let x = motion.wordsTapeMargin, correction = motion.pace.cumulativeTapeCorrection
       for time in [1.01, 1.02] {
         updateNative(view, motion, attempt: attempt, typed: "m", rtl: rtl, time: time,
-          vertical: { vertical.append($0) }, horizontal: { horizontal.append($0) })
+          vertical: { vertical.append($0) }, horizontal: receive)
       }
-      view.present(at: 1.02); RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.002))
+      view.present(at: 1.02); drainMainQueue()
       XCTAssertEqual(horizontal.count, 1)
       XCTAssertEqual(motion.wordsTapeMargin, x)
       XCTAssertEqual(motion.pace.cumulativeTapeCorrection, correction)
       XCTAssertEqual(view.subviews[0].frame.height, height)
     }
+  }
+
+  private func drainMainQueue() {
+    let drained = expectation(description: "Previously enqueued main-queue notifications processed")
+    DispatchQueue.main.async { drained.fulfill() }
+    wait(for: [drained], timeout: 1)
   }
 
   func testStopAndNewAttemptInvalidateQueuedHorizontalWordRemovalAndItsTopology() {
@@ -108,7 +118,7 @@ import XCTest
     updateNative(view, motion, attempt: attempt, typed: "m", time: 1, vertical: { _ in }, horizontal: { horizontal.append($0) })
     view.stop()
     updateNative(view, motion, attempt: UUID(), typed: "", time: 2, vertical: { _ in }, horizontal: { horizontal.append($0) })
-    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.002))
+    drainMainQueue()
     XCTAssertTrue(horizontal.isEmpty)
     XCTAssertEqual(motion.wordsTapeMargin, fresh)
   }

@@ -409,8 +409,16 @@ struct TapePracticePrompt: View {
   let retirement: PromptLineScrollContext
   var newlineWords: [TapePromptWord] = []
   var viewportLineCount = 3
+  var reservesViewportLineCount = false
   var onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil
   @State private var metrics: TapePromptLayoutMetrics?
+
+  private var viewportHeight: CGFloat {
+    let fallback = CGFloat(fontSize * 1.7)
+    guard !newlineWords.isEmpty else { return fallback }
+    let limit = (metrics?.rowHeight ?? fallback) * CGFloat(viewportLineCount)
+    return reservesViewportLineCount ? limit : min(metrics?.contentHeight ?? fallback, limit)
+  }
 
   var body: some View {
     TapePromptBridge(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
@@ -419,11 +427,32 @@ struct TapePracticePrompt: View {
       mode: mode, margin: margin,
       smoothScroll: animatesScroll, carets: carets, retirement: retirement,
       newlineWords: newlineWords, onMetrics: { metrics = $0 }, onTapeWordsRemoved: onTapeWordsRemoved)
-      .frame(height: newlineWords.isEmpty ? fontSize * 1.7
-        : min(metrics?.contentHeight ?? fontSize * 1.7,
-          (metrics?.rowHeight ?? fontSize * 1.7) * CGFloat(viewportLineCount)))
+      .frame(height: viewportHeight)
       .clipped()
       .accessibilityLabel("卷带练习提示")
+  }
+}
+
+extension TapePracticePrompt {
+  /// Zen owns measured word boxes from its initial hidden placeholder onward.
+  /// Its empty target cannot signal the controls that the user later enters.
+  init(session: TypingSession, rendering: PromptRendering, mode: PracticeTapeMode,
+    margin: Double, fontSize: Double, animatesScroll: Bool,
+    carets: PromptCaretNativeView.Configuration, retirement: PromptLineScrollContext,
+    onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil) {
+    let zen = session.configuration.mode == .zen
+    self.init(rendering: rendering,
+      anchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(session: session, rendering: rendering, mode: mode),
+      wordAnchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(session: session, rendering: rendering, mode: .word),
+      wordStartCharacterOffsets: PracticeTapePolicy.wordStartCharacterOffsets(session: session, rendering: rendering),
+      checksDirectionPerGlyph: session.configuration.mode == .custom || zen
+        || session.configuration.language == .mixedLanguages,
+      mode: mode, margin: margin, fontSize: fontSize, animatesScroll: animatesScroll,
+      carets: carets, retirement: retirement,
+      newlineWords: zen || session.hasPracticeNewlineContent
+        ? TapePromptProjection.words(session: session, rendering: rendering) : [],
+      viewportLineCount: zen ? 2 : 3, reservesViewportLineCount: zen,
+      onTapeWordsRemoved: onTapeWordsRemoved)
   }
 }
 
@@ -2898,22 +2927,12 @@ private struct ContentView: View {
             .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers),
           glyphIDs: specialPromptGlyphIDs, carets: specialPromptCaretConfiguration)
       } else if usesTapePractice {
-        TapePracticePrompt(
-          rendering: rendering,
-          anchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(
-            session: session, rendering: rendering, mode: settings.practiceTapeMode),
-          wordAnchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(
-            session: session, rendering: rendering, mode: .word),
-          wordStartCharacterOffsets: PracticeTapePolicy.wordStartCharacterOffsets(session: session, rendering: rendering),
-          checksDirectionPerGlyph: session.configuration.mode == .custom || session.configuration.mode == .zen
-            || session.configuration.language == .mixedLanguages,
+        TapePracticePrompt(session: session, rendering: rendering,
           mode: settings.practiceTapeMode,
           margin: settings.practiceTapeMargin,
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll,
           carets: makeSpecialPromptCaretConfiguration(rightToLeft: session.configuration.usesRightToLeftPrompt),
           retirement: practiceLineScrollContext(rendering),
-          newlineWords: session.hasPracticeNewlineContent ? TapePromptProjection.words(session: session, rendering: rendering) : [],
-          viewportLineCount: session.configuration.mode == .zen ? 2 : 3,
           onTapeWordsRemoved: { session.removeTapePromptWords($0) })
       } else {
         Text(rendering.text)
