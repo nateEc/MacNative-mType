@@ -1,11 +1,20 @@
 import Foundation
 
 /// One main-actor read binds input identity, raw field units and final slots.
-/// It does not mutate the typing session or replace a representable transaction.
+/// Optional topology and retirement bind a complete representable transaction.
+/// Without them, the compatibility path remains a same-field refresh only.
 struct TapePromptProjectionSnapshot {
   let input: PromptCaretInputIdentity
   let field: PromptCompositionField
   let rendering: PromptRendering
+  let newlineWords: [TapePromptWord]?
+  let retirement: PromptLineScrollContext?
+
+  init(input: PromptCaretInputIdentity, field: PromptCompositionField, rendering: PromptRendering,
+    newlineWords: [TapePromptWord]? = nil, retirement: PromptLineScrollContext? = nil) {
+    self.input = input; self.field = field; self.rendering = rendering
+    self.newlineWords = newlineWords; self.retirement = retirement
+  }
 }
 
 /// Word identity and structural ownership come from the session, never from

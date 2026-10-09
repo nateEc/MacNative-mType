@@ -235,7 +235,7 @@ final class TapePromptNativeView: NSView {
     config.glyphRect = { [weak self] id in self?.glyphRect(id, main: false) }
     config.mainGlyphRect = { [weak self] id in self?.glyphRect(id, main: true) }
     if textView.usesFieldProjection {
-      if latestProjection != nil && textView.projectedLayout != nil {
+      if latestProjection != nil {
         let fallback = projectionInput ?? .init(attemptID: config.attemptID, typed: "", composition: "", glyphID: config.mainGlyphID)
         config.latestInput = { [weak self] in
           self?.refreshProjection(at: ProcessInfo.processInfo.systemUptime)
@@ -272,15 +272,48 @@ final class TapePromptNativeView: NSView {
 
   private func refreshProjection(at time: TimeInterval) {
     guard !presentingProjection, !refreshingProjection, let config = configuration,
-      textView.projectedLayout != nil, let oldField = compositionField else { return }
+      textView.usesFieldProjection, let oldField = compositionField else { return }
     // Guard the callback itself, not only the model rebuild following it.
     let revision = retirementRevision
     refreshingProjection = true
     defer { refreshingProjection = false }
     guard let next = latestProjection?(), retirementRevision == revision,
       configuration?.attemptID == config.attemptID, configuration?.coordinator === config.coordinator,
-      next.input.attemptID == config.attemptID,
-      next.field.index == oldField.index,
+      next.input.attemptID == config.attemptID else { return }
+    guard (next.newlineWords == nil) == (next.retirement == nil) else { return }
+    if let words = next.newlineWords, let context = next.retirement {
+      guard context.attemptID == config.attemptID,
+        context.firstRetainedWordIndex >= (retirement?.firstRetainedWordIndex ?? 0),
+        next.field.index >= context.firstRetainedWordIndex,
+        next.field.index >= textView.firstRetainedNewlineIndex,
+        context.words.contains(where: { $0.index == next.field.index }),
+        next.rendering.compositionTextMap?.fieldRuns.contains(where: { $0.fieldID == next.field.index }) == true,
+        words.isEmpty ? TapePromptTextView.supportsProjection(next.rendering.compositionTextMap,
+          newlineWords: words, rightToLeft: config.rightToLeft)
+          : words.contains(where: { $0.index == next.field.index && !$0.isRemoved }) else { return }
+      guard projectionInput != next.input || oldField.index != next.field.index
+        || oldField.inputUTF16 != next.field.inputUTF16 || rendering.text != next.rendering.text
+        || rendering.compositionTextMap?.fieldRuns != next.rendering.compositionTextMap?.fieldRuns
+        || rendering.compositionTextMap?.canonicalAliases != next.rendering.compositionTextMap?.canonicalAliases
+        || rendering.compositionTextMap?.caret != next.rendering.compositionTextMap?.caret
+        || textView.newlineWords != words
+        || retirement?.firstRetainedWordIndex != context.firstRetainedWordIndex
+        || retirement?.activeWordID != context.activeWordID
+        || retirement?.words.map(\.index) != context.words.map(\.index)
+        || retirement?.words.map(\.glyphID) != context.words.map(\.glyphID) else { return }
+      var nextConfig = config
+      nextConfig.mainGlyphID = next.input.glyphID
+      nextConfig.latestInput = { next.input }; nextConfig.latestGlyphID = { next.input.glyphID }
+      nextConfig.latestRendering = { next.rendering }
+      configure(rendering: next.rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+        compositionField: next.field, hidesCompositionExtras: hidesCompositionExtras,
+        latestProjection: latestProjection, checksDirectionPerGlyph: checksDirectionPerGlyph,
+        mode: mode, margin: margin, smoothScroll: smoothScroll, retirement: context,
+        newlineWords: words, onMetrics: onMetrics, onTapeWordsRemoved: onTapeWordsRemoved,
+        carets: nextConfig, at: time)
+      return
+    }
+    guard next.field.index == oldField.index,
       TapePromptTextView.supportsProjection(next.rendering.compositionTextMap,
         newlineWords: textView.newlineWords, rightToLeft: config.rightToLeft) else { return }
     guard projectionInput != next.input || oldField.inputUTF16 != next.field.inputUTF16

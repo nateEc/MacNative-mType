@@ -244,4 +244,74 @@ import XCTest
       }
     }
   }
+
+  func testCompleteFreshSnapshotCrossesFieldsAndUpdatesCandidatesWithoutRepresentableUpdate() throws {
+    var session = TypingSession(configuration: .words(3), prompt: "a\nbc tail")
+    var marked = "X"
+    func snapshot() throws -> TapePromptProjectionSnapshot {
+      let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: marked, style: .replace))
+      let rendering = presentation.render { _, glyph, cell in AttributedString(cell?.text ?? String(glyph.character)) }
+      let field = try XCTUnwrap(session.promptCompositionField)
+      return .init(input: .init(attemptID: session.automaticInputAttemptID, typed: session.typed,
+          composition: marked, glyphID: session.promptCaretGlyphIndex), field: field, rendering: rendering,
+        newlineWords: TapePromptProjection.words(session: session, rendering: rendering),
+        retirement: .init(attemptID: session.automaticInputAttemptID,
+          activeWordID: session.promptWordPresentations[field.index].range.lowerBound,
+          characterOffsets: rendering.glyphCharacterOffsets, smoothScroll: false, reducesMotion: true,
+          words: session.promptWordPresentations.enumerated().map { .init(index: $0.offset, glyphID: $0.element.range.lowerBound) },
+          firstRetainedWordIndex: session.firstRetainedPromptWordIndex, onRetire: { _ in }))
+    }
+    var latest = try snapshot(), reads = 0, stops = false
+    let coordinator = PromptCaretMotionCoordinator()
+    let owner = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 120))
+    defer { owner.stop() }
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    let config = PromptCaretNativeView.Configuration(text: latest.rendering.text, mainOffset: nil, paceOffset: nil,
+      mainStyle: .bar, paceStyle: .off, font: font, lineSpacing: 0, rightToLeft: false,
+      accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+      attemptID: session.automaticInputAttemptID, coordinator: coordinator,
+      mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
+    owner.configure(rendering: latest.rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+      compositionField: latest.field, latestProjection: { [weak owner] in
+        reads += 1; if stops { owner?.stop() }; return latest
+      },
+      mode: .letter, margin: 0.25, smoothScroll: false, retirement: latest.retirement,
+      newlineWords: latest.newlineWords ?? [], carets: config, at: 0)
+    session.insertBatch("a\nb", at: Date(timeIntervalSinceReferenceDate: 917_100_000))
+    for candidate in ["XYZ😀", "", "候选"] {
+      marked = candidate; latest = try snapshot(); reads = 0
+      owner.present(at: 1)
+      XCTAssertEqual(reads, 1)
+      XCTAssertEqual(owner.accessibilityLabel(), String(latest.rendering.text.characters))
+      let native = TapeNewlineTextLayout()
+      native.configure(text: latest.rendering.text, words: latest.newlineWords ?? [], font: font,
+        rightToLeft: false, resets: true, compositionMap: latest.rendering.compositionTextMap)
+      let expected = try XCTUnwrap(native.projectedAdvance(fieldID: latest.field.index,
+        acceptedUTF16Count: latest.field.inputUTF16.count, mode: .letter, hidesExtras: false, viewportWidth: 400))
+      XCTAssertEqual(coordinator.wordsTapeMargin, -expected, accuracy: 0.001)
+      XCTAssertEqual(try XCTUnwrap(coordinator.main.position).minY,
+        try XCTUnwrap(native.projectedFieldRect(latest.field.index)).minY, accuracy: 0.001)
+    }
+    let valid = latest, label = owner.accessibilityLabel(), margin = coordinator.wordsTapeMargin
+    let stale = PromptCaretInputIdentity(attemptID: UUID(), typed: "stale", composition: "bad", glyphID: 0)
+    let invalid: [TapePromptProjectionSnapshot] = [
+      .init(input: stale, field: valid.field, rendering: valid.rendering,
+        newlineWords: valid.newlineWords, retirement: valid.retirement),
+      .init(input: valid.input, field: valid.field, rendering: valid.rendering,
+        newlineWords: nil, retirement: valid.retirement),
+      .init(input: valid.input, field: valid.field, rendering: valid.rendering,
+        newlineWords: valid.newlineWords, retirement: nil),
+      .init(input: valid.input, field: valid.field, rendering: valid.rendering,
+        newlineWords: [], retirement: valid.retirement)
+    ]
+    for value in invalid {
+      latest = value; reads = 0; owner.present(at: 2)
+      XCTAssertEqual(reads, 1)
+      XCTAssertEqual(owner.accessibilityLabel(), label)
+      XCTAssertEqual(coordinator.wordsTapeMargin, margin)
+    }
+    latest = valid; stops = true; reads = 0; owner.present(at: 2)
+    XCTAssertEqual(reads, 1); XCTAssertEqual(owner.accessibilityLabel(), label)
+    owner.present(at: 3); XCTAssertEqual(reads, 1)
+  }
 }

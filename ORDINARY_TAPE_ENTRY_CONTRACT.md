@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 完整实时投影事务增量（2026-10-10）
+
+TapePromptProjectionSnapshot 可同时携带换行词描述与退休上下文；两者缺一即拒绝，旧三字段快照保留仅同字段刷新规则。原生 owner 以同一输入／字段／文字／拓扑事务调用既有 configure，允许跨字段，不另建滚动或退休状态机。验证 attempt、活动字段存在、退休前缀不回退，并在 provider 返回后重新验证停止／配置身份；未变化快照不重新配置，避免无谓取消待执行事务。光标读取缓存覆盖多行投影，最新文字通过已有 rendering provider 提供，不修改只读光标配置文本。
+
+新增实际 owner 测试以 `a\nbc tail` 跨字段输入后直接 present，依次切换 emoji 候选、空候选和中文候选，检查单次读取、实际文字、接受推进和主光标纵坐标；另拒绝旧 attempt、单边元数据及与结构换行不符的空拓扑，验证 provider 中 stop 后不再读取。该测试关闭 pace，不构成独立 pace 完整事务或实际输入法验收。
+
+证据：`../../work/tape-transaction-snapshot-red.log` 保留缺少新初始化参数的编译失败，`first.log` 保留只读配置文本的编译失败；`config-fixed.log` 单项零失败。最终 `../../work/tape-transaction-snapshot-verified.log` 186 项零失败零跳过，24.519 秒（wall 24.541 秒），进程退出 0；`../../work/tape-transaction-snapshot-originality.log` 原创性检查退出 0。上述 first.log／config-fixed.log 均使用相同 tape-transaction-snapshot- 前缀。
+
+本轮零主程序启动、无新增截图。应用层 `!usesTapePractice` 保护未解除；初始配置的新鲜多行快照选择、独立 pace 的完整事务、复杂队列、连接／混合方向和真实 IME 仍开放。完整冻结门禁未重跑，兼容分类不升级，完整 goal active。
+
 ## 多行投影字段身份与 filler 隔离增量（2026-10-10）
 
 多行投影 owner 的跨词判定、活动词框、纵向退休边界和完成时活动字段保护改用 compositionField.index；canonical glyph ID 不再充当字段唯一身份。前缀纯确认也要求字段索引不变。TapeNewlineTextLayout 的 precedingBreak、存活 filler 过滤、动画 channel、重排及计划请求统一按稳定词／字段索引存储；canonical alias 仍仅负责字形关联。旧非投影 owner 的字符查找逻辑保留。
