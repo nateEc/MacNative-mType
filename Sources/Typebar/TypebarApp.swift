@@ -2170,12 +2170,27 @@ private struct ContentView: View {
   }
 
   private func runClock() async {
+    if TimerDeliveryDiagnostics.enabled {
+      TimerDeliveryDiagnostics.trace(.clockStarted,
+        hasStarted: session.hasStarted, isFinished: session.isFinished)
+    }
+    defer {
+      if TimerDeliveryDiagnostics.enabled {
+        TimerDeliveryDiagnostics.trace(.clockStopped,
+          hasStarted: session.hasStarted, isFinished: session.isFinished)
+      }
+    }
     var previousDelivery = ProcessInfo.processInfo.systemUptime
     while !Task.isCancelled {
       try? await Task.sleep(nanoseconds: 100_000_000)
       guard !Task.isCancelled else { return }
       let delivery = ProcessInfo.processInfo.systemUptime
-      advanceClock(at: .now, deliveryGap: delivery - previousDelivery)
+      let deliveryGap = delivery - previousDelivery
+      if TimerDeliveryDiagnostics.enabled, !session.isFinished, deliveryGap > 0.25 {
+        TimerDeliveryDiagnostics.trace(.lateDelivery, duration: deliveryGap,
+          hasStarted: session.hasStarted, isFinished: session.isFinished)
+      }
+      advanceClock(at: .now, deliveryGap: deliveryGap)
       previousDelivery = delivery
     }
   }
@@ -3774,6 +3789,21 @@ private struct ContentView: View {
   private func handleInsertedText(
     _ text: String, forceError: Bool, origin: TypingInputOrigin = .physicalKeyboard
   ) {
+    let diagnosticStart = TimerDeliveryDiagnostics.enabled ? ProcessInfo.processInfo.systemUptime : 0
+    let tracesFirstInput = TimerDeliveryDiagnostics.enabled && !session.hasStarted
+    if tracesFirstInput {
+      TimerDeliveryDiagnostics.trace(.inputStarted,
+        hasStarted: session.hasStarted, isFinished: session.isFinished)
+    }
+    defer {
+      if TimerDeliveryDiagnostics.enabled {
+        let duration = ProcessInfo.processInfo.systemUptime - diagnosticStart
+        if tracesFirstInput || duration > 0.125 {
+          TimerDeliveryDiagnostics.trace(.inputFinished, duration: duration,
+            hasStarted: session.hasStarted, isFinished: session.isFinished)
+        }
+      }
+    }
     synchronizeLiveInputRules()
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count

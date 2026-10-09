@@ -2,6 +2,31 @@ import XCTest
 @testable import Typebar
 
 final class TimerDeliveryDiagnosticsTests: XCTestCase {
+  func testPhaseRecordsUseFixedLabelsAndOnlyRelativeTimeAndState() {
+    for phase in TimerDeliveryDiagnostics.Phase.allCases {
+      XCTAssertEqual(TimerDeliveryDiagnostics.phaseRecord(phase: phase, offset: 12.345,
+        duration: 0.03, hasStarted: true, isFinished: false),
+        "typebar-phase phase=\(phase.rawValue) offset=12.345000 duration=0.030000 started=1 finished=0\n")
+    }
+    XCTAssertEqual(TimerDeliveryDiagnostics.phaseRecord(phase: .clockStopped, offset: 0,
+      duration: 0, hasStarted: false, isFinished: true),
+      "typebar-phase phase=clock-stopped offset=0.000000 duration=0.000000 started=0 finished=1\n")
+  }
+
+  func testPhaseWriterUsesExistingDoubleOptInBeforeSamplingOrWriting() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TimerDeliveryDiagnostics.swift"), encoding: .utf8)
+    let begin = try XCTUnwrap(source.range(of: "static func trace("))
+    let writer = String(source[begin.lowerBound...])
+    let guardRange = try XCTUnwrap(writer.range(of: "guard enabled else { return }"))
+    XCTAssertLessThan(guardRange.lowerBound,
+      try XCTUnwrap(writer.range(of: "ProcessInfo.processInfo.systemUptime")).lowerBound)
+    XCTAssertLessThan(guardRange.lowerBound,
+      try XCTUnwrap(writer.range(of: "FileHandle.standardError.write")).lowerBound)
+    XCTAssertTrue(source.contains("enum Phase: String, CaseIterable"))
+  }
+
   func testProductionClockRejectsTerminalSessionBeforeTimingAndDeliveryEffects() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()

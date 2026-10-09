@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 结果弹窗实际退出复验与阶段诊断（2026-10-10）
+
+被测提交 7eab44f，唯一隔离包 `../../work/Typebar-Result-Quit-20261010.app`（app.typebar.qa.resultquit20261010），内存数据及独立偏好域。打包日志 result-quit-package.log 退出 0；初始读取后输入一个 c，普通计时练习仍失败。result-quit-runtime.log 记录 deliveryGap=1.849543、preflight=0.000064、drift=0.808253、severe=1、failed=1，并保留 Charts 固定尺寸回退诊断。在失败结果弹窗保持打开时按 ⌘Q，唯一主进程句柄正常退出 0，随后无 Typebar 残留；没有 TERM 或第二实例。这实际验证了失败结果弹窗的快捷键退出修正，不代表菜单退出、成功结果、NoStress、多窗口长测试确认或真实 IME 已验收。
+
+随后增加默认关闭的阶段诊断，仍要求 QA 内存包标志与 TYPEBAR_QA_TIMER_DIAGNOSTICS=1 双重启用。仅写固定阶段标签、相对单调时间、时长及会话状态，不记录输入内容、身份或绝对时间；覆盖计时任务进入／退出、迟到唤醒、首次输入处理进入／退出和较慢处理完成。0.25／0.125 秒只是日志筛选条件，不改变计时健康阈值、100ms 调度或退出保护。输入处理时长包含诊断写入，诊断自身可能扰动时间；它不覆盖处理器之外的全部原生输入／渲染阶段，进程退出也不保证执行任务 defer。尚未在实际 GUI 收集新增阶段记录，不据此声称找到首次延迟根因。
+
+../../work/timer-phase-red.log 为新增 API 缺失编译失败，不是行为反例。timer-phase-verified.log 权威退出 0：55 项零失败零跳过（0.859 秒，墙钟 0.866）；包含阶段格式、双重启用源码门禁与相关计时／结果退出回归。timer-phase-originality.log 退出 0，固定参考 pin 的原创边界通过。源码门禁与组件测试不等于完整 ContentView 或设备证明；本轮未重跑全量 readiness，完整 goal 继续 active。
+
 ## 延后观测反证与结果弹窗退出边界（2026-10-10）
 
 被测 81b2f51，构建唯一 Debug 隔离包 `../../work/Typebar-Timer-Observation-20261010.app`，独立域 app.typebar.qa.timerobservation20261010、内存记录／令牌、显式数值诊断。`../../work/timer-observation-package.log` 退出 0。原生输入和应用层代码检查未找到显式睡眠／等待；这不排除隐式框架阻塞。为区分观测扰动，初始 AX 读取后只发送一个 `r` 按键，不立即读取 AX，然后等待同一运行句柄并读取独立 stderr 文件。
