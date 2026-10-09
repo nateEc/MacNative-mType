@@ -276,7 +276,8 @@ import XCTest
     view.requestPacePosition(at: 0.061)
     motion.sample(at: 0.07)
     XCTAssertEqual(motion.pace.position, target)
-    XCTAssertEqual(reads, 3, "Main initialization plus two logical pace requests, not repeated reads")
+    XCTAssertNil(motion.main.position, "Disabled main caret must not resolve text geometry")
+    XCTAssertEqual(reads, 2, "Only two logical pace requests read geometry; disabled main and repeated reads do not")
   }
 
   func testIndependentPrunedTargetPreservesReadyMarginAndDoesNotPaint() {

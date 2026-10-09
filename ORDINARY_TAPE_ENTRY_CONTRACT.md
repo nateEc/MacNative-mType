@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 完整门禁发现的历史断言契约冲突（2026-10-10）
+
+c5417e4 完整门禁的原生测试权威退出 1：4170 项、4 次断言失败，885.437s（墙钟 885.911）。失败集中于两个用例；服务与打包阶段尚未执行。原始完整日志保留在 work 下 typebar-native-rewrite-readiness.rmWYxW/client-tests.log 对应系统临时目录，整体日志为 caret-content-readiness.YNiz6S.gate.log。CoreData 错误输出不是这四次断言失败的归因。
+
+核查当前实现与独立回归后，旧 pace 用例配置 mainStyle.off，却要求主光标初始化额外读取一次文字；修正为两个逻辑 pace 请求，并新增主光标没有位置的断言，原有插值、目标位置和重复请求不重启断言保留。旧焦点集成用例要求不变快照重复送达；改为去重后的通知序列，仍验证真实返回及移除视图后不观察旧窗口。产品代码没有改动，未放宽计时或几何正确性。fullgate-contract-reconciliation.log 权威退出 0，相关三个测试组 21 项零失败，0.891s（墙钟 0.895）。本轮零 Typebar 主程序启动；这只是局部契约核对，不代表整轮门禁或完整功能等价通过，需重新运行完整门禁。
+
 ## 光标纯位移保留本地标记内容（2026-10-10）
 
 基于 029285d 核查 PromptCaretNativeView.paint：旧判断只有原生 frame 与样式／颜色／尺寸全相同才跳过；平滑移动改变 frame 时仍赋值 NSHostingView.rootView。PromptCaretMarkerView.body 仅使用 rect.width／height、style、accent，所有本地形状均不读取文档原点，因此纯位移不需要替换 SwiftUI 标记内容。这个机制是已定位的冗余工作，不等于完整应用计时失败的根因。

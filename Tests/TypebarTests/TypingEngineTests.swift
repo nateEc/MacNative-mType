@@ -18435,18 +18435,19 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(returned, [false]) // The initial non-key snapshot is not a return.
     input.refreshWindowFocusState()
-    XCTAssertEqual(returned, [false, false])
+    XCTAssertEqual(returned, [false], "Unchanged focus snapshots must not be redelivered")
 
     let center = NotificationCenter.default
     center.post(name: NSWindow.didBecomeKeyNotification, object: window)
     center.post(name: NSWindow.didResignKeyNotification, object: window)
     input.refreshWindowFocusState()
     center.post(name: NSWindow.didBecomeKeyNotification, object: window)
-    XCTAssertEqual(returned, [false, false, false, false, false, true])
+    XCTAssertEqual(returned, [false, false, false, true],
+      "Real focus transitions still reach the tracker and report a return")
 
     input.removeFromSuperview()
     center.post(name: NSWindow.didResignKeyNotification, object: window)
-    XCTAssertEqual(returned.count, 6) // Detached views no longer observe the old window.
+    XCTAssertEqual(returned.count, 4) // Detached views no longer observe the old window.
   }
 
   func testSessionFactoryLeavesZenPromptFreeformAndBuildsOtherModePrompts() {
