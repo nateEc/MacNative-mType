@@ -146,9 +146,24 @@ import XCTest
     let child = try XCTUnwrap(descendants(host, PromptCaretNativeView.self).first)
     child.layout(); child.present(at: 0)
     XCTAssertEqual(descendants(host, PromptCaretNativeView.self).count, 1)
-    let standalone = NSHostingView(rootView: ASLHandshapeGlyph(character: "a", color: .gray, background: .clear, size: 28))
-    XCTAssertEqual(try XCTUnwrap(container.rect(for: 5)).size, standalone.fittingSize,
-      "SwiftUI rounds the real cell to 29×31; do not substitute the unrounded 28.56-point proposal")
+    var referenceSize: CGSize?
+    let standalone = NSHostingView(rootView:
+      ASLHandshapeGlyph(character: "a", color: .gray, background: .clear, size: 28)
+        .anchorPreference(key: ASLPromptBoundsKey.self, value: .bounds) { [5: $0] }
+        .frame(width: 100, height: 70, alignment: .topLeading)
+        .overlayPreferenceValue(ASLPromptBoundsKey.self) { anchors in
+          GeometryReader { geometry in
+            Color.clear.onAppear { referenceSize = anchors[5].map { geometry[$0].size } }
+          }
+        })
+    // fittingSize measures the hosting envelope, not its child glyph. Resolve
+    // an independent child's anchor in the same window and a fixed parent.
+    host.addSubview(standalone)
+    defer { standalone.removeFromSuperview() }
+    settle(standalone)
+    XCTAssertTrue(standalone.window === window)
+    XCTAssertEqual(try XCTUnwrap(container.rect(for: 5)).size, try XCTUnwrap(referenceSize),
+      "Compare actual mounted SwiftUI measurements, not an unattached view's pixel rounding")
     XCTAssertEqual(coordinator.main.position, container.rect(for: 23))
     XCTAssertEqual(coordinator.pace.position, container.rect(for: 11))
     XCTAssertNotEqual(coordinator.main.position, coordinator.pace.position)
@@ -246,18 +261,30 @@ import XCTest
     let hidden = try capture(host, name: "asl-shared-hidden")
     XCTAssertNotEqual(themed, hidden)
     let bitmap = try XCTUnwrap(NSBitmapImageRep(data: hidden))
-    var blue = 0, otherColoredInk = 0
+    var blue = 0
     for y in 0..<bitmap.pixelsHigh { for x in 0..<bitmap.pixelsWide {
       if let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB), color.alphaComponent > 0.5 {
         let channels = [color.redComponent, color.greenComponent, color.blueComponent]
         if channels.max()! - channels.min()! > 0.12 {
           if color.blueComponent > color.redComponent + 0.1 && color.blueComponent > color.greenComponent + 0.1 { blue += 1 }
-          else { otherColoredInk += 1 }
         }
       }
     } }
     XCTAssertGreaterThan(blue, 5, "The independent caret remains visible")
-    XCTAssertEqual(otherColoredInk, 0, "Hidden hands must not leave any purple/orange/green ink")
+    // A blue antialiased edge need not satisfy both blue-dominance thresholds.
+    // Remove only the independent caret, then require the entire hand surface
+    // to be blank instead of classifying those edge pixels as hand ink.
+    child.isHidden = true
+    host.needsDisplay = true
+    let handOnly = try XCTUnwrap(NSBitmapImageRep(data: capture(host, name: "asl-shared-hidden-without-caret")))
+    var handInk = 0
+    for y in 0..<handOnly.pixelsHigh { for x in 0..<handOnly.pixelsWide {
+      let color = try XCTUnwrap(handOnly.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+      if abs(1 - color.redComponent) + abs(1 - color.greenComponent) + abs(1 - color.blueComponent) > 0.01 {
+        handInk += 1
+      }
+    } }
+    XCTAssertEqual(handInk, 0, "Hidden hands must leave no ink, including achromatic or antialiased pixels")
     XCTAssertFalse(window.isVisible)
   }
 

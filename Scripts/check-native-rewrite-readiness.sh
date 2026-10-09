@@ -341,6 +341,11 @@ run_logged_check "executing complete pinned vertical and tape channel compositio
   env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-tape-line-composition.mjs" "$reference_root"
+run_logged_check "executing complete pinned newline word-only overflow and persistent topology" \
+  "$temporary_directory/tape-newline-overflow-source-check.log" \
+  env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-tape-newline-overflow.mjs" "$reference_root"
 run_logged_check "executing pinned line jump and complete animation curve" \
   "$temporary_directory/line-scroll-source-check.log" \
   env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \

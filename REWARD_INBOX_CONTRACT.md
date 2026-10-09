@@ -1,5 +1,31 @@
 # 原生奖励收件箱与周任务交付
 
+## 换行 Tape word-only 缺口与结构账本增量
+
+最终重新冻结门禁 `/tmp/typebar-tape-newline-flow-corrected-readiness.log` 终态退出 0：原生 3,911 项零失败零跳过（907.886 秒），服务 501 项（12.599 秒）；十万词耐久 164.135 秒、16 项隔离磁盘迁移 5.813 秒、53 表面、1,117 唯一人工场景结构、90／3／1 配置元数据及未启动应用包资源／URL scheme／严格签名／原创边界通过。六新增在全量中 1.556 秒，修正边界的 ASL 21 项及历史筛选 8 项均通过；120 组新完整源码两次请求与全部既有源码对照通过。25 文件 `/tmp/typebar-tape-newline-flow-corrected-frozen.sha256` 门禁前中后一致；68 原始日志 `/tmp/typebar-tape-newline-flow-corrected-logs.a6ZY27`、182 图 `/tmp/typebar-tape-newline-flow-corrected-images.qMLYTW` 保留。最终四张 Tape 缺口／重绘图与三张 ASL 正负控制图已逐张复查：Tape 全幅非空像素一致，ASL 保留可见手形／独立蓝 caret 正控制，移除 caret 后隐藏手形面全白。所有窗口从不显示并关闭，零主程序启动，无残留主程序／测试／编译进程；既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。终态后才补 README／本合同；没有运行中编辑或并行验收，首轮失败与修正证据不覆盖。参考固定且干净，未操作真实账户、Keychain、成绩库或部署；生产换行回退、tapeMode 部分及完整 goal active 保持，下方为阶段证据。
+
+首轮冻结 `/tmp/typebar-tape-newline-flow-final-readiness.log` 终态退出 1：原生 3,911 项、三处失败（927.941 秒），六新增通过（1.782 秒），十万词 159.111 秒、16 磁盘迁移 5.271 秒通过；服务／应用包未执行，不能宣称本轮全量通过。23 文件哈希一致，66 原始日志从临时目录复制保存到 `/tmp/typebar-tape-newline-flow-final-logs.4Y5yN0`，失败与图片均保留，未在运行中编辑或重复开跑。
+
+三处失败来自既有测试的环境／测量假设。ASL 比较了实际词内 28.5×31pt 与独立 hosting envelope 的 29×31pt；仅挂载或读取未解析 GeometryReader.size 仍不等价。独立手形改在同窗口固定父布局中解析真实 bounds anchor，保留精确相等而非放宽容限。隐藏图误判的三个像素均在蓝光标顶边，RGB 分别约 0.872／0.923／0.994（`/tmp/typebar-tape-newline-flow-pixel-diagnosis.log`，观察到 2× 屏幕）；移除独立 caret 后整面必须零墨迹，另保留 caret 可见与位置断言，不再把蓝色抗锯齿边缘分类成手形。历史筛选测试不再假定 NSApp.currentEvent 为 nil，而同步核对默认 binding 实际读取的修饰键；显式普通／Shift／其他组合、激活时读取与 1,136 源案例保留。产品代码与语义未因此改变。
+
+`/tmp/typebar-tape-newline-flow-unrelated-baseline.log` 29 项两处 ASL 失败（2.072 秒），事件 nil 失败仅在首轮全量出现，未伪称稳定复现；`unrelated-corrected.log`、`unrelated-measured.log`、`unrelated-anchor.log` 均保留独立 hosting／几何测量仍不等于词内子边界的一处失败。最终 `unrelated-fixed-parent.log` 29 项零失败零跳过（2.817 秒），不是反复原样重跑取绿灯。`/tmp/typebar-tape-newline-flow-failure-images.8cHzNY/asl-shared-hidden-without-caret.png` 已检查为全白，与可见手形及独立蓝 caret 的正控制分开；窗口从不显示并关闭。随后重新冻结含两份修正测试的 25 文件，再以完整门禁终态为最终交付依据。
+
+2026-10-09，固定干净参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `scrollTape` 横向移除的是 word 节点，可能非连续且包括 lookahead 中的未来词；beforeNewline／newline 不因此消失，leading afterNewline 又单独清理。原先仅有连续首个保留词下界，不能表示这种状态：把横向缺口确认成纵向前缀会错误折叠旧空行。因此本轮没有复用单行退休近似，而是实现并接通持久 `TapeNewlineFlow` 结构账本、实际 TextKit 词框和 native view 的独立横向身份事件。
+
+账本保留 word／beforeNewline／newline／afterNewline 的身份，在同一次请求的原节点序列上计算扫描范围、补偿和 filler 目标；下一次请求观察真正缺失后的邻接关系，不无条件读取最初 Return owner 的标记。原生布局释放消失的文字框和对应 canonical glyph 映射，但结构行仍占高度；空行的 beforeNewline 仍可参与后续纵向边界选择。lookahead 范围内 filler 按累计已删宽度重定再续动，未访问 filler 保留状态；新输入使用删后拓扑，重绘不恢复缺失框，重启重建，既有纵向前缀补偿按首个仍存活框测量。
+
+视图使用真实已呈现词框及旧 words margin 判断溢出，同步补偿 words／两个 marker，再请求新的横向目标；当前活动词通过 context 或 canonical anchor 保护，是 native 防丢策略，不宣称与原版删活动词异常路径等价。新增 `PromptTapeWordRemoval` 传独立词序号集合，经尝试／修订代次异步通知、去重与拆卸取消，不伪造纵向 `PromptWordRetirement`。原版会保留空的旧结构行，四图中上部空行因此不是由 UI 填补或前缀折叠来掩盖的。没有新 Timer／产品依赖／WebView／原版产品代码资产，原文、输入、成绩、回放及持久格式不变。
+
+新 QA 完整执行固定 `getNlCharWidth`／`scrollTape` 和完整性校验的 Anime.js 4.2.2；120 组为三种混合行／错误 Return结构 × 双向 × 即时／平滑 × 五种预请求溢出集合 × 两种 viewport，每组两次真实调用，比较持续存活节点、删词集合、leading 清理、补偿、cap 和 0／31／62／113／150ms filler。QA 使用自有整数框／受控 offsetLeft，不证明浏览器 CSSOM 与实际字体数值，也不是完整输入／pace／纵横异步队列。早期标为未来词的案例其实在 lookahead 外，复核后给末词加 Return 使其被访问，并增加必须实际删除 index>active 的有效性断言；最终完整函数与 Swift 账本对照均通过，不能把早期未触发标签算作覆盖。
+
+`/tmp/typebar-tape-newline-flow-red.log` 与 `native-red.log` 是新增 API 未存在的编译失败，只作功能缺失证据，不声称行为红灯；`first.log` 首个持久缺口用例通过。`source.log` 测试因 Double?／CGFloat? 类型误用失败，修正后 `source-fixed.log` 两项通过（0.868 秒）。`native-first.log` 36 项零失败零跳过（12.034 秒），`integrated-first.log` 当时相关 178 项通过（30.237 秒）。以上初期源码探针尚未有效触发未来词，最终覆盖以后续带有效性断言版本为准。
+
+真实视图 `actual-view.log` 五项产生四处失败（1.738 秒）：删词改变后续标记邻接，普通 representable 重绘误把删前目标与删后测量差异当成新 scrollTape，第二次补偿／位移。缓存改为删后测量，不改原请求的目标、时钟或同词真实新输入；`repeat-fixed.log` 180 项通过（30.548 秒）。最终 `/tmp/typebar-tape-newline-flow-final-regression.log` 相关 181 项零失败零跳过（31.048 秒），六新增 1.473 秒。测试保留缺口、空行、独立事件、重复重绘、重开取消与完整 120 组两次请求源证据，未放宽容限或禁用用例；最后补无 context 时的 canonical anchor 防丢兜底后，将以冻结全量结果为最终依据。全部日志保留，运行中未编辑。
+
+四张 `/tmp/typebar-tape-newline-flow-focused-images.dyY7Jm/tape-newline-overflow-{ltr,rtl}-{retired,refresh}.png` 已逐张检查。实际文字框删去、旧结构行保留，重绘前后全幅逐像素差异为零且强制非空；两种 marker 关闭，NSWindow 从不显示并关闭，零主程序启动。最终重新冻结结果见本节首段。
+
+同会话行为优先、源码驱动、决策／风险复核围绕“缺口≠前缀”、持久拓扑与邻接变化、重复请求／通知代次和结构空行反例进行，不是独立评审；根因技能用于真实重复滚动缺陷与未来案例有效性。**横向身份集合仍未接入 TypingSession 回删、共享显示投影及字体重建恢复**，不能以 callback 存在冒充会话端到端。生产工厂仍不传 newlineWords，明确换行继续普通回退；未来缺失目标／活动词异常策略、任意纵横／反向队列、hint／Zen／joining／复杂控制／混合行高／尾随 Return、可见物化性能与真实设备／IME 仍开放。下一步需将独立集合接入会话可回删范围与共享投影，再组合生产接线。53 表面、94 配置 90／3／1 不升级，新增两个人工待验项，完整重写 goal active，下方为阶段历史。
+
 ## 换行 Tape 实际纵向 owner、内部删除与会话确认增量
 
 最终冻结门禁 `/tmp/typebar-tape-native-transition-final-readiness.log` 终态退出 0：原生 3,905 项零失败零跳过（2088.733 秒），服务 501 项（11.807 秒）；十万词耐久 1383.664 秒、16 项隔离磁盘冷读 6.289 秒、53 表面、1,115 唯一人工场景结构、90／3／1 配置元数据和未启动应用包资源／URL scheme／严格签名／原创边界通过。十新增在全量中 4.612 秒，128 条完整源码归一化实际 owner 轨迹和全部既有源码检查通过。20 文件 `/tmp/typebar-tape-native-transition-final-frozen.sha256` 门禁前中后一致；67 原始日志 `/tmp/typebar-tape-native-transition-final-logs.hFPd8I`、177 图 `/tmp/typebar-tape-native-transition-final-images.lt3R3l` 保留，最终六张新图已逐张复查，完成／确认全幅像素一致且非空。窗口从不显示并关闭，零主程序启动，无残留主程序／测试／编译进程；既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。门禁运行中发生对话中断，但按同一已确认活跃句柄续等，未重跑或并行验收、未编辑冻结文件；终态后才补 README／本合同。电源日志 `/tmp/typebar-tape-native-transition-sleep-evidence.log` 记录该耐久用例期间多次 Sleep／DarkWake，含 09:32:08 起 1022 秒维护睡眠，09:49:54 完整唤醒；保留实际长耗时，不扣除睡眠推算性能，也不把本次当清醒基准或性能等价证明。参考仍固定且干净，未操作真实账户、Keychain、成绩库或部署。生产换行回退、tapeMode 部分及完整 goal active 保持，下方为阶段证据。

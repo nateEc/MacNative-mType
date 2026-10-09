@@ -33,6 +33,9 @@ final class TapePromptNativeView: NSView {
   private var pendingNewlineJumps = 0
   private var pendingNewline: (deadline: TimeInterval, retirement: PromptWordRetirement)?
   private var awaitsWordScroll = false
+  private var onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)?
+  private var pendingTapeWordRemovals: Set<Int> = []
+  private var notifiedTapeWordRemovals: Set<Int> = []
 
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -51,6 +54,7 @@ final class TapePromptNativeView: NSView {
     mode: PracticeTapeMode, margin: Double, smoothScroll: Bool,
     retirement: PromptLineScrollContext? = nil,
     newlineWords: [TapePromptWord] = [], onMetrics: ((TapePromptLayoutMetrics) -> Void)? = nil,
+    onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil,
     carets: PromptCaretNativeView.Configuration, at time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
     let nextInput = carets.latestInput?()
     let inputChanged = nextInput != lastInput
@@ -67,6 +71,7 @@ final class TapePromptNativeView: NSView {
     if resets {
       notifiedRetirementIndex = retirement?.firstRetainedWordIndex ?? 0
       pendingRetirement = nil
+      pendingTapeWordRemovals = []; notifiedTapeWordRemovals = []
       resetNewlineTransition(firstRetained: retirement?.firstRetainedWordIndex ?? 0)
     }
     let acknowledgesNativePrefix = !resets && !newlineWords.isEmpty
@@ -102,6 +107,7 @@ final class TapePromptNativeView: NSView {
     self.wordStartCharacterOffsets = wordStartCharacterOffsets
     self.checksDirectionPerGlyph = checksDirectionPerGlyph
     self.onMetrics = onMetrics
+    self.onTapeWordsRemoved = onTapeWordsRemoved
     if resets { reportedMetrics = nil }
     self.mode = mode; self.margin = margin.clamped(to: 0...1); self.smoothScroll = smoothScroll
     lastInput = nextInput
@@ -120,6 +126,7 @@ final class TapePromptNativeView: NSView {
     setAccessibilityLabel(String(rendering.text.characters))
     updateGeometry(at: time, retiresWords: !onlyAcknowledgesPrefix)
     deliverRetirement()
+    deliverTapeWordRemoval()
     deliverMetrics()
     // Input/configuration requests do not advance animations between frames.
     // Initial/re-anchored geometry has no running layout to preserve.
@@ -134,6 +141,7 @@ final class TapePromptNativeView: NSView {
     needsScroll = true; snapsScroll = true
     updateGeometry(at: ProcessInfo.processInfo.systemUptime)
     deliverRetirement()
+    deliverTapeWordRemoval()
     deliverMetrics()
     present(at: ProcessInfo.processInfo.systemUptime)
     schedulePresentation()
@@ -147,13 +155,31 @@ final class TapePromptNativeView: NSView {
       config.coordinator.resetLayout()
     }
     textView.viewportWidth = bounds.width
-    let advance = textView.advance(at: anchorCharacterIndex,
+    var advance = textView.advance(at: anchorCharacterIndex,
       wordStart: wordStartCharacterOffsets[anchorCharacterIndex], mode: mode, rightToLeft: config.rightToLeft)
     let scrollRequested = !awaitsWordScroll && (needsScroll || advance != lastScrollAdvance)
     let duration = snapsScroll || !smoothScroll || config.reducesMotion ? 0.0 : 0.125
     if scrollRequested {
       if retiresWords { prepareRetirement(rightToLeft: config.rightToLeft) }
-      textView.requestNewlineLayout(at: anchorCharacterIndex, duration: duration, time: time)
+      let origin = textOrigin + config.coordinator.wordsTapeMargin
+      let active = retirement?.words.first(where: { $0.glyphID == retirement?.activeWordID })?.index
+        ?? textView.newlineWords.first(where: { $0.characters.contains(anchorCharacterIndex) })?.index
+      if let pass = textView.requestNewlineScroll(at: anchorCharacterIndex, mode: mode,
+        duration: duration, time: time, overflowing: { index, rect in
+          // A currently active box is never discarded by the native owner.
+          // Future/non-prefix holes remain distinct from a session prefix.
+          index != active && PracticeTapePolicy.isOverflowing(wordLeft: rect.minX + origin,
+            wordWidth: rect.width, viewportWidth: self.bounds.width, rightToLeft: config.rightToLeft)
+        }) {
+        advance = pass.advance
+        if pass.compensation != 0 {
+          config.coordinator.tapeWordsRemoved(width: config.rightToLeft ? -pass.compensation : pass.compensation)
+        }
+        if !pass.removedWords.isEmpty {
+          pendingTapeWordRemovals.formUnion(pass.removedWords)
+          geometryRevision &+= 1
+        }
+      }
     }
     textView.setFrameSize(.init(width: max(bounds.width, textView.contentWidth),
       height: max(bounds.height, textView.newlineMetrics?.contentHeight ?? 0)))
@@ -171,7 +197,11 @@ final class TapePromptNativeView: NSView {
       config.coordinator.tapeScroll(to: config.rightToLeft ? advance : -advance,
         duration: duration, at: time)
       needsScroll = false; snapsScroll = false
-      lastScrollAdvance = advance
+      // Removing a word changes future marker adjacency. Cache the resulting
+      // measurement, not the pre-deletion request target, so an unchanged
+      // representable update cannot manufacture a second scrollTape call.
+      lastScrollAdvance = textView.advance(at: anchorCharacterIndex,
+        wordStart: wordStartCharacterOffsets[anchorCharacterIndex], mode: mode, rightToLeft: config.rightToLeft)
     }
   }
 
@@ -270,6 +300,19 @@ final class TapePromptNativeView: NSView {
     }
   }
 
+  private func deliverTapeWordRemoval() {
+    guard let config = configuration, let notify = onTapeWordsRemoved else { return }
+    let indices = pendingTapeWordRemovals.subtracting(notifiedTapeWordRemovals)
+    guard !indices.isEmpty else { return }
+    let revision = retirementRevision, attempt = config.attemptID
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.retirementRevision == revision, self.configuration?.attemptID == attempt else { return }
+      self.notifiedTapeWordRemovals.formUnion(indices)
+      self.pendingTapeWordRemovals.subtract(indices)
+      notify(.init(attemptID: attempt, wordIndices: indices))
+    }
+  }
+
   private func glyphRect(_ id: Int, main: Bool) -> CGRect? {
     guard let offset = rendering.characterOffset(forGlyphAt: id),
       var rect = textView.glyphRect(at: offset, minimumOffset: wordStartCharacterOffsets[offset] ?? offset) else { return nil }
@@ -302,7 +345,7 @@ final class TapePromptNativeView: NSView {
     if let pendingNewline, time >= pendingNewline.deadline.nextDown {
       finishNewlineTransition(at: time)
       updateGeometry(at: time, retiresWords: false)
-      deliverRetirement(); deliverMetrics()
+      deliverRetirement(); deliverTapeWordRemoval(); deliverMetrics()
     }
     if !textView.newlineWords.isEmpty {
       textView.setFrameSize(.init(width: max(bounds.width, textView.contentWidth),
@@ -339,6 +382,7 @@ final class TapePromptNativeView: NSView {
     metricsRevision &+= 1; onMetrics = nil; reportedMetrics = nil
     textView.stopNewlines()
     retirement = nil; notifiedRetirementIndex = 0; pendingRetirement = nil
+    pendingTapeWordRemovals = []; notifiedTapeWordRemovals = []; onTapeWordsRemoved = nil
     resetNewlineTransition(firstRetained: 0)
     timer?.invalidate(); timer = nil
     caretView.stop()
@@ -502,9 +546,14 @@ private final class TapePromptTextView: NSView {
     layoutManager.drawGlyphs(forGlyphRange: range, at: .zero)
   }
 
-  func requestNewlineLayout(at offset: Int, duration: TimeInterval, time: TimeInterval) {
-    guard let newlineLayout else { return }
-    newlineLayout.request(newlineLayout.plan(at: offset, viewportWidth: viewportWidth), duration: duration, at: time)
+  func requestNewlineScroll(at offset: Int, mode: PracticeTapeMode, duration: TimeInterval,
+    time: TimeInterval, overflowing: (Int, CGRect) -> Bool)
+    -> (advance: CGFloat, compensation: CGFloat, removedWords: Set<Int>)? {
+    guard let newlineLayout else { return nil }
+    let pass = newlineLayout.requestScroll(at: offset, mode: mode, viewportWidth: viewportWidth,
+      duration: duration, time: time, overflowing: overflowing)
+    needsDisplay = true
+    return pass
   }
   func sampleNewlines(at time: TimeInterval) {
     guard let newlineLayout else { return }
@@ -512,12 +561,11 @@ private final class TapePromptTextView: NSView {
   }
   func retirementBoundary(before activeGlyphID: Int, hideBound: CGFloat) -> Int? {
     guard let layout = newlineLayout, let active = newlineWords.first(where: { $0.glyphID == activeGlyphID }) else { return nil }
-    return newlineWords.last(where: { $0.index >= firstRetainedNewlineIndex && $0.index < active.index
-      && layout.wordRect(at: $0.characters.lowerBound).map { $0.minY < hideBound } == true }).map { $0.index + 1 }
+    return layout.retirementBoundary(before: active.index, hideBound: hideBound)
   }
   func retireNewlinePrefix(before index: Int) -> CGFloat? {
     guard index > firstRetainedNewlineIndex, let source = newlineSource, let layout = newlineLayout,
-      let first = newlineWords.first(where: { $0.index == index }),
+      let first = newlineWords.first(where: { $0.index >= index && layout.wordRect(at: $0.characters.lowerBound) != nil }),
       let width = layout.prefixCompensation(at: first.characters.lowerBound) else { return nil }
     firstRetainedNewlineIndex = index
     layout.configure(text: source.text, words: newlineWords.filter { $0.index >= index },

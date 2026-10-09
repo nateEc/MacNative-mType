@@ -11,9 +11,9 @@ import AppKit
       height: CGFloat.greatestFiniteMagnitude))
     let storage = NSTextStorage()
     let characterRanges: [Int: NSRange]
-    let row: Int
-    let inline: CGFloat
-    let precedingBreak: Int?
+    var row: Int
+    var inline: CGFloat
+    var precedingBreak: Int?
     let bounds: CGRect
 
     init(descriptor: TapePromptWord, prepared: NSAttributedString,
@@ -68,6 +68,8 @@ import AppKit
   private var totalWidth: CGFloat = 0
   private var maximumRowWidth: CGFloat = 0
   private var pendingPrefixCorrection: CGFloat = 0
+  private var flow = TapeNewlineFlow()
+  private var rowsByNode: [TapeNewlineFlow.Node: Int] = [:]
   private(set) var leadingEdge: CGFloat = 0
   private(set) var metrics = TapePromptLayoutMetrics(contentHeight: 0, rowHeight: 0)
   private(set) var wordMetrics: [TapeNewlineWordMetric] = []
@@ -77,11 +79,11 @@ import AppKit
   func configure(text: AttributedString, words descriptors: [TapePromptWord], font: NSFont,
     rightToLeft: Bool, resets: Bool) {
     if resets { indents = [:]; pendingPrefixCorrection = 0 }
-    guard self.text != text || self.descriptors != descriptors || self.font != font
+    guard resets || self.text != text || self.descriptors != descriptors || self.font != font
       || self.rightToLeft != rightToLeft else { return }
     if !resets, let first = descriptors.first, let oldFirst = self.descriptors.first,
       first.index > oldFirst.index,
-      let retained = words.first(where: { $0.descriptor.index == first.index }) {
+      let retained = words.first(where: { $0.descriptor.index >= first.index }) {
       // Source scrollTape removes the *presented* leading filler, not the
       // mathematical width of the retired text (which may exceed the cap).
       let oldFrame = frame(retained)
@@ -121,12 +123,81 @@ import AppKit
     metrics = .init(contentHeight: CGFloat(rows) * rowHeight, rowHeight: rowHeight)
     totalWidth = wordMetrics.reduce(0) { $0 + $1.width + $1.gap }
     maximumRowWidth = words.map { $0.inline + $0.bounds.width }.max() ?? 0
+    flow.configure(words: wordMetrics, resets: resets)
+    reflowConnectedBoxes()
     updateOrigin()
   }
 
   func plan(at offset: Int, viewportWidth: CGFloat) -> TapeNewlinePlan {
     let active = word(at: offset)?.descriptor.index ?? words.last?.descriptor.index ?? 0
-    return .measure(words: wordMetrics, active: active, viewportWidth: viewportWidth)
+    var preview = flow
+    guard let pass = preview.scroll(active: active, viewportWidth: viewportWidth,
+      overflowing: { _ in false }, fillerMargin: { _ in 0 }) else {
+      return .init(beforeActive: 0, indents: [:])
+    }
+    return .init(beforeActive: pass.beforeActive, indents: pass.indents)
+  }
+
+  /// One horizontal request sees the last presented boxes. The persistent
+  /// topology, native layout and surviving filler channels change together.
+  func requestScroll(at offset: Int, mode: PracticeTapeMode, viewportWidth: CGFloat,
+    duration: TimeInterval, time: TimeInterval, overflowing: (Int, CGRect) -> Bool)
+    -> (advance: CGFloat, compensation: CGFloat, removedWords: Set<Int>)? {
+    guard let active = word(at: offset) else { return nil }
+    let within = mode == .letter ? inlineAdvance(in: active, before: offset) : 0
+    let frames = Dictionary(uniqueKeysWithValues: words.map { ($0.descriptor.index, frame($0)) })
+    let glyphIDs = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.index, $0.glyphID) })
+    let margins = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.index, indents[$0.glyphID]?.tapeMargin ?? 0) })
+    guard let pass = flow.scroll(active: active.descriptor.index, viewportWidth: viewportWidth,
+      overflowing: { index in frames[index].map { overflowing(index, $0) } ?? false },
+      fillerMargin: { margins[$0] ?? 0 }) else { return nil }
+    let liveFillers = Set(flow.nodes.filter { $0.kind == .afterNewline }.compactMap { glyphIDs[$0.index] })
+    indents = indents.filter { liveFillers.contains($0.key) }
+    for (index, target) in pass.indents {
+      guard let id = glyphIDs[index] else { continue }
+      var channel = indents[id] ?? .init()
+      let correction = (pass.fillerCorrections[index] ?? 0) + pendingPrefixCorrection
+      if correction != 0 { channel.shiftTapeOrigin(by: -correction) }
+      channel.tapeScroll(to: target, at: time, duration: duration)
+      indents[id] = channel
+    }
+    pendingPrefixCorrection = 0
+    reflowConnectedBoxes(); updateOrigin()
+    return (pass.beforeActive + within, pass.compensation, pass.removedWords)
+  }
+
+  private func reflowConnectedBoxes() {
+    let byIndex = Dictionary(uniqueKeysWithValues: words.map { ($0.descriptor.index, $0) })
+    let glyphIDs = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.index, $0.glyphID) })
+    let gaps = Dictionary(uniqueKeysWithValues: wordMetrics.map { ($0.index, $0.gap) })
+    words = []; wordByOffset = [:]; rowsByNode = [:]
+    var row = 0, occupiedRow = -1, inline: CGFloat = 0, preceding: Int?
+    for node in flow.nodes {
+      rowsByNode[node] = row
+      switch node.kind {
+      case .word:
+        guard let word = byIndex[node.index] else { continue }
+        word.row = row; word.inline = inline; word.precedingBreak = preceding
+        let slot = words.count; words.append(word)
+        for offset in word.characterRanges.keys { wordByOffset[offset] = slot }
+        inline += word.bounds.width + (gaps[node.index] ?? 0)
+        occupiedRow = max(occupiedRow, row)
+      case .beforeNewline: occupiedRow = max(occupiedRow, row)
+      case .newline: row += 1; inline = 0; preceding = nil
+      case .afterNewline: preceding = glyphIDs[node.index]
+      }
+    }
+    metrics = .init(contentHeight: CGFloat(occupiedRow + 1) * metrics.rowHeight, rowHeight: metrics.rowHeight)
+    totalWidth = words.reduce(0) { $0 + $1.bounds.width + (gaps[$1.descriptor.index] ?? 0) }
+    maximumRowWidth = words.map { $0.inline + $0.bounds.width }.max() ?? 0
+  }
+
+  func retirementBoundary(before active: Int, hideBound: CGFloat) -> Int? {
+    guard let slot = flow.nodes.firstIndex(of: .init(kind: .word, index: active)) else { return nil }
+    return flow.nodes.prefix(slot).last(where: { node in
+      (node.kind == .word || node.kind == .beforeNewline)
+        && CGFloat(rowsByNode[node] ?? 0) * metrics.rowHeight < hideBound
+    }).map { $0.index + 1 }
   }
 
   func request(_ plan: TapeNewlinePlan, duration: TimeInterval, at time: TimeInterval) {
@@ -179,14 +250,17 @@ import AppKit
   func advance(at offset: Int, mode: PracticeTapeMode, viewportWidth: CGFloat) -> CGFloat {
     guard let word = word(at: offset) else { return 0 }
     let before = plan(at: offset, viewportWidth: viewportWidth).beforeActive
-    guard mode == .letter, offset > word.descriptor.characters.lowerBound else { return before }
+    return before + (mode == .letter ? inlineAdvance(in: word, before: offset) : 0)
+  }
+  private func inlineAdvance(in word: Word, before offset: Int) -> CGFloat {
+    guard offset > word.descriptor.characters.lowerBound else { return 0 }
     var within = word.width(before: offset)
     if word.rect(offset, minimum: offset)?.width == 0 {
       for index in stride(from: offset - 1, through: word.descriptor.characters.lowerBound, by: -1) {
         if let rect = word.rect(index, minimum: index), rect.width > 0 { within -= rect.width; break }
       }
     }
-    return before + within
+    return within
   }
   func direction(at offset: Int, perGlyph: Bool, fallback: Bool) -> Bool {
     guard characters.indices.contains(offset), let word = word(at: offset) else { return fallback }

@@ -4,13 +4,13 @@ import XCTest
 @testable import Typebar
 
 final class ResultHistoryFilterChoiceTests: XCTestCase {
-  @MainActor func testWithoutACurrentApplicationEventTheDefaultBindingTogglesNormally() {
-    XCTAssertNil(NSApp?.currentEvent)
+  @MainActor func testDefaultBindingUsesActualApplicationModifiersWithoutAssumingAnIdleDesktop() {
+    let flags = NSApp?.currentEvent?.modifierFlags ?? []
     var selected: Set<TestMode> = [.time, .words]
     let choice = ResultHistoryFilterChoice.binding(for: .words,
       selection: Binding(get: { selected }, set: { selected = $0 }))
     choice.wrappedValue = false
-    XCTAssertEqual(selected, [.time])
+    XCTAssertEqual(selected, flags.contains(.shift) ? [.words] : [.time])
   }
 
   @MainActor func testShiftClickOnAnAlreadySelectedModeKeepsOnlyThatMode() {
