@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 契约修正后的完整门禁（2026-10-10）
+
+在已推送 bd4b30d 的干净工作树上重新执行 check-native-rewrite-readiness.sh，固定参考 91bd24bb8513785c7364cbea29296ff7adafac41、Redis 6.2.6 与 Anime.js 4.2.2 归档。会话 11000 权威退出 0；完整日志 caret-contract-readiness.FOUyOi.gate.log，74 份分项日志保留在 work/caret-contract-readiness.FOUyOi/。原生 4170 项零失败、零跳过，889.727s（墙钟 890.213）；服务 501 项零失败，12.995s（墙钟 13.065）。两个历史契约冲突用例均在完整测试中通过，万词自定义文本用例 7.081s 通过。
+
+Release 构建 425.42s 完成，未打开的应用包签名、资源边界及原创边界检查通过，最终输出 native rewrite readiness check passed。本轮从源码对照到打包全过程代码冻结、零 Typebar 主程序启动。此门禁验证固定源码行为探针、原生及自托管服务测试与包边界，不代替实机 GUI、设备 IME、视觉主题或完整人工验收。配置仍有四项部分覆盖，官方主题精确色彩覆盖仍为 0/187，普通计时实际应用延迟失败仍开放；完整重写 goal 保持 active。
+
 ## 完整门禁发现的历史断言契约冲突（2026-10-10）
 
 c5417e4 完整门禁的原生测试权威退出 1：4170 项、4 次断言失败，885.437s（墙钟 885.911）。失败集中于两个用例；服务与打包阶段尚未执行。原始完整日志保留在 work 下 typebar-native-rewrite-readiness.rmWYxW/client-tests.log 对应系统临时目录，整体日志为 caret-content-readiness.YNiz6S.gate.log。CoreData 错误输出不是这四次断言失败的归因。
