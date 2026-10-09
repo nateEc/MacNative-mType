@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 连接文字策略增量（2026-10-10）
+
+Tape 投影此前默认逐槽排版，未传共享字段布局已有的 joinsLetters。现在该参数从 session 的 usesJoiningScriptPrompt 经 TapePracticePrompt／桥接传入 owner；单行 PromptFieldTextLayout 与多行每字段词盒都使用该策略。多行布局变更检测及复用检查纳入策略，owner 变化触发重配置；同字段刷新、完整事务刷新和前缀重建保留参数，newlineSource 保存它。默认 false 保持既有调用兼容，不引入新的字体或上游资产。
+
+新增阿拉伯文 `سلام\nمرحبا نهاية` 及固定 `لام` 候选：先确认共享布局连接／分离宽度差异超过 1 点，使反例确实区分塑形；同一多行布局 false／true／false／true 切换，比较实际字段宽度。实际 RTL owner 同样切换，检查 outline 主光标宽度、右边距锁定及接受推进。对照复用同一原生字段布局，证明参数和几何接线，不独立证明 TextKit 本身或与上游的像素等价。
+
+`../../work/tape-joining-red.log` 保留缺少新参数的预期编译失败；`../../work/tape-joining-first.log` 专项一项零失败，0.087 秒（wall 0.089 秒）。加入实际 owner 检查后 `../../work/tape-joining-verified.log` 191 项零失败零跳过，24.861 秒（wall 24.884 秒），进程退出 0；`../../work/tape-joining-originality.log` 原创性检查退出 0。
+
+零主程序启动，无新截图；不是视觉或实机输入法验收。单行连接候选的完整组合、独立 pace／退休交错、混合方向、策略改变时未确认移除队列、应用渲染保护与真实设备仍开放。完整冻结门禁未重跑，整体功能分类不升级，完整 goal active。
+
 ## 首次完整投影事务增量（2026-10-10）
 
 configure 的首次 provider 读取现在区分完整事务和旧三字段同字段快照。完整事务检查 attempt、元数据成对、活动 map／词目录、传入退休前缀不回退与同 attempt 原生保留字段边界；同步替换字段、渲染、换行描述、退休上下文和主 glyph ID，再执行既有配置流程。旧快照仍按同字段／单行限制接受。provider 返回后比较 retirementRevision，stop 或重配置使外层事务中止。

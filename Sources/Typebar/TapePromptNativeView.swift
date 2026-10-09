@@ -18,6 +18,7 @@ final class TapePromptNativeView: NSView {
   private var presentingProjection = false
   private var wordStartCharacterOffsets: [Int: Int] = [:]
   private var checksDirectionPerGlyph = false
+  private var joinsLetters = false
   private var mode: PracticeTapeMode = .off
   private var margin = 0.0
   private var smoothScroll = false
@@ -59,6 +60,7 @@ final class TapePromptNativeView: NSView {
     compositionField: PromptCompositionField? = nil, hidesCompositionExtras: Bool = false,
     latestProjection: (() -> TapePromptProjectionSnapshot?)? = nil,
     checksDirectionPerGlyph: Bool = false,
+    joinsLetters: Bool = false,
     mode: PracticeTapeMode, margin: Double, smoothScroll: Bool,
     retirement: PromptLineScrollContext? = nil,
     newlineWords: [TapePromptWord] = [], onMetrics: ((TapePromptLayoutMetrics) -> Void)? = nil,
@@ -114,6 +116,7 @@ final class TapePromptNativeView: NSView {
       || self.mode != mode || self.margin != margin || self.smoothScroll != smoothScroll
       || configuration?.reducesMotion != carets.reducesMotion
       || configuration?.rightToLeft != carets.rightToLeft || self.checksDirectionPerGlyph != checksDirectionPerGlyph
+      || self.joinsLetters != joinsLetters
       || textView.usesFieldProjection != nextUsesProjection
     retirementRevision &+= 1
     metricsRevision &+= 1
@@ -171,6 +174,7 @@ final class TapePromptNativeView: NSView {
     self.latestProjection = latestProjection; projectionInput = nextInput
     self.wordStartCharacterOffsets = wordStartCharacterOffsets
     self.checksDirectionPerGlyph = checksDirectionPerGlyph
+    self.joinsLetters = joinsLetters
     self.onMetrics = onMetrics
     self.onTapeWordsRemoved = onTapeWordsRemoved
     if resets { reportedMetrics = nil }
@@ -181,7 +185,7 @@ final class TapePromptNativeView: NSView {
     else if let removedWidth { carets.coordinator.tapeWordsRemoved(width: removedWidth) }
     textView.configure(text: rendering.text, font: carets.font, rightToLeft: carets.rightToLeft,
       newlineWords: newlineWords, resets: resets,
-      compositionMap: nextMap)
+      compositionMap: nextMap, joinsLetters: joinsLetters)
     let changedWord = textView.usesMultilineProjection
       ? previousFieldIndex != compositionField?.index : previousWordID != retirement?.activeWordID
     if !resets, changedWord {
@@ -329,7 +333,7 @@ final class TapePromptNativeView: NSView {
       nextConfig.latestRendering = { next.rendering }
       configure(rendering: next.rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
         compositionField: next.field, hidesCompositionExtras: hidesCompositionExtras,
-        latestProjection: latestProjection, checksDirectionPerGlyph: checksDirectionPerGlyph,
+        latestProjection: latestProjection, checksDirectionPerGlyph: checksDirectionPerGlyph, joinsLetters: joinsLetters,
         mode: mode, margin: margin, smoothScroll: smoothScroll, retirement: context,
         newlineWords: words, onMetrics: onMetrics, onTapeWordsRemoved: onTapeWordsRemoved,
         carets: nextConfig, at: time)
@@ -346,7 +350,7 @@ final class TapePromptNativeView: NSView {
     projectionInput = next.input; lastInput = next.input
     compositionField = next.field; rendering = next.rendering
     textView.configure(text: rendering.text, font: config.font, rightToLeft: config.rightToLeft,
-      newlineWords: [], resets: false, compositionMap: rendering.compositionTextMap)
+      newlineWords: [], resets: false, compositionMap: rendering.compositionTextMap, joinsLetters: joinsLetters)
     geometryRevision &+= 1; needsScroll = true
     // Prefix retirement and structural transitions still belong to the full
     // representable transaction. A same-field refresh cannot acknowledge them.
@@ -652,7 +656,7 @@ private final class TapePromptTextView: NSView {
   private var newlineLayout: TapeNewlineTextLayout?
   private(set) var newlineWords: [TapePromptWord] = []
   private(set) var firstRetainedNewlineIndex = 0
-  private var newlineSource: (text: AttributedString, font: NSFont, rightToLeft: Bool, map: PromptCompositionTextMap?)?
+  private var newlineSource: (text: AttributedString, font: NSFont, rightToLeft: Bool, map: PromptCompositionTextMap?, joinsLetters: Bool)?
   var viewportWidth: CGFloat = 0
   var newlineMetrics: TapePromptLayoutMetrics? { newlineLayout?.metrics }
   var removedNewlineWordIndices: Set<Int> { newlineLayout?.removedWordIndices ?? [] }
@@ -674,12 +678,12 @@ private final class TapePromptTextView: NSView {
   required init?(coder: NSCoder) { fatalError("TapePromptTextView is created in code") }
 
   func configure(text: AttributedString, font: NSFont, rightToLeft: Bool,
-    newlineWords: [TapePromptWord], resets: Bool, compositionMap: PromptCompositionTextMap? = nil) {
+    newlineWords: [TapePromptWord], resets: Bool, compositionMap: PromptCompositionTextMap? = nil, joinsLetters: Bool = false) {
     // Multiline topology remains owned by the persistent flow below.
     if let map = compositionMap, Self.supportsProjection(map, newlineWords: newlineWords, rightToLeft: rightToLeft) {
       stopNewlines()
       projectedLayout = PromptFieldTextLayout(map: map, width: 1_000_000_000,
-        font: font, lineSpacing: 0, rightToLeft: rightToLeft, unbounded: true, reusing: projectedLayout)
+        font: font, lineSpacing: 0, rightToLeft: rightToLeft, joinsLetters: joinsLetters, unbounded: true, reusing: projectedLayout)
       needsDisplay = true
       return
     }
@@ -689,10 +693,10 @@ private final class TapePromptTextView: NSView {
       if newlineLayout == nil { newlineLayout = TapeNewlineTextLayout() }
       if resets { firstRetainedNewlineIndex = newlineWords.first?.index ?? 0 }
       firstRetainedNewlineIndex = max(firstRetainedNewlineIndex, newlineWords.first?.index ?? 0)
-      newlineSource = (text, font, rightToLeft, compositionMap)
+      newlineSource = (text, font, rightToLeft, compositionMap, joinsLetters)
       usesMultilineProjection = compositionMap != nil
       newlineLayout?.configure(text: text, words: newlineWords.filter { $0.index >= firstRetainedNewlineIndex },
-        font: font, rightToLeft: rightToLeft, resets: resets, compositionMap: compositionMap)
+        font: font, rightToLeft: rightToLeft, resets: resets, compositionMap: compositionMap, joinsLetters: joinsLetters)
       self.newlineWords = newlineWords
       needsDisplay = true
       return
@@ -838,7 +842,7 @@ private final class TapePromptTextView: NSView {
     guard let width else { return nil }
     firstRetainedNewlineIndex = index
     layout.configure(text: source.text, words: newlineWords.filter { $0.index >= index },
-      font: source.font, rightToLeft: source.rightToLeft, resets: false, compositionMap: source.map)
+      font: source.font, rightToLeft: source.rightToLeft, resets: false, compositionMap: source.map, joinsLetters: source.joinsLetters)
     needsDisplay = true
     return width
   }

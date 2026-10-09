@@ -249,6 +249,48 @@ import XCTest
     try verifyCompleteFreshSnapshot(independentPace: false)
   }
 
+  func testJoiningScriptWordUsesFieldShapingAndRebuildsWhenPolicyChanges() throws {
+    var session = TypingSession(configuration: .words(3), prompt: "سلام\nمرحبا نهاية")
+    session.insertBatch("س", at: Date(timeIntervalSinceReferenceDate: 917_100_000))
+    let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: "لام", style: .replace))
+    let rendering = presentation.render { _, glyph, cell in AttributedString(cell?.text ?? String(glyph.character)) }
+    let map = try XCTUnwrap(rendering.compositionTextMap)
+    let field = try XCTUnwrap(session.promptCompositionField)
+    let cells = map.fieldRuns.filter { $0.fieldID == field.index }.flatMap(\.cells).filter { !$0.isGap }
+    let run = PromptFieldTextRun(fieldID: field.index, cells: cells, structuralReturn: false)
+    let font = NSFont.systemFont(ofSize: 28)
+    let joined = PromptFieldTextLayout(fieldRuns: [run], aliases: map.canonicalAliases, anchor: map.caret,
+      width: 1_000_000_000, font: font, lineSpacing: 0, rightToLeft: true, joinsLetters: true, unbounded: true)
+    let separated = PromptFieldTextLayout(fieldRuns: [run], aliases: map.canonicalAliases, anchor: map.caret,
+      width: 1_000_000_000, font: font, lineSpacing: 0, rightToLeft: true, joinsLetters: false, unbounded: true)
+    XCTAssertGreaterThan(abs(joined.size.width - separated.size.width), 1, "Fixture must distinguish connected shaping")
+    let native = TapeNewlineTextLayout()
+    let words = TapePromptProjection.words(session: session, rendering: rendering)
+    let motion = PromptCaretMotionCoordinator()
+    let owner = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 120))
+    defer { owner.stop() }
+    let config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
+      mainStyle: .outline, paceStyle: .off, font: font, lineSpacing: 0, rightToLeft: true,
+      accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+      attemptID: session.automaticInputAttemptID, coordinator: motion,
+      mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
+    for policy in [false, true, false, true] {
+      native.configure(text: rendering.text, words: words, font: font, rightToLeft: true,
+        resets: false, compositionMap: map, joinsLetters: policy)
+      XCTAssertEqual(try XCTUnwrap(native.projectedFieldRect(field.index)).width,
+        policy ? joined.size.width : separated.size.width, accuracy: 0.001)
+      owner.configure(rendering: rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+        compositionField: field, joinsLetters: policy, mode: .letter, margin: 0.25,
+        smoothScroll: false, newlineWords: words, carets: config, at: 0)
+      let expected = try XCTUnwrap((policy ? joined : separated).mainRect(style: .outline))
+      XCTAssertEqual(try XCTUnwrap(motion.main.position).width, expected.width, accuracy: 0.001)
+      XCTAssertEqual(try XCTUnwrap(motion.main.position).minX, 300 - expected.width, accuracy: 0.001)
+      let advance = try XCTUnwrap(native.projectedAdvance(fieldID: field.index,
+        acceptedUTF16Count: field.inputUTF16.count, mode: .letter, hidesExtras: false, viewportWidth: 400))
+      XCTAssertEqual(motion.wordsTapeMargin, advance, accuracy: 0.001)
+    }
+  }
+
   func testSessionSnapshotBindsTopologyAndRejectsStaleRetirementAttempt() throws {
     for prompt in ["abcd next", "a\nbc tail"] {
       var session = TypingSession(configuration: .words(3), prompt: prompt)

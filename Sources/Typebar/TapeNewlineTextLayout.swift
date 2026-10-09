@@ -19,7 +19,7 @@ import AppKit
     var projectedCells: [PromptFieldTextRun.Cell] = []
 
     init(descriptor: TapePromptWord, cells: [PromptFieldTextRun.Cell],
-      map: PromptCompositionTextMap, font: NSFont, rightToLeft: Bool,
+      map: PromptCompositionTextMap, font: NSFont, rightToLeft: Bool, joinsLetters: Bool,
       row: Int, inline: CGFloat, precedingBreak: Int?, reusing previous: PromptFieldTextLayout?) {
       self.descriptor = descriptor; self.row = row; self.inline = inline
       self.precedingBreak = precedingBreak; characterRanges = [:]
@@ -28,7 +28,7 @@ import AppKit
         structuralReturn: false)
       let layout = PromptFieldTextLayout(fieldRuns: [run], aliases: map.canonicalAliases,
         anchor: map.caret, width: 1_000_000_000, font: font, lineSpacing: 0,
-        rightToLeft: rightToLeft, unbounded: true, reusing: previous)
+        rightToLeft: rightToLeft, joinsLetters: joinsLetters, unbounded: true, reusing: previous)
       projected = layout
       bounds = .init(origin: .zero, size: layout.size)
     }
@@ -90,6 +90,7 @@ import AppKit
   private var compositionMap: PromptCompositionTextMap?
   private var font: NSFont?
   private var rightToLeft = false
+  private var joinsLetters = false
   private var indents: [Int: PromptCaretChannel] = [:]
   private var characters: [Character] = []
   private var totalWidth: CGFloat = 0
@@ -105,10 +106,11 @@ import AppKit
   var contentWidth: CGFloat { rightToLeft ? leadingEdge : (words.map { frame($0).maxX }.max() ?? 0) }
 
   func configure(text: AttributedString, words descriptors: [TapePromptWord], font: NSFont,
-    rightToLeft: Bool, resets: Bool, compositionMap: PromptCompositionTextMap? = nil) {
+    rightToLeft: Bool, resets: Bool, compositionMap: PromptCompositionTextMap? = nil, joinsLetters: Bool = false) {
     if resets { indents = [:]; pendingPrefixCorrection = 0 }
     guard resets || self.text != text || self.descriptors != descriptors || self.font != font
       || self.rightToLeft != rightToLeft
+      || self.joinsLetters != joinsLetters
       || self.compositionMap?.fieldRuns != compositionMap?.fieldRuns
       || self.compositionMap?.canonicalAliases != compositionMap?.canonicalAliases
       || self.compositionMap?.caret != compositionMap?.caret else { return }
@@ -121,6 +123,7 @@ import AppKit
       pendingPrefixCorrection = self.rightToLeft ? leadingEdge - oldFrame.maxX : oldFrame.minX
     }
     self.text = text; self.descriptors = descriptors; self.font = font; self.rightToLeft = rightToLeft
+    self.joinsLetters = joinsLetters
     self.compositionMap = compositionMap
     let prepared = TapePromptTextStorage.prepare(text, font: font, rightToLeft: rightToLeft)
     let string = prepared.string
@@ -144,7 +147,7 @@ import AppKit
       if let compositionMap {
         let cells = cellsByField[descriptor.index] ?? []
         word = Word(descriptor: descriptor, cells: cells, map: compositionMap, font: font,
-          rightToLeft: rightToLeft, row: row, inline: inline, precedingBreak: precedingBreak,
+          rightToLeft: rightToLeft, joinsLetters: joinsLetters, row: row, inline: inline, precedingBreak: precedingBreak,
           reusing: resets ? nil : previousLayouts[descriptor.index])
       } else {
         word = Word(descriptor: descriptor, prepared: prepared, ranges: ranges,

@@ -399,6 +399,7 @@ struct TapePracticePrompt: View {
   let rendering: PromptRendering
   var compositionField: PromptCompositionField? = nil
   var hidesCompositionExtras = false
+  var joinsLetters = false
   var latestProjection: (() -> TapePromptProjectionSnapshot?)? = nil
   let anchorCharacterIndex: Int
   let wordAnchorCharacterIndex: Int
@@ -431,6 +432,7 @@ struct TapePracticePrompt: View {
       compositionField: compositionField, hidesCompositionExtras: hidesCompositionExtras,
       latestProjection: latestProjection,
       checksDirectionPerGlyph: checksDirectionPerGlyph,
+      joinsLetters: joinsLetters,
       mode: mode, margin: margin,
       smoothScroll: animatesScroll, carets: carets, retirement: retirement,
       newlineWords: newlineWords, onMetrics: { metrics = $0 }, onTapeWordsRemoved: onTapeWordsRemoved)
@@ -455,6 +457,7 @@ extension TapePracticePrompt {
     self.init(rendering: rendering,
       compositionField: rendering.compositionTextMap == nil ? nil : session.promptCompositionField,
       hidesCompositionExtras: session.configuration.rules.hideExtraLetters,
+      joinsLetters: session.configuration.usesJoiningScriptPrompt,
       latestProjection: latestProjection,
       anchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(session: session, rendering: rendering, mode: mode),
       wordAnchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(session: session, rendering: rendering, mode: .word),
@@ -479,6 +482,7 @@ private struct TapePromptBridge: NSViewRepresentable {
   let hidesCompositionExtras: Bool
   let latestProjection: (() -> TapePromptProjectionSnapshot?)?
   let checksDirectionPerGlyph: Bool
+  let joinsLetters: Bool
   let mode: PracticeTapeMode
   let margin: Double
   let smoothScroll: Bool
@@ -494,6 +498,7 @@ private struct TapePromptBridge: NSViewRepresentable {
       compositionField: compositionField, hidesCompositionExtras: hidesCompositionExtras,
       latestProjection: latestProjection,
       checksDirectionPerGlyph: checksDirectionPerGlyph,
+      joinsLetters: joinsLetters,
       mode: mode, margin: margin,
       smoothScroll: smoothScroll, retirement: retirement, newlineWords: newlineWords,
       onMetrics: onMetrics, onTapeWordsRemoved: onTapeWordsRemoved, carets: carets)
