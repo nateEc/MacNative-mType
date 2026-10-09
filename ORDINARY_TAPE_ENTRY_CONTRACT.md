@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 生产统计子树观察隔离（2026-10-10）
+
+将先前局部宿主对照接入生产：ContentView 拥有独立 LiveStatsClockSignal，LiveStatsClockContent 在自身 body 读取信号并执行最新统计闭包。统计不再直接读取父层 lastClockTickSecond；原始指标计算、整秒交付、计时健康阈值、声音、阈值判定和 Layout Fluid 消费者不变。两个重置入口同步清零。闭包随父视图重建更新，不缓存会话／设置或用 identity 强制重建。
+
+行为优先：live-stats-production-scope-red.log 因尚未实现生产组件而编译失败，保留原始日志。实现后 verified.log 26 项零失败零跳过（9.430s，墙钟 9.435）。补入真实 TypingSession／外部时间源的生产子树对照后，live-stats-production-scope-final.log 42 项零失败零跳过（9.455s，墙钟 9.462）。无订阅倒计时保持 30s；父订阅及生产子树订阅均交付 29／20／10s。三个秒值交付时，父读取组求值 1→4，子树独读组 1→1；父 caption 改变及 20→0 重置仍正确显示。全部窗口不可见，不启动 Typebar 主程序。
+
+补充时钟消费者首轮 44 项零失败但漏传参考导致一项跳过，不计完整对照；live-stats-production-clock-consumers-pinned.log 固定参考后 44 项零失败零跳过（0.776s，墙钟 0.781），覆盖单调时钟、pace、slow timer、计时健康、整秒补交、Layout Fluid 与实时阈值。定向筛选未命中的类名不算执行证据，以日志实际套件和方法为准。原创性脚本直接执行先退出 126（无执行权限）；改用 zsh 后 live-stats-production-scope-originality-zsh.log 退出 0。人工场景结构仍为 1,151 项通过，不代表人工验收。
+
+会话内有界决策复核：生产组件的倒计时更新、父真实状态变化和重置反例已约束，但不是独立审查，也不证明完整 ContentView 输入／主题／布局耗时。Layout Fluid 仍可有意让父层观察秒值。此次零 GUI 启动、无全量门禁或新 Release 实机证据，之前普通计时失败仍未关闭；下一步以单实例 Release 验证此边界，完整兼容矩阵和 goal 维持未完成。
+
 ## 秒级观察范围宿主对照（2026-10-10）
 
 按行为优先测试与会话内决策审查，先验证“统计子视图观察秒级数据能避免父页面重新求值”，而非直接大拆生产 ContentView。新增 LiveStatsClockScopeTests，使用现有平台 Observation、真实 NSHostingView 和不可见窗口：两种情况均让子视图显示每次秒值，只有一组父视图也读取该值。三个交付后父读取组 body 1→4，子视图独读组 1→1；两组真实父 caption 变化均重新求值并正确传到子视图，原有秒值保留。此为局部求值范围，不是布局或调度耗时基准。

@@ -13,12 +13,15 @@ import XCTest
   private struct Content: View {
     let probe: Probe
     let readsDelivery: Bool
+    var usesChildScope = false
     @State private var second = 0
+    @State private var signal = LiveStatsClockSignal()
     @State private var session: TypingSession
 
-    init(probe: Probe, readsDelivery: Bool) {
+    init(probe: Probe, readsDelivery: Bool, usesChildScope: Bool = false) {
       self.probe = probe
       self.readsDelivery = readsDelivery
+      self.usesChildScope = usesChildScope
       var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber birch")
         .withElapsedClock(.init(now: { probe.now }))
       session.insert("a")
@@ -27,7 +30,17 @@ import XCTest
 
     var body: some View {
       if readsDelivery { _ = second }
-      probe.deliver = { second = $0 }
+      probe.deliver = { if usesChildScope { signal.second = $0 } else { second = $0 } }
+      return Group {
+        if usesChildScope {
+          LiveStatsClockContent(signal: signal) { countdown }
+        } else {
+          countdown
+        }
+      }
+    }
+
+    private var countdown: some View {
       let value = session.progressText() ?? "—"
       probe.displayed = value
       return Text(value)
@@ -35,9 +48,10 @@ import XCTest
   }
 
   func testHostedCountdownNeedsAnObservedClockDeliveryDependency() throws {
-    for readsDelivery in [false, true] {
+    for (readsDelivery, usesChildScope) in [(false, false), (true, false), (false, true)] {
       let probe = Probe()
-      let host = NSHostingView(rootView: Content(probe: probe, readsDelivery: readsDelivery))
+      let host = NSHostingView(rootView: Content(probe: probe, readsDelivery: readsDelivery,
+        usesChildScope: usesChildScope))
       let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 300, height: 100),
         styleMask: .borderless, backing: .buffered, defer: false)
       window.isReleasedWhenClosed = false
@@ -54,7 +68,7 @@ import XCTest
         probe.now = Double(second)
         try XCTUnwrap(probe.deliver)(second)
         flush()
-        XCTAssertEqual(probe.displayed, readsDelivery ? "\(30 - second)s" : "30s")
+        XCTAssertEqual(probe.displayed, (readsDelivery || usesChildScope) ? "\(30 - second)s" : "30s")
       }
       XCTAssertFalse(window.isVisible)
     }
@@ -68,6 +82,10 @@ import XCTest
     let start = try XCTUnwrap(source.range(of: "private var stats: some View {"))
     let end = try XCTUnwrap(source.range(of: "private var attentionWarnings:",
       range: start.upperBound..<source.endIndex))
-    XCTAssertTrue(source[start.lowerBound..<end.lowerBound].contains("_ = lastClockTickSecond"))
+    let stats = source[start.lowerBound..<end.lowerBound]
+    XCTAssertTrue(stats.contains("LiveStatsClockContent(signal: liveStatsClockSignal)"))
+    XCTAssertFalse(stats.contains("_ = lastClockTickSecond"))
+    XCTAssertTrue(source.contains("liveStatsClockSignal.second = lastDueSecond"))
+    XCTAssertEqual(source.components(separatedBy: "liveStatsClockSignal.second = 0").count - 1, 2)
   }
 }

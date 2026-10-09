@@ -1292,6 +1292,7 @@ private struct ContentView: View {
   @State private var capsLockEnabled = false
   @State private var lastTimeWarningSecond: Int?
   @State private var lastClockTickSecond = 0
+  @State private var liveStatsClockSignal = LiveStatsClockSignal()
   @State private var timerHealth = TimerHealthState()
   @State private var promptInputWrapLayout = PromptInputWrapLayout()
   @State private var restartLockMessage: String?
@@ -2262,6 +2263,7 @@ private struct ContentView: View {
       }
       if let lastDueSecond = dueSeconds.last {
         lastClockTickSecond = lastDueSecond
+        liveStatsClockSignal.second = lastDueSecond
         session.enforceLivePracticeThresholds(at: now)
         if session.isFinished { return }
       }
@@ -3681,9 +3683,10 @@ private struct ContentView: View {
   }
 
   private var stats: some View {
-    // Elapsed time advances outside observable state. Subscribe this subtree
-    // to real-second deliveries even when input, rules and pace do not change.
-    _ = lastClockTickSecond
+    LiveStatsClockContent(signal: liveStatsClockSignal) { liveStatsContent }
+  }
+
+  private var liveStatsContent: some View {
     let now = Date.now
     let live = LiveTypingMetrics(
       session: session, at: now, blindMode: settings.blindMode, unit: settings.typingSpeedUnit)
@@ -4335,6 +4338,7 @@ private struct ContentView: View {
     clearTypingPowerEffect()
     lastTimeWarningSecond = nil
     lastClockTickSecond = 0
+    liveStatsClockSignal.second = 0
     timerHealth = .init()
     liveContentRequestID = UUID()
     let requestID = liveContentRequestID
@@ -4612,6 +4616,7 @@ private struct ContentView: View {
     keyboardGuideFeedback = nil
     lastTimeWarningSecond = nil
     lastClockTickSecond = 0
+    liveStatsClockSignal.second = 0
     timerHealth = .init()
     NativeSpeech.shared.stop()
     TypingFeedbackSound.shared.beginPracticeAttempt()
