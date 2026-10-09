@@ -21,18 +21,24 @@ struct PromptCompositionField {
   let targetUTF16: [UInt16]
   let inputUTF16: [UInt16]
   let targetGlyphSlices: [TargetGlyphSlice]
+  let targetUTF16Range: Range<Int>
+  let sourceTargetUTF16: [UInt16]
+  let sourceFieldUTF16Ranges: [Range<Int>]
 
   init(index: Int, boundary: Boundary, inputUTF16: [UInt16],
-    targets: UnitInputTargets, targetRange: Range<Int>) {
+    targets: UnitInputTargets, targetRange: Range<Int>, sourceFieldUTF16Ranges: [Range<Int>]? = nil) {
     self.index = index
     self.boundary = boundary
     self.inputUTF16 = inputUTF16
+    self.sourceTargetUTF16 = targets.units
+    self.sourceFieldUTF16Ranges = sourceFieldUTF16Ranges ?? targets.fields
     var targetRange = targetRange
     if boundary == .separated || boundary == .hidden,
       !targetRange.isEmpty, targets.units[targetRange.upperBound - 1] == 32 {
       targetRange = targetRange.lowerBound..<(targetRange.upperBound - 1)
     }
     targetUTF16 = Array(targets.units[targetRange])
+    targetUTF16Range = targetRange
     var slices = [TargetGlyphSlice]()
     var unit = targetRange.lowerBound
     while unit < targetRange.upperBound {

@@ -1,5 +1,23 @@
 # 组合投影的真实字段与部分字形归属
 
+## 全局组合身份投影增量
+
+本增量新增纯原生、只读 `PromptCompositionProjection`。`PromptCompositionField` 同时保留显示切片的全局 UTF-16 范围、完整源单位与权威字段目录；旧 ends 转换为单位边界，Zen 使用实际接受字段起点，没有可信目录的隐藏文本明确为一个 unsegmented 字段。会话不接受候选、不改变计分、导航、回放、结果、存储或协议。
+
+呈现 ID 与 canonical glyph ID 分开：整字形替换可以保留原 ID，融合字段拆片、多字形组成的字段字符及候选溢出使用互不重复的负 ID。负 ID 只在当前快照内有效，不作为持久或跨快照身份。`canonicalAliases` 是独立的一对多关联，不向文字 offset 字典塞重复键；`sourceSlices` 保留原始单位片段，`sourceFieldIndex` 不从解码后的 grapheme 或词框猜测。真实接受 extras 优先按输入缓冲的字段起点归属；未知归属显式 nil。退役／独立移除仅过滤相应字段片段，空字段目录与结构 Return 元数据保留。
+
+主光标明确记录某呈现槽之前或最后候选之后，reference UTF-16 caret 坐标独立于原生字段 grapheme。取消时按真实活动字段找回目标片段，不能依赖可能因融合而缺失的旧 canonical caret。Zen 候选期间隐藏尾部光标占位符，取消恢复；已结束会话返回 nil。`displayUTF16` 是身份／候选墨迹投影，**不是完整的已输入错误替换、hint 或最终 attributes**；禁止直接代替生产 renderer 的属性文本。
+
+十七项新模型测试覆盖多槽、三种样式、溢出、接受 extras、真实空字段、重音／旗帜跨字段、普通 SPACE 融合、Zen、控制结构、取消、旧 ends／flat、回删／重开／结束、实际退休／删词、lone surrogate 和全空目录。现有完整源探针保持 132 常规／36 Unicode／15 字段案例，追加实际 `updateWordLetters` marked 输出；新增一项 XCTest 比较全局候选文本、归属、唯一身份与 reference caret，并仅在 ASCII 目标下比较单位一致的正确性。探针仍使用自有事件快照、DOM／RAF／cache 绑定，未执行这些案例的源码插入／导航、浏览器布局或系统 IME。不得把十五组夹具计作十五项 XCTest。
+
+首次 `/tmp/typebar-global-composition-initial.log` 为新 API 不存在及一个测试方法名误用的编译失败，不是生产行为红测。首轮实现 `/tmp/typebar-global-composition-first.log` 共 36 项、两处失败，均为融合字段取消时旧 canonical caret 为 nil；按字段目标单位定位后，`/tmp/typebar-global-composition-caret-green.log` 36 项零失败（0.080 秒）。扩展 `/tmp/typebar-global-composition-source-regression.log` 44 项两处失败，是测试把停止输入后的接受文本误当成原始提交；改为保存投影前接受文本及原始字段快照并验证不变，未修改生产输入语义。最终 `/tmp/typebar-global-composition-verified-regression.log` 66 项零失败零跳过（8.242 秒，墙钟 8.249 秒），含十八新增及相关字段、计划、源码与退休回归。
+
+行为测试、有界决策复核、源码驱动和风险检查共同约束实现。本会话三次有界复核关注身份融合、取消 nil caret、原始输入／退休边界；非独立审计。没有重用上游产品代码或资源，JS 仅用于 QA 对照。本轮零 Typebar 主程序启动，测试串行无编译重叠。
+
+十文件冻结清单 `/tmp/typebar-global-composition-final-frozen.sha256` 启动前、中途与终态逐项一致。唯一完整门禁 session 46964 退出 0，主日志 `/tmp/typebar-global-composition-final-readiness.log`；原生 4,014 项零失败零跳过（951.350 秒，墙钟 951.839 秒），服务 501 项零失败零跳过（11.764 秒，墙钟 11.825 秒）。十万词耐久 185.908 秒，十六磁盘迁移 4.976 秒，17 项新模型 0.016 秒、四项源对照 0.730 秒；不作新增投影 UI 性能证明。固定源码探针、元数据无漂移、53 表面、1,134 人工场景结构、94 配置 89／4／1、未启动应用包／签名／资源与原创性检查通过。结构通过不表示人工执行。74 日志保留于 `/tmp/typebar-global-composition-final-logs.WIhk2c`，214 既有组件图在 `/tmp/typebar-global-composition-final-images.llEax3`；本轮无新组合 UI 图、未作新图复查，不冒充生产接线或 IME 证据。CoreData／系统诊断及首轮失败日志保留。终态固定参考 pin 干净且未变，零主程序、测试、编译器残留；终态后仅四份文档补结果，其余六个冻结代码／测试／探针输入不变。
+
+**仍未接入普通／Tape／ASL／Choo 生产呈现。** 下一阶段须统一最终属性、UTF-16 渲染范围、字框和字段几何、before／after 主光标、canonical pace 别名、滚动／退休与字体恢复。不能把部分片段拼接后的新 grapheme 边界冒充源槽位，也不能用重复 offset 伪造身份。原版混合 UTF-16／scalar 与原生 grapheme 的 Unicode 差异、UI 性能、实际系统 IME、模式和设备验收继续开放。94 配置仍 89 映射／4 部分／1 不适用，完整 goal active。下方保留此前字段阶段的验收历史。
+
 固定只读源码 `91bd24bb8513785c7364cbea29296ff7adafac41`，独立原生实现，Swift 6.2.4／macOS SDK 26.2，最低 macOS 14，QA Node 22.22.1。本增量继续 [组合模型](COMPOSITION_PROJECTION_CONTRACT.md)，不缩减完整重写目标。**仍未替换生产渲染**：不能将字段读取和模型初始化称为普通／Tape／ASL／Choo 接线，也不代表真实系统 IME 已验收。配置仍为 94 项中的 89 映射／4 部分／1 不适用，goal active。
 
 ## 必须保留的身份

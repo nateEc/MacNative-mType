@@ -25,6 +25,7 @@ import XCTest
     let accepted: String
     let index: Int, letterIndex: Int
     let targetUnits: [UInt16], inputUnits: [UInt16]
+    let marked: [Cell]
   }
   private static var cachedEvidence: Evidence?
 
@@ -120,6 +121,35 @@ import XCTest
       let plan = PromptCompositionPlan(field: field, composition: "XYZ", style: .replace)
       XCTAssertEqual(plan.referenceLetterUnitIndex, fixture.letterIndex)
       XCTAssertEqual(field.boundary, fixture.zen ? .zen : fixture.hidden ? .hidden : .separated)
+    }
+  }
+
+  func testGlobalMarkedOwnershipAndReferenceCaretMatchCompletePinnedFieldUpdates() throws {
+    for fixture in try evidence().fieldFixtures {
+      let configuration = TestConfiguration(mode: fixture.zen ? .zen : .custom,
+        duration: nil, wordLimit: nil, difficulty: .normal,
+        rules: .init(strictSpace: fixture.strict, stopOnErrorMode: fixture.stop ? .letter : .off),
+        modifiers: fixture.hidden ? [.noSpaces] : [])
+      let prompt = fixture.words.joined()
+      let batch = TransformedPromptBatch(text: prompt, noSpaceTargetWords: fixture.hidden ? fixture.words : [])
+      var session = TypingSession(configuration: configuration, prompt: prompt,
+        noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: batch.noSpaceWordLengths),
+        noSpaceTargetWords: batch.noSpaceTargetWords)
+      session.insertBatch(fixture.accepted, at: Date(timeIntervalSinceReferenceDate: 915_100_000))
+      let acceptedBeforeProjection = session.typed
+      let fieldBeforeProjection = session.promptCompositionField?.inputUTF16
+      let result = try XCTUnwrap(session.promptCompositionProjection(composition: "XYZ", style: .replace))
+      XCTAssertEqual(result.markedCells.map(\.displayUTF16), fixture.marked.map(\.textUnits))
+      XCTAssertTrue(result.markedCells.allSatisfy { $0.sourceFieldIndex == fixture.index })
+      XCTAssertEqual(result.referenceLetterUnitIndex, fixture.letterIndex)
+      XCTAssertEqual(Set(result.cells.map(\.id)).count, result.cells.count)
+      // Source ordinary marked slots count UTF-16; native consumes field
+      // graphemes. Compare correctness only where those units coincide.
+      if fixture.targetUnits.allSatisfy({ $0 < 128 }) {
+        XCTAssertEqual(result.markedCells.map(\.matchesTarget), fixture.marked.map(\.correct))
+      }
+      XCTAssertEqual(session.typed, acceptedBeforeProjection)
+      XCTAssertEqual(session.promptCompositionField?.inputUTF16, fieldBeforeProjection)
     }
   }
 }

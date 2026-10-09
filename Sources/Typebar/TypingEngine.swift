@@ -5002,8 +5002,11 @@ struct TypingSession {
       buffer.activeCount == 0 ? [] : buffer.field(buffer.fieldIndex)
     } ?? Array(codeInputFieldText.utf16)
     if configuration.mode == .zen {
+      let targets = UnitInputTargets(typed, buildsASCIICatalog: true)
+      let ranges = acceptedUnits.map { buffer in buffer.starts.indices.map { buffer.range($0) } }
       return .init(index: acceptedUnits?.fieldIndex ?? replayCommittedSeparatorCount,
-        boundary: .zen, inputUTF16: input, targets: UnitInputTargets(""), targetRange: 0..<0)
+        boundary: .zen, inputUTF16: input, targets: targets,
+        targetRange: targets.units.count..<targets.units.count, sourceFieldUTF16Ranges: ranges)
     }
     // ASCII catalogs are normally omitted by the engine's streaming fast
     // path. This presentation snapshot builds one without mutating that path.
@@ -5013,16 +5016,22 @@ struct TypingSession {
     // raw-word directory. Preserve those ends instead of guessing new words
     // or flattening a field the engine still navigates independently.
     if let range = activeNoSpaceWordRange, range.upperBound <= promptCharacters.count {
-      let start = String(promptCharacters[..<range.lowerBound]).utf16.count
-      let end = start + String(promptCharacters[range]).utf16.count
+      var starts = [0]
+      for character in promptCharacters { starts.append(starts.last! + String(character).utf16.count) }
+      var first = 0
+      let ranges = noSpaceWordEndIndices.map { end -> Range<Int> in
+        defer { first = end }
+        return starts[first]..<starts[end]
+      }
       return .init(index: completedWordCount, boundary: .hidden, inputUTF16: input,
-        targets: targets, targetRange: start..<end)
+        targets: targets, targetRange: starts[range.lowerBound]..<starts[range.upperBound],
+        sourceFieldUTF16Ranges: ranges)
     }
     if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers),
       !targets.noSpace, !hasNoSpaceWordSegmentation {
       return .init(index: 0, boundary: .unsegmented,
         inputUTF16: acceptedUnits?.units ?? Array(typed.utf16),
-        targets: targets, targetRange: targets.units.indices)
+        targets: targets, targetRange: targets.units.indices, sourceFieldUTF16Ranges: [targets.units.indices])
     }
     let index = acceptedUnits?.fieldIndex
       ?? (hasNoSpaceWordSegmentation ? completedWordCount : replayCommittedSeparatorCount)
@@ -5030,6 +5039,36 @@ struct TypingSession {
     let range = targets.fields[index]
     return .init(index: index, boundary: targets.noSpace ? .hidden : .separated,
       inputUTF16: input, targets: targets, targetRange: range)
+  }
+
+  /// A read-only global projection. Accepted extras use their actual source
+  /// field; a field boundary need not align with a decoded native Character.
+  func promptCompositionProjection(composition: String, style: CompositionDisplayStyle) -> PromptCompositionProjection? {
+    guard let field = promptCompositionField else { return nil }
+    let glyphs = composition.isEmpty ? promptGlyphs : acceptedPromptGlyphs
+    let targetCount = configuration.mode == .zen ? typed.count : promptCharacters.count
+    var owners: [Int: Int] = [:]
+    for (word, presentation) in promptWordPresentations.enumerated() {
+      for id in presentation.extraGlyphIndices where glyphs.indices.contains(id) { owners[id] = word }
+    }
+    if let buffer = acceptedUnits, configuration.mode != .zen, !configuration.rules.blindMode {
+      let presentation = promptPresentationInput
+      var unit = 0, owner = 0, extra = targetCount
+      for (index, character) in typed.enumerated() {
+        while owner + 1 < buffer.starts.count, buffer.starts[owner + 1] <= unit { owner += 1 }
+        if !presentation.targets.indices.contains(index) || presentation.targets[index] == nil {
+          if glyphs.indices.contains(extra) { owners[extra] = owner }
+          extra += 1
+        }
+        unit += String(character).utf16.count
+      }
+    }
+    let placeholder = configuration.mode == .zen ? promptCaretGlyphIndex : nil
+    let indices = glyphs.indices.filter { $0 < targetCount || $0 == placeholder || !configuration.rules.hideExtraLetters }
+    return .init(glyphs: glyphs, indices: indices, targetGlyphCount: targetCount, field: field,
+      composition: composition, style: style, canonicalCaret: promptCaretGlyphIndex,
+      zenPlaceholder: placeholder, extraOwners: owners,
+      firstRetainedFieldIndex: firstRetainedPromptWordIndex, removedFieldIndices: removedTapePromptWordIndices)
   }
 
   /// Zen's empty active field has a presentation-only cell. It is never an

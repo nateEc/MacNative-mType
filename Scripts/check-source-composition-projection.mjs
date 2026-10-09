@@ -135,7 +135,8 @@ for (const sample of fieldSamples) {
   assert.ok(letters(html).some(value => value.marked));
   fieldFixtures.push({words: sample.words, hidden: sample.hidden ?? false, zen: sample.zen ?? false,
     strict: sample.strict ?? false, stop: sample.stop ?? false, accepted: sample.accepted,
-    index: sample.index, targetUnits: units(display), inputUnits: units(input), letterIndex: position.letterIndex});
+    index: sample.index, targetUnits: units(display), inputUnits: units(input), letterIndex: position.letterIndex,
+    marked: letters(html).filter(value => value.marked)});
 }
 assert.equal(fieldFixtures.length, 15);
 assert.deepEqual(fieldFixtures[8].inputUnits, [55357], 'Never decode a retained lone surrogate into a replacement unit');
