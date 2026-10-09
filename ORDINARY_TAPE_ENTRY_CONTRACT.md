@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 固定字数模式的题长反向对照（2026-10-10）
+
+本轮仅启动一个已有隔离 QA 包 Typebar-Render-Duration-20261010.app，二进制对应 b7ca8d6；当前仓库 6cca172 仅增加文档，无产品差异。独立偏好域 app.typebar.qa.renderduration20261010、内存记录，屏幕键盘全程关闭，English／字数模式／正确首字母物理输入，按 10 → 200 → 10 词执行。每次通过同一自定义字数编辑器应用并重开，题文随机生成，不声称逐字相同；没有切换健康策略或模式。完整数值证据为 ../../work/word-length-timer-runtime.log。
+
+第一轮 10 词：input duration=0.000703；首个迟到交付间隔 0.969600 秒（尚未到整秒），首次 due=1 时 elapsed=1.340192、drift=0.340192、severe=1、failed=0；之后第 2–8 秒 drift<0.1，没有失败。重开并设为 200 词：input duration=0.000689、首次交付间隔 1.990824、preflight=0.000064、elapsed=1.977275、drift=0.977275、severe=1、failed=1；AX 确认计时失败、不保存。该字数失败结果显示 0/0/0/6 而输入字符 1 UTF-16 单位，这是本次原始结果，不套用时间模式的 1/0/0/0。
+
+第三轮回到 10 词：input duration=0.000463；首个迟到交付间隔 0.935228，首次 due=1 时 elapsed=1.189290、drift=0.189290、severe=0、failed=0；第 2–8 秒 drift<0.1，没有失败。两次短题都没有完成，仅说明所观察时间内未触发致命健康保护，不证明有效练习或保存通过。三轮都处于 0<wordLimit<250 的同一健康门禁；反向恢复加强了题长相关证据，减少单纯模式差异／启动顺序解释，但随机题文、窗口布局和自动化观测仍不能完全分离，不宣称题长已是唯一根因。
+
+没有 prompt-render-finished 记录，单次完整重建超过 125ms 仍未观测到；下一步应定位长提示累计布局／更新与计时交付的关系，不用跨帧旧投影或放宽健康阈值掩盖故障。第三轮第 8 秒后 ⌘Q，唯一主进程权威退出 0，随后无 Typebar；无 TERM 或第二实例，保留末尾 Charts 尺寸回退诊断。没有改真实用户域或保存成绩，本轮只采证与补文档，未重跑全量测试，完整 goal active。
+
 ## 物理输入与屏幕键盘的同实例对照（2026-10-10）
 
 被测 b7ca8d6，复用已签名 QA 包 Typebar-Render-Duration-20261010.app（独立偏好域、内存记录），本轮仅启动一个主进程。virtual-input-timer-runtime.log 保存完整数值记录。第一轮普通时间 30 秒，物理单键 m：input duration=0.000702、deliveryGap=1.809123、preflight=0.000077、drift=0.793643、failed=1。点击再来一次，展开屏幕键盘，在新题 orchard 首字上点击原生“输入 o”按钮：input duration=0.000535、deliveryGap=1.797622、preflight=0.000063、drift=0.782622、failed=1。两次 AX 结果均为失败且不保存、1/0/0/0。生产 VirtualKeyboard.onInsert 直接调用 handleInsertedText(origin: .virtualKeyboard)，不经过 NativeTypingInput.keyDown 的 interpretKeyEvents；因此该物理键盘解释路径不是复现的必要条件，但两次都使用自动化 UI 操作及 AX 观测，未排除其共同扰动。
