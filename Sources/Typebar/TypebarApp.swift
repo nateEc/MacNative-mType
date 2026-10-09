@@ -2712,8 +2712,9 @@ private struct ContentView: View {
                   maximumTextWidth: settings.practiceLineWidth.maximumWidth(
                     fontSize: settings.fontSize, customColumns: settings.customPracticeLineColumns),
                   horizontalTextInset: 4,
-                  measuresTextRows: !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo,
-                  measuresCustomRows: practiceVisualEffect.usesASL
+                  measuresTextRows: !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
+                    && renderedPrompt.compositionTextMap == nil,
+                  measuresCustomRows: practiceVisualEffect.usesASL || renderedPrompt.compositionTextMap != nil
                 ) {
                   practicePrompt
                 }
@@ -3007,6 +3008,17 @@ private struct ContentView: View {
           carets: makeSpecialPromptCaretConfiguration(rightToLeft: session.configuration.usesRightToLeftPrompt),
           retirement: practiceLineScrollContext(rendering),
           onTapeWordsRemoved: { session.removeTapePromptWords($0) })
+      } else if rendering.compositionTextMap != nil {
+        PromptFieldPracticePrompt(rendering: rendering,
+          font: practicePromptNSFont(size: settings.fontSize), lineSpacing: usesJoiningScript ? 8 : 12,
+          rightToLeft: isRightToLeft, joinsLetters: usesJoiningScript,
+          carets: makeSpecialPromptCaretConfiguration(rightToLeft: isRightToLeft),
+          lineScroll: showsAllPracticeLines ? nil : practiceLineScrollContext(rendering),
+          viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3))
+          .overlay {
+            PromptInputWrapOverlay(layout: promptInputWrapLayout)
+              .allowsHitTesting(false).accessibilityHidden(true)
+          }
       } else {
         Text(rendering.text)
           .lineSpacing(usesJoiningScript ? 8 : 12)

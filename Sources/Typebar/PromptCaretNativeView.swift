@@ -38,6 +38,10 @@ final class PromptCaretNativeView: NSView {
     var glyphIsRightToLeft: ((Int) -> Bool)? = nil
     var geometryRevision: UInt64 = 0
     var mainGlyphRect: ((Int) -> CGRect?)? = nil
+    // Field layouts resolve virtual IDs themselves; canonical pace IDs remain
+    // a separate API and may alias several presentation slots.
+    var fieldMainRect: ((TypingCaretStyle) -> CGRect?)? = nil
+    var fieldPaceRect: ((Int, Bool) -> CGRect?)? = nil
     var automaticallyPresents = true
   }
 
@@ -59,6 +63,12 @@ final class PromptCaretNativeView: NSView {
   private var mainRightToLeft: Bool?
   private var paceRightToLeft: Bool?
 
+  /// A fresh provider can rebuild a custom layout during this presentation,
+  /// before SwiftUI delivers its next configuration/geometry revision.
+  func invalidateGeometry() {
+    needsPosition = true; paceGeometryNeedsUpdate = true
+  }
+
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -67,7 +77,8 @@ final class PromptCaretNativeView: NSView {
     let layoutChanged = old.map { $0.font != next.font || $0.lineSpacing != next.lineSpacing
       || $0.rightToLeft != next.rightToLeft
       || ($0.glyphRect != nil) != (next.glyphRect != nil)
-      || ($0.mainGlyphRect != nil) != (next.mainGlyphRect != nil) } ?? false
+      || ($0.mainGlyphRect != nil) != (next.mainGlyphRect != nil)
+      || ($0.fieldMainRect != nil) != (next.fieldMainRect != nil) } ?? false
     let styleChanged = old?.mainStyle != next.mainStyle || old?.paceStyle != next.paceStyle
     let restarted = old?.attemptID != next.attemptID || old?.coordinator !== next.coordinator
     next.coordinator.prepare(attemptID: next.attemptID)
@@ -178,7 +189,8 @@ final class PromptCaretNativeView: NSView {
       if config.mainStyle.drawsMarker {
         mainRightToLeft = glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
         let mainRect: CGRect?
-        if let rendering, let map = rendering.compositionTextMap {
+        if let resolver = config.fieldMainRect { mainRect = resolver(config.mainStyle) }
+        else if let rendering, let map = rendering.compositionTextMap {
           mainRect = map.caret.flatMap { anchor in map.inkRanges[anchor.cellID].flatMap { range in
             PromptCaretLayout.rect(in: rendering.text, utf16Range: range, containerSize: bounds.size,
               font: config.font, lineSpacing: config.lineSpacing, isRightToLeft: config.rightToLeft,
@@ -232,7 +244,8 @@ final class PromptCaretNativeView: NSView {
         let rendering = config.latestRendering?()
         func endpoint(_ offset: Int?, glyphID: Int?, after: Bool) -> CGRect? {
           let measured: CGRect?
-          if let rendering, let map = rendering.compositionTextMap, let glyphID {
+          if let resolver = config.fieldPaceRect, let glyphID { measured = resolver(glyphID, after) }
+          else if let rendering, let map = rendering.compositionTextMap, let glyphID {
             measured = map.range(forCanonicalGlyph: glyphID, after: after).flatMap {
               PromptCaretLayout.rect(in: rendering.text, utf16Range: $0, containerSize: bounds.size,
                 font: config.font, lineSpacing: config.lineSpacing, isRightToLeft: config.rightToLeft,

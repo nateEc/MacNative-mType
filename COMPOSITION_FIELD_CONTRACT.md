@@ -1,5 +1,31 @@
 # 组合投影的真实字段与部分字形归属
 
+## 普通原生字段与独立槽布局增量
+
+上轮普通单一 Text 的跨字段再融合反例现由实际 `PromptFieldPracticePrompt`／`PromptFieldNativeView` 替代路径处理。共享投影新增按实际归属排列的 `fieldRuns`，不从拼接后的 grapheme 猜字段，不插入分隔 Unicode，不重复 offset。普通 LTR／整体 RTL／Zen 使用独立字段及槽字框；连接文字仅在字段内共同塑形。Tape／ASL／Choo 全局候选适配和混合方向仍未迁移，不能计四呈现完成。
+
+`PromptFieldTextLayout` 使用已有自有原生流布局与 AppKit 字体／颜色准备；非连接文字按槽独立测量／绘制，连接文字按字段内段保留塑形，真实 Return 分段，独立删词保留精确匿名结构行。提交 SPACE 不属于词墨迹；整词换行、超长词的完整外层分配、软换行空白跟随与 RTL 外层位置共用实际字框。提示独立绘制且预留末行空间，不扩大槽、字段或 pace 的墨迹；零 advance 的组合符仍绘制，不强塞假宽度。
+
+同一份几何驱动文字、主 before／after、canonical pace 首／末关联、字段行跟随与自定义视口行高。首次 pace 动画从第一个真实保留槽开始；fresh provider 在候选重排时同步使主／pace 几何失效，不等 SwiftUI 下一次配置，未改变 pace 时钟与队列算法。停止时清空滚动上下文、取消通知和既有子控制器，新增 owner 无计时器、无应用启动。原生辅助功能仅登记 staticText 与共享文本，不作为 VoiceOver 实测。
+
+缓存仅复用内容、字体、方向、间距和宽度匹配的不可变文字／度量；位置、分组、字段身份、canonical 关联与锚点每个快照重新计算，不缓存虚拟 ID 的跨快照语义，也不保留历史模型链。复用结果与全新布局逐框对照，退休后组号变化及宽度／RTL 变化不污染旧快照。最终专项中 1,249 槽首次配置加十次缓存量测 0.153050 秒，改变候选后的原生配置 0.014284 秒；不含完整 formatter／SwiftUI 重建、实机绘制或 FPS，首次成本与大题目 UI 性能仍须优化和验收。
+
+固定只读参考 `91bd24bb8513785c7364cbea29296ff7adafac41`，Swift 6.2.4／macOS SDK 26.2、最低 macOS 14。复读完整 `updateWordLetters`、`.word letter` 独立 inline-block、joining-script 字段内 inline、词换行和提示规则；已安装 SDK 确认 NSViewRepresentable sizeThatFits 在 macOS 13 起可用，文字绘制和量测复用仓库已使用的原生 API。行为测试与根因追踪驱动修复；源码核对、有界本会话三次实质复核分别约束字段／槽塑形、身份与几何边界、不可变缓存，非独立审计，后续仅处理具体风险反例。没有复制上游产品代码、CSS 或资源，也没有新增产品依赖。
+
+`/tmp/typebar-field-layout-red.log` 两项两处预期失败：组合符／区域旗帜字段都落在前字段的 x=0 字框；独立布局后通过。`policy-red.log` 五项三处真实失败定位到 canonical 关联缓存、软换行 SPACE 和不重建文本时的视口行数通知；`policy-green.log` 五项通过。`expanded.log` 十六项两处失败分别为匿名空行默认字号，以及未隔离 AppKit 自动释放池的释放测试；显式当前字号及按既有测试惯例隔离池后，`height-red.log` 十七项仅余末行提示内容高度 33 小于 51.816 的真实反例，预留空间后通过。`pace-red.log` 单项两处断言确认首段 pace 直接跳终点；`fresh-pace-red.log` 单项两处断言确认新候选重排未同步移动未变序号的 pace。两者修复后，最终 `/tmp/typebar-field-layout-verified-regression.log` 537 项零失败零跳过（62.584 秒，墙钟 62.642 秒），含 21 项新增字段测试（0.818 秒）；上述简写日志均为 `/tmp/typebar-field-layout-` 前缀，失败轮不覆盖。
+
+五张新图在 `/tmp/typebar-field-layout-focused-images.bA8GsQ`，文件为 `composition-fields-fused-cancellation.png`、`composition-fields-regional-boundaries.png`、`composition-fields-slots-hint.png`、`composition-fields-wrapped.png`、`composition-fields-joining-rtl.png`；实际生产字段组件经 NSHostingView 挂载，窗口不可见且关闭，不是完整 ContentView 或实际系统 IME。新图中跨字段组合符与区域标志不再共用前字段框；单区域标志采用系统字体的独立字形，不冒充国旗资源。自有 palette／hint 夹具并非完整主题。旧三张单 Text 诊断图现在是旧组件对照，不代表新的普通生产路径。
+
+**仍未完成**：输入准入依旧显式传 `composition: nil` 并用旧全局文字量测，必须迁移到同一真实字段几何且保持候选隔离；连接文字 dots 等逐词 broken-joining 策略、其余三呈现、混合方向、任意滚动／动画队列、字体恢复、原版混合 UTF-16／scalar 差异、真实 IME／窗口／VoiceOver／设备与 UI 性能均保持开放。原生边界和组件图不能宣称浏览器 CSS 像素等价。94 配置仍 89 映射／4 部分／1 不适用，完整 goal active。下方为此前阶段历史，仅此段范围替代普通单 Text 的旧几何缺口。
+
+### 持久证据复验（2026-10-09）
+
+此前 `/tmp/typebar-field-layout-*` 日志、图与冻结清单在续跑时已不存在，不能以会话摘要代替当前可复核证据。本次未改动产品代码或测试，重新冻结十一文件并执行唯一完整门禁 session 33772，退出 0。持久证据目录为 `../../work/field-readiness.wiQBed`：`readiness.log`、`frozen.sha256`、`logs/` 下 75 份日志及 `images/` 下 222 张组件图。启动前、中途与终态十一项哈希均一致；终态后仅本合同、README、规范与功能盘点四文档补记录，其余七输入不变。
+
+原生 4,054 项零失败零跳过（855.222 秒，墙钟 855.661 秒），服务 501 项零失败零跳过（10.585 秒，墙钟 10.639 秒）；新增字段 21 项 0.775 秒，十万词 152.773 秒，十六磁盘迁移 9.191 秒。1,249 槽加十次缓存量测 0.132289 秒，改变候选后的原生配置 0.014082 秒，仅诊断，不代表完整 UI 或设备 FPS。上述五张字段图已从持久目录重新逐张查看；系统／CoreData 诊断保留，未通过跳过、重试或放宽断言消除。
+
+只读参考 pin 干净未变；53 表面、1,138 人工场景结构、94 配置 89／4／1、未启动包／签名／资源及原创性边界均通过。隔离 QA Redis 6.2.6 从官方版本归档重建，现代 SDK 使用 `REDIS_CFLAGS=-DMAC_OS_X_VERSION_10_6=1060` 选择原有 `fstat`／kqueue 分支；归档、构建日志与服务程序位于 `../../work/typebar-qa-runtime`，未改本机 Redis 服务或产品依赖。零 Typebar 主程序启动，终态零测试／编译残留。人工场景仅结构检查，主题精确映射仍 0／187、挑战 1 项待映射；输入准入及前述未完成项保持开放，完整 goal active。
+
 ## 普通呈现的最终属性与光标接线增量
 
 本增量把 `PromptCompositionPresentation` 接入普通生产 `ContentView.renderedPrompt` 的 LTR／整体 RTL 路径（含 Zen），不再把整段候选塞进一个当前字形。Tape／ASL／Choo 与原先混合方向回退仍走既有共享渲染，不能计作四呈现完成。普通渲染在候选更新及取消时生成全局槽；既有颜色、typed effect、错误提示、控制字符和源字段 phase 继续由原生策略负责。候选不是已完成输入，不参与 dots／hide 的完成集合；marked 下划线与匹配颜色分开。`.below` 的独立候选条保留。

@@ -10,6 +10,7 @@ struct PromptCompositionPresentation {
   let completedIndices: Set<Int>
   let emptyPlaceholderIndex: Int?
   let isZen: Bool
+  private let gapIndices: Set<Int>
 
   init?(session: TypingSession, composition: String, style: CompositionDisplayStyle) {
     guard let field = session.promptCompositionField,
@@ -49,12 +50,14 @@ struct PromptCompositionPresentation {
     }
     let originalWords = session.promptWordPresentations
     let errors = session.promptCompositionFieldErrors(field)
+    var gaps: Set<Int> = []
     words = projection.fields.map { source in
       var indices = indicesByField[source.index] ?? []
       if let last = indices.last, !source.targetUTF16Range.isEmpty,
         field.sourceTargetUTF16[source.targetUTF16Range.upperBound - 1] == 32,
         projection.cells[last].compositionIndex == nil,
         projection.cells[last].targetUTF16Range?.upperBound == source.targetUTF16Range.upperBound {
+        gaps.insert(last)
         indices.removeLast() // A commit SPACE is not part of the word ink.
       }
       let previous = originalWords.indices.contains(source.index) ? originalWords[source.index] : nil
@@ -63,6 +66,7 @@ struct PromptCompositionPresentation {
         hasInputError: errors?[source.index].input ?? previous?.hasInputError ?? false,
         hasCommitError: errors?[source.index].commit ?? previous?.hasCommitError ?? false)
     }
+    gapIndices = gaps
   }
 
   func markedText(for cell: PromptCompositionProjection.Cell, glyph: TypingPromptGlyph) -> String {
@@ -73,6 +77,7 @@ struct PromptCompositionPresentation {
   func render(_ renderGlyph: (Int, TypingPromptGlyph, PromptCompositionProjection.Cell?) -> AttributedString) -> PromptRendering {
     var text = AttributedString(), ranges: [Int: NSRange] = [:], inks: [Int: NSRange] = [:], texts: [Int: AttributedString] = [:]
     var fieldUnits: [Int: Int] = [:], structuralUnits: [Int: Int] = [:], nextField = 0, unit = 0
+    var fieldRuns: [PromptFieldTextRun] = []
     func emitRemovedFields(before owner: Int) {
       while nextField < owner {
         let field = projection.fields[nextField]
@@ -80,6 +85,7 @@ struct PromptCompositionPresentation {
           structuralUnits[field.index] = unit
           text += AttributedString(String(repeating: "\n", count: field.structuralReturnCount))
           unit += field.structuralReturnCount
+          fieldRuns.append(.init(fieldID: field.index, cells: [], removedReturns: field.structuralReturnCount))
         }
         nextField += 1
       }
@@ -87,6 +93,11 @@ struct PromptCompositionPresentation {
     for (index, cell) in projection.cells.enumerated() {
       if let owner = cell.sourceFieldIndex { emitRemovedFields(before: owner) }
       let value = renderGlyph(index, glyphs[index], cell.compositionIndex == nil ? nil : cell)
+      let entry = PromptFieldTextRun.Cell(id: cell.id, glyph: glyphs[index], text: value, isGap: gapIndices.contains(index))
+      if let last = fieldRuns.indices.last, fieldRuns[last].fieldID == cell.sourceFieldIndex,
+        fieldRuns[last].removedReturns == 0 {
+        fieldRuns[last].cells.append(entry)
+      } else { fieldRuns.append(.init(fieldID: cell.sourceFieldIndex, cells: [entry])) }
       ranges[cell.id] = NSRange(location: unit, length: String(value.characters).utf16.count)
       let hint = value.runs.first { ($0.baselineOffset ?? 0) < 0 }
       let body = hint.map { AttributedString(value[..<$0.range.lowerBound]) } ?? value
@@ -99,7 +110,7 @@ struct PromptCompositionPresentation {
     }
     emitRemovedFields(before: projection.fields.count)
     let map = PromptCompositionTextMap(text: text, cellRanges: ranges, inkRanges: inks, cellTexts: texts,
-      canonicalAliases: projection.canonicalAliases, fieldUnits: fieldUnits, caret: projection.caret)
+      canonicalAliases: projection.canonicalAliases, fieldUnits: fieldUnits, caret: projection.caret, fieldRuns: fieldRuns)
     // Legacy character offsets remain a convenience for older callers, not
     // the identity directory. Partial/virtual slots live only in cellRanges.
     let offsets = Dictionary(projection.cells.filter { $0.id >= 0 }.compactMap { cell in
@@ -121,12 +132,15 @@ struct PromptCompositionTextMap {
   let canonicalAliases: [Int: [Int]]
   let fieldCharacterOffsets: [Int: Int]
   let caret: PromptCompositionProjection.Anchor?
+  let fieldRuns: [PromptFieldTextRun]
   private let characterStarts: [Int]
 
   init(text: AttributedString, cellRanges: [Int: NSRange], inkRanges: [Int: NSRange], cellTexts: [Int: AttributedString],
-    canonicalAliases: [Int: [Int]], fieldUnits: [Int: Int], caret: PromptCompositionProjection.Anchor?) {
+    canonicalAliases: [Int: [Int]], fieldUnits: [Int: Int], caret: PromptCompositionProjection.Anchor?,
+    fieldRuns: [PromptFieldTextRun] = []) {
     self.cellRanges = cellRanges; self.inkRanges = inkRanges
     self.cellTexts = cellTexts; self.canonicalAliases = canonicalAliases; self.caret = caret
+    self.fieldRuns = fieldRuns
     var starts = [0]
     for character in text.characters { starts.append(starts.last! + String(character).utf16.count) }
     characterStarts = starts
