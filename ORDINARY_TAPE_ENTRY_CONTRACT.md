@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## Caps Lock 同值写入局部对照（2026-10-10）
+
+完整门禁后继续排查普通计时延迟。生产 advanceClock 每 100ms 写入 capsLockEnabled，先前 ClockIdleInvalidationTests 未覆盖 Bool 状态同值赋值。按根因调试及行为优先测试技能扩展探索性探针，不预设失败或修改生产代码：在真实 SwiftUI @State、NSHostingView 和不可见窗口中，比较规则同步／tick 四种组合与是否重复写入 Caps Lock 的八种组合；增加真实 Caps Lock 变化的正对照，保留真实输入正对照与窗口不可见检查。测试不读取或改变系统 Caps Lock，只使用确定性的 Bool 状态。
+
+clock-caps-invalidation.log 与格式化后 clock-caps-invalidation-final.log 均权威退出 0；后者包含诊断记录测试共 7 项零失败，3.825s（墙钟 3.828）。八种组合的空闲 body 计数均 1→1、输入后均 2→2，真实 Caps Lock 变化仍更新。此局部证据不支持“同值 Bool 写入单独造成持续重绘”，不证明完整 ContentView 或主线程健康，也不构成实际计时故障修复。生产代码未变、零 Typebar 主程序启动；下一步仍需完整应用新二进制下的入口证据。
+
 ## 契约修正后的完整门禁（2026-10-10）
 
 在已推送 bd4b30d 的干净工作树上重新执行 check-native-rewrite-readiness.sh，固定参考 91bd24bb8513785c7364cbea29296ff7adafac41、Redis 6.2.6 与 Anime.js 4.2.2 归档。会话 11000 权威退出 0；完整日志 caret-contract-readiness.FOUyOi.gate.log，74 份分项日志保留在 work/caret-contract-readiness.FOUyOi/。原生 4170 项零失败、零跳过，889.727s（墙钟 890.213）；服务 501 项零失败，12.995s（墙钟 13.065）。两个历史契约冲突用例均在完整测试中通过，万词自定义文本用例 7.081s 通过。
