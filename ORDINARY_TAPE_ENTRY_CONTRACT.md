@@ -1,5 +1,17 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 语言 Picker 禁用与专注动画局部对照（2026-10-10）
+
+基于 47a19b2 核查首键之后的配置区：practiceLayout 对整个 configurationPanel 应用 opacity、allowsHitTesting、disabled、accessibilityHidden 及 125ms 动画；语言 Picker 的普通模式选项是 TypingLanguage.allCases，当前 448 项（包括合成目录项，不将该数改写为独立语言数量）。首键会由 TypingVisualFocus.inputDidUpdate／hasStarted 触发专注状态。先检验“该 Picker 的禁用／专注变更本身足以造成秒级工作”的局部机制，而非凭完整应用采样直接替换控件。
+
+按行为优先测试技能建立探索性 LanguagePickerInvalidationTests，无故意失败阶段，产品源码未改。使用真实 SwiftUI @State、NSHostingView、从未显示的 NSWindow，比较两项与完整目录；分别只禁用和追加同类专注外观修饰，四次交替状态切换。probe 断言 body 确实更新、禁用状态已交付、英语选择保留及窗口不可见；回调在 defer 清除并卸载关闭窗口。耗时仅输出，不固定性能门槛、不固定框架内部 body 次数，且测试不是用户实际点击、无障碍选择或完整 ContentView 验收。
+
+最初 language-picker-invalidation.log 一项通过，30ms 固定交付窗口内，两项切换约 38–40ms，448 项约 143–146ms；说明有目录相关开销，但未复现一秒以上阻塞。补充专注动画后统一使用 200ms 交付窗口，足以跨过声明的 125ms 动画时长；不可见窗口也可能不实际播放可见动画，不冒称实体帧验收。language-picker-focus-invalidation.log 17 项零失败但缺固定参考有一项跳过；补齐参考与 Anime.js 归档后 language-picker-focus-pinned.log 权威退出 0，17 项零失败零跳过，7.665s（墙钟 7.668）。
+
+最终原始观察：只禁用的两项切换约 210–214ms、448 项约 318–324ms；专注外观两项约 210–214ms、448 项约 319–326ms，均包含固定 200ms 交付窗口。完整目录初次挂载约 475–485ms，两个选项约 222–249ms，含冷初始化及交付；固定顺序、单次本机观察，不作统计显著性推论。局部控件没有复现已观察到的秒级延迟，但不能因此排除完整配置区累计工作、可见布局／显示或 AX 扰动。保持原语言 Picker，不将减少选项或删除交互功能作为修复。
+
+另核查 TimerHealthPolicy.monitors：custom、quote、zen 不监测失败，不能用“切换到没有语言 Picker 的 custom 后不失败”证明控件是根因或问题修复；如做跨模式对照，应比较实际交付间隔／drift，并明确不同模式语义。格式化后的 language-picker-focus-final.log 再次权威退出 0，17 项零失败零跳过，7.955s（墙钟 7.965）；language-picker-originality.log 原创边界通过，人工文档结构审计保持 1151 个唯一场景，git diff --check 通过。本轮零 Typebar 主程序启动，不重跑全量 readiness 或升级人工验收。下一步仍需定位完整入口在失败前的主线程交付工作，完整重写 goal 保持 active。
+
 ## 优化构建对照与显式打包配置（2026-10-10）
 
 核查 bbd5e1f 的打包脚本，两次 swift build 都未传配置，此前 GUI 样本均来自默认 debug。新增 TYPEBAR_BUILD_CONFIGURATION，默认 release，显式 debug／release 均可；非法值在构建及创建应用前拒绝，构建和 --show-bin-path 使用同一个已校验值。保留既有输出拒绝覆盖、QA 内存容器、标识定制及 ad-hoc 签名，不改客户端计时／输入实现或保护阈值。README 补充调试配置及已知计时故障边界。
