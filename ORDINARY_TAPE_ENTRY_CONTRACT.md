@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 统计子树 Release 首键采样仍失败（2026-10-10）
+
+冻结 80e090e 的生产代码，独立内存包 Typebar-Stats-Scope-20261010.app、bundle app.typebar.qa.statsscope20261010；stats-scope-qa-package.log 构建 453.67s、终态退出 0。只启动唯一 PID 46080／会话 38635，普通 30 秒模式，首词 signal。第一轮只按 s，随后等待五秒不读 AX；日志确认首次交付前已失败，之后 AX 确认计时健康失败、1/0/0/0。stats-scope-qa-runtime.log：输入处理 0.000772s，deliveryGap=1.680081、preflight=0.000048、elapsed=1.645473、drift=0.645473、failed=1；提示渲染三次合计 0.030948s，最长 0.010871s。统计观察隔离没有消除首键失败，不能当作完整性能修复。
+
+同一实例点击重复本轮，AX 确认同一题目及未开始状态，然后启动 /usr/bin/sample 46080 8，在采样尚在运行时按同一 s；采样期间不读 AX。采样会话 16789 终态退出 0，stats-scope-first-input-sample.txt 保留。第二轮仍失败：输入 0.000291s、deliveryGap=1.786916、preflight=0.000044、elapsed=1.770983、drift=0.770983、failed=1；三次提示渲染合计 0.037335s，最长 0.014627s。采样完成后 AX 确认同样失败／1/0/0/0；采样本身会扰动性能，不把两轮数值差直接解释成产品差异。
+
+不同于之前延迟结束后才开始的采样，此次覆盖首键前后。主线程共 6,179 个样本，其中事件等待 mach_msg2_trap 分支 2,874；NSRunLoop.addObserver 分支 1,351，其下 flushObservers 1,010、NSHostingView.beginTransaction 910 为嵌套计数，不能相加。另有显示事务／布局分支及 SwiftUI 图更新；样本包含失败后结果页布局，没有时间分段，不能把整个分支归为首键原因，亦不是耗时精确测量。下一步需把首键到首次交付的窗口与结果页阶段分开，定位父图更新／布局链，而非继续假设提示字符串组装或统计秒级读取是唯一原因。
+
+按根因调试技能保留反证，没有降低健康阈值、删功能或再改产品来迎合结果。正常 ⌘Q 后主会话 38635 权威退出 0，pgrep 确认无 Typebar；无退出后 AX 查询、无第二实例。此轮仅新增实机诊断记录，无完整门禁／有效成绩／可见倒计时刷新验收，全部兼容缺口和完整 goal 继续开放。
+
 ## 生产统计子树观察隔离（2026-10-10）
 
 将先前局部宿主对照接入生产：ContentView 拥有独立 LiveStatsClockSignal，LiveStatsClockContent 在自身 body 读取信号并执行最新统计闭包。统计不再直接读取父层 lastClockTickSecond；原始指标计算、整秒交付、计时健康阈值、声音、阈值判定和 Layout Fluid 消费者不变。两个重置入口同步清零。闭包随父视图重建更新，不缓存会话／设置或用 identity 强制重建。
