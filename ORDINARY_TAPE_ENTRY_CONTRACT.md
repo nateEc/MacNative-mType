@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## RTL 投影与有限自然坐标增量（2026-10-10）
+
+实际单行投影组件支持同向 RTL：共享 PromptFieldTextLayout 新增显式 unbounded，外层使用实测自然总宽、内部连接字段不因测量提案折行，RTL 镜像不再依赖十亿点提案；默认有界排版、复用隔离与普通生产路径保持不变。Tape 接受推进按 leading edge 与活动字段右边界计算，主 letter 光标右端锁定边距、word 按活动词右端平移；pace 别名使用同一有限坐标。投影方向查询不再读旧文字 storage，而按逐槽文本／原始字段目标及既有方向策略解析。
+
+直接核对固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41` 的 scrollTape 符号、Caret 的测试流向／逐词与逐字方向规则；参考干净，Swift 6.2.4／最低 macOS 14，不引入平台新 API。`../../work/tape-projection-rtl-red.log` 一项四处预期失败：旧 RTL 路径未消费显式接受推进；first.log 九项通过。shared-red.log 十一项两处失败暴露连接字段仍内部折行，修正无界模式的内部宽度限制。以上三个日志位于 `../../work/` 且前缀 `tape-projection-rtl-`。
+
+最终 `../../work/tape-projection-rtl.qIeQwW/verified.log`：111 项零失败零跳过（6.054 秒，墙钟 6.067 秒），固定参考与 Anime 归档齐备。三新增覆盖四主光标样式、有限坐标／接受推进／pace、RTL 完成字段后的 letter／word 推进、双向自然与默认有界连接字段量测；普通字段换行与旧 Tape 回归同跑。两张 tape-projection-rtl-letter／word.png 实际组件图逐张查看，窗口始终不可见并关闭，零 Typebar 主程序启动。配置量测诊断不是设备 FPS。
+
+行为先行、源码驱动与差异风险复核约束本增量；没有新动画时钟、产品依赖、输入／计分／回放或存储修改。应用层 Tape 组合保护未解除，多行拓扑、fresh provider、退休队列、混合／反向方向、真实阿拉伯文连接塑形及系统 IME／设备仍开放；几何单元测试不证明这些组合。完整冻结门禁未重跑，94 配置 89／4／1、主题精确 0／187、挑战一项待映射不升级，完整 goal active。下方仅 LTR 的表述为历史阶段。
+
 ## 实际 Tape owner 投影组件增量（2026-10-10）
 
 TapePromptNativeView 新增显式 compositionField／hidesCompositionExtras 输入，支持单行 LTR 无结构 Return 的实际组件投影。文字绘制复用 PromptFieldTextLayout 独立槽框，主光标经真实 before／after 锚点解析，canonical pace 保留首末别名；letter 主光标锁定边距，word 按活动字段原点平移。推进使用原始接受单位前缀与实测槽宽，不随候选主光标终点推进。缺少显式字段时不自动启用新布局；多行／RTL 仍走旧路径，应用层 Tape 投影保护未解除，尚未接通完整生产功能。

@@ -85,31 +85,33 @@ struct PromptFieldTextRun: Equatable {
   private let font: NSFont
   private let width: CGFloat
   private let joinsLetters: Bool
+  private let unbounded: Bool
   private(set) var cellFrames: [Int: CGRect] = [:]
   private(set) var fieldFrames: [Int: CGRect] = [:]
   private(set) var size: CGSize = .zero
   let lineSpacing: CGFloat
 
   convenience init(map: PromptCompositionTextMap, width: CGFloat, font: NSFont, lineSpacing: CGFloat = 12,
-    rightToLeft: Bool = false, joinsLetters: Bool = false, reusing previous: PromptFieldTextLayout? = nil) {
+    rightToLeft: Bool = false, joinsLetters: Bool = false, unbounded: Bool = false,
+    reusing previous: PromptFieldTextLayout? = nil) {
     self.init(fieldRuns: map.fieldRuns, aliases: map.canonicalAliases, anchor: map.caret,
       width: width, font: font, lineSpacing: lineSpacing, rightToLeft: rightToLeft,
-      joinsLetters: joinsLetters, reusing: previous)
+      joinsLetters: joinsLetters, unbounded: unbounded, reusing: previous)
   }
 
   init(fieldRuns: [PromptFieldTextRun], aliases: [Int: [Int]] = [:],
     anchor: PromptCompositionProjection.Anchor? = nil, width: CGFloat, font: NSFont,
-    lineSpacing: CGFloat = 12, rightToLeft: Bool = false, joinsLetters: Bool = false,
+    lineSpacing: CGFloat = 12, rightToLeft: Bool = false, joinsLetters: Bool = false, unbounded: Bool = false,
     reusing previous: PromptFieldTextLayout? = nil) {
     self.aliases = aliases; self.anchor = anchor; self.rightToLeft = rightToLeft
     self.font = font; self.lineSpacing = lineSpacing
     let limit = width.isFinite ? max(1, width) : 1
-    self.width = limit; self.joinsLetters = joinsLetters
+    self.width = limit; self.joinsLetters = joinsLetters; self.unbounded = unbounded
     // Only immutable text/metrics are reused. Positions, identities, aliases,
     // anchors and groups belong to this snapshot; no old layout is mutated.
     let reuse = previous.flatMap {
       $0.width == limit && $0.font == font && $0.lineSpacing == lineSpacing
-        && $0.rightToLeft == rightToLeft && $0.joinsLetters == joinsLetters ? $0 : nil
+        && $0.rightToLeft == rightToLeft && $0.joinsLetters == joinsLetters && $0.unbounded == unbounded ? $0 : nil
     }
     var groups: [Int] = []
     for (group, field) in fieldRuns.enumerated() {
@@ -121,7 +123,8 @@ struct PromptFieldTextRun: Equatable {
         let box: Box
         if let old, old.cells == cells, old.fieldID == field.fieldID, old.breaks == breaks { box = old }
         else { box = Box(cells: cells, fieldID: field.fieldID, breaks: breaks,
-          font: font, rightToLeft: rightToLeft, spacing: lineSpacing, width: limit) }
+          font: font, rightToLeft: rightToLeft, spacing: lineSpacing,
+          width: unbounded ? .greatestFiniteMagnitude : limit) }
         for id in box.ranges.keys { boxByCell[id] = boxes.count }
         boxes.append(box); groups.append(group)
       }
@@ -141,13 +144,16 @@ struct PromptFieldTextRun: Equatable {
       if !pending.isEmpty { append(pending, breaks: breaksAfterField) }
       for _ in 0..<field.removedReturns { append([], breaks: true) }
     }
+    // Tape mirrors around the measured natural extent, not the no-wrap
+    // proposal. Ordinary bounded wrapping keeps its existing width.
+    let flowWidth = unbounded ? max(1, boxes.reduce(CGFloat.zero) { $0 + $1.bounds.width }) : limit
     let geometry = ASLPromptFlowGeometry(cells: boxes.enumerated().map { index, box in
       .init(size: box.bounds.size, wordID: groups[index], isLineBreak: box.breaks, isSeparator: box.isGap)
-    }, width: limit, rowSpacing: lineSpacing)
+    }, width: flowWidth, rowSpacing: lineSpacing)
     size = geometry.size
     for (index, box) in boxes.enumerated() {
       let point = geometry.positions[index]
-      let origin = CGPoint(x: rightToLeft ? limit - point.x - box.bounds.width : point.x, y: point.y)
+      let origin = CGPoint(x: rightToLeft ? flowWidth - point.x - box.bounds.width : point.x, y: point.y)
       origins.append(origin)
       for id in box.ranges.keys { cellFrames[id] = box.rect(id, origin: origin) }
       if let owner = box.fieldID, !box.isGap, !box.ranges.isEmpty {

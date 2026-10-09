@@ -1,5 +1,7 @@
 # Typebar
 
+当前 [Tape RTL 投影组件](ORDINARY_TAPE_ENTRY_CONTRACT.md#rtl-投影与有限自然坐标增量2026-10-10)支持同向 RTL 接受推进、右边距主光标与有限坐标 pace；无界字段量测不改变默认有界排版。相关 111 项零失败零跳过，两张不可见组件图已查看，零主程序启动。应用层保护未解除，多行／混合方向／fresh provider／退休及实机仍开放，完整门禁未重跑、goal active。
+
 当前 [Tape 投影组件](ORDINARY_TAPE_ENTRY_CONTRACT.md#实际-tape-owner-投影组件增量2026-10-10)已在实际原生 owner 支持显式字段的单行 LTR 绘制、虚拟槽主光标与 canonical pace，已提交推进独立于候选终点。相关 96 项零失败零跳过，两张不可见窗口组件图已检查；切回旧布局漏滚的失败与修复记录保留。零主程序启动；应用层保护尚未解除，多行／方向／fresh provider／退休／实机仍待完成，完整门禁未重跑、goal active。
 
 Choo 视口与行跟随的[完整冻结复验](CHOO_SHARED_RENDERING_CONTRACT.md#视口与行跟随完整冻结复验2026-10-10)已通过：原生 4,108／服务 501 项零失败，824 个受跟踪输入终态一致，75 日志／228 既有组件图保留，未启动应用包及原创性检查通过。零 Typebar 主程序启动、终态零测试／编译残留。人工场景仅结构检查，Tape 投影、复杂组合和实机验收仍开放，兼容分类不升级、完整 goal active；下方为历史阶段。

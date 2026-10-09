@@ -175,4 +175,99 @@ import XCTest
     XCTAssertEqual(-coordinator.wordsTapeMargin,
       ("a" as NSString).size(withAttributes: [.font: font]).width, accuracy: 0.001)
   }
+
+  func testRTLProjectedOwnerLocksTrailingEdgeAndUsesFiniteNativeCoordinates() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "אבג דהו")
+    session.insertBatch("א", at: start)
+    let rendering = try render(session, marked: "בגד")
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    for style in [TypingCaretStyle.bar, .block, .outline, .underline] {
+      let coordinator = PromptCaretMotionCoordinator()
+      var config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
+        mainStyle: style, paceStyle: .outline, font: font, lineSpacing: 0, rightToLeft: true,
+        accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+        attemptID: session.automaticInputAttemptID, coordinator: coordinator,
+        mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
+      config.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+        fromAfter: false, targetAfter: false, fraction: 1, targetGlyphID: 4) }
+      let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 80))
+      defer { view.stop() }
+      view.configure(rendering: rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+        compositionField: session.promptCompositionField, mode: .letter, margin: 0.25,
+        smoothScroll: false, carets: config, at: 0)
+      view.present(at: 0)
+      XCTAssertEqual(try XCTUnwrap(coordinator.main.position).maxX, 300, accuracy: 0.001)
+      XCTAssertEqual(coordinator.wordsTapeMargin,
+        ("א" as NSString).size(withAttributes: [.font: font]).width, accuracy: 0.001)
+      let textView = try XCTUnwrap(view.subviews.first { !($0 is PromptCaretNativeView) })
+      XCTAssertLessThan(textView.frame.width, 1000)
+      XCTAssertLessThan(abs(textView.frame.minX), 1000)
+      XCTAssertGreaterThan(try XCTUnwrap(coordinator.pace.position).minX, -1000)
+      XCTAssertLessThan(try XCTUnwrap(coordinator.pace.position).maxX, 300)
+      if style == .bar { try capture(view, name: "tape-projection-rtl-letter") }
+    }
+  }
+
+  private func capture(_ view: TapePromptNativeView, name: String) throws {
+    let window = NSWindow(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .aqua)
+    window.contentView = view; view.layer?.backgroundColor = NSColor.white.cgColor
+    defer { window.contentView = nil; window.close() }
+    view.layoutSubtreeIfNeeded(); view.displayIfNeeded()
+    let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+    view.cacheDisplay(in: view.bounds, to: bitmap)
+    let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+    XCTAssertGreaterThan(png.count, 500); XCTAssertFalse(window.isVisible)
+    if let directory = ProcessInfo.processInfo.environment["TYPEBAR_PROFILE_PB_QA_IMAGE_DIRECTORY"] {
+      try png.write(to: URL(fileURLWithPath: directory).appendingPathComponent(name + ".png"))
+    }
+  }
+
+  func testNaturalFlowWidthDoesNotWrapJoinedFieldAtTheMeasurementProposal() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "abcdefgh next")
+    let map = try XCTUnwrap(render(session, marked: "").compositionTextMap)
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    for rtl in [false, true] {
+      let bounded = PromptFieldTextLayout(map: map, width: 50, font: font, rightToLeft: rtl, joinsLetters: true)
+      let natural = PromptFieldTextLayout(map: map, width: 50, font: font,
+        rightToLeft: rtl, joinsLetters: true, unbounded: true)
+      XCTAssertGreaterThan(bounded.size.height, natural.size.height)
+      XCTAssertGreaterThan(natural.size.width, 50)
+      XCTAssertTrue(natural.cellFrames.values.allSatisfy { abs($0.minY) < 0.001 })
+      XCTAssertGreaterThanOrEqual(natural.cellFrames.values.map(\.minX).min() ?? 0, -0.001)
+      XCTAssertLessThanOrEqual(natural.cellFrames.values.map(\.maxX).max() ?? 0, natural.size.width + 0.001)
+    }
+  }
+
+  func testRTLWordProjectionAdvancesByCompletedFieldAndKeepsCandidateCaretWithinActiveWord() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "אבג דהו")
+    session.insertBatch("אבג ד", at: start)
+    let rendering = try render(session, marked: "הוז")
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    let before = "אבג ".reduce(CGFloat.zero) { $0 + (String($1) as NSString).size(withAttributes: [.font: font]).width }
+    for mode in [PracticeTapeMode.letter, .word] {
+      let coordinator = PromptCaretMotionCoordinator()
+      let config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
+        mainStyle: .bar, paceStyle: .off, font: font, lineSpacing: 0, rightToLeft: true,
+        accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+        attemptID: session.automaticInputAttemptID, coordinator: coordinator,
+        mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
+      let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 80))
+      defer { view.stop() }
+      view.configure(rendering: rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+        compositionField: session.promptCompositionField, mode: mode, margin: 0.25,
+        smoothScroll: false, carets: config, at: 0)
+      view.present(at: 0)
+      let expected = before + (mode == .letter ? ("ד" as NSString).size(withAttributes: [.font: font]).width : 0)
+      XCTAssertEqual(coordinator.wordsTapeMargin, expected, accuracy: 0.001)
+      let main = try XCTUnwrap(coordinator.main.position)
+      if mode == .letter { XCTAssertEqual(main.maxX, 300, accuracy: 0.001) }
+      else {
+        XCTAssertLessThan(main.maxX, 300)
+        XCTAssertGreaterThan(main.minX, 200)
+        try capture(view, name: "tape-projection-rtl-word")
+      }
+      XCTAssertEqual(session.typed, "אבג ד")
+    }
+  }
 }

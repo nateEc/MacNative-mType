@@ -232,20 +232,23 @@ final class TapePromptNativeView: NSView {
     guard let layout = textView.projectedLayout, let field = compositionField,
       let map = rendering.compositionTextMap, let frame = layout.fieldFrames[field.index] else { return nil }
     if mode == .off { return 0 }
-    guard mode == .letter else { return frame.minX }
+    let before = configuration?.rightToLeft == true
+      ? textView.leadingEdge(rightToLeft: true) - frame.maxX : frame.minX
+    guard mode == .letter else { return before }
     let cells = map.fieldRuns.filter { $0.fieldID == field.index }.flatMap(\.cells).filter { !$0.isGap }
     let count = field.inputUTF16.count
     let next = count < cells.count ? cells[count].id : nil
-    return frame.minX + TapePromptProjection.inlineAdvance(cells: Array(cells.prefix(count)), nextCellID: next,
+    return before + TapePromptProjection.inlineAdvance(cells: Array(cells.prefix(count)), nextCellID: next,
       frames: layout.cellFrames, hidesExtras: hidesCompositionExtras)
   }
 
   private func projectedMainRect(style: TypingCaretStyle) -> CGRect? {
     guard let layout = textView.projectedLayout, var rect = layout.mainRect(style: style) else { return nil }
-    let base = bounds.width * margin
+    let rtl = configuration?.rightToLeft ?? false
+    let base = bounds.width * (rtl ? 1 - margin : margin)
     if mode == .word, let field = compositionField, let word = layout.fieldFrames[field.index] {
-      rect.origin.x += base - word.minX
-    } else { rect.origin.x = base }
+      rect.origin.x += base - (rtl ? word.maxX : word.minX)
+    } else { rect.origin.x = base - (rtl ? rect.width : 0) }
     return rect
   }
 
@@ -360,7 +363,10 @@ final class TapePromptNativeView: NSView {
   private func glyphRect(_ id: Int, main: Bool) -> CGRect? {
     if let layout = textView.projectedLayout {
       guard var rect = layout.canonicalRect(id, after: false) else { return nil }
-      rect.origin.x += main ? bounds.width * margin : textOrigin
+      if main {
+        let rtl = configuration?.rightToLeft ?? false
+        rect.origin.x = bounds.width * (rtl ? 1 - margin : margin) - (rtl ? rect.width : 0)
+      } else { rect.origin.x += textOrigin }
       return rect
     }
     guard let offset = rendering.characterOffset(forGlyphAt: id),
@@ -381,6 +387,20 @@ final class TapePromptNativeView: NSView {
   }
 
   private func isRightToLeft(_ id: Int) -> Bool {
+    if textView.projectedLayout != nil, let map = rendering.compositionTextMap {
+      let ids = map.canonicalAliases[id] ?? [id]
+      guard let run = map.fieldRuns.first(where: { run in run.cells.contains { ids.contains($0.id) } }) else {
+        return configuration?.rightToLeft ?? false
+      }
+      let value: String
+      if checksDirectionPerGlyph {
+        value = run.cells.first(where: { ids.contains($0.id) }).map { String($0.text.characters) } ?? ""
+      } else if let owner = run.fieldID, let field = compositionField,
+        field.sourceFieldUTF16Ranges.indices.contains(owner) {
+        value = String(decoding: field.sourceTargetUTF16[field.sourceFieldUTF16Ranges[owner]], as: UTF16.self)
+      } else { value = run.cells.map { String($0.text.characters) }.joined() }
+      return PracticeTapePolicy.isRightToLeft(value, fallback: configuration?.rightToLeft ?? false)
+    }
     guard let offset = rendering.characterOffset(forGlyphAt: id) else { return configuration?.rightToLeft ?? false }
     return textView.direction(at: offset, wordStart: wordStartCharacterOffsets[offset],
       perGlyph: checksDirectionPerGlyph, fallback: configuration?.rightToLeft ?? false)
@@ -463,7 +483,7 @@ private final class TapePromptTextView: NSView {
   static func supportsProjection(_ map: PromptCompositionTextMap?,
     newlineWords: [TapePromptWord], rightToLeft: Bool) -> Bool {
     guard let map else { return false }
-    return newlineWords.isEmpty && !rightToLeft
+    return newlineWords.isEmpty
       && !map.fieldRuns.contains { $0.endsWithReturn || $0.removedReturns > 0 }
   }
   private let layoutManager = NSLayoutManager()
@@ -507,7 +527,7 @@ private final class TapePromptTextView: NSView {
     if let map = compositionMap, Self.supportsProjection(map, newlineWords: newlineWords, rightToLeft: rightToLeft) {
       stopNewlines()
       projectedLayout = PromptFieldTextLayout(map: map, width: 1_000_000_000,
-        font: font, lineSpacing: 0, reusing: projectedLayout)
+        font: font, lineSpacing: 0, rightToLeft: rightToLeft, unbounded: true, reusing: projectedLayout)
       needsDisplay = true
       return
     }
@@ -576,7 +596,7 @@ private final class TapePromptTextView: NSView {
   }
 
   func leadingEdge(rightToLeft: Bool) -> CGFloat {
-    if projectedLayout != nil { return 0 }
+    if let projectedLayout { return rightToLeft ? projectedLayout.size.width : 0 }
     if let newlineLayout { return newlineLayout.leadingEdge }
     return rightToLeft ? leadingRight : leadingLeft
   }
