@@ -1,5 +1,17 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 应用入口完整冻结复验（2026-10-10）
+
+被测原生提交 `19d0c4864105e9c1a0f437c1f6173f90bbbc7b62`。完整脚本 `Scripts/check-native-rewrite-readiness.sh` 的复验会话 94063 权威退出 0；证据目录 `../../work/tape-production-readiness-retry.5Ip2sJ/` 保留 gate.log、826 文件 inputs.sha256、多次运行中校验、freeze-terminal.log 及 logs/ 下 74 份日志。运行中不修改输入；终态 826 项全部校验通过，原生和参考工作树干净，参考 pin 仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。
+
+原生 client-tests.log：4,138 项零失败零跳过，878.757 秒（wall 879.234 秒）；服务 service-tests.log：501 项零失败零跳过，11.830 秒（wall 11.891 秒）。固定源行为探针、16 磁盘迁移相关验证及历史 writer 准备、未打开应用的打包／签名／资源边界／原创性通过。零主程序启动，终态无 Typebar 主程序、相关测试或 Swift 编译残留。日志保留 Core Data／XPC 和只读存储诊断，不将“测试通过”写成“无诊断”。
+
+首轮会话 6300 已退出 1，证据 `../../work/tape-production-readiness.uziUE7/`：周 XP 探针要求 Redis 6.2.6，但默认 PATH 得到 8.6.1，尚未执行全套测试。该轮输入校验终态一致，失败日志保留。核验已有 `../../work/typebar-qa-runtime/redis-6.2.6/src/redis-server` 的版本后，仅通过新门禁进程 TYPEBAR_SOURCE_REDIS_SERVER 指定它；先单独周 XP 源探针通过（redis-recovery.log），再新目录完整复验。未替换系统 Redis、未放宽版本断言、未覆盖旧日志，也未并发重启仍活跃的会话。
+
+53 表面、239 原生键盘布局、94 配置（89 映射／4 部分／1 不适用）、446 独立语言、187 主题身份、57 映射加 1 待映射挑战与 1,147 人工场景结构审计通过。主题精确原生映射仍 0／187（49 相关原创替代、138 无相关替代）；人工场景未执行。本轮无新截图，不把模型／源码／组件回归当作实际 ContentView 输入、混合方向、连接塑形视觉或 IME 实机验收。复杂旧配置／确认队列交错、策略变更时未确认移除及完整方向边界仍开放，功能分类不升级。
+
+本节替代下方阶段记录中“完整门禁待复验／未重跑”的当前状态，不抹去其历史失败与局部证据，也不将完整门禁通过等同完整重写目标完成。完整 goal active。
+
 ## 应用投影入口启用增量（2026-10-10）
 
 renderedPrompt 的 usesCompositionProjection 移除 `!usesTapePractice`；composition 非 nil 及既有方向条件保持不变。已有 Tape 字段、双光标、退休、完整新鲜快照、首次配置和连接塑形适配器现在可由应用渲染路径使用。混合方向回退尚未解决，不将它隐式移除；整体目标范围不变。
