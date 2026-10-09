@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 实际应用入口验收未通过（2026-10-10）
+
+对 f3f988d 构建单独验收包 `../../work/Typebar-Tape-GUI-20261010.app`，Bundle ID 为 app.typebar.qa.tape20261010，TypebarQAInMemoryStore 为 true；SwiftData 和账户令牌使用内存，默认偏好使用独立应用域。未导入、删除或修改共享本机字体／背景。打包日志 `../../work/tape-gui-package-20261010.log` 退出 0。本轮仅启动一个主程序，启动前无 Typebar 进程。
+
+通过真实设置窗口把“单行卷带”从关闭改为按字符，关闭设置返回 ContentView。提示以 `pocket willow voyage` 开头，向 Typing input 输入 `pocket willow voyage `。实际结果窗口报告“计时调度持续延迟，为避免不准确的成绩已停止测试”，显示 3/3 单词正确、21/0/0/0 UTF-16 单位、100% 准确率、2 秒、134 WPM，并明确不保存成绩。无障碍树和屏幕观察一致。这是验收失败记录，不能以正确字符计数替代通过结论；尚未定位为 Tape 渲染、计时策略还是自动化／运行环境的影响，不推断根因，也不放宽保护条件。
+
+未操作真实 IME，未验证候选组合、混合方向或长程退休队列。退出快捷键后进程仍存在，对本轮创建的确切 PID 14630 发送 TERM 清理；不得扩大到其他用户实例。后续应先复现并定位调度延迟，再继续入口验收。整体功能分类不升级，goal active。
+
 ## 已确认退休前缀隔离增量（2026-10-10）
 
 configure 在最新候选选择后、修改布局之前检查最终有效退休上下文：同一 owner attempt／上下文 attempt 的 firstRetainedWordIndex 不得低于已接纳值。先选择快照再检查，允许有效新快照替换旧 representable 参数；新 attempt 可以从 0 重新开始。检查不要求异步 session 确认追上原生提前移除的全部前缀，也不改通知或退休状态机。
