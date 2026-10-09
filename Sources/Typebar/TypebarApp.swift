@@ -3648,9 +3648,10 @@ private struct ContentView: View {
     let font = practicePromptNSFont(size: settings.fontSize)
     return .init(slowTimer: timerHealth.usesSlowTimer) { current, candidate in
       PromptInputWrapGeometry.rejects(session: current, candidate: candidate,
-        rendering: renderedPrompt(for: current, composition: nil), width: width, font: font,
+        rendering: renderedPrompt(for: current, composition: ""), width: width, font: font,
         lineSpacing: current.configuration.usesJoiningScriptPrompt ? 8 : 12,
-        isRightToLeft: current.configuration.usesRightToLeftPrompt)
+        isRightToLeft: current.configuration.usesRightToLeftPrompt,
+        joinsLetters: current.configuration.usesJoiningScriptPrompt)
     }
   }
 

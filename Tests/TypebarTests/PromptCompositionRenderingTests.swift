@@ -228,7 +228,7 @@ import XCTest
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    XCTAssertTrue(source.contains("renderedPrompt(for: current, composition: nil)"))
+    XCTAssertTrue(source.contains("renderedPrompt(for: current, composition: \"\")"))
   }
 
   func testIndependentRemovedFieldRetainsEveryStructuralReturn() throws {

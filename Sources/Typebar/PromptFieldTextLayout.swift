@@ -86,9 +86,18 @@ struct PromptFieldTextRun: Equatable {
   private(set) var size: CGSize = .zero
   let lineSpacing: CGFloat
 
-  init(map: PromptCompositionTextMap, width: CGFloat, font: NSFont, lineSpacing: CGFloat = 12,
+  convenience init(map: PromptCompositionTextMap, width: CGFloat, font: NSFont, lineSpacing: CGFloat = 12,
     rightToLeft: Bool = false, joinsLetters: Bool = false, reusing previous: PromptFieldTextLayout? = nil) {
-    self.aliases = map.canonicalAliases; anchor = map.caret; self.rightToLeft = rightToLeft
+    self.init(fieldRuns: map.fieldRuns, aliases: map.canonicalAliases, anchor: map.caret,
+      width: width, font: font, lineSpacing: lineSpacing, rightToLeft: rightToLeft,
+      joinsLetters: joinsLetters, reusing: previous)
+  }
+
+  init(fieldRuns: [PromptFieldTextRun], aliases: [Int: [Int]] = [:],
+    anchor: PromptCompositionProjection.Anchor? = nil, width: CGFloat, font: NSFont,
+    lineSpacing: CGFloat = 12, rightToLeft: Bool = false, joinsLetters: Bool = false,
+    reusing previous: PromptFieldTextLayout? = nil) {
+    self.aliases = aliases; self.anchor = anchor; self.rightToLeft = rightToLeft
     self.font = font; self.lineSpacing = lineSpacing
     let limit = width.isFinite ? max(1, width) : 1
     self.width = limit; self.joinsLetters = joinsLetters
@@ -99,7 +108,7 @@ struct PromptFieldTextRun: Equatable {
         && $0.rightToLeft == rightToLeft && $0.joinsLetters == joinsLetters ? $0 : nil
     }
     var groups: [Int] = []
-    for (group, field) in map.fieldRuns.enumerated() {
+    for (group, field) in fieldRuns.enumerated() {
       func append(_ cells: [PromptFieldTextRun.Cell], breaks: Bool = false) {
         let old: Box? = cells.first.flatMap { cell in
           guard let reuse, let index = reuse.boxByCell[cell.id] else { return nil }
@@ -140,7 +149,7 @@ struct PromptFieldTextRun: Equatable {
         fieldFrames[owner] = fieldFrames[owner].map { $0.union(frame) } ?? frame
       }
     }
-    let ids = map.fieldRuns.flatMap { $0.cells.map(\.id) }
+    let ids = fieldRuns.flatMap { $0.cells.map(\.id) }
     for (id, next) in zip(ids, ids.dropFirst()) { followingCell[id] = next }
     for box in boxes {
       for id in box.hints.keys {

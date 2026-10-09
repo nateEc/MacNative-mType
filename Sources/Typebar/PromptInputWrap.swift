@@ -27,7 +27,53 @@ enum PromptInputWrapGeometry {
   /// Probe the already-rendered letters and append only missing input units.
   /// Hints, retired prefixes, replacement text, RTL, and font preparation are
   /// shared with the actual prompt, not a projected mutation of the session.
-  static func rejects(
+  @MainActor static func rejects(
+    session: TypingSession, candidate: [UInt16], rendering: PromptRendering,
+    width: CGFloat, font: NSFont, lineSpacing: CGFloat, isRightToLeft: Bool,
+    joinsLetters: Bool = false
+  ) -> Bool {
+    if let map = rendering.compositionTextMap {
+      return rejectsFieldGrowth(session: session, candidate: candidate, fields: map.fieldRuns,
+        width: width, font: font, lineSpacing: lineSpacing,
+        rightToLeft: isRightToLeft, joinsLetters: joinsLetters)
+    }
+    return rejectsLegacyGrowth(session: session, candidate: candidate, rendering: rendering,
+      width: width, font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
+  }
+
+  /// Probe copies only: never accept candidate units, score, or manufacture a
+  /// text/identity map whose ranges disagree with its fields. The main-thread
+  /// platform callback is synchronous; the portable engine stays actor-free.
+  @MainActor private static func rejectsFieldGrowth(session: TypingSession, candidate: [UInt16],
+    fields: [PromptFieldTextRun], width: CGFloat, font: NSFont, lineSpacing: CGFloat,
+    rightToLeft: Bool, joinsLetters: Bool) -> Bool {
+    let missing = candidate.count - session.promptInputWrapLetterUnitCount
+    guard width.isFinite, width > 0, missing > 0,
+      let owner = session.promptCompositionField?.index,
+      let index = fields.firstIndex(where: { $0.fieldID == owner && !$0.cells.isEmpty }) else { return false }
+    let before = PromptFieldTextLayout(fieldRuns: fields, width: width, font: font,
+      lineSpacing: lineSpacing, rightToLeft: rightToLeft, joinsLetters: joinsLetters)
+    guard let first = before.fieldFrames[owner] else { return false }
+    var extended = fields
+    var id = (fields.flatMap { $0.cells.map(\.id) }.max() ?? -1) + 1
+    let cells: [PromptFieldTextRun.Cell] = candidate.suffix(missing).map { unit in
+      let glyph = TypingPromptGlyph(character: String(decoding: [unit], as: UTF16.self).first!, state: .extra)
+      let text = AttributedString(PromptControlCharacterPresentation.plan(for: glyph, style: .off).text)
+      defer { id += 1 }
+      return .init(id: id, glyph: glyph, text: text, isGap: false)
+    }
+    // Preserve this adapter's actual Return/extra order, including an extra
+    // row already following Return; only commit SPACE stays outside the ink.
+    let insertion = extended[index].cells.firstIndex { $0.isGap }
+      ?? extended[index].cells.endIndex
+    extended[index].cells.insert(contentsOf: cells, at: insertion)
+    let after = PromptFieldTextLayout(fieldRuns: extended, width: width, font: font,
+      lineSpacing: lineSpacing, rightToLeft: rightToLeft, joinsLetters: joinsLetters, reusing: before)
+    guard let last = after.fieldFrames[owner] else { return false }
+    return last.minY > first.minY || last.height > first.height
+  }
+
+  private static func rejectsLegacyGrowth(
     session: TypingSession, candidate: [UInt16], rendering: PromptRendering,
     width: CGFloat, font: NSFont, lineSpacing: CGFloat, isRightToLeft: Bool
   ) -> Bool {
