@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 已确认退休前缀隔离增量（2026-10-10）
+
+configure 在最新候选选择后、修改布局之前检查最终有效退休上下文：同一 owner attempt／上下文 attempt 的 firstRetainedWordIndex 不得低于已接纳值。先选择快照再检查，允许有效新快照替换旧 representable 参数；新 attempt 可以从 0 重新开始。检查不要求异步 session 确认追上原生提前移除的全部前缀，也不改通知或退休状态机。
+
+新增真实 session 先确认前缀 1，再依次提交无 provider 的旧参数、旧完整快照、由新快照替换的旧参数，以及新 attempt。检查实际文字、Tape 位移、主光标和重开归零。`../../work/tape-ack-prefix-red.log` 单项四处失败，旧参数重新放回前缀并将位移从 -138.46875 改成 -207.703125；修正后 verified.log 193 项零失败。补齐新 attempt 边界后的最终 `../../work/tape-ack-prefix-final.log` 193 项零失败零跳过，24.961 秒（wall 24.984 秒），进程退出 0。verified.log 使用同一 tape-ack-prefix- 前缀；`../../work/tape-ack-prefix-originality.log` 原创性检查退出 0。
+
+本轮范围内差异审查未发现其他待修正项；构造配置交错不等于真实 SwiftUI 调度／IME 验收。零主程序启动，无新截图；完整冻结门禁未为本增量重跑，下方完整门禁明确对应此前 19d0c48。更多多行／平滑／隐藏标记／方向／队列组合、策略变更时未确认移除与真实设备仍开放，整体兼容分类不升级，完整 goal active。
+
 ## 应用入口完整冻结复验（2026-10-10）
 
 被测原生提交 `19d0c4864105e9c1a0f437c1f6173f90bbbc7b62`。完整脚本 `Scripts/check-native-rewrite-readiness.sh` 的复验会话 94063 权威退出 0；证据目录 `../../work/tape-production-readiness-retry.5Ip2sJ/` 保留 gate.log、826 文件 inputs.sha256、多次运行中校验、freeze-terminal.log 及 logs/ 下 74 份日志。运行中不修改输入；终态 826 项全部校验通过，原生和参考工作树干净，参考 pin 仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。

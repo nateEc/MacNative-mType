@@ -101,6 +101,11 @@ final class TapePromptNativeView: NSView {
     let compositionField = initial?.field ?? compositionField
     let newlineWords = initial?.newlineWords ?? newlineWords
     let retirement = initial?.retirement ?? retirement
+    // A complete fresh snapshot may supersede old representable arguments,
+    // but the effective same-attempt transaction cannot undo acknowledged deletion.
+    if configuration?.attemptID == carets.attemptID, let old = self.retirement, let next = retirement,
+      old.attemptID == next.attemptID,
+      next.firstRetainedWordIndex < old.firstRetainedWordIndex { return }
     var carets = carets
     if let initial { carets.mainGlyphID = initial.input.glyphID }
     let nextInput = initial?.input ?? carets.latestInput?()

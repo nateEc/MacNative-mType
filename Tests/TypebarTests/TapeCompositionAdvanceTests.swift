@@ -73,6 +73,56 @@ import XCTest
     XCTAssertEqual(session.typed, "a")
   }
 
+  func testOldRepresentableAndSnapshotCannotRestoreAcknowledgedPrefix() throws {
+    var session = TypingSession(configuration: .words(7), prompt: "aaa bbb ccc ddd eee fff ggg")
+    session.insertBatch("aaa bbb ccc ", at: start)
+    func snapshot() throws -> TapePromptProjectionSnapshot {
+      let rendering = try render(session, marked: "XYZ")
+      let field = try XCTUnwrap(session.promptCompositionField)
+      return try XCTUnwrap(TapePromptProjection.snapshot(session: session, composition: "XYZ", rendering: rendering,
+        retirement: .init(attemptID: session.automaticInputAttemptID, activeWordID: field.index,
+          characterOffsets: rendering.compositionTextMap?.fieldCharacterOffsets ?? [:], smoothScroll: false, reducesMotion: true,
+          words: PromptLineScrollWord.compositionFields(field), firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
+          onRetire: { _ in })))
+    }
+    let stale = try snapshot()
+    session.retirePromptWords(.init(attemptID: session.automaticInputAttemptID, firstRetainedWordIndex: 1))
+    XCTAssertEqual(session.firstRetainedPromptWordIndex, 1)
+    let acknowledged = try snapshot()
+    let motion = PromptCaretMotionCoordinator()
+    let owner = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+    defer { owner.stop() }
+    func config(_ value: TapePromptProjectionSnapshot) -> PromptCaretNativeView.Configuration {
+      .init(text: value.rendering.text, mainOffset: nil, paceOffset: nil,
+      mainStyle: .bar, paceStyle: .off, font: .monospacedSystemFont(ofSize: 28, weight: .regular),
+      lineSpacing: 0, rightToLeft: false, accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+      attemptID: value.input.attemptID, coordinator: motion,
+      mainGlyphID: value.input.glyphID, automaticallyPresents: false)
+    }
+    func configure(_ value: TapePromptProjectionSnapshot, provider: (() -> TapePromptProjectionSnapshot?)? = nil) {
+      owner.configure(rendering: value.rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+        compositionField: value.field, latestProjection: provider, mode: .letter, margin: 0.25,
+        smoothScroll: false, retirement: value.retirement, newlineWords: value.newlineWords ?? [], carets: config(value), at: 0)
+    }
+    configure(acknowledged)
+    let label = owner.accessibilityLabel(), margin = motion.wordsTapeMargin, main = motion.main.position
+    for provider in [false, true] {
+      configure(stale, provider: provider ? { stale } : nil)
+      XCTAssertEqual(owner.accessibilityLabel(), label)
+      XCTAssertEqual(motion.wordsTapeMargin, margin)
+      XCTAssertEqual(motion.main.position, main)
+    }
+    configure(stale, provider: { acknowledged })
+    XCTAssertEqual(owner.accessibilityLabel(), label, "A fresh complete transaction may rescue old representable arguments")
+    XCTAssertEqual(motion.wordsTapeMargin, margin)
+    session = TypingSession(configuration: .words(7), prompt: "aaa bbb ccc ddd eee fff ggg")
+    let restarted = try snapshot()
+    XCTAssertNotEqual(restarted.input.attemptID, acknowledged.input.attemptID)
+    configure(restarted)
+    XCTAssertEqual(owner.accessibilityLabel(), String(restarted.rendering.text.characters))
+    XCTAssertEqual(motion.wordsTapeMargin, 0)
+  }
+
   func testUtf16SnapshotCountSelectsDisplayedSlotsRatherThanGraphemeCount() throws {
     var session = TypingSession(configuration: .words(2), prompt: "😀 next")
     session.insertBatch("😀", at: start)
