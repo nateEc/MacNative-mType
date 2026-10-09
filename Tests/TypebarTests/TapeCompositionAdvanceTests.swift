@@ -13,6 +13,53 @@ import XCTest
     }
   }
 
+  func testProjectedCrossWordRetirementUsesFieldBoxesAndAcknowledgesPrefixWithoutJump() throws {
+    for rtl in [false, true] { for mode in [PracticeTapeMode.letter, .word] {
+      var session = TypingSession(configuration: .words(7), prompt: "aaa bbb ccc ddd eee fff ggg")
+      session.insertBatch("aaa bbb ", at: start)
+      let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+      let coordinator = PromptCaretMotionCoordinator()
+      let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 60))
+      defer { view.stop() }
+      var retired: [PromptWordRetirement] = []
+      func configure(at time: Double) throws {
+        let rendering = try render(session, marked: "XYZ")
+        let field = try XCTUnwrap(session.promptCompositionField)
+        let config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
+          mainStyle: .bar, paceStyle: .off, font: font, lineSpacing: 0, rightToLeft: rtl,
+          accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
+          attemptID: session.automaticInputAttemptID, coordinator: coordinator,
+          mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
+        view.configure(rendering: rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+          compositionField: field, mode: mode, margin: 0.25, smoothScroll: false,
+          retirement: .init(attemptID: session.automaticInputAttemptID, activeWordID: session.promptWordPresentations[field.index].range.lowerBound,
+            characterOffsets: rendering.glyphCharacterOffsets, smoothScroll: false, reducesMotion: true,
+            words: session.promptWordPresentations.enumerated().map { .init(index: $0.offset, glyphID: $0.element.range.lowerBound) },
+            firstRetainedWordIndex: session.firstRetainedPromptWordIndex, onRetire: { retired.append($0) }),
+          carets: config, at: time)
+        view.present(at: time)
+      }
+      try configure(at: 0)
+      session.insertBatch("ccc ", at: start.addingTimeInterval(1))
+      try configure(at: 1)
+      RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+      XCTAssertEqual(retired, [.init(attemptID: session.automaticInputAttemptID, firstRetainedWordIndex: 1)])
+      guard let removal = retired.first else { continue }
+      let before = try XCTUnwrap(coordinator.main.position)
+      let margin = coordinator.wordsTapeMargin
+      session.retirePromptWords(removal)
+      try configure(at: 1)
+      XCTAssertEqual(try XCTUnwrap(coordinator.main.position), before)
+      let width = ("aaa " as NSString).size(withAttributes: [.font: font]).width
+      XCTAssertEqual(coordinator.wordsTapeMargin - margin, rtl ? -width : width, accuracy: 0.001)
+      XCTAssertEqual(coordinator.main.cumulativeTapeCorrection, rtl ? -width : width, accuracy: 0.001)
+      try configure(at: 1)
+      RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+      XCTAssertEqual(retired.count, 1)
+      XCTAssertEqual(coordinator.main.cumulativeTapeCorrection, rtl ? -width : width, accuracy: 0.001)
+    } }
+  }
+
   func testAcceptedPrefixDoesNotAdvanceToMarkedCandidateEnd() throws {
     var session = TypingSession(configuration: .words(2), prompt: "abcd next")
     session.insertBatch("a", at: start)

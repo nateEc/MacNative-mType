@@ -114,7 +114,12 @@ final class TapePromptNativeView: NSView {
       old.attemptID == next.attemptID, next.firstRetainedWordIndex > old.firstRetainedWordIndex,
       let word = old.words.first(where: { $0.index == next.firstRetainedWordIndex }),
       let offset = self.rendering.characterOffset(forGlyphAt: word.glyphID) {
-      let advance = textView.prefixCompensation(at: offset, rightToLeft: carets.rightToLeft)
+      let advance: CGFloat
+      if let layout = textView.projectedLayout, let frame = layout.fieldFrames[word.index] {
+        advance = carets.rightToLeft ? layout.size.width - frame.maxX : frame.minX
+      } else {
+        advance = textView.prefixCompensation(at: offset, rightToLeft: carets.rightToLeft)
+      }
       removedWidth = carets.rightToLeft ? -advance : advance
       needsScroll = true
     } else { removedWidth = nil }
@@ -325,8 +330,14 @@ final class TapePromptNativeView: NSView {
     // Inspect the last presented words margin, not the destination requested
     // by this input. Single-line word boxes are ordered along the tape.
     for word in context.words where word.index >= boundary && word.index < active {
-      guard let offset = rendering.characterOffset(forGlyphAt: word.glyphID),
-        let rect = textView.wordRect(at: offset, start: offset),
+      let rect: CGRect?
+      if let layout = textView.projectedLayout {
+        rect = layout.fieldFrames[word.index]
+      } else {
+        rect = rendering.characterOffset(forGlyphAt: word.glyphID)
+          .flatMap { textView.wordRect(at: $0, start: $0) }
+      }
+      guard let rect,
         PracticeTapePolicy.isOverflowing(wordLeft: rect.minX + textOrigin +
           (configuration?.coordinator.wordsTapeMargin ?? 0), wordWidth: rect.width,
           viewportWidth: bounds.width, rightToLeft: rightToLeft) else { break }
