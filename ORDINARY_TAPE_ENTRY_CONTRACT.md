@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 计时失败诊断准备（2026-10-10）
+
+已追踪实际入口 `runClock → advanceClock → TimerHealthState.observe → failForTimerHealth`。固定参考 `frontend/src/ts/test/test-timer.ts:319` 的短测试范围、125／250／500 ms 和严重延迟超过五次边界与当前策略一致。上轮失败只有最终界面证据，不能据此判断是主线程调度、同步预处理、Tape 渲染还是自动化环境造成。
+
+新增 timing-only 诊断：仅 Info.plist 的 TypebarQAInMemoryStore 为 true 且进程环境 TYPEBAR_QA_TIMER_DIAGNOSTICS=1 时，整秒到期检查后向 stderr 输出一行。字段为相邻回调入口的 uptime 间隔（包含上一轮处理和睡眠／调度）、当前同步规则／Caps Lock／字体检查耗时、会话 elapsed、上一已交付整秒、首个到期整秒、drift、严重延迟计数和失败位。不记录输入、提示、账户、日历时间或成绩载荷；普通包即使设置环境开关也不输出。记录在诊断写入前完成；stderr 输出自身可能影响后续调度，不能把带诊断运行当成无扰动性能基准。未修改阈值、失败／保存策略或时钟采样来源。
+
+`../../work/timer-diagnostics-red.log` 为两个新测试在 API 缺失时编译失败，不冒称计时缺陷的行为反例。`timer-diagnostics-verified.log` 首轮 31 项零失败、1 项因缺少参考路径跳过。提供参考路径与 Anime.js 归档后的 `timer-diagnostics-final.log`：Tape、诊断、elapsed clock、Slow Timer、健康阈值与整秒策略共 224 项零失败零跳过，25.486 秒（wall 25.513 秒），进程退出 0；`timer-diagnostics-originality.log` 检查退出 0。新增测试验证双重开关以及固定数值记录格式；不证明实际 ContentView 输出已观察。
+
+本轮零主程序启动，未采集新的实际运行诊断，也未修复／关闭上一节实际验收失败。范围内风险复核检查开关、内容与调用顺序，无新增待修正项，非独立审计。下一次只启动一个独立内存验收包，显式开关并捕获 stderr，再以普通／Tape 对照定位。完整门禁未为本诊断增量重跑，整体兼容分类不升级，goal active。
+
 ## 实际应用入口验收未通过（2026-10-10）
 
 对 f3f988d 构建单独验收包 `../../work/Typebar-Tape-GUI-20261010.app`，Bundle ID 为 app.typebar.qa.tape20261010，TypebarQAInMemoryStore 为 true；SwiftData 和账户令牌使用内存，默认偏好使用独立应用域。未导入、删除或修改共享本机字体／背景。打包日志 `../../work/tape-gui-package-20261010.log` 退出 0。本轮仅启动一个主程序，启动前无 Typebar 进程。

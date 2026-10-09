@@ -2168,10 +2168,13 @@ private struct ContentView: View {
   }
 
   private func runClock() async {
+    var previousDelivery = ProcessInfo.processInfo.systemUptime
     while !Task.isCancelled {
       try? await Task.sleep(nanoseconds: 100_000_000)
       guard !Task.isCancelled else { return }
-      advanceClock(at: .now)
+      let delivery = ProcessInfo.processInfo.systemUptime
+      advanceClock(at: .now, deliveryGap: delivery - previousDelivery)
+      previousDelivery = delivery
     }
   }
 
@@ -2193,10 +2196,13 @@ private struct ContentView: View {
     return "通知，\(unreadNotificationCount) 条未读"
   }
 
-  private func advanceClock(at now: Date) {
+  private func advanceClock(at now: Date, deliveryGap: TimeInterval) {
+    let preflightStart = TimerDeliveryDiagnostics.enabled ? ProcessInfo.processInfo.systemUptime : 0
     synchronizeLiveInputRules()
     capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
     verifyChallengeFontAvailability()
+    let preflight = TimerDeliveryDiagnostics.enabled
+      ? ProcessInfo.processInfo.systemUptime - preflightStart : 0
     if session.hasStarted {
       let elapsed = session.elapsedSeconds(at: now)
       let dueSeconds = ClockTickPolicy.dueSeconds(
@@ -2205,6 +2211,13 @@ private struct ContentView: View {
         timerHealth.observe(
           drift: elapsed - Double(firstDueSecond), configuration: session.configuration,
           animationSettingsRevision: settings.animationFrameRateRevision)
+        if TimerDeliveryDiagnostics.enabled {
+          let record = TimerDeliveryDiagnostics.record(deliveryGap: deliveryGap,
+            preflight: preflight, elapsed: elapsed, previousSecond: lastClockTickSecond,
+            firstDueSecond: firstDueSecond, severeCount: timerHealth.severeDriftCount,
+            failed: timerHealth.shouldFail)
+          try? FileHandle.standardError.write(contentsOf: Data(record.utf8))
+        }
         if timerHealth.shouldFail {
           session.failForTimerHealth(at: now)
           return
