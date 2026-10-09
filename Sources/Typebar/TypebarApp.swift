@@ -3681,6 +3681,9 @@ private struct ContentView: View {
   }
 
   private var stats: some View {
+    // Elapsed time advances outside observable state. Subscribe this subtree
+    // to real-second deliveries even when input, rules and pace do not change.
+    _ = lastClockTickSecond
     let now = Date.now
     let live = LiveTypingMetrics(
       session: session, at: now, blindMode: settings.blindMode, unit: settings.typingSpeedUnit)

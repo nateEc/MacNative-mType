@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 实时统计秒级刷新依赖修正（2026-10-10）
+
+针对上一轮 AX 倒计时滞后，源码核查 stats 用 Date.now 和 SessionElapsedClock 计算实时数值，却未直接读取 lastClockTickSecond；无布局流动等其他读取时，时钟写入该 State 不一定使统计子树重新求值。新增 LiveStatsClockDependencyTests，用真实 SwiftUI State、不可见 NSHostingView 窗口和独立可控 SessionElapsedClock 比较未读取／读取交付秒状态：无输入续写，时间依次推进 1、10、20 秒；未读取分支一直 30s，读取分支正确为 29s、20s、10s。此为宿主行为对照，不是对实际 AX 缓存行为的完全归因。
+
+live-stats-clock-red.log 两项中一项失败：宿主对照通过，生产 stats 接线缺失断言失败。生产 stats 增加对已有 lastClockTickSecond 的显式读取，建立每秒求值依赖；仍使用当前真实时钟计算数值，不修改计分、健康阈值或采样，不增加定时器、不重建视图身份。live-stats-clock-verified.log 权威退出 0，统计依赖、空闲、实时指标和诊断共 25 项零失败零跳过，7.595s（墙钟 7.599）。本轮零 Typebar 主程序启动；未重新跑完整门禁或 Release GUI，新刷新会增加必要的每秒界面求值，其真实调度负载影响须实测。本修正不宣称解决普通计时健康失败，设备／视觉验收与完整 goal 继续开放。
+
 ## 单字符输入后无 AX 采样（2026-10-10）
 
 复用累计诊断 Release 包，唯一实例 PID 40239／会话 71043，首词 thunder 只输入正确字符 t；随后先通过进程日志确认 started=1，再取五秒系统采样，期间不读取 AX。active-no-ax-sample.txt 采样权威退出 0，主线程 4212 个样本中事件等待分支 3896，不能解释为正在满负荷布局。采样开始前已经发生 1.258090s 交付间隔，三次提示渲染共 0.029751s、最长 0.010056s，首秒漂移 0.214364、failed=0；采样未覆盖最初延迟，因此不能据其等待分支否认首次布局问题。
