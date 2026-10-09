@@ -4978,9 +4978,29 @@ private struct RemoteAccountAPI {
 }
 
 final class AccountTokenStore {
+    struct KeychainAccess {
+        var read: (CFDictionary) -> (OSStatus, CFTypeRef?)
+        var add: (CFDictionary) -> OSStatus
+        var delete: (CFDictionary) -> OSStatus
+
+        static var system: Self {
+            Self(read: { query in
+                var item: CFTypeRef?
+                return (SecItemCopyMatching(query, &item), item)
+            }, add: { SecItemAdd($0, nil) }, delete: { SecItemDelete($0) })
+        }
+    }
+
     private let service = "app.typebar.desktop"
+    private let keychain: KeychainAccess
+    private var inMemoryTokens: [String: String]?
     private static let legacyAccount = "remote-access-token"
     private var activeEndpoint = "http://127.0.0.1:8080"
+
+    init(info: [String: Any] = Bundle.main.infoDictionary ?? [:], keychain: KeychainAccess = .system) {
+        self.keychain = keychain
+        inMemoryTokens = QAStoreMode.usesInMemoryStore(info: info) ? [:] : nil
+    }
 
     static func accountName(for endpoint: String) -> String {
         "remote-access-token.v2.\(RemoteServerScope(endpoint: endpoint).storageSuffix)"
@@ -5004,6 +5024,10 @@ final class AccountTokenStore {
 
     func save(_ token: String, for endpoint: String) throws {
         let account = Self.accountName(for: endpoint)
+        if inMemoryTokens != nil {
+            inMemoryTokens?[account] = token
+            return
+        }
         clear(account: account)
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -5012,7 +5036,7 @@ final class AccountTokenStore {
             kSecValueData: Data(token.utf8),
             kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
-        let status = SecItemAdd(query as CFDictionary, nil)
+        let status = keychain.add(query as CFDictionary)
         guard status == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
     }
 
@@ -5043,6 +5067,7 @@ final class AccountTokenStore {
     }
 
     private func load(account: String) -> String? {
+        if let inMemoryTokens { return inMemoryTokens[account] }
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
@@ -5050,18 +5075,22 @@ final class AccountTokenStore {
             kSecReturnData: true,
             kSecMatchLimit: kSecMatchLimitOne
         ]
-        var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
+        let (status, item) = keychain.read(query as CFDictionary)
+        guard status == errSecSuccess, let data = item as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
     private func clear(account: String) {
+        if inMemoryTokens != nil {
+            inMemoryTokens?.removeValue(forKey: account)
+            return
+        }
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: account
         ]
-        SecItemDelete(query as CFDictionary)
+        _ = keychain.delete(query as CFDictionary)
     }
 }
 
