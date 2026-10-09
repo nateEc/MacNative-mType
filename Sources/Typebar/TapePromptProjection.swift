@@ -3,6 +3,18 @@ import Foundation
 /// Word identity and structural ownership come from the session, never from
 /// splitting the displayed string (which can contain replacement/hint text).
 enum TapePromptProjection {
+  /// The source scrolls over input.length displayed letter nodes, not the
+  /// candidate caret or canonical glyph IDs. Keep the raw UTF-16 count even
+  /// when it selects a marked node after a multi-unit accepted character.
+  /// Geometry applies hidden-extra and zero-width handling separately.
+  static func advanceCells(session: TypingSession, rendering: PromptRendering,
+    mode: PracticeTapeMode) -> [PromptFieldTextRun.Cell] {
+    guard mode == .letter, let field = session.promptCompositionField,
+      let map = rendering.compositionTextMap else { return [] }
+    return Array(map.fieldRuns.lazy.filter { $0.fieldID == field.index }
+      .flatMap(\.cells).filter { !$0.isGap }.prefix(field.inputUTF16.count))
+  }
+
   static func words(session: TypingSession, rendering: PromptRendering) -> [TapePromptWord] {
     let glyphs = session.promptGlyphs
     let presentations = session.promptWordPresentations

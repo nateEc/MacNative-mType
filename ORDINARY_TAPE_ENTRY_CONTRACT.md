@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 投影推进槽接口增量（2026-10-10）
+
+新增 TapePromptProjection.advanceCells：从活动原始字段的 inputUTF16.count 选择最终 fieldRuns 中非提交 gap 的前缀，保留独立槽 ID 与属性，不用候选主光标终点或拼接字符串字符偏移。off／word／无 map／空输入返回空前缀。固定 scrollTape 对应行为为以 input.length 遍历实际 letter 节点，因此一个已提交 emoji 的两个 UTF-16 单位可能选择一个额外候选槽；这项源混合单位行为不擅自改为 grapheme 计数。隐藏 extra 和下一槽零宽回退仍由待接几何层处理。
+
+证据 `../../work/tape-advance-cells.CjtdUn/`：红灯 `../tape-advance-red.log` 为新接口不存在；focused.log 四项一处失败，夹具目标有可复用 canonical ID，无法满足虚拟槽断言，改为目标末尾的真实候选溢出。broad.log 32 项零失败但缺参考环境而跳过一项，不计完整成功；补齐固定参考与归档后的 verified.log 最终 32 项零失败零跳过（3.585 秒，墙钟 3.589 秒）。四新增检查接受前缀／候选终点分离、UTF-16 与真实虚拟槽、空输入及活动字段归属。行为先行和差异风险复核约束本次接口；无持久化、输入、计分或时钟改动。
+
+这是原生几何适配的前置接口，尚未接到 TapePromptNativeView；生产 Tape 组合投影保护仍保留，不能计作可见功能完成。完整门禁未重跑、无新图、零 Typebar 主程序启动。实际候选槽布局、隐藏 extra／零宽补偿、pace 别名、退休队列、方向与实机 IME 仍待验，兼容分类不升级、goal active。
+
 ## Tape 事件快照锚点证据（2026-10-10）
 
 下一步组合投影适配前先核对固定参考的真实事件 getter／logger／helpers。既有完整 scrollTape／Caret／RAF 探针不再用 getCurrentInput 替身，而由真实 input 快照提供推进长度；六类 composition 更新（含 emoji、组合符、控制字符、清空和中文）不改变快照，切活动字段后无新 input 返回空。480 个已提交快照共 2,880 次候选隔离断言通过，128 普通、32 前缀退休和 28 方向例的输出 JSON 与改动前逐字节相同。
