@@ -1,5 +1,7 @@
 # Typebar
 
+当前 [首次完整投影事务](ORDINARY_TAPE_ENTRY_CONTRACT.md#首次完整投影事务增量2026-10-10)在配置入口同步采用最新字段／文字／拓扑／退休上下文，provider 内停止会中止旧配置；190 项 Tape 回归零失败零跳过、原创性通过，零主程序启动。应用保护与复杂队列／方向／实机仍开放，完整门禁未重跑、goal active。
+
 当前 [Tape 应用快照构造](ORDINARY_TAPE_ENTRY_CONTRACT.md#应用快照构造增量2026-10-10)绑定捕获的 session、候选、渲染和退休上下文，应用 provider 已接桥接；189 项相关测试零失败零跳过、原创性通过。零主程序启动，渲染保护仍保留；入口启用、方向／复杂队列和真实 IME 未完成，完整门禁未重跑、goal active。
 
 当前 [单行退休字段身份](ORDINARY_TAPE_ENTRY_CONTRACT.md#单行退休字段身份增量2026-10-10)修正共享 glyph ID 时漏发前缀移除；十六组合与 188 项 Tape 回归零失败零跳过，原创性通过。零主程序启动，应用快照构造／入口启用、方向和真实 IME 仍开放，完整门禁未重跑、goal active。

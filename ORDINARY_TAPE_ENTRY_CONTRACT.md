@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 首次完整投影事务增量（2026-10-10）
+
+configure 的首次 provider 读取现在区分完整事务和旧三字段同字段快照。完整事务检查 attempt、元数据成对、活动 map／词目录、传入退休前缀不回退与同 attempt 原生保留字段边界；同步替换字段、渲染、换行描述、退休上下文和主 glyph ID，再执行既有配置流程。旧快照仍按同字段／单行限制接受。provider 返回后比较 retirementRevision，stop 或重配置使外层事务中止。
+
+新增初次读取后 provider 即不可用的反例：传入旧字段 0，唯一可用快照已跨行；检查配置结束后的新文字、接受推进和主光标纵坐标。另在初次 provider 内 stop，确认随后 present 不再读取。`../../work/tape-initial-transaction-red.log` 保留测试中负号与 try 的语法错误；修正后 `red-verified.log` 单项三处行为失败，旧行纵坐标 0 对新行 45。产品修复后 `verified.log` 回归通过；加入原生保留字段检查和停止断言后的最终 `../../work/tape-initial-transaction-final.log` 190 项零失败零跳过，24.827 秒（wall 24.850 秒），进程退出 0。上述 red-verified.log／verified.log 均使用相同 tape-initial-transaction- 前缀。`../../work/tape-initial-transaction-originality.log` 原创性检查退出 0。
+
+零主程序启动，无新增截图；应用投影渲染保护未解除，复杂旧 representable／确认元数据交错、更多重入与队列组合、方向／连接塑形和真实 IME 仍开放。完整冻结门禁未重跑，功能分类不升级，完整 goal active。
+
 ## 应用快照构造增量（2026-10-10）
 
 TapePromptProjection.snapshot 从传入的同一 session 值绑定输入身份、原始字段、最终渲染、按 Zen／声明换行／生成换行选择的拓扑和退休上下文。拒绝 attempt 不匹配、退休前缀不一致、缺少活动字段 map 或退休词目录。构造器不重新读取 live session；调用者负责用同一捕获值生成 rendering，字段存在检查不能证明任意外部 rendering 的新鲜性。

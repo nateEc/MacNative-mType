@@ -285,6 +285,53 @@ import XCTest
     try verifyCompleteFreshSnapshot(independentPace: true)
   }
 
+  func testInitialConfigureConsumesCompleteCrossFieldSnapshotBeforeProviderBecomesUnavailable() throws {
+    var session = TypingSession(configuration: .words(3), prompt: "a\nbc tail")
+    func snapshot() throws -> TapePromptProjectionSnapshot {
+      let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: "XYZ😀", style: .replace))
+      let rendering = presentation.render { _, glyph, cell in AttributedString(cell?.text ?? String(glyph.character)) }
+      let field = try XCTUnwrap(session.promptCompositionField)
+      let context = PromptLineScrollContext(attemptID: session.automaticInputAttemptID, activeWordID: field.index,
+        characterOffsets: rendering.compositionTextMap?.fieldCharacterOffsets ?? [:], smoothScroll: false, reducesMotion: true,
+        words: PromptLineScrollWord.compositionFields(field), firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
+        onRetire: { _ in })
+      return try XCTUnwrap(TapePromptProjection.snapshot(session: session, composition: "XYZ😀", rendering: rendering, retirement: context))
+    }
+    let old = try snapshot()
+    session.insertBatch("a\nb", at: Date(timeIntervalSinceReferenceDate: 917_100_000))
+    let fresh = try snapshot()
+    let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+    let motion = PromptCaretMotionCoordinator()
+    let owner = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 120))
+    defer { owner.stop() }
+    let config = PromptCaretNativeView.Configuration(text: old.rendering.text, mainOffset: nil, paceOffset: nil,
+      mainStyle: .bar, paceStyle: .off, font: font, lineSpacing: 0, rightToLeft: false, accent: .yellow,
+      motion: .off, reducesMotion: true, frameRate: 30, attemptID: old.input.attemptID,
+      coordinator: motion, mainGlyphID: old.input.glyphID, automaticallyPresents: false)
+    var reads = 0
+    owner.configure(rendering: old.rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+      compositionField: old.field, latestProjection: { reads += 1; return reads == 1 ? fresh : nil },
+      mode: .letter, margin: 0.25, smoothScroll: false, retirement: old.retirement,
+      newlineWords: old.newlineWords ?? [], carets: config, at: 0)
+    XCTAssertEqual(owner.accessibilityLabel(), String(fresh.rendering.text.characters))
+    let reference = TapeNewlineTextLayout()
+    reference.configure(text: fresh.rendering.text, words: fresh.newlineWords ?? [], font: font,
+      rightToLeft: false, resets: true, compositionMap: fresh.rendering.compositionTextMap)
+    let advance = try XCTUnwrap(reference.projectedAdvance(fieldID: fresh.field.index,
+      acceptedUTF16Count: fresh.field.inputUTF16.count, mode: .letter, hidesExtras: false, viewportWidth: 400))
+    XCTAssertEqual(motion.wordsTapeMargin, -advance, accuracy: 0.001)
+    XCTAssertEqual(try XCTUnwrap(motion.main.position).minY,
+      try XCTUnwrap(reference.projectedFieldRect(fresh.field.index)).minY, accuracy: 0.001)
+    owner.stop(); reads = 0
+    owner.configure(rendering: old.rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+      compositionField: old.field, latestProjection: { [weak owner] in
+        reads += 1; owner?.stop(); return fresh
+      }, mode: .letter, margin: 0.25, smoothScroll: false, retirement: old.retirement,
+      newlineWords: old.newlineWords ?? [], carets: config, at: 1)
+    owner.present(at: 2)
+    XCTAssertEqual(reads, 1, "Stop inside initial provider must abort the outer configuration")
+  }
+
   private func verifyCompleteFreshSnapshot(independentPace: Bool) throws {
     var session = TypingSession(configuration: .words(3), prompt: "a\nbc tail")
     var marked = "X"

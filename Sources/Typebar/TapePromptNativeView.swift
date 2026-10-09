@@ -64,14 +64,32 @@ final class TapePromptNativeView: NSView {
     newlineWords: [TapePromptWord] = [], onMetrics: ((TapePromptLayoutMetrics) -> Void)? = nil,
     onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil,
     carets: PromptCaretNativeView.Configuration, at time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+    let revision = retirementRevision
     let candidate: TapePromptProjectionSnapshot? = {
       guard !refreshingProjection else { return nil }
       refreshingProjection = true
       defer { refreshingProjection = false }
       return latestProjection?()
     }()
+    guard retirementRevision == revision else { return }
     let initial = candidate.flatMap { value -> TapePromptProjectionSnapshot? in
       guard value.input.attemptID == carets.attemptID,
+        (value.newlineWords == nil) == (value.retirement == nil) else { return nil }
+      if let words = value.newlineWords, let context = value.retirement {
+        let retained = configuration?.attemptID == carets.attemptID
+          ? max(self.retirement?.firstRetainedWordIndex ?? 0, textView.firstRetainedNewlineIndex) : 0
+        guard context.attemptID == carets.attemptID,
+          context.firstRetainedWordIndex >= (retirement?.firstRetainedWordIndex ?? 0),
+          value.field.index >= retained,
+          value.field.index >= context.firstRetainedWordIndex,
+          context.words.contains(where: { $0.index == value.field.index }),
+          value.rendering.compositionTextMap?.fieldRuns.contains(where: { $0.fieldID == value.field.index }) == true,
+          words.isEmpty ? TapePromptTextView.supportsProjection(value.rendering.compositionTextMap,
+            newlineWords: words, rightToLeft: carets.rightToLeft)
+            : words.contains(where: { $0.index == value.field.index && !$0.isRemoved }) else { return nil }
+        return value
+      }
+      guard
         value.field.index == compositionField?.index,
         TapePromptTextView.supportsProjection(value.rendering.compositionTextMap,
           newlineWords: newlineWords, rightToLeft: carets.rightToLeft) else { return nil }
@@ -79,6 +97,10 @@ final class TapePromptNativeView: NSView {
     }
     let rendering = initial?.rendering ?? rendering
     let compositionField = initial?.field ?? compositionField
+    let newlineWords = initial?.newlineWords ?? newlineWords
+    let retirement = initial?.retirement ?? retirement
+    var carets = carets
+    if let initial { carets.mainGlyphID = initial.input.glyphID }
     let nextInput = initial?.input ?? carets.latestInput?()
     let nextMap = compositionField == nil ? nil : rendering.compositionTextMap
     let nextUsesProjection = nextMap != nil && (!newlineWords.isEmpty || TapePromptTextView.supportsProjection(nextMap,
