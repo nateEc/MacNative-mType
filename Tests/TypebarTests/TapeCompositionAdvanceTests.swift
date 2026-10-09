@@ -55,4 +55,37 @@ import XCTest
     let legacy = PromptRendering(text: rendering.text, glyphCharacterOffsets: rendering.glyphCharacterOffsets)
     XCTAssertTrue(TapePromptProjection.advanceCells(session: session, rendering: legacy, mode: .letter).isEmpty)
   }
+
+  func testMeasuredAdvanceUsesVirtualSlotBoxesNotCanonicalOffsets() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "😀 next")
+    session.insertBatch("😀", at: start)
+    let rendering = try render(session, marked: "XY")
+    let map = try XCTUnwrap(rendering.compositionTextMap)
+    let native = PromptFieldTextLayout(map: map, width: 10000,
+      font: NSFont.monospacedSystemFont(ofSize: 28, weight: .regular))
+    let cells = TapePromptProjection.advanceCells(session: session, rendering: rendering, mode: .letter)
+    let expected = try cells.reduce(CGFloat.zero) { $0 + (try XCTUnwrap(native.cellFrames[$1.id])).width }
+    XCTAssertGreaterThan(expected, 0)
+    XCTAssertEqual(TapePromptProjection.inlineAdvance(cells: cells, nextCellID: nil,
+      frames: native.cellFrames, hidesExtras: false), expected)
+  }
+
+  func testAdvanceSkipsHiddenExtrasAndBacksOffLastPositiveWidthBeforeZeroSlot() {
+    func cell(_ id: Int, _ state: TypingPromptCharacterState) -> PromptFieldTextRun.Cell {
+      .init(id: id, glyph: .init(character: "x", state: state), text: AttributedString("x"), isGap: false)
+    }
+    let cells = [cell(1, .correct), cell(-1, .extra), cell(-2, .pending)]
+    let frames: [Int: CGRect] = [1: .init(x: 0, y: 0, width: 11, height: 30),
+      -1: .init(x: 11, y: 0, width: 17, height: 30),
+      -2: .init(x: 28, y: 0, width: 0, height: 30),
+      -3: .init(x: 28, y: 0, width: 0, height: 30)]
+    XCTAssertEqual(TapePromptProjection.inlineAdvance(cells: cells, nextCellID: -3,
+      frames: frames, hidesExtras: false), 11)
+    XCTAssertEqual(TapePromptProjection.inlineAdvance(cells: cells, nextCellID: -3,
+      frames: frames, hidesExtras: true), 0)
+    XCTAssertEqual(TapePromptProjection.inlineAdvance(cells: cells, nextCellID: nil,
+      frames: frames, hidesExtras: true), 11)
+    XCTAssertEqual(TapePromptProjection.inlineAdvance(cells: [], nextCellID: -3,
+      frames: frames, hidesExtras: false), 0)
+  }
 }

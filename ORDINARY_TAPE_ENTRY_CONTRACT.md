@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 投影实测推进距离增量（2026-10-10）
+
+推进槽接口新增 inlineAdvance：按实际槽 ID 的 allocation 宽度顺序求和，不以 canonical offsets 或墨迹并集代替；hidesExtras 跳过 .extra，下一槽明确为零宽时扣除最近正宽，缺失下一槽不误判为零宽。直接复核固定参考 test-ui.ts 的完整 scrollTape 当前词宽计算段；调用者仍须提供真实下一槽以及 blind／hideExtra 设置，字段前缀、方向和退休补偿不在此函数中。
+
+两新增测试包含真实 PromptFieldTextLayout 测得的 emoji／虚拟候选槽宽，以及受控隐藏 extra／零宽／缺失下一槽边界。`../../work/tape-measured-advance-red.log` 保留初始红灯（缺接口及错误测试枚举类型）；修正测试类型后的 `tape-measured-advance-red-verified.log` 仍因缺接口失败。最终 `tape-measured-advance-verified.log` 34 项零失败零跳过（3.578 秒，墙钟 3.583 秒），参考与动画归档环境齐备。行为先行及差异风险复核约束本增量；真实量测不是浏览器像素等价，受控框不代表全部字体和连接塑形验收。
+
+尚未接入 TapePromptNativeView，也未解除生产组合投影保护；这不是可见功能完成。完整门禁未重跑，无新图、零主程序启动；词容器几何、候选主／pace、结构行与队列组合仍开放，goal active、兼容分类不升级。
+
 ## 投影推进槽接口增量（2026-10-10）
 
 新增 TapePromptProjection.advanceCells：从活动原始字段的 inputUTF16.count 选择最终 fieldRuns 中非提交 gap 的前缀，保留独立槽 ID 与属性，不用候选主光标终点或拼接字符串字符偏移。off／word／无 map／空输入返回空前缀。固定 scrollTape 对应行为为以 input.length 遍历实际 letter 节点，因此一个已提交 emoji 的两个 UTF-16 单位可能选择一个额外候选槽；这项源混合单位行为不擅自改为 grapheme 计数。隐藏 extra 和下一槽零宽回退仍由待接几何层处理。

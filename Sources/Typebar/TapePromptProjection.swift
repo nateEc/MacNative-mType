@@ -3,6 +3,22 @@ import Foundation
 /// Word identity and structural ownership come from the session, never from
 /// splitting the displayed string (which can contain replacement/hint text).
 enum TapePromptProjection {
+  /// Sum the measured letter allocations in source order. This is not the
+  /// union of their ink bounds: joining, zero-width and virtual slots retain
+  /// their own allocation semantics. A missing next slot is not zero-width.
+  static func inlineAdvance(cells: [PromptFieldTextRun.Cell], nextCellID: Int?,
+    frames: [Int: CGRect], hidesExtras: Bool) -> CGFloat {
+    var width: CGFloat = 0, lastPositive: CGFloat = 0
+    for cell in cells {
+      if hidesExtras && cell.glyph.state == .extra { continue }
+      let advance = frames[cell.id]?.width ?? 0
+      width += advance
+      if advance > 0 { lastPositive = advance }
+    }
+    if let nextCellID, frames[nextCellID]?.width == 0 { width -= lastPositive }
+    return width
+  }
+
   /// The source scrolls over input.length displayed letter nodes, not the
   /// candidate caret or canonical glyph IDs. Keep the raw UTF-16 count even
   /// when it selects a marked node after a multi-unit accepted character.
