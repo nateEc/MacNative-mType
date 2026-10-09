@@ -1,5 +1,7 @@
 # Typebar
 
+当前 [完整事务的独立 pace 验证](ORDINARY_TAPE_ENTRY_CONTRACT.md#完整事务的独立-pace-验证2026-10-10)覆盖多行跨字段候选刷新、canonical 目标位置及不呈现主光标；187 项 Tape 回归零失败零跳过、原创性通过。本轮只新增测试，初次参照漏执行 filler 重排的失败已保留并校正。零主程序启动，应用接线／复杂队列／方向与实机仍开放，goal active。
+
 当前 [Tape 完整实时事务](ORDINARY_TAPE_ENTRY_CONTRACT.md#完整实时投影事务增量2026-10-10)绑定输入、字段、文字、换行拓扑与退休上下文，支持不等待 representable 更新的跨字段候选刷新；186 项相关回归零失败零跳过、原创性通过。零主程序启动，应用保护仍保留；独立 pace 的完整事务、复杂队列、方向／IME 与完整门禁尚待验证，goal active。
 
 当前 [多行字段身份与 filler 隔离](ORDINARY_TAPE_ENTRY_CONTRACT.md#多行投影字段身份与-filler-隔离增量2026-10-10)消除共享 glyph ID 对跨行事务和缩进通道的影响；十六组合加 filler 反例、最终 185 项相关回归零失败零跳过，原创性通过。一次未复现通知失败及事件等待修正均保留。零主程序启动，完整门禁未重跑；真实部分字素／复杂队列／实时快照和应用入口／IME 仍开放，goal active。

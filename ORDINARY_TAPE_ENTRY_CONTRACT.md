@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 完整事务的独立 pace 验证（2026-10-10）
+
+完整快照测试抽取共享场景并新增独立 `requestPacePosition(fromDeadline: true)` 路径：在不更新 representable 的跨字段输入后依次切换 emoji／空／中文候选，验证单次 provider 读取、最新文字、接受推进、canonical pace 目标横纵坐标，以及 deadline 不改变主光标。随后正常 present 验证主光标纵坐标；既有无效快照／停止边界仍执行。配置为 LTR、letter、关闭动效，不外推到平滑／RTL／混合方向／实际 IME。
+
+初次 `../../work/tape-complete-pace-first.log` 七项三处横坐标失败；参照布局只 configure／量测，未执行 requestProjectedScroll，所以没有更新 Return filler 缩进。补上与 owner 相同的滚动请求后 `../../work/tape-complete-pace-flow.log` 单项零失败（0.136 秒，wall 0.137 秒），产品代码未修改，不将该失败记为产品缺陷。最终 `../../work/tape-complete-pace-verified.log` 187 项零失败零跳过，24.349 秒（wall 24.372 秒），进程退出 0；`../../work/tape-complete-pace-originality.log` 原创性检查退出 0。
+
+本轮仅测试和证据文档，零主程序启动，无新增截图；应用层保护未解除，初始配置选择、复杂队列、连接塑形与方向、实机验收仍开放。完整冻结门禁未重跑，整体功能兼容分类不升级，完整 goal active。
+
 ## 完整实时投影事务增量（2026-10-10）
 
 TapePromptProjectionSnapshot 可同时携带换行词描述与退休上下文；两者缺一即拒绝，旧三字段快照保留仅同字段刷新规则。原生 owner 以同一输入／字段／文字／拓扑事务调用既有 configure，允许跨字段，不另建滚动或退休状态机。验证 attempt、活动字段存在、退休前缀不回退，并在 provider 返回后重新验证停止／配置身份；未变化快照不重新配置，避免无谓取消待执行事务。光标读取缓存覆盖多行投影，最新文字通过已有 rendering provider 提供，不修改只读光标配置文本。

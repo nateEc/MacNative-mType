@@ -246,6 +246,14 @@ import XCTest
   }
 
   func testCompleteFreshSnapshotCrossesFieldsAndUpdatesCandidatesWithoutRepresentableUpdate() throws {
+    try verifyCompleteFreshSnapshot(independentPace: false)
+  }
+
+  func testIndependentPaceRefreshesCompleteCrossFieldTransactionWithoutPresentingMain() throws {
+    try verifyCompleteFreshSnapshot(independentPace: true)
+  }
+
+  private func verifyCompleteFreshSnapshot(independentPace: Bool) throws {
     var session = TypingSession(configuration: .words(3), prompt: "a\nbc tail")
     var marked = "X"
     func snapshot() throws -> TapePromptProjectionSnapshot {
@@ -266,11 +274,14 @@ import XCTest
     let owner = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 120))
     defer { owner.stop() }
     let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
-    let config = PromptCaretNativeView.Configuration(text: latest.rendering.text, mainOffset: nil, paceOffset: nil,
-      mainStyle: .bar, paceStyle: .off, font: font, lineSpacing: 0, rightToLeft: false,
+    let paceID = try XCTUnwrap(session.promptWordPresentations.last).range.lowerBound
+    var config = PromptCaretNativeView.Configuration(text: latest.rendering.text, mainOffset: nil, paceOffset: nil,
+      mainStyle: .bar, paceStyle: independentPace ? .outline : .off, font: font, lineSpacing: 0, rightToLeft: false,
       accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30,
       attemptID: session.automaticInputAttemptID, coordinator: coordinator,
       mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
+    config.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: false, targetAfter: false, fraction: 1, targetGlyphID: paceID) }
     owner.configure(rendering: latest.rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
       compositionField: latest.field, latestProjection: { [weak owner] in
         reads += 1; if stops { owner?.stop() }; return latest
@@ -278,9 +289,14 @@ import XCTest
       mode: .letter, margin: 0.25, smoothScroll: false, retirement: latest.retirement,
       newlineWords: latest.newlineWords ?? [], carets: config, at: 0)
     session.insertBatch("a\nb", at: Date(timeIntervalSinceReferenceDate: 917_100_000))
+    let caret = try XCTUnwrap(owner.subviews.compactMap { $0 as? PromptCaretNativeView }.first)
     for candidate in ["XYZ😀", "", "候选"] {
       marked = candidate; latest = try snapshot(); reads = 0
-      owner.present(at: 1)
+      if independentPace {
+        let main = coordinator.main.position
+        _ = caret.requestPacePosition(at: 1, fromDeadline: true)
+        XCTAssertEqual(coordinator.main.position, main, "Independent deadline must not present main")
+      } else { owner.present(at: 1) }
       XCTAssertEqual(reads, 1)
       XCTAssertEqual(owner.accessibilityLabel(), String(latest.rendering.text.characters))
       let native = TapeNewlineTextLayout()
@@ -289,6 +305,16 @@ import XCTest
       let expected = try XCTUnwrap(native.projectedAdvance(fieldID: latest.field.index,
         acceptedUTF16Count: latest.field.inputUTF16.count, mode: .letter, hidesExtras: false, viewportWidth: 400))
       XCTAssertEqual(coordinator.wordsTapeMargin, -expected, accuracy: 0.001)
+      if independentPace {
+        _ = native.requestProjectedScroll(fieldID: latest.field.index,
+          acceptedUTF16Count: latest.field.inputUTF16.count, mode: .letter, hidesExtras: false,
+          viewportWidth: 400, duration: 0, time: 1, overflowing: { _, _ in false })
+        let target = try XCTUnwrap(native.projectedCanonicalRect(paceID, after: false))
+        let pace = try XCTUnwrap(coordinator.pace.position)
+        XCTAssertEqual(pace.minX, target.minX + 100 - native.leadingEdge - expected, accuracy: 0.001)
+        XCTAssertEqual(pace.minY, target.minY, accuracy: 0.001)
+        owner.present(at: 1)
+      }
       XCTAssertEqual(try XCTUnwrap(coordinator.main.position).minY,
         try XCTUnwrap(native.projectedFieldRect(latest.field.index)).minY, accuracy: 0.001)
     }
