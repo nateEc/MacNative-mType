@@ -83,5 +83,62 @@ const emoji = unicodeFixtures.find(value => value.mode === 'words' && value.styl
 assert.deepEqual(emoji.tail.slice(0, 2).map(value => value.textUnits), [[0xD83D], [0xDE00]],
   'Pinned source splits ordinary marked emoji into surrogate cells; do not call this native grapheme parity');
 verify();
-if (option) process.stdout.write(JSON.stringify({pin, fixtures, unicodeFixtures}));
-else console.log('Composition projection source passed (132 complete word-update/caret cases and 36 explicit Unicode cases; real Words/Strings, off/below/replace, Zen, overflow, controls, cancel; owned DOM/RAF and no browser geometry; source mixed UTF-16/scalar defects retained)');
+// Complete event getters consume explicit, owned input snapshots. This does
+// not execute insertion/navigation, generation, live-cache math or browser IME.
+const fieldSamples = [
+  {words: ['abcdef ', 'gh ', 'ij'], accepted: 'a gXYZ', index: 1, snapshots: [[0, 'a '], [1, 'gXYZ']]},
+  {words: ['a\n', '\n', 'b ', 'c'], accepted: 'a\n', index: 1, snapshots: [[0, 'a\n']]},
+  {words: ['a\n', '\n', 'b ', 'c'], accepted: 'a\n\n', index: 2, snapshots: [[0, 'a\n'], [1, '\n']]},
+  {words: ['a ', '\u0301b ', 'tail'], accepted: 'a ', index: 1, snapshots: [[0, 'a ']]},
+  {words: ['ab', 'CD', 'xy'], hidden: true, accepted: 'abC', index: 1, snapshots: [[0, 'ab'], [1, 'C']]},
+  {words: ['ab', '', 'xy'], hidden: true, accepted: 'ab', index: 1, snapshots: [[0, 'ab']]},
+  {words: ['a', '\u0301b', 'tail'], hidden: true, accepted: 'a', index: 1, snapshots: [[0, 'a']]},
+  {words: ['🇫', '🇷🇨', 'tail'], hidden: true, accepted: '🇫', index: 1, snapshots: [[0, '🇫']]},
+  {words: ['🙂x', 'tail'], hidden: true, accepted: '🙃', stop: true, index: 0, snapshots: [[0, '\ud83d']]},
+  {words: ['\n', 'a ', 'tail'], strict: true, accepted: '\n', index: 0, snapshots: [[0, '\n']]},
+  {words: [], zen: true, accepted: 'one\n🙂', index: 1, snapshots: [[0, 'one\n'], [1, '🙂']]},
+  {words: [], zen: true, accepted: '', index: 0, snapshots: []},
+  {words: ['ab'], hidden: true, stop: true, accepted: 'abx', index: 0, snapshots: [[0, '']]},
+  {words: ['a ', 'tail'], hidden: true, accepted: 'a', index: 0, snapshots: [[0, 'a']]},
+  {words: ['', ''], hidden: true, accepted: '', index: 0, snapshots: []},
+];
+const fieldFixtures = [];
+for (const sample of fieldSamples) {
+  let html = '', position;
+  const mode = sample.zen ? 'zen' : 'words';
+  const context = vm.createContext({Config: {mode, indicateTypos: 'off', compositionDisplay: 'replace',
+    tapeMode: 'off', showAllLines: true, caretStyle: 'bar', smoothCaret: 'off'},
+    getActiveWordIndex: () => sample.index, isResultCalculating: () => false,
+    roundTo2: value => Math.round(value * 100) / 100, isSafeNumber: Number.isFinite,
+    recordEventForCache() {}, resetLiveCache() {}, console: {debug() {}},
+    findSingleActiveFunboxWithFunction: () => undefined,
+    requestDebouncedAnimationFrame: (_key, callback) => callback(),
+    getWordElement: () => ({setHtml(value) {html = value;}, qsa: () => [],
+      native: {insertAdjacentHTML() {}, getElementsByTagName: () => []}}),
+    isLanguageRightToLeft: () => false, isDirectionReversed: () => false,
+    SlowTimer: {get: () => false}, Caret: class {goTo(value) {position = value;}},
+    qsr: () => ({}), CompositionState: {getData: () => 'XYZ'}, configEvent: {subscribe() {}}});
+  new vm.Script(javascript(source('utils/strings')) + '\nglobalThis.Strings = {splitIntoCharacters};\n' +
+    javascript(source('test/test-words')) + '\nglobalThis.TestWords = {words};\n' +
+    javascript(source('test/events/helpers')) + '\n(() => {\n' + javascript(source('test/events/data')) +
+    '\nObject.assign(globalThis, {getCurrentInput, logTestEvent});\n})();\n' +
+    update + '\n' + caret).runInContext(context, {timeout: 1000});
+  context.sample = sample;
+  vm.runInContext('for (const word of sample.words) words.push(word, 0);' +
+    'for (const [wordIndex, inputValue] of sample.snapshots) logTestEvent("input", 0,' +
+    '{inputType: "insertText", wordIndex, inputValue, data: inputValue, correct: true});', context);
+  const display = vm.runInContext('words.getCurrent()?.display ?? ""', context);
+  const input = vm.runInContext('getCurrentInput()', context);
+  await vm.runInContext('updateWordLetters({wordIndex: sample.index, input: getCurrentInput(), compositionData: "XYZ"})', context);
+  vm.runInContext('updatePosition(true)', context);
+  assert.equal(position.wordIndex, sample.index); assert.equal(position.letterIndex, input.length + 3);
+  assert.ok(letters(html).some(value => value.marked));
+  fieldFixtures.push({words: sample.words, hidden: sample.hidden ?? false, zen: sample.zen ?? false,
+    strict: sample.strict ?? false, stop: sample.stop ?? false, accepted: sample.accepted,
+    index: sample.index, targetUnits: units(display), inputUnits: units(input), letterIndex: position.letterIndex});
+}
+assert.equal(fieldFixtures.length, 15);
+assert.deepEqual(fieldFixtures[8].inputUnits, [55357], 'Never decode a retained lone surrogate into a replacement unit');
+verify();
+if (option) process.stdout.write(JSON.stringify({pin, fixtures, unicodeFixtures, fieldFixtures}));
+else console.log('Composition projection source passed (132 complete word-update/caret cases, 36 explicit Unicode cases and 15 complete Words/event-getter/update/caret field cases; seeded snapshots and owned DOM/RAF/cache bindings, no insertion/navigation/browser/IME parity; source mixed UTF-16/scalar defects retained)');

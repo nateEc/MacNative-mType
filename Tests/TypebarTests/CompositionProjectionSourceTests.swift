@@ -17,6 +17,14 @@ import XCTest
   private struct Evidence: Decodable {
     let pin: String
     let fixtures: [Fixture], unicodeFixtures: [Fixture]
+    let fieldFixtures: [FieldFixture]
+  }
+  private struct FieldFixture: Decodable {
+    let words: [String]
+    let hidden: Bool, zen: Bool, strict: Bool, stop: Bool
+    let accepted: String
+    let index: Int, letterIndex: Int
+    let targetUnits: [UInt16], inputUnits: [UInt16]
   }
   private static var cachedEvidence: Evidence?
 
@@ -39,6 +47,7 @@ import XCTest
     let value = try JSONDecoder().decode(Evidence.self, from: data)
     XCTAssertEqual(value.pin, "91bd24bb8513785c7364cbea29296ff7adafac41")
     XCTAssertEqual(value.fixtures.count, 132); XCTAssertEqual(value.unicodeFixtures.count, 36)
+    XCTAssertEqual(value.fieldFixtures.count, 15)
     Self.cachedEvidence = value
     return value
   }
@@ -89,6 +98,28 @@ import XCTest
         composition: fixture.composition, isZen: false, style: .replace)
       XCTAssertEqual(plan.cells.first?.matchesTarget, false,
         "Canonical equivalence must not turn an originally wrong marked prefix into a correct one")
+    }
+  }
+
+  func testActualSessionFieldsMatchCompletePinnedWordsAndEventGetters() throws {
+    for fixture in try evidence().fieldFixtures {
+      let configuration = TestConfiguration(mode: fixture.zen ? .zen : .custom,
+        duration: nil, wordLimit: nil, difficulty: .normal,
+        rules: .init(strictSpace: fixture.strict, stopOnErrorMode: fixture.stop ? .letter : .off),
+        modifiers: fixture.hidden ? [.noSpaces] : [])
+      let prompt = fixture.words.joined()
+      let batch = TransformedPromptBatch(text: prompt, noSpaceTargetWords: fixture.hidden ? fixture.words : [])
+      var session = TypingSession(configuration: configuration, prompt: prompt,
+        noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: batch.noSpaceWordLengths),
+        noSpaceTargetWords: batch.noSpaceTargetWords)
+      session.insertBatch(fixture.accepted, at: Date(timeIntervalSinceReferenceDate: 915_100_000))
+      let field = try XCTUnwrap(session.promptCompositionField, fixture.words.description)
+      XCTAssertEqual(field.index, fixture.index, fixture.words.description)
+      XCTAssertEqual(field.targetUTF16, fixture.targetUnits, fixture.words.description)
+      XCTAssertEqual(field.inputUTF16, fixture.inputUnits, fixture.words.description)
+      let plan = PromptCompositionPlan(field: field, composition: "XYZ", style: .replace)
+      XCTAssertEqual(plan.referenceLetterUnitIndex, fixture.letterIndex)
+      XCTAssertEqual(field.boundary, fixture.zen ? .zen : fixture.hidden ? .hidden : .separated)
     }
   }
 }

@@ -4993,6 +4993,45 @@ struct TypingSession {
     return glyphs.firstIndex { $0.state == .current }
   }
 
+  /// Composition belongs to the actual input field, including retained
+  /// separator units and hidden directories that may bisect a native glyph.
+  /// Decoding input or inspecting the visible caret cannot recover that data.
+  var promptCompositionField: PromptCompositionField? {
+    guard !isFinished else { return nil }
+    let input = acceptedUnits.map { buffer in
+      buffer.activeCount == 0 ? [] : buffer.field(buffer.fieldIndex)
+    } ?? Array(codeInputFieldText.utf16)
+    if configuration.mode == .zen {
+      return .init(index: acceptedUnits?.fieldIndex ?? replayCommittedSeparatorCount,
+        boundary: .zen, inputUTF16: input, targets: UnitInputTargets(""), targetRange: 0..<0)
+    }
+    // ASCII catalogs are normally omitted by the engine's streaming fast
+    // path. This presentation snapshot builds one without mutating that path.
+    let targets = unitTargets.fields.isEmpty
+      ? UnitInputTargets(prompt, buildsASCIICatalog: true) : unitTargets
+    // Legacy attempts may retain trustworthy grapheme ends without the newer
+    // raw-word directory. Preserve those ends instead of guessing new words
+    // or flattening a field the engine still navigates independently.
+    if let range = activeNoSpaceWordRange, range.upperBound <= promptCharacters.count {
+      let start = String(promptCharacters[..<range.lowerBound]).utf16.count
+      let end = start + String(promptCharacters[range]).utf16.count
+      return .init(index: completedWordCount, boundary: .hidden, inputUTF16: input,
+        targets: targets, targetRange: start..<end)
+    }
+    if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers),
+      !targets.noSpace, !hasNoSpaceWordSegmentation {
+      return .init(index: 0, boundary: .unsegmented,
+        inputUTF16: acceptedUnits?.units ?? Array(typed.utf16),
+        targets: targets, targetRange: targets.units.indices)
+    }
+    let index = acceptedUnits?.fieldIndex
+      ?? (hasNoSpaceWordSegmentation ? completedWordCount : replayCommittedSeparatorCount)
+    guard targets.fields.indices.contains(index) else { return nil }
+    let range = targets.fields[index]
+    return .init(index: index, boundary: targets.noSpace ? .hidden : .separated,
+      inputUTF16: input, targets: targets, targetRange: range)
+  }
+
   /// Zen's empty active field has a presentation-only cell. It is never an
   /// accepted underscore or a separator owned by the preceding word.
   var zenEmptyWordPlaceholderGlyphIndex: Int? {
