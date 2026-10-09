@@ -1,5 +1,7 @@
 # Typebar
 
+当前 [Tape 会话缺口与原生恢复增量](REWARD_INBOX_CONTRACT.md)：独立删词集合接通普通／hard 回删、共享投影、结构换行工厂及实际 SwiftUI 桥接；确认不重复补偿，字号重建不复活缺失词，输入／结果／回放不变。十新增、相关 318 项通过；最终重新冻结原生 3,921／服务 501 项零失败零跳过，十万词、16 磁盘迁移、53 表面、1,119 人工结构及未启动应用包／签名／原创边界通过。22 哈希一致，71 日志／188 图和失败／中止记录见合同，最终六张新图与四张旧 Tape 图已复查。完整门禁现在自动启用耐久用例；生产换行保护、复杂内容／异步队列／设备待验及 tapeMode 部分保持，完整 goal active、零主程序启动。下方为阶段历史。
+
 当前 [换行 Tape word-only 缺口与结构账本增量](REWARD_INBOX_CONTRACT.md)：真实原生组件分开横向删词与纵向裁前缀，保留换行结构，发出独立词身份事件；修正普通重绘触发第二次滚动的问题。六新增／相关 181 项、120 组完整源码两次请求对照通过；首轮三个既有环境／测量断言失败及修正证据保留。重新冻结原生 3,911／服务 501 项零失败零跳过，十万词、16 磁盘迁移、53 表面、1,117 人工结构及未启动应用包／签名／原创边界通过；25 哈希一致，68 日志／182 图见合同，四张 Tape 与三张 ASL 正负控制图已复查。横向集合尚未接入会话回删／共享投影及生产入口，生产换行回退与 tapeMode 部分保持；完整 goal active、零主程序启动。下方为阶段历史。
 
 当前 [换行 Tape 实际 owner 增量](REWARD_INBOX_CONTRACT.md)：真实原生组件接通纵向等待、完成帧内部删行及异步会话确认去重，保留同词独立横向输入，覆盖重叠与取消。十新增／相关 175 项零失败零跳过，128 条完整源码归一化顺序驱动实际组件；六张未显示窗口图已检查，完成／确认非空像素一致。最终冻结原生 3,905／服务 501 项零失败零跳过，十万词、16 磁盘冷读、53 表面、1,115 人工结构及未启动应用包／签名／原创边界通过；20 哈希一致，67 日志／177 图见合同。本次耐久含已核实系统睡眠，保留实际长耗时而不当清醒性能基准。生产换行回退与 tapeMode 部分保持，横向溢出退休组合、生产工厂及复杂输入／设备仍待完成。完整 goal active、零主程序启动，下方为阶段历史。
@@ -819,10 +821,13 @@ zsh Scripts/check-macos-app-package.sh --reference /absolute/path/to/monkeytype-
 
 对固定参考源码执行串行的重写验收总门禁：它会检查原创性与兼容矩阵、完整运行原生客户端和自建服务测试、再无启动地验签并扫描临时应用包。它在每个编译或测试步骤前拒绝已有的 Typebar、测试或 Swift 编译进程，且自身绝不启动 Typebar：
 
+总门禁自行启用 `TYPEBAR_ENDURANCE_TESTS=1`，实际运行十万词用例；普通定向测试仍按原约定选择是否启用。周 XP／每日缓存源码对照需要参考固定的 Redis 6.2.6；系统版本不匹配时，通过 `TYPEBAR_SOURCE_REDIS_SERVER` 指定独立程序路径，不替换系统安装或连接真实 Redis 数据。日志与图片可分别指定现有空目录 `TYPEBAR_READINESS_LOG_DIRECTORY`、`TYPEBAR_PROFILE_PB_QA_IMAGE_DIRECTORY`，保留失败证据。
+
 每日趋势源对照会下载 QA 专用 `chartjs-plugin-trendline@3.2.4` npm 归档并核验锁文件完整性，不安装产品依赖。已有归档可通过 `TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE` 指定；详情见 [每日图合同](ACCOUNT_DAILY_ACTIVITY_CONTRACT.md)。
 
 ```zsh
-zsh Scripts/check-native-rewrite-readiness.sh /absolute/path/to/monkeytype-reference
+TYPEBAR_SOURCE_REDIS_SERVER=/absolute/path/to/redis-6.2.6/src/redis-server \
+  zsh Scripts/check-native-rewrite-readiness.sh /absolute/path/to/monkeytype-reference
 ```
 
 检查参考源码隔离与生产服务边界：

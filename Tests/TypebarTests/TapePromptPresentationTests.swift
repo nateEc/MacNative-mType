@@ -18,7 +18,7 @@ import XCTest
   func testProductionTapeDoesNotDrawLegacyCaretInsideMovingText() throws {
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     XCTAssertTrue(app.contains("TapePromptNativeView"), "Tape needs actual shared text geometry and separate caret channels")
-    let start = try XCTUnwrap(app.range(of: "private struct TapePracticePrompt"))
+    let start = try XCTUnwrap(app.range(of: "struct TapePracticePrompt"))
     let end = try XCTUnwrap(app.range(of: "struct ChooGlyphPalette"))
     XCTAssertFalse(app[start.lowerBound..<end.lowerBound].contains(".easeOut(duration: 0.16)"),
       "Only the Tape path is governed by this contract; unrelated UI transitions are not Tape")

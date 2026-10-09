@@ -395,7 +395,7 @@ private struct RoundPracticeContent<Content: View>: View {
   }
 }
 
-private struct TapePracticePrompt: View {
+struct TapePracticePrompt: View {
   let rendering: PromptRendering
   let anchorCharacterIndex: Int
   let wordAnchorCharacterIndex: Int
@@ -407,14 +407,21 @@ private struct TapePracticePrompt: View {
   let animatesScroll: Bool
   let carets: PromptCaretNativeView.Configuration
   let retirement: PromptLineScrollContext
+  var newlineWords: [TapePromptWord] = []
+  var viewportLineCount = 3
+  var onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil
+  @State private var metrics: TapePromptLayoutMetrics?
 
   var body: some View {
     TapePromptBridge(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
       wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
       checksDirectionPerGlyph: checksDirectionPerGlyph,
       mode: mode, margin: margin,
-      smoothScroll: animatesScroll, carets: carets, retirement: retirement)
-      .frame(height: fontSize * 1.7)
+      smoothScroll: animatesScroll, carets: carets, retirement: retirement,
+      newlineWords: newlineWords, onMetrics: { metrics = $0 }, onTapeWordsRemoved: onTapeWordsRemoved)
+      .frame(height: newlineWords.isEmpty ? fontSize * 1.7
+        : min(metrics?.contentHeight ?? fontSize * 1.7,
+          (metrics?.rowHeight ?? fontSize * 1.7) * CGFloat(viewportLineCount)))
       .clipped()
       .accessibilityLabel("卷带练习提示")
   }
@@ -430,13 +437,17 @@ private struct TapePromptBridge: NSViewRepresentable {
   let smoothScroll: Bool
   let carets: PromptCaretNativeView.Configuration
   let retirement: PromptLineScrollContext
+  var newlineWords: [TapePromptWord] = []
+  var onMetrics: ((TapePromptLayoutMetrics) -> Void)? = nil
+  var onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil
   func makeNSView(context: Context) -> TapePromptNativeView { TapePromptNativeView() }
   func updateNSView(_ view: TapePromptNativeView, context: Context) {
     view.configure(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
       wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
       checksDirectionPerGlyph: checksDirectionPerGlyph,
       mode: mode, margin: margin,
-      smoothScroll: smoothScroll, retirement: retirement, carets: carets)
+      smoothScroll: smoothScroll, retirement: retirement, newlineWords: newlineWords,
+      onMetrics: onMetrics, onTapeWordsRemoved: onTapeWordsRemoved, carets: carets)
   }
   static func dismantleNSView(_ view: TapePromptNativeView, coordinator: ()) { view.stop() }
 }
@@ -2900,7 +2911,10 @@ private struct ContentView: View {
           margin: settings.practiceTapeMargin,
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll,
           carets: makeSpecialPromptCaretConfiguration(rightToLeft: session.configuration.usesRightToLeftPrompt),
-          retirement: practiceLineScrollContext(rendering))
+          retirement: practiceLineScrollContext(rendering),
+          newlineWords: session.hasPracticeNewlineContent ? TapePromptProjection.words(session: session, rendering: rendering) : [],
+          viewportLineCount: session.configuration.mode == .zen ? 2 : 3,
+          onTapeWordsRemoved: { session.removeTapePromptWords($0) })
       } else {
         Text(rendering.text)
           .lineSpacing(usesJoiningScript ? 8 : 12)
@@ -3173,7 +3187,8 @@ private struct ContentView: View {
       hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
     let emptyWordPlaceholder = session.zenEmptyWordPlaceholderGlyphIndex
     return PromptRendering.make(glyphs: glyphs, indices: indices,
-      emptyWordPlaceholderGlyphID: emptyWordPlaceholder) { index, glyph in
+      emptyWordPlaceholderGlyphID: emptyWordPlaceholder,
+      words: words, removedTapeWordIndices: session.removedTapePromptWordIndices) { index, glyph in
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
         isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
         effect: settings.typedCharacterEffect)

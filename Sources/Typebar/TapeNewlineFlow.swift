@@ -1,12 +1,5 @@
 import AppKit
 
-/// Horizontal disappearance is not a vertical prefix acknowledgement.
-/// These identities are process-local and do not erase prompt/input/replay.
-struct PromptTapeWordRemoval: Equatable {
-  let attemptID: UUID
-  let wordIndices: Set<Int>
-}
-
 /// Presentation topology, not input data. A horizontally removed word leaves
 /// its three structural Return boxes in place; only vertical retirement can
 /// remove an entire row prefix. Identity survives text-offset rebuilds.
@@ -26,8 +19,9 @@ struct TapeNewlineFlow {
   private(set) var nodes: [Node] = []
   private var absent: Set<Node> = []
   private var metrics: [Int: TapeNewlineWordMetric] = [:]
+  var removedWordIndices: Set<Int> { Set(absent.filter { $0.kind == .word }.map(\.index)) }
 
-  mutating func configure(words: [TapeNewlineWordMetric], resets: Bool) {
+  mutating func configure(words: [TapeNewlineWordMetric], resets: Bool, removedWords: Set<Int> = []) {
     if resets { absent = [] }
     metrics = Dictionary(uniqueKeysWithValues: words.map { ($0.index, $0) })
     let available = words.flatMap { word -> [Node] in
@@ -36,6 +30,7 @@ struct TapeNewlineFlow {
         .init(kind: .newline, index: word.index), .init(kind: .afterNewline, index: word.index)]
     }
     absent.formIntersection(available)
+    absent.formUnion(available.filter { $0.kind == .word && removedWords.contains($0.index) })
     nodes = available.filter { !absent.contains($0) }
   }
 

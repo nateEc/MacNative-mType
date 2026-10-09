@@ -74,6 +74,7 @@ import AppKit
   private(set) var metrics = TapePromptLayoutMetrics(contentHeight: 0, rowHeight: 0)
   private(set) var wordMetrics: [TapeNewlineWordMetric] = []
   var isAnimating: Bool { indents.values.contains { $0.isAnimatingTape } }
+  var removedWordIndices: Set<Int> { flow.removedWordIndices }
   var contentWidth: CGFloat { rightToLeft ? leadingEdge : (words.map { frame($0).maxX }.max() ?? 0) }
 
   func configure(text: AttributedString, words descriptors: [TapePromptWord], font: NSFont,
@@ -106,24 +107,25 @@ import AppKit
       let slot = words.count
       words.append(word)
       for offset in word.characterRanges.keys { wordByOffset[offset] = slot }
-      let markerWidth = descriptor.newlineCharacterOffset.map {
+      let markerWidth: CGFloat? = descriptor.ownsNewline ? descriptor.newlineCharacterOffset.map {
         descriptor.incorrectNewline ? 0 : (word.rect($0, minimum: $0)?.width ?? 0)
-      }
+      } ?? 0 : nil
       wordMetrics.append(.init(index: descriptor.index, width: word.bounds.width, gap: gap, newlineWidth: markerWidth))
       rowHeight = max(rowHeight, word.bounds.height)
       inline += word.bounds.width + gap
-      if descriptor.newlineCharacterOffset != nil {
+      if descriptor.ownsNewline {
         row += 1; inline = 0; precedingBreak = descriptor.glyphID
       }
     }
-    let liveBreaks = Set(descriptors.filter { $0.newlineCharacterOffset != nil }.map(\.glyphID))
+    let liveBreaks = Set(descriptors.filter(\.ownsNewline).map(\.glyphID))
     indents = indents.filter { liveBreaks.contains($0.key) }
     rowHeight += 12
     let rows = (words.last?.row ?? -1) + 1
     metrics = .init(contentHeight: CGFloat(rows) * rowHeight, rowHeight: rowHeight)
     totalWidth = wordMetrics.reduce(0) { $0 + $1.width + $1.gap }
     maximumRowWidth = words.map { $0.inline + $0.bounds.width }.max() ?? 0
-    flow.configure(words: wordMetrics, resets: resets)
+    flow.configure(words: wordMetrics, resets: resets,
+      removedWords: Set(descriptors.filter(\.isRemoved).map(\.index)))
     reflowConnectedBoxes()
     updateOrigin()
   }

@@ -402,7 +402,7 @@ run_logged_check "preparing isolated historical disk model writers" "$temporary_
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
 run_logged_check "running native client test suite" "$temporary_directory/client-tests.log" \
-  env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_REFERENCE_ROOT="$reference_root" \
+  env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_ENDURANCE_TESTS=1 TYPEBAR_REFERENCE_ROOT="$reference_root" \
   TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES="$config_link_source_dependencies" \
   TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   TYPEBAR_INBOX_SOURCE_PACKAGE="$inbox_source_package" \

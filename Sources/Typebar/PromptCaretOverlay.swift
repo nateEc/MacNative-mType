@@ -42,19 +42,43 @@ struct PromptRendering {
   let text: AttributedString
   let glyphCharacterOffsets: [Int: Int]
   var emptyWordPlaceholderGlyphID: Int? = nil
+  var structuralNewlineOffsets: [Int: Int] = [:]
 
   static func make(
     glyphs: [TypingPromptGlyph], indices: [Int], emptyWordPlaceholderGlyphID: Int? = nil,
+    words: [TypingPromptWordPresentation] = [], removedTapeWordIndices: Set<Int> = [],
     renderGlyph: (Int, TypingPromptGlyph) -> AttributedString
   ) -> Self {
     var text = AttributedString()
     var offsets: [Int: Int] = [:]
+    var owners: [Int: Int] = [:], structural: [Int: Int] = [:]
+    if !removedTapeWordIndices.isEmpty {
+      for (word, value) in words.enumerated() {
+        for index in value.range { owners[index] = word }
+        for index in value.extraGlyphIndices { owners[index] = word }
+      }
+      for (word, value) in words.enumerated() {
+        let index = value.range.upperBound
+        if owners[index] == nil, glyphs.indices.contains(index), glyphs[index].state != .extra,
+          glyphs[index].character == " " || glyphs[index].character == "\n" { owners[index] = word }
+      }
+    }
     for index in indices {
+      if let word = owners[index], removedTapeWordIndices.contains(word) {
+        // The word's Return ink disappears, but its structural row survives.
+        // It deliberately owns no canonical glyph offset or rendering call.
+        if glyphs[index].character == "\n", glyphs[index].state != .extra {
+          structural[word] = text.characters.count
+          text += AttributedString("\n")
+        }
+        continue
+      }
       offsets[index] = text.characters.count
       text += renderGlyph(index, glyphs[index])
     }
     return Self(text: text, glyphCharacterOffsets: offsets,
-      emptyWordPlaceholderGlyphID: emptyWordPlaceholderGlyphID.flatMap { offsets[$0] == nil ? nil : $0 })
+      emptyWordPlaceholderGlyphID: emptyWordPlaceholderGlyphID.flatMap { offsets[$0] == nil ? nil : $0 },
+      structuralNewlineOffsets: structural)
   }
 
   func characterOffset(forGlyphAt index: Int?) -> Int? {

@@ -78,6 +78,10 @@ final class TapePromptNativeView: NSView {
       && self.retirement?.attemptID == retirement?.attemptID
       && (retirement?.firstRetainedWordIndex ?? 0) > (self.retirement?.firstRetainedWordIndex ?? 0)
       && (retirement?.firstRetainedWordIndex ?? 0) <= textView.firstRetainedNewlineIndex
+    let newlyAcknowledgedWords = Set(newlineWords.filter(\.isRemoved).map(\.index))
+      .subtracting(textView.newlineWords.filter(\.isRemoved).map(\.index))
+    let acknowledgesNativeWords = !resets && !newlyAcknowledgedWords.isEmpty
+      && newlyAcknowledgedWords.isSubset(of: textView.removedNewlineWordIndices)
     let removedWidth: CGFloat?
     if !resets, !acknowledgesNativePrefix, let old = self.retirement, let next = retirement,
       old.attemptID == next.attemptID, next.firstRetainedWordIndex > old.firstRetainedWordIndex,
@@ -87,7 +91,7 @@ final class TapePromptNativeView: NSView {
       removedWidth = carets.rightToLeft ? -advance : advance
       needsScroll = true
     } else { removedWidth = nil }
-    let onlyAcknowledgesPrefix = (removedWidth != nil || acknowledgesNativePrefix) && nextInput == lastInput
+    let onlyAcknowledgesPrefix = (removedWidth != nil || acknowledgesNativePrefix || acknowledgesNativeWords) && nextInput == lastInput
       && self.retirement?.activeWordID == retirement?.activeWordID
       && configuration?.mainGlyphID == carets.mainGlyphID
     needsScroll = needsScroll || resets || (!onlyAcknowledgesPrefix && (self.anchorCharacterIndex != anchorCharacterIndex
@@ -426,6 +430,7 @@ private final class TapePromptTextView: NSView {
   private var newlineSource: (text: AttributedString, font: NSFont, rightToLeft: Bool)?
   var viewportWidth: CGFloat = 0
   var newlineMetrics: TapePromptLayoutMetrics? { newlineLayout?.metrics }
+  var removedNewlineWordIndices: Set<Int> { newlineLayout?.removedWordIndices ?? [] }
   var isAnimatingNewlines: Bool { newlineLayout?.isAnimating ?? false }
   var contentWidth: CGFloat { newlineLayout?.contentWidth ?? layoutManager.usedRect(for: container).maxX }
   override var isFlipped: Bool { true }

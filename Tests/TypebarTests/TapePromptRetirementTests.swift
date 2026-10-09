@@ -152,10 +152,13 @@ import XCTest
       defer { view.stop(); window.contentView = nil; window.close() }
       view.layoutSubtreeIfNeeded()
       var retired: [PromptWordRetirement] = []
-      configure(view, coordinator, attempt: attempt, active: 5, rtl: rtl, at: 0) { retired.append($0) }
+      let delivered = expectation(description: "Actual prefix retirement, rtl=\(rtl)")
+      delivered.assertForOverFulfill = true
+      let accept: (PromptWordRetirement) -> Void = { retired.append($0); delivered.fulfill() }
+      configure(view, coordinator, attempt: attempt, active: 5, rtl: rtl, at: 0, notify: accept)
       view.present(at: 0)
-      configure(view, coordinator, attempt: attempt, active: 6, rtl: rtl, at: 1) { retired.append($0) }
-      drain(); view.present(at: 1)
+      configure(view, coordinator, attempt: attempt, active: 6, rtl: rtl, at: 1, notify: accept)
+      wait(for: [delivered], timeout: 1); view.present(at: 1)
       let boundary = try XCTUnwrap(retired.last).firstRetainedWordIndex
       XCTAssertEqual(boundary, 4)
       var images: [Data] = []
@@ -263,7 +266,7 @@ import XCTest
   func testProductionTapePassesCanonicalSessionRetirementContext() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    let start = try XCTUnwrap(app.range(of: "private struct TapePracticePrompt"))
+    let start = try XCTUnwrap(app.range(of: "struct TapePracticePrompt"))
     let end = try XCTUnwrap(app.range(of: "struct ChooGlyphPalette"))
     XCTAssertTrue(app[start.lowerBound..<end.lowerBound].contains("retirement: retirement"))
     XCTAssertTrue(app.contains("retirement: practiceLineScrollContext(rendering)"))

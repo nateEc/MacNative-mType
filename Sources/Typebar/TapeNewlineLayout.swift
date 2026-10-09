@@ -42,6 +42,9 @@ struct TapePromptWord: Equatable {
   let characters: Range<Int>
   var newlineCharacterOffset: Int? = nil
   var incorrectNewline = false
+  var hasStructuralNewline = false
+  var isRemoved = false
+  var ownsNewline: Bool { hasStructuralNewline || newlineCharacterOffset != nil }
 }
 
 struct TapePromptLayoutMetrics: Equatable {

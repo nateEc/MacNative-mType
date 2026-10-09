@@ -1,5 +1,25 @@
 # 原生奖励收件箱与周任务交付
 
+## Tape 独立词可见性与会话恢复增量
+
+最终重新冻结 `/tmp/typebar-tape-word-visibility-corrected-readiness.log` 终态退出 0：原生 3,921 项零失败零跳过（1008.013 秒），服务 501 项（12.578 秒）；十万词实际执行 190.336 秒、16 项隔离磁盘迁移 5.254 秒、53 表面、1,119 唯一人工场景结构、90／3／1 配置元数据及未启动应用包资源／URL scheme／严格签名／原创边界通过。十新增在全量中 1.344 秒，旧 Tape 12 项 0.328 秒；全部既有源码对照通过。22 文件 `/tmp/typebar-tape-word-visibility-corrected-frozen.sha256` 门禁前中后一致，71 原始日志 `/tmp/typebar-tape-word-visibility-corrected-logs.zeCcyD`、188 图 `/tmp/typebar-tape-word-visibility-corrected-images.QhD9Zo` 保留。最终六张新图及四张旧单行 Tape 前后图已逐张复查，自动化保留非空／确认像素一致与旧双向整张 PNG 精确一致；所有窗口从不显示且关闭，零主程序启动，无残留主程序／测试／编译进程。既有 XPC／CoreData、隔离只读 SwiftData 513、编译及 Node 警告保留，不宣称修复。终态并校验冻结文件后才补 README／本合同；失败与中止轮不覆盖，没有运行中编辑或并行验收。参考仍固定且干净，未操作真实账户、Keychain、成绩库或部署。生产换行回退、tapeMode 部分和完整 goal active 保持，下方为阶段证据。
+
+首轮 `/tmp/typebar-tape-word-visibility-final-readiness.log` 在固定服务环境校验处退出 1：系统默认 Redis 8.6.1 不满足参考 6.2.6，未执行原生／服务测试；两个原始日志保留于 `/tmp/typebar-tape-word-visibility-final-logs.AlhknR`。明确 `TYPEBAR_SOURCE_REDIS_SERVER=/tmp/typebar-redis-626.GUUCo3/reference/src/redis-server` 后运行 `verified-readiness.log`；复查发现一项旧单行 Tape 位图用例仍使用 3ms drain，在回调未到达时解包失败，且调用漏传耐久开关使一项跳过。本轮主动停止、终态 130，不宣称完整通过；十新增通过（1.491 秒）和 16 磁盘迁移通过（5.058 秒）只是局部证据，服务／打包未执行。22 冻结文件始终一致，原始阶段日志保留于 `/tmp/typebar-tape-word-visibility-verified-logs.AQQmJb`，图片位于 `verified-images.s73vKv`，六张新图已检查。
+
+终态后才修旧位图夹具为具体 XCTest 事件等待并拒绝重复通知，保留双向整张 PNG 精确一致及边界 4 断言；不改产品逻辑或扩大像素容差。完整门禁现在直接给客户端设置 `TYPEBAR_ENDURANCE_TESTS=1`，避免依赖调用方忘传造成静默跳过，不把普通定向测试强制变成耐久测试。`gate-repair-focused.log` 22 项零失败零跳过（2.173 秒）。随后重新冻结再完整串行验收，不能把中止轮或之前阶段当最终证明。
+
+固定干净参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。完整 `before-delete.ts` 在 freedom 判断前检查上一词是否存在；完整 `handleDeleteOnError` 的两个 hard 模式也先检查上一词节点。新增尝试内 `removedTapePromptWordIndices`，独立于纵向下界；拒绝过期／非法／已退休／当前活动词通知，合法 lookahead 身份可记录，重复去重，纵向推进清掉无用旧身份，重开清空。当前词仍能修正，上一缺失词不可重新打开；不是删除输入数据或用连续前缀折叠空行。保护当前词是 native 防丢边界，不宣称原版异常删活动词路径等价。
+
+共享 `PromptRendering` 不再物化消失词的文字、extra／hint 或 canonical offset；目标 Return 只保留无 ID 的结构 LF。`TapePromptProjection` 读取会话词／控制符身份而非拆分显示文本，缺失词可持有空范围及独立结构换行。原生结构账本在字体／layout reset 后重新接收会话 mask；native 确认更新显示偏移但不重复请求横向滚动，真正新输入仍独立滚动。实际 `TapePracticePrompt`／NSViewRepresentable 透传结构、指标和通知，单行旧高度不变；生产 `!session.hasPracticeNewlineContent` 保护仍在，未启用不完整换行入口。没有复制原版产品代码／资产、WebView、新产品依赖或新 Timer；持久格式、提示、输入、结果及回放不变。
+
+十项新增覆盖非连续缺口与当前修正、两种 hard 恢复、非法／过期／活动／未来／重复事件及纵向修剪、结果／portable／archive 不变、extra／结构 LF、Unicode no-space、完整固定删除函数、字体重建、双向原生确认像素／后续真实输入，以及实际 SwiftUI 桥接的字号变化／重开。既有 32 个 before-delete 和 8 个 hard 函数案例复用探针，不能计为新增源码案例。SwiftUI 使用受控四行 never-visible 窗口与显式 root 更新，只证明实际桥接，不冒充生产三行／Zen 两行、观察调度、实机或浏览器 CSSOM。
+
+先行 API／行为日志 `/tmp/typebar-tape-word-visibility-{api-red,behavior-red,first}.log` 保留：无实现基线六项 34 断言失败，其中三个来自测试错误假设 `result()` 重复读取共用 UUID，不能算产品缺陷；结果每次生成新 UUID，改为仅排除该身份后逐字段比较，实际 portable／archive 仍精确比较完整结果。正确模式类型是既有 `DeleteOnErrorMode`，最早编译夹具误用枚举亦不算行为失败。`model-source.log` 17 项、`native-first.log` 44 项通过。`component-first.log` 九项两失败因 2ms 内尚未收到异步通知，孤立 `component-localized.log` 一项通过不能据重跑认定已修；改用具体 XCTest 事件等待及重复通知断言，`component-corrected.log` 47 项通过（15.014 秒）。
+
+扩展 `expanded.log` 318 项五失败：两个旧静态定位仍假定组件是 private，三个新 settle 高度用默认行高而非实际词框高度。仅同步定位锚点并采用独立实际 TextKit 指标，行为断言保留；`expanded-measured.log` 在发现补丁未应用时主动停止，终态 130，不算验收。最终 `expanded-final.log` 318 项零失败零跳过（52.255 秒），十新增 1.242 秒。`/tmp/typebar-tape-word-visibility-focused-images.DUOIlw` 六张新图已逐张检查：LTR／RTL 确认前后非空全幅像素一致，28／32 点字体保留两条旧空行与实际存活文字。测试窗口从不显示且关闭；不抹掉失败日志，不用旧轮全量代替本轮冻结结果。
+
+未来缺失目标被激活的策略、任意纵横／反向队列、复杂控制／no-space 内嵌多换行／Zen／hint／joining、混合行高／末尾 Return、可见范围物化／性能、实机 IME 仍未完成；生产换行回退、53 表面分类与 90 映射／3 部分／1 不适用不升级，完整 goal active。最终串行冻结结果另补，不操作真实账户、Keychain、成绩库或部署。
+
 ## 换行 Tape word-only 缺口与结构账本增量
 
 最终重新冻结门禁 `/tmp/typebar-tape-newline-flow-corrected-readiness.log` 终态退出 0：原生 3,911 项零失败零跳过（907.886 秒），服务 501 项（12.599 秒）；十万词耐久 164.135 秒、16 项隔离磁盘迁移 5.813 秒、53 表面、1,117 唯一人工场景结构、90／3／1 配置元数据及未启动应用包资源／URL scheme／严格签名／原创边界通过。六新增在全量中 1.556 秒，修正边界的 ASL 21 项及历史筛选 8 项均通过；120 组新完整源码两次请求与全部既有源码对照通过。25 文件 `/tmp/typebar-tape-newline-flow-corrected-frozen.sha256` 门禁前中后一致；68 原始日志 `/tmp/typebar-tape-newline-flow-corrected-logs.a6ZY27`、182 图 `/tmp/typebar-tape-newline-flow-corrected-images.qMLYTW` 保留。最终四张 Tape 缺口／重绘图与三张 ASL 正负控制图已逐张复查：Tape 全幅非空像素一致，ASL 保留可见手形／独立蓝 caret 正控制，移除 caret 后隐藏手形面全白。所有窗口从不显示并关闭，零主程序启动，无残留主程序／测试／编译进程；既有 CoreData／AddressBook XPC、隔离只读 SwiftData 513、编译／Node 警告保留，不宣称修复。终态后才补 README／本合同；没有运行中编辑或并行验收，首轮失败与修正证据不覆盖。参考固定且干净，未操作真实账户、Keychain、成绩库或部署；生产换行回退、tapeMode 部分及完整 goal active 保持，下方为阶段证据。
