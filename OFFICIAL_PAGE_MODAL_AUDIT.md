@@ -1,5 +1,7 @@
 # 官方页面与模态能力审计
 
+换行 Tape 前缀组件增量：TestSurface 增补九项已呈现 leading-filler／cap 补偿、扫描范围内保留 filler 重定、重复确认／同轮新输入、停止／全新 owner 和实际保留行位图证据；64 组完整源码使用实际 TextKit 共享测量，四张 never-visible 图已检查。生产换行仍回退、实际纵向 await／退休通知接线未完成，53 表面及 tapeMode 部分分类不升级；完整冻结结果见合同，零主程序启动、goal active，下方为阶段历史。
+
 Tape 纵横通道增量：TestSurface 新增七项完整源码／共享几何、纵向结束保留横向状态、真实容器重叠／重开证据；相关 160 项通过，128 条实际 Anime.js／RAF／promise 轨迹覆盖双向、两模式、四 marker、即时／平滑、等待期间独立 scrollTape 与重叠行跳。只修正共用 owner 的纵向完成，不接通生产换行 Tape 或冒充浏览器／native 几何等价。53 表面、tapeMode 部分和全部待验分类不升级，零主程序启动，完整冻结结果见合同、goal active；下方为阶段历史。
 
 Tape 换行布局组件：TestSurface 增补累计缩进、正确／错误 Return、连续空行、lookahead／三倍宽上限、原生词框／字素／独立 filler 呈现和尺寸回调取消证据。14 新测试／相关 99 项通过，60 组完整函数／300 实际动画检查点及四张 never-visible LTR／RTL 图通过；生产换行回退保持，尚未接通纵横动画 await／leading-filler 清理及全部控制词。53 表面分类和 tapeMode 部分不升级，完整冻结结果另见合同，零主程序启动、goal active。

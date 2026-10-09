@@ -67,6 +67,7 @@ import AppKit
   private var characters: [Character] = []
   private var totalWidth: CGFloat = 0
   private var maximumRowWidth: CGFloat = 0
+  private var pendingPrefixCorrection: CGFloat = 0
   private(set) var leadingEdge: CGFloat = 0
   private(set) var metrics = TapePromptLayoutMetrics(contentHeight: 0, rowHeight: 0)
   private(set) var wordMetrics: [TapeNewlineWordMetric] = []
@@ -75,9 +76,17 @@ import AppKit
 
   func configure(text: AttributedString, words descriptors: [TapePromptWord], font: NSFont,
     rightToLeft: Bool, resets: Bool) {
-    if resets { indents = [:] }
+    if resets { indents = [:]; pendingPrefixCorrection = 0 }
     guard self.text != text || self.descriptors != descriptors || self.font != font
       || self.rightToLeft != rightToLeft else { return }
+    if !resets, let first = descriptors.first, let oldFirst = self.descriptors.first,
+      first.index > oldFirst.index,
+      let retained = words.first(where: { $0.descriptor.index == first.index }) {
+      // Source scrollTape removes the *presented* leading filler, not the
+      // mathematical width of the retired text (which may exceed the cap).
+      let oldFrame = frame(retained)
+      pendingPrefixCorrection = self.rightToLeft ? leadingEdge - oldFrame.maxX : oldFrame.minX
+    }
     self.text = text; self.descriptors = descriptors; self.font = font; self.rightToLeft = rightToLeft
     let prepared = TapePromptTextStorage.prepare(text, font: font, rightToLeft: rightToLeft)
     let string = prepared.string
@@ -124,9 +133,15 @@ import AppKit
     for word in words {
       guard let target = plan.indents[word.descriptor.index] else { continue }
       var channel = indents[word.descriptor.glyphID] ?? .init()
+      if pendingPrefixCorrection != 0 {
+        // Only the fillers visited by this scroll request are rebased. Far
+        // future fillers keep their old values until their own lookahead.
+        channel.shiftTapeOrigin(by: -pendingPrefixCorrection)
+      }
       channel.tapeScroll(to: target, at: time, duration: duration)
       indents[word.descriptor.glyphID] = channel
     }
+    pendingPrefixCorrection = 0
     updateOrigin()
   }
 
@@ -151,6 +166,11 @@ import AppKit
       y: CGFloat(word.row) * metrics.rowHeight, width: word.bounds.width, height: word.bounds.height)
   }
   func wordRect(at offset: Int) -> CGRect? { word(at: offset).map { frame($0) } }
+  func prefixCompensation(at offset: Int) -> CGFloat? {
+    guard let word = word(at: offset) else { return nil }
+    let rect = frame(word)
+    return rightToLeft ? leadingEdge - rect.maxX : rect.minX
+  }
   func glyphRect(at offset: Int, minimumOffset: Int) -> CGRect? {
     guard let word = word(at: offset), let rect = word.rect(offset, minimum: minimumOffset) else { return nil }
     let origin = frame(word).origin

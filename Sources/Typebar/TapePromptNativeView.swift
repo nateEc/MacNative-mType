@@ -65,7 +65,7 @@ final class TapePromptNativeView: NSView {
       old.attemptID == next.attemptID, next.firstRetainedWordIndex > old.firstRetainedWordIndex,
       let word = old.words.first(where: { $0.index == next.firstRetainedWordIndex }),
       let offset = self.rendering.characterOffset(forGlyphAt: word.glyphID) {
-      let advance = textView.advance(at: offset, wordStart: offset, mode: .word, rightToLeft: carets.rightToLeft)
+      let advance = textView.prefixCompensation(at: offset, rightToLeft: carets.rightToLeft)
       removedWidth = carets.rightToLeft ? -advance : advance
       needsScroll = true
     } else { removedWidth = nil }
@@ -377,6 +377,11 @@ private final class TapePromptTextView: NSView {
   func leadingEdge(rightToLeft: Bool) -> CGFloat {
     if let newlineLayout { return newlineLayout.leadingEdge }
     return rightToLeft ? leadingRight : leadingLeft
+  }
+
+  func prefixCompensation(at offset: Int, rightToLeft: Bool) -> CGFloat {
+    if let newlineLayout { return newlineLayout.prefixCompensation(at: offset) ?? 0 }
+    return advance(at: offset, wordStart: offset, mode: .word, rightToLeft: rightToLeft)
   }
 
   func advance(at offset: Int, wordStart: Int?, mode: PracticeTapeMode, rightToLeft: Bool) -> CGFloat {

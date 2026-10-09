@@ -331,6 +331,11 @@ run_logged_check "executing complete pinned newline tape filler layout and anima
   env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-tape-newlines.mjs" "$reference_root"
+run_logged_check "executing complete pinned newline leading-filler cleanup and retained prefix frames" \
+  "$temporary_directory/tape-newline-prefix-source-check.log" \
+  env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-tape-newline-prefix.mjs" "$reference_root"
 run_logged_check "executing complete pinned vertical and tape channel composition" \
   "$temporary_directory/tape-line-composition-source-check.log" \
   env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \

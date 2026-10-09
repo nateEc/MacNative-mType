@@ -1,5 +1,7 @@
 # 官方配置兼容性审计
 
+2026-10-09 换行 Tape 前缀组件增量：按已呈现且可能受 cap 限制的 leading filler 补偿，并从正确原点继续保留 filler 动画；九项回归、64 组完整源码／实际 TextKit 共享测量和四张实际组件图补证。它不是完整纵向 await／退休通知或生产换行入口，tapeMode 部分与 90／3／1 不变；完整冻结结果见合同，零主程序启动、goal active，下方为阶段历史。
+
 2026-10-09 Tape 纵横通道增量：纵向完成只清 words 纵向状态，不清或采样独立横向通道；7 新增／相关 160 项及 128 条完整实际动画源码／共享几何轨迹通过，真实原生 follower 重叠／重开不创建窗口。实际换行渲染与 leading-filler／前缀 await 接线、Zen／hint／复杂控制／全部连写与设备仍未完成，生产回退及 90／3／1 分类保持；完整冻结结果见合同，零主程序启动、goal active。下方为阶段历史。
 
 2026-10-09 Tape 换行布局组件：固定完整 scrollTape／getNlCharWidth 的 60 组轨迹及 300 个实际 Anime.js 呈现检查点，对照累计缩进、正确／错误 Return、连续空行、两处 lookahead 与三倍宽上限；14 新测试／相关 99 项零失败零跳过，四张 never-visible 原生 LTR／RTL 三行图已检查。生产换行回退未取消，纵横 await 顺序／leading-filler 清理、Zen／hint／复杂控制和可见范围性能仍待接入验证；tapeMode 仍部分、90／3／1 不变，完整冻结结果另见合同，零主程序启动、goal active。下方为阶段历史。
@@ -752,7 +754,7 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `timerOpacity` | `liveStatsOpacity` | 已映射；四档 25/50/75/100%。 |
 | `highlightMode` | `promptHighlightMode` | 已映射。 |
 | `typedEffect` | `typedCharacterEffect` | 已映射。 |
-| `tapeMode` | `practiceTapeMode` | 部分；启用关闭完整行，关闭卷带不恢复完整行，命令与偏好页遵守相同互斥规则。单行 LTR／RTL 原生文字、逐词混排、锁定主光标、独立 pace 和横向旧词退休／位移补偿已接通；afterNewline 累计布局／独立动画及纵向完成保留横向状态已有有界组件／共享几何证据，但生产明确换行仍回退普通提示。实际渲染纵横 await 组合／leading-filler 清理、Zen／hint／复杂控制／全部连写与真实设备顺序未完成，不以配置可保存冒充完整功能等价。 |
+| `tapeMode` | `practiceTapeMode` | 部分；启用关闭完整行，关闭卷带不恢复完整行，命令与偏好页遵守相同互斥规则。单行 LTR／RTL 原生文字、逐词混排、锁定主光标、独立 pace 和横向旧词退休／位移补偿已接通；afterNewline 累计布局／独立动画、已呈现 leading-filler 前缀补偿／保留 filler 重定及纵向完成保留横向状态已有有界原生组件／共享测量证据，但生产明确换行仍回退普通提示。实际纵向 owner await／退休通知与生产接线、Zen／hint／复杂控制／全部连写与真实设备顺序未完成，不以配置可保存冒充完整功能等价。 |
 | `tapeMargin` | `practiceTapeMargin` | 已映射；以 0–1 原生比例保存。 |
 | `smoothLineScroll` | `smoothPracticeLineScroll` | 已映射。 |
 | `showAllLines` | `showAllPracticeLines` | 部分映射：词／引语／自定义（含计时自定义）展开，不重开，下一轮生成读取；有限 1–100,000 词完整预览，无限／自定义 bound 遵守覆盖。自有引语默认首批 100、开启全量，toPush 窗口 1–4 优先覆盖。卷带内拒绝启用；更大预算与外部短词源保持可练习并提示未完整预览，仍有差异；实际布局与设备仍待验收。 |
