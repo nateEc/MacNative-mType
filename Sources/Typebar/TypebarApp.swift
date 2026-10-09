@@ -2203,6 +2203,9 @@ private struct ContentView: View {
     verifyChallengeFontAvailability()
     let preflight = TimerDeliveryDiagnostics.enabled
       ? ProcessInfo.processInfo.systemUptime - preflightStart : 0
+    // Keep native monitoring live on the result screen, but never re-deliver
+    // a frozen attempt's pending seconds or timer-health failure.
+    guard !session.isFinished else { return }
     if session.hasStarted {
       let elapsed = session.elapsedSeconds(at: now)
       let dueSeconds = ClockTickPolicy.dueSeconds(

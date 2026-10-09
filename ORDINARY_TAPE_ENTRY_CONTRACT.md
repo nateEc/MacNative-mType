@@ -1,5 +1,19 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 优化后实机反证与终态时钟入口（2026-10-10）
+
+对 07a4ae6 构建 Debug 隔离包 `../../work/Typebar-Timer-Optimized-20261010.app`（独立域 app.typebar.qa.timeroptimized20261010、内存记录／令牌、诊断显式开启），`../../work/timer-optimized-package.log` 退出 0。唯一实例 PID 23034；未改真实用户偏好、字体、背景或输入源。优化不足以关闭计时缺陷：普通模式两次批量输入及一次单键输入均失败，Tape 按字符模式也失败，全部保留不保存成绩策略。
+
+`../../work/timer-optimized-runtime.log`：第 1 行普通输入 `drift voyage window `，deliveryGap=2.175304、preflight=0.000061、drift=1.151866，实际结果 20/0/0/0、3/3 正确；第 75 行普通输入 `bright amber orchard `，2.606688／0.000057／1.514926，实际结果 21/0/0/0、3/3 正确；第 284 行普通模式首个 `o` 按键，1.982166／0.000065／0.921472，实际结果 1/0/0/0；第 617 行 Tape 输入 `bright marble violet `，2.193193／0.000077／1.152772，实际结果 21/0/0/0、3/3 正确。均 severe=1、failed=1。以上分别为秒级交付间隔、同步预处理秒数及首个到期整秒的延迟；不能再把失败仅归于 Tape 或批量输入。
+
+8 秒普通采样 `../../work/timer-optimized-ordinary-sample.txt` 中主线程 6,334 个样本大部分处于 AppKit 等待（5,737 个 mach_msg2_trap）；12 秒 Tape 采样 `timer-optimized-tape-sample.txt` 仍有刷新投影／渲染工作。这些采样包含输入后及结果阶段，没有阶段标记，不能用整体样本分布排除短暂主线程阻塞或证明调度器根因，也不能据不同采样时长报告提速比例。下一步需进一步区分实际计时唤醒、输入处理与系统／自动化环境，而不是改变安全阈值。未验真实 IME。
+
+记录还重复证明终态生命周期问题：失败后 previous=0、due=1、冻结 elapsed 和 failed=1 持续出现。原生 `session.isFinished` 覆盖 completed／failed／invalidAFK／abandoned／bailedOut；新增 advanceClock 终态返回，位于本机规则／Caps Lock／字体监测之后、elapsed／整秒交付／健康观察／诊断／警示音／阈值／tick 之前。保持本机监测，阻止冻结会话重复交付，不修改首次回调、重开归零、时钟来源或保护阈值。固定参考 test-timer.clear 将 stopped 设为 true 并清除 timeout，本次符合停止后不继续交付的生命周期。
+
+新生产源码接线门禁在 `../../work/timer-terminal-entry-red.log` 一项预期失败（终态 guard 缺失），不是动态 GUI 反例。`timer-terminal-entry-verified.log`：诊断、elapsed clock、Slow Timer、健康阈值、整秒策略、结束优先级和渲染快照共 49 项零失败零跳过，0.825 秒（wall 0.832 秒），退出 0；`timer-terminal-entry-originality.log` 原创性退出 0。范围内风险复核确认终态范围和监测顺序，无其他待修正项，非独立审计；尚未对修正后的主程序确认日志停止，也未重跑完整门禁。
+
+本轮只启动上述一个实例，四轮对照在同一进程内完成。退出快捷键后仍存在，仅向已核验确切 PID 23034 发送 TERM，运行句柄权威退出 143，随后无 Typebar；未再次启动。首次计时延迟、退出快捷键行为及实际设备仍待定位／验证，整体兼容分类不升级，goal active。
+
 ## 实机诊断对照与渲染热路径增量（2026-10-10）
 
 被测 b86125a，以 `../../work/Typebar-Timer-Diagnostic-20261010.app` 独立域 app.typebar.qa.timer20261010、内存记录／令牌及显式 TYPEBAR_QA_TIMER_DIAGNOSTICS=1 直接运行唯一实例 PID 19526。打包日志 `../../work/timer-gui-package.log` 退出 0；默认 swift build 为 Debug，不推断 Release 性能。启动前无 Typebar；本轮未修改用户域偏好、字体、背景或输入源。
