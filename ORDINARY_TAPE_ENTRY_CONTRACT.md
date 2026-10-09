@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## Tape 事件快照锚点证据（2026-10-10）
+
+下一步组合投影适配前先核对固定参考的真实事件 getter／logger／helpers。既有完整 scrollTape／Caret／RAF 探针不再用 getCurrentInput 替身，而由真实 input 快照提供推进长度；六类 composition 更新（含 emoji、组合符、控制字符、清空和中文）不改变快照，切活动字段后无新 input 返回空。480 个已提交快照共 2,880 次候选隔离断言通过，128 普通、32 前缀退休和 28 方向例的输出 JSON 与改动前逐字节相同。
+
+证据 `../../work/tape-event-anchor.lQ5PzM/`：before／after 为初始替换对照；verified.log 保留计数预期误算 3,072 的失败，按实际循环 480×6 修正为 2,880；final.json 与 before.json 的 cmp 通过。native.log 中 TapePromptPresentationTests 17 项零失败（3.555 秒，墙钟 3.558 秒），含完整固定源横向通道对照，参考环境齐备、没有跳过。源码仅 QA 动态读取，不复制进原生产品。
+
+本次为减少实现不确定性的源码探针增量，不改产品行为，未做产品红灯测试。使用源码驱动与行为先行技能，差异风险复核未见新增产品路径；候选事件虽保持为最后更新，DOM 仍是受控的三字母框，未执行真实候选排版、系统 IME 或事件控制器。原生 Tape 组合投影仍未接通：必须分开已提交推进锚点与候选主光标，不可直接以候选终点替代 Tape advance。完整门禁本轮未重跑；零主程序启动，无新增截图，兼容分类不升级、goal active。
+
 本轮解除普通目标含换行时的 Tape 生产回退，复用既有 SwiftUI／AppKit 词框，不复制 Monkeytype 产品代码、字体或资产。固定只读参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`。这是完整原生重写的一个增量，不是功能等价完成声明。
 
 ## 行为与源码依据

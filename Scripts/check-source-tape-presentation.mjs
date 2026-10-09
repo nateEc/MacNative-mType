@@ -26,11 +26,14 @@ const begin = ui.indexOf('function getNlCharWidth('), end = ui.indexOf('\nfuncti
 assert.ok(begin >= 0 && end > begin);
 function plain(source) { return stripTypeScriptTypes(source.replace(/^import [\s\S]*?;\n/gm,'').replace(/^export /gm,''), {mode:'transform'}); }
 const callbacks = plain(ui.slice(begin,end));
+const eventHelpers = plain(fs.readFileSync(path.join(root,'frontend/src/ts/test/events/helpers.ts'),'utf8'));
+const eventData = plain(fs.readFileSync(path.join(root,'frontend/src/ts/test/events/data.ts'),'utf8'));
 const caretModule = plain(fs.readFileSync(path.join(root,'frontend/src/ts/elements/caret.ts'),'utf8'));
 const rafModule = plain(fs.readFileSync(path.join(root,'frontend/src/ts/utils/debounced-animation-frame.ts'),'utf8'));
 const strings = fs.readFileSync(path.join(root,'frontend/src/ts/utils/strings.ts'),'utf8');
 const directionModule = plain(strings.slice(strings.indexOf('function hasRTLCharacters('), strings.indexOf('\nexport const CHAR_EQUIVALENCE_SETS')));
 const fixtures = [], retirements = [];
+let compositionChecks = 0;
 for (const removes of [false,true])
 for (const rtl of [false,true])
 for (const wordRTL of [false,true])
@@ -90,8 +93,29 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
     TestWords:{words:{get:()=>({display:wordRTL?'אאא':'aaa'})}},
     getActivePage:()=>'test',getResultVisible:()=>false,centeringActiveLine:Promise.resolve(),
     isDirectionReversed:()=>false,isLanguageRightToLeft:()=>rtl,getActiveWordElement:()=>words[active],
-    getCurrentInput:()=>input,window:{getComputedStyle:()=>({marginRight:'12'})},
+    getActiveWordIndex:()=>active,
+    roundTo2:value=>Math.round(value*100)/100,isSafeNumber:Number.isFinite,
+    recordEventForCache(){},resetLiveCache(){},console:{debug(){}},
+    window:{getComputedStyle:()=>({marginRight:'12'})},
   });
+  // Exercise the pinned event getter, not a substitute that can accidentally
+  // include marked text. Source modules remain QA-only and never ship in the app.
+  vm.runInContext(eventHelpers+'\n(()=>{'+eventData+
+    '\nObject.assign(globalThis,{getCurrentInput,logTestEvent});})();',context);
+  function accepted(value){
+    input=value;
+    context.logTestEvent('input',clock,{wordIndex:active,inputValue:value,
+      inputType:'insertText',data:value,correct:true});
+    assert.equal(context.getCurrentInput(),value);
+    context.logTestEvent('composition',clock,{event:'start',wordIndex:active});
+    for(const candidate of ['XYZ','😀','e\u0301','\n\t','','候选']){
+      context.logTestEvent('composition',clock,{event:'update',wordIndex:active,data:candidate});
+      assert.equal(context.getCurrentInput(),value,'Marked candidates must not enter the Tape advance snapshot');
+      compositionChecks++;
+    }
+    // Leave the final candidate active while the complete scrollTape runs.
+    assert.equal(context.getCurrentInput(),value);
+  }
   vm.runInContext(rafModule,context);
   vm.runInContext(directionModule,context);
   vm.runInContext('{'+caretModule+'\nglobalThis.SourceCaret = Caret;}',context);
@@ -133,12 +157,13 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
     trace.push({type:'frame',time:clock-10000,rendered});flush();sample();}}
   await context.scrollTape(true);go(0,1,0,0,true);sample();
   assert.equal(wordsEl.native.marginLeft,rtl?-88:100,'Initial tape margin follows test flow and CSS word-right margin');
-  input='a';await context.scrollTape();go(1);sample();
+  accepted('a');await context.scrollTape();go(1);sample();
   tickTo(25);
-  if(overlap){input='aa';await context.scrollTape();go(2,2,0,150);sample();}
+  if(overlap){accepted('aa');await context.scrollTape();go(2,2,0,150);sample();}
   tickTo(220);
   go(input.length,2,1,0);sample(); // A completed margin folds only on the next goTo.
-  active=1;input='a';await context.scrollTape();go(1,3,0,100);sample();
+  active=1;assert.equal(context.getCurrentInput(),'','New active field has no accepted snapshot');
+  accepted('a');await context.scrollTape();go(1,3,0,100);sample();
   tickTo(450);go(1,3,1,0);sample();
   assert.equal(mainElement.native.marginLeft,0,'Locked main never receives a tape margin');
   assert.equal(main.cumulativeTapeMarginCorrection,0);
@@ -146,7 +171,8 @@ for (const smooth of [false,true]) for (const overlap of [false,true]) {
   assert.equal(trace.filter(item=>item.type==='scroll').length,overlap?4:3);
   if(removes){
     for(const [word,time] of [[2,600],[3,750],[4,900]]){
-      active=word;input='a';await context.scrollTape();go(1,4,1,100);sample();tickTo(time);
+      active=word;assert.equal(context.getCurrentInput(),'');
+      accepted('a');await context.scrollTape();go(1,4,1,100);sample();tickTo(time);
     }
     assert.deepEqual(words.filter(w=>w.removed).map(w=>w.index),[0]);
     assert.equal(main.cumulativeTapeMarginCorrection,rtl?-48:48);
@@ -163,5 +189,6 @@ for(const text of ['', 'אבג', 'abc', '123', '؟', '،אבג؟', 'word؟', '�
 for(const fallback of [false,true]) directions.push({text,fallback,rtl:context.isWordRightToLeft(text,fallback,false)[0]});
 verify();assert.equal(fixtures.length,128);assert.equal(directions.length,28);
 assert.equal(retirements.length,32);
+assert.equal(compositionChecks,2880); // 128 regular (320 snapshots) + 32 retirement (160 snapshots), six candidates each.
 if(option)process.stdout.write(JSON.stringify({pin,fixtures,directions,retirements}));
-else console.log('Tape presentation source passed: 128 complete scrollTape/Caret/RAF sequences, 32 prefix-removal sequences and 28 complete direction-helper cases with real locked Anime.js, independent LTR/RTL test and word flow, single-line owned boxes/clock, four styles, immediate/smooth/overlap/folding; not browser CSS, newline, reverse-direction or arbitrary scheduling proof');
+else console.log('Tape presentation source passed: 128 complete scrollTape/Caret/RAF sequences, 32 prefix-removal sequences, 28 direction-helper cases and 2880 marked-candidate isolation checks using complete pinned event getter/logger/helpers and real locked Anime.js; independent LTR/RTL test and word flow, single-line owned boxes/clock, four styles, immediate/smooth/overlap/folding; not browser CSS, native marked geometry, real IME, newline, reverse-direction or arbitrary scheduling proof');
