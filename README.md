@@ -1,5 +1,7 @@
 # Typebar
 
+Return／Unicode 增量的 [十四文件完整冻结复验](COMPOSITION_FIELD_CONTRACT.md#return-与-unicode-增量的完整冻结复验2026-10-10) 通过：原生 4,072／服务 501 项零失败零跳过，未启动包／签名／原创性通过；75 日志、222 既有组件图已持久保留。零主程序启动、终态零残留。四项部分兼容、真实 IME 与整体功能等价仍未完成，goal active；下方“待补／未重跑”为专项阶段历史。
+
 当前 [Unicode 准入探针](COMPOSITION_FIELD_CONTRACT.md#准入探针的-scalar-槽数与-utf-16-临时单位) 修正 scalar 槽数与 UTF-16 临时单位混用，包含旧回退的 surrogate 融合反例；32 项专项、798 项扩大回归零失败零跳过，原创性检查通过。保留原版探针可能与最终接受渲染不同的行为；零主程序启动，完整门禁与整体功能等价仍未完成，goal active。下方为历史版本证据。
 
 当前增量修正 [Return 字段结构与错误输入归属](COMPOSITION_FIELD_CONTRACT.md#return-字段容器与错误输入归属增量)，包含已提交历史与真实 extras 保留。补齐固定原版动画环境后，795 项相关回归零失败零跳过、原创性边界检查通过；本增量完整门禁未重跑，零主程序启动，完整 goal active。下方 4,064／501 为上一冻结版本结果，不代表当前增量。
