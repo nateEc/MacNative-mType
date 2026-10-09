@@ -178,7 +178,18 @@ final class PromptCaretNativeView: NSView {
       if config.mainStyle.drawsMarker {
         mainRightToLeft = glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
         let mainRect: CGRect?
-        if let resolver = config.mainGlyphRect { mainRect = glyphID.flatMap(resolver) }
+        if let rendering, let map = rendering.compositionTextMap {
+          mainRect = map.caret.flatMap { anchor in map.inkRanges[anchor.cellID].flatMap { range in
+            PromptCaretLayout.rect(in: rendering.text, utf16Range: range, containerSize: bounds.size,
+              font: config.font, lineSpacing: config.lineSpacing, isRightToLeft: config.rightToLeft,
+              followsWrappedWhitespace: !anchor.after).map { rect in
+                PromptPaceCaretGeometry.rect(from: rect, to: rect, fromAfter: anchor.after, toAfter: anchor.after,
+                  style: config.mainStyle, rightToLeft: mainRightToLeft ?? config.rightToLeft,
+                  fraction: 1, reducesMotion: true,
+                  afterWidth: (" " as NSString).size(withAttributes: [.font: config.font]).width)
+              }
+          } }
+        } else if let resolver = config.mainGlyphRect { mainRect = glyphID.flatMap(resolver) }
         else { mainRect = measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID) }
         coordinator.positionMain(at: mainRect,
           time: time, duration: needsSnap || config.reducesMotion ? 0 : config.motion.duration ?? 0)
@@ -220,7 +231,15 @@ final class PromptCaretNativeView: NSView {
         // A missing/pruned target preserves the old position and folding flag.
         let rendering = config.latestRendering?()
         func endpoint(_ offset: Int?, glyphID: Int?, after: Bool) -> CGRect? {
-          guard let rect = measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID) else { return nil }
+          let measured: CGRect?
+          if let rendering, let map = rendering.compositionTextMap, let glyphID {
+            measured = map.range(forCanonicalGlyph: glyphID, after: after).flatMap {
+              PromptCaretLayout.rect(in: rendering.text, utf16Range: $0, containerSize: bounds.size,
+                font: config.font, lineSpacing: config.lineSpacing, isRightToLeft: config.rightToLeft,
+                followsWrappedWhitespace: !after)
+            }
+          } else { measured = measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID) }
+          guard let rect = measured else { return nil }
           return PromptPaceCaretGeometry.rect(from: rect, to: rect,
             fromAfter: after, toAfter: after, style: config.paceStyle,
             rightToLeft: glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft,

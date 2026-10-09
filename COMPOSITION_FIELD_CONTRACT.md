@@ -1,5 +1,27 @@
 # 组合投影的真实字段与部分字形归属
 
+## 普通呈现的最终属性与光标接线增量
+
+本增量把 `PromptCompositionPresentation` 接入普通生产 `ContentView.renderedPrompt` 的 LTR／整体 RTL 路径（含 Zen），不再把整段候选塞进一个当前字形。Tape／ASL／Choo 与原先混合方向回退仍走既有共享渲染，不能计作四呈现完成。普通渲染在候选更新及取消时生成全局槽；既有颜色、typed effect、错误提示、控制字符和源字段 phase 继续由原生策略负责。候选不是已完成输入，不参与 dots／hide 的完成集合；marked 下划线与匹配颜色分开。`.below` 的独立候选条保留。
+
+新增 `PromptCompositionTextMap` 保存每槽完整属性、完整 UTF-16 范围及不含提示／结构 Return 的 inkRanges，另存 canonical 一对多关联和派生的字段字符坐标。旧 character offsets 只是旧调用者的便利，不作为新槽的身份目录。普通主光标使用显式 before／after 锚点，pace 仍取 canonical 关联的首／末槽；TextKit 直接测量 UTF-16 墨迹，不再把 hint 或结构换行当正文框。before 提交空白保留既有软换行跟随策略，after 候选不借下一词的框。普通行跟随改用实际字段 ID／派生坐标；这不是实际字段独立框布局。
+
+融合片段的状态与词错误从实际接受字段单位及 forced flags 读取，不能继承跨字段 canonical 整字形错误。pending／隐藏片段、记忆模式遮蔽、真实空词与提交 SPACE 的范围保留；独立移除字段保存精确 Return 数量，不把多次换行压成一个布尔值。输入准入明确调用 `renderedPrompt(for: current, composition: nil)`，继续使用不含候选的既有准入表示；本增量没有修改准入、导航、计分、回放、存储或协议算法。
+
+Swift 6.2.4／macOS SDK 26.2、最低 macOS 14，固定只读参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。主代理完整复读固定 `updateWordLetters` span 与 `.dead`／highlight-off 样式，复用已有原生 AppKit／TextKit 接口；不复制产品源码或资源。行为测试、源码驱动及本会话有界复核分别约束身份、属性和几何；三次实质复核聚焦融合范围、片段状态、hint／Return 框，非独立审计，之后仅修具体风险反例。
+
+十九新增测试覆盖最终属性／接受提示、拼接后重新融合但独立的 UTF-16 范围、三种样式、字段状态与 forced errors、主／pace ink、软换行、记忆遮蔽、SPACE、Return 精确数量、Zen 控制／占位、实际 TypingInputView marked 更新／取消、整体 RTL block after／取消与 fresh provider，以及普通生产路径和准入的静态接线检查。测试 factory 提供自有颜色／提示；真实组件是 NSHostingView Text 与原生 caret，不把它等同于完整 ContentView 挂载或实际系统 IME。现有 132 常规／36 Unicode／15 字段的完整源码对照继续保留，未新增源码夹具数量。
+
+初始 `rendering-initial.log` 因新 API 缺失编译失败，不是行为红测。`rendering-first.log` 八项六处失败中的 `.both` 预期和随机 `.words` 构造为测试错误；修正后 `rendering-fixture-verified.log` 八项两处真实失败定位到接受片段被误判、重复 hint，按实际字段单位修复。`rendering-ink-red.log` 十项两处预期失败：hint 把 pace 框扩成 48 点，Return 把 after 光标推到 400 点容器右缘；独立墨迹范围修复。`rendering-policy-red.log` 十五项六处失败，修正隐藏、字段错误、SPACE 范围、软换行和准入静态接线。`rendering-policy-green.log` 67 项零失败但一项源环境跳过；不冒充最终全覆盖。
+
+单项 pace 首次墨迹量测 18 点、第二次 21 点的差异，在任何视图创建前两次相同 TextKit 调用即可复现；NSApplication 初始化未解决，内部原因未查明，不宣称平台缺陷已修。`rendering-pace-isolated/range/appkit/diagnostic/repeat.log` 均保留。最终该测试验证精确 1 单位的 ink range、同一环境下完整含提示框大于墨迹框以及真实 pace 等于墨迹框，仍能捕获旧完整框错误；不以首次调用字体度量恒定为合同，也没有重试或跳过。`rendering-structure-red.log` 的额外两处颜色 wrapper 比较、一个已结束会话构造为测试问题；按既有允许移除未来词的案例重构后，`rendering-structure-verified-red.log` 十九项一处真实失败确认两个 LF 丢成一个，再改为精确计数。本段简写日志均以 `/tmp/typebar-composition-` 为前缀。
+
+最终 `/tmp/typebar-composition-rendering-final-regression.log` 444 项零失败零跳过（41.578 秒，墙钟 41.621 秒），十九新增 0.079 秒。三图位于 `/tmp/typebar-composition-rendering-focused-images.3W6m5R`，文件为 `composition-normal-slots-hint.png`、`composition-normal-overflow-after.png`、`composition-normal-fused-cancellation.png`，已逐张查看；截图仅为离屏组件，无主程序启动。
+
+**第三张图证实仍未完成的几何限制**：普通单一 Text 拼接会再次把组合符合到前字，颜色／光标仍受融合字框塑形影响；独立 UTF-16 身份不是原版独立字段布局等价。旗帜、组合符跨字段的源外观和边界 caret 仍须实际字段框／槽布局解决，不能靠重复 offset、插入假分隔符或绿测宣称完成。Tape／ASL／Choo 全局槽适配、混合方向 fallback、实际 IME／窗口／VoiceOver／设备、完整滚动队列、字体恢复与 UI 性能继续开放。94 配置 89 映射／4 部分／1 不适用，完整 goal active；下方均为此前阶段历史。
+
+本增量最终十二文件冻结清单 `/tmp/typebar-composition-rendering-final-frozen.sha256` 在启动前、中途及终态全部一致。唯一完整门禁 session 32192 退出 0，主日志 `/tmp/typebar-composition-rendering-final-readiness.log`；原生 4,033 项零失败零跳过（933.750 秒，墙钟 934.248 秒），服务 501 项零失败零跳过（13.110 秒，墙钟 13.180 秒）。十九新增呈现测试 0.154 秒、十万词耐久 159.999 秒、十六磁盘迁移 5.003 秒；耐久不证明新 UI 性能。固定源码对照、元数据无漂移、53 表面、1,136 人工场景结构、94 配置 89／4／1、未启动应用的包／签名／资源与原创性边界均通过；人工结构检查不是人工执行，主题精确原生映射仍为 0／187，挑战仍有 1 项待映射，不把门禁通过当成整体功能等价。74 日志保留在 `/tmp/typebar-composition-rendering-final-logs.ORWE4y`，217 组件图在 `/tmp/typebar-composition-rendering-final-images.Q17VC1`；其中三张新普通候选图已逐张复查，融合取消缺口仍如上所述。系统／CoreData 诊断及失败轮保留。参考 pin 干净未变，零主程序启动、终态零测试／编译残留；终态后只在本合同及 README／规范／功能盘点四份文档补结果，其余八个冻结代码／测试／人工清单输入不变。完整 goal active。
+
 ## 全局组合身份投影增量
 
 本增量新增纯原生、只读 `PromptCompositionProjection`。`PromptCompositionField` 同时保留显示切片的全局 UTF-16 范围、完整源单位与权威字段目录；旧 ends 转换为单位边界，Zen 使用实际接受字段起点，没有可信目录的隐藏文本明确为一个 unsegmented 字段。会话不接受候选、不改变计分、导航、回放、结果、存储或协议。

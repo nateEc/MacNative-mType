@@ -36,7 +36,8 @@ struct PromptCompositionProjection {
     let index: Int
     let targetUTF16Range: Range<Int>
     let cellIDs: [Int]
-    let hasStructuralReturn: Bool
+    let structuralReturnCount: Int
+    var hasStructuralReturn: Bool { structuralReturnCount > 0 }
     let isRetired: Bool
     let isRemoved: Bool
   }
@@ -178,7 +179,7 @@ struct PromptCompositionProjection {
     canonicalAliases = aliases
     fields = ranges.enumerated().map { index, range in
       .init(index: index, targetUTF16Range: range, cellIDs: fieldIDs[index] ?? [],
-        hasStructuralReturn: field.sourceTargetUTF16[range].contains(10),
+        structuralReturnCount: field.sourceTargetUTF16[range].filter { $0 == 10 }.count,
         isRetired: index < firstRetainedFieldIndex, isRemoved: removedFieldIndices.contains(index))
     }
     if !isVisible(field.index) { caret = nil }

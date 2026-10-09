@@ -5071,6 +5071,43 @@ struct TypingSession {
       firstRetainedFieldIndex: firstRetainedPromptWordIndex, removedFieldIndices: removedTapePromptWordIndices)
   }
 
+  /// A split target can be correct even when its fused canonical glyph is
+  /// wrong. Read only this fragment's actual field units and forced flags.
+  func promptCompositionFragmentGlyph(_ cell: PromptCompositionProjection.Cell,
+    source: TypingPromptGlyph, field: PromptCompositionField) -> TypingPromptGlyph {
+    guard source.state != .hidden, let buffer = acceptedUnits,
+      let owner = cell.sourceFieldIndex, let span = cell.targetUTF16Range,
+      field.sourceFieldUTF16Ranges.indices.contains(owner) else {
+      return .init(character: cell.text.first!, state: source.state, typedCharacter: source.typedCharacter)
+    }
+    let input = buffer.range(owner)
+    let offset = span.lowerBound - field.sourceFieldUTF16Ranges[owner].lowerBound
+    guard offset >= 0, offset < input.count else {
+      return .init(character: cell.text.first!, state: .pending)
+    }
+    let end = min(input.upperBound, input.lowerBound + offset + span.count)
+    let entries = buffer.entries[(input.lowerBound + offset)..<end]
+    let units = entries.map(\.unit)
+    let matches = units == cell.displayUTF16 && !entries.contains(where: \.forced)
+    return .init(character: cell.text.first!, state: configuration.rules.blindMode || matches ? .correct : .incorrect,
+      typedCharacter: matches ? nil : String(decoding: units, as: UTF16.self).first)
+  }
+
+  func promptCompositionFieldErrors(_ field: PromptCompositionField) -> [(input: Bool, commit: Bool)]? {
+    guard let buffer = acceptedUnits, configuration.mode != .zen else { return nil }
+    return field.sourceFieldUTF16Ranges.enumerated().map { index, target in
+      guard index <= buffer.fieldIndex else { return (false, false) }
+      let input = buffer.range(index)
+      var error = input.count > target.count
+      for (offset, entry) in buffer.entries[input].enumerated() {
+        if entry.forced || offset >= target.count || entry.unit != field.sourceTargetUTF16[target.lowerBound + offset] {
+          error = true
+        }
+      }
+      return (error, index < field.index && (error || input.count != target.count))
+    }
+  }
+
   /// Zen's empty active field has a presentation-only cell. It is never an
   /// accepted underscore or a separator owned by the preceding word.
   var zenEmptyWordPlaceholderGlyphIndex: Int? {

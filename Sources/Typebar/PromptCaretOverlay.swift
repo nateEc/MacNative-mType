@@ -43,6 +43,12 @@ struct PromptRendering {
   let glyphCharacterOffsets: [Int: Int]
   var emptyWordPlaceholderGlyphID: Int? = nil
   var structuralNewlineOffsets: [Int: Int] = [:]
+  var compositionTextMap: PromptCompositionTextMap? = nil
+
+  var mainCharacterOffset: Int? {
+    guard let map = compositionTextMap, let anchor = map.caret, let range = map.cellRanges[anchor.cellID] else { return nil }
+    return map.characterOffset(atUTF16: range.location)
+  }
 
   static func make(
     glyphs: [TypingPromptGlyph], indices: [Int], emptyWordPlaceholderGlyphID: Int? = nil,
@@ -780,6 +786,28 @@ enum PromptCaretLayout {
       nextRect.minY > rect.minY
     {
       return nextRect
+    }
+    return rect
+  }
+
+  static func rect(in attributedText: AttributedString, utf16Range: NSRange,
+    containerSize: CGSize, font: NSFont, lineSpacing: CGFloat, isRightToLeft: Bool = false,
+    followsWrappedWhitespace: Bool = true) -> CGRect? {
+    guard containerSize.width > 0, utf16Range.location >= 0, utf16Range.length > 0 else { return nil }
+    let storage = preparedStorage(in: attributedText, font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
+    guard utf16Range.location < storage.length, utf16Range.length <= storage.length - utf16Range.location else { return nil }
+    let layout = NSLayoutManager(), container = NSTextContainer(size: .init(width: containerSize.width, height: .greatestFiniteMagnitude))
+    container.lineFragmentPadding = 0; layout.addTextContainer(container); storage.addLayoutManager(layout)
+    layout.ensureLayout(for: container)
+    let glyphs = layout.glyphRange(forCharacterRange: utf16Range, actualCharacterRange: nil)
+    guard glyphs.length > 0 else { return nil }
+    let rect = layout.boundingRect(forGlyphRange: glyphs, in: container).integral
+    if followsWrappedWhitespace,
+      (storage.string as NSString).substring(with: utf16Range).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      NSMaxRange(utf16Range) < storage.length {
+      let next = layout.glyphRange(forCharacterRange: .init(location: NSMaxRange(utf16Range), length: 1), actualCharacterRange: nil)
+      let nextRect = layout.boundingRect(forGlyphRange: next, in: container).integral
+      if nextRect.minY > rect.minY { return nextRect }
     }
     return rect
   }

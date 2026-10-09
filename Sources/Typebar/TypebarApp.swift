@@ -2945,7 +2945,20 @@ private struct ContentView: View {
   }
 
   private func practiceLineScrollContext(_ rendering: PromptRendering) -> PromptLineScrollContext {
-    .init(attemptID: session.automaticInputAttemptID,
+    if let offsets = rendering.compositionTextMap?.fieldCharacterOffsets {
+      return .init(attemptID: session.automaticInputAttemptID,
+        activeWordID: session.promptCompositionField?.index, characterOffsets: offsets,
+        smoothScroll: settings.smoothPracticeLineScroll, reducesMotion: settings.reducePracticeMotion,
+        words: (session.promptCompositionField?.sourceFieldUTF16Ranges.indices ?? 0..<0).map {
+          .init(index: $0, glyphID: $0)
+        }, firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
+        onRetire: { session.retirePromptWords($0) },
+        followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
+          slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines),
+        caretMotion: promptCaretMotion, centersActiveLine: !settings.showAllPracticeLines,
+        wrapperRevision: settings.practiceWrapperRevision)
+    }
+    return .init(attemptID: session.automaticInputAttemptID,
       activeWordID: session.promptWordPresentations.first(where: { $0.phase == .active })?.range.lowerBound,
       characterOffsets: rendering.glyphCharacterOffsets,
       smoothScroll: settings.smoothPracticeLineScroll, reducesMotion: settings.reducePracticeMotion,
@@ -3015,7 +3028,7 @@ private struct ContentView: View {
             if !showsAllPracticeLines {
               PromptAutoScrollOverlay(
                 text: rendering.text,
-                characterOffset: rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex),
+                characterOffset: rendering.mainCharacterOffset ?? rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex),
                 font: practicePromptNSFont(size: settings.fontSize),
                 lineSpacing: usesJoiningScript ? 8 : 12,
                 isRightToLeft: isRightToLeft,
@@ -3029,7 +3042,7 @@ private struct ContentView: View {
               PromptCaretOverlay(
                 text: rendering.text,
                 mainCharacterOffset: settings.caretStyle.drawsMarker
-                  ? rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex) : nil,
+                  ? rendering.mainCharacterOffset ?? rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex) : nil,
                 mainStyle: settings.caretStyle,
                 paceCharacterOffset: nil,
                 paceStyle: settings.paceCaretStyle,
@@ -3246,16 +3259,24 @@ private struct ContentView: View {
   }
 
   private var renderedPrompt: PromptRendering {
-    renderedPrompt(for: session)
+    renderedPrompt(for: session, composition: compositionText)
   }
 
-  private func renderedPrompt(for session: TypingSession) -> PromptRendering {
-    let completedCharacterIndices = session.completedPromptCharacterIndices
+  private func renderedPrompt(for session: TypingSession, composition: String?) -> PromptRendering {
+    // Custom word-box renderers need their own projected geometry adapter.
+    // Keep their existing shared rendering until that adapter is connected.
+    let usesCompositionProjection = composition != nil && !usesTapePractice && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
+      && (!session.configuration.containsRightToLeftPromptRun || session.configuration.usesRightToLeftPrompt)
+    let presentation = usesCompositionProjection
+      ? PromptCompositionPresentation(session: session, composition: composition ?? "", style: settings.compositionDisplayStyle) : nil
+    let completedCharacterIndices = presentation?.completedIndices ?? session.completedPromptCharacterIndices
     let promptHighlightMode = effectivePromptHighlightMode
-    let glyphs = session.promptGlyphs
-    let caretIndex = session.promptCaretGlyphIndex
+    let glyphs = presentation?.glyphs ?? session.promptGlyphs
+    let caretIndex = presentation.map { value in value.projection.caret.flatMap { anchor in
+      value.projection.cells.firstIndex { $0.id == anchor.cellID }
+    } } ?? session.promptCaretGlyphIndex
     let targetGlyphCount = session.prompt.count
-    let words = session.promptWordPresentations
+    let words = presentation?.words ?? session.promptWordPresentations
     let indices = PromptGlyphLayout.indices(
       glyphs: glyphs, words: words, hideExtraLetters: session.configuration.rules.hideExtraLetters,
       firstRetainedWordIndex: session.firstRetainedPromptWordIndex)
@@ -3264,20 +3285,21 @@ private struct ContentView: View {
       mode: promptHighlightMode, blindMode: session.configuration.rules.blindMode,
       typedEffect: settings.typedCharacterEffect,
       hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
-    let emptyWordPlaceholder = session.zenEmptyWordPlaceholderGlyphIndex
-    return PromptRendering.make(glyphs: glyphs, indices: indices,
-      emptyWordPlaceholderGlyphID: emptyWordPlaceholder,
-      words: words, removedTapeWordIndices: session.removedTapePromptWordIndices) { index, glyph in
+    let emptyWordPlaceholder = presentation?.emptyPlaceholderIndex ?? session.zenEmptyWordPlaceholderGlyphIndex
+    func renderGlyph(_ index: Int, _ glyph: TypingPromptGlyph,
+      _ markedCell: PromptCompositionProjection.Cell?) -> AttributedString {
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
         isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
         effect: settings.typedCharacterEffect)
       let replacesCurrentWithComposition = index == caretIndex
+        && presentation == nil
         && settings.compositionDisplayStyle == .replace
-        && !compositionText.isEmpty
+        && composition?.isEmpty == false
       let textPlan = PromptControlCharacterPresentation.plan(
         for: glyph, style: settings.typoIndicatorStyle,
-        isZen: session.configuration.mode == .zen, isExtra: index >= targetGlyphCount,
-        compositionReplacement: replacesCurrentWithComposition ? compositionText : nil,
+        isZen: session.configuration.mode == .zen,
+        isExtra: glyph.state == .extra || (presentation == nil && index >= targetGlyphCount),
+        compositionReplacement: markedCell?.text ?? (replacesCurrentWithComposition ? composition : nil),
         isEmptyWordPlaceholder: index == emptyWordPlaceholder)
       let displayedText: String
       if turnsIntoDot {
@@ -3323,6 +3345,11 @@ private struct ContentView: View {
       if settings.typedCharacterEffect != .hide || !completedCharacterIndices.contains(index) {
         appearance.applyErrorUnderline(to: &character, errorColor: errorFeedbackColor)
       }
+      if markedCell != nil {
+        let underline = appearance.color == .hidden ? Color.clear : futurePromptColor
+        character.underlineStyle = Text.LineStyle(color: underline)
+        character.appKit.underlineColor = NSColor(underline)
+      }
       if appearance.color != .hidden, let hintText = textPlan.hint
       {
         var hint = AttributedString(hintText)
@@ -3337,6 +3364,12 @@ private struct ContentView: View {
       }
       return character
     }
+    if let presentation { return presentation.render(renderGlyph) }
+    return PromptRendering.make(glyphs: glyphs, indices: indices,
+      emptyWordPlaceholderGlyphID: emptyWordPlaceholder,
+      words: words, removedTapeWordIndices: session.removedTapePromptWordIndices) { index, glyph in
+        renderGlyph(index, glyph, nil)
+      }
   }
 
   private var completedPromptColor: Color {
@@ -3603,7 +3636,7 @@ private struct ContentView: View {
     let font = practicePromptNSFont(size: settings.fontSize)
     return .init(slowTimer: timerHealth.usesSlowTimer) { current, candidate in
       PromptInputWrapGeometry.rejects(session: current, candidate: candidate,
-        rendering: renderedPrompt(for: current), width: width, font: font,
+        rendering: renderedPrompt(for: current, composition: nil), width: width, font: font,
         lineSpacing: current.configuration.usesJoiningScriptPrompt ? 8 : 12,
         isRightToLeft: current.configuration.usesRightToLeftPrompt)
     }
