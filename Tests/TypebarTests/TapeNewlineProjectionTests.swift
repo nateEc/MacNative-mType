@@ -149,4 +149,68 @@ import XCTest
       XCTAssertFalse(window.isVisible)
     } }
   }
+
+  func testProjectedVerticalRetirementKeepsMapAndAcknowledgesPrefixOnce() throws {
+    for rtl in [false, true] { for smooth in [false, true] { for cancels in [false, true] {
+      var session = TypingSession(configuration: .words(4), prompt: "a\nb\nc\ntail")
+      let coordinator = PromptCaretMotionCoordinator()
+      let owner = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 160))
+      defer { owner.stop() }
+      let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+      var retired: [PromptWordRetirement] = []
+      func configure(at time: Double) throws {
+        let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: "XYZ😀", style: .replace))
+        let original = presentation.render { _, glyph, cell in AttributedString(cell?.text ?? String(glyph.character)) }
+        let rendering = PromptRendering(text: original.text, glyphCharacterOffsets: [:], compositionTextMap: original.compositionTextMap)
+        let descriptors = TapePromptProjection.words(session: session, rendering: original)
+        let field = try XCTUnwrap(session.promptCompositionField)
+        var config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
+          mainStyle: .bar, paceStyle: .outline, font: font, lineSpacing: 0, rightToLeft: rtl,
+          accent: .yellow, motion: .off, reducesMotion: false, frameRate: 30,
+          attemptID: session.automaticInputAttemptID, coordinator: coordinator,
+          mainGlyphID: session.promptCaretGlyphIndex, automaticallyPresents: false)
+        let identity = PromptCaretInputIdentity(attemptID: session.automaticInputAttemptID,
+          typed: session.typed, composition: "XYZ😀", glyphID: session.promptCaretGlyphIndex)
+        config.latestInput = { identity }
+        config.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+          fromAfter: false, targetAfter: false, fraction: 1, targetGlyphID: 6) }
+        owner.configure(rendering: rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
+          compositionField: field, mode: .letter, margin: 0.25, smoothScroll: smooth,
+          retirement: .init(attemptID: session.automaticInputAttemptID,
+            activeWordID: session.promptWordPresentations[field.index].range.lowerBound,
+            characterOffsets: [:], smoothScroll: smooth, reducesMotion: false,
+            words: session.promptWordPresentations.enumerated().map { .init(index: $0.offset, glyphID: $0.element.range.lowerBound) },
+            firstRetainedWordIndex: session.firstRetainedPromptWordIndex, onRetire: { retired.append($0) }),
+          newlineWords: descriptors, carets: config, at: time)
+      }
+      try configure(at: 0)
+      session.insertBatch("a\n", at: Date(timeIntervalSinceReferenceDate: 917_100_000))
+      try configure(at: 0.1); owner.present(at: 0.213)
+      session.insertBatch("b\n", at: Date(timeIntervalSinceReferenceDate: 917_100_001))
+      try configure(at: 1)
+      if cancels {
+        owner.stop(); owner.present(at: 2)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.002))
+        XCTAssertTrue(retired.isEmpty, "Stop cancels pending completion and already queued notification")
+        continue
+      }
+      owner.present(at: 1.05)
+      if smooth { XCTAssertLessThan(coordinator.wordsMargin, 0) }
+      owner.present(at: 1.113)
+      RunLoop.main.run(until: Date().addingTimeInterval(0.002))
+      XCTAssertEqual(retired.map(\.firstRetainedWordIndex), [1])
+      guard let removal = retired.first else { continue }
+      let main = try XCTUnwrap(coordinator.main.position), pace = try XCTUnwrap(coordinator.pace.position)
+      let correction = coordinator.pace.cumulativeTapeCorrection
+      session.retirePromptWords(removal)
+      try configure(at: 1.113); owner.present(at: 1.113)
+      XCTAssertEqual(coordinator.main.position, main)
+      XCTAssertEqual(coordinator.pace.position, pace)
+      XCTAssertEqual(coordinator.pace.cumulativeTapeCorrection, correction)
+      try configure(at: 1.113); owner.present(at: 1.113)
+      RunLoop.main.run(until: Date().addingTimeInterval(0.002))
+      XCTAssertEqual(retired.count, 1)
+      XCTAssertEqual(session.typed, "a\nb\n")
+    } } }
+  }
 }

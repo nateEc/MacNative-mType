@@ -85,8 +85,7 @@ final class TapePromptNativeView: NSView {
       newlineWords: newlineWords, rightToLeft: carets.rightToLeft))
     let inputChanged = nextInput != lastInput
     let previousWordID = self.retirement?.activeWordID
-    let previousWordTop = previousWordID.flatMap { self.rendering.characterOffset(forGlyphAt: $0) }
-      .flatMap { textView.wordRect(at: $0, start: $0)?.minY }
+    let previousWordTop = previousWordID.flatMap { retirementWordRect($0)?.minY }
     let resets = configuration == nil || configuration?.attemptID != carets.attemptID
       || configuration?.coordinator !== carets.coordinator || configuration?.font != carets.font
       || self.mode != mode || self.margin != margin || self.smoothScroll != smoothScroll
@@ -361,8 +360,7 @@ final class TapePromptNativeView: NSView {
   private func beginNewlineTransition(previousTop: CGFloat?, at time: TimeInterval) {
     guard let config = configuration, !textView.newlineWords.isEmpty,
       let context = retirement, let active = context.activeWordID,
-      let offset = rendering.characterOffset(forGlyphAt: active),
-      let current = textView.wordRect(at: offset, start: offset), let previousTop,
+      let current = retirementWordRect(active), let previousTop,
       current.minY > previousTop else {
       // Backward movement is not blocked by lineTransition in the source.
       awaitsWordScroll = false
@@ -380,6 +378,15 @@ final class TapePromptNativeView: NSView {
     pendingNewline = (time + max(0, duration - PromptLineScrollMotion.autoplayLead),
       .init(attemptID: context.attemptID, firstRetainedWordIndex: boundary))
     if duration == 0 { finishNewlineTransition(at: time) }
+  }
+
+  private func retirementWordRect(_ glyphID: Int) -> CGRect? {
+    if textView.usesMultilineProjection {
+      guard let index = retirement?.words.first(where: { $0.glyphID == glyphID })?.index else { return nil }
+      return textView.projectedFieldRect(index)
+    }
+    return rendering.characterOffset(forGlyphAt: glyphID)
+      .flatMap { textView.wordRect(at: $0, start: $0) }
   }
 
   private func finishNewlineTransition(at time: TimeInterval) {
@@ -583,7 +590,7 @@ private final class TapePromptTextView: NSView {
   private var newlineLayout: TapeNewlineTextLayout?
   private(set) var newlineWords: [TapePromptWord] = []
   private(set) var firstRetainedNewlineIndex = 0
-  private var newlineSource: (text: AttributedString, font: NSFont, rightToLeft: Bool)?
+  private var newlineSource: (text: AttributedString, font: NSFont, rightToLeft: Bool, map: PromptCompositionTextMap?)?
   var viewportWidth: CGFloat = 0
   var newlineMetrics: TapePromptLayoutMetrics? { newlineLayout?.metrics }
   var removedNewlineWordIndices: Set<Int> { newlineLayout?.removedWordIndices ?? [] }
@@ -620,7 +627,7 @@ private final class TapePromptTextView: NSView {
       if newlineLayout == nil { newlineLayout = TapeNewlineTextLayout() }
       if resets { firstRetainedNewlineIndex = newlineWords.first?.index ?? 0 }
       firstRetainedNewlineIndex = max(firstRetainedNewlineIndex, newlineWords.first?.index ?? 0)
-      newlineSource = (text, font, rightToLeft)
+      newlineSource = (text, font, rightToLeft, compositionMap)
       usesMultilineProjection = compositionMap != nil
       newlineLayout?.configure(text: text, words: newlineWords.filter { $0.index >= firstRetainedNewlineIndex },
         font: font, rightToLeft: rightToLeft, resets: resets, compositionMap: compositionMap)
@@ -752,11 +759,20 @@ private final class TapePromptTextView: NSView {
   }
   func retireNewlinePrefix(before index: Int) -> CGFloat? {
     guard index > firstRetainedNewlineIndex, let source = newlineSource, let layout = newlineLayout,
-      let first = newlineWords.first(where: { $0.index >= index && layout.wordRect(at: $0.characters.lowerBound) != nil }),
-      let width = layout.prefixCompensation(at: first.characters.lowerBound) else { return nil }
+      let first = newlineWords.first(where: {
+        $0.index >= index && (usesMultilineProjection ? layout.projectedFieldRect($0.index) != nil
+          : layout.wordRect(at: $0.characters.lowerBound) != nil)
+      }) else { return nil }
+    let width: CGFloat?
+    if usesMultilineProjection {
+      width = layout.projectedFieldRect(first.index).map {
+        source.rightToLeft ? layout.leadingEdge - $0.maxX : $0.minX
+      }
+    } else { width = layout.prefixCompensation(at: first.characters.lowerBound) }
+    guard let width else { return nil }
     firstRetainedNewlineIndex = index
     layout.configure(text: source.text, words: newlineWords.filter { $0.index >= index },
-      font: source.font, rightToLeft: source.rightToLeft, resets: false)
+      font: source.font, rightToLeft: source.rightToLeft, resets: false, compositionMap: source.map)
     needsDisplay = true
     return width
   }

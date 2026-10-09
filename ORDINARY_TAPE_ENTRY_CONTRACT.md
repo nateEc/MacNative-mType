@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 多行投影纵向退休事务增量（2026-10-10）
+
+跨行检测改为通过退休上下文的词身份读取真实投影字段框，不再要求旧字符偏移。原生前缀移除按存活字段框与已展示 leading edge 计算补偿；newlineSource 保留 compositionMap，在退休后的原生重建中继续使用投影词盒，避免退回旧 Character 目录。原有首跳策略、独立横纵动画与异步通知 revision 保护保持。
+
+新增真实 session／owner 测试主动清空旧偏移目录，使用候选溢出与 emoji；方向 × 即时／平滑 × 确认／停止共八组合覆盖纵向退休、主／pace 位置、重复确认不补偿两次，以及停止取消未完成或已排队的通知。`../../work/tape-projected-retirement-red.log` 一项六处失败，暴露缺失纵向移动及退休；first.log 修复后一项通过，verified.log 最终 184 项 Tape 相关回归零失败零跳过（24.363 秒，墙钟 24.385 秒），固定源／动画环境齐备；originality.log 通过。上述四份日志均在同目录、使用 tape-projected-retirement- 前缀。
+
+行为先行、有界会话内决策与风险复核关注跨行几何、投影保存及取消，不是独立审计。零 Typebar 主程序启动、终态零测试／编译残留，本增量无新持久组件图或完整门禁复跑。测试使用 Latin 改流方向，实际 RTL 文字／混合方向、共享 canonical ID 的部分字段、复杂重叠队列与像素级退休等价仍需证据；多行实时快照、完整生产入口、IME／设备仍开放。应用保护与整体兼容分类不升级，goal active；下方“纵向退休未接线”为此前阶段状态。
+
 ## 多行投影 owner 与双光标几何增量（2026-10-10）
 
 显式 compositionField 与 newlineWords 配置现在让实际 TapePromptNativeView 的文字层使用持久流投影词盒；layout 类型切换纳入 reset。横向请求按真实字段索引、raw UTF-16 接受数和隐藏 extras 读取新入口；活动词保护使用字段索引，不由旧字符锚点猜测。主光标使用字段内最终 before／after，letter 锁定边距，word 按字段前缘定位；独立 pace 使用 canonical 首／末 alias 加实际文字 origin。新增只读 projectedAdvance 用复制的流预览，不修改真实移除状态或动画。没有新增时钟。
