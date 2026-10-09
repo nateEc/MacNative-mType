@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 光标纯位移保留本地标记内容（2026-10-10）
+
+基于 029285d 核查 PromptCaretNativeView.paint：旧判断只有原生 frame 与样式／颜色／尺寸全相同才跳过；平滑移动改变 frame 时仍赋值 NSHostingView.rootView。PromptCaretMarkerView.body 仅使用 rect.width／height、style、accent，所有本地形状均不读取文档原点，因此纯位移不需要替换 SwiftUI 标记内容。这个机制是已定位的冗余工作，不等于完整应用计时失败的根因。
+
+按行为优先测试技能，caret-translation-content-red.log 一项七次预期断言失败：七种可见样式平移后 rootView.rect 被改为新文档坐标。修正将更新拆开：只在样式、颜色或尺寸变化时替换 rootView，只在 frame 变化时赋原生 frame；初建、隐藏／显示、alpha、文档定位、RTL 锚点公式、pace 请求和计时器均保持。局部内容保留上次构建原点是有意语义：文档位置属于 NSView.frame，不参与标记 body；没有缓存提示文字或输入状态，也没有跳过新的目标几何。
+
+首项测试遍历七种可见样式，验证 frame 确实平移、内容保留、尺寸变化及主题颜色更新仍送达。补充主／pace 双标记在四个换行动画采样点的内容保留、frame 与各自 coordinator 文档位置一致、前后层顺序不变。caret-translation-content-verified.log 302 项零失败零跳过；补测后 caret-translation-content-final.log 权威退出 0，303 项零失败零跳过，18.169s（墙钟 18.201），带固定参考与归档，覆盖光标、blink、pace、组合投影、焦点及相关健康检查。
+
+风险审查核对了 body 不使用文档原点、尺寸／样式／颜色失效键、主／pace 共用 paint、原生位置与插值、停止生命周期及既有 blink 断言；没有更改视觉选项、接受输入、计分、保护阈值或持久化。caret-translation-originality.log 原创边界通过，人工文档结构审计保持 1151 个唯一场景，git diff --check 通过。本轮零 Typebar 主程序启动，未测完整 GUI 帧率或首键计时表现；不宣称可量化加速或延迟故障已解决。全量 readiness、设备 IME、主题与完整人工功能验收仍开放，下一步完整入口实测须使用新二进制而非先前的 release 包，完整 goal 保持 active。
+
 ## 语言 Picker 禁用与专注动画局部对照（2026-10-10）
 
 基于 47a19b2 核查首键之后的配置区：practiceLayout 对整个 configurationPanel 应用 opacity、allowsHitTesting、disabled、accessibilityHidden 及 125ms 动画；语言 Picker 的普通模式选项是 TypingLanguage.allCases，当前 448 项（包括合成目录项，不将该数改写为独立语言数量）。首键会由 TypingVisualFocus.inputDidUpdate／hasStarted 触发专注状态。先检验“该 Picker 的禁用／专注变更本身足以造成秒级工作”的局部机制，而非凭完整应用采样直接替换控件。

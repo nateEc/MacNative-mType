@@ -330,10 +330,12 @@ final class PromptCaretNativeView: NSView {
     let frame = CGRect(x: PromptCaretPlacementPolicy.horizontalAnchor(for: rect, style: style,
       isRightToLeft: rightToLeft) - rect.width / 2, y: rect.minY,
       width: max(1, rect.width), height: max(1, rect.height))
-    if let host, host.frame == frame, host.rootView.style == style,
-      host.rootView.accent == accent, host.rootView.rect.size == rect.size { return }
-    host?.rootView = marker
-    host?.frame = frame
+    guard let host else { return }
+    // Marker content is local: only size/style/color affect its SwiftUI body.
+    // Native interpolation changes document position without replacing it.
+    if host.rootView.style != style || host.rootView.accent != accent
+      || host.rootView.rect.size != rect.size { host.rootView = marker }
+    if host.frame != frame { host.frame = frame }
   }
 }
 

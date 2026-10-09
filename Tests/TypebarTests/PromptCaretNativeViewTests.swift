@@ -9,11 +9,68 @@ import XCTest
 
   private func configuration(_ motion: PromptCaretMotionCoordinator, attempt: UUID,
     text: String = "amber\nbirch\ncedar\ndelta", style: TypingCaretStyle = .bar,
-    paceStyle: TypingCaretStyle = .off, mainOffset: Int = 0) -> PromptCaretNativeView.Configuration {
+    paceStyle: TypingCaretStyle = .off, mainOffset: Int = 0, accent: Color = .yellow) -> PromptCaretNativeView.Configuration {
     .init(text: AttributedString(text), mainOffset: mainOffset, paceOffset: nil,
       mainStyle: style, paceStyle: paceStyle, font: font, lineSpacing: 12,
-      rightToLeft: false, accent: .yellow, motion: .off, reducesMotion: false,
+      rightToLeft: false, accent: accent, motion: .off, reducesMotion: false,
       frameRate: 30, attemptID: attempt, coordinator: motion)
+  }
+
+  func testTranslationMovesNativeFrameWithoutReplacingMarkerContent() throws {
+    for style in TypingCaretStyle.allCases where style.drawsMarker {
+      let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+      let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 360, height: 400))
+      defer { view.stop() }
+      var box = CGRect(x: 10, y: 20, width: 18, height: 32), typed = "a"
+      var config = configuration(motion, attempt: attempt, style: style)
+      config.automaticallyPresents = false
+      config.latestInput = { .init(attemptID: attempt, typed: typed, composition: "", glyphID: 0) }
+      config.mainGlyphRect = { _ in box }
+      view.update(config); view.layout(); view.present(at: 0)
+      let host = try XCTUnwrap(view.subviews.compactMap { $0 as? NSHostingView<PromptCaretMarkerView> }.first)
+      let initialContent = host.rootView.rect, initialFrame = host.frame
+      box = box.offsetBy(dx: 30, dy: 45); typed += "b"
+      view.present(at: 0.1)
+      XCTAssertEqual(host.frame.minX, initialFrame.minX + 30, accuracy: 1e-8)
+      XCTAssertEqual(host.frame.minY, initialFrame.minY + 45, accuracy: 1e-8)
+      XCTAssertEqual(host.rootView.rect, initialContent,
+        "Local marker content does not change when only its native document position moves")
+      box.size = .init(width: 22, height: 38); typed += "c"
+      view.present(at: 0.2)
+      XCTAssertEqual(host.rootView.rect.size, box.size)
+      config = configuration(motion, attempt: attempt, style: style, accent: .red)
+      config.automaticallyPresents = false
+      config.latestInput = { .init(attemptID: attempt, typed: typed, composition: "", glyphID: 0) }
+      config.mainGlyphRect = { _ in box }
+      view.update(config); view.present(at: 0.3)
+      XCTAssertEqual(host.rootView.accent, .red)
+    }
+  }
+
+  func testLineMotionTranslatesBothMarkersWithoutChangingLocalContent() throws {
+    let motion = PromptCaretMotionCoordinator()
+    let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 360, height: 400))
+    defer { view.stop() }
+    var config = PromptCaretNativeView.Configuration(text: AttributedString("amber\nbirch"),
+      mainOffset: 0, paceOffset: 6, mainStyle: .bar, paceStyle: .outline,
+      font: font, lineSpacing: 12, rightToLeft: false, accent: .yellow,
+      motion: .medium, reducesMotion: false, frameRate: 60, attemptID: UUID(), coordinator: motion)
+    config.automaticallyPresents = false
+    view.update(config); view.layout(); view.present(at: 0)
+    let markers = view.subviews.compactMap { $0 as? NSHostingView<PromptCaretMarkerView> }
+    XCTAssertEqual(markers.count, 2)
+    let contents = markers.map { $0.rootView.rect }, frames = markers.map(\.frame)
+    motion.lineJump(to: -45, duration: 0.125, at: 0)
+    for time in [0.025, 0.05, 0.1, 0.2] {
+      view.present(at: time)
+      XCTAssertEqual(markers.map { $0.rootView.rect }, contents)
+    }
+    XCTAssertNotEqual(markers.map(\.frame), frames)
+    let main = try XCTUnwrap(markers.first { $0.rootView.style == .bar })
+    let pace = try XCTUnwrap(markers.first { $0.rootView.style == .outline })
+    XCTAssertEqual(main.frame.minY, try XCTUnwrap(motion.documentRect(isPace: false)).minY, accuracy: 1e-8)
+    XCTAssertEqual(pace.frame.minY, try XCTUnwrap(motion.documentRect(isPace: true)).minY, accuracy: 1e-8)
+    XCTAssertEqual(markers.map { $0.rootView.style }, [.outline, .bar])
   }
 
   func testLatestInputAndMarkedCompositionReadFreshGeometryWithoutPerFrameRendering() throws {
