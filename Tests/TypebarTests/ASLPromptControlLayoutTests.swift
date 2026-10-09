@@ -183,7 +183,7 @@ import XCTest
     XCTAssertEqual(process.terminationStatus, 0, String(decoding: diagnostics, as: UTF8.self))
     guard process.terminationStatus == 0 else { return }
     let evidence = try JSONDecoder().decode(Evidence.self, from: data)
-    XCTAssertEqual(evidence.pin, "91bd24bb8513785c7364cbea29296ff7adafac41"); XCTAssertEqual(evidence.fixtures.count, 44)
+    XCTAssertEqual(evidence.pin, "91bd24bb8513785c7364cbea29296ff7adafac41"); XCTAssertEqual(evidence.fixtures.count, 52)
     for fixture in evidence.fixtures {
       let target = Array(fixture.display), input = Array(fixture.input), zen = fixture.mode == "zen"
       for (index, letter) in fixture.updated.enumerated() {

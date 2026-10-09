@@ -52,6 +52,7 @@ const samples = [
   ['a\n', ''], ['a\n', 'a\n'], ['\n', '\n'], ['\ta', '\ta'], ['a\t', 'a\t'],
   ['\n', 'X'], ['a', '\n'], ['a', 'a\n'], ['a\n', 'aX'],
   ['', ''], ['\t', ''],
+  ['a\n\nb', 'a\n\nb'], ['\na', '\na'],
 ];
 const fixtures = [];
 for (const mode of ['words', 'zen']) for (const style of ['off', 'replace'])
@@ -84,6 +85,6 @@ for (const [original, input] of samples) {
   if (mode === 'zen' && input.includes('\n')) assert.ok(adjacent.includes("class='newline'"));
   fixtures.push({mode, style, original, input, display, initial: initialLetters, updated, helpers});
 }
-assert.equal(fixtures.length, 44); verify();
+assert.equal(fixtures.length, 52); verify();
 if (option) process.stdout.write(JSON.stringify({pin, fixtures}));
-else console.log('ASL controls source passed (44 complete build/update cases; real Words/Strings, target/extra Return and Zen controls/empty sentinel; CSS rules static, owned DOM/hints/RAF, no browser metrics or font assets)');
+else console.log('ASL controls source passed (52 complete build/update cases; real Words/Strings, internal/leading/extra Return and Zen controls/empty sentinel; CSS rules static, owned DOM/hints/RAF, no browser metrics or font assets)');

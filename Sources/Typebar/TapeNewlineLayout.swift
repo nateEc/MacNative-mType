@@ -44,6 +44,8 @@ struct TapePromptWord: Equatable {
   var incorrectNewline = false
   var hasStructuralNewline = false
   var isRemoved = false
+  /// Canonical control cells, distinct from the unmapped structural LF.
+  var controlCharacterOffsets: [Int: Character] = [:]
   var ownsNewline: Bool { hasStructuralNewline || newlineCharacterOffset != nil }
 }
 

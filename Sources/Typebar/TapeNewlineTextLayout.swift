@@ -21,8 +21,17 @@ import AppKit
       self.descriptor = descriptor; self.row = row; self.inline = inline
       self.precedingBreak = precedingBreak
       var mapping: [Int: NSRange] = [:]
-      for offset in descriptor.characters where ranges.indices.contains(offset) && characters[offset] != "\n" {
-        let fragment = prepared.attributedSubstring(from: ranges[offset])
+      for offset in descriptor.characters where ranges.indices.contains(offset) {
+        let fragment: NSAttributedString
+        if let control = descriptor.controlCharacterOffsets[offset], characters[offset] == control {
+          // Zen controls have no ink, but still own a native icon-sized cell.
+          // Keep the shared opacity/font/decoration attributes unchanged.
+          fragment = NSAttributedString(string: control == "\n" ? "↵" : "→",
+            attributes: prepared.attributes(at: ranges[offset].location, effectiveRange: nil))
+        } else {
+          guard characters[offset] != "\n" else { continue }
+          fragment = prepared.attributedSubstring(from: ranges[offset])
+        }
         mapping[offset] = NSRange(location: storage.length, length: fragment.length)
         storage.append(fragment)
       }
