@@ -328,6 +328,28 @@ import AppKit
     let ids = compositionMap?.canonicalAliases[id] ?? [id]
     return (after ? ids.last : ids.first).flatMap { projectedCellRect($0) }
   }
+  func projectedMainRect(style: TypingCaretStyle) -> CGRect? {
+    for word in words {
+      if let rect = word.projected?.mainRect(style: style) {
+        let origin = frame(word).origin
+        return rect.offsetBy(dx: origin.x, dy: origin.y)
+      }
+    }
+    return nil
+  }
+  func projectedAdvance(fieldID: Int, acceptedUTF16Count: Int, mode: PracticeTapeMode,
+    hidesExtras: Bool, viewportWidth: CGFloat) -> CGFloat? {
+    guard let word = words.first(where: { $0.descriptor.index == fieldID }),
+      let layout = word.projected else { return nil }
+    var preview = flow
+    guard let pass = preview.scroll(active: fieldID, viewportWidth: viewportWidth,
+      overflowing: { _ in false }, fillerMargin: { _ in 0 }) else { return nil }
+    let count = max(0, acceptedUTF16Count), cells = word.projectedCells
+    let within = mode == .letter ? TapePromptProjection.inlineAdvance(cells: Array(cells.prefix(count)),
+      nextCellID: count < cells.count ? cells[count].id : nil, frames: layout.cellFrames,
+      hidesExtras: hidesExtras) : 0
+    return pass.beforeActive + within
+  }
   func prefixCompensation(at offset: Int) -> CGFloat? {
     guard let word = word(at: offset) else { return nil }
     let rect = frame(word)

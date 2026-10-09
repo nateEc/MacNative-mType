@@ -81,8 +81,8 @@ final class TapePromptNativeView: NSView {
     let compositionField = initial?.field ?? compositionField
     let nextInput = initial?.input ?? carets.latestInput?()
     let nextMap = compositionField == nil ? nil : rendering.compositionTextMap
-    let nextUsesProjection = TapePromptTextView.supportsProjection(nextMap,
-      newlineWords: newlineWords, rightToLeft: carets.rightToLeft)
+    let nextUsesProjection = nextMap != nil && (!newlineWords.isEmpty || TapePromptTextView.supportsProjection(nextMap,
+      newlineWords: newlineWords, rightToLeft: carets.rightToLeft))
     let inputChanged = nextInput != lastInput
     let previousWordID = self.retirement?.activeWordID
     let previousWordTop = previousWordID.flatMap { self.rendering.characterOffset(forGlyphAt: $0) }
@@ -92,7 +92,7 @@ final class TapePromptNativeView: NSView {
       || self.mode != mode || self.margin != margin || self.smoothScroll != smoothScroll
       || configuration?.reducesMotion != carets.reducesMotion
       || configuration?.rightToLeft != carets.rightToLeft || self.checksDirectionPerGlyph != checksDirectionPerGlyph
-      || (textView.projectedLayout != nil) != nextUsesProjection
+      || textView.usesFieldProjection != nextUsesProjection
     retirementRevision &+= 1
     metricsRevision &+= 1
     if resets {
@@ -205,9 +205,11 @@ final class TapePromptNativeView: NSView {
     if scrollRequested {
       if retiresWords { prepareRetirement(rightToLeft: config.rightToLeft) }
       let origin = textOrigin + config.coordinator.wordsTapeMargin
-      let active = retirement?.words.first(where: { $0.glyphID == retirement?.activeWordID })?.index
+      let active = (textView.usesMultilineProjection ? compositionField?.index : nil)
+        ?? retirement?.words.first(where: { $0.glyphID == retirement?.activeWordID })?.index
         ?? textView.newlineWords.first(where: { $0.characters.contains(anchorCharacterIndex) })?.index
       if let pass = textView.requestNewlineScroll(at: anchorCharacterIndex, mode: mode,
+        field: compositionField, hidesExtras: hidesCompositionExtras,
         duration: duration, time: time, overflowing: { index, rect in
           // A currently active box is never discarded by the native owner.
           // Future/non-prefix holes remain distinct from a session prefix.
@@ -229,8 +231,8 @@ final class TapePromptNativeView: NSView {
     caretView.frame = bounds
     config.glyphRect = { [weak self] id in self?.glyphRect(id, main: false) }
     config.mainGlyphRect = { [weak self] id in self?.glyphRect(id, main: true) }
-    if textView.projectedLayout != nil {
-      if latestProjection != nil {
+    if textView.usesFieldProjection {
+      if latestProjection != nil && textView.projectedLayout != nil {
         let fallback = projectionInput ?? .init(attemptID: config.attemptID, typed: "", composition: "", glyphID: config.mainGlyphID)
         config.latestInput = { [weak self] in
           self?.refreshProjection(at: ProcessInfo.processInfo.systemUptime)
@@ -242,7 +244,7 @@ final class TapePromptNativeView: NSView {
       }
       config.fieldMainRect = { [weak self] style in self?.projectedMainRect(style: style) }
       config.fieldPaceRect = { [weak self] id, after in
-        guard let self, let rect = self.textView.projectedLayout?.canonicalRect(id, after: after) else { return nil }
+        guard let self, let rect = self.textView.projectedCanonicalRect(id, after: after) else { return nil }
         return rect.offsetBy(dx: self.textOrigin, dy: 0)
       }
     }
@@ -296,6 +298,9 @@ final class TapePromptNativeView: NSView {
   }
 
   private func projectedAdvance() -> CGFloat? {
+    if let field = compositionField, textView.usesMultilineProjection {
+      return textView.projectedNewlineAdvance(field: field, mode: mode, hidesExtras: hidesCompositionExtras)
+    }
     guard let layout = textView.projectedLayout, let field = compositionField,
       let map = rendering.compositionTextMap, let frame = layout.fieldFrames[field.index] else { return nil }
     if mode == .off { return 0 }
@@ -310,10 +315,10 @@ final class TapePromptNativeView: NSView {
   }
 
   private func projectedMainRect(style: TypingCaretStyle) -> CGRect? {
-    guard let layout = textView.projectedLayout, var rect = layout.mainRect(style: style) else { return nil }
+    guard var rect = textView.projectedMainRect(style: style) else { return nil }
     let rtl = configuration?.rightToLeft ?? false
     let base = bounds.width * (rtl ? 1 - margin : margin)
-    if mode == .word, let field = compositionField, let word = layout.fieldFrames[field.index] {
+    if mode == .word, let field = compositionField, let word = textView.projectedFieldRect(field.index) {
       rect.origin.x += base - (rtl ? word.maxX : word.minX)
     } else { rect.origin.x = base - (rtl ? rect.width : 0) }
     return rect
@@ -434,8 +439,8 @@ final class TapePromptNativeView: NSView {
   }
 
   private func glyphRect(_ id: Int, main: Bool) -> CGRect? {
-    if let layout = textView.projectedLayout {
-      guard var rect = layout.canonicalRect(id, after: false) else { return nil }
+    if textView.usesFieldProjection {
+      guard var rect = textView.projectedCanonicalRect(id, after: false) else { return nil }
       if main {
         let rtl = configuration?.rightToLeft ?? false
         rect.origin.x = bounds.width * (rtl ? 1 - margin : margin) - (rtl ? rect.width : 0)
@@ -460,7 +465,7 @@ final class TapePromptNativeView: NSView {
   }
 
   private func isRightToLeft(_ id: Int) -> Bool {
-    if textView.projectedLayout != nil, let map = rendering.compositionTextMap {
+    if textView.usesFieldProjection, let map = rendering.compositionTextMap {
       let ids = map.canonicalAliases[id] ?? [id]
       guard let run = map.fieldRuns.first(where: { run in run.cells.contains { ids.contains($0.id) } }) else {
         return configuration?.rightToLeft ?? false
@@ -557,6 +562,8 @@ final class TapePromptNativeView: NSView {
 /// hint metrics and hidden listening text are not approximated by fixed widths.
 private final class TapePromptTextView: NSView {
   private(set) var projectedLayout: PromptFieldTextLayout?
+  private(set) var usesMultilineProjection = false
+  var usesFieldProjection: Bool { projectedLayout != nil || usesMultilineProjection }
   static func supportsProjection(_ map: PromptCompositionTextMap?,
     newlineWords: [TapePromptWord], rightToLeft: Bool) -> Bool {
     guard let map else { return false }
@@ -599,8 +606,7 @@ private final class TapePromptTextView: NSView {
 
   func configure(text: AttributedString, font: NSFont, rightToLeft: Bool,
     newlineWords: [TapePromptWord], resets: Bool, compositionMap: PromptCompositionTextMap? = nil) {
-    // The multiline flow owner still needs a field-aware topology adapter.
-    // Never flatten virtual slots into its legacy Character directory.
+    // Multiline topology remains owned by the persistent flow below.
     if let map = compositionMap, Self.supportsProjection(map, newlineWords: newlineWords, rightToLeft: rightToLeft) {
       stopNewlines()
       projectedLayout = PromptFieldTextLayout(map: map, width: 1_000_000_000,
@@ -615,8 +621,9 @@ private final class TapePromptTextView: NSView {
       if resets { firstRetainedNewlineIndex = newlineWords.first?.index ?? 0 }
       firstRetainedNewlineIndex = max(firstRetainedNewlineIndex, newlineWords.first?.index ?? 0)
       newlineSource = (text, font, rightToLeft)
+      usesMultilineProjection = compositionMap != nil
       newlineLayout?.configure(text: text, words: newlineWords.filter { $0.index >= firstRetainedNewlineIndex },
-        font: font, rightToLeft: rightToLeft, resets: resets)
+        font: font, rightToLeft: rightToLeft, resets: resets, compositionMap: compositionMap)
       self.newlineWords = newlineWords
       needsDisplay = true
       return
@@ -718,10 +725,18 @@ private final class TapePromptTextView: NSView {
     layoutManager.drawGlyphs(forGlyphRange: range, at: .zero)
   }
 
-  func requestNewlineScroll(at offset: Int, mode: PracticeTapeMode, duration: TimeInterval,
+  func requestNewlineScroll(at offset: Int, mode: PracticeTapeMode,
+    field: PromptCompositionField? = nil, hidesExtras: Bool = false, duration: TimeInterval,
     time: TimeInterval, overflowing: (Int, CGRect) -> Bool)
     -> (advance: CGFloat, compensation: CGFloat, removedWords: Set<Int>)? {
     guard let newlineLayout else { return nil }
+    if usesMultilineProjection, let field {
+      let pass = newlineLayout.requestProjectedScroll(fieldID: field.index,
+        acceptedUTF16Count: field.inputUTF16.count, mode: mode, hidesExtras: hidesExtras,
+        viewportWidth: viewportWidth, duration: duration, time: time, overflowing: overflowing)
+      needsDisplay = true
+      return pass
+    }
     let pass = newlineLayout.requestScroll(at: offset, mode: mode, viewportWidth: viewportWidth,
       duration: duration, time: time, overflowing: overflowing)
     needsDisplay = true
@@ -746,7 +761,24 @@ private final class TapePromptTextView: NSView {
     return width
   }
   func stopNewlines() {
+    usesMultilineProjection = false
     newlineLayout = nil; newlineWords = []; newlineSource = nil; firstRetainedNewlineIndex = 0
+  }
+  func projectedCanonicalRect(_ id: Int, after: Bool) -> CGRect? {
+    if let projectedLayout { return projectedLayout.canonicalRect(id, after: after) }
+    return usesMultilineProjection ? newlineLayout?.projectedCanonicalRect(id, after: after) : nil
+  }
+  func projectedFieldRect(_ id: Int) -> CGRect? {
+    if let projectedLayout { return projectedLayout.fieldFrames[id] }
+    return usesMultilineProjection ? newlineLayout?.projectedFieldRect(id) : nil
+  }
+  func projectedMainRect(style: TypingCaretStyle) -> CGRect? {
+    if let projectedLayout { return projectedLayout.mainRect(style: style) }
+    return usesMultilineProjection ? newlineLayout?.projectedMainRect(style: style) : nil
+  }
+  func projectedNewlineAdvance(field: PromptCompositionField, mode: PracticeTapeMode, hidesExtras: Bool) -> CGFloat? {
+    newlineLayout?.projectedAdvance(fieldID: field.index, acceptedUTF16Count: field.inputUTF16.count,
+      mode: mode, hidesExtras: hidesExtras, viewportWidth: viewportWidth)
   }
 }
 

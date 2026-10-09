@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 多行投影 owner 与双光标几何增量（2026-10-10）
+
+显式 compositionField 与 newlineWords 配置现在让实际 TapePromptNativeView 的文字层使用持久流投影词盒；layout 类型切换纳入 reset。横向请求按真实字段索引、raw UTF-16 接受数和隐藏 extras 读取新入口；活动词保护使用字段索引，不由旧字符锚点猜测。主光标使用字段内最终 before／after，letter 锁定边距，word 按字段前缘定位；独立 pace 使用 canonical 首／末 alias 加实际文字 origin。新增只读 projectedAdvance 用复制的流预览，不修改真实移除状态或动画。没有新增时钟。
+
+新增实际 owner 测试主动清空旧 glyphCharacterOffsets，保留真实会话的字段投影与原始词描述；方向 × letter／word 四组合验证文字 margin、主光标 x／y 与 canonical pace x／y。该反例不代表真实 IME 必然产生空目录。`../../work/tape-multiline-owner-red.log` 一项两处失败（推进及缺失主光标），first.log 三项通过，verified.log 183 项零失败零跳过（均为同目录 tape-multiline-owner- 前缀）。持久 `../../work/tape-multiline-owner.EIrmj0/` 的 final.log 183 项零失败零跳过（24.234 秒，墙钟 24.256 秒），四张 tape-multiline-owner-{ltr,rtl}-{letter,word}.png 已逐张查看，originality.log 通过。不可见窗口关闭、零主程序启动，终态零测试／编译残留。
+
+行为先行、有界会话内决策与风险复核关注几何身份和活动字段保护，不是独立审计。测试使用 Latin 内容改变流方向，不能证明 Hebrew／Arabic、连接塑形或混合方向等价。仅接通固定配置快照；多行 latestProjection 刷新尚未接入，纵向退休仍需字段索引与保留投影 map 的完整事务迁移，不能据此解除应用入口保护。实际 IME／设备、跨词实时事务、匿名行及完整门禁仍待验证，配置／整体兼容分类不升级，goal active。下方“主 owner 尚未接线”为此前阶段状态。
+
 ## 多行持久流投影词盒增量（2026-10-10）
 
 TapeNewlineTextLayout 增加显式 compositionMap 入口，在现有 TapeNewlineFlow 内按字段索引建立独立原生槽盒；不把虚拟候选槽转换成旧 Character offset。字段盒去除提交 gap、关闭普通段落的结构换行，Return 拓扑仍由原有描述与持久流拥有；native 文字绘制使用同一投影盒。增加字段框、opaque cell 框、canonical 首／末 alias 框及按 raw UTF-16 接受数请求滚动的入口，推进继续复用隐藏 extras／零宽槽规则。旧入口默认 nil 保持原路径。字段一次分组，未变化文字盒复用，不加入新时钟。
