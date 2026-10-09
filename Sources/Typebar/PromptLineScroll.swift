@@ -3,6 +3,15 @@ import AppKit
 struct PromptLineScrollWord {
   let index: Int
   let glyphID: Int
+
+  /// Zen's empty active field follows the generated target directory. It is
+  /// still a real word container and must participate in retirement lookup.
+  static func compositionFields(_ field: PromptCompositionField?) -> [Self] {
+    guard let field else { return [] }
+    return (0..<max(field.sourceFieldUTF16Ranges.count, field.index + 1)).map {
+      .init(index: $0, glyphID: $0)
+    }
+  }
 }
 
 struct PromptWordRetirement: Equatable {

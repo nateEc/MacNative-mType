@@ -547,6 +547,7 @@ struct ChooPracticePrompt: View {
   var glyphIDs: [Int] = []
   var carets: PromptCaretNativeView.Configuration? = nil
   var viewportLineCount: Int? = nil
+  var lineScroll: PromptLineScrollContext? = nil
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
@@ -555,9 +556,17 @@ struct ChooPracticePrompt: View {
       isEnabled: isEnabled, reducesMotion: reducesMotion,
       systemReducedMotion: systemReduceMotion,
       ignoresSystemReducedMotion: ignoresSystemReducedMotion)
+    let effectiveScroll = lineScroll.map {
+      PromptLineScrollContext(attemptID: $0.attemptID, activeWordID: $0.activeWordID,
+        characterOffsets: $0.characterOffsets, smoothScroll: $0.smoothScroll,
+        reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: animationFrameRate,
+        words: $0.words, firstRetainedWordIndex: $0.firstRetainedWordIndex,
+        onRetire: $0.onRetire, followsWordReflow: $0.followsWordReflow, caretMotion: $0.caretMotion,
+        centersActiveLine: $0.centersActiveLine, wrapperRevision: $0.wrapperRevision)
+    }
     return ChooLayerPrompt(glyphs: glyphs, font: font, palette: palette,
                            animates: animates, frameRate: animationFrameRate,
-                           glyphIDs: glyphIDs, rendering: rendering, carets: carets)
+                           glyphIDs: glyphIDs, rendering: rendering, carets: carets, lineScroll: effectiveScroll)
       .background {
         GeometryReader { proxy in
           Color.clear.preference(key: PracticeViewportHeightKey.self,
@@ -580,6 +589,7 @@ private struct ChooLayerPrompt: NSViewRepresentable {
   let glyphIDs: [Int]
   let rendering: PromptRendering
   let carets: PromptCaretNativeView.Configuration?
+  let lineScroll: PromptLineScrollContext?
 
   func makeNSView(context: Context) -> ChooLayerView { ChooLayerView() }
 
@@ -588,9 +598,10 @@ private struct ChooLayerPrompt: NSViewRepresentable {
                    animates: animates, frameRate: frameRate,
                    glyphIDs: glyphIDs, rendering: rendering)
     view.configureCarets(carets, glyphIDs: glyphIDs)
+    view.configureLineScroll(lineScroll)
   }
 
-  static func dismantleNSView(_ view: ChooLayerView, coordinator: ()) { view.stopCarets() }
+  static func dismantleNSView(_ view: ChooLayerView, coordinator: ()) { view.stop() }
 
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: ChooLayerView, context: Context) -> CGSize? {
     let width = max(1, proposal.width ?? nsView.bounds.width)
@@ -618,6 +629,11 @@ final class ChooLayerView: NSView {
   private var caretConfiguration: PromptCaretNativeView.Configuration?
   private var glyphIndexByID: [Int: Int] = [:]
   private var geometryRevision: UInt64 = 0
+  private var lineScroll: PromptLineScrollContext?
+  private var follower: PromptAutoScrollView?
+  private var promptText = AttributedString()
+  private var lineGeometry = ASLPromptLineGeometry(frames: [:])
+  private var lineGeometryRevision: UInt64?
 
   override var isFlipped: Bool { true }
 
@@ -646,7 +662,7 @@ final class ChooLayerView: NSView {
   }
 
   override func viewWillMove(toSuperview newSuperview: NSView?) {
-    if newSuperview == nil { stopCarets() }
+    if newSuperview == nil { stop() }
     super.viewWillMove(toSuperview: newSuperview)
   }
 
@@ -688,6 +704,7 @@ final class ChooLayerView: NSView {
     }
     self.glyphs = visibleGlyphs
     self.presentation = presentation
+    promptText = rendering?.text ?? AttributedString()
     promptFont = font
     self.palette = palette
     self.animates = animates
@@ -704,6 +721,7 @@ final class ChooLayerView: NSView {
     super.layout()
     refreshVisibleLayers()
     refreshCarets()
+    refreshLineScroll()
   }
 
   func configureCarets(_ configuration: PromptCaretNativeView.Configuration?, glyphIDs: [Int]) {
@@ -717,6 +735,53 @@ final class ChooLayerView: NSView {
   func stopCarets() {
     caretView?.stop(); caretView?.removeFromSuperview(); caretView = nil
     caretConfiguration = nil
+  }
+
+  func configureLineScroll(_ context: PromptLineScrollContext?) {
+    lineScroll = context
+    refreshLineScroll()
+  }
+
+  func stop() {
+    stopCarets()
+    lineScroll = nil
+    follower?.cancelCaretMotion(); follower?.stopLineScroll()
+    follower?.removeFromSuperview(); follower = nil
+  }
+
+  private func refreshLineScroll() {
+    guard let context = lineScroll, let map = presentation?.compositionMap else {
+      follower?.cancelCaretMotion(); follower?.stopLineScroll()
+      follower?.removeFromSuperview(); follower = nil
+      return
+    }
+    if lineGeometryRevision != geometryRevision {
+      var frames: [Int: CGRect] = [:], words: [Int: CGRect] = [:]
+      for field in map.fieldRuns {
+        for cell in field.cells {
+          guard let index = glyphIndexByID[cell.id], glyphFrames.indices.contains(index) else { continue }
+          var frame = glyphFrames[index]; frame.size.width -= ChooPromptFieldLayout.inkOverhang
+          frames[cell.id] = frame
+          if let owner = field.fieldID, !cell.isGap, frame.width > 0, frame.height > 0 {
+            words[owner] = words[owner].map { $0.union(frame) } ?? frame
+          }
+        }
+      }
+      lineGeometry = ASLPromptLineGeometry(frames: frames, wordFrames: words)
+      lineGeometryRevision = geometryRevision
+    }
+    if follower == nil {
+      let view = PromptAutoScrollView(frame: bounds)
+      view.autoresizingMask = [.width, .height]
+      addSubview(view); follower = view
+    }
+    follower?.frame = bounds
+    follower?.update(text: promptText, characterOffset: nil, font: promptFont, lineSpacing: 12,
+      isRightToLeft: false, lineScroll: context,
+      customGeometry: .init(revision: geometryRevision, caretGlyphID: map.caret?.cellID,
+        measure: { [weak self] active, previous, caret, words in
+          self?.lineGeometry.measure(active: active, previous: previous, caret: caret, words: words)
+        }))
   }
 
   private func refreshCarets() {
@@ -3015,12 +3080,11 @@ private struct ContentView: View {
 
   private func practiceLineScrollContext(_ rendering: PromptRendering) -> PromptLineScrollContext {
     if let offsets = rendering.compositionTextMap?.fieldCharacterOffsets {
+      let field = session.promptCompositionField
       return .init(attemptID: session.automaticInputAttemptID,
-        activeWordID: session.promptCompositionField?.index, characterOffsets: offsets,
+        activeWordID: field?.index, characterOffsets: offsets,
         smoothScroll: settings.smoothPracticeLineScroll, reducesMotion: settings.reducePracticeMotion,
-        words: (session.promptCompositionField?.sourceFieldUTF16Ranges.indices ?? 0..<0).map {
-          .init(index: $0, glyphID: $0)
-        }, firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
+        words: PromptLineScrollWord.compositionFields(field), firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
         onRetire: { session.retirePromptWords($0) },
         followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
           slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines),
@@ -3068,7 +3132,8 @@ private struct ContentView: View {
           ignoresSystemReducedMotion: !VisualFunboxReducedMotionPolicy
             .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers),
           glyphIDs: specialPromptGlyphIDs, carets: specialPromptCaretConfiguration,
-          viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3))
+          viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3),
+          lineScroll: showsAllPracticeLines ? nil : practiceLineScrollContext(rendering))
       } else if usesTapePractice {
         TapePracticePrompt(session: session, rendering: rendering,
           mode: settings.practiceTapeMode,

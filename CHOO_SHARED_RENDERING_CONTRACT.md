@@ -1,5 +1,19 @@
 # Choo 接入共享属性文本
 
+## 组合投影行跟随与退休增量（2026-10-10）
+
+普通非 Tape Choo 的实际原生 owner 现接收共享行滚动上下文，不依赖主／pace 光标是否显示。按当前投影的字段 ID 聚合真实字层 allocation（排除提交 SPACE 与两点墨迹余量），以字段框及 marked 槽框驱动既有 PromptAutoScrollView；几何按 revision 缓存，宽度／属性／身份变化重建，旋转不改变布局。系统减少动态效果与帧率传入共享控制器，平滑完成后退休，移除／重开取消旧回调；showAllLines 不装有界跟随，无 map 旧路径不冒充投影适配。
+
+真实 Zen 测试发现共用上下文遗漏空活动字段：目录只含已生成文字，活动空词位于其后，无法查询退休边界。新增 PromptLineScrollWord.compositionFields 同时覆盖目录与真实活动字段，普通／ASL／Choo 共用生产入口；普通未来字段保留，nil 字段为空。不改输入、计分、回放、存储或协议，不新增产品依赖、动画时钟或独立滚动状态机。
+
+固定只读参考仍 `91bd24bb8513785c7364cbea29296ff7adafac41`，直接核对行跳转／移除和活动词更新相关流程。实际 Choo 字层行框与完整固定 lineJump／removeTestElements 源探针对照：四组行高×平滑开关共八组，其中实际行高的四次连续跳行核对 top、退休边界、原点和时长；自有 DOM／动画边界不是浏览器像素或任意 RAF 等价。另有完整源退休探针 56 强制居中、12 序列／60 转行、32 before-delete 模块及 8 恢复例通过。Swift 6.2.4／最低 macOS 14 和现有接口不变。
+
+证据 `../../work/choo-follow.Oc4drz/`：red.log 一项两处生产接线失败；first.log 六项一处真实 Zen 退休失败，zen-diagnostic.log 保留目录与活动字段诊断，修正后 zen-fixed.log 七项通过。broad.log 为编译器 signal 4，系统 swift-frontend-2026-10-10-015100 两份 ips 报告指向类型转换递归；仅把新增测试的元组推断表达式拆为显式字典循环后编译通过。compiler-localization.log 十一项四处断言失败，均为首跳错误预期 0；完整原版及既有合同要求无退休边界 nil，修正测试 oracle，不修改产品行为。source-retirement.log 缺少 VM 模块旗标失败，按原脚本要求补旗标后的 source-retirement-verified.log 通过。
+
+最终 broad-verified.log：214 项零失败零跳过（38.639 秒，墙钟 38.669 秒），十一新增 4.027 秒；final-frozen.sha256 三个代码／测试输入在执行前与终态一致，originality.log 通过。覆盖隐藏／可见主和 pace、即时／平滑及减少动效、连续退休、移除／重开取消、Zen 空词与 marked 隔离、全行显示、长字段 caret 跟随、真实源函数几何对照。测试挂载窗口始终不可见并关闭，零 Typebar 主程序启动、终态零测试／编译残留；本轮无新增截图，不计完整 ContentView、实机 IME／VoiceOver、运行中旋转或设备性能验收。行为先行、源码核对、根因调试与本会话风险复核约束本增量，不是独立审计。
+
+完整冻结发布门禁尚未重跑，前次 4,092／501 不代表当前提交。Choo 无 map 旧布局、匿名结构空行／混合高度、fresh provider／任意 RAF 与重叠队列、Tape 投影、方向／完整组合、精确字体与实机性能仍开放；本轮有限测试不宣称完整行滚动等价。人工新增两项待验，94 配置仍 89／4／1、主题精确 0／187、挑战一项待映射，完整 goal active。下方“行跟随未接通”仅为历史阶段。
+
 ## 组合投影视口行高增量（2026-10-10）
 
 Choo 组合投影不再固定使用 184 点视口。生产组件从同一 ChooPromptFieldLayout 字段槽框报告原生行高，经共享 Preference 交给 PracticePromptViewport，普通预留三行、Zen 两行；showAllLines 不请求有界行高。只对已有组合 map 启用，无 map 的旧路径保留。旋转不改变布局 advance／行高，不以 TextKit 普通文字排版代替独立字层；输入、计分、回放、存储、协议和动画时钟不变，没有新增定时器或产品依赖。
