@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-10 TST-02 below LF 修正：新增仅测试目标的本地 WebKit normal 空白对照，六组动态文本与原生实际显示 UTF-16 比较；明确红测原生 LF 导致三行而非一行后修正显示折叠，保留原始辅助功能候选。六项组件／浏览器规则／生产宿主联合回归及原创性边界通过，详见 [LF 实测与残余边界](COMPOSITION_PROJECTION_CONTRACT.md)。产品仍纯原生、零主程序启动；动态 CR 像素、软换行、全字体和真实 IME 未验收，分类与 goal active 不变。
+
 2026-10-10 TST-02 below 横向空白修正：显示层折叠 ASCII 空格与 Tab、修剪行首尾横向空白，原始候选保留于辅助功能及输入状态；NBSP 与其他字符不泛化折叠。明确红测三处差异，修正旧窄页尾空格断言后五项联合回归通过，固定参考原创性边界通过。详见 [修复证据与剩余 CSS 边界](COMPOSITION_PROJECTION_CONTRACT.md)。换行转换、软换行边缘、真实 IME 与其他差异仍开放，分类及 goal active 不变；零主程序启动。
 
 2026-10-10 TST-02 below 组件补证：新增换行／Tab／RTL isolate／分解重音／emoji 的 UTF-16 原文、辅助功能、主题色更新、取消空行高度与 owner 回归；连同三项生产宿主共五项零失败零跳过。详见 [候选控制字符与视觉等价边界](COMPOSITION_PROJECTION_CONTRACT.md)。仅测试增强、零主程序启动，不证明网页 whitespace、RTL 像素或系统 IME；分类与完整 goal active 不变。

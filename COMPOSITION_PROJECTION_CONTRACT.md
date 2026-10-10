@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：LF 候选显示与本地 WebKit 对照（2026-10-10）
+
+完整读取固定参考 CompositionDisplay、mount.tsx 与 test.html，候选位于 wordsWrapper 外的独立挂载点，直接输出动态文本；网页根为 lang=en。新增 QA-only WebKit 测试，以自有最小 HTML 的动态 textContent、计算样式 normal 和 innerText 测量英文 LF、动态 CRLF、中文 LF、混合 RTL LF、连续 LF 与 ZWSP+LF。使用非持久数据存储、禁止外部加载的 CSP、无 baseURL，不加载原版网站／代码／资源；WebKit 仅存在测试目标，产品没有网页运行时。
+
+探索 `work/below-break-webkit-probe.log` 一项通过（0.696s，墙钟 0.697）：输出依次为 a空格b、aCR空格b、首行空格次行、سلام空格שלום、a空格b、aZWSP空格b。动态 CR 不被 HTML 解析器预处理，不能先把全部换行规范化再冒称等价。此输出不是完整网页／Chrome／全部 Unicode 或像素证据。
+
+`below-break-red.log` 两项四处预期失败（2.213s，墙钟 2.215）：原生两组 LF 原文仍显示多行，实际 99pt 而非空候选的一行 33pt；独立 WebKit 输出测试通过。独立原生显示算法随后把 LF 与 ASCII 空格／Tab 一同折叠，保留 CR 及其他字符，原始辅助功能候选不变。测试将短 LF 候选的显示串与一行高度同时检查，另把六组原生实际 NSTextField.stringValue 的 UTF-16 与 WebKit innerText 逐组对照，不仅对照静态常量。
+
+最终 `below-break-green.log` 六项零失败零跳过（52.279s，墙钟 52.281），包含两个组件、WebKit 对照（0.624s）与三个生产宿主（48.427s）。`below-break-originality.log` 固定参考源码／资源边界通过，非全面原创性证明。会话内有界风险复核无新增可落实问题，非独立评审；未重跑完整门禁或 Release，零 Typebar 主程序启动。
+
+此前“换行转换尚未实现”是历史范围；本轮只补上述实测 LF 显示。动态 CR 的实际字形／布局、软换行边缘裁切、浏览器差异、全字体与真实系统 IME 仍开放；innerText 相同不等于像素完全一致。compositionDisplay 保持部分，完整 goal active。
+
 ## TST-02：below 横向空白显示修正（2026-10-10）
 
 固定源码 CompositionDisplay 直接输出文本节点，没有保留空白样式。依据 [CSS Text 3 空白处理规则](https://www.w3.org/TR/css-text-3/#white-space-processing)，独立原生显示层折叠 ASCII 空格／Tab，去除行首尾横向空白，纯横向空白使用既有一行占位；不使用宽泛 Unicode whitespace 集合，NBSP、双向控制符、分解重音与 emoji 保留。原始候选仍进入辅助功能标签，输入器／会话／计分未修改。此前“原生 stringValue 原文完整”是历史补证；当前显示串与原始候选分开检查，不把显示规范化写回输入。

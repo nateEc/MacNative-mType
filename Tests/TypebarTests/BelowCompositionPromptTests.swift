@@ -30,7 +30,8 @@ import XCTest
     let field = try XCTUnwrap(fields(host).first)
     let emptyHeight = field.bounds.height
     let candidates: [(String, String)] = [
-      ("首行\n次行\n末行", "首行\n次行\n末行"),
+      ("首行\n次行\n末行", "首行 次行 末行"),
+      ("a\n\n  b", "a b"),
       ("候\t选", "候 选"),
       ("  a \t\t b  ", "a b"),
       ("\t  ", " "),
@@ -48,7 +49,7 @@ import XCTest
       XCTAssertEqual(field.font, font)
       XCTAssertTrue(host.bounds.contains(field.convert(field.bounds, to: host)))
       if text.contains("\n") {
-        XCTAssertGreaterThan(field.bounds.height, emptyHeight * 2)
+        XCTAssertEqual(field.bounds.height, emptyHeight, accuracy: 1)
       }
       host.rootView = root("", .red)
       flush()
