@@ -36,10 +36,11 @@ import XCTest
       attemptID: configuration.attemptID, coordinator: motion, automaticallyPresents: false)
     configuration.fieldDirectionPerGlyph = true
     var target = 0, sequence = 1.0, fraction = 1.0
+    var predecessor: PaceCaretGlyphAnchor?
     configuration.latestRendering = { value }
     configuration.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
       fromAfter: false, targetAfter: true, fraction: fraction, stepDuration: 1,
-      sequence: sequence, targetGlyphID: target) }
+      sequence: sequence, targetGlyphID: target, zeroDeadlinePredecessor: predecessor) }
     view.configure(rendering: value, font: font, carets: configuration)
     view.layout(); view.present(at: 0)
     let caret = try XCTUnwrap(view.subviews.compactMap { $0 as? PromptCaretNativeView }.first)
@@ -51,6 +52,21 @@ import XCTest
       "Changing the target direction must not teleport the last presented edge")
     motion.sample(at: 1.1); fraction = 1; view.present(at: 1.1)
     XCTAssertEqual(marker.frame.midX, try XCTUnwrap(view.measuredRect(for: 3)).maxX, accuracy: 0.1)
+    let latinEdge = marker.frame.midX
+    target = 0; sequence = 3; fraction = 0
+    view.present(at: 1.2)
+    XCTAssertEqual(marker.frame.midX, latinEdge, accuracy: 0.1,
+      "Returning to RTL must preserve the last presented LTR edge too")
+    motion.sample(at: 2.2); fraction = 1; view.present(at: 2.2)
+    XCTAssertEqual(marker.frame.midX, try XCTUnwrap(view.measuredRect(for: 0)).minX, accuracy: 0.1)
+    predecessor = .init(glyphIndex: 3, after: true)
+    sequence = 5; fraction = 0
+    caret.requestPacePosition(at: 2.3, fromDeadline: true)
+    view.present(at: 2.3)
+    XCTAssertEqual(marker.frame.midX, try XCTUnwrap(view.measuredRect(for: 3)).maxX, accuracy: 0.1,
+      "A skipped LTR predecessor must establish its own edge before returning to RTL")
+    motion.sample(at: 3.3); fraction = 1; view.present(at: 3.3)
+    XCTAssertEqual(marker.frame.midX, try XCTUnwrap(view.measuredRect(for: 0)).minX, accuracy: 0.1)
   }
 
   func testCanonicalDirectionUsesFirstAndLastAliasSlotsIndependently() throws {

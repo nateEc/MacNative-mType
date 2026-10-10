@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## Pace 往返方向及跳过前驱的实际 marker 验证（2026-10-10）
+
+扩展既有原生字段回归，验证 Hebrew→Latin→Hebrew：每次方向变更立即检查实际 NSHostingView marker 的边缘连续，再采样到完整时长检查终点。随后从 Hebrew 状态跳到 sequence 5，明确指定 Latin after 为零时长 predecessor，通过 fromDeadline 请求验证动画从 Latin 的右边缘开始，结束于 Hebrew 左边缘。这覆盖上一轮前驱方向同步修复尚未直接验证的路径。
+
+本轮只补既有实现的行为证据，不新增产品逻辑，因此未人为制造红灯。pace-direction-roundtrip.log 135 项零失败零跳过（4.930s，墙钟 4.945）；pace-direction-predecessor.log 151 项零失败零跳过（5.664s，墙钟 5.681），包含字段、光标与配速调度。两次测试均确认进程正常退出后才编辑，未启动 Typebar 主程序。
+
+这些边界已获定向证据，但不关闭整个双向布局、真实 IME、性能或全功能兼容缺口；未运行新完整门禁／Release GUI，goal 仍 active。
+
 ## Pace 跨方向动画坐标连续性（2026-10-10）
 
 实际原生 marker 回归先复现 Hebrew 到 Latin 的方向切换跳动：pace-direction-continuity-red.log 一项一处失败，marker 从 16.802734375 跳到 0（0.703s，墙钟 0.704）。端点方向正确并不意味着动画起点连续。
