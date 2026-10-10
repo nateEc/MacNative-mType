@@ -9,6 +9,7 @@ import XCTest
   private final class Probe: NSObject, WKNavigationDelegate {
     let completed: XCTestExpectation
     var values: [String]?
+    var geometry: [[String: Any]]?
     var error: Error?
 
     init(completed: XCTestExpectation) { self.completed = completed }
@@ -17,11 +18,21 @@ import XCTest
       webView.evaluateJavaScript("""
         Array.from(document.querySelectorAll('div')).map(e => {
           if (getComputedStyle(e).whiteSpace !== 'normal') throw Error('unexpected whitespace');
-          return e.innerText;
+          const ranges = [];
+          for (let i = 0; i < e.firstChild.length; i++) {
+            const range = document.createRange();
+            range.setStart(e.firstChild, i);
+            range.setEnd(e.firstChild, i + 1);
+            const rect = range.getBoundingClientRect();
+            ranges.push({unit: e.firstChild.data.charCodeAt(i), x: rect.x, y: rect.y,
+              width: rect.width, height: rect.height});
+          }
+          return {text: e.innerText, height: e.getBoundingClientRect().height, ranges};
         })
         """) {
         result, error in
-        self.values = result as? [String]
+        self.geometry = result as? [[String: Any]]
+        self.values = self.geometry?.compactMap { $0["text"] as? String }
         self.error = error
         self.completed.fulfill()
       }
@@ -35,7 +46,7 @@ import XCTest
   }
 
   func testNormalWhitespaceEngineProbeWithoutOpeningWindow() throws {
-    let candidates = ["a\nb", "a\r\nb", "首行\n次行", "سلام\nשלום", "a\n\n b", "a\u{200B}\nb"]
+    let candidates = ["a\nb", "a\r\nb", "首行\n次行", "سلام\nשלום", "a\n\n b", "a\u{200B}\nb", "a\rb"]
     let json = try String(decoding: JSONEncoder().encode(candidates), as: UTF8.self)
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .nonPersistent()
@@ -61,7 +72,16 @@ import XCTest
     let values = try XCTUnwrap(probe.values)
     print("COMPOSITION WHITESPACE WEBKIT \(values.debugDescription)")
     XCTAssertEqual(values.count, candidates.count)
-    XCTAssertEqual(values, ["a b", "a\r b", "首行 次行", "سلام שלום", "a b", "a\u{200B} b"])
+    XCTAssertEqual(values, ["a b", "a\r b", "首行 次行", "سلام שלום", "a b", "a\u{200B} b", "a\rb"])
+    for row in try XCTUnwrap(probe.geometry) {
+      let ranges = try XCTUnwrap(row["ranges"] as? [[String: Any]])
+      let firstY = try XCTUnwrap(ranges.first?["y"] as? Double)
+      for range in ranges where range["unit"] as? Int == 13 {
+        XCTAssertEqual(try XCTUnwrap(range["width"] as? Double), 0)
+        XCTAssertEqual(try XCTUnwrap(range["y"] as? Double), firstY)
+      }
+    }
+    var singleLineHeight: CGFloat?
     for (candidate, displayed) in zip(candidates, values) {
       let host = NSHostingView(rootView:
         BelowCompositionPrompt(text: candidate,
@@ -76,7 +96,13 @@ import XCTest
         (view as? NSTextField).map { [$0] } ?? view.subviews.flatMap(fields)
       }
       let field = try XCTUnwrap(fields(host).first)
-      XCTAssertEqual(Array(field.stringValue.utf16), Array(displayed.utf16))
+      if singleLineHeight == nil { singleLineHeight = field.bounds.height }
+      if candidate.contains("\r") {
+        XCTAssertEqual(field.bounds.height, try XCTUnwrap(singleLineHeight), accuracy: 1)
+      }
+      // WebKit innerText retains dynamic CR, but its measured glyph has no advance.
+      let visibleText = displayed.replacingOccurrences(of: "\r", with: "")
+      XCTAssertEqual(Array(field.stringValue.utf16), Array(visibleText.utf16))
       XCTAssertEqual(field.accessibilityLabel(), "正在组合：\(candidate)")
       XCTAssertNil(host.window)
     }

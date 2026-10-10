@@ -25,12 +25,13 @@ struct BelowCompositionPrompt: NSViewRepresentable {
 
   // The reference's normal CSS whitespace collapses ASCII spaces, tabs and LF.
   // Keep the original candidate for accessibility and never alter input state.
-  // Dynamic CR is not an HTML-parser newline; keep it rather than normalizing it.
+  // Dynamic CR is retained in the raw candidate but has zero advance in WebKit.
   private var collapsedWhitespace: String {
     var result = String.UnicodeScalarView()
     var pendingSpace = false
     var hasLineContent = false
     for scalar in text.unicodeScalars {
+      if scalar == "\r" { continue }
       if scalar == " " || scalar == "\t" || scalar == "\n" {
         pendingSpace = hasLineContent
       } else {

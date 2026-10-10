@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：动态 CR 的零宽显示与强制换行修正（2026-10-10）
+
+此前 innerText 字符串对照保留 CR，并不证明原生行高。增强同一本地 WebKit 探针，逐 UTF-16 单位使用 Range 测量 x／y／宽高；`work/below-cr-geometry-probe.log` 一项通过（0.794s，墙钟 0.796），观测动态 CR 宽度为零、与相邻字母同一 y，而原生 aCRLFb 标签高度为 66pt，普通 aLFb 为 33pt。此为探索证据，不将当时绿色测试误称已有布局断言通过。
+
+加入独立 aCRb 案例，并对 CR 零宽／同一基线、原生一行高度及可见串作明确断言。`below-cr-geometry-red.log` 一项三处预期失败（1.469s，墙钟 1.471），包括实际 66pt 对 33pt 与两组仍包含 CR 的可见串。显示算法随后忽略 CR 的视觉占位，LF 仍按前轮折叠，原始候选及辅助功能标签不变；不向输入器、提交、回放或存储写入变换。
+
+`below-cr-geometry-green.log` 六项零失败零跳过（53.229s，墙钟 53.231），含七组 WebKit／原生对照、两项组件与三项生产宿主。CR 的浏览器原始 innerText 仍严格检查，再以实测零宽规则比较可见串，不把原始候选删除。`below-cr-originality.log` 固定参考边界通过，非全面原创性证明。会话内风险复核未发现新增可落实问题，非独立审计；未重跑完整门禁／Release，零 Typebar 主程序启动。
+
+该修正只证明本机 WebKit 及当前字体下短候选的 CR 非强制换行边界，不证明全部控制字符字形、所有浏览器／字体、软换行像素或真实 IME。此前 CR 未验收记录保留历史范围；完整 compositionDisplay 与 goal 继续部分／active。
+
 ## TST-02：LF 候选显示与本地 WebKit 对照（2026-10-10）
 
 完整读取固定参考 CompositionDisplay、mount.tsx 与 test.html，候选位于 wordsWrapper 外的独立挂载点，直接输出动态文本；网页根为 lang=en。新增 QA-only WebKit 测试，以自有最小 HTML 的动态 textContent、计算样式 normal 和 innerText 测量英文 LF、动态 CRLF、中文 LF、混合 RTL LF、连续 LF 与 ZWSP+LF。使用非持久数据存储、禁止外部加载的 CSP、无 baseURL，不加载原版网站／代码／资源；WebKit 仅存在测试目标，产品没有网页运行时。
