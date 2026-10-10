@@ -66,6 +66,12 @@ import XCTest
           "practice-host automaticSizing=\(automaticSizing) insertion=\(insertion) input=\(inserted - start) layout=\(laidOut - inserted) delivery=\(delivered - laidOut) finalLayout=\(finished - delivered)"
         )
       }
+      for backdrop in PracticeBackdropStyle.allCases {
+        settings.practiceBackdrop = backdrop
+        flush()
+        XCTAssertTrue(inputs(in: host).contains { $0 === input },
+          "Background branch changes must not replace the practice input owner")
+      }
     }
   }
 }

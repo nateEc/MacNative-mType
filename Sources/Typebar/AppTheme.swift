@@ -87,6 +87,10 @@ enum PracticeBackdropStyle: String, CaseIterable, Codable, Equatable, Identifiab
 
     var id: Self { self }
 
+    func requiresTimeline(reduceMotion: Bool, systemReduceMotion: Bool) -> Bool {
+        self == .halos && !reduceMotion && !systemReduceMotion
+    }
+
     var displayName: String {
         switch self {
         case .solid: "纯色"
@@ -112,27 +116,36 @@ struct PracticeBackdrop: View {
     @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
     var body: some View {
-        TimelineView(
-            .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
-        ) { timeline in
-            GeometryReader { proxy in
-                let phase = reduceMotion || systemReduceMotion ? 0 : sin(timeline.date.timeIntervalSinceReferenceDate / 4)
-                ZStack {
-                    theme.background
-                    switch style {
-                    case .solid:
-                        EmptyView()
-                    case .halos:
-                        haloLayer(size: proxy.size, phase: phase)
-                    case .grid:
-                        gridLayer(size: proxy.size)
-                    }
+        Group {
+            if style.requiresTimeline(reduceMotion: reduceMotion, systemReduceMotion: systemReduceMotion) {
+                TimelineView(
+                    .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+                ) { timeline in
+                    content(phase: sin(timeline.date.timeIntervalSinceReferenceDate / 4))
                 }
-                .frame(width: proxy.size.width, height: proxy.size.height)
+            } else {
+                content(phase: 0)
             }
         }
         .accessibilityHidden(true)
         .allowsHitTesting(false)
+    }
+
+    private func content(phase: Double) -> some View {
+        GeometryReader { proxy in
+            ZStack {
+                theme.background
+                switch style {
+                case .solid:
+                    EmptyView()
+                case .halos:
+                    haloLayer(size: proxy.size, phase: phase)
+                case .grid:
+                    gridLayer(size: proxy.size)
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
     }
 
     private func haloLayer(size: CGSize, phase: Double) -> some View {
