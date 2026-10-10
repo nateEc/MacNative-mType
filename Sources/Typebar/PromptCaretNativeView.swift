@@ -44,6 +44,7 @@ final class PromptCaretNativeView: NSView {
     var fieldMainDirection: (() -> Bool)? = nil
     var fieldDirectionPerGlyph = false
     var fieldPaceRect: ((Int, Bool) -> CGRect?)? = nil
+    var fieldPaceDirection: ((Int, Bool) -> Bool)? = nil
     var automaticallyPresents = true
   }
 
@@ -80,6 +81,7 @@ final class PromptCaretNativeView: NSView {
       || $0.rightToLeft != next.rightToLeft
       || $0.fieldDirectionPerGlyph != next.fieldDirectionPerGlyph
       || ($0.fieldMainDirection != nil) != (next.fieldMainDirection != nil)
+      || ($0.fieldPaceDirection != nil) != (next.fieldPaceDirection != nil)
       || ($0.glyphRect != nil) != (next.glyphRect != nil)
       || ($0.mainGlyphRect != nil) != (next.mainGlyphRect != nil)
       || ($0.fieldMainRect != nil) != (next.fieldMainRect != nil) } ?? false
@@ -246,9 +248,13 @@ final class PromptCaretNativeView: NSView {
     let coordinator = config.coordinator
     coordinator.prepare(attemptID: attempt)
     let frame = config.paceFrame?()
+    func direction(_ glyphID: Int?, after: Bool) -> Bool {
+      glyphID.flatMap { config.fieldPaceDirection?($0, after) }
+        ?? glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
+    }
     let lostGeometry = coordinator.pace.position == nil
     if lostGeometry {
-      paceRightToLeft = config.glyphIsRightToLeft?(config.firstGlyphID) ?? config.rightToLeft
+      paceRightToLeft = direction(config.firstGlyphID, after: false)
       coordinator.positionPace(at: measure(0, text: config.text, config: config, glyphID: config.firstGlyphID), time: time, duration: 0)
     }
     if let frame {
@@ -271,7 +277,7 @@ final class PromptCaretNativeView: NSView {
           guard let rect = measured else { return nil }
           return PromptPaceCaretGeometry.rect(from: rect, to: rect,
             fromAfter: after, toAfter: after, style: config.paceStyle,
-            rightToLeft: glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft,
+            rightToLeft: direction(glyphID, after: after),
             fraction: 1, reducesMotion: true,
             afterWidth: (" " as NSString).size(withAttributes: [.font: config.font]).width)
         }
@@ -291,7 +297,7 @@ final class PromptCaretNativeView: NSView {
         let offset = frame.targetGlyphID.flatMap { rendering?.characterOffset(forGlyphAt: $0) }
           ?? (frame.targetGlyphID == nil ? frame.targetCharacterOffset : nil)
         if let target = endpoint(offset, glyphID: frame.targetGlyphID, after: frame.targetAfter) {
-          paceRightToLeft = frame.targetGlyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
+          paceRightToLeft = direction(frame.targetGlyphID, after: frame.targetAfter)
           if changed || target != paceTargetRect {
             coordinator.positionPace(at: target, time: time,
               duration: config.reducesMotion ? 0 : remaining)

@@ -209,9 +209,18 @@ struct PromptFieldTextRun: Equatable {
     return (after ? ids.last : ids.first).flatMap { caretRect($0, after: after) }
   }
   func mainDirection(perGlyph: Bool) -> Bool {
-    guard let anchor, let index = boxByCell[anchor.cellID] else { return rightToLeft }
+    guard let anchor else { return rightToLeft }
+    return direction(at: anchor.cellID, perGlyph: perGlyph)
+  }
+  func canonicalDirection(_ id: Int, after: Bool, perGlyph: Bool) -> Bool? {
+    let ids = aliases[id] ?? (cellFrames[id] == nil ? [] : [id])
+    guard let cell = after ? ids.last : ids.first else { return nil }
+    return direction(at: cell, perGlyph: perGlyph)
+  }
+  private func direction(at cellID: Int, perGlyph: Bool) -> Bool {
+    guard let index = boxByCell[cellID] else { return rightToLeft }
     let box = boxes[index]
-    let cells = perGlyph ? box.cells.filter { $0.id == anchor.cellID }
+    let cells = perGlyph ? box.cells.filter { $0.id == cellID }
       : box.fieldID.map { owner in boxes.filter { $0.fieldID == owner }.flatMap(\.cells) } ?? box.cells
     let text = cells.map { String(ASLPromptGlyphContent(glyph: $0.glyph, text: $0.text).main.characters) }.joined()
     return PracticeTapePolicy.isRightToLeft(text, fallback: rightToLeft)

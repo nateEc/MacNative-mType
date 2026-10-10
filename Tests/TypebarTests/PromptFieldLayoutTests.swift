@@ -7,6 +7,44 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testCanonicalDirectionUsesFirstAndLastAliasSlotsIndependently() throws {
+    let value = try rendering("אב XY", marked: "א")
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let layout = PromptFieldTextLayout(fieldRuns: map.fieldRuns, aliases: [900: [0, 3]],
+      width: 400, font: font)
+    XCTAssertEqual(layout.canonicalDirection(900, after: false, perGlyph: true), true)
+    XCTAssertEqual(layout.canonicalDirection(900, after: true, perGlyph: true), false)
+    XCTAssertEqual(layout.canonicalRect(900, after: false), layout.cellFrames[0])
+    XCTAssertEqual(layout.canonicalRect(900, after: true), layout.cellFrames[3])
+    XCTAssertNil(layout.canonicalDirection(901, after: false, perGlyph: true),
+      "A missing canonical target must not borrow another field's direction")
+  }
+
+  func testNativePaceAfterEdgesResolveEachCanonicalTargetsDirection() throws {
+    let value = try rendering("אב XY", marked: "א")
+    let view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 400, height: 180))
+    defer { view.stop() }
+    let motion = PromptCaretMotionCoordinator()
+    var configuration = config(motion, style: .off, pace: .bar)
+    configuration.fieldDirectionPerGlyph = true
+    var target = 0, sequence = 1.0
+    configuration.latestRendering = { value }
+    configuration.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: false, targetAfter: true, fraction: 1, sequence: sequence, targetGlyphID: target) }
+    view.configure(rendering: value, font: font, carets: configuration)
+    view.layout(); view.present(at: 0)
+    let hebrew = try XCTUnwrap(view.measuredRect(for: 0))
+    XCTAssertEqual(motion.pace.position, hebrew.offsetBy(dx: -hebrew.width, dy: 0))
+    let caret = try XCTUnwrap(view.subviews.compactMap { $0 as? PromptCaretNativeView }.first)
+    let marker = try XCTUnwrap(caret.subviews.compactMap { $0 as? NSHostingView<PromptCaretMarkerView> }.first)
+    XCTAssertEqual(marker.frame.midX, hebrew.minX, accuracy: 0.1)
+    target = 3; sequence = 2
+    view.present(at: 0.1)
+    let latin = try XCTUnwrap(view.measuredRect(for: 3))
+    XCTAssertEqual(motion.pace.position, latin.offsetBy(dx: latin.width, dy: 0))
+    XCTAssertEqual(marker.frame.midX, latin.maxX, accuracy: 0.1)
+  }
+
   func testFieldMainCaretUsesResolvedMixedDirectionRatherThanOuterFlow() throws {
     let value = try rendering("אב cd", marked: "א")
     let map = try XCTUnwrap(value.compositionTextMap)

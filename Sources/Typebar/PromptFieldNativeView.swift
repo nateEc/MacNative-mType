@@ -138,6 +138,10 @@ final class PromptFieldNativeView: NSView {
     config.fieldMainRect = { [weak self] style in self?.model?.mainRect(style: style, perGlyph: perGlyph) }
     config.fieldMainDirection = { [weak self] in self?.model?.mainDirection(perGlyph: perGlyph) ?? false }
     config.fieldPaceRect = { [weak self] id, after in self?.model?.canonicalRect(id, after: after) }
+    let fallbackDirection = config.rightToLeft
+    config.fieldPaceDirection = { [weak self] id, after in
+      self?.model?.canonicalDirection(id, after: after, perGlyph: perGlyph) ?? fallbackDirection
+    }
     caret.update(config); updateFollower()
   }
   private func updateFollower() {

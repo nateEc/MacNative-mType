@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## Pace canonical 端点独立方向接线（2026-10-10）
+
+新增实际原生 Pace 回归：LTR 外流内从 Hebrew after 目标切换到 Latin after 目标，检查 coordinator 几何与 NSHostingView marker.frame.midX。field-pace-direction-red.log 一项两处预期失败（0.712s，墙钟 0.713），Hebrew after 错向右偏移，marker 同样采用全局 LTR 边缘。
+
+PromptFieldTextLayout 将共享字段方向解析提取为按实际 cell 的方法，canonicalDirection 对 before／after 分别选择 alias 首／尾槽，缺失返回 nil。原生字段新增 fieldPaceDirection resolver，使用与主光标一致的词级／字母级设置。PromptCaretNativeView 在初始位置、单个 endpoint（包括零时长 predecessor）和目标绘制方向均按各自 canonical ID／after 解析，不将一个目标的方向套到其他端点；缺失几何仍沿用既有保留位置政策，未改 deadline／插值／计时阈值。
+
+field-pace-direction-green.log 152 项零失败零跳过（5.160s，墙钟 5.177）。补 canonical alias 从 Hebrew 首槽映射到 Latin 尾槽的独立方向／对应几何与缺失目标反例后，field-pace-direction-final.log 174 项零失败零跳过（50.291s，墙钟 50.310），含完整宿主、原生光标、字段布局、组合和 Tape 前进等回归。原创性 field-pace-direction-originality.log 退出 0。中断前仅只读检查，恢复后确认无遗留测试或主程序，未重复启动。
+
+本次两个新测试证明实际端点方向与 alias 首尾边界，不单独证明全部跨行／混合方向插值、显式 bidi 控制、所有字体／标点／控制符或系统 IME。混排生产入口回退仍保留，真实设备、首键性能与完整兼容缺口不关闭；零 Typebar 图形主程序启动，无新完整门禁／Release GUI，compositionDisplay 部分与完整 goal active 不变。
+
 ## 字段主光标方向与原生 marker 接线（2026-10-10）
 
 固定 caret 源码的 custom／Zen／Polyglot 按字母规则及 strings.isWordRightToLeft 的标点裁剪／基准回退用于确定本次合同。PromptFieldTextLayout.mainDirection 从当前 projection anchor 所属实际 cell 读取主文字；词级读取同字段所有主文字，不含 hint。mainRect 接受明确方向模式，旧未指定模式的几何调用保留原行为。原生字段同时提供几何 resolver 与 fieldMainDirection，PromptCaretNativeView 在最新 rendering provider 更新后读取该方向，用于最终 marker 的左右边缘；不能只改矩形、不改 bar 绘制方向。
