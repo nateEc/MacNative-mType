@@ -127,6 +127,18 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .khmer)
   }
 
+  func testArabicKoreanMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .korean)
+  }
+
+  func testArabicKorean1kMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .korean1k)
+  }
+
+  func testArabicKorean5kMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .korean5k)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
@@ -134,7 +146,8 @@ import XCTest
     let checksGujarati = [.gujarati, .gujarati1k].contains(mixedLanguage)
     let checksKannada = mixedLanguage == .kannada
     let checksKhmer = mixedLanguage == .khmer
-    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada || checksKhmer
+    let checksKorean = [.korean, .korean1k, .korean5k].contains(mixedLanguage)
+    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada || checksKhmer || checksKorean
     let checksConnectedRun = checksLTRJoiningRun || [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
@@ -150,6 +163,7 @@ import XCTest
     case .gujarati, .gujarati1k: extendedWord = "કિરણ"
     case .kannada: extendedWord = "ಕಿರಣ"
     case .khmer: extendedWord = "ខ្មែរ"
+    case .korean, .korean1k, .korean5k: extendedWord = "한글"
     default: extendedWord = nil
     }
     let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
@@ -330,7 +344,8 @@ import XCTest
           XCTAssertFalse(window.isVisible)
           if checksLTRJoiningRun {
             let firstPart: String, lastPart: String
-            if checksKhmer { (firstPart, lastPart) = ("ខ្មែ", "រ") }
+            if checksKorean { (firstPart, lastPart) = ("한", "글") }
+            else if checksKhmer { (firstPart, lastPart) = ("ខ្មែ", "រ") }
             else if checksKannada { (firstPart, lastPart) = ("ಕಿ", "ರಣ") }
             else if checksGujarati { (firstPart, lastPart) = ("કિ", "રણ") }
             else if checksTamil { (firstPart, lastPart) = ("கொ", "டி") }
@@ -341,6 +356,21 @@ import XCTest
             input.insertText("سلام ", replacementRange: .init(location: NSNotFound, length: 0))
             for style in CompositionDisplayStyle.allCases {
               settings.compositionDisplayStyle = style
+              if checksKorean {
+                for candidate in ["ㅎ", "하", "한"] {
+                  input.setMarkedText(candidate,
+                    selectedRange: .init(location: candidate.utf16.count, length: 0),
+                    replacementRange: .init(location: NSNotFound, length: 0))
+                  flush()
+                  XCTAssertTrue(input.hasMarkedText())
+                  XCTAssertEqual(field.accessibilityValue() as? String,
+                    style == .replace ? "ab سلام " + candidate + "글 cd" : mixedText)
+                  XCTAssertTrue(inputs(in: host).contains { $0 === input })
+                  XCTAssertTrue(fields(in: host).contains { $0 === field })
+                }
+                input.unmarkText(); flush()
+                XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
+              }
               input.setMarkedText("X", selectedRange: .init(location: 1, length: 0),
                 replacementRange: .init(location: NSNotFound, length: 0))
               flush()

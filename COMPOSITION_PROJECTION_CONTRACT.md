@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：Arabic／Korean 三目录混排生产入口（2026-10-10）
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制代码或资产。自有 Unicode 夹具“ab سلام 한글 cd”分别进入 Korean／Korean 1k／Korean 5k 的实际 practiceContent 宿主；arabic-korean-host-red.log 三项均预期失败于原生字段缺失（3.388s，墙钟 3.390）。生产仅增加三个身份的共享准入，光标与组合显示保持同一策略，Malayalam 等未验证混排继续回退；未改韩文计分或输入提交规则。
+
+每个宿主四组尺寸策略覆盖三样式候选差异、Arabic 连字、Korean LTR 两端几何、精确辅助文本、更新／取消、接受“한”后标记“글”、逐单位回删及输入／字段 owner 保持。首轮 arabic-korean-focused.log 32 项零失败零跳过（87.534s，墙钟 87.539）。另补每样式“ㅎ”→“하”→“한”连续候选更新，检查 replace 精确替换当前音节而 off／below 保留目标、取消恢复；arabic-korean-jamo-focused.log 32 项零失败零跳过（106.295s，墙钟 106.301）。这是手动调用原生输入协议的兼容 Jamo／合成音节场景，不是系统输入法真实事件、完整现代／古 Jamo 或全部韩文词库验收。
+
+三目录跨行测试覆盖三样式、两字体、90pt 宽度、长→短→取消、缓存与新建布局一致、每槽几何、后词不重叠和 canonical 恢复。固定参考及锁定 Anime 环境下 arabic-korean-regression.log 340 项零失败零跳过（631.039s，墙钟 631.086），含全部二十六生产宿主（589.228s，墙钟 589.231）、既有 Korean 路径、布局／投影／方向、两个退休测试集及 ASL／Choo 既有组件。arabic-korean-originality.log 固定参考边界退出 0，不扩大为全面原创性证明。
+
+会话内风险审查核对完整差异、两个消费入口、候选隔离与保留回退，无剩余可落实发现，非独立评审。所有运行终态后写记录，零 Typebar 主程序启动。无数据格式／迁移或新网络行为。人工步骤待执行：逐目录选择 English／Arabic／Korean 自定义夹具，使用真实韩文输入法组合、退格拆分、取消和部分提交，逐样式检查候选窗／below 位置、窄窗跨行、全部字体及 Pace／ASL／Choo。未做新 Release、最低系统或完整冻结门禁；TST-02／compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：Arabic／Khmer 混排生产入口（2026-10-10）
 
 固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，不复制源码或资产。自有 Unicode 夹具“ab سلام ខ្មែរ cd”进入实际 practiceContent 宿主，先复现字段未挂载：arabic-khmer-host-red.log 一项预期失败，1.907s／墙钟 1.908。生产仅增加 Khmer 共享投影准入，光标与组合显示两个入口共用该策略；Korean 等未验证混排保持回退。
