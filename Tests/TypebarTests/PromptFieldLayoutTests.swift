@@ -463,6 +463,10 @@ import XCTest
     }
   }
 
+  func testWrappedMyanmarBurmeseCandidatesReuseAndCancelWithoutStaleSlots() throws {
+    try checkWrappedOppositeJoiningCandidates(language: .myanmarBurmese, word: "မြန်မာ")
+  }
+
   private func checkWrappedOppositeJoiningCandidates(language: TypingLanguage, word indicWord: String) throws {
     let configuration = TestConfiguration.words(4, language: .mixedLanguages,
       mixedLanguageComponents: [.english, .arabic, language])

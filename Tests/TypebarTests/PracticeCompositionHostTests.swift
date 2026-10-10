@@ -163,6 +163,10 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .tibetan1k)
   }
 
+  func testArabicMyanmarBurmeseMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .myanmarBurmese)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
@@ -175,7 +179,8 @@ import XCTest
     let checksSinhala = mixedLanguage == .sinhala
     let checksTelugu = [.telugu, .telugu1k].contains(mixedLanguage)
     let checksTibetan = [.tibetan, .tibetan1k].contains(mixedLanguage)
-    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada || checksKhmer || checksKorean || checksMalayalam || checksSinhala || checksTelugu || checksTibetan
+    let checksMyanmar = mixedLanguage == .myanmarBurmese
+    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada || checksKhmer || checksKorean || checksMalayalam || checksSinhala || checksTelugu || checksTibetan || checksMyanmar
     let checksConnectedRun = checksLTRJoiningRun || [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
@@ -196,6 +201,7 @@ import XCTest
     case .sinhala: extendedWord = "කිරණ"
     case .telugu, .telugu1k: extendedWord = "కిరణం"
     case .tibetan, .tibetan1k: extendedWord = "བོད་སྐད་"
+    case .myanmarBurmese: extendedWord = "မြန်မာ"
     default: extendedWord = nil
     }
     let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
@@ -376,7 +382,8 @@ import XCTest
           XCTAssertFalse(window.isVisible)
           if checksLTRJoiningRun {
             let firstPart: String, lastPart: String
-            if checksTibetan { (firstPart, lastPart) = ("བོད་", "སྐད་") }
+            if checksMyanmar { (firstPart, lastPart) = ("မြန်", "မာ") }
+            else if checksTibetan { (firstPart, lastPart) = ("བོད་", "སྐད་") }
             else if checksTelugu { (firstPart, lastPart) = ("కి", "రణం") }
             else if checksSinhala { (firstPart, lastPart) = ("කි", "රණ") }
             else if checksMalayalam { (firstPart, lastPart) = ("കി", "രണം") }

@@ -47,8 +47,10 @@ final class PolyglotDirectionTests: XCTestCase {
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, tibetan])))
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, tibetan])))
     }
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .myanmarBurmese])))
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .myanmarBurmese])))
+    XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .myanmarBurmese])))
+    XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .myanmarBurmese])))
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .likanu])))
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .likanu])))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .arabic)))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .english)))
   }

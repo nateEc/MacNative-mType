@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：Arabic／Myanmar Burmese 混排生产入口（2026-10-10）
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制代码或资产。自有 Unicode 夹具“ab سلام မြန်မာ cd”进入实际 practiceContent 宿主；arabic-myanmar-host-red.log 一项预期失败于原生字段缺失（1.985s，墙钟 1.987）。生产仅增加 Myanmar Burmese 的共享准入，光标与组合显示继续共用策略；Likanu 未验证混排仍回退，未改输入提交或计分。
+
+四组尺寸策略覆盖三样式活动字段候选差异、Arabic 连字与 Myanmar LTR 两端几何、精确辅助文本、“မြန်”→“မြန်မာ”更新／取消、接受“မြန်”后标记“မာ”、逐 UTF-16 单位回删及输入／字段 owner 保持。跨行专项覆盖三样式、两字体、90pt 宽度、长→短→取消、缓存／新建一致、每槽几何、后词不重叠与 canonical 恢复。夹具包含组合字符，但不证明全部缅文正字法／连字、词库或真实系统输入法事件。
+
+arabic-myanmar-focused.log 30 项零失败零跳过（35.018s，墙钟 35.023）。固定参考及锁定 Anime 环境下 arabic-myanmar-regression.log 352 项零失败零跳过（839.606s，墙钟 839.651），含全部三十三宿主（792.861s，墙钟 792.865）、布局／投影／方向、两个退休测试集及既有 Korean／ASL／Choo 组件。arabic-myanmar-originality.log 固定参考边界退出 0，不扩大为全面原创性证明。一次短进程采样确认日志缓冲期间已运行新增宿主，不作性能结论。会话内风险审查核对完整差异、两个共享入口、候选隔离与保留回退，无剩余可落实发现，非独立评审。
+
+所有运行终态后写记录，零 Typebar 主程序启动。无存储格式、迁移或新网络行为。人工步骤待执行：选择 English／Arabic／Myanmar Burmese 自定义夹具，以真实 IME 逐样式更新／取消／部分提交，检查 below 独立候选位置、窄窗恢复、全部连字／字体及 Pace／ASL／Choo 可见组合。未做新 Release、最低系统或完整冻结门禁；TST-02／compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：Arabic／Tibetan 两目录混排生产入口（2026-10-10）
 
 固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制源码或资产。自有 Unicode 夹具“ab سلام བོད་སྐད་ cd”分别进入 Tibetan／Tibetan 1k 实际 practiceContent 宿主；arabic-tibetan-host-red.log 两项预期失败于原生字段缺失（2.643s，墙钟 2.644）。生产仅增加两身份的共享准入，光标与组合显示继续共用策略；Myanmar Burmese／Likanu 未验证混排仍回退，未改输入提交或计分。
