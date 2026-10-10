@@ -129,8 +129,12 @@ import XCTest
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
         mixedLanguageComponents: [.english, .arabic, gujarati])))
     }
+    for devanagari in [TypingLanguage.nepali, .nepali1k, .sanskrit] {
+      XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
+        mixedLanguageComponents: [.english, .arabic, devanagari])))
+    }
     XCTAssertFalse(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
-      mixedLanguageComponents: [.english, .arabic, .nepali])))
+      mixedLanguageComponents: [.english, .arabic, .kannada])))
   }
 
   func testSwiftUIBridgeUsesExplicitProjectedFieldInsteadOfLegacyCaretOffset() throws {

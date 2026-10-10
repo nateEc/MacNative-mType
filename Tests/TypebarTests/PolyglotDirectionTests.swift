@@ -23,8 +23,12 @@ final class PolyglotDirectionTests: XCTestCase {
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, gujarati])))
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, gujarati])))
     }
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .nepali])))
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .nepali])))
+    for devanagari in [TypingLanguage.nepali, .nepali1k, .sanskrit] {
+      XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, devanagari])))
+      XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, devanagari])))
+    }
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .kannada])))
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .kannada])))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .arabic)))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .english)))
   }

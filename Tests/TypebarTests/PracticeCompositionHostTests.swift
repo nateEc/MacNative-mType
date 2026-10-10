@@ -107,12 +107,24 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .gujarati1k)
   }
 
+  func testArabicNepaliMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .nepali)
+  }
+
+  func testArabicNepali1kMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .nepali1k)
+  }
+
+  func testArabicSanskritMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .sanskrit)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
-    let checksHindi = [.hindi, .hindi1k].contains(mixedLanguage)
+    let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
     let checksGujarati = [.gujarati, .gujarati1k].contains(mixedLanguage)
-    let checksLTRJoiningRun = mixedLanguage == .bangla || checksHindi || checksTamil || checksGujarati
+    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati
     let checksConnectedRun = checksLTRJoiningRun || [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
@@ -123,7 +135,7 @@ import XCTest
     case .kurdishCentral: extendedWord = "کوردی"
     case .yiddish: extendedWord = "ייִדיש"
     case .bangla: extendedWord = "বাংলা"
-    case .hindi, .hindi1k: extendedWord = "किरण"
+    case .hindi, .hindi1k, .nepali, .nepali1k, .sanskrit: extendedWord = "किरण"
     case .tamil, .tamil1k, .tamilOld: extendedWord = "கொடி"
     case .gujarati, .gujarati1k: extendedWord = "કિરણ"
     default: extendedWord = nil
@@ -308,7 +320,7 @@ import XCTest
             let firstPart: String, lastPart: String
             if checksGujarati { (firstPart, lastPart) = ("કિ", "રણ") }
             else if checksTamil { (firstPart, lastPart) = ("கொ", "டி") }
-            else if checksHindi { (firstPart, lastPart) = ("कि", "रण") }
+            else if checksDevanagari { (firstPart, lastPart) = ("कि", "रण") }
             else { (firstPart, lastPart) = ("বাং", "লা") }
             let wholeWord = try XCTUnwrap(extendedWord)
             input.doCommand(by: #selector(NSResponder.deleteBackward(_:)))

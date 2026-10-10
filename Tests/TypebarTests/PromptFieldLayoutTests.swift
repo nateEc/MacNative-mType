@@ -423,6 +423,12 @@ import XCTest
     }
   }
 
+  func testWrappedNepaliAndSanskritCandidatesReuseAndCancelWithoutStaleSlots() throws {
+    for language in [TypingLanguage.nepali, .nepali1k, .sanskrit] {
+      try checkWrappedOppositeJoiningCandidates(language: language, word: "किरण")
+    }
+  }
+
   private func checkWrappedOppositeJoiningCandidates(language: TypingLanguage, word indicWord: String) throws {
     let configuration = TestConfiguration.words(4, language: .mixedLanguages,
       mixedLanguageComponents: [.english, .arabic, language])

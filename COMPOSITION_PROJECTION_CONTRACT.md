@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：Nepali／Nepali 1k／Sanskrit 混排生产入口（2026-10-10）
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 保持干净，只读复核 test-ui.ts 候选显示分支，未复制代码或资源。没有以既有 Hindi 验证代替其他目录：三个新实际 practiceContent 宿主分别复现字段缺失，arabic-devanagari-host-red.log 三项三处预期失败（3.003s，墙钟 3.005）。生产共享准入增加 Nepali、Nepali 1k、Sanskrit，Kannada 等未验证连写混排仍回退。
+
+自有短文本“ab سلام किरण cd”作为 Unicode 输入夹具，不是参考词表或这三个语言完整正字法样本。PracticeCompositionHostTests 的四种尺寸策略保留三种初始候选显示更新／取消、提交／回删与 Arabic 连字检查；后续 replace 字段中的“कि”→“किरण”、取消、接受“कि”后标记“रण”，检查精确源辅助文本、两端方向及原生输入／字段 owner 保持。共享测试变量改称 Devanagari，Hindi 两项原行为与断言保持。
+
+PromptFieldLayoutTests 对三个身份运行 Arabic 和天城文各自活动字段的长候选→短词→取消，覆盖三样式、两字体、90pt 宽度，保留复用／新建一致、每槽几何、实际多行、下一字段不重叠、canonical 前后方向和取消恢复。PolyglotDirectionTests 与 OrdinaryTapePracticeTests 检查三目录准入及 Kannada 的保留回退。
+
+arabic-devanagari-focused.log 32 项零失败零跳过（58.210s，墙钟 58.215）。固定参考与锁定 Anime 环境下 arabic-devanagari-regression.log 172 项零失败零跳过（335.825s，墙钟 335.844），含全部二十一项生产宿主 326.330s／墙钟 326.333，以及方向／字段／投影、Tape 退休及 ASL／Choo 既有组件。arabic-devanagari-originality.log 固定参考边界退出 0，不扩大为全面原创性证明。
+
+会话内风险审查核对完整差异、策略两入口、共享候选分段和旧覆盖，无剩余可落实发现，非独立评审。人工步骤待执行：自定义选择 English／Arabic／上述每个目录，使用该夹具检查真实系统输入法在三样式的更新／取消、Arabic 后天城文部分提交及窄窗跨行恢复；随后另验语言特有连字、字体、Pace／ASL／Choo。无存储变化，无数据迁移或新网络行为，本机离线练习保持。所有运行终态后写记录，零 Typebar 主程序启动；未做新 Release、最低系统、实体 IME 或完整冻结门禁。TST-02、compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：Arabic／Gujarati 两目录混排生产入口（2026-10-10）
 
 固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 保持干净，只读复核 test-ui.ts 的候选显示分支，未复制代码或资源。自有文本“ab سلام કિરણ cd”，Gujarati／Gujarati 1k 两个实际生产宿主先复现原生字段缺失：arabic-gujarati-host-red.log 两项两处预期失败（2.454s，墙钟 2.455）。生产只在共享投影准入增加两个目录；Nepali 等尚未验证的混排继续回退。
