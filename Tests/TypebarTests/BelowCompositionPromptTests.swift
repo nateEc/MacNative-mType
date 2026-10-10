@@ -29,12 +29,20 @@ import XCTest
     flush()
     let field = try XCTUnwrap(fields(host).first)
     let emptyHeight = field.bounds.height
-    let candidates = ["首行\n次行\n末行", "候\t选", "abc \u{2067}שלום\u{2069} xyz", "e\u{301} 😀"]
-    for text in candidates {
+    let candidates: [(String, String)] = [
+      ("首行\n次行\n末行", "首行\n次行\n末行"),
+      ("候\t选", "候 选"),
+      ("  a \t\t b  ", "a b"),
+      ("\t  ", " "),
+      ("a\u{00A0}\u{00A0}b", "a\u{00A0}\u{00A0}b"),
+      ("abc \u{2067}שלום\u{2069} xyz", "abc \u{2067}שלום\u{2069} xyz"),
+      ("e\u{301} 😀", "e\u{301} 😀"),
+    ]
+    for (text, displayed) in candidates {
       host.rootView = root(text, .blue)
       flush()
       XCTAssertTrue(fields(host).first === field)
-      XCTAssertEqual(Array(field.stringValue.utf16), Array(text.utf16))
+      XCTAssertEqual(Array(field.stringValue.utf16), Array(displayed.utf16))
       XCTAssertEqual(field.accessibilityLabel(), "正在组合：\(text)")
       XCTAssertEqual(field.textColor, .blue)
       XCTAssertEqual(field.font, font)

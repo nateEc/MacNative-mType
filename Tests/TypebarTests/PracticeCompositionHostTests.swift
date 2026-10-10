@@ -386,7 +386,11 @@ import XCTest
                 replacementRange: .init(location: NSNotFound, length: 0))
               flush()
               let candidate = try XCTUnwrap(candidateElements(in: host).first)
-              XCTAssertEqual(candidate.stringValue, long)
+              // The narrow fixture has one trailing ASCII space: normal CSS
+              // trims its visual advance, while accessibility retains the input.
+              let displayedLong = hostWidth < 1000 ? String(long.dropLast()) : long
+              XCTAssertEqual(candidate.stringValue, displayedLong)
+              XCTAssertEqual(candidate.accessibilityLabel(), "正在组合：\(long)")
               XCTAssertTrue(candidate === emptyCandidate)
               XCTAssertGreaterThan(candidate.bounds.height, settings.fontSize * 1.5)
               let candidateFrame = candidate.convert(candidate.bounds, to: host)

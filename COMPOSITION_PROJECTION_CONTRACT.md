@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：below 横向空白显示修正（2026-10-10）
+
+固定源码 CompositionDisplay 直接输出文本节点，没有保留空白样式。依据 [CSS Text 3 空白处理规则](https://www.w3.org/TR/css-text-3/#white-space-processing)，独立原生显示层折叠 ASCII 空格／Tab，去除行首尾横向空白，纯横向空白使用既有一行占位；不使用宽泛 Unicode whitespace 集合，NBSP、双向控制符、分解重音与 emoji 保留。原始候选仍进入辅助功能标签，输入器／会话／计分未修改。此前“原生 stringValue 原文完整”是历史补证；当前显示串与原始候选分开检查，不把显示规范化写回输入。
+
+`work/below-horizontal-space-red.log` 一项三处预期失败（1.971s，墙钟 1.972），明确覆盖 Tab、连续横向空白与纯空白。首次实现后 `below-horizontal-space-green.log` 五项四处失败（51.884s，墙钟 51.887），均为窄页四组宿主仍断言末尾空格显示；保留失败日志。明确将窄页显示预期改为去掉 fixture 唯一尾空格，同时新增完整原文辅助功能标签断言；不采用宽松比较。最终 `below-horizontal-space-final.log` 五项零失败零跳过（50.827s，墙钟 50.829），含两项组件与三项生产宿主，状态避让／窄页／缩放 owner 回归通过。
+
+`below-horizontal-space-originality.log` 固定参考源码／资源边界通过，非全面原创性证明。会话内风险复核无新增可落实问题，非独立审计。未重跑完整门禁或 Release；零主程序启动。换行转空格／删除的浏览器上下文规则仍未实现，软换行边缘空白、ZWSP、双向视觉与真实 IME 也不由本次检查证明；不将横向修正描述为完整 CSS 等价。compositionDisplay 继续部分，完整 goal active。
+
 ## TST-02：候选控制字符与主题更新的原生边界（2026-10-10）
 
 新增组件回归，在同一不可见 NSWindow／NSHostingView 内更新含三行文本、Tab、RTL isolate 控制符、分解重音与 emoji 的候选，按 UTF-16 序列验证原文不被规范化或截断，辅助功能标签同步；红→蓝→红文字色更新、字体与原生 owner 保留，取消回到同一空白行高度。三行候选确实增加原生布局高度，完整组件保持在宿主边界内。此为已有行为补证，无故意失败阶段、无产品修改。

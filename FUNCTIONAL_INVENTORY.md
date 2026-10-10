@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-10 TST-02 below 横向空白修正：显示层折叠 ASCII 空格与 Tab、修剪行首尾横向空白，原始候选保留于辅助功能及输入状态；NBSP 与其他字符不泛化折叠。明确红测三处差异，修正旧窄页尾空格断言后五项联合回归通过，固定参考原创性边界通过。详见 [修复证据与剩余 CSS 边界](COMPOSITION_PROJECTION_CONTRACT.md)。换行转换、软换行边缘、真实 IME 与其他差异仍开放，分类及 goal active 不变；零主程序启动。
+
 2026-10-10 TST-02 below 组件补证：新增换行／Tab／RTL isolate／分解重音／emoji 的 UTF-16 原文、辅助功能、主题色更新、取消空行高度与 owner 回归；连同三项生产宿主共五项零失败零跳过。详见 [候选控制字符与视觉等价边界](COMPOSITION_PROJECTION_CONTRACT.md)。仅测试增强、零主程序启动，不证明网页 whitespace、RTL 像素或系统 IME；分类与完整 goal active 不变。
 
 2026-10-10 TST-02 单实例窗口观察：独立 bundle ID 与内存成绩库的 QA 包仅打开一次，确认唯一进程；观察 below 空候选占位／状态布局和设置关闭后的输入焦点，再正常 ⌘Q 并确认零残留。详见 [有限人工证据及未验收边界](COMPOSITION_PROJECTION_CONTRACT.md)。没有真实 IME 输入，不证明活动组合／失焦效果或会话保留，不改产品代码，分类与 goal active 不变。
