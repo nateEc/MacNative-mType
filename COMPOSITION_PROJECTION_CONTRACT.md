@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：Arabic／Malayalam 混排生产入口（2026-10-10）
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制源码或资产。自有 Unicode 夹具“ab سلام കിരണം cd”进入实际 practiceContent 宿主，arabic-malayalam-host-red.log 一项预期失败于原生字段缺失（1.929s，墙钟 1.931）。生产仅增加 Malayalam 共享准入，光标与组合显示保持共用策略；Sinhala 等未验证混排继续回退。
+
+四组尺寸策略覆盖初始和后段活动字段三样式，以不匹配候选区分替换与保留原文，检查“കി”→“കിരണം”更新／取消、接受“കി”后标记“രണം”、逐 UTF-16 单位回删、精确辅助文本、Arabic RTL／Malayalam LTR 两端几何和输入／字段 owner 保持。该带组合元音夹具不证明全部 Malayalam 连字／正字法或词库。跨行专项另覆盖三样式、两字体、90pt 宽度、长→短→取消、复用／新建一致、每槽几何、后词不重叠与 canonical 恢复。
+
+arabic-malayalam-focused.log 30 项零失败零跳过（33.398s，墙钟 33.403）。固定参考及锁定 Anime 环境下 arabic-malayalam-regression.log 342 项零失败零跳过（656.097s，墙钟 656.137），含全部二十七生产宿主（613.354s，墙钟 613.357）、布局／投影／方向、两个退休测试集、既有 Korean 和 ASL／Choo 组件。arabic-malayalam-originality.log 固定参考边界退出 0，不扩称全面原创性证明。会话内风险审查核对完整差异、两个消费入口、候选隔离及回退，无剩余可落实发现，非独立评审。
+
+所有运行终态后写记录，零 Typebar 主程序启动。无存储格式、数据迁移或新网络行为。人工步骤待执行：选择 English／Arabic／Malayalam 自定义夹具，用真实 IME 逐样式检查更新／取消／部分提交、below 独立候选位置、窄窗跨行、特有连字和全字体，再验 Pace／ASL／Choo 可见组合。未做新 Release、最低系统或完整冻结门禁；TST-02／compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：Arabic／Korean 三目录混排生产入口（2026-10-10）
 
 固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制代码或资产。自有 Unicode 夹具“ab سلام 한글 cd”分别进入 Korean／Korean 1k／Korean 5k 的实际 practiceContent 宿主；arabic-korean-host-red.log 三项均预期失败于原生字段缺失（3.388s，墙钟 3.390）。生产仅增加三个身份的共享准入，光标与组合显示保持同一策略，Malayalam 等未验证混排继续回退；未改韩文计分或输入提交规则。

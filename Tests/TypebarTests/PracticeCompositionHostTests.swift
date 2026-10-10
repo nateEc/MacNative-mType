@@ -139,6 +139,10 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .korean5k)
   }
 
+  func testArabicMalayalamMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .malayalam)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
@@ -147,7 +151,8 @@ import XCTest
     let checksKannada = mixedLanguage == .kannada
     let checksKhmer = mixedLanguage == .khmer
     let checksKorean = [.korean, .korean1k, .korean5k].contains(mixedLanguage)
-    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada || checksKhmer || checksKorean
+    let checksMalayalam = mixedLanguage == .malayalam
+    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada || checksKhmer || checksKorean || checksMalayalam
     let checksConnectedRun = checksLTRJoiningRun || [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
@@ -164,6 +169,7 @@ import XCTest
     case .kannada: extendedWord = "ಕಿರಣ"
     case .khmer: extendedWord = "ខ្មែរ"
     case .korean, .korean1k, .korean5k: extendedWord = "한글"
+    case .malayalam: extendedWord = "കിരണം"
     default: extendedWord = nil
     }
     let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
@@ -344,7 +350,8 @@ import XCTest
           XCTAssertFalse(window.isVisible)
           if checksLTRJoiningRun {
             let firstPart: String, lastPart: String
-            if checksKorean { (firstPart, lastPart) = ("한", "글") }
+            if checksMalayalam { (firstPart, lastPart) = ("കി", "രണം") }
+            else if checksKorean { (firstPart, lastPart) = ("한", "글") }
             else if checksKhmer { (firstPart, lastPart) = ("ខ្មែ", "រ") }
             else if checksKannada { (firstPart, lastPart) = ("ಕಿ", "ರಣ") }
             else if checksGujarati { (firstPart, lastPart) = ("કિ", "રણ") }
