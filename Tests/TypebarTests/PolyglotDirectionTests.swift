@@ -8,7 +8,10 @@ final class PolyglotDirectionTests: XCTestCase {
     }
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .arabic])))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .persian, .urdu])))
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .bangla])))
+    for bangla in [TypingLanguage.bangla, .bangla10k, .banglaLetters] {
+      XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, bangla])))
+    }
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .hindi])))
     XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .hindi])))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .arabic)))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .english)))

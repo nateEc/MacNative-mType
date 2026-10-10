@@ -75,9 +75,13 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .yiddish)
   }
 
+  func testArabicBanglaMixedProductionCompositionPreservesOppositeJoiningRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .bangla)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
-    let checksConnectedRun = [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
+    let checksConnectedRun = [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral, .bangla].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
     case .persian: extendedWord = "پیام"
@@ -86,6 +90,7 @@ import XCTest
     case .sindhi: extendedWord = "سنڌي"
     case .kurdishCentral: extendedWord = "کوردی"
     case .yiddish: extendedWord = "ייִדיש"
+    case .bangla: extendedWord = "বাংলা"
     default: extendedWord = nil
     }
     let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
@@ -103,7 +108,8 @@ import XCTest
       if let mixedLanguage {
         let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
           difficulty: .normal, rules: .init(), language: .mixedLanguages,
-          mixedLanguageComponents: [.english, mixedLanguage])
+          mixedLanguageComponents: mixedLanguage == .bangla
+            ? [.english, .arabic, .bangla] : [.english, mixedLanguage])
         let selection = ActiveTestSelectionDocument(
           preset: .init(configuration: configuration, customText: mixedText),
           testParameterMemory: .legacyDefaults(configuration: configuration))
@@ -149,9 +155,15 @@ import XCTest
       }
       func checkExtendedRun(_ field: PromptFieldNativeView) throws {
         guard let extendedLastSlot else { return }
-        XCTAssertGreaterThan(try XCTUnwrap(field.measuredRect(for: extendedFirstSlot)).minX,
-          try XCTUnwrap(field.measuredRect(for: extendedLastSlot)).minX,
-          "Language-specific letters must retain their own RTL shaping and source slots")
+        let first = try XCTUnwrap(field.measuredRect(for: extendedFirstSlot))
+        let last = try XCTUnwrap(field.measuredRect(for: extendedLastSlot))
+        if mixedLanguage == .bangla {
+          XCTAssertLessThan(first.minX, last.minX,
+            "Bangla must retain LTR shaping next to the Arabic RTL run")
+        } else {
+          XCTAssertGreaterThan(first.minX, last.minX,
+            "Language-specific letters must retain their own RTL shaping and source slots")
+        }
       }
       if mixedDirection {
         let field = try XCTUnwrap(fields(in: host).first)
@@ -257,6 +269,34 @@ import XCTest
           input.unmarkText(); flush()
           XCTAssertFalse(input.hasMarkedText())
           XCTAssertFalse(window.isVisible)
+          if mixedLanguage == .bangla {
+            input.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+            input.insertText("سلام ", replacementRange: .init(location: NSNotFound, length: 0))
+            input.setMarkedText("বাং", selectedRange: .init(location: "বাং".utf16.count, length: 0),
+              replacementRange: .init(location: NSNotFound, length: 0))
+            flush()
+            input.setMarkedText("বাংলা", selectedRange: .init(location: "বাংলা".utf16.count, length: 0),
+              replacementRange: .init(location: NSNotFound, length: 0))
+            flush()
+            XCTAssertTrue(input.hasMarkedText())
+            XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
+            try checkExtendedRun(field)
+            input.unmarkText(); flush()
+            XCTAssertEqual(field.accessibilityValue() as? String, mixedText,
+              "Cancelling Bangla must retain the source after the completed Arabic word")
+            input.insertText("বাং", replacementRange: .init(location: NSNotFound, length: 0))
+            input.setMarkedText("লা", selectedRange: .init(location: "লা".utf16.count, length: 0),
+              replacementRange: .init(location: NSNotFound, length: 0))
+            flush()
+            XCTAssertTrue(input.hasMarkedText())
+            XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
+            try checkExtendedRun(field)
+            XCTAssertTrue(inputs(in: host).contains { $0 === input })
+            XCTAssertTrue(fields(in: host).contains { $0 === field })
+            input.unmarkText(); flush()
+            XCTAssertFalse(input.hasMarkedText())
+            XCTAssertFalse(window.isVisible)
+          }
         }
         continue
       }

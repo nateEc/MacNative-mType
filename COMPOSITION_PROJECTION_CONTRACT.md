@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## Arabic／Bangla 相反方向连写混排生产入口（2026-10-10）
+
+固定参考仍为 91bd24bb8513785c7364cbea29296ff7adafac41，重新只读核对 test-ui.ts 候选槽循环及 below 初始化；未复制代码或资源。新增完整宿主场景选择 English／Arabic／Bangla，自有短文本“ab سلام বাংলা cd”，精确检查 AX 原文、Arabic RTL 与 Bangla LTR 的原生槽几何，并保留三种组合显示的既有更新／取消／提交回删检查。
+
+arabic-bangla-mixed-red.log 一项一处预期失败：缺少 PromptFieldNativeView（2.181s，墙钟 2.182）。共享入口策略仅新增 Bangla 三个语言身份，其余未验证连写家族继续回退；方向和 Tape 入口测试增加正例并保留 Hindi 反例，未改变 shaping 标记、候选规则或计时健康阈值。arabic-bangla-mixed-focused.log 29 项零失败零跳过（21.899s，墙钟 21.904）。
+
+随后增强活动 Bangla 字段：完成 Arabic 后候选由“বাং”更新为“বাংলা”，验证 LTR 槽顺序、取消不消耗原文，提交“বাং”后继续标记“লা”，AX 仍精确保持原文，输入及字段 owner 保留。arabic-bangla-mixed-active.log 29 项零失败零跳过（24.231s，墙钟 24.235）；最终 arabic-bangla-mixed-final.log 215 项零失败零跳过（195.043s，墙钟 195.066），涵盖全部十一项完整宿主、字段／光标、方向、组合、普通 Tape 和 Tape 前进。固定参考原创性边界退出 0，所有运行终态后才编辑记录，零 Typebar 主程序启动。
+
+三身份策略覆盖不等于逐词库或实体 Bangla IME 验收；活动字段增强不代替全部样式、跨行和字体组合。Hindi 等混排仍回退，真实 IME、可见窗口与首键问题仍开放，compositionDisplay 部分及完整 goal active 不变。本轮无新全量门禁／Release GUI；下方 Bangla 回退说明为历史快照。
+
 ## 其余 RTL 家族混排入口与全身份策略检查（2026-10-10）
 
 新增 Pashto、Sindhi、Central Kurdish、Yiddish 四项完整生产宿主测试，使用自有短文本中特有文字 run，检查原始 AX 文本、RTL 几何、三种候选显示、更新／取消／提交回删和输入及字段 owner 保留；前三种同时验证活动候选的 lam-alef 连字与部分提交后继续连写。四组隔离尺寸配置不变，无可见窗口。
