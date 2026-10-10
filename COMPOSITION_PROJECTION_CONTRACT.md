@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：below 窄宽与 RTL 原生组件回归（2026-10-10）
+
+仅增加 BelowCompositionPromptTests，不改变生产行为。实际 NSHostingView／不可见 NSWindow 挂载生产组件，以 system 28pt、monospaced 40pt 和三组独立构造的 Arabic／Hebrew、中文／LTR／Hebrew、组合长音符／重音／韩文候选，逐组 1000→180pt 收窄、取消、恢复宽度并切换字体。检查原文、字号、居中、原生对齐宽度、长文本高度增加、实际 cell 所需高度、宿主容纳、取消占位与行高收缩，以及同一原生 owner。
+
+初始 below-narrow-rtl.log 仅编译歧义；明确 CGFloat 后 fixed.log 一项 13 处失败，12 处来自把 bounds 当作布局宽度，一处短文本本来可在 180pt 放入一行。alignment.log 改用三次重复的长文本后仅剩 12 处宽度失败；有界诊断确认 bounds=184、alignment=180、左右 inset 各 2pt。测试改为实际 alignmentRect 宽度断言，未扩大容差；保留换行、完整容纳和 owner 要求，不把这些测试假设错误归为产品故障。新增既有行为回归，无人为制造产品失败阶段。
+
+below-narrow-rtl-final.log 三项零失败零跳过（41.664s，墙钟 41.666）：组件一项（1.908s）和两个实际生产宿主（39.756s，墙钟 39.757）。同会话风险复核无可落实发现，非独立审查；零 Typebar 主程序启动。此回归不证明文字双向视觉顺序、每个字形未截断、实际系统 IME／聚焦、全部字体或生产页窄窗布局；组件证据不能扩大为整页验收。前一 356 项证据仅覆盖 da07c18 的生产实现，不冒称重跑全量，compositionDisplay 继续部分，完整 goal active。
+
 ## TST-02：below 独立候选行与状态避让增量（2026-10-10）
 
 基于下方固定源码差异独立实现 BelowCompositionPrompt：原生 wrapping NSTextField 全宽居中，使用实际练习字体、字号与次要文字色；空候选保留一行，更新／取消保持同一视图，off／replace 不挂载。失焦透明度 0.25、模糊半径 4，0.25s 进入、聚焦即时恢复，尊重减少动态效果。固定参考未覆盖模糊变量；其锁定 Tailwind 4.3.2 的 [版本主题源码](https://raw.githubusercontent.com/tailwindlabs/tailwindcss/v4.3.2/packages/tailwindcss/theme.css) 明确 blur-xs 为 4px，参考 tailwind.css 未覆盖该值。参数一致不等于两平台像素完全一致。
