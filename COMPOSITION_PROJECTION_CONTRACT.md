@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## 独立字段视觉顺序解析组件（2026-10-10）
+
+为解决上轮“整字段塑形会破坏关闭连写”冲突，新增独立 PromptFieldVisualOrder：只返回单个未换行字段的物理 cell ID 顺序，不改输入、原 cells、绘制盒子或连写开关。自有 TextKit 分析上下文使用去除 hint 的主文字、明确基准方向和实际 UTF-16 范围；普通位置按行／x 排序，连字共用位置按双向嵌入级别处理独立 ID；空显示槽保留原位置，避免空槽源序与坐标比较形成非传递排序。坐标／级别／源 ID 构成稳定顺序，不以方向布尔值简单翻转全部混合字符。
+
+源码驱动技能核对已安装 Xcode macOS SDK NSLayoutManager.h，getGlyphsInRange:glyphs:properties:characterIndexes:bidiLevels: 在 macOS 10.5 起可用，低于项目 macOS 14 最低版本。组件通过实际 TextKit 输出验证，不复制上游算法或资产。会话内决策审查（非独立评审）要求视觉顺序与连写塑形分开，保留当前生产回退；本轮是独立组件探索，最初三项无故意失败阶段。
+
+field-visual-order-first.log 三项零失败（0.064s，墙钟 0.066）；补空显示槽后 field-visual-order-final.log 48 项零失败零跳过（1.054s，墙钟 1.060）。Arabic سلام 反例 field-visual-order-ligature-red.log 一项一处预期失败（0.731s，墙钟 0.732）：分析塑形使 lam／alef 共用几何，原坐标排序为 [3,1,2,0] 而独立绘制身份应为 [3,2,1,0]。接入 SDK 双向嵌入级别后 ligature-green.log 49 项零失败（1.072s，墙钟 1.078）。最终修正同位置不同级别的全序边界，field-visual-order-regression.log 105 项零失败零跳过（3.239s，墙钟 3.251），原创性 field-visual-order-originality.log 退出 0。
+
+五项新测试覆盖 Hebrew 的两种外方向、内部 Latin／数字顺序、空输入／身份不变、空显示槽和 Arabic 连字分析冲突。它不是布局分配、换行后逐行 bidi、控制符、主／pace 边缘或生产入口接线，不能用这五项证明全部 Unicode 等价。组件尚未由生产布局消费；下一步必须连同字段分配和光标方向一起验证，再考虑取消混排回退。本轮零 Typebar 主程序启动，无新全量门禁／真实 IME 验收，部分分类与完整 goal active 保持。
+
 ## 混排回退的实际布局反例（2026-10-10）
 
 固定参考 elements/caret.ts 的 getTargetPositionAndWidth 明确在 Zen／custom／Polyglot 按字母判断 RTL；因此不能仅以全局语言方向推导混排光标。当前生产门控仍保留，未取消回退。
