@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-10 TST-02 below 组件补证：新增换行／Tab／RTL isolate／分解重音／emoji 的 UTF-16 原文、辅助功能、主题色更新、取消空行高度与 owner 回归；连同三项生产宿主共五项零失败零跳过。详见 [候选控制字符与视觉等价边界](COMPOSITION_PROJECTION_CONTRACT.md)。仅测试增强、零主程序启动，不证明网页 whitespace、RTL 像素或系统 IME；分类与完整 goal active 不变。
+
 2026-10-10 TST-02 单实例窗口观察：独立 bundle ID 与内存成绩库的 QA 包仅打开一次，确认唯一进程；观察 below 空候选占位／状态布局和设置关闭后的输入焦点，再正常 ⌘Q 并确认零残留。详见 [有限人工证据及未验收边界](COMPOSITION_PROJECTION_CONTRACT.md)。没有真实 IME 输入，不证明活动组合／失焦效果或会话保留，不改产品代码，分类与 goal active 不变。
 
 2026-10-10 TST-02 below 增量完整冻结门禁通过：0ff635b 的客户端 4,256／服务端 501 项零失败零跳过，全部 37 组合宿主和十万词耐久通过，Release 构建及未打开包的资源／签名／原创性边界通过；849 文件哈希终态一致，74 阶段日志保留，详见 [below 冻结验证与环境失败记录](COMPOSITION_PROJECTION_CONTRACT.md)。首轮错误使用系统 Redis 的失败保留，补齐锁定 QA 依赖后才完整重跑。零主程序启动，本次仅记录验证；真实 IME、全字体／视觉、首键性能、主题差异及其他人工验收仍开放，配置分类、compositionDisplay 部分与完整 goal active 不变。

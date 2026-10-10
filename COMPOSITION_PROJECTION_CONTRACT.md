@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：候选控制字符与主题更新的原生边界（2026-10-10）
+
+新增组件回归，在同一不可见 NSWindow／NSHostingView 内更新含三行文本、Tab、RTL isolate 控制符、分解重音与 emoji 的候选，按 UTF-16 序列验证原文不被规范化或截断，辅助功能标签同步；红→蓝→红文字色更新、字体与原生 owner 保留，取消回到同一空白行高度。三行候选确实增加原生布局高度，完整组件保持在宿主边界内。此为已有行为补证，无故意失败阶段、无产品修改。
+
+`work/below-control-theme-tests.log` 两项零失败零跳过（2.650s，墙钟 2.652）；`work/below-control-theme-regression.log` 五项零失败零跳过（51.686s，墙钟 51.688），含三项生产 below 宿主的状态避让、窄页混排与活动组合缩放。没有重跑完整门禁，零 Typebar 主程序启动，终态进程检查无残留。
+
+完整读取固定参考 `components/pages/test/CompositionDisplay.tsx` 后确认其直接输出网页文本节点；本轮只检查原生内容完整性，不证明网页 whitespace 折叠与原生显式换行相同，也不证明双向控制符的视觉顺序、真实 IME、主题切换的实际整页像素或焦点模糊。相关视觉对照仍开放，compositionDisplay 保持部分，goal active。
+
 ## TST-02：单实例真实窗口有限观察（2026-10-10）
 
 复用上述冻结门禁的 Release 构建，打包独立 `app.typebar.qa.below-ime-0ff635b`，启用 `TypebarQAInMemoryStore`，不使用日常成绩库。在独立 QA 偏好中选择下方显示，仅打开一次；`pgrep -x Typebar` 确认唯一进程 23919。实际窗口滚动至练习区，观察空候选占位与下方 30s／错误状态区没有覆盖提示；打开设置再关闭后，AX 焦点回到 Typing input，below 选择保留。返回时提示内容重新生成，未把此次窗口往返认作活动会话保留验证。
