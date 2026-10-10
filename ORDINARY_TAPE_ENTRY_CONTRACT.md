@@ -1,5 +1,19 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 原生语言菜单降低完整宿主同步布局开销（2026-10-10）
+
+在 d3c7bd7 完整门禁之后进行可撤回试探：语言 Picker 原路径在每次会话更新时参与大量菜单项的 SwiftUI 图更新。用 owner-local NSPopUpButton 保留完整有序语言身份，仅选项列表变化时重建菜单，普通输入只同步选择与最新 binding。原生控件保留“语言”AX 标签与系统外观，继承 SwiftUI disabled；现有 selectLanguage、重启保护、引语过滤及 onChange 链不变，无全局缓存、额外计时器或动画／健康阈值修改。
+
+安装版本为 Swift 6.2.4／macOS 26.2 SDK，最低目标仍 macOS 14。核对本机 [NSPopUpButton 主接口](/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSPopUpButton.h)，采用旧 initializer／选择／菜单 API，不用 macOS 15 新增便捷 API。会话内决策审查与风险审查重点为完整身份、旧闭包、禁用、拒绝变更与退休，不是独立第三方审计。
+
+native-language-popup-probe.log 单项零失败（9.567s，墙钟 9.569），四组首字符同步布局约 182–199ms，后续约 52–55ms。随后恢复旧 Picker 对照 native-language-popup-baseline-restored.log 单项零失败（14.018s，墙钟 14.020），首字符约 323–339ms。恢复新控件后的最终同路径约 189–197ms，后续约 52–55ms。配置相同、四组尺寸选项不变，但顺序、随机提示与系统负载不构成公平硬件基准；不把这些 DEBUG 数字换算为实际 Release 首键故障已解决。
+
+边界回归先保留失败：native-language-popup-lifecycle-red.log 三项六处失败（0.719s，墙钟 0.721）；动作派发的三处由独立测试未初始化 NSApplication 引起。补该测试环境后 native-language-popup-dispatch-red.log 三项三处真实生命周期失败（0.685s，墙钟 0.686）。增加宿主拒绝绑定后 native-language-popup-rejected-red.log 四项四处失败（0.858s，墙钟 0.859），包括拒绝后仍显示未接受语言。修正为回读实际 binding，并在 detach／dismantle 清理 action、target 和回调；native-language-popup-behavior-final.log 四项零失败（0.254s，墙钟 0.256）。
+
+native-language-popup-final.log 19 项零失败零跳过（154.922s，墙钟 154.925），包含全部十一项生产宿主、四项菜单行为、视觉聚焦集成和语言命令／引语选择。覆盖全部菜单标题／身份／顺序与项目复用、程序更新不派发、最新 callback、disabled、空列表、拒绝及接受 binding、同 owner 与退休释放。native-language-popup.png 为不可见宿主生成的组件图，已检查系统菜单与标签显示；非完整窗口验收。固定参考原创性边界退出 0；所有运行终态后才编辑记录，零 Typebar 主程序启动。
+
+审查后补菜单数量保持断言，native-language-popup-menu-count-final.log 四项零失败零跳过（0.302s，墙钟 0.304）。这些对照支持语言菜单路径贡献实质开销，不锁定 SwiftUI 内部逐项重建机制或整个首键根因。风险审查未发现剩余可落实缺陷；真实键盘菜单操作、Release 首键、最低系统和完整窗口仍待验。此前全量门禁冻结 2ca44a8，不覆盖本次原生菜单新增生产代码；兼容分类与完整 goal active 不变。
+
 ## 近期增量的完整冻结门禁复验（2026-10-10）
 
 冻结 2ca44a8 的完整门禁通过，见 [当前组合投影门禁证据](COMPOSITION_PROJECTION_CONTRACT.md)。客户端 4,211／服务 501 项零失败零跳过，845 文件哈希终态一致，74 日志保留；字体延迟目录查询、跨行候选及 Tape 退休回调检查均通过，Release 构建 374.72s、未打开包／签名／原创性边界通过。零主程序启动，权威会话终态后才编辑记录。

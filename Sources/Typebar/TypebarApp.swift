@@ -2338,14 +2338,10 @@ private struct ContentView: View {
         .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
       } else {
         if mode != .custom && mode != .zen {
-          Picker("语言", selection: Binding(
+          PracticeLanguagePicker(languages: availableLanguages, selection: Binding(
             get: { language },
             set: { _ = selectLanguage($0) }
-          )) {
-            ForEach(availableLanguages, id: \.self) { language in
-              Text(language.displayName).tag(language)
-            }
-          }
+          ))
           .onChange(of: language) { _, language in
             languageChanged(to: language)
             refreshZipfNotice()
