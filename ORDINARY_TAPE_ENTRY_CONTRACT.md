@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 原生字段重复配置的尺寸失效修正（2026-10-10）
+
+检查同步更新路径发现 PromptFieldNativeView.configure 无条件 invalidateIntrinsicContentSize 并设置 needsLayout，即使模型／测量尺寸完全相同。新增实际原生视图回归先配置、布局并清除 dirty，再重复同一配置；field-layout-invalidation-red.log 一项一处预期失败（0.722s，墙钟 0.723），失败为重复配置仍请求布局。测试同时保留几何代次、尺寸和辅助功能值不变，以及字体变大必须改变尺寸并请求布局的正例。
+
+生产改为配置前保存 intrinsicContentSize，仍更新完整 rendering、控制器／最新 provider、视口通知和可访问值，并保持重绘；仅实际测量尺寸变化才通知 intrinsic size 失效和请求布局。不缓存旧 rendering，不更改光标或计时阈值。field-layout-invalidation-green.log 53 项零失败零跳过（44.677s，墙钟 44.683），含完整生产宿主的输入、组合更新／取消／提交／回删，以及模型投影。完整宿主首键同步布局仍约 360–363ms，后续约 134–138ms；不声称该修正解决首键性能故障。
+
+field-layout-invalidation-regression.log 在固定参考与锁定 Anime 归档下扩展原生字段、ASL／Choo／Tape 组合等共 100 项零失败零跳过（3.186s，墙钟 3.198）。原创性首次调用漏写 --reference，退出 1 为参数错误，原日志保留；正确调用 field-layout-invalidation-originality-verified.log 退出 0。全部进程终态后才补文档，零 Typebar 主程序启动，无新完整门禁／Release GUI。真实 IME、尺寸变化组合和实际首键故障仍需更广验收；完整功能 goal active。
+
 ## typingPanel 类型边界候选撤回（2026-10-10）
 
 按根因调试重新检查既有五秒采样的输入后显式布局分支（540 个样本，不与初次挂载 872 或交付 523 相加）：最高单一路径的项目帧包括 ContentView.body 60、typingPanel 53、renderedPrompt 53、原生提示 updateNSView 30、configure 25 和 measure 19；均为嵌套包含计数，不构成互斥占比或精确耗时。旧采样早于静态背景修正，只用于提出候选，不替代当前版本复测。

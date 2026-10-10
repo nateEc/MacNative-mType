@@ -29,6 +29,29 @@ import XCTest
     }
   }
 
+  func testIdenticalNativeFieldConfigurationDoesNotRequestAnotherLayout() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "abcdef gh")
+    let result = render(try presentation(session, "中"))
+    let view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 400, height: 200))
+    defer { view.stop() }
+    let config = PromptCaretNativeView.Configuration(text: result.text, mainOffset: 0, paceOffset: nil,
+      mainStyle: .bar, paceStyle: .off, font: font, lineSpacing: 12, rightToLeft: false,
+      accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30, attemptID: UUID(),
+      coordinator: PromptCaretMotionCoordinator(), automaticallyPresents: false)
+    view.configure(rendering: result, font: font, carets: config)
+    view.layoutSubtreeIfNeeded()
+    view.needsLayout = false
+    let size = view.intrinsicContentSize, revision = view.geometryRevision
+    view.configure(rendering: result, font: font, carets: config)
+    XCTAssertFalse(view.needsLayout, "Unchanged intrinsic size must not invalidate parent layout")
+    XCTAssertEqual(view.intrinsicContentSize, size)
+    XCTAssertEqual(view.geometryRevision, revision)
+    XCTAssertEqual(view.accessibilityValue() as? String, String(result.text.characters))
+    view.configure(rendering: result, font: font.withSize(56), carets: config)
+    XCTAssertTrue(view.needsLayout, "A changed measured size must still request layout")
+    XCTAssertNotEqual(view.intrinsicContentSize, size)
+  }
+
   func testFinalAttributesReplaceEverySlotAndPreserveAcceptedHints() throws {
     var session = TypingSession(configuration: .words(2), prompt: "abcdef gh")
     session.insert("X", at: start)

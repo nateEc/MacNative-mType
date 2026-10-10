@@ -75,6 +75,7 @@ final class PromptFieldNativeView: NSView {
     rightToLeft: Bool = false, joinsLetters: Bool = false, carets: PromptCaretNativeView.Configuration,
     lineScroll: PromptLineScrollContext? = nil, viewportLineCount: Int? = nil,
     onViewportHeight: ((CGFloat?) -> Void)? = nil) {
+    let previousSize = intrinsicContentSize
     let changed = self.font != font || self.lineSpacing != lineSpacing
       || self.rightToLeft != rightToLeft || self.joinsLetters != joinsLetters
       || self.rendering.compositionTextMap?.fieldRuns != rendering.compositionTextMap?.fieldRuns
@@ -90,7 +91,11 @@ final class PromptFieldNativeView: NSView {
     deliverHeight()
     configureControllers()
     setAccessibilityValue(String(rendering.text.characters))
-    needsDisplay = true; invalidateIntrinsicContentSize(); needsLayout = true
+    needsDisplay = true
+    if intrinsicContentSize != previousSize {
+      invalidateIntrinsicContentSize()
+      needsLayout = true
+    }
   }
 
   @discardableResult func measure(width: CGFloat) -> CGSize {
