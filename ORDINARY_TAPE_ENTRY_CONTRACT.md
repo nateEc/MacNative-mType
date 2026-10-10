@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## TST-02：跨宽度盒缓存候选撤回与几何保护（2026-10-10）
+
+新增跨宽度回归，以英文、Hebrew／Arabic 混排及换行，在两种整体方向、独立／连写分组、400→1→90→400→40→400 宽度链逐步比较重用与全新布局的槽／字段矩形、尺寸、canonical 边界／方向和主光标。旧生产实现基线一项零失败零跳过（0.295s），不是人为构造的失败测试；本轮为性能探索及既有行为保护。
+
+采样第一轮误选 SwiftPM discovery helper，`work/practice-host-sync-sample.txt` 无有效调用树，不计定位证据；原测试终态后，以精确 xctest 子进程重跑并采样，`practice-host-sync-sample-verified.txt` 有效，测试一项零失败零跳过（11.601s）。样本含字段 configure／measure／文本盒测量，但初始挂载与输入路径混合，不能据此量化同步布局主因。
+
+试探允许单字符盒跨宽度重用，连写盒仍保留宽度条件，所有位置重新排列。`field-width-reuse-probe.log` 52 项零失败零跳过（14.603s，墙钟 14.609），但实际宿主首字符仍约 196–203ms，没有相对此前 197–207ms 的明确收益。会话内决策复核据此撤回生产缓存改动，不保留无收益复杂性；非独立评审或公平硬件基准。
+
+最终仅保留新增几何测试，`field-width-reuse-restored.log` 52 项零失败零跳过（15.380s，墙钟 15.387），生产源码恢复原版本。零主程序启动，无新完整门禁／Release 实测，首键漂移与完整功能等价仍开放，goal active。
+
 ## TST-02：当前连续输入的减少动态效果反证（2026-10-10）
 
 在 `15f5124` 干净版本串行运行同一完整生产不可见宿主测试，两轮均启用已有布局栈诊断，仅第二轮启用 TYPEBAR_TEST_REDUCE_MOTION=1；未改源码、未启动主程序。`work/practice-host-current-performance-baseline.log` 与 `work/practice-host-current-reduced-motion.log` 均终态退出零，一项测试零失败零跳过。每轮四组尺寸配置、每组三次连续插入，保持输入 owner／固定尺寸／不可见窗口等原断言。

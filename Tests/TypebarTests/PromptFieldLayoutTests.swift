@@ -7,6 +7,38 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testWidthTransitionsReuseMatchesFreshGeometryForIndependentAndJoiningCells() throws {
+    for text in ["amber birch cedar", "ab אב cd", "ab سلام cd", "a\nb c"] {
+      let value = try rendering(text, marked: "")
+      let map = try XCTUnwrap(value.compositionTextMap)
+      for joins in [false, true] {
+        for rtl in [false, true] {
+          var previous = PromptFieldTextLayout(map: map, width: 400, font: font,
+            rightToLeft: rtl, joinsLetters: joins)
+          for width: CGFloat in [1, 90, 400, 40, 400] {
+            let reused = PromptFieldTextLayout(map: map, width: width, font: font,
+              rightToLeft: rtl, joinsLetters: joins, reusing: previous)
+            let fresh = PromptFieldTextLayout(map: map, width: width, font: font,
+              rightToLeft: rtl, joinsLetters: joins)
+            XCTAssertEqual(reused.cellFrames, fresh.cellFrames)
+            XCTAssertEqual(reused.fieldFrames, fresh.fieldFrames)
+            XCTAssertEqual(reused.size, fresh.size)
+            for id in map.canonicalAliases.keys {
+              for after in [false, true] {
+                XCTAssertEqual(reused.canonicalRect(id, after: after), fresh.canonicalRect(id, after: after))
+                XCTAssertEqual(reused.canonicalDirection(id, after: after, perGlyph: true),
+                  fresh.canonicalDirection(id, after: after, perGlyph: true))
+              }
+            }
+            XCTAssertEqual(reused.mainRect(style: .bar, perGlyph: false),
+              fresh.mainRect(style: .bar, perGlyph: false))
+            previous = reused
+          }
+        }
+      }
+    }
+  }
+
   func testEdgeRebasePreservesTweenTimingWithChangingGlyphWidths() throws {
     var original = PromptCaretChannel()
     original.goTo(.init(x: 10, y: 0, width: 20, height: 30), at: 0, duration: 0)
