@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：Arabic／Kannada 混排生产入口（2026-10-10）
+
+退休专项补充：实际测试集名称为 TapePromptRetirementTests 与 PromptWordRetirementTests（下文 TapeRetirementTests 为记录时的简称错误）。补跑 arabic-kannada-retirement.log 22 项零失败但一项因未传参考路径跳过，保留该日志。补齐固定参考和锁定 Anime 环境后 arabic-kannada-retirement-fixed-reference.log 22 项零失败零跳过（7.636s，墙钟 7.640）。未改测试断言或产品代码。
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制代码或资产。新增实际 practiceContent 宿主使用自有 Unicode 夹具“ab سلام ಕಿರಣ cd”，先复现原生字段缺失：arabic-kannada-host-red.log 一项预期失败，1.923s／墙钟 1.924。生产仅增加 Kannada 的共享投影准入，原生光标与组合显示两个消费入口保持共用策略；Khmer 等未验证混排仍回退。
+
+宿主覆盖默认／空／空／默认四组尺寸策略、Arabic 连字及 Kannada LTR 两端方向、初始和后段字段三种候选显示；以不匹配候选区分 replace 与 off／below，检查“ಕಿ”→“ಕಿರಣ”更新、取消、部分提交后标记“ರಣ”、逐 UTF-16 单位回删及输入／字段 owner 保持。该夹具不是完整 Kannada 正字法或词库证明。跨行测试另覆盖三样式、两字体、90pt 宽度、长→短→取消时复用／新建一致、每槽几何、下一字段不重叠与 canonical 恢复。
+
+arabic-kannada-focused.log 30 项零失败零跳过（33.971s，墙钟 33.976）；固定参考与锁定 Anime 环境下 arabic-kannada-regression.log 273 项零失败零跳过（498.648s，墙钟 498.681），含全部二十二生产宿主（465.529s，墙钟 465.532）、布局／投影／方向和 ASL／Choo 既有组件。注意过滤器 PromptTapeRetirementTests 未匹配实际 TapeRetirementTests，不能将此次称为 Tape 退休专门回归。arabic-kannada-originality.log 固定参考边界退出 0，不扩称全面原创性证明。一次短进程采样确认缓冲期间运行到新增宿主，不作性能结论。
+
+会话内风险审查核对完整差异、共享准入两入口、候选隔离和保留回退，无剩余可落实发现，非独立评审。所有运行终态后写记录，零 Typebar 主程序启动。无存储格式、迁移或网络变化，本机离线行为保持。人工步骤待执行：选择 English／Arabic／Kannada 自定义夹具，以真实 IME 在三样式更新／取消／部分提交，检查 below 独立候选位置、窄窗跨行与全部字体，并另验 Pace／ASL／Choo 可见组合。此次未做新 Release 或完整冻结门禁；TST-02／compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：原生菜单与 Indic 三样式增量完整冻结复验（2026-10-10）
 
 冻结提交 3bad00958caf39beef3b19fa0fb5dec2a00d00c9，固定参考 91bd24bb8513785c7364cbea29296ff7adafac41。单次顺序门禁会话正常结束，gate_exit=0、hash_exit=0；847 个跟踪文件 SHA-256 终态一致。证据目录为 work/frozen-readiness.boLoNO，保留 revision.txt、inputs.sha256、gate.log、freeze-verification.log 和 logs/ 下 74 份分阶段日志。运行期间未修改源码、未重启门禁或启动 Typebar 主程序。
