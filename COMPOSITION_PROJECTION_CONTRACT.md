@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：Arabic／Sinhala 混排生产入口（2026-10-10）
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制代码或资产。自有 Unicode 夹具“ab سلام කිරණ cd”进入实际 practiceContent 宿主，arabic-sinhala-host-red.log 一项预期失败于原生字段未挂载（1.898s，墙钟 1.899）。生产仅增加 Sinhala 的共享准入，光标与组合显示两个入口保持共用；Telugu 等未验证混排继续回退。
+
+四组尺寸策略覆盖初始与后段活动字段三样式差异、Arabic 连字与 Sinhala LTR 两端几何，检查“කි”→“කිරණ”更新／取消、接受“කි”后标记“රණ”、逐 UTF-16 单位回删、精确辅助文本和输入／字段 owner 保持。带组合元音夹具不证明全部 Sinhala 正字法／连字或词库。跨行专项覆盖三样式、两字体、90pt 宽度、长→短→取消、缓存与新建一致、每槽几何、后词不重叠和 canonical 恢复。
+
+arabic-sinhala-focused.log 30 项零失败零跳过（32.818s，墙钟 32.822）。固定参考与锁定 Anime 环境下 arabic-sinhala-regression.log 344 项零失败零跳过（679.526s，墙钟 679.565），含全部二十八宿主（638.526s，墙钟 638.530）、布局／投影／方向、两个退休测试集及既有 Korean／ASL／Choo 组件。arabic-sinhala-originality.log 固定参考边界退出 0，不扩称全面原创性证明。会话内风险审查核对完整差异、两个入口、候选隔离与保留回退，无剩余可落实发现，非独立评审。
+
+所有运行终态后写记录，零 Typebar 主程序启动。无数据格式、迁移或新网络行为。人工步骤待执行：选择 English／Arabic／Sinhala 自定义夹具，真实 IME 逐样式更新／取消／部分提交，检查 below 独立候选位置、窄窗恢复、全部连字／字体和 Pace／ASL／Choo 可见组合。未做新 Release、最低系统或完整冻结门禁；TST-02／compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：Arabic／Malayalam 混排生产入口（2026-10-10）
 
 固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制源码或资产。自有 Unicode 夹具“ab سلام കിരണം cd”进入实际 practiceContent 宿主，arabic-malayalam-host-red.log 一项预期失败于原生字段缺失（1.929s，墙钟 1.931）。生产仅增加 Malayalam 共享准入，光标与组合显示保持共用策略；Sinhala 等未验证混排继续回退。
