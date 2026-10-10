@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：后段 Indic 活动字段的三样式生产验证（2026-10-10）
+
+本轮只增强验证，不改产品。此前后段活动字段主要以 replace 检查，三样式宿主检查只在初始 Latin 字段。本次将 Bangla、Hindi 两目录、Tamil 三目录、Gujarati 两目录、Nepali 两目录与 Sanskrit 共十一目录的后段活动字段都按 off／below／replace 更新、取消、部分提交和回删。仍使用各自自有 Unicode 夹具及四组尺寸策略，不复制参考资产。
+
+先标记不匹配的“X”：replace 要精确显示替换后的字段及剩余原文，off／below 要保留原目标字段；取消后精确恢复。之后运行短→整词候选、取消、接受首段再标记尾段，保留方向／输入和字段 owner 断言。每种样式结束按已提交的 UTF-16 单位数回删，再检查恢复与下一模式；不以相同目标候选的相同文字输出冒充样式区别。此处只验证目标字段文本，不证明 below 的独立候选视觉位置或 off 的系统候选窗行为。
+
+indic-active-styles-focused.log 单项二十处失败（28.406s，墙钟 28.408）：新循环最初按首段 Character 数量回删，留下组合元音之前的已接受单位，污染后续样式。根因核对 NativeTypingInput 的 onDelete 链及 TypingEngine.removeLastTypedCharacter／removeAcceptedUnit，不能据此认定产品取消失败。仅清理循环改为 firstPart.utf16，原模式差异／精确文本／owner 断言未改，indic-active-styles-unit-isolation.log 同项零失败（27.899s，墙钟 27.900）。没有生产修复、重试或删除失败证据。
+
+最终固定参考／锁定 Anime 环境下 indic-active-styles-final.log 109 项零失败零跳过（299.646s，墙钟 299.657），含十一完整宿主（296.819s，墙钟 296.820）、布局／候选投影及 Tape 退休；这是受影响路径专项，不是全部二十一宿主或全量门禁。indic-active-styles-originality.log 固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 边界退出 0。会话内风险审查核对样式分支、循环状态隔离与原有断言，无剩余可落实发现，非独立评审。
+
+所有测试／审计终态后写记录，零 Typebar 主程序启动。无数据格式／迁移、网络或输入产品行为变化。人工步骤：以此前各目录自定义混排夹具进入 Arabic 后的 Indic 活动词，逐一切换三样式，真实 IME 输入不匹配候选、更新／取消和部分提交，检查候选窗／下方候选位置、方向与窄窗恢复；仍未执行。全字体、真实 IME、可见布局、最低系统与新完整冻结门禁保持待验；TST-02 和 compositionDisplay 仍部分，完整 goal active。下方“后半段只测 replace”为历史范围，本段补齐的仅是所列宿主专项。
+
 ## TST-02：Nepali／Nepali 1k／Sanskrit 混排生产入口（2026-10-10）
 
 固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 保持干净，只读复核 test-ui.ts 候选显示分支，未复制代码或资源。没有以既有 Hindi 验证代替其他目录：三个新实际 practiceContent 宿主分别复现字段缺失，arabic-devanagari-host-red.log 三项三处预期失败（3.003s，墙钟 3.005）。生产共享准入增加 Nepali、Nepali 1k、Sanskrit，Kannada 等未验证连写混排仍回退。

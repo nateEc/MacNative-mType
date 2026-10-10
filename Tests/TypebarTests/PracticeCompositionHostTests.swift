@@ -325,30 +325,48 @@ import XCTest
             let wholeWord = try XCTUnwrap(extendedWord)
             input.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
             input.insertText("سلام ", replacementRange: .init(location: NSNotFound, length: 0))
-            input.setMarkedText(firstPart, selectedRange: .init(location: firstPart.utf16.count, length: 0),
-              replacementRange: .init(location: NSNotFound, length: 0))
-            flush()
-            input.setMarkedText(wholeWord, selectedRange: .init(location: wholeWord.utf16.count, length: 0),
-              replacementRange: .init(location: NSNotFound, length: 0))
-            flush()
-            XCTAssertTrue(input.hasMarkedText())
-            XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
-            try checkExtendedRun(field)
-            input.unmarkText(); flush()
-            XCTAssertEqual(field.accessibilityValue() as? String, mixedText,
-              "Cancelling the Indic candidate must retain the source after the completed Arabic word")
-            input.insertText(firstPart, replacementRange: .init(location: NSNotFound, length: 0))
-            input.setMarkedText(lastPart, selectedRange: .init(location: lastPart.utf16.count, length: 0),
-              replacementRange: .init(location: NSNotFound, length: 0))
-            flush()
-            XCTAssertTrue(input.hasMarkedText())
-            XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
-            try checkExtendedRun(field)
-            XCTAssertTrue(inputs(in: host).contains { $0 === input })
-            XCTAssertTrue(fields(in: host).contains { $0 === field })
-            input.unmarkText(); flush()
-            XCTAssertFalse(input.hasMarkedText())
-            XCTAssertFalse(window.isVisible)
+            for style in CompositionDisplayStyle.allCases {
+              settings.compositionDisplayStyle = style
+              input.setMarkedText("X", selectedRange: .init(location: 1, length: 0),
+                replacementRange: .init(location: NSNotFound, length: 0))
+              flush()
+              XCTAssertEqual(field.accessibilityValue() as? String,
+                style == .replace ? "ab سلام X" + wholeWord.dropFirst() + " cd" : mixedText,
+                "The selected style must affect the active Indic field, not only the initial Latin field")
+              input.unmarkText(); flush()
+              XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
+              input.setMarkedText(firstPart, selectedRange: .init(location: firstPart.utf16.count, length: 0),
+                replacementRange: .init(location: NSNotFound, length: 0))
+              flush()
+              input.setMarkedText(wholeWord, selectedRange: .init(location: wholeWord.utf16.count, length: 0),
+                replacementRange: .init(location: NSNotFound, length: 0))
+              flush()
+              XCTAssertTrue(input.hasMarkedText())
+              XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
+              try checkExtendedRun(field)
+              input.unmarkText(); flush()
+              XCTAssertEqual(field.accessibilityValue() as? String, mixedText,
+                "Cancelling the Indic candidate must retain the source after the completed Arabic word")
+              input.insertText(firstPart, replacementRange: .init(location: NSNotFound, length: 0))
+              input.setMarkedText(lastPart, selectedRange: .init(location: lastPart.utf16.count, length: 0),
+                replacementRange: .init(location: NSNotFound, length: 0))
+              flush()
+              XCTAssertTrue(input.hasMarkedText())
+              XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
+              try checkExtendedRun(field)
+              XCTAssertTrue(inputs(in: host).contains { $0 === input })
+              XCTAssertTrue(fields(in: host).contains { $0 === field })
+              input.unmarkText(); flush()
+              XCTAssertFalse(input.hasMarkedText())
+              XCTAssertFalse(window.isVisible)
+              for _ in firstPart.utf16 {
+                input.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+              }
+              flush()
+              XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
+              XCTAssertTrue(inputs(in: host).contains { $0 === input })
+              XCTAssertTrue(fields(in: host).contains { $0 === field })
+            }
           }
         }
         continue
