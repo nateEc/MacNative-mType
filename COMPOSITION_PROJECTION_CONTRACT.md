@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：原生菜单与 Indic 三样式增量完整冻结复验（2026-10-10）
+
+冻结提交 3bad00958caf39beef3b19fa0fb5dec2a00d00c9，固定参考 91bd24bb8513785c7364cbea29296ff7adafac41。单次顺序门禁会话正常结束，gate_exit=0、hash_exit=0；847 个跟踪文件 SHA-256 终态一致。证据目录为 work/frozen-readiness.boLoNO，保留 revision.txt、inputs.sha256、gate.log、freeze-verification.log 和 logs/ 下 74 份分阶段日志。运行期间未修改源码、未重启门禁或启动 Typebar 主程序。
+
+客户端 4,229 项零失败（1346.893s，墙钟 1347.363），服务端 501 项零失败（11.479s，墙钟 11.538）。此次包括新增原生语言菜单、Hindi／Tamil／Gujarati／Nepali／Sanskrit 生产入口及十一 Indic 活动字段三样式验证；全部二十一生产宿主和十万词耐久检查通过。Release 优化构建 397.07s，未打开应用包的资源边界、签名及固定参考原创性边界检查通过；边界审计不是全面原创性证明。
+
+本次只记录验证，无产品、存储格式、数据迁移或网络行为变化。人工复验仍需单实例检查真实 IME 更新／取消／部分提交、below 候选位置、窄窗跨行及全部字体，再单独衡量首键性能；本门禁不替代这些可见行为，也不证明全部语言词库、精确主题、全部挑战或最低系统。TST-02／compositionDisplay 仍部分，完整 goal active。下方“新完整门禁未验”是历史阶段说明。
+
 ## TST-02：后段 Indic 活动字段的三样式生产验证（2026-10-10）
 
 本轮只增强验证，不改产品。此前后段活动字段主要以 replace 检查，三样式宿主检查只在初始 Latin 字段。本次将 Bangla、Hindi 两目录、Tamil 三目录、Gujarati 两目录、Nepali 两目录与 Sanskrit 共十一目录的后段活动字段都按 off／below／replace 更新、取消、部分提交和回删。仍使用各自自有 Unicode 夹具及四组尺寸策略，不复制参考资产。
