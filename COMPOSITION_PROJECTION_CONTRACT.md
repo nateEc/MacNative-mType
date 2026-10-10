@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：below 候选行源码差异与下一验收契约（2026-10-10，未修复）
+
+完整门禁之后对固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 只读复核：frontend/src/ts/components/pages/test/CompositionDisplay.tsx 的 below 分支使用全宽、居中、练习字号的独立候选行；非 focused 状态弱化并模糊，重新聚焦即时恢复。input/listeners/composition.ts 在组合更新时设置候选文本，结束时清空；test/test-ui.ts 在 below 重置／切换时设置空白占位。未复制实现或资源。
+
+当前原生 TypebarApp.typingPanel 的候选分支仍在 bottomLeading 浮层内，字号为 max(14, fontSize * 0.58)，带小背景面板，仅非空时出现；它不是上述独立居中行。现有 PracticeCompositionHostTests 验证正文投影、原生 owner 和组合取消，但未独立断言 below 候选行的几何、字号、失焦与占位，故此前自动门禁通过不能关闭此差异。这是静态源码可定位的产品差异，尚无新增运行时复现，不把它写成已修复。
+
+后续独立宿主验收必须覆盖：below 空候选仍保留行高；候选从短到长再取消只更新该行，正文不被替换，候选行不覆盖正文／标签／Pace；候选行位于正文后方并全宽居中，采用所选练习字体和字号；模式切到 off／replace 不保留候选行；失焦弱化、聚焦即时恢复；窄宽换行与 RTL 候选不越界。测试应进入实际生产宿主，并同时检查文字、几何和输入 owner，不能只检查新建策略对象。真实 IME 与全字体视觉仍独立待验。
+
+本次仅记录可核查差异与行为契约，不改变产品、存储、迁移、离线／网络或运行权限，无需为文档制造失败测试。零主程序启动。compositionDisplay 与完整 goal 继续部分／未完成。
+
 ## TST-02：全部当前混排增量的冻结完整验证（2026-10-10）
 
 冻结提交 0c317e1d54b2666f05e2aae3973491942cff2d7d，固定参考 91bd24bb8513785c7364cbea29296ff7adafac41。单次顺序门禁终态 gate_exit=0、hash_exit=0，847 个跟踪文件 SHA-256 一致。证据目录 work/frozen-readiness-all-mixed.Nr4pws 保留 revision.txt、inputs.sha256、gate.log、freeze-verification.log 与 74 份阶段日志。运行中未修改代码、未重启门禁，零 Typebar 主程序启动，参考工作区干净。
