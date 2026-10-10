@@ -5,6 +5,15 @@ import XCTest
 
 @testable import Typebar
 
+@MainActor private final class PracticeLayoutCountingHost<Content: View>: NSHostingView<Content> {
+  private(set) var layoutCount = 0
+
+  override func layout() {
+    layoutCount += 1
+    super.layout()
+  }
+}
+
 @MainActor final class PracticeCompositionHostTests: XCTestCase {
   func testProductionPracticeCompositionMountsNativeInputAndSurvivesFirstInsertion() throws {
     for automaticSizing in [true, false, false, true] {
@@ -26,7 +35,7 @@ import XCTest
         network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor()
       )
       .modelContainer(container).frame(width: 1000, height: 720)
-      let host = NSHostingView(rootView: root)
+      let host = PracticeLayoutCountingHost(rootView: root)
       if !automaticSizing { host.sizingOptions = [] }
       let window = NSWindow(
         contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
@@ -48,13 +57,17 @@ import XCTest
       flush()
       let input = try XCTUnwrap(inputs(in: host).first)
       for (insertion, text) in ["a", "b", "c"].enumerated() {
+        let initialFrame = host.frame
+        let initialLayoutCount = host.layoutCount
         let start = ProcessInfo.processInfo.systemUptime
         input.insertText(text, replacementRange: .init(location: NSNotFound, length: 0))
         let inserted = ProcessInfo.processInfo.systemUptime
         host.layoutSubtreeIfNeeded()
         let laidOut = ProcessInfo.processInfo.systemUptime
+        let synchronousLayouts = host.layoutCount - initialLayoutCount
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
         let delivered = ProcessInfo.processInfo.systemUptime
+        let deliveredLayouts = host.layoutCount - initialLayoutCount - synchronousLayouts
         host.layoutSubtreeIfNeeded()
         let finished = ProcessInfo.processInfo.systemUptime
         XCTAssertTrue(
@@ -62,8 +75,9 @@ import XCTest
           "First input must retain the native input owner"
         )
         XCTAssertFalse(window.isVisible)
+        XCTAssertEqual(host.frame, initialFrame, "Input must not resize the fixed practice host")
         print(
-          "practice-host automaticSizing=\(automaticSizing) insertion=\(insertion) input=\(inserted - start) layout=\(laidOut - inserted) delivery=\(delivered - laidOut) finalLayout=\(finished - delivered)"
+          "practice-host automaticSizing=\(automaticSizing) insertion=\(insertion) input=\(inserted - start) layout=\(laidOut - inserted) delivery=\(delivered - laidOut) finalLayout=\(finished - delivered) synchronousLayouts=\(synchronousLayouts) deliveredLayouts=\(deliveredLayouts) finalLayouts=\(host.layoutCount - initialLayoutCount - synchronousLayouts - deliveredLayouts)"
         )
       }
       for backdrop in PracticeBackdropStyle.allCases {
