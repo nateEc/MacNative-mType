@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## Pace 跨方向动画坐标连续性（2026-10-10）
+
+实际原生 marker 回归先复现 Hebrew 到 Latin 的方向切换跳动：pace-direction-continuity-red.log 一项一处失败，marker 从 16.802734375 跳到 0（0.703s，墙钟 0.704）。端点方向正确并不意味着动画起点连续。
+
+非全字宽 Pace 在方向切换时按字形宽度转换已呈现位置与已有 tween 的两端坐标，保留 started、duration、curve，不提前采样，不修改 margin／tapeMargin。零 deadline predecessor 成功解析后同时记录该端点自己的方向，随后向目标方向转换；全字宽样式不做边缘坐标转换。
+
+新增不同字形宽度的 channel 回归，在 0、0.25、0.5、1 秒检查边缘对应、尺寸和滚动通道保持不变。pace-direction-continuity-green.log 154 项零失败零跳过（5.167s，墙钟 5.184）；最终 pace-direction-continuity-final.log 163 项零失败零跳过（54.783s，墙钟 54.801），含完整宿主、组合、字段、光标与 Tape 回归。独立原创性检查退出 0，参考 pin 不变。
+
+本轮零 Typebar 主程序启动。未运行新完整门禁或 Release GUI；这些测试不证明全部双向文字、跨行插值、实体 IME 或首键性能已解决。compositionDisplay 部分覆盖与完整 goal active 不变。
+
 ## Pace canonical 端点独立方向接线（2026-10-10）
 
 新增实际原生 Pace 回归：LTR 外流内从 Hebrew after 目标切换到 Latin after 目标，检查 coordinator 几何与 NSHostingView marker.frame.midX。field-pace-direction-red.log 一项两处预期失败（0.712s，墙钟 0.713），Hebrew after 错向右偏移，marker 同样采用全局 LTR 边缘。

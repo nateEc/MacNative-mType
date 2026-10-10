@@ -7,6 +7,52 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testEdgeRebasePreservesTweenTimingWithChangingGlyphWidths() throws {
+    var original = PromptCaretChannel()
+    original.goTo(.init(x: 10, y: 0, width: 20, height: 30), at: 0, duration: 0)
+    original.goTo(.init(x: 100, y: 0, width: 40, height: 30), at: 0, duration: 1, curve: .linear)
+    var rebased = original
+    rebased.rebaseHorizontalEdge(fromRTL: true, toRTL: false)
+    XCTAssertEqual(try XCTUnwrap(rebased.position).minX, try XCTUnwrap(original.position).maxX)
+    for time in [0.25, 0.5, 1.0] {
+      original.sample(at: time); rebased.sample(at: time)
+      XCTAssertEqual(try XCTUnwrap(rebased.position).minX, try XCTUnwrap(original.position).maxX,
+        accuracy: 0.001)
+      XCTAssertEqual(rebased.position?.size, original.position?.size)
+      XCTAssertEqual(rebased.margin, original.margin)
+      XCTAssertEqual(rebased.tapeMargin, original.tapeMargin)
+    }
+  }
+
+  func testPaceDirectionChangePreservesTheLastPresentedMarkerBeforeTweening() throws {
+    let value = try rendering("אב XY", marked: "א")
+    let view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 400, height: 180))
+    defer { view.stop() }
+    let motion = PromptCaretMotionCoordinator()
+    var configuration = config(motion, style: .off, pace: .bar)
+    configuration = .init(text: configuration.text, mainOffset: nil, paceOffset: nil,
+      mainStyle: .off, paceStyle: .bar, font: font, lineSpacing: 12, rightToLeft: false,
+      accent: .blue, motion: .off, reducesMotion: false, frameRate: 30,
+      attemptID: configuration.attemptID, coordinator: motion, automaticallyPresents: false)
+    configuration.fieldDirectionPerGlyph = true
+    var target = 0, sequence = 1.0, fraction = 1.0
+    configuration.latestRendering = { value }
+    configuration.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: false, targetAfter: true, fraction: fraction, stepDuration: 1,
+      sequence: sequence, targetGlyphID: target) }
+    view.configure(rendering: value, font: font, carets: configuration)
+    view.layout(); view.present(at: 0)
+    let caret = try XCTUnwrap(view.subviews.compactMap { $0 as? PromptCaretNativeView }.first)
+    let marker = try XCTUnwrap(caret.subviews.compactMap { $0 as? NSHostingView<PromptCaretMarkerView> }.first)
+    let previous = marker.frame.midX
+    target = 3; sequence = 2; fraction = 0
+    view.present(at: 0.1)
+    XCTAssertEqual(marker.frame.midX, previous, accuracy: 0.1,
+      "Changing the target direction must not teleport the last presented edge")
+    motion.sample(at: 1.1); fraction = 1; view.present(at: 1.1)
+    XCTAssertEqual(marker.frame.midX, try XCTUnwrap(view.measuredRect(for: 3)).maxX, accuracy: 0.1)
+  }
+
   func testCanonicalDirectionUsesFirstAndLastAliasSlotsIndependently() throws {
     let value = try rendering("אב XY", marked: "א")
     let map = try XCTUnwrap(value.compositionTextMap)

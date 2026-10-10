@@ -45,6 +45,18 @@ struct PromptCaretChannel {
 
   var isAnimatingTape: Bool { tapeTween != nil }
 
+  mutating func rebaseHorizontalEdge(fromRTL: Bool, toRTL: Bool) {
+    guard fromRTL != toRTL else { return }
+    func rebased(_ rect: CGRect) -> CGRect {
+      rect.offsetBy(dx: (fromRTL ? rect.width : 0) - (toRTL ? rect.width : 0), dy: 0)
+    }
+    position = position.map(rebased)
+    if let tween = positionTween {
+      positionTween = .init(from: rebased(tween.from), to: rebased(tween.to),
+        started: tween.started, duration: tween.duration, curve: tween.curve)
+    }
+  }
+
   mutating func sample(at time: TimeInterval) {
     if let tween = positionTween {
       position = tween.value(at: time)
@@ -180,6 +192,10 @@ struct PromptCaretChannel {
 
   func positionPace(at rect: CGRect?, time: TimeInterval, duration: TimeInterval) {
     pace.goTo(rect?.offsetBy(dx: words.tapeMargin, dy: words.margin), at: time, duration: duration, curve: .linear)
+  }
+
+  func rebasePaceHorizontalEdge(fromRTL: Bool, toRTL: Bool) {
+    pace.rebaseHorizontalEdge(fromRTL: fromRTL, toRTL: toRTL)
   }
 
   func cancel(at time: TimeInterval) {

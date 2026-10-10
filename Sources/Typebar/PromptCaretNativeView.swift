@@ -290,15 +290,23 @@ final class PromptCaretNativeView: NSView {
           let predecessor = frame.zeroDeadlinePredecessor
           let offset = predecessor.flatMap { rendering?.characterOffset(forGlyphAt: $0.glyphIndex) }
             ?? (predecessor == nil ? frame.fromCharacterOffset : nil)
-          coordinator.positionPace(at: endpoint(offset, glyphID: predecessor?.glyphIndex ?? frame.fromGlyphID,
-            after: predecessor?.after ?? frame.fromAfter),
-            time: time, duration: 0)
+          let predecessorID = predecessor?.glyphIndex ?? frame.fromGlyphID
+          let predecessorAfter = predecessor?.after ?? frame.fromAfter
+          if let rect = endpoint(offset, glyphID: predecessorID, after: predecessorAfter) {
+            coordinator.positionPace(at: rect, time: time, duration: 0)
+            paceRightToLeft = direction(predecessorID, after: predecessorAfter)
+          }
         }
         let offset = frame.targetGlyphID.flatMap { rendering?.characterOffset(forGlyphAt: $0) }
           ?? (frame.targetGlyphID == nil ? frame.targetCharacterOffset : nil)
         if let target = endpoint(offset, glyphID: frame.targetGlyphID, after: frame.targetAfter) {
-          paceRightToLeft = direction(frame.targetGlyphID, after: frame.targetAfter)
-          if changed || target != paceTargetRect {
+          let nextDirection = direction(frame.targetGlyphID, after: frame.targetAfter)
+          let directionChanged = paceRightToLeft.map { $0 != nextDirection } ?? false
+          if directionChanged, !config.paceStyle.usesFullGlyphWidth, let previousDirection = paceRightToLeft {
+            coordinator.rebasePaceHorizontalEdge(fromRTL: previousDirection, toRTL: nextDirection)
+          }
+          paceRightToLeft = nextDirection
+          if changed || target != paceTargetRect || directionChanged {
             coordinator.positionPace(at: target, time: time,
               duration: config.reducesMotion ? 0 : remaining)
           }
