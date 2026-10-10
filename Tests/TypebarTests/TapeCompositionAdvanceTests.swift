@@ -22,6 +22,7 @@ import XCTest
       let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 60))
       defer { view.stop() }
       var retired: [PromptWordRetirement] = []
+      let delivered = XCTestExpectation(description: "Projected prefix retirement callback")
       func configure(at time: Double) throws {
         let original = try render(session, marked: "XYZ")
         let rendering = PromptRendering(text: original.text,
@@ -38,14 +39,17 @@ import XCTest
           retirement: .init(attemptID: session.automaticInputAttemptID, activeWordID: sharedIDs ? 0 : session.promptWordPresentations[field.index].range.lowerBound,
             characterOffsets: rendering.glyphCharacterOffsets, smoothScroll: false, reducesMotion: true,
             words: session.promptWordPresentations.enumerated().map { .init(index: $0.offset, glyphID: sharedIDs ? 0 : $0.element.range.lowerBound) },
-            firstRetainedWordIndex: session.firstRetainedPromptWordIndex, onRetire: { retired.append($0) }),
+            firstRetainedWordIndex: session.firstRetainedPromptWordIndex, onRetire: {
+              retired.append($0)
+              if retired.count == 1 { delivered.fulfill() }
+            }),
           carets: config, at: time)
         view.present(at: time)
       }
       try configure(at: 0)
       session.insertBatch("ccc ", at: start.addingTimeInterval(1))
       try configure(at: 1)
-      RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+      wait(for: [delivered], timeout: 1)
       XCTAssertEqual(retired, [.init(attemptID: session.automaticInputAttemptID, firstRetainedWordIndex: 1)])
       guard let removal = retired.first else { continue }
       let before = try XCTUnwrap(coordinator.main.position)
@@ -57,7 +61,9 @@ import XCTest
       XCTAssertEqual(coordinator.wordsTapeMargin - margin, rtl ? -width : width, accuracy: 0.001)
       XCTAssertEqual(coordinator.main.cumulativeTapeCorrection, rtl ? -width : width, accuracy: 0.001)
       try configure(at: 1)
-      RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+      let drained = XCTestExpectation(description: "Pending duplicate retirement deliveries drained")
+      DispatchQueue.main.async { drained.fulfill() }
+      wait(for: [drained], timeout: 1)
       XCTAssertEqual(retired.count, 1)
       XCTAssertEqual(coordinator.main.cumulativeTapeCorrection, rtl ? -width : width, accuracy: 0.001)
     } } } }

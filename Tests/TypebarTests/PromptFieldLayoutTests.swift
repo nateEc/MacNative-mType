@@ -210,8 +210,9 @@ import XCTest
     return try render(session, marked: marked)
   }
 
-  private func render(_ session: TypingSession, marked: String = "", hints: Bool = false) throws -> PromptRendering {
-    let value = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: marked, style: .replace))
+  private func render(_ session: TypingSession, marked: String = "", hints: Bool = false,
+    style: CompositionDisplayStyle = .replace) throws -> PromptRendering {
+    let value = try XCTUnwrap(PromptCompositionPresentation(session: session, composition: marked, style: style))
     return value.render { index, glyph, cell in
       let plan = PromptControlCharacterPresentation.plan(for: glyph, style: .both,
         isZen: value.isZen, compositionReplacement: cell?.text,
@@ -398,6 +399,63 @@ import XCTest
       try XCTUnwrap(joined.fieldFrames[1]).minX)
     XCTAssertLessThanOrEqual(try XCTUnwrap(joined.fieldFrames[1]).maxX,
       try XCTUnwrap(joined.fieldFrames[2]).minX)
+  }
+
+  func testWrappedOppositeJoiningCandidatesReuseAndCancelWithoutStaleSlots() throws {
+    let configuration = TestConfiguration.words(4, language: .mixedLanguages,
+      mixedLanguageComponents: [.english, .arabic, .bangla])
+    for (accepted, word, owner, rtl) in [
+      ("ab ", "سلام", 1, true), ("ab سلام ", "বাংলা", 2, false)
+    ] {
+      var session = TypingSession(configuration: configuration, prompt: "ab سلام বাংলা cd")
+      session.insertBatch(accepted, at: start)
+      for style in CompositionDisplayStyle.allCases {
+        for testedFont in [font, NSFont.systemFont(ofSize: 28, weight: .regular)] {
+          let initialMap = try XCTUnwrap(render(session, style: style).compositionTextMap)
+          let initial = PromptFieldTextLayout(map: initialMap, width: 90, font: testedFont, joinsLetters: true)
+          var previous = initial
+          for marked in [String(repeating: word, count: 12), word, ""] {
+            let map = try XCTUnwrap(render(session, marked: marked, style: style).compositionTextMap)
+            let reused = PromptFieldTextLayout(map: map, width: 90, font: testedFont,
+              joinsLetters: true, reusing: previous)
+            let fresh = PromptFieldTextLayout(map: map, width: 90, font: testedFont, joinsLetters: true)
+            XCTAssertEqual(reused.cellFrames, fresh.cellFrames)
+            XCTAssertEqual(reused.fieldFrames, fresh.fieldFrames)
+            XCTAssertEqual(reused.size, fresh.size)
+            XCTAssertEqual(reused.cellFrames.count, map.cellTexts.count,
+              "Every current slot must have geometry, including wrapped candidate extras")
+            let active = try XCTUnwrap(map.fieldRuns.first { $0.fieldID == owner })
+            let rows = try Set(active.cells.filter { !$0.isGap }.map {
+              try XCTUnwrap(reused.cellFrames[$0.id]).minY
+            })
+            if marked.count > word.count {
+              XCTAssertGreaterThan(rows.count, 1, "The long candidate must actually wrap")
+              let following = try XCTUnwrap(reused.fieldFrames[owner + 1])
+              XCTAssertGreaterThanOrEqual(following.minY,
+                try XCTUnwrap(reused.fieldFrames[owner]).maxY,
+                "The following word must not overlap a multi-row candidate")
+            }
+            for id in map.canonicalAliases.keys {
+              for after in [false, true] {
+                XCTAssertEqual(reused.canonicalRect(id, after: after), fresh.canonicalRect(id, after: after))
+                XCTAssertEqual(reused.canonicalDirection(id, after: after, perGlyph: true),
+                  fresh.canonicalDirection(id, after: after, perGlyph: true))
+              }
+            }
+            XCTAssertEqual(reused.mainRect(style: .bar, perGlyph: false),
+              fresh.mainRect(style: .bar, perGlyph: false))
+            XCTAssertEqual(reused.mainDirection(perGlyph: false), rtl)
+            if marked.isEmpty {
+              XCTAssertEqual(map.canonicalAliases, initialMap.canonicalAliases)
+              XCTAssertEqual(reused.cellFrames, initial.cellFrames,
+                "Cancellation must restore original slots rather than retain expanded candidate geometry")
+              XCTAssertEqual(reused.fieldFrames, initial.fieldFrames)
+            }
+            previous = reused
+          }
+        }
+      }
+    }
   }
 
   func testNativeFreshCandidateCancellationUpdatesFieldCaretWithoutAConfigurationUpdate() throws {

@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## 相反方向连写候选跨行、缓存复用与取消（2026-10-10）
+
+本轮仅增强测试，不改变生产行为。新增布局回归在 English／Arabic／Bangla 自有文本上分别进入 Arabic 和 Bangla 活动字段，覆盖三种组合显示、monospaced／system 两种本机字体，固定 90pt 宽度，以十二次重复的长候选→原词短候选→取消运行。断言长候选实际多行、下一词不覆盖多行字段、每个当前槽有几何、canonical 前后目标及方向和主光标与全新布局一致；取消后 aliases 与原始布局恢复，旧扩展槽不残留。mixed-joining-wrap-focused.log 一项零失败（0.224s，墙钟 0.226），已有行为验证无故意失败阶段。
+
+mixed-joining-wrap-final.log 205 项一失败（13.426s，墙钟 13.448）：新增跨行检查通过，旧 Tape 前缀退休测试在固定 10ms RunLoop 等待后未收到异步回调。mixed-wrap-retirement-reproduction.log 单项独立通过（0.631s，墙钟 0.632），故仅确认间歇性，不能据此认定无生产竞态。源码 deliverRetirement 明确使用主队列异步通知；测试改为等待实际回调，确认前缀与通知次数，再以主队列哨兵排空已排队的重复通知，保留光标、margin、累计修正和重复交付断言。1s 只作缺失回调的失败超时，不新增生产重试或放宽计时健康阈值。
+
+mixed-joining-wrap-callback-final.log 同组 205 项零失败零跳过（10.871s，墙钟 10.891），固定参考原创性边界退出 0。全部运行终态后才编辑记录，零 Typebar 主程序启动。本轮没有新的完整宿主、全量门禁或 Release GUI；几何回归不等于实体 IME／全部字体／视觉检查，异步测试改进不证明排除所有退休竞态，compositionDisplay 部分与完整 goal active 不变。
+
 ## Arabic／Bangla 相反方向连写混排生产入口（2026-10-10）
 
 固定参考仍为 91bd24bb8513785c7364cbea29296ff7adafac41，重新只读核对 test-ui.ts 候选槽循环及 below 初始化；未复制代码或资源。新增完整宿主场景选择 English／Arabic／Bangla，自有短文本“ab سلام বাংলা cd”，精确检查 AX 原文、Arabic RTL 与 Bangla LTR 的原生槽几何，并保留三种组合显示的既有更新／取消／提交回删检查。
