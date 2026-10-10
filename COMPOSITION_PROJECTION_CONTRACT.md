@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## 混排回退的实际布局反例（2026-10-10）
+
+固定参考 elements/caret.ts 的 getTargetPositionAndWidth 明确在 Zen／custom／Polyglot 按字母判断 RTL；因此不能仅以全局语言方向推导混排光标。当前生产门控仍保留，未取消回退。
+
+用既有 PromptFieldLayoutTests.rendering("אב cd", marked: "א") 得到实际 compositionTextMap，构造 PromptFieldTextLayout(map: map, width: 400, font: font, rightToLeft: false, joinsLetters: false)。分别读取首字段 cells[0]／cells[1] 的 cellFrames，应满足第二个希伯来字母 minX 小于第一个，同时 fieldFrames[0].maxX 不超过 fieldFrames[1].minX，保持独立词的 LTR 流。临时反例测试 field-mixed-direction-red.log 一项一处预期失败（0.741s，墙钟 0.743），实际第二字母 x=16.802734375、第一字母 x=0，说明逐字盒子未保留字段内部 RTL 顺序。此反例针对候选字段组件，不将它说成当前有回退保护的生产混排路径已暴露同样错误。
+
+候选让含 RTL 字形的字段共享 TextKit 塑形上下文，独立词与提交空格身份不合并。新反例通过，但 field-mixed-direction-green.log 45 项一处失败（1.736s，墙钟 1.742）：既有 testJoiningScriptShapesWithinItsFieldButNeverAcrossFields 的非连写 Arabic 对照宽度也被塑形，与 joinsLetters=false 的独立字形合同冲突。没有删除／放宽旧断言，候选生产变更与临时失败测试全部撤回，日志保留用于重现；恢复后 field-mixed-direction-restored.log 44 项零失败零跳过（1.093s，墙钟 1.099）。
+
+下一实现须分开字段内双向视觉排序与连写塑形开关，并接通按字母的主／pace 边缘、混合标点／数字、控制符和取消后恢复，不能用扩大塑形范围或只改全局方向替代。此轮仅新增诊断记录，生产／测试代码与之前提交相同，零 Typebar 主程序启动，无新完整门禁／真实 IME 验收。compositionDisplay 仍部分、完整 goal active。
+
 ## 当前生产入口补证（2026-10-10）
 
 提交链路增量：四组实际生产宿主先设置候选，再经 insertText 接受一个 ASCII 字符；确认 marked range 清空，重新组合的原生可访问内容包含候选但不再从首槽开始。随后通过真实 responder deleteBackward 命令删除接受字符，重新组合恢复首槽前缀。此检查通过后续实际呈现观察会话推进／回删，不读取私有会话，也不将取消链路的内容相同当成提交证明。practice-production-composition-commit.log 与组合完成／Return 回归共 20 项零失败零跳过（44.807s，墙钟 44.809），含两个完整宿主用例。该验证补已有行为覆盖，无故意失败阶段；仍不是真实系统 IME／候选窗口／多字符接受／混合 RTL／成绩验收。本轮生产代码未改、零 GUI 主程序启动、未重跑全量门禁，部分分类与完整 goal active 保持。
