@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+当前 Arabic／LTR 混排已接入多槽组合生产入口，保留整词 shaping 与独立 canonical 槽；完整宿主检查三种组合显示、未改动 Arabic run 顺序、活动字段的 lam-alef 候选更新／取消及部分已提交文字与候选继续连写。194 项定向回归零失败零跳过、原创性通过，见 [组合入口合同](COMPOSITION_PROJECTION_CONTRACT.md)。Persian 等其他混排仍回退，真实 IME／全部方向与字体／可见窗口未验；compositionDisplay 仍部分、配置 89／4／1 与完整 goal active 不变，零主程序启动。下方 Arabic 混排回退描述为本轮之前的快照。
+
 当前 Hebrew／LTR 混排的组合多槽投影与独立原生光标已接入生产练习页，详见 [混排入口证据](COMPOSITION_PROJECTION_CONTRACT.md)。完整宿主覆盖三种组合显示、更新／取消／提交／回删和未改动 Hebrew 字形的实际顺序；192 项回归零失败零跳过，原创性通过，零主程序启动。Arabic 等其他混排 shaping 仍回退，真实 IME、可见窗口和全部组合未验；`compositionDisplay` 保持部分、配置 89／4／1 与完整 goal active 不变。下方“混合方向保持旧回退”为此前版本记录，不覆盖本次已验证家族。
 
 当前 [已确认退休前缀隔离](ORDINARY_TAPE_ENTRY_CONTRACT.md#已确认退休前缀隔离增量2026-10-10)修复旧 representable／快照复活已删除前缀和改变位移；一新增／193 项 Tape 相关回归零失败零跳过、原创性通过。有效新快照与新 attempt 正常接受，零主程序启动；此前完整门禁为修改前版本，复杂队列、方向与实机仍开放，兼容分类不升级、goal active。

@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## Arabic／LTR 混排整词候选入口（2026-10-10）
+
+继续基于固定版本候选逐槽显示规则推进 production gate。新增完整宿主以隔离选择恢复自有“ab سلام cd”与 English／Arabic 自定义配置，三种组合模式复用既有更新／取消／提交／回删检查。arabic-mixed-projection-red.log 两项四处失败（2.382s，墙钟 2.383）：生产宿主缺少字段渲染器为真实入口缺口；模型另三处来自复用了 noSpaces 辅助函数，使源槽编号不再对应原文，不算产品 shaping 故障。
+
+模型改为保留空格的直接会话后 arabic-mixed-field-identity.log 通过。检查整词宽度小于孤立字形之和、Arabic 两端实际物理顺序、lam-alef 同一连字几何但 canonical 槽各自保留、各槽方向及相邻字段不重叠。未为获得绿色修改原生 TextKit shaping 或方向实现。
+
+入口共享策略扩展 Arabic、Arabic 10k、Egypt／Egypt 1k、Morocco 家族，Hebrew 保持；其他尚未验证的混排 shaping 继续回退。策略测试包含 English／Hebrew／Arabic 共存以及 Persian 的保留回退，单一 Arabic 的原支持不变。arabic-mixed-projection-green.log 16 项零失败零跳过（16.212s，墙钟 16.215）。
+
+完整宿主进一步进入 Arabic 活动字段，标记“سلا”时检查 lam／alef 非空测量框相等；取消后源文本不变；提交“س”再标记“لا”，原生输入及字段 owner 保留、辅助文本仍精确对应源文。新 marked 几何断言明确 XCTUnwrap 双端，不接受 nil==nil 的伪通过。arabic-mixed-projection-final.log 194 项零失败零跳过（79.676s，墙钟 79.700），包含四种完整宿主、字段、光标、方向、组合与 Tape 前进。固定参考原创性检查退出 0；所有测试／审计终态后才写本记录。
+
+零 Typebar 主程序启动，无新全量门禁／Release GUI。当前证据不覆盖全部 Arabic 内容、字体、显式 bidi 控制、跨行候选、真实键盘／IME或长期队列，也不证明首键性能解决；Persian 等混排仍开放，compositionDisplay 仍部分，完整 goal active。
+
 ## Hebrew／LTR 混排组合生产入口（2026-10-10）
 
 只读核对官方 test-ui.ts 的候选循环：组合候选逐槽参与显示，replace 改为候选文本，off／below 保留对应目标，超出目标的候选仍显示。参考仓库干净且 HEAD 为 91bd24bb8513785c7364cbea29296ff7adafac41；未复制源码或资产。原生模型已有独立槽与方向几何，但生产 mixed RTL gate 仍拒绝该模型。

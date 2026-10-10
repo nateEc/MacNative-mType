@@ -379,6 +379,27 @@ import XCTest
     XCTAssertGreaterThanOrEqual(try XCTUnwrap(isolated.fieldFrames[1]).minX, try XCTUnwrap(isolated.fieldFrames[0]).maxX)
   }
 
+  func testArabicJoiningInLTRFieldFlowRetainsLigatureAndCanonicalSlots() throws {
+    let result = try render(TypingSession(configuration: .words(3), prompt: "ab سلام cd"), marked: "中文")
+    let map = try XCTUnwrap(result.compositionTextMap)
+    let joined = PromptFieldTextLayout(map: map, width: 400, font: font, joinsLetters: true)
+    let isolated = PromptFieldTextLayout(map: map, width: 400, font: font)
+    XCTAssertLessThan(try XCTUnwrap(joined.fieldFrames[1]).width,
+      try XCTUnwrap(isolated.fieldFrames[1]).width)
+    XCTAssertGreaterThan(try XCTUnwrap(joined.cellFrames[3]).minX,
+      try XCTUnwrap(joined.cellFrames[6]).minX)
+    XCTAssertEqual(joined.cellFrames[4], joined.cellFrames[5],
+      "Lam and alef retain separate source slots but share the shaped ligature's geometry")
+    for id in 3...6 {
+      XCTAssertEqual(joined.canonicalRect(id, after: false), joined.cellFrames[id])
+      XCTAssertEqual(joined.canonicalDirection(id, after: false, perGlyph: true), true)
+    }
+    XCTAssertLessThanOrEqual(try XCTUnwrap(joined.fieldFrames[0]).maxX,
+      try XCTUnwrap(joined.fieldFrames[1]).minX)
+    XCTAssertLessThanOrEqual(try XCTUnwrap(joined.fieldFrames[1]).maxX,
+      try XCTUnwrap(joined.fieldFrames[2]).minX)
+  }
+
   func testNativeFreshCandidateCancellationUpdatesFieldCaretWithoutAConfigurationUpdate() throws {
     var result = try rendering("a \u{301}b tail", accepted: "a", marked: "XY"), marked = "XY", reads = 0
     let motion = PromptCaretMotionCoordinator(), view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 400, height: 180))

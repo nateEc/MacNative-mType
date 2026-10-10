@@ -44,10 +44,17 @@ import XCTest
   }
 
   func testMixedDirectionProductionCompositionUsesAllCandidateSlots() throws {
-    try checkProductionHost(checksMarkedText: true, mixedDirection: true)
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .hebrew)
   }
 
-  private func checkProductionHost(checksMarkedText: Bool, mixedDirection: Bool = false) throws {
+  func testArabicMixedDirectionProductionCompositionPreservesJoinedRun() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .arabic)
+  }
+
+  private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
+    let mixedDirection = mixedLanguage != nil
+    let mixedText = mixedLanguage == .arabic ? "ab سلام cd" : "ab אב cd"
+    let lastRTLSlot = mixedLanguage == .arabic ? 6 : 4
     for automaticSizing in [true, false, false, true] {
       let suite = "PracticeCompositionHostTests.\(UUID())"
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -55,12 +62,12 @@ import XCTest
       let settings = AppSettings(defaults: defaults)
       let reduceMotion = ProcessInfo.processInfo.environment["TYPEBAR_TEST_REDUCE_MOTION"] == "1"
       settings.reducePracticeMotion = reduceMotion
-      if mixedDirection {
+      if let mixedLanguage {
         let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
           difficulty: .normal, rules: .init(), language: .mixedLanguages,
-          mixedLanguageComponents: [.english, .hebrew])
+          mixedLanguageComponents: [.english, mixedLanguage])
         let selection = ActiveTestSelectionDocument(
-          preset: .init(configuration: configuration, customText: "ab אב cd"),
+          preset: .init(configuration: configuration, customText: mixedText),
           testParameterMemory: .legacyDefaults(configuration: configuration))
         XCTAssertTrue(settings.saveActiveTestSelection(selection))
       }
@@ -104,11 +111,11 @@ import XCTest
       }
       if mixedDirection {
         let field = try XCTUnwrap(fields(in: host).first)
-        XCTAssertEqual(field.accessibilityValue() as? String, "ab אב cd")
-        let firstHebrew = try XCTUnwrap(field.measuredRect(for: 3))
-        let secondHebrew = try XCTUnwrap(field.measuredRect(for: 4))
-        XCTAssertGreaterThan(firstHebrew.minX, secondHebrew.minX,
-          "Production word shaping must retain the Hebrew run's physical order")
+        XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
+        let firstRTL = try XCTUnwrap(field.measuredRect(for: 3))
+        let lastRTL = try XCTUnwrap(field.measuredRect(for: lastRTLSlot))
+        XCTAssertGreaterThan(firstRTL.minX, lastRTL.minX,
+          "Production word shaping must retain the RTL run's physical order")
       }
       if checksMarkedText {
         for style in CompositionDisplayStyle.allCases {
@@ -134,8 +141,8 @@ import XCTest
             XCTAssertTrue((field.accessibilityValue() as? String)?.hasPrefix("中文") == true)
             if mixedDirection {
               XCTAssertGreaterThan(try XCTUnwrap(field.measuredRect(for: 3)).minX,
-                try XCTUnwrap(field.measuredRect(for: 4)).minX,
-                "Candidate projection must not reverse the untouched Hebrew run")
+                try XCTUnwrap(field.measuredRect(for: lastRTLSlot)).minX,
+                "Candidate projection must not reverse the untouched RTL run")
             }
           }
           input.unmarkText()
@@ -181,6 +188,30 @@ import XCTest
         flush()
         XCTAssertTrue(inputs(in: host).contains { $0 === input })
         XCTAssertFalse(window.isVisible)
+        if mixedLanguage == .arabic {
+          input.insertText("ab ", replacementRange: .init(location: NSNotFound, length: 0))
+          input.setMarkedText("سلا", selectedRange: .init(location: 3, length: 0),
+            replacementRange: .init(location: NSNotFound, length: 0))
+          flush()
+          let field = try XCTUnwrap(fields(in: host).first)
+          XCTAssertEqual(field.accessibilityValue() as? String, "ab سلام cd")
+          XCTAssertEqual(try XCTUnwrap(field.measuredRect(for: 4)),
+            try XCTUnwrap(field.measuredRect(for: 5)),
+            "A marked lam-alef must stay joined within the active Arabic field")
+          input.unmarkText(); flush()
+          XCTAssertEqual(field.accessibilityValue() as? String, mixedText,
+            "Cancelling the Arabic candidate must preserve the original source")
+          input.insertText("س", replacementRange: .init(location: NSNotFound, length: 0))
+          input.setMarkedText("لا", selectedRange: .init(location: 2, length: 0),
+            replacementRange: .init(location: NSNotFound, length: 0))
+          flush()
+          XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
+          XCTAssertTrue(inputs(in: host).contains { $0 === input })
+          XCTAssertTrue(fields(in: host).contains { $0 === field })
+          input.unmarkText(); flush()
+          XCTAssertFalse(input.hasMarkedText())
+          XCTAssertFalse(window.isVisible)
+        }
         continue
       }
       for (insertion, text) in ["a", "b", "c"].enumerated() {

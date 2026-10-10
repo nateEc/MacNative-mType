@@ -8,7 +8,8 @@ enum PromptFieldProjectionPolicy {
     // Keep that shaping intact; only genuinely unverified mixed families fall back.
     return configuration.mixedLanguageComponents.allSatisfy { language in
       switch language {
-      case .hebrew, .hebrew1k, .hebrew5k, .hebrew10k: return true
+      case .hebrew, .hebrew1k, .hebrew5k, .hebrew10k,
+        .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco: return true
       default: return !language.usesJoiningScriptPrompt
       }
     }
