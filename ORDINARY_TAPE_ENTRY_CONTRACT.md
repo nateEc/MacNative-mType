@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 配置面板禁用传播对照未解释首键同步成本（2026-10-10）
+
+冻结 f90a03c 工作区洁净后，仅临时将配置面板 .disabled(visualFocus.isFocused) 改为 .disabled(false)，其余命中测试、AX 隐藏、opacity 动画与全部内容保持；此为根因定位试探，无预先故意失败阶段，不是交付候选。configuration-disable-layout-probe.log 一项零失败（14.902s，墙钟 14.904），四组首字符同步布局约 347–385ms，后续约 131–139ms，第二字符事件交付仍有 411–480 次根布局。不能支持禁用传播是首键同步成本主因，也不能将不同次数当作优化或退化的公平基准。
+
+权威测试会话终态后立即恢复原行为，再运行完整首键宿主与 TypingVisualFocusIntegrationTests。configuration-disable-layout-restored.log 三项零失败零跳过（16.802s，墙钟 16.804），首字符同步布局约 360–392ms，隐藏配置键盘不可编辑保护检查通过。git diff 确认生产源码及测试无改动，零 Typebar 主程序启动，无新全量门禁／Release GUI。
+
+源码 TypingVisualFocus.set 将聚焦提交排至下一轮主线程；同步布局与后续 RunLoop 交付分开测量。本轮仅排除一个不足的修复候选，不锁定完整根因。后续优先追踪聚焦提交前的同步图更新／测量，保留配置交互功能、默认动画和计时健康阈值；首键性能及完整兼容 goal 仍 active。
+
 ## 字体家族目录按需查询，不宣称首键修复（2026-10-10）
 
 当前源码确认 NativePracticeFont.postScriptName(for:) 在验证名称及直接字体匹配之前提前求值系统 availableFontFamilies。新增副作用计数回归：空名称、含内部控制字符名称和直接有效 PostScript 名称应零次查询；无法直接解析时仍查询一次当前目录。font-family-lazy-red.log 一项两处预期失败（0.611s，墙钟 0.613），实际提前枚举三次，最后累计四次。
