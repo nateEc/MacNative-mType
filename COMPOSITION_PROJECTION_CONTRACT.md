@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：Arabic／Likanu 混排生产入口与目录准入检查（2026-10-10）
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制代码或资产。独立构造字符夹具“ab سلام x̄ʌʃ cd”进入实际 practiceContent 宿主，不读取参考词值或转换实现。arabic-likanu-host-red.log 一项预期失败于原生字段缺失（2.060s，墙钟 2.062）。生产仅增加 Likanu 共享准入，光标与组合显示保持同一策略，未改输入提交、转换器或计分。默认未验证连写语言回退分支保留，但当前目录已无该准入缺口。
+
+四组尺寸策略覆盖三样式活动字段候选差异、Arabic 连字与 Likanu LTR 两端几何、精确辅助文本、“x̄”→“x̄ʌʃ”更新／取消、接受“x̄”后标记“ʌʃ”、逐 UTF-16 单位回删和输入／字段 owner 保持。跨行专项覆盖三样式、两字体、90pt 宽度、长→短→取消、缓存／新建一致、每槽几何、后词不重叠及 canonical 恢复。组合长音符夹具不证明全部 Likanu 正字法、专用字体或真实输入法事件。新增测试逐当前连写语言 ID 检查 Arabic／Hebrew 混排准入，仅证明策略覆盖，不扩称每个目录均有独立实际宿主或全部视觉验收。
+
+arabic-likanu-focused.log 31 项零失败零跳过（33.519s，墙钟 33.524）。随后仅将旧策略测试名称改为反映当前覆盖，固定参考及锁定 Anime 环境下 arabic-likanu-regression.log 355 项零失败零跳过（857.339s，墙钟 857.381），含全部三十四宿主（813.736s，墙钟 813.741）、布局／投影／方向、两个退休测试集与既有 Korean／ASL／Choo 组件。arabic-likanu-originality.log 固定参考边界退出 0，不扩大为全面原创性证明。一次短进程采样确认日志缓冲期间运行到 Malayalam 宿主，不作性能结论。会话内风险审查核对完整差异、共享入口、候选隔离与默认回退，无剩余可落实发现，非独立评审。
+
+所有运行终态后写记录，零 Typebar 主程序启动。无存储格式、迁移或新网络行为。人工步骤待执行：选择 English／Arabic／Likanu 自定义夹具，逐样式实际输入组合符、更新／取消／部分提交，检查 below 独立候选位置、窄窗恢复、专用及全部字体和 Pace／ASL／Choo 可见组合。未做新 Release、最低系统或完整冻结门禁；TST-02／compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：Arabic／Myanmar Burmese 混排生产入口（2026-10-10）
 
 固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，未复制代码或资产。自有 Unicode 夹具“ab سلام မြန်မာ cd”进入实际 practiceContent 宿主；arabic-myanmar-host-red.log 一项预期失败于原生字段缺失（1.985s，墙钟 1.987）。生产仅增加 Myanmar Burmese 的共享准入，光标与组合显示继续共用策略；Likanu 未验证混排仍回退，未改输入提交或计分。

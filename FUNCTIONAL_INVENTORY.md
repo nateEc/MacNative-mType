@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+当前 TST-02 混排生产入口新增 Likanu：实际宿主先复现字段缺失，再开放共享准入；三样式候选差异、组合符更新／取消／部分提交、方向／owner 与跨行恢复有回归。新增当前连写目录逐 ID 的 Arabic／Hebrew 准入检查，当前无该策略缺口，但不代表每目录独立宿主或全部视觉验收。355 项扩展检查零失败零跳过，含全部三十四宿主、两个退休测试集及既有 Korean／ASL／Choo 组件，原创性边界通过，详见 [Likanu 证据与人工步骤](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动，无迁移或新网络行为；真实 IME、全正字法／字体／视觉和新完整门禁仍待验，功能分类与完整 goal active 不变。下方记录保留各阶段当时范围。
+
 当前 TST-02 混排生产入口新增 Myanmar Burmese：实际宿主先复现字段缺失，再开放共享准入；三样式候选差异、更新／取消／部分提交、方向／owner 与跨行恢复有回归，Likanu 未验证混排仍回退。352 项扩展检查零失败零跳过，含全部三十三宿主、两个退休测试集及既有 Korean／ASL／Choo 组件，原创性边界通过，详见 [Myanmar Burmese 证据与人工步骤](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动，无迁移或新网络行为；真实 IME、全部正字法／连字／字体／视觉和新完整门禁仍待验，功能分类与完整 goal active 不变。下方记录保留各阶段当时范围。
 
 当前 TST-02 混排生产入口新增 Tibetan／Tibetan 1k：两项实际宿主先复现字段缺失，再开放共享准入；三样式候选差异、更新／取消／部分提交、方向／owner 与跨行恢复有回归，Myanmar Burmese／Likanu 未验证混排仍回退。350 项扩展检查零失败零跳过，含全部三十二宿主、两个退休测试集及既有 Korean／ASL／Choo 组件，原创性边界通过，详见 [Tibetan 证据与人工步骤](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动，无迁移或新网络行为；真实 IME、全叠字／字体／视觉和新完整门禁仍待验，功能分类与完整 goal active 不变。下方语言记录保留当时范围。

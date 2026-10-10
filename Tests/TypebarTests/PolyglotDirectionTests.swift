@@ -2,7 +2,7 @@ import XCTest
 @testable import Typebar
 
 final class PolyglotDirectionTests: XCTestCase {
-  func testFieldProjectionAdmitsVerifiedMixButPreservesUnverifiedShapingFallback() {
+  func testFieldProjectionAdmitsVerifiedMixedFamiliesWithoutChangingSingleLanguageSupport() {
     for rtl in TypingLanguage.allCases.filter(\.usesRightToLeftPrompt) {
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, rtl])))
     }
@@ -49,10 +49,19 @@ final class PolyglotDirectionTests: XCTestCase {
     }
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .myanmarBurmese])))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .myanmarBurmese])))
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .likanu])))
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .likanu])))
+    XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .likanu])))
+    XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .likanu])))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .arabic)))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .english)))
+  }
+
+  func testCurrentJoiningLanguageCatalogHasNoMixedProjectionAdmissionGaps() {
+    for language in TypingLanguage.allCases where language.usesJoiningScriptPrompt {
+      for rtl in [TypingLanguage.arabic, .hebrew] {
+        XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, rtl, language])),
+          "The current catalog must not silently fall back for \(language.rawValue)")
+      }
+    }
   }
 
   private func configuration(_ languages: [TypingLanguage], base: TypingLanguage? = .english,
