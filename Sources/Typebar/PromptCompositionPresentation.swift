@@ -9,7 +9,8 @@ enum PromptFieldProjectionPolicy {
     return configuration.mixedLanguageComponents.allSatisfy { language in
       switch language {
       case .hebrew, .hebrew1k, .hebrew5k, .hebrew10k,
-        .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco: return true
+        .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
+        .persian, .persian1k, .persian5k, .persian20k, .urdu, .urdu1k: return true
       default: return !language.usesJoiningScriptPrompt
       }
     }

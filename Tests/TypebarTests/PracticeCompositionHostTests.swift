@@ -51,10 +51,25 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .arabic)
   }
 
+  func testPersianMixedDirectionProductionCompositionPreservesJoinedRun() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .persian)
+  }
+
+  func testUrduMixedDirectionProductionCompositionPreservesJoinedRun() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .urdu)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
-    let mixedText = mixedLanguage == .arabic ? "ab سلام cd" : "ab אב cd"
-    let lastRTLSlot = mixedLanguage == .arabic ? 6 : 4
+    let checksConnectedRun = [.arabic, .persian, .urdu].contains(mixedLanguage)
+    let mixedText: String
+    switch mixedLanguage {
+    case .persian: mixedText = "ab سلام پیام cd"
+    case .urdu: mixedText = "ab سلام ٹماٹر cd"
+    default: mixedText = checksConnectedRun ? "ab سلام cd" : "ab אב cd"
+    }
+    let extendedLastSlot = mixedLanguage == .persian ? 11 : (mixedLanguage == .urdu ? 12 : nil)
+    let lastRTLSlot = checksConnectedRun ? 6 : 4
     for automaticSizing in [true, false, false, true] {
       let suite = "PracticeCompositionHostTests.\(UUID())"
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -109,6 +124,12 @@ import XCTest
       func fields(in view: NSView) -> [PromptFieldNativeView] {
         (view as? PromptFieldNativeView).map { [$0] } ?? view.subviews.flatMap { fields(in: $0) }
       }
+      func checkExtendedRun(_ field: PromptFieldNativeView) throws {
+        guard let extendedLastSlot else { return }
+        XCTAssertGreaterThan(try XCTUnwrap(field.measuredRect(for: 8)).minX,
+          try XCTUnwrap(field.measuredRect(for: extendedLastSlot)).minX,
+          "Language-specific letters must retain their own RTL shaping and source slots")
+      }
       if mixedDirection {
         let field = try XCTUnwrap(fields(in: host).first)
         XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
@@ -116,6 +137,7 @@ import XCTest
         let lastRTL = try XCTUnwrap(field.measuredRect(for: lastRTLSlot))
         XCTAssertGreaterThan(firstRTL.minX, lastRTL.minX,
           "Production word shaping must retain the RTL run's physical order")
+        try checkExtendedRun(field)
       }
       if checksMarkedText {
         for style in CompositionDisplayStyle.allCases {
@@ -143,6 +165,7 @@ import XCTest
               XCTAssertGreaterThan(try XCTUnwrap(field.measuredRect(for: 3)).minX,
                 try XCTUnwrap(field.measuredRect(for: lastRTLSlot)).minX,
                 "Candidate projection must not reverse the untouched RTL run")
+              try checkExtendedRun(field)
             }
           }
           input.unmarkText()
@@ -188,13 +211,13 @@ import XCTest
         flush()
         XCTAssertTrue(inputs(in: host).contains { $0 === input })
         XCTAssertFalse(window.isVisible)
-        if mixedLanguage == .arabic {
+        if checksConnectedRun {
           input.insertText("ab ", replacementRange: .init(location: NSNotFound, length: 0))
           input.setMarkedText("سلا", selectedRange: .init(location: 3, length: 0),
             replacementRange: .init(location: NSNotFound, length: 0))
           flush()
           let field = try XCTUnwrap(fields(in: host).first)
-          XCTAssertEqual(field.accessibilityValue() as? String, "ab سلام cd")
+          XCTAssertEqual(field.accessibilityValue() as? String, mixedText)
           XCTAssertEqual(try XCTUnwrap(field.measuredRect(for: 4)),
             try XCTUnwrap(field.measuredRect(for: 5)),
             "A marked lam-alef must stay joined within the active Arabic field")

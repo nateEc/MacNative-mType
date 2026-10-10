@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+当前 Persian／Urdu 混排已接通生产组合入口，完整宿主验证三种显示、更新取消／提交回删、连字与特有文字 run 顺序，见 [组合投影合同](COMPOSITION_PROJECTION_CONTRACT.md)。210 项相关回归及固定参考 30 项强化专项零失败零跳过，原创性通过，零主程序启动。Pashto 等其他混排仍回退，真实 IME、字体／跨行与首键未验；compositionDisplay 仍部分、配置 89／4／1 与完整 goal active 不变。此前全量冻结门禁不覆盖本次新增策略，下方 Persian 回退描述为历史快照。
+
 当前 [混排入口完整冻结复验](COMPOSITION_PROJECTION_CONTRACT.md)通过：冻结 ed098bf，845 文件 SHA-256 终态一致，客户端 4,202／服务 501 项零失败，74 日志与未打开的 Release 包／签名／原创性检查通过。首轮旧字符串断言失败已保留并修正复验，零 Typebar 主程序启动。该证据不替代真实 IME、首键性能、精确主题与人工验收；配置 89／4／1 及完整 goal active 不变。
 
 当前 Arabic／LTR 混排已接入多槽组合生产入口，保留整词 shaping 与独立 canonical 槽；完整宿主检查三种组合显示、未改动 Arabic run 顺序、活动字段的 lam-alef 候选更新／取消及部分已提交文字与候选继续连写。194 项定向回归零失败零跳过、原创性通过，见 [组合入口合同](COMPOSITION_PROJECTION_CONTRACT.md)。Persian 等其他混排仍回退，真实 IME／全部方向与字体／可见窗口未验；compositionDisplay 仍部分、配置 89／4／1 与完整 goal active 不变，零主程序启动。下方 Arabic 混排回退描述为本轮之前的快照。

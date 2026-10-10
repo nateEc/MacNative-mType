@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## Persian／Urdu 混排生产入口与特有字形（2026-10-10）
+
+新增 Persian、Urdu 各自的完整生产宿主测试，隔离选择／存储和四组尺寸配置不变。persian-urdu-mixed-host-red.log 两项两处预期失败（3.349s，墙钟 3.350），两种配置均缺少 PromptFieldNativeView。共享策略加入 Persian 四个词库与 Urdu 两个词库，未改变原生整词 shaping、输入规范化或计时器；策略与 Tape 入口测试同步验证新增家族及 English／Arabic／Persian／Urdu 共存，Pashto 作为仍未验证家族保留回退反例。
+
+persian-urdu-mixed-host-final.log 210 项零失败零跳过（116.048s，墙钟 116.072），含全部六项完整宿主、字段／光标、方向、组合、普通 Tape 和 Tape 前进。随后强化自有文本：Persian“ab سلام پیام cd”、Urdu“ab سلام ٹماٹر cd”，精确检查源文本和两种特有文字 run 的 RTL 几何，在 replace 候选更新后重复验证；活动字段仍检查非空 lam-alef 连字、取消不消耗源槽、部分提交后继续候选、输入及字段 owner 保留。
+
+persian-urdu-mixed-specific-letters.log 30 项零失败但漏传参考导致一项源码测试跳过（36.377s，墙钟 36.381），不算完整专项通过。终态后补固定参考／归档重跑，persian-urdu-mixed-specific-pinned.log 30 项零失败零跳过（37.582s，墙钟 37.587）。固定参考原创性检查退出 0，全部测试与审计终态后才编辑文档，零 Typebar 主程序启动。
+
+新增特有字形证据针对提示中未改动的 run，不等同所有 Persian／Urdu 实体 IME 候选、字体或跨行组合。其他 mixed shaping 家族、真实键盘／IME、可见窗口和首键性能仍开放；compositionDisplay 仍部分，完整 goal active。未重跑本次新策略之后的完整门禁／Release GUI，下方 ed098bf 全量证据仅覆盖此前冻结版本。
+
 ## 混排入口完整冻结门禁复验通过（2026-10-10）
 
 冻结已推送 ed098bf988109dab51331e90546f19cbbcc2ad55，完整重跑 check-native-rewrite-readiness.sh；固定参考 91bd24bb8513785c7364cbea29296ff7adafac41、Redis 6.2.6 和锁定 Anime 归档不变。主会话 17756 权威退出 0 后才编辑记录。845 个跟踪文件运行前 SHA-256 快照在结束后全部核对通过；期间无源码编辑、并行第二轮或因日志缓冲重启。
