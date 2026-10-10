@@ -79,9 +79,19 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .bangla)
   }
 
+  func testArabicHindiMixedProductionCompositionPreservesOppositeJoiningRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .hindi)
+  }
+
+  func testArabicHindi1kMixedProductionCompositionPreservesOppositeJoiningRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .hindi1k)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
-    let checksConnectedRun = [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral, .bangla].contains(mixedLanguage)
+    let checksHindi = [.hindi, .hindi1k].contains(mixedLanguage)
+    let checksLTRJoiningRun = mixedLanguage == .bangla || checksHindi
+    let checksConnectedRun = checksLTRJoiningRun || [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
     case .persian: extendedWord = "پیام"
@@ -91,6 +101,7 @@ import XCTest
     case .kurdishCentral: extendedWord = "کوردی"
     case .yiddish: extendedWord = "ייִדיש"
     case .bangla: extendedWord = "বাংলা"
+    case .hindi, .hindi1k: extendedWord = "किरण"
     default: extendedWord = nil
     }
     let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
@@ -108,8 +119,8 @@ import XCTest
       if let mixedLanguage {
         let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
           difficulty: .normal, rules: .init(), language: .mixedLanguages,
-          mixedLanguageComponents: mixedLanguage == .bangla
-            ? [.english, .arabic, .bangla] : [.english, mixedLanguage])
+          mixedLanguageComponents: checksLTRJoiningRun
+            ? [.english, .arabic, mixedLanguage] : [.english, mixedLanguage])
         let selection = ActiveTestSelectionDocument(
           preset: .init(configuration: configuration, customText: mixedText),
           testParameterMemory: .legacyDefaults(configuration: configuration))
@@ -157,9 +168,9 @@ import XCTest
         guard let extendedLastSlot else { return }
         let first = try XCTUnwrap(field.measuredRect(for: extendedFirstSlot))
         let last = try XCTUnwrap(field.measuredRect(for: extendedLastSlot))
-        if mixedLanguage == .bangla {
+        if checksLTRJoiningRun {
           XCTAssertLessThan(first.minX, last.minX,
-            "Bangla must retain LTR shaping next to the Arabic RTL run")
+            "The Indic run must retain LTR shaping next to the Arabic RTL run")
         } else {
           XCTAssertGreaterThan(first.minX, last.minX,
             "Language-specific letters must retain their own RTL shaping and source slots")
@@ -269,13 +280,16 @@ import XCTest
           input.unmarkText(); flush()
           XCTAssertFalse(input.hasMarkedText())
           XCTAssertFalse(window.isVisible)
-          if mixedLanguage == .bangla {
+          if checksLTRJoiningRun {
+            let firstPart = checksHindi ? "कि" : "বাং"
+            let lastPart = checksHindi ? "रण" : "লা"
+            let wholeWord = try XCTUnwrap(extendedWord)
             input.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
             input.insertText("سلام ", replacementRange: .init(location: NSNotFound, length: 0))
-            input.setMarkedText("বাং", selectedRange: .init(location: "বাং".utf16.count, length: 0),
+            input.setMarkedText(firstPart, selectedRange: .init(location: firstPart.utf16.count, length: 0),
               replacementRange: .init(location: NSNotFound, length: 0))
             flush()
-            input.setMarkedText("বাংলা", selectedRange: .init(location: "বাংলা".utf16.count, length: 0),
+            input.setMarkedText(wholeWord, selectedRange: .init(location: wholeWord.utf16.count, length: 0),
               replacementRange: .init(location: NSNotFound, length: 0))
             flush()
             XCTAssertTrue(input.hasMarkedText())
@@ -283,9 +297,9 @@ import XCTest
             try checkExtendedRun(field)
             input.unmarkText(); flush()
             XCTAssertEqual(field.accessibilityValue() as? String, mixedText,
-              "Cancelling Bangla must retain the source after the completed Arabic word")
-            input.insertText("বাং", replacementRange: .init(location: NSNotFound, length: 0))
-            input.setMarkedText("লা", selectedRange: .init(location: "লা".utf16.count, length: 0),
+              "Cancelling the Indic candidate must retain the source after the completed Arabic word")
+            input.insertText(firstPart, replacementRange: .init(location: NSNotFound, length: 0))
+            input.setMarkedText(lastPart, selectedRange: .init(location: lastPart.utf16.count, length: 0),
               replacementRange: .init(location: NSNotFound, length: 0))
             flush()
             XCTAssertTrue(input.hasMarkedText())

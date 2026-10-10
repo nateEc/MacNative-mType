@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## Arabic／Hindi 两目录混排生产入口与跨行候选（2026-10-10）
+
+固定参考仍为 91bd24bb8513785c7364cbea29296ff7adafac41，工作树干净；只读复核 insert-text.ts 的组合结束输入边界，不复制源码或资产。新增实际 practiceContent 宿主以自有文本“ab سلام किरण cd”、English／Arabic／Hindi 选择复现原生字段未挂载：arabic-hindi-host-red.log 一项一处预期失败（1.809s，墙钟 1.810）。生产只把 Hindi／Hindi 1k 加入共享准入策略，不改变 shaping、计时或布局实现；Tamil 等未验证连写混排继续回退。
+
+宿主沿用默认／空／空／默认四组 sizingOptions、内存 SwiftData 与隔离偏好；覆盖三种候选显示、更新／取消、提交／回删与输入 owner 保持。进入 Arabic 字段保留 lam-alef 连接，再进入 Hindi 字段，候选“कि”→“किरण”→取消；接受“कि”后标记“रण”，检查源辅助文本精确对应、原生字段／输入 owner 保持、Arabic RTL 与 Hindi LTR 两端物理顺序。Hindi 1k 独立宿主复验同样边界。该夹具覆盖带前置元音的多 UTF-16 单位，不代表全部天城文连字／实体 IME 验收。
+
+跨行回归复用既有 Bangla 场景，在 Hindi 两目录分别验证 Arabic 与 Hindi 活动字段；三种显示、两种字体、90pt 宽度，十二次重复长候选→短词→取消。保留每槽几何、实际多行、后续字段不重叠、canonical 前后方向、主光标及复用与全新布局一致，取消恢复原 slots／aliases；没有删除 Bangla 断言。
+
+arabic-hindi-host-focused.log 29 项零失败、一项因首次未提供参考环境跳过（22.376s，墙钟 22.380），不当作零跳过证据。补齐固定参考和锁定 Anime 归档后 arabic-hindi-regression.log 135 项零失败零跳过（179.134s，墙钟 179.148），含十二项完整宿主、布局／投影／方向／普通 Tape／退休回调；新增 Hindi 跨行 0.305s。随后补 Hindi 1k 宿主并整理共享测试变量，arabic-hindi-identities-final.log 四项零失败零跳过（52.970s，墙钟 52.972），包含 Hindi／Hindi 1k／Bangla 三宿主及 Hindi 跨行；之前广回归并不包含最后新增的宿主方法。
+
+固定参考原创性边界退出 0；会话内风险审查检查两个策略消费入口、准入范围、测试保留及退休，不是独立评审。所有测试／审计终态后才写记录，零 Typebar 主程序启动。真实 IME、全部字体、RTL 基准段落与其他语言混排、Pace／ASL／Choo 组合实机及新完整冻结门禁仍待验；模型与不可见宿主不证明这些范围，compositionDisplay 部分与完整 goal active 不变。
+
 ## RTL 与 Bangla 增量完整冻结门禁通过（2026-10-10）
 
 冻结已推送提交 2ca44a81659f8b1d713b301e19e8d1ed80681f7a，运行完整 check-native-rewrite-readiness.sh；固定参考 91bd24bb8513785c7364cbea29296ff7adafac41、隔离 Redis 6.2.6、锁定 Anime 归档保持。主会话 39486 权威退出 0 后才编辑本记录。845 个跟踪文件运行前 SHA-256 快照在终态全部核对通过；没有中途源码编辑、并行第二轮或因输出缓冲重启。

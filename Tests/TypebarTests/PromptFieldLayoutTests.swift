@@ -402,12 +402,22 @@ import XCTest
   }
 
   func testWrappedOppositeJoiningCandidatesReuseAndCancelWithoutStaleSlots() throws {
+    try checkWrappedOppositeJoiningCandidates(language: .bangla, word: "বাংলা")
+  }
+
+  func testWrappedHindiCandidatesReuseAndCancelWithoutStaleSlots() throws {
+    for language in [TypingLanguage.hindi, .hindi1k] {
+      try checkWrappedOppositeJoiningCandidates(language: language, word: "किरण")
+    }
+  }
+
+  private func checkWrappedOppositeJoiningCandidates(language: TypingLanguage, word indicWord: String) throws {
     let configuration = TestConfiguration.words(4, language: .mixedLanguages,
-      mixedLanguageComponents: [.english, .arabic, .bangla])
+      mixedLanguageComponents: [.english, .arabic, language])
     for (accepted, word, owner, rtl) in [
-      ("ab ", "سلام", 1, true), ("ab سلام ", "বাংলা", 2, false)
+      ("ab ", "سلام", 1, true), ("ab سلام ", indicWord, 2, false)
     ] {
-      var session = TypingSession(configuration: configuration, prompt: "ab سلام বাংলা cd")
+      var session = TypingSession(configuration: configuration, prompt: "ab سلام \(indicWord) cd")
       session.insertBatch(accepted, at: start)
       for style in CompositionDisplayStyle.allCases {
         for testedFont in [font, NSFont.systemFont(ofSize: 28, weight: .regular)] {

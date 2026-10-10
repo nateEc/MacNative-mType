@@ -119,8 +119,10 @@ import XCTest
     }
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
       mixedLanguageComponents: [.english, .arabic, .bangla])))
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
+    XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
       mixedLanguageComponents: [.english, .arabic, .hindi])))
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
+      mixedLanguageComponents: [.english, .arabic, .tamil])))
   }
 
   func testSwiftUIBridgeUsesExplicitProjectedFieldInsteadOfLegacyCaretOffset() throws {

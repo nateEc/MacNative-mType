@@ -12,7 +12,7 @@ enum PromptFieldProjectionPolicy {
         .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
         .persian, .persian1k, .persian5k, .persian20k, .urdu, .urdu1k, .urdu5k,
         .pashto, .sindhi, .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k,
-        .yiddish, .bangla, .bangla10k, .banglaLetters: return true
+        .yiddish, .bangla, .bangla10k, .banglaLetters, .hindi, .hindi1k: return true
       default: return !language.usesJoiningScriptPrompt
       }
     }
