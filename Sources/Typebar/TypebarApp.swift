@@ -82,10 +82,13 @@ struct TypebarApp: App {
   static func practiceContent(settings: AppSettings, account: AccountSession,
     announcements: RemoteAnnouncementCenter, hotkey: GlobalHotkeyMonitor,
     systemKeyboardGuide: SystemKeyboardGuideMonitor, network: NetworkConnectivityMonitor,
-    systemAppearance: SystemAppearanceMonitor) -> some View {
+    systemAppearance: SystemAppearanceMonitor,
+    liveContentFetch: @escaping @MainActor (LivePracticeContentSource, TypingLanguage) async -> LivePracticeContent? = {
+      await LivePracticeContentService.fetch(source: $0, language: $1)
+    }) -> some View {
     ContentView(settings: settings, account: account, announcements: announcements,
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
-      systemAppearance: systemAppearance)
+      systemAppearance: systemAppearance, liveContentFetch: liveContentFetch)
   }
 
   private static let modelConfiguration = ModelConfiguration(
@@ -1173,6 +1176,7 @@ private struct ContentView: View {
   let systemKeyboardGuide: SystemKeyboardGuideMonitor
   let network: NetworkConnectivityMonitor
   let systemAppearance: SystemAppearanceMonitor
+  let liveContentFetch: @MainActor (LivePracticeContentSource, TypingLanguage) async -> LivePracticeContent?
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
@@ -4436,7 +4440,7 @@ private struct ContentView: View {
     isLoadingLiveContent = true
     liveContentMessage = "正在获取随机\(source.displayName)；失败时继续使用离线内容。"
     Task {
-      let content = await LivePracticeContentService.fetch(source: source, language: configuration.language)
+      let content = await liveContentFetch(source, configuration.language)
       guard requestID == liveContentRequestID else { return }
       isLoadingLiveContent = false
       guard let content else {
@@ -4461,6 +4465,7 @@ private struct ContentView: View {
         showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
       session = session.withElapsedClock()
       liveContentMessage = "已载入\(content.attribution)。"
+      refreshPaceTarget()
       if configuration.modifiers.contains(.listening) {
         NativeSpeech.shared.speak(session.prompt, language: configuration.language)
       }

@@ -1,5 +1,15 @@
 # 完整提示行的模式与限制规则
 
+## TST-02：延迟在线替换的当前设置与 Pace 修复（2026-10-10）
+
+在同一个实际生产 practiceContent 入口增加默认仍调用既有服务的主线程异步获取闭包，供测试在网络边界返回自有内容；不增加网络端点、请求、存储字段或发布行为。不可见 NSWindow／内存库宿主使用延迟诗歌夹具，等待请求挂起后开启完整行，再返回自有三词循环的 151 词内容；实际字段辅助功能文本等于全部预期提示。直接通过原生输入 owner 输入首字后，检查独立 outline Pace 标记存在且未隐藏。未打开窗口或 Typebar 主程序，无真实网络。
+
+该检查定位出在线返回重建会话后遗漏 Pace 初始化：原版固定 test-logic.ts 在完成 init 后调用 PaceCaret.init，而本机离线 reset 已配置 Pace，在线替换却丢失其进度对象。现在在替换会话及 elapsed clock 就绪后调用既有 refreshPaceTarget，以新提示和当前设置重新求取速度，再处理 listening／焦点；请求 ID、配置及已开始守卫保持。并非改变正在进行的输入或复用旧提示的 Pace 几何。
+
+准备阶段 `live-replacement-host-red.log` 是测试夹具并发隔离编译错误，`red-behavior.log` 未设置全局 Funbox 而没有加载，均不计缺陷红测；`red-configured.log` 暴露多次请求的夹具 continuation 清理不足，保留该诊断。改为保存并恢复全部等待请求后，`work/live-replacement-host-red-final.log` 一项一处预期失败（3.974s，墙钟 3.975），只缺 Pace 标记，完整提示断言已通过。产品修复后 `live-replacement-host-green.log` 新宿主＋三项在线预览＋十八项完整行共 22 项零失败零跳过（8.374s，墙钟 8.378）。
+
+`live-replacement-pace-regression.log` 扩展 62 项有一项因缺参考环境跳过；补齐固定参考及 Node 22.22.1 后，`live-replacement-pace-regression-final.log` 相同 62 项零失败零跳过（1.254s，墙钟 1.260），覆盖 Pace 时钟／推进／结果选择／账户标签及在线解析。`live-replacement-originality.log` 固定参考边界通过；会话内有界风险审查未发现新增可落实问题，不是独立审计。尚未对该产品增量运行新完整门禁／Release，下面 `941679f` 冻结证据属于修改前。真实联网、物理 IME、所有 Pace 模式与异步排列、视觉／性能和完整预览残余差异仍开放；兼容分类及完整 goal active 不变。
+
 ## TST-02：在线完整预览增量的完整冻结验证（2026-10-10）
 
 冻结提交 `941679f2a19dfe3f7e2ba0fd6d069e8302cca166` 的单次完整 readiness 门禁与终态 SHA-256 检查均退出零；851 个跟踪输入全部一致，项目及固定参考工作区干净。证据保留于 `work/frozen-readiness-live-preview.zYxg32`：`gate.log`、`freeze-verification.log` 和 `logs/` 内 74 份阶段日志。参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`，不是最新上游兼容声明。
