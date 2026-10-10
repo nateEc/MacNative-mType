@@ -64,7 +64,7 @@ struct TypebarApp: App {
   }
 
   private var rootContent: some View {
-    ContentView(
+    Self.practiceContent(
       settings: settings, account: account, announcements: announcements, hotkey: hotkey,
       systemKeyboardGuide: systemKeyboardGuide, network: network, systemAppearance: systemAppearance)
       .frame(minWidth: 760, minHeight: 480)
@@ -76,6 +76,16 @@ struct TypebarApp: App {
       .onChange(of: account.currentUser?.id) { _, _ in
         Task { await announcements.refresh(using: account) }
       }
+  }
+
+  /// One production composition entry for the app and isolated hosted checks.
+  static func practiceContent(settings: AppSettings, account: AccountSession,
+    announcements: RemoteAnnouncementCenter, hotkey: GlobalHotkeyMonitor,
+    systemKeyboardGuide: SystemKeyboardGuideMonitor, network: NetworkConnectivityMonitor,
+    systemAppearance: SystemAppearanceMonitor) -> some View {
+    ContentView(settings: settings, account: account, announcements: announcements,
+      hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
+      systemAppearance: systemAppearance)
   }
 
   private static let modelConfiguration = ModelConfiguration(

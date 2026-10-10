@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 完整生产练习页的不可见宿主证据（2026-10-10）
+
+应用 rootContent 与新测试共用 TypebarApp.practiceContent，原有 ContentView、依赖和生命周期不复制、不裁剪；应用外层恢复账户／公告任务与窗口配置仍留原处。新增 PracticeCompositionHostTests，以独立 UserDefaults suite、内存 SwiftData 容器及未显示窗口挂载实际生产练习页，直接调用原生 NSTextInputClient 插入首字符，断言原生输入 owner 仍为同一实例。不同于实际 macOS 键盘／IME／可见 WindowGroup，不将其当作实机验收。探索性机制排查无故意失败阶段；共用入口仅纯组合抽取，不改计时、配置或呈现规则。
+
+practice-composition-host.log 一项通过（2.894s），首输入及布局 0.643120s。进一步按默认／空／空／默认 sizingOptions 顺序对照完整宿主，practice-composition-sizing-comparison.log 与光标、统计范围等 20 项零失败零跳过（10.455s，墙钟 10.458），四组分别 0.640804／0.644176／0.647548／0.652063s。关闭整页尺寸协商没有显著解除局部开销，维持生产尺寸选项不变。固定顺序和冷缓存仍非公平性能基准。
+
+分段 practice-composition-phase-probe.log 一项通过（9.231s，墙钟 9.233）：输入回调 0.000528–0.000894s、首次同步布局 0.358303–0.364460s、要求至少 100ms 的事件交付阶段实际 0.282541–0.316829s、末次布局约 20–28 微秒。该分段将主要局部工作定位在布局／交付，而非输入回调；不能把交付阶段全部解释为 CPU 忙碌或推断具体控件责任。新增宿主可在不启动主程序的情况下继续做实际生产页对照。
+
+格式化后 practice-composition-final-regression.log 六项零失败零跳过（13.818s，墙钟 13.821），涵盖生产页、统计依赖／范围、空闲观察与原生窗口焦点；首次布局仍约 0.357–0.364s。practice-composition-originality.log 固定参考原创性检查退出 0。所有编译／测试／审计终态后才补文档，本轮零 Typebar 主程序启动、无全量门禁或新 Release 验收。首键计时失败和完整功能兼容仍未关闭，goal active。
+
 ## 固定光标宿主尺寸协商局部反证（2026-10-10）
 
 沿失败前布局采样检查 PromptCaretNativeView.paint：光标由原生 frame 定位，其内容是独立 NSHostingView。按源码驱动技能读取已安装 Xcode macOS SDK 的 SwiftUI.swiftinterface，确认 NSHostingView.sizingOptions 与 NSHostingSizingOptions 在 macOS 13 起可用，低于项目最低 macOS 14；接口仅证明签名和可用性，不据此推断框架内部耗时或默认行为。
