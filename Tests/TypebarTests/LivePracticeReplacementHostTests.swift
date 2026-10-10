@@ -34,8 +34,12 @@ import XCTest
     try checkDelayedReplacement(disablesPace: true)
   }
 
+  func testLiveResponseDuringUncommittedCompositionPreservesPromptAndCandidate() throws {
+    try checkDelayedReplacement(composesBeforeReturn: true)
+  }
+
   private func checkDelayedReplacement(startsBeforeReturn: Bool = false,
-    disablesPace: Bool = false) throws {
+    disablesPace: Bool = false, composesBeforeReturn: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -46,6 +50,7 @@ import XCTest
     settings.paceCaretStyle = .outline
     settings.showAllPracticeLines = false
     settings.testModifiers = [.poetryStream]
+    if composesBeforeReturn { settings.compositionDisplayStyle = .below }
     let configuration = TestConfiguration.words(151).with(modifiers: [.poetryStream])
     XCTAssertTrue(settings.saveActiveTestSelection(.init(
       preset: .init(configuration: configuration),
@@ -83,6 +88,12 @@ import XCTest
     let initialPrompt = try XCTUnwrap(initialField.accessibilityValue() as? String)
     let initialInput = try XCTUnwrap(views(TypingInputView.self, in: host).first)
     var startedCaret: CGRect?
+    if composesBeforeReturn {
+      initialInput.setMarkedText("中文", selectedRange: .init(location: 2, length: 0),
+        replacementRange: .init(location: NSNotFound, length: 0))
+      flush()
+      XCTAssertTrue(initialInput.hasMarkedText())
+    }
     if startsBeforeReturn {
       // Exercise the native focus callbacks without activating this window.
       // A genuinely unfocused production window intentionally has no main marker.
@@ -99,7 +110,8 @@ import XCTest
     for _ in 0..<5 { flush() }
     let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
     let expected = (0..<151).map { ["quiet", "harbor", "morning"][$0 % 3] }.joined(separator: " ")
-    XCTAssertEqual(field.accessibilityValue() as? String, startsBeforeReturn ? initialPrompt : expected,
+    XCTAssertEqual(field.accessibilityValue() as? String,
+      startsBeforeReturn || composesBeforeReturn ? initialPrompt : expected,
       "Use current display settings only before input starts; a late response must not replace an active prompt")
     let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
     XCTAssertTrue(input === initialInput, "Transport completion must not replace the native input owner")
@@ -108,10 +120,18 @@ import XCTest
         .first { $0.rootView.style == .bar && !$0.isHidden })
       XCTAssertEqual(caret.frame, startedCaret,
         "The accepted first character's main caret must not reset when the response arrives")
-    } else {
+    } else if !composesBeforeReturn {
       input.insertText("q", replacementRange: .init(location: NSNotFound, length: 0))
     }
     flush()
+    if composesBeforeReturn {
+      XCTAssertTrue(input.hasMarkedText(), "A late response must not end native marked text")
+      XCTAssertTrue(views(NSTextField.self, in: host)
+        .contains { $0.accessibilityLabel() == "正在组合：中文" },
+        "The exact uncommitted candidate must remain attached to the production prompt")
+      XCTAssertFalse(window.isVisible)
+      return
+    }
     let markers = views(NSHostingView<PromptCaretMarkerView>.self, in: host)
     XCTAssertEqual(markers.contains { $0.rootView.style == .outline && !$0.isHidden }, !disablesPace,
       "Online completion must use the current Pace choice, not the pre-request choice")
