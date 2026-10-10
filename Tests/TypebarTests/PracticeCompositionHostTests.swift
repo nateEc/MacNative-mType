@@ -127,6 +127,34 @@ import XCTest
           XCTAssertTrue(inputs(in: host).contains { $0 === input })
           XCTAssertFalse(window.isVisible)
         }
+        settings.compositionDisplayStyle = .replace
+        input.setMarkedText(
+          "候", selectedRange: .init(location: 1, length: 0),
+          replacementRange: .init(location: NSNotFound, length: 0))
+        input.insertText("Q", replacementRange: .init(location: NSNotFound, length: 0))
+        flush()
+        XCTAssertFalse(input.hasMarkedText(), "Accepting text must clear the native marked range")
+        input.setMarkedText(
+          "候", selectedRange: .init(location: 1, length: 0),
+          replacementRange: .init(location: NSNotFound, length: 0))
+        flush()
+        let afterCommit = try XCTUnwrap(fields(in: host).first?.accessibilityValue() as? String)
+        XCTAssertTrue(afterCommit.contains("候"))
+        XCTAssertFalse(
+          afterCommit.hasPrefix("候"), "Accepted input must advance the production caret")
+        input.unmarkText()
+        input.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+        input.setMarkedText(
+          "候", selectedRange: .init(location: 1, length: 0),
+          replacementRange: .init(location: NSNotFound, length: 0))
+        flush()
+        XCTAssertTrue(
+          (fields(in: host).first?.accessibilityValue() as? String)?.hasPrefix("候") == true,
+          "Deleting the accepted character must restore the first target slot")
+        input.unmarkText()
+        flush()
+        XCTAssertTrue(inputs(in: host).contains { $0 === input })
+        XCTAssertFalse(window.isVisible)
         continue
       }
       for (insertion, text) in ["a", "b", "c"].enumerated() {

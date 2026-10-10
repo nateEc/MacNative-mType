@@ -2,6 +2,8 @@
 
 ## 当前生产入口补证（2026-10-10）
 
+提交链路增量：四组实际生产宿主先设置候选，再经 insertText 接受一个 ASCII 字符；确认 marked range 清空，重新组合的原生可访问内容包含候选但不再从首槽开始。随后通过真实 responder deleteBackward 命令删除接受字符，重新组合恢复首槽前缀。此检查通过后续实际呈现观察会话推进／回删，不读取私有会话，也不将取消链路的内容相同当成提交证明。practice-production-composition-commit.log 与组合完成／Return 回归共 20 项零失败零跳过（44.807s，墙钟 44.809），含两个完整宿主用例。该验证补已有行为覆盖，无故意失败阶段；仍不是真实系统 IME／候选窗口／多字符接受／混合 RTL／成绩验收。本轮生产代码未改、零 GUI 主程序启动、未重跑全量门禁，部分分类与完整 goal active 保持。
+
 下方为模型建立时的历史证据，不能将“尚未替换生产渲染”当作当前状态。当前 ContentView.renderedPrompt 已在非混合 RTL 门控下调用 PromptCompositionPresentation，原生字段呈现已消费 compositionTextMap；完整功能仍未验收。
 
 PracticeCompositionHostTests 新增独立生产入口测试，共用实际 TypebarApp.practiceContent、隔离设置／内存 SwiftData 与不可见窗口，不复制简化渲染。四组宿主逐一选择 off／below／replace，通过真实 TypingInputView.setMarkedText 更新候选；检查 PromptFieldNativeView 的实际可访问值是否按 replace 显示候选、更新时字段 owner 保留，取消后重组同一候选的内容精确相同，输入 owner 保留且窗口未显示。直接 NSTextInputClient 调用不是实体键盘或系统 IME，未证明 below 浮层的视觉位置。原连续输入测试独立运行，不用组合预热污染原始诊断。
