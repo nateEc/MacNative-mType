@@ -1,6 +1,8 @@
 # 功能盘点与追踪表
 
-当前混排生产入口新增 Tamil／Tamil 1k／Tamil Old：三个实际宿主先复现原生字段缺失，再开放三目录准入；验证带组合元音候选更新／取消／部分提交、相反方向与 owner 保持，另有全部样式的跨行候选恢复。165 项扩展回归零失败零跳过，含十六项生产宿主和 ASL／Choo 既有组件，原创性边界通过，详见 [Tamil 混排证据](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动；真实 IME、全部字体、可见效果及新完整门禁仍待验，功能分类与 goal active 不变。
+当前 TST-02 混排入口新增 Gujarati／Gujarati 1k：两个实际宿主先复现字段缺失，再开放准入；带前置元音候选更新／取消／部分提交、相反方向、owner 保持及跨行缓存恢复有回归。168 项扩展检查零失败零跳过，含十八项生产宿主；原创性边界通过，详见 [Gujarati 证据与人工步骤](COMPOSITION_PROJECTION_CONTRACT.md)。不涉及存储迁移或网络行为，零 Typebar 主程序启动；真实 IME、全部字体和新完整门禁仍待验，功能分类与 goal active 不变。
+
+此前混排生产入口新增 Tamil／Tamil 1k／Tamil Old：三个实际宿主先复现原生字段缺失，再开放三目录准入；验证带组合元音候选更新／取消／部分提交、相反方向与 owner 保持，另有全部样式的跨行候选恢复。165 项扩展回归零失败零跳过，含十六项生产宿主和 ASL／Choo 既有组件，原创性边界通过，详见 [Tamil 混排证据](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动；真实 IME、全部字体、可见效果及新完整门禁仍待验。
 
 此前混排生产入口新增 Hindi／Hindi 1k：先复现原生字段缺失，再解除这两个目录的准入回退；实际宿主覆盖 Arabic 与 Hindi 相反方向、带元音候选更新／取消／部分提交及 owner 保持，两目录跨行候选／缓存恢复有回归。135 项扩展回归与后补四项身份／共享路径检查均零失败零跳过，原创性边界通过，零主程序启动，详见 [Hindi 混排证据](COMPOSITION_PROJECTION_CONTRACT.md)。真实 IME、全部字体及新完整门禁仍待验。
 

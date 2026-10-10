@@ -99,11 +99,20 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .tamilOld)
   }
 
+  func testArabicGujaratiMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .gujarati)
+  }
+
+  func testArabicGujarati1kMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .gujarati1k)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
     let checksHindi = [.hindi, .hindi1k].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
-    let checksLTRJoiningRun = mixedLanguage == .bangla || checksHindi || checksTamil
+    let checksGujarati = [.gujarati, .gujarati1k].contains(mixedLanguage)
+    let checksLTRJoiningRun = mixedLanguage == .bangla || checksHindi || checksTamil || checksGujarati
     let checksConnectedRun = checksLTRJoiningRun || [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
@@ -116,6 +125,7 @@ import XCTest
     case .bangla: extendedWord = "বাংলা"
     case .hindi, .hindi1k: extendedWord = "किरण"
     case .tamil, .tamil1k, .tamilOld: extendedWord = "கொடி"
+    case .gujarati, .gujarati1k: extendedWord = "કિરણ"
     default: extendedWord = nil
     }
     let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
@@ -295,8 +305,11 @@ import XCTest
           XCTAssertFalse(input.hasMarkedText())
           XCTAssertFalse(window.isVisible)
           if checksLTRJoiningRun {
-            let firstPart = checksTamil ? "கொ" : checksHindi ? "कि" : "বাং"
-            let lastPart = checksTamil ? "டி" : checksHindi ? "रण" : "লা"
+            let firstPart: String, lastPart: String
+            if checksGujarati { (firstPart, lastPart) = ("કિ", "રણ") }
+            else if checksTamil { (firstPart, lastPart) = ("கொ", "டி") }
+            else if checksHindi { (firstPart, lastPart) = ("कि", "रण") }
+            else { (firstPart, lastPart) = ("বাং", "লা") }
             let wholeWord = try XCTUnwrap(extendedWord)
             input.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
             input.insertText("سلام ", replacementRange: .init(location: NSNotFound, length: 0))

@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：Arabic／Gujarati 两目录混排生产入口（2026-10-10）
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 保持干净，只读复核 test-ui.ts 的候选显示分支，未复制代码或资源。自有文本“ab سلام કિરણ cd”，Gujarati／Gujarati 1k 两个实际生产宿主先复现原生字段缺失：arabic-gujarati-host-red.log 两项两处预期失败（2.454s，墙钟 2.455）。生产只在共享投影准入增加两个目录；Nepali 等尚未验证的混排继续回退。
+
+PracticeCompositionHostTests 在四种尺寸策略中保留初始字段三样式更新／取消、提交／回删及 Arabic lam-alef 检查，再以 replace 进入 Gujarati 字段，标记“કિ”→“કિરણ”、取消、接受“કિ”后标记“રણ”。断言精确源辅助文本、Arabic RTL／Gujarati LTR 两端物理顺序及字段／原生输入 owner 保持。带前置元音的夹具并不证明全部连字、所有样式在后段候选或真实系统输入法均已验收。
+
+PromptFieldLayoutTests 的两目录跨行测试包含 Arabic 和 Gujarati 活动字段，三种样式、两种字体、90pt 宽度；长候选→短词→取消的复用与新建布局一致，每槽几何、实际多行、下一字段不重叠、canonical 前后方向和取消恢复断言保留。PolyglotDirectionTests 与 OrdinaryTapePracticeTests 验证两个目录准入、Nepali 保留回退；已有 Hindi／Tamil／Bangla 场景及断言没有删除。
+
+arabic-gujarati-focused.log 31 项零失败零跳过（40.686s，墙钟 40.690）。固定参考及锁定 Anime 环境下 arabic-gujarati-regression.log 168 项零失败零跳过（286.463s，墙钟 286.481），其中全部十八项生产宿主 274.112s／墙钟 274.114；涵盖布局／投影／方向、Tape 退休、ASL／Choo 既有组件，不等于新 Gujarati 组合的全部可见效果验收。arabic-gujarati-originality.log 固定参考边界退出 0，只证明该审计范围。
+
+会话内风险审查核对完整差异、共享准入两入口、候选分段与旧覆盖，未见剩余可落实缺陷，非独立评审。人工步骤仍待执行：在自定义练习选择 English／Arabic／Gujarati（另复验 Gujarati 1k），输入上述自有文本，逐一检查三样式的真实输入法更新／取消、Arabic 后 Gujarati 部分提交、方向及窄窗跨行恢复；全字体、Pace／ASL／Choo、最低系统与新完整冻结门禁均未验。无存储格式变化，不需迁移；本机离线输入，不增加网络或收集数据。所有测试／审计终态后写记录，零 Typebar 主程序启动。TST-02、compositionDisplay 仍部分，完整 goal active。
+
 ## Arabic／Tamil 三目录混排生产入口（2026-10-10）
 
 固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 保持干净，只读复核 test-ui.ts 组合候选显示分支，不复制代码／资源。Arabic／Tamil、Tamil 1k、Tamil Old 三个真实 practiceContent 宿主均先复现原生字段缺失：arabic-tamil-host-red.log 三项三处预期失败（2.997s，墙钟 2.998）。生产只增加这三个目录的共享投影准入；Gujarati 等未验证混排仍回退，既有语言、计时、存储与 shaping 实现不变。
