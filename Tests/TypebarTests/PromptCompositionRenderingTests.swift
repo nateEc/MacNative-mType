@@ -7,6 +7,37 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_100_000)
 
+  func testDeterministicProjectionAndAttributedRenderPhaseMeasurementsPreserveOutput() throws {
+    for count in [30, 100] {
+      let prompt = Array(repeating: "amber", count: count).joined(separator: " ")
+      var session = TypingSession(configuration: .words(count), prompt: prompt)
+      session.insertBatch("a", at: start)
+      for marked in ["", "中文"] {
+        let baseline = render(try presentation(session, marked))
+        let baselineMap = try XCTUnwrap(baseline.compositionTextMap)
+        var construction: TimeInterval = 0, attributed: TimeInterval = 0
+        for _ in 0..<10 {
+          let began = ProcessInfo.processInfo.systemUptime
+          let value = try presentation(session, marked)
+          let constructed = ProcessInfo.processInfo.systemUptime
+          let output = render(value)
+          let finished = ProcessInfo.processInfo.systemUptime
+          construction += constructed - began
+          attributed += finished - constructed
+          let map = try XCTUnwrap(output.compositionTextMap)
+          XCTAssertEqual(output.text, baseline.text)
+          XCTAssertEqual(output.glyphCharacterOffsets, baseline.glyphCharacterOffsets)
+          XCTAssertEqual(map.cellRanges, baselineMap.cellRanges)
+          XCTAssertEqual(map.inkRanges, baselineMap.inkRanges)
+          XCTAssertEqual(map.canonicalAliases, baselineMap.canonicalAliases)
+          XCTAssertEqual(map.fieldRuns, baselineMap.fieldRuns)
+          XCTAssertEqual(map.caret, baselineMap.caret)
+        }
+        print("projection-phase words=\(count) markedUnits=\(marked.utf16.count) iterations=10 construction=\(construction) attributed=\(attributed)")
+      }
+    }
+  }
+
   private func presentation(_ session: TypingSession, _ marked: String,
     style: CompositionDisplayStyle = .replace) throws -> PromptCompositionPresentation {
     try XCTUnwrap(PromptCompositionPresentation(session: session, composition: marked, style: style))
