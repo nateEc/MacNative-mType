@@ -1,5 +1,11 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：单实例真实窗口有限观察（2026-10-10）
+
+复用上述冻结门禁的 Release 构建，打包独立 `app.typebar.qa.below-ime-0ff635b`，启用 `TypebarQAInMemoryStore`，不使用日常成绩库。在独立 QA 偏好中选择下方显示，仅打开一次；`pgrep -x Typebar` 确认唯一进程 23919。实际窗口滚动至练习区，观察空候选占位与下方 30s／错误状态区没有覆盖提示；打开设置再关闭后，AX 焦点回到 Typing input，below 选择保留。返回时提示内容重新生成，未把此次窗口往返认作活动会话保留验证。
+
+没有切换系统输入源、粘贴中文或执行真实 IME 候选输入，因而本次不证明 marked 候选、取消／接受、失焦模糊或系统候选窗口位置。观察后使用正常 ⌘Q 退出，再以进程检查确认零 Typebar；退出后不再查询应用以免重新启动。此记录仅为已有行为的有限人工观察，不改产品代码，不重跑已完成的全量门禁，不提升 compositionDisplay 分类，完整 goal 仍 active。
+
 ## TST-02：below 实现与宿主增量的冻结完整门禁（2026-10-10）
 
 冻结提交 0ff635bb959bf214ce18f1d00d4347a6fbff7262，固定参考 91bd24bb8513785c7364cbea29296ff7adafac41。证据目录 work/frozen-readiness-below-fixed.lkZpDd 保存 revision.txt、inputs.sha256、gate.log、freeze-verification.log 与 74 份阶段日志。单次修正环境后的顺序门禁终态 gate_exit=0、hash_exit=0，849 个跟踪文件 SHA-256 全部一致，运行期间未编辑源码或重启。参考仓库保持干净，零 Typebar 主程序启动。
