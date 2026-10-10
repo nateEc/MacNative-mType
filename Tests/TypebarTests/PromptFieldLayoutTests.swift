@@ -7,6 +7,56 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testIndependentHebrewCellsUseRTLOrderWithinLTRFieldFlow() throws {
+    let value = try rendering("אב cd", marked: "א")
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let layout = PromptFieldTextLayout(map: map, width: 400, font: font)
+    let ids = map.fieldRuns[0].cells.map(\.id)
+    XCTAssertLessThan(try XCTUnwrap(layout.cellFrames[ids[1]]).minX,
+      try XCTUnwrap(layout.cellFrames[ids[0]]).minX)
+    XCTAssertLessThanOrEqual(try XCTUnwrap(layout.fieldFrames[0]).maxX,
+      try XCTUnwrap(layout.fieldFrames[1]).minX)
+  }
+
+  func testIndependentLatinCellsStayLTRWithinRTLFieldFlow() throws {
+    let value = try rendering("ab cd", marked: "a")
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let layout = PromptFieldTextLayout(map: map, width: 400, font: font, rightToLeft: true)
+    let ids = map.fieldRuns[0].cells.map(\.id)
+    XCTAssertLessThan(try XCTUnwrap(layout.cellFrames[ids[0]]).minX,
+      try XCTUnwrap(layout.cellFrames[ids[1]]).minX)
+    XCTAssertLessThanOrEqual(try XCTUnwrap(layout.fieldFrames[1]).maxX,
+      try XCTUnwrap(layout.fieldFrames[0]).minX)
+  }
+
+  func testMixedDigitsKeepLTRSequenceInsideIndependentRTLField() throws {
+    let value = try rendering("אב12גד tail", marked: "א")
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let layout = PromptFieldTextLayout(map: map, width: 400, font: font)
+    let ids = Array(map.fieldRuns[0].cells.filter { !$0.isGap }.map(\.id))
+    let physical = try ids.sorted {
+      try XCTUnwrap(layout.cellFrames[$0]).minX < XCTUnwrap(layout.cellFrames[$1]).minX
+    }
+    XCTAssertEqual(physical, [ids[5], ids[4], ids[2], ids[3], ids[1], ids[0]])
+    for id in ids { XCTAssertEqual(layout.canonicalRect(id, after: false), layout.cellFrames[id]) }
+  }
+
+  func testIndependentRTLOrderingStaysWithinEachWrappedRow() throws {
+    let value = try rendering("אבגדהוזח tail", marked: "א")
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let layout = PromptFieldTextLayout(map: map, width: 65, font: font)
+    let ids = map.fieldRuns[0].cells.filter { !$0.isGap }.map(\.id)
+    let rows = try Dictionary(grouping: ids) { try XCTUnwrap(layout.cellFrames[$0]).minY }
+    XCTAssertGreaterThan(rows.count, 1, "The case must actually wrap")
+    for row in rows.values {
+      for (first, next) in zip(row, row.dropFirst()) {
+        XCTAssertLessThan(try XCTUnwrap(layout.cellFrames[next]).minX,
+          try XCTUnwrap(layout.cellFrames[first]).minX)
+      }
+    }
+    XCTAssertEqual(layout.cellFrames.count, map.cellTexts.count)
+  }
+
   private func rendering(_ words: String, accepted: String = "", marked: String = "") throws -> PromptRendering {
     var session = TestSessionFactory.make(configuration: .init(mode: .custom, duration: nil, wordLimit: nil,
       difficulty: .normal, rules: .init(), modifiers: [.noSpaces]), customText: words)

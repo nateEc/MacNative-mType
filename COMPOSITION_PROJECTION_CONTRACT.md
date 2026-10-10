@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## 独立字形视觉顺序接入字段分配（2026-10-10）
+
+PromptFieldTextLayout 现在消费 PromptFieldVisualOrder，但没有合并独立字形的绘制／TextKit 盒子。先沿用既有逻辑词分组、逐字尺寸、结构 Return 与 ASL 行分配，再按字段 group 与已分配 y 聚合非 gap 单字盒子；仅对 RTL 基准或含 RTL 字形的行解析物理顺序，从原行最左边界按各盒子原宽度重新放置。连写分支不变，提交空格不跨字段重排，canonical alias 与逻辑 followingCell 仍按原身份建立。仅可见位置变化，不改输入、计分、原词或回放。
+
+行为优先：field-visual-allocation-red.log 两项两处预期失败（0.769s，墙钟 0.771），分别为 LTR 外流的 Hebrew 与 RTL 外流的 Latin 字母顺序；修正后 green.log 51 项零失败零跳过（1.062s，墙钟 1.069），包括上一失败候选破坏的 Arabic 连写／非连写宽度对照。再补内部数字顺序、canonicalRect 身份和实际窄视口多行 RTL 检查，field-visual-allocation-regression.log 109 项零失败零跳过（3.342s，墙钟 3.355），含原生字段、组合、ASL／Choo／Tape 相关回归。完整生产宿主及原生光标 field-visual-allocation-host.log 85 项零失败零跳过（49.701s，墙钟 49.710），原创性 field-visual-allocation-originality.log 退出 0。
+
+会话内决策审查（非独立审计）以连写开关、字段边界、逐行分配和 canonical 身份为反例约束，没有放宽旧测试或使用整字段塑形替代独立绘制。该增量尚不包括逐字主／pace 边缘、段落级显式 bidi 控制跨行继承、完整 Unicode／复杂控制／视觉实机与系统 IME 验收；按已分配行重新解析方向不等同于浏览器完整段落 bidi 等价。混排生产入口回退仍保留，compositionDisplay 部分分类不提升。零 Typebar 主程序启动，无新全量门禁／Release GUI，完整 goal active。
+
 ## 独立字段视觉顺序解析组件（2026-10-10）
 
 为解决上轮“整字段塑形会破坏关闭连写”冲突，新增独立 PromptFieldVisualOrder：只返回单个未换行字段的物理 cell ID 顺序，不改输入、原 cells、绘制盒子或连写开关。自有 TextKit 分析上下文使用去除 hint 的主文字、明确基准方向和实际 UTF-16 范围；普通位置按行／x 排序，连字共用位置按双向嵌入级别处理独立 ID；空显示槽保留原位置，避免空槽源序与坐标比较形成非传递排序。坐标／级别／源 ID 构成稳定顺序，不以方向布尔值简单翻转全部混合字符。

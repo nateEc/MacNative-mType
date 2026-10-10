@@ -22,6 +22,10 @@ struct PromptFieldTextRun: Equatable {
 /// Ordinary letters are independent boxes. Joining scripts shape within a
 /// field only. Hints are separate drawing layers, never advances or caret ink.
 @MainActor final class PromptFieldTextLayout {
+  private struct FieldRow: Hashable {
+    let group: Int
+    let y: CGFloat
+  }
   private final class Box {
     let manager = NSLayoutManager()
     let container = NSTextContainer(size: .init(width: CGFloat.greatestFiniteMagnitude,
@@ -151,10 +155,32 @@ struct PromptFieldTextRun: Equatable {
       .init(size: box.bounds.size, wordID: groups[index], isLineBreak: box.breaks, isSeparator: box.isGap)
     }, width: flowWidth, rowSpacing: lineSpacing)
     size = geometry.size
-    for (index, box) in boxes.enumerated() {
+    origins = boxes.enumerated().map { index, box in
       let point = geometry.positions[index]
-      let origin = CGPoint(x: rightToLeft ? flowWidth - point.x - box.bounds.width : point.x, y: point.y)
-      origins.append(origin)
+      return CGPoint(x: rightToLeft ? flowWidth - point.x - box.bounds.width : point.x, y: point.y)
+    }
+    if !joinsLetters {
+      var rows: [FieldRow: [Int]] = [:]
+      for (index, box) in boxes.enumerated() where !box.isGap && box.cells.count == 1 {
+        rows[.init(group: groups[index], y: origins[index].y), default: []].append(index)
+      }
+      for indices in rows.values {
+        let cells = indices.map { boxes[$0].cells[0] }
+        guard rightToLeft || cells.contains(where: {
+          PracticeTapePolicy.isRightToLeft(String($0.glyph.character), fallback: false)
+        }) else { continue }
+        let order = PromptFieldVisualOrder.cellIDs(cells, font: font, rightToLeft: rightToLeft)
+        let byID = Dictionary(uniqueKeysWithValues: indices.map { (boxes[$0].cells[0].id, $0) })
+        var x = indices.map { origins[$0].x }.min() ?? 0
+        for id in order {
+          guard let index = byID[id] else { continue }
+          origins[index].x = x
+          x += boxes[index].bounds.width
+        }
+      }
+    }
+    for (index, box) in boxes.enumerated() {
+      let origin = origins[index]
       for id in box.ranges.keys { cellFrames[id] = box.rect(id, origin: origin) }
       if let owner = box.fieldID, !box.isGap, !box.ranges.isEmpty {
         let frame = CGRect(origin: origin, size: box.bounds.size)
