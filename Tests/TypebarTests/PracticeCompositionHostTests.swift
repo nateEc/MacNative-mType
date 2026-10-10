@@ -47,6 +47,10 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, checksBelowStatus: true)
   }
 
+  func testNarrowProductionBelowCandidateRetainsMixedRTLTextAndInputOwner() throws {
+    try checkProductionHost(checksMarkedText: true, checksBelowStatus: true, hostWidth: 640)
+  }
+
   func testMixedDirectionProductionCompositionUsesAllCandidateSlots() throws {
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .hebrew)
   }
@@ -176,7 +180,7 @@ import XCTest
   }
 
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil,
-    checksBelowStatus: Bool = false) throws {
+    checksBelowStatus: Bool = false, hostWidth: CGFloat = 1000) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
@@ -260,11 +264,11 @@ import XCTest
         systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
         network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor()
       )
-      .modelContainer(container).frame(width: 1000, height: 720)
+      .modelContainer(container).frame(width: hostWidth, height: 720)
       let host = PracticeLayoutCountingHost(rootView: root)
       if !automaticSizing { host.sizingOptions = [] }
       let window = NSWindow(
-        contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
+        contentRect: .init(x: 0, y: 0, width: hostWidth, height: 720),
         styleMask: .borderless, backing: .buffered, defer: false)
       window.isReleasedWhenClosed = false
       window.contentView = host
@@ -371,7 +375,7 @@ import XCTest
             XCTAssertEqual(candidateElements(in: host).first?.stringValue, "中文")
             XCTAssertTrue(candidateElements(in: host).first === emptyCandidate)
             if checksBelowStatus {
-              let long = String(repeating: "候选文本换行验证", count: 8)
+              let long = String(repeating: hostWidth < 1000 ? "سلام שלום mixed 候选 " : "候选文本换行验证", count: 8)
               input.setMarkedText(long, selectedRange: .init(location: long.utf16.count, length: 0),
                 replacementRange: .init(location: NSNotFound, length: 0))
               flush()
@@ -379,6 +383,9 @@ import XCTest
               XCTAssertEqual(candidate.stringValue, long)
               XCTAssertTrue(candidate === emptyCandidate)
               XCTAssertGreaterThan(candidate.bounds.height, settings.fontSize * 1.5)
+              let candidateFrame = candidate.convert(candidate.bounds, to: host)
+              XCTAssertGreaterThanOrEqual(candidateFrame.minX, host.bounds.minX)
+              XCTAssertLessThanOrEqual(candidateFrame.maxX, host.bounds.maxX)
               if let directory = ProcessInfo.processInfo.environment["TYPEBAR_BELOW_QA_IMAGE_DIRECTORY"] {
                 candidate.scrollToVisible(candidate.bounds.insetBy(dx: 0, dy: -120))
                 flush()
@@ -387,7 +394,7 @@ import XCTest
                 let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
                 host.cacheDisplay(in: host.bounds, to: bitmap)
                 try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(
-                  to: URL(fileURLWithPath: directory).appendingPathComponent("below-status-\(hostIndex).png"))
+                  to: URL(fileURLWithPath: directory).appendingPathComponent("below-status-\(Int(hostWidth))-\(hostIndex).png"))
               }
               XCTAssertFalse(window.isVisible)
               input.setMarkedText("中文", selectedRange: .init(location: 2, length: 0),

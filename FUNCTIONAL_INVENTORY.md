@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-10 TST-02 below 实际窄页补充：640×720 生产宿主覆盖四组尺寸配置与三样式，混合 RTL 长候选检查换行、边界及 owner；四张窄页截图确认滚动后的完整候选、标签与 Pace 无相互覆盖。连同宽页、组件复验三项零失败零跳过，详见 [实际窄页证据与边界](COMPOSITION_PROJECTION_CONTRACT.md)。仅增强测试、零主程序启动，不证明实际连续缩放、完整 RTL shaping、全字体或系统 IME，功能分类与 goal active 不变。
+
 2026-10-10 TST-02 below 测试补充：原生组件两种字体／三组 RTL 与混合候选经收窄、取消、恢复与换字体，检查实际 alignmentRect、换行高度、占位与 owner；连同两个生产宿主共三项零失败零跳过。只改测试，零主程序启动，详见 [窄宽与 RTL 证据边界](COMPOSITION_PROJECTION_CONTRACT.md)。不扩称实际整页窄窗、字形完整像素或系统 IME 验收，功能分类与 goal active 不变。
 
 2026-10-10 TST-02 below 增量：独立实现全宽居中、练习字号的原生候选行，空白保留行高，更新／取消保持 owner，off／replace 卸载；below 的标签与 Pace 改为候选之后正常布局，四组不可见宿主截图确认长候选不再被状态浮层遮盖。356 项回归零失败零跳过，含全部 35 宿主，固定参考原创性边界通过。详见 [below 独立候选行证据与残余边界](COMPOSITION_PROJECTION_CONTRACT.md)。真实 IME、焦点视觉、窄窗／RTL／全字体和新完整门禁仍待验，compositionDisplay 继续部分，goal active；零主程序启动，无存储迁移或新网络行为。此前静态差异记录保留在契约中。

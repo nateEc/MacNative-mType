@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：640pt 实际练习页 below 候选布局（2026-10-10）
+
+仅增强 PracticeCompositionHostTests，共享生产宿主增加默认仍为 1000 的宽度参数。新增 640×720 场景经四组尺寸配置和三种组合模式，启用自有标签与 80 WPM Pace，below 输入八次重复的“سلام שלום mixed 候选 ”，检查原文、长候选换行、左右边界、候选／输入 owner，以及原有取消／接受／回删链路。不是简化组件替代生产页。
+
+below-narrow-production.log 一项零失败（16.379s，墙钟 16.381）。补拍复验 below-narrow-production-final.log 三项零失败零跳过（34.427s，墙钟 34.428），含窄页、原宽页和组件回归；生产宿主两项 32.498s，组件 1.929s。证据目录 work/below-narrow-page.J1XA3g，640pt 的 below-status-640-0 至 3.png 均人工查看；滚动到候选后完整候选、标签和 Pace 可见，无相互覆盖。快照文件名加入宿主宽度，避免宽／窄组互相覆盖。已有行为补覆盖，无人为失败阶段，运行期间未编辑或重启，零 Typebar 主程序启动。
+
+本次同会话风险审查无其他可落实发现，非独立审查。未改生产、存储或网络；未重跑全部宿主或完整门禁。失焦快照只证明该几何与状态避让，不证明整个页面其他区域、RTL 字形次序／候选溢出正文 shaping、实际窗口连续缩放、实体键盘／系统 IME、全部字体或其他特殊呈现。上述边界保持开放；compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：below 窄宽与 RTL 原生组件回归（2026-10-10）
 
 仅增加 BelowCompositionPromptTests，不改变生产行为。实际 NSHostingView／不可见 NSWindow 挂载生产组件，以 system 28pt、monospaced 40pt 和三组独立构造的 Arabic／Hebrew、中文／LTR／Hebrew、组合长音符／重音／韩文候选，逐组 1000→180pt 收窄、取消、恢复宽度并切换字体。检查原文、字号、居中、原生对齐宽度、长文本高度增加、实际 cell 所需高度、宿主容纳、取消占位与行高收缩，以及同一原生 owner。
