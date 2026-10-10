@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## TST-02：当前连续输入的减少动态效果反证（2026-10-10）
+
+在 `15f5124` 干净版本串行运行同一完整生产不可见宿主测试，两轮均启用已有布局栈诊断，仅第二轮启用 TYPEBAR_TEST_REDUCE_MOTION=1；未改源码、未启动主程序。`work/practice-host-current-performance-baseline.log` 与 `work/practice-host-current-reduced-motion.log` 均终态退出零，一项测试零失败零跳过。每轮四组尺寸配置、每组三次连续插入，保持输入 owner／固定尺寸／不可见窗口等原断言。
+
+普通分支首字符同步布局约 197–207ms，后续约 54–58ms；减少动态效果分支分别约 197–209ms 与 55–62ms，没有观察到同步布局成本的明显下降。后者第二／第三字符交付期间记录的额外布局数均为零，前者仍有重复交付布局；这支持动画参与交付期失效，但不支持“关闭动画即可消除同步布局开销”。运行顺序、随机提示、DEBUG 与栈诊断均限制因果和性能结论，不将这些数值当作严格硬件基准或 Release 漂移根因。
+
+后续应分别定位共有同步布局与动画交付失效，不通过强制减少动态效果、放宽计时健康阈值或删除视觉功能掩盖问题。既有 Release 严重漂移、实体输入／窗口及完整兼容性仍未验收；本次无产品改动，完整 goal active。
+
 ## 原生菜单版本的单实例 Release 实机复测（2026-10-10）
 
 冻结 6bf1be1，独立内存包 Typebar-Native-Popup-QA-6bf1be1.app，身份 app.typebar.qa.nativepopup6bf1be1；Release 构建 365.81s，打包会话 86930 退出 0，codesign 严格验证通过。脚本首次直接调用因无执行权限退出 126，改用既有 /bin/zsh 执行，没有修改权限或源码。唯一主程序 PID 1384、会话 58095，启动前无 Typebar；启用既有 timing-only QA 开关。运行证据为 ../../work/native-popup-release-runtime.log。
