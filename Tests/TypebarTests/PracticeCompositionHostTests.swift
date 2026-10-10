@@ -51,6 +51,10 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, checksBelowStatus: true, hostWidth: 640)
   }
 
+  func testProductionBelowResizeDuringCompositionPreservesCandidateAndInputOwners() throws {
+    try checkProductionHost(checksMarkedText: true, checksBelowStatus: true, checksBelowResize: true)
+  }
+
   func testMixedDirectionProductionCompositionUsesAllCandidateSlots() throws {
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .hebrew)
   }
@@ -180,7 +184,8 @@ import XCTest
   }
 
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil,
-    checksBelowStatus: Bool = false, hostWidth: CGFloat = 1000) throws {
+    checksBelowStatus: Bool = false, hostWidth: CGFloat = 1000,
+    checksBelowResize: Bool = false) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
@@ -256,7 +261,7 @@ import XCTest
         SavedCustomTextRecord.self, ResultFilterPresetRecord.self,
         LocalPersonalBestLedgerRecord.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-      let root = TypebarApp.practiceContent(
+      let content = TypebarApp.practiceContent(
         settings: settings,
         account: AccountSession(defaults: defaults),
         announcements: RemoteAnnouncementCenter(defaults: defaults),
@@ -264,7 +269,8 @@ import XCTest
         systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
         network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor()
       )
-      .modelContainer(container).frame(width: hostWidth, height: 720)
+      .modelContainer(container)
+      let root = content.frame(width: hostWidth, height: 720)
       let host = PracticeLayoutCountingHost(rootView: root)
       if !automaticSizing { host.sizingOptions = [] }
       let window = NSWindow(
@@ -386,6 +392,29 @@ import XCTest
               let candidateFrame = candidate.convert(candidate.bounds, to: host)
               XCTAssertGreaterThanOrEqual(candidateFrame.minX, host.bounds.minX)
               XCTAssertLessThanOrEqual(candidateFrame.maxX, host.bounds.maxX)
+              if checksBelowResize {
+                let originalHeight = candidate.bounds.height
+                for width: CGFloat in [640, 1000] {
+                  host.rootView = content.frame(width: width, height: 720)
+                  window.setContentSize(.init(width: width, height: 720))
+                  flush()
+                  XCTAssertEqual(host.bounds.width, width, accuracy: 1)
+                  XCTAssertTrue(candidateElements(in: host).first === candidate)
+                  XCTAssertTrue(inputs(in: host).first === input)
+                  XCTAssertTrue(fields(in: host).contains { $0 === field })
+                  XCTAssertTrue(input.hasMarkedText())
+                  XCTAssertEqual(candidate.stringValue, long)
+                  let resizedFrame = candidate.convert(candidate.bounds, to: host)
+                  XCTAssertGreaterThanOrEqual(resizedFrame.minX, host.bounds.minX)
+                  XCTAssertLessThanOrEqual(resizedFrame.maxX, host.bounds.maxX)
+                  if width == 640 {
+                    XCTAssertGreaterThan(candidate.bounds.height, originalHeight)
+                  } else {
+                    XCTAssertEqual(candidate.bounds.height, originalHeight, accuracy: 1)
+                  }
+                  XCTAssertFalse(window.isVisible)
+                }
+              }
               if let directory = ProcessInfo.processInfo.environment["TYPEBAR_BELOW_QA_IMAGE_DIRECTORY"] {
                 candidate.scrollToVisible(candidate.bounds.insetBy(dx: 0, dy: -120))
                 flush()

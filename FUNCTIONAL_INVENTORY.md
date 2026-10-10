@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-10 TST-02 below 活动组合缩放补充：同一实际练习内容与不可见窗口在未提交长候选时 1000→640→1000pt 切换，四组配置确认换行／高度恢复、原文及 marked 状态、输入／候选／字段 owner 保持。五项联合回归零失败零跳过，详见 [缩放状态证据边界](COMPOSITION_PROJECTION_CONTRACT.md)。仅增强测试、零主程序启动，不代替真实拖窗、连续帧率、RTL／全字体或系统 IME 验收，分类与 goal active 不变。
+
 2026-10-10 TST-02 below 实际窄页补充：640×720 生产宿主覆盖四组尺寸配置与三样式，混合 RTL 长候选检查换行、边界及 owner；四张窄页截图确认滚动后的完整候选、标签与 Pace 无相互覆盖。连同宽页、组件复验三项零失败零跳过，详见 [实际窄页证据与边界](COMPOSITION_PROJECTION_CONTRACT.md)。仅增强测试、零主程序启动，不证明实际连续缩放、完整 RTL shaping、全字体或系统 IME，功能分类与 goal active 不变。
 
 2026-10-10 TST-02 below 测试补充：原生组件两种字体／三组 RTL 与混合候选经收窄、取消、恢复与换字体，检查实际 alignmentRect、换行高度、占位与 owner；连同两个生产宿主共三项零失败零跳过。只改测试，零主程序启动，详见 [窄宽与 RTL 证据边界](COMPOSITION_PROJECTION_CONTRACT.md)。不扩称实际整页窄窗、字形完整像素或系统 IME 验收，功能分类与 goal active 不变。
