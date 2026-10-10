@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## 混排入口完整冻结门禁首轮与旧断言更新（2026-10-10）
+
+冻结 ab53dcb754d8b602f41610569336247a310c4bcc 的 845 个跟踪文件，运行完整 check-native-rewrite-readiness.sh，固定参考、Redis 6.2.6 和 Anime 归档不变。mixed-readiness.K4qccV.gate.log 保留主日志；会话 66062 权威退出 1 后才编辑，源码 SHA-256 核对完成。客户端 4,202 项一处失败（992.841s，墙钟 993.320），失败为 OrdinaryTapePracticeTests 要求入口源码直接包含旧 RTL 回退条件的字符串，而生产已改为共享 PromptFieldProjectionPolicy。
+
+此轮十万词耐久通过（159.098s），官方脚本完整原生会话通过（82.432s），新增 Arabic／Hebrew 完整宿主及原有两种宿主均通过。元数据、页面／服务表面、布局／主题／挑战身份、固定源码行为和历史磁盘模型准备完成；客户端失败后没有继续服务测试或 Release 打包，不将此轮写成全量通过。临时目录未自动清理或归档，终态后将其 72 个日志复制到上述保留目录，未覆盖其他证据。
+
+更新旧测试而非生产逻辑：仍检查 gate 不排除 Tape、composition 非 nil 条件，以及实际接线共享策略；增加 English、Hebrew／Arabic 混排允许与 Persian 混排保留回退的执行断言。失败日志保留，没有删除测试、恢复旧功能限制或跳过失败。shared-projection-gate-final.log 为专项复验，完整门禁仍需在新冻结版本重跑。零 Typebar 主程序启动，真实 IME、首键性能和完整兼容 goal 仍开放。
+
 ## Arabic／LTR 混排整词候选入口（2026-10-10）
 
 继续基于固定版本候选逐槽显示规则推进 production gate。新增完整宿主以隔离选择恢复自有“ab سلام cd”与 English／Arabic 自定义配置，三种组合模式复用既有更新／取消／提交／回删检查。arabic-mixed-projection-red.log 两项四处失败（2.382s，墙钟 2.383）：生产宿主缺少字段渲染器为真实入口缺口；模型另三处来自复用了 noSpaces 辅助函数，使源槽编号不再对应原文，不算产品 shaping 故障。

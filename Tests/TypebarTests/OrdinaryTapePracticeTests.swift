@@ -103,7 +103,7 @@ import XCTest
     return CGFloat(model.fontSize * 1.7)
   }
 
-  func testProductionCompositionGateAllowsTapeWithExistingDirectionFallback() throws {
+  func testProductionCompositionGateAllowsTapeWithSharedDirectionPolicy() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     let start = try XCTUnwrap(source.range(of: "let usesCompositionProjection ="))
@@ -111,7 +111,14 @@ import XCTest
     let gate = source[start.lowerBound..<end.lowerBound]
     XCTAssertFalse(gate.contains("!usesTapePractice"))
     XCTAssertTrue(gate.contains("composition != nil"))
-    XCTAssertTrue(gate.contains("!session.configuration.containsRightToLeftPromptRun || session.configuration.usesRightToLeftPrompt"))
+    XCTAssertTrue(gate.contains("PromptFieldProjectionPolicy.supports(session.configuration)"))
+    XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10)))
+    for rtl in [TypingLanguage.hebrew, .arabic] {
+      XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
+        mixedLanguageComponents: [.english, rtl])))
+    }
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
+      mixedLanguageComponents: [.english, .persian])))
   }
 
   func testSwiftUIBridgeUsesExplicitProjectedFieldInsteadOfLegacyCaretOffset() throws {
