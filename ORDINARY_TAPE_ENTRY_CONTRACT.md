@@ -1,5 +1,15 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 原生菜单版本的单实例 Release 实机复测（2026-10-10）
+
+冻结 6bf1be1，独立内存包 Typebar-Native-Popup-QA-6bf1be1.app，身份 app.typebar.qa.nativepopup6bf1be1；Release 构建 365.81s，打包会话 86930 退出 0，codesign 严格验证通过。脚本首次直接调用因无执行权限退出 126，改用既有 /bin/zsh 执行，没有修改权限或源码。唯一主程序 PID 1384、会话 58095，启动前无 Typebar；启用既有 timing-only QA 开关。运行证据为 ../../work/native-popup-release-runtime.log。
+
+普通 30 秒默认英文，首词 lantern，真实首键 l 后先读取日志、再读 AX：输入处理 0.000534s，输入后较迟交付 0.785321s；首秒 elapsed=1.077805、drift=0.077805、severe=0、failed=0，AX 倒计时为 25s。随后 ⌘R 重置，在原生“语言”菜单用 Down／Return 选择 English · 1k · Typebar，再用 Up／Return 恢复 English，AX 选择值均对应。再次 ⌘R 后默认英文提示恢复；没有逐项实际选择全部语言，也未验证最低 macOS 14。
+
+同一实例第二轮真实首键 l，输入处理 0.001005s，输入后较迟交付 0.839871s；首秒 elapsed=1.138701、drift=0.138701、severe=0、failed=0，后续 AX 为 23s、17s、8s。续输 antern 加空格，最终 8/0/0/0、1/1 单词正确。整秒 12 出现 drift=0.399566、severe=1、failed=0，不隐藏残余延迟，也不据观察时间认定 AX 是原因。终秒 elapsed=30.073596、failed=0；结果页为“闲置无效”，明确不保存，不是有效成绩、持续输入或完整性能验收。窗口截图只检查一次活动状态，提示位于视口下方，不能声称整个窗口布局验收完成。
+
+两轮未复现先前首键计时失败，支持新路径值得继续验证，但随机提示、运行顺序、系统负载、诊断及 AX 观察不构成严格 Release 对照，不能宣布首键问题彻底解决。用 ⌘Q 正常退出，会话 58095 退出 0，pgrep 确认零 Typebar；退出后不再查询应用界面。编译及主程序存活时未编辑项目；本轮只补证据记录，不改变产品、阈值或功能覆盖分类。完整功能 goal active，新原生菜单尚未做完整冻结门禁。
+
 ## 原生语言菜单降低完整宿主同步布局开销（2026-10-10）
 
 在 d3c7bd7 完整门禁之后进行可撤回试探：语言 Picker 原路径在每次会话更新时参与大量菜单项的 SwiftUI 图更新。用 owner-local NSPopUpButton 保留完整有序语言身份，仅选项列表变化时重建菜单，普通输入只同步选择与最新 binding。原生控件保留“语言”AX 标签与系统外观，继承 SwiftUI disabled；现有 selectLanguage、重启保护、引语过滤及 onChange 链不变，无全局缓存、额外计时器或动画／健康阈值修改。
