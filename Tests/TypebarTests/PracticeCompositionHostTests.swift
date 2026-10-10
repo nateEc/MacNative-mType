@@ -637,6 +637,10 @@ import XCTest
         continue
       }
       for (insertion, text) in ["a", "b", "c"].enumerated() {
+        if hostIndex == 0, insertion == 0,
+          ProcessInfo.processInfo.environment["TYPEBAR_TEST_INPUT_SAMPLE_MARKER"] == "1" {
+          FileHandle.standardError.write(Data("practice-host input-sampling-start\n".utf8))
+        }
         let initialFrame = host.frame
         let initialLayoutCount = host.layoutCount
         let start = ProcessInfo.processInfo.systemUptime
