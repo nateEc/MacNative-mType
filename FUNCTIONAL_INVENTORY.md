@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+当前 Pashto／Sindhi／Central Kurdish／Yiddish 混排生产组合入口已接通，补齐全 RTL 身份检查发现的 Urdu 5k 遗漏。214 项相关回归零失败零跳过、固定参考原创性边界通过，零主程序启动，详见 [组合投影合同](COMPOSITION_PROJECTION_CONTRACT.md)。身份策略覆盖不等于全部 IME 或词库验收；RTL 与 Bangla／Hindi 连写混排仍回退，真实 IME、字体／跨行、首键及完整门禁复验开放。配置 89／4／1、compositionDisplay 部分与完整 goal active 不变；下方其他家族回退说明为历史记录。
+
 当前 Persian／Urdu 混排已接通生产组合入口，完整宿主验证三种显示、更新取消／提交回删、连字与特有文字 run 顺序，见 [组合投影合同](COMPOSITION_PROJECTION_CONTRACT.md)。210 项相关回归及固定参考 30 项强化专项零失败零跳过，原创性通过，零主程序启动。Pashto 等其他混排仍回退，真实 IME、字体／跨行与首键未验；compositionDisplay 仍部分、配置 89／4／1 与完整 goal active 不变。此前全量冻结门禁不覆盖本次新增策略，下方 Persian 回退描述为历史快照。
 
 当前 [混排入口完整冻结复验](COMPOSITION_PROJECTION_CONTRACT.md)通过：冻结 ed098bf，845 文件 SHA-256 终态一致，客户端 4,202／服务 501 项零失败，74 日志与未打开的 Release 包／签名／原创性检查通过。首轮旧字符串断言失败已保留并修正复验，零 Typebar 主程序启动。该证据不替代真实 IME、首键性能、精确主题与人工验收；配置 89／4／1 及完整 goal active 不变。

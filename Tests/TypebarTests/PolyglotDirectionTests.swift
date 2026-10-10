@@ -3,15 +3,13 @@ import XCTest
 
 final class PolyglotDirectionTests: XCTestCase {
   func testFieldProjectionAdmitsVerifiedMixButPreservesUnverifiedShapingFallback() {
-    for rtl in [TypingLanguage.hebrew, .hebrew1k, .hebrew5k, .hebrew10k,
-      .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
-      .persian, .persian1k, .persian5k, .persian20k, .urdu, .urdu1k] {
+    for rtl in TypingLanguage.allCases.filter(\.usesRightToLeftPrompt) {
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, rtl])))
     }
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .arabic])))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .persian, .urdu])))
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .pashto])))
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .pashto])))
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .bangla])))
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .hindi])))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .arabic)))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .english)))
   }

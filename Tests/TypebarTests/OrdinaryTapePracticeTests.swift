@@ -113,12 +113,12 @@ import XCTest
     XCTAssertTrue(gate.contains("composition != nil"))
     XCTAssertTrue(gate.contains("PromptFieldProjectionPolicy.supports(session.configuration)"))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10)))
-    for rtl in [TypingLanguage.hebrew, .arabic, .persian, .urdu] {
+    for rtl in TypingLanguage.allCases.filter(\.usesRightToLeftPrompt) {
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
         mixedLanguageComponents: [.english, rtl])))
     }
     XCTAssertFalse(PromptFieldProjectionPolicy.supports(.words(10, language: .mixedLanguages,
-      mixedLanguageComponents: [.english, .pashto])))
+      mixedLanguageComponents: [.english, .arabic, .bangla])))
   }
 
   func testSwiftUIBridgeUsesExplicitProjectedFieldInsteadOfLegacyCaretOffset() throws {

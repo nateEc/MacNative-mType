@@ -59,16 +59,39 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .urdu)
   }
 
+  func testPashtoMixedDirectionProductionCompositionPreservesJoinedRun() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .pashto)
+  }
+
+  func testSindhiMixedDirectionProductionCompositionPreservesJoinedRun() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .sindhi)
+  }
+
+  func testKurdishMixedDirectionProductionCompositionPreservesJoinedRun() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .kurdishCentral)
+  }
+
+  func testYiddishMixedDirectionProductionCompositionPreservesRTLRun() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .yiddish)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
-    let checksConnectedRun = [.arabic, .persian, .urdu].contains(mixedLanguage)
-    let mixedText: String
+    let checksConnectedRun = [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
+    let extendedWord: String?
     switch mixedLanguage {
-    case .persian: mixedText = "ab سلام پیام cd"
-    case .urdu: mixedText = "ab سلام ٹماٹر cd"
-    default: mixedText = checksConnectedRun ? "ab سلام cd" : "ab אב cd"
+    case .persian: extendedWord = "پیام"
+    case .urdu: extendedWord = "ٹماٹر"
+    case .pashto: extendedWord = "پښتو"
+    case .sindhi: extendedWord = "سنڌي"
+    case .kurdishCentral: extendedWord = "کوردی"
+    case .yiddish: extendedWord = "ייִדיש"
+    default: extendedWord = nil
     }
-    let extendedLastSlot = mixedLanguage == .persian ? 11 : (mixedLanguage == .urdu ? 12 : nil)
+    let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
+    let mixedText = prefix + (extendedWord.map { " " + $0 } ?? "") + " cd"
+    let extendedFirstSlot = prefix.count + 1
+    let extendedLastSlot = extendedWord.map { extendedFirstSlot + $0.count - 1 }
     let lastRTLSlot = checksConnectedRun ? 6 : 4
     for automaticSizing in [true, false, false, true] {
       let suite = "PracticeCompositionHostTests.\(UUID())"
@@ -126,7 +149,7 @@ import XCTest
       }
       func checkExtendedRun(_ field: PromptFieldNativeView) throws {
         guard let extendedLastSlot else { return }
-        XCTAssertGreaterThan(try XCTUnwrap(field.measuredRect(for: 8)).minX,
+        XCTAssertGreaterThan(try XCTUnwrap(field.measuredRect(for: extendedFirstSlot)).minX,
           try XCTUnwrap(field.measuredRect(for: extendedLastSlot)).minX,
           "Language-specific letters must retain their own RTL shaping and source slots")
       }

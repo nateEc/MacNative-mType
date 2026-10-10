@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## 其余 RTL 家族混排入口与全身份策略检查（2026-10-10）
+
+新增 Pashto、Sindhi、Central Kurdish、Yiddish 四项完整生产宿主测试，使用自有短文本中特有文字 run，检查原始 AX 文本、RTL 几何、三种候选显示、更新／取消／提交回删和输入及字段 owner 保留；前三种同时验证活动候选的 lam-alef 连字与部分提交后继续连写。四组隔离尺寸配置不变，无可见窗口。
+
+remaining-rtl-mixed-red.log 四项四处缺少原生字段的预期失败（5.080s，墙钟 5.082）。扩展共享策略后 remaining-rtl-mixed-final.log 214 项两处失败（175.481s，墙钟 175.504）：新增十项宿主全部通过，但遍历所有 RTL 身份发现原策略遗漏 Urdu 5k。保留检查并补齐该身份后，remaining-rtl-mixed-corrected.log 同组 214 项零失败零跳过（175.190s，墙钟 175.213）。固定参考原创性边界检查退出 0；全部测试与审计终态后才编辑本记录，零 Typebar 主程序启动。
+
+所有 RTL 语言身份的策略覆盖不等于逐词库、逐字体或实体 IME 验收；完整宿主仅十项代表路径。RTL 与 Bangla／Hindi 等未验证连写混排继续回退。真实 IME、跨行／字体、可见窗口及首键性能仍开放，compositionDisplay 仍部分，goal active。本轮未重跑完整门禁或 Release GUI，下方 ed098bf 全量证据不覆盖这些新增策略。后文“Pashto 等仍回退”为历史快照。
+
 ## Persian／Urdu 混排生产入口与特有字形（2026-10-10）
 
 新增 Persian、Urdu 各自的完整生产宿主测试，隔离选择／存储和四组尺寸配置不变。persian-urdu-mixed-host-red.log 两项两处预期失败（3.349s，墙钟 3.350），两种配置均缺少 PromptFieldNativeView。共享策略加入 Persian 四个词库与 Urdu 两个词库，未改变原生整词 shaping、输入规范化或计时器；策略与 Tape 入口测试同步验证新增家族及 English／Arabic／Persian／Urdu 共存，Pashto 作为仍未验证家族保留回退反例。

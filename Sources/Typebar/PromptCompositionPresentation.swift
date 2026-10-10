@@ -10,7 +10,9 @@ enum PromptFieldProjectionPolicy {
       switch language {
       case .hebrew, .hebrew1k, .hebrew5k, .hebrew10k,
         .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
-        .persian, .persian1k, .persian5k, .persian20k, .urdu, .urdu1k: return true
+        .persian, .persian1k, .persian5k, .persian20k, .urdu, .urdu1k, .urdu5k,
+        .pashto, .sindhi, .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k,
+        .yiddish: return true
       default: return !language.usesJoiningScriptPrompt
       }
     }
