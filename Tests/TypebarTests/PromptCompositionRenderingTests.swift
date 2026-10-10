@@ -47,6 +47,22 @@ import XCTest
     XCTAssertEqual(view.intrinsicContentSize, size)
     XCTAssertEqual(view.geometryRevision, revision)
     XCTAssertEqual(view.accessibilityValue() as? String, String(result.text.characters))
+    func renderedPixels() throws -> Data {
+      let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+      view.cacheDisplay(in: view.bounds, to: bitmap)
+      return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+    }
+    let originalPixels = try renderedPixels()
+    let replacement = render(try presentation(session, "文"))
+    view.configure(rendering: replacement, font: font, carets: config)
+    XCTAssertEqual(view.intrinsicContentSize, size,
+      "The counterexample must actually preserve measured size")
+    XCTAssertFalse(view.needsLayout)
+    XCTAssertGreaterThan(view.geometryRevision, revision,
+      "Equal size must not suppress rebuilding changed content")
+    XCTAssertEqual(view.accessibilityValue() as? String, String(replacement.text.characters))
+    XCTAssertNotEqual(try renderedPixels(), originalPixels, "Changed content must still be redrawn")
+    XCTAssertNotNil(view.measuredRect(for: try XCTUnwrap(replacement.compositionTextMap?.caret).cellID))
     view.configure(rendering: result, font: font.withSize(56), carets: config)
     XCTAssertTrue(view.needsLayout, "A changed measured size must still request layout")
     XCTAssertNotEqual(view.intrinsicContentSize, size)

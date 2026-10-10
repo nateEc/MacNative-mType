@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 同尺寸候选更新的反例验证（2026-10-10）
+
+补强上轮尺寸失效修正：实际 PromptFieldNativeView 将候选“中”更新为“文”，先断言测量尺寸确实相等，再断言不请求额外布局；同时几何代次增加、候选 caret 槽可测量、可访问文本精确更新，且缓存绘制 PNG 与原候选不同。此检查不允许用尺寸相同跳过内容重建。保留完全重复配置不变与字体变大必须布局的两端正反例。
+
+第一轮 field-equal-size-content.log 20 项中一处失败（0.825s，墙钟 0.828）：试图通过未挂载视图的 needsDisplay 标志判断重绘，该标志未保持。生产源码明确仍设置 needsDisplay，不据此认定调度故障；改为实际 bitmapImageRep／cacheDisplay 输出比较，不放宽内容或像素变化要求。field-equal-size-content-pixels.log 20 项零失败零跳过（0.192s，墙钟 0.195）。这证明显式绘制使用新内容，不单独证明可见窗口的系统重绘交付时序。
+
+固定参考／归档下 field-equal-size-content-regression.log 100 项零失败零跳过（3.297s，墙钟 3.310），涵盖字段布局、组合、ASL／Choo／Tape。此轮是已有生产修正的反例覆盖，无预先故意失败阶段；错误测试参照和修正日志均保留。没有产品代码变化、GUI 主程序启动或新完整门禁；真实 IME、可见交付、首键延迟及完整功能兼容仍开放，goal active。
+
 ## 原生字段重复配置的尺寸失效修正（2026-10-10）
 
 检查同步更新路径发现 PromptFieldNativeView.configure 无条件 invalidateIntrinsicContentSize 并设置 needsLayout，即使模型／测量尺寸完全相同。新增实际原生视图回归先配置、布局并清除 dirty，再重复同一配置；field-layout-invalidation-red.log 一项一处预期失败（0.722s，墙钟 0.723），失败为重复配置仍请求布局。测试同时保留几何代次、尺寸和辅助功能值不变，以及字体变大必须改变尺寸并请求布局的正例。
