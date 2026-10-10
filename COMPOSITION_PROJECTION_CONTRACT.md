@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## Hebrew／LTR 混排组合生产入口（2026-10-10）
+
+只读核对官方 test-ui.ts 的候选循环：组合候选逐槽参与显示，replace 改为候选文本，off／below 保留对应目标，超出目标的候选仍显示。参考仓库干净且 HEAD 为 91bd24bb8513785c7364cbea29296ff7adafac41；未复制源码或资产。原生模型已有独立槽与方向几何，但生产 mixed RTL gate 仍拒绝该模型。
+
+新增完整生产宿主测试，从隔离 active selection 恢复自有文本“ab אב cd”、English／Hebrew 混排自定义配置；mixed-composition-host-red.log 一项一处失败（2.406s，墙钟 2.408），组合时找不到 PromptFieldNativeView。第一版按 usesJoiningScriptPrompt 分类后 green 日志仍失败（2.666s，墙钟 2.667）：该项目标志包括 Hebrew 的整词排版，并非严格的连接字形分类。保留既有 shaping 参数，不改变全局语言排版定义，改为明确允许 Hebrew 四个词库及其非 shaping 混排伙伴，其他混排 shaping 家族保持原回退。
+
+统一 PromptFieldProjectionPolicy 同时用于投影入口和独立光标条件，防止原生字段与 inline 光标同时生成。方向策略测试覆盖 Hebrew 四库、English、单一 Arabic 的既有支持，以及 English／Arabic 和 English／Hebrew／Arabic 混排的保留回退。mixed-composition-host-shaping.log 15 项零失败零跳过（14.523s，墙钟 14.526）。
+
+最终完整宿主增加恢复文本精确相等断言，测量 Hebrew 两槽物理顺序，并在 replace 候选更新后再次核对未改动 Hebrew run；三种组合模式、候选更新、取消不提交、提交后推进及回删还原继续使用完整生产页。mixed-composition-host-final.log 192 项零失败零跳过（63.295s，墙钟 63.315），包括完整宿主、字段／光标、方向、组合与 Tape 前进。固定参考原创性检查退出 0，所有进程终态后才编辑文档。
+
+零 Typebar 主程序启动。不可见宿主不是系统键盘／IME或可见窗口验收；本次只证明该 Hebrew 混排接线及明确场景，不证明全部 bidi 控制／标点／跨行、Arabic 等混排、Pace 长期退休队列或首键性能。没有新全量门禁／Release GUI，compositionDisplay 仍部分，完整 goal active。
+
 ## Pace 往返方向及跳过前驱的实际 marker 验证（2026-10-10）
 
 扩展既有原生字段回归，验证 Hebrew→Latin→Hebrew：每次方向变更立即检查实际 NSHostingView marker 的边缘连续，再采样到完整时长检查终点。随后从 Hebrew 状态跳到 sequence 5，明确指定 Latin after 为零时长 predecessor，通过 fromDeadline 请求验证动画从 Latin 的右边缘开始，结束于 Hebrew 左边缘。这覆盖上一轮前驱方向同步修复尚未直接验证的路径。

@@ -2,6 +2,16 @@ import XCTest
 @testable import Typebar
 
 final class PolyglotDirectionTests: XCTestCase {
+  func testFieldProjectionAdmitsHebrewMixButPreservesUnverifiedShapingFallback() {
+    for hebrew in [TypingLanguage.hebrew, .hebrew1k, .hebrew5k, .hebrew10k] {
+      XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, hebrew])))
+    }
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic])))
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .arabic])))
+    XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .arabic)))
+    XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .english)))
+  }
+
   private func configuration(_ languages: [TypingLanguage], base: TypingLanguage? = .english,
     count: Int = 1) -> TestConfiguration {
     .words(count, language: .mixedLanguages, mixedLanguageComponents: languages,

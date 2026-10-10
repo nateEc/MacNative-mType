@@ -43,7 +43,11 @@ import XCTest
     try checkProductionHost(checksMarkedText: true)
   }
 
-  private func checkProductionHost(checksMarkedText: Bool) throws {
+  func testMixedDirectionProductionCompositionUsesAllCandidateSlots() throws {
+    try checkProductionHost(checksMarkedText: true, mixedDirection: true)
+  }
+
+  private func checkProductionHost(checksMarkedText: Bool, mixedDirection: Bool = false) throws {
     for automaticSizing in [true, false, false, true] {
       let suite = "PracticeCompositionHostTests.\(UUID())"
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -51,6 +55,15 @@ import XCTest
       let settings = AppSettings(defaults: defaults)
       let reduceMotion = ProcessInfo.processInfo.environment["TYPEBAR_TEST_REDUCE_MOTION"] == "1"
       settings.reducePracticeMotion = reduceMotion
+      if mixedDirection {
+        let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
+          difficulty: .normal, rules: .init(), language: .mixedLanguages,
+          mixedLanguageComponents: [.english, .hebrew])
+        let selection = ActiveTestSelectionDocument(
+          preset: .init(configuration: configuration, customText: "ab אב cd"),
+          testParameterMemory: .legacyDefaults(configuration: configuration))
+        XCTAssertTrue(settings.saveActiveTestSelection(selection))
+      }
       let container = try ModelContainer(
         for: TestResultRecord.self, TestPresetRecord.self,
         SavedCustomTextRecord.self, ResultFilterPresetRecord.self,
@@ -89,6 +102,14 @@ import XCTest
       func fields(in view: NSView) -> [PromptFieldNativeView] {
         (view as? PromptFieldNativeView).map { [$0] } ?? view.subviews.flatMap { fields(in: $0) }
       }
+      if mixedDirection {
+        let field = try XCTUnwrap(fields(in: host).first)
+        XCTAssertEqual(field.accessibilityValue() as? String, "ab אב cd")
+        let firstHebrew = try XCTUnwrap(field.measuredRect(for: 3))
+        let secondHebrew = try XCTUnwrap(field.measuredRect(for: 4))
+        XCTAssertGreaterThan(firstHebrew.minX, secondHebrew.minX,
+          "Production word shaping must retain the Hebrew run's physical order")
+      }
       if checksMarkedText {
         for style in CompositionDisplayStyle.allCases {
           settings.compositionDisplayStyle = style
@@ -111,6 +132,11 @@ import XCTest
             "Updating marked text must retain the field renderer")
           if style == .replace {
             XCTAssertTrue((field.accessibilityValue() as? String)?.hasPrefix("中文") == true)
+            if mixedDirection {
+              XCTAssertGreaterThan(try XCTUnwrap(field.measuredRect(for: 3)).minX,
+                try XCTUnwrap(field.measuredRect(for: 4)).minX,
+                "Candidate projection must not reverse the untouched Hebrew run")
+            }
           }
           input.unmarkText()
           flush()

@@ -1,6 +1,20 @@
 import AppKit
 import SwiftUI
 
+enum PromptFieldProjectionPolicy {
+  static func supports(_ configuration: TestConfiguration) -> Bool {
+    if !configuration.containsRightToLeftPromptRun || configuration.usesRightToLeftPrompt { return true }
+    // The broader native shaping flag includes Hebrew word-level layout.
+    // Keep that shaping intact; only genuinely unverified mixed families fall back.
+    return configuration.mixedLanguageComponents.allSatisfy { language in
+      switch language {
+      case .hebrew, .hebrew1k, .hebrew5k, .hebrew10k: return true
+      default: return !language.usesJoiningScriptPrompt
+      }
+    }
+  }
+}
+
 /// Dense appearance indices are not presentation or canonical identities.
 /// The existing appearance policy consumes this ephemeral word/glyph list.
 struct PromptCompositionPresentation {

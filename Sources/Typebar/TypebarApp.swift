@@ -3461,8 +3461,7 @@ private struct ContentView: View {
     else {
       return false
     }
-    return !session.configuration.containsRightToLeftPromptRun
-      || session.configuration.usesRightToLeftPrompt
+    return PromptFieldProjectionPolicy.supports(session.configuration)
   }
 
   private var usesIndependentPromptCarets: Bool {
@@ -3511,9 +3510,10 @@ private struct ContentView: View {
     let usesIndependentPromptCarets = self.usesIndependentPromptCarets
     let paceGuideIndex = usesIndependentPromptCarets ? nil : self.paceGuideIndex
     // Native ordinary, ASL, Choo and Tape adapters resolve projected cells.
-    // Mixed-direction prompts retain the existing fallback until verified.
+    // Verified mixed-direction fields share canonical geometry and carets.
+    // Other mixed shaping families retain the fallback pending verification.
     let usesCompositionProjection = composition != nil
-      && (!session.configuration.containsRightToLeftPromptRun || session.configuration.usesRightToLeftPrompt)
+      && PromptFieldProjectionPolicy.supports(session.configuration)
     let presentation = usesCompositionProjection
       ? PromptCompositionPresentation(session: session, composition: composition ?? "", style: settings.compositionDisplayStyle) : nil
     let completedCharacterIndices = presentation?.completedIndices ?? session.completedPromptCharacterIndices
