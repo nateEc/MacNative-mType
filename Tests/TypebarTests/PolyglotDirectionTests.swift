@@ -15,8 +15,12 @@ final class PolyglotDirectionTests: XCTestCase {
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, hindi])))
       XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, hindi])))
     }
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .tamil])))
-    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .tamil])))
+    for tamil in [TypingLanguage.tamil, .tamil1k, .tamilOld] {
+      XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, tamil])))
+      XCTAssertTrue(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, tamil])))
+    }
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .arabic, .gujarati])))
+    XCTAssertFalse(PromptFieldProjectionPolicy.supports(configuration([.english, .hebrew, .gujarati])))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .arabic)))
     XCTAssertTrue(PromptFieldProjectionPolicy.supports(.words(10, language: .english)))
   }

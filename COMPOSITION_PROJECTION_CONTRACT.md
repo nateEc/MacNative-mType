@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## Arabic／Tamil 三目录混排生产入口（2026-10-10）
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 保持干净，只读复核 test-ui.ts 组合候选显示分支，不复制代码／资源。Arabic／Tamil、Tamil 1k、Tamil Old 三个真实 practiceContent 宿主均先复现原生字段缺失：arabic-tamil-host-red.log 三项三处预期失败（2.997s，墙钟 2.998）。生产只增加这三个目录的共享投影准入；Gujarati 等未验证混排仍回退，既有语言、计时、存储与 shaping 实现不变。
+
+自有文本“ab سلام கொடி cd”，默认／空／空／默认四组宿主尺寸策略保持。三种候选样式在初始字段更新／取消、提交／回删断言保留；随后进入 Arabic 字段验证 lam-alef 连接，再以 replace 进入 Tamil 字段验证带组合元音候选“கொ”→“கொடி”→取消，以及接受“கொ”后标记“டி”。精确辅助文本、Arabic RTL／Tamil LTR 两端顺序和原生输入／字段 owner 保持均检查。此处后半段不是三种样式下逐一实测，亦不代表全部 Tamil 连字／实体 IME。
+
+三个目录另运行跨行长候选→短候选→取消，覆盖三种显示、两种字体、90pt 宽度、Arabic 与 Tamil 各自活动字段，检查复用／全新布局一致、每槽几何、实际多行、下一字段不重叠、canonical 前后方向及取消恢复。既有 Hindi／Bangla 场景未删除，广回归继续通过。
+
+arabic-tamil-focused.log 32 项零失败零跳过（58.182s，墙钟 58.187）；固定参考及锁定 Anime 环境下 arabic-tamil-regression.log 165 项零失败零跳过（250.205s，墙钟 250.222），含全部十六项生产宿主（241.505s，墙钟 241.507）、方向、布局、候选投影、Tape 退休和 ASL／Choo 既有组件检查。后两者只是共享组件回归，不是新增 Tamil 场景的可见验收。arabic-tamil-originality.log 固定源边界退出 0，不冒称全面原创性证明。
+
+会话内风险审查核对完整差异、共享准入两消费入口、回退与原有断言，没有剩余可落实发现，非独立评审。全部测试／审计终态后写记录，零 Typebar 主程序启动。没有新的 Release 构建、完整冻结门禁、最低系统、实体 IME 或全字体视觉验收；compositionDisplay 仍部分，94 配置分类与完整 goal active 不变。
+
 ## Arabic／Hindi 两目录混排生产入口与跨行候选（2026-10-10）
 
 固定参考仍为 91bd24bb8513785c7364cbea29296ff7adafac41，工作树干净；只读复核 insert-text.ts 的组合结束输入边界，不复制源码或资产。新增实际 practiceContent 宿主以自有文本“ab سلام किरण cd”、English／Arabic／Hindi 选择复现原生字段未挂载：arabic-hindi-host-red.log 一项一处预期失败（1.809s，墙钟 1.810）。生产只把 Hindi／Hindi 1k 加入共享准入策略，不改变 shaping、计时或布局实现；Tamil 等未验证连写混排继续回退。

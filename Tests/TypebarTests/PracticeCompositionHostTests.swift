@@ -87,10 +87,23 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .hindi1k)
   }
 
+  func testArabicTamilMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .tamil)
+  }
+
+  func testArabicTamil1kMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .tamil1k)
+  }
+
+  func testArabicTamilOldMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .tamilOld)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
     let checksHindi = [.hindi, .hindi1k].contains(mixedLanguage)
-    let checksLTRJoiningRun = mixedLanguage == .bangla || checksHindi
+    let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
+    let checksLTRJoiningRun = mixedLanguage == .bangla || checksHindi || checksTamil
     let checksConnectedRun = checksLTRJoiningRun || [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
@@ -102,6 +115,7 @@ import XCTest
     case .yiddish: extendedWord = "ייִדיש"
     case .bangla: extendedWord = "বাংলা"
     case .hindi, .hindi1k: extendedWord = "किरण"
+    case .tamil, .tamil1k, .tamilOld: extendedWord = "கொடி"
     default: extendedWord = nil
     }
     let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
@@ -281,8 +295,8 @@ import XCTest
           XCTAssertFalse(input.hasMarkedText())
           XCTAssertFalse(window.isVisible)
           if checksLTRJoiningRun {
-            let firstPart = checksHindi ? "कि" : "বাং"
-            let lastPart = checksHindi ? "रण" : "লা"
+            let firstPart = checksTamil ? "கொ" : checksHindi ? "कि" : "বাং"
+            let lastPart = checksTamil ? "டி" : checksHindi ? "रण" : "লা"
             let wholeWord = try XCTUnwrap(extendedWord)
             input.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
             input.insertText("سلام ", replacementRange: .init(location: NSNotFound, length: 0))
