@@ -47,22 +47,25 @@ import XCTest
       }
       flush()
       let input = try XCTUnwrap(inputs(in: host).first)
-      let start = ProcessInfo.processInfo.systemUptime
-      input.insertText("a", replacementRange: .init(location: NSNotFound, length: 0))
-      let inserted = ProcessInfo.processInfo.systemUptime
-      host.layoutSubtreeIfNeeded()
-      let laidOut = ProcessInfo.processInfo.systemUptime
-      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
-      let delivered = ProcessInfo.processInfo.systemUptime
-      host.layoutSubtreeIfNeeded()
-      let finished = ProcessInfo.processInfo.systemUptime
-      XCTAssertTrue(
-        inputs(in: host).contains { $0 === input }, "First input must retain the native input owner"
-      )
-      XCTAssertFalse(window.isVisible)
-      print(
-        "practice-host automaticSizing=\(automaticSizing) input=\(inserted - start) layout=\(laidOut - inserted) delivery=\(delivered - laidOut) finalLayout=\(finished - delivered)"
-      )
+      for (insertion, text) in ["a", "b", "c"].enumerated() {
+        let start = ProcessInfo.processInfo.systemUptime
+        input.insertText(text, replacementRange: .init(location: NSNotFound, length: 0))
+        let inserted = ProcessInfo.processInfo.systemUptime
+        host.layoutSubtreeIfNeeded()
+        let laidOut = ProcessInfo.processInfo.systemUptime
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        let delivered = ProcessInfo.processInfo.systemUptime
+        host.layoutSubtreeIfNeeded()
+        let finished = ProcessInfo.processInfo.systemUptime
+        XCTAssertTrue(
+          inputs(in: host).contains { $0 === input },
+          "First input must retain the native input owner"
+        )
+        XCTAssertFalse(window.isVisible)
+        print(
+          "practice-host automaticSizing=\(automaticSizing) insertion=\(insertion) input=\(inserted - start) layout=\(laidOut - inserted) delivery=\(delivered - laidOut) finalLayout=\(finished - delivered)"
+        )
+      }
     }
   }
 }
