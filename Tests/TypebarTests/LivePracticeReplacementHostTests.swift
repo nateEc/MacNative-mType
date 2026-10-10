@@ -23,6 +23,19 @@ import XCTest
   }
 
   func testDelayedLiveReplacementUsesCurrentWholePreviewAndKeepsConfiguredPace() throws {
+    try checkDelayedReplacement()
+  }
+
+  func testLiveResponseAfterFirstInputPreservesPromptAndMainCaret() throws {
+    try checkDelayedReplacement(startsBeforeReturn: true)
+  }
+
+  func testDisablingPaceDuringLiveFetchDoesNotRestoreTheOldMarker() throws {
+    try checkDelayedReplacement(disablesPace: true)
+  }
+
+  private func checkDelayedReplacement(startsBeforeReturn: Bool = false,
+    disablesPace: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -64,19 +77,44 @@ import XCTest
     XCTAssertEqual(pending.source, .poetry)
     XCTAssertFalse(pending.continuations.isEmpty, "The production load must reach the injected transport")
     settings.showAllPracticeLines = true
+    if disablesPace { settings.paceGuideMode = .off }
     flush()
+    let initialField = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+    let initialPrompt = try XCTUnwrap(initialField.accessibilityValue() as? String)
+    let initialInput = try XCTUnwrap(views(TypingInputView.self, in: host).first)
+    var startedCaret: CGRect?
+    if startsBeforeReturn {
+      // Exercise the native focus callbacks without activating this window.
+      // A genuinely unfocused production window intentionally has no main marker.
+      initialInput.onFocusChanged(true)
+      initialInput.onWindowFocusChanged(true, false)
+      flush()
+      initialInput.insertText(String(initialPrompt.prefix(1)),
+        replacementRange: .init(location: NSNotFound, length: 0))
+      flush()
+      startedCaret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
+        .first { $0.rootView.style == .bar && !$0.isHidden }).frame
+    }
     pending.finish()
     for _ in 0..<5 { flush() }
     let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
     let expected = (0..<151).map { ["quiet", "harbor", "morning"][$0 % 3] }.joined(separator: " ")
-    XCTAssertEqual(field.accessibilityValue() as? String, expected,
-      "A setting changed while transport is suspended must control the actual replacement")
+    XCTAssertEqual(field.accessibilityValue() as? String, startsBeforeReturn ? initialPrompt : expected,
+      "Use current display settings only before input starts; a late response must not replace an active prompt")
     let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
-    input.insertText("q", replacementRange: .init(location: NSNotFound, length: 0))
+    XCTAssertTrue(input === initialInput, "Transport completion must not replace the native input owner")
+    if startsBeforeReturn {
+      let caret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
+        .first { $0.rootView.style == .bar && !$0.isHidden })
+      XCTAssertEqual(caret.frame, startedCaret,
+        "The accepted first character's main caret must not reset when the response arrives")
+    } else {
+      input.insertText("q", replacementRange: .init(location: NSNotFound, length: 0))
+    }
     flush()
     let markers = views(NSHostingView<PromptCaretMarkerView>.self, in: host)
-    XCTAssertTrue(markers.contains { $0.rootView.style == .outline && !$0.isHidden },
-      "Online replacement must retain the configured independent pace marker after input starts")
+    XCTAssertEqual(markers.contains { $0.rootView.style == .outline && !$0.isHidden }, !disablesPace,
+      "Online completion must use the current Pace choice, not the pre-request choice")
     XCTAssertFalse(window.isVisible)
   }
 }
