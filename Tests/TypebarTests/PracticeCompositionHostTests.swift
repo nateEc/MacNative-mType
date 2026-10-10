@@ -123,13 +123,18 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .kannada)
   }
 
+  func testArabicKhmerMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .khmer)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
     let checksGujarati = [.gujarati, .gujarati1k].contains(mixedLanguage)
     let checksKannada = mixedLanguage == .kannada
-    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada
+    let checksKhmer = mixedLanguage == .khmer
+    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada || checksKhmer
     let checksConnectedRun = checksLTRJoiningRun || [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
@@ -144,6 +149,7 @@ import XCTest
     case .tamil, .tamil1k, .tamilOld: extendedWord = "கொடி"
     case .gujarati, .gujarati1k: extendedWord = "કિરણ"
     case .kannada: extendedWord = "ಕಿರಣ"
+    case .khmer: extendedWord = "ខ្មែរ"
     default: extendedWord = nil
     }
     let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
@@ -324,7 +330,8 @@ import XCTest
           XCTAssertFalse(window.isVisible)
           if checksLTRJoiningRun {
             let firstPart: String, lastPart: String
-            if checksKannada { (firstPart, lastPart) = ("ಕಿ", "ರಣ") }
+            if checksKhmer { (firstPart, lastPart) = ("ខ្មែ", "រ") }
+            else if checksKannada { (firstPart, lastPart) = ("ಕಿ", "ರಣ") }
             else if checksGujarati { (firstPart, lastPart) = ("કિ", "રણ") }
             else if checksTamil { (firstPart, lastPart) = ("கொ", "டி") }
             else if checksDevanagari { (firstPart, lastPart) = ("कि", "रण") }

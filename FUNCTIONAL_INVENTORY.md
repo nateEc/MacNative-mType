@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+当前 TST-02 混排生产入口新增 Khmer：实际宿主先复现字段缺失，再开放共享准入；三样式差异、更新／取消／部分提交、相反方向、owner 与跨行恢复有回归，Korean 等未验证语言仍回退。297 项扩展回归零失败零跳过，含全部二十三宿主、两个退休测试集及 ASL／Choo 既有组件，原创性边界通过，详见 [Khmer 证据与人工步骤](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动，无迁移或网络变化；真实 IME、全字体、可见效果与新完整门禁仍待验，功能分类与完整 goal active 不变。
+
 Kannada 增量另补齐实际 TapePromptRetirementTests／PromptWordRetirementTests：首次 22 项一处缺参考路径跳过，补齐固定参考环境后 22 项零失败零跳过；原日志保留，未改断言。以下 273 项仍仅指原扩展回归，不混合统计。
 
 当前 TST-02 混排生产入口新增 Kannada：实际宿主先复现字段缺失，再开放共享准入；三样式候选差异、更新／取消／部分提交、方向／owner 保持与跨行缓存恢复有回归，Khmer 等未验证语言仍回退。273 项扩展检查零失败零跳过，含全部二十二宿主及 ASL／Choo 既有组件；固定参考原创性边界通过，详见 [Kannada 证据与人工步骤](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动，无迁移或网络变化；真实 IME、全部字体、视觉效果与新完整门禁仍待验。此次过滤器未匹配 TapePromptRetirementTests，不将其算作退休专项回归；功能分类和完整 goal active 不变。

@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：Arabic／Khmer 混排生产入口（2026-10-10）
+
+固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 test-ui.ts 候选显示分支只读复核，不复制源码或资产。自有 Unicode 夹具“ab سلام ខ្មែរ cd”进入实际 practiceContent 宿主，先复现字段未挂载：arabic-khmer-host-red.log 一项预期失败，1.907s／墙钟 1.908。生产仅增加 Khmer 共享投影准入，光标与组合显示两个入口共用该策略；Korean 等未验证混排保持回退。
+
+四组尺寸策略覆盖初始与后段活动字段三样式，使用不匹配候选区分替换和保留原文，检查“ខ្មែ”→“ខ្មែរ”更新、取消、部分接受后标记“រ”、逐 UTF-16 单位回删、精确辅助文本、Arabic RTL／Khmer LTR 两端几何与原生输入／字段 owner 保持。夹具包含下标辅音与元音，但不代表全正字法／词库。另有三样式、两字体、90pt 宽度长→短→取消跨行回归，检查缓存／新建一致、每槽几何、后词不重叠和 canonical 恢复。
+
+arabic-khmer-focused.log 30 项零失败零跳过（33.506s，墙钟 33.511）。固定参考及锁定 Anime 环境下 arabic-khmer-regression.log 297 项零失败零跳过（540.207s，墙钟 540.249），含全部二十三宿主（498.667s，墙钟 498.670）、布局／投影／方向、TapePromptRetirementTests／PromptWordRetirementTests 和 ASL／Choo 既有组件。arabic-khmer-originality.log 固定参考原创性边界退出 0，不扩大为全面原创性证明。会话内风险审查核对完整差异、两个消费入口、候选隔离和回退，无剩余可落实发现，非独立评审。
+
+所有测试／审计终态后写记录，零 Typebar 主程序启动。无存储格式、数据迁移或新网络行为。人工步骤待执行：选择 English／Arabic／Khmer 自定义夹具，以真实 IME 逐一检查三样式更新／取消／部分提交、below 候选位置、窄窗恢复和全部字体，再验 Pace／ASL／Choo 可见组合。未做新 Release、完整冻结门禁或最低系统验证；TST-02／compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：Arabic／Kannada 混排生产入口（2026-10-10）
 
 退休专项补充：实际测试集名称为 TapePromptRetirementTests 与 PromptWordRetirementTests（下文 TapeRetirementTests 为记录时的简称错误）。补跑 arabic-kannada-retirement.log 22 项零失败但一项因未传参考路径跳过，保留该日志。补齐固定参考和锁定 Anime 环境后 arabic-kannada-retirement-fixed-reference.log 22 项零失败零跳过（7.636s，墙钟 7.640）。未改测试断言或产品代码。
