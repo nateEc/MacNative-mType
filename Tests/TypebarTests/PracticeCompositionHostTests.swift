@@ -36,6 +36,14 @@ import XCTest
 
 @MainActor final class PracticeCompositionHostTests: XCTestCase {
   func testProductionPracticeCompositionMountsNativeInputAndSurvivesFirstInsertion() throws {
+    try checkProductionHost(checksMarkedText: false)
+  }
+
+  func testProductionCompositionModesUpdateAndCancelWithoutCommitting() throws {
+    try checkProductionHost(checksMarkedText: true)
+  }
+
+  private func checkProductionHost(checksMarkedText: Bool) throws {
     for automaticSizing in [true, false, false, true] {
       let suite = "PracticeCompositionHostTests.\(UUID())"
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -78,6 +86,49 @@ import XCTest
       }
       flush()
       let input = try XCTUnwrap(inputs(in: host).first)
+      func fields(in view: NSView) -> [PromptFieldNativeView] {
+        (view as? PromptFieldNativeView).map { [$0] } ?? view.subviews.flatMap { fields(in: $0) }
+      }
+      if checksMarkedText {
+        for style in CompositionDisplayStyle.allCases {
+          settings.compositionDisplayStyle = style
+          input.setMarkedText(
+            "候", selectedRange: .init(location: 1, length: 0),
+            replacementRange: .init(location: NSNotFound, length: 0))
+          flush()
+          XCTAssertTrue(input.hasMarkedText())
+          let field = try XCTUnwrap(fields(in: host).first)
+          let firstValue = try XCTUnwrap(field.accessibilityValue() as? String)
+          XCTAssertEqual(
+            firstValue.hasPrefix("候"), style == .replace,
+            "The production renderer must honor the selected composition display style")
+          input.setMarkedText(
+            "中文", selectedRange: .init(location: 2, length: 0),
+            replacementRange: .init(location: NSNotFound, length: 0))
+          flush()
+          XCTAssertTrue(
+            fields(in: host).contains { $0 === field },
+            "Updating marked text must retain the field renderer")
+          if style == .replace {
+            XCTAssertTrue((field.accessibilityValue() as? String)?.hasPrefix("中文") == true)
+          }
+          input.unmarkText()
+          flush()
+          XCTAssertFalse(input.hasMarkedText())
+          input.setMarkedText(
+            "候", selectedRange: .init(location: 1, length: 0),
+            replacementRange: .init(location: NSNotFound, length: 0))
+          flush()
+          XCTAssertEqual(
+            try XCTUnwrap(fields(in: host).first).accessibilityValue() as? String,
+            firstValue, "Cancellation must not commit either candidate or consume target slots")
+          input.unmarkText()
+          flush()
+          XCTAssertTrue(inputs(in: host).contains { $0 === input })
+          XCTAssertFalse(window.isVisible)
+        }
+        continue
+      }
       for (insertion, text) in ["a", "b", "c"].enumerated() {
         let initialFrame = host.frame
         let initialLayoutCount = host.layoutCount
@@ -88,7 +139,8 @@ import XCTest
         let laidOut = ProcessInfo.processInfo.systemUptime
         let synchronousLayouts = host.layoutCount - initialLayoutCount
         if insertion == 1,
-          ProcessInfo.processInfo.environment["TYPEBAR_TEST_LAYOUT_STACK"] == "1" {
+          ProcessInfo.processInfo.environment["TYPEBAR_TEST_LAYOUT_STACK"] == "1"
+        {
           host.captureLayoutAtCount = host.layoutCount + 10
           host.captureInvalidationAtCount = host.invalidationCount + 10
         }
@@ -107,18 +159,21 @@ import XCTest
           "practice-host automaticSizing=\(automaticSizing) reduceMotion=\(reduceMotion) insertion=\(insertion) input=\(inserted - start) layout=\(laidOut - inserted) delivery=\(delivered - laidOut) finalLayout=\(finished - delivered) synchronousLayouts=\(synchronousLayouts) deliveredLayouts=\(deliveredLayouts) finalLayouts=\(host.layoutCount - initialLayoutCount - synchronousLayouts - deliveredLayouts)"
         )
         if insertion == 1, !host.capturedLayoutStack.isEmpty {
-          print("practice-host layout-stack automaticSizing=\(automaticSizing)\n"
-            + host.capturedLayoutStack.joined(separator: "\n"))
+          print(
+            "practice-host layout-stack automaticSizing=\(automaticSizing)\n"
+              + host.capturedLayoutStack.joined(separator: "\n"))
         }
         if insertion == 1, !host.capturedInvalidationStack.isEmpty {
-          print("practice-host invalidation-stack automaticSizing=\(automaticSizing)\n"
-            + host.capturedInvalidationStack.joined(separator: "\n"))
+          print(
+            "practice-host invalidation-stack automaticSizing=\(automaticSizing)\n"
+              + host.capturedInvalidationStack.joined(separator: "\n"))
         }
       }
       for backdrop in PracticeBackdropStyle.allCases {
         settings.practiceBackdrop = backdrop
         flush()
-        XCTAssertTrue(inputs(in: host).contains { $0 === input },
+        XCTAssertTrue(
+          inputs(in: host).contains { $0 === input },
           "Background branch changes must not replace the practice input owner")
       }
     }

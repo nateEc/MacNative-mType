@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## 当前生产入口补证（2026-10-10）
+
+下方为模型建立时的历史证据，不能将“尚未替换生产渲染”当作当前状态。当前 ContentView.renderedPrompt 已在非混合 RTL 门控下调用 PromptCompositionPresentation，原生字段呈现已消费 compositionTextMap；完整功能仍未验收。
+
+PracticeCompositionHostTests 新增独立生产入口测试，共用实际 TypebarApp.practiceContent、隔离设置／内存 SwiftData 与不可见窗口，不复制简化渲染。四组宿主逐一选择 off／below／replace，通过真实 TypingInputView.setMarkedText 更新候选；检查 PromptFieldNativeView 的实际可访问值是否按 replace 显示候选、更新时字段 owner 保留，取消后重组同一候选的内容精确相同，输入 owner 保留且窗口未显示。直接 NSTextInputClient 调用不是实体键盘或系统 IME，未证明 below 浮层的视觉位置。原连续输入测试独立运行，不用组合预热污染原始诊断。
+
+首次合并探索 practice-production-marked-modes.log 一项零失败（25.487s，墙钟 25.489）；随后拆分并补取消未误提交断言，practice-production-marked-modes-final.log 与模型渲染共 21 项零失败零跳过（40.025s，墙钟 40.029），格式化后再次通过，日志 practice-production-marked-modes-formatted.log。补已有行为的生产接线证据，没有故意失败阶段；生产代码未变、零主程序启动、无新全量门禁。混合 RTL 门控、Unicode 源单位差异、全部呈现组合和真实 IME 仍开放，compositionDisplay 部分及完整 goal active 不变。
+
 固定只读参考 `91bd24bb8513785c7364cbea29296ff7adafac41`；独立 Swift 实现，不复制原版产品代码或资产。本增量是组合显示重写的模型／证据阶段，**尚未替换生产渲染**，不声称已修复实际 IME 界面。完整 goal active。
 
 ## 原版行为与现有缺口
