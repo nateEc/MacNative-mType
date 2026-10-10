@@ -119,9 +119,14 @@ final class PromptFieldNativeView: NSView {
       if rendering.compositionTextMap?.fieldRuns != next.compositionTextMap?.fieldRuns
         || rendering.compositionTextMap?.canonicalAliases != next.compositionTextMap?.canonicalAliases
         || rendering.compositionTextMap?.caret != next.compositionTextMap?.caret {
+        let previousSize = intrinsicContentSize
         rendering = next; invalidatesModel = true; notificationRevision &+= 1
         _ = measure(width: max(1, bounds.width))
-        updateFollower(); needsDisplay = true; invalidateIntrinsicContentSize()
+        updateFollower(); needsDisplay = true
+        if intrinsicContentSize != previousSize {
+          invalidateIntrinsicContentSize()
+          needsLayout = true
+        }
         setAccessibilityValue(String(next.text.characters))
       }
     }

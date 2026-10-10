@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 最新候选读取路径的 intrinsic 约束失效（2026-10-10）
+
+源码沿首键问题检查发现，configure 已按实际尺寸通知失效，但 refreshRendering 在最新 provider 返回改变内容时仍无条件 invalidateIntrinsicContentSize。实际 Auto Layout 父视图挂载字段回归先验证候选“中”→“文”尺寸相等、几何代次和辅助文本更新。field-fresh-size-red.log 一项通过，父 needsLayout 未能区分该问题；改查字段 needsUpdateConstraints 后，field-fresh-constraints-red.log 一项一处预期失败（0.717s，墙钟 0.718）。这是约束失效证据，不是整个父树无需布局的证明。
+
+refreshRendering 现在保存旧 intrinsicContentSize，仍更新 rendering／模型、follower、重绘与辅助文本，仅尺寸变化时 invalidateIntrinsicContentSize 并请求布局。新增缓存 PNG 比较确认同尺寸内容变化仍到达绘制路径，以及 80 字候选改变高度时约束和布局失效仍发生的正例。首次 green 日志五处失败：缓存绘制影响父布局状态，且测试未提供改变的 latestInput，第二次 present 合理地不再读取 provider。identity 日志补新输入身份后仅父布局断言失败；最终删除不成立的“光标正常变化也不能布局”要求，保留精确 intrinsic 约束要求、尺寸变化、内容、像素和辅助文本断言，未修改生产光标读取策略。
+
+field-fresh-constraints-final.log 177 项零失败零跳过（50.571s，墙钟 50.590），含完整宿主组合更新／取消／提交／回删、字段／光标、Tape 前进。独立固定参考原创性检查退出 0。完整宿主首字符同步布局仍约 355–365ms，后续约 135ms；本修正不证明首键性能问题解决。所有测试和审计终态后才编辑记录，零 Typebar 主程序启动；没有新完整门禁或 Release GUI，真实 IME、首键和完整功能兼容 goal 继续开放。
+
 ## 同尺寸候选更新的反例验证（2026-10-10）
 
 补强上轮尺寸失效修正：实际 PromptFieldNativeView 将候选“中”更新为“文”，先断言测量尺寸确实相等，再断言不请求额外布局；同时几何代次增加、候选 caret 槽可测量、可访问文本精确更新，且缓存绘制 PNG 与原候选不同。此检查不允许用尺寸相同跳过内容重建。保留完全重复配置不变与字体变大必须布局的两端正反例。

@@ -29,6 +29,55 @@ import XCTest
     }
   }
 
+  func testFreshCandidateOnlyInvalidatesIntrinsicConstraintsWhenSizeChanges() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "abcdef gh")
+    var current = render(try presentation(session, "中"))
+    let parent = NSView(frame: .init(x: 0, y: 0, width: 400, height: 200))
+    let view = PromptFieldNativeView(frame: parent.bounds)
+    defer { view.stop() }
+    view.translatesAutoresizingMaskIntoConstraints = false
+    parent.addSubview(view)
+    NSLayoutConstraint.activate([
+      view.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
+      view.topAnchor.constraint(equalTo: parent.topAnchor),
+      view.widthAnchor.constraint(equalToConstant: 400)
+    ])
+    var config = PromptCaretNativeView.Configuration(text: current.text, mainOffset: 0, paceOffset: nil,
+      mainStyle: .bar, paceStyle: .off, font: font, lineSpacing: 12, rightToLeft: false,
+      accent: .yellow, motion: .off, reducesMotion: true, frameRate: 30, attemptID: UUID(),
+      coordinator: PromptCaretMotionCoordinator(), automaticallyPresents: false)
+    config.latestRendering = { current }
+    let attemptID = config.attemptID
+    config.latestInput = { .init(attemptID: attemptID, typed: "",
+      composition: String(current.text.characters), glyphID: 0) }
+    view.configure(rendering: current, font: font, carets: config)
+    parent.layoutSubtreeIfNeeded()
+    parent.needsLayout = false; view.needsLayout = false
+    parent.needsUpdateConstraints = false; view.needsUpdateConstraints = false
+    let size = view.intrinsicContentSize, revision = view.geometryRevision
+    func pixels() throws -> Data {
+      let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+      view.cacheDisplay(in: view.bounds, to: bitmap)
+      return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+    }
+    let before = try pixels()
+    parent.needsLayout = false; view.needsLayout = false
+    parent.needsUpdateConstraints = false; view.needsUpdateConstraints = false
+    current = render(try presentation(session, "文"))
+    view.present(at: 0)
+    XCTAssertEqual(view.intrinsicContentSize, size)
+    XCTAssertGreaterThan(view.geometryRevision, revision)
+    XCTAssertEqual(view.accessibilityValue() as? String, String(current.text.characters))
+    XCTAssertFalse(view.needsUpdateConstraints, "Equal size must not invalidate intrinsic constraints")
+    XCTAssertNotEqual(try pixels(), before, "Fresh content must still reach the native draw path")
+    current = render(try presentation(session, String(repeating: "中", count: 80)))
+    view.present(at: 1)
+    XCTAssertNotEqual(view.intrinsicContentSize, size)
+    XCTAssertTrue(view.needsUpdateConstraints, "Changed height must still invalidate intrinsic constraints")
+    XCTAssertTrue(view.needsLayout)
+    XCTAssertEqual(view.accessibilityValue() as? String, String(current.text.characters))
+  }
+
   func testIdenticalNativeFieldConfigurationDoesNotRequestAnotherLayout() throws {
     let session = TypingSession(configuration: .words(2), prompt: "abcdef gh")
     let result = render(try presentation(session, "中"))
