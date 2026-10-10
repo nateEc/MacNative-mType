@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 字体家族目录按需查询，不宣称首键修复（2026-10-10）
+
+当前源码确认 NativePracticeFont.postScriptName(for:) 在验证名称及直接字体匹配之前提前求值系统 availableFontFamilies。新增副作用计数回归：空名称、含内部控制字符名称和直接有效 PostScript 名称应零次查询；无法直接解析时仍查询一次当前目录。font-family-lazy-red.log 一项两处预期失败（0.611s，墙钟 0.613），实际提前枚举三次，最后累计四次。
+
+仅将 installedFamilies 参数改为非逃逸 autoclosure，并在需要家族匹配时求值；保留规范化、直接名称优先、家族匹配及本地覆盖／预览行为，不缓存系统字体，不改变动画或计时健康阈值。font-family-lazy-final.log 19 项零失败但缺固定参考一项跳过（15.946s，墙钟 15.950），不算完整通过。终态后补环境重跑 font-family-lazy-pinned.log：19 项零失败零跳过（16.396s，墙钟 16.400），覆盖字体预览／命令、已安装名字、统计观察范围及四组完整宿主连续输入。固定参考原创性检查退出 0。
+
+完整宿主首字符同步布局仍约 351–363ms，未证明主要延迟改善。此修改消除已实证的无用目录访问，不关闭首键问题；后续需继续定位同步布局。零 Typebar 主程序启动，无新 Release GUI 或全量门禁；全部测试及审计终态后才编辑记录，完整 goal active。
+
 ## 最新候选读取路径的 intrinsic 约束失效（2026-10-10）
 
 源码沿首键问题检查发现，configure 已按实际尺寸通知失效，但 refreshRendering 在最新 provider 返回改变内容时仍无条件 invalidateIntrinsicContentSize。实际 Auto Layout 父视图挂载字段回归先验证候选“中”→“文”尺寸相等、几何代次和辅助文本更新。field-fresh-size-red.log 一项通过，父 needsLayout 未能区分该问题；改查字段 needsUpdateConstraints 后，field-fresh-constraints-red.log 一项一处预期失败（0.717s，墙钟 0.718）。这是约束失效证据，不是整个父树无需布局的证明。

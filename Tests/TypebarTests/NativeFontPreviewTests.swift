@@ -3,6 +3,21 @@ import XCTest
 @testable import Typebar
 
 final class NativeFontPreviewTests: XCTestCase {
+  func testEmptyAndDirectFontNamesDoNotEnumerateInstalledFamilies() throws {
+    let direct = try XCTUnwrap(NSFont(name: "Courier", size: 15))
+    var enumerations = 0
+    func families() -> [String] { enumerations += 1; return [] }
+    XCTAssertNil(NativePracticeFont.postScriptName(for: "  ", installedFamilies: families()))
+    XCTAssertNil(NativePracticeFont.postScriptName(for: "bad\nname", installedFamilies: families()))
+    XCTAssertEqual(NativePracticeFont.postScriptName(for: direct.fontName,
+      installedFamilies: families()), direct.fontName)
+    XCTAssertEqual(enumerations, 0,
+      "Empty, invalid and directly resolvable names must not load the system family catalog")
+    XCTAssertNil(NativePracticeFont.postScriptName(for: "TypebarMissingFont_928713",
+      installedFamilies: families()))
+    XCTAssertEqual(enumerations, 1, "Unresolved names must still consult current installed families")
+  }
+
   func testCatalogRowsPreviewTheirRequestedFontDespiteAnActiveLocalOverride() throws {
     let local = try XCTUnwrap(NSFont(name: "Courier", size: 15))
     let serif = try XCTUnwrap(NSFont(name: "Georgia", size: 15))

@@ -51,7 +51,8 @@ enum NativePracticeFont {
     postScriptName(for: requestedName, installedFamilies: installedFamilies) != nil
   }
 
-  static func postScriptName(for requestedName: String, installedFamilies: [String]) -> String? {
+  static func postScriptName(for requestedName: String,
+    installedFamilies: @autoclosure () -> [String]) -> String? {
     let name = normalizedName(requestedName)
     guard !name.isEmpty else { return nil }
 
@@ -61,7 +62,9 @@ enum NativePracticeFont {
       }
     }
 
-    guard let family = matchingFamily(for: name, in: installedFamilies) else { return nil }
+    // The default path commonly has no installed name. Enumerating the system
+    // catalog is only needed after validation and direct-name lookup fail.
+    guard let family = matchingFamily(for: name, in: installedFamilies()) else { return nil }
     return postScriptName(forFamily: family)
   }
 

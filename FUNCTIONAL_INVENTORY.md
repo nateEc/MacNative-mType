@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+当前字体解析已避免为空／非法／直接有效名称提前枚举系统字体家族；未解析名称仍查询当前目录，无缓存或字体选择功能删减。19 项固定参考专项零失败零跳过、原创性边界通过，零主程序启动，详见 [首键相关证据](ORDINARY_TAPE_ENTRY_CONTRACT.md)。完整宿主首字符同步布局仍约 351–363ms，不宣称首键性能修复；全部兼容分类与 goal active 不变，本轮无新全量门禁或实机验收。
+
 当前 Pashto／Sindhi／Central Kurdish／Yiddish 混排生产组合入口已接通，补齐全 RTL 身份检查发现的 Urdu 5k 遗漏。214 项相关回归零失败零跳过、固定参考原创性边界通过，零主程序启动，详见 [组合投影合同](COMPOSITION_PROJECTION_CONTRACT.md)。身份策略覆盖不等于全部 IME 或词库验收；RTL 与 Bangla／Hindi 连写混排仍回退，真实 IME、字体／跨行、首键及完整门禁复验开放。配置 89／4／1、compositionDisplay 部分与完整 goal active 不变；下方其他家族回退说明为历史记录。
 
 当前 Persian／Urdu 混排已接通生产组合入口，完整宿主验证三种显示、更新取消／提交回删、连字与特有文字 run 顺序，见 [组合投影合同](COMPOSITION_PROJECTION_CONTRACT.md)。210 项相关回归及固定参考 30 项强化专项零失败零跳过，原创性通过，零主程序启动。Pashto 等其他混排仍回退，真实 IME、字体／跨行与首键未验；compositionDisplay 仍部分、配置 89／4／1 与完整 goal active 不变。此前全量冻结门禁不覆盖本次新增策略，下方 Persian 回退描述为历史快照。
