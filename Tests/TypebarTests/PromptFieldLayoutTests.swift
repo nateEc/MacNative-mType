@@ -7,6 +7,52 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testFieldMainCaretUsesResolvedMixedDirectionRatherThanOuterFlow() throws {
+    let value = try rendering("אב cd", marked: "א")
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let layout = PromptFieldTextLayout(map: map, width: 400, font: font)
+    let anchor = try XCTUnwrap(map.caret)
+    let own = try XCTUnwrap(layout.cellFrames[anchor.cellID])
+    XCTAssertTrue(layout.mainDirection(perGlyph: false))
+    XCTAssertEqual(PromptCaretPlacementPolicy.horizontalAnchor(
+      for: try XCTUnwrap(layout.mainRect(style: .bar, perGlyph: false)), style: .bar,
+      isRightToLeft: layout.mainDirection(perGlyph: false)), own.maxX,
+      accuracy: 0.1)
+  }
+
+  func testPerGlyphMainDirectionDiffersFromMixedFieldDirection() throws {
+    let value = try rendering("אבXYZ cd", accepted: "אב", marked: "X")
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let layout = PromptFieldTextLayout(map: map, width: 400, font: font)
+    XCTAssertTrue(layout.mainDirection(perGlyph: false))
+    XCTAssertFalse(layout.mainDirection(perGlyph: true))
+    let own = try XCTUnwrap(layout.cellFrames[try XCTUnwrap(map.caret).cellID])
+    XCTAssertEqual(PromptCaretPlacementPolicy.horizontalAnchor(
+      for: try XCTUnwrap(layout.mainRect(style: .bar, perGlyph: true)), style: .bar,
+      isRightToLeft: layout.mainDirection(perGlyph: true)), own.minX,
+      accuracy: 0.1)
+  }
+
+  func testNativeMainMarkerSwitchesEdgesWhenDirectionModeChanges() throws {
+    let value = try rendering("אבXYZ cd", accepted: "אב", marked: "X")
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 400, height: 180))
+    defer { view.stop() }
+    var configuration = config(PromptCaretMotionCoordinator())
+    view.configure(rendering: value, font: font, carets: configuration)
+    view.layout(); view.present(at: 0)
+    let caret = try XCTUnwrap(view.subviews.compactMap { $0 as? PromptCaretNativeView }.first)
+    let marker = try XCTUnwrap(caret.subviews.compactMap { $0 as? NSHostingView<PromptCaretMarkerView> }.first)
+    let own = try XCTUnwrap(view.measuredRect(for: try XCTUnwrap(map.caret).cellID))
+    XCTAssertEqual(marker.frame.midX, own.maxX, accuracy: 0.1)
+    let revision = view.geometryRevision
+    configuration.fieldDirectionPerGlyph = true
+    view.configure(rendering: value, font: font, carets: configuration)
+    view.present(at: 0.1)
+    XCTAssertEqual(view.geometryRevision, revision, "Mode changes must not invent text geometry changes")
+    XCTAssertEqual(marker.frame.midX, own.minX, accuracy: 0.1)
+  }
+
   func testIndependentHebrewCellsUseRTLOrderWithinLTRFieldFlow() throws {
     let value = try rendering("אב cd", marked: "א")
     let map = try XCTUnwrap(value.compositionTextMap)

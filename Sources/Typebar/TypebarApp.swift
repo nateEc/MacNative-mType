@@ -3434,7 +3434,7 @@ private struct ContentView: View {
   }
 
   private func makeSpecialPromptCaretConfiguration(rightToLeft: Bool = false) -> PromptCaretNativeView.Configuration {
-    return .init(text: AttributedString(), mainOffset: nil, paceOffset: nil,
+    var configuration = PromptCaretNativeView.Configuration(text: AttributedString(), mainOffset: nil, paceOffset: nil,
       mainStyle: settings.caretStyle, paceStyle: settings.paceCaretStyle,
       font: practicePromptNSFont(size: settings.fontSize), lineSpacing: 12,
       rightToLeft: rightToLeft,
@@ -3450,6 +3450,9 @@ private struct ContentView: View {
         isVisible: (inputHasFocus || showsVirtualKeyboard) && typingWindowHasFocus && !session.isFinished,
         isBlinking: visualFocus.caretIsBlinking, revision: visualFocus.caretBlinkRevision) },
       mainGlyphID: currentPromptGlyphIndex)
+    configuration.fieldDirectionPerGlyph = session.configuration.mode == .zen
+      || session.configuration.mode == .custom || session.configuration.language == .mixedLanguages
+    return configuration
   }
 
   private var usesNativeCaretOverlay: Bool {

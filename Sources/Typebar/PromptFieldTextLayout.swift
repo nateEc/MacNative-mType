@@ -208,10 +208,19 @@ struct PromptFieldTextRun: Equatable {
     let ids = aliases[id] ?? (cellFrames[id] == nil ? [] : [id])
     return (after ? ids.last : ids.first).flatMap { caretRect($0, after: after) }
   }
-  func mainRect(style: TypingCaretStyle) -> CGRect? {
+  func mainDirection(perGlyph: Bool) -> Bool {
+    guard let anchor, let index = boxByCell[anchor.cellID] else { return rightToLeft }
+    let box = boxes[index]
+    let cells = perGlyph ? box.cells.filter { $0.id == anchor.cellID }
+      : box.fieldID.map { owner in boxes.filter { $0.fieldID == owner }.flatMap(\.cells) } ?? box.cells
+    let text = cells.map { String(ASLPromptGlyphContent(glyph: $0.glyph, text: $0.text).main.characters) }.joined()
+    return PracticeTapePolicy.isRightToLeft(text, fallback: rightToLeft)
+  }
+  func mainRect(style: TypingCaretStyle, perGlyph: Bool? = nil) -> CGRect? {
     guard let anchor, let rect = caretRect(anchor.cellID, after: anchor.after) else { return nil }
     return PromptPaceCaretGeometry.rect(from: rect, to: rect, fromAfter: anchor.after, toAfter: anchor.after,
-      style: style, rightToLeft: rightToLeft, fraction: 1, reducesMotion: true,
+      style: style, rightToLeft: perGlyph.map { mainDirection(perGlyph: $0) } ?? rightToLeft,
+      fraction: 1, reducesMotion: true,
       afterWidth: (" " as NSString).size(withAttributes: [.font: font]).width)
   }
   var lineGeometry: ASLPromptLineGeometry {

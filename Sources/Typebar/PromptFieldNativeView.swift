@@ -134,7 +134,9 @@ final class PromptFieldNativeView: NSView {
     config.firstGlyphID = rendering.compositionTextMap?.canonicalAliases.keys.min() ?? 0
     config.glyphRect = { [weak self] id in self?.model?.canonicalRect(id, after: false) }
     config.latestRendering = { [weak self] in self?.refreshRendering() ?? .init(text: AttributedString(), glyphCharacterOffsets: [:]) }
-    config.fieldMainRect = { [weak self] style in self?.model?.mainRect(style: style) }
+    let perGlyph = config.fieldDirectionPerGlyph
+    config.fieldMainRect = { [weak self] style in self?.model?.mainRect(style: style, perGlyph: perGlyph) }
+    config.fieldMainDirection = { [weak self] in self?.model?.mainDirection(perGlyph: perGlyph) ?? false }
     config.fieldPaceRect = { [weak self] id, after in self?.model?.canonicalRect(id, after: after) }
     caret.update(config); updateFollower()
   }

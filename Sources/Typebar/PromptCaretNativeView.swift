@@ -41,6 +41,8 @@ final class PromptCaretNativeView: NSView {
     // Field layouts resolve virtual IDs themselves; canonical pace IDs remain
     // a separate API and may alias several presentation slots.
     var fieldMainRect: ((TypingCaretStyle) -> CGRect?)? = nil
+    var fieldMainDirection: (() -> Bool)? = nil
+    var fieldDirectionPerGlyph = false
     var fieldPaceRect: ((Int, Bool) -> CGRect?)? = nil
     var automaticallyPresents = true
   }
@@ -76,6 +78,8 @@ final class PromptCaretNativeView: NSView {
     let old = configuration
     let layoutChanged = old.map { $0.font != next.font || $0.lineSpacing != next.lineSpacing
       || $0.rightToLeft != next.rightToLeft
+      || $0.fieldDirectionPerGlyph != next.fieldDirectionPerGlyph
+      || ($0.fieldMainDirection != nil) != (next.fieldMainDirection != nil)
       || ($0.glyphRect != nil) != (next.glyphRect != nil)
       || ($0.mainGlyphRect != nil) != (next.mainGlyphRect != nil)
       || ($0.fieldMainRect != nil) != (next.fieldMainRect != nil) } ?? false
@@ -196,7 +200,8 @@ final class PromptCaretNativeView: NSView {
       let offset = latest.flatMap { _ in rendering?.characterOffset(forGlyphAt: glyphID) }
         ?? (latest == nil ? config.mainOffset : nil)
       if config.mainStyle.drawsMarker {
-        mainRightToLeft = glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
+        mainRightToLeft = config.fieldMainDirection?()
+          ?? glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
         let mainRect: CGRect?
         if let resolver = config.fieldMainRect { mainRect = resolver(config.mainStyle) }
         else if let rendering, let map = rendering.compositionTextMap {

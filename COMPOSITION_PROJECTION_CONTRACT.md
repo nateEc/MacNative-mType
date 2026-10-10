@@ -1,5 +1,15 @@
 # 组合显示投影与完整固定源码证据
 
+## 字段主光标方向与原生 marker 接线（2026-10-10）
+
+固定 caret 源码的 custom／Zen／Polyglot 按字母规则及 strings.isWordRightToLeft 的标点裁剪／基准回退用于确定本次合同。PromptFieldTextLayout.mainDirection 从当前 projection anchor 所属实际 cell 读取主文字；词级读取同字段所有主文字，不含 hint。mainRect 接受明确方向模式，旧未指定模式的几何调用保留原行为。原生字段同时提供几何 resolver 与 fieldMainDirection，PromptCaretNativeView 在最新 rendering provider 更新后读取该方向，用于最终 marker 的左右边缘；不能只改矩形、不改 bar 绘制方向。
+
+新增 fieldDirectionPerGlyph 配置；生产特殊提示光标工厂在 custom／Zen／mixedLanguages 时启用，其他模式用词级方向。配置模式或 resolver 存在性变化使位置失效，不伪造文字 geometryRevision。首次 field-main-direction-red.log 为新接口缺失的编译失败，不算行为红测。首轮 green.log 50 项一处断言失败（1.744s，墙钟 1.750）：测试把 bar 所属字形矩形 minX 误认为最终边缘，改为实际 PromptCaretPlacementPolicy 锚点；方向要求不放宽。最终再通过真正原生 NSHostingView marker.frame.midX 验证换边，模式切换时保持同一测量几何代次。
+
+field-main-direction-regression.log 111 项零失败零跳过（3.339s，墙钟 3.353），涵盖字段、组合、ASL／Choo／Tape。field-main-direction-native-final.log 133 项零失败零跳过（51.690s，墙钟 51.705），含两个模型方向新例、实际 marker 模式切换、完整生产宿主及光标相关回归。原创性 field-main-direction-originality.log 退出 0。默认 time 宿主不能替代 custom／Zen／mixedLanguages 全模式实机验证，工厂条件仍需更广验收。
+
+此增量只接主光标，不改变 pace 方向规则；未取消混排入口回退。逐字 pace 两端方向、明确 bidi 控制跨行继承、全部候选／Unicode／控制符／RTL joining／真实 IME 仍开放。零 Typebar 图形主程序启动，无新完整门禁／Release GUI；compositionDisplay 仍部分，完整 goal active。
+
 ## 独立字形视觉顺序接入字段分配（2026-10-10）
 
 PromptFieldTextLayout 现在消费 PromptFieldVisualOrder，但没有合并独立字形的绘制／TextKit 盒子。先沿用既有逻辑词分组、逐字尺寸、结构 Return 与 ASL 行分配，再按字段 group 与已分配 y 聚合非 gap 单字盒子；仅对 RTL 基准或含 RTL 字形的行解析物理顺序，从原行最左边界按各盒子原宽度重新放置。连写分支不变，提交空格不跨字段重排，canonical alias 与逻辑 followingCell 仍按原身份建立。仅可见位置变化，不改输入、计分、原词或回放。
