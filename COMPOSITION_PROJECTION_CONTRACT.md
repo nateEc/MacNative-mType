@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：活动候选期间保存字体与字号更新（2026-10-10）
+
+实际 TypebarApp.practiceContent 的四组不可见宿主在 below“中文”候选未提交时应用本机 Georgia／40pt，再恢复默认等宽／28pt。检查实际候选 NSTextField 的 fontName／pointSize 更新及恢复、候选／输入 owner 保留、hasMarkedText 仍真、候选与实际提示辅助功能内容不变，随后继续既有长候选、取消／接受／回删链路。只增加测试，补已有行为证据，无人为失败阶段；不安装／打包字体，不改产品、输入或持久化格式。
+
+首轮 `work/font-composition-host.log` 十四项零失败但跳过一项固定源码测试（21.439s，墙钟 21.442），原因未传 TYPEBAR_REFERENCE_ROOT，保留日志且不计零跳过。补齐固定只读参考后，`font-composition-host-final.log` 十四项零失败零跳过（21.172s，墙钟 21.175），包含十一字体预览／解析／完整固定源轨迹、两个候选组件与新生产宿主（17.422s）。没有修改测试以隐藏跳过。
+
+本次验证保存字体的实际生产更新，不将状态级预览测试扩大为命令面板临时预览的活动候选验证，也不证明 Georgia 的中文 fallback 像素、长文本全字体、文件异步、实体 IME 或全部字体资源等价。未做新完整门禁／Release，零主程序启动。fontFamily／compositionDisplay 继续部分，完整 goal active。
+
 ## TST-02：动态 CR 的零宽显示与强制换行修正（2026-10-10）
 
 此前 innerText 字符串对照保留 CR，并不证明原生行高。增强同一本地 WebKit 探针，逐 UTF-16 单位使用 Range 测量 x／y／宽高；`work/below-cr-geometry-probe.log` 一项通过（0.794s，墙钟 0.796），观测动态 CR 宽度为零、与相邻字母同一 y，而原生 aCRLFb 标签高度为 66pt，普通 aLFb 为 33pt。此为探索证据，不将当时绿色测试误称已有布局断言通过。

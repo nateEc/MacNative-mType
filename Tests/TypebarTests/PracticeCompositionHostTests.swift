@@ -59,6 +59,10 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, checksBelowStatus: true, checksWholeLineToggle: true)
   }
 
+  func testSavedFontAndSizeChangesDuringCompositionUpdateCandidateWithoutCommitting() throws {
+    try checkProductionHost(checksMarkedText: true, checksBelowStatus: true, checksFontChanges: true)
+  }
+
   func testMixedDirectionProductionCompositionUsesAllCandidateSlots() throws {
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .hebrew)
   }
@@ -189,7 +193,8 @@ import XCTest
 
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil,
     checksBelowStatus: Bool = false, hostWidth: CGFloat = 1000,
-    checksBelowResize: Bool = false, checksWholeLineToggle: Bool = false) throws {
+    checksBelowResize: Bool = false, checksWholeLineToggle: Bool = false,
+    checksFontChanges: Bool = false) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
@@ -384,6 +389,25 @@ import XCTest
           if !mixedDirection, style == .below {
             XCTAssertEqual(candidateElements(in: host).first?.stringValue, "中文")
             XCTAssertTrue(candidateElements(in: host).first === emptyCandidate)
+            if checksFontChanges {
+              let candidate = try XCTUnwrap(emptyCandidate)
+              let originalFont = try XCTUnwrap(candidate.font)
+              let before = field.accessibilityValue() as? String
+              let georgia = try XCTUnwrap(NSFont(name: "Georgia", size: 40))
+              for changed in [true, false] {
+                settings.installedPracticeFontName = changed ? "Georgia" : ""
+                settings.fontSize = changed ? 40 : 28
+                flush()
+                XCTAssertTrue(inputs(in: host).first === input)
+                XCTAssertTrue(input.hasMarkedText())
+                XCTAssertTrue(candidateElements(in: host).first === candidate)
+                XCTAssertEqual(candidate.stringValue, "中文")
+                XCTAssertEqual(candidate.font?.fontName, changed ? georgia.fontName : originalFont.fontName)
+                XCTAssertEqual(candidate.font?.pointSize, changed ? 40 : 28)
+                XCTAssertEqual(try XCTUnwrap(fields(in: host).first).accessibilityValue() as? String, before)
+                XCTAssertFalse(window.isVisible)
+              }
+            }
             if checksWholeLineToggle {
               let before = field.accessibilityValue() as? String
               for enabled in [true, false] {
