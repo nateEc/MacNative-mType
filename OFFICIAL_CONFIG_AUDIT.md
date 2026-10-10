@@ -767,7 +767,7 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `tapeMode` | `practiceTapeMode` | 部分；启用关闭完整行，关闭卷带不恢复完整行，命令与偏好页遵守相同互斥规则。单行 LTR／RTL、混排、独立主／pace、横向退休与 word-only 缺口、换行累计布局及纵向 owner／确认去重已有原生组件与完整源码对照；独立集合接入会话回删、共享投影、结构行工厂及字体恢复。普通 LF 与 Zen 生产入口已在各自合同范围接通，唯一隔离窗口有限确认自定义三行 Return 推进。复杂组合候选／hint、内部 LF 全导航、未来缺失词激活、任意纵横／反向队列、全部连写与真实设备仍开放，不以配置可保存或限定窗口检查冒充完整等价。 |
 | `tapeMargin` | `practiceTapeMargin` | 已映射；以 0–1 原生比例保存。 |
 | `smoothLineScroll` | `smoothPracticeLineScroll` | 已映射。 |
-| `showAllLines` | `showAllPracticeLines` | 部分映射：词／引语／自定义（含计时自定义）展开，不重开，下一轮生成读取；有限 1–100,000 词完整预览，无限／自定义 bound 遵守覆盖。自有引语默认首批 100、开启全量，toPush 窗口 1–4 优先覆盖。卷带内拒绝启用；更大预算与外部短词源保持可练习并提示未完整预览，仍有差异；实际布局与设备仍待验收。 |
+| `showAllLines` | `showAllPracticeLines` | 部分映射：词／引语／Zen／有限非计时自定义展开当前内容；time、计时及无限自定义保持有界滚动。切换不重开，下一轮生成读取；有限 1–100,000 词完整预览，无限／自定义 bound 遵守覆盖。自有引语默认首批 100、开启全量，toPush 窗口 1–4 优先覆盖。卷带内拒绝启用；更大预算与外部短词源保持可练习并提示未完整预览，仍有差异；实际布局与设备仍待验收。 |
 | `alwaysShowDecimalPlaces` | `alwaysShowDecimalPlaces` | 已映射。完成结果页保留未取整的速度与准确率；关闭时按参考规则展示换算后整数、向下取整准确率、四舍五入稳定度及四舍五入总用时，开启时速度、非满分准确率与两类稳定度展示两位小数，满分准确率保留 `100%`，短时总用时展示两位小数、超过 61 秒切换为时钟格式；旧本机记录安全回退为原整数值。 |
 | `typingSpeedUnit` | `typingSpeedUnit` | 已映射。 |
 | `startGraphsAtZero` | `startGraphsAtZero` | 已映射。 |

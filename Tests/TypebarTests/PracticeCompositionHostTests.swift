@@ -55,6 +55,10 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, checksBelowStatus: true, checksBelowResize: true)
   }
 
+  func testWholeLineToggleDuringCompositionRetainsInputAndCandidateWithoutCommitting() throws {
+    try checkProductionHost(checksMarkedText: true, checksBelowStatus: true, checksWholeLineToggle: true)
+  }
+
   func testMixedDirectionProductionCompositionUsesAllCandidateSlots() throws {
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .hebrew)
   }
@@ -185,7 +189,7 @@ import XCTest
 
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil,
     checksBelowStatus: Bool = false, hostWidth: CGFloat = 1000,
-    checksBelowResize: Bool = false) throws {
+    checksBelowResize: Bool = false, checksWholeLineToggle: Bool = false) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
@@ -380,6 +384,19 @@ import XCTest
           if !mixedDirection, style == .below {
             XCTAssertEqual(candidateElements(in: host).first?.stringValue, "中文")
             XCTAssertTrue(candidateElements(in: host).first === emptyCandidate)
+            if checksWholeLineToggle {
+              let before = field.accessibilityValue() as? String
+              for enabled in [true, false] {
+                settings.showAllPracticeLines = enabled
+                flush()
+                XCTAssertTrue(inputs(in: host).first === input)
+                XCTAssertTrue(input.hasMarkedText())
+                XCTAssertTrue(candidateElements(in: host).first === emptyCandidate)
+                XCTAssertEqual(candidateElements(in: host).first?.stringValue, "中文")
+                XCTAssertEqual(try XCTUnwrap(fields(in: host).first).accessibilityValue() as? String, before)
+                XCTAssertFalse(window.isVisible)
+              }
+            }
             if checksBelowStatus {
               let long = String(repeating: hostWidth < 1000 ? "سلام שלום mixed 候选 " : "候选文本换行验证", count: 8)
               input.setMarkedText(long, selectedRange: .init(location: long.utf16.count, length: 0),
