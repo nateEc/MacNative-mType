@@ -1,5 +1,17 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：below 独立候选行与状态避让增量（2026-10-10）
+
+基于下方固定源码差异独立实现 BelowCompositionPrompt：原生 wrapping NSTextField 全宽居中，使用实际练习字体、字号与次要文字色；空候选保留一行，更新／取消保持同一视图，off／replace 不挂载。失焦透明度 0.25、模糊半径 4，0.25s 进入、聚焦即时恢复，尊重减少动态效果。固定参考未覆盖模糊变量；其锁定 Tailwind 4.3.2 的 [版本主题源码](https://raw.githubusercontent.com/tailwindlabs/tailwindcss/v4.3.2/packages/tailwindcss/theme.css) 明确 blur-xs 为 4px，参考 tailwind.css 未覆盖该值。参数一致不等于两平台像素完全一致。
+
+实际生产宿主增加原生候选文字、位置、字号、全宽、占位、模式卸载及 owner 断言。新增长中文候选同时启用自有标签和 80 WPM Pace，覆盖四组尺寸配置。初始截图复现旧 bottomLeading 状态浮层盖住第二行候选；改为 below 模式下候选之后的正常布局，off／replace 保留原状态浮层。below-status-after-visible.log 一项零失败（18.195s，墙钟 18.196），below-status-after/below-status-0 至 3.png 均人工查看，滚动后的完整候选、标签及 Pace 无重叠。窗口从未显示，失焦截图不证明实际聚焦切换、系统 IME 或全部字体／窄窗／RTL。自动断言验证长候选换行，标签避让当前由人工截图证明，不冒充完整自动视觉回归。
+
+保留探索失败：最初 SwiftUI AX 枚举未发现候选，不算产品视觉失败；一次增强测试误比完整滚动内容，改为 visibleRect。该轮还出现字段 owner 消失，原因未证实；保留诊断与原 owner 断言，随后专项及完整宿主未复现，不声称已定位或修复。早先 below-candidate-regression.log 的 349 项有两项因缺少锁定 Anime archive 失败，不能记成绿色；补齐依赖的两项 source-scroll-recheck 通过（0.760s，墙钟 0.762）。
+
+最终冻结当前源码，固定参考及锁定 Anime archive 环境下 below-candidate-final-regression.log 356 项零失败零跳过（929.490s，墙钟 929.531），含全部 35 实际生产宿主（890.299s，墙钟 890.303）、源投影、字段、ASL／Choo 和两个退休测试集。同一轮运行未改源码或重启；短采样仅确认缓冲日志之后实际已到 Malayalam，不作性能基准。below-candidate-originality.log 边界检查退出 0，参考保持干净，不扩称全面原创性证明。会话内差异审查未发现其他可落实缺陷，非独立评审。
+
+没有新增输入 owner、定时器、网络或存储迁移，零 Typebar 主程序启动。下方“未修复”为此前差异记录；本轮解决独立行和状态避让，但真实 IME、焦点切换视觉、窄窗／RTL／全部字体、Pace／ASL／Choo 组合、最低系统、新 Release 与完整冻结门禁仍待验，compositionDisplay 继续部分，完整 goal active。
+
 ## TST-02：below 候选行源码差异与下一验收契约（2026-10-10，未修复）
 
 完整门禁之后对固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 只读复核：frontend/src/ts/components/pages/test/CompositionDisplay.tsx 的 below 分支使用全宽、居中、练习字号的独立候选行；非 focused 状态弱化并模糊，重新聚焦即时恢复。input/listeners/composition.ts 在组合更新时设置候选文本，结束时清空；test/test-ui.ts 在 below 重置／切换时设置空白占位。未复制实现或资源。

@@ -43,6 +43,10 @@ import XCTest
     try checkProductionHost(checksMarkedText: true)
   }
 
+  func testBelowCandidateWrapsAlongsideActiveTagsAndPaceWithoutOpeningWindow() throws {
+    try checkProductionHost(checksMarkedText: true, checksBelowStatus: true)
+  }
+
   func testMixedDirectionProductionCompositionUsesAllCandidateSlots() throws {
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .hebrew)
   }
@@ -171,7 +175,8 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .likanu)
   }
 
-  private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
+  private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil,
+    checksBelowStatus: Bool = false) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
@@ -215,13 +220,23 @@ import XCTest
     let extendedFirstSlot = prefix.count + 1
     let extendedLastSlot = extendedWord.map { extendedFirstSlot + $0.count - 1 }
     let lastRTLSlot = checksConnectedRun ? 6 : 4
-    for automaticSizing in [true, false, false, true] {
+    for (hostIndex, automaticSizing) in [true, false, false, true].enumerated() {
       let suite = "PracticeCompositionHostTests.\(UUID())"
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       defer { defaults.removePersistentDomain(forName: suite) }
       let settings = AppSettings(defaults: defaults)
       let reduceMotion = ProcessInfo.processInfo.environment["TYPEBAR_TEST_REDUCE_MOTION"] == "1"
       settings.reducePracticeMotion = reduceMotion
+      if checksBelowStatus {
+        settings.activeResultTags = ["候选行避让验证"]
+        settings.paceGuideMode = .custom
+        settings.paceGuideCustomWpm = 80
+        let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
+          difficulty: .normal, rules: .init(), language: .english)
+        XCTAssertTrue(settings.saveActiveTestSelection(.init(
+          preset: .init(configuration: configuration, customText: "quiet harbor carries a patient silver morning"),
+          testParameterMemory: .legacyDefaults(configuration: configuration))))
+      }
       if let mixedLanguage {
         let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
           difficulty: .normal, rules: .init(), language: .mixedLanguages,
@@ -270,6 +285,15 @@ import XCTest
       func fields(in view: NSView) -> [PromptFieldNativeView] {
         (view as? PromptFieldNativeView).map { [$0] } ?? view.subviews.flatMap { fields(in: $0) }
       }
+      func candidateElements(in view: NSView) -> [NSTextField] {
+        let own: [NSTextField]
+        if let field = view as? NSTextField,
+          let label = field.accessibilityLabel(),
+          label.hasPrefix("正在组合：") || label == "组合输入候选行" {
+          own = [field]
+        } else { own = [] }
+        return own + view.subviews.flatMap { candidateElements(in: $0) }
+      }
       func checkExtendedRun(_ field: PromptFieldNativeView) throws {
         guard let extendedLastSlot else { return }
         let first = try XCTUnwrap(field.measuredRect(for: extendedFirstSlot))
@@ -294,11 +318,40 @@ import XCTest
       if checksMarkedText {
         for style in CompositionDisplayStyle.allCases {
           settings.compositionDisplayStyle = style
+          flush()
+          let emptyCandidate = candidateElements(in: host).first
+          if !mixedDirection, style == .below {
+            XCTAssertEqual(try XCTUnwrap(emptyCandidate).stringValue, " ")
+          }
           input.setMarkedText(
             "候", selectedRange: .init(location: 1, length: 0),
             replacementRange: .init(location: NSNotFound, length: 0))
           flush()
           XCTAssertTrue(input.hasMarkedText())
+          if !mixedDirection {
+            let candidates = candidateElements(in: host)
+            XCTAssertEqual(candidates.count, style == .below ? 1 : 0)
+            if style == .below, let candidate = candidates.first {
+              XCTAssertEqual(candidate.accessibilityLabel(), "正在组合：候")
+              XCTAssertEqual(candidate.stringValue, "候")
+              XCTAssertTrue(candidate === emptyCandidate)
+              XCTAssertEqual(candidate.alignment, .center)
+              XCTAssertEqual(try XCTUnwrap(candidate.font).pointSize, settings.fontSize)
+              let frame = candidate.convert(candidate.bounds, to: host)
+              XCTAssertEqual(frame.midX, host.bounds.midX, accuracy: 2,
+                "Below composition must be centered, not a bottom-leading badge")
+              XCTAssertGreaterThanOrEqual(frame.height, settings.fontSize,
+                "Below composition must retain the selected practice font size")
+              XCTAssertGreaterThan(frame.width, host.bounds.width * 0.7)
+              let field = try XCTUnwrap(fields(in: host).first)
+              let promptFrame = field.convert(field.visibleRect, to: host)
+              if host.isFlipped {
+                XCTAssertGreaterThanOrEqual(frame.minY, promptFrame.maxY)
+              } else {
+                XCTAssertLessThanOrEqual(frame.maxY, promptFrame.minY)
+              }
+            }
+          }
           let field = try XCTUnwrap(fields(in: host).first)
           let firstValue = try XCTUnwrap(field.accessibilityValue() as? String)
           XCTAssertEqual(
@@ -308,9 +361,40 @@ import XCTest
             "中文", selectedRange: .init(location: 2, length: 0),
             replacementRange: .init(location: NSNotFound, length: 0))
           flush()
+          if fields(in: host).isEmpty {
+            print("BELOW HOST missing field style=\(style) marked=\(input.hasMarkedText()) inputs=\(inputs(in: host).count) sameInput=\(inputs(in: host).contains { $0 === input }) sizing=\(automaticSizing)")
+          }
           XCTAssertTrue(
             fields(in: host).contains { $0 === field },
             "Updating marked text must retain the field renderer")
+          if !mixedDirection, style == .below {
+            XCTAssertEqual(candidateElements(in: host).first?.stringValue, "中文")
+            XCTAssertTrue(candidateElements(in: host).first === emptyCandidate)
+            if checksBelowStatus {
+              let long = String(repeating: "候选文本换行验证", count: 8)
+              input.setMarkedText(long, selectedRange: .init(location: long.utf16.count, length: 0),
+                replacementRange: .init(location: NSNotFound, length: 0))
+              flush()
+              let candidate = try XCTUnwrap(candidateElements(in: host).first)
+              XCTAssertEqual(candidate.stringValue, long)
+              XCTAssertTrue(candidate === emptyCandidate)
+              XCTAssertGreaterThan(candidate.bounds.height, settings.fontSize * 1.5)
+              if let directory = ProcessInfo.processInfo.environment["TYPEBAR_BELOW_QA_IMAGE_DIRECTORY"] {
+                candidate.scrollToVisible(candidate.bounds.insetBy(dx: 0, dy: -120))
+                flush()
+                XCTAssertTrue(host.bounds.contains(candidate.convert(candidate.bounds, to: host)),
+                  "The complete candidate row must be visible before visual QA")
+                let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+                host.cacheDisplay(in: host.bounds, to: bitmap)
+                try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(
+                  to: URL(fileURLWithPath: directory).appendingPathComponent("below-status-\(hostIndex).png"))
+              }
+              XCTAssertFalse(window.isVisible)
+              input.setMarkedText("中文", selectedRange: .init(location: 2, length: 0),
+                replacementRange: .init(location: NSNotFound, length: 0))
+              flush()
+            }
+          }
           if style == .replace {
             XCTAssertTrue((field.accessibilityValue() as? String)?.hasPrefix("中文") == true)
             if mixedDirection {
@@ -323,6 +407,12 @@ import XCTest
           input.unmarkText()
           flush()
           XCTAssertFalse(input.hasMarkedText())
+          if !mixedDirection, style == .below {
+            let candidate = try XCTUnwrap(candidateElements(in: host).first)
+            XCTAssertEqual(candidate.stringValue, " ")
+            XCTAssertTrue(candidate === emptyCandidate)
+            XCTAssertGreaterThanOrEqual(candidate.bounds.height, settings.fontSize)
+          }
           input.setMarkedText(
             "候", selectedRange: .init(location: 1, length: 0),
             replacementRange: .init(location: NSNotFound, length: 0))

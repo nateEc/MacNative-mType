@@ -2882,6 +2882,7 @@ private struct ContentView: View {
     let ignoresSystemReducedMotion = !VisualFunboxReducedMotionPolicy
       .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers)
     return ZStack(alignment: .topLeading) {
+      VStack(spacing: 16) {
       RoundPracticeContent(
         isEnabled: practiceVisualEffect.usesRound,
         reducesMotion: settings.reducePracticeMotion,
@@ -2923,6 +2924,20 @@ private struct ContentView: View {
             .rotationEffect(.degrees(practiceVisualTransform.rotationDegrees))
           }
         }
+      }
+
+      if settings.compositionDisplayStyle == .below {
+        let focused = inputHasFocus && typingWindowHasFocus
+        BelowCompositionPrompt(text: compositionText,
+          font: practicePromptNSFont(size: settings.fontSize), color: NSColor(activeTheme.secondaryText))
+          .frame(maxWidth: .infinity)
+          .opacity(focused ? 1 : 0.25)
+          .blur(radius: focused ? 0 : 4)
+          .animation(systemReduceMotion || settings.reducePracticeMotion || focused
+            ? nil : .easeInOut(duration: 0.25), value: focused)
+        practiceStatusBadges
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
       }
 
       NativeTypingInput(
@@ -3105,6 +3120,15 @@ private struct ContentView: View {
       }
     }
     .overlay(alignment: .bottomLeading) {
+      if settings.compositionDisplayStyle != .below {
+        practiceStatusBadges.padding(12)
+      }
+    }
+    .onTapGesture { requestTypingFocus() }
+  }
+
+  @ViewBuilder private var practiceStatusBadges: some View {
+    if !activeSessionTags.isEmpty || (activePaceTargetWpm != nil && paceGuideIndex != nil) {
       VStack(alignment: .leading, spacing: 6) {
         if !activeSessionTags.isEmpty {
           Label("标签：\(activeSessionTags.joined(separator: "、"))", systemImage: "tag")
@@ -3126,22 +3150,8 @@ private struct ContentView: View {
             "节奏引导：目标 \(activePaceTargetWpm.formatted(.number.precision(.fractionLength(0...2)))) WPM，\(paceGuideProgressDescription)，目标位置 \(paceGuideIndex + 1)"
           )
         }
-        if settings.compositionDisplayStyle == .below, !compositionText.isEmpty {
-          Text(compositionText)
-            .font(settings.practiceFont.font(
-              size: max(14, settings.fontSize * 0.58),
-              installedFontName: settings.installedPracticeFontName,
-              language: session.configuration.language))
-            .foregroundStyle(activeTheme.accent)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(activeTheme.panel.opacity(0.9), in: RoundedRectangle(cornerRadius: 6))
-            .accessibilityLabel("正在组合：\(compositionText)")
-        }
       }
-      .padding(12)
     }
-    .onTapGesture { requestTypingFocus() }
   }
 
   private func practiceLineScrollContext(_ rendering: PromptRendering,
