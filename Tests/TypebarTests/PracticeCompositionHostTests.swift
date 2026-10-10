@@ -7,9 +7,29 @@ import XCTest
 
 @MainActor private final class PracticeLayoutCountingHost<Content: View>: NSHostingView<Content> {
   private(set) var layoutCount = 0
+  var captureLayoutAtCount: Int?
+  private(set) var capturedLayoutStack: [String] = []
+  private(set) var invalidationCount = 0
+  var captureInvalidationAtCount: Int?
+  private(set) var capturedInvalidationStack: [String] = []
+
+  override var needsLayout: Bool {
+    didSet {
+      guard needsLayout else { return }
+      invalidationCount += 1
+      if invalidationCount == captureInvalidationAtCount {
+        captureInvalidationAtCount = nil
+        capturedInvalidationStack = Array(Thread.callStackSymbols.prefix(40))
+      }
+    }
+  }
 
   override func layout() {
     layoutCount += 1
+    if layoutCount == captureLayoutAtCount {
+      captureLayoutAtCount = nil
+      capturedLayoutStack = Array(Thread.callStackSymbols.prefix(40))
+    }
     super.layout()
   }
 }
@@ -21,6 +41,8 @@ import XCTest
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       defer { defaults.removePersistentDomain(forName: suite) }
       let settings = AppSettings(defaults: defaults)
+      let reduceMotion = ProcessInfo.processInfo.environment["TYPEBAR_TEST_REDUCE_MOTION"] == "1"
+      settings.reducePracticeMotion = reduceMotion
       let container = try ModelContainer(
         for: TestResultRecord.self, TestPresetRecord.self,
         SavedCustomTextRecord.self, ResultFilterPresetRecord.self,
@@ -65,6 +87,11 @@ import XCTest
         host.layoutSubtreeIfNeeded()
         let laidOut = ProcessInfo.processInfo.systemUptime
         let synchronousLayouts = host.layoutCount - initialLayoutCount
+        if insertion == 1,
+          ProcessInfo.processInfo.environment["TYPEBAR_TEST_LAYOUT_STACK"] == "1" {
+          host.captureLayoutAtCount = host.layoutCount + 10
+          host.captureInvalidationAtCount = host.invalidationCount + 10
+        }
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
         let delivered = ProcessInfo.processInfo.systemUptime
         let deliveredLayouts = host.layoutCount - initialLayoutCount - synchronousLayouts
@@ -77,8 +104,16 @@ import XCTest
         XCTAssertFalse(window.isVisible)
         XCTAssertEqual(host.frame, initialFrame, "Input must not resize the fixed practice host")
         print(
-          "practice-host automaticSizing=\(automaticSizing) insertion=\(insertion) input=\(inserted - start) layout=\(laidOut - inserted) delivery=\(delivered - laidOut) finalLayout=\(finished - delivered) synchronousLayouts=\(synchronousLayouts) deliveredLayouts=\(deliveredLayouts) finalLayouts=\(host.layoutCount - initialLayoutCount - synchronousLayouts - deliveredLayouts)"
+          "practice-host automaticSizing=\(automaticSizing) reduceMotion=\(reduceMotion) insertion=\(insertion) input=\(inserted - start) layout=\(laidOut - inserted) delivery=\(delivered - laidOut) finalLayout=\(finished - delivered) synchronousLayouts=\(synchronousLayouts) deliveredLayouts=\(deliveredLayouts) finalLayouts=\(host.layoutCount - initialLayoutCount - synchronousLayouts - deliveredLayouts)"
         )
+        if insertion == 1, !host.capturedLayoutStack.isEmpty {
+          print("practice-host layout-stack automaticSizing=\(automaticSizing)\n"
+            + host.capturedLayoutStack.joined(separator: "\n"))
+        }
+        if insertion == 1, !host.capturedInvalidationStack.isEmpty {
+          print("practice-host invalidation-stack automaticSizing=\(automaticSizing)\n"
+            + host.capturedInvalidationStack.joined(separator: "\n"))
+        }
       }
       for backdrop in PracticeBackdropStyle.allCases {
         settings.practiceBackdrop = backdrop
