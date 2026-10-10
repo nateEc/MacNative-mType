@@ -147,6 +147,14 @@ import XCTest
     try checkProductionHost(checksMarkedText: true, mixedLanguage: .sinhala)
   }
 
+  func testArabicTeluguMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .telugu)
+  }
+
+  func testArabicTelugu1kMixedProductionCompositionPreservesOppositeShapedRuns() throws {
+    try checkProductionHost(checksMarkedText: true, mixedLanguage: .telugu1k)
+  }
+
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
@@ -157,7 +165,8 @@ import XCTest
     let checksKorean = [.korean, .korean1k, .korean5k].contains(mixedLanguage)
     let checksMalayalam = mixedLanguage == .malayalam
     let checksSinhala = mixedLanguage == .sinhala
-    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada || checksKhmer || checksKorean || checksMalayalam || checksSinhala
+    let checksTelugu = [.telugu, .telugu1k].contains(mixedLanguage)
+    let checksLTRJoiningRun = mixedLanguage == .bangla || checksDevanagari || checksTamil || checksGujarati || checksKannada || checksKhmer || checksKorean || checksMalayalam || checksSinhala || checksTelugu
     let checksConnectedRun = checksLTRJoiningRun || [.arabic, .persian, .urdu, .pashto, .sindhi, .kurdishCentral].contains(mixedLanguage)
     let extendedWord: String?
     switch mixedLanguage {
@@ -176,6 +185,7 @@ import XCTest
     case .korean, .korean1k, .korean5k: extendedWord = "한글"
     case .malayalam: extendedWord = "കിരണം"
     case .sinhala: extendedWord = "කිරණ"
+    case .telugu, .telugu1k: extendedWord = "కిరణం"
     default: extendedWord = nil
     }
     let prefix = checksConnectedRun ? "ab سلام" : "ab אב"
@@ -356,7 +366,8 @@ import XCTest
           XCTAssertFalse(window.isVisible)
           if checksLTRJoiningRun {
             let firstPart: String, lastPart: String
-            if checksSinhala { (firstPart, lastPart) = ("කි", "රණ") }
+            if checksTelugu { (firstPart, lastPart) = ("కి", "రణం") }
+            else if checksSinhala { (firstPart, lastPart) = ("කි", "රණ") }
             else if checksMalayalam { (firstPart, lastPart) = ("കി", "രണം") }
             else if checksKorean { (firstPart, lastPart) = ("한", "글") }
             else if checksKhmer { (firstPart, lastPart) = ("ខ្មែ", "រ") }

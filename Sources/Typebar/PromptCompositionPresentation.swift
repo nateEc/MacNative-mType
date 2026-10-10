@@ -15,7 +15,8 @@ enum PromptFieldProjectionPolicy {
         .yiddish, .bangla, .bangla10k, .banglaLetters, .hindi, .hindi1k,
         .tamil, .tamil1k, .tamilOld, .gujarati, .gujarati1k,
         .nepali, .nepali1k, .sanskrit, .kannada, .khmer,
-        .korean, .korean1k, .korean5k, .malayalam, .sinhala: return true
+        .korean, .korean1k, .korean5k, .malayalam, .sinhala,
+        .telugu, .telugu1k: return true
       default: return !language.usesJoiningScriptPrompt
       }
     }

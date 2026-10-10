@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+当前 TST-02 混排生产入口新增 Telugu／Telugu 1k：两项实际宿主先复现字段缺失，再开放共享准入；三样式候选差异、更新／取消／部分提交、方向／owner 和跨行恢复有回归，Tibetan 等未验证语言仍回退。347 项扩展检查零失败零跳过，含全部三十宿主、两个退休测试集及既有 Korean／ASL／Choo 组件，原创性边界通过，详见 [Telugu 证据与人工步骤](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动，无迁移或新网络行为；真实 IME、全部连字／字体／视觉和新完整门禁仍待验，功能分类与完整 goal active 不变。下方各语言记录保留当时范围。
+
 当前 TST-02 混排生产入口新增 Sinhala：实际宿主先复现字段缺失，再开放共享准入；三样式候选差异、更新／取消／部分提交、方向／owner 与跨行恢复有回归，Telugu 等未验证语言仍回退。344 项扩展检查零失败零跳过，含全部二十八宿主、两个退休测试集及既有 Korean／ASL／Choo 组件，原创性边界通过，详见 [Sinhala 证据与人工步骤](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动，无迁移或网络变化；真实 IME、全连字／字体／视觉与新完整门禁仍待验，功能分类与完整 goal active 不变。
 
 当前 TST-02 混排生产入口新增 Malayalam：实际宿主先复现字段缺失，再开放共享准入；三样式候选差异、更新／取消／部分提交、方向／owner 与跨行恢复有回归，Sinhala 等未验证语言仍回退。342 项扩展检查零失败零跳过，含全部二十七宿主、两个退休测试集、既有 Korean 和 ASL／Choo 组件，原创性边界通过，详见 [Malayalam 证据与人工步骤](COMPOSITION_PROJECTION_CONTRACT.md)。零主程序启动，无迁移或网络变化；真实 IME、全部连字／字体／视觉与新完整门禁仍待验，功能分类与完整 goal active 不变。
