@@ -68,14 +68,14 @@ struct LivePracticeContent: Equatable {
     promptDescriptor(for: configuration).text
   }
 
-  func promptDescriptor(for configuration: TestConfiguration) -> LivePracticePrompt {
+  func promptDescriptor(for configuration: TestConfiguration, showAllLines: Bool = false) -> LivePracticePrompt {
     guard !tokens.isEmpty else {
       return .init(text: text, noSpaceBoundarySource: nil)
     }
     let targetCount: Int
     switch configuration.mode {
     case .time, .words:
-      targetCount = GeneratedPromptChunkPolicy.wordCount(for: configuration)
+      targetCount = GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
     case .quote, .zen, .custom:
       targetCount = tokens.count
     }

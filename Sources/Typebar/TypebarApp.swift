@@ -4450,7 +4450,8 @@ private struct ContentView: View {
         liveContentMessage = "已获取\(content.attribution)，为避免打断输入，本轮仍使用现有提示。"
         return
       }
-      let livePrompt = content.promptDescriptor(for: configuration)
+      let livePrompt = content.promptDescriptor(for: configuration,
+        showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
       TypingFeedbackSound.shared.beginPracticeAttempt()
       session = TestSessionFactory.make(
         configuration: configuration, streamPrompt: livePrompt.text,
