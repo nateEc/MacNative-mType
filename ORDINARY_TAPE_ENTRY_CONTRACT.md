@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## TST-02：原生候选选区回报修正（2026-10-11）
+
+TypingInputView 原先忽略 setMarkedText 的 selectedRange，始终回报零选区。Apple 的 [setMarkedText 契约](https://developer.apple.com/documentation/appkit/nstextinputclient/setmarkedtext(_:selectedrange:replacementrange:)) 要求设置插入字符串内的选区，[selectedRange 契约](https://developer.apple.com/documentation/appkit/nstextinputclient/selectedrange()) 要求回报文本存储中的范围。本视图只保留当前候选，marked range 从零起，因此保存 UTF-16 相对范围，不将练习历史正文纳入编辑存储，也不改变固定练习光标规则。
+
+`work/composition-selection-red.log` 两项测试五处断言失败，复现 emoji／组合字符候选的非零选区以及越界／无选区回报错误。修正保存候选选区，长度按 NSAttributedString.length 限界，以减法避免加法溢出；保留 NSNotFound 无选区语义。确认、取消、空候选更新及自动结束均清空选区。修正后首轮 62 项通过；增加空更新和自动结束覆盖后 `work/composition-selection-final.log` 共 63 项零失败零跳过（9.533s，墙钟 9.540），包含 Return、结束、热键、Unicode 与 ASL／Choo 生产宿主。
+
+风险审查未发现可落实的新问题：状态仍由输入视图拥有，回调前更新，无异步、持久化或网络变化。固定参考原创边界检查退出零；首次直接执行脚本因非可执行权限退出 126，改用 zsh 调用通过，未改权限。该检查仅覆盖定义的长字面量／受保护资源边界，不代表完整原创性证明。主程序零启动，无新完整门禁、Release 或真实系统 IME 验收；整体 goal 与首键性能问题仍未完成。
+
 ## TST-02：ASL 未确认长候选的模式切换（2026-10-11）
 
 补齐与 Choo 对称的实际 ASL 生产宿主验收：仅设置一次四十字未确认候选，依次切换 replace／off／below／replace，检查 marked range 不变、原输入视图与 ASL owner 保留、投影对应实际槽位存在且有限、replace 实际跨行、below 行正文与显隐正确。取消后全部原始目标矩形恢复。此为既有行为的覆盖缺口补证，无产品缺陷红测，不修改产品实现；独立会话投影提供槽位索引，真实原生 owner 提供布局结果。

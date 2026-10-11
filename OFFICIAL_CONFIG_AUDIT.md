@@ -1,5 +1,7 @@
 # 官方配置兼容性审计
 
+2026-10-11 TST-02 原生输入增量：修正 NSTextInputClient 忽略候选选区的问题，按 UTF-16 回报并在确认／取消／空更新／自动结束时清空。红测两项五处失败，修正后 63 项相关回归零失败零跳过，详见 ORDINARY_TAPE_ENTRY_CONTRACT.md 的对应记录。此为原生平台输入契约修正，不改变 compositionDisplay 的部分分类，也不是物理输入法全覆盖或新完整冻结门禁。94 键 89／4／1 保持，goal active。
+
 2026-10-11 当前矩阵校正：`compositionDisplay` 行以现有生产源码为准，不再沿用“仅单字形替换／全部未接线”的早期结论。`ContentView.renderedPrompt(for:composition:)` 通过 `PromptFieldProjectionPolicy.supports` 选择统一组合投影，并把同一 rendering 传入普通字段、Tape、ASL 和 Choo 适配器；未支持的混排连写配置仍保留回退。既有冻结门禁包含 39 项生产组合宿主，但不是每种适配器／修饰器／导航组合或物理 IME 的验收。本次只修正文档，部分分类及 94 键 89／4／1 保持，完整 goal 仍 active。
 
 2026-10-11 TST-02 字体家族增量完整冻结验证：冻结 `4e3a298eb273210a66edeaed62807aa7228fcb55` 的单轮完整 readiness 门禁及终态哈希检查均退出零（`gate_exit=0 hash_exit=0`），852 跟踪文件全部一致，项目与固定参考工作区干净。证据保留于 `work/frozen-readiness-font-family.KPvXX2` 的 `gate.log`、`freeze-verification.log` 和 `logs/` 内 74 份阶段日志。参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`，不是最新上游兼容声明。

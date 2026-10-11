@@ -223,6 +223,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onPhysicalKey: (UInt16, Bool, Bool) -> Void = { _, _, _ in }
 
     private var composition = NSAttributedString()
+    private var compositionSelection = NSRange(location: 0, length: 0)
     private var compositionEscapeKeyCode: UInt16?
     private var leftShiftPressed = false
     private var rightShiftPressed = false
@@ -590,6 +591,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             text = string as? String ?? ""
         }
         composition = NSAttributedString()
+        compositionSelection = NSRange(location: 0, length: 0)
         onCompositionChanged("")
         let forcesError = pendingForcedError
         pendingForcedError = false
@@ -602,6 +604,17 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             composition = attributed
         } else {
             composition = NSAttributedString(string: string as? String ?? "")
+        }
+        // AppKit selections are UTF-16 ranges relative to the marked string.
+        // Bound without adding location + length, which can overflow.
+        if composition.length == 0 {
+            compositionSelection = NSRange(location: 0, length: 0)
+        } else if selectedRange.location == NSNotFound {
+            compositionSelection = NSRange(location: NSNotFound, length: 0)
+        } else {
+            let location = min(max(0, selectedRange.location), composition.length)
+            compositionSelection = NSRange(location: location,
+                length: min(max(0, selectedRange.length), composition.length - location))
         }
         if startsComposition, composition.length > 0 { onCompositionStarted() }
         if shouldFinishWithComposition(composition.string, pendingForcedError) {
@@ -616,10 +629,11 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
 
     func unmarkText() {
         composition = NSAttributedString()
+        compositionSelection = NSRange(location: 0, length: 0)
         onCompositionChanged("")
     }
 
-    func selectedRange() -> NSRange { NSRange(location: 0, length: 0) }
+    func selectedRange() -> NSRange { compositionSelection }
 
     func markedRange() -> NSRange {
         composition.length == 0 ? NSRange(location: NSNotFound, length: 0) : NSRange(location: 0, length: composition.length)
