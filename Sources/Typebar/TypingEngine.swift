@@ -923,11 +923,16 @@ enum TestModifier: String, CaseIterable, Codable, Equatable, Identifiable {
 /// Carries rendered targets, not a recipe that can resample random transforms.
 struct TransformedPromptBatch {
   let text: String
+  let sourceFields: [String]?
   let noSpaceWordLengths: [Int]
   let noSpaceTargetWords: [String]
 
-  init(text: String, noSpaceTargetWords: [String] = []) {
+  init(text: String, noSpaceTargetWords: [String] = [], sourceFields: [String]? = nil) {
     self.text = text
+    self.sourceFields = sourceFields.flatMap { fields in
+      !fields.isEmpty && fields.allSatisfy({ !$0.isEmpty })
+        && fields.joined().utf16.elementsEqual(text.utf16) ? fields : nil
+    }
     let lengths = noSpaceTargetWords.map(\.count)
     // Preserve actual words even when joining fuses their glyphs. Only the
     // legacy grapheme-indexed engine's offsets require non-fusing boundaries.
@@ -4403,7 +4408,8 @@ struct TypingSession {
     didSet { refreshUnitTargets() }
   }
   private var unitTargets = UnitInputTargets("")
-  private let sourceFields: [String]?
+  private var sourceFields: [String]?
+  private let initialSourceFields: [String]?
   private var paceCaretProgress: PaceCaretProgress?
   /// Source initialization selects this once; input or later prompt growth
   /// cannot switch the scoring basis. It is not a language-menu preference.
@@ -4670,6 +4676,7 @@ struct TypingSession {
     if initializationFailure != nil { self.outcome = .failed }
     self.prompt = prompt
     self.sourceFields = sourceFields
+    self.initialSourceFields = sourceFields
     self.promptCharacters = Array(prompt)
     let initialTargets = UnitInputTargets(prompt, sourceFields: sourceFields)
     self.unitTargets = initialTargets
@@ -4776,7 +4783,7 @@ struct TypingSession {
       }
     }
     return TypingSession(
-      configuration: configuration, prompt: initialPrompt, sourceFields: sourceFields,
+      configuration: configuration, prompt: initialPrompt, sourceFields: initialSourceFields,
       repeatingPrompt: repeatingPrompt,
       generatedWordContinuation: initialGeneratedWordContinuation.map {
         generatedWordContinuation?.replayingContinuation(after: $0) ?? $0
@@ -4876,7 +4883,9 @@ struct TypingSession {
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
   private var loadedLiveContentWordCount: Int {
     let pending = externalPromptContinuation.map {
-      $0.noSpaceTargetWords.isEmpty ? GeneratedWordBoundPolicy.wordCount(in: $0.text) : $0.noSpaceTargetWords.count
+      $0.noSpaceTargetWords.isEmpty
+        ? $0.sourceFields?.count ?? GeneratedWordBoundPolicy.wordCount(in: $0.text)
+        : $0.noSpaceTargetWords.count
     } ?? 0
     return (hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount) + pending
   }
@@ -8544,6 +8553,11 @@ struct TypingSession {
 
   private mutating func appendExternalBatch(_ batch: TransformedPromptBatch) {
     var end = promptCharacters.count
+    if let fields = sourceFields, let continuationFields = batch.sourceFields,
+      fields.joined().utf16.elementsEqual(prompt.utf16)
+    {
+      sourceFields = fields + continuationFields
+    }
     appendPrompt(batch.text)
     for length in batch.noSpaceWordLengths {
       end += length

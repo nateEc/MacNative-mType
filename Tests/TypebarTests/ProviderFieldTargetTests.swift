@@ -2,6 +2,15 @@ import XCTest
 @testable import Typebar
 
 final class ProviderFieldTargetTests: XCTestCase {
+  func testTransformedBatchOnlyRetainsExactNonemptyProviderFields() {
+    let fields = ["north\nsouth ", "tail"]
+    XCTAssertEqual(TransformedPromptBatch(text: fields.joined(), sourceFields: fields).sourceFields, fields)
+    for invalid in [[], ["wrong"], ["", fields.joined()]] {
+      XCTAssertNil(TransformedPromptBatch(text: fields.joined(), sourceFields: invalid).sourceFields)
+    }
+    XCTAssertNil(TransformedPromptBatch(text: "e\u{301}\ntail", sourceFields: ["é\ntail"]).sourceFields)
+  }
+
   func testExplicitProviderFieldsRetainInternalLineFeedAsContent() {
     let fields = ["north\nsouth ", "harbor ", "tail"]
     let targets = UnitInputTargets(fields.joined(), sourceFields: fields)
