@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 TST-02 提供者响应可达性审查：新增固定参考实际 poetry 模块六项隔离网络响应探针，正常内容／成功空段／空数组／缺少 lines／JSON 与传输拒绝均通过，并接入完整门禁（本轮未重跑门禁）。poetry 正常结果为 Section 或 false；undefined 仅保留为调用方防御测试，不冒称生产可达。源码发现 wikipedia 拒绝 Promise 未由 funbox 包装转换为 false，且旁路 await 在生成器 catch 外；实际网页异常最终状态未运行验证，原生 Optional 失败策略不能因此宣称兼容。详情见 EMPTY_PROVIDER_GENERATION_CHECKPOINT.md，旁路词序与阈值等缺口仍开放，验收分类不升级；零主程序实例，goal active。
+
 2026-10-12 TST-02 独立在线生成器已接入真实异步宿主：需求由实际词前进记录，消费最后余池字段时不提前取段，下一次前进取段；成功只发布一个字段，保留余池及原生输入 owner。生成器空段/传输失败与活动 NoQuit 旁路失败分开，取消/单飞/请求身份守卫保留。真实宿主及时序红测后，171 项最终定向回归零失败、无跳过，含 24 项在线宿主和其后 PB 保存；源码及原创边界通过，零主程序启动。中间 Pace 宿主失败及不可见 presenter 采样更正均保留证据，不称为产品性能修复。详见 [异步接线证据和未完成边界](EMPTY_PROVIDER_GENERATION_CHECKPOINT.md)。旁路阈值/词序、false/undefined、空段同调用重取、全部修饰器/并发导航/真实网络、IME/视觉/性能及新全量门禁仍开放，功能分类和整体 goal active 不变。
 
 2026-10-12 TST-02 在线生成与结果呈现增量的完整冻结门禁通过：冻结 `abaa01a31b686068958fe2fc5461d3a5b3f4cf52`，固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`，显式 QA Redis 6.2.6、默认临时目录。客户端 4,368 项与服务端 501 项均零失败、无跳过；全部在线宿主接 PB 保存的旧崩溃序列、42 项组合输入宿主及十万词耐久通过。Release 构建 429.70 秒，未打开包的签名、许可证、资源和原创性检查通过；`gate_exit=0 hash_exit=0`，866 个冻结文件终态哈希一致，75 份阶段日志保留于 `work/frozen-readiness-result-container.Rl3Bob`。详见 [完整冻结证据及剩余差异](EMPTY_PROVIDER_GENERATION_CHECKPOINT.md)。全程零 Typebar 主程序实例，运行期间未改源码、未因日志缓冲重启。当前分类不提升为完全实现：在线生成的旁路/词池调度、false/undefined、空段同调用重取，实体 IME/全部字体/视觉、实际 Release 首键与计时性能、精确主题及结果呈现释放仍待对齐或验证；完整目标保持 active。

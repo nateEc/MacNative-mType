@@ -408,6 +408,10 @@ run_logged_check "executing pinned generator ordering, section demand and active
   "$temporary_directory/generated-order-section-demand-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-generated-backwards-order.mjs" "$reference_root"
+run_logged_check "executing pinned poetry provider response classification" \
+  "$temporary_directory/poetry-provider-outcomes-source-check.log" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-poetry-outcomes.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
