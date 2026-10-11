@@ -57,7 +57,7 @@ import XCTest
     try checkDelayedReplacement(prefetches: true, failsPrefetch: true)
   }
 
-  func testFailedPrefetchRestartsOfflineEvenWhenNoQuitLockedTheActiveAttempt() throws {
+  func testFailedPrefetchRetainsNoQuitLockedAttemptAndCanRecoverOnLaterProgress() throws {
     try checkDelayedReplacement(prefetches: true, failsPrefetch: true, locksNoQuit: true)
   }
 
@@ -330,6 +330,32 @@ import XCTest
         return
       }
       if failsPrefetch {
+        if locksNoQuit {
+          XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
+          XCTAssertTrue(settings.testModifiers.contains(.noQuit))
+          XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+          XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(.poetryStream), true)
+          XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(.noQuit), true)
+          let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+          XCTAssertEqual(field.accessibilityValue() as? String, beforeReply)
+          XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+          XCTAssertEqual(pending.callCount, initialRequestCount + 1)
+          XCTAssertTrue(pending.continuations.isEmpty)
+          XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+          pending.returnsFailure = false
+          initialInput.insertText(authoredTokens[134] + " ",
+            replacementRange: .init(location: NSNotFound, length: 0))
+          for _ in 0..<5 { flush() }
+          XCTAssertEqual(pending.callCount, initialRequestCount + 2)
+          XCTAssertEqual(pending.continuations.count, 1)
+          pending.finish()
+          for _ in 0..<5 { flush() }
+          XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
+          XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+          XCTAssertTrue((field.accessibilityValue() as? String)?.hasSuffix(authoredTokens.suffix(3).joined(separator: " ")) == true)
+          XCTAssertFalse(window.isVisible)
+          return
+        }
         XCTAssertFalse(settings.testModifiers.contains(.poetryStream))
         XCTAssertEqual(settings.testModifiers.contains(.noQuit), locksNoQuit)
         XCTAssertTrue(settings.allowsRestartingConfigurationChange,

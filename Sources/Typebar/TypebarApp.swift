@@ -4564,10 +4564,17 @@ private struct ContentView: View {
         guard let content, content.source == source,
           session.appendLiveContent(content.sectionDescriptor) else {
           liveContentTask = nil
-          liveContentStreamingActive = false
           isLoadingLiveContent = false
+          guard NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session) else {
+            // Provider failure does not override an active NoQuit attempt.
+            // Preserve its source and targets; later forward progress may
+            // request a new section without a tight retry loop.
+            liveContentMessage = "无法续取\(source.displayName)；NoQuit 练习保持进行，内容来源未关闭。"
+            return
+          }
+          liveContentStreamingActive = false
           session.failLiveContentFetch()
-          // A source failure ends the old attempt before changing its locked
+          // A restartable source failure ends the old attempt before changing
           // configuration. Keep every unrelated modifier on the new attempt.
           synchronizeNoQuitConfigurationLock()
           let failedModifier: TestModifier = source == .poetry ? .poetryStream : .referenceStream

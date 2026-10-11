@@ -205,7 +205,7 @@ for(const [response,message,disabled] of [
 ownedSection={words:['harbor']};sectionCalls=0;toggledSources.length=0;
 assert.deepEqual((await main.namespace.generateWords({name:'english',words:['owned']})).words,['harbor ']);
 assert.equal(sectionCalls,1);assert.deepEqual(toggledSources,[]);
-console.log('4 pinned section-admission cases passed (actual generator and funbox functions; authored provider responses distinguish empty generation failure from disabled fetch failure; no parser/HTTP/UI/recovery equivalence claim).');
+console.log('4 pinned section-admission cases passed (actual generator and funbox functions; authored provider responses distinguish empty generation failure from requested source-disable on fetch failure; toggle recorder is not setter-admission evidence; no parser/HTTP/UI/recovery equivalence claim).');
 // Execute the complete actual addWord function, not a paraphrase of its branch
 // conditions. Its surrounding module/startup is deliberately outside this
 // probe. The exact pinned source range is read only and remains in memory.
@@ -272,3 +272,49 @@ ownedActiveWordIndex=3;
 await addWord();
 assert.equal(testWords.words.length,103);assert.equal(sectionCalls,0);
 console.log('Pinned sequential forward-tail case passed (100 published fields plus 3 retained fields; actual addWord/generator/storage, owned forward index; no navigation or physical-input execution claim).');
+// The earlier recorder boundaries prove requests to toggle/restart, not that
+// those requests are admitted. Execute both complete pinned functions on the
+// active no_quit path; unknown downstream dependencies remain unresolved so
+// crossing either guard fails instead of inventing successful mutation.
+const settersSource=fs.readFileSync(path.join(root,'frontend/src/ts/config/setters.ts'),'utf8');
+const toggleStart=settersSource.indexOf('export function toggleFunbox(');
+assert.ok(toggleStart>=0);
+const toggleBody=stripTypeScriptTypes(settersSource.slice(toggleStart),{mode:'transform'}).replace(/^export /,'');
+const restartStart=logicSource.indexOf('export async function restart(');
+const restartEnd=logicSource.indexOf('\nlet lastInitError:',restartStart);
+assert.ok(restartStart>=0&&restartEnd>restartStart);
+const restartBody=stripTypeScriptTypes(logicSource.slice(restartStart,restartEnd),{mode:'transform'}).replace(/^export /,'');
+const guardNotices=[];
+config.funbox=['poetry','no_quit'];config.words=50;ownedActiveWordIndex=0;
+const activeToggle=vm.compileFunction(toggleBody+'\nreturn toggleFunbox;',
+  ['Config','isTestActive','showNoticeNotification'])(config,()=>true,(...args)=>guardNotices.push(args));
+const activeRestart=vm.compileFunction(restartBody+'\nreturn restart;',
+  ['isTestActive','isFunboxActive','showNoticeNotification'])(()=>true,
+  name=>config.funbox.includes(name),(...args)=>guardNotices.push(args));
+const guardedAddWord=vm.compileFunction(addBody+'\nreturn addWord;',[
+  'Config','TestWords','WordsGenerator','TestUI','getActiveFunboxes','getActiveWordIndex',
+  'findSingleActiveFunboxWithFunction','showErrorNotification','toggleFunbox','restart','timerEvent',
+])(config,testWords,main.namespace,
+  {addWord:word=>displayed.push(word),appendEmptyWordElement:unexpected},active,()=>ownedActiveWordIndex,
+  name=>active().find(value=>typeof value.functions[name]==='function'),
+  (...args)=>notices.push(args),activeToggle,activeRestart,{dispatch:value=>failures.push(value)});
+testWords.words.reset();testWords.words.push('opening ',0);
+main.namespace.currentSection.splice(0,main.namespace.currentSection.length,'retained');
+ownedSection=false;ownedSectionQueue=[];sectionCalls=0;
+notices.length=0;failures.length=0;displayed.length=0;
+await guardedAddWord();
+assert.equal(sectionCalls,1);
+assert.deepEqual(config.funbox,['poetry','no_quit'],'Actual active NoQuit setter keeps the source enabled');
+assert.equal(guardNotices.length,2,'Both toggle and restart reject the active NoQuit attempt');
+assert.equal(notices.length,1,'The section-fetch error is still reported');
+assert.deepEqual(failures,[],'False prefetch does not dispatch a generation failure');
+assert.deepEqual(displayed,[]);assert.equal(testWords.words.length,1);
+assert.deepEqual([...main.namespace.currentSection],['retained']);
+ownedSection={words:['first','second']};
+await guardedAddWord();
+assert.equal(sectionCalls,2);
+assert.deepEqual(displayed,['first','second','retained'],
+  'A later valid response can append its section and the preserved generator tail');
+assert.equal(testWords.words.length,4);assert.deepEqual(failures,[]);
+assert.deepEqual(config.funbox,['poetry','no_quit']);assert.equal(guardNotices.length,2);
+console.log('Pinned active-NoQuit false-prefetch case passed (complete actual addWord/toggleFunbox/restart functions, real generator/storage; owned active/config/notification boundaries; no full event bus, UI or backend execution claim).');
