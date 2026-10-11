@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 退役时序根因调查：源码检查确认跟随为主队列异步交付，而失败夹具仅固定等待 5ms；尚未证明这是根因。整组 Prompt 同进程首次复现漏传 Anime.js 固定归档，源码探针因此失败（work/retirement-prompt-family-reproduction.log），不作为产品回归。补齐与门禁一致的 TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE 后，556 项零失败、无跳过（71.040 秒，墙钟 71.120 秒；work/retirement-prompt-family-with-anime.log），原退役用例也通过。没有改产品、放宽断言或延长等待；全量 4407 项中的两处失败仍未关闭，下一步需交付／布局调度的判别证据，不用局部绿色覆盖全量失败。
+
 2026-10-12 冻结 4b2b3a9 全量门禁未通过：客户端 4,407 项、2 处失败（2091.534 秒，墙钟 2092.042 秒），均为 PromptWordRetirementTests.testCompletePinnedDeletionAndLineTimingMatchNativePolicies 原生退役回调 0/预期 2；服务端与 Release 未执行。冻结摘要通过，完整日志补存 work/readiness-final-lf.sVgqny（自动归档目录为空，原临时日志仍在）。十万词 155.352 秒、35 在线宿主及随后同进程 19 PB、42 组合宿主均通过，不抵消失败。单独原样复现通过（5.695 秒）；仅增加无敏感信息的夹具/阶段断言说明后，退役与重排 23 项通过（11.075 秒，墙钟 11.081 秒）。间歇性根因仍未知，未改产品、未放宽断言、未认定修复。对应日志 work/retirement-isolated-reproduction.log、work/retirement-labeled-regression.log；goal active。
 
 2026-10-12 TST-02 空白末词错误字母／quickEnd：固定源码六组验证，仅不受 stop 约束的 quickEnd 完成；原生先行失败后修正末词长度判断与完成计数。七组 115 项回归通过，错误输入逐字回放保留。deleteOnError、重复 quickEnd 及错误序列混合未验收；详见 GENERATED_BACKWARDS_ORDER_CONTRACT.md，完整 goal active。
