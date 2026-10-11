@@ -1,5 +1,15 @@
 # 完整提示行的模式与限制规则
 
+## TST-02：短外部词源有限结束反例（2026-10-11，未修复）
+
+整体缺口复核将“任意短外部词源”提升为可重放反例。自有三词 quiet／harbor／morning，以 streamPrompt 输入七词 words 测试并开启完整行；输入原有循环续接序列的七个词，不为最终正确词额外补提交字符。普通空格路径 outcome 为 completed，但 completedWordCount 为 6；下划线路径 outcome 仍 active、计数为 6 且 result 为 nil。`work/short-external-preview-budget-final.log` 一项四处失败（0.643s，墙钟 0.645）。首轮 `budget.log` 使用 Set 而接口要求 Array，编译错误仅为夹具问题，不算产品红测。
+
+未修改产品实现。失败用例保留为 `Scripts/diagnostics/ShortExternalPreviewTests.swift.fixture`，通过 apply_patch 放回 Tests/TypebarTests/ShortExternalPreviewTests.swift 后运行 `swift test --filter ShortExternalPreviewTests` 可复现；不是默认通过套件的一部分，不计作已通过或已修复。下一步定位有限重复续接的最终目标截断、末提交字符与完成计数，修正时应将夹具提升为持续回归，不能增加多余末分隔符或把期望改成六词来消除失败。
+
+固定参考仍为 91bd24bb8513785c7364cbea29296ff7adafac41。静态读取 words-generator.ts 的完整行预算选择以及 test-logic.ts 的 addWord／pullSection 说明官方有 section 续拉；本轮没有执行该官方分支。不能把本机短文本循环铺满当作官方 section 拉取等价。即便有限结束修复，任意外部源完整预览／异步拉取仍是独立缺口。
+
+移出诊断后 `work/short-external-preview-existing-regression.log` 既有完整行与在线描述器 21 项零失败零跳过（4.745s，墙钟 4.748），只证明既有范围，不否定上述失败。主程序零启动，无新完整门禁或 Release；showAllLines 部分与整体 goal active 保持。
+
 ## TST-02：延迟在线替换与 Pace 增量的完整冻结验证（2026-10-11）
 
 冻结提交 `8eff6ba0a4325becbc733c8c8c680f68494ca441` 的同一轮完整 readiness 门禁终态 `gate_exit=0 hash_exit=0`；852 个跟踪文件 SHA-256 全部一致，项目及固定参考工作区干净。证据保存于 `work/frozen-readiness-live-protection.aP8avM` 的 `gate.log`、`freeze-verification.log` 与 `logs/` 内 74 份阶段日志。参考仍固定为 `91bd24bb8513785c7364cbea29296ff7adafac41`，不声称覆盖最新上游。
