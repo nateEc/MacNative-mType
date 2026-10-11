@@ -6525,10 +6525,11 @@ struct TestSessionFactory {
     // An external provider can supply less than the requested word budget.
     // Keep its existing continuation instead of treating that short source
     // as a complete preview (which would finish the attempt prematurely).
-    let hasIncompleteExternalPreview = showAllLines && streamPrompt != nil
+    let hasIncompleteExternalSource = streamPrompt != nil
       && configuration.mode == .words && !configuration.isInfinite
       && GeneratedWordBoundPolicy.wordCount(in: noSpaceBoundarySource ?? prompt)
         < (configuration.wordLimit ?? 25)
+    let hasIncompleteExternalPreview = showAllLines && hasIncompleteExternalSource
     let generatesWholeLines = showAllLines && !hasIncompleteExternalPreview
     if usesFreshGeneratedWords { preservesGeneratedWordOrder = true }
     var batch: TransformedPromptBatch
@@ -6561,7 +6562,7 @@ struct TestSessionFactory {
     let noSpaceWordLengths = customSectionChunk?.noSpaceWordLengths ?? batch.noSpaceWordLengths
     let noSpaceTargetWords = customSectionChunk?.noSpaceTargetWords ?? batch.noSpaceTargetWords
     let repeats = (GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration, showAllLines: generatesWholeLines)
-      || hasIncompleteExternalPreview)
+      || hasIncompleteExternalSource)
       && !hasCompleteRandomWordPrompt && !streamsRandomCustomText
       && !streamsSequentialCustomText
       && customSectionWordStream == nil

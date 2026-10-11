@@ -1,5 +1,15 @@
 # 完整提示行的模式与限制规则
 
+## TST-02：短词源有限续接末词修正（2026-10-11）
+
+本节更新下方未修复反例的当前状态，历史失败记录保留。重复词源原先整批追加到有限预算之后，且始终报告可扩展，导致普通末词完成计数不足、下划线末词仍要求多余提交。现在有限 words 的重复续接按剩余词数裁剪，真正最后一批清除末提交字符（下划线单独按修饰器处理），达到预算后不再报告重复扩展。普通分隔符路径保留截取范围内原始字符，不以重新分词拼接替换正文。计时／无限与其他独立生成 cursor 的路径不改。
+
+原七词反例 `work/short-external-preview-fix.log` 第一版仍有三处下划线失败；通用末提交清理不识别下划线，修正后 `fix-final.log` 一项通过。扩展到完整行开关对照发现关闭时根本不识别短源：入口现将有限目标续接需要与预览提示分离，开关只决定提示，不决定能否完成。`disabled-fix.log` 一项通过，覆盖 6 种词数 × 2 分隔符 × 2 开关共 24 组，包含整批与非整批末尾、逐步完成前后、精确最终提示／词数／零错误、回放、SwiftData 可移植结果及重复练习。诊断夹具已移入 Tests/TypebarTests/ShortExternalPreviewTests.swift，成为默认持续回归，不再作为未修复 fixture 留存。
+
+上一轮大范围 `work/short-external-preview-regression.log` 928 项、7 处失败、1 项跳过（367.378s，墙钟 367.462）：5 处是关闭完整行反例，2 处因 PATH 缺 Go，跳过为显式十万词耐久开关未设置。保留该结果，不计通过。补齐 /opt/homebrew/bin 后最终 `short-external-preview-final-regression.log` 定向 131 项零失败零跳过（39.487s，墙钟 39.502），包含生成流、自定义流、无空格、完整行／在线描述器及 Go／Java 编译。最终命令明确排除可选十万词耐久，不代表本轮跑过耐久或完整 TypingEngineTests／冻结门禁。
+
+风险审查未发现新的可落实问题，无归档／实体／网络变化；固定参考原创边界检查通过，仅限脚本范围。零主程序启动，无新 Release／完整门禁／真实 IME 验收。本次只修复已有循环续接的有限结束语义，不把循环铺满当作官方 section 拉取；任意外部源的完整预览与异步 section、超预算等差异仍开放，showAllLines 部分及整体 goal active 保持。
+
 ## TST-02：短外部词源有限结束反例（2026-10-11，未修复）
 
 整体缺口复核将“任意短外部词源”提升为可重放反例。自有三词 quiet／harbor／morning，以 streamPrompt 输入七词 words 测试并开启完整行；输入原有循环续接序列的七个词，不为最终正确词额外补提交字符。普通空格路径 outcome 为 completed，但 completedWordCount 为 6；下划线路径 outcome 仍 active、计数为 6 且 result 为 nil。`work/short-external-preview-budget-final.log` 一项四处失败（0.643s，墙钟 0.645）。首轮 `budget.log` 使用 Set 而接口要求 Array，编译错误仅为夹具问题，不算产品红测。

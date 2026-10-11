@@ -4848,7 +4848,9 @@ struct TypingSession {
   var usesIncrementalPromptExtension: Bool {
     generatedWordContinuation?.hasRemaining == true || generatedStreamContinuation?.hasRemaining == true
       || generatedCodeContinuation?.hasRemaining == true
-      || repeatingPrompt?.isEmpty == false
+      || (repeatingPrompt?.isEmpty == false
+        && !(configuration.mode == .words && !configuration.isInfinite
+          && unitTargets.sourceFieldCount >= (configuration.wordLimit ?? 25)))
       || randomCustomSourceTokens?.isEmpty == false
       || sequentialCustomWordStream != nil || finiteCustomTextStream?.hasRemaining == true
       || customSectionWordStream?.hasRemaining == true
@@ -8311,19 +8313,50 @@ struct TypingSession {
     }
     guard let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
     let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    var repeatedText = repeatingPrompt
+    var repeatedTargets = repeatingNoSpaceTargetWords
+    var repeatedLengths = repeatingNoSpaceWordLengths
+    if configuration.mode == .words, let limit = configuration.wordLimit, limit > 0 {
+      let remaining = limit - unitTargets.sourceFieldCount
+      guard remaining > 0 else { return }
+      if usesNoSpaceSeparator, !repeatedTargets.isEmpty,
+        repeatedTargets.joined().utf16.elementsEqual(repeatingPrompt.utf16) {
+        repeatedTargets = Array(repeatedTargets.prefix(remaining))
+        var batch = TransformedPromptBatch(text: repeatedTargets.joined(), noSpaceTargetWords: repeatedTargets)
+        if repeatedTargets.count == remaining {
+          if configuration.modifiers.contains(.underscoreSeparators), repeatedTargets.last?.hasSuffix("_") == true {
+            repeatedTargets[repeatedTargets.count - 1].removeLast()
+            batch = .init(text: repeatedTargets.joined(), noSpaceTargetWords: repeatedTargets)
+          } else {
+            batch = FinitePromptCommitPolicy.finalized(batch)
+          }
+        }
+        repeatedText = batch.text
+        repeatedTargets = batch.noSpaceTargetWords
+        repeatedLengths = batch.noSpaceWordLengths
+      } else if !usesNoSpaceSeparator {
+        var characters = Array(repeatingPrompt)
+        let progress = Self.wordProgress(remaining + 1, in: characters)
+        if let cutoff = progress.startIndex { characters = Array(characters.prefix(cutoff)) }
+        if progress.count >= remaining {
+          while characters.last.map(isPromptWordSeparator) == true { characters.removeLast() }
+        }
+        repeatedText = String(characters)
+      }
+    }
     let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
     let previousEnd = promptCharacters.count + separator.count
-    appendPrompt(separator + repeatingPrompt)
+    appendPrompt(separator + repeatedText)
     guard usesNoSpaceSeparator else { return }
     var end = previousEnd
-    for length in repeatingNoSpaceWordLengths {
+    for length in repeatedLengths {
       end += length
       noSpaceWordEndIndices.append(end)
     }
-    guard !repeatingNoSpaceTargetWords.isEmpty,
-      repeatingNoSpaceTargetWords.joined().utf16.elementsEqual(repeatingPrompt.utf16)
+    guard !repeatedTargets.isEmpty,
+      repeatedTargets.joined().utf16.elementsEqual(repeatedText.utf16)
     else { return }
-    noSpaceTargetWords += repeatingNoSpaceTargetWords
+    noSpaceTargetWords += repeatedTargets
   }
 
   private mutating func refillGeneratedIfNeeded(activeWordBefore: Int, at date: Date) {
