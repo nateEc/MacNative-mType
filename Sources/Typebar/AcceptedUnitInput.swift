@@ -81,8 +81,8 @@ struct AcceptedUnitInput {
   }
 }
 
-/// Source fields split literal separator units, independently of how macOS
-/// groups their surrounding Unicode scalars into visible glyphs.
+/// Source fields retain literal UTF-16 units independently of visible glyphs.
+/// Explicit provider fields can contain LF without introducing another field.
 struct UnitInputTargets {
   let units: [UInt16]
   let glyphs: [Int]
@@ -94,8 +94,13 @@ struct UnitInputTargets {
   let requiresKoreanDisassembly: Bool
 
   init(_ text: String, buildsASCIICatalog: Bool = false, noSpaceWords: [String]? = nil,
-    asciiSeparatorCount: Int? = nil) {
-    requiresUnitInput = text.utf8.contains { $0 > 127 || $0 == 13 }
+    asciiSeparatorCount: Int? = nil, sourceFields: [String]? = nil) {
+    let providerFields = sourceFields.flatMap { fields -> [String]? in
+      guard !fields.isEmpty, fields.allSatisfy({ !$0.isEmpty }),
+        fields.joined().utf16.elementsEqual(text.utf16) else { return nil }
+      return fields
+    }
+    requiresUnitInput = providerFields != nil || text.utf8.contains { $0 > 127 || $0 == 13 }
     hasNewline = text.utf8.contains(10)
     noSpace = noSpaceWords.map { !$0.isEmpty && $0.joined().utf16.elementsEqual(text.utf16) } ?? false
     requiresKoreanDisassembly = requiresUnitInput && text.utf16.contains {
@@ -126,6 +131,16 @@ struct UnitInputTargets {
         return start..<end
       }
       sourceFieldCount = noSpaceWords.count
+      return
+    }
+    if let providerFields {
+      var start = 0
+      fields = providerFields.map { field in
+        let end = start + field.utf16.count
+        defer { start = end }
+        return start..<end
+      }
+      sourceFieldCount = providerFields.count
       return
     }
     var ranges: [Range<Int>] = []
