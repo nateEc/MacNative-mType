@@ -659,6 +659,7 @@ import XCTest
         }
         continue
       }
+      let inputField = try XCTUnwrap(fields(in: host).first)
       for (insertion, text) in ["a", "b", "c"].enumerated() {
         if hostIndex == 0, insertion == 0,
           ProcessInfo.processInfo.environment["TYPEBAR_TEST_INPUT_SAMPLE_MARKER"] == "1" {
@@ -671,11 +672,14 @@ import XCTest
         }
         let initialFrame = host.frame
         let initialLayoutCount = host.layoutCount
+        let initialGeometryRevision = inputField.geometryRevision
         let start = ProcessInfo.processInfo.systemUptime
         input.insertText(text, replacementRange: .init(location: NSNotFound, length: 0))
         let inserted = ProcessInfo.processInfo.systemUptime
+        let insertedGeometryRevision = inputField.geometryRevision
         host.layoutSubtreeIfNeeded()
         let laidOut = ProcessInfo.processInfo.systemUptime
+        let synchronousGeometryRevision = inputField.geometryRevision
         let synchronousLayouts = host.layoutCount - initialLayoutCount
         if insertion == 1,
           ProcessInfo.processInfo.environment["TYPEBAR_TEST_LAYOUT_STACK"] == "1"
@@ -685,6 +689,7 @@ import XCTest
         }
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
         let delivered = ProcessInfo.processInfo.systemUptime
+        let deliveredGeometryRevision = inputField.geometryRevision
         let deliveredLayouts = host.layoutCount - initialLayoutCount - synchronousLayouts
         host.layoutSubtreeIfNeeded()
         let finished = ProcessInfo.processInfo.systemUptime
@@ -692,11 +697,14 @@ import XCTest
           inputs(in: host).contains { $0 === input },
           "First input must retain the native input owner"
         )
+        XCTAssertTrue(fields(in: host).contains { $0 === inputField },
+          "Accepted input must retain the native field layout owner")
         XCTAssertFalse(window.isVisible)
         XCTAssertEqual(host.frame, initialFrame, "Input must not resize the fixed practice host")
         print(
           "practice-host automaticSizing=\(automaticSizing) reduceMotion=\(reduceMotion) insertion=\(insertion) input=\(inserted - start) layout=\(laidOut - inserted) delivery=\(delivered - laidOut) finalLayout=\(finished - delivered) synchronousLayouts=\(synchronousLayouts) deliveredLayouts=\(deliveredLayouts) finalLayouts=\(host.layoutCount - initialLayoutCount - synchronousLayouts - deliveredLayouts)"
         )
+        print("practice-host geometry insertion=\(insertion) input=\(insertedGeometryRevision &- initialGeometryRevision) synchronous=\(synchronousGeometryRevision &- insertedGeometryRevision) delivery=\(deliveredGeometryRevision &- synchronousGeometryRevision) final=\(inputField.geometryRevision &- deliveredGeometryRevision)")
         if insertion == 1, !host.capturedLayoutStack.isEmpty {
           print(
             "practice-host layout-stack automaticSizing=\(automaticSizing)\n"

@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## TST-02：生产宿主首字符几何重建次数（2026-10-11）
+
+沿上一节独立字段对照，验证“生产首字符是否重复重建字段几何”假设。仅在既有实际宿主测试读取 `geometryRevision`，记录输入、同步布局、RunLoop 交付、最终布局四阶段增量；新增接受字符后原字段 owner 保留断言。无产品诊断开关或源码行为修改，因此不制造产品红测。宿主布局调用次数与字段几何版本是不同指标，不能互换。
+
+`work/production-first-input-geometry-revisions.log` 三词／九十词两项零失败零跳过（17.085s，墙钟 17.087）。两规模各四组、每组三字符全部为 input=0、synchronous=1、delivery=0、final=0；九十词首字符同步布局约 186.732–190.862ms，三词约 45.968–48.168ms。该运行不支持“同一字符重复重建字段模型”解释；不能从重建次数推出每次重建耗时，也不能排除一次模型生成成本。RunLoop 交付阶段存在数百次宿主 layout 调用但字段不重测，故不通过改字形缓存来解释交付调度。
+
+共享夹具默认入口回归 `production-first-input-geometry-default.log` 一项零失败零跳过（11.044s，墙钟 11.046），同样每字符仅同步阶段一次几何重建。固定参考 originality boundary `production-first-input-geometry-originality.log` 通过；该有限边界检查不等于全面原创性证明。无新完整门禁，零 Typebar 主程序启动，首键性能与完整 goal active 不变。下一步应分开检查同步 SwiftUI 图更新和交付布局调度，不重复尝试已有无收益的宽度复用改动。
+
 ## TST-02：首个接受字符的字段缓存分层对照（2026-10-11）
 
 检查 `ASLPromptGlyphContent.hint` 为可选值，普通字符返回 nil，赋值不会在提示字典中保留空项，排除“普通字符空提示额外增加高度”的代码阅读假设，未修改产品。已有千槽位缓存检查 `work/field-cache-current-baseline.log` 一项零失败：首次配置约 143ms，候选更新约 32ms；这是独立原生配置，不是生产首键延迟。
