@@ -39,6 +39,15 @@ import XCTest
     try checkProductionHost(checksMarkedText: false)
   }
 
+  func testShortPromptFirstInputPreservesNativeOwnerWithoutOpeningWindow() throws {
+    try checkProductionHost(checksMarkedText: false, customPrompt: "quiet harbor morning")
+  }
+
+  func testLongCustomPromptFirstInputPreservesNativeOwnerWithoutOpeningWindow() throws {
+    let text = Array(repeating: "quiet harbor morning", count: 30).joined(separator: " ")
+    try checkProductionHost(checksMarkedText: false, customPrompt: text)
+  }
+
   func testProductionCompositionModesUpdateAndCancelWithoutCommitting() throws {
     try checkProductionHost(checksMarkedText: true)
   }
@@ -194,7 +203,7 @@ import XCTest
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil,
     checksBelowStatus: Bool = false, hostWidth: CGFloat = 1000,
     checksBelowResize: Bool = false, checksWholeLineToggle: Bool = false,
-    checksFontChanges: Bool = false) throws {
+    checksFontChanges: Bool = false, customPrompt: String? = nil) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
@@ -245,14 +254,17 @@ import XCTest
       let settings = AppSettings(defaults: defaults)
       let reduceMotion = ProcessInfo.processInfo.environment["TYPEBAR_TEST_REDUCE_MOTION"] == "1"
       settings.reducePracticeMotion = reduceMotion
-      if checksBelowStatus {
-        settings.activeResultTags = ["候选行避让验证"]
-        settings.paceGuideMode = .custom
-        settings.paceGuideCustomWpm = 80
+      if checksBelowStatus || customPrompt != nil {
+        if checksBelowStatus {
+          settings.activeResultTags = ["候选行避让验证"]
+          settings.paceGuideMode = .custom
+          settings.paceGuideCustomWpm = 80
+        }
         let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
           difficulty: .normal, rules: .init(), language: .english)
         XCTAssertTrue(settings.saveActiveTestSelection(.init(
-          preset: .init(configuration: configuration, customText: "quiet harbor carries a patient silver morning"),
+          preset: .init(configuration: configuration,
+            customText: customPrompt ?? "quiet harbor carries a patient silver morning"),
           testParameterMemory: .legacyDefaults(configuration: configuration))))
       }
       if let mixedLanguage {
@@ -324,6 +336,10 @@ import XCTest
           XCTAssertGreaterThan(first.minX, last.minX,
             "Language-specific letters must retain their own RTL shaping and source slots")
         }
+      }
+      if let customPrompt {
+        XCTAssertEqual(try XCTUnwrap(fields(in: host).first).accessibilityValue() as? String,
+          customPrompt, "The comparison must mount the actual requested prompt")
       }
       if mixedDirection {
         let field = try XCTUnwrap(fields(in: host).first)
