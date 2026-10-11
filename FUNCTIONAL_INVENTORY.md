@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 TST-02 原生百科续取异常来源保留已实现：真实宿主旧实现两项／9 断言红；现生成器失败结束尝试但保留百科来源与预设，旁路失败保留提示、输入和 NoQuit，可随后续前进恢复；诗歌 false 策略不变。五项新宿主绿，扩大回归 144 项及独立补跑台账／字段目标／NoQuit 31 项均零失败、无跳过；两个进程不冒称完整门禁同进程存储序列。依据来源的失败契约，未引入 undefined；Optional 具体原因、实际百科 schema 异常及初始化失败重试仍未验收。详见 EMPTY_PROVIDER_GENERATION_CHECKPOINT.md。本轮零主程序实例，旁路顺序／阈值等缺口仍开放，不升级全功能验收，goal active。
+
 2026-10-12 TST-02 调用方异常传播新增可执行证据：固定参考完整 addWord／真实生成器和存储的两项自有拒绝 Promise 场景通过；旁路原样拒绝且保持余池／来源，无通知或失败；生成器捕获、通知并派发失败，但不关闭来源。既有探针全部通过，见 `work/provider-rejection-caller-source.log` 与 EMPTY_PROVIDER_GENERATION_CHECKPOINT.md。提供者为自有拒绝适配器，不是实际百科网络／浏览器端到端证据；原生 Optional 折叠后关闭来源的差异待宿主回归修复，本轮未改产品、未跑完整门禁、不升级验收分类，零主程序实例，goal active。
 
 2026-10-12 TST-02 提供者响应可达性审查：新增固定参考实际 poetry 模块六项隔离网络响应探针，正常内容／成功空段／空数组／缺少 lines／JSON 与传输拒绝均通过，并接入完整门禁（本轮未重跑门禁）。poetry 正常结果为 Section 或 false；undefined 仅保留为调用方防御测试，不冒称生产可达。源码发现 wikipedia 拒绝 Promise 未由 funbox 包装转换为 false，且旁路 await 在生成器 catch 外；实际网页异常最终状态未运行验证，原生 Optional 失败策略不能因此宣称兼容。详情见 EMPTY_PROVIDER_GENERATION_CHECKPOINT.md，旁路词序与阈值等缺口仍开放，验收分类不升级；零主程序实例，goal active。

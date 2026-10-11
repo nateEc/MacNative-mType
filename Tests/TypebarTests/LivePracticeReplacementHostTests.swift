@@ -28,7 +28,7 @@ import XCTest
       let pending = continuations
       continuations = []
       for continuation in pending {
-        continuation.resume(returning: returnsFailure ? nil : .init(source: .poetry, title: "Authored delayed fixture",
+        continuation.resume(returning: returnsFailure ? nil : .init(source: source ?? .poetry, title: "Authored delayed fixture",
           byline: nil, tokens: scriptedTokens ?? (0..<151).map { ["quiet", "harbor", "morning"][$0 % 3] }, separator: " "))
       }
     }
@@ -74,6 +74,30 @@ import XCTest
 
   func testUnlockedGeneratorFailureDisablesSourceWithoutRestartingOffline() throws {
     try checkDelayedReplacement(prefetches: true, failsPrefetch: true, generatesNextWord: true)
+  }
+
+  func testEncyclopediaGeneratorFailureEndsAttemptWithoutDisablingSource() throws {
+    try checkDelayedReplacement(prefetches: true, failsPrefetch: true,
+      generatesNextWord: true, encyclopedia: true)
+  }
+
+  func testEncyclopediaSideFailurePreservesAttemptAndCanRecoverOnLaterProgress() throws {
+    try checkDelayedReplacement(prefetches: true, failsPrefetch: true, encyclopedia: true)
+  }
+
+  func testEncyclopediaGeneratorFailurePreservesSourceAndReleasesNoQuitLock() throws {
+    try checkDelayedReplacement(prefetches: true, failsPrefetch: true, locksNoQuit: true,
+      generatesNextWord: true, encyclopedia: true)
+  }
+
+  func testEncyclopediaSideFailurePreservesNoQuitLockAndCanRecover() throws {
+    try checkDelayedReplacement(prefetches: true, failsPrefetch: true, locksNoQuit: true,
+      encyclopedia: true)
+  }
+
+  func testLeavingPracticeRejectsLateEncyclopediaGeneratorFailure() throws {
+    try checkDelayedReplacement(prefetches: true, cancelsPrefetch: true, failsPrefetch: true,
+      generatesNextWord: true, encyclopedia: true)
   }
 
   func testBackwardDeletionDoesNotStartAnotherGeneratorRequest() throws {
@@ -154,7 +178,7 @@ import XCTest
     emptyPrefetch: Bool = false, emptyInitialReplies: Int = 0,
     exhaustsBeforeEmpty: Bool = false, failsInitial: Bool = false,
     failsInitialFill: Bool = false, generatesNextWord: Bool = false,
-    checksBackwardInput: Bool = false) throws {
+    checksBackwardInput: Bool = false, encyclopedia: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -164,7 +188,8 @@ import XCTest
     settings.paceGuideCustomWpm = 80
     settings.paceCaretStyle = .outline
     settings.showAllPracticeLines = false
-    let modifiers: [TestModifier] = locksNoQuit ? [.poetryStream, .noQuit] : [.poetryStream]
+    let sourceModifier: TestModifier = encyclopedia ? .referenceStream : .poetryStream
+    let modifiers: [TestModifier] = locksNoQuit ? [sourceModifier, .noQuit] : [sourceModifier]
     settings.testModifiers = modifiers
     if composesBeforeReturn { settings.compositionDisplayStyle = .below }
     let configuration = TestConfiguration.words(prefetches ? 300 : 151).with(modifiers: modifiers)
@@ -220,7 +245,7 @@ import XCTest
       }
     }
     for _ in 0..<10 where pending.continuations.isEmpty { flush() }
-    XCTAssertEqual(pending.source, .poetry)
+    XCTAssertEqual(pending.source, encyclopedia ? .encyclopedia : .poetry)
     XCTAssertFalse(pending.continuations.isEmpty, "The production load must reach the injected transport")
     if !prefetches { settings.showAllPracticeLines = true }
     if disablesPace { settings.paceGuideMode = .off }
@@ -359,10 +384,10 @@ import XCTest
           XCTAssertGreaterThan(pending.cancelledReplies, cancelled)
           XCTAssertEqual(field.accessibilityValue() as? String, before)
         } else if emptyPrefetch || failsPrefetch {
-          let keepsSource = emptyPrefetch || locksNoQuit
-          XCTAssertEqual(settings.testModifiers.contains(.poetryStream), keepsSource)
+          let keepsSource = emptyPrefetch || locksNoQuit || encyclopedia
+          XCTAssertEqual(settings.testModifiers.contains(sourceModifier), keepsSource)
           XCTAssertEqual(settings.testModifiers.contains(.noQuit), locksNoQuit)
-          XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(.poetryStream), keepsSource)
+          XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(sourceModifier), keepsSource)
           XCTAssertTrue(settings.allowsRestartingConfigurationChange, "Generator failure ends the attempt, unlike a refused side-pull restart")
           XCTAssertEqual(field.accessibilityValue() as? String, before)
           XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
@@ -457,6 +482,32 @@ import XCTest
         return
       }
       if failsPrefetch {
+        if encyclopedia {
+          XCTAssertTrue(settings.testModifiers.contains(sourceModifier))
+          XCTAssertEqual(settings.allowsRestartingConfigurationChange, !locksNoQuit)
+          XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(sourceModifier), true)
+          XCTAssertEqual(fieldBeforeReply.accessibilityValue() as? String, beforeReply)
+          XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+          XCTAssertEqual(pending.callCount, initialRequestCount + 1, "No immediate retry after a rejected side request")
+          XCTAssertTrue(pending.continuations.isEmpty)
+          XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+          XCTAssertFalse(NSApplication.shared.windows.contains {
+            $0 !== window && !priorWindowIDs.contains(ObjectIdentifier($0)) && $0.contentView != nil
+          }, "A rejected side request does not end the attempt or present a result")
+          pending.returnsFailure = false
+          initialInput.insertText(authoredTokens[134] + " ",
+            replacementRange: .init(location: NSNotFound, length: 0))
+          for _ in 0..<5 { flush() }
+          XCTAssertEqual(pending.callCount, initialRequestCount + 2)
+          XCTAssertEqual(pending.continuations.count, 1)
+          pending.finish()
+          for _ in 0..<5 { flush() }
+          XCTAssertTrue(settings.testModifiers.contains(sourceModifier))
+          XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+          XCTAssertTrue((fieldBeforeReply.accessibilityValue() as? String)?.hasSuffix(authoredTokens.suffix(3).joined(separator: " ")) == true)
+          XCTAssertFalse(window.isVisible)
+          return
+        }
         if locksNoQuit {
           XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
           XCTAssertTrue(settings.testModifiers.contains(.noQuit))

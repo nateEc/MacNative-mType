@@ -4564,7 +4564,10 @@ private struct ContentView: View {
           guard session.needsLiveContentGeneration else { return }
           guard let content, content.source == source else {
             let canDisableSource = NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session)
-            if canDisableSource {
+            // The pinned poetry provider converts failures to false; the
+            // encyclopedia provider rejects instead. Its rejection reaches
+            // generator failure without requesting a source toggle.
+            if canDisableSource && source == .poetry {
               let failedModifier: TestModifier = source == .poetry ? .poetryStream : .referenceStream
               settings.testModifiers.removeAll { $0 == failedModifier }
               persistActiveTestSelection(for: configuration.with(
@@ -4585,6 +4588,15 @@ private struct ContentView: View {
             return
           }
           liveContentMessage = "已生成\(content.attribution)的下一个词。"
+          return
+        }
+        if content == nil && source == .encyclopedia {
+          // A rejected side pull is outside the reference generator's catch.
+          // Contain it at the native task boundary without turning it into a
+          // false response, ending this attempt, or retrying in a tight loop.
+          liveContentTask = nil
+          isLoadingLiveContent = false
+          liveContentMessage = "无法续取百科内容；本轮保留当前提示和内容来源。"
           return
         }
         if let content, content.source == source, content.text.isEmpty {
