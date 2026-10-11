@@ -11,6 +11,7 @@ import XCTest
     var callCount = 0
     var cancelledReplies = 0
     var scriptedTokens: [String]?
+    var returnsFailure = false
     func fetch(_ source: LivePracticeContentSource, _ language: TypingLanguage) async -> LivePracticeContent? {
       self.source = source
       callCount += 1
@@ -22,7 +23,7 @@ import XCTest
       let pending = continuations
       continuations = []
       for continuation in pending {
-        continuation.resume(returning: .init(source: .poetry, title: "Authored delayed fixture",
+        continuation.resume(returning: returnsFailure ? nil : .init(source: .poetry, title: "Authored delayed fixture",
           byline: nil, tokens: scriptedTokens ?? (0..<151).map { ["quiet", "harbor", "morning"][$0 % 3] }, separator: " "))
       }
     }
@@ -52,9 +53,17 @@ import XCTest
     try checkDelayedReplacement(prefetches: true, cancelsPrefetch: true)
   }
 
+  func testFailedPrefetchDisablesOnlyItsSourceAndRestartsOffline() throws {
+    try checkDelayedReplacement(prefetches: true, failsPrefetch: true)
+  }
+
+  func testFailedPrefetchRestartsOfflineEvenWhenNoQuitLockedTheActiveAttempt() throws {
+    try checkDelayedReplacement(prefetches: true, failsPrefetch: true, locksNoQuit: true)
+  }
+
   private func checkDelayedReplacement(startsBeforeReturn: Bool = false,
     disablesPace: Bool = false, composesBeforeReturn: Bool = false, prefetches: Bool = false,
-    cancelsPrefetch: Bool = false) throws {
+    cancelsPrefetch: Bool = false, failsPrefetch: Bool = false, locksNoQuit: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -64,9 +73,10 @@ import XCTest
     settings.paceGuideCustomWpm = 80
     settings.paceCaretStyle = .outline
     settings.showAllPracticeLines = false
-    settings.testModifiers = [.poetryStream]
+    let modifiers: [TestModifier] = locksNoQuit ? [.poetryStream, .noQuit] : [.poetryStream]
+    settings.testModifiers = modifiers
     if composesBeforeReturn { settings.compositionDisplayStyle = .below }
-    let configuration = TestConfiguration.words(prefetches ? 300 : 151).with(modifiers: [.poetryStream])
+    let configuration = TestConfiguration.words(prefetches ? 300 : 151).with(modifiers: modifiers)
     XCTAssertTrue(settings.saveActiveTestSelection(.init(
       preset: .init(configuration: configuration),
       testParameterMemory: .legacyDefaults(configuration: configuration))))
@@ -144,13 +154,35 @@ import XCTest
       let fieldBeforeReply = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
       let beforeReply = try XCTUnwrap(fieldBeforeReply.accessibilityValue() as? String)
       let priorCancelledReplies = pending.cancelledReplies
+      if locksNoQuit {
+        XCTAssertFalse(settings.allowsRestartingConfigurationChange,
+          "The active No Quit attempt must actually be locked before the source fails")
+      }
       if cancelsPrefetch {
         window.contentView = nil
         for _ in 0..<5 { flush() }
       }
       pending.scriptedTokens = Array(authoredTokens[151..<300])
+      pending.returnsFailure = failsPrefetch
       pending.finish()
       for _ in 0..<5 { flush() }
+      if failsPrefetch {
+        XCTAssertFalse(settings.testModifiers.contains(.poetryStream))
+        XCTAssertEqual(settings.testModifiers.contains(.noQuit), locksNoQuit)
+        XCTAssertTrue(settings.allowsRestartingConfigurationChange,
+          "The newly restarted attempt has not started typing")
+        XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(.noQuit), locksNoQuit)
+        XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(.poetryStream), false)
+        let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+        let offlinePrompt = try XCTUnwrap(field.accessibilityValue() as? String)
+        XCTAssertFalse(offlinePrompt.isEmpty)
+        XCTAssertNotEqual(offlinePrompt, beforeReply)
+        XCTAssertFalse(offlinePrompt.contains("owned"))
+        XCTAssertEqual(pending.callCount, initialRequestCount + 1)
+        XCTAssertTrue(pending.continuations.isEmpty)
+        XCTAssertFalse(window.isVisible)
+        return
+      }
       if cancelsPrefetch {
         XCTAssertGreaterThan(pending.cancelledReplies, priorCancelledReplies)
         XCTAssertEqual(fieldBeforeReply.accessibilityValue() as? String, beforeReply)

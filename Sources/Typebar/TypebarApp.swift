@@ -4526,8 +4526,14 @@ private struct ContentView: View {
           liveContentTask = nil
           liveContentStreamingActive = false
           isLoadingLiveContent = false
-          liveContentMessage = "无法续取\(source.displayName)，本轮已停止；请重启或关闭在线内容。"
           session.failLiveContentFetch()
+          // A source failure ends the old attempt before changing its locked
+          // configuration. Keep every unrelated modifier on the new attempt.
+          synchronizeNoQuitConfigurationLock()
+          let failedModifier: TestModifier = source == .poetry ? .poetryStream : .referenceStream
+          settings.testModifiers.removeAll { $0 == failedModifier }
+          reset(restarting: true)
+          liveContentMessage = "无法续取\(source.displayName)，已关闭该内容来源并重新开始离线练习。"
           return
         }
         liveContentMessage = "已续接\(content.attribution)。"
