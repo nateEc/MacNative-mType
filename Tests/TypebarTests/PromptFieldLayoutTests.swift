@@ -703,6 +703,35 @@ import XCTest
     view.stop()
   }
 
+  func testFirstAcceptedCharacterCacheMatchesFreshLayoutAtBothPromptScales() throws {
+    for count in [1, 30] {
+      let prompt = Array(repeating: "quiet harbor morning", count: count).joined(separator: " ")
+      for accepted in ["q", "x"] {
+        var session = TypingSession(configuration: .words(count * 3), prompt: prompt)
+        let initial = try render(session)
+        let view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 400, height: 180))
+        view.configure(rendering: initial, font: font, carets: config(.init()))
+        session.insertBatch(accepted, at: start)
+        let changed = try render(session)
+        let map = try XCTUnwrap(changed.compositionTextMap)
+        let began = ProcessInfo.processInfo.systemUptime
+        view.configure(rendering: changed, font: font, carets: config(.init()))
+        let elapsed = ProcessInfo.processInfo.systemUptime - began
+        let fresh = PromptFieldTextLayout(map: map, width: 400, font: font)
+        XCTAssertEqual(view.measure(width: 400), fresh.size)
+        XCTAssertEqual(map.cellTexts.count, prompt.count)
+        for (id, rect) in fresh.cellFrames {
+          XCTAssertEqual(view.measuredRect(for: id), rect)
+        }
+        let revision = view.geometryRevision
+        XCTAssertEqual(view.measure(width: 400), fresh.size)
+        XCTAssertEqual(view.geometryRevision, revision)
+        print("field first accepted character: words=\(count * 3) input=\(accepted) configure=\(elapsed)s (native configure only; not production first-key latency)")
+        view.stop()
+      }
+    }
+  }
+
   func testReuseRepositionsRetainedFieldsWithoutMutatingThePreviousSnapshot() throws {
     var session = TypingSession(configuration: .words(3), prompt: "ab cd ef")
     session.insertBatch("ab cd ", at: start)
