@@ -35,8 +35,8 @@ enum LivePracticeContentSource: Equatable {
 
 struct LivePracticePrompt: Equatable {
   let text: String
-  /// Original system-tokenizer boundaries for a visible prompt that contains
-  /// no separators, such as Chinese encyclopedia text.
+  /// Explicit source boundaries for a provider that supplies unseparated text.
+  /// Live MediaWiki introductions retain their ASCII-space source fields.
   let noSpaceBoundarySource: String?
 }
 
@@ -302,39 +302,14 @@ enum LivePracticeContentService {
       default: spaced.unicodeScalars.append(scalar)
       }
     }
-    let words = language.usesNoSpaceLiveText
-      ? introductionTokensWithoutSpaces(spaced)
-      : spaced.split(separator: " ").map(String.init)
+    let words = spaced.unicodeScalars.split(whereSeparator: { $0.value == 0x20 })
+      .map { String(String.UnicodeScalarView($0)) }
     guard !words.isEmpty else { return nil }
     let title = identity.title.trimmingCharacters(in: .whitespacesAndNewlines)
     let author = identity.author?.trimmingCharacters(in: .whitespacesAndNewlines)
     return .init(source: .encyclopedia,
       title: title.isEmpty ? LivePracticeContentSource.encyclopedia.displayName : title,
-      byline: author?.isEmpty == false ? author : nil, tokens: words,
-      separator: language.usesNoSpaceLiveText ? "" : " ")
-  }
-
-  private static func introductionTokensWithoutSpaces(_ normalized: String) -> [String] {
-    let text = normalized.replacingOccurrences(of: " ", with: "")
-    guard !text.isEmpty else { return [] }
-    let tokenizer = NLTokenizer(unit: .word)
-    tokenizer.string = text
-    var words: [String] = []
-    var previousEnd = text.startIndex
-    tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
-      let gap = String(text[previousEnd..<range.lowerBound])
-      if words.isEmpty {
-        words.append(gap + text[range])
-      } else {
-        words[words.count - 1].append(gap)
-        words.append(String(text[range]))
-      }
-      previousEnd = range.upperBound
-      return true
-    }
-    guard !words.isEmpty else { return [text] }
-    words[words.count - 1].append(contentsOf: text[previousEnd...])
-    return words
+      byline: author?.isEmpty == false ? author : nil, tokens: words, separator: " ")
   }
 
   private static func data(from url: URL, session: URLSession) async -> Data? {

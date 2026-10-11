@@ -610,12 +610,11 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
       XCTAssertEqual(content.text, expected)
       let preview = content.promptDescriptor(for: .init(mode: .custom, duration: nil,
         wordLimit: nil, difficulty: .normal, rules: .init(), language: .simplifiedChinese))
-      let boundaries = try XCTUnwrap(preview.noSpaceBoundarySource)
-      XCTAssertEqual(boundaries.replacingOccurrences(of: " ", with: ""), expected)
-      let configuration = TestConfiguration.words(boundaries.split(separator: " ").count,
+      XCTAssertNil(preview.noSpaceBoundarySource)
+      let configuration = TestConfiguration.words(1,
         language: .simplifiedChinese).with(modifiers: [.referenceStream])
       var practice = TestSessionFactory.make(configuration: configuration,
-        streamPrompt: content.text, streamNoSpaceBoundarySource: boundaries, showAllLines: true)
+        streamPrompt: content.text, streamsLiveContent: true, showAllLines: true)
       XCTAssertEqual(practice.prompt, expected)
       let now = Date(timeIntervalSince1970: 1_700_000_000)
       practice.insertBatch(expected, at: now)
@@ -625,6 +624,43 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
       let result = try XCTUnwrap(practice.result(at: now))
       XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
         through: result.elapsedDuration), expected)
+    }
+  }
+
+  func testChineseIntroductionsPreserveASCIISourceFieldsInsteadOfSystemTokens() async throws {
+    for language in [TypingLanguage.simplifiedChinese, .traditionalChinese, .jyutping] {
+      try await withSession { session in
+        let expected = "「海港」有12艘船，天气好。 第二段有34艘。"
+        let response = try JSONSerialization.data(withJSONObject: [
+          "query": ["pages": ["724": ["extract": "<p>「海港」有12艘船，天气好。</p><p>第二段有34艘。</p>"]]]
+        ])
+        IntroductionProtocol.fixture.set([
+          (200, #"{"pageid":724,"title":"原创海港"}"#),
+          (200, String(decoding: response, as: UTF8.self))
+        ])
+        let fetched = await LivePracticeContentService.fetch(source: .encyclopedia,
+          language: language, session: session)
+        let content = try XCTUnwrap(fetched)
+        XCTAssertEqual(content.text, expected)
+        let configuration = TestConfiguration.words(2, language: language).with(modifiers: [.referenceStream])
+        let descriptor = content.promptDescriptor(for: configuration, showAllLines: true)
+        XCTAssertEqual(descriptor.text, expected)
+        XCTAssertNil(descriptor.noSpaceBoundarySource)
+        var practice = TestSessionFactory.make(configuration: configuration,
+          streamPrompt: descriptor.text, streamsLiveContent: true, showAllLines: true)
+        XCTAssertEqual(practice.prompt, expected)
+        let began = Date(timeIntervalSince1970: 1_700_000_000)
+        practice.insertBatch(String(expected.dropLast()), at: began)
+        XCTAssertFalse(practice.isFinished)
+        practice.insertBatch(String(expected.suffix(1)), at: began.addingTimeInterval(2))
+        XCTAssertEqual(practice.outcome, .completed)
+        XCTAssertEqual(practice.completedWordCount, 2)
+        XCTAssertEqual(practice.errors, 0)
+        let result = try XCTUnwrap(practice.result())
+        XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+          through: result.elapsedDuration), expected)
+        XCTAssertEqual(practice.repeatedAttempt().prompt, expected)
+      }
     }
   }
 
