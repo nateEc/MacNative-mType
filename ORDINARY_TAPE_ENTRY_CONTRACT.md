@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## TST-02：输入法候选正文读取修正（2026-10-11）
+
+原生输入视图已有当前 attributed 候选存储，但 attributedSubstring 始终返回 nil。按 Apple 的 [候选子串读取契约](https://developer.apple.com/documentation/appkit/nstextinputclient/attributedsubstring(forproposedrange:actualrange:))，对范围越界请求返回与现有存储的交集，完全越界返回 nil，并可调整字素边界。修正只开放当前候选，不提供练习历史／目标正文；以减法限制请求长度避免溢出，非空请求扩展到 NSString 完整组合字符范围并回报 actualRange，保留 attributed 属性。空候选／无效位置仍返回 nil，存储内部零长度请求返回空子串，不改变选区或确认候选。
+
+`work/composition-substring-red.log` 两项五处失败：已有候选的 emoji 半代理项、超大范围及内部空范围读取仍为 nil。修正后 `work/composition-substring-green.log` 65 项零失败零跳过（10.740s，墙钟 10.747），覆盖 emoji／组合重音扩展、属性保留、可空 actualRange 指针、NSNotFound／完全越界、Int.max 长度、取消后不可读取，以及选区、Return、结束、热键、Unicode 和特殊生产宿主回归。
+
+风险审查未发现新的可落实问题：读取不改变候选生命周期，无网络／持久化／异步新增。固定参考原创边界检查通过，仅代表脚本定义范围。主程序零启动；未执行新完整冻结门禁、Release 或真实物理 IME 验收，不能把平台接口测试当作完整输入法兼容证明。整体 goal active，首键性能与其他功能缺口仍待完成。
+
 ## TST-02：特殊生产宿主的 Unicode 选区保留（2026-10-11）
 
 将上轮原生选区修正的证据从孤立输入视图延伸到实际 ASL／Choo 生产宿主：三种组合显示模式都加入自有候选“😀é候”（三字素、五 UTF-16 单元），原输入 owner 和特殊渲染 owner 必须保留；候选 marked range 为五单元，中间组合字符选区为 {2, 2}，经过 SwiftUI 布局交付后仍相同。继续检查实际 ASL 槽位、Choo 完整显示正文／层墨迹、below 行及取消后的原始布局恢复。既有四十字候选的模式切换也增加选区未变断言，取消后检查零选区。此为既有修正的生产集成覆盖，不制造新的产品红测，也不改产品实现。
