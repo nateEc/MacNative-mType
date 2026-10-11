@@ -94,16 +94,28 @@ final class CompositionCompletionTests: XCTestCase {
     XCTAssertEqual(session.outcome, .active)
   }
 
-  func testFinalWordOfIncrementalStreamUsesTheConfiguredLimitNotTheChunkEdge() {
+  func testFinalWordOfIncrementalStreamUsesTheConfiguredLimitNotTheChunkEdge() throws {
     var session = TypingSession(
       configuration: .words(3), prompt: "amber pine", repeatingPrompt: "amber pine")
+    XCTAssertTrue(session.usesIncrementalPromptExtension)
     session.insert("amber ", at: start)
     XCTAssertFalse(session.shouldFinishWithComposition("pine", at: start.addingTimeInterval(1)))
     session.insert("pine ", at: start.addingTimeInterval(1))
-    XCTAssertTrue(session.usesIncrementalPromptExtension)
+    // Once all three targets are loaded, no fourth word may be appended.
+    XCTAssertFalse(session.usesIncrementalPromptExtension)
+    XCTAssertEqual(session.prompt, "amber pine amber")
     XCTAssertTrue(session.shouldFinishWithComposition("amber", at: start.addingTimeInterval(2)))
     XCTAssertEqual(session.completedWordCount, 2)
     XCTAssertEqual(session.outcome, .active)
+    session.insertBatch("amber", at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 3)
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertEqual(session.typed, "amber pine amber")
+    let result = try XCTUnwrap(session.result(at: start.addingTimeInterval(2)))
+    XCTAssertEqual(
+      TypingReplay.typedText(events: result.replayEvents, through: result.elapsedDuration),
+      session.typed)
   }
 
   func testFinalCodeWordCanFinishWhenTheGeneratedCursorStillExists() {
