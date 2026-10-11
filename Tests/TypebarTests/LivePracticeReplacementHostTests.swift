@@ -5,6 +5,11 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class LivePracticeReplacementHostTests: XCTestCase {
+  private final class ExistingWindow: NSWindow {
+    var closeCount = 0
+    override func close() { closeCount += 1; super.close() }
+  }
+
   @MainActor private final class PendingContent {
     var continuations: [CheckedContinuation<LivePracticeContent?, Never>] = []
     var source: LivePracticeContentSource?
@@ -98,6 +103,25 @@ import XCTest
       emptyPrefetch: true, exhaustsBeforeEmpty: true)
   }
 
+  func testFailedGenerationPresentationKeepsAValidStoreWhileAnUnrelatedStoreSaves() throws {
+    let existing = ExistingWindow(contentRect: .init(x: 0, y: 0, width: 200, height: 100),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    existing.isReleasedWhenClosed = false
+    let existingContent = NSView()
+    existing.contentView = existingContent
+    defer { existing.contentView = nil; existing.close() }
+    try checkDelayedReplacement(prefetches: true, locksNoQuit: true,
+      emptyPrefetch: true, exhaustsBeforeEmpty: true)
+    XCTAssertEqual(existing.closeCount, 0, "Fixture retirement must not close a pre-existing window")
+    XCTAssertTrue(existing.contentView === existingContent)
+    let writer = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
+      SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    defer { withExtendedLifetime(writer) {} }
+    try LocalPersonalBestStore.initialize(in: writer.mainContext)
+    XCTAssertEqual(try writer.mainContext.fetchCount(FetchDescriptor<LocalPersonalBestLedgerRecord>()), 1)
+  }
+
   private func checkDelayedReplacement(startsBeforeReturn: Bool = false,
     disablesPace: Bool = false, composesBeforeReturn: Bool = false, prefetches: Bool = false,
     cancelsPrefetch: Bool = false, failsPrefetch: Bool = false, locksNoQuit: Bool = false,
@@ -123,6 +147,7 @@ import XCTest
     let container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
       SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let priorWindowIDs = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
     let pending = PendingContent()
     let authoredTokens = (0..<300).map { "owned\($0)" }
     if prefetches { pending.scriptedTokens = Array(authoredTokens.prefix(151)) }
@@ -137,17 +162,19 @@ import XCTest
     window.isReleasedWhenClosed = false
     window.contentView = host
     defer {
-      pending.finish()
-      // Release query/observation nodes before their in-memory container.
-      host.rootView = AnyView(EmptyView())
-      host.layoutSubtreeIfNeeded()
-      XCTAssertTrue(views(TypingInputView.self, in: host).isEmpty,
-        "Replacing the hosted root must remove the old practice input before releasing its store")
-      XCTAssertTrue(views(PromptFieldNativeView.self, in: host).isEmpty,
-        "Replacing the hosted root must remove the old prompt before releasing its store")
-      window.contentView = nil
-      window.close()
-      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      withExtendedLifetime(container) {
+        pending.finish()
+        // Release query/observation nodes before their in-memory container.
+        host.rootView = AnyView(EmptyView())
+        host.layoutSubtreeIfNeeded()
+        XCTAssertTrue(views(TypingInputView.self, in: host).isEmpty,
+          "Replacing the hosted root must remove the old practice input before releasing its store")
+        XCTAssertTrue(views(PromptFieldNativeView.self, in: host).isEmpty,
+          "Replacing the hosted root must remove the old prompt before releasing its store")
+        window.contentView = nil
+        window.close()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      }
     }
     func flush() {
       host.layoutSubtreeIfNeeded()
@@ -312,6 +339,9 @@ import XCTest
           XCTAssertTrue((fieldBeforeReply.accessibilityValue() as? String)?.contains("owned150") == true,
             "Failure retains the authored targets rather than starting an offline attempt")
           XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+          XCTAssertTrue(NSApplication.shared.windows.contains {
+            $0 !== window && !priorWindowIDs.contains(ObjectIdentifier($0)) && $0.contentView != nil
+          }, "The failed attempt must really create result presentation content before retirement")
           XCTAssertFalse(window.isVisible)
           return
         }

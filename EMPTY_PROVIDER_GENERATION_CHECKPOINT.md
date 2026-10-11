@@ -1,5 +1,21 @@
 # 在线空内容生成检查点（未验收）
 
+## 结果呈现的数据容器所有权修复（2026-10-12）
+
+下述旧崩溃记录保留为历史证据。本轮最小复现及扩大序列已通过，完整门禁仍须重新执行，不能据此宣布发布就绪或功能等价。
+
+临时指针追踪将崩溃接收者定位到 `testEmptySectionAtExhaustedTargetsFailsWithoutDisablingSource` 的旧 ModelContext，而非随后写入的 PB 上下文（`provider-storage-context-identity-probe.log`）。本机已安装框架的离线反汇编及公开 getter 分派入口、ModelContext 虚表对应关系确认触发点为 `ModelContext.container`：强容器槽为空，弱容器加载也为空时触发断点。未把最近导出符号猜测作为该结论依据；诊断工具和地址不进入产品。
+
+窗口边界诊断发现失败结果生成了不可见的 `SheetPresentationWindow`，但它尚未出现在根窗口的 attachedSheet/sheets/childWindows 中；替换根内容及关闭根窗口后呈现内容仍存在。因此不能仅根据旧原生输入已拆除，就认定查询页面的所有呈现所有者都已退出。单个失败结果宿主接独立 PB 保存即可 signal 5（`provider-storage-exhausted-result-minimal-red.log`）；新增持久回归在原实现也发生同样崩溃（`provider-result-presentation-retirement-red.log`）。
+
+撤回的无效尝试：仅关闭本次新建的结果窗口、清空其 contentView 并保持容器到 teardown 结束，仍崩溃（`provider-result-presentation-retirement-green.log`，文件名不代表通过）；父页面 onDisappear 清空 completedResult 仍崩溃（`provider-result-binding-disappearance-check.log`）。NotificationCenter.debugDescription 的能力检查连自有注册观察器也不枚举，因此空输出不能证明没有观察器。没有保留这些诊断、窗口扫描清理或猜测性产品改动。
+
+实际修复在结果 sheet 内容上显式应用父页面的 ModelContainer，使呈现内容存活期间持有对应容器；不隐藏失败结果，不使用全局容器缓存，不改变成绩保存或 NoQuit 行为。回归断言失败结果确实创建了新的呈现内容，随后退役练习宿主并向另一份存储实际保存；另设已有窗口哨兵，验证宿主清理没有关闭或替换无关窗口。teardown 显式保留本次容器直到根内容拆除结束。
+
+验证：`provider-result-explicit-container-check.log` 最小 3 项通过，15.427 秒（总墙钟 15.429 秒）。最终命名和注释后的 `provider-result-container-ownership-regression.log` 共 42 项、0 失败、无跳过，92.202 秒（总墙钟 92.208 秒）：18 项在线宿主、19 项 PB 台账、1 项输入拆除、4 项结果终止策略。日志中的三个只读存储保存错误来自实际只读失败路径测试，相关断言通过，不据此推广任何其他错误可忽略。原创边界通过（`provider-result-container-originality.log`）；已安装 Swift 6.2.4 的 SwiftData / _SwiftData_SwiftUI 接口确认公开 container getter 和 modelContainer modifier 签名。
+
+只使用不可见 XCTest 宿主，Typebar 主程序零实例。以上证明当前失败序列不再因容器失效崩溃，**没有证明呈现内容会及时释放、没有内存残留，或全部 macOS 版本生命周期正确**；这些仍需单独验证。原生在线生成调度及下述功能差异仍开放，目标保持进行中。
+
 ## 后续定位与已验证的原生输入拆除修复
 
 **完整门禁的存储崩溃仍未解决。** 本节输入生命周期修复不能替代门禁修复或证明功能等价。最终源码重跑 `provider-native-input-final-host-sequence.log`：输入拆除测试通过，17 项在线宿主断言全部通过（85.487 秒，总墙钟 85.489 秒），随后 PB 保存仍收到 signal 5。没有跳过保存测试、增加等待来掩盖问题或改变其预期。

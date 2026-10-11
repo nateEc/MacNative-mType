@@ -2059,6 +2059,9 @@ private struct ContentView: View {
     }
     .sheet(item: $completedResult) { result in
       completedResultSheet(result)
+        // A presentation can outlive the practice root and its environment.
+        // Keep its queried context's container alive for that entire lifetime.
+        .modelContainer(modelContext.container)
         .background(ResultSheetTerminationBridge()
           .frame(width: 0, height: 0).accessibilityHidden(true))
     }
