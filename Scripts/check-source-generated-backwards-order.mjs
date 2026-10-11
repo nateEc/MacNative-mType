@@ -447,3 +447,30 @@ await assert.rejects(main.namespace.getNextWord(105,100,missingHistory.word,save
 assert.equal(sectionCalls,1,'Missing history at the finite limit must not fetch');
 ownedRepeated=false;
 console.log('Pinned side-publication/repeat composition passed: direct side fields bypass saved generator history, consumed old tail replays, missing in-budget history fetches, out-of-budget history rejects. Owned provider/cursor; no real navigation, HTTP or native-equivalence claim.');
+
+for (const fixture of [
+  {name:'side section bypasses backwards alteration', modifiers:['poetry','backwards'],
+    section:['fresh','later'], expected:['fresh','later','0deniater']},
+  {name:'side section caps its own size rather than remaining global budget', modifiers:['poetry'],
+    section:Array.from({length:10},(_,i)=>`side${i}`),
+    expected:[...Array.from({length:10},(_,i)=>`side${i}`),'retained0']},
+]) {
+  config.mode='words';config.words=105;config.language='english';config.showAllLines=false;
+  activeNames=fixture.modifiers;ownedRepeated=false;ownedSectionError=undefined;
+  ownedSection={words:['setup']};ownedSectionQueue=[];
+  await main.namespace.generateWords({name:'english',words:['owned']});
+  testWords.words.reset();
+  for(let i=0;i<100;i++)testWords.words.push(`owned${i} `,0);
+  main.namespace.currentSection.splice(0,main.namespace.currentSection.length,
+    ...Array.from({length:5},(_,i)=>`retained${i}`));
+  ownedActiveWordIndex=81;ownedSection={words:fixture.section};sectionCalls=0;
+  failures.length=0;notices.length=0;displayed.length=0;toggledSources.length=0;
+  await addWord();
+  assert.equal(sectionCalls,1);
+  assert.deepEqual(testWords.words.get().slice(100).map(word=>word.text),fixture.expected,fixture.name);
+  assert.equal(testWords.words.length,100+fixture.expected.length);
+  assert.deepEqual(Array.from(main.namespace.currentSection),['retained1','retained2','retained3','retained4']);
+  assert.deepEqual(failures,[]);assert.deepEqual(toggledSources,[]);
+  console.log(`PASS side publication contract: ${fixture.name}`);
+}
+console.log('2 side-publication contracts passed with complete actual caller and generator: raw side words versus altered generator tail, and finite published oversupply. Authored cursor/provider, no input-completion or navigation reachability claim.');
