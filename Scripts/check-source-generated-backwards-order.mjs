@@ -552,3 +552,14 @@ for(const stopOnError of ['off','word','letter']) {
     difficulty==='normal'&&!strictSpace?true:undefined);
 }
 console.log('18 pinned blank-final-LF rule combinations finish correctly; strict/difficulty suppress navigation, not correct final-word completion. Owned navigation/DOM; no browser end-to-end claim.');
+
+for(const quickEnd of [false,true])for(const stopOnError of ['off','word','letter']) {
+  Object.assign(config,{difficulty:'normal',strictSpace:false,quickEnd,stopOnError});
+  ownedInput='';ownedCurrentInput='';ownedFinished=0;ownedInputEvents.length=0;
+  await insertModule.namespace.emulateInsertText({data:'x',now:1000});
+  assert.equal(ownedFinished,quickEnd&&stopOnError==='off'?1:0);
+  assert.equal(ownedInputEvents.length,1);
+  assert.equal(ownedInputEvents[0].correct,false);
+  assert.equal(ownedInputEvents[0].inputStopped,stopOnError==='letter'?true:undefined);
+}
+console.log('6 pinned blank-final-LF wrong-letter quickEnd/stop rules passed: only unrestricted quickEnd finishes. Actual handlers/helpers, owned DOM/navigation.');

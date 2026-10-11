@@ -6073,6 +6073,8 @@ struct TypingSession {
       if unitTargets.noSpace { return committed + (outcome == .completed && noSpaceTerminalFieldMatches ? 1 : 0) }
       if outcome == .completed, isAtFinalBlankTarget,
         retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
+          || configuration.mode == .words && configuration.rules.quickEnd
+            && inputWordText().utf16.count == 1
       { return committed + 1 }
       if outcome == .completed, configuration.mode == .custom,
         configuration.customTextCompletion == .words, !acceptedUnits.lastCommits
@@ -6100,6 +6102,8 @@ struct TypingSession {
       ? cachedCommittedWordCount : scannedCommittedWordCount
     if outcome == .completed, isAtFinalBlankTarget,
       retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
+        || configuration.mode == .words && configuration.rules.quickEnd
+          && inputWordText().utf16.count == 1
     {
       // Finishing a matching final blank is independent of navigation: its
       // retained LF completes one word without becoming a submitted separator.
@@ -8862,8 +8866,12 @@ struct TypingSession {
     // Strict-space/difficulty can retain a correct LF in the final blank
     // field without navigation. Correctness still completes that word.
     if sourceFields?.count == wordLimit, isAtFinalBlankTarget,
-      !usesIncrementalPromptExtension, inputWordText() == "\n",
-      lastInputWasCorrect == true { return true }
+      !usesIncrementalPromptExtension {
+      let input = inputWordText()
+      if input == "\n", lastInputWasCorrect == true { return true }
+      if configuration.rules.quickEnd, !configuration.rules.stopOnError,
+        !configuration.rules.deleteOnError, input.utf16.count == 1 { return true }
+    }
     if let acceptedUnits {
       // Explicit provider fields own their word boundaries, including a
       // newline-only word. Inferred whitespace is not an additional word.

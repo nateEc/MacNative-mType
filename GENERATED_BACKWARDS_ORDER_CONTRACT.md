@@ -1,5 +1,11 @@
 # 生成型词流反写顺序
 
+## 2026-10-12 空白末词错误字母与 quickEnd
+
+固定源码完整前置过滤与输入处理器执行 quickEnd 两值 × stopOnError 三值共六组：错误字母 `x` 仅在 quickEnd=true 且 stop=off 时完成；letter-stop 事件标记 inputStopped，其他不擅自结束（work/blank-lf-quick-source.log）。普通难度、非 strict、deleteOnError=off，DOM／事件／导航为自有适配器，不泛化到其他设置。
+
+原生先行复现该组无法完成（work/blank-lf-quick-red.log），补上最终显式空白字段长度判断；随后结果断言复现完成词数 1 而非 2（work/blank-lf-quick-focused.log），修正 words 模式已完成末词的 quickEnd 计数。保留错误字母，不伪造正确输入。最终相关七组 115 项零失败（23.100 秒，墙钟 23.112 秒），覆盖六组状态、letter-stop 输入保留、完成计数和逐字回放；日志 work/blank-lf-quick-regression.log。deleteOnError、不同错误序列及难度／strict 混合、重复 quickEnd、真实 GUI／IME 与完整门禁仍开放，goal active。
+
 ## 2026-10-12 空白 LF 末词规则组合
 
 固定源码完整前置过滤／输入处理器执行 3 难度 × 2 strictSpace × 3 stopOnError 共 18 组：正确最终 LF 均触发 finish；strictSpace=true 或非普通难度的事件不 commitsWord，仍依当前词正确完成。DOM／输入／事件／导航为自有适配器，未执行真实浏览器导航。源码日志 work/blank-lf-rules-source.log。

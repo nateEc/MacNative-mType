@@ -233,6 +233,34 @@ final class LiveGeneratorDemandTests: XCTestCase {
     XCTAssertTrue(practice.needsLiveContentGeneration)
   }
 
+  func testWrongFinalBlankFieldOnlyQuickEndsWithoutStopRules() throws {
+    for quickEnd in [false, true] {
+      for stop in [StopOnErrorMode.off, .word, .letter] {
+        var rules = InputRules()
+        rules.quickEnd = quickEnd
+        rules.stopOnErrorMode = stop
+        let configuration = TestConfiguration(mode: .words, duration: nil, wordLimit: 2,
+          difficulty: .normal, rules: rules, modifiers: [.poetryStream])
+        var practice = TypingSession(configuration: configuration,
+          prompt: "owned ", sourceFields: ["owned "],
+          externalPromptContinuation: .init(text: "\n", sourceFields: ["\n"]),
+          streamsLiveContent: true)
+        practice.insertBatch("owned ", at: began)
+        XCTAssertFalse(practice.isFinished)
+        practice.insertBatch("x", at: began.addingTimeInterval(1))
+        XCTAssertEqual(practice.isFinished, quickEnd && stop == .off,
+          "quickEnd=\(quickEnd), stop=\(stop)")
+        XCTAssertEqual(practice.typed, stop == .letter ? "owned " : "owned x")
+        if quickEnd && stop == .off {
+          XCTAssertEqual(practice.completedWordCount, 2)
+          let result = try XCTUnwrap(practice.result())
+          XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+            through: result.elapsedDuration), "owned x")
+        }
+      }
+    }
+  }
+
   func testGeneratedSectionPublishesOneFieldAndRetainsItsTailForLaterProgress() throws {
     var practice = session()
     let opening = practice.prompt

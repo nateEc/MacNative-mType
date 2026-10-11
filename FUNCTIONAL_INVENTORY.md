@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 TST-02 空白末词错误字母／quickEnd：固定源码六组验证，仅不受 stop 约束的 quickEnd 完成；原生先行失败后修正末词长度判断与完成计数。七组 115 项回归通过，错误输入逐字回放保留。deleteOnError、重复 quickEnd 及错误序列混合未验收；详见 GENERATED_BACKWARDS_ORDER_CONTRACT.md，完整 goal active。
+
 2026-10-12 TST-02 空白 LF 正确输入规则组合：固定源码 18 组确认 strict-space／难度可抑制导航但不阻止正确最终词完成；原生先行失败后修正非导航末词判断。七组 114 项回归通过，18 组计数与逐字回放验证；错误输入、deleteOnError／quickEnd 及真实导航仍待验收，不泛化成全部输入规则覆盖。详见 GENERATED_BACKWARDS_ORDER_CONTRACT.md。
 
 2026-10-12 TST-02 普通空白 LF 末词完成：固定源码完整前置过滤与输入处理器确认接受且完成；原生先行失败后修正显式字段完成计数，同时保留实际输入要求避免提前完成。最终 113 项零失败，含结果回放及重复；普通设置边界关闭，strict-space／难度组合与真实导航仍开放，不提升为整个 LF 功能完成。下文为历史证据，详见 GENERATED_BACKWARDS_ORDER_CONTRACT.md。
