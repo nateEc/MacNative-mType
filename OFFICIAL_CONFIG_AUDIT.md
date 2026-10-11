@@ -1,5 +1,7 @@
 # 官方配置兼容性审计
 
+2026-10-11 当前矩阵校正：`compositionDisplay` 行以现有生产源码为准，不再沿用“仅单字形替换／全部未接线”的早期结论。`ContentView.renderedPrompt(for:composition:)` 通过 `PromptFieldProjectionPolicy.supports` 选择统一组合投影，并把同一 rendering 传入普通字段、Tape、ASL 和 Choo 适配器；未支持的混排连写配置仍保留回退。既有冻结门禁包含 39 项生产组合宿主，但不是每种适配器／修饰器／导航组合或物理 IME 的验收。本次只修正文档，部分分类及 94 键 89／4／1 保持，完整 goal 仍 active。
+
 2026-10-11 TST-02 字体家族增量完整冻结验证：冻结 `4e3a298eb273210a66edeaed62807aa7228fcb55` 的单轮完整 readiness 门禁及终态哈希检查均退出零（`gate_exit=0 hash_exit=0`），852 跟踪文件全部一致，项目与固定参考工作区干净。证据保留于 `work/frozen-readiness-font-family.KPvXX2` 的 `gate.log`、`freeze-verification.log` 和 `logs/` 内 74 份阶段日志。参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`，不是最新上游兼容声明。
 
 客户端 4,270 项零失败零跳过（1864.967s，墙钟 1865.467），含全部 39 项生产组合宿主（946.605s，墙钟 946.611）、字体别名实际候选切换及十万词耐久（156.390s）；服务端 501 项零失败零跳过（11.102s，墙钟 11.161）。Release 构建 410.29s，未打开应用包的签名／资源及固定参考原创性边界通过。两次短时采样仅确认缓冲日志期间执行到 Hindi 1k／Sinhala 宿主，不是性能验收；终态相关测试／编译进程已退出，Typebar 主程序实例为零，整轮没有启动主程序。
@@ -16,7 +18,7 @@
 
 2026-10-10 生产组合入口核验：当前 ContentView 已调用 PromptCompositionPresentation，普通活动词不再仅把整串候选放进一个字形；下方“统一模型尚待接入所有呈现”描述的是早期阶段，不代表当前完全未接线。新增完整生产练习页宿主回归，覆盖 off／below／replace 的原生提示可访问内容、候选更新、取消后重组内容一致和输入 owner 保留；相关 21 项零失败零跳过（40.025s，墙钟 40.029）。该证据使用不可见窗口与 NSTextInputClient 直接调用，不是系统 IME、below 候选位置视觉、混合 RTL 或全部呈现组合验收。compositionDisplay 仍部分，89／4／1 分类不变。
 
-当前组合显示源码核对见 [投影合同](COMPOSITION_PROJECTION_CONTRACT.md)：原版完整更新／caret 函数的 132 组常规与 36 组 Unicode 案例证明，组合占据活动词内多个目标并保留溢出／独立光标。现有生产仍是一个字形内替换整串候选，统一原生模型尚待接入所有呈现分支；`compositionDisplay` 从已映射更正为部分。94 配置现在为 89 映射／4 部分／1 不适用，不表示功能完成；下方为历史阶段。
+早期组合显示源码核对见 [投影合同](COMPOSITION_PROJECTION_CONTRACT.md)：原版完整更新／caret 函数的 132 组常规与 36 组 Unicode 案例证明，组合占据活动词内多个目标并保留溢出／独立光标。当时生产仍是一个字形内替换整串候选，统一原生模型尚待接入所有呈现分支；`compositionDisplay` 从已映射更正为部分。此段保留历史原因，不代表当前生产接线状态。94 配置为 89 映射／4 部分／1 不适用，不表示功能完成；下方为历史阶段。
 
 2026-10-09 Tape 独立词可见性增量：会话用尝试内独立集合记录缺口，普通回删／hard 自动恢复检查上一词是否仍存在；共享投影去掉词墨迹、extra／hint 和 canonical ID，同时保留无 ID 的结构换行。原生工厂、异步确认去重、字体重建与实际 SwiftUI 桥接已有十项新回归及相关 318 项零失败零跳过（52.255 秒）。固定完整删除函数的 32／8 案例复用既有探针，不冒充新源码案例。生产明确换行仍回退，未来缺失词激活策略、复杂内容／纵横队列与设备未完成；tapeMode 部分及 90／3／1 不升级。最终冻结结果见合同，下方为历史阶段。
 
@@ -753,7 +755,7 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `confidenceMode` | `confidenceMode` | 已映射；off／on／max 活动同步，开启关闭自由回退、停止输入和自动删除，不恢复旧规则。 |
 | `quickEnd` | `quickEnd` | 已映射；活动同步不直接结束。普通有限路径与代码词流共用最终词 UTF-16 长度及词输入上限，保留最终词／全部生成、错误恢复限制和候选不误确认的边界。`QuickEndUnicodeTests` 与 `CodeWordContractTests` 覆盖；无空格专用完成及完整 Unicode 恢复仍待单独补证。 |
 | `indicateTypos` | `typoIndicatorStyle` | 已映射。 |
-| `compositionDisplay` | `compositionDisplayStyle` | 部分；off／below／replace 选择可保存，但生产仍只替换当前单个字形，未按完整候选跨度消耗目标或移动主光标；Zen、超词候选及普通／Tape／ASL／Choo 统一投影尚未接线。独立原生组合模型与完整固定源码更新／caret 对照已建立，不将模型测试当作生产实现或真实 IME 验收；UTF-16／scalar 与原生 grapheme 的差异明确保留。 |
+| `compositionDisplay` | `compositionDisplayStyle` | 部分；off／below／replace 选择可保存。生产 `renderedPrompt` 已按 `PromptFieldProjectionPolicy` 接入统一候选跨度与独立光标投影，同一 rendering 传入普通字段、Tape、ASL／Choo 适配器；Zen 与超词候选有独立模型覆盖，不等同全部生产组合验收。普通生产宿主已有模式切换、候选更新／取消、below 位置、字体切换与限定混排连写的不可见窗口回归；未支持的混排连写仍回退。全部呈现／修饰器／导航交互、物理 IME、可见窗口排版及跨平台 Unicode 差异仍待验收，不以模型或宿主绿灯宣称完整等价。 |
 | `hideExtraLetters` | `hideExtraLetters` | 已映射。 |
 | `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 已映射；设置页以独立“简化输入”开关呈现并持久保存，不再混入趣味修饰器列表。它用现有 Unicode 归一化简化重音、变音、常见连字和可省略的阿拉伯语标记；遇到固定参考标记 `noLazyMode` 的非自定义语言时只在当前练习临时过滤，切回支持语言会恢复用户选择，自定义文本保持可用。多语练习在至少一个组成语言支持时启用；Arabic 另保留默认开启、可持久化关闭的快捷偏好。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
