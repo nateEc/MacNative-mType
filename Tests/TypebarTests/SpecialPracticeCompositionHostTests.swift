@@ -112,6 +112,41 @@ import XCTest
           "Cancellation must restore every original ASL target allocation")
       }
     }
+    input.setMarkedText(longCandidate, selectedRange: .init(location: longCandidate.utf16.count, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    flush()
+    for style in [CompositionDisplayStyle.replace, .off, .below, .replace] {
+      settings.compositionDisplayStyle = style
+      flush()
+      XCTAssertTrue(input.hasMarkedText(), "Changing ASL display style must not consume the candidate")
+      XCTAssertEqual(input.markedRange().length, longCandidate.utf16.count)
+      XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
+      XCTAssertTrue(descendants(host, ASLPromptCaretContainer.self).first === owner)
+      let projection = try XCTUnwrap(session.promptCompositionProjection(composition: longCandidate, style: style))
+      for cell in projection.cells {
+        let rect = try XCTUnwrap(owner.measuredRect(for: cell.id))
+        XCTAssertTrue(rect.origin.x.isFinite && rect.origin.y.isFinite)
+        XCTAssertGreaterThan(rect.height, 0)
+      }
+      if style == .replace {
+        XCTAssertEqual(projection.markedCells.count, longCandidate.count)
+        let rows = try Set(projection.markedCells.map {
+          try XCTUnwrap(owner.measuredRect(for: $0.id)).minY
+        })
+        XCTAssertGreaterThan(rows.count, 1)
+      }
+      let rows = descendants(host, NSTextField.self).filter {
+        $0.accessibilityLabel()?.hasPrefix("正在组合：") == true
+      }
+      XCTAssertEqual(rows.count, style == .below ? 1 : 0)
+      if style == .below { XCTAssertEqual(rows.first?.stringValue, longCandidate) }
+      XCTAssertFalse(window.isVisible)
+      XCTAssertEqual(host.frame, frame)
+    }
+    input.unmarkText()
+    flush()
+    XCTAssertFalse(input.hasMarkedText())
+    for (id, rect) in initial { XCTAssertEqual(owner.measuredRect(for: id), rect) }
     settings.compositionDisplayStyle = .replace
     flush()
     input.setMarkedText("候", selectedRange: .init(location: 1, length: 0),
