@@ -4865,6 +4865,20 @@ struct TypingSession {
       || quoteWordStream?.hasRemaining == true
   }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
+  private var loadedLiveContentWordCount: Int {
+    let pending = externalPromptContinuation.map {
+      $0.noSpaceTargetWords.isEmpty ? GeneratedWordBoundPolicy.wordCount(in: $0.text) : $0.noSpaceTargetWords.count
+    } ?? 0
+    return (hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount) + pending
+  }
+
+  var needsLiveContentPrefetch: Bool {
+    guard !isFinished, LivePracticeContentSource.selected(for: configuration) != nil else { return false }
+    let loaded = loadedLiveContentWordCount
+    if configuration.mode == .words, !configuration.isInfinite,
+      loaded >= (configuration.wordLimit ?? 25) { return false }
+    return loaded - completedWordCount < 20
+  }
   mutating func appendLiveContent(_ content: LivePracticePrompt) -> Bool {
     guard !isFinished, LivePracticeContentSource.selected(for: configuration) != nil,
       !content.text.isEmpty else { return false }
@@ -4873,10 +4887,7 @@ struct TypingSession {
     let source = content.noSpaceBoundarySource ?? content.text
     let words = source.split(separator: " ").map(String.init)
     guard !words.isEmpty else { return false }
-    let pendingCount = externalPromptContinuation.map {
-      $0.noSpaceTargetWords.isEmpty ? GeneratedWordBoundPolicy.wordCount(in: $0.text) : $0.noSpaceTargetWords.count
-    } ?? 0
-    let loaded = (hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount) + pendingCount
+    let loaded = loadedLiveContentWordCount
     let bound = configuration.mode == .words && !configuration.isInfinite
       ? configuration.wordLimit ?? 25 : Int.max
     guard loaded < bound else { return false }

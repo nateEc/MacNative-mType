@@ -405,6 +405,65 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testLivePrefetchThresholdCountsPendingTailAndStopsAtLoadedFiniteBudget() throws {
+    for (language, tokens, separator) in [
+      (TypingLanguage.english, (0..<300).map { "owned\($0)" }, " "),
+      (.simplifiedChinese, (0..<300).map { "港\($0)船" }, "")
+    ] {
+      let configuration = TestConfiguration.words(300, language: language)
+        .with(modifiers: [.referenceStream])
+      let content = LivePracticeContent(source: .encyclopedia, title: "Owned", byline: nil,
+        tokens: Array(tokens.prefix(151)), separator: separator)
+      let preview = content.promptDescriptor(for: configuration)
+      var practice = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: preview.text, streamNoSpaceBoundarySource: preview.noSpaceBoundarySource,
+        streamContinuation: content.continuationDescriptor(for: configuration))
+      let now = Date(timeIntervalSince1970: 1_700_000_000)
+      XCTAssertFalse(practice.needsLiveContentPrefetch)
+      practice.insertBatch(tokens.prefix(81).joined(separator: separator) + separator, at: now)
+      XCTAssertFalse(practice.needsLiveContentPrefetch, "The queued 51-word tail is still available")
+      practice.insertBatch(tokens[81..<131].joined(separator: separator) + separator, at: now)
+      XCTAssertEqual(practice.completedWordCount, 131)
+      XCTAssertFalse(practice.needsLiveContentPrefetch, "Exactly 20 remaining words does not trigger")
+      practice.insertBatch(tokens[131] + separator, at: now)
+      XCTAssertEqual(practice.completedWordCount, 132)
+      XCTAssertTrue(practice.needsLiveContentPrefetch, "19 remaining words requests the next section")
+      let rest = tokens[151..<300]
+      XCTAssertTrue(practice.appendLiveContent(.init(text: rest.joined(separator: separator),
+        noSpaceBoundarySource: separator.isEmpty ? rest.joined(separator: " ") : nil)))
+      XCTAssertFalse(practice.needsLiveContentPrefetch, "The complete finite budget is now loaded")
+      practice.insertBatch(tokens[132..<300].joined(separator: separator), at: now)
+      XCTAssertEqual(practice.outcome, .completed)
+      XCTAssertFalse(practice.needsLiveContentPrefetch)
+    }
+    XCTAssertFalse(TestSessionFactory.make(configuration: .words(300)).needsLiveContentPrefetch)
+  }
+
+  func testOpenEndedPrefetchThresholdKeepsSourceWordCountsWithHiddenSeparators() throws {
+    let tokens = (0..<151).map { "owned\($0)" }
+    let content = LivePracticeContent(source: .encyclopedia, title: "Owned", byline: nil,
+      tokens: tokens, separator: " ")
+    for base in [TestConfiguration.words(0), .timed(seconds: 30)] {
+      for (alterations, commit) in [([TestModifier](), " "), ([.noSpaces], ""), ([.underscoreSeparators], "_")] {
+        let configuration = base.with(modifiers: [.referenceStream] + alterations)
+        XCTAssertEqual(configuration.modifiers.contains(.referenceStream), !configuration.isInfinite)
+        XCTAssertEqual(LivePracticeContentSource.selected(for: configuration) != nil, !configuration.isInfinite)
+        let preview = content.promptDescriptor(for: configuration)
+        var practice = TestSessionFactory.make(configuration: configuration,
+          streamPrompt: preview.text, streamContinuation: content.continuationDescriptor(for: configuration))
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        practice.insertBatch(tokens.prefix(131).joined(separator: commit) + commit, at: now)
+        XCTAssertEqual(practice.completedWordCount, 131)
+        XCTAssertFalse(practice.needsLiveContentPrefetch)
+        practice.insertBatch(tokens[131] + commit, at: now)
+        XCTAssertEqual(practice.completedWordCount, 132)
+        XCTAssertEqual(practice.errors, 0)
+        XCTAssertEqual(practice.needsLiveContentPrefetch, !configuration.isInfinite,
+          "Timed sources prefetch at 19; incompatible infinite configurations must not fetch")
+      }
+    }
+  }
+
   func testEmptyIntroductionStopsWhenNextRandomRequestFails() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([
