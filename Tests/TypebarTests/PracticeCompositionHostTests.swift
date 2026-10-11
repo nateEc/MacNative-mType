@@ -666,6 +666,16 @@ import XCTest
         continue
       }
       let inputField = try XCTUnwrap(fields(in: host).first)
+      func diagnosticCells() throws -> [Int: PromptFieldTextRun.Cell]? {
+        guard ProcessInfo.processInfo.environment["TYPEBAR_TEST_FIELD_DIFF"] == "1" else { return nil }
+        // Read-only test diagnostic, deliberately not a production API.
+        // Fail if the private snapshot moves rather than silently reporting zero.
+        let rendering = try XCTUnwrap(Mirror(reflecting: inputField).children.first {
+          $0.label == "rendering"
+        }?.value as? PromptRendering)
+        let map = try XCTUnwrap(rendering.compositionTextMap)
+        return Dictionary(uniqueKeysWithValues: map.fieldRuns.flatMap(\.cells).map { ($0.id, $0) })
+      }
       for (insertion, text) in acceptedInputs.enumerated() {
         if hostIndex == 0, insertion == 0,
           ProcessInfo.processInfo.environment["TYPEBAR_TEST_INPUT_SAMPLE_MARKER"] == "1" {
@@ -677,6 +687,8 @@ import XCTest
           }
         }
         let initialFrame = host.frame
+        let initialCells = try diagnosticCells()
+        let initialFieldWidth = inputField.bounds.width
         let initialLayoutCount = host.layoutCount
         let initialGeometryRevision = inputField.geometryRevision
         let start = ProcessInfo.processInfo.systemUptime
@@ -686,6 +698,11 @@ import XCTest
         host.layoutSubtreeIfNeeded()
         let laidOut = ProcessInfo.processInfo.systemUptime
         let synchronousGeometryRevision = inputField.geometryRevision
+        if let initialCells, let currentCells = try diagnosticCells() {
+          let retained = Set(initialCells.keys).intersection(currentCells.keys)
+          let changed = retained.filter { initialCells[$0] != currentCells[$0] }.count
+          print("practice-host field-diff insertion=\(insertion) before=\(initialCells.count) after=\(currentCells.count) changed=\(changed) added=\(Set(currentCells.keys).subtracting(initialCells.keys).count) removed=\(Set(initialCells.keys).subtracting(currentCells.keys).count) widthBefore=\(initialFieldWidth) widthAfter=\(inputField.bounds.width)")
+        }
         let synchronousLayouts = host.layoutCount - initialLayoutCount
         if insertion == 1,
           ProcessInfo.processInfo.environment["TYPEBAR_TEST_LAYOUT_STACK"] == "1"
