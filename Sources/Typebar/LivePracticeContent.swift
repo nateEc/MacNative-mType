@@ -75,14 +75,16 @@ struct LivePracticeContent: Equatable {
     guard !Task.isCancelled else { return nil }
     guard configuration.mode == .time || configuration.mode == .words else { return self }
     let target = GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
-    var collected = Array(tokens.prefix(target))
+    // The preview budget limits presentation, not ownership of fetched text.
+    // Keep each section's tail for a later larger preview or stream consumer.
+    var collected = tokens
     var titles = [title]
     var authors = [byline].compactMap { $0 }
     while collected.count < target {
       guard !Task.isCancelled, let next = await fetchNext(), !Task.isCancelled,
         next.source == source, next.separator == separator, !next.tokens.isEmpty
       else { return nil }
-      collected.append(contentsOf: next.tokens.prefix(target - collected.count))
+      collected.append(contentsOf: next.tokens)
       titles.append(next.title)
       if let author = next.byline { authors.append(author) }
     }

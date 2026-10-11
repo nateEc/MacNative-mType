@@ -213,6 +213,48 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     XCTAssertEqual(alreadyFilled, loaded)
   }
 
+  @MainActor func testLargerPreviewConsumesRetainedSectionTailWithoutAnotherFetch() async throws {
+    for (language, firstTokens, nextTokens, separator) in [
+      (TypingLanguage.english, ["Amber"], ["harbor.", "Fresh", "boats"], " "),
+      (.simplifiedChinese, ["「海港」"], ["12艘", "船，", "天气好。"], "")
+    ] {
+      let first = LivePracticeContent(source: .encyclopedia, title: "First", byline: nil,
+        tokens: firstTokens, separator: separator)
+      let short = TestConfiguration.words(2, language: language).with(modifiers: [.referenceStream])
+      let initial = await first.fillingInitialPrompt(for: short, showAllLines: true) {
+        LivePracticeContent(source: .encyclopedia, title: "Second", byline: nil,
+          tokens: nextTokens, separator: separator)
+      }
+      let retained = try XCTUnwrap(initial)
+      let allTokens = firstTokens + nextTokens
+      XCTAssertEqual(retained.text, allTokens.joined(separator: separator))
+      XCTAssertEqual(retained.promptDescriptor(for: short, showAllLines: true).text,
+        allTokens.prefix(2).joined(separator: separator))
+      let expandedConfiguration = TestConfiguration.words(4, language: language)
+        .with(modifiers: [.referenceStream])
+      var extraRequests = 0
+      let expanded = await retained.fillingInitialPrompt(for: expandedConfiguration, showAllLines: true) {
+        extraRequests += 1
+        return nil
+      }
+      XCTAssertEqual(extraRequests, 0)
+      let loaded = try XCTUnwrap(expanded)
+      let descriptor = loaded.promptDescriptor(for: expandedConfiguration, showAllLines: true)
+      XCTAssertEqual(descriptor.text, allTokens.joined(separator: separator))
+      var practice = TestSessionFactory.make(configuration: expandedConfiguration,
+        streamPrompt: descriptor.text, streamNoSpaceBoundarySource: descriptor.noSpaceBoundarySource,
+        showAllLines: true)
+      let now = Date(timeIntervalSince1970: 1_700_000_000)
+      practice.insertBatch(descriptor.text, at: now)
+      XCTAssertEqual(practice.outcome, .completed)
+      XCTAssertEqual(practice.completedWordCount, 4)
+      XCTAssertEqual(practice.errors, 0)
+      let result = try XCTUnwrap(practice.result(at: now))
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), descriptor.text)
+    }
+  }
+
   func testEmptyIntroductionStopsWhenNextRandomRequestFails() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([
