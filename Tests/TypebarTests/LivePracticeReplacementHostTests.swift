@@ -91,12 +91,20 @@ import XCTest
       hotkey: GlobalHotkeyMonitor(), systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
       network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor(),
       liveContentFetch: pending.fetch).modelContainer(container)
-    let host = NSHostingView(rootView: content.frame(width: 1000, height: 720))
+    let host = NSHostingView(rootView: AnyView(content.frame(width: 1000, height: 720)))
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
       styleMask: .borderless, backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
     window.contentView = host
-    defer { pending.finish(); window.contentView = nil; window.close() }
+    defer {
+      pending.finish()
+      // Release query/observation nodes before their in-memory container.
+      host.rootView = AnyView(EmptyView())
+      host.layoutSubtreeIfNeeded()
+      window.contentView = nil
+      window.close()
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    }
     func flush() {
       host.layoutSubtreeIfNeeded()
       RunLoop.main.run(until: Date().addingTimeInterval(0.1))

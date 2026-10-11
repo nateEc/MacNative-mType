@@ -5,6 +5,70 @@ final class ProviderFieldSessionTests: XCTestCase {
   private let began = Date(timeIntervalSinceReferenceDate: 917_000_000)
   private let fields = ["north\nsouth ", "harbor ", "tail"]
 
+  func testInvalidOpeningMetadataDoesNotChangeLaterSectionTransformation() {
+    let configuration = TestConfiguration.words(4).with(modifiers: [.poetryStream])
+    var legacy = TypingSession(configuration: configuration, prompt: "north harbor ", streamsLiveContent: true)
+    var invalid = TypingSession(configuration: configuration, prompt: "north harbor ",
+      sourceFields: ["wrong"], streamsLiveContent: true)
+    let next = LivePracticePrompt(text: "third\n tail", noSpaceBoundarySource: nil)
+    XCTAssertTrue(legacy.appendLiveContent(next))
+    XCTAssertTrue(invalid.appendLiveContent(next))
+    XCTAssertEqual(invalid.prompt, legacy.prompt)
+  }
+
+  func testNewLiveSectionRetainsFieldsAndRepeatHistory() throws {
+    for opening in [["north\nsouth ", "harbor "], ["north\nsouth ", "harbor"]] {
+      var session = TypingSession(configuration: TestConfiguration.words(4).with(modifiers: [.poetryStream]),
+        prompt: opening.joined(), sourceFields: opening, streamsLiveContent: true)
+      session.insertBatch("north\n", at: began)
+      XCTAssertTrue(session.appendLiveContent(.init(text: "third\nfourth tail ignored", noSpaceBoundarySource: nil)))
+      XCTAssertFalse(session.prompt.contains("ignored"))
+      XCTAssertEqual(session.nextExpectedCharacter, "h")
+      XCTAssertFalse(session.needsLiveContentPrefetch)
+      session.insertBatch("harbor third\ntai", at: began.addingTimeInterval(1))
+      XCTAssertFalse(session.isFinished)
+      session.insertBatch("l", at: began.addingTimeInterval(2))
+      XCTAssertEqual(session.outcome, .completed)
+      XCTAssertEqual(session.completedWordCount, 4)
+      let result = try XCTUnwrap(session.result())
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), "north\nharbor third\ntail")
+      var repeated = session.repeatedAttempt()
+      repeated.insertBatch("north\nharbor third\ntail", at: began.addingTimeInterval(5))
+      XCTAssertEqual(repeated.outcome, .completed)
+      XCTAssertEqual(repeated.completedWordCount, 4)
+    }
+  }
+
+  func testMultipleNewSectionsRetainAccumulatedRepeatHistory() {
+    let opening = ["north\nsouth ", "harbor"]
+    var session = TypingSession(configuration: TestConfiguration.words(6).with(modifiers: [.poetryStream]),
+      prompt: opening.joined(), sourceFields: opening, streamsLiveContent: true)
+    session.insertBatch("north\n", at: began)
+    XCTAssertTrue(session.appendLiveContent(.init(text: "third\nfourth anchor", noSpaceBoundarySource: nil)))
+    XCTAssertTrue(session.appendLiveContent(.init(text: "fifth\nsixth tail", noSpaceBoundarySource: nil)))
+    XCTAssertFalse(session.needsLiveContentPrefetch)
+    session.insertBatch("harbor third\nanchor fifth\ntail", at: began.addingTimeInterval(2))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 6)
+    var repeated = session.repeatedAttempt()
+    repeated.insertBatch("north\nharbor third\nanchor fifth\ntail", at: began.addingTimeInterval(5))
+    XCTAssertEqual(repeated.outcome, .completed)
+    XCTAssertEqual(repeated.completedWordCount, 6)
+  }
+
+  func testNewSectionRetainsTransformedUppercaseFields() {
+    let opening = ["NORTH\nSOUTH ", "HARBOR "]
+    var session = TypingSession(configuration: TestConfiguration.words(4).with(modifiers: [.poetryStream, .uppercase]),
+      prompt: opening.joined(), sourceFields: opening, streamsLiveContent: true)
+    session.insertBatch("NORTH\n", at: began)
+    XCTAssertTrue(session.appendLiveContent(.init(text: "third\nfourth tail", noSpaceBoundarySource: nil)))
+    XCTAssertTrue(session.prompt.hasSuffix("THIRD\nFOURTH TAIL"))
+    session.insertBatch("HARBOR THIRD\nTAIL", at: began.addingTimeInterval(2))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 4)
+  }
+
   func testOrdinaryLineFeedCommitsWholeProviderFieldAndSkipsItsRemainder() throws {
     var session = TypingSession(configuration: .words(3), prompt: fields.joined(), sourceFields: fields)
     session.insertBatch("north\n", at: began)

@@ -927,6 +927,25 @@ struct TransformedPromptBatch {
   let noSpaceWordLengths: [Int]
   let noSpaceTargetWords: [String]
 
+  func prefixed(with separator: String) -> Self {
+    var fields = sourceFields
+    if !separator.isEmpty, var values = fields {
+      values[0] = separator + values[0]
+      fields = values
+    }
+    return .init(text: separator + text, noSpaceTargetWords: noSpaceTargetWords, sourceFields: fields)
+  }
+
+  func appending(_ next: Self, separator: String) -> Self {
+    var combined: [String]?
+    if var fields = sourceFields, let nextFields = next.sourceFields {
+      fields[fields.count - 1] += separator
+      combined = fields + nextFields
+    }
+    return .init(text: text + separator + next.text,
+      noSpaceTargetWords: noSpaceTargetWords + next.noSpaceTargetWords, sourceFields: combined)
+  }
+
   init(text: String, noSpaceTargetWords: [String] = [], sourceFields: [String]? = nil) {
     self.text = text
     self.sourceFields = sourceFields.flatMap { fields in
@@ -1307,11 +1326,12 @@ enum TestModifierPolicy {
     _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
     preservesNoSpaceBoundaries: Bool = false, wordOffset: Int = 0, wordBound: Int? = nil,
     preservesWordOrder: Bool = false, formatsWordPool: Bool = false,
+    capturesSourceFields: Bool = false,
     britishEnglish: BritishEnglishPolicy.Context? = nil,
     nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> TransformedPromptBatch {
     let presented = language?.presentationText(prompt) ?? prompt
-    guard britishEnglish?.enabled == true || formatsWordPool || preservesNoSpaceBoundaries || modifiers.contains(where: { canonicalTextAlterations.contains($0)
+    guard capturesSourceFields || britishEnglish?.enabled == true || formatsWordPool || preservesNoSpaceBoundaries || modifiers.contains(where: { canonicalTextAlterations.contains($0)
       || [.noSpaces, .arrowStream, .lazyLatin].contains($0) }) else {
       return .init(text: presented)
     }
@@ -1325,6 +1345,7 @@ enum TestModifierPolicy {
     if modifiers.contains(.backwards), !preservesWordOrder { words.reverse() }
     var output = ""
     var targets: [String] = []
+    var sourceFields: [String] = []
     var generatedWordIndex = wordOffset
     var previousBritishWord: String?
     for (index, word) in words.enumerated() {
@@ -1340,11 +1361,14 @@ enum TestModifierPolicy {
         previousBritishWord = BritishEnglishPolicy.previousWordKey(altered)
       }
       if !word.isEmpty { generatedWordIndex += 1 }
+      var field = altered
       output += altered
       if capturesTargets, !word.isEmpty { targets.append(altered) }
       if index < words.count - 1, !capturesTargets, altered.unicodeScalars.last != "\n" {
         output.append(" ")
+        if capturesSourceFields { field.append(" ") }
       }
+      if capturesSourceFields, !field.isEmpty { sourceFields.append(field) }
     }
     // This batch API has historically represented a complete prompt. The
     // streaming word API below keeps newline commits until its caller knows
@@ -1354,8 +1378,13 @@ enum TestModifierPolicy {
       if capturesTargets, targets.last?.hasSuffix("\n") == true {
         targets[targets.count - 1].removeLast()
       }
+      if capturesSourceFields, sourceFields.last?.hasSuffix("\n") == true {
+        sourceFields[sourceFields.count - 1].removeLast()
+        if sourceFields.last?.isEmpty == true { sourceFields.removeLast() }
+      }
     }
-    return .init(text: output, noSpaceTargetWords: targets)
+    return .init(text: output, noSpaceTargetWords: targets,
+      sourceFields: capturesSourceFields ? sourceFields : nil)
   }
 
   // Direct reference toggles sort official names before applying alterText.
@@ -4675,10 +4704,12 @@ struct TypingSession {
     self.initializationFailure = initializationFailure
     if initializationFailure != nil { self.outcome = .failed }
     self.prompt = prompt
-    self.sourceFields = sourceFields
-    self.initialSourceFields = sourceFields
+    let validatedSourceFields = sourceFields == nil ? nil
+      : TransformedPromptBatch(text: prompt, sourceFields: sourceFields).sourceFields
+    self.sourceFields = validatedSourceFields
+    self.initialSourceFields = validatedSourceFields
     self.promptCharacters = Array(prompt)
-    let initialTargets = UnitInputTargets(prompt, sourceFields: sourceFields)
+    let initialTargets = UnitInputTargets(prompt, sourceFields: validatedSourceFields)
     self.unitTargets = initialTargets
     self.initialKoreanScoring = configuration.mode != .zen && initialTargets.requiresKoreanDisassembly
     self.promptSeparatorUnitCount = prompt.utf8.reduce(into: 0) { count, unit in
@@ -4926,21 +4957,21 @@ struct TypingSession {
     let batch = TestModifierPolicy.transformedBatch(selected, modifiers: configuration.modifiers,
       language: configuration.language, preservesNoSpaceBoundaries: content.noSpaceBoundarySource != nil,
       wordOffset: loaded, wordBound: bound, preservesWordOrder: true,
+      capturesSourceFields: sourceFields != nil,
       britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false))
     guard !batch.text.isEmpty else { return false }
     let joinsWithoutSpace = hasNoSpaceWordSegmentation || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     let history = initialExternalPromptContinuation
     let historyTail = history?.text ?? initialPrompt
     let historySeparator = joinsWithoutSpace || historyTail.last?.isWhitespace == true ? "" : " "
-    initialExternalPromptContinuation = .init(
-      text: (history?.text ?? "") + historySeparator + batch.text,
-      noSpaceTargetWords: (history?.noSpaceTargetWords ?? []) + batch.noSpaceTargetWords)
+    initialExternalPromptContinuation = history.map { $0.appending(batch, separator: historySeparator) }
+      ?? batch.prefixed(with: historySeparator)
     if let pending = externalPromptContinuation {
       externalPromptContinuation = nil
       appendExternalBatch(pending)
     }
     let separator = joinsWithoutSpace || prompt.last?.isWhitespace == true ? "" : " "
-    appendExternalBatch(.init(text: separator + batch.text, noSpaceTargetWords: batch.noSpaceTargetWords))
+    appendExternalBatch(batch.prefixed(with: separator))
     return true
   }
   var liveWeakSpotScores: WeakSpotScores { currentWeakSpotScores }
@@ -8553,9 +8584,15 @@ struct TypingSession {
 
   private mutating func appendExternalBatch(_ batch: TransformedPromptBatch) {
     var end = promptCharacters.count
-    if let fields = sourceFields, let continuationFields = batch.sourceFields,
+    if var fields = sourceFields, var continuationFields = batch.sourceFields,
       fields.joined().utf16.elementsEqual(prompt.utf16)
     {
+      // A leading inter-section space closes the previous source field.
+      while continuationFields.first?.hasPrefix(" ") == true {
+        continuationFields[0].removeFirst()
+        fields[fields.count - 1].append(" ")
+        if continuationFields[0].isEmpty { continuationFields.removeFirst() }
+      }
       sourceFields = fields + continuationFields
     }
     appendPrompt(batch.text)
