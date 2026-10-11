@@ -109,6 +109,17 @@ struct LivePracticeContent: Equatable {
       text: selectedTokens.joined(separator: separator),
       noSpaceBoundarySource: separator.isEmpty ? selectedTokens.joined(separator: " ") : nil)
   }
+
+  func continuationDescriptor(for configuration: TestConfiguration, showAllLines: Bool = false) -> LivePracticePrompt? {
+    guard configuration.mode == .words || configuration.mode == .time else { return nil }
+    let start = GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
+    let end = configuration.mode == .words && !configuration.isInfinite
+      ? min(tokens.count, configuration.wordLimit ?? 25) : tokens.count
+    guard start < end else { return nil }
+    let remaining = tokens[start..<end]
+    return .init(text: remaining.joined(separator: separator),
+      noSpaceBoundarySource: separator.isEmpty ? remaining.joined(separator: " ") : nil)
+  }
 }
 
 enum LivePracticeContentReplacementPolicy {

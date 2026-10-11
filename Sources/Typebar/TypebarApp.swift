@@ -4480,6 +4480,8 @@ private struct ContentView: View {
       session = TestSessionFactory.make(
         configuration: configuration, streamPrompt: livePrompt.text,
         streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource,
+        streamContinuation: content.continuationDescriptor(for: configuration,
+          showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off),
         weakSpotScores: session.liveWeakSpotScores,
         wordDecorationState: session.liveWordDecorationState,
         showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)

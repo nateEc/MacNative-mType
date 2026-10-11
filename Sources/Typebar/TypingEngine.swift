@@ -4437,6 +4437,8 @@ struct TypingSession {
   private let initialSequentialCustomWordStream: CustomSequentialWordStream?
   private var finiteCustomTextStream: CustomFiniteTextStream?
   private let initialFiniteCustomTextStream: CustomFiniteTextStream?
+  private var externalPromptContinuation: TransformedPromptBatch?
+  private let initialExternalPromptContinuation: TransformedPromptBatch?
   private var sectionEndIndices: [Int]
   private let initialSectionEndIndices: [Int]
   private var noSpaceSectionWordEnds: [Int]
@@ -4646,6 +4648,7 @@ struct TypingSession {
     randomCustomPreviousWords: [String] = [],
     sequentialCustomWordStream: CustomSequentialWordStream? = nil,
     finiteCustomTextStream: CustomFiniteTextStream? = nil,
+    externalPromptContinuation: TransformedPromptBatch? = nil,
     customSectionWordStream: CustomSectionWordStream? = nil,
     noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
@@ -4688,6 +4691,8 @@ struct TypingSession {
     self.initialSequentialCustomWordStream = sequentialCustomWordStream
     self.finiteCustomTextStream = finiteCustomTextStream
     self.initialFiniteCustomTextStream = finiteCustomTextStream
+    self.externalPromptContinuation = externalPromptContinuation
+    self.initialExternalPromptContinuation = externalPromptContinuation
     self.sectionEndIndices = sectionEndIndices
     self.initialSectionEndIndices = sectionEndIndices
     self.noSpaceSectionWordEnds = noSpaceSectionWordEnds
@@ -4779,6 +4784,7 @@ struct TypingSession {
       randomCustomPreviousWords: initialRandomCustomPreviousWords,
       sequentialCustomWordStream: initialSequentialCustomWordStream,
       finiteCustomTextStream: initialFiniteCustomTextStream,
+      externalPromptContinuation: initialExternalPromptContinuation,
       customSectionWordStream: initialCustomSectionWordStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
@@ -4846,7 +4852,8 @@ struct TypingSession {
     return projected.outcome == .completed || projected.outcome == .invalidAFK
   }
   var usesIncrementalPromptExtension: Bool {
-    generatedWordContinuation?.hasRemaining == true || generatedStreamContinuation?.hasRemaining == true
+    externalPromptContinuation != nil
+      || generatedWordContinuation?.hasRemaining == true || generatedStreamContinuation?.hasRemaining == true
       || generatedCodeContinuation?.hasRemaining == true
       || (repeatingPrompt?.isEmpty == false
         && !(configuration.mode == .words && !configuration.isInfinite
@@ -6173,7 +6180,7 @@ struct TypingSession {
       // the upcoming target visible immediately after its final character.
       extendPromptIfNeeded(at: date)
     }
-    if finiteCustomTextStream?.hasRemaining == true,
+    if (finiteCustomTextStream?.hasRemaining == true || externalPromptContinuation != nil),
       nextTargetIndex >= promptCharacters.count
     {
       extendPromptIfNeeded(at: date)
@@ -8223,6 +8230,18 @@ struct TypingSession {
 
   private mutating func extendPromptIfNeeded(at date: Date) {
     guard !isAtEmptyNoSpaceWord, reachedInputTargetEnd else { return }
+    if let chunk = externalPromptContinuation {
+      externalPromptContinuation = nil
+      let previousEnd = promptCharacters.count
+      appendPrompt(chunk.text)
+      var end = previousEnd
+      for length in chunk.noSpaceWordLengths {
+        end += length
+        noSpaceWordEndIndices.append(end)
+      }
+      noSpaceTargetWords += chunk.noSpaceTargetWords
+      return
+    }
     if quoteWordStream?.hasRemaining == true {
       refillQuoteIfNeeded(activeWordBefore: max(0, quoteNavigationIndex - 1), at: date)
       return

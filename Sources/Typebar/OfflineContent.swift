@@ -6340,6 +6340,7 @@ struct TestSessionFactory {
     quote: OfflineQuote? = nil,
     streamPrompt: String? = nil,
     streamNoSpaceBoundarySource: String? = nil,
+    streamContinuation: LivePracticePrompt? = nil,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
     showAllLines: Bool = false,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
@@ -6559,6 +6560,19 @@ struct TestSessionFactory {
       batch = FinitePromptCommitPolicy.finalized(batch)
     }
     let transformedPrompt = batch.text
+    let externalBatch: TransformedPromptBatch? = streamContinuation.flatMap { continuation in
+      guard !continuation.text.isEmpty else { return nil }
+      let boundarySource = continuation.noSpaceBoundarySource
+      let source = boundarySource ?? continuation.text
+      let prepared = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
+        language: configuration.language, preservesNoSpaceBoundaries: boundarySource != nil,
+        wordOffset: GeneratedWordBoundPolicy.wordCount(in: streamNoSpaceBoundarySource ?? streamPrompt ?? ""),
+        wordBound: GeneratedWordBoundPolicy.wordCount(in: source), preservesWordOrder: true,
+        britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
+        nextRandomCaseBit: nextRandomCaseBit)
+      return configuration.mode == .words && !configuration.isInfinite
+        ? FinitePromptCommitPolicy.finalized(prepared) : prepared
+    }
     let noSpaceWordLengths = customSectionChunk?.noSpaceWordLengths ?? batch.noSpaceWordLengths
     let noSpaceTargetWords = customSectionChunk?.noSpaceTargetWords ?? batch.noSpaceTargetWords
     let repeats = (GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration, showAllLines: generatesWholeLines)
@@ -6579,6 +6593,7 @@ struct TestSessionFactory {
         nextTokenIndex: streamWordCount ?? GeneratedPromptChunkPolicy.wordCount(for: configuration))
       : nil
     let primesRepeatedPrompt = !streamsRandomCustomText && !streamsSequentialCustomText
+      && externalBatch == nil
       && !usesGeneratedCode && customSectionWordStream == nil
       && !usesFreshGeneratedWords && !usesGeneratedStream
       && !(generatesWholeLines && configuration.mode == .words)
@@ -6603,7 +6618,9 @@ struct TestSessionFactory {
     } else {
       let hasGeneratedFuture = generatedWordContinuation?.hasRemaining == true
         || generatedStreamContinuation?.hasRemaining == true || generatedCodeContinuation?.hasRemaining == true
+        || externalBatch != nil
       let needsCommit = hasGeneratedFuture && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+        && noSpaceWordLengths.isEmpty
         && transformedPrompt.last != " " && transformedPrompt.last != "\n"
       initialPrompt = transformedPrompt + (needsCommit ? " " : "")
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(for: noSpaceWordLengths)
@@ -6630,6 +6647,7 @@ struct TestSessionFactory {
       randomCustomPreviousWords: randomCustomPreviousWords,
       sequentialCustomWordStream: sequentialCustomWordStream,
       finiteCustomTextStream: finiteCustomTextStream,
+      externalPromptContinuation: externalBatch,
       customSectionWordStream: customSectionWordStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
