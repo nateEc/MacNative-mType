@@ -1,5 +1,25 @@
 # 在线空内容生成检查点（未验收）
 
+## 后续定位与已验证的原生输入拆除修复
+
+**完整门禁的存储崩溃仍未解决。** 本节输入生命周期修复不能替代门禁修复或证明功能等价。最终源码重跑 `provider-native-input-final-host-sequence.log`：输入拆除测试通过，17 项在线宿主断言全部通过（85.487 秒，总墙钟 85.489 秒），随后 PB 保存仍收到 signal 5。没有跳过保存测试、增加等待来掩盖问题或改变其预期。
+
+进一步缩小所得证据：
+
+- `provider-storage-four-hosts.log` 与 `provider-storage-five-hosts.log` 的两组分别通过，共 5 项/23.347 秒及 6 项/25.762 秒；不能把任意多个宿主直接解释为必然崩溃。
+- 临时弱引用诊断的 9 宿主序列通过（`provider-storage-lifetime-probe.log`，10 项、49.407 秒），各自 teardown 时宿主、窗口、容器和上下文都已释放；扩大至 17 宿主仍崩溃（`provider-storage-full-lifetime-probe.log`），另有一次 Pace 断言失败。诊断改变了分配/时序，未据此宣称修复，临时诊断已经撤掉。
+- 新增销毁断言证实替换为空根视图后，旧输入与提示视图均从宿主移除；17 项断言通过后保存仍崩溃（`provider-storage-root-disposal-sequence.log`，85.797 秒）。这些断言保留，检查的是可观察原生视图树，不等于证明全部查询观察器已释放。
+- 自有临时最小查询宿主连续 20 次挂载、观察真实保存、销毁并向另一份存储保存，测试通过（`provider-query-saved-lifecycle-probe.log`，1.040 秒）。仅添加捕获查询页面值的未绑定延迟任务即可触发 signal 5（`provider-query-unstructured-task-red.log`）；报告 `xctest-2026-10-11-234341.ips` 的前三个框架栈帧与门禁相同。这证明一种触发机制，不证明已找到真实练习页的全部触发路径。
+- 将焦点提示延迟改为视图绑定任务的实验仍未消除完整序列崩溃（`provider-focus-task-lifecycle-green.log`：17 项宿主通过后保存崩溃，文件名不是通过结论）。该实验与临时 SDK 查询测试均已撤回，最终 `TypebarApp.swift` 没有此实验改动。
+
+另一个可独立证明的缺陷已修复：`NativeTypingInput` 原先没有拆除清理，AppKit 继续持有原生视图时，其页面回调也继续持有页面。新增真实 representable 拆除测试在修改前出现 4 个预期断言失败（`provider-native-input-lifecycle-red.log`，0.701 秒）：捕获对象未释放、组合结束谓词和时钟未清理、18 个晚到回调仍执行。现在拆除时清空全部页面回调和测试时钟、移除窗口观察器及本地按键监视器，排队聚焦改为弱引用。
+
+会话内决策审查（非独立审查）另发现拆除与实际脱离窗口之间仍可能存在排队聚焦。新增断言在仅清回调的版本明确失败（`provider-native-input-retired-focus-red.log`，0.726 秒）；现以退役状态阻止排队聚焦、再次接受第一响应者以及重新安装窗口观察器。未对正常仍挂载的输入禁用回调或快捷键。
+
+最终相关回归 `provider-native-input-retirement-regression.log`：131 项、0 失败、无跳过，4.332 秒（总墙钟 4.344 秒），覆盖拆除、焦点投递、组合选择/子串/完成/快捷键、实时指标与反馈、运行中输入规则、字边界删除、组合字符输入和位置恢复。只在 macOS 26.1 / Apple Swift 6.2.4 验证，不宣称所有最低支持系统或实体输入法已验收。所有宿主窗口不可见，未启动 Typebar 主程序。
+
+原创边界检查通过（`provider-native-input-retirement-originality.log`），未发现与固定参考源码的长字面量或受保护资源重叠。本轮保留的产品修改仅为原生输入生命周期修复；存储崩溃继续定位，在线生成调度等原始功能差异仍开放，目标保持进行中。
+
 ## 最新完整门禁失败：宿主序列后的存储崩溃（2026-10-11）
 
 冻结提交 `f263ce264c0036093319825da9a9ee153e531f58` 的完整门禁未通过，不能作为发布或功能等价证明。证据目录 `work/frozen-readiness-live-pool.70eThg` 位于项目所在工作区：`result.txt` 为 `gate_exit=1 hash_exit=0`，865 个受跟踪文件的 SHA-256 检查通过。客户端进程 xctest（PID 84359）在 `LocalPersonalBestLedgerTests.testAccountResetCreatesKnownEmptyLedgerInsteadOfRebuildingOldHistory` 的首次保存处收到 signal 5；服务端测试和发布打包阶段没有执行。失败退出后日志仍在门禁临时目录，已另行复制其中 73 份日志至证据目录的 `logs/`，没有覆盖已有日志。

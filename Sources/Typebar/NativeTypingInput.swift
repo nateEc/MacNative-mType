@@ -187,11 +187,19 @@ struct NativeTypingInput: NSViewRepresentable {
         guard context.coordinator.appliedFocusRequest != focusRequest else { return }
         context.coordinator.appliedFocusRequest = focusRequest
         view.resetBailoutAttempt()
-        DispatchQueue.main.async { view.window?.makeFirstResponder(view) }
+        DispatchQueue.main.async { [weak view] in
+          guard let view, !view.isRetired, let window = view.window else { return }
+          window.makeFirstResponder(view)
+        }
+    }
+
+    static func dismantleNSView(_ view: TypingInputView, coordinator: Coordinator) {
+      view.retirePageCallbacks()
     }
 }
 
 class TypingInputView: NSView, @preconcurrency NSTextInputClient {
+    private(set) var isRetired = false
     var onInsert: (String, Bool) -> Void = { _, _ in }
     var onDelete: () -> Void = {}
     var onDeleteWord: () -> Void = {}
@@ -248,6 +256,26 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
 
     required init?(coder: NSCoder) { nil }
 
+    /// AppKit may retain a detached input beyond its SwiftUI page's lifetime.
+    /// Native callbacks must not keep that page's queries or context alive.
+    func retirePageCallbacks() {
+      isRetired = true
+      removeWindowFocusObservers()
+      removeLocalKeyDownMonitor()
+      onInsert = { _, _ in }
+      onDelete = {}; onDeleteWord = {}; onRestart = {}; onOpenCommandPalette = {}
+      onBailoutArmed = {}; onBailout = {}; onQuickRestartProtectionRequired = {}; onFinishZen = {}
+      onFocusChanged = { _ in }
+      onWindowFocusChanged = { _, _ in }
+      onCompositionStarted = {}
+      onCompositionChanged = { _ in }
+      shouldFinishWithComposition = { _, _ in false }
+      onModifierFlagsChanged = { _ in }
+      onKeyDown = { _, _, _, _ in }
+      onPhysicalKey = { _, _, _ in }
+      bailoutClock = { .now }
+    }
+
     override func viewWillMove(toWindow newWindow: NSWindow?) {
       if window !== newWindow { lastWindowFocusState = nil }
       removeWindowFocusObservers()
@@ -259,7 +287,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       super.viewDidMoveToWindow()
       removeWindowFocusObservers()
       removeLocalKeyDownMonitor()
-      guard let window else { return }
+      guard !isRetired, let window else { return }
       let center = NotificationCenter.default
       center.addObserver(
         self, selector: #selector(windowDidBecomeKey(_:)),
@@ -272,7 +300,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       reportWindowFocus(isKey: window.isKeyWindow, hasAttachedSheet: window.attachedSheet != nil)
     }
 
-    override var acceptsFirstResponder: Bool { true }
+    override var acceptsFirstResponder: Bool { !isRetired }
 
     func refreshWindowFocusState() {
       guard let window else { return }

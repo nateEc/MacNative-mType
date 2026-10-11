@@ -141,6 +141,10 @@ import XCTest
       // Release query/observation nodes before their in-memory container.
       host.rootView = AnyView(EmptyView())
       host.layoutSubtreeIfNeeded()
+      XCTAssertTrue(views(TypingInputView.self, in: host).isEmpty,
+        "Replacing the hosted root must remove the old practice input before releasing its store")
+      XCTAssertTrue(views(PromptFieldNativeView.self, in: host).isEmpty,
+        "Replacing the hosted root must remove the old prompt before releasing its store")
       window.contentView = nil
       window.close()
       RunLoop.main.run(until: Date().addingTimeInterval(0.1))
