@@ -101,6 +101,9 @@ enum NativePracticeFont {
   }
 
   private static func postScriptName(forFamily family: String) -> String? {
+    // Resolve the canonical family through AppKit before consulting its member
+    // list: catalog order is not a default-face contract (e.g. Braille outlines).
+    if let font = NSFont(name: family, size: 1) { return font.fontName }
     guard
       let member = NSFontManager.shared.availableMembers(ofFontFamily: family)?.first,
       let postScriptName = member.first as? String,

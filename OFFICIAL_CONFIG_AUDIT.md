@@ -1,5 +1,9 @@
 # 官方配置兼容性审计
 
+2026-10-11 TST-02 字体家族归一化修正：固定原版 ui.ts 的字体选择以家族为单位，常规样式不应因目录顺序变成其他字形。本机通过大小写／宽度归一化匹配家族后，原先直接选第一个成员；实际 Apple Braille 目录首项是 Outline 6 Dot，而标准家族名正常解析为 AppleBraille。新增实际系统字体测试先复现两个别名均选错（1 项、2 处断言失败），修正为标准家族名先经 AppKit 解析，再保留原成员回退。没有添加字体资源、下载、安装、保存字段或迁移。
+
+证据位于 `work/font-family-default-face-red.log`、`font-family-default-face-green.log` 与 `font-family-default-face-regression.log`。首轮 16 项零失败但一项缺参考环境跳过；补齐固定参考及 Node 后 28 项零失败零跳过（0.887s，墙钟 0.891），覆盖名称解析、目录预览、命令预览／应用、本地字体策略及语言回退。会话内风险检查未发现新增可落实问题，非独立审计；零主程序启动。此处验证的是系统 API 和名称解析，不是实体窗口字体视觉、所有字体／最低系统或新增完整门禁／Release，上一轮冻结证据早于本修正。fontFamily 仍部分、94 配置 89／4／1 与完整 goal active 不变。
+
 2026-10-10 生产组合入口核验：当前 ContentView 已调用 PromptCompositionPresentation，普通活动词不再仅把整串候选放进一个字形；下方“统一模型尚待接入所有呈现”描述的是早期阶段，不代表当前完全未接线。新增完整生产练习页宿主回归，覆盖 off／below／replace 的原生提示可访问内容、候选更新、取消后重组内容一致和输入 owner 保留；相关 21 项零失败零跳过（40.025s，墙钟 40.029）。该证据使用不可见窗口与 NSTextInputClient 直接调用，不是系统 IME、below 候选位置视觉、混合 RTL 或全部呈现组合验收。compositionDisplay 仍部分，89／4／1 分类不变。
 
 当前组合显示源码核对见 [投影合同](COMPOSITION_PROJECTION_CONTRACT.md)：原版完整更新／caret 函数的 132 组常规与 36 组 Unicode 案例证明，组合占据活动词内多个目标并保留溢出／独立光标。现有生产仍是一个字形内替换整串候选，统一原生模型尚待接入所有呈现分支；`compositionDisplay` 从已映射更正为部分。94 配置现在为 89 映射／4 部分／1 不适用，不表示功能完成；下方为历史阶段。

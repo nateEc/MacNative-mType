@@ -3,6 +3,15 @@ import XCTest
 @testable import Typebar
 
 final class NativeFontPreviewTests: XCTestCase {
+  func testNormalizedFamilyNameKeepsTheSameDefaultFaceAsItsCanonicalName() throws {
+    let canonical = try XCTUnwrap(NSFont(name: "Apple Braille", size: 28))
+    for alias in ["applebraille", "Ａｐｐｌｅ Ｂｒａｉｌｌｅ"] {
+      XCTAssertEqual(NativePracticeFont.postScriptName(for: alias,
+        installedFamilies: ["Apple Braille"]), canonical.fontName,
+        "Normalizing a family identity must not select an outline variant")
+    }
+  }
+
   func testEmptyAndDirectFontNamesDoNotEnumerateInstalledFamilies() throws {
     let direct = try XCTUnwrap(NSFont(name: "Courier", size: 15))
     var enumerations = 0
