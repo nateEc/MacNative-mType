@@ -223,6 +223,31 @@ import XCTest
       XCTAssertEqual(allocations(), initialAllocations,
         "Cancellation must restore layer allocations independently of animated rotation")
     }
+    input.setMarkedText(longCandidate, selectedRange: .init(location: longCandidate.utf16.count, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    flush()
+    for style in [CompositionDisplayStyle.replace, .off, .below, .replace] {
+      settings.compositionDisplayStyle = style
+      flush()
+      XCTAssertTrue(input.hasMarkedText(), "Changing display style must not confirm or cancel the candidate")
+      XCTAssertEqual(input.markedRange().length, longCandidate.utf16.count)
+      XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
+      XCTAssertTrue(descendants(host, ChooLayerView.self).first === owner)
+      let expected = style == .replace ? longCandidate + " harbor morning"
+        : "quiet" + String(longCandidate.dropFirst(5)) + " harbor morning"
+      XCTAssertEqual(owner.accessibilityLabel(), expected)
+      let rows = descendants(host, NSTextField.self).filter {
+        $0.accessibilityLabel()?.hasPrefix("正在组合：") == true
+      }
+      XCTAssertEqual(rows.count, style == .below ? 1 : 0)
+      if style == .below { XCTAssertEqual(rows.first?.stringValue, longCandidate) }
+      XCTAssertFalse(window.isVisible)
+      XCTAssertEqual(host.frame, frame)
+    }
+    input.unmarkText()
+    flush()
+    XCTAssertEqual(owner.accessibilityLabel(), prompt)
+    XCTAssertEqual(allocations(), initialAllocations)
     settings.compositionDisplayStyle = .replace
     flush()
     input.setMarkedText("候", selectedRange: .init(location: 1, length: 0),
