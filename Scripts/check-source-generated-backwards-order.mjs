@@ -278,6 +278,34 @@ for (const published of [1, 100]) {
   ownedSectionError=undefined;
 }
 console.log('2 pinned complete-addWord rejection cases passed (side pull propagates rejection without timer failure; generator catches rejection and fails without source toggle; owned rejecting provider, not MediaWiki transport or browser presentation evidence).');
+// Authored storage/cursor states isolate the side-pull boundary. They do not
+// establish that every state is reachable through real keyboard navigation.
+for (const fixture of [
+  {name:'twenty published fields remain', active:80, limit:300, calls:0, added:['retained0']},
+  {name:'nineteen published fields remain with cached tail', active:81, limit:300,
+    calls:1, added:['fresh', 'later', 'retained0']},
+  {name:'cached tail reaches finite budget but published fields do not', active:81, limit:105,
+    calls:1, added:['fresh', 'later', 'retained0']},
+]) {
+  config.mode='words';config.words=fixture.limit;config.language='english';
+  activeNames=['poetry'];ownedRepeated=false;ownedSectionError=undefined;
+  ownedSection={words:['setup']};ownedSectionQueue=[];
+  await main.namespace.generateWords({name:'english',words:['owned']});
+  testWords.words.reset();
+  for(let i=0;i<100;i++)testWords.words.push(`owned${i} `,0);
+  main.namespace.currentSection.splice(0,main.namespace.currentSection.length,
+    ...Array.from({length:5},(_,i)=>`retained${i}`));
+  ownedActiveWordIndex=fixture.active;
+  ownedSection={words:['fresh','later']};ownedSectionQueue=[];
+  sectionCalls=0;restarts=0;failures.length=0;notices.length=0;toggledSources.length=0;displayed.length=0;
+  await addWord();
+  assert.equal(sectionCalls,fixture.calls,fixture.name);
+  assert.deepEqual(testWords.words.get().slice(100).map(word=>word.text),fixture.added,fixture.name);
+  assert.deepEqual(Array.from(main.namespace.currentSection),['retained1','retained2','retained3','retained4']);
+  assert.deepEqual(failures,[]);assert.deepEqual(toggledSources,[]);assert.equal(restarts,0);
+  console.log(`PASS side threshold: ${fixture.name}`);
+}
+console.log('3 side-threshold cases passed: published count controls demand and finite completion; cached ownership alone does not suppress a side pull. Authored state, no navigation/HTTP reachability claim.');
 config.words=103;
 testWords.words.reset();
 for(let i=0;i<100;i++)testWords.words.push(`owned${i} `,0);
