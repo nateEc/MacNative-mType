@@ -946,6 +946,50 @@ struct TransformedPromptBatch {
       noSpaceTargetWords: noSpaceTargetWords + next.noSpaceTargetWords, sourceFields: combined)
   }
 
+  func takingFirstField() -> (first: Self, remaining: Self?)? {
+    // Source fields own internal LF and Unicode boundaries. Never recover
+    // those fields by splitting the rendered text on arbitrary whitespace.
+    let fields: [String]
+    if !noSpaceTargetWords.isEmpty { fields = noSpaceTargetWords }
+    else if let sourceFields { fields = sourceFields }
+    else {
+      guard !text.isEmpty else { return nil }
+      let start = text.firstIndex(where: { $0 != " " }) ?? text.endIndex
+      let end = text[start...].firstIndex(of: " ").map { text.index(after: $0) } ?? text.endIndex
+      fields = [String(text[..<end]), String(text[end...])].filter { !$0.isEmpty }
+    }
+    guard let first = fields.first else { return nil }
+    let tail = Array(fields.dropFirst())
+    let keepsSourceFields = sourceFields?.count == fields.count
+    return (
+      .init(text: first, noSpaceTargetWords: noSpaceTargetWords.isEmpty ? [] : [first],
+        sourceFields: keepsSourceFields ? [first] : nil),
+      tail.isEmpty ? nil : .init(text: tail.joined(),
+        noSpaceTargetWords: noSpaceTargetWords.isEmpty ? [] : tail,
+        sourceFields: keepsSourceFields ? tail : nil))
+  }
+
+  var retainedFieldCount: Int? {
+    noSpaceTargetWords.isEmpty ? sourceFields?.count : noSpaceTargetWords.count
+  }
+
+  func retainedField(at index: Int) -> Self? {
+    let fields = noSpaceTargetWords.isEmpty ? sourceFields : noSpaceTargetWords
+    guard let fields, fields.indices.contains(index) else { return nil }
+    return .init(text: fields[index],
+      noSpaceTargetWords: noSpaceTargetWords.isEmpty ? [] : [fields[index]],
+      sourceFields: sourceFields?.count == fields.count ? [fields[index]] : nil)
+  }
+
+  func remainingFields(startingAt index: Int) -> Self? {
+    if index == 0 { return self }
+    let fields = noSpaceTargetWords.isEmpty ? sourceFields : noSpaceTargetWords
+    guard let fields, fields.indices.contains(index) else { return nil }
+    let tail = Array(fields[index...])
+    return .init(text: tail.joined(), noSpaceTargetWords: noSpaceTargetWords.isEmpty ? [] : tail,
+      sourceFields: sourceFields?.count == fields.count ? tail : nil)
+  }
+
   init(text: String, noSpaceTargetWords: [String] = [], sourceFields: [String]? = nil) {
     self.text = text
     self.sourceFields = sourceFields.flatMap { fields in
@@ -4474,6 +4518,9 @@ struct TypingSession {
   private var finiteCustomTextStream: CustomFiniteTextStream?
   private let initialFiniteCustomTextStream: CustomFiniteTextStream?
   private var externalPromptContinuation: TransformedPromptBatch?
+  // Keep validated provider fields immutable while consuming them. Rejoining
+  // the entire tail on every forward action would copy long sections O(n²).
+  private var liveContinuationFieldOffset = 0
   private var initialExternalPromptContinuation: TransformedPromptBatch?
   private let streamsLiveContent: Bool
   private var sectionEndIndices: [Int]
@@ -4918,7 +4965,8 @@ struct TypingSession {
         ? $0.sourceFields?.count ?? GeneratedWordBoundPolicy.wordCount(in: $0.text)
         : $0.noSpaceTargetWords.count
     } ?? 0
-    return (hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount) + pending
+    return (hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount)
+      + pending - liveContinuationFieldOffset
   }
 
   var needsLiveContentPrefetch: Bool {
@@ -4973,7 +5021,8 @@ struct TypingSession {
       ?? batch.prefixed(with: historySeparator)
     if let pending = externalPromptContinuation {
       externalPromptContinuation = nil
-      appendExternalBatch(pending)
+      appendExternalBatch(pending.remainingFields(startingAt: liveContinuationFieldOffset) ?? pending)
+      liveContinuationFieldOffset = 0
     }
     let separator = joinsWithoutSpace || prompt.last?.isWhitespace == true ? "" : " "
     appendExternalBatch(batch.prefixed(with: separator))
@@ -6819,7 +6868,7 @@ struct TypingSession {
     let commitErrorStart = ordinaryCommitErrorStart(for: inputCharacter, targetIndex: targetIndex)
     if retainsLeadingSeparator { retainedWordSeparatorTypedIndices.insert(typedGraphemeCount) }
     let hasGeneratedCursor = generatedWordContinuation != nil || generatedStreamContinuation != nil
-      || generatedCodeContinuation != nil
+      || generatedCodeContinuation != nil || streamsLiveContent && externalPromptContinuation != nil
     let generatedWordBefore = hasGeneratedCursor ? quoteNavigationIndex : 0
     appendTypedCharacter(
       inputCharacter, targetIndex: targetIndex,
@@ -8354,6 +8403,10 @@ struct TypingSession {
   private mutating func extendPromptIfNeeded(at date: Date) {
     guard !isAtEmptyNoSpaceWord, reachedInputTargetEnd else { return }
     if let chunk = externalPromptContinuation {
+      if streamsLiveContent {
+        appendRetainedLiveField()
+        return
+      }
       externalPromptContinuation = nil
       appendExternalBatch(chunk)
       return
@@ -8499,10 +8552,30 @@ struct TypingSession {
   private mutating func refillGeneratedIfNeeded(activeWordBefore: Int, at date: Date) {
     guard !isFinished,
       generatedWordContinuation?.hasRemaining == true || generatedStreamContinuation?.hasRemaining == true
-        || generatedCodeContinuation?.hasRemaining == true else { return }
+        || generatedCodeContinuation?.hasRemaining == true
+        || streamsLiveContent && externalPromptContinuation != nil else { return }
     let bound = configuration.visibleFutureWordCount ?? 100
     guard unitTargets.sourceFieldCount - (activeWordBefore + 1) <= bound else { return }
-    appendGeneratedWord(at: date)
+    if streamsLiveContent, externalPromptContinuation != nil { appendRetainedLiveField() }
+    else { appendGeneratedWord(at: date) }
+  }
+
+  private mutating func appendRetainedLiveField() {
+    if let pending = externalPromptContinuation,
+      let first = pending.retainedField(at: liveContinuationFieldOffset) {
+      liveContinuationFieldOffset += 1
+      if liveContinuationFieldOffset == pending.retainedFieldCount {
+        externalPromptContinuation = nil
+        liveContinuationFieldOffset = 0
+      }
+      appendExternalBatch(first)
+      return
+    }
+    // Legacy caller metadata is absent. Preserve its explicit ASCII-space
+    // fallback; actual factory-created live batches retain validated fields.
+    guard let next = externalPromptContinuation?.takingFirstField() else { return }
+    externalPromptContinuation = next.remaining
+    appendExternalBatch(next.first)
   }
 
   private mutating func appendGeneratedWord(at date: Date) {

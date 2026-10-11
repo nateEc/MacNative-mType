@@ -5,6 +5,128 @@ final class ProviderFieldSessionTests: XCTestCase {
   private let began = Date(timeIntervalSinceReferenceDate: 917_000_000)
   private let fields = ["north\nsouth ", "harbor ", "tail"]
 
+  func testTakingFirstFieldRetainsLiteralBoundariesWithoutResampling() throws {
+    let cases: [(TransformedPromptBatch, [String])] = [
+      (.init(text: "north\nsouth e\u{301} 🙂", sourceFields: ["north\nsouth ", "e\u{301} ", "🙂"]),
+        ["north\nsouth ", "e\u{301} ", "🙂"]),
+      (.init(text: "🇺🇸e\u{301}", noSpaceTargetWords: ["🇺", "🇸", "e\u{301}"],
+        sourceFields: ["🇺", "🇸", "e\u{301}"]), ["🇺", "🇸", "e\u{301}"]),
+      (.init(text: "north\nsouth e\u{301} 🙂"), ["north\nsouth ", "e\u{301} ", "🙂"]),
+    ]
+    for (batch, expected) in cases {
+      var pending: TransformedPromptBatch? = batch
+      var output = ""
+      for field in expected {
+        let next = try XCTUnwrap(pending?.takingFirstField())
+        XCTAssertTrue(next.first.text.utf16.elementsEqual(field.utf16))
+        if batch.sourceFields != nil { XCTAssertEqual(next.first.sourceFields, [field]) }
+        if !batch.noSpaceTargetWords.isEmpty { XCTAssertEqual(next.first.noSpaceTargetWords, [field]) }
+        output += next.first.text
+        pending = next.remaining
+      }
+      XCTAssertNil(pending)
+      XCTAssertTrue(output.utf16.elementsEqual(batch.text.utf16))
+    }
+    XCTAssertNil(TransformedPromptBatch(text: "").takingFirstField())
+  }
+
+  func testLiveUnderscoreGeneratorTailKeepsNoSpaceFieldsAndFiniteLastSuffix() {
+    let opening = (0..<100).map { "owned\($0)" }
+    let tail = ["next", "e\u{301}", "tail"]
+    var session = TestSessionFactory.make(configuration: TestConfiguration.words(103)
+      .with(modifiers: [.poetryStream, .underscoreSeparators]),
+      streamPrompt: opening.joined(separator: " "),
+      streamContinuation: .init(text: tail.joined(separator: " "), noSpaceBoundarySource: nil),
+      streamsLiveContent: true)
+    let original = opening.map { $0 + "_" }.joined()
+    XCTAssertEqual(session.prompt, original)
+    let renderedTail = ["next_", "e\u{301}_", "tail"]
+    for i in 0..<3 {
+      session.insertBatch(opening[i] + "_", at: began.addingTimeInterval(Double(i)))
+      XCTAssertEqual(session.prompt, original + renderedTail.prefix(i + 1).joined())
+      XCTAssertEqual(session.completedWordCount, i + 1)
+    }
+    session.insertBatch(opening.dropFirst(3).map { $0 + "_" }.joined() + renderedTail.joined(),
+      at: began.addingTimeInterval(4))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 103)
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertFalse(session.prompt.hasSuffix("_"))
+  }
+
+  func testNonLiveExternalContinuationKeepsItsExistingBatchBoundary() {
+    var session = TypingSession(configuration: .words(4), prompt: "north harbor ",
+      sourceFields: ["north ", "harbor "],
+      externalPromptContinuation: .init(text: "third tail", sourceFields: ["third ", "tail"]))
+    session.insertBatch("north ", at: began)
+    XCTAssertEqual(session.prompt, "north harbor ")
+    session.insertBatch("harbor ", at: began.addingTimeInterval(1))
+    XCTAssertEqual(session.prompt, "north harbor third tail")
+    session.insertBatch("third tail", at: began.addingTimeInterval(2))
+    XCTAssertEqual(session.outcome, .completed)
+  }
+
+  func testNewSectionAfterPartialTailConsumptionDoesNotDuplicateFieldsOrRepeatHistory() {
+    for underscore in [false, true] {
+      let modifiers: [TestModifier] = underscore ? [.poetryStream, .underscoreSeparators] : [.poetryStream]
+      let opening = (0..<100).map { "owned\($0)" }
+      let tail = ["next", "e\u{301}", "tail"]
+      var session = TestSessionFactory.make(configuration: TestConfiguration.words(105).with(modifiers: modifiers),
+        streamPrompt: opening.joined(separator: " "),
+        streamContinuation: .init(text: tail.joined(separator: " "), noSpaceBoundarySource: nil),
+        streamsLiveContent: true)
+      let commit = underscore ? "_" : " "
+      let first = opening[0] + commit
+      session.insertBatch(first, at: began)
+      XCTAssertTrue(session.prompt.hasSuffix(tail[0] + commit))
+      XCTAssertTrue(session.appendLiveContent(.init(text: "anchor last ignored", noSpaceBoundarySource: nil)))
+      let allWords = opening + tail + ["anchor", "last"]
+      let expected = allWords.dropLast().map { $0 + commit }.joined() + allWords.last!
+      XCTAssertEqual(session.prompt, expected,
+        "A new section drains only the unconsumed tail and clips the finite budget")
+      XCTAssertFalse(session.prompt.contains("ignored"))
+      session.insertBatch(String(expected.dropFirst(first.count)), at: began.addingTimeInterval(1))
+      XCTAssertEqual(session.outcome, .completed)
+      XCTAssertEqual(session.completedWordCount, 105)
+      XCTAssertEqual(session.errors, 0)
+      var repeated = session.repeatedAttempt()
+      repeated.insertBatch(expected, at: began.addingTimeInterval(2))
+      XCTAssertEqual(repeated.outcome, .completed)
+      XCTAssertEqual(repeated.completedWordCount, 105)
+      XCTAssertEqual(repeated.errors, 0)
+    }
+  }
+
+  func testLiveGeneratorTailPublishesOneFieldPerForwardCommitAndRepeatsExactly() throws {
+    let opening = (0..<100).map { "owned\($0) " }
+    let tail = ["north\nsouth ", "e\u{301} ", "tail"]
+    var session = TypingSession(configuration: TestConfiguration.words(103).with(modifiers: [.poetryStream]),
+      prompt: opening.joined(), sourceFields: opening,
+      externalPromptContinuation: .init(text: tail.joined(), sourceFields: tail), streamsLiveContent: true)
+    let original = session.prompt
+    for i in 0..<3 {
+      session.insertBatch(opening[i], at: began.addingTimeInterval(Double(i)))
+      XCTAssertEqual(session.prompt, original + tail.prefix(i + 1).joined(),
+        "A forward commit publishes one retained source field, not none or the whole tail")
+      XCTAssertEqual(session.completedWordCount, i + 1)
+    }
+    let remainingInput = opening.dropFirst(3).joined() + "north\ne\u{301} tail"
+    session.insertBatch(remainingInput, at: began.addingTimeInterval(4))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 103)
+    XCTAssertEqual(session.wordReviews.count, 103)
+    XCTAssertEqual(session.errors, 0)
+    let result = try XCTUnwrap(session.result())
+    let accepted = opening.joined() + "north\ne\u{301} tail"
+    XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents, through: result.elapsedDuration), accepted)
+    var repeated = session.repeatedAttempt()
+    repeated.insertBatch(opening[0], at: began.addingTimeInterval(5))
+    XCTAssertEqual(repeated.prompt, original + tail[0])
+    repeated.insertBatch(opening.dropFirst().joined() + "north\ne\u{301} tail", at: began.addingTimeInterval(6))
+    XCTAssertEqual(repeated.outcome, .completed)
+    XCTAssertEqual(repeated.errors, 0)
+  }
+
   func testEmptyInitialGenerationIsTerminalWithoutAnAttemptResult() {
     let configuration = TestConfiguration.words(4).with(modifiers: [.poetryStream])
     var session = TypingSession(configuration: configuration, prompt: "",

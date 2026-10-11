@@ -16,6 +16,7 @@ const config={mode:'words',words:3,language:'english',showAllLines:false,lazyMod
   punctuation:false,numbers:false,britishEnglish:false};
 let activeNames=['backwards','binary'], functions, drawIndex=0;
 let ownedIndexes=[], spacingMs=0, ownedRepeated=false;
+let ownedActiveWordIndex=0;
 let ownedSection, sectionCalls=0;
 let ownedSectionQueue=[];
 const toggledSources=[];
@@ -35,7 +36,7 @@ const bindings={
   'test/practise-words':{before:{mode:null}},
   'controllers/quotes-controller':{default:{}},
   'states/test':{isRepeated:()=>ownedRepeated,getCurrentQuote:()=>null,setCurrentQuote:()=>{},getSelectedQuoteId:()=>null,
-    getActiveWordIndex:()=>0},
+    getActiveWordIndex:()=>ownedActiveWordIndex},
   'test/funbox/list':{
     getActiveFunboxes:active,
     getActiveFunboxesWithFunction:name=>active().filter(value=>typeof value.functions[name]==='function'),
@@ -221,7 +222,7 @@ const addWord=vm.compileFunction(addBody+'\nreturn addWord;',[
   'Config','TestWords','WordsGenerator','TestUI','getActiveFunboxes','getActiveWordIndex',
   'findSingleActiveFunboxWithFunction','showErrorNotification','toggleFunbox','restart','timerEvent',
 ])(config,testWords,main.namespace,
-  {addWord:word=>displayed.push(word),appendEmptyWordElement:unexpected},active,()=>0,
+  {addWord:word=>displayed.push(word),appendEmptyWordElement:unexpected},active,()=>ownedActiveWordIndex,
   name=>active().find(value=>typeof value.functions[name]==='function'),
   (...args)=>notices.push(args),bindings['config/setters'].toggleFunbox,
   async()=>{restarts++},{dispatch:value=>failures.push(value)});
@@ -251,3 +252,23 @@ for(const fixture of [
   assert.equal(ownedSectionQueue.length,0,fixture.name);
 }
 console.log('6 pinned complete-addWord cases passed with actual generator/functions/word storage (owned provider, UI, active index, notification and timer boundaries; no full test-logic module, HTTP, DOM or native recovery equivalence claim).');
+config.words=103;
+testWords.words.reset();
+for(let i=0;i<100;i++)testWords.words.push(`owned${i} `,0);
+main.namespace.currentSection.splice(0,main.namespace.currentSection.length,'north\nsouth','e\u0301','tail');
+sectionCalls=0;displayed.length=0;failures.length=0;toggledSources.length=0;
+for(let i=0;i<3;i++){
+  // word-navigation calls addWord before increasing the active index.
+  ownedActiveWordIndex=i;
+  await addWord();
+  assert.equal(testWords.words.length,101+i);
+  assert.equal(main.namespace.currentSection.length,2-i);
+  assert.equal(sectionCalls,0,'A retained generator tail supplies one new field per forward transition');
+}
+assert.deepEqual(displayed,['north\nsouth','e\u0301','tail']);
+assert.equal(testWords.words.get(102).commit,'','Final finite target has no commit');
+assert.deepEqual(failures,[]);assert.deepEqual(toggledSources,[]);
+ownedActiveWordIndex=3;
+await addWord();
+assert.equal(testWords.words.length,103);assert.equal(sectionCalls,0);
+console.log('Pinned sequential forward-tail case passed (100 published fields plus 3 retained fields; actual addWord/generator/storage, owned forward index; no navigation or physical-input execution claim).');
