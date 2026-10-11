@@ -19,6 +19,7 @@ let ownedIndexes=[], spacingMs=0, ownedRepeated=false;
 let ownedActiveWordIndex=0;
 let ownedSection, sectionCalls=0;
 let ownedSectionQueue=[];
+let ownedSectionError;
 const toggledSources=[];
 const languages={english:{name:'english',words:['ab','cd'],rightToLeft:false},
   owned:{name:'owned',words:['ef','gh'],rightToLeft:false}};
@@ -31,7 +32,7 @@ const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuff
 const bindings={
   'config/store':{Config:config},
   'config/setters':{toggleFunbox:name=>toggledSources.push(name)},
-  'test/poetry':{getPoem:async()=>{sectionCalls++;return ownedSectionQueue.length?ownedSectionQueue.shift():ownedSection}},
+  'test/poetry':{getPoem:async()=>{sectionCalls++;if(ownedSectionError)throw ownedSectionError;return ownedSectionQueue.length?ownedSectionQueue.shift():ownedSection}},
   'test/custom-text':{getPipeDelimiter:()=>false},
   'test/practise-words':{before:{mode:null}},
   'controllers/quotes-controller':{default:{}},
@@ -252,6 +253,31 @@ for(const fixture of [
   assert.equal(ownedSectionQueue.length,0,fixture.name);
 }
 console.log('6 pinned complete-addWord cases passed with actual generator/functions/word storage (owned provider, UI, active index, notification and timer boundaries; no full test-logic module, HTTP, DOM or native recovery equivalence claim).');
+// A rejected provider Promise is not a false return. Use an owned rejecting
+// adapter to isolate propagation through the complete real caller; this does
+// not claim that poetry itself rejects, or execute MediaWiki transport.
+for (const published of [1, 100]) {
+  config.words=300;ownedActiveWordIndex=0;
+  testWords.words.reset();
+  for(let i=0;i<published;i++)testWords.words.push(`owned${i} `,0);
+  const tail=published===1?['retained']:[];
+  main.namespace.currentSection.splice(0,main.namespace.currentSection.length,...tail);
+  ownedSectionQueue=[];ownedSectionError=new Error('Owned provider rejection');
+  sectionCalls=0;restarts=0;toggledSources.length=0;
+  failures.length=0;notices.length=0;displayed.length=0;
+  if(published===1) await assert.rejects(addWord(),error=>error===ownedSectionError);
+  else await addWord();
+  assert.equal(sectionCalls,1);
+  assert.equal(testWords.words.length,published);
+  assert.deepEqual(Array.from(main.namespace.currentSection),tail);
+  assert.deepEqual(displayed,[]);
+  assert.deepEqual(toggledSources,[],'Rejection does not reach the false/undefined toggle branch');
+  assert.equal(restarts,0);
+  assert.deepEqual(failures,published===1?[]:[{key:'fail',value:'word generation error'}]);
+  assert.equal(notices.length,published===1?0:1);
+  ownedSectionError=undefined;
+}
+console.log('2 pinned complete-addWord rejection cases passed (side pull propagates rejection without timer failure; generator catches rejection and fails without source toggle; owned rejecting provider, not MediaWiki transport or browser presentation evidence).');
 config.words=103;
 testWords.words.reset();
 for(let i=0;i<100;i++)testWords.words.push(`owned${i} `,0);

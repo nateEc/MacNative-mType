@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 TST-02 调用方异常传播新增可执行证据：固定参考完整 addWord／真实生成器和存储的两项自有拒绝 Promise 场景通过；旁路原样拒绝且保持余池／来源，无通知或失败；生成器捕获、通知并派发失败，但不关闭来源。既有探针全部通过，见 `work/provider-rejection-caller-source.log` 与 EMPTY_PROVIDER_GENERATION_CHECKPOINT.md。提供者为自有拒绝适配器，不是实际百科网络／浏览器端到端证据；原生 Optional 折叠后关闭来源的差异待宿主回归修复，本轮未改产品、未跑完整门禁、不升级验收分类，零主程序实例，goal active。
+
 2026-10-12 TST-02 提供者响应可达性审查：新增固定参考实际 poetry 模块六项隔离网络响应探针，正常内容／成功空段／空数组／缺少 lines／JSON 与传输拒绝均通过，并接入完整门禁（本轮未重跑门禁）。poetry 正常结果为 Section 或 false；undefined 仅保留为调用方防御测试，不冒称生产可达。源码发现 wikipedia 拒绝 Promise 未由 funbox 包装转换为 false，且旁路 await 在生成器 catch 外；实际网页异常最终状态未运行验证，原生 Optional 失败策略不能因此宣称兼容。详情见 EMPTY_PROVIDER_GENERATION_CHECKPOINT.md，旁路词序与阈值等缺口仍开放，验收分类不升级；零主程序实例，goal active。
 
 2026-10-12 TST-02 独立在线生成器已接入真实异步宿主：需求由实际词前进记录，消费最后余池字段时不提前取段，下一次前进取段；成功只发布一个字段，保留余池及原生输入 owner。生成器空段/传输失败与活动 NoQuit 旁路失败分开，取消/单飞/请求身份守卫保留。真实宿主及时序红测后，171 项最终定向回归零失败、无跳过，含 24 项在线宿主和其后 PB 保存；源码及原创边界通过，零主程序启动。中间 Pace 宿主失败及不可见 presenter 采样更正均保留证据，不称为产品性能修复。详见 [异步接线证据和未完成边界](EMPTY_PROVIDER_GENERATION_CHECKPOINT.md)。旁路阈值/词序、false/undefined、空段同调用重取、全部修饰器/并发导航/真实网络、IME/视觉/性能及新全量门禁仍开放，功能分类和整体 goal active 不变。
