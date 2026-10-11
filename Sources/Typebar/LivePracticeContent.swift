@@ -107,12 +107,26 @@ enum LivePracticeContentService {
     let extract: String
   }
 
+  private struct EncyclopediaIdentity: Decodable {
+    let pageid: Int
+    let title: String
+    let author: String?
+  }
+
+  private struct EncyclopediaIntroduction: Decodable {
+    struct Query: Decodable {
+      struct Page: Decodable { let extract: String }
+      let pages: [String: Page]
+    }
+    let query: Query
+  }
+
   static func fetch(
-    source: LivePracticeContentSource, language: TypingLanguage
+    source: LivePracticeContentSource, language: TypingLanguage, session: URLSession = .shared
   ) async -> LivePracticeContent? {
     switch source {
-    case .poetry: return await fetchPoetry()
-    case .encyclopedia: return await fetchEncyclopedia(language: language)
+    case .poetry: return await fetchPoetry(session: session)
+    case .encyclopedia: return await fetchEncyclopedia(language: language, session: session)
     }
   }
 
@@ -136,24 +150,46 @@ enum LivePracticeContentService {
       language: language)
   }
 
-  private static func fetchPoetry() async -> LivePracticeContent? {
+  private static func fetchPoetry(session: URLSession) async -> LivePracticeContent? {
     guard let url = URL(string: "https://poetrydb.org/random") else { return nil }
-    guard let data = await data(from: url) else { return nil }
+    guard let data = await data(from: url, session: session) else { return nil }
     return poetry(from: data)
   }
 
-  private static func fetchEncyclopedia(language: TypingLanguage) async -> LivePracticeContent? {
-    guard let url = URL(string: "https://\(wikipediaLanguageCode(for: language)).wikipedia.org/api/rest_v1/page/random/summary")
+  private static func fetchEncyclopedia(language: TypingLanguage, session: URLSession) async -> LivePracticeContent? {
+    let host = "\(wikipediaLanguageCode(for: language)).wikipedia.org"
+    guard !Task.isCancelled,
+      let url = URL(string: "https://\(host)/api/rest_v1/page/random/summary"),
+      let identityData = await data(from: url, session: session),
+      let identity = try? JSONDecoder().decode(EncyclopediaIdentity.self, from: identityData),
+      identity.pageid > 0, !Task.isCancelled
     else { return nil }
-    guard let data = await data(from: url) else { return nil }
-    return encyclopedia(from: data, language: language)
+
+    var introductionURL = URLComponents()
+    introductionURL.scheme = "https"
+    introductionURL.host = host
+    introductionURL.path = "/w/api.php"
+    // Ask the upstream extractor for text; never render or execute remote HTML.
+    introductionURL.queryItems = [
+      .init(name: "action", value: "query"), .init(name: "format", value: "json"),
+      .init(name: "pageids", value: String(identity.pageid)),
+      .init(name: "prop", value: "extracts"), .init(name: "exintro", value: "true"),
+      .init(name: "explaintext", value: "true")
+    ]
+    guard let url = introductionURL.url,
+      let introductionData = await data(from: url, session: session), !Task.isCancelled,
+      let introduction = try? JSONDecoder().decode(EncyclopediaIntroduction.self, from: introductionData),
+      let page = introduction.query.pages[String(identity.pageid)]
+    else { return nil }
+    return makeContent(source: .encyclopedia, title: identity.title, byline: identity.author,
+      rawText: page.extract, language: language)
   }
 
-  private static func data(from url: URL) async -> Data? {
+  private static func data(from url: URL, session: URLSession) async -> Data? {
     var request = URLRequest(url: url)
     request.timeoutInterval = 8
     request.setValue("Typebar/0.1 (native macOS typing practice)", forHTTPHeaderField: "User-Agent")
-    guard let (data, response) = try? await URLSession.shared.data(for: request),
+    guard let (data, response) = try? await session.data(for: request),
       let http = response as? HTTPURLResponse,
       (200..<300).contains(http.statusCode)
     else { return nil }
