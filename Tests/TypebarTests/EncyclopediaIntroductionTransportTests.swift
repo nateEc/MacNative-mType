@@ -411,7 +411,7 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
-  func testNewLiveSectionAppendsAfterPendingTailWithoutResettingInputOrReplay() throws {
+  func testNewLiveSectionPrecedesRetainedTailWithoutResettingInputOrReplay() throws {
     for (language, tokens, separator) in [
       (TypingLanguage.english, (0..<190).map { "owned\($0)" }, " "),
       (.simplifiedChinese, (0..<190).map { "港\($0)船" }, "")
@@ -423,7 +423,7 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
       let preview = content.promptDescriptor(for: configuration)
       var practice = TestSessionFactory.make(configuration: configuration,
         streamPrompt: preview.text, streamNoSpaceBoundarySource: preview.noSpaceBoundarySource,
-        streamContinuation: content.continuationDescriptor(for: configuration))
+        streamContinuation: content.continuationDescriptor(for: configuration), streamsLiveContent: true)
       let now = Date(timeIntervalSince1970: 1_700_000_000)
       practice.insertBatch(tokens.prefix(10).joined(separator: separator) + separator, at: now)
       let started = practice.startedAt
@@ -437,9 +437,10 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
         noSpaceBoundarySource: separator.isEmpty ? extra.joined(separator: " ") : nil)))
       XCTAssertEqual(practice.startedAt, started)
       XCTAssertEqual(practice.completedWordCount, 10)
-      let expected = tokens.prefix(175).joined(separator: separator)
-      XCTAssertEqual(practice.prompt, expected)
-      practice.insertBatch(tokens[10..<175].joined(separator: separator), at: now)
+      let expectedWords = Array(tokens.prefix(110)) + Array(extra) + Array(tokens[110..<136])
+      let expected = expectedWords.joined(separator: separator)
+      XCTAssertEqual(practice.prompt, expectedWords.prefix(150).joined(separator: separator) + separator)
+      practice.insertBatch(expectedWords.dropFirst(10).joined(separator: separator), at: now)
       XCTAssertEqual(practice.outcome, .completed)
       XCTAssertEqual(practice.errors, 0)
       XCTAssertEqual(practice.completedWordCount, 175)
@@ -449,14 +450,19 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
       XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
         through: result.elapsedDuration), expected)
       var repeated = practice.repeatedAttempt()
-      repeated.insertBatch(expected, at: now)
-      XCTAssertEqual(repeated.prompt, expected)
+      repeated.insertBatch(tokens.prefix(136).joined(separator: separator) + separator, at: now)
+      XCTAssertTrue(repeated.needsLiveContentGeneration)
+      XCTAssertTrue(repeated.acceptGeneratedLiveContent(.init(text: extra.joined(separator: separator),
+        noSpaceBoundarySource: separator.isEmpty ? extra.joined(separator: " ") : nil)))
+      repeated.insertBatch(extra.joined(separator: separator), at: now)
+      XCTAssertEqual(repeated.prompt, (Array(tokens.prefix(136)) + Array(extra)).joined(separator: separator))
+      XCTAssertNotEqual(repeated.prompt, expected, "Direct side fields are not inserted into generator replay history")
       XCTAssertEqual(repeated.outcome, .completed)
       XCTAssertEqual(repeated.errors, 0)
     }
   }
 
-  func testLivePrefetchThresholdCountsPendingTailAndStopsAtLoadedFiniteBudget() throws {
+  func testLivePrefetchThresholdCountsPublishedFieldsRatherThanPendingTail() throws {
     for (language, tokens, separator) in [
       (TypingLanguage.english, (0..<300).map { "owned\($0)" }, " "),
       (.simplifiedChinese, (0..<300).map { "港\($0)船" }, "")
@@ -472,7 +478,7 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
       let now = Date(timeIntervalSince1970: 1_700_000_000)
       XCTAssertFalse(practice.needsLiveContentPrefetch)
       practice.insertBatch(tokens.prefix(81).joined(separator: separator) + separator, at: now)
-      XCTAssertFalse(practice.needsLiveContentPrefetch, "The queued 51-word tail is still available")
+      XCTAssertTrue(practice.needsLiveContentPrefetch, "A queued tail does not suppress the published nineteen-field side threshold")
       practice.insertBatch(tokens[81..<131].joined(separator: separator) + separator, at: now)
       XCTAssertEqual(practice.completedWordCount, 131)
       XCTAssertFalse(practice.needsLiveContentPrefetch, "Exactly 20 remaining words does not trigger")
@@ -553,7 +559,12 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
       XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
         through: result.elapsedDuration), tokens.joined(separator: separator))
       var repeated = practice.repeatedAttempt()
-      repeated.insertBatch(tokens.joined(separator: separator), at: now)
+      repeated.insertBatch(tokens.prefix(100).joined(separator: separator) + separator, at: now)
+      XCTAssertEqual(repeated.outcome, .active)
+      XCTAssertTrue(repeated.needsLiveContentGeneration, "The directly published side section was not saved as generator history")
+      XCTAssertTrue(repeated.acceptGeneratedLiveContent(.init(text: rest.joined(separator: separator),
+        noSpaceBoundarySource: separator.isEmpty ? rest.joined(separator: " ") : nil)))
+      repeated.insertBatch(rest.joined(separator: separator), at: now)
       XCTAssertEqual(repeated.outcome, .completed)
       XCTAssertEqual(repeated.errors, 0)
     }
@@ -727,20 +738,29 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
           XCTAssertTrue(practice.appendLiveContent(try XCTUnwrap(next).sectionDescriptor))
           XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 4)
           XCTAssertFalse(practice.needsLiveContentPrefetch, "The finite budget is now fully loaded")
-          let remaining = tokens[106..<175].joined(separator: separator)
+          let sideInput = tokens[125..<180].joined(separator: underscore ? "" : separator)
+          let remaining = tokens[106..<125].joined(separator: separator) + separator + sideInput
           practice.insertBatch(String(remaining.dropLast()), at: began.addingTimeInterval(2))
           XCTAssertFalse(practice.isFinished)
           practice.insertBatch(String(remaining.suffix(1)), at: began.addingTimeInterval(3))
           XCTAssertEqual(practice.outcome, .completed)
-          XCTAssertEqual(practice.completedWordCount, 175)
+          XCTAssertEqual(practice.completedWordCount, 180, "The fetched 55-field side section is not clipped to fifty remaining fields")
           XCTAssertEqual(practice.errors, 0)
-          let expected = tokens.prefix(175).joined(separator: separator)
+          let expected = tokens.prefix(125).joined(separator: separator) + separator + sideInput
           let result = try XCTUnwrap(practice.result())
           XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
             through: result.elapsedDuration), expected)
           XCTAssertEqual(try XCTUnwrap(TestResultRecord(result: result).portableResult), result)
           var repeated = practice.repeatedAttempt()
-          repeated.insertBatch(expected, at: began.addingTimeInterval(4))
+          repeated.insertBatch(tokens.prefix(125).joined(separator: separator) + separator, at: began.addingTimeInterval(4))
+          XCTAssertTrue(repeated.needsLiveContentGeneration)
+          XCTAssertEqual(repeated.errors, 0, "Saved-history phase: \(language), underscore=\(underscore)")
+          XCTAssertEqual(repeated.typed, tokens.prefix(125).joined(separator: separator) + separator,
+            "Saved-history input boundary: \(language), underscore=\(underscore)")
+          XCTAssertTrue(repeated.acceptGeneratedLiveContent(try XCTUnwrap(next).sectionDescriptor))
+          XCTAssertEqual(repeated.nextExpectedCharacter, "海", "Fresh-section boundary: \(language), underscore=\(underscore)")
+          repeated.insertBatch(tokens[125..<175].joined(separator: separator), at: began.addingTimeInterval(5))
+          XCTAssertEqual(repeated.prompt, tokens.prefix(175).joined(separator: separator))
           XCTAssertEqual(repeated.outcome, .completed)
           XCTAssertEqual(repeated.completedWordCount, 175)
           XCTAssertEqual(repeated.errors, 0)

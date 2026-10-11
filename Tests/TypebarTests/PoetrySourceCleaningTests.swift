@@ -33,7 +33,7 @@ final class PoetrySourceCleaningTests: XCTestCase {
     XCTAssertEqual(calls, 1)
   }
 
-  func testParsedFactoryPrefetchPreservesSourceFieldsAndFiniteBudgetThroughReplay() throws {
+  func testParsedFactorySideSectionPreservesFieldsOversupplyAndRequiresFreshRepeatGeneration() throws {
     let opening = try content(lines: ["north\nsouth"] + (1..<100).map { "owned\($0)" })
     let next = try content(lines: ["third\nfourth tail ignored"])
     let began = Date(timeIntervalSinceReferenceDate: 917_000_000)
@@ -43,23 +43,28 @@ final class PoetrySourceCleaningTests: XCTestCase {
       var session = TestSessionFactory.make(configuration: configuration,
         streamPrompt: opening.prompt(for: configuration), streamsLiveContent: true)
       XCTAssertTrue(session.appendLiveContent(next.sectionDescriptor))
-      XCTAssertFalse(session.prompt.contains("ignored"))
+      XCTAssertTrue(session.prompt.contains("ignored"), "The side caller caps section size, not the remaining global budget")
       XCTAssertFalse(session.needsLiveContentPrefetch)
       let first = stop == .off ? "north\n" : "north\nsouth "
       let last = stop == .off ? "third\ntail" : "third\nfourth tail"
-      let entered = first + (1..<100).map { "owned\($0) " }.joined() + last
+      let openingInput = first + (1..<100).map { "owned\($0) " }.joined()
+      let entered = openingInput + last + " ignored"
       session.insertBatch(String(entered.dropLast()), at: began)
       XCTAssertFalse(session.isFinished)
-      session.insertBatch("l", at: began.addingTimeInterval(2))
+      session.insertBatch("d", at: began.addingTimeInterval(2))
       XCTAssertEqual(session.outcome, .completed)
-      XCTAssertEqual(session.completedWordCount, 102)
-      XCTAssertEqual(session.wordReviews.count, 102)
+      XCTAssertEqual(session.completedWordCount, 103)
+      XCTAssertEqual(session.wordReviews.count, 103)
       if stop != .off { XCTAssertEqual(session.errors, 0) }
       let result = try XCTUnwrap(session.result())
       XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
         through: result.elapsedDuration), entered)
       var repeated = session.repeatedAttempt()
-      repeated.insertBatch(entered, at: began.addingTimeInterval(5))
+      repeated.insertBatch(openingInput, at: began.addingTimeInterval(5))
+      XCTAssertTrue(repeated.needsLiveContentGeneration)
+      XCTAssertFalse(repeated.prompt.contains("ignored"), "The side caller did not save generator returns")
+      XCTAssertTrue(repeated.acceptGeneratedLiveContent(next.sectionDescriptor))
+      repeated.insertBatch(last, at: began.addingTimeInterval(6))
       XCTAssertEqual(repeated.outcome, .completed)
       XCTAssertEqual(repeated.completedWordCount, 102)
     }

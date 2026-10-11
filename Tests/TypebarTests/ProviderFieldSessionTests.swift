@@ -80,17 +80,26 @@ final class ProviderFieldSessionTests: XCTestCase {
       session.insertBatch(first, at: began)
       XCTAssertTrue(session.prompt.hasSuffix(tail[0] + commit))
       XCTAssertTrue(session.appendLiveContent(.init(text: "anchor last ignored", noSpaceBoundarySource: nil)))
-      let allWords = opening + tail + ["anchor", "last"]
-      let expected = allWords.dropLast().map { $0 + commit }.joined() + allWords.last!
+      let generatedPrefix = (opening + [tail[0]]).map { $0 + commit }.joined()
+      let sideText = ["anchor", "last", "ignored"].joined(separator: underscore ? "" : " ")
+      let expected = generatedPrefix + sideText + (underscore ? "" : " ") + tail[1] + (underscore ? "_" : "")
       XCTAssertEqual(session.prompt, expected,
-        "A new section drains only the unconsumed tail and clips the finite budget")
-      XCTAssertFalse(session.prompt.contains("ignored"))
+        "A side section publishes raw fields before consuming one old generator field")
+      XCTAssertTrue(session.prompt.contains("ignored"))
+      XCTAssertFalse(session.prompt.hasSuffix(tail[2]), "The remaining cache does not drain after the finite published budget is reached")
       session.insertBatch(String(expected.dropFirst(first.count)), at: began.addingTimeInterval(1))
       XCTAssertEqual(session.outcome, .completed)
       XCTAssertEqual(session.completedWordCount, 105)
       XCTAssertEqual(session.errors, 0)
       var repeated = session.repeatedAttempt()
-      repeated.insertBatch(expected, at: began.addingTimeInterval(2))
+      repeated.insertBatch(opening.prefix(3).map { $0 + commit }.joined(), at: began.addingTimeInterval(2))
+      XCTAssertTrue(repeated.needsLiveContentGeneration)
+      XCTAssertEqual(repeated.prompt, (opening + Array(tail.prefix(2))).map { $0 + commit }.joined())
+      XCTAssertTrue(repeated.acceptGeneratedLiveContent(.init(text: "anchor last ignored", noSpaceBoundarySource: nil)))
+      let repeatedWords = opening + Array(tail.prefix(2)) + ["anchor", "last", "ignored"]
+      let repeatExpected = repeatedWords.dropLast().map { $0 + commit }.joined() + repeatedWords.last!
+      let repeatPrefix = opening.prefix(3).map { $0 + commit }.joined()
+      repeated.insertBatch(String(repeatExpected.dropFirst(repeatPrefix.count)), at: began.addingTimeInterval(3))
       XCTAssertEqual(repeated.outcome, .completed)
       XCTAssertEqual(repeated.completedWordCount, 105)
       XCTAssertEqual(repeated.errors, 0)
@@ -172,31 +181,39 @@ final class ProviderFieldSessionTests: XCTestCase {
     XCTAssertEqual(invalid.prompt, legacy.prompt)
   }
 
-  func testNewLiveSectionRetainsFieldsAndRepeatHistory() throws {
+  func testNewLiveSectionRetainsRawFieldsButRepeatRequiresNewGeneration() throws {
     for opening in [["north\nsouth ", "harbor "], ["north\nsouth ", "harbor"]] {
       var session = TypingSession(configuration: TestConfiguration.words(4).with(modifiers: [.poetryStream]),
         prompt: opening.joined(), sourceFields: opening, streamsLiveContent: true)
       session.insertBatch("north\n", at: began)
       XCTAssertTrue(session.appendLiveContent(.init(text: "third\nfourth tail ignored", noSpaceBoundarySource: nil)))
-      XCTAssertFalse(session.prompt.contains("ignored"))
+      XCTAssertTrue(session.prompt.contains("ignored"), "A side section is not clipped to the remaining global budget")
       XCTAssertEqual(session.nextExpectedCharacter, "h")
       XCTAssertFalse(session.needsLiveContentPrefetch)
-      session.insertBatch("harbor third\ntai", at: began.addingTimeInterval(1))
+      session.insertBatch("harbor third\ntail ignore", at: began.addingTimeInterval(1))
       XCTAssertFalse(session.isFinished)
-      session.insertBatch("l", at: began.addingTimeInterval(2))
+      session.insertBatch("d", at: began.addingTimeInterval(2))
       XCTAssertEqual(session.outcome, .completed)
-      XCTAssertEqual(session.completedWordCount, 4)
+      XCTAssertEqual(session.completedWordCount, 5)
       let result = try XCTUnwrap(session.result())
       XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
-        through: result.elapsedDuration), "north\nharbor third\ntail")
+        through: result.elapsedDuration), "north\nharbor third\ntail ignored")
       var repeated = session.repeatedAttempt()
-      repeated.insertBatch("north\nharbor third\ntail", at: began.addingTimeInterval(5))
+      repeated.insertBatch("north\nharbor ", at: began.addingTimeInterval(5))
+      XCTAssertEqual(repeated.outcome, .active)
+      XCTAssertTrue(repeated.needsLiveContentGeneration)
+      XCTAssertFalse(repeated.prompt.contains("ignored"), "Direct side publication bypasses saved generator returns")
+      XCTAssertTrue(repeated.acceptGeneratedLiveContent(.init(text: "third\nfourth tail", noSpaceBoundarySource: nil)))
+      // The manually authored opening can omit its final commit. Blind input
+      // was rejected while waiting; explicitly submit it after content arrives.
+      if !repeated.typed.hasSuffix(" ") { repeated.insertBatch(" ", at: began.addingTimeInterval(6)) }
+      repeated.insertBatch("third\ntail", at: began.addingTimeInterval(6))
       XCTAssertEqual(repeated.outcome, .completed)
       XCTAssertEqual(repeated.completedWordCount, 4)
     }
   }
 
-  func testMultipleNewSectionsRetainAccumulatedRepeatHistory() {
+  func testMultipleSideSectionsDoNotAccumulateGeneratorRepeatHistory() {
     let opening = ["north\nsouth ", "harbor"]
     var session = TypingSession(configuration: TestConfiguration.words(6).with(modifiers: [.poetryStream]),
       prompt: opening.joined(), sourceFields: opening, streamsLiveContent: true)
@@ -208,19 +225,25 @@ final class ProviderFieldSessionTests: XCTestCase {
     XCTAssertEqual(session.outcome, .completed)
     XCTAssertEqual(session.completedWordCount, 6)
     var repeated = session.repeatedAttempt()
-    repeated.insertBatch("north\nharbor third\nanchor fifth\ntail", at: began.addingTimeInterval(5))
+    repeated.insertBatch("north\nharbor ", at: began.addingTimeInterval(5))
+    XCTAssertTrue(repeated.needsLiveContentGeneration)
+    XCTAssertEqual(repeated.completedWordCount, 2)
+    XCTAssertFalse(repeated.prompt.contains("third"))
+    XCTAssertTrue(repeated.acceptGeneratedLiveContent(.init(text: "third\nfourth anchor fifth\nsixth tail", noSpaceBoundarySource: nil)))
+    if !repeated.typed.hasSuffix(" ") { repeated.insertBatch(" ", at: began.addingTimeInterval(6)) }
+    repeated.insertBatch("third\nanchor fifth\ntail", at: began.addingTimeInterval(6))
     XCTAssertEqual(repeated.outcome, .completed)
     XCTAssertEqual(repeated.completedWordCount, 6)
   }
 
-  func testNewSectionRetainsTransformedUppercaseFields() {
+  func testSideSectionBypassesUppercaseButRetainsItsSourceFields() {
     let opening = ["NORTH\nSOUTH ", "HARBOR "]
     var session = TypingSession(configuration: TestConfiguration.words(4).with(modifiers: [.poetryStream, .uppercase]),
       prompt: opening.joined(), sourceFields: opening, streamsLiveContent: true)
     session.insertBatch("NORTH\n", at: began)
     XCTAssertTrue(session.appendLiveContent(.init(text: "third\nfourth tail", noSpaceBoundarySource: nil)))
-    XCTAssertTrue(session.prompt.hasSuffix("THIRD\nFOURTH TAIL"))
-    session.insertBatch("HARBOR THIRD\nTAIL", at: began.addingTimeInterval(2))
+    XCTAssertTrue(session.prompt.hasSuffix("third\nfourth tail"))
+    session.insertBatch("HARBOR third\ntail", at: began.addingTimeInterval(2))
     XCTAssertEqual(session.outcome, .completed)
     XCTAssertEqual(session.completedWordCount, 4)
   }
@@ -320,14 +343,14 @@ final class ProviderFieldSessionTests: XCTestCase {
     XCTAssertEqual(repeated.completedWordCount, 4)
   }
 
-  func testPendingLineFeedTerminatedFieldsFillBudgetWithoutExtraPrefetch() {
+  func testUnpublishedLineFeedFieldsDoNotSuppressSidePrefetch() {
     let opening = ["north ", "harbor "]
     let continuation = ["third\n", "tail"]
     var session = TypingSession(configuration: TestConfiguration.words(4).with(modifiers: [.poetryStream]),
       prompt: opening.joined(), sourceFields: opening,
       externalPromptContinuation: .init(text: continuation.joined(), sourceFields: continuation),
       streamsLiveContent: true)
-    XCTAssertFalse(session.needsLiveContentPrefetch)
+    XCTAssertTrue(session.needsLiveContentPrefetch, "The pinned side caller counts published fields, not cached ownership")
     session.insertBatch("north harbor third\n", at: began)
     XCTAssertEqual(session.completedWordCount, 3)
     XCTAssertEqual(session.nextExpectedCharacter, "t")

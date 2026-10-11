@@ -4522,6 +4522,8 @@ struct TypingSession {
   // the entire tail on every forward action would copy long sections O(n²).
   private var liveContinuationFieldOffset = 0
   private var liveGenerationDemand = false
+  private var consumedLiveGeneratorFields: [TransformedPromptBatch] = []
+  private var isReplayingLiveGeneratorHistory = false
   private var initialExternalPromptContinuation: TransformedPromptBatch?
   private let streamsLiveContent: Bool
   private var sectionEndIndices: [Int]
@@ -4861,7 +4863,7 @@ struct TypingSession {
           weakSpotScores: currentWeakSpotScores, wordDecorationState: liveWordDecorationState, elapsedClock: elapsedClock)
       }
     }
-    return TypingSession(
+    var repeated = TypingSession(
       configuration: configuration, prompt: initialPrompt, sourceFields: initialSourceFields,
       repeatingPrompt: repeatingPrompt,
       generatedWordContinuation: initialGeneratedWordContinuation.map {
@@ -4877,7 +4879,7 @@ struct TypingSession {
       randomCustomPreviousWords: initialRandomCustomPreviousWords,
       sequentialCustomWordStream: initialSequentialCustomWordStream,
       finiteCustomTextStream: initialFiniteCustomTextStream,
-      externalPromptContinuation: initialExternalPromptContinuation,
+      externalPromptContinuation: streamsLiveContent ? consumedLiveGeneratorReplay : initialExternalPromptContinuation,
       streamsLiveContent: streamsLiveContent,
       customSectionWordStream: initialCustomSectionWordStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
@@ -4886,6 +4888,11 @@ struct TypingSession {
       repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords, generationNotice: initialGenerationNotice,
       initializationFailure: initializationFailure, weakSpotScores: currentWeakSpotScores,
       wordDecorationState: liveWordDecorationState, elapsedClock: elapsedClock)
+    if streamsLiveContent {
+      repeated.consumedLiveGeneratorFields = consumedLiveGeneratorFields
+      repeated.isReplayingLiveGeneratorHistory = true
+    }
+    return repeated
   }
 
   var isFinished: Bool { outcome != .active }
@@ -4960,6 +4967,13 @@ struct TypingSession {
       || quoteWordStream?.hasRemaining == true
   }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
+  private var livePublishedWordCount: Int {
+    hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount
+  }
+  private var finiteCompletionWordLimit: Int? {
+    guard let limit = configuration.wordLimit, limit > 0 else { return configuration.wordLimit }
+    return streamsLiveContent && configuration.mode == .words ? max(limit, livePublishedWordCount) : limit
+  }
   private var loadedLiveContentWordCount: Int {
     let pending = externalPromptContinuation.map {
       $0.noSpaceTargetWords.isEmpty
@@ -4972,10 +4986,17 @@ struct TypingSession {
 
   var needsLiveContentPrefetch: Bool {
     guard !isFinished, LivePracticeContentSource.selected(for: configuration) != nil else { return false }
-    let loaded = loadedLiveContentWordCount
+    let loaded = livePublishedWordCount
     if configuration.mode == .words, !configuration.isInfinite,
       loaded >= (configuration.wordLimit ?? 25) { return false }
     return loaded - completedWordCount < 20
+  }
+  private var consumedLiveGeneratorReplay: TransformedPromptBatch? {
+    guard !consumedLiveGeneratorFields.isEmpty else { return nil }
+    let fields = consumedLiveGeneratorFields.allSatisfy { $0.sourceFields != nil }
+      ? consumedLiveGeneratorFields.flatMap { $0.sourceFields ?? [] } : nil
+    return .init(text: consumedLiveGeneratorFields.map(\.text).joined(),
+      noSpaceTargetWords: consumedLiveGeneratorFields.flatMap(\.noSpaceTargetWords), sourceFields: fields)
   }
   /// A forward transition can need a generator section even while the
   /// published window is full. This is not the twenty-word side pull.
@@ -4987,7 +5008,7 @@ struct TypingSession {
   }
   private var hasUnloadedLiveContentTargets: Bool {
     configuration.mode != .words || configuration.isInfinite
-      || loadedLiveContentWordCount < (configuration.wordLimit ?? 25)
+      || livePublishedWordCount < (configuration.wordLimit ?? 25)
   }
   var isWaitingForLiveContent: Bool {
     streamsLiveContent && !isFinished && hasUnloadedLiveContentTargets
@@ -5018,19 +5039,25 @@ struct TypingSession {
     let source = content.noSpaceBoundarySource ?? content.text
     let words = source.split(separator: " ").map(String.init)
     guard !words.isEmpty else { return false }
-    let loaded = loadedLiveContentWordCount
+    let loaded = forGenerator ? loadedLiveContentWordCount
+      : (hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount)
     let bound = configuration.mode == .words && !configuration.isInfinite
       ? configuration.wordLimit ?? 25 : Int.max
     guard loaded < bound else { return false }
-    let selected = words.prefix(bound - loaded).joined(separator: " ")
-    var batch = TestModifierPolicy.transformedBatch(selected, modifiers: configuration.modifiers,
-      language: configuration.language, preservesNoSpaceBoundaries: content.noSpaceBoundarySource != nil,
+    let selected = words.prefix(forGenerator ? bound - loaded : bound).joined(separator: " ")
+    let joinsWithoutSpace = hasNoSpaceWordSegmentation || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    // The caller's side publication bypasses generator alteration. Keep
+    // boundary capture, but do not reverse, uppercase or decorate these words.
+    var batch = TestModifierPolicy.transformedBatch(selected, modifiers: forGenerator ? configuration.modifiers : [],
+      language: forGenerator ? configuration.language : nil,
+      preservesNoSpaceBoundaries: content.noSpaceBoundarySource != nil || !forGenerator && joinsWithoutSpace,
       wordOffset: loaded, wordBound: bound, preservesWordOrder: true,
       capturesSourceFields: sourceFields != nil,
-      britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false))
+      britishEnglish: forGenerator ? .init(configuration: configuration, authoredQuoteAlternate: false) : nil)
     guard !batch.text.isEmpty else { return false }
-    let joinsWithoutSpace = hasNoSpaceWordSegmentation || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
-    if forGenerator, !joinsWithoutSpace, !batch.text.hasSuffix("\n"), words.prefix(bound - loaded).count < bound - loaded {
+    if !joinsWithoutSpace, !batch.text.hasSuffix("\n"),
+      (forGenerator && words.prefix(bound - loaded).count < bound - loaded
+        || !forGenerator && externalPromptContinuation != nil) {
       let fields = batch.sourceFields.map { values in
         var fields = values
         fields[fields.count - 1] += " "
@@ -5038,12 +5065,8 @@ struct TypingSession {
       }
       batch = .init(text: batch.text + " ", sourceFields: fields)
     }
-    let history = initialExternalPromptContinuation
-    let historyTail = history?.text ?? initialPrompt
-    let historySeparator = joinsWithoutSpace || historyTail.last?.isWhitespace == true ? "" : " "
-    initialExternalPromptContinuation = history.map { $0.appending(batch, separator: historySeparator) }
-      ?? batch.prefixed(with: historySeparator)
     if forGenerator {
+      isReplayingLiveGeneratorHistory = false
       liveGenerationDemand = false
       let separator = joinsWithoutSpace || prompt.last?.isWhitespace == true ? "" : " "
       externalPromptContinuation = batch.prefixed(with: separator)
@@ -5051,13 +5074,11 @@ struct TypingSession {
       appendRetainedLiveField()
       return true
     }
-    if let pending = externalPromptContinuation {
-      externalPromptContinuation = nil
-      appendExternalBatch(pending.remainingFields(startingAt: liveContinuationFieldOffset) ?? pending)
-      liveContinuationFieldOffset = 0
-    }
     let separator = joinsWithoutSpace || prompt.last?.isWhitespace == true ? "" : " "
     appendExternalBatch(batch.prefixed(with: separator))
+    // A side pull publishes directly; it neither replaces nor drains the
+    // generator's owned section, and does not enter generator replay history.
+    if externalPromptContinuation != nil { appendRetainedLiveField() }
     return true
   }
   var liveWeakSpotScores: WeakSpotScores { currentWeakSpotScores }
@@ -8366,7 +8387,7 @@ struct TypingSession {
       // external previews may oversupply it: honor the finite word budget.
       let wordBudget = configuration.mode == .words
         || configuration.mode == .custom && configuration.customTextCompletion == .words
-          && customSectionWordStream == nil ? configuration.wordLimit : nil
+          && customSectionWordStream == nil ? finiteCompletionWordLimit : nil
       let finalFieldCount = wordBudget.flatMap { $0 > 0 ? min($0, unitTargets.fields.count) : nil }
         ?? unitTargets.fields.count
       guard latestNoSpaceFinishDecision, let attemptedField = latestNoSpaceAttemptFieldIndex,
@@ -8436,6 +8457,7 @@ struct TypingSession {
     guard !isAtEmptyNoSpaceWord, reachedInputTargetEnd else { return }
     if let chunk = externalPromptContinuation {
       if streamsLiveContent {
+        guard hasUnloadedLiveContentTargets else { return }
         appendRetainedLiveField()
         return
       }
@@ -8589,6 +8611,7 @@ struct TypingSession {
     let bound = configuration.visibleFutureWordCount ?? 100
     guard unitTargets.sourceFieldCount - (activeWordBefore + 1) <= bound else { return }
     if streamsLiveContent {
+      guard hasUnloadedLiveContentTargets else { return }
       if externalPromptContinuation != nil { appendRetainedLiveField() }
       else { liveGenerationDemand = true }
     } else { appendGeneratedWord(at: date) }
@@ -8602,14 +8625,44 @@ struct TypingSession {
         externalPromptContinuation = nil
         liveContinuationFieldOffset = 0
       }
-      appendExternalBatch(first)
+      appendConsumedLiveGeneratorField(first)
       return
     }
     // Legacy caller metadata is absent. Preserve its explicit ASCII-space
     // fallback; actual factory-created live batches retain validated fields.
     guard let next = externalPromptContinuation?.takingFirstField() else { return }
     externalPromptContinuation = next.remaining
-    appendExternalBatch(next.first)
+    appendConsumedLiveGeneratorField(next.first)
+  }
+
+  private mutating func appendConsumedLiveGeneratorField(_ field: TransformedPromptBatch) {
+    var field = field
+    if !hasNoSpaceWordSegmentation, !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers),
+      field.noSpaceTargetWords.isEmpty, !field.text.hasSuffix(" "), !field.text.hasSuffix("\n"),
+      configuration.mode != .words || configuration.isInfinite
+        || livePublishedWordCount + 1 < (configuration.wordLimit ?? 25) {
+      let fields = field.sourceFields.map { values in
+        var values = values
+        values[values.count - 1].append(" ")
+        return values
+      }
+      field = .init(text: field.text + " ", sourceFields: fields)
+    }
+    // Replay owns the generator return, before the caller removes the final
+    // published commit. Do not change saved history to match display storage.
+    if !isReplayingLiveGeneratorHistory { consumedLiveGeneratorFields.append(field) }
+    if configuration.mode == .words, !configuration.isInfinite,
+      livePublishedWordCount + 1 >= (configuration.wordLimit ?? 25),
+      field.noSpaceTargetWords.isEmpty, field.text.hasSuffix(" ") {
+      let fields = field.sourceFields.map { values in
+        var values = values
+        values[values.count - 1].removeLast()
+        return values
+      }
+      appendExternalBatch(.init(text: String(field.text.dropLast()), sourceFields: fields))
+    } else {
+      appendExternalBatch(field)
+    }
   }
 
   private mutating func appendGeneratedWord(at date: Date) {
@@ -8778,7 +8831,7 @@ struct TypingSession {
   }
 
   private var reachedConfiguredWordLimit: Bool {
-    guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return false }
+    guard let wordLimit = finiteCompletionWordLimit, wordLimit > 0 else { return false }
     return completedWordCount >= wordLimit
   }
 
@@ -8793,7 +8846,7 @@ struct TypingSession {
     guard unitTargets.noSpace, let acceptedUnits, !acceptedUnits.lastCommits else { return false }
     let limit = configuration.mode == .words
       || configuration.mode == .custom && configuration.customTextCompletion == .words && customSectionWordStream == nil
-      ? configuration.wordLimit : nil
+      ? finiteCompletionWordLimit : nil
     let count = limit.flatMap { $0 > 0 ? $0 : nil } ?? unitTargets.fields.count
     let index = acceptedUnits.fieldIndex
     guard index == count - 1, unitTargets.fields.indices.contains(index),
@@ -8803,7 +8856,7 @@ struct TypingSession {
   }
 
   private var shouldFinishEnglishWordsTest: Bool {
-    guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return false }
+    guard let wordLimit = finiteCompletionWordLimit, wordLimit > 0 else { return false }
     if let acceptedUnits {
       let targets = unitTargets.fields.indices.filter { !unitTargets.field($0, withoutCommit: true).isEmpty }
       guard targets.count >= wordLimit, acceptedUnits.fieldIndex >= targets[wordLimit - 1] else { return false }
