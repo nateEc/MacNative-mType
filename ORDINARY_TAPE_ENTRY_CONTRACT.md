@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## TST-02：特殊生产宿主的 Unicode 选区保留（2026-10-11）
+
+将上轮原生选区修正的证据从孤立输入视图延伸到实际 ASL／Choo 生产宿主：三种组合显示模式都加入自有候选“😀é候”（三字素、五 UTF-16 单元），原输入 owner 和特殊渲染 owner 必须保留；候选 marked range 为五单元，中间组合字符选区为 {2, 2}，经过 SwiftUI 布局交付后仍相同。继续检查实际 ASL 槽位、Choo 完整显示正文／层墨迹、below 行及取消后的原始布局恢复。既有四十字候选的模式切换也增加选区未变断言，取消后检查零选区。此为既有修正的生产集成覆盖，不制造新的产品红测，也不改产品实现。
+
+首轮末尾光标场景 `work/special-host-unicode-selection.log` 两项零失败零跳过（9.513s，墙钟 9.515）。最终中间非空选区版本，在固定官方参考与 Anime 归档环境下 `work/special-host-unicode-selection-final.log` 共 95 项零失败零跳过（19.966s，墙钟 19.977），包含 ASL、源码投影、选区及两种特殊生产宿主。没有可见窗口或主程序启动；没有新完整冻结门禁、Release、真实输入法或完整视觉验收。该证据不将 compositionDisplay 从部分改为完成，整体 goal active。
+
 ## TST-02：原生候选选区回报修正（2026-10-11）
 
 TypingInputView 原先忽略 setMarkedText 的 selectedRange，始终回报零选区。Apple 的 [setMarkedText 契约](https://developer.apple.com/documentation/appkit/nstextinputclient/setmarkedtext(_:selectedrange:replacementrange:)) 要求设置插入字符串内的选区，[selectedRange 契约](https://developer.apple.com/documentation/appkit/nstextinputclient/selectedrange()) 要求回报文本存储中的范围。本视图只保留当前候选，marked range 从零起，因此保存 UTF-16 相对范围，不将练习历史正文纳入编辑存储，也不改变固定练习光标规则。

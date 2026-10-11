@@ -66,11 +66,15 @@ import XCTest
     for style in CompositionDisplayStyle.allCases {
       settings.compositionDisplayStyle = style
       flush()
-      for candidate in ["候", "中文", longCandidate] {
-        input.setMarkedText(candidate, selectedRange: .init(location: candidate.utf16.count, length: 0),
+      for candidate in ["候", "中文", "😀e\u{301}候", longCandidate] {
+        let selection = candidate == "😀e\u{301}候" ? NSRange(location: 2, length: 2)
+          : NSRange(location: candidate.utf16.count, length: 0)
+        input.setMarkedText(candidate, selectedRange: selection,
           replacementRange: .init(location: NSNotFound, length: 0))
         flush()
         XCTAssertTrue(input.hasMarkedText())
+        XCTAssertEqual(input.markedRange(), NSRange(location: 0, length: candidate.utf16.count))
+        XCTAssertEqual(input.selectedRange(), selection)
         XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
         XCTAssertTrue(descendants(host, ASLPromptCaretContainer.self).first === owner)
         let projection = try XCTUnwrap(session.promptCompositionProjection(composition: candidate, style: style))
@@ -107,6 +111,7 @@ import XCTest
       input.unmarkText()
       flush()
       XCTAssertFalse(input.hasMarkedText())
+      XCTAssertEqual(input.selectedRange(), NSRange(location: 0, length: 0))
       for (id, rect) in initial {
         XCTAssertEqual(owner.measuredRect(for: id), rect,
           "Cancellation must restore every original ASL target allocation")
@@ -120,6 +125,7 @@ import XCTest
       flush()
       XCTAssertTrue(input.hasMarkedText(), "Changing ASL display style must not consume the candidate")
       XCTAssertEqual(input.markedRange().length, longCandidate.utf16.count)
+      XCTAssertEqual(input.selectedRange(), NSRange(location: longCandidate.utf16.count, length: 0))
       XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
       XCTAssertTrue(descendants(host, ASLPromptCaretContainer.self).first === owner)
       let projection = try XCTUnwrap(session.promptCompositionProjection(composition: longCandidate, style: style))
@@ -227,11 +233,15 @@ import XCTest
     for style in CompositionDisplayStyle.allCases {
       settings.compositionDisplayStyle = style
       flush()
-      for candidate in ["候", "中文", longCandidate] {
-        input.setMarkedText(candidate, selectedRange: .init(location: candidate.utf16.count, length: 0),
+      for candidate in ["候", "中文", "😀e\u{301}候", longCandidate] {
+        let selection = candidate == "😀e\u{301}候" ? NSRange(location: 2, length: 2)
+          : NSRange(location: candidate.utf16.count, length: 0)
+        input.setMarkedText(candidate, selectedRange: selection,
           replacementRange: .init(location: NSNotFound, length: 0))
         flush()
         XCTAssertTrue(input.hasMarkedText())
+        XCTAssertEqual(input.markedRange(), NSRange(location: 0, length: candidate.utf16.count))
+        XCTAssertEqual(input.selectedRange(), selection)
         XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
         XCTAssertTrue(descendants(host, ChooLayerView.self).first === owner)
         let displayed = try XCTUnwrap(owner.accessibilityLabel())
@@ -269,6 +279,7 @@ import XCTest
       input.unmarkText()
       flush()
       XCTAssertFalse(input.hasMarkedText())
+      XCTAssertEqual(input.selectedRange(), NSRange(location: 0, length: 0))
       XCTAssertEqual(owner.accessibilityLabel(), prompt,
         "Cancellation must restore the complete unconsumed target")
       XCTAssertEqual(allocations(), initialAllocations,
@@ -282,6 +293,7 @@ import XCTest
       flush()
       XCTAssertTrue(input.hasMarkedText(), "Changing display style must not confirm or cancel the candidate")
       XCTAssertEqual(input.markedRange().length, longCandidate.utf16.count)
+      XCTAssertEqual(input.selectedRange(), NSRange(location: longCandidate.utf16.count, length: 0))
       XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
       XCTAssertTrue(descendants(host, ChooLayerView.self).first === owner)
       let expected = style == .replace ? longCandidate + " harbor morning"
