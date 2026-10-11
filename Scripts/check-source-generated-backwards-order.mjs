@@ -413,3 +413,37 @@ assert.deepEqual(displayed,['first','second','retained'],
 assert.equal(testWords.words.length,4);assert.deepEqual(failures,[]);
 assert.deepEqual(config.funbox,['poetry','no_quit']);assert.equal(guardNotices.length,2);
 console.log('Pinned active-NoQuit false-prefetch case passed (complete actual addWord/toggleFunbox/restart functions, real generator/storage; owned active/config/notification boundaries; no full event bus, UI or backend execution claim).');
+
+// Compose a real generated opening, an authored near-tail cursor and repeat.
+// Direct side publication does not pass through getNextWord's saved history.
+config.mode='words';config.words=105;config.showAllLines=false;config.language='english';
+activeNames=['poetry'];ownedRepeated=false;ownedSectionError=undefined;
+ownedSection={words:Array.from({length:105},(_,i)=>`opening${i}`)};
+ownedSectionQueue=[];sectionCalls=0;
+const beforeSideRepeat=await main.namespace.generateWords({name:'english',words:['owned']});
+assert.equal(beforeSideRepeat.words.length,100);
+assert.deepEqual(Array.from(main.namespace.currentSection),
+  Array.from({length:5},(_,i)=>`opening${100+i}`));
+testWords.words.reset();
+for(const word of beforeSideRepeat.words)testWords.words.push(word,0);
+ownedActiveWordIndex=81;ownedSection={words:['sideFirst','sideSecond']};
+displayed.length=0;failures.length=0;notices.length=0;toggledSources.length=0;
+await addWord();
+assert.deepEqual(testWords.words.get().slice(100).map(word=>word.text),
+  ['sideFirst','sideSecond','opening100']);
+assert.equal(sectionCalls,2);
+ownedRepeated=true;ownedSection={words:['fallbackFirst','fallbackSecond']};sectionCalls=0;
+const afterSideRepeat=await main.namespace.generateWords({name:'english',words:['different']});
+assert.deepEqual(afterSideRepeat.words,beforeSideRepeat.words);
+assert.equal(sectionCalls,0,'Saved opening avoids another provider call');
+const savedTail=await main.namespace.getNextWord(100,100,afterSideRepeat.words.at(-1),afterSideRepeat.words.at(-2));
+assert.equal(savedTail.word,'opening100 ');
+assert.equal(sectionCalls,0,'Only the generator-consumed old tail was saved');
+const missingHistory=await main.namespace.getNextWord(101,100,savedTail.word,afterSideRepeat.words.at(-1));
+assert.equal(missingHistory.word,'fallbackFirst ');
+assert.equal(sectionCalls,1,'Missing finite history below the limit resumes actual section generation');
+await assert.rejects(main.namespace.getNextWord(105,100,missingHistory.word,savedTail.word),
+  /Repeated word is undefined/);
+assert.equal(sectionCalls,1,'Missing history at the finite limit must not fetch');
+ownedRepeated=false;
+console.log('Pinned side-publication/repeat composition passed: direct side fields bypass saved generator history, consumed old tail replays, missing in-budget history fetches, out-of-budget history rejects. Owned provider/cursor; no real navigation, HTTP or native-equivalence claim.');
