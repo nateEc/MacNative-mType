@@ -3,6 +3,27 @@ import XCTest
 @testable import Typebar
 
 final class EncyclopediaIntroductionTransportTests: XCTestCase {
+  func testIntroductionPreservesSourceMetadataWithoutTrimmingOrFallback() async throws {
+    try await withSession { session in
+      for (title, author) in [("  Harbor — \n", " Writer \t"), ("", ""), (" \t", " \n")] {
+        let identity = try JSONSerialization.data(withJSONObject: [
+          "pageid": 724, "title": title, "author": author
+        ])
+        IntroductionProtocol.fixture.set([
+          (200, String(decoding: identity, as: UTF8.self)),
+          (200, #"{"query":{"pages":{"724":{"extract":"<p>Owned harbor.</p>"}}}}"#)
+        ])
+        let fetched = await LivePracticeContentService.fetch(
+          source: .encyclopedia, language: .english, session: session)
+        let content = try XCTUnwrap(fetched)
+        XCTAssertEqual(content.title, title)
+        XCTAssertEqual(content.byline, author)
+        XCTAssertEqual(content.text, "Owned harbor.")
+        XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 2)
+      }
+    }
+  }
+
   private func withSession(_ body: (URLSession) async throws -> Void) async throws {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [IntroductionProtocol.self]

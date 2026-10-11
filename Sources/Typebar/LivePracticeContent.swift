@@ -305,11 +305,8 @@ enum LivePracticeContentService {
     let words = spaced.unicodeScalars.split(whereSeparator: { $0.value == 0x20 })
       .map { String(String.UnicodeScalarView($0)) }
     guard !words.isEmpty else { return nil }
-    let title = identity.title.trimmingCharacters(in: .whitespacesAndNewlines)
-    let author = identity.author?.trimmingCharacters(in: .whitespacesAndNewlines)
     return .init(source: .encyclopedia,
-      title: title.isEmpty ? LivePracticeContentSource.encyclopedia.displayName : title,
-      byline: author?.isEmpty == false ? author : nil, tokens: words, separator: " ")
+      title: identity.title, byline: identity.author, tokens: words, separator: " ")
   }
 
   private static func data(from url: URL, session: URLSession) async -> Data? {
