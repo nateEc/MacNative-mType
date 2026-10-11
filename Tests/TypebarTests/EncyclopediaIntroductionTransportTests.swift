@@ -464,6 +464,74 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testLiveBufferExhaustionWaitsWithoutRepeatingOrScoringBlindInput() throws {
+    for (language, tokens, separator) in [
+      (TypingLanguage.english, (0..<125).map { "owned\($0)" }, " "),
+      (.simplifiedChinese, (0..<125).map { "港\($0)船" }, "")
+    ] {
+      let configuration = TestConfiguration.words(125, language: language)
+        .with(modifiers: [.referenceStream])
+      let content = LivePracticeContent(source: .encyclopedia, title: "Owned", byline: nil,
+        tokens: Array(tokens.prefix(100)), separator: separator)
+      let preview = content.promptDescriptor(for: configuration)
+      var practice = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: preview.text, streamNoSpaceBoundarySource: preview.noSpaceBoundarySource,
+        streamsLiveContent: true)
+      let now = Date(timeIntervalSince1970: 1_700_000_000)
+      practice.insertBatch(tokens.prefix(100).joined(separator: separator) + separator, at: now)
+      XCTAssertTrue(practice.isWaitingForLiveContent)
+      XCTAssertEqual(practice.prompt, preview.text + separator)
+      XCTAssertEqual(practice.outcome, .active)
+      XCTAssertEqual(practice.completedWordCount, 100)
+      let typed = practice.typed
+      let errors = practice.errors
+      let started = practice.startedAt
+      practice.insertBatch("blind input", at: now)
+      XCTAssertEqual(practice.typed, typed)
+      XCTAssertEqual(practice.errors, errors)
+      let rest = tokens[100..<125]
+      XCTAssertTrue(practice.appendLiveContent(.init(text: rest.joined(separator: separator),
+        noSpaceBoundarySource: separator.isEmpty ? rest.joined(separator: " ") : nil)))
+      XCTAssertFalse(practice.isWaitingForLiveContent)
+      XCTAssertEqual(practice.startedAt, started)
+      practice.insertBatch(rest.joined(separator: separator), at: now)
+      XCTAssertEqual(practice.outcome, .completed)
+      XCTAssertEqual(practice.completedWordCount, 125)
+      XCTAssertEqual(practice.errors, 0)
+      let result = try XCTUnwrap(practice.result(at: now))
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), tokens.joined(separator: separator))
+      var repeated = practice.repeatedAttempt()
+      repeated.insertBatch(tokens.joined(separator: separator), at: now)
+      XCTAssertEqual(repeated.outcome, .completed)
+      XCTAssertEqual(repeated.errors, 0)
+    }
+  }
+
+  func testTimedLiveWaitDoesNotPauseClockWithAlteredSeparators() throws {
+    let tokens = (0..<100).map { "owned\($0)" }
+    let content = LivePracticeContent(source: .encyclopedia, title: "Owned", byline: nil,
+      tokens: tokens, separator: " ")
+    for (alterations, commit) in [([TestModifier](), " "), ([.noSpaces], ""), ([.underscoreSeparators], "_")] {
+      let configuration = TestConfiguration.timed(seconds: 30)
+        .with(modifiers: [.referenceStream] + alterations)
+      let preview = content.promptDescriptor(for: configuration)
+      var practice = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: preview.text, streamsLiveContent: true)
+      let now = Date(timeIntervalSince1970: 1_700_000_000)
+      practice.insertBatch(tokens.joined(separator: commit) + commit, at: now)
+      XCTAssertEqual(practice.completedWordCount, 100)
+      XCTAssertEqual(practice.errors, 0)
+      XCTAssertTrue(practice.isWaitingForLiveContent)
+      practice.tick(at: now.addingTimeInterval(1))
+      XCTAssertEqual(practice.remainingSeconds(at: now.addingTimeInterval(1)), 29)
+      XCTAssertTrue(practice.isWaitingForLiveContent)
+      practice.tick(at: now.addingTimeInterval(30))
+      XCTAssertTrue(practice.isFinished)
+      XCTAssertFalse(practice.isWaitingForLiveContent)
+    }
+  }
+
   func testEmptyIntroductionStopsWhenNextRandomRequestFails() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([

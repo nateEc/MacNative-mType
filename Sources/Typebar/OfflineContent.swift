@@ -6341,6 +6341,7 @@ struct TestSessionFactory {
     streamPrompt: String? = nil,
     streamNoSpaceBoundarySource: String? = nil,
     streamContinuation: LivePracticePrompt? = nil,
+    streamsLiveContent: Bool = false,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
     showAllLines: Bool = false,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
@@ -6350,6 +6351,7 @@ struct TestSessionFactory {
   ) -> TypingSession {
     let polyglotPreparation = PolyglotGenerationPreparation(configuration)
     var configuration = polyglotPreparation.configuration
+    let streamsLiveContent = streamsLiveContent && LivePracticeContentSource.selected(for: configuration) != nil
     // Only fresh generation changes Dockerfile's historical input behavior.
     // Import and original-target repeat retain the captured configuration.
     if configuration.language == .dockerFile { configuration.dockerfileUsesLiteralIndentation = true }
@@ -6561,7 +6563,7 @@ struct TestSessionFactory {
     }
     let externalWordBound = configuration.mode == .words && !configuration.isInfinite
       ? configuration.wordLimit ?? 25 : Int.max
-    if streamContinuation != nil, configuration.modifiers.contains(.underscoreSeparators) {
+    if streamContinuation != nil || streamsLiveContent, configuration.modifiers.contains(.underscoreSeparators) {
       // A fetched section boundary is not the end of the configured test.
       // Both batches must use the same absolute final-word index.
       batch = TestModifierPolicy.transformedBatch(noSpaceBoundarySource ?? prompt,
@@ -6631,6 +6633,8 @@ struct TestSessionFactory {
       let hasGeneratedFuture = generatedWordContinuation?.hasRemaining == true
         || generatedStreamContinuation?.hasRemaining == true || generatedCodeContinuation?.hasRemaining == true
         || externalBatch != nil
+        || (streamsLiveContent && (configuration.mode != .words || configuration.isInfinite
+          || GeneratedWordBoundPolicy.wordCount(in: noSpaceBoundarySource ?? prompt) < (configuration.wordLimit ?? 25)))
       let needsCommit = hasGeneratedFuture && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
         && noSpaceWordLengths.isEmpty
         && transformedPrompt.last != " " && transformedPrompt.last != "\n"
@@ -6660,6 +6664,7 @@ struct TestSessionFactory {
       sequentialCustomWordStream: sequentialCustomWordStream,
       finiteCustomTextStream: finiteCustomTextStream,
       externalPromptContinuation: externalBatch,
+      streamsLiveContent: streamsLiveContent,
       customSectionWordStream: customSectionWordStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,

@@ -4439,6 +4439,7 @@ struct TypingSession {
   private let initialFiniteCustomTextStream: CustomFiniteTextStream?
   private var externalPromptContinuation: TransformedPromptBatch?
   private var initialExternalPromptContinuation: TransformedPromptBatch?
+  private let streamsLiveContent: Bool
   private var sectionEndIndices: [Int]
   private let initialSectionEndIndices: [Int]
   private var noSpaceSectionWordEnds: [Int]
@@ -4649,6 +4650,7 @@ struct TypingSession {
     sequentialCustomWordStream: CustomSequentialWordStream? = nil,
     finiteCustomTextStream: CustomFiniteTextStream? = nil,
     externalPromptContinuation: TransformedPromptBatch? = nil,
+    streamsLiveContent: Bool = false,
     customSectionWordStream: CustomSectionWordStream? = nil,
     noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
@@ -4693,6 +4695,7 @@ struct TypingSession {
     self.initialFiniteCustomTextStream = finiteCustomTextStream
     self.externalPromptContinuation = externalPromptContinuation
     self.initialExternalPromptContinuation = externalPromptContinuation
+    self.streamsLiveContent = streamsLiveContent
     self.sectionEndIndices = sectionEndIndices
     self.initialSectionEndIndices = sectionEndIndices
     self.noSpaceSectionWordEnds = noSpaceSectionWordEnds
@@ -4785,6 +4788,7 @@ struct TypingSession {
       sequentialCustomWordStream: initialSequentialCustomWordStream,
       finiteCustomTextStream: initialFiniteCustomTextStream,
       externalPromptContinuation: initialExternalPromptContinuation,
+      streamsLiveContent: streamsLiveContent,
       customSectionWordStream: initialCustomSectionWordStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
@@ -4852,7 +4856,8 @@ struct TypingSession {
     return projected.outcome == .completed || projected.outcome == .invalidAFK
   }
   var usesIncrementalPromptExtension: Bool {
-    externalPromptContinuation != nil
+    (streamsLiveContent && hasUnloadedLiveContentTargets)
+      || externalPromptContinuation != nil
       || generatedWordContinuation?.hasRemaining == true || generatedStreamContinuation?.hasRemaining == true
       || generatedCodeContinuation?.hasRemaining == true
       || (repeatingPrompt?.isEmpty == false
@@ -4878,6 +4883,14 @@ struct TypingSession {
     if configuration.mode == .words, !configuration.isInfinite,
       loaded >= (configuration.wordLimit ?? 25) { return false }
     return loaded - completedWordCount < 20
+  }
+  private var hasUnloadedLiveContentTargets: Bool {
+    configuration.mode != .words || configuration.isInfinite
+      || loadedLiveContentWordCount < (configuration.wordLimit ?? 25)
+  }
+  var isWaitingForLiveContent: Bool {
+    streamsLiveContent && !isFinished && hasUnloadedLiveContentTargets
+      && externalPromptContinuation == nil && completedWordCount >= loadedLiveContentWordCount
   }
   mutating func appendLiveContent(_ content: LivePracticePrompt) -> Bool {
     guard !isFinished, LivePracticeContentSource.selected(for: configuration) != nil,
@@ -6471,6 +6484,7 @@ struct TypingSession {
   private mutating func insertCharacter(
     _ character: Character, forceError: Bool, at date: Date, evaluatesTerminalRules: Bool
   ) -> Bool {
+    guard !isWaitingForLiveContent else { return false }
     latestReplayInputPosition = nil
     latestNoSpaceAttempt = nil
     latestNoSpaceAttemptFieldIndex = nil
@@ -8371,7 +8385,7 @@ struct TypingSession {
       appendGeneratedWord(at: date)
       return
     }
-    guard let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
+    guard !streamsLiveContent, let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
     let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       || hasNoSpaceWordSegmentation
     var repeatedText = repeatingPrompt
