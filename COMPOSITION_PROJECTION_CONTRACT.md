@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：完整生产 ASL 候选槽位与取消恢复（2026-10-11）
+
+新增实际 `TypebarApp.practiceContent` 的 ASL 宿主测试：隔离全局修饰器／选择、UserDefaults 和内存 SwiftData，挂载从未显示的固定窗口。先确认实际 ASL caret container 与每个原目标的测量矩形；off／below／replace 下分别更新“候”和“中文”，对照独立会话投影的全部 cell ID 均有实际非空有限测量。“中文”替换时两候选占两个独立且顺序正确的槽位；below 有且仅有一条实际原生候选行，其他模式没有。输入／ASL owner 保留、窗口不可见、宿主尺寸固定，取消后全部原始槽位矩形恢复。此为已有生产功能补证，不制造产品红测，不修改产品。
+
+`work/asl-production-composition-host.log` ASL／Choo 两项零失败零跳过（5.817s，墙钟 5.819）。扩大 ASL 组合及删行组件回归，`asl-production-composition-regression.log` 30 项零失败、一项因缺参考环境跳过；补齐只读固定参考、Node 与已校验 Anime.js 归档后，`asl-production-composition-regression-pinned.log` 30 项零失败零跳过（11.179s，墙钟 11.184），包含实际手形行测量与完整固定删行函数对照。两轮证据分别保留，不把跳过当通过。
+
+该场景只覆盖默认英文三词、默认布局和单／双字候选，不证明 ASL 物理 IME、手形视觉／像素、确认提交后全部导航、长候选／跨行、全部修饰器组合或 Release 性能。本轮无新存储／迁移／网络行为，零主程序启动，未跑新完整门禁；compositionDisplay 仍部分，完整 goal active。
+
 ## TST-02：完整生产 Choo 组合输入宿主（2026-10-11）
 
 新增 `SpecialPracticeCompositionHostTests`：隔离 UserDefaults 与内存 SwiftData，实际 `TypebarApp.practiceContent` 挂载于从未显示的窗口，保存英文三词自定义选择并显式配置全局 Choo 修饰器。通过实际 NSTextInputClient 在 off／below／replace 下更新“候”及“中文”，核对 Choo 可访问全文、实际 CATextLayer 候选墨迹、below 原生候选行、输入及图层 owner 保留、固定宿主尺寸和窗口不可见。取消后全文恢复；确认 q 后下一候选以 q候 开始，证明提交一次后候选位于下一目标，取消不消费该目标。不是只检查组件工厂或源码字符串。

@@ -5,6 +5,92 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class SpecialPracticeCompositionHostTests: XCTestCase {
+  func testProductionASLCompositionUpdatesActualSlotsAndCancellationRestoresGeometry() throws {
+    let suite = "SpecialPracticeCompositionHostTests.ASL.\(UUID())"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let settings = AppSettings(defaults: defaults)
+    settings.testModifiers = [.aslVisual]
+    let prompt = "quiet harbor morning"
+    let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), language: .english, modifiers: [.aslVisual])
+    XCTAssertTrue(settings.saveActiveTestSelection(.init(
+      preset: .init(configuration: configuration, customText: prompt),
+      testParameterMemory: .legacyDefaults(configuration: configuration))))
+    let container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
+      SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let content = TypebarApp.practiceContent(settings: settings,
+      account: AccountSession(defaults: defaults),
+      announcements: RemoteAnnouncementCenter(defaults: defaults), hotkey: GlobalHotkeyMonitor(),
+      systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
+      network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor())
+      .modelContainer(container).frame(width: 1000, height: 720)
+    let host = NSHostingView(rootView: content)
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    func descendants<T: NSView>(_ view: NSView, _ type: T.Type) -> [T] {
+      (view as? T).map { [$0] } ?? view.subviews.flatMap { descendants($0, type) }
+    }
+    func flush() {
+      host.layoutSubtreeIfNeeded()
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      host.layoutSubtreeIfNeeded()
+    }
+    flush()
+    let input = try XCTUnwrap(descendants(host, TypingInputView.self).first)
+    let owner = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
+    let initial = try Dictionary(uniqueKeysWithValues: (0..<prompt.count).map {
+      ($0, try XCTUnwrap(owner.measuredRect(for: $0)))
+    })
+    let frame = host.frame
+    let session = TypingSession(configuration: configuration, prompt: prompt)
+    for style in CompositionDisplayStyle.allCases {
+      settings.compositionDisplayStyle = style
+      flush()
+      for candidate in ["候", "中文"] {
+        input.setMarkedText(candidate, selectedRange: .init(location: candidate.utf16.count, length: 0),
+          replacementRange: .init(location: NSNotFound, length: 0))
+        flush()
+        XCTAssertTrue(input.hasMarkedText())
+        XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
+        XCTAssertTrue(descendants(host, ASLPromptCaretContainer.self).first === owner)
+        let projection = try XCTUnwrap(session.promptCompositionProjection(composition: candidate, style: style))
+        for cell in projection.cells {
+          let rect = try XCTUnwrap(owner.measuredRect(for: cell.id))
+          XCTAssertTrue(rect.origin.x.isFinite && rect.origin.y.isFinite)
+          XCTAssertGreaterThan(rect.height, 0)
+        }
+        if style == .replace {
+          let marked = projection.cells.filter { $0.compositionIndex != nil }
+          XCTAssertEqual(marked.count, candidate.count)
+          if marked.count == 2 {
+            XCTAssertLessThan(try XCTUnwrap(owner.measuredRect(for: marked[0].id)).minX,
+              try XCTUnwrap(owner.measuredRect(for: marked[1].id)).minX,
+              "Two marked characters must occupy separate actual ASL layout cells")
+          }
+        }
+        let rows = descendants(host, NSTextField.self).filter {
+          $0.accessibilityLabel()?.hasPrefix("正在组合：") == true
+        }
+        XCTAssertEqual(rows.count, style == .below ? 1 : 0)
+        if style == .below { XCTAssertEqual(rows.first?.stringValue, candidate) }
+        XCTAssertFalse(window.isVisible)
+        XCTAssertEqual(host.frame, frame)
+      }
+      input.unmarkText()
+      flush()
+      XCTAssertFalse(input.hasMarkedText())
+      for (id, rect) in initial {
+        XCTAssertEqual(owner.measuredRect(for: id), rect,
+          "Cancellation must restore every original ASL target allocation")
+      }
+    }
+  }
+
   func testProductionChooCompositionModesUpdateAndCancelWithoutConsumingTargets() throws {
     let suite = "SpecialPracticeCompositionHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
