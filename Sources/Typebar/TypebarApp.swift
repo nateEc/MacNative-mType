@@ -3546,6 +3546,8 @@ private struct ContentView: View {
       && PromptFieldProjectionPolicy.supports(session.configuration)
     let presentation = usesCompositionProjection
       ? PromptCompositionPresentation(session: session, composition: composition ?? "", style: settings.compositionDisplayStyle) : nil
+    CompositionProjectionDiagnostics.observe(expected: usesCompositionProjection,
+      available: presentation != nil, marked: composition?.isEmpty == false, session: session)
     let completedCharacterIndices = presentation?.completedIndices ?? session.completedPromptCharacterIndices
     let promptHighlightMode = effectivePromptHighlightMode
     let glyphs = presentation?.glyphs ?? session.promptGlyphs

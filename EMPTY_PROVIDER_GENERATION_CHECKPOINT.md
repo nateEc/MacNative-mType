@@ -1,5 +1,11 @@
 # 在线空内容生成检查点（未验收）
 
+## 缺失投影有界诊断（2026-10-12，非修复）
+
+连续宿主未复现后，沿渲染调用方检查发现：期望使用投影但 PromptCompositionPresentation 返回 nil 时，提示可走普通 Text 分支；仅观察 PromptFieldNativeView 缺失无法区分该分支与挂载问题。新增 CompositionProjectionDiagnostics，在 Debug 且 `TYPEBAR_QA_IN_MEMORY_STORE=1`、`TYPEBAR_QA_COMPOSITION_DIAGNOSTICS=1` 同时启用时，只对带 marked text 的缺失预期投影输出最多 20 次状态；仅含 started／finished／fieldAvailable 布尔值，不记录提示、输入、身份、错误内容或结果。开关进程级缓存；Release 不执行诊断，不修改呈现选择、输入、排空或断言。后续完整门禁需要显式打开诊断以收集失败时状态；没有输出本身不能证明没有挂载问题。
+
+此为未复现缺陷的观察性增量，按行为优先流程的探索性例外，不伪造产品修复红测。三项诊断测试验证双开关、仅目标状态消耗预算和第 21 次抑制、固定无内容记录格式。首次诊断与原宿主共 4 项通过，21.298 秒（墙钟 21.300）。缓存开关后的最终回归 35 项零失败无跳过，21.626 秒（墙钟 21.630），实际覆盖诊断、字段、投影和原失败宿主；筛选中的不存在类名 PromptCompositionPresentationTests 不计覆盖，随后补跑真实 PromptCompositionRenderingTests／PromptCompositionPlanTests 共 31 项零失败无跳过，0.714 秒（墙钟 0.717）。日志 `work/composition-projection-diagnostics-{regression,final-regression,rendering-regression}.log`；宿主未触发缺失诊断，不算原失败根因已定。原创性脚本直接执行因权限退出 126，随后 zsh 调用退出 0，两份日志分别保留于 `work/composition-projection-diagnostics-originality{,-zsh}.log`。仅不可见串行测试，零主程序实例；Release 和新完整门禁尚未执行，goal active。
+
 ## 组合输入连续宿主复现结果（2026-10-12，未定位）
 
 在 `0a3d8c9ddcb3bdea11ba683d0e803ed172e24d9b` 上，保持产品和测试不变，单独运行原失败用例：1 项／0 失败，21.589 秒（墙钟 21.591），日志 `work/composition-diagnostic-focused-01.log`。随后只启动一个测试会话，以 `PracticeCompositionHostTests` 筛选连续执行；该筛选同时匹配 SpecialPracticeCompositionHostTests。实际共 44 项／0 失败／无跳过，987.743 秒（墙钟 987.750）；其中普通组合宿主 42 项，978.608 秒（墙钟 978.614），特殊宿主 2 项，9.135 秒。原失败用例本轮通过，21.174 秒，日志 `work/composition-diagnostic-class-sequence-01.log`。退出码 0，终态后确认无 xctest 或 Typebar 主程序进程，工作区未改动。
