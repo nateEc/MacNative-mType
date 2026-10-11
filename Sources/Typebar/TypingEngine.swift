@@ -4976,6 +4976,15 @@ struct TypingSession {
       loaded >= (configuration.wordLimit ?? 25) { return false }
     return loaded - completedWordCount < 20
   }
+  /// A forward transition can need a generator section even while the
+  /// published window is full. This is not the twenty-word side pull.
+  var needsLiveContentGeneration: Bool {
+    guard streamsLiveContent, completedWordCount > 0, !isFinished,
+      LivePracticeContentSource.selected(for: configuration) != nil,
+      externalPromptContinuation == nil, hasUnloadedLiveContentTargets else { return false }
+    let published = hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount
+    return published - completedWordCount <= (configuration.visibleFutureWordCount ?? 100)
+  }
   private var hasUnloadedLiveContentTargets: Bool {
     configuration.mode != .words || configuration.isInfinite
       || loadedLiveContentWordCount < (configuration.wordLimit ?? 25)
@@ -4995,6 +5004,13 @@ struct TypingSession {
     fail(at: date, reason: .wordGeneration)
   }
   mutating func appendLiveContent(_ content: LivePracticePrompt) -> Bool {
+    appendLiveContent(content, forGenerator: false)
+  }
+  mutating func acceptGeneratedLiveContent(_ content: LivePracticePrompt) -> Bool {
+    guard needsLiveContentGeneration else { return false }
+    return appendLiveContent(content, forGenerator: true)
+  }
+  private mutating func appendLiveContent(_ content: LivePracticePrompt, forGenerator: Bool) -> Bool {
     guard !isFinished, LivePracticeContentSource.selected(for: configuration) != nil,
       !content.text.isEmpty else { return false }
     if let boundaries = content.noSpaceBoundarySource,
@@ -5007,18 +5023,33 @@ struct TypingSession {
       ? configuration.wordLimit ?? 25 : Int.max
     guard loaded < bound else { return false }
     let selected = words.prefix(bound - loaded).joined(separator: " ")
-    let batch = TestModifierPolicy.transformedBatch(selected, modifiers: configuration.modifiers,
+    var batch = TestModifierPolicy.transformedBatch(selected, modifiers: configuration.modifiers,
       language: configuration.language, preservesNoSpaceBoundaries: content.noSpaceBoundarySource != nil,
       wordOffset: loaded, wordBound: bound, preservesWordOrder: true,
       capturesSourceFields: sourceFields != nil,
       britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false))
     guard !batch.text.isEmpty else { return false }
     let joinsWithoutSpace = hasNoSpaceWordSegmentation || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    if forGenerator, !joinsWithoutSpace, !batch.text.hasSuffix("\n"), words.prefix(bound - loaded).count < bound - loaded {
+      let fields = batch.sourceFields.map { values in
+        var fields = values
+        fields[fields.count - 1] += " "
+        return fields
+      }
+      batch = .init(text: batch.text + " ", sourceFields: fields)
+    }
     let history = initialExternalPromptContinuation
     let historyTail = history?.text ?? initialPrompt
     let historySeparator = joinsWithoutSpace || historyTail.last?.isWhitespace == true ? "" : " "
     initialExternalPromptContinuation = history.map { $0.appending(batch, separator: historySeparator) }
       ?? batch.prefixed(with: historySeparator)
+    if forGenerator {
+      let separator = joinsWithoutSpace || prompt.last?.isWhitespace == true ? "" : " "
+      externalPromptContinuation = batch.prefixed(with: separator)
+      liveContinuationFieldOffset = 0
+      appendRetainedLiveField()
+      return true
+    }
     if let pending = externalPromptContinuation {
       externalPromptContinuation = nil
       appendExternalBatch(pending.remainingFields(startingAt: liveContinuationFieldOffset) ?? pending)
