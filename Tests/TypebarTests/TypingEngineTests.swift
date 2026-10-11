@@ -19711,7 +19711,7 @@ final class TypingEngineTests: XCTestCase {
     [{"title":"Night Walk","author":"A. Writer","lines":["Dawn, arrives.","Hands learn slowly."]}]
     """.utf8)
     let poetry = try XCTUnwrap(LivePracticeContentService.poetry(from: poetryData))
-    XCTAssertEqual(poetry.text, "Dawn arrives Hands learn slowly")
+    XCTAssertEqual(poetry.text, "Dawn, arrives. Hands learn slowly.")
     XCTAssertEqual(poetry.attribution, "诗歌内容：Night Walk · A. Writer")
     XCTAssertEqual(poetry.prompt(for: .words(7)).split(separator: " ").count, 7)
     let poetryConfiguration = TestConfiguration.words(4).with(modifiers: [.poetryStream])
@@ -20070,7 +20070,7 @@ final class TypingEngineTests: XCTestCase {
       TestSessionFactory.make(
         configuration: poetryConfiguration, streamPrompt: poetry.prompt(for: poetryConfiguration)
       ).prompt,
-      "Dawn arrives Hands learn")
+      "Dawn, arrives. Hands learn")
     XCTAssertTrue(LivePracticeContentReplacementPolicy.shouldApply(
       hasStarted: false, currentConfiguration: poetryConfiguration,
       requestedConfiguration: poetryConfiguration))

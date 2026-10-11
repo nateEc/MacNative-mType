@@ -175,9 +175,24 @@ enum LivePracticeContentService {
     guard let document = try? JSONDecoder().decode([PoetryDocument].self, from: data),
       let first = document.first
     else { return nil }
-    return makeContent(
-      source: .poetry, title: first.title, byline: first.author, rawText: first.lines.joined(separator: " "),
-      language: .english)
+    // Source words are separated by ASCII spaces within each line, not by
+    // punctuation or Unicode whitespace. Count only nonempty cleaned words.
+    var words: [String] = []
+    for line in first.lines {
+      for part in line.unicodeScalars.split(whereSeparator: { $0.value == 0x20 }) {
+        let kept = part.filter { $0.value != 0x2014 && $0.value != 0x5F }
+        let word = String(String.UnicodeScalarView(kept))
+        guard !word.isEmpty else { continue }
+        words.append(word)
+        if words.count == 100 {
+          return .init(source: .poetry, title: first.title, byline: first.author,
+            tokens: words, separator: " ")
+        }
+      }
+    }
+    guard !words.isEmpty else { return nil }
+    return .init(source: .poetry, title: first.title, byline: first.author,
+      tokens: words, separator: " ")
   }
 
   static func encyclopedia(
