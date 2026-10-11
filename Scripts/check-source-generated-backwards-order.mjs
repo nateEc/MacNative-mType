@@ -16,6 +16,8 @@ const config={mode:'words',words:3,language:'english',showAllLines:false,lazyMod
   punctuation:false,numbers:false,britishEnglish:false};
 let activeNames=['backwards','binary'], functions, drawIndex=0;
 let ownedIndexes=[], spacingMs=0, ownedRepeated=false;
+let ownedSection, sectionCalls=0;
+const toggledSources=[];
 const languages={english:{name:'english',words:['ab','cd'],rightToLeft:false},
   owned:{name:'owned',words:['ef','gh'],rightToLeft:false}};
 const binary=i=>(i%256).toString(2).padStart(8,'0');
@@ -26,6 +28,8 @@ const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuff
   nthElementFromArray:(words,index)=>words.at(index)};
 const bindings={
   'config/store':{Config:config},
+  'config/setters':{toggleFunbox:name=>toggledSources.push(name)},
+  'test/poetry':{getPoem:async()=>{sectionCalls++;return ownedSection}},
   'test/custom-text':{getPipeDelimiter:()=>false},
   'test/practise-words':{before:{mode:null}},
   'controllers/quotes-controller':{default:{}},
@@ -177,3 +181,25 @@ config.words=1;activeNames=['weakspot'];ownedIndexes=[1,0,...Array(19).fill(1)];
 const codeWeak=await main.namespace.generateWords({name:'code_swift',words:['aaax','bb']});
 assert.deepEqual(codeWeak.words,['aaax ']);assert.equal(ownedIndexes.length,0);
 console.log('10 code-pool fixtures passed (normal/reverse/Zipf plumbing, real cached repeat, candidate gates and weakspot; ranks, source input words, repeated flag and runtime boundaries are owned adapters, no code corpus, source RNG, punctuation decoration, number injection or device equivalence claim).');
+// Provider responses are authored adapters, not HTTP or parser evidence.
+// Execute the real section selection and word admission: a successful empty
+// section must not be conflated with false/undefined provider failure.
+config.language='english';config.words=1;activeNames=['poetry'];ownedRepeated=false;
+for(const [response,message,disabled] of [
+  [{words:[]},'Random word is empty',false],
+  [false,'Failed to pull section',true],
+  [undefined,'Failed to pull section',true],
+]) {
+  ownedSection=response;sectionCalls=0;toggledSources.length=0;
+  await assert.rejects(main.namespace.generateWords({name:'english',words:['owned']}),error=>{
+    assert.equal(error.message,message);
+    assert.equal(error instanceof bindings['utils/word-gen-error'].WordGenError,!disabled);
+    return true;
+  });
+  assert.equal(sectionCalls,1,'Neither failure path silently refetches');
+  assert.deepEqual(toggledSources,disabled?['poetry']:[]);
+}
+ownedSection={words:['harbor']};sectionCalls=0;toggledSources.length=0;
+assert.deepEqual((await main.namespace.generateWords({name:'english',words:['owned']})).words,['harbor ']);
+assert.equal(sectionCalls,1);assert.deepEqual(toggledSources,[]);
+console.log('4 pinned section-admission cases passed (actual generator and funbox functions; authored provider responses distinguish empty generation failure from disabled fetch failure; no parser/HTTP/UI/recovery equivalence claim).');

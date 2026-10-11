@@ -2,6 +2,38 @@ import XCTest
 @testable import Typebar
 
 final class PoetrySourceCleaningTests: XCTestCase {
+  func testParsedFactoryPrefetchPreservesSourceFieldsAndFiniteBudgetThroughReplay() throws {
+    let opening = try content(lines: ["north\nsouth"] + (1..<100).map { "owned\($0)" })
+    let next = try content(lines: ["third\nfourth tail ignored"])
+    let began = Date(timeIntervalSinceReferenceDate: 917_000_000)
+    for stop in [StopOnErrorMode.off, .word, .letter] {
+      let configuration = TestConfiguration.words(102, rules: .init(stopOnErrorMode: stop))
+        .with(modifiers: [.poetryStream])
+      var session = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: opening.prompt(for: configuration), streamsLiveContent: true)
+      XCTAssertTrue(session.appendLiveContent(next.sectionDescriptor))
+      XCTAssertFalse(session.prompt.contains("ignored"))
+      XCTAssertFalse(session.needsLiveContentPrefetch)
+      let first = stop == .off ? "north\n" : "north\nsouth "
+      let last = stop == .off ? "third\ntail" : "third\nfourth tail"
+      let entered = first + (1..<100).map { "owned\($0) " }.joined() + last
+      session.insertBatch(String(entered.dropLast()), at: began)
+      XCTAssertFalse(session.isFinished)
+      session.insertBatch("l", at: began.addingTimeInterval(2))
+      XCTAssertEqual(session.outcome, .completed)
+      XCTAssertEqual(session.completedWordCount, 102)
+      XCTAssertEqual(session.wordReviews.count, 102)
+      if stop != .off { XCTAssertEqual(session.errors, 0) }
+      let result = try XCTUnwrap(session.result())
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), entered)
+      var repeated = session.repeatedAttempt()
+      repeated.insertBatch(entered, at: began.addingTimeInterval(5))
+      XCTAssertEqual(repeated.outcome, .completed)
+      XCTAssertEqual(repeated.completedWordCount, 102)
+    }
+  }
+
   func testFactoryOmitsSpaceAfterLineFeedTerminatedProviderField() throws {
     let value = try content(lines: ["north\n harbor tail"])
     let configuration = TestConfiguration.words(3).with(modifiers: [.poetryStream])
