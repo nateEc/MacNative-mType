@@ -1,5 +1,15 @@
 # 在线空内容生成检查点（未验收）
 
+## 生成器耗尽时的独立取段需求补证（2026-10-12）
+
+新增六项固定完整 addWord、真实 words-generator/funbox-functions/词存储探针（`provider-generator-demand-source.log`）：活动索引为 0、已发布 100 或 101 个字段而 currentSection 为空时，仍取段一次；有效两词响应只发布第一个字段，第二个留在生成器池。已发布 102 个字段时超过未来词边界，不取段也不追加。100 字段时成功空段派发 word generation error，不请求关闭来源；false/undefined 均请求关闭来源并派发生成失败，不请求 restart。三个失败场景均没有追加字段或重取。
+
+提供者响应、UI、活动索引、通知和配置边界是自有适配；此组 toggle 为记录器，仅证明关闭请求，**不证明真实 setter 会允许关闭活动 NoQuit 来源**。既有真实 NoQuit setter/restart 守卫及后续恢复探针在同次执行仍通过。未执行完整导航模块、真实 HTTP 或设备输入；没有以本组证据宣称这些边界等价。
+
+这确认下一项原生修正必须区分生成器取段与少于 20 个已发布目标时的旁路续取。当前 `needsLiveContentPrefetch` 仍按已加载总数（含未发布池）计数；`appendLiveContent` 仍先排空旧池再追加整段；仅调整 20 词阈值不足以对齐实际词序及失败处理。应先为无剩余池的逐词生成建立独立需求/响应入口，再分别处理正常段、空段及 false/undefined，保留请求身份、取消、输入所有者、有限预算与重复历史；这些原生修改本轮尚未实现。
+
+本轮是探索性行为证据增强，没有人为改坏产品制造红测。六项新增及原有排序/弱词/完整 addWord/NoQuit 守卫探针全部通过；`zsh -n` 与原创边界通过（`provider-generator-demand-originality.log`）。探针现接入完整 readiness 的独立日志阶段；只验证了该阶段命令与脚本语法，未重新运行全门禁，上一节冻结验收不覆盖此次门禁脚本改动。零 Typebar 主程序启动，目标保持进行中。
+
 ## 结果容器修复后的完整冻结门禁通过（2026-10-12）
 
 冻结提交 `abaa01a31b686068958fe2fc5461d3a5b3f4cf52`，参考仍为固定只读 `91bd24bb8513785c7364cbea29296ff7adafac41`。`work/frozen-readiness-result-container.Rl3Bob` 保存冻结提交、866 个跟踪文件的 SHA-256 清单、75 份阶段日志和终态检查；`result.txt` 为 `gate_exit=0 hash_exit=0`，866 项终态哈希全部一致。显式使用 QA Redis 6.2.6、默认临时目录；测试、构建和审计期间未修改源码。

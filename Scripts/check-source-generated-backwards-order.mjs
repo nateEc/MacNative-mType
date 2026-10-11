@@ -272,6 +272,33 @@ ownedActiveWordIndex=3;
 await addWord();
 assert.equal(testWords.words.length,103);assert.equal(sectionCalls,0);
 console.log('Pinned sequential forward-tail case passed (100 published fields plus 3 retained fields; actual addWord/generator/storage, owned forward index; no navigation or physical-input execution claim).');
+// Generator demand is distinct from the <20-field side pull. A full visible
+// window can still require the generator to acquire its next retained section.
+config.words=300;ownedActiveWordIndex=0;
+for(const fixture of [
+  {name:'empty generator with full visible window',published:100,response:{words:['fresh','later']},calls:1,added:['fresh'],tail:['later'],fails:0,disabled:false},
+  {name:'empty generator with inclusive future bound',published:101,response:{words:['fresh','later']},calls:1,added:['fresh'],tail:['later'],fails:0,disabled:false},
+  {name:'future window beyond bound',published:102,response:{words:['unused']},calls:0,added:[],tail:[],fails:0,disabled:false},
+  {name:'successful empty generator pull',published:100,response:{words:[]},calls:1,added:[],tail:[],fails:1,disabled:false},
+  {name:'false generator pull',published:100,response:false,calls:1,added:[],tail:[],fails:1,disabled:true},
+  {name:'undefined generator pull',published:100,response:undefined,calls:1,added:[],tail:[],fails:1,disabled:true},
+]){
+  testWords.words.reset();
+  for(let i=0;i<fixture.published;i++)testWords.words.push(`owned${i} `,0);
+  main.namespace.currentSection.splice(0,main.namespace.currentSection.length);
+  ownedSection=fixture.response;ownedSectionQueue=[];sectionCalls=0;restarts=0;
+  displayed.length=0;failures.length=0;notices.length=0;toggledSources.length=0;
+  await addWord();
+  assert.equal(sectionCalls,fixture.calls,fixture.name);
+  assert.deepEqual(displayed,fixture.added,fixture.name);
+  assert.deepEqual(testWords.words.get().slice(fixture.published).map(word=>word.text),fixture.added,fixture.name);
+  assert.deepEqual([...main.namespace.currentSection],fixture.tail,fixture.name);
+  assert.deepEqual(failures,fixture.fails?[{key:'fail',value:'word generation error'}]:[],fixture.name);
+  assert.deepEqual(toggledSources,fixture.disabled?['poetry']:[],fixture.name);
+  assert.equal(notices.length,fixture.fails,fixture.name);
+  assert.equal(restarts,0,fixture.name);
+}
+console.log('6 pinned generator-demand cases passed (100/101/102 published fields; real addWord/generator/storage; authored provider and UI boundaries, toggle recorder is not actual setter admission; no HTTP/navigation/device equivalence claim).');
 // The earlier recorder boundaries prove requests to toggle/restart, not that
 // those requests are admitted. Execute both complete pinned functions on the
 // active no_quit path; unknown downstream dependencies remain unresolved so
