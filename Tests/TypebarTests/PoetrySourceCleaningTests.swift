@@ -30,6 +30,31 @@ final class PoetrySourceCleaningTests: XCTestCase {
     XCTAssertFalse(value.text.contains("word101!"))
   }
 
+  func testEmbeddedTabsAndNonbreakingSpacesRemainContentThroughSessionAndReplay() throws {
+    let value = try content(lines: ["left\tright next\u{00A0}word tail"])
+    let configuration = TestConfiguration.words(3).with(modifiers: [.poetryStream])
+    let expected = "left\tright next\u{00A0}word tail"
+    var session = TestSessionFactory.make(configuration: configuration,
+      streamPrompt: value.prompt(for: configuration))
+    XCTAssertEqual(session.prompt, expected)
+    let began = Date(timeIntervalSinceReferenceDate: 917_000_000)
+    session.insertBatch(String(expected.dropLast()), at: began)
+    XCTAssertFalse(session.isFinished)
+    session.insertBatch(String(expected.suffix(1)), at: began.addingTimeInterval(2))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 3)
+    XCTAssertEqual(session.errors, 0)
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+      through: result.elapsedDuration), expected)
+    var repeated = session.repeatedAttempt()
+    XCTAssertEqual(repeated.prompt, expected)
+    repeated.insertBatch(expected, at: began.addingTimeInterval(5))
+    XCTAssertEqual(repeated.outcome, .completed)
+    XCTAssertEqual(repeated.completedWordCount, 3)
+    XCTAssertEqual(repeated.errors, 0)
+  }
+
   func testSourceTitleAndAuthorAreNotTypographyNormalizedOrTrimmed() throws {
     let value = try content(lines: ["one"], title: "  Harbor —  ", author: " Writer ")
     XCTAssertEqual(value.title, "  Harbor —  ")
