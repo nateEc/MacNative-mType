@@ -299,6 +299,20 @@ for(const fixture of [
   assert.equal(restarts,0,fixture.name);
 }
 console.log('6 pinned generator-demand cases passed (100/101/102 published fields; real addWord/generator/storage; authored provider and UI boundaries, toggle recorder is not actual setter admission; no HTTP/navigation/device equivalence claim).');
+testWords.words.reset();
+for(let i=0;i<100;i++)testWords.words.push(`owned${i} `,0);
+main.namespace.currentSection.splice(0,main.namespace.currentSection.length,'lastRetained');
+ownedSection={words:['fresh','later']};ownedSectionQueue=[];sectionCalls=0;displayed.length=0;
+ownedActiveWordIndex=0;
+await addWord();
+assert.equal(sectionCalls,0,'Consuming the last retained field does not itself pull a new section');
+assert.equal(main.namespace.currentSection.length,0);
+ownedActiveWordIndex=1;
+await addWord();
+assert.equal(sectionCalls,1,'The next forward action sees an already-empty pool and pulls');
+assert.deepEqual(displayed,['lastRetained','fresh']);
+assert.deepEqual([...main.namespace.currentSection],['later']);
+console.log('Pinned last-retained-field transition passed (no pull while consuming the tail; next forward action pulls exactly once; owned active-index boundary, not complete navigation execution).');
 // The earlier recorder boundaries prove requests to toggle/restart, not that
 // those requests are admitted. Execute both complete pinned functions on the
 // active no_quit path; unknown downstream dependencies remain unresolved so

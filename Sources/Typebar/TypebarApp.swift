@@ -1465,7 +1465,9 @@ private struct ContentView: View {
     .onChange(of: session.hasStarted) { _, started in
       if started, !session.isFinished { visualFocus.set(true) }
     }
-    .onChange(of: session.completedWordCount) { _, _ in prefetchLiveContentIfNeeded() }
+    .onChange(of: session.completedWordCount) { previous, current in
+      if current > previous { prefetchLiveContentIfNeeded(allowsGeneration: true) }
+    }
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: account.accountTagRevision) { _, _ in
@@ -4538,18 +4540,53 @@ private struct ContentView: View {
     }
   }
 
-  private func prefetchLiveContentIfNeeded() {
-    guard liveContentStreamingActive, liveContentTask == nil, session.needsLiveContentPrefetch,
+  private func prefetchLiveContentIfNeeded(allowsGeneration: Bool = false) {
+    let generatesNextWord = !session.needsLiveContentPrefetch
+      && allowsGeneration && session.needsLiveContentGeneration
+    guard liveContentStreamingActive, liveContentTask == nil,
+      session.needsLiveContentPrefetch || generatesNextWord,
       let source = LivePracticeContentSource.selected(for: session.configuration) else { return }
     let configuration = session.configuration
     let requestID = liveContentRequestID
     isLoadingLiveContent = true
     liveContentMessage = "正在续取\(source.displayName)。"
     liveContentTask = Task {
-      while !Task.isCancelled, session.needsLiveContentPrefetch {
+      while !Task.isCancelled,
+        (generatesNextWord ? session.needsLiveContentGeneration : session.needsLiveContentPrefetch) {
         let content = await liveContentFetch(source, configuration.language)
         guard !Task.isCancelled, requestID == liveContentRequestID,
           session.configuration == configuration, !session.isFinished else { return }
+        if generatesNextWord {
+          liveContentTask = nil
+          isLoadingLiveContent = false
+          // Demand belongs to the forward transition that requested it;
+          // consuming the final retained field does not create fresh demand.
+          guard session.needsLiveContentGeneration else { return }
+          guard let content, content.source == source else {
+            let canDisableSource = NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session)
+            if canDisableSource {
+              let failedModifier: TestModifier = source == .poetry ? .poetryStream : .referenceStream
+              settings.testModifiers.removeAll { $0 == failedModifier }
+              persistActiveTestSelection(for: configuration.with(
+                modifiers: configuration.modifiers.filter { $0 != failedModifier }))
+            }
+            liveContentStreamingActive = false
+            session.failLiveContentFetch()
+            synchronizeNoQuitConfigurationLock()
+            liveContentMessage = "无法生成下一个在线词，练习已停止。"
+            return
+          }
+          guard !content.text.isEmpty,
+            session.acceptGeneratedLiveContent(content.sectionDescriptor) else {
+            liveContentStreamingActive = false
+            session.failLiveContentGeneration()
+            synchronizeNoQuitConfigurationLock()
+            liveContentMessage = "在线段落无法生成下一个词；练习已停止，内容来源保持开启。"
+            return
+          }
+          liveContentMessage = "已生成\(content.attribution)的下一个词。"
+          return
+        }
         if let content, content.source == source, content.text.isEmpty {
           // Keep the active targets and source identity. Only later progress
           // requests another section; an empty reply must not spin or restart

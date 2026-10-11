@@ -4521,6 +4521,7 @@ struct TypingSession {
   // Keep validated provider fields immutable while consuming them. Rejoining
   // the entire tail on every forward action would copy long sections O(n²).
   private var liveContinuationFieldOffset = 0
+  private var liveGenerationDemand = false
   private var initialExternalPromptContinuation: TransformedPromptBatch?
   private let streamsLiveContent: Bool
   private var sectionEndIndices: [Int]
@@ -4979,11 +4980,10 @@ struct TypingSession {
   /// A forward transition can need a generator section even while the
   /// published window is full. This is not the twenty-word side pull.
   var needsLiveContentGeneration: Bool {
-    guard streamsLiveContent, completedWordCount > 0, !isFinished,
+    guard streamsLiveContent, liveGenerationDemand, !isFinished,
       LivePracticeContentSource.selected(for: configuration) != nil,
       externalPromptContinuation == nil, hasUnloadedLiveContentTargets else { return false }
-    let published = hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount
-    return published - completedWordCount <= (configuration.visibleFutureWordCount ?? 100)
+    return true
   }
   private var hasUnloadedLiveContentTargets: Bool {
     configuration.mode != .words || configuration.isInfinite
@@ -5044,6 +5044,7 @@ struct TypingSession {
     initialExternalPromptContinuation = history.map { $0.appending(batch, separator: historySeparator) }
       ?? batch.prefixed(with: historySeparator)
     if forGenerator {
+      liveGenerationDemand = false
       let separator = joinsWithoutSpace || prompt.last?.isWhitespace == true ? "" : " "
       externalPromptContinuation = batch.prefixed(with: separator)
       liveContinuationFieldOffset = 0
@@ -6899,7 +6900,7 @@ struct TypingSession {
     let commitErrorStart = ordinaryCommitErrorStart(for: inputCharacter, targetIndex: targetIndex)
     if retainsLeadingSeparator { retainedWordSeparatorTypedIndices.insert(typedGraphemeCount) }
     let hasGeneratedCursor = generatedWordContinuation != nil || generatedStreamContinuation != nil
-      || generatedCodeContinuation != nil || streamsLiveContent && externalPromptContinuation != nil
+      || generatedCodeContinuation != nil || streamsLiveContent
     let generatedWordBefore = hasGeneratedCursor ? quoteNavigationIndex : 0
     appendTypedCharacter(
       inputCharacter, targetIndex: targetIndex,
@@ -8584,11 +8585,13 @@ struct TypingSession {
     guard !isFinished,
       generatedWordContinuation?.hasRemaining == true || generatedStreamContinuation?.hasRemaining == true
         || generatedCodeContinuation?.hasRemaining == true
-        || streamsLiveContent && externalPromptContinuation != nil else { return }
+        || streamsLiveContent && (externalPromptContinuation != nil || hasUnloadedLiveContentTargets) else { return }
     let bound = configuration.visibleFutureWordCount ?? 100
     guard unitTargets.sourceFieldCount - (activeWordBefore + 1) <= bound else { return }
-    if streamsLiveContent, externalPromptContinuation != nil { appendRetainedLiveField() }
-    else { appendGeneratedWord(at: date) }
+    if streamsLiveContent {
+      if externalPromptContinuation != nil { appendRetainedLiveField() }
+      else { liveGenerationDemand = true }
+    } else { appendGeneratedWord(at: date) }
   }
 
   private mutating func appendRetainedLiveField() {

@@ -21,6 +21,18 @@ final class LiveGeneratorDemandTests: XCTestCase {
     }
   }
 
+  func testConsumingLastRetainedFieldWaitsUntilTheNextForwardActionToRequest() {
+    let fields = (0..<100).map { "owned\($0) " }
+    var practice = TypingSession(configuration: .words(300).with(modifiers: [.poetryStream]),
+      prompt: fields.joined(), sourceFields: fields,
+      externalPromptContinuation: .init(text: "retained ", sourceFields: ["retained "]),
+      streamsLiveContent: true)
+    practice.insertBatch("owned0 ", at: began)
+    XCTAssertFalse(practice.needsLiveContentGeneration)
+    practice.insertBatch("owned1 ", at: began.addingTimeInterval(1))
+    XCTAssertTrue(practice.needsLiveContentGeneration)
+  }
+
   func testGeneratedSectionPublishesOneFieldAndRetainsItsTailForLaterProgress() throws {
     var practice = session()
     let opening = practice.prompt
@@ -33,12 +45,14 @@ final class LiveGeneratorDemandTests: XCTestCase {
     XCTAssertEqual(practice.prompt, opening + "north\nsouth e\u{301} ")
     practice.insertBatch("owned2 ", at: began.addingTimeInterval(2))
     XCTAssertEqual(practice.prompt, opening + "north\nsouth e\u{301} tail ")
-    XCTAssertTrue(practice.needsLiveContentGeneration)
+    XCTAssertFalse(practice.needsLiveContentGeneration)
     XCTAssertEqual(practice.completedWordCount, 3)
     XCTAssertEqual(practice.errors, 0)
+    practice.insertBatch("owned3 ", at: began.addingTimeInterval(3))
+    XCTAssertTrue(practice.needsLiveContentGeneration)
     var repeated = practice.repeatedAttempt()
     XCTAssertEqual(repeated.prompt, opening)
-    repeated.insertBatch("owned0 owned1 owned2 ", at: began.addingTimeInterval(3))
+    repeated.insertBatch("owned0 owned1 owned2 owned3 ", at: began.addingTimeInterval(4))
     XCTAssertEqual(repeated.prompt, practice.prompt)
   }
 

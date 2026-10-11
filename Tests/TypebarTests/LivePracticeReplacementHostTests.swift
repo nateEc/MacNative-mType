@@ -54,6 +54,32 @@ import XCTest
     try checkDelayedReplacement(prefetches: true)
   }
 
+  func testExhaustedGeneratorFetchesWithFullWindowAndPublishesOnlyOneField() throws {
+    try checkDelayedReplacement(prefetches: true, generatesNextWord: true)
+  }
+
+  func testEmptyGeneratorSectionFailsEvenWithFullWindowAndActiveNoQuit() throws {
+    try checkDelayedReplacement(prefetches: true, locksNoQuit: true, emptyPrefetch: true,
+      generatesNextWord: true)
+  }
+
+  func testGeneratorTransportFailureEndsNoQuitAttemptWithoutDisablingSource() throws {
+    try checkDelayedReplacement(prefetches: true, failsPrefetch: true, locksNoQuit: true,
+      generatesNextWord: true)
+  }
+
+  func testLeavingPracticeCancelsGeneratorRequestAndRejectsItsLateField() throws {
+    try checkDelayedReplacement(prefetches: true, cancelsPrefetch: true, generatesNextWord: true)
+  }
+
+  func testUnlockedGeneratorFailureDisablesSourceWithoutRestartingOffline() throws {
+    try checkDelayedReplacement(prefetches: true, failsPrefetch: true, generatesNextWord: true)
+  }
+
+  func testBackwardDeletionDoesNotStartAnotherGeneratorRequest() throws {
+    try checkDelayedReplacement(prefetches: true, generatesNextWord: true, checksBackwardInput: true)
+  }
+
   func testLeavingLivePracticeCancelsPrefetchAndRejectsLateSection() throws {
     try checkDelayedReplacement(prefetches: true, cancelsPrefetch: true)
   }
@@ -127,7 +153,8 @@ import XCTest
     cancelsPrefetch: Bool = false, failsPrefetch: Bool = false, locksNoQuit: Bool = false,
     emptyPrefetch: Bool = false, emptyInitialReplies: Int = 0,
     exhaustsBeforeEmpty: Bool = false, failsInitial: Bool = false,
-    failsInitialFill: Bool = false) throws {
+    failsInitialFill: Bool = false, generatesNextWord: Bool = false,
+    checksBackwardInput: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -296,11 +323,77 @@ import XCTest
     if prefetches {
       let initialRequestCount = pending.callCount
       XCTAssertTrue(pending.continuations.isEmpty, "Initial restoration requests must have resolved")
-      initialInput.insertText(authoredTokens.prefix(131).joined(separator: " ") + " ",
-        replacementRange: .init(location: NSNotFound, length: 0))
-      for _ in 0..<5 { flush() }
-      XCTAssertEqual(pending.callCount, initialRequestCount, "20 words remain including the retained tail")
-      initialInput.insertText(authoredTokens[131] + " ",
+      if generatesNextWord {
+        initialInput.insertText("o", replacementRange: .init(location: NSNotFound, length: 0))
+        for _ in 0..<5 { flush() }
+        XCTAssertEqual(pending.callCount, initialRequestCount, "A partial first word must not request generator content")
+        initialInput.insertText("wned0 " + authoredTokens[1..<51].joined(separator: " ") + " ",
+          replacementRange: .init(location: NSNotFound, length: 0))
+        for _ in 0..<5 { flush() }
+        XCTAssertEqual(pending.callCount, initialRequestCount, "Consuming the last retained field does not itself fetch")
+        initialInput.insertText(authoredTokens[51] + " ",
+          replacementRange: .init(location: NSNotFound, length: 0))
+        for _ in 0..<5 { flush() }
+        XCTAssertEqual(pending.callCount, initialRequestCount + 1, "The next forward action must fetch with a full future window")
+        XCTAssertEqual(pending.continuations.count, 1)
+        initialInput.insertText(authoredTokens[52..<54].joined(separator: " ") + " ",
+          replacementRange: .init(location: NSNotFound, length: 0))
+        for _ in 0..<5 { flush() }
+        XCTAssertEqual(pending.callCount, initialRequestCount + 1, "Generator requests must remain single-flight")
+        let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+        let before = try XCTUnwrap(field.accessibilityValue() as? String)
+        let cancelled = pending.cancelledReplies
+        if locksNoQuit { XCTAssertFalse(settings.allowsRestartingConfigurationChange) }
+        if cancelsPrefetch {
+          window.contentView = nil
+          for _ in 0..<5 { flush() }
+        }
+        pending.scriptedTokens = emptyPrefetch ? []
+          : checksBackwardInput ? [authoredTokens[151]] : Array(authoredTokens[151..<300])
+        pending.returnsFailure = failsPrefetch
+        pending.finish()
+        for _ in 0..<5 { flush() }
+        XCTAssertEqual(pending.callCount, initialRequestCount + 1)
+        XCTAssertTrue(pending.continuations.isEmpty)
+        if cancelsPrefetch {
+          XCTAssertGreaterThan(pending.cancelledReplies, cancelled)
+          XCTAssertEqual(field.accessibilityValue() as? String, before)
+        } else if emptyPrefetch || failsPrefetch {
+          let keepsSource = emptyPrefetch || locksNoQuit
+          XCTAssertEqual(settings.testModifiers.contains(.poetryStream), keepsSource)
+          XCTAssertEqual(settings.testModifiers.contains(.noQuit), locksNoQuit)
+          XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(.poetryStream), keepsSource)
+          XCTAssertTrue(settings.allowsRestartingConfigurationChange, "Generator failure ends the attempt, unlike a refused side-pull restart")
+          XCTAssertEqual(field.accessibilityValue() as? String, before)
+          XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+          XCTAssertTrue(NSApplication.shared.windows.contains {
+            $0 !== window && !priorWindowIDs.contains(ObjectIdentifier($0)) && $0.contentView != nil
+          }, "A generator failure must produce real result presentation content")
+        } else {
+          XCTAssertEqual(field.accessibilityValue() as? String, before.trimmingCharacters(in: .whitespaces) + " owned151 ")
+          XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+          if checksBackwardInput {
+            initialInput.onDeleteWord()
+            for _ in 0..<5 { flush() }
+            XCTAssertEqual(pending.callCount, initialRequestCount + 1,
+              "Backward progress must not fetch another section even when its generator pool is empty")
+            XCTAssertTrue(pending.continuations.isEmpty)
+            XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+            return
+          }
+          initialInput.insertText(authoredTokens[54] + " ",
+            replacementRange: .init(location: NSNotFound, length: 0))
+          for _ in 0..<5 { flush() }
+          XCTAssertTrue((field.accessibilityValue() as? String)?.hasSuffix("owned151 owned152 ") == true)
+          XCTAssertFalse((field.accessibilityValue() as? String)?.contains("owned153") == true)
+          XCTAssertEqual(pending.callCount, initialRequestCount + 1)
+        }
+        XCTAssertFalse(window.isVisible)
+        return
+      }
+      // One bulk input event reaches the side-pull boundary before SwiftUI
+      // delivers the count change. Separate tests above cover earlier demand.
+      initialInput.insertText(authoredTokens.prefix(132).joined(separator: " ") + " ",
         replacementRange: .init(location: NSNotFound, length: 0))
       for _ in 0..<5 { flush() }
       XCTAssertEqual(pending.callCount, initialRequestCount + 1, "19 words must start a new section request")
@@ -447,6 +540,10 @@ import XCTest
       XCTAssertFalse(window.isVisible)
       return
     }
+    // An invisible host's run-loop drain does not guarantee a timer delivery.
+    // Sample the actual presenter just as the main-caret assertions above do.
+    XCTAssertFalse(views(PromptCaretNativeView.self, in: host).isEmpty)
+    presentCarets()
     let markers = views(NSHostingView<PromptCaretMarkerView>.self, in: host)
     XCTAssertEqual(markers.contains { $0.rootView.style == .outline && !$0.isHidden }, !disablesPace,
       "Online completion must use the current Pace choice, not the pre-request choice")
