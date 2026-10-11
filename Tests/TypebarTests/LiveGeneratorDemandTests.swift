@@ -193,6 +193,34 @@ final class LiveGeneratorDemandTests: XCTestCase {
     }
   }
 
+  func testFinalBlankLineFeedCompletesAcrossStrictDifficultyAndStopRules() throws {
+    for difficulty in [Difficulty.normal, .expert, .master] {
+      for strict in [false, true] {
+        for stop in [StopOnErrorMode.off, .word, .letter] {
+          var rules = InputRules()
+          rules.strictSpace = strict
+          rules.stopOnErrorMode = stop
+          let configuration = TestConfiguration(mode: .words, duration: nil, wordLimit: 2,
+            difficulty: difficulty, rules: rules, modifiers: [.poetryStream])
+          var practice = TypingSession(configuration: configuration,
+            prompt: "owned ", sourceFields: ["owned "],
+            externalPromptContinuation: .init(text: "\n", sourceFields: ["\n"]),
+            streamsLiveContent: true)
+          practice.insertBatch("owned ", at: began)
+          XCTAssertFalse(practice.isFinished)
+          XCTAssertEqual(practice.prompt, "owned \n")
+          practice.insertBatch("\n", at: began.addingTimeInterval(1))
+          XCTAssertEqual(practice.outcome, .completed, "\(difficulty), strict=\(strict), stop=\(stop)")
+          XCTAssertEqual(practice.completedWordCount, 2)
+          XCTAssertEqual(practice.errors, 0)
+          let result = try XCTUnwrap(practice.result())
+          XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+            through: result.elapsedDuration), "owned \n")
+        }
+      }
+    }
+  }
+
   func testConsumingLastRetainedFieldWaitsUntilTheNextForwardActionToRequest() {
     let fields = (0..<100).map { "owned\($0) " }
     var practice = TypingSession(configuration: .words(300).with(modifiers: [.poetryStream]),

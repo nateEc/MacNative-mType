@@ -1,5 +1,11 @@
 # 生成型词流反写顺序
 
+## 2026-10-12 空白 LF 末词规则组合
+
+固定源码完整前置过滤／输入处理器执行 3 难度 × 2 strictSpace × 3 stopOnError 共 18 组：正确最终 LF 均触发 finish；strictSpace=true 或非普通难度的事件不 commitsWord，仍依当前词正确完成。DOM／输入／事件／导航为自有适配器，未执行真实浏览器导航。源码日志 work/blank-lf-rules-source.log。
+
+原生新增组合用例在旧实现复现 normal/strict=true/stop=off 的 active、计数 1 与结果 nil 三处失败（work/blank-lf-rules-native.log；先行一次测试类型名拼写编译错误已纠正，不计行为证据）。补充有限最终空白字段正确 LF 的非导航完成判断，要求显式字段数满足实际有限预算、无待加载内容且本次输入正确。18 组结果逐字回放及计数通过；相关七组最终 114 项零失败（23.137 秒，墙钟 23.150 秒），日志 work/blank-lf-rules-regression.log。下文“strict-space／难度组合未验收”为历史状态；本段只验收正确 LF 的上述组合，错误输入、deleteOnError、quickEnd 组合、真实导航／IME 和完整门禁仍开放，goal active。
+
 ## 2026-10-12 普通空白 LF 末词完成修正
 
 新增固定源码执行覆盖完整 before-insert、onInsertText、validation、util 与 finish helper：普通难度、strictSpace=false 下，末词 `\n` 通过前置过滤，事件 correct/commitsWord=true，并触发 finish。输入 DOM、事件、游标、导航与 UI 为自有适配器，不代表浏览器真实导航／网络／IME 端到端。参考源码仅只读执行，不移植其代码。

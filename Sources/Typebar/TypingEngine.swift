@@ -8859,6 +8859,11 @@ struct TypingSession {
 
   private var shouldFinishEnglishWordsTest: Bool {
     guard let wordLimit = finiteCompletionWordLimit, wordLimit > 0 else { return false }
+    // Strict-space/difficulty can retain a correct LF in the final blank
+    // field without navigation. Correctness still completes that word.
+    if sourceFields?.count == wordLimit, isAtFinalBlankTarget,
+      !usesIncrementalPromptExtension, inputWordText() == "\n",
+      lastInputWasCorrect == true { return true }
     if let acceptedUnits {
       // Explicit provider fields own their word boundaries, including a
       // newline-only word. Inferred whitespace is not an additional word.

@@ -539,3 +539,16 @@ assert.equal(ownedInputEvents.length,1);
 assert.equal(ownedInputEvents[0].correct,true);
 assert.equal(ownedInputEvents[0].commitsWord,true);
 console.log('Pinned complete before-insert/onInsertText accepts and finishes a blank final LF under normal/non-strict settings. Actual validation/util/finish helpers; owned input/events/DOM/navigation adapter, not browser end-to-end proof.');
+
+for(const difficulty of ['normal','expert','master'])for(const strictSpace of [false,true])
+for(const stopOnError of ['off','word','letter']) {
+  Object.assign(config,{difficulty,strictSpace,stopOnError});
+  ownedInput='';ownedCurrentInput='';ownedFinished=0;ownedInputEvents.length=0;
+  await insertModule.namespace.emulateInsertText({data:'\n',now:1000});
+  assert.equal(ownedFinished,1,JSON.stringify({difficulty,strictSpace,stopOnError}));
+  assert.equal(ownedInputEvents.length,1);
+  assert.equal(ownedInputEvents[0].correct,true);
+  assert.equal(ownedInputEvents[0].commitsWord,
+    difficulty==='normal'&&!strictSpace?true:undefined);
+}
+console.log('18 pinned blank-final-LF rule combinations finish correctly; strict/difficulty suppress navigation, not correct final-word completion. Owned navigation/DOM; no browser end-to-end claim.');
