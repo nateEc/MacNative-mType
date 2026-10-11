@@ -1,5 +1,11 @@
 # 在线空内容生成检查点（未验收）
 
+## 首次生成重试调用方实证（2026-10-12，原生尚未修改）
+
+新增自有 `check-source-initial-generation-retries.mjs`，只读提取并执行固定参考 test-logic.ts 的完整 init 函数；生成器结果、语言和 UI 为显式自有适配器。连续三次异常、空生成／异常混合、第三次恢复三组通过，日志 `work/initial-generation-retry-caller-source.log`。每组恰好三次生成及三次词表重置；两组耗尽时显示一次初始化失败、提交一次捕获错误、退出 restarting 状态且无第四次生成；第三组发布有效目标并成功返回，不显示初始化失败。异常和 WordGenError 共用重试计数，配置来源未被调用方关闭。此探针不执行真实生成器、提供者网络或实际界面，不能据此声称诗词 false 不会关闭来源；其关闭来源发生在原版生成器另一边界。
+
+探针已接入后续完整门禁的独立日志阶段；zsh 语法检查、固定参考原创性检查通过（`work/initial-generation-retry-caller-originality.log`），未启动主程序。当前原生首次百科 nil 仍立即关闭来源并离线重建，且空段／异常没有统一计数；本轮未修改产品或声称兼容性修复。下一步以真实不可见宿主建立百科连续失败／恢复／已开始输入边界红测，再落实有界初始化重试。新探针未运行新完整门禁，旧冻结通过仅覆盖其原提交，goal active。
+
 ## 诊断开启的冻结完整门禁通过（2026-10-12，非全部功能验收）
 
 冻结提交 `8038bcea2849a13fba0ee4f31b5024bad3556726`，开启 `TYPEBAR_QA_COMPOSITION_DIAGNOSTICS=1`，固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`；单会话完整门禁退出 0，文件校验退出 0，870 个跟踪文件保持一致。证据 `work/frozen-readiness-composition-diagnostic.3zeTnk` 含 commit.txt、files.sha256、hash-check.log、result.txt、gate.log 及自动留存的 77 份日志。本次日志留存成功不代表旧失败路径未留存的原因已修复。
