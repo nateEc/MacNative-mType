@@ -153,6 +153,18 @@ final class LiveGeneratorDemandTests: XCTestCase {
     XCTAssertEqual(practice.prompt, fields.joined() + "color honor")
   }
 
+  func testFinalCachedLineFeedCommitIsRemovedOnlyFromNonemptyField() {
+    for terminal in ["last\n", "\n"] {
+      let opening = (0..<100).map { "owned\($0) " }
+      var practice = TypingSession(configuration: .words(101).with(modifiers: [.poetryStream]),
+        prompt: opening.joined(), sourceFields: opening,
+        externalPromptContinuation: .init(text: terminal, sourceFields: [terminal]),
+        streamsLiveContent: true)
+      practice.insertBatch("owned0 ", at: began)
+      XCTAssertEqual(practice.prompt, opening.joined() + (terminal == "\n" ? "\n" : "last"))
+    }
+  }
+
   func testForwardProgressRequestsGeneratorSectionWithAFullVisibleWindow() {
     for count in [100, 101, 102] {
       var practice = session(published: count)

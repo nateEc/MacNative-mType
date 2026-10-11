@@ -8653,7 +8653,9 @@ struct TypingSession {
     if !isReplayingLiveGeneratorHistory { consumedLiveGeneratorFields.append(field) }
     if configuration.mode == .words, !configuration.isInfinite,
       livePublishedWordCount + 1 >= (configuration.wordLimit ?? 25),
-      field.noSpaceTargetWords.isEmpty, field.text.hasSuffix(" ") {
+      field.noSpaceTargetWords.isEmpty,
+      (field.text.hasSuffix(" ") || field.text.hasSuffix("\n")),
+      field.text.count > 1 {
       let fields = field.sourceFields.map { values in
         var values = values
         values[values.count - 1].removeLast()

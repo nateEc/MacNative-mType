@@ -487,3 +487,18 @@ for(const index of [104,109,110]) {
     allWordsGenerated:main.namespace.areAllWordsGenerated()}),index===110);
 }
 console.log('Pinned finish helper rejects correct words at configured index 104 and penultimate published index 109; accepts the actual last published index 110. Actual helper/generation predicate; authored handler flags, no complete input-handler execution claim.');
+
+for (const terminal of ['last\n', '\n']) {
+  config.words=101;activeNames=['poetry'];ownedRepeated=false;
+  ownedSection={words:['setup']};ownedSectionQueue=[];ownedSectionError=undefined;
+  await main.namespace.generateWords({name:'english',words:['owned']});
+  testWords.words.reset();
+  for(let i=0;i<100;i++)testWords.words.push(`owned${i} `,0);
+  main.namespace.currentSection.splice(0,main.namespace.currentSection.length,terminal);
+  ownedActiveWordIndex=0;
+  await addWord();
+  const last=testWords.words.get().at(-1);
+  assert.equal(last.textWithCommit,terminal==='\n'?'\n':'last');
+  assert.equal(last.commit,terminal==='\n'?'\n':'');
+}
+console.log('Pinned final LF contracts passed: nonempty final field loses LF commit; empty LF field retains it. Actual caller, generator and TestWords; owned cursor/provider.');
