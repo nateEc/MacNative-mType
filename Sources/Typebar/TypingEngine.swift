@@ -4403,6 +4403,7 @@ struct TypingSession {
     didSet { refreshUnitTargets() }
   }
   private var unitTargets = UnitInputTargets("")
+  private let sourceFields: [String]?
   private var paceCaretProgress: PaceCaretProgress?
   /// Source initialization selects this once; input or later prompt growth
   /// cannot switch the scoring basis. It is not a language-menu preference.
@@ -4639,7 +4640,8 @@ struct TypingSession {
   private(set) var failureReason: TestFailureReason?
 
   init(
-    configuration: TestConfiguration, prompt: String, repeatingPrompt: String? = nil,
+    configuration: TestConfiguration, prompt: String, sourceFields: [String]? = nil,
+    repeatingPrompt: String? = nil,
     generatedWordContinuation: GeneratedWordContinuation? = nil,
     generatedStreamContinuation: GeneratedStreamContinuation? = nil,
     generatedCodeContinuation: GeneratedCodeContinuation? = nil,
@@ -4667,8 +4669,9 @@ struct TypingSession {
     self.initializationFailure = initializationFailure
     if initializationFailure != nil { self.outcome = .failed }
     self.prompt = prompt
+    self.sourceFields = sourceFields
     self.promptCharacters = Array(prompt)
-    let initialTargets = UnitInputTargets(prompt)
+    let initialTargets = UnitInputTargets(prompt, sourceFields: sourceFields)
     self.unitTargets = initialTargets
     self.initialKoreanScoring = configuration.mode != .zen && initialTargets.requiresKoreanDisassembly
     self.promptSeparatorUnitCount = prompt.utf8.reduce(into: 0) { count, unit in
@@ -4715,7 +4718,7 @@ struct TypingSession {
   private mutating func refreshUnitTargets() {
     unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: acceptedUnits != nil,
       noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil,
-      asciiSeparatorCount: promptSeparatorUnitCount)
+      asciiSeparatorCount: promptSeparatorUnitCount, sourceFields: sourceFields)
   }
 
   mutating func configurePace(wpm: Double?, clock: PaceCaretClock = .system) {
@@ -4773,7 +4776,8 @@ struct TypingSession {
       }
     }
     return TypingSession(
-      configuration: configuration, prompt: initialPrompt, repeatingPrompt: repeatingPrompt,
+      configuration: configuration, prompt: initialPrompt, sourceFields: sourceFields,
+      repeatingPrompt: repeatingPrompt,
       generatedWordContinuation: initialGeneratedWordContinuation.map {
         generatedWordContinuation?.replayingContinuation(after: $0) ?? $0
       },
@@ -7737,7 +7741,8 @@ struct TypingSession {
 
   private mutating func beginUnitInput() {
     unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: true,
-      noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil)
+      noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil,
+      sourceFields: sourceFields)
     var buffer = AcceptedUnitInput()
     for (index, character) in typed.enumerated() {
       let target = typedTargetIndices[index]
@@ -7795,12 +7800,19 @@ struct TypingSession {
     let oldTail = String(typed.suffix(2))
     let start = acceptedUnits!.entries.count - oldTail.utf16.count
     let retained = retainedWordSeparatorTypedIndices.contains(typedGraphemeCount)
+    // A correct LF inside a provider field is not a complete-word match.
+    // Error guards retain that unit without navigating to the next field.
+    let retainsIncompleteSourceSeparator = sourceFields != nil && !unitTargets.noSpace
+      && (unit == 32 || unit == 10)
+      && (configuration.rules.stopOnErrorMode != .off || configuration.rules.deleteOnErrorMode.isEnabled)
+      && acceptedUnits!.field(acceptedUnits!.fieldIndex) + [unit]
+        != unitTargets.field(acceptedUnits!.fieldIndex)
     let advances = !(unitTargets.noSpace || hasOrdinarySourceFields && unit == 32)
       || acceptedUnits!.fieldIndex < unitTargets.fields.count - 1
       || usesIncrementalPromptExtension
     acceptedUnits!.append(.init(unit: unit, target: targetIndex, date: timingDate(at: date),
       forced: forceError, extra: countsAsExtraError,
-      commits: commits ?? ((unit == 32 || unit == 10) && !retained)),
+      commits: commits ?? ((unit == 32 || unit == 10) && !retained && !retainsIncompleteSourceSeparator)),
       advances: advances)
     if forceError, let targetIndex { forcedErrorIndices.insert(targetIndex) }
     projectUnitTail(oldTail: oldTail, unitStart: start)
