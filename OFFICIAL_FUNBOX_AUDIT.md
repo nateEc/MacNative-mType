@@ -715,8 +715,8 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `read_ahead_hard` | 预读遮挡（当前及后两词） | 等价实现 | `FUN-01` |
 | `memory` | 记忆模式 | 等价实现 | 首次有效输入后隐藏提示；只允许 words/quote/custom，time/zen 直接启用或切换会被拒绝；无逐项 setter 的导入转为有限 25 词 |
 | `nospace` | 无空格 | 等价实现 | 移除显示分隔符，同时保留可安全映射的原始词边界与渲染后词段；拒绝直接输入的常见 Unicode 空白字符，遇错停下和修正后再前进均在原始词末字符提交点阻止错误词；字数进度、expert 难度校验、末字符提交的 Burst、最低单词速度和弹性词长阈值，以及结果词历史、Burst 热力图、错词和慢词复练都逐词运行 |
-| `poetry` | 诗性散文 | 等价实现 | 英文等空格分词的 time/words 练习中，用户启用后会以原生 URLSession 请求 PoetryDB 的随机诗歌，显示标题/作者；强制关闭标点和数字；请求失败、超时或用户已开始输入时保持 Typebar 自有离线诗性流，且不保存远端内容到设置 |
-| `wikipedia` | 知识短文 | 等价实现 | 所有空格分词的原生语言，以及简体/繁体中文的 time/words 练习中，用户启用后会以原生 URLSession 请求对应 Wikipedia 的随机摘要，并显示标题；强制关闭标点和数字；中文内容由 macOS 的系统词元器分段后以无空格提示呈现。日语假名与罗马字选项均承诺保持所选书写形式，随机百科可能含汉字，故保守使用原创离线知识流。请求失败、超时或用户已开始输入时始终保持 Typebar 自有离线内容，避免将网页代码、资产或固定外部文本纳入项目 |
+| `poetry` | 诗性散文 | 部分实现，未验收等价 | 原生 URLSession 获取 PoetryDB 内容，保留标题/作者、来源字段、空生成三次初始化边界及失败回放。完整 addWord 探针已证实：运行中空段后同一次调用可能再取段或消费生成器残留；当前原生等待后续输入的调度不等价。false/undefined 返回、初始化传输失败回退、真实窗口自动呈现仍待对齐；详见 EMPTY_PROVIDER_GENERATION_CHECKPOINT.md |
+| `wikipedia` | 知识短文 | 部分实现，未验收等价 | 原生获取对应 Wikipedia 摘要并显示标题，中文使用系统词元器。所选书写形式限制仍可能使用原创离线内容。共享在线续取路径的空段调度、失败分类与参考完整调用链未对齐；诗歌提供者的六例探针不证明 Wikipedia 提供者本身等价，须另行验收 |
 | `weakspot` | 弱项训练 | 部分覆盖 | app 生命周期内保留瞬时输入间隔与错误罚时，20 候选首个最高值；均分只计已学习 Unicode 标量并保留已学零分，普通／代码反池在抽样前应用、Polyglot 新池不二次反转。会话输入即时学习，普通及代码／条目新生成词读最新簿，重开传整簿而不重记旧样本；代码和四类条目新段接入 20 候选整段评分，段内余词和已生成缓存不重抽；普通词及生成流也保留完整实际目标，嵌套重开固定开头检查点。取词后应用装饰，实际源码及原生有界夹具通过；浏览器异步补题时序、其他词源完整缓存／分段、段身份消费者、全部组合、字符键规范、真实捕获／IME、词库身份与分布仍未等价验证。不写评分簿到成绩／偏好，Weakspot 练习不产生 PB；独立持久化分析不变；见 GENERATED_LOOKAHEAD_CONTRACT.md、GENERATED_TARGET_CACHE_CONTRACT.md、WEAKSPOT_LIVE_GENERATION_CONTRACT.md、ORDINARY_ENTRY_GENERATION_CONTRACT.md、CODE_SECTION_GENERATION_CONTRACT.md、CODE_WORD_DECORATION_CONTRACT.md、CODE_POOL_GENERATION_CONTRACT.md、ORDINARY_BACKWARDS_POOL_CONTRACT.md、`FUN-WS-01`、`FUN-WS-LIVE-01`、`MET-02` |
 | `pseudolang` | 伪语言词流 | 等价实现 | Typebar 自有生成器 |
 | `IPv4` | IPv4 地址流 | 等价实现 | Typebar 自有确定性地址流；强制关闭数字 |

@@ -11,12 +11,13 @@ assert.ok(process.argv[2],'Reference checkout required');
 assert.equal(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),
   '91bd24bb8513785c7364cbea29296ff7adafac41');
 assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
-const actual=new Set(['test/words-generator','test/funbox/funbox-functions','test/wordset','test/weak-spot']);
+const actual=new Set(['test/words-generator','test/funbox/funbox-functions','test/wordset','test/weak-spot','test/test-words']);
 const config={mode:'words',words:3,language:'english',showAllLines:false,lazyMode:false,
   punctuation:false,numbers:false,britishEnglish:false};
 let activeNames=['backwards','binary'], functions, drawIndex=0;
 let ownedIndexes=[], spacingMs=0, ownedRepeated=false;
 let ownedSection, sectionCalls=0;
+let ownedSectionQueue=[];
 const toggledSources=[];
 const languages={english:{name:'english',words:['ab','cd'],rightToLeft:false},
   owned:{name:'owned',words:['ef','gh'],rightToLeft:false}};
@@ -29,11 +30,12 @@ const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuff
 const bindings={
   'config/store':{Config:config},
   'config/setters':{toggleFunbox:name=>toggledSources.push(name)},
-  'test/poetry':{getPoem:async()=>{sectionCalls++;return ownedSection}},
+  'test/poetry':{getPoem:async()=>{sectionCalls++;return ownedSectionQueue.length?ownedSectionQueue.shift():ownedSection}},
   'test/custom-text':{getPipeDelimiter:()=>false},
   'test/practise-words':{before:{mode:null}},
   'controllers/quotes-controller':{default:{}},
-  'states/test':{isRepeated:()=>ownedRepeated,getCurrentQuote:()=>null,setCurrentQuote:()=>{},getSelectedQuoteId:()=>null},
+  'states/test':{isRepeated:()=>ownedRepeated,getCurrentQuote:()=>null,setCurrentQuote:()=>{},getSelectedQuoteId:()=>null,
+    getActiveWordIndex:()=>0},
   'test/funbox/list':{
     getActiveFunboxes:active,
     getActiveFunboxesWithFunction:name=>active().filter(value=>typeof value.functions[name]==='function'),
@@ -203,3 +205,49 @@ ownedSection={words:['harbor']};sectionCalls=0;toggledSources.length=0;
 assert.deepEqual((await main.namespace.generateWords({name:'english',words:['owned']})).words,['harbor ']);
 assert.equal(sectionCalls,1);assert.deepEqual(toggledSources,[]);
 console.log('4 pinned section-admission cases passed (actual generator and funbox functions; authored provider responses distinguish empty generation failure from disabled fetch failure; no parser/HTTP/UI/recovery equivalence claim).');
+// Execute the complete actual addWord function, not a paraphrase of its branch
+// conditions. Its surrounding module/startup is deliberately outside this
+// probe. The exact pinned source range is read only and remains in memory.
+const logicSource=fs.readFileSync(path.join(root,'frontend/src/ts/test/test-logic.ts'),'utf8');
+const addStart=logicSource.indexOf('export async function addWord(): Promise<void> {');
+const addEnd=logicSource.indexOf('\ntype RetrySaving = {',addStart);
+assert.ok(addStart>=0&&addEnd>addStart,'Pinned complete addWord range must exist');
+const addBody=stripTypeScriptTypes(logicSource.slice(addStart,addEnd),{mode:'transform'})
+  .replace(/^export /,'');
+const testWords=modules.get('test/test-words').namespace;
+let restarts=0;
+const failures=[],notices=[],displayed=[];
+const addWord=vm.compileFunction(addBody+'\nreturn addWord;',[
+  'Config','TestWords','WordsGenerator','TestUI','getActiveFunboxes','getActiveWordIndex',
+  'findSingleActiveFunboxWithFunction','showErrorNotification','toggleFunbox','restart','timerEvent',
+])(config,testWords,main.namespace,
+  {addWord:word=>displayed.push(word),appendEmptyWordElement:unexpected},active,()=>0,
+  name=>active().find(value=>typeof value.functions[name]==='function'),
+  (...args)=>notices.push(args),bindings['config/setters'].toggleFunbox,
+  async()=>{restarts++},{dispatch:value=>failures.push(value)});
+config.words=50;
+for(const fixture of [
+  {name:'empty with retained generator tail',tail:['retained'],responses:[{words:[]}],calls:1,added:['retained'],fails:0,restarts:0,disabled:false},
+  {name:'empty then valid generator section',tail:[],responses:[{words:[]},{words:['fresh']}],calls:2,added:['fresh'],fails:0,restarts:0,disabled:false},
+  {name:'empty then empty generator section',tail:[],responses:[{words:[]},{words:[]}],calls:2,added:[],fails:1,restarts:0,disabled:false},
+  {name:'false prefetch with retained tail',tail:['retained'],responses:[false],calls:1,added:[],fails:0,restarts:1,disabled:true},
+  {name:'undefined prefetch with retained tail',tail:['retained'],responses:[undefined],calls:1,added:[],fails:0,restarts:0,disabled:false},
+  {name:'valid prefetch still consumes generator tail',tail:['retained'],responses:[{words:['first','second']}],calls:1,added:['first','second','retained'],fails:0,restarts:0,disabled:false},
+]){
+  testWords.words.reset();testWords.words.push('opening ',0);
+  main.namespace.currentSection.splice(0,main.namespace.currentSection.length,...fixture.tail);
+  ownedSectionQueue=[...fixture.responses];ownedSection=undefined;
+  sectionCalls=0;restarts=0;toggledSources.length=0;
+  failures.length=0;notices.length=0;displayed.length=0;
+  await addWord();
+  assert.equal(sectionCalls,fixture.calls,fixture.name);
+  assert.deepEqual(testWords.words.get().slice(1).map(word=>word.text),fixture.added,fixture.name);
+  assert.deepEqual(displayed,fixture.added,fixture.name);
+  assert.equal(failures.length,fixture.fails,fixture.name);
+  if(fixture.fails) assert.deepEqual(failures,[{key:'fail',value:'word generation error'}]);
+  assert.equal(restarts,fixture.restarts,fixture.name);
+  assert.deepEqual(toggledSources,fixture.disabled?['poetry']:[],fixture.name);
+  assert.equal(notices.length,fixture.fails+fixture.restarts,fixture.name);
+  assert.equal(ownedSectionQueue.length,0,fixture.name);
+}
+console.log('6 pinned complete-addWord cases passed with actual generator/functions/word storage (owned provider, UI, active index, notification and timer boundaries; no full test-logic module, HTTP, DOM or native recovery equivalence claim).');

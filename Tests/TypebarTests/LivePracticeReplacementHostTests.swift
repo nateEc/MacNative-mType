@@ -136,6 +136,14 @@ import XCTest
     func views<T: NSView>(_ type: T.Type, in view: NSView) -> [T] {
       (view as? T).map { [$0] } ?? view.subviews.flatMap { views(type, in: $0) }
     }
+    func presentCarets() {
+      // A bounded run-loop drain does not guarantee a timer presentation in
+      // an invisible XCTest window. Sample the real presenter on both sides
+      // of transport completion, rather than compare a stale pre-input frame.
+      for presenter in views(PromptCaretNativeView.self, in: host) {
+        presenter.present(at: ProcessInfo.processInfo.systemUptime)
+      }
+    }
     for _ in 0..<10 where pending.continuations.isEmpty { flush() }
     XCTAssertEqual(pending.source, .poetry)
     XCTAssertFalse(pending.continuations.isEmpty, "The production load must reach the injected transport")
@@ -158,11 +166,17 @@ import XCTest
       initialInput.onFocusChanged(true)
       initialInput.onWindowFocusChanged(true, false)
       flush()
+      presentCarets()
+      let beforeInputCaret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
+        .first { $0.rootView.style == .bar && !$0.isHidden }).frame
       initialInput.insertText(String(initialPrompt.prefix(1)),
         replacementRange: .init(location: NSNotFound, length: 0))
       flush()
+      presentCarets()
       startedCaret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
         .first { $0.rootView.style == .bar && !$0.isHidden }).frame
+      XCTAssertGreaterThan(try XCTUnwrap(startedCaret).minX, beforeInputCaret.minX,
+        "The first accepted English character must advance the main caret before the response")
     }
     if emptyInitialReplies > 0 {
       let initialRequestCount = pending.callCount
@@ -303,6 +317,7 @@ import XCTest
     let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
     XCTAssertTrue(input === initialInput, "Transport completion must not replace the native input owner")
     if startsBeforeReturn {
+      presentCarets()
       let caret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
         .first { $0.rootView.style == .bar && !$0.isHidden })
       XCTAssertEqual(caret.frame, startedCaret,
