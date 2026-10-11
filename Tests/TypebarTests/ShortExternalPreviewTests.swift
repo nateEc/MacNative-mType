@@ -2,6 +2,30 @@ import XCTest
 @testable import Typebar
 
 final class ShortExternalPreviewTests: XCTestCase {
+  func testThousandWordUnseparatedExternalContinuationPreservesProgressAndReplay() throws {
+    let words = ["甲", "乙丙", "丁"]
+    let configuration = TestConfiguration.words(1_000, language: .simplifiedChinese)
+    var session = TestSessionFactory.make(configuration: configuration,
+      streamPrompt: words.joined(), streamNoSpaceBoundarySource: words.joined(separator: " "),
+      showAllLines: true)
+    let start = Date(timeIntervalSinceReferenceDate: 917_000_000)
+    for index in 0..<1_000 {
+      session.insertBatch(words[index % 3], at: start.addingTimeInterval(Double(index) * 0.5))
+      if (index + 1).isMultiple(of: 100) {
+        XCTAssertEqual(session.completedWordCount, index + 1)
+      }
+      if index == 998 { XCTAssertFalse(session.isFinished) }
+    }
+    let target = (0..<1_000).map { words[$0 % 3] }.joined()
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 1_000)
+    XCTAssertEqual(session.prompt, target)
+    XCTAssertEqual(session.errors, 0)
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents, through: result.elapsedDuration), target)
+    XCTAssertEqual(try XCTUnwrap(TestResultRecord(result: result).portableResult), result)
+  }
+
   func testShortUnseparatedExternalSourceRetainsOriginalTokenBoundaries() throws {
     let words = ["甲", "乙丙", "丁"]
     for showAllLines in [false, true] {
