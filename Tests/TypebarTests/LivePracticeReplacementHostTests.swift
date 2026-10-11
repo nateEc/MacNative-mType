@@ -186,6 +186,12 @@ import XCTest
       emptyPrefetch: true, exhaustsBeforeEmpty: true, recoversAfterEmptyAtExhaustion: true)
   }
 
+  func testCancelledGeneratorRequestAfterEmptySideSectionRejectsLateSuccess() throws {
+    try checkDelayedReplacement(prefetches: true, locksNoQuit: true,
+      emptyPrefetch: true, exhaustsBeforeEmpty: true, recoversAfterEmptyAtExhaustion: true,
+      cancelsAfterEmpty: true)
+  }
+
   func testFailedGenerationPresentationKeepsAValidStoreWhileAnUnrelatedStoreSaves() throws {
     let existing = ExistingWindow(contentRect: .init(x: 0, y: 0, width: 200, height: 100),
       styleMask: .borderless, backing: .buffered, defer: false)
@@ -209,7 +215,8 @@ import XCTest
     disablesPace: Bool = false, composesBeforeReturn: Bool = false, prefetches: Bool = false,
     cancelsPrefetch: Bool = false, failsPrefetch: Bool = false, locksNoQuit: Bool = false,
     emptyPrefetch: Bool = false, emptyInitialReplies: Int = 0,
-    exhaustsBeforeEmpty: Bool = false, recoversAfterEmptyAtExhaustion: Bool = false, failsInitial: Bool = false,
+    exhaustsBeforeEmpty: Bool = false, recoversAfterEmptyAtExhaustion: Bool = false,
+    cancelsAfterEmpty: Bool = false, failsInitial: Bool = false,
     failsInitialFill: Bool = false, generatesNextWord: Bool = false,
     checksBackwardInput: Bool = false, encyclopedia: Bool = false,
     initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false) throws {
@@ -561,6 +568,26 @@ import XCTest
         XCTAssertEqual(pending.continuations.count, 1)
         XCTAssertFalse(settings.allowsRestartingConfigurationChange,
           "The same NoQuit attempt stays active while the generator pull is pending")
+        if cancelsAfterEmpty {
+          let beforeCancellation = pending.cancelledReplies
+          let before = fieldBeforeReply.accessibilityValue() as? String
+          window.contentView = nil
+          for _ in 0..<5 { flush() }
+          pending.scriptedTokens = Array(authoredTokens[151..<300])
+          pending.finish()
+          for _ in 0..<5 { flush() }
+          XCTAssertGreaterThan(pending.cancelledReplies, beforeCancellation)
+          XCTAssertEqual(pending.callCount, initialRequestCount + 2)
+          XCTAssertTrue(pending.continuations.isEmpty)
+          XCTAssertEqual(fieldBeforeReply.accessibilityValue() as? String, before)
+          XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
+          XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+          XCTAssertFalse(NSApplication.shared.windows.contains {
+            $0 !== window && !priorWindowIDs.contains(ObjectIdentifier($0)) && $0.contentView != nil
+          }, "Late success after cancellation must not present results")
+          XCTAssertFalse(window.isVisible)
+          return
+        }
         pending.scriptedTokens = Array(authoredTokens[151..<300])
         pending.finish()
         for _ in 0..<5 { flush() }
