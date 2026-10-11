@@ -386,6 +386,9 @@ import XCTest
               XCTAssertGreaterThanOrEqual(frame.height, settings.fontSize,
                 "Below composition must retain the selected practice font size")
               XCTAssertGreaterThan(frame.width, host.bounds.width * 0.7)
+              if fields(in: host).isEmpty {
+                print("COMPOSITION missing prompt phase=below-candidate host=\(hostIndex) sizing=\(automaticSizing) style=\(style) marked=\(input.hasMarkedText()) inputs=\(inputs(in: host).count) sameInput=\(inputs(in: host).contains { $0 === input }) candidates=\(candidates.count) layouts=\(host.layoutCount) bounds=\(host.bounds)")
+              }
               let field = try XCTUnwrap(fields(in: host).first)
               let promptFrame = field.convert(field.visibleRect, to: host)
               if host.isFlipped {

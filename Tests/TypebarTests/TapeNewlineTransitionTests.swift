@@ -53,10 +53,15 @@ import XCTest
       let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 160))
       let motion = PromptCaretMotionCoordinator(), attempt = UUID()
       var retired: [PromptWordRetirement] = []
+      let notification = expectation(description: "Actual retirement notification rtl=\(rtl)")
+      let onRetire: (PromptWordRetirement) -> Void = {
+        retired.append($0)
+        notification.fulfill()
+      }
       defer { view.stop() }
-      begin(view, motion, attempt, rtl: rtl) { retired.append($0) }
+      begin(view, motion, attempt, rtl: rtl, onRetire: onRetire)
       let x = motion.wordsTapeMargin, height = view.subviews[0].frame.height
-      update(view, motion, attempt, active: 2, rtl: rtl, time: 1) { retired.append($0) }
+      update(view, motion, attempt, active: 2, rtl: rtl, time: 1, onRetire: onRetire)
       view.present(at: 1.05)
       XCTAssertEqual(motion.wordsTapeMargin, x, accuracy: 1e-7, "New-word scrollTape must await lineJump")
       XCTAssertLessThan(motion.wordsMargin, 0)
@@ -69,7 +74,10 @@ import XCTest
       XCTAssertEqual(motion.wordsTapeMargin, 0, accuracy: 1e-7)
       XCTAssertTrue(motion.isAnimatingTape)
       XCTAssertTrue(retired.isEmpty, "Session mutation is asynchronous")
-      drainNotifications()
+      // A fixed run-loop drain can finish before the main-queue callback
+      // under an existing SwiftUI host load. Await the actual notification;
+      // the assertions above still require mutation to be asynchronous.
+      wait(for: [notification], timeout: 1)
       XCTAssertEqual(retired.map(\.firstRetainedWordIndex), [1])
       XCTAssertEqual(retired.first?.attemptID, attempt)
     }

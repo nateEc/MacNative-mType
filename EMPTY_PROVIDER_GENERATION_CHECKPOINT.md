@@ -1,5 +1,19 @@
 # 在线空内容生成检查点（未验收）
 
+## 冻结百科修复门禁失败及 Tape 通知观察修正（2026-10-12）
+
+冻结提交 `cf43af495c9bdcbd6d26d4351553d1f20070f2a4` 的完整门禁已退出 1，文件校验退出 0；868 个跟踪文件保持一致。证据目录 `work/frozen-readiness-encyclopedia-rejection.N0lV1Y`。客户端 4386 项／3 个失败断言／无跳过，2114.325 秒（套件墙钟 2114.927）；三个断言来自两个用例：PracticeCompositionHostTests.testProductionCompositionModesUpdateAndCancelWithoutCommitting 在当时第 389 行、下方候选已存在时无法取得 PromptFieldNativeView；TapeNewlineTransitionTests.testActualNewWordAwaitsVerticalDeletionBeforeHorizontalRequestAndAsyncNotification 的当时第 73／74 行未看到退役通知及尝试 ID。42 项组合宿主共 1 失败，943.894 秒（墙钟 943.900）。此前 29 项在线宿主及随后同进程 19 项 PB 台账通过，10 万词耐久 162.451 秒通过；均不覆盖上述失败。客户端失败后服务端及 Release／打包阶段未执行，不引用历史通过替代本次结果。
+
+退出清理没有将日志保存到指定 logs 目录；原临时目录仍存在，终态后已以不覆盖方式补存 75 份日志。保留原 gate.log、result.txt、files.sha256 及 hash-check.log；没有修改失败记录或删去诊断。该日志留存机制的原因尚未修复。
+
+未修改实现的两项最小复现 `work/composition-and-tape-unmodified-focused-repro.log`：组合宿主通过（21.799 秒），随后 Tape 再现相同两个断言失败；共 2 项、2 失败，21.866 秒（墙钟 21.868）。Tape 单独运行通过（`work/tape-newline-isolated-unmodified-repro.log`，0.129 秒，墙钟 0.131）。因此不能以单次通过声称两项已修复或未经验证地归为同一原因。
+
+Tape 的实际 deliverRetirement 使用主队列异步投递，测试原本仅排空主循环 2 毫秒。观察探针保留该排空并等待真实通知：明确记录 `rtl=false` 在旧排空结束时仍未通知，随后实际回调到达、值与尝试 ID 断言通过（`work/tape-newline-real-notification-observation.log`，2 项／0 失败，21.429 秒，墙钟 21.431）。最终测试改为 XCTestExpectation 有界等待真实回调，仍在等待之前断言原生前缀已删除、水平运动已开始、会话通知未同步执行；未修改产品通知策略或增加盲目 sleep。相关其他测试继续保留其自身排空语义，本次不推广为全部通知时序已验证。
+
+组合输入提示缺失尚未重现其门禁失败：仅在该原断言之前增加失败时的有限诊断，记录宿主轮次、尺寸策略、组合样式、marked 状态、输入所有者身份、候选数和布局次数；不记录用户内容、不放宽断言、不增加等待或替代提示。根因仍未确定，不能把之后的绿色组合用例算成修复。
+
+首轮相关回归 `work/tape-notification-boundary-regression.log` 为 61 项／0 失败／3 跳过，缺少参考与锁定依赖环境；未计跳过为通过。补齐固定参考、Node 和既有锁定 Anime.js 档案后，同组最终回归 `work/tape-notification-boundary-complete-regression.log`：61 项／0 失败／无跳过，28.939 秒（墙钟 28.947），含原组合宿主及 Tape 前缀、换行、退役、可见性和组合前进。仍需解决组合宿主门禁失败并重跑完整门禁，不升级功能验收。全过程仅不可见 XCTest，Typebar 主程序零实例，goal active。
+
 ## 原生百科续取异常保留来源（2026-10-12）
 
 真实不可见练习宿主新增回归，在旧实现中两项／9 个断言预期失败（`work/provider-encyclopedia-rejection-host-red.log`，18.980 秒，墙钟 18.982）：无锁生成器失败关闭了百科来源与预设；旁路失败重置为离线提示、关闭来源并阻止后续在线恢复。产品现在按固定两种提供者契约处理续取 nil：诗歌保持既有 false 处理；百科生成器失败结束尝试并呈现失败结果，但保留来源与预设；百科旁路失败只收束当前异步任务，保留尝试、提示、原生输入所有者及 NoQuit 状态，可在后续前进时再次续取，不立即循环重试。
