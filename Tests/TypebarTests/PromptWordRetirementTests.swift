@@ -316,9 +316,10 @@ import XCTest
       update(0)
       for step in sequence.steps {
         update(step.activeWordIndex)
-        XCTAssertEqual(retired, step.during)
+        let context = "smooth=\(sequence.smooth) perRow=\(sequence.perRow) rowHeight=\(sequence.rowHeight) active=\(step.activeWordIndex) before=\(step.before)"
+        XCTAssertEqual(retired, step.during, context + " phase=during")
         RunLoop.main.run(until: Date().addingTimeInterval(sequence.smooth ? 0.15 : 0.001))
-        XCTAssertEqual(retired, step.after)
+        XCTAssertEqual(retired, step.after, context + " phase=after")
       }
     }
   }
