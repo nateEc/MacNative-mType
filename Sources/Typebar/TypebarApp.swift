@@ -4448,7 +4448,18 @@ private struct ContentView: View {
     liveContentMessage = "正在获取随机\(source.displayName)；失败时继续使用离线内容。"
     liveContentTask?.cancel()
     liveContentTask = Task {
-      let content = await liveContentFetch(source, configuration.language)
+      let firstContent = await liveContentFetch(source, configuration.language)
+      var content = firstContent
+      while let pendingContent = content {
+        let wholePreview = settings.showAllPracticeLines && settings.practiceTapeMode == .off
+        content = await pendingContent.fillingInitialPrompt(for: configuration,
+          showAllLines: wholePreview) {
+            await liveContentFetch(source, configuration.language)
+          }
+        // Display settings can change while a later section is in flight.
+        // Fill the current budget before constructing its final descriptor.
+        if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off) { break }
+      }
       guard !Task.isCancelled, requestID == liveContentRequestID else { return }
       liveContentTask = nil
       isLoadingLiveContent = false

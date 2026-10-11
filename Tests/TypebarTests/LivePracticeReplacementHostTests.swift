@@ -17,7 +17,7 @@ import XCTest
       continuations = []
       for continuation in pending {
         continuation.resume(returning: .init(source: .poetry, title: "Authored delayed fixture",
-          byline: nil, tokens: ["quiet", "harbor", "morning"], separator: " "))
+          byline: nil, tokens: (0..<151).map { ["quiet", "harbor", "morning"][$0 % 3] }, separator: " "))
       }
     }
   }

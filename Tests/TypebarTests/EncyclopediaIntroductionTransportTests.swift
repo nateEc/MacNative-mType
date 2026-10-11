@@ -128,6 +128,91 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  @MainActor func testInitialPromptUsesFreshIntroductionsInsteadOfCyclingShortPage() async throws {
+      let transportConfiguration = URLSessionConfiguration.ephemeral
+      transportConfiguration.protocolClasses = [IntroductionProtocol.self]
+      let session = URLSession(configuration: transportConfiguration)
+      defer { session.invalidateAndCancel(); IntroductionProtocol.fixture.reset() }
+      IntroductionProtocol.fixture.set([
+        (200, #"{"pageid":724,"title":"First owned page"}"#),
+        (200, #"{"query":{"pages":{"724":{"extract":"Amber harbor."}}}}"#),
+        (200, #"{"pageid":812,"title":"Second owned page"}"#),
+        (200, #"{"query":{"pages":{"812":{"extract":"Fresh boats arrive."}}}}"#)
+      ])
+      let first = await LivePracticeContentService.fetch(source: .encyclopedia, language: .english, session: session)
+      let initial = try XCTUnwrap(first)
+      let configuration = TestConfiguration.words(4).with(modifiers: [.referenceStream])
+      let filled = await initial.fillingInitialPrompt(for: configuration, showAllLines: true) {
+        await LivePracticeContentService.fetch(source: .encyclopedia, language: .english, session: session)
+      }
+      let loaded = try XCTUnwrap(filled)
+      let descriptor = loaded.promptDescriptor(for: configuration, showAllLines: true)
+      XCTAssertEqual(descriptor.text, "Amber harbor. Fresh boats")
+      XCTAssertEqual(loaded.title, "First owned page / Second owned page")
+      XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 4)
+      var practice = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: descriptor.text, showAllLines: true)
+      let now = Date(timeIntervalSince1970: 1_700_000_000)
+      practice.insertBatch(descriptor.text, at: now)
+      XCTAssertEqual(practice.outcome, .completed)
+      XCTAssertEqual(practice.completedWordCount, 4)
+      XCTAssertEqual(practice.errors, 0)
+  }
+
+  @MainActor func testInitialPromptFillDoesNotCycleAfterFetchFailureOrCancellation() async throws {
+    let first = LivePracticeContent(source: .encyclopedia, title: "Owned", byline: nil,
+      tokens: ["Amber", "harbor."], separator: " ")
+    let configuration = TestConfiguration.words(4).with(modifiers: [.referenceStream])
+    var calls = 0
+    let failed = await first.fillingInitialPrompt(for: configuration, showAllLines: true) {
+      calls += 1
+      return nil
+    }
+    XCTAssertNil(failed)
+    XCTAssertEqual(calls, 1)
+    let task = Task {
+      await first.fillingInitialPrompt(for: configuration, showAllLines: true) {
+        withUnsafeCurrentTask { $0?.cancel() }
+        return LivePracticeContent(source: .encyclopedia, title: "Late", byline: nil,
+          tokens: ["Must", "not", "apply"], separator: " ")
+      }
+    }
+    let cancelled = await task.value
+    XCTAssertNil(cancelled)
+  }
+
+  @MainActor func testFreshNoSpaceInitialSectionsKeepBoundariesAndReplay() async throws {
+    let first = LivePracticeContent(source: .encyclopedia, title: "海港", byline: "甲",
+      tokens: ["「海港」", "12艘"], separator: "")
+    let configuration = TestConfiguration.words(4, language: .simplifiedChinese)
+      .with(modifiers: [.referenceStream])
+    let filled = await first.fillingInitialPrompt(for: configuration, showAllLines: true) {
+      LivePracticeContent(source: .encyclopedia, title: "船舶", byline: "乙",
+        tokens: ["船，", "天气好。", "多余"], separator: "")
+    }
+    let loaded = try XCTUnwrap(filled)
+    XCTAssertEqual(loaded.byline, "甲 / 乙")
+    let descriptor = loaded.promptDescriptor(for: configuration, showAllLines: true)
+    XCTAssertEqual(descriptor.text, "「海港」12艘船，天气好。")
+    XCTAssertEqual(descriptor.noSpaceBoundarySource, "「海港」 12艘 船， 天气好。")
+    var practice = TestSessionFactory.make(configuration: configuration,
+      streamPrompt: descriptor.text, streamNoSpaceBoundarySource: descriptor.noSpaceBoundarySource,
+      showAllLines: true)
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    practice.insertBatch(descriptor.text, at: now)
+    XCTAssertEqual(practice.outcome, .completed)
+    XCTAssertEqual(practice.completedWordCount, 4)
+    XCTAssertEqual(practice.errors, 0)
+    let result = try XCTUnwrap(practice.result(at: now))
+    XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+      through: result.elapsedDuration), descriptor.text)
+    let alreadyFilled = await loaded.fillingInitialPrompt(for: configuration, showAllLines: true) {
+      XCTFail("A complete initial word budget must not request another section")
+      return nil
+    }
+    XCTAssertEqual(alreadyFilled, loaded)
+  }
+
   func testEmptyIntroductionStopsWhenNextRandomRequestFails() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([

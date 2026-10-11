@@ -68,6 +68,29 @@ struct LivePracticeContent: Equatable {
     promptDescriptor(for: configuration).text
   }
 
+  @MainActor func fillingInitialPrompt(
+    for configuration: TestConfiguration, showAllLines: Bool,
+    fetchNext: () async -> LivePracticeContent?
+  ) async -> LivePracticeContent? {
+    guard !Task.isCancelled else { return nil }
+    guard configuration.mode == .time || configuration.mode == .words else { return self }
+    let target = GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
+    var collected = Array(tokens.prefix(target))
+    var titles = [title]
+    var authors = [byline].compactMap { $0 }
+    while collected.count < target {
+      guard !Task.isCancelled, let next = await fetchNext(), !Task.isCancelled,
+        next.source == source, next.separator == separator, !next.tokens.isEmpty
+      else { return nil }
+      collected.append(contentsOf: next.tokens.prefix(target - collected.count))
+      titles.append(next.title)
+      if let author = next.byline { authors.append(author) }
+    }
+    return .init(source: source, title: titles.joined(separator: " / "),
+      byline: authors.isEmpty ? nil : authors.joined(separator: " / "),
+      tokens: collected, separator: separator)
+  }
+
   func promptDescriptor(for configuration: TestConfiguration, showAllLines: Bool = false) -> LivePracticePrompt {
     guard !tokens.isEmpty else {
       return .init(text: text, noSpaceBoundarySource: nil)
