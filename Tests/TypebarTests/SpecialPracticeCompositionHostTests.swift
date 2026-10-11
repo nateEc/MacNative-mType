@@ -47,11 +47,12 @@ import XCTest
       ($0, try XCTUnwrap(owner.measuredRect(for: $0)))
     })
     let frame = host.frame
-    let session = TypingSession(configuration: configuration, prompt: prompt)
+    var session = TypingSession(configuration: configuration, prompt: prompt)
+    let longCandidate = String(repeating: "中文", count: 20)
     for style in CompositionDisplayStyle.allCases {
       settings.compositionDisplayStyle = style
       flush()
-      for candidate in ["候", "中文"] {
+      for candidate in ["候", "中文", longCandidate] {
         input.setMarkedText(candidate, selectedRange: .init(location: candidate.utf16.count, length: 0),
           replacementRange: .init(location: NSNotFound, length: 0))
         flush()
@@ -72,6 +73,13 @@ import XCTest
               try XCTUnwrap(owner.measuredRect(for: marked[1].id)).minX,
               "Two marked characters must occupy separate actual ASL layout cells")
           }
+          if candidate == longCandidate {
+            let rows = try Set(marked.map {
+              try XCTUnwrap(owner.measuredRect(for: $0.id)).minY
+            })
+            XCTAssertGreaterThan(rows.count, 1,
+              "The long candidate must actually exercise ASL cross-row layout")
+          }
         }
         let rows = descendants(host, NSTextField.self).filter {
           $0.accessibilityLabel()?.hasPrefix("正在组合：") == true
@@ -89,6 +97,30 @@ import XCTest
           "Cancellation must restore every original ASL target allocation")
       }
     }
+    settings.compositionDisplayStyle = .replace
+    flush()
+    input.setMarkedText("候", selectedRange: .init(location: 1, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    input.insertText("q", replacementRange: .init(location: NSNotFound, length: 0))
+    session.insertBatch("q", at: Date())
+    flush()
+    XCTAssertFalse(input.hasMarkedText())
+    input.setMarkedText("中文", selectedRange: .init(location: 2, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    flush()
+    let afterCommit = try XCTUnwrap(session.promptCompositionProjection(composition: "中文", style: .replace))
+    let marked = afterCommit.markedCells
+    XCTAssertEqual(marked.count, 2)
+    let firstMarked = try XCTUnwrap(marked.first)
+    XCTAssertGreaterThan(try XCTUnwrap(owner.measuredRect(for: firstMarked.id)).minX,
+      try XCTUnwrap(owner.measuredRect(for: 0)).minX,
+      "The next ASL candidate must follow the accepted q rather than replace it")
+    XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
+    XCTAssertTrue(descendants(host, ASLPromptCaretContainer.self).first === owner)
+    input.unmarkText()
+    flush()
+    for (id, rect) in initial { XCTAssertEqual(owner.measuredRect(for: id), rect) }
+    XCTAssertFalse(window.isVisible)
   }
 
   func testProductionChooCompositionModesUpdateAndCancelWithoutConsumingTargets() throws {
