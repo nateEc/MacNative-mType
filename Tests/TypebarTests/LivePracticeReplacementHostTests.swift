@@ -120,6 +120,34 @@ import XCTest
     try checkDelayedReplacement(failsInitial: true)
   }
 
+  func testEncyclopediaInitialRejectionsRecoverOnThirdGenerationWithoutDisablingSource() throws {
+    try checkDelayedReplacement(encyclopedia: true, initialEncyclopediaFailures: [true, true])
+  }
+
+  func testEncyclopediaThreeInitialRejectionsStopWithoutOfflineReplacement() throws {
+    try checkDelayedReplacement(locksNoQuit: true, encyclopedia: true,
+      initialEncyclopediaFailures: [true, true, true])
+  }
+
+  func testEncyclopediaEmptyAndRejectedInitialGenerationsShareThreeAttemptBound() throws {
+    try checkDelayedReplacement(encyclopedia: true, initialEncyclopediaFailures: [false, true, false])
+  }
+
+  func testEncyclopediaInitialRetryExhaustionCannotReplaceStartedNoQuitAttempt() throws {
+    try checkDelayedReplacement(startsBeforeReturn: true, locksNoQuit: true,
+      encyclopedia: true, initialEncyclopediaFailures: [true, true, true])
+  }
+
+  func testEncyclopediaPartialInitialFillFailureRestartsGenerationWithoutPublishingPartialText() throws {
+    try checkDelayedReplacement(failsInitialFill: true, encyclopedia: true,
+      initialEncyclopediaFailures: [true, true])
+  }
+
+  func testEncyclopediaLeavingDuringInitialRetryRejectsLateSuccessWithoutAnotherRequest() throws {
+    try checkDelayedReplacement(encyclopedia: true,
+      initialEncyclopediaFailures: [true, true], cancelsInitialRetry: true)
+  }
+
   func testFailedInitialFetchKeepsUnrelatedNoQuitOnTheUnstartedReplacement() throws {
     try checkDelayedReplacement(locksNoQuit: true, failsInitial: true)
   }
@@ -178,7 +206,8 @@ import XCTest
     emptyPrefetch: Bool = false, emptyInitialReplies: Int = 0,
     exhaustsBeforeEmpty: Bool = false, failsInitial: Bool = false,
     failsInitialFill: Bool = false, generatesNextWord: Bool = false,
-    checksBackwardInput: Bool = false, encyclopedia: Bool = false) throws {
+    checksBackwardInput: Bool = false, encyclopedia: Bool = false,
+    initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -277,6 +306,80 @@ import XCTest
         .first { $0.rootView.style == .bar && !$0.isHidden }).frame
       XCTAssertGreaterThan(try XCTUnwrap(startedCaret).minX, beforeInputCaret.minX,
         "The first accepted English character must advance the main caret before the response")
+    }
+    if !initialEncyclopediaFailures.isEmpty {
+      XCTAssertTrue(encyclopedia)
+      if failsInitialFill {
+        let beforeFill = pending.callCount
+        pending.scriptedTokens = ["ownedPartialInitial"]
+        pending.finish()
+        for _ in 0..<5 { flush() }
+        XCTAssertEqual(pending.callCount, beforeFill + 1)
+        XCTAssertEqual(pending.continuations.count, 1)
+      }
+      let firstRequestCount = pending.callCount
+      for (index, rejected) in initialEncyclopediaFailures.enumerated() {
+        pending.returnsFailure = rejected
+        pending.scriptedTokens = rejected ? nil : []
+        pending.finish()
+        for _ in 0..<5 { flush() }
+        XCTAssertTrue(settings.testModifiers.contains(sourceModifier))
+        XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(sourceModifier), true)
+        XCTAssertEqual(pending.callCount, firstRequestCount + min(index + 1, 2))
+        if index < 2 {
+          guard !pending.continuations.isEmpty else {
+            XCTFail("An initial encyclopedia failure must retry rather than disable its source")
+            return
+          }
+          XCTAssertEqual(pending.continuations.count, 1, "Initialization remains single-flight")
+        }
+        if cancelsInitialRetry && index == 0 {
+          let beforeCancellation = pending.cancelledReplies
+          window.contentView = nil
+          for _ in 0..<5 { flush() }
+          pending.returnsFailure = false
+          pending.scriptedTokens = ["ownedLateSuccess"] + Array(repeating: "harbor", count: 150)
+          pending.finish()
+          for _ in 0..<5 { flush() }
+          XCTAssertGreaterThan(pending.cancelledReplies, beforeCancellation)
+          XCTAssertEqual(pending.callCount, firstRequestCount + 1)
+          XCTAssertTrue(pending.continuations.isEmpty)
+          XCTAssertEqual(initialField.accessibilityValue() as? String, initialPrompt)
+          XCTAssertTrue(settings.testModifiers.contains(sourceModifier))
+          XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+          XCTAssertFalse(window.isVisible)
+          return
+        }
+      }
+      if initialEncyclopediaFailures.count == 3 {
+        XCTAssertTrue(pending.continuations.isEmpty, "No fourth generation after three failures")
+        if startsBeforeReturn {
+          XCTAssertEqual(views(PromptFieldNativeView.self, in: host).first?.accessibilityValue() as? String, initialPrompt)
+          XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+          XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+        } else {
+          XCTAssertTrue(views(PromptFieldNativeView.self, in: host).isEmpty,
+            "Exhaustion must not publish an offline replacement")
+          initialInput.insertText("ignored", replacementRange: .init(location: NSNotFound, length: 0))
+          for _ in 0..<5 { flush() }
+          XCTAssertTrue(views(PromptFieldNativeView.self, in: host).isEmpty)
+          XCTAssertTrue(settings.allowsRestartingConfigurationChange)
+        }
+      } else {
+        pending.returnsFailure = false
+        pending.scriptedTokens = ["ownedRecovery"] + Array(repeating: "harbor", count: 150)
+        pending.finish()
+        for _ in 0..<5 { flush() }
+        XCTAssertTrue((views(PromptFieldNativeView.self, in: host).first?.accessibilityValue() as? String)?.hasPrefix("ownedRecovery") == true)
+        XCTAssertFalse((views(PromptFieldNativeView.self, in: host).first?.accessibilityValue() as? String)?.contains("ownedPartialInitial") == true)
+        XCTAssertTrue(pending.continuations.isEmpty)
+      }
+      XCTAssertEqual(pending.callCount, firstRequestCount + 2)
+      XCTAssertTrue(settings.testModifiers.contains(sourceModifier))
+      XCTAssertEqual(settings.testModifiers.contains(.noQuit), locksNoQuit)
+      XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+      XCTAssertFalse(window.isVisible)
+      return
     }
     if emptyInitialReplies > 0 {
       let initialRequestCount = pending.callCount

@@ -4463,22 +4463,29 @@ private struct ContentView: View {
   private func refreshLiveContentIfNeeded(configuration: TestConfiguration, requestID: UUID) {
     guard let source = LivePracticeContentSource.selected(for: configuration) else { return }
     isLoadingLiveContent = true
-    liveContentMessage = "正在获取随机\(source.displayName)；失败时继续使用离线内容。"
+    liveContentMessage = source == .poetry
+      ? "正在获取随机\(source.displayName)；失败时继续使用离线内容。"
+      : "正在获取随机\(source.displayName)；初始化失败时最多尝试三次。"
     liveContentTask?.cancel()
     liveContentTask = Task {
       let firstContent = await liveContentFetch(source, configuration.language)
       var content = firstContent
-      var emptyGenerationAttempts = 0
-      while let pendingContent = content {
+      var failedGenerationAttempts = 0
+      while !Task.isCancelled {
         let wholePreview = settings.showAllPracticeLines && settings.practiceTapeMode == .off
-        content = await pendingContent.fillingInitialPrompt(for: configuration,
-          showAllLines: wholePreview) {
-            await liveContentFetch(source, configuration.language)
-          }
-        if content?.text.isEmpty == true {
-          emptyGenerationAttempts += 1
-          if emptyGenerationAttempts == 3 { break }
-          guard !Task.isCancelled else { return }
+        if let pendingContent = content {
+          content = await pendingContent.fillingInitialPrompt(for: configuration,
+            showAllLines: wholePreview) {
+              await liveContentFetch(source, configuration.language)
+            }
+        }
+        if content?.text.isEmpty != false {
+          // Poetry false disables its source in the reference generator;
+          // encyclopedia rejection instead reaches the shared init budget.
+          if content == nil && source == .poetry { break }
+          failedGenerationAttempts += 1
+          if failedGenerationAttempts == 3 { break }
+          guard !Task.isCancelled, requestID == liveContentRequestID else { return }
           content = await liveContentFetch(source, configuration.language)
           continue
         }
@@ -4497,10 +4504,9 @@ private struct ContentView: View {
           ?? "无法获取随机\(source.displayName)；输入已经开始，本轮保持现有练习。"
         return
       }
-      guard let content else {
-        // A transport/parse failure disables the selected provider before
-        // rebuilding, unlike a successfully decoded empty generation. The
-        // replacement guard above also protects already-started attempts.
+      if content == nil && source == .poetry {
+        // Keep the poetry provider's false outcome separate from rejection.
+        // The replacement guard above protects already-started attempts.
         synchronizeNoQuitConfigurationLock()
         let failedModifier: TestModifier = source == .poetry ? .poetryStream : .referenceStream
         settings.testModifiers.removeAll { $0 == failedModifier }
@@ -4508,16 +4514,17 @@ private struct ContentView: View {
         liveContentMessage = "无法获取随机\(source.displayName)，已关闭该内容来源并重新开始离线练习。"
         return
       }
-      if content.text.isEmpty {
+      if content?.text.isEmpty != false {
         session = TypingSession(configuration: configuration, prompt: "",
-          initializationFailure: "在线内容为空，连续三次无法生成练习；请重试或关闭内容来源。",
+          initializationFailure: "连续三次无法生成在线练习；请重试或关闭内容来源。",
           weakSpotScores: session.liveWeakSpotScores,
           wordDecorationState: session.liveWordDecorationState).withElapsedClock()
         liveContentStreamingActive = false
-        liveContentMessage = "在线内容为空，初始化已停止；内容来源保持开启。"
+        liveContentMessage = "在线练习初始化失败，已停止；内容来源保持开启。"
         synchronizeNoQuitConfigurationLock()
         return
       }
+      guard let content else { return }
       let livePrompt = content.promptDescriptor(for: configuration,
         showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
       TypingFeedbackSound.shared.beginPracticeAttempt()
