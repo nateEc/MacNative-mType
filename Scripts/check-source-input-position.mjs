@@ -34,6 +34,22 @@ function reset(words,{stop='off',strict=false,mode='words',grow=false}={}) {
 }
 function inputEvents(){return eventData.getAllTestEvents().filter(e=>e.type==='input').map(e=>e.data)}
 function positions(){return inputEvents().map(e=>e.charIndex)}
+// Owned poem-shaped targets, not copied source content. Execute the actual
+// insert/validation/navigation/event modules; generation and DOM remain adapters.
+bindings['test/funbox/list'].isFunboxActiveWithProperty=()=>false;
+for (const [stop,expectedIndex] of [['off',1],['word',0],['letter',0]]) {
+ reset(['north\nsouth ','harbor ','tail '],{stop});
+ for (const data of 'north\n') await main.namespace.emulateInsertText({data,now:0});
+ assert.equal(wordIndex,expectedIndex);
+ assert.equal(completed,false);
+ assert.equal(inputEvents().length,6);
+ assert.equal(inputEvents().at(-1).correct,true);
+ assert.equal(inputEvents().at(-1).commitsWord,stop==='off'?true:undefined);
+ assert.equal(element,stop==='off'?'':'north\n');
+ assert.equal(targets[wordIndex],stop==='off'?'harbor ':'north\nsouth ');
+}
+bindings['test/funbox/list'].isFunboxActiveWithProperty=p=>p==='nospace';
+console.log('3 pinned-source poem-shaped embedded-LF commit scenarios passed (actual input modules; generated targets supplied, no generator/DOM/IME equivalence claim).');
 reset(['hi\n_','next']);
 await main.namespace.emulateInsertText({data:'hi\n_next',now:0});
 assert.equal(wordIndex,1);assert.equal(completed,false);assert.equal(element,'t');
