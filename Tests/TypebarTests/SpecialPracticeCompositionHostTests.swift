@@ -5,6 +5,20 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class SpecialPracticeCompositionHostTests: XCTestCase {
+  private func captureIfRequested(host: NSView, owner: NSView, name: String) throws {
+    guard let directory = ProcessInfo.processInfo.environment["TYPEBAR_SPECIAL_COMPOSITION_QA_DIRECTORY"] else { return }
+    owner.scrollToVisible(owner.bounds)
+    host.layoutSubtreeIfNeeded()
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    host.layoutSubtreeIfNeeded()
+    XCTAssertTrue(host.bounds.intersects(owner.convert(owner.visibleRect, to: host)),
+      "The actual special prompt must intersect the captured viewport")
+    let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+    host.cacheDisplay(in: host.bounds, to: bitmap)
+    try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(
+      to: URL(fileURLWithPath: directory).appendingPathComponent(name + ".png"))
+  }
+
   func testProductionASLCompositionUpdatesActualSlotsAndCancellationRestoresGeometry() throws {
     let suite = "SpecialPracticeCompositionHostTests.ASL.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -79,6 +93,7 @@ import XCTest
             })
             XCTAssertGreaterThan(rows.count, 1,
               "The long candidate must actually exercise ASL cross-row layout")
+            try captureIfRequested(host: host, owner: owner, name: "asl-long-replace")
           }
         }
         let rows = descendants(host, NSTextField.self).filter {
@@ -204,6 +219,7 @@ import XCTest
             "Every marked character must own an actual Choo text layer")
           XCTAssertGreaterThan(Set(markedLayers.map { $0.position.y }).count, 1,
             "The long candidate must actually exercise cross-row Choo layout")
+          try captureIfRequested(host: host, owner: owner, name: "choo-long-replace")
         }
         let candidateRows = descendants(host, NSTextField.self).filter {
           $0.accessibilityLabel()?.hasPrefix("正在组合：") == true

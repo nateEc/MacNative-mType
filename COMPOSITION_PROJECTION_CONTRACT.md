@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：实际特殊呈现宿主静态渲染检查（2026-10-11）
+
+测试新增默认关闭的 `TYPEBAR_SPECIAL_COMPOSITION_QA_DIRECTORY`。仅设置输出目录时，在既有四十字 replace 场景滚动实际 owner 至可见范围并断言与宿主视口相交，缓存完整 NSHostingView 的实际显示为 PNG；不启动应用、不设置假焦点、不用设计图替代产品。默认未设置时无截图、滚动或额外 RunLoop 行为。本增量为可观测性补证，不制造产品红测。
+
+`work/special-composition-visual.JfBbhE/host.log` ASL／Choo 两项零失败零跳过（8.130s，墙钟 8.132），生成并逐张检查 `asl-long-replace.png` 和 `choo-long-replace.png`：候选跨两行，ASL 后续目标为手形，Choo 后续目标为文字，在这两张静态图中候选行未被卡片边界裁断。不可见窗口的失焦提示覆盖候选上方一小部分；保留此事实，不宣称无遮挡、真实焦点或整体界面验收。Choo 的动画呈现帧也不由这张缓存图证明。截图仅为隔离测试的自有文字及布局，无真实成绩／个人资料。
+
+截图开关关闭后 `default-off.log` 两项零失败零跳过（7.933s，墙钟 7.935），现有状态断言保持。无产品／保存／网络改动，零主程序启动；未跑新完整门禁、系统 IME、可见交付或 Release 性能，compositionDisplay 部分及完整 goal active 不变。
+
 ## TST-02：Choo 未确认长候选期间切换显示模式（2026-10-11）
 
 扩展完整 Choo 生产宿主：只设置一次四十字候选，在不重新 setMarkedText 的情况下切换 replace→off→below→replace。每步检查 marked range 仍为四十个 UTF-16 单位、原输入与 Choo owner 保留，完整显示符合当前样式及超词溢出语义；below 恰有一条实际原生候选行，其他模式不保留该行。固定宿主尺寸和窗口不可见断言保持；最终取消恢复原全文与所有图层分配，随后既有单字符确认检查继续通过。
