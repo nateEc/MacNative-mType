@@ -11,7 +11,7 @@ assert.ok(process.argv[2],'Reference checkout required');
 assert.equal(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),
   '91bd24bb8513785c7364cbea29296ff7adafac41');
 assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
-const actual=new Set(['test/words-generator','test/funbox/funbox-functions','test/wordset','test/weak-spot','test/test-words','input/helpers/fail-or-finish']);
+const actual=new Set(['test/words-generator','test/funbox/funbox-functions','test/wordset','test/weak-spot','test/test-words','input/helpers/fail-or-finish','input/handlers/insert-text','input/handlers/before-insert-text','input/helpers/validation','input/helpers/util']);
 const config={mode:'words',words:3,language:'english',showAllLines:false,lazyMode:false,
   punctuation:false,numbers:false,britishEnglish:false};
 let activeNames=['backwards','binary'], functions, drawIndex=0;
@@ -20,6 +20,8 @@ let ownedActiveWordIndex=0;
 let ownedSection, sectionCalls=0;
 let ownedSectionQueue=[];
 let ownedSectionError;
+let ownedInput='',ownedCurrentInput='',ownedFinished=0;
+const ownedInputEvents=[];
 const toggledSources=[];
 const languages={english:{name:'english',words:['ab','cd'],rightToLeft:false},
   owned:{name:'owned',words:['ef','gh'],rightToLeft:false}};
@@ -30,6 +32,20 @@ const active=()=>activeNames.map(name=>({name,properties:name==='backwards'?['wo
 const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuffle:words=>words,
   nthElementFromArray:(words,index)=>words.at(index)};
 const bindings={
+  'utils/strings':{removeLanguageSize:value=>value,isSpace:value=>value===' ',
+    areCharactersVisuallyEqual:(a,b)=>a===b},
+  'test/test-ui':{afterTestTextInput:()=>{}},
+  'test/test-logic':{finish:()=>{ownedFinished++;},startTest:()=>{}},
+  'input/input-element':{getInputElementValue:()=>({inputValue:ownedInput}),
+    setInputElementValue:value=>{ownedInput=value;},
+    appendToInputElementValue:value=>{ownedInput+=value;},
+    replaceInputElementLastValueChar:value=>{ownedInput=ownedInput.slice(0,-1)+value;}},
+  'test/events/data':{getCurrentInput:()=>ownedCurrentInput,
+    logTestEvent:(_type,_now,event)=>{ownedInputEvents.push(event);}},
+  'legacy-states/composition':{getComposing:()=>false},
+  'input/state':{resetIncorrectShiftsInARow:()=>{},isAwaitingNextWord:()=>false},
+  'legacy-states/slow-timer':{get:()=>false},
+  'input/helpers/word-navigation':{goToNextWord:async()=>({lastBurst:null,increasedWordIndex:false})},
   'config/store':{Config:config},
   'config/setters':{toggleFunbox:name=>toggledSources.push(name)},
   'test/poetry':{getPoem:async()=>{sectionCalls++;if(ownedSectionError)throw ownedSectionError;return ownedSectionQueue.length?ownedSectionQueue.shift():ownedSection}},
@@ -37,7 +53,8 @@ const bindings={
   'test/practise-words':{before:{mode:null}},
   'controllers/quotes-controller':{default:{}},
   'states/test':{isRepeated:()=>ownedRepeated,getCurrentQuote:()=>null,setCurrentQuote:()=>{},getSelectedQuoteId:()=>null,
-    getActiveWordIndex:()=>ownedActiveWordIndex},
+    getActiveWordIndex:()=>ownedActiveWordIndex,isTestActive:()=>true,
+    isTestRestarting:()=>false,isResultCalculating:()=>false,wordsHaveNewline:()=>true},
   'test/funbox/list':{
     getActiveFunboxes:active,
     getActiveFunboxesWithFunction:name=>active().filter(value=>typeof value.functions[name]==='function'),
@@ -507,3 +524,18 @@ for (const terminal of ['last\n', '\n']) {
   ownedRepeated=false;
 }
 console.log('Pinned final LF contracts passed: nonempty final field loses LF commit; empty LF field retains it. Actual caller, generator and TestWords; owned cursor/provider.');
+
+const insertModule=modules.get('input/handlers/insert-text');
+await insertModule.link((id,from)=>moduleFor(resolve(id,from.identifier)));
+await insertModule.evaluate();
+Object.assign(config,{difficulty:'normal',strictSpace:false,oppositeShiftMode:'off',
+  minBurst:'off',keymapMode:'off',blindMode:false,stopOnError:'off',deleteOnError:'off'});
+ownedActiveWordIndex=100;ownedCurrentInput='';ownedInput='';ownedFinished=0;
+ownedInputEvents.length=0;
+assert.equal(testWords.words.getCurrent().textWithCommit,'\n');
+await insertModule.namespace.emulateInsertText({data:'\n',now:1000});
+assert.equal(ownedFinished,1);
+assert.equal(ownedInputEvents.length,1);
+assert.equal(ownedInputEvents[0].correct,true);
+assert.equal(ownedInputEvents[0].commitsWord,true);
+console.log('Pinned complete before-insert/onInsertText accepts and finishes a blank final LF under normal/non-strict settings. Actual validation/util/finish helpers; owned input/events/DOM/navigation adapter, not browser end-to-end proof.');

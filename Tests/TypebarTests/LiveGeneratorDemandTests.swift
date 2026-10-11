@@ -162,11 +162,11 @@ final class LiveGeneratorDemandTests: XCTestCase {
         streamsLiveContent: true)
       practice.insertBatch("owned0 ", at: began)
       XCTAssertEqual(practice.prompt, opening.joined() + (terminal == "\n" ? "\n" : "last"))
-      // The source probe establishes blank-LF publication, not its full
-      // input-handler completion semantics. Completion below covers nonempty LF.
-      if terminal == "\n" { continue }
       let accepted = opening.joined() + (terminal == "\n" ? "\n" : "last")
-      practice.insertBatch(String(accepted.dropFirst("owned0 ".count)), at: began.addingTimeInterval(1))
+      practice.insertBatch(String(accepted.dropFirst("owned0 ".count).dropLast()),
+        at: began.addingTimeInterval(1))
+      XCTAssertFalse(practice.isFinished, "The final field must actually receive input")
+      practice.insertBatch(String(accepted.suffix(1)), at: began.addingTimeInterval(1.5))
       XCTAssertEqual(practice.outcome, .completed, "terminal=\(String(reflecting: terminal))")
       XCTAssertEqual(practice.completedWordCount, 101)
       XCTAssertEqual(practice.errors, 0)

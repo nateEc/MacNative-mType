@@ -8860,9 +8860,15 @@ struct TypingSession {
   private var shouldFinishEnglishWordsTest: Bool {
     guard let wordLimit = finiteCompletionWordLimit, wordLimit > 0 else { return false }
     if let acceptedUnits {
-      let targets = unitTargets.fields.indices.filter { !unitTargets.field($0, withoutCommit: true).isEmpty }
+      // Explicit provider fields own their word boundaries, including a
+      // newline-only word. Inferred whitespace is not an additional word.
+      let targets = unitTargets.fields.indices.filter {
+        sourceFields != nil || !unitTargets.field($0, withoutCommit: true).isEmpty
+      }
       guard targets.count >= wordLimit, acceptedUnits.fieldIndex >= targets[wordLimit - 1] else { return false }
-      let input = acceptedUnits.starts.indices.filter { !acceptedUnits.field($0, withoutCommit: true).isEmpty }
+      let input = acceptedUnits.starts.indices.filter {
+        !acceptedUnits.field($0, withoutCommit: sourceFields == nil).isEmpty
+      }
       guard input.count >= wordLimit else { return false }
       if currentWordIsCorrect || lastInputCommitsWord { return true }
       return configuration.rules.quickEnd && !configuration.rules.stopOnError && !configuration.rules.deleteOnError

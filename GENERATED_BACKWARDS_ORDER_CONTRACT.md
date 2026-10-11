@@ -1,5 +1,11 @@
 # 生成型词流反写顺序
 
+## 2026-10-12 普通空白 LF 末词完成修正
+
+新增固定源码执行覆盖完整 before-insert、onInsertText、validation、util 与 finish helper：普通难度、strictSpace=false 下，末词 `\n` 通过前置过滤，事件 correct/commitsWord=true，并触发 finish。输入 DOM、事件、游标、导航与 UI 为自有适配器，不代表浏览器真实导航／网络／IME 端到端。参考源码仅只读执行，不移植其代码。
+
+原生重新启用空白 LF 完成断言，旧代码复现 active 与 nil 结果失败（work/blank-lf-native-red.log）。定位为完成判断排除了显式空白字段。初版改动引发 9 处已有提前完成回归（work/blank-lf-native-green.log），随后收紧输入计数为实际非空字段；目标侧保留显式空白字段，推断空白分词不变。最终 113 项零失败（23.057 秒，墙钟 23.069 秒），含末字符前不完成、101 词完成计数、逐字回放和重复；日志 work/blank-lf-final-regression.log。源码探针 work/blank-lf-handler-source.log 通过。下文先前“空白 LF 完成未证明”为历史状态，本段只关闭普通设置的处理器／原生内核边界；strict-space／难度组合、真实导航、主 GUI、完整门禁／Release 仍未验收。goal active。
+
 ## 2026-10-12 有限末词 LF 提交符增量
 
 后续重复／结果证据：实际固定生成器重复读取仍返回含 LF 的原字段，最终显示去提交符不回写生成历史。非空 LF 原生用例增加 101 词完成计数、零错误、结果逐字回放及重复练习完成断言；相关 33 项通过（2.996 秒，墙钟 3.000 秒），日志 work/final-lf-repeat-regression.log 与 work/final-lf-repeat-source.log。探索性假设“空白 LF 输入后应完成”失败（work/final-lf-repeat-diagnostic.log 明确 terminal="\\n"）；尚无完整原版输入链证明此假设，未据此改变产品，也未把 active 状态固化为正确规则。空白 LF 仅验证发布保留，完成语义仍开放。本次只增加证据，无产品代码变更。
