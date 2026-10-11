@@ -158,30 +158,37 @@ enum LivePracticeContentService {
 
   private static func fetchEncyclopedia(language: TypingLanguage, session: URLSession) async -> LivePracticeContent? {
     let host = "\(wikipediaLanguageCode(for: language)).wikipedia.org"
-    guard !Task.isCancelled,
-      let url = URL(string: "https://\(host)/api/rest_v1/page/random/summary"),
-      let identityData = await data(from: url, session: session),
-      let identity = try? JSONDecoder().decode(EncyclopediaIdentity.self, from: identityData),
-      identity.pageid > 0, !Task.isCancelled
-    else { return nil }
+    // Empty, successfully decoded introductions select a new page. Transport
+    // and schema failures still terminate; cancellation bounds obsolete work.
+    while !Task.isCancelled {
+      guard !Task.isCancelled,
+        let url = URL(string: "https://\(host)/api/rest_v1/page/random/summary"),
+        let identityData = await data(from: url, session: session),
+        let identity = try? JSONDecoder().decode(EncyclopediaIdentity.self, from: identityData),
+        identity.pageid > 0, !Task.isCancelled
+      else { return nil }
 
-    var introductionURL = URLComponents()
-    introductionURL.scheme = "https"
-    introductionURL.host = host
-    introductionURL.path = "/w/api.php"
-    // Ask the upstream extractor for text; never render or execute remote HTML.
-    introductionURL.queryItems = [
-      .init(name: "action", value: "query"), .init(name: "format", value: "json"),
-      .init(name: "pageids", value: String(identity.pageid)),
-      .init(name: "prop", value: "extracts"), .init(name: "exintro", value: "true"),
-      .init(name: "explaintext", value: "true")
-    ]
-    guard let url = introductionURL.url,
-      let introductionData = await data(from: url, session: session), !Task.isCancelled,
-      let introduction = try? JSONDecoder().decode(EncyclopediaIntroduction.self, from: introductionData),
-      let page = introduction.query.pages[String(identity.pageid)]
-    else { return nil }
-    return makeIntroductionContent(identity: identity, text: page.extract, language: language)
+      var introductionURL = URLComponents()
+      introductionURL.scheme = "https"
+      introductionURL.host = host
+      introductionURL.path = "/w/api.php"
+      // Ask the upstream extractor for text; never render or execute remote HTML.
+      introductionURL.queryItems = [
+        .init(name: "action", value: "query"), .init(name: "format", value: "json"),
+        .init(name: "pageids", value: String(identity.pageid)),
+        .init(name: "prop", value: "extracts"), .init(name: "exintro", value: "true"),
+        .init(name: "explaintext", value: "true")
+      ]
+      guard let url = introductionURL.url,
+        let introductionData = await data(from: url, session: session), !Task.isCancelled,
+        let introduction = try? JSONDecoder().decode(EncyclopediaIntroduction.self, from: introductionData),
+        let page = introduction.query.pages[String(identity.pageid)]
+      else { return nil }
+      if let content = makeIntroductionContent(identity: identity, text: page.extract, language: language) {
+        return content
+      }
+    }
+    return nil
   }
 
   private static func makeIntroductionContent(

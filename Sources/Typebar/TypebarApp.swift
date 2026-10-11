@@ -1332,6 +1332,7 @@ private struct ContentView: View {
   @State private var typingPowerGeneration = 0
   @State private var typingPowerShakeOffset = CGSize.zero
   @State private var liveContentRequestID = UUID()
+  @State private var liveContentTask: Task<Void, Never>?
   @State private var isLoadingLiveContent = false
   @State private var liveContentMessage: String?
   @State private var zipfNotice: String?
@@ -1553,6 +1554,10 @@ private struct ContentView: View {
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear(perform: contentAppeared)
     .onDisappear {
+      liveContentTask?.cancel()
+      liveContentTask = nil
+      liveContentRequestID = UUID()
+      isLoadingLiveContent = false
       visualFocus.retire()
       automaticInputScheduler.cancel()
       session.cancelAutomaticInput()
@@ -4363,6 +4368,8 @@ private struct ContentView: View {
     lastClockTickSecond = 0
     liveStatsClockSignal.second = 0
     timerHealth = .init()
+    liveContentTask?.cancel()
+    liveContentTask = nil
     liveContentRequestID = UUID()
     let requestID = liveContentRequestID
     isLoadingLiveContent = false
@@ -4439,9 +4446,11 @@ private struct ContentView: View {
     guard let source = LivePracticeContentSource.selected(for: configuration) else { return }
     isLoadingLiveContent = true
     liveContentMessage = "正在获取随机\(source.displayName)；失败时继续使用离线内容。"
-    Task {
+    liveContentTask?.cancel()
+    liveContentTask = Task {
       let content = await liveContentFetch(source, configuration.language)
-      guard requestID == liveContentRequestID else { return }
+      guard !Task.isCancelled, requestID == liveContentRequestID else { return }
+      liveContentTask = nil
       isLoadingLiveContent = false
       guard let content else {
         liveContentMessage = "无法获取随机\(source.displayName)，正在使用原创离线内容。"

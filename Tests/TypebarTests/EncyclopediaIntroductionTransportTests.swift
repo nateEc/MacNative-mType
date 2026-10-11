@@ -113,15 +113,31 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
-  func testEmptyIntroductionDoesNotReuseTheSummary() async throws {
+  func testEmptyIntroductionRequestsAnotherRandomPage() async throws {
+    try await withSession { session in
+      IntroductionProtocol.fixture.set([
+        (200, #"{"pageid":724,"title":"Empty","extract":"Do not reuse"}"#),
+        (200, #"{"query":{"pages":{"724":{"extract":"[12] \n\t"}}}}"#),
+        (200, #"{"pageid":812,"title":"Second independent page"}"#),
+        (200, #"{"query":{"pages":{"812":{"extract":"Fresh introduction 42."}}}}"#)
+      ])
+      let content = await LivePracticeContentService.fetch(source: .encyclopedia, language: .english, session: session)
+      XCTAssertEqual(content?.text, "Fresh introduction 42.")
+      XCTAssertEqual(content?.title, "Second independent page")
+      XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 4)
+    }
+  }
+
+  func testEmptyIntroductionStopsWhenNextRandomRequestFails() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([
         (200, #"{"pageid":724,"title":"Owned","extract":"Short preview"}"#),
-        (200, #"{"query":{"pages":{"724":{"extract":" \n\t "}}}}"#)
+        (200, #"{"query":{"pages":{"724":{"extract":" \n\t "}}}}"#),
+        (503, "{}")
       ])
       let content = await LivePracticeContentService.fetch(source: .encyclopedia, language: .english, session: session)
       XCTAssertNil(content)
-      XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 2)
+      XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 3)
     }
   }
 
@@ -171,6 +187,25 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
       XCTAssertTrue(IntroductionProtocol.fixture.requests.isEmpty)
     }
   }
+
+  func testCancellationDuringReplacementPageRequestStopsEmptyIntroductionRetry() async throws {
+    try await withSession { session in
+      let replacementStarted = expectation(description: "replacement page request started")
+      IntroductionProtocol.fixture.set([
+        (200, #"{"pageid":724,"title":"Empty"}"#),
+        (200, #"{"query":{"pages":{"724":{"extract":""}}}}"#),
+        (0, "")
+      ], onHold: { replacementStarted.fulfill() })
+      let task = Task {
+        await LivePracticeContentService.fetch(source: .encyclopedia, language: .english, session: session)
+      }
+      await fulfillment(of: [replacementStarted], timeout: 2)
+      task.cancel()
+      let content = await task.value
+      XCTAssertNil(content)
+      XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 3)
+    }
+  }
 }
 
 private final class IntroductionProtocol: URLProtocol, @unchecked Sendable {
@@ -178,10 +213,12 @@ private final class IntroductionProtocol: URLProtocol, @unchecked Sendable {
     private let lock = NSLock()
     private var responses: [(Int, String)] = []
     private var captured: [URLRequest] = []
+    private var holdCallback: (@Sendable () -> Void)?
     var requests: [URLRequest] { lock.withLock { captured } }
-    func set(_ responses: [(Int, String)]) {
-      lock.withLock { self.responses = responses; captured = [] }
+    func set(_ responses: [(Int, String)], onHold: (@Sendable () -> Void)? = nil) {
+      lock.withLock { self.responses = responses; captured = []; holdCallback = onHold }
     }
+    func notifyHeldRequest() { lock.withLock { holdCallback }?() }
     func reset() { set([]) }
     func next(_ request: URLRequest) -> (Int, Data) {
       lock.withLock {
@@ -196,6 +233,10 @@ private final class IntroductionProtocol: URLProtocol, @unchecked Sendable {
   override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
   override func startLoading() {
     let (status, data) = Self.fixture.next(request)
+    if status == 0 {
+      Self.fixture.notifyHeldRequest()
+      return
+    }
     guard let url = request.url,
       let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)
     else { return }
