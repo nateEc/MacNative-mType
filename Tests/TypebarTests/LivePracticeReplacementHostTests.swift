@@ -61,6 +61,22 @@ import XCTest
     try checkDelayedReplacement(prefetches: true, failsPrefetch: true, locksNoQuit: true)
   }
 
+  func testFailedInitialFetchDisablesItsSourceAndRebuildsOffline() throws {
+    try checkDelayedReplacement(failsInitial: true)
+  }
+
+  func testFailedInitialFetchKeepsUnrelatedNoQuitOnTheUnstartedReplacement() throws {
+    try checkDelayedReplacement(locksNoQuit: true, failsInitial: true)
+  }
+
+  func testLateInitialFetchFailureCannotResetAnAlreadyLockedAttempt() throws {
+    try checkDelayedReplacement(startsBeforeReturn: true, locksNoQuit: true, failsInitial: true)
+  }
+
+  func testFailureWhileFillingInitialPreviewDiscardsPartialContentAndDisablesSource() throws {
+    try checkDelayedReplacement(locksNoQuit: true, failsInitial: true, failsInitialFill: true)
+  }
+
   func testEmptyPrefetchRetainsSourcePromptAndLockedAttemptUntilLaterProgress() throws {
     try checkDelayedReplacement(prefetches: true, locksNoQuit: true, emptyPrefetch: true)
   }
@@ -86,7 +102,8 @@ import XCTest
     disablesPace: Bool = false, composesBeforeReturn: Bool = false, prefetches: Bool = false,
     cancelsPrefetch: Bool = false, failsPrefetch: Bool = false, locksNoQuit: Bool = false,
     emptyPrefetch: Bool = false, emptyInitialReplies: Int = 0,
-    exhaustsBeforeEmpty: Bool = false) throws {
+    exhaustsBeforeEmpty: Bool = false, failsInitial: Bool = false,
+    failsInitialFill: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -207,8 +224,44 @@ import XCTest
       }
       pending.scriptedTokens = nil
     }
+    let requestsBeforeInitialReply = pending.callCount
+    if failsInitial {
+      pending.returnsFailure = !failsInitialFill
+      if failsInitialFill { pending.scriptedTokens = ["ownedPartialInitial"] }
+    }
     pending.finish()
     for _ in 0..<5 { flush() }
+    if failsInitialFill {
+      XCTAssertEqual(pending.callCount, requestsBeforeInitialReply + 1)
+      XCTAssertEqual(pending.continuations.count, 1)
+      pending.returnsFailure = true
+      pending.finish()
+      for _ in 0..<5 { flush() }
+    }
+    if failsInitial {
+      XCTAssertEqual(settings.testModifiers.contains(.poetryStream), startsBeforeReturn)
+      XCTAssertEqual(settings.testModifiers.contains(.noQuit), locksNoQuit)
+      XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(.poetryStream), startsBeforeReturn)
+      XCTAssertEqual(settings.allowsRestartingConfigurationChange, !(startsBeforeReturn && locksNoQuit))
+      XCTAssertEqual(pending.callCount, requestsBeforeInitialReply + (failsInitialFill ? 1 : 0),
+        "The initial failure must not trigger an additional provider request")
+      XCTAssertTrue(pending.continuations.isEmpty)
+      let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+      XCTAssertFalse((field.accessibilityValue() as? String)?.isEmpty ?? true)
+      XCTAssertFalse((field.accessibilityValue() as? String)?.contains("ownedPartialInitial") == true,
+        "A failed initial fill must not publish its partially collected provider words")
+      if startsBeforeReturn {
+        XCTAssertEqual(field.accessibilityValue() as? String, initialPrompt)
+        XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+        presentCarets()
+        let caret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
+          .first { $0.rootView.style == .bar && !$0.isHidden })
+        XCTAssertEqual(caret.frame, startedCaret)
+      }
+      XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+      XCTAssertFalse(window.isVisible)
+      return
+    }
     if prefetches {
       let initialRequestCount = pending.callCount
       XCTAssertTrue(pending.continuations.isEmpty, "Initial restoration requests must have resolved")

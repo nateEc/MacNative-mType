@@ -4482,15 +4482,23 @@ private struct ContentView: View {
       guard !Task.isCancelled, requestID == liveContentRequestID else { return }
       liveContentTask = nil
       isLoadingLiveContent = false
-      guard let content else {
-        liveContentMessage = "无法获取随机\(source.displayName)，正在使用原创离线内容。"
-        return
-      }
       guard LivePracticeContentReplacementPolicy.shouldApply(
         hasStarted: session.hasStarted, currentConfiguration: session.configuration,
         requestedConfiguration: configuration)
       else {
-        liveContentMessage = "已获取\(content.attribution)，为避免打断输入，本轮仍使用现有提示。"
+        liveContentMessage = content.map { "已获取\($0.attribution)，为避免打断输入，本轮仍使用现有提示。" }
+          ?? "无法获取随机\(source.displayName)；输入已经开始，本轮保持现有练习。"
+        return
+      }
+      guard let content else {
+        // A transport/parse failure disables the selected provider before
+        // rebuilding, unlike a successfully decoded empty generation. The
+        // replacement guard above also protects already-started attempts.
+        synchronizeNoQuitConfigurationLock()
+        let failedModifier: TestModifier = source == .poetry ? .poetryStream : .referenceStream
+        settings.testModifiers.removeAll { $0 == failedModifier }
+        reset(restarting: true)
+        liveContentMessage = "无法获取随机\(source.displayName)，已关闭该内容来源并重新开始离线练习。"
         return
       }
       if content.text.isEmpty {
