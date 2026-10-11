@@ -181,8 +181,45 @@ enum LivePracticeContentService {
       let introduction = try? JSONDecoder().decode(EncyclopediaIntroduction.self, from: introductionData),
       let page = introduction.query.pages[String(identity.pageid)]
     else { return nil }
-    return makeContent(source: .encyclopedia, title: identity.title, byline: identity.author,
-      rawText: page.extract, language: language)
+    return makeIntroductionContent(identity: identity, text: page.extract, language: language)
+  }
+
+  private static func makeIntroductionContent(
+    identity: EncyclopediaIdentity, text: String, language: TypingLanguage
+  ) -> LivePracticeContent? {
+    let withoutReferences = text.replacingOccurrences(
+      of: #"\[[0-9]+\]"#, with: "", options: .regularExpression)
+    var normalized = ""
+    for scalar in withoutReferences.unicodeScalars {
+      switch scalar.value {
+      case 0x200B...0x200D, 0xFEFF: continue
+      case 0x201C, 0x201D: normalized.append("\"")
+      case 0x2018, 0x2019: normalized.append("'")
+      case 0x2013, 0x2014: normalized.append("-")
+      case 0x2026: normalized.append("...")
+      case 0x00AB: normalized.append("<<")
+      case 0x00BB: normalized.append(">>")
+      default:
+        // Plain-text extraction uses line breaks where HTML had paragraphs.
+        if CharacterSet.whitespacesAndNewlines.contains(scalar) {
+          normalized.append(" ")
+        } else if wikipediaLanguageCode(for: language) != "en"
+          || (0x20...0x7E).contains(scalar.value) {
+          normalized.unicodeScalars.append(scalar)
+        }
+      }
+    }
+    if language.usesNoSpaceLiveText {
+      return makeContent(source: .encyclopedia, title: identity.title, byline: identity.author,
+        rawText: normalized, language: language)
+    }
+    let words = normalized.split(separator: " ").map(String.init)
+    guard !words.isEmpty else { return nil }
+    let title = identity.title.trimmingCharacters(in: .whitespacesAndNewlines)
+    let author = identity.author?.trimmingCharacters(in: .whitespacesAndNewlines)
+    return .init(source: .encyclopedia,
+      title: title.isEmpty ? LivePracticeContentSource.encyclopedia.displayName : title,
+      byline: author?.isEmpty == false ? author : nil, tokens: words, separator: " ")
   }
 
   private static func data(from url: URL, session: URLSession) async -> Data? {

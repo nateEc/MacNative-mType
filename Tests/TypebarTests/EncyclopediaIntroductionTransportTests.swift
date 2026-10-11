@@ -78,6 +78,41 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testIntroductionPreservesNumbersAndPunctuationWhileCleaningReferenceMarkers() async throws {
+    try await withSession { session in
+      for (language, text, expected) in [
+        (TypingLanguage.english, "“North”—2026… [12] café\u{200B}!", "\"North\"-2026... caf!"),
+        (.german, "Über 12, ‘Boote’\u{FEFF} [3] am\u{00A0}Ufer.", "Über 12, 'Boote' am Ufer.")
+      ] {
+        let response = try JSONSerialization.data(withJSONObject: [
+          "query": ["pages": ["724": ["extract": text]]]
+        ])
+        IntroductionProtocol.fixture.set([
+          (200, #"{"pageid":724,"title":"Owned"}"#),
+          (200, String(decoding: response, as: UTF8.self))
+        ])
+        let content = await LivePracticeContentService.fetch(source: .encyclopedia, language: language, session: session)
+        XCTAssertEqual(content?.text, expected)
+        let loaded = try XCTUnwrap(content)
+        let configuration = TestConfiguration.words(
+          expected.split(separator: " ").count, language: language).with(modifiers: [.referenceStream])
+        let descriptor = loaded.promptDescriptor(for: configuration, showAllLines: true)
+        var practice = TestSessionFactory.make(configuration: configuration,
+          streamPrompt: descriptor.text, streamNoSpaceBoundarySource: descriptor.noSpaceBoundarySource,
+          showAllLines: true)
+        XCTAssertEqual(practice.prompt, expected)
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        practice.insertBatch(expected, at: now)
+        XCTAssertEqual(practice.outcome, .completed)
+        XCTAssertEqual(practice.completedWordCount, configuration.wordLimit)
+        XCTAssertEqual(practice.errors, 0)
+        let result = try XCTUnwrap(practice.result(at: now))
+        XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+          through: result.elapsedDuration), expected)
+      }
+    }
+  }
+
   func testEmptyIntroductionDoesNotReuseTheSummary() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([
