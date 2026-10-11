@@ -48,6 +48,11 @@ import XCTest
     try checkProductionHost(checksMarkedText: false, customPrompt: text)
   }
 
+  func testCorrectLongCustomPromptFirstInputPreservesNativeOwnerWithoutOpeningWindow() throws {
+    let text = Array(repeating: "quiet harbor morning", count: 30).joined(separator: " ")
+    try checkProductionHost(checksMarkedText: false, customPrompt: text, acceptedInputs: ["q", "u", "i"])
+  }
+
   func testProductionCompositionModesUpdateAndCancelWithoutCommitting() throws {
     try checkProductionHost(checksMarkedText: true)
   }
@@ -203,7 +208,8 @@ import XCTest
   private func checkProductionHost(checksMarkedText: Bool, mixedLanguage: TypingLanguage? = nil,
     checksBelowStatus: Bool = false, hostWidth: CGFloat = 1000,
     checksBelowResize: Bool = false, checksWholeLineToggle: Bool = false,
-    checksFontChanges: Bool = false, customPrompt: String? = nil) throws {
+    checksFontChanges: Bool = false, customPrompt: String? = nil,
+    acceptedInputs: [String] = ["a", "b", "c"]) throws {
     let mixedDirection = mixedLanguage != nil
     let checksDevanagari = [.hindi, .hindi1k, .nepali, .nepali1k, .sanskrit].contains(mixedLanguage)
     let checksTamil = [.tamil, .tamil1k, .tamilOld].contains(mixedLanguage)
@@ -660,7 +666,7 @@ import XCTest
         continue
       }
       let inputField = try XCTUnwrap(fields(in: host).first)
-      for (insertion, text) in ["a", "b", "c"].enumerated() {
+      for (insertion, text) in acceptedInputs.enumerated() {
         if hostIndex == 0, insertion == 0,
           ProcessInfo.processInfo.environment["TYPEBAR_TEST_INPUT_SAMPLE_MARKER"] == "1" {
           FileHandle.standardError.write(Data("practice-host input-sampling-start\n".utf8))
