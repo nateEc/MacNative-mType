@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：完整生产 Choo 组合输入宿主（2026-10-11）
+
+新增 `SpecialPracticeCompositionHostTests`：隔离 UserDefaults 与内存 SwiftData，实际 `TypebarApp.practiceContent` 挂载于从未显示的窗口，保存英文三词自定义选择并显式配置全局 Choo 修饰器。通过实际 NSTextInputClient 在 off／below／replace 下更新“候”及“中文”，核对 Choo 可访问全文、实际 CATextLayer 候选墨迹、below 原生候选行、输入及图层 owner 保留、固定宿主尺寸和窗口不可见。取消后全文恢复；确认 q 后下一候选以 q候 开始，证明提交一次后候选位于下一目标，取消不消费该目标。不是只检查组件工厂或源码字符串。
+
+首轮 `work/choo-production-composition-host.log` 一项失败因夹具未设置全局 testModifiers，实际 Choo 未挂载；补齐后 `choo-production-composition-host-settings.log` 两处失败因读取 accessibilityValue，而组件实际全文使用 accessibilityLabel。按既有接口修正，未修改产品或放宽存在断言，并保留实际图层检查。第一次联合 `choo-production-composition-host-final.log` 28 项零失败；进一步加入 below 行和确认后位置，最终 `choo-production-composition-host-confirmation.log` 28 项零失败零跳过（5.385s，墙钟 5.389），含生产宿主及 Choo 投影／渲染回归。此为现有生产行为覆盖补证，无人为产品红测。
+
+范围限于默认英文三词、一个不可见窗口、默认动画和已列输入；未验收 ASL 完整宿主、真实系统 IME、全部特殊呈现组合／长候选／跨行或可见动画。无产品、保存、迁移、网络协议变化，零主程序启动；未重跑新完整门禁，compositionDisplay 仍部分，首键性能及完整 goal active 不变。
+
 ## TST-02：空白修正与动态设置后的完整冻结门禁（2026-10-10）
 
 冻结提交 `7a7a83d6430b1d39e7140d91977f9ab359274dc6` 的完整门禁已终态返回 `gate_exit=0 hash_exit=0`。证据目录为 `work/frozen-readiness-recent.WcYO91`，保留 74 阶段日志及 850 个跟踪文件的校验清单／终态验证；参考仍为只读 `91bd24bb8513785c7364cbea29296ff7adafac41`。本节更新下方各增量记录“未重跑完整门禁／Release”的当前状态，不改写历史测试结果。
