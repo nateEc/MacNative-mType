@@ -244,23 +244,27 @@ const addWord=vm.compileFunction(addBody+'\nreturn addWord;',[
   name=>active().find(value=>typeof value.functions[name]==='function'),
   (...args)=>notices.push(args),bindings['config/setters'].toggleFunbox,
   async()=>{restarts++},{dispatch:value=>failures.push(value)});
-config.words=50;
+config.words=300;
 for(const fixture of [
   {name:'empty with retained generator tail',tail:['retained'],responses:[{words:[]}],calls:1,added:['retained'],fails:0,restarts:0,disabled:false},
   {name:'empty then valid generator section',tail:[],responses:[{words:[]},{words:['fresh']}],calls:2,added:['fresh'],fails:0,restarts:0,disabled:false},
+  {name:'empty side before visible exhaustion with empty generator',published:151,active:134,tail:[],responses:[{words:[]},{words:['fresh']}],calls:2,added:['fresh'],fails:0,restarts:0,disabled:false},
   {name:'empty then empty generator section',tail:[],responses:[{words:[]},{words:[]}],calls:2,added:[],fails:1,restarts:0,disabled:false},
   {name:'false prefetch with retained tail',tail:['retained'],responses:[false],calls:1,added:[],fails:0,restarts:1,disabled:true},
   {name:'undefined prefetch with retained tail',tail:['retained'],responses:[undefined],calls:1,added:[],fails:0,restarts:0,disabled:false},
   {name:'valid prefetch still consumes generator tail',tail:['retained'],responses:[{words:['first','second']}],calls:1,added:['first','second','retained'],fails:0,restarts:0,disabled:false},
 ]){
-  testWords.words.reset();testWords.words.push('opening ',0);
+  const published=fixture.published??1;
+  ownedActiveWordIndex=fixture.active??0;
+  testWords.words.reset();
+  for(let i=0;i<published;i++)testWords.words.push('opening ',i);
   main.namespace.currentSection.splice(0,main.namespace.currentSection.length,...fixture.tail);
   ownedSectionQueue=[...fixture.responses];ownedSection=undefined;
   sectionCalls=0;restarts=0;toggledSources.length=0;
   failures.length=0;notices.length=0;displayed.length=0;
   await addWord();
   assert.equal(sectionCalls,fixture.calls,fixture.name);
-  assert.deepEqual(testWords.words.get().slice(1).map(word=>word.text),fixture.added,fixture.name);
+  assert.deepEqual(testWords.words.get().slice(published).map(word=>word.text),fixture.added,fixture.name);
   assert.deepEqual(displayed,fixture.added,fixture.name);
   assert.equal(failures.length,fixture.fails,fixture.name);
   if(fixture.fails) assert.deepEqual(failures,[{key:'fail',value:'word generation error'}]);
@@ -269,7 +273,8 @@ for(const fixture of [
   assert.equal(notices.length,fixture.fails+fixture.restarts,fixture.name);
   assert.equal(ownedSectionQueue.length,0,fixture.name);
 }
-console.log('6 pinned complete-addWord cases passed with actual generator/functions/word storage (owned provider, UI, active index, notification and timer boundaries; no full test-logic module, HTTP, DOM or native recovery equivalence claim).');
+ownedActiveWordIndex=0;
+console.log('7 pinned complete-addWord cases passed with actual generator/functions/word storage (owned provider, UI, active index, notification and timer boundaries; no full test-logic module, HTTP, DOM or native recovery equivalence claim).');
 // A rejected provider Promise is not a false return. Use an owned rejecting
 // adapter to isolate propagation through the complete real caller; this does
 // not claim that poetry itself rejects, or execute MediaWiki transport.

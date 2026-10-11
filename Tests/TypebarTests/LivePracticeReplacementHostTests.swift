@@ -160,7 +160,7 @@ import XCTest
     try checkDelayedReplacement(locksNoQuit: true, failsInitial: true, failsInitialFill: true)
   }
 
-  func testEmptyPrefetchRetainsSourcePromptAndLockedAttemptUntilLaterProgress() throws {
+  func testEmptyPrefetchWithEmptyCacheRequestsGeneratorWithinLockedAttempt() throws {
     try checkDelayedReplacement(prefetches: true, locksNoQuit: true, emptyPrefetch: true)
   }
 
@@ -179,6 +179,11 @@ import XCTest
   func testEmptySectionAtExhaustedTargetsFailsWithoutDisablingSource() throws {
     try checkDelayedReplacement(prefetches: true, locksNoQuit: true,
       emptyPrefetch: true, exhaustsBeforeEmpty: true)
+  }
+
+  func testEmptySideSectionAtExhaustionRequestsGeneratorSectionBeforeFailing() throws {
+    try checkDelayedReplacement(prefetches: true, locksNoQuit: true,
+      emptyPrefetch: true, exhaustsBeforeEmpty: true, recoversAfterEmptyAtExhaustion: true)
   }
 
   func testFailedGenerationPresentationKeepsAValidStoreWhileAnUnrelatedStoreSaves() throws {
@@ -204,7 +209,7 @@ import XCTest
     disablesPace: Bool = false, composesBeforeReturn: Bool = false, prefetches: Bool = false,
     cancelsPrefetch: Bool = false, failsPrefetch: Bool = false, locksNoQuit: Bool = false,
     emptyPrefetch: Bool = false, emptyInitialReplies: Int = 0,
-    exhaustsBeforeEmpty: Bool = false, failsInitial: Bool = false,
+    exhaustsBeforeEmpty: Bool = false, recoversAfterEmptyAtExhaustion: Bool = false, failsInitial: Bool = false,
     failsInitialFill: Bool = false, generatesNextWord: Bool = false,
     checksBackwardInput: Bool = false, encyclopedia: Bool = false,
     initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false) throws {
@@ -550,10 +555,58 @@ import XCTest
       pending.returnsFailure = failsPrefetch
       pending.finish()
       for _ in 0..<5 { flush() }
+      if recoversAfterEmptyAtExhaustion {
+        XCTAssertEqual(pending.callCount, initialRequestCount + 2,
+          "An empty side section with no retained generator field must request a generator section")
+        XCTAssertEqual(pending.continuations.count, 1)
+        XCTAssertFalse(settings.allowsRestartingConfigurationChange,
+          "The same NoQuit attempt stays active while the generator pull is pending")
+        pending.scriptedTokens = Array(authoredTokens[151..<300])
+        pending.finish()
+        for _ in 0..<5 { flush() }
+        XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
+        XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+        let recoveredField = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+        XCTAssertTrue((recoveredField.accessibilityValue() as? String)?.contains("owned151") == true)
+        XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+        XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+        XCTAssertFalse(window.isVisible)
+        return
+      }
       if emptyPrefetch {
+        if !exhaustsBeforeEmpty {
+          XCTAssertEqual(pending.callCount, initialRequestCount + 2)
+          XCTAssertEqual(pending.continuations.count, 1)
+          let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+          XCTAssertEqual(field.accessibilityValue() as? String, beforeReply)
+          XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+          XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+          pending.scriptedTokens = Array(authoredTokens[151..<300])
+          pending.finish()
+          for _ in 0..<5 { flush() }
+          XCTAssertEqual(pending.callCount, initialRequestCount + 2)
+          XCTAssertTrue(pending.continuations.isEmpty)
+          XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
+          XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+          let recovered = try XCTUnwrap(field.accessibilityValue() as? String)
+          XCTAssertTrue(recovered.contains("owned151"))
+          XCTAssertFalse(recovered.contains("owned152"), "Generator publishes only its first field")
+          XCTAssertFalse(window.isVisible)
+          return
+        }
+        if exhaustsBeforeEmpty {
+          XCTAssertEqual(pending.callCount, initialRequestCount + 2,
+            "The empty side pull must be followed by one generator pull")
+          XCTAssertEqual(pending.continuations.count, 1)
+          XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+          // A second empty response fails generation; it must not retry again.
+          pending.finish()
+          for _ in 0..<5 { flush() }
+        }
         XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
         XCTAssertTrue(settings.testModifiers.contains(.noQuit))
-        XCTAssertEqual(pending.callCount, initialRequestCount + 1, "No tight loop on empty sections")
+        XCTAssertEqual(pending.callCount, initialRequestCount + (exhaustsBeforeEmpty ? 2 : 1),
+          "No tight loop on empty sections")
         XCTAssertTrue(pending.continuations.isEmpty)
         if exhaustsBeforeEmpty {
           XCTAssertTrue(settings.allowsRestartingConfigurationChange, "Generation failure ends the active lock")
@@ -566,23 +619,6 @@ import XCTest
           XCTAssertFalse(window.isVisible)
           return
         }
-        let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
-        XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
-        XCTAssertFalse(settings.allowsRestartingConfigurationChange)
-        XCTAssertEqual(field.accessibilityValue() as? String, beforeReply)
-        pending.scriptedTokens = Array(authoredTokens[151..<300])
-        initialInput.insertText(authoredTokens[134] + " ",
-          replacementRange: .init(location: NSNotFound, length: 0))
-        for _ in 0..<5 { flush() }
-        XCTAssertEqual(pending.callCount, initialRequestCount + 2)
-        XCTAssertEqual(pending.continuations.count, 1)
-        pending.finish()
-        for _ in 0..<5 { flush() }
-        XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
-        XCTAssertFalse(settings.allowsRestartingConfigurationChange)
-        XCTAssertTrue((field.accessibilityValue() as? String)?.hasSuffix(authoredTokens.suffix(3).joined(separator: " ")) == true)
-        XCTAssertFalse(window.isVisible)
-        return
       }
       if failsPrefetch {
         if encyclopedia {

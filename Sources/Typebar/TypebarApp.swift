@@ -4560,12 +4560,13 @@ private struct ContentView: View {
     isLoadingLiveContent = true
     liveContentMessage = "正在续取\(source.displayName)。"
     liveContentTask = Task {
+      var requestsGeneratorWord = generatesNextWord
       while !Task.isCancelled,
-        (generatesNextWord ? session.needsLiveContentGeneration : session.needsLiveContentPrefetch) {
+        (requestsGeneratorWord ? session.needsLiveContentGeneration : session.needsLiveContentPrefetch) {
         let content = await liveContentFetch(source, configuration.language)
         guard !Task.isCancelled, requestID == liveContentRequestID,
           session.configuration == configuration, !session.isFinished else { return }
-        if generatesNextWord {
+        if requestsGeneratorWord {
           liveContentTask = nil
           isLoadingLiveContent = false
           // Demand belongs to the forward transition that requested it;
@@ -4609,6 +4610,13 @@ private struct ContentView: View {
           return
         }
         if let content, content.source == source, content.text.isEmpty {
+          // An empty side pull does not end addWord: the generator still
+          // consumes its pending field or, when empty, pulls one section.
+          // The generator branch terminates on another empty response.
+          if session.needsLiveContentGeneration {
+            requestsGeneratorWord = true
+            continue
+          }
           // Keep the active targets and source identity. Only later progress
           // requests another section; an empty reply must not spin or restart
           // the attempt as though the provider had failed.
