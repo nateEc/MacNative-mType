@@ -3,6 +3,30 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class CompositionSubstringTests: XCTestCase {
+  func testMutableInputIsSnapshottedUntilExplicitCandidateUpdate() throws {
+    let input = TypingInputView(frame: .zero)
+    let candidate = NSMutableAttributedString(string: "中文", attributes: [.underlineStyle: 1])
+    var changes = [String]()
+    input.onCompositionChanged = { changes.append($0) }
+    input.setMarkedText(candidate, selectedRange: .init(location: 2, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    candidate.replaceCharacters(in: .init(location: 0, length: 2), with: "候")
+    candidate.addAttribute(.underlineStyle, value: 2, range: .init(location: 0, length: 1))
+    let stored = try XCTUnwrap(input.attributedSubstring(
+      forProposedRange: .init(location: 0, length: 2), actualRange: nil))
+    XCTAssertEqual(stored.string, "中文")
+    XCTAssertEqual(stored.attribute(.underlineStyle, at: 0, effectiveRange: nil) as? Int, 1)
+    XCTAssertEqual(input.markedRange(), NSRange(location: 0, length: 2))
+    XCTAssertEqual(input.selectedRange(), NSRange(location: 2, length: 0))
+    XCTAssertEqual(changes, ["中文"])
+    input.setMarkedText(candidate, selectedRange: .init(location: 1, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    XCTAssertEqual(input.attributedSubstring(forProposedRange: .init(location: 0, length: 1),
+      actualRange: nil)?.string, "候")
+    XCTAssertEqual(input.markedRange(), NSRange(location: 0, length: 1))
+    XCTAssertEqual(changes, ["中文", "候"])
+  }
+
   func testCandidateReadbackPreservesAttributesAndExpandsUnicodeBoundaries() throws {
     let input = TypingInputView(frame: .zero)
     let candidate = NSAttributedString(string: "😀e\u{301}候", attributes: [.underlineStyle: 1])

@@ -1,5 +1,11 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## TST-02：可变输入候选的快照所有权（2026-10-11）
+
+原先 setMarkedText 直接保留输入法传来的 NSAttributedString 对象；若实际为 NSMutableAttributedString，调用方随后修改正文或属性会绕过 onCompositionChanged，已存选区也可能超出新的 marked range。`work/composition-mutable-snapshot-red.log` 一项三处失败，复现原候选“中文”无通知地变为“候”、下划线属性改变及长度缩短。修正接收 attributed 输入时建立不可变 NSAttributedString 快照；显式再次 setMarkedText 仍接受同一缓冲区的新内容并正常通知。
+
+`work/composition-mutable-snapshot-green.log` 66 项零失败零跳过（10.250s，墙钟 10.257），覆盖正文／属性映射隔离、marked／selected range 一致、更新通知，以及既有选区、子串、结束、Return、热键、Unicode 和 ASL／Choo 宿主回归。风险审查未发现可落实的新问题；这不是属性值对象的任意深拷贝承诺，也没有增加存储、网络或异步路径。固定参考原创边界检查通过，仅限脚本定义范围。主程序零启动，无新完整门禁、Release 或真实 IME 验收；完整 goal 与首键性能问题仍未完成。
+
 ## TST-02：输入法候选正文读取修正（2026-10-11）
 
 原生输入视图已有当前 attributed 候选存储，但 attributedSubstring 始终返回 nil。按 Apple 的 [候选子串读取契约](https://developer.apple.com/documentation/appkit/nstextinputclient/attributedsubstring(forproposedrange:actualrange:))，对范围越界请求返回与现有存储的交集，完全越界返回 nil，并可调整字素边界。修正只开放当前候选，不提供练习历史／目标正文；以减法限制请求长度避免溢出，非空请求扩展到 NSString 完整组合字符范围并回报 actualRange，保留 attributed 属性。空候选／无效位置仍返回 nil，存储内部零长度请求返回空子串，不改变选区或确认候选。

@@ -601,7 +601,9 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         let startsComposition = composition.length == 0
         if let attributed = string as? NSAttributedString {
-            composition = attributed
+            // Input methods may reuse mutable attributed buffers. Own the
+            // accepted text so later mutations cannot bypass update callbacks.
+            composition = NSAttributedString(attributedString: attributed)
         } else {
             composition = NSAttributedString(string: string as? String ?? "")
         }
