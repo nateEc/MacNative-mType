@@ -5,6 +5,40 @@ final class ProviderFieldSessionTests: XCTestCase {
   private let began = Date(timeIntervalSinceReferenceDate: 917_000_000)
   private let fields = ["north\nsouth ", "harbor ", "tail"]
 
+  func testEmptyInitialGenerationIsTerminalWithoutAnAttemptResult() {
+    let configuration = TestConfiguration.words(4).with(modifiers: [.poetryStream])
+    var session = TypingSession(configuration: configuration, prompt: "",
+      initializationFailure: "在线内容为空，连续三次无法生成练习。")
+    XCTAssertEqual(session.outcome, .failed)
+    XCTAssertNotNil(session.generationNotice)
+    XCTAssertNil(session.result())
+    session.insertBatch("ignored", at: began)
+    XCTAssertEqual(session.typed, "")
+    XCTAssertEqual(session.configuration, configuration)
+    XCTAssertEqual(session.repeatedAttempt().outcome, .failed)
+  }
+
+  func testEmptyLiveGenerationFailureRetainsAcceptedTargetsAndReplay() throws {
+    let configuration = TestConfiguration.words(4).with(modifiers: [.poetryStream, .noQuit])
+    var session = TypingSession(configuration: configuration, prompt: "north harbor ",
+      sourceFields: ["north ", "harbor "], streamsLiveContent: true)
+    session.insertBatch("north harbor ", at: began)
+    XCTAssertTrue(session.isWaitingForLiveContent)
+    let originalPrompt = session.prompt
+    let originalTyped = session.typed
+    session.failLiveContentGeneration(at: began.addingTimeInterval(2))
+    XCTAssertEqual(session.outcome, .failed)
+    XCTAssertEqual(session.failureReason, .wordGeneration)
+    XCTAssertEqual(session.configuration, configuration)
+    XCTAssertEqual(session.prompt, originalPrompt)
+    XCTAssertEqual(session.typed, originalTyped)
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+      through: result.elapsedDuration), originalTyped)
+    session.insertBatch("ignored", at: began.addingTimeInterval(3))
+    XCTAssertEqual(session.typed, originalTyped)
+  }
+
   func testInvalidOpeningMetadataDoesNotChangeLaterSectionTransformation() {
     let configuration = TestConfiguration.words(4).with(modifiers: [.poetryStream])
     var legacy = TypingSession(configuration: configuration, prompt: "north harbor ", streamsLiveContent: true)

@@ -4941,6 +4941,11 @@ struct TypingSession {
     generationNotice = "无法续取在线内容，练习已停止。请重启或关闭在线内容修饰器。"
     fail(at: date, reason: .wordGeneration)
   }
+  mutating func failLiveContentGeneration(at date: Date = .now) {
+    guard streamsLiveContent, !isFinished else { return }
+    generationNotice = "在线内容为空，无法生成下一个词；练习已停止，内容来源保持开启。"
+    fail(at: date, reason: .wordGeneration)
+  }
   mutating func appendLiveContent(_ content: LivePracticePrompt) -> Bool {
     guard !isFinished, LivePracticeContentSource.selected(for: configuration) != nil,
       !content.text.isEmpty else { return false }

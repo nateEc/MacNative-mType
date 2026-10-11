@@ -2,6 +2,37 @@ import XCTest
 @testable import Typebar
 
 final class PoetrySourceCleaningTests: XCTestCase {
+  func testSuccessfullyDecodedEmptyPoemRemainsDistinctFromProviderFailure() throws {
+    let value = try content(lines: ["— ___ —_", "   "], title: " Empty ", author: " Writer ")
+    XCTAssertEqual(value.text, "")
+    XCTAssertEqual(value.title, " Empty ")
+    XCTAssertEqual(value.byline, " Writer ")
+    XCTAssertEqual(value.sectionDescriptor.text, "")
+    XCTAssertNil(LivePracticeContentService.poetry(from: Data("[]".utf8)))
+    XCTAssertNil(LivePracticeContentService.poetry(from: Data("invalid".utf8)))
+  }
+
+  @MainActor func testInitialFillReportsEmptyGenerationWithoutSilentlyFetchingAgain() async throws {
+    let empty = LivePracticeContent(source: .poetry, title: "Empty", byline: nil,
+      tokens: [], separator: " ")
+    let valid = LivePracticeContent(source: .poetry, title: "Owned", byline: nil,
+      tokens: ["north", "harbor"], separator: " ")
+    let configuration = TestConfiguration.words(4).with(modifiers: [.poetryStream])
+    var calls = 0
+    let first = await empty.fillingInitialPrompt(for: configuration, showAllLines: true) {
+      calls += 1
+      return nil
+    }
+    XCTAssertEqual(first?.text, "")
+    XCTAssertEqual(calls, 0, "Initialization owns its bounded reattempt, not the fill helper")
+    let later = await valid.fillingInitialPrompt(for: configuration, showAllLines: true) {
+      calls += 1
+      return empty
+    }
+    XCTAssertEqual(later?.text, "")
+    XCTAssertEqual(calls, 1)
+  }
+
   func testParsedFactoryPrefetchPreservesSourceFieldsAndFiniteBudgetThroughReplay() throws {
     let opening = try content(lines: ["north\nsouth"] + (1..<100).map { "owned\($0)" })
     let next = try content(lines: ["third\nfourth tail ignored"])

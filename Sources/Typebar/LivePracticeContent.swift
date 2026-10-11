@@ -79,6 +79,9 @@ struct LivePracticeContent: Equatable {
   ) async -> LivePracticeContent? {
     guard !Task.isCancelled else { return nil }
     guard configuration.mode == .time || configuration.mode == .words else { return self }
+    // A decoded empty section is a generation failure, not failed transport.
+    // Let initialization own its bounded restart rather than hiding it here.
+    guard !tokens.isEmpty else { return self }
     let target = GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
     // The preview budget limits presentation, not ownership of fetched text.
     // Keep each section's tail for a later larger preview or stream consumer.
@@ -87,8 +90,9 @@ struct LivePracticeContent: Equatable {
     var authors = [byline].compactMap { $0 }
     while collected.count < target {
       guard !Task.isCancelled, let next = await fetchNext(), !Task.isCancelled,
-        next.source == source, next.separator == separator, !next.tokens.isEmpty
+        next.source == source, next.separator == separator
       else { return nil }
+      if next.tokens.isEmpty { return next }
       collected.append(contentsOf: next.tokens)
       titles.append(next.title)
       if let author = next.byline { authors.append(author) }
@@ -190,7 +194,6 @@ enum LivePracticeContentService {
         }
       }
     }
-    guard !words.isEmpty else { return nil }
     return .init(source: .poetry, title: first.title, byline: first.author,
       tokens: words, separator: " ")
   }

@@ -4461,12 +4461,20 @@ private struct ContentView: View {
     liveContentTask = Task {
       let firstContent = await liveContentFetch(source, configuration.language)
       var content = firstContent
+      var emptyGenerationAttempts = 0
       while let pendingContent = content {
         let wholePreview = settings.showAllPracticeLines && settings.practiceTapeMode == .off
         content = await pendingContent.fillingInitialPrompt(for: configuration,
           showAllLines: wholePreview) {
             await liveContentFetch(source, configuration.language)
           }
+        if content?.text.isEmpty == true {
+          emptyGenerationAttempts += 1
+          if emptyGenerationAttempts == 3 { break }
+          guard !Task.isCancelled else { return }
+          content = await liveContentFetch(source, configuration.language)
+          continue
+        }
         // Display settings can change while a later section is in flight.
         // Fill the current budget before constructing its final descriptor.
         if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off) { break }
@@ -4483,6 +4491,16 @@ private struct ContentView: View {
         requestedConfiguration: configuration)
       else {
         liveContentMessage = "已获取\(content.attribution)，为避免打断输入，本轮仍使用现有提示。"
+        return
+      }
+      if content.text.isEmpty {
+        session = TypingSession(configuration: configuration, prompt: "",
+          initializationFailure: "在线内容为空，连续三次无法生成练习；请重试或关闭内容来源。",
+          weakSpotScores: session.liveWeakSpotScores,
+          wordDecorationState: session.liveWordDecorationState).withElapsedClock()
+        liveContentStreamingActive = false
+        liveContentMessage = "在线内容为空，初始化已停止；内容来源保持开启。"
+        synchronizeNoQuitConfigurationLock()
         return
       }
       let livePrompt = content.promptDescriptor(for: configuration,
@@ -4521,6 +4539,20 @@ private struct ContentView: View {
         let content = await liveContentFetch(source, configuration.language)
         guard !Task.isCancelled, requestID == liveContentRequestID,
           session.configuration == configuration, !session.isFinished else { return }
+        if let content, content.source == source, content.text.isEmpty {
+          // Keep the active targets and source identity. Only later progress
+          // requests another section; an empty reply must not spin or restart
+          // the attempt as though the provider had failed.
+          liveContentTask = nil
+          isLoadingLiveContent = false
+          liveContentMessage = "本次在线段落为空；内容来源保持开启。"
+          if session.isWaitingForLiveContent {
+            liveContentStreamingActive = false
+            session.failLiveContentGeneration()
+            synchronizeNoQuitConfigurationLock()
+          }
+          return
+        }
         guard let content, content.source == source,
           session.appendLiveContent(content.sectionDescriptor) else {
           liveContentTask = nil

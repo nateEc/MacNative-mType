@@ -61,9 +61,32 @@ import XCTest
     try checkDelayedReplacement(prefetches: true, failsPrefetch: true, locksNoQuit: true)
   }
 
+  func testEmptyPrefetchRetainsSourcePromptAndLockedAttemptUntilLaterProgress() throws {
+    try checkDelayedReplacement(prefetches: true, locksNoQuit: true, emptyPrefetch: true)
+  }
+
+  func testEmptyInitialSectionReattemptsBeforeApplyingAValidPrompt() throws {
+    try checkDelayedReplacement(emptyInitialReplies: 1)
+  }
+
+  func testThreeEmptyInitialSectionsStopWithoutDisablingSourceOrUsingOfflinePrompt() throws {
+    try checkDelayedReplacement(emptyInitialReplies: 3)
+  }
+
+  func testEmptyInitializationFailureCannotReplaceAnAlreadyStartedAttempt() throws {
+    try checkDelayedReplacement(startsBeforeReturn: true, emptyInitialReplies: 3)
+  }
+
+  func testEmptySectionAtExhaustedTargetsFailsWithoutDisablingSource() throws {
+    try checkDelayedReplacement(prefetches: true, locksNoQuit: true,
+      emptyPrefetch: true, exhaustsBeforeEmpty: true)
+  }
+
   private func checkDelayedReplacement(startsBeforeReturn: Bool = false,
     disablesPace: Bool = false, composesBeforeReturn: Bool = false, prefetches: Bool = false,
-    cancelsPrefetch: Bool = false, failsPrefetch: Bool = false, locksNoQuit: Bool = false) throws {
+    cancelsPrefetch: Bool = false, failsPrefetch: Bool = false, locksNoQuit: Bool = false,
+    emptyPrefetch: Bool = false, emptyInitialReplies: Int = 0,
+    exhaustsBeforeEmpty: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -141,6 +164,35 @@ import XCTest
       startedCaret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
         .first { $0.rootView.style == .bar && !$0.isHidden }).frame
     }
+    if emptyInitialReplies > 0 {
+      let initialRequestCount = pending.callCount
+      pending.scriptedTokens = []
+      for _ in 0..<emptyInitialReplies {
+        pending.finish()
+        for _ in 0..<5 { flush() }
+      }
+      XCTAssertEqual(pending.callCount, initialRequestCount + min(emptyInitialReplies, 2))
+      XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
+      if emptyInitialReplies == 3 {
+        XCTAssertTrue(pending.continuations.isEmpty, "Three failed initial generations are the limit")
+        if startsBeforeReturn {
+          let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+          XCTAssertEqual(field.accessibilityValue() as? String, initialPrompt)
+          XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+        } else {
+          XCTAssertTrue(views(PromptFieldNativeView.self, in: host).isEmpty,
+            "An initial generation failure must not leave an offline prompt")
+          initialInput.insertText("ignored", replacementRange: .init(location: NSNotFound, length: 0))
+          for _ in 0..<5 { flush() }
+          XCTAssertTrue(views(PromptFieldNativeView.self, in: host).isEmpty)
+          XCTAssertEqual(pending.callCount, initialRequestCount + 2)
+          XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+        }
+        XCTAssertFalse(window.isVisible)
+        return
+      }
+      pending.scriptedTokens = nil
+    }
     pending.finish()
     for _ in 0..<5 { flush() }
     if prefetches {
@@ -166,14 +218,50 @@ import XCTest
         XCTAssertFalse(settings.allowsRestartingConfigurationChange,
           "The active No Quit attempt must actually be locked before the source fails")
       }
+      if exhaustsBeforeEmpty {
+        initialInput.insertText(authoredTokens[134..<151].joined(separator: " ") + " ",
+          replacementRange: .init(location: NSNotFound, length: 0))
+        for _ in 0..<5 { flush() }
+      }
       if cancelsPrefetch {
         window.contentView = nil
         for _ in 0..<5 { flush() }
       }
-      pending.scriptedTokens = Array(authoredTokens[151..<300])
+      pending.scriptedTokens = emptyPrefetch ? [] : Array(authoredTokens[151..<300])
       pending.returnsFailure = failsPrefetch
       pending.finish()
       for _ in 0..<5 { flush() }
+      if emptyPrefetch {
+        XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
+        XCTAssertTrue(settings.testModifiers.contains(.noQuit))
+        XCTAssertEqual(pending.callCount, initialRequestCount + 1, "No tight loop on empty sections")
+        XCTAssertTrue(pending.continuations.isEmpty)
+        if exhaustsBeforeEmpty {
+          XCTAssertTrue(settings.allowsRestartingConfigurationChange, "Generation failure ends the active lock")
+          XCTAssertTrue((fieldBeforeReply.accessibilityValue() as? String)?.contains("owned150") == true,
+            "Failure retains the authored targets rather than starting an offline attempt")
+          XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+          XCTAssertFalse(window.isVisible)
+          return
+        }
+        let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+        XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+        XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+        XCTAssertEqual(field.accessibilityValue() as? String, beforeReply)
+        pending.scriptedTokens = Array(authoredTokens[151..<300])
+        initialInput.insertText(authoredTokens[134] + " ",
+          replacementRange: .init(location: NSNotFound, length: 0))
+        for _ in 0..<5 { flush() }
+        XCTAssertEqual(pending.callCount, initialRequestCount + 2)
+        XCTAssertEqual(pending.continuations.count, 1)
+        pending.finish()
+        for _ in 0..<5 { flush() }
+        XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
+        XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+        XCTAssertTrue((field.accessibilityValue() as? String)?.hasSuffix(authoredTokens.suffix(3).joined(separator: " ")) == true)
+        XCTAssertFalse(window.isVisible)
+        return
+      }
       if failsPrefetch {
         XCTAssertFalse(settings.testModifiers.contains(.poetryStream))
         XCTAssertEqual(settings.testModifiers.contains(.noQuit), locksNoQuit)
