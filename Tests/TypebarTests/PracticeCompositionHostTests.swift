@@ -676,6 +676,15 @@ import XCTest
         let map = try XCTUnwrap(rendering.compositionTextMap)
         return Dictionary(uniqueKeysWithValues: map.fieldRuns.flatMap(\.cells).map { ($0.id, $0) })
       }
+      func diagnosticBoxes() throws -> [AnyObject]? {
+        guard ProcessInfo.processInfo.environment["TYPEBAR_TEST_FIELD_DIFF"] == "1" else { return nil }
+        let model = try XCTUnwrap(Mirror(reflecting: inputField).children.first {
+          $0.label == "model"
+        }?.value as? PromptFieldTextLayout)
+        return try XCTUnwrap(Mirror(reflecting: model).children.first {
+          $0.label == "boxes"
+        }?.value as? [AnyObject])
+      }
       for (insertion, text) in acceptedInputs.enumerated() {
         if hostIndex == 0, insertion == 0,
           ProcessInfo.processInfo.environment["TYPEBAR_TEST_INPUT_SAMPLE_MARKER"] == "1" {
@@ -688,6 +697,9 @@ import XCTest
         }
         let initialFrame = host.frame
         let initialCells = try diagnosticCells()
+        // Retain the original objects so allocator address recycling cannot
+        // masquerade as reuse in this opt-in diagnostic.
+        let initialBoxes = try diagnosticBoxes()
         let initialFieldWidth = inputField.bounds.width
         let initialLayoutCount = host.layoutCount
         let initialGeometryRevision = inputField.geometryRevision
@@ -702,6 +714,11 @@ import XCTest
           let retained = Set(initialCells.keys).intersection(currentCells.keys)
           let changed = retained.filter { initialCells[$0] != currentCells[$0] }.count
           print("practice-host field-diff insertion=\(insertion) before=\(initialCells.count) after=\(currentCells.count) changed=\(changed) added=\(Set(currentCells.keys).subtracting(initialCells.keys).count) removed=\(Set(initialCells.keys).subtracting(currentCells.keys).count) widthBefore=\(initialFieldWidth) widthAfter=\(inputField.bounds.width)")
+        }
+        if let initialBoxes, let currentBoxes = try diagnosticBoxes() {
+          let before = Set(initialBoxes.map(ObjectIdentifier.init))
+          let after = Set(currentBoxes.map(ObjectIdentifier.init))
+          print("practice-host box-reuse insertion=\(insertion) before=\(before.count) after=\(after.count) reused=\(before.intersection(after).count) created=\(after.subtracting(before).count)")
         }
         let synchronousLayouts = host.layoutCount - initialLayoutCount
         if insertion == 1,
