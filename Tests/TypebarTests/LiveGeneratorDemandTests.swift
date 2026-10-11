@@ -153,7 +153,7 @@ final class LiveGeneratorDemandTests: XCTestCase {
     XCTAssertEqual(practice.prompt, fields.joined() + "color honor")
   }
 
-  func testFinalCachedLineFeedCommitIsRemovedOnlyFromNonemptyField() {
+  func testFinalCachedLineFeedCommitIsRemovedOnlyFromNonemptyField() throws {
     for terminal in ["last\n", "\n"] {
       let opening = (0..<100).map { "owned\($0) " }
       var practice = TypingSession(configuration: .words(101).with(modifiers: [.poetryStream]),
@@ -162,6 +162,23 @@ final class LiveGeneratorDemandTests: XCTestCase {
         streamsLiveContent: true)
       practice.insertBatch("owned0 ", at: began)
       XCTAssertEqual(practice.prompt, opening.joined() + (terminal == "\n" ? "\n" : "last"))
+      // The source probe establishes blank-LF publication, not its full
+      // input-handler completion semantics. Completion below covers nonempty LF.
+      if terminal == "\n" { continue }
+      let accepted = opening.joined() + (terminal == "\n" ? "\n" : "last")
+      practice.insertBatch(String(accepted.dropFirst("owned0 ".count)), at: began.addingTimeInterval(1))
+      XCTAssertEqual(practice.outcome, .completed, "terminal=\(String(reflecting: terminal))")
+      XCTAssertEqual(practice.completedWordCount, 101)
+      XCTAssertEqual(practice.errors, 0)
+      let result = try XCTUnwrap(practice.result())
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), accepted)
+      var repeated = practice.repeatedAttempt()
+      repeated.insertBatch(accepted, at: began.addingTimeInterval(2))
+      XCTAssertEqual(repeated.prompt, practice.prompt)
+      XCTAssertEqual(repeated.outcome, .completed)
+      XCTAssertEqual(repeated.completedWordCount, 101)
+      XCTAssertEqual(repeated.errors, 0)
     }
   }
 

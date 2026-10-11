@@ -500,5 +500,10 @@ for (const terminal of ['last\n', '\n']) {
   const last=testWords.words.get().at(-1);
   assert.equal(last.textWithCommit,terminal==='\n'?'\n':'last');
   assert.equal(last.commit,terminal==='\n'?'\n':'');
+  ownedRepeated=true;
+  await main.namespace.generateWords({name:'english',words:['different']});
+  const replayed=await main.namespace.getNextWord(100,100,'owned99 ','owned98 ');
+  assert.equal(replayed.word,terminal,'Repeat retains the generator LF before final display stripping');
+  ownedRepeated=false;
 }
 console.log('Pinned final LF contracts passed: nonempty final field loses LF commit; empty LF field retains it. Actual caller, generator and TestWords; owned cursor/provider.');
