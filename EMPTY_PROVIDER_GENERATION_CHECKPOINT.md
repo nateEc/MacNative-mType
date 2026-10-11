@@ -1,5 +1,11 @@
 # 在线空内容生成检查点（未验收）
 
+## 组合输入连续宿主复现结果（2026-10-12，未定位）
+
+在 `0a3d8c9ddcb3bdea11ba683d0e803ed172e24d9b` 上，保持产品和测试不变，单独运行原失败用例：1 项／0 失败，21.589 秒（墙钟 21.591），日志 `work/composition-diagnostic-focused-01.log`。随后只启动一个测试会话，以 `PracticeCompositionHostTests` 筛选连续执行；该筛选同时匹配 SpecialPracticeCompositionHostTests。实际共 44 项／0 失败／无跳过，987.743 秒（墙钟 987.750）；其中普通组合宿主 42 项，978.608 秒（墙钟 978.614），特殊宿主 2 项，9.135 秒。原失败用例本轮通过，21.174 秒，日志 `work/composition-diagnostic-class-sequence-01.log`。退出码 0，终态后确认无 xctest 或 Typebar 主程序进程，工作区未改动。
+
+仅保留该测试类的前序执行顺序不足以复现完整门禁中的提示缺失；本轮没有触发已有失败诊断，不能判定原因或声称修复。旧失败用例仅执行 8.828 秒，不能直接归因于默认 30 秒计时结束；组合确实启动真实计时，但仍缺少失败时会话／投影状态证据。后续应区分投影失效与原生视图挂载边界，不盲目延长排空、放宽断言或重跑直到绿色。完整门禁的失败记录继续有效，功能未升级验收，goal active。
+
 ## 冻结百科修复门禁失败及 Tape 通知观察修正（2026-10-12）
 
 冻结提交 `cf43af495c9bdcbd6d26d4351553d1f20070f2a4` 的完整门禁已退出 1，文件校验退出 0；868 个跟踪文件保持一致。证据目录 `work/frozen-readiness-encyclopedia-rejection.N0lV1Y`。客户端 4386 项／3 个失败断言／无跳过，2114.325 秒（套件墙钟 2114.927）；三个断言来自两个用例：PracticeCompositionHostTests.testProductionCompositionModesUpdateAndCancelWithoutCommitting 在当时第 389 行、下方候选已存在时无法取得 PromptFieldNativeView；TapeNewlineTransitionTests.testActualNewWordAwaitsVerticalDeletionBeforeHorizontalRequestAndAsyncNotification 的当时第 73／74 行未看到退役通知及尝试 ID。42 项组合宿主共 1 失败，943.894 秒（墙钟 943.900）。此前 29 项在线宿主及随后同进程 19 项 PB 台账通过，10 万词耐久 162.451 秒通过；均不覆盖上述失败。客户端失败后服务端及 Release／打包阶段未执行，不引用历史通过替代本次结果。
