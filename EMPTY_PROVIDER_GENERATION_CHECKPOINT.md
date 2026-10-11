@@ -1,5 +1,22 @@
 # 在线空内容生成检查点（未验收）
 
+## 最新完整门禁失败：宿主序列后的存储崩溃（2026-10-11）
+
+冻结提交 `f263ce264c0036093319825da9a9ee153e531f58` 的完整门禁未通过，不能作为发布或功能等价证明。证据目录 `work/frozen-readiness-live-pool.70eThg` 位于项目所在工作区：`result.txt` 为 `gate_exit=1 hash_exit=0`，865 个受跟踪文件的 SHA-256 检查通过。客户端进程 xctest（PID 84359）在 `LocalPersonalBestLedgerTests.testAccountResetCreatesKnownEmptyLedgerInsteadOfRebuildingOldHistory` 的首次保存处收到 signal 5；服务端测试和发布打包阶段没有执行。失败退出后日志仍在门禁临时目录，已另行复制其中 73 份日志至证据目录的 `logs/`，没有覆盖已有日志。
+
+崩溃报告 `xctest-2026-10-11-232211.ips` 的主线程栈为本地 PB 保存 → SwiftData 保存通知 → `_SwiftData_SwiftUI` 观察器 → SwiftData EXC_BREAKPOINT。这定位了边界，但尚未识别具体失效查询对象，不能断言已经找到根因。十万词耐久用例在该轮通过，耗时 162.375 秒，不代表后续客户端完整套件通过。
+
+缩小验证均使用 `TYPEBAR_QA_IN_MEMORY_STORE=1 swift test`（已有构建时加 `--skip-build`），没有启动 Typebar 主程序：
+
+- `provider-full-gate-storage-reproduction.log`：连续运行 17 项 `LivePracticeReplacementHostTests` 后，接上述 PB 测试，再次 signal 5。宿主阶段另有一次 Pace 标记断言失败，未删除或放宽断言。
+- `provider-storage-tail-half.log`：后半组 9 个宿主场景接 PB 保存仍崩溃；组合输入场景另有一次提示视图不存在的断言失败。尚不证明这些表现与存储崩溃具有同一根因。
+- `provider-storage-autorelease-lifetime-check.log`：临时尝试显式保留 ModelContainer，并将宿主操作置于 autorelease pool。17 项宿主断言全部通过，随后 PB 保存依旧崩溃；该无效改动已经完整撤回。
+- 单独的 NoQuit 失败恢复、组合输入、三次空初始化场景分别接 PB 保存均通过，见 `provider-noquit-storage-minimal-red.log`（文件名不代表实际失败）、`provider-composition-storage-minimal.log`、`provider-empty-init-storage-minimal.log`。
+- 其余后半组六个场景逐个与 PB 保存配对均通过，见 `provider-storage-pair-test*.log`：未锁定续取失败、初始化填充失败、晚到初始化失败、离开练习取消、输入后晚到响应、单飞续取。
+- 两个续取失败宿主场景连续运行再接 PB 保存也通过：`provider-storage-two-hosts.log`，3 项、0 失败，15.902 秒（总墙钟 15.904 秒）。因此还不能把“多个宿主”泛化为任何两个宿主必然触发，须继续缩小具体序列或累积条件。
+
+当前没有保留猜测性的产品或测试修复。下一步定位具体连续宿主组合及保存通知观察器生命周期，修复后必须重跑失败序列及完整门禁；在线生成调度、false/undefined 分类等下述功能差异仍然开放。目标保持进行中。
+
 参考源码固定为 `91bd24bb8513785c7364cbea29296ff7adafac41`，不表示最新版本。
 本次原生实现没有复用参考实现代码或资产。
 
