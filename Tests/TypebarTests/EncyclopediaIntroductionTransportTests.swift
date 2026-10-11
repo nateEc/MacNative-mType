@@ -125,6 +125,40 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testChineseIntroductionRetainsPunctuationAndDigitsAcrossNativeWordBoundaries() async throws {
+    try await withSession { session in
+      let expected = "「海港」有12艘船，天气好。"
+      let response = try JSONSerialization.data(withJSONObject: [
+        "query": ["pages": ["724": ["extract": expected]]]
+      ])
+      IntroductionProtocol.fixture.set([
+        (200, #"{"pageid":724,"title":"原创海港"}"#),
+        (200, String(decoding: response, as: UTF8.self))
+      ])
+      let fetched = await LivePracticeContentService.fetch(
+        source: .encyclopedia, language: .simplifiedChinese, session: session)
+      let content = try XCTUnwrap(fetched)
+      XCTAssertEqual(content.text, expected)
+      let preview = content.promptDescriptor(for: .init(mode: .custom, duration: nil,
+        wordLimit: nil, difficulty: .normal, rules: .init(), language: .simplifiedChinese))
+      let boundaries = try XCTUnwrap(preview.noSpaceBoundarySource)
+      XCTAssertEqual(boundaries.replacingOccurrences(of: " ", with: ""), expected)
+      let configuration = TestConfiguration.words(boundaries.split(separator: " ").count,
+        language: .simplifiedChinese).with(modifiers: [.referenceStream])
+      var practice = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: content.text, streamNoSpaceBoundarySource: boundaries, showAllLines: true)
+      XCTAssertEqual(practice.prompt, expected)
+      let now = Date(timeIntervalSince1970: 1_700_000_000)
+      practice.insertBatch(expected, at: now)
+      XCTAssertEqual(practice.outcome, .completed)
+      XCTAssertEqual(practice.completedWordCount, configuration.wordLimit)
+      XCTAssertEqual(practice.errors, 0)
+      let result = try XCTUnwrap(practice.result(at: now))
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), expected)
+    }
+  }
+
   func testAlreadyCancelledTaskDoesNotStartEitherRequest() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([])

@@ -209,17 +209,39 @@ enum LivePracticeContentService {
         }
       }
     }
-    if language.usesNoSpaceLiveText {
-      return makeContent(source: .encyclopedia, title: identity.title, byline: identity.author,
-        rawText: normalized, language: language)
-    }
-    let words = normalized.split(separator: " ").map(String.init)
+    let words = language.usesNoSpaceLiveText
+      ? introductionTokensWithoutSpaces(normalized)
+      : normalized.split(separator: " ").map(String.init)
     guard !words.isEmpty else { return nil }
     let title = identity.title.trimmingCharacters(in: .whitespacesAndNewlines)
     let author = identity.author?.trimmingCharacters(in: .whitespacesAndNewlines)
     return .init(source: .encyclopedia,
       title: title.isEmpty ? LivePracticeContentSource.encyclopedia.displayName : title,
-      byline: author?.isEmpty == false ? author : nil, tokens: words, separator: " ")
+      byline: author?.isEmpty == false ? author : nil, tokens: words,
+      separator: language.usesNoSpaceLiveText ? "" : " ")
+  }
+
+  private static func introductionTokensWithoutSpaces(_ normalized: String) -> [String] {
+    let text = normalized.replacingOccurrences(of: " ", with: "")
+    guard !text.isEmpty else { return [] }
+    let tokenizer = NLTokenizer(unit: .word)
+    tokenizer.string = text
+    var words: [String] = []
+    var previousEnd = text.startIndex
+    tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+      let gap = String(text[previousEnd..<range.lowerBound])
+      if words.isEmpty {
+        words.append(gap + text[range])
+      } else {
+        words[words.count - 1].append(gap)
+        words.append(String(text[range]))
+      }
+      previousEnd = range.upperBound
+      return true
+    }
+    guard !words.isEmpty else { return [text] }
+    words[words.count - 1].append(contentsOf: text[previousEnd...])
+    return words
   }
 
   private static func data(from url: URL, session: URLSession) async -> Data? {
