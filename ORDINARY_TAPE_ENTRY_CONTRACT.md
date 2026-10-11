@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## TST-02：完整字体门禁后的首键复测与采样边界（2026-10-11）
+
+在干净 `2679a96` 上不改产品或测试，用既有不可见实际宿主用例重新测量。`work/first-input-current-baseline.log` 单项通过；四组首字符输入处理 0.356–0.845ms，同步布局 195.182–201.832ms，后续字符同步布局约 54.948–60.232ms。后续交付仍有额外根布局，不能将这些 DEBUG／随机提示／宿主数字当成公平 Release 基准或故障已解决；说明此前字体修正及完整门禁通过没有关闭首键问题。
+
+采样准备存在三次无效结果：`first-input-current-sampled.log` 测试已结束才查询进程；`first-input-current-sampled-final.log` 监听窗口未捕获标记；`first-input-current-sampled-bounded.log` 收到标记时已无测试进程。三项测试本身通过，不计有效采样。核对本合同既有 SwiftPM 转发缓冲限制后，改为直接 `xcrun xctest -XCTest TypebarTests.PracticeCompositionHostTests/testProductionPracticeCompositionMountsNativeInputAndSurvivesFirstInsertion .build/debug/TypebarPackageTests.xctest`，同一脚本监听标记并采样其实际 PID。
+
+`first-input-current-direct.log` 单项零失败零跳过（11.382s，墙钟 11.383），采样与测试均退出零，`first-input-current-direct-sample.txt` 留存。但该样本 329 个宿主帧对应第 665 行 RunLoop 交付，而非第 656 行输入后同步布局；其下提示构造、字段配置及 SwiftUI 图更新为嵌套样本，不能相加为独立耗时，也不能归因为首键 200ms 成本。此次不提交无证据产品优化；后续需要在同步布局前建立可观测采样窗口，再决定图依赖／测量层修复。零主程序启动，无新产品、存储或网络行为，首键性能与完整 goal active 不变。
+
 ## TST-02：配置面板类型边界反证（2026-10-10）
 
 在 `90a734e` 上仅试探将 practiceLayout 的 configurationPanel 包为 AnyView，全部控件、绑定、焦点隐藏／禁用及动画修饰保持。此为可撤回性能实验，不制造行为失败阶段；会话内决策审查要求不因类型边界牺牲身份／功能，且没有明确收益则撤回，非独立审计。
