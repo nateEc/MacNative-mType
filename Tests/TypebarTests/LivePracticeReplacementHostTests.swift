@@ -8,16 +8,22 @@ import XCTest
   @MainActor private final class PendingContent {
     var continuations: [CheckedContinuation<LivePracticeContent?, Never>] = []
     var source: LivePracticeContentSource?
+    var callCount = 0
+    var cancelledReplies = 0
+    var scriptedTokens: [String]?
     func fetch(_ source: LivePracticeContentSource, _ language: TypingLanguage) async -> LivePracticeContent? {
       self.source = source
-      return await withCheckedContinuation { continuations.append($0) }
+      callCount += 1
+      let content = await withCheckedContinuation { continuations.append($0) }
+      if withUnsafeCurrentTask(body: { $0?.isCancelled == true }) { cancelledReplies += 1 }
+      return content
     }
     func finish() {
       let pending = continuations
       continuations = []
       for continuation in pending {
         continuation.resume(returning: .init(source: .poetry, title: "Authored delayed fixture",
-          byline: nil, tokens: (0..<151).map { ["quiet", "harbor", "morning"][$0 % 3] }, separator: " "))
+          byline: nil, tokens: scriptedTokens ?? (0..<151).map { ["quiet", "harbor", "morning"][$0 % 3] }, separator: " "))
       }
     }
   }
@@ -38,8 +44,17 @@ import XCTest
     try checkDelayedReplacement(composesBeforeReturn: true)
   }
 
+  func testLiveSectionPrefetchIsSingleFlightAndAppendsWithoutReplacingNativeInput() throws {
+    try checkDelayedReplacement(prefetches: true)
+  }
+
+  func testLeavingLivePracticeCancelsPrefetchAndRejectsLateSection() throws {
+    try checkDelayedReplacement(prefetches: true, cancelsPrefetch: true)
+  }
+
   private func checkDelayedReplacement(startsBeforeReturn: Bool = false,
-    disablesPace: Bool = false, composesBeforeReturn: Bool = false) throws {
+    disablesPace: Bool = false, composesBeforeReturn: Bool = false, prefetches: Bool = false,
+    cancelsPrefetch: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -51,7 +66,7 @@ import XCTest
     settings.showAllPracticeLines = false
     settings.testModifiers = [.poetryStream]
     if composesBeforeReturn { settings.compositionDisplayStyle = .below }
-    let configuration = TestConfiguration.words(151).with(modifiers: [.poetryStream])
+    let configuration = TestConfiguration.words(prefetches ? 300 : 151).with(modifiers: [.poetryStream])
     XCTAssertTrue(settings.saveActiveTestSelection(.init(
       preset: .init(configuration: configuration),
       testParameterMemory: .legacyDefaults(configuration: configuration))))
@@ -59,6 +74,8 @@ import XCTest
       SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let pending = PendingContent()
+    let authoredTokens = (0..<300).map { "owned\($0)" }
+    if prefetches { pending.scriptedTokens = Array(authoredTokens.prefix(151)) }
     let content = TypebarApp.practiceContent(settings: settings,
       account: AccountSession(defaults: defaults), announcements: RemoteAnnouncementCenter(defaults: defaults),
       hotkey: GlobalHotkeyMonitor(), systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
@@ -81,7 +98,7 @@ import XCTest
     for _ in 0..<10 where pending.continuations.isEmpty { flush() }
     XCTAssertEqual(pending.source, .poetry)
     XCTAssertFalse(pending.continuations.isEmpty, "The production load must reach the injected transport")
-    settings.showAllPracticeLines = true
+    if !prefetches { settings.showAllPracticeLines = true }
     if disablesPace { settings.paceGuideMode = .off }
     flush()
     let initialField = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
@@ -108,6 +125,48 @@ import XCTest
     }
     pending.finish()
     for _ in 0..<5 { flush() }
+    if prefetches {
+      let initialRequestCount = pending.callCount
+      XCTAssertTrue(pending.continuations.isEmpty, "Initial restoration requests must have resolved")
+      initialInput.insertText(authoredTokens.prefix(131).joined(separator: " ") + " ",
+        replacementRange: .init(location: NSNotFound, length: 0))
+      for _ in 0..<5 { flush() }
+      XCTAssertEqual(pending.callCount, initialRequestCount, "20 words remain including the retained tail")
+      initialInput.insertText(authoredTokens[131] + " ",
+        replacementRange: .init(location: NSNotFound, length: 0))
+      for _ in 0..<5 { flush() }
+      XCTAssertEqual(pending.callCount, initialRequestCount + 1, "19 words must start a new section request")
+      XCTAssertEqual(pending.continuations.count, 1)
+      initialInput.insertText(authoredTokens[132..<134].joined(separator: " ") + " ",
+        replacementRange: .init(location: NSNotFound, length: 0))
+      for _ in 0..<5 { flush() }
+      XCTAssertEqual(pending.callCount, initialRequestCount + 1, "Progress during an in-flight request must not duplicate it")
+      let fieldBeforeReply = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+      let beforeReply = try XCTUnwrap(fieldBeforeReply.accessibilityValue() as? String)
+      let priorCancelledReplies = pending.cancelledReplies
+      if cancelsPrefetch {
+        window.contentView = nil
+        for _ in 0..<5 { flush() }
+      }
+      pending.scriptedTokens = Array(authoredTokens[151..<300])
+      pending.finish()
+      for _ in 0..<5 { flush() }
+      if cancelsPrefetch {
+        XCTAssertGreaterThan(pending.cancelledReplies, priorCancelledReplies)
+        XCTAssertEqual(fieldBeforeReply.accessibilityValue() as? String, beforeReply)
+        XCTAssertEqual(pending.callCount, initialRequestCount + 1)
+        XCTAssertFalse(window.isVisible)
+        return
+      }
+      let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+      XCTAssertEqual(field.accessibilityValue() as? String,
+        beforeReply.trimmingCharacters(in: .whitespaces) + " " + authoredTokens[151..<300].joined(separator: " "),
+        "Append must preserve the exact retained visible window, not restore retired words")
+      XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+      XCTAssertEqual(pending.callCount, initialRequestCount + 1)
+      XCTAssertFalse(window.isVisible)
+      return
+    }
     let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
     let expected = (0..<151).map { ["quiet", "harbor", "morning"][$0 % 3] }.joined(separator: " ")
     XCTAssertEqual(field.accessibilityValue() as? String,

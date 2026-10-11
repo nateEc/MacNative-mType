@@ -532,6 +532,25 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testFailedLiveFetchTerminatesWaitingWithoutAcceptingMoreInput() throws {
+    let configuration = TestConfiguration.words(125).with(modifiers: [.referenceStream])
+    let initial = (0..<100).map { "owned\($0)" }.joined(separator: " ")
+    var practice = TestSessionFactory.make(configuration: configuration,
+      streamPrompt: initial, streamsLiveContent: true)
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    practice.insertBatch(initial + " ", at: now)
+    XCTAssertTrue(practice.isWaitingForLiveContent)
+    let typed = practice.typed
+    practice.failLiveContentFetch(at: now)
+    XCTAssertEqual(practice.outcome, .failed)
+    XCTAssertEqual(practice.failureReason, .wordGeneration)
+    XCTAssertFalse(practice.isWaitingForLiveContent)
+    XCTAssertFalse(practice.needsLiveContentPrefetch)
+    practice.insertBatch("not accepted", at: now)
+    XCTAssertEqual(practice.typed, typed)
+    XCTAssertEqual(practice.errors, 0)
+  }
+
   func testEmptyIntroductionStopsWhenNextRandomRequestFails() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([

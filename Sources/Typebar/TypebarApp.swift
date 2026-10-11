@@ -1333,6 +1333,7 @@ private struct ContentView: View {
   @State private var typingPowerShakeOffset = CGSize.zero
   @State private var liveContentRequestID = UUID()
   @State private var liveContentTask: Task<Void, Never>?
+  @State private var liveContentStreamingActive = false
   @State private var isLoadingLiveContent = false
   @State private var liveContentMessage: String?
   @State private var zipfNotice: String?
@@ -1464,6 +1465,7 @@ private struct ContentView: View {
     .onChange(of: session.hasStarted) { _, started in
       if started, !session.isFinished { visualFocus.set(true) }
     }
+    .onChange(of: session.completedWordCount) { _, _ in prefetchLiveContentIfNeeded() }
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: account.accountTagRevision) { _, _ in
@@ -1554,6 +1556,7 @@ private struct ContentView: View {
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear(perform: contentAppeared)
     .onDisappear {
+      liveContentStreamingActive = false
       liveContentTask?.cancel()
       liveContentTask = nil
       liveContentRequestID = UUID()
@@ -1566,6 +1569,12 @@ private struct ContentView: View {
       restorePersistedTestSelection()
     }
     .onChange(of: session.outcome) { previousOutcome, outcome in
+      if outcome != .active {
+        liveContentTask?.cancel()
+        liveContentTask = nil
+        liveContentStreamingActive = false
+        isLoadingLiveContent = false
+      }
       if outcome != .active { visualFocus.retire() }
       TypingFeedbackSound.shared.playPracticeFinish(
         previousOutcome: previousOutcome, outcome: outcome, hasStarted: session.hasStarted,
@@ -2462,7 +2471,8 @@ private struct ContentView: View {
         if let liveContentMessage {
           HStack(spacing: 7) {
             if isLoadingLiveContent { ProgressView().controlSize(.small) }
-            Label(liveContentMessage, systemImage: "network")
+            Label(session.isWaitingForLiveContent ? "正在等待新的在线段落，倒计时继续。" : liveContentMessage,
+              systemImage: "network")
               .font(.caption)
               .foregroundStyle(.secondary)
           }
@@ -4368,6 +4378,7 @@ private struct ContentView: View {
     lastClockTickSecond = 0
     liveStatsClockSignal.second = 0
     timerHealth = .init()
+    liveContentStreamingActive = false
     liveContentTask?.cancel()
     liveContentTask = nil
     liveContentRequestID = UUID()
@@ -4482,16 +4493,48 @@ private struct ContentView: View {
         streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource,
         streamContinuation: content.continuationDescriptor(for: configuration,
           showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off),
+        streamsLiveContent: true,
         weakSpotScores: session.liveWeakSpotScores,
         wordDecorationState: session.liveWordDecorationState,
         showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
       session = session.withElapsedClock()
+      liveContentStreamingActive = true
       liveContentMessage = "已载入\(content.attribution)。"
       refreshPaceTarget()
       if configuration.modifiers.contains(.listening) {
         NativeSpeech.shared.speak(session.prompt, language: configuration.language)
       }
       requestTypingFocus()
+      prefetchLiveContentIfNeeded()
+    }
+  }
+
+  private func prefetchLiveContentIfNeeded() {
+    guard liveContentStreamingActive, liveContentTask == nil, session.needsLiveContentPrefetch,
+      let source = LivePracticeContentSource.selected(for: session.configuration) else { return }
+    let configuration = session.configuration
+    let requestID = liveContentRequestID
+    isLoadingLiveContent = true
+    liveContentMessage = "正在续取\(source.displayName)。"
+    liveContentTask = Task {
+      while !Task.isCancelled, session.needsLiveContentPrefetch {
+        let content = await liveContentFetch(source, configuration.language)
+        guard !Task.isCancelled, requestID == liveContentRequestID,
+          session.configuration == configuration, !session.isFinished else { return }
+        guard let content, content.source == source,
+          session.appendLiveContent(content.sectionDescriptor) else {
+          liveContentTask = nil
+          liveContentStreamingActive = false
+          isLoadingLiveContent = false
+          liveContentMessage = "无法续取\(source.displayName)，本轮已停止；请重启或关闭在线内容。"
+          session.failLiveContentFetch()
+          return
+        }
+        liveContentMessage = "已续接\(content.attribution)。"
+      }
+      guard !Task.isCancelled, requestID == liveContentRequestID else { return }
+      liveContentTask = nil
+      isLoadingLiveContent = false
     }
   }
 

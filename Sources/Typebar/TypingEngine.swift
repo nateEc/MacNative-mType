@@ -4892,6 +4892,11 @@ struct TypingSession {
     streamsLiveContent && !isFinished && hasUnloadedLiveContentTargets
       && externalPromptContinuation == nil && completedWordCount >= loadedLiveContentWordCount
   }
+  mutating func failLiveContentFetch(at date: Date = .now) {
+    guard streamsLiveContent, !isFinished else { return }
+    generationNotice = "无法续取在线内容，练习已停止。请重启或关闭在线内容修饰器。"
+    fail(at: date, reason: .wordGeneration)
+  }
   mutating func appendLiveContent(_ content: LivePracticePrompt) -> Bool {
     guard !isFinished, LivePracticeContentSource.selected(for: configuration) != nil,
       !content.text.isEmpty else { return false }

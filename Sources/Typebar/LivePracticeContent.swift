@@ -64,6 +64,10 @@ struct LivePracticeContent: Equatable {
     return detail.isEmpty ? source.displayName : "\(source.displayName)：\(detail)"
   }
 
+  var sectionDescriptor: LivePracticePrompt {
+    .init(text: text, noSpaceBoundarySource: separator.isEmpty ? tokens.joined(separator: " ") : nil)
+  }
+
   func prompt(for configuration: TestConfiguration) -> String {
     promptDescriptor(for: configuration).text
   }
