@@ -162,11 +162,22 @@ import XCTest
     let input = try XCTUnwrap(descendants(host, TypingInputView.self).first)
     let owner = try XCTUnwrap(descendants(host, ChooLayerView.self).first)
     XCTAssertEqual(owner.accessibilityLabel(), prompt)
+    func textLayers() -> [CATextLayer] {
+      owner.layer?.sublayers?.compactMap { $0 as? CATextLayer }.filter { $0.name != "chooHint" } ?? []
+    }
+    func allocations() -> [CGRect] {
+      textLayers().map { CGRect(origin: $0.position, size: $0.bounds.size) }.sorted {
+        $0.minY == $1.minY ? $0.minX < $1.minX : $0.minY < $1.minY
+      }
+    }
+    let initialAllocations = allocations()
+    XCTAssertFalse(initialAllocations.isEmpty)
+    let longCandidate = String(repeating: "中文", count: 20)
     let frame = host.frame
     for style in CompositionDisplayStyle.allCases {
       settings.compositionDisplayStyle = style
       flush()
-      for candidate in ["候", "中文"] {
+      for candidate in ["候", "中文", longCandidate] {
         input.setMarkedText(candidate, selectedRange: .init(location: candidate.utf16.count, length: 0),
           replacementRange: .init(location: NSNotFound, length: 0))
         flush()
@@ -175,9 +186,25 @@ import XCTest
         XCTAssertTrue(descendants(host, ChooLayerView.self).first === owner)
         let displayed = try XCTUnwrap(owner.accessibilityLabel())
         XCTAssertEqual(displayed.hasPrefix(candidate), style == .replace)
+        let expected = style == .replace
+          ? candidate + String(prompt.dropFirst(min(5, candidate.count)))
+          : "quiet" + String(candidate.dropFirst(5)) + " harbor morning"
+        XCTAssertEqual(displayed, expected,
+          "Off/below retain target ink but must preserve candidate overflow beyond quiet")
         let ink = owner.layer?.sublayers?.compactMap { $0 as? CATextLayer }
           .compactMap { ($0.string as? NSAttributedString)?.string }.joined() ?? ""
-        XCTAssertEqual(ink.contains("候") || ink.contains("中"), style == .replace)
+        XCTAssertEqual(ink.contains("候") || ink.contains("中"), style == .replace || candidate.count > 5,
+          "style=\(style) candidateCount=\(candidate.count) label=\(displayed) ink=\(ink)")
+        if candidate == longCandidate, style == .replace {
+          let markedLayers = textLayers().filter {
+            let value = ($0.string as? NSAttributedString)?.string
+            return value == "中" || value == "文"
+          }
+          XCTAssertEqual(markedLayers.count, candidate.count,
+            "Every marked character must own an actual Choo text layer")
+          XCTAssertGreaterThan(Set(markedLayers.map { $0.position.y }).count, 1,
+            "The long candidate must actually exercise cross-row Choo layout")
+        }
         let candidateRows = descendants(host, NSTextField.self).filter {
           $0.accessibilityLabel()?.hasPrefix("正在组合：") == true
         }
@@ -193,6 +220,8 @@ import XCTest
       XCTAssertFalse(input.hasMarkedText())
       XCTAssertEqual(owner.accessibilityLabel(), prompt,
         "Cancellation must restore the complete unconsumed target")
+      XCTAssertEqual(allocations(), initialAllocations,
+        "Cancellation must restore layer allocations independently of animated rotation")
     }
     settings.compositionDisplayStyle = .replace
     flush()
