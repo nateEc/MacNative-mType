@@ -1,5 +1,15 @@
 # 生成型词流反写顺序
 
+## 2026-10-12 有限超量完成和已消费历史试作
+
+固定源码脚本进一步执行完整 fail-or-finish 模块的完成辅助函数：在实际词存储已发布 111 词、配置 105 词且 areAllWordsGenerated 返回 true 时，正确输入在索引 104 和 109 均不结束，在索引 110 才结束。原版处理器传入的 allWordsTyped 标志在此为自有输入，因此不冒称完整输入监听器／导航／DOM 执行。完整脚本通过，日志 side-oversupply-finish-source.log。
+
+原生新增超量完成用例先复现三处失败；改为以已发布末词完成并停止继续排空旧缓存后剩一处词数 110／111 差异，原因是发布末词仍带空格提交符。现在在发布端去除该最终空格，生成器历史保留去除前的返回值。14 项 LiveGeneratorDemandTests 零失败（0.828 秒、墙钟 0.831 秒），日志 side-oversupply-finish-native-red.log、side-oversupply-finish-native-focused.log 和 side-oversupply-final-commit-focused.log。换行提交符及全部无空格组合仍未据此验收。
+
+重复历史改为只记录生成器实际消费的字段，旁路原文和未消费缓存排除；重复时保留既有完整历史并禁止重放二次入库，避免部分重复后再重开丢词。两项首次历史用例先行四处失败（live-consumed-history-red.log），部分重复用例在普通与下划线两模式四处失败（live-partial-repeat-history-red.log）。完成该阶段后 52 项扩大回归零失败（79.086 秒、墙钟 79.093 秒），仅可选十万词耐久因未设置 TYPEBAR_ENDURANCE_TESTS=1 按既有规则跳过；不声称本次耐久通过。该 52 项运行早于后续有限超量完成修正，不能覆盖后者。
+
+原生试作仍仅在未提交工作区；旧广回归的过时契约和真实回归需继续逐项核对，新完整门禁未运行，目标 active。本次只提交源码探针和检查记录，不将试作送入 main。主程序保持零实例。
+
 ## 2026-10-12 旁路预取边界补证（仍有原生缺口）
 
 同一固定参考的完整 addWord、生成器与词存储探针新增三项自有状态：100 个已发布词、5 个保留词，在活动索引 80 时不预取、81 时预取；有限总词数为 105 且缓存已占满预算时仍预取。后二者先发布新段 fresh、later，再从旧缓存发布 retained0，只消耗一个旧缓存词。完整脚本运行退出 0，三项均通过；日志位于工作目录 side-prefetch-published-threshold-source.log。

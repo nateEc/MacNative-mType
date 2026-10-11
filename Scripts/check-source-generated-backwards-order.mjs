@@ -11,7 +11,7 @@ assert.ok(process.argv[2],'Reference checkout required');
 assert.equal(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),
   '91bd24bb8513785c7364cbea29296ff7adafac41');
 assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
-const actual=new Set(['test/words-generator','test/funbox/funbox-functions','test/wordset','test/weak-spot','test/test-words']);
+const actual=new Set(['test/words-generator','test/funbox/funbox-functions','test/wordset','test/weak-spot','test/test-words','input/helpers/fail-or-finish']);
 const config={mode:'words',words:3,language:'english',showAllLines:false,lazyMode:false,
   punctuation:false,numbers:false,britishEnglish:false};
 let activeNames=['backwards','binary'], functions, drawIndex=0;
@@ -474,3 +474,16 @@ for (const fixture of [
   console.log(`PASS side publication contract: ${fixture.name}`);
 }
 console.log('2 side-publication contracts passed with complete actual caller and generator: raw side words versus altered generator tail, and finite published oversupply. Authored cursor/provider, no input-completion or navigation reachability claim.');
+const finishModule=modules.get('input/helpers/fail-or-finish');
+await finishModule.link((id,from)=>moduleFor(resolve(id,from.identifier)));
+await finishModule.evaluate();
+config.quickEnd=false;config.stopOnError='off';config.deleteOnError='off';
+assert.equal(testWords.words.length,111);
+assert.equal(main.namespace.areAllWordsGenerated(),true);
+for(const index of [104,109,110]) {
+  assert.equal(finishModule.namespace.checkIfFinished({goingToNextWord:false,
+    testInputWithData:'owned',currentWord:'owned',
+    allWordsTyped:index>=testWords.words.length-1,
+    allWordsGenerated:main.namespace.areAllWordsGenerated()}),index===110);
+}
+console.log('Pinned finish helper rejects correct words at configured index 104 and penultimate published index 109; accepts the actual last published index 110. Actual helper/generation predicate; authored handler flags, no complete input-handler execution claim.');
