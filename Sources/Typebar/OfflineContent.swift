@@ -6559,6 +6559,18 @@ struct TestSessionFactory {
     {
       batch = FinitePromptCommitPolicy.finalized(batch)
     }
+    let externalWordBound = configuration.mode == .words && !configuration.isInfinite
+      ? configuration.wordLimit ?? 25 : Int.max
+    if streamContinuation != nil, configuration.modifiers.contains(.underscoreSeparators) {
+      // A fetched section boundary is not the end of the configured test.
+      // Both batches must use the same absolute final-word index.
+      batch = TestModifierPolicy.transformedBatch(noSpaceBoundarySource ?? prompt,
+        modifiers: configuration.modifiers, language: configuration.language,
+        preservesNoSpaceBoundaries: noSpaceBoundarySource != nil,
+        wordBound: externalWordBound, preservesWordOrder: true,
+        britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
+        nextRandomCaseBit: nextRandomCaseBit)
+    }
     let transformedPrompt = batch.text
     let externalBatch: TransformedPromptBatch? = streamContinuation.flatMap { continuation in
       guard !continuation.text.isEmpty else { return nil }
@@ -6567,7 +6579,7 @@ struct TestSessionFactory {
       let prepared = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
         language: configuration.language, preservesNoSpaceBoundaries: boundarySource != nil,
         wordOffset: GeneratedWordBoundPolicy.wordCount(in: streamNoSpaceBoundarySource ?? streamPrompt ?? ""),
-        wordBound: GeneratedWordBoundPolicy.wordCount(in: source), preservesWordOrder: true,
+        wordBound: externalWordBound, preservesWordOrder: true,
         britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
         nextRandomCaseBit: nextRandomCaseBit)
       return configuration.mode == .words && !configuration.isInfinite

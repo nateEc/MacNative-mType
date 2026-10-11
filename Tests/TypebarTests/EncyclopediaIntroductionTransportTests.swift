@@ -313,6 +313,53 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testRetainedTailKeepsUnderscoreCommitsAtBatchBoundaryAndFiniteEnd() throws {
+    let tokens = (0..<151).map { "owned\($0)" }
+    let configuration = TestConfiguration.words(151)
+      .with(modifiers: [.referenceStream, .underscoreSeparators])
+    XCTAssertTrue(configuration.modifiers.contains(.underscoreSeparators))
+    let content = LivePracticeContent(source: .encyclopedia, title: "Owned", byline: nil,
+      tokens: tokens, separator: " ")
+    let preview = content.promptDescriptor(for: configuration)
+    var practice = TestSessionFactory.make(configuration: configuration,
+      streamPrompt: preview.text, streamContinuation: content.continuationDescriptor(for: configuration))
+    XCTAssertEqual(practice.prompt, tokens.prefix(100).joined(separator: "_") + "_")
+    let expected = tokens.joined(separator: "_")
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    practice.insertBatch(expected, at: now)
+    XCTAssertEqual(practice.prompt, expected)
+    XCTAssertEqual(practice.outcome, .completed)
+    XCTAssertEqual(practice.completedWordCount, 151)
+    XCTAssertEqual(practice.errors, 0)
+    let result = try XCTUnwrap(practice.result(at: now))
+    XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+      through: result.elapsedDuration), expected)
+    var repeated = practice.repeatedAttempt()
+    repeated.insertBatch(expected, at: now)
+    XCTAssertEqual(repeated.prompt, expected)
+    XCTAssertEqual(repeated.outcome, .completed)
+    XCTAssertEqual(repeated.errors, 0)
+  }
+
+  func testOpenEndedUnderscoreTailKeepsItsLastCommitForFutureContent() throws {
+    let tokens = (0..<373).map { "owned\($0)" }
+    let content = LivePracticeContent(source: .encyclopedia, title: "Owned", byline: nil,
+      tokens: tokens, separator: " ")
+    for configuration in [TestConfiguration.words(0), .timed(seconds: 30)] {
+      let configuration = configuration.with(modifiers: [.referenceStream, .underscoreSeparators])
+      let preview = content.promptDescriptor(for: configuration)
+      var practice = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: preview.text, streamContinuation: content.continuationDescriptor(for: configuration))
+      XCTAssertEqual(practice.prompt, tokens.prefix(100).joined(separator: "_") + "_")
+      practice.insertBatch(tokens.prefix(100).joined(separator: "_") + "_",
+        at: Date(timeIntervalSince1970: 1_700_000_000))
+      XCTAssertEqual(practice.prompt, tokens.joined(separator: "_") + "_")
+      XCTAssertEqual(practice.completedWordCount, 100)
+      XCTAssertEqual(practice.outcome, .active)
+      XCTAssertEqual(practice.errors, 0)
+    }
+  }
+
   func testEmptyIntroductionStopsWhenNextRandomRequestFails() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([
