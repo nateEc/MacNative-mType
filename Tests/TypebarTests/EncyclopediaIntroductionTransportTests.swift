@@ -360,6 +360,51 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testNewLiveSectionAppendsAfterPendingTailWithoutResettingInputOrReplay() throws {
+    for (language, tokens, separator) in [
+      (TypingLanguage.english, (0..<190).map { "owned\($0)" }, " "),
+      (.simplifiedChinese, (0..<190).map { "港\($0)船" }, "")
+    ] {
+      let configuration = TestConfiguration.words(175, language: language)
+        .with(modifiers: [.referenceStream])
+      let content = LivePracticeContent(source: .encyclopedia, title: "Owned", byline: nil,
+        tokens: Array(tokens.prefix(151)), separator: separator)
+      let preview = content.promptDescriptor(for: configuration)
+      var practice = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: preview.text, streamNoSpaceBoundarySource: preview.noSpaceBoundarySource,
+        streamContinuation: content.continuationDescriptor(for: configuration))
+      let now = Date(timeIntervalSince1970: 1_700_000_000)
+      practice.insertBatch(tokens.prefix(10).joined(separator: separator) + separator, at: now)
+      let started = practice.startedAt
+      let beforeRejectedAppend = practice.prompt
+      XCTAssertFalse(practice.appendLiveContent(.init(text: " ", noSpaceBoundarySource: nil)))
+      XCTAssertFalse(practice.appendLiveContent(.init(text: "mismatch", noSpaceBoundarySource: "other words")))
+      XCTAssertEqual(practice.prompt, beforeRejectedAppend)
+      XCTAssertEqual(practice.completedWordCount, 10)
+      let extra = tokens[151..<190]
+      XCTAssertTrue(practice.appendLiveContent(.init(text: extra.joined(separator: separator),
+        noSpaceBoundarySource: separator.isEmpty ? extra.joined(separator: " ") : nil)))
+      XCTAssertEqual(practice.startedAt, started)
+      XCTAssertEqual(practice.completedWordCount, 10)
+      let expected = tokens.prefix(175).joined(separator: separator)
+      XCTAssertEqual(practice.prompt, expected)
+      practice.insertBatch(tokens[10..<175].joined(separator: separator), at: now)
+      XCTAssertEqual(practice.outcome, .completed)
+      XCTAssertEqual(practice.errors, 0)
+      XCTAssertEqual(practice.completedWordCount, 175)
+      XCTAssertFalse(practice.appendLiveContent(.init(text: "must not append", noSpaceBoundarySource: nil)))
+      XCTAssertEqual(practice.prompt, expected)
+      let result = try XCTUnwrap(practice.result(at: now))
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), expected)
+      var repeated = practice.repeatedAttempt()
+      repeated.insertBatch(expected, at: now)
+      XCTAssertEqual(repeated.prompt, expected)
+      XCTAssertEqual(repeated.outcome, .completed)
+      XCTAssertEqual(repeated.errors, 0)
+    }
+  }
+
   func testEmptyIntroductionStopsWhenNextRandomRequestFails() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([

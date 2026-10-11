@@ -4438,7 +4438,7 @@ struct TypingSession {
   private var finiteCustomTextStream: CustomFiniteTextStream?
   private let initialFiniteCustomTextStream: CustomFiniteTextStream?
   private var externalPromptContinuation: TransformedPromptBatch?
-  private let initialExternalPromptContinuation: TransformedPromptBatch?
+  private var initialExternalPromptContinuation: TransformedPromptBatch?
   private var sectionEndIndices: [Int]
   private let initialSectionEndIndices: [Int]
   private var noSpaceSectionWordEnds: [Int]
@@ -4865,6 +4865,42 @@ struct TypingSession {
       || quoteWordStream?.hasRemaining == true
   }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
+  mutating func appendLiveContent(_ content: LivePracticePrompt) -> Bool {
+    guard !isFinished, LivePracticeContentSource.selected(for: configuration) != nil,
+      !content.text.isEmpty else { return false }
+    if let boundaries = content.noSpaceBoundarySource,
+      boundaries.replacingOccurrences(of: " ", with: "") != content.text { return false }
+    let source = content.noSpaceBoundarySource ?? content.text
+    let words = source.split(separator: " ").map(String.init)
+    guard !words.isEmpty else { return false }
+    let pendingCount = externalPromptContinuation.map {
+      $0.noSpaceTargetWords.isEmpty ? GeneratedWordBoundPolicy.wordCount(in: $0.text) : $0.noSpaceTargetWords.count
+    } ?? 0
+    let loaded = (hasNoSpaceWordSegmentation ? noSpaceTargetWords.count : unitTargets.sourceFieldCount) + pendingCount
+    let bound = configuration.mode == .words && !configuration.isInfinite
+      ? configuration.wordLimit ?? 25 : Int.max
+    guard loaded < bound else { return false }
+    let selected = words.prefix(bound - loaded).joined(separator: " ")
+    let batch = TestModifierPolicy.transformedBatch(selected, modifiers: configuration.modifiers,
+      language: configuration.language, preservesNoSpaceBoundaries: content.noSpaceBoundarySource != nil,
+      wordOffset: loaded, wordBound: bound, preservesWordOrder: true,
+      britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false))
+    guard !batch.text.isEmpty else { return false }
+    let joinsWithoutSpace = hasNoSpaceWordSegmentation || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    let history = initialExternalPromptContinuation
+    let historyTail = history?.text ?? initialPrompt
+    let historySeparator = joinsWithoutSpace || historyTail.last?.isWhitespace == true ? "" : " "
+    initialExternalPromptContinuation = .init(
+      text: (history?.text ?? "") + historySeparator + batch.text,
+      noSpaceTargetWords: (history?.noSpaceTargetWords ?? []) + batch.noSpaceTargetWords)
+    if let pending = externalPromptContinuation {
+      externalPromptContinuation = nil
+      appendExternalBatch(pending)
+    }
+    let separator = joinsWithoutSpace || prompt.last?.isWhitespace == true ? "" : " "
+    appendExternalBatch(.init(text: separator + batch.text, noSpaceTargetWords: batch.noSpaceTargetWords))
+    return true
+  }
   var liveWeakSpotScores: WeakSpotScores { currentWeakSpotScores }
   var liveWordDecorationState: PoolWordDecorationState {
     generatedCodeContinuation?.decorationState ?? currentWordDecorationState
@@ -8232,14 +8268,7 @@ struct TypingSession {
     guard !isAtEmptyNoSpaceWord, reachedInputTargetEnd else { return }
     if let chunk = externalPromptContinuation {
       externalPromptContinuation = nil
-      let previousEnd = promptCharacters.count
-      appendPrompt(chunk.text)
-      var end = previousEnd
-      for length in chunk.noSpaceWordLengths {
-        end += length
-        noSpaceWordEndIndices.append(end)
-      }
-      noSpaceTargetWords += chunk.noSpaceTargetWords
+      appendExternalBatch(chunk)
       return
     }
     if quoteWordStream?.hasRemaining == true {
@@ -8469,6 +8498,16 @@ struct TypingSession {
       generationNotice = "无法生成引语的下一个词，练习已停止。请选择另一条引语或切换拼写设置。"
       fail(at: date, reason: .wordGeneration)
     }
+  }
+
+  private mutating func appendExternalBatch(_ batch: TransformedPromptBatch) {
+    var end = promptCharacters.count
+    appendPrompt(batch.text)
+    for length in batch.noSpaceWordLengths {
+      end += length
+      noSpaceWordEndIndices.append(end)
+    }
+    noSpaceTargetWords += batch.noSpaceTargetWords
   }
 
   private mutating func appendPrompt(_ chunk: String) {
