@@ -664,6 +664,70 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testParsedChineseSectionsRetainTailPrefetchBudgetAndExactFinalReplay() async throws {
+    for language in [TypingLanguage.simplifiedChinese, .traditionalChinese, .jyutping] {
+      for underscore in [false, true] {
+        try await withSession { transport in
+          let tokens = (0..<180).map { "海\($0)港。" }
+          func introduction(_ id: String, _ words: ArraySlice<String>) throws -> String {
+            let data = try JSONSerialization.data(withJSONObject: [
+              "query": ["pages": [id: ["extract": "<p>" + words.joined(separator: " ") + "</p>"]]]
+            ])
+            return String(decoding: data, as: UTF8.self)
+          }
+          IntroductionProtocol.fixture.set([
+            (200, #"{"pageid":724,"title":"第一段"}"#),
+            (200, try introduction("724", tokens[..<125])),
+            (200, #"{"pageid":812,"title":"第二段"}"#),
+            (200, try introduction("812", tokens[125...]))
+          ])
+          let fetched = await LivePracticeContentService.fetch(source: .encyclopedia,
+            language: language, session: transport)
+          let first = try XCTUnwrap(fetched)
+          let modifiers: [TestModifier] = underscore ? [.referenceStream, .underscoreSeparators] : [.referenceStream]
+          let configuration = TestConfiguration.words(175, language: language).with(modifiers: modifiers)
+          let preview = first.promptDescriptor(for: configuration)
+          XCTAssertEqual(preview.text, tokens.prefix(100).joined(separator: " "))
+          XCTAssertNil(preview.noSpaceBoundarySource)
+          var practice = TestSessionFactory.make(configuration: configuration,
+            streamPrompt: preview.text, streamContinuation: first.continuationDescriptor(for: configuration),
+            streamsLiveContent: true)
+          let separator = underscore ? "_" : " "
+          let began = Date(timeIntervalSince1970: 1_700_000_000)
+          practice.insertBatch(tokens.prefix(105).joined(separator: separator) + separator, at: began)
+          XCTAssertEqual(practice.completedWordCount, 105)
+          XCTAssertFalse(practice.needsLiveContentPrefetch, "20 retained source fields remain")
+          practice.insertBatch(tokens[105] + separator, at: began.addingTimeInterval(1))
+          XCTAssertEqual(practice.completedWordCount, 106)
+          XCTAssertTrue(practice.needsLiveContentPrefetch, "19 retained source fields trigger prefetch")
+          XCTAssertFalse(practice.isWaitingForLiveContent)
+          let next = await LivePracticeContentService.fetch(source: .encyclopedia,
+            language: language, session: transport)
+          XCTAssertTrue(practice.appendLiveContent(try XCTUnwrap(next).sectionDescriptor))
+          XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 4)
+          XCTAssertFalse(practice.needsLiveContentPrefetch, "The finite budget is now fully loaded")
+          let remaining = tokens[106..<175].joined(separator: separator)
+          practice.insertBatch(String(remaining.dropLast()), at: began.addingTimeInterval(2))
+          XCTAssertFalse(practice.isFinished)
+          practice.insertBatch(String(remaining.suffix(1)), at: began.addingTimeInterval(3))
+          XCTAssertEqual(practice.outcome, .completed)
+          XCTAssertEqual(practice.completedWordCount, 175)
+          XCTAssertEqual(practice.errors, 0)
+          let expected = tokens.prefix(175).joined(separator: separator)
+          let result = try XCTUnwrap(practice.result())
+          XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+            through: result.elapsedDuration), expected)
+          XCTAssertEqual(try XCTUnwrap(TestResultRecord(result: result).portableResult), result)
+          var repeated = practice.repeatedAttempt()
+          repeated.insertBatch(expected, at: began.addingTimeInterval(4))
+          XCTAssertEqual(repeated.outcome, .completed)
+          XCTAssertEqual(repeated.completedWordCount, 175)
+          XCTAssertEqual(repeated.errors, 0)
+        }
+      }
+    }
+  }
+
   func testAlreadyCancelledTaskDoesNotStartEitherRequest() async throws {
     try await withSession { session in
       IntroductionProtocol.fixture.set([])
