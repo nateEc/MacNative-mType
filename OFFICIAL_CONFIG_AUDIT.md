@@ -1,5 +1,9 @@
 # 官方配置兼容性审计
 
+2026-10-11 TST-02 字体别名实际宿主补证：扩展既有字体切换场景，在未提交“中文”候选期间依次应用 Georgia、`applebraille`、全宽 Apple Braille 别名，再恢复原字体。实际候选 NSTextField 的字体名称／字号符合标准家族，原输入 owner、marked text、候选 owner 和提示内容均保持，窗口不可见。只增强测试，无产品或保存变化。
+
+`work/font-family-default-face-host.log` 首轮 29 项四处失败均为既有居中断言，不是字体切换失败。`font-family-default-face-host-center-diagnostic.log` 确认内容视口宽 983、外框 1000，17 点滚动条导致按外框比较差 8.5 点；候选实际位于内容视口中央。测试改为同坐标系下实际 NSClipView 中心比较，保持 2 点容差，未修改产品布局或系统滚动条偏好。最终 `font-family-default-face-host-final.log` 字体及 below 宿主联合 32 项零失败零跳过（66.805s，墙钟 66.809）。不是全部 39 宿主／物理 IME／全字体视觉或新完整门禁验收；fontFamily 部分及完整 goal active 不变，零主程序启动。
+
 2026-10-11 TST-02 字体家族归一化修正：固定原版 ui.ts 的字体选择以家族为单位，常规样式不应因目录顺序变成其他字形。本机通过大小写／宽度归一化匹配家族后，原先直接选第一个成员；实际 Apple Braille 目录首项是 Outline 6 Dot，而标准家族名正常解析为 AppleBraille。新增实际系统字体测试先复现两个别名均选错（1 项、2 处断言失败），修正为标准家族名先经 AppKit 解析，再保留原成员回退。没有添加字体资源、下载、安装、保存字段或迁移。
 
 证据位于 `work/font-family-default-face-red.log`、`font-family-default-face-green.log` 与 `font-family-default-face-regression.log`。首轮 16 项零失败但一项缺参考环境跳过；补齐固定参考及 Node 后 28 项零失败零跳过（0.887s，墙钟 0.891），覆盖名称解析、目录预览、命令预览／应用、本地字体策略及语言回退。会话内风险检查未发现新增可落实问题，非独立审计；零主程序启动。此处验证的是系统 API 和名称解析，不是实体窗口字体视觉、所有字体／最低系统或新增完整门禁／Release，上一轮冻结证据早于本修正。fontFamily 仍部分、94 配置 89／4／1 与完整 goal active 不变。

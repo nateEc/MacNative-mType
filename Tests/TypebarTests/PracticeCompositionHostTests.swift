@@ -357,8 +357,10 @@ import XCTest
               XCTAssertEqual(candidate.alignment, .center)
               XCTAssertEqual(try XCTUnwrap(candidate.font).pointSize, settings.fontSize)
               let frame = candidate.convert(candidate.bounds, to: host)
-              XCTAssertEqual(frame.midX, host.bounds.midX, accuracy: 2,
-                "Below composition must be centered, not a bottom-leading badge")
+              let viewport = try XCTUnwrap(candidate.enclosingScrollView?.contentView)
+              let viewportFrame = viewport.convert(viewport.bounds, to: host)
+              XCTAssertEqual(frame.midX, viewportFrame.midX, accuracy: 2,
+                "Below composition must be centered in the content viewport, excluding scrollbars")
               XCTAssertGreaterThanOrEqual(frame.height, settings.fontSize,
                 "Below composition must retain the selected practice font size")
               XCTAssertGreaterThan(frame.width, host.bounds.width * 0.7)
@@ -394,16 +396,21 @@ import XCTest
               let originalFont = try XCTUnwrap(candidate.font)
               let before = field.accessibilityValue() as? String
               let georgia = try XCTUnwrap(NSFont(name: "Georgia", size: 40))
-              for changed in [true, false] {
-                settings.installedPracticeFontName = changed ? "Georgia" : ""
-                settings.fontSize = changed ? 40 : 28
+              let braille = try XCTUnwrap(NSFont(name: "Apple Braille", size: 40))
+              let choices: [(name: String, font: NSFont)] = [
+                ("Georgia", georgia), ("applebraille", braille),
+                ("Ａｐｐｌｅ Ｂｒａｉｌｌｅ", braille), ("", originalFont),
+              ]
+              for choice in choices {
+                settings.installedPracticeFontName = choice.name
+                settings.fontSize = choice.font.pointSize
                 flush()
                 XCTAssertTrue(inputs(in: host).first === input)
                 XCTAssertTrue(input.hasMarkedText())
                 XCTAssertTrue(candidateElements(in: host).first === candidate)
                 XCTAssertEqual(candidate.stringValue, "中文")
-                XCTAssertEqual(candidate.font?.fontName, changed ? georgia.fontName : originalFont.fontName)
-                XCTAssertEqual(candidate.font?.pointSize, changed ? 40 : 28)
+                XCTAssertEqual(candidate.font?.fontName, choice.font.fontName)
+                XCTAssertEqual(candidate.font?.pointSize, choice.font.pointSize)
                 XCTAssertEqual(try XCTUnwrap(fields(in: host).first).accessibilityValue() as? String, before)
                 XCTAssertFalse(window.isVisible)
               }
