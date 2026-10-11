@@ -5928,12 +5928,14 @@ enum GeneratedWordBoundPolicy {
 struct GeneratedWordChunk {
   let source: String
   let transformed: String
+  let sourceFields: [String]?
   let noSpaceWordLengths: [Int]
   let noSpaceTargetWords: [String]
 
   init(source: String, batch: TransformedPromptBatch) {
     self.source = source
     transformed = batch.text
+    sourceFields = batch.sourceFields
     noSpaceWordLengths = batch.noSpaceWordLengths
     noSpaceTargetWords = batch.noSpaceTargetWords
   }
@@ -5941,6 +5943,7 @@ struct GeneratedWordChunk {
   init(source: String, configuration: TestConfiguration, wordOffset: Int = 0,
     preservesNoSpaceBoundaries: Bool = false, showAllLines: Bool = false,
     preservesWordOrder: Bool = false, formatsWordPool: Bool = false,
+    capturesSourceFields: Bool = false,
     authoredBritishQuote: Bool = false,
     nextRandomCaseBit: () -> Bool = { Bool.random() }) {
     self.source = source
@@ -5950,9 +5953,11 @@ struct GeneratedWordChunk {
         wordOffset: wordOffset, sourceWordCount: GeneratedWordBoundPolicy.wordCount(in: source),
         showAllLines: showAllLines), preservesWordOrder: preservesWordOrder,
       formatsWordPool: formatsWordPool,
+      capturesSourceFields: capturesSourceFields,
       britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: authoredBritishQuote),
       nextRandomCaseBit: nextRandomCaseBit)
     transformed = batch.text
+    sourceFields = batch.sourceFields
     noSpaceWordLengths = batch.noSpaceWordLengths
     noSpaceTargetWords = batch.noSpaceTargetWords
   }
@@ -6533,6 +6538,7 @@ struct TestSessionFactory {
       && GeneratedWordBoundPolicy.wordCount(in: noSpaceBoundarySource ?? prompt)
         < (configuration.wordLimit ?? 25)
     let hasIncompleteExternalPreview = showAllLines && hasIncompleteExternalSource
+    let capturesLiveSourceFields = streamPrompt != nil && LivePracticeContentSource.selected(for: configuration) != nil
     let generatesWholeLines = showAllLines && !hasIncompleteExternalPreview
     if usesFreshGeneratedWords { preservesGeneratedWordOrder = true }
     var batch: TransformedPromptBatch
@@ -6547,13 +6553,17 @@ struct TestSessionFactory {
       let chunk = GeneratedWordChunk(source: boundarySource, configuration: configuration,
         preservesNoSpaceBoundaries: true, showAllLines: generatesWholeLines,
         preservesWordOrder: preservesGeneratedWordOrder,
+        capturesSourceFields: capturesLiveSourceFields,
         nextRandomCaseBit: nextRandomCaseBit)
-      batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
+      batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords,
+        sourceFields: chunk.sourceFields)
     } else {
       let chunk = GeneratedWordChunk(source: prompt, configuration: configuration, showAllLines: generatesWholeLines,
         preservesWordOrder: preservesGeneratedWordOrder,
+        capturesSourceFields: capturesLiveSourceFields,
         nextRandomCaseBit: nextRandomCaseBit)
-      batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
+      batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords,
+        sourceFields: chunk.sourceFields)
     }
     if configuration.mode == .custom, configuration.customTextCompletion == .finish,
       !streamsCustomSections, finiteTextSource != nil || verifiedScript != nil,
@@ -6570,6 +6580,7 @@ struct TestSessionFactory {
         modifiers: configuration.modifiers, language: configuration.language,
         preservesNoSpaceBoundaries: noSpaceBoundarySource != nil,
         wordBound: externalWordBound, preservesWordOrder: true,
+        capturesSourceFields: capturesLiveSourceFields,
         britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
         nextRandomCaseBit: nextRandomCaseBit)
     }
@@ -6582,6 +6593,7 @@ struct TestSessionFactory {
         language: configuration.language, preservesNoSpaceBoundaries: boundarySource != nil,
         wordOffset: GeneratedWordBoundPolicy.wordCount(in: streamNoSpaceBoundarySource ?? streamPrompt ?? ""),
         wordBound: externalWordBound, preservesWordOrder: true,
+        capturesSourceFields: capturesLiveSourceFields,
         britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
         nextRandomCaseBit: nextRandomCaseBit)
       return configuration.mode == .words && !configuration.isInfinite
@@ -6647,8 +6659,18 @@ struct TestSessionFactory {
         ?? (hasIncompleteExternalPreview
           ? "当前外部词源仅提供部分目标；当前目标保持不变，保留原有续接方式，未预览全部目标。" : nil)]
       .compactMap { $0 }
+    let initialSourceFields = batch.sourceFields.flatMap { fields -> [String]? in
+      if initialPrompt.utf16.elementsEqual(batch.text.utf16) { return fields }
+      if initialPrompt.utf16.elementsEqual((batch.text + " ").utf16) {
+        var committed = fields
+        committed[committed.count - 1].append(" ")
+        return committed
+      }
+      return nil
+    }
     return TypingSession(
       configuration: configuration, prompt: initialPrompt,
+      sourceFields: initialSourceFields,
       repeatingPrompt: repeats && generatedWordContinuation == nil
         && generatedStreamContinuation == nil && generatedCodeContinuation == nil
         ? transformedPrompt : nil,
@@ -6729,10 +6751,15 @@ enum FinitePromptCommitPolicy {
     else { return batch }
     // Joined no-space text can place the previous word's letter directly
     // before an empty LF target. Preserve that explicitly captured slot.
-    if batch.noSpaceTargetWords.last == String(commit) { return batch }
+    if batch.noSpaceTargetWords.last == String(commit) || batch.sourceFields?.last == String(commit) { return batch }
     var targets = batch.noSpaceTargetWords
     if !targets.isEmpty { targets[targets.count - 1].removeLast() }
-    return .init(text: String(batch.text.dropLast()), noSpaceTargetWords: targets)
+    var fields = batch.sourceFields
+    if var captured = fields {
+      captured[captured.count - 1].removeLast()
+      fields = captured
+    }
+    return .init(text: String(batch.text.dropLast()), noSpaceTargetWords: targets, sourceFields: fields)
   }
 }
 

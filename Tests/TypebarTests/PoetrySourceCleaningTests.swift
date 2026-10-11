@@ -2,6 +2,76 @@ import XCTest
 @testable import Typebar
 
 final class PoetrySourceCleaningTests: XCTestCase {
+  func testFactoryOmitsSpaceAfterLineFeedTerminatedProviderField() throws {
+    let value = try content(lines: ["north\n harbor tail"])
+    let configuration = TestConfiguration.words(3).with(modifiers: [.poetryStream])
+    var session = TestSessionFactory.make(configuration: configuration,
+      streamPrompt: value.prompt(for: configuration), streamsLiveContent: true)
+    let expected = "north\nharbor tail"
+    XCTAssertEqual(session.prompt, expected)
+    let began = Date(timeIntervalSinceReferenceDate: 917_000_000)
+    session.insertBatch(String(expected.dropLast()), at: began)
+    XCTAssertFalse(session.isFinished)
+    session.insertBatch("l", at: began.addingTimeInterval(2))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 3)
+    XCTAssertEqual(session.errors, 0)
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+      through: result.elapsedDuration), expected)
+    var repeated = session.repeatedAttempt()
+    repeated.insertBatch(expected, at: began.addingTimeInterval(5))
+    XCTAssertEqual(repeated.outcome, .completed)
+    XCTAssertEqual(repeated.completedWordCount, 3)
+    XCTAssertEqual(repeated.errors, 0)
+  }
+
+  func testParsedPoemFactoryRetainsInternalLineFeedCommitRulesAndReplay() throws {
+    let value = try content(lines: ["north\nsouth harbor tail"])
+    let began = Date(timeIntervalSinceReferenceDate: 917_000_000)
+    for stop in [StopOnErrorMode.off, .word, .letter] {
+      let configuration = TestConfiguration.words(3, rules: .init(stopOnErrorMode: stop))
+        .with(modifiers: [.poetryStream])
+      var session = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: value.prompt(for: configuration), streamsLiveContent: true)
+      session.insertBatch("north\n", at: began)
+      XCTAssertEqual(session.completedWordCount, stop == .off ? 1 : 0)
+      XCTAssertEqual(session.nextExpectedCharacter, stop == .off ? "h" : "s")
+      let suffix = stop == .off ? "harbor tail" : "south harbor tail"
+      session.insertBatch(String(suffix.dropLast()), at: began.addingTimeInterval(1))
+      XCTAssertFalse(session.isFinished)
+      session.insertBatch(String(suffix.suffix(1)), at: began.addingTimeInterval(2))
+      XCTAssertEqual(session.outcome, .completed)
+      XCTAssertEqual(session.completedWordCount, 3)
+      let result = session.result()
+      XCTAssertNotNil(result)
+      XCTAssertEqual(result.map { TypingReplay.typedText(events: $0.replayEvents,
+        through: $0.elapsedDuration) }, "north\n" + suffix)
+      if stop != .off { XCTAssertEqual(session.errors, 0) }
+      var repeated = session.repeatedAttempt()
+      repeated.insertBatch("north\n" + suffix, at: began.addingTimeInterval(5))
+      XCTAssertEqual(repeated.outcome, .completed)
+      XCTAssertEqual(repeated.completedWordCount, 3)
+    }
+  }
+
+  func testFactoryRetainedTailPreservesProviderFields() {
+    let configuration = TestConfiguration.words(4).with(modifiers: [.poetryStream])
+    var session = TestSessionFactory.make(configuration: configuration,
+      streamPrompt: "north\nsouth harbor",
+      streamContinuation: .init(text: "third\nfourth tail", noSpaceBoundarySource: nil),
+      streamsLiveContent: true)
+    session.insertBatch("north\nharbor third\ntai", at: Date(timeIntervalSinceReferenceDate: 917_000_000))
+    XCTAssertFalse(session.isFinished)
+    session.insertBatch("l", at: Date(timeIntervalSinceReferenceDate: 917_000_002))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 4)
+    var repeated = session.repeatedAttempt()
+    repeated.insertBatch("north\nharbor third\ntail", at: Date(timeIntervalSinceReferenceDate: 917_000_005))
+    XCTAssertEqual(repeated.outcome, .completed)
+    XCTAssertEqual(repeated.completedWordCount, 4)
+  }
+
   private func content(lines: [String], title: String = "Harbor", author: String = "Writer") throws -> LivePracticeContent {
     let data = try JSONSerialization.data(withJSONObject: [
       ["title": title, "author": author, "lines": lines],
