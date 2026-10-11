@@ -56,6 +56,9 @@ bundle_value() {
   || fail "native OAuth/profile URL scheme is missing"
 
 codesign --verify --deep --strict "$app_path"
+cmp "$project_root/Resources/ThirdPartyNotices.txt" \
+  "$app_path/Contents/Resources/ThirdPartyNotices.txt" \
+  || fail "third-party license notices missing or modified"
 if [[ -n "$reference_root" ]]; then
   zsh "$project_root/Scripts/check-originality-boundaries.sh" \
     --reference "$reference_root" \

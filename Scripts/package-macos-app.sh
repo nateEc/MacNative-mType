@@ -29,6 +29,8 @@ binary_dir="$(swift build --configuration "$build_configuration" --show-bin-path
 mkdir -p "$app_path/Contents/MacOS"
 cp "$binary_dir/Typebar" "$app_path/Contents/MacOS/Typebar"
 cp "$project_root/Resources/Info.plist" "$app_path/Contents/Info.plist"
+mkdir -p "$app_path/Contents/Resources"
+cp "$project_root/Resources/ThirdPartyNotices.txt" "$app_path/Contents/Resources/ThirdPartyNotices.txt"
 if [[ -n "$bundle_identifier" ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $bundle_identifier" "$app_path/Contents/Info.plist"
 fi

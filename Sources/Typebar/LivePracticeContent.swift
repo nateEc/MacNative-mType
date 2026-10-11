@@ -1,5 +1,6 @@
 import Foundation
 import NaturalLanguage
+import SwiftSoup
 
 /// Public content sources used by the reference product's poetry and
 /// encyclopedia practice modes. Typebar requests them only after the user
@@ -212,12 +213,11 @@ enum LivePracticeContentService {
       introductionURL.scheme = "https"
       introductionURL.host = host
       introductionURL.path = "/w/api.php"
-      // Ask the upstream extractor for text; never render or execute remote HTML.
+      // Parse the introduction locally without rendering or loading HTML resources.
       introductionURL.queryItems = [
         .init(name: "action", value: "query"), .init(name: "format", value: "json"),
         .init(name: "pageids", value: String(identity.pageid)),
-        .init(name: "prop", value: "extracts"), .init(name: "exintro", value: "true"),
-        .init(name: "explaintext", value: "true")
+        .init(name: "prop", value: "extracts"), .init(name: "exintro", value: "true")
       ]
       guard let url = introductionURL.url,
         let introductionData = await data(from: url, session: session), !Task.isCancelled,
@@ -231,10 +231,32 @@ enum LivePracticeContentService {
     return nil
   }
 
+  static func introductionText(fromHTML html: String) -> String? {
+    let paragraphJoined = html.replacingOccurrences(of: #"</p><p>+"#, with: " ",
+      options: .regularExpression)
+    guard let document = try? SwiftSoup.parseBodyFragment(paragraphJoined),
+      let body = document.body() else { return nil }
+    // DOM textContent concatenates nodes, not visually laid-out block text.
+    // Keep raw-text nodes inert and ignore comments/template document fragments.
+    var nodes: [Node] = [body]
+    var extracted = ""
+    while let node = nodes.popLast() {
+      if let textNode = node as? TextNode {
+        extracted.append(textNode.getWholeText())
+      } else if let dataNode = node as? DataNode {
+        extracted.append(dataNode.getWholeData())
+      } else if (node as? Element)?.tagNameNormal() != "template" {
+        nodes.append(contentsOf: node.getChildNodes().reversed())
+      }
+    }
+    return extracted
+  }
+
   private static func makeIntroductionContent(
     identity: EncyclopediaIdentity, text: String, language: TypingLanguage
   ) -> LivePracticeContent? {
-    let withoutReferences = text.replacingOccurrences(
+    guard let extracted = introductionText(fromHTML: text) else { return nil }
+    let withoutReferences = extracted.replacingOccurrences(
       of: #"\[[0-9]+\]"#, with: "", options: .regularExpression)
     var normalized = ""
     for scalar in withoutReferences.unicodeScalars {
@@ -246,19 +268,28 @@ enum LivePracticeContentService {
       case 0x2026: normalized.append("...")
       case 0x00AB: normalized.append("<<")
       case 0x00BB: normalized.append(">>")
+      case 0x2007, 0x202F, 0x00A0: normalized.append(" ")
       default:
-        // Plain-text extraction uses line breaks where HTML had paragraphs.
-        if CharacterSet.whitespacesAndNewlines.contains(scalar) {
-          normalized.append(" ")
-        } else if wikipediaLanguageCode(for: language) != "en"
+        if wikipediaLanguageCode(for: language) != "en"
           || (0x20...0x7E).contains(scalar.value) {
           normalized.unicodeScalars.append(scalar)
         }
       }
     }
+    // English ASCII filtering precedes whitespace conversion in the reference.
+    // Use the ECMAScript whitespace set, not Foundation's broader Unicode set.
+    var spaced = ""
+    for scalar in normalized.unicodeScalars {
+      switch scalar.value {
+      case 0x09...0x0D, 0x20, 0xA0, 0x1680, 0x2000...0x200A,
+        0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
+        spaced.append(" ")
+      default: spaced.unicodeScalars.append(scalar)
+      }
+    }
     let words = language.usesNoSpaceLiveText
-      ? introductionTokensWithoutSpaces(normalized)
-      : normalized.split(separator: " ").map(String.init)
+      ? introductionTokensWithoutSpaces(spaced)
+      : spaced.split(separator: " ").map(String.init)
     guard !words.isEmpty else { return nil }
     let title = identity.title.trimmingCharacters(in: .whitespacesAndNewlines)
     let author = identity.author?.trimmingCharacters(in: .whitespacesAndNewlines)

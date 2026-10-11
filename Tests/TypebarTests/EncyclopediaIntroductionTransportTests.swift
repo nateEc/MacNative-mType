@@ -34,7 +34,7 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
       XCTAssertEqual(query["prop"], "extracts")
       XCTAssertEqual(query["pageids"], "724")
       XCTAssertEqual(query["exintro"], "true")
-      XCTAssertEqual(query["explaintext"], "true")
+      XCTAssertNil(query["explaintext"])
       XCTAssertNil(query["exchars"])
       XCTAssertNil(query["exsentences"])
       for request in requests {
@@ -54,6 +54,36 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
         let content = await LivePracticeContentService.fetch(source: .encyclopedia, language: .english, session: session)
         XCTAssertNil(content)
         XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 2)
+      }
+    }
+  }
+
+  func testHTMLIntroductionUsesDecodedTextNodesAndReferenceCleaningOrder() async throws {
+    try await withSession { session in
+      let cases: [(TypingLanguage, String, String)] = [
+        (.english, "<p>North <b>harbor</b>&nbsp;2026 [12]</p><p>South &amp; west &#x1F680;.</p>",
+          "North harbor 2026 South & west ."),
+        (.english, "<p>left\nright\tend</p><p>next&nbsp;word</p>", "leftrightend next word"),
+        (.german, "<p>left\nright\tend</p><p>next&nbsp;word</p>", "left right end next word"),
+        (.german, "<div>Über<br>12</div><div>&NotEqualTilde; ‘Boote’</div><!--ignored--><p>am</p><p>Ufer.</p>",
+          "Über12≂̸ 'Boote'am Ufer."),
+        (.english, "<img src='https://invalid.example/owned.png'>North<script>owned()</script><style>.x{}</style>tail",
+          "Northowned().x{}tail"),
+        (.english, "<p>One <b>two</p>three", "One twothree")
+      ]
+      for (language, html, expected) in cases {
+        let response = try JSONSerialization.data(withJSONObject: [
+          "query": ["pages": ["724": ["extract": html]]]
+        ])
+        IntroductionProtocol.fixture.set([
+          (200, #"{"pageid":724,"title":"Owned"}"#),
+          (200, String(decoding: response, as: UTF8.self))
+        ])
+        let content = await LivePracticeContentService.fetch(source: .encyclopedia,
+          language: language, session: session)
+        XCTAssertEqual(content?.text, expected, html)
+        XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 2,
+          "HTML resources must never initiate requests")
       }
     }
   }
