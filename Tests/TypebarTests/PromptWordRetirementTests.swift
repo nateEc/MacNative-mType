@@ -168,6 +168,73 @@ import XCTest
     }
   }
 
+  func testCoalescedForwardRowsRetireTheSamePrefixAsDeliveredRows() {
+    for smooth in [false, true] {
+    for coalesced in [false, true] {
+      let scroll = NSScrollView(frame: .init(x: 0, y: 0, width: 360, height: 135))
+      let document = Document(frame: .init(x: 0, y: 0, width: 360, height: 500))
+      scroll.documentView = document
+      let follower = PromptAutoScrollView(frame: document.bounds)
+      document.addSubview(follower)
+      follower.layoutSubtreeIfNeeded()
+      let id = UUID(), starts = (0..<8).map { $0 * 3 }
+      var retired = 0
+      func update(_ index: Int) {
+        follower.update(text: AttributedString("aa bb\ncc dd\nee ff\ngg hh"),
+          characterOffset: starts[index], font: .monospacedSystemFont(ofSize: 28, weight: .medium),
+          lineSpacing: 12, isRightToLeft: false,
+          lineScroll: .init(attemptID: id, activeWordID: starts[index],
+            characterOffsets: Dictionary(uniqueKeysWithValues: starts.map { ($0, $0) }),
+            smoothScroll: smooth, reducesMotion: false,
+            words: starts.enumerated().map { .init(index: $0.offset, glyphID: $0.element) },
+            onRetire: { retired = $0.firstRetainedWordIndex }))
+      }
+      update(0)
+      RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+      update(2)
+      if !coalesced { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+      update(4)
+      if coalesced { XCTAssertEqual(retired, 0, "No synchronous retirement from update") }
+      RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+      if smooth {
+        XCTAssertEqual(retired, 0, "Smooth retirement waits for animation")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+      }
+      XCTAssertEqual(retired, 2, "coalesced=\(coalesced), smooth=\(smooth)")
+    }
+    }
+  }
+
+  func testQueuedForwardRowsDoNotRetireAfterRestartOrDetach() {
+    for detach in [false, true] {
+      let scroll = NSScrollView(frame: .init(x: 0, y: 0, width: 360, height: 135))
+      let document = Document(frame: .init(x: 0, y: 0, width: 360, height: 500))
+      scroll.documentView = document
+      let follower = PromptAutoScrollView(frame: document.bounds)
+      document.addSubview(follower)
+      follower.layoutSubtreeIfNeeded()
+      let id = UUID()
+      var events = 0
+      func update(_ row: Int, attempt: UUID) {
+        follower.update(text: AttributedString("amber\nbirch\ncedar\ndelta"),
+          characterOffset: row * 6, font: .monospacedSystemFont(ofSize: 28, weight: .medium),
+          lineSpacing: 12, isRightToLeft: false,
+          lineScroll: .init(attemptID: attempt, activeWordID: row * 6,
+            characterOffsets: [0: 0, 6: 6, 12: 12, 18: 18], smoothScroll: false,
+            reducesMotion: false, words: (0...3).map { .init(index: $0, glyphID: $0 * 6) },
+            onRetire: { _ in events += 1 }))
+      }
+      update(0, attempt: id)
+      RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+      update(1, attempt: id)
+      update(2, attempt: id)
+      if detach { follower.removeFromSuperview() }
+      else { update(0, attempt: UUID()) }
+      RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+      XCTAssertEqual(events, 0)
+    }
+  }
+
   @Observable final class Model {
     var session = TypingSession(configuration: .words(4, rules: .init(freedomMode: true)),
       prompt: "amber\nbirch\ncedar\ndelta")

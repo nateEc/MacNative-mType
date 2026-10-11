@@ -263,6 +263,7 @@ final class PromptAutoScrollView: NSView {
   private var isRightToLeft = false
   private var lastWidth: CGFloat = 0
   private var isFollowScheduled = false
+  private var pendingNavigation: [(context: PromptLineScrollContext, offset: Int?)] = []
   private var lineScroll: PromptLineScrollContext?
   private var customGeometry: PromptLineScrollCustomGeometry?
   private var previousWordID: Int?
@@ -296,6 +297,16 @@ final class PromptAutoScrollView: NSView {
       || (self.customGeometry == nil) != (customGeometry == nil)
     let layoutChanged = self.font != font || structuralLayoutChanged
     let textChanged = self.text != text
+    if attemptChanged || prefixChanged || wrapperChanged || layoutChanged || textChanged
+      || self.customGeometry?.revision != customGeometry?.revision {
+      pendingNavigation.removeAll(keepingCapacity: true)
+    } else if isFollowScheduled, let previous = self.lineScroll,
+      previous.activeWordID != lineScroll?.activeWordID,
+      pendingNavigation.last?.context.activeWordID != previous.activeWordID {
+      // Render work may coalesce, but already received navigation steps own
+      // separate line-jump decisions. Keep lightweight contexts, not text copies.
+      pendingNavigation.append((previous, self.characterOffset))
+    }
     let needsFollow = self.characterOffset != characterOffset
       || textChanged
       || self.font != font || self.lineSpacing != lineSpacing
@@ -365,6 +376,7 @@ final class PromptAutoScrollView: NSView {
 
   override func viewWillMove(toSuperview newSuperview: NSView?) {
     if newSuperview == nil {
+      pendingNavigation.removeAll(keepingCapacity: true)
       cancelCaretMotion()
       stopLineScroll()
       wordReflow = .init()
@@ -394,6 +406,17 @@ final class PromptAutoScrollView: NSView {
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       self.isFollowScheduled = false
+      let navigation = self.pendingNavigation
+      self.pendingNavigation.removeAll(keepingCapacity: true)
+      let offset = self.characterOffset
+      for step in navigation {
+        guard self.lineScroll?.attemptID == step.context.attemptID,
+          self.lineScroll?.firstRetainedWordIndex == step.context.firstRetainedWordIndex,
+          self.superview != nil else { break }
+        self.characterOffset = step.offset
+        self.followActiveWord(step.context)
+      }
+      self.characterOffset = offset
       self.followCurrentGlyph()
     }
   }

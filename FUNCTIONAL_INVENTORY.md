@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 合并导航退役缺口修正：可控两行推进中，逐步交付退役 2，合并交付退役 0（work/retirement-coalesced-rows-red.log）；不是以局部通过否认旧全量失败。PromptAutoScrollView 稳定文本／布局下保存已收到但未交付的导航上下文，由同一个异步任务按序消费，重开／前缀／几何变化及卸载清除旧上下文。没有在 SwiftUI update 中同步触发退役回调。新增立即／平滑与合并／逐步四组合、非同步回调及重开／卸载取消断言；558 项 Prompt 家族零失败、无跳过（73.173 秒，墙钟 73.255 秒；work/retirement-queued-navigation-regression.log），聚焦转绿见 work/retirement-coalesced-rows-green.log。根因调试／行为优先及会话内决策复核选择保留离散导航、异步交付以避免重入；不是独立评审。上下文只保留至主队列交付，但高频队列内存、同时改变文本／字体的导航、真实 IME、全量旧失败是否同因仍待验证。全量门禁／服务端／Release 仍未重新通过，goal active。
+
 2026-10-12 退役时序根因调查：源码检查确认跟随为主队列异步交付，而失败夹具仅固定等待 5ms；尚未证明这是根因。整组 Prompt 同进程首次复现漏传 Anime.js 固定归档，源码探针因此失败（work/retirement-prompt-family-reproduction.log），不作为产品回归。补齐与门禁一致的 TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE 后，556 项零失败、无跳过（71.040 秒，墙钟 71.120 秒；work/retirement-prompt-family-with-anime.log），原退役用例也通过。没有改产品、放宽断言或延长等待；全量 4407 项中的两处失败仍未关闭，下一步需交付／布局调度的判别证据，不用局部绿色覆盖全量失败。
 
 2026-10-12 冻结 4b2b3a9 全量门禁未通过：客户端 4,407 项、2 处失败（2091.534 秒，墙钟 2092.042 秒），均为 PromptWordRetirementTests.testCompletePinnedDeletionAndLineTimingMatchNativePolicies 原生退役回调 0/预期 2；服务端与 Release 未执行。冻结摘要通过，完整日志补存 work/readiness-final-lf.sVgqny（自动归档目录为空，原临时日志仍在）。十万词 155.352 秒、35 在线宿主及随后同进程 19 PB、42 组合宿主均通过，不抵消失败。单独原样复现通过（5.695 秒）；仅增加无敏感信息的夹具/阶段断言说明后，退役与重排 23 项通过（11.075 秒，墙钟 11.081 秒）。间歇性根因仍未知，未改产品、未放宽断言、未认定修复。对应日志 work/retirement-isolated-reproduction.log、work/retirement-labeled-regression.log；goal active。
