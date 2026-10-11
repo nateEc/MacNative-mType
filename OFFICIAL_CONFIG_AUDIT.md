@@ -1,5 +1,11 @@
 # 官方配置兼容性审计
 
+2026-10-11 TST-02 字体家族增量完整冻结验证：冻结 `4e3a298eb273210a66edeaed62807aa7228fcb55` 的单轮完整 readiness 门禁及终态哈希检查均退出零（`gate_exit=0 hash_exit=0`），852 跟踪文件全部一致，项目与固定参考工作区干净。证据保留于 `work/frozen-readiness-font-family.KPvXX2` 的 `gate.log`、`freeze-verification.log` 和 `logs/` 内 74 份阶段日志。参考仍为 `91bd24bb8513785c7364cbea29296ff7adafac41`，不是最新上游兼容声明。
+
+客户端 4,270 项零失败零跳过（1864.967s，墙钟 1865.467），含全部 39 项生产组合宿主（946.605s，墙钟 946.611）、字体别名实际候选切换及十万词耐久（156.390s）；服务端 501 项零失败零跳过（11.102s，墙钟 11.161）。Release 构建 410.29s，未打开应用包的签名／资源及固定参考原创性边界通过。两次短时采样仅确认缓冲日志期间执行到 Hindi 1k／Sinhala 宿主，不是性能验收；终态相关测试／编译进程已退出，Typebar 主程序实例为零，整轮没有启动主程序。
+
+本节取代下方字体归一化修正和实际宿主补证的“尚未完整门禁／Release”当前状态，保留历史失败与范围。此次只记录验证，没有新产品、存储、迁移或网络行为；全字体／RTL／实际像素视觉、物理 IME、最低系统、首键性能和全面原创性仍未证明。fontFamily 部分、94 配置 89／4／1 与完整 goal active 不变。
+
 2026-10-11 TST-02 字体别名实际宿主补证：扩展既有字体切换场景，在未提交“中文”候选期间依次应用 Georgia、`applebraille`、全宽 Apple Braille 别名，再恢复原字体。实际候选 NSTextField 的字体名称／字号符合标准家族，原输入 owner、marked text、候选 owner 和提示内容均保持，窗口不可见。只增强测试，无产品或保存变化。
 
 `work/font-family-default-face-host.log` 首轮 29 项四处失败均为既有居中断言，不是字体切换失败。`font-family-default-face-host-center-diagnostic.log` 确认内容视口宽 983、外框 1000，17 点滚动条导致按外框比较差 8.5 点；候选实际位于内容视口中央。测试改为同坐标系下实际 NSClipView 中心比较，保持 2 点容差，未修改产品布局或系统滚动条偏好。最终 `font-family-default-face-host-final.log` 字体及 below 宿主联合 32 项零失败零跳过（66.805s，墙钟 66.809）。不是全部 39 宿主／物理 IME／全字体视觉或新完整门禁验收；fontFamily 部分及完整 goal active 不变，零主程序启动。
