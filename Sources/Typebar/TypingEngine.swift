@@ -4850,7 +4850,8 @@ struct TypingSession {
       || generatedCodeContinuation?.hasRemaining == true
       || (repeatingPrompt?.isEmpty == false
         && !(configuration.mode == .words && !configuration.isInfinite
-          && unitTargets.sourceFieldCount >= (configuration.wordLimit ?? 25)))
+          && (hasNoSpaceWordSegmentation ? noSpaceWordEndIndices.count : unitTargets.sourceFieldCount)
+            >= (configuration.wordLimit ?? 25)))
       || randomCustomSourceTokens?.isEmpty == false
       || sequentialCustomWordStream != nil || finiteCustomTextStream?.hasRemaining == true
       || customSectionWordStream?.hasRemaining == true
@@ -8313,11 +8314,12 @@ struct TypingSession {
     }
     guard let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
     let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+      || hasNoSpaceWordSegmentation
     var repeatedText = repeatingPrompt
     var repeatedTargets = repeatingNoSpaceTargetWords
     var repeatedLengths = repeatingNoSpaceWordLengths
     if configuration.mode == .words, let limit = configuration.wordLimit, limit > 0 {
-      let remaining = limit - unitTargets.sourceFieldCount
+      let remaining = limit - (hasNoSpaceWordSegmentation ? noSpaceWordEndIndices.count : unitTargets.sourceFieldCount)
       guard remaining > 0 else { return }
       if usesNoSpaceSeparator, !repeatedTargets.isEmpty,
         repeatedTargets.joined().utf16.elementsEqual(repeatingPrompt.utf16) {

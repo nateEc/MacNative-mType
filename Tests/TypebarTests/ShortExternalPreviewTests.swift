@@ -2,6 +2,35 @@ import XCTest
 @testable import Typebar
 
 final class ShortExternalPreviewTests: XCTestCase {
+  func testShortUnseparatedExternalSourceRetainsOriginalTokenBoundaries() throws {
+    let words = ["甲", "乙丙", "丁"]
+    for showAllLines in [false, true] {
+      for limit in [4, 6, 7, 8, 9, 10] {
+      let configuration = TestConfiguration.words(limit, language: .simplifiedChinese)
+      var session = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: words.joined(), streamNoSpaceBoundarySource: words.joined(separator: " "),
+        showAllLines: showAllLines)
+      let target = (0..<limit).map { words[$0 % 3] }.joined()
+      let start = Date(timeIntervalSinceReferenceDate: 917_000_000)
+      session.insertBatch(String(target.dropLast()), at: start)
+      XCTAssertFalse(session.isFinished)
+      session.insertBatch(String(target.suffix(1)), at: start.addingTimeInterval(2))
+      XCTAssertEqual(session.outcome, .completed, "prompt=\(session.prompt) typed=\(session.typed)")
+      XCTAssertEqual(session.prompt, target)
+      XCTAssertEqual(session.completedWordCount, limit)
+      XCTAssertEqual(session.errors, 0)
+      let result = try XCTUnwrap(session.result())
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents, through: result.elapsedDuration), target)
+      XCTAssertEqual(try XCTUnwrap(TestResultRecord(result: result).portableResult), result)
+      var repeated = session.repeatedAttempt()
+      repeated.insertBatch(target, at: start)
+      XCTAssertEqual(repeated.outcome, .completed)
+      XCTAssertEqual(repeated.completedWordCount, limit)
+      XCTAssertEqual(repeated.errors, 0)
+      }
+    }
+  }
+
   func testShortExternalSourceRetainsFiniteBudgetThroughContinuation() throws {
     for modifiers: [TestModifier] in [[], [.underscoreSeparators]] {
       for limit in [4, 6, 7, 8, 9, 10] {
