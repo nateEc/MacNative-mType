@@ -3,6 +3,25 @@ import XCTest
 @testable import Typebar
 
 final class EncyclopediaIntroductionTransportTests: XCTestCase {
+  func testNonstringAttributionDoesNotPreventLoadingValidIntroduction() async throws {
+    try await withSession { session in
+      for metadata in ["", #","title":null,"author":null"#,
+        #","title":42,"author":7"#,
+        #","title":{"label":"Owned"},"author":["Fixture"]"#] {
+        IntroductionProtocol.fixture.set([
+          (200, "{\"pageid\":724" + metadata + "}"),
+          (200, #"{"query":{"pages":{"724":{"extract":"north south harbor"}}}}"#)
+        ])
+        let fetched = await LivePracticeContentService.fetch(
+          source: .encyclopedia, language: .english, session: session)
+        XCTAssertEqual(fetched?.text, "north south harbor")
+        XCTAssertEqual(fetched?.title, "")
+        XCTAssertNil(fetched?.byline)
+        XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 2)
+      }
+    }
+  }
+
   func testPoetryClassifiesDecodedBodyRatherThanHTTPStatus() async throws {
     try await withSession { session in
       for status in [200, 201, 404, 503] {

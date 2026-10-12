@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 `TST-02` 百科身份署名解码修正：固定 wikipedia.ts 对 Post 仅类型断言，title／author 直接赋给 Section；已核对生成器及旁路只消费 words。因此不应因非关键署名阻止有效导言。新增生产运输测试四类缺失／null／数字／结构化署名，先复现 12 断言失败、每例仅一请求（0.830 秒，墙钟 0.831；work/wiki-metadata-red.log）。现 pageid 仍严格 Int 解码并保留正值守卫，署名仅读取实际字符串、其余不展示，不执行 JSON 字符串化；完整导言仍按既有 schema、HTTP 200 及取消规则读取。最终诗歌清理／百科运输／在线生成三组 68 项零失败、无跳过（21.403 秒，墙钟 21.412；work/wiki-metadata-green.log）。依据为固定官方源码阅读，不是完整浏览器 XHR 对照运行；任意 pageid 类型／范围的其他差异仍开放。行为优先／源码驱动／根因调试与会话内风险复核限定此改动，非独立审查；未更改存储、端点或重试，未重跑真实网络、完整门禁／Release，零主程序实例，完整 goal active。
+
 本轮元数据修复的固定诗歌提供者 17 案例复核及原创性检查通过，分别见 work/poetry-metadata-fix-source.log、work/poetry-metadata-fix-originality.log；检查之后未再修改产品／测试。
 
 2026-10-12 `TST-02` 非字符串诗歌署名不再拒绝练习：固定 words-generator.ts getFunboxSection 与 test-logic.ts addWord 只读追踪确认调用方仅消费 section.words，不读 title／author。两项原生先行测试复现有效词语因缺失元数据解码为 nil（1 失败，3.921 秒，墙钟 3.923；work/poetry-metadata-red.log），非法 lines 守卫通过。现先严格解码全部 lines，再可选读取字符串署名；缺失／null／非字符串标题不展示，作者为 nil，不执行 JS 字符串化、不声称保留任意 JSON 元数据。四类异常署名均可完成三词会话并精确回放；另守卫合法字段独立保留、null／非数组／混合行及百词后的非法行拒绝。三组最终 67 项零失败、无跳过（19.682 秒，墙钟 19.689；work/poetry-metadata-green.log）。行为优先／源码驱动／根因调试与会话内风险复核限定此分类修复，非独立审查。未变更存储、端点、重试；未启动主程序，未重新执行真实网络、完整门禁或 Release。上节元数据拒绝待修状态在本边界内解除，GUI／实体输入法、全部提供者 schema 及其余矩阵仍未验收，完整 goal active。

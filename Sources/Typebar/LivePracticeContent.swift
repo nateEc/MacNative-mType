@@ -178,6 +178,17 @@ enum LivePracticeContentService {
     let pageid: Int
     let title: String
     let author: String?
+
+    private enum CodingKeys: String, CodingKey { case pageid, title, author }
+
+    init(from decoder: Decoder) throws {
+      let fields = try decoder.container(keyedBy: CodingKeys.self)
+      pageid = try fields.decode(Int.self, forKey: .pageid)
+      // Attribution is not a prerequisite for fetching the selected page.
+      // As with poetry, only actual strings are eligible for native display.
+      title = (try? fields.decode(String.self, forKey: .title)) ?? ""
+      author = try? fields.decode(String.self, forKey: .author)
+    }
   }
 
   private struct EncyclopediaIntroduction: Decodable {
