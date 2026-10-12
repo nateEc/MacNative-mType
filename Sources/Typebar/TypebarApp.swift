@@ -86,6 +86,9 @@ struct TypebarApp: App {
     liveContentFetch: @escaping @MainActor (LivePracticeContentSource, TypingLanguage) async -> LivePracticeContent? = {
       await LivePracticeContentService.fetch(source: $0, language: $1)
     },
+    livePromptPrepare: @escaping @MainActor (LivePracticeContent, TestConfiguration, Bool) async throws -> LivePracticePrompt = {
+      try await $0.preparingPromptDescriptor(for: $1, showAllLines: $2)
+    },
     wholePreviewPrepare: @escaping @MainActor (TestConfiguration, WeakSpotScores, PoolWordDecorationState) async throws -> TypingSession = {
       try await WholePreviewWordPreparation.prepareSession(configuration: $0,
         weakSpotScores: $1, wordDecorationState: $2)
@@ -93,6 +96,7 @@ struct TypebarApp: App {
     ContentView(settings: settings, account: account, announcements: announcements,
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
       systemAppearance: systemAppearance, liveContentFetch: liveContentFetch,
+      livePromptPrepare: livePromptPrepare,
       wholePreviewPrepare: wholePreviewPrepare)
   }
 
@@ -1182,6 +1186,7 @@ private struct ContentView: View {
   let network: NetworkConnectivityMonitor
   let systemAppearance: SystemAppearanceMonitor
   let liveContentFetch: @MainActor (LivePracticeContentSource, TypingLanguage) async -> LivePracticeContent?
+  let livePromptPrepare: @MainActor (LivePracticeContent, TestConfiguration, Bool) async throws -> LivePracticePrompt
   let wholePreviewPrepare: @MainActor (TestConfiguration, WeakSpotScores, PoolWordDecorationState) async throws -> TypingSession
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
@@ -4578,8 +4583,7 @@ private struct ContentView: View {
         // Fill the current budget before constructing its final descriptor.
         if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off), let current = content {
           do {
-            preparedPrompt = try await current.preparingPromptDescriptor(for: configuration,
-              showAllLines: wholePreview)
+            preparedPrompt = try await livePromptPrepare(current, configuration, wholePreview)
           } catch { return }
           guard !Task.isCancelled, requestID == liveContentRequestID else { return }
           if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off) { break }

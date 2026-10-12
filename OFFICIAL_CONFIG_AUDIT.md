@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+## 在线描述符挂起期间的预算变化（2026-10-12）
+
+practiceContent 增加 livePromptPrepare 注入边界，默认仍调用 preparingPromptDescriptor；生产发布控制逻辑不变。新隐藏宿主检查在准备旧全行描述符后挂起，关闭全行显示再返回旧值，断言准备预算依次为 true、false，最终可访问提示等于当前有界描述符加流式分词空格、输入所有者不变、窗口不可见。该证据补上设置变化的精确交错，但不覆盖此挂起点的请求替换或取消交错。
+
+决策复核：注入局限于既有生产组合入口，无全局开关、网络请求或存储改变；测试故意返回已准备的旧结果，不能依赖提供方配合取消。保留原始同步描述符作预算对照，不用新实现自证全部文本正确。
+
+验证边界：53 项相关回归 1 项失败、52 项通过，耗时 285.428 秒（work/live-prompt-budget-host-regression.log）。失败项 testEmptyInitializationFailureCannotReplaceAnAlreadyStartedAttempt 在第三次空返回后无法找到提示视图；单独与新增测试共跑 2 项通过、8.374 秒（work/live-prompt-budget-focused-reproduction.log），原因尚未定位，不增加重试掩盖，也不宣称回归全绿。新增测试第一次失败为测试预期少了既有流式尾空格，保留日志 live-prompt-budget-interleaving.log，修正后通过。未跑新完整门禁，零可见主程序启动，showAllLines 等 partial 与完整 goal active 不变。
+
 ## 在线初始提示描述符按 token 协作装配（2026-10-12）
 
 在线路径填充完词源后，原 promptDescriptor 仍以全量 selectedTokens map 和 joined 一次性装配。新增 preparingPromptDescriptor，每批最多 100 个原始 token，直接累加提示及必要的无空格来源边界，块前／末块后检查取消、块后 Task.yield。保留原 token 循环选择、空 token、内部换行及分隔符语义，不把已变换 GeneratedWordChunk 装配器用于原始来源字段。普通同步描述符仍保留作独立对照及既有调用路径。

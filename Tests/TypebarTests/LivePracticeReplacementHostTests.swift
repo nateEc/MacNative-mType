@@ -38,6 +38,10 @@ import XCTest
     try checkDelayedReplacement()
   }
 
+  func testDisplayBudgetChangedDuringPromptAssemblyDiscardsOldDescriptor() throws {
+    try checkDelayedReplacement(changesBudgetDuringAssembly: true)
+  }
+
   func testLiveResponseAfterFirstInputPreservesPromptAndMainCaret() throws {
     try checkDelayedReplacement(startsBeforeReturn: true)
   }
@@ -236,7 +240,8 @@ import XCTest
     cancelsAfterEmpty: Bool = false, failsAfterCancellation: Bool = false, failsInitial: Bool = false,
     failsInitialFill: Bool = false, generatesNextWord: Bool = false,
     checksBackwardInput: Bool = false, encyclopedia: Bool = false,
-    initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false) throws {
+    initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false,
+    changesBudgetDuringAssembly: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -259,13 +264,24 @@ import XCTest
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let priorWindowIDs = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
     let pending = PendingContent()
+    var assemblyBudgets: [Bool] = []
+    var suspendedAssembly: CheckedContinuation<LivePracticePrompt, Never>?
+    var staleDescriptor: LivePracticePrompt?
     let authoredTokens = (0..<300).map { "owned\($0)" }
     if prefetches { pending.scriptedTokens = Array(authoredTokens.prefix(151)) }
     let content = TypebarApp.practiceContent(settings: settings,
       account: AccountSession(defaults: defaults), announcements: RemoteAnnouncementCenter(defaults: defaults),
       hotkey: GlobalHotkeyMonitor(), systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
       network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor(),
-      liveContentFetch: pending.fetch).modelContainer(container)
+      liveContentFetch: pending.fetch,
+      livePromptPrepare: { content, configuration, wholePreview in
+        assemblyBudgets.append(wholePreview)
+        if changesBudgetDuringAssembly && assemblyBudgets.count == 1 {
+          staleDescriptor = content.promptDescriptor(for: configuration, showAllLines: wholePreview)
+          return await withCheckedContinuation { suspendedAssembly = $0 }
+        }
+        return try await content.preparingPromptDescriptor(for: configuration, showAllLines: wholePreview)
+      }).modelContainer(container)
     let host = NSHostingView(rootView: AnyView(content.frame(width: 1000, height: 720)))
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
       styleMask: .borderless, backing: .buffered, defer: false)
@@ -274,6 +290,10 @@ import XCTest
     defer {
       withExtendedLifetime(container) {
         pending.finish()
+        if let continuation = suspendedAssembly, let descriptor = staleDescriptor {
+          suspendedAssembly = nil
+          continuation.resume(returning: descriptor)
+        }
         // Release query/observation nodes before their in-memory container.
         host.rootView = AnyView(EmptyView())
         host.layoutSubtreeIfNeeded()
@@ -446,6 +466,30 @@ import XCTest
     }
     pending.finish()
     for _ in 0..<5 { flush() }
+    if changesBudgetDuringAssembly {
+      XCTAssertEqual(assemblyBudgets, [true])
+      let continuation = try XCTUnwrap(suspendedAssembly)
+      let stale = try XCTUnwrap(staleDescriptor)
+      XCTAssertEqual(stale.text.split(separator: " ").count, 151)
+      settings.showAllPracticeLines = false
+      flush()
+      suspendedAssembly = nil
+      // Return the old descriptor even if the caller cancelled: production
+      // ownership checks must not depend on a cooperative injected provider.
+      continuation.resume(returning: stale)
+      for _ in 0..<10 { flush() }
+      XCTAssertEqual(assemblyBudgets, [true, false])
+      let expected = LivePracticeContent(source: .poetry, title: "Authored delayed fixture",
+        byline: nil, tokens: (0..<151).map { ["quiet", "harbor", "morning"][$0 % 3] }, separator: " ")
+        .promptDescriptor(for: configuration, showAllLines: false)
+      XCTAssertNotEqual(expected.text, stale.text)
+      let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+      // A bounded live window retains its trailing streaming word boundary.
+      XCTAssertEqual(field.accessibilityValue() as? String, expected.text + " ")
+      XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+      XCTAssertFalse(window.isVisible)
+      return
+    }
     if failsInitialFill {
       XCTAssertEqual(pending.callCount, requestsBeforeInitialReply + 1)
       XCTAssertEqual(pending.continuations.count, 1)
