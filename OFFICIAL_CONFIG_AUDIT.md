@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+## 新冻结版本完整门禁（2026-10-12）
+
+冻结提交 85ab56d1bbe1a52431221a056232eecba18e57d5 的 check-native-rewrite-readiness.sh 已以退出码 0 完成，参考源码固定于 91bd24bb8513785c7364cbea29296ff7adafac41。客户端 4,530 项零失败（2330.784 秒测试、2331.300 秒墙钟），服务端 501 项零失败（11.019 秒测试、11.074 秒墙钟）；Release 构建 439.78 秒，未打开应用的 macOS 包验证、资源边界与原创性边界检查通过。该完整运行覆盖最近字体导入、在线任务取消、协作装配及最终会话准备改动，不再借用旧冻结版本的完整门禁作为这些改动的证明。
+
+源码整个运行保持冻结且工作树干净：跟踪文件聚合 SHA-256 为 97340a70a99c750007b0ef7461aea5f7b6042962675ec2cb2419a0ef40359898，结束后重新计算相同。77 份日志自动留存 work/readiness-85ab56d.4IDvRi，主日志 work/readiness-85ab56d-gate.log。Release 优化编译等待期间确认同一会话及编译器活跃，未因缓冲输出重启门禁。未启动可见 Typebar 主程序，结束时也无主程序进程。
+
+这是冻结版本的回归及包边界证据，不是目标完成：不新增实体 IME、公开内容网络、可见窗口帧延迟、全量内存或新增尾部变换点精确宿主交错证据。规模测试中的旧同步工厂数字仍仅为基线；历史空初始化宿主失败的原根因仍未知。compositionDisplay、tapeMode、showAllLines、fontFamily 四项 partial 及主题／语料／物理键盘等既有缺口保持，完整 goal active。下文“未跑新完整门禁”描述保留为各阶段当时的历史状态，不应解读为本次冻结版本尚未运行。
+
 ## 在线最终会话协作准备接入（2026-10-12）
 
 新增 TestSessionFactory.preparingLiveSession 并接入生产初始在线加载。先由原 make 准备初始提示、消费其随机位，内部 defersStreamContinuationTransformation 标志让非空尾部保留存在标记而不立即变换；原初始窗口／重复预填决策仍见到尾部存在，避免无限模式把提示预复制。随后按同一 nextRandomCaseBit 顺序协作变换尾部，沿用绝对 wordOffset／wordBound 和 FinitePromptCommitPolicy.finalized，再安装 externalPromptContinuation 与 initialExternalPromptContinuation、复位字段游标。占位会话保持未发布，只有完整准备完成后才交给生产状态。
