@@ -1,5 +1,11 @@
 # 官方配置兼容性审计
 
+## 六种字体容器的文件绑定练习路径（2026-10-12）
+
+复核既有真实注册测试发现，共用 checkOwnedFont 主要验证 CTFontCreateWithName 的 28pt 路径；它不能单独证明新文件绑定渲染路径在 WOFF／WOFF2 中可用。保留这些旧断言，另在同一实际保存／注册／重复读取／注销链中加入文件描述符创建与 NativePracticeFont.nsFont 的本地解析。TTF、CFF/OTF、未压缩 WOFF、实际 zlib 压缩 WOFF、CFF WOFF2、TrueType WOFF2 六种容器各检查 8／15／28／72／144pt，共 30 组：精确加载 URL、字号和名称、AppKit 同一实例（===）、不再按名称查找、非零 x 字形及矩形路径位置／宽高按字号缩放。自写字形与既有编码范围不变，不增加字体或运行依赖。
+
+固定参考环境相关 48 项零失败零跳过，1.941s（墙钟 1.947），work/font-containers-file-bound-regression.log。测试数未增加，新增的是上述共享流程中的可观察覆盖；本轮只补证，无产品修改、不制造红测。零主程序启动，只注册自有临时进程字体并注销清理。不能据此泛化为所有字体、WOFF2 变换／熵编码、SwiftUI 最终像素、最低系统或真实性能；未跑新完整门禁／Release，fontFamily 部分及完整 goal active 保持。
+
 ## 导入准入与文件绑定渲染采用同一字体来源（2026-10-12）
 
 确定性注入红测：注册成功、描述符存在、文件绑定来源可用，但全局名称可用性为 false 时，旧准入返回 nil；单项一处断言失败（work/font-file-admission-red.log）。这是两种解析来源不一致的隔离合同复现，不冒称原生系统稳定产生某一种同名查找结果。现移除独立全局 NSFont(name:) 可用性及 CTFontCreateWithName 来源检查，改用此前已验收的 font(at:url,size:1) 文件描述符创建；该函数验证实际 URL，再核对 fontName 与描述符名称一致。注册成功或同 URL process 已注册的前置门槛不变，来源失败仍返回 nil，保留失败注销／恢复机制。

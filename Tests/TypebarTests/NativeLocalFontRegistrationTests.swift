@@ -409,6 +409,27 @@ import XCTest
     XCTAssertEqual(bounds.width, 11.2, accuracy: 0.001)
     XCTAssertEqual(bounds.height, 19.6, accuracy: 0.001,
       "The actual loaded outline must match our 400×700 rectangle at 28pt / 1000 units-per-em")
+    // Exercise the actual file-bound rendering path for every container,
+    // not just successful global-name registration at one probe size.
+    for size: CGFloat in [8, 15, 28, 72, 144] {
+      let bound = try XCTUnwrap(LocalPracticeFontRegistration.font(at: url, size: size))
+      let practice = try XCTUnwrap(NativePracticeFont.nsFont(named: "Courier", size: size,
+        localFont: { _ in bound },
+        installedFontName: { _ in XCTFail("The imported font must not be re-resolved by name"); return nil }))
+      XCTAssertTrue(practice === bound)
+      XCTAssertEqual(practice.pointSize, size)
+      XCTAssertEqual(practice.fontName, name)
+      let source = try XCTUnwrap(CTFontCopyAttribute(practice as CTFont, kCTFontURLAttribute) as? URL)
+      XCTAssertEqual(source.resolvingSymlinksInPath(), url.resolvingSymlinksInPath())
+      var boundCharacter: UniChar = 120, boundGlyph: CGGlyph = 0
+      XCTAssertTrue(CTFontGetGlyphsForCharacters(practice as CTFont, &boundCharacter, &boundGlyph, 1))
+      XCTAssertNotEqual(boundGlyph, 0)
+      let path = try XCTUnwrap(CTFontCreatePathForGlyph(practice as CTFont, boundGlyph, nil))
+      XCTAssertEqual(path.boundingBoxOfPath.minX, size * 0.1, accuracy: 0.001)
+      XCTAssertEqual(path.boundingBoxOfPath.minY, 0, accuracy: 0.001)
+      XCTAssertEqual(path.boundingBoxOfPath.width, size * 0.4, accuracy: 0.001)
+      XCTAssertEqual(path.boundingBoxOfPath.height, size * 0.7, accuracy: 0.001)
+    }
     XCTAssertTrue(CTFontManagerUnregisterFontsForURL(url as CFURL, .process, nil))
     XCTAssertEqual(CTFontManagerGetScopeForURL(url as CFURL), .none)
     active = nil
