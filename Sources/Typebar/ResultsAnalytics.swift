@@ -1187,8 +1187,16 @@ enum ResultPromptText {
     if result.configuration.language.usesSpaceDelimitedWords,
       !TestModifierPolicy.usesNoSpaceInput(result.configuration.modifiers), !needsLegacyNoSpaceParsing
     {
-      let targets = reviews.map(\.target)
-      return targets.isEmpty ? nil : targets.joined(separator: " ")
+      let events = TypingReplay.chronologicalEvents(result.replayEvents)
+        .filter { $0.offset <= result.capturedDuration }
+      let reached = events.isEmpty ? reviews.count
+        : SavedTextInputHistoryPolicy.inputFields(events: events).count
+      guard reached > 0 else { return nil }
+      let targets = UnitInputTargets(result.prompt, buildsASCIICatalog: true)
+      let count = min(reached, targets.fields.count)
+      guard count > 0 else { return nil }
+      let end = targets.fields[count - 1].upperBound
+      return String(decoding: targets.units.prefix(end), as: UTF16.self)
     }
 
     guard let typed = ResultInputText.make(for: result) else { return nil }

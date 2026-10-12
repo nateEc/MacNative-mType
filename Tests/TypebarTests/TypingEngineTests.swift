@@ -17462,7 +17462,7 @@ final class TypingEngineTests: XCTestCase {
       ResultPromptText.make(
         for: result,
         reviews: [.init(index: 0, target: "amber", typed: "amxer", hasInputError: true)]),
-      "amber")
+      "amber ")
 
     let chinese = CompletedTestResult(
       id: UUID(), configuration: .timed(seconds: 30, language: .simplifiedChinese),

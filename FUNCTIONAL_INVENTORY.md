@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 复制练习提示保留提交字符：固定官方 copyWordsListButton 使用已触及原目标的 textWithCommit，原生原先用空格连接 review.target，丢失 LF／空字段及末尾提交。两项红测均失败，现对既有空格分词分支按终局前输入字段数，通过 UnitInputTargets 截取原提示字段前缀，保留 SPACE／LF、制表符内容及 Unicode 拼写；无回放旧归档仍按 review 数回退。更新旧 amber 预期为含原提交空格的 amber，不改断言为接受丢失。最终 46 项相关测试通过（work/result-prompt-commit-final.log，0.170 秒墙钟），原创性边界通过。Zen／无空格分支未改，代码语言等其他分支及真实剪贴板点击未新增验收；零主程序启动，未跑完整门禁／Release，partial 与完整 goal active 保持。
+
 2026-10-12 Zen 慢词复制保留输入字段：固定官方回调在 Zen 使用输入历史而非目标词。新增模式感知选择，使用终局前已记录输入字段，保留提交空格／换行、字段顺序及严格小于阈值，缺失 Burst 不选中；普通模式与默认阈值不变。真实 Zen 会话证明旧 review 路径遗漏提交字符、新路径输出正确。最初“Zen 无 review 导致入口缺失”假设已被真实会话否定，不作为结论；菜单现在按可用输入字段判定。红测、错误假设失败及最终 42 项零失败日志见 work/zen-slow-copy-{red,verified,final}.log。未验收真实剪贴板／结果页点击、全部回放格式或完整门禁／Release；零主程序启动，原 partial 与完整 goal active 保持。
 
 2026-10-12 Zen 结果错词复制修复：只读核对固定官方 test-ui.ts 的 copyMissedWordsListButton 回调，Zen 应复制实际输入而不是错词键列表。原生此前按错词是否为空隐藏导出入口，且复制函数没有模式分支；新增模式感知策略，Zen 使用既有终局回放重建，普通模式保持错词顺序及空格分隔，缺失／全删除回放不冒用提示。红测三项中一项两处断言失败；修复后新测试及相邻结果复制／终局时间共 38 项零失败（work/zen-missed-copy-green.log）。菜单接线已修改，但未做真实剪贴板／可见结果页点击验收，不扩大为完整 UI 证明；零主程序启动，未重跑完整门禁／Release，其他 partial 与完整 goal active 保持。

@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 结果提示复制的原始提交字符（2026-10-12）
+
+固定官方 test-ui.ts 的 copyWordsListButton 在普通模式按 getInputHistory 长度取原词字段并连接 textWithCommit，Zen 连接输入历史。原生 ResultPromptText 的既有空格分词分支用空格连接 review.target，因此即使输入回放和原提示保有 LF，也会导出扁平文本并遗漏最后已触及词的提交。自有夹具两个红测均按预期失败（work/result-prompt-commit-red.log）：harbor LF 被变成 harbor，含空行／tab 的多字段被变成空格连接的 review 字符串。
+
+修复限定该原分支：按截至 capturedDuration 的有序输入历史字段数取 UnitInputTargets 原始字段前缀；无回放旧归档保留 review 数回退，边界夹至原目标范围。保留原始 UTF-16 拼写、SPACE／LF 提交及非提交 tab，不复制输入拼写错误或未来目标。Zen 和无空格分支未改。既有测试原先期待 amber、不含源提交 SPACE，现按官方已核实合同改为 amber SPACE；新增独立断言避免仅更新旧预期掩盖回归。
+
+初次修复相关 44 项通过（result-prompt-commit-green.log），增加未来 review 排除、分解 Unicode 及无回放回退后最终 46 项零失败（work/result-prompt-commit-final.log，0.164 秒测试、0.170 秒墙钟），含 Zen 两种复制、原结果输入／提示复制及终局时间边界。原创性边界检查通过（work/result-prompt-commit-originality.log）。行为优先和根因技能用于复现丢失边界并修复 owning 复制策略，而非改变输入或计分。
+
+未新增真实剪贴板写入／可见结果页点击、代码语言分支、所有来源边界／所有回放格式、完整门禁或 Release 验收。零可见主程序启动、无公共网络内容请求；四项配置 partial、其他缺口与完整 goal active 保持。
+
 ## Zen 慢词复制输入字段语义（2026-10-12）
 
 只读检查固定官方 test-ui.ts 的 copySlowWordsListButton 与 events/stats.ts 的 getInputHistory：Zen 从按词事件的最终输入字段选择，非 Zen 从目标词选择，缺失 Burst 视为不选中，严格低于正有限阈值才复制，默认阈值仅平均正有效 Burst 并四舍五入。未复制参考实现或资源。
