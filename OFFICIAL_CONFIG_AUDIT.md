@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+## 在线填充汇总文本的协作连接（2026-10-12）
+
+源码核查发现 fillingInitialPrompt 虽然在各节之间 yield，结束时仍调用公开初始化器，将全部 collected token 再一次同步 joined；已有内容足够也重新构造。改为仅在确有新节时每 100 token 连接，并在块前／末块后检查取消、块后 yield；由私有 preparedText 初始化器保留文本和原始 token。普通公开构造器仍用同步 joined，作为独立对照。无新节时在取消检查后直接 return self。
+
+会话内决策复核：不能截断超过预算的尾部 token，不能改变来源／分隔符校验和空节失败，也不能将无空格文本按空白重新分词。测试两来源乘三分隔符，对组合重音、emoji、中文、阿拉伯文、空 token 和内部换行精确比较原公开初始化器的 UTF-8、内容对象、署名与继续描述符；断言 304 token 的块进度为 100、200、300、304。另验首块和最后一块取消不返回填充对象、100,002 token 已有内容不取数或重装配；既有 100,001 词预算／余量测试继续覆盖真实新填充路径。行为保持型性能重构使用独立旧语义对照，不制造产品红测。
+
+work/live-filled-content-assembly.log 定点 15 项零失败（4.709 秒）；work/live-filled-content-host-regression.log 全部相关 59 项零失败，其中 44 项实际隐藏宿主（272.136 秒）。零可见主程序启动、无公共内容网络。私有初始化器只用于内部已准备文本；依然全量保留 tokens／text，不称有界内存或已验证输入延迟。单节同步解码／构造、单个超长 token、署名 joined、继续描述符及最终会话构造／布局仍有同步限制；新增挂起点中的配置变化由现有加载器复核显示状态和请求所有权，但本轮未新增该填充装配点的精确宿主交错。未跑新完整门禁，showAllLines 等 partial 与完整 goal active 保持。
+
 ## 已取消在线任务仍启动首次取数的根因与修复（2026-10-12）
 
 为 PendingContent 增加逐请求 ID、等待 ID、取消处理器通知和入口取消状态。先验证等待请求中只有一个未取消所有者（work/live-replacement-request-ownership.log），再增加“已取消任务不得进入取数”的断言；红测精确报告 requestsCancelledAtEntry 为 [1, 3]（work/live-replacement-cancelled-entry-red.log，1 项 1 失败），证明不是单纯等待回复计数误读。

@@ -52,12 +52,20 @@ struct LivePracticeContent: Equatable {
     source: LivePracticeContentSource, title: String, byline: String?, tokens: [String],
     separator: String
   ) {
+    self.init(source: source, title: title, byline: byline, tokens: tokens,
+      separator: separator, preparedText: tokens.joined(separator: separator))
+  }
+
+  private init(
+    source: LivePracticeContentSource, title: String, byline: String?, tokens: [String],
+    separator: String, preparedText: String
+  ) {
     self.source = source
     self.title = title
     self.byline = byline
     self.tokens = tokens
     self.separator = separator
-    text = tokens.joined(separator: separator)
+    text = preparedText
   }
 
   var attribution: String {
@@ -83,6 +91,7 @@ struct LivePracticeContent: Equatable {
 
   @MainActor func fillingInitialPrompt(
     for configuration: TestConfiguration, showAllLines: Bool,
+    didAssemble: (Int) -> Void = { _ in },
     fetchNext: () async -> LivePracticeContent?
   ) async -> LivePracticeContent? {
     guard !Task.isCancelled else { return nil }
@@ -109,9 +118,24 @@ struct LivePracticeContent: Equatable {
       await Task.yield()
     }
     guard !Task.isCancelled else { return nil }
+    // Reusing a retained section must not rejoin its already prepared text.
+    if collected.count == tokens.count { return self }
+    var preparedText = "", offset = 0
+    while offset < collected.count {
+      guard !Task.isCancelled else { return nil }
+      let end = offset + min(100, collected.count - offset)
+      for index in offset..<end {
+        if index > 0 { preparedText += separator }
+        preparedText += collected[index]
+      }
+      offset = end
+      didAssemble(offset)
+      await Task.yield()
+    }
+    guard !Task.isCancelled else { return nil }
     return .init(source: source, title: titles.joined(separator: " / "),
       byline: authors.isEmpty ? nil : authors.joined(separator: " / "),
-      tokens: collected, separator: separator)
+      tokens: collected, separator: separator, preparedText: preparedText)
   }
 
   func promptDescriptor(for configuration: TestConfiguration, showAllLines: Bool = false) -> LivePracticePrompt {
