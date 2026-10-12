@@ -80,7 +80,9 @@ run_check() {
   shift
 
   print -- "→ $label"
-  "$@"
+  # zsh ERR_EXIT from inside a function can bypass the shell's EXIT trap.
+  # Exit explicitly so failed checks retain evidence before cleanup.
+  "$@" || exit $?
 }
 
 run_logged_check() {
@@ -95,7 +97,7 @@ run_logged_check() {
   else
     print -u2 -- "✗ $label"
     tail -n 200 "$log_path" >&2
-    return 1
+    exit 1
   fi
 }
 
