@@ -6902,7 +6902,7 @@ private struct CompletedResultView: View {
             Button("复制结果文字", action: copyResultText)
             Button("复制练习提示", action: copyResultPrompt)
             Button("复制实际输入", action: copyResultInput)
-            if !missedWords.isEmpty {
+            if MissedWordCopyText.make(for: result, words: missedWords) != nil {
               Button("复制错词列表", action: copyMissedWords)
             }
             if !wordReviews.isEmpty {
@@ -7414,7 +7414,11 @@ private struct CompletedResultView: View {
   }
 
   private func copyMissedWords() {
-    copyTextToClipboard(MissedWordCopyText.make(words: missedWords), success: "错词列表已复制")
+    guard let text = MissedWordCopyText.make(for: result, words: missedWords) else {
+      exportNotice("没有可复制的错词或 Zen 输入回放", level: .notice)
+      return
+    }
+    copyTextToClipboard(text, success: "错词列表已复制")
   }
 
   private func prepareSlowWordCopy() {

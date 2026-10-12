@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+## Zen 结果错词复制行为修复（2026-10-12）
+
+参考固定提交 91bd24bb8513785c7364cbea29296ff7adafac41 的 frontend/src/ts/test/test-ui.ts，copyMissedWordsListButton 在 Zen 分支拼接输入历史，在其他模式拼接错词键。原生 ResultView.copyMissedWords 只调用数组连接，导出菜单也只在 missedWords 非空时显示；因此无目标词的 Zen 无法经这个入口复制自由输入。未复制参考代码／资产。
+
+行为优先与根因定位：先给既有数组策略添加保持原行为的模式感知适配入口，用独立 Unicode 输入、删除、换行、尾空格及终局后事件夹具复现，work/zen-missed-copy-red.log 三项中一项失败、两处断言分别得到 nil 和伪目标值，而预期为编辑后的输入。修复只在 Zen 分支调用已有 ResultInputText，并让生产导出菜单及复制动作使用同一策略；普通模式不变，缺失／完全删除回放返回 nil，动作显示无可复制内容的通知而不复制未来提示。
+
+最终新策略与相邻结果输入／提示复制、TerminalTimingTests、ResultElapsedTimeTests 共 38 项零失败（work/zen-missed-copy-green.log，0.144 秒测试、0.149 秒墙钟）。这是策略执行与生产接线证据，未执行真实系统剪贴板写入或可见结果页菜单点击；不声称物理输入法或所有回放来源验收。零可见主程序启动、无公共网络内容请求，未重跑完整门禁／Release；四项配置 partial 与其他缺口保持，完整 goal active。
+
 ## 在线准备挂起后导入离线选择（2026-10-12）
 
 检查生产入口确认 settings.testModifiers 的观察仅刷新提示，toggleTestModifier 本身不触发重开，不能把直接赋值测试当作运行命令面板关闭来源。本轮在隔离 settings 上 toggleTestModifier 关闭来源，再调用真实 importActiveTestSelection 导入新的 152 词选择；生产 activeTestSelectionGeneration 观察负责恢复选择和重开。分别在提示描述符及真实完整会话准备后的发布边界挂起，返回无视取消的旧结果。保持此前在线选择替换场景仍断言一条有效等待回复，新增离线场景独立断言零等待回复，没有削弱旧场景。

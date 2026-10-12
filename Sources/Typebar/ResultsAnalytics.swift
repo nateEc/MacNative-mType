@@ -923,6 +923,13 @@ enum WordPracticeText {
 }
 
 enum MissedWordCopyText {
+  static func make(for result: CompletedTestResult, words: [String]) -> String? {
+    if result.configuration.mode == .zen {
+      return ResultInputText.make(for: result)
+    }
+    return words.isEmpty ? nil : make(words: words)
+  }
+
   /// A copied list remains space separated even for unspaced languages, so
   /// individual locally identified targets can be read and reused elsewhere.
   static func make(words: [String]) -> String {
