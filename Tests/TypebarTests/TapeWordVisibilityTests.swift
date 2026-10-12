@@ -170,13 +170,13 @@ import XCTest
 
   private func updateSession(_ session: TypingSession, view: TapePromptNativeView,
     motion: PromptCaretMotionCoordinator, rtl: Bool, time: TimeInterval,
-    removed: @escaping (PromptTapeWordRemoval) -> Void) {
+    fontSize: CGFloat = 28, removed: @escaping (PromptTapeWordRemoval) -> Void) {
     let rendering = render(session), words = TapePromptProjection.words(session: session, rendering: rendering)
     let active = session.promptWordPresentations[4].range.lowerBound
     let typed = session.typed, attempt = session.automaticInputAttemptID
     let glyph = active + (typed.split(separator: "\n", omittingEmptySubsequences: false).last?.count ?? 0)
     var config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
-      mainStyle: .off, paceStyle: .off, font: .monospacedSystemFont(ofSize: 28, weight: .medium),
+      mainStyle: .off, paceStyle: .off, font: .monospacedSystemFont(ofSize: fontSize, weight: .medium),
       lineSpacing: 0, rightToLeft: rtl, accent: .yellow, motion: .off, reducesMotion: false,
       frameRate: 60, attemptID: attempt, coordinator: motion, mainGlyphID: glyph)
     config.latestInput = { .init(attemptID: attempt, typed: typed, composition: "", glyphID: glyph) }
@@ -196,6 +196,53 @@ import XCTest
         URL(fileURLWithPath: directory).appendingPathComponent("tape-word-visibility-\(name).png"))
     }
     return bitmap
+  }
+
+  func testFontRebuildBeforeHorizontalRemovalAcknowledgementStillDeliversRemoval() {
+    for rtl in [false, true] {
+      var session = newlineSession()
+      let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 200))
+      let motion = PromptCaretMotionCoordinator()
+      var events: [PromptTapeWordRemoval] = []
+      let delivered = expectation(description: "Removal survives font rebuild rtl=\(rtl)")
+      let accept: (PromptTapeWordRemoval) -> Void = {
+        events.append($0); session.removeTapePromptWords($0); delivered.fulfill()
+      }
+      updateSession(session, view: view, motion: motion, rtl: rtl, time: 0, removed: accept)
+      session.insert("m", at: start.addingTimeInterval(1))
+      updateSession(session, view: view, motion: motion, rtl: rtl, time: 1, removed: accept)
+      view.present(at: 1)
+      XCTAssertTrue(events.isEmpty)
+      updateSession(session, view: view, motion: motion, rtl: rtl, time: 1.01,
+        fontSize: 32, removed: accept)
+      wait(for: [delivered], timeout: 1)
+      XCTAssertEqual(events.count, 1)
+      XCTAssertEqual(session.removedTapePromptWordIndices, [0, 1, 2])
+      updateSession(session, view: view, motion: motion, rtl: rtl, time: 1.02,
+        fontSize: 32, removed: accept)
+      RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.002))
+      XCTAssertEqual(events.count, 1)
+      view.stop()
+    }
+  }
+
+  func testOwnerReplacementRejectsPendingHorizontalRemovalAfterFontRebuild() {
+    var session = newlineSession()
+    let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 200))
+    let motion = PromptCaretMotionCoordinator()
+    var events: [PromptTapeWordRemoval] = []
+    let accept: (PromptTapeWordRemoval) -> Void = { events.append($0) }
+    updateSession(session, view: view, motion: motion, rtl: false, time: 0, removed: accept)
+    session.insert("m", at: start.addingTimeInterval(1))
+    updateSession(session, view: view, motion: motion, rtl: false, time: 1, removed: accept)
+    view.present(at: 1)
+    updateSession(session, view: view, motion: motion, rtl: false, time: 1.01,
+      fontSize: 32, removed: accept)
+    updateSession(session, view: view, motion: PromptCaretMotionCoordinator(), rtl: false,
+      time: 1.02, fontSize: 32, removed: accept)
+    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
+    XCTAssertTrue(events.isEmpty)
+    view.stop()
   }
 
   func testActualSessionAcknowledgementPreservesNativePixelsAndAppliesNoSecondCompensation() throws {

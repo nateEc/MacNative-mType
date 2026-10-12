@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 Tape 横向词孔的通知前字体重建竞态修复：同尝试、同 coordinator 重建此前清空待发词移除并重置布局孔状态，LTR／RTL 红测一项六处失败（work/tape-horizontal-font-red.log）。现在保留原生已完成词孔及待发／已发通知集合，新 revision 重新交付未确认通知；更换 owner 仍清空旧状态。新增确认后不重复通知及字体重建后 owner 替换拒绝旧通知反例。带固定源码环境的相关 261 项零失败（work/tape-horizontal-font-regression.log，108.626 秒墙钟）。behavior-first-testing 先红后绿，同会话有界 decision-review 检查身份、代次和确认幂等；非独立评审。未打开可见主程序，未重跑完整门禁／Release；不证明可见像素、实体 IME 或所有反向输入交错，tapeMode partial 与完整 goal active 保持。
+
 2026-10-12 Tape 已完成前缀删除的字体重建竞态修复：当前普通换行 Tape 已进入生产，不沿用早期“仍回退”说明。实际 native owner 在动画完成后先移除旧行，再异步通知会话；通知前字体重建却共用新尝试重置分支，恢复旧行并清掉完成通知。首次测试夹具引用私有类型未编译，不作为红测；改用独立原生布局高度对照后，LTR／RTL 一项八处有效失败（work/tape-font-pending-prefix-red-verified.log），六行高度 306 而非五行 255，通知未到。修复在同尝试且同 coordinator 的几何重建中保留已完成前缀、按新代次重新交付通知，未完成动画仍取消；新尝试／owner 更换仍清除旧状态。新增反例确认重建后更换 owner／尝试不发布旧通知，确认后不二次通知。相关 259 项零失败（work/tape-font-pending-prefix-regression.log，108.075 秒墙钟），含普通 Tape、真实组合输入宿主及重启／拆卸回归。同会话有界 decision-review 核对 owner 身份、代次失效和确认幂等，不声称独立评审。该修复不证明横向词孔通知前重建、任意反向输入队列、可见帧率或实体 IME；零可见主程序，未重跑完整门禁／Release，tapeMode partial 与完整 goal active 保持。
 
 2026-10-12 慢词复制空目标保持：新增只读探针执行固定官方 copySlowWordsListButton 的完整点击／弹窗执行回调，六组自有输入历史与 Burst 边界覆盖空目标／仅空目标、重复词、严格阈值、Zen 提交字符、缺失 Burst 和未触及尾部。原生对照红测两处断言失败：原生跳过空目标，输出 harbor 而非含位置分隔符的“ harbor ”（work/slow-copy-source-red.log）。仅移除普通策略的额外非空过滤，不改顺序、阈值或缺失 Burst 保护；最终相关 73 项零失败（work/slow-copy-source-final.log，0.546 秒墙钟）。探针已接入完整门禁，参考代码只在 QA 运行时读取，产品不包含回调源码／资产；历史、弹窗校验与剪贴板是自有适配边界，不声称浏览器、真实剪贴板或全部空字段生成验收。零主程序启动，未重跑完整门禁／Release，原 partial 与完整 goal active 保持。

@@ -137,12 +137,16 @@ final class TapePromptNativeView: NSView {
         preservesCompletedPrefix ? textView.firstRetainedNewlineIndex : 0)
       if preservesCompletedPrefix {
         newlineWords.removeAll { $0.index < retained }
+        let removed = textView.removedNewlineWordIndices
+        for index in newlineWords.indices where removed.contains(newlineWords[index].index) {
+          newlineWords[index].isRemoved = true
+        }
         notifiedRetirementIndex = max(notifiedRetirementIndex, retirement?.firstRetainedWordIndex ?? 0)
       } else {
         notifiedRetirementIndex = retirement?.firstRetainedWordIndex ?? 0
         pendingRetirement = nil
+        pendingTapeWordRemovals = []; notifiedTapeWordRemovals = []
       }
-      pendingTapeWordRemovals = []; notifiedTapeWordRemovals = []
       resetNewlineTransition(firstRetained: retained)
     }
     let acknowledgesNativePrefix = !resets && !newlineWords.isEmpty
