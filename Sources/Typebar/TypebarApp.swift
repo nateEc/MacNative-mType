@@ -89,6 +89,10 @@ struct TypebarApp: App {
     livePromptPrepare: @escaping @MainActor (LivePracticeContent, TestConfiguration, Bool) async throws -> LivePracticePrompt = {
       try await $0.preparingPromptDescriptor(for: $1, showAllLines: $2)
     },
+    liveSessionPrepare: @escaping @MainActor (TestConfiguration, LivePracticePrompt, LivePracticePrompt?, WeakSpotScores, PoolWordDecorationState, Bool) async throws -> TypingSession = {
+      try await TestSessionFactory.preparingLiveSession(configuration: $0, prompt: $1,
+        continuation: $2, weakSpotScores: $3, wordDecorationState: $4, showAllLines: $5)
+    },
     wholePreviewPrepare: @escaping @MainActor (TestConfiguration, WeakSpotScores, PoolWordDecorationState) async throws -> TypingSession = {
       try await WholePreviewWordPreparation.prepareSession(configuration: $0,
         weakSpotScores: $1, wordDecorationState: $2)
@@ -97,6 +101,7 @@ struct TypebarApp: App {
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
       systemAppearance: systemAppearance, liveContentFetch: liveContentFetch,
       livePromptPrepare: livePromptPrepare,
+      liveSessionPrepare: liveSessionPrepare,
       wholePreviewPrepare: wholePreviewPrepare)
   }
 
@@ -1187,6 +1192,7 @@ private struct ContentView: View {
   let systemAppearance: SystemAppearanceMonitor
   let liveContentFetch: @MainActor (LivePracticeContentSource, TypingLanguage) async -> LivePracticeContent?
   let livePromptPrepare: @MainActor (LivePracticeContent, TestConfiguration, Bool) async throws -> LivePracticePrompt
+  let liveSessionPrepare: @MainActor (TestConfiguration, LivePracticePrompt, LivePracticePrompt?, WeakSpotScores, PoolWordDecorationState, Bool) async throws -> TypingSession
   let wholePreviewPrepare: @MainActor (TestConfiguration, WeakSpotScores, PoolWordDecorationState) async throws -> TypingSession
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
@@ -4592,10 +4598,9 @@ private struct ContentView: View {
             preparedContinuation = try await current.preparingContinuationDescriptor(
               for: configuration, showAllLines: wholePreview)
             if let prompt = preparedPrompt {
-              preparedLiveSession = try await TestSessionFactory.preparingLiveSession(
-                configuration: configuration, prompt: prompt, continuation: preparedContinuation,
-                weakSpotScores: session.liveWeakSpotScores,
-                wordDecorationState: session.liveWordDecorationState, showAllLines: wholePreview)
+              preparedLiveSession = try await liveSessionPrepare(
+                configuration, prompt, preparedContinuation, session.liveWeakSpotScores,
+                session.liveWordDecorationState, wholePreview)
             }
           } catch { return }
           guard !Task.isCancelled, requestID == liveContentRequestID else { return }

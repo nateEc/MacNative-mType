@@ -65,6 +65,22 @@ import XCTest
     try checkDelayedReplacement(replacesSelectionDuringAssembly: true)
   }
 
+  func testDisplayBudgetChangedAfterLiveSessionPreparationRejectsOldSession() throws {
+    try checkDelayedReplacement(changesBudgetDuringAssembly: true, suspendsPreparedSession: true)
+  }
+
+  func testFirstInputAfterLiveSessionPreparationPreservesPromptAndCaret() throws {
+    try checkDelayedReplacement(startsDuringAssembly: true, suspendsPreparedSession: true)
+  }
+
+  func testDisappearanceAfterLiveSessionPreparationRejectsCancelledSession() throws {
+    try checkDelayedReplacement(cancelsDuringAssembly: true, suspendsPreparedSession: true)
+  }
+
+  func testReplacingSelectionAfterLiveSessionPreparationRejectsOldSession() throws {
+    try checkDelayedReplacement(replacesSelectionDuringAssembly: true, suspendsPreparedSession: true)
+  }
+
   func testLiveResponseAfterFirstInputPreservesPromptAndMainCaret() throws {
     try checkDelayedReplacement(startsBeforeReturn: true)
   }
@@ -265,7 +281,8 @@ import XCTest
     checksBackwardInput: Bool = false, encyclopedia: Bool = false,
     initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false,
     changesBudgetDuringAssembly: Bool = false, startsDuringAssembly: Bool = false,
-    cancelsDuringAssembly: Bool = false, replacesSelectionDuringAssembly: Bool = false) throws {
+    cancelsDuringAssembly: Bool = false, replacesSelectionDuringAssembly: Bool = false,
+    suspendsPreparedSession: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -300,8 +317,8 @@ import XCTest
       network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor(),
       liveContentFetch: pending.fetch,
       livePromptPrepare: { content, configuration, wholePreview in
-        assemblyBudgets.append(wholePreview)
-        if (changesBudgetDuringAssembly || startsDuringAssembly || cancelsDuringAssembly
+        if !suspendsPreparedSession { assemblyBudgets.append(wholePreview) }
+        if !suspendsPreparedSession && (changesBudgetDuringAssembly || startsDuringAssembly || cancelsDuringAssembly
           || replacesSelectionDuringAssembly) && assemblyBudgets.count == 1 {
           staleDescriptor = content.promptDescriptor(for: configuration, showAllLines: wholePreview)
           let descriptor: LivePracticePrompt = await withCheckedContinuation { suspendedAssembly = $0 }
@@ -309,6 +326,24 @@ import XCTest
           return descriptor
         }
         return try await content.preparingPromptDescriptor(for: configuration, showAllLines: wholePreview)
+      },
+      liveSessionPrepare: { configuration, prompt, continuation, weakSpots, decoration, wholePreview in
+        let prepared = try await TestSessionFactory.preparingLiveSession(configuration: configuration,
+          prompt: prompt, continuation: continuation, weakSpotScores: weakSpots,
+          wordDecorationState: decoration, showAllLines: wholePreview)
+        if suspendsPreparedSession {
+          assemblyBudgets.append(wholePreview)
+          if assemblyBudgets.count == 1 {
+            staleDescriptor = prompt
+            // Keep the real completed session local on the main actor. The
+            // descriptor is only a release signal, not a fake session result.
+            let _: LivePracticePrompt = await withCheckedContinuation { suspendedAssembly = $0 }
+            if withUnsafeCurrentTask(body: { $0?.isCancelled == true }) { cancelledAssemblyReplies += 1 }
+          }
+        }
+        // Deliberately ignore cancellation after the suspended release. The
+        // production publication guard must reject this completed old session.
+        return prepared
       }).modelContainer(container)
     let host = NSHostingView(rootView: AnyView(content.frame(width: 1000, height: 720)))
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
