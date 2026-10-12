@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 在线后续余量协作装配：生产初始加载在发布前异步准备 continuation，初始提示与尾部共用每 100 token 的可取消装配器；尾部仍按原有限／无限预算切片、不循环补齐。Unicode 与无空格边界独立对照、100,002 token 保留尾部、首末批取消和无余量 nil 等定点及相邻 19 项通过；全部相关 63 项通过，其中隐藏宿主 44 项（work/live-continuation-host-regression.log，285.907 秒）。零主程序启动；尾部装配点精确宿主交错、最终同步会话构造／布局和全量内存等缺口仍在，未跑新完整门禁，showAllLines partial 与完整 goal active 保持。
+
 2026-10-12 在线填充后文本连接改进：fillingInitialPrompt 汇总词源后不再通过公开构造器全量同步 joined，而以每 100 token 协作连接、首批／末批检查取消，经私有构造器保存已准备文本；已有充足内容直接复用，保留全部尾部余量。Unicode 字节、分隔符、署名、取消和 100,001 词等定点 15 项通过，全部相关 59 项通过（隐藏宿主 44 项，work/live-filled-content-host-regression.log，272.136 秒）。零主程序启动；单节解码、署名汇总、最终会话／布局及总内存限制不变，未跑新完整门禁，showAllLines partial 与完整 goal active 保持。
 
 2026-10-12 过期在线任务首次取数修复：为测试传输逐请求记录取消状态，红测确认恢复及词数观察重复重置后，已取消任务仍进入首次取数（请求 1、3）。生产在线任务首次 fetch 前现检查取消及请求 ID；相关 56 项通过，其中隐藏宿主 44 项（work/live-replacement-cancelled-entry-green.log，274.006 秒）；最终加强的单条等待回复断言定点通过（live-replacement-single-pending-verified.log）。此前两条等待回复在该场景的原因已定位，不推广为所有并发路径单飞证明。零主程序启动；未跑新完整门禁，真实输入法／资源布局等 partial 与完整 goal active 保持。

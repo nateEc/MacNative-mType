@@ -164,12 +164,28 @@ struct LivePracticeContent: Equatable {
     case .time, .words: count = initialWordCount(for: configuration, showAllLines: showAllLines)
     case .quote, .zen, .custom: count = tokens.count
     }
+    return try await preparingDescriptor(start: 0, count: count, didAssemble: didAssemble)
+  }
+
+  @MainActor func preparingContinuationDescriptor(for configuration: TestConfiguration,
+    showAllLines: Bool = false, didAssemble: (Int) -> Void = { _ in }) async throws -> LivePracticePrompt? {
+    try Task.checkCancellation()
+    guard configuration.mode == .words || configuration.mode == .time else { return nil }
+    let start = initialWordCount(for: configuration, showAllLines: showAllLines)
+    let end = configuration.mode == .words && !configuration.isInfinite
+      ? min(tokens.count, configuration.wordLimit ?? 25) : tokens.count
+    guard start < end else { return nil }
+    return try await preparingDescriptor(start: start, count: end - start, didAssemble: didAssemble)
+  }
+
+  @MainActor private func preparingDescriptor(start: Int, count: Int,
+    didAssemble: (Int) -> Void) async throws -> LivePracticePrompt {
     var prompt = "", boundaries = "", offset = 0
     while offset < count {
       try Task.checkCancellation()
       let end = offset + min(100, count - offset)
       for index in offset..<end {
-        let token = tokens[index % tokens.count]
+        let token = tokens[(start + index) % tokens.count]
         if index > 0 { prompt += separator }
         prompt += token
         if separator.isEmpty {

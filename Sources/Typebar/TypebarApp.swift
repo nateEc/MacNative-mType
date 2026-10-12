@@ -4563,6 +4563,7 @@ private struct ContentView: View {
       let firstContent = await liveContentFetch(source, configuration.language)
       var content = firstContent
       var preparedPrompt: LivePracticePrompt?
+      var preparedContinuation: LivePracticePrompt?
       var failedGenerationAttempts = 0
       while !Task.isCancelled {
         let wholePreview = settings.showAllPracticeLines && settings.practiceTapeMode == .off
@@ -4587,6 +4588,8 @@ private struct ContentView: View {
         if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off), let current = content {
           do {
             preparedPrompt = try await livePromptPrepare(current, configuration, wholePreview)
+            preparedContinuation = try await current.preparingContinuationDescriptor(
+              for: configuration, showAllLines: wholePreview)
           } catch { return }
           guard !Task.isCancelled, requestID == liveContentRequestID else { return }
           if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off) { break }
@@ -4629,8 +4632,7 @@ private struct ContentView: View {
       session = TestSessionFactory.make(
         configuration: configuration, streamPrompt: livePrompt.text,
         streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource,
-        streamContinuation: content.continuationDescriptor(for: configuration,
-          showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off),
+        streamContinuation: preparedContinuation,
         streamsLiveContent: true,
         weakSpotScores: session.liveWeakSpotScores,
         wordDecorationState: session.liveWordDecorationState,

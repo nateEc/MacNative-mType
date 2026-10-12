@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 在线后续余量描述符的协作准备（2026-10-12）
+
+生产初始加载先前在最终 TestSessionFactory.make 参数中同步 continuationDescriptor，可能一次性连接较大保留尾部。新增 preparingContinuationDescriptor，与初始 preparingPromptDescriptor 共用私有分批连接器，每批最多 100 token、块前和末块后检查取消、块后 yield。尾部起点仍为当前显示预算，有限词数终点仍 min(tokens.count, wordLimit)，无限／时间模式仍保留全部余量。同步切片实现保留作独立行为对照及其他既有调用。
+
+生产任务将提示和余量都准备完，再检查请求 ID、取消和当前全行／纸带预算，发布时只使用 preparedContinuation，不在会话构造参数中重新连接尾部。显示预算改变则重走准备循环，不能发布混合预算的提示／尾部。本轮没有新增全局状态或可见窗口。
+
+会话内决策复核：初始提示允许循环选择，但尾部必须保持原切片、不补齐／不越过有限目标，且无余量保持 nil。测试组合重音、emoji、中文、阿拉伯文、空 token、内部换行乘三分隔符，对有限／无限／时间／可见未来覆盖及全行开关比较原同步切片的 UTF-8 和来源边界；另验证 100,002 token 末尾 owned100001 未截断、首批／末批取消不返回尾部、无余量不触发装配。本次为行为保持重构，使用独立旧实现对照，不制造产品红测。
+
+work/live-continuation-cooperative.log 定点及相邻 19 项零失败（4.653 秒）；work/live-continuation-host-regression.log 相关 63 项零失败，其中 44 项真实隐藏宿主（285.907 秒）。这些宿主覆盖整个生产路径，尚未精确挂起在新增尾部装配点改变配置／输入。单 token 大小、单节构造、署名连接、最终会话的同步继续数据处理／布局和全量内存仍有限制，不能声称低延迟或有界内存全部验收。零主程序启动、无公共内容网络，未跑新完整门禁，showAllLines 等 partial 与完整 goal active 保持。
+
 ## 在线填充汇总文本的协作连接（2026-10-12）
 
 源码核查发现 fillingInitialPrompt 虽然在各节之间 yield，结束时仍调用公开初始化器，将全部 collected token 再一次同步 joined；已有内容足够也重新构造。改为仅在确有新节时每 100 token 连接，并在块前／末块后检查取消、块后 yield；由私有 preparedText 初始化器保留文本和原始 token。普通公开构造器仍用同步 joined，作为独立对照。无新节时在取消检查后直接 return self。
