@@ -42,6 +42,10 @@ import XCTest
     try checkDelayedReplacement(changesBudgetDuringAssembly: true)
   }
 
+  func testFirstInputDuringPromptAssemblyPreventsLateReplacement() throws {
+    try checkDelayedReplacement(startsDuringAssembly: true)
+  }
+
   func testLiveResponseAfterFirstInputPreservesPromptAndMainCaret() throws {
     try checkDelayedReplacement(startsBeforeReturn: true)
   }
@@ -241,7 +245,7 @@ import XCTest
     failsInitialFill: Bool = false, generatesNextWord: Bool = false,
     checksBackwardInput: Bool = false, encyclopedia: Bool = false,
     initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false,
-    changesBudgetDuringAssembly: Bool = false) throws {
+    changesBudgetDuringAssembly: Bool = false, startsDuringAssembly: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -276,7 +280,7 @@ import XCTest
       liveContentFetch: pending.fetch,
       livePromptPrepare: { content, configuration, wholePreview in
         assemblyBudgets.append(wholePreview)
-        if changesBudgetDuringAssembly && assemblyBudgets.count == 1 {
+        if (changesBudgetDuringAssembly || startsDuringAssembly) && assemblyBudgets.count == 1 {
           staleDescriptor = content.promptDescriptor(for: configuration, showAllLines: wholePreview)
           return await withCheckedContinuation { suspendedAssembly = $0 }
         }
@@ -355,6 +359,8 @@ import XCTest
         .first { $0.rootView.style == .bar && !$0.isHidden }).frame
       XCTAssertGreaterThan(try XCTUnwrap(startedCaret).minX, beforeInputCaret.minX,
         "The first accepted English character must advance the main caret before the response")
+      XCTAssertEqual(views(PromptFieldNativeView.self, in: host).first?.accessibilityValue() as? String,
+        initialPrompt, "Accepted first input must retain the prompt before any provider reply")
     }
     if !initialEncyclopediaFailures.isEmpty {
       XCTAssertTrue(encyclopedia)
@@ -433,9 +439,13 @@ import XCTest
     if emptyInitialReplies > 0 {
       let initialRequestCount = pending.callCount
       pending.scriptedTokens = []
-      for _ in 0..<emptyInitialReplies {
+      for replyIndex in 0..<emptyInitialReplies {
         pending.finish()
         for _ in 0..<5 { flush() }
+        if startsBeforeReturn {
+          XCTAssertEqual(views(PromptFieldNativeView.self, in: host).first?.accessibilityValue() as? String,
+            initialPrompt, "Started attempt lost its prompt after empty reply \(replyIndex + 1); requests=\(pending.callCount)")
+        }
       }
       XCTAssertEqual(pending.callCount, initialRequestCount + min(emptyInitialReplies, 2))
       XCTAssertTrue(settings.testModifiers.contains(.poetryStream))
@@ -466,6 +476,38 @@ import XCTest
     }
     pending.finish()
     for _ in 0..<5 { flush() }
+    if startsDuringAssembly {
+      XCTAssertEqual(assemblyBudgets, [true])
+      let continuation = try XCTUnwrap(suspendedAssembly)
+      let stale = try XCTUnwrap(staleDescriptor)
+      XCTAssertNotEqual(stale.text, initialPrompt)
+      initialInput.onFocusChanged(true)
+      initialInput.onWindowFocusChanged(true, false)
+      flush()
+      presentCarets()
+      let beforeCaret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
+        .first { $0.rootView.style == .bar && !$0.isHidden }).frame
+      initialInput.insertText(String(initialPrompt.prefix(1)),
+        replacementRange: .init(location: NSNotFound, length: 0))
+      flush()
+      presentCarets()
+      let acceptedCaret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
+        .first { $0.rootView.style == .bar && !$0.isHidden }).frame
+      XCTAssertGreaterThan(acceptedCaret.minX, beforeCaret.minX)
+      suspendedAssembly = nil
+      continuation.resume(returning: stale)
+      for _ in 0..<5 { flush() }
+      presentCarets()
+      XCTAssertEqual(assemblyBudgets, [true])
+      let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+      XCTAssertEqual(field.accessibilityValue() as? String, initialPrompt)
+      XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+      XCTAssertEqual(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
+        .first { $0.rootView.style == .bar && !$0.isHidden }?.frame, acceptedCaret)
+      XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+      XCTAssertFalse(window.isVisible)
+      return
+    }
     if changesBudgetDuringAssembly {
       XCTAssertEqual(assemblyBudgets, [true])
       let continuation = try XCTUnwrap(suspendedAssembly)

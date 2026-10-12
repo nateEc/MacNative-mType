@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 装配挂起后的首字符保护补证：隐藏生产宿主在准备描述符后挂起，通过真实原生输入框接受首字符，再释放旧结果，确认原提示、输入对象及主光标位置保留，不产生保存结果。新增场景与既有不稳定空初始化场景定点 3 项通过（work/live-prompt-input-interleaving.log）；全部相关 54 项通过，其中隐藏宿主 42 项（work/live-prompt-input-host-regression.log，284.789 秒）。为空响应每一步增加有界诊断断言，上轮失败未复现但根因仍未确认；没有猜测性产品修复。本轮只增加证据，零主程序启动，完整 goal active 及 partial／完整门禁缺口保持。
+
 2026-10-12 在线描述符精确交错补证：生产组合入口增加默认仍调用原协作装配器的注入边界；隐藏宿主在描述符准备中挂起、关闭全行显示、强制返回旧预算结果，确认重新按当前预算装配且保留原输入对象。新增测试通过。相关 53 项回归有 1 项既有空初始化宿主失败（无法找到提示视图），与新增测试一起单独复现时 2 项通过，根因未确认，不能称全套通过。日志 work/live-prompt-budget-host-regression.log、live-prompt-budget-focused-reproduction.log；首轮新测试漏算流式末尾空格的预期错误保留于 live-prompt-budget-interleaving.log。零主程序启动；goal active，既有 partial 与完整门禁缺口不变。
 
 2026-10-12 在线初始描述符装配改进：按 100 个原始 token 协作准备文本／来源边界，实际替换任务在挂起后重查请求和显示状态，不以旧预算发布。100,001 词精确对照、取消及最大合法目标首批取消，连同全部 40 项隐藏在线替换宿主等相关 52 项通过（work/live-prompt-cooperative-assembly-host-regression.log），决策复核及未验证精确交错见 OFFICIAL_CONFIG_AUDIT.md。零主程序启动、本地夹具无公共网络；其他同步拼接／最终构造布局和总内存仍有缺口，未跑新完整门禁，showAllLines 部分与完整 goal active 保持。
