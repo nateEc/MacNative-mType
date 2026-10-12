@@ -1,8 +1,18 @@
 import Foundation
 
-/// Prepares finite pool-generated words cooperatively without changing their
-/// initial-generation bound. Production admission/UI wiring remains separate.
+/// Cooperatively prepares finite pool-generated words with their full initial
+/// bound. Display admission stays explicit; other sources keep separate paths.
 enum WholePreviewWordPreparation {
+  /// Stage the UI migration inside the existing whole-preview admission range.
+  /// Larger targets still require a resource/presentation design, not a new cap.
+  static func usesAsyncPreparation(configuration: TestConfiguration, showAllLines: Bool) -> Bool {
+    GeneratedPromptChunkPolicy.previewsWholeFiniteWords(for: configuration, showAllLines: showAllLines)
+      && (configuration.wordLimit ?? 0) > GeneratedPromptChunkPolicy.maximumInitialWordCount
+      && configuration.visibleFutureWordCount == nil
+      && LivePracticeContentSource.selected(for: configuration) == nil
+      && TypebarStreamContent.prompt(configuration: configuration, wordCount: 1) == nil
+  }
+
   @MainActor static func prepare(
     configuration: TestConfiguration, sourceWords: [String]? = nil,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),

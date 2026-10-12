@@ -110,6 +110,7 @@ enum TypingInputNavigationPolicy {
 
 struct NativeTypingInput: NSViewRepresentable {
     var focusRequest: Int
+    var acceptsTextInput = true
     var quickRestartKey: QuickRestartKey
     var keyboardInputMapping: KeyboardInputMapping
     var keymapLayout: KeyboardLayout
@@ -183,6 +184,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onModifierFlagsChanged = onModifierFlagsChanged
         view.onKeyDown = onKeyDown
         view.onPhysicalKey = onPhysicalKey
+        view.acceptsTextInput = acceptsTextInput
         view.refreshWindowFocusState()
         guard context.coordinator.appliedFocusRequest != focusRequest else { return }
         context.coordinator.appliedFocusRequest = focusRequest
@@ -200,6 +202,15 @@ struct NativeTypingInput: NSViewRepresentable {
 
 class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     private(set) var isRetired = false
+    var acceptsTextInput = true {
+      didSet {
+        guard oldValue != acceptsTextInput else { return }
+        pendingForcedError = false
+        guard !acceptsTextInput else { return }
+        unmarkText()
+        inputContext?.discardMarkedText()
+      }
+    }
     var onInsert: (String, Bool) -> Void = { _, _ in }
     var onDelete: () -> Void = {}
     var onDeleteWord: () -> Void = {}
@@ -612,6 +623,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func insertText(_ string: Any, replacementRange: NSRange) {
+        guard acceptsTextInput else { return }
         let text: String
         if let attributed = string as? NSAttributedString {
             text = attributed.string
@@ -627,6 +639,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        guard acceptsTextInput else { return }
         let startsComposition = composition.length == 0
         if let attributed = string as? NSAttributedString {
             // Input methods may reuse mutable attributed buffers. Own the

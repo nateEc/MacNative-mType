@@ -2,7 +2,7 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WholePreviewPreparationTaskTests: XCTestCase {
-  private final class Gate {
+  @MainActor private final class Gate {
     var pending: CheckedContinuation<TypingSession, Error>?
     var started: CheckedContinuation<Void, Never>?
 
@@ -29,6 +29,20 @@ import XCTest
   private enum Failure: Error { case expected }
   private func session(_ text: String) -> sending TypingSession {
     .init(configuration: .words(1), prompt: text)
+  }
+
+  func testRepeatedStartsRegisterAndResumeGateOnOneActor() async {
+    let owner = WholePreviewPreparationTask()
+    var completions = 0
+    for _ in 0..<200 {
+      let gate = Gate()
+      let task = owner.start(operation: { try await gate.prepare() }) { _ in completions += 1 }
+      await gate.waitUntilStarted()
+      gate.finish(.success(session("owned")))
+      await task.value
+    }
+    XCTAssertEqual(completions, 200)
+    XCTAssertFalse(owner.isPreparing)
   }
 
   func testOwnerCanBeReleasedWhileUncooperativePreparationIsSuspended() async {
