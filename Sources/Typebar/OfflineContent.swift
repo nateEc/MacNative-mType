@@ -6219,6 +6219,7 @@ struct GeneratedCandidateContinuation {
   }
 
   mutating func nextChunk(maximumWordCount: Int? = nil, weakSpotScores: WeakSpotScores? = nil,
+    initialPreparationWordBound: Int? = nil,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) }) -> GeneratedWordChunk {
@@ -6230,7 +6231,7 @@ struct GeneratedCandidateContinuation {
     guard count > 0 else { return .init(source: "", configuration: configuration) }
     guard !pool.isEmpty else { return .init(source: "", configuration: configuration) }
     let noSpace = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
-    let bound = GeneratedWordBoundPolicy.bound(for: configuration, wordOffset: emittedWords,
+    let bound = initialPreparationWordBound ?? GeneratedWordBoundPolicy.bound(for: configuration, wordOffset: emittedWords,
       sourceWordCount: count, showAllLines: previewsWholeFiniteWords)
     var sourceWords: [String] = []
     var targets: [String] = []

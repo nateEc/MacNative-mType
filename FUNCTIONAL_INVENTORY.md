@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 全行词池准备基础实现：新增按完整词界分批且可取消的实际生成入口，701 词普通／下划线／无空格与单次一致、100,001 词末尾及巨额目标取消通过；误接来源的有效红测后加入明确拒绝。最终相关 56 项零失败（9.442 秒，墙钟 9.450；work/whole-preview-preparation-final.log），详见 OFFICIAL_CONFIG_AUDIT.md。尚无生产 UI 接线、发布身份／内存预算控制，不能当作解除现有全行上限；四项部分配置不升级，零主程序启动，完整 goal active。
+
 2026-10-12 `showAllLines` 差异实证：固定完整生成器新增 100,001 词全行／末提交符案例通过（work/whole-preview-100001-source-final.log）；原生现状 18 项通过（8.787 秒，墙钟 8.793；work/whole-preview-boundary-native.log）仍明确超十万词只预览 100，不能视为官方对齐。会话内决策复核记录合法巨额预算下同步移除上限的阻塞／内存反例及后续可取消准备、尝试身份、词序／回放验收要求，见 OFFICIAL_CONFIG_AUDIT.md。本轮仅补探针，未修改产品、未运行新完整门禁，四项部分配置不升级；零主程序启动，完整 goal active。
 
 2026-10-12 `fontFamily` 本机全目录补证：当前 263 家族逐项通过生产解析、15pt 预览与选中项核对、四组文字有限正尺寸测量，字体预览 6 项零失败（2.594 秒，墙钟 2.598；work/installed-font-catalog-runtime.log）。未使用本地字体覆盖、未下载／安装字体、未创建 GUI，产品未变。不是字形正确性、实际像素、所有尺寸／OS 或缺失网页字体资源验收；四项部分配置不升级，详见 OFFICIAL_CONFIG_AUDIT.md，完整 goal active。
