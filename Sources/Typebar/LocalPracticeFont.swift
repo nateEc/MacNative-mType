@@ -65,11 +65,10 @@ enum TypebarLocalPracticeFontStore {
   }
 
   static func remove() throws {
-    for url in storedFontURLs {
-      unregister(url)
-      try FileManager.default.removeItem(at: url)
-    }
-    UserDefaults.standard.removeObject(forKey: enabledDefaultsKey)
+    try LocalPracticeFontRemoval.remove(storedFontURLs, unregister: unregister,
+      register: { _ = registerAndRead(url: $0) },
+      removeFile: { try FileManager.default.removeItem(at: $0) },
+      didRemove: { UserDefaults.standard.removeObject(forKey: enabledDefaultsKey) })
   }
 
   private static var storedFontURL: URL? { storedFontURLs.first }
@@ -103,6 +102,24 @@ enum TypebarLocalPracticeFontStore {
   private static var directoryURL: URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent(directoryName, isDirectory: true)
+  }
+}
+
+enum LocalPracticeFontRemoval {
+  static func remove(_ urls: [URL], unregister: (URL) -> Void, register: (URL) -> Void,
+    removeFile: (URL) throws -> Void, didRemove: () -> Void) throws {
+    for url in urls {
+      unregister(url)
+      do {
+        try removeFile(url)
+      } catch {
+        // Only this file was just unregistered. Earlier successful removals
+        // must not be resurrected, and later files have not been touched.
+        register(url)
+        throw error
+      }
+    }
+    didRemove()
   }
 }
 
