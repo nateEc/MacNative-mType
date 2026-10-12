@@ -83,12 +83,10 @@ enum TypebarLocalPracticeFontStore {
   }
 
   private static func registerAndRead(url: URL) -> LocalPracticeFontInfo? {
-    var registrationError: Unmanaged<CFError>?
-    _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &registrationError)
-    guard let info = fontInfo(at: url), NSFont(name: info.postScriptName, size: 1) != nil else {
-      return nil
-    }
-    return info
+    LocalPracticeFontRegistration.read(url: url, register: { url in
+      CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+    }, isRegistered: { CTFontManagerGetScopeForURL($0 as CFURL) == .process },
+      readInfo: fontInfo(at:), isAvailable: { NSFont(name: $0, size: 1) != nil })
   }
 
   private static func unregister(_ url: URL) {
@@ -110,6 +108,17 @@ enum TypebarLocalPracticeFontStore {
   private static var directoryURL: URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent(directoryName, isDirectory: true)
+  }
+}
+
+enum LocalPracticeFontRegistration {
+  static func read(url: URL, register: (URL) -> Bool, isRegistered: (URL) -> Bool,
+    readInfo: (URL) -> LocalPracticeFontInfo?, isAvailable: (String) -> Bool) -> LocalPracticeFontInfo? {
+    // CTFontManager.h defines success by the registration result and exposes
+    // URL-specific scope for idempotent reads. Name lookup alone is insufficient.
+    guard register(url) || isRegistered(url) else { return nil }
+    guard let info = readInfo(url), isAvailable(info.postScriptName) else { return nil }
+    return info
   }
 }
 

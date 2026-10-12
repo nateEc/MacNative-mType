@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 本地字体注册准入：不以同名可用掩盖注册失败（2026-10-12）
+
+修正 `registerAndRead` 忽略原生注册结果的路径。新增同一生产准入函数，只有注册返回成功，或该文件 URL 已在进程范围注册，才继续描述符与可用性检查；单纯 NSFont 同名可用不再放行。读取已注册本地字体仍幂等，不改变目录、文件格式或设置键。注册调用不请求未使用的错误对象；注销路径未改。
+
+源码驱动依据为本机 Xcode 26.3（17C529）SDK 的 [CTFontManager.h](/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreText.framework/Headers/CTFontManager.h:155)：RegisterFontsForURL 返回注册成功与否，GetScopeForURL 对未注册 URL 返回 none；两者 macOS 10.6 起可用，满足项目 macOS 14 最低目标。本机运行 macOS 26.1，不冒称最低系统实测。CTFontManagerErrors.h 另区分 alreadyRegistered 与 duplicatedName，不能仅凭名称查找替代文件注册判断。
+
+`work/font-registration-admission-red.log` 三项一处有效失败：注册 false、URL 未注册、同名可用 true 时旧实现错误返回字体信息。修正后增加与真实临时目录事务联测，确认失败不删除旧文件、不启用，并保留原字节；原生注册及 URL scope 均为可控回调，不注册真实字体。最终固定参考环境 `font-registration-admission-green.log` 32 项零失败零跳过（1.874s，墙钟 1.878）。已有生产字体／字号切换宿主在 reduce motion 环境 `font-registration-production-font-host.log` 一项通过（18.001s，墙钟 18.003）；`font-registration-originality.log` 固定参考原创边界通过。
+
+行为优先技能保留红测及事务恢复证据；会话内决策复核（非独立评审）确认同名失败拒绝与同文件幂等两个反例均覆盖。真实字体四格式注册、部分注册后的清理、恢复注册失败、同名解析来源及并发／崩溃仍未完整验证。零主程序启动，未改真实字体文件或用户设置，未跑新完整门禁／Release；fontFamily 部分与完整 goal active 保持。
+
 ## 本地字体替换事务：旧文件快照与目录别名修正（2026-10-12）
 
 修正实际导入路径：先固定旧字体文件列表再发布新文件，注销、失败恢复和成功清理均只处理该旧列表，避免把刚写入的新字体视为旧字体。导入和目录读取解析目录别名，避免目录链接直接枚举失败被当作空列表。原应用支持目录、文件格式、私有文件名规则和启用设置键不变；AppSettings 仍仅在保存成功后增加字体版本。将同一生产事务提取为显式目录／解析／注册／启用边界，测试不碰真实用户目录、设置或 Core Text 注册。

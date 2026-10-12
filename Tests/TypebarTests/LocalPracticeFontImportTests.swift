@@ -109,4 +109,20 @@ final class LocalPracticeFontImportTests: XCTestCase {
       XCTAssertEqual(try Data(contentsOf: previous), Data("previous fixture".utf8))
     }
   }
+
+  func testSameNameAvailableButRegistrationFailsPreservesPreviousFile() throws {
+    try withDirectory { directory, previous in
+      var enables = 0
+      XCTAssertThrowsError(try LocalPracticeFontImport.save(Data("new fixture".utf8),
+        originalFilename: "new.ttf", directory: directory, readInfo: { _ in self.info },
+        register: { url in
+          LocalPracticeFontRegistration.read(url: url,
+            register: { $0.lastPathComponent == previous.lastPathComponent },
+            isRegistered: { _ in false }, readInfo: { _ in self.info }, isAvailable: { _ in true })
+        }, unregister: { _ in }, enable: { enables += 1 }))
+      XCTAssertEqual(try Data(contentsOf: previous), Data("previous fixture".utf8))
+      XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [previous.lastPathComponent])
+      XCTAssertEqual(enables, 0)
+    }
+  }
 }

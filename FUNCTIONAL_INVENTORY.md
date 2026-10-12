@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 本地字体注册准入修正：不再因系统同名字体可用而接受该文件注册失败；仅原生注册成功或同一 URL 已在进程范围注册可继续解析，保留同文件重复读取。三项一处红测复现后修正，含文件替换恢复联测的相关 32 项零失败零跳过，生产字体切换宿主一项与原创边界通过（work/font-registration-admission-green.log），SDK 契约及边界见 OFFICIAL_CONFIG_AUDIT.md。原生注册为可控回调、零主程序启动；真实注册／部分失败／并发崩溃与新完整门禁尚未完成，fontFamily 部分及完整 goal active 不变。
+
 2026-10-12 本地字体导入修正：旧文件列表改为发布新文件前快照，失败恢复和成功清理不再包含新字体；目录别名先解析再读取。五项隔离真实文件事务及字体相关最终 28 项零失败零跳过，已有生产字体切换宿主一项通过、原创边界通过，详见 OFFICIAL_CONFIG_AUDIT.md 与 work/font-import-transaction-final-expanded.log。无真实字体注册或用户目录写入、零主程序启动；并发／崩溃／原生注册与恢复失败仍待验证，未跑新完整门禁／Release，旧完整门禁早于本产品改动。fontFamily 部分及完整 goal active 保持。
 
 2026-10-12 字体缺字回退补证：三种常用本机字体、四组 Latin／CJK／Arabic／Hebrew 样例的实际 TextKit 字形检查通过；未分配字符负向对照能检出非零编号的 LastResort 方框，并区分合字 null 槽位。固定参考环境相关 23 项零失败零跳过（work/font-native-fallback-glyphs-verified.log），失败与检测器修正详见 OFFICIAL_CONFIG_AUDIT.md。无产品改动、零主程序启动，不泛化为全字体／全脚本或像素正确性，fontFamily 部分及完整 goal active 不变。
