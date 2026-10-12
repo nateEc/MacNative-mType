@@ -119,11 +119,18 @@ const codeRepeated=await main.namespace.generateWords({name:'code_swift',words:[
 assert.deepEqual(codeRepeated.words,codeOpening.words);
 assert.deepEqual(ownedIndexes,[2,2,2],'Repeat uses actual saved targets without rank draws');
 ownedRepeated=false;ownedIndexes=[];config.language='english';
-for(const [limit,showAll,underscore] of [[3,false,false],[3,false,true],[101,false,true],[101,true,true]]){
+for(const [limit,showAll,underscore] of [[3,false,false],[3,false,true],[101,false,true],[101,true,true],
+  [100001,true,true]]){
   config.words=limit;config.showAllLines=showAll;drawIndex=0;
   activeNames=['backwards','binary',...(underscore?['underscore_spaces']:[])];
   const pool=['oak','elm','ash'];
-  const generated=await main.namespace.generateWords({name:'english',words:pool});
+  const savedDebug=console.debug;
+  let generated;
+  try {
+    // The large owned-word boundary needs assertions, not per-word traces.
+    if(limit>100000) console.debug=()=>{};
+    generated=await main.namespace.generateWords({name:'english',words:pool});
+  } finally { console.debug=savedDebug; }
   assert.deepEqual(pool,['ash','elm','oak'],'Only the source candidate pool reverses');
   const bound=showAll?limit:Math.min(100,limit);
   const expected=Array.from({length:bound},(_,i)=>binary(i).split('').reverse().join('')+
@@ -134,7 +141,7 @@ for(const [limit,showAll,underscore] of [[3,false,false],[3,false,true],[101,fal
     assert.equal(next.word,binary(bound).split('').reverse().join('')+'_');
   }
 }
-console.log('4 generated-backwards ordering fixtures passed (GetText/config/metadata/random adapters).');
+console.log('5 generated-backwards ordering fixtures passed, including the 100001-word whole preview (GetText/config/metadata/random adapters).');
 for(const backwards of [false,true]){
   for(const zipf of [false,true]){
     config.words=3;config.showAllLines=false;
