@@ -2,6 +2,36 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WholePreviewWordPreparationTests: XCTestCase {
+  func testProductionGenerationInputsSurvivePreparationAndRepeat() async throws {
+    var scores = WeakSpotScores()
+    scores.record(character: "z", interval: 2, isCorrect: false)
+    let state = PoolWordDecorationState(spanishClosing: "!")
+    let configuration = TestConfiguration.words(201, language: .spanish,
+      contentOptions: .init(includePunctuation: true, includeNumbers: true))
+      .with(modifiers: [.weakSpot, .randomCase, .underscoreSeparators])
+    var referenceDraw = 0
+    var reference = GeneratedCodeContinuation(configuration: configuration, batchTokenCount: 201,
+      showAllLines: true, weakSpotScores: scores, sourceWords: ["oak", "zebra"], decorationState: state)
+    let expected = reference.nextChunk(nextRandomWordIndex: { referenceDraw += 1; return referenceDraw % 2 },
+      nextRandomCaseBit: { true }, nextRandomContentUnit: { 0.95 })
+    var preparedDraw = 0
+    let session = try await WholePreviewWordPreparation.prepareSession(configuration: configuration,
+      sourceWords: ["oak", "zebra"], weakSpotScores: scores, wordDecorationState: state,
+      nextRandomWordIndex: { preparedDraw += 1; return preparedDraw % 2 },
+      nextRandomCaseBit: { true }, nextRandomContentUnit: { 0.95 })
+    XCTAssertEqual(session.prompt, expected.transformed)
+    XCTAssertEqual(session.liveWeakSpotScores, scores)
+    XCTAssertEqual(session.liveWordDecorationState, reference.decorationState)
+    XCTAssertEqual(session.repeatedAttempt().liveWeakSpotScores, scores)
+    XCTAssertEqual(session.repeatedAttempt().liveWordDecorationState, reference.decorationState)
+    XCTAssertEqual(session.repeatedAttempt().prompt, expected.transformed)
+
+    let french = try await WholePreviewWordPreparation.prepareSession(
+      configuration: .words(2, language: .french), sourceWords: ["oak"],
+      wordDecorationState: state, nextRandomWordIndex: { 0 })
+    XCTAssertEqual(french.liveWordDecorationState, state)
+  }
+
   func testPreparedSessionPreservesExactTargetsAndRepeatWithoutRegeneration() async throws {
     for modifiers: [TestModifier] in [[], [.underscoreSeparators], [.noSpaces]] {
       let configuration = TestConfiguration.words(201, language: .codeSwift).with(modifiers: modifiers)
