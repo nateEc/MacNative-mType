@@ -198,10 +198,15 @@ import XCTest
     return bitmap
   }
 
-  func testFontRebuildBeforeHorizontalRemovalAcknowledgementStillDeliversRemoval() {
+  func testFontRebuildBeforeHorizontalRemovalAcknowledgementStillDeliversRemoval() throws {
     for rtl in [false, true] {
       var session = newlineSession()
+      let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 80, height: 200),
+        styleMask: .borderless, backing: .buffered, defer: false)
+      window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .aqua)
       let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 200))
+      window.contentView = view; view.layer?.backgroundColor = NSColor.black.cgColor
+      defer { view.stop(); window.contentView = nil; window.close() }
       let motion = PromptCaretMotionCoordinator()
       var events: [PromptTapeWordRemoval] = []
       let delivered = expectation(description: "Removal survives font rebuild rtl=\(rtl)")
@@ -215,14 +220,31 @@ import XCTest
       XCTAssertTrue(events.isEmpty)
       updateSession(session, view: view, motion: motion, rtl: rtl, time: 1.01,
         fontSize: 32, removed: accept)
+      let before = try bitmap(view, name: "font-pending-\(rtl)")
+      XCTAssertTrue(events.isEmpty, "Bitmap capture must remain before asynchronous acknowledgement")
+      let margin = motion.wordsTapeMargin, correction = motion.pace.cumulativeTapeCorrection
       wait(for: [delivered], timeout: 1)
       XCTAssertEqual(events.count, 1)
       XCTAssertEqual(session.removedTapePromptWordIndices, [0, 1, 2])
       updateSession(session, view: view, motion: motion, rtl: rtl, time: 1.02,
         fontSize: 32, removed: accept)
+      view.present(at: 1.02)
+      let after = try bitmap(view, name: "font-acknowledged-\(rtl)")
+      var ink = 0, differences = 0
+      for y in 0..<before.pixelsHigh { for x in 0..<before.pixelsWide {
+        let a = try XCTUnwrap(before.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+        let b = try XCTUnwrap(after.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+        if a.redComponent + a.greenComponent + a.blueComponent > 0.2 { ink += 1 }
+        if abs(a.redComponent - b.redComponent) + abs(a.greenComponent - b.greenComponent)
+          + abs(a.blueComponent - b.blueComponent) > 0.01 { differences += 1 }
+      } }
+      XCTAssertGreaterThan(ink, 20, "Do not accept two blank bitmaps")
+      XCTAssertEqual(differences, 0, "Session acknowledgement must not change rebuilt native ink")
+      XCTAssertEqual(motion.wordsTapeMargin, margin)
+      XCTAssertEqual(motion.pace.cumulativeTapeCorrection, correction)
       RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.002))
       XCTAssertEqual(events.count, 1)
-      view.stop()
+      XCTAssertFalse(window.isVisible)
     }
   }
 
