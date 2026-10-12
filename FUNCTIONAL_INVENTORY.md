@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 本地字体命令源码对照补证：新增只读探针执行固定官方 font-family.ts 的完整命令定义，使用自有存储／通知／重新应用边界，覆盖无文件、有文件、成功移除、删除失败及应用失败，共八个可用性状态；核对失败通知和 apply 调用边界。原生测试逐状态比较导入／移除命令，再交叉检查原生独有“重新启用”操作，含已有导入恢复、真实 Core Text 注册及预览相关 45 项零失败（work/local-font-command-source-regression.log，2.322 秒墙钟）。无产品缺陷复现或产品改动，不虚构红测。探针加入完整门禁但本轮未执行完整门禁／Release；源代码只在 QA 中读取，不进入产品，不声称真实浏览器文件选择、原生删除失败恢复、所有字体资源视觉或实体输入法验收。零可见主程序启动，fontFamily partial 与完整 goal active 保持。
+
 2026-10-12 横向词孔字体重建补充绘制证据：加强已有竞态测试，在未显示的真实 NSWindow 中分别捕获 LTR／RTL 字体重建后、异步会话确认前后的 AppKit 位图，断言仍有实际文字、像素差为零且滚动／pace 补偿不二次变化。额外断言捕获没有提前交付异步通知，窗口始终不可见。聚焦一项通过，含固定官方源码环境的相关 38 项零失败（work/tape-horizontal-font-pixels-regression.log，15.008 秒墙钟）。本轮仅加强测试，不改产品，不需要虚构新红测；上一轮真实缺陷红测保持。此证据仅比较同次重建的确认前后，不证明字体视觉完整一致、全部方向混排、实体 IME 或可见帧率；未重跑完整门禁／Release，partial 和完整 goal active 保持。
 
 2026-10-12 Tape 横向词孔的通知前字体重建竞态修复：同尝试、同 coordinator 重建此前清空待发词移除并重置布局孔状态，LTR／RTL 红测一项六处失败（work/tape-horizontal-font-red.log）。现在保留原生已完成词孔及待发／已发通知集合，新 revision 重新交付未确认通知；更换 owner 仍清空旧状态。新增确认后不重复通知及字体重建后 owner 替换拒绝旧通知反例。带固定源码环境的相关 261 项零失败（work/tape-horizontal-font-regression.log，108.626 秒墙钟）。behavior-first-testing 先红后绿，同会话有界 decision-review 检查身份、代次和确认幂等；非独立评审。未打开可见主程序，未重跑完整门禁／Release；不证明可见像素、实体 IME 或所有反向输入交错，tapeMode partial 与完整 goal active 保持。

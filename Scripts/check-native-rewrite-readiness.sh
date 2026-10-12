@@ -378,6 +378,10 @@ run_logged_check "executing pinned font hover, preview and command dismissal lif
   "$temporary_directory/font-command-preview-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" \
   "$project_root/Scripts/check-source-font-command-preview.mjs" "$reference_root"
+run_logged_check "executing pinned local font command availability and removal recovery" \
+  "$temporary_directory/local-font-command-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" \
+  "$project_root/Scripts/check-source-local-font-commands.mjs" "$reference_root"
 run_logged_check "executing pinned SlowTimer lifecycle and effect gates" \
   "$temporary_directory/slow-timer-effects-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
