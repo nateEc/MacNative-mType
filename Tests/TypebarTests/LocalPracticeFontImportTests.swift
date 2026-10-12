@@ -119,7 +119,8 @@ final class LocalPracticeFontImportTests: XCTestCase {
         register: { url in
           LocalPracticeFontRegistration.read(url: url,
             register: { $0.lastPathComponent == previous.lastPathComponent },
-            isRegistered: { _ in false }, readInfo: { _ in self.info }, isAvailable: { _ in true })
+            isRegistered: { _ in false }, readInfo: { _ in self.info }, isAvailable: { _ in true },
+            isSelectedSource: { _, _ in true })
         }, unregister: { _ in }, enable: { enables += 1 }))
       XCTAssertEqual(try Data(contentsOf: previous), Data("previous fixture".utf8))
       XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [previous.lastPathComponent])

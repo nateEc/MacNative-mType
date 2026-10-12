@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 同名来源准入与恢复补证：旧 TTF／新 CFF 同名后置失败时实际来源回到旧文件；生产准入增加 1pt 字体来源 URL 校验，独立同名注册合同检查成功来源／失败恢复及不误注销独立文件。最终相关 44 项和隐藏字体切换宿主通过（work/font-same-name-source-verified.log），错误“同名必失败”测试假设及失败日志详见 OFFICIAL_CONFIG_AUDIT.md。不同字号／缓存状态的同名选择仍未证明，不称全部解决；零主程序启动，新产品变更未跑完整门禁，fontFamily 部分与完整 goal active 保持。
+
 2026-10-12 注册后失败清理修正：真实新字体注册后注入后置检查失败，红测发现新文件删除后仍保留进程注册；失败分支现先注销本次新 URL、再恢复旧字体。相关 41 项零失败零跳过、隐藏生产字体切换宿主通过（work/font-partial-registration-green.log、font-partial-registration-production-host.log），详见 OFFICIAL_CONFIG_AUDIT.md。零主程序启动；原生注销／恢复失败及并发崩溃仍未验证，新产品修改未跑完整门禁，fontFamily 部分与完整 goal active 保持。
 
 2026-10-12 TrueType WOFF2 补证：自写字形以 glyf／loca 空变换版本 3 进入真实生产导入、注册、来源、轮廓与注销链；三类 Web 字体的截断／损坏签名共六次失败均保留旧文件、注册、启用计数并清理候选。最终相关 40 项零失败零跳过（work/font-registration-native-tt-woff2-verified.log），详见 OFFICIAL_CONFIG_AUDIT.md。无产品修改、零主程序启动；非空变换／压缩熵块／未对齐无可选区及更多恶意输入仍未验收，未跑新完整门禁，fontFamily 部分与完整 goal active 保持。

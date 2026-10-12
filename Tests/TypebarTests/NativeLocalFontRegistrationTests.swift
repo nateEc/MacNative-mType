@@ -5,13 +5,22 @@ import XCTest
 
 @MainActor final class NativeLocalFontRegistrationTests: XCTestCase {
   func testPostRegistrationFailureUnregistersNewFontBeforeRestoringPreviousFont() throws {
+    try checkPostRegistrationFailure(sameName: false)
+  }
+
+  func testSameNamePostRegistrationFailureRestoresPreviousFontSource() throws {
+    try checkPostRegistrationFailure(sameName: true)
+  }
+
+  private func checkPostRegistrationFailure(sameName: Bool) throws {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("typebar-native-font-\(UUID())", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let oldName = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
-    let newName = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let newName = sameName ? oldName : "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
     let oldBytes = OwnedTestFontFixture.make(postScriptName: oldName)
-    let newBytes = OwnedTestFontFixture.make(postScriptName: newName)
+    let newBytes = sameName ? OwnedTestFontFixture.makeOTF(postScriptName: newName)
+      : OwnedTestFontFixture.make(postScriptName: newName)
     var failedURL: URL?
     defer {
       // Clean a registration leak even when the failing implementation removed its file.
@@ -31,7 +40,7 @@ import XCTest
       unregister: { _ = CTFontManagerUnregisterFontsForURL($0 as CFURL, .process, nil) },
       enable: { enables += 1 })
     let oldURL = try XCTUnwrap(LocalPracticeFontImport.storedURLs(in: directory).first)
-    XCTAssertThrowsError(try LocalPracticeFontImport.save(newBytes, originalFilename: "new.ttf",
+    XCTAssertThrowsError(try LocalPracticeFontImport.save(newBytes, originalFilename: sameName ? "new.otf" : "new.ttf",
       directory: directory, readInfo: LocalPracticeFontRegistration.fontInfo(at:), register: { url in
         if url.lastPathComponent == oldURL.lastPathComponent {
           // Recovery must not run while the rejected generation remains registered.
@@ -41,6 +50,10 @@ import XCTest
         failedURL = url
         XCTAssertEqual(LocalPracticeFontRegistration.read(url: url)?.postScriptName, newName)
         XCTAssertEqual(CTFontManagerGetScopeForURL(url as CFURL), .process)
+        let selected = CTFontCreateWithName(newName as CFString, 28, nil)
+        let selectedURL = CTFontCopyAttribute(selected, kCTFontURLAttribute) as? URL
+        XCTAssertEqual(selectedURL?.resolvingSymlinksInPath(), url.resolvingSymlinksInPath(),
+          "The temporary replacement must actually resolve to the new file")
         return nil // Inject a failure after the real native registration succeeded.
       }, unregister: { _ = CTFontManagerUnregisterFontsForURL($0 as CFURL, .process, nil) },
       enable: { enables += 1 })) { error in
@@ -52,6 +65,10 @@ import XCTest
     XCTAssertEqual(CTFontManagerGetScopeForURL(rejectedURL as CFURL), .none)
     XCTAssertEqual(CTFontManagerGetScopeForURL(oldURL as CFURL), .process)
     XCTAssertEqual(LocalPracticeFontRegistration.read(url: oldURL), oldInfo)
+    let restored = CTFontCreateWithName(oldName as CFString, 28, nil)
+    let restoredURL = CTFontCopyAttribute(restored, kCTFontURLAttribute) as? URL
+    XCTAssertEqual(restoredURL?.resolvingSymlinksInPath(), oldURL.resolvingSymlinksInPath(),
+      "Name availability alone must not mask a stale rejected font source")
     XCTAssertEqual(try Data(contentsOf: oldURL), oldBytes)
     XCTAssertEqual(enables, 1)
     XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [oldURL.lastPathComponent])
@@ -101,6 +118,76 @@ import XCTest
     XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [secondURL.lastPathComponent])
     XCTAssertTrue(CTFontManagerUnregisterFontsForURL(secondURL as CFURL, .process, nil))
     XCTAssertEqual(CTFontManagerGetScopeForURL(secondURL as CFURL), .none)
+  }
+
+  func testNativeSameNameImportRequiresSelectedSourceAndPreservesUnrelatedRegistration() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("typebar-native-conflict-\(UUID())", isDirectory: true)
+    let directory = root.appendingPathComponent("store", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let externalURL = root.appendingPathComponent("separately-registered.ttf")
+    defer {
+      _ = CTFontManagerUnregisterFontsForURL(externalURL as CFURL, .process, nil)
+      for url in LocalPracticeFontImport.storedURLs(in: directory) {
+        _ = CTFontManagerUnregisterFontsForURL(url as CFURL, .process, nil)
+      }
+      try? FileManager.default.removeItem(at: root)
+    }
+    let conflictName = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let externalBytes = OwnedTestFontFixture.make(postScriptName: conflictName)
+    try externalBytes.write(to: externalURL)
+    XCTAssertEqual(LocalPracticeFontRegistration.read(url: externalURL)?.postScriptName, conflictName)
+    let oldName = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let oldBytes = OwnedTestFontFixture.make(postScriptName: oldName)
+    var enables = 0
+    func save(_ bytes: Data, filename: String,
+      register: (URL) -> LocalPracticeFontInfo? = LocalPracticeFontRegistration.read(url:)) throws -> LocalPracticeFontInfo {
+      try LocalPracticeFontImport.save(bytes, originalFilename: filename, directory: directory,
+        readInfo: LocalPracticeFontRegistration.fontInfo(at:), register: register,
+        unregister: { _ = CTFontManagerUnregisterFontsForURL($0 as CFURL, .process, nil) },
+        enable: { enables += 1 })
+    }
+    let oldInfo = try save(oldBytes, filename: "old.ttf")
+    let oldURL = try XCTUnwrap(LocalPracticeFontImport.storedURLs(in: directory).first)
+    var rejectedURL: URL?
+    let newBytes = OwnedTestFontFixture.makeOTF(postScriptName: conflictName)
+    var imported: LocalPracticeFontInfo?
+    do {
+      imported = try save(newBytes, filename: "conflict.otf", register: { url in
+          let result = LocalPracticeFontRegistration.read(url: url)
+          if url.lastPathComponent != oldURL.lastPathComponent {
+            rejectedURL = url
+            if result != nil {
+              let selected = CTFontCreateWithName(conflictName as CFString, 1, nil)
+              XCTAssertEqual((CTFontCopyAttribute(selected, kCTFontURLAttribute) as? URL)?.resolvingSymlinksInPath(),
+                url.resolvingSymlinksInPath(), "Success requires the imported file, not merely its name")
+            }
+          }
+          return result
+        })
+    } catch {
+        guard case LocalPracticeFontError.couldNotLoad = error else {
+          return XCTFail("Expected registration failure, received \(error)")
+        }
+    }
+    let attemptedURL = try XCTUnwrap(rejectedURL)
+    XCTAssertEqual(CTFontManagerGetScopeForURL(externalURL as CFURL), .process)
+    XCTAssertEqual(try Data(contentsOf: externalURL), externalBytes)
+    if let imported {
+      XCTAssertEqual(imported.postScriptName, conflictName)
+      XCTAssertEqual(CTFontManagerGetScopeForURL(attemptedURL as CFURL), .process)
+      XCTAssertEqual(CTFontManagerGetScopeForURL(oldURL as CFURL), .none)
+      XCTAssertEqual(try Data(contentsOf: attemptedURL), newBytes)
+      XCTAssertEqual(enables, 2)
+      XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [attemptedURL.lastPathComponent])
+    } else {
+      XCTAssertEqual(CTFontManagerGetScopeForURL(attemptedURL as CFURL), .none)
+      XCTAssertEqual(CTFontManagerGetScopeForURL(oldURL as CFURL), .process)
+      XCTAssertEqual(LocalPracticeFontRegistration.read(url: oldURL), oldInfo)
+      XCTAssertEqual(try Data(contentsOf: oldURL), oldBytes)
+      XCTAssertEqual(enables, 1)
+      XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [oldURL.lastPathComponent])
+    }
   }
 
   func testOwnedFontRegistersIdempotentlyAndUsesItsOwnFileWithoutUserStore() throws {
