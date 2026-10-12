@@ -147,6 +147,17 @@ enum LivePracticeContentService {
     let lines: [String]
   }
 
+  private struct PoetryResponse: Decodable {
+    let first: PoetryDocument?
+
+    init(from decoder: Decoder) throws {
+      var items = try decoder.unkeyedContainer()
+      // The provider selects index zero, not the first valid document. Later
+      // array items are unconsumed and must not invalidate that selection.
+      first = items.isAtEnd ? nil : try items.decode(PoetryDocument.self)
+    }
+  }
+
   private struct EncyclopediaSummary: Decodable {
     let title: String
     let extract: String
@@ -176,7 +187,7 @@ enum LivePracticeContentService {
   }
 
   static func poetry(from data: Data) -> LivePracticeContent? {
-    guard let document = try? JSONDecoder().decode([PoetryDocument].self, from: data),
+    guard let document = try? JSONDecoder().decode(PoetryResponse.self, from: data),
       let first = document.first
     else { return nil }
     // Source words are separated by ASCII spaces within each line, not by

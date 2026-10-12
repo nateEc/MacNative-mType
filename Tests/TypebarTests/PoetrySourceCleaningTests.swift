@@ -2,6 +2,27 @@ import XCTest
 @testable import Typebar
 
 final class PoetrySourceCleaningTests: XCTestCase {
+  func testOnlyFirstPoemIsDecodedWithoutValidatingUnconsumedItems() throws {
+    for tail in ["null", "42", #"{"lines":4}"#, #"{"title":"Other"}"#] {
+      let payload = #"[{"title":"Owned","author":"Fixture","lines":["north south"]},"# + tail + "]"
+      let content = try XCTUnwrap(LivePracticeContentService.poetry(from: Data(payload.utf8)))
+      XCTAssertEqual(content.text, "north south")
+      XCTAssertEqual(content.title, "Owned")
+      XCTAssertEqual(content.byline, "Fixture")
+    }
+  }
+
+  func testInvalidOrEmptyFirstPoemNeverSelectsLaterValidPoem() {
+    let later = #"{"title":"Later","author":"Fixture","lines":["ignored"]}"#
+    for first in ["null", "42", #"{"lines":4}"#] {
+      XCTAssertNil(LivePracticeContentService.poetry(from: Data(("[" + first + "," + later + "]").utf8)))
+    }
+    let empty = #"[{"title":"Owned","author":"Fixture","lines":["— _"]},"# + later + "]"
+    XCTAssertEqual(LivePracticeContentService.poetry(from: Data(empty.utf8))?.text, "")
+    XCTAssertNil(LivePracticeContentService.poetry(from: Data(
+      #"[{"title":"Owned","author":"Fixture","lines":["north"]}, invalid]"#.utf8)))
+  }
+
   func testSuccessfullyDecodedEmptyPoemRemainsDistinctFromProviderFailure() throws {
     let value = try content(lines: ["— ___ —_", "   "], title: " Empty ", author: " Writer ")
     XCTAssertEqual(value.text, "")

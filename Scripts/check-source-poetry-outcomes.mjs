@@ -16,6 +16,9 @@ const source = fs.readFileSync(path.join(root, 'frontend/src/ts/test/poetry.ts')
 const cases = [
   {name: 'valid section', body: [{title: 'Owned', author: 'Fixture', lines: ['north south']}], words: ['north', 'south']},
   {name: 'decoded empty section', body: [{title: 'Owned', author: 'Fixture', lines: ['— _']}], words: []},
+  {name: 'unrelated invalid trailing item', body: [{title: 'Owned', author: 'Fixture', lines: ['north south']}, null, {lines: 4}], words: ['north', 'south']},
+  {name: 'first empty section does not select later poem', body: [{title: 'Owned', author: 'Fixture', lines: ['— _']}, {title: 'Later', author: 'Fixture', lines: ['ignored']}], words: []},
+  {name: 'invalid first item does not select later poem', body: [null, {title: 'Later', author: 'Fixture', lines: ['ignored']}], failure: true},
   {name: 'valid JSON on HTTP 404', status: 404, body: [{title: 'Owned', author: 'Fixture', lines: ['north south']}], words: ['north', 'south']},
   {name: 'empty section on HTTP 503', status: 503, body: [{title: 'Owned', author: 'Fixture', lines: ['— _']}], words: []},
   {name: 'empty response array', body: [], failure: true},
@@ -55,4 +58,4 @@ for (const fixture of cases) {
   else assert.deepEqual(Array.from(outcome.words), fixture.words);
   console.log(`PASS ${fixture.name}`);
 }
-console.log('Pinned poetry provider: 8 cases passed; HTTP status does not reject decoded sections; undefined is not a provider outcome in these cases.');
+console.log(`Pinned poetry provider: ${cases.length} cases passed; only the first item is consumed, HTTP status does not reject decoded sections; undefined is not a provider outcome in these cases.`);
