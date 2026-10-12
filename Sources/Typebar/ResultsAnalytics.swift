@@ -1182,11 +1182,12 @@ enum ResultPromptText {
       return ResultInputText.make(for: result)
     }
 
+    let events = TypingReplay.chronologicalEvents(result.replayEvents)
+      .filter { $0.offset <= result.capturedDuration }
+    let hasRecordedFields = !events.isEmpty && events.allSatisfy { $0.inputField != nil }
     if let directory = result.targetWordDirectory {
       guard directory.matches(prompt: result.prompt, noSpace: true) else { return nil }
-      let events = TypingReplay.chronologicalEvents(result.replayEvents)
-        .filter { $0.offset <= result.capturedDuration }
-      if !events.isEmpty, events.allSatisfy({ $0.inputField != nil }) {
+      if hasRecordedFields {
         let reached = SavedTextInputHistoryPolicy.inputFields(events: events).count
         guard reached > 0 else { return nil }
         return directory.words.prefix(reached).joined()
@@ -1194,12 +1195,10 @@ enum ResultPromptText {
     }
 
     let needsLegacyNoSpaceParsing = result.configuration.language.usesCJKWordStream
-      && !result.prompt.contains(where: \.isWhitespace)
+      && !result.prompt.contains(where: \.isWhitespace) && !hasRecordedFields
     if result.configuration.language.usesSpaceDelimitedWords || result.configuration.language.isCodeLanguage,
       !TestModifierPolicy.usesNoSpaceInput(result.configuration.modifiers), !needsLegacyNoSpaceParsing
     {
-      let events = TypingReplay.chronologicalEvents(result.replayEvents)
-        .filter { $0.offset <= result.capturedDuration }
       let reached = events.isEmpty ? reviews.count
         : SavedTextInputHistoryPolicy.inputFields(events: events).count
       guard reached > 0 else { return nil }
