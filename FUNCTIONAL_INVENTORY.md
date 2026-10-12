@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 自有 WOFF2 补证：Swift 从自写 CFF 组装 null transforms、Brotli 非压缩块及合法对齐私有区，实际生产注册／重复读取／文件来源／轮廓／注销通过；相关 38 项零失败零跳过，独立解码还原原始 charstring，详见 OFFICIAL_CONFIG_AUDIT.md、work/font-registration-native-woff2-verified.log。保留未对齐、无可选区版本被 Core Text 拒绝的失败证据，不宣称全部 WOFF2 支持；压缩熵块／TrueType 变换等仍待验收。无产品修改、零主程序启动、不安装系统字体、未跑新完整门禁，fontFamily 部分及完整 goal active 保持。
+
 2026-10-12 自有 CFF/OpenType 补证：真正 OTTO＋CFF、无 glyf 的自写矩形字体通过真实注册／来源／重复读取／注销；共用流程新增实际轮廓尺寸断言，TTF、CFF、两种 WOFF 均符合自写几何。相关 37 项零失败零跳过，完整新夹具原创边界通过（work/font-registration-native-cff-regression.log），详见 OFFICIAL_CONFIG_AUDIT.md。无产品改动、零主程序启动、不安装系统字体；WOFF2、更多内容与真实冲突／最低系统／GUI 等未验收，fontFamily 部分及完整 goal active 保持。
 
 2026-10-12 自有 WOFF 真实注册补证：从自写矩形 SFNT 生成未压缩／实际 zlib 压缩两种 WOFF 1.0，在生产边界验证注册、重复读取、文件来源、字形和注销。相关 36 项零失败零跳过，完整新夹具原创边界通过（work/font-registration-native-woff-regression.log），详见 OFFICIAL_CONFIG_AUDIT.md。无产品改动、零主程序启动、不安装系统字体；OTF／WOFF2、其他内容与畸形数据／真实冲突／最低系统等仍待验证，未跑新完整门禁，fontFamily 部分及完整 goal active 保持。

@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 自有 WOFF2 CFF 原生注册与编码差异（2026-10-12）
+
+从自写 CFF/OTF 生成 WOFF2：48 字节头、规范已知标签、最短 UIntBase128 长度、null transform 的无填充表流、head.flags bit 11，以及 Swift 自行组装的 Brotli 非压缩 meta-block。普通测试不依赖 Python／Brotli 库、不调用外部编码器、不读取原版字体。编码契约依据 [W3C WOFF2](https://www.w3.org/TR/WOFF2/) 与 [RFC 7932](https://www.rfc-editor.org/rfc/rfc7932.html)。最终容器带四字节自有私有区 QA00，偏移按 §7 对齐，填充由该块明确归属；头长度、私有区偏移／长度／内容均有断言。
+
+首次未经末端对齐、显式标签的夹具在实际生产描述符读取时 invalidFont（work/font-registration-native-woff2.log）；改已知标签仍失败（font-registration-native-woff2-known-tags.log），没有修改产品或放松成功断言。独立 fontTools／Brotli 解码能还原前者的名称、表、字形；同一自写 OTF 通过 fontTools 标准 WOFF2 编码后，Core Text 描述符读取成功（font-registration-woff2-independent.log、font-registration-woff2-reference-encoder.log）。仅补齐后原生用例通过（font-registration-native-woff2-aligned.log）；显式标签加对齐的相关 38 项亦通过，但规范要求编码器使用已知标签，并限制无归属尾部字节，因此最终恢复已知标签、增加合法私有区，不保留中间编码。
+
+最终固定源码相关 38 项零失败零跳过，2.206s（墙钟 2.212），日志 font-registration-native-woff2-verified.log。新增 WOFF2 用例通过实际保存、进程注册、重复读取、精确字体来源 URL、非缺字字形及矩形轮廓尺寸、注销和 scope none 全链。最终独立解码日志 font-registration-woff2-final-independent.log 还原两字形、唯一名称、head.flags 2051、矩形 charstring；容器 936 字节、Brotli 863 字节、私有区偏移 932／长度 4。时间戳零值警告属于生成器固定时间，不是解码失败。独立工具只用于手动诊断，无新增测试／应用依赖。
+
+这是特定 CFF＋null transforms＋Brotli 非压缩块＋私有区的本机 macOS 26.1 证据，不是压缩熵块、变换后 TrueType、多字体集合或所有 WOFF2 的覆盖。尤其已知标签但未末端对齐、无可选区的版本仍被本机 Core Text 拒绝；目前证据只定位到容器对齐差异，未证明原生内部机制、未修复该兼容性缺口，不用正向夹具掩盖。无产品修改、零主程序启动、不安装系统字体；未重跑完整门禁／Release，fontFamily 部分及完整 goal active 保持。
+
 ## 自有 CFF/OpenType 与真实轮廓尺寸验收（2026-10-12）
 
 扩展原创字形生成器 `--cff`，从同一自写矩形构建 Type 2 charstring，而非将 TTF 改扩展名。Swift 夹具使用 CFF 表模板，运行时以等长唯一名称替换两处 CFF 名称，并重建 name 表、目录和校验。明确断言 OTTO 标识、CFF 表存在及 glyf 表不存在；目录按九个表计算搜索字段，与既有十表 TrueType 分开。编码依据 [OpenType 文件规范](https://learn.microsoft.com/en-us/typography/opentype/spec/otff)，CFF 字节均由自写轮廓和可复现脚本生成，不读取原版／第三方字体。

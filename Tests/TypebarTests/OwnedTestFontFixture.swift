@@ -97,6 +97,54 @@ enum OwnedTestFontFixture {
     return Data(font)
   }
 
+  /// WOFF2 CFF with null transforms and a Brotli uncompressed meta-block.
+  /// W3C WOFF2 sections 3–5 and RFC 7932 section 9; no external encoder.
+  static func makeWOFF2(postScriptName: String) -> Data {
+    let sfnt = Array(makeOTF(postScriptName: postScriptName))
+    func integer(at offset: Int) -> Int {
+      sfnt[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
+    }
+    func base128(_ value: Int) -> [UInt8] {
+      var remaining = value, bytes = [UInt8(value & 127)]
+      remaining >>= 7
+      while remaining > 0 {
+        bytes.insert(UInt8(remaining & 127) | 128, at: 0)
+        remaining >>= 7
+      }
+      return bytes
+    }
+    let count = Int(sfnt[4]) << 8 | Int(sfnt[5])
+    var directory: [UInt8] = [], payload: [UInt8] = []
+    let knownTags: [String: UInt8] = ["cmap": 0, "head": 1, "hhea": 2, "hmtx": 3,
+      "maxp": 4, "name": 5, "OS/2": 6, "post": 7, "CFF ": 13]
+    for index in 0..<count {
+      let record = 12 + index * 16
+      let offset = integer(at: record + 8), length = integer(at: record + 12)
+      let tag = Array(sfnt[record..<(record + 4)])
+      directory += [knownTags[String(bytes: tag, encoding: .ascii)!]!] + base128(length)
+      var table = Array(sfnt[offset..<(offset + length)])
+      if tag == Array("head".utf8) { table[16] |= 8 } // Required head.flags bit 11.
+      payload += table // No SFNT alignment padding inside the Brotli stream.
+    }
+    precondition((1...65536).contains(payload.count))
+    // WBITS=16, ISLAST=0, MNIBBLES=4, MLEN-1, ISUNCOMPRESSED=1.
+    let bits = ((payload.count - 1) << 4) | (1 << 20)
+    let brotli = [0, 8, 16].map { UInt8(truncatingIfNeeded: bits >> $0) }
+      + payload + [3] // ISLAST=1, ISLASTEMPTY=1, zero padding.
+    let padding = [UInt8](repeating: 0, count: (4 - (48 + directory.count + brotli.count) % 4) % 4)
+    // A private block makes this alignment padding explicitly valid (§7),
+    // rather than adding unclaimed trailing bytes after compressed data (§3).
+    let privateData = Array("QA00".utf8)
+    let privateOffset = 48 + directory.count + brotli.count + padding.count
+    let header = word(0x774F4632) + Array(sfnt[0..<4])
+      + word(UInt32(privateOffset + privateData.count)) + short(count) + short(0)
+      + word(UInt32(sfnt.count)) + word(UInt32(brotli.count))
+      + short(1) + short(0) + Array(repeating: UInt8(0), count: 12)
+      + word(UInt32(privateOffset)) + word(UInt32(privateData.count))
+    precondition(header.count == 48)
+    return Data(header + directory + brotli + padding + privateData)
+  }
+
   /// WOFF 1.0 permits storing tables uncompressed (compLength == origLength).
   /// Keep the identical original SFNT tables and checksums; only repackage.
   static func makeWOFF(postScriptName: String, compressed: Bool = false) -> Data {

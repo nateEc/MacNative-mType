@@ -88,6 +88,23 @@ import XCTest
     })
   }
 
+  func testOwnedWOFF2RegistersIdempotentlyAndUsesItsOwnFileWithoutUserStore() throws {
+    try checkOwnedFont(format: "woff2", make: { name in
+      let data = OwnedTestFontFixture.makeWOFF2(postScriptName: name)
+      XCTAssertEqual(Array(data.prefix(8)), Array("wOF2OTTO".utf8))
+      let bytes = Array(data)
+      func integer(at offset: Int) -> Int {
+        bytes[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
+      }
+      XCTAssertEqual(integer(at: 8), data.count)
+      let privateOffset = integer(at: 40), privateLength = integer(at: 44)
+      XCTAssertEqual(privateOffset % 4, 0)
+      XCTAssertEqual(privateOffset + privateLength, data.count)
+      XCTAssertEqual(Array(bytes[privateOffset...]), Array("QA00".utf8))
+      return data
+    })
+  }
+
   private func checkOwnedFont(format: String, make: (String) -> Data) throws {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("typebar-native-font-\(UUID())", isDirectory: true)
