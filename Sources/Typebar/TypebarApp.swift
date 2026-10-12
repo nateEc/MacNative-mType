@@ -4557,6 +4557,9 @@ private struct ContentView: View {
       : "正在获取随机\(source.displayName)；初始化失败时最多尝试三次。"
     liveContentTask?.cancel()
     liveContentTask = Task {
+      // A later synchronous reset can retire this task before its first turn.
+      // Do not start transport work for an owner which is already obsolete.
+      guard !Task.isCancelled, requestID == liveContentRequestID else { return }
       let firstContent = await liveContentFetch(source, configuration.language)
       var content = firstContent
       var preparedPrompt: LivePracticePrompt?

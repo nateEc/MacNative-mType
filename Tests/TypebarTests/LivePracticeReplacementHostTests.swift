@@ -15,12 +15,23 @@ import XCTest
     var source: LivePracticeContentSource?
     var callCount = 0
     var cancelledReplies = 0
+    var pendingRequestIDs: Set<Int> = []
+    var cancelledRequestIDs: Set<Int> = []
+    var requestsCancelledAtEntry: Set<Int> = []
     var scriptedTokens: [String]?
     var returnsFailure = false
     func fetch(_ source: LivePracticeContentSource, _ language: TypingLanguage) async -> LivePracticeContent? {
       self.source = source
       callCount += 1
-      let content = await withCheckedContinuation { continuations.append($0) }
+      let requestID = callCount
+      if Task.isCancelled { requestsCancelledAtEntry.insert(requestID) }
+      pendingRequestIDs.insert(requestID)
+      let content = await withTaskCancellationHandler {
+        await withCheckedContinuation { continuations.append($0) }
+      } onCancel: {
+        Task { @MainActor in self.cancelledRequestIDs.insert(requestID) }
+      }
+      pendingRequestIDs.remove(requestID)
       if withUnsafeCurrentTask(body: { $0?.isCancelled == true }) { cancelledReplies += 1 }
       return content
     }
@@ -508,8 +519,12 @@ import XCTest
       let requestsBeforeLateReturn = pending.callCount
       let pendingRepliesBeforeLateReturn = pending.continuations.count
       if replacesSelectionDuringAssembly {
-        XCTAssertGreaterThan(pendingRepliesBeforeLateReturn, 0,
-          "The replacement must reach the actual transport before releasing the old descriptor")
+        XCTAssertEqual(pendingRepliesBeforeLateReturn, 1,
+          "Only the current replacement may reach transport; obsolete queued tasks must not fetch")
+        XCTAssertTrue(pending.requestsCancelledAtEntry.isEmpty,
+          "An already-cancelled task must not enter the transport: \(pending.requestsCancelledAtEntry.sorted())")
+        XCTAssertEqual(pending.pendingRequestIDs.subtracting(pending.cancelledRequestIDs).count, 1,
+          "Exactly one pending transport may still belong to an uncancelled replacement task; pending=\(pending.pendingRequestIDs.sorted()), cancelled=\(pending.cancelledRequestIDs.sorted())")
       } else {
         XCTAssertEqual(pendingRepliesBeforeLateReturn, 0)
       }

@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 已取消在线任务仍启动首次取数的根因与修复（2026-10-12）
+
+为 PendingContent 增加逐请求 ID、等待 ID、取消处理器通知和入口取消状态。先验证等待请求中只有一个未取消所有者（work/live-replacement-request-ownership.log），再增加“已取消任务不得进入取数”的断言；红测精确报告 requestsCancelledAtEntry 为 [1, 3]（work/live-replacement-cancelled-entry-red.log，1 项 1 失败），证明不是单纯等待回复计数误读。
+
+调用链：restoreActiveTestSelection -> apply -> reset，同时词数控件的 onChange(wordLimit) 也 reset；reset 会取消旧 liveContentTask，但已排队任务的首个执行语句直接调用 liveContentFetch，没有入口取消检查。因而旧任务即使首次调度前已取消仍启动取数。生产修复只在首次 fetch 前加入 !Task.isCancelled 且 requestID == liveContentRequestID 守卫，不改有效请求重试、填充、发布或配置恢复规则，不把“去重所有 reset”混入本修复。
+
+相关 56 项零失败，其中隐藏宿主 44 项（work/live-replacement-cancelled-entry-green.log，274.006 秒）。随后将该切换场景等待回复数从仅大于零加强为等于一，定点 1 项通过（work/live-replacement-single-pending-verified.log，4.177 秒）；最终测试加强后的全组未再跑，产品代码与 56 项验证时相同。取消处理器中的 MainActor 通知仅用于夹具诊断，不改变生产操作。
+
+此证据定位并修复上轮两条等待回复场景，不证明所有网络并发或已进入传输后的取消契约。此前空初始化偶发失败根因仍未定位（本轮整组通过），关闭来源命令交错仍未验收。零可见主程序启动，无公共内容网络；未跑新完整发布门禁，既有 partial／性能输入法限制与完整 goal active 保持。
+
 ## 在线装配失效后的强制成功返回（2026-10-12）
 
 新增两个隐藏生产宿主交错：一是在 livePromptPrepare 挂起期间退出视图，二是通过 importActiveTestSelection 导入 152 词选择，触发恢复与新请求。释放旧描述符时从旧任务内部确认取消标志，再检查当前提示不变、传输请求数及等待回复数不变、没有保存结果或新结果窗口。替换场景额外检查导入目标确为 152 词且新传输已到达。本轮测试既有行为，不改产品逻辑，不制造产品红测。
