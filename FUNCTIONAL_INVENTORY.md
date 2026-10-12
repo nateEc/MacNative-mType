@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 最终在线会话工厂规模诊断：真实 TestSessionFactory.make 仍同步变换整个保留尾部。新增自有来源夹具在 1,001／10,001／100,001 尾部字段下验证目标、增量模式、首尾字段保留／有界消费，记录本机 Debug 单次构造约 6.678／50.775／529.998ms，首次输入约 1–2ms（work/live-session-construction-scale-verified.log）。相关 20 项通过仅证明功能检查，不是性能通过。下一瓶颈为最终全尾部变换；本轮未改产品，不把此测量当历史可见 Hang 根因，零主程序启动，完整 goal active 与 partial 保持。
+
 2026-10-12 在线后续余量协作装配：生产初始加载在发布前异步准备 continuation，初始提示与尾部共用每 100 token 的可取消装配器；尾部仍按原有限／无限预算切片、不循环补齐。Unicode 与无空格边界独立对照、100,002 token 保留尾部、首末批取消和无余量 nil 等定点及相邻 19 项通过；全部相关 63 项通过，其中隐藏宿主 44 项（work/live-continuation-host-regression.log，285.907 秒）。零主程序启动；尾部装配点精确宿主交错、最终同步会话构造／布局和全量内存等缺口仍在，未跑新完整门禁，showAllLines partial 与完整 goal active 保持。
 
 2026-10-12 在线填充后文本连接改进：fillingInitialPrompt 汇总词源后不再通过公开构造器全量同步 joined，而以每 100 token 协作连接、首批／末批检查取消，经私有构造器保存已准备文本；已有充足内容直接复用，保留全部尾部余量。Unicode 字节、分隔符、署名、取消和 100,001 词等定点 15 项通过，全部相关 59 项通过（隐藏宿主 44 项，work/live-filled-content-host-regression.log，272.136 秒）。零主程序启动；单节解码、署名汇总、最终会话／布局及总内存限制不变，未跑新完整门禁，showAllLines partial 与完整 goal active 保持。

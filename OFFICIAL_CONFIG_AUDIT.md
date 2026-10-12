@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 最终在线会话构造的规模证据（2026-10-12）
+
+追踪 TestSessionFactory.make：协作准备的 streamContinuation 仍在工厂内同步调用 TestModifierPolicy.transformedBatch，使用初始提示词数作为绝对 wordOffset、有限目标作为 wordBound，并与初始提示共享 nextRandomCaseBit。因此不能直接把尾部变换提前或移到任意线程，否则可能改变随机调用顺序、修饰器边界和来源字段。当前 retainedField 游标已避免每次消费重拆整个尾部，下一需拆解的是首次全量变换，而非假定消费端仍有相同问题。
+
+新增 LiveSessionConstructionEvidenceTests 使用自有 poetry 来源、固定 start 初始字段和 ownedN 尾部，真实协作准备描述符后调用最终同步工厂，检查词数目标、初始有界提示、增量扩展，输入首字段后检查 owned0 已进入可见窗口而末尾尚未整段追加。描述符末尾字节还在工厂前确认保留。该测试不是对内部整段尾部的完全可访问性证明，也不把固定夹具推广为所有修饰器验收。
+
+work/live-session-construction-scale-verified.log 记录本机 Debug、每规模一次：1,001 字段 0.006677875s，10,001 字段 0.050775125s，100,001 字段 0.529998042s；对应首段 start 加空格的消费为 0.002144208s／0.001333958s／0.001344083s。计时只包围同步 factory 和 insertBatch，排除描述符准备；不是 Release 性能基准、物理按键延迟、内存峰值或历史可见 Hang 的归因。相关 20 项零失败，5.295 秒，不设置机器相关硬阈值、不称性能通过。
+
+首轮测试编译错误是把 await 放入 XCTUnwrap 同步 autoclosure，已拆分等待与解包，失败日志保留 work/live-session-construction-scale.log。此次为诊断新增证据，不改产品逻辑，不制造行为缺陷红测；未重跑全部宿主或完整门禁。零可见主程序启动、无公共内容网络。下一步应保留初始到尾部的确定性变换次序并协作准备最终批次，先审查修饰器跨字段合同。showAllLines partial、原始内存／布局／输入法及完整 goal active 不变。
+
 ## 在线后续余量描述符的协作准备（2026-10-12）
 
 生产初始加载先前在最终 TestSessionFactory.make 参数中同步 continuationDescriptor，可能一次性连接较大保留尾部。新增 preparingContinuationDescriptor，与初始 preparingPromptDescriptor 共用私有分批连接器，每批最多 100 token、块前和末块后检查取消、块后 yield。尾部起点仍为当前显示预算，有限词数终点仍 min(tokens.count, wordLimit)，无限／时间模式仍保留全部余量。同步切片实现保留作独立行为对照及其他既有调用。
