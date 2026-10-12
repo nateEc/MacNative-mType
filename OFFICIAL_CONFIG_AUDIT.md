@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 有序在线批次协作变换基础（2026-10-12）
+
+会话内决策复核：不能将原 transformedBatch 按任意文本块调用后拼接，因为空字段不递增绝对词索引、随机位调用序列必须一致、无空格目标需要来源字段、消息式末换行只能在整批终结时裁剪。LivePromptTransformation.prepare 按有序在线来源合同准备批次，保留原 transformedWord 实现，每百字段 yield、块内检查取消、最终批次构造前后检查取消。保留英式上下文中的 previousBritishWord 状态，但该准备器不是任意 standalone 全段倒序／词池格式化接口的替代。
+
+独立证据：原同步 transformedBatch 保持不变，对三种源文本乘十五组修饰器选择乘两种来源边界，共 90 组，比较 UTF-8、来源字段、无空格目标和长度，以及确定性随机位消耗次数。初轮美国配置相关 22 项通过（work/live-transform-contract.log，5.473 秒）；最终英式配置并增加绝对第十词不附加下划线、100,001 字段完整输出和首末批取消，相关 24 项通过（work/live-transform-contract-verified.log，5.583 秒）。不是全修饰器组合、所有语言或独立引用文本合同证明。
+
+目前准备器尚未接入 TestSessionFactory.make：必须先保留初始提示到尾部的随机消费次序和最终有限提交处理，再替换同步外部批次路径。故上一节测得约 530ms 瓶颈仍存在，本轮没有宣称产品性能改善。语言展示转换、ASCII 标量拆分／数组化、TransformedPromptBatch 最终校验仍同步，全量内存仍未约束；首末批取消证据不能替代这些阶段的延迟验收。此阶段为后续安全集成建立行为对照，不制造缺陷红测。
+
+零可见主程序启动、无公共内容网络；未重跑全部隐藏宿主或完整门禁，生产使用路径未切换。后续应接入保序的最终会话准备并验证生产宿主取消／配置交错与规模变化。完整 goal active，showAllLines 等 partial、物理输入法及其他原缺口不变。
+
 ## 最终在线会话构造的规模证据（2026-10-12）
 
 追踪 TestSessionFactory.make：协作准备的 streamContinuation 仍在工厂内同步调用 TestModifierPolicy.transformedBatch，使用初始提示词数作为绝对 wordOffset、有限目标作为 wordBound，并与初始提示共享 nextRandomCaseBit。因此不能直接把尾部变换提前或移到任意线程，否则可能改变随机调用顺序、修饰器边界和来源字段。当前 retainedField 游标已避免每次消费重拆整个尾部，下一需拆解的是首次全量变换，而非假定消费端仍有相同问题。
