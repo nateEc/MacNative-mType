@@ -4,6 +4,59 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class NativeLocalFontRegistrationTests: XCTestCase {
+  func testPostRegistrationFailureUnregistersNewFontBeforeRestoringPreviousFont() throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("typebar-native-font-\(UUID())", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let oldName = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let newName = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let oldBytes = OwnedTestFontFixture.make(postScriptName: oldName)
+    let newBytes = OwnedTestFontFixture.make(postScriptName: newName)
+    var failedURL: URL?
+    defer {
+      // Clean a registration leak even when the failing implementation removed its file.
+      if let failedURL {
+        if !FileManager.default.fileExists(atPath: failedURL.path) { try? newBytes.write(to: failedURL) }
+        _ = CTFontManagerUnregisterFontsForURL(failedURL as CFURL, .process, nil)
+      }
+      for url in LocalPracticeFontImport.storedURLs(in: directory) {
+        _ = CTFontManagerUnregisterFontsForURL(url as CFURL, .process, nil)
+      }
+      try? FileManager.default.removeItem(at: directory)
+    }
+    var enables = 0
+    let oldInfo = try LocalPracticeFontImport.save(oldBytes, originalFilename: "old.ttf",
+      directory: directory, readInfo: LocalPracticeFontRegistration.fontInfo(at:),
+      register: LocalPracticeFontRegistration.read(url:),
+      unregister: { _ = CTFontManagerUnregisterFontsForURL($0 as CFURL, .process, nil) },
+      enable: { enables += 1 })
+    let oldURL = try XCTUnwrap(LocalPracticeFontImport.storedURLs(in: directory).first)
+    XCTAssertThrowsError(try LocalPracticeFontImport.save(newBytes, originalFilename: "new.ttf",
+      directory: directory, readInfo: LocalPracticeFontRegistration.fontInfo(at:), register: { url in
+        if url.lastPathComponent == oldURL.lastPathComponent {
+          // Recovery must not run while the rejected generation remains registered.
+          if let failedURL { XCTAssertEqual(CTFontManagerGetScopeForURL(failedURL as CFURL), .none) }
+          return LocalPracticeFontRegistration.read(url: url)
+        }
+        failedURL = url
+        XCTAssertEqual(LocalPracticeFontRegistration.read(url: url)?.postScriptName, newName)
+        XCTAssertEqual(CTFontManagerGetScopeForURL(url as CFURL), .process)
+        return nil // Inject a failure after the real native registration succeeded.
+      }, unregister: { _ = CTFontManagerUnregisterFontsForURL($0 as CFURL, .process, nil) },
+      enable: { enables += 1 })) { error in
+        guard case LocalPracticeFontError.couldNotLoad = error else {
+          return XCTFail("Expected load failure, received \(error)")
+        }
+      }
+    let rejectedURL = try XCTUnwrap(failedURL)
+    XCTAssertEqual(CTFontManagerGetScopeForURL(rejectedURL as CFURL), .none)
+    XCTAssertEqual(CTFontManagerGetScopeForURL(oldURL as CFURL), .process)
+    XCTAssertEqual(LocalPracticeFontRegistration.read(url: oldURL), oldInfo)
+    XCTAssertEqual(try Data(contentsOf: oldURL), oldBytes)
+    XCTAssertEqual(enables, 1)
+    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [oldURL.lastPathComponent])
+  }
+
   func testNativeReplacementAndInvalidImportKeepCorrectFileAndRegistration() throws {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("typebar-native-font-\(UUID())", isDirectory: true)

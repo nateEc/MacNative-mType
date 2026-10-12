@@ -158,6 +158,10 @@ enum LocalPracticeFontImport {
 
     previousURLs.forEach(unregister)
     guard let info = register(destinationURL) else {
+      // Registration may succeed before descriptor/availability checks fail.
+      // Retire this owned generation while its file still exists, before
+      // restoring the previous fonts (which may share its PostScript name).
+      unregister(destinationURL)
       previousURLs.forEach { _ = register($0) }
       try? FileManager.default.removeItem(at: destinationURL)
       throw LocalPracticeFontError.couldNotLoad

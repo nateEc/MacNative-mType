@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 注册后失败清理修正：真实新字体注册后注入后置检查失败，红测发现新文件删除后仍保留进程注册；失败分支现先注销本次新 URL、再恢复旧字体。相关 41 项零失败零跳过、隐藏生产字体切换宿主通过（work/font-partial-registration-green.log、font-partial-registration-production-host.log），详见 OFFICIAL_CONFIG_AUDIT.md。零主程序启动；原生注销／恢复失败及并发崩溃仍未验证，新产品修改未跑完整门禁，fontFamily 部分与完整 goal active 保持。
+
 2026-10-12 TrueType WOFF2 补证：自写字形以 glyf／loca 空变换版本 3 进入真实生产导入、注册、来源、轮廓与注销链；三类 Web 字体的截断／损坏签名共六次失败均保留旧文件、注册、启用计数并清理候选。最终相关 40 项零失败零跳过（work/font-registration-native-tt-woff2-verified.log），详见 OFFICIAL_CONFIG_AUDIT.md。无产品修改、零主程序启动；非空变换／压缩熵块／未对齐无可选区及更多恶意输入仍未验收，未跑新完整门禁，fontFamily 部分与完整 goal active 保持。
 
 2026-10-12 自有 WOFF2 补证：Swift 从自写 CFF 组装 null transforms、Brotli 非压缩块及合法对齐私有区，实际生产注册／重复读取／文件来源／轮廓／注销通过；相关 38 项零失败零跳过，独立解码还原原始 charstring，详见 OFFICIAL_CONFIG_AUDIT.md、work/font-registration-native-woff2-verified.log。保留未对齐、无可选区版本被 Core Text 拒绝的失败证据，不宣称全部 WOFF2 支持；压缩熵块／TrueType 变换等仍待验收。无产品修改、零主程序启动、不安装系统字体、未跑新完整门禁，fontFamily 部分及完整 goal active 保持。

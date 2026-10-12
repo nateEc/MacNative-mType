@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 注册后检查失败：先注销拒绝的新字体，再恢复旧字体（2026-10-12）
+
+新增真实 Core Text 注册的失败注入回归：先注册自有唯一名称 TTF，再令新字体真实注册成功、scope process，随后在同一导入 register 回调返回 nil，模拟注册之后的描述符／可用性检查失败。旧实现只恢复旧字体并删除新文件，新 URL 在恢复之前及导入结束后均仍为 process，单项两处红测失败（work/font-partial-registration-red.log）。这是明确后置失败注入下的注册泄漏，不冒称自然发生的 Core Text 故障或所有部分注册情形。
+
+修复实际文件事务的失败分支：在新文件仍存在时先 unregister(destinationURL)，再恢复 previousURLs、删除拒绝文件并抛出原加载错误。注销范围只限本次导入生成的自有 URL；成功路径、候选无效路径及启用行为不变。同步调整原回调事务断言，区分旧字体退役与新字体失败清理，未放松注册恢复断言。源码驱动核对本机 Xcode 26.3／macOS 26.1 SDK CTFontManager.h：UnregisterFontsForURL 按 URL 注销、scope 应匹配注册范围、返回 Bool 表示注销是否成功，接口自 macOS 10.6 可用；生产原回调仍使用 process 范围。
+
+最终相关 41 项零失败零跳过，1.950s（墙钟 1.955），font-partial-registration-green.log。新增回归实际验证旧字体恢复之前新 URL 已 scope none，结束后仍 none，旧 URL process、旧描述符及文件字节保持、启用次数不变，候选及失败文件无残留。隐藏生产字体／字号组合宿主单项通过，18.060s（墙钟 18.062），font-partial-registration-production-host.log。测试只注册自有临时进程字体，结束清理；零主程序启动，不写真实用户配置／字体目录。
+
+注销回调仍为 Void：原生注销失败、旧字体恢复失败、并发／崩溃、真实同名冲突及所有部分集合注册尚未证明，不以本修复宣称事务完全安全。未跑新完整门禁／Release，旧完整门禁早于本产品变更；fontFamily 部分与完整 goal active 保持。
+
 ## TrueType WOFF2 与畸形 Web 字体保留旧状态（2026-10-12）
 
 扩展同一自写字形 WOFF2 生成器为 TrueType 分支，不以 CFF 或改扩展名代替。按 [WOFF2 §4.1、§5.3](https://www.w3.org/TR/WOFF2/#table_dir_format) 将 glyf／loca 标识为空变换版本 3，其他表仍版本 0；测试明确断言 TrueType flavor、十张表、glyf 0xCA／loca 0xCB 及无 CFF 表。沿用合法对齐私有区、Brotli 非压缩块，无第三方字体或新依赖。真实生产保存／注册／重复读取／精确加载 URL／矩形轮廓／注销整链通过（work/font-registration-native-tt-woff2.log，单项 0.016s）。

@@ -29,8 +29,9 @@ final class LocalPracticeFontImportTests: XCTestCase {
           default: XCTFail("Expected registration failure, received \(error)")
           }
         }
-      XCTAssertEqual(removals.map(\.lastPathComponent), [previous.lastPathComponent],
-        "The new, not-yet-registered file is not a previous font")
+      XCTAssertEqual(removals.count, 2, "Retire old once, then clean a possibly partially registered new font")
+      XCTAssertEqual(removals.first?.lastPathComponent, previous.lastPathComponent)
+      XCTAssertEqual(removals.last?.lastPathComponent, registrations.first?.lastPathComponent)
       XCTAssertEqual(registrations.count, 2, "Try new once, then restore the previous font once")
       XCTAssertEqual(registrations.last?.lastPathComponent, previous.lastPathComponent)
       XCTAssertEqual(LocalPracticeFontImport.storedURLs(in: directory).map(\.lastPathComponent), [previous.lastPathComponent])
