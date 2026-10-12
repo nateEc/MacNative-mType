@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 无空格结果复制的已保存目标目录（2026-10-12）
+
+固定官方 copyWordsListButton 按已触及字段数连接真实目标，而非按输入字符数截断。原生 ResultPromptText 无空格分支虽有旧词库猜测回退，却未使用成绩已保存的 targetWordDirectory。自有目录 north／harbor／river 及字段快照红测两项三处失败，得到 n、northh；不匹配目录也错误返回猜测片段（work/no-space-result-copy-red.log）。
+
+新增目录优先分支：先以原始 UTF-16 拼接匹配 prompt 且 noSpace 为 true；不匹配则返回 nil，不冒用失效目标。对于终局前有序事件全部带输入字段快照的记录，按最终输入历史字段数连接保存目标前缀，保留空目标身份及可跨可见字形的实际边界。没有完整快照元数据时仍走既有旧回退，尚不声称其词边界准确；Zen 分支优先级及普通代码／空格路径不变。
+
+初次相关 68 项通过；加入真实 noSpaces 自定义工厂→输入→bailOut→成绩复制、分解 Unicode 跨字形边界及空目标字段，最终 71 项零失败（work/no-space-result-copy-final.log，0.350 秒测试、0.359 秒墙钟）。原创性边界检查通过（work/no-space-result-copy-originality.log）。行为优先与根因技能用于复现目录忽略并修正复制边界；不修改输入、计分或存储格式。
+
+未新增所有 legacy／混合元数据、全部修饰器与目录异常恢复、真实剪贴板／可见菜单点击验收，未跑完整门禁／Release。零可见主程序启动、无公共网络内容请求；四项配置 partial 与完整 goal active 保持。
+
 ## 代码语言的提示字段复制（2026-10-12）
 
 固定官方 test-ui.ts 的 copyWordsListButton 对非 Zen 统一连接已触及目标的 textWithCommit，不按已输入字符数截断。当前原生 usesSpaceDelimitedWords 对代码语言为 false，但 TypingSession.usesWordCommitInput 为 usesSpaceDelimitedWords 或 isCodeLanguage；ResultPromptText 缺失后半条件，使代码结果错误进入按字符长度截取的分支。独立 Python／JavaScript／Dockerfile 夹具红测两项四处失败：部分 em 只复制 em，tab 缩进字段仅复制两个字符（work/code-result-copy-red.log）。

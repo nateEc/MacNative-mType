@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 无空格提示复制接入保存词目录：原先忽略 targetWordDirectory，n／northh 被按字符数复制而非完整已触及词。两项红测三处失败，现对匹配原提示的无空格目录及完整字段快照，按终局前输入字段数连接保存目标；不匹配目录返回不可复制，缺字段元数据仍保留原旧回退。真实自定义 noSpaces 工厂／成绩、跨字形 Unicode 原始边界和空目标身份等最终相关 71 项零失败（work/no-space-result-copy-final.log，0.359 秒墙钟），原创性边界通过。未证明所有旧回放／目录修复、全部修饰器或真实剪贴板点击；零主程序启动，未跑完整门禁／Release，partial 与完整 goal active 保持。
+
 2026-10-12 代码语言提示复制修复：ResultPromptText 的字段分支此前只看 usesSpaceDelimitedWords，遗漏代码语言，而 TypingSession.usesWordCommitInput 明确包含代码语言，导致部分输入 em 只能复制 em 而非整个已触及代码字段及 LF。Python／JavaScript／Dockerfile 两项红测四处失败，修复后共用原字段复制分支，不变更无空格修饰器保护。最终测试遍历当前目录全部 isCodeLanguage 身份，并覆盖 tab 缩进／错误输入，相关 48 项零失败（work/code-result-copy-final.log，0.191 秒墙钟），原创性边界通过。不是全部代码生成器／代码装饰或剪贴板点击验收；零主程序启动，未跑完整门禁／Release，其他缺口和完整 goal active 保持。
 
 2026-10-12 复制练习提示保留提交字符：固定官方 copyWordsListButton 使用已触及原目标的 textWithCommit，原生原先用空格连接 review.target，丢失 LF／空字段及末尾提交。两项红测均失败，现对既有空格分词分支按终局前输入字段数，通过 UnitInputTargets 截取原提示字段前缀，保留 SPACE／LF、制表符内容及 Unicode 拼写；无回放旧归档仍按 review 数回退。更新旧 amber 预期为含原提交空格的 amber，不改断言为接受丢失。最终 46 项相关测试通过（work/result-prompt-commit-final.log，0.170 秒墙钟），原创性边界通过。Zen／无空格分支未改，代码语言等其他分支及真实剪贴板点击未新增验收；零主程序启动，未跑完整门禁／Release，partial 与完整 goal active 保持。

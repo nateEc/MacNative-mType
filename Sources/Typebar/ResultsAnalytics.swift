@@ -1182,6 +1182,17 @@ enum ResultPromptText {
       return ResultInputText.make(for: result)
     }
 
+    if let directory = result.targetWordDirectory {
+      guard directory.matches(prompt: result.prompt, noSpace: true) else { return nil }
+      let events = TypingReplay.chronologicalEvents(result.replayEvents)
+        .filter { $0.offset <= result.capturedDuration }
+      if !events.isEmpty, events.allSatisfy({ $0.inputField != nil }) {
+        let reached = SavedTextInputHistoryPolicy.inputFields(events: events).count
+        guard reached > 0 else { return nil }
+        return directory.words.prefix(reached).joined()
+      }
+    }
+
     let needsLegacyNoSpaceParsing = result.configuration.language.usesCJKWordStream
       && !result.prompt.contains(where: \.isWhitespace)
     if result.configuration.language.usesSpaceDelimitedWords || result.configuration.language.isCodeLanguage,
