@@ -104,7 +104,11 @@ struct LivePracticeContent: Equatable {
       collected.append(contentsOf: next.tokens)
       titles.append(next.title)
       if let author = next.byline { authors.append(author) }
+      // An async provider may return cached content without suspending. Give
+      // navigation/cancellation a chance between sections, including the last.
+      await Task.yield()
     }
+    guard !Task.isCancelled else { return nil }
     return .init(source: source, title: titles.joined(separator: " / "),
       byline: authors.isEmpty ? nil : authors.joined(separator: " / "),
       tokens: collected, separator: separator)

@@ -2,6 +2,38 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class LiveWholePreviewBudgetTests: XCTestCase {
+  @MainActor private final class CancellationRequest {
+    var cancel: (() -> Void)?
+  }
+
+  func testImmediateCachedSectionsAllowQueuedCancellationBeforePublishing() async {
+    await checkQueuedCancellation(limit: 1001)
+  }
+
+  func testQueuedCancellationAfterFinalCachedSectionDoesNotPublish() async {
+    await checkQueuedCancellation(limit: 2)
+  }
+
+  private func checkQueuedCancellation(limit: Int) async {
+    let request = CancellationRequest()
+    var fetches = 0
+    let task = Task { @MainActor in
+      await LivePracticeContent(source: .encyclopedia, title: "First", byline: nil,
+        tokens: ["harbor"], separator: " ")
+        .fillingInitialPrompt(for: .words(limit), showAllLines: true) {
+          fetches += 1
+          if fetches == 1 { Task { @MainActor in request.cancel?() } }
+          return LivePracticeContent(source: .encyclopedia, title: "Cached", byline: nil,
+            tokens: ["next"], separator: " ")
+        }
+    }
+    request.cancel = { task.cancel() }
+    let result = await task.value
+    request.cancel = nil
+    XCTAssertTrue(result == nil, "Queued cancellation must run before a cached fill publishes")
+    XCTAssertLessThan(fetches, max(2, limit - 1), "Immediate async responses must not monopolize the actor")
+  }
+
   func testAboveSynchronousCeilingFetchesFullInitialBudgetAndRetainsOversupply() async throws {
     for source: LivePracticeContentSource in [.poetry, .encyclopedia] {
       let configuration = TestConfiguration.words(100_001)
