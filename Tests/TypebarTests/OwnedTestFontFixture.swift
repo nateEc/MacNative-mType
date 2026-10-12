@@ -97,10 +97,10 @@ enum OwnedTestFontFixture {
     return Data(font)
   }
 
-  /// WOFF2 CFF with null transforms and a Brotli uncompressed meta-block.
+  /// WOFF2 CFF or TrueType with null transforms and a Brotli uncompressed meta-block.
   /// W3C WOFF2 sections 3–5 and RFC 7932 section 9; no external encoder.
-  static func makeWOFF2(postScriptName: String) -> Data {
-    let sfnt = Array(makeOTF(postScriptName: postScriptName))
+  static func makeWOFF2(postScriptName: String, cff: Bool = true) -> Data {
+    let sfnt = Array(assemble(postScriptName: postScriptName, cff: cff))
     func integer(at offset: Int) -> Int {
       sfnt[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
     }
@@ -116,12 +116,15 @@ enum OwnedTestFontFixture {
     let count = Int(sfnt[4]) << 8 | Int(sfnt[5])
     var directory: [UInt8] = [], payload: [UInt8] = []
     let knownTags: [String: UInt8] = ["cmap": 0, "head": 1, "hhea": 2, "hmtx": 3,
-      "maxp": 4, "name": 5, "OS/2": 6, "post": 7, "CFF ": 13]
+      "maxp": 4, "name": 5, "OS/2": 6, "post": 7, "glyf": 10, "loca": 11, "CFF ": 13]
     for index in 0..<count {
       let record = 12 + index * 16
       let offset = integer(at: record + 8), length = integer(at: record + 12)
       let tag = Array(sfnt[record..<(record + 4)])
-      directory += [knownTags[String(bytes: tag, encoding: .ascii)!]!] + base128(length)
+      let tagName = String(bytes: tag, encoding: .ascii)!
+      // Only glyf/loca use version 3 for null transforms; others use version 0.
+      let transform: UInt8 = (tagName == "glyf" || tagName == "loca") ? 0xC0 : 0
+      directory += [knownTags[tagName]! | transform] + base128(length)
       var table = Array(sfnt[offset..<(offset + length)])
       if tag == Array("head".utf8) { table[16] |= 8 } // Required head.flags bit 11.
       payload += table // No SFNT alignment padding inside the Brotli stream.

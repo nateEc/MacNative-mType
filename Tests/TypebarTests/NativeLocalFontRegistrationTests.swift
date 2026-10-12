@@ -105,6 +105,72 @@ import XCTest
     })
   }
 
+  func testOwnedTrueTypeWOFF2RegistersIdempotentlyAndUsesItsOwnFileWithoutUserStore() throws {
+    try checkOwnedFont(format: "woff2", make: { name in
+      let data = OwnedTestFontFixture.makeWOFF2(postScriptName: name, cff: false)
+      XCTAssertEqual(Array(data.prefix(8)), [0x77, 0x4F, 0x46, 0x32, 0, 1, 0, 0])
+      let bytes = Array(data)
+      let count = Int(bytes[12]) << 8 | Int(bytes[13])
+      XCTAssertEqual(count, 10)
+      var offset = 48, flags: [UInt8] = []
+      for _ in 0..<count {
+        flags.append(bytes[offset])
+        offset += 1
+        // Every table has only origLength: all transforms are null.
+        while bytes[offset] & 0x80 != 0 { offset += 1 }
+        offset += 1
+      }
+      XCTAssertTrue(flags.contains(0xCA), "glyf must use null transform version 3")
+      XCTAssertTrue(flags.contains(0xCB), "loca must use null transform version 3")
+      XCTAssertFalse(flags.contains(13), "TrueType coverage must not reuse CFF data")
+      return data
+    })
+  }
+
+  func testMalformedWebFontImportsPreservePreviouslyRegisteredFont() throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("typebar-native-font-\(UUID())", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer {
+      for url in LocalPracticeFontImport.storedURLs(in: directory) {
+        _ = CTFontManagerUnregisterFontsForURL(url as CFURL, .process, nil)
+      }
+      try? FileManager.default.removeItem(at: directory)
+    }
+    var enables = 0
+    func save(_ bytes: Data, extension suffix: String) throws -> LocalPracticeFontInfo {
+      try LocalPracticeFontImport.save(bytes, originalFilename: "owned." + suffix,
+        directory: directory, readInfo: LocalPracticeFontRegistration.fontInfo(at:),
+        register: LocalPracticeFontRegistration.read(url:),
+        unregister: { _ = CTFontManagerUnregisterFontsForURL($0 as CFURL, .process, nil) },
+        enable: { enables += 1 })
+    }
+    let oldName = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let oldBytes = OwnedTestFontFixture.make(postScriptName: oldName)
+    let oldInfo = try save(oldBytes, extension: "ttf")
+    let oldURL = try XCTUnwrap(LocalPracticeFontImport.storedURLs(in: directory).first)
+    let name = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let formats = [("woff", OwnedTestFontFixture.makeWOFF(postScriptName: name, compressed: true)),
+      ("woff2", OwnedTestFontFixture.makeWOFF2(postScriptName: name)),
+      ("woff2", OwnedTestFontFixture.makeWOFF2(postScriptName: name, cff: false))]
+    for (suffix, valid) in formats {
+      var badSignature = valid
+      badSignature.replaceSubrange(0..<4, with: [0, 0, 0, 0])
+      for malformed in [Data(valid.prefix(24)), badSignature] {
+        XCTAssertThrowsError(try save(malformed, extension: suffix)) { error in
+          XCTAssertTrue(error is LocalPracticeFontError, "Unexpected error: \(error)")
+        }
+        XCTAssertEqual(enables, 1)
+        XCTAssertEqual(LocalPracticeFontImport.storedURLs(in: directory), [oldURL])
+        XCTAssertEqual(try Data(contentsOf: oldURL), oldBytes)
+        XCTAssertEqual(CTFontManagerGetScopeForURL(oldURL as CFURL), .process)
+        XCTAssertEqual(LocalPracticeFontRegistration.read(url: oldURL), oldInfo)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path),
+          [oldURL.lastPathComponent], "Failed candidates must not remain on disk")
+      }
+    }
+  }
+
   private func checkOwnedFont(format: String, make: (String) -> Data) throws {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("typebar-native-font-\(UUID())", isDirectory: true)

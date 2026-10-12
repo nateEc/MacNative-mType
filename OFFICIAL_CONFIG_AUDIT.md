@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+## TrueType WOFF2 与畸形 Web 字体保留旧状态（2026-10-12）
+
+扩展同一自写字形 WOFF2 生成器为 TrueType 分支，不以 CFF 或改扩展名代替。按 [WOFF2 §4.1、§5.3](https://www.w3.org/TR/WOFF2/#table_dir_format) 将 glyf／loca 标识为空变换版本 3，其他表仍版本 0；测试明确断言 TrueType flavor、十张表、glyf 0xCA／loca 0xCB 及无 CFF 表。沿用合法对齐私有区、Brotli 非压缩块，无第三方字体或新依赖。真实生产保存／注册／重复读取／精确加载 URL／矩形轮廓／注销整链通过（work/font-registration-native-tt-woff2.log，单项 0.016s）。
+
+新增真实失败保留测试：先注册自有唯一名称 TTF，再分别以压缩 WOFF 1.0、CFF WOFF2、TrueType WOFF2 为底本，构造截断到 24 字节和破坏签名两类数据，共六次拒绝。每次都验证类型化字体错误、旧文件唯一且字节不变、旧 URL 保持进程注册、重复读取仍为旧字体、启用计数不变，且目录中没有候选残留。测试使用实际 Core Text 与隔离临时目录，结束注销清理，不写真实 store 或系统字体目录。它是六个明确畸形输入的证据，不等于压缩流安全审计或所有注册失败恢复。
+
+本轮补现有行为证据、无产品修改，因此不制造产品红测。最终固定参考环境相关 40 项零失败零跳过，2.415s（墙钟 2.420），日志 font-registration-native-tt-woff2-verified.log；之前含六次失败保留检查的 40 项亦通过（font-registration-native-tt-woff2-regression.log）。零主程序启动。非空 glyf／loca 变换、压缩熵块、集合字体、未对齐无可选区兼容性、最低系统、真实 GUI／并发恢复等仍待验证，未跑新完整门禁／Release；fontFamily 部分及完整 goal active 保持。
+
 ## 自有 WOFF2 CFF 原生注册与编码差异（2026-10-12）
 
 从自写 CFF/OTF 生成 WOFF2：48 字节头、规范已知标签、最短 UIntBase128 长度、null transform 的无填充表流、head.flags bit 11，以及 Swift 自行组装的 Brotli 非压缩 meta-block。普通测试不依赖 Python／Brotli 库、不调用外部编码器、不读取原版字体。编码契约依据 [W3C WOFF2](https://www.w3.org/TR/WOFF2/) 与 [RFC 7932](https://www.rfc-editor.org/rfc/rfc7932.html)。最终容器带四字节自有私有区 QA00，偏移按 §7 对齐，填充由该块明确归属；头长度、私有区偏移／长度／内容均有断言。
