@@ -24,7 +24,15 @@ enum OwnedTestFontFixture {
   }
 
   static func make(postScriptName: String) -> Data {
-    let templates = [
+    assemble(postScriptName: postScriptName, cff: false)
+  }
+
+  static func makeOTF(postScriptName: String) -> Data {
+    assemble(postScriptName: postScriptName, cff: true)
+  }
+
+  private static func assemble(postScriptName: String, cff: Bool) -> Data {
+    var templates = [
       "OS/2": "AAMCWAGQAAUABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAD8/Pz8AAAB4AHgDIP84AAADIADIAAAAAAAAAAAAAAAAAAAAIAAA",
       "cmap": "AAAAAgAAAAMAAAAUAAMAAQAAABQABAAgAAAABAAEAAEAAAB4//8AAAB4////iQABAAAAAA==",
       "glyf": "AAEAZAAAAfQCvAADAAAzIREhZAGQ/nACvAA=",
@@ -35,7 +43,29 @@ enum OwnedTestFontFixture {
       "maxp": "AAEAAAACAAQAAQAAAAAAAgAAAAAAAAAAAAAAAAAAAAA=",
       "post": "AAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAFs=",
     ]
+    if cff {
+      // Reproduced by describe-owned-test-font.py --cff; still our rectangle.
+      templates.removeValue(forKey: "glyf")
+      templates.removeValue(forKey: "loca")
+      templates["maxp"] = "AABQAAAC"
+      templates["post"] = "AAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      templates["CFF "] = "AQAEAQABAQEqVHlwZWJhclFBMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAAAQEBG/gbAvgbA/gYBO+L+Ij5UAX3FQ+L9y0S9xgRAAEBASpUeXBlYmFyUUEwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMAAAAABZAAIBAQQQ+OwO+OzvFvgk+VD8JAYO"
+    }
     var tables = templates.mapValues { Array(Data(base64Encoded: $0)!) }
+    if var bytes = tables["CFF "] {
+      let placeholder = Array(("TypebarQA" + String(repeating: "0", count: 32)).utf8)
+      let replacement = Array(postScriptName.utf8)
+      precondition(replacement.count == placeholder.count)
+      var replacements = 0
+      for offset in 0...(bytes.count - placeholder.count) {
+        if Array(bytes[offset..<(offset + placeholder.count)]) == placeholder {
+          bytes.replaceSubrange(offset..<(offset + placeholder.count), with: replacement)
+          replacements += 1
+        }
+      }
+      precondition(replacements == 2) // Name INDEX and shared family/full-name string.
+      tables["CFF "] = bytes
+    }
     let names = [(1, postScriptName), (2, "Regular"), (3, postScriptName),
       (4, postScriptName + " Regular"), (6, postScriptName)]
     var records: [UInt8] = [], strings: [UInt8] = []
@@ -46,9 +76,10 @@ enum OwnedTestFontFixture {
       strings += bytes
     }
     tables["name"] = short(0) + short(names.count) + short(6 + records.count) + records + strings
-    // Ten tables: searchRange = 8 * 16, entrySelector = 3, rangeShift = 2 * 16.
-    precondition(tables.count == 10)
-    let header = word(0x00010000) + short(10) + short(128) + short(3) + short(32)
+    // Nine CFF or ten TrueType tables, with the same largest power of two (8).
+    precondition(tables.count == (cff ? 9 : 10))
+    let header = word(cff ? 0x4F54544F : 0x00010000) + short(tables.count)
+      + short(128) + short(3) + short(tables.count * 16 - 128)
     var directory: [UInt8] = [], payload: [UInt8] = []
     var headOffset = 0
     for tag in tables.keys.sorted() {

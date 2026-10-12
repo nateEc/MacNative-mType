@@ -5,24 +5,35 @@ The Swift test assembles these tables with a fresh name and valid checksums.
 Run manually to reproduce the embedded templates; not a test dependency.
 """
 import base64
+import argparse
 import io
 import json
 
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
+from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.ttLib import TTFont
 
-builder = FontBuilder(1000, isTTF=True)
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--cff", action="store_true", help="Generate CFF/OpenType rather than TrueType tables")
+arguments = parser.parse_args()
+builder = FontBuilder(1000, isTTF=not arguments.cff)
 builder.setupGlyphOrder([".notdef", "x"])
 builder.setupCharacterMap({120: "x"})
-empty = TTGlyphPen(None)
-rectangle = TTGlyphPen(None)
+empty = T2CharStringPen(600, None) if arguments.cff else TTGlyphPen(None)
+rectangle = T2CharStringPen(600, None) if arguments.cff else TTGlyphPen(None)
 rectangle.moveTo((100, 0))
 rectangle.lineTo((500, 0))
 rectangle.lineTo((500, 700))
 rectangle.lineTo((100, 700))
 rectangle.closePath()
-builder.setupGlyf({".notdef": empty.glyph(), "x": rectangle.glyph()})
+if arguments.cff:
+    placeholder = "TypebarQA" + "0" * 32
+    builder.setupCFF(placeholder, {"FullName": placeholder, "FamilyName": placeholder,
+                                  "Weight": "Regular"},
+                     {".notdef": empty.getCharString(), "x": rectangle.getCharString()}, {})
+else:
+    builder.setupGlyf({".notdef": empty.glyph(), "x": rectangle.glyph()})
 builder.setupHorizontalMetrics({".notdef": (600, 0), "x": (600, 100)})
 builder.setupHorizontalHeader(ascent=800, descent=-200)
 builder.setupNameTable({"familyName": "Owned Fixture", "styleName": "Regular",

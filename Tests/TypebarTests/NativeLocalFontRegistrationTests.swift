@@ -58,6 +58,21 @@ import XCTest
     try checkOwnedFont(format: "woff", make: { OwnedTestFontFixture.makeWOFF(postScriptName: $0) })
   }
 
+  func testOwnedCFFOpenTypeRegistersIdempotentlyAndUsesItsOwnFileWithoutUserStore() throws {
+    try checkOwnedFont(format: "otf", make: { name in
+      let data = OwnedTestFontFixture.makeOTF(postScriptName: name)
+      XCTAssertEqual(data.prefix(4), Data("OTTO".utf8))
+      let bytes = Array(data)
+      let count = Int(bytes[4]) << 8 | Int(bytes[5])
+      let tags = (0..<count).map { index in
+        String(decoding: bytes[(12 + index * 16)..<(16 + index * 16)], as: UTF8.self)
+      }
+      XCTAssertTrue(tags.contains("CFF "))
+      XCTAssertFalse(tags.contains("glyf"), "OTF coverage must use CFF outlines, not a renamed TrueType file")
+      return data
+    })
+  }
+
   func testOwnedCompressedWOFFRegistersIdempotentlyAndUsesItsOwnFileWithoutUserStore() throws {
     try checkOwnedFont(format: "woff", make: { name in
       let data = OwnedTestFontFixture.makeWOFF(postScriptName: name, compressed: true)
@@ -104,6 +119,13 @@ import XCTest
     var character: UniChar = 120, glyph: CGGlyph = 0
     XCTAssertTrue(CTFontGetGlyphsForCharacters(font, &character, &glyph, 1))
     XCTAssertNotEqual(glyph, 0)
+    let outline = try XCTUnwrap(CTFontCreatePathForGlyph(font, glyph, nil))
+    let bounds = outline.boundingBoxOfPath
+    XCTAssertEqual(bounds.minX, 2.8, accuracy: 0.001)
+    XCTAssertEqual(bounds.minY, 0, accuracy: 0.001)
+    XCTAssertEqual(bounds.width, 11.2, accuracy: 0.001)
+    XCTAssertEqual(bounds.height, 19.6, accuracy: 0.001,
+      "The actual loaded outline must match our 400×700 rectangle at 28pt / 1000 units-per-em")
     XCTAssertTrue(CTFontManagerUnregisterFontsForURL(url as CFURL, .process, nil))
     XCTAssertEqual(CTFontManagerGetScopeForURL(url as CFURL), .none)
     active = nil

@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 自有 CFF/OpenType 与真实轮廓尺寸验收（2026-10-12）
+
+扩展原创字形生成器 `--cff`，从同一自写矩形构建 Type 2 charstring，而非将 TTF 改扩展名。Swift 夹具使用 CFF 表模板，运行时以等长唯一名称替换两处 CFF 名称，并重建 name 表、目录和校验。明确断言 OTTO 标识、CFF 表存在及 glyf 表不存在；目录按九个表计算搜索字段，与既有十表 TrueType 分开。编码依据 [OpenType 文件规范](https://learn.microsoft.com/en-us/typography/opentype/spec/otff)，CFF 字节均由自写轮廓和可复现脚本生成，不读取原版／第三方字体。
+
+真实生产边界继续检查保存、进程注册、重复读取、精确加载文件 URL、字形和注销。另将真实轮廓检查接到 TTF、CFF、压缩／未压缩 WOFF 共用流程：CTFontCreatePathForGlyph 取实际加载字体的路径，四项尺寸断言为 28pt、1000 units-per-em 下 x=2.8、y=0、宽 11.2、高 19.6，符合自写 400×700 矩形。接口契约核对本机 SDK CTFont.h 的路径随字号缩放说明（macOS 10.5 起可用）；它是原生轮廓证据，不冒称像素、复杂文字连接或真实 GUI 正确。
+
+本轮为已有行为补证，无产品修改、不制造红测。`work/font-registration-native-cff.log` CFF 一项真实执行通过（0.015s）；最终固定参考环境 `font-registration-native-cff-regression.log` 37 项零失败零跳过（3.072s，墙钟 3.078），含所有共用轮廓检查。完整新脚本及夹具暂存后 `font-registration-native-cff-originality.log` 固定参考原创边界通过。测试只注册自有唯一名称的临时进程字体，验证注销并清理，零主程序启动。
+
+仅证明本机 macOS 26.1 的上述特定轮廓及格式链路；WOFF2、更多 CFF 内容／变体、真实同名冲突、畸形数据、最低系统和导入 GUI／并发崩溃仍待验证。未跑新完整门禁／Release，fontFamily 部分及完整 goal active 不变。
+
 ## 自有 WOFF 1.0：未压缩与压缩表真实注册（2026-10-12）
 
 扩展自有矩形字体夹具，按 [W3C WOFF 1.0](https://www.w3.org/TR/WOFF/) 将原 SFNT 表重封装为 WOFF，保留表校验和，动态生成唯一名称。分别构造 compLength 等于 origLength 的未压缩表，以及使用本机 SDK zlib compressBound／compress2 的压缩表；只在确实更小时保存压缩数据。压缩场景明确断言至少一张表 compLength 小于 origLength，防止名义压缩但实际未走解码路径。zlib 是系统模块，无新包依赖；生成不读取外部字体或网页资产。
