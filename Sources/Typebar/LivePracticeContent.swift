@@ -143,8 +143,19 @@ enum LivePracticeContentReplacementPolicy {
 enum LivePracticeContentService {
   private struct PoetryDocument: Decodable {
     let title: String
-    let author: String
+    let author: String?
     let lines: [String]
+
+    private enum CodingKeys: String, CodingKey { case title, author, lines }
+
+    init(from decoder: Decoder) throws {
+      let fields = try decoder.container(keyedBy: CodingKeys.self)
+      lines = try fields.decode([String].self, forKey: .lines)
+      // Upstream practice consumers use words only. Attribution must not
+      // reject playable text; render only actual strings, never JSON coercions.
+      title = (try? fields.decode(String.self, forKey: .title)) ?? ""
+      author = try? fields.decode(String.self, forKey: .author)
+    }
   }
 
   private struct PoetryResponse: Decodable {

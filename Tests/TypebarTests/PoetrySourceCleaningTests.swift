@@ -2,6 +2,49 @@ import XCTest
 @testable import Typebar
 
 final class PoetrySourceCleaningTests: XCTestCase {
+  @MainActor func testAttributionTypesDoNotRejectPlayableProviderWords() throws {
+    for metadata in ["", #""title":null,"author":null,"#, #""title":42,"author":7,"#,
+      #""title":{"label":"Owned"},"author":["Fixture"],"#] {
+      let payload = "[{" + metadata + #""lines":["north south harbor"]}]"#
+      let content = try XCTUnwrap(LivePracticeContentService.poetry(from: Data(payload.utf8)))
+      XCTAssertEqual(content.text, "north south harbor")
+      XCTAssertEqual(content.title, "")
+      XCTAssertNil(content.byline)
+      let configuration = TestConfiguration.words(3).with(modifiers: [.poetryStream])
+      var practice = TestSessionFactory.make(configuration: configuration,
+        streamPrompt: content.prompt(for: configuration), showAllLines: true)
+      let entered = practice.prompt
+      let began = Date(timeIntervalSinceReferenceDate: 917_000_000)
+      practice.insertBatch(String(entered.dropLast()), at: began)
+      XCTAssertFalse(practice.isFinished)
+      practice.insertBatch(String(entered.suffix(1)), at: began.addingTimeInterval(2))
+      XCTAssertEqual(practice.outcome, .completed)
+      XCTAssertEqual(practice.completedWordCount, 3)
+      let result = try XCTUnwrap(practice.result())
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), entered)
+    }
+  }
+
+  func testInvalidLinesStillRejectAfterAttributionIsMadeNonessential() {
+    for lines in ["null", "42", #"["north",42]"#,
+      "[\"" + Array(repeating: "north", count: 100).joined(separator: " ") + "\",42]"] {
+      XCTAssertNil(LivePracticeContentService.poetry(from: Data(
+        ("[{\"lines\":" + lines + "}]").utf8)))
+    }
+  }
+
+  func testValidAttributionFieldSurvivesInvalidOtherField() throws {
+    let titled = try XCTUnwrap(LivePracticeContentService.poetry(from: Data(
+      #"[{"title":" Owned ","author":42,"lines":["north"]}]"#.utf8)))
+    XCTAssertEqual(titled.title, " Owned ")
+    XCTAssertNil(titled.byline)
+    let authored = try XCTUnwrap(LivePracticeContentService.poetry(from: Data(
+      #"[{"title":null,"author":" Writer ","lines":["north"]}]"#.utf8)))
+    XCTAssertEqual(authored.title, "")
+    XCTAssertEqual(authored.byline, " Writer ")
+  }
+
   func testOnlyFirstPoemIsDecodedWithoutValidatingUnconsumedItems() throws {
     for tail in ["null", "42", #"{"lines":4}"#, #"{"title":"Other"}"#] {
       let payload = #"[{"title":"Owned","author":"Fixture","lines":["north south"]},"# + tail + "]"
