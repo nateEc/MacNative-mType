@@ -65,13 +65,23 @@ final class LiveWholePreviewTests: XCTestCase {
     XCTAssertFalse(repeated.isFinished)
   }
 
-  func testDisabledTimedInfiniteAndOverBudgetDescriptorsRemainBounded() {
+  func testDisabledTimedAndInfiniteDescriptorsRemainBounded() {
     let content = LivePracticeContent(source: .poetry, title: "Authored fixture", byline: nil,
       tokens: ["quiet", "harbor"], separator: " ")
     XCTAssertEqual(content.promptDescriptor(for: .words(701)).text.split(separator: " ").count, 100)
-    for configuration in [TestConfiguration.timed(seconds: 30), .words(0), .words(100_001)] {
+    for configuration in [TestConfiguration.timed(seconds: 30), .words(0)] {
       XCTAssertEqual(content.promptDescriptor(for: configuration, showAllLines: true)
         .text.split(separator: " ").count, 100)
     }
+  }
+
+  func testFiniteDescriptorAboveSynchronousCeilingPreservesExactTarget() {
+    let content = LivePracticeContent(source: .poetry, title: "Authored fixture", byline: nil,
+      tokens: ["quiet", "harbor"], separator: " ")
+    let descriptor = content.promptDescriptor(for: .words(100_001), showAllLines: true)
+    let expected = String(repeating: "quiet harbor ", count: 50_000) + "quiet"
+    XCTAssertTrue(descriptor.text == expected)
+    XCTAssertNil(descriptor.noSpaceBoundarySource)
+    XCTAssertTrue(content.continuationDescriptor(for: .words(100_001), showAllLines: true) == nil)
   }
 }
