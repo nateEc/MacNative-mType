@@ -46,6 +46,14 @@ import XCTest
     try checkDelayedReplacement(startsDuringAssembly: true)
   }
 
+  func testDisappearanceDuringPromptAssemblyRejectsCancelledLateDescriptor() throws {
+    try checkDelayedReplacement(cancelsDuringAssembly: true)
+  }
+
+  func testReplacingSelectionDuringPromptAssemblyRejectsOldRequestDescriptor() throws {
+    try checkDelayedReplacement(replacesSelectionDuringAssembly: true)
+  }
+
   func testLiveResponseAfterFirstInputPreservesPromptAndMainCaret() throws {
     try checkDelayedReplacement(startsBeforeReturn: true)
   }
@@ -245,7 +253,8 @@ import XCTest
     failsInitialFill: Bool = false, generatesNextWord: Bool = false,
     checksBackwardInput: Bool = false, encyclopedia: Bool = false,
     initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false,
-    changesBudgetDuringAssembly: Bool = false, startsDuringAssembly: Bool = false) throws {
+    changesBudgetDuringAssembly: Bool = false, startsDuringAssembly: Bool = false,
+    cancelsDuringAssembly: Bool = false, replacesSelectionDuringAssembly: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -271,6 +280,7 @@ import XCTest
     var assemblyBudgets: [Bool] = []
     var suspendedAssembly: CheckedContinuation<LivePracticePrompt, Never>?
     var staleDescriptor: LivePracticePrompt?
+    var cancelledAssemblyReplies = 0
     let authoredTokens = (0..<300).map { "owned\($0)" }
     if prefetches { pending.scriptedTokens = Array(authoredTokens.prefix(151)) }
     let content = TypebarApp.practiceContent(settings: settings,
@@ -280,9 +290,12 @@ import XCTest
       liveContentFetch: pending.fetch,
       livePromptPrepare: { content, configuration, wholePreview in
         assemblyBudgets.append(wholePreview)
-        if (changesBudgetDuringAssembly || startsDuringAssembly) && assemblyBudgets.count == 1 {
+        if (changesBudgetDuringAssembly || startsDuringAssembly || cancelsDuringAssembly
+          || replacesSelectionDuringAssembly) && assemblyBudgets.count == 1 {
           staleDescriptor = content.promptDescriptor(for: configuration, showAllLines: wholePreview)
-          return await withCheckedContinuation { suspendedAssembly = $0 }
+          let descriptor: LivePracticePrompt = await withCheckedContinuation { suspendedAssembly = $0 }
+          if withUnsafeCurrentTask(body: { $0?.isCancelled == true }) { cancelledAssemblyReplies += 1 }
+          return descriptor
         }
         return try await content.preparingPromptDescriptor(for: configuration, showAllLines: wholePreview)
       }).modelContainer(container)
@@ -476,6 +489,53 @@ import XCTest
     }
     pending.finish()
     for _ in 0..<5 { flush() }
+    if cancelsDuringAssembly || replacesSelectionDuringAssembly {
+      XCTAssertEqual(assemblyBudgets, [true])
+      let continuation = try XCTUnwrap(suspendedAssembly)
+      let stale = try XCTUnwrap(staleDescriptor)
+      if replacesSelectionDuringAssembly {
+        let replacement = TestConfiguration.words(152)
+        XCTAssertTrue(settings.importActiveTestSelection(.init(
+          preset: .init(configuration: replacement),
+          testParameterMemory: .legacyDefaults(configuration: replacement))))
+      } else {
+        window.contentView = nil
+      }
+      for _ in 0..<5 { flush() }
+      let retainedField = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+      let retainedPrompt = try XCTUnwrap(retainedField.accessibilityValue() as? String)
+      XCTAssertNotEqual(retainedPrompt, stale.text)
+      let requestsBeforeLateReturn = pending.callCount
+      let pendingRepliesBeforeLateReturn = pending.continuations.count
+      if replacesSelectionDuringAssembly {
+        XCTAssertGreaterThan(pendingRepliesBeforeLateReturn, 0,
+          "The replacement must reach the actual transport before releasing the old descriptor")
+      } else {
+        XCTAssertEqual(pendingRepliesBeforeLateReturn, 0)
+      }
+      suspendedAssembly = nil
+      // Deliberately return success from an already-cancelled operation.
+      continuation.resume(returning: stale)
+      for _ in 0..<5 { flush() }
+      XCTAssertEqual(cancelledAssemblyReplies, 1)
+      XCTAssertEqual(assemblyBudgets, [true])
+      XCTAssertEqual(pending.callCount, requestsBeforeLateReturn)
+      XCTAssertEqual(pending.continuations.count, pendingRepliesBeforeLateReturn,
+        "Old descriptor completion must neither consume nor add replacement transport replies")
+      XCTAssertEqual(retainedField.accessibilityValue() as? String, retainedPrompt)
+      XCTAssertEqual(views(PromptFieldNativeView.self, in: host).first?.accessibilityValue() as? String,
+        retainedPrompt)
+      XCTAssertTrue(settings.testModifiers.contains(sourceModifier))
+      if replacesSelectionDuringAssembly {
+        XCTAssertEqual(settings.activeTestSelection?.preset.configuration.wordLimit, 152)
+      }
+      XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+      XCTAssertFalse(NSApplication.shared.windows.contains {
+        $0 !== window && !priorWindowIDs.contains(ObjectIdentifier($0)) && $0.contentView != nil
+      }, "Cancelled descriptor completion must not open another practice or result window")
+      XCTAssertFalse(window.isVisible)
+      return
+    }
     if startsDuringAssembly {
       XCTAssertEqual(assemblyBudgets, [true])
       let continuation = try XCTUnwrap(suspendedAssembly)

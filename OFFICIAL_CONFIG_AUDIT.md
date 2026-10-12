@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 在线装配失效后的强制成功返回（2026-10-12）
+
+新增两个隐藏生产宿主交错：一是在 livePromptPrepare 挂起期间退出视图，二是通过 importActiveTestSelection 导入 152 词选择，触发恢复与新请求。释放旧描述符时从旧任务内部确认取消标志，再检查当前提示不变、传输请求数及等待回复数不变、没有保存结果或新结果窗口。替换场景额外检查导入目标确为 152 词且新传输已到达。本轮测试既有行为，不改产品逻辑，不制造产品红测。
+
+根因调试限定了测试驱动边界：直接改 settings.testModifiers 仅刷新提示通知，不执行命令的 reset；saveActiveTestSelection 仅保存，importActiveTestSelection 才递增恢复 generation；restoreActiveTestSelection 的 appliesGlobalSettings:false 保留全局修饰器。因此原“关闭来源”测试预期不成立，最终场景是导入新词数且保留来源，并非声称关闭来源命令已验收。失败日志依次保留为 work/live-prompt-cancellation-interleaving.log、live-prompt-cancellation-verified.log、live-prompt-cancellation-import-verified.log。
+
+新选择恢复后实际有两条等待传输回复，而非最初假定一条（work/live-prompt-cancellation-replacement-verified.log）。目前未区分是否包含已取消回复，不能据此声称单飞或确定产品缺陷；本测试聚焦旧结果不能改变新请求，精确比较释放前后数量，不把未知并发情况隐藏。后续应追踪每条请求的取消状态及恢复调用链。
+
+最终 work/live-prompt-retired-result-verified.log 17 项零失败、22.327 秒，其中 5 项隐藏宿主覆盖取消、请求替换、预算变化、首字符保护和此前不稳定空初始化（此次通过，原根因仍未确认）。未重跑全部宿主及完整门禁。零可见主程序启动、无公共内容网络；关闭来源命令交错、真实输入法与既有资源／布局缺口不变，完整 goal active。
+
 ## 在线装配挂起期间接受首字符（2026-10-12）
 
 在真实生产组合入口的 livePromptPrepare 注入点挂起旧结果，使用不可见宿主的 TypingInputView 输入原提示首字符，验证主光标确实前移，再强制返回与原提示不同的旧描述符。最终断言原提示、同一输入对象、前移后的主光标保持不变，且没有持久化结果。这里验证既有发布保护，不修改产品行为，因此不制造产品红测。与仅在 fetch 期间输入的既有检查不同，该场景覆盖新增装配 await 后的保护。
