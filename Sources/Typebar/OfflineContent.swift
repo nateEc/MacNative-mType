@@ -6656,7 +6656,8 @@ struct TestSessionFactory {
       initialNoSpaceTargetWords = noSpaceTargetWords
     }
     let generationNotices = [polyglotPreparation.notice,
-      GeneratedPromptChunkPolicy.previewNotice(for: configuration, showAllLines: showAllLines)
+      (streamPrompt == nil
+        ? GeneratedPromptChunkPolicy.previewNotice(for: configuration, showAllLines: showAllLines) : nil)
         ?? (hasIncompleteExternalPreview
           ? "当前外部词源仅提供部分目标；当前目标保持不变，保留原有续接方式，未预览全部目标。" : nil)]
       .compactMap { $0 }

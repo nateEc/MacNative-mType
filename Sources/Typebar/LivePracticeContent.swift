@@ -73,6 +73,14 @@ struct LivePracticeContent: Equatable {
     promptDescriptor(for: configuration).text
   }
 
+  private func initialWordCount(for configuration: TestConfiguration, showAllLines: Bool) -> Int {
+    if showAllLines, configuration.mode == .words, !configuration.isInfinite,
+      configuration.visibleFutureWordCount == nil {
+      return configuration.wordLimit ?? 25
+    }
+    return GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
+  }
+
   @MainActor func fillingInitialPrompt(
     for configuration: TestConfiguration, showAllLines: Bool,
     fetchNext: () async -> LivePracticeContent?
@@ -82,7 +90,7 @@ struct LivePracticeContent: Equatable {
     // A decoded empty section is a generation failure, not failed transport.
     // Let initialization own its bounded restart rather than hiding it here.
     guard !tokens.isEmpty else { return self }
-    let target = GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
+    let target = initialWordCount(for: configuration, showAllLines: showAllLines)
     // The preview budget limits presentation, not ownership of fetched text.
     // Keep each section's tail for a later larger preview or stream consumer.
     var collected = tokens
@@ -109,7 +117,7 @@ struct LivePracticeContent: Equatable {
     let targetCount: Int
     switch configuration.mode {
     case .time, .words:
-      targetCount = GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
+      targetCount = initialWordCount(for: configuration, showAllLines: showAllLines)
     case .quote, .zen, .custom:
       targetCount = tokens.count
     }
@@ -121,7 +129,7 @@ struct LivePracticeContent: Equatable {
 
   func continuationDescriptor(for configuration: TestConfiguration, showAllLines: Bool = false) -> LivePracticePrompt? {
     guard configuration.mode == .words || configuration.mode == .time else { return nil }
-    let start = GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
+    let start = initialWordCount(for: configuration, showAllLines: showAllLines)
     let end = configuration.mode == .words && !configuration.isInfinite
       ? min(tokens.count, configuration.wordLimit ?? 25) : tokens.count
     guard start < end else { return nil }
