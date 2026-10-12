@@ -1,5 +1,11 @@
 # 官方配置兼容性审计
 
+2026-10-12 原生字段排版资源共享：PromptFieldTextLayout 在单一兼容布局内按完整 AttributedString 与单槽／多槽换行条件共享 TextShape（NSLayoutManager／NSTextContainer／NSTextStorage）；每个 Box 仍独立保存字符身份、范围、提示、词归属与换行，位置、别名及光标属于当前快照。跨快照仍要求宽度、字体、行距、方向、连写与纸带条件全部一致。未合并字符，不引入全局缓存，不改目标文本或截断上限。新增重复槽位资源数量、样式／kern 隔离与快照指标、相同文本不同换行条件三项守卫。先行测试实际复现 1,249 套排版资源；另有错误的空格光标假设失败，现按既有换行空格指向下一行语义修正断言，不改变产品规则（work/field-shaping-share-red{,-final}.log）。
+
+首轮排版 70 项零失败（5.352 秒，墙钟 5.366；work/field-shaping-share-green.log）；扩大回归 133 项零失败（79.361 秒，墙钟 79.377；work/field-shaping-share-regression.log），真实 100,001 词宿主完整发布 58.583 秒，前轮相同案例 119.916 秒。运行途中采样于 12:16:55 记录截至当时 physical footprint 峰值约 1.3 GB（work/field-shaping-share-large-stack.txt），低于前轮晚期记录约 5.1 GB；采样早于本轮大宿主结束，不作为进程最终峰值或 Release 设备基准。目标、槽位、几何仍全量持有，准备后的原生构造仍同步，不宣称总体内存有界或交互性能达标。
+
+投影首轮 44 项中 6 项因未设置参考路径跳过（work/field-shaping-share-projection.log），随后明确固定参考路径重跑排版及四类投影测试 99 项零失败、无跳过（7.190 秒，墙钟 7.202；work/field-shaping-share-final.log）；不将跳过算作源码对照成功。固定参考原创性检查通过。行为优先与会话内决策复核针对属性键、换行与旧快照污染反例，非独立审查。未启动主程序；完整门禁／Release、实体输入法／像素与全部组合宿主未新增验收，四项部分配置及完整 goal active 保持。
+
 2026-10-12 有限普通词池全行准备解除十万词入口限制：官方固定 words-generator 的 showAllLines 分支使用实际 Config.words，现生产异步入口同样接收超过 100,000 的有限目标，不改变在线／专用流、计时／无限及可见词覆盖路径。三项新增测试先复现 10 处断言失败（work/whole-preview-uncapped-red.log），修正后零失败（122.070 秒，墙钟 122.072；work/whole-preview-uncapped-green.log）：真实 100,001 词生成器通过隐藏原生宿主完整发布，文本与 accessibilityValue 精确一致；最大合法目标通过暂停夹具验证退出取消及晚到结果不发布，不声称真实构造最大目标。扩大回归 158 项零失败（165.871 秒，墙钟 165.893；work/whole-preview-uncapped-regression-baseline.log）。
 
 性能尚不达标：真实大目标测试进程采样记录 physical footprint 峰值约 5.1 GB（work/whole-preview-uncapped-stack.txt）；热采样集中于 PromptFieldTextLayout 的逐字符 Box／AttributedString／原生排版资源构造（work/whole-preview-uncapped-hot-stack.txt）。下一步验证相同文本与完整样式的不可变排版资源共享，保留每个字符独立身份、位置、提示及词边界；本提交尚未实施。准备可取消不等于全量目标内存有界或排版可取消。全程零主程序实例；未重跑完整门禁／Release，四项部分配置和完整 goal active 保持。

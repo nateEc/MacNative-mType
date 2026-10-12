@@ -26,21 +26,53 @@ struct PromptFieldTextRun: Equatable {
     let group: Int
     let y: CGFloat
   }
-  private final class Box {
+  /// Shared only inside a compatible layout snapshot. Text and metrics are
+  /// immutable after construction; slot ownership and positions never live here.
+  private final class TextShape {
+    let text: AttributedString
+    let wraps: Bool
     let manager = NSLayoutManager()
     let container = NSTextContainer(size: .init(width: CGFloat.greatestFiniteMagnitude,
       height: CGFloat.greatestFiniteMagnitude))
     let storage: NSTextStorage
+    var bounds: CGRect = .zero
+    init(text: AttributedString, wraps: Bool,
+      font: NSFont, rightToLeft: Bool, spacing: CGFloat, width: CGFloat) {
+      self.text = text; self.wraps = wraps
+      storage = TapePromptTextStorage.prepare(text, font: font, rightToLeft: rightToLeft)
+      let paragraph = NSMutableParagraphStyle()
+      paragraph.baseWritingDirection = rightToLeft ? .rightToLeft : .leftToRight
+      paragraph.alignment = .left; paragraph.lineSpacing = spacing; paragraph.lineBreakMode = .byCharWrapping
+      storage.addAttribute(.paragraphStyle, value: paragraph, range: .init(location: 0, length: storage.length))
+      container.lineFragmentPadding = 0; manager.addTextContainer(container); storage.addLayoutManager(manager)
+      manager.ensureLayout(for: container)
+      bounds = occupiedBounds()
+      if bounds.width > width, wraps {
+        container.containerSize.width = max(1, width)
+        manager.ensureLayout(for: container); bounds = occupiedBounds()
+        // A wrapped word owns its full allocation, not just the last row.
+        bounds.size.width = max(bounds.width, width)
+      }
+      if storage.length == 0 || bounds.height == 0 { bounds.size.height = manager.defaultLineHeight(for: font) }
+    }
+    private func occupiedBounds() -> CGRect {
+      TapePromptTextStorage.advanceRect(.init(location: 0, length: manager.numberOfGlyphs), manager: manager, container: container)
+    }
+  }
+  private final class Box {
+    let shape: TextShape
+    var manager: NSLayoutManager { shape.manager }
+    var container: NSTextContainer { shape.container }
+    var bounds: CGRect { shape.bounds }
     let ranges: [Int: NSRange]
     let hints: [Int: AttributedString]
     let cells: [PromptFieldTextRun.Cell]
     let fieldID: Int?
     let isGap: Bool
     let breaks: Bool
-    var bounds: CGRect = .zero
 
     init(cells: [PromptFieldTextRun.Cell], fieldID: Int?, breaks: Bool,
-      font: NSFont, rightToLeft: Bool, spacing: CGFloat, width: CGFloat) {
+      shapeFor: (AttributedString, Bool) -> TextShape) {
       self.cells = cells; self.fieldID = fieldID; self.breaks = breaks
       isGap = cells.count == 1 && cells[0].isGap
       var text = AttributedString(), ranges: [Int: NSRange] = [:], hints: [Int: AttributedString] = [:], unit = 0
@@ -52,24 +84,7 @@ struct PromptFieldTextRun: Equatable {
         hints[cell.id] = content.hint
       }
       self.ranges = ranges; self.hints = hints
-      storage = TapePromptTextStorage.prepare(text, font: font, rightToLeft: rightToLeft)
-      let paragraph = NSMutableParagraphStyle()
-      paragraph.baseWritingDirection = rightToLeft ? .rightToLeft : .leftToRight
-      paragraph.alignment = .left; paragraph.lineSpacing = spacing; paragraph.lineBreakMode = .byCharWrapping
-      storage.addAttribute(.paragraphStyle, value: paragraph, range: .init(location: 0, length: storage.length))
-      container.lineFragmentPadding = 0; manager.addTextContainer(container); storage.addLayoutManager(manager)
-      manager.ensureLayout(for: container)
-      bounds = occupiedBounds()
-      if bounds.width > width, cells.count > 1 {
-        container.containerSize.width = max(1, width)
-        manager.ensureLayout(for: container); bounds = occupiedBounds()
-        // A wrapped word owns its full allocation, not just the last row.
-        bounds.size.width = max(bounds.width, width)
-      }
-      if storage.length == 0 || bounds.height == 0 { bounds.size.height = manager.defaultLineHeight(for: font) }
-    }
-    private func occupiedBounds() -> CGRect {
-      TapePromptTextStorage.advanceRect(.init(location: 0, length: manager.numberOfGlyphs), manager: manager, container: container)
+      shape = shapeFor(text, cells.count > 1)
     }
     func rect(_ id: Int, origin: CGPoint) -> CGRect? {
       guard let range = ranges[id], range.length > 0 else { return nil }
@@ -80,6 +95,7 @@ struct PromptFieldTextRun: Equatable {
   }
 
   private var boxes: [Box] = []
+  var shapingResourceCount: Int { Set(boxes.map { ObjectIdentifier($0.manager) }).count }
   private var origins: [CGPoint] = []
   private var boxByCell: [Int: Int] = [:]
   private var followingCell: [Int: Int] = [:]
@@ -118,6 +134,15 @@ struct PromptFieldTextRun: Equatable {
         && $0.rightToLeft == rightToLeft && $0.joinsLetters == joinsLetters && $0.unbounded == unbounded ? $0 : nil
     }
     var groups: [Int] = []
+    var shapes: [String: [TextShape]] = [:]
+    func shapeFor(_ text: AttributedString, _ wraps: Bool) -> TextShape {
+      let key = String(text.characters)
+      if let shape = shapes[key]?.first(where: { $0.wraps == wraps && $0.text == text }) { return shape }
+      let shape = TextShape(text: text, wraps: wraps, font: font, rightToLeft: rightToLeft,
+        spacing: lineSpacing, width: unbounded ? .greatestFiniteMagnitude : limit)
+      shapes[key, default: []].append(shape)
+      return shape
+    }
     for (group, field) in fieldRuns.enumerated() {
       func append(_ cells: [PromptFieldTextRun.Cell], breaks: Bool = false) {
         let old: Box? = cells.first.flatMap { cell in
@@ -125,10 +150,13 @@ struct PromptFieldTextRun: Equatable {
           return reuse.boxes[index]
         }
         let box: Box
-        if let old, old.cells == cells, old.fieldID == field.fieldID, old.breaks == breaks { box = old }
-        else { box = Box(cells: cells, fieldID: field.fieldID, breaks: breaks,
-          font: font, rightToLeft: rightToLeft, spacing: lineSpacing,
-          width: unbounded ? .greatestFiniteMagnitude : limit) }
+        if let old, old.cells == cells, old.fieldID == field.fieldID, old.breaks == breaks {
+          box = old
+          let key = String(old.shape.text.characters)
+          if !(shapes[key]?.contains(where: { $0 === old.shape }) ?? false) {
+            shapes[key, default: []].append(old.shape)
+          }
+        } else { box = Box(cells: cells, fieldID: field.fieldID, breaks: breaks, shapeFor: shapeFor) }
         for id in box.ranges.keys { boxByCell[id] = boxes.count }
         boxes.append(box); groups.append(group)
       }

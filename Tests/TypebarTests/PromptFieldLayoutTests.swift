@@ -7,6 +7,62 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testRepeatedIndependentSlotsShareShapingWithoutSharingPositions() throws {
+    let value = try render(TypingSession(configuration: .words(250),
+      prompt: Array(repeating: "abcd", count: 250).joined(separator: " ")))
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let layout = PromptFieldTextLayout(map: map, width: 400, font: font)
+    XCTAssertLessThan(layout.shapingResourceCount, 20)
+    XCTAssertEqual(layout.cellFrames.count, 1249)
+    XCTAssertEqual(layout.fieldFrames.count, 250)
+    XCTAssertNotEqual(layout.cellFrames[0], layout.cellFrames[5])
+    let gaps = Set(map.fieldRuns.flatMap { $0.cells.filter(\.isGap).map(\.id) })
+    for (id, aliases) in map.canonicalAliases where !aliases.contains(where: { gaps.contains($0) }) {
+      XCTAssertEqual(layout.canonicalRect(id, after: false), aliases.first.flatMap { layout.cellFrames[$0] })
+    }
+  }
+
+  func testSharedShapesDistinguishFullAttributesAndCompatibleSnapshotMetrics() throws {
+    let value = try render(TypingSession(configuration: .words(2), prompt: "aa aa"))
+    let map = try XCTUnwrap(value.compositionTextMap)
+    let first = PromptFieldTextLayout(map: map, width: 400, font: font)
+    var fields = map.fieldRuns
+    let cell = fields[1].cells[0]
+    var styled = cell.text
+    styled.foregroundColor = .purple
+    styled.kern = 7
+    fields[1].cells[0] = .init(id: cell.id, glyph: cell.glyph, text: styled, isGap: cell.isGap)
+    let changed = PromptFieldTextLayout(fieldRuns: fields, width: 400, font: font, reusing: first)
+    XCTAssertGreaterThan(changed.shapingResourceCount, first.shapingResourceCount)
+    let saved = first.cellFrames
+    for width: CGFloat in [35, 400] {
+      for rtl in [false, true] {
+        let reused = PromptFieldTextLayout(fieldRuns: fields, width: width, font: font,
+          rightToLeft: rtl, reusing: changed)
+        let fresh = PromptFieldTextLayout(fieldRuns: fields, width: width, font: font, rightToLeft: rtl)
+        XCTAssertEqual(reused.cellFrames, fresh.cellFrames)
+        XCTAssertEqual(reused.fieldFrames, fresh.fieldFrames)
+        XCTAssertEqual(reused.size, fresh.size)
+      }
+    }
+    XCTAssertEqual(first.cellFrames, saved)
+  }
+
+  func testIdenticalTextDoesNotShareDifferentSingleSlotWrappingRules() throws {
+    func cell(_ id: Int, _ character: Character, _ text: String) -> PromptFieldTextRun.Cell {
+      .init(id: id, glyph: .init(character: character, state: .pending),
+        text: AttributedString(text), isGap: false)
+    }
+    let fields: [PromptFieldTextRun] = [
+      .init(fieldID: 0, cells: [cell(0, "a", "abcd")]),
+      .init(fieldID: 1, cells: [cell(1, "a", "ab"), cell(2, "c", "cd")])
+    ]
+    let layout = PromptFieldTextLayout(fieldRuns: fields, width: 20, font: font, joinsLetters: true)
+    XCTAssertEqual(layout.shapingResourceCount, 2)
+    XCTAssertGreaterThan(try XCTUnwrap(layout.fieldFrames[1]).height,
+      try XCTUnwrap(layout.fieldFrames[0]).height)
+  }
+
   func testWidthTransitionsReuseMatchesFreshGeometryForIndependentAndJoiningCells() throws {
     for text in ["amber birch cedar", "ab אב cd", "ab سلام cd", "a\nb c"] {
       let value = try rendering(text, marked: "")
