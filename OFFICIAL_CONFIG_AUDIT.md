@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## 在线最终会话协作准备接入（2026-10-12）
+
+新增 TestSessionFactory.preparingLiveSession 并接入生产初始在线加载。先由原 make 准备初始提示、消费其随机位，内部 defersStreamContinuationTransformation 标志让非空尾部保留存在标记而不立即变换；原初始窗口／重复预填决策仍见到尾部存在，避免无限模式把提示预复制。随后按同一 nextRandomCaseBit 顺序协作变换尾部，沿用绝对 wordOffset／wordBound 和 FinitePromptCommitPolicy.finalized，再安装 externalPromptContinuation 与 initialExternalPromptContinuation、复位字段游标。占位会话保持未发布，只有完整准备完成后才交给生产状态。
+
+生产任务在准备结束后检查取消、请求 ID 和全行／纸带状态；显示预算变化重走循环，输入开始则既有替换策略拒绝发布。声音开始事件与 elapsedClock 安装仍发生在真正发布处，不因预准备提前开始新尝试。同步 make 默认路径未切换，保留作独立行为基线。内部延迟标志只供协作工厂使用；直接 make 调用若主动设置该标志不能把占位会话发布，这属于内部调用合同而非用户设置。
+
+会话内决策复核重点：外部批次是否存在影响无限模式初始预填，不能简单先 make(nil tail) 后补尾部；同时必须安装重放快照，不能只替换当前续接。新测试在有限／无限／时间模式乘六种修饰器选择的 18 组中比较同步工厂的初始 UTF-8、生成提示、随机位消耗、输入后窗口／结果／精度和重放提示；另检无空格来源、nil／空尾部、100,001 字段按 1001 批准备、首字段有界消费及取消不返回可发布会话。不是所有语言／修饰器组合或重放全部字段的穷尽证明。
+
+work/live-session-preparation-verified.log 相关 28 项零失败（6.147 秒）；work/live-session-preparation-host-regression.log 相关 72 项零失败，其中 44 项实际隐藏生产宿主（263.756 秒）。首轮编译错误为取消测试 Task 返回非 Sendable TypingSession，改为 Task<Void, Error> 丢弃局部结果，不增加 unchecked Sendable；失败记录保留 work/live-session-preparation.log。
+
+约 530ms 的原同步全尾部变换不再用于这条生产加载路径，但尚未测实际帧延迟或最大不可中断片段，不声称新延迟达标；规模诊断日志中的 TYPEBAR_QA_LIVE_FACTORY 数字仍测旧同步 make，仅作基线。初始全行变换、语言转换／标量拆分、最终批次校验／有限终结、会话布局及全量内存仍有限制。未新增在最终尾部变换点精确挂起的生产宿主交错，已有宿主验证贯穿新路径但不能替代该精确场景。零可见主程序启动、无公共内容网络，未跑新完整门禁，showAllLines 等 partial、原输入法及完整 goal active 不变。
+
 ## 有序在线批次协作变换基础（2026-10-12）
 
 会话内决策复核：不能将原 transformedBatch 按任意文本块调用后拼接，因为空字段不递增绝对词索引、随机位调用序列必须一致、无空格目标需要来源字段、消息式末换行只能在整批终结时裁剪。LivePromptTransformation.prepare 按有序在线来源合同准备批次，保留原 transformedWord 实现，每百字段 yield、块内检查取消、最终批次构造前后检查取消。保留英式上下文中的 previousBritishWord 状态，但该准备器不是任意 standalone 全段倒序／词池格式化接口的替代。

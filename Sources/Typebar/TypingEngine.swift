@@ -4803,6 +4803,14 @@ struct TypingSession {
     refreshUnitTargets()
   }
 
+  /// Only the unpublished live factory preparation may replace its sentinel.
+  mutating func installPreparedInitialLiveContinuation(_ batch: TransformedPromptBatch) {
+    precondition(!hasStarted)
+    externalPromptContinuation = batch
+    initialExternalPromptContinuation = batch
+    liveContinuationFieldOffset = 0
+  }
+
   private mutating func refreshUnitTargets() {
     unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: acceptedUnits != nil,
       noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil,

@@ -4564,6 +4564,7 @@ private struct ContentView: View {
       var content = firstContent
       var preparedPrompt: LivePracticePrompt?
       var preparedContinuation: LivePracticePrompt?
+      var preparedLiveSession: TypingSession?
       var failedGenerationAttempts = 0
       while !Task.isCancelled {
         let wholePreview = settings.showAllPracticeLines && settings.practiceTapeMode == .off
@@ -4590,6 +4591,12 @@ private struct ContentView: View {
             preparedPrompt = try await livePromptPrepare(current, configuration, wholePreview)
             preparedContinuation = try await current.preparingContinuationDescriptor(
               for: configuration, showAllLines: wholePreview)
+            if let prompt = preparedPrompt {
+              preparedLiveSession = try await TestSessionFactory.preparingLiveSession(
+                configuration: configuration, prompt: prompt, continuation: preparedContinuation,
+                weakSpotScores: session.liveWeakSpotScores,
+                wordDecorationState: session.liveWordDecorationState, showAllLines: wholePreview)
+            }
           } catch { return }
           guard !Task.isCancelled, requestID == liveContentRequestID else { return }
           if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off) { break }
@@ -4627,17 +4634,9 @@ private struct ContentView: View {
         return
       }
       guard let content else { return }
-      guard let livePrompt = preparedPrompt else { return }
+      guard let preparedLiveSession else { return }
       TypingFeedbackSound.shared.beginPracticeAttempt()
-      session = TestSessionFactory.make(
-        configuration: configuration, streamPrompt: livePrompt.text,
-        streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource,
-        streamContinuation: preparedContinuation,
-        streamsLiveContent: true,
-        weakSpotScores: session.liveWeakSpotScores,
-        wordDecorationState: session.liveWordDecorationState,
-        showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
-      session = session.withElapsedClock()
+      session = preparedLiveSession.withElapsedClock()
       liveContentStreamingActive = true
       liveContentMessage = "已载入\(content.attribution)。"
       refreshPaceTarget()

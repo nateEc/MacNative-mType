@@ -6348,6 +6348,7 @@ struct TestSessionFactory {
     streamNoSpaceBoundarySource: String? = nil,
     streamContinuation: LivePracticePrompt? = nil,
     streamsLiveContent: Bool = false,
+    defersStreamContinuationTransformation: Bool = false,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
     showAllLines: Bool = false,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
@@ -6588,6 +6589,9 @@ struct TestSessionFactory {
     let transformedPrompt = batch.text
     let externalBatch: TransformedPromptBatch? = streamContinuation.flatMap { continuation in
       guard !continuation.text.isEmpty else { return nil }
+      // Preserve presence-dependent initial-window decisions while a live
+      // preparation owns the actual transformation before publication.
+      if defersStreamContinuationTransformation { return .init(text: "") }
       let boundarySource = continuation.noSpaceBoundarySource
       let source = boundarySource ?? continuation.text
       let prepared = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
@@ -6700,6 +6704,33 @@ struct TestSessionFactory {
         ? noSpaceTargetWords : [],
       generationNotice: generationNotices.isEmpty ? nil : generationNotices.joined(separator: "\n"),
       weakSpotScores: weakSpotScores, wordDecorationState: currentDecorationState)
+  }
+
+  @MainActor static func preparingLiveSession(configuration: TestConfiguration,
+    prompt: LivePracticePrompt, continuation: LivePracticePrompt?,
+    weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
+    showAllLines: Bool = false, nextRandomCaseBit: () -> Bool = { Bool.random() },
+    didTransform: (Int) -> Void = { _ in }) async throws -> TypingSession {
+    try Task.checkCancellation()
+    var session = make(configuration: configuration, streamPrompt: prompt.text,
+      streamNoSpaceBoundarySource: prompt.noSpaceBoundarySource, streamContinuation: continuation,
+      streamsLiveContent: true, defersStreamContinuationTransformation: true,
+      weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState,
+      showAllLines: showAllLines, nextRandomCaseBit: nextRandomCaseBit)
+    if let continuation, !continuation.text.isEmpty {
+      let effective = session.configuration
+      let prepared = try await LivePromptTransformation.prepare(
+        continuation.noSpaceBoundarySource ?? continuation.text, configuration: effective,
+        preservesNoSpaceBoundaries: continuation.noSpaceBoundarySource != nil,
+        wordOffset: GeneratedWordBoundPolicy.wordCount(in: prompt.noSpaceBoundarySource ?? prompt.text),
+        wordBound: effective.mode == .words && !effective.isInfinite ? effective.wordLimit ?? 25 : Int.max,
+        nextRandomCaseBit: nextRandomCaseBit, didTransform: didTransform)
+      let finalized = effective.mode == .words && !effective.isInfinite
+        ? FinitePromptCommitPolicy.finalized(prepared) : prepared
+      session.installPreparedInitialLiveContinuation(finalized)
+    }
+    try Task.checkCancellation()
+    return session
   }
 
   static func weakSpotPrompt(
