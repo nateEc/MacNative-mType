@@ -6905,7 +6905,7 @@ private struct CompletedResultView: View {
             if MissedWordCopyText.make(for: result, words: missedWords) != nil {
               Button("复制错词列表", action: copyMissedWords)
             }
-            if !wordReviews.isEmpty {
+            if SlowWordCopyPolicy.hasInputWords(for: result, reviews: wordReviews) {
               Button("复制慢词列表…", action: prepareSlowWordCopy)
             }
             Button("复制结果图片", action: copyResultImage)
@@ -7433,7 +7433,7 @@ private struct CompletedResultView: View {
       return
     }
     let words = SlowWordCopyPolicy.words(
-      reviews: wordReviews, bursts: wordBursts, below: threshold)
+      for: result, reviews: wordReviews, bursts: wordBursts, below: threshold)
     guard !words.isEmpty else {
       exportNotice("没有低于 \(slowWordThresholdText) WPM 的已输入词", level: .notice)
       return

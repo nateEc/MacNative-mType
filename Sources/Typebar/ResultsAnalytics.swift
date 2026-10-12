@@ -749,6 +749,29 @@ struct SlowWordPracticePlan: Equatable {
 enum SlowWordCopyPolicy {
   static let fallbackThreshold = 80.0
 
+  static func words(for result: CompletedTestResult, reviews: [TypedWordReview],
+    bursts: [Int?], below threshold: Double) -> [String] {
+    guard result.configuration.mode == .zen else {
+      return words(reviews: reviews, bursts: bursts, below: threshold)
+    }
+    guard threshold.isFinite, threshold > 0 else { return [] }
+    return zenInputWords(for: result).enumerated().compactMap { index, word in
+      guard bursts.indices.contains(index), let burst = bursts[index], Double(burst) < threshold
+      else { return nil }
+      return word
+    }
+  }
+
+  static func hasInputWords(for result: CompletedTestResult, reviews: [TypedWordReview]) -> Bool {
+    result.configuration.mode == .zen ? !zenInputWords(for: result).isEmpty : !reviews.isEmpty
+  }
+
+  private static func zenInputWords(for result: CompletedTestResult) -> [String] {
+    let events = TypingReplay.chronologicalEvents(result.replayEvents)
+      .filter { $0.offset <= result.capturedDuration }
+    return SavedTextInputHistoryPolicy.inputFields(events: events)
+  }
+
   static func defaultThreshold(bursts: [Int?]) -> Double {
     let measured = bursts.compactMap { $0 }.filter { $0 > 0 }
     guard !measured.isEmpty else { return fallbackThreshold }

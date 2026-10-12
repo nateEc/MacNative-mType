@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## Zen 慢词复制输入字段语义（2026-10-12）
+
+只读检查固定官方 test-ui.ts 的 copySlowWordsListButton 与 events/stats.ts 的 getInputHistory：Zen 从按词事件的最终输入字段选择，非 Zen 从目标词选择，缺失 Burst 视为不选中，严格低于正有限阈值才复制，默认阈值仅平均正有效 Burst 并四舍五入。未复制参考实现或资源。
+
+原生 SlowWordCopyPolicy 原路径仅取 review.target，不能完整表达 Zen 输入提交字符。模式感知适配入口保持旧语义的红测中，两项测试的一项两处失败，Zen 返回空数组（work/zen-slow-copy-red.log）；此夹具故意没有 review，不代表实际所有 Zen 会话都无 review。首次修复后 41 项通过（zen-slow-copy-green.log）。随后真实工厂、逐字符输入、finishZen、result 和实际 wordBurstHistory 端到端检查否定了“实际 Zen review 为空”的假设：42 项中仅该错误假设断言失败（zen-slow-copy-verified.log），复制结果断言已通过。修正假设后仍保留独立断言，确认真实会话旧 review 复制与预期含提交字符的字段列表不同。
+
+最终模式感知策略在 Zen 使用 SavedTextInputHistoryPolicy.inputFields 读取截至 capturedDuration 的有序事件，保留字段及其提交字符，不自行按空白切词；普通模式沿用原目标词策略，阈值、默认值和 Burst 计算不变。导出菜单按同一模式的输入可用性显示，复制动作调用模式感知策略。最终相关 42 项零失败（work/zen-slow-copy-final.log，0.150 秒测试、0.155 秒墙钟），覆盖真实会话、独立字段、终局后事件、空／零 Burst、严格边界、无效阈值及相邻复制／时间回归。行为优先和根因技能使错误假设经执行被纠正，未削弱正确的复制行为断言。
+
+尚未执行真实剪贴板写入、可见菜单点击、所有 legacy／混合元数据回放或全部语言验收，未重跑完整门禁／Release。零可见主程序启动、无公共网络内容请求；四项配置 partial、其他缺口及完整 goal active 保持。
+
 ## Zen 结果错词复制行为修复（2026-10-12）
 
 参考固定提交 91bd24bb8513785c7364cbea29296ff7adafac41 的 frontend/src/ts/test/test-ui.ts，copyMissedWordsListButton 在 Zen 分支拼接输入历史，在其他模式拼接错词键。原生 ResultView.copyMissedWords 只调用数组连接，导出菜单也只在 missedWords 非空时显示；因此无目标词的 Zen 无法经这个入口复制自由输入。未复制参考代码／资产。
