@@ -81,6 +81,15 @@ import XCTest
     try checkDelayedReplacement(replacesSelectionDuringAssembly: true, suspendsPreparedSession: true)
   }
 
+  func testImportingOfflineSelectionDuringPromptAssemblyDoesNotRestoreOnlineSource() throws {
+    try checkDelayedReplacement(replacesSelectionDuringAssembly: true, disablesSourceBeforeImport: true)
+  }
+
+  func testImportingOfflineSelectionAfterLiveSessionPreparationDoesNotRestoreOnlineSource() throws {
+    try checkDelayedReplacement(replacesSelectionDuringAssembly: true,
+      suspendsPreparedSession: true, disablesSourceBeforeImport: true)
+  }
+
   func testLiveResponseAfterFirstInputPreservesPromptAndMainCaret() throws {
     try checkDelayedReplacement(startsBeforeReturn: true)
   }
@@ -282,7 +291,7 @@ import XCTest
     initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false,
     changesBudgetDuringAssembly: Bool = false, startsDuringAssembly: Bool = false,
     cancelsDuringAssembly: Bool = false, replacesSelectionDuringAssembly: Bool = false,
-    suspendsPreparedSession: Bool = false) throws {
+    suspendsPreparedSession: Bool = false, disablesSourceBeforeImport: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -540,6 +549,10 @@ import XCTest
       let continuation = try XCTUnwrap(suspendedAssembly)
       let stale = try XCTUnwrap(staleDescriptor)
       if replacesSelectionDuringAssembly {
+        if disablesSourceBeforeImport {
+          XCTAssertTrue(settings.toggleTestModifier(sourceModifier))
+          XCTAssertFalse(settings.testModifiers.contains(sourceModifier))
+        }
         let replacement = TestConfiguration.words(152)
         XCTAssertTrue(settings.importActiveTestSelection(.init(
           preset: .init(configuration: replacement),
@@ -553,7 +566,7 @@ import XCTest
       XCTAssertNotEqual(retainedPrompt, stale.text)
       let requestsBeforeLateReturn = pending.callCount
       let pendingRepliesBeforeLateReturn = pending.continuations.count
-      if replacesSelectionDuringAssembly {
+      if replacesSelectionDuringAssembly && !disablesSourceBeforeImport {
         XCTAssertEqual(pendingRepliesBeforeLateReturn, 1,
           "Only the current replacement may reach transport; obsolete queued tasks must not fetch")
         XCTAssertTrue(pending.requestsCancelledAtEntry.isEmpty,
@@ -575,9 +588,32 @@ import XCTest
       XCTAssertEqual(retainedField.accessibilityValue() as? String, retainedPrompt)
       XCTAssertEqual(views(PromptFieldNativeView.self, in: host).first?.accessibilityValue() as? String,
         retainedPrompt)
-      XCTAssertTrue(settings.testModifiers.contains(sourceModifier))
+      XCTAssertEqual(settings.testModifiers.contains(sourceModifier), !disablesSourceBeforeImport)
       if replacesSelectionDuringAssembly {
         XCTAssertEqual(settings.activeTestSelection?.preset.configuration.wordLimit, 152)
+        XCTAssertEqual(settings.activeTestSelection?.preset.configuration.modifiers.contains(sourceModifier),
+          !disablesSourceBeforeImport)
+      }
+      if disablesSourceBeforeImport {
+        XCTAssertTrue(views(TypingInputView.self, in: host).first === initialInput)
+        XCTAssertFalse(retainedPrompt.isEmpty)
+        initialInput.onFocusChanged(true)
+        initialInput.onWindowFocusChanged(true, false)
+        flush()
+        presentCarets()
+        let beforeCaret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
+          .first { $0.rootView.style == .bar && !$0.isHidden }).frame
+        initialInput.insertText(String(retainedPrompt.prefix(1)),
+          replacementRange: .init(location: NSNotFound, length: 0))
+        flush()
+        presentCarets()
+        let afterCaret = try XCTUnwrap(views(NSHostingView<PromptCaretMarkerView>.self, in: host)
+          .first { $0.rootView.style == .bar && !$0.isHidden }).frame
+        XCTAssertGreaterThan(afterCaret.minX, beforeCaret.minX,
+          "The replacement offline attempt must still accept real native input")
+        XCTAssertEqual(retainedField.accessibilityValue() as? String, retainedPrompt)
+        XCTAssertEqual(pending.callCount, requestsBeforeLateReturn)
+        XCTAssertTrue(pending.continuations.isEmpty)
       }
       XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
       XCTAssertFalse(NSApplication.shared.windows.contains {
