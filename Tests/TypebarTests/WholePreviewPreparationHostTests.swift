@@ -12,16 +12,33 @@ import XCTest
     var fails = false
     var usesActualGenerator = false
     var actualPrompt: String?
+    var preparedWordCount = 0
+    var preparationStarted: TimeInterval?
+    var lastBatchElapsed: TimeInterval?
+    var preparationReturnedElapsed: TimeInterval?
+    var preparationErrorType: String?
     enum Failure: Error { case expected }
     func prepare(_ configuration: TestConfiguration, _ scores: WeakSpotScores,
       _ state: PoolWordDecorationState) async throws -> TypingSession {
       calls += 1
       let number = calls
       if usesActualGenerator {
-        let prepared = try await WholePreviewWordPreparation.prepareSession(configuration: configuration,
-          weakSpotScores: scores, wordDecorationState: state, nextRandomWordIndex: { 0 })
-        actualPrompt = prepared.prompt
-        return prepared
+        let started = ProcessInfo.processInfo.systemUptime
+        preparationStarted = started
+        do {
+          let prepared = try await WholePreviewWordPreparation.prepareSession(configuration: configuration,
+            weakSpotScores: scores, wordDecorationState: state, nextRandomWordIndex: { 0 },
+            didPrepare: { count in
+              self.preparedWordCount = count
+              self.lastBatchElapsed = ProcessInfo.processInfo.systemUptime - started
+            })
+          preparationReturnedElapsed = ProcessInfo.processInfo.systemUptime - started
+          actualPrompt = prepared.prompt
+          return prepared
+        } catch {
+          preparationErrorType = String(describing: type(of: error))
+          throw error
+        }
       }
       await withCheckedContinuation { replies.append($0) }
       if Task.isCancelled {
@@ -113,8 +130,12 @@ import XCTest
     for _ in 0..<10 where pending.calls == 0 { flush() }
     XCTAssertEqual(pending.calls, 1)
     if scenario == .actual {
-      for _ in 0..<200 where pending.actualPrompt == nil { flush() }
-      let actual = try XCTUnwrap(pending.actualPrompt)
+      var flushCount = 0
+      for _ in 0..<200 where pending.actualPrompt == nil { flush(); flushCount += 1 }
+      let elapsed = pending.preparationStarted.map { ProcessInfo.processInfo.systemUptime - $0 }
+      let evidence = "words=\(wordCount) calls=\(pending.calls) flushes=\(flushCount) prepared=\(pending.preparedWordCount) elapsed=\(String(describing: elapsed)) lastBatch=\(String(describing: pending.lastBatchElapsed)) returned=\(String(describing: pending.preparationReturnedElapsed)) errorType=\(pending.preparationErrorType ?? "none")"
+      print("whole preview preparation observation: \(evidence)")
+      let actual = try XCTUnwrap(pending.actualPrompt, evidence)
       flush()
       XCTAssertEqual(actual.split(separator: " ").count, wordCount)
       XCTAssertEqual(target(), actual)

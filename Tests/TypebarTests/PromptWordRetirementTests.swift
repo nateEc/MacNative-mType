@@ -371,22 +371,27 @@ import XCTest
       let text = AttributedString(Array(repeating: Array(repeating: "aa", count: sequence.perRow).joined(separator: " "), count: 6).joined(separator: "\n"))
       let starts = (0..<(sequence.perRow * 6)).map { $0 * 3 }, id = UUID()
       var retired = 0
+      var retiredAt: TimeInterval?
       func update(_ index: Int) {
         follower.update(text: text, characterOffset: starts[index], font: font, lineSpacing: spacing,
           isRightToLeft: false, lineScroll: .init(attemptID: id, activeWordID: starts[index],
             characterOffsets: Dictionary(uniqueKeysWithValues: starts.map { ($0, $0) }),
             smoothScroll: sequence.smooth, reducesMotion: false,
             words: starts.enumerated().map { .init(index: $0.offset, glyphID: $0.element) },
-            onRetire: { retired = $0.firstRetainedWordIndex }))
+            onRetire: {
+              retired = $0.firstRetainedWordIndex
+              retiredAt = ProcessInfo.processInfo.systemUptime
+            }))
         RunLoop.main.run(until: Date().addingTimeInterval(0.005))
       }
       update(0)
       for step in sequence.steps {
+        let started = ProcessInfo.processInfo.systemUptime
         update(step.activeWordIndex)
         let context = "smooth=\(sequence.smooth) perRow=\(sequence.perRow) rowHeight=\(sequence.rowHeight) active=\(step.activeWordIndex) before=\(step.before)"
-        XCTAssertEqual(retired, step.during, context + " phase=during")
+        XCTAssertEqual(retired, step.during, context + " phase=during elapsed=\(ProcessInfo.processInfo.systemUptime - started) lastRetiredAt=\(String(describing: retiredAt))")
         RunLoop.main.run(until: Date().addingTimeInterval(sequence.smooth ? 0.15 : 0.001))
-        XCTAssertEqual(retired, step.after, context + " phase=after")
+        XCTAssertEqual(retired, step.after, context + " phase=after elapsed=\(ProcessInfo.processInfo.systemUptime - started) lastRetiredAt=\(String(describing: retiredAt))")
       }
     }
   }
