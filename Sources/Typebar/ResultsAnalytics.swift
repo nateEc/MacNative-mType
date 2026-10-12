@@ -1184,7 +1184,7 @@ enum ResultPromptText {
 
     let needsLegacyNoSpaceParsing = result.configuration.language.usesCJKWordStream
       && !result.prompt.contains(where: \.isWhitespace)
-    if result.configuration.language.usesSpaceDelimitedWords,
+    if result.configuration.language.usesSpaceDelimitedWords || result.configuration.language.isCodeLanguage,
       !TestModifierPolicy.usesNoSpaceInput(result.configuration.modifiers), !needsLegacyNoSpaceParsing
     {
       let events = TypingReplay.chronologicalEvents(result.replayEvents)

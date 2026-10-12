@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+## 代码语言的提示字段复制（2026-10-12）
+
+固定官方 test-ui.ts 的 copyWordsListButton 对非 Zen 统一连接已触及目标的 textWithCommit，不按已输入字符数截断。当前原生 usesSpaceDelimitedWords 对代码语言为 false，但 TypingSession.usesWordCommitInput 为 usesSpaceDelimitedWords 或 isCodeLanguage；ResultPromptText 缺失后半条件，使代码结果错误进入按字符长度截取的分支。独立 Python／JavaScript／Dockerfile 夹具红测两项四处失败：部分 em 只复制 em，tab 缩进字段仅复制两个字符（work/code-result-copy-red.log）。
+
+修复仅对齐字段分支准入，原无空格修饰器与旧 CJK 保护、输入历史界限、提交字符保留及归档回退不变。初次相关 48 项通过（code-result-copy-green.log）；最终新测试遍历当前目录全部 isCodeLanguage 身份，另验证缩进和错误输入仍复制完整原目标，相关 48 项零失败（work/code-result-copy-final.log，0.185 秒测试、0.191 秒墙钟）。原创性边界检查通过（work/code-result-copy-originality.log）。行为优先与根因技能用于确认实际错误分支并对齐引擎语义，未修改输入或计分。
+
+目录身份遍历使用同一自有字段夹具，不是每个代码生成器／装饰器的全内容验收，也未执行真实剪贴板或可见菜单点击。零可见主程序启动、无公共网络内容请求，未跑完整门禁／Release；四项配置 partial 及完整 goal active 保持。
+
 ## 结果提示复制的原始提交字符（2026-10-12）
 
 固定官方 test-ui.ts 的 copyWordsListButton 在普通模式按 getInputHistory 长度取原词字段并连接 textWithCommit，Zen 连接输入历史。原生 ResultPromptText 的既有空格分词分支用空格连接 review.target，因此即使输入回放和原提示保有 LF，也会导出扁平文本并遗漏最后已触及词的提交。自有夹具两个红测均按预期失败（work/result-prompt-commit-red.log）：harbor LF 被变成 harbor，含空行／tab 的多字段被变成空格连接的 review 字符串。
