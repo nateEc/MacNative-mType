@@ -2,6 +2,22 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WholePreviewWordPreparationTests: XCTestCase {
+  func testLargeFinitePoolTargetsEnterCancellablePreparationWithoutCeiling() {
+    for count in [100_001, 1_000_000, OfficialTestLimitInput.maximumValue] {
+      let configuration = TestConfiguration.words(count)
+      XCTAssertTrue(WholePreviewWordPreparation.usesAsyncPreparation(
+        configuration: configuration, showAllLines: true))
+      XCTAssertFalse(WholePreviewWordPreparation.usesAsyncPreparation(
+        configuration: configuration, showAllLines: false))
+    }
+    for configuration in [TestConfiguration.words(0), .timed(seconds: 30),
+      .words(100_001).with(modifiers: [.binaryStream]),
+      .words(100_001).with(modifiers: [.poetryStream])] {
+      XCTAssertFalse(WholePreviewWordPreparation.usesAsyncPreparation(
+        configuration: configuration, showAllLines: true))
+    }
+  }
+
   func testFreshConfigurationPreparationMatchesSynchronousFactory() async throws {
     let configurations: [TestConfiguration] = [
       .words(3, language: .dockerFile),

@@ -24,7 +24,12 @@ import XCTest
         return prepared
       }
       await withCheckedContinuation { replies.append($0) }
-      if Task.isCancelled { cancelled += 1 }
+      if Task.isCancelled {
+        cancelled += 1
+        // Ignore cancellation deliberately, without allocating a giant test
+        // fixture merely to prove its obsolete result cannot be published.
+        return .init(configuration: configuration, prompt: "owned\(number)")
+      }
       if fails { throw Failure.expected }
       // Deliberately return even when cancelled to exercise publication guards.
       return .init(configuration: configuration,
@@ -47,9 +52,15 @@ import XCTest
   func testReturningToHostRestartsInterruptedPreparation() throws { try check(.resume) }
   func testTapeModeCancelsPendingWholePreparation() throws { try check(.tape) }
   func testActualGeneratorPublishesItsEntireTargetThroughHost() throws { try check(.actual) }
+  func testAboveFormerCeilingPublishesCompleteActualTargetThroughHost() throws {
+    try check(.actual, wordCount: 100_001)
+  }
+  func testLargestLegalPendingTargetCanLeaveWithoutPublishing() throws {
+    try check(.leave, wordCount: OfficialTestLimitInput.maximumValue)
+  }
   private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual }
 
-  private func check(_ scenario: Scenario) throws {
+  private func check(_ scenario: Scenario, wordCount: Int = 201) throws {
     let suite = "WholePreviewPreparationHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -57,7 +68,7 @@ import XCTest
     settings.reducePracticeMotion = true
     settings.showAllPracticeLines = true
     settings.testModifiers = [.noQuit]
-    let configuration = TestConfiguration.words(201).with(modifiers: [.noQuit])
+    let configuration = TestConfiguration.words(wordCount).with(modifiers: [.noQuit])
     XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: configuration),
       testParameterMemory: .legacyDefaults(configuration: configuration))))
     let container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
@@ -99,10 +110,10 @@ import XCTest
     for _ in 0..<10 where pending.calls == 0 { flush() }
     XCTAssertEqual(pending.calls, 1)
     if scenario == .actual {
-      for _ in 0..<20 where pending.actualPrompt == nil { flush() }
+      for _ in 0..<200 where pending.actualPrompt == nil { flush() }
       let actual = try XCTUnwrap(pending.actualPrompt)
       flush()
-      XCTAssertEqual(actual.split(separator: " ").count, 201)
+      XCTAssertEqual(actual.split(separator: " ").count, wordCount)
       XCTAssertEqual(target(), actual)
       return
     }

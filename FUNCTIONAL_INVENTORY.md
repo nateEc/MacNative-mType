@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 普通有限词池的全行异步入口不再限制十万词：真实 100,001 词隐藏宿主完整发布与文本精确验证通过，最大合法目标的暂停夹具退出取消／拒绝晚到发布通过；158 项回归零失败（work/whole-preview-uncapped-regression-baseline.log）。先行三项 10 断言失败及转绿证据详见 OFFICIAL_CONFIG_AUDIT.md。仍有明确性能缺口：测试进程峰值约 5.1 GB，热采样指向逐字符原生排版对象，资源共享待实施；在线／专用流上限没有因此解除，不升级 showAllLines 或其他三项部分分类。不代表实体 GUI／IME、最大目标实际生成、完整门禁／Release 验收；零主程序实例，完整 goal active。
+
 2026-10-12 全行异步准备界面接线：现有上限内 101...100,000 词词池路径已接入真实重置、加载保护、取消、返回恢复及成功／失败处理；新增 9 隐藏宿主与原生文本接收测试，先复现候选残留和规则变化空会话后修正。测试闸门 continuation 竞争已定位并显式 MainActor 隔离，新增 200 次启动检查；不能泛化为所有历史停滞根除。17 组 155 项及既有在线宿主 40 项分别零失败（work/whole-preview-host-complete-final.log、whole-preview-host-online-regression.log），证据及失败运行详见 OFFICIAL_CONFIG_AUDIT.md。不是实体 IME／GUI／大目标性能或完整门禁验收；超十万词差异仍存在，四项部分配置不升级，零主程序启动，完整 goal active。
 
 2026-10-12 全行准备请求控制器：新增替换／取消身份检查、当前终态清理及重入保护，6 项生命周期测试通过，含真实巨额生成取消不发布。直接 Task 取消先复现加载状态残留后修正；PTY 相关八组 109 项零失败（work/whole-preview-task-regression-pty.log）。首次重定向运行的持续等待、采样与指定测试 PID 终止证据保留，原因未证实，不能称为已根除；详见 OFFICIAL_CONFIG_AUDIT.md。尚未接入 UI，导航／输入／资源边界仍待验收，四项部分配置不升级，零主程序启动，完整 goal active。

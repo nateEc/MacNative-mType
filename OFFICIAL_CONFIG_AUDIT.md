@@ -1,5 +1,9 @@
 # 官方配置兼容性审计
 
+2026-10-12 有限普通词池全行准备解除十万词入口限制：官方固定 words-generator 的 showAllLines 分支使用实际 Config.words，现生产异步入口同样接收超过 100,000 的有限目标，不改变在线／专用流、计时／无限及可见词覆盖路径。三项新增测试先复现 10 处断言失败（work/whole-preview-uncapped-red.log），修正后零失败（122.070 秒，墙钟 122.072；work/whole-preview-uncapped-green.log）：真实 100,001 词生成器通过隐藏原生宿主完整发布，文本与 accessibilityValue 精确一致；最大合法目标通过暂停夹具验证退出取消及晚到结果不发布，不声称真实构造最大目标。扩大回归 158 项零失败（165.871 秒，墙钟 165.893；work/whole-preview-uncapped-regression-baseline.log）。
+
+性能尚不达标：真实大目标测试进程采样记录 physical footprint 峰值约 5.1 GB（work/whole-preview-uncapped-stack.txt）；热采样集中于 PromptFieldTextLayout 的逐字符 Box／AttributedString／原生排版资源构造（work/whole-preview-uncapped-hot-stack.txt）。下一步验证相同文本与完整样式的不可变排版资源共享，保留每个字符独立身份、位置、提示及词边界；本提交尚未实施。准备可取消不等于全量目标内存有界或排版可取消。全程零主程序实例；未重跑完整门禁／Release，四项部分配置和完整 goal active 保持。
+
 2026-10-12 全行准备接入真实界面重置流程：现有 101...100,000 词有限词池全行路径使用异步准备；短目标、在线源、专用流、计时／无限、可见词覆盖及超现上限目标保留既有路径。这是界面迁移阶段，不是认可或消除十万词差异。准备时空占位会话不接受物理／虚拟文本、删除或组合输入，不启动练习／No Quit，显示准备提示；重置、规则／全行／纸带切换、页面退出及重复入口取消旧请求，返回页面可重启被中断的准备。成功后校验请求与当前配置、保存准备后配置，恢复 pace／语音／输入焦点请求；失败可重启，不发布半成品。新增 9 项隐藏 NSHostingView 宿主测试，覆盖真实生成器 201 词完整发布、加载输入保护、重置旧结果、离开／返回、规则与显示／纸带变化及失败重启；另有原生文本开关清除候选、拒绝加载期间 marked／committed text 并恢复接收的测试。不是实体 IME 或实际窗口像素／焦点验收。
 
 先行新参数 API 编译失败 work/whole-preview-host-red.log 不算行为红测；最初 4 宿主通过（work/whole-preview-host-green.log）。补充原生候选检查复现 5 项各 1 断言失败（11.731 秒，墙钟 11.733；work/whole-preview-host-composition-red.log），原生 NSTextInputClient 增加默认开启的文本接收开关，在关闭时清除候选及强制错误暂态；不改变正常已加载路径。规则切换有效红测复现 3 处失败／空会话（work/whole-preview-host-rules-red.log），现加载期间重置准备、完成发布再检查当前配置；已开始会话仍走原有实时规则更新。SwiftUI 回调表达式类型检查超时保留于 work/whole-preview-host-complete.log，提取独立规则处理方法后编译通过，未放宽编译检查。
