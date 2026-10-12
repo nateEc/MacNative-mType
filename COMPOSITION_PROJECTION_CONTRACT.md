@@ -1,5 +1,13 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：普通纸带生产宿主的未确认候选生命周期（2026-10-12）
+
+新增 `TapePracticeCompositionHostTests`，挂载实际 `TypebarApp.practiceContent`，不以手工组件桥接代替生产入口。letter／word 两种纸带分别通过实际文本输入控件更新短候选、emoji／组合字符及四十字候选；同一未确认候选跨 replace→off→below→replace 设置更新，检查完整纸带可访问文本、候选 UTF-16 范围、原输入／纸带 owner 保留及 below 原生候选行。每次取消后检查恢复，随后确认 q，再投影下一双字候选，与独立推进一次的会话相符。窗口始终不显示，使用隔离 UserDefaults 和内存模型。
+
+这是既有行为的生产集成补证，无产品修改，不制造红测。首轮 `work/tape-production-composition-host.log` 编译失败：测试误引用文件私有绘制类；改为可访问全文观察。有效首轮 `tape-production-composition-host-valid.log` 四处失败来自测试错误假定提交后输入范围累加；实际 NativeTypingInput 只拥有未确认缓冲区，提交清空 selection，下一 marked range 从零开始。核对实现后修正测试契约，未改产品。初次联合回归 34 项零失败、一项缺参考路径跳过；补固定参考路径，最终 `tape-production-composition-regression-final.log` 34 项零失败零跳过（12.324s，墙钟 12.329），包括完整固定源码普通纸带视口对照。
+
+零主程序启动。本证据不包含实体 IME、实际像素／光标几何、换行／RTL 生产纸带候选或 Release 性能，不升级 compositionDisplay／tapeMode 部分分类。未重跑完整门禁，完整 goal active。
+
 ## TST-02：实际特殊呈现宿主静态渲染检查（2026-10-11）
 
 测试新增默认关闭的 `TYPEBAR_SPECIAL_COMPOSITION_QA_DIRECTORY`。仅设置输出目录时，在既有四十字 replace 场景滚动实际 owner 至可见范围并断言与宿主视口相交，缓存完整 NSHostingView 的实际显示为 PNG；不启动应用、不设置假焦点、不用设计图替代产品。默认未设置时无截图、滚动或额外 RunLoop 行为。本增量为可观测性补证，不制造产品红测。
