@@ -37,6 +37,11 @@ enum TypebarLocalPracticeFontStore {
     return registerAndRead(url: url)
   }
 
+  static func activeFont(size: CGFloat) -> NSFont? {
+    guard isActive, let url = storedFontURL, registerAndRead(url: url) != nil else { return nil }
+    return LocalPracticeFontRegistration.font(at: url, size: size)
+  }
+
   static func save(_ data: Data, originalFilename: String) throws -> LocalPracticeFontInfo {
     try LocalPracticeFontImport.save(data, originalFilename: originalFilename,
       directory: directoryURL, readInfo: fontInfo(at:), register: registerAndRead(url:),
@@ -102,6 +107,15 @@ enum TypebarLocalPracticeFontStore {
 }
 
 enum LocalPracticeFontRegistration {
+  static func font(at url: URL, size: CGFloat) -> NSFont? {
+    guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
+      let descriptor = descriptors.first else { return nil }
+    let font = CTFontCreateWithFontDescriptor(descriptor, size, nil)
+    guard let source = CTFontCopyAttribute(font, kCTFontURLAttribute) as? URL,
+      source.resolvingSymlinksInPath() == url.resolvingSymlinksInPath() else { return nil }
+    return font as NSFont
+  }
+
   static func read(url: URL) -> LocalPracticeFontInfo? {
     read(url: url, register: { CTFontManagerRegisterFontsForURL($0 as CFURL, .process, nil) },
       isRegistered: { CTFontManagerGetScopeForURL($0 as CFURL) == .process },

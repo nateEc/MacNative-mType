@@ -4,6 +4,53 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class NativeLocalFontRegistrationTests: XCTestCase {
+  func testFileBoundFontsKeepTheirSourceAtMultipleSizesDespiteSameNameRegistration() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-file-font-\(UUID())")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let first = root.appendingPathComponent("first.ttf"), second = root.appendingPathComponent("second.otf")
+    defer {
+      for url in [first, second] { _ = CTFontManagerUnregisterFontsForURL(url as CFURL, .process, nil) }
+      try? FileManager.default.removeItem(at: root)
+    }
+    let name = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    try OwnedTestFontFixture.make(postScriptName: name).write(to: first)
+    try OwnedTestFontFixture.makeOTF(postScriptName: name).write(to: second)
+    XCTAssertTrue(CTFontManagerRegisterFontsForURL(first as CFURL, .process, nil))
+    _ = CTFontManagerRegisterFontsForURL(second as CFURL, .process, nil)
+    for size: CGFloat in [8, 15, 28, 72, 144] {
+      for url in [first, second] {
+        let font = try XCTUnwrap(LocalPracticeFontRegistration.font(at: url, size: size))
+        XCTAssertEqual(font.pointSize, size)
+        XCTAssertEqual(font.fontName, name)
+        let practiceFont = try XCTUnwrap(NativePracticeFont.nsFont(named: "Courier", size: size,
+          localFont: { requestedSize in
+            XCTAssertEqual(requestedSize, size)
+            return font
+          }, installedFontName: { _ in XCTFail("An active file-bound font must not be resolved by name"); return nil }))
+        XCTAssertTrue(practiceFont === font, "Practice must retain the exact file-bound native font")
+        let source = CTFontCopyAttribute(font as CTFont, kCTFontURLAttribute) as? URL
+        XCTAssertEqual(source?.resolvingSymlinksInPath(), url.resolvingSymlinksInPath())
+        var character: UniChar = 120, glyph: CGGlyph = 0
+        XCTAssertTrue(CTFontGetGlyphsForCharacters(font as CTFont, &character, &glyph, 1))
+        let path = try XCTUnwrap(CTFontCreatePathForGlyph(font as CTFont, glyph, nil))
+        XCTAssertEqual(path.boundingBoxOfPath.width, size * 0.4, accuracy: 0.001)
+        XCTAssertEqual(path.boundingBoxOfPath.height, size * 0.7, accuracy: 0.001)
+      }
+    }
+  }
+
+  func testUnavailableFileBoundFontFallsBackOnlyToConfiguredInstalledFamily() throws {
+    let font = try XCTUnwrap(NativePracticeFont.nsFont(named: "Courier", size: 28,
+      localFont: { _ in nil }, installedFontName: { name in
+        XCTAssertEqual(name, "Courier")
+        return "Courier"
+      }))
+    XCTAssertEqual(font.fontName, NSFont(name: "Courier", size: 28)?.fontName)
+    XCTAssertEqual(font.pointSize, 28)
+    XCTAssertNil(NativePracticeFont.nsFont(named: "missing", size: 28,
+      localFont: { _ in nil }, installedFontName: { _ in nil }))
+  }
+
   func testPostRegistrationFailureUnregistersNewFontBeforeRestoringPreviousFont() throws {
     try checkPostRegistrationFailure(sameName: false)
   }

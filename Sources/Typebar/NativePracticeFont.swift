@@ -69,12 +69,17 @@ enum NativePracticeFont {
   }
 
   static func font(named requestedName: String, size: Double) -> Font? {
-    guard let postScriptName = Resolver().postScriptName(for: requestedName) else { return nil }
+    if let local = TypebarLocalPracticeFontStore.activeFont(size: size) { return Font(local) }
+    guard let postScriptName = postScriptName(for: requestedName) else { return nil }
     return .custom(postScriptName, size: size)
   }
 
-  static func nsFont(named requestedName: String, size: CGFloat) -> NSFont? {
-    guard let postScriptName = Resolver().postScriptName(for: requestedName) else { return nil }
+  static func nsFont(named requestedName: String, size: CGFloat,
+    localFont: (CGFloat) -> NSFont? = TypebarLocalPracticeFontStore.activeFont(size:),
+    installedFontName: (String) -> String? = { postScriptName(for: $0) }) -> NSFont? {
+    if let local = localFont(size) { return local }
+    // A failed file-bound local lookup must not retry that local font by name.
+    guard let postScriptName = installedFontName(requestedName) else { return nil }
     return NSFont(name: postScriptName, size: size)
   }
 

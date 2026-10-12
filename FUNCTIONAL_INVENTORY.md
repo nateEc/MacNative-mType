@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 本地字体渲染路径修正：按当前文件描述符创建指定字号并验证来源，AppKit 保留同一原生对象、SwiftUI 从该对象创建 Font；失败时不再按本地名称重试。自有同名 TTF／CFF 在五个字号共十组来源／轮廓检查通过，相关 46 项及隐藏生产宿主通过（work/font-file-bound-regression.log），详见 OFFICIAL_CONFIG_AUDIT.md。零主程序启动；store 仍有 1pt 准入限制，SwiftUI 像素、更多内容／字号和性能未证明，未跑新完整门禁，fontFamily 部分与完整 goal active 保持。
+
 2026-10-12 同名来源准入与恢复补证：旧 TTF／新 CFF 同名后置失败时实际来源回到旧文件；生产准入增加 1pt 字体来源 URL 校验，独立同名注册合同检查成功来源／失败恢复及不误注销独立文件。最终相关 44 项和隐藏字体切换宿主通过（work/font-same-name-source-verified.log），错误“同名必失败”测试假设及失败日志详见 OFFICIAL_CONFIG_AUDIT.md。不同字号／缓存状态的同名选择仍未证明，不称全部解决；零主程序启动，新产品变更未跑完整门禁，fontFamily 部分与完整 goal active 保持。
 
 2026-10-12 注册后失败清理修正：真实新字体注册后注入后置检查失败，红测发现新文件删除后仍保留进程注册；失败分支现先注销本次新 URL、再恢复旧字体。相关 41 项零失败零跳过、隐藏生产字体切换宿主通过（work/font-partial-registration-green.log、font-partial-registration-production-host.log），详见 OFFICIAL_CONFIG_AUDIT.md。零主程序启动；原生注销／恢复失败及并发崩溃仍未验证，新产品修改未跑完整门禁，fontFamily 部分与完整 goal active 保持。

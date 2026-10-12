@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 本地练习字体按文件描述符创建并传给渲染端（2026-10-12）
+
+检查实际 NativePracticeFont 后发现：本地 override 在 Resolver 中只传 PostScript 名称，SwiftUI／AppKit 在每个字号又按名称构造字体，导入来源检查没有传递到这个创建边界。改为 TypebarLocalPracticeFontStore.activeFont(size:) 在原启用及注册准入之后，从当前文件读取描述符；LocalPracticeFontRegistration.font(at:size:) 用 CTFontCreateWithFontDescriptor 创建指定字号，并再次验证实际 kCTFontURLAttribute 与文件 URL 一致，之后桥接 NSFont。Core Text 会返回 best match，故不能省去这次 URL 检查。本机 Xcode 26.3（17C529）／macOS 26.1 的 CTFont.h 确认该 best-match 契约、size 覆盖描述符字号及 macOS 10.5 可用性；Swift 编译确认 CTFont／NSFont 桥接和 SwiftUI Font(NSFont) 路径可用。未引入新依赖。
+
+SwiftUI 本地路径直接 Font(local)，AppKit 返回同一个 NSFont 实例，不再丢弃文件描述符后按名字重建。若文件绑定创建失败，两端仅按已配置的系统／命名字体回退，不再调用本地名称 Resolver 重试。保留 Resolver 的目录预览／命令语义，不让字体目录浏览触发本地注册。AppKit 解析函数注入本地对象与系统名称查找边界，测试不访问真实用户 store。
+
+探索性运行先验证实际描述符行为（font-file-bound-native.log，单项 0.013s），未制造同名选择必然失败的红测。自有同名 TTF／CFF 两个文件，在 8／15／28／72／144pt 共十组创建中均验证精确 URL、名字、字号及自写矩形轮廓缩放；第二文件的重复名称注册结果不作为前提，描述符必须绑定请求文件。最终 AppKit 渲染解析保留同一实例（===），不得调用系统名称解析；本地对象不可用时，仅解析请求配置，缺失配置返回 nil。相关 46 项零失败零跳过，2.178s（墙钟 2.184），work/font-file-bound-regression.log。隐藏生产字体／字号组合宿主一项通过，17.906s（墙钟 17.907），font-file-bound-production-host.log。
+
+零主程序启动，只注册自有临时进程字体并清理，不安装字体、不写用户配置。本轮证明上述字号／格式和 AppKit 对象传递，不等于 SwiftUI 最终像素来源、所有字体／可变光学尺寸／缓存状态或实体 IME 验收。store 仍经过此前 1pt 按名准入，同名导入可能拒绝，尚未完全消除该限制；原生注销／恢复失败、最低系统、并发和性能仍待验证。产品有改动但未重跑完整门禁／Release，fontFamily 部分及完整 goal active 保持。
+
 ## 同名恢复来源与导入准入来源校验（2026-10-12）
 
 扩展注册后失败回归，同一唯一 PostScript 名称的旧 TTF／新 CFF-OTF 两个不同文件，在真实新注册后注入失败；临时选择来源确为新文件，先注销新 URL 再恢复旧字体，最终来源精确回到旧 URL。异名与同名两项先独立通过（work/font-same-name-recovery.log，0.023s）。这是实际注册加后置失败注入，不是自然冲突导致的原生错误。
