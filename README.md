@@ -925,6 +925,15 @@ TYPEBAR_SOURCE_REDIS_SERVER=/absolute/path/to/redis-6.2.6/src/redis-server \
   zsh Scripts/check-native-rewrite-readiness.sh /absolute/path/to/monkeytype-reference
 ```
 
+显式运行真实公共网络短练习验收（不启动主程序、不保存成绩）：
+
+```zsh
+TYPEBAR_QA_IN_MEMORY_STORE=1 swift test -Xswiftc -DTYPEBAR_LIVE_NETWORK_QA \
+  --filter LiveContentNetworkAcceptanceTests
+```
+
+该入口使用生产诗歌／百科运输、解析及初始提示工厂，分别完成英文诗歌、英文百科、简体中文百科三词练习并核对回放。会话不使用磁盘缓存或 Cookie，30 秒后请求取消；这是协作式取消，不是独立进程硬超时。提供者不可用即失败，不跳过、不用夹具替代，也不将抓取文本写入验收日志。未设置编译开关时，这些用例不进入普通测试清单，日常回归不依赖公共网络。此入口不验证 GUI／实体输入法、长练习续取、所有语言或服务持续可用性，亦不替代完整门禁。
+
 检查参考源码隔离与生产服务边界：
 
 ```zsh
