@@ -1,5 +1,13 @@
 # 普通多行 Tape 生产入口与高度所有权
 
+## 完成前缀删除后的字体重建（2026-10-12）
+
+真实 TapePromptNativeView 在完成动画帧先删除旧行，随后异步通知 TypingSession；此前字体变化触发 resets，将已完成前缀与 pendingRetirement 一同清除。LTR／RTL 的精确交错红测得到六行高度 306 而非独立五行布局 255，通知超时；首次私有类型编译失败不是行为红测，保留 work/tape-font-pending-prefix-red.log，正式证据为同前缀 red-verified.log。
+
+同尝试、同 coordinator 且仍有换行词的几何重建现在按已完成原生下界裁去旧词，再重建字体布局，保留待确认的完成值并用当前代次交付；旧闭包因代次不符被拒绝。未完成垂直动画照常取消，新尝试／owner 更换清空下界和通知。新增 owner 更换反例及确认后不重复通知检查，相关 259 项零失败（work/tape-font-pending-prefix-regression.log，108.075 秒墙钟）。有界同会话风险审查确认身份、代次和确认幂等；不是独立评审或任意交错证明。
+
+不改完整提示、输入、计分、回放或归档。独立横向词孔在通知前重建、任意回退到未确认已删前缀的输入顺序、可见性能和真实 IME 仍开放；零可见 Typebar 启动，未执行新完整门禁／Release，tapeMode partial 与完整 goal active。下方为各阶段历史。
+
 ## TST-02：可变输入候选的快照所有权（2026-10-11）
 
 原先 setMarkedText 直接保留输入法传来的 NSAttributedString 对象；若实际为 NSMutableAttributedString，调用方随后修改正文或属性会绕过 onCompositionChanged，已存选区也可能超出新的 marked range。`work/composition-mutable-snapshot-red.log` 一项三处失败，复现原候选“中文”无通知地变为“候”、下划线属性改变及长度缩短。修正接收 attributed 输入时建立不可变 NSAttributedString 快照；显式再次 setMarkedText 仍接受同一缓冲区的新内容并正常通知。

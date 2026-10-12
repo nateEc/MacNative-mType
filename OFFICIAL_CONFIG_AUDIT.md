@@ -1,5 +1,9 @@
 # 官方配置兼容性审计
 
+## Tape 完成删除与字体重建的通知边界（2026-10-12）
+
+普通含换行 Tape 的生产入口当前已接通。新反例在真实原生 owner 的删行完成帧和异步会话确认之间重建字体，LTR／RTL 都恢复旧行并丢失通知；一项八处有效红测见 work/tape-font-pending-prefix-red-verified.log。修复区分同 owner 几何重建与新尝试重置：完成前缀保持，旧代次回调失效，新代次只确认一次；尚未完成的动画仍取消，owner 更换／重启不继承通知。相关 259 项通过（work/tape-font-pending-prefix-regression.log）。不把前缀修复扩大为独立横向词孔、任意反向队列或设备验收，未跑新完整门禁，tapeMode partial 与完整 goal active 保持。
+
 ## 慢词复制的空目标位置（2026-10-12）
 
 完整固定官方慢词复制回调对照确认：目标为空但已有低于阈值的 Burst 时仍选中该字段，join 分隔符与词数不能丢失。原生多加的非空过滤造成两处红测失败，移除后相关 73 项通过；六组回调适配边界探针与独立空目标测试均保留，探针加入门禁。日志 work/slow-copy-source-{red,final}.log。未把自有历史／弹窗／剪贴板适配器当成真实菜单或设备验收，未跑新完整门禁／Release，partial 与完整 goal active 保持。

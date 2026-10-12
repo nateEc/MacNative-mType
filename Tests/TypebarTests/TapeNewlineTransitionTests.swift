@@ -9,7 +9,8 @@ import XCTest
   private func update(_ view: TapePromptNativeView, _ motion: PromptCaretMotionCoordinator,
     _ attempt: UUID, active: Int, retained: Int = 0, typed: String = "", smooth: Bool = true,
     rtl: Bool = false, uniform: Bool = false, mode: PracticeTapeMode = .letter,
-    style: TypingCaretStyle = .bar, time: TimeInterval, onRetire: @escaping (PromptWordRetirement) -> Void) {
+    style: TypingCaretStyle = .bar, fontOverride: NSFont? = nil,
+    time: TimeInterval, onRetire: @escaping (PromptWordRetirement) -> Void) {
     var text = AttributedString(), offsets: [Int: Int] = [:], words: [TapePromptWord] = []
     for index in retained..<strings.count {
       let start = text.characters.count, string = (uniform ? "abc" : strings[index]) + (index < 5 ? "↵" : "")
@@ -22,7 +23,7 @@ import XCTest
     text.foregroundColor = .gray
     let glyph = active * 100 + typed.count
     var config = PromptCaretNativeView.Configuration(text: AttributedString(), mainOffset: nil, paceOffset: nil,
-      mainStyle: style, paceStyle: style, font: font, lineSpacing: 0, rightToLeft: rtl,
+      mainStyle: style, paceStyle: style, font: fontOverride ?? font, lineSpacing: 0, rightToLeft: rtl,
       accent: .yellow, motion: .off, reducesMotion: false, frameRate: 60,
       attemptID: attempt, coordinator: motion, mainGlyphID: glyph)
     config.latestInput = { .init(attemptID: attempt, typed: typed, composition: "", glyphID: glyph) }
@@ -80,6 +81,62 @@ import XCTest
       wait(for: [notification], timeout: 1)
       XCTAssertEqual(retired.map(\.firstRetainedWordIndex), [1])
       XCTAssertEqual(retired.first?.attemptID, attempt)
+    }
+  }
+
+  func testFontRebuildBeforeCompletedPrefixNotificationKeepsRemovalAndDeliversOnce() throws {
+    for rtl in [false, true] {
+      let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 160))
+      let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+      var retired: [PromptWordRetirement] = []
+      let notification = expectation(description: "Completed prefix survives font rebuild rtl=\(rtl)")
+      notification.assertForOverFulfill = true
+      let notify: (PromptWordRetirement) -> Void = { retired.append($0); notification.fulfill() }
+      defer { view.stop() }
+      begin(view, motion, attempt, rtl: rtl, onRetire: notify)
+      let originalHeight = try XCTUnwrap(view.subviews.first).frame.height
+      update(view, motion, attempt, active: 2, rtl: rtl, time: 1, onRetire: notify)
+      view.present(at: 1.113)
+      XCTAssertTrue(retired.isEmpty, "The completed native removal is not yet acknowledged by the session")
+      XCTAssertLessThan(try XCTUnwrap(view.subviews.first).frame.height, originalHeight)
+      update(view, motion, attempt, active: 2, rtl: rtl,
+        fontOverride: .monospacedSystemFont(ofSize: 32, weight: .medium), time: 1.12, onRetire: notify)
+      let expected = TapePromptNativeView(frame: view.frame)
+      defer { expected.stop() }
+      update(expected, PromptCaretMotionCoordinator(), UUID(), active: 2, retained: 1, rtl: rtl,
+        fontOverride: .monospacedSystemFont(ofSize: 32, weight: .medium), time: 1.12, onRetire: { _ in })
+      XCTAssertEqual(try XCTUnwrap(view.subviews.first).frame.height,
+        try XCTUnwrap(expected.subviews.first).frame.height, accuracy: 0.01,
+        "Font geometry must not restore the removed native row")
+      wait(for: [notification], timeout: 1)
+      XCTAssertEqual(retired, [.init(attemptID: attempt, firstRetainedWordIndex: 1)])
+      update(view, motion, attempt, active: 2, retained: 1, rtl: rtl,
+        fontOverride: .monospacedSystemFont(ofSize: 32, weight: .medium), time: 1.2, onRetire: notify)
+      drainNotifications()
+      XCTAssertEqual(retired.count, 1)
+      XCTAssertEqual(try XCTUnwrap(view.subviews.first).frame.height,
+        try XCTUnwrap(expected.subviews.first).frame.height, accuracy: 0.01)
+    }
+  }
+
+  func testOwnerReplacementAfterFontRebuildStillRejectsOldCompletedPrefix() throws {
+    for changesAttempt in [false, true] {
+      let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 160))
+      let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+      let notification = expectation(description: "Old completed prefix owner must not publish")
+      notification.isInverted = true
+      let notify: (PromptWordRetirement) -> Void = { _ in notification.fulfill() }
+      defer { view.stop() }
+      begin(view, motion, attempt, onRetire: notify)
+      update(view, motion, attempt, active: 2, time: 1, onRetire: notify)
+      view.present(at: 1.113)
+      update(view, motion, attempt, active: 2,
+        fontOverride: .monospacedSystemFont(ofSize: 32, weight: .medium), time: 1.12, onRetire: notify)
+      let croppedHeight = try XCTUnwrap(view.subviews.first).frame.height
+      update(view, PromptCaretMotionCoordinator(), changesAttempt ? UUID() : attempt, active: 0,
+        fontOverride: .monospacedSystemFont(ofSize: 32, weight: .medium), time: 1.13, onRetire: notify)
+      XCTAssertGreaterThan(try XCTUnwrap(view.subviews.first).frame.height, croppedHeight)
+      wait(for: [notification], timeout: 0.05)
     }
   }
 

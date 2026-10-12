@@ -99,7 +99,7 @@ final class TapePromptNativeView: NSView {
     }
     let rendering = initial?.rendering ?? rendering
     let compositionField = initial?.field ?? compositionField
-    let newlineWords = initial?.newlineWords ?? newlineWords
+    var newlineWords = initial?.newlineWords ?? newlineWords
     let retirement = initial?.retirement ?? retirement
     // A complete fresh snapshot may supersede old representable arguments,
     // but the effective same-attempt transaction cannot undo acknowledged deletion.
@@ -126,10 +126,24 @@ final class TapePromptNativeView: NSView {
     retirementRevision &+= 1
     metricsRevision &+= 1
     if resets {
-      notifiedRetirementIndex = retirement?.firstRetainedWordIndex ?? 0
-      pendingRetirement = nil
+      // Geometry can change after native deletion but before its asynchronous
+      // session acknowledgement. A font rebuild is not a new removal owner:
+      // retain the completed prefix and reissue its notification under this
+      // revision, while still cancelling any unfinished animation below.
+      let preservesCompletedPrefix = configuration?.attemptID == carets.attemptID
+        && configuration?.coordinator === carets.coordinator
+        && !newlineWords.isEmpty && !textView.newlineWords.isEmpty
+      let retained = max(retirement?.firstRetainedWordIndex ?? 0,
+        preservesCompletedPrefix ? textView.firstRetainedNewlineIndex : 0)
+      if preservesCompletedPrefix {
+        newlineWords.removeAll { $0.index < retained }
+        notifiedRetirementIndex = max(notifiedRetirementIndex, retirement?.firstRetainedWordIndex ?? 0)
+      } else {
+        notifiedRetirementIndex = retirement?.firstRetainedWordIndex ?? 0
+        pendingRetirement = nil
+      }
       pendingTapeWordRemovals = []; notifiedTapeWordRemovals = []
-      resetNewlineTransition(firstRetained: retirement?.firstRetainedWordIndex ?? 0)
+      resetNewlineTransition(firstRetained: retained)
     }
     let acknowledgesNativePrefix = !resets && !newlineWords.isEmpty
       && self.retirement?.attemptID == retirement?.attemptID
