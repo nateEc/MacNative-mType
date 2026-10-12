@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 字体缺字回退补证：三种常用本机字体、四组 Latin／CJK／Arabic／Hebrew 样例的实际 TextKit 字形检查通过；未分配字符负向对照能检出非零编号的 LastResort 方框，并区分合字 null 槽位。固定参考环境相关 23 项零失败零跳过（work/font-native-fallback-glyphs-verified.log），失败与检测器修正详见 OFFICIAL_CONFIG_AUDIT.md。无产品改动、零主程序启动，不泛化为全字体／全脚本或像素正确性，fontFamily 部分及完整 goal active 不变。
+
 2026-10-12 混合方向生产纸带补证：英文＋阿拉伯语候选生命周期及英文／希伯来语多行确认、删行、候选取消、完整保存回放在两种纸带中通过。固定参考环境相关 89 项零失败零跳过（work/tape-production-mixed-direction-regression.log），详见 COMPOSITION_PROJECTION_CONTRACT.md。无产品改动、零主程序启动；可访问全文不作为连接字形／双向像素排序／光标几何或真实 IME 证明，未跑新完整门禁，四项部分分类与完整 goal active 保持。
 
 2026-10-12 生产纸带确认换行完整链补证：英文／希伯来语三行分别在两种纸带中逐字确认 Return，第二次换行首行移除、换行后候选取消不恢复前缀、完成前零结果及完成后单条完整结果／回放均通过。固定参考环境相关 54 项零失败零跳过（work/tape-production-return-regression.log），详见 COMPOSITION_PROJECTION_CONTRACT.md。隔离内存模型、零主程序启动，无产品改动；未验证真实 IME／双向像素排序／光标几何／动画或 Release 性能，四项部分分类及完整 goal active 保持。

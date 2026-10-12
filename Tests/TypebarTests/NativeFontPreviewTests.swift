@@ -3,6 +3,59 @@ import XCTest
 @testable import Typebar
 
 final class NativeFontPreviewTests: XCTestCase {
+  private func hasMissingGlyphs(_ storage: NSTextStorage, _ manager: NSLayoutManager,
+    _ range: NSRange) -> Bool {
+    (range.location..<NSMaxRange(range)).contains { index in
+      guard !manager.propertyForGlyph(at: index).contains(.null) else { return false }
+      let character = manager.characterIndexForGlyph(at: index)
+      let font = storage.attribute(.font, at: character, effectiveRange: nil) as? NSFont
+      return manager.glyph(at: index) == 0 || font?.fontName == "LastResort"
+    }
+  }
+
+  @MainActor func testMissingGlyphProbeDistinguishesNotdefFromSuppressedLigatureSlots() {
+    let storage = NSTextStorage(string: "\u{0378}",
+      attributes: [.font: NSFont.systemFont(ofSize: 28)])
+    let manager = NSLayoutManager()
+    let container = NSTextContainer(size: .init(width: 2000, height: 2000))
+    manager.addTextContainer(container)
+    storage.addLayoutManager(manager)
+    manager.ensureLayout(for: container)
+    let range = manager.glyphRange(for: container)
+    XCTAssertGreaterThan(range.length, 0)
+    XCTAssertTrue(hasMissingGlyphs(storage, manager, range),
+      "An unassigned scalar must exercise the missing-glyph check, including LastResort's nonzero boxes")
+  }
+
+  @MainActor func testCommonNamedFontsUseNativeFallbackWithoutMissingGlyphsForMixedScripts() throws {
+    // A nonzero bounding box also measures .notdef boxes. Inspect the actual
+    // TextKit glyph stream instead, without registering or importing any font.
+    for name in ["Menlo", "Courier", "Georgia"] {
+      let primary = try XCTUnwrap(NSFont(name: name, size: 28))
+      for sample in ["quiet harbor", "中文かな한글", "سلام עולם", "quiet 中文 سلام עולם"] {
+        let source = NSAttributedString(string: sample, attributes: [.font: primary])
+        let storage = NSTextStorage(attributedString: source)
+        let manager = NSLayoutManager()
+        let container = NSTextContainer(size: .init(width: 2000, height: 2000))
+        container.lineFragmentPadding = 0
+        manager.addTextContainer(container)
+        storage.addLayoutManager(manager)
+        manager.ensureLayout(for: container)
+        let range = manager.glyphRange(for: container)
+        XCTAssertGreaterThan(range.length, 0, "\(name): \(sample)")
+        XCTAssertEqual(manager.characterRange(forGlyphRange: range, actualGlyphRange: nil),
+          NSRange(location: 0, length: sample.utf16.count))
+        XCTAssertFalse(hasMissingGlyphs(storage, manager, range),
+          "Missing glyph or LastResort box in native fallback: \(name), \(sample)")
+        let bounds = manager.usedRect(for: container)
+        XCTAssertTrue(bounds.width.isFinite && bounds.width > 0)
+        XCTAssertTrue(bounds.height.isFinite && bounds.height > 0)
+        XCTAssertEqual(source.attribute(.font, at: 0, effectiveRange: nil) as? NSFont, primary,
+          "TextKit font fixing may change layout storage, not the original font request")
+      }
+    }
+  }
+
   @MainActor func testEveryInstalledCatalogFamilyResolvesAndMeasuresWithoutLocalOverride() throws {
     let families = NativeFontCatalog.installedFamilies
     XCTAssertFalse(families.isEmpty)

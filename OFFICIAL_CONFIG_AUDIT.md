@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+## 字体原生回退：真实字形与负向对照（2026-10-12）
+
+新增 TextKit 字形流验收，区别于既有非零测量尺寸：Menlo／Courier／Georgia 各排版 Latin、CJK、Arabic／Hebrew 与混合四组自写样例，检查完整 UTF-16 范围、有限正尺寸，非 null 字形不为 .notdef，实际回退字体不是 LastResort，原始不可变字体请求不被排版存储修改。未注册、下载或导入字体，不创建窗口。此处是系统原生排版层补证，非完整生产宿主或像素正确性验收。
+
+负向对照采用未分配字符 U+0378，确保同一检测器真实检出缺字。首轮 `work/font-native-fallback-glyphs.log` 12 处失败来自错误测试契约：TextKit 正常修正布局存储的字体；阿拉伯语合字槽位可为不显示的 null 字形。按本机 SDK NSLayoutManager.h 的 NSGlyphPropertyNull 定义分类并保留不可变源检查，`font-native-fallback-glyphs-classified.log` 七项通过，但不能就此宣布检测可靠。负向对照首轮 `font-native-fallback-glyphs-final.log` 一处失败，诊断 `font-native-fallback-negative-diagnostic.log` 明确显示 LastResort 字体生成非零编号 4，证明单看零字形漏检。检测器新增 LastResort 判断，不排除该负例；最终 `font-native-fallback-glyphs-verified.log` 固定参考环境相关 23 项零失败零跳过（2.437s，墙钟 2.440），包含负向对照和既有 263 家族目录测量。
+
+无产品改动，不把测试契约修正称作产品修复。仅上述三字体／四样例证明未使用缺字方框，不证明其他家族、脚本、设备、字形连接／双向像素顺序、实际 IME 或完整字体资产等价。fontFamily 仍部分，94 配置 89／4／1 不变；零主程序启动，未跑新完整门禁，完整 goal active。
+
 2026-10-12 当前完整门禁通过：冻结产品／测试／脚本提交 4a225998a732fb1fd76853e455be516fe50c2dcf，单次串行门禁正常退出 0。完整客户端 4,470 项零失败、无跳过（2250.620 秒，墙钟 2251.134），完整自建服务端 501 项零失败（13.978 秒，墙钟 14.064）；显式十万词耐力实际通过（155.572 秒），生产组合宿主 42 项零失败（931.040 秒，墙钟 931.047）。Release 编译 475.83 秒，未打开的 QA 应用包元数据、严格签名、许可证及包内受保护资源／源码原创性边界检查通过。最终门禁输出的 91bd24bb8513785c7364cbea29296ff7adafac41 是参考提交，不是产品提交；不可混淆两种冻结身份。
 
 完整日志保留在 work/readiness-4a22599.00oXl4（77 份），外层 work/readiness-4a22599.00oXl4.gate.log；tracked.sha256 冻结清单及 freeze-verified.log 确认所有跟踪文件在整个运行中未变。退出后自动留存和临时目录清理均已确认，前轮 zsh 失败出口问题另有实际函数红／绿测试，不将成功清理单独当作所有失败路径证明。编译／测试／主程序进程均无残留，全程零主程序启动。只读一次堆栈采样 work/readiness-4a22599-current-stack.txt 确认日志静默时已推进至尼泊尔文宿主，而非停在缓冲最后显示的印地文用例；该采样不是可见帧率或性能通过证据。所有原始诊断仅本地保存。
