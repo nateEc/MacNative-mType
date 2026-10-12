@@ -3,6 +3,32 @@ import XCTest
 @testable import Typebar
 
 final class NativeFontPreviewTests: XCTestCase {
+  @MainActor func testEveryInstalledCatalogFamilyResolvesAndMeasuresWithoutLocalOverride() throws {
+    let families = NativeFontCatalog.installedFamilies
+    XCTAssertFalse(families.isEmpty)
+    let resolver = NativePracticeFont.Resolver(localFontName: {
+      XCTFail("Catalog traversal must not register or access the imported font")
+      return nil
+    })
+    for family in families {
+      let resolved = try XCTUnwrap(NativePracticeFont.postScriptName(for: family),
+        "Installed family must resolve: \(family)")
+      let expected = try XCTUnwrap(NSFont(name: resolved, size: 15))
+      let preview = NativeFontCatalog.previewFont(for: family, size: 15, resolver: resolver)
+      XCTAssertEqual(preview.fontName, expected.fontName, family)
+      XCTAssertEqual(preview.pointSize, 15, family)
+      XCTAssertEqual(NativeFontCatalog.selectedFamily(for: resolved, in: families), family)
+      for sample in ["Aa 123", "中文かな한글", "العربية עברית", "ລາວ سنڌي"] {
+        let measured = NSAttributedString(string: sample, attributes: [.font: preview])
+          .boundingRect(with: .init(width: 2000, height: 2000),
+            options: [.usesLineFragmentOrigin, .usesFontLeading])
+        XCTAssertTrue(measured.width.isFinite && measured.width > 0, family)
+        XCTAssertTrue(measured.height.isFinite && measured.height > 0, family)
+      }
+    }
+    print("Installed catalog runtime acceptance: \(families.count) families, four script samples each; no GUI")
+  }
+
   func testNormalizedFamilyNameKeepsTheSameDefaultFaceAsItsCanonicalName() throws {
     let canonical = try XCTUnwrap(NSFont(name: "Apple Braille", size: 28))
     for alias in ["applebraille", "Ａｐｐｌｅ Ｂｒａｉｌｌｅ"] {
