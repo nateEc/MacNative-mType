@@ -119,11 +119,9 @@ enum LocalPracticeFontRegistration {
   static func read(url: URL) -> LocalPracticeFontInfo? {
     read(url: url, register: { CTFontManagerRegisterFontsForURL($0 as CFURL, .process, nil) },
       isRegistered: { CTFontManagerGetScopeForURL($0 as CFURL) == .process },
-      readInfo: fontInfo(at:), isAvailable: { NSFont(name: $0, size: 1) != nil },
+      readInfo: fontInfo(at:),
       isSelectedSource: { name, url in
-        let font = CTFontCreateWithName(name as CFString, 1, nil)
-        guard let selectedURL = CTFontCopyAttribute(font, kCTFontURLAttribute) as? URL else { return false }
-        return selectedURL.resolvingSymlinksInPath() == url.resolvingSymlinksInPath()
+        font(at: url, size: 1)?.fontName == name
       })
   }
 
@@ -137,12 +135,12 @@ enum LocalPracticeFontRegistration {
   }
 
   static func read(url: URL, register: (URL) -> Bool, isRegistered: (URL) -> Bool,
-    readInfo: (URL) -> LocalPracticeFontInfo?, isAvailable: (String) -> Bool,
+    readInfo: (URL) -> LocalPracticeFontInfo?,
     isSelectedSource: (String, URL) -> Bool) -> LocalPracticeFontInfo? {
     // CTFontManager.h defines success by the registration result and exposes
     // URL-specific scope for idempotent reads. Name lookup alone is insufficient.
     guard register(url) || isRegistered(url) else { return nil }
-    guard let info = readInfo(url), isAvailable(info.postScriptName),
+    guard let info = readInfo(url),
       isSelectedSource(info.postScriptName, url) else { return nil }
     return info
   }

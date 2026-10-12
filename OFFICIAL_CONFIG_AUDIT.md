@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 导入准入与文件绑定渲染采用同一字体来源（2026-10-12）
+
+确定性注入红测：注册成功、描述符存在、文件绑定来源可用，但全局名称可用性为 false 时，旧准入返回 nil；单项一处断言失败（work/font-file-admission-red.log）。这是两种解析来源不一致的隔离合同复现，不冒称原生系统稳定产生某一种同名查找结果。现移除独立全局 NSFont(name:) 可用性及 CTFontCreateWithName 来源检查，改用此前已验收的 font(at:url,size:1) 文件描述符创建；该函数验证实际 URL，再核对 fontName 与描述符名称一致。注册成功或同 URL process 已注册的前置门槛不变，来源失败仍返回 nil，保留失败注销／恢复机制。
+
+删除旧注入接口的 isAvailable 参数，isSelectedSource 代表指定文件的可用性／来源条件；保留注册失败拒绝、重复读取、缺失描述符短路和错误来源拒绝检查，新增准入恰好验证请求文件的断言。同名独立注册合同成功分支现在验证实际文件绑定的 28pt 字体，而非已不用于练习的全局名称选择，不要求系统固定选择哪一个同名文件。另加真实缺失／损坏文件检查，确保文件绑定创建返回 nil，而不把 Core Text 的 best match 系统字体当作成功。源码驱动再次核对本机 SDK CTFont.h 的 best-match／字号覆盖契约，因此文件 URL 复核仍必须保留。
+
+最初相关 47 项通过（font-file-admission-green.log）；最终固定源码相关 48 项零失败零跳过，1.982s（墙钟 1.988），font-file-admission-verified.log。包含自有 TTF、CFF、两种 WOFF、两种 null-transform WOFF2、五字号文件来源／轮廓、真实同名注册及失败恢复合同。隐藏生产字体／字号组合宿主单项通过，17.865s（墙钟 17.866），font-file-admission-production-host.log。只使用自有唯一名称临时进程字体并清理，零主程序启动，不写真实用户配置或安装字体。
+
+此前 1pt“全局按名选择”门槛已移除；仍有 1pt 文件描述符探测和原生 process 注册门槛，不保证所有字号／可变字体／缓存或原生拒绝注册的文件都支持。SwiftUI 最终像素、注销／恢复失败、最低系统、并发和性能仍待验证。产品变更未跑新完整门禁／Release，fontFamily 部分与完整 goal active 保持。
+
 ## 本地练习字体按文件描述符创建并传给渲染端（2026-10-12）
 
 检查实际 NativePracticeFont 后发现：本地 override 在 Resolver 中只传 PostScript 名称，SwiftUI／AppKit 在每个字号又按名称构造字体，导入来源检查没有传递到这个创建边界。改为 TypebarLocalPracticeFontStore.activeFont(size:) 在原启用及注册准入之后，从当前文件读取描述符；LocalPracticeFontRegistration.font(at:size:) 用 CTFontCreateWithFontDescriptor 创建指定字号，并再次验证实际 kCTFontURLAttribute 与文件 URL 一致，之后桥接 NSFont。Core Text 会返回 best match，故不能省去这次 URL 检查。本机 Xcode 26.3（17C529）／macOS 26.1 的 CTFont.h 确认该 best-match 契约、size 覆盖描述符字号及 macOS 10.5 可用性；Swift 编译确认 CTFont／NSFont 桥接和 SwiftUI Font(NSFont) 路径可用。未引入新依赖。

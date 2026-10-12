@@ -4,6 +4,16 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class NativeLocalFontRegistrationTests: XCTestCase {
+  func testFileBoundFontRejectsMissingAndInvalidFilesRatherThanReturningSystemFallback() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-invalid-font-\(UUID())")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let url = root.appendingPathComponent("invalid.ttf")
+    XCTAssertNil(LocalPracticeFontRegistration.font(at: url, size: 28))
+    try Data("not a font".utf8).write(to: url)
+    XCTAssertNil(LocalPracticeFontRegistration.font(at: url, size: 28))
+  }
+
   func testFileBoundFontsKeepTheirSourceAtMultipleSizesDespiteSameNameRegistration() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-file-font-\(UUID())")
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -205,9 +215,12 @@ import XCTest
           if url.lastPathComponent != oldURL.lastPathComponent {
             rejectedURL = url
             if result != nil {
-              let selected = CTFontCreateWithName(conflictName as CFString, 1, nil)
-              XCTAssertEqual((CTFontCopyAttribute(selected, kCTFontURLAttribute) as? URL)?.resolvingSymlinksInPath(),
-                url.resolvingSymlinksInPath(), "Success requires the imported file, not merely its name")
+              if let selected = LocalPracticeFontRegistration.font(at: url, size: 28) {
+                XCTAssertEqual((CTFontCopyAttribute(selected as CTFont, kCTFontURLAttribute) as? URL)?.resolvingSymlinksInPath(),
+                  url.resolvingSymlinksInPath(), "Success requires the imported file, not merely its name")
+              } else {
+                XCTFail("An admitted font must also be usable at the practice size")
+              }
             }
           }
           return result
