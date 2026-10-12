@@ -131,6 +131,36 @@ struct LivePracticeContent: Equatable {
       noSpaceBoundarySource: separator.isEmpty ? selectedTokens.joined(separator: " ") : nil)
   }
 
+  @MainActor func preparingPromptDescriptor(for configuration: TestConfiguration,
+    showAllLines: Bool = false, didAssemble: (Int) -> Void = { _ in }) async throws -> LivePracticePrompt {
+    try Task.checkCancellation()
+    guard !tokens.isEmpty else { return .init(text: text, noSpaceBoundarySource: nil) }
+    let count: Int
+    switch configuration.mode {
+    case .time, .words: count = initialWordCount(for: configuration, showAllLines: showAllLines)
+    case .quote, .zen, .custom: count = tokens.count
+    }
+    var prompt = "", boundaries = "", offset = 0
+    while offset < count {
+      try Task.checkCancellation()
+      let end = offset + min(100, count - offset)
+      for index in offset..<end {
+        let token = tokens[index % tokens.count]
+        if index > 0 { prompt += separator }
+        prompt += token
+        if separator.isEmpty {
+          if index > 0 { boundaries += " " }
+          boundaries += token
+        }
+      }
+      offset = end
+      didAssemble(offset)
+      await Task.yield()
+    }
+    try Task.checkCancellation()
+    return .init(text: prompt, noSpaceBoundarySource: separator.isEmpty ? boundaries : nil)
+  }
+
   func continuationDescriptor(for configuration: TestConfiguration, showAllLines: Bool = false) -> LivePracticePrompt? {
     guard configuration.mode == .words || configuration.mode == .time else { return nil }
     let start = initialWordCount(for: configuration, showAllLines: showAllLines)

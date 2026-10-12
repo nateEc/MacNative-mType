@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## 在线初始提示描述符按 token 协作装配（2026-10-12）
+
+在线路径填充完词源后，原 promptDescriptor 仍以全量 selectedTokens map 和 joined 一次性装配。新增 preparingPromptDescriptor，每批最多 100 个原始 token，直接累加提示及必要的无空格来源边界，块前／末块后检查取消、块后 Task.yield。保留原 token 循环选择、空 token、内部换行及分隔符语义，不把已变换 GeneratedWordChunk 装配器用于原始来源字段。普通同步描述符仍保留作独立对照及既有调用路径。
+
+实际初始在线替换任务在填充后 await 描述符准备，不提前结束 loading。新增挂起返回后核对取消及 requestID；全行／卷带显示状态改变则继续准备当前预算，而非用旧设置的描述符发布。最终沿用 hasStarted、配置与请求身份替换保护，来源失败的三次重试／关闭诗歌等策略不变。会话内决策复核（非独立审查）的主要反例是装配期间设置／请求或输入状态变化；源码重查与既有全部替换宿主覆盖一般发布保护，但没有专门强制在描述符中间切换设置的生产注入测试，不以一般回归冒充该精确交错已证明。
+
+三项新测试以独立同步描述符作 UTF-8 对照，覆盖空格／无分隔／换行三种分隔、有限／无限／计时及全行开关，包含分解重音、组合 emoji、中文、阿拉伯文、空 token 和内部 LF；100,001 词完整预算不变；首块及末块取消拒绝返回，最大合法预算首批 100 token 后取消，无全目标预分配。源码检查先确认同步装配缺口，无伪造行为红测；首次补丁因 TypebarApp 路径遗漏 Sources/Typebar 而未应用，检查工作区无变化后重试，非产品失败。
+
+针对性最终 15 项通过（work/live-prompt-cooperative-assembly-verified.log，12.395s／墙钟 12.398）；扩大至全部 40 项隐藏生产在线替换宿主后，相关 52 项零失败零跳过，250.852s（墙钟 250.859），live-prompt-cooperative-assembly-host-regression.log。涵盖输入／候选保护、显示设置、离开取消、重试、预取、noQuit 及数据保存相关场景。全部为本地夹具，不进行公共内容网络验证；零主程序启动。
+
+在线内容对象初始 text 拼接、continuationDescriptor、最终 factory／会话构造和布局仍同步；完整 token／文本仍驻留内存，单个超大 token 也可阻塞，不保证 yield 公平性或设备延迟达标。未跑新完整门禁／Release，showAllLines 部分分类及完整 goal active 保持。
+
 ## showAllLines：最终提示装配也按块协作与检查取消（2026-10-12）
 
 重新核对固定参考 91bd24bb8513785c7364cbea29296ff7adafac41 的 words-generator.ts 全行分支及 test-ui.ts 高度逻辑：有限目标仍是全部目标，不以另一固定上限替代。原生已按块准备大目标，但 prepareSession 最后仍在主线程以 map/joined、flatMap 与全量边界 map 一次性装配。新增 WholePreviewChunkAssembly，按既有生成块累加文本、无空格目标及累计边界，每块前检查取消、块后 Task.yield，末块后再次检查；prepareSession 采用此结果，在最终同步 TypingSession 构造前后检查取消。不改变目标、生成顺序、装饰／弱点状态或最终提交符。

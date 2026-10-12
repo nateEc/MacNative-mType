@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 在线初始描述符装配改进：按 100 个原始 token 协作准备文本／来源边界，实际替换任务在挂起后重查请求和显示状态，不以旧预算发布。100,001 词精确对照、取消及最大合法目标首批取消，连同全部 40 项隐藏在线替换宿主等相关 52 项通过（work/live-prompt-cooperative-assembly-host-regression.log），决策复核及未验证精确交错见 OFFICIAL_CONFIG_AUDIT.md。零主程序启动、本地夹具无公共网络；其他同步拼接／最终构造布局和总内存仍有缺口，未跑新完整门禁，showAllLines 部分与完整 goal active 保持。
+
 2026-10-12 全行最终装配改进：普通词池／原生流的 prepareSession 不再一次性拼接所有提示与无空格边界，改为按生成块协作、检查取消，最终同步会话构造前后再检查。100,001 词完整装配、Unicode 对照、首块／末块取消及实际发布／重启宿主等相关 42 项通过（work/whole-preview-cooperative-assembly-large.log），会话内决策复核与限制见 OFFICIAL_CONFIG_AUDIT.md。零主程序启动；全量内存、同步最终构造／布局及在线其他路径仍有缺口，未跑新完整门禁，showAllLines 部分与完整 goal active 保持。
 
 2026-10-12 字体容器渲染路径补证：六种自写字体容器各五个字号共 30 组，通过实际保存后的文件绑定来源、原生对象传递和轮廓缩放检查，保留既有按名注册及注销验收。相关 48 项零失败零跳过（work/font-containers-file-bound-regression.log）；计数未增加，覆盖断言扩展，详见 OFFICIAL_CONFIG_AUDIT.md。无产品改动、零主程序启动；其他编码／最终像素／最低系统等未验收，未跑新完整门禁，fontFamily 部分与完整 goal active 保持。

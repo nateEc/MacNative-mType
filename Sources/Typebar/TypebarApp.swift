@@ -4554,6 +4554,7 @@ private struct ContentView: View {
     liveContentTask = Task {
       let firstContent = await liveContentFetch(source, configuration.language)
       var content = firstContent
+      var preparedPrompt: LivePracticePrompt?
       var failedGenerationAttempts = 0
       while !Task.isCancelled {
         let wholePreview = settings.showAllPracticeLines && settings.practiceTapeMode == .off
@@ -4575,7 +4576,14 @@ private struct ContentView: View {
         }
         // Display settings can change while a later section is in flight.
         // Fill the current budget before constructing its final descriptor.
-        if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off) { break }
+        if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off), let current = content {
+          do {
+            preparedPrompt = try await current.preparingPromptDescriptor(for: configuration,
+              showAllLines: wholePreview)
+          } catch { return }
+          guard !Task.isCancelled, requestID == liveContentRequestID else { return }
+          if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off) { break }
+        }
       }
       guard !Task.isCancelled, requestID == liveContentRequestID else { return }
       liveContentTask = nil
@@ -4609,8 +4617,7 @@ private struct ContentView: View {
         return
       }
       guard let content else { return }
-      let livePrompt = content.promptDescriptor(for: configuration,
-        showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
+      guard let livePrompt = preparedPrompt else { return }
       TypingFeedbackSound.shared.beginPracticeAttempt()
       session = TestSessionFactory.make(
         configuration: configuration, streamPrompt: livePrompt.text,
