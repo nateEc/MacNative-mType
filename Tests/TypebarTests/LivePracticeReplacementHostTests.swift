@@ -192,6 +192,23 @@ import XCTest
       cancelsAfterEmpty: true)
   }
 
+  func testCancelledGeneratorAfterEmptySideBeforeExhaustionRejectsLateSuccess() throws {
+    try checkDelayedReplacement(prefetches: true, locksNoQuit: true,
+      emptyPrefetch: true, recoversAfterEmptyAtExhaustion: true, cancelsAfterEmpty: true)
+  }
+
+  func testCancelledGeneratorAfterEmptySideBeforeExhaustionRejectsLateFailure() throws {
+    try checkDelayedReplacement(prefetches: true, locksNoQuit: true,
+      emptyPrefetch: true, recoversAfterEmptyAtExhaustion: true,
+      cancelsAfterEmpty: true, failsAfterCancellation: true)
+  }
+
+  func testCancelledGeneratorAfterEmptySideAtExhaustionRejectsLateFailure() throws {
+    try checkDelayedReplacement(prefetches: true, locksNoQuit: true,
+      emptyPrefetch: true, exhaustsBeforeEmpty: true, recoversAfterEmptyAtExhaustion: true,
+      cancelsAfterEmpty: true, failsAfterCancellation: true)
+  }
+
   func testFailedGenerationPresentationKeepsAValidStoreWhileAnUnrelatedStoreSaves() throws {
     let existing = ExistingWindow(contentRect: .init(x: 0, y: 0, width: 200, height: 100),
       styleMask: .borderless, backing: .buffered, defer: false)
@@ -216,7 +233,7 @@ import XCTest
     cancelsPrefetch: Bool = false, failsPrefetch: Bool = false, locksNoQuit: Bool = false,
     emptyPrefetch: Bool = false, emptyInitialReplies: Int = 0,
     exhaustsBeforeEmpty: Bool = false, recoversAfterEmptyAtExhaustion: Bool = false,
-    cancelsAfterEmpty: Bool = false, failsInitial: Bool = false,
+    cancelsAfterEmpty: Bool = false, failsAfterCancellation: Bool = false, failsInitial: Bool = false,
     failsInitialFill: Bool = false, generatesNextWord: Bool = false,
     checksBackwardInput: Bool = false, encyclopedia: Bool = false,
     initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false) throws {
@@ -574,6 +591,7 @@ import XCTest
           window.contentView = nil
           for _ in 0..<5 { flush() }
           pending.scriptedTokens = Array(authoredTokens[151..<300])
+          pending.returnsFailure = failsAfterCancellation
           pending.finish()
           for _ in 0..<5 { flush() }
           XCTAssertGreaterThan(pending.cancelledReplies, beforeCancellation)
