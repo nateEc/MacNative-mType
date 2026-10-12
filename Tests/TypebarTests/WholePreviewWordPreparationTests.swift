@@ -11,10 +11,30 @@ import XCTest
         configuration: configuration, showAllLines: false))
     }
     for configuration in [TestConfiguration.words(0), .timed(seconds: 30),
-      .words(100_001).with(modifiers: [.binaryStream]),
       .words(100_001).with(modifiers: [.poetryStream])] {
       XCTAssertFalse(WholePreviewWordPreparation.usesAsyncPreparation(
         configuration: configuration, showAllLines: true))
+    }
+  }
+
+  func testNativeStreamsPrepareExactFiniteTargetsAcrossBatchBoundaries() async throws {
+    let streams: [TestModifier] = [.binaryStream, .accountingStream, .hexadecimalStream,
+      .symbolStream, .asciiStream, .specialCharacterStream, .gibberishStream,
+      .arrowStream, .ipv4Stream, .ipv6Stream, .pseudolangStream]
+    for stream in streams {
+      for alterations: [TestModifier] in [[], [.underscoreSeparators], [.noSpaces], [.messagingStyle], [.alternatingCase]] {
+        let configuration = TestConfiguration.words(201).with(modifiers: [stream] + alterations)
+        XCTAssertTrue(WholePreviewWordPreparation.usesAsyncPreparation(configuration: configuration, showAllLines: true))
+        let isNativeStream = TypebarStreamContent.prompt(configuration: configuration, wordCount: 1) != nil
+        let expected = TestSessionFactory.make(configuration: configuration, showAllLines: true,
+          nextRandomWordIndex: { 0 })
+        var draws = 0
+        let actual = try await WholePreviewWordPreparation.prepareSession(configuration: configuration,
+          nextRandomWordIndex: { draws += 1; return 0 })
+        if isNativeStream { XCTAssertEqual(draws, 0, "Native streams must not draw pool words") }
+        XCTAssertEqual(actual.prompt, expected.prompt, "\(stream) \(alterations)")
+        XCTAssertEqual(actual.repeatedAttempt().prompt, expected.prompt)
+      }
     }
   }
 
@@ -100,7 +120,7 @@ import XCTest
 
   func testNonPoolConfigurationsAreRejectedBeforeAnyDraw() async {
     for configuration in [TestConfiguration.timed(seconds: 30), .words(0),
-      .words(3).with(modifiers: [.binaryStream]), .words(3).with(modifiers: [.poetryStream])] {
+      .words(3).with(modifiers: [.poetryStream])] {
       var draws = 0
       do {
         _ = try await WholePreviewWordPreparation.prepare(configuration: configuration,
@@ -136,6 +156,34 @@ import XCTest
     XCTAssertEqual(chunks.count, 1001)
     let targets = chunks.map(\.transformed).joined()
     XCTAssertEqual(targets, String(repeating: "north_", count: 100_000) + "north")
+  }
+
+  func testNativeStreamAboveOldCeilingPreservesFinalAlterationAndNoSpaceTargets() async throws {
+    for alteration: TestModifier in [.underscoreSeparators, .noSpaces] {
+      let configuration = TestConfiguration.words(100_001).with(modifiers: [.binaryStream, alteration])
+      XCTAssertTrue(configuration.modifiers.contains(.binaryStream))
+      let source = try XCTUnwrap(TypebarStreamContent.prompt(configuration: configuration, wordCount: 100_001))
+      let expected = GeneratedWordChunk(source: source, batch: TestModifierPolicy.transformedBatch(source,
+        modifiers: configuration.modifiers, language: configuration.language,
+        wordBound: 100_001, preservesWordOrder: true))
+      let chunks = try await WholePreviewWordPreparation.prepare(configuration: configuration)
+      XCTAssertEqual(chunks.count, 1001)
+      XCTAssertEqual(chunks.map(\.source).joined(), source)
+      XCTAssertEqual(chunks.map(\.transformed).joined(), expected.transformed)
+      XCTAssertEqual(chunks.flatMap(\.noSpaceTargetWords), expected.noSpaceTargetWords)
+    }
+  }
+
+  func testNativeStreamMaximumTargetCancelsAfterFirstBatchWithoutPublishing() async {
+    var counts: [Int] = []
+    let task = Task { @MainActor in
+      try await WholePreviewWordPreparation.prepare(configuration:
+        TestConfiguration.words(OfficialTestLimitInput.maximumValue).with(modifiers: [.binaryStream]),
+        didPrepare: { counts.append($0); withUnsafeCurrentTask { $0?.cancel() } })
+    }
+    do { _ = try await task.value; XCTFail("Cancelled stream must not publish") }
+    catch is CancellationError {} catch { XCTFail("Unexpected error: \(error)") }
+    XCTAssertEqual(counts, [100])
   }
 
   func testCancellationStopsHugePreparationAtTheNextBatchBoundary() async throws {

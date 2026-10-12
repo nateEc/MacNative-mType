@@ -52,6 +52,9 @@ import XCTest
   func testReturningToHostRestartsInterruptedPreparation() throws { try check(.resume) }
   func testTapeModeCancelsPendingWholePreparation() throws { try check(.tape) }
   func testActualGeneratorPublishesItsEntireTargetThroughHost() throws { try check(.actual) }
+  func testNativeStreamPublishesExactTargetThroughProductionHost() throws {
+    try check(.actual, modifiers: [.binaryStream])
+  }
   func testAboveFormerCeilingPublishesCompleteActualTargetThroughHost() throws {
     try check(.actual, wordCount: 100_001)
   }
@@ -60,15 +63,15 @@ import XCTest
   }
   private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual }
 
-  private func check(_ scenario: Scenario, wordCount: Int = 201) throws {
+  private func check(_ scenario: Scenario, wordCount: Int = 201, modifiers: [TestModifier] = [.noQuit]) throws {
     let suite = "WholePreviewPreparationHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
     let settings = AppSettings(defaults: defaults)
     settings.reducePracticeMotion = true
     settings.showAllPracticeLines = true
-    settings.testModifiers = [.noQuit]
-    let configuration = TestConfiguration.words(wordCount).with(modifiers: [.noQuit])
+    settings.testModifiers = modifiers
+    let configuration = TestConfiguration.words(wordCount).with(modifiers: modifiers)
     XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: configuration),
       testParameterMemory: .legacyDefaults(configuration: configuration))))
     let container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,

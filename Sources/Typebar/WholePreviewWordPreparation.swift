@@ -1,16 +1,15 @@
 import Foundation
 
-/// Cooperatively prepares finite pool-generated words with their full initial
+/// Cooperatively prepares finite native-generated words with their full initial
 /// bound. Display admission stays explicit; other sources keep separate paths.
 enum WholePreviewWordPreparation {
-  /// Finite pool previews prepare their actual target, including above the
+  /// Finite native previews prepare their actual target, including above the
   /// legacy synchronous ceiling. Preparation remains cancellable, not memory-bounded.
   static func usesAsyncPreparation(configuration: TestConfiguration, showAllLines: Bool) -> Bool {
     showAllLines && configuration.mode == .words && !configuration.isInfinite
       && (configuration.wordLimit ?? 0) > GeneratedPromptChunkPolicy.maximumInitialWordCount
       && configuration.visibleFutureWordCount == nil
       && LivePracticeContentSource.selected(for: configuration) == nil
-      && TypebarStreamContent.prompt(configuration: configuration, wordCount: 1) == nil
   }
 
   @MainActor static func prepare(
@@ -71,9 +70,13 @@ enum WholePreviewWordPreparation {
     if configuration.language == .dockerFile { configuration.dockerfileUsesLiteralIndentation = true }
     guard configuration.mode == .words, let limit = configuration.wordLimit, limit > 0,
       configuration.visibleFutureWordCount == nil,
-      LivePracticeContentSource.selected(for: configuration) == nil,
-      TypebarStreamContent.prompt(configuration: configuration, wordCount: 1) == nil
+      LivePracticeContentSource.selected(for: configuration) == nil
     else { throw PreparationError.unsupportedConfiguration }
+    if TypebarStreamContent.prompt(configuration: configuration, wordCount: 1) != nil {
+      let chunks = try await prepareStream(configuration: configuration, limit: limit,
+        nextRandomCaseBit: nextRandomCaseBit, didPrepare: didPrepare)
+      return (chunks, wordDecorationState, configuration, preparation.notice)
+    }
     var generator = GeneratedCodeContinuation(configuration: configuration, batchTokenCount: 100,
       weakSpotScores: weakSpotScores, sourceWords: sourceWords, decorationState: wordDecorationState,
       nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex)
@@ -96,4 +99,40 @@ enum WholePreviewWordPreparation {
   }
 
   enum PreparationError: Error { case emptyGeneration, unsupportedConfiguration }
+
+  @MainActor private static func prepareStream(configuration: TestConfiguration, limit: Int,
+    nextRandomCaseBit: () -> Bool, didPrepare: (Int) -> Void) async throws -> [GeneratedWordChunk] {
+    let noSpace = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    var chunks: [GeneratedWordChunk] = []
+    var prepared = 0
+    var previousTarget: String?
+    while prepared < limit {
+      try Task.checkCancellation()
+      let count = min(100, limit - prepared)
+      guard let source = TypebarStreamContent.prompt(configuration: configuration,
+        wordCount: count, startIndex: prepared) else { throw PreparationError.emptyGeneration }
+      var output = ""
+      var targets: [String] = []
+      for (offset, word) in source.split(separator: " ").enumerated() {
+        if previousTarget != nil, !noSpace, previousTarget?.hasSuffix("\n") != true { output.append(" ") }
+        var target = TestModifierPolicy.transformedWord(configuration.language.presentationText(String(word)),
+          modifiers: configuration.modifiers, language: configuration.language,
+          wordIndex: prepared + offset, wordBound: limit, nextRandomCaseBit: nextRandomCaseBit)
+        // Match the complete-prompt transform: only its final message commit
+        // is removed, never a chunk boundary's newline.
+        if prepared + offset == limit - 1, configuration.modifiers.contains(.messagingStyle),
+          target.hasSuffix("\n") { target.removeLast() }
+        output += target
+        targets.append(target)
+        previousTarget = target
+      }
+      chunks.append(.init(source: (prepared > 0 ? " " : "") + source,
+        batch: .init(text: output, noSpaceTargetWords: noSpace ? targets : [])))
+      prepared += count
+      didPrepare(prepared)
+      await Task.yield()
+    }
+    try Task.checkCancellation()
+    return chunks
+  }
 }
