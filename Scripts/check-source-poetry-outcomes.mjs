@@ -15,6 +15,12 @@ assert.equal(execFileSync('git', ['-C', root, 'status', '--porcelain'], {encodin
 const source = fs.readFileSync(path.join(root, 'frontend/src/ts/test/poetry.ts'), 'utf8');
 const cases = [
   {name: 'valid section', body: [{title: 'Owned', author: 'Fixture', lines: ['north south']}], words: ['north', 'south']},
+  {name: 'missing attribution does not reject words', body: [{lines: ['north south']}], words: ['north', 'south'], metadata: [undefined, undefined]},
+  {name: 'null attribution does not reject words', body: [{title: null, author: null, lines: ['north south']}], words: ['north', 'south'], metadata: [null, null]},
+  {name: 'numeric attribution is retained', body: [{title: 42, author: 7, lines: ['north south']}], words: ['north', 'south'], metadata: [42, 7]},
+  {name: 'structured attribution is retained', body: [{title: {label: 'Owned'}, author: ['Fixture'], lines: ['north south']}], words: ['north', 'south'], metadata: [{label: 'Owned'}, ['Fixture']]},
+  {name: 'null lines reject even with valid attribution', body: [{title: 'Owned', author: 'Fixture', lines: null}], failure: true},
+  {name: 'nonstring line rejects even after word budget', body: [{title: 'Owned', author: 'Fixture', lines: [Array(100).fill('north').join(' '), 42]}], failure: true},
   {name: 'decoded empty section', body: [{title: 'Owned', author: 'Fixture', lines: ['— _']}], words: []},
   {name: 'unrelated invalid trailing item', body: [{title: 'Owned', author: 'Fixture', lines: ['north south']}, null, {lines: 4}], words: ['north', 'south']},
   {name: 'first empty section does not select later poem', body: [{title: 'Owned', author: 'Fixture', lines: ['— _']}, {title: 'Later', author: 'Fixture', lines: ['ignored']}], words: []},
@@ -55,7 +61,10 @@ for (const fixture of cases) {
   assert.equal(calls, 1);
   assert.notEqual(outcome, undefined);
   if (fixture.failure) assert.equal(outcome, false);
-  else assert.deepEqual(Array.from(outcome.words), fixture.words);
+  else {
+    assert.deepEqual(Array.from(outcome.words), fixture.words);
+    if (fixture.metadata) assert.deepEqual([outcome.title, outcome.author], fixture.metadata);
+  }
   console.log(`PASS ${fixture.name}`);
 }
 console.log(`Pinned poetry provider: ${cases.length} cases passed; only the first item is consumed, HTTP status does not reject decoded sections; undefined is not a provider outcome in these cases.`);

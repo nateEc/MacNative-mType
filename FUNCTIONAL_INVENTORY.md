@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 `TST-02` 诗歌元数据 schema 差异已证实：固定完整 poetry.ts 执行探针由 11 扩为 17 案例（work/poetry-metadata-source.log），有效 lines 配合缺失／null／数字／对象及数组署名仍返回词语，并原样保留 title／author；null lines 及百词预算之后的非字符串行仍返回 false。Section 构造器只读核对确认直接赋值、不另做类型验证；探针仍使用自有等价 Section 适配器，不冒称浏览器展示结果。现原生 PoetryDocument 的必需 String title／author 会拒绝前四种有效词语响应，故这是已复现的提供者分类差异，不是完成项；后续需保持有效词语可练习并核对署名消费／展示语义，不能用无证据的字符串化或静默空值替代宣称完全对齐。本轮仅扩源码探针，产品未改、未重跑 Swift／完整门禁或 Release，零主程序实例，完整 goal active。
+
 2026-10-12 `TST-02` 公共网络生产链路补证：新增仅显式 `TYPEBAR_LIVE_NETWORK_QA` 编译开关启用的独立入口，临时 URLSession 无磁盘缓存／Cookie，30 秒协作式取消；实际调用生产服务解析、初始提示与会话工厂，英文诗歌、英／简中百科均完成三词练习、零错误并精确核对回放。3 项零失败、无跳过（7.673 秒，墙钟 7.675 秒；work/live-production-content-network.log）。撤去开关后普通三组回归 64 项零失败（19.838 秒，墙钟 19.848 秒；work/live-network-offline-regression.log），普通测试清单无网络 QA 符号（work/live-network-offline-test-list.log）。不保存抓取内容、成绩或账户状态，不启动主程序。行为优先技能对现有正确链路直接补证，未人为制造红测；会话内风险复核未发现提交阻断项，非独立审查。此证据更新历史“真实网络短链路未验”状态，不代表 GUI／实体 IME、长练习续取、全部语言、持续可用性或新的完整门禁／Release 验收；纯重写完整 goal active。
 
 2026-10-12 `TST-02` 诗歌数组首项选择修正：固定完整诗歌 provider 探针扩为 11 案例，确认仅消费 index 0，后续错误结构不影响有效首项，首项为空／无效不改选后项（work/poetry-first-item-source.log）。原生全数组强类型解码先复现一处有效失败（两项测试、一处失败，0.690 秒；work/poetry-first-item-red.log）；现响应包装只解码第一文档，仍由 JSONDecoder 校验完整 JSON 语法，不跳过无效首项、不复制后续诗歌。新增 null／数字／缺字段／错误字段尾项、无效首项、清理后空首项和非法 JSON 守卫；最终三组 64 项零失败、无跳过（19.343 秒，墙钟 19.351 秒；work/poetry-first-item-green.log），含前轮 HTTP 分类和百科运输／生成器边界。原创性检查通过（work/poetry-first-item-originality.log）。源码驱动／行为优先／根因调试及会话内风险复核限定此修复，不是独立审查；没有变更存储格式、网络端点或重试。缺失／非字符串署名与其他 schema 差异、实体网络／GUI 和新完整门禁／Release 未验；主程序未启动，完整 goal active。
