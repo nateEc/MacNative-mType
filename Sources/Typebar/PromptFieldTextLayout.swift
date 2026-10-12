@@ -26,6 +26,12 @@ struct PromptFieldTextRun: Equatable {
     let group: Int
     let y: CGFloat
   }
+  private struct ContentProjection {
+    let text: AttributedString
+    let ownsLineBreak: Bool
+    let main: AttributedString
+    let hint: AttributedString?
+  }
   /// Shared only inside a compatible layout snapshot. Text and metrics are
   /// immutable after construction; slot ownership and positions never live here.
   private final class TextShape {
@@ -72,12 +78,13 @@ struct PromptFieldTextRun: Equatable {
     let breaks: Bool
 
     init(cells: [PromptFieldTextRun.Cell], fieldID: Int?, breaks: Bool,
+      contentFor: (PromptFieldTextRun.Cell) -> ContentProjection,
       shapeFor: (AttributedString, Bool) -> TextShape) {
       self.cells = cells; self.fieldID = fieldID; self.breaks = breaks
       isGap = cells.count == 1 && cells[0].isGap
       var text = AttributedString(), ranges: [Int: NSRange] = [:], hints: [Int: AttributedString] = [:], unit = 0
       for cell in cells {
-        let content = ASLPromptGlyphContent(glyph: cell.glyph, text: cell.text)
+        let content = contentFor(cell)
         let main = content.main
         ranges[cell.id] = .init(location: unit, length: String(main.characters).utf16.count)
         unit += ranges[cell.id]!.length; text += main
@@ -96,6 +103,7 @@ struct PromptFieldTextRun: Equatable {
 
   private var boxes: [Box] = []
   var shapingResourceCount: Int { Set(boxes.map { ObjectIdentifier($0.manager) }).count }
+  private(set) var preparedContentProjectionCount = 0
   private var origins: [CGPoint] = []
   private var boxByCell: [Int: Int] = [:]
   private var followingCell: [Int: Int] = [:]
@@ -134,9 +142,27 @@ struct PromptFieldTextRun: Equatable {
         && $0.rightToLeft == rightToLeft && $0.joinsLetters == joinsLetters && $0.unbounded == unbounded ? $0 : nil
     }
     var groups: [Int] = []
-    var shapes: [String: [TextShape]] = [:]
+    // Projection depends on the complete authored attributes and structural
+    // Return ownership, never the slot ID or its position. Keep this cache local.
+    // Swift String/AttributedString equality is canonically equivalent, but
+    // TextKit ranges address exact UTF-16 storage. Never merge those encodings.
+    func textUnits(_ text: AttributedString) -> [UInt16] { Array(String(text.characters).utf16) }
+    var projections: [[UInt16]: [ContentProjection]] = [:]
+    func contentFor(_ cell: PromptFieldTextRun.Cell) -> ContentProjection {
+      let content = ASLPromptGlyphContent(glyph: cell.glyph, text: cell.text)
+      let key = textUnits(content.text)
+      if let projection = projections[key]?.first(where: {
+        $0.ownsLineBreak == content.ownsLineBreak && $0.text == content.text
+      }) { return projection }
+      let projection = ContentProjection(text: content.text, ownsLineBreak: content.ownsLineBreak,
+        main: content.main, hint: content.hint)
+      projections[key, default: []].append(projection)
+      preparedContentProjectionCount += 1
+      return projection
+    }
+    var shapes: [[UInt16]: [TextShape]] = [:]
     func shapeFor(_ text: AttributedString, _ wraps: Bool) -> TextShape {
-      let key = String(text.characters)
+      let key = textUnits(text)
       if let shape = shapes[key]?.first(where: { $0.wraps == wraps && $0.text == text }) { return shape }
       let shape = TextShape(text: text, wraps: wraps, font: font, rightToLeft: rightToLeft,
         spacing: lineSpacing, width: unbounded ? .greatestFiniteMagnitude : limit)
@@ -150,13 +176,17 @@ struct PromptFieldTextRun: Equatable {
           return reuse.boxes[index]
         }
         let box: Box
-        if let old, old.cells == cells, old.fieldID == field.fieldID, old.breaks == breaks {
+        if let old, old.cells == cells, old.fieldID == field.fieldID, old.breaks == breaks,
+          zip(old.cells, cells).allSatisfy({ textUnits($0.text) == textUnits($1.text) }) {
           box = old
-          let key = String(old.shape.text.characters)
+          let key = textUnits(old.shape.text)
           if !(shapes[key]?.contains(where: { $0 === old.shape }) ?? false) {
             shapes[key, default: []].append(old.shape)
           }
-        } else { box = Box(cells: cells, fieldID: field.fieldID, breaks: breaks, shapeFor: shapeFor) }
+        } else {
+          box = Box(cells: cells, fieldID: field.fieldID, breaks: breaks,
+            contentFor: contentFor, shapeFor: shapeFor)
+        }
         for id in box.ranges.keys { boxByCell[id] = boxes.count }
         boxes.append(box); groups.append(group)
       }

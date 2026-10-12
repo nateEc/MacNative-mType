@@ -13,6 +13,7 @@ import XCTest
     let map = try XCTUnwrap(value.compositionTextMap)
     let layout = PromptFieldTextLayout(map: map, width: 400, font: font)
     XCTAssertLessThan(layout.shapingResourceCount, 20)
+    XCTAssertLessThan(layout.preparedContentProjectionCount, 20)
     XCTAssertEqual(layout.cellFrames.count, 1249)
     XCTAssertEqual(layout.fieldFrames.count, 250)
     XCTAssertNotEqual(layout.cellFrames[0], layout.cellFrames[5])
@@ -46,6 +47,54 @@ import XCTest
       }
     }
     XCTAssertEqual(first.cellFrames, saved)
+  }
+
+  func testContentProjectionSeparatesHintAttributesFromIdenticalMainInk() {
+    var firstHint = AttributedString("x")
+    firstHint.baselineOffset = -12; firstHint.foregroundColor = .red
+    var secondHint = firstHint
+    secondHint.foregroundColor = .blue
+    let fields = [firstHint, secondHint, firstHint].enumerated().map { id, hint in
+      PromptFieldTextRun(fieldID: id, cells: [.init(id: id,
+        glyph: .init(character: "a", state: .incorrect),
+        text: AttributedString("a") + hint, isGap: false)])
+    }
+    let layout = PromptFieldTextLayout(fieldRuns: fields, width: 400, font: font)
+    XCTAssertEqual(layout.preparedContentProjectionCount, 2)
+    XCTAssertEqual(layout.shapingResourceCount, 1)
+    XCTAssertEqual(layout.fieldFrames.count, 3)
+    XCTAssertEqual(layout.cellFrames.count, 3)
+  }
+
+  func testContentProjectionDoesNotMergeExtraAndStructuralReturns() {
+    let fields = [TypingPromptCharacterState.pending, .extra, .pending].enumerated().map { id, state in
+      PromptFieldTextRun(fieldID: id, cells: [.init(id: id,
+        glyph: .init(character: "\n", state: state), text: AttributedString("\n"), isGap: false)])
+    }
+    let layout = PromptFieldTextLayout(fieldRuns: fields, width: 400, font: font)
+    XCTAssertEqual(layout.preparedContentProjectionCount, 2)
+    XCTAssertEqual(layout.shapingResourceCount, 2)
+    XCTAssertEqual(layout.cellFrames.count, 3)
+  }
+
+  func testContentProjectionPreservesCanonicallyEquivalentUTF16Representations() {
+    let texts = ["é", "e\u{301}"]
+    XCTAssertEqual(texts[0], texts[1])
+    XCTAssertNotEqual(Array(texts[0].utf16), Array(texts[1].utf16))
+    let fields = texts.enumerated().map { id, text in
+      PromptFieldTextRun(fieldID: id, cells: [.init(id: id,
+        glyph: .init(character: "é", state: .pending), text: AttributedString(text), isGap: false)])
+    }
+    let layout = PromptFieldTextLayout(fieldRuns: fields, width: 400, font: font)
+    XCTAssertEqual(layout.preparedContentProjectionCount, 2)
+    XCTAssertEqual(layout.shapingResourceCount, 2)
+    XCTAssertEqual(layout.cellFrames.count, 2)
+    let first = PromptFieldTextLayout(fieldRuns: [fields[0]], width: 400, font: font)
+    let decomposed = PromptFieldTextRun(fieldID: 0, cells: [.init(id: 0,
+      glyph: fields[0].cells[0].glyph, text: fields[1].cells[0].text, isGap: false)])
+    let reused = PromptFieldTextLayout(fieldRuns: [decomposed], width: 400, font: font, reusing: first)
+    XCTAssertEqual(reused.preparedContentProjectionCount, 1,
+      "Canonical equivalence must not reuse the old storage ranges")
   }
 
   func testIdenticalTextDoesNotShareDifferentSingleSlotWrappingRules() throws {
