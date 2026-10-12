@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 混合方向生产纸带补证：英文＋阿拉伯语候选生命周期及英文／希伯来语多行确认、删行、候选取消、完整保存回放在两种纸带中通过。固定参考环境相关 89 项零失败零跳过（work/tape-production-mixed-direction-regression.log），详见 COMPOSITION_PROJECTION_CONTRACT.md。无产品改动、零主程序启动；可访问全文不作为连接字形／双向像素排序／光标几何或真实 IME 证明，未跑新完整门禁，四项部分分类与完整 goal active 保持。
+
 2026-10-12 生产纸带确认换行完整链补证：英文／希伯来语三行分别在两种纸带中逐字确认 Return，第二次换行首行移除、换行后候选取消不恢复前缀、完成前零结果及完成后单条完整结果／回放均通过。固定参考环境相关 54 项零失败零跳过（work/tape-production-return-regression.log），详见 COMPOSITION_PROJECTION_CONTRACT.md。隔离内存模型、零主程序启动，无产品改动；未验证真实 IME／双向像素排序／光标几何／动画或 Release 性能，四项部分分类及完整 goal active 保持。
 
 2026-10-12 生产纸带换行／RTL 组合补证：三行英文与希伯来语目标已在两种纸带的隐藏实际生产宿主执行候选样式切换、取消及首字符确认后下一候选，目标原样保留、原输入与纸带 owner 保留。固定参考环境相关 53 项零失败零跳过（work/tape-production-direction-newline-regression.log），详见 COMPOSITION_PROJECTION_CONTRACT.md。无产品改动、零主程序启动；未证明真实 IME／双向像素排序／Return 确认后删行或 Release 性能，四项部分分类和完整 goal active 不变。

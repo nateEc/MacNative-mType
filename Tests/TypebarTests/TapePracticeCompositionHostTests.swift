@@ -21,7 +21,18 @@ import XCTest
     try checkProduction(prompt: "שלום\nעולם\nבוקר", language: .hebrew)
   }
 
-  private func checkProduction(prompt: String, language: TypingLanguage = .english) throws {
+  func testProductionMixedArabicTapeCompositionPreservesTargetAndCandidate() throws {
+    try checkProduction(prompt: "quiet سلام morning", language: .mixedLanguages,
+      components: [.english, .arabic], additionalCandidate: "سلا")
+  }
+
+  func testProductionMixedMultilineTapeRetirementPreservesCompleteResultAndReplay() throws {
+    try checkProduction(prompt: "quiet\nשלום\nmorning", language: .mixedLanguages,
+      components: [.english, .hebrew], additionalCandidate: "אב")
+  }
+
+  private func checkProduction(prompt: String, language: TypingLanguage = .english,
+    components: [TypingLanguage] = [], additionalCandidate: String? = nil) throws {
     for mode in [PracticeTapeMode.letter, .word] {
       let suite = "TapePracticeCompositionHostTests.\(UUID())"
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -31,7 +42,8 @@ import XCTest
       settings.reducePracticeMotion = true
       settings.saveCompletedResults = true
       let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
-        difficulty: .normal, rules: .init(), language: language)
+        difficulty: .normal, rules: .init(), language: language,
+        mixedLanguageComponents: components)
       XCTAssertTrue(settings.saveActiveTestSelection(.init(
         preset: .init(configuration: configuration, customText: prompt),
         testParameterMemory: .legacyDefaults(configuration: configuration))))
@@ -85,7 +97,9 @@ import XCTest
         if style == .below && !candidate.isEmpty { XCTAssertEqual(rows.first?.stringValue, candidate) }
         XCTAssertFalse(window.isVisible)
       }
-      for candidate in ["候", "😀e\u{301}候", String(repeating: "中文", count: 20)] {
+      let candidates = ["候", "😀e\u{301}候", String(repeating: "中文", count: 20)]
+        + (additionalCandidate.map { [$0] } ?? [])
+      for candidate in candidates {
         input.setMarkedText(candidate, selectedRange: .init(location: candidate.utf16.count, length: 0),
           replacementRange: .init(location: NSNotFound, length: 0))
         for style in [CompositionDisplayStyle.replace, .off, .below, .replace] {
