@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 本地字体导入修正：旧文件列表改为发布新文件前快照，失败恢复和成功清理不再包含新字体；目录别名先解析再读取。五项隔离真实文件事务及字体相关最终 28 项零失败零跳过，已有生产字体切换宿主一项通过、原创边界通过，详见 OFFICIAL_CONFIG_AUDIT.md 与 work/font-import-transaction-final-expanded.log。无真实字体注册或用户目录写入、零主程序启动；并发／崩溃／原生注册与恢复失败仍待验证，未跑新完整门禁／Release，旧完整门禁早于本产品改动。fontFamily 部分及完整 goal active 保持。
+
 2026-10-12 字体缺字回退补证：三种常用本机字体、四组 Latin／CJK／Arabic／Hebrew 样例的实际 TextKit 字形检查通过；未分配字符负向对照能检出非零编号的 LastResort 方框，并区分合字 null 槽位。固定参考环境相关 23 项零失败零跳过（work/font-native-fallback-glyphs-verified.log），失败与检测器修正详见 OFFICIAL_CONFIG_AUDIT.md。无产品改动、零主程序启动，不泛化为全字体／全脚本或像素正确性，fontFamily 部分及完整 goal active 不变。
 
 2026-10-12 混合方向生产纸带补证：英文＋阿拉伯语候选生命周期及英文／希伯来语多行确认、删行、候选取消、完整保存回放在两种纸带中通过。固定参考环境相关 89 项零失败零跳过（work/tape-production-mixed-direction-regression.log），详见 COMPOSITION_PROJECTION_CONTRACT.md。无产品改动、零主程序启动；可访问全文不作为连接字形／双向像素排序／光标几何或真实 IME 证明，未跑新完整门禁，四项部分分类与完整 goal active 保持。
