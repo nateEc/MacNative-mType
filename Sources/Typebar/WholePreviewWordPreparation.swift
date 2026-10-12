@@ -45,13 +45,16 @@ enum WholePreviewWordPreparation {
       nextRandomContentUnit: nextRandomContentUnit, nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex,
       didPrepare: didPrepare)
     try Task.checkCancellation()
-    return TypingSession(configuration: result.configuration,
-      prompt: result.chunks.map(\.transformed).joined(),
-      noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(
-        for: result.chunks.flatMap(\.noSpaceWordLengths)),
-      noSpaceTargetWords: result.chunks.flatMap(\.noSpaceTargetWords),
+    let assembled = try await WholePreviewChunkAssembly.assemble(result.chunks)
+    try Task.checkCancellation()
+    let session = TypingSession(configuration: result.configuration,
+      prompt: assembled.prompt,
+      noSpaceWordEndIndices: assembled.endIndices,
+      noSpaceTargetWords: assembled.targetWords,
       generationNotice: result.notice,
       weakSpotScores: weakSpotScores, wordDecorationState: result.decorationState)
+    try Task.checkCancellation()
+    return session
   }
 
   @MainActor private static func prepareResult(
@@ -134,5 +137,35 @@ enum WholePreviewWordPreparation {
     }
     try Task.checkCancellation()
     return chunks
+  }
+}
+
+/// Keeps the final merge cooperative too; the complete result still occupies
+/// memory, and TypingSession construction remains a separate synchronous stage.
+enum WholePreviewChunkAssembly {
+  struct Result {
+    let prompt: String
+    let endIndices: [Int]
+    let targetWords: [String]
+  }
+
+  @MainActor static func assemble(_ chunks: [GeneratedWordChunk],
+    didAssemble: (Int) -> Void = { _ in }) async throws -> Result {
+    try Task.checkCancellation()
+    var prompt = "", endIndices: [Int] = [], targetWords: [String] = []
+    var end = 0
+    for (index, chunk) in chunks.enumerated() {
+      try Task.checkCancellation()
+      prompt += chunk.transformed
+      for length in chunk.noSpaceWordLengths {
+        end += length
+        endIndices.append(end)
+      }
+      targetWords.append(contentsOf: chunk.noSpaceTargetWords)
+      didAssemble(index + 1)
+      await Task.yield()
+    }
+    try Task.checkCancellation()
+    return .init(prompt: prompt, endIndices: endIndices, targetWords: targetWords)
   }
 }
