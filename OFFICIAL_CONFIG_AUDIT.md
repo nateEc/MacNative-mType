@@ -1,5 +1,9 @@
 # 官方配置兼容性审计
 
+2026-10-12 排版共享后的生产组合宿主回归补证：冻结产品提交 8a93f1d92715908d45c2171b594fb10f3fdf2423，单一测试进程运行到正常退出 0，期间不编辑源码、不重启测试、不打开主程序窗口。PracticeCompositionHostTests 42 项零失败（939.643 秒，墙钟 939.648），同一过滤器还匹配 SpecialPracticeCompositionHostTests 的 ASL／Choo 两项零失败（8.606 秒，墙钟 8.607）；合计 44 项零失败、无跳过（948.250 秒，墙钟 948.257；work/field-shaping-share-production-host.log）。覆盖多种自动尺寸宿主、混合方向及复杂文字候选更新／取消、首键输入 owner 保留、候选期间窗口／字体尺寸／全行显示变化；这是隐藏 NSHostingView 与直接 NSTextInputClient 调用证据，不是实体输入法、可见窗口像素或 Release 设备性能验收。
+
+日志中的部分首键后 deliveredLayouts 仍达数百次，同时 geometry revision 可保持不变；测试没有布局次数上限，不因断言通过宣称布局抖动消失。后续需针对实际布局／失效传播采样定位，不能仅凭计数推断具体循环来源。行为优先技能用于既有生产行为直接补证，未人为制造红测；本轮产品与测试代码未变，只更新审计记录。结束后无 Typebar 主程序或 xctest 进程；未新增完整门禁／Release，四项部分配置及完整 goal active 保持。
+
 2026-10-12 原生字段排版资源共享：PromptFieldTextLayout 在单一兼容布局内按完整 AttributedString 与单槽／多槽换行条件共享 TextShape（NSLayoutManager／NSTextContainer／NSTextStorage）；每个 Box 仍独立保存字符身份、范围、提示、词归属与换行，位置、别名及光标属于当前快照。跨快照仍要求宽度、字体、行距、方向、连写与纸带条件全部一致。未合并字符，不引入全局缓存，不改目标文本或截断上限。新增重复槽位资源数量、样式／kern 隔离与快照指标、相同文本不同换行条件三项守卫。先行测试实际复现 1,249 套排版资源；另有错误的空格光标假设失败，现按既有换行空格指向下一行语义修正断言，不改变产品规则（work/field-shaping-share-red{,-final}.log）。
 
 首轮排版 70 项零失败（5.352 秒，墙钟 5.366；work/field-shaping-share-green.log）；扩大回归 133 项零失败（79.361 秒，墙钟 79.377；work/field-shaping-share-regression.log），真实 100,001 词宿主完整发布 58.583 秒，前轮相同案例 119.916 秒。运行途中采样于 12:16:55 记录截至当时 physical footprint 峰值约 1.3 GB（work/field-shaping-share-large-stack.txt），低于前轮晚期记录约 5.1 GB；采样早于本轮大宿主结束，不作为进程最终峰值或 Release 设备基准。目标、槽位、几何仍全量持有，准备后的原生构造仍同步，不宣称总体内存有界或交互性能达标。
