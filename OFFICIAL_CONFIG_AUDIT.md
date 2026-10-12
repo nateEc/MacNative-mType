@@ -1,5 +1,9 @@
 # 官方配置兼容性审计
 
+2026-10-12 全行准备请求生命周期基础：新增 MainActor WholePreviewPreparationTask，单一请求持有 task／UUID，替换与取消清除身份并取消旧任务；只有当前任务可结束加载状态，发布前检查取消，回调前清理状态以支持回调重入。新增 6 项确定性 continuation 闸门／实际生成测试，覆盖不合作任务取消、旧成功／旧错误不覆盖或清除新请求、当前错误重入、直接 Task 取消终态清理、控制器释放及真实巨额目标首批取消不发布。先行缺 API 编译失败（work/whole-preview-task-red.log）不算行为红测；测试结果转移经本机 Swift 6.2.4 与 SDK _Concurrency.swiftinterface 的 sending 签名核对，修正闸门参数及新建会话返回的所有权声明，未加入 unchecked Sendable，相关编译失败保留在 task-green／task-cancel-red 日志。随后直接 Task 取消有效红测 5 项中 1 失败（1.300 秒，墙钟 1.302；work/whole-preview-task-cancel-red-final.log），修正清理顺序。
+
+首次八组运行 work/whole-preview-task-final.log 在缓冲日志未完整输出时持续休眠，采样 work/whole-preview-task-stack.txt 显示 XCTest 等待、无活跃生成线程，具体悬挂测试及根因未证实；保留证据后只对测试 PID 63855 发送 TERM，该次退出 1，不算通过。源码未变，PTY 独立 6 项通过（0.026 秒，墙钟 0.029；work/whole-preview-task-owner-diagnostic.log）；PTY 八组 109 项零失败、无跳过（10.805 秒，墙钟 10.819；work/whole-preview-task-regression-pty.log）。一次成功不证明停滞根除。行为优先／会话内决策复核／根因及源码核对限定此入口；控制器尚未接入 UI，不能冒称页面导航、显示设置、输入阻塞或巨额内存已验收，四项部分分类及完整 goal active 保持；未启动主程序、未新增完整门禁／Release。
+
 2026-10-12 全行异步入口的新配置预处理修正：决策复核界面重置／输入／加载流程时发现普通工厂会执行 PolyglotGenerationPreparation 并为新 Dockerfile 设置字面缩进标记，异步准备尚未执行，不能直接替换生产入口。新增 Dockerfile、未选中代码主语言、RTL 主语言与所选 LTR 组合冲突三例，对照实际工厂的完整配置、提示和生成目标，并检查重复配置／提示。先行 1 项测试复现 8 处断言失败（0.930 秒，墙钟 0.931；work/whole-preview-config-red.log）；现异步生成前执行相同预处理，会话保存处理后配置及方向冲突提示，不重新处理历史重复。七组 103 项零失败、无跳过（10.898 秒，墙钟 10.910；work/whole-preview-config-green.log）。行为优先及会话内决策复核限定此改动，未启动主程序、未接入生产界面、未新增完整门禁／Release；旧请求发布身份、巨额目标内存／显示仍待解决，四项部分分类和完整 goal active 保持。
 
 2026-10-12 全行准备生产参数衔接：prepare／prepareSession 接收弱点分数、已有装饰状态，以及大小写、内容、词池洗牌随机入口，传递到实际生成器；建立会话时保存弱点分数及最终装饰状态。新增 201 词西班牙语弱点／随机大小写／下划线及数字标点与单次完整生成精确一致验证，重复保留分数与状态；另以法语确认不消费已有西班牙语关闭标点。先行测试因参数不存在编译失败（work/whole-preview-inputs-red.log），不是行为红测；五组 71 项零失败、无跳过（10.921 秒，墙钟 10.929；work/whole-preview-inputs-green.log）。修正上一节“入口尚未提供弱点分数、已有装饰状态”状态，不扩张为界面验收或全部生成配置证明；洗牌入口虽已传递，本轮未新增 Polyglot 专项证据。未启动主程序、未接入生产界面或新完整门禁／Release，完整目标内存、取消发布身份及完整配置预处理仍待解决，四项部分分类及 goal active 保持。
