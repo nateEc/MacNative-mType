@@ -6,6 +6,18 @@ import XCTest
 
 @MainActor final class TapePracticeCompositionHostTests: XCTestCase {
   func testProductionTapeCompositionUpdatesCancelsAndCommitsWithoutReplacingInput() throws {
+    try checkProduction(prompt: "quiet harbor morning")
+  }
+
+  func testProductionMultilineTapeCompositionPreservesReturnsAcrossDisplayChanges() throws {
+    try checkProduction(prompt: "quiet\nharbor\nmorning")
+  }
+
+  func testProductionRTLTapeCompositionPreservesTargetsAcrossDisplayChanges() throws {
+    try checkProduction(prompt: "שלום עולם בוקר", language: .hebrew)
+  }
+
+  private func checkProduction(prompt: String, language: TypingLanguage = .english) throws {
     for mode in [PracticeTapeMode.letter, .word] {
       let suite = "TapePracticeCompositionHostTests.\(UUID())"
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -13,9 +25,8 @@ import XCTest
       let settings = AppSettings(defaults: defaults)
       settings.practiceTapeMode = mode
       settings.reducePracticeMotion = true
-      let prompt = "quiet harbor morning"
       let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
-        difficulty: .normal, rules: .init(), language: .english)
+        difficulty: .normal, rules: .init(), language: language)
       XCTAssertTrue(settings.saveActiveTestSelection(.init(
         preset: .init(configuration: configuration, customText: prompt),
         testParameterMemory: .legacyDefaults(configuration: configuration))))
@@ -49,12 +60,15 @@ import XCTest
       flush()
       let input = try XCTUnwrap(descendants(host, TypingInputView.self).first)
       let owner = try XCTUnwrap(descendants(host, TapePromptNativeView.self).first)
-      var expected = TypingSession(configuration: configuration, prompt: prompt)
+      var expected = TestSessionFactory.make(configuration: configuration, customText: prompt)
+      XCTAssertEqual(expected.prompt, prompt, "The fixture must actually reach production unchanged")
       func check(_ candidate: String, _ style: CompositionDisplayStyle) throws {
         let presentation = try XCTUnwrap(PromptCompositionPresentation(session: expected,
           composition: candidate, style: style))
         let rendering = presentation.render { _, glyph, cell in
-          AttributedString(cell?.text ?? String(glyph.character))
+          AttributedString(PromptControlCharacterPresentation.plan(for: glyph,
+            style: settings.typoIndicatorStyle, isExtra: glyph.state == .extra,
+            compositionReplacement: cell?.text).text)
         }
         XCTAssertEqual(owner.accessibilityLabel(), String(rendering.text.characters))
         XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
@@ -85,8 +99,9 @@ import XCTest
       }
       input.setMarkedText("候", selectedRange: .init(location: 1, length: 0),
         replacementRange: .init(location: NSNotFound, length: 0))
-      input.insertText("q", replacementRange: .init(location: NSNotFound, length: 0))
-      expected.insertBatch("q", at: Date())
+      let accepted = String(try XCTUnwrap(prompt.first))
+      input.insertText(accepted, replacementRange: .init(location: NSNotFound, length: 0))
+      expected.insertBatch(accepted, at: Date())
       flush()
       XCTAssertFalse(input.hasMarkedText())
       // This input client owns only the marked buffer, not the committed prompt.

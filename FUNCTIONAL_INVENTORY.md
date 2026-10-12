@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 生产纸带换行／RTL 组合补证：三行英文与希伯来语目标已在两种纸带的隐藏实际生产宿主执行候选样式切换、取消及首字符确认后下一候选，目标原样保留、原输入与纸带 owner 保留。固定参考环境相关 53 项零失败零跳过（work/tape-production-direction-newline-regression.log），详见 COMPOSITION_PROJECTION_CONTRACT.md。无产品改动、零主程序启动；未证明真实 IME／双向像素排序／Return 确认后删行或 Release 性能，四项部分分类和完整 goal active 不变。
+
 2026-10-12 普通纸带生产组合输入补证：新增隐藏生产宿主，letter／word 两模式的候选更新、未确认期间显示设置切换、Unicode 范围、取消、确认后下一候选及原输入／纸带 owner 保留通过。固定参考环境下 34 项零失败零跳过（work/tape-production-composition-regression-final.log）；首次测试编译及错误范围预期的修正详见 COMPOSITION_PROJECTION_CONTRACT.md，不记为产品缺陷修复。无产品变更、零主程序启动，未重跑完整门禁或物理 IME／像素／RTL 换行生产候选验收，四项部分分类及完整 goal active 不变。
 
 2026-10-12 当前完整门禁通过：冻结 4a225998a732fb1fd76853e455be516fe50c2dcf，客户端 4,470 项、服务端 501 项零失败，十万词耐力与 42 项组合宿主实际执行通过；Release 475.83 秒完成，无启动的应用包验签、元数据、许可证与原创性通过。77 份日志自动保留，冻结哈希一致、临时目录清理及无残留进程均已核对，详见 OFFICIAL_CONFIG_AUDIT.md。1,151 场景仅清单审计；主题精确映射、四项部分配置、实体 IME／可见窗口、超大目标资源与设备性能仍未完成，不以整套自动测试替代全功能等价。完整 goal active。

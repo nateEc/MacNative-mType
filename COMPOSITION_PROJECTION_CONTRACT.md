@@ -1,5 +1,11 @@
 # 组合显示投影与完整固定源码证据
 
+## TST-02：生产纸带的换行及 RTL 目标（2026-10-12）
+
+扩展 `TapePracticeCompositionHostTests` 为三个独立测试入口，共用实际生产挂载流程。新增三行英文目标及希伯来语 RTL 目标，两者分别运行 letter／word、三种显示样式的未确认切换、短／Unicode／四十字候选、取消和确认首字符后下一候选。期望会话使用真实自定义文本工厂，并明确断言目标原样保留，避免预处理移除换行导致空覆盖；控制字符全文通过既有显示策略计算，生产纸带可访问全文逐步比较。实际输入／纸带 owner 始终保留，所有窗口不可见，模型与设置隔离。
+
+本轮为既有行为补证，不修改产品或制造红测。`work/tape-production-direction-newline.log` 三项零失败零跳过（18.096s，墙钟 18.098）；固定参考环境下扩展普通纸带、组合推进、组合投影与呈现，`tape-production-direction-newline-regression.log` 53 项零失败零跳过（24.478s，墙钟 24.485）。未运行新完整门禁。零主程序启动，不证明真实 IME、双向文字像素排序／光标几何、确认 Return 后删行、混合方向组合或 Release 性能；compositionDisplay／tapeMode 仍部分，完整 goal active。
+
 ## TST-02：普通纸带生产宿主的未确认候选生命周期（2026-10-12）
 
 新增 `TapePracticeCompositionHostTests`，挂载实际 `TypebarApp.practiceContent`，不以手工组件桥接代替生产入口。letter／word 两种纸带分别通过实际文本输入控件更新短候选、emoji／组合字符及四十字候选；同一未确认候选跨 replace→off→below→replace 设置更新，检查完整纸带可访问文本、候选 UTF-16 范围、原输入／纸带 owner 保留及 below 原生候选行。每次取消后检查恢复，随后确认 q，再投影下一双字候选，与独立推进一次的会话相符。窗口始终不显示，使用隔离 UserDefaults 和内存模型。
