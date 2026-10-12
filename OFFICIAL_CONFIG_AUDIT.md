@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+2026-10-12 当前 Release 单实例可见窗口补证：冻结 758deb228c0ea3932b583e2c52593dc8d53e830d，Release 编译及 QA 打包正常退出 0（447.99 秒；work/visible-perf-758deb2-build.log）。独立包 work/Typebar-Perf-758deb2.app，bundle ID app.typebar.qa.perf758deb2，TypebarQAInMemoryStore=true；移除仅此生成 QA 包的 CFBundleURLTypes 后重新签名、严格校验通过，避免注册正式回调，不修改项目 plist。QA 内存令牌边界沿用已验证隔离合同，不登录账户。签名会改变打包二进制字节，不能将包内 SHA256 与未重新签名构建目录的差异称为源码变化。
+
+通过原生 UI 工具仅启动一个 PID 15348，使用自有固定文本 quiet harbor morning quiet harbor morning。逐段键入后截图与 AX 确认正确字形、活动词光标及换行；完整六词完成显示 100% 准确率、0 错误、6/6 正确、41 个 UTF-16 输入单位，并呈现成绩与精确回放目标。自动化分批键入、操作等待及短词 WPM 不用于真人成绩或延迟基准。随后在同一实例重复本轮并键入两词，最后按 ⌘Q 正常退出；进程检查与 UI 应用清单均确认 QA／正式 Typebar 不运行，trace 元数据亦记录 exit(0)。GUI 截图只在工具会话直接查看，不声称已保存为仓库图片；内存成绩不会写入正式成绩库。产品／测试源码全程不变。
+
+针对唯一 PID 的 Animation Hitches 20 秒录制正常保存为 work/visible-perf-758deb2-short.trace（约 785 MB，仅本地，不推送原始环境信息）。初始 xctrace 等待的 sample 栈停在 CoreSimulator 设备发现／磁盘服务同步请求（work/visible-perf-trace-wait-stack.txt），后自行进入录制，未重启工具或更改系统服务。录制覆盖结果页返回与重复输入，不能冒称覆盖首次启动输入。离线导出 toc／metrics／hitches／samples／profile XML；potential-hangs 标记 50 段，含 111.36 ms Brief Unresponsiveness、48 段 Potential Interaction Delay，以及 19.358762 秒处 1.934274479 秒 Hang。hitches 表 1,244 行、中位 8.333291 ms、最大 33.33325 ms，不将表行数直接定义为用户卡顿次数或报告未经推导的 FPS。
+
+尾段 Hang 区间的主线程运行采样仅一条，经过 CoreText／NSLayoutManager、PromptFieldTextLayout.TextShape、sizeThatFits 与 NSHostingView 尺寸约束；采样过少，不能将 1.93 秒全归因于该栈或排除自动化／录制开销。性能未通过；后续需更窄的时段标记、轻量采样及可重复对照，保留原始 trace，不盲改动画。根因调试／行为优先技能用于真实可见窗口与证据边界；固定参考源码及包资源原创性检查通过。未新增完整门禁或所有设备／IME／模式验收，四项部分配置及完整 goal active 保持。
+
 2026-10-12 高频隐藏宿主布局的边界定位：同一短提示首键复现开启动画时 0.1 秒内 deliveredLayouts 达 333...371，geometry delivery revision 为 0；捕获宿主失效堆栈经过 SwiftUI NSHostingView.requestUpdate 与 Transaction.addAnimationListener（work/field-repeat-layout-stack.log）。同输入仅启用已有减少动态效果设置后，deliveredLayouts 为 0...1（work/field-repeat-layout-reduced.log）。此对照不能单独认定字段排版有循环，也不授权以默认关闭动画替代性能修复。
 
 新增独立 VisualFocusAnimationHostTests：隐藏窗口仅含两行文字及 0.125 秒透明度动画，没有 TypebarApp、打字引擎、排版对象或光标计时器。独立运行动画开启时 activeLayouts=2101、减少动态效果为 1，动画结束后均为 0（work/field-repeat-layout-isolated-final.log）；只断言动画结束后停止布局、宿主尺寸不变、窗口不可见，不将运行中计数冻结成框架实现契约。它反证“高计数必然由产品字段循环造成”的假设，不能证明可见窗口也有同样调度或产品性能已达标；后续需可见窗口实际帧率／输入延迟证据。产品代码及默认动画未变。
