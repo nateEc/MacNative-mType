@@ -3,6 +3,44 @@ import XCTest
 @testable import Typebar
 
 final class EncyclopediaIntroductionTransportTests: XCTestCase {
+  func testPoetryClassifiesDecodedBodyRatherThanHTTPStatus() async throws {
+    try await withSession { session in
+      for status in [200, 201, 404, 503] {
+        IntroductionProtocol.fixture.set([(status,
+          #"[{"title":"Owned","author":"Fixture","lines":["north south"]}]"#)])
+        let content = await LivePracticeContentService.fetch(source: .poetry, language: .english, session: session)
+        XCTAssertEqual(content?.text, "north south", "status=\(status)")
+        XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 1)
+      }
+      IntroductionProtocol.fixture.set([(503,
+        #"[{"title":"Owned","author":"Fixture","lines":["— _"]}]"#)])
+      let empty = await LivePracticeContentService.fetch(source: .poetry, language: .english, session: session)
+      XCTAssertEqual(empty?.text, "", "Decoded empty generation is not transport failure")
+      for body in ["[]", "{}", "invalid"] {
+        IntroductionProtocol.fixture.set([(503, body)])
+        let invalid = await LivePracticeContentService.fetch(source: .poetry, language: .english, session: session)
+        XCTAssertNil(invalid)
+      }
+    }
+  }
+
+  func testEncyclopediaRequiresExactly200AtBothRequestBoundaries() async throws {
+    try await withSession { session in
+      let identity = #"{"pageid":724,"title":"Owned"}"#
+      let introduction = #"{"query":{"pages":{"724":{"extract":"Owned harbor"}}}}"#
+      for status in [201, 206] {
+        IntroductionProtocol.fixture.set([(status, identity), (200, introduction)])
+        let first = await LivePracticeContentService.fetch(source: .encyclopedia, language: .english, session: session)
+        XCTAssertNil(first)
+        XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 1)
+        IntroductionProtocol.fixture.set([(200, identity), (status, introduction)])
+        let second = await LivePracticeContentService.fetch(source: .encyclopedia, language: .english, session: session)
+        XCTAssertNil(second)
+        XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 2)
+      }
+    }
+  }
+
   func testIntroductionPreservesSourceMetadataWithoutTrimmingOrFallback() async throws {
     try await withSession { session in
       for (title, author) in [("  Harbor — \n", " Writer \t"), ("", ""), (" \t", " \n")] {

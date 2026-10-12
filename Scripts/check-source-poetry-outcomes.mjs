@@ -16,6 +16,8 @@ const source = fs.readFileSync(path.join(root, 'frontend/src/ts/test/poetry.ts')
 const cases = [
   {name: 'valid section', body: [{title: 'Owned', author: 'Fixture', lines: ['north south']}], words: ['north', 'south']},
   {name: 'decoded empty section', body: [{title: 'Owned', author: 'Fixture', lines: ['— _']}], words: []},
+  {name: 'valid JSON on HTTP 404', status: 404, body: [{title: 'Owned', author: 'Fixture', lines: ['north south']}], words: ['north', 'south']},
+  {name: 'empty section on HTTP 503', status: 503, body: [{title: 'Owned', author: 'Fixture', lines: ['— _']}], words: []},
   {name: 'empty response array', body: [], failure: true},
   {name: 'missing lines', body: [{title: 'Owned', author: 'Fixture'}], failure: true},
   {name: 'JSON rejection', jsonFailure: true, failure: true},
@@ -29,7 +31,7 @@ for (const fixture of cases) {
       calls++;
       assert.equal(url, 'https://poetrydb.org/random');
       if (fixture.transportFailure) throw new Error('Owned transport failure');
-      return {json: async () => {
+      return {status: fixture.status ?? 200, ok: (fixture.status ?? 200) < 400, json: async () => {
         if (fixture.jsonFailure) throw new Error('Owned decoding failure');
         return fixture.body;
       }};
@@ -53,4 +55,4 @@ for (const fixture of cases) {
   else assert.deepEqual(Array.from(outcome.words), fixture.words);
   console.log(`PASS ${fixture.name}`);
 }
-console.log('Pinned poetry provider: 6 cases passed; undefined is not a provider outcome in these cases.');
+console.log('Pinned poetry provider: 8 cases passed; HTTP status does not reject decoded sections; undefined is not a provider outcome in these cases.');

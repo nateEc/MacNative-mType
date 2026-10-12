@@ -211,7 +211,9 @@ enum LivePracticeContentService {
 
   private static func fetchPoetry(session: URLSession) async -> LivePracticeContent? {
     guard let url = URL(string: "https://poetrydb.org/random") else { return nil }
-    guard let data = await data(from: url, session: session) else { return nil }
+    // Poetry classifies the decoded document, even on a non-success HTTP
+    // response. Encyclopedia instead requires exactly 200 at both boundaries.
+    guard let data = await data(from: url, session: session, requiresOKStatus: false) else { return nil }
     return poetry(from: data)
   }
 
@@ -312,13 +314,15 @@ enum LivePracticeContentService {
       title: identity.title, byline: identity.author, tokens: words, separator: " ")
   }
 
-  private static func data(from url: URL, session: URLSession) async -> Data? {
+  private static func data(
+    from url: URL, session: URLSession, requiresOKStatus: Bool = true
+  ) async -> Data? {
     var request = URLRequest(url: url)
     request.timeoutInterval = 8
     request.setValue("Typebar/0.1 (native macOS typing practice)", forHTTPHeaderField: "User-Agent")
     guard let (data, response) = try? await session.data(for: request),
       let http = response as? HTTPURLResponse,
-      (200..<300).contains(http.statusCode)
+      !requiresOKStatus || http.statusCode == 200
     else { return nil }
     return data
   }
