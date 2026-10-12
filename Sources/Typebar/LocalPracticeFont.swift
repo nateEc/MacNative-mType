@@ -83,10 +83,7 @@ enum TypebarLocalPracticeFontStore {
   }
 
   private static func registerAndRead(url: URL) -> LocalPracticeFontInfo? {
-    LocalPracticeFontRegistration.read(url: url, register: { url in
-      CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
-    }, isRegistered: { CTFontManagerGetScopeForURL($0 as CFURL) == .process },
-      readInfo: fontInfo(at:), isAvailable: { NSFont(name: $0, size: 1) != nil })
+    LocalPracticeFontRegistration.read(url: url)
   }
 
   private static func unregister(_ url: URL) {
@@ -95,14 +92,7 @@ enum TypebarLocalPracticeFontStore {
   }
 
   private static func fontInfo(at url: URL) -> LocalPracticeFontInfo? {
-    guard
-      let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
-      let descriptor = descriptors.first,
-      let postScriptName = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String
-    else { return nil }
-    let displayName =
-      (CTFontDescriptorCopyAttribute(descriptor, kCTFontDisplayNameAttribute) as? String) ?? postScriptName
-    return .init(postScriptName: postScriptName, displayName: displayName)
+    LocalPracticeFontRegistration.fontInfo(at: url)
   }
 
   private static var directoryURL: URL {
@@ -112,6 +102,21 @@ enum TypebarLocalPracticeFontStore {
 }
 
 enum LocalPracticeFontRegistration {
+  static func read(url: URL) -> LocalPracticeFontInfo? {
+    read(url: url, register: { CTFontManagerRegisterFontsForURL($0 as CFURL, .process, nil) },
+      isRegistered: { CTFontManagerGetScopeForURL($0 as CFURL) == .process },
+      readInfo: fontInfo(at:), isAvailable: { NSFont(name: $0, size: 1) != nil })
+  }
+
+  static func fontInfo(at url: URL) -> LocalPracticeFontInfo? {
+    guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
+      let descriptor = descriptors.first,
+      let name = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String
+    else { return nil }
+    return .init(postScriptName: name,
+      displayName: (CTFontDescriptorCopyAttribute(descriptor, kCTFontDisplayNameAttribute) as? String) ?? name)
+  }
+
   static func read(url: URL, register: (URL) -> Bool, isRegistered: (URL) -> Bool,
     readInfo: (URL) -> LocalPracticeFontInfo?, isAvailable: (String) -> Bool) -> LocalPracticeFontInfo? {
     // CTFontManager.h defines success by the registration result and exposes

@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 自有 TTF 的真实 Core Text 注册与替换验收（2026-10-12）
+
+新增可复现、自写矩形轮廓的两字形测试字体，不读取第三方或 Monkeytype 字体。`Scripts/describe-owned-test-font.py` 使用已安装 fontTools 4.51.0 从零生成表模板，普通 Swift 测试不调用 Python、不增加运行依赖；`OwnedTestFontFixture` 每次生成唯一名称的 name 表及整个 SFNT，按 [OpenType 校验规则](https://learn.microsoft.com/en-us/typography/opentype/spec/otff) 重算校验，名称采用规范的 [UTF-16BE 编码](https://learn.microsoft.com/en-us/typography/opentype/otspec182/name)。这些模板和矩形仅为原创验收夹具，不是分发给用户的字体或网页资产。
+
+将实际描述符读取和原生注册封装移入可直接调用的同一生产边界，原 store 委托，不改变准入行为。两项测试通过真实 Core Text 回调和隔离临时目录执行：TTF 保存、进程注册范围、同文件重复读取、实际加载文件 URL、x 的非缺字字形、成功注销；以及无效导入不改变原文件／注册／启用次数，真实第二字体替换后旧文件消失且旧 URL 不再注册、新文件唯一且可重复读取。名字每次 UUID 唯一；注册仅进程范围，结束注销并清理自有临时文件，不安装系统字体、不写用户字体目录或启用设置。
+
+本轮为补充此前缺失的真实接口证据，不制造产品红测。`work/font-registration-native-owned.log` 首项实际执行通过（0.015s）；固定参考环境 `font-registration-native-owned-regression.log` 34 项零失败零跳过（1.847s，墙钟 1.852）。已有生产字体／字号切换宿主在 reduce motion 环境 `font-registration-native-owned-production-host.log` 一项通过（21.280s，墙钟 21.281）。新脚本／夹具加入暂存范围后，`font-registration-native-owned-staged-originality.log` 完整固定参考原创边界通过，非只检查旧已跟踪文件。
+
+仅证明本机 macOS 26.1 的自有 TTF 链路；OTF／WOFF／WOFF2、同名冲突真实失败、部分注册清理、实际用户导入 GUI、最低系统、并发／崩溃仍未证明。零主程序启动，未跑新完整门禁／Release。fontFamily 部分及完整 goal active 不变。
+
 ## 本地字体注册准入：不以同名可用掩盖注册失败（2026-10-12）
 
 修正 `registerAndRead` 忽略原生注册结果的路径。新增同一生产准入函数，只有注册返回成功，或该文件 URL 已在进程范围注册，才继续描述符与可用性检查；单纯 NSFont 同名可用不再放行。读取已注册本地字体仍幂等，不改变目录、文件格式或设置键。注册调用不请求未使用的错误对象；注销路径未改。
