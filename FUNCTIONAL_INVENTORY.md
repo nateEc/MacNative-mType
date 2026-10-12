@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-12 自有 WOFF 真实注册补证：从自写矩形 SFNT 生成未压缩／实际 zlib 压缩两种 WOFF 1.0，在生产边界验证注册、重复读取、文件来源、字形和注销。相关 36 项零失败零跳过，完整新夹具原创边界通过（work/font-registration-native-woff-regression.log），详见 OFFICIAL_CONFIG_AUDIT.md。无产品改动、零主程序启动、不安装系统字体；OTF／WOFF2、其他内容与畸形数据／真实冲突／最低系统等仍待验证，未跑新完整门禁，fontFamily 部分及完整 goal active 保持。
+
 2026-10-12 自有 TTF 实际注册补证：自写矩形字形、唯一名称和校验的字体通过真实生产 Core Text 边界验证保存、重复读取、加载来源、字形、注销，以及无效导入保留和第二字体替换。相关 34 项、生产字体切换宿主一项均零失败零跳过，包含新夹具的原创边界通过（work/font-registration-native-owned-regression.log），详见 OFFICIAL_CONFIG_AUDIT.md。只注册进程范围且结束注销、零主程序启动；OTF／WOFF／WOFF2、真实冲突及 GUI／最低系统／并发恢复仍待验收，未跑新完整门禁，fontFamily 部分与完整 goal active 保持。
 
 2026-10-12 本地字体注册准入修正：不再因系统同名字体可用而接受该文件注册失败；仅原生注册成功或同一 URL 已在进程范围注册可继续解析，保留同文件重复读取。三项一处红测复现后修正，含文件替换恢复联测的相关 32 项零失败零跳过，生产字体切换宿主一项与原创边界通过（work/font-registration-admission-green.log），SDK 契约及边界见 OFFICIAL_CONFIG_AUDIT.md。原生注册为可控回调、零主程序启动；真实注册／部分失败／并发崩溃与新完整门禁尚未完成，fontFamily 部分及完整 goal active 不变。

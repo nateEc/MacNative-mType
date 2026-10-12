@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+## 自有 WOFF 1.0：未压缩与压缩表真实注册（2026-10-12）
+
+扩展自有矩形字体夹具，按 [W3C WOFF 1.0](https://www.w3.org/TR/WOFF/) 将原 SFNT 表重封装为 WOFF，保留表校验和，动态生成唯一名称。分别构造 compLength 等于 origLength 的未压缩表，以及使用本机 SDK zlib compressBound／compress2 的压缩表；只在确实更小时保存压缩数据。压缩场景明确断言至少一张表 compLength 小于 origLength，防止名义压缩但实际未走解码路径。zlib 是系统模块，无新包依赖；生成不读取外部字体或网页资产。
+
+通过同一实际生产导入／注册边界，两个 WOFF 场景均检查成功启用一次、进程注册范围、重复读取、加载文件 URL 精确来源、x 的实际非缺字字形、成功注销与 scope none。保存位于隔离临时目录，结束注销并清理，不触碰系统字体安装或用户配置。`work/font-registration-native-woff.log` 未压缩一项通过（0.015s）；`font-registration-native-woff-compressed.log` 四项真实原生字体测试零失败零跳过（0.031s，墙钟 0.033）。最终固定参考环境 `font-registration-native-woff-regression.log` 36 项零失败零跳过（2.005s，墙钟 2.010），暂存完整新夹具后 `font-registration-native-woff-originality.log` 固定参考原创边界通过。
+
+本轮补充现有行为证据，无产品改动、不制造红测，零主程序启动。仅证明本机 macOS 26.1 这两个 WOFF 1.0 编码及已有 TTF；OTF／WOFF2、其他字体内容、元数据／私有区／畸形压缩数据、真实冲突、最低系统、实际 GUI／并发崩溃仍待验证。未跑新完整门禁／Release，fontFamily 部分与完整 goal active 不变。
+
 ## 自有 TTF 的真实 Core Text 注册与替换验收（2026-10-12）
 
 新增可复现、自写矩形轮廓的两字形测试字体，不读取第三方或 Monkeytype 字体。`Scripts/describe-owned-test-font.py` 使用已安装 fontTools 4.51.0 从零生成表模板，普通 Swift 测试不调用 Python、不增加运行依赖；`OwnedTestFontFixture` 每次生成唯一名称的 name 表及整个 SFNT，按 [OpenType 校验规则](https://learn.microsoft.com/en-us/typography/opentype/spec/otff) 重算校验，名称采用规范的 [UTF-16BE 编码](https://learn.microsoft.com/en-us/typography/opentype/otspec182/name)。这些模板和矩形仅为原创验收夹具，不是分发给用户的字体或网页资产。

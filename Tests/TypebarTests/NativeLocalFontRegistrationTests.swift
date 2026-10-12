@@ -51,6 +51,29 @@ import XCTest
   }
 
   func testOwnedFontRegistersIdempotentlyAndUsesItsOwnFileWithoutUserStore() throws {
+    try checkOwnedFont(format: "ttf", make: OwnedTestFontFixture.make(postScriptName:))
+  }
+
+  func testOwnedWOFFRegistersIdempotentlyAndUsesItsOwnFileWithoutUserStore() throws {
+    try checkOwnedFont(format: "woff", make: { OwnedTestFontFixture.makeWOFF(postScriptName: $0) })
+  }
+
+  func testOwnedCompressedWOFFRegistersIdempotentlyAndUsesItsOwnFileWithoutUserStore() throws {
+    try checkOwnedFont(format: "woff", make: { name in
+      let data = OwnedTestFontFixture.makeWOFF(postScriptName: name, compressed: true)
+      let bytes = Array(data)
+      func integer(at offset: Int) -> Int {
+        bytes[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
+      }
+      let count = Int(bytes[12]) << 8 | Int(bytes[13])
+      XCTAssertTrue((0..<count).contains {
+        integer(at: 44 + $0 * 20 + 8) < integer(at: 44 + $0 * 20 + 12)
+      }, "The compressed fixture must contain an actually compressed table")
+      return data
+    })
+  }
+
+  private func checkOwnedFont(format: String, make: (String) -> Data) throws {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("typebar-native-font-\(UUID())", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -62,8 +85,8 @@ import XCTest
     let name = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
     XCTAssertNil(NSFont(name: name, size: 28), "The original fixture must not collide with an installed font")
     var enables = 0
-    let info = try LocalPracticeFontImport.save(OwnedTestFontFixture.make(postScriptName: name),
-      originalFilename: "owned.ttf", directory: directory,
+    let info = try LocalPracticeFontImport.save(make(name),
+      originalFilename: "owned." + format, directory: directory,
       readInfo: LocalPracticeFontRegistration.fontInfo(at:), register: LocalPracticeFontRegistration.read(url:),
       unregister: { _ = CTFontManagerUnregisterFontsForURL($0 as CFURL, .process, nil) },
       enable: { enables += 1 })
