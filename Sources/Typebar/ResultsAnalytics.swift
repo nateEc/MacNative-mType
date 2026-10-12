@@ -783,7 +783,7 @@ enum SlowWordCopyPolicy {
   ) -> [String] {
     guard threshold.isFinite, threshold > 0 else { return [] }
     return reviews.enumerated().compactMap { index, review in
-      guard !review.target.isEmpty, bursts.indices.contains(index),
+      guard bursts.indices.contains(index),
         let burst = bursts[index], Double(burst) < threshold
       else { return nil }
       return review.target

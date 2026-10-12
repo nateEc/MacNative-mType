@@ -323,6 +323,9 @@ run_logged_check "executing pinned WebAudio sample group seek, slot selection an
 run_logged_check "executing pinned whole-line wrapper mode and limit decisions" \
   "$temporary_directory/line-display-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-line-display.mjs" "$reference_root"
+run_logged_check "executing pinned complete slow-word copy callback" \
+  "$temporary_directory/slow-word-copy-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-slow-word-copy.mjs" "$reference_root"
 line_scroll_anime_archive="${TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE:-$temporary_directory/animejs-4.2.2.tgz}"
 if [[ ! -f "$line_scroll_anime_archive" ]]; then
   run_logged_check "preparing pinned QA-only line scroll animation archive" "$temporary_directory/line-scroll-source-runtime.log" \
