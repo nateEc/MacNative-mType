@@ -1,5 +1,11 @@
 # 官方配置兼容性审计
 
+2026-10-12 高频隐藏宿主布局的边界定位：同一短提示首键复现开启动画时 0.1 秒内 deliveredLayouts 达 333...371，geometry delivery revision 为 0；捕获宿主失效堆栈经过 SwiftUI NSHostingView.requestUpdate 与 Transaction.addAnimationListener（work/field-repeat-layout-stack.log）。同输入仅启用已有减少动态效果设置后，deliveredLayouts 为 0...1（work/field-repeat-layout-reduced.log）。此对照不能单独认定字段排版有循环，也不授权以默认关闭动画替代性能修复。
+
+新增独立 VisualFocusAnimationHostTests：隐藏窗口仅含两行文字及 0.125 秒透明度动画，没有 TypebarApp、打字引擎、排版对象或光标计时器。独立运行动画开启时 activeLayouts=2101、减少动态效果为 1，动画结束后均为 0（work/field-repeat-layout-isolated-final.log）；只断言动画结束后停止布局、宿主尺寸不变、窗口不可见，不将运行中计数冻结成框架实现契约。它反证“高计数必然由产品字段循环造成”的假设，不能证明可见窗口也有同样调度或产品性能已达标；后续需可见窗口实际帧率／输入延迟证据。产品代码及默认动画未变。
+
+探针最初嵌套 private Observable 类型导致宏扩展访问编译失败（work/field-repeat-layout-isolated.log），修正测试类型可见性；探索性定位没有人为制造产品红测。首轮焦点回归 18 项中两项缺参考路径跳过（work/field-repeat-layout-focus-regression.log），补路径后因未传既有 Anime.js 归档出现两处断言／解码失败（work/field-repeat-layout-focus-final.log），未改产品或放宽断言。明确固定参考与校验归档后最终 20 项零失败、无跳过（2.525 秒，墙钟 2.528；work/field-repeat-layout-focus-complete.log），含既有焦点控制／集成、官方动画帧率源码对照及新探针。根因调试与行为优先技能用于区分平台隐藏宿主与产品边界，非独立审查；零主程序启动，结束无残留测试进程，未新增完整门禁／Release，完整 goal active。
+
 2026-10-12 排版共享后的生产组合宿主回归补证：冻结产品提交 8a93f1d92715908d45c2171b594fb10f3fdf2423，单一测试进程运行到正常退出 0，期间不编辑源码、不重启测试、不打开主程序窗口。PracticeCompositionHostTests 42 项零失败（939.643 秒，墙钟 939.648），同一过滤器还匹配 SpecialPracticeCompositionHostTests 的 ASL／Choo 两项零失败（8.606 秒，墙钟 8.607）；合计 44 项零失败、无跳过（948.250 秒，墙钟 948.257；work/field-shaping-share-production-host.log）。覆盖多种自动尺寸宿主、混合方向及复杂文字候选更新／取消、首键输入 owner 保留、候选期间窗口／字体尺寸／全行显示变化；这是隐藏 NSHostingView 与直接 NSTextInputClient 调用证据，不是实体输入法、可见窗口像素或 Release 设备性能验收。
 
 日志中的部分首键后 deliveredLayouts 仍达数百次，同时 geometry revision 可保持不变；测试没有布局次数上限，不因断言通过宣称布局抖动消失。后续需针对实际布局／失效传播采样定位，不能仅凭计数推断具体循环来源。行为优先技能用于既有生产行为直接补证，未人为制造红测；本轮产品与测试代码未变，只更新审计记录。结束后无 Typebar 主程序或 xctest 进程；未新增完整门禁／Release，四项部分配置及完整 goal active 保持。
