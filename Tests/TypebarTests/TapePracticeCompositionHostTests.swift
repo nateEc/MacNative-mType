@@ -17,6 +17,10 @@ import XCTest
     try checkProduction(prompt: "שלום עולם בוקר", language: .hebrew)
   }
 
+  func testProductionRTLMultilineTapeRetirementPreservesCompleteResultAndReplay() throws {
+    try checkProduction(prompt: "שלום\nעולם\nבוקר", language: .hebrew)
+  }
+
   private func checkProduction(prompt: String, language: TypingLanguage = .english) throws {
     for mode in [PracticeTapeMode.letter, .word] {
       let suite = "TapePracticeCompositionHostTests.\(UUID())"
@@ -25,6 +29,7 @@ import XCTest
       let settings = AppSettings(defaults: defaults)
       settings.practiceTapeMode = mode
       settings.reducePracticeMotion = true
+      settings.saveCompletedResults = true
       let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
         difficulty: .normal, rules: .init(), language: language)
       XCTAssertTrue(settings.saveActiveTestSelection(.init(
@@ -114,6 +119,41 @@ import XCTest
       input.unmarkText()
       flush()
       try check("", .replace)
+      if prompt.contains("\n") {
+        XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+        var returns = 0
+        for character in prompt.dropFirst() {
+          input.insertText(String(character), replacementRange: .init(location: NSNotFound, length: 0))
+          flush()
+          if character == "\n" {
+            returns += 1
+            XCTAssertTrue(descendants(host, TypingInputView.self).first === input)
+            XCTAssertTrue(descendants(host, TapePromptNativeView.self).first === owner)
+            if returns == 2 {
+              let firstRow = String(try XCTUnwrap(prompt.split(separator: "\n").first))
+              XCTAssertFalse(owner.accessibilityLabel()?.contains(firstRow) ?? true,
+                "The second accepted Return must retire the first row in the production tape")
+            }
+            let before = owner.accessibilityLabel()
+            input.setMarkedText("候选", selectedRange: .init(location: 2, length: 0),
+              replacementRange: .init(location: NSNotFound, length: 0))
+            flush()
+            input.unmarkText()
+            flush()
+            XCTAssertEqual(owner.accessibilityLabel(), before,
+              "Cancellation after Return must not restore the retired prefix or consume the next target")
+            XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+          }
+        }
+        let records = try container.mainContext.fetch(FetchDescriptor<TestResultRecord>())
+        XCTAssertEqual(records.count, 1, "Only the completed attempt may be persisted")
+        let result = try XCTUnwrap(records.first?.portableResult)
+        XCTAssertEqual(result.prompt, prompt)
+        XCTAssertEqual(result.errorCount, 0)
+        XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+          through: result.elapsedDuration), prompt,
+          "Retired rows and accepted Returns must remain in the complete replay")
+      }
     }
   }
 }
