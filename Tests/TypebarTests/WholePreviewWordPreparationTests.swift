@@ -2,6 +2,27 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WholePreviewWordPreparationTests: XCTestCase {
+  func testFreshConfigurationPreparationMatchesSynchronousFactory() async throws {
+    let configurations: [TestConfiguration] = [
+      .words(3, language: .dockerFile),
+      .words(3, language: .mixedLanguages, mixedLanguageComponents: [.english, .french],
+        polyglotBaseLanguage: .codeSwift),
+      .words(3, language: .mixedLanguages, mixedLanguageComponents: [.english, .french],
+        polyglotBaseLanguage: .arabic)
+    ]
+    for requested in configurations {
+      let expected = TestSessionFactory.make(configuration: requested, showAllLines: true,
+        nextRandomWordIndex: { 0 }, nextRandomPoolShuffleIndex: { $0 - 1 })
+      let prepared = try await WholePreviewWordPreparation.prepareSession(configuration: requested,
+        nextRandomWordIndex: { 0 }, nextRandomPoolShuffleIndex: { $0 - 1 })
+      XCTAssertEqual(prepared.configuration, expected.configuration)
+      XCTAssertEqual(prepared.generationNotice, expected.generationNotice)
+      XCTAssertEqual(prepared.prompt, expected.prompt)
+      XCTAssertEqual(prepared.repeatedAttempt().configuration, expected.configuration)
+      XCTAssertEqual(prepared.repeatedAttempt().generationNotice, expected.generationNotice)
+    }
+  }
+
   func testProductionGenerationInputsSurvivePreparationAndRepeat() async throws {
     var scores = WeakSpotScores()
     scores.record(character: "z", interval: 2, isCorrect: false)

@@ -36,11 +36,12 @@ enum WholePreviewWordPreparation {
       nextRandomContentUnit: nextRandomContentUnit, nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex,
       didPrepare: didPrepare)
     try Task.checkCancellation()
-    return TypingSession(configuration: configuration,
+    return TypingSession(configuration: result.configuration,
       prompt: result.chunks.map(\.transformed).joined(),
       noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(
         for: result.chunks.flatMap(\.noSpaceWordLengths)),
       noSpaceTargetWords: result.chunks.flatMap(\.noSpaceTargetWords),
+      generationNotice: result.notice,
       weakSpotScores: weakSpotScores, wordDecorationState: result.decorationState)
   }
 
@@ -50,8 +51,14 @@ enum WholePreviewWordPreparation {
     nextRandomWordIndex: () -> Int, nextRandomCaseBit: () -> Bool,
     nextRandomContentUnit: () -> Double, nextRandomPoolShuffleIndex: (Int) -> Int,
     didPrepare: (Int) -> Void
-  ) async throws -> (chunks: [GeneratedWordChunk], decorationState: PoolWordDecorationState) {
+  ) async throws -> (chunks: [GeneratedWordChunk], decorationState: PoolWordDecorationState,
+    configuration: TestConfiguration, notice: String?) {
     try Task.checkCancellation()
+    let preparation = PolyglotGenerationPreparation(configuration)
+    var configuration = preparation.configuration
+    // Fresh generation uses literal Dockerfile indentation; replay keeps the
+    // captured configuration rather than preparing a historical attempt again.
+    if configuration.language == .dockerFile { configuration.dockerfileUsesLiteralIndentation = true }
     guard configuration.mode == .words, let limit = configuration.wordLimit, limit > 0,
       configuration.visibleFutureWordCount == nil,
       LivePracticeContentSource.selected(for: configuration) == nil,
@@ -75,7 +82,7 @@ enum WholePreviewWordPreparation {
       await Task.yield()
     }
     try Task.checkCancellation()
-    return (chunks, generator.decorationState)
+    return (chunks, generator.decorationState, configuration, preparation.notice)
   }
 
   enum PreparationError: Error { case emptyGeneration, unsupportedConfiguration }
