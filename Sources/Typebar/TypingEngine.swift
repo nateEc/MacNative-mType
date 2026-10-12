@@ -8657,7 +8657,6 @@ struct TypingSession {
     if !isReplayingLiveGeneratorHistory { consumedLiveGeneratorFields.append(field) }
     if configuration.mode == .words, !configuration.isInfinite,
       livePublishedWordCount + 1 >= (configuration.wordLimit ?? 25),
-      field.noSpaceTargetWords.isEmpty,
       (field.text.hasSuffix(" ") || field.text.hasSuffix("\n")),
       field.text.count > 1 {
       let fields = field.sourceFields.map { values in
@@ -8665,7 +8664,10 @@ struct TypingSession {
         values[values.count - 1].removeLast()
         return values
       }
-      appendExternalBatch(.init(text: String(field.text.dropLast()), sourceFields: fields))
+      var targets = field.noSpaceTargetWords
+      if !targets.isEmpty { targets[targets.count - 1].removeLast() }
+      appendExternalBatch(.init(text: String(field.text.dropLast()),
+        noSpaceTargetWords: targets, sourceFields: fields))
     } else {
       appendExternalBatch(field)
     }

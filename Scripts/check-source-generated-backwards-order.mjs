@@ -28,7 +28,7 @@ const languages={english:{name:'english',words:['ab','cd'],rightToLeft:false},
 const binary=i=>(i%256).toString(2).padStart(8,'0');
 const unexpected=()=>{throw Error('Unexpected adapter call outside ordering probe')};
 const active=()=>activeNames.map(name=>({name,properties:name==='backwards'?['wordOrder:reverse']:
-  name==='underscore_spaces'?['nospace']:[],functions:functions[name]}));
+  ['underscore_spaces','nospace'].includes(name)?['nospace']:[],functions:functions[name]}));
 const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuffle:words=>words,
   nthElementFromArray:(words,index)=>words.at(index)};
 const bindings={
@@ -510,12 +510,12 @@ for(const index of [104,109,110]) {
 }
 console.log('Pinned finish helper rejects correct words at configured index 104 and penultimate published index 109; accepts the actual last published index 110. Actual helper/generation predicate; authored handler flags, no complete input-handler execution claim.');
 
-for (const terminal of ['last\n', '\n']) {
-  config.words=101;activeNames=['poetry'];ownedRepeated=false;
+for (const noSpace of [true,false]) for (const terminal of ['last\n', '\n']) {
+  config.words=101;activeNames=noSpace?['poetry','nospace']:['poetry'];ownedRepeated=false;
   ownedSection={words:['setup']};ownedSectionQueue=[];ownedSectionError=undefined;
   await main.namespace.generateWords({name:'english',words:['owned']});
   testWords.words.reset();
-  for(let i=0;i<100;i++)testWords.words.push(`owned${i} `,0);
+  for(let i=0;i<100;i++)testWords.words.push(`owned${i}${noSpace?'':' '}`,0);
   main.namespace.currentSection.splice(0,main.namespace.currentSection.length,terminal);
   ownedActiveWordIndex=0;
   await addWord();
@@ -528,7 +528,7 @@ for (const terminal of ['last\n', '\n']) {
   assert.equal(replayed.word,terminal,'Repeat retains the generator LF before final display stripping');
   ownedRepeated=false;
 }
-console.log('Pinned final LF contracts passed: nonempty final field loses LF commit; empty LF field retains it. Actual caller, generator and TestWords; owned cursor/provider.');
+console.log('4 pinned final LF contracts passed in ordinary and nospace modes: nonempty final field loses LF commit; empty LF field retains it. Actual caller, generator and TestWords; owned cursor/provider.');
 
 const insertModule=modules.get('input/handlers/insert-text');
 await insertModule.link((id,from)=>moduleFor(resolve(id,from.identifier)));

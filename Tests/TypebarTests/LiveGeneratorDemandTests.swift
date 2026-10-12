@@ -182,6 +182,39 @@ final class LiveGeneratorDemandTests: XCTestCase {
     }
   }
 
+  func testNoSpaceFinalCachedLineFeedMatchesDisplayCompletionAndRepeat() throws {
+    for terminal in ["last\n", "\n"] {
+      let opening = (0..<100).map { "owned\($0)" }
+      let final = terminal == "\n" ? "\n" : "last"
+      let accepted = opening.joined() + final
+      var practice = TypingSession(configuration: .words(101).with(modifiers: [.poetryStream, .noSpaces]),
+        prompt: opening.joined(),
+        externalPromptContinuation: .init(text: terminal, noSpaceTargetWords: [terminal]),
+        streamsLiveContent: true, noSpaceTargetWords: opening)
+      practice.insertBatch(opening[0], at: began)
+      XCTAssertEqual(practice.prompt, accepted)
+      practice.insertBatch(String(accepted.dropFirst(opening[0].count).dropLast()),
+        at: began.addingTimeInterval(1))
+      XCTAssertFalse(practice.isFinished)
+      practice.insertBatch(String(accepted.suffix(1)), at: began.addingTimeInterval(1.5))
+      XCTAssertEqual(practice.outcome, .completed, "terminal=\(String(reflecting: terminal))")
+      XCTAssertEqual(practice.completedWordCount, 101)
+      XCTAssertEqual(practice.errors, 0)
+      let result = try XCTUnwrap(practice.result())
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), accepted)
+      var repeated = practice.repeatedAttempt()
+      repeated.insertBatch(accepted, at: began.addingTimeInterval(2))
+      XCTAssertEqual(repeated.prompt, accepted)
+      XCTAssertEqual(repeated.outcome, .completed)
+      XCTAssertEqual(repeated.completedWordCount, 101)
+      XCTAssertEqual(repeated.errors, 0)
+      XCTAssertEqual(result.targetWordDirectory?.words, opening + [final])
+      XCTAssertEqual(result.targetWordDirectory?.noSpace, true)
+      XCTAssertEqual(repeated.result()?.targetWordDirectory, result.targetWordDirectory)
+    }
+  }
+
   func testForwardProgressRequestsGeneratorSectionWithAFullVisibleWindow() {
     for count in [100, 101, 102] {
       var practice = session(published: count)
