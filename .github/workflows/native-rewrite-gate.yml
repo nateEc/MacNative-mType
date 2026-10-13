@@ -16,7 +16,8 @@ jobs:
   verify-native-rewrite:
     name: Verify native rewrite
     runs-on: macos-15
-    timeout-minutes: 30
+    # The complete client suite alone took 39 minutes on a local Apple Silicon host.
+    timeout-minutes: 90
 
     steps:
       - name: Check out Typebar

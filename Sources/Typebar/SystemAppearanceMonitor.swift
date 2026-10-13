@@ -25,7 +25,7 @@ final class SystemAppearanceMonitor {
         guard let self else { return }
         // Read the latest application state on the UI actor; queued callbacks
         // cannot restore an obsolete appearance after a newer system change.
-        colorScheme = SystemAppearancePolicy.colorScheme(for: application.effectiveAppearance)
+        self.colorScheme = SystemAppearancePolicy.colorScheme(for: application.effectiveAppearance)
       }
     }
   }

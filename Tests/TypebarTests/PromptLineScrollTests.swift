@@ -36,6 +36,12 @@ import XCTest
     update(follower, row: 2, attempt: attempt)
     XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 0.5)
     update(follower, row: 3, attempt: attempt)
+    // Follow is scheduled on the main queue. A busy AppKit test run may not
+    // drain that queue within update's five-millisecond run-loop window.
+    let deadline = Date().addingTimeInterval(0.25)
+    while abs(scroll.contentView.bounds.minY - 90) > 0.5 && Date() < deadline {
+      RunLoop.main.run(until: min(deadline, Date().addingTimeInterval(0.005)))
+    }
     XCTAssertEqual(scroll.contentView.bounds.minY, 90, accuracy: 0.5)
   }
 
