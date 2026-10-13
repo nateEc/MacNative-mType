@@ -6349,6 +6349,7 @@ struct TestSessionFactory {
     streamContinuation: LivePracticePrompt? = nil,
     streamsLiveContent: Bool = false,
     defersStreamContinuationTransformation: Bool = false,
+    preparedStreamPromptBatch: TransformedPromptBatch? = nil,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
     showAllLines: Bool = false,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
@@ -6544,7 +6545,9 @@ struct TestSessionFactory {
     let generatesWholeLines = showAllLines && !hasIncompleteExternalPreview
     if usesFreshGeneratedWords { preservesGeneratedWordOrder = true }
     var batch: TransformedPromptBatch
-    if let quoteChunk {
+    if let preparedStreamPromptBatch, streamPrompt != nil, capturesLiveSourceFields {
+      batch = preparedStreamPromptBatch
+    } else if let quoteChunk {
       batch = quoteChunk
     } else if streamsCustomSections {
       batch = .init(text: prompt)
@@ -6575,7 +6578,8 @@ struct TestSessionFactory {
     }
     let externalWordBound = configuration.mode == .words && !configuration.isInfinite
       ? configuration.wordLimit ?? 25 : Int.max
-    if streamContinuation != nil || streamsLiveContent, configuration.modifiers.contains(.underscoreSeparators) {
+    if preparedStreamPromptBatch == nil, streamContinuation != nil || streamsLiveContent,
+      configuration.modifiers.contains(.underscoreSeparators) {
       // A fetched section boundary is not the end of the configured test.
       // Both batches must use the same absolute final-word index.
       batch = TestModifierPolicy.transformedBatch(noSpaceBoundarySource ?? prompt,
@@ -6710,11 +6714,40 @@ struct TestSessionFactory {
     prompt: LivePracticePrompt, continuation: LivePracticePrompt?,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
     showAllLines: Bool = false, nextRandomCaseBit: () -> Bool = { Bool.random() },
+    didTransformInitial: (Int) -> Void = { _ in },
     didTransform: (Int) -> Void = { _ in }) async throws -> TypingSession {
+    try Task.checkCancellation()
+    let effective = PolyglotGenerationPreparation(configuration).configuration
+    var initialBatch: TransformedPromptBatch?
+    if LivePracticeContentSource.selected(for: effective) != nil {
+      let validBoundaries = prompt.noSpaceBoundarySource.flatMap {
+        $0.replacingOccurrences(of: " ", with: "") == prompt.text ? $0 : nil
+      }
+      let source = validBoundaries ?? prompt.text
+      let incomplete = effective.mode == .words && !effective.isInfinite
+        && GeneratedWordBoundPolicy.wordCount(in: prompt.noSpaceBoundarySource ?? prompt.text)
+          < (effective.wordLimit ?? 25)
+      initialBatch = try await LivePromptTransformation.prepare(source, configuration: effective,
+        preservesNoSpaceBoundaries: validBoundaries != nil, wordOffset: 0,
+        wordBound: GeneratedWordBoundPolicy.bound(for: effective, wordOffset: 0,
+          sourceWordCount: GeneratedWordBoundPolicy.wordCount(in: source),
+          showAllLines: showAllLines && !incomplete), preservesWordOrder: false,
+        nextRandomCaseBit: nextRandomCaseBit, didTransform: didTransformInitial)
+      if effective.modifiers.contains(.underscoreSeparators) {
+        // The synchronous factory historically transforms again using the
+        // external absolute bound. Preserve both passes' random draws.
+        initialBatch = try await LivePromptTransformation.prepare(
+          prompt.noSpaceBoundarySource ?? prompt.text, configuration: effective,
+          preservesNoSpaceBoundaries: prompt.noSpaceBoundarySource != nil, wordOffset: 0,
+          wordBound: effective.mode == .words && !effective.isInfinite ? effective.wordLimit ?? 25 : Int.max,
+          nextRandomCaseBit: nextRandomCaseBit, didTransform: didTransformInitial)
+      }
+    }
     try Task.checkCancellation()
     var session = make(configuration: configuration, streamPrompt: prompt.text,
       streamNoSpaceBoundarySource: prompt.noSpaceBoundarySource, streamContinuation: continuation,
       streamsLiveContent: true, defersStreamContinuationTransformation: true,
+      preparedStreamPromptBatch: initialBatch,
       weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState,
       showAllLines: showAllLines, nextRandomCaseBit: nextRandomCaseBit)
     if let continuation, !continuation.text.isEmpty {

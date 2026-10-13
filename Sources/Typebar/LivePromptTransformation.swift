@@ -6,14 +6,16 @@ import Foundation
 enum LivePromptTransformation {
   @MainActor static func prepare(_ source: String, configuration: TestConfiguration,
     preservesNoSpaceBoundaries: Bool, wordOffset: Int, wordBound: Int,
+    preservesWordOrder: Bool = true,
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     didTransform: (Int) -> Void = { _ in }) async throws -> TransformedPromptBatch {
     try Task.checkCancellation()
     let modifiers = configuration.modifiers
     let language = configuration.language
     let presented = language.presentationText(source)
-    let words = presented.unicodeScalars.split(separator: " ", omittingEmptySubsequences: false)
+    var words = presented.unicodeScalars.split(separator: " ", omittingEmptySubsequences: false)
       .map { String(String.UnicodeScalarView($0)) }
+    if modifiers.contains(.backwards), !preservesWordOrder { words.reverse() }
     let capturesTargets = TestModifierPolicy.usesNoSpaceInput(modifiers) || preservesNoSpaceBoundaries
     let britishEnglish = BritishEnglishPolicy.Context(configuration: configuration, authoredQuoteAlternate: false)
     var output = ""
