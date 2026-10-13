@@ -1,5 +1,15 @@
 # 已捕获无空格词字段回放合同
 
+## 格式 17 清空后继续插入的回放修复（2026-10-13）
+
+真实 no-space 会话在有限末词批量提交后，可在同一字段保存 `discardedInputUnits` 并继续接受或停止下一键。此前接受文本回放先收缩尾单位，字段视觉回放却继续保留旧字母标记和旧光标：`abx` 停止模式仍显示 `ab` 正确、光标位置 2；普通 `abx` 再输入 `y` 把 `x/y` 画在目标之后。两项真实会话红测六处失败（work/no-space-field-replay-contraction-red.log）。
+
+字段动作装配现在只对有效的插入清空标记，使用保存的插入后字段快照扣除当前接受单位数，先生成无声的同字段收缩，再处理原键。停止键扣除零接受单位；代理对的两个 UTF-16 单位可对应一个目标字形，收缩仍清除其标记。回放时间线不为收缩补一次点击音；正式输入与固定结果数据不改，便携实体往返后相同结果仍按新消费规则呈现。三项新增测试覆盖停止、接受／便携往返和代理对。
+
+第一次试图把收缩扩展到退回已裁掉目标的删除事件，与已有完整源码回放合同冲突：181 项范围内六处旧断言失败。限定为带标记的退回仍有三处冲突；这条推断已撤回，旧的净最终词前缀、退回忽略及源声音规则全部保持。两轮失败日志 `work/no-space-field-replay-contraction-regression.log`、`work/no-space-field-replay-contraction-regression-final.log` 保留，不把曾经的新删除预期算作修复证据。最终字段回放、声音、seek、原始单位、格式 17／20 和旧版共 181 项零失败（work/no-space-field-replay-contraction-regression-complete.log）；固定源码九场景通过（work/no-space-field-replay-source-check-verified.log），原创性边界通过（work/no-space-field-replay-contraction-originality.log）。首次源码探针因缺 `--experimental-vm-modules` 未执行，日志单列，不算行为失败。行为优先、根因定位和同会话有界决策复核影响了边界选择，非独立评审。
+
+这只修复已保存清空标记的插入视觉消费，未证明删除收缩的视觉等价、真实窗口点击／声音、全部旧库或实体 IME；无新存储格式、实体列、设置与服务协议。本增量尚未重跑完整门禁／Release，人工设备场景及完整 goal 仍待验收，零可见主程序。
+
 固定参考：91bd24bb8513785c7364cbea29296ff7adafac41。只读完整 frontend/src/ts/test/replay-ui.ts 与 TestWords，并核对提交符生成处理。原生实现与夹具独立编写，没有复制参考源码或资产。
 
 ## 动作、目标与定位

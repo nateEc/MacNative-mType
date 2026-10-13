@@ -3642,7 +3642,9 @@ enum TypingReplay {
     let orderedEvents = chronologicalEvents(events.filter { $0.offset.isFinite })
     if let recorded = recordedFieldActions(targetFields: targetFields,
       events: orderedEvents, configuration: configuration)
-    { return recorded.map { .init(offset: $0.offset, cue: $0.soundCue) } }
+    { return recorded.compactMap { action in
+      action.soundCue.map { .init(offset: action.offset, cue: $0) }
+    } }
     if orderedEvents.contains(where: { $0.validatedTextUTF16 != nil || $0.inputField?.validatedValueUTF16 != nil }) {
       return rawUnitSoundTimeline(targetFields: targetFields, events: orderedEvents, isZen: isZen)
     }
@@ -3789,13 +3791,15 @@ enum TypingReplay {
       case advance(correct: Bool)
       case retreat
       case resize(Int)
+      case contraction(Int)
     }
     let offset: TimeInterval
     let kind: Kind
-    var soundCue: TypingReplaySoundCue {
+    var soundCue: TypingReplaySoundCue? {
       switch kind {
       case .input(_, let correct), .advance(let correct): return correct ? .click : .error
       case .retreat, .resize: return .click
+      case .contraction: return nil
       }
     }
   }
@@ -3859,6 +3863,7 @@ enum TypingReplay {
       // Native word deletion has multiple primitives but one source action,
       // whose snapshot is its final destination, not its first removed unit.
       let event = events[range.upperBound - 1]
+      let contracted = event.validatedDiscardedInputUnits != nil
       index = range.upperBound
       guard let field = event.inputField else { continue }
       if event.kind == .insert && event.text.isEmpty && !event.isStoppedInsertion && !isZen { continue }
@@ -3867,6 +3872,14 @@ enum TypingReplay {
         let correct = wentBack || isZen
           || finalFields[previousField] == targets[previousField]
         actions.append(.init(offset: event.offset, kind: wentBack ? .retreat : .advance(correct: correct)))
+      }
+      if contracted, event.kind == .insert {
+        // The retained snapshot already excludes the discarded tail. Reset
+        // the replay cursor before applying this key, including stopped keys.
+        let acceptedCount = event.isStoppedInsertion ? 0 : event.inputUnits.count
+        guard field.units.count >= acceptedCount else { return nil }
+        actions.append(.init(offset: event.offset,
+          kind: .contraction(field.units.count - acceptedCount)))
       }
       switch event.kind {
       case .insert:

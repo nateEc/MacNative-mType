@@ -135,7 +135,7 @@ struct FieldReplayPlan {
       actions[frame.nextActionIndex].offset <= elapsed
     {
       let action = actions[frame.nextActionIndex]
-      if Self.apply(action, to: &frame) { cues.append(action.soundCue) }
+      if Self.apply(action, to: &frame), let cue = action.soundCue { cues.append(cue) }
       frame.nextActionIndex += 1
     }
     return cues
@@ -173,7 +173,7 @@ struct FieldReplayPlan {
         }
       }
       frame.position += 1
-    case .resize(let position):
+    case .resize(let position), .contraction(let position):
       frame.position = position
       let suffix = min(position, frame.fields[frame.word].letters.count)
       for index in (suffix..<frame.fields[frame.word].letters.count).reversed() {

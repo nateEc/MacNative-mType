@@ -5,8 +5,68 @@ import SwiftData
 final class NoSpaceFieldReplayTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 909_500_000)
   private let configuration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
+  private func terminalAttempt(stopsOnError: Bool = false) -> TypingSession {
+    .init(configuration: .init(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal,
+      rules: .init(stopOnErrorMode: stopsOnError ? .letter : .off), modifiers: [.noSpaces]),
+      prompt: "ab", noSpaceTargetWords: ["ab"])
+  }
   private func inserted(_ unit: UInt16, field: Int, snapshot: [UInt16], at offset: Double) -> TypingReplayEvent {
     .init(offset: offset, kind: .insert, units: [unit], inputField: .init(index: field, units: snapshot), inputCorrectness: [true])
+  }
+
+  func testStoppedTerminalClearRemovesOldFieldMarksAndCaretWithoutExtraSound() throws {
+    var session = terminalAttempt(stopsOnError: true)
+    session.insertBatch("abx", at: start)
+    XCTAssertEqual(session.typed, "")
+    XCTAssertEqual(session.outcome, .active)
+    session.bailOut(at: start.addingTimeInterval(2))
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(result.replayEvents.last?.discardedInputUnits, 2)
+    let plan = try XCTUnwrap(FieldReplayPlan.make(prompt: result.prompt, events: result.replayEvents,
+      configuration: result.configuration, targetWordDirectory: result.targetWordDirectory))
+    var frame = plan.initialFrame
+    XCTAssertEqual(plan.advance(&frame, through: 2), [.click, .click])
+    XCTAssertEqual(frame.coordinate, .init(word: 0, position: 0))
+    XCTAssertEqual(frame.presentation.glyphs.map(\.state), [.pending, .pending])
+    XCTAssertEqual(frame, plan.frame(through: 2))
+  }
+
+  func testAcceptedTerminalClearReplacesOldMarksAtTheOriginalField() throws {
+    var session = terminalAttempt()
+    session.insertBatch("abx", at: start)
+    XCTAssertEqual(session.typed, "x")
+    XCTAssertEqual(session.outcome, .active)
+    session.insert("y", at: start.addingTimeInterval(1))
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(result.replayEvents[2].discardedInputUnits, 2)
+    for saved in [result, try XCTUnwrap(TestResultRecord(result: result).portableResult)] {
+      let plan = try XCTUnwrap(FieldReplayPlan.make(prompt: saved.prompt, events: saved.replayEvents,
+        configuration: saved.configuration, targetWordDirectory: saved.targetWordDirectory))
+      let afterX = plan.frame(through: 0)
+      XCTAssertEqual(afterX.coordinate, .init(word: 0, position: 1))
+      XCTAssertEqual(afterX.presentation.glyphs.map(\.state), [.incorrect, .pending])
+      let afterY = plan.frame(through: 1)
+      XCTAssertEqual(afterY.coordinate, .init(word: 0, position: 2))
+      XCTAssertEqual(afterY.presentation.glyphs.map(\.state), [.incorrect, .incorrect])
+    }
+  }
+
+  func testSupplementaryTerminalClearRemovesBothSourceUnitsFromOneRenderedLetter() throws {
+    var session = TypingSession(configuration: .init(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), modifiers: [.noSpaces]),
+      prompt: "🙂", noSpaceTargetWords: ["🙂"])
+    session.insertBatch("🙂z", at: start)
+    XCTAssertEqual(session.typed, "z")
+    session.bailOut(at: start.addingTimeInterval(2))
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(result.replayEvents.last?.discardedInputUnits, 2)
+    let plan = try XCTUnwrap(FieldReplayPlan.make(prompt: result.prompt, events: result.replayEvents,
+      configuration: result.configuration, targetWordDirectory: result.targetWordDirectory))
+    let frame = plan.frame(through: 2)
+    XCTAssertEqual(frame.coordinate, .init(word: 0, position: 1))
+    XCTAssertEqual(frame.presentation.text, "🙂")
+    XCTAssertEqual(frame.presentation.glyphs.map(\.state), [.incorrect])
   }
 
   func testKnownHiddenBoundariesProduceTargetFrameAndIndexBasedSeek() throws {
