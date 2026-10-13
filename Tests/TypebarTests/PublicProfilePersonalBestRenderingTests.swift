@@ -364,7 +364,7 @@ import XCTest
           authenticationMethods: [.password, .discord], availableBadges: [badge], selectedBadgeID: badge.id,
           showAllBadges: showAll)
       }
-      func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+      @MainActor func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
       account.currentUser = user(bio: "初始简介")
       let identity = AccountProfileEditIdentity(account: account)
       host.rootView = root(AccountProfileEditor(account: account, user: try XCTUnwrap(account.currentUser), identity: identity), width: 480, padding: 24)

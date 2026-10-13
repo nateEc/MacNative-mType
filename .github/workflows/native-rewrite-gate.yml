@@ -78,8 +78,11 @@ jobs:
           cat "$test_log"
           if [[ "$test_status" -ne 0 ]]; then
             xctest_failures="$(grep -E 'Test Case .+ (failed|threw an error)' "$test_log" | tail -n 5 || true)"
+            compiler_failure="$(grep -m 1 -E '^[^[:space:]]+:[0-9]+:[0-9]+: error:' "$test_log" || true)"
             if [[ -n "$xctest_failures" ]]; then
               diagnosis="$xctest_failures"
+            elif [[ -n "$compiler_failure" ]]; then
+              diagnosis="$compiler_failure"
             else
               diagnosis="$(tail -n 30 "$test_log")"
             fi
