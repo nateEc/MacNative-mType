@@ -14,8 +14,10 @@ enum LivePromptTransformation {
     try Task.checkCancellation()
     let modifiers = configuration.modifiers
     let language = configuration.language
-    let presented = language.presentationText(source)
-    var words = try await sourceWords(presented, didScan: didScanSource)
+    // Swiss German's ß expansion preserves ASCII word boundaries and is
+    // applied by transformedWord. Scan the original scalars so cancellation
+    // can interrupt long sources before constructing their presented text.
+    var words = try await sourceWords(source, didScan: didScanSource)
     if modifiers.contains(.backwards), !preservesWordOrder { words.reverse() }
     let capturesTargets = TestModifierPolicy.usesNoSpaceInput(modifiers) || preservesNoSpaceBoundaries
     let britishEnglish = BritishEnglishPolicy.Context(configuration: configuration, authoredQuoteAlternate: false)

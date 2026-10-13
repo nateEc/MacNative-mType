@@ -2,6 +2,33 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class LiveSessionPreparationTests: XCTestCase {
+  func testSwissGermanInitialAndTailMatchSynchronousSessionAndRandomOrder() async throws {
+    let prompt = LivePracticePrompt(text: "maß straße fuß", noSpaceBoundarySource: nil)
+    let tail = LivePracticePrompt(text: "grüße groß", noSpaceBoundarySource: nil)
+    for modifiers: [TestModifier] in [[], [.backwards], [.randomCase],
+      [.underscoreSeparators, .randomCase], [.messagingStyle, .noSpaces]] {
+      let configuration = TestConfiguration.words(301, language: .swissGerman)
+        .with(modifiers: [.poetryStream] + modifiers)
+      var expectedDraws = 0, actualDraws = 0
+      var expected = TestSessionFactory.make(configuration: configuration, streamPrompt: prompt.text,
+        streamContinuation: tail, streamsLiveContent: true, showAllLines: true,
+        nextRandomCaseBit: { expectedDraws += 1; return expectedDraws.isMultiple(of: 3) })
+      var actual = try await TestSessionFactory.preparingLiveSession(configuration: configuration,
+        prompt: prompt, continuation: tail, showAllLines: true,
+        nextRandomCaseBit: { actualDraws += 1; return actualDraws.isMultiple(of: 3) })
+      XCTAssertEqual(Array(actual.prompt.utf8), Array(expected.prompt.utf8))
+      XCTAssertEqual(actual.promptWordPresentations.map(\.range), expected.promptWordPresentations.map(\.range))
+      XCTAssertEqual(actualDraws, expectedDraws)
+      let input = String(expected.prompt.prefix(4))
+      let date = Date(timeIntervalSince1970: 1000)
+      expected.insertBatch(input, at: date)
+      actual.insertBatch(input, at: date)
+      XCTAssertEqual(Array(actual.prompt.utf8), Array(expected.prompt.utf8))
+      XCTAssertEqual(actual.preciseAccuracy, expected.preciseAccuracy)
+      XCTAssertEqual(actual.repeatedAttempt().prompt, expected.repeatedAttempt().prompt)
+    }
+  }
+
   func testInitialTransformationCanCancelBeforeSessionPublicationWithoutContinuation() async {
     var batches: [Int] = []
     let task = Task<Void, Error> { @MainActor in
