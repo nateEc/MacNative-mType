@@ -445,14 +445,6 @@ struct TapePracticePrompt: View {
   var onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil
   @State private var metrics: TapePromptLayoutMetrics?
 
-  private var viewportHeight: CGFloat {
-    let fallback = CGFloat(fontSize * 1.7)
-    guard !newlineWords.isEmpty else { return fallback }
-    if expandsToContentHeight { return metrics?.contentHeight ?? fallback }
-    let limit = (metrics?.rowHeight ?? fallback) * CGFloat(viewportLineCount)
-    return reservesViewportLineCount ? limit : min(metrics?.contentHeight ?? fallback, limit)
-  }
-
   var body: some View {
     TapePromptBridge(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,
       wordAnchorCharacterIndex: wordAnchorCharacterIndex, wordStartCharacterOffsets: wordStartCharacterOffsets,
@@ -462,8 +454,10 @@ struct TapePracticePrompt: View {
       joinsLetters: joinsLetters,
       mode: mode, margin: margin,
       smoothScroll: animatesScroll, carets: carets, retirement: retirement,
-      newlineWords: newlineWords, onMetrics: { metrics = $0 }, onTapeWordsRemoved: onTapeWordsRemoved)
-      .frame(height: viewportHeight)
+      newlineWords: newlineWords, onMetrics: { metrics = $0 }, onTapeWordsRemoved: onTapeWordsRemoved,
+      fallbackHeight: CGFloat(fontSize * 1.7), viewportLineCount: viewportLineCount,
+      reservesViewportLineCount: reservesViewportLineCount, expandsToContentHeight: expandsToContentHeight,
+      observedMetrics: metrics)
       .clipped()
       .accessibilityLabel("卷带练习提示")
   }
@@ -518,6 +512,17 @@ private struct TapePromptBridge: NSViewRepresentable {
   var newlineWords: [TapePromptWord] = []
   var onMetrics: ((TapePromptLayoutMetrics) -> Void)? = nil
   var onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil
+  var fallbackHeight: CGFloat = 48
+  var viewportLineCount = 3
+  var reservesViewportLineCount = false
+  var expandsToContentHeight = false
+  // Keep native animated topology changes observable to SwiftUI measurement.
+  var observedMetrics: TapePromptLayoutMetrics? = nil
+  func sizeThatFits(_ proposal: ProposedViewSize, nsView: TapePromptNativeView, context: Context) -> CGSize? {
+    let height = nsView.viewportHeight(fallback: fallbackHeight, lineCount: viewportLineCount,
+      reservesLineCount: reservesViewportLineCount, expandsToContent: expandsToContentHeight)
+    return CGSize(width: max(1, proposal.width ?? nsView.bounds.width), height: height)
+  }
   func makeNSView(context: Context) -> TapePromptNativeView { TapePromptNativeView() }
   func updateNSView(_ view: TapePromptNativeView, context: Context) {
     view.configure(rendering: rendering, anchorCharacterIndex: anchorCharacterIndex,

@@ -103,6 +103,23 @@ import XCTest
     return CGFloat(model.fontSize * 1.7)
   }
 
+  func testDeclaredNewlineViewportUsesMeasuredRowsBeforeAsyncMetricsDelivery() throws {
+    for size: Double in [15, 28, 32] {
+      for configuration: TestConfiguration in [.words(3),
+        .init(mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init())] {
+        let model = Model(TypingSession(configuration: configuration, prompt: "a\nb\nc"))
+        model.fontSize = size
+        let (window, host) = mount(model)
+        defer { close(window, host) }
+        host.layoutSubtreeIfNeeded()
+        let native = try XCTUnwrap(descendants(host, TapePromptNativeView.self).first)
+        XCTAssertEqual(native.bounds.height, expectedHeight(model), accuracy: 0.01,
+          "The first layout must reserve measured rows without an async update, size=\(size)")
+        XCTAssertFalse(window.isVisible)
+      }
+    }
+  }
+
   func testProductionCompositionGateAllowsTapeWithSharedDirectionPolicy() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)

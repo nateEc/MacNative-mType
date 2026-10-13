@@ -506,6 +506,16 @@ final class TapePromptNativeView: NSView {
     }
   }
 
+  func viewportHeight(fallback: CGFloat, lineCount: Int, reservesLineCount: Bool,
+    expandsToContent: Bool) -> CGFloat {
+    // configure has already shaped these word boxes. Size from that same
+    // layout, without a second shape pass or waiting for the metrics callback.
+    guard let metrics = textView.newlineMetrics else { return fallback }
+    if expandsToContent { return metrics.contentHeight }
+    let limit = metrics.rowHeight * CGFloat(lineCount)
+    return reservesLineCount ? limit : min(metrics.contentHeight, limit)
+  }
+
   private func deliverRetirement() {
     guard let value = pendingRetirement, let context = retirement, let notify = context.onRetire,
       value.firstRetainedWordIndex > max(context.firstRetainedWordIndex, notifiedRetirementIndex) else { return }
