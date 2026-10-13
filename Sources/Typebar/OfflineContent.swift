@@ -6714,6 +6714,7 @@ struct TestSessionFactory {
     prompt: LivePracticePrompt, continuation: LivePracticePrompt?,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
     showAllLines: Bool = false, nextRandomCaseBit: () -> Bool = { Bool.random() },
+    initialBatchCheckpoint: ((Int) async -> Void)? = nil,
     didTransformInitial: (Int) -> Void = { _ in },
     didTransform: (Int) -> Void = { _ in }) async throws -> TypingSession {
     try Task.checkCancellation()
@@ -6732,7 +6733,8 @@ struct TestSessionFactory {
         wordBound: GeneratedWordBoundPolicy.bound(for: effective, wordOffset: 0,
           sourceWordCount: GeneratedWordBoundPolicy.wordCount(in: source),
           showAllLines: showAllLines && !incomplete), preservesWordOrder: false,
-        nextRandomCaseBit: nextRandomCaseBit, didTransform: didTransformInitial)
+        nextRandomCaseBit: nextRandomCaseBit, batchCheckpoint: initialBatchCheckpoint,
+        didTransform: didTransformInitial)
       if effective.modifiers.contains(.underscoreSeparators) {
         // The synchronous factory historically transforms again using the
         // external absolute bound. Preserve both passes' random draws.
@@ -6740,7 +6742,8 @@ struct TestSessionFactory {
           prompt.noSpaceBoundarySource ?? prompt.text, configuration: effective,
           preservesNoSpaceBoundaries: prompt.noSpaceBoundarySource != nil, wordOffset: 0,
           wordBound: effective.mode == .words && !effective.isInfinite ? effective.wordLimit ?? 25 : Int.max,
-          nextRandomCaseBit: nextRandomCaseBit, didTransform: didTransformInitial)
+          nextRandomCaseBit: nextRandomCaseBit, batchCheckpoint: initialBatchCheckpoint,
+          didTransform: didTransformInitial)
       }
     }
     try Task.checkCancellation()

@@ -8,6 +8,7 @@ enum LivePromptTransformation {
     preservesNoSpaceBoundaries: Bool, wordOffset: Int, wordBound: Int,
     preservesWordOrder: Bool = true,
     nextRandomCaseBit: () -> Bool = { Bool.random() },
+    batchCheckpoint: ((Int) async -> Void)? = nil,
     didTransform: (Int) -> Void = { _ in }) async throws -> TransformedPromptBatch {
     try Task.checkCancellation()
     let modifiers = configuration.modifiers
@@ -43,6 +44,7 @@ enum LivePromptTransformation {
       if !field.isEmpty { fields.append(field) }
       if (index + 1).isMultiple(of: 100) || index == words.count - 1 {
         didTransform(index + 1)
+        if let batchCheckpoint { await batchCheckpoint(index + 1) }
         await Task.yield()
       }
     }

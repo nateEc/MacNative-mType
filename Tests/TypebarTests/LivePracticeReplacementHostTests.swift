@@ -69,6 +69,22 @@ import XCTest
     try checkDelayedReplacement(changesBudgetDuringAssembly: true, suspendsPreparedSession: true)
   }
 
+  func testDisplayBudgetChangedInsideInitialTransformationRejectsOldPrompt() throws {
+    try checkDelayedReplacement(changesBudgetDuringAssembly: true, suspendsInitialTransformation: true)
+  }
+
+  func testFirstInputInsideInitialTransformationPreservesPromptAndCaret() throws {
+    try checkDelayedReplacement(startsDuringAssembly: true, suspendsInitialTransformation: true)
+  }
+
+  func testDisappearanceInsideInitialTransformationRejectsCancelledPrompt() throws {
+    try checkDelayedReplacement(cancelsDuringAssembly: true, suspendsInitialTransformation: true)
+  }
+
+  func testReplacingSelectionInsideInitialTransformationRejectsOldPrompt() throws {
+    try checkDelayedReplacement(replacesSelectionDuringAssembly: true, suspendsInitialTransformation: true)
+  }
+
   func testFirstInputAfterLiveSessionPreparationPreservesPromptAndCaret() throws {
     try checkDelayedReplacement(startsDuringAssembly: true, suspendsPreparedSession: true)
   }
@@ -291,7 +307,8 @@ import XCTest
     initialEncyclopediaFailures: [Bool] = [], cancelsInitialRetry: Bool = false,
     changesBudgetDuringAssembly: Bool = false, startsDuringAssembly: Bool = false,
     cancelsDuringAssembly: Bool = false, replacesSelectionDuringAssembly: Bool = false,
-    suspendsPreparedSession: Bool = false, disablesSourceBeforeImport: Bool = false) throws {
+    suspendsPreparedSession: Bool = false, disablesSourceBeforeImport: Bool = false,
+    suspendsInitialTransformation: Bool = false) throws {
     let suite = "LivePracticeReplacementHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -318,6 +335,14 @@ import XCTest
     var suspendedAssembly: CheckedContinuation<LivePracticePrompt, Never>?
     var staleDescriptor: LivePracticePrompt?
     var cancelledAssemblyReplies = 0
+    var initialCheckpointCounts: [Int] = []
+    var initialTransformedCounts: [Int] = []
+    defer {
+      if suspendsInitialTransformation {
+        XCTAssertEqual(initialCheckpointCounts, [100], "Suspend inside the actual initial transform, not after preparation")
+        XCTAssertEqual(initialTransformedCounts.first, 100)
+      }
+    }
     let authoredTokens = (0..<300).map { "owned\($0)" }
     if prefetches { pending.scriptedTokens = Array(authoredTokens.prefix(151)) }
     let content = TypebarApp.practiceContent(settings: settings,
@@ -326,8 +351,8 @@ import XCTest
       network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor(),
       liveContentFetch: pending.fetch,
       livePromptPrepare: { content, configuration, wholePreview in
-        if !suspendsPreparedSession { assemblyBudgets.append(wholePreview) }
-        if !suspendsPreparedSession && (changesBudgetDuringAssembly || startsDuringAssembly || cancelsDuringAssembly
+        if !suspendsPreparedSession && !suspendsInitialTransformation { assemblyBudgets.append(wholePreview) }
+        if !suspendsPreparedSession && !suspendsInitialTransformation && (changesBudgetDuringAssembly || startsDuringAssembly || cancelsDuringAssembly
           || replacesSelectionDuringAssembly) && assemblyBudgets.count == 1 {
           staleDescriptor = content.promptDescriptor(for: configuration, showAllLines: wholePreview)
           let descriptor: LivePracticePrompt = await withCheckedContinuation { suspendedAssembly = $0 }
@@ -337,9 +362,23 @@ import XCTest
         return try await content.preparingPromptDescriptor(for: configuration, showAllLines: wholePreview)
       },
       liveSessionPrepare: { configuration, prompt, continuation, weakSpots, decoration, wholePreview in
+        if suspendsInitialTransformation { assemblyBudgets.append(wholePreview) }
+        let isOldInitialPreparation = suspendsInitialTransformation && assemblyBudgets.count == 1
         let prepared = try await TestSessionFactory.preparingLiveSession(configuration: configuration,
           prompt: prompt, continuation: continuation, weakSpotScores: weakSpots,
-          wordDecorationState: decoration, showAllLines: wholePreview)
+          wordDecorationState: decoration, showAllLines: wholePreview,
+          initialBatchCheckpoint: suspendsInitialTransformation ? { count in
+            if isOldInitialPreparation && initialCheckpointCounts.isEmpty {
+              XCTAssertEqual(count, 100)
+              XCTAssertEqual(initialTransformedCounts, [100])
+              initialCheckpointCounts.append(count)
+              staleDescriptor = prompt
+              let _: LivePracticePrompt = await withCheckedContinuation { suspendedAssembly = $0 }
+              if Task.isCancelled { cancelledAssemblyReplies += 1 }
+            }
+          } : nil, didTransformInitial: { count in
+            if isOldInitialPreparation { initialTransformedCounts.append(count) }
+          })
         if suspendsPreparedSession {
           assemblyBudgets.append(wholePreview)
           if assemblyBudgets.count == 1 {
