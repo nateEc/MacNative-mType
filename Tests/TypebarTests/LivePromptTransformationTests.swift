@@ -2,6 +2,25 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class LivePromptTransformationTests: XCTestCase {
+  func testSourceScanningCanCancelBeforeAnyRandomTransformation() async {
+    for cancelAt in [4096, 5001] {
+      var scanned: [Int] = [], draws = 0
+      let task = Task<Void, Error> { @MainActor in
+        _ = try await LivePromptTransformation.prepare(String(repeating: "x", count: 5001),
+          configuration: .words(1).with(modifiers: [.randomCase]),
+          preservesNoSpaceBoundaries: false, wordOffset: 0, wordBound: 1,
+          nextRandomCaseBit: { draws += 1; return true }, didScanSource: { count in
+            scanned.append(count)
+            if count == cancelAt { withUnsafeCurrentTask { $0?.cancel() } }
+          })
+      }
+      do { try await task.value; XCTFail("Source scan cancellation must reject the batch") }
+      catch is CancellationError {} catch { XCTFail("Unexpected error: \(error)") }
+      XCTAssertEqual(scanned, cancelAt == 4096 ? [4096] : [4096, 5001])
+      XCTAssertEqual(draws, 0, "Cancelled parsing must not consume transformation random bits")
+    }
+  }
+
   func testOrderedLiveContractMatchesSynchronousTransformerAndRandomDraws() async throws {
     let sources = ["", "  e\u{301} 👩🏽‍💻 中文 سلام a\nb \u{301}end  ",
       "colour center organise HI! next\n"]
@@ -30,6 +49,35 @@ import XCTest
           XCTAssertEqual(actual.noSpaceWordLengths, expected.noSpaceWordLengths)
           XCTAssertEqual(actualDraws, expectedDraws)
         }
+      }
+    }
+  }
+
+  func testScanBoundariesPreserveScalarBytesEmptyFieldsAndReverseOrdering() async throws {
+    let sources = ["", " ", String(repeating: " ", count: 4096),
+      String(repeating: "x", count: 4095) + "\u{301}👩🏽‍💻\t\n river  ",
+      String(repeating: " ", count: 4095) + "\u{301}harbor\u{00a0}end  "]
+    for source in sources {
+      for modifiers: [TestModifier] in [[], [.backwards, .randomCase], [.messagingStyle, .noSpaces]] {
+        let configuration = TestConfiguration.words(1000).with(modifiers: modifiers)
+        var oldDraws = 0, newDraws = 0, scans: [Int] = []
+        let expected = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
+          language: configuration.language, wordOffset: 0, wordBound: 1000,
+          preservesWordOrder: false, capturesSourceFields: true,
+          britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
+          nextRandomCaseBit: { oldDraws += 1; return oldDraws.isMultiple(of: 3) })
+        let actual = try await LivePromptTransformation.prepare(source, configuration: configuration,
+          preservesNoSpaceBoundaries: false, wordOffset: 0, wordBound: 1000, preservesWordOrder: false,
+          nextRandomCaseBit: { newDraws += 1; return newDraws.isMultiple(of: 3) },
+          didScanSource: { scans.append($0) })
+        XCTAssertEqual(Array(actual.text.utf8), Array(expected.text.utf8))
+        XCTAssertEqual(actual.sourceFields?.map { Array($0.utf8) }, expected.sourceFields?.map { Array($0.utf8) })
+        XCTAssertEqual(actual.noSpaceTargetWords.map { Array($0.utf8) }, expected.noSpaceTargetWords.map { Array($0.utf8) })
+        XCTAssertEqual(newDraws, oldDraws)
+        let count = source.unicodeScalars.count
+        var expectedScans = Array(stride(from: 4096, through: count, by: 4096))
+        if count == 0 || !count.isMultiple(of: 4096) { expectedScans.append(count) }
+        XCTAssertEqual(scans, expectedScans)
       }
     }
   }

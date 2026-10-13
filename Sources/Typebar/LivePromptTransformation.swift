@@ -9,13 +9,13 @@ enum LivePromptTransformation {
     preservesWordOrder: Bool = true,
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     batchCheckpoint: ((Int) async -> Void)? = nil,
+    didScanSource: (Int) -> Void = { _ in },
     didTransform: (Int) -> Void = { _ in }) async throws -> TransformedPromptBatch {
     try Task.checkCancellation()
     let modifiers = configuration.modifiers
     let language = configuration.language
     let presented = language.presentationText(source)
-    var words = presented.unicodeScalars.split(separator: " ", omittingEmptySubsequences: false)
-      .map { String(String.UnicodeScalarView($0)) }
+    var words = try await sourceWords(presented, didScan: didScanSource)
     if modifiers.contains(.backwards), !preservesWordOrder { words.reverse() }
     let capturesTargets = TestModifierPolicy.usesNoSpaceInput(modifiers) || preservesNoSpaceBoundaries
     let britishEnglish = BritishEnglishPolicy.Context(configuration: configuration, authoredQuoteAlternate: false)
@@ -62,5 +62,34 @@ enum LivePromptTransformation {
     let result = TransformedPromptBatch(text: output, noSpaceTargetWords: targets, sourceFields: fields)
     try Task.checkCancellation()
     return result
+  }
+
+  @MainActor private static func sourceWords(_ presented: String,
+    didScan: (Int) -> Void) async throws -> [String] {
+    try Task.checkCancellation()
+    var words: [String] = [], field = "", scanned = 0
+    for scalar in presented.unicodeScalars {
+      if scalar.value == 0x20 {
+        words.append(field)
+        field = ""
+      } else {
+        field.unicodeScalars.append(scalar)
+      }
+      scanned += 1
+      if scanned.isMultiple(of: 4096) {
+        didScan(scanned)
+        await Task.yield()
+        try Task.checkCancellation()
+      }
+    }
+    // Like split(omittingEmptySubsequences: false), retain the final empty
+    // field after a separator and the sole empty field of an empty source.
+    words.append(field)
+    if scanned == 0 || !scanned.isMultiple(of: 4096) {
+      didScan(scanned)
+      await Task.yield()
+    }
+    try Task.checkCancellation()
+    return words
   }
 }
