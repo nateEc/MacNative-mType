@@ -30,8 +30,9 @@ jobs:
         run: |
           set -euo pipefail
           test -d "$DEVELOPER_DIR"
-          xcodebuild -version
-          xcodebuild -version | grep -Fxq 'Xcode 26.3'
+          xcode_version="$(xcodebuild -version)"
+          printf '%s\n' "$xcode_version"
+          grep -Fxq 'Xcode 26.3' <<< "$xcode_version"
           swift --version
           swift -e 'import AppKit; print("system reduce motion:", NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)'
 
