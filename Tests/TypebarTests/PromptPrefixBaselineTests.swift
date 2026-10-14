@@ -128,7 +128,12 @@ import XCTest
     for smooth in [false, true] {
       let (scroll, follower) = fixture(), attempt = UUID()
       var retired: [Int] = []
-      let notify: (PromptWordRetirement) -> Void = { retired.append($0.firstRetainedWordIndex) }
+      let second = expectation(description: "Coalesced word retirement, smooth=\(smooth)")
+      second.assertForOverFulfill = true
+      let notify: (PromptWordRetirement) -> Void = {
+        retired.append($0.firstRetainedWordIndex)
+        if $0.firstRetainedWordIndex == 2 { second.fulfill() }
+      }
       for active in [0, 3, 6] {
         update(follower, text: "aa\nbb\ncc\ndd", active: active,
           offsets: [0: 0, 3: 3, 6: 6, 9: 9], attempt: attempt, smooth: smooth, notify: notify)
@@ -139,6 +144,7 @@ import XCTest
         offsets: [3: 0, 6: 3, 9: 6], retained: 1, attempt: attempt, smooth: smooth, pump: false, notify: notify)
       update(follower, text: "bb\ncc\ndd", active: 9,
         offsets: [3: 0, 6: 3, 9: 6], retained: 1, attempt: attempt, smooth: smooth, notify: notify)
+      wait(for: [second], timeout: 1)
       finish()
       XCTAssertEqual(retired, [1, 2], "smooth=\(smooth)")
       withExtendedLifetime(scroll) { follower.removeFromSuperview() }

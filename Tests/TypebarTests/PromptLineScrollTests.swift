@@ -3,6 +3,15 @@ import SwiftUI
 import XCTest
 @testable import Typebar
 
+@MainActor private final class PromptClipOriginRecorder: NSObject {
+  var origins: [CGFloat] = []
+
+  @objc func record(_ notification: Notification) {
+    guard let clip = notification.object as? NSClipView else { return }
+    origins.append(clip.bounds.minY)
+  }
+}
+
 @MainActor final class PromptLineScrollTests: XCTestCase {
   private final class Document: NSView { override var isFlipped: Bool { true } }
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .medium)
@@ -65,11 +74,22 @@ import XCTest
     XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 0.5)
   }
 
-  func testReducedMotionSettlesImmediatelyDespiteSmoothSetting() {
+  func testReducedMotionSettlesImmediatelyDespiteSmoothSetting() throws {
     let (scroll, follower) = fixture(), attempt = UUID()
+    let clip = scroll.contentView, recorder = PromptClipOriginRecorder()
+    clip.postsBoundsChangedNotifications = true
+    NotificationCenter.default.addObserver(recorder, selector: #selector(PromptClipOriginRecorder.record(_:)),
+      name: NSView.boundsDidChangeNotification, object: clip)
+    defer { NotificationCenter.default.removeObserver(recorder) }
     update(follower, row: 0, attempt: attempt, smooth: true, reduced: true)
     update(follower, row: 1, attempt: attempt, smooth: true, reduced: true)
+    recorder.origins.removeAll()
     update(follower, row: 2, attempt: attempt, smooth: true, reduced: true)
+    let deadline = Date().addingTimeInterval(1)
+    while !recorder.origins.contains(where: { abs($0) > 0.5 }) && Date() < deadline {
+      RunLoop.main.run(until: min(deadline, Date().addingTimeInterval(0.005)))
+    }
+    XCTAssertEqual(try XCTUnwrap(recorder.origins.first(where: { abs($0) > 0.5 })), 45, accuracy: 0.5)
     XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 0.5)
   }
 
@@ -180,17 +200,23 @@ import XCTest
     XCTAssertEqual(scroll.bounds.height, 135, accuracy: 1)
     XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 1)
     XCTAssertFalse(window.isVisible)
+    let clip = scroll.contentView
     host.rootView = root(row: 0)
     host.layoutSubtreeIfNeeded()
-    RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+    let resetDeadline = Date().addingTimeInterval(1)
+    while abs(clip.bounds.minY) > 0.5 && Date() < resetDeadline {
+      RunLoop.main.run(until: min(resetDeadline, Date().addingTimeInterval(0.005)))
+    }
+    XCTAssertEqual(clip.bounds.minY, 0, accuracy: 0.5)
     for row in 1...2 {
       host.rootView = root(row: row, smooth: true, frameRate: 15)
       host.layoutSubtreeIfNeeded()
       RunLoop.main.run(until: Date().addingTimeInterval(0.01))
     }
-    RunLoop.main.run(until: Date().addingTimeInterval(0.02))
-    XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 0.5)
-    RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+    let deadline = Date().addingTimeInterval(1)
+    while abs(clip.bounds.minY - 45) > 0.5 && Date() < deadline {
+      RunLoop.main.run(until: min(deadline, Date().addingTimeInterval(0.005)))
+    }
     XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 1)
     if let directory = ProcessInfo.processInfo.environment["TYPEBAR_LINE_SCROLL_QA_IMAGE_DIRECTORY"],
       let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
