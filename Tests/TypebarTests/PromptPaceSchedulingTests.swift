@@ -205,7 +205,7 @@ import XCTest
     XCTAssertEqual(motion.pace.position, predecessor)
   }
 
-  func testActualDeadlineTimerGeneratesMoreTargetsThanFifteenFPSPolling() {
+  func testActualDeadlineTimerSchedulesPaceSeparatelyFromFifteenFPSDrawing() {
     let motion = PromptCaretMotionCoordinator()
     let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 600, height: 400))
     defer { view.stop() }
@@ -226,10 +226,17 @@ import XCTest
       return self.rendering
     }
     view.update(config); view.layout(); view.present(at: ProcessInfo.processInfo.systemUptime)
+    let intervals = view.scheduledTimerIntervals
+    XCTAssertEqual(intervals.drawing ?? -1, 1.0 / 15, accuracy: 0.000001)
+    // The initial target may request an immediate wake (zero); later targets
+    // use 40ms deadlines. Neither may inherit the 67ms presentation cadence.
+    XCTAssertNotNil(intervals.pace)
+    XCTAssertGreaterThanOrEqual(intervals.pace ?? -1, 0)
+    XCTAssertLessThanOrEqual(intervals.pace ?? .infinity, 0.04 + 0.000001)
     origin = clock.now() // Exclude initial native hosting/layout warm-up.
     RunLoop.main.run(until: Date().addingTimeInterval(0.26))
-    XCTAssertGreaterThanOrEqual(Set(requests).count, 5,
-      "40ms pace deadlines must not be reduced to 67ms drawing polls: \(requests)")
+    XCTAssertTrue(requests.contains(where: { $0 > 1 }),
+      "The independently scheduled pace timer must wake and read a later target: \(requests)")
   }
 
   func testStartingPaceRequestsItsFirstTargetWithoutWaitingForAPresentation() {

@@ -292,12 +292,18 @@ import XCTest
   func testAnimationInheritsLowFrameRateAndRetimesWhenTheSettingChanges() {
     let (scroll, follower) = fixture(), attempt = UUID()
     for row in 0...2 { update(follower, row: row, attempt: attempt, smooth: true, frameRate: 15) }
-    RunLoop.main.run(until: Date().addingTimeInterval(0.02))
-    XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 0.5)
+    XCTAssertEqual(follower.scheduledLineScrollInterval ?? -1, 1.0 / 15, accuracy: 0.000001)
     update(follower, row: 2, attempt: attempt, smooth: true, frameRate: 30)
-    RunLoop.main.run(until: Date().addingTimeInterval(0.04))
+    XCTAssertEqual(follower.scheduledLineScrollInterval ?? -1, 1.0 / 30, accuracy: 0.000001)
+    let firstDeadline = Date().addingTimeInterval(1)
+    while scroll.contentView.bounds.minY <= 0 && Date() < firstDeadline {
+      RunLoop.main.run(until: min(firstDeadline, Date().addingTimeInterval(0.005)))
+    }
     XCTAssertGreaterThan(scroll.contentView.bounds.minY, 0)
-    RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+    let finalDeadline = Date().addingTimeInterval(1)
+    while abs(scroll.contentView.bounds.minY - 45) > 0.5 && Date() < finalDeadline {
+      RunLoop.main.run(until: min(finalDeadline, Date().addingTimeInterval(0.005)))
+    }
     XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 0.5)
   }
 

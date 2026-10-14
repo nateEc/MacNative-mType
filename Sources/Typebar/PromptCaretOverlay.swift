@@ -397,6 +397,8 @@ final class PromptAutoScrollView: NSView {
     if resetOverlap { lineScrollOverlap = .init() }
   }
 
+  var scheduledLineScrollInterval: TimeInterval? { lineScrollTimer?.timeInterval }
+
   func cancelCaretMotion() {
     lineScroll?.caretMotion?.cancel(at: ProcessInfo.processInfo.systemUptime)
   }

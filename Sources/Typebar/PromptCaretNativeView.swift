@@ -53,6 +53,9 @@ final class PromptCaretNativeView: NSView {
   private var paceHost: NSHostingView<PromptCaretMarkerView>?
   private var timer: Timer?
   private var paceTimer: Timer?
+  var scheduledTimerIntervals: (drawing: TimeInterval?, pace: TimeInterval?) {
+    (timer?.timeInterval, paceTimer?.timeInterval)
+  }
   private var input: PromptCaretInputIdentity?
   private var mainOffset: Int?
   private var paceSequence: Double?
