@@ -57,6 +57,61 @@ final class NoSpaceUnitSessionTests: XCTestCase {
     XCTAssertEqual(result.wpm, 0)
   }
 
+  func testWrongFinalNoSpaceFieldFinishesOnImplicitCommitRegardlessOfQuickEnd() throws {
+    for quickEnd in [false, true] {
+      var session = attempt("ab cd", rules: .init(quickEnd: quickEnd))
+      XCTAssertEqual(session.prompt, "abcd")
+      session.insertBatch("ab", at: start)
+      XCTAssertEqual(session.outcome, .active)
+      session.insertBatch("ce", at: start.addingTimeInterval(1))
+      XCTAssertEqual(session.outcome, .completed, "quickEnd=\(quickEnd)")
+      XCTAssertEqual(session.typed, "abce")
+      XCTAssertEqual(session.completedWordCount, 2)
+      XCTAssertEqual(session.wordReviews.map(\.target), ["ab", "cd"])
+      XCTAssertEqual(session.wordReviews.map(\.typed), ["ab", "ce"])
+      let result = try XCTUnwrap(session.result())
+      XCTAssertEqual(result.replayEvents.last?.inputField?.index, 1)
+      XCTAssertEqual(result.replayEvents.last?.inputField?.value, "ce")
+      XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
+        through: result.elapsedDuration), session.typed)
+    }
+  }
+
+  func testErrorRecoveryBlocksQuickEndFromFinishingWrongFinalNoSpaceField() {
+    for rules in [InputRules(stopOnErrorMode: .letter, quickEnd: true),
+      .init(stopOnErrorMode: .word, quickEnd: true),
+      .init(deleteOnErrorMode: .letter, quickEnd: true)]
+    {
+      var session = attempt("ab cd", rules: rules)
+      session.insertBatch("ab", at: start)
+      session.insertBatch("ce", at: start.addingTimeInterval(1))
+      XCTAssertEqual(session.outcome, .active, "\(rules)")
+      XCTAssertLessThan(session.completedWordCount, 2)
+    }
+  }
+
+  func testNoSpaceImplicitFinalCommitUsesUTF16LengthAcrossDifferentGlyphWidths() {
+    for quickEnd in [false, true] {
+      let configuration = TestConfiguration.words(2, rules: .init(quickEnd: quickEnd))
+        .with(modifiers: [.noSpaces])
+      var wideTarget = TypingSession(configuration: configuration, prompt: "ab🙂",
+        noSpaceTargetWords: ["ab", "🙂"])
+      wideTarget.insertBatch("abx", at: start)
+      XCTAssertEqual(wideTarget.outcome, .active, "quickEnd=\(quickEnd)")
+      wideTarget.insert("y", at: start.addingTimeInterval(1))
+      XCTAssertEqual(wideTarget.outcome, .completed, "quickEnd=\(quickEnd)")
+      XCTAssertEqual(wideTarget.wordReviews.map(\.typed), ["ab", "xy"])
+
+      var wideInput = TypingSession(configuration: configuration, prompt: "abcd",
+        noSpaceTargetWords: ["ab", "cd"])
+      wideInput.insertBatch("ab", at: start)
+      XCTAssertEqual(wideInput.outcome, .active)
+      wideInput.insert("🙂", at: start.addingTimeInterval(1))
+      XCTAssertEqual(wideInput.outcome, .completed, "quickEnd=\(quickEnd)")
+      XCTAssertEqual(wideInput.wordReviews.map(\.typed), ["ab", "🙂"])
+    }
+  }
+
   func testRegionalIndicatorTargetsKeepSeparateFieldsEvenInsideOneGlyph() throws {
     var session = attempt("🇫 🇷🇨", rules: .init(freedomMode: true))
     session.insert("🇫", at: start)

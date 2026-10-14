@@ -98,6 +98,19 @@ assert.deepEqual(positions(),[0,1,0,1]);
 assert.deepEqual(inputEvents().map(e=>e.lastWord===true),[false,false,true,true]);
 assert.equal(completed,true);
 
+for(const quickEnd of [false,true]) for(const [lastTarget,lastInput] of [
+  ['cd','ce'],['🙂','xy'],['cd','🙂']
+]) {
+ reset(['ab',lastTarget]);Config.quickEnd=quickEnd;
+ await main.namespace.emulateInsertText({data:'ab'+lastInput,now:0});
+ assert.equal(completed,true,`No-space implicit final commit: quickEnd=${quickEnd}, target=${lastTarget}, input=${lastInput}`);
+ assert.equal(wordIndex,1);
+ assert.equal(inputEvents().at(-1).commitsWord,true);
+ assert.equal(inputEvents().at(-1).lastWord,true);
+}
+Config.quickEnd=false;
+console.log('6 pinned-source no-space final-field scenarios passed (actual input modules; owned targets and in-memory input adapter).');
+
 reset(['a','b'],{mode:'time',grow:true});
 await main.namespace.emulateInsertText({data:'ab',now:0});
 assert.equal(inputEvents().at(-1).lastWord,true);
