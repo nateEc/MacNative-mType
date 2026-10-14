@@ -421,6 +421,10 @@ run_logged_check "executing pinned poetry provider response classification" \
   "$temporary_directory/poetry-provider-outcomes-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-poetry-outcomes.mjs" "$reference_root"
+run_logged_check "executing pinned live section caller branches" \
+  "$temporary_directory/live-section-caller-source-check.log" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-live-section-caller.mjs" "$reference_root"
 run_logged_check "executing pinned complete initial generation retry bounds" \
   "$temporary_directory/initial-generation-retries-source-check.log" \
   "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \
