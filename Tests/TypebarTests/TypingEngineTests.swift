@@ -8884,7 +8884,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardGuideModel.rows(for: .colemakDHKANSI)[3].map(\.label).joined(), "XCDVZMH,./")
     XCTAssertEqual(
-      KeyboardGuideModel.rows(for: .colemakDHKISO)[3].map(\.label).joined(), "ZXCDV`MH,./")
+      KeyboardGuideModel.rows(for: .colemakDHKISO)[3].map(\.label).joined(), "ZXCDV\\MH,./")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "k", layout: .colemakDHKANSI), "home-5")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "m", layout: .colemakDHKISO), "bottom-6")
     XCTAssertEqual(
@@ -8894,7 +8894,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .colemakDHKISO), "Z")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.shift], layout: .colemakDHKISO), "~")
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.shift], layout: .colemakDHKISO), "|")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "M", layout: .colemakDHKANSI), 45)
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Z", layout: .colemakDHKISO), 10)
 

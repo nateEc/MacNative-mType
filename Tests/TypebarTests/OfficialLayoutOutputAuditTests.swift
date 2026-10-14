@@ -106,6 +106,44 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     }
   }
 
+  func testColemakISOLayoutsKeepTheirDistinctExtraKeys() {
+    let variants: [(KeyboardLayout, String, String)] = [
+      (.colemakDHISO, "\\", "|"), (.colemakDHKISO, "#", "'"),
+    ]
+    let numberKeys: [(UInt16, String, String)] = [
+      (50, "`", "~"), (18, "1", "!"), (19, "2", "@"), (20, "3", "#"),
+      (21, "4", "$"), (23, "5", "%"), (22, "6", "^"), (26, "7", "&"),
+      (28, "8", "*"), (25, "9", "("), (29, "0", ")"), (27, "-", "_"),
+      (24, "=", "+"),
+    ]
+    for (layout, isoHomeBase, isoHomeShift) in variants {
+      let rows = KeyboardGuideModel.rows(for: layout)
+      XCTAssertEqual(rows[0].count, 13, "\(layout) number row")
+      XCTAssertEqual(rows[0].first?.label, "`", "\(layout) grave key")
+      XCTAssertEqual(rows[2].count, 12, "\(layout) ISO home row")
+      XCTAssertEqual(rows[2].last?.label, isoHomeBase, "\(layout) extra home key")
+      XCTAssertEqual(rows[2].last?.shiftedLabel, isoHomeShift, "\(layout) extra home Shift")
+      XCTAssertEqual(rows[3].count, 11, "\(layout) ISO bottom row")
+      XCTAssertEqual(rows[3][5].label, "\\", "\(layout) bottom backslash")
+      XCTAssertEqual(rows[3][5].legend(
+        style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), "|", "\(layout) bottom Shift")
+      for (keyCode, base, shifted) in numberKeys {
+        XCTAssertEqual(KeyboardLayoutEmulator.text(
+          forKeyCode: keyCode, modifierFlags: [], mapping: .builtIn(layout)), base)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(
+          forKeyCode: keyCode, modifierFlags: .shift, mapping: .builtIn(layout)), shifted)
+      }
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 42, modifierFlags: [], mapping: .builtIn(layout)), isoHomeBase)
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 42, modifierFlags: .shift, mapping: .builtIn(layout)), isoHomeShift)
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 11, modifierFlags: [], mapping: .builtIn(layout)), "\\")
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 11, modifierFlags: .shift, mapping: .builtIn(layout)), "|")
+    }
+  }
+
   func testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation() throws {
     guard let root = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_AUDIT_REFERENCE"] else {
       throw XCTSkip("Set TYPEBAR_LAYOUT_AUDIT_REFERENCE to a pinned read-only checkout")

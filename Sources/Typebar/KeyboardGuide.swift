@@ -3001,10 +3001,11 @@ enum KeyboardGuideModel {
       ]
     case .colemakDHISO:
       [
-        row("number", "1234567890-="),
+        row("number", "`1234567890-="),
         row("top", "QWFPBJLUY;[]"),
-        row("home", "ARSTGMNEIO'"),
-        row("bottom", "ZXCDV`KH,./"),
+        row("home", "ARSTGMNEIO'")
+          + [KeyboardGuideKey("home-11", label: "\\", shiftedLabel: "|")],
+        row("bottom", "ZXCDV\\KH,./"),
       ]
     case .colemakDHMatrix:
       [
@@ -3038,10 +3039,11 @@ enum KeyboardGuideModel {
       ]
     case .colemakDHKISO:
       [
-        row("number", "1234567890-="),
+        row("number", "`1234567890-="),
         row("top", "QWFPBJLUY;[]"),
-        row("home", "ARSTGKNEIO'"),
-        row("bottom", "ZXCDV`MH,./"),
+        row("home", "ARSTGKNEIO'")
+          + [KeyboardGuideKey("home-11", label: "#", shiftedLabel: "'")],
+        row("bottom", "ZXCDV\\MH,./"),
       ]
     case .ansiNorman:
       [
