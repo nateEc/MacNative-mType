@@ -122,6 +122,12 @@ final class ReplayCharacterTextView: NSTextView {
 
   func update(text: String, reachableIndices: Set<Int>, selectedIndex: Int?,
     glyphs: [TypingPromptGlyph]? = nil, errorIndices: Set<Int> = []) {
+    // A newly attached document view can still have a zero-width frame on
+    // macOS 15; keep TextKit tied to the viewport even when text is unchanged.
+    if let scrollView = enclosingScrollView, scrollView.contentSize.width > 0,
+      bounds.width != scrollView.contentSize.width {
+      setFrameSize(NSSize(width: scrollView.contentSize.width, height: frame.height))
+    }
     let validGlyphs = glyphs.flatMap {
       String($0.map(\.character)).utf16.elementsEqual(text.utf16) ? $0 : nil
     }

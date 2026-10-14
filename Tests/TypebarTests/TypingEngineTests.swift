@@ -17920,6 +17920,7 @@ final class TypingEngineTests: XCTestCase {
     let picker = ReplayCharacterTextView()
     let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 240, height: 96))
     scrollView.documentView = picker
+    picker.setFrameSize(.zero) // macOS 15 can leave a newly attached document view at zero width.
     let prompt = Array(repeating: "amber harbor", count: 80).joined(separator: " ")
     picker.update(
       text: prompt, reachableIndices: Set(0..<prompt.count),
@@ -17929,6 +17930,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(picker.isVerticallyResizable)
     XCTAssertEqual(picker.string, prompt)
     scrollView.layoutSubtreeIfNeeded()
+    XCTAssertGreaterThan(picker.bounds.width, 200)
+    picker.setFrameSize(.zero)
+    picker.update(text: prompt, reachableIndices: Set(0..<prompt.count), selectedIndex: nil)
     XCTAssertGreaterThan(picker.bounds.width, 200)
     if let layoutManager = picker.layoutManager, let textContainer = picker.textContainer {
       layoutManager.ensureLayout(for: textContainer)
