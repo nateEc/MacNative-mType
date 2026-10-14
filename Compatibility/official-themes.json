@@ -242,7 +242,13 @@
     "peaches",
     "tangerine",
     "tiramisu",
-    "terra"
+    "terra",
+    "aether",
+    "bento",
+    "hanok",
+    "carbon",
+    "horizon",
+    "laser"
   ],
   "exactMappings": {},
   "relatedMappings": {
@@ -294,6 +300,12 @@
     "peaches": "peaches",
     "tangerine": "tangerine",
     "tiramisu": "tiramisu",
-    "terra": "terra"
+    "terra": "terra",
+    "aether": "aether",
+    "bento": "bento",
+    "hanok": "hanok",
+    "carbon": "carbon",
+    "horizon": "horizon",
+    "laser": "laser"
   }
 }

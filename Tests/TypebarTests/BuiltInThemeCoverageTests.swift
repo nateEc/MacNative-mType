@@ -4,6 +4,36 @@ import XCTest
 @testable import Typebar
 
 final class BuiltInThemeCoverageTests: XCTestCase {
+  func testSixNewRelatedThemesAreSelectableReadableAndDistinct() throws {
+    let names = ["aether", "bento", "hanok", "carbon", "horizon", "laser"]
+    let variants = names.compactMap(AppTheme.init(rawValue:))
+    XCTAssertEqual(variants.count, names.count)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .light }.count, 3)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .dark }.count, 3)
+    for theme in variants {
+      XCTAssertEqual(try JSONDecoder().decode(AppTheme.self, from: JSONEncoder().encode(theme)), theme)
+      XCTAssertTrue(theme.displayName.hasSuffix(" · Typebar"))
+      XCTAssertEqual(ThemeQuickPickerSearch.results(
+        scope: .builtIn, query: theme.rawValue, builtInThemes: AppTheme.allCases,
+        customThemes: [], favoriteThemeIDs: []).builtInThemes, [theme])
+      XCTAssertEqual(ThemeCommandCatalog.target(
+        for: ThemeCommandCatalog.identifier(for: .builtIn(theme))), .builtIn(theme))
+      let resolved = theme.resolvedTheme
+      for surface in [theme.background, theme.panel] {
+        XCTAssertGreaterThanOrEqual(contrast(resolved.text, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(contrast(resolved.secondaryText, surface), 4.5, theme.rawValue)
+        for mark in [resolved.accent, resolved.caret, resolved.error, resolved.extraInput,
+          resolved.colorfulError, resolved.colorfulExtraInput] {
+          XCTAssertGreaterThanOrEqual(contrast(mark, surface), 3.0, theme.rawValue)
+        }
+      }
+      for other in AppTheme.allCases where other != theme {
+        XCTAssertNotEqual(ThemeColor(color: theme.background), ThemeColor(color: other.background),
+          "Duplicate background: \(theme.rawValue), \(other.rawValue)")
+      }
+    }
+  }
+
   func testEighteenNewMaterialThemesAreSelectableReadableAndDistinctFromTheExistingCatalog() throws {
     let names = [
       "blue_dolphin", "earthsong", "fleuriste", "froyo", "fruit_chew", "hedge",

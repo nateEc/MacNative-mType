@@ -326,6 +326,12 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case tangerine
     case tiramisu
     case terra
+    case aether
+    case bento
+    case hanok
+    case carbon
+    case horizon
+    case laser
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -407,6 +413,12 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .tangerine: "橘瓣 · Typebar"
         case .tiramisu: "提拉米苏 · Typebar"
         case .terra: "陶土 · Typebar"
+        case .aether: "晴空薄雾 · Typebar"
+        case .bento: "漆盒彩格 · Typebar"
+        case .hanok: "木格纸窗 · Typebar"
+        case .carbon: "石墨 · Typebar"
+        case .horizon: "暮色地平线 · Typebar"
+        case .laser: "霓虹光束 · Typebar"
         }
     }
 
@@ -548,6 +560,18 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0xE9D6BE, 0xD9C09F, 0x554825, 0x392F29, 0x5D4E3E, light: true, error: 0x942C41)
         case .terra:
             Self.palette(0x3E302C, 0x5B4640, 0xE5B69E, 0xF5EDE1, 0xDACCC1, light: false, error: 0xF3A899)
+        case .aether:
+            Self.palette(0xECEAF7, 0xD6D4EA, 0x4F4C98, 0x262743, 0x525269, light: true, error: 0x8E314A)
+        case .bento:
+            Self.palette(0xF4E5D8, 0xE5D0BF, 0x8A3F32, 0x382B2C, 0x604B48, light: true, error: 0x882842)
+        case .hanok:
+            Self.palette(0xEAE2CE, 0xD5C6A9, 0x335C48, 0x302F27, 0x524C3F, light: true, error: 0x943340)
+        case .carbon:
+            Self.palette(0x20272B, 0x344148, 0x9AE0D5, 0xF2F5F2, 0xC3D4D1, light: false, error: 0xFF9B9B)
+        case .horizon:
+            Self.palette(0x202F45, 0x354B62, 0xF5BF8C, 0xF5F1E9, 0xC9D4DD, light: false, error: 0xFF9EAB)
+        case .laser:
+            Self.palette(0x2F213C, 0x493354, 0xF29AD3, 0xF9EDF7, 0xD9C6D8, light: false, error: 0xFCB08F)
         }
     }
 }
