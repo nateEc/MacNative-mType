@@ -27,10 +27,11 @@ enum LocalPracticeFontFilePolicy {
 enum TypebarLocalPracticeFontStore {
   private static let directoryName = "Typebar"
   private static let enabledDefaultsKey = "typebar.local-practice-font-enabled"
+  private static let selectedDefaultsKey = "typebar.local-practice-font-selected-file"
 
-  static var hasStoredFont: Bool { storedFontURL != nil }
+  static var hasStoredFont: Bool { !storedFontURLs.isEmpty }
 
-  static var isActive: Bool { hasStoredFont && isEnabled }
+  static var isActive: Bool { storedFontURL != nil && isEnabled }
 
   static var activeInfo: LocalPracticeFontInfo? {
     guard isActive, let url = storedFontURL else { return nil }
@@ -43,16 +44,26 @@ enum TypebarLocalPracticeFontStore {
   }
 
   static func save(_ data: Data, originalFilename: String) throws -> LocalPracticeFontInfo {
-    try LocalPracticeFontImport.save(data, originalFilename: originalFilename,
+    // Pin the legacy choice before a failed registration can leave an extra
+    // owned file. An empty value also protects a failed first import.
+    LocalPracticeFontSelection.pinLegacySelection(in: storedFontURLs,
+      defaults: .standard, key: selectedDefaultsKey)
+    return try LocalPracticeFontImport.save(data, originalFilename: originalFilename,
       directory: directoryURL, readInfo: fontInfo(at:), register: registerAndRead(url:),
-      unregister: unregister, enable: { setEnabled(true) })
+      unregister: unregister, enable: { setEnabled(true) }, selectActive: {
+        UserDefaults.standard.set($0.lastPathComponent, forKey: selectedDefaultsKey)
+      })
   }
 
   /// Re-enables a font file that was deliberately retained after switching
   /// back to a system or named font.
   @discardableResult
   static func activate() -> Bool {
-    guard let url = storedFontURL, registerAndRead(url: url) != nil else { return false }
+    let preferred = storedFontURL
+    let candidates = (preferred.map { [$0] } ?? [])
+      + storedFontURLs.filter { $0 != preferred }
+    guard let url = candidates.first(where: { registerAndRead(url: $0) != nil }) else { return false }
+    UserDefaults.standard.set(url.lastPathComponent, forKey: selectedDefaultsKey)
     setEnabled(true)
     return true
   }
@@ -68,10 +79,16 @@ enum TypebarLocalPracticeFontStore {
     try LocalPracticeFontRemoval.remove(storedFontURLs, unregister: unregister,
       register: { _ = registerAndRead(url: $0) },
       removeFile: { try FileManager.default.removeItem(at: $0) },
-      didRemove: { UserDefaults.standard.removeObject(forKey: enabledDefaultsKey) })
+      didRemove: {
+        UserDefaults.standard.removeObject(forKey: enabledDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: selectedDefaultsKey)
+      })
   }
 
-  private static var storedFontURL: URL? { storedFontURLs.first }
+  private static var storedFontURL: URL? {
+    LocalPracticeFontSelection.selectedURL(in: storedFontURLs,
+      defaults: .standard, key: selectedDefaultsKey)
+  }
 
   private static var storedFontURLs: [URL] {
     LocalPracticeFontImport.storedURLs(in: directoryURL)
@@ -106,6 +123,27 @@ enum TypebarLocalPracticeFontStore {
   private static var directoryURL: URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent(directoryName, isDirectory: true)
+  }
+}
+
+/// Nil preference is the old app's first-file choice. Any stored value,
+/// including an empty or malformed one, must not silently select a different
+/// private file left by an interrupted import or removal.
+enum LocalPracticeFontSelection {
+  static func selectedURL(in urls: [URL], selectedFilename: String?) -> URL? {
+    guard let selectedFilename else { return urls.first }
+    return urls.first { $0.lastPathComponent == selectedFilename }
+  }
+
+  static func selectedURL(in urls: [URL], defaults: UserDefaults, key: String) -> URL? {
+    guard let value = defaults.object(forKey: key) else { return urls.first }
+    guard let filename = value as? String else { return nil }
+    return selectedURL(in: urls, selectedFilename: filename)
+  }
+
+  static func pinLegacySelection(in urls: [URL], defaults: UserDefaults, key: String) {
+    guard defaults.object(forKey: key) == nil else { return }
+    defaults.set(urls.first?.lastPathComponent ?? "", forKey: key)
   }
 }
 
@@ -173,7 +211,8 @@ enum LocalPracticeFontImport {
 
   static func save(_ data: Data, originalFilename: String, directory: URL,
     readInfo: (URL) -> LocalPracticeFontInfo?, register: (URL) -> LocalPracticeFontInfo?,
-    unregister: (URL) throws -> Void, enable: () -> Void) throws -> LocalPracticeFontInfo {
+    unregister: (URL) throws -> Void, enable: () -> Void,
+    selectActive: (URL) -> Void = { _ in }) throws -> LocalPracticeFontInfo {
     guard LocalPracticeFontFilePolicy.supports(filename: originalFilename) else {
       throw LocalPracticeFontError.unsupportedFormat
     }
@@ -220,6 +259,9 @@ enum LocalPracticeFontImport {
       if retiredDestination { try? FileManager.default.removeItem(at: destinationURL) }
       throw LocalPracticeFontError.couldNotLoad
     }
+    // Select the registered file before deleting prior generations. If old
+    // file cleanup leaves multiple files, ordinary reads use the new choice.
+    selectActive(destinationURL)
     for url in previousURLs {
       try? FileManager.default.removeItem(at: url)
     }

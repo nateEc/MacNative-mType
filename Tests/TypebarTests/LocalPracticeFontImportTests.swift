@@ -56,7 +56,9 @@ final class LocalPracticeFontImportTests: XCTestCase {
         }, unregister: { url in
           XCTAssertEqual(url.lastPathComponent, previous.lastPathComponent)
           throw failure
-        }, enable: { enabled = true })) { error in
+        }, enable: { enabled = true }, selectActive: { _ in
+          XCTFail("A failed unload must not change the active file")
+        })) { error in
           XCTAssertEqual(error as NSError, failure)
         }
       XCTAssertTrue(registered, "The failed unload might have partially changed native registration")
@@ -104,7 +106,8 @@ final class LocalPracticeFontImportTests: XCTestCase {
           return nil // Native registration may have succeeded before source validation failed.
         }, unregister: { url in
           if url.lastPathComponent != previous.lastPathComponent { throw failure }
-        }, enable: { XCTFail("Failed replacement must not change the enabled setting") })) { error in
+        }, enable: { XCTFail("Failed replacement must not change the enabled setting") },
+        selectActive: { _ in XCTFail("Failed cleanup must not select its retained file") })) { error in
           guard case LocalPracticeFontError.couldNotLoad = error else {
             return XCTFail("Expected loading failure, received \(error)")
           }
@@ -137,6 +140,27 @@ final class LocalPracticeFontImportTests: XCTestCase {
       XCTAssertFalse(FileManager.default.fileExists(atPath: previous.path))
       XCTAssertEqual(enables, 1)
       XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [active.lastPathComponent])
+    }
+  }
+
+  func testSuccessfulReplacementRecordsNewFileBeforeEnablingIt() throws {
+    try withDirectory { directory, previous in
+      var selected: URL?, enabled = false
+      _ = try LocalPracticeFontImport.save(Data("new fixture".utf8), originalFilename: "new.otf",
+        directory: directory, readInfo: { _ in self.info }, register: { _ in self.info },
+        unregister: { _ in }, enable: {
+          XCTAssertNotNil(selected, "The active filename must be recorded before enabling")
+          enabled = true
+        }, selectActive: { url in
+          XCTAssertTrue(FileManager.default.fileExists(atPath: previous.path))
+          XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+          selected = url
+        })
+      XCTAssertTrue(enabled)
+      let active = try XCTUnwrap(selected)
+      XCTAssertNotEqual(active.lastPathComponent, previous.lastPathComponent)
+      XCTAssertEqual(LocalPracticeFontImport.storedURLs(in: directory).map(\.lastPathComponent),
+        [active.lastPathComponent])
     }
   }
 
