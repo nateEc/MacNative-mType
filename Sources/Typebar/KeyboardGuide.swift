@@ -1231,7 +1231,8 @@ enum KeyboardGuideModel {
     case .ansiQwerty:
       [
         row("number", "1234567890-="),
-        row("top", "QWERTYUIOP[]"),
+        row("top", "QWERTYUIOP[]")
+          + [KeyboardGuideKey("top-12", label: "\\", shiftedLabel: "|")],
         row("home", "ASDFGHJKL;'"),
         row("bottom", "ZXCVBNM,./"),
       ]
