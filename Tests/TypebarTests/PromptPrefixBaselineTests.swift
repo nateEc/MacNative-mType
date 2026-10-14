@@ -33,7 +33,12 @@ import XCTest
     for smooth in [false, true] {
       let (scroll, follower) = fixture(), attempt = UUID()
       var retired: [Int] = []
-      let notify: (PromptWordRetirement) -> Void = { retired.append($0.firstRetainedWordIndex) }
+      let delivered = expectation(description: "Native prefix retirement, smooth=\(smooth)")
+      delivered.assertForOverFulfill = true
+      let notify: (PromptWordRetirement) -> Void = {
+        retired.append($0.firstRetainedWordIndex)
+        delivered.fulfill()
+      }
       update(follower, text: "aa\nbb cc dd", active: 0, offsets: [0: 0, 3: 3, 6: 6, 9: 9],
         attempt: attempt, smooth: smooth, notify: notify)
       update(follower, text: "aa\nbb cc dd", active: 6, offsets: [0: 0, 3: 3, 6: 6, 9: 9],
@@ -42,7 +47,7 @@ import XCTest
       // IDs model the same active field, not a new updateActiveElement call.
       update(follower, text: "aa\nbb\nxx\nyy cc dd", active: 6,
         offsets: [0: 0, 3: 3, 6: 12, 9: 15], attempt: attempt, smooth: smooth, notify: notify)
-      finish()
+      wait(for: [delivered], timeout: 1)
       XCTAssertEqual(retired, [1], "smooth=\(smooth)")
       update(follower, text: "bb\nxx\nyy cc dd", active: 6,
         offsets: [3: 0, 6: 9, 9: 12], retained: 1, attempt: attempt, smooth: smooth, notify: notify)

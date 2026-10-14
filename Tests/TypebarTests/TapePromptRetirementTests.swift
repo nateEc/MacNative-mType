@@ -187,11 +187,16 @@ import XCTest
       let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 60))
       defer { view.stop() }
       var retired: [PromptWordRetirement] = []
-      configure(view, coordinator, attempt: attempt, active: 0, rtl: rtl, smooth: smooth, pace: pace, at: 0) { retired.append($0) }
-      configure(view, coordinator, attempt: attempt, active: 5, rtl: rtl, smooth: smooth, pace: pace, at: 1) { retired.append($0) }
+      let delivered = expectation(description: "Tape prefix retirement, rtl=\(rtl) smooth=\(smooth) pace=\(pace)")
+      delivered.assertForOverFulfill = true
+      let notify: (PromptWordRetirement) -> Void = { retired.append($0); delivered.fulfill() }
+      configure(view, coordinator, attempt: attempt, active: 0, rtl: rtl, smooth: smooth, pace: pace, at: 0, notify: notify)
+      configure(view, coordinator, attempt: attempt, active: 5, rtl: rtl, smooth: smooth, pace: pace, at: 1, notify: notify)
       view.present(at: 1.07); drain()
-      configure(view, coordinator, attempt: attempt, active: 6, rtl: rtl, smooth: smooth, pace: pace, at: 1.07) { retired.append($0) }
+      configure(view, coordinator, attempt: attempt, active: 6, rtl: rtl, smooth: smooth, pace: pace,
+        at: 1.07, notify: notify)
       view.present(at: 1.07); drain()
+      wait(for: [delivered], timeout: 1)
       let boundary = try XCTUnwrap(retired.last).firstRetainedWordIndex
       XCTAssertGreaterThan(boundary, 0)
       let before = try XCTUnwrap(coordinator.pace.visibleRect)
