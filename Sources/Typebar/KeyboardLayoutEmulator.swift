@@ -125,7 +125,7 @@ enum KeyboardLayoutEmulator {
       guard let layers = keys[keyCode] else { return false }
       return [layers.normal, layers.shifted, layers.option, layers.shiftedOption]
         .compactMap { $0 }
-        .contains { $0 == output || $0.caseInsensitiveCompare(output) == .orderedSame }
+        .contains(output)
     }
     if let first = layoutSearchOrder.first(where: matches) { return first }
     return keys.keys.filter { !layoutSearchOrderSet.contains($0) }.sorted().first(where: matches)
@@ -1848,7 +1848,7 @@ enum KeyboardLayoutEmulator {
         "50:чЧ 18:1! 19:2@ 20:3№ 21:4$ 23:5% 22:6€ 26:7§ 28:8* 25:9( 29:0) 27:-_ 24:=+ "
           + "12:яЯ 13:вВ 14:еЕ 15:рР 17:тТ 16:ъЪ 32:уУ 34:иИ 31:оО 35:пП 33:шШ 30:щЩ "
           + "0:аА 1:сС 2:дД 3:фФ 5:гГ 4:хХ 38:йЙ 40:кК 37:лЛ 41:;: 39:'\" 42:юЮ "
-          + "10:юЮ 6:зЗ 7:ьѝ 8:цЦ 9:жЖ 11:бБ 45:нН 46:мМ 43:,< 47:.> 44:/?"
+          + "10:юЮ 6:зЗ 7:ьЬ 8:цЦ 9:жЖ 11:бБ 45:нН 46:мМ 43:,< 47:.> 44:/?"
       )
     case .belarusian:
       map(

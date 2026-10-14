@@ -9343,7 +9343,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardGuideModel.highlightedKey(for: "ю", layout: .bulgarianPhoneticTraditional), "home-11")
     XCTAssertEqual(
-      KeyboardGuideModel.highlightedKey(for: "ѝ", layout: .bulgarianPhoneticTraditional), "bottom-2")
+      KeyboardGuideModel.highlightedKey(for: "Ь", layout: .bulgarianPhoneticTraditional), "bottom-2")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "ѝ", layout: .bulgarianPhoneticTraditional))
     XCTAssertEqual(
       KeyboardGuideModel.highlightedKey(for: "№", layout: .bulgarianPhoneticTraditional), "number-3")
     XCTAssertEqual(
@@ -9359,7 +9360,7 @@ final class TypingEngineTests: XCTestCase {
         forKeyCode: 12, modifierFlags: [.shift], layout: .bulgarianPhoneticTraditional), "Я")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
-        forKeyCode: 7, modifierFlags: [.shift], layout: .bulgarianPhoneticTraditional), "ѝ")
+        forKeyCode: 7, modifierFlags: [.shift], layout: .bulgarianPhoneticTraditional), "Ь")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
         forKeyCode: 20, modifierFlags: [.shift], layout: .bulgarianPhoneticTraditional), "№")
@@ -9370,7 +9371,8 @@ final class TypingEngineTests: XCTestCase {
       KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .bulgarianPhoneticTraditional),
       "ю")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "№", layout: .bulgarianPhoneticTraditional), 20)
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ѝ", layout: .bulgarianPhoneticTraditional), 7)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ь", layout: .bulgarianPhoneticTraditional), 7)
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "Ѝ", layout: .bulgarianPhoneticTraditional))
     XCTAssertEqual(
       KeyboardInputLayout.bulgarianPhoneticTraditional.emulatedLayout, .bulgarianPhoneticTraditional)
 

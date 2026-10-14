@@ -89,4 +89,18 @@ import XCTest
       inputMapping: .builtIn(.ansiQwerty), oppositeShiftKeymap: .custom(layout),
       logicalCharacter: "a"))
   }
+
+  func testExactVisualCharacterDoesNotFoldTurkishOrCustomCaseAcrossHands() throws {
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "i", layout: .turkishQ), 39,
+      "Turkish dotted i is on the home row, not the earlier dotless-I key")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "I", layout: .turkishQ), 34)
+
+    let custom = try XCTUnwrap(CustomKeyboardGuideLayoutPolicy.make(
+      name: "Split I", numberRow: "I", topRow: "abcdefghji", homeRow: "k", bottomRow: "l",
+      shiftedNumberRow: "I", shiftedTopRow: "ABCDEFGHJI"))
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "i", mapping: .custom(custom)), 35)
+    XCTAssertFalse(try forcedError(
+      inputMapping: .builtIn(.ansiQwerty), oppositeShiftKeymap: .custom(custom),
+      logicalCharacter: "i"), "The displayed right-hand i permits left Shift")
+  }
 }

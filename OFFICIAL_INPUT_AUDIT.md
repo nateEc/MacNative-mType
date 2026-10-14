@@ -1,5 +1,9 @@
 # 官方输入路径审计
 
+2026-10-14 反向 Shift 的精确字符查找：固定 [layoutKeyToKeycode](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/utils/key-converter.ts#L15-L48) 对每个键的层字符使用精确 `includes`，无命中则由 keydown 路径视为中性。原生此前在所有位置上再做不区分大小写比较，Turkish Q 的 `i` 因先遇到 `ı/I` 层而落到另一键；合法自定义布局可把同样误配跨到左右手，错误强制 Shift 判定。新增合成 AppKit 及 Turkish Q 反例先得到三处失败，现反查只接受层字符的精确匹配，保留显示顺序与未知字符中性。五项相邻及扩大输入／布局 809 项零失败；实体键盘／IME、完整 Unicode 层及混合布局仍待验收。
+
+同一更正暴露 Bulgarian Phonetic Traditional 旧测试依赖大小写折叠命中不存在的 `Ѝ`；固定布局底排第 3 键实际为 `ь/Ь`。按固定源码修改视觉、输入和反查断言后先复现三处失败，再同步修正原生两层映射；没有用模糊匹配或放宽断言掩盖错键。布局覆盖仍以 `OFFICIAL_LAYOUT_AUDIT.md` 的逐项审计边界为准。
+
 2026-10-14 反向 Shift 的视觉键位来源补证：固定 [keydown.ts 的判定分支](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/keydown.ts#L74-L96) 在 `keymap` 模式、非 `overrideSync` 时按显示键位查找逻辑键；找不到的位置视为中性。`on` 与 `overrideSync` 使用物理键位。原生桥此前优先查询输入模拟布局，显示布局与模拟布局不同会把同一次 Shift 判到另一侧；未知逻辑键又错误回退物理侧。现在显式内建／自定义显示布局独立于输入模拟进行比较，同步显示、系统显示和 Layout Fluid 使用物理键，未知显示键位不中断输入但不强制 Shift 错误。先行 AppKit 行为测试有三个预期断言失败；修正后新增三项及相关输入／键位 46 项零失败。仅为合成 AppKit 按键与固定源码分支的证据，未宣称真实实体左右 Shift、IME 或全部原版键位布局等价。
 
 2026-10-14 重复视觉键位的反查顺序：固定 [layoutKeyToKeycode](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/utils/key-converter.ts#L15-L48) 顺序搜索行和键；原生字典遍历在自定义布局多个键显示同一字符时会随机选中后面的左右手位置。使用通过原生布局校验的重复键位夹具，先行测试八次都没有返回第一显示键；现在按数字、上、中、ISO 下排、下排、Space 的显示顺序查询，保留其他键码的确定性回退。新增四项反向 Shift 测试及输入引擎／布局相关 808 项零失败；真实硬件、浏览器布局 JSON 的全部特殊层和重复字符变体仍需逐项验证。
