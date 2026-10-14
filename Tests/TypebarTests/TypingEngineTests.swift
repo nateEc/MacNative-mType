@@ -4773,7 +4773,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: session.nextExpectedCharacter), "space")
     session.insert(" ", at: start)
     XCTAssertEqual(
-      KeyboardGuideModel.highlightedKey(for: session.nextExpectedCharacter), "number-0")
+      KeyboardGuideModel.highlightedKey(for: session.nextExpectedCharacter), "number-1")
     session.insert("1", at: start)
     XCTAssertNil(KeyboardGuideModel.highlightedKey(for: session.nextExpectedCharacter))
   }
@@ -4987,7 +4987,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiQwerty), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiDvorak), "bottom-1")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "/", layout: .ansiDvorak), "top-10")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "_", layout: .ansiDvorak), "number-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "_", layout: .ansiDvorak), "home-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "?", layout: .ansiDvorak), "top-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "e", layout: .ansiColemak), "home-7")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .ansiColemak), "top-9")
@@ -4999,7 +4999,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "é", layout: .frenchAzerty), "number-1")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "à", layout: .frenchAzerty), "number-9")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ".", layout: .frenchAzerty), "bottom-7")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "_", layout: .ansiQwerty), "number-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "_", layout: .ansiQwerty), "number-11")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "_", layout: .frenchAzerty), "number-7")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "，", layout: .ansiDvorak), nil)
   }

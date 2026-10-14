@@ -1230,7 +1230,7 @@ enum KeyboardGuideModel {
     switch layout {
     case .ansiQwerty:
       [
-        row("number", "1234567890-="),
+        row("number", "`1234567890-="),
         row("top", "QWERTYUIOP[]")
           + [KeyboardGuideKey("top-12", label: "\\", shiftedLabel: "|")],
         row("home", "ASDFGHJKL;'"),
@@ -1238,8 +1238,9 @@ enum KeyboardGuideModel {
       ]
     case .ansiDvorak:
       [
-        row("number", "1234567890-="),
-        row("top", "',.PYFGCRL/="),
+        row("number", "`1234567890[]"),
+        row("top", "',.PYFGCRL/=")
+          + [KeyboardGuideKey("top-12", label: "\\", shiftedLabel: "|")],
         row("home", "AOEUIDHTNS-"),
         row("bottom", ";QJKXBMWVZ"),
       ]
@@ -2963,8 +2964,9 @@ enum KeyboardGuideModel {
       ]
     case .ansiColemak:
       [
-        row("number", "1234567890-="),
-        row("top", "QWFPGJLUY;[]"),
+        row("number", "`1234567890-="),
+        row("top", "QWFPGJLUY;[]")
+          + [KeyboardGuideKey("top-12", label: "\\", shiftedLabel: "|")],
         row("home", "ARSTDHNEIO'"),
         row("bottom", "ZXCVBKM,./"),
       ]
@@ -2984,8 +2986,9 @@ enum KeyboardGuideModel {
       ]
     case .ansiColemakDH:
       [
-        row("number", "1234567890-="),
-        row("top", "QWFPBJLUY;[]"),
+        row("number", "`1234567890-="),
+        row("top", "QWFPBJLUY;[]")
+          + [KeyboardGuideKey("top-12", label: "\\", shiftedLabel: "|")],
         row("home", "ARSTGMNEIO'"),
         row("bottom", "XCDVZKH,./"),
       ]
@@ -3005,8 +3008,9 @@ enum KeyboardGuideModel {
       ]
     case .colemakDHMatrix:
       [
-        row("number", "1234567890-="),
-        row("top", "QWFPBJLUY;[]"),
+        row("number", "`1234567890-="),
+        row("top", "QWFPBJLUY;[]")
+          + [KeyboardGuideKey("top-12", label: "\\", shiftedLabel: "|")],
         row("home", "ARSTGMNEIO'"),
         row("bottom", "ZXCDVKH,./"),
       ]
@@ -3026,8 +3030,9 @@ enum KeyboardGuideModel {
       ]
     case .colemakDHKANSI:
       [
-        row("number", "1234567890-="),
-        row("top", "QWFPBJLUY;[]"),
+        row("number", "`1234567890-="),
+        row("top", "QWFPBJLUY;[]")
+          + [KeyboardGuideKey("top-12", label: "\\", shiftedLabel: "|")],
         row("home", "ARSTGKNEIO'"),
         row("bottom", "XCDVZMH,./"),
       ]
@@ -3047,8 +3052,9 @@ enum KeyboardGuideModel {
       ]
     case .ansiWorkman:
       [
-        row("number", "1234567890-="),
-        row("top", "QDRWBJFUP;[]"),
+        row("number", "`1234567890-="),
+        row("top", "QDRWBJFUP;[]")
+          + [KeyboardGuideKey("top-12", label: "\\", shiftedLabel: "|")],
         row("home", "ASHTGYNEOI'"),
         row("bottom", "ZXMCVKL,./"),
       ]

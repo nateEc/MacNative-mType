@@ -33,7 +33,10 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
   ]
 
   func testANSIQwertyBackslashKeyMatchesOfficialBaseAndShift() {
-    let row = KeyboardGuideModel.rows(for: .ansiQwerty)[1]
+    let rows = KeyboardGuideModel.rows(for: .ansiQwerty)
+    XCTAssertEqual(rows[0].count, 13)
+    XCTAssertEqual(rows[0].first?.label, "`")
+    let row = rows[1]
     XCTAssertEqual(row.count, 13)
     XCTAssertEqual(row.last?.label, "\\")
     XCTAssertEqual(row.last?.shiftedLabel, "|")
@@ -51,6 +54,56 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 44, modifierFlags: [], mapping: .builtIn(.macedonian)), "/")
     XCTAssertEqual(KeyboardLayoutEmulator.text(
       forKeyCode: 44, modifierFlags: .shift, mapping: .builtIn(.macedonian)), "?")
+  }
+
+  func testColemakAndWorkmanVariantsKeepStandardANSIOuterKeys() {
+    let layouts: [KeyboardLayout] = [
+      .ansiColemak, .ansiColemakDH, .colemakDHMatrix, .colemakDHKANSI, .ansiWorkman,
+    ]
+    let outerKeys: [(UInt16, String, String)] = [
+      (50, "`", "~"), (18, "1", "!"), (19, "2", "@"), (20, "3", "#"),
+      (21, "4", "$"), (23, "5", "%"), (22, "6", "^"), (26, "7", "&"),
+      (28, "8", "*"), (25, "9", "("), (29, "0", ")"), (27, "-", "_"),
+      (24, "=", "+"), (42, "\\", "|"),
+    ]
+    for layout in layouts {
+      let rows = KeyboardGuideModel.rows(for: layout)
+      XCTAssertEqual(rows[0].count, 13, "\(layout) number row")
+      XCTAssertEqual(rows[0].first?.label, "`", "\(layout) grave key")
+      XCTAssertEqual(rows[1].count, 13, "\(layout) top row")
+      XCTAssertEqual(rows[1].last?.label, "\\", "\(layout) backslash key")
+      XCTAssertEqual(rows[1].last?.legend(
+        style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), "|", "\(layout) Shift backslash")
+      for (keyCode, base, shifted) in outerKeys {
+        XCTAssertEqual(KeyboardLayoutEmulator.text(
+          forKeyCode: keyCode, modifierFlags: [], mapping: .builtIn(layout)), base,
+          "\(layout) key \(keyCode) base")
+        XCTAssertEqual(KeyboardLayoutEmulator.text(
+          forKeyCode: keyCode, modifierFlags: .shift, mapping: .builtIn(layout)), shifted,
+          "\(layout) key \(keyCode) Shift")
+      }
+    }
+  }
+
+  func testANSIDvorakRetainsItsOwnNumberRowAndBackslash() {
+    let rows = KeyboardGuideModel.rows(for: .ansiDvorak)
+    XCTAssertEqual(rows[0].count, 13)
+    XCTAssertEqual(rows[0].first?.label, "`")
+    XCTAssertEqual(rows[0].suffix(2).map(\.label), ["[", "]"])
+    XCTAssertEqual(rows[1].count, 13)
+    XCTAssertEqual(rows[1].last?.label, "\\")
+    let outerKeys: [(UInt16, String, String)] = [
+      (50, "`", "~"), (18, "1", "!"), (19, "2", "@"), (20, "3", "#"),
+      (21, "4", "$"), (23, "5", "%"), (22, "6", "^"), (26, "7", "&"),
+      (28, "8", "*"), (25, "9", "("), (29, "0", ")"), (27, "[", "{"),
+      (24, "]", "}"), (42, "\\", "|"),
+    ]
+    for (keyCode, base, shifted) in outerKeys {
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: keyCode, modifierFlags: [], mapping: .builtIn(.ansiDvorak)), base)
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: keyCode, modifierFlags: .shift, mapping: .builtIn(.ansiDvorak)), shifted)
+    }
   }
 
   func testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation() throws {
