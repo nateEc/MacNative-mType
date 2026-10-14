@@ -332,6 +332,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case carbon
     case horizon
     case laser
+    case `80s_after_dark`
+    case bliss
+    case bouquet
+    case comfy
+    case dino
+    case floret
+    case grand_prix
+    case hammerhead
+    case incognito
+    case leather
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -419,6 +429,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .carbon: "石墨 · Typebar"
         case .horizon: "暮色地平线 · Typebar"
         case .laser: "霓虹光束 · Typebar"
+        case .`80s_after_dark`: "八十年代夜色 · Typebar"
+        case .bliss: "晴霁 · Typebar"
+        case .bouquet: "花束 · Typebar"
+        case .comfy: "舒适角落 · Typebar"
+        case .dino: "蕨绿恐龙 · Typebar"
+        case .floret: "夜花 · Typebar"
+        case .grand_prix: "赛道 · Typebar"
+        case .hammerhead: "锤头鲨 · Typebar"
+        case .incognito: "隐身 · Typebar"
+        case .leather: "皮革 · Typebar"
         }
     }
 
@@ -572,6 +592,26 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0x202F45, 0x354B62, 0xF5BF8C, 0xF5F1E9, 0xC9D4DD, light: false, error: 0xFF9EAB)
         case .laser:
             Self.palette(0x2F213C, 0x493354, 0xF29AD3, 0xF9EDF7, 0xD9C6D8, light: false, error: 0xFCB08F)
+        case .`80s_after_dark`:
+            Self.palette(0x29213D, 0x3F3151, 0xF9BDB6, 0xFFF3E8, 0xDCCBDE, light: false, error: 0xFFB3AA)
+        case .bliss:
+            Self.palette(0xE8F2F7, 0xCEE2EB, 0x315A77, 0x233443, 0x496273, light: true, error: 0x9C3444)
+        case .bouquet:
+            Self.palette(0xF1E5EC, 0xDCC6D4, 0x7A3C66, 0x382A37, 0x59465A, light: true, error: 0x932E46)
+        case .comfy:
+            Self.palette(0x342D3B, 0x4B4152, 0xEEC7A1, 0xF7F0E7, 0xDED2DB, light: false, error: 0xFFADA8)
+        case .dino:
+            Self.palette(0xE4E7C8, 0xCBD2AA, 0x3F5C35, 0x2C3727, 0x485446, light: true, error: 0x903B40)
+        case .floret:
+            Self.palette(0x203442, 0x33505C, 0xFFC4D5, 0xF3F7F5, 0xCDDEDC, light: false, error: 0xFFB2A2)
+        case .grand_prix:
+            Self.palette(0x222830, 0x3A424A, 0xF6D780, 0xF5F6F1, 0xCBD2D3, light: false, error: 0xFFAA9A)
+        case .hammerhead:
+            Self.palette(0xDBEAE7, 0xB7D1D0, 0x275E65, 0x233B40, 0x3F5B60, light: true, error: 0x9A3845)
+        case .incognito:
+            Self.palette(0x252D40, 0x3B4558, 0xCFC8F3, 0xF7F7FB, 0xCED5E7, light: false, error: 0xFFB9A8)
+        case .leather:
+            Self.palette(0xEAD9C0, 0xD3BC9F, 0x663C35, 0x332925, 0x544237, light: true, error: 0x8A2F40)
         }
     }
 }

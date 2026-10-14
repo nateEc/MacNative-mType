@@ -41,7 +41,7 @@ fail_audit("official theme identities drift") unless names == fixture.fetch("off
 native = File.read(native_path)
 native_block = native.match(/enum AppTheme:.*?\{(.*?)\n\s*var displayName:/m)
 fail_audit("cannot locate native AppTheme cases") unless native_block
-native_names = native_block[1].scan(/^\s*case\s+(\w+)\s*$/).flatten
+native_names = native_block[1].scan(/^\s*case\s+`?([A-Za-z0-9_]+)`?\s*$/).flatten
 fail_audit("native built-in theme identities drift") unless native_names == fixture.fetch("nativeBuiltInThemes")
 
 mappings = fixture.fetch("exactMappings")

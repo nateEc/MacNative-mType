@@ -248,7 +248,17 @@
     "hanok",
     "carbon",
     "horizon",
-    "laser"
+    "laser",
+    "80s_after_dark",
+    "bliss",
+    "bouquet",
+    "comfy",
+    "dino",
+    "floret",
+    "grand_prix",
+    "hammerhead",
+    "incognito",
+    "leather"
   ],
   "exactMappings": {},
   "relatedMappings": {
@@ -306,6 +316,16 @@
     "hanok": "hanok",
     "carbon": "carbon",
     "horizon": "horizon",
-    "laser": "laser"
+    "laser": "laser",
+    "80s_after_dark": "80s_after_dark",
+    "bliss": "bliss",
+    "bouquet": "bouquet",
+    "comfy": "comfy",
+    "dino": "dino",
+    "floret": "floret",
+    "grand_prix": "grand_prix",
+    "hammerhead": "hammerhead",
+    "incognito": "incognito",
+    "leather": "leather"
   }
 }
