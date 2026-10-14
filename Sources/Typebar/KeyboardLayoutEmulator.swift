@@ -30,6 +30,13 @@ enum KeyboardLayoutEmulator {
     [6, 7, 8, 9, 11, 45, 46, 43, 47, 44],
   ]
 
+  // Reverse lookup follows the displayed row/column order, including the ISO
+  // extra key and layouts that assign an output to the physical Space key.
+  private static let layoutSearchOrder: [UInt16] = [
+    physicalRows[0], physicalRows[1], physicalRows[2], [10], physicalRows[3], [49],
+  ].flatMap { $0 }
+  private static let layoutSearchOrderSet = Set(layoutSearchOrder)
+
   static func character(
     forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, mapping: KeyboardInputMapping
   ) -> Character? {
@@ -114,13 +121,14 @@ enum KeyboardLayoutEmulator {
   }
 
   private static func keyCode(forOutput output: String, keys: [UInt16: KeyLayers]) -> UInt16? {
-    keys.first { _, layers in
-      [layers.normal, layers.shifted, layers.option, layers.shiftedOption]
+    func matches(_ keyCode: UInt16) -> Bool {
+      guard let layers = keys[keyCode] else { return false }
+      return [layers.normal, layers.shifted, layers.option, layers.shiftedOption]
         .compactMap { $0 }
-        .contains {
-          $0 == output || $0.caseInsensitiveCompare(output) == .orderedSame
-        }
-    }?.key
+        .contains { $0 == output || $0.caseInsensitiveCompare(output) == .orderedSame }
+    }
+    if let first = layoutSearchOrder.first(where: matches) { return first }
+    return keys.keys.filter { !layoutSearchOrderSet.contains($0) }.sorted().first(where: matches)
   }
 
   private static func keys(for layout: CustomKeyboardGuideLayout) -> [UInt16: KeyLayers] {

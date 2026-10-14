@@ -2,6 +2,8 @@
 
 2026-10-14 反向 Shift 的视觉键位来源补证：固定 [keydown.ts 的判定分支](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/keydown.ts#L74-L96) 在 `keymap` 模式、非 `overrideSync` 时按显示键位查找逻辑键；找不到的位置视为中性。`on` 与 `overrideSync` 使用物理键位。原生桥此前优先查询输入模拟布局，显示布局与模拟布局不同会把同一次 Shift 判到另一侧；未知逻辑键又错误回退物理侧。现在显式内建／自定义显示布局独立于输入模拟进行比较，同步显示、系统显示和 Layout Fluid 使用物理键，未知显示键位不中断输入但不强制 Shift 错误。先行 AppKit 行为测试有三个预期断言失败；修正后新增三项及相关输入／键位 46 项零失败。仅为合成 AppKit 按键与固定源码分支的证据，未宣称真实实体左右 Shift、IME 或全部原版键位布局等价。
 
+2026-10-14 重复视觉键位的反查顺序：固定 [layoutKeyToKeycode](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/utils/key-converter.ts#L15-L48) 顺序搜索行和键；原生字典遍历在自定义布局多个键显示同一字符时会随机选中后面的左右手位置。使用通过原生布局校验的重复键位夹具，先行测试八次都没有返回第一显示键；现在按数字、上、中、ISO 下排、下排、Space 的显示顺序查询，保留其他键码的确定性回退。新增四项反向 Shift 测试及输入引擎／布局相关 808 项零失败；真实硬件、浏览器布局 JSON 的全部特殊层和重复字符变体仍需逐项验证。
+
 2026-10-03 当前阶段：[完成统计提交与历史边界](RESULT_CONSISTENCY_SERVICE_CONTRACT.md) 核对完整原版 buildDbResult 后纠正“WPM 稳定度应固定保存”的审计：原版只在完成请求传递该值，历史保存按键稳定度。自建 v1 服务新增明确协商的匿名 resultConsistency；WPM 在后台派生、仅瞬时提交，按键值保存并进入用户历史行与远端 CSV，旧服务不收到扩展、旧服务记录缺值不补零。后台等待后再次检查取消和账户范围；不改本机归档 22、SwiftData 实体或旧成绩。八项客户端、七项服务新增回归，定向 71／26 项与四组实际原版构造对照通过；最终完整门禁结果见契约。本机 WPM 展示／CSV 是明确原生补充，不冒充原版持久字段或官方覆盖。GUI／IME、旧库／降级、跨设备、实际部署及混合性能仍未验，完整 goal active；下方保留历史阶段。
 
 2026-10-03 当前阶段：[韩文会话计分与归档 22](KOREAN_SESSION_SCORING_CONTRACT.md) 已接入已知字段的实时／最终 WPM、Raw、明确分类基础、历史及辅助功能标签、CSV 和 v2 匿名计量；原始回放、尝试准确率及旧成绩不回算。默认归档 22，显式分类基础最低 22，旧 v2 最低仍 21；十三项新增测试和固定源有界对照已覆盖。真实 IME／设备、活动曲线与其他消费者、旧库／降级、部署及完整功能等价仍开放，官方覆盖不升级，完整 goal active。下方保留历史阶段，当前生产与格式状态以本合同为准。

@@ -75,4 +75,18 @@ import XCTest
       selectedLayout: .ansiQwerty, customLayout: custom, layoutFluid: false),
       .builtIn(.ansiQwerty))
   }
+
+  func testRepeatedVisualLabelsUseTheFirstDisplayedKeyPosition() throws {
+    let layout = try XCTUnwrap(CustomKeyboardGuideLayoutPolicy.make(
+      name: "Repeated A", numberRow: "aaaaaaaaaaaaa", topRow: "aaaaaaaaaaaaa",
+      homeRow: "aaaaaaaaaaa", bottomRow: "aaaaaaaaaa"))
+    XCTAssertTrue(layout.supportsPhysicalInputMapping)
+    for _ in 0..<8 {
+      XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "a", mapping: .custom(layout)), 50,
+        "A visual lookup must use the first row and first key, as the displayed layout does")
+    }
+    XCTAssertTrue(try forcedError(
+      inputMapping: .builtIn(.ansiQwerty), oppositeShiftKeymap: .custom(layout),
+      logicalCharacter: "a"))
+  }
 }
