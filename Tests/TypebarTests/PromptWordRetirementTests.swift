@@ -179,6 +179,8 @@ import XCTest
       follower.layoutSubtreeIfNeeded()
       let id = UUID(), starts = (0..<8).map { $0 * 3 }
       var retired = 0
+      let delivered = expectation(description: "Forward rows retire the final prefix, coalesced=\(coalesced), smooth=\(smooth)")
+      delivered.assertForOverFulfill = true
       func update(_ index: Int) {
         follower.update(text: AttributedString("aa bb\ncc dd\nee ff\ngg hh"),
           characterOffset: starts[index], font: .monospacedSystemFont(ofSize: 28, weight: .medium),
@@ -187,7 +189,10 @@ import XCTest
             characterOffsets: Dictionary(uniqueKeysWithValues: starts.map { ($0, $0) }),
             smoothScroll: smooth, reducesMotion: false,
             words: starts.enumerated().map { .init(index: $0.offset, glyphID: $0.element) },
-            onRetire: { retired = $0.firstRetainedWordIndex }))
+            onRetire: {
+              retired = $0.firstRetainedWordIndex
+              if retired == 2 { delivered.fulfill() }
+            }))
       }
       update(0)
       RunLoop.main.run(until: Date().addingTimeInterval(0.02))
@@ -200,6 +205,7 @@ import XCTest
         XCTAssertEqual(retired, 0, "Smooth retirement waits for animation")
         RunLoop.main.run(until: Date().addingTimeInterval(0.15))
       }
+      wait(for: [delivered], timeout: 1)
       XCTAssertEqual(retired, 2, "coalesced=\(coalesced), smooth=\(smooth)")
     }
     }

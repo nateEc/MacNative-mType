@@ -63,14 +63,18 @@ import XCTest
       let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 60))
       defer { view.stop() }
       var retired: [PromptWordRetirement] = []
-      configure(view, coordinator, attempt: attempt, active: 0, rtl: rtl, smooth: true, mode: mode, at: 0) { retired.append($0) }
-      configure(view, coordinator, attempt: attempt, active: 2, rtl: rtl, smooth: true, mode: mode, at: 1) { retired.append($0) }
+      let delivered = expectation(description: "Smooth Tape prefix retirement, mode=\(mode), rtl=\(rtl)")
+      delivered.assertForOverFulfill = true
+      let notify: (PromptWordRetirement) -> Void = { retired.append($0); delivered.fulfill() }
+      configure(view, coordinator, attempt: attempt, active: 0, rtl: rtl, smooth: true, mode: mode, at: 0, notify: notify)
+      configure(view, coordinator, attempt: attempt, active: 2, rtl: rtl, smooth: true, mode: mode, at: 1, notify: notify)
       view.present(at: 1.07); drain()
       XCTAssertTrue(coordinator.isAnimatingTape)
       XCTAssertTrue(retired.isEmpty)
-      configure(view, coordinator, attempt: attempt, active: 3, rtl: rtl, smooth: true, mode: mode, at: 1.07) { retired.append($0) }
+      configure(view, coordinator, attempt: attempt, active: 3, rtl: rtl, smooth: true, mode: mode, at: 1.07, notify: notify)
       drain()
       XCTAssertTrue(coordinator.isAnimatingTape, "Retirement is not a tween completion hook")
+      wait(for: [delivered], timeout: 1)
       XCTAssertEqual(retired, [.init(attemptID: attempt, firstRetainedWordIndex: 1)])
     } }
   }
@@ -215,14 +219,18 @@ import XCTest
       let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 60))
       defer { view.stop() }
       var retired: [PromptWordRetirement] = []
+      let delivered = expectation(description: "Tape overflow retirement, rtl=\(rtl)")
+      delivered.assertForOverFulfill = true
+      let notify: (PromptWordRetirement) -> Void = { retired.append($0); delivered.fulfill() }
       for active in 0...2 {
-        configure(view, coordinator, attempt: attempt, active: active, rtl: rtl, at: Double(active)) { retired.append($0) }
+        configure(view, coordinator, attempt: attempt, active: active, rtl: rtl, at: Double(active), notify: notify)
         view.present(at: Double(active)); drain()
         XCTAssertTrue(retired.isEmpty, "The new destination is not the pre-scroll source geometry")
       }
-      configure(view, coordinator, attempt: attempt, active: 3, rtl: rtl, at: 3) { retired.append($0) }
+      configure(view, coordinator, attempt: attempt, active: 3, rtl: rtl, at: 3, notify: notify)
       XCTAssertTrue(retired.isEmpty, "SwiftUI configure cannot synchronously mutate its observed session")
       drain()
+      wait(for: [delivered], timeout: 1)
       XCTAssertEqual(retired, [.init(attemptID: attempt, firstRetainedWordIndex: 1)])
     }
   }
