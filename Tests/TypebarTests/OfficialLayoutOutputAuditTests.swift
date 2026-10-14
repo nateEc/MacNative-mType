@@ -43,6 +43,16 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 42, modifierFlags: .shift, mapping: .builtIn(.ansiQwerty)), "|")
   }
 
+  func testMacedonianQuestionMarkShiftMatchesOfficialLayout() {
+    let lastKey = KeyboardGuideModel.rows(for: .macedonian)[3].last
+    XCTAssertEqual(lastKey?.label, "/")
+    XCTAssertEqual(lastKey?.shiftedLabel, "?")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 44, modifierFlags: [], mapping: .builtIn(.macedonian)), "/")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 44, modifierFlags: .shift, mapping: .builtIn(.macedonian)), "?")
+  }
+
   func testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation() throws {
     guard let root = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_AUDIT_REFERENCE"] else {
       throw XCTSkip("Set TYPEBAR_LAYOUT_AUDIT_REFERENCE to a pinned read-only checkout")
