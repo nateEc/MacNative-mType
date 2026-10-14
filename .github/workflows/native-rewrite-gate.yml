@@ -16,12 +16,33 @@ jobs:
   verify-native-rewrite:
     name: Verify native rewrite
     runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     # The complete client suite alone took 39 minutes on a local Apple Silicon host.
     timeout-minutes: 90
 
     steps:
       - name: Check out Typebar
         uses: actions/checkout@v6
+
+      - name: Verify pinned Xcode and motion environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+          xcodebuild -version | grep -Fxq 'Xcode 26.3'
+          swift --version
+          swift -e 'import AppKit; print("system reduce motion:", NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)'
+
+      - name: Set up Go for native code-practice compilation tests
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.8'
+          cache: false
+
+      - name: Verify Go toolchain
+        run: go version
 
       - name: Check out the pinned Monkeytype reference
         id: reference
