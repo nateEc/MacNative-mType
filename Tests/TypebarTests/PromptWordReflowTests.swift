@@ -266,6 +266,7 @@ import XCTest
                   slowTimer: true, showAllLines: false)))
           }
       }.frame(width: width).foregroundStyle(.white).background(.black)
+        .environment(\.typebarSystemReduceMotionOverride, false)
     }
   }
 

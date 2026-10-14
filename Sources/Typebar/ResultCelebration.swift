@@ -78,6 +78,7 @@ struct ResultCelebrationView: View {
   let text: Color
   let subduedText: Color
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarSystemReduceMotionOverride) private var systemReduceMotionOverride
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
   @State private var particles: [ResultCelebrationParticle] = []
   @State private var generation = 0
@@ -114,7 +115,7 @@ struct ResultCelebrationView: View {
     ResultCelebrationPolicy.shouldEmit(
       isNewPersonalBest: isNewPersonalBest,
       hasZeroSpeedFeedback: hasZeroSpeedFeedback,
-      reducesMotion: reducesMotion || systemReduceMotion, slowTimer: slowTimer)
+      reducesMotion: reducesMotion || (systemReduceMotionOverride ?? systemReduceMotion), slowTimer: slowTimer)
   }
 
   private func playIfNeeded() {

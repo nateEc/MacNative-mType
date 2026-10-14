@@ -12,6 +12,7 @@ import XCTest
     mode: PracticeTapeMode = .word,
     pace: Int? = nil,
     at time: Double, notify: @escaping (PromptWordRetirement) -> Void) {
+    view.automaticPresentationEnabled = false // These tests advance a synthetic clock with present(at:).
     let string = String(text.dropFirst(retained * 4))
     var attributed = AttributedString(string); attributed.foregroundColor = .gray
     let rendering = PromptRendering(text: attributed,

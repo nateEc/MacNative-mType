@@ -155,10 +155,11 @@ import XCTest
   }
 
   func testProductionCelebrationDrawsNormallyButNotForSlowTimerSnapshot() throws {
-    for slow in [false, true] {
+    for (slow, systemReduced) in [(false, false), (true, false), (false, true)] {
       let view = ResultCelebrationView(isNewPersonalBest: true, hasZeroSpeedFeedback: false,
         reducesMotion: false, slowTimer: slow, accent: .red, text: .green, subduedText: .blue)
         .frame(width: 360, height: 180).background(.black)
+        .environment(\.typebarSystemReduceMotionOverride, systemReduced)
       let host = NSHostingView(rootView: view)
       let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 360, height: 180),
         styleMask: [.titled], backing: .buffered, defer: false)
@@ -175,11 +176,12 @@ import XCTest
             max(color.redComponent, color.greenComponent, color.blueComponent) > 0.2 { colored += 1 }
         }
       }
-      if slow { XCTAssertEqual(colored, 0) } else { XCTAssertGreaterThan(colored, 0) }
+      if slow || systemReduced { XCTAssertEqual(colored, 0) } else { XCTAssertGreaterThan(colored, 0) }
       XCTAssertFalse(window.isVisible)
       if let directory = ProcessInfo.processInfo.environment["TYPEBAR_SLOW_TIMER_QA_IMAGE_DIRECTORY"] {
         try bitmap.representation(using: .png, properties: [:])?.write(
-          to: URL(fileURLWithPath: directory).appendingPathComponent(slow ? "slow-suppressed.png" : "normal-celebration.png"))
+          to: URL(fileURLWithPath: directory).appendingPathComponent(
+            systemReduced ? "system-reduced.png" : slow ? "slow-suppressed.png" : "normal-celebration.png"))
       }
     }
   }

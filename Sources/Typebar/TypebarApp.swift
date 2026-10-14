@@ -600,17 +600,18 @@ struct ChooPracticePrompt: View {
   var viewportLineCount: Int? = nil
   var lineScroll: PromptLineScrollContext? = nil
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarSystemReduceMotionOverride) private var systemReduceMotionOverride
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
     let animates = PracticeVisualAnimationPolicy.shouldAnimate(
       isEnabled: isEnabled, reducesMotion: reducesMotion,
-      systemReducedMotion: systemReduceMotion,
+      systemReducedMotion: systemReduceMotionOverride ?? systemReduceMotion,
       ignoresSystemReducedMotion: ignoresSystemReducedMotion)
     let effectiveScroll = lineScroll.map {
       PromptLineScrollContext(attemptID: $0.attemptID, activeWordID: $0.activeWordID,
         characterOffsets: $0.characterOffsets, smoothScroll: $0.smoothScroll,
-        reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: animationFrameRate,
+        reducesMotion: $0.reducesMotion || (systemReduceMotionOverride ?? systemReduceMotion), frameRate: animationFrameRate,
         words: $0.words, firstRetainedWordIndex: $0.firstRetainedWordIndex,
         onRetire: $0.onRetire, followsWordReflow: $0.followsWordReflow, caretMotion: $0.caretMotion,
         centersActiveLine: $0.centersActiveLine, wrapperRevision: $0.wrapperRevision)

@@ -363,14 +363,17 @@ import XCTest
         fromAfter: false, targetAfter: false, fraction: 0, stepDuration: 0.02, sequence: 1)
     }
     var config = configuration(motion)
+    config.automaticallyPresents = false // Isolate deadline polling from the independent draw clock.
     config.paceFrame = provider
     view.update(config); view.layout(); view.requestPacePosition(at: 0)
     config = configuration(motion, paceStyle: .off); config.paceFrame = provider
+    config.automaticallyPresents = false
     view.update(config)
     let disabled = reads
     RunLoop.main.run(until: Date().addingTimeInterval(0.08))
     XCTAssertEqual(reads, disabled)
     config = configuration(motion); config.paceFrame = { reads += 1; return nil }
+    config.automaticallyPresents = false
     view.update(config); view.requestPacePosition(at: 0.08)
     let unavailable = reads
     RunLoop.main.run(until: Date().addingTimeInterval(0.02))

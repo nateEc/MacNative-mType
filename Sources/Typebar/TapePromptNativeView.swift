@@ -26,6 +26,7 @@ final class TapePromptNativeView: NSView {
   private var lastWidth: CGFloat = 0
   private var geometryRevision: UInt64 = 0
   private var timer: Timer?
+  var automaticPresentationEnabled = true
   private var needsScroll = false
   private var snapsScroll = true
   private var lastScrollAdvance: CGFloat?
@@ -616,6 +617,7 @@ final class TapePromptNativeView: NSView {
   }
 
   private func schedulePresentation() {
+    guard automaticPresentationEnabled else { timer?.invalidate(); timer = nil; return }
     guard let config = configuration,
       config.mainStyle.drawsMarker || config.paceStyle.drawsMarker || config.coordinator.isAnimatingTape
         || textView.isAnimatingNewlines || pendingNewline != nil else { return }

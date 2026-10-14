@@ -268,6 +268,7 @@ import XCTest
                 onRetire: { model.session.retirePromptWords($0) }))
           }
       }.frame(width: 360).foregroundStyle(.white).background(.black)
+        .environment(\.typebarSystemReduceMotionOverride, false)
     }
   }
 

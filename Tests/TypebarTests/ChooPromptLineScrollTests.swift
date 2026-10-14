@@ -64,6 +64,7 @@ import XCTest
             measuresTextRows: false, measuresCustomRows: true) { prompt }
         }
       }.frame(width: 240).background(Color.white)
+        .environment(\.typebarSystemReduceMotionOverride, false)
     }
   }
 

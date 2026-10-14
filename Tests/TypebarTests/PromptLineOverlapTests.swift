@@ -212,6 +212,7 @@ import XCTest
               latestGlyphID: { model.session.promptCaretGlyphIndex }, latestRendering: { model.rendering })
           }
       }.frame(width: 360)
+        .environment(\.typebarSystemReduceMotionOverride, false)
     }
   }
 

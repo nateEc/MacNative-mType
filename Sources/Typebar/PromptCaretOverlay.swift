@@ -229,6 +229,7 @@ struct PromptAutoScrollOverlay: NSViewRepresentable {
   let isRightToLeft: Bool
   var lineScroll: PromptLineScrollContext? = nil
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarSystemReduceMotionOverride) private var systemReduceMotionOverride
   @Environment(\.typebarAnimationFrameRate) private var lineScrollFrameRate
 
   func makeNSView(context: Context) -> PromptAutoScrollView {
@@ -239,7 +240,7 @@ struct PromptAutoScrollOverlay: NSViewRepresentable {
     let lineScroll = lineScroll.map {
       PromptLineScrollContext(attemptID: $0.attemptID, activeWordID: $0.activeWordID,
         characterOffsets: $0.characterOffsets, smoothScroll: $0.smoothScroll,
-        reducesMotion: $0.reducesMotion || systemReduceMotion, frameRate: lineScrollFrameRate,
+        reducesMotion: $0.reducesMotion || (systemReduceMotionOverride ?? systemReduceMotion), frameRate: lineScrollFrameRate,
         words: $0.words, firstRetainedWordIndex: $0.firstRetainedWordIndex, onRetire: $0.onRetire,
         followsWordReflow: $0.followsWordReflow, caretMotion: $0.caretMotion,
         centersActiveLine: $0.centersActiveLine, wrapperRevision: $0.wrapperRevision)
@@ -663,6 +664,7 @@ struct PromptCaretOverlay: NSViewRepresentable {
   var latestRendering: (() -> PromptRendering)? = nil
   var mainPresentation: (() -> PromptCaretBlinkPresentation)? = nil
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarSystemReduceMotionOverride) private var systemReduceMotionOverride
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   func makeNSView(context: Context) -> PromptCaretNativeView { PromptCaretNativeView() }
@@ -671,7 +673,7 @@ struct PromptCaretOverlay: NSViewRepresentable {
     view.update(.init(text: text, mainOffset: mainCharacterOffset, paceOffset: paceCharacterOffset,
       mainStyle: mainStyle, paceStyle: paceStyle, font: font, lineSpacing: lineSpacing,
       rightToLeft: isRightToLeft, accent: accent, motion: motion,
-      reducesMotion: reducesPaceMotion || systemReduceMotion,
+      reducesMotion: reducesPaceMotion || (systemReduceMotionOverride ?? systemReduceMotion),
       frameRate: animationFrameRate, attemptID: attemptID, coordinator: coordinator,
       firstRetainedWordIndex: firstRetainedWordIndex,
       latestInput: latestInput, latestGlyphID: latestGlyphID,

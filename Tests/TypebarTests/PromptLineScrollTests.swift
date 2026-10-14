@@ -163,6 +163,7 @@ import XCTest
                 smoothScroll: smooth, reducesMotion: false))
           }
       }.frame(width: 360).environment(\.typebarAnimationFrameRate, frameRate)
+        .environment(\.typebarSystemReduceMotionOverride, false)
     }
     let host = NSHostingView(rootView: root(row: 0))
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 360, height: 135),
