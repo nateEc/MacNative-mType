@@ -144,6 +144,24 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     }
   }
 
+  func testNorwegianAndNordicKeepDistinctFirstNumberKeys() {
+    let norwegian = KeyboardGuideModel.rows(for: .norwegianQwerty)[0][0]
+    XCTAssertEqual(norwegian.label, "|")
+    XCTAssertEqual(norwegian.shiftedLabel, "§")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: .builtIn(.norwegianQwerty)), "|")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .shift, mapping: .builtIn(.norwegianQwerty)), "§")
+
+    let nordic = KeyboardGuideModel.rows(for: .nordicQwerty)[0][0]
+    XCTAssertEqual(nordic.label, "§")
+    XCTAssertEqual(nordic.shiftedLabel, "°")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: .builtIn(.nordicQwerty)), "§")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .shift, mapping: .builtIn(.nordicQwerty)), "°")
+  }
+
   func testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation() throws {
     guard let root = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_AUDIT_REFERENCE"] else {
       throw XCTSkip("Set TYPEBAR_LAYOUT_AUDIT_REFERENCE to a pinned read-only checkout")

@@ -3162,9 +3162,9 @@ enum KeyboardGuideModel {
     case .nordicQwerty, .norwegianQwerty:
       [
         row(
-          "number", "§1234567890+\\",
-          characters: ["§°", "1!", "2\"", "3#", "4¤", "5%", "6&", "7/", "8(", "9)", "0=", "+?", "\\`"],
-          shiftedLabels: ["°", "!", "\"", "#", "¤", "%", "&", "/", "(", ")", "=", "?", "`"]
+          "number", layout == .norwegianQwerty ? "|1234567890+\\" : "§1234567890+\\",
+          characters: [layout == .norwegianQwerty ? "|§" : "§°", "1!", "2\"", "3#", "4¤", "5%", "6&", "7/", "8(", "9)", "0=", "+?", "\\`"],
+          shiftedLabels: [layout == .norwegianQwerty ? "§" : "°", "!", "\"", "#", "¤", "%", "&", "/", "(", ")", "=", "?", "`"]
         ),
         row(
           "top", "QWERTYUIOPÅ¨",
