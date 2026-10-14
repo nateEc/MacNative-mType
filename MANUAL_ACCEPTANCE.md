@@ -1,5 +1,7 @@
 # Typebar 人工验收记录
 
+2026-10-14 结果 sheet 退出补证：以当前 `01d4bc2` 的单一隔离 Release QA 包（`app.typebar.qa.quit20261014`、内存 SwiftData）启动，开始英语 30 秒测试并输入 `a`，等待其“闲置无效”结果 sheet 出现。sheet 明确提示不保存；首次 ⌘Q 后应用直接退出，`pgrep -x Typebar` 为零。该次仅证明这一条快捷键／终态路径，未执行菜单退出、成功成绩或双窗口。上次同类 sheet 曾出现首次 ⌘Q 只关闭 sheet、二次才退出，因此差异仍未稳定复现或归因，`RESULT-SHEET-QUIT-01/02` 不升级。Xcode 26.3 SDK 的 `NSWindow.preventsApplicationTerminationWhenModal` 仅规定模态窗口是否阻止应用终止；现有桥接测试未证明真实 ⌘Q 总能到达代理，不据此添加推测性修复。
+
 2026-10-14 唯一隔离 Release QA 包（独立 bundle ID、内存 SwiftData）补证：开始前和退出后均为零 Typebar 进程，两次启动从未并存。命令面板切换“按字符卷带”后，以自有 `abc\ndef` 自定义文本在可见窗口观察两行与 Return 标记；输入 `abc`、按 Return 时主光标移到 `def` 行，输入 `def` 后结果页给出 2/2 词正确、7 个输入字符、零错误。首轮因界面检查间隔超过闲置阈值而“闲置无效”、不保存；第二轮连续输入因题量过短“结果无效”、不保存。只支持 `TAPE-NL-01` 的简单 LTR 正确 Return 可见子例，不证明错误／额外 Return、连续空行、RTL、词模式、平滑、pace、退休、实体 IME、合格成绩或浏览器等价。首轮“闲置无效”sheet 的首次 ⌘Q 仅关闭 sheet、进程仍在，第二次才退出；第二轮“题量过短”sheet 的首次 ⌘Q 直接退出。`RESULT-SHEET-QUIT-01` 的终态差异未稳定复现或归因，不能视为全面通过。临时 QA 包已移至废纸篓，可恢复。
 
 计时延迟的同模式题长反向对照见 [当前合同](ORDINARY_TAPE_ENTRY_CONTRACT.md#固定字数模式的题长反向对照2026-10-10)，物理／屏幕键盘、结果弹窗退出及其他阶段证据也保存在该合同中。自动化操作、源码门禁和不可见组件不替代人工设备验收，以下场景保持待验收。
