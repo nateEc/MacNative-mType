@@ -16,6 +16,22 @@ final class LocalPracticeFontRemovalTests: XCTestCase {
     XCTAssertTrue(cleared)
   }
 
+  func testUnregistrationFailureKeepsFileAndEnabledSetting() throws {
+    let url = URL(fileURLWithPath: "/owned/a.ttf")
+    let failure = NSError(domain: "CoreTextUnregisterFailure", code: 9)
+    var restored = false
+    XCTAssertThrowsError(try LocalPracticeFontRemoval.remove([url], unregister: { _ in
+      throw failure
+    }, register: { restored = $0 == url }, removeFile: { _ in
+      XCTFail("A font still registered by Core Text must not be deleted")
+    }, didRemove: {
+      XCTFail("A failed removal must keep the user's enabled setting")
+    })) { error in
+      XCTAssertEqual(error as NSError, failure)
+    }
+    XCTAssertTrue(restored, "The failed unload might have partially changed native registration")
+  }
+
   func testPartialFailureRestoresOnlyFailedFileAndDoesNotTouchLaterFiles() {
     let urls = ["a", "b", "c"].map { URL(fileURLWithPath: "/owned/\($0).ttf") }
     var unregistered: [URL] = [], restored: [URL] = [], removed: [URL] = []

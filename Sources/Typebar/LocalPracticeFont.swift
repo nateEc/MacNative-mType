@@ -90,9 +90,13 @@ enum TypebarLocalPracticeFontStore {
     LocalPracticeFontRegistration.read(url: url)
   }
 
-  private static func unregister(_ url: URL) {
-    var registrationError: Unmanaged<CFError>?
-    _ = CTFontManagerUnregisterFontsForURL(url as CFURL, .process, &registrationError)
+  private static func unregister(_ url: URL) throws {
+    let scope = CTFontManagerGetScopeForURL(url as CFURL)
+    if scope == .none { return }
+    guard scope == .process,
+      CTFontManagerUnregisterFontsForURL(url as CFURL, .process, nil) else {
+      throw LocalPracticeFontError.couldNotUnload
+    }
   }
 
   private static func fontInfo(at url: URL) -> LocalPracticeFontInfo? {
@@ -106,15 +110,15 @@ enum TypebarLocalPracticeFontStore {
 }
 
 enum LocalPracticeFontRemoval {
-  static func remove(_ urls: [URL], unregister: (URL) -> Void, register: (URL) -> Void,
+  static func remove(_ urls: [URL], unregister: (URL) throws -> Void, register: (URL) -> Void,
     removeFile: (URL) throws -> Void, didRemove: () -> Void) throws {
     for url in urls {
-      unregister(url)
       do {
+        try unregister(url)
         try removeFile(url)
       } catch {
-        // Only this file was just unregistered. Earlier successful removals
-        // must not be resurrected, and later files have not been touched.
+        // A failed native unload may have partially changed registration.
+        // Restore only this still-owned file; earlier deletions stay deleted.
         register(url)
         throw error
       }
@@ -169,7 +173,7 @@ enum LocalPracticeFontImport {
 
   static func save(_ data: Data, originalFilename: String, directory: URL,
     readInfo: (URL) -> LocalPracticeFontInfo?, register: (URL) -> LocalPracticeFontInfo?,
-    unregister: (URL) -> Void, enable: () -> Void) throws -> LocalPracticeFontInfo {
+    unregister: (URL) throws -> Void, enable: () -> Void) throws -> LocalPracticeFontInfo {
     guard LocalPracticeFontFilePolicy.supports(filename: originalFilename) else {
       throw LocalPracticeFontError.unsupportedFormat
     }
@@ -192,14 +196,28 @@ enum LocalPracticeFontImport {
       "\(filenamePrefix)-active-\(UUID().uuidString).\(fileExtension)", isDirectory: false)
     try data.write(to: destinationURL, options: .atomic)
 
-    previousURLs.forEach(unregister)
+    var attemptedUnloads: [URL] = []
+    do {
+      for url in previousURLs {
+        attemptedUnloads.append(url)
+        try unregister(url)
+      }
+    } catch {
+      // Keep every old file intact. A failed native call can have partially
+      // unloaded its URL, so also try to restore the URL that reported failure.
+      attemptedUnloads.forEach { _ = register($0) }
+      try? FileManager.default.removeItem(at: destinationURL)
+      throw error
+    }
     guard let info = register(destinationURL) else {
       // Registration may succeed before descriptor/availability checks fail.
       // Retire this owned generation while its file still exists, before
       // restoring the previous fonts (which may share its PostScript name).
-      unregister(destinationURL)
+      let retiredDestination = (try? unregister(destinationURL)) != nil
       previousURLs.forEach { _ = register($0) }
-      try? FileManager.default.removeItem(at: destinationURL)
+      // Core Text forbids moving a still-registered file. Retain it for
+      // recovery if native cleanup fails; never silently delete its bytes.
+      if retiredDestination { try? FileManager.default.removeItem(at: destinationURL) }
       throw LocalPracticeFontError.couldNotLoad
     }
     for url in previousURLs {
@@ -224,6 +242,7 @@ enum LocalPracticeFontError: LocalizedError {
   case unsupportedFormat
   case invalidFont
   case couldNotLoad
+  case couldNotUnload
 
   var errorDescription: String? {
     switch self {
@@ -233,6 +252,8 @@ enum LocalPracticeFontError: LocalizedError {
       "所选文件不是 macOS 可以读取的字体。"
     case .couldNotLoad:
       "字体文件已保存，但当前 macOS 无法加载它。"
+    case .couldNotUnload:
+      "当前 macOS 无法安全停用旧字体；原文件已保留，请稍后重试。"
     }
   }
 }
