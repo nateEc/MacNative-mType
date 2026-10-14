@@ -827,6 +827,23 @@ enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
   func usesCustomRows(inputLayout: KeyboardInputLayout) -> Bool {
     self == .custom || (self == .inputEmulation && inputLayout == .custom)
   }
+
+  /// The reference's overrideSync and Layout Fluid compare the physical key;
+  /// explicit visual layouts compare the position of the logical key instead.
+  func oppositeShiftMapping(
+    selectedLayout: KeyboardLayout, customLayout: CustomKeyboardGuideLayout?,
+    layoutFluid: Bool
+  ) -> KeyboardInputMapping {
+    if layoutFluid { return .system }
+    switch self {
+    case .inputEmulation, .systemInput:
+      return .system
+    case .builtIn:
+      return .builtIn(selectedLayout)
+    case .custom:
+      return customLayout.map(KeyboardInputMapping.custom) ?? .builtIn(selectedLayout)
+    }
+  }
 }
 
 /// A user-authored visual keymap. It can remain presentation-only or be

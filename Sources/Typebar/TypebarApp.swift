@@ -3012,7 +3012,10 @@ private struct ContentView: View {
         focusRequest: focusRequest, acceptsTextInput: !isPreparingWholePreview,
         quickRestartKey: settings.quickRestartKey,
         keyboardInputMapping: effectiveKeyboardInputMapping,
-        keymapLayout: effectiveKeyboardLayout,
+        oppositeShiftKeymap: settings.keyboardGuideLayoutSource.oppositeShiftMapping(
+          selectedLayout: settings.keyboardLayout,
+          customLayout: settings.selectedCustomKeyboardLayout,
+          layoutFluid: session.configuration.modifiers.contains(.layoutFluid)),
         oppositeShiftMode: settings.oppositeShiftMode,
         mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
         acceptsNewlineInput: session.acceptsNewlineInput,

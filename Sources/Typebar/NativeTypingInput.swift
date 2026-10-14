@@ -113,7 +113,7 @@ struct NativeTypingInput: NSViewRepresentable {
     var acceptsTextInput = true
     var quickRestartKey: QuickRestartKey
     var keyboardInputMapping: KeyboardInputMapping
-    var keymapLayout: KeyboardLayout
+    var oppositeShiftKeymap: KeyboardInputMapping
     var oppositeShiftMode: OppositeShiftMode
     var mapsArrowKeysToInput: Bool
     var acceptsNewlineInput: Bool
@@ -162,7 +162,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onOpenCommandPalette = onOpenCommandPalette
         view.quickRestartKey = quickRestartKey
         view.keyboardInputMapping = keyboardInputMapping
-        view.keymapLayout = keymapLayout
+        view.oppositeShiftKeymap = oppositeShiftKeymap
         view.oppositeShiftMode = oppositeShiftMode
         view.mapsArrowKeysToInput = mapsArrowKeysToInput
         view.acceptsNewlineInput = acceptsNewlineInput
@@ -221,7 +221,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onQuickRestartProtectionRequired: () -> Void = {}
     var quickRestartKey: QuickRestartKey = .off
     var keyboardInputMapping: KeyboardInputMapping = .system
-    var keymapLayout: KeyboardLayout = .ansiQwerty
+    var oppositeShiftKeymap: KeyboardInputMapping = .builtIn(.ansiQwerty)
     var oppositeShiftMode: OppositeShiftMode = .off
     var mapsArrowKeysToInput = false
     var acceptsNewlineInput = false
@@ -495,21 +495,20 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             onDelete()
             return
         }
-        let shiftComparisonKeyCode: UInt16
-        if oppositeShiftMode == .keymap,
-           let logicalCharacter = event.characters?.first,
-           let mappedKeyCode = KeyboardLayoutEmulator.keyCode(
-             for: logicalCharacter, mapping: keyboardInputMapping)
-             ?? KeyboardLayoutEmulator.keyCode(for: logicalCharacter, layout: keymapLayout)
-        {
-            shiftComparisonKeyCode = mappedKeyCode
+        let shiftComparisonKeyCode: UInt16?
+        if oppositeShiftMode == .keymap, oppositeShiftKeymap != .system {
+            shiftComparisonKeyCode = event.characters?.first.flatMap {
+                KeyboardLayoutEmulator.keyCode(for: $0, mapping: oppositeShiftKeymap)
+            }
         } else {
             shiftComparisonKeyCode = event.keyCode
         }
-        let forcesError = oppositeShiftMode != .off
-          && !OppositeShiftPolicy.usesOppositeShift(
-            keyCode: shiftComparisonKeyCode, leftShiftPressed: leftShiftPressed,
-            rightShiftPressed: rightShiftPressed)
+        let usesCorrectShift = shiftComparisonKeyCode.map {
+            OppositeShiftPolicy.usesOppositeShift(
+                keyCode: $0, leftShiftPressed: leftShiftPressed,
+                rightShiftPressed: rightShiftPressed)
+        } ?? true
+        let forcesError = oppositeShiftMode != .off && !usesCorrectShift
         if let emulatedText = KeyboardLayoutEmulator.text(
             forKeyCode: event.keyCode, modifierFlags: event.modifierFlags,
             mapping: keyboardInputMapping
