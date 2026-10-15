@@ -296,14 +296,29 @@ import XCTest
       let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 160))
       let motion = PromptCaretMotionCoordinator(), attempt = UUID()
       var retired: [PromptWordRetirement] = []
+      let notification = active == 1
+        ? expectation(description: "Backward input preserves the completed prefix notification") : nil
+      let notify: (PromptWordRetirement) -> Void = {
+        retired.append($0)
+        notification?.fulfill()
+      }
       defer { view.stop() }
-      begin(view, motion, attempt) { retired.append($0) }
+      begin(view, motion, attempt, onRetire: notify)
       let height = view.subviews[0].frame.height
-      update(view, motion, attempt, active: 2, time: 1) { retired.append($0) }
+      update(view, motion, attempt, active: 2, time: 1, onRetire: notify)
       view.present(at: 1.04)
-      update(view, motion, attempt, active: active, time: 1.05) { retired.append($0) }
+      update(view, motion, attempt, active: active, time: 1.05, onRetire: notify)
       XCTAssertTrue(motion.isAnimatingTape, "Backward input has its own horizontal request")
-      view.present(at: 1.113); drainNotifications()
+      view.present(at: 1.113)
+      if let notification {
+        wait(for: [notification], timeout: 1)
+      } else {
+        // The delivery above is queued synchronously by present(at:). A main-
+        // queue barrier observes that turn without assuming a 2 ms deadline.
+        let drained = expectation(description: "Queued retirement callbacks have drained")
+        DispatchQueue.main.async { drained.fulfill() }
+        wait(for: [drained], timeout: 1)
+      }
       XCTAssertEqual(motion.wordsMargin, 0)
       XCTAssertEqual(retired.map(\.firstRetainedWordIndex), active == 0 ? [] : [1])
       if active == 0 { XCTAssertEqual(view.subviews[0].frame.height, height) }

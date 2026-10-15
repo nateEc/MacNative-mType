@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-15 远端 [Native Rewrite Gate #38675558849](https://github.com/nateEc/MacNative-mType/actions/runs/38675558849) 在 macOS 15 的完整客户端阶段失败，后续包与服务未执行；失败为 `PromptLineOverlapTests.testANewJumpAtTheSamePhysicalTargetStillReplacesTheCompletionTime` 先收旧退休索引 1 再收新索引 2，以及 `TapeNewlineTransitionTests.testBackwardInputIsNotBlockedAndCannotDeleteTheCurrentlyActiveNativePrefix` 在固定 2ms 排队后尚未收到预期索引 1。本机旧测试各重复 15 次均通过，未能复现远端负载，但源码显示前者固定 70ms 窗口不能保证旧动画在替换时仍待决，后者确实经主队列异步交付。测试现把替换安排在旧动画确认待决后立即进行、等待新索引的真实完成且仍拒绝旧索引；后退测试等待实际通知或已排队主队列屏障，保留零删除、动画和视图几何断言。修正后定点重复 20 轮及相关 41 项（3 项既有条件跳过）零失败；macOS 15 尚未验证，不推送试探性提交，也未启动 Typebar。
+
 2026-10-15 `INP-01`／Tamil99 固定源码逐键纠偏（本地待推送）：先行四层对照在 192 个实体键输出中发现 12 处差异，集中在六键；独立定点测试先失败，改正反引号、单层 Shift 回退、冒号、`௱` 与 `ௐ` 后，Tamil99 192 项及旧持久化选择测试全过。全局四层差分现为 87/46,060，分布于 14 布局（59 处显式不同、28 处交给 macOS）；下段 99 项是修正前的历史数值。旧布局 ID 和数据格式不变，但升级后的字符输出改变，旧二进制会恢复旧语义；真人键盘、IME、Option 图例仍待验收，无原版资产进入产品。
 
 2026-10-15 `INP-01`／Pashto、Hindi InScript、Thai Pattachote、Arabic (macOS)、Whix2、Persian Standard 六布局源码逐键纠偏（本地待推送）：固定参考的 6 × 192 个四层物理键比较点，修正前分别差 90、48、46、36、28、14，修正后六项全过；数字行、底行、单层回退、Whix2 空白外观键实际插入空格、Persian Standard 的 ANSI 额外键边界、键盘提示与旧持久化选择均有定点测试。已保存布局 ID 和数据格式不变，但这些布局升级后的字符输出会改变；回退旧二进制会恢复旧键位，真人键盘、IME、Option 图例仍待验收。全局四层差分由上一批的 361/46,060 降至 99/46,060，仍跨 15 布局；没有复制或打包原版键位 JSON、代码或资产。

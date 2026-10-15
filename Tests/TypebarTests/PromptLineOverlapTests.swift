@@ -48,18 +48,21 @@ import XCTest
     RunLoop.main.run(until: Date().addingTimeInterval(0.005))
   }
 
-  func testANewJumpAtTheSamePhysicalTargetStillReplacesTheCompletionTime() {
+  func testANewJumpAtTheSamePhysicalTargetReplacesOlderRetirement() {
     let (scroll, follower) = fixture(), attempt = UUID()
     var retired: [PromptWordRetirement] = []
-    let notify: (PromptWordRetirement) -> Void = { retired.append($0) }
+    let completed = expectation(description: "The replacement jump retires its own prefix")
+    let notify: (PromptWordRetirement) -> Void = {
+      retired.append($0)
+      if $0.firstRetainedWordIndex == 2 { completed.fulfill() }
+    }
     for row in 0...2 {
       update(follower, row: row, attempt: attempt, caret: row == 2 ? 30 : nil, notify: notify)
     }
-    RunLoop.main.run(until: Date().addingTimeInterval(0.07))
+    XCTAssertTrue(retired.isEmpty, "The older jump must still be pending before replacement")
     update(follower, row: 3, attempt: attempt, caret: 30, notify: notify)
-    RunLoop.main.run(until: Date().addingTimeInterval(0.065))
     XCTAssertTrue(retired.isEmpty, "The canceled older animation cannot complete the newer jump")
-    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    wait(for: [completed], timeout: 1)
     XCTAssertEqual(retired, [.init(attemptID: attempt, firstRetainedWordIndex: 2)])
     XCTAssertGreaterThan(scroll.contentView.bounds.minY, 90)
   }
