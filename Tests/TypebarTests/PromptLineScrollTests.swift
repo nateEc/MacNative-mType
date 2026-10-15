@@ -61,16 +61,20 @@ import XCTest
     XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 0.5)
   }
 
-  func testSmoothLineScrollMovesOverTimeAndSettlesAtTheSameOrigin() {
+  func testSmoothLineScrollSchedulesMotionAndSettlesAtTheSameOrigin() {
     let (scroll, follower) = fixture(), attempt = UUID()
     update(follower, row: 0, attempt: attempt, smooth: true)
     update(follower, row: 1, attempt: attempt, smooth: true)
     update(follower, row: 2, attempt: attempt, smooth: true)
-    XCTAssertLessThan(scroll.contentView.bounds.minY, 44)
-    RunLoop.main.run(until: Date().addingTimeInterval(0.04))
-    XCTAssertGreaterThan(scroll.contentView.bounds.minY, 0)
-    XCTAssertLessThan(scroll.contentView.bounds.minY, 45)
-    RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+    let scheduledDeadline = Date().addingTimeInterval(1)
+    while follower.lastScheduledLineScrollInterval == nil && Date() < scheduledDeadline {
+      RunLoop.main.run(until: min(scheduledDeadline, Date().addingTimeInterval(0.005)))
+    }
+    XCTAssertEqual(follower.lastScheduledLineScrollInterval ?? -1, 1.0 / 60, accuracy: 0.000001)
+    let settledDeadline = Date().addingTimeInterval(1)
+    while abs(scroll.contentView.bounds.minY - 45) > 0.5 && Date() < settledDeadline {
+      RunLoop.main.run(until: min(settledDeadline, Date().addingTimeInterval(0.005)))
+    }
     XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 0.5)
   }
 
@@ -287,6 +291,15 @@ import XCTest
   func testAnimationProgressClampsBothEnds() {
     XCTAssertEqual(PromptLineScrollMotion.progress(elapsed: -1), 0)
     XCTAssertEqual(PromptLineScrollMotion.progress(elapsed: 1), 1)
+  }
+
+  func testAnimationProgressMovesContinuouslyBetweenEndpoints() {
+    let duration = PromptLineScrollMotion.duration
+    let first = PromptLineScrollMotion.progress(elapsed: duration / 3)
+    let second = PromptLineScrollMotion.progress(elapsed: duration * 2 / 3)
+    XCTAssertGreaterThan(first, 0)
+    XCTAssertLessThan(first, second)
+    XCTAssertLessThan(second, 1)
   }
 
   func testAnimationInheritsLowFrameRateAndRetimesWhenTheSettingChanges() {

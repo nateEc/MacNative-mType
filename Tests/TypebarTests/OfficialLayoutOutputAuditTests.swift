@@ -820,6 +820,19 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     }
   }
 
+  func testRussianGuidePreservesOfficialUppercaseBaseKeys() {
+    let cases: [(KeyboardLayout, Int, Int, String, String)] = [
+      (.redaktor, 0, 11, "Ъ", "Ь"),
+      (.juiyaf, 1, 11, "Ь", "Ъ"),
+    ]
+    for (layout, row, column, base, shifted) in cases {
+      let key = KeyboardGuideModel.rows(for: layout)[row][column]
+      XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: [], capsLockEnabled: false), base)
+      XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: .option, capsLockEnabled: false), base)
+      XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), shifted)
+    }
+  }
+
   func testDvorakAndSwedishColemakGuidesShowPinnedISOSymbols() {
     let cases: [(KeyboardLayout, Int, Int, String)] = [
       (.spanishDvorak, 3, 0, ">"),

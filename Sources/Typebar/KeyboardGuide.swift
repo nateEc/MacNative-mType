@@ -1168,6 +1168,7 @@ struct KeyboardGuideKey: Identifiable, Equatable {
   let shiftedLabel: String?
   let optionLabel: String?
   let shiftedOptionLabel: String?
+  let preservesDynamicBaseCase: Bool
 
   init(
     _ id: String,
@@ -1176,7 +1177,8 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     width: CGFloat = 28,
     shiftedLabel: String? = nil,
     optionLabel: String? = nil,
-    shiftedOptionLabel: String? = nil
+    shiftedOptionLabel: String? = nil,
+    preservesDynamicBaseCase: Bool = false
   ) {
     self.id = id
     self.label = label
@@ -1189,6 +1191,7 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     self.shiftedLabel = shiftedLabel
     self.optionLabel = optionLabel
     self.shiftedOptionLabel = shiftedOptionLabel
+    self.preservesDynamicBaseCase = preservesDynamicBaseCase
   }
 
   private static func typedCharacters(for character: Character) -> [Character] {
@@ -1243,7 +1246,8 @@ struct KeyboardGuideKey: Identifiable, Equatable {
       if modifierFlags.contains(.shift), let shiftedSymbol = Self.shiftedSymbol(for: label) {
         return shiftedSymbol
       }
-      return (modifierFlags.contains(.shift) || capsLockEnabled) ? label.uppercased() : label.lowercased()
+      return (modifierFlags.contains(.shift) || capsLockEnabled) ? label.uppercased()
+        : preservesDynamicBaseCase ? label : label.lowercased()
     }
   }
 
@@ -2362,7 +2366,8 @@ enum KeyboardGuideModel {
           "number", labels: ["ё", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Ъ", "="],
           shiftedLabels: ["Ё", "№", ":", ";", "/", "₽", "@", "ё", "?", "!", "%", "Ь", "+"],
           optionLabels: Array(repeating: nil, count: 13),
-          shiftedOptionLabels: Array(repeating: nil, count: 13)
+          shiftedOptionLabels: Array(repeating: nil, count: 13),
+          preserveBaseCaseAt: [11]
         ),
         layeredRow(
           "top", labels: ["ц", "ы", "я", "й", "ь", "з", "д", "в", "к", "г", "ш", "щ", "\\"],
@@ -2395,7 +2400,8 @@ enum KeyboardGuideModel {
           "top", labels: ["й", "у", "и", "я", "ф", "х", "ж", "р", ".", "ш", "ц", "Ь", "\\"],
           shiftedLabels: ["Й", "У", "И", "Я", "Ф", "Х", "Ж", "Р", ",", "Ш", "Ц", "Ъ", "/"],
           optionLabels: Array(repeating: nil, count: 13),
-          shiftedOptionLabels: Array(repeating: nil, count: 13)
+          shiftedOptionLabels: Array(repeating: nil, count: 13),
+          preserveBaseCaseAt: [11]
         ),
         layeredRow(
           "home", labels: ["в", "е", "а", "о", "ч", "г", "т", "н", "с", "д", "б"],
@@ -4400,7 +4406,8 @@ enum KeyboardGuideModel {
     characters: [String]? = nil,
     shiftedLabels: [String?]? = nil,
     optionLabels: [String?]? = nil,
-    shiftedOptionLabels: [String?]? = nil
+    shiftedOptionLabels: [String?]? = nil,
+    preserveBaseCaseAt: Set<Int> = []
   )
     -> [KeyboardGuideKey]
   {
@@ -4417,7 +4424,8 @@ enum KeyboardGuideModel {
         },
         shiftedOptionLabel: shiftedOptionLabels.flatMap { labels in
           labels.indices.contains(offset) ? labels[offset] : nil
-        }
+        },
+        preservesDynamicBaseCase: preserveBaseCaseAt.contains(offset)
       )
     }
   }
@@ -4427,7 +4435,8 @@ enum KeyboardGuideModel {
     labels: [String],
     shiftedLabels: [String?],
     optionLabels: [String?]? = nil,
-    shiftedOptionLabels: [String?]? = nil
+    shiftedOptionLabels: [String?]? = nil,
+    preserveBaseCaseAt: Set<Int> = []
   ) -> [KeyboardGuideKey] {
     let characters = labels.indices.map { index in
       return [labels[index], shiftedLabels[index], optionLabels?[safe: index] ?? nil,
@@ -4437,7 +4446,8 @@ enum KeyboardGuideModel {
     }
     return row(
       prefix, labels: labels, characters: characters, shiftedLabels: shiftedLabels,
-      optionLabels: optionLabels, shiftedOptionLabels: shiftedOptionLabels)
+      optionLabels: optionLabels, shiftedOptionLabels: shiftedOptionLabels,
+      preserveBaseCaseAt: preserveBaseCaseAt)
   }
 
   private static func swissQwertzRows(
