@@ -9678,22 +9678,38 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testArabic102MapsItsRegionalKeyDifferencesAndPersists() {
+  func testArabic102MapsItsRegionalKeyDifferencesAndPersists() throws {
     let rows = KeyboardGuideModel.rows(for: .arabic102)
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .arabic102), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ذ", layout: .arabic102), "top-12")
     XCTAssertEqual(rows[3][0].label, "ـ")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ؤ", layout: .arabic102), "bottom-3")
-    XCTAssertEqual(rows[2][1].shiftedLabel, "NUL")
+    XCTAssertEqual(rows[2][1].shiftedLabel, "\u{200B}")
 
     XCTAssertEqual(KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .arabic102), ">")
     XCTAssertEqual(KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [], layout: .arabic102), "ذ")
     XCTAssertEqual(KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [.shift], layout: .arabic102), "ّ")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 1, modifierFlags: [.shift], layout: .arabic102), "\u{0000}")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 1, modifierFlags: [.shift], layout: .arabic102), "\u{200B}")
     XCTAssertEqual(KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .arabic102), "ـ")
     XCTAssertEqual(KeyboardLayoutEmulator.character(forKeyCode: 8, modifierFlags: [.shift], layout: .arabic102), "ِ")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ذ", layout: .arabic102), 42)
     XCTAssertEqual(KeyboardInputLayout.arabic102.emulatedLayout, .arabic102)
+
+    var inserted = [String]()
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = .builtIn(.arabic102)
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    for (keyCode, flags, characters) in [
+      (UInt16(1), NSEvent.ModifierFlags.shift, "S"),
+      (UInt16(11), NSEvent.ModifierFlags(), "b"),
+    ] {
+      let event = try XCTUnwrap(NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
+        context: nil, characters: characters, charactersIgnoringModifiers: characters,
+        isARepeat: false, keyCode: keyCode))
+      inputView.keyDown(with: event)
+    }
+    XCTAssertEqual(inserted, ["\u{200B}", "ﻻ"])
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!

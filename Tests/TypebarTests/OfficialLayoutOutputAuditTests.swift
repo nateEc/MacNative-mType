@@ -236,6 +236,27 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     XCTAssertNil(KeyboardLayoutEmulator.keyCode(forOutput: "ஸ்ரீ", layout: .tamil99))
   }
 
+  func testOfficialArabic102UsesPinnedPresentationFormsAndZeroWidthShift() {
+    let mapping = KeyboardInputMapping.builtIn(.arabic102)
+    let rows = KeyboardGuideModel.rows(for: .arabic102)
+    XCTAssertEqual(rows[1][4].shiftedLabel, "ﻹ")
+    XCTAssertEqual(rows[2][1].shiftedLabel, "\u{200B}")
+    XCTAssertEqual(rows[2][4].shiftedLabel, "ﻷ")
+    XCTAssertEqual(rows[3][5].label, "ﻻ")
+    XCTAssertEqual(rows[3][5].shiftedLabel, "ﻵ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ﻻ", layout: .arabic102), "bottom-5")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 17, modifierFlags: .shift, mapping: mapping), "ﻹ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 1, modifierFlags: [.option, .shift], mapping: mapping), "\u{200B}")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 5, modifierFlags: .shift, mapping: mapping), "ﻷ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 11, modifierFlags: .option, mapping: mapping), "ﻻ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 11, modifierFlags: [.option, .shift], mapping: mapping), "ﻵ")
+  }
+
   func testMacedonianQuestionMarkShiftMatchesOfficialLayout() {
     let lastKey = KeyboardGuideModel.rows(for: .macedonian)[3].last
     XCTAssertEqual(lastKey?.label, "/")
