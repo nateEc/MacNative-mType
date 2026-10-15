@@ -682,6 +682,160 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 18, modifierFlags: .shift, mapping: .builtIn(.urduPhonetic)), "1")
   }
 
+  func testPinnedGuideLegendsMatchReferenceLayers() throws {
+    guard let root = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_GUIDE_AUDIT_REFERENCE"] else {
+      throw XCTSkip("Set TYPEBAR_LAYOUT_GUIDE_AUDIT_REFERENCE to a pinned read-only checkout")
+    }
+    let reference = URL(fileURLWithPath: root, isDirectory: true)
+    let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let mapping = try JSONDecoder().decode(Mapping.self, from: Data(contentsOf:
+      repository.appendingPathComponent("Compatibility/official-layouts.json")))
+
+    let git = Process(), output = Pipe()
+    git.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    git.arguments = ["-C", reference.path, "rev-parse", "HEAD"]
+    git.standardOutput = output
+    git.standardError = Pipe()
+    try git.run()
+    git.waitUntilExit()
+    let actualCommit = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    XCTAssertEqual(git.terminationStatus, 0)
+    XCTAssertEqual(actualCommit, mapping.referenceCommit, "Do not compare against a moving reference")
+    guard git.terminationStatus == 0, actualCommit == mapping.referenceCommit else { return }
+
+    let onlyOfficialID = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_GUIDE_AUDIT_ONLY"]
+    let auditedIDs: [String]
+    if let onlyOfficialID {
+      _ = try XCTUnwrap(mapping.nativeExact[onlyOfficialID], "Unknown official layout: \(onlyOfficialID)")
+      auditedIDs = [onlyOfficialID]
+    } else {
+      auditedIDs = mapping.nativeExact.keys.sorted()
+    }
+
+    let modifiers: [NSEvent.ModifierFlags] = [[], .shift, .option, [.shift, .option]]
+    var mismatchCount = 0
+    var checkedLegends = 0
+    var mismatchesByLayout: [String: Int] = [:]
+    var firstMismatchByLayout: [String: String] = [:]
+    var examples: [String] = []
+    var visuallyBlankSpaces = 0
+    for officialID in auditedIDs {
+      let native = try XCTUnwrap(KeyboardLayout(rawValue: try XCTUnwrap(mapping.nativeExact[officialID])))
+      let sourceURL = reference.appendingPathComponent("frontend/static/layouts/\(officialID).json")
+      let source = try JSONDecoder().decode(ReferenceLayout.self, from: Data(contentsOf: sourceURL))
+      let sourceRows = [source.keys.row1, source.keys.row2, source.keys.row3, source.keys.row4]
+      let guideRows = KeyboardGuideModel.rows(for: native)
+      if guideRows.count != sourceRows.count {
+        mismatchCount += 1
+        mismatchesByLayout[officialID, default: 0] += 1
+        let detail = "\(officialID): expected \(sourceRows.count) rows, got \(guideRows.count)"
+        firstMismatchByLayout[officialID] = detail
+        examples.append(detail)
+        continue
+      }
+      for row in sourceRows.indices {
+        if guideRows[row].count != sourceRows[row].count {
+          mismatchCount += 1
+          mismatchesByLayout[officialID, default: 0] += 1
+          let detail = "\(officialID) row \(row + 1): expected \(sourceRows[row].count) keys, got \(guideRows[row].count)"
+          if firstMismatchByLayout[officialID] == nil { firstMismatchByLayout[officialID] = detail }
+          if examples.count < 20 {
+            examples.append(detail)
+          }
+          continue
+        }
+        for column in sourceRows[row].indices {
+          let layers = sourceRows[row][column]
+          guard let base = layers.first else { continue }
+          for flags in modifiers {
+            let shifted = flags.contains(.shift)
+            let alternateIndex = flags.contains(.option) && layers.count > 2 ? 2 : 0
+            let preferredIndex = alternateIndex + (shifted ? 1 : 0)
+            let preferred = layers.indices.contains(preferredIndex) ? layers[preferredIndex] : ""
+            let plainIndex = shifted ? 1 : 0
+            let plain = layers.indices.contains(plainIndex) ? layers[plainIndex] : ""
+            let expected = preferred.isEmpty ? (plain.isEmpty ? base : plain) : preferred
+            let key = guideRows[row][column]
+            let actual = key.legend(
+              style: .dynamic, modifierFlags: flags, capsLockEnabled: false)
+            checkedLegends += 1
+            // A literal Space has no visible glyph. Keep it blank only when
+            // the guide still advertises that the physical key can type it.
+            if expected == " ", actual.isEmpty, key.characters.contains(" ") {
+              visuallyBlankSpaces += 1
+              continue
+            }
+            if actual != expected {
+              mismatchCount += 1
+              mismatchesByLayout[officialID, default: 0] += 1
+              let detail = "\(officialID) row \(row + 1) key \(column + 1) "
+                + "\(flags.contains(.option) ? "Option+" : "")\(shifted ? "Shift" : "base"): "
+                + "expected \(expected.debugDescription), got \(actual.debugDescription)"
+              if firstMismatchByLayout[officialID] == nil { firstMismatchByLayout[officialID] = detail }
+              if examples.count < 20 {
+                examples.append(detail)
+              }
+            }
+          }
+        }
+      }
+    }
+    let byLayout = mismatchesByLayout.sorted {
+      $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
+    }.map { "\($0.key):\($0.value)" }
+    XCTAssertEqual(mismatchCount, 0,
+      "\(mismatchCount) of \(checkedLegends) visual legends or rows differ across "
+        + "\(mismatchesByLayout.count) layouts (\(visuallyBlankSpaces) verified blank Space legends). "
+        + "By layout: \(byLayout.joined(separator: ", ")). "
+        + "First per layout:\n\(firstMismatchByLayout.keys.sorted().compactMap { firstMismatchByLayout[$0] }.joined(separator: "\n"))\n"
+        + "First mismatches:\n\(examples.joined(separator: "\n"))")
+  }
+
+  func testArmenianThreeLayerGuideFallsBackToShiftOnOptionShift() {
+    let key = KeyboardGuideModel.rows(for: .armenianHMQwerty)[0][4]
+    XCTAssertEqual(key.shiftedLabel, "$")
+    XCTAssertEqual(key.optionLabel, "¢")
+    XCTAssertNil(key.shiftedOptionLabel)
+    XCTAssertEqual(key.legend(
+      style: .dynamic, modifierFlags: [.option, .shift], capsLockEnabled: false), "$")
+    XCTAssertEqual(VirtualKeyboardOutputPolicy.output(
+      for: key, shift: true, option: true), "$")
+  }
+
+  func testTurkishGuidesKeepDottedAndDotlessBaseLettersDistinct() {
+    let cases: [(KeyboardLayout, Int, Int, String, String)] = [
+      (.turkishF, 1, 3, "ı", "I"),
+      (.turkishF, 2, 1, "i", "İ"),
+      (.turkishE, 2, 2, "i", "İ"),
+      (.turkishE, 2, 3, "ı", "I"),
+    ]
+    for (layout, row, column, base, shifted) in cases {
+      let key = KeyboardGuideModel.rows(for: layout)[row][column]
+      XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: [], capsLockEnabled: false), base)
+      XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), shifted)
+      XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: .option, capsLockEnabled: false), base)
+      XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: [.option, .shift], capsLockEnabled: false), shifted)
+    }
+  }
+
+  func testDvorakAndSwedishColemakGuidesShowPinnedISOSymbols() {
+    let cases: [(KeyboardLayout, Int, Int, String)] = [
+      (.spanishDvorak, 3, 0, ">"),
+      (.swedishDvorak, 3, 0, ">"),
+      (.swedishDvorak, 3, 1, ":"),
+      (.swedishColemak, 1, 11, "^"),
+    ]
+    for (layout, row, column, expected) in cases {
+      let key = KeyboardGuideModel.rows(for: layout)[row][column]
+      XCTAssertEqual(key.legend(
+        style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), expected)
+      XCTAssertEqual(key.legend(
+        style: .dynamic, modifierFlags: [.option, .shift], capsLockEnabled: false), expected)
+    }
+  }
+
   func testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation() throws {
     guard let root = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_AUDIT_REFERENCE"] else {
       throw XCTSkip("Set TYPEBAR_LAYOUT_AUDIT_REFERENCE to a pinned read-only checkout")

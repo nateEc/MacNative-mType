@@ -1233,8 +1233,11 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     case .uppercase: return label.uppercased()
     case .dynamic:
       if modifierFlags.contains(.option) {
-        if modifierFlags.contains(.shift), let shiftedOptionLabel { return shiftedOptionLabel }
-        if let optionLabel { return optionLabel }
+        if modifierFlags.contains(.shift) {
+          if let shiftedOptionLabel { return shiftedOptionLabel }
+        } else if let optionLabel {
+          return optionLabel
+        }
       }
       if modifierFlags.contains(.shift), let shiftedLabel { return shiftedLabel }
       if modifierFlags.contains(.shift), let shiftedSymbol = Self.shiftedSymbol(for: label) {
@@ -1279,7 +1282,7 @@ enum OfficialUrduPhoneticKeymap {
 
 enum KeyboardGuideModel {
   static func rows(for layout: KeyboardLayout) -> [[KeyboardGuideKey]] {
-    switch layout {
+    let sourceRows: [[KeyboardGuideKey]] = switch layout {
     case .ansiQwerty:
       [
         row("number", "`1234567890-="),
@@ -1300,54 +1303,38 @@ enum KeyboardGuideModel {
       [
         layeredRow(
           "number", labels: ["`", "[", "]", "/", "p", "f", "m", "l", "j", "4", "3", "2", "1"],
-          shiftedLabels: ["~", "{", "}", "?", "P", "F", "M", "L", "J", "$", "#", "@", "!"],
-          optionLabels: ["`", "“", "‘", "÷", "π", "ƒ", "µ", "¬", "∆", "¢", "£", "™", "¡"],
-          shiftedOptionLabels: ["`", "”", "’", "¿", "∏", "Ï", "Â", "Ò", "Ô", "›", "‹", "€", "⁄"]
+          shiftedLabels: ["~", "{", "}", "?", "P", "F", "M", "L", "J", "$", "#", "@", "!"]
         ),
         layeredRow(
           "top", labels: [";", "q", "b", "y", "u", "r", "s", "o", ".", "6", "5", "=", "\\"],
-          shiftedLabels: [":", "Q", "B", "Y", "U", "R", "S", "O", ">", "^", "%", "+", "|"],
-          optionLabels: ["…", "œ", "∫", "¥", "¨", "®", "ß", "ø", "≥", "§", "∞", "≠", "«"],
-          shiftedOptionLabels: ["Ú", "Œ", "ı", "Á", "¨", "‰", "Í", "Ø", "˘", "ﬂ", "ﬁ", "±", "»"]
+          shiftedLabels: [":", "Q", "B", "Y", "U", "R", "S", "O", ">", "^", "%", "+", "|"]
         ),
         layeredRow(
           "home", labels: ["-", "k", "c", "d", "t", "h", "e", "a", "z", "8", "7"],
-          shiftedLabels: ["_", "K", "C", "D", "T", "H", "E", "A", "Z", "*", "&"],
-          optionLabels: ["–", "˚", "ç", "∂", "†", "˙", "´", "å", "Ω", "•", "¶"],
-          shiftedOptionLabels: ["—", "", "Ç", "Î", "ˇ", "Ó", "´", "Å", "¸", "°", "‡"]
+          shiftedLabels: ["_", "K", "C", "D", "T", "H", "E", "A", "Z", "*", "&"]
         ),
         layeredRow(
           "bottom", labels: ["'", "x", "g", "v", "w", "n", "i", ",", "0", "9"],
-          shiftedLabels: ["\"", "X", "G", "V", "W", "N", "I", "<", ")", "("],
-          optionLabels: ["æ", "≈", "©", "√", "∑", "˜", "ˆ", "≤", "º", "ª"],
-          shiftedOptionLabels: ["Æ", "˛", "˝", "◊", "„", "˜", "ˆ", "¯", "‚", "·"]
+          shiftedLabels: ["\"", "X", "G", "V", "W", "N", "I", "<", ")", "("]
         ),
       ]
     case .dvorakRight:
       [
         layeredRow(
           "number", labels: ["`", "1", "2", "3", "4", "j", "l", "m", "f", "p", "/", "[", "]"],
-          shiftedLabels: ["~", "!", "@", "#", "$", "J", "L", "M", "F", "P", "?", "{", "}"],
-          optionLabels: ["`", "¡", "™", "£", "¢", "∆", "¬", "µ", "ƒ", "π", "÷", "“", "‘"],
-          shiftedOptionLabels: ["`", "⁄", "€", "‹", "›", "Ô", "Ò", "Â", "Ï", "∏", "¿", "”", "’"]
+          shiftedLabels: ["~", "!", "@", "#", "$", "J", "L", "M", "F", "P", "?", "{", "}"]
         ),
         layeredRow(
           "top", labels: ["5", "6", "q", ".", "o", "r", "s", "u", "y", "b", ";", "=", "\\"],
-          shiftedLabels: ["%", "^", "Q", ">", "O", "R", "S", "U", "Y", "B", ":", "+", "|"],
-          optionLabels: ["∞", "§", "œ", "≥", "ø", "®", "ß", "¨", "¥", "∫", "…", "≠", "«"],
-          shiftedOptionLabels: ["ﬁ", "ﬂ", "Œ", "˘", "Ø", "‰", "Í", "¨", "Á", "ı", "Ú", "±", "»"]
+          shiftedLabels: ["%", "^", "Q", ">", "O", "R", "S", "U", "Y", "B", ":", "+", "|"]
         ),
         layeredRow(
           "home", labels: ["7", "8", "z", "a", "e", "h", "t", "d", "c", "k", "-"],
-          shiftedLabels: ["&", "*", "Z", "A", "E", "H", "T", "D", "C", "K", "_"],
-          optionLabels: ["¶", "•", "Ω", "å", "´", "˙", "†", "∂", "ç", "˚", "–"],
-          shiftedOptionLabels: ["‡", "°", "¸", "Å", "´", "Ó", "ˇ", "Î", "Ç", "", "—"]
+          shiftedLabels: ["&", "*", "Z", "A", "E", "H", "T", "D", "C", "K", "_"]
         ),
         layeredRow(
           "bottom", labels: ["9", "0", "x", ",", "i", "n", "w", "v", "g", "'"],
-          shiftedLabels: ["(", ")", "X", "<", "I", "N", "W", "V", "G", "\""],
-          optionLabels: ["ª", "º", "≈", "≤", "ˆ", "˜", "∑", "√", "©", "æ"],
-          shiftedOptionLabels: ["·", "‚", "˛", "¯", "ˆ", "˜", "„", "◊", "˝", "Æ"]
+          shiftedLabels: ["(", ")", "X", "<", "I", "N", "W", "V", "G", "\""]
         ),
       ]
     case .programmerDvorak:
@@ -1435,7 +1422,8 @@ enum KeyboardGuideModel {
           characters: ["aA", "oO", "eE", "uU", "iI", "dD", "rR", "tT", "nN", "sS", "´¨", "çÇ"],
           shiftedLabels: ["A", "O", "E", "U", "I", "D", "R", "T", "N", "S", "¨", "Ç"]
         ),
-        row("bottom", "<-QJKXBMWVZ"),
+        row("bottom", "<-QJKXBMWVZ",
+          shiftedLabels: [">", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil]),
       ]
     case .swedishColemak:
       [
@@ -1444,7 +1432,8 @@ enum KeyboardGuideModel {
           characters: ["§½", "1!", "2\"", "3#", "4¤", "5%", "6&", "7/", "8(", "9)", "0=", "+?", "´`"],
           shiftedLabels: ["½", "!", "\"", "#", "¤", "%", "&", "/", "(", ")", "=", "?", "`"]
         ),
-        row("top", "QWFPGJLUYÖÅ¨"),
+        row("top", "QWFPGJLUYÖÅ¨",
+          shiftedLabels: [nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "^"]),
         row(
           "home", "ARSTDHNEIOÄ'",
           characters: ["aA", "rR", "sS", "tT", "dD", "hH", "nN", "eE", "iI", "oO", "äÄ", "'*"],
@@ -1473,7 +1462,8 @@ enum KeyboardGuideModel {
           characters: ["aA", "oO", "eE", "uU", "iI", "dD", "hH", "tT", "nN", "sS", "-_", "'*"],
           shiftedLabels: ["A", "O", "E", "U", "I", "D", "H", "T", "N", "S", "_", "*"]
         ),
-        row("bottom", "<.QJKXBMWVZ"),
+        row("bottom", "<.QJKXBMWVZ",
+          shiftedLabels: [">", ":", nil, nil, nil, nil, nil, nil, nil, nil, nil]),
       ]
     case .frenchDvorak:
       [
@@ -3497,12 +3487,14 @@ enum KeyboardGuideModel {
           shiftedLabels: ["+", "!", "\"", "^", "$", "%", "&", "'", "(", ")", "=", "?", "_"]
         ),
         row(
-          "top", "FGĞIODRNHPQWX",
-          characters: ["fF", "gG", "ğĞ", "ıI", "oO", "dD", "rR", "nN", "hH", "pP", "qQ", "wW", "xX"]
+          "top", labels: ["F", "G", "Ğ", "ı", "O", "D", "R", "N", "H", "P", "Q", "W", "X"],
+          characters: ["fF", "gG", "ğĞ", "ıI", "oO", "dD", "rR", "nN", "hH", "pP", "qQ", "wW", "xX"],
+          shiftedLabels: [nil, nil, nil, "I", nil, nil, nil, nil, nil, nil, nil, nil, nil]
         ),
         row(
-          "home", "UİEAÜTKMLYŞ",
-          characters: ["uU", "iİ", "eE", "aA", "üÜ", "tT", "kK", "mM", "lL", "yY", "şŞ"]
+          "home", labels: ["U", "i", "E", "A", "Ü", "T", "K", "M", "L", "Y", "Ş"],
+          characters: ["uU", "iİ", "eE", "aA", "üÜ", "tT", "kK", "mM", "lL", "yY", "şŞ"],
+          shiftedLabels: [nil, "İ", nil, nil, nil, nil, nil, nil, nil, nil, nil]
         ),
         row(
           "bottom", "JÖVCÇZSB.,",
@@ -3522,7 +3514,7 @@ enum KeyboardGuideModel {
           characters: ["qQ", "jJ", "üÜ", "oO", "fF", "cC", "tT", "mM", "kK", "bB", "sS", "pP"]
         ),
         row(
-          "home", "EAİIGĞLNRDV,",
+          "home", labels: ["E", "A", "i", "ı", "G", "Ğ", "L", "N", "R", "D", "V", ","],
           characters: ["eE", "aA", "iİ", "ıI", "gG", "ğĞ", "lL", "nN", "rR", "dD", "vV", ",;"],
           shiftedLabels: ["E", "A", "İ", "I", "G", "Ğ", "L", "N", "R", "D", "V", ";"]
         ),
@@ -4234,6 +4226,20 @@ enum KeyboardGuideModel {
         ),
       ]
     }
+    // The physical emulator deliberately ignores macOS-only Option glyphs
+    // when the pinned layout has no third layer. Keep the guide, highlighting,
+    // and mouse keyboard on the same authored Base/Shift contract.
+    guard layout.isPinnedOfficialLayout, !layout.hasPinnedAltGrLayer else { return sourceRows }
+    return sourceRows.map { row in
+      row.map { key in
+        guard key.optionLabel != nil || key.shiftedOptionLabel != nil else { return key }
+        let base = key.legend(style: .dynamic, modifierFlags: [], capsLockEnabled: false)
+        let shifted = key.legend(style: .dynamic, modifierFlags: .shift, capsLockEnabled: false)
+        return KeyboardGuideKey(
+          key.id, label: key.label, characters: base + shifted, width: key.width,
+          shiftedLabel: key.shiftedLabel)
+      }
+    }
   }
 
   static func highlightedKey(
@@ -4420,11 +4426,12 @@ enum KeyboardGuideModel {
     _ prefix: String,
     labels: [String],
     shiftedLabels: [String?],
-    optionLabels: [String?],
-    shiftedOptionLabels: [String?]
+    optionLabels: [String?]? = nil,
+    shiftedOptionLabels: [String?]? = nil
   ) -> [KeyboardGuideKey] {
     let characters = labels.indices.map { index in
-      return [labels[index], shiftedLabels[index], optionLabels[index], shiftedOptionLabels[index]]
+      return [labels[index], shiftedLabels[index], optionLabels?[safe: index] ?? nil,
+        shiftedOptionLabels?[safe: index] ?? nil]
         .compactMap { $0 }
         .joined()
     }

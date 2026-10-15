@@ -11,8 +11,7 @@ enum VirtualKeyboardOutputPolicy {
     }
     guard !key.characters.isEmpty else { return nil }
     let candidate: String
-    if option {
-      guard let layer = shift ? key.shiftedOptionLabel : key.optionLabel else { return nil }
+    if option, let layer = shift ? key.shiftedOptionLabel : key.optionLabel {
       candidate = layer
     } else {
       let flags: NSEvent.ModifierFlags = shift ? [.shift] : []

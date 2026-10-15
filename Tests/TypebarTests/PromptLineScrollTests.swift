@@ -292,19 +292,65 @@ import XCTest
   func testAnimationInheritsLowFrameRateAndRetimesWhenTheSettingChanges() {
     let (scroll, follower) = fixture(), attempt = UUID()
     for row in 0...2 { update(follower, row: row, attempt: attempt, smooth: true, frameRate: 15) }
-    XCTAssertEqual(follower.scheduledLineScrollInterval ?? -1, 1.0 / 15, accuracy: 0.000001)
+    let initialDeadline = Date().addingTimeInterval(1)
+    while follower.lastScheduledLineScrollInterval == nil && Date() < initialDeadline {
+      RunLoop.main.run(until: min(initialDeadline, Date().addingTimeInterval(0.005)))
+    }
+    XCTAssertEqual(follower.lastScheduledLineScrollInterval ?? -1, 1.0 / 15, accuracy: 0.000001)
     update(follower, row: 2, attempt: attempt, smooth: true, frameRate: 30)
-    XCTAssertEqual(follower.scheduledLineScrollInterval ?? -1, 1.0 / 30, accuracy: 0.000001)
+    let changeDeadline = Date().addingTimeInterval(1)
+    while follower.lastScheduledLineScrollInterval != 1.0 / 30,
+      (follower.scheduledLineScrollInterval != nil || scroll.contentView.bounds.minY < 44.5),
+      Date() < changeDeadline {
+      RunLoop.main.run(until: min(changeDeadline, Date().addingTimeInterval(0.005)))
+    }
+    var expectedOrigin: CGFloat = 45
+    if follower.lastScheduledLineScrollInterval != 1.0 / 30 {
+      // On a busy runner the first 125ms animation can finish before the
+      // asynchronous settings follow. In that case verify the next jump uses
+      // the new cadence; an unfinished old timer still fails below.
+      XCTAssertNil(follower.scheduledLineScrollInterval)
+      XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 0.5)
+      update(follower, row: 3, attempt: attempt, smooth: true, frameRate: 30)
+      expectedOrigin = 90
+    }
+    let retimeDeadline = Date().addingTimeInterval(1)
+    while follower.lastScheduledLineScrollInterval != 1.0 / 30 && Date() < retimeDeadline {
+      RunLoop.main.run(until: min(retimeDeadline, Date().addingTimeInterval(0.005)))
+    }
+    XCTAssertEqual(follower.lastScheduledLineScrollInterval ?? -1, 1.0 / 30, accuracy: 0.000001)
     let firstDeadline = Date().addingTimeInterval(1)
     while scroll.contentView.bounds.minY <= 0 && Date() < firstDeadline {
       RunLoop.main.run(until: min(firstDeadline, Date().addingTimeInterval(0.005)))
     }
     XCTAssertGreaterThan(scroll.contentView.bounds.minY, 0)
     let finalDeadline = Date().addingTimeInterval(1)
-    while abs(scroll.contentView.bounds.minY - 45) > 0.5 && Date() < finalDeadline {
+    while abs(scroll.contentView.bounds.minY - expectedOrigin) > 0.5 && Date() < finalDeadline {
       RunLoop.main.run(until: min(finalDeadline, Date().addingTimeInterval(0.005)))
     }
+    XCTAssertEqual(scroll.contentView.bounds.minY, expectedOrigin, accuracy: 0.5)
+  }
+
+  func testFinishedLowFrameRateAnimationKeepsCadenceEvidenceForNextJump() {
+    let (scroll, follower) = fixture(), attempt = UUID()
+    for row in 0...2 { update(follower, row: row, attempt: attempt, smooth: true, frameRate: 15) }
+    let firstDeadline = Date().addingTimeInterval(1)
+    while (follower.scheduledLineScrollInterval != nil || scroll.contentView.bounds.minY < 44.5),
+      Date() < firstDeadline {
+      RunLoop.main.run(until: min(firstDeadline, Date().addingTimeInterval(0.005)))
+    }
+    XCTAssertNil(follower.scheduledLineScrollInterval)
+    XCTAssertEqual(follower.lastScheduledLineScrollInterval ?? -1, 1.0 / 15, accuracy: 0.000001)
     XCTAssertEqual(scroll.contentView.bounds.minY, 45, accuracy: 0.5)
+
+    update(follower, row: 3, attempt: attempt, smooth: true, frameRate: 30)
+    let secondDeadline = Date().addingTimeInterval(1)
+    while (follower.lastScheduledLineScrollInterval != 1.0 / 30
+      || abs(scroll.contentView.bounds.minY - 90) > 0.5), Date() < secondDeadline {
+      RunLoop.main.run(until: min(secondDeadline, Date().addingTimeInterval(0.005)))
+    }
+    XCTAssertEqual(follower.lastScheduledLineScrollInterval ?? -1, 1.0 / 30, accuracy: 0.000001)
+    XCTAssertEqual(scroll.contentView.bounds.minY, 90, accuracy: 0.5)
   }
 
   func testNativeCadenceRespectsScreenLimitAndKnownFallback() {

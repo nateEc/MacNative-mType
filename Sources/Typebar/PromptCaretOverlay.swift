@@ -398,6 +398,7 @@ final class PromptAutoScrollView: NSView {
   }
 
   var scheduledLineScrollInterval: TimeInterval? { lineScrollTimer?.timeInterval }
+  private(set) var lastScheduledLineScrollInterval: TimeInterval?
 
   func cancelCaretMotion() {
     lineScroll?.caretMotion?.cancel(at: ProcessInfo.processInfo.systemUptime)
@@ -589,6 +590,7 @@ final class PromptAutoScrollView: NSView {
     let timer = Timer(timeInterval: interval, target: PromptLineScrollTimerTarget(owner: self),
       selector: #selector(PromptLineScrollTimerTarget.tick(_:)), userInfo: nil, repeats: true)
     lineScrollTimer = timer
+    lastScheduledLineScrollInterval = interval
     RunLoop.main.add(timer, forMode: .common)
   }
 

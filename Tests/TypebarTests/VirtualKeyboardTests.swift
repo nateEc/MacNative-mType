@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @testable import Typebar
@@ -10,7 +11,8 @@ final class VirtualKeyboardTests: XCTestCase {
     XCTAssertEqual(VirtualKeyboardOutputPolicy.output(for: letter, shift: false, option: false), "q")
     XCTAssertEqual(VirtualKeyboardOutputPolicy.output(for: letter, shift: true, option: false), "Q")
     XCTAssertEqual(VirtualKeyboardOutputPolicy.output(for: digit, shift: true, option: false), "!")
-    XCTAssertNil(VirtualKeyboardOutputPolicy.output(for: letter, shift: false, option: true))
+    XCTAssertEqual(VirtualKeyboardOutputPolicy.output(for: letter, shift: false, option: true), "q")
+    XCTAssertEqual(VirtualKeyboardOutputPolicy.output(for: letter, shift: true, option: true), "Q")
   }
 
   func testSpaceAndNonTypingKeysHaveExplicitOutcomes() {
@@ -42,5 +44,24 @@ final class VirtualKeyboardTests: XCTestCase {
     XCTAssertEqual(session.errors, 0)
     session.deleteBackward()
     XCTAssertEqual(session.typed, "")
+  }
+
+  func testPinnedHandedDvorakOptionFallsBackToTypedBaseAndShift() throws {
+    for layout in [KeyboardLayout.dvorakLeft, .dvorakRight] {
+      let rows = KeyboardGuideModel.rows(for: layout)
+      let key = try XCTUnwrap(rows[0].first { $0.label == "f" })
+      XCTAssertNil(key.optionLabel)
+      XCTAssertNil(key.shiftedOptionLabel)
+      XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "ƒ", layout: layout))
+      for (flags, shifted, expected) in [
+        (NSEvent.ModifierFlags.option, false, key.label),
+        (NSEvent.ModifierFlags([.option, .shift]), true, key.label.uppercased()),
+      ] {
+        XCTAssertEqual(key.legend(
+          style: .dynamic, modifierFlags: flags, capsLockEnabled: false), expected)
+        XCTAssertEqual(VirtualKeyboardOutputPolicy.output(
+          for: key, shift: shifted, option: true), expected)
+      }
+    }
   }
 }

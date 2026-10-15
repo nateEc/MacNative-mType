@@ -9782,10 +9782,14 @@ final class TypingEngineTests: XCTestCase {
     let rows = KeyboardGuideModel.rows(for: .arabicMac)
     XCTAssertEqual(rows[0][0].label, "§")
     XCTAssertEqual(rows[0][0].shiftedLabel, "±")
-    XCTAssertEqual(rows[0][2].optionLabel, "ط")
-    XCTAssertEqual(rows[0][2].shiftedOptionLabel, "❊")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ٱ", layout: .arabicMac), "number-6")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "چ", layout: .arabicMac), "top-10")
+    XCTAssertNil(rows[0][2].optionLabel)
+    XCTAssertNil(rows[0][2].shiftedOptionLabel)
+    XCTAssertEqual(rows[0][2].legend(
+      style: .dynamic, modifierFlags: .option, capsLockEnabled: false), "2")
+    XCTAssertEqual(rows[0][2].legend(
+      style: .dynamic, modifierFlags: [.option, .shift], capsLockEnabled: false), "@")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "ٱ", layout: .arabicMac))
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "چ", layout: .arabicMac))
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ؤ", layout: .arabicMac), "bottom-6")
 
     XCTAssertEqual(

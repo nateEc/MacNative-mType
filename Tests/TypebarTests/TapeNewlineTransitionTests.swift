@@ -181,16 +181,21 @@ import XCTest
     let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 320))
     let motion = PromptCaretMotionCoordinator(), attempt = UUID()
     var retired: [PromptWordRetirement] = []
+    let notification = expectation(description: "Only the latest newline retirement is delivered")
+    notification.assertForOverFulfill = true
+    let notify: (PromptWordRetirement) -> Void = { retired.append($0); notification.fulfill() }
     defer { view.stop() }
-    begin(view, motion, attempt) { retired.append($0) }
-    update(view, motion, attempt, active: 2, time: 1) { retired.append($0) }
+    begin(view, motion, attempt, onRetire: notify)
+    update(view, motion, attempt, active: 2, time: 1, onRetire: notify)
     view.present(at: 1.05)
-    update(view, motion, attempt, active: 3, time: 1.06) { retired.append($0) }
+    update(view, motion, attempt, active: 3, time: 1.06, onRetire: notify)
     view.present(at: 1.113); drainNotifications()
     XCTAssertLessThan(motion.wordsMargin, 0)
     XCTAssertTrue(retired.isEmpty, "A replaced vertical promise cannot complete")
-    view.present(at: 1.173); drainNotifications()
+    view.present(at: 1.173)
     XCTAssertEqual(motion.wordsMargin, 0)
+    XCTAssertTrue(retired.isEmpty, "Session mutation remains asynchronous")
+    wait(for: [notification], timeout: 1)
     XCTAssertEqual(retired.map(\.firstRetainedWordIndex), [2])
   }
 
@@ -198,12 +203,16 @@ import XCTest
     let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 320))
     let motion = PromptCaretMotionCoordinator(), attempt = UUID()
     var retired: [PromptWordRetirement] = []
+    let notification = expectation(description: "Immediate newline retirement is delivered")
+    notification.assertForOverFulfill = true
+    let notify: (PromptWordRetirement) -> Void = { retired.append($0); notification.fulfill() }
     defer { view.stop() }
-    begin(view, motion, attempt, smooth: false) { retired.append($0) }
-    update(view, motion, attempt, active: 2, smooth: false, time: 1) { retired.append($0) }
+    begin(view, motion, attempt, smooth: false, onRetire: notify)
+    update(view, motion, attempt, active: 2, smooth: false, time: 1, onRetire: notify)
     XCTAssertEqual(motion.wordsMargin, 0)
     XCTAssertFalse(motion.isAnimatingTape)
-    drainNotifications()
+    XCTAssertTrue(retired.isEmpty, "Session mutation remains asynchronous")
+    wait(for: [notification], timeout: 1)
     XCTAssertEqual(retired.map(\.firstRetainedWordIndex), [1])
   }
 
