@@ -69,7 +69,7 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 11, modifierFlags: .option, mapping: optimot))
 
     XCTAssertEqual(KeyboardLayoutEmulator.text(
-      forKeyCode: 29, modifierFlags: .option, mapping: .builtIn(.whix2)), "")
+      forKeyCode: 29, modifierFlags: .option, mapping: .builtIn(.whix2)), " ")
     XCTAssertNil(KeyboardLayoutEmulator.text(
       forKeyCode: 42, modifierFlags: .option, mapping: .builtIn(.urduPhonetic)))
     XCTAssertNil(KeyboardLayoutEmulator.text(
@@ -89,6 +89,101 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 18, modifierFlags: .option, mapping: .builtIn(.dvorakLeft)), "[")
     XCTAssertEqual(KeyboardLayoutEmulator.text(
       forKeyCode: 18, modifierFlags: [.option, .shift], mapping: .builtIn(.dvorakLeft)), "{")
+  }
+
+  func testOfficialPashtoUsesPinnedPhysicalKeysAndSingleLayerFallback() {
+    let mapping = KeyboardInputMapping.builtIn(.pashto)
+    let rows = KeyboardGuideModel.rows(for: .pashto)
+    XCTAssertEqual(rows[0][0].label, "`")
+    XCTAssertEqual(rows[0][2].label, "2")
+    XCTAssertEqual(rows[3][0].label, "ظ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "`")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: .shift, mapping: mapping), "!")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 12, modifierFlags: .shift, mapping: mapping), "ض")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 42, modifierFlags: .option, mapping: mapping), "\"")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 6, modifierFlags: [.option, .shift], mapping: mapping), "ئ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 11, modifierFlags: .shift, mapping: mapping), "ذ")
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "ؤ", layout: .pashto))
+  }
+
+  func testOfficialHindiInscriptUsesPinnedNumberAndBottomRows() {
+    let mapping = KeyboardInputMapping.builtIn(.hindiInscript)
+    let rows = KeyboardGuideModel.rows(for: .hindiInscript)
+    XCTAssertEqual(rows[0][0].label, "ॊ")
+    XCTAssertEqual(rows[0][1].label, "1")
+    XCTAssertEqual(rows[3][0].label, "ॆ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "ॊ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 23, modifierFlags: .shift, mapping: mapping), "5")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 24, modifierFlags: [], mapping: mapping), "ऋ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 6, modifierFlags: [.option, .shift], mapping: mapping), "ऎ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 45, modifierFlags: .shift, mapping: mapping), "ळ")
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(forOutput: "क्ष", layout: .hindiInscript))
+  }
+
+  func testOfficialThaiPattachoteUsesPinnedNumberAndBottomRows() {
+    let mapping = KeyboardInputMapping.builtIn(.thaiPattachote)
+    let rows = KeyboardGuideModel.rows(for: .thaiPattachote)
+    XCTAssertEqual(rows[0][0].label, "฿")
+    XCTAssertEqual(rows[0][1].label, "ๅ")
+    XCTAssertEqual(rows[3][0].label, "ฃ")
+    XCTAssertEqual(rows[3][9].label, "จ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "฿")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .shift, mapping: mapping), "~")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: .option, mapping: mapping), "ๅ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 6, modifierFlags: [.option, .shift], mapping: mapping), "ฅ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 44, modifierFlags: .shift, mapping: mapping), "ฉ")
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "ฬ", layout: .thaiPattachote))
+  }
+
+  func testOfficialArabicMacUsesPinnedNumberAndHomeRows() {
+    let mapping = KeyboardInputMapping.builtIn(.arabicMac)
+    let rows = KeyboardGuideModel.rows(for: .arabicMac)
+    XCTAssertEqual(rows[0][0].label, "§")
+    XCTAssertEqual(rows[0][1].label, "1")
+    XCTAssertEqual(rows[2][0].shiftedLabel, "«")
+    XCTAssertEqual(rows[2][1].shiftedLabel, "»")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "§")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [.option, .shift], mapping: mapping), "±")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: .option, mapping: mapping), "1")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 0, modifierFlags: .shift, mapping: mapping), "«")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 1, modifierFlags: [.option, .shift], mapping: mapping), "»")
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "∞", layout: .arabicMac))
+  }
+
+  func testOfficialWhix2BlankLegendsEmitRealSpacesOnEveryLayer() {
+    let mapping = KeyboardInputMapping.builtIn(.whix2)
+    let rows = KeyboardGuideModel.rows(for: .whix2)
+    XCTAssertEqual(rows[0][10].label, "")
+    XCTAssertEqual(rows[0][10].characters, Set(" "))
+    XCTAssertEqual(rows[1][12].characters, Set(" "))
+    XCTAssertEqual(rows[2][10].characters, Set(" "))
+    for keyCode: UInt16 in [29, 27, 24, 33, 30, 42, 39] {
+      for flags: NSEvent.ModifierFlags in [[], .shift, .option, [.option, .shift]] {
+        XCTAssertEqual(KeyboardLayoutEmulator.text(
+          forKeyCode: keyCode, modifierFlags: flags, mapping: mapping), " ")
+      }
+    }
   }
 
   func testMacedonianQuestionMarkShiftMatchesOfficialLayout() {

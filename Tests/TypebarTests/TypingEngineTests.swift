@@ -6835,8 +6835,8 @@ final class TypingEngineTests: XCTestCase {
     let expected: [(String, [String], [String])] = [
       (
         "whix2",
-        ["1234567890", "blndk'fouj", "shrtwycaei", "qxmvzpg,./"],
-        ["!@#$%^&*()", "BLNDK\"FOUJ", "SHRTWYCAEI", "QXMVZPG<>?"]
+        ["1234567890   ", "blndk'fouj   ", "shrtwycaei ", "qxmvzpg,./"],
+        ["!@#$%^&*()   ", "BLNDK\"FOUJ   ", "SHRTWYCAEI ", "QXMVZPG<>?"]
       ),
       (
         "haruka",
@@ -6900,9 +6900,9 @@ final class TypingEngineTests: XCTestCase {
     let whix2 = try XCTUnwrap(KeyboardLayout(rawValue: "whix2"))
     for keyCode: UInt16 in [29, 27, 24, 33, 30, 42, 39] {
       XCTAssertEqual(
-        KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: whix2), "")
+        KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: whix2), " ")
       XCTAssertEqual(
-        KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: whix2), "")
+        KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: whix2), " ")
     }
     XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "`", layout: whix2))
     XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "`", layout: whix2))
@@ -6917,7 +6917,7 @@ final class TypingEngineTests: XCTestCase {
         context: nil, characters: "0", charactersIgnoringModifiers: "0", isARepeat: false,
         keyCode: 29))
     inputView.keyDown(with: blankKey)
-    XCTAssertEqual(inserted, [""])
+    XCTAssertEqual(inserted, [" "])
   }
 
   @MainActor
@@ -9473,35 +9473,35 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testPashtoMapsArabicScriptLayersAndPersists() {
+  func testPashtoUsesPinnedPhysicalLayersAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .pashto)
-    XCTAssertEqual(rows[0][0].label, "ZWJ")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{200D}", layout: .pashto), "number-0")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "۲", layout: .pashto), "number-2")
+    XCTAssertEqual(rows[0][0].label, "\u{0060}")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{0060}", layout: .pashto), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "2", layout: .pashto), "number-2")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ض", layout: .pashto), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ځ", layout: .pashto), "top-8")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ک", layout: .pashto), "home-9")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ئ", layout: .pashto), "bottom-0")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{200C}", layout: .pashto), "bottom-4")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "\u{200C}", layout: .pashto))
 
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .pashto), "ض")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .pashto), "\u{200D}")
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .pashto), "\u{0060}")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.shift], layout: .pashto), "ْ")
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.shift], layout: .pashto), "ض")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 6, modifierFlags: [.shift], layout: .pashto), "ظ")
+      KeyboardLayoutEmulator.character(forKeyCode: 6, modifierFlags: [.shift], layout: .pashto), "ئ")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 7, modifierFlags: [], layout: .pashto), "ې")
+      KeyboardLayoutEmulator.character(forKeyCode: 7, modifierFlags: [], layout: .pashto), "ط")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 43, modifierFlags: [.shift], layout: .pashto), "،")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 47, modifierFlags: [], layout: .pashto), "ږ")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.shift], layout: .pashto), "\u{200C}")
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ؤ", layout: .pashto), 46)
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "\u{200D}", layout: .pashto), 50)
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.shift], layout: .pashto), "ذ")
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "ؤ", layout: .pashto))
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "\u{0060}", layout: .pashto), 50)
     XCTAssertEqual(KeyboardInputLayout.pashto.emulatedLayout, .pashto)
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -9712,8 +9712,8 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testArabicMacUsesPinnedFallbackAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .arabicMac)
-    XCTAssertEqual(rows[0][0].label, "ـ")
-    XCTAssertNil(rows[0][0].shiftedLabel)
+    XCTAssertEqual(rows[0][0].label, "§")
+    XCTAssertEqual(rows[0][0].shiftedLabel, "±")
     XCTAssertEqual(rows[0][2].optionLabel, "ط")
     XCTAssertEqual(rows[0][2].shiftedOptionLabel, "❊")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ٱ", layout: .arabicMac), "number-6")
@@ -9721,7 +9721,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ؤ", layout: .arabicMac), "bottom-6")
 
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 18, modifierFlags: [], layout: .arabicMac), "١")
+      KeyboardLayoutEmulator.character(forKeyCode: 18, modifierFlags: [], layout: .arabicMac), "1")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 19, modifierFlags: [.option, .shift], layout: .arabicMac), "@")
     XCTAssertEqual(
@@ -9862,15 +9862,16 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testThaiPattachoteMapsStandardLayersAndPersists() {
+  func testThaiPattachoteUsesPinnedPhysicalLayersAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .thaiPattachote)
-    XCTAssertEqual(rows[0][0].label, "_")
-    XCTAssertEqual(rows[0][0].shiftedLabel, "฿")
-    XCTAssertEqual(rows[0][1].label, "=")
+    XCTAssertEqual(rows[0][0].label, "฿")
+    XCTAssertEqual(rows[0][0].shiftedLabel, "~")
+    XCTAssertEqual(rows[0][1].label, "ๅ")
     XCTAssertEqual(rows[0][1].shiftedLabel, "+")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "็", layout: .thaiPattachote), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ผ", layout: .thaiPattachote), "home-6")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ฬ", layout: .thaiPattachote), "bottom-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ฉ", layout: .thaiPattachote), "bottom-9")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "ฬ", layout: .thaiPattachote))
 
     for (keyCodes, guideRow) in zip(SystemKeyboardGuide.physicalRows, rows) {
       for (keyCode, key) in zip(keyCodes, guideRow) {
@@ -9886,7 +9887,7 @@ final class TypingEngineTests: XCTestCase {
     }
 
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], layout: .thaiPattachote), "฿")
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], layout: .thaiPattachote), "~")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 38, modifierFlags: [.shift], layout: .thaiPattachote), "ผ")
     XCTAssertEqual(
@@ -9967,12 +9968,12 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testHindiInscriptMapsMacSystemLayersSuppressesEmptyKeysAndPersists() {
+  func testHindiInscriptUsesPinnedLayersAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .hindiInscript)
-    XCTAssertEqual(rows[0][0].label, "₹")
-    XCTAssertEqual(rows[0][5].shiftedLabel, "ज्ञ")
-    XCTAssertEqual(rows[3][0].label, "")
-    XCTAssertNil(rows[3][0].shiftedLabel)
+    XCTAssertEqual(rows[0][0].label, "ॊ")
+    XCTAssertEqual(rows[0][5].shiftedLabel, "5")
+    XCTAssertEqual(rows[3][0].label, "ॆ")
+    XCTAssertEqual(rows[3][0].shiftedLabel, "ऎ")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ौ", layout: .hindiInscript), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "क", layout: .hindiInscript), "home-7")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "।", layout: .hindiInscript), "bottom-8")
@@ -9992,14 +9993,14 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(
       KeyboardLayoutEmulator.text(forKeyCode: 23, modifierFlags: [.shift], layout: .hindiInscript),
-      "ज्ञ")
+      "5")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.text(forKeyCode: 6, modifierFlags: [], layout: .hindiInscript), "")
+      KeyboardLayoutEmulator.text(forKeyCode: 6, modifierFlags: [], layout: .hindiInscript), "ॆ")
     XCTAssertEqual(
       KeyboardLayoutEmulator.text(forKeyCode: 9, modifierFlags: [.shift], layout: .hindiInscript), "न")
     XCTAssertEqual(
       KeyboardLayoutEmulator.text(forKeyCode: 12, modifierFlags: [.option], layout: .hindiInscript), "ौ")
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "क्ष", layout: .hindiInscript), 26)
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(forOutput: "क्ष", layout: .hindiInscript))
     XCTAssertEqual(KeyboardInputLayout.hindiInscript.emulatedLayout, .hindiInscript)
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
