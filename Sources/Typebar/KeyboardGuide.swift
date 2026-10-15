@@ -2724,8 +2724,7 @@ enum KeyboardGuideModel {
           labels: ["k", "y", "è", ".", "w", "⌫", "g", "c", "m", "h", "v"],
           shiftedLabels: ["K", "Y", "È", ":", "W", "⌫", "G", "C", "M", "H", "V"],
           optionLabels: ["ø", "ȯ", "ò", "…", nil, "⌫", "Ω", "ǫ", "ō", "ŏ", "ǒ"],
-          shiftedOptionLabels: [nil, nil, nil, "·", nil, "⌫", nil, nil, nil, nil, nil],
-          nonTypingIndex: 5
+          shiftedOptionLabels: [nil, nil, nil, "·", nil, "⌫", nil, nil, nil, nil, nil]
         ),
       ]
     case .graphiteAngleVC:
@@ -3069,17 +3068,18 @@ enum KeyboardGuideModel {
       ]
     case .colemakDHWideANSI:
       [
-        row("number", "123456=7890-"),
+        row("number", "`123456=7890-"),
         row("top", "QWFPB[JLUY;'\\"),
         row("home", "ARSTG]MNEIO"),
         row("bottom", "XCDVZ/KH,."),
       ]
     case .colemakDHWideISO:
       [
-        row("number", "123456=7890-"),
+        row("number", "`123456=7890-"),
         row("top", "QWFPB[JLUY;/"),
         row("home", "ARSTG]MNEIO'"),
-        row("bottom", "ZXCDV\\#KH,."),
+        row("bottom", "ZXCDV\\#KH,.",
+          shiftedLabels: ["Z", "X", "C", "D", "V", "|", "#", "K", "H", "<", ">"]),
       ]
     case .colemakDHKANSI:
       [
@@ -3414,7 +3414,7 @@ enum KeyboardGuideModel {
           "home", "ASDFGHJKLÑ{",
           characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "ñÑ", "{["],
           shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ", "["]
-        ),
+        ) + [KeyboardGuideKey("home-11", label: "", characters: " ")],
         isoBottomRow()
       ]
     case .polishProgrammers:
@@ -3442,14 +3442,28 @@ enum KeyboardGuideModel {
     case .frenchAzerty:
       [
         row(
-          "number", "1234567890-",
-          characters: ["1&", "2é~", "3\"#", "4'", "5(", "6-", "7è`", "8_\\", "9ç^", "0à@", "°)"]
+          "number", labels: ["`", "&", "é", "\"", "'", "(", "-", "è", "_", "ç", "à", ")", "="],
+          characters: ["`", "&1", "é2~", "\"3#", "'4{", "(5[", "-6|", "è7`", "_8\\", "ç9", "à0@", ")°]", "=+}"],
+          shiftedLabels: ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "°", "+"],
+          optionLabels: [nil, nil, "~", "#", "{", "[", "|", "`", "\\", nil, "@", "]", "}"],
+          shiftedOptionLabels: [nil, nil, "2", "3", "4", "5", "6", "7", "8", nil, "0", "°", "+"]
         ),
-        row("top", "AZERTYUIOP^$"),
-        row("home", "QSDFGHJKLMÙ*"),
         row(
-          "bottom", "WXCVBN,;:!",
-          characters: ["w", "x", "c", "v", "b", "n", ",?", ";.", ":/", "!§"]
+          "top", "AZERTYUIOP^$",
+          characters: ["aA", "zZ", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "^¨", "$£¤"],
+          shiftedLabels: ["A", "Z", "E", "R", "T", "Y", "U", "I", "O", "P", "¨", "£"],
+          optionLabels: [nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "¤"],
+          shiftedOptionLabels: [nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "£"]
+        ),
+        row(
+          "home", "QSDFGHJKLMÙ*",
+          characters: ["qQ", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "mM", "ù%", "*µ"],
+          shiftedLabels: ["Q", "S", "D", "F", "G", "H", "J", "K", "L", "M", "%", "µ"]
+        ),
+        row(
+          "bottom", "<WXCVBN,;:!",
+          characters: ["<>", "wW", "xX", "cC", "vV", "bB", "nN", ",?", ";.", ":/", "!§"],
+          shiftedLabels: [">", "W", "X", "C", "V", "B", "N", "?", ".", "/", "§"]
         ),
       ]
     case .turkishQ:
@@ -4407,11 +4421,9 @@ enum KeyboardGuideModel {
     labels: [String],
     shiftedLabels: [String?],
     optionLabels: [String?],
-    shiftedOptionLabels: [String?],
-    nonTypingIndex: Int? = nil
+    shiftedOptionLabels: [String?]
   ) -> [KeyboardGuideKey] {
     let characters = labels.indices.map { index in
-      if index == nonTypingIndex { return "" }
       return [labels[index], shiftedLabels[index], optionLabels[index], shiftedOptionLabels[index]]
         .compactMap { $0 }
         .joined()

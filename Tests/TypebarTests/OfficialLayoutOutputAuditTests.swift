@@ -47,7 +47,7 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 42, modifierFlags: .shift, mapping: .builtIn(.ansiQwerty)), "|")
   }
 
-  func testOfficialOptionFallbackDoesNotChangeSystemCustomLegacyOrActionKeys() {
+  func testOfficialOptionFallbackDoesNotChangeSystemCustomLegacyOrGlyphKeys() {
     let qwerty = KeyboardInputMapping.builtIn(.ansiQwerty)
     XCTAssertEqual(KeyboardLayoutEmulator.text(
       forKeyCode: 12, modifierFlags: .option, mapping: qwerty), "q")
@@ -63,10 +63,8 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 22, modifierFlags: .option, mapping: optimot), "×")
     XCTAssertEqual(KeyboardLayoutEmulator.text(
       forKeyCode: 22, modifierFlags: [.option, .shift], mapping: optimot), "6")
-    XCTAssertNil(KeyboardLayoutEmulator.text(
-      forKeyCode: 11, modifierFlags: .option, mapping: optimot))
-    XCTAssertTrue(KeyboardLayoutEmulator.performsBackwardDelete(
-      forKeyCode: 11, modifierFlags: .option, mapping: optimot))
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 11, modifierFlags: .option, mapping: optimot), "⌫")
 
     XCTAssertEqual(KeyboardLayoutEmulator.text(
       forKeyCode: 29, modifierFlags: .option, mapping: .builtIn(.whix2)), " ")
@@ -248,6 +246,151 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 32, modifierFlags: .option, mapping: polish), "u")
     XCTAssertEqual(KeyboardLayoutEmulator.text(
       forKeyCode: 32, modifierFlags: [.option, .shift], mapping: polish), "U")
+  }
+
+  @MainActor
+  func testOfficialFrenchAzertyUsesPinnedISOAndAltGrKeys() throws {
+    let mapping = KeyboardInputMapping.builtIn(.frenchAzerty)
+    let rows = KeyboardGuideModel.rows(for: .frenchAzerty)
+    XCTAssertEqual(rows.map(\.count), [13, 12, 12, 11])
+    XCTAssertEqual(rows[0][0].label, "`")
+    XCTAssertEqual(rows[0][0].shiftedLabel, "`")
+    XCTAssertEqual(rows[0][2].optionLabel, "~")
+    XCTAssertEqual(rows[0][2].legend(
+      style: .dynamic, modifierFlags: [.option, .shift], capsLockEnabled: false), "2")
+    XCTAssertEqual(rows[1][11].optionLabel, "¤")
+    XCTAssertEqual(rows[2][11].label, "*")
+    XCTAssertEqual(rows[2][11].shiftedLabel, "µ")
+    XCTAssertEqual(rows[3][0].label, "<")
+    XCTAssertEqual(rows[3][0].shiftedLabel, ">")
+    for flags: NSEvent.ModifierFlags in [[], .shift, .option, [.shift, .option]] {
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 50, modifierFlags: flags, mapping: mapping), "`")
+    }
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 19, modifierFlags: .option, mapping: mapping), "~")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 19, modifierFlags: [.option, .shift], mapping: mapping), "2")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 30, modifierFlags: .option, mapping: mapping), "¤")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 42, modifierFlags: .shift, mapping: mapping), "µ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 10, modifierFlags: [], mapping: mapping), "<")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 10, modifierFlags: .shift, mapping: mapping), ">")
+
+    var inserted = [String]()
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = mapping
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    for (keyCode, flags, characters) in [
+      (UInt16(50), NSEvent.ModifierFlags(), "`"),
+      (UInt16(19), NSEvent.ModifierFlags.option, "2"),
+      (UInt16(42), NSEvent.ModifierFlags.shift, "µ"),
+      (UInt16(10), NSEvent.ModifierFlags(), "<"),
+    ] {
+      let event = try XCTUnwrap(NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
+        context: nil, characters: characters, charactersIgnoringModifiers: characters,
+        isARepeat: false, keyCode: keyCode))
+      inputView.keyDown(with: event)
+    }
+    XCTAssertEqual(inserted, ["`", "~", "µ", "<"])
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .frenchAzerty
+    settings.keyboardInputLayout = .frenchAzerty
+    settings.layoutFluidLayouts = [.frenchAzerty, .ansiQwerty]
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .frenchAzerty)
+    XCTAssertEqual(restored.keyboardInputLayout, .frenchAzerty)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.frenchAzerty, .ansiQwerty])
+  }
+
+  func testOfficialColemakDHWideKeepsPinnedFirstAndHashKeys() {
+    for layout in [KeyboardLayout.colemakDHWideANSI, .colemakDHWideISO] {
+      let mapping = KeyboardInputMapping.builtIn(layout)
+      let rows = KeyboardGuideModel.rows(for: layout)
+      XCTAssertEqual(rows[0].count, 13)
+      XCTAssertEqual(rows[0][0].label, "`")
+      for (flags, expected) in [
+        (NSEvent.ModifierFlags(), "`"), (.shift, "~"), (.option, "`"),
+        ([.option, .shift], "~"),
+      ] {
+        XCTAssertEqual(KeyboardLayoutEmulator.text(
+          forKeyCode: 50, modifierFlags: flags, mapping: mapping), expected)
+      }
+    }
+    let iso = KeyboardInputMapping.builtIn(.colemakDHWideISO)
+    XCTAssertEqual(KeyboardGuideModel.rows(for: .colemakDHWideISO)[3][6].shiftedLabel, "#")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 45, modifierFlags: .shift, mapping: iso), "#")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 45, modifierFlags: [.option, .shift], mapping: iso), "#")
+  }
+
+  @MainActor
+  func testOfficialLatinAmericanBlankHomeKeyTypesSpace() throws {
+    let mapping = KeyboardInputMapping.builtIn(.latinAmericanQwerty)
+    let rows = KeyboardGuideModel.rows(for: .latinAmericanQwerty)
+    XCTAssertEqual(rows.map(\.count), [13, 12, 12, 11])
+    XCTAssertEqual(rows[2].last?.label, "")
+    XCTAssertEqual(rows[2].last?.characters, Set(" "))
+    for flags: NSEvent.ModifierFlags in [[], .shift, .option, [.option, .shift]] {
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 42, modifierFlags: flags, mapping: mapping), " ")
+    }
+    var inserted = [String]()
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = mapping
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    let event = try XCTUnwrap(NSEvent.keyEvent(
+      with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+      context: nil, characters: "\\", charactersIgnoringModifiers: "\\",
+      isARepeat: false, keyCode: 42))
+    inputView.keyDown(with: event)
+    XCTAssertEqual(inserted, [" "])
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .latinAmericanQwerty
+    settings.keyboardInputLayout = .latinAmericanQwerty
+    settings.layoutFluidLayouts = [.latinAmericanQwerty, .ansiQwerty]
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .latinAmericanQwerty)
+    XCTAssertEqual(restored.keyboardInputLayout, .latinAmericanQwerty)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.latinAmericanQwerty, .ansiQwerty])
+  }
+
+  @MainActor
+  func testOfficialOptimotGlyphFollowsPinnedInsertionPath() throws {
+    let mapping = KeyboardInputMapping.builtIn(.optimot)
+    let guide = KeyboardGuideModel.rows(for: .optimot)[3][5]
+    XCTAssertEqual(guide.label, "⌫")
+    XCTAssertTrue(guide.characters.contains("⌫"))
+    var inserted = [String]()
+    var deletions = 0
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = mapping
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    inputView.onDelete = { deletions += 1 }
+    for flags: NSEvent.ModifierFlags in [[], .shift, .option, [.option, .shift]] {
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 11, modifierFlags: flags, mapping: mapping), "⌫")
+      let event = try XCTUnwrap(NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
+        context: nil, characters: "b", charactersIgnoringModifiers: "b",
+        isARepeat: false, keyCode: 11))
+      inputView.keyDown(with: event)
+    }
+    XCTAssertEqual(inserted, ["⌫", "⌫", "⌫", "⌫"])
+    XCTAssertEqual(deletions, 0)
   }
 
   func testOfficialTamil99UsesPinnedShiftOutputs() {

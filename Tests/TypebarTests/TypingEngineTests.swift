@@ -4996,11 +4996,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "r", layout: .ansiWorkman), "top-2")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "a", layout: .frenchAzerty), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .frenchAzerty), "home-0")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "é", layout: .frenchAzerty), "number-1")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "à", layout: .frenchAzerty), "number-9")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ".", layout: .frenchAzerty), "bottom-7")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "é", layout: .frenchAzerty), "number-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "à", layout: .frenchAzerty), "number-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ".", layout: .frenchAzerty), "bottom-8")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "_", layout: .ansiQwerty), "number-11")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "_", layout: .frenchAzerty), "number-7")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "_", layout: .frenchAzerty), "number-8")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "，", layout: .ansiDvorak), nil)
   }
 
@@ -8532,7 +8532,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testOptimotPreservesFourLayersAndRoutesItsMappedDeleteAsEditing() throws {
+  func testOptimotPreservesFourLayersAndTypesItsPinnedGlyph() throws {
     let ansiRows = SystemKeyboardGuide.physicalRows
     let isoRows = [
       ansiRows[0], Array(ansiRows[1].dropLast()), ansiRows[2] + [42], [10] + ansiRows[3],
@@ -8573,15 +8573,10 @@ final class TypingEngineTests: XCTestCase {
         for (flags, expected) in layers {
           let output = KeyboardLayoutEmulator.text(
             forKeyCode: keyCode, modifierFlags: flags, layout: layout)
-          if keyCode == 11 {
-            XCTAssertNil(output)
-            XCTAssertTrue(guide.characters.isEmpty)
-          } else {
-            let fallback = flags.contains(.shift)
-              ? shifted[rowIndex][keyIndex] : normal[rowIndex][keyIndex]
-            XCTAssertEqual(output,
-              expected[rowIndex][keyIndex].flatMap { $0.isEmpty ? nil : $0 } ?? fallback)
-          }
+          let fallback = flags.contains(.shift)
+            ? shifted[rowIndex][keyIndex] : normal[rowIndex][keyIndex]
+          XCTAssertEqual(output,
+            expected[rowIndex][keyIndex].flatMap { $0.isEmpty ? nil : $0 } ?? fallback)
         }
       }
     }
@@ -8600,20 +8595,14 @@ final class TypingEngineTests: XCTestCase {
           isARepeat: false, keyCode: 11))
       input.keyDown(with: event)
     }
-    XCTAssertEqual(deleteCount, 4)
-    XCTAssertTrue(inserted.isEmpty)
-    XCTAssertFalse(
-      KeyboardLayoutEmulator.performsBackwardDelete(
-        forKeyCode: 11, modifierFlags: [], mapping: .system))
-    XCTAssertFalse(
-      KeyboardLayoutEmulator.performsBackwardDelete(
-        forKeyCode: 45, modifierFlags: [], mapping: .builtIn(layout)))
-    XCTAssertFalse(
-      KeyboardLayoutEmulator.performsBackwardDelete(
-        forKeyCode: 11, modifierFlags: [.command], mapping: .builtIn(layout)))
-    XCTAssertFalse(
-      KeyboardLayoutEmulator.performsBackwardDelete(
-        forKeyCode: 11, modifierFlags: [.control], mapping: .builtIn(layout)))
+    XCTAssertEqual(deleteCount, 0)
+    XCTAssertEqual(inserted, ["⌫", "⌫", "⌫", "⌫"])
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 11, modifierFlags: [], mapping: .system))
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 11, modifierFlags: [.command], mapping: .builtIn(layout)))
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 11, modifierFlags: [.control], mapping: .builtIn(layout)))
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
@@ -8944,7 +8933,7 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(
       KeyboardGuideModel.rows(for: .colemakDHWideANSI)[0].map(\.label).joined(),
-      "123456=7890-")
+      "`123456=7890-")
     XCTAssertEqual(
       KeyboardGuideModel.rows(for: .colemakDHWideANSI)[3].map(\.label).joined(),
       "XCDVZ/KH,.")
@@ -8969,7 +8958,7 @@ final class TypingEngineTests: XCTestCase {
         forKeyCode: 10, modifierFlags: [], layout: .colemakDHWideISO), "z")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
-        forKeyCode: 45, modifierFlags: [.shift], layout: .colemakDHWideISO), "~")
+        forKeyCode: 45, modifierFlags: [.shift], layout: .colemakDHWideISO), "#")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
         forKeyCode: 45, modifierFlags: [], layout: .colemakDHWideISO), "#")
@@ -10538,7 +10527,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.brazilianABNT2, .ansiQwerty])
   }
 
-  func testLatinAmericanQwertyLeavesItsDeadKeyToMacOSAndMapsTypedSymbols() {
+  func testLatinAmericanQwertyMapsPinnedBlankAndTypedSymbols() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ñ", layout: .latinAmericanQwerty), "home-9")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "¡", layout: .latinAmericanQwerty), "number-12")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "[", layout: .latinAmericanQwerty), "home-10")
@@ -10550,8 +10539,8 @@ final class TypingEngineTests: XCTestCase {
       KeyboardLayoutEmulator.character(forKeyCode: 24, modifierFlags: [.shift], layout: .latinAmericanQwerty), "¡")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [.shift], layout: .latinAmericanQwerty), "[")
-    XCTAssertNil(
-      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [], layout: .latinAmericanQwerty))
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [], layout: .latinAmericanQwerty), " ")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ñ", layout: .latinAmericanQwerty), 41)
   }
 

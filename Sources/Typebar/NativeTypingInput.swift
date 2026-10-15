@@ -488,13 +488,6 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             onInsert(String(arrow), false)
             return
         }
-        if KeyboardLayoutEmulator.performsBackwardDelete(
-            forKeyCode: event.keyCode, modifierFlags: event.modifierFlags,
-            mapping: keyboardInputMapping
-        ) {
-            onDelete()
-            return
-        }
         let shiftComparisonKeyCode: UInt16?
         if oppositeShiftMode == .keymap, oppositeShiftKeymap != .system {
             shiftComparisonKeyCode = event.characters?.first.flatMap {

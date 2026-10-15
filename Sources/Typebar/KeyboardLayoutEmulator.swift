@@ -67,18 +67,6 @@ enum KeyboardLayoutEmulator {
     return modifierFlags.contains(.shift) ? layers.shifted : layers.normal
   }
 
-  static func performsBackwardDelete(
-    forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags,
-    mapping: KeyboardInputMapping
-  ) -> Bool {
-    guard keyCode == 11,
-      !modifierFlags.contains(.command),
-      !modifierFlags.contains(.control),
-      case .builtIn(.optimot) = mapping
-    else { return false }
-    return true
-  }
-
   static func character(
     forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, layout: KeyboardLayout?
   ) -> Character? {
@@ -1229,7 +1217,7 @@ enum KeyboardLayoutEmulator {
         isoBaseShiftMap(
           normal: ["$«»\"-+*/=()@#", "àjoébfdl'qxz", "aieu,ptsrnôç", "kyè.w⌫gcmhv"],
           shifted: ["€1234567890_%", "ÀJOÉBFDL?QXZ", "AIEU;PTSRN!Ç", "KYÈ:W⌫GCMHV"]
-        ).filter { $0.key != 11 },
+        ),
         options: [
           50: ("£", "©"), 18: ("“", "¼"), 19: ("”", "½"), 20: ("„", "¾"),
           21: ("‑", "⅓"), 23: ("±", "⅔"), 22: ("×", nil), 26: ("\\", "÷"),
@@ -1621,16 +1609,16 @@ enum KeyboardLayoutEmulator {
           + "6:zZ 7:xX 8:cC 9:dD 11:vV 45:kK 46:hH 43:,< 47:.> 44:/?")
     case .colemakDHWideANSI:
       map(
-        "18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:=+ 28:7& 25:8* 29:9( 27:0) 24:-_ "
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:=+ 28:7& 25:8* 29:9( 27:0) 24:-_ "
           + "12:qQ 13:wW 14:fF 15:pP 17:bB 16:[{ 32:jJ 34:lL 31:uU 35:yY 33:;: 30:'\" 42:\\| "
           + "0:aA 1:rR 2:sS 3:tT 5:gG 4:]} 38:mM 40:nN 37:eE 41:iI 39:oO "
           + "6:xX 7:cC 8:dD 9:vV 11:zZ 45:/? 46:kK 43:hH 47:,< 44:.>")
     case .colemakDHWideISO:
       map(
-        "18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:=+ 28:7& 25:8* 29:9( 27:0) 24:-_ "
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:=+ 28:7& 25:8* 29:9( 27:0) 24:-_ "
           + "12:qQ 13:wW 14:fF 15:pP 17:bB 16:[{ 32:jJ 34:lL 31:uU 35:yY 33:;: 30:/? "
           + "0:aA 1:rR 2:sS 3:tT 5:gG 4:]} 38:mM 40:nN 37:eE 41:iI 39:oO 42:'\" "
-          + "10:zZ 6:xX 7:cC 8:dD 9:vV 11:\\| 45:#~ 46:kK 43:hH 47:,< 44:.>")
+          + "10:zZ 6:xX 7:cC 8:dD 9:vV 11:\\| 45:## 46:kK 43:hH 47:,< 44:.>")
     case .colemakDHKANSI:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
@@ -1790,11 +1778,12 @@ enum KeyboardLayoutEmulator {
         ]
       )
     case .latinAmericanQwerty:
-      map(
+      withSpaceKeys(map(
         "50:|° 18:1! 19:2\" 20:3# 21:4$ 23:5% 22:6& 26:7/ 28:8( 25:9) 29:0= 27:'? 24:¿¡ "
           + "12:qQ 13:wW 14:eE 15:rR 17:tT 16:yY 32:uU 34:iI 31:oO 35:pP 33:´¨ 30:+* "
           + "0:aA 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:ñÑ 39:{[ "
-          + "10:<> 6:zZ 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:,; 47:.: 44:-_")
+          + "10:<> 6:zZ 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:,; 47:.: 44:-_"
+      ), keyCodes: [42])
     case .polishProgrammers:
       withOptionLayers(
         ansiQwertyKeys(),
@@ -1804,11 +1793,19 @@ enum KeyboardLayoutEmulator {
           37: ("ł", "Ł"), 45: ("ń", "Ń"),
         ])
     case .frenchAzerty:
-      map(
-        "18:&1 19:é2 20:\"3 21:'4 23:(5 22:-6 26:è7 28:_8 25:ç9 29:à0 27:)° 24:=+ "
-          + "12:aA 13:zZ 14:eE 15:rR 17:tT 16:yY 32:uU 34:iI 31:oO 35:pP 33:^¨ 30:$£ "
-          + "0:qQ 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:mM 39:ù% "
-          + "6:wW 7:xX 8:cC 9:vV 11:bB 45:nN 46:,? 43:;. 47::/ 44:!§")
+      withOptionLayers(
+        map(
+          "50:`` 18:&1 19:é2 20:\"3 21:'4 23:(5 22:-6 26:è7 28:_8 25:ç9 29:à0 27:)° 24:=+ "
+            + "12:aA 13:zZ 14:eE 15:rR 17:tT 16:yY 32:uU 34:iI 31:oO 35:pP 33:^¨ 30:$£ "
+            + "0:qQ 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:mM 39:ù% 42:*µ "
+            + "10:<> 6:wW 7:xX 8:cC 9:vV 11:bB 45:nN 46:,? 43:;. 47::/ 44:!§"
+        ),
+        options: [
+          19: ("~", nil), 20: ("#", nil), 21: ("{", nil), 23: ("[", nil),
+          22: ("|", nil), 26: ("`", nil), 28: ("\\", nil), 29: ("@", nil),
+          27: ("]", nil), 24: ("}", nil), 30: ("¤", nil),
+        ]
+      )
     case .turkishQ:
       map(
         "50:\"é 18:1! 19:2' 20:3^ 21:4+ 23:5% 22:6& 26:7/ 28:8( 25:9) 29:0= 27:*? 24:-_ "
@@ -2232,7 +2229,7 @@ enum KeyboardLayoutEmulator {
     return layeredKeys
   }
 
-  /// Whix2's visually blank positions insert Space in the pinned layout
+  /// Official layouts can assign Space to visually blank physical keys
   /// instead of falling through to the active macOS input source.
   private static func withSpaceKeys(
     _ keys: [UInt16: KeyLayers], keyCodes: Set<UInt16>
