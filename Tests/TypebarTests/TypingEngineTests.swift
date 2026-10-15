@@ -9098,14 +9098,15 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testTurkishFMapsTurkishLettersAndPersists() {
+  func testTurkishFMapsTurkishLettersAndPersists() throws {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ğ", layout: .turkishF), "top-2")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ı", layout: .turkishF), "top-3")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "İ", layout: .turkishF), "home-1")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ü", layout: .turkishF), "home-4")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ö", layout: .turkishF), "bottom-2")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .turkishF), "bottom-5")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .turkishF), "bottom-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ö", layout: .turkishF), "bottom-1")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .turkishF), "bottom-4")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: ">", layout: .turkishF))
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "x", layout: .turkishF), "top-12")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "?", layout: .turkishF), "number-11")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 15, modifierFlags: [.shift], layout: .turkishF), "I")
@@ -9114,12 +9115,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 7, modifierFlags: [], layout: .turkishF), "ö")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], layout: .turkishF), "*")
-    XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .turkishF), ">")
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], layout: .turkishF), "+")
+    XCTAssertNil(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .turkishF))
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ş", layout: .turkishF), 39)
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "?", layout: .turkishF), 27)
     XCTAssertEqual(KeyboardInputLayout.turkishF.emulatedLayout, .turkishF)
+
+    var inserted = [String]()
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = .builtIn(.turkishF)
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    for (keyCode, flags, characters) in [
+      (UInt16(50), NSEvent.ModifierFlags.shift, "+"),
+      (UInt16(42), NSEvent.ModifierFlags(), "x"),
+    ] {
+      let event = try XCTUnwrap(NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
+        context: nil, characters: characters, charactersIgnoringModifiers: characters,
+        isARepeat: false, keyCode: keyCode))
+      inputView.keyDown(with: event)
+    }
+    XCTAssertEqual(inserted, ["+", "x"])
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
@@ -9146,7 +9163,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ę", layout: .polishProgrammers), "top-2")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ł", layout: .polishProgrammers), "home-8")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ź", layout: .polishProgrammers), "bottom-1")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "€", layout: .polishProgrammers), "top-6")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "€", layout: .polishProgrammers))
 
     let aKey = KeyboardGuideModel.rows(for: .polishProgrammers)[2][0]
     XCTAssertEqual(aKey.legend(style: .dynamic, modifierFlags: [.option], capsLockEnabled: false), "ą")
@@ -9160,12 +9177,12 @@ final class TypingEngineTests: XCTestCase {
         forKeyCode: 14, modifierFlags: [.option, .shift], layout: .polishProgrammers), "Ę")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
-        forKeyCode: 32, modifierFlags: [.option], layout: .polishProgrammers), "€")
+        forKeyCode: 32, modifierFlags: [.option], layout: .polishProgrammers), "u")
     XCTAssertNil(
       KeyboardLayoutEmulator.character(
         forKeyCode: 0, modifierFlags: [.option, .control], layout: .polishProgrammers))
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ł", layout: .polishProgrammers), 37)
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "€", layout: .polishProgrammers), 32)
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "€", layout: .polishProgrammers))
     XCTAssertEqual(KeyboardInputLayout.polishProgrammers.emulatedLayout, .polishProgrammers)
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -9285,15 +9302,16 @@ final class TypingEngineTests: XCTestCase {
       restored.layoutFluidLayouts, [.hungarianOfficial, .jcuken, .bulgarianOfficial])
   }
 
-  func testUkrainianJcukenMapsUkrainianLettersAndPhysicalKeyPositions() {
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ґ", layout: .ukrainianJcuken), "number-0")
+  @MainActor
+  func testUkrainianJcukenMapsPinnedAnsiAndAltGrPositions() throws {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ґ", layout: .ukrainianJcuken), "top-6")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ї", layout: .ukrainianJcuken), "top-11")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "і", layout: .ukrainianJcuken), "home-1")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "є", layout: .ukrainianJcuken), "home-10")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .ukrainianJcuken), "bottom-0")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: ">", layout: .ukrainianJcuken))
 
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .ukrainianJcuken), "ґ")
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .ukrainianJcuken), "'")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
         forKeyCode: 30, modifierFlags: [.shift], layout: .ukrainianJcuken), "Ї")
@@ -9302,9 +9320,26 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
         forKeyCode: 39, modifierFlags: [.shift], layout: .ukrainianJcuken), "Є")
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ґ", layout: .ukrainianJcuken), 50)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ґ", layout: .ukrainianJcuken), 32)
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "є", layout: .ukrainianJcuken), 39)
     XCTAssertEqual(KeyboardInputLayout.ukrainianJcuken.emulatedLayout, .ukrainianJcuken)
+
+    var inserted = [String]()
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = .builtIn(.ukrainianJcuken)
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    for (keyCode, flags, characters) in [
+      (UInt16(50), NSEvent.ModifierFlags.shift, "~"),
+      (UInt16(32), NSEvent.ModifierFlags.option, "u"),
+      (UInt16(42), NSEvent.ModifierFlags(), "\\"),
+    ] {
+      let event = try XCTUnwrap(NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
+        context: nil, characters: characters, charactersIgnoringModifiers: characters,
+        isARepeat: false, keyCode: keyCode))
+      inputView.keyDown(with: event)
+    }
+    XCTAssertEqual(inserted, ["₴", "ґ", "ґ"])
   }
 
   func testBulgarianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
@@ -9519,12 +9554,13 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testEstonianMapsRegionalLettersAndPersists() {
+  func testEstonianMapsRegionalLettersAndPersists() throws {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "õ", layout: .estonian), "top-11")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ü", layout: .estonian), "top-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ö", layout: .estonian), "home-9")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ä", layout: .estonian), "home-10")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ˇ", layout: .estonian), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "~", layout: .estonian), "number-0")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "ˇ", layout: .estonian))
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "<", layout: .estonian), "bottom-0")
 
     XCTAssertEqual(
@@ -9541,6 +9577,17 @@ final class TypingEngineTests: XCTestCase {
       KeyboardLayoutEmulator.character(forKeyCode: 44, modifierFlags: [], layout: .estonian), "-")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ö", layout: .estonian), 41)
     XCTAssertEqual(KeyboardInputLayout.estonian.emulatedLayout, .estonian)
+
+    var inserted = [String]()
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = .builtIn(.estonian)
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    let event = try XCTUnwrap(NSEvent.keyEvent(
+      with: .keyDown, location: .zero, modifierFlags: .shift, timestamp: 0, windowNumber: 0,
+      context: nil, characters: "~", charactersIgnoringModifiers: "~",
+      isARepeat: false, keyCode: 50))
+    inputView.keyDown(with: event)
+    XCTAssertEqual(inserted, ["^"])
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
@@ -9662,21 +9709,21 @@ final class TypingEngineTests: XCTestCase {
   func testPersianFarsiMapsLegacyPersianKeysAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .persianFarsi)
     XCTAssertEqual(rows[0][0].label, "÷")
-    XCTAssertEqual(rows[1][3].shiftedLabel, "ریال")
-    XCTAssertEqual(rows[3][0].label, "پ")
+    XCTAssertEqual(rows[1][3].shiftedLabel, "ق")
+    XCTAssertEqual(rows[3][0].label, "ظ")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ی", layout: .persianFarsi), "home-2")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "گ", layout: .persianFarsi), "home-10")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ژ", layout: .persianFarsi), "bottom-3")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ژ", layout: .persianFarsi), "bottom-2")
 
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 2, modifierFlags: [], layout: .persianFarsi), "ی")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 7, modifierFlags: [.shift], layout: .persianFarsi), "ي")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.text(forKeyCode: 15, modifierFlags: [.shift], layout: .persianFarsi), "ریال")
-    XCTAssertNil(
-      KeyboardLayoutEmulator.character(forKeyCode: 15, modifierFlags: [.shift], layout: .persianFarsi))
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "ریال", layout: .persianFarsi), 15)
+      KeyboardLayoutEmulator.text(forKeyCode: 15, modifierFlags: [.shift], layout: .persianFarsi), "ق")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 15, modifierFlags: [.shift], layout: .persianFarsi), "ق")
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(forOutput: "ریال", layout: .persianFarsi))
     XCTAssertEqual(KeyboardInputLayout.persianFarsi.emulatedLayout, .persianFarsi)
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -10138,9 +10185,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [], layout: .mongolianCyrillic), "№")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [.shift], layout: .mongolianCyrillic), "1")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 21, modifierFlags: [], layout: .mongolianCyrillic), "₮")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [], layout: .mongolianCyrillic), "¥")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [], layout: .mongolianCyrillic), "\\")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.shift], layout: .mongolianCyrillic), "|")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.option], layout: .mongolianCyrillic), "¥")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.option], layout: .mongolianCyrillic), "\\")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.option, .shift], layout: .mongolianCyrillic), "|")
     XCTAssertEqual(KeyboardInputLayout.mongolianCyrillic.emulatedLayout, .mongolianCyrillic)
 
@@ -10158,9 +10205,9 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testHebrewMapsStandardLettersShiftLayerAndPersists() {
+  func testHebrewMapsStandardLettersShiftLayerAndPersists() throws {
     let rows = KeyboardGuideModel.rows(for: .hebrew)
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .hebrew), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "~", layout: .hebrew), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ק", layout: .hebrew), "top-2")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ש", layout: .hebrew), "home-0")
     XCTAssertEqual(rows[3][0].label, "\\")
@@ -10178,6 +10225,17 @@ final class TypingEngineTests: XCTestCase {
       KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .hebrew), "|")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "צ", layout: .hebrew), 46)
     XCTAssertEqual(KeyboardInputLayout.hebrew.emulatedLayout, .hebrew)
+
+    var inserted = [String]()
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = .builtIn(.hebrew)
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    let event = try XCTUnwrap(NSEvent.keyEvent(
+      with: .keyDown, location: .zero, modifierFlags: .shift, timestamp: 0, windowNumber: 0,
+      context: nil, characters: "~", charactersIgnoringModifiers: "~",
+      isARepeat: false, keyCode: 50))
+    inputView.keyDown(with: event)
+    XCTAssertEqual(inserted, [";"])
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!

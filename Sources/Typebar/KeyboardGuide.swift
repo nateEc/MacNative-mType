@@ -3419,12 +3419,12 @@ enum KeyboardGuideModel {
       ]
     case .polishProgrammers:
       [
-        row("number", "1234567890-="),
+        row("number", "`1234567890-="),
         row(
-          "top", "QWERTYUIOP[]",
-          characters: ["qQ", "wW", "eEęĘ", "rR", "tT", "yY", "uU€", "iI", "oOóÓ", "pP", "[{", "]}"],
-          optionLabels: [nil, nil, "ę", nil, nil, nil, "€", nil, "ó", nil, nil, nil],
-          shiftedOptionLabels: [nil, nil, "Ę", nil, nil, nil, "€", nil, "Ó", nil, nil, nil]
+          "top", "QWERTYUIOP[]\\",
+          characters: ["qQ", "wW", "eEęĘ", "rR", "tT", "yY", "uU", "iI", "oOóÓ", "pP", "[{", "]}", "\\|"],
+          optionLabels: [nil, nil, "ę", nil, nil, nil, nil, nil, "ó", nil, nil, nil, nil],
+          shiftedOptionLabels: [nil, nil, "Ę", nil, nil, nil, nil, nil, "Ó", nil, nil, nil, nil]
         ),
         row(
           "home", "ASDFGHJKL;'",
@@ -3478,22 +3478,22 @@ enum KeyboardGuideModel {
     case .turkishF:
       [
         row(
-          "number", "+1234567890/-",
-          characters: ["+*", "1!", "2\"", "3^", "4$", "5%", "6&", "7'", "8(", "9)", "0=", "/?", "-_"],
-          shiftedLabels: ["*", "!", "\"", "^", "$", "%", "&", "'", "(", ")", "=", "?", "_"]
+          "number", "*1234567890/-",
+          characters: ["*+", "1!", "2\"", "3^", "4$", "5%", "6&", "7'", "8(", "9)", "0=", "/?", "-_"],
+          shiftedLabels: ["+", "!", "\"", "^", "$", "%", "&", "'", "(", ")", "=", "?", "_"]
         ),
         row(
-          "top", "FGĞIODRNHPQW",
-          characters: ["fF", "gG", "ğĞ", "ıI", "oO", "dD", "rR", "nN", "hH", "pP", "qQ", "wW"]
+          "top", "FGĞIODRNHPQWX",
+          characters: ["fF", "gG", "ğĞ", "ıI", "oO", "dD", "rR", "nN", "hH", "pP", "qQ", "wW", "xX"]
         ),
         row(
-          "home", "UİEAÜTKMLYŞX",
-          characters: ["uU", "iİ", "eE", "aA", "üÜ", "tT", "kK", "mM", "lL", "yY", "şŞ", "xX"]
+          "home", "UİEAÜTKMLYŞ",
+          characters: ["uU", "iİ", "eE", "aA", "üÜ", "tT", "kK", "mM", "lL", "yY", "şŞ"]
         ),
         row(
-          "bottom", "<JÖVCÇZSB.,",
-          characters: ["<>", "jJ", "öÖ", "vV", "cC", "çÇ", "zZ", "sS", "bB", ".:", ",;"],
-          shiftedLabels: [">", "J", "Ö", "V", "C", "Ç", "Z", "S", "B", ":", ";"]
+          "bottom", "JÖVCÇZSB.,",
+          characters: ["jJ", "öÖ", "vV", "cC", "çÇ", "zZ", "sS", "bB", ".:", ",;"],
+          shiftedLabels: ["J", "Ö", "V", "C", "Ç", "Z", "S", "B", ":", ";"]
         ),
       ]
     case .turkishE:
@@ -3633,14 +3633,16 @@ enum KeyboardGuideModel {
     case .ukrainianJcuken:
       [
         row(
-          "number", "Ґ1234567890-=",
-          characters: ["ґҐ", "1!", "2\"", "3№", "4;", "5%", "6:", "7?", "8*", "9(", "0)", "-_", "=+"],
-          shiftedLabels: ["Ґ", "!", "\"", "№", ";", "%", ":", "?", "*", "(", ")", "_", "+"]
+          "number", "'1234567890-=",
+          characters: ["'₴", "1!", "2\"", "3№", "4;", "5%", "6:", "7?", "8*", "9(", "0)", "-_", "=+"],
+          shiftedLabels: ["₴", "!", "\"", "№", ";", "%", ":", "?", "*", "(", ")", "_", "+"]
         ),
         row(
-          "top", "ЙЦУКЕНГШЩЗХЇ\\",
-          characters: ["йЙ", "цЦ", "уУ", "кК", "еЕ", "нН", "гГ", "шШ", "щЩ", "зЗ", "хХ", "їЇ", "\\/"],
-          shiftedLabels: ["Й", "Ц", "У", "К", "Е", "Н", "Г", "Ш", "Щ", "З", "Х", "Ї", "/"]
+          "top", "йцукенгшщзхїґ",
+          characters: ["йЙ", "цЦ", "уУ", "кК", "еЕ", "нН", "гГґҐ", "шШ", "щЩ", "зЗ", "хХ", "їЇ", "ґҐ"],
+          shiftedLabels: ["Й", "Ц", "У", "К", "Е", "Н", "Г", "Ш", "Щ", "З", "Х", "Ї", "Ґ"],
+          optionLabels: [nil, nil, nil, nil, nil, nil, "ґ", nil, nil, nil, nil, nil, nil],
+          shiftedOptionLabels: [nil, nil, nil, nil, nil, nil, "Ґ", nil, nil, nil, nil, nil, nil]
         ),
         row(
           "home", "ФІВАПРОЛДЖЄ",
@@ -3648,9 +3650,9 @@ enum KeyboardGuideModel {
           shiftedLabels: ["Ф", "І", "В", "А", "П", "Р", "О", "Л", "Д", "Ж", "Є"]
         ),
         row(
-          "bottom", "<ЯЧСМИТЬБЮ.",
-          characters: ["<>", "яЯ", "чЧ", "сС", "мМ", "иИ", "тТ", "ьЬ", "бБ", "юЮ", ".,"],
-          shiftedLabels: [">", "Я", "Ч", "С", "М", "И", "Т", "Ь", "Б", "Ю", ","]
+          "bottom", "ячсмитьбю.",
+          characters: ["яЯ", "чЧ", "сС", "мМ", "иИ", "тТ", "ьЬ", "бБ", "юЮ", ".,"],
+          shiftedLabels: ["Я", "Ч", "С", "М", "И", "Т", "Ь", "Б", "Ю", ","]
         ),
       ]
     case .bulgarianCyrillic:
@@ -3793,9 +3795,9 @@ enum KeyboardGuideModel {
     case .estonian:
       [
         row(
-          "number", "ˇ1234567890+´",
-          characters: ["ˇ~", "1!", "2\"", "3#", "4¤", "5%", "6&", "7/", "8(", "9)", "0=", "+?", "´`"],
-          shiftedLabels: ["~", "!", "\"", "#", "¤", "%", "&", "/", "(", ")", "=", "?", "`"]
+          "number", "~1234567890+´",
+          characters: ["~^", "1!", "2\"", "3#", "4¤", "5%", "6&", "7/", "8(", "9)", "0=", "+?", "´`"],
+          shiftedLabels: ["^", "!", "\"", "#", "¤", "%", "&", "/", "(", ")", "=", "?", "`"]
         ),
         row(
           "top", "QWERTYUIOPÜÕ'",
@@ -3845,8 +3847,8 @@ enum KeyboardGuideModel {
         ),
         row(
           "top", "ضصثقفغعهخحجچپ",
-          characters: ["ضً", "صٌ", "ثٍ", "قریال", "ف،", "غ؛", "ع,", "ه]", "خ[", "ح\\", "ج}", "چ{", "پ|"],
-          shiftedLabels: ["ً", "ٌ", "ٍ", "ریال", "،", "؛", ",", "]", "[", "\\", "}", "{", "|"]
+          characters: ["ضً", "صٌ", "ثٍ", "ق", "ف،", "غ؛", "ع,", "ه]", "خ[", "ح\\", "ج}", "چ{", "پ|"],
+          shiftedLabels: ["ً", "ٌ", "ٍ", "ق", "،", "؛", ",", "]", "[", "\\", "}", "{", "|"]
         ),
         row(
           "home", "شسیبلاتنمکگ",
@@ -3854,9 +3856,9 @@ enum KeyboardGuideModel {
           shiftedLabels: ["َ", "ُ", "ِ", "ّ", "ۀ", "آ", "ـ", "«", "»", ":", "\""]
         ),
         row(
-          "bottom", "پظطزرذدئو./",
-          characters: ["پ|", "ظة", "طي", "زژ", "رؤ", "ذإ", "دأ", "ئء", "و<", ".>", "/؟"],
-          shiftedLabels: ["|", "ة", "ي", "ژ", "ؤ", "إ", "أ", "ء", "<", ">", "؟"]
+          "bottom", "ظطزرذدئو./",
+          characters: ["ظة", "طي", "زژ", "رؤ", "ذإ", "دأ", "ئء", "و<", ".>", "/؟"],
+          shiftedLabels: ["ة", "ي", "ژ", "ؤ", "إ", "أ", "ء", "<", ">", "؟"]
         ),
       ]
     case .arabic101:
@@ -4150,8 +4152,8 @@ enum KeyboardGuideModel {
           shiftedOptionLabels: ["≈", nil, "—", "§", "€", nil, "…", nil, nil, "{", "}", "—", "≈"]
         ),
         row(
-          "top", labels: ["ф", "ц", "у", "ж", "э", "н", "г", "ш", "ү", "з", "к", "ъ", "¥"],
-          characters: ["фФјЈ", "цЦџЏ", "уУўЎ", "жЖєЄ", "эЭ", "нНњЊ", "гГѓЃ", "шШѕЅ", "үҮ'„", "зЗ‘’", "кК“”", "ъЪ«»", "¥|\\"],
+          "top", labels: ["ф", "ц", "у", "ж", "э", "н", "г", "ш", "ү", "з", "к", "ъ", "\\"],
+          characters: ["фФјЈ", "цЦџЏ", "уУўЎ", "жЖєЄ", "эЭ", "нНњЊ", "гГѓЃ", "шШѕЅ", "үҮ'„", "зЗ‘’", "кК“”", "ъЪ«»", "\\|"],
           shiftedLabels: ["Ф", "Ц", "У", "Ж", "Э", "Н", "Г", "Ш", "Ү", "З", "К", "Ъ", "|"],
           optionLabels: ["ј", "џ", "ў", "є", nil, "њ", "ѓ", "ѕ", "'", "‘", "“", "«", "\\"],
           shiftedOptionLabels: ["Ј", "Џ", "Ў", "Є", nil, "Њ", "Ѓ", "Ѕ", "„", "’", "”", "»", "|"]
@@ -4174,9 +4176,9 @@ enum KeyboardGuideModel {
     case .hebrew:
       [
         row(
-          "number", ";1234567890-=",
-          characters: [";~", "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9)", "0(", "-_", "=+"],
-          shiftedLabels: ["~", "!", "@", "#", "$", "%", "^", "&", "*", ")", "(", "_", "+"]
+          "number", "~1234567890-=",
+          characters: ["~;", "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9)", "0(", "-_", "=+"],
+          shiftedLabels: [";", "!", "@", "#", "$", "%", "^", "&", "*", ")", "(", "_", "+"]
         ),
         row(
           "top", "/'קראטוןםפ][\\",

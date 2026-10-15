@@ -131,11 +131,19 @@ import XCTest
     XCTAssertEqual(pending.calls, 1)
     if scenario == .actual {
       var flushCount = 0
-      for _ in 0..<200 where pending.actualPrompt == nil { flush(); flushCount += 1 }
+      // The 100,001-word generator was still progressing at 99,700 words when
+      // a fixed 200-flush wait expired on the macOS 15 runner. Wait for the
+      // actual completion, with a finite wall-clock bound for a stalled task.
+      let deadline = Date().addingTimeInterval(wordCount > 100_000 ? 90 : 20)
+      while pending.actualPrompt == nil && Date() < deadline {
+        flush()
+        flushCount += 1
+      }
       let elapsed = pending.preparationStarted.map { ProcessInfo.processInfo.systemUptime - $0 }
       let evidence = "words=\(wordCount) calls=\(pending.calls) flushes=\(flushCount) prepared=\(pending.preparedWordCount) elapsed=\(String(describing: elapsed)) lastBatch=\(String(describing: pending.lastBatchElapsed)) returned=\(String(describing: pending.preparationReturnedElapsed)) errorType=\(pending.preparationErrorType ?? "none")"
       print("whole preview preparation observation: \(evidence)")
       let actual = try XCTUnwrap(pending.actualPrompt, evidence)
+      XCTAssertEqual(pending.preparedWordCount, wordCount)
       flush()
       XCTAssertEqual(actual.split(separator: " ").count, wordCount)
       XCTAssertEqual(target(), actual)

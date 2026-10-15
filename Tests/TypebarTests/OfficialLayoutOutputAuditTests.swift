@@ -212,6 +212,44 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "\u{200D}", layout: .persianStandard))
   }
 
+  func testOfficialMongolianUsesPinnedBackslashKey() {
+    let mapping = KeyboardInputMapping.builtIn(.mongolianCyrillic)
+    let key = KeyboardGuideModel.rows(for: .mongolianCyrillic)[1][12]
+    XCTAssertEqual(key.label, "\\")
+    XCTAssertEqual(key.shiftedLabel, "|")
+    for flags: NSEvent.ModifierFlags in [[], .option] {
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 42, modifierFlags: flags, mapping: mapping), "\\")
+    }
+    for flags: NSEvent.ModifierFlags in [.shift, [.option, .shift]] {
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 42, modifierFlags: flags, mapping: mapping), "|")
+    }
+  }
+
+  func testOfficialPersianFarsiAndPolishProgrammersUsePinnedFallbacks() {
+    let farsi = KeyboardInputMapping.builtIn(.persianFarsi)
+    let farsiRows = KeyboardGuideModel.rows(for: .persianFarsi)
+    XCTAssertEqual(farsiRows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(farsiRows[1][3].shiftedLabel, "ق")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 15, modifierFlags: .shift, mapping: farsi), "ق")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 15, modifierFlags: [.option, .shift], mapping: farsi), "ق")
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 10, modifierFlags: [], mapping: farsi))
+
+    let polish = KeyboardInputMapping.builtIn(.polishProgrammers)
+    let polishRows = KeyboardGuideModel.rows(for: .polishProgrammers)
+    XCTAssertEqual(polishRows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(polishRows[1][6].characters, Set("u"))
+    XCTAssertEqual(polishRows[1][12].label, "\\")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 32, modifierFlags: .option, mapping: polish), "u")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 32, modifierFlags: [.option, .shift], mapping: polish), "U")
+  }
+
   func testOfficialTamil99UsesPinnedShiftOutputs() {
     let mapping = KeyboardInputMapping.builtIn(.tamil99)
     let rows = KeyboardGuideModel.rows(for: .tamil99)
@@ -273,6 +311,85 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 11, modifierFlags: .option, mapping: mapping), "ﻻ")
     XCTAssertEqual(KeyboardLayoutEmulator.text(
       forKeyCode: 11, modifierFlags: [.option, .shift], mapping: mapping), "ﻵ")
+  }
+
+  func testOfficialUkrainianUsesPinnedAnsiAndAltGrKeys() {
+    let mapping = KeyboardInputMapping.builtIn(.ukrainianJcuken)
+    let rows = KeyboardGuideModel.rows(for: .ukrainianJcuken)
+    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(rows[0][0].label, "'")
+    XCTAssertEqual(rows[0][0].shiftedLabel, "₴")
+    XCTAssertEqual(rows[1][6].optionLabel, "ґ")
+    XCTAssertEqual(rows[1][6].shiftedOptionLabel, "Ґ")
+    XCTAssertEqual(rows[1][12].label, "ґ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "'")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .shift, mapping: mapping), "₴")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 32, modifierFlags: .option, mapping: mapping), "ґ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 32, modifierFlags: [.option, .shift], mapping: mapping), "Ґ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 42, modifierFlags: [], mapping: mapping), "ґ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 42, modifierFlags: .shift, mapping: mapping), "Ґ")
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 10, modifierFlags: [], mapping: mapping))
+  }
+
+  func testOfficialEstonianUsesPinnedFirstNumberKey() {
+    let mapping = KeyboardInputMapping.builtIn(.estonian)
+    let first = KeyboardGuideModel.rows(for: .estonian)[0][0]
+    XCTAssertEqual(first.label, "~")
+    XCTAssertEqual(first.shiftedLabel, "^")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "~")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .shift, mapping: mapping), "^")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .option, mapping: mapping), "~")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [.option, .shift], mapping: mapping), "^")
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "ˇ", layout: .estonian))
+  }
+
+  func testOfficialHebrewUsesPinnedFirstNumberKey() {
+    let mapping = KeyboardInputMapping.builtIn(.hebrew)
+    let first = KeyboardGuideModel.rows(for: .hebrew)[0][0]
+    XCTAssertEqual(first.label, "~")
+    XCTAssertEqual(first.shiftedLabel, ";")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "~")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .shift, mapping: mapping), ";")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .option, mapping: mapping), "~")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [.option, .shift], mapping: mapping), ";")
+  }
+
+  func testOfficialTurkishFUsesPinnedAnsiRows() {
+    let mapping = KeyboardInputMapping.builtIn(.turkishF)
+    let rows = KeyboardGuideModel.rows(for: .turkishF)
+    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(rows[0][0].label, "*")
+    XCTAssertEqual(rows[0][0].shiftedLabel, "+")
+    XCTAssertEqual(rows[1].last?.label, "X")
+    XCTAssertEqual(rows[2].last?.label, "Ş")
+    XCTAssertEqual(rows[3][0].label, "J")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "*")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .shift, mapping: mapping), "+")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: .option, mapping: mapping), "*")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [.option, .shift], mapping: mapping), "+")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 42, modifierFlags: [], mapping: mapping), "x")
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 10, modifierFlags: [], mapping: mapping))
   }
 
   func testMacedonianQuestionMarkShiftMatchesOfficialLayout() {
