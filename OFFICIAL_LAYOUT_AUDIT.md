@@ -13,6 +13,8 @@
 
 ### 逐键验证现状（2026-10-15）
 
+2026-10-15 本地待推送的 Arabic (101) 纠偏：固定源码四层比较原差 8/192，先行定点测试复现 `ﻹ/ﻷ/ﻻ/ﻵ` 被旧实现写成多字符组合；改正原生输入、提示、反查后，192 项、实际按键事件和旧设置恢复定点通过，扩大相关 823 项零失败（1 项条件跳过）。全局差分从下段 77/46,060 降为 69/46,060，跨 12 布局（41 显式、28 macOS 回退）。旧 ID／格式不变，但已保存布局的输出语义改变；真人键盘与 IME 未验收。
+
 2026-10-15 本地待推送的 Arabic (102) 纠偏：四个实体键涉及 10 个四层比较点，先行测试复现兼容字形 `ﻹ/ﻷ/ﻻ/ﻵ` 与零宽空格被旧实现写成分解字符及 NUL；改正原生输入与提示后，该布局 192 项、原生按键交付和设置恢复定点通过，扩大相关 822 项零失败（1 项条件跳过）。全局差分从下段 87/46,060 降为 77/46,060，跨 13 布局（49 显式、28 macOS 回退）。旧 ID／格式保持，文本语义改变；真人键盘和 IME 未验收。
 
 2026-10-15 Tamil99 纠偏：固定源码四层 192 个实体输出原差 12 处，先行定点测试复现六键，再校正原生输入与键盘提示；192 项、旧布局持久化测试现全过。全局四层差分从下段所述 99/46,060 降为 87/46,060，跨 14 布局（59 处显式不同、28 处仍回退 macOS）。保存 ID 和数据格式不变，字符语义变化；真人键盘、IME、Option 图例尚未验收。
@@ -26,12 +28,11 @@
 | 布局 | 差异数 | 布局 | 差异数 |
 | --- | ---: | --- | ---: |
 | `azerty` | 23 | `ukrainian` | 10 |
-| `arabic_101` | 8 | `colemak_dh_iso_wide` | 6 |
-| `colemak_dh_wide` | 4 | `estonian` | 4 |
-| `hebrew` | 4 | `latam_qwerty` | 4 |
-| `optimot` | 4 | `turkish_f` | 4 |
-| `mongolian` | 2 | `persian_farsi` | 2 |
-| `polish_programmers` | 2 | — | — |
+| `colemak_dh_iso_wide` | 6 | `colemak_dh_wide` | 4 |
+| `estonian` | 4 | `hebrew` | 4 |
+| `latam_qwerty` | 4 | `optimot` | 4 |
+| `turkish_f` | 4 | `mongolian` | 2 |
+| `persian_farsi` | 2 | `polish_programmers` | 2 |
 
 `nativeExact` 的 239 项目前是布局身份及原生功能路径的覆盖声明，**不是逐键输出已全部验证通过**。只读差分测试 `OfficialLayoutOutputAuditTests.testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation` 在设置 `TYPEBAR_LAYOUT_AUDIT_REFERENCE` 为上述固定 checkout 路径时，比较原版布局模拟器实际消费的键位 JSON 与原生物理键模拟；不设置时跳过，不会下载或打包上游数据。`TYPEBAR_LAYOUT_AUDIT_ONLY` 可限于一个官方 ID；`TYPEBAR_LAYOUT_AUDIT_ALL_LAYERS=1` 还验证 Base、Shift、Option、Shift+Option 和实体 Space，按原版缺层回退规则计算期望值。该测试要求差异为零，除已验证的定点布局外目前仍失败，不能作为全布局绿色验收引用。
 

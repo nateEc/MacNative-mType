@@ -9600,14 +9600,14 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testArabic101PreservesLigatureOutputsAndPersists() {
+  func testArabic101PreservesPinnedLigatureOutputsAndPersists() throws {
     let rows = KeyboardGuideModel.rows(for: .arabic101)
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ذ", layout: .arabic101), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ّ", layout: .arabic101), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ض", layout: .arabic101), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "إ", layout: .arabic101), "top-5")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ش", layout: .arabic101), "home-0")
-    XCTAssertEqual(rows[3][5].label, "لا")
+    XCTAssertEqual(rows[3][5].label, "ﻻ")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ظ", layout: .arabic101), "bottom-10")
 
     XCTAssertEqual(
@@ -9615,18 +9615,34 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.shift], layout: .arabic101), "َ")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.text(forKeyCode: 17, modifierFlags: [.shift], layout: .arabic101), "لإ")
-    XCTAssertNil(
-      KeyboardLayoutEmulator.character(forKeyCode: 17, modifierFlags: [.shift], layout: .arabic101))
+      KeyboardLayoutEmulator.text(forKeyCode: 17, modifierFlags: [.shift], layout: .arabic101), "ﻹ")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.text(forKeyCode: 11, modifierFlags: [], layout: .arabic101), "لا")
+      KeyboardLayoutEmulator.character(forKeyCode: 17, modifierFlags: [.shift], layout: .arabic101), "ﻹ")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.text(forKeyCode: 11, modifierFlags: [.shift], layout: .arabic101), "لآ")
+      KeyboardLayoutEmulator.text(forKeyCode: 11, modifierFlags: [], layout: .arabic101), "ﻻ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 11, modifierFlags: [.shift], layout: .arabic101), "ﻵ")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .arabic101), "|")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ض", layout: .arabic101), 12)
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "لأ", layout: .arabic101), 5)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "ﻷ", layout: .arabic101), 5)
     XCTAssertEqual(KeyboardInputLayout.arabic101.emulatedLayout, .arabic101)
+
+    var inserted = [String]()
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = .builtIn(.arabic101)
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    for (keyCode, flags, characters) in [
+      (UInt16(17), NSEvent.ModifierFlags.shift, "F"),
+      (UInt16(11), NSEvent.ModifierFlags(), "b"),
+    ] {
+      let event = try XCTUnwrap(NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
+        context: nil, characters: characters, charactersIgnoringModifiers: characters,
+        isARepeat: false, keyCode: keyCode))
+      inputView.keyDown(with: event)
+    }
+    XCTAssertEqual(inserted, ["ﻹ", "ﻻ"])
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
