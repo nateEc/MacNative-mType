@@ -212,6 +212,30 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "\u{200D}", layout: .persianStandard))
   }
 
+  func testOfficialTamil99UsesPinnedShiftOutputs() {
+    let mapping = KeyboardInputMapping.builtIn(.tamil99)
+    let rows = KeyboardGuideModel.rows(for: .tamil99)
+    XCTAssertEqual(rows[0][0].label, "\u{0060}")
+    XCTAssertEqual(rows[1][4].shiftedLabel, "ஏ")
+    XCTAssertEqual(rows[1][5].shiftedLabel, "ள")
+    XCTAssertEqual(rows[1][7].shiftedLabel, ":")
+    XCTAssertEqual(rows[2][8].shiftedLabel, "௱")
+    XCTAssertEqual(rows[3][5].shiftedLabel, "ௐ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "\u{0060}")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 17, modifierFlags: .shift, mapping: mapping), "ஏ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 16, modifierFlags: .shift, mapping: mapping), "ள")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 34, modifierFlags: .shift, mapping: mapping), ":")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 37, modifierFlags: .shift, mapping: mapping), "௱")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 45, modifierFlags: [.option, .shift], mapping: mapping), "ௐ")
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(forOutput: "ஸ்ரீ", layout: .tamil99))
+  }
+
   func testMacedonianQuestionMarkShiftMatchesOfficialLayout() {
     let lastKey = KeyboardGuideModel.rows(for: .macedonian)[3].last
     XCTAssertEqual(lastKey?.label, "/")

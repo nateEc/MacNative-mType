@@ -10018,11 +10018,11 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testTamil99MapsMacLayersMultiScalarOutputAndSuppressedKeys() {
+  func testTamil99MapsPinnedShiftOutputsAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .tamil99)
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ஆ", layout: .tamil99), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "க", layout: .tamil99), "home-5")
-    XCTAssertEqual(rows[1][5].shiftedLabel, "ஸ்ரீ")
+    XCTAssertEqual(rows[1][5].shiftedLabel, "ள")
 
     for (keyCodes, guideRow) in zip(SystemKeyboardGuide.physicalRows, rows) {
       for (keyCode, key) in zip(keyCodes, guideRow) {
@@ -10033,12 +10033,13 @@ final class TypingEngineTests: XCTestCase {
         XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .tamil99), sourceShift)
       }
     }
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 16, modifierFlags: [.shift], layout: .tamil99), "ஸ்ரீ")
-    XCTAssertNil(KeyboardLayoutEmulator.character(forKeyCode: 16, modifierFlags: [.shift], layout: .tamil99))
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 16, modifierFlags: [.shift], layout: .tamil99), "ள")
+    XCTAssertEqual(KeyboardLayoutEmulator.character(forKeyCode: 16, modifierFlags: [.shift], layout: .tamil99), "ள")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 4, modifierFlags: [.shift], layout: .tamil99), "க")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 22, modifierFlags: [.option], layout: .tamil99), "6")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 22, modifierFlags: [.option, .shift], layout: .tamil99), "^")
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "ஸ்ரீ", layout: .tamil99), 16)
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(forOutput: "ஸ்ரீ", layout: .tamil99))
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "ௐ", layout: .tamil99), 45)
     XCTAssertEqual(KeyboardInputLayout.tamil99.emulatedLayout, .tamil99)
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"

@@ -4085,26 +4085,26 @@ enum KeyboardGuideModel {
     case .tamil99:
       [
         layeredRow(
-          "number", labels: ["₹", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          "number", labels: ["\u{0060}", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
           shiftedLabels: ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+"],
           optionLabels: ["`", "¡", "™", "£", "¢", "§", nil, "‘", "’", "“", "”", "–", "≠"],
           shiftedOptionLabels: [nil, "⁄", "❊", "#", "€", "٪", "&", "^", "*", ")", "(", "_", "+"]
         ),
         layeredRow(
           "top", labels: ["ஆ", "ஈ", "ஊ", "ஐ", "ஏ", "ள", "ற", "ன", "ட", "ண", "ச", "ஞ", "\\"],
-          shiftedLabels: ["ஸ", "ஷ", "ஜ", "ஹ", "X", "ஸ்ரீ", "ஶ", "ஈ", "[", "]", "{", "}", "|"],
+          shiftedLabels: ["ஸ", "ஷ", "ஜ", "ஹ", "ஏ", "ள", "ஶ", ":", "[", "]", "{", "}", "|"],
           optionLabels: ["ா", "ீ", "ூ", "ை", "ே", nil, nil, nil, nil, nil, "“", "‘", "«"],
           shiftedOptionLabels: [nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "”", "’", "»"]
         ),
         layeredRow(
           "home", labels: ["அ", "இ", "உ", "்", "எ", "க", "ப", "ம", "த", "ந", "ய"],
-          shiftedLabels: ["௹", "௺", "௸", "ஃ", nil, nil, nil, "\"", ":", ";", "'"],
+          shiftedLabels: ["௹", "௺", "௸", "ஃ", nil, nil, nil, "\"", "௱", ";", "'"],
           optionLabels: [nil, "ி", "ு", "்", "ெ", nil, nil, nil, nil, nil, "æ"],
           shiftedOptionLabels: [nil, nil, nil, nil, "ஃ", nil, nil, nil, nil, nil, nil]
         ),
         layeredRow(
           "bottom", labels: ["ஔ", "ஓ", "ஒ", "வ", "ங", "ல", "ர", ",", ".", "ழ"],
-          shiftedLabels: ["௳", "௴", "௵", "௶", "௷", nil, "/", "<", ">", "?"],
+          shiftedLabels: ["௳", "௴", "௵", "௶", "௷", "ௐ", "/", "<", ">", "?"],
           optionLabels: ["ௌ", "ோ", "ொ", nil, nil, nil, nil, "௹", "।", "/"],
           shiftedOptionLabels: [nil, nil, "©", nil, nil, nil, nil, "„", nil, "¿"]
         ),
