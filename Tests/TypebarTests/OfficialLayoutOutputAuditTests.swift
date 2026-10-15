@@ -423,9 +423,9 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     XCTAssertEqual(rows[1][4].shiftedLabel, "ﻹ")
     XCTAssertEqual(rows[2][1].shiftedLabel, "\u{200B}")
     XCTAssertEqual(rows[2][4].shiftedLabel, "ﻷ")
-    XCTAssertEqual(rows[3][5].label, "ﻻ")
-    XCTAssertEqual(rows[3][5].shiftedLabel, "ﻵ")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ﻻ", layout: .arabic102), "bottom-5")
+    XCTAssertEqual(rows[3][4].label, "ﻻ")
+    XCTAssertEqual(rows[3][4].shiftedLabel, "ﻵ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ﻻ", layout: .arabic102), "bottom-4")
     XCTAssertEqual(KeyboardLayoutEmulator.text(
       forKeyCode: 17, modifierFlags: .shift, mapping: mapping), "ﻹ")
     XCTAssertEqual(KeyboardLayoutEmulator.text(
@@ -443,9 +443,9 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     let rows = KeyboardGuideModel.rows(for: .arabic101)
     XCTAssertEqual(rows[1][4].shiftedLabel, "ﻹ")
     XCTAssertEqual(rows[2][4].shiftedLabel, "ﻷ")
-    XCTAssertEqual(rows[3][5].label, "ﻻ")
-    XCTAssertEqual(rows[3][5].shiftedLabel, "ﻵ")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ﻻ", layout: .arabic101), "bottom-5")
+    XCTAssertEqual(rows[3][4].label, "ﻻ")
+    XCTAssertEqual(rows[3][4].shiftedLabel, "ﻵ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ﻻ", layout: .arabic101), "bottom-4")
     XCTAssertEqual(KeyboardLayoutEmulator.text(
       forKeyCode: 17, modifierFlags: .shift, mapping: mapping), "ﻹ")
     XCTAssertEqual(KeyboardLayoutEmulator.text(
@@ -810,6 +810,8 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       (.turkishF, 2, 1, "i", "İ"),
       (.turkishE, 2, 2, "i", "İ"),
       (.turkishE, 2, 3, "ı", "I"),
+      (.turkishQ, 1, 7, "ı", "I"),
+      (.turkishQ, 2, 10, "i", "İ"),
     ]
     for (layout, row, column, base, shifted) in cases {
       let key = KeyboardGuideModel.rows(for: layout)[row][column]
@@ -831,6 +833,96 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: .option, capsLockEnabled: false), base)
       XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), shifted)
     }
+  }
+
+  func testPinnedTenKeyBottomRowsOmitUnshownPhysicalPrefixKeys() {
+    let cases: [(KeyboardLayout, [String])] = [
+      (.arabic101, ["ئ", "ء", "ؤ", "ر", "ﻻ", "ى", "ة", "و", "ز", "ظ"]),
+      (.arabic102, ["ئ", "ء", "ؤ", "ر", "ﻻ", "ى", "ة", "و", "ز", "ظ"]),
+      (.hebrew, ["ז", "ס", "ב", "ה", "נ", "מ", "צ", "ת", "ץ", "."]),
+      (.macedonian, ["з", "џ", "ц", "в", "б", "н", "м", ",", ".", "/"]),
+      (.russianJcuken, ["я", "ч", "с", "м", "и", "т", "ь", "б", "ю", "."]),
+    ]
+    for (layout, expected) in cases {
+      let row = KeyboardGuideModel.rows(for: layout)[3]
+      XCTAssertEqual(row.map {
+        $0.legend(style: .dynamic, modifierFlags: [], capsLockEnabled: false)
+      }, expected, "\(layout) bottom row")
+    }
+  }
+
+  func testPashtoGuideIncludesPinnedBottomRowDhal() {
+    let row = KeyboardGuideModel.rows(for: .pashto)[3]
+    XCTAssertEqual(row.map {
+      $0.legend(style: .dynamic, modifierFlags: [], capsLockEnabled: false)
+    }, ["ظ", "ط", "ز", "ر", "ذ", "د", "ړ", "و", "ږ", "/"])
+    XCTAssertEqual(row[4].legend(
+      style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), "ذ")
+  }
+
+  func testPinnedNumberRowsExposeTheirLeadingSymbolKeys() {
+    let cases: [(KeyboardLayout, [String], String)] = [
+      (.ansiColemakDHV, ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "=", "["], "~"),
+      (.ansiColemakWide, ["`", "1", "2", "3", "4", "5", "6", "=", "7", "8", "9", "0", "-"], "~"),
+      (.programmerWorkman, ["`", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "-", "="], "~"),
+      (.germanQwertz, ["^", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "ß", "´"], "°"),
+    ]
+    for (layout, expected, firstShift) in cases {
+      let row = KeyboardGuideModel.rows(for: layout)[0]
+      XCTAssertEqual(row.map {
+        $0.legend(style: .dynamic, modifierFlags: [], capsLockEnabled: false)
+      }, expected, "\(layout) number row")
+      XCTAssertEqual(row[0].legend(
+        style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), firstShift)
+    }
+  }
+
+  func testPinnedANSIStyleRowsKeepBothOuterSymbolKeys() {
+    let layouts: [KeyboardLayout] = [
+      .mtgapASRT, .qgmlwb, .qgmlwy, .ansiColemakAngle,
+      .halmak, .ansiNorman, .qwpr,
+    ]
+    for layout in layouts {
+      let rows = KeyboardGuideModel.rows(for: layout)
+      XCTAssertEqual(rows[0].count, 13, "\(layout) number row")
+      XCTAssertEqual(rows[1].count, 13, "\(layout) top row")
+      XCTAssertEqual(rows[0][0].legend(
+        style: .dynamic, modifierFlags: [], capsLockEnabled: false), "`")
+      XCTAssertEqual(rows[0][0].legend(
+        style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), "~")
+      XCTAssertEqual(rows[1].last?.legend(
+        style: .dynamic, modifierFlags: [], capsLockEnabled: false), "\\")
+      XCTAssertEqual(rows[1].last?.legend(
+        style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), "|")
+    }
+  }
+
+  func testRegionalGuidesPlaceEdgeKeysInPinnedRows() {
+    let brazilian = KeyboardGuideModel.rows(for: .brazilianABNT2)
+    XCTAssertEqual(brazilian[1].count, 12)
+    XCTAssertEqual(brazilian[2].count, 12)
+    XCTAssertEqual(brazilian[2].last?.legend(
+      style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), "}")
+
+    let belarusian = KeyboardGuideModel.rows(for: .belarusian)
+    XCTAssertEqual(belarusian.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(belarusian[1].last?.legend(
+      style: .dynamic, modifierFlags: [], capsLockEnabled: false), "\\")
+    XCTAssertEqual(belarusian[3][0].legend(
+      style: .dynamic, modifierFlags: [], capsLockEnabled: false), "я")
+
+    let estonian = KeyboardGuideModel.rows(for: .estonian)
+    XCTAssertEqual(estonian[1].count, 12)
+    XCTAssertEqual(estonian[2].count, 12)
+    XCTAssertEqual(estonian[2].last?.legend(
+      style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), "*")
+
+    let turkish = KeyboardGuideModel.rows(for: .turkishQ)
+    XCTAssertEqual(turkish.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(turkish[1].last?.legend(
+      style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), ";")
+    XCTAssertEqual(turkish[3][0].legend(
+      style: .dynamic, modifierFlags: [], capsLockEnabled: false), "z")
   }
 
   func testDvorakAndSwedishColemakGuidesShowPinnedISOSymbols() {

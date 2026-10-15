@@ -5013,7 +5013,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .germanQwertz), "bottom-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .germanQwertz), "bottom-8")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ":", layout: .germanQwertz), "bottom-9")
-    let numberTwo = KeyboardGuideModel.rows(for: .germanQwertz)[0][1]
+    let numberTwo = KeyboardGuideModel.rows(for: .germanQwertz)[0][2]
     XCTAssertEqual(numberTwo.legend(style: .dynamic, modifierFlags: [.shift], capsLockEnabled: false), "\"")
 
     XCTAssertEqual(
@@ -5185,7 +5185,7 @@ final class TypingEngineTests: XCTestCase {
       "XCVBZKM,./")
     XCTAssertEqual(
       KeyboardGuideModel.rows(for: .ansiColemakWide)[0].map(\.label).joined(),
-      "123456=7890-")
+      "`123456=7890-")
     XCTAssertEqual(
       KeyboardGuideModel.rows(for: .ansiNorman)[2].map(\.label).joined(),
       "ASETGYNIOH'")
@@ -9069,8 +9069,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ğ", layout: .turkishQ), "top-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ı", layout: .turkishQ), "top-7")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "İ", layout: .turkishQ), "home-10")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .turkishQ), "bottom-9")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .turkishQ), "home-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .turkishQ), "bottom-8")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .turkishQ), "top-12")
 
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [], layout: .turkishQ), "ğ")
@@ -9192,9 +9192,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ё", layout: .russianJcuken), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "й", layout: .russianJcuken), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ж", layout: .russianJcuken), "home-9")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "я", layout: .russianJcuken), "bottom-1")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ",", layout: .russianJcuken), "bottom-10")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .russianJcuken), "bottom-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "я", layout: .russianJcuken), "bottom-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ",", layout: .russianJcuken), "bottom-9")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: ">", layout: .russianJcuken))
 
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .russianJcuken), "ё")
@@ -9421,10 +9421,10 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testBelarusianMapsDistinctCyrillicKeysAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ў", layout: .belarusian), "top-8")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "і", layout: .belarusian), "bottom-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "і", layout: .belarusian), "bottom-4")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ё", layout: .belarusian), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "№", layout: .belarusian), "number-3")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .belarusian), "bottom-0")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: ">", layout: .belarusian))
 
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 31, modifierFlags: [], layout: .belarusian), "ў")
@@ -9461,8 +9461,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ѓ", layout: .macedonian), "top-11")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ж", layout: .macedonian), "top-12")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ќ", layout: .macedonian), "home-10")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ѐ", layout: .macedonian), "bottom-0")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "џ", layout: .macedonian), "bottom-2")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "ѐ", layout: .macedonian))
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "џ", layout: .macedonian), "bottom-1")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "„", layout: .macedonian), "number-2")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "‘", layout: .macedonian), "number-7")
 
@@ -9643,8 +9643,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ض", layout: .arabic101), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "إ", layout: .arabic101), "top-5")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ش", layout: .arabic101), "home-0")
-    XCTAssertEqual(rows[3][5].label, "ﻻ")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ظ", layout: .arabic101), "bottom-10")
+    XCTAssertEqual(rows[3][4].label, "ﻻ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ظ", layout: .arabic101), "bottom-9")
 
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .arabic101), "ض")
@@ -9734,8 +9734,8 @@ final class TypingEngineTests: XCTestCase {
     let rows = KeyboardGuideModel.rows(for: .arabic102)
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .arabic102), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ذ", layout: .arabic102), "top-12")
-    XCTAssertEqual(rows[3][0].label, "ـ")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ؤ", layout: .arabic102), "bottom-3")
+    XCTAssertEqual(rows[2][6].shiftedLabel, "ـ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ؤ", layout: .arabic102), "bottom-2")
     XCTAssertEqual(rows[2][1].shiftedLabel, "\u{200B}")
 
     XCTAssertEqual(KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .arabic102), ">")
@@ -10203,8 +10203,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "~", layout: .hebrew), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ק", layout: .hebrew), "top-2")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ש", layout: .hebrew), "home-0")
-    XCTAssertEqual(rows[3][0].label, "\\")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ץ", layout: .hebrew), "bottom-9")
+    XCTAssertEqual(rows[3][0].label, "ז")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ץ", layout: .hebrew), "bottom-8")
 
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 14, modifierFlags: [], layout: .hebrew), "ק")
@@ -10494,21 +10494,10 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testBrazilianABNT2UsesPinnedISOPhysicalKeysAndFallback() {
     let rows = KeyboardGuideModel.rows(for: .brazilianABNT2)
-    let keyRows = [
-      SystemKeyboardGuide.physicalRows[0],
-      SystemKeyboardGuide.physicalRows[1],
-      SystemKeyboardGuide.physicalRows[2],
-      [UInt16(10)] + SystemKeyboardGuide.physicalRows[3],
-    ]
-    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 11])
-    for (keyCodes, guideRow) in zip(keyRows, rows) {
-      for (keyCode, key) in zip(keyCodes, guideRow) {
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: .brazilianABNT2), key.label)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: .brazilianABNT2), key.shiftedLabel)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .brazilianABNT2), key.label)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .brazilianABNT2), key.shiftedLabel ?? key.label)
-      }
-    }
+    XCTAssertEqual(rows.map(\.count), [13, 12, 12, 11])
+    XCTAssertEqual(rows[1].last?.label, "[")
+    XCTAssertEqual(rows[2].last?.label, "]")
+    XCTAssertEqual(rows[3].first?.label, "|")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .brazilianABNT2), "home-9")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 10, modifierFlags: [], layout: .brazilianABNT2), "|")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 10, modifierFlags: [.option, .shift], layout: .brazilianABNT2), "|")

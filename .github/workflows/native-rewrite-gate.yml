@@ -96,7 +96,12 @@ jobs:
           set -euo pipefail
           test_log="$(mktemp "${RUNNER_TEMP}/typebar-client-tests.XXXXXX.log")"
           test_status=0
-          TYPEBAR_QA_IN_MEMORY_STORE=1 swift test >"$test_log" 2>&1 || test_status=$?
+          env \
+            TYPEBAR_QA_IN_MEMORY_STORE=1 \
+            TYPEBAR_LAYOUT_AUDIT_REFERENCE="${{ steps.reference.outputs.path }}" \
+            TYPEBAR_LAYOUT_AUDIT_ALL_LAYERS=1 \
+            TYPEBAR_LAYOUT_GUIDE_AUDIT_REFERENCE="${{ steps.reference.outputs.path }}" \
+            swift test >"$test_log" 2>&1 || test_status=$?
           cat "$test_log"
           if [[ "$test_status" -ne 0 ]]; then
             xctest_failures="$(grep -E 'Test Case .+ (failed|threw an error)' "$test_log" | tail -n 5 || true)"
