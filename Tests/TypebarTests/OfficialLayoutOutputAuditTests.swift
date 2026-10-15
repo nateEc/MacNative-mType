@@ -186,6 +186,32 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     }
   }
 
+  func testOfficialPersianStandardUsesPinnedANSIRowsAndSingleLayerFallback() {
+    let mapping = KeyboardInputMapping.builtIn(.persianStandard)
+    let rows = KeyboardGuideModel.rows(for: .persianStandard)
+    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(rows[0][0].label, "\u{0060}")
+    XCTAssertEqual(rows[0][4].shiftedLabel, "۴")
+    XCTAssertEqual(rows[1][11].shiftedLabel, "}")
+    XCTAssertEqual(rows[1][12].shiftedLabel, "{")
+    XCTAssertEqual(rows[3][9].shiftedLabel, "?")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 50, modifierFlags: [], mapping: mapping), "\u{0060}")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 21, modifierFlags: [.option, .shift], mapping: mapping), "۴")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 30, modifierFlags: .shift, mapping: mapping), "}")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 42, modifierFlags: .shift, mapping: mapping), "{")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 11, modifierFlags: .shift, mapping: mapping), "ذ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 44, modifierFlags: .shift, mapping: mapping), "?")
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 10, modifierFlags: [], mapping: mapping))
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "\u{200D}", layout: .persianStandard))
+  }
+
   func testMacedonianQuestionMarkShiftMatchesOfficialLayout() {
     let lastKey = KeyboardGuideModel.rows(for: .macedonian)[3].last
     XCTAssertEqual(lastKey?.label, "/")

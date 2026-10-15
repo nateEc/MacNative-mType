@@ -13,7 +13,7 @@
 
 ### 逐键验证现状（2026-10-15）
 
-2026-10-15 本地待推送的五布局纠偏：Pashto、Hindi InScript、Thai Pattachote、Arabic (macOS)、Whix2 与固定原版分别差 90、48、46、36、28 个四层输出；本次以独立原生映射、可见键盘提示及 Whix2 实际空格输入事件修正，5 × 192 个参考比较点全部通过。全局四层差分由上一批的 361/46,060 降为 113/46,060，分布于 16 布局：85 处显式值不同、28 处仍交给 macOS。五个已保存布局 ID 和数据格式不变，但升级后的键位字符会改变；旧二进制可恢复旧语义。真人键盘、IME、Option 图例与完整 UI 尚未验收，不能把逐键文本差分等同于全功能验收。
+2026-10-15 本地待推送的六布局纠偏：Pashto、Hindi InScript、Thai Pattachote、Arabic (macOS)、Whix2、Persian Standard 与固定原版分别差 90、48、46、36、28、14 个四层输出；本次以独立原生映射、可见键盘提示、Whix2 实际空格输入事件及 Persian Standard ANSI 额外键边界修正，6 × 192 个参考比较点全部通过。全局四层差分由上一批的 361/46,060 降为 99/46,060，分布于 15 布局：71 处显式值不同、28 处仍交给 macOS。六个已保存布局 ID 和数据格式不变，但升级后的键位字符会改变；旧二进制可恢复旧语义。真人键盘、IME、Option 图例与完整 UI 尚未验收，不能把逐键文本差分等同于全功能验收。
 
 2026-10-15 上一批已推送（提交 56143f7）的四层输入修正：固定源码 `layout-emulator.ts` 的显式布局在 Option/AltGr 层不存在或为空时，回退到同一物理键的 Base/Shift；普通 Space 也由布局模拟输出。原生现仅对 239 个固定官方布局应用该回退，系统输入、自定义布局、Typebar 专属五项和旧 CRULP 维持原路径；已明确保留 Optimot 的非文本删除键。固定 239 布局中仅 13 项定义第三层，源码只读检查守卫这项分类；其余布局不再沿用旧 macOS Option 符号。ABNT2 按原版 ISO 键码表将 `|` 与 `/` 放回对应实体键，并移除原版未映射的额外键码 `94`；这会改变旧 Typebar 的 ABNT2 键位行为，但不改变持久化 ID。官方 QWERTY 在修正前为 98/192 处差异，修正后 192 项全过；ABNT2 196 项全过。完整四层差分由 15,404/46,060 降为 361/46,060，仍有 21 个布局未通过，其中 333 处显式值不同、28 处仍交给 macOS。此变化会改变已保存官方内置布局的 Option 输入行为，但不改变保存 ID 或数据格式；旧二进制回退会恢复旧行为，真人输入法、设备和 UI 图例尚未验收。
 
@@ -21,14 +21,14 @@
 
 | 布局 | 差异数 | 布局 | 差异数 |
 | --- | ---: | --- | ---: |
-| `azerty` | 23 | `persian_standard` | 14 |
-| `tamil99` | 12 | `arabic_102` | 10 |
-| `ukrainian` | 10 | `arabic_101` | 8 |
-| `colemak_dh_iso_wide` | 6 | `colemak_dh_wide` | 4 |
-| `estonian` | 4 | `hebrew` | 4 |
-| `latam_qwerty` | 4 | `optimot` | 4 |
-| `turkish_f` | 4 | `mongolian` | 2 |
-| `persian_farsi` | 2 | `polish_programmers` | 2 |
+| `azerty` | 23 | `tamil99` | 12 |
+| `arabic_102` | 10 | `ukrainian` | 10 |
+| `arabic_101` | 8 | `colemak_dh_iso_wide` | 6 |
+| `colemak_dh_wide` | 4 | `estonian` | 4 |
+| `hebrew` | 4 | `latam_qwerty` | 4 |
+| `optimot` | 4 | `turkish_f` | 4 |
+| `mongolian` | 2 | `persian_farsi` | 2 |
+| `polish_programmers` | 2 | — | — |
 
 `nativeExact` 的 239 项目前是布局身份及原生功能路径的覆盖声明，**不是逐键输出已全部验证通过**。只读差分测试 `OfficialLayoutOutputAuditTests.testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation` 在设置 `TYPEBAR_LAYOUT_AUDIT_REFERENCE` 为上述固定 checkout 路径时，比较原版布局模拟器实际消费的键位 JSON 与原生物理键模拟；不设置时跳过，不会下载或打包上游数据。`TYPEBAR_LAYOUT_AUDIT_ONLY` 可限于一个官方 ID；`TYPEBAR_LAYOUT_AUDIT_ALL_LAYERS=1` 还验证 Base、Shift、Option、Shift+Option 和实体 Space，按原版缺层回退规则计算期望值。该测试要求差异为零，除已验证的定点布局外目前仍失败，不能作为全布局绿色验收引用。
 

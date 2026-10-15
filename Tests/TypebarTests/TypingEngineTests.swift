@@ -9557,32 +9557,32 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testPersianStandardMapsArabicScriptLayersAndPersists() {
+  func testPersianStandardUsesPinnedANSILayersAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .persianStandard)
-    XCTAssertEqual(rows[0][0].label, "ZWJ")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{200D}", layout: .persianStandard), "number-0")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "﷼", layout: .persianStandard), "number-4")
+    XCTAssertEqual(rows[0][0].label, "\u{0060}")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{0060}", layout: .persianStandard), "number-0")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "﷼", layout: .persianStandard))
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ض", layout: .persianStandard), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ؤ", layout: .persianStandard), "home-0")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ظ", layout: .persianStandard), "bottom-1")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{200C}", layout: .persianStandard), "bottom-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ظ", layout: .persianStandard), "bottom-0")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: "\u{200C}", layout: .persianStandard))
 
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .persianStandard), "ض")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.shift], layout: .persianStandard), "ْ")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 21, modifierFlags: [.shift], layout: .persianStandard), "﷼")
-    XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .persianStandard), "\\")
+      KeyboardLayoutEmulator.character(forKeyCode: 21, modifierFlags: [.shift], layout: .persianStandard), "۴")
+    XCTAssertNil(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .persianStandard))
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 9, modifierFlags: [.shift], layout: .persianStandard), "ٰ")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.shift], layout: .persianStandard), "\u{200C}")
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.shift], layout: .persianStandard), "ذ")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 45, modifierFlags: [.shift], layout: .persianStandard), "ٔ")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "پ", layout: .persianStandard), 46)
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "\u{200D}", layout: .persianStandard), 50)
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "\u{200D}", layout: .persianStandard))
     XCTAssertEqual(KeyboardInputLayout.persianStandard.emulatedLayout, .persianStandard)
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
