@@ -11,11 +11,29 @@
 - 其余名称统一标记为 `systemInputOrCustom`：可使用 macOS 当前输入源或用户自写键盘图，但不能宣称已有同名内置实现。
 - 清单只保留公开配置名称和 Typebar 自有枚举值；固定参考键位 JSON 仅用于审计可观察输入行为，不复制、打包或执行其中的数据文件、图例、代码或其他资产，产品映射由 Typebar 以独立 Swift 数据结构重新实现。
 
-### 逐键验证现状（2026-10-14）
+### 逐键验证现状（2026-10-15）
+
+2026-10-15 本地未推送的四层输入修正：固定源码 `layout-emulator.ts` 的显式布局在 Option/AltGr 层不存在或为空时，回退到同一物理键的 Base/Shift；普通 Space 也由布局模拟输出。原生现仅对 239 个固定官方布局应用该回退，系统输入、自定义布局、Typebar 专属五项和旧 CRULP 维持原路径；已明确保留 Optimot 的非文本删除键。固定 239 布局中仅 13 项定义第三层，源码只读检查守卫这项分类；其余布局不再沿用旧 macOS Option 符号。ABNT2 按原版 ISO 键码表将 `|` 与 `/` 放回对应实体键，并移除原版未映射的额外键码 `94`；这会改变旧 Typebar 的 ABNT2 键位行为，但不改变持久化 ID。官方 QWERTY 在修正前为 98/192 处差异，修正后 192 项全过；ABNT2 196 项全过。完整四层差分由 15,404/46,060 降为 361/46,060，仍有 21 个布局未通过，其中 333 处显式值不同、28 处仍交给 macOS。此变化会改变已保存官方内置布局的 Option 输入行为，但不改变保存 ID 或数据格式；旧二进制回退会恢复旧行为，真人输入法、设备和 UI 图例尚未验收。
+
+剩余四层文本差异按布局分布（同一固定参考与测试命令，可复测；非真人键盘验收）：
+
+| 布局 | 差异数 | 布局 | 差异数 |
+| --- | ---: | --- | ---: |
+| `pashto` | 90 | `hindi_inscript` | 48 |
+| `thai_pattachote` | 46 | `arabic_mac` | 36 |
+| `whix2` | 28 | `azerty` | 23 |
+| `persian_standard` | 14 | `tamil99` | 12 |
+| `arabic_102` | 10 | `ukrainian` | 10 |
+| `arabic_101` | 8 | `colemak_dh_iso_wide` | 6 |
+| `colemak_dh_wide` | 4 | `estonian` | 4 |
+| `hebrew` | 4 | `latam_qwerty` | 4 |
+| `optimot` | 4 | `turkish_f` | 4 |
+| `mongolian` | 2 | `persian_farsi` | 2 |
+| `polish_programmers` | 2 | — | — |
 
 `nativeExact` 的 239 项目前是布局身份及原生功能路径的覆盖声明，**不是逐键输出已全部验证通过**。只读差分测试 `OfficialLayoutOutputAuditTests.testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation` 在设置 `TYPEBAR_LAYOUT_AUDIT_REFERENCE` 为上述固定 checkout 路径时，比较原版布局模拟器实际消费的键位 JSON 与原生物理键模拟；不设置时跳过，不会下载或打包上游数据。`TYPEBAR_LAYOUT_AUDIT_ONLY` 可限于一个官方 ID；`TYPEBAR_LAYOUT_AUDIT_ALL_LAYERS=1` 还验证 Base、Shift、Option、Shift+Option 和实体 Space，按原版缺层回退规则计算期望值。该测试要求差异为零，除已验证的定点布局外目前仍失败，不能作为全布局绿色验收引用。
 
-修复前述 ANSI／ISO 键位与 Norwegian 首键，并将官方 `urdu_phonetic` 指向独立精确入口后，旧口径的 22,444 个 Base／显式 Shift 比较点尚有 142 处差异，分布于 20 个布局：129 处显式输出不同，13 处回退 macOS。更完整的四层口径涵盖 46,060 个比较点，尚有 15,404 处差异，分布于 232 个布局：603 处显式输出不同，14,801 处本地未接管而交给 macOS。后者大多由原版在显式模拟时使用 Base／Shift 回退、Typebar 当前却让 Option 交给系统处理造成，不能冒称 239 项已完成四层兼容；也不能不经实际事件验证便把每个 nil 都断定为不同的最终输入字符。官方 Urdu 的 48 个可触达键 × 四层共 192 项已在固定源码定点对照中通过；旧 CRULP 以原始持久化 ID 保留。全局 Option 策略、真实 IME／实体键盘及其余差异仍待逐项修复与验收。
+上一轮基线（本次四层回退修正前）：修复前述 ANSI／ISO 键位与 Norwegian 首键，并将官方 `urdu_phonetic` 指向独立精确入口后，22,444 个 Base／显式 Shift 比较点尚有 142 处差异，分布于 20 个布局：129 处显式输出不同，13 处回退 macOS。四层口径涵盖 46,060 个比较点，当时有 15,404 处差异，分布于 232 个布局：603 处显式输出不同，14,801 处本地未接管而交给 macOS。该数字已由上段的新测量取代；也不能不经实际事件验证便把每个 nil 都断定为不同的最终输入字符。官方 Urdu 的 48 个可触达键 × 四层共 192 项已在固定源码定点对照中通过；旧 CRULP 以原始持久化 ID 保留。真实 IME／实体键盘及其余差异仍待逐项修复与验收。
 
 ## 当前覆盖
 

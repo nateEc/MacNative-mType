@@ -1518,11 +1518,6 @@ enum OfficialLayoutCommandTarget: Equatable {
 /// layouts remain available in Settings without masquerading as reference
 /// command choices.
 enum OfficialLayoutCommandCatalog {
-    private static let typebarOnlyLayouts: Set<KeyboardLayout> = [
-        .nordicQwerty, .hungarianQwertz, .greekAlphabetic, .bulgarianCyrillic,
-        .serbianCyrillic, .urduPhonetic,
-    ]
-
     private static let aliases: [String: KeyboardLayout] = [
         "qwerty": .ansiQwerty,
         "dvorak": .ansiDvorak,
@@ -1624,7 +1619,7 @@ enum OfficialLayoutCommandCatalog {
                 "input", "layout", "default", "输入", "布局", "关闭", "系统当前输入源",
             ], group: .settings)
         let layouts = KeyboardLayout.allCases.compactMap { layout -> CommandPaletteItem? in
-            guard !typebarOnlyLayouts.contains(layout) else { return nil }
+            guard layout.isPinnedOfficialLayout else { return nil }
             let officialName = officialNameByLayout[layout] ?? layout.rawValue
             return CommandPaletteItem(
                 id: "input.layout.\(officialName)", title: "模拟布局：\(layout.displayName)",
@@ -1642,7 +1637,7 @@ enum OfficialLayoutCommandCatalog {
         if officialName == "default" { return .system }
         if let layout = aliases[officialName] { return .builtIn(layout) }
         guard let layout = KeyboardLayout(rawValue: officialName),
-            !typebarOnlyLayouts.contains(layout)
+            layout.isPinnedOfficialLayout
         else { return nil }
         return .builtIn(layout)
     }

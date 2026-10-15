@@ -250,6 +250,32 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
 
   var id: Self { self }
 
+  /// The pinned Monkeytype layout namespace excludes Typebar-only choices and
+  /// the persisted CRULP variant, which predates its distinct official entry.
+  var isPinnedOfficialLayout: Bool {
+    switch self {
+    case .nordicQwerty, .hungarianQwertz, .greekAlphabetic,
+      .bulgarianCyrillic, .serbianCyrillic, .urduPhonetic:
+      false
+    default:
+      true
+    }
+  }
+
+  /// Only these pinned layouts declare any third key variant in the source
+  /// schema. Other built-ins may have native macOS Option legends, but those
+  /// legends do not belong to Monkeytype's explicit input-layout contract.
+  var hasPinnedAltGrLayer: Bool {
+    switch self {
+    case .frenchAzerty, .frenchAzertyAFNOR, .frenchBepo, .frenchBepoAFNOR,
+      .statica3x5, .vestnik, .polishProgrammers, .ukrainianJcuken,
+      .optimot, .ergopti, .rulemak, .gralmakS, .armenianHMQwerty:
+      true
+    default:
+      false
+    }
+  }
+
   var displayName: String {
     switch self {
     case .ansiQwerty: "ANSI QWERTY"
@@ -3366,10 +3392,10 @@ enum KeyboardGuideModel {
           shiftedOptionLabels: ["Æ", "§", "Ð", "◊", "˝", "Ħ", "&", "", "Ł", "ő", "^"]
         ),
         layeredRow(
-          "bottom", labels: ["\\", "z", "x", "c", "v", "b", "n", "m", ",", ".", ";", "/"],
-          shiftedLabels: ["|", "Z", "X", "C", "V", "B", "N", "M", "<", ">", ":", "?"],
-          optionLabels: ["∏", "Ω", "≈", "₢", "ʋ", "∫", "ŋ", "µ", "≤", "≥", "…", "°"],
-          shiftedOptionLabels: ["ă", "<", ">", "©", "Ʋ", "™", "Ŋ", "µ", "«", "»", "…", "¿"]
+          "bottom", labels: ["|", "z", "x", "c", "v", "b", "n", "m", ",", ".", "/"],
+          shiftedLabels: ["|", "Z", "X", "C", "V", "B", "N", "M", "<", ">", "?"],
+          optionLabels: ["∏", "Ω", "≈", "₢", "ʋ", "∫", "ŋ", "µ", "≤", "≥", "…"],
+          shiftedOptionLabels: ["ă", "<", ">", "©", "Ʋ", "™", "Ŋ", "µ", "«", "»", "…"]
         ),
       ]
     case .latinAmericanQwerty:

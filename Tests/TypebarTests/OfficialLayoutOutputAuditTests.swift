@@ -47,6 +47,50 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 42, modifierFlags: .shift, mapping: .builtIn(.ansiQwerty)), "|")
   }
 
+  func testOfficialOptionFallbackDoesNotChangeSystemCustomLegacyOrActionKeys() {
+    let qwerty = KeyboardInputMapping.builtIn(.ansiQwerty)
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 12, modifierFlags: .option, mapping: qwerty), "q")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 12, modifierFlags: [.option, .shift], mapping: qwerty), "Q")
+    for flags: NSEvent.ModifierFlags in [[], .shift, .option, [.option, .shift]] {
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: 49, modifierFlags: flags, mapping: qwerty), " ")
+    }
+
+    let optimot = KeyboardInputMapping.builtIn(.optimot)
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 22, modifierFlags: .option, mapping: optimot), "×")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 22, modifierFlags: [.option, .shift], mapping: optimot), "6")
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 11, modifierFlags: .option, mapping: optimot))
+    XCTAssertTrue(KeyboardLayoutEmulator.performsBackwardDelete(
+      forKeyCode: 11, modifierFlags: .option, mapping: optimot))
+
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 29, modifierFlags: .option, mapping: .builtIn(.whix2)), "")
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 42, modifierFlags: .option, mapping: .builtIn(.urduPhonetic)))
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 12, modifierFlags: .option, mapping: .system))
+    let custom = CustomKeyboardGuideLayout(
+      name: "Custom", numberRow: "1", topRow: "q", homeRow: "a", bottomRow: "z")
+    XCTAssertNil(KeyboardLayoutEmulator.text(
+      forKeyCode: 12, modifierFlags: .option, mapping: .custom(custom)))
+  }
+
+  func testOfficialTwoLayerLayoutsIgnoreNativeMacOnlyOptionSymbols() {
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 12, modifierFlags: .option, mapping: .builtIn(.brazilianABNT2)), "q")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 12, modifierFlags: [.option, .shift], mapping: .builtIn(.brazilianABNT2)), "Q")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: .option, mapping: .builtIn(.dvorakLeft)), "[")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: [.option, .shift], mapping: .builtIn(.dvorakLeft)), "{")
+  }
+
   func testMacedonianQuestionMarkShiftMatchesOfficialLayout() {
     let lastKey = KeyboardGuideModel.rows(for: .macedonian)[3].last
     XCTAssertEqual(lastKey?.label, "/")
@@ -241,6 +285,10 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       let native = try XCTUnwrap(KeyboardLayout(rawValue: rawValue))
       let sourceURL = reference.appendingPathComponent("frontend/static/layouts/\(officialID).json")
       let source = try JSONDecoder().decode(ReferenceLayout.self, from: Data(contentsOf: sourceURL))
+      let sourceHasAltGr = [
+        source.keys.row1, source.keys.row2, source.keys.row3, source.keys.row4, source.keys.row5,
+      ].joined().contains { $0.count > 2 }
+      XCTAssertEqual(native.hasPinnedAltGrLayer, sourceHasAltGr, "\(officialID) AltGr declaration")
       var codes: [[UInt16]]
       switch source.type {
       case "ansi":

@@ -5110,15 +5110,15 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testDvorakSingleHandedLayoutsMapAllMacSystemLayersAndPersist() {
+  func testDvorakSingleHandedLayoutsUsePinnedOptionFallbackAndPersist() {
     for layout in [KeyboardLayout.dvorakLeft, .dvorakRight] {
       let rows = KeyboardGuideModel.rows(for: layout)
       for (keyCodes, guideRow) in zip(SystemKeyboardGuide.physicalRows, rows) {
         for (keyCode, key) in zip(keyCodes, guideRow) {
           XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: layout), key.label)
           XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: layout), key.shiftedLabel)
-          XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: layout), key.optionLabel)
-          XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: layout), key.shiftedOptionLabel)
+          XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: layout), key.label)
+          XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: layout), key.shiftedLabel ?? key.label)
         }
       }
 
@@ -5138,14 +5138,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "p", layout: .dvorakLeft), "number-4")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "p", layout: .dvorakRight), "number-9")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [], layout: .dvorakLeft), "[")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [.option], layout: .dvorakLeft), "“")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [.option], layout: .dvorakLeft), "[")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [], layout: .dvorakRight), "1")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 41, modifierFlags: [], layout: .dvorakLeft), "8")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 41, modifierFlags: [], layout: .dvorakRight), "k")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "p", layout: .dvorakLeft), 21)
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "p", layout: .dvorakRight), 25)
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 1, modifierFlags: [.option, .shift], layout: .dvorakLeft), "")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 41, modifierFlags: [.option, .shift], layout: .dvorakRight), "")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 1, modifierFlags: [.option, .shift], layout: .dvorakLeft), "K")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 41, modifierFlags: [.option, .shift], layout: .dvorakRight), "K")
   }
 
   @MainActor
@@ -5482,11 +5482,11 @@ final class TypingEngineTests: XCTestCase {
             key.shiftedLabel)
           XCTAssertEqual(
             KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: layout),
-            key.optionLabel)
+            key.optionLabel.flatMap { $0.isEmpty ? nil : $0 } ?? key.label)
           XCTAssertEqual(
             KeyboardLayoutEmulator.text(
               forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: layout),
-            key.shiftedOptionLabel)
+            key.shiftedOptionLabel.flatMap { $0.isEmpty ? nil : $0 } ?? key.shiftedLabel ?? key.label)
         }
       }
     }
@@ -5497,7 +5497,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: [.option, .shift], layout: .frenchAzertyAFNOR), " ")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 17, modifierFlags: [.option, .shift], layout: .frenchBepo), "`")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 46, modifierFlags: [.option, .shift], layout: .frenchBepo), "̊")
-    XCTAssertNil(KeyboardLayoutEmulator.text(forKeyCode: 16, modifierFlags: [.option, .shift], layout: .frenchBepo))
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 16, modifierFlags: [.option, .shift], layout: .frenchBepo), "!")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: [], layout: .frenchBepo), " ")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "å", layout: .swedishColemak), "top-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ä", layout: .swedishDvorak), "top-1")
@@ -5567,12 +5567,12 @@ final class TypingEngineTests: XCTestCase {
         XCTAssertEqual(
           KeyboardLayoutEmulator.text(
             forKeyCode: keyCode, modifierFlags: [.option], layout: .frenchBepoAFNOR),
-          key.optionLabel)
+          key.optionLabel.flatMap { $0.isEmpty ? nil : $0 } ?? key.label)
         XCTAssertEqual(
           KeyboardLayoutEmulator.text(
             forKeyCode: keyCode, modifierFlags: [.option, .shift],
             layout: .frenchBepoAFNOR),
-          key.shiftedOptionLabel)
+          key.shiftedOptionLabel.flatMap { $0.isEmpty ? nil : $0 } ?? key.shiftedLabel ?? key.label)
       }
     }
 
@@ -5584,9 +5584,9 @@ final class TypingEngineTests: XCTestCase {
       KeyboardLayoutEmulator.text(
         forKeyCode: 31, modifierFlags: [.option, .shift], layout: .frenchBepoAFNOR),
       "£")
-    XCTAssertNil(
+    XCTAssertEqual(
       KeyboardLayoutEmulator.text(
-        forKeyCode: 35, modifierFlags: [.option], layout: .frenchBepoAFNOR))
+        forKeyCode: 35, modifierFlags: [.option], layout: .frenchBepoAFNOR), "j")
     XCTAssertEqual(
       KeyboardLayoutEmulator.text(
         forKeyCode: 49, modifierFlags: [], layout: .frenchBepoAFNOR),
@@ -6977,7 +6977,7 @@ final class TypingEngineTests: XCTestCase {
         KeyboardGuideModel.bottomRow(for: .minimal, layout: layout).map(\.label), thumbLabels)
       XCTAssertEqual(
         KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: [], layout: layout),
-        physicalSpaceOutput)
+        physicalSpaceOutput ?? " ")
 
       for (keyCodes, guideRow) in zip(ansiRows, guideRows) {
         for (keyCode, key) in zip(keyCodes, guideRow) {
@@ -8124,10 +8124,10 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(
         KeyboardGuideModel.bottomRow(for: .minimal, layout: layout).map(\.label), thumbLabels)
       for (flags, expectedOutput) in [
-        (NSEvent.ModifierFlags(), spaceOutput),
-        (NSEvent.ModifierFlags.shift, spaceOutput?.uppercased()),
-        (NSEvent.ModifierFlags.option, spaceOutput),
-        ([NSEvent.ModifierFlags.option, .shift], spaceOutput?.uppercased()),
+        (NSEvent.ModifierFlags(), spaceOutput ?? " "),
+        (NSEvent.ModifierFlags.shift, (spaceOutput ?? " ").uppercased()),
+        (NSEvent.ModifierFlags.option, spaceOutput ?? " "),
+        ([NSEvent.ModifierFlags.option, .shift], (spaceOutput ?? " ").uppercased()),
       ] {
         XCTAssertEqual(
           KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: flags, layout: layout),
@@ -8577,7 +8577,10 @@ final class TypingEngineTests: XCTestCase {
             XCTAssertNil(output)
             XCTAssertTrue(guide.characters.isEmpty)
           } else {
-            XCTAssertEqual(output, expected[rowIndex][keyIndex])
+            let fallback = flags.contains(.shift)
+              ? shifted[rowIndex][keyIndex] : normal[rowIndex][keyIndex]
+            XCTAssertEqual(output,
+              expected[rowIndex][keyIndex].flatMap { $0.isEmpty ? nil : $0 } ?? fallback)
           }
         }
       }
@@ -9707,7 +9710,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testArabicMacMapsSystemLayersSuppressesUnassignedShiftAndPersists() {
+  func testArabicMacUsesPinnedFallbackAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .arabicMac)
     XCTAssertEqual(rows[0][0].label, "ـ")
     XCTAssertNil(rows[0][0].shiftedLabel)
@@ -9720,13 +9723,13 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 18, modifierFlags: [], layout: .arabicMac), "١")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 19, modifierFlags: [.option, .shift], layout: .arabicMac), "❊")
+      KeyboardLayoutEmulator.character(forKeyCode: 19, modifierFlags: [.option, .shift], layout: .arabicMac), "@")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [.option, .shift], layout: .arabicMac), "ک")
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [.option, .shift], layout: .arabicMac), ":")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.text(forKeyCode: 3, modifierFlags: [.shift], layout: .arabicMac), "")
+      KeyboardLayoutEmulator.text(forKeyCode: 3, modifierFlags: [.shift], layout: .arabicMac), "ب")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ة", layout: .arabicMac), 30)
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ژ", layout: .arabicMac), 11)
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "ژ", layout: .arabicMac))
     XCTAssertEqual(KeyboardInputLayout.arabicMac.emulatedLayout, .arabicMac)
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -9839,8 +9842,8 @@ final class TypingEngineTests: XCTestCase {
       KeyboardLayoutEmulator.character(forKeyCode: 26, modifierFlags: [.shift], layout: .thaiKedmanee), "฿")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 44, modifierFlags: [], layout: .thaiKedmanee), "ฝ")
-    XCTAssertNil(
-      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.option], layout: .thaiKedmanee))
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.option], layout: .thaiKedmanee), "ๆ")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "โ", layout: .thaiKedmanee), 3)
     XCTAssertEqual(KeyboardInputLayout.thaiKedmanee.emulatedLayout, .thaiKedmanee)
 
@@ -9886,8 +9889,8 @@ final class TypingEngineTests: XCTestCase {
       KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], layout: .thaiPattachote), "฿")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 38, modifierFlags: [.shift], layout: .thaiPattachote), "ผ")
-    XCTAssertNil(
-      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.option], layout: .thaiPattachote))
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.option], layout: .thaiPattachote), "็")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "โ", layout: .thaiPattachote), 37)
     XCTAssertEqual(KeyboardInputLayout.thaiPattachote.emulatedLayout, .thaiPattachote)
 
@@ -9942,9 +9945,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
         forKeyCode: 33, modifierFlags: [.shift], layout: .japaneseHiragana), "「")
-    XCTAssertNil(
+    XCTAssertEqual(
       KeyboardLayoutEmulator.character(
-        forKeyCode: 12, modifierFlags: [.option], layout: .japaneseHiragana))
+        forKeyCode: 12, modifierFlags: [.option], layout: .japaneseHiragana), "た")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "む", layout: .japaneseHiragana), 42)
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "・", layout: .japaneseHiragana), 44)
     XCTAssertEqual(KeyboardInputLayout.japaneseHiragana.emulatedLayout, .japaneseHiragana)
@@ -9983,7 +9986,7 @@ final class TypingEngineTests: XCTestCase {
         XCTAssertEqual(
           KeyboardLayoutEmulator.text(
             forKeyCode: keyCode, modifierFlags: [.shift], layout: .hindiInscript),
-          key.shiftedLabel ?? "")
+          key.shiftedLabel?.isEmpty == false ? key.shiftedLabel : key.label)
       }
     }
 
@@ -9993,9 +9996,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardLayoutEmulator.text(forKeyCode: 6, modifierFlags: [], layout: .hindiInscript), "")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.text(forKeyCode: 9, modifierFlags: [.shift], layout: .hindiInscript), "")
-    XCTAssertNil(
-      KeyboardLayoutEmulator.text(forKeyCode: 12, modifierFlags: [.option], layout: .hindiInscript))
+      KeyboardLayoutEmulator.text(forKeyCode: 9, modifierFlags: [.shift], layout: .hindiInscript), "न")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 12, modifierFlags: [.option], layout: .hindiInscript), "ौ")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "क्ष", layout: .hindiInscript), 26)
     XCTAssertEqual(KeyboardInputLayout.hindiInscript.emulatedLayout, .hindiInscript)
 
@@ -10023,16 +10026,17 @@ final class TypingEngineTests: XCTestCase {
     for (keyCodes, guideRow) in zip(SystemKeyboardGuide.physicalRows, rows) {
       for (keyCode, key) in zip(keyCodes, guideRow) {
         XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: .tamil99), key.label)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: .tamil99), key.shiftedLabel ?? "")
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .tamil99), key.optionLabel)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .tamil99), key.shiftedOptionLabel)
+        let sourceShift = key.shiftedLabel.flatMap { $0.isEmpty ? nil : $0 } ?? key.label
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: .tamil99), sourceShift)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .tamil99), key.label)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .tamil99), sourceShift)
       }
     }
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 16, modifierFlags: [.shift], layout: .tamil99), "ஸ்ரீ")
     XCTAssertNil(KeyboardLayoutEmulator.character(forKeyCode: 16, modifierFlags: [.shift], layout: .tamil99))
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 4, modifierFlags: [.shift], layout: .tamil99), "")
-    XCTAssertNil(KeyboardLayoutEmulator.text(forKeyCode: 22, modifierFlags: [.option], layout: .tamil99))
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 22, modifierFlags: [.option, .shift], layout: .tamil99), "&")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 4, modifierFlags: [.shift], layout: .tamil99), "க")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 22, modifierFlags: [.option], layout: .tamil99), "6")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 22, modifierFlags: [.option, .shift], layout: .tamil99), "^")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "ஸ்ரீ", layout: .tamil99), 16)
     XCTAssertEqual(KeyboardInputLayout.tamil99.emulatedLayout, .tamil99)
 
@@ -10060,8 +10064,8 @@ final class TypingEngineTests: XCTestCase {
       for (keyCode, key) in zip(keyCodes, guideRow) {
         XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: .armenianHMQwerty), key.label)
         XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: .armenianHMQwerty), key.shiftedLabel)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .armenianHMQwerty), key.optionLabel)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .armenianHMQwerty), key.shiftedOptionLabel)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .armenianHMQwerty), key.optionLabel.flatMap { $0.isEmpty ? nil : $0 } ?? key.label)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .armenianHMQwerty), key.shiftedOptionLabel.flatMap { $0.isEmpty ? nil : $0 } ?? key.shiftedLabel ?? key.label)
       }
     }
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ք", layout: .armenianHMQwerty), 40)
@@ -10091,18 +10095,18 @@ final class TypingEngineTests: XCTestCase {
       for (keyCode, key) in zip(keyCodes, guideRow) {
         XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: .mongolianCyrillic), key.label)
         XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: .mongolianCyrillic), key.shiftedLabel)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .mongolianCyrillic), key.optionLabel)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .mongolianCyrillic), key.shiftedOptionLabel)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .mongolianCyrillic), key.label)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .mongolianCyrillic), key.shiftedLabel ?? key.label)
       }
     }
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ө", layout: .mongolianCyrillic), 3)
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "љ", layout: .mongolianCyrillic), 37)
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "љ", layout: .mongolianCyrillic))
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [], layout: .mongolianCyrillic), "№")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [.shift], layout: .mongolianCyrillic), "1")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 21, modifierFlags: [], layout: .mongolianCyrillic), "₮")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [], layout: .mongolianCyrillic), "¥")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.shift], layout: .mongolianCyrillic), "|")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.option], layout: .mongolianCyrillic), "\\")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.option], layout: .mongolianCyrillic), "¥")
     XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.option, .shift], layout: .mongolianCyrillic), "|")
     XCTAssertEqual(KeyboardInputLayout.mongolianCyrillic.emulatedLayout, .mongolianCyrillic)
 
@@ -10403,31 +10407,30 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testBrazilianABNT2MapsMacLayersAndBothExtraPhysicalKeys() {
+  func testBrazilianABNT2UsesPinnedISOPhysicalKeysAndFallback() {
     let rows = KeyboardGuideModel.rows(for: .brazilianABNT2)
     let keyRows = [
       SystemKeyboardGuide.physicalRows[0],
       SystemKeyboardGuide.physicalRows[1],
       SystemKeyboardGuide.physicalRows[2],
-      [UInt16(10)] + SystemKeyboardGuide.physicalRows[3] + [UInt16(94)],
+      [UInt16(10)] + SystemKeyboardGuide.physicalRows[3],
     ]
-    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 12])
+    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 11])
     for (keyCodes, guideRow) in zip(keyRows, rows) {
       for (keyCode, key) in zip(keyCodes, guideRow) {
         XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: .brazilianABNT2), key.label)
         XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: .brazilianABNT2), key.shiftedLabel)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .brazilianABNT2), key.optionLabel)
-        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .brazilianABNT2), key.shiftedOptionLabel)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .brazilianABNT2), key.label)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .brazilianABNT2), key.shiftedLabel ?? key.label)
       }
     }
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .brazilianABNT2), "home-9")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 10, modifierFlags: [], layout: .brazilianABNT2), "\\")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 10, modifierFlags: [.option, .shift], layout: .brazilianABNT2), "ă")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 94, modifierFlags: [], layout: .brazilianABNT2), "/")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 94, modifierFlags: [.shift], layout: .brazilianABNT2), "?")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 94, modifierFlags: [.option], layout: .brazilianABNT2), "°")
-    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 94, modifierFlags: [.option, .shift], layout: .brazilianABNT2), "¿")
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ă", layout: .brazilianABNT2), 10)
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 10, modifierFlags: [], layout: .brazilianABNT2), "|")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 10, modifierFlags: [.option, .shift], layout: .brazilianABNT2), "|")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 44, modifierFlags: [], layout: .brazilianABNT2), "/")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 44, modifierFlags: [.shift], layout: .brazilianABNT2), "?")
+    XCTAssertNil(KeyboardLayoutEmulator.text(forKeyCode: 94, modifierFlags: [], layout: .brazilianABNT2))
+    XCTAssertNil(KeyboardLayoutEmulator.keyCode(for: "ă", layout: .brazilianABNT2))
     XCTAssertEqual(KeyboardInputLayout.brazilianABNT2.emulatedLayout, .brazilianABNT2)
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -10485,9 +10488,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(
       KeyboardLayoutEmulator.character(
         forKeyCode: 0, modifierFlags: [], layout: KeyboardInputLayout.system.emulatedLayout))
-    XCTAssertNil(
+    XCTAssertEqual(
       KeyboardLayoutEmulator.character(
-        forKeyCode: 0, modifierFlags: [.option], layout: .ansiDvorak))
+        forKeyCode: 0, modifierFlags: [.option], layout: .ansiDvorak), "a")
   }
 
   func testKeyboardInputLayoutSeparatesSystemInputFromGuideAndPreservesLegacyChoices() {

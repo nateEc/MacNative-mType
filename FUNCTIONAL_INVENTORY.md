@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-15 `INP-01`／官方布局四层缺层回退（本地未推送）：固定源码显式布局在 Option/AltGr 无值时输出该实体键的 Base/Shift 值；原生此前对多数内置布局交给 macOS，QWERTY 192 个四层比较点中因此有 98 处不同。先行只读差分与独立边界测试均失败，现仅为 239 个官方内置布局补缺层和普通 Space，并共享官方目录身份判定；源码只读检查验证其中仅 13 项定义第三层，其余不再沿用 macOS 系统 Option 符号。系统、自定义、旧 CRULP、空键与 Optimot 删除动作保留各自合同。ABNT2 按固定源码 ISO 物理位置改正两键，并撤下原版未映射的额外键 `94`；旧 Typebar ABNT2 用户的对应键位行为会改变，保存 ID 不变。QWERTY 192 项与 ABNT2 196 项已全过；全局四层差分由 15,404/46,060 降为 361/46,060，仍跨 21 个布局，不冒称完成。官方布局已保存的 Option 输入将随升级改变而数据 ID 不变，真实输入法、视觉图例与 macOS 15 门禁另验；无原版资产进入产品。
+
 2026-10-15 远端门禁与布局目录核验：已推送的 `8ceb323` 在 macOS 15 的 [Native Rewrite Gate #803](https://github.com/nateEc/MacNative-mType/actions/runs/38566694298) 客户端执行 4,607 项、96 项按条件跳过，仅 `TapePromptRetirementTests.testActualSessionRetirementBlocksMissingHistoryWithoutErasingPromptInputOrReplay` 一项三处断言失败；服务和 Release 因门禁停止未执行。该测试在本机通过，远端未收到预期退休通知，原因仍未证实；现以最长 1 秒等待原本异步的真实通知，仍断言退休下界、提示输入与回放不丢失，不修改产品退休算法。新增官方 Urdu 身份使旧 CRULP 多出一个仅 Typebar 选项，已从官方命令目录排除，保留 Settings 与存档恢复；布局目录覆盖 7 项、固定参考 239 项清单和原创性边界通过。新测试与 macOS 15 修正结果待下一次合批推送验证，不能以本机结果宣称门禁通过。
 
 2026-10-14 官方 Urdu Phonetic 与四层审计增量（尚未推送）：固定原版 `layout-emulator.ts` 在显式布局模式下用键位 JSON 决定实际输入，单层键的 Shift 和无专用 AltGr 层的 Option 均回退该键的基础／Shift 字符。原 `urduPhonetic` 对应旧 CRULP 变体且被设置、归档及 Layout Fluid 持久化；为不悄悄重写旧用户键位，保留其原始 ID 和旧行为，新增 `urduPhoneticOfficial` 并把官方 `urdu_phonetic` 入口指向它。新入口与旧入口的独立键位、修饰层和持久化测试通过；固定源码 48 键 × 四层的 192 项定点对照通过。旧 Base／显式 Shift 差分现为 142/22,444；首次完整四层口径为 15,404/46,060，其中 14,801 项是原生未接管 Option／其他修饰路径。四层全布局验收远未完成，旧二进制读取新 ID 的降级行为、真人键盘和 IME 也未验证；不复制或打包上游布局资产。

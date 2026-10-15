@@ -83,6 +83,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(officialNames.count, fixture.officialCount)
     XCTAssertEqual(fixture.nativeExact.count, 239)
     XCTAssertEqual(fixture.nativeRelated.count, 0)
+    XCTAssertEqual(KeyboardLayout.allCases.filter(\.isPinnedOfficialLayout).count, fixture.officialCount)
     XCTAssertTrue(exactNames.isSubset(of: officialNames))
     XCTAssertTrue(relatedNames.isSubset(of: officialNames))
     XCTAssertTrue(exactNames.isDisjoint(with: relatedNames))
@@ -92,7 +93,8 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.unlistedPolicy, "systemInputOrCustom")
 
     for rawValue in Array(fixture.nativeExact.values) + Array(fixture.nativeRelated.values) {
-      XCTAssertNotNil(KeyboardLayout(rawValue: rawValue), "Unknown Typebar layout: \(rawValue)")
+      let layout = try XCTUnwrap(KeyboardLayout(rawValue: rawValue), "Unknown Typebar layout: \(rawValue)")
+      XCTAssertTrue(layout.isPinnedOfficialLayout, "Official mapping excluded: \(rawValue)")
     }
 
     let configAudit = try String(

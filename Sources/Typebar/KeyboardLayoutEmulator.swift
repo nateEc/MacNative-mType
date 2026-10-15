@@ -162,6 +162,29 @@ enum KeyboardLayoutEmulator {
   }
 
   private static func keys(for layout: KeyboardLayout) -> [UInt16: KeyLayers] {
+    let raw = rawKeys(for: layout)
+    guard layout.isPinnedOfficialLayout else { return raw }
+    var resolved = raw
+    for (keyCode, layers) in raw {
+      // The pinned emulator falls back from a missing/empty AltGr layer to
+      // Base or Shift, and from an empty Shift layer to Base. A key missing
+      // entirely still stays unmapped (notably Optimot's delete action).
+      let shifted = layers.shifted.isEmpty ? layers.normal : layers.shifted
+      let option = layout.hasPinnedAltGrLayer ? layers.option : nil
+      let shiftedOption = layout.hasPinnedAltGrLayer ? layers.shiftedOption : nil
+      resolved[keyCode] = .init(
+        normal: layers.normal, shifted: shifted,
+        option: option.flatMap { $0.isEmpty ? nil : $0 } ?? layers.normal,
+        shiftedOption: shiftedOption.flatMap { $0.isEmpty ? nil : $0 } ?? shifted)
+    }
+    // All pinned layouts without an explicit thumb output use ordinary Space.
+    if resolved[49] == nil {
+      resolved[49] = .init(normal: " ", shifted: " ", option: " ", shiftedOption: " ")
+    }
+    return resolved
+  }
+
+  private static func rawKeys(for layout: KeyboardLayout) -> [UInt16: KeyLayers] {
     switch layout {
     case .ansiQwerty:
       ansiQwertyKeys()
@@ -1749,7 +1772,7 @@ enum KeyboardLayoutEmulator {
           "50:'\" 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6¨ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
             + "12:qQ 13:wW 14:eE 15:rR 17:tT 16:yY 32:uU 34:iI 31:oO 35:pP 33:´` 30:[{ 42:]} "
             + "0:aA 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:çÇ 39:~^ "
-            + "10:\\| 6:zZ 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:,< 47:.> 44:;: 94:/?"
+            + "10:|| 6:zZ 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:,< 47:.> 44:/?"
         ),
         options: [
           50: ("`", "’"), 18: ("¹", "¡"), 19: ("²", "½"), 20: ("³", "¾"),
@@ -1763,7 +1786,7 @@ enum KeyboardLayoutEmulator {
           37: ("ł", "Ł"), 41: ("·", "ő"), 39: ("~", "^"),
           10: ("∏", "ă"), 6: ("Ω", "<"), 7: ("≈", ">"), 8: ("₢", "©"),
           9: ("ʋ", "Ʋ"), 11: ("∫", "™"), 45: ("ŋ", "Ŋ"), 46: ("µ", "µ"),
-          43: ("≤", "«"), 47: ("≥", "»"), 44: ("…", "…"), 94: ("°", "¿"),
+          43: ("≤", "«"), 47: ("≥", "»"), 44: ("…", "…"),
         ]
       )
     case .latinAmericanQwerty:
