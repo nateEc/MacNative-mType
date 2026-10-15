@@ -27,6 +27,16 @@ enum VirtualKeyboardOutputPolicy {
   }
 }
 
+enum VirtualKeyboardAccessibilityLabel {
+  static func label(for output: String, row: Int?, column: Int) -> String {
+    guard output == " " else { return "输入 \(output)" }
+    if let row {
+      return "输入空格（第\(row + 1)排第\(column + 1)键）"
+    }
+    return "输入空格（底排空格键）"
+  }
+}
+
 /// A mouse-accessible input surface. It follows the current native layout,
 /// while the ordinary keyboard guide remains a display-only hint.
 struct VirtualKeyboard: View {
@@ -62,14 +72,17 @@ struct VirtualKeyboard: View {
         VStack(spacing: 5) {
           ForEach(rows.indices, id: \.self) { rowIndex in
             HStack(spacing: 5) {
-              ForEach(rows[rowIndex]) { key in keyButton(key) }
+              ForEach(Array(rows[rowIndex].enumerated()), id: \.element.id) { columnIndex, key in
+                keyButton(key, row: rowIndex, column: columnIndex)
+              }
             }
           }
           HStack(spacing: 5) {
             modifierButton("⇧", active: shift) { shift.toggle() }
             modifierButton("⌥", active: option) { option.toggle() }
-            ForEach(KeyboardGuideModel.bottomRow(for: .minimal, layout: layout)) { key in
-              keyButton(key)
+            ForEach(Array(KeyboardGuideModel.bottomRow(for: .minimal, layout: layout).enumerated()),
+              id: \.element.id) { columnIndex, key in
+              keyButton(key, row: nil, column: columnIndex)
             }
             Button("退格", systemImage: "delete.left") {
               onDelete()
@@ -99,7 +112,7 @@ struct VirtualKeyboard: View {
   }
 
   @ViewBuilder
-  private func keyButton(_ key: KeyboardGuideKey) -> some View {
+  private func keyButton(_ key: KeyboardGuideKey, row: Int?, column: Int) -> some View {
     if let output = VirtualKeyboardOutputPolicy.output(for: key, shift: shift, option: option) {
       Button {
         press(output)
@@ -111,7 +124,8 @@ struct VirtualKeyboard: View {
       }
       .buttonStyle(.bordered)
       .controlSize(.small)
-      .accessibilityLabel(output == " " ? "输入空格" : "输入 \(output)")
+      .accessibilityLabel(VirtualKeyboardAccessibilityLabel.label(
+        for: output, row: row, column: column))
     }
   }
 

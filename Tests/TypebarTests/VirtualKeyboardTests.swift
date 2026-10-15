@@ -39,6 +39,36 @@ final class VirtualKeyboardTests: XCTestCase {
     }
   }
 
+  func testSpaceKeysHaveDistinctAccessibleNamesAcrossOfficialLayouts() {
+    for layout in KeyboardLayout.allCases {
+      let rows = KeyboardGuideModel.rows(for: layout)
+      let bottom = KeyboardGuideModel.bottomRow(for: .minimal, layout: layout)
+      for (shift, option) in [(false, false), (true, false), (false, true), (true, true)] {
+        var names: [String] = []
+        for (rowIndex, row) in rows.enumerated() {
+          for (columnIndex, key) in row.enumerated() {
+            if VirtualKeyboardOutputPolicy.output(for: key, shift: shift, option: option) == " " {
+              names.append(VirtualKeyboardAccessibilityLabel.label(
+                for: " ", row: rowIndex, column: columnIndex))
+            }
+          }
+        }
+        for (columnIndex, key) in bottom.enumerated() {
+          if VirtualKeyboardOutputPolicy.output(for: key, shift: shift, option: option) == " " {
+            names.append(VirtualKeyboardAccessibilityLabel.label(
+              for: " ", row: nil, column: columnIndex))
+          }
+        }
+        XCTAssertEqual(Set(names).count, names.count, "\(layout.displayName), shift=\(shift), option=\(option)")
+      }
+    }
+    XCTAssertEqual(VirtualKeyboardAccessibilityLabel.label(for: " ", row: 2, column: 11),
+      "输入空格（第3排第12键）")
+    XCTAssertEqual(VirtualKeyboardAccessibilityLabel.label(for: " ", row: nil, column: 0),
+      "输入空格（底排空格键）")
+    XCTAssertEqual(VirtualKeyboardAccessibilityLabel.label(for: "a", row: 1, column: 0), "输入 a")
+  }
+
   func testSelectedNonLatinLayoutKeepsItsOwnVisibleCharacters() throws {
     let keys = KeyboardGuideModel.rows(for: .russianJcuken).flatMap { $0 }
     let letter = try XCTUnwrap(keys.first(where: { $0.label == "Й" }))

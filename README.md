@@ -1149,7 +1149,7 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 上一阶段内置键盘图增至九十三种：新增 TypeHack、ISRT、ISRT Angle、Engram 与 Engrammer。五项均完整覆盖 47 个 ANSI Base/Shift 位置，TypeHack 与 Engram 保留非标准符号层，Engram 两项在精简提示中仍显示数字行；不复制、打包或运行参考布局资产
 - 上一阶段内置键盘图增至九十八种：新增 Semimak、Semimak JQ、Semimak JQC、Canary 与 Canary Matrix。五项均完整覆盖 47 个 ANSI Base/Shift 位置，并保留三种 Semimak 的 J/Q/C 差异和两种 Canary 的独立排列；不复制、打包或运行参考布局资产
 - 上一阶段内置键盘图增至一百零三种：新增 Boo、Boo Mangle、APT、APT Angle 与 Middlemak。五项均完整覆盖 47 个 ANSI Base/Shift 位置；Boo 两项保留非标准符号层，Boo Mangle 在精简提示中仍显示数字行，APT Angle 保留独立底行；不复制、打包或运行参考布局资产
-- 上一阶段内置键盘图增至一百五十三种：新增 Whix2、Haruka、Kuntum、Kuntem 与 Kuntem-JQ。Haruka 与三个 Kuntum/Kuntem 变体完整覆盖 47 个 ANSI Base/Shift 位置；Whix2 精确保留 40 个赋值位置和 7 个空位，不复制、打包或运行参考布局资产
+- 上一阶段内置键盘图增至一百五十三种：新增 Whix2、Haruka、Kuntum、Kuntem 与 Kuntem-JQ。Haruka 与三个 Kuntum/Kuntem 变体完整覆盖 47 个 ANSI Base/Shift 位置；Whix2 的 40 个非空格位置及 7 个视觉留白但实际输出空格的位置均按固定参考核对，不复制、打包或运行参考布局资产
 - 上一阶段内置键盘图增至一百五十八种：新增 BEAKL Zi、Snorkle、MALTRON、PRSTEN 与 RSTHD。五项完整覆盖 47 个 ANSI Base/Shift 位置；其中四项原生显示双拇指行，普通 Mac 的唯一物理 Space 按固定参考可观察语义映射到第五行首项，第二项仅作为布局提示，不复制、打包或运行参考布局资产
 - 上一阶段内置键盘图增至一百六十三种：新增 Hands Down Promethium、Statica 3×5、Vestnik、Diktor 与 Diktor Voronov Mod。Promethium 原生显示 `R + 空格` 拇指行并由物理 Space 输入 `r`；五项的 AltGr 未重定义键保持布局 Base/Shift，Statica/Vestnik 另保留特殊 Cyrillic 层，Diktor 两项保留重排数字符号层，不复制、打包或运行参考布局资产
 - 当前内置键盘图为一百九十三种：新增 Sturdy Ortho、HiYou、Xenia、Xenia Alt 与 Burmese。保留 HiYou ISO 单层符号键、Burmese 独立组合符和数字行、其余三项 ANSI 排列、完整 Base/Shift 与 AltGr 基础层回退，不复制、打包或运行参考布局资产
