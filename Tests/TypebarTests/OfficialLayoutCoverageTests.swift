@@ -125,6 +125,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
         .builtIn(layout), officialName)
     }
     XCTAssertNil(OfficialLayoutCommandCatalog.target(for: "input.layout.nordicQwerty"))
+    XCTAssertNil(OfficialLayoutCommandCatalog.target(for: "input.layout.urduPhonetic"))
     XCTAssertNil(OfficialLayoutCommandCatalog.target(for: "input.layout.qwerty.extra"))
     XCTAssertNil(OfficialLayoutCommandCatalog.target(for: "input.layout."))
   }
@@ -156,6 +157,8 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     }
     XCTAssertNil(
       KeyboardGuideLayoutCommandCatalog.target(for: "keyboard.keymapLayout.nordicQwerty"))
+    XCTAssertNil(
+      KeyboardGuideLayoutCommandCatalog.target(for: "keyboard.keymapLayout.urduPhonetic"))
     XCTAssertNil(
       KeyboardGuideLayoutCommandCatalog.target(for: "keyboard.keymapLayout.qwerty.extra"))
     XCTAssertNil(KeyboardGuideLayoutCommandCatalog.target(for: "keyboard.keymapLayout."))

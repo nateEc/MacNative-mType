@@ -13,9 +13,9 @@
 
 ### 逐键验证现状（2026-10-14）
 
-`nativeExact` 的 239 项目前是布局身份及原生功能路径的覆盖声明，**不是逐键输出已全部验证通过**。新增的只读差分测试 `OfficialLayoutOutputAuditTests.testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation` 在设置 `TYPEBAR_LAYOUT_AUDIT_REFERENCE` 为上述固定 checkout 路径时，比较官方键帽 JSON 与原生物理键模拟的 Base/Shift 层；不设置时跳过，不会下载或打包上游数据。该测试刻意要求差异为零，当前仍失败，不能作为绿色验收结果引用。
+`nativeExact` 的 239 项目前是布局身份及原生功能路径的覆盖声明，**不是逐键输出已全部验证通过**。只读差分测试 `OfficialLayoutOutputAuditTests.testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation` 在设置 `TYPEBAR_LAYOUT_AUDIT_REFERENCE` 为上述固定 checkout 路径时，比较原版布局模拟器实际消费的键位 JSON 与原生物理键模拟；不设置时跳过，不会下载或打包上游数据。`TYPEBAR_LAYOUT_AUDIT_ONLY` 可限于一个官方 ID；`TYPEBAR_LAYOUT_AUDIT_ALL_LAYERS=1` 还验证 Base、Shift、Option、Shift+Option 和实体 Space，按原版缺层回退规则计算期望值。该测试要求差异为零，除已验证的定点布局外目前仍失败，不能作为全布局绿色验收引用。
 
-修复 ANSI QWERTY 缺失的反斜杠键、Macedonian 底排 `/` 的 Shift 问号、Colemak／Workman 五项和 ANSI Dvorak 的缺失外圈键、Colemak-DH／DHK 两项 ISO 专属实体键，并将 Norwegian QWERTY 与旧 Nordic QWERTY 的首键分开后，22,444 个比较点尚有 172 处差异，分布于 21 个布局：159 处为显式输出与官方图例不同，13 处为原生模拟器未接管、回退 macOS 输入源。这些是需要甄别的差分线索，并非 172 个已经证实的用户可见缺陷；例如系统输入源可能产出相同字符，某些上游图例使用 Unicode 表示形式，而特殊动作键也不能简单视为文本键。后续须逐项核对官方输入语义、原生视觉提示和实际事件路径，再修复或明确记录有意差异。现有清单数量、路由和持久化测试不能替代这一验证。
+修复前述 ANSI／ISO 键位与 Norwegian 首键，并将官方 `urdu_phonetic` 指向独立精确入口后，旧口径的 22,444 个 Base／显式 Shift 比较点尚有 142 处差异，分布于 20 个布局：129 处显式输出不同，13 处回退 macOS。更完整的四层口径涵盖 46,060 个比较点，尚有 15,404 处差异，分布于 232 个布局：603 处显式输出不同，14,801 处本地未接管而交给 macOS。后者大多由原版在显式模拟时使用 Base／Shift 回退、Typebar 当前却让 Option 交给系统处理造成，不能冒称 239 项已完成四层兼容；也不能不经实际事件验证便把每个 nil 都断定为不同的最终输入字符。官方 Urdu 的 48 个可触达键 × 四层共 192 项已在固定源码定点对照中通过；旧 CRULP 以原始持久化 ID 保留。全局 Option 策略、真实 IME／实体键盘及其余差异仍待逐项修复与验收。
 
 ## 当前覆盖
 

@@ -237,6 +237,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case arabic102
   case arabicMac
   case urduPhonetic
+  case urduPhoneticOfficial
   case thaiKedmanee
   case thaiPattachote
   case japaneseHiragana
@@ -485,7 +486,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .arabic101: "Arabic (101)"
     case .arabic102: "Arabic (102)"
     case .arabicMac: "Arabic (macOS)"
-    case .urduPhonetic: "Urdu Phonetic (CRULP)"
+    case .urduPhonetic: "Urdu Phonetic (CRULP · legacy)"
+    case .urduPhoneticOfficial: "Urdu Phonetic (Monkeytype)"
     case .thaiKedmanee: "Thai Kedmanee"
     case .thaiPattachote: "Thai Pattachote"
     case .japaneseHiragana: "Japanese Hiragana"
@@ -740,6 +742,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case arabic102
   case arabicMac
   case urduPhonetic
+  case urduPhoneticOfficial
   case thaiKedmanee
   case thaiPattachote
   case japaneseHiragana
@@ -1223,6 +1226,29 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     ]
     return shiftedSymbols[label]
   }
+}
+
+/// Original Swift representation of the pinned Urdu Phonetic input behavior.
+/// A missing shifted layer keeps the base character, including Arabic marks.
+enum OfficialUrduPhoneticKeymap {
+  static let normalRows: [[String]] = [
+    ["ً", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+    ["ق", "و", "ع", "ر", "ت", "ی", "ء", "ئ", "ہ", "پ", "[", "]", "\\"],
+    ["ا", "س", "د", "ف", "گ", "ھ", "ج", "ک", "ل", "؛", "'"],
+    ["ز", "ش", "چ", "ڈ", "ب", "ن", "م", "،", "۔", "/"],
+  ]
+
+  static let shiftedRows: [[String]] = {
+    var rows = normalRows
+    let numberSymbols = ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+"]
+    for (index, symbol) in numberSymbols.enumerated() { rows[0][index + 1] = symbol }
+    rows[1][10] = "{"
+    rows[1][11] = "}"
+    rows[1][12] = "|"
+    rows[2][10] = "\""
+    rows[3][9] = "?"
+    return rows
+  }()
 }
 
 enum KeyboardGuideModel {
@@ -3912,6 +3938,10 @@ enum KeyboardGuideModel {
           optionLabels: ["؏", "؎", "؃", "ؕ", "﷽", "؀", nil, ">", "<", nil]
         ),
       ]
+    case .urduPhoneticOfficial:
+      baseShiftRows(
+        normalLabels: OfficialUrduPhoneticKeymap.normalRows,
+        shiftedLabels: OfficialUrduPhoneticKeymap.shiftedRows)
     case .thaiKedmanee:
       [
         row(

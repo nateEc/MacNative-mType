@@ -1514,13 +1514,13 @@ enum OfficialLayoutCommandTarget: Equatable {
     }
 }
 
-/// Exposes only the fixed reference layout schema. Five additional Typebar
+/// Exposes only the fixed reference layout schema. Typebar-only and legacy
 /// layouts remain available in Settings without masquerading as reference
 /// command choices.
 enum OfficialLayoutCommandCatalog {
     private static let typebarOnlyLayouts: Set<KeyboardLayout> = [
         .nordicQwerty, .hungarianQwertz, .greekAlphabetic, .bulgarianCyrillic,
-        .serbianCyrillic,
+        .serbianCyrillic, .urduPhonetic,
     ]
 
     private static let aliases: [String: KeyboardLayout] = [
@@ -1591,7 +1591,7 @@ enum OfficialLayoutCommandCatalog {
         "arabic_101": .arabic101,
         "arabic_102": .arabic102,
         "arabic_mac": .arabicMac,
-        "urdu_phonetic": .urduPhonetic,
+        "urdu_phonetic": .urduPhoneticOfficial,
         "thai_kedmanee": .thaiKedmanee,
         "thai_pattachote": .thaiPattachote,
         "japanese_hiragana": .japaneseHiragana,

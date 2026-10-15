@@ -1187,7 +1187,7 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射；使用有限非负小数且不施加额外速度上限，固定/弹性命令要求按当前显示单位输入整数后换算，旧整数配置可直接迁移。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用自有英式词库，English 源逐词运行独立的有限拼写规则、引号／连字符／大小写及引语前词例外；13 个实际 English 源身份显示选择器，Wordle 不误启用。非空自有英式备用引语绕过二次转换；缺失／空备用源先准备普通引语。自有引语按初始／逐次预算生成，区分 raw／去提交前词；完整替换表、原版三次重选／异步错误 UI、全部组合与设备仍未证明等价。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。命令面板另按固定名称提供 48 项切换与 `none` 清除入口；`weakspot` 为实时选词修饰器，多语路由到 Typebar 原生工作流，持久化弱项分析保持独立入口。 |
-| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 244 个原生内置布局可任选至多 15 个进入原生序列。 |
+| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 245 个原生内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 已映射；固定 schema 的 446 个单语言 ID 全部是可搜索的原生候选，至少选择两项、去重并合并为虚拟词池，普通词频从合并池均匀抽取，Zipf 词频从合并池偏向低位抽取；与前两词重复时最多重抽 100 次，不强制按语言轮转。LTR、RTL、双向、无空格及代码词表均使用 Typebar 自有内容；全 RTL 组合使用原生 RTL 段落，双向组合交给 macOS Unicode 双向排版。与参考的具体词表、跨语言同形词去重及随机序列不承诺一致。新建或缺失／无效配置采用参考默认的 English、Spanish、French、German 四项；已有明确保存的旧 153 项组合继续原样加载，不强制迁移。 |
 | `freedomMode` | `freedomMode` | 已映射；活动同步不重启，开启按来源关闭信心模式。`RuntimeInputRuleTests` 覆盖下一次删除与真实命令消费。 |
 | `strictSpace` | `strictSpace` | 已映射。 |

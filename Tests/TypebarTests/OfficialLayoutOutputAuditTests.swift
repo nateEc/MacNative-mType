@@ -22,6 +22,7 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       let row2: [[String]]
       let row3: [[String]]
       let row4: [[String]]
+      let row5: [[String]]
     }
   }
 
@@ -162,6 +163,37 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 50, modifierFlags: .shift, mapping: .builtIn(.nordicQwerty)), "°")
   }
 
+  func testOfficialUrduPhoneticKeepsSingleLayerTextWithoutChangingLegacyLayout() {
+    guard let official = KeyboardLayout(rawValue: "urduPhoneticOfficial") else {
+      XCTFail("Official Urdu Phonetic must have a distinct persisted layout identity")
+      return
+    }
+    let mapping = KeyboardInputMapping.builtIn(official)
+    for (keyCode, expected) in [(UInt16(12), "ق"), (0, "ا"), (9, "ڈ")] {
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: keyCode, modifierFlags: [], mapping: mapping), expected)
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: keyCode, modifierFlags: .shift, mapping: mapping), expected)
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: keyCode, modifierFlags: .option, mapping: mapping), expected)
+      XCTAssertEqual(KeyboardLayoutEmulator.text(
+        forKeyCode: keyCode, modifierFlags: [.shift, .option], mapping: mapping), expected)
+    }
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: [], mapping: mapping), "1")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: .shift, mapping: mapping), "!")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: .option, mapping: mapping), "1")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: [.shift, .option], mapping: mapping), "!")
+
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: [], mapping: .builtIn(.urduPhonetic)), "۱")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(
+      forKeyCode: 18, modifierFlags: .shift, mapping: .builtIn(.urduPhonetic)), "1")
+  }
+
   func testPinnedBaseAndShiftLegendsAgreeWithNativeEmulation() throws {
     guard let root = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_AUDIT_REFERENCE"] else {
       throw XCTSkip("Set TYPEBAR_LAYOUT_AUDIT_REFERENCE to a pinned read-only checkout")
@@ -185,6 +217,16 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     XCTAssertEqual(actualCommit, mapping.referenceCommit, "Do not compare against a moving reference")
     guard git.terminationStatus == 0, actualCommit == mapping.referenceCommit else { return }
 
+    let onlyOfficialID = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_AUDIT_ONLY"]
+    let allLayers = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_AUDIT_ALL_LAYERS"] == "1"
+    let auditedIDs: [String]
+    if let onlyOfficialID {
+      _ = try XCTUnwrap(mapping.nativeExact[onlyOfficialID], "Unknown official layout: \(onlyOfficialID)")
+      auditedIDs = [onlyOfficialID]
+    } else {
+      auditedIDs = mapping.nativeExact.keys.sorted()
+    }
+
     var mismatches: [String] = []
     var mismatchCount = 0
     var mismatchesByLayout: [String: Int] = [:]
@@ -194,12 +236,12 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     var deferredByLayout: [String: Int] = [:]
     var explicitByLayout: [String: Int] = [:]
     var checkedLayers = 0
-    for officialID in mapping.nativeExact.keys.sorted() {
+    for officialID in auditedIDs {
       let rawValue = try XCTUnwrap(mapping.nativeExact[officialID])
       let native = try XCTUnwrap(KeyboardLayout(rawValue: rawValue))
       let sourceURL = reference.appendingPathComponent("frontend/static/layouts/\(officialID).json")
       let source = try JSONDecoder().decode(ReferenceLayout.self, from: Data(contentsOf: sourceURL))
-      let codes: [[UInt16]]
+      var codes: [[UInt16]]
       switch source.type {
       case "ansi":
         codes = ansiCodes
@@ -210,7 +252,12 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
         XCTFail("Unknown layout type for \(officialID): \(source.type)")
         continue
       }
-      let rows = [source.keys.row1, source.keys.row2, source.keys.row3, source.keys.row4]
+      var rows = [source.keys.row1, source.keys.row2, source.keys.row3, source.keys.row4]
+      if allLayers {
+        let space = try XCTUnwrap(source.keys.row5.first, "\(officialID) needs a Space key")
+        rows.append([space])
+        codes.append([49])
+      }
       for row in rows.indices {
         XCTAssertEqual(rows[row].count, codes[row].count, "\(officialID) row \(row + 1)")
         guard rows[row].count == codes[row].count else { continue }
@@ -218,8 +265,22 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
           let legends = rows[row][column]
           guard let base = legends.first else { continue }
           let keyCode = codes[row][column]
-          let expected = [(base, NSEvent.ModifierFlags())]
-            + (legends.count > 1 ? [(legends[1], NSEvent.ModifierFlags.shift)] : [])
+          let expected: [(String, NSEvent.ModifierFlags)]
+          if allLayers {
+            let modifiers: [NSEvent.ModifierFlags] = [[], .shift, .option, [.shift, .option]]
+            expected = modifiers.map { flags in
+              let shifted = flags.contains(.shift)
+              let alternateIndex = flags.contains(.option) && legends.count > 2 ? 2 : 0
+              let preferredIndex = alternateIndex + (shifted ? 1 : 0)
+              let preferred = legends.indices.contains(preferredIndex) ? legends[preferredIndex] : ""
+              let plainIndex = shifted ? 1 : 0
+              let plain = legends.indices.contains(plainIndex) ? legends[plainIndex] : ""
+              return (preferred.isEmpty ? (plain.isEmpty ? base : plain) : preferred, flags)
+            }
+          } else {
+            expected = [(base, NSEvent.ModifierFlags())]
+              + (legends.count > 1 ? [(legends[1], NSEvent.ModifierFlags.shift)] : [])
+          }
           for (text, modifiers) in expected {
             checkedLayers += 1
             let actual = KeyboardLayoutEmulator.text(
@@ -236,12 +297,12 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
               }
               if firstMismatchByLayout[officialID] == nil {
                 firstMismatchByLayout[officialID] = "\(officialID) row \(row + 1) key \(column + 1) "
-                  + "\(modifiers.contains(.shift) ? "Shift" : "base"): "
+                  + "\(modifiers.contains(.option) ? "Option+" : "")\(modifiers.contains(.shift) ? "Shift" : "base"): "
                   + "expected \(text.debugDescription), got \(actual.debugDescription)"
               }
-              if mismatches.count < 12 {
+              if mismatches.count < (onlyOfficialID == nil ? 12 : 100) {
                 mismatches.append("\(officialID) row \(row + 1) key \(column + 1) "
-                  + "\(modifiers.contains(.shift) ? "Shift" : "base"): "
+                  + "\(modifiers.contains(.option) ? "Option+" : "")\(modifiers.contains(.shift) ? "Shift" : "base"): "
                   + "expected \(text.debugDescription), got \(actual.debugDescription)")
               }
             }
@@ -249,11 +310,14 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
         }
       }
     }
-    XCTAssertGreaterThan(checkedLayers, 20_000)
+    XCTAssertGreaterThan(checkedLayers, onlyOfficialID == nil ? 20_000 : 0)
+    if onlyOfficialID == "urdu_phonetic", allLayers {
+      XCTAssertEqual(checkedLayers, 192, "The official Urdu check must include 48 keys and four layers")
+    }
     let byLayout = mismatchesByLayout.sorted {
       $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
     }.map { "\($0.key):\($0.value)" }
-    XCTAssertEqual(mismatchCount, 0, "\(mismatchCount) of \(checkedLayers) base/Shift outputs differ "
+    XCTAssertEqual(mismatchCount, 0, "\(mismatchCount) of \(checkedLayers) \(allLayers ? "all-layer" : "base/Shift") outputs differ "
       + "(\(explicitDifferentCount) explicit, \(deferredCount) deferred to macOS) "
       + "across \(mismatchesByLayout.count) layouts. By layout: \(byLayout.joined(separator: ", ")). "
       + "Explicit by layout: \(explicitByLayout.sorted { $0.key < $1.key }). "

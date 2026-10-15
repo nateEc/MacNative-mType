@@ -8821,17 +8821,18 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testColemakDHISOUsesTheAngleModExtraKeyAndPersists() {
     let bottomRow = KeyboardGuideModel.rows(for: .colemakDHISO)[3]
-    XCTAssertEqual(bottomRow.map(\.label).joined(), "ZXCDV`KH,./")
+    XCTAssertEqual(bottomRow.map(\.label).joined(), "ZXCDV\\KH,./")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "z", layout: .colemakDHISO), "bottom-0")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "`", layout: .colemakDHISO), "bottom-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "`", layout: .colemakDHISO), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.rows(for: .colemakDHISO)[2][11].label, "\\")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .colemakDHISO), "z")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .colemakDHISO), "Z")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [], layout: .colemakDHISO), "`")
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [], layout: .colemakDHISO), "\\")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Z", layout: .colemakDHISO), 10)
-    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "~", layout: .colemakDHISO), 11)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "~", layout: .colemakDHISO), 50)
     XCTAssertEqual(KeyboardInputLayout.colemakDHISO.emulatedLayout, .colemakDHISO)
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -9779,6 +9780,33 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardLayout, .urduPhonetic)
     XCTAssertEqual(restored.keyboardInputLayout, .urduPhonetic)
     XCTAssertEqual(restored.layoutFluidLayouts, [.urduPhonetic, .ansiQwerty])
+  }
+
+  @MainActor
+  func testOfficialUrduPhoneticHasDistinctVisualInputAndPersistedIdentity() {
+    let rows = KeyboardGuideModel.rows(for: .urduPhoneticOfficial)
+    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(rows[0][0].label, "ً")
+    XCTAssertEqual(rows[0][1].label, "1")
+    XCTAssertEqual(rows[1][5].label, "ی")
+    XCTAssertEqual(rows[2][5].label, "ھ")
+    XCTAssertEqual(rows[3][3].label, "ڈ")
+    XCTAssertEqual(rows[2][0].legend(
+      style: .dynamic, modifierFlags: .shift, capsLockEnabled: false), "ا")
+    XCTAssertEqual(KeyboardInputLayout.urduPhoneticOfficial.emulatedLayout, .urduPhoneticOfficial)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .urduPhoneticOfficial
+    settings.keyboardInputLayout = .urduPhoneticOfficial
+    settings.layoutFluidLayouts = [.urduPhoneticOfficial, .urduPhonetic]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .urduPhoneticOfficial)
+    XCTAssertEqual(restored.keyboardInputLayout, .urduPhoneticOfficial)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.urduPhoneticOfficial, .urduPhonetic])
   }
 
   @MainActor
@@ -21503,7 +21531,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 244)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 245)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

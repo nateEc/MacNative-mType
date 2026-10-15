@@ -1966,6 +1966,15 @@ enum KeyboardLayoutEmulator {
           43: (">", nil), 47: ("<", nil),
         ]
       )
+    case .urduPhoneticOfficial:
+      withSpaceLayers(
+        withBaseFallbackOptionLayers(
+          baseShiftMap(
+            keyRows: physicalRows,
+            normalRows: OfficialUrduPhoneticKeymap.normalRows,
+            shiftedRows: OfficialUrduPhoneticKeymap.shiftedRows),
+          overrides: [:]),
+        option: " ", shiftedOption: " ")
     case .thaiKedmanee:
       map(
         "50:_|% 18:ๅ|+ 19:/|๑ 20:-|๒ 21:ภ|๓ 23:ถ|๔ 22:ุ|ู 26:ึ|฿ 28:ค|๕ 25:ต|๖ 29:จ|๗ 27:ข|๘ 24:ช|๙ "

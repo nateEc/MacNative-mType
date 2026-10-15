@@ -1,5 +1,9 @@
 # 功能盘点与追踪表
 
+2026-10-15 远端门禁与布局目录核验：已推送的 `8ceb323` 在 macOS 15 的 [Native Rewrite Gate #803](https://github.com/nateEc/MacNative-mType/actions/runs/38566694298) 客户端执行 4,607 项、96 项按条件跳过，仅 `TapePromptRetirementTests.testActualSessionRetirementBlocksMissingHistoryWithoutErasingPromptInputOrReplay` 一项三处断言失败；服务和 Release 因门禁停止未执行。该测试在本机通过，远端未收到预期退休通知，原因仍未证实；现以最长 1 秒等待原本异步的真实通知，仍断言退休下界、提示输入与回放不丢失，不修改产品退休算法。新增官方 Urdu 身份使旧 CRULP 多出一个仅 Typebar 选项，已从官方命令目录排除，保留 Settings 与存档恢复；布局目录覆盖 7 项、固定参考 239 项清单和原创性边界通过。新测试与 macOS 15 修正结果待下一次合批推送验证，不能以本机结果宣称门禁通过。
+
+2026-10-14 官方 Urdu Phonetic 与四层审计增量（尚未推送）：固定原版 `layout-emulator.ts` 在显式布局模式下用键位 JSON 决定实际输入，单层键的 Shift 和无专用 AltGr 层的 Option 均回退该键的基础／Shift 字符。原 `urduPhonetic` 对应旧 CRULP 变体且被设置、归档及 Layout Fluid 持久化；为不悄悄重写旧用户键位，保留其原始 ID 和旧行为，新增 `urduPhoneticOfficial` 并把官方 `urdu_phonetic` 入口指向它。新入口与旧入口的独立键位、修饰层和持久化测试通过；固定源码 48 键 × 四层的 192 项定点对照通过。旧 Base／显式 Shift 差分现为 142/22,444；首次完整四层口径为 15,404/46,060，其中 14,801 项是原生未接管 Option／其他修饰路径。四层全布局验收远未完成，旧二进制读取新 ID 的降级行为、真人键盘和 IME 也未验证；不复制或打包上游布局资产。
+
 2026-10-14 键盘布局地区变体增量（待下一批推送）：固定官方 Norwegian QWERTY 左上角实体键为竖线／分节符，原生此前错误共用旧 Nordic QWERTY 的分节符／度数。先行测试验证两个布局必须保持独立，现仅修正 Norwegian 的视觉与显式输入，保留 Nordic 旧行为；只读差分从 174 降为 172，仍有 21 个布局待逐键甄别。真实 macOS 输入法与实体键盘尚未验收。
 
 2026-10-14 键盘布局 ISO 逐键增量（待下一批推送）：Colemak-DH ISO 与 Colemak-DHK ISO 在固定原版均有 13 个数字／符号键、home 行末 ISO 额外键以及底排第六个反斜杠键，两项的 home 额外键分别输出反斜杠／竖线与井号／单引号。先行行为测试复现原生视觉与显式输入的缺键及错误图例，修正后定点通过；只读差分从上一批的 234 降为 174，仍有 22 个布局未逐键一致。实体键位置、真人输入法和完整远端门禁尚待验证，不能把数值下降解释为全功能完成。

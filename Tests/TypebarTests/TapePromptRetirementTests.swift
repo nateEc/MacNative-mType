@@ -123,13 +123,17 @@ import XCTest
     let coordinator = PromptCaretMotionCoordinator()
     let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 80, height: 60))
     defer { view.stop() }
+    let delivered = expectation(description: "Actual session Tape prefix retirement")
+    delivered.assertForOverFulfill = true
     for active in 0...3 {
       if active > 0 { session.insertBatch("aaa ", at: start.addingTimeInterval(Double(active))) }
       configure(view, coordinator, attempt: attempt, active: active, at: Double(active)) {
         session.retirePromptWords($0)
+        delivered.fulfill()
       }
       view.present(at: Double(active)); drain()
     }
+    wait(for: [delivered], timeout: 1)
     XCTAssertEqual(session.firstRetainedPromptWordIndex, 1)
     XCTAssertEqual(session.prompt, original); XCTAssertEqual(session.typed, "aaa aaa aaa ")
     let beforeReplay = try replay(session)
