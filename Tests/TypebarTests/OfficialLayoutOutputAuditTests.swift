@@ -682,7 +682,7 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
       forKeyCode: 18, modifierFlags: .shift, mapping: .builtIn(.urduPhonetic)), "1")
   }
 
-  func testPinnedGuideLegendsMatchReferenceLayers() throws {
+  func testPinnedGuideLegendsAndVirtualKeyboardOutputMatchReferenceLayers() throws {
     guard let root = ProcessInfo.processInfo.environment["TYPEBAR_LAYOUT_GUIDE_AUDIT_REFERENCE"] else {
       throw XCTSkip("Set TYPEBAR_LAYOUT_GUIDE_AUDIT_REFERENCE to a pinned read-only checkout")
     }
@@ -721,6 +721,10 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     var firstMismatchByLayout: [String: String] = [:]
     var examples: [String] = []
     var visuallyBlankSpaces = 0
+    var clickMismatchCount = 0
+    var checkedClicks = 0
+    var clickMismatchesByLayout: [String: Int] = [:]
+    var clickExamples: [String] = []
     for officialID in auditedIDs {
       let native = try XCTUnwrap(KeyboardLayout(rawValue: try XCTUnwrap(mapping.nativeExact[officialID])))
       let sourceURL = reference.appendingPathComponent("frontend/static/layouts/\(officialID).json")
@@ -761,6 +765,20 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
             let actual = key.legend(
               style: .dynamic, modifierFlags: flags, capsLockEnabled: false)
             checkedLegends += 1
+            let clicked = VirtualKeyboardOutputPolicy.output(
+              for: key, shift: shifted, option: flags.contains(.option))
+            let expectedClick: String? = expected.isEmpty ? nil : expected
+            checkedClicks += 1
+            if clicked != expectedClick {
+              clickMismatchCount += 1
+              clickMismatchesByLayout[officialID, default: 0] += 1
+              if clickExamples.count < 20 {
+                clickExamples.append(
+                  "\(officialID) row \(row + 1) key \(column + 1) "
+                    + "\(flags.contains(.option) ? "Option+" : "")\(shifted ? "Shift" : "base"): "
+                    + "expected click \(String(describing: expectedClick)), got \(String(describing: clicked))")
+              }
+            }
             // A literal Space has no visible glyph. Keep it blank only when
             // the guide still advertises that the physical key can type it.
             if expected == " ", actual.isEmpty, key.characters.contains(" ") {
@@ -791,6 +809,11 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
         + "By layout: \(byLayout.joined(separator: ", ")). "
         + "First per layout:\n\(firstMismatchByLayout.keys.sorted().compactMap { firstMismatchByLayout[$0] }.joined(separator: "\n"))\n"
         + "First mismatches:\n\(examples.joined(separator: "\n"))")
+    XCTAssertEqual(clickMismatchCount, 0,
+      "\(clickMismatchCount) of \(checkedClicks) mouse keyboard outputs differ across "
+        + "\(clickMismatchesByLayout.count) layouts. "
+        + "By layout: \(clickMismatchesByLayout.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: ", ")). "
+        + "First mismatches:\n\(clickExamples.joined(separator: "\n"))")
   }
 
   func testArmenianThreeLayerGuideFallsBackToShiftOnOptionShift() {

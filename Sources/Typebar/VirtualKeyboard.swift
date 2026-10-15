@@ -18,6 +18,11 @@ enum VirtualKeyboardOutputPolicy {
       candidate = key.legend(
         style: .dynamic, modifierFlags: flags, capsLockEnabled: false)
     }
+    // Some official keys intentionally draw no glyph while typing a Space.
+    if candidate.isEmpty, key.label.isEmpty,
+      key.characters.count == 1, key.characters.contains(" ") {
+      return " "
+    }
     return Array(candidate).count == 1 ? candidate : nil
   }
 }

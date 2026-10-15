@@ -18,8 +18,25 @@ final class VirtualKeyboardTests: XCTestCase {
   func testSpaceAndNonTypingKeysHaveExplicitOutcomes() {
     let space = KeyboardGuideKey("space", label: "空格", characters: " ")
     let control = KeyboardGuideKey("control", label: "⌃", characters: "")
+    let blankControl = KeyboardGuideKey("blank-control", label: "", characters: "")
     XCTAssertEqual(VirtualKeyboardOutputPolicy.output(for: space, shift: false, option: false), " ")
     XCTAssertNil(VirtualKeyboardOutputPolicy.output(for: control, shift: false, option: false))
+    XCTAssertNil(VirtualKeyboardOutputPolicy.output(for: blankControl, shift: false, option: false))
+  }
+
+  func testOfficialVisuallyBlankSpaceKeysRemainClickableOnEveryLayer() {
+    let keys = [
+      KeyboardGuideModel.rows(for: .latinAmericanQwerty)[2][11],
+      KeyboardGuideModel.rows(for: .whix2)[0][10],
+    ]
+    for key in keys {
+      XCTAssertEqual(key.label, "")
+      XCTAssertTrue(key.characters.contains(" "))
+      for (shift, option) in [(false, false), (true, false), (false, true), (true, true)] {
+        XCTAssertEqual(VirtualKeyboardOutputPolicy.output(
+          for: key, shift: shift, option: option), " ")
+      }
+    }
   }
 
   func testSelectedNonLatinLayoutKeepsItsOwnVisibleCharacters() throws {
