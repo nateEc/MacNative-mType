@@ -258,7 +258,17 @@
     "grand_prix",
     "hammerhead",
     "incognito",
-    "leather"
+    "leather",
+    "arch",
+    "bingsu",
+    "godspeed",
+    "macroblank",
+    "pastel",
+    "bushido",
+    "drowning",
+    "evil_eye",
+    "joker",
+    "matrix"
   ],
   "exactMappings": {},
   "relatedMappings": {
@@ -326,6 +336,16 @@
     "grand_prix": "grand_prix",
     "hammerhead": "hammerhead",
     "incognito": "incognito",
-    "leather": "leather"
+    "leather": "leather",
+    "arch": "arch",
+    "bingsu": "bingsu",
+    "godspeed": "godspeed",
+    "macroblank": "macroblank",
+    "pastel": "pastel",
+    "bushido": "bushido",
+    "drowning": "drowning",
+    "evil_eye": "evil_eye",
+    "joker": "joker",
+    "matrix": "matrix"
   }
 }

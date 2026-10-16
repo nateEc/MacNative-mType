@@ -342,6 +342,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case hammerhead
     case incognito
     case leather
+    case arch
+    case bingsu
+    case godspeed
+    case macroblank
+    case pastel
+    case bushido
+    case drowning
+    case evil_eye
+    case joker
+    case matrix
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -439,6 +449,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .hammerhead: "锤头鲨 · Typebar"
         case .incognito: "隐身 · Typebar"
         case .leather: "皮革 · Typebar"
+        case .arch: "石拱 · Typebar"
+        case .bingsu: "冰沙 · Typebar"
+        case .godspeed: "疾行 · Typebar"
+        case .macroblank: "留白 · Typebar"
+        case .pastel: "粉彩 · Typebar"
+        case .bushido: "漆夜 · Typebar"
+        case .drowning: "深潜 · Typebar"
+        case .evil_eye: "邪眼 · Typebar"
+        case .joker: "纸牌 · Typebar"
+        case .matrix: "矩阵 · Typebar"
         }
     }
 
@@ -612,6 +632,26 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0x252D40, 0x3B4558, 0xCFC8F3, 0xF7F7FB, 0xCED5E7, light: false, error: 0xFFB9A8)
         case .leather:
             Self.palette(0xEAD9C0, 0xD3BC9F, 0x663C35, 0x332925, 0x544237, light: true, error: 0x8A2F40)
+        case .arch:
+            Self.palette(0xE1E8ED, 0xC6D2DB, 0x315A6F, 0x20323B, 0x455965, light: true, error: 0x8B354C)
+        case .bingsu:
+            Self.palette(0xEFE8F3, 0xDCD0E6, 0x63466F, 0x29283D, 0x514E67, light: true, error: 0x8F344B)
+        case .godspeed:
+            Self.palette(0xE5EDF1, 0xC7D9DF, 0x315D73, 0x1D3540, 0x405F6B, light: true, error: 0x9A3545)
+        case .macroblank:
+            Self.palette(0xF1F3F2, 0xD9DEDD, 0x315260, 0x252E32, 0x4D5D61, light: true, error: 0x962E49)
+        case .pastel:
+            Self.palette(0xE9E9F4, 0xD5D7EA, 0x5F518D, 0x2B304B, 0x515674, light: true, error: 0x973D55)
+        case .bushido:
+            Self.palette(0x292838, 0x403C4D, 0xE2B68C, 0xF5F0EA, 0xCED0DE, light: false, error: 0xF2A8A1)
+        case .drowning:
+            Self.palette(0x092E3A, 0x174554, 0xA7D8CF, 0xE8F5F0, 0xBED8DD, light: false, error: 0xFBB09A)
+        case .evil_eye:
+            Self.palette(0x242B55, 0x384578, 0xEDD79B, 0xF5F4EE, 0xCDD7EA, light: false, error: 0xFFB4AB)
+        case .joker:
+            Self.palette(0x312936, 0x4B3D52, 0xD9D497, 0xF6F1EA, 0xD6C9D8, light: false, error: 0xF4A8AA)
+        case .matrix:
+            Self.palette(0x162C25, 0x234438, 0xB7D6A2, 0xEDF4E7, 0xC9D9C9, light: false, error: 0xFFAD9E)
         }
     }
 }
