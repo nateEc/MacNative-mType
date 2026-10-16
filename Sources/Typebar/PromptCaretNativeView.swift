@@ -46,6 +46,7 @@ final class PromptCaretNativeView: NSView {
     var fieldPaceRect: ((Int, Bool) -> CGRect?)? = nil
     var fieldPaceDirection: ((Int, Bool) -> Bool)? = nil
     var automaticallyPresents = true
+    var insertionAnchor: PromptInsertionAnchor? = nil
   }
 
   private var configuration: Configuration?
@@ -80,6 +81,7 @@ final class PromptCaretNativeView: NSView {
 
   func update(_ next: Configuration) {
     let old = configuration
+    if old?.insertionAnchor !== next.insertionAnchor { old?.insertionAnchor?.unregister(self) }
     let layoutChanged = old.map { $0.font != next.font || $0.lineSpacing != next.lineSpacing
       || $0.rightToLeft != next.rightToLeft
       || $0.fieldDirectionPerGlyph != next.fieldDirectionPerGlyph
@@ -112,6 +114,7 @@ final class PromptCaretNativeView: NSView {
       needsPosition = true
     }
     configuration = next
+    next.insertionAnchor?.register(self, attemptID: next.attemptID)
     if !next.automaticallyPresents { timer?.invalidate(); timer = nil }
     else if timer == nil || old?.frameRate != next.frameRate { scheduleTimer() }
     schedulePaceTimer(after: 0)
@@ -144,6 +147,7 @@ final class PromptCaretNativeView: NSView {
   func stop() {
     timer?.invalidate(); timer = nil
     paceTimer?.invalidate(); paceTimer = nil
+    configuration?.insertionAnchor?.unregister(self)
     configuration?.coordinator.cancelCarets(at: ProcessInfo.processInfo.systemUptime)
     configuration = nil
     blinkClock = .init()
@@ -201,30 +205,10 @@ final class PromptCaretNativeView: NSView {
     if presentation.isVisible, config.mainStyle.drawsMarker,
       changed || needsPosition || coordinator.main.position == nil {
       let rendering = config.latestRendering?()
-      let glyphID = config.latestGlyphID?() ?? latest?.glyphID ?? config.mainGlyphID
-      let offset = latest.flatMap { _ in rendering?.characterOffset(forGlyphAt: glyphID) }
-        ?? (latest == nil ? config.mainOffset : nil)
-      if config.mainStyle.drawsMarker {
-        mainRightToLeft = config.fieldMainDirection?()
-          ?? glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
-        let mainRect: CGRect?
-        if let resolver = config.fieldMainRect { mainRect = resolver(config.mainStyle) }
-        else if let rendering, let map = rendering.compositionTextMap {
-          mainRect = map.caret.flatMap { anchor in map.inkRanges[anchor.cellID].flatMap { range in
-            PromptCaretLayout.rect(in: rendering.text, utf16Range: range, containerSize: bounds.size,
-              font: config.font, lineSpacing: config.lineSpacing, isRightToLeft: config.rightToLeft,
-              followsWrappedWhitespace: !anchor.after).map { rect in
-                PromptPaceCaretGeometry.rect(from: rect, to: rect, fromAfter: anchor.after, toAfter: anchor.after,
-                  style: config.mainStyle, rightToLeft: mainRightToLeft ?? config.rightToLeft,
-                  fraction: 1, reducesMotion: true,
-                  afterWidth: (" " as NSString).size(withAttributes: [.font: config.font]).width)
-              }
-          } }
-        } else if let resolver = config.mainGlyphRect { mainRect = glyphID.flatMap(resolver) }
-        else { mainRect = measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID) }
-        coordinator.positionMain(at: mainRect,
-          time: time, duration: needsSnap || config.reducesMotion ? 0 : config.motion.duration ?? 0)
-      }
+      let geometry = mainGeometry(config: config, rendering: rendering, latest: latest, style: config.mainStyle)
+      mainRightToLeft = geometry.rightToLeft
+      coordinator.positionMain(at: geometry.rect,
+        time: time, duration: needsSnap || config.reducesMotion ? 0 : config.motion.duration ?? 0)
       input = latest; mainOffset = config.mainOffset
       needsPosition = false; needsSnap = false
     }
@@ -335,6 +319,49 @@ final class PromptCaretNativeView: NSView {
     if let glyphRect = config.glyphRect { return glyphID.flatMap(glyphRect) }
     return offset.flatMap { PromptCaretLayout.rect(in: text, characterOffset: $0, containerSize: bounds.size,
       font: config.font, lineSpacing: config.lineSpacing, isRightToLeft: config.rightToLeft) }
+  }
+
+  private func mainGeometry(config: Configuration, rendering: PromptRendering?,
+    latest: PromptCaretInputIdentity?, style: TypingCaretStyle) -> (rect: CGRect?, rightToLeft: Bool) {
+    let glyphID = config.latestGlyphID?() ?? latest?.glyphID ?? config.mainGlyphID
+    let offset = latest.flatMap { _ in rendering?.characterOffset(forGlyphAt: glyphID) }
+      ?? (latest == nil ? config.mainOffset : nil)
+    let rightToLeft = config.fieldMainDirection?()
+      ?? glyphID.flatMap { config.glyphIsRightToLeft?($0) } ?? config.rightToLeft
+    let rect: CGRect?
+    if let resolver = config.fieldMainRect { rect = resolver(style) }
+    else if let rendering, let map = rendering.compositionTextMap {
+      rect = map.caret.flatMap { anchor in map.inkRanges[anchor.cellID].flatMap { range in
+        PromptCaretLayout.rect(in: rendering.text, utf16Range: range, containerSize: bounds.size,
+          font: config.font, lineSpacing: config.lineSpacing, isRightToLeft: config.rightToLeft,
+          followsWrappedWhitespace: !anchor.after).map { measured in
+            PromptPaceCaretGeometry.rect(from: measured, to: measured, fromAfter: anchor.after,
+              toAfter: anchor.after, style: style, rightToLeft: rightToLeft,
+              fraction: 1, reducesMotion: true,
+              afterWidth: (" " as NSString).size(withAttributes: [.font: config.font]).width)
+          }
+      } }
+    } else if let resolver = config.mainGlyphRect { rect = glyphID.flatMap(resolver) }
+    else { rect = measure(offset, text: rendering?.text ?? config.text, config: config, glyphID: glyphID) }
+    return (rect, rightToLeft)
+  }
+
+  /// AppKit's zero-length candidate query uses the logical prompt insertion
+  /// point, not the marker's animated frame or the hidden input's 1pt bounds.
+  func insertionScreenRect() -> NSRect? {
+    guard let initial = configuration, let window, bounds.width > 0 else { return nil }
+    let rendering = initial.latestRendering?()
+    guard let config = configuration, config.attemptID == initial.attemptID,
+      config.coordinator === initial.coordinator else { return nil }
+    let latest = config.latestInput?()
+    guard latest?.attemptID == nil || latest?.attemptID == config.attemptID else { return nil }
+    let geometry = mainGeometry(config: config, rendering: rendering, latest: latest, style: .bar)
+    guard let rect = geometry.rect, rect.minX.isFinite, rect.minY.isFinite,
+      rect.width.isFinite, rect.height.isFinite, rect.height > 0 else { return nil }
+    let x = PromptCaretPlacementPolicy.horizontalAnchor(for: rect, style: .bar,
+      isRightToLeft: geometry.rightToLeft)
+    let insertion = NSRect(x: x, y: rect.minY, width: 0, height: rect.height)
+    return window.convertToScreen(convert(insertion, to: nil))
   }
 
   private func paint(_ rect: CGRect?, style: TypingCaretStyle, accent: Color, rightToLeft: Bool,

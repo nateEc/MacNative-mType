@@ -1214,6 +1214,7 @@ private struct ContentView: View {
     configuration: TypebarInitialTestSelection.configuration).withElapsedClock()
   @State private var noQuitConfigurationLockOwnerID = UUID()
   @State private var promptCaretMotion = PromptCaretMotionCoordinator()
+  @State private var promptInsertionAnchor = PromptInsertionAnchor()
   @State private var mode: TestMode = .time
   @State private var language: TypingLanguage = .english
   @State private var polyglotReturnLanguage: TypingLanguage?
@@ -3010,6 +3011,8 @@ private struct ContentView: View {
 
       NativeTypingInput(
         focusRequest: focusRequest, acceptsTextInput: !isPreparingWholePreview,
+        insertionAnchor: promptInsertionAnchor,
+        insertionAttemptID: session.automaticInputAttemptID,
         quickRestartKey: settings.quickRestartKey,
         keyboardInputMapping: effectiveKeyboardInputMapping,
         oppositeShiftKeymap: settings.keyboardGuideLayoutSource.oppositeShiftMapping(
@@ -3345,14 +3348,13 @@ private struct ContentView: View {
             }
           }
           .overlay(alignment: isRightToLeft ? .topTrailing : .topLeading) {
-            if usesNativeCaretOverlay {
-              PromptCaretOverlay(
+            PromptCaretOverlay(
                 text: rendering.text,
-                mainCharacterOffset: settings.caretStyle.drawsMarker
-                  ? rendering.mainCharacterOffset ?? rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex) : nil,
-                mainStyle: settings.caretStyle,
+                mainCharacterOffset: rendering.mainCharacterOffset
+                  ?? rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex),
+                mainStyle: usesNativeCaretOverlay ? settings.caretStyle : .off,
                 paceCharacterOffset: nil,
-                paceStyle: settings.paceCaretStyle,
+                paceStyle: usesNativeCaretOverlay ? settings.paceCaretStyle : .off,
                 font: practicePromptNSFont(size: settings.fontSize),
                 lineSpacing: usesJoiningScript ? 8 : 12,
                 isRightToLeft: isRightToLeft,
@@ -3369,8 +3371,8 @@ private struct ContentView: View {
                 mainPresentation: { .init(
                   isVisible: (inputHasFocus || showsVirtualKeyboard) && typingWindowHasFocus && !session.isFinished,
                   isBlinking: visualFocus.caretIsBlinking,
-                  revision: visualFocus.caretBlinkRevision) })
-            }
+                  revision: visualFocus.caretBlinkRevision) },
+                insertionAnchor: promptInsertionAnchor)
           }
       }
     }
@@ -3513,7 +3515,6 @@ private struct ContentView: View {
   }
 
   private var specialPromptCaretConfiguration: PromptCaretNativeView.Configuration? {
-    guard settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker else { return nil }
     return makeSpecialPromptCaretConfiguration()
   }
 
@@ -3536,6 +3537,8 @@ private struct ContentView: View {
       mainGlyphID: currentPromptGlyphIndex)
     configuration.fieldDirectionPerGlyph = session.configuration.mode == .zen
       || session.configuration.mode == .custom || session.configuration.language == .mixedLanguages
+    configuration.automaticallyPresents = settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker
+    configuration.insertionAnchor = promptInsertionAnchor
     return configuration
   }
 

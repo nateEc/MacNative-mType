@@ -111,6 +111,8 @@ enum TypingInputNavigationPolicy {
 struct NativeTypingInput: NSViewRepresentable {
     var focusRequest: Int
     var acceptsTextInput = true
+    var insertionAnchor: PromptInsertionAnchor? = nil
+    var insertionAttemptID: UUID? = nil
     var quickRestartKey: QuickRestartKey
     var keyboardInputMapping: KeyboardInputMapping
     var oppositeShiftKeymap: KeyboardInputMapping
@@ -155,6 +157,8 @@ struct NativeTypingInput: NSViewRepresentable {
     }
 
     func updateNSView(_ view: TypingInputView, context: Context) {
+        view.insertionAnchor = insertionAnchor
+        view.insertionAttemptID = insertionAttemptID
         view.onInsert = onInsert
         view.onDelete = onDelete
         view.onDeleteWord = onDeleteWord
@@ -202,6 +206,8 @@ struct NativeTypingInput: NSViewRepresentable {
 
 class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     private(set) var isRetired = false
+    var insertionAnchor: PromptInsertionAnchor?
+    var insertionAttemptID: UUID?
     var acceptsTextInput = true {
       didSet {
         guard oldValue != acceptsTextInput else { return }
@@ -696,6 +702,15 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
         actualRange?.pointee = range
+        if range.length == 0 {
+            if range.location == compositionSelection.location,
+               let insertionAnchor, let insertionAttemptID, let window,
+               let rect = insertionAnchor.screenRect(attemptID: insertionAttemptID, in: window) {
+                return rect
+            }
+            let fallback = NSRect(x: bounds.minX, y: bounds.minY, width: 0, height: bounds.height)
+            return window?.convertToScreen(convert(fallback, to: nil)) ?? .zero
+        }
         return window?.convertToScreen(convert(bounds, to: nil)) ?? .zero
     }
 
