@@ -352,6 +352,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case evil_eye
     case joker
     case matrix
+    case dark
+    case dots
+    case graen
+    case milkshake
+    case pink_lemonade
+    case soaring_skies
+    case taro
+    case terrazzo
+    case viridescent
+    case wavez
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -459,6 +469,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .evil_eye: "邪眼 · Typebar"
         case .joker: "纸牌 · Typebar"
         case .matrix: "矩阵 · Typebar"
+        case .dark: "暗铅 · Typebar"
+        case .dots: "墨点 · Typebar"
+        case .graen: "苔石 · Typebar"
+        case .milkshake: "莓奶 · Typebar"
+        case .pink_lemonade: "粉柠 · Typebar"
+        case .soaring_skies: "高空 · Typebar"
+        case .taro: "芋紫 · Typebar"
+        case .terrazzo: "水磨石 · Typebar"
+        case .viridescent: "铜锈绿 · Typebar"
+        case .wavez: "浪纹 · Typebar"
         }
     }
 
@@ -652,6 +672,26 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0x312936, 0x4B3D52, 0xD9D497, 0xF6F1EA, 0xD6C9D8, light: false, error: 0xF4A8AA)
         case .matrix:
             Self.palette(0x162C25, 0x234438, 0xB7D6A2, 0xEDF4E7, 0xC9D9C9, light: false, error: 0xFFAD9E)
+        case .dark:
+            Self.palette(0x20242B, 0x343A43, 0xD7B978, 0xF3F2EA, 0xC4CCD2, light: false, error: 0xFFAB9D)
+        case .dots:
+            Self.palette(0xE5E7E2, 0xCCD1CB, 0x315E57, 0x243934, 0x455C55, light: true, error: 0x983B4A)
+        case .graen:
+            Self.palette(0xDCE7D6, 0xC3D6C3, 0x325F4F, 0x24382D, 0x435948, light: true, error: 0x973A4B)
+        case .milkshake:
+            Self.palette(0xF1E1E1, 0xE1CCD0, 0x75415D, 0x382B34, 0x654C5B, light: true, error: 0x973F4B)
+        case .pink_lemonade:
+            Self.palette(0xFBE6D3, 0xEFCDCA, 0x974052, 0x472F36, 0x6E4A54, light: true, error: 0x934043)
+        case .soaring_skies:
+            Self.palette(0x1D334D, 0x2F4D68, 0xECC994, 0xF0F3F4, 0xC4D4DB, light: false, error: 0xFFB3A5)
+        case .taro:
+            Self.palette(0xE9E0EB, 0xD4C4D9, 0x604C82, 0x312A3D, 0x584D64, light: true, error: 0x924050)
+        case .terrazzo:
+            Self.palette(0xE6E1D5, 0xD0C8B7, 0x3F675F, 0x33352F, 0x505749, light: true, error: 0x8E3C47)
+        case .viridescent:
+            Self.palette(0x102F30, 0x244A49, 0xD2C78F, 0xE8F3EC, 0xC5D6CD, light: false, error: 0xFFB39E)
+        case .wavez:
+            Self.palette(0x162F48, 0x294A65, 0x99D6D9, 0xEDF3F3, 0xC2D4D9, light: false, error: 0xFFB0A4)
         }
     }
 }

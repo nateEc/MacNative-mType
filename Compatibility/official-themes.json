@@ -268,7 +268,17 @@
     "drowning",
     "evil_eye",
     "joker",
-    "matrix"
+    "matrix",
+    "dark",
+    "dots",
+    "graen",
+    "milkshake",
+    "pink_lemonade",
+    "soaring_skies",
+    "taro",
+    "terrazzo",
+    "viridescent",
+    "wavez"
   ],
   "exactMappings": {},
   "relatedMappings": {
@@ -346,6 +356,16 @@
     "drowning": "drowning",
     "evil_eye": "evil_eye",
     "joker": "joker",
-    "matrix": "matrix"
+    "matrix": "matrix",
+    "dark": "dark",
+    "dots": "dots",
+    "graen": "graen",
+    "milkshake": "milkshake",
+    "pink_lemonade": "pink_lemonade",
+    "soaring_skies": "soaring_skies",
+    "taro": "taro",
+    "terrazzo": "terrazzo",
+    "viridescent": "viridescent",
+    "wavez": "wavez"
   }
 }

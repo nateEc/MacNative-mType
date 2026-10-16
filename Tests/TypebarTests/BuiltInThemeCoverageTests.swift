@@ -4,6 +4,36 @@ import XCTest
 @testable import Typebar
 
 final class BuiltInThemeCoverageTests: XCTestCase {
+  func testTenMoreOriginalThemeIdentitiesAreSelectableReadableAndPersistent() throws {
+    let names = ["dark", "dots", "graen", "milkshake", "pink_lemonade",
+      "soaring_skies", "taro", "terrazzo", "viridescent", "wavez"]
+    let variants = names.compactMap(AppTheme.init(rawValue:))
+    XCTAssertEqual(variants.count, names.count)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .light }.count, 6)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .dark }.count, 4)
+    for theme in variants {
+      XCTAssertEqual(try JSONDecoder().decode(AppTheme.self, from: JSONEncoder().encode(theme)), theme)
+      XCTAssertTrue(theme.displayName.hasSuffix(" · Typebar"))
+      XCTAssertTrue(ThemeQuickPickerSearch.results(
+        scope: .builtIn, query: theme.rawValue, builtInThemes: AppTheme.allCases,
+        customThemes: [], favoriteThemeIDs: []).builtInThemes.contains(theme))
+      XCTAssertEqual(ThemeCommandCatalog.target(
+        for: ThemeCommandCatalog.identifier(for: .builtIn(theme))), .builtIn(theme))
+      let resolved = theme.resolvedTheme
+      for surface in [resolved.background, resolved.panel] {
+        XCTAssertGreaterThanOrEqual(contrast(resolved.text, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(contrast(resolved.secondaryText, surface), 4.5, theme.rawValue)
+        for mark in [resolved.accent, resolved.caret, resolved.error, resolved.extraInput] {
+          XCTAssertGreaterThanOrEqual(contrast(mark, surface), 3.0, theme.rawValue)
+        }
+      }
+      for other in AppTheme.allCases where other != theme {
+        XCTAssertNotEqual(ThemeColor(color: theme.background), ThemeColor(color: other.background),
+          "Duplicate background: \(theme.rawValue), \(other.rawValue)")
+      }
+    }
+  }
+
   func testTenFurtherOriginalThemesAreSelectableReadableAndPersistByIdentity() throws {
     let names = ["arch", "bingsu", "godspeed", "macroblank", "pastel",
       "bushido", "drowning", "evil_eye", "joker", "matrix"]
