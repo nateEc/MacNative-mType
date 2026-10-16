@@ -222,9 +222,16 @@ import XCTest
     try settle(host, model: model)
     XCTAssertFalse(model.session.removedTapePromptWordIndices.isEmpty)
     XCTAssertEqual(model.session.typed, input)
-    let events = model.removals.count
     host.needsLayout = true; try settle(host, model: model)
-    XCTAssertEqual(model.removals.count, events, "Acknowledgement/repaint is not a second removal")
+    // A later layout may discover another overflowing word; only repeating
+    // the same identity would be a duplicate acknowledgement.
+    var notifiedWords = Set<Int>()
+    for event in model.removals {
+      XCTAssertTrue(notifiedWords.isDisjoint(with: event.wordIndices),
+        "Acknowledgement/repaint must not notify the same word twice: \(model.removals.map(\.wordIndices))")
+      notifiedWords.formUnion(event.wordIndices)
+    }
+    XCTAssertEqual(model.session.typed, input, "Later overflow cleanup must not delete accepted input")
     try capture(original, name: "overflow")
     XCTAssertFalse(window.isVisible)
   }
