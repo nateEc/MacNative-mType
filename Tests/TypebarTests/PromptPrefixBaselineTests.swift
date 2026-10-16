@@ -91,21 +91,30 @@ import XCTest
     for smooth in [false, true] {
       let (scroll, follower) = fixture(), attempt = UUID()
       var retired: [Int] = []
-      let notify: (PromptWordRetirement) -> Void = { retired.append($0.firstRetainedWordIndex) }
+      let firstRetirement = expectation(description: "Ordinary first retirement, smooth=\(smooth)")
+      firstRetirement.assertForOverFulfill = true
+      let smoothRetirement = smooth ? expectation(description: "Ordinary smooth followup retirement") : nil
+      smoothRetirement?.assertForOverFulfill = true
+      let notify: (PromptWordRetirement) -> Void = {
+        retired.append($0.firstRetainedWordIndex)
+        if $0.firstRetainedWordIndex == 1 { firstRetirement.fulfill() }
+        if $0.firstRetainedWordIndex == 3 { smoothRetirement?.fulfill() }
+      }
       let text = "aa\nbb cc\ndd ee ff"
       let offsets = [0: 0, 3: 3, 6: 6, 9: 9]
       for active in [0, 6, 9] {
         update(follower, text: text, active: active, offsets: offsets,
           attempt: attempt, smooth: smooth, notify: notify)
       }
-      finish()
+      wait(for: [firstRetirement], timeout: 2)
       XCTAssertEqual(retired, [1])
       update(follower, text: "bb cc\ndd ee ff", active: 9,
         offsets: [3: 0, 6: 3, 9: 6], retained: 1, attempt: attempt, smooth: smooth, notify: notify)
       finish()
       update(follower, text: "bb cc\nxx\ndd ee ff", active: 9,
         offsets: [3: 0, 6: 3, 9: 9], retained: 1, attempt: attempt, smooth: smooth, notify: notify)
-      finish()
+      if let smoothRetirement { wait(for: [smoothRetirement], timeout: 2) }
+      else { finish() }
       XCTAssertEqual(retired, smooth ? [1, 3] : [1], "smooth=\(smooth)")
       withExtendedLifetime(scroll) { follower.removeFromSuperview() }
     }

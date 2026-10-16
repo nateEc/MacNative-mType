@@ -39,7 +39,7 @@ enum VirtualKeyboardAccessibilityLabel {
 
 enum VirtualKeyboardVisibleLegend {
   static func text(for key: KeyboardGuideKey, output: String) -> String {
-    if output == " ", key.label.isEmpty { return "" }
+    if output == " ", key.label.isEmpty || key.label == " " { return "" }
     return output == " " ? "空格" : output
   }
 }

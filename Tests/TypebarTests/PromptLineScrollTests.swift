@@ -241,8 +241,13 @@ import XCTest
     }
     let geometry = try XCTUnwrap(PromptLineScrollGeometry.measure(in: unicode, activeOffset: 4,
       previousOffset: 2, width: 360, font: font, lineSpacing: 12, rightToLeft: false))
-    XCTAssertEqual(scroll.contentView.bounds.minY, try XCTUnwrap(geometry.previousWordTop), accuracy: 0.5)
-    XCTAssertGreaterThan(geometry.activeTop, try XCTUnwrap(geometry.previousWordTop))
+    let previousTop = try XCTUnwrap(geometry.previousWordTop)
+    let deadline = Date().addingTimeInterval(2)
+    while abs(scroll.contentView.bounds.minY - previousTop) > 0.5 && Date() < deadline {
+      RunLoop.main.run(until: min(deadline, Date().addingTimeInterval(0.005)))
+    }
+    XCTAssertEqual(scroll.contentView.bounds.minY, previousTop, accuracy: 0.5)
+    XCTAssertGreaterThan(geometry.activeTop, previousTop)
   }
 
   func testPinnedCompleteLineJumpAndActualAnimationSeekMatchNativePolicy() throws {

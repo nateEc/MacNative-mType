@@ -63,6 +63,25 @@ final class VirtualKeyboardTests: XCTestCase {
     XCTAssertEqual(VirtualKeyboardVisibleLegend.text(for: q, output: "Q"), "Q")
   }
 
+  func testLiteralSpaceLegendsStayBlankButBottomSpaceKeepsItsName() throws {
+    for layout in [KeyboardLayout.threeL, .neo] {
+      let keys = KeyboardGuideModel.rows(for: layout).flatMap { $0 }
+        .filter { $0.label == " " }
+      XCTAssertFalse(keys.isEmpty, layout.displayName)
+      for key in keys {
+        for (shift, option) in [(false, false), (true, false), (false, true), (true, true)] {
+          let output = try XCTUnwrap(VirtualKeyboardOutputPolicy.output(
+            for: key, shift: shift, option: option))
+          XCTAssertEqual(output, " ")
+          XCTAssertEqual(VirtualKeyboardVisibleLegend.text(for: key, output: output), "")
+        }
+      }
+      let bottom = try XCTUnwrap(KeyboardGuideModel.bottomRow(
+        for: .minimal, layout: layout).first { $0.id == "space" })
+      XCTAssertEqual(VirtualKeyboardVisibleLegend.text(for: bottom, output: " "), "空格")
+    }
+  }
+
   func testSpaceKeysHaveDistinctAccessibleNamesAcrossOfficialLayouts() {
     for layout in KeyboardLayout.allCases {
       let rows = KeyboardGuideModel.rows(for: layout)

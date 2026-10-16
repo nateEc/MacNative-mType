@@ -725,6 +725,9 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
     var checkedClicks = 0
     var clickMismatchesByLayout: [String: Int] = [:]
     var clickExamples: [String] = []
+    var buttonLegendMismatchCount = 0
+    var buttonLegendMismatchesByLayout: [String: Int] = [:]
+    var buttonLegendExamples: [String] = []
     for officialID in auditedIDs {
       let native = try XCTUnwrap(KeyboardLayout(rawValue: try XCTUnwrap(mapping.nativeExact[officialID])))
       let sourceURL = reference.appendingPathComponent("frontend/static/layouts/\(officialID).json")
@@ -779,6 +782,21 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
                     + "expected click \(String(describing: expectedClick)), got \(String(describing: clicked))")
               }
             }
+            let expectedButtonLegend = expectedClick.map { $0 == " " ? "" : $0 }
+            let actualButtonLegend = clicked.map {
+              VirtualKeyboardVisibleLegend.text(for: key, output: $0)
+            }
+            if actualButtonLegend != expectedButtonLegend {
+              buttonLegendMismatchCount += 1
+              buttonLegendMismatchesByLayout[officialID, default: 0] += 1
+              if buttonLegendExamples.count < 20 {
+                buttonLegendExamples.append(
+                  "\(officialID) row \(row + 1) key \(column + 1) "
+                    + "\(flags.contains(.option) ? "Option+" : "")\(shifted ? "Shift" : "base"): "
+                    + "expected button \(String(describing: expectedButtonLegend)), "
+                    + "got \(String(describing: actualButtonLegend))")
+              }
+            }
             // A literal Space has no visible glyph. Keep it blank only when
             // the guide still advertises that the physical key can type it.
             if expected == " ", actual.isEmpty, key.characters.contains(" ") {
@@ -814,6 +832,10 @@ final class OfficialLayoutOutputAuditTests: XCTestCase {
         + "\(clickMismatchesByLayout.count) layouts. "
         + "By layout: \(clickMismatchesByLayout.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: ", ")). "
         + "First mismatches:\n\(clickExamples.joined(separator: "\n"))")
+    XCTAssertEqual(buttonLegendMismatchCount, 0,
+      "\(buttonLegendMismatchCount) of \(checkedClicks) mouse keyboard button legends differ. "
+        + "By layout: \(buttonLegendMismatchesByLayout.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: ", ")). "
+        + "First mismatches:\n\(buttonLegendExamples.joined(separator: "\n"))")
   }
 
   func testArmenianThreeLayerGuideFallsBackToShiftOnOptionShift() {
