@@ -39,6 +39,30 @@ final class VirtualKeyboardTests: XCTestCase {
     }
   }
 
+  func testBlankSpaceKeysStayVisuallyBlankWhileRemainingAccessibleAndClickable() throws {
+    for layout in [KeyboardLayout.latinAmericanQwerty, .whix2] {
+      let rows = KeyboardGuideModel.rows(for: layout)
+      let blanks: [KeyboardGuideKey] = Array(rows.joined()).filter { key in
+        key.label.isEmpty && key.characters.count == 1 && key.characters.contains(" ")
+      }
+      XCTAssertEqual(blanks.count, layout == .whix2 ? 7 : 1)
+      for key in blanks {
+        for (shift, option) in [(false, false), (true, false), (false, true), (true, true)] {
+          let output = try XCTUnwrap(VirtualKeyboardOutputPolicy.output(
+            for: key, shift: shift, option: option))
+          XCTAssertEqual(output, " ")
+          XCTAssertEqual(VirtualKeyboardVisibleLegend.text(for: key, output: output), "")
+        }
+      }
+      let bottomSpace = try XCTUnwrap(KeyboardGuideModel.bottomRow(
+        for: .minimal, layout: layout).first { $0.id == "space" })
+      XCTAssertEqual(VirtualKeyboardVisibleLegend.text(for: bottomSpace, output: " "), "空格")
+    }
+    let q = try XCTUnwrap(KeyboardGuideModel.rows(for: .ansiQwerty)
+      .flatMap { $0 }.first { $0.label.lowercased() == "q" })
+    XCTAssertEqual(VirtualKeyboardVisibleLegend.text(for: q, output: "Q"), "Q")
+  }
+
   func testSpaceKeysHaveDistinctAccessibleNamesAcrossOfficialLayouts() {
     for layout in KeyboardLayout.allCases {
       let rows = KeyboardGuideModel.rows(for: layout)

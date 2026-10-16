@@ -37,6 +37,13 @@ enum VirtualKeyboardAccessibilityLabel {
   }
 }
 
+enum VirtualKeyboardVisibleLegend {
+  static func text(for key: KeyboardGuideKey, output: String) -> String {
+    if output == " ", key.label.isEmpty { return "" }
+    return output == " " ? "空格" : output
+  }
+}
+
 /// A mouse-accessible input surface. It follows the current native layout,
 /// while the ordinary keyboard guide remains a display-only hint.
 struct VirtualKeyboard: View {
@@ -117,7 +124,7 @@ struct VirtualKeyboard: View {
       Button {
         press(output)
       } label: {
-        Text(output == " " ? "空格" : output)
+        Text(VirtualKeyboardVisibleLegend.text(for: key, output: output))
           .font(.system(size: 12, weight: .medium, design: .monospaced))
           .frame(width: max(28, key.width), height: 25)
           .foregroundStyle(output == nextCharacter.map(String.init) ? accent : .primary)
