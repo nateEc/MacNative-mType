@@ -69,4 +69,23 @@ import XCTest
       actualRange: &actual))
     XCTAssertEqual(actual, NSRange(location: NSNotFound, length: 0))
   }
+
+  func testEmptyReadAtMarkedUTF16EndIsValidWithoutConfirmingTheCandidate() throws {
+    let input = TypingInputView(frame: .zero)
+    input.setMarkedText("😀候", selectedRange: .init(location: 3, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    var actual = NSRange(location: NSNotFound, length: 0)
+    let empty = try XCTUnwrap(input.attributedSubstring(
+      forProposedRange: .init(location: 3, length: 0), actualRange: &actual))
+    XCTAssertEqual(empty.string, "")
+    XCTAssertEqual(actual, NSRange(location: 3, length: 0))
+    XCTAssertEqual(input.selectedRange(), NSRange(location: 3, length: 0))
+    XCTAssertTrue(input.hasMarkedText())
+    XCTAssertNil(input.attributedSubstring(
+      forProposedRange: .init(location: 3, length: 1), actualRange: &actual))
+    XCTAssertEqual(actual, NSRange(location: NSNotFound, length: 0))
+    XCTAssertNil(input.attributedSubstring(
+      forProposedRange: .init(location: 4, length: 0), actualRange: &actual))
+    XCTAssertEqual(actual, NSRange(location: NSNotFound, length: 0))
+  }
 }

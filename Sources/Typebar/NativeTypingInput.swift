@@ -679,7 +679,9 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
         actualRange?.pointee = NSRange(location: NSNotFound, length: 0)
         guard composition.length > 0, range.location != NSNotFound,
-              range.location >= 0, range.location < composition.length, range.length >= 0 else { return nil }
+              range.location >= 0, range.length >= 0,
+              range.location < composition.length
+                || (range.location == composition.length && range.length == 0) else { return nil }
         let bounded = NSRange(location: range.location,
             length: min(range.length, composition.length - range.location))
         // Input methods may query only part of a UTF-16 surrogate pair or
