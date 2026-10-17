@@ -362,6 +362,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case terrazzo
     case viridescent
     case wavez
+    case chaos_theory
+    case cyberspace
+    case dark_note
+    case darling
+    case dev
+    case dollar
+    case dualshot
+    case everblush
+    case ez_mode
+    case fledgling
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -479,6 +489,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .terrazzo: "水磨石 · Typebar"
         case .viridescent: "铜锈绿 · Typebar"
         case .wavez: "浪纹 · Typebar"
+        case .chaos_theory: "混沌图谱 · Typebar"
+        case .cyberspace: "数据海 · Typebar"
+        case .dark_note: "暗色手记 · Typebar"
+        case .darling: "柔玫 · Typebar"
+        case .dev: "开发室 · Typebar"
+        case .dollar: "纸币绿 · Typebar"
+        case .dualshot: "双镜头 · Typebar"
+        case .everblush: "长春绯 · Typebar"
+        case .ez_mode: "轻松模式 · Typebar"
+        case .fledgling: "新羽 · Typebar"
         }
     }
 
@@ -692,6 +712,26 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0x102F30, 0x244A49, 0xD2C78F, 0xE8F3EC, 0xC5D6CD, light: false, error: 0xFFB39E)
         case .wavez:
             Self.palette(0x162F48, 0x294A65, 0x99D6D9, 0xEDF3F3, 0xC2D4D9, light: false, error: 0xFFB0A4)
+        case .chaos_theory:
+            Self.palette(0x242433, 0x373A4B, 0xDCD28B, 0xF5F0E8, 0xCFD0D7, light: false, error: 0xFFB3A1)
+        case .cyberspace:
+            Self.palette(0x142F3F, 0x244659, 0xA9E6D8, 0xEFF8F4, 0xBED6DD, light: false, error: 0xFFB6A7)
+        case .dark_note:
+            Self.palette(0x252624, 0x3B403B, 0xE8CD9E, 0xF5F0E5, 0xD0D2C8, light: false, error: 0xFFB0A0)
+        case .darling:
+            Self.palette(0xF2E8E6, 0xE1D4D4, 0x7A3B58, 0x382933, 0x5B4753, light: true, error: 0x8E3349)
+        case .dev:
+            Self.palette(0xE4EAEF, 0xCDD9E0, 0x315B75, 0x243746, 0x465F70, light: true, error: 0x983F48)
+        case .dollar:
+            Self.palette(0xE8EDD8, 0xD3DFC0, 0x3E6246, 0x28382D, 0x485C4A, light: true, error: 0x983C48)
+        case .dualshot:
+            Self.palette(0x28313B, 0x3C4B56, 0xE9B8AB, 0xF0F4F2, 0xCBD4D7, light: false, error: 0xFFB7A5)
+        case .everblush:
+            Self.palette(0xEEE5E9, 0xDCCFD8, 0x6D466D, 0x332C3D, 0x594D62, light: true, error: 0x8F3B50)
+        case .ez_mode:
+            Self.palette(0xF1E9D6, 0xDED3B8, 0x365F67, 0x303A37, 0x4F5A50, light: true, error: 0x943D4C)
+        case .fledgling:
+            Self.palette(0x22352E, 0x355046, 0xDCCF95, 0xF1F4E9, 0xC9D9CC, light: false, error: 0xFFB6A8)
         }
     }
 }

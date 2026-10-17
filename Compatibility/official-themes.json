@@ -278,7 +278,17 @@
     "taro",
     "terrazzo",
     "viridescent",
-    "wavez"
+    "wavez",
+    "chaos_theory",
+    "cyberspace",
+    "dark_note",
+    "darling",
+    "dev",
+    "dollar",
+    "dualshot",
+    "everblush",
+    "ez_mode",
+    "fledgling"
   ],
   "exactMappings": {},
   "relatedMappings": {
@@ -366,6 +376,16 @@
     "taro": "taro",
     "terrazzo": "terrazzo",
     "viridescent": "viridescent",
-    "wavez": "wavez"
+    "wavez": "wavez",
+    "chaos_theory": "chaos_theory",
+    "cyberspace": "cyberspace",
+    "dark_note": "dark_note",
+    "darling": "darling",
+    "dev": "dev",
+    "dollar": "dollar",
+    "dualshot": "dualshot",
+    "everblush": "everblush",
+    "ez_mode": "ez_mode",
+    "fledgling": "fledgling"
   }
 }
