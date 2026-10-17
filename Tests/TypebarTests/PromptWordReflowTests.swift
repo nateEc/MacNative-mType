@@ -80,6 +80,12 @@ import XCTest
     update(follower, text: "aa\nbb cc dd", word: 0, attempt: attempt, follows: false)
     update(follower, text: "aa\nbb cc dd", word: 6, attempt: attempt, follows: false)
     update(follower, text: "aa\nbb ccxx dd", word: 6, attempt: attempt, follows: false)
+    // The preceding text update owns a queued main-thread follow. Ensure it
+    // completes before testing the separate settings-only update; otherwise
+    // these two inputs legitimately coalesce (covered by the adjacent test).
+    let textFollowed = expectation(description: "text-only follow completed before enabling reflow")
+    DispatchQueue.main.async { textFollowed.fulfill() }
+    wait(for: [textFollowed], timeout: 3)
     XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 0.5)
     update(follower, text: "aa\nbb ccxx dd", word: 6, attempt: attempt)
     XCTAssertEqual(scroll.contentView.bounds.minY, 0, accuracy: 0.5)
