@@ -34,14 +34,14 @@ struct PromptCompositionPresentation {
   let isZen: Bool
   private let gapIndices: Set<Int>
   private let markedInputRanges: [NSRange]
-  private let showsMarkedInk: Bool
+  private let compositionStyle: CompositionDisplayStyle
 
   init?(session: TypingSession, composition: String, style: CompositionDisplayStyle) {
     guard let field = session.promptCompositionField,
       let projection = session.promptCompositionProjection(composition: composition, style: style) else { return nil }
     self.projection = projection
     isZen = session.configuration.mode == .zen
-    showsMarkedInk = style == .replace
+    compositionStyle = style
     var markedUnit = 0
     markedInputRanges = Array(composition).map { character in
       let range = NSRange(location: markedUnit, length: String(character).utf16.count)
@@ -148,7 +148,7 @@ struct PromptCompositionPresentation {
     let map = PromptCompositionTextMap(text: text, cellRanges: ranges, inkRanges: inks, cellTexts: texts,
       canonicalAliases: projection.canonicalAliases, fieldUnits: fieldUnits, caret: projection.caret, fieldRuns: fieldRuns,
       markedInputRanges: markedInputRanges, markedCellIDs: projection.markedCells.map(\.id),
-      showsMarkedInk: showsMarkedInk)
+      compositionStyle: compositionStyle)
     // Legacy character offsets remain a convenience for older callers, not
     // the identity directory. Partial/virtual slots live only in cellRanges.
     let offsets = Dictionary(projection.cells.filter { $0.id >= 0 }.compactMap { cell in
@@ -173,19 +173,19 @@ struct PromptCompositionTextMap {
   let fieldRuns: [PromptFieldTextRun]
   let markedInputRanges: [NSRange]
   let markedCellIDs: [Int]
-  let showsMarkedInk: Bool
+  let compositionStyle: CompositionDisplayStyle?
   private let characterStarts: [Int]
 
   init(text: AttributedString, cellRanges: [Int: NSRange], inkRanges: [Int: NSRange], cellTexts: [Int: AttributedString],
     canonicalAliases: [Int: [Int]], fieldUnits: [Int: Int], caret: PromptCompositionProjection.Anchor?,
     fieldRuns: [PromptFieldTextRun] = [], markedInputRanges: [NSRange] = [],
-    markedCellIDs: [Int] = [], showsMarkedInk: Bool = false) {
+    markedCellIDs: [Int] = [], compositionStyle: CompositionDisplayStyle? = nil) {
     self.cellRanges = cellRanges; self.inkRanges = inkRanges
     self.cellTexts = cellTexts; self.canonicalAliases = canonicalAliases; self.caret = caret
     self.fieldRuns = fieldRuns
     self.markedInputRanges = markedInputRanges
     self.markedCellIDs = markedCellIDs
-    self.showsMarkedInk = showsMarkedInk
+    self.compositionStyle = compositionStyle
     var starts = [0]
     for character in text.characters { starts.append(starts.last! + String(character).utf16.count) }
     characterStarts = starts
@@ -206,7 +206,7 @@ struct PromptCompositionTextMap {
   }
 
   func firstVisibleMarkedCell(for requested: NSRange) -> (id: Int, actualRange: NSRange)? {
-    guard showsMarkedInk, requested.location != NSNotFound,
+    guard compositionStyle == .replace, requested.location != NSNotFound,
       requested.location >= 0, requested.length > 0,
       let last = markedInputRanges.last,
       requested.location < NSMaxRange(last) else { return nil }
@@ -217,5 +217,12 @@ struct PromptCompositionTextMap {
       return (markedCellIDs[index], inputRange)
     }
     return nil
+  }
+
+  func firstMarkedInputRange(for requested: NSRange) -> NSRange? {
+    guard requested.location != NSNotFound, requested.location >= 0, requested.length > 0,
+      let last = markedInputRanges.last, requested.location < NSMaxRange(last) else { return nil }
+    let end = requested.location + min(requested.length, NSMaxRange(last) - requested.location)
+    return markedInputRanges.first { $0.location < end && NSMaxRange($0) > requested.location }
   }
 }

@@ -46,7 +46,7 @@ import XCTest
   }
 
   func testNormalWhitespaceEngineProbeWithoutOpeningWindow() throws {
-    let candidates = ["a\nb", "a\r\nb", "首行\n次行", "سلام\nשלום", "a\n\n b", "a\u{200B}\nb", "a\rb"]
+    let candidates = ["a\nb", "a\r\nb", "首行\n次行", "سلام\nשלום", "a\n\n b", "a\u{200B}\nb", "a\rb", " \u{0301}b"]
     let json = try String(decoding: JSONEncoder().encode(candidates), as: UTF8.self)
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .nonPersistent()
@@ -72,7 +72,7 @@ import XCTest
     let values = try XCTUnwrap(probe.values)
     print("COMPOSITION WHITESPACE WEBKIT \(values.debugDescription)")
     XCTAssertEqual(values.count, candidates.count)
-    XCTAssertEqual(values, ["a b", "a\r b", "首行 次行", "سلام שלום", "a b", "a\u{200B} b", "a\rb"])
+    XCTAssertEqual(values, ["a b", "a\r b", "首行 次行", "سلام שלום", "a b", "a\u{200B} b", "a\rb", "\u{0301}b"])
     for row in try XCTUnwrap(probe.geometry) {
       let ranges = try XCTUnwrap(row["ranges"] as? [[String: Any]])
       let firstY = try XCTUnwrap(ranges.first?["y"] as? Double)

@@ -113,6 +113,7 @@ struct NativeTypingInput: NSViewRepresentable {
     var acceptsTextInput = true
     var insertionAnchor: PromptInsertionAnchor? = nil
     var insertionAttemptID: UUID? = nil
+    var compositionDisplayStyle: CompositionDisplayStyle = .replace
     var quickRestartKey: QuickRestartKey
     var keyboardInputMapping: KeyboardInputMapping
     var oppositeShiftKeymap: KeyboardInputMapping
@@ -159,6 +160,7 @@ struct NativeTypingInput: NSViewRepresentable {
     func updateNSView(_ view: TypingInputView, context: Context) {
         view.insertionAnchor = insertionAnchor
         view.insertionAttemptID = insertionAttemptID
+        view.compositionDisplayStyle = compositionDisplayStyle
         view.onInsert = onInsert
         view.onDelete = onDelete
         view.onDeleteWord = onDeleteWord
@@ -208,6 +210,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     private(set) var isRetired = false
     var insertionAnchor: PromptInsertionAnchor?
     var insertionAttemptID: UUID?
+    var compositionDisplayStyle: CompositionDisplayStyle = .replace
     var acceptsTextInput = true {
       didSet {
         guard oldValue != acceptsTextInput else { return }
@@ -704,16 +707,22 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         actualRange?.pointee = range
         if range.length == 0 {
             if range.location == compositionSelection.location,
-               let insertionAnchor, let insertionAttemptID, let window,
-               let rect = insertionAnchor.screenRect(attemptID: insertionAttemptID, in: window) {
-                return rect
+               let insertionAnchor, let insertionAttemptID, let window {
+                if compositionDisplayStyle == .below,
+                   let rect = insertionAnchor.belowInsertionScreenRect(attemptID: insertionAttemptID,
+                    in: window, location: range.location, markedText: composition.string) {
+                    return rect
+                }
+                if let rect = insertionAnchor.screenRect(attemptID: insertionAttemptID, in: window) {
+                    return rect
+                }
             }
             let fallback = NSRect(x: bounds.minX, y: bounds.minY, width: 0, height: bounds.height)
             return window?.convertToScreen(convert(fallback, to: nil)) ?? .zero
         }
         if let insertionAnchor, let insertionAttemptID, let window,
            let result = insertionAnchor.markedScreenRect(attemptID: insertionAttemptID,
-             in: window, range: range, markedText: composition.string) {
+             in: window, range: range, markedText: composition.string, style: compositionDisplayStyle) {
             actualRange?.pointee = result.actualRange
             return result.rect
         }

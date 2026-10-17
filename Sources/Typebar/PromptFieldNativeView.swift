@@ -83,7 +83,7 @@ final class PromptFieldNativeView: NSView {
       || self.rendering.compositionTextMap?.caret != rendering.compositionTextMap?.caret
       || self.rendering.compositionTextMap?.markedInputRanges != rendering.compositionTextMap?.markedInputRanges
       || self.rendering.compositionTextMap?.markedCellIDs != rendering.compositionTextMap?.markedCellIDs
-      || self.rendering.compositionTextMap?.showsMarkedInk != rendering.compositionTextMap?.showsMarkedInk
+      || self.rendering.compositionTextMap?.compositionStyle != rendering.compositionTextMap?.compositionStyle
     if changed { invalidatesModel = true }
     self.rendering = rendering; self.font = font; self.lineSpacing = lineSpacing
     self.rightToLeft = rightToLeft; self.joinsLetters = joinsLetters
@@ -124,7 +124,7 @@ final class PromptFieldNativeView: NSView {
         || rendering.compositionTextMap?.caret != next.compositionTextMap?.caret
         || rendering.compositionTextMap?.markedInputRanges != next.compositionTextMap?.markedInputRanges
         || rendering.compositionTextMap?.markedCellIDs != next.compositionTextMap?.markedCellIDs
-        || rendering.compositionTextMap?.showsMarkedInk != next.compositionTextMap?.showsMarkedInk {
+        || rendering.compositionTextMap?.compositionStyle != next.compositionTextMap?.compositionStyle {
         let previousSize = intrinsicContentSize
         rendering = next; invalidatesModel = true; notificationRevision &+= 1
         _ = measure(width: max(1, bounds.width))

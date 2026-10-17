@@ -365,20 +365,26 @@ final class PromptCaretNativeView: NSView {
     return window.convertToScreen(convert(insertion, to: nil))
   }
 
-  /// Only the replace projection has marked ink in the prompt. The first
-  /// projected cell owns the AppKit range returned with its actual rectangle.
-  func markedScreenRect(for range: NSRange, markedText: String) -> (rect: NSRect, actualRange: NSRange)? {
+  /// Replace has marked ink in the prompt. Off/below use the prompt insertion
+  /// point when there is no separate candidate-row geometry to report.
+  func markedScreenRect(for range: NSRange, markedText: String,
+    style: CompositionDisplayStyle) -> (rect: NSRect, actualRange: NSRange)? {
     guard let initial = configuration, let window, bounds.width > 0,
       let rendering = initial.latestRendering?(),
       let config = configuration, config.attemptID == initial.attemptID,
       config.coordinator === initial.coordinator,
       config.latestInput?().composition == markedText,
-      let map = rendering.compositionTextMap,
-      let selected = map.firstVisibleMarkedCell(for: range),
+      let map = rendering.compositionTextMap, map.compositionStyle == style else { return nil }
+    if let selected = map.firstVisibleMarkedCell(for: range),
       let rect = config.markedCellRect?(selected.id),
       rect.minX.isFinite, rect.minY.isFinite,
-      rect.width.isFinite, rect.height.isFinite, rect.width > 0, rect.height > 0 else { return nil }
-    return (window.convertToScreen(convert(rect, to: nil)), selected.actualRange)
+      rect.width.isFinite, rect.height.isFinite, rect.width > 0, rect.height > 0 {
+      return (window.convertToScreen(convert(rect, to: nil)), selected.actualRange)
+    }
+    guard map.compositionStyle == .off || map.compositionStyle == .below,
+      let actualRange = map.firstMarkedInputRange(for: range),
+      let rect = insertionScreenRect() else { return nil }
+    return (rect, actualRange)
   }
 
   private func paint(_ rect: CGRect?, style: TypingCaretStyle, accent: Color, rightToLeft: Bool,

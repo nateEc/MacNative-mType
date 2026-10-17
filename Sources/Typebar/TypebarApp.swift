@@ -2998,7 +2998,8 @@ private struct ContentView: View {
       if settings.compositionDisplayStyle == .below {
         let focused = inputHasFocus && typingWindowHasFocus
         BelowCompositionPrompt(text: compositionText,
-          font: practicePromptNSFont(size: settings.fontSize), color: NSColor(activeTheme.secondaryText))
+          font: practicePromptNSFont(size: settings.fontSize), color: NSColor(activeTheme.secondaryText),
+          insertionAnchor: promptInsertionAnchor, attemptID: session.automaticInputAttemptID)
           .frame(maxWidth: .infinity)
           .opacity(focused ? 1 : 0.25)
           .blur(radius: focused ? 0 : 4)
@@ -3013,6 +3014,7 @@ private struct ContentView: View {
         focusRequest: focusRequest, acceptsTextInput: !isPreparingWholePreview,
         insertionAnchor: promptInsertionAnchor,
         insertionAttemptID: session.automaticInputAttemptID,
+        compositionDisplayStyle: settings.compositionDisplayStyle,
         quickRestartKey: settings.quickRestartKey,
         keyboardInputMapping: effectiveKeyboardInputMapping,
         oppositeShiftKeymap: settings.keyboardGuideLayoutSource.oppositeShiftMapping(

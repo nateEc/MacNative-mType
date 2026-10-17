@@ -1,8 +1,214 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import Typebar
 
 @MainActor final class CompositionCandidateRectTests: XCTestCase {
+  func testOffCompositionNonemptySelectionUsesPromptInsertionAndWholeMarkedGrapheme() throws {
+    let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 480, height: 200),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    let host = NSView(frame: .init(x: 0, y: 0, width: 480, height: 200))
+    let input = TypingInputView(frame: .init(x: 2, y: 3, width: 1, height: 1))
+    let field = PromptFieldNativeView(frame: .init(x: 40, y: 30, width: 360, height: 120))
+    host.addSubview(input); host.addSubview(field); window.contentView = host
+    defer { field.stop(); window.contentView = nil; window.close() }
+
+    var session = TypingSession(configuration: .words(2), prompt: "abcdef gh")
+    session.insertBatch("a", at: Date(timeIntervalSinceReferenceDate: 916_100_000))
+    let marked = "😀候"
+    let presentation = try XCTUnwrap(PromptCompositionPresentation(
+      session: session, composition: marked, style: .off))
+    let rendering = presentation.render { _, glyph, marked in
+      AttributedString(marked.map { presentation.markedText(for: $0, glyph: glyph) }
+        ?? String(glyph.character))
+    }
+    let font = NSFont.monospacedSystemFont(ofSize: 24, weight: .regular)
+    let attempt = UUID(), anchor = PromptInsertionAnchor()
+    var config = PromptCaretNativeView.Configuration(text: rendering.text,
+      mainOffset: nil, paceOffset: nil, mainStyle: .off, paceStyle: .off,
+      font: font, lineSpacing: 12, rightToLeft: false,
+      accent: .white, motion: .off, reducesMotion: true, frameRate: 60,
+      attemptID: attempt, coordinator: PromptCaretMotionCoordinator())
+    config.automaticallyPresents = false
+    config.insertionAnchor = anchor
+    config.latestInput = { .init(attemptID: attempt, typed: "a", composition: marked, glyphID: nil) }
+    field.configure(rendering: rendering, font: font, carets: config)
+    field.layoutSubtreeIfNeeded()
+    input.insertionAnchor = anchor
+    input.insertionAttemptID = attempt
+    input.compositionDisplayStyle = .off
+    input.setMarkedText(marked, selectedRange: .init(location: 3, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+
+    let expected = try XCTUnwrap(anchor.screenRect(attemptID: attempt, in: window))
+    var actual = NSRange(location: NSNotFound, length: 0)
+    XCTAssertEqual(input.firstRect(forCharacterRange: .init(location: 1, length: 1),
+      actualRange: &actual), expected)
+    XCTAssertEqual(actual, NSRange(location: 0, length: 2))
+    XCTAssertEqual(input.firstRect(forCharacterRange: .init(location: 2, length: 1),
+      actualRange: &actual), expected)
+    XCTAssertEqual(actual, NSRange(location: 2, length: 1))
+    field.isHidden = true
+    XCTAssertNotEqual(input.firstRect(forCharacterRange: .init(location: 1, length: 1),
+      actualRange: nil), expected)
+  }
+
+  func testBelowCompositionNonemptySelectionUsesItsOwnNativeRow() throws {
+    let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 480, height: 200),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    let host = NSView(frame: .init(x: 0, y: 0, width: 480, height: 200))
+    let input = TypingInputView(frame: .init(x: 2, y: 3, width: 1, height: 1))
+    let marked = "😀候"
+    let attempt = UUID(), anchor = PromptInsertionAnchor()
+    let row = NSHostingView(rootView: BelowCompositionPrompt(text: marked,
+      font: .monospacedSystemFont(ofSize: 26, weight: .regular), color: .labelColor,
+      insertionAnchor: anchor, attemptID: attempt).frame(width: 300, height: 70))
+    row.frame = .init(x: 60, y: 65, width: 300, height: 70)
+    host.addSubview(row); host.addSubview(input); window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    for _ in 0..<3 { row.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    func fields(_ view: NSView) -> [NSTextField] {
+      (view as? NSTextField).map { [$0] } ?? view.subviews.flatMap(fields)
+    }
+    let field = try XCTUnwrap(fields(row).first)
+    let rowScreen = window.convertToScreen(field.convert(field.bounds, to: nil))
+    input.insertionAnchor = anchor
+    input.insertionAttemptID = attempt
+    input.compositionDisplayStyle = .below
+    input.setMarkedText(marked, selectedRange: .init(location: 3, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+
+    var actual = NSRange(location: NSNotFound, length: 0)
+    let first = input.firstRect(forCharacterRange: .init(location: 1, length: 1), actualRange: &actual)
+    XCTAssertEqual(actual, NSRange(location: 0, length: 2))
+    XCTAssertTrue(rowScreen.intersects(first), "The candidate belongs to the visible below row")
+    let second = input.firstRect(forCharacterRange: .init(location: 2, length: 1), actualRange: &actual)
+    XCTAssertEqual(actual, NSRange(location: 2, length: 1))
+    XCTAssertTrue(rowScreen.intersects(second))
+    XCTAssertGreaterThan(second.minX, first.minX)
+    let insertion = input.firstRect(forCharacterRange: .init(location: 3, length: 0), actualRange: &actual)
+    XCTAssertEqual(actual, NSRange(location: 3, length: 0))
+    XCTAssertEqual(insertion.width, 0)
+    XCTAssertTrue(rowScreen.insetBy(dx: -1, dy: -1).contains(insertion.origin),
+      "An empty candidate selection belongs beside the below row")
+    row.setFrameOrigin(.init(x: 80, y: 65))
+    let moved = input.firstRect(forCharacterRange: .init(location: 1, length: 1), actualRange: nil)
+    XCTAssertEqual(moved.minX - first.minX, 20, accuracy: 1)
+    input.compositionDisplayStyle = .replace
+    XCTAssertNotEqual(input.firstRect(forCharacterRange: .init(location: 1, length: 1),
+      actualRange: nil), moved, "A prior below row must not win after switching styles")
+    input.compositionDisplayStyle = .below
+    input.insertionAttemptID = UUID()
+    XCTAssertNotEqual(input.firstRect(forCharacterRange: .init(location: 1, length: 1),
+      actualRange: nil), moved)
+    input.insertionAttemptID = attempt
+    row.rootView = BelowCompositionPrompt(text: "改",
+      font: .monospacedSystemFont(ofSize: 26, weight: .regular), color: .labelColor,
+      insertionAnchor: anchor, attemptID: attempt).frame(width: 300, height: 70)
+    for _ in 0..<3 { row.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    XCTAssertNotEqual(input.firstRect(forCharacterRange: .init(location: 1, length: 1),
+      actualRange: nil), moved, "A newer candidate must not borrow an older row")
+    input.setMarkedText("改", selectedRange: .init(location: 1, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    let updated = input.firstRect(forCharacterRange: .init(location: 0, length: 1), actualRange: nil)
+    XCTAssertTrue(window.convertToScreen(field.convert(field.bounds, to: nil)).intersects(updated))
+    row.isHidden = true
+    XCTAssertNotEqual(input.firstRect(forCharacterRange: .init(location: 0, length: 1),
+      actualRange: nil), updated)
+  }
+
+  func testBelowCandidateRangeFollowsWrappedRowsAndRTLInsertion() throws {
+    let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 440, height: 330),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    let host = NSView(frame: .init(x: 0, y: 0, width: 440, height: 330))
+    let input = TypingInputView(frame: .init(x: 2, y: 3, width: 1, height: 1))
+    let attempt = UUID(), anchor = PromptInsertionAnchor()
+    let marked = Array(repeating: "שלום", count: 7).joined(separator: " ")
+    let row = NSHostingView(rootView: BelowCompositionPrompt(text: marked,
+      font: .systemFont(ofSize: 28), color: .labelColor,
+      insertionAnchor: anchor, attemptID: attempt).frame(width: 150, height: 250))
+    row.frame = .init(x: 50, y: 35, width: 150, height: 250)
+    host.addSubview(row); host.addSubview(input); window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    for _ in 0..<3 { row.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    func fields(_ view: NSView) -> [NSTextField] {
+      (view as? NSTextField).map { [$0] } ?? view.subviews.flatMap(fields)
+    }
+    let field = try XCTUnwrap(fields(row).first)
+    let screen = window.convertToScreen(field.convert(field.bounds, to: nil))
+    input.insertionAnchor = anchor
+    input.insertionAttemptID = attempt
+    input.compositionDisplayStyle = .below
+    input.setMarkedText(marked, selectedRange: .init(location: marked.utf16.count, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    var actual = NSRange(location: NSNotFound, length: 0)
+    let first = input.firstRect(forCharacterRange: .init(location: 0, length: 1), actualRange: &actual)
+    XCTAssertEqual(actual, NSRange(location: 0, length: 1))
+    let final = input.firstRect(forCharacterRange: .init(location: marked.utf16.count - 1, length: 1),
+      actualRange: &actual)
+    XCTAssertEqual(actual, NSRange(location: marked.utf16.count - 1, length: 1))
+    XCTAssertTrue(screen.intersects(first))
+    XCTAssertTrue(screen.intersects(final))
+    XCTAssertNotEqual(first.minY, final.minY, "Wrapped candidates must not all report the first line")
+    let insertion = input.firstRect(forCharacterRange: .init(location: marked.utf16.count, length: 0),
+      actualRange: &actual)
+    XCTAssertEqual(actual, NSRange(location: marked.utf16.count, length: 0))
+    XCTAssertEqual(insertion.width, 0)
+    XCTAssertTrue(screen.insetBy(dx: -1, dy: -1).contains(insertion.origin))
+  }
+
+  func testBelowWhitespaceOnlyCandidateUsesPromptInsteadOfHiddenInput() throws {
+    let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 480, height: 220),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    let host = NSView(frame: .init(x: 0, y: 0, width: 480, height: 220))
+    let input = TypingInputView(frame: .init(x: 2, y: 3, width: 1, height: 1))
+    let field = PromptFieldNativeView(frame: .init(x: 40, y: 75, width: 360, height: 120))
+    let marked = "   "
+    let attempt = UUID(), anchor = PromptInsertionAnchor()
+    let row = NSHostingView(rootView: BelowCompositionPrompt(text: marked,
+      font: .monospacedSystemFont(ofSize: 24, weight: .regular), color: .labelColor,
+      insertionAnchor: anchor, attemptID: attempt).frame(width: 300, height: 40))
+    row.frame = .init(x: 60, y: 20, width: 300, height: 40)
+    host.addSubview(field); host.addSubview(row); host.addSubview(input); window.contentView = host
+    defer { field.stop(); window.contentView = nil; window.close() }
+    var session = TypingSession(configuration: .words(2), prompt: "abcdef gh")
+    session.insertBatch("a", at: Date(timeIntervalSinceReferenceDate: 916_100_000))
+    let presentation = try XCTUnwrap(PromptCompositionPresentation(
+      session: session, composition: marked, style: .below))
+    let rendering = presentation.render { _, glyph, marked in
+      AttributedString(marked.map { presentation.markedText(for: $0, glyph: glyph) }
+        ?? String(glyph.character))
+    }
+    let font = NSFont.monospacedSystemFont(ofSize: 24, weight: .regular)
+    var config = PromptCaretNativeView.Configuration(text: rendering.text,
+      mainOffset: nil, paceOffset: nil, mainStyle: .off, paceStyle: .off,
+      font: font, lineSpacing: 12, rightToLeft: false,
+      accent: .white, motion: .off, reducesMotion: true, frameRate: 60,
+      attemptID: attempt, coordinator: PromptCaretMotionCoordinator())
+    config.automaticallyPresents = false
+    config.insertionAnchor = anchor
+    config.latestInput = { .init(attemptID: attempt, typed: "a", composition: marked, glyphID: nil) }
+    field.configure(rendering: rendering, font: font, carets: config)
+    field.layoutSubtreeIfNeeded()
+    for _ in 0..<3 { row.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    input.insertionAnchor = anchor
+    input.insertionAttemptID = attempt
+    input.compositionDisplayStyle = .below
+    input.setMarkedText(marked, selectedRange: .init(location: 3, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    let expected = try XCTUnwrap(anchor.screenRect(attemptID: attempt, in: window))
+    var actual = NSRange(location: NSNotFound, length: 0)
+    XCTAssertEqual(input.firstRect(forCharacterRange: .init(location: 0, length: 1),
+      actualRange: &actual), expected)
+    XCTAssertEqual(actual, NSRange(location: 0, length: 1))
+    XCTAssertEqual(input.firstRect(forCharacterRange: .init(location: 3, length: 0),
+      actualRange: nil), expected)
+  }
+
   func testOffAndBelowDoNotMisreportTargetInkAsMarkedSelectionGeometry() throws {
     let session = TypingSession(configuration: .words(2), prompt: "abcdef gh")
     for style in [CompositionDisplayStyle.off, .below] {

@@ -4,6 +4,28 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class BelowCompositionPromptTests: XCTestCase {
+  func testCollapsedWhitespaceAndComposedCharactersMapBackToWholeSourceRanges() {
+    let spaces = BelowCompositionProjection("a \n b")
+    XCTAssertEqual(spaces.displayed, "a b")
+    XCTAssertEqual(spaces.firstVisibleRange(for: .init(location: 2, length: 1))?.display,
+      NSRange(location: 1, length: 1))
+    XCTAssertEqual(spaces.firstVisibleRange(for: .init(location: 2, length: 1))?.actual,
+      NSRange(location: 1, length: 3))
+    XCTAssertEqual(spaces.firstVisibleRange(for: .init(location: 4, length: 1))?.display,
+      NSRange(location: 2, length: 1))
+    let composed = BelowCompositionProjection("e\u{301} 😀")
+    XCTAssertEqual(composed.firstVisibleRange(for: .init(location: 1, length: 1))?.actual,
+      NSRange(location: 0, length: 2))
+    XCTAssertEqual(composed.firstVisibleRange(for: .init(location: 4, length: 1))?.actual,
+      NSRange(location: 3, length: 2))
+    let leadingCombined = BelowCompositionProjection(" \u{0301}b")
+    XCTAssertEqual(leadingCombined.displayed, "\u{0301}b",
+      "CSS collapses the leading ASCII space even when a combining scalar follows")
+    XCTAssertEqual(leadingCombined.firstVisibleRange(for: .init(location: 1, length: 1))?.actual,
+      NSRange(location: 0, length: 2))
+    XCTAssertNil(BelowCompositionProjection("\t  ").firstVisibleRange(for: .init(location: 1, length: 1)))
+  }
+
   func testControlCharactersAndThemeUpdatesPreserveCandidateIdentityAndEmptyLine() throws {
     let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
     func root(_ text: String, _ color: NSColor) -> some View {
