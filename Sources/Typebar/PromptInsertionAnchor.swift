@@ -30,4 +30,15 @@ import AppKit
     }
     return nil
   }
+
+  func markedScreenRect(attemptID: UUID, in window: NSWindow,
+    range: NSRange, markedText: String) -> (rect: NSRect, actualRange: NSRange)? {
+    entries.removeAll { $0.view == nil }
+    for entry in entries.reversed() {
+      guard entry.attemptID == attemptID, let view = entry.view,
+        view.window === window, !view.isHiddenOrHasHiddenAncestor else { continue }
+      if let result = view.markedScreenRect(for: range, markedText: markedText) { return result }
+    }
+    return nil
+  }
 }

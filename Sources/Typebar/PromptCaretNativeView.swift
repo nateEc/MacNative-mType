@@ -41,6 +41,7 @@ final class PromptCaretNativeView: NSView {
     // Field layouts resolve virtual IDs themselves; canonical pace IDs remain
     // a separate API and may alias several presentation slots.
     var fieldMainRect: ((TypingCaretStyle) -> CGRect?)? = nil
+    var markedCellRect: ((Int) -> CGRect?)? = nil
     var fieldMainDirection: (() -> Bool)? = nil
     var fieldDirectionPerGlyph = false
     var fieldPaceRect: ((Int, Bool) -> CGRect?)? = nil
@@ -362,6 +363,22 @@ final class PromptCaretNativeView: NSView {
       isRightToLeft: geometry.rightToLeft)
     let insertion = NSRect(x: x, y: rect.minY, width: 0, height: rect.height)
     return window.convertToScreen(convert(insertion, to: nil))
+  }
+
+  /// Only the replace projection has marked ink in the prompt. The first
+  /// projected cell owns the AppKit range returned with its actual rectangle.
+  func markedScreenRect(for range: NSRange, markedText: String) -> (rect: NSRect, actualRange: NSRange)? {
+    guard let initial = configuration, let window, bounds.width > 0,
+      let rendering = initial.latestRendering?(),
+      let config = configuration, config.attemptID == initial.attemptID,
+      config.coordinator === initial.coordinator,
+      config.latestInput?().composition == markedText,
+      let map = rendering.compositionTextMap,
+      let selected = map.firstVisibleMarkedCell(for: range),
+      let rect = config.markedCellRect?(selected.id),
+      rect.minX.isFinite, rect.minY.isFinite,
+      rect.width.isFinite, rect.height.isFinite, rect.width > 0, rect.height > 0 else { return nil }
+    return (window.convertToScreen(convert(rect, to: nil)), selected.actualRange)
   }
 
   private func paint(_ rect: CGRect?, style: TypingCaretStyle, accent: Color, rightToLeft: Bool,

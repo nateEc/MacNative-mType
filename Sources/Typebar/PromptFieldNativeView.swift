@@ -81,6 +81,9 @@ final class PromptFieldNativeView: NSView {
       || self.rendering.compositionTextMap?.fieldRuns != rendering.compositionTextMap?.fieldRuns
       || self.rendering.compositionTextMap?.canonicalAliases != rendering.compositionTextMap?.canonicalAliases
       || self.rendering.compositionTextMap?.caret != rendering.compositionTextMap?.caret
+      || self.rendering.compositionTextMap?.markedInputRanges != rendering.compositionTextMap?.markedInputRanges
+      || self.rendering.compositionTextMap?.markedCellIDs != rendering.compositionTextMap?.markedCellIDs
+      || self.rendering.compositionTextMap?.showsMarkedInk != rendering.compositionTextMap?.showsMarkedInk
     if changed { invalidatesModel = true }
     self.rendering = rendering; self.font = font; self.lineSpacing = lineSpacing
     self.rightToLeft = rightToLeft; self.joinsLetters = joinsLetters
@@ -118,7 +121,10 @@ final class PromptFieldNativeView: NSView {
     if let next = configuration?.latestRendering?() {
       if rendering.compositionTextMap?.fieldRuns != next.compositionTextMap?.fieldRuns
         || rendering.compositionTextMap?.canonicalAliases != next.compositionTextMap?.canonicalAliases
-        || rendering.compositionTextMap?.caret != next.compositionTextMap?.caret {
+        || rendering.compositionTextMap?.caret != next.compositionTextMap?.caret
+        || rendering.compositionTextMap?.markedInputRanges != next.compositionTextMap?.markedInputRanges
+        || rendering.compositionTextMap?.markedCellIDs != next.compositionTextMap?.markedCellIDs
+        || rendering.compositionTextMap?.showsMarkedInk != next.compositionTextMap?.showsMarkedInk {
         let previousSize = intrinsicContentSize
         rendering = next; invalidatesModel = true; notificationRevision &+= 1
         _ = measure(width: max(1, bounds.width))
@@ -141,6 +147,7 @@ final class PromptFieldNativeView: NSView {
     config.latestRendering = { [weak self] in self?.refreshRendering() ?? .init(text: AttributedString(), glyphCharacterOffsets: [:]) }
     let perGlyph = config.fieldDirectionPerGlyph
     config.fieldMainRect = { [weak self] style in self?.model?.mainRect(style: style, perGlyph: perGlyph) }
+    config.markedCellRect = { [weak self] id in self?.model?.cellFrames[id] }
     config.fieldMainDirection = { [weak self] in self?.model?.mainDirection(perGlyph: perGlyph) ?? false }
     config.fieldPaceRect = { [weak self] id, after in self?.model?.canonicalRect(id, after: after) }
     let fallbackDirection = config.rightToLeft

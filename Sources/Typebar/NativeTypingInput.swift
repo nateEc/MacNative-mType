@@ -711,6 +711,12 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             let fallback = NSRect(x: bounds.minX, y: bounds.minY, width: 0, height: bounds.height)
             return window?.convertToScreen(convert(fallback, to: nil)) ?? .zero
         }
+        if let insertionAnchor, let insertionAttemptID, let window,
+           let result = insertionAnchor.markedScreenRect(attemptID: insertionAttemptID,
+             in: window, range: range, markedText: composition.string) {
+            actualRange?.pointee = result.actualRange
+            return result.rect
+        }
         return window?.convertToScreen(convert(bounds, to: nil)) ?? .zero
     }
 

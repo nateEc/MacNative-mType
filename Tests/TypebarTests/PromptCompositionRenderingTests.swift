@@ -7,6 +7,20 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_100_000)
 
+  func testCanonicalCandidateSpellingsKeepTheirDistinctUTF16SourceRanges() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "abcdef gh")
+    let composed = render(try presentation(session, "é"))
+    let decomposed = render(try presentation(session, "e\u{301}"))
+    let first = try XCTUnwrap(composed.compositionTextMap)
+    let second = try XCTUnwrap(decomposed.compositionTextMap)
+    XCTAssertEqual(first.markedInputRanges, [NSRange(location: 0, length: 1)])
+    XCTAssertEqual(second.markedInputRanges, [NSRange(location: 0, length: 2)])
+    XCTAssertEqual(first.firstVisibleMarkedCell(for: .init(location: 0, length: 1))?.actualRange,
+      NSRange(location: 0, length: 1))
+    XCTAssertEqual(second.firstVisibleMarkedCell(for: .init(location: 1, length: 1))?.actualRange,
+      NSRange(location: 0, length: 2))
+  }
+
   func testDeterministicProjectionAndAttributedRenderPhaseMeasurementsPreserveOutput() throws {
     for count in [30, 100] {
       let prompt = Array(repeating: "amber", count: count).joined(separator: " ")
