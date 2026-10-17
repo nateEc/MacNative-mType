@@ -63,4 +63,45 @@ import XCTest
     caret.stop()
     XCTAssertNotEqual(input.firstRect(forCharacterRange: requested, actualRange: nil), expected())
   }
+
+  func testRightToLeftCandidateAnchorFollowsScrolledPromptAndRejectsHiddenOwner() {
+    let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 320, height: 180),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    let host = NSView(frame: .init(x: 0, y: 0, width: 320, height: 180))
+    let input = TypingInputView(frame: .init(x: 2, y: 3, width: 1, height: 1))
+    let scroll = NSScrollView(frame: .init(x: 30, y: 25, width: 260, height: 100))
+    let document = NSView(frame: .init(x: 0, y: 0, width: 260, height: 500))
+    let caret = PromptCaretNativeView(frame: .init(x: 10, y: 230, width: 200, height: 100))
+    document.addSubview(caret); scroll.documentView = document
+    host.addSubview(scroll); host.addSubview(input); window.contentView = host
+    defer { caret.stop(); window.contentView = nil; window.close() }
+
+    let attempt = UUID(), anchor = PromptInsertionAnchor()
+    var config = PromptCaretNativeView.Configuration(text: AttributedString("אבג"),
+      mainOffset: nil, paceOffset: nil, mainStyle: .off, paceStyle: .off,
+      font: .systemFont(ofSize: 20), lineSpacing: 12, rightToLeft: true,
+      accent: .white, motion: .off, reducesMotion: true, frameRate: 60,
+      attemptID: attempt, coordinator: PromptCaretMotionCoordinator())
+    config.fieldMainRect = { _ in NSRect(x: 40, y: 15, width: 12, height: 24) }
+    config.automaticallyPresents = false
+    config.insertionAnchor = anchor
+    caret.update(config)
+    input.insertionAnchor = anchor
+    input.insertionAttemptID = attempt
+
+    let requested = NSRange(location: 0, length: 0)
+    let before = input.firstRect(forCharacterRange: requested, actualRange: nil)
+    let trailing = window.convertToScreen(caret.convert(
+      NSRect(x: 52, y: 15, width: 0, height: 24), to: nil))
+    XCTAssertEqual(before, trailing)
+    scroll.contentView.scroll(to: .init(x: 0, y: 45))
+    scroll.reflectScrolledClipView(scroll.contentView)
+    let after = input.firstRect(forCharacterRange: requested, actualRange: nil)
+    XCTAssertEqual(after.minY, before.minY - 45, accuracy: 0.5)
+    XCTAssertEqual(after.minX, before.minX, accuracy: 0.5)
+
+    scroll.isHidden = true
+    XCTAssertNotEqual(input.firstRect(forCharacterRange: requested, actualRange: nil), after)
+  }
 }
