@@ -1,8 +1,25 @@
 import SwiftUI
 import AppKit
 
-enum PromptGlyphColor: Equatable {
+enum PromptGlyphColor: Hashable {
   case completed, future, error, extra, hidden
+}
+
+/// Reuse ink only within one render. Non-ASCII and any position-dependent
+/// presentation keep their exact original UTF-16 and per-cell attributes.
+struct PlainPendingGlyphInkKey: Hashable {
+  let ascii: UInt8
+  let color: PromptGlyphColor
+  let hasErrorUnderline: Bool
+
+  static func make(glyph: TypingPromptGlyph, appearance: PromptGlyphAppearance,
+    isCompleted: Bool, hasSpecialPresentation: Bool) -> Self? {
+    guard glyph.state == .pending, glyph.typedCharacter == nil, !isCompleted,
+      !hasSpecialPresentation, let ascii = glyph.character.asciiValue,
+      (33...126).contains(ascii), glyph.character.unicodeScalars.count == 1 else { return nil }
+    return .init(ascii: ascii, color: appearance.color,
+      hasErrorUnderline: appearance.hasErrorUnderline)
+  }
 }
 
 enum TypingPromptWordPhase: Equatable {

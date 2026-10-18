@@ -3597,6 +3597,11 @@ private struct ContentView: View {
     let futurePromptColor = promptTextColor(for: .future, theme: activeTheme)
     let errorFeedbackColor = activeTheme.errorColor(usesColorfulMode: settings.colorfulMode)
     let extraInputFeedbackColor = activeTheme.extraInputColor(usesColorfulMode: settings.colorfulMode)
+    let typedCharacterEffect = settings.typedCharacterEffect
+    let compositionDisplayStyle = settings.compositionDisplayStyle
+    let typoIndicatorStyle = settings.typoIndicatorStyle
+    let caretStyle = settings.caretStyle
+    let fontSize = settings.fontSize
     let usesIndependentPromptCarets = self.usesIndependentPromptCarets
     let paceGuideIndex = usesIndependentPromptCarets ? nil : self.paceGuideIndex
     // Native ordinary, ASL, Choo and Tape adapters resolve projected cells.
@@ -3605,7 +3610,7 @@ private struct ContentView: View {
     let usesCompositionProjection = composition != nil
       && PromptFieldProjectionPolicy.supports(session.configuration)
     let presentation = usesCompositionProjection
-      ? PromptCompositionPresentation(session: session, composition: composition ?? "", style: settings.compositionDisplayStyle) : nil
+      ? PromptCompositionPresentation(session: session, composition: composition ?? "", style: compositionDisplayStyle) : nil
     CompositionProjectionDiagnostics.observe(expected: usesCompositionProjection,
       available: presentation != nil, marked: composition?.isEmpty == false, session: session)
     let completedCharacterIndices = presentation?.completedIndices ?? session.completedPromptCharacterIndices
@@ -3622,20 +3627,27 @@ private struct ContentView: View {
     let appearances = PromptGlyphAppearance.plan(
       glyphs: glyphs, words: words,
       mode: promptHighlightMode, blindMode: session.configuration.rules.blindMode,
-      typedEffect: settings.typedCharacterEffect,
+      typedEffect: typedCharacterEffect,
       hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
     let emptyWordPlaceholder = presentation?.emptyPlaceholderIndex ?? session.zenEmptyWordPlaceholderGlyphIndex
+    var plainPendingInk: [PlainPendingGlyphInkKey: AttributedString] = [:]
     func renderGlyph(_ index: Int, _ glyph: TypingPromptGlyph,
       _ markedCell: PromptCompositionProjection.Cell?) -> AttributedString {
+      let isCompleted = completedCharacterIndices.contains(index)
+      let appearance = appearances[index]
+      let plainKey = PlainPendingGlyphInkKey.make(glyph: glyph, appearance: appearance,
+        isCompleted: isCompleted, hasSpecialPresentation: presentation == nil || markedCell != nil
+          || index == caretIndex || index == paceGuideIndex || index == emptyWordPlaceholder)
+      if let plainKey, let cached = plainPendingInk[plainKey] { return cached }
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
-        isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
-        effect: settings.typedCharacterEffect)
+        isCompleted: isCompleted, character: glyph.character,
+        effect: typedCharacterEffect)
       let replacesCurrentWithComposition = index == caretIndex
         && presentation == nil
-        && settings.compositionDisplayStyle == .replace
+        && compositionDisplayStyle == .replace
         && composition?.isEmpty == false
       let textPlan = PromptControlCharacterPresentation.plan(
-        for: glyph, style: settings.typoIndicatorStyle,
+        for: glyph, style: typoIndicatorStyle,
         isZen: session.configuration.mode == .zen,
         isExtra: glyph.state == .extra || (presentation == nil && index >= targetGlyphCount),
         compositionReplacement: markedCell?.text ?? (replacesCurrentWithComposition ? composition : nil),
@@ -3650,7 +3662,6 @@ private struct ContentView: View {
       if !usesIndependentPromptCarets, index == paceGuideIndex, index != caretIndex {
         applyPaceCaret(to: &character, theme: activeTheme)
       }
-      let appearance = appearances[index]
       switch appearance.color {
       case .completed: character.foregroundColor = completedPromptColor
       case .future: character.foregroundColor = futurePromptColor
@@ -3660,10 +3671,10 @@ private struct ContentView: View {
       }
       switch glyph.state {
       case .correct:
-        switch settings.typedCharacterEffect {
-        case .hide where completedCharacterIndices.contains(index):
+        switch typedCharacterEffect {
+        case .hide where isCompleted:
           character.foregroundColor = .clear
-        case .fade where completedCharacterIndices.contains(index):
+        case .fade where isCompleted:
           character.foregroundColor = activeTheme.fadedText.opacity(0.24)
         case .dots where turnsIntoDot:
           character.foregroundColor = activeTheme.accent.opacity(0.74)
@@ -3674,14 +3685,14 @@ private struct ContentView: View {
       case .incorrect, .pending, .hidden, .extra: break
       }
       if index == caretIndex, promptHighlightMode != .off,
-        settings.caretStyle.drawsMarker && !usesIndependentPromptCarets {
+        caretStyle.drawsMarker && !usesIndependentPromptCarets {
         applyCaret(to: &character, theme: activeTheme)
       }
       appearance.applyVisibility(to: &character)
       if let color = character.foregroundColor {
         character.foregroundColor = color.opacity(textPlan.opacity)
       }
-      if settings.typedCharacterEffect != .hide || !completedCharacterIndices.contains(index) {
+      if typedCharacterEffect != .hide || !isCompleted {
         appearance.applyErrorUnderline(to: &character, errorColor: errorFeedbackColor)
       }
       if markedCell != nil {
@@ -3693,14 +3704,15 @@ private struct ContentView: View {
       {
         var hint = AttributedString(hintText)
         hint.font = .system(
-          size: max(9, settings.fontSize * 0.48), weight: .semibold, design: .monospaced)
+          size: max(9, fontSize * 0.48), weight: .semibold, design: .monospaced)
         hint.foregroundColor = errorFeedbackColor.opacity(0.72)
-        hint.baselineOffset = -settings.fontSize * 0.42
+        hint.baselineOffset = -fontSize * 0.42
         // Reserve no additional horizontal advance: the hint sits under the
         // erroneous glyph instead of reflowing every following character.
-        hint.kern = -settings.fontSize * 0.62
+        hint.kern = -fontSize * 0.62
         character += hint
       }
+      if let plainKey { plainPendingInk[plainKey] = character }
       return character
     }
     if let presentation { return presentation.render(renderGlyph) }
