@@ -63,7 +63,7 @@ private struct PromptFieldBridge: NSViewRepresentable {
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: onViewportHeight)
   }
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: PromptFieldNativeView, context: Context) -> CGSize? {
-    nsView.measure(width: max(1, proposal.width ?? nsView.bounds.width))
+    nsView.proposalSize(width: max(1, proposal.width ?? nsView.bounds.width))
   }
   static func dismantleNSView(_ view: PromptFieldNativeView, coordinator: ()) { view.stop() }
 }
@@ -161,6 +161,21 @@ final class PromptFieldNativeView: NSView {
       deliverHeight()
     }
     return model?.size ?? .zero
+  }
+
+  /// SwiftUI may ask for several candidate widths after the view has already
+  /// been laid out. A proposal measures its own snapshot; only the actual
+  /// bounds may replace the model used by draw, carets and scrolling.
+  func proposalSize(width: CGFloat) -> CGSize {
+    let width = width.isFinite ? max(1, width) : 1
+    guard let map = rendering.compositionTextMap else { return .init(width: width, height: 0) }
+    if !invalidatesModel, modelWidth == width, let model { return model.size }
+    if let preparedLayout, preparedLayout.matchesMetrics(width: width, font: font,
+      lineSpacing: lineSpacing, rightToLeft: rightToLeft, joinsLetters: joinsLetters) {
+      return preparedLayout.size
+    }
+    return PromptFieldTextLayout(map: map, width: width, font: font, lineSpacing: lineSpacing,
+      rightToLeft: rightToLeft, joinsLetters: joinsLetters, reusing: model).size
   }
 
   private func refreshRendering() -> PromptRendering {

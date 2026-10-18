@@ -34,6 +34,25 @@ import XCTest
     XCTAssertFalse(window.isVisible)
   }
 
+  func testSizingProposalDoesNotReplaceVisibleFieldGeometry() throws {
+    let prompt = "harbor planet signal willow amber copper orchard paper ripple marble paper quiet marble voyage willow violet thunder window tangent moss ripple amber summer violet voyage quiet signal summer orchard amber ripple quiet drift voyage copper drift amber lantern paper harbor ripple summer willow thunder pocket moss ripple paper window moss"
+    let rendering = try render(TypingSession(configuration: .words(50), prompt: prompt))
+    let view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 756, height: 393))
+    defer { view.stop() }
+    view.configure(rendering: rendering, font: font, carets: config(.init()))
+    let visibleSize = view.intrinsicContentSize
+    let firstCell = view.measuredRect(for: 0)
+    let revision = view.geometryRevision
+
+    let proposed = view.proposalSize(width: 616)
+
+    XCTAssertEqual(proposed.width, 616)
+    XCTAssertGreaterThan(proposed.height, visibleSize.height)
+    XCTAssertEqual(view.intrinsicContentSize, visibleSize)
+    XCTAssertEqual(view.measuredRect(for: 0), firstCell)
+    XCTAssertEqual(view.geometryRevision, revision)
+  }
+
   func testPreparedGeometryIsAdoptedOnlyAtMatchingWidthAndMetrics() async throws {
     let rendered = try render(TypingSession(configuration: .words(250),
       prompt: Array(repeating: "abcd", count: 250).joined(separator: " ")))
