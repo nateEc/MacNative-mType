@@ -144,7 +144,7 @@ import XCTest
           var session = TypingSession(configuration: configuration, prompt: "alpha beta")
           let prepared = PromptRenderPlan(session: session, composition: "", style: style).render()
           session.insertBatch("a", at: Date(timeIntervalSinceReferenceDate: 916_100_000))
-          let patched = try XCTUnwrap(PromptFirstInputPatch.make(prepared: prepared,
+          let patched = try XCTUnwrap(PromptSequentialInputPatch.make(prepared: prepared,
             session: session, style: style))
           let expected = PromptRenderPlan(session: session, composition: "", style: style).render()
           XCTAssertEqual(patched.text, expected.text)
@@ -159,6 +159,52 @@ import XCTest
     }
   }
 
+  func testSequentialInputPatchMatchesFullNativeRenderingWithinFirstWord() throws {
+    for colorful in [false, true] {
+      for flips in [false, true] {
+        var style = PromptRenderStyle(theme: theme, caretStyle: .bar,
+          highlightMode: .letter)
+        style.colorfulMode = colorful
+        style.flipTestColors = flips
+        var session = TypingSession(configuration: .words(2), prompt: "alpha beta")
+        var frame = PromptRenderPlan(session: session, composition: "", style: style).render()
+        for (index, character) in "alph".enumerated() {
+          session.insertBatch(String(character),
+            at: Date(timeIntervalSinceReferenceDate: 916_100_000 + Double(index)))
+          frame = try XCTUnwrap(PromptSequentialInputPatch.make(prepared: frame,
+            session: session, style: style))
+          let expected = PromptRenderPlan(session: session, composition: "", style: style).render()
+          XCTAssertEqual(frame.text, expected.text)
+          XCTAssertEqual(frame.compositionTextMap?.caret, expected.compositionTextMap?.caret)
+          XCTAssertEqual(frame.compositionTextMap?.cellTexts, expected.compositionTextMap?.cellTexts)
+          XCTAssertEqual(frame.compositionTextMap?.fieldRuns, expected.compositionTextMap?.fieldRuns)
+        }
+      }
+    }
+  }
+
+  func testSequentialPatchDeclinesWrongSecondKeyAndWordBoundary() throws {
+    let style = PromptRenderStyle(theme: theme, caretStyle: .bar)
+    for (prompt, second, third) in [("alpha beta", "x", nil), ("abc beta", "b", "c")] {
+      var session = TypingSession(configuration: .words(2), prompt: prompt)
+      let original = PromptRenderPlan(session: session, composition: "", style: style).render()
+      session.insertBatch("a", at: Date(timeIntervalSinceReferenceDate: 916_100_000))
+      let first = try XCTUnwrap(PromptSequentialInputPatch.make(prepared: original,
+        session: session, style: style))
+      session.insertBatch(second, at: Date(timeIntervalSinceReferenceDate: 916_100_001))
+      if let third {
+        let secondFrame = try XCTUnwrap(PromptSequentialInputPatch.make(prepared: first,
+          session: session, style: style))
+        session.insertBatch(third, at: Date(timeIntervalSinceReferenceDate: 916_100_002))
+        XCTAssertNil(PromptSequentialInputPatch.make(prepared: secondFrame,
+          session: session, style: style), "Final letter before a word boundary must fall back for \(prompt)")
+      } else {
+        XCTAssertNil(PromptSequentialInputPatch.make(prepared: first,
+          session: session, style: style), "Wrong key must fall back for \(prompt)")
+      }
+    }
+  }
+
   func testFirstInputPatchDeclinesIncorrectAndStructurallyDifferentInput() {
     let style = PromptRenderStyle(theme: theme, caretStyle: .bar)
     for (prompt, input) in [("alpha beta", "x"), ("écho beta", "é"),
@@ -166,7 +212,7 @@ import XCTest
       var session = TypingSession(configuration: .words(2), prompt: prompt)
       let prepared = PromptRenderPlan(session: session, composition: "", style: style).render()
       session.insertBatch(input, at: Date(timeIntervalSinceReferenceDate: 916_100_000))
-      XCTAssertNil(PromptFirstInputPatch.make(prepared: prepared, session: session,
+      XCTAssertNil(PromptSequentialInputPatch.make(prepared: prepared, session: session,
         style: style), "Fallback required for \(prompt) / \(input)")
     }
   }

@@ -87,6 +87,9 @@ import XCTest
   func testPreparedMediumPreviewPatchesFirstInputLayoutThroughHost() throws {
     try check(.actualFirstInput, wordCount: 5_001)
   }
+  func testPreparedMediumPreviewPatchesSecondInputLayoutThroughHost() throws {
+    try check(.actualSequentialInput, wordCount: 5_001)
+  }
   func testFirstInputThenMarkedTextFontChangeAndSecondKeyKeepCurrentInkAndCaret() throws {
     try check(.actualInterleavings)
   }
@@ -94,6 +97,11 @@ import XCTest
     try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
       "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
     try check(.actualFirstInput, wordCount: 100_001)
+  }
+  func testAboveFormerCeilingAcceptsSequentialInputThroughHost() throws {
+    try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
+      "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
+    try check(.actualSequentialInput, wordCount: 100_001)
   }
   func testLargestLegalPendingTargetCanLeaveWithoutPublishing() throws {
     try check(.leave, wordCount: OfficialTestLimitInput.maximumValue)
@@ -256,7 +264,7 @@ import XCTest
     XCTAssertEqual(target(), expected)
     XCTAssertTrue(views(PromptFieldNativeView.self, in: host).first?.usedPreparedLayout == true)
   }
-  private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual, actualFirstInput, actualInterleavings }
+  private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual, actualFirstInput, actualSequentialInput, actualInterleavings }
 
   private func check(_ scenario: Scenario, wordCount: Int = 201, modifiers: [TestModifier] = [.noQuit]) throws {
     let suite = "WholePreviewPreparationHostTests.\(UUID())"
@@ -274,6 +282,7 @@ import XCTest
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let pending = Pending()
     pending.usesActualGenerator = scenario == .actual || scenario == .actualFirstInput
+      || scenario == .actualSequentialInput
       || scenario == .actualInterleavings
     let content = TypebarApp.practiceContent(settings: settings,
       account: AccountSession(defaults: defaults), announcements: RemoteAnnouncementCenter(defaults: defaults),
@@ -341,7 +350,8 @@ import XCTest
     }
     for _ in 0..<10 where pending.calls == 0 { flush() }
     XCTAssertEqual(pending.calls, 1)
-    if scenario == .actual || scenario == .actualFirstInput || scenario == .actualInterleavings {
+    if scenario == .actual || scenario == .actualFirstInput || scenario == .actualSequentialInput
+      || scenario == .actualInterleavings {
       var flushCount = 0
       // The 100,001-word generator was still progressing at 99,700 words when
       // a fixed 200-flush wait expired on the macOS 15 runner. Wait for the
@@ -381,7 +391,8 @@ import XCTest
       if wordCount > 100_000 {
         print("whole preview stage observation: words=\(wordCount) projection=\(String(describing: pending.projectionElapsed)) rendering=\(String(describing: pending.renderingElapsed)) glyphBatches=\(String(describing: pending.glyphBatchesElapsed)) fieldLayout=\(String(describing: pending.fieldLayoutElapsed))")
       }
-      if scenario == .actualFirstInput || scenario == .actualInterleavings {
+      if scenario == .actualFirstInput || scenario == .actualSequentialInput
+        || scenario == .actualInterleavings {
         let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
         let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
         let beforeCaret = try XCTUnwrap(field.measuredMainCaretRect())
@@ -414,6 +425,28 @@ import XCTest
         XCTAssertFalse(settings.allowsRestartingConfigurationChange,
           "The first character must begin the actual No Quit attempt")
         XCTAssertLessThan(elapsed, 40, "The first key must not render the entire body twice")
+        if scenario == .actualSequentialInput {
+          let second = try XCTUnwrap(actual.dropFirst().first)
+          XCTAssertTrue((33...126).contains(try XCTUnwrap(second.asciiValue)),
+            "The sequential host must exercise an ordinary printable target")
+          let beforeSecondInk = try XCTUnwrap(updated.renderedCellText(for: 1))
+          let firstCaret = try XCTUnwrap(updated.measuredMainCaretRect())
+          let secondStarted = ProcessInfo.processInfo.systemUptime
+          input.onInsert(String(second), false)
+          let secondCallback = ProcessInfo.processInfo.systemUptime - secondStarted
+          flush()
+          let secondElapsed = ProcessInfo.processInfo.systemUptime - secondStarted
+          print("whole preview second input observation: words=\(wordCount) callback=\(secondCallback) elapsed=\(secondElapsed)")
+          let twiceUpdated = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+          XCTAssertTrue(twiceUpdated === field)
+          XCTAssertEqual(target(), actual)
+          XCTAssertTrue(twiceUpdated.usedPreparedLayout,
+            "The second ordinary key must retain the independently patched full-preview layout")
+          XCTAssertNotEqual(twiceUpdated.renderedCellText(for: 1), beforeSecondInk)
+          XCTAssertGreaterThan(try XCTUnwrap(twiceUpdated.measuredMainCaretRect()).minX,
+            firstCaret.minX)
+          XCTAssertLessThan(secondElapsed, 40, "The second key must not render the entire body again")
+        }
         if scenario == .actualInterleavings {
           let second = try XCTUnwrap(actual.dropFirst().first)
           let acceptedInk = try XCTUnwrap(updated.renderedCellText(for: 0))
@@ -461,7 +494,7 @@ import XCTest
     XCTAssertTrue(settings.allowsRestartingConfigurationChange,
       "Pending preparation must not start a No Quit attempt")
     switch scenario {
-    case .actual, .actualFirstInput, .actualInterleavings: XCTFail("Handled above")
+    case .actual, .actualFirstInput, .actualSequentialInput, .actualInterleavings: XCTFail("Handled above")
     case .resume:
       window.contentView = nil
       flush()

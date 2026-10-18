@@ -3855,33 +3855,33 @@ private struct ContentView: View {
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     let typedBefore = session.typed
-    let initialPreview = !hadStarted ? preparedWholePreviewRendering : nil
+    let previousPreview = preparedWholePreviewRendering
     let feedback = TypingLiveInputFeedback.insertBatch(
       effectiveInsertedText(text), into: &session,
       forceError: forceError, origin: origin, defersAutomaticInput: true,
       wrapAdmission: promptInputWrapAdmission)
-    if !hadStarted && session.hasStarted {
+    if session.typed != typedBefore {
       let style = promptRenderStyle
-      if let initialPreview, initialPreview.attemptID == session.automaticInputAttemptID,
-        initialPreview.typedSnapshot.isEmpty, initialPreview.style == style,
-        initialPreview.paceGuideIndex == nil,
-        let patched = PromptFirstInputPatch.make(prepared: initialPreview.rendering,
+      if let previousPreview, previousPreview.attemptID == session.automaticInputAttemptID,
+        previousPreview.typedSnapshot == typedBefore, previousPreview.style == style,
+        previousPreview.paceGuideIndex == nil, compositionText.isEmpty,
+        let patched = PromptSequentialInputPatch.make(prepared: previousPreview.rendering,
           session: session, style: style) {
-        let patchedLayout = initialPreview.layout.flatMap { previous in
+        let patchedLayout = previousPreview.layout.flatMap { previous in
           patched.compositionTextMap.flatMap { map in
-            map.fieldRuns.first?.cells.first.flatMap {
-              previous.patchingFirstInput($0, caret: map.caret)
+            map.fieldRuns.first?.cells.first(where: { $0.id == session.typed.count - 1 }).flatMap {
+              previous.patchingSequentialInput($0, caret: map.caret)
             }
           }
         }
-        preparedWholePreviewRendering = .init(attemptID: initialPreview.attemptID,
+        preparedWholePreviewRendering = .init(attemptID: previousPreview.attemptID,
           typedSnapshot: session.typed, rendering: patched, layout: patchedLayout,
           style: style, paceGuideIndex: nil)
       } else { preparedWholePreviewRendering = nil }
-      synchronizeNoQuitConfigurationLock()
     } else if preparedWholePreviewRendering?.typedSnapshot != session.typed {
       preparedWholePreviewRendering = nil
     }
+    if !hadStarted && session.hasStarted { synchronizeNoQuitConfigurationLock() }
     visualFocus.inputDidUpdate(hasFeedback: !feedback.isEmpty,
       textChanged: session.typed != typedBefore, isFinished: session.isFinished)
     verifyChallengeFontAvailability()

@@ -853,6 +853,8 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 状态：`盘点完成` 仅代表已从参考项目定位功能；不代表已实现。
 
+2026-10-19 `showAllLines` 仍为部分兼容：首词内正确普通 ASCII 连续输入已复用预制墨迹与布局，显式十万零一词宿主验证到第二键；全量准备仍约三十余秒，其他输入和真实可见窗口流畅度未验收。证据与回退边界见 [配置审计](OFFICIAL_CONFIG_AUDIT.md)。
+
 2026-09-23 输入表面补充：固定参考的隐藏 Konami 键序（Up、Up、Down、Down、Left、Right、Left、Right、B、A）已由独立 Swift 状态机实现。它只观察原生输入桥事件，完成后调用 macOS 默认浏览器打开 `https://keymash.io/`；不会复用参考代码、资源或事件数据，不会吞掉练习文本输入，也不会上传提示、实际输入或按键时序。重复事件及 Command／Control／Option 组合明确不触发；详见 `OFFICIAL_INPUT_AUDIT.md` 和 `MANUAL_ACCEPTANCE.md` 的 `INP-KONAMI-01`。
 
 2026-09-04 当前状态更正：内置键盘图现为二十二种，其中新增 Typebar 自写的 `Greek Alphabetic · Typebar`；它按 Typebar 原创字母顺序覆盖 Greek 词流的二十四个基本字母、七个重音元音、词末 `ς` 与练习标点，可用于提示、显式物理输入模拟、归档和 Layout Fluid。本文后续较早写作“十八种”“二十种”或“二十一种”的内置图描述均由此当前数值取代；未收录字符、死键与 Option 层继续使用 macOS 当前输入源，且不导入官方或系统布局资产。

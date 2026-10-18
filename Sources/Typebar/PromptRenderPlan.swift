@@ -241,53 +241,63 @@ struct PromptRenderStyle: Equatable {
   }
 }
 
-/// A provisional first-key frame for an unchanged, ordinary field. It does
-/// not replace the complete render and declines any structural ambiguity.
-@MainActor enum PromptFirstInputPatch {
+/// Advances an unchanged ordinary first field by one correct ASCII key.
+/// Structural or styling ambiguity falls back to a complete render.
+@MainActor enum PromptSequentialInputPatch {
   static func make(prepared: PromptRendering, session: TypingSession,
     style: PromptRenderStyle) -> PromptRendering? {
+    let completedID = session.typed.count - 1
+    let nextID = completedID + 1
     guard session.hasStarted, !session.isFinished, session.configuration.mode != .zen,
-      session.typed.count == 1,
+      completedID >= 0, let typed = session.typed.last,
       style.highlightMode == .letter, style.typedCharacterEffect == .keep,
       !style.usesTapePractice, !session.configuration.rules.blindMode,
       session.configuration.modifiers.allSatisfy({ $0 == .noQuit }),
-      let first = session.prompt.first, let second = session.prompt.dropFirst().first,
-      first.asciiValue.map({ (33...126).contains($0) }) == true,
-      second.asciiValue.map({ (33...126).contains($0) }) == true,
-      session.typed == String(first), let map = prepared.compositionTextMap,
-      map.caret == .init(cellID: 0, after: false),
-      map.cellRanges[0] == .init(location: 0, length: 1),
-      map.cellRanges[1] == .init(location: 1, length: 1),
+      session.typed.allSatisfy({ $0.asciiValue.map { (33...126).contains($0) } == true }),
+      session.prompt.hasPrefix(session.typed),
+      let next = session.prompt.dropFirst(nextID).first,
+      next.asciiValue.map({ (33...126).contains($0) }) == true,
+      let map = prepared.compositionTextMap,
+      map.caret == .init(cellID: completedID, after: false),
+      map.cellRanges[completedID] == .init(location: completedID, length: 1),
+      map.cellRanges[nextID] == .init(location: nextID, length: 1),
       map.markedInputRanges.isEmpty, map.fieldRuns.first?.fieldID == 0,
-      map.fieldRuns[0].cells.count > 1,
-      map.fieldRuns[0].cells[0].id == 0, map.fieldRuns[0].cells[1].id == 1,
-      map.fieldRuns[0].cells[0].glyph.state == .current,
-      map.fieldRuns[0].cells[1].glyph.state == .pending,
-      let previousInk = map.cellTexts[0], String(previousInk.characters) == String(first),
+      map.fieldRuns[0].cells.count > nextID,
+      map.fieldRuns[0].cells[completedID].id == completedID,
+      map.fieldRuns[0].cells[nextID].id == nextID,
+      map.fieldRuns[0].cells[completedID].glyph.state == .current,
+      map.fieldRuns[0].cells[nextID].glyph.state == .pending,
+      let previousInk = map.cellTexts[completedID],
+      String(previousInk.characters) == String(typed),
       PromptRenderSessionPolicy(session: session, highlightMode: style.highlightMode,
         usesTapePractice: false, mainCaretDrawsMarker: style.caretStyle.drawsMarker,
         paceCaretDrawsMarker: style.paceCaretStyle.drawsMarker).usesIndependentPromptCarets
     else { return nil }
     let glyphs = session.promptGlyphs
-    guard glyphs.count > 1, glyphs[0].character == first, glyphs[1].character == second,
-      glyphs[0].state == .correct, glyphs[1].state == .current,
-      glyphs[0].typedCharacter == nil else { return nil }
+    guard glyphs.count > nextID,
+      glyphs[completedID].character == typed,
+      glyphs[nextID].character == next,
+      glyphs[completedID].state == .correct, glyphs[nextID].state == .current,
+      glyphs[completedID].typedCharacter == nil else { return nil }
     let completed = PromptRenderPlan.promptColor(.completed, style: style).opacity(1)
     var text = prepared.text
-    let firstEnd = text.characters.index(after: text.startIndex)
-    text[text.startIndex..<firstEnd].foregroundColor = completed
+    let start = text.characters.index(text.startIndex, offsetBy: completedID)
+    let end = text.characters.index(after: start)
+    text[start..<end].foregroundColor = completed
     var ink = previousInk
     ink.foregroundColor = completed
     var cellTexts = map.cellTexts
-    cellTexts[0] = ink
+    cellTexts[completedID] = ink
     var fieldRuns = map.fieldRuns
-    fieldRuns[0].cells[0] = .init(id: 0, glyph: glyphs[0], text: ink, isGap: false)
-    let next = fieldRuns[0].cells[1]
-    fieldRuns[0].cells[1] = .init(id: 1, glyph: glyphs[1], text: next.text, isGap: next.isGap)
+    fieldRuns[0].cells[completedID] = .init(id: completedID,
+      glyph: glyphs[completedID], text: ink, isGap: false)
+    let nextCell = fieldRuns[0].cells[nextID]
+    fieldRuns[0].cells[nextID] = .init(id: nextID,
+      glyph: glyphs[nextID], text: nextCell.text, isGap: nextCell.isGap)
     return .init(text: text, glyphCharacterOffsets: prepared.glyphCharacterOffsets,
       emptyWordPlaceholderGlyphID: prepared.emptyWordPlaceholderGlyphID,
       structuralNewlineOffsets: prepared.structuralNewlineOffsets,
       compositionTextMap: map.replacing(cellTexts: cellTexts, fieldRuns: fieldRuns,
-        caret: .init(cellID: 1, after: false)))
+        caret: .init(cellID: nextID, after: false)))
   }
 }

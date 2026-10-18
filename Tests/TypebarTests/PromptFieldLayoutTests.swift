@@ -159,10 +159,10 @@ import XCTest
         width: width, font: font)
       let oldCaret = previous.mainRect(style: .bar)
       session.insertBatch("q", at: start)
-      let after = try XCTUnwrap(PromptFirstInputPatch.make(prepared: before,
+      let after = try XCTUnwrap(PromptSequentialInputPatch.make(prepared: before,
         session: session, style: style))
       let map = try XCTUnwrap(after.compositionTextMap)
-      let patched = try XCTUnwrap(previous.patchingFirstInput(
+      let patched = try XCTUnwrap(previous.patchingSequentialInput(
         try XCTUnwrap(map.fieldRuns.first?.cells.first), caret: map.caret))
       let fresh = PromptFieldTextLayout(map: map, width: width, font: font)
       XCTAssertEqual(patched.cellFrames, fresh.cellFrames)
@@ -177,9 +177,37 @@ import XCTest
       var wider = kerned.text
       wider.kern = 8
       kerned = .init(id: kerned.id, glyph: kerned.glyph, text: wider, isGap: kerned.isGap)
-      XCTAssertNil(previous.patchingFirstInput(kerned, caret: map.caret),
+      XCTAssertNil(previous.patchingSequentialInput(kerned, caret: map.caret),
         "A changed advance must fall back to complete layout")
     }
+  }
+
+  func testSecondInputSnapshotPatchesNextBoxAndMatchesFreshLayout() throws {
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light), caretStyle: .bar)
+    var session = TypingSession(configuration: .words(2), prompt: "quiet harbor")
+    let original = PromptRenderPlan(session: session, composition: "", style: style).render()
+    let initialLayout = PromptFieldTextLayout(map: try XCTUnwrap(original.compositionTextMap),
+      width: 65, font: font)
+    session.insertBatch("q", at: start)
+    let first = try XCTUnwrap(PromptSequentialInputPatch.make(prepared: original,
+      session: session, style: style))
+    let firstMap = try XCTUnwrap(first.compositionTextMap)
+    let firstLayout = try XCTUnwrap(initialLayout.patchingSequentialInput(
+      try XCTUnwrap(firstMap.fieldRuns.first?.cells.first), caret: firstMap.caret))
+    session.insertBatch("u", at: start.addingTimeInterval(1))
+    let second = try XCTUnwrap(PromptSequentialInputPatch.make(prepared: first,
+      session: session, style: style))
+    let secondMap = try XCTUnwrap(second.compositionTextMap)
+    let completed = try XCTUnwrap(secondMap.fieldRuns.first?.cells.first(where: { $0.id == 1 }))
+    let patched = try XCTUnwrap(firstLayout.patchingSequentialInput(completed,
+      caret: secondMap.caret))
+    let fresh = PromptFieldTextLayout(map: secondMap, width: 65, font: font)
+    XCTAssertEqual(patched.cellFrames, fresh.cellFrames)
+    XCTAssertEqual(patched.fieldFrames, fresh.fieldFrames)
+    XCTAssertEqual(patched.size, fresh.size)
+    XCTAssertEqual(patched.mainRect(style: .bar), fresh.mainRect(style: .bar))
+    XCTAssertNotEqual(firstLayout.mainRect(style: .bar), patched.mainRect(style: .bar))
   }
 
   func testGeometryReuseRejectsChangedAdvanceAndFieldGrouping() throws {
