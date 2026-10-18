@@ -78,6 +78,9 @@ import XCTest
   func testFirstInputPublishesFreshFieldInkAndCaretThroughHost() throws {
     try check(.actualFirstInput)
   }
+  func testFirstInputThenMarkedTextFontChangeAndSecondKeyKeepCurrentInkAndCaret() throws {
+    try check(.actualInterleavings)
+  }
   func testAboveFormerCeilingAcceptsFirstInputThroughHost() throws {
     try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
       "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
@@ -244,7 +247,7 @@ import XCTest
     XCTAssertEqual(target(), expected)
     XCTAssertTrue(views(PromptFieldNativeView.self, in: host).first?.usedPreparedLayout == true)
   }
-  private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual, actualFirstInput }
+  private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual, actualFirstInput, actualInterleavings }
 
   private func check(_ scenario: Scenario, wordCount: Int = 201, modifiers: [TestModifier] = [.noQuit]) throws {
     let suite = "WholePreviewPreparationHostTests.\(UUID())"
@@ -262,6 +265,7 @@ import XCTest
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let pending = Pending()
     pending.usesActualGenerator = scenario == .actual || scenario == .actualFirstInput
+      || scenario == .actualInterleavings
     let content = TypebarApp.practiceContent(settings: settings,
       account: AccountSession(defaults: defaults), announcements: RemoteAnnouncementCenter(defaults: defaults),
       hotkey: GlobalHotkeyMonitor(), systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
@@ -307,7 +311,7 @@ import XCTest
     }
     for _ in 0..<10 where pending.calls == 0 { flush() }
     XCTAssertEqual(pending.calls, 1)
-    if scenario == .actual || scenario == .actualFirstInput {
+    if scenario == .actual || scenario == .actualFirstInput || scenario == .actualInterleavings {
       var flushCount = 0
       // The 100,001-word generator was still progressing at 99,700 words when
       // a fixed 200-flush wait expired on the macOS 15 runner. Wait for the
@@ -335,7 +339,7 @@ import XCTest
       if let started = pending.preparationStarted {
         print("whole preview presentation observation: words=\(wordCount) elapsed=\(ProcessInfo.processInfo.systemUptime - started) layoutMax=\(layoutMaximum) runLoopMax=\(runLoopMaximum)")
       }
-      if scenario == .actualFirstInput {
+      if scenario == .actualFirstInput || scenario == .actualInterleavings {
         let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
         let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
         let beforeCaret = try XCTUnwrap(field.measuredMainCaretRect())
@@ -360,6 +364,40 @@ import XCTest
         XCTAssertFalse(settings.allowsRestartingConfigurationChange,
           "The first character must begin the actual No Quit attempt")
         XCTAssertLessThan(elapsed, 40, "The first key must not render the entire body twice")
+        if scenario == .actualInterleavings {
+          let second = try XCTUnwrap(actual.dropFirst().first)
+          let acceptedInk = try XCTUnwrap(updated.renderedCellText(for: 0))
+          let secondBeforeInk = try XCTUnwrap(updated.renderedCellText(for: 1))
+          input.setMarkedText("候", selectedRange: .init(location: 1, length: 0),
+            replacementRange: .init(location: NSNotFound, length: 0))
+          flush()
+          XCTAssertTrue(input.hasMarkedText())
+          XCTAssertTrue(target().hasPrefix(String(first) + "候"),
+            "The candidate must replace the current visible cell, not the accepted first cell")
+          settings.fontSize = 36
+          flush()
+          XCTAssertTrue(target().hasPrefix(String(first) + "候"),
+            "A style change must not publish pre-composition ink over the candidate")
+          input.unmarkText()
+          flush()
+          XCTAssertFalse(input.hasMarkedText())
+          XCTAssertEqual(target(), actual)
+          let resumed = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+          XCTAssertTrue(resumed === field)
+          XCTAssertEqual(resumed.renderedCellText(for: 0), acceptedInk)
+          let resumedCaret = try XCTUnwrap(resumed.measuredMainCaretRect())
+          XCTAssertGreaterThan(resumedCaret.minX,
+            try XCTUnwrap(resumed.measuredRect(for: 0)).minX)
+          input.onInsert(String(second), false)
+          flush()
+          XCTAssertEqual(target(), actual)
+          let twiceUpdated = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+          XCTAssertTrue(twiceUpdated === field)
+          XCTAssertNotEqual(twiceUpdated.renderedCellText(for: 1), secondBeforeInk)
+          XCTAssertGreaterThan(try XCTUnwrap(twiceUpdated.measuredMainCaretRect()).minX,
+            resumedCaret.minX)
+          XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+        }
       }
       return
     }
@@ -373,7 +411,7 @@ import XCTest
     XCTAssertTrue(settings.allowsRestartingConfigurationChange,
       "Pending preparation must not start a No Quit attempt")
     switch scenario {
-    case .actual, .actualFirstInput: XCTFail("Handled above")
+    case .actual, .actualFirstInput, .actualInterleavings: XCTFail("Handled above")
     case .resume:
       window.contentView = nil
       flush()
