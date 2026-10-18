@@ -7,6 +7,28 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testPreparedGeometryIsAdoptedOnlyAtMatchingWidthAndMetrics() async throws {
+    let rendered = try render(TypingSession(configuration: .words(250),
+      prompt: Array(repeating: "abcd", count: 250).joined(separator: " ")))
+    let map = try XCTUnwrap(rendered.compositionTextMap)
+    let prepared = try await PromptFieldTextLayout.makeCooperatively(map: map,
+      width: 400, font: font)
+    let view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 400, height: 180))
+    defer { view.stop() }
+    view.configure(rendering: rendered, font: font, carets: config(.init()),
+      preparedLayout: prepared)
+    XCTAssertTrue(view.usesLayout(prepared))
+    XCTAssertEqual(view.measuredRect(for: 0), prepared.cellFrames[0])
+    view.frame.size.width = 200
+    _ = view.measure(width: 200)
+    XCTAssertFalse(view.usesLayout(prepared), "A resized field must not retain stale positions")
+    let changedFont = NSFont.monospacedSystemFont(ofSize: 30, weight: .regular)
+    view.frame.size.width = 400
+    view.configure(rendering: rendered, font: changedFont, carets: config(.init()),
+      preparedLayout: prepared)
+    XCTAssertFalse(view.usesLayout(prepared), "A new font must not retain stale metrics")
+  }
+
   func testRepeatedIndependentSlotsShareShapingWithoutSharingPositions() throws {
     let value = try render(TypingSession(configuration: .words(250),
       prompt: Array(repeating: "abcd", count: 250).joined(separator: " ")))

@@ -158,6 +158,82 @@ import XCTest
     flush()
     XCTAssertFalse(settings.allowsRestartingConfigurationChange)
   }
+
+  func testGeometryStageKeepsInputLockedAndRejectsOldFontWithoutRegenerating() throws {
+    let suite = "WholePreviewGeometryHostTests.\(UUID())"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let settings = AppSettings(defaults: defaults)
+    settings.showAllPracticeLines = true
+    settings.testModifiers = [.noQuit]
+    let configuration = TestConfiguration.words(6_001).with(modifiers: [.noQuit])
+    XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: configuration),
+      testParameterMemory: .legacyDefaults(configuration: configuration))))
+    let container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
+      SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let expected = Array(repeating: "staged", count: 6_001).joined(separator: " ")
+    var generationCalls = 0, layoutCalls = 0
+    var pendingLayouts: [CheckedContinuation<Void, Never>] = []
+    let content = TypebarApp.practiceContent(settings: settings,
+      account: AccountSession(defaults: defaults), announcements: RemoteAnnouncementCenter(defaults: defaults),
+      hotkey: GlobalHotkeyMonitor(), systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
+      network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor(),
+      wholePreviewPrepare: { configuration, _, _ in
+        generationCalls += 1
+        return TypingSession(configuration: configuration, prompt: expected)
+      }, wholePreviewLayout: { map, width, font, spacing, rtl, joins in
+        layoutCalls += 1
+        await withCheckedContinuation { pendingLayouts.append($0) }
+        return try await PromptFieldTextLayout.makeCooperatively(map: map, width: width,
+          font: font, lineSpacing: spacing, rightToLeft: rtl, joinsLetters: joins)
+      }).modelContainer(container)
+    let host = NSHostingView(rootView: AnyView(content.frame(width: 1000, height: 720)))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = host
+    func flush() {
+      host.layoutSubtreeIfNeeded()
+      RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+      host.layoutSubtreeIfNeeded()
+    }
+    func views<T: NSView>(_ type: T.Type, in view: NSView) -> [T] {
+      (view as? T).map { [$0] } ?? view.subviews.flatMap { views(type, in: $0) }
+    }
+    func target() -> String {
+      views(PromptFieldNativeView.self, in: host).compactMap { $0.accessibilityValue() as? String }.joined()
+    }
+    defer {
+      for continuation in pendingLayouts { continuation.resume() }
+      host.rootView = AnyView(EmptyView())
+      flush()
+      window.contentView = nil
+      window.close()
+      withExtendedLifetime(container) {}
+    }
+    let deadline = Date().addingTimeInterval(20)
+    while layoutCalls < 1 && Date() < deadline { flush() }
+    XCTAssertEqual(generationCalls, 1)
+    XCTAssertEqual(layoutCalls, 1)
+    let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
+    input.insertText("x", replacementRange: .init(location: NSNotFound, length: 0))
+    flush()
+    XCTAssertFalse(target().contains("staged"))
+    XCTAssertTrue(settings.allowsRestartingConfigurationChange)
+    settings.fontSize = 36
+    flush()
+    pendingLayouts.removeFirst().resume()
+    while layoutCalls < 2 && Date() < deadline { flush() }
+    XCTAssertEqual(generationCalls, 1)
+    XCTAssertEqual(layoutCalls, 2)
+    XCTAssertFalse(target().contains("staged"))
+    XCTAssertTrue(settings.allowsRestartingConfigurationChange)
+    pendingLayouts.removeFirst().resume()
+    while target() != expected && Date() < deadline { flush() }
+    XCTAssertEqual(target(), expected)
+    XCTAssertTrue(views(PromptFieldNativeView.self, in: host).first?.usedPreparedLayout == true)
+  }
   private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual }
 
   private func check(_ scenario: Scenario, wordCount: Int = 201, modifiers: [TestModifier] = [.noQuit]) throws {
@@ -242,6 +318,10 @@ import XCTest
       let displayed = target()
       XCTAssertTrue(displayed == actual,
         "Complete candidate must publish after rendering: displayed=\(displayed.count) expected=\(actual.count); \(evidence)")
+      if wordCount > 100_000 {
+        XCTAssertTrue(views(PromptFieldNativeView.self, in: host).first?.usedPreparedLayout == true,
+          "The production field must consume ticket-prepared geometry at the actual width")
+      }
       if let started = pending.preparationStarted {
         print("whole preview presentation observation: words=\(wordCount) elapsed=\(ProcessInfo.processInfo.systemUptime - started) layoutMax=\(layoutMaximum) runLoopMax=\(runLoopMaximum)")
       }

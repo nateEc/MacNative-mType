@@ -10,12 +10,15 @@ struct PromptFieldPracticePrompt: View {
   let carets: PromptCaretNativeView.Configuration
   var lineScroll: PromptLineScrollContext? = nil
   var viewportLineCount: Int? = nil
+  var preparedLayout: PromptFieldTextLayout? = nil
+  var onMeasuredWidth: ((CGFloat) -> Void)? = nil
   @State private var viewportHeight: CGFloat?
 
   var body: some View {
     PromptFieldBridge(rendering: rendering, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
-      viewportLineCount: viewportLineCount, onViewportHeight: { viewportHeight = $0 })
+      viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
+      onMeasuredWidth: onMeasuredWidth, onViewportHeight: { viewportHeight = $0 })
       .preference(key: PracticeViewportHeightKey.self, value: viewportHeight)
   }
 }
@@ -29,12 +32,15 @@ private struct PromptFieldBridge: NSViewRepresentable {
   let carets: PromptCaretNativeView.Configuration
   let lineScroll: PromptLineScrollContext?
   let viewportLineCount: Int?
+  let preparedLayout: PromptFieldTextLayout?
+  let onMeasuredWidth: ((CGFloat) -> Void)?
   let onViewportHeight: (CGFloat?) -> Void
   func makeNSView(context: Context) -> PromptFieldNativeView { PromptFieldNativeView() }
   func updateNSView(_ view: PromptFieldNativeView, context: Context) {
     view.configure(rendering: rendering, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
-      viewportLineCount: viewportLineCount, onViewportHeight: onViewportHeight)
+      viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
+      onMeasuredWidth: onMeasuredWidth, onViewportHeight: onViewportHeight)
   }
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: PromptFieldNativeView, context: Context) -> CGSize? {
     nsView.measure(width: max(1, proposal.width ?? nsView.bounds.width))
@@ -54,11 +60,15 @@ final class PromptFieldNativeView: NSView {
   private var configuration: PromptCaretNativeView.Configuration?
   private var lineScroll: PromptLineScrollContext?
   private var model: PromptFieldTextLayout?
+  private var preparedLayout: PromptFieldTextLayout?
   private var invalidatesModel = true
   private var modelWidth: CGFloat = 0
   private(set) var geometryRevision: UInt64 = 0
+  private(set) var usedPreparedLayout = false
   private var viewportLineCount: Int?
   private var onViewportHeight: ((CGFloat?) -> Void)?
+  private var onMeasuredWidth: ((CGFloat) -> Void)?
+  private var reportedWidth: CGFloat?
   private var reportedHeight: CGFloat?
   private var notificationRevision: UInt64 = 0
   override var isFlipped: Bool { true }
@@ -74,6 +84,8 @@ final class PromptFieldNativeView: NSView {
   func configure(rendering: PromptRendering, font: NSFont, lineSpacing: CGFloat = 12,
     rightToLeft: Bool = false, joinsLetters: Bool = false, carets: PromptCaretNativeView.Configuration,
     lineScroll: PromptLineScrollContext? = nil, viewportLineCount: Int? = nil,
+    preparedLayout: PromptFieldTextLayout? = nil,
+    onMeasuredWidth: ((CGFloat) -> Void)? = nil,
     onViewportHeight: ((CGFloat?) -> Void)? = nil) {
     let previousSize = intrinsicContentSize
     let changed = self.font != font || self.lineSpacing != lineSpacing
@@ -84,10 +96,11 @@ final class PromptFieldNativeView: NSView {
       || self.rendering.compositionTextMap?.markedInputRanges != rendering.compositionTextMap?.markedInputRanges
       || self.rendering.compositionTextMap?.markedCellIDs != rendering.compositionTextMap?.markedCellIDs
       || self.rendering.compositionTextMap?.compositionStyle != rendering.compositionTextMap?.compositionStyle
-    if changed { invalidatesModel = true }
+    if changed || preparedLayout != nil && model !== preparedLayout { invalidatesModel = true }
     self.rendering = rendering; self.font = font; self.lineSpacing = lineSpacing
     self.rightToLeft = rightToLeft; self.joinsLetters = joinsLetters
     self.configuration = carets; self.lineScroll = lineScroll
+    self.preparedLayout = preparedLayout; self.onMeasuredWidth = onMeasuredWidth
     self.viewportLineCount = viewportLineCount; self.onViewportHeight = onViewportHeight
     notificationRevision &+= 1
     _ = measure(width: max(1, bounds.width))
@@ -102,13 +115,26 @@ final class PromptFieldNativeView: NSView {
   }
 
   @discardableResult func measure(width: CGFloat) -> CGSize {
+    if width > 1, width.isFinite, onMeasuredWidth != nil, reportedWidth != width {
+      DispatchQueue.main.async { [weak self] in
+        guard let self, self.onMeasuredWidth != nil, self.reportedWidth != width else { return }
+        self.reportedWidth = width; self.onMeasuredWidth?(width)
+      }
+    }
     guard let map = rendering.compositionTextMap else {
       model = nil; return .init(width: width, height: 0)
     }
     if model == nil || invalidatesModel || modelWidth != width {
       modelWidth = width
-      model = PromptFieldTextLayout(map: map, width: width, font: font, lineSpacing: lineSpacing,
-        rightToLeft: rightToLeft, joinsLetters: joinsLetters, reusing: model)
+      if let preparedLayout, preparedLayout.matchesMetrics(width: width, font: font,
+        lineSpacing: lineSpacing, rightToLeft: rightToLeft, joinsLetters: joinsLetters) {
+        model = preparedLayout
+        usedPreparedLayout = true
+      } else {
+        model = PromptFieldTextLayout(map: map, width: width, font: font, lineSpacing: lineSpacing,
+          rightToLeft: rightToLeft, joinsLetters: joinsLetters, reusing: model)
+        usedPreparedLayout = false
+      }
       invalidatesModel = false
       geometryRevision &+= 1
       caret.invalidateGeometry()
@@ -177,6 +203,7 @@ final class PromptFieldNativeView: NSView {
   }
 
   func measuredRect(for id: Int) -> CGRect? { model?.cellFrames[id] }
+  func usesLayout(_ layout: PromptFieldTextLayout) -> Bool { model === layout }
   func measuredFieldRect(for id: Int) -> CGRect? { model?.fieldFrames[id] }
   func present(at time: TimeInterval) { caret.present(at: time) }
   override var intrinsicContentSize: NSSize { model?.size ?? .init(width: NSView.noIntrinsicMetric, height: 0) }
@@ -191,6 +218,7 @@ final class PromptFieldNativeView: NSView {
   }
   func stop() {
     notificationRevision &+= 1; configuration = nil; onViewportHeight = nil
+    onMeasuredWidth = nil; preparedLayout = nil; reportedWidth = nil
     caret.stop(); follower.cancelCaretMotion(); follower.stopLineScroll()
     lineScroll = nil
     follower.update(text: AttributedString(), characterOffset: nil, font: font,

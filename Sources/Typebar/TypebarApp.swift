@@ -99,13 +99,18 @@ struct TypebarApp: App {
     },
     wholePreviewRender: @escaping @MainActor (TypingSession, PromptRenderStyle) async throws -> PromptRendering = {
       try await PromptRenderPlan(session: $0, composition: "", style: $1).renderCooperatively()
+    },
+    wholePreviewLayout: @escaping @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout = {
+      try await PromptFieldTextLayout.makeCooperatively(map: $0, width: $1, font: $2,
+        lineSpacing: $3, rightToLeft: $4, joinsLetters: $5)
     }) -> some View {
     ContentView(settings: settings, account: account, announcements: announcements,
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
       systemAppearance: systemAppearance, liveContentFetch: liveContentFetch,
       livePromptPrepare: livePromptPrepare,
       liveSessionPrepare: liveSessionPrepare,
-      wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender)
+      wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender,
+      wholePreviewLayout: wholePreviewLayout)
   }
 
   private static let modelConfiguration = ModelConfiguration(
@@ -1198,6 +1203,7 @@ private struct NoQuitConfigurationLockSynchronizer: ViewModifier {
 private struct PreparedWholePreviewPresentation {
   let attemptID: UUID
   let rendering: PromptRendering
+  let layout: PromptFieldTextLayout?
   let style: PromptRenderStyle
   let paceGuideIndex: Int?
 }
@@ -1205,6 +1211,8 @@ private struct PreparedWholePreviewPresentation {
 private struct PreparedWholePreviewResult {
   let session: TypingSession
   let rendering: PromptRendering
+  let layout: PromptFieldTextLayout?
+  let layoutWidth: CGFloat?
   let style: PromptRenderStyle
   let paceTargetWpm: Double?
   let paceGuideIndex: Int?
@@ -1223,6 +1231,7 @@ private struct ContentView: View {
   let liveSessionPrepare: @MainActor (TestConfiguration, LivePracticePrompt, LivePracticePrompt?, WeakSpotScores, PoolWordDecorationState, Bool) async throws -> TypingSession
   let wholePreviewPrepare: @MainActor (TestConfiguration, WeakSpotScores, PoolWordDecorationState) async throws -> TypingSession
   let wholePreviewRender: @MainActor (TypingSession, PromptRenderStyle) async throws -> PromptRendering
+  let wholePreviewLayout: @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
@@ -1386,6 +1395,7 @@ private struct ContentView: View {
   @State private var wholePreviewTask = WholePreviewPreparationTask()
   @State private var isPreparingWholePreview = false
   @State private var preparedWholePreviewRendering: PreparedWholePreviewPresentation?
+  @State private var wholePreviewFieldWidth: CGFloat?
   @State private var interruptedWholePreview = false
   @State private var zipfNotice: String?
   @State private var zipfNoticeGeneration = 0
@@ -3339,7 +3349,9 @@ private struct ContentView: View {
           rightToLeft: isRightToLeft, joinsLetters: usesJoiningScript,
           carets: makeSpecialPromptCaretConfiguration(rightToLeft: isRightToLeft),
           lineScroll: showsAllPracticeLines ? nil : practiceLineScrollContext(rendering),
-          viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3))
+          viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3),
+          preparedLayout: preparedWholePreviewLayout,
+          onMeasuredWidth: showsAllPracticeLines ? { width in wholePreviewFieldWidth = width } : nil)
           .overlay {
             PromptInputWrapOverlay(layout: promptInputWrapLayout)
               .allowsHitTesting(false).accessibilityHidden(true)
@@ -3606,6 +3618,15 @@ private struct ContentView: View {
       return prepared.rendering
     }
     return renderedPrompt(for: session, composition: compositionText)
+  }
+
+  private var preparedWholePreviewLayout: PromptFieldTextLayout? {
+    guard let prepared = preparedWholePreviewRendering,
+      prepared.attemptID == session.automaticInputAttemptID,
+      !session.hasStarted, !session.isFinished, session.typed.isEmpty,
+      compositionText.isEmpty, prepared.style == promptRenderStyle,
+      prepared.paceGuideIndex == paceGuideIndex else { return nil }
+    return prepared.layout
   }
 
   private var promptRenderStyle: PromptRenderStyle {
@@ -4441,10 +4462,34 @@ private struct ContentView: View {
           paceCaretDrawsMarker: style.paceCaretStyle.drawsMarker)
         let rendering = try await wholePreviewRender(candidate, style)
         try Task.checkCancellation()
+        var layout: PromptFieldTextLayout?
+        var layoutWidth: CGFloat?
+        if let map = rendering.compositionTextMap, map.fieldRuns.count > 5_000,
+          !practiceVisualEffect.usesASL, !practiceVisualEffect.usesChoo {
+          while wholePreviewFieldWidth == nil {
+            try Task.checkCancellation()
+            try await Task.sleep(nanoseconds: 20_000_000)
+          }
+          let width = wholePreviewFieldWidth!
+          let font = practicePromptNSFont(size: settings.fontSize)
+          layout = try await wholePreviewLayout(map, width, font,
+            candidate.configuration.usesJoiningScriptPrompt ? 8 : 12,
+            candidate.configuration.usesRightToLeftPrompt,
+            candidate.configuration.usesJoiningScriptPrompt)
+          layoutWidth = width
+        }
+        let layoutStillMatches = layout.map {
+          $0.matchesMetrics(width: wholePreviewFieldWidth ?? 0,
+            font: practicePromptNSFont(size: settings.fontSize),
+            lineSpacing: candidate.configuration.usesJoiningScriptPrompt ? 8 : 12,
+            rightToLeft: candidate.configuration.usesRightToLeftPrompt,
+            joinsLetters: candidate.configuration.usesJoiningScriptPrompt)
+        } ?? true
         guard style == promptRenderStyle,
-          paceTarget == paceGuideTarget(currentPrompt: base.prompt)
+          paceTarget == paceGuideTarget(currentPrompt: base.prompt), layoutStillMatches
         else { continue }
         return PreparedWholePreviewResult(session: candidate, rendering: rendering,
+          layout: layout, layoutWidth: layoutWidth,
           style: style, paceTargetWpm: paceTarget, paceGuideIndex: pacePolicy.paceGuideIndex)
       }
     }) { result in
@@ -4456,6 +4501,12 @@ private struct ContentView: View {
       case .success(let prepared):
         guard prepared.style == promptRenderStyle,
           prepared.paceTargetWpm == paceGuideTarget(currentPrompt: prepared.session.prompt),
+          prepared.layoutWidth == nil || prepared.layoutWidth == wholePreviewFieldWidth,
+          prepared.layout.map({ $0.matchesMetrics(width: wholePreviewFieldWidth ?? 0,
+            font: practicePromptNSFont(size: settings.fontSize),
+            lineSpacing: prepared.session.configuration.usesJoiningScriptPrompt ? 8 : 12,
+            rightToLeft: prepared.session.configuration.usesRightToLeftPrompt,
+            joinsLetters: prepared.session.configuration.usesJoiningScriptPrompt) }) ?? true,
           prepared.paceGuideIndex == PromptRenderSessionPolicy(session: prepared.session,
             highlightMode: prepared.style.highlightMode, usesTapePractice: prepared.style.usesTapePractice,
             mainCaretDrawsMarker: prepared.style.caretStyle.drawsMarker,
@@ -4467,7 +4518,7 @@ private struct ContentView: View {
         }
         activePaceTargetWpm = prepared.paceTargetWpm
         preparedWholePreviewRendering = .init(attemptID: prepared.session.automaticInputAttemptID,
-          rendering: prepared.rendering, style: prepared.style,
+          rendering: prepared.rendering, layout: prepared.layout, style: prepared.style,
           paceGuideIndex: prepared.paceGuideIndex)
         session = prepared.session
         isPreparingWholePreview = false

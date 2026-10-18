@@ -145,6 +145,12 @@ struct PromptFieldTextRun: Equatable {
   private(set) var size: CGSize = .zero
   let lineSpacing: CGFloat
 
+  func matchesMetrics(width: CGFloat, font: NSFont, lineSpacing: CGFloat,
+    rightToLeft: Bool, joinsLetters: Bool) -> Bool {
+    self.width == width && self.font == font && self.lineSpacing == lineSpacing
+      && self.rightToLeft == rightToLeft && self.joinsLetters == joinsLetters && !unbounded
+  }
+
   convenience init(map: PromptCompositionTextMap, width: CGFloat, font: NSFont, lineSpacing: CGFloat = 12,
     rightToLeft: Bool = false, joinsLetters: Bool = false, unbounded: Bool = false,
     reusing previous: PromptFieldTextLayout? = nil) {
