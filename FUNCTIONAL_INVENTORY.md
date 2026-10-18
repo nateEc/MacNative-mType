@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-19 `VIS-THEME-INK-01` 未输入提示字的最终合成对比度：单一隔离内存数据 Debug 窗口在“松玫晨纸”主题下目视发现未输入字过淡；实际着色把已经较弱的 `secondaryText` 再乘 55% 透明度，源码色值测试未计算这层合成。新增普通提示与 Choo 的全部内置主题、背景及面板合成对比度合同，旧实现有 412 处低于 3:1（“松玫晨纸”面板约 2.26:1）；移除普通提示、Choo 和应用共用文字角色的重复淡化后，定点 5 项及相邻 129 项零失败。修复版单一窗口的同主题提示目视可读，原有“纸白”主题偏好已恢复，两轮验收均已退出且无 Typebar 主进程。Release 签名应用包、资源与固定参考原创性边界通过。3:1 为源色值按不透明背景合成的计算门槛，不是显示器像素测量；用户自定义主题、所有装饰效果、实体输入及原版主题视觉等价未由此证明。`VIS-01` 与完整重写目标仍为部分。
+
 2026-10-19 `VIS-THEME-CATALOG-01` 最后 23 个官方主题 ID 已有 Typebar 独立制作的原生选择：`catppuccin`、`cy_red`、`dark_magic_girl`、`deku`、`discord`、`dmg`、`dracula`、`github`、`gruvbox_dark`、`gruvbox_light`、`monokai`、`nord`、`nord_light`、`onedark`、`our_theme`、`rainbow_trail`、`rgb`、`rose_pine`、`rose_pine_dawn`、`rose_pine_moon`、`rudy`、`ryujinscales`、`serika`。可经内置选择器搜索、命令入口定位并以原 ID 归档；身份清单现在是 187 个原创相关替代、0 个尚无相关替代，但 187 个官方主题身份、0 个已验证精确原生映射、187 个待映射。先行红测后主题相关 79 项零失败，固定身份审计与原创性检查通过；完整客户端套件在约 18 分钟后仍运行既有多语言窗口组合用例，主动中止，因此本批不宣称全量通过。逐款真实窗口、练习字形透明度、实体输入和官方视觉等价均未验收，故完整重写目标继续进行。详见 [官方主题审计](OFFICIAL_THEME_AUDIT.md)。
 
 2026-10-19 `VIS-THEME-CATALOG-01` 二十三款原创材料主题增量：`serika_dark`、`sewing_tin`、`slambook`、`snes`、`solarized_dark`、`solarized_light`、`solarized_osaka`、`sonokai`、`striker`、`suisei`、`superuser`、`sweden`、`terror_below`、`trackday`、`trance`、`tron_orange`、`vesper`、`vesper_light`、`voc`、`vscode`、`witch_girl`、`pale_nimbus`、`spiderman` 现可在 Typebar 内置主题、搜索和命令入口选用并用原 ID 归档。官方 187 个主题身份、0 个已验证精确原生映射、187 个待映射；其中 164 个原创相关替代、23 个尚无相关替代。仅为独立原生设计；源色值对比度不包含练习透明度，且尚无真实窗口、实体输入或官方视觉等价证据。详见 [官方主题审计](OFFICIAL_THEME_AUDIT.md)。

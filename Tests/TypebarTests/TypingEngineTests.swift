@@ -21478,7 +21478,7 @@ final class TypingEngineTests: XCTestCase {
     let pending = paper.foreground(for: .pending).usingColorSpace(.sRGB)
     let correct = paper.foreground(for: .correct).usingColorSpace(.sRGB)
     XCTAssertEqual(pending?.redComponent ?? -1, 0.38, accuracy: 0.02)
-    XCTAssertEqual(pending?.alphaComponent ?? -1, 0.55, accuracy: 0.02)
+    XCTAssertEqual(pending?.alphaComponent ?? -1, 1, accuracy: 0.02)
     XCTAssertEqual(correct?.redComponent ?? -1, 0.12, accuracy: 0.02)
 
     let flipped = ChooGlyphPalette(

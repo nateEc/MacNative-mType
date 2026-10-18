@@ -124,7 +124,7 @@ struct PromptRenderStyle: Equatable {
       flipsCompletionAndFuture: style.flipTestColors,
       usesAccentForCompleted: style.colorfulMode) {
     case .primary: style.theme.text
-    case .secondary: style.theme.secondaryText.opacity(0.55)
+    case .secondary: style.theme.secondaryText
     case .accent: style.theme.accent
     }
   }

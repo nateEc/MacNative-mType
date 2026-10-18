@@ -564,7 +564,7 @@ struct ChooGlyphPalette: Equatable {
         usesAccentForCompleted: usesColorfulMode)
       {
       case .primary: NSColor(theme.text)
-      case .secondary: NSColor(theme.secondaryText.opacity(0.55))
+      case .secondary: NSColor(theme.secondaryText)
       case .accent: NSColor(theme.accent)
       }
     }
@@ -3679,7 +3679,7 @@ private struct ContentView: View {
       usesAccentForCompleted: settings.colorfulMode)
     {
     case .primary: activeTheme.text
-    case .secondary: activeTheme.secondaryText.opacity(0.55)
+    case .secondary: activeTheme.secondaryText
     case .accent: activeTheme.accent
     }
   }

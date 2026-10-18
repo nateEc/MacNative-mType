@@ -6,6 +6,42 @@ import XCTest
   private let theme = ResolvedTheme(background: .white, panel: .white, accent: .blue,
     colorScheme: .light)
 
+  func testPendingInkRemainsReadableAfterCompositingOnPracticeSurfaces() {
+    let session = TypingSession(configuration: .words(1), prompt: "alpha")
+    for choice in AppTheme.allCases {
+      let palette = choice.resolvedTheme
+      let style = PromptRenderStyle(theme: palette, caretStyle: .off, highlightMode: .off)
+      let rendered = PromptRenderPlan(session: session, composition: nil, style: style).render()
+      guard let ink = rendered.text.runs.first?.foregroundColor else {
+        XCTFail("Missing pending ink: \(choice.rawValue)")
+        continue
+      }
+      let chooInk = ChooGlyphPalette(theme: palette, flipsCompletionAndFuture: false,
+        usesColorfulMode: false).foreground(for: .pending)
+      for surface in [palette.background, palette.panel] {
+        XCTAssertGreaterThanOrEqual(contrast(ink, on: surface), 3.0, "Ordinary: \(choice.rawValue)")
+        XCTAssertGreaterThanOrEqual(contrast(Color(nsColor: chooInk), on: surface), 3.0,
+          "Choo: \(choice.rawValue)")
+      }
+    }
+  }
+
+  private func contrast(_ foreground: Color, on background: Color) -> Double {
+    let ink = ThemeColor(color: foreground), surface = ThemeColor(color: background)
+    let alpha = ink.opacity
+    func linear(_ value: Double) -> Double {
+      value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+    }
+    func luminance(_ red: Double, _ green: Double, _ blue: Double) -> Double {
+      0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+    }
+    let front = luminance(ink.red * alpha + surface.red * (1 - alpha),
+      ink.green * alpha + surface.green * (1 - alpha),
+      ink.blue * alpha + surface.blue * (1 - alpha))
+    let back = luminance(surface.red, surface.green, surface.blue)
+    return (max(front, back) + 0.05) / (min(front, back) + 0.05)
+  }
+
   func testCapturedStyleAndCandidateSessionRemainStableAcrossBatches() async throws {
     let candidate = TypingSession(configuration: .words(3).with(modifiers: [.aslVisual]),
       prompt: "é👩‍💻 alpha\nβeta")
