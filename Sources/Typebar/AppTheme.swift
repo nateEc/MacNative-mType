@@ -441,6 +441,29 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case witch_girl
     case pale_nimbus
     case spiderman
+    case catppuccin
+    case cy_red
+    case dark_magic_girl
+    case deku
+    case discord
+    case dmg
+    case dracula
+    case github
+    case gruvbox_dark
+    case gruvbox_light
+    case monokai
+    case nord
+    case nord_light
+    case onedark
+    case our_theme
+    case rainbow_trail
+    case rgb
+    case rose_pine
+    case rose_pine_dawn
+    case rose_pine_moon
+    case rudy
+    case ryujinscales
+    case serika
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -637,6 +660,29 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .witch_girl: "丁香魔法纸 · Typebar"
         case .pale_nimbus: "雨云薄纸 · Typebar"
         case .spiderman: "夜城红丝 · Typebar"
+        case .catppuccin: "丝绒牛奶 · Typebar"
+        case .cy_red: "赤色电路 · Typebar"
+        case .dark_magic_girl: "午夜绸带 · Typebar"
+        case .deku: "草叶练习簿 · Typebar"
+        case .discord: "紫蓝玻璃 · Typebar"
+        case .dmg: "掌机石英 · Typebar"
+        case .dracula: "古堡蓝墨 · Typebar"
+        case .github: "冷白代码纸 · Typebar"
+        case .gruvbox_dark: "深色木纹 · Typebar"
+        case .gruvbox_light: "浅色木纹 · Typebar"
+        case .monokai: "夜色调色盘 · Typebar"
+        case .nord: "极夜石板 · Typebar"
+        case .nord_light: "极昼石板 · Typebar"
+        case .onedark: "单色烟灰 · Typebar"
+        case .our_theme: "桌边稿纸 · Typebar"
+        case .rainbow_trail: "彩带余光 · Typebar"
+        case .rgb: "三色灯管 · Typebar"
+        case .rose_pine: "松玫深纸 · Typebar"
+        case .rose_pine_dawn: "松玫晨纸 · Typebar"
+        case .rose_pine_moon: "松玫月纸 · Typebar"
+        case .rudy: "红赭矿石 · Typebar"
+        case .ryujinscales: "龙鳞碧釉 · Typebar"
+        case .serika: "浅色铅笔 · Typebar"
         }
     }
 
@@ -1008,6 +1054,52 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0xE5EAEC, 0xCFD8DD, 0x4C6471, 0x2C3A42, 0x485B64, light: true, error: 0x91394C)
         case .spiderman:
             Self.palette(0x302632, 0x473849, 0xEBC0B1, 0xF6F0F0, 0xD8CCD5, light: false, error: 0xFFD495)
+        case .catppuccin:
+            Self.palette(0xE8E5EA, 0xD1CED9, 0x5C507A, 0x2B2D3C, 0x4D4D62, light: true, error: 0x913D50)
+        case .cy_red:
+            Self.palette(0x30252B, 0x493840, 0xF0C5AB, 0xF8F0EA, 0xD7C9CD, light: false, error: 0xFFD59A)
+        case .dark_magic_girl:
+            Self.palette(0x2C253E, 0x443856, 0xEBC5DD, 0xF6EFF7, 0xD3CAD9, light: false, error: 0xFFB8A0)
+        case .deku:
+            Self.palette(0xE1E9D7, 0xC8D7C2, 0x3D6044, 0x28392D, 0x4A5845, light: true, error: 0x913A49)
+        case .discord:
+            Self.palette(0x272C42, 0x3C4560, 0xCED5FB, 0xF2F3FB, 0xCDD2E1, light: false, error: 0xFFB6A2)
+        case .dmg:
+            Self.palette(0xE2E4DD, 0xC9CDC2, 0x5C526F, 0x2E3033, 0x51565A, light: true, error: 0x913A49)
+        case .dracula:
+            Self.palette(0x292639, 0x423D51, 0xB8D8E0, 0xF6F2F4, 0xD2CAD9, light: false, error: 0xFFB5A3)
+        case .github:
+            Self.palette(0xEAF0F1, 0xD0DDE0, 0x315D6E, 0x253940, 0x485F65, light: true, error: 0x943C4D)
+        case .gruvbox_dark:
+            Self.palette(0x302B27, 0x4A4037, 0xE7C393, 0xF5F0E7, 0xD1C8BA, light: false, error: 0xFFB0A1)
+        case .gruvbox_light:
+            Self.palette(0xECE4D5, 0xD6C9B3, 0x635638, 0x353127, 0x554E3F, light: true, error: 0x923C4A)
+        case .monokai:
+            Self.palette(0x2A2D2C, 0x414845, 0xD9DB96, 0xF3F1E8, 0xCCD3C9, light: false, error: 0xFFB2A2)
+        case .nord:
+            Self.palette(0x26343E, 0x3A4C55, 0xABD6DC, 0xF0F4F5, 0xC9D8D8, light: false, error: 0xFFB5A4)
+        case .nord_light:
+            Self.palette(0xE6EFF0, 0xCBDCDF, 0x3C6272, 0x263942, 0x4A6066, light: true, error: 0x933C50)
+        case .onedark:
+            Self.palette(0x252C35, 0x3A4651, 0xBFD4C3, 0xF1F3F1, 0xC7D1D3, light: false, error: 0xFFB2A0)
+        case .our_theme:
+            Self.palette(0xECE9DE, 0xD7D1C0, 0x365E62, 0x30372E, 0x4E574A, light: true, error: 0x913A4A)
+        case .rainbow_trail:
+            Self.palette(0x35243A, 0x513950, 0xF2DE89, 0xFAF0F6, 0xDEC9D9, light: false, error: 0xFFB7A5)
+        case .rgb:
+            Self.palette(0x1C3037, 0x2B4851, 0xC9D9A5, 0xEFF4F1, 0xC5D7D3, light: false, error: 0xFFB3A1)
+        case .rose_pine:
+            Self.palette(0x302A38, 0x4A4050, 0xE5C1C2, 0xF5F0F2, 0xD7CDD5, light: false, error: 0xFFD398)
+        case .rose_pine_dawn:
+            Self.palette(0xEEE4E7, 0xDACDD5, 0x79536A, 0x382D39, 0x584C59, light: true, error: 0x903C4C)
+        case .rose_pine_moon:
+            Self.palette(0x292C42, 0x3E4259, 0xE4C6CF, 0xF4F0F6, 0xD1CCDC, light: false, error: 0xFFCE9C)
+        case .rudy:
+            Self.palette(0x39282A, 0x543B3B, 0xEAC9A6, 0xF7F0E9, 0xDCCBC3, light: false, error: 0xFFDEA0)
+        case .ryujinscales:
+            Self.palette(0x183239, 0x2D5054, 0xD5D4AC, 0xEFF5EE, 0xC5D9D5, light: false, error: 0xFFB5A1)
+        case .serika:
+            Self.palette(0xECE9DF, 0xD4CEC0, 0x53643F, 0x34372B, 0x535849, light: true, error: 0x923A49)
         }
     }
 }

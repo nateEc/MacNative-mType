@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-19 `VIS-THEME-CATALOG-01` 最后 23 个官方主题 ID 已有 Typebar 独立制作的原生选择：`catppuccin`、`cy_red`、`dark_magic_girl`、`deku`、`discord`、`dmg`、`dracula`、`github`、`gruvbox_dark`、`gruvbox_light`、`monokai`、`nord`、`nord_light`、`onedark`、`our_theme`、`rainbow_trail`、`rgb`、`rose_pine`、`rose_pine_dawn`、`rose_pine_moon`、`rudy`、`ryujinscales`、`serika`。可经内置选择器搜索、命令入口定位并以原 ID 归档；身份清单现在是 187 个原创相关替代、0 个尚无相关替代，但 187 个官方主题身份、0 个已验证精确原生映射、187 个待映射。先行红测后主题相关 79 项零失败，固定身份审计与原创性检查通过；完整客户端套件在约 18 分钟后仍运行既有多语言窗口组合用例，主动中止，因此本批不宣称全量通过。逐款真实窗口、练习字形透明度、实体输入和官方视觉等价均未验收，故完整重写目标继续进行。详见 [官方主题审计](OFFICIAL_THEME_AUDIT.md)。
+
 2026-10-19 `VIS-THEME-CATALOG-01` 二十三款原创材料主题增量：`serika_dark`、`sewing_tin`、`slambook`、`snes`、`solarized_dark`、`solarized_light`、`solarized_osaka`、`sonokai`、`striker`、`suisei`、`superuser`、`sweden`、`terror_below`、`trackday`、`trance`、`tron_orange`、`vesper`、`vesper_light`、`voc`、`vscode`、`witch_girl`、`pale_nimbus`、`spiderman` 现可在 Typebar 内置主题、搜索和命令入口选用并用原 ID 归档。官方 187 个主题身份、0 个已验证精确原生映射、187 个待映射；其中 164 个原创相关替代、23 个尚无相关替代。仅为独立原生设计；源色值对比度不包含练习透明度，且尚无真实窗口、实体输入或官方视觉等价证据。详见 [官方主题审计](OFFICIAL_THEME_AUDIT.md)。
 
 2026-10-19 `VIS-THEME-CATALOG-01` 二十款材料主题增量：`ishtar`、`iv_clover`、`iv_spade`、`lil_dragon`、`magic_girl`、`mashu`、`material`、`metaverse`、`mexican`、`miami`、`miami_nights`、`modern_dolch`、`modern_dolch_light`、`mr_sleeves`、`ms_cupcakes`、`oblivion`、`olivia`、`red_dragon`、`red_samurai`、`shoko` 现可按原 ID 从 Typebar 内置选择器、搜索及命令入口选用并归档，十浅十深。官方 187 个主题身份、0 个已验证精确原生映射、187 个待映射；其中 141 个原创相关替代、46 个尚无相关替代。源码仅使用原创配色与既有原生渲染；对比度为源值计算，真实窗口、所有交互及官方视觉等价仍待验收。详见 [官方主题审计](OFFICIAL_THEME_AUDIT.md)。

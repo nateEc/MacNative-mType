@@ -2,7 +2,9 @@
 
 参考固定为 Monkeytype 提交 `91bd24bb8513785c7364cbea29296ff7adafac41` 的 `packages/schemas/src/themes.ts` 中 `ThemeNameSchema`。本审计只保存主题 ID、数量与覆盖状态；不读取、复制或导入官方主题的色值、CSS、图片、字体或其他资产。
 
-当前守恒：187 个官方主题身份、0 个已验证精确原生映射、187 个待映射；其中 164 个原创相关替代、23 个尚无相关替代。逐项身份见 `Compatibility/official-themes.json`；`relatedMappings` 只表示同题材的 Typebar 原创选择，绝不算入 `exactMappings`。
+当前守恒：187 个官方主题身份、0 个已验证精确原生映射、187 个待映射；其中 187 个原创相关替代、0 个尚无相关替代。逐项身份见 `Compatibility/official-themes.json`；`relatedMappings` 只表示同题材的 Typebar 原创选择，绝不算入 `exactMappings`。
+
+2026-10-19 补齐最后 23 个主题身份：`catppuccin`、`cy_red`、`dark_magic_girl`、`deku`、`discord`、`dmg`、`dracula`、`github`、`gruvbox_dark`、`gruvbox_light`、`monokai`、`nord`、`nord_light`、`onedark`、`our_theme`、`rainbow_trail`、`rgb`、`rose_pine`、`rose_pine_dawn`、`rose_pine_moon`、`rudy`、`ryujinscales`、`serika`。设计以文具、石板、玻璃和织物为材料线索；松玫三款采用明确的晨／月／深纸系列，彩带余光仅用高亮黄作辨识点，文字面保持克制。沿用用户字体、排版和动效配置，不读取或采用参考主题色值、CSS、图像、字体或其他资产。先行测试证实 23 项全缺，接入后验证 9 浅 14 深、原 ID 编解码、快速搜索、命令入口、背景互异，及正文／次级文字对背景与面板的源色值对比度至少 4.5:1、标记至少 3:1。色值计算不包含练习字形额外透明度；尚未做逐款可见窗口、实体输入和官方视觉等价验收，`exactMappings` 仍为空。
 
 2026-10-19 新增 `serika_dark`、`sewing_tin`、`slambook`、`snes`、`solarized_dark`、`solarized_light`、`solarized_osaka`、`sonokai`、`striker`、`suisei`、`superuser`、`sweden`、`terror_below`、`trackday`、`trance`、`tron_orange`、`vesper`、`vesper_light`、`voc`、`vscode`、`witch_girl`、`pale_nimbus`、`spiderman` 二十三个 Typebar 原创相关主题身份。深色搪瓷针盒与既有浅色版形成明暗对照，三款铜板与暮色／晨色纸页同样有明确材料系列；控制器紫是此批唯一醒目的识别点，未读取或采用参考项目配色或资产。先行测试确认全部身份缺失；接入后测试 11 浅 12 深、原 ID 归档、搜索、命令定位、背景互异与源色值双表面对比度。三款浅色主题的次级墨色第一次低于 4.5:1，已加深后通过。对比度计算不包含练习字形额外透明度，亦不代替真实窗口逐款验收；`exactMappings` 仍为空。
 
