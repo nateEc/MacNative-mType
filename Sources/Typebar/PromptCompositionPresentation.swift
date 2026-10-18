@@ -107,13 +107,16 @@ struct PromptCompositionPresentation {
       compositionReplacement: cell.text).text
   }
 
-  func render(_ renderGlyph: (Int, TypingPromptGlyph, PromptCompositionProjection.Cell?) -> AttributedString) -> PromptRendering {
-    var text = AttributedString(), ranges: [Int: NSRange] = [:], inks: [Int: NSRange] = [:], texts: [Int: AttributedString] = [:]
+  private struct RenderAccumulator {
+    let presentation: PromptCompositionPresentation
+    var text = AttributedString()
+    var ranges: [Int: NSRange] = [:], inks: [Int: NSRange] = [:], texts: [Int: AttributedString] = [:]
     var fieldUnits: [Int: Int] = [:], structuralUnits: [Int: Int] = [:], nextField = 0, unit = 0
     var fieldRuns: [PromptFieldTextRun] = []
-    func emitRemovedFields(before owner: Int) {
+
+    mutating func emitRemovedFields(before owner: Int) {
       while nextField < owner {
-        let field = projection.fields[nextField]
+        let field = presentation.projection.fields[nextField]
         if field.isRemoved && !field.isRetired && field.hasStructuralReturn {
           structuralUnits[field.index] = unit
           text += AttributedString(String(repeating: "\n", count: field.structuralReturnCount))
@@ -123,10 +126,14 @@ struct PromptCompositionPresentation {
         nextField += 1
       }
     }
-    for (index, cell) in projection.cells.enumerated() {
+
+    mutating func append(_ index: Int, _ cell: PromptCompositionProjection.Cell,
+      renderGlyph: (Int, TypingPromptGlyph, PromptCompositionProjection.Cell?) -> AttributedString) {
       if let owner = cell.sourceFieldIndex { emitRemovedFields(before: owner) }
-      let value = renderGlyph(index, glyphs[index], cell.compositionIndex == nil ? nil : cell)
-      let entry = PromptFieldTextRun.Cell(id: cell.id, glyph: glyphs[index], text: value, isGap: gapIndices.contains(index))
+      let glyph = presentation.glyphs[index]
+      let value = renderGlyph(index, glyph, cell.compositionIndex == nil ? nil : cell)
+      let entry = PromptFieldTextRun.Cell(id: cell.id, glyph: glyph, text: value,
+        isGap: presentation.gapIndices.contains(index))
       if let last = fieldRuns.indices.last, fieldRuns[last].fieldID == cell.sourceFieldIndex,
         fieldRuns[last].removedReturns == 0 {
         fieldRuns[last].cells.append(entry)
@@ -134,7 +141,8 @@ struct PromptCompositionPresentation {
         // Zen's empty next-word placeholder owns the field after the last
         // target range. It has no target structure, not an inferred Return.
         structuralReturn: cell.sourceFieldIndex.map {
-          projection.fields.indices.contains($0) && projection.fields[$0].hasStructuralReturn
+          presentation.projection.fields.indices.contains($0)
+            && presentation.projection.fields[$0].hasStructuralReturn
         })) }
       ranges[cell.id] = NSRange(location: unit, length: String(value.characters).utf16.count)
       let hint = value.runs.first { ($0.baselineOffset ?? 0) < 0 }
@@ -146,20 +154,54 @@ struct PromptCompositionPresentation {
       if let owner = cell.sourceFieldIndex, fieldUnits[owner] == nil { fieldUnits[owner] = unit }
       text += value; unit += ranges[cell.id]!.length
     }
-    emitRemovedFields(before: projection.fields.count)
-    let map = PromptCompositionTextMap(text: text, cellRanges: ranges, inkRanges: inks, cellTexts: texts,
-      canonicalAliases: projection.canonicalAliases, fieldUnits: fieldUnits, caret: projection.caret, fieldRuns: fieldRuns,
-      markedInputRanges: markedInputRanges, markedCellIDs: projection.markedCells.map(\.id),
-      markedInputText: markedInputText, compositionStyle: compositionStyle)
-    // Legacy character offsets remain a convenience for older callers, not
-    // the identity directory. Partial/virtual slots live only in cellRanges.
-    let offsets = Dictionary(projection.cells.filter { $0.id >= 0 }.compactMap { cell in
-      ranges[cell.id].map { (cell.id, map.characterOffset(atUTF16: $0.location)) }
-    }, uniquingKeysWith: { first, _ in first })
-    return .init(text: text, glyphCharacterOffsets: offsets,
-      emptyWordPlaceholderGlyphID: emptyPlaceholderIndex.map { projection.cells[$0].id },
-      structuralNewlineOffsets: structuralUnits.mapValues { map.characterOffset(atUTF16: $0) },
-      compositionTextMap: map)
+
+    mutating func finish() -> PromptRendering {
+      let projection = presentation.projection
+      emitRemovedFields(before: projection.fields.count)
+      let map = PromptCompositionTextMap(text: text, cellRanges: ranges, inkRanges: inks, cellTexts: texts,
+        canonicalAliases: projection.canonicalAliases, fieldUnits: fieldUnits, caret: projection.caret,
+        fieldRuns: fieldRuns, markedInputRanges: presentation.markedInputRanges,
+        markedCellIDs: projection.markedCells.map(\.id), markedInputText: presentation.markedInputText,
+        compositionStyle: presentation.compositionStyle)
+      // Legacy character offsets remain a convenience for older callers, not
+      // the identity directory. Partial/virtual slots live only in cellRanges.
+      let offsets = Dictionary(projection.cells.filter { $0.id >= 0 }.compactMap { cell in
+        ranges[cell.id].map { (cell.id, map.characterOffset(atUTF16: $0.location)) }
+      }, uniquingKeysWith: { first, _ in first })
+      return .init(text: text, glyphCharacterOffsets: offsets,
+        emptyWordPlaceholderGlyphID: presentation.emptyPlaceholderIndex.map { projection.cells[$0].id },
+        structuralNewlineOffsets: structuralUnits.mapValues { map.characterOffset(atUTF16: $0) },
+        compositionTextMap: map)
+    }
+  }
+
+  func render(_ renderGlyph: (Int, TypingPromptGlyph, PromptCompositionProjection.Cell?) -> AttributedString) -> PromptRendering {
+    var result = RenderAccumulator(presentation: self)
+    for (index, cell) in projection.cells.enumerated() { result.append(index, cell, renderGlyph: renderGlyph) }
+    return result.finish()
+  }
+
+  @MainActor func renderCooperatively(batchSize: Int = 512, didRender: (Int) -> Void = { _ in },
+    _ renderGlyph: (Int, TypingPromptGlyph, PromptCompositionProjection.Cell?) -> AttributedString
+  ) async throws -> PromptRendering {
+    try Task.checkCancellation()
+    var result = RenderAccumulator(presentation: self)
+    let interval = max(1, batchSize)
+    for (index, cell) in projection.cells.enumerated() {
+      result.append(index, cell, renderGlyph: renderGlyph)
+      if (index + 1).isMultiple(of: interval) {
+        didRender(index + 1)
+        try Task.checkCancellation()
+        await Task.yield()
+      }
+    }
+    if !projection.cells.count.isMultiple(of: interval) {
+      didRender(projection.cells.count)
+    }
+    try Task.checkCancellation()
+    let rendered = result.finish()
+    try Task.checkCancellation()
+    return rendered
   }
 }
 

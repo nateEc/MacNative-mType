@@ -153,27 +153,74 @@ struct PromptFieldTextRun: Equatable {
       joinsLetters: joinsLetters, unbounded: unbounded, reusing: previous)
   }
 
-  init(fieldRuns: [PromptFieldTextRun], aliases: [Int: [Int]] = [:],
+  private init(aliases: [Int: [Int]], anchor: PromptCompositionProjection.Anchor?, width: CGFloat,
+    font: NSFont, lineSpacing: CGFloat, rightToLeft: Bool, joinsLetters: Bool, unbounded: Bool) {
+    self.aliases = aliases; self.anchor = anchor; self.rightToLeft = rightToLeft
+    self.font = font; self.lineSpacing = lineSpacing
+    self.width = width.isFinite ? max(1, width) : 1
+    self.joinsLetters = joinsLetters; self.unbounded = unbounded
+  }
+
+  convenience init(fieldRuns: [PromptFieldTextRun], aliases: [Int: [Int]] = [:],
     anchor: PromptCompositionProjection.Anchor? = nil, width: CGFloat, font: NSFont,
     lineSpacing: CGFloat = 12, rightToLeft: Bool = false, joinsLetters: Bool = false, unbounded: Bool = false,
     reusing previous: PromptFieldTextLayout? = nil) {
-    self.aliases = aliases; self.anchor = anchor; self.rightToLeft = rightToLeft
-    self.font = font; self.lineSpacing = lineSpacing
-    let limit = width.isFinite ? max(1, width) : 1
-    self.width = limit; self.joinsLetters = joinsLetters; self.unbounded = unbounded
-    // Only immutable text/metrics are reused. Positions, identities, aliases,
-    // anchors and groups belong to this snapshot; no old layout is mutated.
-    let reuse = previous.flatMap {
-      $0.width == limit && $0.font == font && $0.lineSpacing == lineSpacing
-        && $0.rightToLeft == rightToLeft && $0.joinsLetters == joinsLetters && $0.unbounded == unbounded ? $0 : nil
+    self.init(aliases: aliases, anchor: anchor, width: width, font: font, lineSpacing: lineSpacing,
+      rightToLeft: rightToLeft, joinsLetters: joinsLetters, unbounded: unbounded)
+    let builder = Builder(layout: self, previous: previous)
+    for (group, field) in fieldRuns.enumerated() { builder.append(field, group: group) }
+    builder.finish(fieldRuns: fieldRuns)
+  }
+
+  static func makeCooperatively(map: PromptCompositionTextMap, width: CGFloat, font: NSFont,
+    lineSpacing: CGFloat = 12, rightToLeft: Bool = false, joinsLetters: Bool = false,
+    unbounded: Bool = false, reusing previous: PromptFieldTextLayout? = nil,
+    batchSize: Int = 256, didPrepare: (Int) -> Void = { _ in }
+  ) async throws -> PromptFieldTextLayout {
+    try Task.checkCancellation()
+    let layout = PromptFieldTextLayout(aliases: map.canonicalAliases, anchor: map.caret,
+      width: width, font: font, lineSpacing: lineSpacing, rightToLeft: rightToLeft,
+      joinsLetters: joinsLetters, unbounded: unbounded)
+    let builder = Builder(layout: layout, previous: previous)
+    let interval = max(1, batchSize)
+    for (group, field) in map.fieldRuns.enumerated() {
+      builder.append(field, group: group)
+      if (group + 1).isMultiple(of: interval) {
+        didPrepare(group + 1)
+        try Task.checkCancellation()
+        await Task.yield()
+      }
     }
+    if !map.fieldRuns.count.isMultiple(of: interval) { didPrepare(map.fieldRuns.count) }
+    try Task.checkCancellation()
+    builder.finish(fieldRuns: map.fieldRuns)
+    try Task.checkCancellation()
+    return layout
+  }
+
+  @MainActor private final class Builder {
+    let layout: PromptFieldTextLayout
+    let reuse: PromptFieldTextLayout?
     var groups: [Int] = []
+    var projections: [[UInt16]: [ContentProjection]] = [:]
+    var shapes: [[UInt16]: [TextShape]] = [:]
+
+    init(layout: PromptFieldTextLayout, previous: PromptFieldTextLayout?) {
+      self.layout = layout
+      // Only immutable text/metrics are reused. Positions, identities, aliases,
+      // anchors and groups belong to this snapshot; no old layout is mutated.
+      reuse = previous.flatMap {
+        $0.width == layout.width && $0.font == layout.font && $0.lineSpacing == layout.lineSpacing
+          && $0.rightToLeft == layout.rightToLeft && $0.joinsLetters == layout.joinsLetters
+          && $0.unbounded == layout.unbounded ? $0 : nil
+      }
+    }
+
     // Projection depends on the complete authored attributes and structural
     // Return ownership, never the slot ID or its position. Keep this cache local.
     // Swift String/AttributedString equality is canonically equivalent, but
     // TextKit ranges address exact UTF-16 storage. Never merge those encodings.
     func textUnits(_ text: AttributedString) -> [UInt16] { Array(String(text.characters).utf16) }
-    var projections: [[UInt16]: [ContentProjection]] = [:]
     func contentFor(_ cell: PromptFieldTextRun.Cell) -> ContentProjection {
       let content = ASLPromptGlyphContent(glyph: cell.glyph, text: cell.text)
       let key = textUnits(content.text)
@@ -183,19 +230,19 @@ struct PromptFieldTextRun: Equatable {
       let projection = ContentProjection(text: content.text, ownsLineBreak: content.ownsLineBreak,
         main: content.main, hint: content.hint)
       projections[key, default: []].append(projection)
-      preparedContentProjectionCount += 1
+      layout.preparedContentProjectionCount += 1
       return projection
     }
-    var shapes: [[UInt16]: [TextShape]] = [:]
     func shapeFor(_ text: AttributedString, _ wraps: Bool) -> TextShape {
       let key = textUnits(text)
       if let shape = shapes[key]?.first(where: { $0.wraps == wraps && $0.text == text }) { return shape }
-      let shape = TextShape(text: text, wraps: wraps, font: font, rightToLeft: rightToLeft,
-        spacing: lineSpacing, width: unbounded ? .greatestFiniteMagnitude : limit)
+      let shape = TextShape(text: text, wraps: wraps, font: layout.font, rightToLeft: layout.rightToLeft,
+        spacing: layout.lineSpacing, width: layout.unbounded ? .greatestFiniteMagnitude : layout.width)
       shapes[key, default: []].append(shape)
       return shape
     }
-    for (group, field) in fieldRuns.enumerated() {
+
+    func append(_ field: PromptFieldTextRun, group: Int) {
       func append(_ cells: [PromptFieldTextRun.Cell], breaks: Bool = false) {
         let old: Box? = cells.first.flatMap { cell in
           guard let reuse, let index = reuse.boxByCell[cell.id] else { return nil }
@@ -212,9 +259,9 @@ struct PromptFieldTextRun: Equatable {
           box = Box(cells: cells, fieldID: field.fieldID, breaks: breaks,
             contentFor: contentFor, shapeFor: shapeFor)
         }
-        if let cell = box.singleCell { boxByCell[cell.id] = boxes.count }
-        else { for id in box.multipleRanges.keys { boxByCell[id] = boxes.count } }
-        boxes.append(box); groups.append(group)
+        if let cell = box.singleCell { layout.boxByCell[cell.id] = layout.boxes.count }
+        else { for id in box.multipleRanges.keys { layout.boxByCell[id] = layout.boxes.count } }
+        layout.boxes.append(box); groups.append(group)
       }
       var pending: [PromptFieldTextRun.Cell] = []
       // A Return icon is a letter inside the word. The structural boundary
@@ -222,7 +269,7 @@ struct PromptFieldTextRun: Equatable {
       let breaksAfterField = field.endsWithReturn
       for (index, cell) in field.cells.enumerated() {
         let breaks = breaksAfterField && index == field.cells.count - 1
-        if joinsLetters && !cell.isGap {
+        if layout.joinsLetters && !cell.isGap {
           pending.append(cell)
         } else {
           if !pending.isEmpty { append(pending); pending = [] }
@@ -232,59 +279,67 @@ struct PromptFieldTextRun: Equatable {
       if !pending.isEmpty { append(pending, breaks: breaksAfterField) }
       for _ in 0..<field.removedReturns { append([], breaks: true) }
     }
-    // Tape mirrors around the measured natural extent, not the no-wrap
-    // proposal. Ordinary bounded wrapping keeps its existing width.
-    let flowWidth = unbounded ? max(1, boxes.reduce(CGFloat.zero) { $0 + $1.bounds.width }) : limit
-    let geometry = ASLPromptFlowGeometry(cells: boxes.enumerated().map { index, box in
-      .init(size: box.bounds.size, wordID: groups[index], isLineBreak: box.breaks, isSeparator: box.isGap)
-    }, width: flowWidth, rowSpacing: lineSpacing)
-    size = geometry.size
-    origins = boxes.enumerated().map { index, box in
-      let point = geometry.positions[index]
-      return CGPoint(x: rightToLeft ? flowWidth - point.x - box.bounds.width : point.x, y: point.y)
-    }
-    if !joinsLetters {
-      var rows: [FieldRow: [Int]] = [:]
-      for (index, box) in boxes.enumerated() where !box.isGap {
-        if box.singleCell != nil {
-          rows[.init(group: groups[index], y: origins[index].y), default: []].append(index)
+
+    func finish(fieldRuns: [PromptFieldTextRun]) {
+      let boxes = layout.boxes
+      let rightToLeft = layout.rightToLeft, joinsLetters = layout.joinsLetters
+      let font = layout.font, lineSpacing = layout.lineSpacing
+      // Tape mirrors around the measured natural extent, not the no-wrap
+      // proposal. Ordinary bounded wrapping keeps its existing width.
+      let flowWidth = layout.unbounded ? max(1, boxes.reduce(CGFloat.zero) { $0 + $1.bounds.width }) : layout.width
+      let geometry = ASLPromptFlowGeometry(cells: boxes.enumerated().map { index, box in
+        .init(size: box.bounds.size, wordID: groups[index], isLineBreak: box.breaks, isSeparator: box.isGap)
+      }, width: flowWidth, rowSpacing: lineSpacing)
+      layout.size = geometry.size
+      layout.origins = boxes.enumerated().map { index, box in
+        let point = geometry.positions[index]
+        return CGPoint(x: rightToLeft ? flowWidth - point.x - box.bounds.width : point.x, y: point.y)
+      }
+      if !joinsLetters {
+        var rows: [FieldRow: [Int]] = [:]
+        for (index, box) in boxes.enumerated() where !box.isGap {
+          if box.singleCell != nil {
+            rows[.init(group: groups[index], y: layout.origins[index].y), default: []].append(index)
+          }
+        }
+        for indices in rows.values {
+          let cells = indices.compactMap { boxes[$0].singleCell }
+          guard rightToLeft || cells.contains(where: {
+            PracticeTapePolicy.isRightToLeft(String($0.glyph.character), fallback: false)
+          }) else { continue }
+          let order = PromptFieldVisualOrder.cellIDs(cells, font: font, rightToLeft: rightToLeft)
+          let byID = Dictionary(uniqueKeysWithValues: indices.compactMap { index in
+            boxes[index].singleCell.map { ($0.id, index) }
+          })
+          var x = indices.map { layout.origins[$0].x }.min() ?? 0
+          for id in order {
+            guard let index = byID[id] else { continue }
+            layout.origins[index].x = x
+            x += boxes[index].bounds.width
+          }
         }
       }
-      for indices in rows.values {
-        let cells = indices.compactMap { boxes[$0].singleCell }
-        guard rightToLeft || cells.contains(where: {
-          PracticeTapePolicy.isRightToLeft(String($0.glyph.character), fallback: false)
-        }) else { continue }
-        let order = PromptFieldVisualOrder.cellIDs(cells, font: font, rightToLeft: rightToLeft)
-        let byID = Dictionary(uniqueKeysWithValues: indices.compactMap { index in
-          boxes[index].singleCell.map { ($0.id, index) }
-        })
-        var x = indices.map { origins[$0].x }.min() ?? 0
-        for id in order {
-          guard let index = byID[id] else { continue }
-          origins[index].x = x
-          x += boxes[index].bounds.width
+      for (index, box) in boxes.enumerated() {
+        let origin = layout.origins[index]
+        if let cell = box.singleCell { layout.cellFrames[cell.id] = box.rect(cell.id, origin: origin) }
+        else { for id in box.multipleRanges.keys { layout.cellFrames[id] = box.rect(id, origin: origin) } }
+        if let owner = box.fieldID, !box.isGap, box.singleCell != nil || !box.multipleRanges.isEmpty {
+          let frame = CGRect(origin: origin, size: box.bounds.size)
+          layout.fieldFrames[owner] = layout.fieldFrames[owner].map { $0.union(frame) } ?? frame
         }
       }
-    }
-    for (index, box) in boxes.enumerated() {
-      let origin = origins[index]
-      if let cell = box.singleCell { cellFrames[cell.id] = box.rect(cell.id, origin: origin) }
-      else { for id in box.multipleRanges.keys { cellFrames[id] = box.rect(id, origin: origin) } }
-      if let owner = box.fieldID, !box.isGap, box.singleCell != nil || !box.multipleRanges.isEmpty {
-        let frame = CGRect(origin: origin, size: box.bounds.size)
-        fieldFrames[owner] = fieldFrames[owner].map { $0.union(frame) } ?? frame
-      }
-    }
-    let ids = fieldRuns.flatMap { $0.cells.map(\.id) }
-    for (id, next) in zip(ids, ids.dropFirst()) { followingCell[id] = next }
-    for box in boxes {
-      if let cell = box.singleCell, box.singleHint != nil,
-        let rect = cellFrames[cell.id] {
-        size.height = max(size.height, rect.maxY + max(9, font.pointSize * 0.48) * 1.4)
-      }
-      for id in box.multipleHints.keys {
-        if let rect = cellFrames[id] { size.height = max(size.height, rect.maxY + max(9, font.pointSize * 0.48) * 1.4) }
+      let ids = fieldRuns.flatMap { $0.cells.map(\.id) }
+      for (id, next) in zip(ids, ids.dropFirst()) { layout.followingCell[id] = next }
+      for box in boxes {
+        if let cell = box.singleCell, box.singleHint != nil,
+          let rect = layout.cellFrames[cell.id] {
+          layout.size.height = max(layout.size.height, rect.maxY + max(9, font.pointSize * 0.48) * 1.4)
+        }
+        for id in box.multipleHints.keys {
+          if let rect = layout.cellFrames[id] {
+            layout.size.height = max(layout.size.height, rect.maxY + max(9, font.pointSize * 0.48) * 1.4)
+          }
+        }
       }
     }
   }
