@@ -78,6 +78,9 @@ import XCTest
   func testFirstInputPublishesFreshFieldInkAndCaretThroughHost() throws {
     try check(.actualFirstInput)
   }
+  func testPreparedMediumPreviewPatchesFirstInputLayoutThroughHost() throws {
+    try check(.actualFirstInput, wordCount: 5_001)
+  }
   func testFirstInputThenMarkedTextFontChangeAndSecondKeyKeepCurrentInkAndCaret() throws {
     try check(.actualInterleavings)
   }
@@ -356,6 +359,10 @@ import XCTest
         XCTAssertEqual(target(), actual)
         let updated = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
         XCTAssertTrue(updated === field, "The prompt view must keep its native owner across the first key")
+        if wordCount > 5_000 {
+          XCTAssertTrue(updated.usedPreparedLayout,
+            "An unchanged ordinary first-key field should use the newly patched prepared layout")
+        }
         if wordCount > 100_000 {
           XCTAssertTrue(updated.reusedGeometryFromPrevious,
             "A color-only first key should retain the ticket-prepared field geometry")

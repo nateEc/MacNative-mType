@@ -117,6 +117,39 @@ import XCTest
     XCTAssertNotEqual(previous.mainRect(style: .bar), reused.mainRect(style: .bar))
   }
 
+  func testFirstInputSnapshotPatchesOneBoxAndMatchesFreshLayoutAtWrappedWidths() throws {
+    for width: CGFloat in [65, 400] {
+      let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+        accent: .blue, colorScheme: .light), caretStyle: .bar)
+      var session = TypingSession(configuration: .words(2), prompt: "quiet harbor")
+      let before = PromptRenderPlan(session: session, composition: "", style: style).render()
+      let previous = PromptFieldTextLayout(map: try XCTUnwrap(before.compositionTextMap),
+        width: width, font: font)
+      let oldCaret = previous.mainRect(style: .bar)
+      session.insertBatch("q", at: start)
+      let after = try XCTUnwrap(PromptFirstInputPatch.make(prepared: before,
+        session: session, style: style))
+      let map = try XCTUnwrap(after.compositionTextMap)
+      let patched = try XCTUnwrap(previous.patchingFirstInput(
+        try XCTUnwrap(map.fieldRuns.first?.cells.first), caret: map.caret))
+      let fresh = PromptFieldTextLayout(map: map, width: width, font: font)
+      XCTAssertEqual(patched.cellFrames, fresh.cellFrames)
+      XCTAssertEqual(patched.fieldFrames, fresh.fieldFrames)
+      XCTAssertEqual(patched.size, fresh.size)
+      XCTAssertEqual(patched.mainRect(style: .bar), fresh.mainRect(style: .bar))
+      XCTAssertNotEqual(patched.mainRect(style: .bar), oldCaret)
+      XCTAssertEqual(previous.mainRect(style: .bar), oldCaret,
+        "The prepared owner must retain its original anchor")
+      XCTAssertTrue(patched.reusedGeometryFromPrevious)
+      var kerned = try XCTUnwrap(map.fieldRuns.first?.cells.first)
+      var wider = kerned.text
+      wider.kern = 8
+      kerned = .init(id: kerned.id, glyph: kerned.glyph, text: wider, isGap: kerned.isGap)
+      XCTAssertNil(previous.patchingFirstInput(kerned, caret: map.caret),
+        "A changed advance must fall back to complete layout")
+    }
+  }
+
   func testGeometryReuseRejectsChangedAdvanceAndFieldGrouping() throws {
     let original = try render(TypingSession(configuration: .words(2), prompt: "aa aa"))
     let map = try XCTUnwrap(original.compositionTextMap)

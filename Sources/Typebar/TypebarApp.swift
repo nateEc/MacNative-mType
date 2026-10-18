@@ -3867,8 +3867,15 @@ private struct ContentView: View {
         initialPreview.paceGuideIndex == nil,
         let patched = PromptFirstInputPatch.make(prepared: initialPreview.rendering,
           session: session, style: style) {
+        let patchedLayout = initialPreview.layout.flatMap { previous in
+          patched.compositionTextMap.flatMap { map in
+            map.fieldRuns.first?.cells.first.flatMap {
+              previous.patchingFirstInput($0, caret: map.caret)
+            }
+          }
+        }
         preparedWholePreviewRendering = .init(attemptID: initialPreview.attemptID,
-          typedSnapshot: session.typed, rendering: patched, layout: nil,
+          typedSnapshot: session.typed, rendering: patched, layout: patchedLayout,
           style: style, paceGuideIndex: nil)
       } else { preparedWholePreviewRendering = nil }
       synchronizeNoQuitConfigurationLock()

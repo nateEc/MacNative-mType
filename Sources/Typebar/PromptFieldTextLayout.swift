@@ -153,6 +153,49 @@ struct PromptFieldTextRun: Equatable {
       && self.rightToLeft == rightToLeft && self.joinsLetters == joinsLetters && !unbounded
   }
 
+  /// Used only after PromptFirstInputPatch has proved every other field cell
+  /// visually unchanged (the next ASCII cell becomes current with identical
+  /// authored ink). Publish a new owner so the old frame never draws new ink.
+  func patchingFirstInput(_ firstCell: PromptFieldTextRun.Cell,
+    caret: PromptCompositionProjection.Anchor?) -> PromptFieldTextLayout? {
+    guard !rightToLeft, !joinsLetters, !unbounded, anchor == .init(cellID: 0, after: false),
+      caret == .init(cellID: 1, after: false), boxByCell[0] == 0,
+      let old = boxes.first, let original = old.singleCell,
+      old.fieldID == 0, !old.breaks, !old.isGap, old.singleHint == nil,
+      original.id == 0, original.glyph.state == .current,
+      firstCell.id == 0, firstCell.glyph.state == .correct,
+      firstCell.glyph.character == original.glyph.character,
+      !firstCell.isGap, origins.indices.contains(0) else { return nil }
+    let content = ASLPromptGlyphContent(glyph: firstCell.glyph, text: firstCell.text)
+    let projection = ContentProjection(text: content.text, ownsLineBreak: content.ownsLineBreak,
+      main: content.main, hint: content.hint)
+    guard !projection.ownsLineBreak, projection.hint == nil,
+      Array(String(projection.main.characters).utf16)
+        == Array(String(old.shape.text.characters).utf16) else { return nil }
+    let updated = Box(cells: [firstCell], fieldID: old.fieldID, breaks: false,
+      contentFor: { _ in projection }, shapeFor: { text, wraps in
+        TextShape(text: text, wraps: wraps, font: self.font, rightToLeft: false,
+          spacing: self.lineSpacing, width: self.width)
+      })
+    guard updated.bounds == old.bounds,
+      updated.rect(0, origin: origins[0]) == old.rect(0, origin: origins[0]) else { return nil }
+    let snapshot = PromptFieldTextLayout(aliases: aliases, anchor: caret,
+      width: width, font: font, lineSpacing: lineSpacing, rightToLeft: rightToLeft,
+      joinsLetters: joinsLetters, unbounded: unbounded)
+    snapshot.boxes = boxes
+    snapshot.boxes[0] = updated
+    snapshot.boxGroups = boxGroups
+    snapshot.origins = origins
+    snapshot.boxByCell = boxByCell
+    snapshot.followingCell = followingCell
+    snapshot.cellFrames = cellFrames
+    snapshot.fieldFrames = fieldFrames
+    snapshot.size = size
+    snapshot.preparedContentProjectionCount = 1
+    snapshot.reusedGeometryFromPrevious = true
+    return snapshot
+  }
+
   convenience init(map: PromptCompositionTextMap, width: CGFloat, font: NSFont, lineSpacing: CGFloat = 12,
     rightToLeft: Bool = false, joinsLetters: Bool = false, unbounded: Bool = false,
     reusing previous: PromptFieldTextLayout? = nil) {
