@@ -319,10 +319,9 @@ import XCTest
   }
 
   func testListeningConcealmentRunsAfterLegacyCaretAndTypedEffects() throws {
-    let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    let caret = try XCTUnwrap(app.range(of: "applyCaret(to: &character, theme: activeTheme)"))
-    let concealment = try XCTUnwrap(app.range(of: "appearance.applyVisibility(to: &character)")
-      ?? app.range(of: "if appearance.color == .hidden { character.foregroundColor = .clear }"))
+    let painter = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/PromptRenderPlan.swift"), encoding: .utf8)
+    let caret = try XCTUnwrap(painter.range(of: "Self.applyCaret(to: &character, theme: theme, style: style.caretStyle)"))
+    let concealment = try XCTUnwrap(painter.range(of: "appearance.applyVisibility(to: &character)"))
     XCTAssertGreaterThan(concealment.lowerBound, caret.lowerBound,
       "A fallback bar/carrot/banana/monkey must not reveal an untyped listening target")
   }

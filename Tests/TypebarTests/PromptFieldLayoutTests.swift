@@ -7,6 +7,33 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testHostingBridgeAppliesNewSnapshotAfterFirstInput() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "quiet harbor")
+    let first = try render(session)
+    let motion = PromptCaretMotionCoordinator()
+    func root(_ rendering: PromptRendering) -> PromptFieldPracticePrompt {
+      PromptFieldPracticePrompt(rendering: rendering, font: font, lineSpacing: 12,
+        rightToLeft: false, joinsLetters: false, carets: config(motion))
+    }
+    let host = NSHostingView(rootView: root(first))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 400, height: 180),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    host.layoutSubtreeIfNeeded()
+    let native = try XCTUnwrap(descendants(host, PromptFieldNativeView.self).first)
+    let revision = native.geometryRevision
+    session.insertBatch("q", at: start)
+    host.rootView = root(try render(session))
+    host.layoutSubtreeIfNeeded()
+    let updated = try XCTUnwrap(descendants(host, PromptFieldNativeView.self).first)
+    XCTAssertTrue(updated === native)
+    XCTAssertGreaterThan(updated.geometryRevision, revision)
+    XCTAssertEqual(updated.accessibilityValue() as? String, session.prompt)
+    XCTAssertFalse(window.isVisible)
+  }
+
   func testPreparedGeometryIsAdoptedOnlyAtMatchingWidthAndMetrics() async throws {
     let rendered = try render(TypingSession(configuration: .words(250),
       prompt: Array(repeating: "abcd", count: 250).joined(separator: " ")))

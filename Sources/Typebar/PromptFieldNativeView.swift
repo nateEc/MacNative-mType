@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 struct PromptFieldPracticePrompt: View {
-  let rendering: PromptRendering
+  private let renderingSnapshot: PromptFieldRenderingSnapshot
   let font: NSFont
   let lineSpacing: CGFloat
   let rightToLeft: Bool
@@ -14,8 +14,21 @@ struct PromptFieldPracticePrompt: View {
   var onMeasuredWidth: ((CGFloat) -> Void)? = nil
   @State private var viewportHeight: CGFloat?
 
+  init(rendering: PromptRendering, font: NSFont, lineSpacing: CGFloat,
+    rightToLeft: Bool, joinsLetters: Bool, carets: PromptCaretNativeView.Configuration,
+    lineScroll: PromptLineScrollContext? = nil, viewportLineCount: Int? = nil,
+    preparedLayout: PromptFieldTextLayout? = nil,
+    onMeasuredWidth: ((CGFloat) -> Void)? = nil) {
+    renderingSnapshot = PromptFieldRenderingSnapshot(rendering)
+    self.font = font; self.lineSpacing = lineSpacing
+    self.rightToLeft = rightToLeft; self.joinsLetters = joinsLetters
+    self.carets = carets; self.lineScroll = lineScroll
+    self.viewportLineCount = viewportLineCount; self.preparedLayout = preparedLayout
+    self.onMeasuredWidth = onMeasuredWidth
+  }
+
   var body: some View {
-    PromptFieldBridge(rendering: rendering, font: font, lineSpacing: lineSpacing,
+    PromptFieldBridge(renderingSnapshot: renderingSnapshot, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: { viewportHeight = $0 })
@@ -23,8 +36,15 @@ struct PromptFieldPracticePrompt: View {
   }
 }
 
+/// The immutable snapshot is new for each presentation. SwiftUI can compare the
+/// reference without recursively comparing every field run and attributed cell.
+private final class PromptFieldRenderingSnapshot {
+  let value: PromptRendering
+  init(_ value: PromptRendering) { self.value = value }
+}
+
 private struct PromptFieldBridge: NSViewRepresentable {
-  let rendering: PromptRendering
+  let renderingSnapshot: PromptFieldRenderingSnapshot
   let font: NSFont
   let lineSpacing: CGFloat
   let rightToLeft: Bool
@@ -37,7 +57,7 @@ private struct PromptFieldBridge: NSViewRepresentable {
   let onViewportHeight: (CGFloat?) -> Void
   func makeNSView(context: Context) -> PromptFieldNativeView { PromptFieldNativeView() }
   func updateNSView(_ view: PromptFieldNativeView, context: Context) {
-    view.configure(rendering: rendering, font: font, lineSpacing: lineSpacing,
+    view.configure(rendering: renderingSnapshot.value, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: onViewportHeight)

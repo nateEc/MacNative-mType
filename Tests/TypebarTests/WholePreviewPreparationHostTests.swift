@@ -75,6 +75,11 @@ import XCTest
   func testAboveFormerCeilingPublishesCompleteActualTargetThroughHost() throws {
     try check(.actual, wordCount: 100_001)
   }
+  func testAboveFormerCeilingAcceptsFirstInputThroughHost() throws {
+    try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
+      "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
+    try check(.actualFirstInput, wordCount: 100_001)
+  }
   func testLargestLegalPendingTargetCanLeaveWithoutPublishing() throws {
     try check(.leave, wordCount: OfficialTestLimitInput.maximumValue)
   }
@@ -234,7 +239,7 @@ import XCTest
     XCTAssertEqual(target(), expected)
     XCTAssertTrue(views(PromptFieldNativeView.self, in: host).first?.usedPreparedLayout == true)
   }
-  private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual }
+  private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual, actualFirstInput }
 
   private func check(_ scenario: Scenario, wordCount: Int = 201, modifiers: [TestModifier] = [.noQuit]) throws {
     let suite = "WholePreviewPreparationHostTests.\(UUID())"
@@ -251,7 +256,7 @@ import XCTest
       SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let pending = Pending()
-    pending.usesActualGenerator = scenario == .actual
+    pending.usesActualGenerator = scenario == .actual || scenario == .actualFirstInput
     let content = TypebarApp.practiceContent(settings: settings,
       account: AccountSession(defaults: defaults), announcements: RemoteAnnouncementCenter(defaults: defaults),
       hotkey: GlobalHotkeyMonitor(), systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
@@ -297,7 +302,7 @@ import XCTest
     }
     for _ in 0..<10 where pending.calls == 0 { flush() }
     XCTAssertEqual(pending.calls, 1)
-    if scenario == .actual {
+    if scenario == .actual || scenario == .actualFirstInput {
       var flushCount = 0
       // The 100,001-word generator was still progressing at 99,700 words when
       // a fixed 200-flush wait expired on the macOS 15 runner. Wait for the
@@ -325,6 +330,20 @@ import XCTest
       if let started = pending.preparationStarted {
         print("whole preview presentation observation: words=\(wordCount) elapsed=\(ProcessInfo.processInfo.systemUptime - started) layoutMax=\(layoutMaximum) runLoopMax=\(runLoopMaximum)")
       }
+      if scenario == .actualFirstInput {
+        let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
+        let first = try XCTUnwrap(actual.first)
+        let before = ProcessInfo.processInfo.systemUptime
+        input.onInsert(String(first), false)
+        let callback = ProcessInfo.processInfo.systemUptime - before
+        flush()
+        let elapsed = ProcessInfo.processInfo.systemUptime - before
+        print("whole preview first input observation: words=\(wordCount) callback=\(callback) elapsed=\(elapsed) layoutMax=\(layoutMaximum) runLoopMax=\(runLoopMaximum)")
+        XCTAssertEqual(target(), actual)
+        XCTAssertFalse(settings.allowsRestartingConfigurationChange,
+          "The first character must begin the actual No Quit attempt")
+        XCTAssertLessThan(elapsed, 90, "The first key must not regress to multi-minute host layout")
+      }
       return
     }
     XCTAssertEqual(pending.replies.count, 1)
@@ -337,7 +356,7 @@ import XCTest
     XCTAssertTrue(settings.allowsRestartingConfigurationChange,
       "Pending preparation must not start a No Quit attempt")
     switch scenario {
-    case .actual: XCTFail("Handled above")
+    case .actual, .actualFirstInput: XCTFail("Handled above")
     case .resume:
       window.contentView = nil
       flush()
