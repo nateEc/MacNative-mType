@@ -92,4 +92,82 @@ import XCTest
       XCTAssertEqual(actual.compositionTextMap?.cellRanges, expected.compositionTextMap?.cellRanges)
     }
   }
+
+  func testLargeFirstInputSeparatesProjectionAssemblyAndAppearanceCosts() throws {
+    try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_RENDER_ENDURANCE_TESTS"] == "1",
+      "Run explicitly with TYPEBAR_RENDER_ENDURANCE_TESTS=1")
+    let wordCount = 100_001
+    let prompt = Array(repeating: "alpha", count: wordCount).joined(separator: " ")
+    var session = TypingSession(configuration: .words(wordCount), prompt: prompt)
+    session.insertBatch("a", at: Date(timeIntervalSinceReferenceDate: 916_100_000))
+    let started = ProcessInfo.processInfo.systemUptime
+    let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session,
+      composition: "", style: .replace))
+    let projected = ProcessInfo.processInfo.systemUptime
+    do {
+      let plain = presentation.render { _, glyph, _ in AttributedString(String(glyph.character)) }
+      XCTAssertEqual(String(plain.text.characters), prompt)
+      XCTAssertEqual(plain.compositionTextMap?.cellRanges.count, prompt.count)
+      XCTAssertNil(plain.compositionTextMap?.cellRanges.first(where: {
+        $0.value.location != $0.key || $0.value.length != 1
+      }), "Plain ASCII cell ranges must cover the full target at exact offsets")
+    }
+    let assembled = ProcessInfo.processInfo.systemUptime
+    let style = PromptRenderStyle(theme: theme, compositionDisplayStyle: .replace)
+    let plan = PromptRenderPlan(session: session, composition: "", style: style)
+    let planned = ProcessInfo.processInfo.systemUptime
+    let rendered = plan.render()
+    let finished = ProcessInfo.processInfo.systemUptime
+    XCTAssertEqual(String(rendered.text.characters), prompt)
+    XCTAssertEqual(rendered.compositionTextMap?.cellRanges.count, prompt.count)
+    XCTAssertNil(rendered.compositionTextMap?.cellRanges.first(where: {
+      $0.value.location != $0.key || $0.value.length != 1
+    }), "Styled ASCII cell ranges must cover the full target at exact offsets")
+    let patchStarted = ProcessInfo.processInfo.systemUptime
+    var patchedText = rendered.text
+    let end = patchedText.characters.index(after: patchedText.startIndex)
+    patchedText[patchedText.startIndex..<end].foregroundColor = .red
+    let patched = ProcessInfo.processInfo.systemUptime
+    XCTAssertEqual(String(patchedText.characters), prompt)
+    XCTAssertNotEqual(patchedText, rendered.text)
+    print("large-first-input words=\(wordCount) projection=\(projected - started) plainAssembly=\(assembled - projected) planConstruction=\(planned - assembled) fullAppearanceAndAssembly=\(finished - planned) firstGlyphAttributePatch=\(patched - patchStarted)")
+  }
+
+  func testFirstInputPatchMatchesFullNativeRenderingForOrdinaryWord() throws {
+    for configuration in [TestConfiguration.words(2), .words(2).with(modifiers: [.noQuit])] {
+      for colorful in [false, true] {
+        for flips in [false, true] {
+          var style = PromptRenderStyle(theme: theme, caretStyle: .bar,
+            highlightMode: .letter)
+          style.colorfulMode = colorful
+          style.flipTestColors = flips
+          var session = TypingSession(configuration: configuration, prompt: "alpha beta")
+          let prepared = PromptRenderPlan(session: session, composition: "", style: style).render()
+          session.insertBatch("a", at: Date(timeIntervalSinceReferenceDate: 916_100_000))
+          let patched = try XCTUnwrap(PromptFirstInputPatch.make(prepared: prepared,
+            session: session, style: style))
+          let expected = PromptRenderPlan(session: session, composition: "", style: style).render()
+          XCTAssertEqual(patched.text, expected.text)
+          XCTAssertEqual(patched.glyphCharacterOffsets, expected.glyphCharacterOffsets)
+          XCTAssertEqual(patched.compositionTextMap?.caret, expected.compositionTextMap?.caret)
+          XCTAssertEqual(patched.compositionTextMap?.cellTexts, expected.compositionTextMap?.cellTexts)
+          XCTAssertEqual(patched.compositionTextMap?.fieldRuns, expected.compositionTextMap?.fieldRuns)
+          XCTAssertEqual(patched.compositionTextMap?.cellRanges, expected.compositionTextMap?.cellRanges)
+          XCTAssertEqual(patched.compositionTextMap?.inkRanges, expected.compositionTextMap?.inkRanges)
+        }
+      }
+    }
+  }
+
+  func testFirstInputPatchDeclinesIncorrectAndStructurallyDifferentInput() {
+    let style = PromptRenderStyle(theme: theme, caretStyle: .bar)
+    for (prompt, input) in [("alpha beta", "x"), ("écho beta", "é"),
+      ("a🙂 beta", "a"), ("a", "a")] {
+      var session = TypingSession(configuration: .words(2), prompt: prompt)
+      let prepared = PromptRenderPlan(session: session, composition: "", style: style).render()
+      session.insertBatch(input, at: Date(timeIntervalSinceReferenceDate: 916_100_000))
+      XCTAssertNil(PromptFirstInputPatch.make(prepared: prepared, session: session,
+        style: style), "Fallback required for \(prompt) / \(input)")
+    }
+  }
 }

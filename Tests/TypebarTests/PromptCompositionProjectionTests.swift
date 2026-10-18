@@ -14,6 +14,57 @@ final class PromptCompositionProjectionTests: XCTestCase {
     try XCTUnwrap(session.promptCompositionProjection(composition: composition, style: style))
   }
 
+  func testFirstInputWithoutCompositionKeepsStructuralCellsButMovesCaret() throws {
+    for (target, typed) in [
+      ("alpha beta", "a"), ("alpha beta", "x"),
+      ("🙂b tail", "🙂"), ("a\nb tail", "a"), ("سلام tail", "س")
+    ] {
+      var session = attempt(target)
+      let before = try projection(session, "")
+      session.insertBatch(typed, at: start)
+      let after = try projection(session, "")
+      let message = "target=\(target) typed=\(typed)"
+      XCTAssertEqual(before.cells.count, after.cells.count, message)
+      for (old, new) in zip(before.cells, after.cells) {
+        XCTAssertEqual(old.id, new.id, message)
+        XCTAssertEqual(old.displayUTF16, new.displayUTF16, message)
+        XCTAssertEqual(old.sourceSlices, new.sourceSlices, message)
+        XCTAssertEqual(old.sourceFieldIndex, new.sourceFieldIndex, message)
+        XCTAssertEqual(old.targetUTF16Range, new.targetUTF16Range, message)
+        XCTAssertEqual(old.role, new.role, message)
+      }
+      XCTAssertEqual(before.fields.count, after.fields.count, message)
+      for (old, new) in zip(before.fields, after.fields) {
+        XCTAssertEqual(old.index, new.index, message)
+        XCTAssertEqual(old.targetUTF16Range, new.targetUTF16Range, message)
+        XCTAssertEqual(old.cellIDs, new.cellIDs, message)
+        XCTAssertEqual(old.structuralReturnCount, new.structuralReturnCount, message)
+        XCTAssertEqual(old.isRetired, new.isRetired, message)
+        XCTAssertEqual(old.isRemoved, new.isRemoved, message)
+      }
+      XCTAssertEqual(before.canonicalAliases, after.canonicalAliases, message)
+      XCTAssertNotEqual(before.replacedTargetUTF16Range, after.replacedTargetUTF16Range, message)
+      XCTAssertNotEqual(before.caret, after.caret, message)
+    }
+  }
+
+  func testFirstInputProjectionCannotAlwaysReuseOldStructure() throws {
+    var zen = TypingSession(configuration: .init(mode: .zen, duration: nil,
+      wordLimit: nil, difficulty: .normal, rules: .init()), prompt: "")
+    let emptyZen = try projection(zen, "")
+    zen.insertBatch("a", at: start)
+    let typedZen = try projection(zen, "")
+    XCTAssertNotEqual(emptyZen.cells.map(\.id), typedZen.cells.map(\.id),
+      "Zen creates target ownership as the user types")
+
+    var overtyped = attempt("ab cd")
+    let initial = try projection(overtyped, "")
+    overtyped.insertBatch("abXYZ", at: start)
+    let extra = try projection(overtyped, "")
+    XCTAssertNotEqual(initial.cells.map(\.id), extra.cells.map(\.id),
+      "Extra input creates presentation cells before the next field")
+  }
+
   func testMultipleMarkedSlotsConsumeOnlyTheirOwnGlobalTargets() throws {
     var session = attempt("abcdef gh")
     session.insert("a", at: start)

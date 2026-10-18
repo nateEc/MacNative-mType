@@ -1203,6 +1203,7 @@ private struct NoQuitConfigurationLockSynchronizer: ViewModifier {
 
 private struct PreparedWholePreviewPresentation {
   let attemptID: UUID
+  let typedSnapshot: String
   let rendering: PromptRendering
   let layout: PromptFieldTextLayout?
   let style: PromptRenderStyle
@@ -1523,7 +1524,9 @@ private struct ContentView: View {
     .onChange(of: activeChallengeID) { _, _ in commandFontPreview.appliedFontFamily() }
     .onChange(of: session.hasStarted) { _, started in
       if started {
-        preparedWholePreviewRendering = nil
+        if preparedWholePreviewRendering?.typedSnapshot != session.typed {
+          preparedWholePreviewRendering = nil
+        }
         if !session.isFinished { visualFocus.set(true) }
       }
     }
@@ -3103,6 +3106,7 @@ private struct ContentView: View {
         },
         onCompositionStarted: {
           guard !isPreparingWholePreview else { return }
+          preparedWholePreviewRendering = nil
           if activeChallengeID != "mouse-warrior" {
             synchronizeLiveInputRules()
             session.beginComposition()
@@ -3110,6 +3114,7 @@ private struct ContentView: View {
         },
         onCompositionChanged: {
           guard !isPreparingWholePreview else { return }
+          preparedWholePreviewRendering = nil
           let hadMarkedText = !compositionText.isEmpty
           let playsCompositionClick = TypingInputSoundPlan.isAudibleCompositionUpdate(
             previous: compositionText, current: $0)
@@ -3613,7 +3618,7 @@ private struct ContentView: View {
   private var renderedPrompt: PromptRendering {
     if let prepared = preparedWholePreviewRendering, !isPreparingWholePreview,
       prepared.attemptID == session.automaticInputAttemptID,
-      !session.hasStarted, !session.isFinished, session.typed.isEmpty,
+      !session.isFinished, prepared.typedSnapshot == session.typed,
       compositionText.isEmpty, prepared.style == promptRenderStyle,
       prepared.paceGuideIndex == paceGuideIndex {
       return prepared.rendering
@@ -3624,7 +3629,7 @@ private struct ContentView: View {
   private var preparedWholePreviewLayout: PromptFieldTextLayout? {
     guard let prepared = preparedWholePreviewRendering,
       prepared.attemptID == session.automaticInputAttemptID,
-      !session.hasStarted, !session.isFinished, session.typed.isEmpty,
+      !session.isFinished, prepared.typedSnapshot == session.typed,
       compositionText.isEmpty, prepared.style == promptRenderStyle,
       prepared.paceGuideIndex == paceGuideIndex else { return nil }
     return prepared.layout
@@ -3850,13 +3855,25 @@ private struct ContentView: View {
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     let typedBefore = session.typed
+    let initialPreview = !hadStarted ? preparedWholePreviewRendering : nil
     let feedback = TypingLiveInputFeedback.insertBatch(
       effectiveInsertedText(text), into: &session,
       forceError: forceError, origin: origin, defersAutomaticInput: true,
       wrapAdmission: promptInputWrapAdmission)
     if !hadStarted && session.hasStarted {
-      preparedWholePreviewRendering = nil
+      let style = promptRenderStyle
+      if let initialPreview, initialPreview.attemptID == session.automaticInputAttemptID,
+        initialPreview.typedSnapshot.isEmpty, initialPreview.style == style,
+        initialPreview.paceGuideIndex == nil,
+        let patched = PromptFirstInputPatch.make(prepared: initialPreview.rendering,
+          session: session, style: style) {
+        preparedWholePreviewRendering = .init(attemptID: initialPreview.attemptID,
+          typedSnapshot: session.typed, rendering: patched, layout: nil,
+          style: style, paceGuideIndex: nil)
+      } else { preparedWholePreviewRendering = nil }
       synchronizeNoQuitConfigurationLock()
+    } else if preparedWholePreviewRendering?.typedSnapshot != session.typed {
+      preparedWholePreviewRendering = nil
     }
     visualFocus.inputDidUpdate(hasFeedback: !feedback.isEmpty,
       textChanged: session.typed != typedBefore, isFinished: session.isFinished)
@@ -3904,6 +3921,9 @@ private struct ContentView: View {
     guard !isPreparingWholePreview else { return }
     synchronizeLiveInputRules()
     let feedback = TypingLiveInputFeedback.delete(from: &session, wholeWord: deletesWord)
+    if preparedWholePreviewRendering?.typedSnapshot != session.typed {
+      preparedWholePreviewRendering = nil
+    }
     visualFocus.inputDidUpdate(hasFeedback: !feedback.isEmpty,
       textChanged: false, isFinished: session.isFinished)
     for correct in feedback { playInputFeedback(inputWasCorrect: correct) }
@@ -4524,6 +4544,7 @@ private struct ContentView: View {
         }
         activePaceTargetWpm = prepared.paceTargetWpm
         preparedWholePreviewRendering = .init(attemptID: prepared.session.automaticInputAttemptID,
+          typedSnapshot: prepared.session.typed,
           rendering: prepared.rendering, layout: prepared.layout, style: prepared.style,
           paceGuideIndex: prepared.paceGuideIndex)
         session = prepared.session

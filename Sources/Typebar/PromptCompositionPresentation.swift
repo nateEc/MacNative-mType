@@ -273,6 +273,22 @@ struct PromptCompositionTextMap {
     return max(0, low - 1)
   }
   func characterOffset(atUTF16 unit: Int) -> Int { Self.offset(unit, starts: characterStarts) }
+
+  func replacing(cellTexts: [Int: AttributedString], fieldRuns: [PromptFieldTextRun],
+    caret: PromptCompositionProjection.Anchor?) -> Self {
+    Self(copying: self, cellTexts: cellTexts, fieldRuns: fieldRuns, caret: caret)
+  }
+
+  private init(copying original: Self, cellTexts: [Int: AttributedString],
+    fieldRuns: [PromptFieldTextRun], caret: PromptCompositionProjection.Anchor?) {
+    cellRanges = original.cellRanges; inkRanges = original.inkRanges
+    self.cellTexts = cellTexts; canonicalAliases = original.canonicalAliases
+    fieldCharacterOffsets = original.fieldCharacterOffsets; self.caret = caret
+    self.fieldRuns = fieldRuns; markedInputRanges = original.markedInputRanges
+    markedCellIDs = original.markedCellIDs; markedInputText = original.markedInputText
+    compositionStyle = original.compositionStyle; characterStarts = original.characterStarts
+  }
+
   func range(forCanonicalGlyph id: Int, after: Bool = false) -> NSRange? {
     let ids = canonicalAliases[id] ?? (cellRanges[id] == nil ? [] : [id])
     return (after ? ids.last : ids.first).flatMap { inkRanges[$0] }

@@ -119,7 +119,7 @@ struct PromptRenderStyle: Equatable {
       batchSize: batchSize, didRender: didRender) { painter.render($0, $1, nil) }
   }
 
-  private static func promptColor(_ role: PromptTextRole, style: PromptRenderStyle) -> Color {
+  static func promptColor(_ role: PromptTextRole, style: PromptRenderStyle) -> Color {
     switch PromptTextColorPolicy.tone(for: role,
       flipsCompletionAndFuture: style.flipTestColors,
       usesAccentForCompleted: style.colorfulMode) {
@@ -238,5 +238,56 @@ struct PromptRenderStyle: Equatable {
       case .carrot, .banana, .monkey: character.foregroundColor = theme.caret.opacity(0.72)
       }
     }
+  }
+}
+
+/// A provisional first-key frame for an unchanged, ordinary field. It does
+/// not replace the complete render and declines any structural ambiguity.
+@MainActor enum PromptFirstInputPatch {
+  static func make(prepared: PromptRendering, session: TypingSession,
+    style: PromptRenderStyle) -> PromptRendering? {
+    guard session.hasStarted, !session.isFinished, session.configuration.mode != .zen,
+      session.typed.count == 1,
+      style.highlightMode == .letter, style.typedCharacterEffect == .keep,
+      !style.usesTapePractice, !session.configuration.rules.blindMode,
+      session.configuration.modifiers.allSatisfy({ $0 == .noQuit }),
+      let first = session.prompt.first, let second = session.prompt.dropFirst().first,
+      first.asciiValue.map({ (33...126).contains($0) }) == true,
+      second.asciiValue.map({ (33...126).contains($0) }) == true,
+      session.typed == String(first), let map = prepared.compositionTextMap,
+      map.caret == .init(cellID: 0, after: false),
+      map.cellRanges[0] == .init(location: 0, length: 1),
+      map.cellRanges[1] == .init(location: 1, length: 1),
+      map.markedInputRanges.isEmpty, map.fieldRuns.first?.fieldID == 0,
+      map.fieldRuns[0].cells.count > 1,
+      map.fieldRuns[0].cells[0].id == 0, map.fieldRuns[0].cells[1].id == 1,
+      map.fieldRuns[0].cells[0].glyph.state == .current,
+      map.fieldRuns[0].cells[1].glyph.state == .pending,
+      let previousInk = map.cellTexts[0], String(previousInk.characters) == String(first),
+      PromptRenderSessionPolicy(session: session, highlightMode: style.highlightMode,
+        usesTapePractice: false, mainCaretDrawsMarker: style.caretStyle.drawsMarker,
+        paceCaretDrawsMarker: style.paceCaretStyle.drawsMarker).usesIndependentPromptCarets
+    else { return nil }
+    let glyphs = session.promptGlyphs
+    guard glyphs.count > 1, glyphs[0].character == first, glyphs[1].character == second,
+      glyphs[0].state == .correct, glyphs[1].state == .current,
+      glyphs[0].typedCharacter == nil else { return nil }
+    let completed = PromptRenderPlan.promptColor(.completed, style: style).opacity(1)
+    var text = prepared.text
+    let firstEnd = text.characters.index(after: text.startIndex)
+    text[text.startIndex..<firstEnd].foregroundColor = completed
+    var ink = previousInk
+    ink.foregroundColor = completed
+    var cellTexts = map.cellTexts
+    cellTexts[0] = ink
+    var fieldRuns = map.fieldRuns
+    fieldRuns[0].cells[0] = .init(id: 0, glyph: glyphs[0], text: ink, isGap: false)
+    let next = fieldRuns[0].cells[1]
+    fieldRuns[0].cells[1] = .init(id: 1, glyph: glyphs[1], text: next.text, isGap: next.isGap)
+    return .init(text: text, glyphCharacterOffsets: prepared.glyphCharacterOffsets,
+      emptyWordPlaceholderGlyphID: prepared.emptyWordPlaceholderGlyphID,
+      structuralNewlineOffsets: prepared.structuralNewlineOffsets,
+      compositionTextMap: map.replacing(cellTexts: cellTexts, fieldRuns: fieldRuns,
+        caret: .init(cellID: 1, after: false)))
   }
 }
