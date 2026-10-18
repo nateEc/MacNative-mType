@@ -98,7 +98,8 @@ struct TypebarApp: App {
         weakSpotScores: $1, wordDecorationState: $2)
     },
     wholePreviewRender: @escaping @MainActor (TypingSession, PromptRenderStyle) async throws -> PromptRendering = {
-      try await PromptRenderPlan(session: $0, composition: "", style: $1).renderCooperatively()
+      let plan = try await PromptRenderPlan.prepareCooperatively(session: $0, composition: "", style: $1)
+      return try await plan.renderCooperatively()
     },
     wholePreviewLayout: @escaping @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout = {
       try await PromptFieldTextLayout.makeCooperatively(map: $0, width: $1, font: $2,

@@ -42,4 +42,18 @@ import XCTest
       XCTAssertEqual(actual.compositionTextMap?.inkRanges, expected.compositionTextMap?.inkRanges)
     }
   }
+
+  func testCooperativePlanPreparationMatchesSynchronousRendering() async throws {
+    let candidate = TypingSession(configuration: .words(3), prompt: "a \u{301}b 🙂 tail")
+    for style in CompositionDisplayStyle.allCases {
+      let appearance = PromptRenderStyle(theme: theme, compositionDisplayStyle: style)
+      let expected = PromptRenderPlan(session: candidate, composition: "候选", style: appearance).render()
+      let plan = try await PromptRenderPlan.prepareCooperatively(session: candidate,
+        composition: "候选", style: appearance, batchSize: 2)
+      let actual = try await plan.renderCooperatively(batchSize: 2)
+      XCTAssertEqual(actual.text, expected.text)
+      XCTAssertEqual(actual.compositionTextMap?.canonicalAliases, expected.compositionTextMap?.canonicalAliases)
+      XCTAssertEqual(actual.compositionTextMap?.cellRanges, expected.compositionTextMap?.cellRanges)
+    }
+  }
 }

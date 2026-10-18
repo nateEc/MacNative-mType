@@ -39,6 +39,31 @@ struct PromptRenderStyle: Equatable {
   private let extraInputFeedbackColor: Color
 
   init(session: TypingSession, composition: String?, style: PromptRenderStyle) {
+    let usesProjection = composition != nil && PromptFieldProjectionPolicy.supports(session.configuration)
+    let presentation = usesProjection
+      ? PromptCompositionPresentation(session: session, composition: composition ?? "",
+        style: style.compositionDisplayStyle) : nil
+    self.init(session: session, composition: composition, style: style,
+      usesProjection: usesProjection, presentation: presentation)
+  }
+
+  static func prepareCooperatively(session: TypingSession, composition: String?,
+    style: PromptRenderStyle, batchSize: Int = 512
+  ) async throws -> PromptRenderPlan {
+    try Task.checkCancellation()
+    let usesProjection = composition != nil && PromptFieldProjectionPolicy.supports(session.configuration)
+    let presentation: PromptCompositionPresentation?
+    if usesProjection {
+      presentation = try await PromptCompositionPresentation.makeCooperatively(session: session,
+        composition: composition ?? "", style: style.compositionDisplayStyle, batchSize: batchSize)
+    } else { presentation = nil }
+    try Task.checkCancellation()
+    return .init(session: session, composition: composition, style: style,
+      usesProjection: usesProjection, presentation: presentation)
+  }
+
+  private init(session: TypingSession, composition: String?, style: PromptRenderStyle,
+    usesProjection: Bool, presentation: PromptCompositionPresentation?) {
     self.composition = composition
     self.style = style
     removedTapeWordIndices = session.removedTapePromptWordIndices
@@ -48,10 +73,7 @@ struct PromptRenderStyle: Equatable {
       highlightMode: style.highlightMode, usesTapePractice: style.usesTapePractice,
       mainCaretDrawsMarker: style.caretStyle.drawsMarker,
       paceCaretDrawsMarker: style.paceCaretStyle.drawsMarker)
-    let usesProjection = composition != nil && PromptFieldProjectionPolicy.supports(session.configuration)
-    presentation = usesProjection
-      ? PromptCompositionPresentation(session: session, composition: composition ?? "",
-        style: style.compositionDisplayStyle) : nil
+    self.presentation = presentation
     CompositionProjectionDiagnostics.observe(expected: usesProjection,
       available: presentation != nil, marked: composition?.isEmpty == false, session: session)
     completedCharacterIndices = presentation?.completedIndices ?? session.completedPromptCharacterIndices

@@ -40,6 +40,24 @@ struct PromptCompositionPresentation {
   init?(session: TypingSession, composition: String, style: CompositionDisplayStyle) {
     guard let field = session.promptCompositionField,
       let projection = session.promptCompositionProjection(composition: composition, style: style) else { return nil }
+    self.init(session: session, composition: composition, style: style,
+      field: field, projection: projection)
+  }
+
+  @MainActor static func makeCooperatively(session: TypingSession, composition: String,
+    style: CompositionDisplayStyle, batchSize: Int = 512
+  ) async throws -> PromptCompositionPresentation? {
+    try Task.checkCancellation()
+    guard let projection = try await session.promptCompositionProjectionCooperatively(
+      composition: composition, style: style, batchSize: batchSize),
+      let field = session.promptCompositionField else { return nil }
+    try Task.checkCancellation()
+    return .init(session: session, composition: composition, style: style,
+      field: field, projection: projection)
+  }
+
+  private init(session: TypingSession, composition: String, style: CompositionDisplayStyle,
+    field: PromptCompositionField, projection: PromptCompositionProjection) {
     self.projection = projection
     isZen = session.configuration.mode == .zen
     markedInputText = composition

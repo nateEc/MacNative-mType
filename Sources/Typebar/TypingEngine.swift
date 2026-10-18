@@ -5290,7 +5290,18 @@ struct TypingSession {
 
   /// A read-only global projection. Accepted extras use their actual source
   /// field; a field boundary need not align with a decoded native Character.
-  func promptCompositionProjection(composition: String, style: CompositionDisplayStyle) -> PromptCompositionProjection? {
+  private struct PromptProjectionInputs {
+    let field: PromptCompositionField
+    let glyphs: [TypingPromptGlyph]
+    let indices: [Int]
+    let targetCount: Int
+    let caret: Int?
+    let placeholder: Int?
+    let owners: [Int: Int]
+    let overrides: [Int: TypingPromptGlyph]
+  }
+
+  private func promptProjectionInputs(composition: String) -> PromptProjectionInputs? {
     guard let field = promptCompositionField else { return nil }
     let glyphs = composition.isEmpty ? promptGlyphs : acceptedPromptGlyphs
     let targetCount = configuration.mode == .zen ? typed.count : promptCharacters.count
@@ -5315,11 +5326,30 @@ struct TypingSession {
     let indices = glyphs.indices.filter { !returns.suppressed.contains($0)
       && ($0 < targetCount || $0 == placeholder || !configuration.rules.hideExtraLetters) }
     let caret = promptCaretGlyphIndex.flatMap { returns.overrides[$0] != nil || returns.suppressed.contains($0) ? nil : $0 }
-    return .init(glyphs: glyphs, indices: indices, targetGlyphCount: targetCount, field: field,
-      composition: composition, style: style, canonicalCaret: caret,
-      zenPlaceholder: placeholder, extraOwners: owners,
+    return .init(field: field, glyphs: glyphs, indices: indices, targetCount: targetCount,
+      caret: caret, placeholder: placeholder, owners: owners, overrides: returns.overrides)
+  }
+
+  func promptCompositionProjection(composition: String, style: CompositionDisplayStyle) -> PromptCompositionProjection? {
+    guard let input = promptProjectionInputs(composition: composition) else { return nil }
+    return .init(glyphs: input.glyphs, indices: input.indices, targetGlyphCount: input.targetCount,
+      field: input.field, composition: composition, style: style, canonicalCaret: input.caret,
+      zenPlaceholder: input.placeholder, extraOwners: input.owners,
       firstRetainedFieldIndex: firstRetainedPromptWordIndex, removedFieldIndices: removedTapePromptWordIndices,
-      glyphOverrides: returns.overrides)
+      glyphOverrides: input.overrides)
+  }
+
+  @MainActor func promptCompositionProjectionCooperatively(composition: String, style: CompositionDisplayStyle,
+    batchSize: Int = 512, didProject: @MainActor (Int) -> Void = { _ in }
+  ) async throws -> PromptCompositionProjection? {
+    try Task.checkCancellation()
+    guard let input = promptProjectionInputs(composition: composition) else { return nil }
+    return try await PromptCompositionProjection.makeCooperatively(glyphs: input.glyphs,
+      indices: input.indices, targetGlyphCount: input.targetCount, field: input.field,
+      composition: composition, style: style, canonicalCaret: input.caret,
+      zenPlaceholder: input.placeholder, extraOwners: input.owners,
+      firstRetainedFieldIndex: firstRetainedPromptWordIndex, removedFieldIndices: removedTapePromptWordIndices,
+      glyphOverrides: input.overrides, batchSize: batchSize, didProject: didProject)
   }
 
   /// Source Return is a displayed target letter, although legacy navigation
