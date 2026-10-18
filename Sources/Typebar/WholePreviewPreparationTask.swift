@@ -10,15 +10,15 @@ import Foundation
   var isPreparing: Bool { ticket != nil }
 
   @discardableResult
-  func start(
-    operation: @escaping @MainActor () async throws -> TypingSession,
-    completion: @escaping @MainActor (Result<TypingSession, Error>) -> Void
+  func start<Prepared>(
+    operation: @escaping @MainActor () async throws -> Prepared,
+    completion: @escaping @MainActor (Result<Prepared, Error>) -> Void
   ) -> Task<Void, Never> {
     cancel()
     let request = UUID()
     ticket = request
     let running = Task { @MainActor [weak self] in
-      let result: Result<TypingSession, Error>
+      let result: Result<Prepared, Error>
       do {
         try Task.checkCancellation()
         result = .success(try await operation())

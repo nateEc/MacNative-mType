@@ -27,6 +27,26 @@ import XCTest
   }
 
   private enum Failure: Error { case expected }
+  private struct PreparedSnapshot {
+    let session: TypingSession
+    let rendering: PromptRendering
+  }
+  @MainActor private final class PresentationGate {
+    var pending: CheckedContinuation<Void, Never>?
+    var started: CheckedContinuation<Void, Never>?
+    func prepare() async {
+      await withCheckedContinuation { continuation in
+        pending = continuation
+        started?.resume()
+        started = nil
+      }
+    }
+    func waitUntilStarted() async {
+      if pending != nil { return }
+      await withCheckedContinuation { started = $0 }
+    }
+    func finish() { pending?.resume(); pending = nil }
+  }
   private func session(_ text: String) -> sending TypingSession {
     .init(configuration: .words(1), prompt: text)
   }
@@ -144,5 +164,39 @@ import XCTest
     replacement.finish(.success(session("new")))
     await nextTask?.value
     XCTAssertFalse(owner.isPreparing)
+  }
+
+  func testWholeSessionAndRenderingSnapshotShareOnePublicationTicket() async {
+    for oldFails in [false, true] {
+      let owner = WholePreviewPreparationTask()
+      let oldRendering = PresentationGate()
+      var published: [String] = []
+      let first = owner.start(operation: {
+        let prepared = self.session("old")
+        await oldRendering.prepare()
+        if oldFails { throw Failure.expected }
+        return PreparedSnapshot(session: prepared,
+          rendering: .init(text: AttributedString("old-ink"), glyphCharacterOffsets: [:]))
+      }) { result in
+        if let value = try? result.get() {
+          published.append("\(value.session.prompt):\(String(value.rendering.text.characters))")
+        }
+      }
+      await oldRendering.waitUntilStarted()
+      XCTAssertTrue(owner.isPreparing)
+      let second = owner.start(operation: {
+        PreparedSnapshot(session: self.session("new"),
+          rendering: .init(text: AttributedString("new-ink"), glyphCharacterOffsets: [:]))
+      }) { result in
+        if let value = try? result.get() {
+          published.append("\(value.session.prompt):\(String(value.rendering.text.characters))")
+        }
+      }
+      await second.value
+      oldRendering.finish()
+      await first.value
+      XCTAssertEqual(published, ["new:new-ink"])
+      XCTAssertFalse(owner.isPreparing)
+    }
   }
 }
