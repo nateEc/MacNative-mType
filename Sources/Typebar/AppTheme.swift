@@ -398,6 +398,26 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case anti_hero
     case frozen_llama
     case husqy
+    case ishtar
+    case iv_clover
+    case iv_spade
+    case lil_dragon
+    case magic_girl
+    case mashu
+    case material
+    case metaverse
+    case mexican
+    case miami
+    case miami_nights
+    case modern_dolch
+    case modern_dolch_light
+    case mr_sleeves
+    case ms_cupcakes
+    case oblivion
+    case olivia
+    case red_dragon
+    case red_samurai
+    case shoko
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -551,6 +571,26 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .anti_hero: "靛蓝织物 · Typebar"
         case .frozen_llama: "冰蓝纱线 · Typebar"
         case .husqy: "灰褐毛毡 · Typebar"
+        case .ishtar: "星蚀石 · Typebar"
+        case .iv_clover: "四叶草纸 · Typebar"
+        case .iv_spade: "黑桃机壳 · Typebar"
+        case .lil_dragon: "小龙苔 · Typebar"
+        case .magic_girl: "月亮丝绒 · Typebar"
+        case .mashu: "莓粉瓷 · Typebar"
+        case .material: "矿物蓝灰 · Typebar"
+        case .metaverse: "深海数据 · Typebar"
+        case .mexican: "玉米纸 · Typebar"
+        case .miami: "滨海珊瑚 · Typebar"
+        case .miami_nights: "夜航海岸 · Typebar"
+        case .modern_dolch: "深灰陶 · Typebar"
+        case .modern_dolch_light: "浅灰陶 · Typebar"
+        case .mr_sleeves: "针织袖口 · Typebar"
+        case .ms_cupcakes: "莓果糖霜 · Typebar"
+        case .oblivion: "薄雾钛 · Typebar"
+        case .olivia: "橄榄羊皮 · Typebar"
+        case .red_dragon: "龙鳞朱 · Typebar"
+        case .red_samurai: "朱漆刀鞘 · Typebar"
+        case .shoko: "雨后纸窗 · Typebar"
         }
     }
 
@@ -836,6 +876,46 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0xE4EDF2, 0xCBDDE7, 0x375D78, 0x243641, 0x465A69, light: true, error: 0x913F51)
         case .husqy:
             Self.palette(0xE9E4DD, 0xD1C8BD, 0x5B4B43, 0x302D2B, 0x514C48, light: true, error: 0x913F46)
+        case .ishtar:
+            Self.palette(0x27243A, 0x3C3654, 0xE8C7A3, 0xF4F0EB, 0xC9C9D4, light: false, error: 0xFFA89B)
+        case .iv_clover:
+            Self.palette(0xDFEAD9, 0xC8DAC2, 0x375D4A, 0x24392F, 0x45594B, light: true, error: 0x913947)
+        case .iv_spade:
+            Self.palette(0x1C2A32, 0x30414A, 0xBDD9D4, 0xF1F4EF, 0xC0CED0, light: false, error: 0xFFA89B)
+        case .lil_dragon:
+            Self.palette(0xE5ECE6, 0xCBDCD0, 0x496354, 0x263830, 0x4E5A53, light: true, error: 0x913947)
+        case .magic_girl:
+            Self.palette(0x332541, 0x4C3655, 0xF0BFD7, 0xF8EFF6, 0xD8C7D6, light: false, error: 0xFFA89B)
+        case .mashu:
+            Self.palette(0xF0E4EC, 0xDFCADA, 0x744C6A, 0x392D38, 0x5A4957, light: true, error: 0x913947)
+        case .material:
+            Self.palette(0xE0E7E8, 0xC8D6D9, 0x315E6C, 0x24363E, 0x465D62, light: true, error: 0x913947)
+        case .metaverse:
+            Self.palette(0x1D2D43, 0x30445B, 0xADD8D6, 0xF0F4F4, 0xC5D3DB, light: false, error: 0xFFA89B)
+        case .mexican:
+            Self.palette(0xEDE3C7, 0xDACDAA, 0x6B4D22, 0x3C3325, 0x5C503C, light: true, error: 0x913947)
+        case .miami:
+            Self.palette(0xD9EEF0, 0xBCDBDE, 0x8C3D66, 0x233842, 0x495D64, light: true, error: 0x913947)
+        case .miami_nights:
+            Self.palette(0x272C45, 0x3D4260, 0xF3B7C0, 0xF5F0F2, 0xCFCAD9, light: false, error: 0xFFA89B)
+        case .modern_dolch:
+            Self.palette(0x2E3238, 0x434B50, 0xD6D3AA, 0xF0F2EB, 0xC8D1CB, light: false, error: 0xFFA89B)
+        case .modern_dolch_light:
+            Self.palette(0xEAEAE3, 0xD4D7CF, 0x4E6361, 0x303B3A, 0x50605D, light: true, error: 0x913947)
+        case .mr_sleeves:
+            Self.palette(0x302C30, 0x4A3E43, 0xEBC8AA, 0xF4EFEB, 0xD0C9C6, light: false, error: 0xFFA89B)
+        case .ms_cupcakes:
+            Self.palette(0xF2DFE1, 0xE5C5CB, 0x81455E, 0x3A2C36, 0x654C58, light: true, error: 0x913947)
+        case .oblivion:
+            Self.palette(0x232838, 0x353E50, 0xC6D0EA, 0xF2F3F8, 0xC8CFDA, light: false, error: 0xFFA89B)
+        case .olivia:
+            Self.palette(0xE8E3D7, 0xD2CAB8, 0x5D6447, 0x343A2E, 0x4F5541, light: true, error: 0x913947)
+        case .red_dragon:
+            Self.palette(0x35252A, 0x51373D, 0xF1B7A2, 0xFAF0EB, 0xE1CAC7, light: false, error: 0xFFD591)
+        case .red_samurai:
+            Self.palette(0x302829, 0x483738, 0xE5C09B, 0xF5F1EA, 0xD4C9C0, light: false, error: 0xF5A79A)
+        case .shoko:
+            Self.palette(0xE3ECEC, 0xC6DCDD, 0x35647A, 0x283A42, 0x4B6268, light: true, error: 0x913947)
         }
     }
 }

@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-19 `VIS-THEME-CATALOG-01` 二十款材料主题增量：`ishtar`、`iv_clover`、`iv_spade`、`lil_dragon`、`magic_girl`、`mashu`、`material`、`metaverse`、`mexican`、`miami`、`miami_nights`、`modern_dolch`、`modern_dolch_light`、`mr_sleeves`、`ms_cupcakes`、`oblivion`、`olivia`、`red_dragon`、`red_samurai`、`shoko` 现可按原 ID 从 Typebar 内置选择器、搜索及命令入口选用并归档，十浅十深。官方 187 个主题身份、0 个已验证精确原生映射、187 个待映射；其中 141 个原创相关替代、46 个尚无相关替代。源码仅使用原创配色与既有原生渲染；对比度为源值计算，真实窗口、所有交互及官方视觉等价仍待验收。详见 [官方主题审计](OFFICIAL_THEME_AUDIT.md)。
+
 2026-10-19 `VIS-THEME-CATALOG-01` 六款仪表与材料主题增量：`8008`、`9009`、`alduin`、`anti_hero`、`frozen_llama`、`husqy` 已作为 Typebar 自制主题接入内置选择、搜索、命令入口和原 ID 归档，三浅三深。先行测试确认六项缺失；接入后的组件测试核对文字／状态色对背景与面板的计算对比度及背景互异。官方 187 个身份、0 个已验证精确原生映射、187 个待映射；其中 121 个原创相关替代、66 个尚无相关替代。精确视觉映射仍为 0。未读取或复制固定参考的主题配色或资产，也未做可见窗口和实体输入验收；完整重写仍未完成。详见 [官方主题审计](OFFICIAL_THEME_AUDIT.md)。
 
 2026-10-19 showAllLines 字格范围快路径：仅对最终仍是同一可打印 ASCII 字符的 pending 字格直接记录单个 UTF-16 范围，省去全量渲染中重复的字符串转换与 hint 扫描；换行、错误、Unicode、候选等保持原路径。目标 ASCII 却展示单字 emoji 的新反例先失败三处范围断言，补全保护后通过。十万零一词 Debug 隐藏宿主两轮首键约 25.49／25.89 秒，相邻旧实现约 28.11／28.23 秒；Release 两轮约 12.67／12.86 秒，此前约 14.68／14.62 秒。仍非交互可用，完整投影／几何与实机验收继续待办。详见 [官方配置审计](OFFICIAL_CONFIG_AUDIT.md)。

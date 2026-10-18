@@ -2,7 +2,9 @@
 
 参考固定为 Monkeytype 提交 `91bd24bb8513785c7364cbea29296ff7adafac41` 的 `packages/schemas/src/themes.ts` 中 `ThemeNameSchema`。本审计只保存主题 ID、数量与覆盖状态；不读取、复制或导入官方主题的色值、CSS、图片、字体或其他资产。
 
-当前守恒：187 个官方主题身份、0 个已验证精确原生映射、187 个待映射；其中 121 个原创相关替代、66 个尚无相关替代。逐项身份见 `Compatibility/official-themes.json`；`relatedMappings` 只表示同题材的 Typebar 原创选择，绝不算入 `exactMappings`。
+当前守恒：187 个官方主题身份、0 个已验证精确原生映射、187 个待映射；其中 141 个原创相关替代、46 个尚无相关替代。逐项身份见 `Compatibility/official-themes.json`；`relatedMappings` 只表示同题材的 Typebar 原创选择，绝不算入 `exactMappings`。
+
+2026-10-19 新增 `ishtar`、`iv_clover`、`iv_spade`、`lil_dragon`、`magic_girl`、`mashu`、`material`、`metaverse`、`mexican`、`miami`、`miami_nights`、`modern_dolch`、`modern_dolch_light`、`mr_sleeves`、`ms_cupcakes`、`oblivion`、`olivia`、`red_dragon`、`red_samurai`、`shoko` 二十个 Typebar 原创相关主题身份。深／浅灰陶是同一材料的成对变体，朱漆系用暖金错误标记；其余根据纸张、织物、石层、雨窗和海岸独立取色，不采用参考主题的色值、CSS、图片、字体或其他资产。保留现有用户字体、排版及动效控制。先行测试证实全部身份缺失；接入后验证十浅十深、原 ID 编解码、快速搜索、命令入口、背景互异及双表面文字／标记对比度。`olivia` 次级文字第一次计算为 4.45:1，已加深至测试通过；所有配色仍仅为相关替代，不代表逐像素视觉等价或真实窗口验收。
 
 2026-10-19 新增 `8008`、`9009`、`alduin`、`anti_hero`、`frozen_llama`、`husqy` 六个原创相关选择。深色金属与浅色瓷面仪表构成成对的数字主题；其余取熔岩石层、靛蓝织物、冰蓝纱线、灰褐毛毡为材料线索。只保存固定参考的主题身份，不读取或采用其主题色、CSS、图片、字体或其他素材。先行测试证实六项全缺；接入后检查三浅三深、ID 归档、快速搜索、命令定位、背景互异，以及正文／弱提示对背景和面板至少 4.5:1、强调／光标／错误至少 3:1。计算对比度不能替代真实窗口像素、实体输入和逐款人工验收；`exactMappings` 继续为空。
 
