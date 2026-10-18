@@ -1,5 +1,9 @@
 # 官方配置兼容性审计
 
+## showAllLines：候选会话渲染判断隔离（2026-10-18，生产同步路径已接入）
+
+`renderedPrompt(for:composition:)` 现在用传入的会话计算高亮可用性、独立光标及节奏位置，不再借用当前占位会话；光标着色使用本次渲染固定的主／节奏样式。候选 ASL、强制字符高亮和 Tape 的定点行为测试及既有渲染快照检查共 4 项通过，相邻 Prompt 过滤回归 125 项零失败。该改动只排除了未来预渲染的一类跨会话／跨样式污染；生产仍同步构造提示与布局，尚未把完整准备事务接到窗口，`showAllLines` 继续为部分兼容。下文关于旧状态读取的记录为发现时的历史反例。
+
 ## showAllLines：完整呈现事务的所有权边界（2026-10-18，本地未接线）
 
 现有流程在生成完整 `TypingSession` 后就解除 `isPreparingWholePreview` 并发布会话，随后 SwiftUI 同步构造投影、着色文本和 TextKit 几何。新 `WholePreviewPreparationTask.start<Prepared>` 将原有单一票据／取消机制扩展到任意完整准备结果；先行测试因返回“会话＋呈现快照”而编译失败，泛化后验证在第二阶段悬停时重开，旧成功或旧失败均不能覆盖新结果。旧的七项所有权测试及新的第八项通过，真实 `WholePreviewPreparationHostTests` 12 项零失败。当前生产调用仍只返回会话，尚无窗口性能改善。

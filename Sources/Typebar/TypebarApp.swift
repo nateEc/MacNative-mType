@@ -3601,9 +3601,14 @@ private struct ContentView: View {
     let compositionDisplayStyle = settings.compositionDisplayStyle
     let typoIndicatorStyle = settings.typoIndicatorStyle
     let caretStyle = settings.caretStyle
+    let paceCaretStyle = settings.paceCaretStyle
     let fontSize = settings.fontSize
-    let usesIndependentPromptCarets = self.usesIndependentPromptCarets
-    let paceGuideIndex = usesIndependentPromptCarets ? nil : self.paceGuideIndex
+    let sessionPolicy = PromptRenderSessionPolicy(session: session,
+      highlightMode: settings.promptHighlightMode, usesTapePractice: usesTapePractice,
+      mainCaretDrawsMarker: caretStyle.drawsMarker,
+      paceCaretDrawsMarker: paceCaretStyle.drawsMarker)
+    let usesIndependentPromptCarets = sessionPolicy.usesIndependentPromptCarets
+    let paceGuideIndex = sessionPolicy.paceGuideIndex
     // Native ordinary, ASL, Choo and Tape adapters resolve projected cells.
     // Verified mixed-direction fields share canonical geometry and carets.
     // Other mixed shaping families retain the fallback pending verification.
@@ -3614,7 +3619,7 @@ private struct ContentView: View {
     CompositionProjectionDiagnostics.observe(expected: usesCompositionProjection,
       available: presentation != nil, marked: composition?.isEmpty == false, session: session)
     let completedCharacterIndices = presentation?.completedIndices ?? session.completedPromptCharacterIndices
-    let promptHighlightMode = effectivePromptHighlightMode
+    let promptHighlightMode = sessionPolicy.highlightMode
     let glyphs = presentation?.glyphs ?? session.promptGlyphs
     let caretIndex = presentation.map { value in value.projection.caret.flatMap { anchor in
       value.projection.cells.firstIndex { $0.id == anchor.cellID }
@@ -3660,7 +3665,7 @@ private struct ContentView: View {
       }
       var character = AttributedString(displayedText)
       if !usesIndependentPromptCarets, index == paceGuideIndex, index != caretIndex {
-        applyPaceCaret(to: &character, theme: activeTheme)
+        applyPaceCaret(to: &character, theme: activeTheme, style: paceCaretStyle)
       }
       switch appearance.color {
       case .completed: character.foregroundColor = completedPromptColor
@@ -3686,7 +3691,7 @@ private struct ContentView: View {
       }
       if index == caretIndex, promptHighlightMode != .off,
         caretStyle.drawsMarker && !usesIndependentPromptCarets {
-        applyCaret(to: &character, theme: activeTheme)
+        applyCaret(to: &character, theme: activeTheme, style: caretStyle)
       }
       appearance.applyVisibility(to: &character)
       if let color = character.foregroundColor {
@@ -3762,8 +3767,9 @@ private struct ContentView: View {
       configuration: session.configuration)
   }
 
-  private func applyCaret(to character: inout AttributedString, theme activeTheme: ResolvedTheme) {
-    switch settings.caretStyle {
+  private func applyCaret(to character: inout AttributedString, theme activeTheme: ResolvedTheme,
+    style: TypingCaretStyle) {
+    switch style {
     case .off:
       break
     case .bar:
@@ -3781,8 +3787,9 @@ private struct ContentView: View {
     }
   }
 
-  private func applyPaceCaret(to character: inout AttributedString, theme activeTheme: ResolvedTheme) {
-    switch settings.paceCaretStyle {
+  private func applyPaceCaret(to character: inout AttributedString, theme activeTheme: ResolvedTheme,
+    style: TypingCaretStyle) {
+    switch style {
     case .off:
       break
     case .bar:
