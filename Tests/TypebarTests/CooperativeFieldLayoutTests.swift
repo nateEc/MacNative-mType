@@ -40,6 +40,8 @@ import XCTest
             for id in projection.cellRanges.keys {
               XCTAssertEqual(actual.canonicalRect(id, after: false),
                 expected.canonicalRect(id, after: false), prompt)
+              XCTAssertEqual(actual.canonicalRect(id, after: true),
+                expected.canonicalRect(id, after: true), prompt)
             }
           }
         }
@@ -89,5 +91,25 @@ import XCTest
     XCTAssertEqual(actual.fieldFrames, expected.fieldFrames)
     XCTAssertEqual(actual.shapingResourceCount, expected.shapingResourceCount)
     XCTAssertNotNil(actual.fieldFrames[2])
+  }
+
+  func testCancellationDuringFramePlacementReturnsNoPartialLayout() async throws {
+    let projection = try map(Array(repeating: "harbor", count: 120).joined(separator: " "))
+    var prepared = 0, placed = 0
+    let task = Task {
+      try await PromptFieldTextLayout.makeCooperatively(map: projection,
+        width: 180, font: font, batchSize: 8,
+        didPrepare: { prepared = $0 }, didPlace: { count in
+          placed = count
+          if count >= 8 { withUnsafeCurrentTask { $0?.cancel() } }
+        })
+    }
+    do {
+      _ = try await task.value
+      XCTFail("Cancelled frame placement must not publish partial geometry")
+    } catch is CancellationError {
+      XCTAssertEqual(prepared, projection.fieldRuns.count)
+      XCTAssertEqual(placed, 8)
+    }
   }
 }

@@ -169,13 +169,13 @@ struct PromptFieldTextRun: Equatable {
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, unbounded: unbounded)
     let builder = Builder(layout: self, previous: previous)
     for (group, field) in fieldRuns.enumerated() { builder.append(field, group: group) }
-    builder.finish(fieldRuns: fieldRuns)
+    builder.finish()
   }
 
   static func makeCooperatively(map: PromptCompositionTextMap, width: CGFloat, font: NSFont,
     lineSpacing: CGFloat = 12, rightToLeft: Bool = false, joinsLetters: Bool = false,
     unbounded: Bool = false, reusing previous: PromptFieldTextLayout? = nil,
-    batchSize: Int = 256, didPrepare: (Int) -> Void = { _ in }
+    batchSize: Int = 256, didPrepare: (Int) -> Void = { _ in }, didPlace: (Int) -> Void = { _ in }
   ) async throws -> PromptFieldTextLayout {
     try Task.checkCancellation()
     let layout = PromptFieldTextLayout(aliases: map.canonicalAliases, anchor: map.caret,
@@ -193,7 +193,7 @@ struct PromptFieldTextRun: Equatable {
     }
     if !map.fieldRuns.count.isMultiple(of: interval) { didPrepare(map.fieldRuns.count) }
     try Task.checkCancellation()
-    builder.finish(fieldRuns: map.fieldRuns)
+    try await builder.finishCooperatively(batchSize: interval, didPlace: didPlace)
     try Task.checkCancellation()
     return layout
   }
@@ -204,6 +204,7 @@ struct PromptFieldTextRun: Equatable {
     var groups: [Int] = []
     var projections: [[UInt16]: [ContentProjection]] = [:]
     var shapes: [[UInt16]: [TextShape]] = [:]
+    var lastCellID: Int?
 
     init(layout: PromptFieldTextLayout, previous: PromptFieldTextLayout?) {
       self.layout = layout
@@ -243,6 +244,10 @@ struct PromptFieldTextRun: Equatable {
     }
 
     func append(_ field: PromptFieldTextRun, group: Int) {
+      for cell in field.cells {
+        if let lastCellID { layout.followingCell[lastCellID] = cell.id }
+        lastCellID = cell.id
+      }
       func append(_ cells: [PromptFieldTextRun.Cell], breaks: Bool = false) {
         let old: Box? = cells.first.flatMap { cell in
           guard let reuse, let index = reuse.boxByCell[cell.id] else { return nil }
@@ -280,65 +285,99 @@ struct PromptFieldTextRun: Equatable {
       for _ in 0..<field.removedReturns { append([], breaks: true) }
     }
 
-    func finish(fieldRuns: [PromptFieldTextRun]) {
+    func finish() {
+      prepareGeometry()
+      for indices in visualRows() { orderVisualRow(indices) }
+      for index in layout.boxes.indices { placeFrame(at: index) }
+    }
+
+    func finishCooperatively(batchSize: Int,
+      didPlace: (Int) -> Void) async throws {
+      prepareGeometry()
+      try Task.checkCancellation()
+      await Task.yield()
+      let rows = visualRows()
+      for (index, indices) in rows.enumerated() {
+        orderVisualRow(indices)
+        if (index + 1).isMultiple(of: batchSize) {
+          try Task.checkCancellation()
+          await Task.yield()
+        }
+      }
+      try Task.checkCancellation()
+      await Task.yield()
+      for index in layout.boxes.indices {
+        placeFrame(at: index)
+        if (index + 1).isMultiple(of: batchSize) {
+          didPlace(index + 1)
+          try Task.checkCancellation()
+          await Task.yield()
+        }
+      }
+      if !layout.boxes.count.isMultiple(of: batchSize) { didPlace(layout.boxes.count) }
+      try Task.checkCancellation()
+    }
+
+    private func prepareGeometry() {
       let boxes = layout.boxes
-      let rightToLeft = layout.rightToLeft, joinsLetters = layout.joinsLetters
-      let font = layout.font, lineSpacing = layout.lineSpacing
       // Tape mirrors around the measured natural extent, not the no-wrap
       // proposal. Ordinary bounded wrapping keeps its existing width.
       let flowWidth = layout.unbounded ? max(1, boxes.reduce(CGFloat.zero) { $0 + $1.bounds.width }) : layout.width
       let geometry = ASLPromptFlowGeometry(cells: boxes.enumerated().map { index, box in
         .init(size: box.bounds.size, wordID: groups[index], isLineBreak: box.breaks, isSeparator: box.isGap)
-      }, width: flowWidth, rowSpacing: lineSpacing)
+      }, width: flowWidth, rowSpacing: layout.lineSpacing)
       layout.size = geometry.size
       layout.origins = boxes.enumerated().map { index, box in
         let point = geometry.positions[index]
-        return CGPoint(x: rightToLeft ? flowWidth - point.x - box.bounds.width : point.x, y: point.y)
+        return CGPoint(x: layout.rightToLeft ? flowWidth - point.x - box.bounds.width : point.x, y: point.y)
       }
-      if !joinsLetters {
-        var rows: [FieldRow: [Int]] = [:]
-        for (index, box) in boxes.enumerated() where !box.isGap {
-          if box.singleCell != nil {
-            rows[.init(group: groups[index], y: layout.origins[index].y), default: []].append(index)
-          }
-        }
-        for indices in rows.values {
-          let cells = indices.compactMap { boxes[$0].singleCell }
-          guard rightToLeft || cells.contains(where: {
-            PracticeTapePolicy.isRightToLeft(String($0.glyph.character), fallback: false)
-          }) else { continue }
-          let order = PromptFieldVisualOrder.cellIDs(cells, font: font, rightToLeft: rightToLeft)
-          let byID = Dictionary(uniqueKeysWithValues: indices.compactMap { index in
-            boxes[index].singleCell.map { ($0.id, index) }
-          })
-          var x = indices.map { layout.origins[$0].x }.min() ?? 0
-          for id in order {
-            guard let index = byID[id] else { continue }
-            layout.origins[index].x = x
-            x += boxes[index].bounds.width
-          }
+    }
+
+    private func visualRows() -> [[Int]] {
+      guard !layout.joinsLetters else { return [] }
+      var rows: [FieldRow: [Int]] = [:]
+      for (index, box) in layout.boxes.enumerated() where !box.isGap {
+        if box.singleCell != nil {
+          rows[.init(group: groups[index], y: layout.origins[index].y), default: []].append(index)
         }
       }
-      for (index, box) in boxes.enumerated() {
-        let origin = layout.origins[index]
-        if let cell = box.singleCell { layout.cellFrames[cell.id] = box.rect(cell.id, origin: origin) }
-        else { for id in box.multipleRanges.keys { layout.cellFrames[id] = box.rect(id, origin: origin) } }
-        if let owner = box.fieldID, !box.isGap, box.singleCell != nil || !box.multipleRanges.isEmpty {
-          let frame = CGRect(origin: origin, size: box.bounds.size)
-          layout.fieldFrames[owner] = layout.fieldFrames[owner].map { $0.union(frame) } ?? frame
-        }
+      return Array(rows.values)
+    }
+
+    private func orderVisualRow(_ indices: [Int]) {
+      let boxes = layout.boxes
+      let cells = indices.compactMap { boxes[$0].singleCell }
+      guard layout.rightToLeft || cells.contains(where: {
+        PracticeTapePolicy.isRightToLeft(String($0.glyph.character), fallback: false)
+      }) else { return }
+      let order = PromptFieldVisualOrder.cellIDs(cells, font: layout.font, rightToLeft: layout.rightToLeft)
+      let byID = Dictionary(uniqueKeysWithValues: indices.compactMap { index in
+        boxes[index].singleCell.map { ($0.id, index) }
+      })
+      var x = indices.map { layout.origins[$0].x }.min() ?? 0
+      for id in order {
+        guard let index = byID[id] else { continue }
+        layout.origins[index].x = x
+        x += boxes[index].bounds.width
       }
-      let ids = fieldRuns.flatMap { $0.cells.map(\.id) }
-      for (id, next) in zip(ids, ids.dropFirst()) { layout.followingCell[id] = next }
-      for box in boxes {
-        if let cell = box.singleCell, box.singleHint != nil,
-          let rect = layout.cellFrames[cell.id] {
-          layout.size.height = max(layout.size.height, rect.maxY + max(9, font.pointSize * 0.48) * 1.4)
-        }
-        for id in box.multipleHints.keys {
-          if let rect = layout.cellFrames[id] {
-            layout.size.height = max(layout.size.height, rect.maxY + max(9, font.pointSize * 0.48) * 1.4)
-          }
+    }
+
+    private func placeFrame(at index: Int) {
+      let box = layout.boxes[index], origin = layout.origins[index]
+      if let cell = box.singleCell { layout.cellFrames[cell.id] = box.rect(cell.id, origin: origin) }
+      else { for id in box.multipleRanges.keys { layout.cellFrames[id] = box.rect(id, origin: origin) } }
+      if let owner = box.fieldID, !box.isGap, box.singleCell != nil || !box.multipleRanges.isEmpty {
+        let frame = CGRect(origin: origin, size: box.bounds.size)
+        layout.fieldFrames[owner] = layout.fieldFrames[owner].map { $0.union(frame) } ?? frame
+      }
+      let hintHeight = max(9, layout.font.pointSize * 0.48) * 1.4
+      if let cell = box.singleCell, box.singleHint != nil,
+        let rect = layout.cellFrames[cell.id] {
+        layout.size.height = max(layout.size.height, rect.maxY + hintHeight)
+      }
+      for id in box.multipleHints.keys {
+        if let rect = layout.cellFrames[id] {
+          layout.size.height = max(layout.size.height, rect.maxY + hintHeight)
         }
       }
     }
