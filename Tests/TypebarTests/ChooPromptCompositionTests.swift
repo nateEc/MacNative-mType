@@ -221,9 +221,9 @@ import XCTest
 
   func testProductionProjectionGateDoesNotExcludeChoo() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    let start = try XCTUnwrap(source.range(of: "let usesCompositionProjection ="))
-    let end = try XCTUnwrap(source.range(of: "let presentation =", range: start.upperBound..<source.endIndex))
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/PromptRenderPlan.swift"), encoding: .utf8)
+    let start = try XCTUnwrap(source.range(of: "let usesProjection ="))
+    let end = try XCTUnwrap(source.range(of: "presentation = usesProjection", range: start.upperBound..<source.endIndex))
     XCTAssertFalse(source[start.lowerBound..<end.lowerBound].contains("!practiceVisualEffect.usesChoo"))
   }
 

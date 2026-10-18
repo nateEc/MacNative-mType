@@ -3589,143 +3589,15 @@ private struct ContentView: View {
         }
       }
     }
-    // These values are invariant across this synchronous render. Resolving
-    // them per glyph repeats theme-preview and prompt-direction work on every
-    // native presentation tick; do not cache them across subsequent renders.
     let activeTheme = self.activeTheme
-    let completedPromptColor = promptTextColor(for: .completed, theme: activeTheme)
-    let futurePromptColor = promptTextColor(for: .future, theme: activeTheme)
-    let errorFeedbackColor = activeTheme.errorColor(usesColorfulMode: settings.colorfulMode)
-    let extraInputFeedbackColor = activeTheme.extraInputColor(usesColorfulMode: settings.colorfulMode)
-    let typedCharacterEffect = settings.typedCharacterEffect
-    let compositionDisplayStyle = settings.compositionDisplayStyle
-    let typoIndicatorStyle = settings.typoIndicatorStyle
-    let caretStyle = settings.caretStyle
-    let paceCaretStyle = settings.paceCaretStyle
-    let fontSize = settings.fontSize
-    let sessionPolicy = PromptRenderSessionPolicy(session: session,
-      highlightMode: settings.promptHighlightMode, usesTapePractice: usesTapePractice,
-      mainCaretDrawsMarker: caretStyle.drawsMarker,
-      paceCaretDrawsMarker: paceCaretStyle.drawsMarker)
-    let usesIndependentPromptCarets = sessionPolicy.usesIndependentPromptCarets
-    let paceGuideIndex = sessionPolicy.paceGuideIndex
-    // Native ordinary, ASL, Choo and Tape adapters resolve projected cells.
-    // Verified mixed-direction fields share canonical geometry and carets.
-    // Other mixed shaping families retain the fallback pending verification.
-    let usesCompositionProjection = composition != nil
-      && PromptFieldProjectionPolicy.supports(session.configuration)
-    let presentation = usesCompositionProjection
-      ? PromptCompositionPresentation(session: session, composition: composition ?? "", style: compositionDisplayStyle) : nil
-    CompositionProjectionDiagnostics.observe(expected: usesCompositionProjection,
-      available: presentation != nil, marked: composition?.isEmpty == false, session: session)
-    let completedCharacterIndices = presentation?.completedIndices ?? session.completedPromptCharacterIndices
-    let promptHighlightMode = sessionPolicy.highlightMode
-    let glyphs = presentation?.glyphs ?? session.promptGlyphs
-    let caretIndex = presentation.map { value in value.projection.caret.flatMap { anchor in
-      value.projection.cells.firstIndex { $0.id == anchor.cellID }
-    } } ?? session.promptCaretGlyphIndex
-    let targetGlyphCount = session.prompt.count
-    let words = presentation?.words ?? session.promptWordPresentations
-    let indices = PromptGlyphLayout.indices(
-      glyphs: glyphs, words: words, hideExtraLetters: session.configuration.rules.hideExtraLetters,
-      firstRetainedWordIndex: session.firstRetainedPromptWordIndex)
-    let appearances = PromptGlyphAppearance.plan(
-      glyphs: glyphs, words: words,
-      mode: promptHighlightMode, blindMode: session.configuration.rules.blindMode,
-      typedEffect: typedCharacterEffect,
-      hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
-    let emptyWordPlaceholder = presentation?.emptyPlaceholderIndex ?? session.zenEmptyWordPlaceholderGlyphIndex
-    var plainPendingInk: [PlainPendingGlyphInkKey: AttributedString] = [:]
-    func renderGlyph(_ index: Int, _ glyph: TypingPromptGlyph,
-      _ markedCell: PromptCompositionProjection.Cell?) -> AttributedString {
-      let isCompleted = completedCharacterIndices.contains(index)
-      let appearance = appearances[index]
-      let plainKey = PlainPendingGlyphInkKey.make(glyph: glyph, appearance: appearance,
-        isCompleted: isCompleted, hasSpecialPresentation: presentation == nil || markedCell != nil
-          || index == caretIndex || index == paceGuideIndex || index == emptyWordPlaceholder)
-      if let plainKey, let cached = plainPendingInk[plainKey] { return cached }
-      let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
-        isCompleted: isCompleted, character: glyph.character,
-        effect: typedCharacterEffect)
-      let replacesCurrentWithComposition = index == caretIndex
-        && presentation == nil
-        && compositionDisplayStyle == .replace
-        && composition?.isEmpty == false
-      let textPlan = PromptControlCharacterPresentation.plan(
-        for: glyph, style: typoIndicatorStyle,
-        isZen: session.configuration.mode == .zen,
-        isExtra: glyph.state == .extra || (presentation == nil && index >= targetGlyphCount),
-        compositionReplacement: markedCell?.text ?? (replacesCurrentWithComposition ? composition : nil),
-        isEmptyWordPlaceholder: index == emptyWordPlaceholder)
-      let displayedText: String
-      if turnsIntoDot {
-        displayedText = "•"
-      } else {
-        displayedText = textPlan.text
-      }
-      var character = AttributedString(displayedText)
-      if !usesIndependentPromptCarets, index == paceGuideIndex, index != caretIndex {
-        applyPaceCaret(to: &character, theme: activeTheme, style: paceCaretStyle)
-      }
-      switch appearance.color {
-      case .completed: character.foregroundColor = completedPromptColor
-      case .future: character.foregroundColor = futurePromptColor
-      case .error: character.foregroundColor = errorFeedbackColor
-      case .extra: character.foregroundColor = extraInputFeedbackColor
-      case .hidden: character.foregroundColor = .clear
-      }
-      switch glyph.state {
-      case .correct:
-        switch typedCharacterEffect {
-        case .hide where isCompleted:
-          character.foregroundColor = .clear
-        case .fade where isCompleted:
-          character.foregroundColor = activeTheme.fadedText.opacity(0.24)
-        case .dots where turnsIntoDot:
-          character.foregroundColor = activeTheme.accent.opacity(0.74)
-        default: break
-        }
-      case .current:
-        break
-      case .incorrect, .pending, .hidden, .extra: break
-      }
-      if index == caretIndex, promptHighlightMode != .off,
-        caretStyle.drawsMarker && !usesIndependentPromptCarets {
-        applyCaret(to: &character, theme: activeTheme, style: caretStyle)
-      }
-      appearance.applyVisibility(to: &character)
-      if let color = character.foregroundColor {
-        character.foregroundColor = color.opacity(textPlan.opacity)
-      }
-      if typedCharacterEffect != .hide || !isCompleted {
-        appearance.applyErrorUnderline(to: &character, errorColor: errorFeedbackColor)
-      }
-      if markedCell != nil {
-        let underline = appearance.color == .hidden ? Color.clear : futurePromptColor
-        character.underlineStyle = Text.LineStyle(color: underline)
-        character.appKit.underlineColor = NSColor(underline)
-      }
-      if appearance.color != .hidden, let hintText = textPlan.hint
-      {
-        var hint = AttributedString(hintText)
-        hint.font = .system(
-          size: max(9, fontSize * 0.48), weight: .semibold, design: .monospaced)
-        hint.foregroundColor = errorFeedbackColor.opacity(0.72)
-        hint.baselineOffset = -fontSize * 0.42
-        // Reserve no additional horizontal advance: the hint sits under the
-        // erroneous glyph instead of reflowing every following character.
-        hint.kern = -fontSize * 0.62
-        character += hint
-      }
-      if let plainKey { plainPendingInk[plainKey] = character }
-      return character
-    }
-    if let presentation { return presentation.render(renderGlyph) }
-    return PromptRendering.make(glyphs: glyphs, indices: indices,
-      emptyWordPlaceholderGlyphID: emptyWordPlaceholder,
-      words: words, removedTapeWordIndices: session.removedTapePromptWordIndices) { index, glyph in
-        renderGlyph(index, glyph, nil)
-      }
+    let style = PromptRenderStyle(theme: activeTheme, fontSize: settings.fontSize,
+      flipTestColors: settings.flipTestColors, colorfulMode: settings.colorfulMode,
+      typedCharacterEffect: settings.typedCharacterEffect,
+      compositionDisplayStyle: settings.compositionDisplayStyle,
+      typoIndicatorStyle: settings.typoIndicatorStyle,
+      caretStyle: settings.caretStyle, paceCaretStyle: settings.paceCaretStyle,
+      highlightMode: settings.promptHighlightMode, usesTapePractice: usesTapePractice)
+    return PromptRenderPlan(session: session, composition: composition, style: style).render()
   }
 
   private var completedPromptColor: Color {
@@ -3765,45 +3637,6 @@ private struct ContentView: View {
       settingEnabled: settings.showAllPracticeLines,
       tapeMode: settings.practiceTapeMode,
       configuration: session.configuration)
-  }
-
-  private func applyCaret(to character: inout AttributedString, theme activeTheme: ResolvedTheme,
-    style: TypingCaretStyle) {
-    switch style {
-    case .off:
-      break
-    case .bar:
-      character.foregroundColor = activeTheme.caret
-      character.underlineStyle = .single
-    case .outline:
-      character.backgroundColor = activeTheme.caret.opacity(0.14)
-    case .underline:
-      character.underlineStyle = .single
-      character.backgroundColor = activeTheme.caret.opacity(0.12)
-    case .block:
-      character.backgroundColor = activeTheme.caret.opacity(0.55)
-    case .carrot, .banana, .monkey:
-      character.foregroundColor = activeTheme.caret
-    }
-  }
-
-  private func applyPaceCaret(to character: inout AttributedString, theme activeTheme: ResolvedTheme,
-    style: TypingCaretStyle) {
-    switch style {
-    case .off:
-      break
-    case .bar:
-      character.backgroundColor = activeTheme.caret.opacity(0.16)
-      character.underlineStyle = .single
-    case .outline:
-      character.backgroundColor = activeTheme.caret.opacity(0.12)
-    case .underline:
-      character.underlineStyle = .single
-    case .block:
-      character.backgroundColor = activeTheme.caret.opacity(0.34)
-    case .carrot, .banana, .monkey:
-      character.foregroundColor = activeTheme.caret.opacity(0.72)
-    }
   }
 
   private var stats: some View {

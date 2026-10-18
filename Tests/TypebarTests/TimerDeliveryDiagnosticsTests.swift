@@ -43,7 +43,8 @@ final class TimerDeliveryDiagnosticsTests: XCTestCase {
       .deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     let begin = try XCTUnwrap(source.range(of: "private func renderedPrompt(for session:"))
-    let end = try XCTUnwrap(source.range(of: "// These values are invariant", range: begin.upperBound..<source.endIndex))
+    let end = try XCTUnwrap(source.range(of: "let activeTheme = self.activeTheme",
+      range: begin.upperBound..<source.endIndex))
     let body = String(source[begin.lowerBound..<end.lowerBound])
     XCTAssertTrue(body.contains("TimerDeliveryDiagnostics.enabled ? ProcessInfo.processInfo.systemUptime : 0"))
     XCTAssertTrue(body.contains("if TimerDeliveryDiagnostics.enabled"))

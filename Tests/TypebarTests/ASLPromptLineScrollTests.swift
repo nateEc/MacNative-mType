@@ -97,14 +97,15 @@ import XCTest
   func testProductionASLReceivesWordScrollContextEvenWithoutVisibleCarets() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    let plan = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/PromptRenderPlan.swift"), encoding: .utf8)
     let start = try XCTUnwrap(app.range(of: "if practiceVisualEffect.usesASL {"))
     let end = try XCTUnwrap(app.range(of: "} else if practiceVisualEffect.usesChoo {", range: start.upperBound..<app.endIndex))
     XCTAssertTrue(app[start.upperBound..<end.lowerBound].contains("lineScroll:"),
       "ASL must receive the same attempt/word-retirement policy as ordinary prompts")
     XCTAssertTrue(app[start.upperBound..<end.lowerBound].contains("words: session.promptWordPresentations"),
       "Production word ownership must come from session metadata, not rendered replacements")
-    XCTAssertTrue(app.contains("emptyWordPlaceholderGlyphID: emptyWordPlaceholder"))
-    XCTAssertTrue(app.contains("isEmptyWordPlaceholder: index == emptyWordPlaceholder"))
+    XCTAssertTrue(plan.contains("emptyWordPlaceholderGlyphID: emptyWordPlaceholder"))
+    XCTAssertTrue(plan.contains("isEmptyWordPlaceholder: index == plan.emptyWordPlaceholder"))
   }
 
   func testRealZenEmptyActiveWordRetainsItsMeasuredBoxAfterReturn() throws {

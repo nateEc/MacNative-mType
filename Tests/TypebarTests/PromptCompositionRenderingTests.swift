@@ -259,8 +259,10 @@ import XCTest
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    XCTAssertTrue(source.contains("PromptCompositionPresentation(session: session"))
-    XCTAssertTrue(source.contains("presentation.render(renderGlyph)"))
+    let plan = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/PromptRenderPlan.swift"), encoding: .utf8)
+    XCTAssertTrue(source.contains("PromptRenderPlan(session: session, composition: composition, style: style).render()"))
+    XCTAssertTrue(plan.contains("PromptCompositionPresentation(session: session"))
+    XCTAssertTrue(plan.contains("presentation.render { painter.render($0, $1, $2) }"))
     XCTAssertTrue(source.contains("rendering.compositionTextMap?.fieldCharacterOffsets"))
     XCTAssertTrue(source.contains("rendering.mainCharacterOffset"))
   }

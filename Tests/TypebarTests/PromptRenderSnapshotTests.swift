@@ -19,27 +19,20 @@ final class PromptRenderSnapshotTests: XCTestCase {
     XCTAssertTrue(source.contains("let latest = renderedPrompt(for: current, composition: marked)"))
   }
 
-  func testProductionGlyphLoopUsesOneRenderLocalThemeAndCaretPolicy() throws {
+  func testProductionUsesCapturedStyleAndSharedGlyphPainter() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     let begin = try XCTUnwrap(source.range(of: "private func renderedPrompt(for session:"))
     let end = try XCTUnwrap(source.range(of: "private var completedPromptColor", range: begin.upperBound..<source.endIndex))
     let render = String(source[begin.lowerBound..<end.lowerBound])
-    let loop = try XCTUnwrap(render.range(of: "func renderGlyph("))
-    let setup = String(render[..<loop.lowerBound])
-    XCTAssertTrue(setup.contains("let activeTheme = self.activeTheme"))
-    XCTAssertTrue(setup.contains("let sessionPolicy = PromptRenderSessionPolicy(session: session,"))
-    XCTAssertTrue(setup.contains("let usesIndependentPromptCarets = sessionPolicy.usesIndependentPromptCarets"))
-    XCTAssertTrue(setup.contains("let paceGuideIndex = sessionPolicy.paceGuideIndex"))
-    XCTAssertTrue(setup.contains("let promptHighlightMode = sessionPolicy.highlightMode"))
-    XCTAssertTrue(setup.contains("promptTextColor(for: .completed, theme: activeTheme)"))
-    XCTAssertTrue(setup.contains("promptTextColor(for: .future, theme: activeTheme)"))
-    XCTAssertTrue(setup.contains("let errorFeedbackColor = activeTheme.errorColor("))
-    XCTAssertTrue(setup.contains("let extraInputFeedbackColor = activeTheme.extraInputColor("))
-    let glyph = String(render[loop.lowerBound...])
-    XCTAssertFalse(glyph.contains("self.activeTheme"))
-    XCTAssertTrue(glyph.contains("applyCaret(to: &character, theme: activeTheme, style: caretStyle)"))
-    XCTAssertTrue(glyph.contains("applyPaceCaret(to: &character, theme: activeTheme, style: paceCaretStyle)"))
+    XCTAssertTrue(render.contains("let activeTheme = self.activeTheme"))
+    XCTAssertTrue(render.contains("let style = PromptRenderStyle(theme: activeTheme"))
+    XCTAssertTrue(render.contains("return PromptRenderPlan(session: session, composition: composition, style: style).render()"))
+    let plan = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/PromptRenderPlan.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(plan.contains("let sessionPolicy: PromptRenderSessionPolicy"))
+    XCTAssertTrue(plan.contains("var painter = GlyphPainter(plan: self)"))
+    XCTAssertFalse(plan.contains("settings."))
   }
 }
