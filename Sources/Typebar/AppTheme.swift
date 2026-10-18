@@ -25,7 +25,7 @@ struct ThemeColor: Codable, Equatable {
     var color: Color { Color(red: red, green: green, blue: blue, opacity: opacity) }
 }
 
-struct ResolvedTheme {
+struct ResolvedTheme: Equatable {
     let background: Color
     let panel: Color
     let accent: Color

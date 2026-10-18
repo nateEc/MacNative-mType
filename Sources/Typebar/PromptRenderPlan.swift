@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Values used by one prompt render. No AppSettings reference survives a yield.
-struct PromptRenderStyle {
+struct PromptRenderStyle: Equatable {
   let theme: ResolvedTheme
   var fontSize: Double = 28
   var flipTestColors = false

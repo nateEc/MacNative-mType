@@ -26,8 +26,9 @@ final class PromptRenderSnapshotTests: XCTestCase {
     let begin = try XCTUnwrap(source.range(of: "private func renderedPrompt(for session:"))
     let end = try XCTUnwrap(source.range(of: "private var completedPromptColor", range: begin.upperBound..<source.endIndex))
     let render = String(source[begin.lowerBound..<end.lowerBound])
-    XCTAssertTrue(render.contains("let activeTheme = self.activeTheme"))
-    XCTAssertTrue(render.contains("let style = PromptRenderStyle(theme: activeTheme"))
+    XCTAssertTrue(source.contains("private var promptRenderStyle: PromptRenderStyle"))
+    XCTAssertTrue(source.contains("PromptRenderStyle(theme: activeTheme"))
+    XCTAssertTrue(render.contains("let style = promptRenderStyle"))
     XCTAssertTrue(render.contains("return PromptRenderPlan(session: session, composition: composition, style: style).render()"))
     let plan = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/PromptRenderPlan.swift"),
       encoding: .utf8)
