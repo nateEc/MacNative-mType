@@ -308,7 +308,13 @@
     "night_runner",
     "norse",
     "retrocast",
-    "stealth"
+    "stealth",
+    "8008",
+    "9009",
+    "alduin",
+    "anti_hero",
+    "frozen_llama",
+    "husqy"
   ],
   "exactMappings": {},
   "relatedMappings": {
@@ -426,6 +432,12 @@
     "night_runner": "night_runner",
     "norse": "norse",
     "retrocast": "retrocast",
-    "stealth": "stealth"
+    "stealth": "stealth",
+    "8008": "8008",
+    "9009": "9009",
+    "alduin": "alduin",
+    "anti_hero": "anti_hero",
+    "frozen_llama": "frozen_llama",
+    "husqy": "husqy"
   }
 }

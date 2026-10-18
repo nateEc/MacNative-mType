@@ -4,6 +4,36 @@ import XCTest
 @testable import Typebar
 
 final class BuiltInThemeCoverageTests: XCTestCase {
+  func testSixInstrumentAndMaterialThemesAreSelectableReadableAndPersistent() throws {
+    let names = ["8008", "9009", "alduin", "anti_hero", "frozen_llama", "husqy"]
+    let variants = names.compactMap(AppTheme.init(rawValue:))
+    XCTAssertEqual(variants.count, names.count)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .light }.count, 3)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .dark }.count, 3)
+    for theme in variants {
+      XCTAssertEqual(try JSONDecoder().decode(AppTheme.self, from: JSONEncoder().encode(theme)), theme)
+      XCTAssertTrue(theme.displayName.hasSuffix(" · Typebar"))
+      XCTAssertTrue(ThemeQuickPickerSearch.results(
+        scope: .builtIn, query: theme.rawValue, builtInThemes: AppTheme.allCases,
+        customThemes: [], favoriteThemeIDs: []).builtInThemes.contains(theme))
+      XCTAssertEqual(ThemeCommandCatalog.target(
+        for: ThemeCommandCatalog.identifier(for: .builtIn(theme))), .builtIn(theme))
+      let resolved = theme.resolvedTheme
+      for surface in [resolved.background, resolved.panel] {
+        XCTAssertGreaterThanOrEqual(contrast(resolved.text, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(contrast(resolved.secondaryText, surface), 4.5, theme.rawValue)
+        for mark in [resolved.accent, resolved.caret, resolved.error, resolved.extraInput,
+          resolved.colorfulError, resolved.colorfulExtraInput] {
+          XCTAssertGreaterThanOrEqual(contrast(mark, surface), 3.0, theme.rawValue)
+        }
+      }
+      for other in AppTheme.allCases where other != theme {
+        XCTAssertNotEqual(ThemeColor(color: theme.background), ThemeColor(color: other.background),
+          "Duplicate background: \(theme.rawValue), \(other.rawValue)")
+      }
+    }
+  }
+
   func testTenNewOriginalThemeChoicesAreReadableSearchableAndPersistent() throws {
     let names = ["fundamentals", "muted", "passion_fruit", "purpleish", "sewing_tin_light",
       "future_funk", "night_runner", "norse", "retrocast", "stealth"]

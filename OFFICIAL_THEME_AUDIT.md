@@ -2,7 +2,9 @@
 
 参考固定为 Monkeytype 提交 `91bd24bb8513785c7364cbea29296ff7adafac41` 的 `packages/schemas/src/themes.ts` 中 `ThemeNameSchema`。本审计只保存主题 ID、数量与覆盖状态；不读取、复制或导入官方主题的色值、CSS、图片、字体或其他资产。
 
-当前守恒：187 个官方主题身份、0 个已验证精确原生映射、187 个待映射；其中 115 个原创相关替代、72 个尚无相关替代。逐项身份见 `Compatibility/official-themes.json`；`relatedMappings` 只表示同题材的 Typebar 原创选择，绝不算入 `exactMappings`。
+当前守恒：187 个官方主题身份、0 个已验证精确原生映射、187 个待映射；其中 121 个原创相关替代、66 个尚无相关替代。逐项身份见 `Compatibility/official-themes.json`；`relatedMappings` 只表示同题材的 Typebar 原创选择，绝不算入 `exactMappings`。
+
+2026-10-19 新增 `8008`、`9009`、`alduin`、`anti_hero`、`frozen_llama`、`husqy` 六个原创相关选择。深色金属与浅色瓷面仪表构成成对的数字主题；其余取熔岩石层、靛蓝织物、冰蓝纱线、灰褐毛毡为材料线索。只保存固定参考的主题身份，不读取或采用其主题色、CSS、图片、字体或其他素材。先行测试证实六项全缺；接入后检查三浅三深、ID 归档、快速搜索、命令定位、背景互异，以及正文／弱提示对背景和面板至少 4.5:1、强调／光标／错误至少 3:1。计算对比度不能替代真实窗口像素、实体输入和逐款人工验收；`exactMappings` 继续为空。
 
 2026-10-19 新增 `fundamentals`、`muted`、`passion_fruit`、`purpleish`、`sewing_tin_light`、`future_funk`、`night_runner`、`norse`、`retrocast`、`stealth` 十款独立原生主题。Typebar 分别以制图纸、灰绿陶釉、果肉、紫颜料、搪瓷盒、舞厅织物、夜路沥青、峡湾石、老显像管与机壳为材料线索；保留用户字体和排版，老显像管的黄绿墨迹是本批的单一醒目设计点。先行测试确认十个身份原先均缺失；接入后验证五浅五深、原 ID 编解码、快速搜索、命令入口、背景互异，以及正文／弱提示对背景和面板均至少 4.5:1、强调／光标／错误至少 3:1。色值与名称独立设计，未读取或复制固定参考的主题 CSS、色值、图片、字体或其他资产。此为相关替代与计算对比度，不是官方主题视觉等价或真实窗口逐款验收；`exactMappings` 仍为空。
 

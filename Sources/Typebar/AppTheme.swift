@@ -392,6 +392,12 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case norse
     case retrocast
     case stealth
+    case `8008`
+    case `9009`
+    case alduin
+    case anti_hero
+    case frozen_llama
+    case husqy
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -539,6 +545,12 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .norse: "峡湾石 · Typebar"
         case .retrocast: "老显像管 · Typebar"
         case .stealth: "隐身机壳 · Typebar"
+        case .`8008`: "金属仪表 · Typebar"
+        case .`9009`: "瓷面仪表 · Typebar"
+        case .alduin: "熔岩石层 · Typebar"
+        case .anti_hero: "靛蓝织物 · Typebar"
+        case .frozen_llama: "冰蓝纱线 · Typebar"
+        case .husqy: "灰褐毛毡 · Typebar"
         }
     }
 
@@ -812,6 +824,18 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0x2D302A, 0x434B3D, 0xDDE7A1, 0xF2F0DF, 0xD1D4BD, light: false, error: 0xF6AD9A)
         case .stealth:
             Self.palette(0x161D25, 0x28323A, 0xA8C9D0, 0xF2F5F4, 0xC5D1D5, light: false, error: 0xFFA9A1)
+        case .`8008`:
+            Self.palette(0x252C31, 0x3B464A, 0xE8C39D, 0xF4F0E9, 0xC9D0C9, light: false, error: 0xFFA79F)
+        case .`9009`:
+            Self.palette(0xE6E9E6, 0xCCD5D1, 0x365F68, 0x24363A, 0x485D5F, light: true, error: 0x913947)
+        case .alduin:
+            Self.palette(0x302D2C, 0x4A423D, 0xE8C296, 0xF5F0E5, 0xD0C9BD, light: false, error: 0xF5A69D)
+        case .anti_hero:
+            Self.palette(0x262837, 0x3E4353, 0xDDC0BB, 0xF3F0F0, 0xCACCD4, light: false, error: 0xFFAEA3)
+        case .frozen_llama:
+            Self.palette(0xE4EDF2, 0xCBDDE7, 0x375D78, 0x243641, 0x465A69, light: true, error: 0x913F51)
+        case .husqy:
+            Self.palette(0xE9E4DD, 0xD1C8BD, 0x5B4B43, 0x302D2B, 0x514C48, light: true, error: 0x913F46)
         }
     }
 }
