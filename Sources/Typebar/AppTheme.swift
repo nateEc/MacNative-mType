@@ -418,6 +418,29 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case red_dragon
     case red_samurai
     case shoko
+    case serika_dark
+    case sewing_tin
+    case slambook
+    case snes
+    case solarized_dark
+    case solarized_light
+    case solarized_osaka
+    case sonokai
+    case striker
+    case suisei
+    case superuser
+    case sweden
+    case terror_below
+    case trackday
+    case trance
+    case tron_orange
+    case vesper
+    case vesper_light
+    case voc
+    case vscode
+    case witch_girl
+    case pale_nimbus
+    case spiderman
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -591,6 +614,29 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .red_dragon: "龙鳞朱 · Typebar"
         case .red_samurai: "朱漆刀鞘 · Typebar"
         case .shoko: "雨后纸窗 · Typebar"
+        case .serika_dark: "深色铅笔 · Typebar"
+        case .sewing_tin: "深色搪瓷针盒 · Typebar"
+        case .slambook: "旧日手账 · Typebar"
+        case .snes: "控制器紫 · Typebar"
+        case .solarized_dark: "暮色铜板 · Typebar"
+        case .solarized_light: "晨色铜板 · Typebar"
+        case .solarized_osaka: "夜港铜板 · Typebar"
+        case .sonokai: "山影苔石 · Typebar"
+        case .striker: "赛场粉笔 · Typebar"
+        case .suisei: "冰川便笺 · Typebar"
+        case .superuser: "冷绿终端 · Typebar"
+        case .sweden: "北国玻璃 · Typebar"
+        case .terror_below: "深沼石 · Typebar"
+        case .trackday: "赛道皮革 · Typebar"
+        case .trance: "紫雾唱片 · Typebar"
+        case .tron_orange: "橘光机壳 · Typebar"
+        case .vesper: "暮色纸页 · Typebar"
+        case .vesper_light: "晨色纸页 · Typebar"
+        case .voc: "绿色手稿 · Typebar"
+        case .vscode: "冷蓝工作台 · Typebar"
+        case .witch_girl: "丁香魔法纸 · Typebar"
+        case .pale_nimbus: "雨云薄纸 · Typebar"
+        case .spiderman: "夜城红丝 · Typebar"
         }
     }
 
@@ -916,6 +962,52 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0x302829, 0x483738, 0xE5C09B, 0xF5F1EA, 0xD4C9C0, light: false, error: 0xF5A79A)
         case .shoko:
             Self.palette(0xE3ECEC, 0xC6DCDD, 0x35647A, 0x283A42, 0x4B6268, light: true, error: 0x913947)
+        case .serika_dark:
+            Self.palette(0x252C33, 0x39464E, 0xE7C99D, 0xF1F2EE, 0xCBD2CB, light: false, error: 0xFFABA1)
+        case .sewing_tin:
+            Self.palette(0x303A39, 0x485954, 0xDBCEAF, 0xF1F2EA, 0xCAD5C9, light: false, error: 0xFFB0A0)
+        case .slambook:
+            Self.palette(0xF0E5D9, 0xE2D0BD, 0x805040, 0x3B302D, 0x5D4A41, light: true, error: 0x8E354C)
+        case .snes:
+            Self.palette(0xE5E5EE, 0xCFCEDF, 0x5E5085, 0x2E3042, 0x535669, light: true, error: 0x8E354C)
+        case .solarized_dark:
+            Self.palette(0x23363A, 0x355057, 0xD5CCA0, 0xEFF1DF, 0xCFD8CD, light: false, error: 0xF7B3A0)
+        case .solarized_light:
+            Self.palette(0xE8E6D0, 0xD4D2B5, 0x576C55, 0x333F36, 0x475844, light: true, error: 0x8F3648)
+        case .solarized_osaka:
+            Self.palette(0x202E3D, 0x35445B, 0xE8C49D, 0xEFF1EE, 0xC9D2DC, light: false, error: 0xFFAFA0)
+        case .sonokai:
+            Self.palette(0x2B2F35, 0x414A4C, 0xD8D7AB, 0xF3F0E7, 0xCCD3CC, light: false, error: 0xF8ADA0)
+        case .striker:
+            Self.palette(0xE7EADE, 0xCFD7C5, 0x365B66, 0x2B3D3D, 0x4B6060, light: true, error: 0x923A4D)
+        case .suisei:
+            Self.palette(0xE2EDF3, 0xC7DBE9, 0x3E5D8A, 0x253A4A, 0x485C70, light: true, error: 0x923A4D)
+        case .superuser:
+            Self.palette(0x17262E, 0x2A3D46, 0xA9D8C2, 0xEDF4ED, 0xC4D3CE, light: false, error: 0xFFAFA0)
+        case .sweden:
+            Self.palette(0xE4ECED, 0xCAD9DE, 0x4F6176, 0x293A43, 0x465B62, light: true, error: 0x923A4D)
+        case .terror_below:
+            Self.palette(0x21312F, 0x344A46, 0xD3CF9E, 0xEDF3EA, 0xC5D0C4, light: false, error: 0xFFB0A0)
+        case .trackday:
+            Self.palette(0xEEE7DD, 0xD9CDC0, 0x815041, 0x352E2A, 0x5E4B43, light: true, error: 0x91394C)
+        case .trance:
+            Self.palette(0x2A2540, 0x423958, 0xD7B5E6, 0xF6F0F7, 0xD1C7D8, light: false, error: 0xFFA9A0)
+        case .tron_orange:
+            Self.palette(0x242E35, 0x394A4E, 0xF0C391, 0xF1F3ED, 0xCAD5CF, light: false, error: 0xFFABA0)
+        case .vesper:
+            Self.palette(0x292837, 0x413D4C, 0xE0C3B1, 0xF5F0EF, 0xD2CCD1, light: false, error: 0xFFB0A0)
+        case .vesper_light:
+            Self.palette(0xECE8E8, 0xD8D0D3, 0x694F65, 0x38323B, 0x5A4F5A, light: true, error: 0x91394C)
+        case .voc:
+            Self.palette(0xE1E9E2, 0xC7D8CA, 0x3E6758, 0x243A33, 0x486057, light: true, error: 0x91394C)
+        case .vscode:
+            Self.palette(0x1D2935, 0x304253, 0xAED2DA, 0xEEF3F5, 0xC5D1D9, light: false, error: 0xFFADA0)
+        case .witch_girl:
+            Self.palette(0xEDE2ED, 0xDCCADB, 0x6B4865, 0x392F3B, 0x5E4B5A, light: true, error: 0x91394C)
+        case .pale_nimbus:
+            Self.palette(0xE5EAEC, 0xCFD8DD, 0x4C6471, 0x2C3A42, 0x485B64, light: true, error: 0x91394C)
+        case .spiderman:
+            Self.palette(0x302632, 0x473849, 0xEBC0B1, 0xF6F0F0, 0xD8CCD5, light: false, error: 0xFFD495)
         }
     }
 }
