@@ -4,6 +4,37 @@ import XCTest
 @testable import Typebar
 
 final class BuiltInThemeCoverageTests: XCTestCase {
+  func testTenNewOriginalThemeChoicesAreReadableSearchableAndPersistent() throws {
+    let names = ["fundamentals", "muted", "passion_fruit", "purpleish", "sewing_tin_light",
+      "future_funk", "night_runner", "norse", "retrocast", "stealth"]
+    let variants = names.compactMap(AppTheme.init(rawValue:))
+    XCTAssertEqual(variants.count, names.count)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .light }.count, 5)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .dark }.count, 5)
+    for theme in variants {
+      XCTAssertEqual(try JSONDecoder().decode(AppTheme.self, from: JSONEncoder().encode(theme)), theme)
+      XCTAssertTrue(theme.displayName.hasSuffix(" · Typebar"))
+      XCTAssertEqual(ThemeQuickPickerSearch.results(
+        scope: .builtIn, query: theme.rawValue, builtInThemes: AppTheme.allCases,
+        customThemes: [], favoriteThemeIDs: []).builtInThemes, [theme])
+      XCTAssertEqual(ThemeCommandCatalog.target(
+        for: ThemeCommandCatalog.identifier(for: .builtIn(theme))), .builtIn(theme))
+      let resolved = theme.resolvedTheme
+      for surface in [resolved.background, resolved.panel] {
+        XCTAssertGreaterThanOrEqual(contrast(resolved.text, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(contrast(resolved.secondaryText, surface), 4.5, theme.rawValue)
+        for mark in [resolved.accent, resolved.caret, resolved.error, resolved.extraInput,
+          resolved.colorfulError, resolved.colorfulExtraInput] {
+          XCTAssertGreaterThanOrEqual(contrast(mark, surface), 3.0, theme.rawValue)
+        }
+      }
+      for other in AppTheme.allCases where other != theme {
+        XCTAssertNotEqual(ThemeColor(color: theme.background), ThemeColor(color: other.background),
+          "Duplicate background: \(theme.rawValue), \(other.rawValue)")
+      }
+    }
+  }
+
   func testTenFurtherMaterialThemeIdentitiesAreSelectableReadableAndPersistent() throws {
     let names = ["metropolis", "modern_ink", "phantom", "pulse", "repose_dark",
       "repose_light", "retro", "shadow", "terminal", "vaporwave"]
@@ -16,7 +47,7 @@ final class BuiltInThemeCoverageTests: XCTestCase {
       XCTAssertTrue(theme.displayName.hasSuffix(" · Typebar"))
       XCTAssertEqual(ThemeQuickPickerSearch.results(
         scope: .builtIn, query: theme.rawValue, builtInThemes: AppTheme.allCases,
-        customThemes: [], favoriteThemeIDs: []).builtInThemes, [theme])
+        customThemes: [], favoriteThemeIDs: []).builtInThemes.first, theme)
       XCTAssertEqual(ThemeCommandCatalog.target(
         for: ThemeCommandCatalog.identifier(for: .builtIn(theme))), .builtIn(theme))
       let resolved = theme.resolvedTheme

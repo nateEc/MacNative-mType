@@ -2,7 +2,9 @@
 
 参考固定为 Monkeytype 提交 `91bd24bb8513785c7364cbea29296ff7adafac41` 的 `packages/schemas/src/themes.ts` 中 `ThemeNameSchema`。本审计只保存主题 ID、数量与覆盖状态；不读取、复制或导入官方主题的色值、CSS、图片、字体或其他资产。
 
-当前守恒：187 个官方主题身份、0 个已验证精确原生映射、187 个待映射；其中 105 个原创相关替代、82 个尚无相关替代。逐项身份见 `Compatibility/official-themes.json`；`relatedMappings` 只表示同题材的 Typebar 原创选择，绝不算入 `exactMappings`。
+当前守恒：187 个官方主题身份、0 个已验证精确原生映射、187 个待映射；其中 115 个原创相关替代、72 个尚无相关替代。逐项身份见 `Compatibility/official-themes.json`；`relatedMappings` 只表示同题材的 Typebar 原创选择，绝不算入 `exactMappings`。
+
+2026-10-19 新增 `fundamentals`、`muted`、`passion_fruit`、`purpleish`、`sewing_tin_light`、`future_funk`、`night_runner`、`norse`、`retrocast`、`stealth` 十款独立原生主题。Typebar 分别以制图纸、灰绿陶釉、果肉、紫颜料、搪瓷盒、舞厅织物、夜路沥青、峡湾石、老显像管与机壳为材料线索；保留用户字体和排版，老显像管的黄绿墨迹是本批的单一醒目设计点。先行测试确认十个身份原先均缺失；接入后验证五浅五深、原 ID 编解码、快速搜索、命令入口、背景互异，以及正文／弱提示对背景和面板均至少 4.5:1、强调／光标／错误至少 3:1。色值与名称独立设计，未读取或复制固定参考的主题 CSS、色值、图片、字体或其他资产。此为相关替代与计算对比度，不是官方主题视觉等价或真实窗口逐款验收；`exactMappings` 仍为空。
 
 2026-10-18 新增城市钠灯、现代蓝墨、薄雾幽影、脉冲、深／浅休憩、复古磁带、钢影、琥珀终端、晚潮十款独立原生配色，分别提供 `metropolis`、`modern_ink`、`phantom`、`pulse`、`repose_dark`、`repose_light`、`retro`、`shadow`、`terminal`、`vaporwave` 的可搜索选择身份。它们只从各自材料与练习可读性设计配色，没有读取或复制参考色值、CSS、图像、字体或品牌素材；用户字体和版式不变。先行测试因十个 ID 全缺而失败，接入后定点测试验证三浅七深、原 ID 编解码、选择器、命令入口、背景互异，以及正文／弱提示对背景和面板至少 4.5:1、强调／光标／错误至少 3:1。完整客户端 4,671 项／95 项原条件跳过，零失败；对比度是源配色计算，不是实际显示器像素。可见窗口、收藏／随机／恢复和官方视觉等价仍待验收，只列相关替代。
 

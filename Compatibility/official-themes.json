@@ -298,7 +298,17 @@
     "retro",
     "shadow",
     "terminal",
-    "vaporwave"
+    "vaporwave",
+    "fundamentals",
+    "muted",
+    "passion_fruit",
+    "purpleish",
+    "sewing_tin_light",
+    "future_funk",
+    "night_runner",
+    "norse",
+    "retrocast",
+    "stealth"
   ],
   "exactMappings": {},
   "relatedMappings": {
@@ -406,6 +416,16 @@
     "retro": "retro",
     "shadow": "shadow",
     "terminal": "terminal",
-    "vaporwave": "vaporwave"
+    "vaporwave": "vaporwave",
+    "fundamentals": "fundamentals",
+    "muted": "muted",
+    "passion_fruit": "passion_fruit",
+    "purpleish": "purpleish",
+    "sewing_tin_light": "sewing_tin_light",
+    "future_funk": "future_funk",
+    "night_runner": "night_runner",
+    "norse": "norse",
+    "retrocast": "retrocast",
+    "stealth": "stealth"
   }
 }

@@ -382,6 +382,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case shadow
     case terminal
     case vaporwave
+    case fundamentals
+    case muted
+    case passion_fruit
+    case purpleish
+    case sewing_tin_light
+    case future_funk
+    case night_runner
+    case norse
+    case retrocast
+    case stealth
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -519,6 +529,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .shadow: "钢影 · Typebar"
         case .terminal: "琥珀终端 · Typebar"
         case .vaporwave: "晚潮 · Typebar"
+        case .fundamentals: "制图纸 · Typebar"
+        case .muted: "灰绿陶釉 · Typebar"
+        case .passion_fruit: "果肉紫心 · Typebar"
+        case .purpleish: "紫色颜料 · Typebar"
+        case .sewing_tin_light: "浅色搪瓷盒 · Typebar"
+        case .future_funk: "舞厅织物 · Typebar"
+        case .night_runner: "夜路沥青 · Typebar"
+        case .norse: "峡湾石 · Typebar"
+        case .retrocast: "老显像管 · Typebar"
+        case .stealth: "隐身机壳 · Typebar"
         }
     }
 
@@ -772,6 +792,26 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0x121D26, 0x233444, 0xE4C98E, 0xF3F0E0, 0xC7D2C9, light: false, error: 0xFFB4A1)
         case .vaporwave:
             Self.palette(0x302443, 0x4E365A, 0xABE0C9, 0xF8EFF7, 0xD8CEDF, light: false, error: 0xFFB09E)
+        case .fundamentals:
+            Self.palette(0xF0F2EE, 0xDDE3DF, 0x315F77, 0x263843, 0x455A62, light: true, error: 0x913A46)
+        case .muted:
+            Self.palette(0xDCE1D9, 0xC8D0C5, 0x4B5D6A, 0x27382F, 0x4A5B51, light: true, error: 0x8C374D)
+        case .passion_fruit:
+            Self.palette(0xF3D7BC, 0xE5BFA8, 0x773655, 0x3F2B35, 0x5E3F4C, light: true, error: 0x8E2D3B)
+        case .purpleish:
+            Self.palette(0xE8E1F0, 0xD1C7DF, 0x59417C, 0x302840, 0x514663, light: true, error: 0x8D3449)
+        case .sewing_tin_light:
+            Self.palette(0xE4E9E5, 0xC8D1CB, 0x2E6463, 0x27363A, 0x44555A, light: true, error: 0x91384C)
+        case .future_funk:
+            Self.palette(0x2C2432, 0x47394B, 0xE6B8DA, 0xF4EDF2, 0xD6C5D4, light: false, error: 0xF7A998)
+        case .night_runner:
+            Self.palette(0x1B2730, 0x2D3B46, 0xEFD08A, 0xF1F3EE, 0xC6D3D0, light: false, error: 0xFFAFA0)
+        case .norse:
+            Self.palette(0x263A40, 0x39565A, 0xE7C79C, 0xF5F1E7, 0xCCD9D5, light: false, error: 0xFFA7A0)
+        case .retrocast:
+            Self.palette(0x2D302A, 0x434B3D, 0xDDE7A1, 0xF2F0DF, 0xD1D4BD, light: false, error: 0xF6AD9A)
+        case .stealth:
+            Self.palette(0x161D25, 0x28323A, 0xA8C9D0, 0xF2F5F4, 0xC5D1D5, light: false, error: 0xFFA9A1)
         }
     }
 }
