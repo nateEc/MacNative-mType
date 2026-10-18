@@ -162,12 +162,21 @@ struct PromptCompositionPresentation {
           presentation.projection.fields.indices.contains($0)
             && presentation.projection.fields[$0].hasStructuralReturn
         })) }
-      ranges[cell.id] = NSRange(location: unit, length: String(value.characters).utf16.count)
-      let hint = value.runs.first { ($0.baselineOffset ?? 0) < 0 }
-      let body = hint.map { AttributedString(value[..<$0.range.lowerBound]) } ?? value
-      let bodyUnits = Array(String(body.characters).utf16)
-      let length = bodyUnits.count > 1 && bodyUnits.last == 10 ? bodyUnits.count - 1 : bodyUnits.count
-      inks[cell.id] = NSRange(location: unit, length: length)
+      // A one-grapheme replacement can still use two UTF-16 units; trust only
+      // final ink that is exactly the original printable ASCII character.
+      if glyph.state == .pending, glyph.typedCharacter == nil, cell.compositionIndex == nil,
+        let ascii = glyph.character.asciiValue, (33...126).contains(ascii),
+        value.characters.count == 1, value.characters.first == glyph.character {
+        ranges[cell.id] = NSRange(location: unit, length: 1)
+        inks[cell.id] = NSRange(location: unit, length: 1)
+      } else {
+        ranges[cell.id] = NSRange(location: unit, length: String(value.characters).utf16.count)
+        let hint = value.runs.first { ($0.baselineOffset ?? 0) < 0 }
+        let body = hint.map { AttributedString(value[..<$0.range.lowerBound]) } ?? value
+        let bodyUnits = Array(String(body.characters).utf16)
+        let length = bodyUnits.count > 1 && bodyUnits.last == 10 ? bodyUnits.count - 1 : bodyUnits.count
+        inks[cell.id] = NSRange(location: unit, length: length)
+      }
       texts[cell.id] = value
       if let owner = cell.sourceFieldIndex, fieldUnits[owner] == nil { fieldUnits[owner] = unit }
       text += value; unit += ranges[cell.id]!.length

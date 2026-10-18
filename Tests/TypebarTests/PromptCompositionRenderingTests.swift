@@ -21,6 +21,23 @@ import XCTest
       NSRange(location: 0, length: 2))
   }
 
+  func testPendingASCIIShortcutStillMeasuresAOneCharacterUnicodeReplacementInUTF16() throws {
+    let value = try presentation(TypingSession(configuration: .words(2), prompt: "ab cd"), "")
+    let ordinary = value.render { _, glyph, _ in AttributedString(String(glyph.character)) }
+    let ordinaryMap = try XCTUnwrap(ordinary.compositionTextMap)
+    XCTAssertEqual(ordinaryMap.cellRanges[3], NSRange(location: 3, length: 1))
+    XCTAssertEqual(ordinaryMap.inkRanges[3], NSRange(location: 3, length: 1))
+    let replaced = value.render { _, glyph, _ in
+      AttributedString(glyph.character == "c" ? "🙂" : String(glyph.character))
+    }
+    let map = try XCTUnwrap(replaced.compositionTextMap)
+    XCTAssertEqual(String(replaced.text.characters), "ab 🙂d")
+    XCTAssertEqual(map.cellRanges[3], NSRange(location: 3, length: 2))
+    XCTAssertEqual(map.inkRanges[3], NSRange(location: 3, length: 2))
+    XCTAssertEqual(map.cellRanges[4], NSRange(location: 5, length: 1))
+    XCTAssertEqual(map.fieldCharacterOffsets[1], 3)
+  }
+
   func testDeterministicProjectionAndAttributedRenderPhaseMeasurementsPreserveOutput() throws {
     for count in [30, 100] {
       let prompt = Array(repeating: "amber", count: count).joined(separator: " ")
