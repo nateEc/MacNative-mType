@@ -26,14 +26,15 @@ final class OfficialWikipediaHostAuditTests: XCTestCase {
       .appendingPathComponent("frontend/static/languages")
     // Missing source bcp47 falls back to English; Typebar keeps a usable
     // local-language host. The source's nb alias redirects to canonical no,
-    // and its bn_BD value is not a valid Wikipedia host label.
+    // its bn_BD value is not a valid Wikipedia host label, and Indonesian 1k
+    // is incorrectly tagged hu-HU despite containing Indonesian words.
     let nativeExceptions = [
       "ukrainian": "uk", "ukrainian_1k": "uk", "ukrainian_10k": "uk", "ukrainian_50k": "uk",
       "afrikaans": "af", "afrikaans_1k": "af", "afrikaans_10k": "af",
       "croatian": "hr", "filipino": "tl",
       "norwegian_bokmal": "no", "norwegian_bokmal_1k": "no", "norwegian_bokmal_5k": "no",
       "norwegian_bokmal_10k": "no", "norwegian_bokmal_150k": "no", "norwegian_bokmal_600k": "no",
-      "icelandic": "is", "catalan": "ca", "bangla_10k": "bn",
+      "icelandic": "is", "catalan": "ca", "bangla_10k": "bn", "indonesian_1k": "id",
       "urdu": "ur", "urdu_1k": "ur", "urdu_5k": "ur", "xhosa_3k": "xh"
     ]
     var checked = 0

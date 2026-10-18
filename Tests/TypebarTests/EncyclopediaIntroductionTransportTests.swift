@@ -3,6 +3,25 @@ import XCTest
 @testable import Typebar
 
 final class EncyclopediaIntroductionTransportTests: XCTestCase {
+  func testIndonesianOneThousandUsesIndonesianArticleHost() async throws {
+    let configuration = TestConfiguration.words(25, language: .indonesian1k)
+      .with(modifiers: [.referenceStream])
+    XCTAssertEqual(LivePracticeContentSource.selected(for: configuration), .encyclopedia)
+    try await withSession { session in
+      IntroductionProtocol.fixture.set([
+        (200, #"{"pageid":724,"title":"Artikel"}"#),
+        (200, #"{"query":{"pages":{"724":{"extract":"Bahasa Indonesia untuk latihan."}}}}"#)
+      ])
+      let content = await LivePracticeContentService.fetch(
+        source: .encyclopedia, language: .indonesian1k, session: session)
+      XCTAssertEqual(content?.text, "Bahasa Indonesia untuk latihan.")
+      let requests = IntroductionProtocol.fixture.requests
+      XCTAssertEqual(requests.count, 2)
+      XCTAssertEqual(requests.first?.url?.host, "id.wikipedia.org")
+      XCTAssertEqual(requests.last?.url?.host, "id.wikipedia.org")
+    }
+  }
+
   func testNonstringAttributionDoesNotPreventLoadingValidIntroduction() async throws {
     try await withSession { session in
       for metadata in ["", #","title":null,"author":null"#,

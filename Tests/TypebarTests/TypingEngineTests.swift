@@ -13192,7 +13192,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testIndonesianScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, String, Int, Int, Int, Int, String, String)] = [
-      ("indonesian1k", "Bahasa Indonesia · 1k · Typebar", 1_020, 14, 2, 2, "hu", "hu-HU"),
+      ("indonesian1k", "Bahasa Indonesia · 1k · Typebar", 1_020, 14, 2, 2, "id", "id-ID"),
       ("indonesian10k", "Bahasa Indonesia · 10k · Typebar", 13_769, 13, 0, 494, "id", "id-ID"),
     ]
 

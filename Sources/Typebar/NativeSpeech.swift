@@ -109,7 +109,7 @@ extension TypingLanguage {
     case .filipino: "fil-PH"
     case .catalan: "ca-ES"
     case .indonesian: "id-ID"
-    case .indonesian1k: "hu-HU"
+    case .indonesian1k: "id-ID"
     case .indonesian10k: "id-ID"
     case .malay, .malay1k: "ms-MY"
     case .danish, .danish1k, .danish10k: "da-DK"

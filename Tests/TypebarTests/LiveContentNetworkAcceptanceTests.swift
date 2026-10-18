@@ -17,6 +17,10 @@ import XCTest
     try await check(source: .encyclopedia, language: .simplifiedChinese)
   }
 
+  func testPublicIndonesianOneThousandEncyclopediaParsesIntoACompletableNativeAttempt() async throws {
+    try await check(source: .encyclopedia, language: .indonesian1k)
+  }
+
   private func check(source: LivePracticeContentSource, language: TypingLanguage) async throws {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.urlCache = nil
