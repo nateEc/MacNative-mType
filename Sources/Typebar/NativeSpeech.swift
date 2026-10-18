@@ -155,8 +155,8 @@ extension TypingLanguage {
       .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k: "ru-RU"
     case .ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k,
       .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k: "uk-UA"
-    case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: "ja-JP"
-    case .japaneseRomaji1k: "jp-JP"
+    // The pinned Romaji 1k metadata says jp-JP, which selects no macOS voice.
+    case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .japaneseRomaji1k: "ja-JP"
     case .korean, .korean1k, .korean5k: "ko-KR"
     case .turkish, .turkish1k, .turkish5k: "tr-TR"
     case .polish, .polish2k, .polish5k, .polish10k, .polish20k, .polish40k,

@@ -14526,7 +14526,7 @@ final class TypingEngineTests: XCTestCase {
         maximumScalarCount: 15, categorySignatures: ["P": 33, "S": 3, "plain": 951],
         alphabeticCount: 987, nonASCIICount: 0, markCount: 0, scriptRange: nil,
         scriptCount: 0, supportsLazyInput: false, zipfSupport: .unknown,
-        quoteSourceRawValue: "japaneseRomaji", wikipediaCode: "jp", speechLocale: "jp-JP",
+        quoteSourceRawValue: "japaneseRomaji", wikipediaCode: "jp", speechLocale: "ja-JP",
         usesJoiningScript: false, punctuationHistogram: [1: 27, 2: 6],
         spaceHistogram: [1: 1, 2: 2]),
       ExpectedScale(
