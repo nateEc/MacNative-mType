@@ -19,12 +19,14 @@ struct WeakSpotScores: Equatable {
   static let maximumSamplesPerCharacter = 50
   static let incorrectPenalty: TimeInterval = 5
 
-  private var values: [Character: Score] = [:]
+  // Swift Character keys compare canonically equivalent spellings as equal;
+  // the reference's string keys keep their original UTF-16 sequences apart.
+  private var values: [[UInt16]: Score] = [:]
 
   mutating func record(character: Character, interval: TimeInterval, isCorrect: Bool) {
     guard interval.isFinite, interval >= 0 else { return }
     let value = interval + (isCorrect ? 0 : Self.incorrectPenalty)
-    values[character, default: .init()].record(value)
+    values[Array(String(character).utf16), default: .init()].record(value)
   }
 
   mutating func absorb(_ samples: [WeakSpotInputSample]) {
@@ -34,11 +36,11 @@ struct WeakSpotScores: Equatable {
   }
 
   func averageScore(for character: Character) -> TimeInterval {
-    values[character]?.average ?? 0
+    values[Array(String(character).utf16)]?.average ?? 0
   }
 
   func knownAverageScore(for character: Character) -> TimeInterval? {
-    values[character]?.average
+    values[Array(String(character).utf16)]?.average
   }
 }
 

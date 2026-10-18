@@ -1,5 +1,9 @@
 # 功能盘点与追踪表
 
+2026-10-19 `FUN-WS-LIVE-01` 弱项训练精确字符键：固定参考 `frontend/src/ts/test/weak-spot.ts` 按输入数据的原始字符串键累计分数，Swift `Character` 的规范等价比较会错误合并 `é` 与 `e` 加组合重音。先行实际红测一项四处失败；原生瞬时评分簿现按原始 UTF-16 序列区分两者，词候选不再借用另一写法的分数。弱项／生成相邻 63 项及引擎弱项 5 项均零失败；不改词库、成绩、回放或存储格式。真实 IME、批量输入与浏览器事件时序未验收，弱项训练仍为部分覆盖；见 [官方 Funbox 审计](OFFICIAL_FUNBOX_AUDIT.md)。
+
+2026-10-19 `TST-02`／Wikipedia 现状复核：固定参考 `frontend/src/ts/test/wikipedia.ts` 在随机页面身份后读取同页完整导言，空导言换页，网络或结构错误拒绝；`test-logic.ts` 的段落旁路与生成器错误属于不同调用方。当前原生 `LivePracticeContentService.fetchEncyclopedia`、练习页续段调度及相应运输／不可见宿主回归已分别实现这些限定分支，不能继续把早期“只取摘要、空段与失败分类均未接线”作为现状。`TYPEBAR_QA_IN_MEMORY_STORE=1 swift test --filter 'EncyclopediaIntroductionTransportTests|LivePracticeReplacementHostTests'` 实际执行 85 项、零失败；固定参考原创性边界与空白检查通过，未启动 Typebar 图形进程。此处只校正追踪口径：真实公共网络、所有 HTML 清理边界、完整调用链和可见窗口／实体输入仍未验收，`wikipedia` 保持部分实现；逐项范围见 [官方 Funbox 审计](OFFICIAL_FUNBOX_AUDIT.md)。
+
 2026-10-19 `showAllLines` 可见末行越界修复：SwiftUI 的候选宽度测量不再替换原生字段按实际视图宽度持有的字格／光标布局。可见窗口先捕捉到 756×393 视图却使用 616×483 布局的绘制时序；定点先红后绿，50 词完整提示行隔离 Debug 三次及 Release 一次重开均无末行越界。相邻宿主回归、Release 构建及原创性检查通过；未覆盖全部尺寸、字体、IME 或十万词可见性能，配置仍为部分。证据见 [官方配置审计](OFFICIAL_CONFIG_AUDIT.md)。
 
 2026-10-19 `showAllLines` 单字格布局复用：原生 TextKit 字形形状已计算完整占用框时，单字格直接复用该框，避免再次查询同一全范围；多字格和部分范围路径不变。字母、表情、组合字符、控制字符及零宽字符几何合同测试通过。校正抽样的 100,001 词宿主两轮字段布局约 11.00／10.84 秒，改前单轮约 11.47 秒，完整呈现约 33.10／32.68 秒（改前约 33.46 秒）；样本少且环境有波动，不视为可见窗口性能达标，兼容状态仍为部分。

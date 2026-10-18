@@ -15,6 +15,25 @@ final class WeakSpotLiveGenerationTests: XCTestCase {
     return { defer { rank += 1 }; return rank % 2 }
   }
 
+  func testWeakspotKeepsCanonicallyEquivalentInputSequencesSeparate() {
+    var learned = WeakSpotScores()
+    learned.record(character: "e\u{301}", interval: 5, isCorrect: true)
+    XCTAssertNil(learned.knownAverageScore(for: "é"),
+      "The reference keys input data by its exact string, not Swift Character equality")
+    XCTAssertEqual(learned.knownAverageScore(for: "e\u{301}"), 5)
+
+    learned.record(character: "é", interval: 1, isCorrect: true)
+    XCTAssertEqual(learned.knownAverageScore(for: "é"), 1)
+    XCTAssertEqual(learned.knownAverageScore(for: "e\u{301}"), 5)
+    XCTAssertEqual(WeakSpotWordSelection.word(from: ["é", "a"], scores: learned,
+      random: drawPair()), "é")
+
+    var onlyDecomposed = scores("e\u{301}", 5)
+    onlyDecomposed.record(character: "a", interval: 1, isCorrect: true)
+    XCTAssertEqual(WeakSpotWordSelection.word(from: ["é", "a"], scores: onlyDecomposed,
+      random: drawPair()), "a", "An unlearned composed character cannot beat learned a")
+  }
+
   func testLiveInputUpdatesBaselineBeforeWeakspotIsEnabledAndDeletionDoesNotUndoLearning() {
     var session = TypingSession(configuration: .words(2), prompt: "am oak",
       weakSpotScores: scores("m", 1))
