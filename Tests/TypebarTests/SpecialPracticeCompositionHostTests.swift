@@ -86,6 +86,21 @@ import XCTest
         if style == .replace {
           let marked = projection.cells.filter { $0.compositionIndex != nil }
           XCTAssertEqual(marked.count, candidate.count)
+          if candidate == "😀e\u{301}候" {
+            let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session,
+              composition: candidate, style: style))
+            let map = try XCTUnwrap(presentation.render { _, glyph, cell in
+              AttributedString(cell?.text ?? String(glyph.character))
+            }.compositionTextMap)
+            var actual = NSRange(location: NSNotFound, length: 0)
+            for request in [NSRange(location: 1, length: 1), NSRange(location: 2, length: 2)] {
+              let selected = try XCTUnwrap(map.firstVisibleMarkedCell(for: request))
+              let cell = try XCTUnwrap(owner.measuredRect(for: selected.id))
+              XCTAssertEqual(input.firstRect(forCharacterRange: request, actualRange: &actual),
+                window.convertToScreen(owner.convert(cell, to: nil)))
+              XCTAssertEqual(actual, selected.actualRange)
+            }
+          }
           if marked.count == 2 {
             XCTAssertLessThan(try XCTUnwrap(owner.measuredRect(for: marked[0].id)).minX,
               try XCTUnwrap(owner.measuredRect(for: marked[1].id)).minX,
@@ -97,8 +112,18 @@ import XCTest
             })
             XCTAssertGreaterThan(rows.count, 1,
               "The long candidate must actually exercise ASL cross-row layout")
+            let first = input.firstRect(forCharacterRange: .init(location: 0, length: 1), actualRange: nil)
+            let last = input.firstRect(forCharacterRange: .init(location: candidate.utf16.count - 1, length: 1),
+              actualRange: nil)
+            XCTAssertNotEqual(first.minY, last.minY,
+              "ASL candidate queries must follow the visible marked row")
             try captureIfRequested(host: host, owner: owner, name: "asl-long-replace")
           }
+        }
+        if style == .off, candidate == "中文" {
+          let rect = input.firstRect(forCharacterRange: .init(location: 0, length: 1), actualRange: nil)
+          XCTAssertEqual(rect.width, 0, "Off mode anchors at the prompt insertion, not hidden input")
+          XCTAssertGreaterThan(rect.height, 1)
         }
         let rows = descendants(host, NSTextField.self).filter {
           $0.accessibilityLabel()?.hasPrefix("正在组合：") == true
@@ -264,7 +289,38 @@ import XCTest
             "Every marked character must own an actual Choo text layer")
           XCTAssertGreaterThan(Set(markedLayers.map { $0.position.y }).count, 1,
             "The long candidate must actually exercise cross-row Choo layout")
+          let first = input.firstRect(forCharacterRange: .init(location: 0, length: 1), actualRange: nil)
+          let last = input.firstRect(forCharacterRange: .init(location: candidate.utf16.count - 1, length: 1),
+            actualRange: nil)
+          XCTAssertNotEqual(first.minY, last.minY,
+            "Choo candidate queries must follow the visible marked row")
           try captureIfRequested(host: host, owner: owner, name: "choo-long-replace")
+        }
+        if candidate == "😀e\u{301}候", style == .replace {
+          let session = TypingSession(configuration: configuration, prompt: prompt)
+          let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session,
+            composition: candidate, style: style))
+          let map = try XCTUnwrap(presentation.render { _, glyph, cell in
+            AttributedString(cell?.text ?? String(glyph.character))
+          }.compositionTextMap)
+          let cells = map.fieldRuns.flatMap(\.cells)
+          let layers = textLayers()
+          XCTAssertEqual(layers.count, cells.count)
+          var actual = NSRange(location: NSNotFound, length: 0)
+          for request in [NSRange(location: 1, length: 1), NSRange(location: 2, length: 2)] {
+            let selected = try XCTUnwrap(map.firstVisibleMarkedCell(for: request))
+            let index = try XCTUnwrap(cells.firstIndex { $0.id == selected.id })
+            var cell = layers[index].frame
+            cell.size.width -= ChooPromptFieldLayout.inkOverhang
+            XCTAssertEqual(input.firstRect(forCharacterRange: request, actualRange: &actual),
+              window.convertToScreen(owner.convert(cell, to: nil)))
+            XCTAssertEqual(actual, selected.actualRange)
+          }
+        }
+        if style == .off, candidate == "中文" {
+          let rect = input.firstRect(forCharacterRange: .init(location: 0, length: 1), actualRange: nil)
+          XCTAssertEqual(rect.width, 0, "Off mode anchors at the prompt insertion, not hidden input")
+          XCTAssertGreaterThan(rect.height, 1)
         }
         let candidateRows = descendants(host, NSTextField.self).filter {
           $0.accessibilityLabel()?.hasPrefix("正在组合：") == true

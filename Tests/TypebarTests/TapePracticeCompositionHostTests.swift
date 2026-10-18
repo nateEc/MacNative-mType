@@ -109,6 +109,29 @@ import XCTest
           XCTAssertEqual(input.markedRange(), NSRange(location: 0, length: candidate.utf16.count))
           XCTAssertEqual(input.selectedRange(), NSRange(location: candidate.utf16.count, length: 0))
           try check(candidate, style)
+          if candidate == "😀e\u{301}候", style == .replace {
+            let presentation = try XCTUnwrap(PromptCompositionPresentation(session: expected,
+              composition: candidate, style: style))
+            let rendering = presentation.render { _, glyph, cell in
+              AttributedString(PromptControlCharacterPresentation.plan(for: glyph,
+                style: settings.typoIndicatorStyle, isExtra: glyph.state == .extra,
+                compositionReplacement: cell?.text).text)
+            }
+            let map = try XCTUnwrap(rendering.compositionTextMap)
+            var actual = NSRange(location: NSNotFound, length: 0)
+            for request in [NSRange(location: 1, length: 1), NSRange(location: 2, length: 2)] {
+              let selected = try XCTUnwrap(map.firstVisibleMarkedCell(for: request))
+              let cell = try XCTUnwrap(owner.measuredMarkedCellRect(for: selected.id))
+              XCTAssertEqual(input.firstRect(forCharacterRange: request, actualRange: &actual),
+                window.convertToScreen(owner.convert(cell, to: nil)))
+              XCTAssertEqual(actual, selected.actualRange)
+            }
+          }
+          if candidate == "😀e\u{301}候", style == .off {
+            let rect = input.firstRect(forCharacterRange: .init(location: 1, length: 1), actualRange: nil)
+            XCTAssertEqual(rect.width, 0, "Off mode anchors at the tape insertion, not hidden input")
+            XCTAssertGreaterThan(rect.height, 1)
+          }
         }
         input.unmarkText()
         flush()

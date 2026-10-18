@@ -415,7 +415,8 @@ import XCTest
     view.configure(rendering: result, font: font, carets: configuration); view.layout(); view.present(at: 0)
     XCTAssertEqual(motion.pace.position, view.measuredRect(for: 1))
     result.compositionTextMap = .init(text: result.text, cellRanges: map.cellRanges, inkRanges: map.inkRanges,
-      cellTexts: map.cellTexts, canonicalAliases: [900: [0]], fieldUnits: [:], caret: map.caret, fieldRuns: map.fieldRuns)
+      cellTexts: map.cellTexts, canonicalAliases: [900: [0]], fieldUnits: [:], caret: map.caret,
+      fieldRuns: map.fieldRuns, markedInputText: map.markedInputText)
     target = 900; sequence = 2
     view.configure(rendering: result, font: font, carets: configuration); view.present(at: 0.1)
     XCTAssertEqual(motion.pace.position, view.measuredRect(for: 0))

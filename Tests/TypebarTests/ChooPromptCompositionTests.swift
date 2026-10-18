@@ -244,7 +244,7 @@ import XCTest
     var aliases = map.canonicalAliases; aliases[0] = [anchor.cellID]
     let changed = PromptCompositionTextMap(text: rendering.text, cellRanges: map.cellRanges,
       inkRanges: map.inkRanges, cellTexts: map.cellTexts, canonicalAliases: aliases, fieldUnits: [:],
-      caret: nil, fieldRuns: map.fieldRuns)
+      caret: nil, fieldRuns: map.fieldRuns, markedInputText: map.markedInputText)
     let next = PromptRendering(text: rendering.text, glyphCharacterOffsets: rendering.glyphCharacterOffsets,
       compositionTextMap: changed)
     view.configure(glyphs: ids.map { session.promptGlyphs[$0] }, font: font, palette: palette,

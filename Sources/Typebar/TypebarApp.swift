@@ -848,8 +848,12 @@ final class ChooLayerView: NSView {
     configuration.firstGlyphID = glyphIndexByID.min { $0.value < $1.value }?.key ?? 0
     if presentation?.compositionMap != nil {
       let direction = configuration.rightToLeft
+      let presented = PromptRendering(text: promptText, glyphCharacterOffsets: [:],
+        compositionTextMap: presentation?.compositionMap)
+      configuration.latestRendering = { presented }
       configuration.fieldMainRect = { [weak self] style in self?.projectedMainRect(style: style, rightToLeft: direction) }
       configuration.fieldPaceRect = { [weak self] id, after in self?.projectedCanonicalRect(id, after: after) }
+      configuration.markedCellRect = { [weak self] id in self?.projectedRect(id, after: false) }
     }
     caretView?.update(configuration)
   }

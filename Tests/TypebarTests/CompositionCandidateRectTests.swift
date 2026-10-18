@@ -4,6 +4,49 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class CompositionCandidateRectTests: XCTestCase {
+  func testChangedCandidateCannotReuseAnUnrefreshedSpecialPromptMap() throws {
+    let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 400, height: 180),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    let host = NSView(frame: .init(x: 0, y: 0, width: 400, height: 180))
+    let input = TypingInputView(frame: .init(x: 2, y: 3, width: 1, height: 1))
+    let caret = PromptCaretNativeView(frame: .init(x: 40, y: 30, width: 320, height: 110))
+    host.addSubview(input); host.addSubview(caret); window.contentView = host
+    defer { caret.stop(); window.contentView = nil; window.close() }
+
+    let session = TypingSession(configuration: .words(2), prompt: "abcdef gh")
+    let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session,
+      composition: "中", style: .replace))
+    let rendering = presentation.render { _, glyph, cell in
+      AttributedString(cell?.text ?? String(glyph.character))
+    }
+    let cell = CGRect(x: 45, y: 16, width: 20, height: 30)
+    let attempt = UUID(), anchor = PromptInsertionAnchor()
+    var current = "中"
+    var config = PromptCaretNativeView.Configuration(text: rendering.text,
+      mainOffset: nil, paceOffset: nil, mainStyle: .off, paceStyle: .off,
+      font: .monospacedSystemFont(ofSize: 24, weight: .regular), lineSpacing: 12,
+      rightToLeft: false, accent: .white, motion: .off, reducesMotion: true, frameRate: 60,
+      attemptID: attempt, coordinator: PromptCaretMotionCoordinator())
+    config.automaticallyPresents = false
+    config.insertionAnchor = anchor
+    config.latestInput = { .init(attemptID: attempt, typed: "", composition: current, glyphID: nil) }
+    config.latestRendering = { rendering }
+    config.markedCellRect = { _ in cell }
+    caret.update(config)
+    input.insertionAnchor = anchor; input.insertionAttemptID = attempt
+    input.setMarkedText(current, selectedRange: .init(location: 1, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    let presented = window.convertToScreen(caret.convert(cell, to: nil))
+    XCTAssertEqual(input.firstRect(forCharacterRange: .init(location: 0, length: 1), actualRange: nil), presented)
+
+    current = "文" // The input callback can precede the next SwiftUI/AppKit owner update.
+    input.setMarkedText(current, selectedRange: .init(location: 1, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    XCTAssertNotEqual(input.firstRect(forCharacterRange: .init(location: 0, length: 1), actualRange: nil),
+      presented, "A stale same-length candidate must not borrow the prior glyph box")
+  }
+
   func testOffCompositionNonemptySelectionUsesPromptInsertionAndWholeMarkedGrapheme() throws {
     let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 480, height: 200),
       styleMask: .borderless, backing: .buffered, defer: false)

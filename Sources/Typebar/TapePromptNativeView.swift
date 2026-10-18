@@ -300,6 +300,7 @@ final class TapePromptNativeView: NSView {
         guard let self, let rect = self.textView.projectedCanonicalRect(id, after: after) else { return nil }
         return rect.offsetBy(dx: self.textOrigin, dy: 0)
       }
+      config.markedCellRect = { [weak self] id in self?.measuredMarkedCellRect(for: id) }
     }
     config.glyphIsRightToLeft = { [weak self] id in self?.isRightToLeft(id) ?? false }
     config.geometryRevision = geometryRevision
@@ -564,6 +565,10 @@ final class TapePromptNativeView: NSView {
       } else { rect.origin.x = base - (rtl ? rect.width : 0) }
     } else { rect.origin.x += textOrigin }
     return rect
+  }
+
+  func measuredMarkedCellRect(for id: Int) -> CGRect? {
+    textView.projectedCellRect(id).map { textView.convert($0, to: self) }
   }
 
   private var textOrigin: CGFloat {
@@ -888,6 +893,10 @@ private final class TapePromptTextView: NSView {
   func projectedCanonicalRect(_ id: Int, after: Bool) -> CGRect? {
     if let projectedLayout { return projectedLayout.canonicalRect(id, after: after) }
     return usesMultilineProjection ? newlineLayout?.projectedCanonicalRect(id, after: after) : nil
+  }
+  func projectedCellRect(_ id: Int) -> CGRect? {
+    if let projectedLayout { return projectedLayout.cellFrames[id] }
+    return usesMultilineProjection ? newlineLayout?.projectedCellRect(id) : nil
   }
   func projectedFieldRect(_ id: Int) -> CGRect? {
     if let projectedLayout { return projectedLayout.fieldFrames[id] }

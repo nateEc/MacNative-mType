@@ -207,10 +207,13 @@ final class ASLPromptCaretContainer: NSView {
       config.glyphRect = { [weak self] id in self?.rect(for: id) }
       if compositionMap != nil {
         let direction = config.rightToLeft
+        let presented = PromptRendering(text: text, glyphCharacterOffsets: [:], compositionTextMap: compositionMap)
+        config.latestRendering = { presented }
         config.fieldMainRect = { [weak self] style in
           self?.mainRect(style: style, font: font, rightToLeft: direction)
         }
         config.fieldPaceRect = { [weak self] id, after in self?.canonicalRect(id, after: after) }
+        config.markedCellRect = { [weak self] id in self?.frames[id] }
       }
       caret.update(config)
     } else { caret.stop() }

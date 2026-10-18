@@ -374,7 +374,8 @@ final class PromptCaretNativeView: NSView {
       let config = configuration, config.attemptID == initial.attemptID,
       config.coordinator === initial.coordinator,
       config.latestInput?().composition == markedText,
-      let map = rendering.compositionTextMap, map.compositionStyle == style else { return nil }
+      let map = rendering.compositionTextMap, map.compositionStyle == style,
+      map.markedInputText == markedText else { return nil }
     if let selected = map.firstVisibleMarkedCell(for: range),
       let rect = config.markedCellRect?(selected.id),
       rect.minX.isFinite, rect.minY.isFinite,

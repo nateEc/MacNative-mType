@@ -34,6 +34,7 @@ struct PromptCompositionPresentation {
   let isZen: Bool
   private let gapIndices: Set<Int>
   private let markedInputRanges: [NSRange]
+  private let markedInputText: String
   private let compositionStyle: CompositionDisplayStyle
 
   init?(session: TypingSession, composition: String, style: CompositionDisplayStyle) {
@@ -41,6 +42,7 @@ struct PromptCompositionPresentation {
       let projection = session.promptCompositionProjection(composition: composition, style: style) else { return nil }
     self.projection = projection
     isZen = session.configuration.mode == .zen
+    markedInputText = composition
     compositionStyle = style
     var markedUnit = 0
     markedInputRanges = Array(composition).map { character in
@@ -148,7 +150,7 @@ struct PromptCompositionPresentation {
     let map = PromptCompositionTextMap(text: text, cellRanges: ranges, inkRanges: inks, cellTexts: texts,
       canonicalAliases: projection.canonicalAliases, fieldUnits: fieldUnits, caret: projection.caret, fieldRuns: fieldRuns,
       markedInputRanges: markedInputRanges, markedCellIDs: projection.markedCells.map(\.id),
-      compositionStyle: compositionStyle)
+      markedInputText: markedInputText, compositionStyle: compositionStyle)
     // Legacy character offsets remain a convenience for older callers, not
     // the identity directory. Partial/virtual slots live only in cellRanges.
     let offsets = Dictionary(projection.cells.filter { $0.id >= 0 }.compactMap { cell in
@@ -173,18 +175,20 @@ struct PromptCompositionTextMap {
   let fieldRuns: [PromptFieldTextRun]
   let markedInputRanges: [NSRange]
   let markedCellIDs: [Int]
+  let markedInputText: String
   let compositionStyle: CompositionDisplayStyle?
   private let characterStarts: [Int]
 
   init(text: AttributedString, cellRanges: [Int: NSRange], inkRanges: [Int: NSRange], cellTexts: [Int: AttributedString],
     canonicalAliases: [Int: [Int]], fieldUnits: [Int: Int], caret: PromptCompositionProjection.Anchor?,
     fieldRuns: [PromptFieldTextRun] = [], markedInputRanges: [NSRange] = [],
-    markedCellIDs: [Int] = [], compositionStyle: CompositionDisplayStyle? = nil) {
+    markedCellIDs: [Int] = [], markedInputText: String, compositionStyle: CompositionDisplayStyle? = nil) {
     self.cellRanges = cellRanges; self.inkRanges = inkRanges
     self.cellTexts = cellTexts; self.canonicalAliases = canonicalAliases; self.caret = caret
     self.fieldRuns = fieldRuns
     self.markedInputRanges = markedInputRanges
     self.markedCellIDs = markedCellIDs
+    self.markedInputText = markedInputText
     self.compositionStyle = compositionStyle
     var starts = [0]
     for character in text.characters { starts.append(starts.last! + String(character).utf16.count) }
