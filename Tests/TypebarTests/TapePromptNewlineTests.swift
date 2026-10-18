@@ -184,19 +184,32 @@ import XCTest
   func testMetricsAreCoalescedAndCancelledAcrossStopAndRestart() {
     let view = TapePromptNativeView(frame: .init(x: 0, y: 0, width: 400, height: 160)); defer { view.stop() }
     let (rendering, words) = fixture()
-    var reports: [TapePromptLayoutMetrics] = []
-    func update(_ configuration: PromptCaretNativeView.Configuration) {
+    var staleReports: [TapePromptLayoutMetrics] = [], reports: [TapePromptLayoutMetrics] = []
+    func update(_ configuration: PromptCaretNativeView.Configuration,
+      onMetrics: @escaping (TapePromptLayoutMetrics) -> Void) {
       view.configure(rendering: rendering, anchorCharacterIndex: 0, wordAnchorCharacterIndex: 0,
         mode: .word, margin: 0.25, smoothScroll: false, newlineWords: words,
-        onMetrics: { reports.append($0) }, carets: configuration, at: 0)
+        onMetrics: onMetrics, carets: configuration, at: 0)
     }
-    update(config(.init())); update(config(.init())); view.stop()
-    RunLoop.main.run(until: Date().addingTimeInterval(0.005)); XCTAssertTrue(reports.isEmpty)
+    update(config(.init()), onMetrics: { staleReports.append($0) })
+    update(config(.init()), onMetrics: { staleReports.append($0) })
+    view.stop()
+    RunLoop.main.run(until: Date().addingTimeInterval(0.005)); XCTAssertTrue(staleReports.isEmpty)
     let configuration = config(.init())
-    update(configuration); update(configuration); view.layoutSubtreeIfNeeded()
+    let delivered = expectation(description: "重启后指标异步合并送达")
+    delivered.assertForOverFulfill = true
+    let report: (TapePromptLayoutMetrics) -> Void = { metrics in
+      reports.append(metrics)
+      delivered.fulfill()
+    }
+    update(configuration, onMetrics: report); update(configuration, onMetrics: report)
+    view.layoutSubtreeIfNeeded()
+    XCTAssertEqual(XCTWaiter.wait(for: [delivered], timeout: 2), .completed)
+    XCTAssertTrue(staleReports.isEmpty)
+    XCTAssertEqual(reports.count, 1)
+    update(configuration, onMetrics: report)
     RunLoop.main.run(until: Date().addingTimeInterval(0.005)); XCTAssertEqual(reports.count, 1)
-    update(configuration)
-    RunLoop.main.run(until: Date().addingTimeInterval(0.005)); XCTAssertEqual(reports.count, 1)
+    XCTAssertTrue(staleReports.isEmpty)
   }
 
   func testRealLTRAndRTLPixelsAreDrawnOnAllRowsWithoutShowingAWindow() throws {
