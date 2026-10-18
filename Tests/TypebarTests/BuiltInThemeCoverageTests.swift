@@ -4,6 +4,36 @@ import XCTest
 @testable import Typebar
 
 final class BuiltInThemeCoverageTests: XCTestCase {
+  func testTenFurtherMaterialThemeIdentitiesAreSelectableReadableAndPersistent() throws {
+    let names = ["metropolis", "modern_ink", "phantom", "pulse", "repose_dark",
+      "repose_light", "retro", "shadow", "terminal", "vaporwave"]
+    let variants = names.compactMap(AppTheme.init(rawValue:))
+    XCTAssertEqual(variants.count, names.count)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .light }.count, 3)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .dark }.count, 7)
+    for theme in variants {
+      XCTAssertEqual(try JSONDecoder().decode(AppTheme.self, from: JSONEncoder().encode(theme)), theme)
+      XCTAssertTrue(theme.displayName.hasSuffix(" · Typebar"))
+      XCTAssertEqual(ThemeQuickPickerSearch.results(
+        scope: .builtIn, query: theme.rawValue, builtInThemes: AppTheme.allCases,
+        customThemes: [], favoriteThemeIDs: []).builtInThemes, [theme])
+      XCTAssertEqual(ThemeCommandCatalog.target(
+        for: ThemeCommandCatalog.identifier(for: .builtIn(theme))), .builtIn(theme))
+      let resolved = theme.resolvedTheme
+      for surface in [resolved.background, resolved.panel] {
+        XCTAssertGreaterThanOrEqual(contrast(resolved.text, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(contrast(resolved.secondaryText, surface), 4.5, theme.rawValue)
+        for mark in [resolved.accent, resolved.caret, resolved.error, resolved.extraInput] {
+          XCTAssertGreaterThanOrEqual(contrast(mark, surface), 3.0, theme.rawValue)
+        }
+      }
+      for other in AppTheme.allCases where other != theme {
+        XCTAssertNotEqual(ThemeColor(color: theme.background), ThemeColor(color: other.background),
+          "Duplicate background: \(theme.rawValue), \(other.rawValue)")
+      }
+    }
+  }
+
   func testTenAdditionalOriginalThemeIdentitiesAreSelectableReadableAndPersistent() throws {
     let names = ["chaos_theory", "cyberspace", "dark_note", "darling", "dev",
       "dollar", "dualshot", "everblush", "ez_mode", "fledgling"]

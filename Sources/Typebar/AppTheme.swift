@@ -372,6 +372,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case everblush
     case ez_mode
     case fledgling
+    case metropolis
+    case modern_ink
+    case phantom
+    case pulse
+    case repose_dark
+    case repose_light
+    case retro
+    case shadow
+    case terminal
+    case vaporwave
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -499,6 +509,16 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .everblush: "长春绯 · Typebar"
         case .ez_mode: "轻松模式 · Typebar"
         case .fledgling: "新羽 · Typebar"
+        case .metropolis: "城市钠灯 · Typebar"
+        case .modern_ink: "现代蓝墨 · Typebar"
+        case .phantom: "薄雾幽影 · Typebar"
+        case .pulse: "脉冲 · Typebar"
+        case .repose_dark: "深色休憩 · Typebar"
+        case .repose_light: "浅色休憩 · Typebar"
+        case .retro: "复古磁带 · Typebar"
+        case .shadow: "钢影 · Typebar"
+        case .terminal: "琥珀终端 · Typebar"
+        case .vaporwave: "晚潮 · Typebar"
         }
     }
 
@@ -732,6 +752,26 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0xF1E9D6, 0xDED3B8, 0x365F67, 0x303A37, 0x4F5A50, light: true, error: 0x943D4C)
         case .fledgling:
             Self.palette(0x22352E, 0x355046, 0xDCCF95, 0xF1F4E9, 0xC9D9CC, light: false, error: 0xFFB6A8)
+        case .metropolis:
+            Self.palette(0x1C2B32, 0x30424A, 0xF5C277, 0xF7F0E5, 0xCAD4D0, light: false, error: 0xFFAD9B)
+        case .modern_ink:
+            Self.palette(0xE8EDF0, 0xD0DBE1, 0x315E73, 0x22323C, 0x485F69, light: true, error: 0x9A3547)
+        case .phantom:
+            Self.palette(0x272334, 0x3D354A, 0xD4C1E9, 0xF5F0F7, 0xD0C8DA, light: false, error: 0xFFAA9A)
+        case .pulse:
+            Self.palette(0x351F2C, 0x4D3040, 0xF2BC9A, 0xFAF0E9, 0xDFC8D3, light: false, error: 0xFFB2A5)
+        case .repose_dark:
+            Self.palette(0x243239, 0x394A50, 0xC4D9C6, 0xF0F4EF, 0xC5D4D0, light: false, error: 0xFFB2A1)
+        case .repose_light:
+            Self.palette(0xE5EBE6, 0xC9D9D3, 0x4B546D, 0x283443, 0x4D5B64, light: true, error: 0x943B50)
+        case .retro:
+            Self.palette(0xE5D6B5, 0xCDBD9B, 0x3D5A5A, 0x302B24, 0x524B3C, light: true, error: 0x8C3744)
+        case .shadow:
+            Self.palette(0x1A2832, 0x2C3945, 0xB6D9DA, 0xF2F4F2, 0xC0D2D3, light: false, error: 0xFFA99C)
+        case .terminal:
+            Self.palette(0x121D26, 0x233444, 0xE4C98E, 0xF3F0E0, 0xC7D2C9, light: false, error: 0xFFB4A1)
+        case .vaporwave:
+            Self.palette(0x302443, 0x4E365A, 0xABE0C9, 0xF8EFF7, 0xD8CEDF, light: false, error: 0xFFB09E)
         }
     }
 }

@@ -288,7 +288,17 @@
     "dualshot",
     "everblush",
     "ez_mode",
-    "fledgling"
+    "fledgling",
+    "metropolis",
+    "modern_ink",
+    "phantom",
+    "pulse",
+    "repose_dark",
+    "repose_light",
+    "retro",
+    "shadow",
+    "terminal",
+    "vaporwave"
   ],
   "exactMappings": {},
   "relatedMappings": {
@@ -386,6 +396,16 @@
     "dualshot": "dualshot",
     "everblush": "everblush",
     "ez_mode": "ez_mode",
-    "fledgling": "fledgling"
+    "fledgling": "fledgling",
+    "metropolis": "metropolis",
+    "modern_ink": "modern_ink",
+    "phantom": "phantom",
+    "pulse": "pulse",
+    "repose_dark": "repose_dark",
+    "repose_light": "repose_light",
+    "retro": "retro",
+    "shadow": "shadow",
+    "terminal": "terminal",
+    "vaporwave": "vaporwave"
   }
 }
