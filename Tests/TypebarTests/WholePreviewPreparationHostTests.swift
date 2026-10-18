@@ -13,9 +13,13 @@ import XCTest
     var usesActualGenerator = false
     var actualPrompt: String?
     var preparedWordCount = 0
+    var randomDrawCount = 0
     var preparationStarted: TimeInterval?
     var lastBatchElapsed: TimeInterval?
     var preparationReturnedElapsed: TimeInterval?
+    var projectionElapsed: TimeInterval?
+    var renderingElapsed: TimeInterval?
+    var fieldLayoutElapsed: TimeInterval?
     var preparationErrorType: String?
     enum Failure: Error { case expected }
     func prepare(_ configuration: TestConfiguration, _ scores: WeakSpotScores,
@@ -27,7 +31,8 @@ import XCTest
         preparationStarted = started
         do {
           let prepared = try await WholePreviewWordPreparation.prepareSession(configuration: configuration,
-            weakSpotScores: scores, wordDecorationState: state, nextRandomWordIndex: { 0 },
+            weakSpotScores: scores, wordDecorationState: state,
+            nextRandomWordIndex: { self.randomDrawCount += 1; return self.randomDrawCount - 1 },
             didPrepare: { count in
               self.preparedWordCount = count
               self.lastBatchElapsed = ProcessInfo.processInfo.systemUptime - started
@@ -273,7 +278,23 @@ import XCTest
       account: AccountSession(defaults: defaults), announcements: RemoteAnnouncementCenter(defaults: defaults),
       hotkey: GlobalHotkeyMonitor(), systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
       network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor(),
-      wholePreviewPrepare: pending.prepare).modelContainer(container)
+      wholePreviewPrepare: pending.prepare,
+      wholePreviewRender: { candidate, style in
+        let started = ProcessInfo.processInfo.systemUptime
+        let plan = try await PromptRenderPlan.prepareCooperatively(session: candidate,
+          composition: "", style: style)
+        pending.projectionElapsed = ProcessInfo.processInfo.systemUptime - started
+        let rendering = try await plan.renderCooperatively()
+        pending.renderingElapsed = ProcessInfo.processInfo.systemUptime - started
+          - (pending.projectionElapsed ?? 0)
+        return rendering
+      }, wholePreviewLayout: { map, width, font, spacing, rtl, joins in
+        let started = ProcessInfo.processInfo.systemUptime
+        let layout = try await PromptFieldTextLayout.makeCooperatively(map: map, width: width,
+          font: font, lineSpacing: spacing, rightToLeft: rtl, joinsLetters: joins)
+        pending.fieldLayoutElapsed = ProcessInfo.processInfo.systemUptime - started
+        return layout
+      }).modelContainer(container)
     let host = NSHostingView(rootView: AnyView(content.frame(width: 1000, height: 720)))
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
       styleMask: .borderless, backing: .buffered, defer: false)
@@ -327,9 +348,18 @@ import XCTest
       let elapsed = pending.preparationStarted.map { ProcessInfo.processInfo.systemUptime - $0 }
       let evidence = "words=\(wordCount) calls=\(pending.calls) flushes=\(flushCount) prepared=\(pending.preparedWordCount) elapsed=\(String(describing: elapsed)) lastBatch=\(String(describing: pending.lastBatchElapsed)) returned=\(String(describing: pending.preparationReturnedElapsed)) layoutTotal=\(layoutTotal) layoutMax=\(layoutMaximum) runLoopTotal=\(runLoopTotal) runLoopMax=\(runLoopMaximum) errorType=\(pending.preparationErrorType ?? "none")"
       print("whole preview preparation observation: \(evidence)")
+      if modifiers == [.noQuit] {
+        print("whole preview pool draws: words=\(wordCount) draws=\(pending.randomDrawCount)")
+      }
       let actual = try XCTUnwrap(pending.actualPrompt, evidence)
       XCTAssertEqual(pending.preparedWordCount, wordCount)
       XCTAssertEqual(actual.split(separator: " ").count, wordCount)
+      if modifiers == [.noQuit] {
+        XCTAssertGreaterThan(Set(actual.prefix(200).split(separator: " ")).count, 1,
+          "The production-path host must exercise varied pool targets, not forced redraw exhaustion")
+        XCTAssertLessThan(pending.randomDrawCount, wordCount * 10,
+          "A deterministic host draw must not force the source's 100-redraw ceiling for every word")
+      }
       let renderDeadline = Date().addingTimeInterval(wordCount > 100_000 ? 90 : 20)
       while target() != actual && Date() < renderDeadline { flush() }
       let displayed = target()
@@ -341,6 +371,9 @@ import XCTest
       }
       if let started = pending.preparationStarted {
         print("whole preview presentation observation: words=\(wordCount) elapsed=\(ProcessInfo.processInfo.systemUptime - started) layoutMax=\(layoutMaximum) runLoopMax=\(runLoopMaximum)")
+      }
+      if wordCount > 100_000 {
+        print("whole preview stage observation: words=\(wordCount) projection=\(String(describing: pending.projectionElapsed)) rendering=\(String(describing: pending.renderingElapsed)) fieldLayout=\(String(describing: pending.fieldLayoutElapsed))")
       }
       if scenario == .actualFirstInput || scenario == .actualInterleavings {
         let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)

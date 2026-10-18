@@ -41,6 +41,7 @@ struct PromptFieldTextRun: Equatable {
     let container = NSTextContainer(size: .init(width: CGFloat.greatestFiniteMagnitude,
       height: CGFloat.greatestFiniteMagnitude))
     let storage: NSTextStorage
+    var glyphBounds: CGRect = .zero
     var bounds: CGRect = .zero
     init(text: AttributedString, wraps: Bool,
       font: NSFont, rightToLeft: Bool, spacing: CGFloat, width: CGFloat) {
@@ -52,10 +53,10 @@ struct PromptFieldTextRun: Equatable {
       storage.addAttribute(.paragraphStyle, value: paragraph, range: .init(location: 0, length: storage.length))
       container.lineFragmentPadding = 0; manager.addTextContainer(container); storage.addLayoutManager(manager)
       manager.ensureLayout(for: container)
-      bounds = occupiedBounds()
+      glyphBounds = occupiedBounds(); bounds = glyphBounds
       if bounds.width > width, wraps {
         container.containerSize.width = max(1, width)
-        manager.ensureLayout(for: container); bounds = occupiedBounds()
+        manager.ensureLayout(for: container); glyphBounds = occupiedBounds(); bounds = glyphBounds
         // A wrapped word owns its full allocation, not just the last row.
         bounds.size.width = max(bounds.width, width)
       }
@@ -109,6 +110,9 @@ struct PromptFieldTextRun: Equatable {
     func rect(_ id: Int, origin: CGPoint) -> CGRect? {
       let range = singleCell?.id == id ? singleRange : multipleRanges[id]
       guard let range, range.length > 0 else { return nil }
+      if singleCell != nil, range.location == 0, range.length == shape.storage.length {
+        return shape.glyphBounds.offsetBy(dx: origin.x - bounds.minX, dy: origin.y - bounds.minY)
+      }
       let glyphs = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
       return TapePromptTextStorage.advanceRect(glyphs, manager: manager, container: container)
         .offsetBy(dx: origin.x - bounds.minX, dy: origin.y - bounds.minY)

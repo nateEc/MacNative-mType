@@ -72,6 +72,38 @@ import XCTest
     }
   }
 
+  func testSingleCellFramesKeepTextKitAdvanceForLettersControlsAndZeroWidthInk() throws {
+    for value in ["a", "W", "🙂", "e\u{301}", "\t", "\n", "\u{200B}"] {
+      let character = try XCTUnwrap(value.first)
+      let glyph = TypingPromptGlyph(character: character, state: .pending)
+      let text = AttributedString(value)
+      let cell = PromptFieldTextRun.Cell(id: 0, glyph: glyph, text: text, isGap: false)
+      let content = ASLPromptGlyphContent(glyph: glyph, text: text)
+      let storage = TapePromptTextStorage.prepare(content.main, font: font)
+      let paragraph = NSMutableParagraphStyle()
+      paragraph.baseWritingDirection = .leftToRight
+      paragraph.alignment = .left
+      paragraph.lineSpacing = 12
+      paragraph.lineBreakMode = .byCharWrapping
+      storage.addAttribute(.paragraphStyle, value: paragraph,
+        range: .init(location: 0, length: storage.length))
+      let manager = NSLayoutManager()
+      let container = NSTextContainer(size: .init(width: CGFloat.greatestFiniteMagnitude,
+        height: CGFloat.greatestFiniteMagnitude))
+      container.lineFragmentPadding = 0
+      manager.addTextContainer(container)
+      storage.addLayoutManager(manager)
+      manager.ensureLayout(for: container)
+      let expected = TapePromptTextStorage.advanceRect(
+        .init(location: 0, length: manager.numberOfGlyphs), manager: manager,
+        container: container)
+      let layout = PromptFieldTextLayout(fieldRuns: [.init(fieldID: 0, cells: [cell])],
+        width: 400, font: font)
+      let actual = try XCTUnwrap(layout.cellFrames[0], value)
+      XCTAssertEqual(actual.size, expected.size, value)
+    }
+  }
+
   func testSharedShapesDistinguishFullAttributesAndCompatibleSnapshotMetrics() throws {
     let value = try render(TypingSession(configuration: .words(2), prompt: "aa aa"))
     let map = try XCTUnwrap(value.compositionTextMap)
