@@ -226,6 +226,7 @@ final class PromptFieldNativeView: NSView {
   func measuredMainCaretRect() -> CGRect? { model?.mainRect(style: .bar) }
   func renderedCellText(for id: Int) -> AttributedString? { rendering.compositionTextMap?.cellTexts[id] }
   func usesLayout(_ layout: PromptFieldTextLayout) -> Bool { model === layout }
+  var reusedGeometryFromPrevious: Bool { model?.reusedGeometryFromPrevious ?? false }
   func measuredFieldRect(for id: Int) -> CGRect? { model?.fieldFrames[id] }
   func present(at time: TimeInterval) { caret.present(at: time) }
   override var intrinsicContentSize: NSSize { model?.size ?? .init(width: NSView.noIntrinsicMetric, height: 0) }

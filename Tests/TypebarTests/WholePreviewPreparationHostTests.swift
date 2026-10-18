@@ -356,6 +356,10 @@ import XCTest
         XCTAssertEqual(target(), actual)
         let updated = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
         XCTAssertTrue(updated === field, "The prompt view must keep its native owner across the first key")
+        if wordCount > 100_000 {
+          XCTAssertTrue(updated.reusedGeometryFromPrevious,
+            "A color-only first key should retain the ticket-prepared field geometry")
+        }
         XCTAssertNotEqual(updated.renderedCellText(for: 0), beforeInk,
           "The first accepted key must update visible field ink, not retain the initial snapshot")
         let afterCaret = try XCTUnwrap(updated.measuredMainCaretRect())

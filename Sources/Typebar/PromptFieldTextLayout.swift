@@ -128,8 +128,10 @@ struct PromptFieldTextRun: Equatable {
   }
 
   private var boxes: [Box] = []
+  private var boxGroups: [Int] = []
   var shapingResourceCount: Int { Set(boxes.map { ObjectIdentifier($0.manager) }).count }
   private(set) var preparedContentProjectionCount = 0
+  private(set) var reusedGeometryFromPrevious = false
   private var origins: [CGPoint] = []
   private var boxByCell: [Int: Int] = [:]
   private var followingCell: [Int: Int] = [:]
@@ -299,9 +301,40 @@ struct PromptFieldTextRun: Equatable {
     }
 
     func finish() {
+      if reuseGeometryIfUnchanged() { return }
       prepareGeometry()
       if needsVisualOrdering { for indices in visualRows() { orderVisualRow(indices) } }
       for index in layout.boxes.indices { placeFrame(at: index) }
+      layout.boxGroups = groups
+    }
+
+    private func reuseGeometryIfUnchanged() -> Bool {
+      guard let reuse, reuse.boxGroups == groups, reuse.boxes.count == layout.boxes.count else {
+        return false
+      }
+      for index in layout.boxes.indices {
+        let old = reuse.boxes[index], new = layout.boxes[index]
+        guard old.fieldID == new.fieldID, old.breaks == new.breaks,
+          old.isGap == new.isGap, old.bounds == new.bounds,
+          (old.singleHint != nil) == (new.singleHint != nil),
+          old.multipleHints.keys == new.multipleHints.keys else { return false }
+        if old === new { continue }
+        let oldCells = old.allCells, newCells = new.allCells
+        guard oldCells.count == newCells.count,
+          zip(oldCells, newCells).allSatisfy({ $0.id == $1.id
+            && $0.glyph.character == $1.glyph.character && $0.isGap == $1.isGap }),
+          zip(oldCells, newCells).allSatisfy({
+            old.rect($0.id, origin: reuse.origins[index])
+              == new.rect($1.id, origin: reuse.origins[index])
+          }) else { return false }
+      }
+      layout.origins = reuse.origins
+      layout.cellFrames = reuse.cellFrames
+      layout.fieldFrames = reuse.fieldFrames
+      layout.size = reuse.size
+      layout.boxGroups = groups
+      layout.reusedGeometryFromPrevious = true
+      return true
     }
 
     func finishCooperatively(batchSize: Int,
@@ -328,6 +361,7 @@ struct PromptFieldTextRun: Equatable {
         }
       }
       if !layout.boxes.count.isMultiple(of: batchSize) { didPlace(layout.boxes.count) }
+      layout.boxGroups = groups
       try Task.checkCancellation()
     }
 

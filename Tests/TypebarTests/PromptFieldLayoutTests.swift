@@ -98,6 +98,48 @@ import XCTest
     XCTAssertEqual(first.cellFrames, saved)
   }
 
+  func testColorOnlyInputReusesGeometryWithoutReusingOldInkOrCaret() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "quiet harbor")
+    let before = try render(session)
+    let previous = PromptFieldTextLayout(map: try XCTUnwrap(before.compositionTextMap),
+      width: 400, font: font)
+    session.insertBatch("q", at: start)
+    let after = try render(session)
+    let map = try XCTUnwrap(after.compositionTextMap)
+    let reused = PromptFieldTextLayout(map: map, width: 400, font: font, reusing: previous)
+    let fresh = PromptFieldTextLayout(map: map, width: 400, font: font)
+    XCTAssertTrue(reused.reusedGeometryFromPrevious)
+    XCTAssertEqual(reused.cellFrames, fresh.cellFrames)
+    XCTAssertEqual(reused.fieldFrames, fresh.fieldFrames)
+    XCTAssertEqual(reused.size, fresh.size)
+    XCTAssertEqual(reused.mainRect(style: .bar), fresh.mainRect(style: .bar))
+    XCTAssertNotEqual(before.compositionTextMap?.cellTexts[0], map.cellTexts[0])
+    XCTAssertNotEqual(previous.mainRect(style: .bar), reused.mainRect(style: .bar))
+  }
+
+  func testGeometryReuseRejectsChangedAdvanceAndFieldGrouping() throws {
+    let original = try render(TypingSession(configuration: .words(2), prompt: "aa aa"))
+    let map = try XCTUnwrap(original.compositionTextMap)
+    let previous = PromptFieldTextLayout(map: map, width: 400, font: font)
+    var styled = map.fieldRuns
+    let cell = styled[0].cells[0]
+    var wider = cell.text
+    wider.kern = 8
+    styled[0].cells[0] = .init(id: cell.id, glyph: cell.glyph, text: wider, isGap: cell.isGap)
+    let changedAdvance = PromptFieldTextLayout(fieldRuns: styled, width: 400, font: font,
+      reusing: previous)
+    XCTAssertFalse(changedAdvance.reusedGeometryFromPrevious)
+    var regrouped = map.fieldRuns
+    regrouped[0] = .init(fieldID: 99, cells: regrouped[0].cells)
+    let changedOwner = PromptFieldTextLayout(fieldRuns: regrouped, width: 400, font: font,
+      reusing: previous)
+    XCTAssertFalse(changedOwner.reusedGeometryFromPrevious)
+    XCTAssertEqual(changedOwner.fieldFrames,
+      PromptFieldTextLayout(fieldRuns: regrouped, width: 400, font: font).fieldFrames)
+    let changedWidth = PromptFieldTextLayout(map: map, width: 70, font: font, reusing: previous)
+    XCTAssertFalse(changedWidth.reusedGeometryFromPrevious)
+  }
+
   func testContentProjectionSeparatesHintAttributesFromIdenticalMainInk() {
     var firstHint = AttributedString("x")
     firstHint.baselineOffset = -12; firstHint.foregroundColor = .red
