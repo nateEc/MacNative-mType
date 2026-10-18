@@ -19,6 +19,7 @@ import XCTest
     var preparationReturnedElapsed: TimeInterval?
     var projectionElapsed: TimeInterval?
     var renderingElapsed: TimeInterval?
+    var glyphBatchesElapsed: TimeInterval?
     var fieldLayoutElapsed: TimeInterval?
     var preparationErrorType: String?
     enum Failure: Error { case expected }
@@ -284,7 +285,12 @@ import XCTest
         let plan = try await PromptRenderPlan.prepareCooperatively(session: candidate,
           composition: "", style: style)
         pending.projectionElapsed = ProcessInfo.processInfo.systemUptime - started
-        let rendering = try await plan.renderCooperatively()
+        let rendering = try await plan.renderCooperatively(didRender: { count in
+          if count == candidate.prompt.count {
+            pending.glyphBatchesElapsed = ProcessInfo.processInfo.systemUptime - started
+              - (pending.projectionElapsed ?? 0)
+          }
+        })
         pending.renderingElapsed = ProcessInfo.processInfo.systemUptime - started
           - (pending.projectionElapsed ?? 0)
         return rendering
@@ -373,7 +379,7 @@ import XCTest
         print("whole preview presentation observation: words=\(wordCount) elapsed=\(ProcessInfo.processInfo.systemUptime - started) layoutMax=\(layoutMaximum) runLoopMax=\(runLoopMaximum)")
       }
       if wordCount > 100_000 {
-        print("whole preview stage observation: words=\(wordCount) projection=\(String(describing: pending.projectionElapsed)) rendering=\(String(describing: pending.renderingElapsed)) fieldLayout=\(String(describing: pending.fieldLayoutElapsed))")
+        print("whole preview stage observation: words=\(wordCount) projection=\(String(describing: pending.projectionElapsed)) rendering=\(String(describing: pending.renderingElapsed)) glyphBatches=\(String(describing: pending.glyphBatchesElapsed)) fieldLayout=\(String(describing: pending.fieldLayoutElapsed))")
       }
       if scenario == .actualFirstInput || scenario == .actualInterleavings {
         let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)

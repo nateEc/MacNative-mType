@@ -33,6 +33,8 @@ trap cleanup EXIT
 
 TYPEBAR_APP_PATH="$app_path" \
   TYPEBAR_QA_IN_MEMORY_STORE=1 \
+  TYPEBAR_BUNDLE_IDENTIFIER=app.typebar.qa.package-check \
+  TYPEBAR_APP_NAME=Typebar-QA-Package-Check \
   zsh "$project_root/Scripts/package-macos-app.sh"
 
 info_plist="$app_path/Contents/Info.plist"
@@ -46,8 +48,10 @@ bundle_value() {
   || { print -u2 -- "package check failed: bundle is not an application"; exit 1; }
 [[ "$(bundle_value CFBundleExecutable)" == "Typebar" ]] \
   || { print -u2 -- "package check failed: unexpected executable name"; exit 1; }
-[[ "$(bundle_value CFBundleIdentifier)" == "app.typebar.desktop" ]] \
+[[ "$(bundle_value CFBundleIdentifier)" == "app.typebar.qa.package-check" ]] \
   || { print -u2 -- "package check failed: unexpected bundle identifier"; exit 1; }
+[[ "$(bundle_value CFBundleName)" == "Typebar-QA-Package-Check" ]] \
+  || { print -u2 -- "package check failed: unexpected app name"; exit 1; }
 [[ "$(bundle_value LSMinimumSystemVersion)" == "14.0" ]] \
   || { print -u2 -- "package check failed: unexpected minimum macOS version"; exit 1; }
 [[ "$(bundle_value TypebarQAInMemoryStore)" == "true" ]] \

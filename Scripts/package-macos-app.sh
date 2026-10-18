@@ -18,6 +18,13 @@ if [[ "$qa_in_memory_store" != "0" && "$qa_in_memory_store" != "1" ]]; then
   exit 1
 fi
 
+if [[ "$qa_in_memory_store" == "1" ]]; then
+  if [[ -z "$bundle_identifier" || "$bundle_identifier" == "app.typebar.desktop" || -z "$app_name" || "$app_name" == "Typebar" ]]; then
+    print -u2 "QA packages require distinct TYPEBAR_BUNDLE_IDENTIFIER and TYPEBAR_APP_NAME values"
+    exit 1
+  fi
+fi
+
 if [[ -e "$app_path" ]]; then
   print -u2 "Refusing to overwrite existing artifact: $app_path"
   exit 1

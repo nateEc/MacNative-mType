@@ -900,6 +900,9 @@ zsh Scripts/package-macos-app.sh
 默认使用优化的 `release` 构建。需要调试版时显式设置
 `TYPEBAR_BUILD_CONFIGURATION=debug`；仅接受 `debug` 或 `release`，构建和二进制查找使用同一配置。
 脚本仍拒绝覆盖已有应用包，可用 `TYPEBAR_APP_PATH` 指定新的输出路径。
+隔离图形验收若启用 `TYPEBAR_QA_IN_MEMORY_STORE=1`，必须同时设置与正式版不同的
+`TYPEBAR_BUNDLE_IDENTIFIER` 和 `TYPEBAR_APP_NAME`；脚本会在构建前拒绝同名 QA 包。
+启动前检查已有 Typebar 进程，一次只保留一个验收实例，退出后再次核对进程。
 release 不代表功能验收通过：普通计时延迟在优化构建中仍有复现，详见 [普通入口合同](ORDINARY_TAPE_ENTRY_CONTRACT.md)。
 
 无启动地构建、验签并检查应用包的关键元数据：

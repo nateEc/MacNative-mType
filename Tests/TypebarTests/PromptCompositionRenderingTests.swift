@@ -38,6 +38,22 @@ import XCTest
     XCTAssertEqual(map.fieldCharacterOffsets[1], 3)
   }
 
+  func testRenderedTextKeepsExactAttributesAcrossColorAndUnicodeBoundaries() throws {
+    let value = try presentation(TypingSession(configuration: .words(2),
+      prompt: "abc e\u{301}d"), "")
+    var expected = AttributedString()
+    let output = value.render { _, glyph, _ in
+      var character = AttributedString(String(glyph.character))
+      character.foregroundColor = glyph.character == "c" ? .red : .green
+      expected += character
+      return character
+    }
+    XCTAssertEqual(output.text, expected)
+    let map = try XCTUnwrap(output.compositionTextMap)
+    XCTAssertEqual(String(output.text.characters), "abc e\u{301}d")
+    XCTAssertEqual(map.cellRanges.count, value.glyphs.count)
+  }
+
   func testDeterministicProjectionAndAttributedRenderPhaseMeasurementsPreserveOutput() throws {
     for count in [30, 100] {
       let prompt = Array(repeating: "amber", count: count).joined(separator: " ")
