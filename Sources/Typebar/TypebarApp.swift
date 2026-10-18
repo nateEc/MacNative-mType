@@ -1377,12 +1377,9 @@ private struct ContentView: View {
     VStack(spacing: 30) {
       header
       RemoteAnnouncementBannerStack(center: announcements)
-      configurationPanel
-        .opacity(visualFocus.isFocused ? 0 : 1)
-        .allowsHitTesting(!visualFocus.isFocused)
-        .disabled(visualFocus.isFocused)
-        .accessibilityHidden(visualFocus.isFocused)
-        .animation(systemReduceMotion || settings.reducePracticeMotion ? nil : .easeInOut(duration: 0.125), value: visualFocus.isFocused)
+      if !visualFocus.isFocused {
+        configurationPanel
+      }
       if let zipfNotice {
         Label(zipfNotice, systemImage: "exclamationmark.triangle")
           .font(.caption.weight(.medium))
