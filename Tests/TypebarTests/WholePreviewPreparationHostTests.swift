@@ -75,6 +75,9 @@ import XCTest
   func testAboveFormerCeilingPublishesCompleteActualTargetThroughHost() throws {
     try check(.actual, wordCount: 100_001)
   }
+  func testFirstInputPublishesFreshFieldInkAndCaretThroughHost() throws {
+    try check(.actualFirstInput)
+  }
   func testAboveFormerCeilingAcceptsFirstInputThroughHost() throws {
     try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
       "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
@@ -334,6 +337,9 @@ import XCTest
       }
       if scenario == .actualFirstInput {
         let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
+        let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+        let beforeCaret = try XCTUnwrap(field.measuredMainCaretRect())
+        let beforeInk = try XCTUnwrap(field.renderedCellText(for: 0))
         let first = try XCTUnwrap(actual.first)
         let before = ProcessInfo.processInfo.systemUptime
         input.onInsert(String(first), false)
@@ -344,6 +350,13 @@ import XCTest
         let elapsed = ProcessInfo.processInfo.systemUptime - before
         print("whole preview first input observation: words=\(wordCount) callback=\(callback) elapsed=\(elapsed) layoutMax=\(layoutMaximum) runLoopMax=\(runLoopMaximum)")
         XCTAssertEqual(target(), actual)
+        let updated = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+        XCTAssertTrue(updated === field, "The prompt view must keep its native owner across the first key")
+        XCTAssertNotEqual(updated.renderedCellText(for: 0), beforeInk,
+          "The first accepted key must update visible field ink, not retain the initial snapshot")
+        let afterCaret = try XCTUnwrap(updated.measuredMainCaretRect())
+        XCTAssertGreaterThan(afterCaret.minX, beforeCaret.minX,
+          "The field caret must advance with the first accepted key")
         XCTAssertFalse(settings.allowsRestartingConfigurationChange,
           "The first character must begin the actual No Quit attempt")
         XCTAssertLessThan(elapsed, 40, "The first key must not render the entire body twice")

@@ -223,6 +223,8 @@ final class PromptFieldNativeView: NSView {
   }
 
   func measuredRect(for id: Int) -> CGRect? { model?.cellFrames[id] }
+  func measuredMainCaretRect() -> CGRect? { model?.mainRect(style: .bar) }
+  func renderedCellText(for id: Int) -> AttributedString? { rendering.compositionTextMap?.cellTexts[id] }
   func usesLayout(_ layout: PromptFieldTextLayout) -> Bool { model === layout }
   func measuredFieldRect(for id: Int) -> CGRect? { model?.fieldFrames[id] }
   func present(at time: TimeInterval) { caret.present(at: time) }
