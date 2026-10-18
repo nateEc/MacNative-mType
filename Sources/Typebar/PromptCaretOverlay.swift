@@ -50,41 +50,84 @@ struct PromptRendering {
     return map.characterOffset(atUTF16: range.location)
   }
 
+  private struct Assembly {
+    var text = AttributedString()
+    var offsets: [Int: Int] = [:]
+    var structural: [Int: Int] = [:]
+    let owners: [Int: Int]
+    let removedTapeWordIndices: Set<Int>
+
+    init(glyphs: [TypingPromptGlyph], words: [TypingPromptWordPresentation],
+      removedTapeWordIndices: Set<Int>) {
+      self.removedTapeWordIndices = removedTapeWordIndices
+      var owners: [Int: Int] = [:]
+      if !removedTapeWordIndices.isEmpty {
+        for (word, value) in words.enumerated() {
+          for index in value.range { owners[index] = word }
+          for index in value.extraGlyphIndices { owners[index] = word }
+        }
+        for (word, value) in words.enumerated() {
+          let index = value.range.upperBound
+          if owners[index] == nil, glyphs.indices.contains(index), glyphs[index].state != .extra,
+            glyphs[index].character == " " || glyphs[index].character == "\n" { owners[index] = word }
+        }
+      }
+      self.owners = owners
+    }
+
+    mutating func append(_ index: Int, glyph: TypingPromptGlyph,
+      renderGlyph: (Int, TypingPromptGlyph) -> AttributedString) {
+      if let word = owners[index], removedTapeWordIndices.contains(word) {
+        // Retired Return ink disappears, but its structural row survives.
+        if glyph.character == "\n", glyph.state != .extra {
+          structural[word] = text.characters.count
+          text += AttributedString("\n")
+        }
+        return
+      }
+      offsets[index] = text.characters.count
+      text += renderGlyph(index, glyph)
+    }
+
+    func finish(emptyWordPlaceholderGlyphID: Int?) -> PromptRendering {
+      PromptRendering(text: text, glyphCharacterOffsets: offsets,
+        emptyWordPlaceholderGlyphID: emptyWordPlaceholderGlyphID.flatMap { offsets[$0] == nil ? nil : $0 },
+        structuralNewlineOffsets: structural)
+    }
+  }
+
   static func make(
     glyphs: [TypingPromptGlyph], indices: [Int], emptyWordPlaceholderGlyphID: Int? = nil,
     words: [TypingPromptWordPresentation] = [], removedTapeWordIndices: Set<Int> = [],
     renderGlyph: (Int, TypingPromptGlyph) -> AttributedString
   ) -> Self {
-    var text = AttributedString()
-    var offsets: [Int: Int] = [:]
-    var owners: [Int: Int] = [:], structural: [Int: Int] = [:]
-    if !removedTapeWordIndices.isEmpty {
-      for (word, value) in words.enumerated() {
-        for index in value.range { owners[index] = word }
-        for index in value.extraGlyphIndices { owners[index] = word }
-      }
-      for (word, value) in words.enumerated() {
-        let index = value.range.upperBound
-        if owners[index] == nil, glyphs.indices.contains(index), glyphs[index].state != .extra,
-          glyphs[index].character == " " || glyphs[index].character == "\n" { owners[index] = word }
-      }
-    }
+    var result = Assembly(glyphs: glyphs, words: words, removedTapeWordIndices: removedTapeWordIndices)
     for index in indices {
-      if let word = owners[index], removedTapeWordIndices.contains(word) {
-        // The word's Return ink disappears, but its structural row survives.
-        // It deliberately owns no canonical glyph offset or rendering call.
-        if glyphs[index].character == "\n", glyphs[index].state != .extra {
-          structural[word] = text.characters.count
-          text += AttributedString("\n")
-        }
-        continue
-      }
-      offsets[index] = text.characters.count
-      text += renderGlyph(index, glyphs[index])
+      result.append(index, glyph: glyphs[index], renderGlyph: renderGlyph)
     }
-    return Self(text: text, glyphCharacterOffsets: offsets,
-      emptyWordPlaceholderGlyphID: emptyWordPlaceholderGlyphID.flatMap { offsets[$0] == nil ? nil : $0 },
-      structuralNewlineOffsets: structural)
+    return result.finish(emptyWordPlaceholderGlyphID: emptyWordPlaceholderGlyphID)
+  }
+
+  @MainActor static func makeCooperatively(
+    glyphs: [TypingPromptGlyph], indices: [Int], emptyWordPlaceholderGlyphID: Int? = nil,
+    words: [TypingPromptWordPresentation] = [], removedTapeWordIndices: Set<Int> = [],
+    batchSize: Int = 512, didRender: (Int) -> Void = { _ in },
+    renderGlyph: (Int, TypingPromptGlyph) -> AttributedString
+  ) async throws -> Self {
+    try Task.checkCancellation()
+    var result = Assembly(glyphs: glyphs, words: words, removedTapeWordIndices: removedTapeWordIndices)
+    let interval = max(1, batchSize)
+    for (position, index) in indices.enumerated() {
+      result.append(index, glyph: glyphs[index], renderGlyph: renderGlyph)
+      if (position + 1).isMultiple(of: interval) {
+        didRender(position + 1)
+        try Task.checkCancellation()
+        await Task.yield()
+      }
+    }
+    if !indices.count.isMultiple(of: interval) { didRender(indices.count) }
+    try Task.checkCancellation()
+    return result.finish(emptyWordPlaceholderGlyphID: emptyWordPlaceholderGlyphID)
   }
 
   func characterOffset(forGlyphAt index: Int?) -> Int? {

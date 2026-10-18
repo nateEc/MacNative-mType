@@ -90,4 +90,54 @@ final class PromptRenderingAssemblyTests: XCTestCase {
       XCTAssertEqual(result.glyphCharacterOffsets, Dictionary(uniqueKeysWithValues: (0..<count).map { ($0, $0 * 2) }))
     }
   }
+
+  @MainActor func testCooperativeAssemblyMatchesUnicodeAndRetiredTapeStructure() async throws {
+    let session = TypingSession(configuration: .words(4), prompt: "a\nb é👩‍💻")
+    let glyphs = session.promptGlyphs
+    let words = session.promptWordPresentations
+    let indices = Array(glyphs.indices)
+    func ink(_ index: Int, _ glyph: TypingPromptGlyph) -> AttributedString {
+      var value = AttributedString(String(glyph.character))
+      value.foregroundColor = index.isMultiple(of: 2) ? .orange : .blue
+      return value
+    }
+    for removed in [Set<Int>(), Set([0])] {
+      let expected = PromptRendering.make(glyphs: glyphs, indices: indices,
+        emptyWordPlaceholderGlyphID: glyphs.count - 1, words: words,
+        removedTapeWordIndices: removed, renderGlyph: ink)
+      var boundaries: [Int] = []
+      let actual = try await PromptRendering.makeCooperatively(glyphs: glyphs, indices: indices,
+        emptyWordPlaceholderGlyphID: glyphs.count - 1, words: words,
+        removedTapeWordIndices: removed, batchSize: 2,
+        didRender: { boundaries.append($0) }, renderGlyph: ink)
+      XCTAssertEqual(actual.text, expected.text)
+      XCTAssertEqual(actual.glyphCharacterOffsets, expected.glyphCharacterOffsets)
+      XCTAssertEqual(actual.structuralNewlineOffsets, expected.structuralNewlineOffsets)
+      XCTAssertEqual(actual.emptyWordPlaceholderGlyphID, expected.emptyWordPlaceholderGlyphID)
+      let chunks = Array(stride(from: 2, through: indices.count, by: 2))
+      XCTAssertEqual(boundaries, chunks.last == indices.count ? chunks : chunks + [indices.count])
+    }
+  }
+
+  @MainActor func testCooperativeAssemblyCancellationDoesNotPublishPartialText() async {
+    let glyphs = Array(repeating: TypingPromptGlyph(character: "a", state: .pending), count: 10)
+    var rendered = 0
+    let task = Task { @MainActor in
+      try await PromptRendering.makeCooperatively(glyphs: glyphs,
+        indices: Array(glyphs.indices), batchSize: 3, didRender: { count in
+          if count == 3 { withUnsafeCurrentTask { $0?.cancel() } }
+        }) { _, _ in
+          rendered += 1
+          return AttributedString("a")
+        }
+    }
+    do {
+      _ = try await task.value
+      XCTFail("Cancelled assembly must not return a partial rendering")
+    } catch is CancellationError {
+      XCTAssertEqual(rendered, 3)
+    } catch {
+      XCTFail("Unexpected error: \(error)")
+    }
+  }
 }
