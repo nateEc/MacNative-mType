@@ -211,9 +211,11 @@ struct PromptFieldTextRun: Equatable {
     var projections: [[UInt16]: [ContentProjection]] = [:]
     var shapes: [[UInt16]: [TextShape]] = [:]
     var lastCellID: Int?
+    var needsVisualOrdering: Bool
 
     init(layout: PromptFieldTextLayout, previous: PromptFieldTextLayout?) {
       self.layout = layout
+      needsVisualOrdering = layout.rightToLeft
       // Only immutable text/metrics are reused. Positions, identities, aliases,
       // anchors and groups belong to this snapshot; no old layout is mutated.
       reuse = previous.flatMap {
@@ -250,6 +252,11 @@ struct PromptFieldTextRun: Equatable {
     }
 
     func append(_ field: PromptFieldTextRun, group: Int) {
+      if !needsVisualOrdering && !layout.joinsLetters {
+        needsVisualOrdering = field.cells.contains { cell in
+          cell.glyph.character.unicodeScalars.contains { $0.value > 0x7F }
+        }
+      }
       for cell in field.cells {
         if let lastCellID { layout.followingCell[lastCellID] = cell.id }
         lastCellID = cell.id
@@ -293,7 +300,7 @@ struct PromptFieldTextRun: Equatable {
 
     func finish() {
       prepareGeometry()
-      for indices in visualRows() { orderVisualRow(indices) }
+      if needsVisualOrdering { for indices in visualRows() { orderVisualRow(indices) } }
       for index in layout.boxes.indices { placeFrame(at: index) }
     }
 
@@ -302,7 +309,7 @@ struct PromptFieldTextRun: Equatable {
       prepareGeometry()
       try Task.checkCancellation()
       await Task.yield()
-      let rows = visualRows()
+      let rows = needsVisualOrdering ? visualRows() : []
       for (index, indices) in rows.enumerated() {
         orderVisualRow(indices)
         if (index + 1).isMultiple(of: batchSize) {
