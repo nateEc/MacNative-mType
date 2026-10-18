@@ -70,9 +70,12 @@ struct PromptFieldTextRun: Equatable {
     var manager: NSLayoutManager { shape.manager }
     var container: NSTextContainer { shape.container }
     var bounds: CGRect { shape.bounds }
-    let ranges: [Int: NSRange]
-    let hints: [Int: AttributedString]
-    let cells: [PromptFieldTextRun.Cell]
+    let multipleRanges: [Int: NSRange]
+    let multipleHints: [Int: AttributedString]
+    let multipleCells: [PromptFieldTextRun.Cell]
+    let singleCell: PromptFieldTextRun.Cell?
+    let singleRange: NSRange?
+    let singleHint: AttributedString?
     let fieldID: Int?
     let isGap: Bool
     let breaks: Bool
@@ -80,8 +83,18 @@ struct PromptFieldTextRun: Equatable {
     init(cells: [PromptFieldTextRun.Cell], fieldID: Int?, breaks: Bool,
       contentFor: (PromptFieldTextRun.Cell) -> ContentProjection,
       shapeFor: (AttributedString, Bool) -> TextShape) {
-      self.cells = cells; self.fieldID = fieldID; self.breaks = breaks
+      self.fieldID = fieldID; self.breaks = breaks
       isGap = cells.count == 1 && cells[0].isGap
+      if cells.count == 1 {
+        let cell = cells[0], content = contentFor(cell)
+        singleCell = cell
+        singleRange = .init(location: 0, length: String(content.main.characters).utf16.count)
+        singleHint = content.hint
+        multipleCells = []; multipleRanges = [:]; multipleHints = [:]
+        shape = shapeFor(content.main, false)
+        return
+      }
+      multipleCells = cells; singleCell = nil; singleRange = nil; singleHint = nil
       var text = AttributedString(), ranges: [Int: NSRange] = [:], hints: [Int: AttributedString] = [:], unit = 0
       for cell in cells {
         let content = contentFor(cell)
@@ -90,15 +103,28 @@ struct PromptFieldTextRun: Equatable {
         unit += ranges[cell.id]!.length; text += main
         hints[cell.id] = content.hint
       }
-      self.ranges = ranges; self.hints = hints
+      multipleRanges = ranges; multipleHints = hints
       shape = shapeFor(text, cells.count > 1)
     }
     func rect(_ id: Int, origin: CGPoint) -> CGRect? {
-      guard let range = ranges[id], range.length > 0 else { return nil }
+      let range = singleCell?.id == id ? singleRange : multipleRanges[id]
+      guard let range, range.length > 0 else { return nil }
       let glyphs = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
       return TapePromptTextStorage.advanceRect(glyphs, manager: manager, container: container)
         .offsetBy(dx: origin.x - bounds.minX, dy: origin.y - bounds.minY)
     }
+    func matches(_ other: [PromptFieldTextRun.Cell], fieldID: Int?, breaks: Bool,
+      textUnits: (AttributedString) -> [UInt16]) -> Bool {
+      guard self.fieldID == fieldID, self.breaks == breaks else { return false }
+      if let singleCell {
+        return other.count == 1 && singleCell == other[0]
+          && textUnits(singleCell.text) == textUnits(other[0].text)
+      }
+      return multipleCells == other && zip(multipleCells, other).allSatisfy {
+        textUnits($0.text) == textUnits($1.text)
+      }
+    }
+    var allCells: [PromptFieldTextRun.Cell] { singleCell.map { [$0] } ?? multipleCells }
   }
 
   private var boxes: [Box] = []
@@ -176,8 +202,7 @@ struct PromptFieldTextRun: Equatable {
           return reuse.boxes[index]
         }
         let box: Box
-        if let old, old.cells == cells, old.fieldID == field.fieldID, old.breaks == breaks,
-          zip(old.cells, cells).allSatisfy({ textUnits($0.text) == textUnits($1.text) }) {
+        if let old, old.matches(cells, fieldID: field.fieldID, breaks: breaks, textUnits: textUnits) {
           box = old
           let key = textUnits(old.shape.text)
           if !(shapes[key]?.contains(where: { $0 === old.shape }) ?? false) {
@@ -187,7 +212,8 @@ struct PromptFieldTextRun: Equatable {
           box = Box(cells: cells, fieldID: field.fieldID, breaks: breaks,
             contentFor: contentFor, shapeFor: shapeFor)
         }
-        for id in box.ranges.keys { boxByCell[id] = boxes.count }
+        if let cell = box.singleCell { boxByCell[cell.id] = boxes.count }
+        else { for id in box.multipleRanges.keys { boxByCell[id] = boxes.count } }
         boxes.append(box); groups.append(group)
       }
       var pending: [PromptFieldTextRun.Cell] = []
@@ -219,16 +245,20 @@ struct PromptFieldTextRun: Equatable {
     }
     if !joinsLetters {
       var rows: [FieldRow: [Int]] = [:]
-      for (index, box) in boxes.enumerated() where !box.isGap && box.cells.count == 1 {
-        rows[.init(group: groups[index], y: origins[index].y), default: []].append(index)
+      for (index, box) in boxes.enumerated() where !box.isGap {
+        if box.singleCell != nil {
+          rows[.init(group: groups[index], y: origins[index].y), default: []].append(index)
+        }
       }
       for indices in rows.values {
-        let cells = indices.map { boxes[$0].cells[0] }
+        let cells = indices.compactMap { boxes[$0].singleCell }
         guard rightToLeft || cells.contains(where: {
           PracticeTapePolicy.isRightToLeft(String($0.glyph.character), fallback: false)
         }) else { continue }
         let order = PromptFieldVisualOrder.cellIDs(cells, font: font, rightToLeft: rightToLeft)
-        let byID = Dictionary(uniqueKeysWithValues: indices.map { (boxes[$0].cells[0].id, $0) })
+        let byID = Dictionary(uniqueKeysWithValues: indices.compactMap { index in
+          boxes[index].singleCell.map { ($0.id, index) }
+        })
         var x = indices.map { origins[$0].x }.min() ?? 0
         for id in order {
           guard let index = byID[id] else { continue }
@@ -239,8 +269,9 @@ struct PromptFieldTextRun: Equatable {
     }
     for (index, box) in boxes.enumerated() {
       let origin = origins[index]
-      for id in box.ranges.keys { cellFrames[id] = box.rect(id, origin: origin) }
-      if let owner = box.fieldID, !box.isGap, !box.ranges.isEmpty {
+      if let cell = box.singleCell { cellFrames[cell.id] = box.rect(cell.id, origin: origin) }
+      else { for id in box.multipleRanges.keys { cellFrames[id] = box.rect(id, origin: origin) } }
+      if let owner = box.fieldID, !box.isGap, box.singleCell != nil || !box.multipleRanges.isEmpty {
         let frame = CGRect(origin: origin, size: box.bounds.size)
         fieldFrames[owner] = fieldFrames[owner].map { $0.union(frame) } ?? frame
       }
@@ -248,7 +279,11 @@ struct PromptFieldTextRun: Equatable {
     let ids = fieldRuns.flatMap { $0.cells.map(\.id) }
     for (id, next) in zip(ids, ids.dropFirst()) { followingCell[id] = next }
     for box in boxes {
-      for id in box.hints.keys {
+      if let cell = box.singleCell, box.singleHint != nil,
+        let rect = cellFrames[cell.id] {
+        size.height = max(size.height, rect.maxY + max(9, font.pointSize * 0.48) * 1.4)
+      }
+      for id in box.multipleHints.keys {
         if let rect = cellFrames[id] { size.height = max(size.height, rect.maxY + max(9, font.pointSize * 0.48) * 1.4) }
       }
     }
@@ -278,8 +313,8 @@ struct PromptFieldTextRun: Equatable {
   private func direction(at cellID: Int, perGlyph: Bool) -> Bool {
     guard let index = boxByCell[cellID] else { return rightToLeft }
     let box = boxes[index]
-    let cells = perGlyph ? box.cells.filter { $0.id == cellID }
-      : box.fieldID.map { owner in boxes.filter { $0.fieldID == owner }.flatMap(\.cells) } ?? box.cells
+    let cells = perGlyph ? box.allCells.filter { $0.id == cellID }
+      : box.fieldID.map { owner in boxes.filter { $0.fieldID == owner }.flatMap(\.allCells) } ?? box.allCells
     let text = cells.map { String(ASLPromptGlyphContent(glyph: $0.glyph, text: $0.text).main.characters) }.joined()
     return PracticeTapePolicy.isRightToLeft(text, fallback: rightToLeft)
   }
@@ -304,7 +339,9 @@ struct PromptFieldTextRun: Equatable {
         box.manager.drawBackground(forGlyphRange: range, at: origin)
         box.manager.drawGlyphs(forGlyphRange: range, at: origin)
       }
-      for (id, hint) in box.hints {
+      var hints = box.multipleHints
+      if let cell = box.singleCell, let hint = box.singleHint { hints[cell.id] = hint }
+      for (id, hint) in hints {
         guard let rect = cellFrames[id] else { continue }
         var text = hint; text.baselineOffset = nil; text.kern = nil
         let small = NSFont.monospacedSystemFont(ofSize: max(9, font.pointSize * 0.48), weight: .semibold)

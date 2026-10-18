@@ -106,10 +106,22 @@ import XCTest
       styleMask: .borderless, backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
     window.contentView = host
+    var layoutTotal: TimeInterval = 0
+    var layoutMaximum: TimeInterval = 0
+    var runLoopTotal: TimeInterval = 0
+    var runLoopMaximum: TimeInterval = 0
     func flush() {
+      let start = ProcessInfo.processInfo.systemUptime
       host.layoutSubtreeIfNeeded()
+      let beforeRunLoop = ProcessInfo.processInfo.systemUptime
       RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      let afterRunLoop = ProcessInfo.processInfo.systemUptime
       host.layoutSubtreeIfNeeded()
+      let end = ProcessInfo.processInfo.systemUptime
+      let layout = beforeRunLoop - start + end - afterRunLoop
+      let runLoop = afterRunLoop - beforeRunLoop
+      layoutTotal += layout; layoutMaximum = max(layoutMaximum, layout)
+      runLoopTotal += runLoop; runLoopMaximum = max(runLoopMaximum, runLoop)
     }
     func views<T: NSView>(_ type: T.Type, in view: NSView) -> [T] {
       (view as? T).map { [$0] } ?? view.subviews.flatMap { views(type, in: $0) }
@@ -140,7 +152,7 @@ import XCTest
         flushCount += 1
       }
       let elapsed = pending.preparationStarted.map { ProcessInfo.processInfo.systemUptime - $0 }
-      let evidence = "words=\(wordCount) calls=\(pending.calls) flushes=\(flushCount) prepared=\(pending.preparedWordCount) elapsed=\(String(describing: elapsed)) lastBatch=\(String(describing: pending.lastBatchElapsed)) returned=\(String(describing: pending.preparationReturnedElapsed)) errorType=\(pending.preparationErrorType ?? "none")"
+      let evidence = "words=\(wordCount) calls=\(pending.calls) flushes=\(flushCount) prepared=\(pending.preparedWordCount) elapsed=\(String(describing: elapsed)) lastBatch=\(String(describing: pending.lastBatchElapsed)) returned=\(String(describing: pending.preparationReturnedElapsed)) layoutTotal=\(layoutTotal) layoutMax=\(layoutMaximum) runLoopTotal=\(runLoopTotal) runLoopMax=\(runLoopMaximum) errorType=\(pending.preparationErrorType ?? "none")"
       print("whole preview preparation observation: \(evidence)")
       let actual = try XCTUnwrap(pending.actualPrompt, evidence)
       XCTAssertEqual(pending.preparedWordCount, wordCount)
