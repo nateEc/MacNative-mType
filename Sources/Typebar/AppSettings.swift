@@ -1152,6 +1152,7 @@ final class AppSettings {
   }
 
   func setNoQuitConfigurationLock(_ isLocked: Bool, for ownerID: UUID) {
+    guard noQuitConfigurationLocks.ownerIDs.contains(ownerID) != isLocked else { return }
     noQuitConfigurationLocks.setLock(isLocked, for: ownerID)
   }
 

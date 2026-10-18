@@ -5,6 +5,50 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class ClockIdleInvalidationTests: XCTestCase {
+  private struct LockContent: View {
+    let settings: AppSettings
+    let probe: Probe
+
+    var body: some View {
+      probe.bodyCount += 1
+      return Text(settings.allowsRestartingConfigurationChange ? "unlocked" : "locked")
+        .frame(width: 300, height: 100)
+    }
+  }
+
+  func testRepeatedNoQuitLockUpdateDoesNotInvalidateHostedContent() throws {
+    let suite = "ClockLockObservationTests.\(UUID())"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let settings = AppSettings(defaults: defaults)
+    let probe = Probe()
+    let host = NSHostingView(rootView: LockContent(settings: settings, probe: probe))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 300, height: 100),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    func flush() {
+      host.layoutSubtreeIfNeeded()
+      RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+      host.layoutSubtreeIfNeeded()
+    }
+    flush()
+    let owner = UUID()
+    settings.setNoQuitConfigurationLock(true, for: owner)
+    flush()
+    XCTAssertFalse(settings.allowsRestartingConfigurationChange)
+    let lockedBodyCount = probe.bodyCount
+    settings.setNoQuitConfigurationLock(true, for: owner)
+    flush()
+    XCTAssertEqual(probe.bodyCount, lockedBodyCount)
+    settings.setNoQuitConfigurationLock(false, for: owner)
+    flush()
+    XCTAssertTrue(settings.allowsRestartingConfigurationChange)
+    XCTAssertGreaterThan(probe.bodyCount, lockedBodyCount)
+    XCTAssertFalse(window.isVisible)
+  }
+
   private final class Probe {
     var bodyCount = 0
     var apply: (() -> Void)?

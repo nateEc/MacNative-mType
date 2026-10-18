@@ -160,6 +160,8 @@ import XCTest
     XCTAssertEqual(target(), expected)
     XCTAssertEqual(generationCalls, 1)
     input.onInsert("s", false)
+    XCTAssertFalse(settings.allowsRestartingConfigurationChange,
+      "The actual first input must lock No Quit before its callback returns")
     flush()
     XCTAssertFalse(settings.allowsRestartingConfigurationChange)
   }
@@ -335,6 +337,8 @@ import XCTest
         let first = try XCTUnwrap(actual.first)
         let before = ProcessInfo.processInfo.systemUptime
         input.onInsert(String(first), false)
+        XCTAssertFalse(settings.allowsRestartingConfigurationChange,
+          "A long No Quit attempt must lock before the first input callback returns")
         let callback = ProcessInfo.processInfo.systemUptime - before
         flush()
         let elapsed = ProcessInfo.processInfo.systemUptime - before
@@ -342,7 +346,7 @@ import XCTest
         XCTAssertEqual(target(), actual)
         XCTAssertFalse(settings.allowsRestartingConfigurationChange,
           "The first character must begin the actual No Quit attempt")
-        XCTAssertLessThan(elapsed, 90, "The first key must not regress to multi-minute host layout")
+        XCTAssertLessThan(elapsed, 40, "The first key must not render the entire body twice")
       }
       return
     }

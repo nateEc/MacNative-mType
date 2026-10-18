@@ -3846,6 +3846,7 @@ private struct ContentView: View {
       }
     }
     synchronizeLiveInputRules()
+    let hadStarted = session.hasStarted
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     let typedBefore = session.typed
@@ -3853,6 +3854,10 @@ private struct ContentView: View {
       effectiveInsertedText(text), into: &session,
       forceError: forceError, origin: origin, defersAutomaticInput: true,
       wrapAdmission: promptInputWrapAdmission)
+    if !hadStarted && session.hasStarted {
+      preparedWholePreviewRendering = nil
+      synchronizeNoQuitConfigurationLock()
+    }
     visualFocus.inputDidUpdate(hasFeedback: !feedback.isEmpty,
       textChanged: session.typed != typedBefore, isFinished: session.isFinished)
     verifyChallengeFontAvailability()
