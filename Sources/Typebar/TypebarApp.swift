@@ -1217,7 +1217,8 @@ private struct PreparedWholePreviewPresentation {
 
 private struct PreparedWholePreviewResult {
   let session: TypingSession
-  let rendering: PromptRendering
+  // nil is an explicitly admitted viewport source, not an empty rendering.
+  let rendering: PromptRendering?
   let layout: PromptFieldTextLayout?
   let layoutWidth: CGFloat?
   let style: PromptRenderStyle
@@ -4526,6 +4527,12 @@ private struct ContentView: View {
           highlightMode: style.highlightMode, usesTapePractice: style.usesTapePractice,
           mainCaretDrawsMarker: style.caretStyle.drawsMarker,
           paceCaretDrawsMarker: style.paceCaretStyle.drawsMarker)
+        if allowsWholePreviewViewportPreparation(candidate, style: style),
+          try await WholePreviewViewportAdmission.check(session: candidate, style: style) {
+          return PreparedWholePreviewResult(session: candidate, rendering: nil,
+            layout: nil, layoutWidth: nil, style: style,
+            paceTargetWpm: paceTarget, paceGuideIndex: pacePolicy.paceGuideIndex)
+        }
         let rendering = try await wholePreviewRender(candidate, style)
         try Task.checkCancellation()
         var layout: PromptFieldTextLayout?
@@ -4576,17 +4583,23 @@ private struct ContentView: View {
           prepared.paceGuideIndex == PromptRenderSessionPolicy(session: prepared.session,
             highlightMode: prepared.style.highlightMode, usesTapePractice: prepared.style.usesTapePractice,
             mainCaretDrawsMarker: prepared.style.caretStyle.drawsMarker,
-            paceCaretDrawsMarker: prepared.style.paceCaretStyle.drawsMarker).paceGuideIndex
+            paceCaretDrawsMarker: prepared.style.paceCaretStyle.drawsMarker).paceGuideIndex,
+          prepared.rendering != nil || allowsWholePreviewViewportPreparation(prepared.session, style: prepared.style)
         else {
           prepareWholePreview(configuration: configuration, requestID: requestID,
             generatedSession: prepared.session)
           return
         }
         activePaceTargetWpm = prepared.paceTargetWpm
-        preparedWholePreviewRendering = .init(attemptID: prepared.session.automaticInputAttemptID,
-          typedSnapshot: prepared.session.typed,
-          rendering: prepared.rendering, layout: prepared.layout, style: prepared.style,
-          paceGuideIndex: prepared.paceGuideIndex)
+        preparedWholePreviewRendering = prepared.rendering.map { rendering in
+          .init(attemptID: prepared.session.automaticInputAttemptID,
+            typedSnapshot: prepared.session.typed,
+            rendering: rendering, layout: prepared.layout, style: prepared.style,
+            paceGuideIndex: prepared.paceGuideIndex)
+        }
+        if wholePreviewViewportEnabled, prepared.rendering != nil {
+          viewportFallbackAttemptID = prepared.session.automaticInputAttemptID
+        }
         session = prepared.session
         isPreparingWholePreview = false
         if session.configuration.language == .mixedLanguages {
@@ -4606,6 +4619,18 @@ private struct ContentView: View {
       }
       synchronizeNoQuitConfigurationLock()
     }
+  }
+
+  private func allowsWholePreviewViewportPreparation(_ candidate: TypingSession, style: PromptRenderStyle) -> Bool {
+    let effect = PracticeVisualEffect.make(modifiers: candidate.configuration.modifiers)
+    guard wholePreviewViewportEnabled, compositionText.isEmpty, !candidate.isFinished,
+      viewportFallbackAttemptID != candidate.automaticInputAttemptID,
+      PracticeLineDisplayPolicy.shouldShowAllLines(settingEnabled: settings.showAllPracticeLines,
+        tapeMode: settings.practiceTapeMode, configuration: candidate.configuration),
+      !style.usesTapePractice, !effect.usesASL, !effect.usesChoo,
+      PromptFieldProjectionPolicy.supports(candidate.configuration)
+    else { return false }
+    return true
   }
 
   private func synchronizeNoQuitConfigurationLock() {

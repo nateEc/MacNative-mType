@@ -5,7 +5,14 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class ViewportPracticeHostTests: XCTestCase {
-  @MainActor private final class Counts { var generation = 0; var completeRenders = 0 }
+  @MainActor private final class Counts {
+    var generation = 0
+    var completeRenders = 0
+    var preparedRenders = 0
+    var sourceReplies: [CheckedContinuation<Void, Never>] = []
+    func finishFirstSource() { if !sourceReplies.isEmpty { sourceReplies.removeFirst().resume() } }
+    func finishAllSources() { while !sourceReplies.isEmpty { finishFirstSource() } }
+  }
   @MainActor private final class Fixture {
     let suite = "ViewportPracticeHostTests.\(UUID())"
     let defaults: UserDefaults
@@ -15,7 +22,8 @@ import XCTest
     let window: NSWindow
     let counts: Counts
     let prompt: String
-    init(unicode: Bool = false, promptOverride: String? = nil) throws {
+    init(unicode: Bool = false, promptOverride: String? = nil,
+      gatesSource: Bool = false, viewportEnabled: Bool = true) throws {
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = AppSettings(defaults: defaults)
       settings.reducePracticeMotion = true
@@ -37,11 +45,16 @@ import XCTest
         network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor(),
         wholePreviewPrepare: { configuration, _, _ in
           counts.generation += 1
+          if gatesSource { await withCheckedContinuation { counts.sourceReplies.append($0) } }
           return TypingSession(configuration: configuration, prompt: prompt)
+        }, wholePreviewRender: { session, style in
+          counts.preparedRenders += 1
+          let plan = try await PromptRenderPlan.prepareCooperatively(session: session, composition: "", style: style)
+          return try await plan.renderCooperatively()
         }, promptRender: { session, composition, style in
           counts.completeRenders += 1
           return PromptRenderPlan(session: session, composition: composition, style: style).render()
-        }, wholePreviewViewportEnabled: true).modelContainer(container)
+        }, wholePreviewViewportEnabled: viewportEnabled).modelContainer(container)
       host = NSHostingView(rootView: AnyView(content.frame(width: 1000, height: 720)))
       window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
         styleMask: .borderless, backing: .buffered, defer: false)
@@ -113,6 +126,52 @@ import XCTest
     XCTAssertEqual(native.viewport.canvas.measuredMainCaretRect(style: .bar), native.viewport.canvas.measuredRect(for: 2))
     XCTAssertEqual(fixture.counts.generation, 1)
     XCTAssertFalse(fixture.window.isVisible)
+  }
+
+  func testAdmittedSourceSkipsUnusedCompletePreparationButFallbackAndDefaultKeepIt() throws {
+    do {
+      let fixture = try Fixture()
+      defer { fixture.close() }
+      fixture.waitUntil { fixture.promptReady }
+      XCTAssertEqual(fixture.counts.preparedRenders, 0)
+      XCTAssertEqual(fixture.counts.generation, 1)
+    }
+    for enabled in [false, true] {
+      let fixture = try Fixture(unicode: enabled, viewportEnabled: enabled)
+      defer { fixture.close() }
+      fixture.waitUntil { fixture.views(PromptFieldNativeView.self).contains {
+        $0.accessibilityValue() as? String == fixture.prompt
+      } }
+      XCTAssertEqual(fixture.counts.preparedRenders, 1)
+      XCTAssertEqual(fixture.counts.generation, 1)
+      XCTAssertTrue(fixture.views(PromptViewportPracticeNativeView.self).isEmpty)
+    }
+  }
+
+  func testSourceOnlyRestartKeepsInputLockedAndRejectsLateOldGeneration() throws {
+    let fixture = try Fixture(gatesSource: true)
+    defer { fixture.counts.finishAllSources(); fixture.close() }
+    fixture.waitUntil { fixture.counts.generation == 1 && fixture.counts.sourceReplies.count == 1 }
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    XCTAssertFalse(input.acceptsTextInput)
+    input.onInsert("x", false)
+    XCTAssertTrue(fixture.settings.allowsRestartingConfigurationChange)
+    input.onRestart()
+    fixture.waitUntil { fixture.counts.generation == 2 && fixture.counts.sourceReplies.count == 2 }
+    fixture.counts.finishFirstSource()
+    fixture.flush()
+    XCTAssertTrue(fixture.views(PromptViewportPracticeNativeView.self).isEmpty)
+    XCTAssertFalse(input.acceptsTextInput)
+    XCTAssertEqual(fixture.counts.preparedRenders, 0)
+    fixture.settings.fontSize = 36
+    fixture.counts.finishFirstSource()
+    fixture.waitUntil { fixture.promptReady }
+    let activeInput = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    XCTAssertTrue(activeInput.acceptsTextInput)
+    activeInput.onInsert("w", false)
+    fixture.waitUntil { !fixture.settings.allowsRestartingConfigurationChange }
+    XCTAssertEqual(fixture.counts.generation, 2)
+    XCTAssertEqual(fixture.counts.preparedRenders, 0)
   }
 
   func testAdmittedInputAvoidsCompleteRendererButCompositionFallbackUsesIt() throws {
@@ -263,10 +322,13 @@ import XCTest
     fixture.waitUntil { fixture.promptReady }
     let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
     let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    XCTAssertEqual(fixture.counts.preparedRenders, 0)
+    let completeBefore = fixture.counts.completeRenders
     input.onInsert("word0xx", false)
     fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).isEmpty
       && fixture.views(PromptFieldNativeView.self).contains { ($0.accessibilityValue() as? String)?.hasPrefix("word0xx") == true } }
     XCTAssertEqual(native.viewport.measuredFieldCount, 0)
+    XCTAssertGreaterThan(fixture.counts.completeRenders, completeBefore)
     XCTAssertFalse(fixture.settings.allowsRestartingConfigurationChange)
     XCTAssertEqual(fixture.counts.generation, 1)
   }
