@@ -6,6 +6,69 @@ import XCTest
   private let theme = ResolvedTheme(background: .white, panel: .white, accent: .blue,
     colorScheme: .light)
 
+  func testProductionPainterFieldWindowMatchesFullInkAndRejectsStalePlans() throws {
+    var correct = TypingSession(configuration: .words(4), prompt: "alpha beta\ngamma delta")
+    correct.insert("a", at: Date(timeIntervalSinceReferenceDate: 920_100_000))
+    var wrong = TypingSession(configuration: .words(4), prompt: "alpha beta\ngamma delta")
+    wrong.insert("x", at: Date(timeIntervalSinceReferenceDate: 920_100_001))
+    var blind = TypingSession(configuration: .words(4, rules: .init(blindMode: true)),
+      prompt: "alpha beta\ngamma delta")
+    blind.insert("x", at: Date(timeIntervalSinceReferenceDate: 920_100_002))
+    let sessions = [TypingSession(configuration: .words(4), prompt: "alpha beta\ngamma delta"),
+      correct, wrong, blind]
+    for session in sessions {
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      for highlight in [PromptHighlightMode.letter, .nextWord] {
+        var style = PromptRenderStyle(theme: theme, caretStyle: .bar,
+          highlightMode: highlight)
+        style.colorfulMode = true
+        style.typoIndicatorStyle = .both
+        let plan = PromptRenderPlan(session: session, composition: "", style: style)
+        let full = try XCTUnwrap(plan.render().compositionTextMap)
+        for fields in [0..<2, 2..<4, 0..<2] {
+          let window = try XCTUnwrap(plan.renderFieldWindowUsingFullPlan(directory: directory,
+            session: session, fields: fields))
+          XCTAssertEqual(window, full.fieldRuns.filter { fields.contains($0.fieldID ?? -1) })
+        }
+      }
+    }
+    let initial = sessions[0]
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: initial))
+    let style = PromptRenderStyle(theme: theme)
+    let plan = PromptRenderPlan(session: initial, composition: "", style: style)
+    var changed = initial
+    changed.insert("a", at: Date(timeIntervalSinceReferenceDate: 920_100_003))
+    XCTAssertNil(plan.renderFieldWindowUsingFullPlan(directory: directory, session: changed, fields: 0..<2))
+    var toggled = initial
+    toggled.setBlindMode(true)
+    XCTAssertNil(plan.renderFieldWindowUsingFullPlan(directory: directory, session: toggled, fields: 0..<2))
+    let marked = PromptRenderPlan(session: initial, composition: "候选", style: style)
+    XCTAssertNil(marked.renderFieldWindowUsingFullPlan(directory: directory, session: initial, fields: 0..<2))
+  }
+
+  func testProductionPainterWindowKeepsCompletedEffectsAndHiddenInk() throws {
+    let prompt = "alpha beta gamma delta"
+    var committed = TypingSession(configuration: .words(4), prompt: prompt)
+    committed.insertBatch("alpha ", at: Date(timeIntervalSinceReferenceDate: 920_100_004))
+    var concealed = TypingSession(configuration: .words(4).with(modifiers: [.memory]), prompt: prompt)
+    concealed.insert("a", at: Date(timeIntervalSinceReferenceDate: 920_100_005))
+    for session in [committed, concealed] {
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      for effect in [TypedCharacterEffect.keep, .fade, .dots, .hide] {
+        let style = PromptRenderStyle(theme: theme, typedCharacterEffect: effect,
+          highlightMode: .nextTwoWords)
+        let plan = PromptRenderPlan(session: session, composition: "", style: style)
+        let full = try XCTUnwrap(plan.render().compositionTextMap)
+        for fields in [0..<2, 2..<4] {
+          let window = try XCTUnwrap(plan.renderFieldWindowUsingFullPlan(directory: directory,
+            session: session, fields: fields))
+          XCTAssertEqual(window, full.fieldRuns.filter { fields.contains($0.fieldID ?? -1) },
+            "effect=\(effect) fields=\(fields)")
+        }
+      }
+    }
+  }
+
   func testPendingInkRemainsReadableAfterCompositingOnPracticeSurfaces() {
     let session = TypingSession(configuration: .words(1), prompt: "alpha")
     for choice in AppTheme.allCases {

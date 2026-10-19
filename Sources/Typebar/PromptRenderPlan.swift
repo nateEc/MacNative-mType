@@ -19,6 +19,7 @@ struct PromptRenderStyle: Equatable {
 /// Candidate-session projection and appearance are frozen before asynchronous
 /// glyph batches. Callers still own attempt/style/width validation at publish.
 @MainActor struct PromptRenderPlan {
+  private let sourceSession: TypingSession
   private let composition: String?
   private let style: PromptRenderStyle
   private let removedTapeWordIndices: Set<Int>
@@ -64,6 +65,7 @@ struct PromptRenderStyle: Equatable {
 
   private init(session: TypingSession, composition: String?, style: PromptRenderStyle,
     usesProjection: Bool, presentation: PromptCompositionPresentation?) {
+    sourceSession = session
     self.composition = composition
     self.style = style
     removedTapeWordIndices = session.removedTapePromptWordIndices
@@ -104,6 +106,43 @@ struct PromptRenderStyle: Equatable {
       words: words, removedTapeWordIndices: removedTapeWordIndices) {
         painter.render($0, $1, nil)
       }
+  }
+
+  /// Exact production ink for a requested target window. This bridge still
+  /// owns a complete render plan; it does not make initial viewport work cheap.
+  func renderFieldWindowUsingFullPlan(directory: PromptViewportTargetDirectory,
+    session: TypingSession, fields: Range<Int>) -> [PromptFieldTextRun]? {
+    guard composition == "", let presentation,
+      directory.attemptID == session.automaticInputAttemptID,
+      directory.promptTargetID == session.promptTargetID,
+      sourceSession.automaticInputAttemptID == session.automaticInputAttemptID,
+      sourceSession.promptTargetID == session.promptTargetID,
+      sourceSession.configuration == session.configuration,
+      sourceSession.typed == session.typed,
+      sourceSession.lastInputWasCorrect == session.lastInputWasCorrect,
+      sourceSession.promptGlyphs == session.promptGlyphs,
+      sourceSession.promptWordPresentations == session.promptWordPresentations,
+      sourceSession.completedPromptCharacterIndices == session.completedPromptCharacterIndices,
+      sourceSession.promptCaretGlyphIndex == session.promptCaretGlyphIndex,
+      sessionPolicy.paceGuideIndex == PromptRenderSessionPolicy(session: session,
+        highlightMode: style.highlightMode, usesTapePractice: style.usesTapePractice,
+        mainCaretDrawsMarker: style.caretStyle.drawsMarker,
+        paceCaretDrawsMarker: style.paceCaretStyle.drawsMarker).paceGuideIndex,
+      let slice = directory.materialize(fields: fields),
+      let states = directory.materializeStates(fields: fields, session: session),
+      slice.cells.count == states.count,
+      presentation.projection.cells.count == directory.targetUTF16.count,
+      zip(slice.cells, states).allSatisfy({ cell, state in
+        presentation.projection.cells.indices.contains(cell.id)
+          && presentation.projection.cells[cell.id].id == cell.id
+          && presentation.projection.cells[cell.id].sourceFieldIndex == cell.fieldIndex
+          && glyphs[cell.id] == state.glyph
+      })
+    else { return nil }
+    var painter = GlyphPainter(plan: self)
+    return directory.materializeFieldRuns(fields: fields, session: session) { id, glyph in
+      painter.render(id, glyph, nil)
+    }
   }
 
   func renderCooperatively(batchSize: Int = 512, didRender: (Int) -> Void = { _ in }) async throws -> PromptRendering {

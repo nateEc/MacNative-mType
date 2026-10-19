@@ -103,6 +103,42 @@ import XCTest
     XCTAssertEqual(checkpoint?.contentHeight, full.size.height)
   }
 
+  func testProductionPainterWindowsContinueExactInkAndGeometry() throws {
+    var session = TypingSession(configuration: .words(7),
+      prompt: "alpha beta gamma\ndelta epsilon zeta eta")
+    session.insert("x", at: start)
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light), typoIndicatorStyle: .both,
+      highlightMode: .nextWord)
+    let plan = PromptRenderPlan(session: session, composition: "", style: style)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let fullMap = try XCTUnwrap(plan.render().compositionTextMap)
+    let width: CGFloat = 175
+    let fullLayout = PromptFieldTextLayout(map: fullMap, width: width, font: font)
+    var checkpoint: PromptFieldTextLayout.ContinuationCheckpoint?
+    var visited: [Int: CGRect] = [:]
+    for offset in stride(from: 0, to: directory.fieldCount, by: 2) {
+      let range = offset..<min(offset + 2, directory.fieldCount)
+      let runs = try XCTUnwrap(plan.renderFieldWindowUsingFullPlan(directory: directory,
+        session: session, fields: range))
+      let window: PromptFieldTextLayout
+      if let checkpoint {
+        window = try XCTUnwrap(PromptFieldTextLayout.continuing(fieldRuns: runs,
+          from: checkpoint, groupOffset: offset, width: width, font: font))
+      } else { window = PromptFieldTextLayout(fieldRuns: runs, width: width, font: font) }
+      for run in runs {
+        for cell in run.cells {
+          XCTAssertEqual(cell.text, fullMap.cellTexts[cell.id])
+          XCTAssertEqual(window.cellFrames[cell.id], fullLayout.cellFrames[cell.id])
+          visited[cell.id] = window.cellFrames[cell.id]
+        }
+      }
+      checkpoint = window.continuationCheckpoint
+    }
+    XCTAssertEqual(visited, fullLayout.cellFrames)
+    XCTAssertEqual(checkpoint?.contentHeight, fullLayout.size.height)
+  }
+
   func testFieldWindowContinuesMeasuredRowsWithGlobalCellFrames() throws {
     let session = TypingSession(configuration: .words(6),
       prompt: "alpha beta gamma\ndelta epsilon zeta")
