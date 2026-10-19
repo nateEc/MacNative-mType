@@ -2,6 +2,34 @@ import XCTest
 @testable import Typebar
 
 final class PromptViewportTargetDirectoryTests: XCTestCase {
+  func testDistantWordOrdinalsUseLiteralSeparatorsAcrossProviderFields() throws {
+    let fields = [" north\nsouth ", "", " harbor  ", "tail"]
+    let prompt = fields.joined()
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session:
+      TypingSession(configuration: .words(5), prompt: prompt, sourceFields: fields)))
+    let units = Array(prompt.utf16)
+    for index in 0..<directory.fieldCount {
+      let slice = try XCTUnwrap(directory.materialize(fields: index..<(index + 1)))
+      for cell in slice.cells {
+        let expected = units[..<cell.id].filter { $0 == 32 || $0 == 10 }.count
+        XCTAssertEqual(cell.wordOrdinal, expected, "field=\(index) id=\(cell.id)")
+      }
+    }
+  }
+
+  func testWindowStateAfterDistantCursorMatchesFullHighlighting() throws {
+    var session = TypingSession(configuration: .words(10).with(modifiers: [.focusNextWord]),
+      prompt: "one two three four five six seven eight nine ten")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    session.insertBatch("one two three four five six ",
+      at: Date(timeIntervalSinceReferenceDate: 920_000_017))
+    let full = session.promptGlyphs
+    for range in [0..<2, 6..<10, 0..<2] {
+      let cells = try XCTUnwrap(directory.materializeStates(fields: range, session: session))
+      XCTAssertEqual(cells.map(\.glyph), cells.map { full[$0.id] })
+    }
+  }
+
   func testFirstDistantAndReturningFieldsKeepGlobalIdentityAndSourceText() throws {
     for prompt in ["alpha beta gamma delta", "one two\nthree four"] {
       let session = TypingSession(configuration: .words(4), prompt: prompt)
@@ -36,6 +64,39 @@ final class PromptViewportTargetDirectoryTests: XCTestCase {
       session.promptGlyphs.first)
     XCTAssertEqual(before.materialize(fields: 0..<1), after.materialize(fields: 0..<1))
     XCTAssertNotEqual(after.attemptID, session.repeatedAttempt().automaticInputAttemptID)
+  }
+
+  func testPromptTargetIdentityKeepsInputWindowButRejectsSameAttemptAfterLiveGrowth() throws {
+    let opening = ["north ", "harbor "]
+    var session = TypingSession(configuration: .words(5).with(modifiers: [.poetryStream]),
+      prompt: opening.joined(), sourceFields: opening, streamsLiveContent: true)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let initialTargetID = session.promptTargetID
+    XCTAssertNotNil(directory.materializeStates(fields: 0..<1, session: session))
+    session.insert("n", at: Date(timeIntervalSinceReferenceDate: 920_000_016))
+    XCTAssertEqual(session.promptTargetID, initialTargetID)
+    XCTAssertNotNil(directory.materializeStates(fields: 0..<1, session: session))
+    XCTAssertTrue(session.appendLiveContent(.init(text: "third fourth", noSpaceBoundarySource: nil)))
+    XCTAssertNotEqual(session.promptTargetID, initialTargetID)
+    XCTAssertNil(directory.materializeStates(fields: 0..<1, session: session))
+    let refreshed = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    XCTAssertEqual(refreshed.attemptID, directory.attemptID)
+    XCTAssertNotNil(refreshed.materializeStates(fields: 0..<1, session: session))
+  }
+
+  func testCopiedAttemptBranchesCannotReuseAnotherTargetsDirectory() throws {
+    let opening = ["north ", "harbor "]
+    let base = TypingSession(configuration: .words(5).with(modifiers: [.poetryStream]),
+      prompt: opening.joined(), sourceFields: opening, streamsLiveContent: true)
+    var left = base, right = base
+    XCTAssertTrue(left.appendLiveContent(.init(text: "third fourth", noSpaceBoundarySource: nil)))
+    XCTAssertTrue(right.appendLiveContent(.init(text: "other planet", noSpaceBoundarySource: nil)))
+    XCTAssertEqual(left.prompt.utf16.count, right.prompt.utf16.count)
+    XCTAssertNotEqual(left.promptTargetID, right.promptTargetID)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: left))
+    XCTAssertNotNil(directory.materializeStates(fields: 0..<1, session: left))
+    XCTAssertNil(directory.materializeStates(fields: 0..<1, session: right),
+      "Equal append counts do not prove the target bytes match across copied sessions")
   }
 
   func testVisibleStateFollowsInputAndDistantWindowWithoutFullProjection() throws {
@@ -201,6 +262,8 @@ final class PromptViewportTargetDirectoryTests: XCTestCase {
     XCTAssertEqual(distant.cells.count, 7)
     XCTAssertEqual(distant.cells.last?.id, prompt.utf16.count - 1)
     XCTAssertEqual(distant.cells.map(\.unit), Array("oak oak".utf16))
+    XCTAssertEqual(distant.cells.first?.wordOrdinal, words - 2)
+    XCTAssertEqual(distant.cells.last?.wordOrdinal, words - 1)
     var paintedIDs: [Int] = []
     let distantRuns = try XCTUnwrap(directory.materializeFieldRuns(fields: (words - 2)..<words,
       session: session) { id, glyph in

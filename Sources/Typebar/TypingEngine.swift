@@ -4491,8 +4491,14 @@ struct TypingSession {
   private let initialGenerationNotice: String?
   private let initializationFailure: String?
   private(set) var prompt: String {
-    didSet { refreshUnitTargets() }
+    didSet {
+      promptTargetID = UUID()
+      refreshUnitTargets()
+    }
   }
+  /// A fresh identity for each target mutation, including divergent copies of
+  /// one attempt. Input and presentation changes keep the same target ID.
+  private(set) var promptTargetID = UUID()
   private var unitTargets = UnitInputTargets("")
   private var sourceFields: [String]?
   private let initialSourceFields: [String]?
@@ -5472,7 +5478,7 @@ struct TypingSession {
   /// visibility follows literal separators, which need not match provider
   /// field boundaries; extras and stopped input need the full presentation.
   func promptViewportTargetGlyphs(in cells: [PromptViewportTargetDirectory.Cell],
-    targetUTF16: [UInt16]) -> [TypingPromptGlyph]? {
+    targetUTF16: [UInt16], separatorOffsets: [Int]) -> [TypingPromptGlyph]? {
     guard !isFinished,
       firstRetainedPromptWordIndex == 0, removedTapePromptWordIndices.isEmpty,
       stoppedPromptInput == nil, !isAtEmptyNoSpaceWord,
@@ -5492,24 +5498,19 @@ struct TypingSession {
       typedByTarget[target] = typedIndex
     }
     let active = min(nextTargetIndex, targetUTF16.count)
-    let currentWord = targetUTF16.prefix(active).reduce(0) { count, unit in
-      count + (unit == 32 || unit == 10 ? 1 : 0)
+    var lower = 0, upper = separatorOffsets.count
+    while lower < upper {
+      let middle = lower + (upper - lower) / 2
+      if separatorOffsets[middle] < active { lower = middle + 1 }
+      else { upper = middle }
     }
+    let currentWord = lower
     let visibleFutureWords = usesWordCommitInput ? configuration.visibleFutureWordCount : nil
     let concealedWords = hasStarted ? configuration.readAheadConcealedWordCount : nil
     let concealAll = configuration.modifiers.contains(.memory) && hasStarted
     let concealPending = configuration.modifiers.contains(.simonSays)
-    var scanned = 0, ordinal = 0
-    var wordOrdinals: [Int] = []
-    wordOrdinals.reserveCapacity(cells.count)
-    for cell in cells {
-      while scanned < cell.id {
-        if targetUTF16[scanned] == 32 || targetUTF16[scanned] == 10 { ordinal += 1 }
-        scanned += 1
-      }
-      wordOrdinals.append(ordinal)
-    }
-    return zip(cells, wordOrdinals).map { cell, wordOrdinal in
+    return cells.map { cell in
+      let wordOrdinal = cell.wordOrdinal
       let id = cell.id
       let character = Character(String(UnicodeScalar(targetUTF16[id])!))
       let typedIndex = typedByTarget[id]

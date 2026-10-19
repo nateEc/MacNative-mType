@@ -8,6 +8,7 @@ struct PromptViewportTargetDirectory {
     let id: Int
     let unit: UInt16
     let fieldIndex: Int
+    let wordOrdinal: Int
   }
 
   struct Field: Equatable {
@@ -29,8 +30,11 @@ struct PromptViewportTargetDirectory {
   }
 
   let attemptID: UUID
+  let promptTargetID: UUID
   let targetUTF16: [UInt16]
   private let fieldRanges: [Range<Int>]
+  private let wordOrdinalsAtFieldStart: [Int]
+  private let separatorOffsets: [Int]
   var fieldCount: Int { fieldRanges.count }
 
   init?(session: TypingSession) {
@@ -38,7 +42,7 @@ struct PromptViewportTargetDirectory {
     let units = source.sourceTargetUTF16
     // Every supported UTF-16 unit is one canonical target ID. CRLF can be
     // one native grapheme despite two ASCII units, so retain the full path.
-    guard session.prompt.utf8.count == units.count,
+    guard session.prompt.utf16.elementsEqual(units),
       units.allSatisfy({ $0 < 128 && $0 != 13 }) else { return nil }
     var end = 0
     for range in source.sourceFieldUTF16Ranges {
@@ -47,8 +51,22 @@ struct PromptViewportTargetDirectory {
     }
     guard end == units.count else { return nil }
     attemptID = session.automaticInputAttemptID
+    promptTargetID = session.promptTargetID
     targetUTF16 = units
     fieldRanges = source.sourceFieldUTF16Ranges
+    var ordinal = 0
+    var starts: [Int] = []
+    var separators: [Int] = []
+    starts.reserveCapacity(fieldRanges.count)
+    for range in fieldRanges {
+      starts.append(ordinal)
+      for index in range where units[index] == 32 || units[index] == 10 {
+        separators.append(index)
+        ordinal += 1
+      }
+    }
+    wordOrdinalsAtFieldStart = starts
+    separatorOffsets = separators
   }
 
   func materialize(fields requested: Range<Int>) -> Slice? {
@@ -60,11 +78,14 @@ struct PromptViewportTargetDirectory {
     cells.reserveCapacity(fieldRanges[requested].reduce(0) { $0 + $1.count })
     for index in requested {
       let range = fieldRanges[index]
+      var ordinal = wordOrdinalsAtFieldStart[index]
       fields.append(.init(index: index, targetUTF16Range: range,
         cellIDs: Array(range),
         structuralReturnCount: targetUTF16[range].filter { $0 == 10 }.count))
       for unit in range {
-        cells.append(.init(id: unit, unit: targetUTF16[unit], fieldIndex: index))
+        let value = targetUTF16[unit]
+        cells.append(.init(id: unit, unit: value, fieldIndex: index, wordOrdinal: ordinal))
+        if value == 32 || value == 10 { ordinal += 1 }
       }
     }
     return .init(attemptID: attemptID, fields: fields, cells: cells)
@@ -75,9 +96,9 @@ struct PromptViewportTargetDirectory {
   func materializeStates(fields requested: Range<Int>, session: TypingSession) -> [StateCell]? {
     guard let slice = materialize(fields: requested),
       session.automaticInputAttemptID == attemptID,
-      session.prompt.utf16.elementsEqual(targetUTF16),
+      session.promptTargetID == promptTargetID,
       let glyphs = session.promptViewportTargetGlyphs(in: slice.cells,
-        targetUTF16: targetUTF16), glyphs.count == slice.cells.count
+        targetUTF16: targetUTF16, separatorOffsets: separatorOffsets), glyphs.count == slice.cells.count
     else { return nil }
     return zip(slice.cells, glyphs).map { StateCell(id: $0.id, glyph: $1) }
   }
