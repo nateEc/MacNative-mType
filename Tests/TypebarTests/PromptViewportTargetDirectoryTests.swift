@@ -38,12 +38,56 @@ final class PromptViewportTargetDirectoryTests: XCTestCase {
     XCTAssertNotEqual(after.attemptID, session.repeatedAttempt().automaticInputAttemptID)
   }
 
+  func testVisibleStateFollowsInputAndDistantWindowWithoutFullProjection() throws {
+    var session = TypingSession(configuration: .words(4), prompt: "alpha beta gamma delta")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    for input in ["", "a", "x", "l"] {
+      if !input.isEmpty { session.insert(input, at: Date(timeIntervalSinceReferenceDate: 920_000_001)) }
+      let full = session.promptGlyphs
+      for range in [0..<2, 2..<4, 0..<2] {
+        let slice = try XCTUnwrap(directory.materializeStates(fields: range, session: session))
+        XCTAssertEqual(slice.map(\.id), directory.materialize(fields: range)?.cells.map(\.id))
+        XCTAssertEqual(slice.map(\.glyph), slice.map { full[$0.id] })
+      }
+    }
+  }
+
+  func testVisibleStateRejectsStaleAttemptAndUnprovenExtraInput() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "ab cd")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    XCTAssertNotNil(directory.materializeStates(fields: 0..<1, session: session))
+    XCTAssertNil(directory.materializeStates(fields: 0..<1, session: session.repeatedAttempt()))
+    session.insertBatch("abXYZ", at: Date(timeIntervalSinceReferenceDate: 920_000_002))
+    XCTAssertNil(directory.materializeStates(fields: 0..<1, session: session))
+    let focused = TypingSession(configuration: .words(2).with(modifiers: [.focusCurrentWord]),
+      prompt: "ab cd")
+    let focusedDirectory = try XCTUnwrap(PromptViewportTargetDirectory(session: focused))
+    XCTAssertNil(focusedDirectory.materializeStates(fields: 0..<1, session: focused),
+      "Focus masking needs its own window-state parity proof")
+  }
+
+  func testVisibleStateMatchesReturnDeletionAndWrongInput() throws {
+    var session = TypingSession(configuration: .words(3), prompt: "a\nb cd")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    for input in ["a", "\n", "x"] {
+      session.insert(input, at: Date(timeIntervalSinceReferenceDate: 920_000_003))
+      let full = session.promptGlyphs
+      for range in [0..<1, 1..<3] {
+        let slice = try XCTUnwrap(directory.materializeStates(fields: range, session: session))
+        XCTAssertEqual(slice.map(\.glyph), slice.map { full[$0.id] })
+      }
+    }
+    session.deleteBackward(at: Date(timeIntervalSinceReferenceDate: 920_000_004))
+    let slice = try XCTUnwrap(directory.materializeStates(fields: 1..<3, session: session))
+    XCTAssertEqual(slice.map(\.glyph), slice.map { session.promptGlyphs[$0.id] })
+  }
+
   func testHundredThousandWordDirectoryMaterializesOnlyRequestedFields() throws {
     try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
       "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
     let words = 100_001
     let prompt = Array(repeating: "oak", count: words).joined(separator: " ")
-    let session = TypingSession(configuration: .words(words), prompt: prompt)
+    var session = TypingSession(configuration: .words(words), prompt: prompt)
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     XCTAssertEqual(directory.fieldCount, words)
     XCTAssertEqual(directory.targetUTF16, Array(prompt.utf16))
@@ -55,6 +99,17 @@ final class PromptViewportTargetDirectoryTests: XCTestCase {
     XCTAssertEqual(distant.cells.count, 7)
     XCTAssertEqual(distant.cells.last?.id, prompt.utf16.count - 1)
     XCTAssertEqual(distant.cells.map(\.unit), Array("oak oak".utf16))
+    let state = try XCTUnwrap(directory.materializeStates(fields: (words - 2)..<words,
+      session: session))
+    XCTAssertEqual(state.count, 7)
+    XCTAssertTrue(state.allSatisfy { $0.glyph.state == .pending })
+    session.insert("o", at: Date(timeIntervalSinceReferenceDate: 920_000_005))
+    let firstAfterInput = try XCTUnwrap(directory.materializeStates(fields: 0..<2, session: session))
+    let distantAfterInput = try XCTUnwrap(directory.materializeStates(fields: (words - 2)..<words,
+      session: session))
+    XCTAssertEqual(firstAfterInput.first?.glyph.state, .correct)
+    XCTAssertEqual(firstAfterInput.dropFirst().first?.glyph.state, .current)
+    XCTAssertEqual(distantAfterInput.map(\.glyph), state.map(\.glyph))
   }
 
   func testUnprovenFusionAndHiddenBoundariesUseExistingFullProjection() {

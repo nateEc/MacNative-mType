@@ -5468,6 +5468,42 @@ struct TypingSession {
     }
   }
 
+  /// Color only canonical ASCII target IDs requested by a viewport. This
+  /// deliberately refuses presentation paths whose extras or modifiers need
+  /// more than one stable target cell; no full prompt glyph array is built.
+  func promptViewportTargetGlyphs(in ids: [Int], targetUTF16: [UInt16]) -> [TypingPromptGlyph]? {
+    guard !isFinished, configuration.modifiers.isEmpty, configuration.rules == .init(),
+      firstRetainedPromptWordIndex == 0, removedTapePromptWordIndices.isEmpty,
+      stoppedPromptInput == nil, forcedErrorIndices.isEmpty,
+      blindCommittedMissingTargetIndices.isEmpty, !isAtEmptyNoSpaceWord,
+      targetUTF16.count == promptCharacters.count,
+      ids.allSatisfy({ targetUTF16.indices.contains($0) && targetUTF16[$0] < 128 })
+    else { return nil }
+    let presentation = promptPresentationInput
+    let typedCharacters = Array(typed)
+    guard presentation.targets.count == typedCharacters.count,
+      presentation.targets.allSatisfy({ $0.map { targetUTF16.indices.contains($0) } ?? false })
+    else { return nil }
+    let wanted = Set(ids)
+    var typedByTarget: [Int: Int] = [:]
+    for (typedIndex, target) in presentation.targets.enumerated() {
+      guard let target, wanted.contains(target), typedByTarget[target] == nil else { continue }
+      typedByTarget[target] = typedIndex
+    }
+    let active = min(nextTargetIndex, targetUTF16.count)
+    return ids.map { id in
+      let character = Character(String(UnicodeScalar(targetUTF16[id])!))
+      if let typedIndex = typedByTarget[id] {
+        let input = typedCharacters[typedIndex]
+        let matches = InputTextIdentity.matches(input, character)
+        return .init(character: character, state: matches ? .correct : .incorrect,
+          typedCharacter: matches ? nil : input)
+      }
+      return .init(character: character,
+        state: id == active ? .current : .pending)
+    }
+  }
+
   /// Rendering can match a correct retained newline to its glyph without
   /// changing the engine's navigation cursor. A later commit at that same
   /// target is extra input, not a retroactive error on the first correct LF.

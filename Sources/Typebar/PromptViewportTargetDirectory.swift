@@ -23,6 +23,11 @@ struct PromptViewportTargetDirectory {
     let cells: [Cell]
   }
 
+  struct StateCell: Equatable {
+    let id: Int
+    let glyph: TypingPromptGlyph
+  }
+
   let attemptID: UUID
   let targetUTF16: [UInt16]
   private let fieldRanges: [Range<Int>]
@@ -63,5 +68,17 @@ struct PromptViewportTargetDirectory {
       }
     }
     return .init(attemptID: attemptID, fields: fields, cells: cells)
+  }
+
+  /// A strictly admitted first step toward window coloring. Unsupported
+  /// presentation paths remain on the existing full projection.
+  func materializeStates(fields requested: Range<Int>, session: TypingSession) -> [StateCell]? {
+    guard let slice = materialize(fields: requested),
+      session.automaticInputAttemptID == attemptID,
+      session.prompt.utf16.elementsEqual(targetUTF16),
+      let glyphs = session.promptViewportTargetGlyphs(in: slice.cells.map(\.id),
+        targetUTF16: targetUTF16)
+    else { return nil }
+    return zip(slice.cells, glyphs).map { StateCell(id: $0.id, glyph: $1) }
   }
 }
