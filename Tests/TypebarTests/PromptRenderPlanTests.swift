@@ -6,6 +6,45 @@ import XCTest
   private let theme = ResolvedTheme(background: .white, panel: .white, accent: .blue,
     colorScheme: .light)
 
+  func testWindowAppearancePlanningMatchesFullWordsIncludingErrorsAndHiding() throws {
+    let prompt = "alpha beta gamma delta epsilon"
+    var committedError = TypingSession(configuration: .words(5), prompt: prompt)
+    committedError.insertBatch("alxha ", at: Date(timeIntervalSinceReferenceDate: 920_200_000))
+    var listening = TypingSession(configuration: .words(5).with(modifiers: [.listening]),
+      prompt: prompt)
+    listening.insert("a", at: Date(timeIntervalSinceReferenceDate: 920_200_001))
+    var blind = TypingSession(configuration: .words(5, rules: .init(blindMode: true)), prompt: prompt)
+    blind.insertBatch("alxha ", at: Date(timeIntervalSinceReferenceDate: 920_200_002))
+    for session in [TypingSession(configuration: .words(5), prompt: prompt),
+      committedError, listening, blind] {
+      let glyphs = session.promptGlyphs
+      let words = session.promptWordPresentations
+      let selected = [0, 1, 2, 5, 6, 11, prompt.count - 2, prompt.count - 1]
+      let localGlyphs = selected.map { glyphs[$0] }
+      let touching = words.enumerated().compactMap { index, word ->
+        (index: Int, value: TypingPromptWordPresentation)? in
+        selected.contains(where: { word.range.contains($0) || word.extraGlyphIndices.contains($0) })
+          ? (index: index, value: word) : nil
+      }
+      let active = words.firstIndex { $0.phase == .active }
+      for mode in [PromptHighlightMode.off, .letter, .word, .nextWord, .nextThreeWords] {
+        for effect in [TypedCharacterEffect.keep, .hide, .dots] {
+          let full = PromptGlyphAppearance.plan(glyphs: glyphs, words: words,
+            mode: mode, blindMode: session.configuration.rules.blindMode,
+            typedEffect: effect,
+            hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
+          let window = try XCTUnwrap(PromptGlyphAppearance.planWindow(glyphs: localGlyphs,
+            globalIndices: selected, words: touching, activeWordIndex: active,
+            mode: mode, blindMode: session.configuration.rules.blindMode,
+            typedEffect: effect,
+            hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening)))
+          XCTAssertEqual(window, selected.map { full[$0] },
+            "mode=\(mode) effect=\(effect)")
+        }
+      }
+    }
+  }
+
   func testProductionPainterFieldWindowMatchesFullInkAndRejectsStalePlans() throws {
     var correct = TypingSession(configuration: .words(4), prompt: "alpha beta\ngamma delta")
     correct.insert("a", at: Date(timeIntervalSinceReferenceDate: 920_100_000))
@@ -66,6 +105,21 @@ import XCTest
             "effect=\(effect) fields=\(fields)")
         }
       }
+    }
+  }
+
+  func testWindowAppearanceKeepsProviderFieldWithInternalReturn() throws {
+    let fields = ["north\nsouth ", "harbor ", "tail"]
+    let session = TypingSession(configuration: .words(4), prompt: fields.joined(),
+      sourceFields: fields)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: theme, highlightMode: .nextWord)
+    let plan = PromptRenderPlan(session: session, composition: "", style: style)
+    let full = try XCTUnwrap(plan.render().compositionTextMap)
+    for range in [0..<1, 1..<3, 0..<1] {
+      let window = try XCTUnwrap(plan.renderFieldWindowUsingFullPlan(directory: directory,
+        session: session, fields: range))
+      XCTAssertEqual(window, full.fieldRuns.filter { range.contains($0.fieldID ?? -1) })
     }
   }
 

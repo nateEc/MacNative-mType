@@ -61,42 +61,80 @@ struct PromptGlyphAppearance: Equatable {
     if color == .hidden { text.foregroundColor = .clear }
   }
 
+  private static func initial(_ glyph: TypingPromptGlyph, mode: PromptHighlightMode) -> Self {
+    let color: PromptGlyphColor
+    switch glyph.state {
+    case .correct: color = .completed
+    case .incorrect: color = .error
+    case .extra: color = .extra
+    case .current, .pending: color = .future
+    case .hidden: color = .hidden
+    }
+    return .init(color: mode == .off && color == .completed ? .future : color)
+  }
+
+  private static func wordColor(index: Int, word: TypingPromptWordPresentation,
+    activeWord: Int?, mode: PromptHighlightMode, blindMode: Bool) -> PromptGlyphColor? {
+    guard let futureCount = mode.futureWordCount else { return nil }
+    if word.phase == .committed { return !blindMode && word.hasCommitError ? .error : .future }
+    if word.phase == .active && !blindMode && word.hasInputError { return .error }
+    return activeWord.map { index <= $0 + futureCount } == true ? .completed : .future
+  }
+
+  private static func applyWord(_ word: TypingPromptWordPresentation,
+    wordColor: PromptGlyphColor?, blindMode: Bool, typedEffect: TypedCharacterEffect,
+    to appearance: inout Self) {
+    guard appearance.color != .hidden else { return }
+    if typedEffect == .hide && word.phase == .committed {
+      appearance.color = .hidden
+      return
+    }
+    if let wordColor { appearance.color = wordColor }
+    appearance.hasErrorUnderline = word.phase == .committed && word.hasCommitError && !blindMode
+  }
+
   static func plan(
     glyphs: [TypingPromptGlyph], words: [TypingPromptWordPresentation],
     mode: PromptHighlightMode, blindMode: Bool, typedEffect: TypedCharacterEffect = .keep,
     hidesUntypedGlyphs: Bool = false
   ) -> [Self] {
-    var output = glyphs.map { glyph in
-      let color: PromptGlyphColor
-      switch glyph.state {
-      case .correct: color = .completed
-      case .incorrect: color = .error
-      case .extra: color = .extra
-      case .current, .pending: color = .future
-      case .hidden: color = .hidden
-      }
-      return Self(color: mode == .off && color == .completed ? .future : color)
-    }
+    var output = glyphs.map { initial($0, mode: mode) }
     let activeWord = words.firstIndex { $0.phase == .active }
     for (wordIndex, word) in words.enumerated() {
-      let wordColor: PromptGlyphColor?
-      if let futureCount = mode.futureWordCount {
-        if word.phase == .committed {
-          wordColor = !blindMode && word.hasCommitError ? .error : .future
-        } else if word.phase == .active && !blindMode && word.hasInputError {
-          wordColor = .error
-        } else {
-          wordColor = activeWord.map { wordIndex <= $0 + futureCount } == true ? .completed : .future
-        }
-      } else { wordColor = nil }
-      for index in Array(word.range) + word.extraGlyphIndices where output.indices.contains(index) {
-        guard output[index].color != .hidden else { continue }
-        if typedEffect == .hide && word.phase == .committed {
-          output[index].color = .hidden
-          continue
-        }
-        if let wordColor { output[index].color = wordColor }
-        output[index].hasErrorUnderline = word.phase == .committed && word.hasCommitError && !blindMode
+      let ink = wordColor(index: wordIndex, word: word, activeWord: activeWord,
+        mode: mode, blindMode: blindMode)
+      for index in word.range where output.indices.contains(index) {
+        applyWord(word, wordColor: ink, blindMode: blindMode,
+          typedEffect: typedEffect, to: &output[index])
+      }
+      for index in word.extraGlyphIndices where output.indices.contains(index) {
+        applyWord(word, wordColor: ink, blindMode: blindMode,
+          typedEffect: typedEffect, to: &output[index])
+      }
+    }
+    if hidesUntypedGlyphs {
+      for index in output.indices where output[index].color == .future { output[index].color = .hidden }
+    }
+    return output
+  }
+
+  /// The caller supplies only words touching its selected global glyph IDs.
+  /// Word indices and activeWordIndex remain global, not window-local.
+  static func planWindow(glyphs: [TypingPromptGlyph], globalIndices: [Int],
+    words: [(index: Int, value: TypingPromptWordPresentation)], activeWordIndex: Int?,
+    mode: PromptHighlightMode, blindMode: Bool, typedEffect: TypedCharacterEffect = .keep,
+    hidesUntypedGlyphs: Bool = false) -> [Self]? {
+    guard glyphs.count == globalIndices.count,
+      globalIndices.allSatisfy({ $0 >= 0 }), Set(globalIndices).count == globalIndices.count
+    else { return nil }
+    var output = glyphs.map { initial($0, mode: mode) }
+    for (index, word) in words {
+      let ink = wordColor(index: index, word: word, activeWord: activeWordIndex,
+        mode: mode, blindMode: blindMode)
+      for (local, global) in globalIndices.enumerated()
+        where word.range.contains(global) || word.extraGlyphIndices.contains(global) {
+        applyWord(word, wordColor: ink, blindMode: blindMode,
+          typedEffect: typedEffect, to: &output[local])
       }
     }
     if hidesUntypedGlyphs {

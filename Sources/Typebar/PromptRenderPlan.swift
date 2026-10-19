@@ -134,14 +134,36 @@ struct PromptRenderStyle: Equatable {
       presentation.projection.cells.count == directory.targetUTF16.count,
       zip(slice.cells, states).allSatisfy({ cell, state in
         presentation.projection.cells.indices.contains(cell.id)
+          && glyphs.indices.contains(cell.id)
+          && appearances.indices.contains(cell.id)
           && presentation.projection.cells[cell.id].id == cell.id
           && presentation.projection.cells[cell.id].sourceFieldIndex == cell.fieldIndex
           && glyphs[cell.id] == state.glyph
       })
     else { return nil }
+    let selectedIDs = states.map(\.id)
+    let selected = Set(selectedIDs)
+    let targetBounds = selectedIDs.first.flatMap { first in
+      selectedIDs.last.map { first..<($0 + 1) }
+    }
+    let touchingWords: [(index: Int, value: TypingPromptWordPresentation)] = words.enumerated().compactMap {
+      index, word in
+      let touches = targetBounds.map { word.range.overlaps($0) } == true
+        || word.extraGlyphIndices.contains(where: selected.contains)
+      return touches ? (index: index, value: word) : nil
+    }
+    guard let localAppearances = PromptGlyphAppearance.planWindow(
+      glyphs: states.map(\.glyph), globalIndices: selectedIDs,
+      words: touchingWords, activeWordIndex: words.firstIndex { $0.phase == .active },
+      mode: sessionPolicy.highlightMode, blindMode: session.configuration.rules.blindMode,
+      typedEffect: style.typedCharacterEffect,
+      hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening)),
+      zip(selectedIDs, localAppearances).allSatisfy({ id, appearance in appearances[id] == appearance })
+    else { return nil }
+    let appearanceByID = Dictionary(uniqueKeysWithValues: zip(selectedIDs, localAppearances))
     var painter = GlyphPainter(plan: self)
     return directory.materializeFieldRuns(fields: fields, session: session) { id, glyph in
-      painter.render(id, glyph, nil)
+      painter.render(id, glyph, nil, appearanceOverride: appearanceByID[id])
     }
   }
 
@@ -181,9 +203,10 @@ struct PromptRenderStyle: Equatable {
     }
 
     mutating func render(_ index: Int, _ glyph: TypingPromptGlyph,
-      _ markedCell: PromptCompositionProjection.Cell?) -> AttributedString {
+      _ markedCell: PromptCompositionProjection.Cell?,
+      appearanceOverride: PromptGlyphAppearance? = nil) -> AttributedString {
       let isCompleted = plan.completedCharacterIndices.contains(index)
-      let appearance = plan.appearances[index]
+      let appearance = appearanceOverride ?? plan.appearances[index]
       let plainKey = PlainPendingGlyphInkKey.make(glyph: glyph, appearance: appearance,
         isCompleted: isCompleted, hasSpecialPresentation: plan.presentation == nil || markedCell != nil
           || index == plan.caretIndex || index == plan.sessionPolicy.paceGuideIndex
