@@ -83,6 +83,61 @@ import XCTest
     XCTAssertLessThan(sequence.nextField, directory.fieldCount)
   }
 
+  func testNativeFieldCanExposeFullAccessiblePromptWhileDrawingOnlyAWindow() {
+    let view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { view.stop() }
+    let local = PromptRendering(text: AttributedString("oak"), glyphCharacterOffsets: [:])
+    view.configure(rendering: local, font: font, carets: config(.init()),
+      accessibilityText: "oak pine maple")
+    XCTAssertEqual(view.accessibilityValue() as? String, "oak pine maple")
+    view.configure(rendering: local, font: font, carets: config(.init()),
+      accessibilityText: "oak pine maple cedar")
+    XCTAssertEqual(view.accessibilityValue() as? String, "oak pine maple cedar")
+    view.configure(rendering: local, font: font, carets: config(.init()))
+    XCTAssertEqual(view.accessibilityValue() as? String, "oak",
+      "A later full-path configuration must not retain stale accessibility text")
+  }
+
+  func testNativeFieldRefreshKeepsExplicitAccessibleTextUntilFullPathReconfigures() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "oak pine")
+    var current = try render(session)
+    let view = PromptFieldNativeView(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { view.stop() }
+    var carets = config(.init())
+    carets.latestRendering = { current }
+    view.configure(rendering: current, font: font, carets: carets,
+      accessibilityText: "oak pine maple")
+    session.insert("o", at: start)
+    current = try render(session)
+    view.present(at: 0)
+    XCTAssertEqual(view.accessibilityValue() as? String, "oak pine maple")
+    view.configure(rendering: current, font: font, carets: carets)
+    XCTAssertEqual(view.accessibilityValue() as? String, String(current.text.characters))
+  }
+
+  func testSwiftUIFieldBridgePassesFullAccessibleTextAndClearsItOnFallback() throws {
+    let rendering = try render(TypingSession(configuration: .words(2), prompt: "oak pine"))
+    func root(_ fullText: String?) -> PromptFieldPracticePrompt {
+      PromptFieldPracticePrompt(rendering: rendering, font: font, lineSpacing: 12,
+        rightToLeft: false, joinsLetters: false, carets: config(.init()),
+        accessibilityText: fullText)
+    }
+    let host = NSHostingView(rootView: root("oak pine maple"))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 250, height: 120),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    host.layoutSubtreeIfNeeded()
+    let native = try XCTUnwrap(descendants(host, PromptFieldNativeView.self).first)
+    XCTAssertEqual(native.accessibilityValue() as? String, "oak pine maple")
+    host.rootView = root(nil)
+    host.layoutSubtreeIfNeeded()
+    XCTAssertTrue(descendants(host, PromptFieldNativeView.self).first === native)
+    XCTAssertEqual(native.accessibilityValue() as? String, "oak pine")
+    XCTAssertFalse(window.isVisible)
+  }
+
   func testDirectoryBuildsIndependentFieldWindowsWithFullPathCellGeometry() throws {
     var session = TypingSession(configuration: .words(7),
       prompt: "alpha beta gamma\ndelta epsilon zeta eta")

@@ -11,6 +11,7 @@ struct PromptFieldPracticePrompt: View {
   var lineScroll: PromptLineScrollContext? = nil
   var viewportLineCount: Int? = nil
   var preparedLayout: PromptFieldTextLayout? = nil
+  var accessibilityText: String? = nil
   var onMeasuredWidth: ((CGFloat) -> Void)? = nil
   @State private var viewportHeight: CGFloat?
 
@@ -18,12 +19,14 @@ struct PromptFieldPracticePrompt: View {
     rightToLeft: Bool, joinsLetters: Bool, carets: PromptCaretNativeView.Configuration,
     lineScroll: PromptLineScrollContext? = nil, viewportLineCount: Int? = nil,
     preparedLayout: PromptFieldTextLayout? = nil,
+    accessibilityText: String? = nil,
     onMeasuredWidth: ((CGFloat) -> Void)? = nil) {
     renderingSnapshot = PromptFieldRenderingSnapshot(rendering)
     self.font = font; self.lineSpacing = lineSpacing
     self.rightToLeft = rightToLeft; self.joinsLetters = joinsLetters
     self.carets = carets; self.lineScroll = lineScroll
     self.viewportLineCount = viewportLineCount; self.preparedLayout = preparedLayout
+    self.accessibilityText = accessibilityText
     self.onMeasuredWidth = onMeasuredWidth
   }
 
@@ -31,6 +34,7 @@ struct PromptFieldPracticePrompt: View {
     PromptFieldBridge(renderingSnapshot: renderingSnapshot, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
+      accessibilityText: accessibilityText,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: { viewportHeight = $0 })
       .preference(key: PracticeViewportHeightKey.self, value: viewportHeight)
   }
@@ -53,6 +57,7 @@ private struct PromptFieldBridge: NSViewRepresentable {
   let lineScroll: PromptLineScrollContext?
   let viewportLineCount: Int?
   let preparedLayout: PromptFieldTextLayout?
+  let accessibilityText: String?
   let onMeasuredWidth: ((CGFloat) -> Void)?
   let onViewportHeight: (CGFloat?) -> Void
   func makeNSView(context: Context) -> PromptFieldNativeView { PromptFieldNativeView() }
@@ -60,6 +65,7 @@ private struct PromptFieldBridge: NSViewRepresentable {
     view.configure(rendering: renderingSnapshot.value, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
+      accessibilityText: accessibilityText,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: onViewportHeight)
   }
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: PromptFieldNativeView, context: Context) -> CGSize? {
@@ -88,6 +94,7 @@ final class PromptFieldNativeView: NSView {
   private var viewportLineCount: Int?
   private var onViewportHeight: ((CGFloat?) -> Void)?
   private var onMeasuredWidth: ((CGFloat) -> Void)?
+  private var accessibilityTextOverride: String?
   private var reportedWidth: CGFloat?
   private var reportedHeight: CGFloat?
   private var notificationRevision: UInt64 = 0
@@ -105,6 +112,7 @@ final class PromptFieldNativeView: NSView {
     rightToLeft: Bool = false, joinsLetters: Bool = false, carets: PromptCaretNativeView.Configuration,
     lineScroll: PromptLineScrollContext? = nil, viewportLineCount: Int? = nil,
     preparedLayout: PromptFieldTextLayout? = nil,
+    accessibilityText: String? = nil,
     onMeasuredWidth: ((CGFloat) -> Void)? = nil,
     onViewportHeight: ((CGFloat?) -> Void)? = nil) {
     let previousSize = intrinsicContentSize
@@ -121,12 +129,13 @@ final class PromptFieldNativeView: NSView {
     self.rightToLeft = rightToLeft; self.joinsLetters = joinsLetters
     self.configuration = carets; self.lineScroll = lineScroll
     self.preparedLayout = preparedLayout; self.onMeasuredWidth = onMeasuredWidth
+    accessibilityTextOverride = accessibilityText
     self.viewportLineCount = viewportLineCount; self.onViewportHeight = onViewportHeight
     notificationRevision &+= 1
     _ = measure(width: max(1, bounds.width))
     deliverHeight()
     configureControllers()
-    setAccessibilityValue(String(rendering.text.characters))
+    setAccessibilityValue(accessibilityTextOverride ?? String(rendering.text.characters))
     needsDisplay = true
     if intrinsicContentSize != previousSize {
       invalidateIntrinsicContentSize()
@@ -194,7 +203,7 @@ final class PromptFieldNativeView: NSView {
           invalidateIntrinsicContentSize()
           needsLayout = true
         }
-        setAccessibilityValue(String(next.text.characters))
+        setAccessibilityValue(accessibilityTextOverride ?? String(next.text.characters))
       }
     }
     return rendering
@@ -257,6 +266,7 @@ final class PromptFieldNativeView: NSView {
   func stop() {
     notificationRevision &+= 1; configuration = nil; onViewportHeight = nil
     onMeasuredWidth = nil; preparedLayout = nil; reportedWidth = nil
+    accessibilityTextOverride = nil
     caret.stop(); follower.cancelCaretMotion(); follower.stopLineScroll()
     lineScroll = nil
     follower.update(text: AttributedString(), characterOffset: nil, font: font,
