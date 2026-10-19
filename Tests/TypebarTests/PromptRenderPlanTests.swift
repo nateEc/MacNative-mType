@@ -85,6 +85,84 @@ import XCTest
     XCTAssertNil(marked.renderFieldWindowUsingFullPlan(directory: directory, session: initial, fields: 0..<2))
   }
 
+  func testIndependentFieldWindowPainterMatchesFullInkWithoutFullPlan() throws {
+    let prompt = "alpha beta\ngamma delta"
+    var committed = TypingSession(configuration: .words(4), prompt: prompt)
+    committed.insertBatch("alpha ", at: Date(timeIntervalSinceReferenceDate: 920_300_100))
+    var wrong = TypingSession(configuration: .words(4), prompt: prompt)
+    wrong.insert("x", at: Date(timeIntervalSinceReferenceDate: 920_300_101))
+    var blind = TypingSession(configuration: .words(4, rules: .init(blindMode: true)), prompt: prompt)
+    blind.insertBatch("alxha ", at: Date(timeIntervalSinceReferenceDate: 920_300_103))
+    var memory = TypingSession(configuration: .words(4).with(modifiers: [.memory]), prompt: prompt)
+    memory.insert("a", at: Date(timeIntervalSinceReferenceDate: 920_300_104))
+    var listening = TypingSession(configuration: .words(4).with(modifiers: [.listening]), prompt: prompt)
+    listening.insert("a", at: Date(timeIntervalSinceReferenceDate: 920_300_105))
+    let providerFields = ["north\nsouth ", "harbor ", "tail"]
+    let provider = TypingSession(configuration: .words(4), prompt: providerFields.joined(),
+      sourceFields: providerFields)
+    for session in [TypingSession(configuration: .words(4), prompt: prompt),
+      committed, wrong, blind, memory, listening, provider] {
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      for effect in [TypedCharacterEffect.keep, .fade, .dots, .hide] {
+        let style = PromptRenderStyle(theme: theme, colorfulMode: true,
+          typedCharacterEffect: effect, typoIndicatorStyle: .both,
+          caretStyle: .bar, highlightMode: .nextWord)
+        let full = try XCTUnwrap(PromptRenderPlan(session: session,
+          composition: "", style: style).render().compositionTextMap)
+        for range in [0..<min(2, directory.fieldCount),
+          max(0, directory.fieldCount - 2)..<directory.fieldCount] {
+          let local = try XCTUnwrap(PromptRenderPlan.renderIndependentFieldWindow(
+            directory: directory, session: session, fields: range, style: style))
+          XCTAssertEqual(local, full.fieldRuns.filter { range.contains($0.fieldID ?? -1) },
+            "effect=\(effect) range=\(range)")
+        }
+      }
+    }
+  }
+
+  func testIndependentFieldWindowRejectsUnverifiedReturnCorrection() throws {
+    var session = TypingSession(configuration: .words(3), prompt: "a\nb cd")
+    session.insertBatch("ax", at: Date(timeIntervalSinceReferenceDate: 920_300_102))
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    XCTAssertNil(PromptRenderPlan.renderIndependentFieldWindow(directory: directory,
+      session: session, fields: 0..<1, style: PromptRenderStyle(theme: theme)))
+  }
+
+  func testIndependentFieldWindowFollowsInputButRejectsChangedTarget() throws {
+    let source = ["north ", "harbor "]
+    var session = TypingSession(configuration: .words(5).with(modifiers: [.poetryStream]),
+      prompt: source.joined(), sourceFields: source, streamsLiveContent: true)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: theme, typedCharacterEffect: .dots,
+      highlightMode: .nextWord)
+    for input in ["", "n"] {
+      if !input.isEmpty { session.insert(input, at: Date(timeIntervalSinceReferenceDate: 920_300_106)) }
+      let full = try XCTUnwrap(PromptRenderPlan(session: session,
+        composition: "", style: style).render().compositionTextMap)
+      let local = try XCTUnwrap(PromptRenderPlan.renderIndependentFieldWindow(
+        directory: directory, session: session, fields: 0..<2, style: style))
+      XCTAssertEqual(local, full.fieldRuns.filter { (0..<2).contains($0.fieldID ?? -1) })
+    }
+    XCTAssertTrue(session.appendLiveContent(.init(text: "third fourth", noSpaceBoundarySource: nil)))
+    XCTAssertNil(PromptRenderPlan.renderIndependentFieldWindow(directory: directory,
+      session: session, fields: 0..<2, style: style))
+  }
+
+  func testIndependentFieldWindowRendersDistantHundredThousandWordSlice() throws {
+    try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
+      "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
+    let count = 100_001
+    let prompt = Array(repeating: "oak", count: count).joined(separator: " ")
+    let session = TypingSession(configuration: .words(count), prompt: prompt)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let runs = try XCTUnwrap(PromptRenderPlan.renderIndependentFieldWindow(directory: directory,
+      session: session, fields: (count - 2)..<count,
+      style: PromptRenderStyle(theme: theme)))
+    XCTAssertEqual(runs.map(\.fieldID), [count - 2, count - 1])
+    XCTAssertEqual(runs.flatMap(\.cells).count, 7)
+    XCTAssertEqual(runs.flatMap(\.cells).map(\.id), Array((prompt.utf16.count - 7)..<prompt.utf16.count))
+  }
+
   func testProductionPainterWindowKeepsCompletedEffectsAndHiddenInk() throws {
     let prompt = "alpha beta gamma delta"
     var committed = TypingSession(configuration: .words(4), prompt: prompt)

@@ -5592,6 +5592,28 @@ struct TypingSession {
     return .init(activeWordIndex: active, words: words)
   }
 
+  /// The existing typed-effect rule colors every target before the last
+  /// accepted separator, except the accepted separator glyphs themselves.
+  /// Resolve that rule only for requested target IDs.
+  func promptViewportCompletedIndices(in cells: [PromptViewportTargetDirectory.Cell],
+    separatorOffsets: [Int]) -> Set<Int>? {
+    let typedCharacters = Array(typed)
+    guard typedTargetIndices.count == typedCharacters.count else { return nil }
+    let separatorTargets = Set(separatorOffsets)
+    var seen = Set<Int>()
+    var accepted = Set<Int>()
+    var lastAccepted: Int?
+    for (index, target) in typedTargetIndices.enumerated() {
+      guard let target, separatorTargets.contains(target), seen.insert(target).inserted else { continue }
+      if isPromptWordSeparator(typedCharacters[index]) {
+        accepted.insert(target)
+        lastAccepted = max(lastAccepted ?? target, target)
+      }
+    }
+    guard let lastAccepted else { return [] }
+    return Set(cells.lazy.map(\.id).filter { $0 < lastAccepted && !accepted.contains($0) })
+  }
+
   /// Rendering can match a correct retained newline to its glyph without
   /// changing the engine's navigation cursor. A later commit at that same
   /// target is extra input, not a retroactive error on the first correct LF.

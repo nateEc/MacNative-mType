@@ -98,6 +98,85 @@ struct PromptRenderStyle: Equatable {
     extraInputFeedbackColor = style.theme.extraInputColor(usesColorfulMode: style.colorfulMode)
   }
 
+  /// A painter context for a strictly admitted target window. It never
+  /// constructs the full projection, glyph array, words, or appearance plan.
+  private init(windowSession session: TypingSession, style: PromptRenderStyle,
+    targetCount: Int, completed: Set<Int>, caret: Int?, policy: PromptRenderSessionPolicy) {
+    sourceSession = session
+    composition = ""
+    self.style = style
+    removedTapeWordIndices = []
+    presentation = nil
+    glyphs = []
+    words = []
+    indices = []
+    appearances = []
+    completedCharacterIndices = completed
+    caretIndex = caret
+    emptyWordPlaceholder = nil
+    targetGlyphCount = targetCount
+    isZen = false
+    sessionPolicy = policy
+    completedPromptColor = Self.promptColor(.completed, style: style)
+    futurePromptColor = Self.promptColor(.future, style: style)
+    errorFeedbackColor = style.theme.errorColor(usesColorfulMode: style.colorfulMode)
+    extraInputFeedbackColor = style.theme.extraInputColor(usesColorfulMode: style.colorfulMode)
+  }
+
+  /// Render a bounded ASCII source-field window with the production painter,
+  /// independently of a complete PromptRenderPlan. Unsupported practice
+  /// effects and target projections continue through the full path.
+  static func renderIndependentFieldWindow(directory: PromptViewportTargetDirectory,
+    session: TypingSession, fields: Range<Int>, style: PromptRenderStyle) -> [PromptFieldTextRun]? {
+    let effect = PracticeVisualEffect.make(modifiers: session.configuration.modifiers)
+    guard !style.usesTapePractice, !effect.usesASL, !effect.usesChoo,
+      PromptFieldProjectionPolicy.supports(session.configuration),
+      let slice = directory.materialize(fields: fields),
+      let states = directory.materializeStates(fields: fields, session: session),
+      let localWords = directory.materializeWordStates(fields: fields, session: session),
+      let completed = directory.completedIndices(in: slice.cells, session: session),
+      slice.cells.count == states.count, localWords.words.count == fields.count,
+      zip(slice.cells, states).allSatisfy({ $0.id == $1.id })
+    else { return nil }
+    let policy = PromptRenderSessionPolicy(session: session,
+      highlightMode: style.highlightMode, usesTapePractice: false,
+      mainCaretDrawsMarker: style.caretStyle.drawsMarker,
+      paceCaretDrawsMarker: style.paceCaretStyle.drawsMarker)
+    let ids = states.map(\.id)
+    guard let appearance = PromptGlyphAppearance.planWindow(
+      glyphs: states.map(\.glyph), globalIndices: ids,
+      words: localWords.words.map { (index: $0.index, value: $0.value) },
+      activeWordIndex: localWords.activeWordIndex,
+      mode: policy.highlightMode, blindMode: session.configuration.rules.blindMode,
+      typedEffect: style.typedCharacterEffect,
+      hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
+    else { return nil }
+    let caret = states.first { $0.glyph.state == .current }?.id
+    let context = Self(windowSession: session, style: style,
+      targetCount: directory.targetUTF16.count, completed: completed, caret: caret, policy: policy)
+    let appearanceByID = Dictionary(uniqueKeysWithValues: zip(ids, appearance))
+    var painter = GlyphPainter(plan: context)
+    var next = 0
+    var runs: [PromptFieldTextRun] = []
+    runs.reserveCapacity(slice.fields.count)
+    for field in slice.fields {
+      var cells: [PromptFieldTextRun.Cell] = []
+      cells.reserveCapacity(field.cellIDs.count)
+      for id in field.cellIDs {
+        guard next < states.count, states[next].id == id,
+          let ink = appearanceByID[id] else { return nil }
+        let glyph = states[next].glyph
+        cells.append(.init(id: id, glyph: glyph,
+          text: painter.render(id, glyph, nil, appearanceOverride: ink),
+          isGap: id == field.targetUTF16Range.upperBound - 1 && directory.targetUTF16[id] == 32))
+        next += 1
+      }
+      runs.append(.init(fieldID: field.index, cells: cells,
+        structuralReturn: field.structuralReturnCount > 0))
+    }
+    return next == states.count ? runs : nil
+  }
+
   func render() -> PromptRendering {
     var painter = GlyphPainter(plan: self)
     if let presentation { return presentation.render { painter.render($0, $1, $2) } }

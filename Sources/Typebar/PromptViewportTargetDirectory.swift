@@ -121,6 +121,11 @@ struct PromptViewportTargetDirectory {
       targetUTF16: targetUTF16, separatorOffsets: separatorOffsets)
   }
 
+  func completedIndices(in cells: [Cell], session: TypingSession) -> Set<Int>? {
+    guard session.automaticInputAttemptID == attemptID, session.promptTargetID == promptTargetID else { return nil }
+    return session.promptViewportCompletedIndices(in: cells, separatorOffsets: separatorOffsets)
+  }
+
   /// Build only requested drawable field runs. The caller supplies appearance
   /// ink; this directory owns target identity and live state, not theme style.
   func materializeFieldRuns(fields requested: Range<Int>, session: TypingSession,
