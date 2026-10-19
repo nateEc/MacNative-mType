@@ -937,6 +937,15 @@ TYPEBAR_QA_IN_MEMORY_STORE=1 swift test -Xswiftc -DTYPEBAR_LIVE_NETWORK_QA \
 
 该入口使用生产诗歌／百科运输、解析及初始提示工厂，分别完成英文诗歌、英文百科、简体中文百科三词练习并核对回放。会话不使用磁盘缓存或 Cookie，30 秒后请求取消；这是协作式取消，不是独立进程硬超时。提供者不可用即失败，不跳过、不用夹具替代，也不将抓取文本写入验收日志。未设置编译开关时，这些用例不进入普通测试清单，日常回归不依赖公共网络。此入口不验证 GUI／实体输入法、长练习续取、所有语言或服务持续可用性，亦不替代完整门禁。
 
+百科 HTML 解析还可显式对照三个随机真实词条（英／德／中）的 WebKit 离屏 DOM `textContent`，不启动 Typebar、不缓存正文：
+
+```zsh
+TYPEBAR_QA_IN_MEMORY_STORE=1 swift test -Xswiftc -DTYPEBAR_LIVE_NETWORK_QA \
+  --filter EncyclopediaHTMLBrowserTests
+```
+
+本地合成 HTML 对照会在普通测试中运行；随机真实词条只在此编译开关下运行。该测试只验证当前提供者返回的导言 HTML 到 DOM 文本这一层，不证明后续语言筛选、整场练习或未来所有词条等价；公开服务不可用时会直接失败，不按夹具成功处理。
+
 检查参考源码隔离与生产服务边界：
 
 ```zsh

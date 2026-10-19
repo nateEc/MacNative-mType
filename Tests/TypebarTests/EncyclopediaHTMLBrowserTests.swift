@@ -1,3 +1,4 @@
+import Foundation
 import WebKit
 import XCTest
 @testable import Typebar
@@ -23,7 +24,7 @@ import XCTest
     }
   }
 
-  func testNativeIntroductionTextMatchesDetachedDOMWithoutOpeningWindow() throws {
+  func testNativeIntroductionTextMatchesDetachedDOMWithoutOpeningWindow() async throws {
     let html = [
       "<p>North <b>harbor</b>&nbsp;2026 [12]</p><p>South &amp; west &#x1F680;.</p>",
       "<p>left\nright\tend</p><p>next&nbsp;word</p>",
@@ -59,6 +60,64 @@ import XCTest
       "<!-- <noscript><b>comment</b></noscript> -->tail",
       "<p>first<table><tr><td>cell</table>last</p>"
     ]
+    let browserValues = try await browserTexts(for: html)
+    XCTAssertEqual(browserValues.count, html.count)
+    for (source, browserText) in zip(html, browserValues) {
+      XCTAssertEqual(LivePracticeContentService.introductionText(fromHTML: source), browserText, source)
+      if source.contains("data-x='encoding=text/html'") {
+        XCTAssertEqual(browserText, "math xmltail", "Only the actual encoding attribute controls HTML integration")
+      }
+      if source.contains("quoted xml") {
+        XCTAssertEqual(browserText, "quoted xmltail")
+      }
+    }
+  }
+
+#if TYPEBAR_LIVE_NETWORK_QA
+  func testPublicWikipediaIntroductionsMatchDetachedDOM() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.urlCache = nil
+    configuration.httpCookieStorage = nil
+    configuration.timeoutIntervalForRequest = 10
+    let session = URLSession(configuration: configuration)
+    defer { session.invalidateAndCancel() }
+    var samples: [(host: String, pageID: Int, html: String)] = []
+    for host in ["en", "de", "zh"] {
+      let summaryURL = try XCTUnwrap(URL(string: "https://\(host).wikipedia.org/api/rest_v1/page/random/summary"))
+      let (identityData, identityResponse) = try await session.data(from: summaryURL)
+      XCTAssertEqual((identityResponse as? HTTPURLResponse)?.statusCode, 200, host)
+      let identity = try XCTUnwrap(JSONSerialization.jsonObject(with: identityData) as? [String: Any])
+      let pageID = try XCTUnwrap(identity["pageid"] as? Int)
+      var components = URLComponents()
+      components.scheme = "https"
+      components.host = "\(host).wikipedia.org"
+      components.path = "/w/api.php"
+      components.queryItems = [
+        .init(name: "action", value: "query"), .init(name: "format", value: "json"),
+        .init(name: "pageids", value: String(pageID)), .init(name: "prop", value: "extracts"),
+        .init(name: "exintro", value: "true")
+      ]
+      let (sectionData, sectionResponse) = try await session.data(from: try XCTUnwrap(components.url))
+      XCTAssertEqual((sectionResponse as? HTTPURLResponse)?.statusCode, 200, host)
+      let section = try XCTUnwrap(JSONSerialization.jsonObject(with: sectionData) as? [String: Any])
+      let query = try XCTUnwrap(section["query"] as? [String: Any])
+      let pages = try XCTUnwrap(query["pages"] as? [String: Any])
+      let page = try XCTUnwrap(pages[String(pageID)] as? [String: Any])
+      let extract = try XCTUnwrap(page["extract"] as? String)
+      samples.append((host, pageID, extract))
+    }
+    for sample in samples {
+      let values = try await browserTexts(for: [sample.html])
+      let browserText = try XCTUnwrap(values.first,
+        "\(sample.host) page \(sample.pageID): HTML UTF-16 \(sample.html.utf16.count)")
+      let native = LivePracticeContentService.introductionText(fromHTML: sample.html)
+      XCTAssertTrue(native == browserText,
+        "\(sample.host) page \(sample.pageID): native UTF-16 \(native?.utf16.count ?? -1), browser \(browserText.utf16.count)")
+    }
+  }
+#endif
+
+  private func browserTexts(for html: [String]) async throws -> [String] {
     let encoded = String(decoding: try JSONEncoder().encode(html), as: UTF8.self)
       .replacingOccurrences(of: "<", with: "\\u003c")
     let configuration = WKWebViewConfiguration()
@@ -79,19 +138,9 @@ import XCTest
       });
       </script>
       """, baseURL: nil)
-    wait(for: [completion], timeout: 20)
+    await fulfillment(of: [completion], timeout: 20)
     XCTAssertNil(probe.error)
-    let browserValues = try XCTUnwrap(probe.values)
-    XCTAssertEqual(browserValues.count, html.count)
-    for (source, browserText) in zip(html, browserValues) {
-      XCTAssertEqual(LivePracticeContentService.introductionText(fromHTML: source), browserText, source)
-      if source.contains("data-x='encoding=text/html'") {
-        XCTAssertEqual(browserText, "math xmltail", "Only the actual encoding attribute controls HTML integration")
-      }
-      if source.contains("quoted xml") {
-        XCTAssertEqual(browserText, "quoted xmltail")
-      }
-    }
     XCTAssertNil(web.window)
+    return try XCTUnwrap(probe.values)
   }
 }
