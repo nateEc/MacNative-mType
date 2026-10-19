@@ -106,6 +106,8 @@ struct TypebarApp: App {
     wholePreviewLayout: @escaping @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout = {
       try await PromptFieldTextLayout.makeCooperatively(map: $0, width: $1, font: $2,
         lineSpacing: $3, rightToLeft: $4, joinsLetters: $5)
+    }, promptRender: @escaping @MainActor (TypingSession, String?, PromptRenderStyle) -> PromptRendering = {
+      PromptRenderPlan(session: $0, composition: $1, style: $2).render()
     }, wholePreviewViewportEnabled: Bool = false) -> some View {
     ContentView(settings: settings, account: account, announcements: announcements,
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
@@ -113,7 +115,8 @@ struct TypebarApp: App {
       livePromptPrepare: livePromptPrepare,
       liveSessionPrepare: liveSessionPrepare,
       wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender,
-      wholePreviewLayout: wholePreviewLayout, wholePreviewViewportEnabled: wholePreviewViewportEnabled)
+      wholePreviewLayout: wholePreviewLayout, promptRender: promptRender,
+      wholePreviewViewportEnabled: wholePreviewViewportEnabled)
   }
 
   private static let modelConfiguration = ModelConfiguration(
@@ -1236,6 +1239,7 @@ private struct ContentView: View {
   let wholePreviewPrepare: @MainActor (TestConfiguration, WeakSpotScores, PoolWordDecorationState) async throws -> TypingSession
   let wholePreviewRender: @MainActor (TypingSession, PromptRenderStyle) async throws -> PromptRendering
   let wholePreviewLayout: @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout
+  let promptRender: @MainActor (TypingSession, String?, PromptRenderStyle) -> PromptRendering
   let wholePreviewViewportEnabled: Bool
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
@@ -2988,9 +2992,9 @@ private struct ContentView: View {
   }
 
   private var typingPanel: some View {
-    // Reuse only within this synchronous view construction. Timer/input
-    // providers below still render their freshly captured session on demand.
-    let rendering = renderedPrompt
+    // The admitted viewport owns its ink. Do not build an unused complete
+    // presentation; the fallback still captures one fresh rendering here.
+    let rendering: PromptRendering? = usesWholePreviewViewport ? nil : renderedPrompt
     let ignoresSystemReducedMotion = !VisualFunboxReducedMotionPolicy
       .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers)
     return ZStack(alignment: .topLeading) {
@@ -3011,10 +3015,12 @@ private struct ContentView: View {
             ignoresSystemReducedMotion: ignoresSystemReducedMotion
           ) {
             Group {
-              if !PracticeLineDisplayPolicy.needsOuterViewport(showsAllLines: showsAllPracticeLines,
+              if usesWholePreviewViewport {
+                practicePrompt(rendering: nil)
+              } else if let rendering, !PracticeLineDisplayPolicy.needsOuterViewport(showsAllLines: showsAllPracticeLines,
                 usesTape: usesTapePractice, usesASL: practiceVisualEffect.usesASL, usesChoo: practiceVisualEffect.usesChoo) {
                 practicePrompt(rendering: rendering)
-              } else {
+              } else if let rendering {
                 PracticePromptViewport(
                   text: rendering.text, font: practicePromptNSFont(size: settings.fontSize),
                   lineSpacing: session.configuration.usesJoiningScriptPrompt ? 8 : 12,
@@ -3312,7 +3318,7 @@ private struct ContentView: View {
       wrapperRevision: settings.practiceWrapperRevision)
   }
 
-  private func practicePrompt(rendering: PromptRendering) -> some View {
+  private func practicePrompt(rendering: PromptRendering?) -> some View {
     let _ = settings.localPracticeFontRevision
     let isRightToLeft = session.configuration.usesRightToLeftPrompt
     let usesJoiningScript = session.configuration.usesJoiningScriptPrompt
@@ -3325,7 +3331,7 @@ private struct ContentView: View {
             guard session.automaticInputAttemptID == attempt else { return }
             viewportFallbackAttemptID = attempt
           })
-      } else if practiceVisualEffect.usesASL {
+      } else if let rendering, practiceVisualEffect.usesASL {
         ASLPracticePrompt(
           glyphs: session.promptGlyphsInDisplayOrder, fontSize: settings.fontSize, accent: activeTheme.accent,
           glyphIDs: specialPromptGlyphIDs, rendering: rendering, carets: specialPromptCaretConfiguration,
@@ -3334,7 +3340,7 @@ private struct ContentView: View {
           caretGlyphID: currentPromptGlyphIndex,
           viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3),
           words: session.promptWordPresentations)
-      } else if practiceVisualEffect.usesChoo {
+      } else if let rendering, practiceVisualEffect.usesChoo {
         ChooPracticePrompt(
           glyphs: session.promptGlyphsInDisplayOrder,
           rendering: rendering,
@@ -3348,7 +3354,7 @@ private struct ContentView: View {
           glyphIDs: specialPromptGlyphIDs, carets: specialPromptCaretConfiguration,
           viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3),
           lineScroll: showsAllPracticeLines ? nil : practiceLineScrollContext(rendering))
-      } else if usesTapePractice {
+      } else if let rendering, usesTapePractice {
         TapePracticePrompt(session: session, rendering: rendering,
           mode: settings.practiceTapeMode,
           margin: settings.practiceTapeMargin,
@@ -3362,7 +3368,7 @@ private struct ContentView: View {
               retirement: practiceLineScrollContext(latest, session: current))
           },
           onTapeWordsRemoved: { session.removeTapePromptWords($0) })
-      } else if rendering.compositionTextMap != nil {
+      } else if let rendering, rendering.compositionTextMap != nil {
         PromptFieldPracticePrompt(rendering: rendering,
           font: practicePromptNSFont(size: settings.fontSize), lineSpacing: usesJoiningScript ? 8 : 12,
           rightToLeft: isRightToLeft, joinsLetters: usesJoiningScript,
@@ -3375,7 +3381,7 @@ private struct ContentView: View {
             PromptInputWrapOverlay(layout: promptInputWrapLayout)
               .allowsHitTesting(false).accessibilityHidden(true)
           }
-      } else {
+      } else if let rendering {
         Text(rendering.text)
           .lineSpacing(usesJoiningScript ? 8 : 12)
           .textSelection(.disabled)
@@ -3671,7 +3677,7 @@ private struct ContentView: View {
       }
     }
     let style = promptRenderStyle
-    return PromptRenderPlan(session: session, composition: composition, style: style).render()
+    return promptRender(session, composition, style)
   }
 
   private var completedPromptColor: Color {
@@ -3887,7 +3893,9 @@ private struct ContentView: View {
       wrapAdmission: promptInputWrapAdmission)
     if session.typed != typedBefore {
       let style = promptRenderStyle
-      if let previousPreview, previousPreview.attemptID == session.automaticInputAttemptID,
+      if usesWholePreviewViewport {
+        preparedWholePreviewRendering = nil
+      } else if let previousPreview, previousPreview.attemptID == session.automaticInputAttemptID,
         previousPreview.typedSnapshot == typedBefore, previousPreview.style == style,
         previousPreview.paceGuideIndex == nil, compositionText.isEmpty,
         let patched = PromptSequentialInputPatch.make(prepared: previousPreview.rendering,

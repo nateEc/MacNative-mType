@@ -5,7 +5,7 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class ViewportPracticeHostTests: XCTestCase {
-  @MainActor private final class Counts { var generation = 0 }
+  @MainActor private final class Counts { var generation = 0; var completeRenders = 0 }
   @MainActor private final class Fixture {
     let suite = "ViewportPracticeHostTests.\(UUID())"
     let defaults: UserDefaults
@@ -38,6 +38,9 @@ import XCTest
         wholePreviewPrepare: { configuration, _, _ in
           counts.generation += 1
           return TypingSession(configuration: configuration, prompt: prompt)
+        }, promptRender: { session, composition, style in
+          counts.completeRenders += 1
+          return PromptRenderPlan(session: session, composition: composition, style: style).render()
         }, wholePreviewViewportEnabled: true).modelContainer(container)
       host = NSHostingView(rootView: AnyView(content.frame(width: 1000, height: 720)))
       window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
@@ -110,6 +113,41 @@ import XCTest
     XCTAssertEqual(native.viewport.canvas.measuredMainCaretRect(style: .bar), native.viewport.canvas.measuredRect(for: 2))
     XCTAssertEqual(fixture.counts.generation, 1)
     XCTAssertFalse(fixture.window.isVisible)
+  }
+
+  func testAdmittedInputAvoidsCompleteRendererButCompositionFallbackUsesIt() throws {
+    let fixture = try Fixture()
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.promptReady }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    let before = fixture.counts.completeRenders
+    input.onInsert("w", false)
+    fixture.waitUntil { fixture.promptReady
+      && native.viewport.canvas.measuredMainCaretRect(style: .bar) == native.viewport.canvas.measuredRect(for: 1) }
+    XCTAssertEqual(fixture.counts.completeRenders, before,
+      "An admitted display must not also construct the complete prompt after input")
+    XCTAssertNotNil(native.viewport.canvas.renderedCellText(for: 0))
+    input.onDelete()
+    fixture.waitUntil { fixture.promptReady
+      && native.viewport.canvas.measuredMainCaretRect(style: .bar) == native.viewport.canvas.measuredRect(for: 0) }
+    input.onInsert("w", false)
+    fixture.waitUntil { fixture.promptReady
+      && native.viewport.canvas.measuredMainCaretRect(style: .bar) == native.viewport.canvas.measuredRect(for: 1) }
+    XCTAssertEqual(fixture.counts.completeRenders, before,
+      "Deleting and retyping must not rebuild unused complete presentation")
+    let ink = native.viewport.canvas.renderedCellText(for: 0)
+    fixture.settings.flipTestColors.toggle()
+    fixture.waitUntil { fixture.promptReady && native.viewport.canvas.renderedCellText(for: 0) != ink }
+    XCTAssertEqual(fixture.counts.completeRenders, before,
+      "Appearance changes must repaint admitted ink without the complete renderer")
+    input.setMarkedText("中", selectedRange: .init(location: 1, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).isEmpty
+      && fixture.views(PromptFieldNativeView.self).contains { ($0.accessibilityValue() as? String)?.contains("中") == true } }
+    XCTAssertGreaterThan(fixture.counts.completeRenders, before)
+    XCTAssertEqual(fixture.counts.generation, 1)
+    XCTAssertFalse(fixture.settings.allowsRestartingConfigurationChange)
   }
 
   func testWholePromptExpandsToExactHeightAndUsesThePageScroller() throws {
