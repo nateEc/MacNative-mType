@@ -63,6 +63,60 @@ import XCTest
       directory: directory, style: style, width: 180, font: font))
   }
 
+  func testIndependentWindowCaretMatchesFullFieldGeometryBeforeAndAfterInput() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "ab cd")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    for accepted in ["", "ab "] {
+      if !accepted.isEmpty { session.insertBatch(accepted, at: start) }
+      let map = try XCTUnwrap(PromptRenderPlan(session: session,
+        composition: "", style: style).render().compositionTextMap)
+      let full = PromptFieldTextLayout(map: map, width: 45, font: font)
+      let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+        directory: directory, style: style, width: 45, font: font))
+      let first = try XCTUnwrap(sequence.append(fields: 0..<1))
+      let second = try XCTUnwrap(sequence.append(fields: 1..<2))
+      let expected = try XCTUnwrap(full.mainRect(style: .bar))
+      let local = accepted.isEmpty ? first : second
+      XCTAssertEqual(local.layout.mainRect(style: .bar), expected)
+      XCTAssertEqual(local.layout.cellFrames[session.promptCaretGlyphIndex!],
+        full.cellFrames[session.promptCaretGlyphIndex!])
+    }
+  }
+
+  func testNativeViewportCaretFollowsVisibleWindowAndRetiresOnEviction() throws {
+    let session = TypingSession(configuration: .words(4), prompt: "one two three four")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let fullMap = try XCTUnwrap(PromptRenderPlan(session: session,
+      composition: "", style: style).render().compositionTextMap)
+    let full = PromptFieldTextLayout(map: fullMap, width: 180, font: font)
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let first = try XCTUnwrap(sequence.append(fields: 0..<2))
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: 180, height: 400))
+    let motion = PromptCaretMotionCoordinator()
+    var carets = config(motion, attempt: session.automaticInputAttemptID)
+    carets.mainGlyphID = session.promptCaretGlyphIndex
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [first]))))
+    canvas.configureCaret(carets)
+    canvas.presentCaret(at: 0)
+    XCTAssertEqual(motion.main.position, full.mainRect(style: .bar))
+    let second = try XCTUnwrap(sequence.append(fields: 2..<4))
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [second]))))
+    canvas.presentCaret(at: 0.1)
+    XCTAssertTrue(canvas.caretIsRetired, "The old animation position must not remain visible")
+    let returned = try XCTUnwrap(sequence.revisit(fields: 0..<2))
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [returned]))))
+    canvas.presentCaret(at: 0.2)
+    XCTAssertEqual(motion.main.position, full.mainRect(style: .bar))
+    canvas.frame.size.width = 160
+    XCTAssertTrue(canvas.caretIsRetired)
+    XCTAssertNil(canvas.measuredMainCaretRect(style: .bar))
+  }
+
   func testEvictedFieldWindowCanBeRebuiltFromSavedFlowCheckpoint() throws {
     let session = TypingSession(configuration: .words(6), prompt: "alpha beta gamma delta epsilon zeta")
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))

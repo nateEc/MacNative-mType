@@ -76,6 +76,14 @@ import AppKit
     canvas.clear()
   }
 
+  func configureCaret(_ configuration: PromptCaretNativeView.Configuration) {
+    canvas.configureCaret(configuration)
+  }
+
+  func presentCaret(at time: TimeInterval) {
+    canvas.presentCaret(at: time)
+  }
+
   override func setFrameSize(_ newSize: NSSize) {
     let oldWidth = bounds.width
     super.setFrameSize(newSize)

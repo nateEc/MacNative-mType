@@ -100,14 +100,18 @@ import AppKit
     guard let runs = PromptRenderPlan.renderIndependentFieldWindow(
       directory: directory, session: session, fields: fields, style: style) else { return nil }
     let layout: PromptFieldTextLayout
+    let anchor = session.promptCaretGlyphIndex.map {
+      PromptCompositionProjection.Anchor(cellID: $0, after: false)
+    }
     if let start {
       guard let continued = PromptFieldTextLayout.continuing(fieldRuns: runs,
         from: start, groupOffset: fields.lowerBound, width: width,
         font: font, lineSpacing: lineSpacing,
-        rightToLeft: rightToLeft, joinsLetters: joinsLetters) else { return nil }
+        rightToLeft: rightToLeft, joinsLetters: joinsLetters,
+        anchor: anchor) else { return nil }
       layout = continued
     } else {
-      layout = PromptFieldTextLayout(fieldRuns: runs, width: width,
+      layout = PromptFieldTextLayout(fieldRuns: runs, anchor: anchor, width: width,
         font: font, lineSpacing: lineSpacing,
         rightToLeft: rightToLeft, joinsLetters: joinsLetters)
     }

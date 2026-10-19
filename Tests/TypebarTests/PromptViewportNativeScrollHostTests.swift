@@ -15,6 +15,18 @@ import XCTest
     XCTFail("Viewport did not reach the expected state")
   }
 
+  private func caretConfig(_ session: TypingSession,
+    motion: PromptCaretMotionCoordinator) -> PromptCaretNativeView.Configuration {
+    var configuration = PromptCaretNativeView.Configuration(text: AttributedString(),
+      mainOffset: nil, paceOffset: nil, mainStyle: .bar, paceStyle: .off,
+      font: font, lineSpacing: 12, rightToLeft: false, accent: .blue,
+      motion: .off, reducesMotion: true, frameRate: 30,
+      attemptID: session.automaticInputAttemptID, coordinator: motion,
+      automaticallyPresents: false)
+    configuration.mainGlyphID = session.promptCaretGlyphIndex
+    return configuration
+  }
+
   func testNativeScrollerDemandsMoreAtMeasuredEndAndRevisitsEvictedTop() async throws {
     let prompt = (0..<80).map { "word\($0)" }.joined(separator: " ")
     let session = TypingSession(configuration: .words(80), prompt: prompt)
@@ -251,11 +263,18 @@ import XCTest
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 32))
     try await waitUntil { host.measuredFieldCount == 32 && !host.isPreparing }
+    let motion = PromptCaretMotionCoordinator()
+    host.configureCaret(caretConfig(session, motion: motion))
+    host.presentCaret(at: 0)
+    XCTAssertEqual(motion.main.position, host.canvas.measuredRect(for: 0))
     let before = host.canvas.renderedCellText(for: 0)
     session.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
     XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    host.configureCaret(caretConfig(session, motion: motion))
+    host.presentCaret(at: 0.1)
     XCTAssertEqual(host.measuredFieldCount, 32)
     XCTAssertNotEqual(host.canvas.renderedCellText(for: 0), before)
+    XCTAssertEqual(motion.main.position, host.canvas.measuredRect(for: 1))
     XCTAssertEqual(host.canvas.accessibilityValue() as? String, prompt)
     XCTAssertFalse(host.canvas.hasCompleteHeight)
   }
@@ -273,5 +292,31 @@ import XCTest
     session.insertBatch("ax", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
     XCTAssertFalse(host.replaceVisibleSession(session, style: style))
     XCTAssertEqual(host.canvas.renderedCellText(for: 0), before)
+  }
+
+  func testNativeScrollHostCaretMovesWithAcceptedInputAndCurrentWindow() async throws {
+    var session = TypingSession(configuration: .words(4), prompt: "one two three four")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    let motion = PromptCaretMotionCoordinator()
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
+    host.configureCaret(caretConfig(session, motion: motion))
+    host.presentCaret(at: 0)
+    let initial = try XCTUnwrap(PromptRenderPlan(session: session,
+      composition: "", style: style).render().compositionTextMap)
+    XCTAssertEqual(motion.main.position,
+      PromptFieldTextLayout(map: initial, width: 180, font: font).mainRect(style: .bar))
+    session.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    host.configureCaret(caretConfig(session, motion: motion))
+    host.presentCaret(at: 0.1)
+    let updated = try XCTUnwrap(PromptRenderPlan(session: session,
+      composition: "", style: style).render().compositionTextMap)
+    XCTAssertEqual(motion.main.position,
+      PromptFieldTextLayout(map: updated, width: 180, font: font).mainRect(style: .bar))
   }
 }

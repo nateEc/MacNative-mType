@@ -5,11 +5,17 @@ import AppKit
 /// expose only measured prefix height, never a guessed full-page extent.
 @MainActor final class PromptViewportNativeCanvas: NSView {
   private var snapshot: PromptViewportFieldLayoutSequence.DrawingSnapshot?
+  private let caret = PromptCaretNativeView(frame: .zero)
+  private var caretConfiguration: PromptCaretNativeView.Configuration?
+  private var geometryRevision: UInt64 = 0
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
+    caret.frame = bounds
+    caret.isHidden = true
+    addSubview(caret)
     setAccessibilityElement(true)
     setAccessibilityRole(.staticText)
   }
@@ -17,6 +23,9 @@ import AppKit
 
   func clear() {
     snapshot = nil
+    caretConfiguration = nil
+    caret.stop()
+    caret.isHidden = true
     setAccessibilityValue("")
     invalidateIntrinsicContentSize()
     needsDisplay = true
@@ -30,11 +39,13 @@ import AppKit
     let oldWidth = bounds.width
     super.setFrameSize(newSize)
     retireSnapshotIfWidthChanged(from: oldWidth)
+    caret.frame = bounds
   }
   override func setBoundsSize(_ newSize: NSSize) {
     let oldWidth = bounds.width
     super.setBoundsSize(newSize)
     retireSnapshotIfWidthChanged(from: oldWidth)
+    caret.frame = bounds
   }
 
   @discardableResult func configure(snapshot next: PromptViewportFieldLayoutSequence.DrawingSnapshot) -> Bool {
@@ -45,6 +56,8 @@ import AppKit
     else { return false }
     let oldSize = intrinsicContentSize
     snapshot = next
+    geometryRevision &+= 1
+    applyCaretConfiguration()
     setAccessibilityValue(next.accessibilityText)
     needsDisplay = true
     if intrinsicContentSize != oldSize { invalidateIntrinsicContentSize() }
@@ -58,6 +71,43 @@ import AppKit
   }
   func measuredRect(for id: Int) -> CGRect? {
     snapshot?.windows.reversed().compactMap { $0.layout.cellFrames[id] }.first
+  }
+  func measuredMainCaretRect(style: TypingCaretStyle) -> CGRect? {
+    snapshot?.windows.compactMap { $0.layout.mainRect(style: style) }.first
+  }
+  var caretIsRetired: Bool { caret.isHidden }
+  func configureCaret(_ configuration: PromptCaretNativeView.Configuration) {
+    caretConfiguration = configuration
+    applyCaretConfiguration()
+  }
+  func presentCaret(at time: TimeInterval) {
+    guard snapshot != nil, caretConfiguration != nil else { return }
+    caret.present(at: time)
+  }
+  private func applyCaretConfiguration() {
+    guard snapshot != nil, var configuration = caretConfiguration else { return }
+    guard measuredMainCaretRect(style: configuration.mainStyle) != nil else {
+      caret.stop()
+      caret.isHidden = true
+      return
+    }
+    let perGlyph = configuration.fieldDirectionPerGlyph
+    let fallbackDirection = configuration.rightToLeft
+    configuration.geometryRevision = geometryRevision
+    configuration.fieldMainRect = { [weak self] style in
+      self?.measuredMainCaretRect(style: style)
+    }
+    configuration.fieldMainDirection = { [weak self] in
+      self?.snapshot?.windows.first(where: { $0.layout.mainRect(style: .bar) != nil })?
+        .layout.mainDirection(perGlyph: perGlyph) ?? fallbackDirection
+    }
+    configuration.fieldPaceRect = { [weak self] id, after in
+      self?.snapshot?.windows.compactMap { $0.layout.canonicalRect(id, after: after) }.first
+    }
+    configuration.markedCellRect = { [weak self] id in self?.measuredRect(for: id) }
+    caret.frame = bounds
+    caret.isHidden = false
+    caret.update(configuration)
   }
   func renderedCellText(for id: Int) -> AttributedString? {
     snapshot?.windows.reversed().lazy

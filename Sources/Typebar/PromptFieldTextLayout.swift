@@ -256,8 +256,9 @@ struct PromptFieldTextRun: Equatable {
 
   private convenience init(continuingFieldRuns fieldRuns: [PromptFieldTextRun],
     from checkpoint: ContinuationCheckpoint, groupOffset: Int, width: CGFloat, font: NSFont,
-    lineSpacing: CGFloat, rightToLeft: Bool, joinsLetters: Bool) {
-    self.init(aliases: [:], anchor: nil, width: width, font: font, lineSpacing: lineSpacing,
+    lineSpacing: CGFloat, rightToLeft: Bool, joinsLetters: Bool,
+    anchor: PromptCompositionProjection.Anchor?) {
+    self.init(aliases: [:], anchor: anchor, width: width, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, unbounded: false,
       startCheckpoint: checkpoint)
     nextGroupOffset = groupOffset + fieldRuns.count
@@ -268,7 +269,8 @@ struct PromptFieldTextRun: Equatable {
 
   static func continuing(fieldRuns: [PromptFieldTextRun], from checkpoint: ContinuationCheckpoint,
     groupOffset: Int, width: CGFloat, font: NSFont, lineSpacing: CGFloat = 12,
-    rightToLeft: Bool = false, joinsLetters: Bool = false
+    rightToLeft: Bool = false, joinsLetters: Bool = false,
+    anchor: PromptCompositionProjection.Anchor? = nil
   ) -> PromptFieldTextLayout? {
     guard !fieldRuns.isEmpty, groupOffset >= 0, width.isFinite,
       checkpoint.flow.width == max(1, width), checkpoint.flow.rowSpacing == lineSpacing,
@@ -278,7 +280,7 @@ struct PromptFieldTextRun: Equatable {
     else { return nil }
     return .init(continuingFieldRuns: fieldRuns, from: checkpoint, groupOffset: groupOffset,
       width: width, font: font, lineSpacing: lineSpacing,
-      rightToLeft: rightToLeft, joinsLetters: joinsLetters)
+      rightToLeft: rightToLeft, joinsLetters: joinsLetters, anchor: anchor)
   }
 
   static func makeCooperatively(map: PromptCompositionTextMap, width: CGFloat, font: NSFont,
