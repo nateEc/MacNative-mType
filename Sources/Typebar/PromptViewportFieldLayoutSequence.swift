@@ -95,6 +95,14 @@ import AppKit
       from: fields.lowerBound == 0 ? nil : checkpointsByField[fields.lowerBound])
   }
 
+  func measuredTop(forField index: Int) -> CGFloat? {
+    guard let span = measuredSpans.first(where: { $0.fields.contains(index) }),
+      let window = revisit(fields: span.fields) else { return nil }
+    let cells = window.runs.first(where: { $0.fieldID == index })?.cells ?? []
+    return cells.compactMap { window.layout.cellFrames[$0.id]?.minY }.min()
+      ?? span.inkY?.lowerBound
+  }
+
   private func makeWindow(fields: Range<Int>,
     from start: PromptFieldTextLayout.ContinuationCheckpoint?) -> Window? {
     guard let runs = PromptRenderPlan.renderIndependentFieldWindow(

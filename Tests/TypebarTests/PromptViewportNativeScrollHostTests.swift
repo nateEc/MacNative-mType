@@ -55,6 +55,88 @@ import XCTest
     XCTAssertFalse(window.isVisible)
   }
 
+  func testScrollToUnmeasuredFieldPreparesThroughTargetAndShowsItsGlyph() async throws {
+    let prompt = (0..<40).map { "word\($0)" }.joined(separator: " ")
+    let session = TypingSession(configuration: .words(40), prompt: prompt)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
+    XCTAssertFalse(host.scrollToField(-1))
+    XCTAssertFalse(host.scrollToField(directory.fieldCount))
+    XCTAssertTrue(host.scrollToField(25))
+    try await waitUntil { host.canvas.measuredRect(for: (0..<25).reduce(0) { $0 + "word\($1) ".utf16.count }) != nil
+      && !host.isPreparing }
+    let targetID = (0..<25).reduce(0) { $0 + "word\($1) ".utf16.count }
+    let rect = try XCTUnwrap(host.canvas.measuredRect(for: targetID))
+    XCTAssertTrue(host.scrollView.contentView.documentVisibleRect.intersects(rect))
+    XCTAssertLessThan(sequence.nextField, sequence.fieldCount)
+    XCTAssertFalse(host.canvas.hasCompleteHeight)
+    XCTAssertLessThan(host.retainedWindowCount, sequence.measuredSpans.count)
+  }
+
+  func testNewAttemptCancelsPendingRemoteFieldScroll() async throws {
+    let oldSession = TypingSession(configuration: .words(80),
+      prompt: (0..<80).map { "old\($0)" }.joined(separator: " "))
+    let oldDirectory = try XCTUnwrap(PromptViewportTargetDirectory(session: oldSession))
+    let oldSequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: oldSession,
+      directory: oldDirectory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: oldSequence, batchSize: 2))
+    try await waitUntil { oldSequence.nextField > 2 && !host.isPreparing }
+    let oldMeasured = oldSequence.nextField
+    XCTAssertTrue(host.scrollToField(70))
+    let newSession = TypingSession(configuration: .words(3), prompt: "new round now")
+    let newDirectory = try XCTUnwrap(PromptViewportTargetDirectory(session: newSession))
+    let newSequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: newSession,
+      directory: newDirectory, style: style, width: 180, font: font))
+    XCTAssertTrue(host.configure(sequence: newSequence, batchSize: 2))
+    try await waitUntil { !host.isPreparing }
+    XCTAssertEqual(host.canvas.accessibilityValue() as? String, newSession.prompt)
+    XCTAssertEqual(host.scrollView.contentView.bounds.minY, 0)
+    XCTAssertEqual(oldSequence.nextField, oldMeasured)
+  }
+
+  func testManualTopScrollCancelsPendingDistantFieldRequest() async throws {
+    let session = TypingSession(configuration: .words(80),
+      prompt: (0..<80).map { "word\($0)" }.joined(separator: " "))
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
+    XCTAssertTrue(host.scrollToField(70))
+    host.scrollToTop()
+    try await waitUntil { !host.isPreparing }
+    XCTAssertLessThan(sequence.nextField, 70)
+    XCTAssertEqual(host.scrollView.contentView.bounds.minY, 0)
+    XCTAssertNotNil(host.canvas.measuredRect(for: 0))
+  }
+
+  func testNewMeasuredFieldRequestSupersedesPendingDistantRequest() async throws {
+    let session = TypingSession(configuration: .words(80),
+      prompt: (0..<80).map { "word\($0)" }.joined(separator: " "))
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
+    XCTAssertTrue(host.scrollToField(70))
+    XCTAssertTrue(host.scrollToField(0))
+    try await waitUntil { !host.isPreparing }
+    XCTAssertLessThan(sequence.nextField, 70)
+    XCTAssertEqual(host.scrollView.contentView.bounds.minY, 0)
+    XCTAssertNotNil(host.canvas.measuredRect(for: 0))
+  }
+
   func testWidthChangeRetiresOldMeasuredCanvas() async throws {
     let session = TypingSession(configuration: .words(4), prompt: "one two three four")
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))

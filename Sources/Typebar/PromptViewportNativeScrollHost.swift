@@ -19,6 +19,7 @@ import AppKit
   private var sequence: PromptViewportFieldLayoutSequence?
   private var batchSize = 0
   private var retained: [Int: PromptViewportFieldLayoutSequence.Window] = [:]
+  private var pendingFieldScroll: Int?
   private(set) var preparationFailure: Error?
   var isPreparing: Bool { preparation.isPreparing }
   var retainedWindowCount: Int { retained.count }
@@ -70,6 +71,7 @@ import AppKit
 
   func stop() {
     preparation.cancel()
+    pendingFieldScroll = nil
     sequence = nil
     retained.removeAll()
     preparationFailure = nil
@@ -107,6 +109,8 @@ import AppKit
   }
 
   func scrollToMeasuredEnd() {
+    pendingFieldScroll = nil
+    preparation.cancel()
     let bottom = max(0, canvas.frame.height - clip.bounds.height)
     clip.scroll(to: .init(x: 0, y: bottom))
     scrollView.reflectScrolledClipView(clip)
@@ -114,9 +118,35 @@ import AppKit
   }
 
   func scrollToTop() {
+    pendingFieldScroll = nil
+    preparation.cancel()
     clip.scroll(to: .zero)
     scrollView.reflectScrolledClipView(clip)
     visibleRegionChanged()
+  }
+
+  /// A distant target is reached by bounded sequential measurement; unknown
+  /// geometry is never estimated as a complete document height.
+  @discardableResult func scrollToField(_ index: Int) -> Bool {
+    guard let sequence, index >= 0, index < sequence.fieldCount else { return false }
+    if index < sequence.nextField {
+      pendingFieldScroll = nil
+      preparation.cancel()
+      return revealMeasuredField(index, in: sequence)
+    }
+    pendingFieldScroll = index
+    preparation.cancel()
+    requestMoreIfNeeded()
+    return true
+  }
+
+  @discardableResult private func revealMeasuredField(_ index: Int,
+    in sequence: PromptViewportFieldLayoutSequence) -> Bool {
+    guard let y = sequence.measuredTop(forField: index) else { return false }
+    clip.scroll(to: .init(x: 0, y: y))
+    scrollView.reflectScrolledClipView(clip)
+    visibleRegionChanged()
+    return true
   }
 
   private func visibleRegionChanged() {
@@ -129,8 +159,9 @@ import AppKit
       !preparation.isPreparing, sequence.nextField < sequence.fieldCount else { return }
     let visible = clip.documentVisibleRect
     let measured = sequence.contentHeight ?? 0
-    guard measured <= visible.maxY + max(1, visible.height) else { return }
-    let target = sequence.nextField + min(batchSize, sequence.fieldCount - sequence.nextField)
+    guard pendingFieldScroll != nil || measured <= visible.maxY + max(1, visible.height) else { return }
+    let target = min(sequence.nextField + batchSize,
+      (pendingFieldScroll.map { $0 + 1 } ?? sequence.fieldCount))
     preparation.start(sequence: sequence, batchSize: batchSize,
       throughFieldCount: target,
       isCurrent: { [weak self] in
@@ -152,6 +183,10 @@ import AppKit
     for window in snapshot.windows { retained[window.fields.lowerBound] = window }
     resizeDocumentToMeasuredHeight()
     refreshVisibleWindows()
+    if let target = pendingFieldScroll, let sequence, target < sequence.nextField {
+      pendingFieldScroll = nil
+      _ = revealMeasuredField(target, in: sequence)
+    }
   }
 
   private func resizeDocumentToMeasuredHeight() {
