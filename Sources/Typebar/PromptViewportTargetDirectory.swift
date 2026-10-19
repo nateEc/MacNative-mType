@@ -77,8 +77,34 @@ struct PromptViewportTargetDirectory {
       session.automaticInputAttemptID == attemptID,
       session.prompt.utf16.elementsEqual(targetUTF16),
       let glyphs = session.promptViewportTargetGlyphs(in: slice.cells,
-        targetUTF16: targetUTF16)
+        targetUTF16: targetUTF16), glyphs.count == slice.cells.count
     else { return nil }
     return zip(slice.cells, glyphs).map { StateCell(id: $0.id, glyph: $1) }
+  }
+
+  /// Build only requested drawable field runs. The caller supplies appearance
+  /// ink; this directory owns target identity and live state, not theme style.
+  func materializeFieldRuns(fields requested: Range<Int>, session: TypingSession,
+    renderGlyph: (Int, TypingPromptGlyph) -> AttributedString) -> [PromptFieldTextRun]? {
+    guard let states = materializeStates(fields: requested, session: session) else { return nil }
+    var runs: [PromptFieldTextRun] = []
+    runs.reserveCapacity(requested.count)
+    var next = 0
+    for fieldIndex in requested {
+      let range = fieldRanges[fieldIndex]
+      var cells: [PromptFieldTextRun.Cell] = []
+      cells.reserveCapacity(range.count)
+      for id in range {
+        guard next < states.count else { return nil }
+        let state = states[next]
+        guard state.id == id else { return nil }
+        cells.append(.init(id: id, glyph: state.glyph, text: renderGlyph(id, state.glyph),
+          isGap: id == range.upperBound - 1 && targetUTF16[id] == 32))
+        next += 1
+      }
+      runs.append(.init(fieldID: fieldIndex, cells: cells,
+        structuralReturn: targetUTF16[range].contains(10)))
+    }
+    return runs
   }
 }

@@ -7,6 +7,102 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testDirectoryBuildsIndependentFieldWindowsWithFullPathCellGeometry() throws {
+    var session = TypingSession(configuration: .words(7),
+      prompt: "alpha beta gamma\ndelta epsilon zeta eta")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let width: CGFloat = 185
+    for accepted in ["", "a"] {
+      if !accepted.isEmpty { session.insert(accepted, at: start) }
+      let map = try XCTUnwrap(try render(session).compositionTextMap)
+      let full = PromptFieldTextLayout(map: map, width: width, font: font)
+      var checkpoint: PromptFieldTextLayout.ContinuationCheckpoint?
+      var visited: [Int: CGRect] = [:]
+      for offset in stride(from: 0, to: directory.fieldCount, by: 2) {
+        let range = offset..<min(offset + 2, directory.fieldCount)
+        var paintedIDs: [Int] = []
+        let runs = try XCTUnwrap(directory.materializeFieldRuns(fields: range, session: session) { id, glyph in
+          paintedIDs.append(id)
+          let plan = PromptControlCharacterPresentation.plan(
+            for: glyph, style: .both, isZen: false)
+          var text = AttributedString(plan.text)
+          text.foregroundColor = glyph.state == .correct ? .green : .orange
+          if plan.opacity != 1 { text.foregroundColor = text.foregroundColor?.opacity(plan.opacity) }
+          return text
+        })
+        XCTAssertEqual(paintedIDs, directory.materialize(fields: range)?.cells.map(\.id))
+        XCTAssertEqual(runs.map(\.fieldID), Array(range).map(Optional.some))
+        let window: PromptFieldTextLayout
+        if let checkpoint {
+          window = try XCTUnwrap(PromptFieldTextLayout.continuing(fieldRuns: runs,
+            from: checkpoint, groupOffset: offset, width: width, font: font))
+        } else { window = PromptFieldTextLayout(fieldRuns: runs, width: width, font: font) }
+        for run in runs {
+          for cell in run.cells {
+            XCTAssertEqual(cell, map.fieldRuns.flatMap(\.cells).first { $0.id == cell.id })
+            XCTAssertEqual(window.cellFrames[cell.id], full.cellFrames[cell.id])
+            visited[cell.id] = window.cellFrames[cell.id]
+          }
+        }
+        checkpoint = window.continuationCheckpoint
+      }
+      XCTAssertEqual(visited, full.cellFrames)
+      XCTAssertEqual(checkpoint?.contentHeight, full.size.height)
+      let returned = try XCTUnwrap(directory.materializeFieldRuns(fields: 0..<2,
+        session: session) { _, glyph in AttributedString(String(glyph.character)) })
+      XCTAssertEqual(returned.flatMap(\.cells).map(\.id),
+        map.fieldRuns.prefix(2).flatMap(\.cells).map(\.id))
+    }
+    XCTAssertNil(directory.materializeFieldRuns(fields: 0..<2,
+      session: session.repeatedAttempt()) { _, glyph in AttributedString(String(glyph.character)) })
+    var paintedAfterInvalidRange = false
+    XCTAssertNil(directory.materializeFieldRuns(fields: directory.fieldCount..<(directory.fieldCount + 1),
+      session: session) { _, glyph in
+      paintedAfterInvalidRange = true
+      return AttributedString(String(glyph.character))
+    })
+    XCTAssertFalse(paintedAfterInvalidRange)
+  }
+
+  func testDirectoryFieldWindowsKeepSourceBoundariesAndEmbeddedReturns() throws {
+    let source = ["", "north\nsouth ", "", "harbor ", "tail"]
+    let session = TypingSession(configuration: .words(4), prompt: source.joined(), sourceFields: source)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    XCTAssertTrue((0..<directory.fieldCount).contains { index in
+      (directory.materialize(fields: index..<(index + 1))?.fields.first?.structuralReturnCount ?? 0) > 0
+    })
+    let map = try XCTUnwrap(try render(session).compositionTextMap)
+    let full = PromptFieldTextLayout(map: map, width: 180, font: font)
+    var checkpoint: PromptFieldTextLayout.ContinuationCheckpoint?
+    var visited: [Int: CGRect] = [:]
+    for field in 0..<directory.fieldCount {
+      let runs = try XCTUnwrap(directory.materializeFieldRuns(fields: field..<(field + 1),
+        session: session) { _, glyph in
+        let plan = PromptControlCharacterPresentation.plan(for: glyph, style: .both, isZen: false)
+        var text = AttributedString(plan.text)
+        text.foregroundColor = .orange
+        if plan.opacity != 1 { text.foregroundColor = text.foregroundColor?.opacity(plan.opacity) }
+        return text
+      })
+      XCTAssertEqual(runs.count, 1)
+      XCTAssertEqual(runs[0].fieldID, field)
+      XCTAssertEqual(runs[0].cells.isEmpty,
+        directory.materialize(fields: field..<(field + 1))?.fields.first?.cellIDs.isEmpty)
+      let window: PromptFieldTextLayout
+      if let checkpoint {
+        window = try XCTUnwrap(PromptFieldTextLayout.continuing(fieldRuns: runs,
+          from: checkpoint, groupOffset: field, width: 180, font: font))
+      } else { window = PromptFieldTextLayout(fieldRuns: runs, width: 180, font: font) }
+      for cell in runs[0].cells {
+        XCTAssertEqual(window.cellFrames[cell.id], full.cellFrames[cell.id])
+        visited[cell.id] = window.cellFrames[cell.id]
+      }
+      checkpoint = window.continuationCheckpoint
+    }
+    XCTAssertEqual(visited, full.cellFrames)
+    XCTAssertEqual(checkpoint?.contentHeight, full.size.height)
+  }
+
   func testFieldWindowContinuesMeasuredRowsWithGlobalCellFrames() throws {
     let session = TypingSession(configuration: .words(6),
       prompt: "alpha beta gamma\ndelta epsilon zeta")

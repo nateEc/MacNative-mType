@@ -201,6 +201,15 @@ final class PromptViewportTargetDirectoryTests: XCTestCase {
     XCTAssertEqual(distant.cells.count, 7)
     XCTAssertEqual(distant.cells.last?.id, prompt.utf16.count - 1)
     XCTAssertEqual(distant.cells.map(\.unit), Array("oak oak".utf16))
+    var paintedIDs: [Int] = []
+    let distantRuns = try XCTUnwrap(directory.materializeFieldRuns(fields: (words - 2)..<words,
+      session: session) { id, glyph in
+      paintedIDs.append(id)
+      return AttributedString(String(glyph.character))
+    })
+    XCTAssertEqual(distantRuns.flatMap(\.cells).count, 7)
+    XCTAssertEqual(paintedIDs, distant.cells.map(\.id))
+    XCTAssertEqual(distantRuns.map(\.fieldID), [words - 2, words - 1])
     let state = try XCTUnwrap(directory.materializeStates(fields: (words - 2)..<words,
       session: session))
     XCTAssertEqual(state.count, 7)
