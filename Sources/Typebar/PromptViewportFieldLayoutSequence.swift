@@ -5,11 +5,21 @@ import AppKit
 /// this sequence is not a replacement for full-text accessibility or scrolling.
 @MainActor final class PromptViewportFieldLayoutSequence {
   struct Window {
+    fileprivate let ownerID: UUID
     let fields: Range<Int>
     let runs: [PromptFieldTextRun]
     let layout: PromptFieldTextLayout
   }
 
+  struct DrawingSnapshot {
+    let windows: [Window]
+    let width: CGFloat
+    let measuredHeight: CGFloat
+    let hasCompleteHeight: Bool
+    let accessibilityText: String
+  }
+
+  private let ownerID = UUID()
   private let session: TypingSession
   private let directory: PromptViewportTargetDirectory
   private let style: PromptRenderStyle
@@ -61,6 +71,21 @@ import AppKit
       next.nextGroupOffset == fields.upperBound else { return nil }
     self.checkpoint = next
     nextField = fields.upperBound
-    return .init(fields: fields, runs: runs, layout: layout)
+    return .init(ownerID: ownerID, fields: fields, runs: runs, layout: layout)
+  }
+
+  /// Retain only drawable windows chosen by the caller. The height is exact
+  /// through nextField, and becomes the full page height only at fieldCount.
+  func drawingSnapshot(windows requested: [Window]) -> DrawingSnapshot? {
+    guard let checkpoint, !requested.isEmpty,
+      requested.allSatisfy({ $0.ownerID == ownerID && $0.fields.upperBound <= nextField
+        && $0.layout.matchesMetrics(width: width, font: font, lineSpacing: lineSpacing,
+          rightToLeft: rightToLeft, joinsLetters: joinsLetters) }),
+      zip(requested, requested.dropFirst()).allSatisfy({ $0.fields.upperBound <= $1.fields.lowerBound })
+    else { return nil }
+    return .init(windows: requested, width: width,
+      measuredHeight: checkpoint.contentHeight,
+      hasCompleteHeight: nextField == directory.fieldCount,
+      accessibilityText: session.prompt)
   }
 }

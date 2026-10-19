@@ -81,6 +81,11 @@ import XCTest
     XCTAssertEqual(second.layout.cellFrames.count, 8)
     XCTAssertEqual(sequence.nextField, 4)
     XCTAssertLessThan(sequence.nextField, directory.fieldCount)
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: 180, height: 120))
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [second]))))
+    XCTAssertFalse(canvas.hasCompleteHeight)
+    XCTAssertEqual(canvas.measuredRect(for: 0), nil)
+    XCTAssertEqual(canvas.accessibilityValue() as? String, prompt)
   }
 
   func testNativeFieldCanExposeFullAccessiblePromptWhileDrawingOnlyAWindow() {
@@ -136,6 +141,57 @@ import XCTest
     XCTAssertTrue(descendants(host, PromptFieldNativeView.self).first === native)
     XCTAssertEqual(native.accessibilityValue() as? String, "oak pine")
     XCTAssertFalse(window.isVisible)
+  }
+
+  func testNativeViewportCanvasDrawsOwnedWindowsAtGlobalPositions() throws {
+    let session = TypingSession(configuration: .words(4), prompt: "alpha beta gamma delta")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let width: CGFloat = 180
+    let fullMap = try XCTUnwrap(PromptRenderPlan(session: session,
+      composition: "", style: style).render().compositionTextMap)
+    let full = PromptFieldTextLayout(map: fullMap, width: width, font: font)
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(
+      session: session, directory: directory, style: style, width: width, font: font))
+    let first = try XCTUnwrap(sequence.append(fields: 0..<2))
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: width, height: 400))
+    let firstSnapshot = try XCTUnwrap(sequence.drawingSnapshot(windows: [first]))
+    XCTAssertTrue(canvas.configure(snapshot: firstSnapshot))
+    func pixels() throws -> Data {
+      let image = try XCTUnwrap(canvas.bitmapImageRepForCachingDisplay(in: canvas.bounds))
+      canvas.cacheDisplay(in: canvas.bounds, to: image)
+      return try XCTUnwrap(image.representation(using: .png, properties: [:]))
+    }
+    let firstPixels = try pixels()
+    XCTAssertEqual(canvas.accessibilityValue() as? String, session.prompt)
+    XCTAssertFalse(canvas.hasCompleteHeight)
+    XCTAssertEqual(canvas.measuredRect(for: 0), full.cellFrames[0])
+    XCTAssertNil(canvas.measuredRect(for: session.prompt.utf16.count - 1))
+    let second = try XCTUnwrap(sequence.append(fields: 2..<4))
+    let lastSnapshot = try XCTUnwrap(sequence.drawingSnapshot(windows: [second]))
+    XCTAssertTrue(canvas.configure(snapshot: lastSnapshot))
+    XCTAssertTrue(canvas.hasCompleteHeight)
+    XCTAssertEqual(canvas.intrinsicContentSize.height, full.size.height)
+    XCTAssertNil(canvas.measuredRect(for: 0), "Evicted windows must not retain drawable boxes")
+    XCTAssertEqual(canvas.measuredRect(for: session.prompt.utf16.count - 1),
+      full.cellFrames[session.prompt.utf16.count - 1])
+    XCTAssertEqual(canvas.accessibilityValue() as? String, session.prompt)
+    XCTAssertNotEqual(try pixels(), firstPixels, "The second native window must change drawn pixels")
+    let foreign = try XCTUnwrap(PromptViewportFieldLayoutSequence(
+      session: session, directory: directory, style: style, width: width, font: font))
+    let foreignWindow = try XCTUnwrap(foreign.append(fields: 0..<1))
+    XCTAssertNil(sequence.drawingSnapshot(windows: [foreignWindow]),
+      "Another sequence cannot supply a same-target but differently owned window")
+    canvas.frame.size.width = width - 20
+    XCTAssertFalse(canvas.hasCompleteHeight, "Resizing must retire the old geometry")
+    XCTAssertNil(canvas.measuredRect(for: session.prompt.utf16.count - 1))
+    XCTAssertFalse(canvas.configure(snapshot: lastSnapshot),
+      "A snapshot measured for the old width must not be republished")
+    canvas.frame.size.width = width
+    XCTAssertTrue(canvas.configure(snapshot: lastSnapshot))
+    canvas.bounds.size.width = width - 10
+    XCTAssertFalse(canvas.hasCompleteHeight, "Changing bounds width also invalidates geometry")
   }
 
   func testDirectoryBuildsIndependentFieldWindowsWithFullPathCellGeometry() throws {
