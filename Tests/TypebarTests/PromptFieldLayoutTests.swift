@@ -7,6 +7,82 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testIndependentPainterAndSequentialLayoutMatchCompleteGeometry() throws {
+    var wrong = TypingSession(configuration: .words(7),
+      prompt: "alpha beta gamma\ndelta epsilon zeta eta")
+    wrong.insert("x", at: start)
+    let source = ["", "north\nsouth ", "", "harbor ", "tail"]
+    let provider = TypingSession(configuration: .words(4), prompt: source.joined(),
+      sourceFields: source)
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light), typoIndicatorStyle: .both,
+      highlightMode: .nextWord)
+    let width: CGFloat = 180
+    for session in [wrong, provider] {
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      let complete = try XCTUnwrap(PromptRenderPlan(session: session,
+        composition: "", style: style).render().compositionTextMap)
+      let full = PromptFieldTextLayout(map: complete, width: width, font: font)
+      let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(
+        session: session, directory: directory, style: style, width: width, font: font))
+      var visited: [Int: CGRect] = [:]
+      for offset in stride(from: 0, to: directory.fieldCount, by: 2) {
+        let range = offset..<min(offset + 2, directory.fieldCount)
+        XCTAssertNil(sequence.append(fields: (offset + 1)..<min(offset + 2, directory.fieldCount)),
+          "Skipping a field must not advance the checkpoint")
+        let window = try XCTUnwrap(sequence.append(fields: range))
+        XCTAssertEqual(window.runs,
+          complete.fieldRuns.filter { range.contains($0.fieldID ?? -1) })
+        for run in window.runs {
+          for cell in run.cells {
+            XCTAssertEqual(window.layout.cellFrames[cell.id], full.cellFrames[cell.id])
+            visited[cell.id] = window.layout.cellFrames[cell.id]
+          }
+        }
+      }
+      XCTAssertEqual(visited, full.cellFrames)
+      XCTAssertEqual(sequence.nextField, directory.fieldCount)
+      XCTAssertEqual(sequence.contentHeight, full.size.height)
+    }
+  }
+
+  func testIndependentLayoutSequenceDoesNotAdvanceAfterUnsupportedInput() throws {
+    var session = TypingSession(configuration: .words(3), prompt: "a\nb cd")
+    session.insertBatch("ax", at: start)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(
+      session: session, directory: directory, style: style, width: 180, font: font))
+    XCTAssertNil(sequence.append(fields: 0..<1))
+    XCTAssertEqual(sequence.nextField, 0)
+    XCTAssertNil(sequence.contentHeight)
+    XCTAssertNil(PromptViewportFieldLayoutSequence(session: session, directory: directory,
+      style: style, width: .infinity, font: font))
+    XCTAssertNil(PromptViewportFieldLayoutSequence(session: session.repeatedAttempt(),
+      directory: directory, style: style, width: 180, font: font))
+  }
+
+  func testIndependentLayoutSequenceOnlyMeasuresRequestedFieldsInHundredThousandWords() throws {
+    try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
+      "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
+    let count = 100_001
+    let prompt = Array(repeating: "oak", count: count).joined(separator: " ")
+    let session = TypingSession(configuration: .words(count), prompt: prompt)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(
+      session: session, directory: directory, style: style, width: 180, font: font))
+    let first = try XCTUnwrap(sequence.append(fields: 0..<2))
+    let second = try XCTUnwrap(sequence.append(fields: 2..<4))
+    XCTAssertEqual(first.runs.flatMap(\.cells).count, 8)
+    XCTAssertEqual(second.runs.flatMap(\.cells).count, 8)
+    XCTAssertEqual(second.layout.cellFrames.count, 8)
+    XCTAssertEqual(sequence.nextField, 4)
+    XCTAssertLessThan(sequence.nextField, directory.fieldCount)
+  }
+
   func testDirectoryBuildsIndependentFieldWindowsWithFullPathCellGeometry() throws {
     var session = TypingSession(configuration: .words(7),
       prompt: "alpha beta gamma\ndelta epsilon zeta eta")
