@@ -53,6 +53,8 @@ final class PromptCaretNativeView: NSView {
   private var configuration: Configuration?
   private var mainHost: NSHostingView<PromptCaretMarkerView>?
   private var paceHost: NSHostingView<PromptCaretMarkerView>?
+  var hasVisibleMainMarker: Bool { !isHidden && mainHost?.isHidden == false && (mainHost?.alphaValue ?? 0) > 0 }
+  var hasVisiblePaceMarker: Bool { !isHidden && paceHost?.isHidden == false }
   private var timer: Timer?
   private var paceTimer: Timer?
   var scheduledTimerIntervals: (drawing: TimeInterval?, pace: TimeInterval?) {

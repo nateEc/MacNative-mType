@@ -76,6 +76,8 @@ import AppKit
     snapshot?.windows.compactMap { $0.layout.mainRect(style: style) }.first
   }
   var caretIsRetired: Bool { caret.isHidden }
+  var hasVisibleMainMarker: Bool { caret.hasVisibleMainMarker }
+  var hasVisiblePaceMarker: Bool { caret.hasVisiblePaceMarker }
   func configureCaret(_ configuration: PromptCaretNativeView.Configuration) {
     caretConfiguration = configuration
     applyCaretConfiguration()
@@ -86,10 +88,27 @@ import AppKit
   }
   private func applyCaretConfiguration() {
     guard snapshot != nil, var configuration = caretConfiguration else { return }
-    guard measuredMainCaretRect(style: configuration.mainStyle) != nil else {
+    let hasMainAnchor = measuredMainCaretRect(style: .bar) != nil
+    let hasPaceFrame = configuration.paceStyle.drawsMarker && configuration.paceFrame != nil
+    guard hasMainAnchor || hasPaceFrame else {
       caret.stop()
       caret.isHidden = true
       return
+    }
+    let originalPresentation = configuration.mainPresentation
+    configuration.mainPresentation = { [weak self] in
+      var presentation = originalPresentation?() ?? .init()
+      if self?.measuredMainCaretRect(style: .bar) == nil { presentation.isVisible = false }
+      return presentation
+    }
+    if let originalPaceFrame = configuration.paceFrame {
+      configuration.paceFrame = { [weak self] in
+        guard let frame = originalPaceFrame(), let target = frame.targetGlyphID,
+          self?.snapshot?.windows.contains(where: {
+            $0.layout.canonicalRect(target, after: frame.targetAfter) != nil
+          }) == true else { return nil }
+        return frame
+      }
     }
     let perGlyph = configuration.fieldDirectionPerGlyph
     let fallbackDirection = configuration.rightToLeft

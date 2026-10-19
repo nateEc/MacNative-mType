@@ -117,6 +117,118 @@ import XCTest
     XCTAssertNil(canvas.measuredMainCaretRect(style: .bar))
   }
 
+  func testNativeViewportPaceOnlyMarkerFollowsTargetWindowAndDisappearsWhenEvicted() throws {
+    let session = TypingSession(configuration: .words(4), prompt: "one two three four")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let first = try XCTUnwrap(sequence.append(fields: 0..<2))
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: 180, height: 400))
+    let motion = PromptCaretMotionCoordinator()
+    var carets = config(motion, attempt: session.automaticInputAttemptID,
+      style: .off, pace: .bar)
+    carets.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: false, targetAfter: false, fraction: 1, sequence: 1,
+      targetGlyphID: 4, fromGlyphID: 0) }
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [first]))))
+    canvas.configureCaret(carets)
+    canvas.presentCaret(at: 0)
+    XCTAssertFalse(canvas.caretIsRetired)
+    XCTAssertTrue(canvas.hasVisiblePaceMarker)
+    XCTAssertEqual(motion.pace.position, first.layout.cellFrames[4])
+    let second = try XCTUnwrap(sequence.append(fields: 2..<4))
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [second]))))
+    canvas.presentCaret(at: 0.1)
+    XCTAssertFalse(canvas.hasVisiblePaceMarker)
+    let returned = try XCTUnwrap(sequence.revisit(fields: 0..<2))
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [returned]))))
+    canvas.presentCaret(at: 0.2)
+    XCTAssertTrue(canvas.hasVisiblePaceMarker)
+    XCTAssertEqual(motion.pace.position, first.layout.cellFrames[4])
+  }
+
+  func testPaceTargetInDistantWindowCanShowWithoutMainAnchorThere() throws {
+    let session = TypingSession(configuration: .words(4), prompt: "one two three four")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let first = try XCTUnwrap(sequence.append(fields: 0..<2))
+    let second = try XCTUnwrap(sequence.append(fields: 2..<4))
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: 180, height: 400))
+    let motion = PromptCaretMotionCoordinator()
+    var carets = config(motion, attempt: session.automaticInputAttemptID,
+      style: .off, pace: .bar)
+    carets.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: false, targetAfter: false, fraction: 1, sequence: 1,
+      targetGlyphID: 8, fromGlyphID: 4) }
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [first]))))
+    canvas.configureCaret(carets)
+    canvas.presentCaret(at: 0)
+    XCTAssertFalse(canvas.hasVisiblePaceMarker)
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [second]))))
+    canvas.presentCaret(at: 0.1)
+    XCTAssertTrue(canvas.hasVisiblePaceMarker)
+    XCTAssertEqual(motion.pace.position, second.layout.cellFrames[8])
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [first]))))
+    canvas.presentCaret(at: 0.2)
+    XCTAssertFalse(canvas.hasVisiblePaceMarker)
+  }
+
+  func testMainAndPaceMarkersOwnDifferentVisibleWindows() throws {
+    let session = TypingSession(configuration: .words(4), prompt: "one two three four")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let first = try XCTUnwrap(sequence.append(fields: 0..<2))
+    let second = try XCTUnwrap(sequence.append(fields: 2..<4))
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: 180, height: 400))
+    let motion = PromptCaretMotionCoordinator()
+    var carets = config(motion, attempt: session.automaticInputAttemptID,
+      style: .bar, pace: .bar)
+    carets.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
+      fromAfter: false, targetAfter: false, fraction: 1, sequence: 1,
+      targetGlyphID: 8, fromGlyphID: 4) }
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [first]))))
+    canvas.configureCaret(carets)
+    canvas.presentCaret(at: 0)
+    XCTAssertTrue(canvas.hasVisibleMainMarker)
+    XCTAssertFalse(canvas.hasVisiblePaceMarker)
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [second]))))
+    canvas.presentCaret(at: 0.1)
+    XCTAssertFalse(canvas.hasVisibleMainMarker)
+    XCTAssertTrue(canvas.hasVisiblePaceMarker)
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [first]))))
+    canvas.presentCaret(at: 0.2)
+    XCTAssertTrue(canvas.hasVisibleMainMarker)
+    XCTAssertFalse(canvas.hasVisiblePaceMarker)
+  }
+
+  func testViewportPaceRejectsFrameWithoutCanonicalTargetID() throws {
+    let session = TypingSession(configuration: .words(2), prompt: "one two")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let window = try XCTUnwrap(sequence.append(fields: 0..<2))
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let motion = PromptCaretMotionCoordinator()
+    var carets = config(motion, attempt: session.automaticInputAttemptID,
+      style: .off, pace: .bar)
+    carets.paceFrame = { .init(fromCharacterOffset: nil, targetCharacterOffset: 4,
+      fromAfter: false, targetAfter: false, fraction: 1, sequence: 1) }
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [window]))))
+    canvas.configureCaret(carets)
+    canvas.presentCaret(at: 0)
+    XCTAssertFalse(canvas.hasVisiblePaceMarker)
+  }
+
   func testEvictedFieldWindowCanBeRebuiltFromSavedFlowCheckpoint() throws {
     let session = TypingSession(configuration: .words(6), prompt: "alpha beta gamma delta epsilon zeta")
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
