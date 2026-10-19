@@ -3325,7 +3325,6 @@ private struct ContentView: View {
             guard session.automaticInputAttemptID == attempt else { return }
             viewportFallbackAttemptID = attempt
           })
-          .frame(height: 184)
       } else if practiceVisualEffect.usesASL {
         ASLPracticePrompt(
           glyphs: session.promptGlyphsInDisplayOrder, fontSize: settings.fontSize, accent: activeTheme.accent,

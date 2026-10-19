@@ -19,21 +19,32 @@ import SwiftUI
   }
 }
 
-struct PromptViewportPracticePrompt: NSViewRepresentable {
+struct PromptViewportPracticePrompt: View {
   private let snapshot: PromptViewportPracticeSnapshot
   let onFailure: (UUID) -> Void
+  @State private var height: CGFloat = 1
   init(session: TypingSession, style: PromptRenderStyle, font: NSFont,
     carets: PromptCaretNativeView.Configuration, onFailure: @escaping (UUID) -> Void) {
     snapshot = .init(session: session, style: style, font: font, carets: carets)
     self.onFailure = onFailure
   }
+  var body: some View {
+    PromptViewportPracticeBridge(snapshot: snapshot, onFailure: onFailure,
+      onHeight: { height = $0 }).frame(height: height)
+  }
+}
+
+private struct PromptViewportPracticeBridge: NSViewRepresentable {
+  let snapshot: PromptViewportPracticeSnapshot
+  let onFailure: (UUID) -> Void
+  let onHeight: (CGFloat) -> Void
   func makeNSView(context: Context) -> PromptViewportPracticeNativeView { .init() }
   func updateNSView(_ view: PromptViewportPracticeNativeView, context: Context) {
-    view.configure(snapshot, onFailure: onFailure)
+    view.configure(snapshot, onFailure: onFailure, onHeight: onHeight)
   }
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: PromptViewportPracticeNativeView,
     context: Context) -> CGSize? {
-    .init(width: max(1, proposal.width ?? nsView.bounds.width), height: 184)
+    .init(width: max(1, proposal.width ?? nsView.bounds.width), height: proposal.height ?? nsView.measuredHeight)
   }
   static func dismantleNSView(_ view: PromptViewportPracticeNativeView, coordinator: ()) { view.stop() }
 }
@@ -41,12 +52,14 @@ struct PromptViewportPracticePrompt: NSViewRepresentable {
 /// Owns only the presentation bridge. The existing practice page still owns
 /// input, scoring and the complete rendering fallback.
 @MainActor final class PromptViewportPracticeNativeView: NSView {
-  let viewport = PromptViewportNativeScrollHost(frame: .zero)
+  let viewport = PromptViewportNativeScrollHost(pageScrolling: true)
+  private(set) var measuredHeight: CGFloat = 1
   private var snapshot: PromptViewportPracticeSnapshot?
   private var applied: PromptViewportPracticeSnapshot?
   private var appliedWidth: CGFloat = 0
   private var directory: PromptViewportTargetDirectory?
   private var onFailure: ((UUID) -> Void)?
+  private var onHeight: ((CGFloat) -> Void)?
   private var reportedFailure: PromptViewportPracticeSnapshot?
   private var pendingReadingPosition: PromptViewportNativeScrollHost.ReadingPosition?
   private let batchSize = 32
@@ -57,21 +70,26 @@ struct PromptViewportPracticePrompt: NSViewRepresentable {
     viewport.onPreparationFailure = { [weak self] _ in self?.reportFailure() }
     viewport.onLayoutWidthChange = { [weak self] in self?.needsLayout = true }
     viewport.onLayoutWillRetire = { [weak self] in self?.rememberReadingPosition() }
+    viewport.onMeasuredHeightChange = { [weak self] in self?.publishHeight($0) }
   }
   required init?(coder: NSCoder) { fatalError("PromptViewportPracticeNativeView is created in code") }
 
-  fileprivate func configure(_ snapshot: PromptViewportPracticeSnapshot, onFailure: @escaping (UUID) -> Void) {
-    self.snapshot = snapshot; self.onFailure = onFailure
+  fileprivate func configure(_ snapshot: PromptViewportPracticeSnapshot, onFailure: @escaping (UUID) -> Void,
+    onHeight: @escaping (CGFloat) -> Void) {
+    self.snapshot = snapshot; self.onFailure = onFailure; self.onHeight = onHeight
     needsLayout = true
     reconcile()
   }
   override func setFrameSize(_ newSize: NSSize) {
+    if abs(newSize.width - bounds.width) >= 0.001 { rememberReadingPosition() }
     super.setFrameSize(newSize)
     needsLayout = true
   }
   override func layout() {
     super.layout()
     reconcile()
+    viewport.refreshPageVisibility()
+    restoreReadingPositionIfReady()
   }
   private func reconcile() {
     guard let snapshot, bounds.width.isFinite, bounds.width > 1 else { return }
@@ -98,14 +116,28 @@ struct PromptViewportPracticePrompt: NSViewRepresentable {
           rightToLeft: snapshot.rightToLeft, joinsLetters: snapshot.joinsLetters),
         sequence.append(fields: 0..<min(batchSize, sequence.fieldCount)) != nil,
         viewport.configure(sequence: sequence, batchSize: batchSize) else { reportFailure(); return }
-      if let position = pendingReadingPosition {
-        pendingReadingPosition = nil
-        guard viewport.restoreReadingPosition(position) else { reportFailure(); return }
-      }
     }
     viewport.configureCaret(snapshot.carets)
     applied = snapshot; appliedWidth = width
     reportedFailure = nil
+  }
+  private func publishHeight(_ height: CGFloat) {
+    guard let snapshot, measuredHeight != height else { return }
+    measuredHeight = height
+    invalidateIntrinsicContentSize()
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.snapshot?.session.automaticInputAttemptID == snapshot.session.automaticInputAttemptID,
+        self.snapshot?.session.promptTargetID == snapshot.session.promptTargetID,
+        self.measuredHeight == height else { return }
+      self.onHeight?(height)
+      self.needsLayout = true
+    }
+  }
+  private func restoreReadingPositionIfReady() {
+    guard let position = pendingReadingPosition, viewport.canvas.hasCompleteHeight,
+      abs(bounds.height - measuredHeight) < 0.01 else { return }
+    pendingReadingPosition = nil
+    guard viewport.restoreReadingPosition(position) else { reportFailure(); return }
   }
   private func rememberReadingPosition() {
     if pendingReadingPosition == nil { pendingReadingPosition = viewport.captureReadingPosition() }
@@ -120,7 +152,7 @@ struct PromptViewportPracticePrompt: NSViewRepresentable {
   }
   func stop() {
     snapshot = nil; applied = nil; directory = nil
-    onFailure = nil; reportedFailure = nil; appliedWidth = 0
+    onFailure = nil; onHeight = nil; reportedFailure = nil; appliedWidth = 0
     pendingReadingPosition = nil
     viewport.stop()
   }

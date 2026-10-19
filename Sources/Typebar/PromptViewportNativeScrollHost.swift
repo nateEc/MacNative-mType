@@ -50,11 +50,16 @@ import AppKit
   private var retained: [Int: PromptViewportFieldLayoutSequence.Window] = [:]
   private var pendingFieldScroll: Int?
   private var internalScrollDepth = 0
+  private var usesPageScrolling = false
+  private weak var observedPageClip: NSClipView?
+  private weak var observedPageDocument: NSView?
   private(set) var preparationFailure: Error?
   var onPreparationFailure: ((Error) -> Void)?
   var onLayoutWidthChange: (() -> Void)?
   var onLayoutWillRetire: (() -> Void)?
+  var onMeasuredHeightChange: ((CGFloat) -> Void)?
   var layoutWidth: CGFloat { clip.bounds.width }
+  var visibleDocumentRect: CGRect { usesPageScrolling ? canvas.visibleRect : clip.documentVisibleRect }
   var isPreparing: Bool { preparation.isPreparing }
   var retainedWindowCount: Int { retained.count }
   var measuredFieldCount: Int { sequence?.nextField ?? 0 }
@@ -75,6 +80,78 @@ import AppKit
   }
   required init?(coder: NSCoder) { fatalError("PromptViewportNativeScrollHost is created in code") }
 
+  convenience init(pageScrolling: Bool) {
+    self.init(frame: .zero)
+    usesPageScrolling = pageScrolling
+    scrollView.hasVerticalScroller = !pageScrolling
+  }
+
+  deinit { NotificationCenter.default.removeObserver(self) }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    observePageClip()
+  }
+
+  override func viewDidMoveToSuperview() {
+    super.viewDidMoveToSuperview()
+    observePageClip()
+  }
+
+  private func observePageClip() {
+    let pageClip = usesPageScrolling ? enclosingScrollView?.contentView : nil
+    let pageDocument = usesPageScrolling ? enclosingScrollView?.documentView : nil
+    guard observedPageClip !== pageClip || observedPageDocument !== pageDocument else { return }
+    if let observedPageClip {
+      NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: observedPageClip)
+    }
+    if let observedPageDocument {
+      NotificationCenter.default.removeObserver(self, name: NSView.frameDidChangeNotification, object: observedPageDocument)
+    }
+    observedPageClip = pageClip
+    observedPageDocument = pageDocument
+    if let pageClip {
+      pageClip.postsBoundsChangedNotifications = true
+      NotificationCenter.default.addObserver(self, selector: #selector(pageClipChanged),
+        name: NSView.boundsDidChangeNotification, object: pageClip)
+    }
+    if let pageDocument {
+      pageDocument.postsFrameChangedNotifications = true
+      NotificationCenter.default.addObserver(self, selector: #selector(pageDocumentChanged),
+        name: NSView.frameDidChangeNotification, object: pageDocument)
+    }
+    visibleRegionChanged()
+  }
+
+  func refreshPageVisibility() {
+    guard usesPageScrolling else { return }
+    observePageClip()
+    visibleRegionChanged()
+  }
+
+  @objc private func pageDocumentChanged() { visibleRegionChanged() }
+
+  @objc private func pageClipChanged() {
+    if internalScrollDepth == 0, pendingFieldScroll != nil {
+      pendingFieldScroll = nil
+      preparation.cancel()
+    }
+    visibleRegionChanged()
+  }
+
+  private func scrollDocument(to y: CGFloat) {
+    if usesPageScrolling, let page = enclosingScrollView, let document = page.documentView {
+      let point = canvas.convert(.init(x: 0, y: y), to: document)
+      var bounds = page.contentView.bounds
+      bounds.origin.y = point.y
+      page.contentView.scroll(to: page.contentView.constrainBoundsRect(bounds).origin)
+      page.reflectScrolledClipView(page.contentView)
+    } else {
+      clip.scroll(to: .init(x: 0, y: y))
+      scrollView.reflectScrolledClipView(clip)
+    }
+  }
+
   @discardableResult func configure(sequence next: PromptViewportFieldLayoutSequence,
     batchSize: Int) -> Bool {
     guard batchSize > 0, abs(layoutWidth - next.layoutWidth) < 0.001 else { return false }
@@ -94,7 +171,7 @@ import AppKit
   @discardableResult func replaceVisibleSession(_ session: TypingSession,
     style: PromptRenderStyle) -> Bool {
     guard let sequence else { return false }
-    if clip.documentVisibleRect.minY >= 0.001 {
+    if visibleDocumentRect.minY >= 0.001 {
       return replaceRemoteSession(session, style: style, from: sequence)
     }
     guard let next = sequence.replacingSession(session, style: style),
@@ -112,7 +189,7 @@ import AppKit
 
   private func replaceRemoteSession(_ session: TypingSession, style: PromptRenderStyle,
     from old: PromptViewportFieldLayoutSequence) -> Bool {
-    let visible = clip.documentVisibleRect
+    let visible = visibleDocumentRect
     let spans = old.measuredSpans.filter { span in
       guard let ink = span.inkY else { return false }
       return ink.lowerBound <= visible.maxY && ink.upperBound >= visible.minY
@@ -135,8 +212,8 @@ import AppKit
     canvas.frame = .init(x: 0, y: 0, width: next.layoutWidth,
       height: max(1, clip.bounds.height, snapshot.measuredHeight))
     guard canvas.configure(snapshot: snapshot) else { return false }
-    withInternalScroll { clip.scroll(to: .init(x: 0, y: newOrigin)) }
-    scrollView.reflectScrolledClipView(clip)
+    resizeDocumentToMeasuredHeight()
+    withInternalScroll { scrollDocument(to: newOrigin) }
     refreshVisibleWindows()
     requestMoreIfNeeded()
     return true
@@ -169,7 +246,7 @@ import AppKit
       let rect = canvas.measuredRect(for: character), rect.height > 0 else { return nil }
     return .init(attemptID: sequence.attemptID, promptTargetID: sequence.promptTargetID,
       character: character,
-      rowFraction: max(0, min(1, (clip.bounds.minY - rect.minY) / rect.height)),
+      rowFraction: max(0, min(1, (visibleDocumentRect.minY - rect.minY) / rect.height)),
       selection: canvas.accessibilitySelectedTextRange())
   }
 
@@ -180,7 +257,7 @@ import AppKit
       sequence.promptTargetID == position.promptTargetID,
       let rect = accessibilityTextRect(for: .init(location: position.character, length: 1)) else { return false }
     withInternalScroll {
-      clip.scroll(to: .init(x: 0, y: rect.minY + position.rowFraction * rect.height))
+      scrollDocument(to: rect.minY + position.rowFraction * rect.height)
     }
     scrollView.reflectScrolledClipView(clip)
     visibleRegionChanged()
@@ -215,8 +292,8 @@ import AppKit
   func scrollToMeasuredEnd() {
     pendingFieldScroll = nil
     preparation.cancel()
-    let bottom = max(0, canvas.frame.height - clip.bounds.height)
-    clip.scroll(to: .init(x: 0, y: bottom))
+    let bottom = max(0, canvas.frame.height - visibleDocumentRect.height)
+    scrollDocument(to: bottom)
     scrollView.reflectScrolledClipView(clip)
     visibleRegionChanged()
   }
@@ -224,7 +301,7 @@ import AppKit
   func scrollToTop() {
     pendingFieldScroll = nil
     preparation.cancel()
-    clip.scroll(to: .zero)
+    scrollDocument(to: 0)
     scrollView.reflectScrolledClipView(clip)
     visibleRegionChanged()
   }
@@ -247,7 +324,7 @@ import AppKit
   @discardableResult private func revealMeasuredField(_ index: Int,
     in sequence: PromptViewportFieldLayoutSequence) -> Bool {
     guard let y = sequence.measuredTop(forField: index) else { return false }
-    clip.scroll(to: .init(x: 0, y: y))
+    scrollDocument(to: y)
     scrollView.reflectScrolledClipView(clip)
     visibleRegionChanged()
     return true
@@ -331,7 +408,7 @@ import AppKit
     guard let rect = accessibilityTextRect(for: range) else { return false }
     pendingFieldScroll = nil
     preparation.cancel()
-    clip.scroll(to: .init(x: 0, y: rect.minY))
+    scrollDocument(to: rect.minY)
     scrollView.reflectScrolledClipView(clip)
     visibleRegionChanged()
     NSAccessibility.post(element: canvas, notification: .layoutChanged)
@@ -341,9 +418,9 @@ import AppKit
   private func requestMoreIfNeeded() {
     guard let sequence, preparationFailure == nil,
       !preparation.isPreparing, sequence.nextField < sequence.fieldCount else { return }
-    let visible = clip.documentVisibleRect
+    let visible = visibleDocumentRect
     let measured = sequence.contentHeight ?? 0
-    guard pendingFieldScroll != nil || measured <= visible.maxY + max(1, visible.height) else { return }
+    guard usesPageScrolling || pendingFieldScroll != nil || measured <= visible.maxY + max(1, visible.height) else { return }
     let target = min(sequence.nextField + batchSize,
       (pendingFieldScroll.map { $0 + 1 } ?? sequence.fieldCount))
     preparation.start(sequence: sequence, batchSize: batchSize,
@@ -377,17 +454,18 @@ import AppKit
 
   private func resizeDocumentToMeasuredHeight() {
     guard let sequence else { return }
-    let height = max(1, clip.bounds.height, sequence.contentHeight ?? 0)
+    let height = max(1, usesPageScrolling ? 0 : clip.bounds.height, sequence.contentHeight ?? 0)
     if canvas.frame.width != sequence.layoutWidth || canvas.frame.height != height {
       withInternalScroll {
         canvas.frame = .init(x: 0, y: 0, width: sequence.layoutWidth, height: height)
       }
     }
+    if !usesPageScrolling || sequence.nextField == sequence.fieldCount { onMeasuredHeightChange?(height) }
   }
 
   private func refreshVisibleWindows() {
     guard let sequence, !sequence.measuredSpans.isEmpty else { return }
-    let visible = clip.documentVisibleRect
+    let visible = visibleDocumentRect
     let spans = sequence.measuredSpans.filter { span in
       guard let ink = span.inkY else { return false }
       return ink.lowerBound <= visible.maxY && ink.upperBound >= visible.minY

@@ -15,7 +15,7 @@ import XCTest
     let window: NSWindow
     let counts: Counts
     let prompt: String
-    init(unicode: Bool = false) throws {
+    init(unicode: Bool = false, promptOverride: String? = nil) throws {
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = AppSettings(defaults: defaults)
       settings.reducePracticeMotion = true
@@ -27,7 +27,7 @@ import XCTest
       container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
         SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-      let prompt = (0..<201).map { unicode && $0 == 1 ? "😀" : "word\($0)" }.joined(separator: " ")
+      let prompt = promptOverride ?? (0..<201).map { unicode && $0 == 1 ? "😀" : "word\($0)" }.joined(separator: " ")
       self.prompt = prompt
       let counts = Counts()
       self.counts = counts
@@ -54,7 +54,24 @@ import XCTest
       let root = root ?? host
       return (root as? T).map { [$0] } ?? root.subviews.flatMap { views(type, in: $0) }
     }
+    var promptReady: Bool {
+      guard let native = views(PromptViewportPracticeNativeView.self).first else { return false }
+      return native.viewport.canvas.hasCompleteHeight
+        && native.viewport.canvas.accessibilityValue() as? String == prompt
+        && abs(native.frame.height - native.measuredHeight) < 0.01
+        && (native.enclosingScrollView?.documentView?.frame.height ?? 0) >= native.frame.height
+    }
+    func completeLayout(width: CGFloat) throws -> PromptFieldTextLayout {
+      let session = TypingSession(configuration: .words(201), prompt: prompt)
+      let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+        accent: .blue, colorScheme: .light), fontSize: settings.fontSize)
+      let map = try XCTUnwrap(PromptRenderPlan(session: session, composition: "", style: style).render().compositionTextMap)
+      let font = settings.practiceFont.nsFont(size: settings.fontSize,
+        installedFontName: settings.installedPracticeFontName, language: session.configuration.language)
+      return PromptFieldTextLayout(map: map, width: width, font: font)
+    }
     func waitUntil(_ ready: () -> Bool) {
+      flush()
       let deadline = Date().addingTimeInterval(15)
       while !ready() && Date() < deadline { flush() }
       XCTAssertTrue(ready(), "Practice page did not reach the expected renderer")
@@ -72,7 +89,7 @@ import XCTest
   func testActualPracticeInputRepaintsViewportAndKeepsRemotePosition() throws {
     let fixture = try Fixture()
     defer { fixture.close() }
-    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+    fixture.waitUntil { fixture.promptReady }
     let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
     let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
     XCTAssertEqual(fixture.counts.generation, 1)
@@ -83,11 +100,11 @@ import XCTest
     XCTAssertNotEqual(native.viewport.canvas.renderedCellText(for: 0), before)
     XCTAssertEqual(native.viewport.canvas.measuredMainCaretRect(style: .bar), native.viewport.canvas.measuredRect(for: 1))
     native.viewport.canvas.setAccessibilitySelectedTextRange(.init(location: 130, length: 1))
-    fixture.waitUntil { native.viewport.scrollView.contentView.bounds.minY > 0 }
-    let origin = native.viewport.scrollView.contentView.bounds.minY
+    fixture.waitUntil { native.viewport.visibleDocumentRect.minY > 0 }
+    let origin = native.viewport.visibleDocumentRect.minY
     input.onInsert("o", false)
     fixture.flush()
-    XCTAssertEqual(native.viewport.scrollView.contentView.bounds.minY, origin)
+    XCTAssertEqual(native.viewport.visibleDocumentRect.minY, origin)
     XCTAssertEqual(native.viewport.canvas.accessibilityValue() as? String, fixture.prompt)
     native.viewport.scrollToTop()
     XCTAssertEqual(native.viewport.canvas.measuredMainCaretRect(style: .bar), native.viewport.canvas.measuredRect(for: 2))
@@ -95,10 +112,50 @@ import XCTest
     XCTAssertFalse(fixture.window.isVisible)
   }
 
+  func testWholePromptExpandsToExactHeightAndUsesThePageScroller() throws {
+    let fixture = try Fixture()
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.promptReady }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    let full = try fixture.completeLayout(width: native.viewport.layoutWidth)
+    fixture.waitUntil { native.viewport.canvas.hasCompleteHeight }
+    XCTAssertEqual(native.frame.height, full.size.height, accuracy: 0.01)
+    XCTAssertFalse(native.viewport.scrollView.hasVerticalScroller, "Only the page may scroll the full prompt")
+    let page = try XCTUnwrap(native.enclosingScrollView)
+    let document = try XCTUnwrap(page.documentView)
+    XCTAssertTrue(NSLocationInRange(0, native.viewport.canvas.accessibilityVisibleCharacterRange()))
+    let lastID = fixture.prompt.utf16.count - 1
+    let last = try XCTUnwrap(full.cellFrames[lastID])
+    let pageRect = native.viewport.canvas.convert(last, to: document)
+    var bounds = page.contentView.bounds
+    bounds.origin.y = pageRect.minY
+    page.contentView.scroll(to: page.contentView.constrainBoundsRect(bounds).origin)
+    page.reflectScrolledClipView(page.contentView)
+    fixture.flush()
+    XCTAssertTrue(NSLocationInRange(lastID, native.viewport.canvas.accessibilityVisibleCharacterRange()))
+    XCTAssertLessThan(native.viewport.retainedWindowCount, 7, "An expanded page must not retain every drawing window")
+    XCTAssertFalse(fixture.window.isVisible)
+  }
+
+  func testPageHeightMatchesShortMultilineAndOversizedFieldPrompts() throws {
+    for prompt in ["oak", "oak\n\npine\n", String(repeating: "a", count: 240) + " tail"] {
+      let fixture = try Fixture(promptOverride: prompt)
+      defer { fixture.close() }
+      fixture.waitUntil { fixture.promptReady }
+      let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+      let full = try fixture.completeLayout(width: native.viewport.layoutWidth)
+      XCTAssertEqual(native.frame.height, full.size.height, accuracy: 0.01, prompt)
+      XCTAssertEqual(native.viewport.canvas.frame.height, full.size.height, accuracy: 0.01, prompt)
+      XCTAssertEqual(native.viewport.canvas.accessibilityNumberOfCharacters(), prompt.utf16.count)
+      XCTAssertFalse(native.viewport.scrollView.hasVerticalScroller)
+      if prompt == "oak" { XCTAssertLessThan(native.frame.height, 184, "A short prompt must shrink to its actual height") }
+    }
+  }
+
   func testCompositionUsesCompleteRendererAndRetiresViewportWithoutResettingAttempt() throws {
     let fixture = try Fixture()
     defer { fixture.close() }
-    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+    fixture.waitUntil { fixture.promptReady }
     let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
     let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
     input.onInsert("w", false)
@@ -129,7 +186,7 @@ import XCTest
   func testExtraInputFallbackKeepsAcceptedTextAndRetiresViewport() throws {
     let fixture = try Fixture()
     defer { fixture.close() }
-    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+    fixture.waitUntil { fixture.promptReady }
     let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
     let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
     input.onInsert("word0xx", false)
@@ -143,53 +200,60 @@ import XCTest
   func testRemoteReadingPositionAndSelectionSurviveFontAndWidthChanges() throws {
     let fixture = try Fixture()
     defer { fixture.close() }
-    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+    fixture.waitUntil { fixture.promptReady }
     let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
     let selected = NSRange(location: 730, length: 3)
     native.viewport.canvas.setAccessibilitySelectedTextRange(selected)
     fixture.flush()
     let anchor = native.viewport.canvas.accessibilityVisibleCharacterRange().location
+    let oldRowHeight = try XCTUnwrap(native.viewport.canvas.measuredRect(for: anchor)).height
+    let oldWidth = native.frame.width
     XCTAssertNotEqual(anchor, NSNotFound)
-    XCTAssertGreaterThan(native.viewport.scrollView.contentView.bounds.minY, 0)
+    XCTAssertGreaterThan(native.viewport.visibleDocumentRect.minY, 0)
     fixture.settings.fontSize = 36
-    fixture.flush()
+    fixture.waitUntil { fixture.promptReady
+      && (native.viewport.canvas.measuredRect(for: anchor)?.height ?? 0) > oldRowHeight
+      && NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()) }
     XCTAssertTrue(NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()),
       "Reflow must keep the reading row, not return to the first batch")
     XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), selected)
     fixture.settings.customPracticeLineColumns = 30
     fixture.settings.practiceLineWidth = .custom
-    fixture.flush()
+    fixture.waitUntil { fixture.promptReady && native.frame.width < oldWidth
+      && NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()) }
     XCTAssertTrue(NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()))
     XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), selected)
-    native.viewport.scrollView.scrollerStyle = .legacy
-    native.viewport.scrollView.tile()
-    fixture.flush()
-    XCTAssertTrue(NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()))
+    let page = try XCTUnwrap(native.enclosingScrollView)
+    page.scrollerStyle = .legacy
+    page.tile()
+    fixture.waitUntil { fixture.promptReady && native.viewport.canvas.accessibilitySelectedTextRange() == selected }
+    XCTAssertTrue(NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()),
+      "anchor=\(anchor) visible=\(native.viewport.canvas.accessibilityVisibleCharacterRange()) rect=\(native.viewport.visibleDocumentRect)")
     XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), selected)
     XCTAssertEqual(fixture.counts.generation, 1)
-    XCTAssertLessThan(native.viewport.measuredFieldCount, 201, "Restoring a reading anchor must not measure the entire target")
+    XCTAssertEqual(native.viewport.measuredFieldCount, 201, "Expanded page height requires complete measurement")
     XCTAssertFalse(fixture.window.isVisible)
     let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
     input.onRestart()
     fixture.waitUntil { fixture.counts.generation == 2
-      && fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+      && fixture.promptReady }
     let restarted = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
     XCTAssertEqual(restarted.viewport.canvas.accessibilitySelectedTextRange(), .init(location: NSNotFound, length: 0))
-    XCTAssertEqual(restarted.viewport.scrollView.contentView.bounds.minY, 0)
+    XCTAssertEqual(restarted.viewport.visibleDocumentRect.minY, 0)
     XCTAssertEqual(native.viewport.measuredFieldCount, 0, "Restart must retire the former display owner")
   }
 
   func testManualRemoteScrollWithoutSelectionSurvivesReflow() throws {
     let fixture = try Fixture()
     defer { fixture.close() }
-    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+    fixture.waitUntil { fixture.promptReady }
     let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
     XCTAssertTrue(native.viewport.scrollToField(100))
-    fixture.waitUntil { !native.viewport.isPreparing && native.viewport.scrollView.contentView.bounds.minY > 0 }
+    fixture.waitUntil { !native.viewport.isPreparing && native.viewport.visibleDocumentRect.minY > 0 }
     let anchor = native.viewport.canvas.accessibilityVisibleCharacterRange().location
     XCTAssertNotEqual(anchor, NSNotFound)
     fixture.settings.fontSize = 36
-    fixture.flush()
+    fixture.waitUntil { fixture.promptReady && NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()) }
     XCTAssertTrue(NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()))
     XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), .init(location: NSNotFound, length: 0))
     XCTAssertEqual(fixture.counts.generation, 1)
@@ -198,7 +262,7 @@ import XCTest
   func testFontAndLineWidthChangesUseVisibleWidthIncludingLegacyScroller() throws {
     let fixture = try Fixture()
     defer { fixture.close() }
-    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+    fixture.waitUntil { fixture.promptReady }
     let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
     let oldRect = try XCTUnwrap(native.viewport.canvas.measuredRect(for: 0))
     let oldWidth = native.bounds.width
@@ -207,16 +271,17 @@ import XCTest
     fixture.settings.practiceLineWidth = .custom
     fixture.waitUntil { native.viewport.canvas.measuredRect(for: 0).map { $0.height > oldRect.height } == true
       && native.bounds.width < oldWidth }
-    native.viewport.scrollView.scrollerStyle = .legacy
-    native.viewport.scrollView.tile()
+    let page = try XCTUnwrap(native.enclosingScrollView)
+    page.scrollerStyle = .legacy
+    page.tile()
     fixture.flush()
-    XCTAssertLessThan(native.viewport.scrollView.contentView.bounds.width, native.bounds.width)
+    XCTAssertLessThan(page.contentView.bounds.width, page.bounds.width)
     XCTAssertEqual(native.viewport.canvas.frame.width, native.viewport.scrollView.contentView.bounds.width)
     XCTAssertEqual(native.viewport.canvas.accessibilityValue() as? String, fixture.prompt)
-    native.viewport.scrollView.scrollerStyle = .overlay
-    native.viewport.scrollView.tile()
-    native.viewport.scrollView.scrollerStyle = .legacy
-    native.viewport.scrollView.tile()
+    page.scrollerStyle = .overlay
+    page.tile()
+    page.scrollerStyle = .legacy
+    page.tile()
     fixture.flush()
     XCTAssertEqual(native.viewport.canvas.accessibilityValue() as? String, fixture.prompt,
       "A retired layout must rebuild even when the width returns to its prior value")
