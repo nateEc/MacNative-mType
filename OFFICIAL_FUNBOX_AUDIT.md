@@ -1,6 +1,6 @@
 # 官方 Funbox 逐项审计
 
-Wikipedia HTML 增量：原生文本提取现保留脚本启用时 `noscript` 的字面内部内容，并区分 SVG／MathML 外来子树与 HTML 集成点；浏览器 DOM 对照和实际百科运输到练习文本的回归已补。纯原生生产路径不调用 WebKit；解析畸形嵌套、真实页面全分布、可见窗口和实体输入仍未验收，`wikipedia` 保持部分实现。详见 FUNCTIONAL_INVENTORY.md。
+Wikipedia HTML 增量：原生文本提取现保留脚本启用时 `noscript` 的字面内部内容，并区分 SVG／MathML 外来子树与 HTML 集成点；进一步补齐 SVG `desc`／`title` 和 `select` 内的节点解析差异。浏览器 DOM 对照、三语言随机真实导言对照及实际百科运输到练习文本的回归已补。纯原生生产路径不调用 WebKit；解析畸形嵌套、真实页面全分布、可见窗口和实体输入仍未验收，`wikipedia` 保持部分实现。详见 FUNCTIONAL_INVENTORY.md。
 
 Tape RTL 增量：单行 RTL 及相邻反向词保留源顺序，主光标与 pace 各自按词／字符方向取边缘；RTL 参数只交给实际 Tape，ASL／Choo 默认不变，不改输入／原文／回放或既有原生外观。12 新增／相关 140 项、128 条完整源码轨迹和 28 方向案例通过；最终冻结原生 3,853／服务 501 项零失败零跳过，十万词、16 磁盘冷读、53 表面、1,105 人工结构及未启动应用包／签名／原创边界通过。13 哈希、64 日志／159 图及三张复查新图见 [合同](REWARD_INBOX_CONTRACT.md)。六部分／42 历史有界分类不变；tapeMode 下调部分，换行／afterNewline／退休、全部 joining／混排／专业手形／真实设备与视口虚拟化仍开放，零主程序启动、goal active。下方为历史阶段。
 

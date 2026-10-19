@@ -397,24 +397,38 @@ enum LivePracticeContentService {
     let source = html as NSString
     var cursor = 0
     var prepared = ""
-    // Only foreignObject and MathML's HTML integration points re-enter HTML.
+    // SVG and MathML integration points re-enter HTML.
     var foreignContexts: [String] = []
+    var insideSelect = false
     while cursor < source.length,
       let tag = tags.firstMatch(in: html, range: NSRange(location: cursor, length: source.length - cursor)) {
       prepared += source.substring(with: NSRange(location: cursor, length: tag.range.location - cursor))
-      prepared += source.substring(with: tag.range)
+      let opening = tag.range(at: 1).length == 0
+      let name = tag.range(at: 2).location == NSNotFound ? ""
+        : source.substring(with: tag.range(at: 2)).lowercased()
+      var tagText = source.substring(with: tag.range)
+      // SwiftSoup treats SVG title as raw text, whereas browsers parse child
+      // HTML there. An SVG foreignObject provides that parsing context.
+      if name == "title",
+        (opening && foreignContexts.last == "svg" || !opening && foreignContexts.last == "title") {
+        let nameRange = tag.range(at: 2)
+        let relative = NSRange(location: nameRange.location - tag.range.location, length: nameRange.length)
+        tagText = (tagText as NSString).replacingCharacters(in: relative, with: "foreignObject")
+      }
+      prepared += tagText
       cursor = NSMaxRange(tag.range)
       guard tag.range(at: 2).location != NSNotFound else { continue }
-      let name = source.substring(with: tag.range(at: 2)).lowercased()
-      if tag.range(at: 1).length != 0 {
+      if !opening {
         if foreignContexts.last == name { foreignContexts.removeLast() }
+        if name == "select" { insideSelect = false }
         continue
       }
+      if name == "select" { insideSelect = true }
       if name == "svg" || name == "math" {
         foreignContexts.append(name)
         continue
       }
-      if name == "foreignobject", foreignContexts.last == "svg" {
+      if ["foreignobject", "desc", "title"].contains(name), foreignContexts.last == "svg" {
         foreignContexts.append(name)
         continue
       }
@@ -426,7 +440,9 @@ enum LivePracticeContentService {
           continue
         }
       }
-      if name == "noscript", ["svg", "math"].contains(foreignContexts.last ?? "") { continue }
+      if name == "noscript", insideSelect || ["svg", "math"].contains(foreignContexts.last ?? "") {
+        continue
+      }
       guard ["noscript", "script", "style", "textarea", "title", "iframe",
         "xmp", "noembed", "noframes", "plaintext"].contains(name),
         let closing = try? NSRegularExpression(pattern: "</\(name)\\s*>", options: .caseInsensitive)

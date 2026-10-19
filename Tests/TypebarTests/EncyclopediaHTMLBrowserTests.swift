@@ -58,7 +58,20 @@ import XCTest
       "<iframe><noscript><b>frame</b></noscript></iframe>tail",
       "<xmp><noscript><b>raw</b></noscript></xmp>tail",
       "<!-- <noscript><b>comment</b></noscript> -->tail",
-      "<p>first<table><tr><td>cell</table>last</p>"
+      "<p>first<table><tr><td>cell</table>last</p>",
+      "<svg><![CDATA[<noscript><b>literal</b></noscript>]]></svg>tail",
+      "<svg><desc><noscript><b>description</b></noscript></desc></svg>tail",
+      "<math><mrow><annotation-xml encoding='text/html'><noscript><b>row</b></noscript></annotation-xml></mrow></math>tail",
+      "<table><tr><td><noscript><b>cell</b></noscript></td></tr></table>tail",
+      "<select><noscript><b>option</b></noscript><option>next</select>tail",
+      "<select><noscript><option>first</option></noscript><option>next</select>tail",
+      "<select><option><noscript><b>inside</b></noscript>after</select>tail",
+      "<select><optgroup><noscript><b>group</b></noscript><option>next</select>tail",
+      "<datalist><noscript><b>data</b></noscript></datalist>tail",
+      "<svg><title><noscript><b>svg title</b></noscript></title></svg>tail",
+      "<svg><title><b>bold</b></title></svg>tail",
+      "<svg><desc><b>bold</b></desc></svg>tail",
+      "<svg><select><noscript><b>foreign</b></noscript></select></svg>tail"
     ]
     let browserValues = try await browserTexts(for: html)
     XCTAssertEqual(browserValues.count, html.count)

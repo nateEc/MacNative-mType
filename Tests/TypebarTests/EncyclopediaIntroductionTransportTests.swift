@@ -22,6 +22,25 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testIntroductionCarriesSVGAndSelectDOMTextIntoPractice() async throws {
+    let html = "<p>Before <svg><desc><noscript><b>North</b></noscript></desc>"
+      + "<title><b>coast</b></title></svg> <select><noscript><option>harbor</option>"
+      + "</noscript></select> after</p>"
+    let response = try JSONSerialization.data(withJSONObject: [
+      "query": ["pages": ["724": ["extract": html]]]
+    ])
+    try await withSession { session in
+      IntroductionProtocol.fixture.set([
+        (200, #"{"pageid":724,"title":"Owned"}"#),
+        (200, String(decoding: response, as: UTF8.self))
+      ])
+      let content = await LivePracticeContentService.fetch(
+        source: .encyclopedia, language: .english, session: session)
+      XCTAssertEqual(content?.text, "Before <b>North</b>coast harbor after")
+      XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 2)
+    }
+  }
+
   func testNonstringAttributionDoesNotPreventLoadingValidIntroduction() async throws {
     try await withSession { session in
       for metadata in ["", #","title":null,"author":null"#,

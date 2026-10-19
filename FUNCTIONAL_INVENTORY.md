@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-19 `TST-02`／Wikipedia 外来内容与选择器的 DOM 文本：在真实导言 QA 后扩展原创合成 HTML 对照，先行失败定位到六处浏览器／原生差异。SVG `desc`、`title` 是 HTML 集成点；固定 SwiftSoup 将 SVG `title` 当原始文本，原生现仅在该上下文将其作为等价的 `foreignObject` 解析，并在 `select` 内保留浏览器对 `noscript` 的节点解析。WebKit 离屏红测已转绿，新增注入运输回归证明该文本进入最终英文练习；普通 `title`、SVG 非集成点及原有 MathML 夹具继续受对照保护。生产不调用 WebKit、不打开 Typebar、不复制参考实现或资产；畸形标签全分布、真实长文性能与 GUI／实体输入仍开放，`wikipedia` 保持部分实现。
+
 2026-10-19 `TST-02`／Wikipedia 真实导言 DOM 对照：在既有合成 HTML 回归外，新增显式网络 QA，从 `en`／`de`／`zh` 三个公开随机页面入口取得 pageid，再请求同页导言 HTML，逐篇比较原生解析与离屏 WebKit 临时 `div.textContent`。首次异步测试中的同步等待导致 WebKit 回调超时，改为异步等待后合成与真实样本两项均通过（7.716 秒）；不把测试等待故障误认为产品解析差异。仅当 `TYPEBAR_LIVE_NETWORK_QA` 编译开关开启时请求网络，使用临时会话、无 Cookie／缓存，不保存正文或打开 Typebar；普通回归仍只用自有合成夹具。随机三页成功是当前样本的有界证据，后续筛选、所有语言、长文性能和 GUI／输入仍开放，`wikipedia` 保持部分实现。
 
 2026-10-19 `TST-02`／Wikipedia `noscript` 文本边界：固定源码在脚本启用的浏览器中将百科 HTML 放入临时 `div` 后读取 `textContent`；固定 SwiftSoup 2.14.1 则按脚本禁用语义解析 `noscript`，先行 WebKit 对照出现四处字面标签／实体差异。原生现在只在 HTML 上下文保留 `noscript` 内原始文本，同时绕过脚本、iframe 等原始文本块，区分 SVG／MathML 外来内容及各自 HTML 集成点。扩展浏览器对照与运输到最终练习文本的回归通过；没有引入生产 WebKit、打开 Typebar 或加载 HTML 外部资源。此为有界清理修复，不覆盖畸形嵌套、全部浏览器解析规则、真实页面分布与长内容性能；`wikipedia` 继续部分实现。
