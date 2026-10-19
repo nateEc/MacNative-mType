@@ -3,9 +3,10 @@ import Foundation
 /// Progressively measures one immutable viewport sequence. The caller owns the
 /// live publication contract (attempt, target, input, style, width) through
 /// isCurrent; task tickets prevent reentrant restart or cancellation from
-/// publishing an obsolete batch or completion.
+/// publishing an obsolete batch or completion. A bounded demand stops at its
+/// requested field count; a later request can resume the same sequence.
 @MainActor final class PromptViewportPreparationTask {
-  enum Failure: Error { case invalidBatchSize, unsupportedWindow }
+  enum Failure: Error { case invalidBatchSize, invalidDemand, unsupportedWindow }
 
   private var task: Task<Void, Never>?
   private var ticket: UUID?
@@ -13,6 +14,7 @@ import Foundation
 
   @discardableResult
   func start(sequence: PromptViewportFieldLayoutSequence, batchSize: Int,
+    throughFieldCount: Int? = nil,
     isCurrent: @escaping @MainActor () -> Bool,
     onBatch: @escaping @MainActor (PromptViewportFieldLayoutSequence.DrawingSnapshot) -> Void,
     completion: @escaping @MainActor (Result<Void, Error>) -> Void
@@ -20,13 +22,19 @@ import Foundation
     cancel()
     let request = UUID()
     ticket = request
+    let target = throughFieldCount ?? sequence.fieldCount
     let running = Task { @MainActor [weak self] in
       guard batchSize > 0 else {
         self?.finish(request: request, result: .failure(Failure.invalidBatchSize),
           isCurrent: isCurrent, completion: completion)
         return
       }
-      while sequence.nextField < sequence.fieldCount {
+      guard target > 0, target <= sequence.fieldCount else {
+        self?.finish(request: request, result: .failure(Failure.invalidDemand),
+          isCurrent: isCurrent, completion: completion)
+        return
+      }
+      while sequence.nextField < target {
         do {
           // Do not retain the owner across the yield. Closing the host after
           // a published batch must deallocate and cancel this preparation.
@@ -36,7 +44,7 @@ import Foundation
             return
           }
           let start = sequence.nextField
-          let end = start + min(batchSize, sequence.fieldCount - start)
+          let end = start + min(batchSize, target - start)
           guard let window = sequence.append(fields: start..<end),
             let snapshot = sequence.drawingSnapshot(windows: [window]) else {
             owner.finish(request: request, result: .failure(Failure.unsupportedWindow),
