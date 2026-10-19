@@ -5538,6 +5538,60 @@ struct TypingSession {
     }
   }
 
+  /// Mirrors projection field-word phases and errors without constructing a
+  /// whole-prompt word presentation. The caller has already admitted local
+  /// target glyphs and stable source-field ownership.
+  func promptViewportWordStates(in fieldRanges: [Range<Int>], requested: Range<Int>,
+    targetUTF16: [UInt16], separatorOffsets: [Int]
+  ) -> PromptViewportTargetDirectory.WindowWordStates? {
+    let active = acceptedUnits?.fieldIndex ?? replayCommittedSeparatorCount
+    guard fieldRanges.indices.contains(active), requested.upperBound <= fieldRanges.count else { return nil }
+    var fallbackInputErrors = Set<Int>()
+    if acceptedUnits == nil {
+      let presentation = promptPresentationInput
+      for (typedIndex, character) in typed.enumerated() {
+        guard presentation.targets.indices.contains(typedIndex),
+          let target = presentation.targets[typedIndex], targetUTF16.indices.contains(target)
+        else { return nil }
+        let expected = Character(String(UnicodeScalar(targetUTF16[target])!))
+        guard character != expected || presentation.forcedErrors.contains(target) else { continue }
+        var lower = 0, upper = separatorOffsets.count
+        while lower < upper {
+          let middle = lower + (upper - lower) / 2
+          if separatorOffsets[middle] < target { lower = middle + 1 }
+          else { upper = middle }
+        }
+        fallbackInputErrors.insert(lower)
+      }
+    }
+    let words = requested.map { index -> PromptViewportTargetDirectory.IndexedWord in
+      let target = fieldRanges[index]
+      let end = target.upperBound > target.lowerBound && targetUTF16[target.upperBound - 1] == 32
+        ? target.upperBound - 1 : target.upperBound
+      let range = end > target.lowerBound ? target.lowerBound..<end : 0..<0
+      let previousWordStart = index == 0 ? 0
+        : (separatorOffsets.indices.contains(index - 1) ? separatorOffsets[index - 1] + 1 : -1)
+      let previousInputError = fallbackInputErrors.contains(index)
+      let previousCommitError = committedErrorWordStarts.contains(previousWordStart)
+      let errors: (input: Bool, commit: Bool)? = acceptedUnits.map { buffer in
+        guard index <= buffer.fieldIndex else { return (false, false) }
+        let input = buffer.range(index)
+        var error = input.count > target.count
+        for (offset, entry) in buffer.entries[input].enumerated() {
+          if entry.forced || offset >= target.count || entry.unit != targetUTF16[target.lowerBound + offset] {
+            error = true
+          }
+        }
+        return (error, index < active && (error || input.count != target.count))
+      }
+      let phase: TypingPromptWordPhase = index < active ? .committed : index == active ? .active : .future
+      return .init(index: index, value: .init(range: range, phase: phase,
+        hasInputError: errors?.input ?? previousInputError,
+        hasCommitError: errors?.commit ?? previousCommitError))
+    }
+    return .init(activeWordIndex: active, words: words)
+  }
+
   /// Rendering can match a correct retained newline to its glyph without
   /// changing the engine's navigation cursor. A later commit at that same
   /// target is extra input, not a retroactive error on the first correct LF.

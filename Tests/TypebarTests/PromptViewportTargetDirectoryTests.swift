@@ -2,6 +2,38 @@ import XCTest
 @testable import Typebar
 
 final class PromptViewportTargetDirectoryTests: XCTestCase {
+  func testWindowWordStatesMatchFullCompositionAcrossInputAndProviderBoundaries() throws {
+    let prompt = "alpha beta gamma delta"
+    var wrong = TypingSession(configuration: .words(4), prompt: prompt)
+    wrong.insert("x", at: Date(timeIntervalSinceReferenceDate: 920_300_000))
+    var committed = TypingSession(configuration: .words(4), prompt: prompt)
+    committed.insertBatch("alxha ", at: Date(timeIntervalSinceReferenceDate: 920_300_001))
+    var blind = TypingSession(configuration: .words(4, rules: .init(blindMode: true)), prompt: prompt)
+    blind.insertBatch("alxha ", at: Date(timeIntervalSinceReferenceDate: 920_300_002))
+    let source = ["north\nsouth ", "harbor ", "tail"]
+    var provider = TypingSession(configuration: .words(4), prompt: source.joined(),
+      sourceFields: source)
+    provider.insert("n", at: Date(timeIntervalSinceReferenceDate: 920_300_003))
+    let separated = [" north\nsouth ", "", " harbor  ", "tail"]
+    let unusual = TypingSession(configuration: .words(5), prompt: separated.joined(),
+      sourceFields: separated)
+    for session in [TypingSession(configuration: .words(4), prompt: prompt),
+      wrong, committed, blind, provider, unusual] {
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      let presentation = try XCTUnwrap(PromptCompositionPresentation(session: session,
+        composition: "", style: .replace))
+      let full = presentation.words
+      for range in [0..<min(2, directory.fieldCount),
+        max(0, directory.fieldCount - 2)..<directory.fieldCount] {
+        let window = try XCTUnwrap(directory.materializeWordStates(fields: range,
+          session: session))
+        XCTAssertEqual(window.activeWordIndex, full.firstIndex { $0.phase == .active })
+        XCTAssertEqual(window.words.map(\.index), Array(range))
+        XCTAssertEqual(window.words.map(\.value), Array(full[range]))
+      }
+    }
+  }
+
   func testDistantWordOrdinalsUseLiteralSeparatorsAcrossProviderFields() throws {
     let fields = [" north\nsouth ", "", " harbor  ", "tail"]
     let prompt = fields.joined()
@@ -264,6 +296,12 @@ final class PromptViewportTargetDirectoryTests: XCTestCase {
     XCTAssertEqual(distant.cells.map(\.unit), Array("oak oak".utf16))
     XCTAssertEqual(distant.cells.first?.wordOrdinal, words - 2)
     XCTAssertEqual(distant.cells.last?.wordOrdinal, words - 1)
+    let distantWords = try XCTUnwrap(directory.materializeWordStates(
+      fields: (words - 2)..<words, session: session))
+    XCTAssertEqual(distantWords.words.map(\.index), [words - 2, words - 1])
+    XCTAssertEqual(distantWords.words.map(\.value.range),
+      [(prompt.utf16.count - 7)..<(prompt.utf16.count - 4),
+        (prompt.utf16.count - 3)..<prompt.utf16.count])
     var paintedIDs: [Int] = []
     let distantRuns = try XCTUnwrap(directory.materializeFieldRuns(fields: (words - 2)..<words,
       session: session) { id, glyph in

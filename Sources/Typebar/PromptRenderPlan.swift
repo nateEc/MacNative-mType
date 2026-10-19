@@ -130,7 +130,10 @@ struct PromptRenderStyle: Equatable {
         paceCaretDrawsMarker: style.paceCaretStyle.drawsMarker).paceGuideIndex,
       let slice = directory.materialize(fields: fields),
       let states = directory.materializeStates(fields: fields, session: session),
+      let localWords = directory.materializeWordStates(fields: fields, session: session),
       slice.cells.count == states.count,
+      localWords.activeWordIndex == words.firstIndex(where: { $0.phase == .active }),
+      localWords.words.allSatisfy({ words.indices.contains($0.index) && words[$0.index] == $0.value }),
       presentation.projection.cells.count == directory.targetUTF16.count,
       zip(slice.cells, states).allSatisfy({ cell, state in
         presentation.projection.cells.indices.contains(cell.id)
@@ -142,19 +145,10 @@ struct PromptRenderStyle: Equatable {
       })
     else { return nil }
     let selectedIDs = states.map(\.id)
-    let selected = Set(selectedIDs)
-    let targetBounds = selectedIDs.first.flatMap { first in
-      selectedIDs.last.map { first..<($0 + 1) }
-    }
-    let touchingWords: [(index: Int, value: TypingPromptWordPresentation)] = words.enumerated().compactMap {
-      index, word in
-      let touches = targetBounds.map { word.range.overlaps($0) } == true
-        || word.extraGlyphIndices.contains(where: selected.contains)
-      return touches ? (index: index, value: word) : nil
-    }
     guard let localAppearances = PromptGlyphAppearance.planWindow(
       glyphs: states.map(\.glyph), globalIndices: selectedIDs,
-      words: touchingWords, activeWordIndex: words.firstIndex { $0.phase == .active },
+      words: localWords.words.map { (index: $0.index, value: $0.value) },
+      activeWordIndex: localWords.activeWordIndex,
       mode: sessionPolicy.highlightMode, blindMode: session.configuration.rules.blindMode,
       typedEffect: style.typedCharacterEffect,
       hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening)),

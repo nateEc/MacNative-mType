@@ -29,6 +29,16 @@ struct PromptViewportTargetDirectory {
     let glyph: TypingPromptGlyph
   }
 
+  struct IndexedWord: Equatable {
+    let index: Int
+    let value: TypingPromptWordPresentation
+  }
+
+  struct WindowWordStates: Equatable {
+    let activeWordIndex: Int?
+    let words: [IndexedWord]
+  }
+
   let attemptID: UUID
   let promptTargetID: UUID
   let targetUTF16: [UInt16]
@@ -101,6 +111,14 @@ struct PromptViewportTargetDirectory {
         targetUTF16: targetUTF16, separatorOffsets: separatorOffsets), glyphs.count == slice.cells.count
     else { return nil }
     return zip(slice.cells, glyphs).map { StateCell(id: $0.id, glyph: $1) }
+  }
+
+  /// Source-field word ink for one window. Admission mirrors local glyph
+  /// state; unsupported projections still use the full presentation.
+  func materializeWordStates(fields requested: Range<Int>, session: TypingSession) -> WindowWordStates? {
+    guard materializeStates(fields: requested, session: session) != nil else { return nil }
+    return session.promptViewportWordStates(in: fieldRanges, requested: requested,
+      targetUTF16: targetUTF16, separatorOffsets: separatorOffsets)
   }
 
   /// Build only requested drawable field runs. The caller supplies appearance
