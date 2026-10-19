@@ -22,6 +22,14 @@ struct PromptFieldTextRun: Equatable {
 /// Ordinary letters are independent boxes. Joining scripts shape within a
 /// field only. Hints are separate drawing layers, never advances or caret ink.
 @MainActor final class PromptFieldTextLayout {
+  struct ContinuationCheckpoint {
+    let flow: ASLPromptFlowGeometry.Checkpoint
+    let nextGroupOffset: Int
+    let contentHeight: CGFloat
+    let font: NSFont
+    let rightToLeft: Bool
+    let joinsLetters: Bool
+  }
   private struct FieldRow: Hashable {
     let group: Int
     let y: CGFloat
@@ -146,6 +154,14 @@ struct PromptFieldTextRun: Equatable {
   private let width: CGFloat
   private let joinsLetters: Bool
   private let unbounded: Bool
+  private let startCheckpoint: ContinuationCheckpoint?
+  private var nextGroupOffset: Int = 0
+  private var endFlowCheckpoint: ASLPromptFlowGeometry.Checkpoint?
+  var continuationCheckpoint: ContinuationCheckpoint? {
+    endFlowCheckpoint.map { .init(flow: $0, nextGroupOffset: nextGroupOffset,
+      contentHeight: size.height, font: font,
+      rightToLeft: rightToLeft, joinsLetters: joinsLetters) }
+  }
   private(set) var cellFrames: [Int: CGRect] = [:]
   private(set) var fieldFrames: [Int: CGRect] = [:]
   private(set) var size: CGSize = .zero
@@ -217,11 +233,13 @@ struct PromptFieldTextRun: Equatable {
   }
 
   private init(aliases: [Int: [Int]], anchor: PromptCompositionProjection.Anchor?, width: CGFloat,
-    font: NSFont, lineSpacing: CGFloat, rightToLeft: Bool, joinsLetters: Bool, unbounded: Bool) {
+    font: NSFont, lineSpacing: CGFloat, rightToLeft: Bool, joinsLetters: Bool, unbounded: Bool,
+    startCheckpoint: ContinuationCheckpoint? = nil) {
     self.aliases = aliases; self.anchor = anchor; self.rightToLeft = rightToLeft
     self.font = font; self.lineSpacing = lineSpacing
     self.width = width.isFinite ? max(1, width) : 1
     self.joinsLetters = joinsLetters; self.unbounded = unbounded
+    self.startCheckpoint = startCheckpoint
   }
 
   convenience init(fieldRuns: [PromptFieldTextRun], aliases: [Int: [Int]] = [:],
@@ -230,9 +248,37 @@ struct PromptFieldTextRun: Equatable {
     reusing previous: PromptFieldTextLayout? = nil) {
     self.init(aliases: aliases, anchor: anchor, width: width, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, unbounded: unbounded)
+    nextGroupOffset = fieldRuns.count
     let builder = Builder(layout: self, previous: previous)
     for (group, field) in fieldRuns.enumerated() { builder.append(field, group: group) }
     builder.finish()
+  }
+
+  private convenience init(continuingFieldRuns fieldRuns: [PromptFieldTextRun],
+    from checkpoint: ContinuationCheckpoint, groupOffset: Int, width: CGFloat, font: NSFont,
+    lineSpacing: CGFloat, rightToLeft: Bool, joinsLetters: Bool) {
+    self.init(aliases: [:], anchor: nil, width: width, font: font, lineSpacing: lineSpacing,
+      rightToLeft: rightToLeft, joinsLetters: joinsLetters, unbounded: false,
+      startCheckpoint: checkpoint)
+    nextGroupOffset = groupOffset + fieldRuns.count
+    let builder = Builder(layout: self, previous: nil)
+    for (group, field) in fieldRuns.enumerated() { builder.append(field, group: group + groupOffset) }
+    builder.finish()
+  }
+
+  static func continuing(fieldRuns: [PromptFieldTextRun], from checkpoint: ContinuationCheckpoint,
+    groupOffset: Int, width: CGFloat, font: NSFont, lineSpacing: CGFloat = 12,
+    rightToLeft: Bool = false, joinsLetters: Bool = false
+  ) -> PromptFieldTextLayout? {
+    guard !fieldRuns.isEmpty, groupOffset >= 0, width.isFinite,
+      checkpoint.flow.width == max(1, width), checkpoint.flow.rowSpacing == lineSpacing,
+      checkpoint.font == font, checkpoint.rightToLeft == rightToLeft,
+      checkpoint.joinsLetters == joinsLetters,
+      checkpoint.nextGroupOffset == groupOffset
+    else { return nil }
+    return .init(continuingFieldRuns: fieldRuns, from: checkpoint, groupOffset: groupOffset,
+      width: width, font: font, lineSpacing: lineSpacing,
+      rightToLeft: rightToLeft, joinsLetters: joinsLetters)
   }
 
   static func makeCooperatively(map: PromptCompositionTextMap, width: CGFloat, font: NSFont,
@@ -244,6 +290,7 @@ struct PromptFieldTextRun: Equatable {
     let layout = PromptFieldTextLayout(aliases: map.canonicalAliases, anchor: map.caret,
       width: width, font: font, lineSpacing: lineSpacing, rightToLeft: rightToLeft,
       joinsLetters: joinsLetters, unbounded: unbounded)
+    layout.nextGroupOffset = map.fieldRuns.count
     let builder = Builder(layout: layout, previous: previous)
     let interval = max(1, batchSize)
     for (group, field) in map.fieldRuns.enumerated() {
@@ -364,7 +411,8 @@ struct PromptFieldTextRun: Equatable {
     }
 
     private func reuseGeometryIfUnchanged() -> Bool {
-      guard let reuse, reuse.boxGroups == groups, reuse.boxes.count == layout.boxes.count else {
+      guard layout.startCheckpoint == nil, let reuse,
+        reuse.boxGroups == groups, reuse.boxes.count == layout.boxes.count else {
         return false
       }
       for index in layout.boxes.indices {
@@ -388,6 +436,7 @@ struct PromptFieldTextRun: Equatable {
       layout.fieldFrames = reuse.fieldFrames
       layout.size = reuse.size
       layout.boxGroups = groups
+      layout.endFlowCheckpoint = reuse.endFlowCheckpoint
       layout.reusedGeometryFromPrevious = true
       return true
     }
@@ -425,10 +474,22 @@ struct PromptFieldTextRun: Equatable {
       // Tape mirrors around the measured natural extent, not the no-wrap
       // proposal. Ordinary bounded wrapping keeps its existing width.
       let flowWidth = layout.unbounded ? max(1, boxes.reduce(CGFloat.zero) { $0 + $1.bounds.width }) : layout.width
-      let geometry = ASLPromptFlowGeometry(cells: boxes.enumerated().map { index, box in
+      let cells = boxes.enumerated().map { index, box in
         .init(size: box.bounds.size, wordID: groups[index], isLineBreak: box.breaks, isSeparator: box.isGap)
-      }, width: flowWidth, rowSpacing: layout.lineSpacing)
-      layout.size = geometry.size
+      } as [ASLPromptFlowGeometry.Cell]
+      let geometry: ASLPromptFlowGeometry
+      if let checkpoint = layout.startCheckpoint {
+        // The public continuation gate has already proved matching metrics
+        // and a complete preceding group.
+        geometry = ASLPromptFlowGeometry(cells: cells, width: flowWidth,
+          rowSpacing: layout.lineSpacing, continuingFrom: checkpoint.flow)!
+      } else {
+        geometry = ASLPromptFlowGeometry(cells: cells, width: flowWidth,
+          rowSpacing: layout.lineSpacing)
+      }
+      layout.size = .init(width: geometry.size.width,
+        height: max(geometry.size.height, layout.startCheckpoint?.contentHeight ?? 0))
+      layout.endFlowCheckpoint = geometry.checkpoint
       layout.origins = boxes.enumerated().map { index, box in
         let point = geometry.positions[index]
         return CGPoint(x: layout.rightToLeft ? flowWidth - point.x - box.bounds.width : point.x, y: point.y)

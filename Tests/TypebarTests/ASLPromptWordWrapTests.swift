@@ -97,6 +97,27 @@ import XCTest
     XCTAssertTrue(zero.positions.allSatisfy { $0.x.isFinite && $0.y.isFinite })
   }
 
+  func testMeasuredFlowContinuesFromCompleteWordCheckpointWithoutMovingPriorRows() throws {
+    let cells = [cell(30), cell(30), cell(10, separator: true),
+      cell(40, word: 1), cell(35, word: 1),
+      .init(size: .init(width: 10, height: 20), wordID: 2, isLineBreak: true),
+      cell(25, word: 3), cell(25, word: 3), cell(10, word: 3, separator: true),
+      cell(20, word: 4)]
+    let full = ASLPromptFlowGeometry(cells: cells, width: 70)
+    let first = ASLPromptFlowGeometry(cells: Array(cells[..<3]), width: 70)
+    let middle = try XCTUnwrap(ASLPromptFlowGeometry(cells: Array(cells[3..<6]),
+      width: 70, continuingFrom: first.checkpoint))
+    let last = try XCTUnwrap(ASLPromptFlowGeometry(cells: Array(cells[6...]),
+      width: 70, continuingFrom: middle.checkpoint))
+    XCTAssertEqual(first.positions + middle.positions + last.positions, full.positions)
+    XCTAssertEqual(last.size, full.size)
+    XCTAssertNil(ASLPromptFlowGeometry(cells: Array(cells[6...]),
+      width: 60, continuingFrom: middle.checkpoint), "Width changes invalidate row checkpoints")
+    let partialWord = ASLPromptFlowGeometry(cells: Array(cells[..<4]), width: 70)
+    XCTAssertNil(ASLPromptFlowGeometry(cells: Array(cells[4..<6]),
+      width: 70, continuingFrom: partialWord.checkpoint), "A checkpoint cannot split one measured word")
+  }
+
   func testAdjacentNoSpaceMetadataOverridesPreviousEndBoundary() {
     let glyphs = "abcd".map { TypingPromptGlyph(character: $0, state: .pending) }
     let words: [TypingPromptWordPresentation] = [.init(range: 0..<2, phase: .active, hasInputError: false, hasCommitError: false),

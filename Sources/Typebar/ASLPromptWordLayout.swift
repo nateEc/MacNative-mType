@@ -83,15 +83,45 @@ struct ASLPromptFlowGeometry {
     var isLineBreak = false
     var isSeparator = false
   }
+  /// Exact flow state after complete measured words. A different width or a
+  /// split word cannot reuse it; callers own font/style invalidation.
+  struct Checkpoint: Equatable {
+    let width: CGFloat?
+    let rowSpacing: CGFloat
+    fileprivate let x: CGFloat
+    fileprivate let y: CGFloat
+    fileprivate let rowHeight: CGFloat
+    fileprivate let maximumX: CGFloat
+    let lastWordID: Int?
+    let lastWasLineBreak: Bool
+  }
   let positions: [CGPoint]
   let size: CGSize
+  let checkpoint: Checkpoint
 
   init(cells: [Cell], width: CGFloat?, rowSpacing: CGFloat = 12) {
+    let result = Self.measure(cells: cells, width: width, rowSpacing: rowSpacing, from: nil)
+    positions = result.positions; size = result.size; checkpoint = result.checkpoint
+  }
+
+  init?(cells: [Cell], width: CGFloat, rowSpacing: CGFloat = 12,
+    continuingFrom checkpoint: Checkpoint) {
+    guard width.isFinite, checkpoint.width == max(0, width),
+      checkpoint.rowSpacing == rowSpacing,
+      cells.first.map({ checkpoint.lastWordID != $0.wordID || checkpoint.lastWasLineBreak }) ?? true
+    else { return nil }
+    let result = Self.measure(cells: cells, width: width, rowSpacing: rowSpacing, from: checkpoint)
+    positions = result.positions; size = result.size; self.checkpoint = result.checkpoint
+  }
+
+  private static func measure(cells: [Cell], width: CGFloat?, rowSpacing: CGFloat,
+    from prior: Checkpoint?) -> (positions: [CGPoint], size: CGSize, checkpoint: Checkpoint) {
     let naturalWidth = cells.reduce(CGFloat.zero) { $0 + $1.size.width }
     let proposedWidth = width.flatMap { $0.isFinite ? max(0, $0) : nil }
     let limit = proposedWidth ?? naturalWidth
     var positions = Array(repeating: CGPoint.zero, count: cells.count)
-    var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maximumX: CGFloat = 0
+    var x = prior?.x ?? 0, y = prior?.y ?? 0
+    var rowHeight = prior?.rowHeight ?? 0, maximumX = prior?.maximumX ?? 0
     var start = 0
     while start < cells.count {
       var end = start + 1
@@ -120,8 +150,12 @@ struct ASLPromptFlowGeometry {
       }
       start = end
     }
-    self.positions = positions
-    size = .init(width: proposedWidth ?? max(maximumX, x), height: y + rowHeight)
+    let size = CGSize(width: proposedWidth ?? max(maximumX, x), height: y + rowHeight)
+    let checkpoint = Checkpoint(width: proposedWidth, rowSpacing: rowSpacing,
+      x: x, y: y, rowHeight: rowHeight, maximumX: maximumX,
+      lastWordID: cells.last?.wordID ?? prior?.lastWordID,
+      lastWasLineBreak: cells.last?.isLineBreak ?? prior?.lastWasLineBreak ?? false)
+    return (positions, size, checkpoint)
   }
 }
 

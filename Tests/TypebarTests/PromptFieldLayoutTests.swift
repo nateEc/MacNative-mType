@@ -7,6 +7,94 @@ import XCTest
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let start = Date(timeIntervalSinceReferenceDate: 916_200_000)
 
+  func testFieldWindowContinuesMeasuredRowsWithGlobalCellFrames() throws {
+    let session = TypingSession(configuration: .words(6),
+      prompt: "alpha beta gamma\ndelta epsilon zeta")
+    let map = try XCTUnwrap(try render(session).compositionTextMap)
+    XCTAssertGreaterThan(map.fieldRuns.count, 3)
+    let width: CGFloat = 190
+    let full = PromptFieldTextLayout(map: map, width: width, font: font)
+    let split = 2
+    let prefix = PromptFieldTextLayout(fieldRuns: Array(map.fieldRuns.prefix(split)),
+      width: width, font: font)
+    let checkpoint = try XCTUnwrap(prefix.continuationCheckpoint)
+    let suffix = try XCTUnwrap(PromptFieldTextLayout.continuing(
+      fieldRuns: Array(map.fieldRuns.dropFirst(split)), from: checkpoint,
+      groupOffset: split, width: width, font: font))
+    XCTAssertEqual(suffix.size, full.size)
+    for run in map.fieldRuns.dropFirst(split) {
+      for cell in run.cells {
+        XCTAssertEqual(suffix.cellFrames[cell.id], full.cellFrames[cell.id])
+      }
+    }
+    XCTAssertNil(PromptFieldTextLayout.continuing(fieldRuns: Array(map.fieldRuns.dropFirst(split)),
+      from: checkpoint, groupOffset: split, width: width - 20, font: font))
+    XCTAssertNil(PromptFieldTextLayout.continuing(fieldRuns: Array(map.fieldRuns.dropFirst(split)),
+      from: checkpoint, groupOffset: split, width: width,
+      font: .monospacedSystemFont(ofSize: 31, weight: .regular)))
+    XCTAssertNil(PromptFieldTextLayout.continuing(fieldRuns: Array(map.fieldRuns.dropFirst(split)),
+      from: checkpoint, groupOffset: split + 1, width: width, font: font),
+      "Skipping a field group cannot publish a supposedly complete window")
+  }
+
+  func testEmptySourceFieldsAdvanceWindowGroupIdentityWithoutInventingGeometry() throws {
+    let fields: [PromptFieldTextRun] = [
+      .init(fieldID: 0, cells: []), .init(fieldID: 1, cells: []),
+      .init(fieldID: 2, cells: [
+        .init(id: 42, glyph: .init(character: "a", state: .pending),
+          text: AttributedString("a"), isGap: false)])
+    ]
+    let full = PromptFieldTextLayout(fieldRuns: fields, width: 190, font: font)
+    let prefix = PromptFieldTextLayout(fieldRuns: Array(fields.prefix(2)), width: 190, font: font)
+    let checkpoint = try XCTUnwrap(prefix.continuationCheckpoint)
+    XCTAssertEqual(checkpoint.nextGroupOffset, 2)
+    let suffix = try XCTUnwrap(PromptFieldTextLayout.continuing(
+      fieldRuns: Array(fields.dropFirst(2)), from: checkpoint,
+      groupOffset: 2, width: 190, font: font))
+    XCTAssertEqual(suffix.cellFrames[42], full.cellFrames[42])
+  }
+
+  func testManyFieldWindowsRetainExactFullLayoutWithoutRetainingEarlierLayouts() throws {
+    let prompt = Array(repeating: "oak", count: 101).joined(separator: " ")
+    let map = try XCTUnwrap(try render(TypingSession(configuration: .words(101),
+      prompt: prompt)).compositionTextMap)
+    let width: CGFloat = 205
+    let full = PromptFieldTextLayout(map: map, width: width, font: font)
+    var checkpoint: PromptFieldTextLayout.ContinuationCheckpoint?
+    var lastSize = CGSize.zero
+    for start in stride(from: 0, to: map.fieldRuns.count, by: 13) {
+      let end = min(start + 13, map.fieldRuns.count)
+      let runs = Array(map.fieldRuns[start..<end])
+      let window: PromptFieldTextLayout
+      if let checkpoint {
+        window = try XCTUnwrap(PromptFieldTextLayout.continuing(
+          fieldRuns: runs, from: checkpoint, groupOffset: start,
+          width: width, font: font))
+      } else { window = PromptFieldTextLayout(fieldRuns: runs, width: width, font: font) }
+      for run in runs {
+        for cell in run.cells { XCTAssertEqual(window.cellFrames[cell.id], full.cellFrames[cell.id]) }
+      }
+      checkpoint = window.continuationCheckpoint
+      lastSize = window.size
+    }
+    XCTAssertEqual(lastSize, full.size)
+    XCTAssertEqual(checkpoint?.nextGroupOffset, map.fieldRuns.count)
+  }
+
+  func testContinuationPreservesEarlierHintHeightWhenLaterFieldsAreShorter() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "a b")
+    session.insert("x", at: start)
+    let map = try XCTUnwrap(try render(session, hints: true).compositionTextMap)
+    let full = PromptFieldTextLayout(map: map, width: 400, font: font)
+    let prefix = PromptFieldTextLayout(fieldRuns: [map.fieldRuns[0]], width: 400, font: font)
+    let checkpoint = try XCTUnwrap(prefix.continuationCheckpoint)
+    let suffix = try XCTUnwrap(PromptFieldTextLayout.continuing(
+      fieldRuns: Array(map.fieldRuns.dropFirst()), from: checkpoint,
+      groupOffset: 1, width: 400, font: font))
+    XCTAssertGreaterThan(prefix.size.height, suffix.cellFrames.values.map(\.maxY).max() ?? 0)
+    XCTAssertEqual(suffix.size.height, full.size.height)
+  }
+
   func testHostingBridgeAppliesNewSnapshotAfterFirstInput() throws {
     var session = TypingSession(configuration: .words(2), prompt: "quiet harbor")
     let first = try render(session)
