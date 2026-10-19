@@ -45,6 +45,10 @@ import AppKit
     scrollView.frame = bounds
     addSubview(scrollView)
     clip.didScroll = { [weak self] in self?.clipScrolled() }
+    canvas.accessibilityRectProvider = { [weak self] in self?.accessibilityTextRect(for: $0) }
+    canvas.accessibilityLineProvider = { [weak self] in self?.accessibilityTextLine(for: $0) }
+    canvas.accessibilityLineRangeProvider = { [weak self] in self?.accessibilityTextRange(forLine: $0) }
+    canvas.accessibilitySelectionHandler = { [weak self] in self?.selectAccessibilityText($0) ?? false }
   }
   required init?(coder: NSCoder) { fatalError("PromptViewportNativeScrollHost is created in code") }
 
@@ -216,6 +220,64 @@ import AppKit
     internalScrollDepth += 1
     defer { internalScrollDepth -= 1 }
     body()
+  }
+
+  /// AX text queries are synchronous. Measure only the required prefix, then
+  /// reconstruct requested windows from checkpoints; do not scroll on reads.
+  private func accessibilitySequence(preparedUntil ready: (PromptViewportFieldLayoutSequence) -> Bool)
+    -> PromptViewportFieldLayoutSequence? {
+    guard let sequence else { return nil }
+    if ready(sequence) { return sequence }
+    preparation.cancel()
+    defer {
+      resizeDocumentToMeasuredHeight()
+      refreshVisibleWindows()
+      requestMoreIfNeeded()
+    }
+    while !ready(sequence) {
+      guard sequence.nextField < sequence.fieldCount, preparationFailure == nil else { return nil }
+      let start = sequence.nextField
+      let end = start + min(batchSize, sequence.fieldCount - start)
+      guard sequence.append(fields: start..<end) != nil else {
+        preparationFailure = PromptViewportPreparationTask.Failure.unsupportedWindow
+        return nil
+      }
+    }
+    return sequence
+  }
+
+  private func accessibilityTextRect(for range: NSRange) -> CGRect? {
+    guard let current = sequence, range.location >= 0, range.location <= current.targetUTF16Count,
+      range.length >= 0, range.length <= current.targetUTF16Count - range.location,
+      current.targetUTF16Count > 0 else { return nil }
+    let lastOffset = range.length == 0 ? min(range.location, current.targetUTF16Count - 1) : NSMaxRange(range) - 1
+    guard let field = current.fieldIndex(containingUTF16: lastOffset),
+      let measured = accessibilitySequence(preparedUntil: { $0.nextField > field }) else { return nil }
+    return measured.measuredTextFrame(for: range)
+  }
+
+  private func accessibilityTextLine(for index: Int) -> Int? {
+    guard let field = sequence?.fieldIndex(containingUTF16: index),
+      let measured = accessibilitySequence(preparedUntil: { $0.nextField > field }) else { return nil }
+    return measured.measuredTextLines.firstIndex { NSLocationInRange(index, $0.range) }
+  }
+
+  private func accessibilityTextRange(forLine line: Int) -> NSRange? {
+    guard line >= 0, let measured = accessibilitySequence(preparedUntil: {
+      $0.measuredTextLines.count > line + 1 || $0.nextField == $0.fieldCount
+    }), measured.measuredTextLines.indices.contains(line) else { return nil }
+    return measured.measuredTextLines[line].range
+  }
+
+  private func selectAccessibilityText(_ range: NSRange) -> Bool {
+    guard let rect = accessibilityTextRect(for: range) else { return false }
+    pendingFieldScroll = nil
+    preparation.cancel()
+    clip.scroll(to: .init(x: 0, y: rect.minY))
+    scrollView.reflectScrolledClipView(clip)
+    visibleRegionChanged()
+    NSAccessibility.post(element: canvas, notification: .layoutChanged)
+    return true
   }
 
   private func requestMoreIfNeeded() {

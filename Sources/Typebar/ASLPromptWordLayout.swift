@@ -94,6 +94,7 @@ struct ASLPromptFlowGeometry {
     fileprivate let maximumX: CGFloat
     let lastWordID: Int?
     let lastWasLineBreak: Bool
+    var continuationOrigin: CGPoint { .init(x: x, y: y) }
   }
   let positions: [CGPoint]
   let size: CGSize

@@ -47,6 +47,17 @@ struct PromptViewportTargetDirectory {
   private let separatorOffsets: [Int]
   var fieldCount: Int { fieldRanges.count }
 
+  func fieldIndex(containingUTF16 offset: Int) -> Int? {
+    guard offset >= 0, offset < targetUTF16.count else { return nil }
+    var lower = 0, upper = fieldRanges.count
+    while lower < upper {
+      let middle = lower + (upper - lower) / 2
+      if fieldRanges[middle].upperBound <= offset { lower = middle + 1 }
+      else { upper = middle }
+    }
+    return lower < fieldRanges.count && fieldRanges[lower].contains(offset) ? lower : nil
+  }
+
   init?(session: TypingSession) {
     guard let source = session.promptCompositionField, source.boundary == .separated else { return nil }
     let units = source.sourceTargetUTF16

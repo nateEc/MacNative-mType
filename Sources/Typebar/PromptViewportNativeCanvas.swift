@@ -8,6 +8,12 @@ import AppKit
   private let caret = PromptCaretNativeView(frame: .zero)
   private var caretConfiguration: PromptCaretNativeView.Configuration?
   private var geometryRevision: UInt64 = 0
+  private var accessibilitySource: NSString?
+  private var accessibilitySelection = NSRange(location: NSNotFound, length: 0)
+  var accessibilityRectProvider: ((NSRange) -> CGRect?)?
+  var accessibilityLineProvider: ((Int) -> Int?)?
+  var accessibilityLineRangeProvider: ((Int) -> NSRange?)?
+  var accessibilitySelectionHandler: ((NSRange) -> Bool)?
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -26,6 +32,8 @@ import AppKit
     caretConfiguration = nil
     caret.stop()
     caret.isHidden = true
+    accessibilitySource = nil
+    accessibilitySelection = .init(location: NSNotFound, length: 0)
     setAccessibilityValue("")
     invalidateIntrinsicContentSize()
     needsDisplay = true
@@ -55,12 +63,18 @@ import AppKit
       next.windows.allSatisfy({ $0.layout.size.height <= next.measuredHeight })
     else { return false }
     let oldSize = intrinsicContentSize
+    let targetChanged = snapshot?.promptTargetID != next.promptTargetID
+    if targetChanged { accessibilitySource = next.accessibilityText as NSString }
+    if targetChanged || snapshot?.attemptID != next.attemptID {
+      accessibilitySelection = .init(location: NSNotFound, length: 0)
+    }
     snapshot = next
     geometryRevision &+= 1
     applyCaretConfiguration()
     setAccessibilityValue(next.accessibilityText)
     needsDisplay = true
     if intrinsicContentSize != oldSize { invalidateIntrinsicContentSize() }
+    if targetChanged { NSAccessibility.post(element: self, notification: .valueChanged) }
     return true
   }
 
@@ -139,6 +153,65 @@ import AppKit
     snapshot?.windows.reversed().lazy
       .flatMap(\.runs).lazy.flatMap(\.cells)
       .first(where: { $0.id == id })?.text
+  }
+
+  private func validAccessibilityRange(_ range: NSRange) -> Bool {
+    guard let accessibilitySource else { return false }
+    return range.location >= 0 && range.location <= accessibilitySource.length
+      && range.length >= 0 && range.length <= accessibilitySource.length - range.location
+  }
+
+  override func accessibilityNumberOfCharacters() -> Int { accessibilitySource?.length ?? 0 }
+  override func accessibilityString(for range: NSRange) -> String? {
+    guard validAccessibilityRange(range) else { return nil }
+    return accessibilitySource?.substring(with: range)
+  }
+  override func accessibilityAttributedString(for range: NSRange) -> NSAttributedString? {
+    accessibilityString(for: range).map { NSAttributedString(string: $0) }
+  }
+  override func accessibilityRange(for index: Int) -> NSRange {
+    guard index >= 0, index < accessibilityNumberOfCharacters() else {
+      return .init(location: NSNotFound, length: 0)
+    }
+    return .init(location: index, length: 1)
+  }
+  override func accessibilityFrame(for range: NSRange) -> NSRect {
+    guard validAccessibilityRange(range), let window,
+      let rect = accessibilityRectProvider?(range) else { return .zero }
+    return window.convertToScreen(convert(rect, to: nil))
+  }
+  override func accessibilityLine(for index: Int) -> Int {
+    guard index >= 0, index < accessibilityNumberOfCharacters() else { return NSNotFound }
+    return accessibilityLineProvider?(index) ?? NSNotFound
+  }
+  override func accessibilityRange(forLine line: Int) -> NSRange {
+    guard line >= 0, line < accessibilityNumberOfCharacters() else {
+      return .init(location: NSNotFound, length: 0)
+    }
+    return accessibilityLineRangeProvider?(line) ?? .init(location: NSNotFound, length: 0)
+  }
+  override func accessibilityVisibleCharacterRange() -> NSRange {
+    let visible = visibleRect
+    let ids = snapshot?.windows.flatMap { window in
+      window.layout.cellFrames.compactMap { visible.intersects($0.value) ? $0.key : nil }
+    } ?? []
+    guard let lower = ids.min(), let upper = ids.max() else { return .init(location: NSNotFound, length: 0) }
+    return .init(location: lower, length: upper + 1 - lower)
+  }
+  override func accessibilityRange(for point: NSPoint) -> NSRange {
+    guard let window else { return .init(location: NSNotFound, length: 0) }
+    let local = convert(window.convertFromScreen(.init(origin: point, size: .zero)).origin, from: nil)
+    guard visibleRect.contains(local), let id = snapshot?.windows.lazy.compactMap({ window in
+      window.layout.cellFrames.first(where: { $0.value.contains(local) })?.key
+    }).first else { return .init(location: NSNotFound, length: 0) }
+    return .init(location: id, length: 1)
+  }
+  override func accessibilitySelectedTextRange() -> NSRange { accessibilitySelection }
+  override func accessibilitySelectedText() -> String? { accessibilityString(for: accessibilitySelection) }
+  override func setAccessibilitySelectedTextRange(_ range: NSRange) {
+    guard validAccessibilityRange(range), accessibilitySelectionHandler?(range) == true else { return }
+    accessibilitySelection = range
+    NSAccessibility.post(element: self, notification: .selectedTextChanged)
   }
   override func draw(_ dirtyRect: NSRect) {
     for window in snapshot?.windows ?? [] { window.layout.draw(in: dirtyRect) }

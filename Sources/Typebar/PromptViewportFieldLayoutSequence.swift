@@ -13,6 +13,7 @@ import AppKit
 
   struct DrawingSnapshot {
     let attemptID: UUID
+    let promptTargetID: UUID
     let windows: [Window]
     let width: CGFloat
     let measuredHeight: CGFloat
@@ -23,6 +24,11 @@ import AppKit
   struct MeasuredSpan {
     let fields: Range<Int>
     let inkY: Range<CGFloat>?
+  }
+
+  struct TextLine {
+    let y: CGFloat
+    var range: NSRange
   }
 
   private let ownerID = UUID()
@@ -37,8 +43,11 @@ import AppKit
   private var checkpoint: PromptFieldTextLayout.ContinuationCheckpoint?
   private var checkpointsByField: [Int: PromptFieldTextLayout.ContinuationCheckpoint] = [:]
   private(set) var measuredSpans: [MeasuredSpan] = []
+  private(set) var measuredTextLines: [TextLine] = []
   private(set) var nextField = 0
   var fieldCount: Int { directory.fieldCount }
+  var targetUTF16Count: Int { directory.targetUTF16.count }
+  func fieldIndex(containingUTF16 offset: Int) -> Int? { directory.fieldIndex(containingUTF16: offset) }
   var layoutWidth: CGFloat { width }
   var contentHeight: CGFloat? { checkpoint?.contentHeight }
 
@@ -83,7 +92,45 @@ import AppKit
     measuredSpans.append(.init(fields: fields, inkY: lowerY.flatMap { lower in
       upperY.map { upper in lower..<max(upper, window.layout.size.height) }
     }))
+    for (id, rect) in window.layout.cellFrames.sorted(by: { $0.key < $1.key }) {
+      if let last = measuredTextLines.last, abs(last.y - rect.minY) < 0.5 {
+        measuredTextLines[measuredTextLines.count - 1].range.length = id + 1 - last.range.location
+      } else {
+        measuredTextLines.append(.init(y: rect.minY, range: .init(location: id, length: 1)))
+      }
+    }
     return window
+  }
+
+  /// Original UTF-16 positions are canonical IDs in this admitted ASCII
+  /// directory. Revisit only intersecting measured windows, without scrolling.
+  func measuredTextFrame(for range: NSRange) -> CGRect? {
+    guard range.location >= 0, range.location <= targetUTF16Count,
+      range.length >= 0, range.length <= targetUTF16Count - range.location,
+      targetUTF16Count > 0 else { return nil }
+    let offset = min(range.location, targetUTF16Count - 1)
+    let effective = range.length == 0 ? offset..<(offset + 1) : range.location..<NSMaxRange(range)
+    guard let first = fieldIndex(containingUTF16: effective.lowerBound),
+      let last = fieldIndex(containingUTF16: effective.upperBound - 1), last < nextField else { return nil }
+    var rect = CGRect.null, found = 0
+    for span in measuredSpans where span.fields.upperBound > first && span.fields.lowerBound <= last {
+      guard let window = revisit(fields: span.fields) else { return nil }
+      for (id, frame) in window.layout.cellFrames where effective.contains(id) {
+        rect = rect.union(frame); found += 1
+      }
+    }
+    guard found == effective.count else { return nil }
+    if range.length == 0 {
+      let after = range.location == targetUTF16Count
+      if after, directory.targetUTF16.last == 10, let checkpoint {
+        let point = checkpoint.flow.continuationOrigin
+        return .init(x: rightToLeft ? width - point.x : point.x,
+          y: point.y, width: 0, height: rect.height)
+      }
+      let x = (after != rightToLeft) ? rect.maxX : rect.minX
+      return .init(x: x, y: rect.minY, width: 0, height: rect.height)
+    }
+    return rect
   }
 
   /// Rebuild an evicted window from its exact saved flow boundary. This never
@@ -136,7 +183,8 @@ import AppKit
           rightToLeft: rightToLeft, joinsLetters: joinsLetters) }),
       zip(requested, requested.dropFirst()).allSatisfy({ $0.fields.upperBound <= $1.fields.lowerBound })
     else { return nil }
-    return .init(attemptID: directory.attemptID, windows: requested, width: width,
+    return .init(attemptID: directory.attemptID, promptTargetID: directory.promptTargetID,
+      windows: requested, width: width,
       measuredHeight: checkpoint.contentHeight,
       hasCompleteHeight: nextField == directory.fieldCount,
       accessibilityText: session.prompt)

@@ -43,10 +43,14 @@ final class PromptViewportTargetDirectoryTests: XCTestCase {
     for index in 0..<directory.fieldCount {
       let slice = try XCTUnwrap(directory.materialize(fields: index..<(index + 1)))
       for cell in slice.cells {
+        XCTAssertEqual(directory.fieldIndex(containingUTF16: cell.id), index)
         let expected = units[..<cell.id].filter { $0 == 32 || $0 == 10 }.count
         XCTAssertEqual(cell.wordOrdinal, expected, "field=\(index) id=\(cell.id)")
       }
     }
+    XCTAssertNil(directory.fieldIndex(containingUTF16: -1))
+    XCTAssertNil(directory.fieldIndex(containingUTF16: units.count))
+    XCTAssertNil(directory.fieldIndex(containingUTF16: Int.max))
   }
 
   func testWindowStateAfterDistantCursorMatchesFullHighlighting() throws {
