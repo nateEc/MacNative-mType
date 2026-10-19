@@ -79,6 +79,7 @@ import AppKit
   var hasVisibleMainMarker: Bool { caret.hasVisibleMainMarker }
   var hasVisiblePaceMarker: Bool { caret.hasVisiblePaceMarker }
   func configureCaret(_ configuration: PromptCaretNativeView.Configuration) {
+    if let snapshot, snapshot.attemptID != configuration.attemptID { return }
     caretConfiguration = configuration
     applyCaretConfiguration()
   }
@@ -87,7 +88,13 @@ import AppKit
     caret.present(at: time)
   }
   private func applyCaretConfiguration() {
-    guard snapshot != nil, var configuration = caretConfiguration else { return }
+    guard let snapshot, var configuration = caretConfiguration else { return }
+    guard snapshot.attemptID == configuration.attemptID else {
+      caretConfiguration = nil
+      caret.stop()
+      caret.isHidden = true
+      return
+    }
     let hasMainAnchor = measuredMainCaretRect(style: .bar) != nil
     let hasPaceFrame = configuration.paceStyle.drawsMarker && configuration.paceFrame != nil
     guard hasMainAnchor || hasPaceFrame else {

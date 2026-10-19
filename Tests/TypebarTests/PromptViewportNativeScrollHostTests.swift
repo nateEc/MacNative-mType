@@ -369,6 +369,91 @@ import XCTest
       try XCTUnwrap(host.canvas.measuredRect(for: targetID))))
   }
 
+  func testInputReplacementPreservesCaretAndNativeInsertionAnchorAtTopAndRemote() async throws {
+    for field in [0, 10] {
+      let prompt = (0..<30).map { "word\($0)" }.joined(separator: " ")
+      var session = TypingSession(configuration: .words(30), prompt: prompt)
+      let prefix = (0..<field).map { "word\($0) " }.joined()
+      if !prefix.isEmpty {
+        session.insertBatch(prefix, at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+      }
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+        directory: directory, style: style, width: 180, font: font))
+      let root = NSView(frame: .init(x: 0, y: 0, width: 400, height: 220))
+      let host = PromptViewportNativeScrollHost(frame: .init(x: 30, y: 40, width: 180, height: 100))
+      let input = TypingInputView(frame: .init(x: 1, y: 1, width: 1, height: 1))
+      let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 400, height: 220),
+        styleMask: .borderless, backing: .buffered, defer: false)
+      window.isReleasedWhenClosed = false
+      root.addSubview(host); root.addSubview(input); window.contentView = root
+      defer { host.stop(); window.contentView = nil; window.close() }
+      XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+      XCTAssertTrue(host.scrollToField(field))
+      try await waitUntil { host.canvas.measuredMainCaretRect(style: .bar) != nil && !host.isPreparing }
+      let anchor = PromptInsertionAnchor(), motion = PromptCaretMotionCoordinator()
+      var carets = caretConfig(session, motion: motion)
+      carets.insertionAnchor = anchor
+      carets.latestInput = { .init(attemptID: session.automaticInputAttemptID,
+        typed: session.typed, composition: "", glyphID: session.promptCaretGlyphIndex) }
+      host.configureCaret(carets)
+      input.insertionAnchor = anchor
+      input.insertionAttemptID = session.automaticInputAttemptID
+      host.presentCaret(at: 0)
+      XCTAssertNotNil(anchor.screenRect(attemptID: session.automaticInputAttemptID, in: window))
+
+      session.insert("w", at: Date(timeIntervalSinceReferenceDate: 916_200_001))
+      XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+      let cell = try XCTUnwrap(host.canvas.measuredMainCaretRect(style: .bar))
+      let insertion = NSRect(x: cell.minX, y: cell.minY, width: 0, height: cell.height)
+      let expected = window.convertToScreen(host.canvas.convert(insertion, to: nil))
+      XCTAssertEqual(anchor.screenRect(attemptID: session.automaticInputAttemptID, in: window), expected)
+      XCTAssertEqual(input.firstRect(forCharacterRange: .init(location: 0, length: 0), actualRange: nil), expected)
+      host.presentCaret(at: 0.1)
+      XCTAssertTrue(host.canvas.hasVisibleMainMarker, "field=\(field)")
+      XCTAssertEqual(motion.main.position, cell, "field=\(field)")
+      XCTAssertFalse(window.isVisible)
+      host.stop()
+      XCTAssertNil(anchor.screenRect(attemptID: session.automaticInputAttemptID, in: window))
+    }
+  }
+
+  func testNewAttemptSnapshotRejectsOldCaretConfiguration() throws {
+    var oldSession = TypingSession(configuration: .words(4), prompt: "one two three four")
+    oldSession.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    let newSession = oldSession.repeatedAttempt()
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { canvas.clear() }
+    func snapshot(_ session: TypingSession) throws -> PromptViewportFieldLayoutSequence.DrawingSnapshot {
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+        directory: directory, style: style, width: 180, font: font))
+      let window = try XCTUnwrap(sequence.append(fields: 0..<2))
+      return try XCTUnwrap(sequence.drawingSnapshot(windows: [window]))
+    }
+    let oldMotion = PromptCaretMotionCoordinator()
+    let oldCarets = caretConfig(oldSession, motion: oldMotion)
+    XCTAssertTrue(canvas.configure(snapshot: try snapshot(oldSession)))
+    canvas.configureCaret(oldCarets)
+    canvas.presentCaret(at: 0)
+    let oldPosition = try XCTUnwrap(oldMotion.main.position)
+    XCTAssertTrue(canvas.configure(snapshot: try snapshot(newSession)))
+    XCTAssertTrue(canvas.caretIsRetired)
+    canvas.configureCaret(oldCarets)
+    canvas.presentCaret(at: 0.1)
+    XCTAssertTrue(canvas.caretIsRetired)
+    XCTAssertEqual(oldMotion.main.position, oldPosition)
+    let newMotion = PromptCaretMotionCoordinator()
+    canvas.configureCaret(caretConfig(newSession, motion: newMotion))
+    canvas.presentCaret(at: 0.2)
+    XCTAssertTrue(canvas.hasVisibleMainMarker)
+    XCTAssertEqual(newMotion.main.position, canvas.measuredMainCaretRect(style: .bar))
+    canvas.configureCaret(oldCarets)
+    canvas.presentCaret(at: 0.3)
+    XCTAssertEqual(oldMotion.main.position, oldPosition)
+    XCTAssertTrue(canvas.hasVisibleMainMarker)
+  }
+
   func testUnsupportedRemoteInputLeavesOldSnapshotAndPositionForFallback() async throws {
     let prompt = "a\nb cd " + (0..<20).map { "word\($0)" }.joined(separator: " ")
     var session = TypingSession(configuration: .words(23), prompt: prompt)
@@ -432,7 +517,6 @@ import XCTest
     let before = host.canvas.renderedCellText(for: 0)
     session.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
     XCTAssertTrue(host.replaceVisibleSession(session, style: style))
-    host.configureCaret(caretConfig(session, motion: motion))
     host.presentCaret(at: 0.1)
     XCTAssertEqual(host.measuredFieldCount, 32)
     XCTAssertNotEqual(host.canvas.renderedCellText(for: 0), before)
@@ -459,9 +543,15 @@ import XCTest
     XCTAssertTrue(host.scrollToField(10))
     let targetID = 40
     try await waitUntil { host.canvas.measuredRect(for: targetID) != nil }
+    let motion = PromptCaretMotionCoordinator()
+    host.configureCaret(caretConfig(session, motion: motion))
+    host.presentCaret(at: 0)
+    XCTAssertEqual(motion.main.position, host.canvas.measuredRect(for: targetID))
     let oldInk = host.canvas.renderedCellText(for: targetID)
     session.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_001))
     XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    host.presentCaret(at: 0.1)
+    XCTAssertEqual(motion.main.position, host.canvas.measuredRect(for: targetID + 1))
     XCTAssertLessThanOrEqual(host.measuredFieldCount, 64)
     XCTAssertNotEqual(host.canvas.renderedCellText(for: targetID), oldInk)
     XCTAssertEqual(host.canvas.accessibilityValue() as? String, prompt)

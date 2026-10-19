@@ -12,6 +12,7 @@ import AppKit
   }
 
   struct DrawingSnapshot {
+    let attemptID: UUID
     let windows: [Window]
     let width: CGFloat
     let measuredHeight: CGFloat
@@ -135,7 +136,7 @@ import AppKit
           rightToLeft: rightToLeft, joinsLetters: joinsLetters) }),
       zip(requested, requested.dropFirst()).allSatisfy({ $0.fields.upperBound <= $1.fields.lowerBound })
     else { return nil }
-    return .init(windows: requested, width: width,
+    return .init(attemptID: directory.attemptID, windows: requested, width: width,
       measuredHeight: checkpoint.contentHeight,
       hasCompleteHeight: nextField == directory.fieldCount,
       accessibilityText: session.prompt)

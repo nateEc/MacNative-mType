@@ -73,9 +73,9 @@ import AppKit
     guard let next = sequence.replacingSession(session, style: style),
       let first = next.append(fields: 0..<min(batchSize, next.fieldCount)),
       let snapshot = next.drawingSnapshot(windows: [first]) else { return false }
-    stop()
+    cancelPreparation()
     self.sequence = next
-    retained[first.fields.lowerBound] = first
+    retained = [first.fields.lowerBound: first]
     canvas.frame = .init(x: 0, y: 0, width: next.layoutWidth,
       height: max(1, clip.bounds.height, snapshot.measuredHeight))
     guard canvas.configure(snapshot: snapshot) else { return false }
@@ -102,11 +102,11 @@ import AppKit
     guard let newTop = next.measuredTop(forField: anchor.fields.lowerBound),
       let snapshot = next.drawingSnapshot(windows: visibleWindows) else { return false }
     let newOrigin = max(0, visible.minY + newTop - oldTop)
-    stop()
-    canvas.frame = .init(x: 0, y: 0, width: next.layoutWidth,
-      height: max(1, clip.bounds.height, snapshot.measuredHeight))
+    cancelPreparation()
     self.sequence = next
     retained = Dictionary(uniqueKeysWithValues: visibleWindows.map { ($0.fields.lowerBound, $0) })
+    canvas.frame = .init(x: 0, y: 0, width: next.layoutWidth,
+      height: max(1, clip.bounds.height, snapshot.measuredHeight))
     guard canvas.configure(snapshot: snapshot) else { return false }
     withInternalScroll { clip.scroll(to: .init(x: 0, y: newOrigin)) }
     scrollView.reflectScrolledClipView(clip)
@@ -115,12 +115,16 @@ import AppKit
     return true
   }
 
-  func stop() {
+  private func cancelPreparation() {
     preparation.cancel()
     pendingFieldScroll = nil
+    preparationFailure = nil
+  }
+
+  func stop() {
+    cancelPreparation()
     sequence = nil
     retained.removeAll()
-    preparationFailure = nil
     canvas.clear()
   }
 
