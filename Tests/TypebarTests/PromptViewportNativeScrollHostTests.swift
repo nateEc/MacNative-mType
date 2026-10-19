@@ -316,7 +316,7 @@ import XCTest
     XCTAssertEqual(host.canvas.measuredRect(for: 0), full.cellFrames[0])
   }
 
-  func testRemoteViewportRejectsInputReplacementForCompletePathFallback() async throws {
+  func testRemoteViewportReplaysCurrentSessionAndPreservesVisibleField() async throws {
     var session = TypingSession(configuration: .words(40),
       prompt: (0..<40).map { "word\($0)" }.joined(separator: " "))
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
@@ -328,8 +328,70 @@ import XCTest
     try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
     host.scrollToMeasuredEnd()
     try await waitUntil { host.scrollView.contentView.bounds.minY > 0 }
+    let oldOrigin = host.scrollView.contentView.bounds.minY
+    let oldInk = host.canvas.renderedCellText(for: 0)
     session.insert("w", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    XCTAssertGreaterThan(host.scrollView.contentView.bounds.minY, 0)
+    XCTAssertEqual(host.scrollView.contentView.bounds.minY, oldOrigin, accuracy: 1)
+    host.scrollToTop()
+    let complete = try XCTUnwrap(PromptRenderPlan(session: session,
+      composition: "", style: style).render().compositionTextMap)
+    XCTAssertEqual(host.canvas.renderedCellText(for: 0), complete.fieldRuns.flatMap(\.cells).first?.text)
+    XCTAssertNotEqual(host.canvas.renderedCellText(for: 0), oldInk)
+  }
+
+  func testRemoteViewportRepaintsAcceptedInputAtVisibleField() async throws {
+    let prompt = (0..<30).map { "word\($0)" }.joined(separator: " ")
+    var session = TypingSession(configuration: .words(30), prompt: prompt)
+    let prefix = (0..<10).map { "word\($0) " }.joined()
+    session.insertBatch(prefix, at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    XCTAssertTrue(host.scrollToField(10))
+    let targetID = prefix.utf16.count
+    try await waitUntil { host.canvas.measuredRect(for: targetID) != nil && !host.isPreparing }
+    let oldInk = host.canvas.renderedCellText(for: targetID)
+    session.insert("w", at: Date(timeIntervalSinceReferenceDate: 916_200_001))
+    XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    let complete = try XCTUnwrap(PromptRenderPlan(session: session,
+      composition: "", style: style).render().compositionTextMap)
+    XCTAssertEqual(host.canvas.renderedCellText(for: targetID),
+      complete.fieldRuns.flatMap(\.cells).first(where: { $0.id == targetID })?.text)
+    XCTAssertEqual(host.canvas.measuredRect(for: targetID),
+      PromptFieldTextLayout(map: complete, width: 180, font: font).cellFrames[targetID])
+    XCTAssertNotEqual(host.canvas.renderedCellText(for: targetID), oldInk)
+    XCTAssertTrue(host.scrollView.contentView.documentVisibleRect.intersects(
+      try XCTUnwrap(host.canvas.measuredRect(for: targetID))))
+  }
+
+  func testUnsupportedRemoteInputLeavesOldSnapshotAndPositionForFallback() async throws {
+    let prompt = "a\nb cd " + (0..<20).map { "word\($0)" }.joined(separator: " ")
+    var session = TypingSession(configuration: .words(23), prompt: prompt)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
+    XCTAssertTrue(host.scrollToField(10))
+    try await waitUntil { host.scrollView.contentView.bounds.minY > 0 }
+    let origin = host.scrollView.contentView.bounds.minY
+    let targetID = try XCTUnwrap(directory.materialize(fields: 10..<11)?.cells.first?.id)
+    let oldInk = try XCTUnwrap(host.canvas.renderedCellText(for: targetID))
+    XCTAssertFalse(host.replaceVisibleSession(session.repeatedAttempt(), style: style))
+    var changedStyle = style
+    changedStyle.fontSize = 36
+    XCTAssertFalse(host.replaceVisibleSession(session, style: changedStyle))
+    session.insertBatch("ax", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
     XCTAssertFalse(host.replaceVisibleSession(session, style: style))
+    XCTAssertEqual(host.scrollView.contentView.bounds.minY, origin)
+    XCTAssertEqual(host.canvas.renderedCellText(for: targetID), oldInk)
   }
 
   func testReplacingDuringOldPendingBatchCannotRepublishOldInk() async throws {
@@ -375,6 +437,33 @@ import XCTest
     XCTAssertEqual(host.measuredFieldCount, 32)
     XCTAssertNotEqual(host.canvas.renderedCellText(for: 0), before)
     XCTAssertEqual(motion.main.position, host.canvas.measuredRect(for: 1))
+    XCTAssertEqual(host.canvas.accessibilityValue() as? String, prompt)
+    XCTAssertFalse(host.canvas.hasCompleteHeight)
+  }
+
+  func testHundredThousandWordRemoteInputRepaintsMeasuredPrefixOnly() async throws {
+    try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
+      "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
+    let count = 100_001
+    let prompt = Array(repeating: "oak", count: count).joined(separator: " ")
+    var session = TypingSession(configuration: .words(count), prompt: prompt)
+    session.insertBatch(String(repeating: "oak ", count: 10),
+      at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 32))
+    try await waitUntil { host.measuredFieldCount == 32 && !host.isPreparing }
+    XCTAssertTrue(host.scrollToField(10))
+    let targetID = 40
+    try await waitUntil { host.canvas.measuredRect(for: targetID) != nil }
+    let oldInk = host.canvas.renderedCellText(for: targetID)
+    session.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_001))
+    XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    XCTAssertLessThanOrEqual(host.measuredFieldCount, 64)
+    XCTAssertNotEqual(host.canvas.renderedCellText(for: targetID), oldInk)
     XCTAssertEqual(host.canvas.accessibilityValue() as? String, prompt)
     XCTAssertFalse(host.canvas.hasCompleteHeight)
   }

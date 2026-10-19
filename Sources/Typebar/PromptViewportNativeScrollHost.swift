@@ -62,13 +62,15 @@ import AppKit
     return true
   }
 
-  /// Only the top view can be synchronously repainted from a changed input
-  /// snapshot. A distant viewport or unsupported ink stays on the old host so
-  /// the caller can choose its complete rendering fallback.
+  /// Rebuilds the measured prefix from the current input before publishing.
+  /// Unsupported ink leaves the old host intact for the complete fallback.
   @discardableResult func replaceVisibleSession(_ session: TypingSession,
     style: PromptRenderStyle) -> Bool {
-    guard let sequence, clip.documentVisibleRect.minY < 0.001,
-      let next = sequence.replacingSession(session, style: style),
+    guard let sequence else { return false }
+    if clip.documentVisibleRect.minY >= 0.001 {
+      return replaceRemoteSession(session, style: style, from: sequence)
+    }
+    guard let next = sequence.replacingSession(session, style: style),
       let first = next.append(fields: 0..<min(batchSize, next.fieldCount)),
       let snapshot = next.drawingSnapshot(windows: [first]) else { return false }
     stop()
@@ -77,6 +79,38 @@ import AppKit
     canvas.frame = .init(x: 0, y: 0, width: next.layoutWidth,
       height: max(1, clip.bounds.height, snapshot.measuredHeight))
     guard canvas.configure(snapshot: snapshot) else { return false }
+    requestMoreIfNeeded()
+    return true
+  }
+
+  private func replaceRemoteSession(_ session: TypingSession, style: PromptRenderStyle,
+    from old: PromptViewportFieldLayoutSequence) -> Bool {
+    let visible = clip.documentVisibleRect
+    let spans = old.measuredSpans.filter { span in
+      guard let ink = span.inkY else { return false }
+      return ink.lowerBound <= visible.maxY && ink.upperBound >= visible.minY
+    }
+    guard let anchor = spans.first ?? old.measuredSpans.last,
+      let oldTop = old.measuredTop(forField: anchor.fields.lowerBound),
+      let next = old.replacingSession(session, style: style) else { return false }
+    let visibleStarts = Set((spans.isEmpty ? [anchor] : spans).map { $0.fields.lowerBound })
+    var visibleWindows: [PromptViewportFieldLayoutSequence.Window] = []
+    for span in old.measuredSpans {
+      guard let window = next.append(fields: span.fields) else { return false }
+      if visibleStarts.contains(span.fields.lowerBound) { visibleWindows.append(window) }
+    }
+    guard let newTop = next.measuredTop(forField: anchor.fields.lowerBound),
+      let snapshot = next.drawingSnapshot(windows: visibleWindows) else { return false }
+    let newOrigin = max(0, visible.minY + newTop - oldTop)
+    stop()
+    canvas.frame = .init(x: 0, y: 0, width: next.layoutWidth,
+      height: max(1, clip.bounds.height, snapshot.measuredHeight))
+    self.sequence = next
+    retained = Dictionary(uniqueKeysWithValues: visibleWindows.map { ($0.fields.lowerBound, $0) })
+    guard canvas.configure(snapshot: snapshot) else { return false }
+    withInternalScroll { clip.scroll(to: .init(x: 0, y: newOrigin)) }
+    scrollView.reflectScrolledClipView(clip)
+    refreshVisibleWindows()
     requestMoreIfNeeded()
     return true
   }
