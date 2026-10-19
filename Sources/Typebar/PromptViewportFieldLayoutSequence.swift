@@ -57,6 +57,15 @@ import AppKit
     self.joinsLetters = joinsLetters
   }
 
+  func replacingSession(_ next: TypingSession, style nextStyle: PromptRenderStyle) -> PromptViewportFieldLayoutSequence? {
+    guard next.automaticInputAttemptID == directory.attemptID,
+      next.promptTargetID == directory.promptTargetID,
+      nextStyle.fontSize == style.fontSize else { return nil }
+    return .init(session: next, directory: directory, style: nextStyle,
+      width: width, font: font, lineSpacing: lineSpacing,
+      rightToLeft: rightToLeft, joinsLetters: joinsLetters)
+  }
+
   /// A failed or skipped window never advances the flow checkpoint.
   func append(fields: Range<Int>) -> Window? {
     guard !fields.isEmpty, fields.lowerBound == nextField,

@@ -22,6 +22,7 @@ import AppKit
   private(set) var preparationFailure: Error?
   var isPreparing: Bool { preparation.isPreparing }
   var retainedWindowCount: Int { retained.count }
+  var measuredFieldCount: Int { sequence?.nextField ?? 0 }
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -44,6 +45,25 @@ import AppKit
       height: max(1, clip.bounds.height))
     resizeDocumentToMeasuredHeight()
     refreshVisibleWindows()
+    requestMoreIfNeeded()
+    return true
+  }
+
+  /// Only the top view can be synchronously repainted from a changed input
+  /// snapshot. A distant viewport or unsupported ink stays on the old host so
+  /// the caller can choose its complete rendering fallback.
+  @discardableResult func replaceVisibleSession(_ session: TypingSession,
+    style: PromptRenderStyle) -> Bool {
+    guard let sequence, clip.documentVisibleRect.minY < 0.001,
+      let next = sequence.replacingSession(session, style: style),
+      let first = next.append(fields: 0..<min(batchSize, next.fieldCount)),
+      let snapshot = next.drawingSnapshot(windows: [first]) else { return false }
+    stop()
+    self.sequence = next
+    retained[first.fields.lowerBound] = first
+    canvas.frame = .init(x: 0, y: 0, width: next.layoutWidth,
+      height: max(1, clip.bounds.height, snapshot.measuredHeight))
+    guard canvas.configure(snapshot: snapshot) else { return false }
     requestMoreIfNeeded()
     return true
   }

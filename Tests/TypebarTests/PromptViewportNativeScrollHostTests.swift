@@ -134,4 +134,144 @@ import XCTest
     XCTAssertEqual(sequence.nextField, 20)
     XCTAssertFalse(host.isPreparing)
   }
+
+  func testReplacingTopSessionAfterInputRepaintsFromCurrentState() async throws {
+    var session = TypingSession(configuration: .words(8),
+      prompt: "one two three four five six seven eight")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
+    let originalInk = try XCTUnwrap(host.canvas.renderedCellText(for: 0))
+    session.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    let currentInk = try XCTUnwrap(host.canvas.renderedCellText(for: 0))
+    let complete = try XCTUnwrap(PromptRenderPlan(session: session,
+      composition: "", style: style).render().compositionTextMap)
+    XCTAssertEqual(currentInk, complete.fieldRuns.flatMap(\.cells).first?.text)
+    XCTAssertNotEqual(currentInk, originalInk)
+    XCTAssertEqual(host.canvas.accessibilityValue() as? String, session.prompt)
+  }
+
+  func testReplacingSessionRejectsNewAttemptWithoutPublishingOldInk() async throws {
+    let session = TypingSession(configuration: .words(4), prompt: "one two three four")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
+    let originalInk = host.canvas.renderedCellText(for: 0)
+    XCTAssertFalse(host.replaceVisibleSession(session.repeatedAttempt(), style: style))
+    XCTAssertEqual(host.canvas.renderedCellText(for: 0), originalInk)
+  }
+
+  func testReplacingSessionRejectsFontMetricChangeUntilNewSequenceIsBuilt() async throws {
+    let session = TypingSession(configuration: .words(4), prompt: "one two three four")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
+    var changedStyle = style
+    changedStyle.fontSize = 36
+    XCTAssertFalse(host.replaceVisibleSession(session, style: changedStyle))
+    XCTAssertNotNil(host.canvas.measuredRect(for: 0))
+  }
+
+  func testWrongInputRepaintMatchesFullInkAndGeometry() async throws {
+    var session = TypingSession(configuration: .words(4), prompt: "one two three four")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
+    session.insert("x", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    let complete = try XCTUnwrap(PromptRenderPlan(session: session,
+      composition: "", style: style).render().compositionTextMap)
+    let full = PromptFieldTextLayout(map: complete, width: 180, font: font)
+    XCTAssertEqual(host.canvas.renderedCellText(for: 0),
+      complete.fieldRuns.flatMap(\.cells).first?.text)
+    XCTAssertEqual(host.canvas.measuredRect(for: 0), full.cellFrames[0])
+  }
+
+  func testRemoteViewportRejectsInputReplacementForCompletePathFallback() async throws {
+    var session = TypingSession(configuration: .words(40),
+      prompt: (0..<40).map { "word\($0)" }.joined(separator: " "))
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
+    host.scrollToMeasuredEnd()
+    try await waitUntil { host.scrollView.contentView.bounds.minY > 0 }
+    session.insert("w", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    XCTAssertFalse(host.replaceVisibleSession(session, style: style))
+  }
+
+  func testReplacingDuringOldPendingBatchCannotRepublishOldInk() async throws {
+    var session = TypingSession(configuration: .words(8),
+      prompt: "one two three four five six seven eight")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    session.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    let expected = host.canvas.renderedCellText(for: 0)
+    try await Task.sleep(for: .milliseconds(50))
+    XCTAssertEqual(host.canvas.renderedCellText(for: 0), expected)
+    XCTAssertNotNil(expected)
+    XCTAssertEqual(sequence.nextField, 0, "Cancelled old sequence must not prepare a late batch")
+  }
+
+  func testHundredThousandWordTopInputRepaintsWithoutWholeProjection() async throws {
+    try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
+      "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
+    let count = 100_001
+    let prompt = Array(repeating: "oak", count: count).joined(separator: " ")
+    var session = TypingSession(configuration: .words(count), prompt: prompt)
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 32))
+    try await waitUntil { host.measuredFieldCount == 32 && !host.isPreparing }
+    let before = host.canvas.renderedCellText(for: 0)
+    session.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    XCTAssertTrue(host.replaceVisibleSession(session, style: style))
+    XCTAssertEqual(host.measuredFieldCount, 32)
+    XCTAssertNotEqual(host.canvas.renderedCellText(for: 0), before)
+    XCTAssertEqual(host.canvas.accessibilityValue() as? String, prompt)
+    XCTAssertFalse(host.canvas.hasCompleteHeight)
+  }
+
+  func testUnsupportedExtraInputLeavesOldHostForCompletePathFallback() async throws {
+    var session = TypingSession(configuration: .words(3), prompt: "a\nb cd")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
+    let before = host.canvas.renderedCellText(for: 0)
+    session.insertBatch("ax", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
+    XCTAssertFalse(host.replaceVisibleSession(session, style: style))
+    XCTAssertEqual(host.canvas.renderedCellText(for: 0), before)
+  }
 }

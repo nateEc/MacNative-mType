@@ -59,6 +59,11 @@ import AppKit
   func measuredRect(for id: Int) -> CGRect? {
     snapshot?.windows.reversed().compactMap { $0.layout.cellFrames[id] }.first
   }
+  func renderedCellText(for id: Int) -> AttributedString? {
+    snapshot?.windows.reversed().lazy
+      .flatMap(\.runs).lazy.flatMap(\.cells)
+      .first(where: { $0.id == id })?.text
+  }
   override func draw(_ dirtyRect: NSRect) {
     for window in snapshot?.windows ?? [] { window.layout.draw(in: dirtyRect) }
   }
