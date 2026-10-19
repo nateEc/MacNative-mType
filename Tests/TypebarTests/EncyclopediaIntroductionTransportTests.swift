@@ -76,6 +76,24 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testUnclosedForeignSelectDoesNotChangeFollowingIntroductionText() async throws {
+    let html = "<p>North <svg><select><text>inside</text></svg>"
+      + "<noscript><b>after</b></noscript> south</p>"
+    let response = try JSONSerialization.data(withJSONObject: [
+      "query": ["pages": ["724": ["extract": html]]]
+    ])
+    try await withSession { session in
+      IntroductionProtocol.fixture.set([
+        (200, #"{"pageid":724,"title":"Owned"}"#),
+        (200, String(decoding: response, as: UTF8.self))
+      ])
+      let content = await LivePracticeContentService.fetch(
+        source: .encyclopedia, language: .english, session: session)
+      XCTAssertEqual(content?.text, "North inside<b>after</b> south")
+      XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 2)
+    }
+  }
+
   func testNonstringAttributionDoesNotPreventLoadingValidIntroduction() async throws {
     try await withSession { session in
       for metadata in ["", #","title":null,"author":null"#,

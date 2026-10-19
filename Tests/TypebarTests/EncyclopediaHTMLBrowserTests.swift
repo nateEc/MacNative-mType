@@ -95,7 +95,15 @@ import XCTest
       "<svg><title/><script>left<b>right</b></script></svg>tail",
       "<math><mtext/><noscript><b>foreign</b></noscript></math>tail",
       "<noscript/><b>html</b></noscript>tail",
-      "<select/><noscript><b>html</b></noscript>tail"
+      "<select/><noscript><b>html</b></noscript>tail",
+      "<svg><foreignObject><p>inside</p></svg><noscript><b>after</b></noscript>tail",
+      "<math><mtext><b>inside</b></math><noscript><b>after</b></noscript>tail",
+      "<svg><title><b>inside</b></svg><noscript><b>after</b></noscript>tail",
+      "<svg><foreignObject><svg><text>inside</text></svg></svg><noscript><b>after</b></noscript>tail",
+      "<svg><select><text>inside</text></svg><noscript><b>after</b></noscript>tail",
+      "<math><select><mi>inside</mi></math><noscript><b>after</b></noscript>tail",
+      "<select><option>inside</select><svg><noscript><b>foreign</b></noscript></svg>tail",
+      "<svg><foreignObject><select><option>inside</select></foreignObject><noscript><b>foreign</b></noscript></svg>tail"
     ]
     let wrappers = [
       ("<div>", "</div>"), ("<select>", "</select>"),

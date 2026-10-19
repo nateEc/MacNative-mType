@@ -1,5 +1,7 @@
 # 官方 Funbox 逐项审计
 
+2026-10-19 Wikipedia 外来选择器上下文增量：SVG／MathML 内的未闭合 `select` 不再污染离开外来子树后的 HTML `noscript` 文本；离屏浏览器先红后绿，并补百科运输到练习文本回归。普通 HTML 选择器的斜杠、嵌套及既有外来内容对照继续通过；`wikipedia` 仍为部分覆盖，完整浏览器解析和真实设备未验。详见 FUNCTIONAL_INVENTORY.md。
+
 2026-10-19 Wikipedia 外来内容自闭合增量：真实离屏 DOM 对照揭示 SVG／MathML 自闭合节点后解析上下文未退出的三处差异；原生仅在外来内容识别斜杠自闭合，保留 HTML 非 void 标签的浏览器语义，百科运输回归核对最终练习文本。`wikipedia` 维持部分覆盖；未宣称全部畸形 HTML、网络或实体窗口等价。详见 FUNCTIONAL_INVENTORY.md。
 
 2026-10-19 代码缩进整词删除复核：下方 2026-09 历史审计曾记载“仅删除前行 LF”的差异；现行原生 `removeCodeIndentationBeforeField` 已通过整词导航清掉前一字段。新增真实 `TypingSession` 回归覆盖 `if ready {\n\t` 的整词反缩进，输入与逐事件回放均回到 `if ready `；此限定场景无需重复修复，不代表全部代码输入、输入法或浏览器事件时序已等价。

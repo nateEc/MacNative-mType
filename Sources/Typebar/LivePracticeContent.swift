@@ -399,7 +399,7 @@ enum LivePracticeContentService {
     var prepared = ""
     // SVG and MathML integration points re-enter HTML.
     var foreignContexts: [String] = []
-    var insideSelect = false
+    var selectContextDepth: Int?
     while cursor < source.length,
       let tag = tags.firstMatch(in: html, range: NSRange(location: cursor, length: source.length - cursor)) {
       prepared += source.substring(with: NSRange(location: cursor, length: tag.range.location - cursor))
@@ -430,15 +430,18 @@ enum LivePracticeContentService {
       cursor = NSMaxRange(tag.range)
       guard tag.range(at: 2).location != NSNotFound else { continue }
       if !opening {
-        if foreignContexts.last == name { foreignContexts.removeLast() }
-        if name == "select" { insideSelect = false }
+        if foreignContexts.last == name {
+          foreignContexts.removeLast()
+          if selectContextDepth.map({ $0 > foreignContexts.count }) == true { selectContextDepth = nil }
+        }
+        if name == "select" { selectContextDepth = nil }
         continue
       }
       // HTML ignores the slash on non-void tags; foreign content does not.
       if selfClosing,
         name == "svg" || name == "math" || ["svg", "math"].contains(foreignContexts.last ?? "")
       { continue }
-      if name == "select" { insideSelect = true }
+      if name == "select" { selectContextDepth = foreignContexts.count }
       if name == "svg" || name == "math" {
         foreignContexts.append(name)
         continue
@@ -456,7 +459,7 @@ enum LivePracticeContentService {
           continue
         }
       }
-      if name == "noscript", insideSelect || ["svg", "math"].contains(foreignContexts.last ?? "") {
+      if name == "noscript", selectContextDepth != nil || ["svg", "math"].contains(foreignContexts.last ?? "") {
         continue
       }
       guard ["noscript", "script", "style", "textarea", "title", "iframe",
