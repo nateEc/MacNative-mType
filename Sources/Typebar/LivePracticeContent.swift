@@ -407,6 +407,7 @@ enum LivePracticeContentService {
       let name = tag.range(at: 2).location == NSNotFound ? ""
         : source.substring(with: tag.range(at: 2)).lowercased()
       var tagText = source.substring(with: tag.range)
+      let selfClosing = opening && tagText.dropLast().reversed().drop(while: { $0.isWhitespace }).first == "/"
       // The pinned SwiftSoup parser treats these names as HTML raw text even
       // under SVG/MathML. Browsers parse their foreign-content children as
       // nodes, so use inert names while preserving their textContent shape.
@@ -433,6 +434,10 @@ enum LivePracticeContentService {
         if name == "select" { insideSelect = false }
         continue
       }
+      // HTML ignores the slash on non-void tags; foreign content does not.
+      if selfClosing,
+        name == "svg" || name == "math" || ["svg", "math"].contains(foreignContexts.last ?? "")
+      { continue }
       if name == "select" { insideSelect = true }
       if name == "svg" || name == "math" {
         foreignContexts.append(name)

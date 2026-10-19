@@ -80,7 +80,22 @@ import XCTest
       "<svg><foreignObject><svg><title><b>inner</b></title></svg></foreignObject></svg>tail",
       "<svg><title><svg><title><b>nested</b></title></svg></title></svg>tail",
       "<math><mtext><svg><title><b>mixed</b></title></svg></mtext></math>tail",
-      "<math><mtext><noscript><b>inside</b></noscript></mtext><noscript><b>outside</b></noscript></math>tail"
+      "<math><mtext><noscript><b>inside</b></noscript></mtext><noscript><b>outside</b></noscript></math>tail",
+      "<svg><script>left<b>right</b></script></svg>tail",
+      "<svg><style>left<b>right</b></style></svg>tail",
+      "<math><script>left<b>right</b></script></math>tail",
+      "<svg><foreignObject><svg><script>left<b>right</b></script></svg></foreignObject></svg>tail",
+      "<svg><title><svg><script>left<b>right</b></script></svg></title></svg>tail",
+      "<math><mtext><svg><style>left<b>right</b></style></svg></mtext></math>tail",
+      "<svg><desc><math><script>left<b>right</b></script></math></desc></svg>tail",
+      "<noscript><!--comment--><b>right</b></noscript>tail",
+      "<svg><noscript><!--comment--><b>right</b></noscript></svg>tail",
+      "<template><noscript><b>hidden</b></noscript></template>tail",
+      "<svg><foreignObject/><noscript><b>foreign</b></noscript></svg>tail",
+      "<svg><title/><script>left<b>right</b></script></svg>tail",
+      "<math><mtext/><noscript><b>foreign</b></noscript></math>tail",
+      "<noscript/><b>html</b></noscript>tail",
+      "<select/><noscript><b>html</b></noscript>tail"
     ]
     let wrappers = [
       ("<div>", "</div>"), ("<select>", "</select>"),

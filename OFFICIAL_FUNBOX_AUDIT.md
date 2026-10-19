@@ -1,5 +1,7 @@
 # 官方 Funbox 逐项审计
 
+2026-10-19 Wikipedia 外来内容自闭合增量：真实离屏 DOM 对照揭示 SVG／MathML 自闭合节点后解析上下文未退出的三处差异；原生仅在外来内容识别斜杠自闭合，保留 HTML 非 void 标签的浏览器语义，百科运输回归核对最终练习文本。`wikipedia` 维持部分覆盖；未宣称全部畸形 HTML、网络或实体窗口等价。详见 FUNCTIONAL_INVENTORY.md。
+
 2026-10-19 代码缩进整词删除复核：下方 2026-09 历史审计曾记载“仅删除前行 LF”的差异；现行原生 `removeCodeIndentationBeforeField` 已通过整词导航清掉前一字段。新增真实 `TypingSession` 回归覆盖 `if ready {\n\t` 的整词反缩进，输入与逐事件回放均回到 `if ready `；此限定场景无需重复修复，不代表全部代码输入、输入法或浏览器事件时序已等价。
 
 Wikipedia HTML 增量：原生文本提取现保留脚本启用时 `noscript` 的字面内部内容，并区分 SVG／MathML 外来子树与 HTML 集成点；进一步补齐 SVG `desc`／`title` 和 `select` 内的节点解析差异。浏览器 DOM 对照、三语言随机真实导言对照及实际百科运输到练习文本的回归已补。纯原生生产路径不调用 WebKit；解析畸形嵌套、真实页面全分布、可见窗口和实体输入仍未验收，`wikipedia` 保持部分实现。详见 FUNCTIONAL_INVENTORY.md。
