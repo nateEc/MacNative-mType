@@ -72,6 +72,15 @@ final class CodeFieldIndentationTests: XCTestCase {
     XCTAssertEqual(TypingReplay.typedText(events: try ended(input).replayEvents, through: 1), input.typed)
   }
 
+  func testWholeWordUnindentClearsPreviousCodeFieldAfterTabs() throws {
+    var input = TypingSession(configuration: configuration(), prompt: "if ready {\n\tgo()\n}")
+    input.insertBatch("if ready {\n\t", at: start)
+    input.deleteWordBackward(at: start.addingTimeInterval(1))
+    XCTAssertEqual(input.typed, "if ready ")
+    let result = try ended(input)
+    XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents, through: 1), input.typed)
+  }
+
   func testManualLeadingTabSchedulesRemainingTabsAndKeepsHistoricalAttempts() throws {
     var input = TypingSession(configuration: configuration(), prompt: "\t\tgo() tail")
     input.insert("\t", at: start)

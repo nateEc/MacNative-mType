@@ -1,5 +1,7 @@
 # 官方 Funbox 逐项审计
 
+2026-10-19 代码缩进整词删除复核：下方 2026-09 历史审计曾记载“仅删除前行 LF”的差异；现行原生 `removeCodeIndentationBeforeField` 已通过整词导航清掉前一字段。新增真实 `TypingSession` 回归覆盖 `if ready {\n\t` 的整词反缩进，输入与逐事件回放均回到 `if ready `；此限定场景无需重复修复，不代表全部代码输入、输入法或浏览器事件时序已等价。
+
 Wikipedia HTML 增量：原生文本提取现保留脚本启用时 `noscript` 的字面内部内容，并区分 SVG／MathML 外来子树与 HTML 集成点；进一步补齐 SVG `desc`／`title` 和 `select` 内的节点解析差异。浏览器 DOM 对照、三语言随机真实导言对照及实际百科运输到练习文本的回归已补。纯原生生产路径不调用 WebKit；解析畸形嵌套、真实页面全分布、可见窗口和实体输入仍未验收，`wikipedia` 保持部分实现。详见 FUNCTIONAL_INVENTORY.md。
 
 Tape RTL 增量：单行 RTL 及相邻反向词保留源顺序，主光标与 pace 各自按词／字符方向取边缘；RTL 参数只交给实际 Tape，ASL／Choo 默认不变，不改输入／原文／回放或既有原生外观。12 新增／相关 140 项、128 条完整源码轨迹和 28 方向案例通过；最终冻结原生 3,853／服务 501 项零失败零跳过，十万词、16 磁盘冷读、53 表面、1,105 人工结构及未启动应用包／签名／原创边界通过。13 哈希、64 日志／159 图及三张复查新图见 [合同](REWARD_INBOX_CONTRACT.md)。六部分／42 历史有界分类不变；tapeMode 下调部分，换行／afterNewline／退休、全部 joining／混排／专业手形／真实设备与视口虚拟化仍开放，零主程序启动、goal active。下方为历史阶段。
@@ -726,7 +728,7 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `binary` | 二进制流 | 等价实现 | Typebar 自有生成器；强制关闭标点和数字 |
 | `hexadecimal` | 十六进制流 | 等价实现 | Typebar 自有生成器；强制关闭数字 |
 | `zipf` | Zipf 高频词 | 等价实现 | Typebar 自有词表与秩次加权；参考为 `orderedByFrequency: false` 时会提示词表未按频率排序，未定义时会提示可能不支持，提示持续七秒且不会移除修饰器；`FUN-04` |
-| `morse` | 摩斯符号流 | 部分覆盖 | 独立标准编码；自定义段游标不附提交空格，保留隐藏词界，规范去重音但不折叠全角。零目标词、全量 Unicode 与完整组合顺序仍待补证 |
+| `morse` | 摩斯符号流 | 部分覆盖 | 独立标准编码；自定义段游标不附提交空格，保留隐藏词界，规范去重音但不折叠全角。空目标词的前／中／末／全空及停止、删除、计时边界已由现行 `EmptyNoSpaceTargetTests` 21 项保护；全量 Unicode、完整组合顺序与真实设备仍待补证。 |
 | `crt` | CRT 练习区 | 等价实现 | 原生扫描线、色调与边缘光晕，不改变输入或计分 |
 | `backwards` | 逐词反写 | 部分覆盖 | 自定义／引语词池策略保持；普通／代码池通过按需镜像索引在取词前反池，普通、代码及生成型首批／续批保持取词顺序后按 UTF-16 逐词反写，下划线用全局位置。Polyglot 新池不二次反转；代码先装饰／数字覆盖再反写，按实际最近两词与候选首分量比较，九个代码入口保留段内词序，正常续批接余词、重开缓存结束后抽新段，缓存已生成目标。相关 113 项／扩大 164 项、原有二十三组取词及另脚本 48 组实际装饰夹具通过，不证明源 RNG／全部词库身份。其他词源分段、段身份消费者、完整组合／Unicode、外部段落、非分段规范化、未生成未来随机恢复／方向呈现、其他源最近词身份、原始未排序配置与半代理仍待补齐，设备未验；见 CODE_SECTION_GENERATION_CONTRACT.md、CODE_WORD_DECORATION_CONTRACT.md、CODE_POOL_GENERATION_CONTRACT.md、ORDINARY_BACKWARDS_POOL_CONTRACT.md、GENERATED_BACKWARDS_ORDER_CONTRACT.md |
 | `ddoouubblleedd` | 字符双写 | 等价实现 | 独立 Unicode 标量双写，标准词间空格保持单个；组合标记与非 BMP 标量均按固定参考的 Unicode 正则语义处理 |

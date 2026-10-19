@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-19 当前缺口口径复核：`INPUT-NOSPACE-LASTWORD-BATCH-01` 在历史段落曾写为待实现，但现行 `TerminalFieldReentryTests` 已验证有限末词单批清空重入、停止输入和回放字段，12 项通过；当前剩余的是实机／IME、旧档案及其他回放消费者，不重新实现已在产品内的会话逻辑。`morse` 的空目标词也由现行 `EmptyNoSpaceTargetTests` 覆盖前、中、末、全空、停止／删除与计时边界，21 项通过；完整 Unicode／组合顺序及真实设备仍开放。两组定向合计 33 项零失败。另在唯一隔离 Release QA 实例的闲置无效结果页明确选中 `terminate:` 菜单项后首次退出成功，但与前次失败冲突，`RESULT-SHEET-QUIT-01` 不升级；详见 [人工验收记录](MANUAL_ACCEPTANCE.md)。本条只校正追踪与验收口径，不声称新产品修复或完整等价。
+
 2026-10-19 `TST-02`／Wikipedia 外来内容中的 `script`／`style`：有界离屏浏览器对照先在 SVG 与 MathML 各发现两处原生差异，嵌套标记在浏览器 `textContent` 中变成子文本，固定 SwiftSoup 2.14.1 的 HTML 原始文本解析却保留字面标签。原生现在只在这两类外来上下文把该标签临时换为惰性解析名称，普通 HTML 及 HTML 集成点的原始文本路径不变；浏览器对照转绿，另有从百科响应到最终练习文本的回归。尚未覆盖畸形嵌套全集、随机真实页面分布、长文本性能或可见输入，`wikipedia` 仍为部分实现；此批同时保留结果 sheet 退出的待验收证据，不据此声称退出缺陷已修复。
 
 2026-10-19 `TST-02`／Wikipedia 外来内容与选择器的 DOM 文本：在真实导言 QA 后扩展原创合成 HTML 对照，先行失败定位到六处浏览器／原生差异。SVG `desc`、`title` 是 HTML 集成点；固定 SwiftSoup 将 SVG `title` 当原始文本，原生现仅在该上下文将其作为等价的 `foreignObject` 解析，并在 `select` 内保留浏览器对 `noscript` 的节点解析。WebKit 离屏红测已转绿，新增注入运输回归证明该文本进入最终英文练习；普通 `title`、SVG 非集成点及原有 MathML 夹具继续受对照保护。生产不调用 WebKit、不打开 Typebar、不复制参考实现或资产；畸形标签全分布、真实长文性能与 GUI／实体输入仍开放，`wikipedia` 保持部分实现。
