@@ -25,7 +25,7 @@ import XCTest
   }
 
   func testNativeIntroductionTextMatchesDetachedDOMWithoutOpeningWindow() async throws {
-    let html = [
+    var html = [
       "<p>North <b>harbor</b>&nbsp;2026 [12]</p><p>South &amp; west &#x1F680;.</p>",
       "<p>left\nright\tend</p><p>next&nbsp;word</p>",
       "<div>Über<br>12</div><div>&NotEqualTilde; ‘Boote’</div><!--ignored--><p>am</p><p>Ufer.</p>",
@@ -71,8 +71,35 @@ import XCTest
       "<svg><title><noscript><b>svg title</b></noscript></title></svg>tail",
       "<svg><title><b>bold</b></title></svg>tail",
       "<svg><desc><b>bold</b></desc></svg>tail",
-      "<svg><select><noscript><b>foreign</b></noscript></select></svg>tail"
+      "<svg><select><noscript><b>foreign</b></noscript></select></svg>tail",
+      "<select><option>one</option></select><noscript><b>outside</b></noscript>tail",
+      "<select><optgroup><noscript><b>group</b></noscript></optgroup></select><noscript><b>outside</b></noscript>tail",
+      "<svg><foreignObject><select><noscript><b>inside</b></noscript></select></foreignObject></svg><noscript><b>outside</b></noscript>tail",
+      "<select><option>one<select><option>two</select><noscript><b>after</b></noscript>tail",
+      "<select><option>one</select><select><noscript><b>two</b></noscript></select>tail",
+      "<svg><foreignObject><svg><title><b>inner</b></title></svg></foreignObject></svg>tail",
+      "<svg><title><svg><title><b>nested</b></title></svg></title></svg>tail",
+      "<math><mtext><svg><title><b>mixed</b></title></svg></mtext></math>tail",
+      "<math><mtext><noscript><b>inside</b></noscript></mtext><noscript><b>outside</b></noscript></math>tail"
     ]
+    let wrappers = [
+      ("<div>", "</div>"), ("<select>", "</select>"),
+      ("<svg>", "</svg>"), ("<svg><desc>", "</desc></svg>"),
+      ("<svg><foreignObject>", "</foreignObject></svg>"),
+      ("<math>", "</math>"), ("<math><mtext>", "</mtext></math>"),
+      ("<math><annotation-xml encoding='text/html'>", "</annotation-xml></math>"),
+      ("<table><tr><td>", "</td></tr></table>")
+    ]
+    let fragments = [
+      "left<noscript><b>right</b></noscript>end",
+      "left<noscript>&amp; right</noscript>end",
+      "left<script><noscript><b>right</b></noscript></script>end",
+      "left<style><noscript><b>right</b></noscript></style>end",
+      "left<svg><title><b>right</b></title></svg>end"
+    ]
+    for (open, close) in wrappers {
+      for fragment in fragments { html.append(open + fragment + close + "tail") }
+    }
     let browserValues = try await browserTexts(for: html)
     XCTAssertEqual(browserValues.count, html.count)
     for (source, browserText) in zip(html, browserValues) {

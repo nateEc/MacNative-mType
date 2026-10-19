@@ -4,6 +4,17 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class ResultSheetTerminationTests: XCTestCase {
+  private struct ActualSheetHost: View {
+    @State private var showsResult = true
+
+    var body: some View {
+      Text("Practice").sheet(isPresented: $showsResult) {
+        Text("Finished result")
+          .background(ResultSheetTerminationBridge().frame(width: 0, height: 0))
+      }
+    }
+  }
+
   private func window() -> NSWindow {
     let value = NSWindow(contentRect: .init(x: 0, y: 0, width: 300, height: 200),
       styleMask: [.titled], backing: .buffered, defer: false)
@@ -36,6 +47,39 @@ import XCTest
     sheet.contentView = nil
     XCTAssertTrue(sheet.preventsApplicationTerminationWhenModal)
     sheet.close()
+  }
+
+  func testBridgeRemainsNonblockingWhenAttachedWindowBecomesASheet() {
+    let parent = window(), sheet = window()
+    sheet.preventsApplicationTerminationWhenModal = true
+    let host = NSHostingView(rootView: Text("Finished result")
+      .background(ResultSheetTerminationBridge().frame(width: 0, height: 0)))
+    sheet.contentView = host
+    host.layoutSubtreeIfNeeded()
+    XCTAssertFalse(sheet.preventsApplicationTerminationWhenModal)
+    parent.beginSheet(sheet)
+    XCTAssertTrue(sheet.sheetParent === parent)
+    XCTAssertFalse(sheet.preventsApplicationTerminationWhenModal)
+    parent.endSheet(sheet)
+    sheet.contentView = nil
+    XCTAssertTrue(sheet.preventsApplicationTerminationWhenModal)
+    sheet.close()
+    parent.close()
+  }
+
+  func testActualSwiftUISheetDoesNotPreventTermination() throws {
+    let parent = window()
+    parent.contentView = NSHostingView(rootView: ActualSheetHost())
+    parent.orderFront(nil)
+    defer {
+      if let sheet = parent.attachedSheet { parent.endSheet(sheet) }
+      parent.close()
+    }
+    for _ in 0..<20 where parent.attachedSheet == nil {
+      RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    }
+    let sheet = try XCTUnwrap(parent.attachedSheet)
+    XCTAssertFalse(sheet.preventsApplicationTerminationWhenModal)
   }
 
   func testMovingHostRestoresOldWindowWithoutTouchingOtherLongTestProtection() {

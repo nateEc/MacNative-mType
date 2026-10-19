@@ -407,6 +407,16 @@ enum LivePracticeContentService {
       let name = tag.range(at: 2).location == NSNotFound ? ""
         : source.substring(with: tag.range(at: 2)).lowercased()
       var tagText = source.substring(with: tag.range)
+      // The pinned SwiftSoup parser treats these names as HTML raw text even
+      // under SVG/MathML. Browsers parse their foreign-content children as
+      // nodes, so use inert names while preserving their textContent shape.
+      let foreignRawTextTag = ["script", "style"].contains(name)
+        && ["svg", "math"].contains(foreignContexts.last ?? "")
+      if foreignRawTextTag {
+        let nameRange = tag.range(at: 2)
+        let relative = NSRange(location: nameRange.location - tag.range.location, length: nameRange.length)
+        tagText = (tagText as NSString).replacingCharacters(in: relative, with: "typebar-foreign-\(name)")
+      }
       // SwiftSoup treats SVG title as raw text, whereas browsers parse child
       // HTML there. An SVG foreignObject provides that parsing context.
       if name == "title",
@@ -428,6 +438,7 @@ enum LivePracticeContentService {
         foreignContexts.append(name)
         continue
       }
+      if foreignRawTextTag { continue }
       if ["foreignobject", "desc", "title"].contains(name), foreignContexts.last == "svg" {
         foreignContexts.append(name)
         continue
