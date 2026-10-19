@@ -3823,12 +3823,17 @@ private struct ContentView: View {
   }
 
   private func synchronizeLiveInputRules() {
+    let previous = session.configuration.rules
     session.synchronizeLiveInputRules(settings.inputRules)
+    if session.configuration.rules != previous { preparedWholePreviewRendering = nil }
   }
 
   private func handleInputRuleChange(_ previous: InputRules, _ current: InputRules) {
     if isPreparingWholePreview { reset() }
-    else { session.synchronizeLiveInputRules(current) }
+    else {
+      session.synchronizeLiveInputRules(current)
+      preparedWholePreviewRendering = nil
+    }
   }
 
   private func handleInsertedText(
@@ -3878,7 +3883,7 @@ private struct ContentView: View {
           typedSnapshot: session.typed, rendering: patched, layout: patchedLayout,
           style: style, paceGuideIndex: nil)
       } else { preparedWholePreviewRendering = nil }
-    } else if preparedWholePreviewRendering?.typedSnapshot != session.typed {
+    } else if !feedback.isEmpty || preparedWholePreviewRendering?.typedSnapshot != session.typed {
       preparedWholePreviewRendering = nil
     }
     if !hadStarted && session.hasStarted { synchronizeNoQuitConfigurationLock() }
@@ -3928,7 +3933,7 @@ private struct ContentView: View {
     guard !isPreparingWholePreview else { return }
     synchronizeLiveInputRules()
     let feedback = TypingLiveInputFeedback.delete(from: &session, wholeWord: deletesWord)
-    if preparedWholePreviewRendering?.typedSnapshot != session.typed {
+    if !feedback.isEmpty || preparedWholePreviewRendering?.typedSnapshot != session.typed {
       preparedWholePreviewRendering = nil
     }
     visualFocus.inputDidUpdate(hasFeedback: !feedback.isEmpty,
@@ -5368,7 +5373,10 @@ private struct ContentView: View {
     }
     if let target = BehaviorCommandCatalog.target(for: item.id) {
       target.apply(to: settings)
-      if case .blindMode(let enabled) = target { session.setBlindMode(enabled) }
+      if case .blindMode(let enabled) = target {
+        session.setBlindMode(enabled)
+        preparedWholePreviewRendering = nil
+      }
       return
     }
     if let target = PracticeThresholdCommandCatalog.target(for: item.id) {

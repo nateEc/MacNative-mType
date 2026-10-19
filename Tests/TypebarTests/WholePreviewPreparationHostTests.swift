@@ -106,6 +106,9 @@ import XCTest
   func testLargestLegalPendingTargetCanLeaveWithoutPublishing() throws {
     try check(.leave, wordCount: OfficialTestLimitInput.maximumValue)
   }
+  func testStoppedWrongKeyRepaintsPreparedWholePreviewWithoutAcceptedText() throws {
+    try check(.stopped)
+  }
 
   func testRenderStageKeepsInputLockedAndStyleChangeRendersSameCandidateAgain() throws {
     let suite = "WholePreviewRenderingHostTests.\(UUID())"
@@ -264,7 +267,7 @@ import XCTest
     XCTAssertEqual(target(), expected)
     XCTAssertTrue(views(PromptFieldNativeView.self, in: host).first?.usedPreparedLayout == true)
   }
-  private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, actual, actualFirstInput, actualSequentialInput, actualInterleavings }
+  private enum Scenario { case publish, restart, displayOff, leave, failure, rules, resume, tape, stopped, actual, actualFirstInput, actualSequentialInput, actualInterleavings }
 
   private func check(_ scenario: Scenario, wordCount: Int = 201, modifiers: [TestModifier] = [.noQuit]) throws {
     let suite = "WholePreviewPreparationHostTests.\(UUID())"
@@ -274,7 +277,9 @@ import XCTest
     settings.reducePracticeMotion = true
     settings.showAllPracticeLines = true
     settings.testModifiers = modifiers
-    let configuration = TestConfiguration.words(wordCount).with(modifiers: modifiers)
+    if scenario == .stopped { settings.stopOnErrorMode = .letter }
+    let rules = scenario == .stopped ? InputRules(stopOnErrorMode: .letter) : .init()
+    let configuration = TestConfiguration.words(wordCount, rules: rules).with(modifiers: modifiers)
     XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: configuration),
       testParameterMemory: .legacyDefaults(configuration: configuration))))
     let container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
@@ -495,6 +500,32 @@ import XCTest
       "Pending preparation must not start a No Quit attempt")
     switch scenario {
     case .actual, .actualFirstInput, .actualSequentialInput, .actualInterleavings: XCTFail("Handled above")
+    case .stopped:
+      pending.finishFirst()
+      flush()
+      let expected = Array(repeating: "owned1", count: wordCount).joined(separator: " ")
+      XCTAssertEqual(target(), expected)
+      let field = try XCTUnwrap(views(PromptFieldNativeView.self, in: host).first)
+      let beforeInk = try XCTUnwrap(field.renderedCellText(for: 0))
+      let beforeCaret = try XCTUnwrap(field.measuredMainCaretRect())
+      let ready = try XCTUnwrap(views(TypingInputView.self, in: host).first)
+      XCTAssertEqual(settings.inputRules.stopOnErrorMode, .letter)
+      ready.onInsert("x", false)
+      flush()
+      XCTAssertEqual(settings.inputRules.stopOnErrorMode, .letter)
+      XCTAssertEqual(target(), expected)
+      XCTAssertEqual(try XCTUnwrap(field.measuredMainCaretRect()).minX, beforeCaret.minX,
+        "A stopped wrong key must not move the accepted-text caret")
+      XCTAssertNotEqual(field.renderedCellText(for: 0), beforeInk,
+        "A stopped typo must repaint the current cell even though accepted text is unchanged")
+      let stoppedInk = try XCTUnwrap(field.renderedCellText(for: 0))
+      settings.blindMode = true
+      flush()
+      XCTAssertNotEqual(field.renderedCellText(for: 0), stoppedInk,
+        "A live blind-mode change must not reuse the stopped-error snapshot")
+      settings.blindMode = false
+      flush()
+      XCTAssertEqual(field.renderedCellText(for: 0), stoppedInk)
     case .resume:
       window.contentView = nil
       flush()
