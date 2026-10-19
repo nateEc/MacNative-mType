@@ -140,6 +140,61 @@ import XCTest
     XCTAssertEqual(fixture.counts.generation, 1)
   }
 
+  func testRemoteReadingPositionAndSelectionSurviveFontAndWidthChanges() throws {
+    let fixture = try Fixture()
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    let selected = NSRange(location: 730, length: 3)
+    native.viewport.canvas.setAccessibilitySelectedTextRange(selected)
+    fixture.flush()
+    let anchor = native.viewport.canvas.accessibilityVisibleCharacterRange().location
+    XCTAssertNotEqual(anchor, NSNotFound)
+    XCTAssertGreaterThan(native.viewport.scrollView.contentView.bounds.minY, 0)
+    fixture.settings.fontSize = 36
+    fixture.flush()
+    XCTAssertTrue(NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()),
+      "Reflow must keep the reading row, not return to the first batch")
+    XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), selected)
+    fixture.settings.customPracticeLineColumns = 30
+    fixture.settings.practiceLineWidth = .custom
+    fixture.flush()
+    XCTAssertTrue(NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()))
+    XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), selected)
+    native.viewport.scrollView.scrollerStyle = .legacy
+    native.viewport.scrollView.tile()
+    fixture.flush()
+    XCTAssertTrue(NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()))
+    XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), selected)
+    XCTAssertEqual(fixture.counts.generation, 1)
+    XCTAssertLessThan(native.viewport.measuredFieldCount, 201, "Restoring a reading anchor must not measure the entire target")
+    XCTAssertFalse(fixture.window.isVisible)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    input.onRestart()
+    fixture.waitUntil { fixture.counts.generation == 2
+      && fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+    let restarted = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    XCTAssertEqual(restarted.viewport.canvas.accessibilitySelectedTextRange(), .init(location: NSNotFound, length: 0))
+    XCTAssertEqual(restarted.viewport.scrollView.contentView.bounds.minY, 0)
+    XCTAssertEqual(native.viewport.measuredFieldCount, 0, "Restart must retire the former display owner")
+  }
+
+  func testManualRemoteScrollWithoutSelectionSurvivesReflow() throws {
+    let fixture = try Fixture()
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.accessibilityValue() as? String == fixture.prompt }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    XCTAssertTrue(native.viewport.scrollToField(100))
+    fixture.waitUntil { !native.viewport.isPreparing && native.viewport.scrollView.contentView.bounds.minY > 0 }
+    let anchor = native.viewport.canvas.accessibilityVisibleCharacterRange().location
+    XCTAssertNotEqual(anchor, NSNotFound)
+    fixture.settings.fontSize = 36
+    fixture.flush()
+    XCTAssertTrue(NSLocationInRange(anchor, native.viewport.canvas.accessibilityVisibleCharacterRange()))
+    XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), .init(location: NSNotFound, length: 0))
+    XCTAssertEqual(fixture.counts.generation, 1)
+  }
+
   func testFontAndLineWidthChangesUseVisibleWidthIncludingLegacyScroller() throws {
     let fixture = try Fixture()
     defer { fixture.close() }

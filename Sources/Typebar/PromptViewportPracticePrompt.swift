@@ -48,6 +48,7 @@ struct PromptViewportPracticePrompt: NSViewRepresentable {
   private var directory: PromptViewportTargetDirectory?
   private var onFailure: ((UUID) -> Void)?
   private var reportedFailure: PromptViewportPracticeSnapshot?
+  private var pendingReadingPosition: PromptViewportNativeScrollHost.ReadingPosition?
   private let batchSize = 32
 
   override init(frame frameRect: NSRect) {
@@ -55,6 +56,7 @@ struct PromptViewportPracticePrompt: NSViewRepresentable {
     addSubview(viewport)
     viewport.onPreparationFailure = { [weak self] _ in self?.reportFailure() }
     viewport.onLayoutWidthChange = { [weak self] in self?.needsLayout = true }
+    viewport.onLayoutWillRetire = { [weak self] in self?.rememberReadingPosition() }
   }
   required init?(coder: NSCoder) { fatalError("PromptViewportPracticeNativeView is created in code") }
 
@@ -85,6 +87,7 @@ struct PromptViewportPracticePrompt: NSViewRepresentable {
     if sameTarget && sameMetrics && viewport.measuredFieldCount > 0 {
       guard viewport.replaceVisibleSession(snapshot.session, style: snapshot.style) else { reportFailure(); return }
     } else {
+      if sameTarget { rememberReadingPosition() } else { pendingReadingPosition = nil }
       if directory?.attemptID != snapshot.session.automaticInputAttemptID
         || directory?.promptTargetID != snapshot.session.promptTargetID {
         directory = PromptViewportTargetDirectory(session: snapshot.session)
@@ -95,10 +98,17 @@ struct PromptViewportPracticePrompt: NSViewRepresentable {
           rightToLeft: snapshot.rightToLeft, joinsLetters: snapshot.joinsLetters),
         sequence.append(fields: 0..<min(batchSize, sequence.fieldCount)) != nil,
         viewport.configure(sequence: sequence, batchSize: batchSize) else { reportFailure(); return }
+      if let position = pendingReadingPosition {
+        pendingReadingPosition = nil
+        guard viewport.restoreReadingPosition(position) else { reportFailure(); return }
+      }
     }
     viewport.configureCaret(snapshot.carets)
     applied = snapshot; appliedWidth = width
     reportedFailure = nil
+  }
+  private func rememberReadingPosition() {
+    if pendingReadingPosition == nil { pendingReadingPosition = viewport.captureReadingPosition() }
   }
   private func reportFailure() {
     guard let snapshot, reportedFailure !== snapshot else { return }
@@ -111,6 +121,7 @@ struct PromptViewportPracticePrompt: NSViewRepresentable {
   func stop() {
     snapshot = nil; applied = nil; directory = nil
     onFailure = nil; reportedFailure = nil; appliedWidth = 0
+    pendingReadingPosition = nil
     viewport.stop()
   }
 }

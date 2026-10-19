@@ -34,6 +34,13 @@ import AppKit
 /// It measures one additional batch only when the visible end approaches the
 /// measured prefix, and retains drawing windows around the visible rectangle.
 @MainActor final class PromptViewportNativeScrollHost: NSView {
+  struct ReadingPosition {
+    let attemptID: UUID
+    let promptTargetID: UUID
+    let character: Int
+    let rowFraction: CGFloat
+    let selection: NSRange
+  }
   let canvas = PromptViewportNativeCanvas(frame: .zero)
   let scrollView = NSScrollView(frame: .zero)
   private let clip = PromptViewportReportingClipView(frame: .zero)
@@ -46,6 +53,7 @@ import AppKit
   private(set) var preparationFailure: Error?
   var onPreparationFailure: ((Error) -> Void)?
   var onLayoutWidthChange: (() -> Void)?
+  var onLayoutWillRetire: (() -> Void)?
   var layoutWidth: CGFloat { clip.bounds.width }
   var isPreparing: Bool { preparation.isPreparing }
   var retainedWindowCount: Int { retained.count }
@@ -155,11 +163,37 @@ import AppKit
     canvas.presentCaret(at: time)
   }
 
+  func captureReadingPosition() -> ReadingPosition? {
+    let character = canvas.accessibilityVisibleCharacterRange().location
+    guard let sequence, character != NSNotFound,
+      let rect = canvas.measuredRect(for: character), rect.height > 0 else { return nil }
+    return .init(attemptID: sequence.attemptID, promptTargetID: sequence.promptTargetID,
+      character: character,
+      rowFraction: max(0, min(1, (clip.bounds.minY - rect.minY) / rect.height)),
+      selection: canvas.accessibilitySelectedTextRange())
+  }
+
+  /// Reuses exact prefix measurement, never an estimated remote y coordinate.
+  /// This is synchronous like AX geometry queries and is not a latency claim.
+  @discardableResult func restoreReadingPosition(_ position: ReadingPosition) -> Bool {
+    guard let sequence, sequence.attemptID == position.attemptID,
+      sequence.promptTargetID == position.promptTargetID,
+      let rect = accessibilityTextRect(for: .init(location: position.character, length: 1)) else { return false }
+    withInternalScroll {
+      clip.scroll(to: .init(x: 0, y: rect.minY + position.rowFraction * rect.height))
+    }
+    scrollView.reflectScrolledClipView(clip)
+    visibleRegionChanged()
+    canvas.restoreAccessibilitySelection(position.selection)
+    return true
+  }
+
   override func setFrameSize(_ newSize: NSSize) {
     let oldWidth = bounds.width
     super.setFrameSize(newSize)
     scrollView.frame = bounds
     if abs(newSize.width - oldWidth) >= 0.001 {
+      if sequence != nil { onLayoutWillRetire?() }
       stop()
       canvas.frame.size.width = layoutWidth
     } else {
@@ -172,6 +206,7 @@ import AppKit
     let oldWidth = bounds.width
     super.setBoundsSize(newSize)
     guard abs(newSize.width - oldWidth) >= 0.001 else { return }
+    if sequence != nil { onLayoutWillRetire?() }
     stop()
     scrollView.frame = bounds
     canvas.frame.size.width = layoutWidth
@@ -233,6 +268,7 @@ import AppKit
 
   private func clipWidthChanged() {
     guard let sequence, abs(sequence.layoutWidth - layoutWidth) >= 0.001 else { return }
+    onLayoutWillRetire?()
     stop()
     canvas.frame.size.width = layoutWidth
     onLayoutWidthChange?()

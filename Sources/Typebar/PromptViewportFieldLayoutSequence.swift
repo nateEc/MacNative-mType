@@ -46,6 +46,8 @@ import AppKit
   private(set) var measuredTextLines: [TextLine] = []
   private(set) var nextField = 0
   var fieldCount: Int { directory.fieldCount }
+  var attemptID: UUID { directory.attemptID }
+  var promptTargetID: UUID { directory.promptTargetID }
   var targetUTF16Count: Int { directory.targetUTF16.count }
   func fieldIndex(containingUTF16 offset: Int) -> Int? { directory.fieldIndex(containingUTF16: offset) }
   var layoutWidth: CGFloat { width }

@@ -210,6 +210,12 @@ import AppKit
   override func accessibilitySelectedText() -> String? { accessibilityString(for: accessibilitySelection) }
   override func setAccessibilitySelectedTextRange(_ range: NSRange) {
     guard validAccessibilityRange(range), accessibilitySelectionHandler?(range) == true else { return }
+    restoreAccessibilitySelection(range)
+  }
+  /// Reflow preserves selection independently of the user's reading position.
+  /// Unlike an accessibility selection action, this must not navigate.
+  func restoreAccessibilitySelection(_ range: NSRange) {
+    guard validAccessibilityRange(range) else { return }
     accessibilitySelection = range
     NSAccessibility.post(element: self, notification: .selectedTextChanged)
   }

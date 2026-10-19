@@ -152,6 +152,56 @@ import XCTest
     XCTAssertEqual(host.canvas.accessibilitySelectedTextRange(), .init(location: NSNotFound, length: 0))
   }
 
+  func testReflowRestoresWrappedReadingRowWithoutNavigatingToSelectionAndRejectsOtherTargets() async throws {
+    let prompt = String(repeating: "a", count: 400) + " tail end"
+    let session = TypingSession(configuration: .words(3), prompt: prompt)
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 65, height: 60))
+    let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = host
+    defer { host.stop(); window.contentView = nil; window.close() }
+    XCTAssertTrue(host.configure(sequence: try sequence(session, width: 65), batchSize: 1))
+    try await waitUntil { !host.isPreparing }
+    host.canvas.setAccessibilitySelectedTextRange(.init(location: 10, length: 2))
+    let oldRect = try XCTUnwrap(host.canvas.measuredRect(for: 190))
+    host.scrollView.contentView.scroll(to: .init(x: 0, y: oldRect.minY + oldRect.height * 0.4))
+    let saved = try XCTUnwrap(host.captureReadingPosition())
+    XCTAssertEqual(saved.rowFraction, 0.4, accuracy: 0.001)
+    XCTAssertGreaterThan(saved.character, 100)
+    host.frame.size.width = 95
+    XCTAssertTrue(host.configure(sequence: try sequence(session, width: 95), batchSize: 1))
+    XCTAssertTrue(host.restoreReadingPosition(saved))
+    let newRect = try XCTUnwrap(host.canvas.measuredRect(for: saved.character))
+    XCTAssertEqual(host.scrollView.contentView.bounds.minY,
+      newRect.minY + newRect.height * 0.4, accuracy: 0.001)
+    XCTAssertEqual(host.canvas.accessibilitySelectedTextRange(), .init(location: 10, length: 2))
+    XCTAssertFalse(NSLocationInRange(10, host.canvas.accessibilityVisibleCharacterRange()),
+      "Restoring selection must not navigate away from the reading row")
+    let other = TypingSession(configuration: .words(3), prompt: prompt)
+    XCTAssertTrue(host.configure(sequence: try sequence(other, width: 95), batchSize: 1))
+    XCTAssertFalse(host.restoreReadingPosition(saved))
+    XCTAssertEqual(host.canvas.accessibilitySelectedTextRange(), .init(location: NSNotFound, length: 0))
+    host.stop()
+    XCTAssertFalse(host.restoreReadingPosition(saved))
+  }
+
+  func testReadingPositionRejectsChangedTargetWithinSameAttempt() async throws {
+    let opening = ["north ", "harbor "]
+    var session = TypingSession(configuration: .words(5).with(modifiers: [.poetryStream]),
+      prompt: opening.joined(), sourceFields: opening, streamsLiveContent: true)
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: try sequence(session), batchSize: 1))
+    try await waitUntil { !host.isPreparing }
+    let saved = try XCTUnwrap(host.captureReadingPosition())
+    XCTAssertTrue(session.appendLiveContent(.init(text: "third fourth", noSpaceBoundarySource: nil)))
+    XCTAssertEqual(session.automaticInputAttemptID, saved.attemptID)
+    XCTAssertNotEqual(session.promptTargetID, saved.promptTargetID)
+    XCTAssertTrue(host.configure(sequence: try sequence(session), batchSize: 1))
+    XCTAssertFalse(host.restoreReadingPosition(saved))
+    XCTAssertEqual(host.canvas.accessibilitySelectedTextRange(), .init(location: NSNotFound, length: 0))
+  }
+
   func testZeroLengthEndAfterReturnUsesNextLogicalRow() async throws {
     for prompt in ["one", "one\n", "\n\n"] {
       let session = TypingSession(configuration: .words(3), prompt: prompt)
