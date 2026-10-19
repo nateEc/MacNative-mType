@@ -2,9 +2,20 @@ import AppKit
 
 @MainActor private final class PromptViewportReportingClipView: NSClipView {
   var didScroll: (() -> Void)?
+  private var boundsRevision = 0
   override func setBoundsOrigin(_ newOrigin: NSPoint) {
+    let oldOrigin = bounds.origin
     super.setBoundsOrigin(newOrigin)
-    didScroll?()
+    if bounds.origin != oldOrigin {
+      boundsRevision += 1
+      didScroll?()
+    }
+  }
+  override func scroll(to newOrigin: NSPoint) {
+    let oldOrigin = bounds.origin
+    let oldRevision = boundsRevision
+    super.scroll(to: newOrigin)
+    if bounds.origin != oldOrigin, boundsRevision == oldRevision { didScroll?() }
   }
 }
 
@@ -20,6 +31,7 @@ import AppKit
   private var batchSize = 0
   private var retained: [Int: PromptViewportFieldLayoutSequence.Window] = [:]
   private var pendingFieldScroll: Int?
+  private var internalScrollDepth = 0
   private(set) var preparationFailure: Error?
   var isPreparing: Bool { preparation.isPreparing }
   var retainedWindowCount: Int { retained.count }
@@ -32,7 +44,7 @@ import AppKit
     scrollView.documentView = canvas
     scrollView.frame = bounds
     addSubview(scrollView)
-    clip.didScroll = { [weak self] in self?.visibleRegionChanged() }
+    clip.didScroll = { [weak self] in self?.clipScrolled() }
   }
   required init?(coder: NSCoder) { fatalError("PromptViewportNativeScrollHost is created in code") }
 
@@ -154,6 +166,20 @@ import AppKit
     requestMoreIfNeeded()
   }
 
+  private func clipScrolled() {
+    if internalScrollDepth == 0, pendingFieldScroll != nil {
+      pendingFieldScroll = nil
+      preparation.cancel()
+    }
+    visibleRegionChanged()
+  }
+
+  private func withInternalScroll(_ body: () -> Void) {
+    internalScrollDepth += 1
+    defer { internalScrollDepth -= 1 }
+    body()
+  }
+
   private func requestMoreIfNeeded() {
     guard let sequence, preparationFailure == nil,
       !preparation.isPreparing, sequence.nextField < sequence.fieldCount else { return }
@@ -193,7 +219,9 @@ import AppKit
     guard let sequence else { return }
     let height = max(1, clip.bounds.height, sequence.contentHeight ?? 0)
     if canvas.frame.width != sequence.layoutWidth || canvas.frame.height != height {
-      canvas.frame = .init(x: 0, y: 0, width: sequence.layoutWidth, height: height)
+      withInternalScroll {
+        canvas.frame = .init(x: 0, y: 0, width: sequence.layoutWidth, height: height)
+      }
     }
   }
 

@@ -119,6 +119,24 @@ import XCTest
     XCTAssertNotNil(host.canvas.measuredRect(for: 0))
   }
 
+  func testClipScrollCancelsPendingDistantFieldRequest() async throws {
+    let session = TypingSession(configuration: .words(80),
+      prompt: (0..<80).map { "word\($0)" }.joined(separator: " "))
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: 180, font: font))
+    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
+    XCTAssertTrue(host.scrollToField(70))
+    host.scrollView.contentView.scroll(to: .init(x: 0, y: 20))
+    host.scrollView.reflectScrolledClipView(host.scrollView.contentView)
+    try await waitUntil { !host.isPreparing }
+    XCTAssertLessThan(sequence.nextField, 70)
+    XCTAssertLessThan(host.scrollView.contentView.bounds.minY, 100)
+  }
+
   func testNewMeasuredFieldRequestSupersedesPendingDistantRequest() async throws {
     let session = TypingSession(configuration: .words(80),
       prompt: (0..<80).map { "word\($0)" }.joined(separator: " "))
