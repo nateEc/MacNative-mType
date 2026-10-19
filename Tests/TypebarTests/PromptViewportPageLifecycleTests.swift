@@ -1,0 +1,68 @@
+import AppKit
+import XCTest
+@testable import Typebar
+
+@MainActor final class PromptViewportPageLifecycleTests: XCTestCase {
+  private final class PageDocument: NSView { override var isFlipped: Bool { true } }
+  private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
+  private let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+    accent: .blue, colorScheme: .light))
+
+  private func sequence() throws -> PromptViewportFieldLayoutSequence {
+    let session = TypingSession(configuration: .words(201),
+      prompt: (0..<201).map { "word\($0)" }.joined(separator: " "))
+    return try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: XCTUnwrap(PromptViewportTargetDirectory(session: session)),
+      style: style, width: 180, font: font))
+  }
+
+  func testStopCancelsQueuedWholePageMeasurementDespiteAncestorNotifications() async throws {
+    let page = NSScrollView(frame: .init(x: 0, y: 0, width: 200, height: 100))
+    let document = PageDocument(frame: .init(x: 0, y: 0, width: 180, height: 1000))
+    page.documentView = document
+    let host = PromptViewportNativeScrollHost(pageScrolling: true)
+    host.frame = .init(x: 0, y: 0, width: 180, height: 1)
+    document.addSubview(host)
+    host.refreshPageVisibility()
+    let layout = try sequence()
+    var callbacks = 0
+    host.onMeasuredHeightChange = { _ in callbacks += 1 }
+    host.onPreparationFailure = { _ in XCTFail("A stopped page must not deliver preparation failures") }
+    XCTAssertTrue(host.configure(sequence: layout, batchSize: 2))
+    XCTAssertTrue(host.isPreparing)
+    host.stop()
+    document.frame.size.height += 50
+    NotificationCenter.default.post(name: NSView.frameDidChangeNotification, object: document)
+    page.contentView.scroll(to: .init(x: 0, y: 20))
+    NotificationCenter.default.post(name: NSView.boundsDidChangeNotification, object: page.contentView)
+    for _ in 0..<10 { await Task.yield() }
+    XCTAssertEqual(layout.nextField, 0, "The cancelled task must not measure even its first queued batch")
+    XCTAssertEqual(callbacks, 0)
+    XCTAssertFalse(host.isPreparing)
+    XCTAssertEqual(host.canvas.accessibilityNumberOfCharacters(), 0)
+    host.removeFromSuperview()
+  }
+
+  func testRemovedPageOwnerReleasesWhileObservedAncestorsStayAlive() async throws {
+    let page = NSScrollView(frame: .init(x: 0, y: 0, width: 200, height: 100))
+    let document = PageDocument(frame: .init(x: 0, y: 0, width: 180, height: 1000))
+    page.documentView = document
+    weak var released: PromptViewportNativeScrollHost?
+    do {
+      let host = PromptViewportNativeScrollHost(pageScrolling: true)
+      released = host
+      host.frame = .init(x: 0, y: 0, width: 180, height: 1)
+      document.addSubview(host)
+      host.refreshPageVisibility()
+      XCTAssertTrue(host.configure(sequence: try sequence(), batchSize: 2))
+      host.stop()
+      host.removeFromSuperview()
+    }
+    for _ in 0..<10 { await Task.yield() }
+    XCTAssertNil(released, "Notifications and cancelled preparation must not retain a retired page owner")
+    document.frame.size.height += 50
+    NotificationCenter.default.post(name: NSView.frameDidChangeNotification, object: document)
+    NotificationCenter.default.post(name: NSView.boundsDidChangeNotification, object: page.contentView)
+    XCTAssertTrue(page.documentView === document)
+  }
+}

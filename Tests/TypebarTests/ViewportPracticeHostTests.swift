@@ -152,6 +152,42 @@ import XCTest
     }
   }
 
+  func testWheelOverPromptScrollsPageWithoutMovingInnerClipOrReplacingInput() throws {
+    let fixture = try Fixture()
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.promptReady }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    XCTAssertTrue(fixture.window.makeFirstResponder(input))
+    input.onInsert("w", false)
+    fixture.waitUntil { fixture.promptReady }
+    let page = try XCTUnwrap(native.enclosingScrollView)
+    for style: NSScroller.Style in [.overlay, .legacy] {
+      page.scrollerStyle = style
+      page.tile()
+      fixture.waitUntil { fixture.promptReady }
+      native.viewport.scrollToTop()
+      fixture.flush()
+      let before = page.contentView.bounds.minY
+      let down = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .line,
+        wheelCount: 1, wheel1: -8, wheel2: 0, wheel3: 0))
+      native.viewport.scrollView.scrollWheel(with: try XCTUnwrap(NSEvent(cgEvent: down)))
+      fixture.waitUntil { page.contentView.bounds.minY > before }
+      let afterDown = page.contentView.bounds.minY
+      let up = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .line,
+        wheelCount: 1, wheel1: 8, wheel2: 0, wheel3: 0))
+      native.viewport.scrollView.scrollWheel(with: try XCTUnwrap(NSEvent(cgEvent: up)))
+      fixture.waitUntil { page.contentView.bounds.minY < afterDown }
+      XCTAssertEqual(native.viewport.scrollView.contentView.bounds.minY, 0,
+        "The full-height inner container must not consume page scrolling")
+    }
+    XCTAssertTrue(fixture.window.firstResponder === input)
+    XCTAssertFalse(fixture.settings.allowsRestartingConfigurationChange)
+    XCTAssertEqual(fixture.counts.generation, 1)
+    XCTAssertEqual(native.viewport.canvas.accessibilityValue() as? String, fixture.prompt)
+    XCTAssertFalse(fixture.window.isVisible)
+  }
+
   func testCompositionUsesCompleteRendererAndRetiresViewportWithoutResettingAttempt() throws {
     let fixture = try Fixture()
     defer { fixture.close() }
