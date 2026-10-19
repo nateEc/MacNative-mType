@@ -29,6 +29,7 @@ import AppKit
   private let rightToLeft: Bool
   private let joinsLetters: Bool
   private var checkpoint: PromptFieldTextLayout.ContinuationCheckpoint?
+  private var checkpointsByField: [Int: PromptFieldTextLayout.ContinuationCheckpoint] = [:]
   private(set) var nextField = 0
   var fieldCount: Int { directory.fieldCount }
   var contentHeight: CGFloat? { checkpoint?.contentHeight }
@@ -53,13 +54,33 @@ import AppKit
   func append(fields: Range<Int>) -> Window? {
     guard !fields.isEmpty, fields.lowerBound == nextField,
       fields.upperBound <= directory.fieldCount,
-      let runs = PromptRenderPlan.renderIndependentFieldWindow(
-        directory: directory, session: session, fields: fields, style: style)
-    else { return nil }
+      let window = makeWindow(fields: fields, from: checkpoint),
+      let next = window.layout.continuationCheckpoint,
+      next.nextGroupOffset == fields.upperBound else { return nil }
+    if let checkpoint { checkpointsByField[fields.lowerBound] = checkpoint }
+    self.checkpoint = next
+    nextField = fields.upperBound
+    return window
+  }
+
+  /// Rebuild an evicted window from its exact saved flow boundary. This never
+  /// advances the measured prefix or changes its authoritative page height.
+  func revisit(fields: Range<Int>) -> Window? {
+    guard !fields.isEmpty, fields.lowerBound >= 0,
+      fields.upperBound <= nextField,
+      fields.lowerBound == 0 || checkpointsByField[fields.lowerBound] != nil else { return nil }
+    return makeWindow(fields: fields,
+      from: fields.lowerBound == 0 ? nil : checkpointsByField[fields.lowerBound])
+  }
+
+  private func makeWindow(fields: Range<Int>,
+    from start: PromptFieldTextLayout.ContinuationCheckpoint?) -> Window? {
+    guard let runs = PromptRenderPlan.renderIndependentFieldWindow(
+      directory: directory, session: session, fields: fields, style: style) else { return nil }
     let layout: PromptFieldTextLayout
-    if let checkpoint {
+    if let start {
       guard let continued = PromptFieldTextLayout.continuing(fieldRuns: runs,
-        from: checkpoint, groupOffset: fields.lowerBound, width: width,
+        from: start, groupOffset: fields.lowerBound, width: width,
         font: font, lineSpacing: lineSpacing,
         rightToLeft: rightToLeft, joinsLetters: joinsLetters) else { return nil }
       layout = continued
@@ -68,10 +89,6 @@ import AppKit
         font: font, lineSpacing: lineSpacing,
         rightToLeft: rightToLeft, joinsLetters: joinsLetters)
     }
-    guard let next = layout.continuationCheckpoint,
-      next.nextGroupOffset == fields.upperBound else { return nil }
-    self.checkpoint = next
-    nextField = fields.upperBound
     return .init(ownerID: ownerID, fields: fields, runs: runs, layout: layout)
   }
 

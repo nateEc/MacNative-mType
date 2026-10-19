@@ -63,6 +63,53 @@ import XCTest
       directory: directory, style: style, width: 180, font: font))
   }
 
+  func testEvictedFieldWindowCanBeRebuiltFromSavedFlowCheckpoint() throws {
+    let session = TypingSession(configuration: .words(6), prompt: "alpha beta gamma delta epsilon zeta")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let width: CGFloat = 180
+    let fullMap = try XCTUnwrap(PromptRenderPlan(session: session,
+      composition: "", style: style).render().compositionTextMap)
+    let full = PromptFieldTextLayout(map: fullMap, width: width, font: font)
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(
+      session: session, directory: directory, style: style, width: width, font: font))
+    var first: PromptViewportFieldLayoutSequence.Window? = try XCTUnwrap(sequence.append(fields: 0..<2))
+    let firstFrame = first?.layout.cellFrames[0]
+    first = nil
+    _ = try XCTUnwrap(sequence.append(fields: 2..<4))
+    let last = try XCTUnwrap(sequence.append(fields: 4..<6))
+    let finishedHeight = sequence.contentHeight
+    let returned = try XCTUnwrap(sequence.revisit(fields: 0..<2))
+    XCTAssertEqual(returned.fields, 0..<2)
+    XCTAssertEqual(returned.layout.cellFrames[0], firstFrame)
+    XCTAssertEqual(returned.layout.cellFrames[0], full.cellFrames[0])
+    XCTAssertEqual(sequence.nextField, 6)
+    XCTAssertEqual(sequence.contentHeight, finishedHeight)
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: width, height: 400))
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [last]))))
+    XCTAssertNil(canvas.measuredRect(for: 0))
+    XCTAssertTrue(canvas.configure(snapshot: try XCTUnwrap(sequence.drawingSnapshot(windows: [returned]))))
+    XCTAssertEqual(canvas.measuredRect(for: 0), full.cellFrames[0])
+    XCTAssertTrue(canvas.hasCompleteHeight)
+    XCTAssertEqual(canvas.intrinsicContentSize.height, full.size.height)
+  }
+
+  func testRevisitRejectsUnmeasuredOrUncheckpointedRangesWithoutAdvancing() throws {
+    let session = TypingSession(configuration: .words(5), prompt: "one two three four five")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light))
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(
+      session: session, directory: directory, style: style, width: 180, font: font))
+    XCTAssertNil(sequence.revisit(fields: 0..<1))
+    _ = try XCTUnwrap(sequence.append(fields: 0..<2))
+    XCTAssertNil(sequence.revisit(fields: 1..<2), "No flow checkpoint exists at field one")
+    XCTAssertNil(sequence.revisit(fields: 2..<3), "Field two has not been measured yet")
+    XCTAssertNil(sequence.revisit(fields: 0..<0))
+    XCTAssertEqual(sequence.nextField, 2)
+  }
+
   func testIndependentLayoutSequenceOnlyMeasuresRequestedFieldsInHundredThousandWords() throws {
     try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
       "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
@@ -79,6 +126,8 @@ import XCTest
     XCTAssertEqual(first.runs.flatMap(\.cells).count, 8)
     XCTAssertEqual(second.runs.flatMap(\.cells).count, 8)
     XCTAssertEqual(second.layout.cellFrames.count, 8)
+    let revisited = try XCTUnwrap(sequence.revisit(fields: 0..<2))
+    XCTAssertEqual(revisited.layout.cellFrames, first.layout.cellFrames)
     XCTAssertEqual(sequence.nextField, 4)
     XCTAssertLessThan(sequence.nextField, directory.fieldCount)
     let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: 180, height: 120))
