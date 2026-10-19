@@ -19,6 +19,11 @@ import AppKit
     let accessibilityText: String
   }
 
+  struct MeasuredSpan {
+    let fields: Range<Int>
+    let inkY: Range<CGFloat>?
+  }
+
   private let ownerID = UUID()
   private let session: TypingSession
   private let directory: PromptViewportTargetDirectory
@@ -30,8 +35,10 @@ import AppKit
   private let joinsLetters: Bool
   private var checkpoint: PromptFieldTextLayout.ContinuationCheckpoint?
   private var checkpointsByField: [Int: PromptFieldTextLayout.ContinuationCheckpoint] = [:]
+  private(set) var measuredSpans: [MeasuredSpan] = []
   private(set) var nextField = 0
   var fieldCount: Int { directory.fieldCount }
+  var layoutWidth: CGFloat { width }
   var contentHeight: CGFloat? { checkpoint?.contentHeight }
 
   init?(session: TypingSession, directory: PromptViewportTargetDirectory,
@@ -60,6 +67,12 @@ import AppKit
     if let checkpoint { checkpointsByField[fields.lowerBound] = checkpoint }
     self.checkpoint = next
     nextField = fields.upperBound
+    let frames = Array(window.layout.cellFrames.values)
+    let lowerY = frames.map(\.minY).min()
+    let upperY = frames.map(\.maxY).max()
+    measuredSpans.append(.init(fields: fields, inkY: lowerY.flatMap { lower in
+      upperY.map { upper in lower..<max(upper, window.layout.size.height) }
+    }))
     return window
   }
 

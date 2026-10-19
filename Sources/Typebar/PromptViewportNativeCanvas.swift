@@ -15,12 +15,16 @@ import AppKit
   }
   required init?(coder: NSCoder) { fatalError("PromptViewportNativeCanvas is created in code") }
 
-  private func retireSnapshotIfWidthChanged(from oldWidth: CGFloat) {
-    guard snapshot != nil, abs(bounds.width - oldWidth) >= 0.001 else { return }
+  func clear() {
     snapshot = nil
     setAccessibilityValue("")
     invalidateIntrinsicContentSize()
     needsDisplay = true
+  }
+
+  private func retireSnapshotIfWidthChanged(from oldWidth: CGFloat) {
+    guard snapshot != nil, abs(bounds.width - oldWidth) >= 0.001 else { return }
+    clear()
   }
   override func setFrameSize(_ newSize: NSSize) {
     let oldWidth = bounds.width
