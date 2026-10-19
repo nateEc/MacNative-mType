@@ -76,7 +76,7 @@ struct PromptViewportTargetDirectory {
     guard let slice = materialize(fields: requested),
       session.automaticInputAttemptID == attemptID,
       session.prompt.utf16.elementsEqual(targetUTF16),
-      let glyphs = session.promptViewportTargetGlyphs(in: slice.cells.map(\.id),
+      let glyphs = session.promptViewportTargetGlyphs(in: slice.cells,
         targetUTF16: targetUTF16)
     else { return nil }
     return zip(slice.cells, glyphs).map { StateCell(id: $0.id, glyph: $1) }

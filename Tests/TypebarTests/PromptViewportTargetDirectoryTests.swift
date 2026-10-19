@@ -59,11 +59,113 @@ final class PromptViewportTargetDirectoryTests: XCTestCase {
     XCTAssertNil(directory.materializeStates(fields: 0..<1, session: session.repeatedAttempt()))
     session.insertBatch("abXYZ", at: Date(timeIntervalSinceReferenceDate: 920_000_002))
     XCTAssertNil(directory.materializeStates(fields: 0..<1, session: session))
-    let focused = TypingSession(configuration: .words(2).with(modifiers: [.focusCurrentWord]),
-      prompt: "ab cd")
-    let focusedDirectory = try XCTUnwrap(PromptViewportTargetDirectory(session: focused))
-    XCTAssertNil(focusedDirectory.materializeStates(fields: 0..<1, session: focused),
-      "Focus masking needs its own window-state parity proof")
+  }
+
+  func testVisibilityModifiersAndBlindColorOnlyRequestedFields() throws {
+    let modifiers: [TestModifier?] = [nil, .focusCurrentWord, .focusNextWord,
+      .focusTwoWords, .focusThreeWords, .readAheadEasy, .readAhead,
+      .readAheadHard, .memory, .simonSays]
+    for modifier in modifiers {
+      var configuration = TestConfiguration.words(5)
+      if let modifier { configuration = configuration.with(modifiers: [modifier]) }
+      var session = TypingSession(configuration: configuration, prompt: "ab cd ef gh ij")
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      for input in ["", "a", "x"] {
+        if !input.isEmpty { session.insert(input, at: Date(timeIntervalSinceReferenceDate: 920_000_006)) }
+        let full = session.promptGlyphs
+        for fields in [0..<2, 3..<5, 0..<2] {
+          let slice = try XCTUnwrap(directory.materializeStates(fields: fields, session: session),
+            "modifier=\(String(describing: modifier)) input=\(input)")
+          XCTAssertEqual(slice.map(\.glyph), slice.map { full[$0.id] },
+            "modifier=\(String(describing: modifier)) input=\(input)")
+        }
+      }
+    }
+    var blindRules = InputRules()
+    blindRules.blindMode = true
+    var blindConfiguration = TestConfiguration.words(3)
+    blindConfiguration.rules = blindRules
+    var blind = TypingSession(configuration: blindConfiguration, prompt: "ab cd ef")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: blind))
+    blind.insert("x", at: Date(timeIntervalSinceReferenceDate: 920_000_007))
+    for fields in [0..<1, 2..<3] {
+      let slice = try XCTUnwrap(directory.materializeStates(fields: fields, session: blind))
+      let full = blind.promptGlyphs
+      XCTAssertEqual(slice.map(\.glyph), slice.map { full[$0.id] })
+    }
+  }
+
+  func testVisibilityOrdinalHandlesEmptyFieldsAndStructuralReturns() throws {
+    let prompt = " a  b\nc d "
+    for modifier in [TestModifier.focusCurrentWord, .focusNextWord,
+      .readAheadEasy, .readAheadHard] {
+      var session = TypingSession(configuration: .words(6).with(modifiers: [modifier]),
+        prompt: prompt)
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      for input in ["", " ", "a", " ", " ", "b", "\n"] {
+        if !input.isEmpty { session.insert(input, at: Date(timeIntervalSinceReferenceDate: 920_000_008)) }
+        let full = session.promptGlyphs
+        for index in 0..<directory.fieldCount {
+          let slice = try XCTUnwrap(directory.materializeStates(fields: index..<(index + 1),
+            session: session))
+          XCTAssertEqual(slice.map(\.glyph), slice.map { full[$0.id] },
+            "modifier=\(modifier) input=\(input) field=\(index)")
+        }
+      }
+    }
+  }
+
+  func testProviderFieldContainingReturnDoesNotPretendFieldIndexIsWordOrdinal() throws {
+    let fields = ["north\nsouth ", "harbor ", "tail"]
+    for modifier in [TestModifier.focusCurrentWord, .readAheadEasy] {
+      var session = TypingSession(configuration: .words(4).with(modifiers: [modifier]),
+        prompt: fields.joined(), sourceFields: fields)
+      let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+      for input in ["", "n"] {
+        if !input.isEmpty { session.insert(input, at: Date(timeIntervalSinceReferenceDate: 920_000_015)) }
+        let full = session.promptGlyphs
+        for index in 0..<directory.fieldCount {
+          let slice = try XCTUnwrap(directory.materializeStates(fields: index..<(index + 1),
+            session: session))
+          XCTAssertEqual(slice.map(\.glyph), slice.map { full[$0.id] },
+            "modifier=\(modifier) field=\(index) input=\(input)")
+        }
+      }
+    }
+  }
+
+  func testForcedErrorRetainsTypedCharacterAndStoppedInputFallsBack() throws {
+    var forced = TypingSession(configuration: .words(2), prompt: "ab cd")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: forced))
+    forced.insert("a", forceError: true, at: Date(timeIntervalSinceReferenceDate: 920_000_009))
+    let visible = try XCTUnwrap(directory.materializeStates(fields: 0..<1, session: forced))
+    let full = forced.promptGlyphs
+    XCTAssertEqual(visible.map(\.glyph), visible.map { full[$0.id] })
+    XCTAssertEqual(visible.first?.glyph.state, .incorrect)
+    XCTAssertEqual(visible.first?.glyph.typedCharacter, "a")
+
+    var stopped = TypingSession(configuration: .words(2,
+      rules: .init(stopOnErrorMode: .letter)), prompt: "ab cd")
+    let stoppedDirectory = try XCTUnwrap(PromptViewportTargetDirectory(session: stopped))
+    stopped.insert("a", at: Date(timeIntervalSinceReferenceDate: 920_000_010))
+    stopped.insert("x", at: Date(timeIntervalSinceReferenceDate: 920_000_011))
+    XCTAssertNil(stoppedDirectory.materializeStates(fields: 0..<1, session: stopped),
+      "A transient rejected key changes presentation without changing accepted text")
+  }
+
+  func testBlindCommitStateTracksLiveToggleAndWordReentry() throws {
+    var session = TypingSession(configuration: .words(3, rules: .init(blindMode: true)),
+      prompt: "amber bay cedar")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    session.insertBatch("am ", at: Date(timeIntervalSinceReferenceDate: 920_000_012))
+    session.setBlindMode(false)
+    for step in 0..<3 {
+      let visible = try XCTUnwrap(directory.materializeStates(fields: 0..<2, session: session))
+      let full = session.promptGlyphs
+      XCTAssertEqual(visible.map(\.glyph), visible.map { full[$0.id] })
+      if step == 0 { session.deleteBackward(at: Date(timeIntervalSinceReferenceDate: 920_000_013)) }
+      if step == 1 { session.insert(" ", at: Date(timeIntervalSinceReferenceDate: 920_000_014)) }
+    }
   }
 
   func testVisibleStateMatchesReturnDeletionAndWrongInput() throws {
@@ -110,6 +212,13 @@ final class PromptViewportTargetDirectoryTests: XCTestCase {
     XCTAssertEqual(firstAfterInput.first?.glyph.state, .correct)
     XCTAssertEqual(firstAfterInput.dropFirst().first?.glyph.state, .current)
     XCTAssertEqual(distantAfterInput.map(\.glyph), state.map(\.glyph))
+    let focused = TypingSession(configuration: .words(words).with(modifiers: [.focusCurrentWord]),
+      prompt: prompt)
+    let focusedDirectory = try XCTUnwrap(PromptViewportTargetDirectory(session: focused))
+    let focusedDistant = try XCTUnwrap(focusedDirectory.materializeStates(
+      fields: (words - 2)..<words, session: focused))
+    XCTAssertEqual(focusedDistant.count, 7)
+    XCTAssertTrue(focusedDistant.allSatisfy { $0.glyph.state == .hidden })
   }
 
   func testUnprovenFusionAndHiddenBoundariesUseExistingFullProjection() {

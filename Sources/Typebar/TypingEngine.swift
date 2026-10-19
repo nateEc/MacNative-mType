@@ -5468,39 +5468,72 @@ struct TypingSession {
     }
   }
 
-  /// Color only canonical ASCII target IDs requested by a viewport. This
-  /// deliberately refuses presentation paths whose extras or modifiers need
-  /// more than one stable target cell; no full prompt glyph array is built.
-  func promptViewportTargetGlyphs(in ids: [Int], targetUTF16: [UInt16]) -> [TypingPromptGlyph]? {
-    guard !isFinished, configuration.modifiers.isEmpty, configuration.rules == .init(),
+  /// Color only canonical ASCII target IDs requested by a viewport. Word
+  /// visibility follows literal separators, which need not match provider
+  /// field boundaries; extras and stopped input need the full presentation.
+  func promptViewportTargetGlyphs(in cells: [PromptViewportTargetDirectory.Cell],
+    targetUTF16: [UInt16]) -> [TypingPromptGlyph]? {
+    guard !isFinished,
       firstRetainedPromptWordIndex == 0, removedTapePromptWordIndices.isEmpty,
-      stoppedPromptInput == nil, forcedErrorIndices.isEmpty,
-      blindCommittedMissingTargetIndices.isEmpty, !isAtEmptyNoSpaceWord,
+      stoppedPromptInput == nil, !isAtEmptyNoSpaceWord,
       targetUTF16.count == promptCharacters.count,
-      ids.allSatisfy({ targetUTF16.indices.contains($0) && targetUTF16[$0] < 128 })
+      cells.allSatisfy({ targetUTF16.indices.contains($0.id) && targetUTF16[$0.id] < 128 }),
+      zip(cells, cells.dropFirst()).allSatisfy({ $0.id < $1.id })
     else { return nil }
     let presentation = promptPresentationInput
     let typedCharacters = Array(typed)
     guard presentation.targets.count == typedCharacters.count,
       presentation.targets.allSatisfy({ $0.map { targetUTF16.indices.contains($0) } ?? false })
     else { return nil }
-    let wanted = Set(ids)
+    let wanted = Set(cells.map(\.id))
     var typedByTarget: [Int: Int] = [:]
     for (typedIndex, target) in presentation.targets.enumerated() {
       guard let target, wanted.contains(target), typedByTarget[target] == nil else { continue }
       typedByTarget[target] = typedIndex
     }
     let active = min(nextTargetIndex, targetUTF16.count)
-    return ids.map { id in
-      let character = Character(String(UnicodeScalar(targetUTF16[id])!))
-      if let typedIndex = typedByTarget[id] {
-        let input = typedCharacters[typedIndex]
-        let matches = InputTextIdentity.matches(input, character)
-        return .init(character: character, state: matches ? .correct : .incorrect,
-          typedCharacter: matches ? nil : input)
+    let currentWord = targetUTF16.prefix(active).reduce(0) { count, unit in
+      count + (unit == 32 || unit == 10 ? 1 : 0)
+    }
+    let visibleFutureWords = usesWordCommitInput ? configuration.visibleFutureWordCount : nil
+    let concealedWords = hasStarted ? configuration.readAheadConcealedWordCount : nil
+    let concealAll = configuration.modifiers.contains(.memory) && hasStarted
+    let concealPending = configuration.modifiers.contains(.simonSays)
+    var scanned = 0, ordinal = 0
+    var wordOrdinals: [Int] = []
+    wordOrdinals.reserveCapacity(cells.count)
+    for cell in cells {
+      while scanned < cell.id {
+        if targetUTF16[scanned] == 32 || targetUTF16[scanned] == 10 { ordinal += 1 }
+        scanned += 1
       }
-      return .init(character: character,
-        state: id == active ? .current : .pending)
+      wordOrdinals.append(ordinal)
+    }
+    return zip(cells, wordOrdinals).map { cell, wordOrdinal in
+      let id = cell.id
+      let character = Character(String(UnicodeScalar(targetUTF16[id])!))
+      let typedIndex = typedByTarget[id]
+      let input = typedIndex.map { typedCharacters[$0] }
+      let wrongInput = input.map { !InputTextIdentity.matches($0, character)
+        || presentation.forcedErrors.contains(id) } ?? false
+      var state: TypingPromptCharacterState
+      if typedIndex != nil {
+        state = configuration.rules.blindMode || !wrongInput ? .correct : .incorrect
+      } else if id < active {
+        state = blindCommittedMissingTargetIndices.contains(id) ? .correct : .pending
+      } else if id == active {
+        state = .current
+      } else {
+        state = .pending
+      }
+      if let visibleFutureWords, id >= active,
+        wordOrdinal > currentWord + visibleFutureWords { state = .hidden }
+      if concealAll || (concealPending && id >= active) { state = .hidden }
+      if let concealedWords, concealedWords > 0,
+        wordOrdinal >= currentWord,
+        wordOrdinal < currentWord + concealedWords { state = .hidden }
+      return .init(character: character, state: state,
+        typedCharacter: wrongInput ? input : nil)
     }
   }
 
