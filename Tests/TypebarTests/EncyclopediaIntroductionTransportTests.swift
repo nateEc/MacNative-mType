@@ -185,6 +185,19 @@ final class EncyclopediaIntroductionTransportTests: XCTestCase {
     }
   }
 
+  func testScriptedNoscriptMarkupRemainsLiteralInPublishedPracticeText() async throws {
+    try await withSession { session in
+      IntroductionProtocol.fixture.set([
+        (200, #"{"pageid":724,"title":"Owned"}"#),
+        (200, #"{"query":{"pages":{"724":{"extract":"Before <noscript>&amp; <b>literal</b></noscript> after"}}}}"#)
+      ])
+      let content = await LivePracticeContentService.fetch(
+        source: .encyclopedia, language: .english, session: session)
+      XCTAssertEqual(content?.text, "Before &amp; <b>literal</b> after")
+      XCTAssertEqual(IntroductionProtocol.fixture.requests.count, 2)
+    }
+  }
+
   func testInvalidRandomIdentityDoesNotIssueAnIntroductionRequest() async throws {
     try await withSession { session in
       for payload in ["{}", #"{"pageid":-1,"title":"Owned","extract":"Short preview"}"#, #"{"title":"Owned","extract":"Short preview"}"#] {

@@ -369,7 +369,7 @@ enum LivePracticeContentService {
   static func introductionText(fromHTML html: String) -> String? {
     let paragraphJoined = html.replacingOccurrences(of: #"</p><p>+"#, with: " ",
       options: .regularExpression)
-    guard let document = try? SwiftSoup.parseBodyFragment(paragraphJoined),
+    guard let document = try? SwiftSoup.parseBodyFragment(scriptedNoscriptHTML(paragraphJoined)),
       let body = document.body() else { return nil }
     // DOM textContent concatenates nodes, not visually laid-out block text.
     // Keep raw-text nodes inert and ignore comments/template document fragments.
@@ -385,6 +385,76 @@ enum LivePracticeContentService {
       }
     }
     return extracted
+  }
+
+  private static func scriptedNoscriptHTML(_ html: String) -> String {
+    // SwiftSoup parses noscript as fallback HTML; a script-enabled browser
+    // instead exposes its unparsed contents through textContent. Escape only
+    // those contents before parsing, leaving other raw-text elements intact.
+    guard let tags = try? NSRegularExpression(
+      pattern: #"(?is)<!--.*?-->|<(/?)([a-z][a-z0-9:-]*)(?:[^>"']|"[^"]*"|'[^']*')*>"#)
+    else { return html }
+    let source = html as NSString
+    var cursor = 0
+    var prepared = ""
+    // Only foreignObject and MathML's HTML integration points re-enter HTML.
+    var foreignContexts: [String] = []
+    while cursor < source.length,
+      let tag = tags.firstMatch(in: html, range: NSRange(location: cursor, length: source.length - cursor)) {
+      prepared += source.substring(with: NSRange(location: cursor, length: tag.range.location - cursor))
+      prepared += source.substring(with: tag.range)
+      cursor = NSMaxRange(tag.range)
+      guard tag.range(at: 2).location != NSNotFound else { continue }
+      let name = source.substring(with: tag.range(at: 2)).lowercased()
+      if tag.range(at: 1).length != 0 {
+        if foreignContexts.last == name { foreignContexts.removeLast() }
+        continue
+      }
+      if name == "svg" || name == "math" {
+        foreignContexts.append(name)
+        continue
+      }
+      if name == "foreignobject", foreignContexts.last == "svg" {
+        foreignContexts.append(name)
+        continue
+      }
+      if foreignContexts.last == "math" {
+        if ["mtext", "mi", "mo", "mn", "ms"].contains(name)
+          || (name == "annotation-xml"
+            && htmlEncodedAnnotation(source.substring(with: tag.range))) {
+          foreignContexts.append(name)
+          continue
+        }
+      }
+      if name == "noscript", ["svg", "math"].contains(foreignContexts.last ?? "") { continue }
+      guard ["noscript", "script", "style", "textarea", "title", "iframe",
+        "xmp", "noembed", "noframes", "plaintext"].contains(name),
+        let closing = try? NSRegularExpression(pattern: "</\(name)\\s*>", options: .caseInsensitive)
+      else { continue }
+      let end = closing.firstMatch(in: html,
+        range: NSRange(location: cursor, length: source.length - cursor))
+      let bodyEnd = end?.range.location ?? source.length
+      let body = source.substring(with: NSRange(location: cursor, length: bodyEnd - cursor))
+      prepared += name == "noscript"
+        ? body.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+        : body
+      if let end {
+        prepared += source.substring(with: end.range)
+        cursor = NSMaxRange(end.range)
+      } else { cursor = source.length }
+    }
+    if cursor < source.length {
+      prepared += source.substring(from: cursor)
+    }
+    return prepared
+  }
+
+  private static func htmlEncodedAnnotation(_ openingTag: String) -> Bool {
+    guard let document = try? SwiftSoup.parseBodyFragment(openingTag),
+      let annotation = try? document.getElementsByTag("annotation-xml").first(),
+      let encoding = try? annotation.attr("encoding").lowercased()
+    else { return false }
+    return encoding == "text/html" || encoding == "application/xhtml+xml"
   }
 
   private static func makeIntroductionContent(
