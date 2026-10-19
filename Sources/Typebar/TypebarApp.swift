@@ -79,6 +79,8 @@ struct TypebarApp: App {
   }
 
   /// One production composition entry for the app and isolated hosted checks.
+  /// The viewport injection evaluates the new display owner through this same
+  /// page while keeping whole-preview preparation on the shared path.
   static func practiceContent(settings: AppSettings, account: AccountSession,
     announcements: RemoteAnnouncementCenter, hotkey: GlobalHotkeyMonitor,
     systemKeyboardGuide: SystemKeyboardGuideMonitor, network: NetworkConnectivityMonitor,
@@ -104,14 +106,14 @@ struct TypebarApp: App {
     wholePreviewLayout: @escaping @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout = {
       try await PromptFieldTextLayout.makeCooperatively(map: $0, width: $1, font: $2,
         lineSpacing: $3, rightToLeft: $4, joinsLetters: $5)
-    }) -> some View {
+    }, wholePreviewViewportEnabled: Bool = false) -> some View {
     ContentView(settings: settings, account: account, announcements: announcements,
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
       systemAppearance: systemAppearance, liveContentFetch: liveContentFetch,
       livePromptPrepare: livePromptPrepare,
       liveSessionPrepare: liveSessionPrepare,
       wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender,
-      wholePreviewLayout: wholePreviewLayout)
+      wholePreviewLayout: wholePreviewLayout, wholePreviewViewportEnabled: wholePreviewViewportEnabled)
   }
 
   private static let modelConfiguration = ModelConfiguration(
@@ -1234,6 +1236,7 @@ private struct ContentView: View {
   let wholePreviewPrepare: @MainActor (TestConfiguration, WeakSpotScores, PoolWordDecorationState) async throws -> TypingSession
   let wholePreviewRender: @MainActor (TypingSession, PromptRenderStyle) async throws -> PromptRendering
   let wholePreviewLayout: @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout
+  let wholePreviewViewportEnabled: Bool
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
@@ -1398,6 +1401,7 @@ private struct ContentView: View {
   @State private var isPreparingWholePreview = false
   @State private var preparedWholePreviewRendering: PreparedWholePreviewPresentation?
   @State private var wholePreviewFieldWidth: CGFloat?
+  @State private var viewportFallbackAttemptID: UUID?
   @State private var interruptedWholePreview = false
   @State private var zipfNotice: String?
   @State private var zipfNoticeGeneration = 0
@@ -3114,6 +3118,7 @@ private struct ContentView: View {
         },
         onCompositionChanged: {
           guard !isPreparingWholePreview else { return }
+          if wholePreviewViewportEnabled, !$0.isEmpty { viewportFallbackAttemptID = session.automaticInputAttemptID }
           preparedWholePreviewRendering = nil
           let hadMarkedText = !compositionText.isEmpty
           let playsCompositionClick = TypingInputSoundPlan.isAudibleCompositionUpdate(
@@ -3312,7 +3317,16 @@ private struct ContentView: View {
     let isRightToLeft = session.configuration.usesRightToLeftPrompt
     let usesJoiningScript = session.configuration.usesJoiningScriptPrompt
     return Group {
-      if practiceVisualEffect.usesASL {
+      if usesWholePreviewViewport {
+        PromptViewportPracticePrompt(session: session, style: promptRenderStyle,
+          font: practicePromptNSFont(size: settings.fontSize),
+          carets: makeSpecialPromptCaretConfiguration(rightToLeft: isRightToLeft),
+          onFailure: { attempt in
+            guard session.automaticInputAttemptID == attempt else { return }
+            viewportFallbackAttemptID = attempt
+          })
+          .frame(height: 184)
+      } else if practiceVisualEffect.usesASL {
         ASLPracticePrompt(
           glyphs: session.promptGlyphsInDisplayOrder, fontSize: settings.fontSize, accent: activeTheme.accent,
           glyphIDs: specialPromptGlyphIDs, rendering: rendering, carets: specialPromptCaretConfiguration,
@@ -3698,6 +3712,13 @@ private struct ContentView: View {
       settingEnabled: settings.showAllPracticeLines,
       tapeMode: settings.practiceTapeMode,
       configuration: session.configuration)
+  }
+
+  private var usesWholePreviewViewport: Bool {
+    wholePreviewViewportEnabled && showsAllPracticeLines && !isPreparingWholePreview
+      && !session.isFinished && compositionText.isEmpty && !usesTapePractice
+      && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
+      && viewportFallbackAttemptID != session.automaticInputAttemptID
   }
 
   private var stats: some View {

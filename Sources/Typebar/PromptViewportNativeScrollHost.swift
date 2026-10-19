@@ -2,6 +2,7 @@ import AppKit
 
 @MainActor private final class PromptViewportReportingClipView: NSClipView {
   var didScroll: (() -> Void)?
+  var didResize: (() -> Void)?
   private var boundsRevision = 0
   override func setBoundsOrigin(_ newOrigin: NSPoint) {
     let oldOrigin = bounds.origin
@@ -16,6 +17,16 @@ import AppKit
     let oldRevision = boundsRevision
     super.scroll(to: newOrigin)
     if bounds.origin != oldOrigin, boundsRevision == oldRevision { didScroll?() }
+  }
+  override func setFrameSize(_ newSize: NSSize) {
+    let oldWidth = bounds.width
+    super.setFrameSize(newSize)
+    if abs(bounds.width - oldWidth) >= 0.001 { didResize?() }
+  }
+  override func setBoundsSize(_ newSize: NSSize) {
+    let oldWidth = bounds.width
+    super.setBoundsSize(newSize)
+    if abs(bounds.width - oldWidth) >= 0.001 { didResize?() }
   }
 }
 
@@ -33,6 +44,9 @@ import AppKit
   private var pendingFieldScroll: Int?
   private var internalScrollDepth = 0
   private(set) var preparationFailure: Error?
+  var onPreparationFailure: ((Error) -> Void)?
+  var onLayoutWidthChange: (() -> Void)?
+  var layoutWidth: CGFloat { clip.bounds.width }
   var isPreparing: Bool { preparation.isPreparing }
   var retainedWindowCount: Int { retained.count }
   var measuredFieldCount: Int { sequence?.nextField ?? 0 }
@@ -45,6 +59,7 @@ import AppKit
     scrollView.frame = bounds
     addSubview(scrollView)
     clip.didScroll = { [weak self] in self?.clipScrolled() }
+    clip.didResize = { [weak self] in self?.clipWidthChanged() }
     canvas.accessibilityRectProvider = { [weak self] in self?.accessibilityTextRect(for: $0) }
     canvas.accessibilityLineProvider = { [weak self] in self?.accessibilityTextLine(for: $0) }
     canvas.accessibilityLineRangeProvider = { [weak self] in self?.accessibilityTextRange(forLine: $0) }
@@ -54,7 +69,7 @@ import AppKit
 
   @discardableResult func configure(sequence next: PromptViewportFieldLayoutSequence,
     batchSize: Int) -> Bool {
-    guard batchSize > 0, abs(bounds.width - next.layoutWidth) < 0.001 else { return false }
+    guard batchSize > 0, abs(layoutWidth - next.layoutWidth) < 0.001 else { return false }
     stop()
     sequence = next
     self.batchSize = batchSize
@@ -146,7 +161,7 @@ import AppKit
     scrollView.frame = bounds
     if abs(newSize.width - oldWidth) >= 0.001 {
       stop()
-      canvas.frame.size.width = newSize.width
+      canvas.frame.size.width = layoutWidth
     } else {
       resizeDocumentToMeasuredHeight()
       visibleRegionChanged()
@@ -158,8 +173,8 @@ import AppKit
     super.setBoundsSize(newSize)
     guard abs(newSize.width - oldWidth) >= 0.001 else { return }
     stop()
-    canvas.frame.size.width = newSize.width
     scrollView.frame = bounds
+    canvas.frame.size.width = layoutWidth
   }
 
   func scrollToMeasuredEnd() {
@@ -214,6 +229,13 @@ import AppKit
       preparation.cancel()
     }
     visibleRegionChanged()
+  }
+
+  private func clipWidthChanged() {
+    guard let sequence, abs(sequence.layoutWidth - layoutWidth) >= 0.001 else { return }
+    stop()
+    canvas.frame.size.width = layoutWidth
+    onLayoutWidthChange?()
   }
 
   private func withInternalScroll(_ body: () -> Void) {
@@ -293,14 +315,16 @@ import AppKit
       isCurrent: { [weak self] in
         guard let self else { return false }
         return self.sequence === sequence
-          && abs(self.bounds.width - sequence.layoutWidth) < 0.001
+          && abs(self.layoutWidth - sequence.layoutWidth) < 0.001
       }, onBatch: { [weak self] snapshot in
         self?.publish(snapshot)
       }, completion: { [weak self] result in
         guard let self else { return }
         switch result {
         case .success: self.requestMoreIfNeeded()
-        case .failure(let error): self.preparationFailure = error
+        case .failure(let error):
+          self.preparationFailure = error
+          self.onPreparationFailure?(error)
         }
       })
   }

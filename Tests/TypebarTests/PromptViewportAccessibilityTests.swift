@@ -7,6 +7,17 @@ import XCTest
   private let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
     accent: .blue, colorScheme: .light))
 
+  private func makeHost(frame: NSRect) -> PromptViewportNativeScrollHost {
+    _ = NSApplication.shared
+    _ = NSScroller.preferredScrollerStyle
+    RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+    let host = PromptViewportNativeScrollHost()
+    host.scrollView.scrollerStyle = .overlay
+    host.frame = frame
+    host.scrollView.tile()
+    return host
+  }
+
   private func waitUntil(_ predicate: () -> Bool) async throws {
     for _ in 0..<200 {
       if predicate() { return }
@@ -25,7 +36,7 @@ import XCTest
     let prompt = (0..<60).map { "word\($0)" }.joined(separator: " ")
     let session = TypingSession(configuration: .words(60), prompt: prompt)
     let layout = try sequence(session)
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 180, height: 100),
       styleMask: .borderless, backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
@@ -71,7 +82,7 @@ import XCTest
       for width: CGFloat in [65, 180] {
         let session = TypingSession(configuration: .words(12), prompt: prompt)
         let layout = try sequence(session, width: width)
-        let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: width, height: 60))
+        let host = makeHost(frame: .init(x: 0, y: 0, width: width, height: 60))
         defer { host.stop() }
         XCTAssertTrue(host.configure(sequence: layout, batchSize: 2))
         try await waitUntil { layout.nextField > 0 && !host.isPreparing }
@@ -93,7 +104,7 @@ import XCTest
   func testInvalidQueriesAndRetiredSnapshotCannotReuseOldSelectionOrGeometry() async throws {
     let session = TypingSession(configuration: .words(20), prompt: Array(repeating: "oak", count: 20).joined(separator: " "))
     let layout = try sequence(session)
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: layout, batchSize: 2))
     try await waitUntil { layout.nextField > 0 && !host.isPreparing }
@@ -118,7 +129,7 @@ import XCTest
     let sessionPrompt = String(repeating: "a", count: 120) + " tail final"
     var session = TypingSession(configuration: .words(3), prompt: sessionPrompt)
     let layout = try sequence(session, width: 65)
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 65, height: 60))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 65, height: 60))
     let window = NSWindow(contentRect: .init(x: 100, y: 100, width: 65, height: 60),
       styleMask: .borderless, backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
@@ -145,7 +156,7 @@ import XCTest
     for prompt in ["one", "one\n", "\n\n"] {
       let session = TypingSession(configuration: .words(3), prompt: prompt)
       let layout = try sequence(session)
-      let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+      let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
       let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
       window.isReleasedWhenClosed = false
       window.contentView = host
@@ -168,7 +179,7 @@ import XCTest
     let count = 100_001
     let session = TypingSession(configuration: .words(count), prompt: Array(repeating: "oak", count: count).joined(separator: " "))
     let layout = try sequence(session)
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
     window.contentView = host

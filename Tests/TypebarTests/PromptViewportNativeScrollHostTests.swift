@@ -7,6 +7,19 @@ import XCTest
   private let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
     accent: .blue, colorScheme: .light))
 
+  private func makeHost(frame: NSRect) -> PromptViewportNativeScrollHost {
+    // The first preferred-style read schedules AppKit's initial refresh.
+    // Deliver it before pinning this fixed-width fixture to overlay scrollers.
+    _ = NSApplication.shared
+    _ = NSScroller.preferredScrollerStyle
+    RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+    let host = PromptViewportNativeScrollHost()
+    host.scrollView.scrollerStyle = .overlay
+    host.frame = frame
+    host.scrollView.tile()
+    return host
+  }
+
   private func waitUntil(_ predicate: () -> Bool) async throws {
     for _ in 0..<200 {
       if predicate() { return }
@@ -33,7 +46,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     let window = NSWindow(contentRect: host.frame, styleMask: .borderless,
       backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
@@ -61,7 +74,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
@@ -84,7 +97,7 @@ import XCTest
     let oldDirectory = try XCTUnwrap(PromptViewportTargetDirectory(session: oldSession))
     let oldSequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: oldSession,
       directory: oldDirectory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: oldSequence, batchSize: 2))
     try await waitUntil { oldSequence.nextField > 2 && !host.isPreparing }
@@ -107,7 +120,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
@@ -125,7 +138,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
@@ -143,7 +156,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
@@ -160,7 +173,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 0 }
@@ -170,12 +183,32 @@ import XCTest
     XCTAssertFalse(host.isPreparing)
   }
 
+  func testLegacyScrollerMeasuresClipWidthAndStyleChangeRetiresGeometry() async throws {
+    let session = TypingSession(configuration: .words(8), prompt: "one two three four five six seven eight")
+    let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { host.stop() }
+    host.scrollView.scrollerStyle = .legacy
+    host.scrollView.tile()
+    XCTAssertLessThan(host.layoutWidth, host.bounds.width)
+    let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
+      directory: directory, style: style, width: host.layoutWidth, font: font))
+    XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
+    try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
+    XCTAssertEqual(host.canvas.frame.width, host.scrollView.contentView.bounds.width)
+    XCTAssertNotNil(host.canvas.measuredRect(for: 0))
+    host.scrollView.scrollerStyle = .overlay
+    host.scrollView.tile()
+    XCTAssertNil(host.canvas.measuredRect(for: 0))
+    XCTAssertFalse(host.isPreparing)
+  }
+
   func testBoundsWidthChangeAlsoRetiresOldMeasuredCanvas() async throws {
     let session = TypingSession(configuration: .words(4), prompt: "one two three four")
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 0 }
@@ -194,7 +227,7 @@ import XCTest
     let fullMap = try XCTUnwrap(PromptRenderPlan(session: session,
       composition: "", style: style).render().compositionTextMap)
     let full = PromptFieldTextLayout(map: fullMap, width: 180, font: font)
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
@@ -222,7 +255,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 32))
     try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
@@ -239,7 +272,7 @@ import XCTest
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
     _ = try XCTUnwrap(sequence.append(fields: 0..<20))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     XCTAssertNotNil(host.canvas.measuredRect(for: 0))
@@ -253,7 +286,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
@@ -273,7 +306,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
@@ -287,7 +320,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
@@ -302,7 +335,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
@@ -322,7 +355,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 2 && !host.isPreparing }
@@ -349,7 +382,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     XCTAssertTrue(host.scrollToField(10))
@@ -381,7 +414,7 @@ import XCTest
       let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
         directory: directory, style: style, width: 180, font: font))
       let root = NSView(frame: .init(x: 0, y: 0, width: 400, height: 220))
-      let host = PromptViewportNativeScrollHost(frame: .init(x: 30, y: 40, width: 180, height: 100))
+      let host = makeHost(frame: .init(x: 30, y: 40, width: 180, height: 100))
       let input = TypingInputView(frame: .init(x: 1, y: 1, width: 1, height: 1))
       let window = NSWindow(contentRect: .init(x: 180, y: 220, width: 400, height: 220),
         styleMask: .borderless, backing: .buffered, defer: false)
@@ -460,7 +493,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
@@ -485,7 +518,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     session.insert("o", at: Date(timeIntervalSinceReferenceDate: 916_200_000))
@@ -506,7 +539,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 32))
     try await waitUntil { host.measuredFieldCount == 32 && !host.isPreparing }
@@ -536,7 +569,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 32))
     try await waitUntil { host.measuredFieldCount == 32 && !host.isPreparing }
@@ -563,7 +596,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
     try await waitUntil { sequence.nextField > 0 && !host.isPreparing }
@@ -578,7 +611,7 @@ import XCTest
     let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
     let sequence = try XCTUnwrap(PromptViewportFieldLayoutSequence(session: session,
       directory: directory, style: style, width: 180, font: font))
-    let host = PromptViewportNativeScrollHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    let host = makeHost(frame: .init(x: 0, y: 0, width: 180, height: 100))
     defer { host.stop() }
     let motion = PromptCaretMotionCoordinator()
     XCTAssertTrue(host.configure(sequence: sequence, batchSize: 2))
