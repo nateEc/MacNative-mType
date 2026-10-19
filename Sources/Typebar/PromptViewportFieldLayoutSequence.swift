@@ -30,6 +30,7 @@ import AppKit
   private let joinsLetters: Bool
   private var checkpoint: PromptFieldTextLayout.ContinuationCheckpoint?
   private(set) var nextField = 0
+  var fieldCount: Int { directory.fieldCount }
   var contentHeight: CGFloat? { checkpoint?.contentHeight }
 
   init?(session: TypingSession, directory: PromptViewportTargetDirectory,
