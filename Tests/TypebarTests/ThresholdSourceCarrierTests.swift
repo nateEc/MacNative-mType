@@ -60,7 +60,7 @@ final class ThresholdSourceCarrierTests: XCTestCase {
     let archive = TypebarArchive(version: 33, exportedAt: Date(timeIntervalSince1970: 1_000),
       settings: snapshot, results: [], presets: [])
     XCTAssertThrowsError(try JSONEncoder().encode(archive))
-    let document = TypebarSettingsDocument(settings: snapshot, configuration: configuration,
+    let document = TypebarSettingsDocument(version: 5, settings: snapshot, configuration: configuration,
       layoutFluidLayouts: [.ansiQwerty, .ansiDvorak],
       testParameterMemory: .init(duration: 30, wordLimit: 17,
         customTextDuration: 30, customTextWordLimit: 25, customTextSectionLimit: 5))
@@ -132,7 +132,7 @@ final class ThresholdSourceCarrierTests: XCTestCase {
     let snapshot = try source().applying(to: AppSettingsSnapshot())
     let archive = TypebarArchive(version: 33, exportedAt: Date(timeIntervalSince1970: 1_000), settings: snapshot, results: [], presets: [])
     XCTAssertThrowsError(try encoder.encode(archive))
-    let document = TypebarSettingsDocument(settings: snapshot, configuration: .words(17),
+    let document = TypebarSettingsDocument(version: 5, settings: snapshot, configuration: .words(17),
       layoutFluidLayouts: [.ansiQwerty, .ansiDvorak], testParameterMemory: memory)
     XCTAssertThrowsError(try encoder.encode(document))
 
@@ -141,7 +141,7 @@ final class ThresholdSourceCarrierTests: XCTestCase {
     XCTAssertNoThrow(try decoder.decode(TypebarArchive.self, from: JSONSerialization.data(withJSONObject: rawArchive)))
     rawArchive["settings"] = try object(snapshot)
     XCTAssertThrowsError(try decoder.decode(TypebarArchive.self, from: JSONSerialization.data(withJSONObject: rawArchive)))
-    var rawDocument = try object(TypebarSettingsDocument(settings: .init(), configuration: .words(17),
+    var rawDocument = try object(TypebarSettingsDocument(version: 5, settings: .init(), configuration: .words(17),
       layoutFluidLayouts: [.ansiQwerty, .ansiDvorak], testParameterMemory: memory))
     XCTAssertNoThrow(try decoder.decode(TypebarSettingsDocument.self, from: JSONSerialization.data(withJSONObject: rawDocument)))
     rawDocument["settings"] = try object(snapshot)

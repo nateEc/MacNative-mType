@@ -860,7 +860,7 @@ struct TypebarTestParameterMemory: Codable, Equatable {
 }
 
 struct TypebarSettingsDocument: Codable, Equatable {
-    static let currentVersion = 5
+    static let currentVersion = 6
 
     let version: Int
     let settings: AppSettingsSnapshot
@@ -885,16 +885,20 @@ struct TypebarSettingsDocument: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, settings, configuration, layoutFluidLayouts, testParameterMemory
+        case version, settings, configuration, layoutFluidLayouts, testParameterMemory, thresholdState
     }
 
     func encode(to encoder: Encoder) throws {
-        guard settings.thresholdSource == nil, configuration.rules.thresholdSource == nil
-        else { throw SettingsJSONCommandError.unsupportedVersion(version) }
+        let hasSource = settings.thresholdSource != nil || configuration.rules.thresholdSource != nil
+        guard !hasSource || version == 6 else { throw SettingsJSONCommandError.unsupportedVersion(version) }
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(version, forKey: .version)
-        try values.encode(settings, forKey: .settings)
-        try values.encode(configuration, forKey: .configuration)
+        if hasSource {
+            try values.encode(SettingsJSONThresholdState(settings: settings, configuration: configuration), forKey: .thresholdState)
+        } else {
+            try values.encode(settings, forKey: .settings)
+            try values.encode(configuration, forKey: .configuration)
+        }
         try values.encode(layoutFluidLayouts, forKey: .layoutFluidLayouts)
         try values.encode(testParameterMemory, forKey: .testParameterMemory)
     }
@@ -902,11 +906,20 @@ struct TypebarSettingsDocument: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decode(Int.self, forKey: .version)
-        settings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
+        guard (1...Self.currentVersion).contains(version) else { throw SettingsJSONCommandError.unsupportedVersion(version) }
+        if values.contains(.thresholdState) {
+            guard version == 6, !values.contains(.settings), !values.contains(.configuration)
+            else { throw SettingsJSONCommandError.invalidDocument }
+            let state = try values.decode(SettingsJSONThresholdState.self, forKey: .thresholdState)
+            settings = state.settings
+            configuration = state.configuration
+        } else {
+            settings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
+            configuration = try values.decode(TestConfiguration.self, forKey: .configuration)
+            guard settings.thresholdSource == nil, configuration.rules.thresholdSource == nil
+            else { throw SettingsJSONCommandError.unsupportedVersion(version) }
+        }
         guard version >= 5 || settings.paceGuideMode != .accountTagPersonalBest
-        else { throw SettingsJSONCommandError.unsupportedVersion(version) }
-        configuration = try values.decode(TestConfiguration.self, forKey: .configuration)
-        guard settings.thresholdSource == nil, configuration.rules.thresholdSource == nil
         else { throw SettingsJSONCommandError.unsupportedVersion(version) }
         layoutFluidLayouts = try values.decode([KeyboardLayout].self, forKey: .layoutFluidLayouts)
         if version >= 2 {
@@ -920,11 +933,70 @@ struct TypebarSettingsDocument: Codable, Equatable {
     }
 }
 
+/// Human-editable v6 state. The one canonical source is separate from the two
+/// required, checked legacy projections; no source capability leaks to v1-v5.
+private struct SettingsJSONThresholdState: Codable {
+    let settings: AppSettingsSnapshot
+    let configuration: TestConfiguration
+    init(settings: AppSettingsSnapshot, configuration: TestConfiguration) {
+        self.settings = settings
+        self.configuration = configuration
+    }
+    private enum CodingKeys: String, CodingKey { case settings, configuration, thresholds }
+    private enum RulesKey: String, CodingKey { case rules }
+    private struct Projection: Decodable {
+        let minimumAccuracy: Double
+        let minimumWpm: Double
+        let minimumWordBurstWpm: Double
+        let minimumWordBurstMode: MinimumWordBurstMode
+        func matches(_ settings: AppSettingsSnapshot) -> Bool {
+            minimumAccuracy == settings.minimumAccuracy && minimumWpm == settings.minimumWpm
+                && minimumWordBurstWpm == settings.minimumWordBurstWpm && minimumWordBurstMode == settings.minimumWordBurstMode
+        }
+        func matches(_ rules: InputRules) -> Bool {
+            minimumAccuracy == rules.minimumAccuracy && minimumWpm == rules.minimumWpm
+                && minimumWordBurstWpm == rules.minimumWordBurstWpm && minimumWordBurstMode == rules.minimumWordBurstMode
+        }
+    }
+    func encode(to encoder: Encoder) throws {
+        guard let source = configuration.rules.thresholdSource,
+              settings.thresholdSource == source, source.matches(settings), source.matches(configuration.rules)
+        else { throw SettingsJSONCommandError.invalidConfiguration }
+        _ = try LocalPresetCodec.encode(.init(configuration: configuration, settingsSnapshot: settings))
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        var projectedSettings = settings
+        projectedSettings.thresholdSource = nil
+        var projectedConfiguration = configuration
+        projectedConfiguration.rules.thresholdSource = nil
+        try values.encode(projectedSettings, forKey: .settings)
+        try values.encode(projectedConfiguration, forKey: .configuration)
+        try values.encode(source.configuration, forKey: .thresholds)
+    }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let projectedSettings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
+        var projectedConfiguration = try values.decode(TestConfiguration.self, forKey: .configuration)
+        guard projectedSettings.thresholdSource == nil, projectedConfiguration.rules.thresholdSource == nil
+        else { throw SettingsJSONCommandError.invalidConfiguration }
+        let source = PracticeThresholdSource(configuration: try values.decode(PracticeThresholdConfiguration.self, forKey: .thresholds))
+        settings = source.applying(to: projectedSettings)
+        projectedConfiguration.rules = source.applying(to: projectedConfiguration.rules)
+        configuration = projectedConfiguration
+        let rawSettings = try values.decode(Projection.self, forKey: .settings)
+        let ruleValues = try values.superDecoder(forKey: .configuration).container(keyedBy: RulesKey.self)
+        let rawRules = try ruleValues.decode(Projection.self, forKey: .rules)
+        guard rawSettings.matches(settings), rawRules.matches(configuration.rules)
+        else { throw SettingsJSONCommandError.invalidConfiguration }
+    }
+}
+
 enum SettingsJSONCommandError: Error, Equatable, LocalizedError {
     case emptyDocument
     case invalidDocument
     case invalidConfiguration
     case unsupportedVersion(Int)
+    case thresholdSourceNotReady
+    case configurationLocked
 
     var errorDescription: String? {
         switch self {
@@ -936,6 +1008,10 @@ enum SettingsJSONCommandError: Error, Equatable, LocalizedError {
             "设置 JSON 包含不支持的测试模式或数值范围。"
         case .unsupportedVersion(let version):
             "不支持设置 JSON 版本 \(version)。请使用当前版本的 Typebar 导出。"
+        case .thresholdSourceNotReady:
+            "设置 JSON 已读取，但完整阈值设置尚未接入，原偏好未修改。"
+        case .configurationLocked:
+            "锁定重开测试进行中，暂时不能导入设置 JSON。"
         }
     }
 }
@@ -1061,7 +1137,10 @@ enum SettingsJSONConfigurationPolicy {
 enum SettingsJSONCommandImport {
     @discardableResult
     static func apply(_ json: String, to settings: AppSettings) throws -> TypebarSettingsDocument {
+        guard settings.allowsRestartingConfigurationChange else { throw SettingsJSONCommandError.configurationLocked }
         let document = try SettingsJSONCommandCodec.decode(json)
+        guard document.settings.thresholdSource == nil, document.configuration.rules.thresholdSource == nil
+        else { throw SettingsJSONCommandError.thresholdSourceNotReady }
         settings.apply(document.settings)
         settings.layoutFluidLayouts = document.layoutFluidLayouts
         return document

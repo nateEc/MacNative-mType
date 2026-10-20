@@ -2115,7 +2115,7 @@ private struct ContentView: View {
     }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
-        guard acceptsRestartingConfigurationChange() else { return }
+        guard acceptsRestartingConfigurationChange() else { throw SettingsJSONCommandError.configurationLocked }
         let document = try SettingsJSONCommandImport.apply(json, to: settings)
         let memory = document.testParameterMemory
         duration = memory.duration
