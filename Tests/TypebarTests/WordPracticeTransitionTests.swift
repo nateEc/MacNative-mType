@@ -3,8 +3,7 @@ import XCTest
 
 final class WordPracticeTransitionTests: XCTestCase {
   private func practice(_ words: [String] = ["a|b", "e\u{301}"]) throws -> WordPracticeText.SectionedPractice {
-    try XCTUnwrap(WordPracticeText.sectionedPractice(segments: words, selectedTargetCount: words.count,
-      random: { 0 }))
+    try XCTUnwrap(WordPracticeText.sectionedPractice(segments: words, selectedTargetCount: words.count))
   }
 
   private func selection(_ preset: SavedTestPreset) -> ActiveTestSelectionDocument {

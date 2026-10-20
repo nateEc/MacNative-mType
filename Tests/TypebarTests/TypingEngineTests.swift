@@ -21894,8 +21894,14 @@ final class TypingEngineTests: XCTestCase {
   func testSectionedPracticeCyclesWeightedCandidatesAndUsesCJKCommitSpaces() throws {
     let practice = try XCTUnwrap(
       WordPracticeText.sectionedPractice(
-        segments: ["amber", "amber", "cabin"], selectedTargetCount: 2, random: { 0 }))
-    let sections = CustomTextPolicy.sections(in: practice.text)
+        segments: ["amber", "amber", "cabin"], selectedTargetCount: 2))
+    let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), customTextCompletion: .sections,
+      customTextSectionLimit: practice.sectionCount, customTextOrdering: practice.ordering,
+      customTextPipeDelimiter: true)
+    let session = TestSessionFactory.make(configuration: configuration, customText: practice.text,
+      preparedCustomSections: practice.sections)
+    let sections = session.prompt.split(separator: " ").map(String.init)
     XCTAssertEqual(practice.sectionCount, 10)
     XCTAssertEqual(sections.count, 10)
     XCTAssertEqual(Set(sections), ["amber", "cabin"])

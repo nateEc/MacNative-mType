@@ -99,19 +99,21 @@ final class WordReviewIdentityTests: XCTestCase {
   func testSelectedSpellingsSurviveActualSectionedPracticeCompletionAndRepeat() throws {
     let missed = try XCTUnwrap(MissedWordPracticePlan.make(errorCounts: aliasAttempt().missedWordErrorCounts))
     let practice = try XCTUnwrap(WordPracticeText.sectionedPractice(segments: missed.exerciseWords,
-      selectedTargetCount: missed.selectedWords.count, random: { 0 }))
+      selectedTargetCount: missed.selectedWords.count))
     let sections = CustomTextPolicy.sections(in: practice.text, preservesSourceSpelling: true)
     XCTAssertEqual(Set(sections.map { Array($0.utf16) }).count, 2)
     let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
       difficulty: .normal, rules: .init(), customTextCompletion: .sections,
-      customTextSectionLimit: practice.sectionCount, customTextOrdering: .inOrder,
+      customTextSectionLimit: practice.sectionCount, customTextOrdering: practice.ordering,
       customTextPipeDelimiter: true)
     var exercise = TestSessionFactory.make(configuration: configuration, customText: practice.text,
       preparedCustomSections: practice.sections)
-    XCTAssertEqual(Array(exercise.prompt.utf16), Array(sections.joined(separator: " ").utf16))
+    let generated = exercise.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(generated.count, practice.sectionCount)
+    XCTAssertEqual(Set(generated.map { Array($0.utf16) }), Set(sections.map { Array($0.utf16) }))
     exercise.insertBatch(exercise.prompt, at: start)
     XCTAssertEqual(exercise.outcome, .completed)
-    XCTAssertEqual(exercise.wordReviews.map { Array($0.target.utf16) }, sections.map { Array($0.utf16) })
+    XCTAssertEqual(exercise.wordReviews.map { Array($0.target.utf16) }, generated.map { Array($0.utf16) })
     XCTAssertTrue(exercise.wordReviews.allSatisfy(\.isCorrect))
     var repeated = exercise.repeatedAttempt()
     XCTAssertEqual(Array(repeated.prompt.utf16), Array(exercise.prompt.utf16))
@@ -173,10 +175,10 @@ final class WordReviewIdentityTests: XCTestCase {
     XCTAssertEqual(original.outcome, .completed)
     let missed = try XCTUnwrap(MissedWordPracticePlan.make(errorCounts: original.missedWordErrorCounts))
     let practice = try XCTUnwrap(WordPracticeText.sectionedPractice(segments: missed.exerciseWords,
-      selectedTargetCount: missed.selectedWords.count, random: { 0 }))
+      selectedTargetCount: missed.selectedWords.count))
     let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
       difficulty: .normal, rules: .init(), customTextCompletion: .sections,
-      customTextSectionLimit: practice.sectionCount, customTextOrdering: .inOrder,
+      customTextSectionLimit: practice.sectionCount, customTextOrdering: practice.ordering,
       customTextPipeDelimiter: true)
     var exercise = TestSessionFactory.make(configuration: configuration, customText: practice.text,
       preparedCustomSections: practice.sections)
@@ -206,20 +208,25 @@ final class WordReviewIdentityTests: XCTestCase {
 
   func testStructuredPracticeContinuationKeepsContextAndRepeatBoundaries() throws {
     let practice = try XCTUnwrap(WordPracticeText.sectionedPractice(
-      segments: ["left a|b", "|\u{301}"], selectedTargetCount: 30, random: { 0 }))
+      segments: ["left a|b", "|\u{301}"], selectedTargetCount: 30))
     let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
       difficulty: .normal, rules: .init(), customTextCompletion: .sections,
-      customTextSectionLimit: practice.sectionCount, customTextOrdering: .inOrder,
+      customTextSectionLimit: practice.sectionCount, customTextOrdering: practice.ordering,
       customTextPipeDelimiter: true)
     var exercise = TestSessionFactory.make(configuration: configuration,
       customText: practice.text, preparedCustomSections: practice.sections)
     let opening = exercise.prompt
-    let expected = practice.sections.joined(separator: " ")
     XCTAssertTrue(exercise.usesIncrementalPromptExtension)
-    exercise.insertBatch(expected, at: start)
+    for _ in 0..<10 where exercise.outcome != .completed {
+      exercise.insertBatch(String(exercise.prompt.dropFirst(exercise.typed.count)), at: start)
+    }
+    let expected = exercise.prompt
     XCTAssertEqual(exercise.outcome, .completed)
-    XCTAssertEqual(Array(exercise.prompt.utf16), Array(expected.utf16))
     XCTAssertEqual(exercise.sectionProgress?.completed, practice.sectionCount)
+    XCTAssertEqual(exercise.wordReviews.count, 225)
+    XCTAssertEqual(exercise.wordReviews.filter { $0.target == "left" }.count, 75)
+    XCTAssertEqual(exercise.wordReviews.filter { $0.target == "a|b" }.count, 75)
+    XCTAssertEqual(exercise.wordReviews.filter { Array($0.target.utf16) == Array("|\u{301}".utf16) }.count, 75)
     var repeated = exercise.repeatedAttempt()
     XCTAssertEqual(Array(repeated.prompt.utf16), Array(opening.utf16))
     repeated.insertBatch(expected, at: start.addingTimeInterval(1))

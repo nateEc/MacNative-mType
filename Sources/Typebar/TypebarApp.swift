@@ -6502,7 +6502,7 @@ private struct ContentView: View {
     customText = practice.text
     customTextCompletion = .sections
     customTextSectionLimit = practice.sectionCount
-    customTextOrdering = .inOrder
+    customTextOrdering = practice.ordering
     customTextPipeDelimiter = true
     completedResult = nil
     reset()

@@ -913,38 +913,23 @@ enum WordPracticeText {
     words.joined(separator: language.usesSpaceDelimitedWords ? " " : "")
   }
 
-  /// A practice run is a shuffled sequence of complete candidate sections.
-  /// Rebuilding the small shuffled bag keeps error-frequency duplicates as
-  /// weights while ensuring every candidate is revisited locally.
+  /// Keep the weighted source independently of the completion budget. The
+  /// section stream shuffles candidate positions as each bag is consumed.
   static func sectionedPractice(
-    segments: [String], selectedTargetCount: Int,
-    random: () -> Int = { Int.random(in: Int.min...Int.max) }
+    segments: [String], selectedTargetCount: Int
   ) -> SectionedPractice? {
     let candidates = segments.filter { !$0.isEmpty }
-    let sectionCount = selectedTargetCount * 5
-    guard !candidates.isEmpty, sectionCount > 0 else { return nil }
-
-    var practiceSections: [String] = []
-    while practiceSections.count < sectionCount {
-      var shuffled = candidates
-      guard shuffled.count > 1 else {
-        practiceSections.append(contentsOf: repeatElement(shuffled[0], count: sectionCount - practiceSections.count))
-        break
-      }
-      for index in stride(from: shuffled.count - 1, through: 1, by: -1) {
-        let swapIndex = Int(random().magnitude % UInt(index + 1))
-        shuffled.swapAt(index, swapIndex)
-      }
-      practiceSections.append(contentsOf: shuffled.prefix(sectionCount - practiceSections.count))
-    }
-    return .init(sections: practiceSections)
+    let (sectionCount, overflow) = selectedTargetCount.multipliedReportingOverflow(by: 5)
+    guard !candidates.isEmpty, !overflow, sectionCount > 0 else { return nil }
+    return .init(sections: candidates, sectionCount: sectionCount)
   }
 
   struct SectionedPractice: Equatable {
     let sections: [String]
+    let sectionCount: Int
+    var ordering: CustomTextOrdering { .shuffled }
     /// Editor presentation only; never decode this to recover candidates.
     var text: String { sections.joined(separator: " | ") }
-    var sectionCount: Int { sections.count }
   }
 }
 
