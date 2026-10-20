@@ -1291,8 +1291,7 @@ private struct ContentView: View {
   @State private var activeVerifiedScript: ReferenceScriptChallengePolicy.VerifiedScript?
   @State private var activeSessionTags: [String] = []
   @State private var activeResultTagDraft = ""
-  @State private var practiceReturnPreset: SavedTestPreset?
-  @State private var preparedWordPractice: WordPracticeText.SectionedPractice?
+  @State private var wordPractice: WordPracticeTransition?
   @State private var showingHistory = false
   @State private var showingWeakSpots = false
   @State private var showingPresets = false
@@ -2426,7 +2425,7 @@ private struct ContentView: View {
       .onChange(of: mode) { _, nextMode in
         // A deliberate departure from temporary word practice becomes the
         // user's new source configuration, matching the reference reset rule.
-        if nextMode != .custom { practiceReturnPreset = nil }
+        if nextMode != .custom { wordPractice = nil }
         reset()
       }
     }
@@ -2755,7 +2754,7 @@ private struct ContentView: View {
             TextField("输入你自己的练习文本", text: Binding(
               get: { customText },
               set: { value in
-                preparedWordPractice = nil
+                wordPractice = nil
                 customText = value
               }), axis: .vertical)
               .lineLimit(2...4)
@@ -4508,9 +4507,7 @@ private struct ContentView: View {
       : TestSessionFactory.make(
       configuration: configuration,
       customText: customText,
-      preparedCustomSections: practiceReturnPreset != nil
-        && (preparedWordPractice.map { InputTextIdentity.matches($0.text, customText) } ?? false)
-        ? preparedWordPractice?.sections : nil,
+      preparedCustomSections: wordPractice?.preparedSections(matching: customText),
       finiteTextSource: activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk },
       verifiedScript: activeChallenge?.requirements.referenceScriptSpecification
         == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
@@ -4957,6 +4954,7 @@ private struct ContentView: View {
 
   private func loadSavedCustomText(_ selection: SavedCustomTextSelection, continuous: Bool) {
     guard selectMode(.custom) else { return }
+    wordPractice = nil
     activeChallengeID = nil
     activeVerifiedScript = nil
     guard selection.isLong else {
@@ -4985,7 +4983,7 @@ private struct ContentView: View {
     guard selectMode(.custom) else { return }
     activeChallengeID = nil
     activeLongSavedText = nil
-    practiceReturnPreset = nil
+    wordPractice = nil
     customText = nextText
     customTextCompletion = .finish
     customTextOrdering = .inOrder
@@ -5908,7 +5906,8 @@ private struct ContentView: View {
     _ preset: SavedTestPreset,
     overwritesParameterMemory: Bool = true,
     appliesGlobalSettings: Bool = true,
-    polyglotReturnLanguage: TypingLanguage? = nil
+    polyglotReturnLanguage: TypingLanguage? = nil,
+    restoringSelection: ActiveTestSelectionDocument? = nil
   ) -> Bool {
     guard acceptsRestartingConfigurationChange() else { return false }
     guard preset.settingGroups?.isEmpty != true else { return false }
@@ -5928,7 +5927,16 @@ private struct ContentView: View {
       referenceScriptMessage = "请从挑战库选择脚本并重新导入固定版本文本。"
       return false
     }
-    practiceReturnPreset = nil
+    if let restoringSelection {
+      let memory = restoringSelection.testParameterMemory
+      duration = memory.duration
+      wordLimit = memory.wordLimit
+      customTextDuration = memory.customTextDuration
+      customTextWordLimit = memory.customTextWordLimit
+      customTextSectionLimit = memory.customTextSectionLimit
+      quoteSource = restoringSelection.quoteSource
+    }
+    wordPractice = nil
     referenceScriptMessage = nil
     if let activeVerifiedScript,
       challenge?.requirements.referenceScriptSpecification
@@ -6075,7 +6083,12 @@ private struct ContentView: View {
       configuration: selectedConfiguration,
       quoteID: mode == .quote ? selectedQuoteID : nil,
       customText: mode == .custom ? customText : nil)
-    settings.saveActiveTestSelection(.init(
+    let current = activeTestSelectionDocument(preset: preset)
+    settings.saveActiveTestSelection(wordPractice?.persistedSelection(current: current) ?? current)
+  }
+
+  private func activeTestSelectionDocument(preset: SavedTestPreset) -> ActiveTestSelectionDocument {
+    .init(
       preset: preset,
       quoteSource: quoteSource,
       testParameterMemory: .init(
@@ -6084,10 +6097,10 @@ private struct ContentView: View {
         customTextDuration: customTextDuration,
         customTextWordLimit: customTextWordLimit,
         customTextSectionLimit: customTextSectionLimit),
-      polyglotReturnLanguage: selectedConfiguration.language == .mixedLanguages
+      polyglotReturnLanguage: preset.configuration.language == .mixedLanguages
         ? polyglotReturnLanguage : nil,
       oneHandedChallengeSelection: activeChallengeID == "one-handed-bandit"
-        ? oneHandedChallengeSelection : nil))
+        ? oneHandedChallengeSelection : nil)
   }
 
   private var activeChallenge: TypebarChallenge? {
@@ -6398,9 +6411,12 @@ private struct ContentView: View {
     guard let practice = WordPracticeText.sectionedPractice(
       segments: words, selectedTargetCount: selectedTargetCount)
     else { return }
-    guard selectMode(.custom) else { return }
-    if practiceReturnPreset == nil { practiceReturnPreset = presetDefinition }
-    preparedWordPractice = practice
+    guard let transition = WordPracticeTransition.begin(
+      previous: wordPractice, practice: practice,
+      currentPreset: { presetDefinition },
+      currentSelection: { activeTestSelectionDocument(preset: $0) },
+      selectCustomMode: { selectMode(.custom) }) else { return }
+    wordPractice = transition
     customText = practice.text
     customTextCompletion = .sections
     customTextSectionLimit = practice.sectionCount
@@ -6414,9 +6430,12 @@ private struct ContentView: View {
   /// restored only when the user leaves it for a fresh test; repeating the
   /// result intentionally keeps the same practice prompt.
   private func restoreWordPracticeIfNeeded() -> Bool {
-    guard let preset = practiceReturnPreset else { return false }
-    practiceReturnPreset = nil
-    apply(preset)
+    guard let transition = wordPractice else { return false }
+    // apply clears temporary navigation only after its admission checks.
+    // A rejection consumes this command without falling through to restart.
+    apply(transition.returnPreset, overwritesParameterMemory: false,
+      polyglotReturnLanguage: transition.returnSelection.polyglotReturnLanguage,
+      restoringSelection: transition.returnSelection)
     return true
   }
 
