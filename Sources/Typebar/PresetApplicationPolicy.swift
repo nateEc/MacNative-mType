@@ -21,6 +21,9 @@ enum PresetApplicationPolicy {
       rules.minimumWpm = sourceConfiguration.rules.minimumWpm
       rules.minimumWordBurstWpm = sourceConfiguration.rules.minimumWordBurstWpm
       rules.minimumWordBurstMode = sourceConfiguration.rules.minimumWordBurstMode
+      // Source memory and its effective projection have the same group owner.
+      // Nil deliberately clears metadata when applying a legacy behavior group.
+      rules.thresholdSource = sourceConfiguration.rules.thresholdSource
     }
     if usesInput {
       rules.strictSpace = sourceConfiguration.rules.strictSpace
@@ -79,9 +82,16 @@ enum PresetApplicationPolicy {
       applied.activeResultTags = preset.activeResultTags
         ?? preset.settingsSnapshot?.activeResultTags ?? []
     }
-    if let currentSnapshot = current.settingsSnapshot ?? preset.settingsSnapshot {
+    if var currentSnapshot = current.settingsSnapshot ?? preset.settingsSnapshot {
+      if current.settingsSnapshot == nil {
+        currentSnapshot.copyThresholds(from: currentConfiguration.rules)
+      }
       let sourceSnapshot = preset.settingsSnapshot ?? currentSnapshot
-      applied.settingsSnapshot = currentSnapshot.applying(sourceSnapshot, groups: groups)
+      var resolvedSnapshot = currentSnapshot.applying(sourceSnapshot, groups: groups)
+      if usesBehavior && preset.settingsSnapshot == nil {
+        resolvedSnapshot.copyThresholds(from: sourceConfiguration.rules)
+      }
+      applied.settingsSnapshot = resolvedSnapshot
     }
     applied.settingGroups = preset.settingGroups
     return applied
@@ -89,6 +99,16 @@ enum PresetApplicationPolicy {
 }
 
 private extension AppSettingsSnapshot {
+  /// An old preset may have only input rules. Preserve that explicit projection
+  /// and optional source rather than borrowing another preset's threshold state.
+  mutating func copyThresholds(from rules: InputRules) {
+    minimumAccuracy = rules.minimumAccuracy
+    minimumWpm = rules.minimumWpm
+    minimumWordBurstWpm = rules.minimumWordBurstWpm
+    minimumWordBurstMode = rules.minimumWordBurstMode
+    thresholdSource = rules.thresholdSource
+  }
+
   func applying(_ source: Self, groups: Set<PresetSettingGroup>) -> Self {
     var result = self
     if groups.contains(.test) {
@@ -108,6 +128,7 @@ private extension AppSettingsSnapshot {
       result.minimumWpm = source.minimumWpm
       result.minimumWordBurstWpm = source.minimumWordBurstWpm
       result.minimumWordBurstMode = source.minimumWordBurstMode
+      result.thresholdSource = source.thresholdSource
       result.alwaysShowWordsHistory = source.alwaysShowWordsHistory
       result.testModifiers = source.testModifiers
     }
