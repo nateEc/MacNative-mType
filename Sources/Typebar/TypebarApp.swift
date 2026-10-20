@@ -1281,6 +1281,8 @@ private struct ContentView: View {
   @State private var activeQuoteFeedback: QuoteResultFeedbackTarget?
   @State private var activeQuoteSource: ResultQuoteSource?
   @State private var customText = "A calm practice makes the next difficult sentence feel possible."
+  @State private var customTextSource: CustomTextSource?
+  @State private var customTextStateSaveFailed = false
   @State private var customTextCompletion: CustomTextCompletion = .finish
   @State private var customTextDuration = 30
   @State private var customTextWordLimit = 25
@@ -1661,7 +1663,7 @@ private struct ContentView: View {
       session.cancelAutomaticInput()
     }
     .onChange(of: settings.activeTestSelectionGeneration) { _, _ in
-      restorePersistedTestSelection()
+      restorePersistedTestSelection(explicitSelectionImport: true)
     }
     .onChange(of: session.outcome) { previousOutcome, outcome in
       if outcome != .active {
@@ -2755,6 +2757,7 @@ private struct ContentView: View {
               get: { customText },
               set: { value in
                 wordPractice = nil
+                customTextSource = nil
                 customText = value
               }), axis: .vertical)
               .lineLimit(2...4)
@@ -2763,7 +2766,7 @@ private struct ContentView: View {
                 language: language))
               .disabled(hasLockedCustomTextSource)
               .onChange(of: customText) { _, value in
-                let clamped = CustomTextPolicy.clamped(value)
+                let clamped = preparedCustomSections == nil ? CustomTextPolicy.clamped(value) : value
                 if clamped != value { customText = clamped }
                 if let activeLongSavedText,
                   value != activeLongSavedText.currentChunk
@@ -2777,9 +2780,15 @@ private struct ContentView: View {
                   activeChallengeID = nil
                 }
               }
-            Text("\(customText.count) / \(CustomTextPolicy.maximumLength) 个字符")
+            Text(preparedCustomSections.map { "已准备文本：\($0.count) 段 · \(customText.count) 字符" }
+              ?? "\(customText.count) / \(CustomTextPolicy.maximumLength) 个字符")
               .font(.caption)
               .foregroundStyle(.secondary)
+            if customTextStateSaveFailed {
+              Label("自定义文本未保存到本机；原有记录保持不变。", systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
             if let activeLongSavedText {
               Label(
                 "\(activeLongSavedText.continuous ? "连续剩余文本" : "分段继续")：\(activeLongSavedText.title) · \(LongSavedTextProgress.progressLabel(in: activeLongSavedText.text, offset: activeLongSavedText.progress))",
@@ -4507,7 +4516,7 @@ private struct ContentView: View {
       : TestSessionFactory.make(
       configuration: configuration,
       customText: customText,
-      preparedCustomSections: wordPractice?.preparedSections(matching: customText),
+      preparedCustomSections: preparedCustomSections,
       finiteTextSource: activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk },
       verifiedScript: activeChallenge?.requirements.referenceScriptSpecification
         == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
@@ -4955,6 +4964,7 @@ private struct ContentView: View {
   private func loadSavedCustomText(_ selection: SavedCustomTextSelection, continuous: Bool) {
     guard selectMode(.custom) else { return }
     wordPractice = nil
+    customTextSource = nil
     activeChallengeID = nil
     activeVerifiedScript = nil
     guard selection.isLong else {
@@ -4984,6 +4994,7 @@ private struct ContentView: View {
     activeChallengeID = nil
     activeLongSavedText = nil
     wordPractice = nil
+    customTextSource = nil
     customText = nextText
     customTextCompletion = .finish
     customTextOrdering = .inOrder
@@ -5907,7 +5918,8 @@ private struct ContentView: View {
     overwritesParameterMemory: Bool = true,
     appliesGlobalSettings: Bool = true,
     polyglotReturnLanguage: TypingLanguage? = nil,
-    restoringSelection: ActiveTestSelectionDocument? = nil
+    restoringSelection: ActiveTestSelectionDocument? = nil,
+    restoringCustomTextState: CustomTextStateDocument? = nil
   ) -> Bool {
     guard acceptsRestartingConfigurationChange() else { return false }
     guard preset.settingGroups?.isEmpty != true else { return false }
@@ -5937,6 +5949,7 @@ private struct ContentView: View {
       quoteSource = restoringSelection.quoteSource
     }
     wordPractice = nil
+    if appliesTest { customTextSource = nil }
     referenceScriptMessage = nil
     if let activeVerifiedScript,
       challenge?.requirements.referenceScriptSpecification
@@ -6022,11 +6035,13 @@ private struct ContentView: View {
       quoteSelectionMode = .lengths
       ensureSelectedQuote()
     }
+    if let restoringCustomTextState { installCustomTextState(restoringCustomTextState) }
     reset()
     return true
   }
 
-  private func restoreActiveTestSelection(_ document: ActiveTestSelectionDocument) {
+  private func restoreActiveTestSelection(_ document: ActiveTestSelectionDocument,
+    customState: CustomTextStateDocument? = nil) {
     let memory = document.testParameterMemory
     duration = memory.duration
     wordLimit = memory.wordLimit
@@ -6039,7 +6054,8 @@ private struct ContentView: View {
       preset,
       overwritesParameterMemory: false,
       appliesGlobalSettings: false,
-      polyglotReturnLanguage: document.polyglotReturnLanguage)
+      polyglotReturnLanguage: document.polyglotReturnLanguage,
+      restoringCustomTextState: customState)
     if activeChallengeID == "one-handed-bandit" {
       oneHandedChallengeSelection = document.oneHandedChallengeSelection
         ?? oneHandedChallengeSelection
@@ -6050,7 +6066,7 @@ private struct ContentView: View {
     }
   }
 
-  private func restoreDefaultTestSelection() {
+  private func restoreDefaultTestSelection(customState: CustomTextStateDocument? = nil) {
     let memory = TypebarTestParameterMemory.defaults
     duration = memory.duration
     wordLimit = memory.wordLimit
@@ -6060,14 +6076,17 @@ private struct ContentView: View {
     apply(
       .init(configuration: TypebarInitialTestSelection.configuration),
       overwritesParameterMemory: false,
-      appliesGlobalSettings: false)
+      appliesGlobalSettings: false, restoringCustomTextState: customState)
   }
 
-  private func restorePersistedTestSelection() {
-    if let document = settings.activeTestSelection {
-      restoreActiveTestSelection(document)
+  private func restorePersistedTestSelection(explicitSelectionImport: Bool = false) {
+    let document = settings.activeTestSelection
+    let customState = CustomTextRestorePolicy.source(stored: settings.customTextState,
+      activePreset: document?.preset, explicitSelectionImport: explicitSelectionImport)
+    if let document {
+      restoreActiveTestSelection(document, customState: customState)
     } else {
-      restoreDefaultTestSelection()
+      restoreDefaultTestSelection(customState: customState)
     }
   }
 
@@ -6078,6 +6097,9 @@ private struct ContentView: View {
       activeChallenge?.requirements.referenceScriptSpecification
         == activeVerifiedScript.specification
     { return }
+    if mode == .custom, activeLongSavedText == nil {
+      customTextStateSaveFailed = !settings.saveCustomTextState(customTextStateDocument)
+    }
     let selectedConfiguration = selectedConfiguration ?? session.configuration
     let preset = SavedTestPreset(
       configuration: selectedConfiguration,
@@ -6085,6 +6107,33 @@ private struct ContentView: View {
       customText: mode == .custom ? customText : nil)
     let current = activeTestSelectionDocument(preset: preset)
     settings.saveActiveTestSelection(wordPractice?.persistedSelection(current: current) ?? current)
+  }
+
+  private var preparedCustomSections: [String]? {
+    wordPractice?.preparedSections(matching: customText)
+      ?? customTextSource?.preparedSections(matching: customText)
+  }
+
+  private var customTextStateDocument: CustomTextStateDocument {
+    let customConfiguration = TestConfiguration(mode: .custom,
+      duration: customTextCompletion == .time ? TimeInterval(customTextDuration) : nil,
+      wordLimit: customTextCompletion == .words ? customTextWordLimit : nil,
+      difficulty: .normal, rules: .init(), customTextCompletion: customTextCompletion,
+      customTextSectionLimit: customTextCompletion == .sections ? customTextSectionLimit : nil,
+      customTextOrdering: customTextOrdering, customTextPipeDelimiter: customTextPipeDelimiter)
+    return .init(source: preparedCustomSections.map(CustomTextSource.prepared) ?? .editor(customText),
+      configuration: customConfiguration)
+  }
+
+  private func installCustomTextState(_ document: CustomTextStateDocument) {
+    customTextSource = document.source
+    customText = document.source.text
+    customTextCompletion = document.completion
+    customTextOrdering = document.ordering
+    customTextPipeDelimiter = document.pipeDelimiter
+    if let duration = document.duration { customTextDuration = Int(duration) }
+    if let wordLimit = document.wordLimit { customTextWordLimit = wordLimit }
+    if let sectionLimit = document.sectionLimit { customTextSectionLimit = sectionLimit }
   }
 
   private func activeTestSelectionDocument(preset: SavedTestPreset) -> ActiveTestSelectionDocument {
@@ -6415,8 +6464,13 @@ private struct ContentView: View {
       previous: wordPractice, practice: practice,
       currentPreset: { presetDefinition },
       currentSelection: { activeTestSelectionDocument(preset: $0) },
+      currentCustomTextState: {
+        guard mode == .custom else { return nil }
+        return activeLongSavedText == nil && activeVerifiedScript == nil ? customTextStateDocument : settings.customTextState
+      },
       selectCustomMode: { selectMode(.custom) }) else { return }
     wordPractice = transition
+    customTextSource = .prepared(practice.sections)
     customText = practice.text
     customTextCompletion = .sections
     customTextSectionLimit = practice.sectionCount
@@ -6431,11 +6485,14 @@ private struct ContentView: View {
   /// result intentionally keeps the same practice prompt.
   private func restoreWordPracticeIfNeeded() -> Bool {
     guard let transition = wordPractice else { return false }
+    let returningCustomState = CustomTextRestorePolicy.returningSource(captured: transition.returnCustomTextState,
+      latest: { customTextStateDocument })
     // apply clears temporary navigation only after its admission checks.
     // A rejection consumes this command without falling through to restart.
     apply(transition.returnPreset, overwritesParameterMemory: false,
       polyglotReturnLanguage: transition.returnSelection.polyglotReturnLanguage,
-      restoringSelection: transition.returnSelection)
+      restoringSelection: transition.returnSelection,
+      restoringCustomTextState: returningCustomState)
     return true
   }
 

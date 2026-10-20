@@ -1147,6 +1147,15 @@ final class AppSettings {
     ActiveTestSelectionStore(defaults: defaults).load()
   }
 
+  var customTextState: CustomTextStateDocument? {
+    CustomTextStateStore(defaults: defaults).load()
+  }
+
+  @discardableResult
+  func saveCustomTextState(_ document: CustomTextStateDocument) -> Bool {
+    CustomTextStateStore(defaults: defaults).save(document)
+  }
+
   var allowsRestartingConfigurationChange: Bool {
     noQuitConfigurationLocks.allowsRestartingConfigurationChange
   }
