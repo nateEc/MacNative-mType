@@ -541,6 +541,47 @@ import XCTest
     XCTAssertEqual(fixture.counts.generation, 1)
   }
 
+  func testExternalPageNavigationDuringReflowSupersedesOldReadingAnchor() throws {
+    let fixture = try Fixture(wordCount: 2_001)
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.promptReady }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    let page = try XCTUnwrap(native.enclosingScrollView)
+    let selected = NSRange(location: 730, length: 3)
+    native.viewport.canvas.setAccessibilitySelectedTextRange(selected)
+    fixture.waitUntil { page.contentView.bounds.minY > 0 }
+    fixture.settings.fontSize = 36
+    fixture.waitUntil { native.viewport.isPreparing && !native.viewport.canvas.hasCompleteHeight }
+    page.contentView.scroll(to: .zero)
+    page.reflectScrolledClipView(page.contentView)
+    XCTAssertEqual(page.contentView.bounds.minY, 0)
+    fixture.waitUntil { fixture.promptReady }
+    XCTAssertEqual(page.contentView.bounds.minY, 0,
+      "Reflow must not undo the newer page navigation")
+    XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), selected,
+      "Cancelling position restoration must not erase the independent selection")
+    XCTAssertEqual(fixture.counts.generation, 1)
+  }
+
+  func testNewSelectionDuringReflowSupersedesSavedSelectionAndPosition() throws {
+    let fixture = try Fixture(wordCount: 2_001)
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.promptReady }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    native.viewport.canvas.setAccessibilitySelectedTextRange(.init(location: 730, length: 3))
+    fixture.waitUntil { native.viewport.visibleDocumentRect.minY > 0 }
+    fixture.settings.fontSize = 36
+    fixture.waitUntil { native.viewport.isPreparing && !native.viewport.canvas.hasCompleteHeight }
+    let selected = NSRange(location: 0, length: 2)
+    native.viewport.canvas.setAccessibilitySelectedTextRange(selected)
+    let selectedOrigin = try XCTUnwrap(native.enclosingScrollView).contentView.bounds.minY
+    fixture.waitUntil { fixture.promptReady }
+    XCTAssertEqual(native.viewport.canvas.accessibilitySelectedTextRange(), selected)
+    XCTAssertEqual(native.enclosingScrollView?.contentView.bounds.minY, selectedOrigin)
+    XCTAssertTrue(NSLocationInRange(0, native.viewport.canvas.accessibilityVisibleCharacterRange()))
+    XCTAssertEqual(fixture.counts.generation, 1)
+  }
+
   func testFontAndLineWidthChangesUseVisibleWidthIncludingLegacyScroller() throws {
     let fixture = try Fixture()
     defer { fixture.close() }

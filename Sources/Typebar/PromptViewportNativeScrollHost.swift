@@ -1,5 +1,13 @@
 import AppKit
 
+@MainActor private final class PromptViewportNavigationScrollView: NSScrollView {
+  var willNavigate: (() -> Void)?
+  override func scrollWheel(with event: NSEvent) {
+    willNavigate?()
+    super.scrollWheel(with: event)
+  }
+}
+
 @MainActor private final class PromptViewportReportingClipView: NSClipView {
   var didScroll: (() -> Void)?
   var didResize: (() -> Void)?
@@ -42,7 +50,7 @@ import AppKit
     let selection: NSRange
   }
   let canvas = PromptViewportNativeCanvas(frame: .zero)
-  let scrollView = NSScrollView(frame: .zero)
+  let scrollView: NSScrollView = PromptViewportNavigationScrollView(frame: .zero)
   private let clip = PromptViewportReportingClipView(frame: .zero)
   private let preparation = PromptViewportPreparationTask()
   private var sequence: PromptViewportFieldLayoutSequence?
@@ -53,11 +61,14 @@ import AppKit
   private var usesPageScrolling = false
   private weak var observedPageClip: NSClipView?
   private weak var observedPageDocument: NSView?
+  private var observedPageBounds: CGRect?
+  private var observedPageFrame: CGRect?
   private(set) var preparationFailure: Error?
   var onPreparationFailure: ((Error) -> Void)?
   var onLayoutWidthChange: (() -> Void)?
   var onLayoutWillRetire: (() -> Void)?
   var onMeasuredHeightChange: ((CGFloat) -> Void)?
+  var onExternalNavigation: (() -> Void)?
   var layoutWidth: CGFloat { clip.bounds.width }
   var visibleDocumentRect: CGRect { usesPageScrolling ? canvas.visibleRect : clip.documentVisibleRect }
   var isPreparing: Bool { preparation.isPreparing }
@@ -71,6 +82,10 @@ import AppKit
     scrollView.documentView = canvas
     scrollView.frame = bounds
     addSubview(scrollView)
+    (scrollView as? PromptViewportNavigationScrollView)?.willNavigate = { [weak self] in
+      guard let self, self.usesPageScrolling else { return }
+      self.onExternalNavigation?()
+    }
     clip.didScroll = { [weak self] in self?.clipScrolled() }
     clip.didResize = { [weak self] in self?.clipWidthChanged() }
     canvas.accessibilityRectProvider = { [weak self] in self?.accessibilityTextRect(for: $0) }
@@ -110,6 +125,8 @@ import AppKit
     }
     observedPageClip = pageClip
     observedPageDocument = pageDocument
+    observedPageBounds = pageClip?.bounds
+    observedPageFrame = pageDocument?.frame
     if let pageClip {
       pageClip.postsBoundsChangedNotifications = true
       NotificationCenter.default.addObserver(self, selector: #selector(pageClipChanged),
@@ -129,9 +146,21 @@ import AppKit
     visibleRegionChanged()
   }
 
-  @objc private func pageDocumentChanged() { visibleRegionChanged() }
+  @objc private func pageDocumentChanged() {
+    observedPageBounds = observedPageClip?.bounds
+    observedPageFrame = observedPageDocument?.frame
+    visibleRegionChanged()
+  }
 
   @objc private func pageClipChanged() {
+    let next = observedPageClip?.bounds
+    let frame = observedPageDocument?.frame
+    if internalScrollDepth == 0, let previous = observedPageBounds, let next,
+      previous.origin != next.origin, previous.size == next.size, frame == observedPageFrame {
+      onExternalNavigation?()
+    }
+    observedPageBounds = next
+    observedPageFrame = frame
     if internalScrollDepth == 0, pendingFieldScroll != nil {
       pendingFieldScroll = nil
       preparation.cancel()
@@ -290,6 +319,7 @@ import AppKit
   }
 
   func scrollToMeasuredEnd() {
+    if usesPageScrolling { onExternalNavigation?() }
     pendingFieldScroll = nil
     preparation.cancel()
     let bottom = max(0, canvas.frame.height - visibleDocumentRect.height)
@@ -299,6 +329,7 @@ import AppKit
   }
 
   func scrollToTop() {
+    if usesPageScrolling { onExternalNavigation?() }
     pendingFieldScroll = nil
     preparation.cancel()
     scrollDocument(to: 0)
@@ -310,6 +341,7 @@ import AppKit
   /// geometry is never estimated as a complete document height.
   @discardableResult func scrollToField(_ index: Int) -> Bool {
     guard let sequence, index >= 0, index < sequence.fieldCount else { return false }
+    if usesPageScrolling { onExternalNavigation?() }
     if index < sequence.nextField {
       pendingFieldScroll = nil
       preparation.cancel()
@@ -406,6 +438,7 @@ import AppKit
 
   private func selectAccessibilityText(_ range: NSRange) -> Bool {
     guard let rect = accessibilityTextRect(for: range) else { return false }
+    if usesPageScrolling { onExternalNavigation?() }
     pendingFieldScroll = nil
     preparation.cancel()
     scrollDocument(to: rect.minY)

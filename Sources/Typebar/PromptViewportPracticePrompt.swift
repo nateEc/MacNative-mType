@@ -82,6 +82,7 @@ private struct PromptViewportPracticeBridge: NSViewRepresentable {
   private var reportedReady: PromptViewportPresentationReady?
   private var reportedFailure: PromptViewportPracticeSnapshot?
   private var pendingReadingPosition: PromptViewportNativeScrollHost.ReadingPosition?
+  private var readingPositionWasSuperseded = false
   private let batchSize = 32
 
   override init(frame frameRect: NSRect) {
@@ -91,6 +92,10 @@ private struct PromptViewportPracticeBridge: NSViewRepresentable {
     viewport.onLayoutWidthChange = { [weak self] in self?.needsLayout = true }
     viewport.onLayoutWillRetire = { [weak self] in self?.rememberReadingPosition() }
     viewport.onMeasuredHeightChange = { [weak self] in self?.publishHeight($0) }
+    viewport.onExternalNavigation = { [weak self] in
+      guard let self, self.pendingReadingPosition != nil else { return }
+      self.readingPositionWasSuperseded = true
+    }
   }
   required init?(coder: NSCoder) { fatalError("PromptViewportPracticeNativeView is created in code") }
 
@@ -128,7 +133,8 @@ private struct PromptViewportPracticeBridge: NSViewRepresentable {
     if sameTarget && sameMetrics && viewport.measuredFieldCount > 0 {
       guard viewport.replaceVisibleSession(snapshot.session, style: snapshot.style) else { reportFailure(); return }
     } else {
-      if sameTarget { rememberReadingPosition() } else { pendingReadingPosition = nil }
+      if sameTarget { rememberReadingPosition() }
+      else { pendingReadingPosition = nil; readingPositionWasSuperseded = false }
       if directory?.attemptID != snapshot.session.automaticInputAttemptID
         || directory?.promptTargetID != snapshot.session.promptTargetID {
         directory = PromptViewportTargetDirectory(session: snapshot.session)
@@ -161,6 +167,13 @@ private struct PromptViewportPracticeBridge: NSViewRepresentable {
     guard let position = pendingReadingPosition, viewport.canvas.hasCompleteHeight,
       abs(bounds.height - measuredHeight) < 0.01 else { return }
     pendingReadingPosition = nil
+    if readingPositionWasSuperseded {
+      readingPositionWasSuperseded = false
+      if viewport.canvas.accessibilitySelectedTextRange().location == NSNotFound {
+        viewport.canvas.restoreAccessibilitySelection(position.selection)
+      }
+      return
+    }
     guard viewport.restoreReadingPosition(position) else { reportFailure(); return }
   }
   private func rememberReadingPosition() {
@@ -203,6 +216,7 @@ private struct PromptViewportPracticeBridge: NSViewRepresentable {
     onFailure = nil; onHeight = nil; reportedFailure = nil; appliedWidth = 0
     onReady = nil; reportedReady = nil
     pendingReadingPosition = nil
+    readingPositionWasSuperseded = false
     viewport.stop()
   }
 }

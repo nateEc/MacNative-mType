@@ -65,4 +65,22 @@ import XCTest
     NotificationCenter.default.post(name: NSView.boundsDidChangeNotification, object: page.contentView)
     XCTAssertTrue(page.documentView === document)
   }
+
+  func testWheelAtPageBoundaryStillReportsANewerNavigationIntent() throws {
+    let page = NSScrollView(frame: .init(x: 0, y: 0, width: 200, height: 100))
+    let document = PageDocument(frame: .init(x: 0, y: 0, width: 180, height: 1000))
+    page.documentView = document
+    let host = PromptViewportNativeScrollHost(pageScrolling: true)
+    host.frame = .init(x: 0, y: 0, width: 180, height: 100)
+    document.addSubview(host)
+    host.refreshPageVisibility()
+    defer { host.stop(); host.removeFromSuperview() }
+    var intents = 0
+    host.onExternalNavigation = { intents += 1 }
+    let up = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .line,
+      wheelCount: 1, wheel1: 8, wheel2: 0, wheel3: 0))
+    host.scrollView.scrollWheel(with: try XCTUnwrap(NSEvent(cgEvent: up)))
+    XCTAssertEqual(page.contentView.bounds.minY, 0)
+    XCTAssertGreaterThan(intents, 0, "A boundary wheel gesture must supersede a pending old reading anchor")
+  }
 }
