@@ -29,6 +29,9 @@ enum TestConfigurationShare {
     }
 
     static func link(for preset: SavedTestPreset) throws -> String {
+        guard preset.configuration.rules.thresholdSource == nil,
+              preset.settingsSnapshot?.thresholdSource == nil
+        else { throw TestConfigurationShareError.invalidConfiguration }
         let sharedPreset = testConfigurationOnly(preset)
         guard isValid(sharedPreset) else { throw TestConfigurationShareError.invalidConfiguration }
         let data = try JSONEncoder().encode(Payload(version: version, preset: sharedPreset))

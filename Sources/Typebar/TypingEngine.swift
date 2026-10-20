@@ -2090,6 +2090,7 @@ struct InputRules: Codable, Equatable {
   /// is evaluated after a measurable, space-delimited word commit.
   var minimumWordBurstWpm = 0.0
   var minimumWordBurstMode: MinimumWordBurstMode = .off
+  var thresholdSource: PracticeThresholdSource? = nil
 
   init(
     strictSpace: Bool = false,
@@ -2135,7 +2136,7 @@ struct InputRules: Codable, Equatable {
     case strictSpace, stopOnError, stopOnErrorMode, deleteOnError, deleteOnErrorMode,
       hideExtraLetters, blindMode, quickEnd,
       freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace, minimumAccuracy, minimumWpm,
-      minimumWordBurstWpm, minimumWordBurstMode
+      minimumWordBurstWpm, minimumWordBurstMode, thresholdSource
   }
 
   init(from decoder: Decoder) throws {
@@ -2159,15 +2160,30 @@ struct InputRules: Codable, Equatable {
       try values.decodeIfPresent(OppositeShiftMode.self, forKey: .oppositeShiftMode) ?? .off
     codeUnindentOnBackspace =
       try values.decodeIfPresent(Bool.self, forKey: .codeUnindentOnBackspace) ?? false
-    minimumAccuracy = PracticeThresholdPolicy.accuracy(
-      try values.decodeIfPresent(Double.self, forKey: .minimumAccuracy) ?? 0)
-    minimumWpm = PracticeThresholdPolicy.speed(
-      try values.decodeIfPresent(Double.self, forKey: .minimumWpm) ?? 0)
-    minimumWordBurstWpm = PracticeThresholdPolicy.speed(
-      try values.decodeIfPresent(Double.self, forKey: .minimumWordBurstWpm) ?? 0)
-    minimumWordBurstMode =
-      try values.decodeIfPresent(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
-      ?? (minimumWordBurstWpm > 0 ? .fixed : .off)
+    if values.contains(.thresholdSource) {
+      minimumAccuracy = try values.decode(Double.self, forKey: .minimumAccuracy)
+      minimumWpm = try values.decode(Double.self, forKey: .minimumWpm)
+      minimumWordBurstWpm = try values.decode(Double.self, forKey: .minimumWordBurstWpm)
+      minimumWordBurstMode = try values.decode(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
+    } else {
+      minimumAccuracy = PracticeThresholdPolicy.accuracy(
+        try values.decodeIfPresent(Double.self, forKey: .minimumAccuracy) ?? 0)
+      minimumWpm = PracticeThresholdPolicy.speed(
+        try values.decodeIfPresent(Double.self, forKey: .minimumWpm) ?? 0)
+      minimumWordBurstWpm = PracticeThresholdPolicy.speed(
+        try values.decodeIfPresent(Double.self, forKey: .minimumWordBurstWpm) ?? 0)
+      minimumWordBurstMode =
+        try values.decodeIfPresent(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
+        ?? (minimumWordBurstWpm > 0 ? .fixed : .off)
+    }
+    if values.contains(.thresholdSource) {
+      let source = try values.decode(PracticeThresholdSource.self, forKey: .thresholdSource)
+      guard source.matches(self) else {
+        throw DecodingError.dataCorruptedError(forKey: .thresholdSource, in: values,
+          debugDescription: "Threshold source conflicts with active input rules")
+      }
+      thresholdSource = source
+    }
     normalizeErrorHandlingModes()
   }
 

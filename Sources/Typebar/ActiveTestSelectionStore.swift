@@ -35,7 +35,8 @@ struct ActiveTestSelectionDocument: Codable, Equatable {
       configuration: preset.configuration,
       quoteID: preset.quoteID,
       customText: preset.customText,
-      activeResultTags: nil)
+      activeResultTags: nil,
+      settingsSnapshot: preset.settingsSnapshot?.thresholdSource != nil ? preset.settingsSnapshot : nil)
     self.quoteSource = quoteSource
     self.testParameterMemory = testParameterMemory
     self.polyglotReturnLanguage = PolyglotReturnLanguagePolicy.validated(
@@ -52,11 +53,30 @@ struct ActiveTestSelectionDocument: Codable, Equatable {
     case oneHandedChallengeSelection
   }
 
+  func encode(to encoder: Encoder) throws {
+    guard !PracticeThresholdSource.isPresent(in: preset) else {
+      throw EncodingError.invalidValue(self, .init(codingPath: encoder.codingPath,
+        debugDescription: "Active selection generation does not support threshold source"))
+    }
+    var values = encoder.container(keyedBy: CodingKeys.self)
+    try values.encode(version, forKey: .version)
+    try values.encode(preset, forKey: .preset)
+    try values.encode(quoteSource, forKey: .quoteSource)
+    try values.encode(testParameterMemory, forKey: .testParameterMemory)
+    try values.encodeIfPresent(polyglotReturnLanguage, forKey: .polyglotReturnLanguage)
+    try values.encodeIfPresent(oneHandedChallengeSelection, forKey: .oneHandedChallengeSelection)
+  }
+
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    let preset = try container.decode(SavedTestPreset.self, forKey: .preset)
+    guard !PracticeThresholdSource.isPresent(in: preset) else {
+      throw DecodingError.dataCorruptedError(forKey: .preset, in: container,
+        debugDescription: "Active selection generation does not support threshold source")
+    }
     self.init(
       version: try container.decode(Int.self, forKey: .version),
-      preset: try container.decode(SavedTestPreset.self, forKey: .preset),
+      preset: preset,
       quoteSource: try container.decode(QuoteSource.self, forKey: .quoteSource),
       testParameterMemory: try container.decode(
         TypebarTestParameterMemory.self, forKey: .testParameterMemory),

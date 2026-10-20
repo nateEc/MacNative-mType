@@ -608,6 +608,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var minimumWpm = 0.0
   var minimumWordBurstWpm = 0.0
   var minimumWordBurstMode: MinimumWordBurstMode = .off
+  var thresholdSource: PracticeThresholdSource? = nil
   var practiceLineWidth: PracticeLineWidth = .fluid
   var customPracticeLineColumns = 60
   var practiceTapeMode: PracticeTapeMode = .off
@@ -892,7 +893,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, keyboardInputLayout, keyboardGuideLayoutSource, customKeyboardLayouts, customKeyboardLayoutID, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
       randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, animationFrameRate, showTypingCompanion, typingPowerMode, englishVariant, prefersArabicLazyInput,
       favoriteQuoteIDs, activeResultTags, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
-      minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
+      minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode, thresholdSource,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
       smoothPracticeLineScroll, showAllPracticeLines, smoothCaretMotion, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
       alwaysShowDecimalPlaces, alwaysShowWordsHistory, showWordBurstHeatmap, resultPerformanceVisibility,
@@ -1026,15 +1027,30 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(OppositeShiftMode.self, forKey: .oppositeShiftMode) ?? .off
     codeUnindentOnBackspace =
       try values.decodeIfPresent(Bool.self, forKey: .codeUnindentOnBackspace) ?? false
-    minimumAccuracy = PracticeThresholdPolicy.accuracy(
-      try values.decodeIfPresent(Double.self, forKey: .minimumAccuracy) ?? 0)
-    minimumWpm = PracticeThresholdPolicy.speed(
-      try values.decodeIfPresent(Double.self, forKey: .minimumWpm) ?? 0)
-    minimumWordBurstWpm = PracticeThresholdPolicy.speed(
-      try values.decodeIfPresent(Double.self, forKey: .minimumWordBurstWpm) ?? 0)
-    minimumWordBurstMode =
-      try values.decodeIfPresent(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
-      ?? (minimumWordBurstWpm > 0 ? .fixed : .off)
+    if values.contains(.thresholdSource) {
+      minimumAccuracy = try values.decode(Double.self, forKey: .minimumAccuracy)
+      minimumWpm = try values.decode(Double.self, forKey: .minimumWpm)
+      minimumWordBurstWpm = try values.decode(Double.self, forKey: .minimumWordBurstWpm)
+      minimumWordBurstMode = try values.decode(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
+    } else {
+      minimumAccuracy = PracticeThresholdPolicy.accuracy(
+        try values.decodeIfPresent(Double.self, forKey: .minimumAccuracy) ?? 0)
+      minimumWpm = PracticeThresholdPolicy.speed(
+        try values.decodeIfPresent(Double.self, forKey: .minimumWpm) ?? 0)
+      minimumWordBurstWpm = PracticeThresholdPolicy.speed(
+        try values.decodeIfPresent(Double.self, forKey: .minimumWordBurstWpm) ?? 0)
+      minimumWordBurstMode =
+        try values.decodeIfPresent(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
+        ?? (minimumWordBurstWpm > 0 ? .fixed : .off)
+    }
+    if values.contains(.thresholdSource) {
+      let source = try values.decode(PracticeThresholdSource.self, forKey: .thresholdSource)
+      guard source.matches(self) else {
+        throw DecodingError.dataCorruptedError(forKey: .thresholdSource, in: values,
+          debugDescription: "Threshold source conflicts with active settings")
+      }
+      thresholdSource = source
+    }
     practiceLineWidth =
       try values.decodeIfPresent(PracticeLineWidth.self, forKey: .practiceLineWidth) ?? .standard
     customPracticeLineColumns =

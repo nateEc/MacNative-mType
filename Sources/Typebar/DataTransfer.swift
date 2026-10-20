@@ -478,6 +478,12 @@ struct TypebarArchive: Codable, Equatable {
     }
 
     func encode(to encoder: Encoder) throws {
+        let hasActiveSource = activeTestSelection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false
+        guard settings.thresholdSource == nil,
+              !presets.contains(where: { PracticeThresholdSource.isPresent(in: $0.definition) }),
+              !results.contains(where: { $0.configuration.rules.thresholdSource != nil }),
+              !hasActiveSource
+        else { throw DataTransferError.unsupportedVersion(version) }
         var values = encoder.container(keyedBy: CodingKeys.self)
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(results)
         guard version >= 31 || !resultFilterPresets.contains(where: { $0.filter.accountTagFilter != nil })
@@ -523,6 +529,7 @@ struct TypebarArchive: Codable, Equatable {
         exportedAt = try CompatibleDatePrecision.decode(from: values,
             legacyKey: .exportedAt, precisionKey: .exportedAtReferenceTime)
         let decodedSettings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
+        guard decodedSettings.thresholdSource == nil else { throw DataTransferError.unsupportedVersion(version) }
         let deletedThemes = version >= 9
             ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedCustomThemeIDs) ?? [])
             : []
@@ -536,6 +543,8 @@ struct TypebarArchive: Codable, Equatable {
         settings = Self.sanitizedSettings(
             decodedSettings, deletedThemeIDs: deletedThemes, deletedKeyboardLayoutIDs: deletedKeyboardLayouts)
         let decodedResults = try values.decode([CompletedTestResult].self, forKey: .results)
+        guard !decodedResults.contains(where: { $0.configuration.rules.thresholdSource != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(decodedResults)
         // Inspect the raw payload before tombstones can hide new evidence.
         guard version >= 32 || !decodedResults.contains(where: { $0.quoteSource?.actualLength != nil })
@@ -554,6 +563,8 @@ struct TypebarArchive: Codable, Equatable {
         deletedResultIDs = deletedResults.sorted { $0.uuidString < $1.uuidString }
         results = decodedResults.filter { !deletedResults.contains($0.id) }
         let decodedPresets = try values.decode([NamedPreset].self, forKey: .presets)
+        guard !decodedPresets.contains(where: { PracticeThresholdSource.isPresent(in: $0.definition) })
+        else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 30 || !Self.requiresAccountPaceFormat(settings: decodedSettings, presets: decodedPresets)
         else { throw DataTransferError.unsupportedVersion(version) }
         // Check raw snapshots before tombstones hide an expanded value from
@@ -847,6 +858,17 @@ struct TypebarSettingsDocument: Codable, Equatable {
         case version, settings, configuration, layoutFluidLayouts, testParameterMemory
     }
 
+    func encode(to encoder: Encoder) throws {
+        guard settings.thresholdSource == nil, configuration.rules.thresholdSource == nil
+        else { throw SettingsJSONCommandError.unsupportedVersion(version) }
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(version, forKey: .version)
+        try values.encode(settings, forKey: .settings)
+        try values.encode(configuration, forKey: .configuration)
+        try values.encode(layoutFluidLayouts, forKey: .layoutFluidLayouts)
+        try values.encode(testParameterMemory, forKey: .testParameterMemory)
+    }
+
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decode(Int.self, forKey: .version)
@@ -854,6 +876,8 @@ struct TypebarSettingsDocument: Codable, Equatable {
         guard version >= 5 || settings.paceGuideMode != .accountTagPersonalBest
         else { throw SettingsJSONCommandError.unsupportedVersion(version) }
         configuration = try values.decode(TestConfiguration.self, forKey: .configuration)
+        guard settings.thresholdSource == nil, configuration.rules.thresholdSource == nil
+        else { throw SettingsJSONCommandError.unsupportedVersion(version) }
         layoutFluidLayouts = try values.decode([KeyboardLayout].self, forKey: .layoutFluidLayouts)
         if version >= 2 {
             testParameterMemory = try values.decode(
