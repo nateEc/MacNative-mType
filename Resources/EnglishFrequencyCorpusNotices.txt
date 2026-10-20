@@ -1,10 +1,12 @@
-Typebar English frequency corpus, revision 2
+Typebar English frequency corpus, revision 3
 Adapted selection by Typebar contributors (2026). The selected word data
 is distributed under CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/
 Changes: intersect English frequency tokens with SCOWL size 60, American
 spelling, variant level 1, default category; restrict to ASCII letters;
 prefer existing lowercase/title spellings, preserve I, retain the first
-24,141 frequency-ranked entries. No reference-project words are imported.
+24,141 frequency-ranked entries. Basic English independently selects the
+first 200 entries of at most eight letters, excluding capitals other than I
+and single letters other than a/I. No reference-project words are imported.
 
 SCOWL rel-2026.02.25
 https://github.com/en-wl/wordlist/tree/7e99edab8e32f9f9ea2b15f249ca8d4d67237410

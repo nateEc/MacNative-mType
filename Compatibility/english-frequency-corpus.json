@@ -1,4 +1,12 @@
 {
+  "baseEnglish": {
+    "count": 200,
+    "maximumLength": 7,
+    "minimumLength": 1,
+    "selection": "first 200 ranked entries matching [a-z]{2,8}|a|I",
+    "uniqueCount": 200,
+    "wordsSHA256": "b7d07c46c1aa84730b088a0bf0713688208d9367c803117865dd707624e3f60e"
+  },
   "candidateCount": 77785,
   "choices": {
     "1000": {
@@ -32,9 +40,9 @@
   },
   "count": 24141,
   "dataLicense": "CC-BY-SA-4.0; retain SCOWL and wordfreq source notices",
-  "noticesSHA256": "99114985762941cd4f81188f58a231872479d2b8bc298b07e438f31fcf5e2382",
+  "noticesSHA256": "1734d68ed46f9e984ccd0b1ffe0071ceacfb5fc83cd560243224a18feffc8e2d",
   "preparationDependency": "msgpack==1.1.2 (build-time only)",
-  "revision": "scowl-2026.02.25-wordfreq-3.1.1-v2",
+  "revision": "scowl-2026.02.25-wordfreq-3.1.1-v3",
   "schemaVersion": 1,
   "scowl": {
     "categories": [
@@ -47,7 +55,7 @@
     "variantLevel": 1
   },
   "selection": "ASCII dictionary forms, frequency bands descending, lowercase/title/lexical case preference; preserve I",
-  "swiftSHA256": "798559d2a4e127950fa08dedfc04f2ea61bc748082e7571fb217ee86827e43f4",
+  "swiftSHA256": "01100cca92382d90d08e6e122b9e28da97dd0e465f91ffa0191904d403d3faeb",
   "uniqueCount": 24141,
   "wordfreq": {
     "member": "wordfreq/data/large_en.msgpack.gz",

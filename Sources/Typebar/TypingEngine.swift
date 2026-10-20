@@ -10880,8 +10880,10 @@ enum StarterLexicon {
   static var polish40kWords: [String] { polish40kLexicon.materialized() }
   static var polish200kWords: [String] { polish200kLexicon.materialized() }
 
-  // This small starter corpus is original project content, not imported from Monkeytype.
-  static let words = [
+  // Independently sourced basic English. Other authored practice material must
+  // not silently change when the default corpus is upgraded.
+  static let words = EnglishFrequencyCorpus.basicWords
+  static let authoredStarterWords = [
     "amber", "harbor", "quiet", "copper", "lantern", "paper", "window", "drift",
     "meadow", "signal", "summer", "orchard", "canyon", "violet", "planet", "moss",
     "ripple", "thunder", "willow", "tangent", "pocket", "marble", "voyage", "bright",
@@ -10977,13 +10979,12 @@ enum StarterLexicon {
 
   // Pig Latin is deterministically derived from Typebar's own English starter
   // corpus, never from a reference dictionary or word list.
-  static let pigLatinWords = words.map(PigLatinPolicy.transform)
+  static let pigLatinWords = authoredStarterWords.map(PigLatinPolicy.transform)
 
-  // Authored for Typebar; these spellings are not imported from Monkeytype.
-  static let britishWords = [
-    "colour", "favour", "labour", "neighbour", "centre", "theatre", "catalogue", "dialogue",
-    "organise", "realise", "recognise", "traveller", "cheque", "licence", "programme", "grey",
-  ]
+  // Spelling is a conversion of the same base, not a different specialty pool.
+  static let britishWords = words.map {
+    BritishEnglishPolicy.transformed($0, context: .init(configuration: .words(1, englishVariant: .british)))
+  }
 
   static let simplifiedChineseWords = [
     "晨光", "窗边", "纸张", "远山", "微风", "练习", "专注", "慢慢", "清晰", "湖面",

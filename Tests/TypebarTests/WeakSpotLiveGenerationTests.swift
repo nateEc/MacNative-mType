@@ -117,15 +117,15 @@ final class WeakSpotLiveGenerationTests: XCTestCase {
 
   func testOrdinaryWordContinuationUsesLatestScoresWithOwnedRankInputs() throws {
     let lexicon = TypingLanguage.english.ownedPracticeLexicon()
-    let amber = try XCTUnwrap(lexicon.firstIndex(of: "amber"))
-    let harbor = try XCTUnwrap(lexicon.firstIndex(of: "harbor"))
+    let firstRank = try XCTUnwrap(lexicon.firstIndex(of: "my"))
+    let secondRank = try XCTUnwrap(lexicon.firstIndex(of: "he"))
     var rank = 0
-    let draw = { defer { rank += 1 }; return rank % 2 == 0 ? amber : harbor }
+    let draw = { defer { rank += 1 }; return rank % 2 == 0 ? firstRank : secondRank }
     var cursor = GeneratedWordContinuation(configuration: .words(101).with(modifiers: [.weakSpot]),
       weakSpotScores: scores("m", 1), batchWordCount: 1, previousSource: "quiet")
-    XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: draw).transformed, "amber")
+    XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: draw).transformed, "my")
     XCTAssertEqual(cursor.nextChunk(weakSpotScores: scores("h", 5),
-      nextRandomWordIndex: draw).transformed, "harbor")
+      nextRandomWordIndex: draw).transformed, "he")
   }
 
   func testNoSpaceRejectedSeparatorDoesNotLearnOrChangeTheNextInputGap() {

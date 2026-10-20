@@ -63,11 +63,11 @@ final class EnglishWordPoolTests: XCTestCase {
   }
 
   func testEnglishFactoryUsesTheActualRankAndSingleWordCapitalization() throws {
-    let rank = try XCTUnwrap(TypingLanguage.english.ownedPracticeLexicon().firstIndex(of: "amber"))
+    let rank = try XCTUnwrap(TypingLanguage.english.ownedPracticeLexicon().firstIndex(of: "the"))
     let session = TestSessionFactory.make(configuration: .words(1,
       contentOptions: .init(includePunctuation: true)), nextRandomWordIndex: { rank },
       nextRandomContentUnit: { XCTFail("First word should only capitalize"); return 0 })
-    XCTAssertEqual(session.prompt, "Amber")
+    XCTAssertEqual(session.prompt, "The")
   }
 
   func testCursorRetainsAnEnglishCandidateSectionAndDoesNotChooseASecondSectionWord() {

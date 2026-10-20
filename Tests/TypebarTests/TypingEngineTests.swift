@@ -23439,7 +23439,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(
       prompt?.split(separator: " ").allSatisfy { StarterLexicon.words.contains(String($0)) }
         ?? false)
-    XCTAssertTrue(prompt?.contains("amber") ?? false)
+    XCTAssertTrue(prompt?.split(separator: " ").contains { $0.contains("m") } ?? false)
 
     let ukrainianResult = CompletedTestResult(
       id: UUID(), configuration: .words(1, language: .ukrainian), outcome: .completed,

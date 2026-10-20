@@ -1,5 +1,7 @@
 # 原创性边界与验证
 
+2026-10-20 后续：默认 English 和英式入口接入独立准备的 200 词基础池，仍使用固定 SCOWL／wordfreq 授权数据；仅参考聚合元数据，不用参考词值生成内容。生成物中的原规模数据保持原哈希，Pig Latin／单手挑战继续使用显式自写样本。基础池规则、许可证交付及验证范围见 `OFFICIAL_LANGUAGE_AUDIT.md` 当前节。
+
 2026-10-20 后续：English 25k 也已接入相同固定独立来源，生成容器扩为 24,141 条，并以逐档哈希保护原三档内容；词数据许可与完整署名不变。SCOWL 85 档容量及旧 95 档质量探查均未据此导入新来源，更不作为 450k 已完成证据，见 `OFFICIAL_LANGUAGE_AUDIT.md` 当前节。
 
 2026-10-20 英语 1k／5k／10k 词数据现使用固定 SCOWL／wordfreq 独立授权交集，不再用合成串凑规模；不是 Monkeytype 的源码或词表。生成器、固定输入、哈希、数据许可、打包署名与真实词汇未完成范围见 `OFFICIAL_LANGUAGE_AUDIT.md` 当前节及 `Compatibility/english-frequency-corpus.json`。数据与原生实现许可分开保留，新的署名文件不豁免资源边界检查。

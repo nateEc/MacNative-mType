@@ -25,7 +25,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-English frequency corpus (1k / 5k / 10k / 25k choices)
+English frequency corpus (basic / 1k / 5k / 10k / 25k choices)
 Independently selected from SCOWL rel-2026.02.25 and wordfreq 3.1.1.
 Adapted word selection data: Creative Commons Attribution-ShareAlike 4.0.
 https://creativecommons.org/licenses/by-sa/4.0/

@@ -422,7 +422,7 @@ struct OneHandedChallengeSelection: Codable, Equatable {
 
 enum OneHandedChallengePolicy {
   static func source(for selection: OneHandedChallengeSelection) -> String? {
-    let lexicon = StarterLexicon.words + StarterLexicon.englishFiveLetterWords
+    let lexicon = StarterLexicon.authoredStarterWords + StarterLexicon.englishFiveLetterWords
       + StarterLexicon.englishDoubleLetterWords
       + TypingLanguage.englishLegal.ownedPracticeWords()
       + TypingLanguage.englishMedical.ownedPracticeWords()

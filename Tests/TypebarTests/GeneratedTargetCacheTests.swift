@@ -132,18 +132,18 @@ final class GeneratedTargetCacheTests: XCTestCase {
     var learned = WeakSpotScores()
     learned.record(character: "h", interval: 5, isCorrect: true)
     let lexicon = TypingLanguage.english.ownedPracticeLexicon()
-    let amber = try XCTUnwrap(lexicon.firstIndex(of: "amber"))
-    let harbor = try XCTUnwrap(lexicon.firstIndex(of: "harbor"))
+    let firstRank = try XCTUnwrap(lexicon.firstIndex(of: "my"))
+    let secondRank = try XCTUnwrap(lexicon.firstIndex(of: "he"))
     var rank = 0
-    let draw = { defer { rank += 1 }; return rank % 2 == 0 ? amber : harbor }
+    let draw = { defer { rank += 1 }; return rank % 2 == 0 ? firstRank : secondRank }
     var current = GeneratedWordContinuation(configuration: .words(0).with(modifiers: [.weakSpot]),
       weakSpotScores: baseline, batchWordCount: 1, previousSource: "quiet")
     let opening = current
-    XCTAssertEqual(current.nextChunk(nextRandomWordIndex: draw).transformed, "amber")
+    XCTAssertEqual(current.nextChunk(nextRandomWordIndex: draw).transformed, "my")
     var replay = current.replayingContinuation(after: opening)
     XCTAssertEqual(replay.nextChunk(weakSpotScores: learned,
-      nextRandomWordIndex: { XCTFail("Cached Weakspot word must not draw"); return 0 }).transformed, "amber")
-    XCTAssertEqual(replay.nextChunk(weakSpotScores: learned, nextRandomWordIndex: draw).transformed, "harbor")
+      nextRandomWordIndex: { XCTFail("Cached Weakspot word must not draw"); return 0 }).transformed, "my")
+    XCTAssertEqual(replay.nextChunk(weakSpotScores: learned, nextRandomWordIndex: draw).transformed, "he")
   }
 
   func testOrdinaryFiniteTailCompletesAndRepeatsActualResultWithoutAnExtraCursor() throws {

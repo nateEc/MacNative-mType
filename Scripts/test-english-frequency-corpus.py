@@ -12,6 +12,12 @@ spec.loader.exec_module(prepare)
 
 
 class EnglishFrequencyPreparationTests(unittest.TestCase):
+    def test_basic_words_keep_frequency_order_and_short_word_constraints(self):
+        self.assertEqual(prepare.select_basic_words(
+            ["the", "Mr", "s", "a", "I", "the", "something", "é", "on"], count=4), ["the", "a", "I", "on"])
+        with self.assertRaisesRegex(ValueError, "insufficient short dictionary words"):
+            prepare.select_basic_words(["Mr", "s", "something", "42"])
+
     def test_dictionary_membership_and_frequency_order_not_dictionary_order(self):
         words, bands, count = prepare.select_words(
             ["zebra", "bird", "apple", "apple", "notranked"],
@@ -90,11 +96,13 @@ class EnglishFrequencyPreparationTests(unittest.TestCase):
         old_prefix = b"\n".join(body.splitlines()[:9944]) + b"\n"
         self.assertEqual(prepare.digest(old_prefix),
                          "0a28013ab4dba0ad9bf0394810e217b87e8dd37c95b18eff9a77effcad1c2e96")
+        self.assertEqual(prepare.digest(body),
+                         "d4693d1d418416e5d5594c041f76c2df54dcad0856754610e5feb33909c1b3e4")
 
     def test_every_choice_records_its_own_exact_data_digest(self):
-        words = ["a" + str(n) for n in range(prepare.WORD_COUNT)]
-        # Artifact construction uses synthetic fixtures; source selection and
-        # bundled validation separately reject these numeric test tokens.
+        words = ["word" + chr(97 + n // 17576) + chr(97 + n // 676 % 26)
+                 + chr(97 + n // 26 % 26) + chr(97 + n % 26) for n in range(prepare.WORD_COUNT)]
+        # Synthetic fixture verifies digest mechanics, not dictionary quality.
         outputs = prepare.artifacts(words, list(range(len(words))), len(words), b"packed", "SCOWL", "credits")
         provenance = json.loads(outputs[prepare.PROVENANCE_PATH])
         self.assertEqual(set(provenance["choices"]), {"1000", "5000", "9944", "24141"})
