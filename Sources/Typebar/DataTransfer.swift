@@ -1134,9 +1134,10 @@ enum TypebarArchiveMerge {
         from archive: TypebarArchive,
         existing: [NamedPreset],
         deletedIDs: Set<UUID> = [],
+        reservedIDs: Set<UUID> = [],
         makeID: () -> UUID = UUID.init
     ) -> [NamedPreset] {
-        var occupiedIDs = Set(existing.compactMap(\.id))
+        var occupiedIDs = Set(existing.compactMap(\.id)).union(reservedIDs)
         var knownPresets = existing
         var additions: [NamedPreset] = []
         for remotePreset in archive.presets
@@ -1750,7 +1751,8 @@ enum LocalArchiveImport {
         let newPresets = TypebarArchiveMerge.presetsToInsert(
             from: archive,
             existing: existingPresets,
-            deletedIDs: effectiveDeletedPresetIDs)
+            deletedIDs: effectiveDeletedPresetIDs,
+            reservedIDs: Set(presets.map(\.id)))
         let storedDeletedSavedTextIDs = Set(savedTextTombstoneStore.deletedIDs)
         let archiveDeletedSavedTextIDs = Set(archive.deletedSavedTextIDs)
         let resultingDeletedSavedTextIDs: Set<UUID>
@@ -1800,6 +1802,9 @@ enum LocalArchiveImport {
             deletedIDs: effectiveDeletedFilterPresetIDs
         ).compactMap(ResultFilterPresetRecord.init(portablePreset:))
 
+        let newPresetRecords = try newPresets.map {
+            try TestPresetRecord(id: $0.id ?? UUID(), name: $0.name, definition: $0.definition)
+        }
         let personalBestCheckpoint = try LocalPersonalBestStore.checkpoint(in: modelContext)
         do {
             if let ledger = archive.localPersonalBestLedger {
@@ -1810,10 +1815,7 @@ enum LocalArchiveImport {
         for result in newResults { modelContext.insert(TestResultRecord(result: result)) }
         for update in tagSnapshotUpdates { update.record.accountTagSnapshotData = update.new }
         for result in resultRecordsToDelete { modelContext.delete(result) }
-        for preset in newPresets {
-            modelContext.insert(TestPresetRecord(
-                id: preset.id ?? UUID(), name: preset.name, definition: preset.definition))
-        }
+        for preset in newPresetRecords { modelContext.insert(preset) }
         for preset in presetRecordsToDelete { modelContext.delete(preset) }
         for savedText in newSavedTexts {
             modelContext.insert(SavedCustomTextRecord(

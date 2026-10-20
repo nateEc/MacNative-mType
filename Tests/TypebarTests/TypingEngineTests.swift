@@ -16741,7 +16741,7 @@ final class TypingEngineTests: XCTestCase {
     let preset = SavedTestPreset(
       configuration: result.configuration, quoteID: nil, customText: nil)
     container.mainContext.insert(TestResultRecord(result: result))
-    container.mainContext.insert(TestPresetRecord(name: "One word", definition: preset))
+    container.mainContext.insert(try TestPresetRecord(name: "One word", definition: preset))
     container.mainContext.insert(SavedCustomTextRecord(title: "Saved", text: "amber"))
     container.mainContext.insert(
       try XCTUnwrap(ResultFilterPresetRecord(name: "Recent", filter: .init())))
@@ -24662,7 +24662,7 @@ final class TypingEngineTests: XCTestCase {
       customText: "a tailored practice",
       activeResultTags: ["focus", "morning"]
     )
-    container.mainContext.insert(TestPresetRecord(name: "Focused practice", definition: definition))
+    container.mainContext.insert(try TestPresetRecord(name: "Focused practice", definition: definition))
     try container.mainContext.save()
 
     let record = try XCTUnwrap(
@@ -26554,7 +26554,7 @@ final class TypingEngineTests: XCTestCase {
       for: TestPresetRecord.self, TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let definition = SavedTestPreset(configuration: .words(10), quoteID: nil, customText: nil)
-    let existing = TestPresetRecord(name: "Daily", definition: definition)
+    let existing = try TestPresetRecord(name: "Daily", definition: definition)
     container.mainContext.insert(existing)
     try container.mainContext.save()
     let portable = NamedPreset(id: existing.id, name: existing.name, definition: definition)

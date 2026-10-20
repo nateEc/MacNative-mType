@@ -5366,7 +5366,7 @@ private struct ContentView: View {
       hasBackground: settings.hasLocalBackground || !settings.customBackgroundURL.isEmpty))
     items.append(contentsOf: PresetCommandCatalog.items(
       presets: savedPresets.compactMap { preset in
-        guard let definition = preset.definition else { return nil }
+        guard let definition = preset.applicableDefinition else { return nil }
         return .init(id: preset.id, name: preset.name, definition: definition)
       }))
     items.append(contentsOf: ChallengeCommandCatalog.items(challenges: TypebarChallengeLibrary.all))
@@ -5747,7 +5747,7 @@ private struct ContentView: View {
       return
     }
     if let presetID = PresetCommandCatalog.presetID(for: item.id),
-      let preset = savedPresets.first(where: { $0.id == presetID })?.definition
+      let preset = savedPresets.first(where: { $0.id == presetID })?.applicableDefinition
     {
       apply(preset)
       return
@@ -5963,6 +5963,7 @@ private struct ContentView: View {
     restoringCustomTextState: CustomTextStateDocument? = nil,
     restoringCustomTextRecovery: CustomTextRecoveryState? = nil
   ) -> Bool {
+    guard !PracticeThresholdSource.isPresent(in: preset) else { return false }
     guard acceptsRestartingConfigurationChange() else { return false }
     guard preset.settingGroups?.isEmpty != true else { return false }
     let appliesTest = !preset.isPartial || (preset.settingGroups?.contains(.test) == true)

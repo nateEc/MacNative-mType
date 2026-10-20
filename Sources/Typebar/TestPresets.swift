@@ -94,22 +94,35 @@ final class TestPresetRecord {
     var definitionData: Data
     var createdAt: Date
 
-    init(id: UUID = UUID(), name: String, definition: SavedTestPreset) {
+    init(id: UUID = UUID(), name: String, definition: SavedTestPreset) throws {
+        let encoded = try LocalPresetCodec.encode(definition)
         self.id = id
         self.name = name
-        definitionData = (try? JSONEncoder().encode(definition)) ?? Data()
+        definitionData = encoded
         createdAt = .now
     }
 
     var definition: SavedTestPreset? {
-        try? JSONDecoder().decode(SavedTestPreset.self, from: definitionData)
+        try? LocalPresetCodec.decode(definitionData)
     }
 
-    func update(name: String, definition: SavedTestPreset? = nil) {
-        self.name = name
+    /// Until AppSettings owns the source state, no application path may use it.
+    var applicableDefinition: SavedTestPreset? {
+        guard let definition, !PracticeThresholdSource.isPresent(in: definition) else { return nil }
+        return definition
+    }
+
+    @discardableResult
+    func update(name: String, definition: SavedTestPreset? = nil) -> Bool {
+        guard self.definition != nil else { return false }
+        let encoded: Data?
         if let definition {
-            definitionData = (try? JSONEncoder().encode(definition)) ?? definitionData
-        }
+            guard let data = try? LocalPresetCodec.encode(definition) else { return false }
+            encoded = data
+        } else { encoded = nil }
+        self.name = name
+        if let encoded { definitionData = encoded }
+        return true
     }
 }
 
@@ -125,6 +138,7 @@ struct PresetLibraryView: View {
     @State private var isPartial = false
     @State private var selectedGroups = Set(PresetSettingGroup.allCases)
     @State private var editingPreset: TestPresetRecord?
+    @State private var saveError: String?
 
     var body: some View {
         NavigationStack {
@@ -136,6 +150,7 @@ struct PresetLibraryView: View {
                             .disabled(!canSave)
                     }
                     PresetScopeSelector(isPartial: $isPartial, selectedGroups: $selectedGroups)
+                    if let saveError { Text(saveError).foregroundStyle(.red).font(.caption) }
                 }
                 .padding()
 
@@ -148,7 +163,7 @@ struct PresetLibraryView: View {
                         ForEach(presets) { preset in
                             HStack(spacing: 10) {
                                 Button {
-                                    guard let definition = preset.definition else { return }
+                                    guard let definition = preset.applicableDefinition else { return }
                                     onApply(definition)
                                     dismiss()
                                 } label: {
@@ -161,6 +176,10 @@ struct PresetLibraryView: View {
                                             Text(definition.scopeDescription)
                                                 .font(.caption2)
                                                 .foregroundStyle(.tertiary)
+                                            if PracticeThresholdSource.isPresent(in: definition) {
+                                                Text("完整阈值设置尚未接入，暂不能应用此预设")
+                                                    .font(.caption2).foregroundStyle(.secondary)
+                                            }
                                         }
                                     }
                                     Spacer()
@@ -168,7 +187,7 @@ struct PresetLibraryView: View {
                                         .foregroundStyle(.tint)
                                 }
                                 .buttonStyle(.plain)
-                                .disabled(preset.definition?.settingGroups?.isEmpty == true)
+                                .disabled(preset.applicableDefinition == nil || preset.definition?.settingGroups?.isEmpty == true)
 
                                 Menu {
                                     Button("编辑") { editingPreset = preset }
@@ -206,8 +225,15 @@ struct PresetLibraryView: View {
     private func save() {
         let definition = currentPreset.with(
             settingGroups: isPartial ? selectedGroups : nil)
-        modelContext.insert(TestPresetRecord(
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines), definition: definition))
+        do {
+            let record = try TestPresetRecord(
+                name: name.trimmingCharacters(in: .whitespacesAndNewlines), definition: definition)
+            modelContext.insert(record)
+        } catch {
+            saveError = "预设无法编码，未保存。请检查配置。"
+            return
+        }
+        saveError = nil
         name = ""
         isPartial = false
         selectedGroups = Set(PresetSettingGroup.allCases)
@@ -273,6 +299,7 @@ private struct PresetEditorView: View {
     @State private var updateConfiguration = false
     @State private var isPartial: Bool
     @State private var selectedGroups: Set<PresetSettingGroup>
+    @State private var saveError: String?
 
     init(record: TestPresetRecord, currentPreset: SavedTestPreset) {
         self.record = record
@@ -290,6 +317,7 @@ private struct PresetEditorView: View {
             if updateConfiguration {
                 PresetScopeSelector(isPartial: $isPartial, selectedGroups: $selectedGroups)
             }
+            if let saveError { Text(saveError).foregroundStyle(.red).font(.caption) }
             HStack {
                 Spacer()
                 Button("取消") { dismiss() }
@@ -311,8 +339,11 @@ private struct PresetEditorView: View {
         let definition: SavedTestPreset? = updateConfiguration
             ? currentPreset.with(settingGroups: isPartial ? selectedGroups : nil)
             : nil
-        record.update(
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines), definition: definition)
+        guard record.update(
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines), definition: definition) else {
+            saveError = "预设无法更新，原名称和数据已保留。"
+            return
+        }
         dismiss()
     }
 }

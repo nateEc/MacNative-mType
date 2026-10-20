@@ -208,7 +208,7 @@ final class CustomPaceSpeedMigrationTests: XCTestCase {
   @MainActor
   func testCurrentPresetEntityAndArchiveRetainPrecisionAndDoNotRescoreOldResult() throws {
     let settings = try snapshot(60.25)
-    let preset = TestPresetRecord(name: "owned",
+    let preset = try TestPresetRecord(name: "owned",
       definition: .init(configuration: configuration, settingsSnapshot: settings))
     XCTAssertEqual(preset.definition?.settingsSnapshot?.paceGuideCustomWpm, 60.25)
     let old = CompletedTestResult(id: UUID(), configuration: configuration, outcome: .completed,
