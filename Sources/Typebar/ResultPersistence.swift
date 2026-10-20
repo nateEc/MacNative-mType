@@ -512,7 +512,7 @@ final class TestResultRecord {
 
   init(result: CompletedTestResult) {
     id = result.id
-    configurationData = (try? JSONEncoder().encode(result.configuration)) ?? Data()
+    configurationData = (try? LocalResultConfigurationCodec.encode(result.configuration)) ?? Data()
     outcome = result.outcome.rawValue
     startedAt = result.startedAt
     finishedAt = result.finishedAt
@@ -549,7 +549,7 @@ final class TestResultRecord {
   }
 
   var configuration: TestConfiguration? {
-    try? JSONDecoder().decode(TestConfiguration.self, from: configurationData)
+    try? LocalResultConfigurationCodec.decode(configurationData)
   }
 
   var tags: [String] {

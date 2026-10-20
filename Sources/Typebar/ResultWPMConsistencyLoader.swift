@@ -18,7 +18,7 @@ struct ResultWPMConsistencyInput: Sendable {
     sourceScoringBasis: ResultScoringUnitBasis?) throws {
     self.prompt = prompt; self.events = events; self.duration = duration
     self.targetWordDirectory = targetWordDirectory; self.sourceScoringBasis = sourceScoringBasis
-    configurationData = try configuration.map { try JSONEncoder().encode($0) }
+    configurationData = try configuration.map { try LocalResultConfigurationCodec.encode($0) }
     recordedEventsData = nil; recordedDirectoryData = nil
   }
 
@@ -35,7 +35,7 @@ struct ResultWPMConsistencyInput: Sendable {
     guard !Task.isCancelled else { return nil }
     let configuration: TestConfiguration?
     if let configurationData {
-      guard let decoded = try? JSONDecoder().decode(TestConfiguration.self, from: configurationData) else { return nil }
+      guard let decoded = try? LocalResultConfigurationCodec.decode(configurationData) else { return nil }
       configuration = decoded
     } else { configuration = nil }
     var decodedEvents = events, decodedDirectory = targetWordDirectory

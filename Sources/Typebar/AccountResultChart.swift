@@ -58,11 +58,11 @@ struct AccountResultChartInput: Sendable {
   init(_ result: CompletedTestResult) throws {
     prompt = result.prompt; events = result.replayEvents; duration = result.chartDuration
     directory = result.targetWordDirectory; basis = result.characterStats.sourceUnitBasis
-    configuration = try JSONEncoder().encode(result.configuration)
+    configuration = try LocalResultConfigurationCodec.encode(result.configuration)
   }
   func calculate() -> AccountResultChartData? {
     guard !Task.isCancelled, duration.isFinite, duration > 0, duration <= 122,
-      let config = try? JSONDecoder().decode(TestConfiguration.self, from: configuration) else { return nil }
+      let config = try? LocalResultConfigurationCodec.decode(configuration) else { return nil }
     let points = ResultPerformanceTrace.points(prompt: prompt, events: events, duration: duration,
       configuration: config, targetWordDirectory: directory, sourceScoringBasis: basis)
     let data = AccountResultChartData(samples: points.map {

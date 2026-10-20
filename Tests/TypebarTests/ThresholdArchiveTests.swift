@@ -94,12 +94,13 @@ final class ThresholdArchiveTests: XCTestCase {
     let container = try ModelContainer(for: TestPresetRecord.self, TestResultRecord.self,
       LocalPersonalBestLedgerRecord.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let archive = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertThrowsError(try LocalArchiveImport.apply(archive, settings: settings, results: [], presets: [], savedTexts: [],
-      modelContext: container.mainContext)) {
-        XCTAssertEqual($0 as? LocalArchiveImportError, .thresholdSourceNotReady)
-    }
+    let summary = try LocalArchiveImport.apply(archive, settings: settings, results: [], presets: [], savedTexts: [],
+      modelContext: container.mainContext)
+    XCTAssertEqual(summary.insertedResults, 2)
     XCTAssertEqual(settings.snapshot, before)
-    XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).isEmpty)
+    let saved = try container.mainContext.fetch(FetchDescriptor<TestResultRecord>())
+    XCTAssertEqual(saved.first { $0.id == legacy.id }?.portableResult, legacy)
+    XCTAssertEqual(saved.first { $0.id == withSource.id }?.portableResult, withSource)
   }
 
   @MainActor

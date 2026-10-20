@@ -279,6 +279,7 @@ enum LocalPersonalBestStore {
   static func save(_ result: CompletedTestResult, in context: ModelContext,
     acceptedAt: Date = .now, save: (() throws -> Void)? = nil) throws -> TestResultRecord {
     try result.accountTagSnapshot?.validate()
+    _ = try LocalResultConfigurationCodec.encode(result.configuration)
     let checkpoint = try checkpoint(in: context)
     let id = result.id
     if let old = try context.fetch(FetchDescriptor<TestResultRecord>(predicate: #Predicate { $0.id == id })).first {
@@ -340,7 +341,7 @@ enum LocalPersonalBestStore {
     ledger.historyComplete = records.isEmpty && !legacyStorePresent
     for record in records {
       // TestConfiguration has legacy defaults. Do not infer an absent PB group.
-      guard let object = try? JSONSerialization.jsonObject(with: record.configurationData) as? [String: Any],
+      guard let object = try? LocalResultConfigurationCodec.explicitFields(in: record.configurationData),
         ["mode", "difficulty", "language", "modifiers", "contentOptions"].allSatisfy({ object[$0] != nil }),
         let options = object["contentOptions"] as? [String: Any],
         options["includePunctuation"] is Bool, options["includeNumbers"] is Bool,

@@ -1673,7 +1673,7 @@ enum LocalArchiveImportError: Error, Equatable, LocalizedError {
         case .noQuitConfigurationLocked:
             return "锁定重开测试进行中，暂时不能导入会改写设置的数据。"
         case .thresholdSourceNotReady:
-            return "此归档包含尚未接入的完整阈值设置或成绩，暂不能恢复；原数据未修改。"
+            return "此归档包含尚未接入的完整阈值设置或活动选择，暂不能恢复；原数据未修改。"
         }
     }
 }
@@ -1696,7 +1696,6 @@ enum LocalArchiveImport {
         modelContext: ModelContext
     ) throws -> ArchiveImportSummary {
         guard archive.settings.thresholdSource == nil,
-              !archive.results.contains(where: { $0.configuration.rules.thresholdSource != nil }),
               !(archive.activeTestSelection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false)
         else { throw LocalArchiveImportError.thresholdSourceNotReady }
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(archive.results)
@@ -1842,6 +1841,7 @@ enum LocalArchiveImport {
         let newPresetRecords = try newPresets.map {
             try TestPresetRecord(id: $0.id ?? UUID(), name: $0.name, definition: $0.definition)
         }
+        for result in newResults { _ = try LocalResultConfigurationCodec.encode(result.configuration) }
         let personalBestCheckpoint = try LocalPersonalBestStore.checkpoint(in: modelContext)
         do {
             if let ledger = archive.localPersonalBestLedger {
