@@ -6362,7 +6362,7 @@ struct TestSessionFactory {
   ) -> TypingSession {
     if configuration.mode == .custom, customTextRecoveryBlocked {
       return .init(configuration: configuration, prompt: "",
-        initializationFailure: "无法读取已保存的自定义文本，已停止出题。请使用支持该版本的应用，或明确编辑、选择新的文本后重新开始；原记录未改动。",
+        initializationFailure: "自定义文本尚未安全恢复，已停止出题。请使用支持该版本的应用，或明确编辑、选择新的文本后重新开始；原记录未改动。",
         weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState)
     }
     let polyglotPreparation = PolyglotGenerationPreparation(configuration)

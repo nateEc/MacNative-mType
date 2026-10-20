@@ -4447,6 +4447,9 @@ private struct ContentView: View {
 
   private func reset(restarting: Bool = false) {
     guard acceptsRestartingConfigurationChange() else { return }
+    if let source = customTextRecovery.takePendingSource(whenAllowed: true) {
+      installCustomTextState(source)
+    }
     visualFocus.retire()
     if let activeVerifiedScript,
       activeChallenge?.requirements.referenceScriptSpecification
@@ -4528,7 +4531,7 @@ private struct ContentView: View {
       configuration: configuration,
       customText: customText,
       preparedCustomSections: preparedCustomSections,
-      customTextRecoveryBlocked: customTextRecovery.requiresExplicitSource,
+      customTextRecoveryBlocked: customTextRecovery.blocksCustomGeneration,
       finiteTextSource: activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk },
       verifiedScript: activeChallenge?.requirements.referenceScriptSpecification
         == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
@@ -6064,20 +6067,14 @@ private struct ContentView: View {
 
   private func restoreActiveTestSelection(_ document: ActiveTestSelectionDocument,
     customState: CustomTextStateDocument? = nil, recovery: CustomTextRecoveryState = .init()) {
-    let memory = document.testParameterMemory
-    duration = memory.duration
-    wordLimit = memory.wordLimit
-    customTextDuration = memory.customTextDuration
-    customTextWordLimit = memory.customTextWordLimit
-    customTextSectionLimit = memory.customTextSectionLimit
-    quoteSource = document.quoteSource
     let preset = document.preset
-    apply(
+    guard apply(
       preset,
       overwritesParameterMemory: false,
       appliesGlobalSettings: false,
       polyglotReturnLanguage: document.polyglotReturnLanguage,
-      restoringCustomTextState: customState, restoringCustomTextRecovery: recovery)
+      restoringSelection: document,
+      restoringCustomTextState: customState, restoringCustomTextRecovery: recovery) else { return }
     if activeChallengeID == "one-handed-bandit" {
       oneHandedChallengeSelection = document.oneHandedChallengeSelection
         ?? oneHandedChallengeSelection
@@ -6090,16 +6087,14 @@ private struct ContentView: View {
 
   private func restoreDefaultTestSelection(customState: CustomTextStateDocument? = nil,
     recovery: CustomTextRecoveryState = .init()) {
-    let memory = TypebarTestParameterMemory.defaults
-    duration = memory.duration
-    wordLimit = memory.wordLimit
-    customTextDuration = memory.customTextDuration
-    customTextWordLimit = memory.customTextWordLimit
-    customTextSectionLimit = memory.customTextSectionLimit
+    let preset = SavedTestPreset(configuration: TypebarInitialTestSelection.configuration)
+    let document = ActiveTestSelectionDocument(preset: preset, quoteSource: quoteSource,
+      testParameterMemory: .defaults)
     apply(
-      .init(configuration: TypebarInitialTestSelection.configuration),
+      preset,
       overwritesParameterMemory: false,
-      appliesGlobalSettings: false, restoringCustomTextState: customState, restoringCustomTextRecovery: recovery)
+      appliesGlobalSettings: false, restoringSelection: document,
+      restoringCustomTextState: customState, restoringCustomTextRecovery: recovery)
   }
 
   private func restorePersistedTestSelection(explicitSelectionImport: Bool = false) {
@@ -6497,7 +6492,8 @@ private struct ContentView: View {
       currentSelection: { activeTestSelectionDocument(preset: $0) },
       currentCustomTextState: {
         guard mode == .custom, !customTextRecovery.requiresExplicitSource else { return nil }
-        return activeLongSavedText == nil && activeVerifiedScript == nil ? customTextStateDocument : settings.customTextState
+        return customTextRecovery.pendingSource
+          ?? (activeLongSavedText == nil && activeVerifiedScript == nil ? customTextStateDocument : settings.customTextState)
       },
       selectCustomMode: { selectMode(.custom) }) else { return }
     wordPractice = transition

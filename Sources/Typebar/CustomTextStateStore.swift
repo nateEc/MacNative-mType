@@ -4,6 +4,17 @@ enum CustomTextSource: Codable, Equatable {
   case editor(String)
   case prepared([String])
 
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    switch (lhs, rhs) {
+    case (.editor(let lhs), .editor(let rhs)):
+      return InputTextIdentity.matches(lhs, rhs)
+    case (.prepared(let lhs), .prepared(let rhs)):
+      return lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { InputTextIdentity.matches($0.0, $0.1) }
+    default:
+      return false
+    }
+  }
+
   var text: String {
     switch self {
     case .editor(let text): text
@@ -67,9 +78,19 @@ enum CustomTextRestorePolicy {
     var recovery = CustomTextRecoveryState(read: read)
     if explicitSelectionImport, acceptsReplacement(activePreset) {
       recovery.acceptExplicitSource()
+      if let source = legacySource(activePreset) { recovery.stageKnownSource(source) }
       return (nil, recovery)
     }
+    if case .missing = read, let source = legacySource(activePreset) {
+      recovery.stageKnownSource(source)
+    }
     return (recovery.requiresExplicitSource ? nil : read.document, recovery)
+  }
+
+  private static func legacySource(_ preset: SavedTestPreset?) -> CustomTextStateDocument? {
+    guard acceptsReplacement(preset), let preset, let text = preset.customText else { return nil }
+    let source = CustomTextStateDocument(source: .editor(text), configuration: preset.configuration)
+    return source.isValid ? source : nil
   }
 
   static func acceptsReplacement(_ preset: SavedTestPreset?) -> Bool {
@@ -105,19 +126,40 @@ enum CustomTextStateRead: Equatable {
 
 struct CustomTextRecoveryState: Equatable {
   private(set) var requiresExplicitSource: Bool
+  private(set) var pendingSource: CustomTextStateDocument?
 
   init(read: CustomTextStateRead = .missing) {
+    pendingSource = nil
     switch read {
     case .missing: requiresExplicitSource = false
-    case .available(let document): requiresExplicitSource = !document.isValid
+    case .available(let document):
+      let valid = document.isValid
+      requiresExplicitSource = !valid
+      pendingSource = valid ? document : nil
     case .unavailable: requiresExplicitSource = true
     }
   }
 
-  mutating func acceptExplicitSource() { requiresExplicitSource = false }
+  var blocksCustomGeneration: Bool { requiresExplicitSource || pendingSource != nil }
+
+  mutating func stageKnownSource(_ source: CustomTextStateDocument) {
+    guard !requiresExplicitSource, source.isValid else { return }
+    pendingSource = source
+  }
+
+  mutating func takePendingSource(whenAllowed: Bool) -> CustomTextStateDocument? {
+    guard whenAllowed else { return nil }
+    defer { pendingSource = nil }
+    return pendingSource
+  }
+
+  mutating func acceptExplicitSource() {
+    requiresExplicitSource = false
+    pendingSource = nil
+  }
 
   func permitsAutomaticPersistence(mode: TestMode) -> Bool {
-    mode != .custom || !requiresExplicitSource
+    mode != .custom || !blocksCustomGeneration
   }
 }
 
