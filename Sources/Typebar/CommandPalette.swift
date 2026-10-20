@@ -545,6 +545,19 @@ enum PracticeThresholdCommandTarget: Equatable {
 
     @MainActor
     func applyImmediate(to settings: AppSettings, onConfigurationSave: () -> Void = {}) -> Bool {
+        guard settings.allowsRestartingConfigurationChange else { return false }
+        if settings.hasThresholdProfile {
+            let change: PracticeThresholdConfiguration.Change
+            switch self {
+            case .minimumWpmOff: change = .minimumWpm(mode: .off, customValue: nil)
+            case .minimumAccuracyOff: change = .minimumAccuracy(mode: .off, customValue: nil)
+            case .minimumWordBurstOff: change = .minimumWordBurst(mode: .off, customValue: nil)
+            case .minimumWpmCustom, .minimumAccuracyCustom, .minimumWordBurst: return false
+            }
+            guard settings.updateThresholdConfiguration(change) else { return false }
+            onConfigurationSave()
+            return true
+        }
         switch self {
         case .minimumWpmOff:
             settings.minimumWpm = 0

@@ -7,6 +7,17 @@ enum PracticeThresholdInputKind: Equatable {
 }
 
 enum PracticeThresholdInput {
+  static func editorValue(from text: String, kind: PracticeThresholdInputKind, unit: TypingSpeedUnit,
+    initialCanonicalValue: Double, preserveStoredValue: Bool) -> Double? {
+    let displayed = kind == .accuracy ? initialCanonicalValue : unit.converted(wpm: initialCanonicalValue)
+    if preserveStoredValue, initialCanonicalValue.isFinite, initialCanonicalValue >= 0,
+      displayed.isFinite, kind != .accuracy || initialCanonicalValue <= 100,
+      text.trimmingCharacters(in: .whitespacesAndNewlines) == String(displayed) {
+      return initialCanonicalValue
+    }
+    return value(from: text, kind: kind, unit: unit)
+  }
+
   static func value(
     from text: String, kind: PracticeThresholdInputKind, unit: TypingSpeedUnit
   ) -> Double? {
@@ -35,8 +46,19 @@ enum PracticeThresholdApplication {
     _ value: Double, kind: PracticeThresholdEditorKind, to settings: AppSettings,
     onConfigurationSave: () -> Void = {}
   ) -> Bool {
-    guard value.isFinite, value >= 0 else { return false }
+    guard settings.allowsRestartingConfigurationChange, value.isFinite, value >= 0 else { return false }
     if case .minimumAccuracy = kind, value > 100 { return false }
+    if settings.hasThresholdProfile {
+      let change: PracticeThresholdConfiguration.Change
+      switch kind {
+      case .minimumWpm: change = .minimumWpm(mode: .custom, customValue: value)
+      case .minimumAccuracy: change = .minimumAccuracy(mode: .custom, customValue: value)
+      case .minimumWordBurst(let mode): change = .minimumWordBurst(mode: mode, customValue: value)
+      }
+      guard settings.updateThresholdConfiguration(change) else { return false }
+      onConfigurationSave()
+      return true
+    }
     switch kind {
     case .minimumWpm:
       settings.minimumWpm = value
@@ -55,6 +77,22 @@ enum PracticeThresholdEditorKind: Equatable, Identifiable {
   case minimumWpm
   case minimumAccuracy
   case minimumWordBurst(MinimumWordBurstMode)
+
+  @MainActor
+  func initialCanonicalValue(in settings: AppSettings) -> Double {
+    if let source = settings.thresholdConfiguration {
+      switch self {
+      case .minimumWpm: return source.minimumWpmCustomValue
+      case .minimumAccuracy: return source.minimumAccuracyCustomValue
+      case .minimumWordBurst: return source.minimumWordBurstCustomValue
+      }
+    }
+    switch self {
+    case .minimumWpm: return settings.minimumWpm
+    case .minimumAccuracy: return settings.minimumAccuracy
+    case .minimumWordBurst: return settings.minimumWordBurstWpm
+    }
+  }
 
   var id: String {
     switch self {
@@ -97,24 +135,31 @@ struct PracticeThresholdEditor: View {
   @Environment(\.dismiss) private var dismiss
   let kind: PracticeThresholdEditorKind
   let unit: TypingSpeedUnit
-  let onApply: (Double) -> Void
+  let preservesZeroMode: Bool
+  let initialCanonicalValue: Double
+  let onApply: (Double) -> Bool
   @State private var text: String
+  @State private var applicationFailed = false
   @FocusState private var inputFocused: Bool
 
   init(
     kind: PracticeThresholdEditorKind, unit: TypingSpeedUnit, initialCanonicalValue: Double,
-    onApply: @escaping (Double) -> Void
+    preservesZeroMode: Bool = false,
+    onApply: @escaping (Double) -> Bool
   ) {
     self.kind = kind
     self.unit = unit
     self.onApply = onApply
+    self.preservesZeroMode = preservesZeroMode
+    self.initialCanonicalValue = initialCanonicalValue
     let displayed = kind.inputKind == .accuracy
       ? initialCanonicalValue : unit.converted(wpm: initialCanonicalValue)
     _text = State(initialValue: String(displayed))
   }
 
   private var value: Double? {
-    PracticeThresholdInput.value(from: text, kind: kind.inputKind, unit: unit)
+    PracticeThresholdInput.editorValue(from: text, kind: kind.inputKind, unit: unit,
+      initialCanonicalValue: initialCanonicalValue, preserveStoredValue: preservesZeroMode)
   }
 
   private var inputUnit: String {
@@ -129,7 +174,7 @@ struct PracticeThresholdEditor: View {
             .focused($inputFocused)
           if let value {
             let display = value.formatted(.number.precision(.fractionLength(0...4)))
-            LabeledContent("将应用", value: value == 0 ? "关闭" : "\(display) \(kind.inputKind == .accuracy ? "%" : "WPM")")
+            LabeledContent("将应用", value: value == 0 && !preservesZeroMode ? "关闭" : "\(display) \(kind.inputKind == .accuracy ? "%" : "WPM")")
               .foregroundStyle(.secondary)
           } else {
             Text(kind.inputKind == .wordBurst ? "请输入非负整数。" : "请输入有效的非负数字。")
@@ -137,9 +182,15 @@ struct PracticeThresholdEditor: View {
           }
         }
         Section {
-          Text("\(kind.explanation) 输入 0 会关闭该规则；应用后会退出挑战并重新开始练习。")
+          Text(kind.explanation + (preservesZeroMode
+            ? " 输入 0 会保留所选自定义模式；关闭请使用关闭命令。应用后会退出挑战并重新开始练习。"
+            : " 输入 0 会关闭该规则；应用后会退出挑战并重新开始练习。"))
             .font(.caption)
             .foregroundStyle(.secondary)
+          if applicationFailed {
+            Text("未能应用，原设置已保留。请检查锁定状态或配置存储。")
+              .font(.caption).foregroundStyle(.red)
+          }
         }
       }
       .formStyle(.grouped)
@@ -152,7 +203,7 @@ struct PracticeThresholdEditor: View {
         ToolbarItem(placement: .confirmationAction) {
           Button("应用") {
             guard let value else { return }
-            onApply(value)
+            guard onApply(value) else { applicationFailed = true; return }
             dismiss()
           }
           .keyboardShortcut(.defaultAction)

@@ -2073,7 +2073,8 @@ private struct ContentView: View {
     .sheet(item: $practiceThresholdEditorKind) { kind in
       PracticeThresholdEditor(
         kind: kind, unit: settings.typingSpeedUnit,
-        initialCanonicalValue: practiceThresholdValue(for: kind)
+        initialCanonicalValue: practiceThresholdValue(for: kind),
+        preservesZeroMode: settings.thresholdConfiguration != nil
       ) { value in
         applyPracticeThreshold(value, kind: kind)
       }
@@ -5532,13 +5533,17 @@ private struct ContentView: View {
     }
     if let target = PracticeThresholdCommandCatalog.target(for: item.id) {
       guard acceptsRestartingConfigurationChange() else { return }
+      if let editor = target.editorKind {
+        practiceThresholdEditorKind = editor
+        return
+      }
       if target.applyImmediate(to: settings, onConfigurationSave: {
         activeChallengeID = nil
         persistExplicitTestConfiguration()
       }) {
         reset()
       } else {
-        practiceThresholdEditorKind = target.editorKind
+        account.localNotices.post("阈值未应用，原设置已保留。请检查配置存储。")
       }
       return
     }
@@ -5797,20 +5802,17 @@ private struct ContentView: View {
   }
 
   private func practiceThresholdValue(for kind: PracticeThresholdEditorKind) -> Double {
-    switch kind {
-    case .minimumWpm: settings.minimumWpm
-    case .minimumAccuracy: settings.minimumAccuracy
-    case .minimumWordBurst: settings.minimumWordBurstWpm
-    }
+    kind.initialCanonicalValue(in: settings)
   }
 
-  private func applyPracticeThreshold(_ value: Double, kind: PracticeThresholdEditorKind) {
-    guard acceptsRestartingConfigurationChange() else { return }
+  private func applyPracticeThreshold(_ value: Double, kind: PracticeThresholdEditorKind) -> Bool {
+    guard acceptsRestartingConfigurationChange() else { return false }
     guard PracticeThresholdApplication.apply(value, kind: kind, to: settings, onConfigurationSave: {
       activeChallengeID = nil
       persistExplicitTestConfiguration()
-    }) else { return }
+    }) else { return false }
     reset()
+    return true
   }
 
   private func importCustomBackgroundFromCommand(_ url: URL) {
