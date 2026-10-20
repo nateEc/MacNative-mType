@@ -36,7 +36,8 @@ enum PresetApplicationPolicy {
       rules.codeUnindentOnBackspace = sourceConfiguration.rules.codeUnindentOnBackspace
     }
 
-    let configuration = TestConfiguration(
+    let testMetadata = usesTest ? sourceConfiguration : currentConfiguration
+    var configuration = TestConfiguration(
       mode: usesTest ? sourceConfiguration.mode : currentConfiguration.mode,
       duration: usesTest ? sourceConfiguration.duration : currentConfiguration.duration,
       wordLimit: usesTest ? sourceConfiguration.wordLimit : currentConfiguration.wordLimit,
@@ -55,11 +56,18 @@ enum PresetApplicationPolicy {
         ? sourceConfiguration.customTextSectionLimit : currentConfiguration.customTextSectionLimit,
       customTextOrdering: usesTest
         ? sourceConfiguration.customTextOrdering : currentConfiguration.customTextOrdering,
+      customTextPipeDelimiter: testMetadata.customTextPipeDelimiter,
       mixedLanguageComponents: usesTest
         ? sourceConfiguration.mixedLanguageComponents : currentConfiguration.mixedLanguageComponents,
+      polyglotBaseLanguage: testMetadata.polyglotBaseLanguage,
       modifiers: usesBehavior ? sourceConfiguration.modifiers : currentConfiguration.modifiers,
       contentOptions: usesTest ? sourceConfiguration.contentOptions : currentConfiguration.contentOptions,
       challengeID: usesTest ? sourceConfiguration.challengeID : currentConfiguration.challengeID)
+    configuration.polyglotUsesPrimaryDirection = testMetadata.polyglotUsesPrimaryDirection
+    configuration.polyglotUsesPrimaryCodeInput = testMetadata.polyglotUsesPrimaryCodeInput
+    configuration.polyglotUsesPrimaryInputNormalization = testMetadata.polyglotUsesPrimaryInputNormalization
+    configuration.dockerfileUsesLiteralIndentation = testMetadata.dockerfileUsesLiteralIndentation
+    configuration.zenUsesSourceInputAdmission = testMetadata.zenUsesSourceInputAdmission
 
     var applied = current
     applied.configuration = configuration

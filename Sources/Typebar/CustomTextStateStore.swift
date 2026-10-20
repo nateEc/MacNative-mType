@@ -101,7 +101,11 @@ enum CustomTextRestorePolicy {
 
   static func returningSource(captured: CustomTextStateDocument?,
     latest: () -> CustomTextStateDocument) -> CustomTextStateDocument? {
-    captured ?? latest()
+    guard let captured else { return latest() }
+    var configuration = captured.configuration
+    // Reference return restores text/limit/delimiter but not the sort mode.
+    configuration.customTextOrdering = latest().ordering
+    return .init(version: captured.version, source: captured.source, configuration: configuration)
   }
 
   static func source(stored: CustomTextStateDocument?, activePreset: SavedTestPreset?,

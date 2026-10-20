@@ -6513,13 +6513,17 @@ private struct ContentView: View {
   /// result intentionally keeps the same practice prompt.
   private func restoreWordPracticeIfNeeded() -> Bool {
     guard let transition = wordPractice else { return false }
+    let current = presetDefinition
+    let currentSelection = activeTestSelectionDocument(preset: current)
+    let returningPreset = transition.returningPreset(current: current,
+      parameterMemory: currentSelection.testParameterMemory, quoteID: selectedQuoteID)
     let returningCustomState = CustomTextRestorePolicy.returningSource(captured: transition.returnCustomTextState,
       latest: { customTextStateDocument })
     // apply clears temporary navigation only after its admission checks.
     // A rejection consumes this command without falling through to restart.
-    apply(transition.returnPreset, overwritesParameterMemory: false,
-      polyglotReturnLanguage: transition.returnSelection.polyglotReturnLanguage,
-      restoringSelection: transition.returnSelection,
+    apply(returningPreset, overwritesParameterMemory: false, appliesGlobalSettings: false,
+      polyglotReturnLanguage: currentSelection.polyglotReturnLanguage,
+      restoringSelection: currentSelection,
       restoringCustomTextState: returningCustomState)
     return true
   }

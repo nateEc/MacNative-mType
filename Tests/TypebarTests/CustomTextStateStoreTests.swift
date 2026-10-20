@@ -158,7 +158,7 @@ final class CustomTextStateStoreTests: XCTestCase {
     let latest = CustomTextStateDocument(source: .prepared(["a|b", "e\u{301}"]), configuration: config())
     XCTAssertEqual(CustomTextRestorePolicy.returningSource(captured: nil, latest: { latest }), latest)
     XCTAssertEqual(CustomTextRestorePolicy.returningSource(captured: captured,
-      latest: { XCTFail("Captured custom content must be restored"); return latest }), captured)
+      latest: { latest }), captured)
   }
 
   func testIndependentProcessesReadPreparedArraysAndKeepOrdinaryMode() throws {
