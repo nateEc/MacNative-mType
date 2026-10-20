@@ -4663,6 +4663,9 @@ struct TypingSession {
   /// attempt. Unlike `forcedErrorIndices`, these remain after a backspace so
   /// local error practice can include words the user later corrected.
   private var attemptedErrorCounts = [Int: Int]()
+  /// Ordinary review weights follow the active source field, not a display
+  /// glyph index which can span a fused commit or a provider-internal LF.
+  private var ordinaryFieldAttemptErrors = [Int: Int]()
   private var noSpaceUnitAttemptErrors = [Int: Int]()
   private var highestAttemptedNoSpaceField: Int?
   private var committedWordBursts: [Int] = []
@@ -6966,7 +6969,7 @@ struct TypingSession {
       recordInputAttempt(inputCharacter, correctUnits: units.correct, lastUnitCorrect: units.lastCorrect,
         judgments: units.judgments)
       recordWeakSpotInput(inputCharacter, isCorrect: units.lastCorrect, at: date)
-      if !units.lastCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
+      if !units.lastCorrect { recordAttemptedInputError(at: currentTargetIndex) }
       if rejectsOppositeShiftInput {
         recordReplayEvent(kind: .insert, text: String(inputCharacter), forceError: true,
           inputStopped: true, at: date)
@@ -7032,7 +7035,7 @@ struct TypingSession {
     recordInputAttempt(inputCharacter, correctUnits: accuracyUnits.correct,
       lastUnitCorrect: accuracyUnits.lastCorrect, judgments: accuracyUnits.judgments)
     recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
-    if !isCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
+    if !isCorrect { recordAttemptedInputError(at: currentTargetIndex) }
     // Opposite Shift records a failed physical attempt, but the reference
     // immediately removes its text and does not run stop/delete-on-error
     // recovery. Master difficulty still fails on that rejected mistake.
@@ -7174,7 +7177,7 @@ struct TypingSession {
     beginIfNeeded(at: date)
     recordInputAttempt(character, correctUnits: 0)
     recordWeakSpotInput(character, isCorrect: false, at: date)
-    attemptedErrorCounts[boundary, default: 0] += 1
+    recordAttemptedInputError(at: boundary)
     if evaluatesTerminalRules, configuration.difficulty == .master { fail(at: date) }
     if rejectsOppositeShiftInput || configuration.rules.stopOnErrorMode == .letter {
       if !rejectsOppositeShiftInput && !configuration.rules.blindMode {
@@ -7237,6 +7240,15 @@ struct TypingSession {
       && InputTextIdentity.matches(promptCharacters[targetIndex], character)
       && !(start..<end).contains { forcedErrorIndices.contains($0) }
     return correct ? nil : start
+  }
+
+  private mutating func recordAttemptedInputError(at targetIndex: Int) {
+    // Keep the existing diagnostic map for input rules and presentation.
+    attemptedErrorCounts[targetIndex, default: 0] += 1
+    if hasOrdinarySourceFields {
+      let field = acceptedUnits?.fieldIndex ?? replayCommittedSeparatorCount
+      ordinaryFieldAttemptErrors[field, default: 0] += 1
+    }
   }
 
   private mutating func recordInputAttempt(
@@ -8428,12 +8440,15 @@ struct TypingSession {
     hasError(inWord: word, indices: forcedErrorIndices)
   }
 
-  /// Word targets for result history and local follow-up practice. A flattened
-  /// prompt is eligible only when its saved word slices still exactly match
-  /// the current boundary list; otherwise there is no trustworthy word-level
-  /// representation to expose.
+  /// Review targets omit only each actual field's final commit. Ordinary
+  /// catalogs preserve provider boundaries and fused display glyphs; known
+  /// no-space words and unsupported legacy paths keep their own contracts.
   private var resultTargetWords: [String] {
     if unitTargets.noSpace || hasNoSpaceWordSegmentation { return noSpaceTargetWords }
+    if hasOrdinarySourceFields {
+      let targets = sourceStatsTargets
+      return targets.fields.indices.map { String(decoding: targets.field($0, withoutCommit: true), as: UTF16.self) }
+    }
     guard usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return [] }
@@ -8508,12 +8523,16 @@ struct TypingSession {
     }
   }
 
-  /// Assign each target position to its result word once, then aggregate the
-  /// sparse historical errors without rescanning the entire prompt per word.
+  /// Source-field errors survive correction and unit-mode activation. Only
+  /// legacy paths map diagnostic glyph positions back to target words.
   private func attemptedInputErrorCountsByWord(targetWordCount: Int) -> [Int] {
     var counts = Array(repeating: 0, count: targetWordCount)
     if unitTargets.noSpace {
       for (index, count) in noSpaceUnitAttemptErrors where counts.indices.contains(index) { counts[index] = count }
+      return counts
+    }
+    if hasOrdinarySourceFields {
+      for (index, count) in ordinaryFieldAttemptErrors where counts.indices.contains(index) { counts[index] = count }
       return counts
     }
     guard !attemptedErrorCounts.isEmpty else { return counts }
