@@ -2,10 +2,12 @@ import Foundation
 
 /// Value-owned temporary navigation, separate from the user's saved selection.
 struct WordPracticeTransition {
+  enum PersistenceCause { case automatic, configurationSave }
   let returnPreset: SavedTestPreset
   let returnSelection: ActiveTestSelectionDocument
   let returnCustomTextState: CustomTextStateDocument?
   let preparedPractice: WordPracticeText.SectionedPractice
+  private(set) var lastPersistedSelection: ActiveTestSelectionDocument?
 
   static func begin(
     previous: Self?,
@@ -24,7 +26,8 @@ struct WordPracticeTransition {
     return .init(returnPreset: source,
       returnSelection: selection,
       returnCustomTextState: customState,
-      preparedPractice: practice)
+      preparedPractice: practice,
+      lastPersistedSelection: previous?.lastPersistedSelection)
   }
 
   func preparedSections(matching text: String) -> [String]? {
@@ -32,8 +35,21 @@ struct WordPracticeTransition {
     return preparedPractice.sections
   }
 
-  func persistedSelection(current: ActiveTestSelectionDocument) -> ActiveTestSelectionDocument {
-    returnSelection
+  func persistedSelection(current: ActiveTestSelectionDocument,
+    cause: PersistenceCause = .automatic) -> ActiveTestSelectionDocument {
+    switch cause {
+    case .automatic: lastPersistedSelection ?? returnSelection
+    case .configurationSave: current
+    }
+  }
+
+  @discardableResult
+  mutating func persistSelection(current: ActiveTestSelectionDocument, cause: PersistenceCause,
+    save: (ActiveTestSelectionDocument) -> Bool) -> Bool {
+    let selected = persistedSelection(current: current, cause: cause)
+    guard save(selected) else { return false }
+    lastPersistedSelection = selected
+    return true
   }
 
   func returningPreset(current: SavedTestPreset, parameterMemory: TypebarTestParameterMemory,

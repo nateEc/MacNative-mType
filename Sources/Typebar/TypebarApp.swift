@@ -2826,7 +2826,7 @@ private struct ContentView: View {
               .buttonStyle(.borderless)
               .font(.caption)
             }
-            Picker("完成方式", selection: restartingConfigurationBinding($customTextCompletion)) {
+            Picker("完成方式", selection: restartingConfigurationBinding($customTextCompletion, savesConfiguration: false)) {
               ForEach(CustomTextCompletion.allCases) { completion in
                 Text(completion.displayName).tag(completion)
               }
@@ -2852,7 +2852,7 @@ private struct ContentView: View {
               } else {
                 HStack {
                   Stepper(
-                    value: restartingConfigurationBinding($customTextDuration),
+                    value: restartingConfigurationBinding($customTextDuration, savesConfiguration: false),
                     in: 1...OfficialTestLimitInput.maximumValue,
                     step: 5
                   ) {
@@ -2876,7 +2876,7 @@ private struct ContentView: View {
               } else {
                 HStack {
                   Stepper(
-                    value: restartingConfigurationBinding($customTextWordLimit),
+                    value: restartingConfigurationBinding($customTextWordLimit, savesConfiguration: false),
                     in: 1...OfficialTestLimitInput.maximumValue
                   ) {
                     LabeledContent("循环字数", value: "\(customTextWordLimit) 词")
@@ -2893,7 +2893,7 @@ private struct ContentView: View {
                 if customTextSectionLimit == 0 {
                   LabeledContent("完成段数", value: "无限")
                 } else {
-                  Stepper(value: restartingConfigurationBinding($customTextSectionLimit),
+                  Stepper(value: restartingConfigurationBinding($customTextSectionLimit, savesConfiguration: false),
                     in: 1...OfficialTestLimitInput.maximumValue) {
                     LabeledContent("完成段数", value: "\(customTextSectionLimit) 段")
                   }
@@ -2909,7 +2909,7 @@ private struct ContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            Picker("文本顺序", selection: restartingConfigurationBinding($customTextOrdering)) {
+            Picker("文本顺序", selection: restartingConfigurationBinding($customTextOrdering, savesConfiguration: false)) {
               ForEach(CustomTextOrdering.allCases) { ordering in
                 Text(ordering.displayName).tag(ordering)
               }
@@ -4222,12 +4222,14 @@ private struct ContentView: View {
     return true
   }
 
-  private func restartingConfigurationBinding<Value>(_ value: Binding<Value>) -> Binding<Value> {
+  private func restartingConfigurationBinding<Value>(_ value: Binding<Value>,
+    savesConfiguration: Bool = true) -> Binding<Value> {
     Binding(
       get: { value.wrappedValue },
       set: { updatedValue in
         guard acceptsRestartingConfigurationChange() else { return }
         value.wrappedValue = updatedValue
+        if savesConfiguration { persistExplicitTestConfiguration() }
       })
   }
 
@@ -4256,6 +4258,7 @@ private struct ContentView: View {
     }
     funboxConfigurationMessage = nil
     contentOptions = requested
+    persistExplicitTestConfiguration()
     return true
   }
 
@@ -4266,6 +4269,7 @@ private struct ContentView: View {
     }
     polyglotReturnLanguage = nil
     language = requested
+    persistExplicitTestConfiguration()
     return true
   }
 
@@ -6111,7 +6115,13 @@ private struct ContentView: View {
     }
   }
 
-  private func persistActiveTestSelection(for selectedConfiguration: TestConfiguration? = nil) {
+  private func persistExplicitTestConfiguration() {
+    guard wordPractice != nil else { return }
+    persistActiveTestSelection(for: configuration, cause: .configurationSave)
+  }
+
+  private func persistActiveTestSelection(for selectedConfiguration: TestConfiguration? = nil,
+    cause: WordPracticeTransition.PersistenceCause = .automatic) {
     guard customTextRecovery.permitsAutomaticPersistence(mode: mode) else { return }
     // The selected file exists only in this process. Leave the previous safe
     // selection intact, so relaunch cannot restore a first-chunk impostor.
@@ -6128,7 +6138,11 @@ private struct ContentView: View {
       quoteID: mode == .quote ? selectedQuoteID : nil,
       customText: mode == .custom ? customText : nil)
     let current = activeTestSelectionDocument(preset: preset)
-    settings.saveActiveTestSelection(wordPractice?.persistedSelection(current: current) ?? current)
+    if wordPractice != nil {
+      wordPractice?.persistSelection(current: current, cause: cause, save: settings.saveActiveTestSelection)
+    } else {
+      settings.saveActiveTestSelection(current)
+    }
   }
 
   private var preparedCustomSections: [String]? {
@@ -6282,7 +6296,7 @@ private struct ContentView: View {
         }
         // The reference saves custom Polyglot choices for the next restart
         // instead of interrupting the current test.
-        persistActiveTestSelection(for: configuration)
+        persistActiveTestSelection(for: configuration, cause: .configurationSave)
       }
     )
   }
