@@ -178,7 +178,7 @@ struct WordFilterView: View {
               Text(language.displayName).tag(language)
             }
           }
-          Text("仅筛选 Typebar 自创的离线词表；不会下载或导入第三方词表。")
+          Text("筛选随应用提供的离线词表（含独立授权语料）；不会联网下载词表。")
             .font(.caption)
             .foregroundStyle(.secondary)
         }

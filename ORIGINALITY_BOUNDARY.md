@@ -1,5 +1,7 @@
 # 原创性边界与验证
 
+2026-10-20 英语 1k／5k／10k 词数据现使用固定 SCOWL／wordfreq 独立授权交集，不再用合成串凑规模；不是 Monkeytype 的源码或词表。生成器、固定输入、哈希、数据许可、打包署名与真实词汇未完成范围见 `OFFICIAL_LANGUAGE_AUDIT.md` 当前节及 `Compatibility/english-frequency-corpus.json`。数据与原生实现许可分开保留，新的署名文件不豁免资源边界检查。
+
 账户筛选预设使用原创 SwiftUI 与独立服务文档，QA 只从固定只读参考动态执行 DAL／名称函数，不打包原实现或资产；见 [账户历史筛选预设](ACCOUNT_FILTER_PRESETS_CONTRACT.md)，下方为历史阶段。
 
 2026-10-07 [账户历史 PB 与引语分类](ACCOUNT_HISTORY_METADATA_CONTRACT.md)：历史 PB 读取不可变接受回执，实际引语分类在开始时保存，接通服务持久化、四态／多选、原生成绩行与 CSV；旧未知不回填，不依赖当前皇冠或部分提示。归档 32，新增可选服务能力，设置／表结构不变；本轮完整验证记录见合同，零 GUI。账户预设、完整图表／偏好、官方协议与设备等价仍开放，goal active；下方为历史阶段。

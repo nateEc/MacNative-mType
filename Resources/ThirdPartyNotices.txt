@@ -24,3 +24,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+English frequency corpus (1k / 5k / 10k choices)
+Independently selected from SCOWL rel-2026.02.25 and wordfreq 3.1.1.
+Adapted word selection data: Creative Commons Attribution-ShareAlike 4.0.
+https://creativecommons.org/licenses/by-sa/4.0/
+See the accompanying EnglishFrequencyCorpusNotices.txt for the full SCOWL
+copyright, Robyn Speer / wordfreq attribution, source credits and SUBTLEX terms.
+This data license is separate from the license of Typebar's native code.

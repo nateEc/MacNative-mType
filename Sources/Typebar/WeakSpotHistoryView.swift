@@ -83,7 +83,7 @@ struct WeakSpotHistoryView: View {
               Section("Typebar 自有候选词") {
                 Text(report.suggestedWords.joined(separator: " · "))
                   .textSelection(.enabled)
-                Text("候选按易错和偏慢字符共同排序，只来自所选语言的 Typebar 自写离线词流；分析不会离开这台 Mac。")
+                Text("候选按易错和偏慢字符共同排序，来自所选语言随应用提供的离线词库（含独立授权语料）；分析不会离开这台 Mac。")
                   .font(.caption)
                   .foregroundStyle(.secondary)
               }

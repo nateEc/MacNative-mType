@@ -4080,7 +4080,7 @@ private struct ContentView: View {
       .buttonStyle(.borderedProminent)
       if weakSpotPrompt != nil {
         Button("弱项训练") { startWeakSpotPractice() }
-          .help("依据本机完成测试中的错误字符生成 Typebar 自有词库练习")
+          .help("依据本机完成测试中的错误字符生成离线词库练习")
       }
       Button("朗读提示") {
         NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)

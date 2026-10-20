@@ -10527,23 +10527,18 @@ enum StarterLexicon {
     }
   }
 
-  // Typebar-authored deterministic scale corpora. They preserve the pinned
-  // choice sizes and aggregate input shapes without importing reference words.
+  // Independently sourced real dictionary entries, ordered by frequency.
+  // Provenance and data attribution accompany the generated native corpus.
   static var english1kLexicon: IndexedLexicon {
-    englishScaleLexicon(
-      marker: "q", count: 1_000, minimumToken: "q", maximumLength: 11,
-      uppercaseCount: 1, punctuationCount: 0)
+    IndexedLexicon(count: 1_000) { EnglishFrequencyCorpus.words[$0] }
   }
   static var english5kLexicon: IndexedLexicon {
-    englishScaleLexicon(
-      marker: "ve", count: 5_000, minimumToken: "v", maximumLength: 18,
-      uppercaseCount: 216, punctuationCount: 0)
+    IndexedLexicon(count: 5_000) { EnglishFrequencyCorpus.words[$0] }
   }
   static var english10kLexicon: IndexedLexicon {
-    englishScaleLexicon(
-      marker: "wi", count: 9_944, minimumToken: "w", maximumLength: 18,
-      uppercaseCount: 403, punctuationCount: 0)
+    IndexedLexicon(count: 9_944) { EnglishFrequencyCorpus.words[$0] }
   }
+  // Still synthetic: these larger pools are NOT real vocabulary parity.
   static var english25kLexicon: IndexedLexicon {
     englishScaleLexicon(
       marker: "xo", count: 24_141, minimumToken: "qxqz", maximumLength: 27,

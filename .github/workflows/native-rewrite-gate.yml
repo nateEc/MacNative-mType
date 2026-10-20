@@ -79,6 +79,8 @@ jobs:
           run_check "reference behavior audit" zsh Scripts/check-reference-behavior-audit.sh "${{ steps.reference.outputs.path }}"
           run_check "manual acceptance audit self-test" ruby Scripts/check-manual-acceptance-audit.rb --self-test
           run_check "manual acceptance audit" ruby Scripts/check-manual-acceptance-audit.rb
+          run_check "English corpus preparation contracts" python3 Scripts/test-english-frequency-corpus.py
+          run_check "bundled English corpus integrity" python3 Scripts/prepare-english-frequency-corpus.py --output-root . --check-bundled
           run_check "working-tree whitespace check" git diff --check
 
       - name: Verify no Typebar app is already running

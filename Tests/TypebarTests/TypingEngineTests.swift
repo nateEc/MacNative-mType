@@ -12357,11 +12357,8 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testEnglishScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testRemainingSyntheticEnglishScaleChoicesPreserveIDsAndAggregateShapesOnly() throws {
     let cases: [(String, Int, Int, Int, Int, Int, ZipfFrequencySupport)] = [
-      ("english1k", 1_000, 1, 11, 1, 0, .supported),
-      ("english5k", 5_000, 1, 18, 216, 0, .supported),
-      ("english10k", 9_944, 1, 18, 403, 0, .supported),
       ("english25k", 24_141, 4, 27, 946, 0, .unsupported),
       ("english450k", 450_029, 1, 31, 33_021, 176, .unsupported),
     ]
