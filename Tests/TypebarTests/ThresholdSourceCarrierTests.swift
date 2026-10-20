@@ -53,7 +53,7 @@ final class ThresholdSourceCarrierTests: XCTestCase {
     var configuration = TestConfiguration.words(17)
     configuration.rules = value.applying(to: configuration.rules)
     XCTAssertThrowsError(try TestConfigurationShare.link(for: .init(configuration: configuration)))
-    let archive = TypebarArchive(exportedAt: Date(timeIntervalSince1970: 1_000),
+    let archive = TypebarArchive(version: 33, exportedAt: Date(timeIntervalSince1970: 1_000),
       settings: snapshot, results: [], presets: [])
     XCTAssertThrowsError(try JSONEncoder().encode(archive))
     let document = TypebarSettingsDocument(settings: snapshot, configuration: configuration,
@@ -126,13 +126,13 @@ final class ThresholdSourceCarrierTests: XCTestCase {
 
   func testOuterLegacyProtocolsStillRejectWhenInnerModelCapabilityIsExplicitlyEnabled() throws {
     let snapshot = try source().applying(to: AppSettingsSnapshot())
-    let archive = TypebarArchive(exportedAt: Date(timeIntervalSince1970: 1_000), settings: snapshot, results: [], presets: [])
+    let archive = TypebarArchive(version: 33, exportedAt: Date(timeIntervalSince1970: 1_000), settings: snapshot, results: [], presets: [])
     XCTAssertThrowsError(try encoder.encode(archive))
     let document = TypebarSettingsDocument(settings: snapshot, configuration: .words(17),
       layoutFluidLayouts: [.ansiQwerty, .ansiDvorak], testParameterMemory: memory)
     XCTAssertThrowsError(try encoder.encode(document))
 
-    var rawArchive = try object(TypebarArchive(exportedAt: Date(timeIntervalSince1970: 1_000),
+    var rawArchive = try object(TypebarArchive(version: 33, exportedAt: Date(timeIntervalSince1970: 1_000),
       settings: .init(), results: [], presets: []))
     XCTAssertNoThrow(try decoder.decode(TypebarArchive.self, from: JSONSerialization.data(withJSONObject: rawArchive)))
     rawArchive["settings"] = try object(snapshot)
@@ -159,7 +159,7 @@ final class ThresholdSourceCarrierTests: XCTestCase {
 
   func testArchiveRejectsSourceBeforeDeletedPresetsAndResultsAreFiltered() throws {
     let date = Date(timeIntervalSince1970: 1_000)
-    let base = TypebarArchive(exportedAt: date, settings: .init(), results: [], presets: [])
+    let base = TypebarArchive(version: 33, exportedAt: date, settings: .init(), results: [], presets: [])
     let id = UUID()
     let preset = NamedPreset(id: id, name: "owned", definition: .init(configuration: .words(17),
       settingsSnapshot: try source().applying(to: AppSettingsSnapshot())))

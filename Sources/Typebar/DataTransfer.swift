@@ -365,7 +365,7 @@ struct TypebarArchive: Codable, Equatable {
     // and the selected quote classification, not its streamed prompt length,
     // and independent Polyglot filter choices, including explicit exclusion.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 33
+    static let currentVersion = 34
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -475,15 +475,17 @@ struct TypebarArchive: Codable, Equatable {
             deletedResultFilterPresetIDs, activeTestSelection
         case exportedAtReferenceTime
         case localPersonalBestLedgerData
+        case thresholdSettingsData, thresholdResultsData, thresholdPresetsData
     }
 
     func encode(to encoder: Encoder) throws {
         let hasActiveSource = activeTestSelection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false
-        guard settings.thresholdSource == nil,
-              !presets.contains(where: { PracticeThresholdSource.isPresent(in: $0.definition) }),
-              !results.contains(where: { $0.configuration.rules.thresholdSource != nil }),
-              !hasActiveSource
+        let hasSource = settings.thresholdSource != nil
+            || presets.contains(where: { PracticeThresholdSource.isPresent(in: $0.definition) })
+            || results.contains(where: { $0.configuration.rules.thresholdSource != nil })
+        guard !hasActiveSource, !hasSource || version == 34
         else { throw DataTransferError.unsupportedVersion(version) }
+        try Self.validateSourcePresets(presets)
         var values = encoder.container(keyedBy: CodingKeys.self)
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(results)
         guard version >= 31 || !resultFilterPresets.contains(where: { $0.filter.accountTagFilter != nil })
@@ -502,12 +504,20 @@ struct TypebarArchive: Codable, Equatable {
         try values.encode(version, forKey: .version)
         try CompatibleDatePrecision.encode(exportedAt, into: &values,
             legacyKey: .exportedAt, precisionKey: .exportedAtReferenceTime)
-        try values.encode(settings, forKey: .settings)
+        if hasSource {
+            // Required legacy fields are absent: an old decoder cannot accept
+            // a lossy projection by silently ignoring the new source state.
+            try values.encode(ThresholdArchivePayload.encode(settings), forKey: .thresholdSettingsData)
+            try values.encode(ThresholdArchivePayload.encode(results), forKey: .thresholdResultsData)
+            try values.encode(ThresholdArchivePayload.encode(presets), forKey: .thresholdPresetsData)
+        } else {
+            try values.encode(settings, forKey: .settings)
+            try values.encode(results, forKey: .results)
+            try values.encode(presets, forKey: .presets)
+        }
         try values.encode(deletedCustomThemeIDs, forKey: .deletedCustomThemeIDs)
         try values.encode(deletedCustomKeyboardLayoutIDs, forKey: .deletedCustomKeyboardLayoutIDs)
-        try values.encode(results, forKey: .results)
         try values.encode(deletedResultIDs, forKey: .deletedResultIDs)
-        try values.encode(presets, forKey: .presets)
         try values.encode(deletedPresetIDs, forKey: .deletedPresetIDs)
         try values.encode(savedTexts, forKey: .savedTexts)
         try values.encode(deletedSavedTextIDs, forKey: .deletedSavedTextIDs)
@@ -519,6 +529,13 @@ struct TypebarArchive: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decode(Int.self, forKey: .version)
+        guard (1...Self.currentVersion).contains(version) else { throw DataTransferError.unsupportedVersion(version) }
+        let sourcePayload = values.contains(.thresholdSettingsData)
+            || values.contains(.thresholdResultsData) || values.contains(.thresholdPresetsData)
+        if sourcePayload {
+            guard version == 34, !values.contains(.settings), !values.contains(.results), !values.contains(.presets)
+            else { throw DataTransferError.unsupportedVersion(version) }
+        }
         if values.contains(.localPersonalBestLedgerData) {
             guard version >= 28 else { throw DataTransferError.unsupportedVersion(version) }
             let data = try values.decode(Data.self, forKey: .localPersonalBestLedgerData)
@@ -528,8 +545,10 @@ struct TypebarArchive: Codable, Equatable {
         } else { localPersonalBestLedger = nil }
         exportedAt = try CompatibleDatePrecision.decode(from: values,
             legacyKey: .exportedAt, precisionKey: .exportedAtReferenceTime)
-        let decodedSettings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
-        guard decodedSettings.thresholdSource == nil else { throw DataTransferError.unsupportedVersion(version) }
+        let decodedSettings = sourcePayload
+            ? try ThresholdArchivePayload.decode(AppSettingsSnapshot.self, from: values.decode(Data.self, forKey: .thresholdSettingsData))
+            : try values.decode(AppSettingsSnapshot.self, forKey: .settings)
+        guard sourcePayload || decodedSettings.thresholdSource == nil else { throw DataTransferError.unsupportedVersion(version) }
         let deletedThemes = version >= 9
             ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedCustomThemeIDs) ?? [])
             : []
@@ -542,8 +561,10 @@ struct TypebarArchive: Codable, Equatable {
         }
         settings = Self.sanitizedSettings(
             decodedSettings, deletedThemeIDs: deletedThemes, deletedKeyboardLayoutIDs: deletedKeyboardLayouts)
-        let decodedResults = try values.decode([CompletedTestResult].self, forKey: .results)
-        guard !decodedResults.contains(where: { $0.configuration.rules.thresholdSource != nil })
+        let decodedResults = sourcePayload
+            ? try ThresholdArchivePayload.decode([CompletedTestResult].self, from: values.decode(Data.self, forKey: .thresholdResultsData))
+            : try values.decode([CompletedTestResult].self, forKey: .results)
+        guard sourcePayload || !decodedResults.contains(where: { $0.configuration.rules.thresholdSource != nil })
         else { throw DataTransferError.unsupportedVersion(version) }
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(decodedResults)
         // Inspect the raw payload before tombstones can hide new evidence.
@@ -562,9 +583,12 @@ struct TypebarArchive: Codable, Equatable {
             : []
         deletedResultIDs = deletedResults.sorted { $0.uuidString < $1.uuidString }
         results = decodedResults.filter { !deletedResults.contains($0.id) }
-        let decodedPresets = try values.decode([NamedPreset].self, forKey: .presets)
-        guard !decodedPresets.contains(where: { PracticeThresholdSource.isPresent(in: $0.definition) })
+        let decodedPresets = sourcePayload
+            ? try ThresholdArchivePayload.decode([NamedPreset].self, from: values.decode(Data.self, forKey: .thresholdPresetsData))
+            : try values.decode([NamedPreset].self, forKey: .presets)
+        guard sourcePayload || !decodedPresets.contains(where: { PracticeThresholdSource.isPresent(in: $0.definition) })
         else { throw DataTransferError.unsupportedVersion(version) }
+        try Self.validateSourcePresets(decodedPresets)
         guard version >= 30 || !Self.requiresAccountPaceFormat(settings: decodedSettings, presets: decodedPresets)
         else { throw DataTransferError.unsupportedVersion(version) }
         // Check raw snapshots before tombstones hide an expanded value from
@@ -613,6 +637,12 @@ struct TypebarArchive: Codable, Equatable {
                 .decodeIfPresent(ActiveTestSelectionDocument.self, forKey: .activeTestSelection)
                 .flatMap(ActiveTestSelectionPolicy.validated)
             : nil
+    }
+
+    private static func validateSourcePresets(_ presets: [NamedPreset]) throws {
+        for preset in presets where PracticeThresholdSource.isPresent(in: preset.definition) {
+            _ = try LocalPresetCodec.encode(preset.definition)
+        }
     }
 
     static func requiresExpandedPaceFormat(settings: AppSettingsSnapshot, presets: [NamedPreset]) -> Bool {
@@ -1636,11 +1666,14 @@ enum ArchiveImportSource {
 
 enum LocalArchiveImportError: Error, Equatable, LocalizedError {
     case noQuitConfigurationLocked
+    case thresholdSourceNotReady
 
     var errorDescription: String? {
         switch self {
         case .noQuitConfigurationLocked:
             return "锁定重开测试进行中，暂时不能导入会改写设置的数据。"
+        case .thresholdSourceNotReady:
+            return "此归档包含尚未接入的完整阈值设置或成绩，暂不能恢复；原数据未修改。"
         }
     }
 }
@@ -1662,6 +1695,10 @@ enum LocalArchiveImport {
         source: ArchiveImportSource = .localFile,
         modelContext: ModelContext
     ) throws -> ArchiveImportSummary {
+        guard archive.settings.thresholdSource == nil,
+              !archive.results.contains(where: { $0.configuration.rules.thresholdSource != nil }),
+              !(archive.activeTestSelection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false)
+        else { throw LocalArchiveImportError.thresholdSourceNotReady }
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(archive.results)
         guard settings.allowsRestartingConfigurationChange else {
             throw LocalArchiveImportError.noQuitConfigurationLocked
@@ -1895,6 +1932,24 @@ struct TypebarArchiveDocument: FileDocument {
             localPersonalBestLedger: archive.localPersonalBestLedger,
             at: archive.exportedAt
         )
+    }
+}
+
+/// Private to the v34 archive fields, not a capability for any other format.
+private enum ThresholdArchivePayload {
+    enum Failure: Error { case noncanonicalValue }
+    static func encode<T: Codable & Equatable>(_ value: T) throws -> Data {
+        let encoder = JSONEncoder.typebar
+        encoder.userInfo[PracticeThresholdSource.codingCapability] = true
+        let data = try encoder.encode(value)
+        guard try decode(T.self, from: data) == value else { throw Failure.noncanonicalValue }
+        return data
+    }
+
+    static func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        let decoder = JSONDecoder.typebar
+        decoder.userInfo[PracticeThresholdSource.codingCapability] = true
+        return try decoder.decode(type, from: data)
     }
 }
 
