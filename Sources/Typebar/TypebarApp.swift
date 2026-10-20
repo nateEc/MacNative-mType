@@ -1638,8 +1638,14 @@ private struct ContentView: View {
       presentSignedOutResultClaimIfPossible()
     }
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
-    .onAppear(perform: contentAppeared)
+    .onAppear {
+      visualFocus.onWillCommit = { [weak position = viewportFallbackPosition] in
+        position?.captureForFocusChange()
+      }
+      contentAppeared()
+    }
     .onDisappear {
+      visualFocus.onWillCommit = nil
       interruptedWholePreview = interruptedWholePreview || isPreparingPracticePrompt
       wholePreviewTask.cancel()
       isPreparingWholePreview = false

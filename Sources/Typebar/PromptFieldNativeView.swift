@@ -86,6 +86,7 @@ private struct PromptFieldBridge: NSViewRepresentable {
       allowsFallbackRestoration: allowsFallbackRestoration,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: onViewportHeight)
     wrapLayout?.view = view
+    fallbackPosition?.register(view)
   }
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: PromptFieldNativeView, context: Context) -> CGSize? {
     nsView.proposalSize(width: max(1, proposal.width ?? nsView.bounds.width))
@@ -280,6 +281,26 @@ final class PromptFieldNativeView: NSView {
   func usesLayout(_ layout: PromptFieldTextLayout) -> Bool { model === layout }
   var reusedGeometryFromPrevious: Bool { model?.reusedGeometryFromPrevious ?? false }
   var isAwaitingFallbackPosition: Bool { fallbackPosition?.hasPendingPosition == true }
+  func readingPositionForFocusChange() -> PromptViewportNativeScrollHost.ReadingPosition? {
+    guard fallbackPosition != nil, viewportLineCount == nil, let model,
+      let configuration, let fallbackTargetID, window != nil, superview != nil,
+      let map = rendering.compositionTextMap else { return nil }
+    let visible = visibleRect
+    guard visible.minY > 0 else { return nil }
+    // Canonical IDs survive IME slot aliases; they are not UTF-16 offsets in
+    // general. Reuse actual geometry rather than guessing rows from font size.
+    let candidates = map.canonicalAliases.keys.compactMap { id -> (Int, CGRect)? in
+      guard let rect = model.canonicalRect(id, after: false), rect.height > 0,
+        rect.intersects(visible) else { return nil }
+      return (id, rect)
+    }
+    guard let (id, rect) = candidates.min(by: {
+      $0.1.minY == $1.1.minY ? $0.0 < $1.0 : $0.1.minY < $1.1.minY
+    }) else { return nil }
+    return .init(attemptID: configuration.attemptID, promptTargetID: fallbackTargetID,
+      character: id, rowFraction: max(0, min(1, (visible.minY - rect.minY) / rect.height)),
+      selection: .init(location: NSNotFound, length: 0))
+  }
   func measuredFieldRect(for id: Int) -> CGRect? { model?.fieldFrames[id] }
   func present(at time: TimeInterval) { caret.present(at: time) }
   override var intrinsicContentSize: NSSize { model?.size ?? .init(width: NSView.noIntrinsicMetric, height: 0) }

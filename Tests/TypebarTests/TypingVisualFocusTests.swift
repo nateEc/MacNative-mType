@@ -19,6 +19,27 @@ import XCTest
     frames.flush(); XCTAssertFalse(focus.isFocused)
   }
 
+  func testWillCommitRunsBeforeStateChangeAndCanRetireTheQueuedRequest() {
+    let frames = Frames(), focus = frames.makeFocus()
+    var beforeStates: [Bool] = []
+    focus.onWillCommit = { [weak focus] in
+      guard let focus else { return }
+      beforeStates.append(focus.isFocused)
+      XCTAssertTrue(focus.isTransitionPending)
+    }
+    focus.set(true)
+    XCTAssertTrue(beforeStates.isEmpty)
+    frames.flush()
+    focus.set(false)
+    frames.flush()
+    XCTAssertEqual(beforeStates, [false, true])
+    focus.onWillCommit = { [weak focus] in focus?.retire() }
+    focus.set(true)
+    frames.flush()
+    XCTAssertFalse(focus.isFocused, "A retired request must not commit after its callback")
+    XCTAssertFalse(focus.isTransitionPending)
+  }
+
   func testTransitionReadinessWaitsForCommitAndRetirementInvalidatesIt() {
     let frames = Frames(), focus = frames.makeFocus()
     XCTAssertFalse(focus.isTransitionPending)

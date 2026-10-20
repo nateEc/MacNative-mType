@@ -64,7 +64,7 @@ private struct PromptViewportPracticeBridge: NSViewRepresentable {
   func updateNSView(_ view: PromptViewportPracticeNativeView, context: Context) {
     view.configure(snapshot, onFailure: onFailure, onHeight: onHeight, onReady: onReady)
     wrapLayout?.view = view.viewport.canvas
-    fallbackPosition?.source = view
+    fallbackPosition?.register(view)
   }
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: PromptViewportPracticeNativeView,
     context: Context) -> CGSize? {

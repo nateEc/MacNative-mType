@@ -1,9 +1,10 @@
 import AppKit
 
-/// One-shot, same-target reading anchor for the experimental-to-complete
-/// presentation transition. It owns no view, input or persisted state.
+/// One-shot, same-target reading anchor across field-page layout transitions
+/// and experimental-to-complete fallback. It owns no view or persisted state.
 @MainActor final class PromptViewportFallbackPosition: NSObject {
-  weak var source: PromptViewportPracticeNativeView?
+  private weak var source: PromptViewportPracticeNativeView?
+  private weak var completeSource: PromptFieldNativeView?
   private var pending: PromptViewportNativeScrollHost.ReadingPosition?
   var hasPendingPosition: Bool { pending != nil }
   private weak var page: NSScrollView?
@@ -11,6 +12,24 @@ import AppKit
   private var lastDocumentFrame: CGRect = .zero
 
   deinit { NotificationCenter.default.removeObserver(self) }
+
+  func register(_ source: PromptViewportPracticeNativeView) {
+    self.source = source
+    completeSource = nil
+  }
+
+  func register(_ source: PromptFieldNativeView) {
+    completeSource = source
+    self.source = nil
+  }
+
+  func captureForFocusChange() {
+    guard pending == nil else { return }
+    if let completeSource, let position = completeSource.readingPositionForFocusChange(),
+      let page = completeSource.enclosingScrollView {
+      capture(position, in: page)
+    }
+  }
 
   func capture(attemptID: UUID, targetID: UUID) {
     guard let position = source?.readingPositionForFallback(),

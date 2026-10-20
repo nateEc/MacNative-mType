@@ -23,7 +23,8 @@ import XCTest
     let counts: Counts
     let prompt: String
     init(unicode: Bool = false, promptOverride: String? = nil,
-      gatesSource: Bool = false, viewportEnabled: Bool = true, wordCount: Int = 201) throws {
+      gatesSource: Bool = false, viewportEnabled: Bool = true, wordCount: Int = 201,
+      hostSize: CGSize = .init(width: 1000, height: 720)) throws {
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = AppSettings(defaults: defaults)
       settings.reducePracticeMotion = true
@@ -55,8 +56,8 @@ import XCTest
           counts.completeRenders += 1
           return PromptRenderPlan(session: session, composition: composition, style: style).render()
         }, wholePreviewViewportEnabled: viewportEnabled).modelContainer(container)
-      host = NSHostingView(rootView: AnyView(content.frame(width: 1000, height: 720)))
-      window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 720),
+      host = NSHostingView(rootView: AnyView(content.frame(width: hostSize.width, height: hostSize.height)))
+      window = NSWindow(contentRect: .init(origin: .zero, size: hostSize),
         styleMask: .borderless, backing: .buffered, defer: false)
       window.isReleasedWhenClosed = false
       window.contentView = host
@@ -77,6 +78,12 @@ import XCTest
         && abs(native.frame.height - native.measuredHeight) < 0.01
         && (native.enclosingScrollView?.documentView?.frame.height ?? 0) >= native.frame.height
         && views(TypingInputView.self).first?.acceptsTextInput == true
+    }
+    var completePromptReady: Bool {
+      views(PromptFieldNativeView.self).contains {
+        $0.accessibilityValue() as? String == prompt
+          && abs($0.bounds.height - $0.intrinsicContentSize.height) < 0.01
+      } && views(TypingInputView.self).first?.acceptsTextInput == true
     }
     func completeLayout(width: CGFloat) throws -> PromptFieldTextLayout {
       let session = TypingSession(configuration: .words(201), prompt: prompt)
@@ -102,6 +109,89 @@ import XCTest
       defaults.removePersistentDomain(forName: suite)
       withExtendedLifetime(container) {}
     }
+  }
+
+  func testDefaultWholePromptKeepsRemoteReadingRowAcrossVisualFocusChanges() throws {
+    try checkDefaultWholeFocus(unicode: false, usesComposition: false)
+  }
+
+  func testDefaultWholeUnicodePromptKeepsRemoteReadingRowDuringCompositionAndFocusChanges() throws {
+    try checkDefaultWholeFocus(unicode: true, usesComposition: true)
+  }
+
+  private func checkDefaultWholeFocus(unicode: Bool, usesComposition: Bool) throws {
+    let fixture = try Fixture(unicode: unicode, viewportEnabled: false)
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.completePromptReady }
+    let full = try XCTUnwrap(fixture.views(PromptFieldNativeView.self).first)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    let page = try XCTUnwrap(full.enclosingScrollView)
+    let document = try XCTUnwrap(page.documentView)
+    let start = try XCTUnwrap(fixture.prompt.range(of: "word100")?.lowerBound)
+    let anchor = fixture.prompt.distance(from: fixture.prompt.startIndex, to: start)
+    let rect = try XCTUnwrap(full.measuredRect(for: anchor))
+    let point = full.convert(rect.origin, to: document)
+    page.contentView.scroll(to: point)
+    page.reflectScrolledClipView(page.contentView)
+    fixture.flush()
+    let before = full.visibleRect.minY - rect.minY
+    let unfocusedHeight = document.frame.height
+    if usesComposition {
+      input.setMarkedText("中", selectedRange: .init(location: 1, length: 0),
+        replacementRange: .init(location: NSNotFound, length: 0))
+    } else { input.onInsert("w", false) }
+    fixture.waitUntil { document.frame.height < unfocusedHeight && !full.isAwaitingFallbackPosition }
+    XCTAssertEqual(full.visibleRect.minY - rect.minY, before, accuracy: 1,
+      "Entering visual focus must not move a manually chosen reading row")
+    let focusedHeight = document.frame.height
+    let mouse = try XCTUnwrap(fixture.views(TypingVisualFocusMouseView.self).first)
+    mouse.onMovement(4, 0)
+    fixture.waitUntil { document.frame.height > focusedHeight && !full.isAwaitingFallbackPosition }
+    XCTAssertEqual(full.visibleRect.minY - rect.minY, before, accuracy: 1,
+      "Leaving visual focus must preserve the same reading row")
+    XCTAssertTrue(fixture.views(PromptFieldNativeView.self).first === full)
+    XCTAssertEqual(fixture.counts.generation, 1)
+    XCTAssertFalse(fixture.settings.allowsRestartingConfigurationChange)
+    XCTAssertFalse(fixture.window.isVisible)
+  }
+
+  func testWholePromptAtPageTopDoesNotIntroduceFocusNavigation() throws {
+    let fixture = try Fixture(viewportEnabled: false)
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.completePromptReady }
+    let full = try XCTUnwrap(fixture.views(PromptFieldNativeView.self).first)
+    let page = try XCTUnwrap(full.enclosingScrollView)
+    let height = try XCTUnwrap(page.documentView).frame.height
+    XCTAssertEqual(page.contentView.bounds.minY, 0)
+    try XCTUnwrap(fixture.views(TypingInputView.self).first).onInsert("w", false)
+    fixture.waitUntil { (page.documentView?.frame.height ?? height) < height
+      && !full.isAwaitingFallbackPosition }
+    XCTAssertEqual(page.contentView.bounds.minY, 0,
+      "A layout transition must not navigate an already top-aligned page")
+  }
+
+  func testShortDefaultPracticeStillShowsThreeRowsAfterFocusEntry() throws {
+    let fixture = try Fixture(viewportEnabled: false, hostSize: .init(width: 900, height: 530))
+    defer { fixture.close() }
+    fixture.settings.showAllPracticeLines = false
+    fixture.waitUntil { fixture.views(PromptFieldNativeView.self).contains { $0.bounds.width > 1 }
+      && fixture.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let full = try XCTUnwrap(fixture.views(PromptFieldNativeView.self).first)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    let text = try XCTUnwrap(full.accessibilityValue() as? String)
+    input.onInsert(String(try XCTUnwrap(text.first)), false)
+    fixture.waitUntil { !fixture.settings.allowsRestartingConfigurationChange
+      && full.convert(.zero, to: fixture.host).y < 300 }
+    let frames = (0..<text.utf16.count).compactMap { full.measuredRect(for: $0) }
+    let rows = Dictionary(grouping: frames, by: \.minY).sorted { $0.key < $1.key }.prefix(3)
+    XCTAssertEqual(rows.count, 3)
+    for row in rows {
+      let rect = row.value.reduce(CGRect.null) { $0.union($1) }
+      XCTAssertTrue(full.visibleRect.contains(rect))
+      XCTAssertTrue(fixture.host.bounds.contains(full.convert(rect, to: fixture.host)),
+        "Focused 900×530 practice must retain three complete on-screen rows")
+    }
+    XCTAssertFalse(fixture.window.isVisible)
   }
 
   func testCompositionFallbackKeepsRemoteReadingPosition() throws {

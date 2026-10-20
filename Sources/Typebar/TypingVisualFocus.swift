@@ -10,6 +10,7 @@ import Observation
   @ObservationIgnored private var generation: UInt64 = 0
   @ObservationIgnored private var hasQueuedCommit = false
   var isTransitionPending: Bool { hasQueuedCommit }
+  @ObservationIgnored var onWillCommit: (() -> Void)?
   @ObservationIgnored private let schedule: (@escaping @MainActor () -> Void) -> Void
 
   init(schedule: @escaping (@escaping @MainActor () -> Void) -> Void = { callback in
@@ -28,6 +29,8 @@ import Observation
     let ticket = generation
     schedule { [weak self] in
       guard let self, self.generation == ticket else { return }
+      self.onWillCommit?()
+      guard self.generation == ticket else { return }
       self.hasQueuedCommit = false
       self.isFocused = value
       if value { self.stopCaretBlinking() } else { self.startCaretBlinking() }
