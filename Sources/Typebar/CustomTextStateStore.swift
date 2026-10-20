@@ -62,6 +62,22 @@ struct CustomTextStateDocument: Codable, Equatable {
 }
 
 enum CustomTextRestorePolicy {
+  static func restoration(read: CustomTextStateRead, activePreset: SavedTestPreset?,
+    explicitSelectionImport: Bool) -> (document: CustomTextStateDocument?, recovery: CustomTextRecoveryState) {
+    var recovery = CustomTextRecoveryState(read: read)
+    if explicitSelectionImport, acceptsReplacement(activePreset) {
+      recovery.acceptExplicitSource()
+      return (nil, recovery)
+    }
+    return (recovery.requiresExplicitSource ? nil : read.document, recovery)
+  }
+
+  static func acceptsReplacement(_ preset: SavedTestPreset?) -> Bool {
+    guard let preset, preset.configuration.mode == .custom,
+      let text = preset.customText else { return false }
+    return CustomTextPolicy.isValid(text, configuration: preset.configuration)
+  }
+
   static func returningSource(captured: CustomTextStateDocument?,
     latest: () -> CustomTextStateDocument) -> CustomTextStateDocument? {
     captured ?? latest()
@@ -71,8 +87,37 @@ enum CustomTextRestorePolicy {
     explicitSelectionImport: Bool) -> CustomTextStateDocument? {
     // An explicit custom selection/import owns its text. An ordinary mode
     // change does not erase the independently retained custom source.
-    if explicitSelectionImport, activePreset?.configuration.mode == .custom { return nil }
+    if explicitSelectionImport, acceptsReplacement(activePreset) { return nil }
     return stored
+  }
+}
+
+enum CustomTextStateRead: Equatable {
+  case missing
+  case available(CustomTextStateDocument)
+  case unavailable
+
+  var document: CustomTextStateDocument? {
+    guard case .available(let document) = self else { return nil }
+    return document
+  }
+}
+
+struct CustomTextRecoveryState: Equatable {
+  private(set) var requiresExplicitSource: Bool
+
+  init(read: CustomTextStateRead = .missing) {
+    switch read {
+    case .missing: requiresExplicitSource = false
+    case .available(let document): requiresExplicitSource = !document.isValid
+    case .unavailable: requiresExplicitSource = true
+    }
+  }
+
+  mutating func acceptExplicitSource() { requiresExplicitSource = false }
+
+  func permitsAutomaticPersistence(mode: TestMode) -> Bool {
+    mode != .custom || !requiresExplicitSource
   }
 }
 
@@ -83,10 +128,15 @@ struct CustomTextStateStore {
   init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 
   func load() -> CustomTextStateDocument? {
+    read().document
+  }
+
+  func read() -> CustomTextStateRead {
+    guard defaults.object(forKey: Self.storageKey) != nil else { return .missing }
     guard let data = defaults.data(forKey: Self.storageKey),
       let document = try? JSONDecoder().decode(CustomTextStateDocument.self, from: data),
-      document.isValid else { return nil }
-    return document
+      document.isValid else { return .unavailable }
+    return .available(document)
   }
 
   @discardableResult

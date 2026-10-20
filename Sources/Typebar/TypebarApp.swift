@@ -1283,6 +1283,7 @@ private struct ContentView: View {
   @State private var customText = "A calm practice makes the next difficult sentence feel possible."
   @State private var customTextSource: CustomTextSource?
   @State private var customTextStateSaveFailed = false
+  @State private var customTextRecovery = CustomTextRecoveryState()
   @State private var customTextCompletion: CustomTextCompletion = .finish
   @State private var customTextDuration = 30
   @State private var customTextWordLimit = 25
@@ -2758,6 +2759,7 @@ private struct ContentView: View {
               set: { value in
                 wordPractice = nil
                 customTextSource = nil
+                customTextRecovery.acceptExplicitSource()
                 customText = value
               }), axis: .vertical)
               .lineLimit(2...4)
@@ -2788,6 +2790,15 @@ private struct ContentView: View {
               Label("自定义文本未保存到本机；原有记录保持不变。", systemImage: "exclamationmark.triangle")
                 .font(.caption)
                 .foregroundStyle(.orange)
+            }
+            if customTextRecovery.requiresExplicitSource {
+              Label("已保存的自定义文本无法读取。请使用支持该版本的应用，或明确选择新文本；原记录未改动。",
+                systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.orange)
+              Button("使用新的默认文本") {
+                applyGeneratedCustomText("A calm practice makes the next difficult sentence feel possible.", appending: false)
+              }
             }
             if let activeLongSavedText {
               Label(
@@ -4517,6 +4528,7 @@ private struct ContentView: View {
       configuration: configuration,
       customText: customText,
       preparedCustomSections: preparedCustomSections,
+      customTextRecoveryBlocked: customTextRecovery.requiresExplicitSource,
       finiteTextSource: activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk },
       verifiedScript: activeChallenge?.requirements.referenceScriptSpecification
         == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
@@ -4965,6 +4977,7 @@ private struct ContentView: View {
     guard selectMode(.custom) else { return }
     wordPractice = nil
     customTextSource = nil
+    customTextRecovery.acceptExplicitSource()
     activeChallengeID = nil
     activeVerifiedScript = nil
     guard selection.isLong else {
@@ -4995,6 +5008,7 @@ private struct ContentView: View {
     activeLongSavedText = nil
     wordPractice = nil
     customTextSource = nil
+    customTextRecovery.acceptExplicitSource()
     customText = nextText
     customTextCompletion = .finish
     customTextOrdering = .inOrder
@@ -5181,6 +5195,9 @@ private struct ContentView: View {
     prompt weakSpotPrompt: String, language weakSpotLanguage: TypingLanguage
   ) {
     guard selectMode(.custom) else { return }
+    wordPractice = nil
+    customTextSource = nil
+    customTextRecovery.acceptExplicitSource()
     activeChallengeID = nil
     language = weakSpotLanguage
     customText = weakSpotPrompt
@@ -5919,7 +5936,8 @@ private struct ContentView: View {
     appliesGlobalSettings: Bool = true,
     polyglotReturnLanguage: TypingLanguage? = nil,
     restoringSelection: ActiveTestSelectionDocument? = nil,
-    restoringCustomTextState: CustomTextStateDocument? = nil
+    restoringCustomTextState: CustomTextStateDocument? = nil,
+    restoringCustomTextRecovery: CustomTextRecoveryState? = nil
   ) -> Bool {
     guard acceptsRestartingConfigurationChange() else { return false }
     guard preset.settingGroups?.isEmpty != true else { return false }
@@ -5950,6 +5968,10 @@ private struct ContentView: View {
     }
     wordPractice = nil
     if appliesTest { customTextSource = nil }
+    if let restoringCustomTextRecovery { customTextRecovery = restoringCustomTextRecovery }
+    else if appliesTest, CustomTextRestorePolicy.acceptsReplacement(appliedPreset) {
+      customTextRecovery.acceptExplicitSource()
+    }
     referenceScriptMessage = nil
     if let activeVerifiedScript,
       challenge?.requirements.referenceScriptSpecification
@@ -6041,7 +6063,7 @@ private struct ContentView: View {
   }
 
   private func restoreActiveTestSelection(_ document: ActiveTestSelectionDocument,
-    customState: CustomTextStateDocument? = nil) {
+    customState: CustomTextStateDocument? = nil, recovery: CustomTextRecoveryState = .init()) {
     let memory = document.testParameterMemory
     duration = memory.duration
     wordLimit = memory.wordLimit
@@ -6055,7 +6077,7 @@ private struct ContentView: View {
       overwritesParameterMemory: false,
       appliesGlobalSettings: false,
       polyglotReturnLanguage: document.polyglotReturnLanguage,
-      restoringCustomTextState: customState)
+      restoringCustomTextState: customState, restoringCustomTextRecovery: recovery)
     if activeChallengeID == "one-handed-bandit" {
       oneHandedChallengeSelection = document.oneHandedChallengeSelection
         ?? oneHandedChallengeSelection
@@ -6066,7 +6088,8 @@ private struct ContentView: View {
     }
   }
 
-  private func restoreDefaultTestSelection(customState: CustomTextStateDocument? = nil) {
+  private func restoreDefaultTestSelection(customState: CustomTextStateDocument? = nil,
+    recovery: CustomTextRecoveryState = .init()) {
     let memory = TypebarTestParameterMemory.defaults
     duration = memory.duration
     wordLimit = memory.wordLimit
@@ -6076,21 +6099,25 @@ private struct ContentView: View {
     apply(
       .init(configuration: TypebarInitialTestSelection.configuration),
       overwritesParameterMemory: false,
-      appliesGlobalSettings: false, restoringCustomTextState: customState)
+      appliesGlobalSettings: false, restoringCustomTextState: customState, restoringCustomTextRecovery: recovery)
   }
 
   private func restorePersistedTestSelection(explicitSelectionImport: Bool = false) {
     let document = settings.activeTestSelection
-    let customState = CustomTextRestorePolicy.source(stored: settings.customTextState,
+    let restoration = CustomTextRestorePolicy.restoration(read: settings.customTextStateRead,
       activePreset: document?.preset, explicitSelectionImport: explicitSelectionImport)
+    // Reading the record is independent of accepting its old challenge or
+    // selection. A missing script/font must not discard the recovery gate.
+    customTextRecovery = restoration.recovery
     if let document {
-      restoreActiveTestSelection(document, customState: customState)
+      restoreActiveTestSelection(document, customState: restoration.document, recovery: restoration.recovery)
     } else {
-      restoreDefaultTestSelection(customState: customState)
+      restoreDefaultTestSelection(customState: restoration.document, recovery: restoration.recovery)
     }
   }
 
   private func persistActiveTestSelection(for selectedConfiguration: TestConfiguration? = nil) {
+    guard customTextRecovery.permitsAutomaticPersistence(mode: mode) else { return }
     // The selected file exists only in this process. Leave the previous safe
     // selection intact, so relaunch cannot restore a first-chunk impostor.
     if let activeVerifiedScript,
@@ -6126,6 +6153,7 @@ private struct ContentView: View {
   }
 
   private func installCustomTextState(_ document: CustomTextStateDocument) {
+    customTextRecovery.acceptExplicitSource()
     customTextSource = document.source
     customText = document.source.text
     customTextCompletion = document.completion
@@ -6209,16 +6237,19 @@ private struct ContentView: View {
     let previousText = customText
     let previousVerifiedScript = activeVerifiedScript
     let previousLongSavedText = activeLongSavedText
+    let previousRecovery = customTextRecovery
     activeLongSavedText = nil
+    customTextRecovery.acceptExplicitSource()
     customText = LongSavedTextProgress.nextChunk(in: verified.text, after: 0)
     activeVerifiedScript = verified
     var preset = challenge.preset
     preset.configuration = preset.configuration.with(challengeID: challenge.id)
-    apply(preset)
-    guard activeChallengeID == challenge.id else {
+    let applied = apply(preset)
+    guard applied, activeChallengeID == challenge.id else {
       customText = previousText
       activeVerifiedScript = previousVerifiedScript
       activeLongSavedText = previousLongSavedText
+      customTextRecovery = previousRecovery
       return false
     }
     return true
@@ -6465,11 +6496,12 @@ private struct ContentView: View {
       currentPreset: { presetDefinition },
       currentSelection: { activeTestSelectionDocument(preset: $0) },
       currentCustomTextState: {
-        guard mode == .custom else { return nil }
+        guard mode == .custom, !customTextRecovery.requiresExplicitSource else { return nil }
         return activeLongSavedText == nil && activeVerifiedScript == nil ? customTextStateDocument : settings.customTextState
       },
       selectCustomMode: { selectMode(.custom) }) else { return }
     wordPractice = transition
+    customTextRecovery.acceptExplicitSource()
     customTextSource = .prepared(practice.sections)
     customText = practice.text
     customTextCompletion = .sections

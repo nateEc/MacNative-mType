@@ -1151,6 +1151,10 @@ final class AppSettings {
     CustomTextStateStore(defaults: defaults).load()
   }
 
+  var customTextStateRead: CustomTextStateRead {
+    CustomTextStateStore(defaults: defaults).read()
+  }
+
   @discardableResult
   func saveCustomTextState(_ document: CustomTextStateDocument) -> Bool {
     CustomTextStateStore(defaults: defaults).save(document)

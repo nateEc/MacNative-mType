@@ -6343,6 +6343,7 @@ struct TestSessionFactory {
     customText: String = "",
     customTextIsPrepared: Bool = false,
     preparedCustomSections: [String]? = nil,
+    customTextRecoveryBlocked: Bool = false,
     finiteTextSource: String? = nil,
     verifiedScript: ReferenceScriptChallengePolicy.VerifiedScript? = nil,
     quote: OfflineQuote? = nil,
@@ -6359,6 +6360,11 @@ struct TestSessionFactory {
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) },
     nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }
   ) -> TypingSession {
+    if configuration.mode == .custom, customTextRecoveryBlocked {
+      return .init(configuration: configuration, prompt: "",
+        initializationFailure: "无法读取已保存的自定义文本，已停止出题。请使用支持该版本的应用，或明确编辑、选择新的文本后重新开始；原记录未改动。",
+        weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState)
+    }
     let polyglotPreparation = PolyglotGenerationPreparation(configuration)
     var configuration = polyglotPreparation.configuration
     let streamsLiveContent = streamsLiveContent && LivePracticeContentSource.selected(for: configuration) != nil

@@ -1,5 +1,7 @@
 # 自定义文本独立状态与结构化来源
 
+后续状态：本文记录 `fb93b25` 的独立保存范围。下文“读取不可读状态仍回退字符串”已继续修复为三态读取、custom 生成／自动保存拒绝与明确换源，见 `CUSTOM_TEXT_RECOVERY_CONTRACT.md`；真实 GUI、全部恢复入口及多版本并发仍未验收。历史未完成描述不覆盖新恢复入口的当前实现。
+
 ## 固定参考与先行反例（2026-10-20）
 
 参考版本 `91bd24bb8513785c7364cbea29296ff7adafac41`：`frontend/src/ts/test/custom-text.ts` 32–70 行把数组、排序、限制和分隔设置放在独立 `customTextSettings` 存储；`packages/schemas/src/results.ts` 40–58 行要求至少一个字符串候选。`practise-words.ts` 153–181 行临时进入 custom 时不保存普通模式，但另行写入候选数组。`utils/local-storage-with-schema.ts` 的 get/set 执行 JSON 存储，数组不是编辑器显示字符串。仅只读核对，没有复制实现／资产，也不声称完整浏览器模块已执行。
