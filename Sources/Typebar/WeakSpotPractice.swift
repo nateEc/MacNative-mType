@@ -172,7 +172,11 @@ enum WeakSpotPractice {
   /// correct base or mark against that entire glyph. Legacy tapes stay above.
   private static func addUnitFieldSamples(from result: CompletedTestResult,
     to samples: inout [Character: CharacterSample]) {
-    let targets = TypingReplay.promptFields(result.prompt).map { String($0) }
+    // Field snapshots use source-word indices, not flattened display glyphs.
+    // Unknown no-space boundaries cannot be reconstructed from the prompt.
+    guard let targets = TypingReplay.replayTargetFields(prompt: result.prompt,
+      configuration: result.configuration, targetWordDirectory: result.targetWordDirectory)
+    else { return }
     let fields = targets.map { Array($0.utf16) }
     let owners = targets.map { text in
       text.flatMap { character in
