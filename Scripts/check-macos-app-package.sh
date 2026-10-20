@@ -66,6 +66,9 @@ cmp "$project_root/Resources/ThirdPartyNotices.txt" \
 cmp "$project_root/Resources/EnglishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/EnglishFrequencyCorpusNotices.txt" \
   || fail "English corpus attribution missing or modified"
+cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
+  "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
+  || fail "Spanish corpus attribution missing or modified"
 if [[ -n "$reference_root" ]]; then
   zsh "$project_root/Scripts/check-originality-boundaries.sh" \
     --reference "$reference_root" \

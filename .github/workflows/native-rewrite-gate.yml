@@ -81,6 +81,8 @@ jobs:
           run_check "manual acceptance audit" ruby Scripts/check-manual-acceptance-audit.rb
           run_check "English corpus preparation contracts" python3 Scripts/test-english-frequency-corpus.py
           run_check "bundled English corpus integrity" python3 Scripts/prepare-english-frequency-corpus.py --output-root . --check-bundled
+          run_check "Spanish corpus preparation contracts" python3 Scripts/test-spanish-frequency-corpus.py
+          run_check "bundled Spanish corpus integrity" python3 Scripts/prepare-spanish-frequency-corpus.py --output-root . --check-bundled
           run_check "Western vocabulary audit contracts" python3 Scripts/test-western-basic-corpora.py
           run_check "Western vocabulary integrity" python3 Scripts/check-western-basic-corpora.py
           run_check "working-tree whitespace check" git diff --check

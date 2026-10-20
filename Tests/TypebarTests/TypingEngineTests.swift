@@ -12506,9 +12506,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(report.suggestedWords.allSatisfy { $0.first == target.first })
   }
 
-  func testSpanishScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testSpanishScaleChoicesPreserveIndependentIDsAndCurrentCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int)] = [
-      ("spanish1k", 998, 1, 15, 10, 0, 0, 179),
+      // Independent observed 1k corpus; the larger pools still preserve only
+      // reference aggregate shapes with synthetic entries, not real vocabulary.
+      ("spanish1k", 998, 1, 14, 0, 0, 0, 152),
       ("spanish10k", 9_990, 1, 20, 433, 1, 0, 2_062),
       ("spanish650k", 646_579, 1, 26, 3, 239, 162, 247_122),
     ]
