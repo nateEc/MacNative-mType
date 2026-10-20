@@ -390,13 +390,14 @@ enum BehaviorCommandTarget: Equatable {
     var exitsChallenge: Bool { false }
 
     @MainActor
-    func apply(to settings: AppSettings) {
+    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
         switch self {
         case .quickRestart(let key): settings.quickRestartKey = key
         case .blindMode(let enabled): settings.blindMode = enabled
         case .alwaysShowWordsHistory(let enabled): settings.alwaysShowWordsHistory = enabled
         case .commandPaletteListMode(let mode): settings.commandPaletteListMode = mode
         }
+        onConfigurationSave()
     }
 }
 
@@ -759,9 +760,11 @@ enum InputRuleCommandTarget: Equatable {
     }
 
     @MainActor
-    func apply(to settings: AppSettings, session: inout TypingSession) {
+    func apply(to settings: AppSettings, session: inout TypingSession,
+        onConfigurationSave: () -> Void = {}) {
         apply(to: settings)
         if !requiresRestart { session.synchronizeLiveInputRules(settings.inputRules) }
+        onConfigurationSave()
     }
 }
 
@@ -884,7 +887,7 @@ enum SoundCommandTarget: Equatable {
     }
 
     @MainActor
-    func apply(to settings: AppSettings) {
+    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
         switch self {
         case .volume(let volume):
             settings.soundVolume = volume
@@ -896,6 +899,7 @@ enum SoundCommandTarget: Equatable {
         case .timeWarning(let offset):
             settings.timeWarningOffset = offset
         }
+        onConfigurationSave()
     }
 }
 
@@ -1047,13 +1051,14 @@ enum CaretCommandTarget: Equatable {
     }
 
     @MainActor
-    func apply(to settings: AppSettings) {
+    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
         switch self {
         case .smooth(let motion): settings.smoothCaretMotion = motion
         case .primary(let style): settings.caretStyle = style
         case .pace(let style): settings.paceCaretStyle = style
         case .repeatedPace(let enabled): settings.repeatedPace = enabled
         }
+        onConfigurationSave()
     }
 }
 
@@ -1151,9 +1156,10 @@ enum PaceCaretCommandTarget: Equatable {
     var exitsChallenge: Bool { false }
 
     @MainActor
-    func apply(to settings: AppSettings) {
+    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
         guard case .mode(let mode) = self else { return }
         settings.paceGuideMode = mode
+        onConfigurationSave()
     }
 }
 
@@ -1217,7 +1223,7 @@ enum AppearanceCommandTarget: Equatable {
 
     @discardableResult
     @MainActor
-    func apply(to settings: AppSettings) -> Bool {
+    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) -> Bool {
         switch self {
         case .progress(let style): settings.liveProgressStyle = style
         case .speed(let style): settings.liveSpeedStyle = style
@@ -1225,7 +1231,10 @@ enum AppearanceCommandTarget: Equatable {
         case .burst(let style): settings.liveBurstStyle = style
         case .color(let color): settings.liveStatsColor = color
         case .opacity(let opacity): settings.liveStatsOpacity = opacity
-        case .highlight(let mode): settings.promptHighlightMode = mode
+        case .highlight(let mode):
+            guard FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: mode,
+                modifiers: settings.testModifiers) else { return false }
+            settings.promptHighlightMode = mode
         case .typedEffect(let effect): settings.typedCharacterEffect = effect
         case .tape(let mode):
             settings.practiceTapeMode = mode
@@ -1238,6 +1247,7 @@ enum AppearanceCommandTarget: Equatable {
         case .alwaysShowDecimalPlaces(let enabled): settings.alwaysShowDecimalPlaces = enabled
         case .startGraphsAtZero(let enabled): settings.startGraphsAtZero = enabled
         }
+        onConfigurationSave()
         return true
     }
 }
@@ -1370,13 +1380,14 @@ enum KeyboardGuideCommandTarget: Equatable {
     var exitsChallenge: Bool { false }
 
     @MainActor
-    func apply(to settings: AppSettings) {
+    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
         switch self {
         case .mode(let mode): settings.keyboardGuideMode = mode
         case .style(let style): settings.keyboardGuideStyle = style
         case .legend(let legend): settings.keyboardGuideLegendStyle = legend
         case .keys(let keys): settings.keyboardGuideKeysMode = keys
         }
+        onConfigurationSave()
     }
 }
 
@@ -1772,7 +1783,8 @@ enum ThemeCommandPreviewPolicy {
 enum ThemeCommandApplication {
     @MainActor
     @discardableResult
-    static func apply(_ target: ThemeCommandTarget, to settings: AppSettings) -> Bool {
+    static func apply(_ target: ThemeCommandTarget, to settings: AppSettings,
+        onConfigurationSave: () -> Void = {}) -> Bool {
         // Catalog entries can outlive a custom theme. Reject them before any
         // preference changes, including disabling system appearance following.
         if case .custom(let id) = target,
@@ -1787,6 +1799,7 @@ enum ThemeCommandApplication {
         case .custom(let id):
             settings.selectCustomTheme(id)
         }
+        onConfigurationSave()
         return true
     }
 }

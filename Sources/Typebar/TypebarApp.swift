@@ -5443,7 +5443,7 @@ private struct ContentView: View {
       return
     }
     if let target = SoundCommandCatalog.target(for: item.id) {
-      target.apply(to: settings)
+      target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       switch target.preview {
       case .click(let style):
         TypingFeedbackSound.shared.previewClick(style: style, volume: settings.soundVolume)
@@ -5459,21 +5459,25 @@ private struct ContentView: View {
     }
     if let target = CaretCommandCatalog.target(for: item.id) {
       if target.exitsChallenge { activeChallengeID = nil }
-      target.apply(to: settings)
+      target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       return
     }
     if let target = PaceCaretCommandCatalog.target(for: item.id) {
       switch target {
       case .mode:
-        target.apply(to: settings)
+        target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       case .customSpeed:
         showingPaceGuideSpeedEditor = true
       }
       return
     }
     if let target = AppearanceCommandCatalog.target(for: item.id) {
-      guard target.apply(to: settings) else {
-        funboxConfigurationMessage = "卷带模式不支持显示完整提示行。"
+      guard target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration) else {
+        if case .highlight = target {
+          funboxConfigurationMessage = "当前趣味模式仅支持“当前字符”或“关闭”提示高亮。"
+        } else {
+          funboxConfigurationMessage = "卷带模式不支持显示完整提示行。"
+        }
         return
       }
       if target.exitsChallenge { activeChallengeID = nil }
@@ -5481,7 +5485,7 @@ private struct ContentView: View {
     }
     if let target = KeyboardGuideCommandCatalog.target(for: item.id) {
       if target.exitsChallenge { activeChallengeID = nil }
-      target.apply(to: settings)
+      target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       return
     }
     if item.id == KeyboardGuideSizeCommand.item.id {
@@ -5505,12 +5509,14 @@ private struct ContentView: View {
     if let target = InputRuleCommandCatalog.target(for: item.id) {
       if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
-      target.apply(to: settings, session: &session)
+      var savesConfiguration = false
+      target.apply(to: settings, session: &session, onConfigurationSave: { savesConfiguration = true })
+      if savesConfiguration { persistExplicitTestConfiguration() }
       if target.requiresRestart { reset() }
       return
     }
     if let target = BehaviorCommandCatalog.target(for: item.id) {
-      target.apply(to: settings)
+      target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       if case .blindMode(let enabled) = target {
         session.setBlindMode(enabled)
         preparedWholePreviewRendering = nil
@@ -5670,7 +5676,7 @@ private struct ContentView: View {
       return
     }
     if let target = ThemeCommandCatalog.target(for: item.id) {
-      ThemeCommandApplication.apply(target, to: settings)
+      ThemeCommandApplication.apply(target, to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       return
     }
     if let target = FontFamilyCommandCatalog.target(for: item.id) {

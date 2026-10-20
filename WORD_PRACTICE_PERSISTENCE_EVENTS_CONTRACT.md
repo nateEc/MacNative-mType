@@ -1,5 +1,7 @@
 # 结果练习的配置保存事件
 
+后续八类命令已继续接入明确保存，包括实时规则及主题同值提交；拒绝高亮命令也已前置检查。见 `LIVE_COMMAND_SAVE_EVENTS_CONTRACT.md`；本文“未覆盖命令”的描述是本批起点，不表示这些已接入类别仍缺失。全部独立设置与其他命令／编辑器仍开放。
+
 ## 固定来源与先行失败
 
 参考 `91bd24bb8513785c7364cbea29296ff7adafac41` 的 `frontend/src/ts/test/practise-words.ts` 162–174 行只在进入时以 nosave 切 custom；自定义数组、排序及限额写入独立 customTextSettings。`config/setters.ts` 124–133 行在成功接收后保存并发送事件，即使新值相同也执行。`config/persistence.ts` 的 saveToLocalStorage 写的是完整当前 Config，不是只写那个 key。因此“临时进入不写模式”不等于“练习期间任何保存都恢复旧选择”。
