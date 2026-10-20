@@ -16,7 +16,9 @@ import zipfile
 
 SOURCE = Path("Sources/Typebar/WesternBasicCorpora.swift")
 MANIFEST = Path("Compatibility/western-basic-corpora.json")
-SPECS = {"spanish": (197, 0, 10, "es"), "french": (174, 2, 12, "fr"), "german": (200, 2, 11, "de")}
+SPECS = {"spanish": (197, 0, 10, "es"), "french": (174, 2, 12, "fr"), "german": (200, 2, 11, "de"),
+         "italian": (199, 0, 13, "it")}
+DEFAULT_MIXED = ("spanish", "french", "german")
 WHEEL_SHA = "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
 
 
@@ -50,7 +52,7 @@ def audit_words(words, expected_count, phrase_count, maximum_length):
 def read_lists(root):
     raw = (root / SOURCE).read_bytes()
     lists = dict((name, body.splitlines()) for name, body in re.findall(
-        r'static let (spanish|french|german): \[String\] = """\n(.*?)\n"""', raw.decode("utf-8"), re.S))
+        r'static let (spanish|french|german|italian): \[String\] = """\n(.*?)\n"""', raw.decode("utf-8"), re.S))
     if set(lists) != set(SPECS):
         raise ValueError("missing authored language data")
     return raw, lists
@@ -67,17 +69,17 @@ def manifest(root):
     if len(english) != 200:
         raise ValueError("default English candidate count mismatch")
     owners = {}
-    for language, words in [("english", english)] + list(lists.items()):
+    for language, words in [("english", english)] + [(name, lists[name]) for name in DEFAULT_MIXED]:
         for word in words:
             # Every source is NFC, so Python string keys and native UTF-16 keys
             # have the same equality here. Do not case-fold union ownership.
             owners[word] = language
     return {"schemaVersion": 1, "authoring": "independently authored Typebar vocabulary; no reference word values",
             "source": str(SOURCE), "sourceSHA256": digest(raw), "languages": records,
-            "defaultPolyglot": {"rawCandidateCount": len(english) + sum(map(len, lists.values())),
+            "defaultPolyglot": {"rawCandidateCount": len(english) + sum(len(lists[name]) for name in DEFAULT_MIXED),
                                 "unionCount": len(owners),
                                 "lastOwnerCounts": {name: list(owners.values()).count(name)
-                                                    for name in ["english", *SPECS]}}}
+                                                    for name in ["english", *DEFAULT_MIXED]}}}
 
 
 def verify_frequency(root, wheel):

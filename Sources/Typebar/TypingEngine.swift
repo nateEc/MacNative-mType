@@ -14924,11 +14924,7 @@ enum StarterLexicon {
     "interface", "françoclic", "boucle", "contrôleur",
   ]
 
-  static let italianWords = [
-    "albero", "strada", "luce", "ponte", "mattina", "cielo", "carta", "brezza",
-    "porto", "inchiostro", "giardino", "viaggio", "musica", "nuvola", "calma", "faro",
-    "montagna", "seme", "ritmo", "finestra", "riva", "memoria", "matita", "ascolto",
-  ]
+  static let italianWords = WesternBasicCorpora.italian
 
   private struct ItalianScaleSpecification {
     let marker: String

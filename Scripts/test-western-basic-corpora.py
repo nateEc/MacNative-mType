@@ -20,6 +20,13 @@ class WesternBasicCorpusAuditTests(unittest.TestCase):
         self.assertEqual(report["uppercaseCount"], 3)
         self.assertEqual(report["count"], 3)
 
+    def test_italian_does_not_silently_enter_the_default_four_language_union(self):
+        report = western.manifest(Path(__file__).resolve().parent.parent)
+        self.assertEqual(report["languages"]["italian"]["count"], 199)
+        self.assertEqual(report["defaultPolyglot"]["rawCandidateCount"], 771)
+        self.assertEqual(report["defaultPolyglot"]["unionCount"], 750)
+        self.assertNotIn("italian", report["defaultPolyglot"]["lastOwnerCounts"])
+
     def test_real_multiword_candidates_are_counted_as_candidates_not_tokens(self):
         report = western.audit_words(["ici", "tout à fait", "peu à peu"], 3, 2, 12)
         self.assertEqual(report["multiwordCount"], 2)

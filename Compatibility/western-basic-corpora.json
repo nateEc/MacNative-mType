@@ -27,6 +27,14 @@
       "uppercaseCount": 45,
       "wordsSHA256": "5096ce3837e415e877b0ac35f88dd10d63b969eee6708c063b9d6c61266f4d91"
     },
+    "italian": {
+      "count": 199,
+      "maximumLength": 10,
+      "minimumLength": 1,
+      "multiwordCount": 0,
+      "uppercaseCount": 0,
+      "wordsSHA256": "a62740b4e493c568d143e5b4f4e8b1aa18eb7b820e13be3ddc1a38a9365dd954"
+    },
     "spanish": {
       "count": 197,
       "maximumLength": 10,
@@ -38,5 +46,5 @@
   },
   "schemaVersion": 1,
   "source": "Sources/Typebar/WesternBasicCorpora.swift",
-  "sourceSHA256": "3bb114bb8a3fcd7027c4e6f134403859b3968930eefb6a4323975071a162b39a"
+  "sourceSHA256": "65e1c233b072f97f257e42faa4156b3ac9704789288af0d2a9dc55993f66533f"
 }
