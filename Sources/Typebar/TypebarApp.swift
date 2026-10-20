@@ -5963,7 +5963,7 @@ private struct ContentView: View {
     restoringCustomTextState: CustomTextStateDocument? = nil,
     restoringCustomTextRecovery: CustomTextRecoveryState? = nil
   ) -> Bool {
-    guard !PracticeThresholdSource.isPresent(in: preset) else { return false }
+    guard !settings.hasThresholdProfile, !PracticeThresholdSource.isPresent(in: preset) else { return false }
     guard acceptsRestartingConfigurationChange() else { return false }
     guard preset.settingGroups?.isEmpty != true else { return false }
     let appliesTest = !preset.isPartial || (preset.settingGroups?.contains(.test) == true)

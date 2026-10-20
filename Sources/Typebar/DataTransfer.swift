@@ -1141,7 +1141,8 @@ enum SettingsJSONCommandImport {
     static func apply(_ json: String, to settings: AppSettings) throws -> TypebarSettingsDocument {
         guard settings.allowsRestartingConfigurationChange else { throw SettingsJSONCommandError.configurationLocked }
         let document = try SettingsJSONCommandCodec.decode(json)
-        guard document.settings.thresholdSource == nil, document.configuration.rules.thresholdSource == nil
+        guard document.settings.thresholdSource == nil, document.configuration.rules.thresholdSource == nil,
+              !settings.hasThresholdProfile
         else { throw SettingsJSONCommandError.thresholdSourceNotReady }
         settings.apply(document.settings)
         settings.layoutFluidLayouts = document.layoutFluidLayouts
@@ -1754,7 +1755,7 @@ enum LocalArchiveImportError: Error, Equatable, LocalizedError {
         case .noQuitConfigurationLocked:
             return "锁定重开测试进行中，暂时不能导入会改写设置的数据。"
         case .thresholdSourceNotReady:
-            return "此归档包含尚未接入的完整阈值设置或活动选择，暂不能恢复；原数据未修改。"
+            return "完整阈值设置或活动选择的恢复尚未接入，原数据未修改。"
         }
     }
 }
@@ -1777,6 +1778,7 @@ enum LocalArchiveImport {
         modelContext: ModelContext
     ) throws -> ArchiveImportSummary {
         guard archive.settings.thresholdSource == nil,
+              !settings.hasThresholdProfile,
               !(archive.activeTestSelection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false)
         else { throw LocalArchiveImportError.thresholdSourceNotReady }
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(archive.results)

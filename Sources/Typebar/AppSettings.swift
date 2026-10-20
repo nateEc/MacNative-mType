@@ -1142,6 +1142,36 @@ final class AppSettings {
   @ObservationIgnored private var initializingSettings = true
   @ObservationIgnored private var usingExpandedPaceStorage = false
   @ObservationIgnored private var usingAccountPaceStorage = false
+  private var thresholdSourceState: PracticeThresholdSource?
+  @ObservationIgnored private var synchronizingThresholdProjection = false
+  var hasThresholdProfile: Bool {
+    thresholdSourceState != nil || defaults.object(forKey: ThresholdSettingsStore.storageKey) != nil
+  }
+  var thresholdProfileRead: ThresholdSettingsRead { ThresholdSettingsStore(defaults: defaults).read() }
+  var thresholdConfiguration: PracticeThresholdConfiguration? { thresholdSourceState?.configuration }
+
+  @discardableResult
+  func updateThresholdConfiguration(_ change: PracticeThresholdConfiguration.Change) -> Bool {
+    guard allowsRestartingConfigurationChange, let current = thresholdSourceState else { return false }
+    var configuration = current.configuration
+    do { try configuration.apply(change) } catch { return false }
+    let next = PracticeThresholdSource(configuration: configuration)
+    guard ThresholdSettingsStore(defaults: defaults).save(next.applying(to: snapshot)) else { return false }
+    thresholdSourceState = next
+    synchronizeThresholdProjection()
+    return true
+  }
+
+  private func synchronizeThresholdProjection() {
+    guard let source = thresholdSourceState else { return }
+    synchronizingThresholdProjection = true
+    defer { synchronizingThresholdProjection = false }
+    let rules = source.applying(to: InputRules())
+    minimumAccuracy = rules.minimumAccuracy
+    minimumWpm = rules.minimumWpm
+    minimumWordBurstWpm = rules.minimumWordBurstWpm
+    minimumWordBurstMode = rules.minimumWordBurstMode
+  }
   static let legacyStorageKey = "appSettings.v1"
   static let expandedPaceStorageKey = "appSettings.v2"
   static let accountPaceStorageKey = "appSettings.v3"
@@ -1455,6 +1485,14 @@ final class AppSettings {
   var codeUnindentOnBackspace = false { didSet { persist() } }
   var minimumAccuracy = 0.0 {
     didSet {
+      guard !initializingSettings, !synchronizingThresholdProjection else { return }
+      if thresholdSourceState != nil {
+        let value = minimumAccuracy
+        if !updateThresholdConfiguration(.minimumAccuracy(mode: value == 0 ? .off : .custom, customValue: value == 0 ? nil : value)) {
+          synchronizeThresholdProjection()
+        }
+        return
+      }
       let normalized = PracticeThresholdPolicy.accuracy(minimumAccuracy)
       guard minimumAccuracy == normalized else {
         minimumAccuracy = normalized
@@ -1465,6 +1503,14 @@ final class AppSettings {
   }
   var minimumWpm = 0.0 {
     didSet {
+      guard !initializingSettings, !synchronizingThresholdProjection else { return }
+      if thresholdSourceState != nil {
+        let value = minimumWpm
+        if !updateThresholdConfiguration(.minimumWpm(mode: value == 0 ? .off : .custom, customValue: value == 0 ? nil : value)) {
+          synchronizeThresholdProjection()
+        }
+        return
+      }
       let normalized = PracticeThresholdPolicy.speed(minimumWpm)
       guard minimumWpm == normalized else {
         minimumWpm = normalized
@@ -1475,6 +1521,16 @@ final class AppSettings {
   }
   var minimumWordBurstWpm = 0.0 {
     didSet {
+      guard !initializingSettings, !synchronizingThresholdProjection else { return }
+      if let source = thresholdSourceState {
+        let value = minimumWordBurstWpm
+        let mode: MinimumWordBurstMode = value == 0 ? .off
+          : source.configuration.minimumWordBurstMode == .off ? .fixed : source.configuration.minimumWordBurstMode
+        if !updateThresholdConfiguration(.minimumWordBurst(mode: mode, customValue: value == 0 ? nil : value)) {
+          synchronizeThresholdProjection()
+        }
+        return
+      }
       let normalized = PracticeThresholdPolicy.speed(minimumWordBurstWpm)
       guard minimumWordBurstWpm == normalized else {
         minimumWordBurstWpm = normalized
@@ -1493,6 +1549,11 @@ final class AppSettings {
   }
   var minimumWordBurstMode: MinimumWordBurstMode = .off {
     didSet {
+      guard !initializingSettings, !synchronizingThresholdProjection else { return }
+      if thresholdSourceState != nil {
+        if !updateThresholdConfiguration(.minimumWordBurst(mode: minimumWordBurstMode, customValue: nil)) { synchronizeThresholdProjection() }
+        return
+      }
       if minimumWordBurstMode == .off && minimumWordBurstWpm != 0 {
         minimumWordBurstWpm = 0
         return
@@ -1585,10 +1646,17 @@ final class AppSettings {
       layoutFluidLayouts = LayoutFluidPolicy.normalizedLayouts(
         rawLayouts.compactMap(KeyboardLayout.init(rawValue:)))
     }
-    guard
-      let data = defaults.data(forKey: storageKey),
-      let snapshot = try? JSONDecoder().decode(AppSettingsSnapshot.self, from: data)
-    else { return }
+    let snapshot: AppSettingsSnapshot
+    switch ThresholdSettingsStore(defaults: defaults).read() {
+    case .available(let stored):
+      snapshot = stored
+      thresholdSourceState = stored.thresholdSource
+    case .unavailable: return
+    case .missing:
+      guard let data = defaults.data(forKey: storageKey),
+        let stored = try? JSONDecoder().decode(AppSettingsSnapshot.self, from: data) else { return }
+      snapshot = stored
+    }
     difficulty = snapshot.difficulty
     strictSpace = snapshot.strictSpace
     stopOnError = snapshot.stopOnError
@@ -1709,7 +1777,7 @@ final class AppSettings {
   }
 
   var inputRules: InputRules {
-    .init(
+    let rules = InputRules(
       strictSpace: strictSpace,
       stopOnError: stopOnError,
       stopOnErrorMode: stopOnErrorMode,
@@ -1727,6 +1795,7 @@ final class AppSettings {
       minimumWordBurstWpm: minimumWordBurstWpm,
       minimumWordBurstMode: minimumWordBurstMode
     )
+    return thresholdSourceState?.applying(to: rules) ?? rules
   }
 
   var effectiveKeyboardGuideMode: KeyboardGuideMode {
@@ -1745,7 +1814,7 @@ final class AppSettings {
   }
 
   var snapshot: AppSettingsSnapshot {
-    .init(
+    let snapshot = AppSettingsSnapshot(
       difficulty: difficulty, strictSpace: strictSpace, stopOnError: stopOnError,
       stopOnErrorMode: stopOnErrorMode, deleteOnError: deleteOnError,
       deleteOnErrorMode: deleteOnErrorMode, hideExtraLetters: hideExtraLetters, blindMode: blindMode,
@@ -1818,9 +1887,23 @@ final class AppSettings {
       repeatedPace: repeatedPace,
       streakDayBoundaryOffsetHours: streakDayBoundaryOffsetHours,
       hasSetStreakDayBoundary: hasSetStreakDayBoundary)
+    return thresholdSourceState?.applying(to: snapshot) ?? snapshot
   }
 
   func restoreDefaults(customizationTombstoneStore: CustomizationTombstoneStore = .init()) {
+    let sourceBatch = thresholdSourceState != nil
+    let wasInitializing = initializingSettings
+    if sourceBatch {
+      initializingSettings = true
+      thresholdSourceState = PracticeThresholdSource(configuration: .init())
+    }
+    defer {
+      if sourceBatch {
+        synchronizeThresholdProjection()
+        initializingSettings = wasInitializing
+        persist()
+      }
+    }
     for theme in customThemes { customizationTombstoneStore.markDeletedTheme(theme.id) }
     for layout in customKeyboardLayouts { customizationTombstoneStore.markDeletedKeyboardLayout(layout.id) }
     if TypebarLocalBackgroundStore.hasImage {
@@ -1937,6 +2020,7 @@ final class AppSettings {
   }
 
   func apply(_ configuration: TestConfiguration) {
+    guard !hasThresholdProfile, configuration.rules.thresholdSource == nil else { return }
     difficulty = configuration.difficulty
     strictSpace = configuration.rules.strictSpace
     stopOnError = configuration.rules.stopOnError
@@ -2028,6 +2112,7 @@ final class AppSettings {
   }
 
   func apply(_ snapshot: AppSettingsSnapshot) {
+    guard !hasThresholdProfile, snapshot.thresholdSource == nil else { return }
     if snapshot.paceGuideMode == .accountTagPersonalBest { usingAccountPaceStorage = true }
     // Select the fork before any intermediate preference writes. Never merge
     // subsequent legacy-writer changes back over the new settings generation.
@@ -2466,6 +2551,11 @@ final class AppSettings {
 
   private func persist() {
     guard !initializingSettings else { return }
+    if let source = thresholdSourceState {
+      _ = ThresholdSettingsStore(defaults: defaults).save(source.applying(to: snapshot))
+      return
+    }
+    guard !hasThresholdProfile else { return }
     let snapshot = AppSettingsSnapshot(
       difficulty: difficulty,
       strictSpace: strictSpace,

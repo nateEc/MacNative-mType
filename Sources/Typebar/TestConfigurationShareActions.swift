@@ -59,7 +59,7 @@ struct TestConfigurationShareActionResult: Equatable {
           from: trimmed, current: current, customTextFallback: customTextFallback)
         preset = imported.preset; fields = imported.noticeFields
       }
-      guard !PracticeThresholdSource.isPresent(in: preset) else {
+      guard !PracticeThresholdSource.isPresent(in: preset), !PracticeThresholdSource.isPresent(in: current) else {
         return rejected(TestConfigurationShareError.thresholdSourceNotReady.errorDescription ?? "完整阈值设置尚未接入。")
       }
       guard let applied = applyPreset(preset) else { return rejected(rejection, important: true) }
