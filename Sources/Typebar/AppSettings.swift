@@ -1139,6 +1139,7 @@ final class AppSettings {
   @ObservationIgnored let preferenceConfigurationSaves = PreferenceConfigurationSaveRouter()
   @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored private let feedbackSound: TypingFeedbackSound
+  @ObservationIgnored let localBackgroundStore: TypebarLocalBackgroundStore
   @ObservationIgnored private var batchingClickSoundConfiguration = true
   @ObservationIgnored private var initializingSettings = true
   @ObservationIgnored private var usingExpandedPaceStorage = false
@@ -1632,9 +1633,11 @@ final class AppSettings {
   private(set) var streakDayBoundaryOffsetHours = 0.0 { didSet { persist() } }
   private(set) var hasSetStreakDayBoundary = false { didSet { persist() } }
 
-  init(defaults: UserDefaults = .standard, feedbackSound: TypingFeedbackSound = .shared) {
+  init(defaults: UserDefaults = .standard, feedbackSound: TypingFeedbackSound = .shared,
+    localBackgroundStore: TypebarLocalBackgroundStore = .configured()) {
     self.defaults = defaults
     self.feedbackSound = feedbackSound
+    self.localBackgroundStore = localBackgroundStore
     usingExpandedPaceStorage = defaults.object(forKey: Self.expandedPaceStorageKey) != nil
     usingAccountPaceStorage = defaults.object(forKey: Self.accountPaceStorageKey) != nil
     defer {
@@ -1891,7 +1894,21 @@ final class AppSettings {
     return thresholdSourceState?.applying(to: snapshot) ?? snapshot
   }
 
-  func restoreDefaults(customizationTombstoneStore: CustomizationTombstoneStore = .init()) {
+  var canRestoreDefaults: Bool {
+    guard allowsRestartingConfigurationChange else { return false }
+    guard hasThresholdProfile else { return true }
+    guard thresholdSourceState != nil, case .available = thresholdProfileRead else { return false }
+    return true
+  }
+
+  @discardableResult
+  func restoreDefaults(customizationTombstoneStore: CustomizationTombstoneStore? = nil) -> Bool {
+    guard canRestoreDefaults else { return false }
+    if localBackgroundStore.hasImage {
+      do { try localBackgroundStore.remove() } catch { return false }
+      localBackgroundRevision &+= 1
+    }
+    let customizationTombstoneStore = customizationTombstoneStore ?? .init(defaults: defaults)
     let sourceBatch = thresholdSourceState != nil
     let wasInitializing = initializingSettings
     if sourceBatch {
@@ -1907,10 +1924,6 @@ final class AppSettings {
     }
     for theme in customThemes { customizationTombstoneStore.markDeletedTheme(theme.id) }
     for layout in customKeyboardLayouts { customizationTombstoneStore.markDeletedKeyboardLayout(layout.id) }
-    if TypebarLocalBackgroundStore.hasImage {
-      try? TypebarLocalBackgroundStore.remove()
-      localBackgroundRevision &+= 1
-    }
     difficulty = .normal
     strictSpace = false
     stopOnError = false
@@ -2018,6 +2031,7 @@ final class AppSettings {
     hasSetStreakDayBoundary = false
     ActiveTestSelectionStore(defaults: defaults).remove()
     activeTestSelectionGeneration &+= 1
+    return true
   }
 
   func apply(_ configuration: TestConfiguration) {
@@ -2298,7 +2312,7 @@ final class AppSettings {
     return activeCustomThemeID
   }
 
-  var hasLocalBackground: Bool { TypebarLocalBackgroundStore.hasImage }
+  var hasLocalBackground: Bool { localBackgroundStore.hasImage }
 
   var localPracticeFontInfo: LocalPracticeFontInfo? {
     _ = localPracticeFontRevision
@@ -2310,12 +2324,12 @@ final class AppSettings {
   var isUsingLocalPracticeFont: Bool { localPracticeFontInfo != nil }
 
   func importLocalBackground(data: Data) throws {
-    try TypebarLocalBackgroundStore.save(data)
+    try localBackgroundStore.save(data)
     localBackgroundRevision &+= 1
   }
 
   func removeLocalBackground() throws {
-    try TypebarLocalBackgroundStore.remove()
+    try localBackgroundStore.remove()
     localBackgroundRevision &+= 1
   }
 

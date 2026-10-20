@@ -44,7 +44,8 @@ enum CustomBackgroundURLPolicy {
   static func normalizedRemoteURL(_ rawValue: String) -> String? {
     let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !value.isEmpty else { return "" }
-    guard value.count <= 2_048, !value.contains("`"), !value.contains("\""), !value.contains("'") else { return nil }
+    guard value.count <= 2_048, !value.contains("`"), !value.contains("\""), !value.contains("'")
+    else { return nil }
     guard let components = URLComponents(string: value),
       let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme),
       components.host?.isEmpty == false,
@@ -55,45 +56,78 @@ enum CustomBackgroundURLPolicy {
   }
 }
 
-enum TypebarLocalBackgroundStore {
-  private static let directoryName = "Typebar"
+@MainActor
+final class TypebarLocalBackgroundStore {
   private static let filename = "local-practice-background"
+  private let directoryURL: URL?
+  private var memoryData: Data?
 
-  static var hasImage: Bool {
-    FileManager.default.fileExists(atPath: fileURL.path)
+  init(directoryURL: URL) { self.directoryURL = directoryURL }
+  private init() { directoryURL = nil }
+
+  static func inMemory() -> TypebarLocalBackgroundStore { .init() }
+
+  static func configured(
+    info: [String: Any] = Bundle.main.infoDictionary ?? [:],
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> TypebarLocalBackgroundStore {
+    if QAStoreMode.usesInMemoryStore(info: info) || environment["TYPEBAR_QA_IN_MEMORY_STORE"] == "1"
+    {
+      return .inMemory()
+    }
+    let directory = FileManager.default.urls(
+      for: .applicationSupportDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("Typebar", isDirectory: true)
+    return .init(directoryURL: directory)
   }
 
-  static func image() -> NSImage? {
-    NSImage(contentsOf: fileURL)
+  var isInMemory: Bool { directoryURL == nil }
+
+  var hasImage: Bool {
+    guard let fileURL else { return memoryData != nil }
+    return FileManager.default.fileExists(atPath: fileURL.path)
   }
 
-  static func save(_ data: Data) throws {
+  func image() -> NSImage? {
+    if let fileURL { return NSImage(contentsOf: fileURL) }
+    return memoryData.flatMap(NSImage.init(data:))
+  }
+
+  func save(_ data: Data) throws {
     guard NSImage(data: data) != nil else { throw LocalBackgroundError.unsupportedImage }
+    guard let directoryURL, let fileURL else {
+      memoryData = data
+      return
+    }
     try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
     try data.write(to: fileURL, options: .atomic)
   }
 
-  static func remove() throws {
+  func remove() throws {
+    guard let fileURL else {
+      memoryData = nil
+      return
+    }
     guard hasImage else { return }
+    // This filename owns one image, never an unexpected directory tree.
+    let values = try fileURL.resourceValues(forKeys: [.isDirectoryKey])
+    guard values.isDirectory != true else { throw LocalBackgroundError.unexpectedDirectory }
     try FileManager.default.removeItem(at: fileURL)
   }
 
-  private static var directoryURL: URL {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-      .appendingPathComponent(directoryName, isDirectory: true)
-  }
-
-  private static var fileURL: URL {
-    directoryURL.appendingPathComponent(filename, isDirectory: false)
+  private var fileURL: URL? {
+    directoryURL?.appendingPathComponent(Self.filename, isDirectory: false)
   }
 }
 
 enum LocalBackgroundError: LocalizedError {
   case unsupportedImage
+  case unexpectedDirectory
 
   var errorDescription: String? {
     switch self {
     case .unsupportedImage: "请选择 macOS 可以读取的图片文件。"
+    case .unexpectedDirectory: "本地背景路径不是图片文件；已保留该目录，请检查后重试。"
     }
   }
 }
@@ -106,11 +140,12 @@ struct CustomPracticeBackground: View {
   let fit: CustomBackgroundFit
   let filter: CustomBackgroundFilter
   let localImageRevision: Int
+  let localBackgroundStore: TypebarLocalBackgroundStore
 
   var body: some View {
     ZStack {
       PracticeBackdrop(style: fallbackStyle, theme: theme, reduceMotion: reduceMotion)
-      if let localImage = TypebarLocalBackgroundStore.image() {
+      if let localImage = localBackgroundStore.image() {
         filtered(Image(nsImage: localImage))
       } else if let url = URL(string: remoteURL), !remoteURL.isEmpty {
         AsyncImage(url: url) { phase in
@@ -128,7 +163,8 @@ struct CustomPracticeBackground: View {
   @ViewBuilder private func filtered(_ image: Image) -> some View {
     switch fit {
     case .cover:
-      applyFilters(image.resizable().scaledToFill().frame(maxWidth: .infinity, maxHeight: .infinity))
+      applyFilters(
+        image.resizable().scaledToFill().frame(maxWidth: .infinity, maxHeight: .infinity))
     case .contain:
       applyFilters(image.resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity))
     case .max:

@@ -47,6 +47,7 @@ struct PreferencesView: View {
   @State private var showingRemotePersonalBestResetConfirmation = false
   @State private var showingSessionRevocationConfirmation = false
   @State private var showingRestoreDefaultsConfirmation = false
+  @State private var showingRestoreDefaultsFailure = false
   @State private var thresholdPreferenceMessage: String?
   @State private var submittedQuoteText = ""
   @State private var submittedQuoteAttribution = ""
@@ -2008,10 +2009,15 @@ struct PreferencesView: View {
     ) {
       Button("恢复默认", role: .destructive) {
         guard acceptsRestartingConfigurationChange() else { return }
-        settings.restoreDefaults()
+        showingRestoreDefaultsFailure = !settings.restoreDefaults()
       }
     } message: {
       Text("练习与外观设置将恢复默认，本地背景图片会移除；本地字体文件和练习历史会保留。")
+    }
+    .alert("未能恢复默认设置", isPresented: $showingRestoreDefaultsFailure) {
+      Button("好", role: .cancel) {}
+    } message: {
+      Text("设置被锁定、配置不可读或本地背景无法移除；请检查后重试。")
     }
     .confirmationDialog(
       "重置服务端个人最佳？", isPresented: $showingRemotePersonalBestResetConfirmation,
@@ -2051,6 +2057,11 @@ struct PreferencesView: View {
       titleVisibility: .visible
     ) {
       Button("永久重置", role: .destructive) {
+        guard acceptsRestartingConfigurationChange() else { return }
+        guard settings.canRestoreDefaults else {
+          account.statusMessage = "本机设置不可读或来自更新版本；尚未发起账户重置，请先处理本机配置。"
+          return
+        }
         Task {
           guard await account.resetAccount(
             currentPassword: accountResetPassword.isEmpty ? nil : accountResetPassword)

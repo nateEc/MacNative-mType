@@ -1491,7 +1491,8 @@ private struct ContentView: View {
         reduceMotion: settings.reducePracticeMotion,
         remoteURL: settings.customBackgroundURL, fit: settings.customBackgroundFit,
         filter: settings.customBackgroundFilter,
-        localImageRevision: settings.localBackgroundRevision)
+        localImageRevision: settings.localBackgroundRevision,
+        localBackgroundStore: settings.localBackgroundStore)
     )
     .background(
       WindowCloseConfirmationBridge(
