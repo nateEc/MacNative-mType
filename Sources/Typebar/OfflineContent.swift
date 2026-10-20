@@ -6341,6 +6341,7 @@ struct TestSessionFactory {
   static func make(
     configuration: TestConfiguration,
     customText: String = "",
+    customTextIsPrepared: Bool = false,
     finiteTextSource: String? = nil,
     verifiedScript: ReferenceScriptChallengePolicy.VerifiedScript? = nil,
     quote: OfflineQuote? = nil,
@@ -6472,7 +6473,8 @@ struct TestSessionFactory {
           randomCustomSourceTokens = source.split(whereSeparator: \.isWhitespace).map(String.init)
         }
         if streamsCustomSections {
-          if var stream = CustomSectionWordStream(source: source, configuration: configuration) {
+          if var stream = CustomSectionWordStream(source: source, configuration: configuration,
+            preservesSourceSpelling: customTextIsPrepared) {
             let chunk = withoutActuallyEscaping(nextRandomWordIndex) { random in
               stream.nextChunk(random: random, nextRandomCaseBit: nextRandomCaseBit)
             }
@@ -7160,7 +7162,9 @@ enum CustomTextOrderPolicy {
   ) -> Bool {
     guard let first = section.unicodeScalars.split(separator: " ").first else { return false }
     let key = candidateWordKey(String(String.UnicodeScalarView(first)), lazyLanguage: lazyLanguage)
-    return previous.suffix(2).contains { recentWordKey($0, lazyLanguage: lazyLanguage) == key }
+    return previous.suffix(2).contains {
+      InputTextIdentity.matches(recentWordKey($0, lazyLanguage: lazyLanguage), key)
+    }
   }
 
   static func randomWords(
@@ -7185,7 +7189,9 @@ enum CustomTextOrderPolicy {
       var candidate = drawCandidate()
       if tokens.count >= 4 {
         var attempts = 0
-        while attempts < 100 && recent.contains(candidateWordKey(candidate, lazyLanguage: lazyLanguage)) {
+        while attempts < 100 && recent.contains(where: {
+          InputTextIdentity.matches($0, candidateWordKey(candidate, lazyLanguage: lazyLanguage))
+        }) {
           attempts += 1
           candidate = drawCandidate()
         }

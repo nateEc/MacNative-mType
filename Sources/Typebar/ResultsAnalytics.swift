@@ -802,11 +802,12 @@ struct ContextualMissedWordPracticePlan: Equatable {
   static let maximumSelectedWords = 10
 
   static func make(reviews: [TypedWordReview], errorCounts: [Int]) -> Self? {
-    let countsByTarget = reviews.indices.reduce(into: [String: Int]()) { totals, index in
+    // Source word keys are exact strings, not canonical Unicode aliases.
+    let countsByTarget = reviews.indices.reduce(into: [[UInt16]: Int]()) { totals, index in
       let count = errorCounts.indices.contains(index) ? errorCounts[index] : 0
       let target = reviews[index].target
       guard count > 0, !target.isEmpty else { return }
-      totals[target, default: 0] += count
+      totals[Array(target.utf16), default: 0] += count
     }
     struct Candidate {
       let index: Int
@@ -815,7 +816,7 @@ struct ContextualMissedWordPracticePlan: Equatable {
     }
     let selected = reviews.indices.compactMap { index -> Candidate? in
       let target = reviews[index].target
-      guard let count = countsByTarget[target], count > 0 else { return nil }
+      guard let count = countsByTarget[Array(target.utf16)], count > 0 else { return nil }
       let phrase = index > 0 && !reviews[index - 1].target.isEmpty
         ? "\(reviews[index - 1].target) \(target)" : target
       return .init(index: index, phrase: phrase, count: count)
@@ -873,8 +874,8 @@ struct MissedAndSlowWordPracticePlan: Equatable {
     let selectedMissed = Array(missed.selectedWords.prefix(maximumMissedWords))
     let selectedSlow = Array(slow.selectedWords.prefix(maximumSlowWords))
     guard !selectedMissed.isEmpty, !selectedSlow.isEmpty else { return nil }
-    let missedSet = Set(selectedMissed)
-    let missedWords = missed.exerciseWords.filter { missedSet.contains($0) }
+    let missedSet = Set(selectedMissed.map { Array($0.utf16) })
+    let missedWords = missed.exerciseWords.filter { missedSet.contains(Array($0.utf16)) }
     let slowWords = selectedSlow.enumerated().flatMap { index, word in
       Array(repeating: word, count: selectedSlow.count - index)
     }

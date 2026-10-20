@@ -23,8 +23,9 @@ enum CustomTextPolicy {
             || !CustomSectionWordStream.sourceSections(from: text, usesPipe: true).isEmpty)
     }
 
-    static func sections(in text: String) -> [String] {
-        CustomSectionWordStream.sourceSections(from: text, usesPipe: true)
+    static func sections(in text: String, preservesSourceSpelling: Bool = false) -> [String] {
+        CustomSectionWordStream.sourceSections(from: text, usesPipe: true,
+            preservesSourceSpelling: preservesSourceSpelling)
     }
 
     static func isValidSavedText(

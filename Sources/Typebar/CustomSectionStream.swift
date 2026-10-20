@@ -26,8 +26,9 @@ struct CustomSectionWordStream {
   private var emittedWords = 0
   private var randomState = UInt64.random(in: .min ... .max)
 
-  init?(source: String, configuration: TestConfiguration) {
-    var sections = Self.sourceSections(from: source, usesPipe: configuration.usesCustomTextPipeDelimiter)
+  init?(source: String, configuration: TestConfiguration, preservesSourceSpelling: Bool = false) {
+    var sections = Self.sourceSections(from: source, usesPipe: configuration.usesCustomTextPipeDelimiter,
+      preservesSourceSpelling: preservesSourceSpelling)
     if configuration.modifiers.contains(.backwards) { sections.reverse() }
     let limit: Int
     switch configuration.customTextCompletion {
@@ -160,7 +161,9 @@ struct CustomSectionWordStream {
   }
 
   private func shouldAvoid(_ section: String) -> Bool {
-    if configuration.customTextCompletion == .sections { return recentSections.contains(section) }
+    if configuration.customTextCompletion == .sections {
+      return recentSections.contains { InputTextIdentity.matches($0, section) }
+    }
     return CustomTextOrderPolicy.avoidsRecentFirstWord(in: section, previous: recentWords,
       lazyLanguage: configuration.modifiers.contains(.lazyLatin) ? configuration.language : nil)
   }
@@ -172,10 +175,10 @@ struct CustomSectionWordStream {
     return Int((randomState >> 32) % UInt64(bound))
   }
 
-  static func sourceSections(from source: String, usesPipe: Bool) -> [String] {
+  static func sourceSections(from source: String, usesPipe: Bool, preservesSourceSpelling: Bool = false) -> [String] {
     // A literal delimiter may share a grapheme with the following mark. It
     // still separates candidates; the mark belongs to the next candidate.
-    normalized(source).unicodeScalars.split(separator: usesPipe ? "|" : " ")
+    normalized(source, preservesSourceSpelling: preservesSourceSpelling).unicodeScalars.split(separator: usesPipe ? "|" : " ")
       .map { scalars in
         let trimmed = scalars.drop(while: { $0 == " " }).reversed()
           .drop(while: { $0 == " " }).reversed()
@@ -184,10 +187,13 @@ struct CustomSectionWordStream {
       .filter { !$0.isEmpty }
   }
 
-  private static func normalized(_ source: String) -> String {
+  private static func normalized(_ source: String, preservesSourceSpelling: Bool) -> String {
     var text = ""
     var previousWasCR = false
-    for scalar in source.precomposedStringWithCanonicalMapping.unicodeScalars {
+    // The editor applies NFC; result-driven prepared targets bypass that
+    // editor step without bypassing the existing whitespace rules.
+    let spelling = preservesSourceSpelling ? source : source.precomposedStringWithCanonicalMapping
+    for scalar in spelling.unicodeScalars {
       if scalar.value == 0x0A && previousWasCR {
         previousWasCR = false
         continue

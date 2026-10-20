@@ -6087,7 +6087,7 @@ struct TypingSession {
     let errorCounts = missedWordErrorCountsByWord
     var result: [MissedWordErrorCount] = []
     for index in targetWords.indices where errorCounts.indices.contains(index) && errorCounts[index] > 0 {
-      if let existing = result.firstIndex(where: { $0.word == targetWords[index] }) {
+      if let existing = result.firstIndex(where: { InputTextIdentity.matches($0.word, targetWords[index]) }) {
         result[existing] = .init(word: targetWords[index], count: result[existing].count + errorCounts[index])
       } else {
         result.append(.init(word: targetWords[index], count: errorCounts[index]))
@@ -6145,9 +6145,13 @@ struct TypingSession {
       return (0..<count).map { index in
         let input = recordedFieldStats.history(index)
         let target = unitTargets.field(index)
+        let text = String(decoding: input, as: UTF16.self)
         return .init(index: index, target: noSpaceTargetWords[index],
-          typed: String(decoding: input, as: UTF16.self),
-          hasInputError: input == target && noSpaceUnitAttemptErrors[index, default: 0] > 0)
+          typed: text,
+          // Lossy display can match a literal replacement glyph even when
+          // the retained source unit is an unmatched surrogate.
+          hasInputError: InputTextIdentity.matches(text, noSpaceTargetWords[index])
+            && (input != target || noSpaceUnitAttemptErrors[index, default: 0] > 0))
       }
     }
     guard (!typed.isEmpty || !attemptedErrorCounts.isEmpty),
