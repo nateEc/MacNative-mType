@@ -52,7 +52,11 @@ final class ThresholdSourceCarrierTests: XCTestCase {
       .init(configuration: .words(17), settingsSnapshot: snapshot)))
     var configuration = TestConfiguration.words(17)
     configuration.rules = value.applying(to: configuration.rules)
-    XCTAssertThrowsError(try TestConfigurationShare.link(for: .init(configuration: configuration)))
+    struct LegacyShare: Encodable { let version = 2; let preset: SavedTestPreset }
+    let bytes = try encoder.encode(LegacyShare(preset: .init(configuration: configuration)))
+    let token = bytes.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+      .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+    XCTAssertThrowsError(try TestConfigurationShare.preset(from: "typebar://test?preset=" + token))
     let archive = TypebarArchive(version: 33, exportedAt: Date(timeIntervalSince1970: 1_000),
       settings: snapshot, results: [], presets: [])
     XCTAssertThrowsError(try JSONEncoder().encode(archive))

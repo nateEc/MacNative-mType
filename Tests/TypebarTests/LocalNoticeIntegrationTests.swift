@@ -28,7 +28,7 @@ final class LocalNoticeIntegrationTests: XCTestCase {
     let end = try XCTUnwrap(source.range(of: "private func restoreActiveTestSelection", range: start.upperBound..<source.endIndex))
     let body = String(source[start.lowerBound..<end.lowerBound])
     let lastRejection = try XCTUnwrap(body.range(of: "return false", options: .backwards))
-    let clear = try XCTUnwrap(body.range(of: "practiceReturnPreset = nil"))
+    let clear = try XCTUnwrap(body.range(of: "wordPractice = nil"))
     XCTAssertGreaterThan(clear.lowerBound, lastRejection.upperBound,
       "Static ordering guard only: rejected imports must not retire the practice return selection")
   }
