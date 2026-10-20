@@ -32,16 +32,19 @@ struct PromptViewportPracticePrompt: View {
   private let snapshot: PromptViewportPracticeSnapshot
   let onFailure: (UUID) -> Void
   let onReady: (PromptViewportPresentationReady) -> Void
+  let wrapLayout: PromptInputWrapLayout?
   @State private var height: CGFloat = 1
   init(session: TypingSession, style: PromptRenderStyle, font: NSFont,
-    carets: PromptCaretNativeView.Configuration, onFailure: @escaping (UUID) -> Void,
+    carets: PromptCaretNativeView.Configuration, wrapLayout: PromptInputWrapLayout? = nil,
+    onFailure: @escaping (UUID) -> Void,
     onReady: @escaping (PromptViewportPresentationReady) -> Void = { _ in }) {
     snapshot = .init(session: session, style: style, font: font, carets: carets)
     self.onFailure = onFailure
     self.onReady = onReady
+    self.wrapLayout = wrapLayout
   }
   var body: some View {
-    PromptViewportPracticeBridge(snapshot: snapshot, onFailure: onFailure, onReady: onReady,
+    PromptViewportPracticeBridge(snapshot: snapshot, onFailure: onFailure, onReady: onReady, wrapLayout: wrapLayout,
       onHeight: { height = $0 }).frame(height: height)
   }
 }
@@ -50,10 +53,12 @@ private struct PromptViewportPracticeBridge: NSViewRepresentable {
   let snapshot: PromptViewportPracticeSnapshot
   let onFailure: (UUID) -> Void
   let onReady: (PromptViewportPresentationReady) -> Void
+  let wrapLayout: PromptInputWrapLayout?
   let onHeight: (CGFloat) -> Void
   func makeNSView(context: Context) -> PromptViewportPracticeNativeView { .init() }
   func updateNSView(_ view: PromptViewportPracticeNativeView, context: Context) {
     view.configure(snapshot, onFailure: onFailure, onHeight: onHeight, onReady: onReady)
+    wrapLayout?.view = view.viewport.canvas
   }
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: PromptViewportPracticeNativeView,
     context: Context) -> CGSize? {

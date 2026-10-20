@@ -12,6 +12,7 @@ struct PromptFieldPracticePrompt: View {
   var viewportLineCount: Int? = nil
   var preparedLayout: PromptFieldTextLayout? = nil
   var accessibilityText: String? = nil
+  var wrapLayout: PromptInputWrapLayout? = nil
   var onMeasuredWidth: ((CGFloat) -> Void)? = nil
   @State private var viewportHeight: CGFloat?
 
@@ -20,6 +21,7 @@ struct PromptFieldPracticePrompt: View {
     lineScroll: PromptLineScrollContext? = nil, viewportLineCount: Int? = nil,
     preparedLayout: PromptFieldTextLayout? = nil,
     accessibilityText: String? = nil,
+    wrapLayout: PromptInputWrapLayout? = nil,
     onMeasuredWidth: ((CGFloat) -> Void)? = nil) {
     renderingSnapshot = PromptFieldRenderingSnapshot(rendering)
     self.font = font; self.lineSpacing = lineSpacing
@@ -27,6 +29,7 @@ struct PromptFieldPracticePrompt: View {
     self.carets = carets; self.lineScroll = lineScroll
     self.viewportLineCount = viewportLineCount; self.preparedLayout = preparedLayout
     self.accessibilityText = accessibilityText
+    self.wrapLayout = wrapLayout
     self.onMeasuredWidth = onMeasuredWidth
   }
 
@@ -34,7 +37,7 @@ struct PromptFieldPracticePrompt: View {
     PromptFieldBridge(renderingSnapshot: renderingSnapshot, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
-      accessibilityText: accessibilityText,
+      accessibilityText: accessibilityText, wrapLayout: wrapLayout,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: { viewportHeight = $0 })
       .preference(key: PracticeViewportHeightKey.self, value: viewportHeight)
   }
@@ -58,6 +61,7 @@ private struct PromptFieldBridge: NSViewRepresentable {
   let viewportLineCount: Int?
   let preparedLayout: PromptFieldTextLayout?
   let accessibilityText: String?
+  let wrapLayout: PromptInputWrapLayout?
   let onMeasuredWidth: ((CGFloat) -> Void)?
   let onViewportHeight: (CGFloat?) -> Void
   func makeNSView(context: Context) -> PromptFieldNativeView { PromptFieldNativeView() }
@@ -67,6 +71,7 @@ private struct PromptFieldBridge: NSViewRepresentable {
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
       accessibilityText: accessibilityText,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: onViewportHeight)
+    wrapLayout?.view = view
   }
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: PromptFieldNativeView, context: Context) -> CGSize? {
     nsView.proposalSize(width: max(1, proposal.width ?? nsView.bounds.width))

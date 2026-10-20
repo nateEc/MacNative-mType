@@ -3331,6 +3331,7 @@ private struct ContentView: View {
         PromptViewportPracticePrompt(session: session, style: promptRenderStyle,
           font: practicePromptNSFont(size: settings.fontSize),
           carets: makeSpecialPromptCaretConfiguration(rightToLeft: isRightToLeft),
+          wrapLayout: promptInputWrapLayout,
           onFailure: { attempt in
             guard session.automaticInputAttemptID == attempt else { return }
             viewportFallbackAttemptID = attempt
@@ -3387,11 +3388,8 @@ private struct ContentView: View {
           lineScroll: showsAllPracticeLines ? nil : practiceLineScrollContext(rendering),
           viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3),
           preparedLayout: preparedWholePreviewLayout,
+          wrapLayout: promptInputWrapLayout,
           onMeasuredWidth: showsAllPracticeLines ? { width in wholePreviewFieldWidth = width } : nil)
-          .overlay {
-            PromptInputWrapOverlay(layout: promptInputWrapLayout)
-              .allowsHitTesting(false).accessibilityHidden(true)
-          }
       } else if let rendering {
         Text(rendering.text)
           .lineSpacing(usesJoiningScript ? 8 : 12)

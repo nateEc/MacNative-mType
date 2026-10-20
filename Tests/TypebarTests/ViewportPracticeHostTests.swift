@@ -87,11 +87,12 @@ import XCTest
         installedFontName: settings.installedPracticeFontName, language: session.configuration.language)
       return PromptFieldTextLayout(map: map, width: width, font: font)
     }
-    func waitUntil(_ ready: () -> Bool) {
+    func waitUntil(_ ready: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
       flush()
       let deadline = Date().addingTimeInterval(15)
       while !ready() && Date() < deadline { flush() }
-      XCTAssertTrue(ready(), "Practice page did not reach the expected renderer")
+      let native = views(PromptViewportPracticeNativeView.self).first
+      XCTAssertTrue(ready(), "Practice page did not reach the expected renderer: complete=\(native?.viewport.canvas.hasCompleteHeight as Any), frame=\(native?.frame as Any), measuredHeight=\(native?.measuredHeight as Any), input=\(views(TypingInputView.self).first?.acceptsTextInput as Any)", file: file, line: line)
     }
     func close() {
       host.rootView = AnyView(EmptyView())
@@ -418,6 +419,62 @@ import XCTest
       && fixture.views(PromptFieldNativeView.self).contains { ($0.accessibilityValue() as? String)?.hasPrefix("word0xx") == true } }
     XCTAssertEqual(native.viewport.measuredFieldCount, 0)
     XCTAssertGreaterThan(fixture.counts.completeRenders, completeBefore)
+    XCTAssertFalse(fixture.settings.allowsRestartingConfigurationChange)
+    XCTAssertEqual(fixture.counts.generation, 1)
+  }
+
+  func testViewportBatchKeepsFittingExtrasButRejectsWordHeightGrowthBeforeFallback() throws {
+    for viewportEnabled in [true, false] {
+      try checkBatchWrapAdmission(viewportEnabled: viewportEnabled)
+    }
+  }
+
+  private func checkBatchWrapAdmission(viewportEnabled: Bool) throws {
+    let prompt = String(repeating: "a", count: 28) + " tail"
+    let fixture = try Fixture(promptOverride: prompt, viewportEnabled: viewportEnabled)
+    defer { fixture.close() }
+    fixture.settings.customPracticeLineColumns = 30
+    fixture.settings.practiceLineWidth = .custom
+    fixture.waitUntil { viewportEnabled ? fixture.promptReady : fixture.views(PromptFieldNativeView.self).contains {
+      $0.accessibilityValue() as? String == prompt
+    } }
+    let widthView: NSView = viewportEnabled
+      ? try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first).viewport.canvas
+      : try XCTUnwrap(fixture.views(PromptFieldNativeView.self).first)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    let font = fixture.settings.practiceFont.nsFont(size: fixture.settings.fontSize,
+      installedFontName: fixture.settings.installedPracticeFontName, language: .english)
+    let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
+      accent: .blue, colorScheme: .light), fontSize: fixture.settings.fontSize)
+    let width = widthView.bounds.width
+    var expected = TypingSession(configuration: .words(201).with(modifiers: [.noQuit]), prompt: prompt)
+    let data = String(repeating: "a", count: 28) + String(repeating: "x", count: 12)
+    expected.insertBatch(data, at: .now, wrapAdmission: .init { current, candidate in
+      PromptInputWrapGeometry.rejects(session: current, candidate: candidate,
+        rendering: PromptRenderPlan(session: current, composition: "", style: style).render(),
+        width: width, font: font, lineSpacing: 12, isRightToLeft: false)
+    })
+    XCTAssertGreaterThan(expected.typed.count, 28, "The fitting extras must still be accepted")
+    XCTAssertLessThan(expected.typed.count, data.count, "The oracle must exercise a real wrap rejection")
+    let expectedText = String(PromptRenderPlan(session: expected, composition: "", style: style).render().text.characters)
+    input.onInsert(data, false)
+    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).isEmpty
+      && !fixture.views(PromptFieldNativeView.self).isEmpty }
+    XCTAssertEqual(fixture.views(PromptFieldNativeView.self).first?.accessibilityValue() as? String, expectedText,
+      "viewportEnabled=\(viewportEnabled)")
+    fixture.settings.customPracticeLineColumns = 60
+    fixture.waitUntil { (fixture.views(PromptFieldNativeView.self).first?.bounds.width ?? 0) > width }
+    let expandedWidth = try XCTUnwrap(fixture.views(PromptFieldNativeView.self).first).bounds.width
+    let more = String(repeating: "x", count: 10)
+    expected.insertBatch(more, at: .now, wrapAdmission: .init { current, candidate in
+      PromptInputWrapGeometry.rejects(session: current, candidate: candidate,
+        rendering: PromptRenderPlan(session: current, composition: "", style: style).render(),
+        width: expandedWidth, font: font, lineSpacing: 12, isRightToLeft: false)
+    })
+    XCTAssertEqual(expected.typed.count, 40, "Widening must allow the formerly rejected extras")
+    try XCTUnwrap(fixture.views(TypingInputView.self).first).onInsert(more, false)
+    let expandedText = String(PromptRenderPlan(session: expected, composition: "", style: style).render().text.characters)
+    fixture.waitUntil { fixture.views(PromptFieldNativeView.self).first?.accessibilityValue() as? String == expandedText }
     XCTAssertFalse(fixture.settings.allowsRestartingConfigurationChange)
     XCTAssertEqual(fixture.counts.generation, 1)
   }
