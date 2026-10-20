@@ -108,7 +108,9 @@ enum WeakSpotPractice {
     guard let report = report(
       results: results, language: language, englishVariant: englishVariant)
     else { return nil }
-    let pool = report.suggestedWords
+    // The drill's word limit counts space-separated fields, not lexicon candidates.
+    let pool = report.suggestedWords.flatMap { $0.split(separator: " ").map(String.init) }
+    guard !pool.isEmpty else { return nil }
     return (0..<max(1, wordCount)).map { pool[$0 % pool.count] }.joined(separator: " ")
   }
 
