@@ -11,6 +11,7 @@ import Observation
   @ObservationIgnored private var hasQueuedCommit = false
   var isTransitionPending: Bool { hasQueuedCommit }
   @ObservationIgnored var onWillCommit: (() -> Void)?
+  @ObservationIgnored private var isNotifyingCommit = false
   @ObservationIgnored private let schedule: (@escaping @MainActor () -> Void) -> Void
 
   init(schedule: @escaping (@escaping @MainActor () -> Void) -> Void = { callback in
@@ -29,7 +30,7 @@ import Observation
     let ticket = generation
     schedule { [weak self] in
       guard let self, self.generation == ticket else { return }
-      self.onWillCommit?()
+      self.notifyWillCommit()
       guard self.generation == ticket else { return }
       self.hasQueuedCommit = false
       self.isFocused = value
@@ -70,9 +71,24 @@ import Observation
   /// Native window/sheet retirement must invalidate queued entry immediately.
   /// It must never retain callbacks into a detached or background practice page.
   func retire() {
-    generation &+= 1
-    hasQueuedCommit = false
+    invalidatePendingCommit()
+    if isFocused { notifyWillCommit() }
+    // Capture may synchronously retire again or request entry. The outer
+    // retirement owns the final state and cancels those requests as well.
+    invalidatePendingCommit()
     isFocused = false
     startCaretBlinking()
+  }
+
+  private func notifyWillCommit() {
+    guard !isNotifyingCommit else { return }
+    isNotifyingCommit = true
+    defer { isNotifyingCommit = false }
+    onWillCommit?()
+  }
+
+  private func invalidatePendingCommit() {
+    generation &+= 1
+    hasQueuedCommit = false
   }
 }

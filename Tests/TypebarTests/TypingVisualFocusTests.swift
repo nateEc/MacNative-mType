@@ -57,6 +57,33 @@ import XCTest
     XCTAssertFalse(focus.isTransitionPending)
   }
 
+  func testDirectRetirementNotifiesOnceAndCancelsReentrantRequests() {
+    let frames = Frames(), focus = frames.makeFocus()
+    focus.set(true)
+    frames.flush()
+    var notifications = 0
+    focus.onWillCommit = { [weak focus] in
+      guard let focus else { return }
+      notifications += 1
+      XCTAssertTrue(focus.isFocused, "Capture must see the pre-retirement layout state")
+      XCTAssertFalse(focus.isTransitionPending, "Cancel the old queue before capture")
+      focus.retire()
+      focus.set(true)
+    }
+    focus.set(false)
+    focus.retire()
+    frames.flush()
+    XCTAssertEqual(notifications, 1)
+    XCTAssertFalse(focus.isFocused)
+    XCTAssertFalse(focus.isTransitionPending)
+    focus.retire()
+    XCTAssertEqual(notifications, 1, "Already retired state must not recapture")
+    focus.onWillCommit = nil
+    focus.set(true)
+    frames.flush()
+    XCTAssertTrue(focus.isFocused, "Retirement must not disable a later real entry")
+  }
+
   func testRepeatedSameTurnRequestsHaveOnlyOneQueuedCommit() {
     let frames = Frames(), focus = frames.makeFocus()
     for _ in 0..<100 { focus.set(true) }

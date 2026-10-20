@@ -168,6 +168,50 @@ import XCTest
       && !full.isAwaitingFallbackPosition }
     XCTAssertEqual(page.contentView.bounds.minY, 0,
       "A layout transition must not navigate an already top-aligned page")
+    let focusedHeight = try XCTUnwrap(page.documentView).frame.height
+    try XCTUnwrap(fixture.views(TypingInputView.self).first).onWindowFocusChanged(false, false)
+    fixture.waitUntil { (page.documentView?.frame.height ?? focusedHeight) > focusedHeight
+      && !full.isAwaitingFallbackPosition }
+    XCTAssertEqual(page.contentView.bounds.minY, 0,
+      "Direct retirement must not introduce page-top navigation either")
+  }
+
+  func testWindowAndAttachedSheetRetirementKeepTheWholePromptReadingRow() throws {
+    for (isKey, attachedSheet) in [(false, false), (true, true), (false, true)] {
+      let fixture = try Fixture(viewportEnabled: false)
+      defer { fixture.close() }
+      fixture.waitUntil { fixture.completePromptReady }
+      let full = try XCTUnwrap(fixture.views(PromptFieldNativeView.self).first)
+      let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+      let page = try XCTUnwrap(full.enclosingScrollView)
+      let document = try XCTUnwrap(page.documentView)
+      let initialHeight = document.frame.height
+      input.onInsert("w", false)
+      fixture.waitUntil { document.frame.height < initialHeight && !full.isAwaitingFallbackPosition }
+      let start = try XCTUnwrap(fixture.prompt.range(of: "word100")?.lowerBound)
+      let anchor = fixture.prompt.distance(from: fixture.prompt.startIndex, to: start)
+      let rect = try XCTUnwrap(full.measuredRect(for: anchor))
+      page.contentView.scroll(to: full.convert(rect.origin, to: document))
+      page.reflectScrolledClipView(page.contentView)
+      fixture.flush()
+      let before = full.visibleRect.minY - rect.minY
+      let focusedHeight = document.frame.height
+      input.onWindowFocusChanged(isKey, attachedSheet)
+      fixture.waitUntil { document.frame.height > focusedHeight && !full.isAwaitingFallbackPosition }
+      XCTAssertEqual(full.visibleRect.minY - rect.minY, before, accuracy: 1,
+        "Direct retirement must preserve the reading row; isKey=\(isKey), attachedSheet=\(attachedSheet)")
+      let retiredHeight = document.frame.height
+      input.onWindowFocusChanged(true, false)
+      input.onInsert("o", false)
+      fixture.waitUntil { document.frame.height < retiredHeight && !full.isAwaitingFallbackPosition
+        && full.measuredMainCaretRect() == full.measuredRect(for: 2) }
+      XCTAssertEqual(full.visibleRect.minY - rect.minY, before, accuracy: 1,
+        "Refocus must continue the same input and reading position")
+      XCTAssertTrue(fixture.views(PromptFieldNativeView.self).first === full)
+      XCTAssertEqual(fixture.counts.generation, 1)
+      XCTAssertFalse(fixture.settings.allowsRestartingConfigurationChange)
+      XCTAssertFalse(fixture.window.isVisible)
+    }
   }
 
   func testShortDefaultPracticeStillShowsThreeRowsAfterFocusEntry() throws {
