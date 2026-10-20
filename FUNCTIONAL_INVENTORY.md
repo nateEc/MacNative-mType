@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-21 设置页阈值消费者：六个 Binding 接入已有 v4 的独立模式／记忆，custom/fixed/flex 0 不再被隐藏或关掉；关闭后重新开启恢复记忆而不覆盖成旧默认值。拒写反馈、No Quit 预检和不可读新代禁用仍保留；普通配置不自动升级。九项新增回归，最终相关 124 项零失败／零跳过（3.672 秒），生产接线静态检查不等于可见 UI。行为优先与迁移安全促成先行复现及源／旧配置隔离，发布、完整迁移和窗口验收继续开放。人工清单 1,209 项仅结构检查；本批仅本地提交，无推送或远程重跑。
+
 2026-10-21 源阈值命令与编辑器：已有 v4 的数值提交接入原子接口并显式保留 custom/fixed/flex 零值，关闭命令只关模式、保留记忆；锁定／未来／不可读配置拒绝后不发保存回调。命令编辑器预填记忆值而非关闭后的活跃 0，使用 Bool 结果，失败保留面板并显示固定错误；关闭命令失败给通知，不误开编辑器或重开。
 
 八项新增回归。首段三项有效先行八处失败；接线后定向 16 项及扩大 605 项零失败／零跳过。再补未修改预填值的精度保留后，最终输入／命令 25 项零失败／零跳过；范围重叠不相加，未声称最终补充后重跑 605 项。行为优先与迁移安全促成成功后回调和原值保存；普通旧配置不自动迁移，全局设置页／发布／跨窗口及可见面板仍待继续，完整目标 active。人工清单 1,208 项仅结构检查。
@@ -1837,7 +1839,8 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
-| CFG-THRESHOLD-COMMAND-01 | 完整源阈值命令与编辑确认 | `commandline/lists/min-burst.ts`, `commandline/lists/min-wpm.ts` | CommandDomain, PreferencesDomain | 部分实现：已有 v4 的提交／关闭用原子源接口，零值模式与关闭记忆保持；失败不报成功、编辑器不关闭，预填读取记忆，原值跨单位确认保留精度。普通配置保持既有路径，未全局启用。605 项扩大和最终 25 项输入回归通过，不相加；实机、跨窗口和原版所有输入截断边界待验收。 |
+| CFG-THRESHOLD-PREFERENCES-01 | 设置页完整阈值模式与记忆 | `commandline/lists.ts`, `commandline/lists/min-burst.ts`, `test/test-timer.ts` | PreferencesDomain | 部分实现：已有 v4 的开关、数值及 Burst 模式绑定完整源；开启零值仍显示开启，关闭／再开不覆盖记忆；不可读新代与保存失败不回退旧写法。保留 No Quit 预检和普通配置旧语义，不自动升级；九项新增回归含实际 Binding 和生产接线静态检查，可见窗口、跨窗口和完整迁移待验收。 |
+| CFG-THRESHOLD-COMMAND-01 | 完整源阈值命令与编辑确认 | `commandline/lists/min-burst.ts`, `commandline/lists.ts` | CommandDomain, PreferencesDomain | 部分实现：已有 v4 的提交／关闭用原子源接口，零值模式与关闭记忆保持；失败不报成功、编辑器不关闭，预填读取记忆，原值跨单位确认保留精度。普通配置保持既有路径，未全局启用。605 项扩大和最终 25 项输入回归通过，不相加；实机、跨窗口和原版所有输入截断边界待验收。 |
 | CFG-THRESHOLD-OWNER-01 | 正式设置的完整阈值源所有权 | `config/persistence.ts`, `commandline/lists/min-burst.ts` | PreferencesDomain, TestDomain | 部分实现：已有 v4 在实际 AppSettings 中加载、输出完整规则和单独持久化，原子更新支持独立模式／记忆与零值，数字关闭保留记忆。旧配置不自动迁移，旧整体应用入口对源目标明确拒绝；完整菜单和发布尚未启用。七项新回归、598 项相关检查通过；恢复默认源分支、真实窗口、冷进程与全局升级仍待验收。详见 `THRESHOLD_SOURCE_MIGRATION_CONTRACT.md`。 |
 | TST-STATE-SOURCE-01 | 完整阈值活动选择保存 | `config/persistence.ts`, `config/lifecycle.ts` | TestDomain, PreferencesDomain | 部分实现：源选择采用 v2 独立键，保留完整模式／记忆及限制参数，不重复保存全局设置／标签；新键不可读时拒写而不回退，v35 归档可无损携带。普通 v1 保持原写法，源恢复与正式运行期尚未接入。七项新回归、591 项相关检查通过，实机／跨进程／混用旧版仍待验收；详见 `THRESHOLD_SOURCE_MIGRATION_CONTRACT.md`。 |
 | MET-LIVE-01 | 实时准确率与盲打指标边界 | `states/live-stats.ts`, `test/test-ui.ts`, `test/test-timer.ts`, `test/events/live-cache.ts` | TypingDomain, PracticeScreen | 部分实现：实时准确率按当前输入／整秒更新相位后向下取整，盲打显示 100% 并用 Raw 速度，自有实时错误卡隐藏；当前盲打切换可覆盖会话初始设置且不改变计分。最低门槛仍使用未舍入原值；无窗口 AppKit 与真实会话自动化已覆盖。动态提示字形／声音和完整实机验收仍待独立补证。 |

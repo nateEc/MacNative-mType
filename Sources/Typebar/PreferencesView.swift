@@ -47,6 +47,7 @@ struct PreferencesView: View {
   @State private var showingRemotePersonalBestResetConfirmation = false
   @State private var showingSessionRevocationConfirmation = false
   @State private var showingRestoreDefaultsConfirmation = false
+  @State private var thresholdPreferenceMessage: String?
   @State private var submittedQuoteText = ""
   @State private var submittedQuoteAttribution = ""
   @State private var submittedQuoteLanguage: TypingLanguage = .english
@@ -256,54 +257,70 @@ struct PreferencesView: View {
           Text("仅代码语言有效：光标位于自动插入的行首 Tab 时，退格会移除整段缩进并返回上一行。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Toggle("最低准确率", isOn: minimumAccuracyEnabledBinding(settings: settings))
-          if settings.minimumAccuracy > 0 {
-            Stepper(
-              value: restartingConfigurationBinding($settings.minimumAccuracy), in: 0...100, step: 1
+          Group {
+            Toggle("最低准确率", isOn: thresholdPreferences.accuracyEnabled)
+            if thresholdPreferences.accuracyEnabled.wrappedValue {
+              Stepper(
+                value: thresholdPreferences.accuracy, in: 0...100, step: 1
+              ) {
+                LabeledContent(
+                  "准确率门槛",
+                  value:
+                    "\(thresholdPreferences.accuracy.wrappedValue.formatted(.number.precision(.fractionLength(0...2))))%"
+                )
+              }
+            }
+            Text("测试进行中按计时采样检查准确率；未达门槛会标记失败，不保存完成成绩或发布到榜单。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            Toggle("最低整体速度", isOn: thresholdPreferences.wpmEnabled)
+            if thresholdPreferences.wpmEnabled.wrappedValue {
+              Stepper(
+                value: thresholdPreferences.wpm,
+                in: 0...Double.greatestFiniteMagnitude,
+                step: 5
+              ) {
+                LabeledContent(
+                  "速度门槛",
+                  value:
+                    "\(thresholdPreferences.wpm.wrappedValue.formatted(.number.precision(.fractionLength(0...2)))) WPM"
+                )
+              }
+            }
+            Text("完成至少四词后，测试进行中按计时采样检查 WPM；未达门槛会标记失败，不保存完成成绩或发布到榜单。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            Picker(
+              "最低单词速度",
+              selection: thresholdPreferences.burstMode
             ) {
-              LabeledContent(
-                "准确率门槛",
-                value: "\(settings.minimumAccuracy.formatted(.number.precision(.fractionLength(0...2))))%")
+              ForEach(MinimumWordBurstMode.allCases) { mode in
+                Text(mode.displayName).tag(mode)
+              }
             }
-          }
-          Text("有限测试结束时检查；未达门槛会标记失败，不保存完成成绩或发布到榜单。")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          Toggle("最低整体速度", isOn: minimumWpmEnabledBinding(settings: settings))
-          if settings.minimumWpm > 0 {
-            Stepper(
-              value: restartingConfigurationBinding($settings.minimumWpm),
-              in: 0...Double.greatestFiniteMagnitude,
-              step: 5
-            ) {
-              LabeledContent(
-                "速度门槛",
-                value: "\(settings.minimumWpm.formatted(.number.precision(.fractionLength(0...2)))) WPM")
+            if thresholdPreferences.burstMode.wrappedValue != .off {
+              Stepper(
+                value: thresholdPreferences.burst,
+                in: 0...Double.greatestFiniteMagnitude, step: 5
+              ) {
+                LabeledContent(
+                  "最低速度",
+                  value:
+                    "\(thresholdPreferences.burst.wrappedValue.formatted(.number.precision(.fractionLength(0...2)))) WPM"
+                )
+              }
             }
+            Text("固定档使用该阈值；弹性档会随目标词变长按参考公式降低阈值。空格提交词、无空格的原始词末字符和禅模式空格/换行提交都会检查；未达标会结束本次测试且不保存完成成绩。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
-          Text("有限测试结束时按最终 WPM 检查；未达门槛会标记失败，不保存完成成绩或发布到榜单。")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          Picker(
-            "最低单词速度",
-            selection: restartingConfigurationBinding($settings.minimumWordBurstMode)) {
-            ForEach(MinimumWordBurstMode.allCases) { mode in
-              Text(mode.displayName).tag(mode)
-            }
+          .disabled(settings.hasThresholdProfile && settings.thresholdConfiguration == nil)
+          if settings.hasThresholdProfile && settings.thresholdConfiguration == nil {
+            Text("阈值配置不可读或来自更新版本；已禁止编辑并保留原数据。")
+              .font(.caption).foregroundStyle(.red)
+          } else if let thresholdPreferenceMessage {
+            Text(thresholdPreferenceMessage).font(.caption).foregroundStyle(.red)
           }
-          if settings.minimumWordBurstMode != .off {
-            Stepper(
-              value: restartingConfigurationBinding($settings.minimumWordBurstWpm),
-              in: 0...Double.greatestFiniteMagnitude, step: 5
-            ) {
-              LabeledContent(
-                "最低速度",
-                value: "\(settings.minimumWordBurstWpm.formatted(.number.precision(.fractionLength(0...2)))) WPM")
-            }
-          }
-          Text("固定档使用该阈值；弹性档会随目标词变长按参考公式降低阈值。空格提交词、无空格的原始词末字符和禅模式空格/换行提交都会检查；未达标会结束本次测试且不保存完成成绩。")
-            .font(.caption)
-            .foregroundStyle(.secondary)
           Toggle("最后一词快速结束", isOn: $settings.quickEnd)
           Text("仅在字数、引语或有限自定义测试的最后一词达到目标长度时生效；“遇错停下”或“遇错删除”会自动禁用该行为。")
             .font(.caption)
@@ -2483,24 +2500,13 @@ struct PreferencesView: View {
     )
   }
 
-  private func minimumAccuracyEnabledBinding(settings: AppSettings) -> Binding<Bool> {
-    Binding(
-      get: { settings.minimumAccuracy > 0 },
-      set: {
-        guard acceptsRestartingConfigurationChange() else { return }
-        settings.minimumAccuracy = $0 ? max(95, settings.minimumAccuracy) : 0
-      }
-    )
-  }
-
-  private func minimumWpmEnabledBinding(settings: AppSettings) -> Binding<Bool> {
-    Binding(
-      get: { settings.minimumWpm > 0 },
-      set: {
-        guard acceptsRestartingConfigurationChange() else { return }
-        settings.minimumWpm = $0 ? max(60, settings.minimumWpm) : 0
-      }
-    )
+  private var thresholdPreferences: PracticeThresholdPreferences {
+    PracticeThresholdPreferences(
+      settings: settings,
+      acceptsChange: { acceptsRestartingConfigurationChange() },
+      onResult: { success in
+        thresholdPreferenceMessage = success ? nil : "阈值修改未保存；已保留原配置。"
+      })
   }
 
   @MainActor
