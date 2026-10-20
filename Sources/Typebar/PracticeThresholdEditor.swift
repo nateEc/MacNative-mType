@@ -29,10 +29,14 @@ enum PracticeThresholdInput {
 }
 
 enum PracticeThresholdApplication {
+  @discardableResult
   @MainActor
   static func apply(
-    _ value: Double, kind: PracticeThresholdEditorKind, to settings: AppSettings
-  ) {
+    _ value: Double, kind: PracticeThresholdEditorKind, to settings: AppSettings,
+    onConfigurationSave: () -> Void = {}
+  ) -> Bool {
+    guard value.isFinite, value >= 0 else { return false }
+    if case .minimumAccuracy = kind, value > 100 { return false }
     switch kind {
     case .minimumWpm:
       settings.minimumWpm = value
@@ -42,6 +46,8 @@ enum PracticeThresholdApplication {
       settings.minimumWordBurstWpm = value
       if value > 0 { settings.minimumWordBurstMode = mode }
     }
+    onConfigurationSave()
+    return true
   }
 }
 

@@ -329,6 +329,17 @@ enum PracticePreferenceCommandTarget: Equatable {
 
     var exitsChallenge: Bool { requiresRestart }
 
+    @MainActor
+    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
+        switch self {
+        case .difficulty(let value): settings.difficulty = value
+        case .repeatQuotes(let value): settings.repeatQuotes = value
+        case .saveCompletedResults(let value): settings.saveCompletedResults = value
+        case .englishVariant(let value): settings.englishVariant = value
+        }
+        onConfigurationSave()
+    }
+
 }
 
 enum PracticePreferenceCommandCatalog {
@@ -533,7 +544,7 @@ enum PracticeThresholdCommandTarget: Equatable {
     }
 
     @MainActor
-    func applyImmediate(to settings: AppSettings) -> Bool {
+    func applyImmediate(to settings: AppSettings, onConfigurationSave: () -> Void = {}) -> Bool {
         switch self {
         case .minimumWpmOff:
             settings.minimumWpm = 0
@@ -544,6 +555,7 @@ enum PracticeThresholdCommandTarget: Equatable {
         case .minimumWpmCustom, .minimumAccuracyCustom, .minimumWordBurst:
             return false
         }
+        onConfigurationSave()
         return true
     }
 }
@@ -1456,7 +1468,7 @@ enum KeyboardGuideLayoutCommandTarget: Equatable {
     var exitsChallenge: Bool { false }
 
     @MainActor
-    func apply(to settings: AppSettings) {
+    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
         switch self {
         case .inputSync:
             settings.keyboardGuideLayoutSource = .inputEmulation
@@ -1464,6 +1476,7 @@ enum KeyboardGuideLayoutCommandTarget: Equatable {
             settings.keyboardLayout = layout
             settings.keyboardGuideLayoutSource = .builtIn
         }
+        onConfigurationSave()
     }
 }
 
@@ -1517,11 +1530,12 @@ enum OfficialLayoutCommandTarget: Equatable {
     var exitsChallenge: Bool { true }
 
     @MainActor
-    func apply(to settings: AppSettings) {
+    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
         switch self {
         case .system: settings.keyboardInputLayout = .system
         case .builtIn(let layout): settings.keyboardInputLayout = .init(emulating: layout)
         }
+        onConfigurationSave()
     }
 }
 
@@ -1836,7 +1850,7 @@ enum CurrentThemeFavoriteCommandApplication {
     @MainActor
     static func apply(
         _ target: CurrentThemeFavoriteCommandTarget, to settings: AppSettings,
-        colorScheme: ColorScheme
+        colorScheme: ColorScheme, onConfigurationSave: () -> Void = {}
     ) -> Bool {
         guard let theme = settings.currentBuiltInThemeForFavoriteCommand(for: colorScheme) else {
             return false
@@ -1845,6 +1859,7 @@ enum CurrentThemeFavoriteCommandApplication {
         switch target {
         case .add where !isFavorite, .remove where isFavorite:
             settings.toggleFavoriteTheme(theme)
+            onConfigurationSave()
             return true
         default:
             return false

@@ -108,19 +108,22 @@ enum CustomBackgroundCommandCatalog {
 enum CustomBackgroundCommandApplication {
   @MainActor
   static func applyImmediate(
-    _ target: CustomBackgroundCommandTarget, to settings: AppSettings
+    _ target: CustomBackgroundCommandTarget, to settings: AppSettings,
+    onConfigurationSave: () -> Void = {}
   ) -> Bool {
     guard case .fit(let fit) = target else { return false }
     settings.customBackgroundFit = fit
+    onConfigurationSave()
     return true
   }
 
   @MainActor
   static func removeBackground(
-    from settings: AppSettings, removeLocal: () throws -> Void
+    from settings: AppSettings, onConfigurationSave: () -> Void = {}, removeLocal: () throws -> Void
   ) rethrows {
     try removeLocal()
     settings.customBackgroundURL = ""
+    onConfigurationSave()
   }
 }
 

@@ -5502,14 +5502,14 @@ private struct ContentView: View {
     if let target = KeyboardGuideLayoutCommandCatalog.target(for: item.id) {
       if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
-      target.apply(to: settings)
+      target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       if target.requiresRestart { reset() }
       return
     }
     if let target = OfficialLayoutCommandCatalog.target(for: item.id) {
       if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
-      target.apply(to: settings)
+      target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       if target.requiresRestart { reset() }
       return
     }
@@ -5532,8 +5532,10 @@ private struct ContentView: View {
     }
     if let target = PracticeThresholdCommandCatalog.target(for: item.id) {
       guard acceptsRestartingConfigurationChange() else { return }
-      if target.applyImmediate(to: settings) {
+      if target.applyImmediate(to: settings, onConfigurationSave: {
         activeChallengeID = nil
+        persistExplicitTestConfiguration()
+      }) {
         reset()
       } else {
         practiceThresholdEditorKind = target.editorKind
@@ -5558,6 +5560,7 @@ private struct ContentView: View {
           polyglotReturnLanguage = PolyglotReturnLanguagePolicy.validated(language)
           language = .mixedLanguages
         }
+        persistExplicitTestConfiguration()
         reset()
       case .clear, .modifier:
         if case .modifier(let modifier) = target,
@@ -5586,6 +5589,7 @@ private struct ContentView: View {
           polyglotReturnLanguage = nil
         }
         activeChallengeID = nil
+        persistExplicitTestConfiguration()
         reset()
       }
       return
@@ -5605,12 +5609,7 @@ private struct ContentView: View {
     if let target = PracticePreferenceCommandCatalog.target(for: item.id) {
       if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
-      switch target {
-      case .difficulty(let difficulty): settings.difficulty = difficulty
-      case .repeatQuotes(let enabled): settings.repeatQuotes = enabled
-      case .saveCompletedResults(let enabled): settings.saveCompletedResults = enabled
-      case .englishVariant(let variant): settings.englishVariant = variant
-      }
+      target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       if target.requiresRestart { reset() }
       return
     }
@@ -5722,7 +5721,7 @@ private struct ContentView: View {
     }
     if let target = CurrentThemeFavoriteCommandCatalog.target(for: item.id) {
       _ = CurrentThemeFavoriteCommandApplication.apply(
-        target, to: settings, colorScheme: systemColorScheme)
+        target, to: settings, colorScheme: systemColorScheme, onConfigurationSave: persistExplicitTestConfiguration)
       return
     }
     if let target = CustomBackgroundCommandCatalog.target(for: item.id) {
@@ -5734,14 +5733,16 @@ private struct ContentView: View {
         showingCustomBackgroundCommandImporter = true
       case .remove:
         do {
-          try CustomBackgroundCommandApplication.removeBackground(from: settings) {
+          try CustomBackgroundCommandApplication.removeBackground(from: settings,
+            onConfigurationSave: persistExplicitTestConfiguration) {
             try settings.removeLocalBackground()
           }
         } catch {
           customBackgroundCommandMessage = error.localizedDescription
         }
       case .fit:
-        _ = CustomBackgroundCommandApplication.applyImmediate(target, to: settings)
+        _ = CustomBackgroundCommandApplication.applyImmediate(target, to: settings,
+          onConfigurationSave: persistExplicitTestConfiguration)
       }
       return
     }
@@ -5805,8 +5806,10 @@ private struct ContentView: View {
 
   private func applyPracticeThreshold(_ value: Double, kind: PracticeThresholdEditorKind) {
     guard acceptsRestartingConfigurationChange() else { return }
-    activeChallengeID = nil
-    PracticeThresholdApplication.apply(value, kind: kind, to: settings)
+    guard PracticeThresholdApplication.apply(value, kind: kind, to: settings, onConfigurationSave: {
+      activeChallengeID = nil
+      persistExplicitTestConfiguration()
+    }) else { return }
     reset()
   }
 
