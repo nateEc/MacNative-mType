@@ -79,7 +79,7 @@ final class ThresholdSourceCarrierTests: XCTestCase {
     let before = defaults.data(forKey: ActiveTestSelectionStore.storageKey)
     var configuration = legacy.preset.configuration
     configuration.rules = try source().applying(to: configuration.rules)
-    XCTAssertFalse(store.save(.init(preset: .init(configuration: configuration), testParameterMemory: memory)))
+    XCTAssertFalse(store.save(.init(version: 1, preset: .init(configuration: configuration), testParameterMemory: memory)))
     XCTAssertEqual(defaults.data(forKey: ActiveTestSelectionStore.storageKey), before)
   }
 
@@ -150,7 +150,7 @@ final class ThresholdSourceCarrierTests: XCTestCase {
 
   func testActiveSelectionRejectsKnownSourceBeforeDiscardingItsSnapshot() throws {
     let sourceSnapshot = try source().applying(to: AppSettingsSnapshot())
-    let active = ActiveTestSelectionDocument(preset: .init(configuration: .words(17), settingsSnapshot: sourceSnapshot),
+    let active = ActiveTestSelectionDocument(version: 1, preset: .init(configuration: .words(17), settingsSnapshot: sourceSnapshot),
       testParameterMemory: memory)
     XCTAssertThrowsError(try encoder.encode(active))
     var payload = try object(ActiveTestSelectionDocument(preset: .init(configuration: .words(17)), testParameterMemory: memory))

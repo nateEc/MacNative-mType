@@ -365,7 +365,7 @@ struct TypebarArchive: Codable, Equatable {
     // and the selected quote classification, not its streamed prompt length,
     // and independent Polyglot filter choices, including explicit exclusion.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 34
+    static let currentVersion = 35
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -464,9 +464,12 @@ struct TypebarArchive: Codable, Equatable {
         self.resultFilterPresets = payloadVersion >= 4
             ? resultFilterPresets.filter { $0.isValid && !deletedIDs.contains($0.id) }
             : []
-        self.activeTestSelection = payloadVersion >= 3
-            ? activeTestSelection.flatMap(ActiveTestSelectionPolicy.validated)
-            : nil
+        if let activeTestSelection, PracticeThresholdSource.isPresent(in: activeTestSelection.preset) {
+            // Preserve rejected source evidence until encoding can refuse it.
+            self.activeTestSelection = ActiveTestSelectionPolicy.validated(activeTestSelection) ?? activeTestSelection
+        } else {
+            self.activeTestSelection = payloadVersion >= 3 ? activeTestSelection.flatMap(ActiveTestSelectionPolicy.validated) : nil
+        }
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -483,7 +486,7 @@ struct TypebarArchive: Codable, Equatable {
         let hasSource = settings.thresholdSource != nil
             || presets.contains(where: { PracticeThresholdSource.isPresent(in: $0.definition) })
             || results.contains(where: { $0.configuration.rules.thresholdSource != nil })
-        guard !hasActiveSource, !hasSource || version == 34
+        guard (!hasActiveSource || version >= 35), !hasSource || (34...Self.currentVersion).contains(version)
         else { throw DataTransferError.unsupportedVersion(version) }
         try Self.validateSourcePresets(presets)
         var values = encoder.container(keyedBy: CodingKeys.self)
@@ -533,7 +536,7 @@ struct TypebarArchive: Codable, Equatable {
         let sourcePayload = values.contains(.thresholdSettingsData)
             || values.contains(.thresholdResultsData) || values.contains(.thresholdPresetsData)
         if sourcePayload {
-            guard version == 34, !values.contains(.settings), !values.contains(.results), !values.contains(.presets)
+            guard version >= 34, !values.contains(.settings), !values.contains(.results), !values.contains(.presets)
             else { throw DataTransferError.unsupportedVersion(version) }
         }
         if values.contains(.localPersonalBestLedgerData) {
@@ -632,11 +635,10 @@ struct TypebarArchive: Codable, Equatable {
             ? decodedFilterPresets
                 .filter { $0.isValid && !deletedIDs.contains($0.id) }
             : []
-        activeTestSelection = version >= 3
-            ? try values
-                .decodeIfPresent(ActiveTestSelectionDocument.self, forKey: .activeTestSelection)
-                .flatMap(ActiveTestSelectionPolicy.validated)
-            : nil
+        let decodedActive = try values.decodeIfPresent(ActiveTestSelectionDocument.self, forKey: .activeTestSelection)
+        guard version >= 35 || !(decodedActive.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false)
+        else { throw DataTransferError.unsupportedVersion(version) }
+        activeTestSelection = version >= 3 ? decodedActive.flatMap(ActiveTestSelectionPolicy.validated) : nil
     }
 
     private static func validateSourcePresets(_ presets: [NamedPreset]) throws {

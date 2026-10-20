@@ -15840,7 +15840,7 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertTrue(store.save(document))
     let restored = try XCTUnwrap(store.load())
-    XCTAssertEqual(restored.version, ActiveTestSelectionDocument.currentVersion)
+    XCTAssertEqual(restored.version, ActiveTestSelectionDocument.legacyVersion)
     XCTAssertEqual(restored.preset.configuration, configuration)
     XCTAssertEqual(restored.preset.customText, "alpha beta gamma")
     XCTAssertNil(restored.preset.activeResultTags)

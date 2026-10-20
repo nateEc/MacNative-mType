@@ -28,7 +28,7 @@ final class ThresholdArchiveTests: XCTestCase {
   func testNewArchiveRetainsSourceAndHasNoLossyLegacyPayloadAlongsideIt() throws {
     let data = try archiveData()
     let root = try object(data)
-    XCTAssertEqual(root["version"] as? Int, 34)
+    XCTAssertEqual(root["version"] as? Int, TypebarArchive.currentVersion)
     XCTAssertNil(root["settings"])
     XCTAssertNil(root["results"])
     XCTAssertNil(root["presets"])
@@ -50,7 +50,7 @@ final class ThresholdArchiveTests: XCTestCase {
 
   func testDowngradedFutureMixedMissingAndDamagedSourcePayloadsAreRejected() throws {
     let root = try object(archiveData())
-    for version in [33, 35] {
+    for version in [33, TypebarArchive.currentVersion + 1] {
       var invalid = root
       invalid["version"] = version
       XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: JSONSerialization.data(withJSONObject: invalid)))
