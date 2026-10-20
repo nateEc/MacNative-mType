@@ -19,6 +19,23 @@ import XCTest
     frames.flush(); XCTAssertFalse(focus.isFocused)
   }
 
+  func testTransitionReadinessWaitsForCommitAndRetirementInvalidatesIt() {
+    let frames = Frames(), focus = frames.makeFocus()
+    XCTAssertFalse(focus.isTransitionPending)
+    focus.set(true)
+    XCTAssertTrue(focus.isTransitionPending)
+    frames.flush()
+    XCTAssertFalse(focus.isTransitionPending)
+    XCTAssertTrue(focus.isFocused)
+    focus.set(false)
+    XCTAssertTrue(focus.isTransitionPending)
+    focus.retire()
+    XCTAssertFalse(focus.isTransitionPending)
+    frames.flush()
+    XCTAssertFalse(focus.isFocused)
+    XCTAssertFalse(focus.isTransitionPending)
+  }
+
   func testRepeatedSameTurnRequestsHaveOnlyOneQueuedCommit() {
     let frames = Frames(), focus = frames.makeFocus()
     for _ in 0..<100 { focus.set(true) }

@@ -13,6 +13,9 @@ struct PromptFieldPracticePrompt: View {
   var preparedLayout: PromptFieldTextLayout? = nil
   var accessibilityText: String? = nil
   var wrapLayout: PromptInputWrapLayout? = nil
+  var fallbackPosition: PromptViewportFallbackPosition? = nil
+  var fallbackTargetID: UUID? = nil
+  var allowsFallbackRestoration = true
   var onMeasuredWidth: ((CGFloat) -> Void)? = nil
   @State private var viewportHeight: CGFloat?
 
@@ -22,6 +25,8 @@ struct PromptFieldPracticePrompt: View {
     preparedLayout: PromptFieldTextLayout? = nil,
     accessibilityText: String? = nil,
     wrapLayout: PromptInputWrapLayout? = nil,
+    fallbackPosition: PromptViewportFallbackPosition? = nil, fallbackTargetID: UUID? = nil,
+    allowsFallbackRestoration: Bool = true,
     onMeasuredWidth: ((CGFloat) -> Void)? = nil) {
     renderingSnapshot = PromptFieldRenderingSnapshot(rendering)
     self.font = font; self.lineSpacing = lineSpacing
@@ -30,6 +35,8 @@ struct PromptFieldPracticePrompt: View {
     self.viewportLineCount = viewportLineCount; self.preparedLayout = preparedLayout
     self.accessibilityText = accessibilityText
     self.wrapLayout = wrapLayout
+    self.fallbackPosition = fallbackPosition; self.fallbackTargetID = fallbackTargetID
+    self.allowsFallbackRestoration = allowsFallbackRestoration
     self.onMeasuredWidth = onMeasuredWidth
   }
 
@@ -38,6 +45,8 @@ struct PromptFieldPracticePrompt: View {
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
       accessibilityText: accessibilityText, wrapLayout: wrapLayout,
+      fallbackPosition: fallbackPosition, fallbackTargetID: fallbackTargetID,
+      allowsFallbackRestoration: allowsFallbackRestoration,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: { viewportHeight = $0 })
       .preference(key: PracticeViewportHeightKey.self, value: viewportHeight)
   }
@@ -62,6 +71,9 @@ private struct PromptFieldBridge: NSViewRepresentable {
   let preparedLayout: PromptFieldTextLayout?
   let accessibilityText: String?
   let wrapLayout: PromptInputWrapLayout?
+  let fallbackPosition: PromptViewportFallbackPosition?
+  let fallbackTargetID: UUID?
+  let allowsFallbackRestoration: Bool
   let onMeasuredWidth: ((CGFloat) -> Void)?
   let onViewportHeight: (CGFloat?) -> Void
   func makeNSView(context: Context) -> PromptFieldNativeView { PromptFieldNativeView() }
@@ -70,6 +82,8 @@ private struct PromptFieldBridge: NSViewRepresentable {
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
       accessibilityText: accessibilityText,
+      fallbackPosition: fallbackPosition, fallbackTargetID: fallbackTargetID,
+      allowsFallbackRestoration: allowsFallbackRestoration,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: onViewportHeight)
     wrapLayout?.view = view
   }
@@ -100,6 +114,10 @@ final class PromptFieldNativeView: NSView {
   private var onViewportHeight: ((CGFloat?) -> Void)?
   private var onMeasuredWidth: ((CGFloat) -> Void)?
   private var accessibilityTextOverride: String?
+  private var fallbackPosition: PromptViewportFallbackPosition?
+  private var fallbackTargetID: UUID?
+  private var allowsFallbackRestoration = true
+  private var fallbackRestorationRevision: UInt64?
   private var reportedWidth: CGFloat?
   private var reportedHeight: CGFloat?
   private var notificationRevision: UInt64 = 0
@@ -118,6 +136,8 @@ final class PromptFieldNativeView: NSView {
     lineScroll: PromptLineScrollContext? = nil, viewportLineCount: Int? = nil,
     preparedLayout: PromptFieldTextLayout? = nil,
     accessibilityText: String? = nil,
+    fallbackPosition: PromptViewportFallbackPosition? = nil, fallbackTargetID: UUID? = nil,
+    allowsFallbackRestoration: Bool = true,
     onMeasuredWidth: ((CGFloat) -> Void)? = nil,
     onViewportHeight: ((CGFloat?) -> Void)? = nil) {
     let previousSize = intrinsicContentSize
@@ -135,11 +155,14 @@ final class PromptFieldNativeView: NSView {
     self.configuration = carets; self.lineScroll = lineScroll
     self.preparedLayout = preparedLayout; self.onMeasuredWidth = onMeasuredWidth
     accessibilityTextOverride = accessibilityText
+    self.fallbackPosition = fallbackPosition; self.fallbackTargetID = fallbackTargetID
+    self.allowsFallbackRestoration = allowsFallbackRestoration
     self.viewportLineCount = viewportLineCount; self.onViewportHeight = onViewportHeight
     notificationRevision &+= 1
     _ = measure(width: max(1, bounds.width))
     deliverHeight()
     configureControllers()
+    if fallbackPosition?.hasPendingPosition == true { needsLayout = true }
     setAccessibilityValue(accessibilityTextOverride ?? String(rendering.text.characters))
     needsDisplay = true
     if intrinsicContentSize != previousSize {
@@ -256,12 +279,29 @@ final class PromptFieldNativeView: NSView {
   func renderedCellText(for id: Int) -> AttributedString? { rendering.compositionTextMap?.cellTexts[id] }
   func usesLayout(_ layout: PromptFieldTextLayout) -> Bool { model === layout }
   var reusedGeometryFromPrevious: Bool { model?.reusedGeometryFromPrevious ?? false }
+  var isAwaitingFallbackPosition: Bool { fallbackPosition?.hasPendingPosition == true }
   func measuredFieldRect(for id: Int) -> CGRect? { model?.fieldFrames[id] }
   func present(at time: TimeInterval) { caret.present(at: time) }
   override var intrinsicContentSize: NSSize { model?.size ?? .init(width: NSView.noIntrinsicMetric, height: 0) }
   override func layout() {
     super.layout()
     _ = measure(width: max(1, bounds.width)); configureControllers()
+    scheduleFallbackRestoration()
+  }
+  private func scheduleFallbackRestoration() {
+    guard allowsFallbackRestoration, fallbackPosition?.hasPendingPosition == true,
+      fallbackRestorationRevision != notificationRevision else { return }
+    let revision = notificationRevision
+    fallbackRestorationRevision = revision
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.fallbackRestorationRevision == revision else { return }
+      self.fallbackRestorationRevision = nil
+      guard self.notificationRevision == revision else { self.needsLayout = true; return }
+      guard let model = self.model, abs(self.bounds.height - model.size.height) < 0.01,
+        let attemptID = self.configuration?.attemptID, let targetID = self.fallbackTargetID else { return }
+      self.fallbackPosition?.restore(in: self, attemptID: attemptID, targetID: targetID,
+        rectForCharacter: { model.canonicalRect($0, after: false) })
+    }
   }
   override func draw(_ dirtyRect: NSRect) { model?.draw(in: dirtyRect) }
   override func viewWillMove(toSuperview newSuperview: NSView?) {
@@ -269,6 +309,8 @@ final class PromptFieldNativeView: NSView {
     super.viewWillMove(toSuperview: newSuperview)
   }
   func stop() {
+    fallbackRestorationRevision = nil
+    fallbackPosition = nil; fallbackTargetID = nil
     notificationRevision &+= 1; configuration = nil; onViewportHeight = nil
     onMeasuredWidth = nil; preparedLayout = nil; reportedWidth = nil
     accessibilityTextOverride = nil

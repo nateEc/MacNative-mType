@@ -104,6 +104,65 @@ import XCTest
     }
   }
 
+  func testCompositionFallbackKeepsRemoteReadingPosition() throws {
+    let fixture = try Fixture()
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.promptReady }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    XCTAssertTrue(native.viewport.scrollToField(100))
+    fixture.waitUntil { native.viewport.visibleDocumentRect.minY > 0 }
+    let anchor = native.viewport.canvas.accessibilityVisibleCharacterRange().location
+    let oldRect = try XCTUnwrap(native.viewport.canvas.measuredRect(for: anchor))
+    let oldRowFraction = max(0, min(1,
+      (native.viewport.visibleDocumentRect.minY - oldRect.minY) / oldRect.height))
+    input.setMarkedText("中", selectedRange: .init(location: 1, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).isEmpty
+      && fixture.views(PromptFieldNativeView.self).contains {
+        ($0.accessibilityValue() as? String)?.contains("中") == true
+      } }
+    let full = try XCTUnwrap(fixture.views(PromptFieldNativeView.self).first)
+    fixture.waitUntil { !full.isAwaitingFallbackPosition }
+    let newRect = try XCTUnwrap(full.measuredRect(for: anchor))
+    XCTAssertEqual(full.bounds.height, full.intrinsicContentSize.height, accuracy: 0.01,
+      "The complete parent page must have adopted the replacement layout")
+    XCTAssertEqual((full.visibleRect.minY - newRect.minY) / newRect.height, oldRowFraction, accuracy: 0.01,
+      "A presentation fallback must not reset the manually chosen reading row: oldFrame=\(native.frame) oldRect=\(oldRect) anchor=\(anchor) frame=\(full.frame) size=\(full.intrinsicContentSize) visible=\(full.visibleRect) rect=\(newRect) page=\(full.enclosingScrollView?.contentView.bounds as Any)")
+    XCTAssertEqual(fixture.counts.generation, 1)
+    XCTAssertEqual(native.viewport.measuredFieldCount, 0)
+    XCTAssertFalse(fixture.settings.allowsRestartingConfigurationChange)
+  }
+
+  func testCompositionFallbackDuringReflowKeepsThePendingReadingAnchor() throws {
+    let fixture = try Fixture(wordCount: 2_001)
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.promptReady }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    XCTAssertTrue(native.viewport.scrollToField(100))
+    fixture.waitUntil { native.viewport.visibleDocumentRect.minY > 0 }
+    let anchor = native.viewport.canvas.accessibilityVisibleCharacterRange().location
+    let oldRect = try XCTUnwrap(native.viewport.canvas.measuredRect(for: anchor))
+    let oldRowFraction = max(0, min(1,
+      (native.viewport.visibleDocumentRect.minY - oldRect.minY) / oldRect.height))
+    fixture.settings.fontSize = 36
+    fixture.waitUntil { native.viewport.isPreparing && !native.viewport.canvas.hasCompleteHeight }
+    input.setMarkedText("中", selectedRange: .init(location: 1, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).isEmpty
+      && fixture.views(PromptFieldNativeView.self).contains {
+        ($0.accessibilityValue() as? String)?.contains("中") == true
+      } }
+    let full = try XCTUnwrap(fixture.views(PromptFieldNativeView.self).first)
+    fixture.waitUntil { !full.isAwaitingFallbackPosition }
+    let rect = try XCTUnwrap(full.measuredRect(for: anchor))
+    XCTAssertEqual((full.visibleRect.minY - rect.minY) / rect.height, oldRowFraction, accuracy: 0.01,
+      "Fallback must carry the pending source anchor across new font geometry")
+    XCTAssertEqual(fixture.counts.generation, 1)
+    XCTAssertEqual(native.viewport.measuredFieldCount, 0)
+  }
+
   func testActualPracticeInputRepaintsViewportAndKeepsRemotePosition() throws {
     let fixture = try Fixture()
     defer { fixture.close() }

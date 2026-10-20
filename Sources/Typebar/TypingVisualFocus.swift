@@ -9,6 +9,7 @@ import Observation
   private(set) var caretBlinkRevision: UInt64 = 0
   @ObservationIgnored private var generation: UInt64 = 0
   @ObservationIgnored private var hasQueuedCommit = false
+  var isTransitionPending: Bool { hasQueuedCommit }
   @ObservationIgnored private let schedule: (@escaping @MainActor () -> Void) -> Void
 
   init(schedule: @escaping (@escaping @MainActor () -> Void) -> Void = { callback in

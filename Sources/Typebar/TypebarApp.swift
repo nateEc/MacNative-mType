@@ -1375,6 +1375,7 @@ private struct ContentView: View {
   @State private var liveStatsClockSignal = LiveStatsClockSignal()
   @State private var timerHealth = TimerHealthState()
   @State private var promptInputWrapLayout = PromptInputWrapLayout()
+  @State private var viewportFallbackPosition = PromptViewportFallbackPosition()
   @State private var restartLockMessage: String?
   @State private var modeCompatibilityMessage: String?
   @State private var funboxConfigurationMessage: String?
@@ -3120,6 +3121,9 @@ private struct ContentView: View {
         },
         onCompositionStarted: {
           guard !isPreparingPracticePrompt else { return }
+          if wholePreviewViewportEnabled, viewportFallbackAttemptID != session.automaticInputAttemptID {
+            viewportFallbackPosition.capture(attemptID: session.automaticInputAttemptID, targetID: session.promptTargetID)
+          }
           preparedWholePreviewRendering = nil
           if activeChallengeID != "mouse-warrior" {
             synchronizeLiveInputRules()
@@ -3128,7 +3132,10 @@ private struct ContentView: View {
         },
         onCompositionChanged: {
           guard !isPreparingPracticePrompt else { return }
-          if wholePreviewViewportEnabled, !$0.isEmpty { viewportFallbackAttemptID = session.automaticInputAttemptID }
+          if wholePreviewViewportEnabled, !$0.isEmpty,
+            viewportFallbackAttemptID != session.automaticInputAttemptID {
+            viewportFallbackAttemptID = session.automaticInputAttemptID
+          }
           preparedWholePreviewRendering = nil
           let hadMarkedText = !compositionText.isEmpty
           let playsCompositionClick = TypingInputSoundPlan.isAudibleCompositionUpdate(
@@ -3332,8 +3339,10 @@ private struct ContentView: View {
           font: practicePromptNSFont(size: settings.fontSize),
           carets: makeSpecialPromptCaretConfiguration(rightToLeft: isRightToLeft),
           wrapLayout: promptInputWrapLayout,
+          fallbackPosition: viewportFallbackPosition,
           onFailure: { attempt in
-            guard session.automaticInputAttemptID == attempt else { return }
+            guard session.automaticInputAttemptID == attempt, viewportFallbackAttemptID != attempt else { return }
+            viewportFallbackPosition.capture(attemptID: attempt, targetID: session.promptTargetID)
             viewportFallbackAttemptID = attempt
             viewportReadinessAttemptID = nil
           }, onReady: { ready in
@@ -3389,6 +3398,9 @@ private struct ContentView: View {
           viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3),
           preparedLayout: preparedWholePreviewLayout,
           wrapLayout: promptInputWrapLayout,
+          fallbackPosition: showsAllPracticeLines ? viewportFallbackPosition : nil,
+          fallbackTargetID: session.promptTargetID,
+          allowsFallbackRestoration: !visualFocus.isTransitionPending,
           onMeasuredWidth: showsAllPracticeLines ? { width in wholePreviewFieldWidth = width } : nil)
       } else if let rendering {
         Text(rendering.text)
