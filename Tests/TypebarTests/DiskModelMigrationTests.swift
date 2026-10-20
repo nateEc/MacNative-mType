@@ -26,6 +26,45 @@ final class DiskModelMigrationTests: XCTestCase {
     try exerciseUpgrade("initial")
   }
 
+  func testOrdinaryTargetDirectoryColdReadKeepsNewTargetsAndUnchangedLegacyBytes() throws {
+    try withDirectory { root in
+      let fixture = try createLegacy("before-account-tags", root: root)
+      let oldRows = try XCTUnwrap(fixture.receipt["rows"] as? [String: [[String: Any]]])
+      var session = TypingSession(configuration: .words(2), prompt: "a \u{301}b")
+      session.insertBatch("a \u{301}x ", at: start)
+      let result = try XCTUnwrap(session.result())
+      XCTAssertEqual(result.targetWordDirectory?.words, ["a ", "\u{301}b"])
+      var directoryBytes: Data?, replayBytes: Data?
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        try assertLegacy(container.mainContext, expected: oldRows, version: "before-account-tags")
+        let record = TestResultRecord(result: result)
+        directoryBytes = record.targetWordDirectoryData; replayBytes = record.replayEventsData
+        container.mainContext.insert(record); try container.mainContext.save()
+      }
+      let receipt = root.appendingPathComponent("cold-ordinary-targets.json")
+      try runWriter("current", ["inspect", fixture.store.path, "-", receipt.path], root: root)
+      let cold = try XCTUnwrap(try object(receipt)["rows"] as? [String: [[String: Any]]])
+      let records = try XCTUnwrap(cold["TestResultRecord"])
+      let saved = try XCTUnwrap(records.first { $0["id"] as? String == result.id.uuidString })
+      XCTAssertEqual(saved["targetWordDirectoryData"] as? String, try XCTUnwrap(directoryBytes).base64EncodedString())
+      XCTAssertEqual(saved["replayEventsData"] as? String, try XCTUnwrap(replayBytes).base64EncodedString())
+      let old = try XCTUnwrap(records.first { $0["id"] as? String == resultID.uuidString })
+      for (key, value) in try XCTUnwrap(oldRows["TestResultRecord"]?.first) {
+        XCTAssertEqual(NSDictionary(dictionary: ["value": try XCTUnwrap(old[key])]),
+          NSDictionary(dictionary: ["value": value]), "Legacy field changed: \(key)")
+      }
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        let records = try container.mainContext.fetch(FetchDescriptor<TestResultRecord>())
+        XCTAssertEqual(records.first { $0.id == result.id }?.portableResult, result)
+        try assertStored(XCTUnwrap(records.first { $0.id == resultID }),
+          expected: XCTUnwrap(oldRows["TestResultRecord"]?.first))
+        try assertOtherEntities(container.mainContext, expected: oldRows, version: "before-account-tags")
+      }
+    }
+  }
+
   func testScopedAccountFilterColdReloadPreservesLegacyFilterAndCompletionBytes() throws {
     try withDirectory { root in
       let fixture = try createLegacy("before-account-tags", root: root)

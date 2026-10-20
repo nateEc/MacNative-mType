@@ -1186,7 +1186,8 @@ enum ResultPromptText {
       .filter { $0.offset <= result.capturedDuration }
     let hasRecordedFields = !events.isEmpty && events.allSatisfy { $0.inputField != nil }
     if let directory = result.targetWordDirectory {
-      guard directory.matches(prompt: result.prompt, noSpace: true) else { return nil }
+      guard directory.matches(prompt: result.prompt,
+        noSpace: TestModifierPolicy.usesNoSpaceInput(result.configuration.modifiers)) else { return nil }
       if hasRecordedFields {
         let reached = SavedTextInputHistoryPolicy.inputFields(events: events).count
         guard reached > 0 else { return nil }

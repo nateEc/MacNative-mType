@@ -43,8 +43,8 @@ final class WeakSpotFieldDirectoryTests: XCTestCase {
     session.insertBatch("a \u{301}x ", at: start)
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.outcome, .completed)
-    // The current result producer only persists no-space directories. This
-    // explicit portable fixture tests the reader, not ordinary capture.
+    // Keep the portable reader fixture explicit. Actual ordinary production
+    // capture is independently covered by OrdinaryTargetDirectoryTests.
     let captured = replacingDirectory(result, with: .init(words: ["a ", "\u{301}b"], noSpace: false))
     XCTAssertEqual(WeakSpotPractice.characterScores(results: [captured], language: .english), ["b": 1])
   }

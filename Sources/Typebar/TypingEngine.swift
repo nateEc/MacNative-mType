@@ -8441,9 +8441,19 @@ struct TypingSession {
   }
 
   private var capturedTargetWordDirectory: ResultTargetWordDirectory? {
-    guard TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) else { return nil }
-    let directory = ResultTargetWordDirectory(words: noSpaceTargetWords, noSpace: true)
-    return directory.matches(prompt: prompt, noSpace: true) ? directory : nil
+    let noSpace = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    let words: [String]
+    if noSpace {
+      words = noSpaceTargetWords
+    } else {
+      guard hasOrdinarySourceFields else { return nil }
+      // Use the engine's unit catalog, including literal commits and provider
+      // boundaries. Grapheme splitting cannot recover a space fused to a mark.
+      let targets = sourceStatsTargets
+      words = targets.fields.map { String(decoding: targets.units[$0], as: UTF16.self) }
+    }
+    let directory = ResultTargetWordDirectory(words: words, noSpace: noSpace)
+    return directory.matches(prompt: prompt, noSpace: noSpace) ? directory : nil
   }
 
   private var noSpaceWordRanges: [Range<Int>] {
