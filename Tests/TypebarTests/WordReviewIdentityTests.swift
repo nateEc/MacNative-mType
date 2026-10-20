@@ -107,7 +107,7 @@ final class WordReviewIdentityTests: XCTestCase {
       customTextSectionLimit: practice.sectionCount, customTextOrdering: .inOrder,
       customTextPipeDelimiter: true)
     var exercise = TestSessionFactory.make(configuration: configuration, customText: practice.text,
-      customTextIsPrepared: true)
+      preparedCustomSections: practice.sections)
     XCTAssertEqual(Array(exercise.prompt.utf16), Array(sections.joined(separator: " ").utf16))
     exercise.insertBatch(exercise.prompt, at: start)
     XCTAssertEqual(exercise.outcome, .completed)
@@ -165,5 +165,81 @@ final class WordReviewIdentityTests: XCTestCase {
     let prepared = TestSessionFactory.make(configuration: configuration, customText: source, customTextIsPrepared: true)
     XCTAssertEqual(Array(editor.prompt.utf16), Array("\(composed) \(composed)".utf16))
     XCTAssertEqual(Array(prepared.prompt.utf16), Array("\(decomposed) \(composed)".utf16))
+  }
+
+  func testLiteralPipesSurviveResultDrivenPracticeAsTargetContent() throws {
+    var original = TypingSession(configuration: .words(2), prompt: "a|b |\u{301}")
+    original.insertBatch("x y ", at: start)
+    XCTAssertEqual(original.outcome, .completed)
+    let missed = try XCTUnwrap(MissedWordPracticePlan.make(errorCounts: original.missedWordErrorCounts))
+    let practice = try XCTUnwrap(WordPracticeText.sectionedPractice(segments: missed.exerciseWords,
+      selectedTargetCount: missed.selectedWords.count, random: { 0 }))
+    let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), customTextCompletion: .sections,
+      customTextSectionLimit: practice.sectionCount, customTextOrdering: .inOrder,
+      customTextPipeDelimiter: true)
+    var exercise = TestSessionFactory.make(configuration: configuration, customText: practice.text,
+      preparedCustomSections: practice.sections)
+    exercise.insertBatch(exercise.prompt, at: start)
+    XCTAssertEqual(exercise.outcome, .completed)
+    XCTAssertEqual(exercise.wordReviews.count, practice.sectionCount)
+    let expected = Set(missed.selectedWords.map { Array($0.utf16) })
+    XCTAssertEqual(Set(exercise.wordReviews.map { Array($0.target.utf16) }), expected)
+    var repeated = exercise.repeatedAttempt()
+    XCTAssertEqual(Array(repeated.prompt.utf16), Array(exercise.prompt.utf16))
+    repeated.insertBatch(repeated.prompt, at: start.addingTimeInterval(1))
+    XCTAssertEqual(repeated.outcome, .completed)
+    XCTAssertEqual(Set(repeated.wordReviews.map { Array($0.target.utf16) }), expected)
+  }
+
+  func testPreparedSectionsApplyOnlyGenerationASCIIWhitespaceCleanup() throws {
+    let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), customTextCompletion: .sections,
+      customTextSectionLimit: 3, customTextOrdering: .inOrder, customTextPipeDelimiter: true)
+    var stream = try XCTUnwrap(CustomSectionWordStream(preparedSections:
+      ["  a  |b  ", "   ", "\(decomposed)\u{00A0}tail"], configuration: configuration))
+    let chunk = stream.nextChunk()
+    XCTAssertEqual(Array(chunk.text.utf16), Array("a |b  \(decomposed)\u{00A0}tail".utf16))
+    XCTAssertEqual(chunk.sectionWordEnds, [2, 3, 4])
+    XCTAssertFalse(stream.hasRemaining)
+  }
+
+  func testStructuredPracticeContinuationKeepsContextAndRepeatBoundaries() throws {
+    let practice = try XCTUnwrap(WordPracticeText.sectionedPractice(
+      segments: ["left a|b", "|\u{301}"], selectedTargetCount: 30, random: { 0 }))
+    let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), customTextCompletion: .sections,
+      customTextSectionLimit: practice.sectionCount, customTextOrdering: .inOrder,
+      customTextPipeDelimiter: true)
+    var exercise = TestSessionFactory.make(configuration: configuration,
+      customText: practice.text, preparedCustomSections: practice.sections)
+    let opening = exercise.prompt
+    let expected = practice.sections.joined(separator: " ")
+    XCTAssertTrue(exercise.usesIncrementalPromptExtension)
+    exercise.insertBatch(expected, at: start)
+    XCTAssertEqual(exercise.outcome, .completed)
+    XCTAssertEqual(Array(exercise.prompt.utf16), Array(expected.utf16))
+    XCTAssertEqual(exercise.sectionProgress?.completed, practice.sectionCount)
+    var repeated = exercise.repeatedAttempt()
+    XCTAssertEqual(Array(repeated.prompt.utf16), Array(opening.utf16))
+    repeated.insertBatch(expected, at: start.addingTimeInterval(1))
+    XCTAssertEqual(repeated.outcome, .completed)
+    XCTAssertEqual(repeated.sectionProgress?.completed, practice.sectionCount)
+    XCTAssertEqual(repeated.wordReviews.map { Array($0.target.utf16) },
+      exercise.wordReviews.map { Array($0.target.utf16) })
+  }
+
+  func testStructuredNoSpaceSectionsRetainLiteralPipesAsActualTargets() {
+    let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), customTextCompletion: .sections,
+      customTextSectionLimit: 2, customTextOrdering: .inOrder,
+      customTextPipeDelimiter: true, modifiers: [.noSpaces])
+    var exercise = TestSessionFactory.make(configuration: configuration,
+      customText: "a|b | c|d", preparedCustomSections: ["a|b", "c|d"])
+    XCTAssertEqual(exercise.prompt, "a|bc|d")
+    exercise.insertBatch(exercise.prompt, at: start)
+    XCTAssertEqual(exercise.outcome, .completed)
+    XCTAssertEqual(exercise.wordReviews.map(\.target), ["a|b", "c|d"])
+    XCTAssertTrue(exercise.wordReviews.allSatisfy(\.isCorrect))
   }
 }

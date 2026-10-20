@@ -937,12 +937,14 @@ enum WordPracticeText {
       }
       practiceSections.append(contentsOf: shuffled.prefix(sectionCount - practiceSections.count))
     }
-    return .init(text: practiceSections.joined(separator: " | "), sectionCount: sectionCount)
+    return .init(sections: practiceSections)
   }
 
   struct SectionedPractice: Equatable {
-    let text: String
-    let sectionCount: Int
+    let sections: [String]
+    /// Editor presentation only; never decode this to recover candidates.
+    var text: String { sections.joined(separator: " | ") }
+    var sectionCount: Int { sections.count }
   }
 }
 

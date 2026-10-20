@@ -27,8 +27,20 @@ struct CustomSectionWordStream {
   private var randomState = UInt64.random(in: .min ... .max)
 
   init?(source: String, configuration: TestConfiguration, preservesSourceSpelling: Bool = false) {
-    var sections = Self.sourceSections(from: source, usesPipe: configuration.usesCustomTextPipeDelimiter,
+    let sections = Self.sourceSections(from: source, usesPipe: configuration.usesCustomTextPipeDelimiter,
       preservesSourceSpelling: preservesSourceSpelling)
+    self.init(sections: sections, configuration: configuration, keepsBlankSections: false)
+  }
+
+  /// Result-driven candidates already have boundaries. Literal pipes and
+  /// Unicode spelling are content, not another editor serialization.
+  init?(preparedSections: [String], configuration: TestConfiguration) {
+    self.init(sections: preparedSections, configuration: configuration, keepsBlankSections: true)
+  }
+
+  private init?(sections sourceSections: [String], configuration: TestConfiguration,
+    keepsBlankSections: Bool) {
+    var sections = sourceSections
     if configuration.modifiers.contains(.backwards) { sections.reverse() }
     let limit: Int
     switch configuration.customTextCompletion {
@@ -40,8 +52,11 @@ struct CustomSectionWordStream {
     self.configuration = configuration
     self.sections = sections
     self.words = sections.map { section in
-      section.unicodeScalars.split(separator: " ")
+      // Generation trims/collapses ASCII spaces, not editor whitespace or
+      // NFC. An all-space prepared candidate still has one blank word.
+      let words = section.unicodeScalars.split(separator: " ")
         .map { String(String.UnicodeScalarView($0)) }
+      return words.isEmpty && keepsBlankSections ? [""] : words
     }
     self.sectionLimit = limit
   }

@@ -1292,7 +1292,7 @@ private struct ContentView: View {
   @State private var activeSessionTags: [String] = []
   @State private var activeResultTagDraft = ""
   @State private var practiceReturnPreset: SavedTestPreset?
-  @State private var preparedWordPracticeText: String?
+  @State private var preparedWordPractice: WordPracticeText.SectionedPractice?
   @State private var showingHistory = false
   @State private var showingWeakSpots = false
   @State private var showingPresets = false
@@ -2755,7 +2755,7 @@ private struct ContentView: View {
             TextField("输入你自己的练习文本", text: Binding(
               get: { customText },
               set: { value in
-                preparedWordPracticeText = nil
+                preparedWordPractice = nil
                 customText = value
               }), axis: .vertical)
               .lineLimit(2...4)
@@ -4508,8 +4508,9 @@ private struct ContentView: View {
       : TestSessionFactory.make(
       configuration: configuration,
       customText: customText,
-      customTextIsPrepared: practiceReturnPreset != nil
-        && (preparedWordPracticeText.map { InputTextIdentity.matches($0, customText) } ?? false),
+      preparedCustomSections: practiceReturnPreset != nil
+        && (preparedWordPractice.map { InputTextIdentity.matches($0.text, customText) } ?? false)
+        ? preparedWordPractice?.sections : nil,
       finiteTextSource: activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk },
       verifiedScript: activeChallenge?.requirements.referenceScriptSpecification
         == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
@@ -6399,7 +6400,7 @@ private struct ContentView: View {
     else { return }
     guard selectMode(.custom) else { return }
     if practiceReturnPreset == nil { practiceReturnPreset = presetDefinition }
-    preparedWordPracticeText = practice.text
+    preparedWordPractice = practice
     customText = practice.text
     customTextCompletion = .sections
     customTextSectionLimit = practice.sectionCount

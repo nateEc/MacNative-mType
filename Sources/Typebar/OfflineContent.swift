@@ -6342,6 +6342,7 @@ struct TestSessionFactory {
     configuration: TestConfiguration,
     customText: String = "",
     customTextIsPrepared: Bool = false,
+    preparedCustomSections: [String]? = nil,
     finiteTextSource: String? = nil,
     verifiedScript: ReferenceScriptChallengePolicy.VerifiedScript? = nil,
     quote: OfflineQuote? = nil,
@@ -6473,7 +6474,10 @@ struct TestSessionFactory {
           randomCustomSourceTokens = source.split(whereSeparator: \.isWhitespace).map(String.init)
         }
         if streamsCustomSections {
-          if var stream = CustomSectionWordStream(source: source, configuration: configuration,
+          let preparedStream = preparedCustomSections.map {
+            CustomSectionWordStream(preparedSections: $0, configuration: configuration)
+          }
+          if var stream = preparedStream ?? CustomSectionWordStream(source: source, configuration: configuration,
             preservesSourceSpelling: customTextIsPrepared) {
             let chunk = withoutActuallyEscaping(nextRandomWordIndex) { random in
               stream.nextChunk(random: random, nextRandomCaseBit: nextRandomCaseBit)
