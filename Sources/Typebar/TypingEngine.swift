@@ -10538,12 +10538,10 @@ enum StarterLexicon {
   static var english10kLexicon: IndexedLexicon {
     IndexedLexicon(count: 9_944) { EnglishFrequencyCorpus.words[$0] }
   }
-  // Still synthetic: these larger pools are NOT real vocabulary parity.
   static var english25kLexicon: IndexedLexicon {
-    englishScaleLexicon(
-      marker: "xo", count: 24_141, minimumToken: "qxqz", maximumLength: 27,
-      uppercaseCount: 946, punctuationCount: 0)
+    IndexedLexicon(count: 24_141) { EnglishFrequencyCorpus.words[$0] }
   }
+  // Still synthetic: this larger pool is NOT real vocabulary parity.
   static var english450kLexicon: IndexedLexicon {
     englishScaleLexicon(
       marker: "yu", count: 450_029, minimumToken: "b", maximumLength: 31,

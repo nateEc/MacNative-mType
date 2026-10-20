@@ -12359,7 +12359,6 @@ final class TypingEngineTests: XCTestCase {
 
   func testRemainingSyntheticEnglishScaleChoicesPreserveIDsAndAggregateShapesOnly() throws {
     let cases: [(String, Int, Int, Int, Int, Int, ZipfFrequencySupport)] = [
-      ("english25k", 24_141, 4, 27, 946, 0, .unsupported),
       ("english450k", 450_029, 1, 31, 33_021, 176, .unsupported),
     ]
 

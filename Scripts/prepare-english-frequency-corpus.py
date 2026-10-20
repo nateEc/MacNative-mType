@@ -17,7 +17,9 @@ import zipfile
 
 SCOWL_COMMIT = "7e99edab8e32f9f9ea2b15f249ca8d4d67237410"
 WHEEL_SHA256 = "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
-WORD_COUNT = 9944
+CHOICE_COUNTS = (1000, 5000, 9944, 24141)
+WORD_COUNT = CHOICE_COUNTS[-1]
+REVISION = "scowl-2026.02.25-wordfreq-3.1.1-v2"
 SWIFT_PATH = Path("Sources/Typebar/EnglishFrequencyCorpus.generated.swift")
 PROVENANCE_PATH = Path("Compatibility/english-frequency-corpus.json")
 NOTICES_PATH = Path("Resources/EnglishFrequencyCorpusNotices.txt")
@@ -108,18 +110,18 @@ def artifacts(words, bands, candidate_count, packed, scowl_notice, wordfreq_noti
         "// Word selection data: CC BY-SA 4.0; full attribution and source notices:\n"
         "// Resources/EnglishFrequencyCorpusNotices.txt. No Monkeytype data.\n"
         "enum EnglishFrequencyCorpus {\n"
-        '  static let revision = "scowl-2026.02.25-wordfreq-3.1.1-v1"\n'
+        f'  static let revision = "{REVISION}"\n'
         '  static let words: [String] = """\n' + text +
         '""".split(separator: "\\n").map(String.init)\n}\n'
     )
     notice = (
-        "Typebar English frequency corpus, revision 1\n"
+        "Typebar English frequency corpus, revision 2\n"
         "Adapted selection by Typebar contributors (2026). The selected word data\n"
         "is distributed under CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/\n"
         "Changes: intersect English frequency tokens with SCOWL size 60, American\n"
         "spelling, variant level 1, default category; restrict to ASCII letters;\n"
         "prefer existing lowercase/title spellings, preserve I, retain the first\n"
-        "9,944 frequency-ranked entries. No reference-project words are imported.\n\n"
+        "24,141 frequency-ranked entries. No reference-project words are imported.\n\n"
         "SCOWL rel-2026.02.25\n"
         f"https://github.com/en-wl/wordlist/tree/{SCOWL_COMMIT}\n\n" + scowl_notice +
         "\nwordfreq 3.1.1 — Robyn Speer and contributors\n"
@@ -129,6 +131,7 @@ def artifacts(words, bands, candidate_count, packed, scowl_notice, wordfreq_noti
     )
     provenance = {
         "schemaVersion": 1,
+        "revision": REVISION,
         "scowl": {"commit": SCOWL_COMMIT, "size": 60, "spelling": "A",
                   "variantLevel": 1, "categories": [""], "copyrightSHA256": digest(scowl_notice.encode())},
         "wordfreq": {"version": "3.1.1", "wheelSHA256": WHEEL_SHA256,
@@ -140,9 +143,10 @@ def artifacts(words, bands, candidate_count, packed, scowl_notice, wordfreq_noti
         "wordsSHA256": digest(text.encode()), "swiftSHA256": digest(swift.encode()),
         "noticesSHA256": digest(notice.encode()),
         "choices": {str(n): {"count": n, "lastFrequencyBand": bands[n - 1],
+                            "wordsSHA256": digest(("\n".join(words[:n]) + "\n").encode()),
                             "minimumLength": min(map(len, words[:n])),
                             "maximumLength": max(map(len, words[:n]))}
-                    for n in (1000, 5000, WORD_COUNT)},
+                    for n in CHOICE_COUNTS},
         "dataLicense": "CC-BY-SA-4.0; retain SCOWL and wordfreq source notices",
     }
     return {SWIFT_PATH: swift.encode(), NOTICES_PATH: notice.encode(),
@@ -181,15 +185,16 @@ def verify_bundled(root):
             or body != ("\n".join(words) + "\n").encode()
             or provenance["wordsSHA256"] != digest(body)):
         raise ValueError("bundled corpus word contract mismatch")
-    if (provenance["schemaVersion"] != 1 or provenance["count"] != WORD_COUNT
+    if (provenance["schemaVersion"] != 1 or provenance["revision"] != REVISION or provenance["count"] != WORD_COUNT
             or provenance["uniqueCount"] != WORD_COUNT
             or provenance["scowl"]["commit"] != SCOWL_COMMIT
             or provenance["wordfreq"]["wheelSHA256"] != WHEEL_SHA256):
         raise ValueError("bundled corpus provenance contract mismatch")
-    for count in (1000, 5000, WORD_COUNT):
+    for count in CHOICE_COUNTS:
         choice = provenance["choices"][str(count)]
         if (choice["count"] != count or choice["minimumLength"] != min(map(len, words[:count]))
-                or choice["maximumLength"] != max(map(len, words[:count]))):
+                or choice["maximumLength"] != max(map(len, words[:count]))
+                or choice["wordsSHA256"] != digest(("\n".join(words[:count]) + "\n").encode())):
             raise ValueError("bundled corpus choice metadata mismatch")
 
 

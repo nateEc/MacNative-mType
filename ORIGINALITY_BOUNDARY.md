@@ -1,5 +1,7 @@
 # 原创性边界与验证
 
+2026-10-20 后续：English 25k 也已接入相同固定独立来源，生成容器扩为 24,141 条，并以逐档哈希保护原三档内容；词数据许可与完整署名不变。SCOWL 85 档容量及旧 95 档质量探查均未据此导入新来源，更不作为 450k 已完成证据，见 `OFFICIAL_LANGUAGE_AUDIT.md` 当前节。
+
 2026-10-20 英语 1k／5k／10k 词数据现使用固定 SCOWL／wordfreq 独立授权交集，不再用合成串凑规模；不是 Monkeytype 的源码或词表。生成器、固定输入、哈希、数据许可、打包署名与真实词汇未完成范围见 `OFFICIAL_LANGUAGE_AUDIT.md` 当前节及 `Compatibility/english-frequency-corpus.json`。数据与原生实现许可分开保留，新的署名文件不豁免资源边界检查。
 
 账户筛选预设使用原创 SwiftUI 与独立服务文档，QA 只从固定只读参考动态执行 DAL／名称函数，不打包原实现或资产；见 [账户历史筛选预设](ACCOUNT_FILTER_PRESETS_CONTRACT.md)，下方为历史阶段。

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic preparation contracts; no downloads or full upstream build."""
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -64,7 +65,8 @@ class EnglishFrequencyPreparationTests(unittest.TestCase):
 
     def test_bundled_integrity_detects_changed_data_and_notices(self):
         # Synthetic fixture tests integrity mechanics, not dictionary validity.
-        words = ["word" + chr(97 + n // 676) + chr(97 + n // 26 % 26) + chr(97 + n % 26)
+        words = ["word" + chr(97 + n // 17576) + chr(97 + n // 676 % 26)
+                 + chr(97 + n // 26 % 26) + chr(97 + n % 26)
                  for n in range(prepare.WORD_COUNT)]
         outputs = prepare.artifacts(words, list(range(len(words))), len(words), b"packed", "SCOWL", "credits")
         with tempfile.TemporaryDirectory() as directory:
@@ -80,6 +82,25 @@ class EnglishFrequencyPreparationTests(unittest.TestCase):
             source.write_bytes(source.read_bytes().replace(b"wordaaa", b"changed", 1))
             with self.assertRaisesRegex(ValueError, "hash mismatch"):
                 prepare.verify_bundled(root)
+
+    def test_existing_small_corpus_words_remain_byte_identical(self):
+        # Pin the previous 1k/5k/10k data, not the enlarged container's bytes.
+        source = (Path(__file__).resolve().parent.parent / prepare.SWIFT_PATH).read_bytes()
+        body = source.split(b'  static let words: [String] = """\n', 1)[1].split(b'""".split', 1)[0]
+        old_prefix = b"\n".join(body.splitlines()[:9944]) + b"\n"
+        self.assertEqual(prepare.digest(old_prefix),
+                         "0a28013ab4dba0ad9bf0394810e217b87e8dd37c95b18eff9a77effcad1c2e96")
+
+    def test_every_choice_records_its_own_exact_data_digest(self):
+        words = ["a" + str(n) for n in range(prepare.WORD_COUNT)]
+        # Artifact construction uses synthetic fixtures; source selection and
+        # bundled validation separately reject these numeric test tokens.
+        outputs = prepare.artifacts(words, list(range(len(words))), len(words), b"packed", "SCOWL", "credits")
+        provenance = json.loads(outputs[prepare.PROVENANCE_PATH])
+        self.assertEqual(set(provenance["choices"]), {"1000", "5000", "9944", "24141"})
+        for count in prepare.CHOICE_COUNTS:
+            self.assertEqual(provenance["choices"][str(count)]["wordsSHA256"],
+                             prepare.digest(("\n".join(words[:count]) + "\n").encode()))
 
 
 if __name__ == "__main__":
