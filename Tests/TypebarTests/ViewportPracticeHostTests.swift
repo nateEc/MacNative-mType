@@ -23,19 +23,19 @@ import XCTest
     let counts: Counts
     let prompt: String
     init(unicode: Bool = false, promptOverride: String? = nil,
-      gatesSource: Bool = false, viewportEnabled: Bool = true) throws {
+      gatesSource: Bool = false, viewportEnabled: Bool = true, wordCount: Int = 201) throws {
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = AppSettings(defaults: defaults)
       settings.reducePracticeMotion = true
       settings.showAllPracticeLines = true
       settings.testModifiers = [.noQuit]
-      let configuration = TestConfiguration.words(201).with(modifiers: [.noQuit])
+      let configuration = TestConfiguration.words(wordCount).with(modifiers: [.noQuit])
       XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: configuration),
         testParameterMemory: .legacyDefaults(configuration: configuration))))
       container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
         SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-      let prompt = promptOverride ?? (0..<201).map { unicode && $0 == 1 ? "😀" : "word\($0)" }.joined(separator: " ")
+      let prompt = promptOverride ?? (0..<wordCount).map { unicode && $0 == 1 ? "😀" : "word\($0)" }.joined(separator: " ")
       self.prompt = prompt
       let counts = Counts()
       self.counts = counts
@@ -76,6 +76,7 @@ import XCTest
         && native.viewport.canvas.accessibilityValue() as? String == prompt
         && abs(native.frame.height - native.measuredHeight) < 0.01
         && (native.enclosingScrollView?.documentView?.frame.height ?? 0) >= native.frame.height
+        && views(TypingInputView.self).first?.acceptsTextInput == true
     }
     func completeLayout(width: CGFloat) throws -> PromptFieldTextLayout {
       let session = TypingSession(configuration: .words(201), prompt: prompt)
@@ -172,6 +173,94 @@ import XCTest
     fixture.waitUntil { !fixture.settings.allowsRestartingConfigurationChange }
     XCTAssertEqual(fixture.counts.generation, 2)
     XCTAssertEqual(fixture.counts.preparedRenders, 0)
+  }
+
+  func testSourcePublicationDoesNotUnlockInputBeforePageLayoutIsAdopted() throws {
+    let fixture = try Fixture(gatesSource: true, wordCount: 2_001)
+    defer { fixture.counts.finishAllSources(); fixture.close() }
+    fixture.waitUntil { fixture.counts.sourceReplies.count == 1 }
+    fixture.counts.finishFirstSource()
+    let deadline = Date().addingTimeInterval(15)
+    var checkedUnreadyPage = false
+    while !fixture.promptReady && Date() < deadline {
+      fixture.flush()
+      if !checkedUnreadyPage, !fixture.promptReady,
+        !fixture.views(PromptViewportPracticeNativeView.self).isEmpty {
+        checkedUnreadyPage = true
+        let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+        XCTAssertFalse(input.acceptsTextInput, "Source completion is not page-layout readiness")
+        input.onInsert("x", false)
+        XCTAssertTrue(fixture.settings.allowsRestartingConfigurationChange,
+          "A key delivered before publication must not start the attempt")
+      }
+    }
+    XCTAssertTrue(checkedUnreadyPage, "Exercise the actual source-to-page handoff")
+    fixture.waitUntil { fixture.promptReady }
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    XCTAssertTrue(input.acceptsTextInput)
+    input.onInsert("w", false)
+    fixture.waitUntil { !fixture.settings.allowsRestartingConfigurationChange }
+    XCTAssertEqual(fixture.counts.generation, 1)
+  }
+
+  func testRestartWhileAwaitingPagePublicationCannotUnlockTheReplacementSource() throws {
+    let fixture = try Fixture(gatesSource: true, wordCount: 2_001)
+    defer { fixture.counts.finishAllSources(); fixture.close() }
+    fixture.waitUntil { fixture.counts.sourceReplies.count == 1 }
+    fixture.counts.finishFirstSource()
+    fixture.waitUntil { !fixture.views(PromptViewportPracticeNativeView.self).isEmpty }
+    XCTAssertFalse(fixture.promptReady)
+    let old = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    input.onRestart()
+    fixture.waitUntil { fixture.counts.generation == 2 && fixture.counts.sourceReplies.count == 1 }
+    XCTAssertEqual(old.viewport.measuredFieldCount, 0)
+    let replacement = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    XCTAssertFalse(replacement.acceptsTextInput)
+    replacement.onInsert("x", false)
+    XCTAssertTrue(fixture.settings.allowsRestartingConfigurationChange)
+    fixture.counts.finishFirstSource()
+    fixture.waitUntil { fixture.promptReady }
+    XCTAssertTrue(fixture.views(TypingInputView.self).first?.acceptsTextInput == true)
+    XCTAssertEqual(fixture.counts.generation, 2)
+  }
+
+  func testSynchronousShortSourceUsesTheSamePublicationGateAndCanStart() throws {
+    let fixture = try Fixture(wordCount: 25)
+    defer { fixture.close() }
+    fixture.waitUntil { !fixture.views(PromptViewportPracticeNativeView.self).isEmpty }
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    if abs(native.frame.height - native.measuredHeight) >= 0.01 {
+      XCTAssertFalse(input.acceptsTextInput)
+    }
+    fixture.waitUntil { native.viewport.canvas.hasCompleteHeight
+      && abs(native.frame.height - native.measuredHeight) < 0.01
+      && input.acceptsTextInput }
+    let text = try XCTUnwrap(native.viewport.canvas.accessibilityValue() as? String)
+    let first = try XCTUnwrap(text.first)
+    input.onInsert(String(first), false)
+    fixture.waitUntil { !fixture.settings.allowsRestartingConfigurationChange }
+    XCTAssertEqual(fixture.counts.generation, 0, "Short sources must not enter the asynchronous generator")
+  }
+
+  func testDisablingWholeDisplayWhileAwaitingPublicationRestoresCompleteInputPath() throws {
+    let fixture = try Fixture(gatesSource: true, wordCount: 2_001)
+    defer { fixture.counts.finishAllSources(); fixture.close() }
+    fixture.waitUntil { fixture.counts.sourceReplies.count == 1 }
+    fixture.counts.finishFirstSource()
+    fixture.waitUntil { !fixture.views(PromptViewportPracticeNativeView.self).isEmpty }
+    XCTAssertFalse(fixture.promptReady)
+    let old = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    fixture.settings.showAllPracticeLines = false
+    fixture.waitUntil { fixture.views(PromptViewportPracticeNativeView.self).isEmpty
+      && fixture.views(TypingInputView.self).first?.acceptsTextInput == true
+      && !fixture.views(PromptFieldNativeView.self).isEmpty }
+    XCTAssertEqual(old.viewport.measuredFieldCount, 0)
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    input.onInsert("w", false)
+    fixture.waitUntil { !fixture.settings.allowsRestartingConfigurationChange }
+    XCTAssertEqual(fixture.counts.generation, 1)
   }
 
   func testAdmittedInputAvoidsCompleteRendererButCompositionFallbackUsesIt() throws {

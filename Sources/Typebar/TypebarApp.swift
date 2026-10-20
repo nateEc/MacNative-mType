@@ -1404,6 +1404,7 @@ private struct ContentView: View {
   @State private var liveContentMessage: String?
   @State private var wholePreviewTask = WholePreviewPreparationTask()
   @State private var isPreparingWholePreview = false
+  @State private var viewportReadinessAttemptID: UUID?
   @State private var preparedWholePreviewRendering: PreparedWholePreviewPresentation?
   @State private var wholePreviewFieldWidth: CGFloat?
   @State private var viewportFallbackAttemptID: UUID?
@@ -1468,7 +1469,7 @@ private struct ContentView: View {
           accent: activeTheme.accent, panel: activeTheme.panel,
           allowsNewline: session.acceptsNewlineInput,
           allowsTab: session.acceptsTabInput,
-          isEnabled: !session.isFinished && !isPreparingWholePreview,
+          isEnabled: !session.isFinished && !isPreparingPracticePrompt,
           onInsert: {
             handleInsertedText($0, forceError: false, origin: .virtualKeyboard)
           },
@@ -1577,10 +1578,10 @@ private struct ContentView: View {
     }
     .onChange(of: settings.showAllPracticeLines) { _, _ in
       activeChallengeID = nil
-      if isPreparingWholePreview { reset() }
+      if isPreparingPracticePrompt { reset() }
     }
     .onChange(of: settings.practiceTapeMode) { _, _ in
-      if isPreparingWholePreview { reset() }
+      if isPreparingPracticePrompt { reset() }
     }
     .onChange(of: settings.layoutFluidLayouts, handleLayoutFluidSelectionChange)
     .onChange(of: settings.testModifiers) { _, _ in refreshZipfNotice() }
@@ -1638,9 +1639,10 @@ private struct ContentView: View {
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear(perform: contentAppeared)
     .onDisappear {
-      interruptedWholePreview = interruptedWholePreview || isPreparingWholePreview
+      interruptedWholePreview = interruptedWholePreview || isPreparingPracticePrompt
       wholePreviewTask.cancel()
       isPreparingWholePreview = false
+      viewportReadinessAttemptID = nil
       preparedWholePreviewRendering = nil
       liveContentStreamingActive = false
       liveContentTask?.cancel()
@@ -1658,6 +1660,7 @@ private struct ContentView: View {
       if outcome != .active {
         wholePreviewTask.cancel()
         isPreparingWholePreview = false
+        viewportReadinessAttemptID = nil
         liveContentTask?.cancel()
         liveContentTask = nil
         liveContentStreamingActive = false
@@ -2568,7 +2571,7 @@ private struct ContentView: View {
               .foregroundStyle(.secondary)
           }
         }
-        if isPreparingWholePreview {
+        if isPreparingPracticePrompt {
           HStack(spacing: 7) {
             ProgressView().controlSize(.small)
             Text("正在准备完整练习；完成后可输入。可重新开始或切换设置取消。")
@@ -3061,7 +3064,7 @@ private struct ContentView: View {
       }
 
       NativeTypingInput(
-        focusRequest: focusRequest, acceptsTextInput: !isPreparingWholePreview,
+        focusRequest: focusRequest, acceptsTextInput: !isPreparingPracticePrompt,
         insertionAnchor: promptInsertionAnchor,
         insertionAttemptID: session.automaticInputAttemptID,
         compositionDisplayStyle: settings.compositionDisplayStyle,
@@ -3096,14 +3099,14 @@ private struct ContentView: View {
         onOpenCommandPalette: { showingCommandPalette = true },
         onBailoutArmed: armLongTestBailout,
         onBailout: {
-          guard !isPreparingWholePreview else { return }
+          guard !isPreparingPracticePrompt else { return }
           bailoutConfirmationMessage = nil
           synchronizeLiveInputRules()
           session.bailOut()
         },
         onQuickRestartProtectionRequired: showQuickRestartProtectionNotice,
         onFinishZen: {
-          guard !isPreparingWholePreview else { return }
+          guard !isPreparingPracticePrompt else { return }
           synchronizeLiveInputRules()
           session.finishZen()
         },
@@ -3116,7 +3119,7 @@ private struct ContentView: View {
           handleTypingWindowFocusChange(isFocused, hasAttachedSheet: hasAttachedSheet)
         },
         onCompositionStarted: {
-          guard !isPreparingWholePreview else { return }
+          guard !isPreparingPracticePrompt else { return }
           preparedWholePreviewRendering = nil
           if activeChallengeID != "mouse-warrior" {
             synchronizeLiveInputRules()
@@ -3124,7 +3127,7 @@ private struct ContentView: View {
           }
         },
         onCompositionChanged: {
-          guard !isPreparingWholePreview else { return }
+          guard !isPreparingPracticePrompt else { return }
           if wholePreviewViewportEnabled, !$0.isEmpty { viewportFallbackAttemptID = session.automaticInputAttemptID }
           preparedWholePreviewRendering = nil
           let hadMarkedText = !compositionText.isEmpty
@@ -3141,7 +3144,7 @@ private struct ContentView: View {
           }
         },
         shouldFinishWithComposition: { text, forceError in
-          guard !isPreparingWholePreview else { return false }
+          guard !isPreparingPracticePrompt else { return false }
           guard activeChallengeID != "mouse-warrior" else { return false }
           synchronizeLiveInputRules()
           return session.shouldFinishWithComposition(effectiveInsertedText(text), forceError: forceError)
@@ -3161,7 +3164,7 @@ private struct ContentView: View {
           }
         },
         onPhysicalKey: { keyCode, isKeyDown, isRepeat in
-          guard !isPreparingWholePreview else { return }
+          guard !isPreparingPracticePrompt else { return }
           if isKeyDown && activeChallengeID == "mouse-warrior" {
             session.recordPhysicalKeyboardActivityDuringAttempt()
           }
@@ -3331,6 +3334,13 @@ private struct ContentView: View {
           onFailure: { attempt in
             guard session.automaticInputAttemptID == attempt else { return }
             viewportFallbackAttemptID = attempt
+            viewportReadinessAttemptID = nil
+          }, onReady: { ready in
+            guard viewportReadinessAttemptID == ready.attemptID,
+              session.automaticInputAttemptID == ready.attemptID, session.promptTargetID == ready.targetID,
+              promptRenderStyle == ready.style, practicePromptNSFont(size: settings.fontSize) == ready.font else { return }
+            viewportReadinessAttemptID = nil
+            requestTypingFocus()
           })
       } else if let rendering, practiceVisualEffect.usesASL {
         ASLPracticePrompt(
@@ -3727,6 +3737,16 @@ private struct ContentView: View {
       && viewportFallbackAttemptID != session.automaticInputAttemptID
   }
 
+  private var isPreparingPracticePrompt: Bool {
+    isPreparingWholePreview || viewportReadinessAttemptID == session.automaticInputAttemptID
+  }
+
+  private func awaitViewportPresentationIfNeeded() {
+    viewportReadinessAttemptID = !isPreparingWholePreview
+      && allowsWholePreviewViewportPreparation(session, style: promptRenderStyle)
+      ? session.automaticInputAttemptID : nil
+  }
+
   private var stats: some View {
     LiveStatsClockContent(signal: liveStatsClockSignal) { liveStatsContent }
   }
@@ -3856,7 +3876,7 @@ private struct ContentView: View {
   }
 
   private func handleInputRuleChange(_ previous: InputRules, _ current: InputRules) {
-    if isPreparingWholePreview { reset() }
+    if isPreparingPracticePrompt { reset() }
     else {
       session.synchronizeLiveInputRules(current)
       preparedWholePreviewRendering = nil
@@ -3866,7 +3886,7 @@ private struct ContentView: View {
   private func handleInsertedText(
     _ text: String, forceError: Bool, origin: TypingInputOrigin = .physicalKeyboard
   ) {
-    guard !isPreparingWholePreview else { return }
+    guard !isPreparingPracticePrompt else { return }
     let diagnosticStart = TimerDeliveryDiagnostics.enabled ? ProcessInfo.processInfo.systemUptime : 0
     let tracesFirstInput = TimerDeliveryDiagnostics.enabled && !session.hasStarted
     if tracesFirstInput {
@@ -3959,7 +3979,7 @@ private struct ContentView: View {
   }
 
   private func handleDeletedText(deletesWord: Bool) {
-    guard !isPreparingWholePreview else { return }
+    guard !isPreparingPracticePrompt else { return }
     synchronizeLiveInputRules()
     let feedback = TypingLiveInputFeedback.delete(from: &session, wholeWord: deletesWord)
     if !feedback.isEmpty || preparedWholePreviewRendering?.typedSnapshot != session.typed {
@@ -4429,6 +4449,7 @@ private struct ContentView: View {
     liveContentStreamingActive = false
     wholePreviewTask.cancel()
     isPreparingWholePreview = false
+    viewportReadinessAttemptID = nil
     preparedWholePreviewRendering = nil
     interruptedWholePreview = false
     liveContentTask?.cancel()
@@ -4488,12 +4509,13 @@ private struct ContentView: View {
     isRepeatedPaceAttempt = false
     activePaceTargetWpm = paceGuideTarget()
     session.configurePace(wpm: activePaceTargetWpm)
+    awaitViewportPresentationIfNeeded()
     if !isPreparingWholePreview, session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
     refreshLiveContentIfNeeded(configuration: session.configuration, requestID: requestID)
     if preparesWholePreview { prepareWholePreview(configuration: configuration, requestID: requestID) }
-    requestTypingFocus()
+    if viewportReadinessAttemptID == nil { requestTypingFocus() }
   }
 
   private func contentAppeared() {
@@ -4601,6 +4623,7 @@ private struct ContentView: View {
           viewportFallbackAttemptID = prepared.session.automaticInputAttemptID
         }
         session = prepared.session
+        viewportReadinessAttemptID = prepared.rendering == nil ? prepared.session.automaticInputAttemptID : nil
         isPreparingWholePreview = false
         if session.configuration.language == .mixedLanguages {
           polyglotReturnLanguage = session.configuration.polyglotBaseLanguage
@@ -4609,9 +4632,10 @@ private struct ContentView: View {
         if session.configuration.modifiers.contains(.listening) {
           NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
         }
-        requestTypingFocus()
+        if !isPreparingPracticePrompt { requestTypingFocus() }
       case .failure:
         isPreparingWholePreview = false
+        viewportReadinessAttemptID = nil
         preparedWholePreviewRendering = nil
         session = TypingSession(configuration: configuration, prompt: "",
           initializationFailure: "无法准备完整练习，请重新开始或切换显示设置。",
@@ -4729,10 +4753,11 @@ private struct ContentView: View {
       liveContentStreamingActive = true
       liveContentMessage = "已载入\(content.attribution)。"
       refreshPaceTarget()
+      awaitViewportPresentationIfNeeded()
       if configuration.modifiers.contains(.listening) {
         NativeSpeech.shared.speak(session.prompt, language: configuration.language)
       }
-      requestTypingFocus()
+      if viewportReadinessAttemptID == nil { requestTypingFocus() }
       prefetchLiveContentIfNeeded()
     }
   }
@@ -5013,6 +5038,7 @@ private struct ContentView: View {
   private func startRepeatedAttempt(_ repeatedSession: TypingSession, tags: [String]) {
     wholePreviewTask.cancel()
     isPreparingWholePreview = false
+    viewportReadinessAttemptID = nil
     preparedWholePreviewRendering = nil
     interruptedWholePreview = false
     restartLockMessage = nil
@@ -5033,10 +5059,11 @@ private struct ContentView: View {
     activePaceTargetWpm = paceGuideTarget(
       usingRepeatedPace: shouldUseRepeatedPace ? lastFinishedWpm : nil)
     session.configurePace(wpm: activePaceTargetWpm)
+    awaitViewportPresentationIfNeeded()
     if session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
-    requestTypingFocus()
+    if viewportReadinessAttemptID == nil { requestTypingFocus() }
   }
 
   private func absorbLiveWeakSpotScores(from session: TypingSession) {
