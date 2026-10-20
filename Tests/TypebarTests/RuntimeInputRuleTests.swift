@@ -5,7 +5,7 @@ import XCTest
 final class RuntimeInputRuleTests: XCTestCase {
   private let start = Date(timeIntervalSince1970: 100)
 
-  func testLiveSnapshotDoesNotStartOrReplaceRestartOnlyRules() {
+  func testLiveSnapshotDoesNotStartOrReplaceStrictSpaceStopOrCodeRules() {
     let original = InputRules(strictSpace: true, stopOnErrorMode: .word,
       codeUnindentOnBackspace: true, minimumAccuracy: 60, minimumWpm: 10)
     var session = TypingSession(configuration: .words(3, rules: original), prompt: "abc bay cedar")
@@ -15,6 +15,8 @@ final class RuntimeInputRuleTests: XCTestCase {
     expected.quickEnd = true
     expected.freedomMode = true
     expected.oppositeShiftMode = .keymap
+    expected.minimumAccuracy = 0
+    expected.minimumWpm = 0
     XCTAssertEqual(session.configuration.rules, expected)
     XCTAssertFalse(session.hasStarted)
     XCTAssertEqual(session.typed, "")

@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-21 运行期阈值计分：修复设置已保存但当前尝试仍按旧门槛计分的同步缺口。完整源与活跃投影一起接收，非法组不替换，已结束成绩和重复配置保留；输入文字／起始时间不重开。固定源码完整函数探针扩至 21 组，十项新增原生回归、最终相关 276 项零失败／零跳过（11.054 秒）。行为优先与根因调试促成四项十六处红测，迁移安全与会话内决策复核保留非实时规则及历史边界；整体导入／升级和真实窗口未完成。
+
 2026-10-21 完整源恢复默认：QA 背景存储隔离到内存，正式应用保留原文件路径，设置和视图持有同一存储。恢复前拒绝 No Quit、不可读／未来版本配置，背景移除失败或异常目录不继续清理；返回结果接入设置页及本机账户清理。本域墓碑不再误写标准域。九项新增回归，定向 24 项及最终相关 169 项零失败／零跳过（4.057 秒），范围重叠不相加；真实窗口和跨进程事务未验收，整体源升级／发布继续开放。
 
 2026-10-21 独立设置页阈值保存事件：有效确认后同步交给最近活跃的存活主窗口，结果练习使用明确保存而不是自动回写；同值确认不遗漏，后台注册不抢先，关闭释放处理器。八项新增回归，最终相关 166 项零失败／零跳过（4.196 秒），包括旧／完整源的实际 Binding 与选择存储往返。行为优先、迁移安全及有界会话内决策复核促成单一所有者和失败不推进；窗口接线仅静态检查，跨键失败提示、其余设置事件和完整迁移仍开放。详见 `WORD_PRACTICE_PERSISTENCE_EVENTS_CONTRACT.md`。
@@ -1846,6 +1848,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 | CFG-PREFERENCE-SAVE-01 | 独立设置页阈值的明确保存事件 | `config/setters.ts`, `config/persistence.ts`, `test/practise-words.ts` | PreferencesDomain, TestDomain | 部分实现：六绑定成功后同步路由到最近活跃存活主窗口，结果练习提升当前完整选择，同值有效；后台注册不抢先、关闭移除，拒绝／自动恢复不发事件。八项新增及相关 166 项检查通过，源／旧配置存储往返已验证；窗口生命周期仅静态接线，全部设置覆盖和统一写入失败提示仍开放。 |
 | CFG-THRESHOLD-PREFERENCES-01 | 设置页完整阈值模式与记忆 | `commandline/lists.ts`, `commandline/lists/min-burst.ts`, `test/test-timer.ts` | PreferencesDomain | 部分实现：已有 v4 的开关、数值及 Burst 模式绑定完整源；开启零值仍显示开启，关闭／再开不覆盖记忆；不可读新代与保存失败不回退旧写法。保留 No Quit 预检和普通配置旧语义，不自动升级；九项新增回归含实际 Binding 和生产接线静态检查，可见窗口、跨窗口和完整迁移待验收。 |
 | CFG-THRESHOLD-COMMAND-01 | 完整源阈值命令与编辑确认 | `commandline/lists/min-burst.ts`, `commandline/lists.ts` | CommandDomain, PreferencesDomain | 部分实现：已有 v4 的提交／关闭用原子源接口，零值模式与关闭记忆保持；失败不报成功、编辑器不关闭，预填读取记忆，原值跨单位确认保留精度。普通配置保持既有路径，未全局启用。605 项扩大和最终 25 项输入回归通过，不相加；实机、跨窗口和原版所有输入截断边界待验收。 |
+| CFG-THRESHOLD-LIVE-01 | 当前尝试使用最新阈值计分 | `config/setters.ts`, `config/metadata.tsx`, `test/test-timer.ts`, `input/helpers/fail-or-finish.ts` | TypingDomain, TestDomain | 部分实现：同步完整阈值源与活跃投影，开启／关闭／修改作用于下次采样或词提交，不改已结束成绩；非法组保留原状态，非实时规则不被覆盖。十项新增及相关 276 项检查通过，固定完整模块 21 组探针通过；真实窗口、导航、动态回放及全局迁移仍待验收。 |
 | CFG-THRESHOLD-RESET-01 | 完整源阈值恢复默认与拒绝反馈 | `constants/default-config.ts`, `config/lifecycle.ts` | PreferencesDomain | 部分实现：已有源恢复 off 与 100／90／100 记忆，保留旧键；锁定／不可读源先拒绝，背景目录异常不删除，失败返回并提示。QA 背景显式内存隔离，账户清理预检在本机副作用之前。九项新增及相关 169 项检查通过；窗口／远程顺序仅静态检查，跨资源事务、故障恢复和整体源启用待继续。 |
 | CFG-THRESHOLD-OWNER-01 | 正式设置的完整阈值源所有权 | `config/persistence.ts`, `commandline/lists/min-burst.ts` | PreferencesDomain, TestDomain | 部分实现：已有 v4 在实际 AppSettings 中加载、输出完整规则和单独持久化，原子更新支持独立模式／记忆与零值，数字关闭保留记忆。旧配置不自动迁移，旧整体应用入口对源目标明确拒绝；完整菜单和发布尚未启用。七项新回归、598 项相关检查通过；源恢复默认模型另有 CFG-THRESHOLD-RESET-01 验证，真实窗口、冷进程与全局升级仍待验收。详见 `THRESHOLD_SOURCE_MIGRATION_CONTRACT.md`。 |
 | TST-STATE-SOURCE-01 | 完整阈值活动选择保存 | `config/persistence.ts`, `config/lifecycle.ts` | TestDomain, PreferencesDomain | 部分实现：源选择采用 v2 独立键，保留完整模式／记忆及限制参数，不重复保存全局设置／标签；新键不可读时拒写而不回退，v35 归档可无损携带。普通 v1 保持原写法，源恢复与正式运行期尚未接入。七项新回归、591 项相关检查通过，实机／跨进程／混用旧版仍待验收；详见 `THRESHOLD_SOURCE_MIGRATION_CONTRACT.md`。 |

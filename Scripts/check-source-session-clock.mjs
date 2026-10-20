@@ -56,13 +56,13 @@ async function fixture(options = {}) {
         if (data.event === 'start') state.start = ms;
       }}],
     ['@monkeytype/util/numbers', {roundTo2: n => Math.round(n * 100) / 100}],
-    ['./events/live-cache', {getLiveCachedAccuracy: () => 100,
+    ['./events/live-cache', {getLiveCachedAccuracy: () => state.accuracy ?? 100,
       getLiveCachedTestDurationMs: now => now - state.start,
       getLiveCachedTestSeconds: now => Math.floor((now - state.start) / 1_000),
       getLiveCachedTimerStartMs: () => state.start}],
     ['./events/stats', {getChars: () => ({correctWord: 5, allCorrect: 5, extra: 0, incorrect: 0})}],
     ['../utils/numbers', {calculateWpm: (chars, seconds) => chars * 12 / seconds}],
-    ['../states/test', {getActiveWordIndex: () => 0, isTestActive: () => state.active,
+    ['../states/test', {getActiveWordIndex: () => state.wordIndex ?? 0, isTestActive: () => state.active,
       setCurrentLiveStats: value => { state.live.push(value); }}],
   ]);
   class CalendarDate extends Date {
@@ -82,7 +82,7 @@ async function fixture(options = {}) {
   });
   await module.evaluate(); api = module.namespace;
   await api.start(state.now);
-  return {state, api, driver, fire(elapsed, wall = state.wall) {
+  return {config, state, api, driver, fire(elapsed, wall = state.wall) {
     state.now = state.start + elapsed; state.wall = wall; callback();
   }, steps: () => state.events.filter(x => x.data.event === 'step')};
 }
@@ -148,4 +148,59 @@ for (const options of [{mode: 'time', time: 130}, {mode: 'words', words: 250},
   assert.equal(f.state.signals.length, 0); assert.equal(f.state.slow, false); fixtures++;
 }
 
-console.log(`session clock source probe passed: ${fixtures} owned fixtures, 1 complete pinned module; scheduling/cache/metrics/UI are synthetic, no browser/sleep claim`);
+// Mutate the actual Config binding only after start and a successful first tick.
+for (const kind of ['enable-speed', 'lower-speed', 'enable-accuracy', 'disable-accuracy']) {
+  const initial = kind === 'lower-speed' ? {minWpm: 'custom', minWpmCustomSpeed: 40}
+    : kind === 'disable-accuracy' ? {minAcc: 'custom', minAccCustom: 50.1} : {};
+  const f = await fixture(initial);
+  f.fire(1_000);
+  assert.equal(f.state.signals.length, 0);
+  f.state.wordIndex = 4;
+  f.state.accuracy = 50;
+  if (kind.includes('speed')) {
+    f.config.minWpm = 'custom';
+    f.config.minWpmCustomSpeed = kind === 'enable-speed' ? 40 : 20;
+  } else {
+    f.config.minAccCustom = 50.1;
+    f.config.minAcc = kind === 'enable-accuracy' ? 'custom' : 'off';
+  }
+  f.fire(2_000);
+  const expected = {'enable-speed': 'min speed', 'enable-accuracy': 'min accuracy'}[kind];
+  assert.equal(f.state.signals[0]?.value, expected);
+  assert.equal(f.state.events.filter(event => event.data.event === 'start').length, 1);
+  fixtures++;
+}
+
+const burstConfig = {mode: 'words', minBurst: 'off', minBurstCustomSpeed: 100};
+const burstContext = vm.createContext({Config: burstConfig});
+const misc = fs.readFileSync(path.join(root, 'frontend/src/ts/utils/misc.ts'), 'utf8');
+const start = misc.indexOf('export function whorf(');
+assert.ok(start >= 0);
+const end = misc.indexOf('\n}', start);
+assert.ok(end > start);
+new vm.Script(stripTypeScriptTypes(misc.slice(start, end + 2).replace('export ', ''),
+  {mode: 'transform'})).runInContext(burstContext, {timeout: 1_000});
+const burstFile = path.join(root, 'frontend/src/ts/input/helpers/fail-or-finish.ts');
+const burstModule = new vm.SourceTextModule(stripTypeScriptTypes(fs.readFileSync(burstFile, 'utf8'),
+  {mode: 'transform'}), {identifier: burstFile, context: burstContext});
+await burstModule.link(id => {
+  const bindings = {'../../config/store': {Config: burstConfig},
+    '../../utils/misc': {whorf: burstContext.whorf}, './util': {}}[id];
+  assert.ok(bindings, 'Unapproved burst dependency: ' + id);
+  return new vm.SyntheticModule(Object.keys(bindings), function () {
+    for (const [name, value] of Object.entries(bindings)) this.setExport(name, value);
+  }, {identifier: id, context: burstContext});
+});
+await burstModule.evaluate();
+const checkBurst = () => burstModule.namespace.checkIfFailedDueToMinBurst({
+  testInputWithData: 'amber', currentWord: 'amber', lastBurst: 10});
+assert.equal(checkBurst(), false);
+burstConfig.minBurst = 'fixed'; assert.equal(checkBurst(), true);
+burstConfig.minBurst = 'off'; assert.equal(checkBurst(), false);
+burstConfig.minBurst = 'flex'; burstConfig.minBurstCustomSpeed = 0;
+assert.equal(checkBurst(), false);
+fixtures++;
+assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
+  '91bd24bb8513785c7364cbea29296ff7adafac41');
+assert.equal(execFileSync('git', ['-C', root, 'status', '--porcelain'], {encoding: 'utf8'}).trim(), '');
+console.log(`session clock source probe passed: ${fixtures} owned fixtures, 2 complete pinned modules and complete whorf function; scheduling/cache/metrics/UI are synthetic, no browser/sleep claim`);

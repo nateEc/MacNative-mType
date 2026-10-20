@@ -58,3 +58,5 @@
 门禁后提交前，定向 149 项再次零失败（3.253 秒），完整源 timer 16 组、既有十模块 78 组及 843 场景结构再次通过。日志 /tmp/typebar-session-clock-postgate-focused.log、/tmp/typebar-session-clock-postgate-source.log 和 /tmp/typebar-session-clock-postgate-terminal-source.log。生产代码在全量门禁后未变，补充验证不能代替设备验收。
 
 会话内源码驱动、行为优先、迁移安全及有界决策／风险复核保障采样、队列与旧数据边界，非独立审计。真实旧库／回退、睡眠／系统时间／IME／窗口／VoiceOver、长期资源／组合、完整完成策略与整体等价仍开放；主题、挑战、原始内容身份覆盖不升级。文档技能保存证据，不把 Markdown 当设备／渲染验收。
+
+2026-10-21 补充：check-source-session-clock.mjs 现为 21 组自有夹具，原 16 组保留，新增启动后提高／降低 WPM、开启／关闭准确率和 Burst 当下配置读取。执行两个完整固定模块 test-timer.ts、input/helpers/fail-or-finish.ts 及完整 whorf 函数，时钟、缓存、统计、配置修改和 UI 依赖仍为自有适配，不代表浏览器或完整 setter／No Quit。旧文中的 16 是当时证据，不是当前总数；原生同步阈值修复见 THRESHOLD_SOURCE_MIGRATION_CONTRACT.md。

@@ -5761,7 +5761,8 @@ struct TypingSession {
     configuration.rules.hideExtraLetters = enabled
   }
 
-  /// Synchronizes only settings whose reference metadata permits live changes.
+  /// Synchronizes rules read live by reference input/timer code. Admission
+  /// checks (including No Quit) remain the caller's responsibility.
   mutating func synchronizeLiveInputRules(_ rules: InputRules) {
     guard !isFinished else { return }
     var live = rules
@@ -5777,6 +5778,25 @@ struct TypingSession {
     if live.confidenceMode != .off || live.deleteOnErrorMode.isEnabled {
       configuration.rules.stopOnErrorMode = .off
       configuration.rules.stopOnError = false
+    }
+    // The pinned timer and word-commit checks read current Config, not the
+    // values captured when the attempt started. Keep the source and its four
+    // numeric projections together; malformed snapshots cannot partially
+    // replace the active thresholds or strip their remembered source state.
+    let validThresholds: Bool
+    if let source = rules.thresholdSource {
+      validThresholds = source.configuration.isValid && source.matches(rules)
+    } else {
+      validThresholds = live.minimumAccuracy.isFinite && (0...100).contains(live.minimumAccuracy)
+        && live.minimumWpm.isFinite && live.minimumWpm >= 0
+        && live.minimumWordBurstWpm.isFinite && live.minimumWordBurstWpm >= 0
+    }
+    if validThresholds {
+      configuration.rules.minimumAccuracy = live.minimumAccuracy
+      configuration.rules.minimumWpm = live.minimumWpm
+      configuration.rules.minimumWordBurstWpm = live.minimumWordBurstWpm
+      configuration.rules.minimumWordBurstMode = live.minimumWordBurstMode
+      configuration.rules.thresholdSource = live.thresholdSource
     }
     setBlindMode(live.blindMode)
     setHideExtraLetters(live.hideExtraLetters)
