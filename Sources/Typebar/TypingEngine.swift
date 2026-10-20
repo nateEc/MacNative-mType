@@ -11681,21 +11681,9 @@ enum StarterLexicon {
     "miasto", "deszcz", "cisza", "kierunek", "gwiazda", "notatka", "ogród", "oddech",
   ]
 
-  // Typebar-authored Spanish starter words. Accented forms deliberately
-  // exercise macOS's composed-text input path without importing a web corpus.
-  static let spanishWords = [
-    "árbol", "camino", "luz", "puente", "tarde", "cielo", "papel", "brisa",
-    "puerto", "tinta", "jardín", "viaje", "música", "nube", "calma", "faro",
-    "montaña", "semilla", "ritmo", "ventana", "orilla", "memoria", "lápiz", "amanecer",
-  ]
+  static let spanishWords = WesternBasicCorpora.spanish
 
-  // Typebar-authored German starter words. Umlauts and ß intentionally
-  // exercise native Unicode input without importing a third-party word list.
-  static let germanWords = [
-    "abend", "brücke", "fenster", "garten", "hafen", "insel", "klang", "licht",
-    "morgen", "nähe", "papier", "quelle", "ruhig", "straße", "tinte", "ufer",
-    "wolke", "zeit", "lernen", "fokus", "schritt", "atmen", "größe", "mühe",
-  ]
+  static let germanWords = WesternBasicCorpora.german
 
   // The pinned reference derives Swiss German words from its German wordsets
   // and replaces ß with ss. Keep the same behavior over Typebar-owned German
@@ -14916,13 +14904,7 @@ enum StarterLexicon {
     "á", "te", "lykill", "stóll", "verkefni", "skuggi", "veður",
   ]
 
-  // Typebar-authored French and Italian starter words. These compact lists
-  // deliberately include common accented characters for native text input.
-  static let frenchWords = [
-    "arbre", "chemin", "lumière", "pont", "matin", "ciel", "papier", "brise",
-    "port", "encre", "jardin", "voyage", "musique", "nuage", "calme", "phare",
-    "montagne", "graine", "rythme", "fenêtre", "rive", "mémoire", "crayon", "écoute",
-  ]
+  static let frenchWords = WesternBasicCorpora.french
 
   // Typebar-authored French technology wordplay. This preserves Bitoduc's
   // visible single-token and hyphenated-word practice without importing any

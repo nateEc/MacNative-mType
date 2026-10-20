@@ -18893,9 +18893,9 @@ final class TypingEngineTests: XCTestCase {
     let customTokens = TestSessionFactory.make(configuration: customConfiguration).prompt.split(
       separator: " "
     ).map(String.init)
-    XCTAssertTrue(customTokens.allSatisfy {
-      StarterLexicon.italianWords.contains($0) || StarterLexicon.frenchWords.contains($0)
-    })
+    let customFields = Set((StarterLexicon.italianWords + StarterLexicon.frenchWords)
+      .flatMap { $0.split(separator: " ").map(String.init) })
+    XCTAssertTrue(customTokens.allSatisfy(customFields.contains))
     XCTAssertEqual(customConfiguration.mixedLanguageComponents, selected)
     XCTAssertEqual(
       TypingLanguage.normalizedMixedComponents([.english]),
@@ -22018,6 +22018,9 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testGermanUsesOnlyTypebarOwnedUnicodeCorpusAndQuotes() {
+    let ownedFields = Set(StarterLexicon.germanWords.flatMap { $0.split(separator: " ").map(String.init) })
+    XCTAssertTrue(ownedFields.contains("Hause"), "Fields inside a valid candidate retain owned provenance")
+    XCTAssertFalse(ownedFields.contains("not-an-owned-field!"))
     let prompt = OfflineContent.generatedPrompt(
       wordCount: 12, language: .german,
       contentOptions: .init(includePunctuation: true, includeNumbers: true))
@@ -22026,7 +22029,7 @@ final class TypingEngineTests: XCTestCase {
       prompt.split(separator: " ").allSatisfy { token in
         if token.allSatisfy(\.isNumber) { return true }
         let normalized = token.trimmingCharacters(in: .punctuationCharacters)
-        return StarterLexicon.germanWords.contains(normalized)
+        return ownedFields.contains(normalized)
       })
     XCTAssertEqual(OfflineContent.quotes(for: .german, length: .short).count, 1)
     XCTAssertEqual(OfflineContent.quotes(for: .german, length: .medium).count, 1)
@@ -22202,6 +22205,7 @@ final class TypingEngineTests: XCTestCase {
       let prompt = OfflineContent.generatedPrompt(
         wordCount: 12, language: language,
         contentOptions: .init(includePunctuation: true, includeNumbers: true))
+      let ownedFields = Set(lexicon.flatMap { $0.split(separator: " ").map(String.init) })
       let invalidTokens = prompt.split(separator: " ").compactMap { token -> String? in
         let rawToken = String(token)
         if rawToken.allSatisfy(\.isNumber) { return nil }
@@ -22265,7 +22269,7 @@ final class TypingEngineTests: XCTestCase {
         default:
           baseTokens = [normalized]
         }
-        return baseTokens.contains(where: lexicon.contains)
+        return baseTokens.contains(where: ownedFields.contains)
           ? nil
           : "\(token) → \(baseTokens.joined(separator: " / "))"
       }

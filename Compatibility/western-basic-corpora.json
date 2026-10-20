@@ -1,0 +1,42 @@
+{
+  "authoring": "independently authored Typebar vocabulary; no reference word values",
+  "defaultPolyglot": {
+    "lastOwnerCounts": {
+      "english": 193,
+      "french": 173,
+      "german": 200,
+      "spanish": 184
+    },
+    "rawCandidateCount": 771,
+    "unionCount": 750
+  },
+  "languages": {
+    "french": {
+      "count": 174,
+      "maximumLength": 11,
+      "minimumLength": 1,
+      "multiwordCount": 2,
+      "uppercaseCount": 0,
+      "wordsSHA256": "46ffc446cfc460248ea8fae8ca6790eee06094a0e3e101a0dd308a7d92720390"
+    },
+    "german": {
+      "count": 200,
+      "maximumLength": 10,
+      "minimumLength": 2,
+      "multiwordCount": 2,
+      "uppercaseCount": 45,
+      "wordsSHA256": "5096ce3837e415e877b0ac35f88dd10d63b969eee6708c063b9d6c61266f4d91"
+    },
+    "spanish": {
+      "count": 197,
+      "maximumLength": 10,
+      "minimumLength": 1,
+      "multiwordCount": 0,
+      "uppercaseCount": 0,
+      "wordsSHA256": "045c77f0e18261722b37d2d529ff3f1dd02343075cb5e0f009679747c1d4efd1"
+    }
+  },
+  "schemaVersion": 1,
+  "source": "Sources/Typebar/WesternBasicCorpora.swift",
+  "sourceSHA256": "3bb114bb8a3fcd7027c4e6f134403859b3968930eefb6a4323975071a162b39a"
+}
