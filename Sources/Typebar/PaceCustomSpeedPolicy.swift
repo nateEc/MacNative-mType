@@ -41,7 +41,8 @@ enum PaceCustomSpeedPolicy {
   }
 
   @MainActor
-  static func apply(_ wpm: Double, to settings: AppSettings, activateCustom: Bool) -> Bool {
+  static func apply(_ wpm: Double, to settings: AppSettings, activateCustom: Bool,
+    onConfigurationSave: () -> Void = {}) -> Bool {
     guard isValid(wpm) else { return false }
     if activateCustom {
       settings.paceGuideCustomWpm = wpm
@@ -50,6 +51,7 @@ enum PaceCustomSpeedPolicy {
       settings.paceGuideCustomWpm = wpm
       if settings.paceGuideMode == .off { settings.paceGuideMode = .custom }
     }
+    onConfigurationSave()
     return true
   }
 }

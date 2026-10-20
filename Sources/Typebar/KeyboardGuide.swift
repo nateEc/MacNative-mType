@@ -1063,6 +1063,15 @@ enum KeyboardGuideScalePolicy {
   static func normalized(_ value: Double) -> Double {
     (value * 10).rounded().clamped(to: 5.0...35.0) / 10
   }
+
+  @MainActor
+  static func apply(_ value: Double, to settings: AppSettings,
+    onConfigurationSave: () -> Void = {}) -> Bool {
+    guard isValidInput(value) else { return false }
+    settings.keyboardGuideScale = value
+    onConfigurationSave()
+    return true
+  }
 }
 
 enum KeyboardGuideLegendStyle: String, Codable, CaseIterable, Identifiable {

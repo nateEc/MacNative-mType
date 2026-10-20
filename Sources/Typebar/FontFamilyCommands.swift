@@ -184,27 +184,27 @@ enum FontFamilyCommandApplication {
   static func apply(
     _ target: FontFamilyCommandTarget, to settings: AppSettings,
     isFontAvailable: (String) -> Bool = NativePracticeFont.isAvailable,
-    deactivateLocalFont: () -> Void = TypebarLocalPracticeFontStore.deactivate
+    deactivateLocalFont: () -> Void = TypebarLocalPracticeFontStore.deactivate,
+    onConfigurationSave: () -> Void = {}
   ) -> Bool {
     switch target {
     case .systemDesign(let font):
       deactivateLocalFont()
       settings.installedPracticeFontName = ""
       settings.practiceFont = font
-      return true
     case .knownIdentifier(let identifier):
       guard FontFamilyCommandCatalog.fixedKnownFontIDs.contains(identifier) else { return false }
       deactivateLocalFont()
       settings.installedPracticeFontName = identifier
-      return true
     case .installedName(let name):
       guard isFontAvailable(name) else { return false }
       deactivateLocalFont()
       settings.installedPracticeFontName = name
-      return true
     case .customName, .browseInstalled, .localFile, .useLocalFile, .removeLocalFile:
       return false
     }
+    onConfigurationSave()
+    return true
   }
 }
 
@@ -220,11 +220,13 @@ enum FontFamilyNameCommandPolicy {
   @MainActor
   static func apply(
     _ rawValue: String, to settings: AppSettings,
-    deactivateLocalFont: () -> Void = TypebarLocalPracticeFontStore.deactivate
+    deactivateLocalFont: () -> Void = TypebarLocalPracticeFontStore.deactivate,
+    onConfigurationSave: () -> Void = {}
   ) -> Bool {
     guard let value = normalized(rawValue) else { return false }
     deactivateLocalFont()
     settings.installedPracticeFontName = value
+    onConfigurationSave()
     return true
   }
 }

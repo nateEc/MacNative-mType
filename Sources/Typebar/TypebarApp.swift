@@ -1978,7 +1978,7 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingFontFamilyNameCommandEditor) {
       FontFamilyNameCommandEditor(initialName: settings.installedPracticeFontName) { name in
-        if FontFamilyNameCommandPolicy.apply(name, to: settings) {
+        if FontFamilyNameCommandPolicy.apply(name, to: settings, onConfigurationSave: persistExplicitTestConfiguration) {
           fontFamilyCommandMessage = settings.hasLocalPracticeFont
             ? "已保存所选字体；本地字体文件已保留但未启用。" : nil
         }
@@ -1988,9 +1988,12 @@ private struct ContentView: View {
       NativeFontFamilyPicker(
         selection: Binding(
           get: { settings.installedPracticeFontName },
-          set: {
-            settings.deactivateLocalPracticeFont()
-            settings.installedPracticeFontName = $0
+          set: { name in
+            if !FontFamilyCommandApplication.apply(.installedName(name), to: settings,
+              deactivateLocalFont: settings.deactivateLocalPracticeFont,
+              onConfigurationSave: persistExplicitTestConfiguration) {
+              fontFamilyCommandMessage = "此 Mac 当前无法使用所选字体。"
+            }
           }),
         families: installedFontCommandFamilies)
     }
@@ -2001,7 +2004,8 @@ private struct ContentView: View {
           kind: kind, remoteURL: settings.customBackgroundURL,
           filter: settings.customBackgroundFilter)
       ) { value in
-        if CustomBackgroundCommandEditorPolicy.apply(value, kind: kind, to: settings) {
+        if CustomBackgroundCommandEditorPolicy.apply(value, kind: kind, to: settings,
+          onConfigurationSave: persistExplicitTestConfiguration) {
           customBackgroundCommandMessage = nil
         }
       }
@@ -2010,13 +2014,15 @@ private struct ContentView: View {
       PaceGuideSpeedEditor(
         unit: settings.typingSpeedUnit, initialWpm: settings.paceGuideCustomWpm
       ) { wpm in
-        activeChallengeID = nil
-        _ = PaceCustomSpeedPolicy.apply(wpm, to: settings, activateCustom: true)
+        _ = PaceCustomSpeedPolicy.apply(wpm, to: settings, activateCustom: true, onConfigurationSave: {
+          activeChallengeID = nil
+          persistExplicitTestConfiguration()
+        })
       }
     }
     .sheet(isPresented: $showingKeyboardGuideScaleEditor) {
       KeyboardGuideScaleEditor(initialScale: settings.keyboardGuideScale) { scale in
-        settings.keyboardGuideScale = scale
+        _ = KeyboardGuideScalePolicy.apply(scale, to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       }
     }
     .sheet(isPresented: $showingCustomTimeEditor) {
@@ -4190,7 +4196,8 @@ private struct ContentView: View {
   }
 
   private func applyThemeQuickPickerSelection(_ target: ThemeCommandTarget) {
-    guard ThemeCommandApplication.apply(target, to: settings) else { return }
+    guard ThemeCommandApplication.apply(target, to: settings,
+      onConfigurationSave: persistExplicitTestConfiguration) else { return }
     themeQuickSwitchMessage = nil
   }
 
@@ -5683,7 +5690,8 @@ private struct ContentView: View {
       fontFamilyCommandMessage = nil
       switch target {
       case .systemDesign, .knownIdentifier, .installedName:
-        if !FontFamilyCommandApplication.apply(target, to: settings) {
+        if !FontFamilyCommandApplication.apply(target, to: settings,
+          onConfigurationSave: persistExplicitTestConfiguration) {
           fontFamilyCommandMessage = "此 Mac 当前无法使用所选字体。"
         } else if settings.hasLocalPracticeFont {
           fontFamilyCommandMessage = "已保存所选字体；本地字体文件已保留但未启用。"

@@ -144,7 +144,8 @@ enum CustomBackgroundCommandEditorPolicy {
 
   @MainActor
   static func apply(
-    _ rawValue: String, kind: CustomBackgroundCommandEditorKind, to settings: AppSettings
+    _ rawValue: String, kind: CustomBackgroundCommandEditorKind, to settings: AppSettings,
+    onConfigurationSave: () -> Void = {}
   ) -> Bool {
     guard let value = value(from: rawValue, kind: kind) else { return false }
     switch value {
@@ -161,6 +162,7 @@ enum CustomBackgroundCommandEditorPolicy {
       }
       settings.customBackgroundFilter = filter
     }
+    onConfigurationSave()
     return true
   }
 
