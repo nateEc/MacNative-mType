@@ -89,11 +89,14 @@ struct PracticeThresholdPreferences {
       onResult(false)
       return
     }
+    let accepted: Bool
     if settings.hasThresholdProfile {
-      onResult(settings.updateThresholdConfiguration(change))
+      accepted = settings.updateThresholdConfiguration(change)
     } else {
       legacy()
-      onResult(true)
+      accepted = true
     }
+    if accepted { settings.preferenceConfigurationSaves.deliver() }
+    onResult(accepted)
   }
 }

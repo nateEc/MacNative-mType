@@ -1136,6 +1136,7 @@ private enum RandomThemeTarget: Equatable {
 @MainActor
 @Observable
 final class AppSettings {
+  @ObservationIgnored let preferenceConfigurationSaves = PreferenceConfigurationSaveRouter()
   @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored private let feedbackSound: TypingFeedbackSound
   @ObservationIgnored private var batchingClickSoundConfiguration = true

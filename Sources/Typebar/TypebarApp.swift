@@ -1333,6 +1333,7 @@ private struct ContentView: View {
   @State private var showingProfileSearchCommandEditor = false
   @State private var sharedProfileInbox = SharedProfileLinkInbox()
   @State private var sharedProfileWindow = SharedProfileWindowHost()
+  @State private var preferenceConfigurationOwner = UUID()
   @State private var showingActiveResultTagEditor = false
   @State private var showingFontFamilyNameCommandEditor = false
   @State private var showingInstalledFontCommandPicker = false
@@ -1616,7 +1617,10 @@ private struct ContentView: View {
 
   private var lifecycleContent: some View {
     configuredPracticeContent
-    .background(SharedProfileWindowProbe(host: sharedProfileWindow, didAttach: presentSharedProfileIfPossible)
+    .background(SharedProfileWindowProbe(host: sharedProfileWindow, didAttach: {
+      activatePreferenceConfigurationOwnerIfKey()
+      presentSharedProfileIfPossible()
+    })
       .frame(width: 0, height: 0).allowsHitTesting(false).accessibilityHidden(true))
     .onOpenURL { sharedProfileInbox.receive($0, allowed: sharedProfilePresentationAllowed) }
     .onChange(of: settings.allowsRestartingConfigurationChange) { presentSharedProfileIfPossible() }
@@ -1629,6 +1633,7 @@ private struct ContentView: View {
     }
     .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
       guard notification.object as? NSWindow === sharedProfileWindow.window else { return }
+      settings.preferenceConfigurationSaves.activate(owner: preferenceConfigurationOwner)
       presentSharedProfileIfPossible()
     }
     .task { await runClock() }
@@ -1646,8 +1651,13 @@ private struct ContentView: View {
         position?.captureForFocusChange()
       }
       contentAppeared()
+      settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner) {
+        persistExplicitTestConfiguration()
+      }
+      activatePreferenceConfigurationOwnerIfKey()
     }
     .onDisappear {
+      settings.preferenceConfigurationSaves.remove(owner: preferenceConfigurationOwner)
       visualFocus.onWillCommit = nil
       interruptedWholePreview = interruptedWholePreview || isPreparingPracticePrompt
       wholePreviewTask.cancel()
@@ -6133,6 +6143,11 @@ private struct ContentView: View {
     } else {
       restoreDefaultTestSelection(customState: restoration.document, recovery: restoration.recovery)
     }
+  }
+
+  private func activatePreferenceConfigurationOwnerIfKey() {
+    guard sharedProfileWindow.window?.isKeyWindow == true else { return }
+    settings.preferenceConfigurationSaves.activate(owner: preferenceConfigurationOwner)
   }
 
   private func persistExplicitTestConfiguration() {
