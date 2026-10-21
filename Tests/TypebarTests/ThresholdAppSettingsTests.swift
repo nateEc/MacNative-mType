@@ -114,7 +114,7 @@ final class ThresholdAppSettingsTests: XCTestCase {
     }
   }
 
-  func testUnmigratedApplyPathsRefuseSourceTargetsAndNeverAutoUpgradeLegacyProfiles() throws {
+  func testLegacyApplyAndUnmigratedImportPathsRefuseSourceTargetsWithoutAutoUpgrade() throws {
     try withDefaults { defaults in
       let settings = AppSettings(defaults: defaults)
       XCTAssertFalse(settings.updateThresholdConfiguration(.minimumWpm(mode: .custom, customValue: 44)))

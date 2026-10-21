@@ -1768,6 +1768,126 @@ final class AppSettings {
     hasSetStreakDayBoundary = snapshot.hasSetStreakDayBoundary
   }
 
+  /// An unpublished, non-persisting staging object. No preference loading,
+  /// background files, shared sound player or final sound configuration.
+  private init(validating snapshot: AppSettingsSnapshot, defaults: UserDefaults) {
+    self.defaults = defaults
+    feedbackSound = TypingFeedbackSound(loadSound: { _ in nil }, beep: {})
+    localBackgroundStore = .inMemory()
+    thresholdSourceState = snapshot.thresholdSource
+    installSnapshotFields(snapshot)
+  }
+
+  /// Shared by staging and source application only. Keep the ordinary loader
+  /// and its existing sidecar/initialization semantics separate.
+  private func installSnapshotFields(_ snapshot: AppSettingsSnapshot) {
+    difficulty = snapshot.difficulty
+    strictSpace = snapshot.strictSpace
+    stopOnError = snapshot.stopOnError
+    stopOnErrorMode = snapshot.stopOnErrorMode
+    deleteOnError = snapshot.deleteOnError
+    deleteOnErrorMode = snapshot.deleteOnErrorMode
+    hideExtraLetters = snapshot.hideExtraLetters
+    blindMode = snapshot.blindMode
+    fontSize = snapshot.fontSize
+    practiceFont = snapshot.practiceFont
+    installedPracticeFontName = snapshot.installedPracticeFontName
+    theme = snapshot.theme
+    publishCompletedResults = snapshot.publishCompletedResults
+    saveCompletedResults = snapshot.saveCompletedResults
+    customThemes = snapshot.customThemes
+    activeCustomThemeID = snapshot.activeCustomThemeID
+    lastCustomThemeID = snapshot.lastCustomThemeID
+    favoriteThemeIDs = ThemeFavoritePolicy.normalized(
+      snapshot.favoriteThemeIDs, customThemes: snapshot.customThemes)
+    showKeyboardGuide = snapshot.showKeyboardGuide
+    keyboardGuideMode = snapshot.keyboardGuideMode
+    keyboardGuideScale = snapshot.keyboardGuideScale
+    keyboardGuideLegendStyle = snapshot.keyboardGuideLegendStyle
+    keyboardGuideKeysMode = snapshot.keyboardGuideKeysMode
+    keyboardGuideStyle = snapshot.keyboardGuideStyle
+    keyboardLayout = snapshot.keyboardLayout
+    keyboardInputLayout = snapshot.keyboardInputLayout
+    keyboardGuideLayoutSource = snapshot.keyboardGuideLayoutSource
+    customKeyboardLayouts = snapshot.customKeyboardLayouts
+    customKeyboardLayoutID = snapshot.customKeyboardLayoutID
+    quickEnd = snapshot.quickEnd
+    quickRestartKey = snapshot.quickRestartKey
+    showKeyTips = snapshot.showKeyTips
+    commandPaletteListMode = snapshot.commandPaletteListMode
+    followSystemTheme = snapshot.followSystemTheme
+    systemLightTheme = snapshot.systemLightTheme
+    systemDarkTheme = snapshot.systemDarkTheme
+    randomThemeMode = snapshot.randomThemeMode
+    flipTestColors = snapshot.flipTestColors
+    colorfulMode = snapshot.colorfulMode
+    customBackgroundURL = snapshot.customBackgroundURL
+    customBackgroundFit = snapshot.customBackgroundFit
+    customBackgroundFilter = snapshot.customBackgroundFilter
+    practiceBackdrop = snapshot.practiceBackdrop
+    reducePracticeMotion = snapshot.reducePracticeMotion
+    animationFrameRate = snapshot.animationFrameRate
+    showTypingCompanion = snapshot.showTypingCompanion
+    typingPowerMode = snapshot.typingPowerMode
+    englishVariant = snapshot.englishVariant
+    prefersArabicLazyInput = snapshot.prefersArabicLazyInput
+    favoriteQuoteIDs = snapshot.favoriteQuoteIDs
+    activeResultTags = snapshot.activeResultTags
+    repeatQuotes = snapshot.repeatQuotes
+    freedomMode = snapshot.freedomMode
+    confidenceMode = snapshot.confidenceMode
+    oppositeShiftMode = snapshot.oppositeShiftMode
+    codeUnindentOnBackspace = snapshot.codeUnindentOnBackspace
+    minimumAccuracy = snapshot.minimumAccuracy
+    minimumWpm = snapshot.minimumWpm
+    minimumWordBurstWpm = snapshot.minimumWordBurstWpm
+    minimumWordBurstMode = snapshot.minimumWordBurstMode
+    practiceLineWidth = snapshot.practiceLineWidth
+    customPracticeLineColumns = snapshot.customPracticeLineColumns
+    practiceTapeMode = snapshot.practiceTapeMode
+    practiceTapeMargin = snapshot.practiceTapeMargin
+    smoothPracticeLineScroll = snapshot.smoothPracticeLineScroll
+    showAllPracticeLines = snapshot.showAllPracticeLines
+    smoothCaretMotion = snapshot.smoothCaretMotion
+    caretStyle = snapshot.caretStyle
+    typoIndicatorStyle = snapshot.typoIndicatorStyle
+    compositionDisplayStyle = snapshot.compositionDisplayStyle
+    typingSpeedUnit = snapshot.typingSpeedUnit
+    alwaysShowDecimalPlaces = snapshot.alwaysShowDecimalPlaces
+    alwaysShowWordsHistory = snapshot.alwaysShowWordsHistory
+    showWordBurstHeatmap = snapshot.showWordBurstHeatmap
+    resultPerformanceVisibility = snapshot.resultPerformanceVisibility
+    startGraphsAtZero = snapshot.startGraphsAtZero
+    historyChartVisibility = snapshot.historyChartVisibility
+    showAverage = snapshot.showAverage
+    showPersonalBest = snapshot.showPersonalBest
+    typedCharacterEffect = snapshot.typedCharacterEffect
+    liveSpeedStyle = snapshot.liveSpeedStyle
+    liveAccuracyStyle = snapshot.liveAccuracyStyle
+    liveBurstStyle = snapshot.liveBurstStyle
+    liveProgressStyle = snapshot.liveProgressStyle
+    liveStatsColor = snapshot.liveStatsColor
+    liveStatsOpacity = snapshot.liveStatsOpacity
+    promptHighlightMode = snapshot.promptHighlightMode
+    testModifiers = snapshot.testModifiers
+    showFocusWarning = snapshot.showFocusWarning
+    showCapsLockWarning = snapshot.showCapsLockWarning
+    playErrorBeep = snapshot.playErrorBeep
+    playKeyclickSound = snapshot.playKeyclickSound
+    clickSoundStyle = snapshot.clickSoundStyle
+    errorSoundStyle = snapshot.errorSoundStyle
+    timeWarningOffset = snapshot.timeWarningOffset
+    timeWarningSoundStyle = snapshot.timeWarningSoundStyle
+    soundVolume = snapshot.soundVolume
+    globalHotkeyEnabled = snapshot.globalHotkeyEnabled
+    paceGuideMode = snapshot.paceGuideMode
+    paceGuideCustomWpm = snapshot.paceGuideCustomWpm
+    paceCaretStyle = snapshot.paceCaretStyle
+    repeatedPace = snapshot.repeatedPace
+    streakDayBoundaryOffsetHours = snapshot.streakDayBoundaryOffsetHours
+    hasSetStreakDayBoundary = snapshot.hasSetStreakDayBoundary
+  }
+
   /// Locks in the local practice-day boundary after the first explicit choice.
   /// It affects only derived history statistics; timestamps remain unchanged.
   @discardableResult
@@ -2034,8 +2154,38 @@ final class AppSettings {
     return true
   }
 
-  func apply(_ configuration: TestConfiguration) {
-    guard !hasThresholdProfile, configuration.rules.thresholdSource == nil else { return }
+  @discardableResult
+  func apply(_ configuration: TestConfiguration) -> Bool {
+    if hasThresholdProfile || configuration.rules.thresholdSource != nil {
+      guard configuration.rules.thresholdSource != nil else { return false }
+      var candidate = snapshot
+      candidate.difficulty = configuration.difficulty
+      candidate.strictSpace = configuration.rules.strictSpace
+      candidate.stopOnError = configuration.rules.stopOnError
+      candidate.stopOnErrorMode = configuration.rules.stopOnErrorMode
+      candidate.deleteOnError = configuration.rules.deleteOnError
+      candidate.deleteOnErrorMode = configuration.rules.deleteOnErrorMode
+      candidate.hideExtraLetters = configuration.rules.hideExtraLetters
+      candidate.blindMode = configuration.rules.blindMode
+      candidate.quickEnd = configuration.rules.quickEnd
+      candidate.englishVariant = configuration.englishVariant
+      candidate.freedomMode = configuration.rules.freedomMode
+      candidate.confidenceMode = configuration.rules.confidenceMode
+      candidate.oppositeShiftMode = configuration.rules.oppositeShiftMode
+      candidate.codeUnindentOnBackspace = configuration.rules.codeUnindentOnBackspace
+      candidate.minimumAccuracy = configuration.rules.minimumAccuracy
+      candidate.minimumWpm = configuration.rules.minimumWpm
+      candidate.minimumWordBurstWpm = configuration.rules.minimumWordBurstWpm
+      candidate.minimumWordBurstMode = configuration.rules.minimumWordBurstMode
+      candidate.thresholdSource = configuration.rules.thresholdSource
+      candidate.testModifiers = configuration.modifiers
+      return applySourceSnapshot(candidate, configuration: configuration)
+    }
+    installTestConfigurationFields(configuration)
+    return true
+  }
+
+  private func installTestConfigurationFields(_ configuration: TestConfiguration) {
     difficulty = configuration.difficulty
     strictSpace = configuration.rules.strictSpace
     stopOnError = configuration.rules.stopOnError
@@ -2126,8 +2276,33 @@ final class AppSettings {
     }
   }
 
-  func apply(_ snapshot: AppSettingsSnapshot) {
-    guard !hasThresholdProfile, snapshot.thresholdSource == nil else { return }
+  /// Replace an existing complete source profile only after lossless staging
+  /// and a successful v4 save. Legacy adoption/downgrade is a separate policy.
+  private func applySourceSnapshot(_ incoming: AppSettingsSnapshot,
+    configuration: TestConfiguration? = nil) -> Bool {
+    guard allowsRestartingConfigurationChange, thresholdSourceState != nil,
+      case .available = thresholdProfileRead,
+      let source = incoming.thresholdSource, source.configuration.isValid, source.matches(incoming)
+    else { return false }
+    let staged = AppSettings(validating: incoming, defaults: defaults)
+    guard staged.snapshot == incoming,
+      ThresholdSettingsStore(defaults: defaults).save(incoming) else { return false }
+    let wasInitializing = initializingSettings
+    let wasBatchingSound = batchingClickSoundConfiguration
+    initializingSettings = true
+    batchingClickSoundConfiguration = true
+    thresholdSourceState = source
+    if let configuration { installTestConfigurationFields(configuration) }
+    else { installSnapshotFields(incoming) }
+    initializingSettings = wasInitializing
+    batchingClickSoundConfiguration = wasBatchingSound
+    if configuration == nil { synchronizeClickSoundConfiguration() }
+    return true
+  }
+
+  @discardableResult
+  func apply(_ snapshot: AppSettingsSnapshot) -> Bool {
+    if hasThresholdProfile || snapshot.thresholdSource != nil { return applySourceSnapshot(snapshot) }
     if snapshot.paceGuideMode == .accountTagPersonalBest { usingAccountPaceStorage = true }
     // Select the fork before any intermediate preference writes. Never merge
     // subsequent legacy-writer changes back over the new settings generation.
@@ -2254,6 +2429,7 @@ final class AppSettings {
     repeatedPace = snapshot.repeatedPace
     streakDayBoundaryOffsetHours = snapshot.streakDayBoundaryOffsetHours
     hasSetStreakDayBoundary = snapshot.hasSetStreakDayBoundary
+    return true
   }
 
   var activeTheme: ResolvedTheme {
