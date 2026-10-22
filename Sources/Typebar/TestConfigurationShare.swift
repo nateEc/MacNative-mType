@@ -7,6 +7,7 @@ enum TestConfigurationShareError: Error, Equatable, LocalizedError {
     case unsupportedVersion(Int)
     case invalidConfiguration
     case thresholdSourceNotReady
+    case thresholdSourceChallengeNotReady
 
     var errorDescription: String? {
         switch self {
@@ -14,7 +15,8 @@ enum TestConfigurationShareError: Error, Equatable, LocalizedError {
         case .invalidPayload: "测试链接的数据无法读取。"
         case .unsupportedVersion: "此测试链接版本暂不受支持。"
         case .invalidConfiguration: "测试链接包含不支持的配置范围。"
-        case .thresholdSourceNotReady: "链接已读取，但完整阈值设置尚未接入，暂不能应用。"
+        case .thresholdSourceNotReady: "当前配置尚未启用完整阈值状态，未应用链接。"
+        case .thresholdSourceChallengeNotReady: "完整阈值配置尚不支持挑战链接；未更改当前测试。"
         }
     }
 }
@@ -169,6 +171,7 @@ enum TestConfigurationShare {
 struct TestConfigurationShareView: View {
   @Environment(\.dismiss) private var dismiss
   let currentPreset: SavedTestPreset
+  let latestPreset: (() -> SavedTestPreset)?
   let legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback?
   let challengeLibrary: [TypebarChallenge]
   let notices: LocalNoticeCenter
@@ -177,10 +180,12 @@ struct TestConfigurationShareView: View {
     @State private var pastedLink = ""
     @State private var status: String?
 
-    private var currentLink: String? { try? TestConfigurationShare.link(for: currentPreset) }
+    var effectiveCurrentPreset: SavedTestPreset { latestPreset?() ?? currentPreset }
+    private var currentLink: String? { try? TestConfigurationShare.link(for: effectiveCurrentPreset) }
 
   init(
     currentPreset: SavedTestPreset,
+    latestPreset: (() -> SavedTestPreset)? = nil,
     legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback? = nil,
     challengeLibrary: [TypebarChallenge] = [],
     notices: LocalNoticeCenter,
@@ -188,6 +193,7 @@ struct TestConfigurationShareView: View {
     onApply: @escaping (SavedTestPreset) -> SavedTestPreset?
   ) {
     self.currentPreset = currentPreset
+    self.latestPreset = latestPreset
     self.legacyCustomTextFallback = legacyCustomTextFallback
     self.challengeLibrary = challengeLibrary
     self.notices = notices
@@ -199,7 +205,7 @@ struct TestConfigurationShareView: View {
         NavigationStack {
             Form {
                 Section("分享当前测试") {
-                    Text("链接仅包含测试配置、所选引语 ID 或自定义文本；不会包含账户、成绩或本机设置。")
+                    Text("链接包含测试规则、所选引语 ID 或自定义文本；完整阈值链接还包含关闭时保留的自定义数值。不包含账户、成绩、活动标签或外观。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(currentLink ?? "当前配置无法分享")
@@ -240,7 +246,7 @@ struct TestConfigurationShareView: View {
     }
 
     private func applyPastedLink() {
-        let result = TestConfigurationShareActions.apply(pastedLink, current: currentPreset,
+        let result = TestConfigurationShareActions.apply(pastedLink, current: effectiveCurrentPreset,
             customTextFallback: legacyCustomTextFallback, challenges: challengeLibrary,
             notices: notices, applyPreset: onApply, loadChallenge: onLoadChallenge)
         status = result.status

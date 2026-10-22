@@ -2110,6 +2110,7 @@ private struct ContentView: View {
     }) {
       TestConfigurationShareView(
         currentPreset: presetDefinition,
+        latestPreset: { presetDefinition },
         legacyCustomTextFallback: .init(
           text: customText, completion: customTextCompletion,
           duration: customTextCompletion == .time ? TimeInterval(customTextDuration) : nil,

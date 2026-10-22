@@ -35,17 +35,22 @@ struct TestConfigurationShareActionResult: Equatable {
       notices.post(message, options: .init(important: important))
       return .init(outcome: .rejected, status: message)
     }
-    let rejection = "配置未应用。请先完成锁定测试，或检查该挑战的字体／脚本文本要求。"
+    let rejection = "配置未应用。请先完成锁定测试，或检查配置版本及挑战所需的字体／脚本文本。"
     do {
       let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
       let preset: SavedTestPreset, fields: [TestConfigurationNoticeField]
-      if URLComponents(string: trimmed)?.scheme?.lowercased() == "typebar" {
+      let isNativeLink = URLComponents(string: trimmed)?.scheme?.lowercased() == "typebar"
+      if isNativeLink {
         preset = try TestConfigurationShare.preset(from: trimmed)
         fields = TestConfigurationNoticeField.allCases.filter {
           $0 != .customText || preset.customText != nil
         }
       } else {
         if let challenge = try LegacyChallengeLinkImporter.challenge(from: trimmed, challenges: challenges) {
+          guard !PracticeThresholdSource.isPresent(in: current) else {
+            return rejected(TestConfigurationShareError.thresholdSourceChallengeNotReady.errorDescription
+              ?? "未应用挑战链接。")
+          }
           let outcome = loadChallenge(challenge)
           switch outcome {
           case .rejected: return rejected(rejection, important: true)
@@ -59,12 +64,10 @@ struct TestConfigurationShareActionResult: Equatable {
           from: trimmed, current: current, customTextFallback: customTextFallback)
         preset = imported.preset; fields = imported.noticeFields
       }
-      guard !PracticeThresholdSource.isPresent(in: preset), !PracticeThresholdSource.isPresent(in: current) else {
-        return rejected(TestConfigurationShareError.thresholdSourceNotReady.errorDescription ?? "完整阈值设置尚未接入。")
-      }
-      guard let applied = applyPreset(preset) else { return rejected(rejection, important: true) }
+      let prepared = try ShareThresholdAdmission.preparing(preset, current: current)
+      guard let applied = applyPreset(prepared) else { return rejected(rejection, important: true) }
       if !fields.isEmpty {
-        notices.post(summary(applied, fields: fields), level: .success,
+        notices.post(summary(applied, fields: fields, includesThresholds: isNativeLink), level: .success,
           options: .init(durationMilliseconds: 10_000))
       }
       return .init(outcome: .applied, status: nil)
@@ -74,9 +77,10 @@ struct TestConfigurationShareActionResult: Equatable {
     }
   }
 
-  static func summary(_ preset: SavedTestPreset, fields: [TestConfigurationNoticeField]) -> String {
+  static func summary(_ preset: SavedTestPreset, fields: [TestConfigurationNoticeField],
+    includesThresholds: Bool = false) -> String {
     let config = preset.configuration
-    let lines = fields.map { field -> String in
+    var lines = fields.map { field -> String in
       switch field {
       case .mode: return "模式：" + config.mode.rawValue
       case .parameter:
@@ -94,6 +98,21 @@ struct TestConfigurationShareActionResult: Equatable {
       case .modifiers:
         return "趣味模式：" + (config.modifiers.isEmpty ? "关闭" : config.modifiers.map(\.displayName).joined(separator: "、"))
       }
+    }
+    if includesThresholds, let raw = config.rules.thresholdSource?.configuration {
+      func value(_ number: Double, unit: String) -> String {
+        number.formatted(.number.precision(.fractionLength(0...2))) + unit
+      }
+      func threshold(_ enabled: Bool, remembered: String) -> String {
+        enabled ? "开启（\(remembered)）" : "关闭（记忆 \(remembered)）"
+      }
+      lines.append("最低整体速度：" + threshold(raw.minimumWpmMode == .custom,
+        remembered: value(raw.minimumWpmCustomValue, unit: " WPM")))
+      lines.append("最低准确率：" + threshold(raw.minimumAccuracyMode == .custom,
+        remembered: value(raw.minimumAccuracyCustomValue, unit: "%")))
+      lines.append("最低单词速度：" + (raw.minimumWordBurstMode == .off ? "关闭（记忆 " :
+        (raw.minimumWordBurstMode == .fixed ? "固定（" : "弹性（"))
+        + value(raw.minimumWordBurstCustomValue, unit: " WPM") + "）")
     }
     return "已从链接应用测试配置：\n\n" + lines.joined(separator: "\n")
   }

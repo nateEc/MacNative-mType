@@ -114,7 +114,7 @@ final class ThresholdAppSettingsTests: XCTestCase {
     }
   }
 
-  func testLegacyApplyAndUnmigratedImportPathsRefuseSourceTargetsWithoutAutoUpgrade() throws {
+  func testLegacyApplyAndJSONRefuseSourceTargetsWhileShareHonorsCallbackRejection() throws {
     try withDefaults { defaults in
       let settings = AppSettings(defaults: defaults)
       XCTAssertFalse(settings.updateThresholdConfiguration(.minimumWpm(mode: .custom, customValue: 44)))
@@ -134,10 +134,10 @@ final class ThresholdAppSettingsTests: XCTestCase {
       let center = LocalNoticeCenter(); defer { center.clearAll() }
       var calls = 0
       let outcome = TestConfigurationShareActions.apply(try TestConfigurationShare.link(for: .init(configuration: .words(25))),
-        current: current, challenges: [], notices: center, applyPreset: { value in calls += 1; return value },
+        current: current, challenges: [], notices: center, applyPreset: { _ in calls += 1; return nil },
         loadChallenge: { _ in .applied })
       XCTAssertEqual(outcome.outcome, .rejected)
-      XCTAssertEqual(calls, 0)
+      XCTAssertEqual(calls, 1)
       XCTAssertEqual(sourceSettings.snapshot, before)
     }
   }

@@ -161,7 +161,13 @@ import XCTest
     }
     let legacy = try XCTUnwrap(document["legacy"] as? [[String: Any]])
     XCTAssertEqual(legacy.count, 8)
-    for value in legacy {
+    var raw = PracticeThresholdConfiguration()
+    try raw.apply(.minimumWpm(mode: .off, customValue: 37))
+    try raw.apply(.minimumAccuracy(mode: .off, customValue: 93))
+    try raw.apply(.minimumWordBurst(mode: .flex, customValue: 0))
+    let sourceCurrent = SavedTestPreset(configuration: .words(25,
+      rules: PracticeThresholdSource(configuration: raw).applying(to: InputRules())))
+    for (value, current) in legacy.flatMap({ value in [self.current, sourceCurrent].map { (value, $0) } }) {
       let center = LocalNoticeCenter(); defer { center.clearAll() }
       let link = try XCTUnwrap(value["link"] as? String), fields = try XCTUnwrap(value["fields"] as? [Int])
       let decoded = try LegacyTestSettingsLinkImporter.importedPreset(from: link, current: current)

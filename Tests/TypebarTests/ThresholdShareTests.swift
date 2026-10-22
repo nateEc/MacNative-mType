@@ -70,7 +70,7 @@ final class ThresholdShareTests: XCTestCase {
   }
 
   @MainActor
-  func testSourceLinkApplicationIsRejectedBeforeCallbackUntilSettingsMigration() throws {
+  func testSourceLinkCannotAdoptLegacyProfileBeforeApplicationCallback() throws {
     let link = try TestConfigurationShare.link(for: preset())
     let center = LocalNoticeCenter()
     defer { center.clearAll() }

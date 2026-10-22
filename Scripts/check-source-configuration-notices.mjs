@@ -27,7 +27,8 @@ function complete(file, name) {
 const notices = [], changes = [], custom = [];
 let restarts = 0, conflict = false, blocked = false, rejectsSetting = false;
 const context = vm.createContext({
-  Config:{mode:'words',funbox:[]}, location:{search:''}, TestSettingsSchema:{},
+  Config:{mode:'words',funbox:[],minWpm:'off',minWpmCustomSpeed:37,minAcc:'off',minAccCustom:93,
+    minBurst:'flex',minBurstCustomSpeed:0}, location:{search:''}, TestSettingsSchema:{},
   decompressFromURI, parseJsonWithSchema: text => JSON.parse(text),
   tryCatchSync: fn => { try { return {data:fn()}; } catch(error) { return {error}; } },
   setConfig:(key,value) => { if (rejectsSetting) return false; changes.push([key,value]); context.Config[key] = value; return true; },
@@ -66,6 +67,9 @@ for (const tuple of tuples) {
   const compressed = compressToURI(JSON.stringify(tuple));
   context.query = '?testSettings='+encodeURIComponent(compressed);
   evaluate('loadTestSettingsFromUrl(query)');
+  assert.deepEqual(
+    ['minWpm','minWpmCustomSpeed','minAcc','minAccCustom','minBurst','minBurstCustomSpeed'].map(key=>context.Config[key]),
+    ['off',37,'off',93,'flex',0], 'Eight-slot test links do not own threshold modes or memories');
   const fields = tuple.flatMap((value,index) => value===null ? [] : [index]);
   assert.equal(restarts,1); assert.equal(notices.length,fields.length ? 1 : 0);
   if (fields.length) {
