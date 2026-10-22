@@ -5867,12 +5867,20 @@ private struct ContentView: View {
     return selected.with(polyglotBaseLanguage: polyglotReturnLanguage ?? selected.polyglotBaseLanguage)
   }
 
+  private var challengeSetupSelection: ChallengeSetupSelectionPolicy.Selection {
+    .init(language: language, englishVariant: settings.englishVariant,
+      mixedLanguageComponents: mixedLanguageComponents, contentOptions: contentOptions,
+      polyglotReturnLanguage: polyglotReturnLanguage)
+  }
+
   private var baseConfiguration: TestConfiguration {
     if let activeChallenge {
       let challengePreset = activeChallenge.id == "one-handed-bandit"
         ? (oneHandedChallengePreset ?? activeChallenge.preset) : activeChallenge.preset
+      let challengeSelection = ChallengeSetupSelectionPolicy.applying(challengeSetupSelection,
+        for: activeChallenge, template: challengePreset.configuration)
       let challengeConfiguration = ChallengeInputRulePolicy.applying(settings.inputRules,
-        to: challengePreset.configuration.with(challengeID: activeChallenge.id))
+        to: challengeSelection)
       return challengeConfiguration.with(
         modifiers: effectiveTestModifiers(
           for: challengeConfiguration.language, mode: challengeConfiguration.mode,
@@ -6004,9 +6012,16 @@ private struct ContentView: View {
     if appliesTest, !acceptsPresetResources(appliedPreset.configuration) { return false }
     let selectedOneHandedPreset = challenge?.id == "one-handed-bandit"
       ? (appliedPreset.customText == nil ? challenge?.preset : appliedPreset) : nil
-    let configuration = challenge?.id == "one-handed-bandit"
+    let challengeTemplate = challenge?.id == "one-handed-bandit"
       ? (selectedOneHandedPreset?.configuration ?? appliedPreset.configuration)
       : (challenge?.preset.configuration ?? appliedPreset.configuration)
+    let usesCapturedSelection = restoringSelection != nil || appliedPreset.settingsSnapshot != nil
+    let setupSelection = usesCapturedSelection
+      ? ChallengeSetupSelectionPolicy.Selection(configuration: appliedPreset.configuration) : challengeSetupSelection
+    let configuration = challenge.map {
+      ChallengeSetupSelectionPolicy.applying(setupSelection, for: $0, template: challengeTemplate,
+        clearingPolyglot: !usesCapturedSelection)
+    } ?? challengeTemplate
     guard PresetSettingsApplication.commit(original: preparedPreset, resolved: appliedPreset,
       configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings,
       expectedSourceState: preparation.baseline) else {
