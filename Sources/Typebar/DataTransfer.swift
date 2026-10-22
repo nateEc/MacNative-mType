@@ -999,6 +999,9 @@ enum SettingsJSONCommandError: Error, Equatable, LocalizedError {
     case unsupportedVersion(Int)
     case thresholdSourceNotReady
     case configurationLocked
+    case selectionUnavailable
+    case settingsNotApplied
+    case selectionApplicationFailed
 
     var errorDescription: String? {
         switch self {
@@ -1014,6 +1017,12 @@ enum SettingsJSONCommandError: Error, Equatable, LocalizedError {
             "设置 JSON 已读取，但完整阈值设置尚未接入，原偏好未修改。"
         case .configurationLocked:
             "锁定重开测试进行中，暂时不能导入设置 JSON。"
+        case .selectionUnavailable:
+            "这份设置所需的字体或脚本不可用，未导入设置。"
+        case .settingsNotApplied:
+            "当前设置未能接受这份 JSON，测试选择未修改。"
+        case .selectionApplicationFailed:
+            "偏好已导入，但当前测试未能应用；请检查所需字体或脚本后重试。"
         }
     }
 }
@@ -1138,13 +1147,17 @@ enum SettingsJSONConfigurationPolicy {
 @MainActor
 enum SettingsJSONCommandImport {
     @discardableResult
-    static func apply(_ json: String, to settings: AppSettings) throws -> TypebarSettingsDocument {
+    static func apply(_ json: String, to settings: AppSettings,
+        selectionAdmission: (TestConfiguration) -> Bool = { _ in true }) throws -> TypebarSettingsDocument {
         guard settings.allowsRestartingConfigurationChange else { throw SettingsJSONCommandError.configurationLocked }
         let document = try SettingsJSONCommandCodec.decode(json)
         guard document.settings.thresholdSource == nil, document.configuration.rules.thresholdSource == nil,
               !settings.hasThresholdProfile
         else { throw SettingsJSONCommandError.thresholdSourceNotReady }
-        settings.apply(document.settings)
+        guard selectionAdmission(document.configuration) else { throw SettingsJSONCommandError.selectionUnavailable }
+        guard settings.allowsRestartingConfigurationChange else { throw SettingsJSONCommandError.configurationLocked }
+        guard !settings.hasThresholdProfile else { throw SettingsJSONCommandError.thresholdSourceNotReady }
+        guard settings.apply(document.settings) else { throw SettingsJSONCommandError.settingsNotApplied }
         settings.layoutFluidLayouts = document.layoutFluidLayouts
         return document
     }

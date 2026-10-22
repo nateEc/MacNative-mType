@@ -2128,7 +2128,8 @@ private struct ContentView: View {
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
         guard acceptsRestartingConfigurationChange() else { throw SettingsJSONCommandError.configurationLocked }
-        let document = try SettingsJSONCommandImport.apply(json, to: settings)
+        let document = try SettingsJSONCommandImport.apply(json, to: settings,
+          selectionAdmission: { acceptsPresetResources($0) })
         let memory = document.testParameterMemory
         duration = memory.duration
         wordLimit = memory.wordLimit
@@ -2140,7 +2141,9 @@ private struct ContentView: View {
         if configuration.mode == .custom {
           retainedCustomText = customText
         }
-        apply(.init(configuration: configuration, customText: retainedCustomText))
+        guard apply(.init(configuration: configuration, customText: retainedCustomText)) else {
+          throw SettingsJSONCommandError.selectionApplicationFailed
+        }
       }
     }
     .sheet(isPresented: $showingSavedTexts) {
@@ -5967,6 +5970,21 @@ private struct ContentView: View {
     )
   }
 
+  private func acceptsPresetResources(_ configuration: TestConfiguration) -> Bool {
+    switch PresetResourceAdmission.refusal(for: configuration,
+      wingdingsAvailable: { WingdingsChallengeFont.resolve(size: 12) != nil },
+      scriptIsVerified: { activeVerifiedScript?.specification == $0 }) {
+    case .missingWingdings:
+      fontFamilyCommandMessage = "此 Mac 未提供 Wingdings 字体，无法开始该挑战。"
+      return false
+    case .missingVerifiedScript:
+      referenceScriptMessage = "请从挑战库选择脚本并重新导入固定版本文本。"
+      return false
+    case nil:
+      return true
+    }
+  }
+
   @discardableResult private func apply(
     _ preset: SavedTestPreset,
     overwritesParameterMemory: Bool = true,
@@ -5976,25 +5994,24 @@ private struct ContentView: View {
     restoringCustomTextState: CustomTextStateDocument? = nil,
     restoringCustomTextRecovery: CustomTextRecoveryState? = nil
   ) -> Bool {
-    guard !settings.hasThresholdProfile, !PracticeThresholdSource.isPresent(in: preset) else { return false }
     guard acceptsRestartingConfigurationChange() else { return false }
     guard preset.settingGroups?.isEmpty != true else { return false }
     let appliesTest = !preset.isPartial || (preset.settingGroups?.contains(.test) == true)
     let appliedPreset = PresetApplicationPolicy.applying(current: presetDefinition, preset: preset)
     let challenge = appliesTest
       ? TypebarChallengeLibrary.challenge(id: appliedPreset.configuration.challengeID) : nil
-    if challenge?.id == "ten-words-of-pain",
-      WingdingsChallengeFont.resolve(size: 12) == nil
-    {
-      fontFamilyCommandMessage = "此 Mac 未提供 Wingdings 字体，无法开始该挑战。"
+    if appliesTest, !acceptsPresetResources(appliedPreset.configuration) { return false }
+    let selectedOneHandedPreset = challenge?.id == "one-handed-bandit"
+      ? (appliedPreset.customText == nil ? challenge?.preset : appliedPreset) : nil
+    let configuration = challenge?.id == "one-handed-bandit"
+      ? (selectedOneHandedPreset?.configuration ?? appliedPreset.configuration)
+      : (challenge?.preset.configuration ?? appliedPreset.configuration)
+    guard PresetSettingsApplication.commit(original: preset, resolved: appliedPreset,
+      configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings) else {
+      modeCompatibilityMessage = "本次配置未能应用，已保留当前测试；请检查配置版本或恢复状态。"
       return false
     }
-    if let specification = challenge?.requirements.referenceScriptSpecification,
-      activeVerifiedScript?.specification != specification
-    {
-      referenceScriptMessage = "请从挑战库选择脚本并重新导入固定版本文本。"
-      return false
-    }
+    modeCompatibilityMessage = nil
     if let restoringSelection {
       let memory = restoringSelection.testParameterMemory
       duration = memory.duration
@@ -6025,8 +6042,7 @@ private struct ContentView: View {
     if appliesTest {
       activeChallengeID = challenge?.id
       if challenge?.id == "one-handed-bandit" {
-        oneHandedChallengePreset = appliedPreset.customText == nil
-          ? challenge?.preset : appliedPreset
+        oneHandedChallengePreset = selectedOneHandedPreset
         oneHandedChallengeSelection = oneHandedChallengePreset?.customText.flatMap {
           OneHandedChallengePolicy.identify(source: $0)
         }
@@ -6036,9 +6052,6 @@ private struct ContentView: View {
       }
       if challenge?.id == "mouse-warrior" { showsVirtualKeyboard = true }
     }
-    let configuration = challenge?.id == "one-handed-bandit"
-      ? (oneHandedChallengePreset?.configuration ?? appliedPreset.configuration)
-      : (challenge?.preset.configuration ?? appliedPreset.configuration)
     mode = configuration.mode
     if overwritesParameterMemory {
       if let duration = configuration.duration { self.duration = Int(duration) }
@@ -6079,17 +6092,6 @@ private struct ContentView: View {
     }
     quoteQueue.reset()
     contentOptions = configuration.contentOptions
-    if appliesGlobalSettings {
-      if let settingsSnapshot = appliedPreset.settingsSnapshot {
-        settings.apply(settingsSnapshot)
-      } else {
-        settings.apply(configuration)
-      }
-    }
-    let appliesActiveTags = !preset.isPartial || (preset.settingGroups?.contains(.behavior) == true)
-    if appliesActiveTags, let activeResultTags = appliedPreset.activeResultTags {
-      settings.activeResultTags = activeResultTags
-    }
     ensureSelectedQuote()
     if quoteSelectionMode == .search, selectedQuoteID != requestedQuoteID {
       quoteSelectionMode = .lengths

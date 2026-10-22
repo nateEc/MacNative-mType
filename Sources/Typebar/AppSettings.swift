@@ -1195,6 +1195,10 @@ final class AppSettings {
     ActiveTestSelectionStore(defaults: defaults).load()
   }
 
+  var activeTestSelectionRead: ActiveTestSelectionRead {
+    ActiveTestSelectionStore(defaults: defaults).read()
+  }
+
   var customTextState: CustomTextStateDocument? {
     CustomTextStateStore(defaults: defaults).load()
   }
