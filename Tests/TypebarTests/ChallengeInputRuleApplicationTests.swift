@@ -74,7 +74,7 @@ final class ChallengeInputRuleApplicationTests: XCTestCase {
     }
   }
 
-  func testProjectionRetainsCompleteSourceWithoutWritingOrEnablingSourceChallenges() throws {
+  func testProjectionRetainsCompleteSourceWithoutWritingOrBypassingChallengeAdmission() throws {
     try withSettings { _, defaults in
       var raw = PracticeThresholdConfiguration()
       try raw.apply(.minimumWpm(mode: .custom, customValue: 0))

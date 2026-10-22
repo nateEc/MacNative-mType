@@ -1460,7 +1460,7 @@ private struct ContentView: View {
           feedback: keyboardGuideFeedback, accent: activeTheme.accent,
           panel: activeTheme.panel, layout: effectiveKeyboardLayout,
           overrideRows: effectiveKeyboardGuideOverrideRows,
-          mirrored: settings.testModifiers.contains(.mirrorKeyboard),
+          mirrored: session.configuration.modifiers.contains(.mirrorKeyboard),
           scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
           keysMode: settings.keyboardGuideKeysMode,
           style: settings.keyboardGuideStyle,
@@ -2559,9 +2559,9 @@ private struct ContentView: View {
           }
         }
 
-        if !settings.testModifiers.isEmpty {
+        if !session.configuration.modifiers.isEmpty {
           Label(
-            "修饰器：\(settings.testModifiers.map(\.displayName).joined(separator: "、"))",
+            "修饰器：\(session.configuration.modifiers.map(\.displayName).joined(separator: "、"))",
             systemImage: "wand.and.stars"
           )
           .font(.caption)
@@ -3130,7 +3130,7 @@ private struct ContentView: View {
           customLayout: settings.selectedCustomKeyboardLayout,
           layoutFluid: session.configuration.modifiers.contains(.layoutFluid)),
         oppositeShiftMode: settings.oppositeShiftMode,
-        mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
+        mapsArrowKeysToInput: session.configuration.modifiers.contains(.arrowStream),
         acceptsNewlineInput: session.acceptsNewlineInput,
         acceptsTabInput: session.acceptsTabInput,
         discardsAutofocusInput: settings.showFocusWarning,
@@ -3930,7 +3930,7 @@ private struct ContentView: View {
   }
 
   private func effectiveInsertedText(_ text: String) -> String {
-    settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text
+    session.configuration.modifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text
   }
 
   private func synchronizeLiveInputRules() {
@@ -4488,17 +4488,19 @@ private struct ContentView: View {
         customText = "A calm practice makes the next difficult sentence feel possible."
       }
     }
-    let effectiveMemoryMode = MemoryFunboxModePolicy.effectiveMode(
-      requested: mode, modifiers: settings.testModifiers)
-    if mode != effectiveMemoryMode { mode = effectiveMemoryMode }
-    let languageCompatibleModifiers = language == .mixedLanguages
-      ? TestModifierPolicy.modifiersCompatibleWithPolyglot(settings.testModifiers)
-      : settings.testModifiers
-    let joiningSafeModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
-      languageCompatibleModifiers, language: language,
-      mixedLanguageComponents: mixedLanguageComponents)
-    if settings.testModifiers != joiningSafeModifiers {
-      settings.testModifiers = joiningSafeModifiers
+    if activeChallenge == nil || !settings.hasThresholdProfile {
+      let effectiveMemoryMode = MemoryFunboxModePolicy.effectiveMode(
+        requested: mode, modifiers: settings.testModifiers)
+      if mode != effectiveMemoryMode { mode = effectiveMemoryMode }
+      let languageCompatibleModifiers = language == .mixedLanguages
+        ? TestModifierPolicy.modifiersCompatibleWithPolyglot(settings.testModifiers)
+        : settings.testModifiers
+      let joiningSafeModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
+        languageCompatibleModifiers, language: language,
+        mixedLanguageComponents: mixedLanguageComponents)
+      if settings.testModifiers != joiningSafeModifiers {
+        settings.testModifiers = joiningSafeModifiers
+      }
     }
     let shouldCountRestart = session.hasStarted && !session.isFinished
     wingdingsFontStayedAvailable = true
@@ -6018,10 +6020,12 @@ private struct ContentView: View {
     let usesCapturedSelection = restoringSelection != nil || appliedPreset.settingsSnapshot != nil
     let setupSelection = usesCapturedSelection
       ? ChallengeSetupSelectionPolicy.Selection(configuration: appliedPreset.configuration) : challengeSetupSelection
-    let configuration = challenge.map {
+    let selectedConfiguration = challenge.map {
       ChallengeSetupSelectionPolicy.applying(setupSelection, for: $0, template: challengeTemplate,
         clearingPolyglot: !usesCapturedSelection)
     } ?? challengeTemplate
+    let configuration = challenge == nil ? selectedConfiguration
+      : ChallengeInputRulePolicy.applying(settings.inputRules, to: selectedConfiguration)
     guard PresetSettingsApplication.commit(original: preparedPreset, resolved: appliedPreset,
       configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings,
       expectedSourceState: preparation.baseline) else {

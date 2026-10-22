@@ -32,9 +32,14 @@ enum PresetSourcePreparation {
     guard let owner = current.thresholdSource,
       case .available(let stored) = settings.thresholdProfileRead, stored.thresholdSource == owner,
       settings.activeTestSelectionRead != .unavailable,
-      original.configuration.challengeID == nil,
       (try? LocalPresetCodec.encode(original)) != nil
     else { return nil }
+    if original.configuration.challengeID != nil {
+      guard SourceChallengeAdmission.accepts(original) else { return nil }
+      var prepared = original
+      prepared.configuration.rules = settings.inputRules
+      return .init(preset: prepared, baseline: .init(current: current, persisted: stored))
+    }
     if !appliesGlobalSettings {
       guard !original.isPartial else { return nil }
       return .init(preset: original, baseline: nil)

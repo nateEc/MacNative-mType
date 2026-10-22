@@ -15,6 +15,13 @@ enum PresetSettingsApplication {
     let sourceContext =
       settings.hasThresholdProfile || PracticeThresholdSource.isPresent(in: original)
       || PracticeThresholdSource.isPresent(in: resolved)
+    if sourceContext,
+      original.configuration.challengeID != nil || resolved.configuration.challengeID != nil
+        || configuration.challengeID != nil {
+      return SourceChallengeAdmission.commit(original: original, resolved: resolved,
+        configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings,
+        baseline: expectedSourceState)
+    }
     if sourceContext {
       // Existing-source restoration/application only. Source adoption and
       // challenge overrides have separate migration owners.
