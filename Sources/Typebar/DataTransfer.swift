@@ -1014,7 +1014,7 @@ enum SettingsJSONCommandError: Error, Equatable, LocalizedError {
         case .unsupportedVersion(let version):
             "不支持设置 JSON 版本 \(version)。请使用当前版本的 Typebar 导出。"
         case .thresholdSourceNotReady:
-            "设置 JSON 已读取，但完整阈值设置尚未接入，原偏好未修改。"
+            "当前配置无法采用这份完整阈值状态，原偏好未修改。"
         case .configurationLocked:
             "锁定重开测试进行中，暂时不能导入设置 JSON。"
         case .selectionUnavailable:
@@ -1022,7 +1022,7 @@ enum SettingsJSONCommandError: Error, Equatable, LocalizedError {
         case .settingsNotApplied:
             "当前设置未能接受这份 JSON，测试选择未修改。"
         case .selectionApplicationFailed:
-            "偏好已导入，但当前测试未能应用；请检查所需字体或脚本后重试。"
+            "偏好已导入，但当前测试未能应用；请检查配置版本、锁定状态或所需资源。"
         }
     }
 }
@@ -1150,13 +1150,21 @@ enum SettingsJSONCommandImport {
     static func apply(_ json: String, to settings: AppSettings,
         selectionAdmission: (TestConfiguration) -> Bool = { _ in true }) throws -> TypebarSettingsDocument {
         guard settings.allowsRestartingConfigurationChange else { throw SettingsJSONCommandError.configurationLocked }
-        let document = try SettingsJSONCommandCodec.decode(json)
-        guard document.settings.thresholdSource == nil, document.configuration.rules.thresholdSource == nil,
-              !settings.hasThresholdProfile
-        else { throw SettingsJSONCommandError.thresholdSourceNotReady }
+        let wasSource = settings.hasThresholdProfile
+        let before = settings.snapshot
+        let beforeProfile = settings.thresholdProfileRead
+        let beforeLayouts = settings.layoutFluidLayouts
+        let document = try SettingsJSONSourceAdmission.preparing(SettingsJSONCommandCodec.decode(json), for: settings)
         guard selectionAdmission(document.configuration) else { throw SettingsJSONCommandError.selectionUnavailable }
         guard settings.allowsRestartingConfigurationChange else { throw SettingsJSONCommandError.configurationLocked }
-        guard !settings.hasThresholdProfile else { throw SettingsJSONCommandError.thresholdSourceNotReady }
+        if wasSource {
+            guard settings.snapshot == before, settings.thresholdProfileRead == beforeProfile,
+                  settings.layoutFluidLayouts == beforeLayouts,
+                  settings.activeTestSelectionRead != .unavailable
+            else { throw SettingsJSONCommandError.settingsNotApplied }
+        } else {
+            guard !settings.hasThresholdProfile else { throw SettingsJSONCommandError.thresholdSourceNotReady }
+        }
         guard settings.apply(document.settings) else { throw SettingsJSONCommandError.settingsNotApplied }
         settings.layoutFluidLayouts = document.layoutFluidLayouts
         return document

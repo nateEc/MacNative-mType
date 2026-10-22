@@ -114,7 +114,7 @@ final class ThresholdAppSettingsTests: XCTestCase {
     }
   }
 
-  func testLegacyApplyAndJSONRefuseSourceTargetsWhileShareHonorsCallbackRejection() throws {
+  func testLegacyModelApplyRefusesWhileJSONAndShareUseControlledAdmission() throws {
     try withDefaults { defaults in
       let settings = AppSettings(defaults: defaults)
       XCTAssertFalse(settings.updateThresholdConfiguration(.minimumWpm(mode: .custom, customValue: 44)))
@@ -127,9 +127,10 @@ final class ThresholdAppSettingsTests: XCTestCase {
       XCTAssertEqual(sourceSettings.snapshot, before)
       let legacyJSON = try SettingsJSONCommandCodec.export(settings: .init(fontSize: 42), configuration: .words(25),
         layoutFluidLayouts: [], testParameterMemory: .defaults)
-      XCTAssertThrowsError(try SettingsJSONCommandImport.apply(legacyJSON, to: sourceSettings)) {
-        XCTAssertEqual($0 as? SettingsJSONCommandError, .thresholdSourceNotReady)
-      }
+      let imported = try SettingsJSONCommandImport.apply(legacyJSON, to: sourceSettings)
+      XCTAssertNotNil(imported.settings.thresholdSource)
+      XCTAssertEqual(sourceSettings.fontSize, 42)
+      let afterImport = sourceSettings.snapshot
       let current = SavedTestPreset(configuration: .words(17, rules: sourceSettings.inputRules), settingsSnapshot: sourceSettings.snapshot)
       let center = LocalNoticeCenter(); defer { center.clearAll() }
       var calls = 0
@@ -138,7 +139,7 @@ final class ThresholdAppSettingsTests: XCTestCase {
         loadChallenge: { _ in .applied })
       XCTAssertEqual(outcome.outcome, .rejected)
       XCTAssertEqual(calls, 1)
-      XCTAssertEqual(sourceSettings.snapshot, before)
+      XCTAssertEqual(sourceSettings.snapshot, afterImport)
     }
   }
 }

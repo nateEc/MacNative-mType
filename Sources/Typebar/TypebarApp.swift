@@ -2142,7 +2142,8 @@ private struct ContentView: View {
         if configuration.mode == .custom {
           retainedCustomText = customText
         }
-        guard apply(.init(configuration: configuration, customText: retainedCustomText)) else {
+        guard apply(.init(configuration: configuration, customText: retainedCustomText),
+          appliesGlobalSettings: document.settings.thresholdSource == nil) else {
           throw SettingsJSONCommandError.selectionApplicationFailed
         }
       }

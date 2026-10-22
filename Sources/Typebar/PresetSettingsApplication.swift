@@ -58,7 +58,7 @@ enum PresetSettingsApplication {
 
   /// Reject two different owners for the same applied rule. Captured presets
   /// retain requested funboxes in settings and effective funboxes in the test.
-  private static func agreesWithSnapshot(_ preset: SavedTestPreset) -> Bool {
+  static func agreesWithSnapshot(_ preset: SavedTestPreset) -> Bool {
     guard let snapshot = preset.settingsSnapshot else { return true }
     let configuration = preset.configuration
     var rules = InputRules(
