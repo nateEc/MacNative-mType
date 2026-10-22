@@ -151,7 +151,7 @@ final class ThresholdArchiveTests: XCTestCase {
   }
 
   @MainActor
-  func testPresetOnlyArchiveRestoresToNewLocalFormatWithoutEnablingApplication() throws {
+  func testPresetOnlyArchiveRestoresWithoutImplicitlyUpgradingTheLegacyTarget() throws {
     let expected = try preset()
     let data = try TypebarDataTransfer.exportArchive(settings: .init(), results: [],
       presets: [.init(id: UUID(), name: "owned", definition: expected)], at: date)
@@ -167,7 +167,12 @@ final class ThresholdArchiveTests: XCTestCase {
     XCTAssertEqual(summary.insertedPresets, 1)
     let record = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<TestPresetRecord>()).first)
     XCTAssertEqual(record.definition, expected)
-    XCTAssertNil(record.applicableDefinition)
+    XCTAssertEqual(record.applicableDefinition, expected)
+    let resolved = PresetApplicationPolicy.applying(
+      current: .init(configuration: .words(3), settingsSnapshot: settings.snapshot), preset: expected)
+    XCTAssertFalse(PresetSettingsApplication.commit(original: expected, resolved: resolved,
+      configuration: resolved.configuration, to: settings, appliesGlobalSettings: true))
+    XCTAssertNil(settings.thresholdConfiguration)
     XCTAssertThrowsError(try JSONDecoder().decode(SavedTestPreset.self, from: record.definitionData))
   }
 }

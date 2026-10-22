@@ -19,7 +19,7 @@ final class LocalPresetCodecTests: XCTestCase {
     let expected = try sourcePreset()
     let record = try TestPresetRecord(name: "source", definition: expected)
     XCTAssertEqual(record.definition, expected)
-    XCTAssertNil(record.applicableDefinition)
+    XCTAssertEqual(record.applicableDefinition, expected)
     XCTAssertFalse(record.definitionData.isEmpty)
     XCTAssertThrowsError(try JSONDecoder().decode(SavedTestPreset.self, from: record.definitionData))
     let json = try XCTUnwrap(JSONSerialization.jsonObject(with: record.definitionData) as? [String: Any])

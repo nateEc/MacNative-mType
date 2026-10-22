@@ -106,12 +106,12 @@ final class TestPresetRecord {
         try? LocalPresetCodec.decode(definitionData)
     }
 
-    /// Full, non-challenge source presets can target an existing source profile.
+    /// Non-challenge source presets can target an existing source profile.
     /// The final settings admission still checks the live profile and lock.
     var applicableDefinition: SavedTestPreset? {
         guard let definition else { return nil }
         if PracticeThresholdSource.isPresent(in: definition),
-            definition.isPartial || definition.configuration.challengeID != nil { return nil }
+            definition.settingGroups?.isEmpty == true || definition.configuration.challengeID != nil { return nil }
         return definition
     }
 
@@ -181,7 +181,7 @@ struct PresetLibraryView: View {
                                                 .foregroundStyle(.tertiary)
                                             if PracticeThresholdSource.isPresent(in: definition) {
                                                 Text(preset.applicableDefinition == nil
-                                                    ? "源挑战和部分源预设尚未接入，暂不能应用"
+                                                    ? "源挑战或空分组预设暂不能应用"
                                                     : "需要当前配置已使用完整阈值源")
                                                     .font(.caption2).foregroundStyle(.secondary)
                                             }

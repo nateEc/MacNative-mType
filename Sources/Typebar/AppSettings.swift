@@ -1784,112 +1784,189 @@ final class AppSettings {
 
   /// Shared by staging and source application only. Keep the ordinary loader
   /// and its existing sidecar/initialization semantics separate.
-  private func installSnapshotFields(_ snapshot: AppSettingsSnapshot) {
-    difficulty = snapshot.difficulty
-    strictSpace = snapshot.strictSpace
-    stopOnError = snapshot.stopOnError
-    stopOnErrorMode = snapshot.stopOnErrorMode
-    deleteOnError = snapshot.deleteOnError
-    deleteOnErrorMode = snapshot.deleteOnErrorMode
-    hideExtraLetters = snapshot.hideExtraLetters
-    blindMode = snapshot.blindMode
-    fontSize = snapshot.fontSize
-    practiceFont = snapshot.practiceFont
-    installedPracticeFontName = snapshot.installedPracticeFontName
-    theme = snapshot.theme
-    publishCompletedResults = snapshot.publishCompletedResults
-    saveCompletedResults = snapshot.saveCompletedResults
-    customThemes = snapshot.customThemes
-    activeCustomThemeID = snapshot.activeCustomThemeID
-    lastCustomThemeID = snapshot.lastCustomThemeID
-    favoriteThemeIDs = ThemeFavoritePolicy.normalized(
-      snapshot.favoriteThemeIDs, customThemes: snapshot.customThemes)
-    showKeyboardGuide = snapshot.showKeyboardGuide
-    keyboardGuideMode = snapshot.keyboardGuideMode
-    keyboardGuideScale = snapshot.keyboardGuideScale
-    keyboardGuideLegendStyle = snapshot.keyboardGuideLegendStyle
-    keyboardGuideKeysMode = snapshot.keyboardGuideKeysMode
-    keyboardGuideStyle = snapshot.keyboardGuideStyle
-    keyboardLayout = snapshot.keyboardLayout
-    keyboardInputLayout = snapshot.keyboardInputLayout
-    keyboardGuideLayoutSource = snapshot.keyboardGuideLayoutSource
-    customKeyboardLayouts = snapshot.customKeyboardLayouts
-    customKeyboardLayoutID = snapshot.customKeyboardLayoutID
-    quickEnd = snapshot.quickEnd
-    quickRestartKey = snapshot.quickRestartKey
-    showKeyTips = snapshot.showKeyTips
-    commandPaletteListMode = snapshot.commandPaletteListMode
-    followSystemTheme = snapshot.followSystemTheme
-    systemLightTheme = snapshot.systemLightTheme
-    systemDarkTheme = snapshot.systemDarkTheme
-    randomThemeMode = snapshot.randomThemeMode
-    flipTestColors = snapshot.flipTestColors
-    colorfulMode = snapshot.colorfulMode
-    customBackgroundURL = snapshot.customBackgroundURL
-    customBackgroundFit = snapshot.customBackgroundFit
-    customBackgroundFilter = snapshot.customBackgroundFilter
-    practiceBackdrop = snapshot.practiceBackdrop
-    reducePracticeMotion = snapshot.reducePracticeMotion
-    animationFrameRate = snapshot.animationFrameRate
-    showTypingCompanion = snapshot.showTypingCompanion
-    typingPowerMode = snapshot.typingPowerMode
-    englishVariant = snapshot.englishVariant
-    prefersArabicLazyInput = snapshot.prefersArabicLazyInput
-    favoriteQuoteIDs = snapshot.favoriteQuoteIDs
-    activeResultTags = snapshot.activeResultTags
-    repeatQuotes = snapshot.repeatQuotes
-    freedomMode = snapshot.freedomMode
-    confidenceMode = snapshot.confidenceMode
-    oppositeShiftMode = snapshot.oppositeShiftMode
-    codeUnindentOnBackspace = snapshot.codeUnindentOnBackspace
-    minimumAccuracy = snapshot.minimumAccuracy
-    minimumWpm = snapshot.minimumWpm
-    minimumWordBurstWpm = snapshot.minimumWordBurstWpm
-    minimumWordBurstMode = snapshot.minimumWordBurstMode
-    practiceLineWidth = snapshot.practiceLineWidth
-    customPracticeLineColumns = snapshot.customPracticeLineColumns
-    practiceTapeMode = snapshot.practiceTapeMode
-    practiceTapeMargin = snapshot.practiceTapeMargin
-    smoothPracticeLineScroll = snapshot.smoothPracticeLineScroll
-    showAllPracticeLines = snapshot.showAllPracticeLines
-    smoothCaretMotion = snapshot.smoothCaretMotion
-    caretStyle = snapshot.caretStyle
-    typoIndicatorStyle = snapshot.typoIndicatorStyle
-    compositionDisplayStyle = snapshot.compositionDisplayStyle
-    typingSpeedUnit = snapshot.typingSpeedUnit
-    alwaysShowDecimalPlaces = snapshot.alwaysShowDecimalPlaces
-    alwaysShowWordsHistory = snapshot.alwaysShowWordsHistory
-    showWordBurstHeatmap = snapshot.showWordBurstHeatmap
-    resultPerformanceVisibility = snapshot.resultPerformanceVisibility
-    startGraphsAtZero = snapshot.startGraphsAtZero
-    historyChartVisibility = snapshot.historyChartVisibility
-    showAverage = snapshot.showAverage
-    showPersonalBest = snapshot.showPersonalBest
-    typedCharacterEffect = snapshot.typedCharacterEffect
-    liveSpeedStyle = snapshot.liveSpeedStyle
-    liveAccuracyStyle = snapshot.liveAccuracyStyle
-    liveBurstStyle = snapshot.liveBurstStyle
-    liveProgressStyle = snapshot.liveProgressStyle
-    liveStatsColor = snapshot.liveStatsColor
-    liveStatsOpacity = snapshot.liveStatsOpacity
-    promptHighlightMode = snapshot.promptHighlightMode
-    testModifiers = snapshot.testModifiers
-    showFocusWarning = snapshot.showFocusWarning
-    showCapsLockWarning = snapshot.showCapsLockWarning
-    playErrorBeep = snapshot.playErrorBeep
-    playKeyclickSound = snapshot.playKeyclickSound
-    clickSoundStyle = snapshot.clickSoundStyle
-    errorSoundStyle = snapshot.errorSoundStyle
-    timeWarningOffset = snapshot.timeWarningOffset
-    timeWarningSoundStyle = snapshot.timeWarningSoundStyle
-    soundVolume = snapshot.soundVolume
-    globalHotkeyEnabled = snapshot.globalHotkeyEnabled
-    paceGuideMode = snapshot.paceGuideMode
-    paceGuideCustomWpm = snapshot.paceGuideCustomWpm
-    paceCaretStyle = snapshot.paceCaretStyle
-    repeatedPace = snapshot.repeatedPace
-    streakDayBoundaryOffsetHours = snapshot.streakDayBoundaryOffsetHours
-    hasSetStreakDayBoundary = snapshot.hasSetStreakDayBoundary
+  private func installSnapshotFields(_ snapshot: AppSettingsSnapshot,
+    groups: Set<PresetSettingGroup>? = nil) {
+    if groups?.contains(.behavior) ?? true {
+      difficulty = snapshot.difficulty
+    }
+    if groups?.contains(.input) ?? true {
+      strictSpace = snapshot.strictSpace
+      stopOnError = snapshot.stopOnError
+      stopOnErrorMode = snapshot.stopOnErrorMode
+      deleteOnError = snapshot.deleteOnError
+      deleteOnErrorMode = snapshot.deleteOnErrorMode
+      hideExtraLetters = snapshot.hideExtraLetters
+    }
+    if groups?.contains(.behavior) ?? true {
+      blindMode = snapshot.blindMode
+    }
+    if groups?.contains(.appearance) ?? true {
+      fontSize = snapshot.fontSize
+      practiceFont = snapshot.practiceFont
+      installedPracticeFontName = snapshot.installedPracticeFontName
+    }
+    if groups?.contains(.theme) ?? true {
+      theme = snapshot.theme
+    }
+    if groups?.contains(.behavior) ?? true {
+      publishCompletedResults = snapshot.publishCompletedResults
+      saveCompletedResults = snapshot.saveCompletedResults
+    }
+    if groups?.contains(.theme) ?? true {
+      customThemes = snapshot.customThemes
+      activeCustomThemeID = snapshot.activeCustomThemeID
+      lastCustomThemeID = snapshot.lastCustomThemeID
+      favoriteThemeIDs = ThemeFavoritePolicy.normalized(
+        snapshot.favoriteThemeIDs, customThemes: snapshot.customThemes)
+    }
+    if groups?.contains(.appearance) ?? true {
+      showKeyboardGuide = snapshot.showKeyboardGuide
+      keyboardGuideMode = snapshot.keyboardGuideMode
+      keyboardGuideScale = snapshot.keyboardGuideScale
+      keyboardGuideLegendStyle = snapshot.keyboardGuideLegendStyle
+      keyboardGuideKeysMode = snapshot.keyboardGuideKeysMode
+      keyboardGuideStyle = snapshot.keyboardGuideStyle
+    }
+    if groups?.contains(.input) ?? true {
+      keyboardLayout = snapshot.keyboardLayout
+      keyboardInputLayout = snapshot.keyboardInputLayout
+      keyboardGuideLayoutSource = snapshot.keyboardGuideLayoutSource
+      customKeyboardLayouts = snapshot.customKeyboardLayouts
+      customKeyboardLayoutID = snapshot.customKeyboardLayoutID
+      quickEnd = snapshot.quickEnd
+    }
+    if groups?.contains(.behavior) ?? true {
+      quickRestartKey = snapshot.quickRestartKey
+    }
+    if groups?.contains(.hideElements) ?? true {
+      showKeyTips = snapshot.showKeyTips
+    }
+    if groups?.contains(.behavior) ?? true {
+      commandPaletteListMode = snapshot.commandPaletteListMode
+    }
+    if groups?.contains(.theme) ?? true {
+      followSystemTheme = snapshot.followSystemTheme
+      systemLightTheme = snapshot.systemLightTheme
+      systemDarkTheme = snapshot.systemDarkTheme
+      randomThemeMode = snapshot.randomThemeMode
+      flipTestColors = snapshot.flipTestColors
+      colorfulMode = snapshot.colorfulMode
+      customBackgroundURL = snapshot.customBackgroundURL
+      customBackgroundFit = snapshot.customBackgroundFit
+      customBackgroundFilter = snapshot.customBackgroundFilter
+    }
+    if groups?.contains(.appearance) ?? true {
+      practiceBackdrop = snapshot.practiceBackdrop
+      reducePracticeMotion = snapshot.reducePracticeMotion
+      animationFrameRate = snapshot.animationFrameRate
+    }
+    if groups?.contains(.hidden) ?? true {
+      showTypingCompanion = snapshot.showTypingCompanion
+      typingPowerMode = snapshot.typingPowerMode
+    }
+    if groups?.contains(.behavior) ?? true {
+      englishVariant = snapshot.englishVariant
+    }
+    if groups?.contains(.input) ?? true {
+      prefersArabicLazyInput = snapshot.prefersArabicLazyInput
+    }
+    if groups?.contains(.test) ?? true {
+      favoriteQuoteIDs = snapshot.favoriteQuoteIDs
+    }
+    if groups?.contains(.behavior) ?? true {
+      activeResultTags = snapshot.activeResultTags
+      repeatQuotes = snapshot.repeatQuotes
+    }
+    if groups?.contains(.input) ?? true {
+      freedomMode = snapshot.freedomMode
+      confidenceMode = snapshot.confidenceMode
+      oppositeShiftMode = snapshot.oppositeShiftMode
+      codeUnindentOnBackspace = snapshot.codeUnindentOnBackspace
+    }
+    if groups?.contains(.behavior) ?? true {
+      minimumAccuracy = snapshot.minimumAccuracy
+      minimumWpm = snapshot.minimumWpm
+      minimumWordBurstWpm = snapshot.minimumWordBurstWpm
+      minimumWordBurstMode = snapshot.minimumWordBurstMode
+    }
+    if groups?.contains(.appearance) ?? true {
+      practiceLineWidth = snapshot.practiceLineWidth
+      customPracticeLineColumns = snapshot.customPracticeLineColumns
+      practiceTapeMode = snapshot.practiceTapeMode
+      practiceTapeMargin = snapshot.practiceTapeMargin
+      smoothPracticeLineScroll = snapshot.smoothPracticeLineScroll
+      showAllPracticeLines = snapshot.showAllPracticeLines
+    }
+    if groups?.contains(.caret) ?? true {
+      smoothCaretMotion = snapshot.smoothCaretMotion
+      caretStyle = snapshot.caretStyle
+    }
+    if groups?.contains(.input) ?? true {
+      typoIndicatorStyle = snapshot.typoIndicatorStyle
+      compositionDisplayStyle = snapshot.compositionDisplayStyle
+    }
+    if groups?.contains(.appearance) ?? true {
+      typingSpeedUnit = snapshot.typingSpeedUnit
+      alwaysShowDecimalPlaces = snapshot.alwaysShowDecimalPlaces
+    }
+    if groups?.contains(.behavior) ?? true {
+      alwaysShowWordsHistory = snapshot.alwaysShowWordsHistory
+    }
+    if groups?.contains(.test) ?? true {
+      showWordBurstHeatmap = snapshot.showWordBurstHeatmap
+    }
+    if groups?.contains(.hidden) ?? true {
+      resultPerformanceVisibility = snapshot.resultPerformanceVisibility
+    }
+    if groups?.contains(.appearance) ?? true {
+      startGraphsAtZero = snapshot.startGraphsAtZero
+    }
+    if groups?.contains(.hidden) ?? true {
+      historyChartVisibility = snapshot.historyChartVisibility
+    }
+    if groups?.contains(.hideElements) ?? true {
+      showAverage = snapshot.showAverage
+      showPersonalBest = snapshot.showPersonalBest
+    }
+    if groups?.contains(.appearance) ?? true {
+      typedCharacterEffect = snapshot.typedCharacterEffect
+      liveSpeedStyle = snapshot.liveSpeedStyle
+      liveAccuracyStyle = snapshot.liveAccuracyStyle
+      liveBurstStyle = snapshot.liveBurstStyle
+      liveProgressStyle = snapshot.liveProgressStyle
+      liveStatsColor = snapshot.liveStatsColor
+      liveStatsOpacity = snapshot.liveStatsOpacity
+      promptHighlightMode = snapshot.promptHighlightMode
+    }
+    if groups?.contains(.behavior) ?? true {
+      testModifiers = snapshot.testModifiers
+    }
+    if groups?.contains(.hideElements) ?? true {
+      showFocusWarning = snapshot.showFocusWarning
+      showCapsLockWarning = snapshot.showCapsLockWarning
+    }
+    if groups?.contains(.sound) ?? true {
+      playErrorBeep = snapshot.playErrorBeep
+      playKeyclickSound = snapshot.playKeyclickSound
+      clickSoundStyle = snapshot.clickSoundStyle
+      errorSoundStyle = snapshot.errorSoundStyle
+      timeWarningOffset = snapshot.timeWarningOffset
+      timeWarningSoundStyle = snapshot.timeWarningSoundStyle
+      soundVolume = snapshot.soundVolume
+    }
+    if groups?.contains(.hidden) ?? true {
+      globalHotkeyEnabled = snapshot.globalHotkeyEnabled
+    }
+    if groups?.contains(.caret) ?? true {
+      paceGuideMode = snapshot.paceGuideMode
+      paceGuideCustomWpm = snapshot.paceGuideCustomWpm
+      paceCaretStyle = snapshot.paceCaretStyle
+      repeatedPace = snapshot.repeatedPace
+    }
+    if groups?.contains(.hidden) ?? true {
+      streakDayBoundaryOffsetHours = snapshot.streakDayBoundaryOffsetHours
+      hasSetStreakDayBoundary = snapshot.hasSetStreakDayBoundary
+    }
   }
 
   /// Locks in the local practice-day boundary after the first explicit choice.
@@ -2285,11 +2362,17 @@ final class AppSettings {
   /// Replace an existing complete source profile only after lossless staging
   /// and a successful v4 save. Legacy adoption/downgrade is a separate policy.
   private func applySourceSnapshot(_ incoming: AppSettingsSnapshot,
-    configuration: TestConfiguration? = nil, activeResultTags: [String]? = nil) -> Bool {
+    configuration: TestConfiguration? = nil, activeResultTags: [String]? = nil,
+    groups: Set<PresetSettingGroup>? = nil) -> Bool {
     guard allowsRestartingConfigurationChange, thresholdSourceState != nil,
       case .available = thresholdProfileRead,
       let source = incoming.thresholdSource, source.configuration.isValid, source.matches(incoming)
     else { return false }
+    if let groups {
+      guard !groups.isEmpty,
+        snapshot.applyingPresetSettings(from: incoming, groups: groups) == incoming
+      else { return false }
+    }
     let staged = AppSettings(validating: incoming, defaults: defaults)
     guard staged.snapshot == incoming,
       ThresholdSettingsStore(defaults: defaults).save(incoming) else { return false }
@@ -2302,16 +2385,19 @@ final class AppSettings {
       installTestConfigurationFields(configuration)
       if let activeResultTags { self.activeResultTags = activeResultTags }
     }
-    else { installSnapshotFields(incoming) }
+    else { installSnapshotFields(incoming, groups: groups) }
     initializingSettings = wasInitializing
     batchingClickSoundConfiguration = wasBatchingSound
-    if configuration == nil { synchronizeClickSoundConfiguration() }
+    if configuration == nil, groups?.contains(.sound) ?? true { synchronizeClickSoundConfiguration() }
     return true
   }
 
   @discardableResult
-  func apply(_ snapshot: AppSettingsSnapshot) -> Bool {
-    if hasThresholdProfile || snapshot.thresholdSource != nil { return applySourceSnapshot(snapshot) }
+  func apply(_ snapshot: AppSettingsSnapshot, groups: Set<PresetSettingGroup>? = nil) -> Bool {
+    if hasThresholdProfile || snapshot.thresholdSource != nil {
+      return applySourceSnapshot(snapshot, groups: groups)
+    }
+    guard groups == nil else { return false }
     if snapshot.paceGuideMode == .accountTagPersonalBest { usingAccountPaceStorage = true }
     // Select the fork before any intermediate preference writes. Never merge
     // subsequent legacy-writer changes back over the new settings generation.

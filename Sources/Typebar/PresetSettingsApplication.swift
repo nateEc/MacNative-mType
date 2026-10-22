@@ -14,22 +14,27 @@ enum PresetSettingsApplication {
       settings.hasThresholdProfile || PracticeThresholdSource.isPresent(in: original)
       || PracticeThresholdSource.isPresent(in: resolved)
     if sourceContext {
-      // Existing-source restoration/application only. Source adoption, partial
-      // preset effects and challenge overrides have separate migration owners.
+      // Existing-source restoration/application only. Source adoption and
+      // challenge overrides have separate migration owners.
       guard settings.thresholdConfiguration != nil,
         case .available = settings.thresholdProfileRead,
         settings.activeTestSelectionRead != .unavailable,
-        !original.isPartial, !resolved.isPartial,
         original.configuration.challengeID == nil, resolved.configuration.challengeID == nil,
         configuration.challengeID == nil,
         SettingsJSONConfigurationPolicy.isValid(configuration)
       else { return false }
+      if original.isPartial || resolved.isPartial {
+        guard appliesGlobalSettings, let groups = original.settingGroups, !groups.isEmpty,
+          resolved.settingGroups == groups, resolved.settingsSnapshot != nil
+        else { return false }
+      }
       for definition in [original, resolved] where PracticeThresholdSource.isPresent(in: definition)
       {
         guard (try? LocalPresetCodec.encode(definition)) != nil else { return false }
       }
       if appliesGlobalSettings {
-        guard original.configuration.rules.thresholdSource != nil,
+        let ownsThresholds = !original.isPartial || original.settingGroups?.contains(.behavior) == true
+        guard (!ownsThresholds || original.configuration.rules.thresholdSource != nil),
           resolved.configuration.rules.thresholdSource != nil,
           configuration == resolved.configuration,
           agreesWithSnapshot(resolved)
@@ -44,7 +49,7 @@ enum PresetSettingsApplication {
       // The alias owns tags when present (including an explicit empty list).
       // Include it in the staged source write, never a second settings write.
       if let tags { snapshot.activeResultTags = tags }
-      committed = settings.apply(snapshot)
+      committed = settings.apply(snapshot, groups: sourceContext ? original.settingGroups : nil)
     } else {
       committed = settings.apply(configuration, activeResultTags: tags)
     }
@@ -70,10 +75,10 @@ enum PresetSettingsApplication {
     rules.thresholdSource = snapshot.thresholdSource
     return configuration.rules == rules && configuration.difficulty == snapshot.difficulty
       && configuration.englishVariant == snapshot.englishVariant
-      && configuration.modifiers == EffectiveTestModifierPolicy.modifiers(
+      && configuration == configuration.with(modifiers: EffectiveTestModifierPolicy.modifiers(
         requested: snapshot.testModifiers, language: configuration.language, mode: configuration.mode,
         mixedLanguageComponents: configuration.mixedLanguageComponents,
-        automaticallyEnabledArabic: snapshot.prefersArabicLazyInput)
+        automaticallyEnabledArabic: snapshot.prefersArabicLazyInput))
   }
 }
 

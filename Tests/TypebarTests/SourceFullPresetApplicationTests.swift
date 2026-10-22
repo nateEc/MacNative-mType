@@ -151,7 +151,7 @@ final class SourceFullPresetApplicationTests: XCTestCase {
   func testGlobalSourceAdmissionKeepsLockUnknownStoresAndUnsupportedPresetsUnchanged() throws {
     try withSettings { settings, defaults in
       let incoming = try preset(snapshot: true)
-      var blocked = [incoming.with(settingGroups: [.behavior])]
+      var blocked = [incoming.with(settingGroups: [])]
       var challenge = incoming
       challenge.configuration.challengeID = "ten-words-of-pain"
       blocked.append(challenge)

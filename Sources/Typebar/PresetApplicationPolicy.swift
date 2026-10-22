@@ -39,7 +39,27 @@ enum PresetApplicationPolicy {
       rules.codeUnindentOnBackspace = sourceConfiguration.rules.codeUnindentOnBackspace
     }
 
+    var resolvedSnapshot: AppSettingsSnapshot?
+    if var currentSnapshot = current.settingsSnapshot ?? preset.settingsSnapshot {
+      if current.settingsSnapshot == nil {
+        currentSnapshot.copyThresholds(from: currentConfiguration.rules)
+      }
+      var sourceSnapshot = preset.settingsSnapshot ?? currentSnapshot
+      if preset.settingsSnapshot == nil {
+        sourceSnapshot.copyPresetConfiguration(from: sourceConfiguration)
+      }
+      resolvedSnapshot = currentSnapshot.applyingPresetSettings(from: sourceSnapshot, groups: groups)
+    }
     let testMetadata = usesTest ? sourceConfiguration : currentConfiguration
+    var modifiers = usesBehavior ? sourceConfiguration.modifiers : currentConfiguration.modifiers
+    if let snapshot = resolvedSnapshot, snapshot.thresholdSource != nil, testMetadata.challengeID == nil {
+      modifiers = EffectiveTestModifierPolicy.modifiers(
+        requested: snapshot.testModifiers, language: testMetadata.language, mode: testMetadata.mode,
+        mixedLanguageComponents: testMetadata.mixedLanguageComponents,
+        automaticallyEnabledArabic: snapshot.prefersArabicLazyInput)
+    }
+    // Feed the projection through the complete constructor: it also owns
+    // infinite-limit filtering, Memory mode and forced content options.
     var configuration = TestConfiguration(
       mode: usesTest ? sourceConfiguration.mode : currentConfiguration.mode,
       duration: usesTest ? sourceConfiguration.duration : currentConfiguration.duration,
@@ -63,7 +83,7 @@ enum PresetApplicationPolicy {
       mixedLanguageComponents: usesTest
         ? sourceConfiguration.mixedLanguageComponents : currentConfiguration.mixedLanguageComponents,
       polyglotBaseLanguage: testMetadata.polyglotBaseLanguage,
-      modifiers: usesBehavior ? sourceConfiguration.modifiers : currentConfiguration.modifiers,
+      modifiers: modifiers,
       contentOptions: usesTest ? sourceConfiguration.contentOptions : currentConfiguration.contentOptions,
       challengeID: usesTest ? sourceConfiguration.challengeID : currentConfiguration.challengeID)
     configuration.polyglotUsesPrimaryDirection = testMetadata.polyglotUsesPrimaryDirection
@@ -82,26 +102,16 @@ enum PresetApplicationPolicy {
       applied.activeResultTags = preset.activeResultTags
         ?? preset.settingsSnapshot?.activeResultTags ?? []
     }
-    if var currentSnapshot = current.settingsSnapshot ?? preset.settingsSnapshot {
-      if current.settingsSnapshot == nil {
-        currentSnapshot.copyThresholds(from: currentConfiguration.rules)
-      }
-      let sourceSnapshot = preset.settingsSnapshot ?? currentSnapshot
-      var resolvedSnapshot = currentSnapshot.applying(sourceSnapshot, groups: groups)
-      if usesBehavior && preset.settingsSnapshot == nil {
-        resolvedSnapshot.copyThresholds(from: sourceConfiguration.rules)
-      }
-      applied.settingsSnapshot = resolvedSnapshot
-    }
+    applied.settingsSnapshot = resolvedSnapshot
     applied.settingGroups = preset.settingGroups
     return applied
   }
 }
 
-private extension AppSettingsSnapshot {
+extension AppSettingsSnapshot {
   /// An old preset may have only input rules. Preserve that explicit projection
   /// and optional source rather than borrowing another preset's threshold state.
-  mutating func copyThresholds(from rules: InputRules) {
+  fileprivate mutating func copyThresholds(from rules: InputRules) {
     minimumAccuracy = rules.minimumAccuracy
     minimumWpm = rules.minimumWpm
     minimumWordBurstWpm = rules.minimumWordBurstWpm
@@ -109,7 +119,27 @@ private extension AppSettingsSnapshot {
     thresholdSource = rules.thresholdSource
   }
 
-  func applying(_ source: Self, groups: Set<PresetSettingGroup>) -> Self {
+  fileprivate mutating func copyPresetConfiguration(from configuration: TestConfiguration) {
+    let rules = configuration.rules
+    copyThresholds(from: rules)
+    difficulty = configuration.difficulty
+    englishVariant = configuration.englishVariant
+    testModifiers = configuration.modifiers
+    blindMode = rules.blindMode
+    strictSpace = rules.strictSpace
+    stopOnError = rules.stopOnError
+    stopOnErrorMode = rules.stopOnErrorMode
+    deleteOnError = rules.deleteOnError
+    deleteOnErrorMode = rules.deleteOnErrorMode
+    hideExtraLetters = rules.hideExtraLetters
+    quickEnd = rules.quickEnd
+    freedomMode = rules.freedomMode
+    confidenceMode = rules.confidenceMode
+    oppositeShiftMode = rules.oppositeShiftMode
+    codeUnindentOnBackspace = rules.codeUnindentOnBackspace
+  }
+
+  func applyingPresetSettings(from source: Self, groups: Set<PresetSettingGroup>) -> Self {
     var result = self
     if groups.contains(.test) {
       result.favoriteQuoteIDs = source.favoriteQuoteIDs
@@ -117,6 +147,7 @@ private extension AppSettingsSnapshot {
     }
     if groups.contains(.behavior) {
       result.difficulty = source.difficulty
+      result.blindMode = source.blindMode
       result.publishCompletedResults = source.publishCompletedResults
       result.saveCompletedResults = source.saveCompletedResults
       result.quickRestartKey = source.quickRestartKey
