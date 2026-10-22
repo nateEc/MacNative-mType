@@ -221,12 +221,23 @@ final class SourceArchiveApplicationTests: XCTestCase {
       try autoreleasepool {
         let store = try container(url, allowsSave: false)
         defer { withExtendedLifetime(store) {} }
-        XCTAssertThrowsError(try apply(archive(), settings: settings, defaults: defaults, context: store.mainContext))
+        let incoming = try archive()
+        XCTAssertThrowsError(try apply(incoming, settings: settings, defaults: defaults, context: store.mainContext)) {
+          XCTAssertTrue($0.localizedDescription.contains("重新打开应用"))
+          XCTAssertTrue($0.localizedDescription.contains("设置与删除标记未导入"))
+          XCTAssertEqual((($0 as? ArchivePersistenceFailure)?.underlyingError as NSError?)?.domain,
+            NSCocoaErrorDomain)
+        }
         XCTAssertEqual(settings.snapshot, snapshot)
         XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before as NSDictionary)
-        // SwiftData may retain registered objects after a failed real save.
-        // Verify persistence with a fresh container below, not this cache.
+        // Failed saves can leave registered objects in this context. The fresh
+        // container below is authoritative for persistence, not this cache.
         XCTAssertFalse(store.mainContext.hasChanges)
+        XCTAssertThrowsError(try apply(incoming, settings: settings, defaults: defaults, context: store.mainContext)) {
+          XCTAssertNotNil($0 as? ArchivePersistenceFailure)
+        }
+        XCTAssertEqual(settings.snapshot, snapshot)
+        XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before as NSDictionary)
       }
       try autoreleasepool {
         let store = try container(url)

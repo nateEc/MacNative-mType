@@ -1767,6 +1767,14 @@ enum ArchiveImportSource {
     case cloudSync
 }
 
+struct ArchivePersistenceFailure: LocalizedError {
+    let underlyingError: Error
+
+    var errorDescription: String? {
+        "记录保存失败；设置与删除标记未导入。当前窗口可能包含未保存内容，请退出并重新打开应用后重试。\n原因：\(underlyingError.localizedDescription)"
+    }
+}
+
 enum LocalArchiveImportError: Error, Equatable, LocalizedError {
     case noQuitConfigurationLocked
     case thresholdSourceNotReady
@@ -1989,7 +1997,7 @@ enum LocalArchiveImport {
         } catch {
             LocalPersonalBestStore.restore(personalBestCheckpoint, in: modelContext)
             for update in tagSnapshotUpdates { update.record.accountTagSnapshotData = update.old }
-            throw error
+            throw ArchivePersistenceFailure(underlyingError: error)
         }
         resultTombstoneStore.replaceDeletedIDs(resultingDeletedResultIDs)
         presetTombstoneStore.replaceDeletedIDs(resultingDeletedPresetIDs)
