@@ -2361,21 +2361,25 @@ final class AppSettings {
 
   /// Replace an existing complete source profile only after lossless staging
   /// and a successful v4 save. Legacy adoption/downgrade is a separate policy.
-  private func applySourceSnapshot(_ incoming: AppSettingsSnapshot,
-    configuration: TestConfiguration? = nil, activeResultTags: [String]? = nil,
-    groups: Set<PresetSettingGroup>? = nil) -> Bool {
+  func canApplySourceSnapshot(_ incoming: AppSettingsSnapshot) -> Bool {
     guard allowsRestartingConfigurationChange, thresholdSourceState != nil,
       case .available = thresholdProfileRead,
       let source = incoming.thresholdSource, source.configuration.isValid, source.matches(incoming)
+    else { return false }
+    return AppSettings(validating: incoming, defaults: defaults).snapshot == incoming
+  }
+
+  private func applySourceSnapshot(_ incoming: AppSettingsSnapshot,
+    configuration: TestConfiguration? = nil, activeResultTags: [String]? = nil,
+    groups: Set<PresetSettingGroup>? = nil) -> Bool {
+    guard let source = incoming.thresholdSource, canApplySourceSnapshot(incoming)
     else { return false }
     if let groups {
       guard !groups.isEmpty,
         snapshot.applyingPresetSettings(from: incoming, groups: groups) == incoming
       else { return false }
     }
-    let staged = AppSettings(validating: incoming, defaults: defaults)
-    guard staged.snapshot == incoming,
-      ThresholdSettingsStore(defaults: defaults).save(incoming) else { return false }
+    guard ThresholdSettingsStore(defaults: defaults).save(incoming) else { return false }
     let wasInitializing = initializingSettings
     let wasBatchingSound = batchingClickSoundConfiguration
     initializingSettings = true

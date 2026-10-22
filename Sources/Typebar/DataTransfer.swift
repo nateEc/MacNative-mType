@@ -1770,13 +1770,28 @@ enum ArchiveImportSource {
 enum LocalArchiveImportError: Error, Equatable, LocalizedError {
     case noQuitConfigurationLocked
     case thresholdSourceNotReady
+    case invalidSourceSettings
+    case invalidActiveTestSelection
+    case sourceStateUnavailable
+    case recordsImportedSettingsNotApplied
+    case recordsAndSettingsImportedSelectionNotApplied
 
     var errorDescription: String? {
         switch self {
         case .noQuitConfigurationLocked:
             return "锁定重开测试进行中，暂时不能导入会改写设置的数据。"
         case .thresholdSourceNotReady:
-            return "完整阈值设置或活动选择的恢复尚未接入，原数据未修改。"
+            return "当前配置无法采用归档中的完整阈值状态，原数据未修改。"
+        case .invalidSourceSettings:
+            return "归档中的阈值设置不一致或无法完整应用，未导入数据。"
+        case .invalidActiveTestSelection:
+            return "归档中的测试选择无效、暂不支持或恢复记录不可读，未导入数据。"
+        case .sourceStateUnavailable:
+            return "当前配置或恢复状态不可读或已改变，未导入数据。"
+        case .recordsImportedSettingsNotApplied:
+            return "记录与删除标记已导入，但设置未能完整保存；请检查配置版本或锁定状态后重试。"
+        case .recordsAndSettingsImportedSelectionNotApplied:
+            return "记录、删除标记和设置已导入，但测试选择未恢复；请检查恢复记录。"
         }
     }
 }
@@ -1798,10 +1813,6 @@ enum LocalArchiveImport {
         source: ArchiveImportSource = .localFile,
         modelContext: ModelContext
     ) throws -> ArchiveImportSummary {
-        guard archive.settings.thresholdSource == nil,
-              !settings.hasThresholdProfile,
-              !(archive.activeTestSelection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false)
-        else { throw LocalArchiveImportError.thresholdSourceNotReady }
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(archive.results)
         guard settings.allowsRestartingConfigurationChange else {
             throw LocalArchiveImportError.noQuitConfigurationLocked
@@ -1837,6 +1848,8 @@ enum LocalArchiveImport {
             archive.settings,
             deletedThemeIDs: effectiveDeletedCustomThemeIDs,
             deletedKeyboardLayoutIDs: effectiveDeletedCustomKeyboardLayoutIDs)
+        let sourcePlan = try ArchiveSourceAdmission.preparing(importedSettings,
+            selection: archive.activeTestSelection, to: settings)
         let storedDeletedResultIDs = Set(resultTombstoneStore.deletedIDs)
         let archiveDeletedResultIDs = Set(archive.deletedResultIDs)
         let resultingDeletedResultIDs: Set<UUID>
@@ -1946,6 +1959,7 @@ enum LocalArchiveImport {
             try TestPresetRecord(id: $0.id ?? UUID(), name: $0.name, definition: $0.definition)
         }
         for result in newResults { _ = try LocalResultConfigurationCodec.encode(result.configuration) }
+        try sourcePlan.validateBeforeRecords(to: settings)
         let personalBestCheckpoint = try LocalPersonalBestStore.checkpoint(in: modelContext)
         do {
             if let ledger = archive.localPersonalBestLedger {
@@ -1984,9 +1998,7 @@ enum LocalArchiveImport {
         customizationTombstoneStore.replaceDeletedKeyboardLayoutIDs(
             resultingDeletedCustomKeyboardLayoutIDs)
         tombstoneStore.replaceDeletedIDs(resultingDeletedFilterPresetIDs)
-        settings.apply(importedSettings)
-        let restoredActiveTestSelection = archive.activeTestSelection.map(
-            settings.importActiveTestSelection) ?? false
+        let restoredActiveTestSelection = try sourcePlan.applyAfterRecords(to: settings)
         return .init(
             insertedResults: newResults.count,
             deletedResults: resultRecordsToDelete.count,
