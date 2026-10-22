@@ -14,9 +14,9 @@ enum PresetSettingsApplication {
       settings.hasThresholdProfile || PracticeThresholdSource.isPresent(in: original)
       || PracticeThresholdSource.isPresent(in: resolved)
     if sourceContext {
-      // This opens selection-only restoration, not source adoption, partial
-      // preset effects or challenge rule overrides that are not migrated yet.
-      guard !appliesGlobalSettings, settings.thresholdConfiguration != nil,
+      // Existing-source restoration/application only. Source adoption, partial
+      // preset effects and challenge overrides have separate migration owners.
+      guard settings.thresholdConfiguration != nil,
         case .available = settings.thresholdProfileRead,
         settings.activeTestSelectionRead != .unavailable,
         !original.isPartial, !resolved.isPartial,
@@ -28,18 +28,66 @@ enum PresetSettingsApplication {
       {
         guard (try? LocalPresetCodec.encode(definition)) != nil else { return false }
       }
+      if appliesGlobalSettings {
+        guard original.configuration.rules.thresholdSource != nil,
+          resolved.configuration.rules.thresholdSource != nil,
+          configuration == resolved.configuration,
+          agreesWithSnapshot(resolved)
+        else { return false }
+      }
     }
     guard appliesGlobalSettings else { return true }
+    let appliesTags = !original.isPartial || (original.settingGroups?.contains(.behavior) == true)
+    let tags = appliesTags ? resolved.activeResultTags : nil
     let committed: Bool
-    if let snapshot = resolved.settingsSnapshot {
+    if var snapshot = resolved.settingsSnapshot {
+      // The alias owns tags when present (including an explicit empty list).
+      // Include it in the staged source write, never a second settings write.
+      if let tags { snapshot.activeResultTags = tags }
       committed = settings.apply(snapshot)
     } else {
-      committed = settings.apply(configuration)
+      committed = settings.apply(configuration, activeResultTags: tags)
     }
-    guard committed else { return false }
-    let appliesTags = !original.isPartial || (original.settingGroups?.contains(.behavior) == true)
-    if appliesTags, let tags = resolved.activeResultTags { settings.activeResultTags = tags }
-    return true
+    return committed
+  }
+
+  /// Reject two different owners for the same applied rule. Captured presets
+  /// retain requested funboxes in settings and effective funboxes in the test.
+  private static func agreesWithSnapshot(_ preset: SavedTestPreset) -> Bool {
+    guard let snapshot = preset.settingsSnapshot else { return true }
+    let configuration = preset.configuration
+    var rules = InputRules(
+      strictSpace: snapshot.strictSpace,
+      stopOnError: snapshot.stopOnError, stopOnErrorMode: snapshot.stopOnErrorMode,
+      deleteOnError: snapshot.deleteOnError, deleteOnErrorMode: snapshot.deleteOnErrorMode,
+      hideExtraLetters: snapshot.hideExtraLetters, blindMode: snapshot.blindMode,
+      quickEnd: snapshot.quickEnd, freedomMode: snapshot.freedomMode,
+      confidenceMode: snapshot.confidenceMode, oppositeShiftMode: snapshot.oppositeShiftMode,
+      codeUnindentOnBackspace: snapshot.codeUnindentOnBackspace,
+      minimumAccuracy: snapshot.minimumAccuracy, minimumWpm: snapshot.minimumWpm,
+      minimumWordBurstWpm: snapshot.minimumWordBurstWpm,
+      minimumWordBurstMode: snapshot.minimumWordBurstMode)
+    rules.thresholdSource = snapshot.thresholdSource
+    return configuration.rules == rules && configuration.difficulty == snapshot.difficulty
+      && configuration.englishVariant == snapshot.englishVariant
+      && configuration.modifiers == EffectiveTestModifierPolicy.modifiers(
+        requested: snapshot.testModifiers, language: configuration.language, mode: configuration.mode,
+        mixedLanguageComponents: configuration.mixedLanguageComponents,
+        automaticallyEnabledArabic: snapshot.prefersArabicLazyInput)
+  }
+}
+
+/// One value-only projection for scene construction and preset admission.
+enum EffectiveTestModifierPolicy {
+  static func modifiers(requested: [TestModifier], language: TypingLanguage, mode: TestMode,
+    mixedLanguageComponents: [TypingLanguage], automaticallyEnabledArabic: Bool) -> [TestModifier] {
+    let languageCompatible = language == .mixedLanguages
+      ? TestModifierPolicy.modifiersCompatibleWithPolyglot(requested) : requested
+    let lazy = ArabicLazyInputPolicy.effectiveModifiers(languageCompatible, language: language, mode: mode,
+      mixedLanguageComponents: mixedLanguageComponents, automaticallyEnabled: automaticallyEnabledArabic)
+    return JoiningScriptFunboxPolicy.effectiveModifiers(
+      TestModifierPolicy.modifiersCompatibleWithMode(lazy, mode: mode),
+      language: language, mixedLanguageComponents: mixedLanguageComponents)
   }
 }
 

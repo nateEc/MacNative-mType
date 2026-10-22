@@ -5926,18 +5926,10 @@ private struct ContentView: View {
     for selectedLanguage: TypingLanguage, mode: TestMode,
     mixedLanguageComponents: [TypingLanguage]? = nil, baseModifiers: [TestModifier]? = nil
   ) -> [TestModifier] {
-    let components = mixedLanguageComponents ?? self.mixedLanguageComponents
-    let languageCompatibleModifiers = selectedLanguage == .mixedLanguages
-      ? TestModifierPolicy.modifiersCompatibleWithPolyglot(baseModifiers ?? settings.testModifiers)
-      : (baseModifiers ?? settings.testModifiers)
-    let lazyInputModifiers = ArabicLazyInputPolicy.effectiveModifiers(
-      languageCompatibleModifiers, language: selectedLanguage, mode: mode,
-      mixedLanguageComponents: components,
-      automaticallyEnabled: settings.prefersArabicLazyInput)
-    let modeCompatibleModifiers = TestModifierPolicy.modifiersCompatibleWithMode(
-      lazyInputModifiers, mode: mode)
-    return JoiningScriptFunboxPolicy.effectiveModifiers(
-      modeCompatibleModifiers, language: selectedLanguage, mixedLanguageComponents: components)
+    EffectiveTestModifierPolicy.modifiers(requested: baseModifiers ?? settings.testModifiers,
+      language: selectedLanguage, mode: mode,
+      mixedLanguageComponents: mixedLanguageComponents ?? self.mixedLanguageComponents,
+      automaticallyEnabledArabic: settings.prefersArabicLazyInput)
   }
 
   private func refreshZipfNotice() {

@@ -2159,7 +2159,7 @@ final class AppSettings {
   }
 
   @discardableResult
-  func apply(_ configuration: TestConfiguration) -> Bool {
+  func apply(_ configuration: TestConfiguration, activeResultTags: [String]? = nil) -> Bool {
     if hasThresholdProfile || configuration.rules.thresholdSource != nil {
       guard configuration.rules.thresholdSource != nil else { return false }
       var candidate = snapshot
@@ -2183,9 +2183,11 @@ final class AppSettings {
       candidate.minimumWordBurstMode = configuration.rules.minimumWordBurstMode
       candidate.thresholdSource = configuration.rules.thresholdSource
       candidate.testModifiers = configuration.modifiers
-      return applySourceSnapshot(candidate, configuration: configuration)
+      if let activeResultTags { candidate.activeResultTags = activeResultTags }
+      return applySourceSnapshot(candidate, configuration: configuration, activeResultTags: activeResultTags)
     }
     installTestConfigurationFields(configuration)
+    if let activeResultTags { self.activeResultTags = activeResultTags }
     return true
   }
 
@@ -2283,7 +2285,7 @@ final class AppSettings {
   /// Replace an existing complete source profile only after lossless staging
   /// and a successful v4 save. Legacy adoption/downgrade is a separate policy.
   private func applySourceSnapshot(_ incoming: AppSettingsSnapshot,
-    configuration: TestConfiguration? = nil) -> Bool {
+    configuration: TestConfiguration? = nil, activeResultTags: [String]? = nil) -> Bool {
     guard allowsRestartingConfigurationChange, thresholdSourceState != nil,
       case .available = thresholdProfileRead,
       let source = incoming.thresholdSource, source.configuration.isValid, source.matches(incoming)
@@ -2296,7 +2298,10 @@ final class AppSettings {
     initializingSettings = true
     batchingClickSoundConfiguration = true
     thresholdSourceState = source
-    if let configuration { installTestConfigurationFields(configuration) }
+    if let configuration {
+      installTestConfigurationFields(configuration)
+      if let activeResultTags { self.activeResultTags = activeResultTags }
+    }
     else { installSnapshotFields(incoming) }
     initializingSettings = wasInitializing
     batchingClickSoundConfiguration = wasBatchingSound

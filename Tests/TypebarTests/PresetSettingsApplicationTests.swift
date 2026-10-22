@@ -153,14 +153,15 @@ final class PresetSettingsApplicationTests: XCTestCase {
     }
   }
 
-  func testSourceChallengesPartialPresetsAndGlobalApplicationRemainGuarded() throws {
+  func testSourceChallengesPartialPresetsAndLegacyGlobalApplicationRemainGuarded() throws {
     try withSettings(source: true) { settings, defaults in
       let preset = SavedTestPreset(configuration: .words(3, rules: settings.inputRules))
       let domain = defaults.dictionaryRepresentation() as NSDictionary
+      let legacy = SavedTestPreset(configuration: .words(3))
       XCTAssertFalse(
         PresetSettingsApplication.commit(
-          original: preset, resolved: preset,
-          configuration: preset.configuration, to: settings, appliesGlobalSettings: true))
+          original: legacy, resolved: legacy,
+          configuration: legacy.configuration, to: settings, appliesGlobalSettings: true))
       let partial = preset.with(settingGroups: [.input])
       XCTAssertFalse(
         PresetSettingsApplication.commit(
