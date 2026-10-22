@@ -5990,8 +5990,14 @@ private struct ContentView: View {
   ) -> Bool {
     guard acceptsRestartingConfigurationChange() else { return false }
     guard preset.settingGroups?.isEmpty != true else { return false }
-    let appliesTest = !preset.isPartial || (preset.settingGroups?.contains(.test) == true)
-    let appliedPreset = PresetApplicationPolicy.applying(current: presetDefinition, preset: preset)
+    guard let preparation = PresetSourcePreparation.preparing(preset, to: settings,
+      appliesGlobalSettings: appliesGlobalSettings) else {
+      modeCompatibilityMessage = "本次配置未能应用，已保留当前测试；请检查配置版本或恢复状态。"
+      return false
+    }
+    let preparedPreset = preparation.preset
+    let appliesTest = !preparedPreset.isPartial || (preparedPreset.settingGroups?.contains(.test) == true)
+    let appliedPreset = PresetApplicationPolicy.applying(current: presetDefinition, preset: preparedPreset)
     let challenge = appliesTest
       ? TypebarChallengeLibrary.challenge(id: appliedPreset.configuration.challengeID) : nil
     if appliesTest, !acceptsPresetResources(appliedPreset.configuration) { return false }
@@ -6000,8 +6006,9 @@ private struct ContentView: View {
     let configuration = challenge?.id == "one-handed-bandit"
       ? (selectedOneHandedPreset?.configuration ?? appliedPreset.configuration)
       : (challenge?.preset.configuration ?? appliedPreset.configuration)
-    guard PresetSettingsApplication.commit(original: preset, resolved: appliedPreset,
-      configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings) else {
+    guard PresetSettingsApplication.commit(original: preparedPreset, resolved: appliedPreset,
+      configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings,
+      expectedSourceState: preparation.baseline) else {
       modeCompatibilityMessage = "本次配置未能应用，已保留当前测试；请检查配置版本或恢复状态。"
       return false
     }

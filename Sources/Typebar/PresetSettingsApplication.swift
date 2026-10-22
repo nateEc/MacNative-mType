@@ -7,9 +7,11 @@ enum PresetSettingsApplication {
   static func commit(
     original: SavedTestPreset, resolved: SavedTestPreset,
     configuration: TestConfiguration, to settings: AppSettings,
-    appliesGlobalSettings: Bool
+    appliesGlobalSettings: Bool,
+    expectedSourceState: PresetSourcePreparation.Baseline? = nil
   ) -> Bool {
     guard settings.allowsRestartingConfigurationChange else { return false }
+    if let expectedSourceState, !expectedSourceState.matches(settings) { return false }
     let sourceContext =
       settings.hasThresholdProfile || PracticeThresholdSource.isPresent(in: original)
       || PracticeThresholdSource.isPresent(in: resolved)
