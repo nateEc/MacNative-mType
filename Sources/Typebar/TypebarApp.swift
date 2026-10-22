@@ -5871,7 +5871,8 @@ private struct ContentView: View {
     if let activeChallenge {
       let challengePreset = activeChallenge.id == "one-handed-bandit"
         ? (oneHandedChallengePreset ?? activeChallenge.preset) : activeChallenge.preset
-      let challengeConfiguration = challengePreset.configuration.with(challengeID: activeChallenge.id)
+      let challengeConfiguration = ChallengeInputRulePolicy.applying(settings.inputRules,
+        to: challengePreset.configuration.with(challengeID: activeChallenge.id))
       return challengeConfiguration.with(
         modifiers: effectiveTestModifiers(
           for: challengeConfiguration.language, mode: challengeConfiguration.mode,

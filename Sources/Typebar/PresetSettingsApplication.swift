@@ -53,7 +53,10 @@ enum PresetSettingsApplication {
       if let tags { snapshot.activeResultTags = tags }
       committed = settings.apply(snapshot, groups: sourceContext ? original.settingGroups : nil)
     } else {
-      committed = settings.apply(configuration, activeResultTags: tags)
+      let appliedConfiguration = !original.isPartial
+        && TypebarChallengeLibrary.challenge(id: configuration.challengeID) != nil
+        ? ChallengeInputRulePolicy.applying(settings.inputRules, to: configuration) : configuration
+      committed = settings.apply(appliedConfiguration, activeResultTags: tags)
     }
     return committed
   }
