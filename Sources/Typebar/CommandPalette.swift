@@ -1407,6 +1407,10 @@ enum KeyboardGuideCommandTarget: Equatable {
     @MainActor
     func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
         switch self {
+        case .mode: break
+        default: KeyboardGuidePreferenceApplication.enableForAppearanceChange(settings)
+        }
+        switch self {
         case .mode(let mode): settings.keyboardGuideMode = mode
         case .style(let style): settings.keyboardGuideStyle = style
         case .legend(let legend): settings.keyboardGuideLegendStyle = legend
@@ -1482,6 +1486,7 @@ enum KeyboardGuideLayoutCommandTarget: Equatable {
 
     @MainActor
     func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) {
+        KeyboardGuidePreferenceApplication.enableForAppearanceChange(settings)
         switch self {
         case .inputSync:
             settings.keyboardGuideLayoutSource = .inputEmulation

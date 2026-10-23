@@ -1676,7 +1676,8 @@ private struct ContentView: View {
       }
       contentAppeared()
       settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,
-        requestedModifiers: { practiceRequestedModifiers }, selectedLanguage: { language }) {
+        requestedModifiers: { practiceRequestedModifiers }, selectedLanguage: { language },
+        keyboardGuideMode: { challengeLiveConfiguration.keyboardGuideMode(settings: settings) }) {
         persistExplicitTestConfiguration()
       }
       activatePreferenceConfigurationOwnerIfKey()

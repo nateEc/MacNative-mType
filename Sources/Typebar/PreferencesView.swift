@@ -117,6 +117,10 @@ struct PreferencesView: View {
     })
   }
 
+  private var keyboardGuidePreferences: PracticeKeyboardGuidePreferences {
+    .init(settings: settings)
+  }
+
   var body: some View {
     @Bindable var settings = settings
     @Bindable var account = account
@@ -786,7 +790,7 @@ struct PreferencesView: View {
           Text("在练习文本中显示第二个目标标记；兼容模式会按当前测试参数与活动标签筛选，最近平均取 10 次，24 小时最佳采用滚动时间窗。Typebar 原有的全部同类平均与今日平均仍保留。“上一轮速度”与自动沿用只保留在本次应用运行中。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Picker("键盘提示模式", selection: $settings.keyboardGuideMode) {
+          Picker("键盘提示模式", selection: keyboardGuidePreferences.mode) {
             ForEach(KeyboardGuideMode.allCases) { mode in
               Text(mode.displayName).tag(mode)
             }
@@ -794,9 +798,9 @@ struct PreferencesView: View {
           Text("静态只显示布局；按键反馈会短暂标记刚按下的键（错误为红色）；下一键标记目标键。Simon 指令始终使用下一键。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          if settings.keyboardGuideMode != .off {
+          if settings.preferenceKeyboardGuideMode != .off {
             Slider(
-              value: $settings.keyboardGuideScale,
+              value: keyboardGuidePreferences.scale,
               in: KeyboardGuideScalePolicy.range,
               step: 0.1
             ) {
@@ -809,7 +813,7 @@ struct PreferencesView: View {
             Text("\(settings.keyboardGuideScale, format: .number.precision(.fractionLength(1)))×")
               .font(.caption)
               .foregroundStyle(.secondary)
-            Picker("键盘图例", selection: $settings.keyboardGuideLegendStyle) {
+            Picker("键盘图例", selection: keyboardGuidePreferences.legend) {
               ForEach(KeyboardGuideLegendStyle.allCases) { style in
                 Text(style.displayName).tag(style)
               }
@@ -817,7 +821,7 @@ struct PreferencesView: View {
             Text("动态图例跟随 Shift 与 Caps Lock；Option 图层继续交给 macOS 原生输入处理。")
               .font(.caption)
               .foregroundStyle(.secondary)
-            Picker("键盘按键", selection: $settings.keyboardGuideKeysMode) {
+            Picker("键盘按键", selection: keyboardGuidePreferences.keys) {
               ForEach(KeyboardGuideKeysMode.allCases) { keysMode in
                 Text(keysMode.displayName).tag(keysMode)
               }
@@ -825,7 +829,7 @@ struct PreferencesView: View {
             Text("精简档只在所选布局要求或下一键为数字时显示数字行；完整档增加不可输入的功能键图示。")
               .font(.caption)
               .foregroundStyle(.secondary)
-            Picker("键盘样式", selection: $settings.keyboardGuideStyle) {
+            Picker("键盘样式", selection: keyboardGuidePreferences.style) {
               ForEach(KeyboardGuideStyle.allCases) { style in
                 Text(style.displayName).tag(style)
               }
@@ -834,13 +838,13 @@ struct PreferencesView: View {
               .font(.caption)
               .foregroundStyle(.secondary)
           }
-          Picker("键盘图来源", selection: $settings.keyboardGuideLayoutSource) {
+          Picker("键盘图来源", selection: keyboardGuidePreferences.layoutSource) {
             ForEach(KeyboardGuideLayoutSource.allCases) { source in
               Text(source.displayName).tag(source)
             }
           }
           if settings.keyboardGuideLayoutSource == .builtIn {
-            Picker("内置键盘布局", selection: $settings.keyboardLayout) {
+            Picker("内置键盘布局", selection: keyboardGuidePreferences.layout) {
               ForEach(KeyboardLayout.allCases) { layout in
                 Text(layout.displayName).tag(layout)
               }
@@ -2487,7 +2491,9 @@ struct PreferencesView: View {
       set: { layoutID in
         guard layoutID != settings.customKeyboardLayoutID else { return }
         guard acceptsCustomKeyboardLayoutMutation(settings: settings) else { return }
+        KeyboardGuidePreferenceApplication.enableForAppearanceChange(settings)
         settings.customKeyboardLayoutID = layoutID
+        settings.preferenceConfigurationSaves.deliver()
       }
     )
   }

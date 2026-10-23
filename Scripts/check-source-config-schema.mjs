@@ -9,8 +9,9 @@ import {execFileSync} from 'node:child_process';
 const root = path.resolve(process.argv[2] ?? '');
 const zodRoot = process.env.TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT;
 const runtimeMode = process.argv[3] === '--runtime-projection';
+const keyboardMode = process.argv[3] === '--keyboard-confirmations';
 const funboxMode = process.argv[3] === '--funbox-admission';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode);
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -132,7 +133,7 @@ if (funboxMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode) {
+} else if (runtimeMode || keyboardMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -144,6 +145,26 @@ if (funboxMode) {
     return blocked;
   };
   const setters = await load(path.join(frontend, 'config/setters.ts'));
+  if (keyboardMode) {
+    const fixtures = [];
+    const options = {
+      keymapMode: ['off', 'static', 'react', 'next'],
+      keymapStyle: configSchemas.ConfigSchema.shape.keymapStyle.options,
+      keymapLegendStyle: configSchemas.ConfigSchema.shape.keymapLegendStyle.options,
+      keymapKeys: configSchemas.ConfigSchema.shape.keymapKeys.options,
+      keymapSize: [0.5, 1.4, 3.5], keymapLayout: ['qwerty', 'dvorak', 'overrideSync'],
+    };
+    for (const mode of ['off', 'static', 'react', 'next']) for (const noQuit of [false, true])
+      for (const [key, values] of Object.entries(options)) for (const value of values) {
+        Object.assign(simulation.Config, structuredClone(defaults), {keymapMode: mode, funbox: noQuit ? ['no_quit'] : []});
+        simulation.events = []; simulation.saves = [];
+        const accepted = setters.setConfig(key, value);
+        fixtures.push({mode, noQuit, key, value, accepted, resultMode: simulation.Config.keymapMode,
+          resultValue: simulation.Config[key], events: simulation.events.map(event => event.key), saves: simulation.saves});
+      }
+    verify();
+    console.log(JSON.stringify(fixtures));
+  } else {
   Object.assign(context, {Config: simulation.Config, configEvent: bus,
     getDefaultConfig: () => structuredClone(defaults), migrateConfig: migration.migrateConfig,
     typedKeys: Object.keys, setConfig: setters.setConfig,
@@ -193,6 +214,7 @@ if (funboxMode) {
   for (const funbox of [['read_ahead', 'read_ahead_hard'], ['mirror', 'round_round_baby'], ['tts', 'simon_says']]) await add({funbox});
   verify();
   console.log(JSON.stringify(transport({defaults, catalogs, orderedKeys: Object.keys(defaults), fixtures})));
+  }
 } else {
 const fixtures = [];
 function add(input) {

@@ -1068,9 +1068,19 @@ enum KeyboardGuideScalePolicy {
   static func apply(_ value: Double, to settings: AppSettings,
     onConfigurationSave: () -> Void = {}) -> Bool {
     guard isValidInput(value) else { return false }
+    KeyboardGuidePreferenceApplication.enableForAppearanceChange(settings)
     settings.keyboardGuideScale = value
     onConfigurationSave()
     return true
+  }
+}
+
+enum KeyboardGuidePreferenceApplication {
+  @MainActor
+  static func enableForAppearanceChange(_ settings: AppSettings) {
+    if settings.preferenceKeyboardGuideMode == .off {
+      settings.keyboardGuideMode = .staticGuide
+    }
   }
 }
 

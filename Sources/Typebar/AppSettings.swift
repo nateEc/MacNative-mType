@@ -3149,4 +3149,8 @@ final class AppSettings {
   var preferenceTestModifiers: [TestModifier] {
     preferenceConfigurationSaves.requestedModifiers ?? testModifiers
   }
+
+  var preferenceKeyboardGuideMode: KeyboardGuideMode {
+    preferenceConfigurationSaves.keyboardGuideMode ?? effectiveKeyboardGuideMode
+  }
 }

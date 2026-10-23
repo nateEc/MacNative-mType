@@ -207,7 +207,7 @@ final class PreferenceConfigurationSaveTests: XCTestCase {
     XCTAssertTrue(app.contains("@State private var preferenceConfigurationOwner = UUID()"))
     XCTAssertTrue(
       app.contains(
-        "settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,\n        requestedModifiers: { practiceRequestedModifiers }, selectedLanguage: { language }) {\n        persistExplicitTestConfiguration()"
+        "settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,\n        requestedModifiers: { practiceRequestedModifiers }, selectedLanguage: { language },\n        keyboardGuideMode: { challengeLiveConfiguration.keyboardGuideMode(settings: settings) }) {\n        persistExplicitTestConfiguration()"
       ))
     XCTAssertTrue(
       app.contains(
