@@ -64,6 +64,20 @@ struct SavedTestPreset: Codable, Equatable {
         return copy
     }
 
+    /// User library capture is separate from challenge setup/restoration.
+    func capturedForLibrary(settingGroups: Set<PresetSettingGroup>?) -> Self {
+        var copy = with(settingGroups: settingGroups)
+        copy.configuration.challengeID = nil
+        // This challenge renders these nosave fields outside the global
+        // snapshot. Capture their values, never the challenge qualification.
+        if configuration.challengeID == "ten-words-of-pain", copy.settingsSnapshot != nil {
+            copy.settingsSnapshot?.installedPracticeFontName = WingdingsChallengeFont.familyName
+            copy.settingsSnapshot?.showKeyboardGuide = false
+            copy.settingsSnapshot?.keyboardGuideMode = .off
+        }
+        return copy
+    }
+
     var summaryDescription: String {
         switch configuration.mode {
         case .time: configuration.isInfinite ? "时间 · 无限" : "时间 · \(Int(configuration.duration ?? 0)) 秒"
@@ -232,7 +246,7 @@ struct PresetLibraryView: View {
     }
 
     private func save() {
-        let definition = currentPreset.with(
+        let definition = currentPreset.capturedForLibrary(
             settingGroups: isPartial ? selectedGroups : nil)
         do {
             let record = try TestPresetRecord(
@@ -346,7 +360,7 @@ private struct PresetEditorView: View {
 
     private func save() {
         let definition: SavedTestPreset? = updateConfiguration
-            ? currentPreset.with(settingGroups: isPartial ? selectedGroups : nil)
+            ? currentPreset.capturedForLibrary(settingGroups: isPartial ? selectedGroups : nil)
             : nil
         guard record.update(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines), definition: definition) else {

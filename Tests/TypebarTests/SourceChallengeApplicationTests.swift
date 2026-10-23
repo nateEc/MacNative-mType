@@ -78,6 +78,153 @@ final class SourceChallengeApplicationTests: XCTestCase {
     }
   }
 
+  func testLibraryCaptureOfSourceChallengeAppliesAsOrdinaryPresetWithoutQualification() throws {
+    try withSettings { settings, defaults in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "clean-twenty-five"))
+      var template = challenge.preset
+      template.configuration = template.configuration.with(challengeID: challenge.id)
+      let configuration = try apply(template, to: settings)
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      let current = SavedTestPreset(configuration: configuration, customText: template.customText,
+        activeResultTags: ["captured"], settingsSnapshot: live.snapshot(settings: settings))
+      let beforeCapture = defaults.dictionaryRepresentation() as NSDictionary
+      let capture = current.capturedForLibrary(settingGroups: nil)
+      XCTAssertNil(capture.configuration.challengeID)
+      XCTAssertEqual(capture.configuration, current.configuration.with(challengeID: nil))
+      XCTAssertEqual(capture.settingsSnapshot, current.settingsSnapshot)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, beforeCapture)
+      let record = try TestPresetRecord(name: "From challenge", definition: capture)
+      let incoming = try XCTUnwrap(record.applicableDefinition)
+      let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(incoming, to: settings,
+        appliesGlobalSettings: true))
+      XCTAssertTrue(PresetSettingsApplication.commit(original: prepared.preset, resolved: prepared.preset,
+        configuration: prepared.preset.configuration, to: settings, appliesGlobalSettings: true,
+        expectedSourceState: prepared.baseline))
+      XCTAssertEqual(settings.difficulty, configuration.difficulty)
+      XCTAssertEqual(settings.activeResultTags, ["captured"])
+      var session = TestSessionFactory.make(configuration: prepared.preset.configuration)
+      session.insertBatch(session.prompt, at: Date(timeIntervalSince1970: 100))
+      let result = try XCTUnwrap(session.result())
+      XCTAssertEqual(result.outcome, .completed)
+      XCTAssertNil(result.configuration.challengeID)
+      XCTAssertEqual(current.configuration.challengeID, challenge.id)
+    }
+  }
+
+  func testLibraryCapturePreservesAllSelectedGroupsAndPayloadWithoutMutatingSource() throws {
+    try withSettings { settings, defaults in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+      var template = challenge.preset
+      template.configuration = template.configuration.with(challengeID: challenge.id)
+      let configuration = try apply(template, to: settings)
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      let current = SavedTestPreset(configuration: configuration, quoteID: "owned-id", customText: "owned text",
+        activeResultTags: ["owned"], settingsSnapshot: live.snapshot(settings: settings))
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      let all = PresetSettingGroup.allCases
+      for mask in 0..<(1 << all.count) {
+        let groups = Set(all.enumerated().compactMap { mask & (1 << $0.offset) == 0 ? nil : $0.element })
+        let captured = current.capturedForLibrary(settingGroups: groups)
+        var expected = current.with(settingGroups: groups)
+        expected.configuration.challengeID = nil
+        XCTAssertEqual(captured, expected)
+        XCTAssertEqual(try LocalPresetCodec.decode(LocalPresetCodec.encode(captured)), captured)
+      }
+      XCTAssertEqual(current.configuration.challengeID, challenge.id)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+      let ordinary = current.capturedForLibrary(settingGroups: nil)
+      XCTAssertEqual(ordinary.capturedForLibrary(settingGroups: nil), ordinary)
+    }
+  }
+
+  func testWingdingsLibraryCaptureKeepsVisibleFontAndGuideWithoutChallengeIdentity() throws {
+    try withSettings { settings, _ in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "ten-words-of-pain"))
+      var template = challenge.preset
+      template.configuration = template.configuration.with(challengeID: challenge.id)
+      let configuration = try apply(template, to: settings)
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      var snapshot = live.snapshot(settings: settings)
+      snapshot.showKeyboardGuide = true
+      snapshot.keyboardGuideMode = .next
+      let current = SavedTestPreset(configuration: configuration, settingsSnapshot: snapshot)
+      let capture = current.capturedForLibrary(settingGroups: nil)
+      XCTAssertNil(capture.configuration.challengeID)
+      XCTAssertEqual(capture.settingsSnapshot?.installedPracticeFontName, WingdingsChallengeFont.familyName)
+      XCTAssertEqual(capture.settingsSnapshot?.showKeyboardGuide, false)
+      XCTAssertEqual(capture.settingsSnapshot?.keyboardGuideMode, .off)
+      XCTAssertEqual(current.settingsSnapshot, snapshot)
+      let record = try TestPresetRecord(name: "Symbols", definition: capture)
+      let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(try XCTUnwrap(record.applicableDefinition),
+        to: settings, appliesGlobalSettings: true))
+      XCTAssertTrue(PresetSettingsApplication.commit(original: prepared.preset, resolved: prepared.preset,
+        configuration: prepared.preset.configuration, to: settings, appliesGlobalSettings: true,
+        expectedSourceState: prepared.baseline))
+      XCTAssertEqual(settings.installedPracticeFontName, WingdingsChallengeFont.familyName)
+      XCTAssertEqual(settings.effectiveKeyboardGuideMode, .off)
+    }
+  }
+
+  func testPartialChallengeCapturesApplyOnlyOwnedFieldsToAnOrdinaryTest() throws {
+    for group in PresetSettingGroup.allCases {
+      try withSettings { settings, _ in
+        let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+        var template = challenge.preset
+        template.configuration = template.configuration.with(challengeID: challenge.id)
+        let configuration = try apply(template, to: settings)
+        var live = ChallengeLiveConfigurationState()
+        XCTAssertTrue(live.install(configuration, settings: settings))
+        let capture = SavedTestPreset(configuration: configuration, activeResultTags: ["captured"],
+          settingsSnapshot: live.snapshot(settings: settings)).capturedForLibrary(settingGroups: [group])
+        let record = try TestPresetRecord(name: group.rawValue, definition: capture)
+        let incoming = try XCTUnwrap(record.applicableDefinition)
+        let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(incoming, to: settings,
+          appliesGlobalSettings: true))
+        var ordinaryConfiguration = TestConfiguration.words(3, difficulty: settings.difficulty,
+          rules: settings.inputRules)
+        ordinaryConfiguration.englishVariant = settings.englishVariant
+        let ordinary = SavedTestPreset(configuration: ordinaryConfiguration,
+          activeResultTags: settings.activeResultTags, settingsSnapshot: settings.snapshot)
+        let resolved = PresetApplicationPolicy.applying(current: ordinary, preset: prepared.preset)
+        XCTAssertTrue(PresetSettingsApplication.commit(original: prepared.preset, resolved: resolved,
+          configuration: resolved.configuration, to: settings, appliesGlobalSettings: true,
+          expectedSourceState: prepared.baseline), group.rawValue)
+        XCTAssertNil(resolved.configuration.challengeID)
+        XCTAssertEqual(resolved.configuration.mode, group == .test ? configuration.mode : .words)
+        XCTAssertEqual(settings.difficulty, group == .behavior ? configuration.difficulty : .expert)
+        XCTAssertEqual(settings.testModifiers, group == .behavior ? configuration.modifiers : [])
+        XCTAssertEqual(settings.activeResultTags, group == .behavior ? ["captured"] : [])
+      }
+    }
+  }
+
+  func testLegacyAndOrdinaryCapturesDoNotAdoptSourceOrMutateTheirInput() throws {
+    let original = SavedTestPreset(configuration: .words(25).with(challengeID: "clean-twenty-five"),
+      activeResultTags: ["legacy"], settingsSnapshot: .init())
+    let captured = original.capturedForLibrary(settingGroups: [.test, .behavior])
+    XCTAssertNil(captured.configuration.challengeID)
+    XCTAssertNil(captured.configuration.rules.thresholdSource)
+    XCTAssertNil(captured.settingsSnapshot?.thresholdSource)
+    XCTAssertEqual(captured.activeResultTags, original.activeResultTags)
+    XCTAssertEqual(try LocalPresetCodec.decode(LocalPresetCodec.encode(captured)), captured)
+    XCTAssertEqual(original.configuration.challengeID, "clean-twenty-five")
+    var ordinary = original
+    ordinary.configuration.challengeID = nil
+    XCTAssertEqual(ordinary.capturedForLibrary(settingGroups: nil), ordinary)
+  }
+
+  func testNewAndUpdatedPresetUIUseOrdinaryLibraryCapture() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TestPresets.swift"),
+      encoding: .utf8)
+    XCTAssertEqual(source.components(separatedBy: "currentPreset.capturedForLibrary(").count - 1, 2)
+    XCTAssertFalse(source.contains("currentPreset.with("))
+  }
+
   func testEveryCanonicalSourceLibraryRecordIsAvailableWithoutChangingStoredBytes() throws {
     try withSettings { settings, _ in
       for challenge in TypebarChallengeLibrary.all {
