@@ -245,8 +245,10 @@ import XCTest
       window.close()
       withExtendedLifetime(container) {}
     }
-    let deadline = Date().addingTimeInterval(20)
-    while layoutCalls < 1 && Date() < deadline { flush() }
+    let started = Date()
+    let initialDeadline = Date().addingTimeInterval(20)
+    while layoutCalls < 1 && Date() < initialDeadline { flush() }
+    print("geometry first layout checkpoint: elapsed=\(Date().timeIntervalSince(started)) pending=\(pendingLayouts.count)")
     XCTAssertEqual(generationCalls, 1)
     XCTAssertEqual(layoutCalls, 1)
     let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
@@ -256,14 +258,22 @@ import XCTest
     XCTAssertTrue(settings.allowsRestartingConfigurationChange)
     settings.fontSize = 36
     flush()
+    print("geometry old layout release: elapsed=\(Date().timeIntervalSince(started)) pending=\(pendingLayouts.count)")
+    _ = try XCTUnwrap(pendingLayouts.first, "Initial layout continuation must exist")
+    // Each controlled release starts a different asynchronous stage. The
+    // preceding stage must not consume this stage's bounded wait budget.
+    let replacementDeadline = Date().addingTimeInterval(20)
     pendingLayouts.removeFirst().resume()
-    while layoutCalls < 2 && Date() < deadline { flush() }
+    while layoutCalls < 2 && Date() < replacementDeadline { flush() }
+    print("geometry second layout checkpoint: elapsed=\(Date().timeIntervalSince(started)) pending=\(pendingLayouts.count)")
     XCTAssertEqual(generationCalls, 1)
     XCTAssertEqual(layoutCalls, 2)
     XCTAssertFalse(target().contains("staged"))
     XCTAssertTrue(settings.allowsRestartingConfigurationChange)
+    _ = try XCTUnwrap(pendingLayouts.first, "Replacement layout continuation must exist")
+    let publicationDeadline = Date().addingTimeInterval(20)
     pendingLayouts.removeFirst().resume()
-    while target() != expected && Date() < deadline { flush() }
+    while target() != expected && Date() < publicationDeadline { flush() }
     XCTAssertEqual(target(), expected)
     XCTAssertTrue(views(PromptFieldNativeView.self, in: host).first?.usedPreparedLayout == true)
   }
