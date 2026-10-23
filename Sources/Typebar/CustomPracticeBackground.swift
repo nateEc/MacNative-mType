@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 import SwiftUI
 
@@ -93,6 +94,33 @@ final class TypebarLocalBackgroundStore {
     return memoryData.flatMap(NSImage.init(data:))
   }
 
+  /// nil means absent, not present-but-undecodable. Reads at most maximumBytes + 1.
+  func encodedData(maximumBytes: Int = 64 * 1024 * 1024) throws -> Data? {
+    guard maximumBytes > 0, maximumBytes < Int.max else { throw LocalBackgroundError.invalidLimit }
+    guard let fileURL else {
+      guard let memoryData else { return nil }
+      guard memoryData.count <= maximumBytes else { throw LocalBackgroundError.resourceLimit }
+      return memoryData.withUnsafeBytes { Data($0) }
+    }
+    let descriptor = Darwin.open(fileURL.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+    guard descriptor >= 0 else {
+      if errno == ENOENT { return nil }
+      throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+    }
+    let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+    defer { try? handle.close() }
+    var info = stat()
+    guard fstat(descriptor, &info) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+    guard info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw LocalBackgroundError.unsupportedFile }
+    guard info.st_size >= 0, info.st_size <= maximumBytes else { throw LocalBackgroundError.resourceLimit }
+    var data = Data()
+    while let chunk = try handle.read(upToCount: min(64 * 1024, maximumBytes - data.count + 1)), !chunk.isEmpty {
+      guard chunk.count <= maximumBytes - data.count else { throw LocalBackgroundError.resourceLimit }
+      data.append(chunk)
+    }
+    return data
+  }
+
   func save(_ data: Data) throws {
     guard NSImage(data: data) != nil else { throw LocalBackgroundError.unsupportedImage }
     guard let directoryURL, let fileURL else {
@@ -123,11 +151,15 @@ final class TypebarLocalBackgroundStore {
 enum LocalBackgroundError: LocalizedError {
   case unsupportedImage
   case unexpectedDirectory
+  case unsupportedFile, resourceLimit, invalidLimit
 
   var errorDescription: String? {
     switch self {
     case .unsupportedImage: "请选择 macOS 可以读取的图片文件。"
     case .unexpectedDirectory: "本地背景路径不是图片文件；已保留该目录，请检查后重试。"
+    case .unsupportedFile: "本地背景必须是普通文件；未读取链接或特殊文件。"
+    case .resourceLimit: "背景文件超过读取大小限额。"
+    case .invalidLimit: "背景文件读取限额无效。"
     }
   }
 }
@@ -141,21 +173,24 @@ struct CustomPracticeBackground: View {
   let filter: CustomBackgroundFilter
   let localImageRevision: Int
   let localBackgroundStore: TypebarLocalBackgroundStore
+  @State var loader = CustomBackgroundImageLoader()
+
+  private struct LoadIdentity: Hashable {
+    let address: String
+    let revision: Int
+    let store: ObjectIdentifier
+  }
 
   var body: some View {
     ZStack {
       PracticeBackdrop(style: fallbackStyle, theme: theme, reduceMotion: reduceMotion)
-      if let localImage = localBackgroundStore.image() {
-        filtered(Image(nsImage: localImage))
-      } else if let url = URL(string: remoteURL), !remoteURL.isEmpty {
-        AsyncImage(url: url) { phase in
-          if case .success(let image) = phase { filtered(image) }
-        }
-      }
+      if let image = loader.image { filtered(Image(nsImage: image)) }
     }
-    // Read the revision so a newly imported or removed local image invalidates
-    // this view without serializing the user's image into settings archives.
-    .id(localImageRevision)
+    .task(id: LoadIdentity(address: remoteURL, revision: localImageRevision,
+      store: ObjectIdentifier(localBackgroundStore))) {
+      await loader.load(remoteURL: remoteURL, local: { try localBackgroundStore.encodedData() })
+    }
+    .onDisappear { loader.clear() }
     .accessibilityHidden(true)
     .allowsHitTesting(false)
   }

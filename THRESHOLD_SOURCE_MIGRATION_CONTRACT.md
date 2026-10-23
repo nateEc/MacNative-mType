@@ -1,5 +1,17 @@
 # 阈值源状态与迁移契约
 
+## 原始背景字节到现有显示桥（追加阶段）
+
+检查生产 CustomPracticeBackground 时发现它按 NSImage 解码成功与否选择本地／远端，而固定 source::applyCustomBackground 按本地条目是否 undefined 选择，坏本地不允许借用远端。生产加载桥必须先取得有界的原始本地快照；nil 才表示不存在，空字节、解码失败、权限或其他读取失败不能转换为 nil。读取本应用固定背景文件时不跟随最终符号链接、不阻塞特殊文件，并在打开后检查常规文件身份；这不是对任意父目录／外部写者的文件沙箱保证。
+
+远端改用 [URLSession.AsyncBytes](https://developer.apple.com/documentation/foundation/urlsession/asyncbytes) 的流式读取，检查 HTTP 状态、声明长度和实际累计字节；取消或超额时取消其公开 [task](https://developer.apple.com/documentation/foundation/urlsession/asyncbytes/task)。默认临时 session 不共享缓存、cookie 或凭据存储，不持久化响应；不会把背景请求附上账号认证。仅主动配置的 HTTP(S) 图片地址进入此旧界面桥，全部源 URL／数据格式兼容仍须全配置宿主另行处理。输出字节限额不等同 Foundation 内部缓冲、解码或进程内存的硬隔离。
+
+每次加载／清除建立新代次，异步返回后同时检查取消与代次；本地读取回调重入也不能让旧调用覆盖新状态。取消不是加载失败通知，旧错误不能擦除新图片。现有 SwiftUI 背景用按 URL／本地 revision／store 身份绑定的 task 消费该桥，消失时清除；滤镜或适配变化不应重新发起下载。取得的原始编码容器保留在桥内，供后续帧管线消费。
+
+这里仍是旧属性驱动界面适配，不是全部 source 事件映射：完整配置宿主以后还必须为“同 URL 再次 applyCustomBackground 创建新 img”传入应用代次，不能用 URL 相同或解码缓存命中作为复用图片寿命的依据。Observable 桥供稳定 MainActor UI 入口使用，不是观察回调内提交配置的事务寄存器；新文件 CAS／资源联合发布仍须走既有严格协调器。读取／解码失败和配额错误保存在桥中，设置页失败反馈与完整源通知事件尚待接通。
+
+此阶段保留已有 NSImage 与 SwiftUI 绘制／滤镜，避免在完整宿主尚未准备时丢失已有原生可显示格式；不把它当作 Monkeytype 像素、动画、全配置文件 CAS 后发布、raw URL、几何／rem 或全部 SVG 等格式验收。新资源／布局／滤镜／动画原语还需使用保留字节接入视口宿主；该缺口明确保留，不能因加载桥已进入生产就声称背景重写完成。
+
 ## 动画任务与资源寿命（追加阶段）
 
 BackgroundPlayer 在 MainActor 接受已准备 Playback，立即交付初帧，按时间线的下一次变化安排单个可取消 Task，而非创建固定刷新率的常驻计时器。正式时钟使用 [ContinuousClock](https://developer.apple.com/documentation/swift/continuousclock)，等待使用 [Task.sleep(for:tolerance:clock:)](https://developer.apple.com/documentation/swift/task/sleep(for:tolerance:clock:))，不占用等待线程。长期帧以最多 60 秒的检查点重新投影，不把可能巨大的元数据时长转换成整数纳秒；检查点若仍为同帧，不重复交付，也不重置时间原点。
