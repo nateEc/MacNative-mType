@@ -107,8 +107,16 @@ function transport(value) {
   return value;
 }
 if (defaultsMode) {
+  function alternatives(rule) {
+    if (rule instanceof zod.ZodBoolean) return [false, true];
+    if (rule instanceof zod.ZodEnum) return rule.options;
+    if (rule instanceof zod.ZodLiteral) return [rule.value];
+    if (rule instanceof zod.ZodUnion) return rule.options.flatMap(alternatives);
+    return [];
+  }
+  const choices = Object.fromEntries(Object.entries(configSchemas.ConfigSchema.shape).map(([key, rule]) => [key, alternatives(rule)]));
   verify();
-  console.log(JSON.stringify({defaults, catalogs, orderedKeys: Object.keys(defaults)}));
+  console.log(JSON.stringify({defaults, catalogs, choices, orderedKeys: Object.keys(defaults)}));
 } else if (funboxMode) {
   const funbox = await load(path.join(root, 'packages/funbox/src/index.ts'));
   const metadata = (await load(path.join(frontend, 'config/metadata.tsx'))).configMetadata;
