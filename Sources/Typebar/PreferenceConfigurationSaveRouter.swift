@@ -1,7 +1,9 @@
 import Foundation
+import Observation
 
 /// Synchronous delivery to one live practice window, never a broadcast or a saved setting.
 @MainActor
+@Observable
 final class PreferenceConfigurationSaveRouter {
   private var handlers: [UUID: () -> Void] = [:]
   private var modifierProviders: [UUID: () -> [TestModifier]] = [:]

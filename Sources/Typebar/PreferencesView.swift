@@ -953,7 +953,7 @@ struct PreferencesView: View {
           Text("默认使用 macOS 当前输入法；只有明确选择模拟时才会接管物理按键。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          if settings.testModifiers.contains(.layoutFluid) {
+          if settings.preferenceTestModifiers.contains(.layoutFluid) {
             VStack(alignment: .leading, spacing: 8) {
               Text("布局流动序列")
                 .font(.subheadline.weight(.medium))
@@ -2508,9 +2508,9 @@ struct PreferencesView: View {
 
   private func modifierBinding(_ modifier: TestModifier, settings: AppSettings) -> Binding<Bool> {
     Binding(
-      get: { settings.testModifiers.contains(modifier) },
+      get: { settings.preferenceTestModifiers.contains(modifier) },
       set: { enabled in
-        guard enabled != settings.testModifiers.contains(modifier) else { return }
+        guard enabled != settings.preferenceTestModifiers.contains(modifier) else { return }
         guard acceptsRestartingConfigurationChange() else { return }
         guard settings.toggleTestModifier(modifier) else {
           funboxSelectionMessage = "\(modifier.displayName) 与当前趣味修饰器组合不兼容；已保留现有选择。"
