@@ -36,6 +36,24 @@ final class WebsiteFunboxAdmissionTests: XCTestCase {
     XCTAssertEqual(output.admissions.count, 48)
     XCTAssertEqual(output.combined.count, 11_520)
     var failures: [String] = []
+    let nativeTargets = Dictionary(uniqueKeysWithValues:
+      zip(FunboxCommandCatalog.officialNames, FunboxCommandCatalog.targets).compactMap { name, target in
+        if case .modifier(let modifier) = target { return (name, modifier) }
+        return nil
+      })
+    var nativeFailures: [String] = []
+    for fixture in output.compatibility {
+      // Native selections are sets; website import duplicates and polyglot's
+      // separate language selection have distinct contracts.
+      guard Set(fixture.names).count == fixture.names.count,
+        fixture.names.allSatisfy({ nativeTargets[$0] != nil }) else { continue }
+      let modifiers = fixture.names.compactMap { nativeTargets[$0] }
+      if TestModifierPolicy.isSourceCompatible(modifiers) != fixture.accepted {
+        nativeFailures.append("\(fixture.names)")
+      }
+    }
+    XCTAssertTrue(nativeFailures.isEmpty,
+      "\(nativeFailures.count) native selection mismatches; first: \(Array(nativeFailures.prefix(12)))")
     for fixture in output.compatibility where WebsiteFunboxAdmission.areCompatible(fixture.names) != fixture.accepted {
       failures.append("compatibility \(fixture.names)")
     }
@@ -55,6 +73,37 @@ final class WebsiteFunboxAdmissionTests: XCTestCase {
       }
     }
     XCTAssertTrue(failures.isEmpty, "\(failures.count) mismatches; first: \(Array(failures.prefix(12)))")
+  }
+
+  func testListeningSelectionRetainsSpeakableLanguageIndependentProviders() {
+    let speakable: [TestModifier] = [.accountingStream, .binaryStream, .hexadecimalStream,
+      .arrowStream, .ipv4Stream, .ipv6Stream, .poetryStream, .referenceStream,
+      .morseStream, .underscoreSeparators]
+    for provider in speakable {
+      XCTAssertTrue(TestModifierPolicy.acceptsInteractiveModifierAddition(provider, to: [.listening]), "\(provider)")
+      XCTAssertTrue(TestModifierPolicy.acceptsInteractiveModifierAddition(.listening, to: [provider]), "\(provider)")
+      XCTAssertEqual(Set(TestModifierPolicy.normalized([.listening, provider])), Set([.listening, provider]))
+      XCTAssertEqual(Set(TestModifierPolicy.toggling(provider, in: [.listening])), Set([.listening, provider]))
+      XCTAssertEqual(Set(TestModifierPolicy.toggling(.listening, in: [provider])), Set([.listening, provider]))
+    }
+    for provider: TestModifier in [.gibberishStream, .asciiStream, .specialCharacterStream, .pseudolangStream, .symbolStream] {
+      XCTAssertFalse(TestModifierPolicy.acceptsInteractiveModifierAddition(provider, to: [.listening]))
+      XCTAssertEqual(TestModifierPolicy.normalized([.listening, provider]), [.listening])
+    }
+  }
+
+  func testListeningProvidersSurviveSessionConstructionAndCompleteTheirTargets() {
+    for provider: TestModifier in [.binaryStream, .accountingStream, .ipv4Stream,
+      .arrowStream, .morseStream, .underscoreSeparators] {
+      let configuration = TestConfiguration.words(3).with(modifiers: [.listening, provider])
+      XCTAssertEqual(Set(configuration.modifiers), Set([.listening, provider]))
+      var session = TestSessionFactory.make(configuration: configuration)
+      XCTAssertEqual(Set(session.configuration.modifiers), Set([.listening, provider]))
+      XCTAssertFalse(session.prompt.isEmpty)
+      session.insert(session.prompt, at: Date(timeIntervalSinceReferenceDate: 920_400_000))
+      XCTAssertTrue(session.isFinished, "\(provider)")
+      XCTAssertEqual(session.completedWordCount, 3, "\(provider)")
+    }
   }
 
   func testTypedBoundariesReplacementAndDormantLimits() {

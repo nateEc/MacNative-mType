@@ -1070,6 +1070,11 @@ enum TestModifierPolicy {
     .readAheadEasy, .readAhead, .readAheadHard,
   ]
   private static let sourceFrequencyModifiers: Set<TestModifier> = [.zipf, .weakSpot]
+  private static let unspeakableModifiers: Set<TestModifier> = [
+    .gibberishStream, .asciiStream, .specialCharacterStream, .pseudolangStream,
+    // Preserve the native-only symbol provider's existing listening boundary.
+    .symbolStream,
+  ]
   private static let sourceCapitalisationModifiers: Set<TestModifier> = [
     .uppercase, .titleCase, .alternatingCase, .randomCase, .messagingStyle,
   ]
@@ -1170,7 +1175,8 @@ enum TestModifierPolicy {
     guard !(changesFrequency && ignoresLanguage) else { return false }
 
     let speaks = selected.contains(.listening)
-    guard !(speaks && ignoresLanguage) else { return false }
+    let isUnspeakable = !selected.isDisjoint(with: unspeakableModifiers)
+    guard !(speaks && isUnspeakable && ignoresLanguage) else { return false }
 
     let pushesWords = selected.contains(.focusCurrentWord)
       || selected.contains(.focusNextWord)
