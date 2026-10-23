@@ -4334,13 +4334,14 @@ private struct ContentView: View {
       reportFunboxConfigurationConflict("自选多语与当前趣味修饰器组合不兼容；已保留现有选择。")
       return false
     }
-    polyglotReturnLanguage = nil
+    polyglotReturnLanguage = PolyglotReturnLanguagePolicy.baseWhenSelecting(
+      requested, current: language, previous: polyglotReturnLanguage)
     language = requested
     persistExplicitTestConfiguration()
     return true
   }
 
-  private func acceptsFunboxConfiguration(_ modifiers: [TestModifier]) -> Bool {
+  private func acceptsFunboxConfiguration(_ modifiers: [TestModifier], language: TypingLanguage) -> Bool {
     guard TestModifierPolicy.acceptsModeSelection(mode, modifiers: modifiers, language: language) else {
       reportFunboxConfigurationConflict("当前模式不支持这个趣味模式；请先切换到兼容模式。")
       return false
@@ -5630,10 +5631,12 @@ private struct ContentView: View {
         }
         activeChallengeID = nil
         if language == .mixedLanguages {
-          language = PolyglotReturnLanguagePolicy.validated(polyglotReturnLanguage) ?? .english
+          language = PolyglotReturnLanguagePolicy.languageAfterDisabling(
+            current: language, base: polyglotReturnLanguage)
           polyglotReturnLanguage = nil
         } else {
-          polyglotReturnLanguage = PolyglotReturnLanguagePolicy.validated(language)
+          polyglotReturnLanguage = PolyglotReturnLanguagePolicy.baseWhenSelecting(
+            .mixedLanguages, current: language, previous: polyglotReturnLanguage)
           language = .mixedLanguages
         }
         persistExplicitTestConfiguration()
@@ -5655,13 +5658,15 @@ private struct ContentView: View {
           restartLockMessage = "当前无限测试不支持这个修饰器；请先选择有限时长或字数。"
           return
         }
-        guard acceptsFunboxConfiguration(updated) else { return }
+        let proposedLanguage = target == .clear
+          ? PolyglotReturnLanguagePolicy.languageAfterDisabling(
+            current: language, base: polyglotReturnLanguage)
+          : language
+        guard acceptsFunboxConfiguration(updated, language: proposedLanguage) else { return }
         settings.testModifiers = updated
         applyFiniteFunboxLimitIfNeeded(for: updated)
-        if target == .clear,
-           let returnLanguage = PolyglotReturnLanguagePolicy.validated(polyglotReturnLanguage)
-        {
-          language = returnLanguage
+        if target == .clear {
+          language = proposedLanguage
           polyglotReturnLanguage = nil
         }
         activeChallengeID = nil

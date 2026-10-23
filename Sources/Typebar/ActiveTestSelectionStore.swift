@@ -130,6 +130,16 @@ enum PolyglotReturnLanguagePolicy {
     guard let language, language != .mixedLanguages else { return nil }
     return language
   }
+
+  static func baseWhenSelecting(_ requested: TypingLanguage, current: TypingLanguage,
+    previous: TypingLanguage?) -> TypingLanguage? {
+    guard requested == .mixedLanguages else { return nil }
+    return current == .mixedLanguages ? validated(previous) : validated(current)
+  }
+
+  static func languageAfterDisabling(current: TypingLanguage, base: TypingLanguage?) -> TypingLanguage {
+    current == .mixedLanguages ? validated(base) ?? .english : current
+  }
 }
 
 enum ActiveTestSelectionPolicy {
