@@ -13,7 +13,8 @@ const keyboardMode = process.argv[3] === '--keyboard-confirmations';
 const importMode = process.argv[3] === '--import-preparation';
 const funboxMode = process.argv[3] === '--funbox-admission';
 const defaultsMode = process.argv[3] === '--default-profile';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode);
+const coldMode = process.argv[3] === '--cold-storage';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -27,7 +28,7 @@ const simulation = {Config: {}, events: [], saves: [], stores: [], gates: [], fl
 const noop = () => {};
 const context = vm.createContext({structuredClone, URL,
   document: {get readyState() { return simulation.flags.documentComplete ? 'complete' : 'loading'; }},
-  console: {warn: noop, error: noop, log: noop}});
+  console: {warn: noop, error: noop, log: noop, debug: noop}});
 const modules = new Map();
 const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
@@ -73,6 +74,8 @@ function resolve(id, importer) {
   if (id === '@monkeytype/util/numbers') return path.join(root, 'packages/util/src/numbers.ts');
   if (id === '@monkeytype/util/arrays') return path.join(root, 'packages/util/src/arrays.ts');
   if (id === '@monkeytype/util/json') return path.join(root, 'packages/util/src/json.ts');
+  if (id === '@monkeytype/util/trycatch') return path.join(root, 'packages/util/src/trycatch.ts');
+  if (id === '@monkeytype/util/zod') return path.join(root, 'packages/util/src/zod.ts');
   if (id === '@monkeytype/funbox') return path.join(root, 'packages/funbox/src/index.ts');
   if (id === '../events/config') return 'config-event-adapter';
   assert.ok(id.startsWith('.'), 'Unexpected import: ' + id);
@@ -98,7 +101,8 @@ const catalogs = {
   funboxes: (await load(path.join(schemas, 'configs.ts'))).FunboxNameSchema.options,
 };
 function transport(value) {
-  if (importMode && typeof value === 'string' && !value.isWellFormed()) {
+  if (coldMode && typeof value === 'number' && Object.is(value, -0)) return {$probeNumber:'-0'};
+  if ((importMode || coldMode) && typeof value === 'string' && !value.isWellFormed()) {
     return {$probeUTF16: Array.from({length: value.length}, (_, i) => value.charCodeAt(i))};
   }
   if (typeof value === 'number' && !Number.isFinite(value)) return {$probeNumber: String(value)};
@@ -150,7 +154,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -191,7 +195,71 @@ if (defaultsMode) {
   const from = lifecycle.indexOf('const lastConfigsToApply:'), to = lifecycle.indexOf('\nexport async function resetConfig(', from);
   assert.ok(from >= 0 && to > from);
   new vm.Script(stripTypeScriptTypes(lifecycle.slice(from, to).replace('export async function ', 'async function '), {mode: 'transform'})).runInContext(context);
-  if (importMode) {
+  if (coldMode) {
+    const Storage = (await load(path.join(frontend, 'utils/local-storage-with-schema.ts'))).LocalStorageWithSchema;
+    // Execute actual source storage/read/apply code; browser I/O and remote
+    // publication are controlled adapters, never a real browser or account.
+    const extract = (text, begin, end) => {
+      const a = text.indexOf(begin), b = text.indexOf(end, a);
+      assert.ok(a >= 0 && b > a, `Missing pinned method ${begin}`);
+      return text.slice(a, b).replace(/^export /gm, '');
+    };
+    vm.runInContext(stripTypeScriptTypes(extract(fs.readFileSync(path.join(frontend, 'utils/misc.ts'), 'utf8'),
+      'export function isObject(', '\nexport function prefersReducedMotion'), {mode:'transform'}), context);
+    const persistence = fs.readFileSync(path.join(frontend, 'config/persistence.ts'), 'utf8');
+    vm.runInContext(stripTypeScriptTypes('let configToSend = {};\n' + extract(persistence,
+      'export function saveToLocalStorage(', '\nexport function saveFullConfigToLocalStorage'), {mode:'transform'}), context);
+    const saveKey = context.saveToLocalStorage;
+    context.saveToLocalStorage = (...args) => {simulation.saves.push(args[0]); return saveKey(...args);};
+    context.saveToDatabase = noop; // Keep pending correction state; no timer/network.
+    vm.runInContext(stripTypeScriptTypes(extract(persistence, 'export function saveFullConfigToLocalStorage(', '\nconst saveToDatabase'), {mode:'transform'}), context);
+    vm.runInContext(stripTypeScriptTypes(extract(lifecycle, 'export async function loadFromLocalStorage(', '\nconst lastConfigsToApply'), {mode:'transform'}), context);
+    const fixtures = [];
+    async function add(json, flags = {}) {
+      Object.assign(simulation.Config, structuredClone(defaults));
+      simulation.flags = {authenticated:false, documentComplete:true, customThemeCount:0, development:false, ...flags};
+      simulation.events = []; simulation.saves = []; simulation.stores = []; simulation.gates = [];
+      vm.runInContext('configToSend = {};', context);
+      let disk = json, loaded, migrated = false, finished = 0;
+      const writes = [];
+      context.window = {localStorage:{getItem:() => disk, setItem:(key, value) => {assert.equal(key, 'config'); disk = value; writes.push(value);}}};
+      const storage = new Storage({key:'config', schema:configSchemas.ConfigSchema, fallback:structuredClone(defaults),
+        migrate:value => {migrated = true; return context.isObject(value) ? migration.migrateConfig(value) : structuredClone(defaults);}});
+      context.configLS = {get:() => {const value = storage.get(); loaded = structuredClone(value); return value;}, set:value => storage.set(value)};
+      context.loadDone = () => finished++;
+      context.resetConfig = () => {throw new Error('Unexpected undefined ConfigSchema fallback');};
+      context.saveConfig = () => {throw new Error('Remote write attempted');};
+      context.setAccountButtonSpinner = () => {throw new Error('Remote spinner attempted');};
+      await context.loadFromLocalStorage();
+      assert.equal(finished, 1); assert.equal(simulation.stores.length, 1);
+      const fixture = {json, flags:simulation.flags, loaded, migrated, writes, disk,
+        requested:simulation.stores[0], runtime:structuredClone(simulation.Config), rejectedKeys:simulation.saves, events:simulation.events,
+        pendingSync:vm.runInContext('structuredClone(configToSend)', context)};
+      fixtures.push(fixture);
+      return fixture;
+    }
+    for (const json of [null, '', ' ', '{', 'null', 'true', '17', '"owned"', '[]', '[{}]', '{}',
+      '{"quickTab":true}', '{"quickTab":true,"numbers":true}', '{"soundVolume":"0.5suffix"}',
+      '{"customBackground":"https://example.com/\\ud800.png"}', '{"customBackgroundFilter":[-0,1e400,-1e400,1]}']) await add(json);
+    for (const [key, value] of Object.entries(defaults)) {
+      await add(JSON.stringify({[key]:value}));
+      await add(JSON.stringify({...defaults, [key]:null}));
+    }
+    for (const authenticated of [false, true]) for (const documentComplete of [false, true]) {
+      for (const customThemeCount of [0, 2]) await add(JSON.stringify({...defaults, paceCaret:'tagPb',
+        randomTheme:'custom', quoteLength:[0,0,1], funbox:['rot13','rot13']}), {authenticated, documentComplete, customThemeCount});
+    }
+    for (const patch of [{future:123}, {quickTab:true}, {theme:'dracula',customTheme:true,autoSwitchTheme:true},
+      {accountChart:['off','off','on','off']}, {mode:'zen',numbers:true,punctuation:true}]) await add(JSON.stringify({...defaults, ...patch}));
+    for (const key of ['fontSize','tapeMargin','maxLineWidth']) {
+      for (const value of [{toString:0}, [{toString:0}], [[{toString:null}]]]) await add(JSON.stringify({[key]:value}));
+    }
+    for (const json of ['{"customBackgroundFilter":[-0,1e400,-1e400,1]}', '{']) {
+      const first = await add(json); await add(first.disk);
+    }
+    verify();
+    console.log(JSON.stringify(transport({defaults,catalogs,orderedKeys:Object.keys(defaults),schemaOrderedKeys:Object.keys(configSchemas.ConfigSchema.shape),fixtures})));
+  } else if (importMode) {
     const parser = await load(path.join(root, 'packages/util/src/json.ts'));
     const apply = context.applyConfig;
     let parsed, completeSaves = 0, success = 0, errors = 0;

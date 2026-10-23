@@ -10,7 +10,7 @@ struct WebsiteConfigCatalogs {
   var funboxes: Set<String>
 }
 
-enum WebsiteConfigSchemaError: Error { case invalidDefaults, cannotSanitize }
+enum WebsiteConfigSchemaError: Error { case invalidDefaults, cannotSanitize, cannotCoerce }
 
 struct WebsiteConfigSchema {
   private let rules: [String: WebsiteConfigRule]
@@ -107,12 +107,31 @@ struct WebsiteConfigSchema {
     return known
   }
 
+  /// Browser storage uses the required, strict full schema, not optional/strip.
+  func validatingComplete(_ input: [String: WebsiteConfigValue]) -> [String: WebsiteConfigValue]? {
+    guard input.keys.allSatisfy({ $0.utf8.allSatisfy { $0 < 128 } }), Set(input.keys) == keys,
+      let known = validatingPartial(input), Set(known.keys) == keys else { return nil }
+    return known
+  }
+
   func migrating(_ input: [String: WebsiteConfigValue],
     defaults: [String: WebsiteConfigValue]) throws -> [String: WebsiteConfigValue] {
     guard Set(defaults.keys) == keys,
       defaults.allSatisfy({ rule(for: $0.key)?.accepts($0.value) == true })
     else { throw WebsiteConfigSchemaError.invalidDefaults }
     let fields = input.filter { $0.key.utf8.allSatisfy({ $0 < 128 }) }
+    // JSON cannot carry callable valueOf/toString methods. An own toString
+    // value prevents ordinary object-to-number conversion; array joins can
+    // encounter the same error in nested elements. Preserve the source throw,
+    // rather than quietly treating it as NaN and dropping just that field.
+    func coercionThrows(_ value: WebsiteConfigValue) -> Bool {
+      if let members = value.objectMembers { return members.contains { $0.key == Array("toString".utf16) } }
+      if case .array(let values) = value { return values.contains(where: coercionThrows) }
+      return false
+    }
+    for key in ["fontSize", "tapeMargin", "maxLineWidth"] {
+      if let value = fields[key], coercionThrows(value) { throw WebsiteConfigSchemaError.cannotCoerce }
+    }
     let sanitized = try sanitize(MonkeytypeLegacyConfigMigration.replacingLegacyValues(fields))
     return defaults.merging(sanitized) { _, incoming in incoming }
   }

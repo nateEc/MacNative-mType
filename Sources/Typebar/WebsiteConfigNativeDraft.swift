@@ -12,7 +12,18 @@ struct WebsiteConfigNativeDraft {
     WebsiteConfigNativeThemes.mappedKeys, WebsiteConfigNativePagePreferences.mappedKeys]
   static var mappedKeys: Set<String> { fieldGroups.reduce(into: Set<String>()) { $0.formUnion($1) } }
 
-  let prepared: WebsiteConfigPreparedImport
+  enum Origin {
+    case imported(WebsiteConfigPreparedImport), restored(WebsiteConfigPreparedRestoration)
+    var projection: WebsiteConfigRuntimeProjection {
+      switch self { case .imported(let value): value.projection; case .restored(let value): value.projection }
+    }
+  }
+  let origin: Origin
+  var projection: WebsiteConfigRuntimeProjection { origin.projection }
+  /// Restore evidence is never presented as an original JSON import.
+  var prepared: WebsiteConfigPreparedImport? {
+    guard case .imported(let prepared) = origin else { return nil }; return prepared
+  }
   let inputRules: WebsiteConfigNativeInputRules
   let presentation: WebsiteConfigNativePresentation
   let behavior: WebsiteConfigNativeBehavior
@@ -25,13 +36,23 @@ struct WebsiteConfigNativeDraft {
 
   @MainActor
   init(prepared: WebsiteConfigPreparedImport, pointsPerRem: Double) throws {
+    try self.init(origin: .imported(prepared), pointsPerRem: pointsPerRem)
+  }
+
+  @MainActor
+  init(restoration: WebsiteConfigPreparedRestoration, pointsPerRem: Double) throws {
+    try self.init(origin: .restored(restoration), pointsPerRem: pointsPerRem)
+  }
+
+  @MainActor
+  private init(origin: Origin, pointsPerRem: Double) throws {
     let keys = WebsiteConfigSchema(catalogs: WebsiteConfigNativeProfile.catalogs).keys
     guard Self.mappedKeys == keys, Self.fieldGroups.reduce(0, { $0 + $1.count }) == keys.count else {
       throw WebsiteConfigNativeDraftError.inconsistentCoverage
     }
-    let runtime = prepared.projection.runtime
+    let runtime = origin.projection.runtime
     guard Set(runtime.keys) == keys else { throw WebsiteConfigNativeDraftError.incompleteRuntime }
-    self.prepared = prepared
+    self.origin = origin
     inputRules = try .init(runtime: runtime)
     presentation = try .init(runtime: runtime)
     behavior = try .init(runtime: runtime)

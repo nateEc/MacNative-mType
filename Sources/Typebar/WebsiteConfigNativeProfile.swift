@@ -34,6 +34,17 @@ enum WebsiteConfigNativeProfile {
     try .init(prepared: prepare(json, context: context), pointsPerRem: pointsPerRem)
   }
 
+  static func prepareWebsiteRestoration(_ json: String?, context: WebsiteConfigRuntimeContext) throws -> WebsiteConfigPreparedRestoration {
+    try WebsiteConfigRestoration.prepareWebsiteStorage(json, defaultDocument: defaultDocument(),
+      schema: .init(catalogs: catalogs), context: context)
+  }
+
+  static func prepareNativeRestoration(_ read: WebsiteConfigNativeStateRead,
+    context: WebsiteConfigRuntimeContext) throws -> WebsiteConfigNativeRestoreReadiness {
+    try WebsiteConfigRestoration.prepareNativeState(read, defaultDocument: defaultDocument(),
+      schema: .init(catalogs: catalogs), context: context)
+  }
+
   private static func hex(_ color: Color) throws -> String {
     guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { throw WebsiteConfigSchemaError.invalidDefaults }
     let channels = [rgb.redComponent, rgb.greenComponent, rgb.blueComponent]

@@ -1,5 +1,21 @@
 # 官方配置兼容性审计
 
+## 冷读恢复与来源分离（2026-10-24）
+
+新增完整 schema 冷读准备和 WebsiteConfigPreparedRestoration。源 persistence.configLS 用 strict ConfigSchema，而导入入口用 PartialConfigSchema.strip：旧 quickTab 是可观察反例。LocalStorageWithSchema 冷读按完整 schema、默认／迁移／语法回退建立缓存；默认对象顺序与 schema 顺序不同，缓存比较可能在缺失时写一次、语法回退时先写默认再写 schema。准备器记录顺序和值计划；未知键导致 strict 校验失败后迁移并写回，只有完整有效且应用不变的状态才原样保留磁盘文本，不直接修改浏览器或原生偏好。
+
+原生恢复接受独立存储读取结果，缺失／不可用不自动默认化。可读状态保持原无损 loaded 值，按当前认证／资源上下文重新投影；九组原生候选增加真实来源标记，restored 不提供伪造的 JSON 导入 parsed。浏览器写回计划不用于原生字节，浏览器修正字段的延迟同步也仅保留意图，不计时或发请求。
+
+源探针执行实际 LocalStorageWithSchema、loadFromLocalStorage、saveToLocalStorage／saveFullConfigToLocalStorage、迁移／schema／metadata setter 与完整 applyConfig。浏览器 I/O、通知、账户、debounce 计时和远端发送为受控适配器；没有实际 DOM／资源／主题监听器或服务器，因此本阶段不是整个浏览器冷启动等价证明。原生 8 MiB／深度 128 的资源拒绝上抛，不生成修复；产品路径和旧存储不切换。
+
+首轮复用可选导入的占位实现出现一项三处预期失败；独立准备器的 230 组源对照随后暴露十三处断言差异：完整未知键错误地 strip 导致两例各两处，另九例为数字转换异常未传播。检查源 ConfigSchema.strict 和 Number 对象转换路径后修正 owning schema／迁移入口，230 组与候选七项聚焦测试通过。JSON 对象自有非 callable toString（含数组嵌套）在三个比较字段中抛 cannotCoerce；导入失败，冷读回退，未放宽原断言。
+
+补齐负零传输标记及 loaded／runtime 逐数值位模式对照，验证源读值、请求／运行值、拒绝列表、事件顺序、写回次数与 JSON 值、未知键迁移和待同步修正。额外 Tab 候选断言初次误放在 future 字段夹具，已移回 quickTab 夹具，保留 Tab 期望。最终扩大回归 199 项零失败、无跳过；CI 参考根路径 83 项零失败、无跳过。恢复候选还覆盖新账户上下文重拒绝、原生无损字节不变、不可表示值整体拒绝以及过大／过深数据不产生修复。
+
+移除两个参考根与 Zod 后，四项原生恢复测试零失败、无跳过（明确排除唯一源探针）；原创边界、固定源行为和 1,261 场景矩阵检查通过。本轮只追加准备器／候选来源及迁移纠错，无实际浏览器／原生写回、远端发布、主应用启动或生产消费者切流。
+
+Debug 隔离打包、严格签名、许可文件逐字节与包内原创检查通过；临时应用未启动，固定参考无改动。仅批量推送 native-parity-next，不修改门禁、不重跑远端 Actions 或改写 main，仍不得把这些局部检查称为完整客户端／服务端或冷启动验收。
+
 ## 94 字段无损本地格式与隔离存储（2026-10-24）
 
 新增 typebar.website-config-state / 1 独立数组信封：完整字段按键排序，值以 b／n／s／a 标签表示布尔、64-bit Double 位模式、UTF-16 十六进制单元和单层数组。全数组结构避免 JSON 重复对象键在解析时被合并；重复字段、未知键、非 ASCII 字段名、未知标签、错误长度／十六进制、非 schema 值和版本不符均拒绝。不把该格式交给网站 JSON 导入或旧 Typebar 设置编解码器。
