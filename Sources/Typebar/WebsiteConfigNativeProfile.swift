@@ -29,6 +29,11 @@ enum WebsiteConfigNativeProfile {
       schema: .init(catalogs: catalogs), context: context)
   }
 
+  static func prepareDraft(_ json: String, pointsPerRem: Double,
+    context: WebsiteConfigRuntimeContext) throws -> WebsiteConfigNativeDraft {
+    try .init(prepared: prepare(json, context: context), pointsPerRem: pointsPerRem)
+  }
+
   private static func hex(_ color: Color) throws -> String {
     guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { throw WebsiteConfigSchemaError.invalidDefaults }
     let channels = [rgb.redComponent, rgb.greenComponent, rgb.blueComponent]

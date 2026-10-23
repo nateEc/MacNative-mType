@@ -1,5 +1,21 @@
 # 官方配置兼容性审计
 
+## 页面偏好与完整原生预检（2026-10-24）
+
+补齐 accountChart、ads、customBackground、customBackgroundSize、customBackgroundFilter 五项独立模型草稿，累计 94/94。WebsiteConfigNativeDraft 将九组构造放在同一无副作用预检内，验证字段所有权不重叠且恰好覆盖 schema；保留解析、最终投影、拒绝与事件证据。原生不可表示的阈值／速度／字号／宽度／大整数仍明确失败，不因计数齐全而默认为成功，不部分应用。
+
+固定 metadata.tsx 的 accountChart override 保证速度／准确率至少一项开启，HistoryChart.tsx 的四槽依次为速度、准确率、10 次与 100 次均值；模型拒绝未完成覆盖的双关闭状态，不重放修复。背景地址保留已 trim 的 UTF-16 单元，包括孤立代理项，不预先改写为 URL。theme-controller.ts 优先非 undefined 的本地背景；空本地字符串覆盖远程并清空，而不是网络回退。
+
+滤镜 schema 仅为四个非 NaN 数字，没有范围夹紧，允许无穷与负值；源 CSS 使用 rem blur、乘法 brightness、saturate、opacity 及扩边／缩放。现有原生 CustomBackgroundFilter 有范围夹紧、point blur 与加法亮度，不可直接转换或声称渲染等价；本阶段保留源参数，不新增隐式标准化。广告四值保留导入意图，原生无广告策略不变，不加载第三方 SDK／重载页面；网站广告呈现并非本次实现范围。
+
+完整预检不是持久格式、资源事务或应用成功：当前调用不访问用户设置、本地图片、账户或网络，不改变现有 UI 消费者。后续仍须完成新存储代、资源准入、原子提交／失败恢复、网站入口和渲染，并证明既有记录可恢复，不能把模型齐全当成整个重写完成。
+
+验证：占位实现先出现一项测试十处预期失败；实现后四项原生字段／汇总测试通过。五字段逆向比较已进入 403 组实际完整导入及 671 组运行投影；另实际执行固定 applyCustomBackground／applyCustomBackgroundSize，在不加载图片的 DOM 适配器上验证 36 组背景／本地空值／尺寸选择，包含孤立 UTF-16 单元。覆盖全部 16 组图表开关、四种广告意图／开发覆盖、缺字段／null、无效值、非最终图表、signed zero／无穷／负滤镜、完整候选缺字段／多字段和不可表示速度／整数失败。扩大本地回归 182 项零失败、无跳过；不等同完整客户端／服务端或实机渲染验收。
+
+CI 参考根路径另跑 71 项零失败、无跳过；移除参考根和 Zod 后，四项纯原生页面／汇总测试通过（明确排除源探针）。原创边界和固定源行为审计通过，验收矩阵为 1,259 个唯一场景；本阶段不改工作流、不重跑 Actions、不启动主程序。
+
+Debug 隔离打包、严格签名、许可文件逐字节与包内原创边界检查通过，临时包未启动；固定参考仍干净。本批仅推送 native-parity-next，main 和既有消费者不切换，未把本地窄范围检查冒充全客户端／服务端门禁。
+
 ## 网站主题状态与显式原生预览（2026-10-24）
 
 新增 theme、themeLight、themeDark、autoSwitchTheme、customTheme、customThemeColors、favThemes、randomTheme 八项独立载体，累计 89/94 模型草稿。直接消费最终 runtime，不重放 theme setter 清除 customTheme，也不把两个布尔值折叠为旧原生单选；收藏数组保留顺序与重复。七种随机模式仅保留配置意图，账户准入由上游投影负责，随机袋、预览生命周期与资源激活仍未实现。
