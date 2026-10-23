@@ -10,8 +10,9 @@ const root = path.resolve(process.argv[2] ?? '');
 const zodRoot = process.env.TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT;
 const runtimeMode = process.argv[3] === '--runtime-projection';
 const keyboardMode = process.argv[3] === '--keyboard-confirmations';
+const importMode = process.argv[3] === '--import-preparation';
 const funboxMode = process.argv[3] === '--funbox-admission';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode);
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -25,7 +26,7 @@ const simulation = {Config: {}, events: [], saves: [], stores: [], gates: [], fl
 const noop = () => {};
 const context = vm.createContext({structuredClone, URL,
   document: {get readyState() { return simulation.flags.documentComplete ? 'complete' : 'loading'; }},
-  console: {warn: noop, error: noop}});
+  console: {warn: noop, error: noop, log: noop}});
 const modules = new Map();
 const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
@@ -47,7 +48,7 @@ function getModule(id) {
   if (modules.has(id)) return modules.get(id);
   let module;
   if (id === 'zod' || id === 'store-adapter' || adapters.has(id)) {
-    const values = id === 'zod' ? {...zod, ZodErrorMap: undefined, ZodTypeAny: undefined}
+    const values = id === 'zod' ? {...zod, ZodErrorMap: undefined, ZodTypeAny: undefined, ZodIssue: undefined}
       : id === 'store-adapter' ? {Config: simulation.Config,
         setConfigStore: noop, setFullConfigStore: value => simulation.stores.push(structuredClone(value))}
       : adapters.get(id);
@@ -70,6 +71,7 @@ function resolve(id, importer) {
   if (id === '@monkeytype/util/objects') return path.join(root, 'packages/util/src/objects.ts');
   if (id === '@monkeytype/util/numbers') return path.join(root, 'packages/util/src/numbers.ts');
   if (id === '@monkeytype/util/arrays') return path.join(root, 'packages/util/src/arrays.ts');
+  if (id === '@monkeytype/util/json') return path.join(root, 'packages/util/src/json.ts');
   if (id === '@monkeytype/funbox') return path.join(root, 'packages/funbox/src/index.ts');
   if (id === '../events/config') return 'config-event-adapter';
   assert.ok(id.startsWith('.'), 'Unexpected import: ' + id);
@@ -133,7 +135,7 @@ if (funboxMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode) {
+} else if (runtimeMode || keyboardMode || importMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -174,6 +176,66 @@ if (funboxMode) {
   const from = lifecycle.indexOf('const lastConfigsToApply:'), to = lifecycle.indexOf('\nexport async function resetConfig(', from);
   assert.ok(from >= 0 && to > from);
   new vm.Script(stripTypeScriptTypes(lifecycle.slice(from, to).replace('export async function ', 'async function '), {mode: 'transform'})).runInContext(context);
+  if (importMode) {
+    const parser = await load(path.join(root, 'packages/util/src/json.ts'));
+    const apply = context.applyConfig;
+    let parsed, completeSaves = 0, success = 0, errors = 0;
+    Object.assign(context, {ConfigSchemas: configSchemas, parseJsonWithSchema: parser.parseWithSchema,
+      applyConfig: async value => { parsed = structuredClone(value); await apply(value); },
+      saveFullConfigToLocalStorage: () => completeSaves++,
+      showSuccessNotification: () => success++, showErrorNotification: () => errors++});
+    const start = lifecycle.indexOf('export async function applyConfigFromJson(');
+    const end = lifecycle.indexOf('\nexport async function loadFromLocalStorage(', start);
+    assert.ok(start >= 0 && end > start);
+    new vm.Script(stripTypeScriptTypes(lifecycle.slice(start, end).replace('export async function ', 'async function '), {mode: 'transform'})).runInContext(context);
+    const fixtures = [];
+    async function add(json, flags = {}) {
+      Object.assign(simulation.Config, structuredClone(defaults));
+      simulation.flags = {authenticated: false, documentComplete: true, customThemeCount: 0, development: false, ...flags};
+      simulation.events = []; simulation.saves = []; simulation.stores = []; simulation.gates = [];
+      parsed = undefined; completeSaves = 0; success = 0; errors = 0;
+      await context.applyConfigFromJson(json);
+      const accepted = success === 1;
+      assert.equal(success + errors, 1);
+      assert.equal(completeSaves, accepted ? 1 : 0);
+      assert.equal(simulation.stores.length, accepted ? 1 : 0);
+      fixtures.push({json, flags: simulation.flags, accepted, parsed,
+        requested: simulation.stores[0], runtime: structuredClone(simulation.Config),
+        rejectedKeys: simulation.saves, events: simulation.events});
+    }
+    for (const json of ['', ' ', 'null', 'true', 'false', '1', '"text"', '[]', '[{}]', '{', '{"numbers":true,}', '{}{}', '/*x*/{}']) await add(json);
+    await add('{}');
+    for (const json of ['{"numbers":false,"numbers":true}', '{"quickTab":false,"quickTab":true}',
+      '{"quickTab":true,"numbers":"invalid"}', '{"quickTab":true,"numbers":true}',
+      '{"ownedUnknown":{"constructor":1,"__proto__":{"x":true}}}', '{"words":-0}',
+      '{"fontSize":1e400}', '{"fontSize":-1e400}', '{"words":1e400}', '{"minAccCustom":1e400}',
+      '{"paceCaretCustomSpeed":1e400}', '{"customBackgroundFilter":[1,1e400,1,1]}']) await add(json);
+    const legacy = [
+      {quickTab: true}, {swapEscAndTab: true}, {alwaysShowCPM: true}, {showTimerProgress: false},
+      {showLiveWpm: true, timerStyle: 'text'}, {showAverage: 'wpm'}, {keymapShowTopRow: 'always'},
+      {smoothCaret: true}, {playSoundOnError: true}, {indicateTypos: true}, {fontSize: '125'},
+      {soundVolume: '0.5suffix'}, {quoteLength: -1}, {funbox: 'none'},
+      {customLayoutfluid: 'qwerty#dvorak'}, {accountChart: ['on']},
+      {customThemeColors: Array(9).fill('#123456')}, {customBackgroundFilter: [1, 2, 3, 4, 5]},
+    ];
+    for (const input of legacy) for (const trigger of [{}, {numbers: 'invalid'}, {mode: 'invalid'}, {language: 'owned-invalid-language'}]) {
+      await add(JSON.stringify({...input, ...trigger}));
+    }
+    for (const [key, value] of Object.entries(defaults)) {
+      await add(JSON.stringify({[key]: value, quickTab: true, ownedUnknown: {kept: false}}));
+      await add(JSON.stringify({[key]: null, quickTab: true}));
+    }
+    for (const name of catalogs.funboxes) {
+      await add(JSON.stringify({funbox: [name], quickTab: true}));
+      await add(JSON.stringify({funbox: [name], quickTab: true, numbers: 'invalid'}));
+    }
+    for (const authenticated of [false, true]) for (const documentComplete of [false, true]) {
+      await add(JSON.stringify({paceCaret: 'pb', quickTab: true}), {authenticated, documentComplete});
+      await add(JSON.stringify({randomTheme: 'custom', numbers: 'invalid'}), {authenticated, documentComplete, customThemeCount: 2});
+    }
+    verify();
+    console.log(JSON.stringify(transport({defaults, catalogs, orderedKeys: Object.keys(defaults), fixtures})));
+  } else {
   const fixtures = [];
   async function add(input, flags = {}) {
     simulation.flags = {authenticated: false, documentComplete: true, customThemeCount: 0, development: false, ...flags};
@@ -214,6 +276,7 @@ if (funboxMode) {
   for (const funbox of [['read_ahead', 'read_ahead_hard'], ['mirror', 'round_round_baby'], ['tts', 'simon_says']]) await add({funbox});
   verify();
   console.log(JSON.stringify(transport({defaults, catalogs, orderedKeys: Object.keys(defaults), fixtures})));
+  }
   }
 } else {
 const fixtures = [];

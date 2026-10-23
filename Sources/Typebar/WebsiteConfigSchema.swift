@@ -94,6 +94,14 @@ struct WebsiteConfigSchema {
     throw WebsiteConfigSchemaError.cannotSanitize
   }
 
+  /// The real JSON import entry first safe-parses the optional/strip schema.
+  /// Unknown legacy keys disappear on success; migration is only a fallback.
+  func validatingPartial(_ input: [String: WebsiteConfigValue]) -> [String: WebsiteConfigValue]? {
+    let known = input.filter { rules[$0.key] != nil }
+    guard known.allSatisfy({ rules[$0.key]?.accepts($0.value) == true }) else { return nil }
+    return known
+  }
+
   func migrating(_ input: [String: WebsiteConfigValue],
     defaults: [String: WebsiteConfigValue]) throws -> [String: WebsiteConfigValue] {
     guard Set(defaults.keys) == keys,

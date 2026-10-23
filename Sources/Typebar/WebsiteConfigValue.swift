@@ -36,9 +36,11 @@ indirect enum WebsiteConfigValue: Codable, Equatable {
     case (.null, .null): true
     case (.bool(let a), .bool(let b)): a == b
     case (.number(let a), .number(let b)): a == b || (a.isNaN && b.isNaN)
-    case (.string(let a), .string(let b)): a == b
+    case (.string(let a), .string(let b)): a.utf16.elementsEqual(b.utf16)
     case (.array(let a), .array(let b)): a == b
-    case (.object(let a), .object(let b)): a == b
+    case (.object(let a), .object(let b)):
+      Dictionary(uniqueKeysWithValues: a.map { (Array($0.key.utf16), $0.value) })
+        == Dictionary(uniqueKeysWithValues: b.map { (Array($0.key.utf16), $0.value) })
     default: false
     }
   }
@@ -48,7 +50,7 @@ enum WebsiteConfigInputError: Error { case expectedObject }
 
 enum MonkeytypeLegacyConfigMigration {
   static func decodeObject(_ json: String) throws -> [String: WebsiteConfigValue] {
-    let value = try JSONDecoder().decode(WebsiteConfigValue.self, from: Data(json.utf8))
+    let value = try WebsiteConfigJSONReader.read(json)
     guard case .object(let object) = value else { throw WebsiteConfigInputError.expectedObject }
     return object
   }
