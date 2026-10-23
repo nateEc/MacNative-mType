@@ -913,6 +913,12 @@ private final class TapePromptTextView: NSView {
 }
 
 enum TapePromptTextStorage {
+  @MainActor
+  static func prepare(_ text: AttributedString, fontResource: WebsiteConfigFontResource,
+    rightToLeft: Bool = false) -> NSTextStorage {
+    prepare(text, font: fontResource.renderingFont, rightToLeft: rightToLeft)
+  }
+
   static func advanceRect(_ range: NSRange, manager: NSLayoutManager, container: NSTextContainer) -> CGRect {
     var result = CGRect.null
     manager.enumerateEnclosingRects(forGlyphRange: range,

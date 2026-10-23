@@ -888,6 +888,13 @@ enum PromptCaretLayout {
   }
 
   /// Shared font and paragraph preparation keeps viewport and caret wrapping aligned.
+  @MainActor
+  static func preparedStorage(in attributedText: AttributedString, fontResource: WebsiteConfigFontResource,
+    lineSpacing: CGFloat, isRightToLeft: Bool) -> NSTextStorage {
+    preparedStorage(in: attributedText, font: fontResource.renderingFont,
+      lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
+  }
+
   static func preparedStorage(in attributedText: AttributedString, font: NSFont,
     lineSpacing: CGFloat, isRightToLeft: Bool) -> NSTextStorage {
     let storage = NSTextStorage(attributedString: NSAttributedString(attributedText))

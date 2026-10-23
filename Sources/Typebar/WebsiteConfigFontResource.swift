@@ -18,7 +18,20 @@ struct WebsiteConfigFontResource {
   let faces: [Face]
   let ownedLocalData: Data?
   let localFailure: LocalFailure?
+  /// Prepared before publication; layout never has to resolve these by name.
+  let renderingFont: NSFont
   var primary: Face { faces[0] }
+
+  static func compose(primary: NSFont, fallback: [NSFont]) -> NSFont {
+    guard !fallback.isEmpty else { return primary }
+    let descriptors = fallback.map { CTFontCopyFontDescriptor($0 as CTFont) }
+    let attributes = CTFontDescriptorCreateWithAttributes([
+      kCTFontCascadeListAttribute: descriptors
+    ] as CFDictionary)
+    // Copy the face, preserving size/matrix/variation and data identity. A new
+    // font matched by primary.fontName would lose same-name private faces.
+    return CTFontCreateCopyWithAttributes(primary as CTFont, 0, nil, attributes) as NSFont
+  }
 
   static func candidates(family: String, language: TypingLanguage, hasLocal: Bool) -> [Candidate] {
     [hasLocal ? .local : .family(family)]
@@ -58,10 +71,10 @@ struct WebsiteConfigFontResource {
       }
       return font.map { Face(candidate: candidate, font: $0) }
     }
-    // The final native monospace candidate is always materialized. Do not
-    // rematch the primary by name to attach a cascade: same-name data faces
-    // must retain their own glyphs and metrics. The renderer consumes faces.
-    return .init(candidates: candidates, faces: faces, ownedLocalData: owned, localFailure: failure)
+    // The final native monospace candidate is always materialized. Keep the
+    // direct face descriptors; prepare the cascade before value publication.
+    return .init(candidates: candidates, faces: faces, ownedLocalData: owned, localFailure: failure,
+      renderingFont: compose(primary: faces[0].font, fallback: faces.dropFirst().map(\.font)))
   }
 
   private static let lookupOptions: CTFontOptions = [.preventAutoActivation, .preventAutoDownload]

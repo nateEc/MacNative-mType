@@ -1,5 +1,15 @@
 # 阈值源状态与迁移契约
 
+## 准备字体的真实排版与既有入口（追加阶段）
+
+字体资源在发布前以实际 CTFont 的描述符创建有序级联，再用 CTFontCreateCopyWithAttributes 从原字体复制，仅增加 kCTFontCascadeListAttribute；size 为 0、matrix 为 nil，按 SDK 语义保留原尺寸／矩阵。没有用字体名字重新查找主面或回退面，没有全局注册。renderingFont 是准备阶段存好的值，不是 UI 读取后才执行的延迟资源操作。主字体与候选／实际字体列表继续保留用于身份和失败信息，不因增加级联丢失这些证据。
+
+TapePromptTextStorage 与 PromptCaretLayout 的资源重载只把同一个准备字体交给原有存储／段落逻辑，既有 NSFont 调用路径保持不变，不迁移真实设置或成绩。现有字段布局、视口和光标可直接消费 renderingFont；隐藏挂载宿主只测现有视口重排，不构成生产导入／窗口消费已经切流。
+
+反证与证据：没有级联的占位实现对同名 x／y 自有字体得出错误宽度，交换回退顺序仍无变化；实际级联须选择第一份覆盖 y 的字节面、保留 x 主面，且 NSFont 的现有度量比较能区分两种回退顺序与同名不同字节，避免缓存借用旧几何。测试直接检查 TextKit 字形、UTF-16 范围、光标几何和缺字／LastResort，不能用非零包围盒冒充有字形；自动释放池退出后再次排版，验证资源所有者退出后级联仍可用。末级系统缺字处理依然属于 AppKit，不是一个封闭字体集合，也不由本轮证明系统字体动态加载／下载行为。
+
+自有矩形字库只扩展 cmap 映射，用于 BMP 和补充平面测试；依据 [OpenType cmap](https://learn.microsoft.com/en-us/typography/opentype/spec/cmap)，没有复用参考字形或用户字体。CoreText 的级联及复制接口由本机 SDK 头文件核对，最低 macOS 10.5；当前主机上的字体相等／缓存结果不能替代所有最低目标系统实测。可见 GUI、真实输入法、完整语言／OpenType 功能、异步性能与生产资源宿主仍需验收；回退不删除旧入口，不注册或卸载用户字体。
+
 ## 无注册字体准备与字体／背景联合值发布（追加阶段）
 
 固定 ui.ts 的 applyFontFamily 始终选择有序 CSS 链：本地记录存在时首项 LOCALCUSTOM，否则为配置字体；随后是该语言 preferredFont（若有）、Roboto Mono、Vazirharf、monospace。本地文件无效仍不能把配置字体重新插回链首。逐文件读取固定语言元数据确认，仅 lao 与 sindhi 有偏好字体；不复制字库或词表。原生准备保留候选顺序与重复，实际可用字体列表和本地失败原因分开，系统等宽字体是明确标识的原生替代，不冒充原版内置字形／像素。

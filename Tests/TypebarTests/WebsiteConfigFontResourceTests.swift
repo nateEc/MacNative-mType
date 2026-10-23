@@ -76,6 +76,9 @@ final class WebsiteConfigFontResourceTests: XCTestCase {
     XCTAssertEqual(prepared.primary.font.fontName, name)
     XCTAssertEqual(try advance(prepared.primary.font), 25.2, accuracy: 0.001,
       "A matching PostScript name is not evidence that the data face was used")
+    XCTAssertEqual(prepared.renderingFont.fontName, name)
+    XCTAssertEqual(try advance(prepared.renderingFont), 25.2, accuracy: 0.001,
+      "Adding the cascade must not rematch an installed face with the same name")
     let global = try WebsiteConfigFontResource.prepare(typography: settings, language: .english, local: .absent)
     XCTAssertEqual(try advance(global.primary.font), originalAdvance, accuracy: 0.001,
       "The owned face must not replace name matching for the installed font")

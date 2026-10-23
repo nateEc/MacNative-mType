@@ -27,16 +27,17 @@ enum OwnedTestFontFixture {
     assemble(postScriptName: postScriptName, cff: false)
   }
 
-  static func make(postScriptName: String, advanceWidth: Int) -> Data {
-    assemble(postScriptName: postScriptName, cff: false, advanceWidth: advanceWidth)
+  static func make(postScriptName: String, advanceWidth: Int, character: UInt32 = 120) -> Data {
+    assemble(postScriptName: postScriptName, cff: false, advanceWidth: advanceWidth, character: character)
   }
 
   static func makeOTF(postScriptName: String) -> Data {
     assemble(postScriptName: postScriptName, cff: true)
   }
 
-  private static func assemble(postScriptName: String, cff: Bool, advanceWidth: Int = 600) -> Data {
+  private static func assemble(postScriptName: String, cff: Bool, advanceWidth: Int = 600, character: UInt32 = 120) -> Data {
     precondition((500...32000).contains(advanceWidth))
+    precondition(character <= 0x10FFFF && !(0xD800...0xDFFF).contains(character) && character != 0xFFFF)
     var templates = [
       "OS/2": "AAMCWAGQAAUABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAD8/Pz8AAAB4AHgDIP84AAADIADIAAAAAAAAAAAAAAAAAAAAIAAA",
       "cmap": "AAAAAgAAAAMAAAAUAAMAAQAAABQABAAgAAAABAAEAAEAAAB4//8AAAB4////iQABAAAAAA==",
@@ -57,6 +58,24 @@ enum OwnedTestFontFixture {
       templates["CFF "] = "AQAEAQABAQEqVHlwZWJhclFBMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAAAQEBG/gbAvgbA/gYBO+L+Ij5UAX3FQ+L9y0S9xgRAAEBASpUeXBlYmFyUUEwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMAAAAABZAAIBAQQQ+OwO+OzvFvgk+VD8JAYO"
     }
     var tables = templates.mapValues { Array(Data(base64Encoded: $0)!) }
+    if character != 120 {
+      // The same original rectangle, mapped to a different scalar. OpenType
+      // cmap format 4 (BMP) or 12 (supplementary); no external glyph data.
+      // https://learn.microsoft.com/en-us/typography/opentype/spec/cmap
+      if character <= 0xFFFF {
+        let subtable = short(4) + short(32) + short(0) + short(4) + short(4) + short(1) + short(0)
+          + short(Int(character)) + short(0xFFFF) + short(0)
+          + short(Int(character)) + short(0xFFFF) + short(1 - Int(character)) + short(1) + short(0) + short(0)
+        tables["cmap"] = short(0) + short(1) + short(3) + short(1) + word(12) + subtable
+      } else {
+        tables["cmap"] = short(0) + short(1) + short(3) + short(10) + word(12)
+          + short(12) + short(0) + word(28) + word(0) + word(1)
+          + word(character) + word(character) + word(1)
+        tables["OS/2"]![46] |= 2 // Unicode range bit 57: non-plane-zero.
+      }
+      let bmpBound = min(Int(character), 0xFFFF)
+      tables["OS/2"]!.replaceSubrange(64..<68, with: short(bmpBound) + short(bmpBound))
+    }
     // OpenType hmtx advance widths and hhea extrema; the original rectangle
     // stays unchanged. https://learn.microsoft.com/en-us/typography/opentype/spec/hmtx
     // https://learn.microsoft.com/en-us/typography/opentype/spec/hhea
