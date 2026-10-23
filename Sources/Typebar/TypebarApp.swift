@@ -1363,6 +1363,7 @@ private struct ContentView: View {
   @State private var referenceScriptMessage: String?
   @State private var showsVirtualKeyboard = false
   @State private var activeChallengeID: String?
+  @State private var challengeLiveConfiguration = ChallengeLiveConfigurationState()
   @State private var oneHandedChallengePreset: SavedTestPreset?
   @State private var oneHandedChallengeSelection: OneHandedChallengeSelection?
   @State private var wingdingsFontStayedAvailable = true
@@ -1571,7 +1572,7 @@ private struct ContentView: View {
         return
       }
       guard FunboxForcedContentOptionsPolicy.accepts(
-        promptHighlightMode: selected, modifiers: settings.testModifiers)
+        promptHighlightMode: selected, modifiers: practiceRequestedModifiers)
       else {
         restoringPromptHighlightAfterFunboxConflict = true
         settings.promptHighlightMode = previous
@@ -4260,7 +4261,7 @@ private struct ContentView: View {
   @discardableResult
   private func selectMode(_ requested: TestMode) -> Bool {
     guard acceptsRestartingConfigurationChange() else { return false }
-    guard TestModifierPolicy.acceptsModeSelection(requested, modifiers: settings.testModifiers) else {
+    guard TestModifierPolicy.acceptsModeSelection(requested, modifiers: practiceRequestedModifiers) else {
       let message = "当前修饰器不支持“\(requested.displayName)”模式；请先关闭不兼容的趣味模式。"
       modeCompatibilityMessage = message
       ConfigurationNoticeFeedback.conflict(message, notices: account.localNotices)
@@ -4275,7 +4276,7 @@ private struct ContentView: View {
   private func selectContentOptions(_ requested: ContentOptions) -> Bool {
     guard acceptsRestartingConfigurationChange() else { return false }
     guard FunboxForcedContentOptionsPolicy.accepts(
-      requested, modifiers: settings.testModifiers)
+      requested, modifiers: practiceRequestedModifiers)
     else {
       reportFunboxConfigurationConflict("当前趣味模式要求关闭标点或数字；请先关闭对应选项。")
       return false
@@ -4489,17 +4490,22 @@ private struct ContentView: View {
       }
     }
     if activeChallenge == nil || !settings.hasThresholdProfile {
+      let requestedModifiers = practiceRequestedModifiers
       let effectiveMemoryMode = MemoryFunboxModePolicy.effectiveMode(
-        requested: mode, modifiers: settings.testModifiers)
+        requested: mode, modifiers: requestedModifiers)
       if mode != effectiveMemoryMode { mode = effectiveMemoryMode }
       let languageCompatibleModifiers = language == .mixedLanguages
-        ? TestModifierPolicy.modifiersCompatibleWithPolyglot(settings.testModifiers)
-        : settings.testModifiers
+        ? TestModifierPolicy.modifiersCompatibleWithPolyglot(requestedModifiers)
+        : requestedModifiers
       let joiningSafeModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
         languageCompatibleModifiers, language: language,
         mixedLanguageComponents: mixedLanguageComponents)
-      if settings.testModifiers != joiningSafeModifiers {
-        settings.testModifiers = joiningSafeModifiers
+      if requestedModifiers != joiningSafeModifiers {
+        if challengeLiveConfiguration.hasTransientModifiers(settings: settings) {
+          challengeLiveConfiguration.normalizeModifiers(joiningSafeModifiers, settings: settings)
+        } else {
+          settings.testModifiers = joiningSafeModifiers
+        }
       }
     }
     let shouldCountRestart = session.hasStarted && !session.isFinished
@@ -4969,7 +4975,7 @@ private struct ContentView: View {
   }
 
   private var infiniteIncompatibleModifiers: [TestModifier] {
-    settings.testModifiers.filter(TestModifierPolicy.finiteDurationOnly.contains)
+    practiceRequestedModifiers.filter(TestModifierPolicy.finiteDurationOnly.contains)
   }
 
   private var offersInfiniteSelection: Bool {
@@ -5420,7 +5426,7 @@ private struct ContentView: View {
           settingsJSONCommand = .init(
             mode: .exportSettings,
             initialJSON: try SettingsJSONCommandCodec.export(
-              settings: settings.snapshot,
+              settings: practiceSettingsSnapshot,
               configuration: configuration,
               layoutFluidLayouts: settings.layoutFluidLayouts,
               testParameterMemory: .init(
@@ -5579,7 +5585,7 @@ private struct ContentView: View {
           polyglotReturnLanguage = nil
         } else {
           settings.testModifiers = TestModifierPolicy.modifiersCompatibleWithPolyglot(
-            settings.testModifiers)
+            practiceRequestedModifiers)
           polyglotReturnLanguage = PolyglotReturnLanguagePolicy.validated(language)
           language = .mixedLanguages
         }
@@ -5587,16 +5593,16 @@ private struct ContentView: View {
         reset()
       case .clear, .modifier:
         if case .modifier(let modifier) = target,
-           !settings.testModifiers.contains(modifier),
+           !practiceRequestedModifiers.contains(modifier),
            !TestModifierPolicy.acceptsInteractiveModifierAddition(
-             modifier, to: settings.testModifiers)
+             modifier, to: practiceRequestedModifiers)
         {
           reportFunboxConfigurationConflict(
             "\(modifier.displayName) 与当前趣味修饰器组合不兼容；已保留现有选择。")
           return
         }
         guard let updated = FunboxCommandPolicy.updatedModifiers(
-          for: target, current: settings.testModifiers,
+          for: target, current: practiceRequestedModifiers,
           hasStarted: session.hasStarted)
         else {
           restartLockMessage = "当前无限测试不支持这个修饰器；请先选择有限时长或字数。"
@@ -5875,6 +5881,18 @@ private struct ContentView: View {
       polyglotReturnLanguage: polyglotReturnLanguage)
   }
 
+  private var practiceDifficulty: Difficulty {
+    challengeLiveConfiguration.difficulty(settings: settings)
+  }
+
+  private var practiceRequestedModifiers: [TestModifier] {
+    challengeLiveConfiguration.modifiers(settings: settings)
+  }
+
+  private var practiceSettingsSnapshot: AppSettingsSnapshot {
+    challengeLiveConfiguration.snapshot(settings: settings)
+  }
+
   private var baseConfiguration: TestConfiguration {
     if let activeChallenge {
       let challengePreset = activeChallenge.id == "one-handed-bandit"
@@ -5892,19 +5910,19 @@ private struct ContentView: View {
     switch mode {
     case .time:
       return .timed(
-        seconds: TimeInterval(duration), difficulty: settings.difficulty,
+        seconds: TimeInterval(duration), difficulty: practiceDifficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         mixedLanguageComponents: mixedLanguageComponents, contentOptions: contentOptions
       ).with(modifiers: effectiveTestModifiers(for: language, mode: .time))
     case .words:
       return .words(
-        wordLimit, difficulty: settings.difficulty, rules: settings.inputRules, language: language,
+        wordLimit, difficulty: practiceDifficulty, rules: settings.inputRules, language: language,
         englishVariant: settings.englishVariant, mixedLanguageComponents: mixedLanguageComponents,
         contentOptions: contentOptions
       ).with(modifiers: effectiveTestModifiers(for: language, mode: .words))
     case .quote:
       return .init(
-        mode: .quote, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: practiceDifficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         quoteLength: QuoteLengthSelection.legacyValue(for: quoteLengths), quoteLengths: quoteLengths,
         quoteSelectionMode: quoteSelectionMode,
@@ -5912,7 +5930,7 @@ private struct ContentView: View {
         modifiers: effectiveTestModifiers(for: language, mode: .quote), contentOptions: contentOptions)
     case .zen:
       return .init(
-        mode: .zen, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
+        mode: .zen, duration: nil, wordLimit: nil, difficulty: practiceDifficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         mixedLanguageComponents: mixedLanguageComponents,
         modifiers: effectiveTestModifiers(for: language, mode: .zen), contentOptions: contentOptions)
@@ -5923,7 +5941,7 @@ private struct ContentView: View {
         customTextCompletion == .sections
         ? customTextSectionLimit : nil
       return .init(
-        mode: .custom, duration: duration, wordLimit: wordLimit, difficulty: settings.difficulty,
+        mode: .custom, duration: duration, wordLimit: wordLimit, difficulty: practiceDifficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         customTextCompletion: customTextCompletion,
         customTextSectionLimit: sectionLimit,
@@ -5939,14 +5957,14 @@ private struct ContentView: View {
     for selectedLanguage: TypingLanguage, mode: TestMode,
     mixedLanguageComponents: [TypingLanguage]? = nil, baseModifiers: [TestModifier]? = nil
   ) -> [TestModifier] {
-    EffectiveTestModifierPolicy.modifiers(requested: baseModifiers ?? settings.testModifiers,
+    EffectiveTestModifierPolicy.modifiers(requested: baseModifiers ?? practiceRequestedModifiers,
       language: selectedLanguage, mode: mode,
       mixedLanguageComponents: mixedLanguageComponents ?? self.mixedLanguageComponents,
       automaticallyEnabledArabic: settings.prefersArabicLazyInput)
   }
 
   private func refreshZipfNotice() {
-    zipfNotice = ZipfFrequencyPolicy.notice(for: language, modifiers: settings.testModifiers)
+    zipfNotice = ZipfFrequencyPolicy.notice(for: language, modifiers: practiceRequestedModifiers)
     zipfNoticeGeneration &+= 1
     let generation = zipfNoticeGeneration
     guard zipfNotice != nil else { return }
@@ -5971,7 +5989,7 @@ private struct ContentView: View {
       quoteID: mode == .quote ? selectedQuoteID : nil,
       customText: mode == .custom ? customText : nil,
       activeResultTags: settings.activeResultTags,
-      settingsSnapshot: settings.snapshot
+      settingsSnapshot: practiceSettingsSnapshot
     )
   }
 
@@ -6030,6 +6048,11 @@ private struct ContentView: View {
       configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings,
       expectedSourceState: preparation.baseline) else {
       modeCompatibilityMessage = "本次配置未能应用，已保留当前测试；请检查配置版本或恢复状态。"
+      return false
+    }
+    if settings.hasThresholdProfile, challenge != nil,
+      !challengeLiveConfiguration.install(configuration, settings: settings) {
+      modeCompatibilityMessage = "挑战配置读取状态已改变，未切换测试。"
       return false
     }
     modeCompatibilityMessage = nil

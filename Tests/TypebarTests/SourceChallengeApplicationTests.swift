@@ -202,4 +202,165 @@ final class SourceChallengeApplicationTests: XCTestCase {
       XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
     }
   }
+
+  func testClearingChallengeIdentityKeepsLiveDifficultyAndModifiersWithoutSavingThem() throws {
+    try withSettings { settings, defaults in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+      var preset = challenge.preset
+      preset.configuration = preset.configuration.with(challengeID: challenge.id)
+      let selected = try apply(preset, to: settings)
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.install(selected, settings: settings))
+      let profile = defaults.data(forKey: "appSettings.v4")
+      let ordinary = TestConfiguration.timed(seconds: selected.duration ?? 30,
+        difficulty: live.difficulty(settings: settings), rules: settings.inputRules)
+        .with(modifiers: live.modifiers(settings: settings))
+      XCTAssertNil(ordinary.challengeID)
+      XCTAssertEqual(ordinary.difficulty, selected.difficulty)
+      XCTAssertEqual(ordinary.modifiers, selected.modifiers)
+      var session = TypingSession(configuration: ordinary, prompt: "amber bay")
+      session.insertBatch("wrong ", at: Date(timeIntervalSince1970: 100))
+      XCTAssertEqual(session.outcome, .active)
+      XCTAssertNil(session.failureReason)
+      XCTAssertEqual(defaults.data(forKey: "appSettings.v4"), profile)
+    }
+  }
+
+  private func liveState(settings: AppSettings) throws -> ChallengeLiveConfigurationState {
+    let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+    var preset = challenge.preset
+    preset.configuration = preset.configuration.with(challengeID: challenge.id)
+    let configuration = try apply(preset, to: settings)
+    var state = ChallengeLiveConfigurationState()
+    XCTAssertTrue(state.install(configuration, settings: settings))
+    return state
+  }
+
+  func testSameValueDifficultyApplicationReplacesOnlyTheLiveDifficulty() throws {
+    try withSettings { settings, _ in
+      let state = try liveState(settings: settings)
+      let persisted = settings.difficulty
+      settings.difficulty = persisted
+      XCTAssertEqual(state.difficulty(settings: settings), .expert)
+      XCTAssertEqual(state.modifiers(settings: settings), [.roundVisual])
+    }
+  }
+
+  func testSameValueModifierClearReplacesOnlyTheLiveModifiers() throws {
+    try withSettings { settings, _ in
+      let state = try liveState(settings: settings)
+      let persisted = settings.testModifiers
+      settings.testModifiers = persisted
+      XCTAssertEqual(state.modifiers(settings: settings), [])
+      XCTAssertEqual(state.difficulty(settings: settings), .normal)
+    }
+  }
+
+  func testUnrelatedPreferencesAndThresholdUpdatesDoNotInvalidateLiveFields() throws {
+    try withSettings { settings, _ in
+      let state = try liveState(settings: settings)
+      settings.fontSize = 35
+      XCTAssertTrue(settings.updateThresholdConfiguration(.minimumWpm(mode: .off, customValue: 55)))
+      var appearance = settings.snapshot
+      appearance.fontSize = 39
+      XCTAssertTrue(settings.apply(appearance, groups: [.appearance]))
+      XCTAssertEqual(state.difficulty(settings: settings), .normal)
+      XCTAssertEqual(state.modifiers(settings: settings), [.roundVisual])
+      XCTAssertEqual(settings.thresholdConfiguration?.minimumWpmCustomValue, 55)
+    }
+  }
+
+  func testBehaviorGroupApplicationEvenWithSameValuesSupersedesLiveFields() throws {
+    try withSettings { settings, _ in
+      let state = try liveState(settings: settings)
+      XCTAssertTrue(settings.apply(settings.snapshot, groups: [.behavior]))
+      XCTAssertEqual(state.difficulty(settings: settings), .expert)
+      XCTAssertEqual(state.modifiers(settings: settings), [])
+    }
+  }
+
+  func testRejectedApplicationDoesNotInvalidateOrPersistLiveFields() throws {
+    try withSettings { settings, defaults in
+      let state = try liveState(settings: settings)
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      var invalid = settings.snapshot
+      invalid.minimumWpm = 50
+      XCTAssertFalse(settings.apply(invalid))
+      XCTAssertEqual(state.difficulty(settings: settings), .normal)
+      XCTAssertEqual(state.modifiers(settings: settings), [.roundVisual])
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testOtherWindowFunboxClearDoesNotSupersedeUnownedDifficulty() throws {
+    try withSettings { settings, _ in
+      let state = try liveState(settings: settings)
+      settings.testModifiers = [.mirrorKeyboard]
+      let revision = settings.difficultyApplicationRevision
+      XCTAssertTrue(settings.clearChallengeModifiers())
+      XCTAssertEqual(settings.difficultyApplicationRevision, revision)
+      XCTAssertEqual(state.difficulty(settings: settings), .normal)
+      XCTAssertEqual(state.modifiers(settings: settings), [])
+    }
+  }
+
+  func testAutomaticNormalizationChangesOnlyWindowStateAndDoesNotResurrectModifiers() throws {
+    try withSettings { settings, defaults in
+      var state = try liveState(settings: settings)
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      state.normalizeModifiers([], settings: settings)
+      XCTAssertTrue(state.hasTransientModifiers(settings: settings))
+      XCTAssertEqual(state.modifiers(settings: settings), [])
+      XCTAssertEqual(state.difficulty(settings: settings), .normal)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testExplicitPresetCaptureUsesLiveSnapshotWithoutChangingPreferences() throws {
+    try withSettings { settings, defaults in
+      let state = try liveState(settings: settings)
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      let snapshot = state.snapshot(settings: settings)
+      let configuration = TestConfiguration.words(3, difficulty: state.difficulty(settings: settings),
+        rules: settings.inputRules).with(modifiers: state.modifiers(settings: settings))
+      let preset = SavedTestPreset(configuration: configuration, settingsSnapshot: snapshot)
+      XCTAssertTrue(PresetSettingsApplication.agreesWithSnapshot(preset))
+      XCTAssertEqual(try LocalPresetCodec.decode(LocalPresetCodec.encode(preset)), preset)
+      XCTAssertEqual(snapshot.difficulty, .normal)
+      XCTAssertEqual(settings.snapshot.difficulty, .expert)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testUnloadedLegacyReaderDoesNotAdoptAnAppearingSourceProfile() throws {
+    let suite = "typebar.challenge-live-no-adoption.\(UUID())"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let oldReader = AppSettings(defaults: defaults,
+      feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+    oldReader.difficulty = .expert
+    let source = PracticeThresholdSource(configuration: .init())
+    XCTAssertTrue(ThresholdSettingsStore(defaults: defaults).save(source.applying(to: .init())))
+    var live = ChallengeLiveConfigurationState()
+    let configuration = TestConfiguration.words(3).with(challengeID: "clean-twenty-five")
+    let before = defaults.dictionaryRepresentation() as NSDictionary
+    XCTAssertFalse(live.install(configuration, settings: oldReader))
+    XCTAssertEqual(live.difficulty(settings: oldReader), .expert)
+    XCTAssertNil(oldReader.inputRules.thresholdSource)
+    XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+  }
+
+  func testSourceFunboxClearRefusesToOverwriteUnseenPersistedPreferences() throws {
+    try withSettings { settings, defaults in
+      var external = settings.snapshot
+      external.fontSize = 42
+      XCTAssertTrue(ThresholdSettingsStore(defaults: defaults).save(external))
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      let revision = settings.testModifiersApplicationRevision
+      XCTAssertFalse(settings.clearChallengeModifiers())
+      XCTAssertEqual(settings.testModifiers, [.mirrorKeyboard])
+      XCTAssertEqual(settings.testModifiersApplicationRevision, revision)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
 }

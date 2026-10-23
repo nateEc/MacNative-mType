@@ -1190,6 +1190,8 @@ final class AppSettings {
   // Presentation event identity only; never part of a saved settings snapshot.
   private(set) var practiceWrapperRevision: UInt64 = 0
   private(set) var practiceFontApplicationRevision: UInt64 = 0
+  private(set) var difficultyApplicationRevision: UInt64 = 0
+  private(set) var testModifiersApplicationRevision: UInt64 = 0
 
   var activeTestSelection: ActiveTestSelectionDocument? {
     ActiveTestSelectionStore(defaults: defaults).load()
@@ -1236,7 +1238,10 @@ final class AppSettings {
     return true
   }
 
-  var difficulty: Difficulty = .normal { didSet { persist() } }
+  var difficulty: Difficulty = .normal { didSet {
+    if !initializingSettings { difficultyApplicationRevision &+= 1 }
+    persist()
+  } }
   var strictSpace = false { didSet { persist() } }
   /// Backward-compatible Boolean bridge for archives and callers written
   /// before selectable error-handling variants existed.
@@ -1609,7 +1614,10 @@ final class AppSettings {
       }
     }
   }
-  var testModifiers: [TestModifier] = [] { didSet { persist() } }
+  var testModifiers: [TestModifier] = [] { didSet {
+    if !initializingSettings { testModifiersApplicationRevision &+= 1 }
+    persist()
+  } }
   var showFocusWarning = true { didSet { persist() } }
   var showCapsLockWarning = true { didSet { persist() } }
   var playErrorBeep = false { didSet { persist() } }
@@ -2392,7 +2400,28 @@ final class AppSettings {
     else { installSnapshotFields(incoming, groups: groups) }
     initializingSettings = wasInitializing
     batchingClickSoundConfiguration = wasBatchingSound
+    if groups?.contains(.behavior) ?? true {
+      difficultyApplicationRevision &+= 1
+      testModifiersApplicationRevision &+= 1
+    }
     if configuration == nil, groups?.contains(.sound) ?? true { synchronizeClickSoundConfiguration() }
+    return true
+  }
+
+  /// Challenge setup owns only clearing the persisted Funbox. Do not replay
+  /// other behavior fields or invalidate their window-local nosave values.
+  func clearChallengeModifiers() -> Bool {
+    guard allowsRestartingConfigurationChange, thresholdSourceState != nil,
+      case .available(let stored) = thresholdProfileRead, stored == snapshot else { return false }
+    guard !testModifiers.isEmpty else { return true }
+    var cleared = snapshot
+    cleared.testModifiers = []
+    guard canApplySourceSnapshot(cleared), ThresholdSettingsStore(defaults: defaults).save(cleared) else { return false }
+    let wasInitializing = initializingSettings
+    initializingSettings = true
+    testModifiers = []
+    initializingSettings = wasInitializing
+    testModifiersApplicationRevision &+= 1
     return true
   }
 

@@ -55,7 +55,7 @@ enum SourceChallengeAdmission {
     // mode/difficulty/limits are nosave. Only this owned global delta is saved.
     var cleared = settings.snapshot
     cleared.testModifiers = []
-    guard settings.apply(cleared, groups: [.behavior]), settings.snapshot == cleared,
+    guard settings.clearChallengeModifiers(), settings.snapshot == cleared,
       case .available(let stored) = settings.thresholdProfileRead, stored == cleared else { return false }
     return true
   }
