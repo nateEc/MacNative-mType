@@ -1238,6 +1238,18 @@ final class AppSettings {
     return true
   }
 
+  /// Archive settings application can invalidate current qualification even
+  /// when the saved challenge document is unchanged. Explicitly replay restore.
+  @discardableResult
+  func reapplyActiveTestSelection(_ document: ActiveTestSelectionDocument) -> Bool {
+    guard allowsRestartingConfigurationChange,
+      let validated = ActiveTestSelectionPolicy.validated(document),
+      validated == activeTestSelection,
+      ActiveTestSelectionStore(defaults: defaults).save(validated) else { return false }
+    activeTestSelectionGeneration &+= 1
+    return true
+  }
+
   var difficulty: Difficulty = .normal { didSet {
     if !initializingSettings { difficultyApplicationRevision &+= 1 }
     persist()

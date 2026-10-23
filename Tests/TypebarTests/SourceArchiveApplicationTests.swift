@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class SourceArchiveApplicationTests: XCTestCase {
-  private func withSettings(feedbackSound: ((UserDefaults) -> TypingFeedbackSound)? = nil,
+  private func withSettings(sourceProfile: Bool = true, feedbackSound: ((UserDefaults) -> TypingFeedbackSound)? = nil,
     _ body: (AppSettings, UserDefaults) throws -> Void) throws {
     let suite = "typebar.source-archive-application.\(UUID().uuidString)"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -14,8 +14,10 @@ final class SourceArchiveApplicationTests: XCTestCase {
     try raw.apply(.minimumAccuracy(mode: .off, customValue: 93))
     try raw.apply(.minimumWordBurst(mode: .off, customValue: 84))
     defaults.set(try JSONEncoder().encode(AppSettingsSnapshot(fontSize: 22)), forKey: "appSettings.v1")
-    XCTAssertTrue(ThresholdSettingsStore(defaults: defaults).save(
-      PracticeThresholdSource(configuration: raw).applying(to: .init(fontSize: 31))))
+    if sourceProfile {
+      XCTAssertTrue(ThresholdSettingsStore(defaults: defaults).save(
+        PracticeThresholdSource(configuration: raw).applying(to: .init(fontSize: 31))))
+    }
     try body(AppSettings(defaults: defaults,
       feedbackSound: feedbackSound?(defaults) ?? TypingFeedbackSound(loadSound: { _ in nil }, beep: {}),
       localBackgroundStore: .inMemory()), defaults)
@@ -55,7 +57,8 @@ final class SourceArchiveApplicationTests: XCTestCase {
   }
 
   private func apply(_ archive: TypebarArchive, settings: AppSettings, defaults: UserDefaults,
-    context: ModelContext, source: ArchiveImportSource = .localFile) throws -> ArchiveImportSummary {
+    context: ModelContext, source: ArchiveImportSource = .localFile,
+    resources: @escaping @MainActor (TestConfiguration) -> Bool = ArchiveSourceAdmission.resourcesAvailable) throws -> ArchiveImportSummary {
     try LocalArchiveImport.apply(archive, settings: settings,
       results: context.fetch(FetchDescriptor<TestResultRecord>()),
       presets: context.fetch(FetchDescriptor<TestPresetRecord>()),
@@ -63,7 +66,218 @@ final class SourceArchiveApplicationTests: XCTestCase {
       resultTombstoneStore: .init(defaults: defaults), presetTombstoneStore: .init(defaults: defaults),
       savedTextTombstoneStore: .init(defaults: defaults), customizationTombstoneStore: .init(defaults: defaults),
       resultFilterPresets: context.fetch(FetchDescriptor<ResultFilterPresetRecord>()),
-      tombstoneStore: .init(defaults: defaults), source: source, modelContext: context)
+      tombstoneStore: .init(defaults: defaults), source: source,
+      selectionResourcesAvailable: resources, modelContext: context)
+  }
+
+  private func challengeArchive(source: Bool = true, id: String = "clean-twenty-five") throws -> TypebarArchive {
+    let original = try archive(source: source)
+    let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: id))
+    var configuration = challenge.preset.configuration.with(challengeID: challenge.id)
+    if let owner = original.settings.thresholdSource {
+      configuration.rules = owner.applying(to: configuration.rules)
+    }
+    let selection = ActiveTestSelectionDocument(preset: .init(configuration: configuration,
+      customText: challenge.preset.customText), testParameterMemory: .defaults)
+    return .init(exportedAt: original.exportedAt, settings: original.settings,
+      results: original.results, presets: original.presets, savedTexts: original.savedTexts,
+      activeTestSelection: selection)
+  }
+
+  func testSourceArchiveRestoresChallengeSelectionAndColdReaderCompletesIt() throws {
+    try withSettings { settings, defaults in
+      let store = try container()
+      let original = try challengeArchive()
+      let incoming = try TypebarDataTransfer.importArchive(from: TypebarArchiveDocument(archive: original).archiveData())
+      let summary = try apply(incoming, settings: settings, defaults: defaults, context: store.mainContext)
+      XCTAssertTrue(summary.restoredActiveTestSelection)
+      XCTAssertEqual(summary.insertedResults, 1)
+      let reader = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+      let selection = try XCTUnwrap(reader.activeTestSelection)
+      let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(selection.preset, to: reader,
+        appliesGlobalSettings: false))
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: selection.preset.configuration.challengeID))
+      let configuration = ChallengeInputRulePolicy.applying(reader.inputRules,
+        to: ChallengeSetupSelectionPolicy.applying(.init(configuration: selection.preset.configuration), for: challenge))
+      let profile = defaults.data(forKey: "appSettings.v4")
+      XCTAssertTrue(PresetSettingsApplication.commit(original: prepared.preset, resolved: prepared.preset,
+        configuration: configuration, to: reader, appliesGlobalSettings: false,
+        expectedSourceState: prepared.baseline))
+      var session = TestSessionFactory.make(configuration: configuration)
+      session.insertBatch(session.prompt, at: Date(timeIntervalSince1970: 100))
+      let result = try XCTUnwrap(session.result())
+      XCTAssertTrue(ChallengeEvaluator.evaluate(result, challenge: challenge).passed)
+      XCTAssertEqual(defaults.data(forKey: "appSettings.v4"), profile)
+    }
+  }
+
+  func testLegacyChallengeArchivePromotesSelectionWithoutDiscardingSourceMemories() throws {
+    try withSettings { settings, defaults in
+      let store = try container()
+      let remembered = settings.thresholdConfiguration
+      let old = defaults.data(forKey: "appSettings.v1")
+      let summary = try apply(challengeArchive(source: false), settings: settings,
+        defaults: defaults, context: store.mainContext)
+      XCTAssertTrue(summary.restoredActiveTestSelection)
+      XCTAssertEqual(settings.thresholdConfiguration, remembered)
+      XCTAssertEqual(settings.activeTestSelection?.version, 2)
+      XCTAssertEqual(settings.activeTestSelection?.preset.configuration.challengeID, "clean-twenty-five")
+      XCTAssertEqual(defaults.data(forKey: "appSettings.v1"), old)
+    }
+  }
+
+  func testMissingChallengeResourcesRejectBeforeRecordsPreferencesAndMarkers() throws {
+    try withSettings { settings, defaults in
+      let store = try container()
+      let incoming = try challengeArchive(id: "ten-words-of-pain")
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      XCTAssertThrowsError(try apply(incoming, settings: settings, defaults: defaults,
+        context: store.mainContext, resources: { configuration in
+          PresetResourceAdmission.refusal(for: configuration, wingdingsAvailable: { false },
+            scriptIsVerified: { _ in false }) == nil
+        })) { XCTAssertEqual($0 as? LocalArchiveImportError, .activeTestSelectionResourcesUnavailable) }
+      XCTAssertEqual(try store.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testResourceCallbackCannotOverwriteANewerProfileBeforeRecordWrites() throws {
+    try withSettings { settings, defaults in
+      let store = try container()
+      let originalThresholds = settings.thresholdConfiguration
+      XCTAssertThrowsError(try apply(challengeArchive(), settings: settings, defaults: defaults,
+        context: store.mainContext, resources: { _ in settings.fontSize = 48; return true })) {
+        XCTAssertEqual($0 as? LocalArchiveImportError, .sourceStateUnavailable)
+      }
+      XCTAssertEqual(settings.fontSize, 48)
+      XCTAssertEqual(settings.thresholdConfiguration, originalThresholds)
+      XCTAssertEqual(try store.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+      XCTAssertNil(settings.activeTestSelection)
+    }
+  }
+
+  func testLateResourceLossReportsCommittedRecordsAndSettingsWithoutSavingSelection() throws {
+    var available = true
+    try withSettings(feedbackSound: { _ in
+      TypingFeedbackSound(loadSound: { _ in available = false; return nil }, beep: {})
+    }) { settings, defaults in
+      let store = try container()
+      let original = try challengeArchive()
+      var snapshot = original.settings
+      snapshot.playKeyclickSound = true
+      let incoming = TypebarArchive(exportedAt: original.exportedAt, settings: snapshot,
+        results: original.results, presets: original.presets, savedTexts: original.savedTexts,
+        activeTestSelection: original.activeTestSelection)
+      XCTAssertThrowsError(try apply(incoming, settings: settings, defaults: defaults,
+        context: store.mainContext, resources: { _ in available })) {
+        XCTAssertEqual($0 as? LocalArchiveImportError, .recordsAndSettingsImportedSelectionNotApplied)
+      }
+      XCTAssertEqual(try store.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 1)
+      XCTAssertEqual(settings.snapshot, snapshot)
+      XCTAssertNil(settings.activeTestSelection)
+      XCTAssertEqual(settings.activeTestSelectionGeneration, 0)
+    }
+  }
+
+  func testLateResourceCallbackPreservesAChangedSelectionRatherThanOverwritingIt() throws {
+    try withSettings { settings, defaults in
+      let store = try container()
+      var calls = 0
+      XCTAssertThrowsError(try apply(challengeArchive(), settings: settings, defaults: defaults,
+        context: store.mainContext, resources: { _ in
+          calls += 1
+          if calls == 3 {
+            XCTAssertTrue(settings.importActiveTestSelection(.init(preset: .init(
+              configuration: .words(17, rules: settings.inputRules)), testParameterMemory: .defaults)))
+          }
+          return true
+        })) { XCTAssertEqual($0 as? LocalArchiveImportError, .recordsAndSettingsImportedSelectionNotApplied) }
+      XCTAssertEqual(try store.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 1)
+      XCTAssertEqual(settings.activeTestSelection?.preset.configuration.wordLimit, 17)
+      XCTAssertNil(settings.activeTestSelection?.preset.configuration.challengeID)
+    }
+  }
+
+  func testForgedChallengeSelectionIsRejectedBeforeResourceChecksAndWrites() throws {
+    try withSettings { settings, defaults in
+      let store = try container()
+      let original = try challengeArchive()
+      var preset = try XCTUnwrap(original.activeTestSelection).preset
+      preset.configuration.wordLimit = 3
+      let incoming = TypebarArchive(exportedAt: original.exportedAt, settings: original.settings,
+        results: original.results, presets: original.presets, savedTexts: original.savedTexts,
+        activeTestSelection: .init(preset: preset, testParameterMemory: .defaults))
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      var checked = false
+      XCTAssertThrowsError(try apply(incoming, settings: settings, defaults: defaults,
+        context: store.mainContext, resources: { _ in checked = true; return true })) {
+        XCTAssertEqual($0 as? LocalArchiveImportError, .invalidActiveTestSelection)
+      }
+      XCTAssertFalse(checked)
+      XCTAssertEqual(try store.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testReimportedChallengeReplaysRestorationWithoutDuplicatingRecords() throws {
+    try withSettings { settings, defaults in
+      let store = try container()
+      let incoming = try challengeArchive()
+      _ = try apply(incoming, settings: settings, defaults: defaults, context: store.mainContext)
+      let generation = settings.activeTestSelectionGeneration
+      let repeated = try apply(incoming, settings: settings, defaults: defaults, context: store.mainContext)
+      XCTAssertEqual(repeated.insertedResults, 0)
+      XCTAssertEqual(repeated.insertedPresets, 0)
+      XCTAssertEqual(repeated.insertedSavedTexts, 0)
+      XCTAssertTrue(repeated.restoredActiveTestSelection)
+      XCTAssertEqual(settings.activeTestSelectionGeneration, generation + 1)
+      XCTAssertEqual(try store.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 1)
+    }
+  }
+
+  func testLegacyUnchangedCloudMergeDoesNotPublishSettingsOrSelectionEvents() throws {
+    try withSettings(sourceProfile: false) { settings, defaults in
+      let store = try container()
+      let original = try challengeArchive(source: false)
+      _ = try apply(original, settings: settings, defaults: defaults, context: store.mainContext)
+      let incoming = TypebarArchive(exportedAt: original.exportedAt, settings: settings.snapshot,
+        results: original.results, presets: original.presets, savedTexts: original.savedTexts,
+        activeTestSelection: settings.activeTestSelection)
+      let generation = settings.activeTestSelectionGeneration
+      let difficultyRevision = settings.difficultyApplicationRevision
+      let modifierRevision = settings.testModifiersApplicationRevision
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      let summary = try apply(incoming, settings: settings, defaults: defaults,
+        context: store.mainContext, source: .cloudSync)
+      XCTAssertFalse(summary.restoredActiveTestSelection)
+      XCTAssertEqual(summary.insertedResults, 0)
+      XCTAssertEqual(settings.activeTestSelectionGeneration, generation)
+      XCTAssertEqual(settings.difficultyApplicationRevision, difficultyRevision)
+      XCTAssertEqual(settings.testModifiersApplicationRevision, modifierRevision)
+      XCTAssertFalse(settings.hasThresholdProfile)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testUnchangedCloudMergeDoesNotApplySettingsOrReplayChallengeSelection() throws {
+    try withSettings { settings, defaults in
+      let store = try container()
+      let incoming = try challengeArchive()
+      _ = try apply(incoming, settings: settings, defaults: defaults, context: store.mainContext)
+      let generation = settings.activeTestSelectionGeneration
+      let difficulty = settings.difficultyApplicationRevision
+      let modifiers = settings.testModifiersApplicationRevision
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      let merged = try apply(incoming, settings: settings, defaults: defaults,
+        context: store.mainContext, source: .cloudSync)
+      XCTAssertFalse(merged.restoredActiveTestSelection)
+      XCTAssertEqual(merged.insertedResults, 0)
+      XCTAssertEqual(settings.activeTestSelectionGeneration, generation)
+      XCTAssertEqual(settings.difficultyApplicationRevision, difficulty)
+      XCTAssertEqual(settings.testModifiersApplicationRevision, modifiers)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
   }
 
   func testFullSourceArchiveImportsRecordsSettingsAndSelectionWithoutRewritingLegacyHistory() throws {

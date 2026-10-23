@@ -1780,6 +1780,7 @@ enum LocalArchiveImportError: Error, Equatable, LocalizedError {
     case thresholdSourceNotReady
     case invalidSourceSettings
     case invalidActiveTestSelection
+    case activeTestSelectionResourcesUnavailable
     case sourceStateUnavailable
     case recordsImportedSettingsNotApplied
     case recordsAndSettingsImportedSelectionNotApplied
@@ -1794,12 +1795,14 @@ enum LocalArchiveImportError: Error, Equatable, LocalizedError {
             return "归档中的阈值设置不一致或无法完整应用，未导入数据。"
         case .invalidActiveTestSelection:
             return "归档中的测试选择无效、暂不支持或恢复记录不可读，未导入数据。"
+        case .activeTestSelectionResourcesUnavailable:
+            return "归档测试选择所需的字体或已验证脚本不可用，未导入数据。"
         case .sourceStateUnavailable:
             return "当前配置或恢复状态不可读或已改变，未导入数据。"
         case .recordsImportedSettingsNotApplied:
             return "记录与删除标记已导入，但设置未能完整保存；请检查配置版本或锁定状态后重试。"
         case .recordsAndSettingsImportedSelectionNotApplied:
-            return "记录、删除标记和设置已导入，但测试选择未恢复；请检查恢复记录。"
+            return "记录、删除标记和设置已导入，但测试选择未恢复；请检查恢复记录或所需资源。"
         }
     }
 }
@@ -1819,6 +1822,7 @@ enum LocalArchiveImport {
         resultFilterPresets: [ResultFilterPresetRecord] = [],
         tombstoneStore: ResultFilterPresetTombstoneStore = .init(),
         source: ArchiveImportSource = .localFile,
+        selectionResourcesAvailable: @escaping @MainActor (TestConfiguration) -> Bool = ArchiveSourceAdmission.resourcesAvailable,
         modelContext: ModelContext
     ) throws -> ArchiveImportSummary {
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(archive.results)
@@ -1857,7 +1861,8 @@ enum LocalArchiveImport {
             deletedThemeIDs: effectiveDeletedCustomThemeIDs,
             deletedKeyboardLayoutIDs: effectiveDeletedCustomKeyboardLayoutIDs)
         let sourcePlan = try ArchiveSourceAdmission.preparing(importedSettings,
-            selection: archive.activeTestSelection, to: settings)
+            selection: archive.activeTestSelection, to: settings, importSource: source,
+            selectionResourcesAvailable: selectionResourcesAvailable)
         let storedDeletedResultIDs = Set(resultTombstoneStore.deletedIDs)
         let archiveDeletedResultIDs = Set(archive.deletedResultIDs)
         let resultingDeletedResultIDs: Set<UUID>
