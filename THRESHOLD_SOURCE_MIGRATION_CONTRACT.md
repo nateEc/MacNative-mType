@@ -1,10 +1,20 @@
 # 阈值源状态与迁移契约
 
+## 背景帧方向标签与自然尺寸（追加阶段）
+
+固定 applyCustomBackground 创建普通 img；前端源码／静态 CSS／SCSS／HTML／TS 中未发现 image-orientation 覆盖。依据 [CSS Images 3 的 from-image 默认行为](https://www.w3.org/TR/css-images-3/#the-image-orientation) 构造方向入口，不声称已做浏览器像素实测。[Apple CGImagePropertyOrientation](https://developer.apple.com/documentation/imageio/cgimagepropertyorientation) 的原始数值属于 TIFF／EXIF 1–8，不是 UIKit 的同名枚举编号，镜像与旋转不可混用。
+
+Frame.orientation 对每帧已保留的 kCGImagePropertyOrientation 读取有限、整数、1–8 的 CFNumber；缺失、未知或结构不合法时按原生策略视为 up，原始 properties 不改写。非法值探针是直接构造的元数据边界，不证明真实文件格式可编码 NaN／小数或浏览器对全部损坏文件采用相同政策。读回的原始 CGImage 和完整容器保持不变，不能把已经正向化且仍携带旧标签的人工 Frame 当成原始资源再绘制。
+
+ObjectFit 的 frame 重载显式消费此标签；原始 CGImage 重载增加默认 up 的参数，旧调用保持不自动读取或二次应用标签。非 up 使用 [CIImage.orientationTransform(for:)](https://developer.apple.com/documentation/coreimage/ciimage/orientationtransform(for:)) 只查询仿射变换，不创建 CIContext、不渲染临时图。先由变换后的边界计算自然宽高，再求 cover／contain／fill 内容矩形，随后在调用方上下文中做坐标映射和一次原图绘制。保留 caller clip／CTM／current path／色彩和插值策略。角度与镜像后仍需完整的 CSS 图片盒几何及滤镜后变换，不能把 EXIF 变换代替源 CSS transform。
+
+本机 macOS 26.1、Swift 6.2.4；安装 SDK 声明方向查询可用自 macOS 10.13，低于包最低 macOS 14，但最低系统尚未实测。六色非对称 3×2 原创像素表独立列出八种正确序列，不用同一个系统方向 API 生成预期结果；另测方向后的 contain 留白、2× 与路径恢复、P3，以及 ImageIO 真正写入／准备／绘制 JPEG 的整条入口。JPEG 比较实际解码颜色的正确置换，不假设 JPEG 无损；标签和原始编码数据在绘图后必须不变。其他格式与动画帧合成、HDR、浏览器、性能和生产切流仍未完成。
+
 ## 图片盒内对象适配与调用方画布（追加阶段）
 
 固定 theme-controller.ts::applyCustomBackgroundSize 对 cover／contain 直接设置 objectFit，max 写空串；全局背景样式没有另设 object-position。[CSS Images 3 §4.5／§4.6](https://www.w3.org/TR/css-images-3/#the-object-fit) 的初始适配是 fill，位置为中心，图片内容始终裁到内容盒。QA 扩展已有背景脚本，在运行时读取并执行完整 size setter，三个合法值各捕获一次真实声明，不内嵌源函数，不把模拟 style 捕获声称为浏览器 computed layout。
 
-WebsiteConfigBackgroundObjectFit 接受已经决定的图片盒，以宽高比例产生中心 content rect，再保存调用方 CGContext 状态、裁内容盒、绘图并恢复。max 可非等比拉伸；contain 留白不主动填色，保留调用方已有背景或透明；cover 不向内容盒外泄漏。调用方拥有画布坐标、插值、色彩空间、分辨率和资源预算；组件不分配画布或自动执行 EXIF 方向，输入 CGImage 必须已由后续资源宿主按方向处理。原始图片文件不改动。CGFloat 极端数导致计算无法表达时显式失败，不把无穷结果交给 Core Graphics 或更改原配置。
+WebsiteConfigBackgroundObjectFit 接受已经决定的图片盒，以宽高比例产生中心 content rect，再保存调用方 CGContext 状态、裁内容盒、绘图并恢复。max 可非等比拉伸；contain 留白不主动填色，保留调用方已有背景或透明；cover 不向内容盒外泄漏。调用方拥有画布坐标、插值、色彩空间、分辨率和资源预算；组件不分配画布。原始 CGImage 的默认 up 入口假定已经正向；后续新增的 frame／显式方向入口可处理原始方向数据，见前节。原始图片文件不改动。CGFloat 极端数导致计算无法表达时显式失败，不把无穷结果交给 Core Graphics 或更改原配置。
 
 已安装 SDK 的 CGContextSaveGState／RestoreGState／ClipToRect／DrawImage 可用性早于包最低 macOS 14；ClipToRect 明确清空 current path，而 current path 不属于保存的图形状态。因此路径必须另行保存／重建，不能仅调用 save/restore 就声称不影响后续路径。像素测试使用自有四列分色图、透明条带、1×／2× CTM、平移／已有 clip／曲线路径，并把 contain 画布真正送入先前 sRGB 亮度处理，核对透明条带不被填满。没有比较浏览器插值，也没有证明所有色深／色域、方向或动画。
 

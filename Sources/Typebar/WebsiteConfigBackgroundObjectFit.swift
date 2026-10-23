@@ -1,7 +1,9 @@
 import CoreGraphics
+import CoreImage
+import ImageIO
 
 /// Object content inside an already resolved CSS image box. Not the image box's
-/// absolute position, blur overdraw, transform, orientation or animation policy.
+/// absolute position, blur overdraw, CSS transform or animation policy.
 enum WebsiteConfigBackgroundObjectFit {
   enum Failure: Error, Equatable { case invalidGeometry, unrepresentableGeometry }
 
@@ -25,8 +27,14 @@ enum WebsiteConfigBackgroundObjectFit {
   }
 
   /// Caller owns the context, coordinate system, color space and interpolation.
-  static func draw(_ image: CGImage, in box: CGRect, fit: CustomBackgroundFit, context: CGContext) throws {
-    guard let content = try placement(imageSize: .init(width: image.width, height: image.height), in: box, fit: fit)
+  static func draw(_ image: CGImage, in box: CGRect, fit: CustomBackgroundFit,
+    orientation: CGImagePropertyOrientation = .up, context: CGContext) throws {
+    let rawBounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+    // Ask for geometry only: no CIContext render or intermediate bitmap/color conversion.
+    let direction = orientation == .up ? CGAffineTransform.identity
+      : CIImage(cgImage: image).orientationTransform(for: orientation)
+    let orientedBounds = rawBounds.applying(direction)
+    guard let content = try placement(imageSize: orientedBounds.size, in: box, fit: fit)
     else { return }
     // CGContext's current path is not saved by saveGState, and clip(to:) clears it.
     let path = context.path
@@ -37,6 +45,20 @@ enum WebsiteConfigBackgroundObjectFit {
       if let path { context.addPath(path) }
     }
     context.clip(to: box)
-    context.draw(image, in: content)
+    if orientation == .up {
+      context.draw(image, in: content)
+    } else {
+      // Resolve the natural aspect after orientation, then fit in caller space.
+      context.translateBy(x: content.origin.x, y: content.origin.y)
+      context.scaleBy(x: content.width / orientedBounds.width, y: content.height / orientedBounds.height)
+      context.translateBy(x: -orientedBounds.minX, y: -orientedBounds.minY)
+      context.concatenate(direction)
+      context.draw(image, in: rawBounds)
+    }
+  }
+
+  static func draw(_ frame: WebsiteConfigBackgroundResource.Frame, in box: CGRect,
+    fit: CustomBackgroundFit, context: CGContext) throws {
+    try draw(frame.image, in: box, fit: fit, orientation: frame.orientation, context: context)
   }
 }

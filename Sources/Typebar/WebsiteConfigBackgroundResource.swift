@@ -26,6 +26,15 @@ struct WebsiteConfigBackgroundResource {
   struct Frame {
     let image: CGImage
     let properties: CFDictionary
+    /// ImageIO's per-image TIFF/EXIF value, not UIImage's differently numbered enum.
+    /// Malformed metadata is retained in properties but never invents a transform.
+    var orientation: CGImagePropertyOrientation {
+      guard let number = (properties as NSDictionary)[kCGImagePropertyOrientation] as? NSNumber else { return .up }
+      let value = number.doubleValue
+      guard value.isFinite, value >= 1, value <= 8, value.rounded(.towardZero) == value
+      else { return .up }
+      return CGImagePropertyOrientation(rawValue: UInt32(value)) ?? .up
+    }
   }
   struct Image {
     let encodedData: Data
