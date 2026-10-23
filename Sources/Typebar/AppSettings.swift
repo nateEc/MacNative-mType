@@ -1142,6 +1142,7 @@ final class AppSettings {
   @ObservationIgnored let localBackgroundStore: TypebarLocalBackgroundStore
   @ObservationIgnored private var batchingClickSoundConfiguration = true
   @ObservationIgnored private var initializingSettings = true
+  @ObservationIgnored private var savingLiveConfiguration = false
   @ObservationIgnored private var usingExpandedPaceStorage = false
   @ObservationIgnored private var usingAccountPaceStorage = false
   private var thresholdSourceState: PracticeThresholdSource?
@@ -2413,6 +2414,67 @@ final class AppSettings {
     return AppSettings(validating: incoming, defaults: defaults).snapshot == incoming
   }
 
+  /// Persist the configuration already in use, not a replay of its setters.
+  /// The separate selection store is committed by the caller after success.
+  @discardableResult
+  func persistLiveConfiguration(_ live: ChallengeLiveConfigurationState,
+    hasActiveLocalFont: (() -> Bool)? = nil,
+    deactivateLocalFont: (() -> Bool)? = nil) -> Bool {
+    guard !savingLiveConfiguration, live.canCaptureForPersistence(settings: self) else { return false }
+    let before = snapshot
+    var current = live.snapshot(settings: self)
+    let canonicalModifiers = TestModifierPolicy.normalized(current.testModifiers)
+    guard canonicalModifiers.count == current.testModifiers.count,
+      Set(canonicalModifiers) == Set(current.testModifiers) else { return false }
+    current.testModifiers = canonicalModifiers
+    guard AppSettings(validating: current, defaults: defaults).snapshot == current else { return false }
+    let acceptedFont = live.hasTransientFont(settings: self) ? live.fontFamilyName(settings: self) : nil
+    if hasThresholdProfile {
+      guard thresholdSourceState != nil,
+        case .available(let stored) = thresholdProfileRead, stored == before,
+        current.thresholdSource == before.thresholdSource,
+        ThresholdSettingsStore(defaults: defaults).save(current),
+        thresholdProfileRead == .available(current) else { return false }
+    } else {
+      guard current.thresholdSource == nil else { return false }
+      if let stored = defaults.object(forKey: storageKey) {
+        guard let data = stored as? Data,
+          (try? JSONDecoder().decode(AppSettingsSnapshot.self, from: data)) == before else { return false }
+      }
+      guard let data = try? JSONEncoder().encode(current),
+        (try? JSONDecoder().decode(AppSettingsSnapshot.self, from: data)) == current else { return false }
+      defaults.set(data, forKey: storageKey)
+      guard defaults.data(forKey: storageKey) == data else { return false }
+    }
+    let wasInitializing = initializingSettings
+    savingLiveConfiguration = true
+    initializingSettings = true
+    defer {
+      initializingSettings = wasInitializing
+      savingLiveConfiguration = false
+    }
+    if difficulty != current.difficulty { difficulty = current.difficulty }
+    if testModifiers != current.testModifiers { testModifiers = current.testModifiers }
+    if installedPracticeFontName != current.installedPracticeFontName {
+      installedPracticeFontName = current.installedPracticeFontName
+    }
+    if keyboardGuideMode != current.keyboardGuideMode { keyboardGuideMode = current.keyboardGuideMode }
+    if showKeyboardGuide != current.showKeyboardGuide { showKeyboardGuide = current.showKeyboardGuide }
+    guard snapshot == current else { return false }
+    if TransientFontPersistencePolicy.requiresLocalFontDeactivation(acceptedFamily: acceptedFont,
+      persistedFamily: current.installedPracticeFontName, savesEffectiveSnapshot: true),
+      (hasActiveLocalFont ?? { self.isUsingLocalPracticeFont })() {
+      // The local file is retained. This is an ordered sidecar handoff, not a
+      // cross-store transaction; a failed handoff must be reported as partial.
+      let handedOff = (deactivateLocalFont ?? {
+        self.deactivateLocalPracticeFont()
+        return !self.isUsingLocalPracticeFont
+      })()
+      return handedOff && snapshot == current
+    }
+    return true
+  }
+
   private func applySourceSnapshot(_ incoming: AppSettingsSnapshot,
     configuration: TestConfiguration? = nil, activeResultTags: [String]? = nil,
     groups: Set<PresetSettingGroup>? = nil) -> Bool {
@@ -2692,7 +2754,7 @@ final class AppSettings {
   func deactivateLocalPracticeFont() {
     TypebarLocalPracticeFontStore.deactivate()
     localPracticeFontRevision &+= 1
-    practiceFontApplicationRevision &+= 1
+    if !savingLiveConfiguration { practiceFontApplicationRevision &+= 1 }
   }
 
   func removeLocalPracticeFont() throws {
@@ -2906,11 +2968,13 @@ final class AppSettings {
   }
 
   private func persistPracticeFontApplication() {
+    guard !savingLiveConfiguration else { return }
     practiceFontApplicationRevision &+= 1
     persist()
   }
 
   private func persistKeyboardGuideApplication() {
+    guard !savingLiveConfiguration else { return }
     keyboardGuideApplicationRevision &+= 1
     persist()
   }

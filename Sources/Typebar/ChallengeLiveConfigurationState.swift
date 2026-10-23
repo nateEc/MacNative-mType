@@ -143,4 +143,14 @@ struct ChallengeLiveConfigurationState {
     }
     return snapshot
   }
+
+  func canCaptureForPersistence(settings: AppSettings) -> Bool {
+    if owner === settings { return true }
+    // An ordinary window starts without an overlay. A detached or foreign
+    // overlay must never authorize another model's persistence.
+    return owner == nil && liveDifficulty == nil && liveModifiers == nil
+      && liveFontFamily == nil && liveKeyboardGuide == nil
+      && difficultyRevision == nil && modifiersRevision == nil
+      && fontRevision == nil && keyboardGuideRevision == nil && presentationRevision == nil
+  }
 }

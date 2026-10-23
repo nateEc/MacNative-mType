@@ -2507,18 +2507,11 @@ struct PreferencesView: View {
   }
 
   private func modifierBinding(_ modifier: TestModifier, settings: AppSettings) -> Binding<Bool> {
-    Binding(
-      get: { settings.preferenceTestModifiers.contains(modifier) },
-      set: { enabled in
-        guard enabled != settings.preferenceTestModifiers.contains(modifier) else { return }
-        guard acceptsRestartingConfigurationChange() else { return }
-        guard settings.toggleTestModifier(modifier) else {
-          funboxSelectionMessage = "\(modifier.displayName) 与当前趣味修饰器组合不兼容；已保留现有选择。"
-          return
-        }
-        funboxSelectionMessage = nil
-      }
-    )
+    PracticeFunboxPreferences(settings: settings,
+      acceptsChange: { acceptsRestartingConfigurationChange() },
+      onResult: { accepted in
+        funboxSelectionMessage = accepted ? nil : "\(modifier.displayName) 与当前趣味修饰器组合不兼容；已保留现有选择。"
+      }).selection(for: modifier)
   }
 
   private var thresholdPreferences: PracticeThresholdPreferences {

@@ -6267,6 +6267,10 @@ private struct ContentView: View {
   }
 
   private func persistExplicitTestConfiguration() {
+    guard settings.persistLiveConfiguration(challengeLiveConfiguration) else {
+      account.localNotices.post("当前实时配置未能完整保存；可能已有部分设置生效，请检查配置存储与本地字体选择。")
+      return
+    }
     guard wordPractice != nil else { return }
     persistActiveTestSelection(for: configuration, cause: .configurationSave)
   }

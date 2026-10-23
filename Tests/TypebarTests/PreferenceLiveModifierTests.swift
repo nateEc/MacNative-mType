@@ -159,8 +159,10 @@ final class PreferenceLiveModifierTests: XCTestCase {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
     let preferences = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/PreferencesView.swift"), encoding: .utf8)
-    XCTAssertTrue(preferences.contains("get: { settings.preferenceTestModifiers.contains(modifier) }"))
-    XCTAssertTrue(preferences.contains("guard enabled != settings.preferenceTestModifiers.contains(modifier)"))
+    let controls = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/PracticeFunboxPreferences.swift"), encoding: .utf8)
+    XCTAssertTrue(preferences.contains("PracticeFunboxPreferences(settings: settings"))
+    XCTAssertTrue(controls.contains("get: { settings.preferenceTestModifiers.contains(modifier) }"))
+    XCTAssertTrue(controls.contains("guard enabled != settings.preferenceTestModifiers.contains(modifier)"))
     XCTAssertTrue(preferences.contains("if settings.preferenceTestModifiers.contains(.layoutFluid)"))
   }
 }
