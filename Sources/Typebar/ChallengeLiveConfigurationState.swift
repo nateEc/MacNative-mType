@@ -4,6 +4,8 @@ import Foundation
 /// application of that field. Event revisions distinguish same-value writes.
 @MainActor
 struct ChallengeLiveConfigurationState {
+  enum ApplicationField { case difficulty, modifiers }
+  private weak var owner: AppSettings?
   private var liveDifficulty: Difficulty?
   private var liveModifiers: [TestModifier]?
   private var difficultyRevision: UInt64?
@@ -19,21 +21,54 @@ struct ChallengeLiveConfigurationState {
     liveModifiers = configuration.modifiers
     difficultyRevision = settings.difficultyApplicationRevision
     modifiersRevision = settings.testModifiersApplicationRevision
+    owner = settings
+    return true
+  }
+
+  /// Legacy setup still applies its existing global fields. It needs the same
+  /// event fence, but must not acquire source-only nosave overrides.
+  @discardableResult
+  mutating func observeLegacyChallenge(settings: AppSettings) -> Bool {
+    guard !settings.hasThresholdProfile else { return false }
+    owner = settings
+    liveDifficulty = nil
+    liveModifiers = nil
+    difficultyRevision = settings.difficultyApplicationRevision
+    modifiersRevision = settings.testModifiersApplicationRevision
     return true
   }
 
   func difficulty(settings: AppSettings) -> Difficulty {
-    settings.hasThresholdProfile && difficultyRevision == settings.difficultyApplicationRevision
+    owner === settings && settings.hasThresholdProfile && difficultyRevision == settings.difficultyApplicationRevision
       ? liveDifficulty ?? settings.difficulty : settings.difficulty
   }
 
   func hasTransientModifiers(settings: AppSettings) -> Bool {
-    settings.hasThresholdProfile && liveModifiers != nil
+    owner === settings && settings.hasThresholdProfile && liveModifiers != nil
       && modifiersRevision == settings.testModifiersApplicationRevision
   }
 
   func modifiers(settings: AppSettings) -> [TestModifier] {
     hasTransientModifiers(settings: settings) ? liveModifiers ?? [] : settings.testModifiers
+  }
+
+  /// Own setup is installed after its writes, so its queued notifications have
+  /// the captured revision. Ignore older deliveries and events from a different model.
+  func shouldClearChallenge(for field: ApplicationField, eventRevision: UInt64,
+    settings: AppSettings) -> Bool {
+    guard owner === settings else { return false }
+    let installed: UInt64?
+    let current: UInt64
+    switch field {
+    case .difficulty:
+      installed = difficultyRevision
+      current = settings.difficultyApplicationRevision
+    case .modifiers:
+      installed = modifiersRevision
+      current = settings.testModifiersApplicationRevision
+    }
+    guard let installed else { return false }
+    return eventRevision == current && installed != current
   }
 
   mutating func normalizeModifiers(_ modifiers: [TestModifier], settings: AppSettings) {

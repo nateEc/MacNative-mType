@@ -1564,8 +1564,18 @@ private struct ContentView: View {
     .onChange(of: settings.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }
   }
 
-  private var configuredPracticeContent: some View {
+  private var challengeObservedPracticeContent: some View {
     focusedPracticeContent
+    .onChange(of: settings.difficultyApplicationRevision) { _, revision in
+      handleChallengeFieldApplication(.difficulty, revision: revision)
+    }
+    .onChange(of: settings.testModifiersApplicationRevision) { _, revision in
+      handleChallengeFieldApplication(.modifiers, revision: revision)
+    }
+  }
+
+  private var configuredPracticeContent: some View {
+    challengeObservedPracticeContent
     .onChange(of: settings.promptHighlightMode) { previous, selected in
       if restoringPromptHighlightAfterFunboxConflict {
         restoringPromptHighlightAfterFunboxConflict = false
@@ -3940,6 +3950,16 @@ private struct ContentView: View {
     if session.configuration.rules != previous { preparedWholePreviewRendering = nil }
   }
 
+  private func handleChallengeFieldApplication(_ field: ChallengeLiveConfigurationState.ApplicationField,
+    revision: UInt64) {
+    guard activeChallengeID != nil,
+      challengeLiveConfiguration.shouldClearChallenge(for: field, eventRevision: revision, settings: settings)
+    else { return }
+    // The reference event clears qualification, not the current attempt.
+    // Unowned nosave fields remain in the window-local configuration.
+    activeChallengeID = nil
+  }
+
   private func handleInputRuleChange(_ previous: InputRules, _ current: InputRules) {
     if isPreparingPracticePrompt { reset() }
     else {
@@ -6050,10 +6070,14 @@ private struct ContentView: View {
       modeCompatibilityMessage = "本次配置未能应用，已保留当前测试；请检查配置版本或恢复状态。"
       return false
     }
-    if settings.hasThresholdProfile, challenge != nil,
-      !challengeLiveConfiguration.install(configuration, settings: settings) {
-      modeCompatibilityMessage = "挑战配置读取状态已改变，未切换测试。"
-      return false
+    if challenge != nil {
+      let installed = settings.hasThresholdProfile
+        ? challengeLiveConfiguration.install(configuration, settings: settings)
+        : challengeLiveConfiguration.observeLegacyChallenge(settings: settings)
+      guard installed else {
+        modeCompatibilityMessage = "挑战配置读取状态已改变，未切换测试。"
+        return false
+      }
     }
     modeCompatibilityMessage = nil
     if let restoringSelection {

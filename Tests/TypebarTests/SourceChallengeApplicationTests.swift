@@ -363,4 +363,135 @@ final class SourceChallengeApplicationTests: XCTestCase {
       XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
     }
   }
+
+  func testSceneObservesExplicitDifficultyAndModifierApplicationEvents() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let scene = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(scene.contains(".onChange(of: settings.difficultyApplicationRevision)"))
+    XCTAssertTrue(scene.contains(".onChange(of: settings.testModifiersApplicationRevision)"))
+  }
+
+  func testOwnSetupApplicationEventsDoNotCancelInstalledChallenge() throws {
+    try withSettings { settings, _ in
+      let state = try liveState(settings: settings)
+      XCTAssertFalse(state.shouldClearChallenge(for: .difficulty,
+        eventRevision: settings.difficultyApplicationRevision, settings: settings))
+      XCTAssertFalse(state.shouldClearChallenge(for: .modifiers,
+        eventRevision: settings.testModifiersApplicationRevision, settings: settings))
+    }
+  }
+
+  func testSameValueDifficultyEventClearsIdentityButRetainsUnownedModifiers() throws {
+    try withSettings { settings, defaults in
+      let state = try liveState(settings: settings)
+      let value = settings.difficulty
+      settings.difficulty = value
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      var identity: String? = "round-hour"
+      if state.shouldClearChallenge(for: .difficulty,
+        eventRevision: settings.difficultyApplicationRevision, settings: settings) { identity = nil }
+      XCTAssertNil(identity)
+      XCTAssertEqual(state.modifiers(settings: settings), [.roundVisual])
+      XCTAssertEqual(state.difficulty(settings: settings), .expert)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testSameValueModifierEventClearsIdentityButRetainsUnownedDifficulty() throws {
+    try withSettings { settings, defaults in
+      let state = try liveState(settings: settings)
+      let value = settings.testModifiers
+      settings.testModifiers = value
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      XCTAssertTrue(state.shouldClearChallenge(for: .modifiers,
+        eventRevision: settings.testModifiersApplicationRevision, settings: settings))
+      XCTAssertFalse(state.shouldClearChallenge(for: .difficulty,
+        eventRevision: settings.difficultyApplicationRevision, settings: settings))
+      XCTAssertEqual(state.difficulty(settings: settings), .normal)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testDelayedDeliveryDoesNotClearNewSetupButStillInvalidatesOlderWindow() throws {
+    try withSettings { settings, _ in
+      let oldWindow = try liveState(settings: settings)
+      let oldRevision = settings.difficultyApplicationRevision
+      let value = settings.difficulty
+      settings.difficulty = value
+      let newWindow = try liveState(settings: settings)
+      let current = settings.difficultyApplicationRevision
+      XCTAssertFalse(newWindow.shouldClearChallenge(for: .difficulty,
+        eventRevision: oldRevision, settings: settings))
+      XCTAssertFalse(newWindow.shouldClearChallenge(for: .difficulty,
+        eventRevision: current, settings: settings))
+      XCTAssertTrue(oldWindow.shouldClearChallenge(for: .difficulty,
+        eventRevision: current, settings: settings))
+    }
+  }
+
+  func testRejectedAndLockedApplicationsDoNotCreateCancellationEvents() throws {
+    try withSettings { settings, _ in
+      let state = try liveState(settings: settings)
+      var invalid = settings.snapshot
+      invalid.minimumWpm = 50
+      XCTAssertFalse(settings.apply(invalid))
+      let owner = UUID()
+      settings.setNoQuitConfigurationLock(true, for: owner)
+      defer { settings.setNoQuitConfigurationLock(false, for: owner) }
+      XCTAssertFalse(settings.apply(settings.snapshot))
+      XCTAssertFalse(state.shouldClearChallenge(for: .difficulty,
+        eventRevision: settings.difficultyApplicationRevision, settings: settings))
+      XCTAssertFalse(state.shouldClearChallenge(for: .modifiers,
+        eventRevision: settings.testModifiersApplicationRevision, settings: settings))
+    }
+  }
+
+  func testTransientFieldsAndEventsAreBoundToTheInstalledSettingsModel() throws {
+    try withSettings { settings, defaults in
+      let state = try liveState(settings: settings)
+      let other = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+      let value = other.difficulty
+      other.difficulty = value
+      XCTAssertFalse(state.shouldClearChallenge(for: .difficulty,
+        eventRevision: other.difficultyApplicationRevision, settings: other))
+      XCTAssertEqual(state.difficulty(settings: other), .expert)
+      XCTAssertEqual(state.modifiers(settings: other), [])
+      XCTAssertEqual(state.difficulty(settings: settings), .normal)
+    }
+  }
+
+  func testLegacySetupIgnoresOwnEventsButSameValuePreferencesCancelQualification() throws {
+    let suite = "typebar.legacy-challenge-events.\(UUID())"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let settings = AppSettings(defaults: defaults,
+      feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+    settings.difficulty = .expert
+    let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+    let configuration = challenge.preset.configuration.with(challengeID: challenge.id)
+    let preset = SavedTestPreset(configuration: configuration)
+    XCTAssertTrue(PresetSettingsApplication.commit(original: preset, resolved: preset,
+      configuration: configuration, to: settings, appliesGlobalSettings: true))
+    var state = ChallengeLiveConfigurationState()
+    XCTAssertTrue(state.observeLegacyChallenge(settings: settings))
+    XCTAssertFalse(state.hasTransientModifiers(settings: settings))
+    XCTAssertFalse(state.shouldClearChallenge(for: .difficulty,
+      eventRevision: settings.difficultyApplicationRevision, settings: settings))
+    XCTAssertFalse(state.shouldClearChallenge(for: .modifiers,
+      eventRevision: settings.testModifiersApplicationRevision, settings: settings))
+    let difficulty = settings.difficulty
+    settings.difficulty = difficulty
+    XCTAssertTrue(state.shouldClearChallenge(for: .difficulty,
+      eventRevision: settings.difficultyApplicationRevision, settings: settings))
+    let modifiers = settings.testModifiers
+    settings.testModifiers = modifiers
+    XCTAssertTrue(state.shouldClearChallenge(for: .modifiers,
+      eventRevision: settings.testModifiersApplicationRevision, settings: settings))
+    XCTAssertEqual(state.difficulty(settings: settings), settings.difficulty)
+    XCTAssertEqual(state.modifiers(settings: settings), settings.testModifiers)
+    XCTAssertNil(defaults.object(forKey: "appSettings.v4"))
+  }
 }
