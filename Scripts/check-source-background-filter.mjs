@@ -29,7 +29,7 @@ for (let position = 0; position < 4; position++) {
   }
 }
 const fixtures = [];
-for (const values of cases) {
+function capture(values) {
   let style, writes = 0;
   const context = vm.createContext({getConfig: {customBackgroundFilter: values}, qs: selector => {
     assert.equal(selector, '.customBackground img');
@@ -42,8 +42,20 @@ for (const values of cases) {
   context.applyCustomBackgroundFilters();
   assert.equal(JSON.stringify(style), explicit);
   assert.equal(writes, 2);
-  fixtures.push({values: values.map(value => Object.is(value, -0) ? '-0' : String(value)), css: style.filter});
+  return style;
 }
+for (const values of cases) {
+  fixtures.push({values: values.map(value => Object.is(value, -0) ? '-0' : String(value)), css: capture(values).filter});
+}
+const geometryFixtures = [
+  [0, 0.25, null, -1, Infinity, 0.5, -0],
+  [Infinity, -1, NaN, -Infinity, 0],
+  [0.25, -100, -200, 0],
+].map(sequence => sequence.map(blur => ({
+  blur: blur === null ? null : Object.is(blur, -0) ? '-0' : String(blur),
+  root: blur === null ? 32 : 16,
+  style: blur === null ? null : capture([blur, 1, 1, 1]),
+})));
 const sizeStart = source.indexOf('function applyCustomBackgroundSize():');
 const sizeEnd = source.indexOf('\nexport async function applyCustomBackground()', sizeStart);
 assert.ok(sizeStart >= 0 && sizeEnd > sizeStart);
@@ -62,4 +74,4 @@ for (const fit of ['cover', 'contain', 'max']) {
   fitFixtures.push({fit, objectFit: style.objectFit});
 }
 verify();
-console.log(JSON.stringify({pin, fixtures, fitFixtures}));
+console.log(JSON.stringify({pin, fixtures, fitFixtures, geometryFixtures}));

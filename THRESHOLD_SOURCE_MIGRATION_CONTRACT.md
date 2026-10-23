@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 背景图片盒的独立声明与相对长度（追加阶段）
+
+固定 applyCustomBackgroundFilters 对 filter／width／height／transform／top／position 分别赋值，背景父容器固定且 flex 居中。宽高同用 calc(100% + blur×8 rem)，top 由负号前缀拼接 blur×4，scale 为 1 + blur/100，默认变换原点为盒中心。负 blur 的 top 变成 --...rem，非法而保留旧声明；同一次有效 calc 和 scale 仍更新，不能随非法整条 filter 一起拒绝。无穷／NaN 的裸插值不是 calc(infinity)，按声明语法分别拒绝。宽高一直同表达式，可共用已准入的 rem 增量，但两个轴分别解析／归零。
+
+WebsiteConfigBackgroundGeometry 是单图片、源 setter 已执行后的几何值，不改配置或资源。初始化时的无效属性保持 auto；新图片不借用旧图历史。解析接受显式 viewport 逻辑大小、已经按方向确定的 intrinsic 逻辑大小和根字号 pointsPerRem，输出 CSS 式左上原点／y 向下的图片盒、完整中心变换和变换后边界。它们不是设备像素，也不能直接当作 Core Graphics y 向上坐标；未来合成必须转换坐标并在滤镜后应用 scale。零／负 scale 不可仅用其正外接矩形代替；rem 不冻结成第一次读取的像素。
+
+图片寿命指源 replaceChildren 创建的新 img，不是 URL 或解码字节是否变化；即便复用同一图像缓存也须重新初始化声明历史。浏览器测试的组间复用同一 data URL、但新建 Image，覆盖此差别；仅根字号重排不应创建新声明状态。
+
+[CSS Values 4 的 calc 范围规则](https://www.w3.org/TR/css-values-4/#calc-range) 允许负计算值在使用阶段归零，[Flexbox 绝对定位子项](https://www.w3.org/TR/css-flexbox-1/#abspos-items) 定义静态位置。为避免只做规范推断，QA 扩展既有源脚本，真实执行固定完整 setter 并输出本机测试声明；测试专用 WKWebView 使用自有 100×50 透明 PNG、本地 flex 画布及非持久存储，CSP 禁止外部资源。原生模型对照 16 个源声明／根字号状态的盒前后几何、scale 及既有 filter 历史，0.02 逻辑单位容差覆盖 CSS 1/64 布局量化和浮点矩阵舍入，不称为像素一致。真实引擎确认 auto 初值居中、独立拒绝、负尺寸归零和根字号重排。
+
+WebKit 仅在 Tests，产品不导入或嵌入它。测试沿用项目既有浏览器探针方式，未开窗口或访问原站；callAsyncJavaScript 的安装 SDK 回调版参数标签是 in:in:，与异步版 in:contentWorld: 不同，可用自 macOS 11，包最低仍 macOS 14；当前实测主机为 macOS 26.1／Swift 6.2.4。最初无浏览器原生实现的占位模型被数值断言证伪，最终比较不保留打印探针。
+
+环境非有限／非法或 CGFloat 投影溢出明确失败，不改已接受的声明。模型的有限 Double 是概念几何，不是全部浏览器实现范围或原生画布资源可用性证明；巨大有限长度的浏览器上限、量化、跨浏览器／跨系统、viewport CSS 单位和完整源页面样式集成仍待核对，不以资源失败缩减完整兼容目标。这里未做视口截图或像素合成，也不把 blur 外溢裁到图片盒；生产宿主必须先准备可失败的资源／布局，不在文件提交成功后再执行失败切流。
+
 ## 背景帧方向标签与自然尺寸（追加阶段）
 
 固定 applyCustomBackground 创建普通 img；前端源码／静态 CSS／SCSS／HTML／TS 中未发现 image-orientation 覆盖。依据 [CSS Images 3 的 from-image 默认行为](https://www.w3.org/TR/css-images-3/#the-image-orientation) 构造方向入口，不声称已做浏览器像素实测。[Apple CGImagePropertyOrientation](https://developer.apple.com/documentation/imageio/cgimagepropertyorientation) 的原始数值属于 TIFF／EXIF 1–8，不是 UIKit 的同名枚举编号，镜像与旋转不可混用。
