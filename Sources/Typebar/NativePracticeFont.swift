@@ -10,26 +10,24 @@ enum NativePracticeFont {
   struct Resolver {
     enum Purpose { case practice, catalogPreview }
 
-    let localFontName: () -> String?
+    let localFont: (CGFloat) -> NSFont?
     let installedFontName: (String) -> String?
 
     init(
-      localFontName: @escaping () -> String? = {
-        TypebarLocalPracticeFontStore.activeInfo?.postScriptName
-      },
+      localFont: @escaping (CGFloat) -> NSFont? = TypebarLocalPracticeFontStore.activeFont(size:),
       installedFontName: @escaping (String) -> String? = {
         NativePracticeFont.postScriptName(for: $0)
       }
     ) {
-      self.localFontName = localFontName
+      self.localFont = localFont
       self.installedFontName = installedFontName
     }
 
-    func postScriptName(for requestedName: String, purpose: Purpose = .practice) -> String? {
+    func font(for requestedName: String, size: CGFloat, purpose: Purpose = .practice) -> NSFont? {
       // Previewing another family must neither substitute nor register the
       // user's active local font; actual practice keeps that explicit override.
-      if purpose == .practice, let name = localFontName() { return name }
-      return installedFontName(requestedName)
+      return NativePracticeFont.nsFont(named: requestedName, size: size,
+        localFont: purpose == .practice ? localFont : { _ in nil }, installedFontName: installedFontName)
     }
   }
 

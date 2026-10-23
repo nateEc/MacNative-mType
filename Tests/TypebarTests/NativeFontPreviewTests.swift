@@ -59,7 +59,7 @@ final class NativeFontPreviewTests: XCTestCase {
   @MainActor func testEveryInstalledCatalogFamilyResolvesAndMeasuresWithoutLocalOverride() throws {
     let families = NativeFontCatalog.installedFamilies
     XCTAssertFalse(families.isEmpty)
-    let resolver = NativePracticeFont.Resolver(localFontName: {
+    let resolver = NativePracticeFont.Resolver(localFont: { _ in
       XCTFail("Catalog traversal must not register or access the imported font")
       return nil
     })
@@ -111,19 +111,19 @@ final class NativeFontPreviewTests: XCTestCase {
     let serif = try XCTUnwrap(NSFont(name: "Georgia", size: 15))
     var localLookups = 0
     let resolver = NativePracticeFont.Resolver(
-      localFontName: { localLookups += 1; return local.fontName },
+      localFont: { _ in localLookups += 1; return local },
       installedFontName: { NSFont(name: $0, size: 15)?.fontName })
     let preview = NativeFontCatalog.previewFont(for: "Georgia", resolver: resolver)
     XCTAssertEqual(preview.fontName, serif.fontName)
     XCTAssertEqual(localLookups, 0, "Browsing fonts must not load or register the local practice font")
-    XCTAssertEqual(resolver.postScriptName(for: "Georgia"), local.fontName,
+    XCTAssertTrue(resolver.font(for: "Georgia", size: 15) === local,
       "Actual practice must retain the active local override")
   }
 
   func testMissingCatalogFontFallsBackWithoutSubstitutingTheActiveLocalFont() throws {
     let local = try XCTUnwrap(NSFont(name: "Courier", size: 15))
     let resolver = NativePracticeFont.Resolver(
-      localFontName: { local.fontName }, installedFontName: { _ in nil })
+      localFont: { _ in local }, installedFontName: { _ in nil })
     XCTAssertEqual(NativeFontCatalog.previewFont(for: "Missing", size: 19, resolver: resolver),
       NSFont.systemFont(ofSize: 19))
   }
@@ -131,8 +131,8 @@ final class NativeFontPreviewTests: XCTestCase {
   func testNamedPracticeFontResolvesNormallyWhenNoLocalOverrideIsActive() throws {
     let installed = try XCTUnwrap(NSFont(name: "Georgia", size: 15))
     let resolver = NativePracticeFont.Resolver(
-      localFontName: { nil }, installedFontName: { _ in installed.fontName })
-    XCTAssertEqual(resolver.postScriptName(for: "Georgia"), installed.fontName)
+      localFont: { _ in nil }, installedFontName: { _ in installed.fontName })
+    XCTAssertEqual(resolver.font(for: "Georgia", size: 15)?.fontName, installed.fontName)
     XCTAssertEqual(NativeFontCatalog.previewFont(for: "Georgia", size: 22, resolver: resolver).pointSize, 22)
   }
 }

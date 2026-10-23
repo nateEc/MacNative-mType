@@ -69,10 +69,7 @@ enum NativeFontCatalog {
     for family: String, size: CGFloat = 15,
     resolver: NativePracticeFont.Resolver = .init()
   ) -> NSFont {
-    guard let name = resolver.postScriptName(for: family, purpose: .catalogPreview),
-      let font = NSFont(name: name, size: size)
-    else { return .systemFont(ofSize: size) }
-    return font
+    resolver.font(for: family, size: size, purpose: .catalogPreview) ?? .systemFont(ofSize: size)
   }
 
   @MainActor

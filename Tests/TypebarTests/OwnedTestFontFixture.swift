@@ -27,11 +27,16 @@ enum OwnedTestFontFixture {
     assemble(postScriptName: postScriptName, cff: false)
   }
 
+  static func make(postScriptName: String, advanceWidth: Int) -> Data {
+    assemble(postScriptName: postScriptName, cff: false, advanceWidth: advanceWidth)
+  }
+
   static func makeOTF(postScriptName: String) -> Data {
     assemble(postScriptName: postScriptName, cff: true)
   }
 
-  private static func assemble(postScriptName: String, cff: Bool) -> Data {
+  private static func assemble(postScriptName: String, cff: Bool, advanceWidth: Int = 600) -> Data {
+    precondition((500...32000).contains(advanceWidth))
     var templates = [
       "OS/2": "AAMCWAGQAAUABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAD8/Pz8AAAB4AHgDIP84AAADIADIAAAAAAAAAAAAAAAAAAAAIAAA",
       "cmap": "AAAAAgAAAAMAAAAUAAMAAQAAABQABAAgAAAABAAEAAEAAAB4//8AAAB4////iQABAAAAAA==",
@@ -52,6 +57,15 @@ enum OwnedTestFontFixture {
       templates["CFF "] = "AQAEAQABAQEqVHlwZWJhclFBMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAAAQEBG/gbAvgbA/gYBO+L+Ij5UAX3FQ+L9y0S9xgRAAEBASpUeXBlYmFyUUEwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMAAAAABZAAIBAQQQ+OwO+OzvFvgk+VD8JAYO"
     }
     var tables = templates.mapValues { Array(Data(base64Encoded: $0)!) }
+    // OpenType hmtx advance widths and hhea extrema; the original rectangle
+    // stays unchanged. https://learn.microsoft.com/en-us/typography/opentype/spec/hmtx
+    // https://learn.microsoft.com/en-us/typography/opentype/spec/hhea
+    if advanceWidth != 600 {
+      tables["hmtx"]!.replaceSubrange(0..<2, with: short(advanceWidth))
+      tables["hhea"]!.replaceSubrange(10..<12, with: short(advanceWidth))
+      tables["hhea"]!.replaceSubrange(14..<16, with: short(advanceWidth - 500))
+      tables["OS/2"]!.replaceSubrange(2..<4, with: short(advanceWidth))
+    }
     if var bytes = tables["CFF "] {
       let placeholder = Array(("TypebarQA" + String(repeating: "0", count: 32)).utf8)
       let replacement = Array(postScriptName.utf8)

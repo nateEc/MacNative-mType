@@ -24,18 +24,18 @@ import XCTest
   func testPreviewBypassesLocalOverrideWithoutReadingOrChangingIt() throws {
     var lookups = 0
     let georgia = try XCTUnwrap(NSFont(name: "Georgia", size: 28))
-    let resolver = NativePracticeFont.Resolver(localFontName: { lookups += 1; return "Courier" },
+    let resolver = NativePracticeFont.Resolver(localFont: { lookups += 1; return NSFont(name: "Courier", size: $0) },
       installedFontName: { NSFont(name: $0, size: 28)?.fontName })
     let font = try XCTUnwrap(FontFamilyCommandPreviewPolicy.font(for: .knownIdentifier("Georgia"),
       size: 28, fallback: .monospaced, resolver: resolver))
     XCTAssertEqual(font.fontName, georgia.fontName)
     XCTAssertEqual(lookups, 0)
-    XCTAssertEqual(resolver.postScriptName(for: "Georgia"), "Courier")
+    XCTAssertEqual(resolver.font(for: "Georgia", size: 28)?.fontName, NSFont(name: "Courier", size: 28)?.fontName)
     XCTAssertEqual(lookups, 1)
   }
 
   func testNativeDesignPreviewAndMissingNameUseTheRequestedDesignAndSize() throws {
-    let resolver = NativePracticeFont.Resolver(localFontName: { XCTFail("Preview must not resolve local font"); return "Courier" },
+    let resolver = NativePracticeFont.Resolver(localFont: { XCTFail("Preview must not resolve local font"); return NSFont(name: "Courier", size: $0) },
       installedFontName: { _ in nil })
     let system = try XCTUnwrap(FontFamilyCommandPreviewPolicy.font(for: .systemDesign(.defaultSystem),
       size: 31, fallback: .serif, resolver: resolver))
@@ -72,7 +72,7 @@ import XCTest
     XCTAssertEqual(state.target, .installedName("Menlo"))
     state.clear(savedFont: .defaultSystem, savedName: "Courier")
     XCTAssertEqual(state.target, .installedName("Menlo"))
-    let resolver = NativePracticeFont.Resolver(localFontName: { XCTFail("Clear must use saved family only"); return "Courier" },
+    let resolver = NativePracticeFont.Resolver(localFont: { XCTFail("Clear must use saved family only"); return NSFont(name: "Courier", size: $0) },
       installedFontName: NativePracticeFont.postScriptName)
     XCTAssertEqual(try XCTUnwrap(FontFamilyCommandPreviewPolicy.font(for: state.target,
       size: 28, fallback: .monospaced, resolver: resolver)).fontName, NSFont(name: "Menlo", size: 28)?.fontName)
@@ -176,8 +176,8 @@ import XCTest
       XCTAssertEqual(state.target, .installedName("Menlo"))
       XCTAssertTrue(value.restored.hasPrefix("\"Menlo\""))
       XCTAssertTrue(value.reapplied.hasPrefix(value.local ? "\"LOCALCUSTOM\"" : "\"Menlo\""))
-      let resolver = NativePracticeFont.Resolver(localFontName: { value.local ? "Courier" : nil }, installedFontName: { _ in "Menlo" })
-      XCTAssertEqual(resolver.postScriptName(for: "Menlo"), value.local ? "Courier" : "Menlo")
+      let resolver = NativePracticeFont.Resolver(localFont: { value.local ? NSFont(name: "Courier", size: $0) : nil }, installedFontName: { _ in "Menlo" })
+      XCTAssertEqual(resolver.font(for: "Menlo", size: 28)?.fontName, NSFont(name: value.local ? "Courier" : "Menlo", size: 28)?.fontName)
       XCTAssertFalse(value.restored.contains("LOCALCUSTOM")); XCTAssertFalse(value.restored.contains("Noto Sans Lao"))
     }
   }
@@ -191,7 +191,7 @@ import XCTest
     var font: NSFont {
       FontFamilyCommandPreviewPolicy.font(for: preview.target, size: 28, fallback: settings.practiceFont)
         ?? settings.practiceFont.nsFont(size: 28, installedFontName: settings.installedPracticeFontName,
-          resolver: .init(localFontName: { nil }))
+          resolver: .init(localFont: { _ in nil }))
     }
   }
 

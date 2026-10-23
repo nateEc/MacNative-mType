@@ -20,17 +20,17 @@ final class FontPreferenceTests: XCTestCase {
   func testNamedAndSystemFontApplicationsNeverDeactivateTheLocalOverride() throws {
     try withSettings { settings, _ in
       var saves = 0
-      let resolver = NativePracticeFont.Resolver(localFontName: { "Courier" }, installedFontName: { _ in "Menlo" })
+      let resolver = NativePracticeFont.Resolver(localFont: { NSFont(name: "Courier", size: $0) }, installedFontName: { _ in "Menlo" })
       for target: FontFamilyCommandTarget in [.systemDesign(.serif), .knownIdentifier("Georgia"), .installedName("Menlo")] {
         XCTAssertTrue(FontFamilyCommandApplication.apply(target, to: settings,
           isFontAvailable: { _ in true },
           onConfigurationSave: { saves += 1 }))
-        XCTAssertEqual(resolver.postScriptName(for: settings.installedPracticeFontName), "Courier")
+        XCTAssertEqual(resolver.font(for: settings.installedPracticeFontName, size: 28)?.fontName, NSFont(name: "Courier", size: 28)?.fontName)
       }
       XCTAssertTrue(FontFamilyNameCommandPolicy.apply("Owned Family", to: settings,
         onConfigurationSave: { saves += 1 }))
       XCTAssertEqual(saves, 4)
-      XCTAssertEqual(resolver.postScriptName(for: settings.installedPracticeFontName), "Courier")
+      XCTAssertEqual(resolver.font(for: settings.installedPracticeFontName, size: 28)?.fontName, NSFont(name: "Courier", size: 28)?.fontName)
     }
   }
 

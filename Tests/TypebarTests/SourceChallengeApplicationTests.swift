@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import Typebar
 
@@ -356,10 +357,10 @@ final class SourceChallengeApplicationTests: XCTestCase {
   }
 
   func testChallengeNamedFontUsesTheSameLocalFileFirstCascadeAsOrdinaryPractice() {
-    let resolver = NativePracticeFont.Resolver(localFontName: { "Courier" }, installedFontName: { _ in "Menlo" })
+    let resolver = NativePracticeFont.Resolver(localFont: { NSFont(name: "Courier", size: $0) }, installedFontName: { _ in "Menlo" })
     for name in [WingdingsChallengeFont.familyName, "Georgia", ""] {
-      XCTAssertEqual(resolver.postScriptName(for: name), "Courier")
-      XCTAssertEqual(resolver.postScriptName(for: name, purpose: .catalogPreview), "Menlo")
+      XCTAssertEqual(resolver.font(for: name, size: 28)?.fontName, NSFont(name: "Courier", size: 28)?.fontName)
+      XCTAssertEqual(resolver.font(for: name, size: 28, purpose: .catalogPreview)?.fontName, NSFont(name: "Menlo", size: 28)?.fontName)
     }
   }
 
