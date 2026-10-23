@@ -5,7 +5,7 @@ import AppKit
 /// the user's selected font; no font data is bundled, downloaded, or changed
 /// in the user's settings.
 enum LanguagePracticeFontFallback {
-  private static func identifiers(for language: TypingLanguage) -> [String] {
+  static func preferredIdentifiers(for language: TypingLanguage) -> [String] {
     switch language {
     case .lao: ["Noto_Sans_Lao"]
     case .sindhi: ["Noto_Naskh_Arabic"]
@@ -16,7 +16,7 @@ enum LanguagePracticeFontFallback {
   static func preferredPostScriptNames(
     for language: TypingLanguage, resolve: (String) -> String?
   ) -> [String] {
-    identifiers(for: language).compactMap(resolve)
+    preferredIdentifiers(for: language).compactMap(resolve)
   }
 
   static func applying(to primary: NSFont, language: TypingLanguage) -> NSFont {

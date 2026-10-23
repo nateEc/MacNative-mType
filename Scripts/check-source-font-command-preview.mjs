@@ -7,7 +7,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 const [argument, option] = process.argv.slice(2);
-assert.ok(argument && (!option || option === '--emit-fixtures'));
+assert.ok(argument && (!option || option === '--emit-fixtures' || option === '--emit-cascade-fixtures'));
 const root = path.resolve(argument), pin = '91bd24bb8513785c7364cbea29296ff7adafac41';
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(), pin);
@@ -22,6 +22,40 @@ function between(source, first, last) {
 }
 const plain = text => stripTypeScriptTypes(text, {mode: 'transform'}).replace(/^export /gm, '');
 const fontCode = plain(between(read('ui.ts'), 'let isPreviewingFont = false;', '\nexport function setMediaQueryDebugLevel('));
+if (option === '--emit-cascade-fixtures') {
+  const folder = path.join(root, 'frontend/static/languages');
+  const files = fs.readdirSync(folder).filter(file => file.endsWith('.json')).sort();
+  assert.equal(files.length, 446);
+  const fixtures = [];
+  for (const file of files) {
+    const language = file.slice(0, -5);
+    const preferredFont = JSON.parse(fs.readFileSync(path.join(folder, file), 'utf8')).preferredFont;
+    for (const local of ['absent', 'empty', 'stored']) {
+      let css, localRule = false;
+      const context = vm.createContext({
+        Config: {fontFamily: 'Owned_Family', language},
+        replaceUnderscoresWithSpaces: value => value.replaceAll('_', ' '),
+        getLanguage: async selected => { assert.equal(selected, language); return {preferredFont}; },
+        fileStorage: {getFile: async key => {
+          assert.equal(key, 'LocalFontFamilyFile');
+          return local === 'absent' ? undefined : local === 'empty' ? '' : 'owned-font-file';
+        }},
+        qs: selector => { assert.equal(selector, '.customFont'); return {
+          empty: () => { localRule = false; }, setHtml: () => { localRule = true; },
+        }; },
+        document: {documentElement: {style: {setProperty: (key, value) => {
+          assert.equal(key, '--font'); css = value;
+        }}}},
+      });
+      vm.runInContext(fontCode, context, {timeout: 1000});
+      await context.applyFontFamily();
+      assert.equal(localRule, local !== 'absent');
+      fixtures.push({language, local, css, preferredFont: preferredFont ?? null});
+    }
+  }
+  verify();
+  console.log(JSON.stringify({pin, fixtures}));
+} else {
 const commands = read('commandline/commandline.ts');
 const activeCode = plain(between(commands, 'async function updateActiveCommand(', '\nlet shakeTimeout:'));
 const hideCode = plain(between(commands, 'function hide(', '\nasync function goBackOrHide('));
@@ -86,3 +120,4 @@ for (const hideRoute of ['store', 'chain', 'legacy']) {
 verify();
 if (option) console.log(JSON.stringify({pin, fixtures}));
 else console.log('Font command preview source passed: 12 complete hover/active-command/preview/apply/clear/hide trajectories, store/chain/legacy, empty/non-font choices and intervening saved choice. Clear restores saved name without reapplying local/preferred cascade; owned DOM/modal/file/language boundaries, not browser/native pixel parity.');
+}

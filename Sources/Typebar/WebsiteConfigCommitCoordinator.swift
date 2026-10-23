@@ -28,11 +28,20 @@ final class WebsiteConfigCommitCoordinator {
     let disk: WebsiteConfigFileRegister.Revision
     /// nil means no background admission was attempted, not an empty image.
     let background: WebsiteConfigBackgroundResource?
+    /// nil means font preparation was not attempted, not a failed font.
+    let font: WebsiteConfigFontResource?
   }
   struct BackgroundPrepared {
     fileprivate let configuration: Prepared
     fileprivate let admission: UUID
     let background: WebsiteConfigBackgroundResource
+  }
+  /// Font and background only, not all application resources or a UI transaction.
+  struct ResourcesPrepared {
+    fileprivate let configuration: Prepared
+    fileprivate let admission: UUID
+    let background: WebsiteConfigBackgroundResource
+    let font: WebsiteConfigFontResource
   }
   enum Outcome { case committed(Publication), stale, conflict, unavailable, busy }
   private let router: PreferenceConfigurationSaveRouter
@@ -40,7 +49,7 @@ final class WebsiteConfigCommitCoordinator {
   private let environment: () -> Environment?
   private let identity = UUID()
   private var request = UUID()
-  private var backgroundAdmission = UUID()
+  private var resourceAdmission = UUID()
   private var latest: Publication?
   private var processing = false
 
@@ -76,26 +85,52 @@ final class WebsiteConfigCommitCoordinator {
     processing = true
     defer { processing = false }
     guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
-    backgroundAdmission = UUID()
+    resourceAdmission = UUID()
     let background = try WebsiteConfigBackgroundResource.prepare(
       preferences: prepared.draft.pagePreferences, local: local, remote: remote, limits: limits)
     guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
-    return .init(configuration: prepared, admission: backgroundAdmission, background: background)
+    return .init(configuration: prepared, admission: resourceAdmission, background: background)
+  }
+  func prepareResources(for prepared: Prepared, localFont: WebsiteConfigFontResource.Local,
+    localBackground: WebsiteConfigBackgroundResource.Local, remoteBackground: WebsiteConfigBackgroundResource.Remote? = nil,
+    maximumFontBytes: Int = 32 * 1024 * 1024,
+    backgroundLimits: WebsiteConfigBackgroundResource.Limits = .init()) throws -> ResourcesPrepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true
+    defer { processing = false }
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    resourceAdmission = UUID()
+    let font = try WebsiteConfigFontResource.prepare(typography: prepared.draft.keyboardTypography,
+      language: prepared.draft.testParameters.language, local: localFont, maximumBytes: maximumFontBytes)
+    let background = try WebsiteConfigBackgroundResource.prepare(preferences: prepared.draft.pagePreferences,
+      local: localBackground, remote: remoteBackground, limits: backgroundLimits)
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return .init(configuration: prepared, admission: resourceAdmission, background: background, font: font)
+  }
+  @discardableResult
+  func cancel(_ prepared: ResourcesPrepared) -> Bool {
+    guard prepared.admission == resourceAdmission else { return false }
+    return cancel(prepared.configuration)
+  }
+  func commit(_ prepared: ResourcesPrepared) throws -> Outcome {
+    guard !processing else { return .busy }
+    guard prepared.admission == resourceAdmission else { return .stale }
+    return try commit(prepared.configuration, background: prepared.background, font: prepared.font)
   }
   @discardableResult
   func cancel(_ prepared: BackgroundPrepared) -> Bool {
-    guard prepared.admission == backgroundAdmission else { return false }
+    guard prepared.admission == resourceAdmission else { return false }
     return cancel(prepared.configuration)
   }
   func commit(_ prepared: BackgroundPrepared) throws -> Outcome {
     guard !processing else { return .busy }
-    guard prepared.admission == backgroundAdmission else { return .stale }
+    guard prepared.admission == resourceAdmission else { return .stale }
     return try commit(prepared.configuration, background: prepared.background)
   }
   func commit(_ prepared: Prepared) throws -> Outcome {
     try commit(prepared, background: nil)
   }
-  private func commit(_ prepared: Prepared, background: WebsiteConfigBackgroundResource?) throws -> Outcome {
+  private func commit(_ prepared: Prepared, background: WebsiteConfigBackgroundResource?, font: WebsiteConfigFontResource? = nil) throws -> Outcome {
     guard !processing else { return .busy }
     processing = true
     defer { processing = false }
@@ -108,7 +143,7 @@ final class WebsiteConfigCommitCoordinator {
       // From the record's commit point to this value publication there is no
       // await, caller callback, legacy write, resource activation or event replay.
       let publication = Publication(draft: prepared.draft, owner: prepared.owner.owner,
-        environmentRevision: prepared.environment.revision, disk: disk, background: background)
+        environmentRevision: prepared.environment.revision, disk: disk, background: background, font: font)
       latest = publication
       retire(prepared)
       return .committed(publication)
