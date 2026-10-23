@@ -96,6 +96,14 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare pinned website config schema QA dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema_qa_root="$(zsh Scripts/prepare-website-config-schema-qa.sh)"
+          printf 'TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT=%s\n' "$schema_qa_root" >> "$GITHUB_ENV"
+          printf 'TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT=%s\n' "${{ steps.reference.outputs.path }}" >> "$GITHUB_ENV"
+
       - name: Run native client tests without launching the app
         shell: bash
         run: |
