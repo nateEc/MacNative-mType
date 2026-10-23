@@ -8,6 +8,8 @@ import {createRequire, stripTypeScriptTypes} from 'node:module';
 import {execFileSync} from 'node:child_process';
 const root = path.resolve(process.argv[2] ?? '');
 const zodRoot = process.env.TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT;
+const runtimeMode = process.argv[3] === '--runtime-projection';
+assert.ok(!process.argv[3] || runtimeMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -17,33 +19,60 @@ function verify() {
 verify();
 assert.equal(JSON.parse(fs.readFileSync(path.join(zodRoot, 'package.json'))).version, '3.23.8');
 const zod = createRequire(import.meta.url)(path.join(zodRoot, 'lib/index.js'));
-const context = vm.createContext({structuredClone, URL, console});
+const simulation = {Config: {}, events: [], saves: [], stores: [], gates: [], flags: {}};
+const noop = () => {};
+const context = vm.createContext({structuredClone, URL,
+  document: {get readyState() { return simulation.flags.documentComplete ? 'complete' : 'loading'; }},
+  console: {warn: noop, error: noop}});
 const modules = new Map();
 const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
+const adapters = new Map([
+  [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: noop, showErrorNotification: noop}],
+  [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
+  [path.join(frontend, 'states/test.ts'), {isTestActive: () => true}],
+  [path.join(frontend, 'collections/custom-themes.ts'), {__nonReactive: {getCustomThemes: () => Array(simulation.flags.customThemeCount ?? 0).fill({})}}],
+  [path.join(frontend, 'utils/env.ts'), {isDevEnvironment: () => !!simulation.flags.development}],
+  [path.join(frontend, 'utils/misc.ts'), {reloadAfter: noop, triggerResize: noop, escapeHTML: value => value}],
+  [path.join(frontend, 'utils/strings.ts'), {capitalizeFirstLetter: value => value, camelCaseToWords: value => value}],
+  [path.join(frontend, 'utils/zod.ts'), {getOptions: () => []}],
+  [path.join(frontend, 'types/font-awesome.ts'), {FaObject: undefined}],
+  [path.join(frontend, 'sentry.ts'), {captureException: noop}],
+  [path.join(frontend, 'config/persistence.ts'), {saveToLocalStorage: key => simulation.saves.push(key)}],
+  ['solid-js', {onCleanup: noop, JSXElement: undefined}],
+]);
 function getModule(id) {
   if (modules.has(id)) return modules.get(id);
   let module;
-  if (id === 'zod' || id === 'store-adapter') {
-    const values = id === 'zod' ? {...zod, ZodErrorMap: undefined} : {Config: {}};
+  if (id === 'zod' || id === 'store-adapter' || adapters.has(id)) {
+    const values = id === 'zod' ? {...zod, ZodErrorMap: undefined, ZodTypeAny: undefined}
+      : id === 'store-adapter' ? {Config: simulation.Config,
+        setConfigStore: noop, setFullConfigStore: value => simulation.stores.push(structuredClone(value))}
+      : adapters.get(id);
     module = new vm.SyntheticModule(Object.keys(values), function() {
       for (const [key, value] of Object.entries(values)) this.setExport(key, value);
     }, {context});
   } else {
     let source = fs.readFileSync(id, 'utf8');
-    if (id === path.join(schemas, 'configs.ts')) source += '\nexport const Config = undefined; export const CustomThemeColors = undefined;';
+    if (id === path.join(schemas, 'configs.ts')) source += '\nexport const Config = undefined; export const CustomThemeColors = undefined; export const ConfigValue = undefined; export const FunboxName = undefined;';
+    if (id === path.join(root, 'packages/funbox/src/types.ts')) source += '\nexport const FunboxMetadata = undefined; export const FunboxProperty = undefined; export const FunboxForcedConfig = undefined;';
     module = new vm.SourceTextModule(stripTypeScriptTypes(source, {mode: 'transform'}), {context, identifier: id});
   }
   modules.set(id, module);
   return module;
 }
 function resolve(id, importer) {
-  if (id === 'zod') return id;
-  if (id === './store' && importer === path.join(frontend, 'config/utils.ts')) return 'store-adapter';
+  if (id === 'zod' || id === 'solid-js') return id;
+  if (id.endsWith('/store') && importer.startsWith(path.join(frontend, 'config/'))) return 'store-adapter';
   if (id === '@monkeytype/schemas/configs') return path.join(schemas, 'configs.ts');
   if (id === '@monkeytype/util/objects') return path.join(root, 'packages/util/src/objects.ts');
+  if (id === '@monkeytype/util/numbers') return path.join(root, 'packages/util/src/numbers.ts');
+  if (id === '@monkeytype/util/arrays') return path.join(root, 'packages/util/src/arrays.ts');
+  if (id === '@monkeytype/funbox') return path.join(root, 'packages/funbox/src/index.ts');
+  if (id === '../events/config') return 'config-event-adapter';
   assert.ok(id.startsWith('.'), 'Unexpected import: ' + id);
-  return path.resolve(path.dirname(importer), id + '.ts');
+  const candidate = path.resolve(path.dirname(importer), id + '.ts');
+  return adapters.has(candidate) || fs.existsSync(candidate) ? candidate : candidate + 'x';
 }
 async function load(id) {
   const module = getModule(id);
@@ -69,6 +98,68 @@ function transport(value) {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, transport(v)]));
   return value;
 }
+if (runtimeMode) {
+  const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
+  adapters.set('config-event-adapter', {configEvent: bus});
+  bus.subscribe(event => simulation.events.push(structuredClone(event)));
+  const metadata = (await load(path.join(frontend, 'config/metadata.tsx'))).configMetadata;
+  const originalGate = metadata.funbox.isBlocked;
+  metadata.funbox.isBlocked = options => {
+    const blocked = originalGate(options);
+    simulation.gates.push({value: structuredClone(options.value), current: structuredClone(options.currentConfig), accepted: !blocked});
+    return blocked;
+  };
+  const setters = await load(path.join(frontend, 'config/setters.ts'));
+  Object.assign(context, {Config: simulation.Config, configEvent: bus,
+    getDefaultConfig: () => structuredClone(defaults), migrateConfig: migration.migrateConfig,
+    typedKeys: Object.keys, setConfig: setters.setConfig,
+    saveToLocalStorage: key => simulation.saves.push(key),
+    setFullConfigStore: value => simulation.stores.push(structuredClone(value))});
+  const lifecycle = fs.readFileSync(path.join(frontend, 'config/lifecycle.ts'), 'utf8');
+  const from = lifecycle.indexOf('const lastConfigsToApply:'), to = lifecycle.indexOf('\nexport async function resetConfig(', from);
+  assert.ok(from >= 0 && to > from);
+  new vm.Script(stripTypeScriptTypes(lifecycle.slice(from, to).replace('export async function ', 'async function '), {mode: 'transform'})).runInContext(context);
+  const fixtures = [];
+  async function add(input, flags = {}) {
+    simulation.flags = {authenticated: false, documentComplete: true, customThemeCount: 0, development: false, ...flags};
+    simulation.events = []; simulation.saves = []; simulation.stores = []; simulation.gates = [];
+    const normalized = migration.migrateConfig(structuredClone(input));
+    await context.applyConfig(structuredClone(input));
+    assert.equal(simulation.gates.length, 1); assert.equal(simulation.stores.length, 1);
+    fixtures.push({normalized, flags: simulation.flags, runtime: structuredClone(simulation.Config),
+      requested: simulation.stores[0], rejectedKeys: simulation.saves,
+      events: simulation.events, gate: simulation.gates[0]});
+  }
+  await add({});
+  for (const mode of ['time', 'words', 'quote', 'custom', 'zen']) for (let bits = 0; bits < 4; bits++) {
+    await add({mode, numbers: !!(bits & 1), punctuation: !!(bits & 2)});
+  }
+  for (const freedomMode of [false, true]) for (const confidenceMode of ['off', 'on', 'max'])
+    for (const stopOnError of ['off', 'letter', 'word']) for (const deleteOnError of ['off', 'letter', 'letter_hard', 'word', 'word_hard']) {
+      await add({freedomMode, confidenceMode, stopOnError, deleteOnError});
+    }
+  for (const authenticated of [false, true]) for (const documentComplete of [false, true])
+    for (const paceCaret of ['off', 'pb', 'tagPb', 'custom', 'daily']) await add({paceCaret}, {authenticated, documentComplete});
+  for (const authenticated of [false, true]) for (const customThemeCount of [0, 2])
+    await add({randomTheme: 'custom'}, {authenticated, customThemeCount});
+  for (const monkey of [false, true]) for (const liveSpeedStyle of ['off', 'mini', 'text'])
+    for (const liveAccStyle of ['off', 'mini', 'text']) await add({monkey, liveSpeedStyle, liveAccStyle});
+  for (let bits = 0; bits < 16; bits++) await add({accountChart: [0, 1, 2, 3].map(i => bits & (1 << i) ? 'on' : 'off')});
+  for (const tapeMode of ['off', 'word', 'letter']) for (const showAllLines of [false, true]) await add({tapeMode, showAllLines});
+  for (const development of [false, true]) await add({ads: 'sellout'}, {development});
+  for (const key of ['customLayoutfluid', 'customPolyglot']) {
+    const first = defaults[key][0], second = defaults[key][1];
+    await add({[key]: [first, first]}); await add({[key]: [first, second, first]});
+  }
+  await add({customTheme: true, customThemeColors: Array(10).fill('#abcdef')});
+  for (const suffix of ['\n', '\u0085', '\ufeff']) await add({customBackground: 'http://example.com/p.png' + suffix});
+  for (const keymapSize of [1.0999999999999999, 1.4000000000000001, 1.5999999999999999]) await add({keymapSize});
+  for (const funbox of catalogs.funboxes) for (const mode of ['time', 'words', 'quote', 'custom', 'zen'])
+    for (const highlightMode of ['letter', 'word']) await add({funbox: [funbox], mode, highlightMode});
+  for (const funbox of [['read_ahead', 'read_ahead_hard'], ['mirror', 'round_round_baby'], ['tts', 'simon_says']]) await add({funbox});
+  verify();
+  console.log(JSON.stringify(transport({defaults, catalogs, orderedKeys: Object.keys(defaults), fixtures})));
+} else {
 const fixtures = [];
 function add(input) {
   fixtures.push({input: structuredClone(input), sanitized: sanitize(schema, input),
@@ -123,3 +214,4 @@ for (const value of ['#fff', '#ABCDEF', '#fff\n', '#fff\r\n', '#fff\u0085', '#ff
 }
 verify();
 console.log(JSON.stringify(transport({defaults, catalogs, fixtures})));
+}

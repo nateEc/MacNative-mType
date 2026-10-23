@@ -5,6 +5,10 @@ indirect enum WebsiteConfigValue: Codable, Equatable {
   case null, bool(Bool), number(Double), string(String)
   case array([Self]), object([String: Self])
 
+  static func trimmingWebsiteWhitespace(_ value: String) -> String {
+    value.trimmingCharacters(in: WebsiteConfigNumbers.whitespace)
+  }
+
   init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
     if container.decodeNil() { self = .null }

@@ -16,6 +16,10 @@ struct WebsiteConfigSchema {
   private let rules: [String: WebsiteConfigRule]
   var keys: Set<String> { Set(rules.keys) }
 
+  func accepts(_ value: WebsiteConfigValue, for key: String) -> Bool {
+    rules[key]?.accepts(value) == true
+  }
+
   init(catalogs: WebsiteConfigCatalogs) {
     var fields: [String: WebsiteConfigRule] = [:]
     for key in ["punctuation", "numbers", "burstHeatmap", "resultSaving", "blindMode",
