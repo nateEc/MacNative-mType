@@ -3,6 +3,203 @@ import XCTest
 
 @MainActor
 final class SourceChallengeApplicationTests: XCTestCase {
+  private func wingdingsState(settings: AppSettings) throws -> (ChallengeLiveConfigurationState, TestConfiguration) {
+    settings.installedPracticeFontName = "Georgia"
+    settings.keyboardGuideMode = .next
+    let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "ten-words-of-pain"))
+    var template = challenge.preset
+    template.configuration = template.configuration.with(challengeID: challenge.id)
+    let configuration = try apply(template, to: settings)
+    var live = ChallengeLiveConfigurationState()
+    XCTAssertTrue(live.install(configuration, settings: settings))
+    return (live, configuration)
+  }
+
+  func testSameValueDisplayApplicationReplacesOnlyItsOwnedTransientField() throws {
+    for field in [ChallengeLiveConfigurationState.ApplicationField.font, .keyboardGuide] {
+      try withSettings { settings, _ in
+        let (live, _) = try wingdingsState(settings: settings)
+        XCTAssertFalse(live.shouldClearChallenge(for: .font,
+          eventRevision: settings.practiceFontApplicationRevision, settings: settings))
+        XCTAssertFalse(live.shouldClearChallenge(for: .keyboardGuide,
+          eventRevision: settings.keyboardGuideApplicationRevision, settings: settings))
+        switch field {
+        case .font:
+          settings.installedPracticeFontName = "Georgia"
+          XCTAssertEqual(live.fontFamilyName(settings: settings), "Georgia")
+          XCTAssertEqual(live.keyboardGuideMode(settings: settings), .off)
+          XCTAssertTrue(live.shouldClearChallenge(for: field,
+            eventRevision: settings.practiceFontApplicationRevision, settings: settings))
+        case .keyboardGuide:
+          settings.keyboardGuideMode = .next
+          XCTAssertEqual(live.fontFamilyName(settings: settings), WingdingsChallengeFont.familyName)
+          XCTAssertEqual(live.keyboardGuideMode(settings: settings), .next)
+          XCTAssertTrue(live.shouldClearChallenge(for: field,
+            eventRevision: settings.keyboardGuideApplicationRevision, settings: settings))
+        default: XCTFail("Display field required")
+        }
+      }
+    }
+  }
+
+  func testGuideVisibilityConfirmationAndUnrelatedSettingsHaveDistinctOwnership() throws {
+    try withSettings { settings, _ in
+      let (live, _) = try wingdingsState(settings: settings)
+      let fontRevision = settings.practiceFontApplicationRevision
+      let guideRevision = settings.keyboardGuideApplicationRevision
+      settings.theme = .midnight
+      XCTAssertEqual(settings.practiceFontApplicationRevision, fontRevision)
+      XCTAssertEqual(settings.keyboardGuideApplicationRevision, guideRevision)
+      XCTAssertEqual(live.snapshot(settings: settings).installedPracticeFontName, WingdingsChallengeFont.familyName)
+      XCTAssertEqual(live.keyboardGuideMode(settings: settings), .off)
+      settings.showKeyboardGuide = true
+      XCTAssertGreaterThan(settings.keyboardGuideApplicationRevision, guideRevision)
+      XCTAssertEqual(live.keyboardGuideMode(settings: settings), .next)
+      XCTAssertEqual(live.fontFamilyName(settings: settings), WingdingsChallengeFont.familyName)
+    }
+  }
+
+  func testLaterChallengeKeepsUnownedDisplayButCannotReviveAnExplicitlyReplacedFont() throws {
+    try withSettings { settings, _ in
+      var (live, _) = try wingdingsState(settings: settings)
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+      var template = challenge.preset
+      template.configuration = template.configuration.with(challengeID: challenge.id)
+      let configuration = try apply(template, to: settings)
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      XCTAssertEqual(live.fontFamilyName(settings: settings), WingdingsChallengeFont.familyName)
+      XCTAssertEqual(live.keyboardGuideMode(settings: settings), .off)
+      settings.installedPracticeFontName = "Georgia"
+      let priorRevision = settings.practiceFontApplicationRevision
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      XCTAssertEqual(live.fontFamilyName(settings: settings), "Georgia")
+      XCTAssertEqual(live.keyboardGuideMode(settings: settings), .off)
+      XCTAssertFalse(live.shouldClearChallenge(for: .font, eventRevision: priorRevision, settings: settings))
+    }
+  }
+
+  func testOrdinaryThemePresetPersistsAcceptedWingdingsDisplayForANewReader() throws {
+    try withSettings { settings, defaults in
+      let (live, configuration) = try wingdingsState(settings: settings)
+      let current = SavedTestPreset(configuration: configuration, settingsSnapshot: live.snapshot(settings: settings))
+      var snapshot = settings.snapshot
+      snapshot.theme = .midnight
+      let incoming = SavedTestPreset(configuration: .words(3, rules: settings.inputRules),
+        settingsSnapshot: snapshot, settingGroups: [.theme])
+      let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(incoming, to: settings, appliesGlobalSettings: true))
+      let resolved = PresetApplicationPolicy.applying(current: current, preset: prepared.preset)
+      XCTAssertTrue(PresetSettingsApplication.commit(original: prepared.preset, resolved: resolved,
+        configuration: resolved.configuration, to: settings, appliesGlobalSettings: true,
+        expectedSourceState: prepared.baseline, liveConfiguration: live))
+      XCTAssertNil(resolved.configuration.challengeID)
+      let reader = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+      XCTAssertEqual(reader.installedPracticeFontName, WingdingsChallengeFont.familyName)
+      XCTAssertEqual(reader.effectiveKeyboardGuideMode, .off)
+      XCTAssertEqual(reader.theme, .midnight)
+    }
+  }
+
+  func testDisplayStateDoesNotTransferBetweenSettingsOwners() throws {
+    try withSettings { settings, _ in
+      var (live, _) = try wingdingsState(settings: settings)
+      try withSettings { other, _ in
+        other.installedPracticeFontName = "Courier"
+        other.keyboardGuideMode = .react
+        XCTAssertEqual(live.snapshot(settings: other), other.snapshot)
+        XCTAssertFalse(live.shouldClearChallenge(for: .font,
+          eventRevision: other.practiceFontApplicationRevision, settings: other))
+        let configuration = TestConfiguration.words(25, rules: other.inputRules).with(challengeID: "clean-twenty-five")
+        XCTAssertTrue(live.install(configuration, settings: other))
+        XCTAssertEqual(live.fontFamilyName(settings: other), "Courier")
+        XCTAssertEqual(live.keyboardGuideMode(settings: other), .react)
+      }
+    }
+  }
+
+  func testLegacyWingdingsDisplayRemainsTransientWithoutAdoptingSource() throws {
+    try withSettings { _, defaults in
+      defaults.removeObject(forKey: "appSettings.v4")
+      let settings = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+      settings.installedPracticeFontName = "Georgia"
+      settings.keyboardGuideMode = .next
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "ten-words-of-pain"))
+      var template = challenge.preset
+      template.configuration = template.configuration.with(challengeID: challenge.id)
+      let configuration = try apply(template, to: settings)
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.observeLegacyChallenge(settings: settings, configuration: configuration))
+      XCTAssertEqual(live.snapshot(settings: settings).installedPracticeFontName, WingdingsChallengeFont.familyName)
+      XCTAssertEqual(live.keyboardGuideMode(settings: settings), .off)
+      XCTAssertFalse(settings.hasThresholdProfile)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testSceneUsesDisplayOwnershipForRenderingAndQualificationEvents() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    XCTAssertTrue(source.contains("handleChallengeFieldApplication(.font, revision: revision)"))
+    XCTAssertTrue(source.contains("handleChallengeFieldApplication(.keyboardGuide, revision: revision)"))
+    let begin = try XCTUnwrap(source.range(of: "private var effectiveKeyboardGuideMode:"))
+    let end = try XCTUnwrap(source.range(of: "private func clearCommandFontPreview()"))
+    let rendering = source[begin.lowerBound..<end.lowerBound]
+    XCTAssertTrue(rendering.contains("challengeLiveConfiguration.hasTransientFont(settings: settings)"))
+    XCTAssertTrue(rendering.contains("challengeLiveConfiguration.keyboardGuideMode(settings: settings)"))
+    XCTAssertFalse(rendering.contains("activeChallengeID =="))
+    let forcedGuide = try XCTUnwrap(rendering.range(of: "modifiers.contains(.simonSays)"))
+    let inheritedGuide = try XCTUnwrap(rendering.range(of: "challengeLiveConfiguration.keyboardGuideMode(settings: settings)"))
+    XCTAssertLessThan(forcedGuide.lowerBound, inheritedGuide.lowerBound,
+      "Inherited Wingdings visibility must not hide Simon's required guide")
+  }
+
+  func testSceneHandsAcceptedFontToLocalSelectionOnlyAfterSettingsCommit() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    let start = try XCTUnwrap(source.range(of: "@discardableResult private func apply("))
+    let body = source[start.lowerBound...]
+    let commit = try XCTUnwrap(body.range(of: "guard PresetSettingsApplication.commit("))
+    let handoff = try XCTUnwrap(body.range(of: "TransientFontPersistencePolicy.requiresLocalFontDeactivation("))
+    XCTAssertLessThan(commit.lowerBound, handoff.lowerBound)
+    XCTAssertTrue(body[handoff.lowerBound...].contains("settings.deactivateLocalPracticeFont()"))
+  }
+
+  func testFontHandoffRequiresExplicitEffectiveSnapshotAndMatchingAcceptedFamily() {
+    XCTAssertTrue(TransientFontPersistencePolicy.requiresLocalFontDeactivation(
+      acceptedFamily: "Wingdings", persistedFamily: "Wingdings", savesEffectiveSnapshot: true))
+    XCTAssertFalse(TransientFontPersistencePolicy.requiresLocalFontDeactivation(
+      acceptedFamily: "Wingdings", persistedFamily: "Wingdings", savesEffectiveSnapshot: false))
+    XCTAssertFalse(TransientFontPersistencePolicy.requiresLocalFontDeactivation(
+      acceptedFamily: nil, persistedFamily: "Wingdings", savesEffectiveSnapshot: true))
+    XCTAssertFalse(TransientFontPersistencePolicy.requiresLocalFontDeactivation(
+      acceptedFamily: "Wingdings", persistedFamily: "Georgia", savesEffectiveSnapshot: true))
+  }
+
+  func testWingdingsDisplaySnapshotOutlivesQualificationWithoutChangingPreferences() throws {
+    try withSettings { settings, defaults in
+      settings.installedPracticeFontName = "Georgia"
+      settings.keyboardGuideMode = .next
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "ten-words-of-pain"))
+      var template = challenge.preset
+      template.configuration = template.configuration.with(challengeID: challenge.id)
+      let configuration = try apply(template, to: settings)
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      let ordinary = configuration.with(challengeID: nil)
+      XCTAssertNil(ordinary.challengeID)
+      let snapshot = live.snapshot(settings: settings)
+      XCTAssertEqual(snapshot.installedPracticeFontName, WingdingsChallengeFont.familyName)
+      XCTAssertEqual(snapshot.keyboardGuideMode, .off)
+      XCTAssertFalse(snapshot.showKeyboardGuide)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
   private func withSettings(_ body: (AppSettings, UserDefaults) throws -> Void) throws {
     let suite = "typebar.source-challenge.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

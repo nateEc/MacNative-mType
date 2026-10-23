@@ -1190,6 +1190,7 @@ final class AppSettings {
   // Presentation event identity only; never part of a saved settings snapshot.
   private(set) var practiceWrapperRevision: UInt64 = 0
   private(set) var practiceFontApplicationRevision: UInt64 = 0
+  private(set) var keyboardGuideApplicationRevision: UInt64 = 0
   private(set) var difficultyApplicationRevision: UInt64 = 0
   private(set) var testModifiersApplicationRevision: UInt64 = 0
 
@@ -1358,12 +1359,12 @@ final class AppSettings {
   // Unlike the active selection, this survives a switch to a built-in theme.
   private(set) var lastCustomThemeID: UUID? { didSet { persist() } }
   var favoriteThemeIDs: [String] = [] { didSet { persist() } }
-  var showKeyboardGuide = false { didSet { persist() } }
+  var showKeyboardGuide = false { didSet { persistKeyboardGuideApplication() } }
   var keyboardGuideMode: KeyboardGuideMode = .off {
     didSet {
       let shouldShowGuide = keyboardGuideMode != .off
       if showKeyboardGuide != shouldShowGuide { showKeyboardGuide = shouldShowGuide }
-      persist()
+      persistKeyboardGuideApplication()
     }
   }
   var keyboardGuideScale = 1.0 {
@@ -2652,23 +2653,29 @@ final class AppSettings {
   func importLocalPracticeFont(data: Data, originalFilename: String) throws {
     _ = try TypebarLocalPracticeFontStore.save(data, originalFilename: originalFilename)
     localPracticeFontRevision &+= 1
+    practiceFontApplicationRevision &+= 1
   }
 
   @discardableResult
   func activateLocalPracticeFont() -> Bool {
     let activated = TypebarLocalPracticeFontStore.activate()
-    if activated { localPracticeFontRevision &+= 1 }
+    if activated {
+      localPracticeFontRevision &+= 1
+      practiceFontApplicationRevision &+= 1
+    }
     return activated
   }
 
   func deactivateLocalPracticeFont() {
     TypebarLocalPracticeFontStore.deactivate()
     localPracticeFontRevision &+= 1
+    practiceFontApplicationRevision &+= 1
   }
 
   func removeLocalPracticeFont() throws {
     try TypebarLocalPracticeFontStore.remove()
     localPracticeFontRevision &+= 1
+    practiceFontApplicationRevision &+= 1
   }
 
   func resolvedTheme(for systemColorScheme: ColorScheme) -> ResolvedTheme {
@@ -2877,6 +2884,11 @@ final class AppSettings {
 
   private func persistPracticeFontApplication() {
     practiceFontApplicationRevision &+= 1
+    persist()
+  }
+
+  private func persistKeyboardGuideApplication() {
+    keyboardGuideApplicationRevision &+= 1
     persist()
   }
 

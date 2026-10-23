@@ -1573,6 +1573,12 @@ private struct ContentView: View {
     .onChange(of: settings.testModifiersApplicationRevision) { _, revision in
       handleChallengeFieldApplication(.modifiers, revision: revision)
     }
+    .onChange(of: settings.practiceFontApplicationRevision) { _, revision in
+      handleChallengeFieldApplication(.font, revision: revision)
+    }
+    .onChange(of: settings.keyboardGuideApplicationRevision) { _, revision in
+      handleChallengeFieldApplication(.keyboardGuide, revision: revision)
+    }
   }
 
   private var configuredPracticeContent: some View {
@@ -3539,10 +3545,9 @@ private struct ContentView: View {
   }
 
   private var effectiveKeyboardGuideMode: KeyboardGuideMode {
-    if activeChallengeID == "ten-words-of-pain" { return .off }
     if session.configuration.modifiers.contains(.listening) { return .off }
     if session.configuration.modifiers.contains(.simonSays) { return .next }
-    return settings.effectiveKeyboardGuideMode
+    return challengeLiveConfiguration.keyboardGuideMode(settings: settings)
   }
 
   private func practicePromptNSFont(size: CGFloat) -> NSFont {
@@ -3550,7 +3555,7 @@ private struct ContentView: View {
         for: commandFontPreview.target, size: size, fallback: settings.practiceFont) {
       return font
     }
-    if activeChallengeID == "ten-words-of-pain",
+    if challengeLiveConfiguration.hasTransientFont(settings: settings),
       let font = WingdingsChallengeFont.resolve(size: size)
     {
       return font
@@ -3566,8 +3571,7 @@ private struct ContentView: View {
   }
 
   private var commandFontFamilyName: String {
-    FontFamilyCommandPreviewPolicy.savedName(challengeID: activeChallengeID,
-      installedName: settings.installedPracticeFontName)
+    challengeLiveConfiguration.fontFamilyName(settings: settings)
   }
 
   private func verifyChallengeFontAvailability() {
@@ -6067,16 +6071,24 @@ private struct ContentView: View {
     } ?? challengeTemplate
     let configuration = challenge == nil ? selectedConfiguration
       : ChallengeInputRulePolicy.applying(settings.inputRules, to: selectedConfiguration)
+    let acceptedTransientFontFamily = challengeLiveConfiguration.hasTransientFont(settings: settings)
+      ? challengeLiveConfiguration.fontFamilyName(settings: settings) : nil
     guard PresetSettingsApplication.commit(original: preparedPreset, resolved: appliedPreset,
       configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings,
       expectedSourceState: preparation.baseline, liveConfiguration: challengeLiveConfiguration) else {
       modeCompatibilityMessage = "本次配置未能应用，已保留当前测试；请检查配置版本或恢复状态。"
       return false
     }
+    if TransientFontPersistencePolicy.requiresLocalFontDeactivation(
+      acceptedFamily: acceptedTransientFontFamily, persistedFamily: settings.installedPracticeFontName,
+      savesEffectiveSnapshot: appliesGlobalSettings && appliedPreset.settingsSnapshot != nil
+        && appliedPreset.configuration.challengeID == nil) {
+      settings.deactivateLocalPracticeFont()
+    }
     if challenge != nil {
       let installed = settings.hasThresholdProfile
         ? challengeLiveConfiguration.install(configuration, settings: settings)
-        : challengeLiveConfiguration.observeLegacyChallenge(settings: settings)
+        : challengeLiveConfiguration.observeLegacyChallenge(settings: settings, configuration: configuration)
       guard installed else {
         modeCompatibilityMessage = "挑战配置读取状态已改变，未切换测试。"
         return false

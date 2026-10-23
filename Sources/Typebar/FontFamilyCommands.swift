@@ -42,6 +42,16 @@ enum FontFamilyCommandPreviewPolicy {
   }
 }
 
+/// An explicitly saved effective named font must not be hidden on relaunch
+/// by a previously enabled file. The file itself remains available to reselect.
+enum TransientFontPersistencePolicy {
+  static func requiresLocalFontDeactivation(acceptedFamily: String?, persistedFamily: String,
+    savesEffectiveSnapshot: Bool) -> Bool {
+    guard savesEffectiveSnapshot, let acceptedFamily, !acceptedFamily.isEmpty else { return false }
+    return acceptedFamily == persistedFamily
+  }
+}
+
 /// A reference preview/clear changes presentation only. Clearing uses the
 /// latest saved family (not the opening snapshot or imported-file cascade).
 struct FontFamilyCommandPreviewState {
