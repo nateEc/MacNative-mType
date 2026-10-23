@@ -1292,6 +1292,7 @@ private struct ContentView: View {
   @State private var customTextPipeDelimiter: Bool?
   @State private var activeLongSavedText: ActiveLongSavedText?
   @State private var activeVerifiedScript: ReferenceScriptChallengePolicy.VerifiedScript?
+  @State private var customWordDurationSelection = CustomWordDurationSelection()
   @State private var activeSessionTags: [String] = []
   @State private var activeResultTagDraft = ""
   @State private var wordPractice: WordPracticeTransition?
@@ -4499,10 +4500,11 @@ private struct ContentView: View {
     if let source = customTextRecovery.takePendingSource(whenAllowed: true) {
       installCustomTextState(source)
     }
+    customWordDurationSelection.reconcile(mode: mode, completion: customTextCompletion,
+      wordLimit: customTextWordLimit)
     visualFocus.retire()
     if let activeVerifiedScript,
-      activeChallenge?.requirements.referenceScriptSpecification
-        != activeVerifiedScript.specification
+      !activeVerifiedScript.retainsSource(mode: mode, editorText: customText, challengeID: activeChallengeID)
     {
       self.activeVerifiedScript = nil
       if customText == LongSavedTextProgress.nextChunk(in: activeVerifiedScript.text, after: 0) {
@@ -4589,8 +4591,7 @@ private struct ContentView: View {
       preparedCustomSections: preparedCustomSections,
       customTextRecoveryBlocked: customTextRecovery.blocksCustomGeneration,
       finiteTextSource: activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk },
-      verifiedScript: activeChallenge?.requirements.referenceScriptSpecification
-        == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
+      verifiedScript: activeVerifiedScript,
       quote: selectedQuote,
       weakSpotScores: weakSpotScores,
       wordDecorationState: wordDecorationState,
@@ -5955,7 +5956,9 @@ private struct ContentView: View {
         mixedLanguageComponents: mixedLanguageComponents,
         modifiers: effectiveTestModifiers(for: language, mode: .zen), contentOptions: contentOptions)
     case .custom:
-      let duration = customTextCompletion == .time ? TimeInterval(customTextDuration) : nil
+      let duration = customTextCompletion == .time ? TimeInterval(customTextDuration)
+        : customWordDurationSelection.duration(mode: mode, completion: customTextCompletion,
+          wordLimit: customTextWordLimit)
       let wordLimit = customTextCompletion == .words ? customTextWordLimit : nil
       let sectionLimit =
         customTextCompletion == .sections
@@ -6066,7 +6069,7 @@ private struct ContentView: View {
       : ChallengeInputRulePolicy.applying(settings.inputRules, to: selectedConfiguration)
     guard PresetSettingsApplication.commit(original: preparedPreset, resolved: appliedPreset,
       configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings,
-      expectedSourceState: preparation.baseline) else {
+      expectedSourceState: preparation.baseline, liveConfiguration: challengeLiveConfiguration) else {
       modeCompatibilityMessage = "本次配置未能应用，已保留当前测试；请检查配置版本或恢复状态。"
       return false
     }
@@ -6098,7 +6101,9 @@ private struct ContentView: View {
     referenceScriptMessage = nil
     if let activeVerifiedScript,
       challenge?.requirements.referenceScriptSpecification
-        != activeVerifiedScript.specification
+        != activeVerifiedScript.specification,
+      appliesTest || !activeVerifiedScript.retainsSource(mode: configuration.mode,
+        editorText: appliedPreset.customText ?? customText, challengeID: nil)
     {
       self.activeVerifiedScript = nil
       if appliedPreset.customText == nil,
@@ -6107,8 +6112,9 @@ private struct ContentView: View {
         customText = "A calm practice makes the next difficult sentence feel possible."
       }
     }
+    customWordDurationSelection.accept(configuration)
+    if appliesTest || appliesGlobalSettings { activeChallengeID = challenge?.id }
     if appliesTest {
-      activeChallengeID = challenge?.id
       if challenge?.id == "one-handed-bandit" {
         oneHandedChallengePreset = selectedOneHandedPreset
         oneHandedChallengeSelection = oneHandedChallengePreset?.customText.flatMap {
@@ -6231,10 +6237,7 @@ private struct ContentView: View {
     guard customTextRecovery.permitsAutomaticPersistence(mode: mode) else { return }
     // The selected file exists only in this process. Leave the previous safe
     // selection intact, so relaunch cannot restore a first-chunk impostor.
-    if let activeVerifiedScript,
-      activeChallenge?.requirements.referenceScriptSpecification
-        == activeVerifiedScript.specification
-    { return }
+    if activeVerifiedScript != nil { return }
     if mode == .custom, activeLongSavedText == nil {
       customTextStateSaveFailed = !settings.saveCustomTextState(customTextStateDocument)
     }
@@ -6300,9 +6303,8 @@ private struct ContentView: View {
   }
 
   private func handleActiveChallengeIDChange(to id: String?) {
-    let required = TypebarChallengeLibrary.challenge(id: id)?
-      .requirements.referenceScriptSpecification
-    guard let activeVerifiedScript, activeVerifiedScript.specification != required else { return }
+    guard let activeVerifiedScript,
+      !activeVerifiedScript.retainsSource(mode: mode, editorText: customText, challengeID: id) else { return }
     if id == nil,
       customText == LongSavedTextProgress.nextChunk(in: activeVerifiedScript.text, after: 0)
     {

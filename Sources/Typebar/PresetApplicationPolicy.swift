@@ -51,8 +51,11 @@ enum PresetApplicationPolicy {
       resolvedSnapshot = currentSnapshot.applyingPresetSettings(from: sourceSnapshot, groups: groups)
     }
     let testMetadata = usesTest ? sourceConfiguration : currentConfiguration
+    // Applying ordinary preset settings ends inherited challenge qualification,
+    // even when the test group (and therefore its parameters) is not replaced.
+    let challengeID = usesTest ? sourceConfiguration.challengeID : nil
     var modifiers = usesBehavior ? sourceConfiguration.modifiers : currentConfiguration.modifiers
-    if let snapshot = resolvedSnapshot, snapshot.thresholdSource != nil, testMetadata.challengeID == nil {
+    if let snapshot = resolvedSnapshot, snapshot.thresholdSource != nil, challengeID == nil {
       modifiers = EffectiveTestModifierPolicy.modifiers(
         requested: snapshot.testModifiers, language: testMetadata.language, mode: testMetadata.mode,
         mixedLanguageComponents: testMetadata.mixedLanguageComponents,
@@ -85,7 +88,7 @@ enum PresetApplicationPolicy {
       polyglotBaseLanguage: testMetadata.polyglotBaseLanguage,
       modifiers: modifiers,
       contentOptions: usesTest ? sourceConfiguration.contentOptions : currentConfiguration.contentOptions,
-      challengeID: usesTest ? sourceConfiguration.challengeID : currentConfiguration.challengeID)
+      challengeID: challengeID)
     configuration.polyglotUsesPrimaryDirection = testMetadata.polyglotUsesPrimaryDirection
     configuration.polyglotUsesPrimaryCodeInput = testMetadata.polyglotUsesPrimaryCodeInput
     configuration.polyglotUsesPrimaryInputNormalization = testMetadata.polyglotUsesPrimaryInputNormalization

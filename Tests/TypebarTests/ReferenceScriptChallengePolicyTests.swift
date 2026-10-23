@@ -5,6 +5,43 @@ import XCTest
 @testable import Typebar
 
 final class ReferenceScriptChallengePolicyTests: XCTestCase {
+  private func ownedScript(_ text: String) throws -> ReferenceScriptChallengePolicy.VerifiedScript {
+    let digest = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+    let specification = ReferenceScriptChallengePolicy.Specification(legacyName: "owned",
+      fileName: "owned.txt", byteCount: text.utf8.count, normalizedCharacterCount: text.unicodeScalars.count,
+      normalizedSHA256: digest)
+    return try ReferenceScriptChallengePolicy.verifiedScript(Data(text.utf8), for: specification)
+  }
+
+  func testClearedQualificationRetainsOnlyItsUnchangedCustomSource() throws {
+    let script = try ownedScript("amber harbor willow")
+    XCTAssertTrue(script.retainsSource(mode: .custom, editorText: script.text, challengeID: nil))
+    XCTAssertFalse(script.retainsSource(mode: .words, editorText: script.text, challengeID: nil))
+    XCTAssertFalse(script.retainsSource(mode: .custom, editorText: "new text", challengeID: nil))
+    XCTAssertFalse(script.retainsSource(mode: .custom, editorText: script.text, challengeID: "unknown"))
+    XCTAssertFalse(script.retainsSource(mode: .custom, editorText: script.text, challengeID: "clean-twenty-five"))
+  }
+
+  func testRetainedScriptCompletesAndRepeatsAsUnqualifiedFullTextNotPreviewOnly() throws {
+    let source = String(repeating: "amber harbor ", count: 800) + "end"
+    let script = try ownedScript(source)
+    let preview = LongSavedTextProgress.nextChunk(in: source, after: 0)
+    XCTAssertLessThan(preview.count, source.count)
+    XCTAssertTrue(script.retainsSource(mode: .custom, editorText: preview, challengeID: nil))
+    let configuration = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init(), customTextCompletion: .finish)
+    var session = TestSessionFactory.make(configuration: configuration, customText: preview, verifiedScript: script)
+    let start = Date(timeIntervalSince1970: 100)
+    session.insertBatch(preview, at: start)
+    XCTAssertFalse(session.isFinished)
+    session.insertBatch(String(source.dropFirst(preview.count)), at: start.addingTimeInterval(1))
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(result.outcome, .completed)
+    XCTAssertNil(result.configuration.challengeID)
+    XCTAssertEqual(session.prompt, source)
+    XCTAssertEqual(session.repeatedAttempt().prompt, preview)
+  }
+
   func testFixedScriptLengthCountsUnicodeScalarsRatherThanSwiftGraphemes() throws {
     let normalized = "cafe\u{301} harbor"
     XCTAssertNotEqual(normalized.count, normalized.unicodeScalars.count)

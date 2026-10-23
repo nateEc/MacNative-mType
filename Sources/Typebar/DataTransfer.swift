@@ -1119,7 +1119,7 @@ enum SettingsJSONConfigurationPolicy {
                 guard let wordLimit = configuration.wordLimit,
                       isValidLimit(wordLimit),
                       (configuration.duration == nil || (
-                        configuration.challengeID == "one-handed-bandit"
+                        (configuration.challengeID == nil || configuration.challengeID == "one-handed-bandit")
                         && wordLimit == 10_000 && configuration.duration == 3_600))
                 else { return false }
             case .sections:

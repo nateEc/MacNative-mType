@@ -201,6 +201,205 @@ final class SourceChallengeApplicationTests: XCTestCase {
     }
   }
 
+  func testOrdinaryAppearancePartialReplacesSourceChallengeWithoutChangingUnownedLiveFields() throws {
+    try withSettings { settings, defaults in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+      var template = challenge.preset
+      template.configuration = template.configuration.with(challengeID: challenge.id)
+      let configuration = try apply(template, to: settings)
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      let current = SavedTestPreset(configuration: configuration, activeResultTags: ["current"],
+        settingsSnapshot: live.snapshot(settings: settings))
+      var snapshot = settings.snapshot
+      snapshot.fontSize = 42
+      let incoming = SavedTestPreset(configuration: .words(3, rules: settings.inputRules),
+        activeResultTags: ["incoming"], settingsSnapshot: snapshot, settingGroups: [.appearance])
+      let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(incoming, to: settings,
+        appliesGlobalSettings: true))
+      let resolved = PresetApplicationPolicy.applying(current: current, preset: prepared.preset)
+      XCTAssertNil(resolved.configuration.challengeID)
+      XCTAssertTrue(PresetSettingsApplication.commit(original: prepared.preset, resolved: resolved,
+        configuration: resolved.configuration, to: settings, appliesGlobalSettings: true,
+        expectedSourceState: prepared.baseline, liveConfiguration: live))
+      XCTAssertEqual(resolved.configuration, configuration.with(challengeID: nil))
+      XCTAssertEqual(settings.snapshot, resolved.settingsSnapshot)
+      XCTAssertEqual(live.difficulty(settings: settings), configuration.difficulty)
+      XCTAssertEqual(live.modifiers(settings: settings), configuration.modifiers)
+      XCTAssertEqual(ThresholdSettingsStore(defaults: defaults).read(), .available(settings.snapshot))
+      let reader = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+      XCTAssertEqual(reader.difficulty, configuration.difficulty)
+      XCTAssertEqual(reader.testModifiers, configuration.modifiers)
+    }
+  }
+
+  func testAppearancePartialCanExitEverySourceLibraryTemplateWithoutLosingItsParameters() throws {
+    for challenge in TypebarChallengeLibrary.all {
+      try withSettings { settings, _ in
+        var template = challenge.preset
+        template.configuration = template.configuration.with(challengeID: challenge.id)
+        let configuration = try apply(template, to: settings)
+        var live = ChallengeLiveConfigurationState()
+        XCTAssertTrue(live.install(configuration, settings: settings))
+        let current = SavedTestPreset(configuration: configuration, customText: template.customText,
+          settingsSnapshot: live.snapshot(settings: settings))
+        var snapshot = settings.snapshot
+        snapshot.fontSize = 42
+        let incoming = SavedTestPreset(configuration: .words(3, rules: settings.inputRules),
+          settingsSnapshot: snapshot, settingGroups: [.appearance])
+        let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(incoming, to: settings,
+          appliesGlobalSettings: true))
+        let resolved = PresetApplicationPolicy.applying(current: current, preset: prepared.preset)
+        XCTAssertNil(resolved.configuration.challengeID, challenge.id)
+        XCTAssertEqual(resolved.configuration, configuration.with(challengeID: nil), challenge.id)
+        XCTAssertEqual(resolved.customText, current.customText, challenge.id)
+        XCTAssertTrue(PresetSettingsApplication.commit(original: prepared.preset, resolved: resolved,
+          configuration: resolved.configuration, to: settings, appliesGlobalSettings: true,
+          expectedSourceState: prepared.baseline, liveConfiguration: live), challenge.id)
+        XCTAssertEqual(settings.fontSize, 42, challenge.id)
+      }
+    }
+  }
+
+  func testEachOrdinaryPartialOwnsOnlySelectedPersistentAndTransientFieldsWhenExitingChallenge() throws {
+    for group in PresetSettingGroup.allCases {
+      try withSettings { settings, _ in
+        let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+        var template = challenge.preset
+        template.configuration = template.configuration.with(challengeID: challenge.id)
+        let configuration = try apply(template, to: settings)
+        var live = ChallengeLiveConfigurationState()
+        XCTAssertTrue(live.install(configuration, settings: settings))
+        let current = SavedTestPreset(configuration: configuration, settingsSnapshot: live.snapshot(settings: settings))
+        let before = settings.snapshot
+        var snapshot = before
+        snapshot.difficulty = .master
+        snapshot.testModifiers = [.mirrorKeyboard]
+        snapshot.fontSize = 42
+        snapshot.activeResultTags = ["incoming"]
+        let incoming = SavedTestPreset(configuration: .words(3, difficulty: .master, rules: settings.inputRules)
+          .with(modifiers: [.mirrorKeyboard]), activeResultTags: ["incoming"], settingsSnapshot: snapshot,
+          settingGroups: [group])
+        let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(incoming, to: settings,
+          appliesGlobalSettings: true))
+        let resolved = PresetApplicationPolicy.applying(current: current, preset: prepared.preset)
+        XCTAssertTrue(PresetSettingsApplication.commit(original: prepared.preset, resolved: resolved,
+          configuration: resolved.configuration, to: settings, appliesGlobalSettings: true,
+          expectedSourceState: prepared.baseline, liveConfiguration: live), group.rawValue)
+        XCTAssertNil(resolved.configuration.challengeID)
+        XCTAssertEqual(resolved.configuration.mode, group == .test ? .words : configuration.mode)
+        XCTAssertEqual(settings.snapshot, resolved.settingsSnapshot)
+        XCTAssertEqual(live.difficulty(settings: settings), group == .behavior ? .master : configuration.difficulty)
+        XCTAssertEqual(live.modifiers(settings: settings), group == .behavior ? [.mirrorKeyboard] : configuration.modifiers)
+      }
+    }
+  }
+
+  func testRejectedOrdinaryPartialDoesNotChangeSourceChallengeOrPreferences() throws {
+    for failure in ["lock", "profile", "selection"] {
+      try withSettings { settings, defaults in
+        let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+        var template = challenge.preset
+        template.configuration = template.configuration.with(challengeID: challenge.id)
+        let configuration = try apply(template, to: settings)
+        var live = ChallengeLiveConfigurationState()
+        XCTAssertTrue(live.install(configuration, settings: settings))
+        let current = SavedTestPreset(configuration: configuration, settingsSnapshot: live.snapshot(settings: settings))
+        let incoming = SavedTestPreset(configuration: .words(3, rules: settings.inputRules),
+          settingsSnapshot: settings.snapshot, settingGroups: [.appearance])
+        let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(incoming, to: settings,
+          appliesGlobalSettings: true))
+        let resolved = PresetApplicationPolicy.applying(current: current, preset: prepared.preset)
+        let owner = UUID()
+        if failure == "lock" { settings.setNoQuitConfigurationLock(true, for: owner) }
+        else { defaults.set(Data("{\"version\":99}".utf8),
+          forKey: failure == "profile" ? "appSettings.v4" : "activeTestSelection.v2") }
+        defer { settings.setNoQuitConfigurationLock(false, for: owner) }
+        let before = defaults.dictionaryRepresentation() as NSDictionary
+        XCTAssertFalse(PresetSettingsApplication.commit(original: prepared.preset, resolved: resolved,
+          configuration: resolved.configuration, to: settings, appliesGlobalSettings: true,
+          expectedSourceState: prepared.baseline, liveConfiguration: live))
+        XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+        XCTAssertEqual(current.configuration.challengeID, challenge.id)
+      }
+    }
+  }
+
+  func testPartialDoesNotOverwritePersistentPreferencesUnseenByTheCurrentOwner() throws {
+    try withSettings { settings, defaults in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+      var template = challenge.preset
+      template.configuration = template.configuration.with(challengeID: challenge.id)
+      let configuration = try apply(template, to: settings)
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      let current = SavedTestPreset(configuration: configuration, settingsSnapshot: live.snapshot(settings: settings))
+      var external = settings.snapshot
+      external.fontSize = 48
+      XCTAssertTrue(ThresholdSettingsStore(defaults: defaults).save(external))
+      var snapshot = settings.snapshot
+      snapshot.theme = .midnight
+      let incoming = SavedTestPreset(configuration: .words(3, rules: settings.inputRules),
+        settingsSnapshot: snapshot, settingGroups: [.theme])
+      let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(incoming, to: settings,
+        appliesGlobalSettings: true))
+      let resolved = PresetApplicationPolicy.applying(current: current, preset: prepared.preset)
+      XCTAssertFalse(PresetSettingsApplication.commit(original: prepared.preset, resolved: resolved,
+        configuration: resolved.configuration, to: settings, appliesGlobalSettings: true,
+        expectedSourceState: prepared.baseline, liveConfiguration: live))
+      XCTAssertEqual(ThresholdSettingsStore(defaults: defaults).read(), .available(external))
+      XCTAssertEqual(settings.fontSize, 31)
+    }
+  }
+
+  func testLivePartialAdmissionRejectsUnselectedInjectionAndAnotherModelsState() throws {
+    try withSettings { settings, defaults in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))
+      var template = challenge.preset
+      template.configuration = template.configuration.with(challengeID: challenge.id)
+      let configuration = try apply(template, to: settings)
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      let current = SavedTestPreset(configuration: configuration, settingsSnapshot: live.snapshot(settings: settings))
+      let incoming = SavedTestPreset(configuration: .words(3, rules: settings.inputRules),
+        settingsSnapshot: settings.snapshot, settingGroups: [.input])
+      let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(incoming, to: settings,
+        appliesGlobalSettings: true))
+      let clean = PresetApplicationPolicy.applying(current: current, preset: prepared.preset)
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      var injected = clean
+      injected.settingsSnapshot?.fontSize = 99
+      XCTAssertFalse(PresetSettingsApplication.commit(original: prepared.preset, resolved: injected,
+        configuration: injected.configuration, to: settings, appliesGlobalSettings: true,
+        expectedSourceState: prepared.baseline, liveConfiguration: live))
+      try withSettings { other, _ in
+        var foreign = ChallengeLiveConfigurationState()
+        XCTAssertTrue(foreign.install(configuration, settings: other))
+        XCTAssertFalse(PresetSettingsApplication.commit(original: prepared.preset, resolved: clean,
+          configuration: clean.configuration, to: settings, appliesGlobalSettings: true,
+          expectedSourceState: prepared.baseline, liveConfiguration: foreign))
+      }
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+    }
+  }
+
+  func testSceneCommitsBeforeClearingQualificationAndRetainsEphemeralSources() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    let start = try XCTUnwrap(source.range(of: "@discardableResult private func apply("))
+    let body = source[start.lowerBound...]
+    let commit = try XCTUnwrap(body.range(of: "guard PresetSettingsApplication.commit("))
+    let selection = try XCTUnwrap(body.range(of: "customWordDurationSelection.accept(configuration)"))
+    let identity = try XCTUnwrap(body.range(of: "if appliesTest || appliesGlobalSettings { activeChallengeID = challenge?.id }"))
+    XCTAssertLessThan(commit.lowerBound, selection.lowerBound)
+    XCTAssertLessThan(selection.lowerBound, identity.lowerBound)
+    XCTAssertTrue(source.contains("verifiedScript: activeVerifiedScript,"))
+    XCTAssertTrue(source.contains("if activeVerifiedScript != nil { return }"))
+    XCTAssertTrue(source.contains("customWordDurationSelection.reconcile(mode: mode"))
+  }
+
   func testLegacyAndOrdinaryCapturesDoNotAdoptSourceOrMutateTheirInput() throws {
     let original = SavedTestPreset(configuration: .words(25).with(challengeID: "clean-twenty-five"),
       activeResultTags: ["legacy"], settingsSnapshot: .init())

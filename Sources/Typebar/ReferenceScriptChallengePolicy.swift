@@ -22,6 +22,15 @@ enum ReferenceScriptChallengePolicy {
       self.text = text
       self.specification = specification
     }
+
+    /// The editor holds only a preview chunk; the verified text remains the
+    /// ephemeral source after qualification is cleared, until explicitly replaced.
+    func retainsSource(mode: TestMode, editorText: String, challengeID: String?) -> Bool {
+      guard mode == .custom,
+        editorText == LongSavedTextProgress.nextChunk(in: text, after: 0) else { return false }
+      guard let challengeID else { return true }
+      return TypebarChallengeLibrary.challenge(id: challengeID)?.requirements.referenceScriptSpecification == specification
+    }
   }
 
   enum ImportError: LocalizedError, Equatable {

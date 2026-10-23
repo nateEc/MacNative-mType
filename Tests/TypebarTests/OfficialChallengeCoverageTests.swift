@@ -20,6 +20,8 @@ final class OfficialChallengeCoverageTests: XCTestCase {
           at: file, for: specification)
         let configuration = challenge.preset.configuration.with(challengeID: challenge.id)
         let first = LongSavedTextProgress.nextChunk(in: verified.text, after: 0)
+        XCTAssertTrue(verified.retainsSource(mode: configuration.mode, editorText: first, challengeID: challenge.id))
+        XCTAssertTrue(verified.retainsSource(mode: configuration.mode, editorText: first, challengeID: nil))
         var session = TestSessionFactory.make(
           configuration: configuration, customText: first, verifiedScript: verified)
         XCTAssertEqual(session.prompt, first, specification.legacyName)
@@ -240,8 +242,10 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     var preset = try XCTUnwrap(OneHandedChallengePolicy.preset(for: selection))
     preset.configuration = preset.configuration.with(challengeID: "one-handed-bandit")
     XCTAssertTrue(SettingsJSONConfigurationPolicy.isValid(preset.configuration))
-    XCTAssertFalse(SettingsJSONConfigurationPolicy.isValid(
+    XCTAssertTrue(SettingsJSONConfigurationPolicy.isValid(
       preset.configuration.with(challengeID: nil)))
+    XCTAssertFalse(SettingsJSONConfigurationPolicy.isValid(
+      preset.configuration.with(challengeID: "unknown")))
     let document = ActiveTestSelectionDocument(
       preset: preset, testParameterMemory: .defaults,
       oneHandedChallengeSelection: selection)

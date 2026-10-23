@@ -8,7 +8,8 @@ enum PresetSettingsApplication {
     original: SavedTestPreset, resolved: SavedTestPreset,
     configuration: TestConfiguration, to settings: AppSettings,
     appliesGlobalSettings: Bool,
-    expectedSourceState: PresetSourcePreparation.Baseline? = nil
+    expectedSourceState: PresetSourcePreparation.Baseline? = nil,
+    liveConfiguration: ChallengeLiveConfigurationState? = nil
   ) -> Bool {
     guard settings.allowsRestartingConfigurationChange else { return false }
     if let expectedSourceState, !expectedSourceState.matches(settings) { return false }
@@ -34,7 +35,8 @@ enum PresetSettingsApplication {
       else { return false }
       if original.isPartial || resolved.isPartial {
         guard appliesGlobalSettings, let groups = original.settingGroups, !groups.isEmpty,
-          resolved.settingGroups == groups, resolved.settingsSnapshot != nil
+          resolved.settingGroups == groups, resolved.settingsSnapshot != nil,
+          case .available(let stored) = settings.thresholdProfileRead, stored == settings.snapshot
         else { return false }
       }
       for definition in [original, resolved] where PracticeThresholdSource.isPresent(in: definition)
@@ -58,6 +60,14 @@ enum PresetSettingsApplication {
       // The alias owns tags when present (including an explicit empty list).
       // Include it in the staged source write, never a second settings write.
       if let tags { snapshot.activeResultTags = tags }
+      if sourceContext, let groups = original.settingGroups {
+        let live = liveConfiguration?.snapshot(settings: settings) ?? settings.snapshot
+        guard live.applyingPresetSettings(from: snapshot, groups: groups) == snapshot else { return false }
+        // Reference preset application saves the merged live configuration.
+        // Once proven to belong to this window, retain these values on relaunch.
+        if live != settings.snapshot { return settings.apply(snapshot) }
+        snapshot = settings.snapshot.applyingPresetSettings(from: snapshot, groups: groups)
+      }
       committed = settings.apply(snapshot, groups: sourceContext ? original.settingGroups : nil)
     } else {
       let appliedConfiguration = !original.isPartial
