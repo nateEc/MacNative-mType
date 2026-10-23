@@ -56,6 +56,84 @@ final class SourceChallengeApplicationTests: XCTestCase {
     }
   }
 
+  func testCanonicalSourceChallengeRecordCanBeReadPreparedAndCompleted() throws {
+    try withSettings { settings, defaults in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "clean-twenty-five"))
+      var original = challenge.preset
+      original.configuration = original.configuration.with(challengeID: challenge.id)
+      original.configuration.rules = settings.inputRules
+      let record = try TestPresetRecord(name: "Canonical", definition: original)
+      let bytes = record.definitionData
+      let incoming = try XCTUnwrap(record.applicableDefinition)
+      let before = settings.snapshot
+      let configuration = try apply(incoming, to: settings)
+      var expected = before
+      expected.testModifiers = []
+      XCTAssertEqual(settings.snapshot, expected)
+      XCTAssertEqual(record.definitionData, bytes)
+      XCTAssertNotNil(defaults.data(forKey: "appSettings.v1"))
+      var session = TestSessionFactory.make(configuration: configuration)
+      session.insertBatch(session.prompt, at: Date(timeIntervalSince1970: 100))
+      XCTAssertTrue(ChallengeEvaluator.evaluate(try XCTUnwrap(session.result()), challenge: challenge).passed)
+    }
+  }
+
+  func testEveryCanonicalSourceLibraryRecordIsAvailableWithoutChangingStoredBytes() throws {
+    try withSettings { settings, _ in
+      for challenge in TypebarChallengeLibrary.all {
+        var preset = challenge.preset
+        preset.configuration = preset.configuration.with(challengeID: challenge.id)
+        preset.configuration.rules = settings.inputRules
+        let record = try TestPresetRecord(name: challenge.id, definition: preset)
+        let bytes = record.definitionData
+        XCTAssertEqual(record.applicableDefinition, preset, challenge.id)
+        XCTAssertEqual(record.definitionData, bytes, challenge.id)
+      }
+    }
+  }
+
+  func testSourceChallengeRecordDoesNotExposeInvalidTemplateOrGlobalOverrides() throws {
+    try withSettings { settings, _ in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "clean-twenty-five"))
+      var preset = challenge.preset
+      preset.configuration = preset.configuration.with(challengeID: challenge.id)
+      preset.configuration.rules = settings.inputRules
+      var snapshot = preset; snapshot.settingsSnapshot = settings.snapshot
+      var partial = preset; partial.settingGroups = [.test]
+      var tags = preset; tags.activeResultTags = []
+      var forged = preset; forged.configuration.wordLimit = 3
+      var unknown = preset; unknown.configuration.challengeID = "unknown"
+      for rejected in [snapshot, partial, tags, forged, unknown] {
+        let record = try TestPresetRecord(name: "Rejected", definition: rejected)
+        let bytes = record.definitionData
+        XCTAssertNil(record.applicableDefinition)
+        XCTAssertEqual(record.definitionData, bytes)
+      }
+    }
+  }
+
+  func testAvailableSourceRecordDoesNotBypassTargetOrResourceAdmission() throws {
+    try withSettings { settings, defaults in
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "ten-words-of-pain"))
+      var preset = challenge.preset
+      preset.configuration = preset.configuration.with(challengeID: challenge.id)
+      preset.configuration.rules = settings.inputRules
+      let record = try TestPresetRecord(name: "Needs font", definition: preset)
+      let incoming = try XCTUnwrap(record.applicableDefinition)
+      let before = defaults.dictionaryRepresentation() as NSDictionary
+      XCTAssertEqual(PresetResourceAdmission.refusal(for: incoming.configuration,
+        wingdingsAvailable: { false }, scriptIsVerified: { _ in false }), .missingWingdings)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+      defaults.removeObject(forKey: "appSettings.v4")
+      let legacy = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+      let legacyBefore = defaults.dictionaryRepresentation() as NSDictionary
+      XCTAssertNil(PresetSourcePreparation.preparing(incoming, to: legacy, appliesGlobalSettings: true))
+      XCTAssertFalse(legacy.hasThresholdProfile)
+      XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, legacyBefore)
+    }
+  }
+
   func testSourceFunboxChallengeUsesTransientModifiersAndLeavesGlobalModifiersCleared() throws {
     try withSettings { settings, _ in
       let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "round-hour"))

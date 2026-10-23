@@ -4,7 +4,7 @@ import Foundation
 enum SourceChallengeAdmission {
   /// A library challenge is a transient selection, not an arbitrary preset
   /// allowed to replace global preferences under the same public identity.
-  static func accepts(_ preset: SavedTestPreset) -> Bool {
+  nonisolated static func accepts(_ preset: SavedTestPreset) -> Bool {
     guard !preset.isPartial, preset.settingsSnapshot == nil, preset.activeResultTags == nil,
       preset.quoteID == nil,
       let challenge = TypebarChallengeLibrary.challenge(id: preset.configuration.challengeID),
