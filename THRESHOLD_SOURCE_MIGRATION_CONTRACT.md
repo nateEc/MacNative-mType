@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 显式目录的文件寄存器与条件写入（后续阶段，起点 ea00b3c0）
+
+同会话决策审查拒绝在 UserDefaults 上伪造跨进程 CAS。新增独立 WebsiteConfigFileRegister，只接受调用方明确提供的现有私有本地目录；无真实配置目录默认值，不读／回填／迁移旧偏好。新记录外层携带类型、版本和每次提交的新 UUID，内层仍用无损状态格式；仅完整九组候选可提出写入。此为原生平台协调机制，不是声称浏览器 localStorage 采用同一实现。
+
+所有配合写入者在稳定 .website-config.lock 上取得非阻塞排它锁；锁内读取、验证格式、比较完整字节票据，再将同目录独占创建的 0600 临时文件写完、fsync 并 renameat 替换。票据同时绑定路径与目录设备／inode／创建时间，拒绝外目录、陈旧及 A→B→A 票据；任何成功提交（包括同值）推进 UUID。未来／损坏记录无票据且不能覆盖。锁和目录在使用中不得删除／替换；不协调的外部写入者不在保证范围。
+
+目录和普通文件须同一有效用户拥有且禁止组／其他用户访问；记录还须单硬链接、可读写。目录／锁／记录最后路径项不跟随符号链接，实际记录操作锚定目录描述符。锁忙立即报告 busy，其他 I/O 错误上抛；rename 前失败不改变旧记录，进程遗留临时文件不自动清理。只支持本地卷，未证明网络卷、不同文件系统或断电耐久。
+
+调用方还必须选择非云同步的专用目录；volumeIsLocal 只描述本地卷，不证明没有文件提供者／其他设备同步。不把 iCloud 等非配合写入者、手工替换或迁移目录纳入协议保证；真实产品根目录选择与切流仍待验收。
+
+一次提交只线性化这个记录，不把配置、资源、窗口、账户上下文和旧 UserDefaults 包成事务。不能在文件提交后因 UI 失败谎称磁盘未改变；返回 committed 后也不能阻止另一位配合写入者继续提交。产品消费者、切流／回退所有权、资源与上下文版本检查、原子应用和可见冲突恢复仍未接通。
+
+依据当前 Xcode SDK 的 openat／renameat（macOS 10.10 起）声明和 Apple [flock](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/flock.2.html)／[rename](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/rename.2.html) 契约设计；基本系统调用不是新第三方依赖。当前 Swift 导入将 flock 解析为结构体，编译证据确认后增加仓库自有薄 C 桥接，避免依赖未公开 Swift ABI。没有复用原项目实现或资产。
+
 ## 冷读恢复、来源与写回计划（后续阶段，起点 0ecae2e2）
 
 同会话决策审查：不能用可选网站导入 schema 代替本地存储的完整 schema。quickTab 单独导入会被剥离，冷读旧配置却需要迁移；默认对象与完整 schema 序列化顺序不同，因此同值冷读也可能触发一次写回。恢复采用独立 WebsiteConfigPreparedRestoration，记录加载值、新投影、浏览器写回计划及修正同步意图，不伪造原始导入证据。

@@ -9,7 +9,8 @@ let package = Package(
         .package(url: "https://github.com/scinfu/SwiftSoup.git", exact: "2.14.1")
     ],
     targets: [
-        .executableTarget(name: "Typebar", dependencies: ["SwiftSoup"]),
-        .testTarget(name: "TypebarTests", dependencies: ["Typebar"])
+        .target(name: "TypebarSystem", publicHeadersPath: "include"),
+        .executableTarget(name: "Typebar", dependencies: ["SwiftSoup", "TypebarSystem"]),
+        .testTarget(name: "TypebarTests", dependencies: ["Typebar", "TypebarSystem"])
     ]
 )
