@@ -1,5 +1,15 @@
 # 阈值源状态与迁移契约
 
+## 背景离屏像素处理（追加阶段）
+
+WebsiteConfigBackgroundRasterizer 的输入为调用方已布局的设备像素画布，以及该图片已接受的声明状态；不是原始图片自动适配入口。pointsPerRem 和 pixelsPerPoint 必须显式为正有限值。按链顺序应用原语，最后才裁到输入画布范围；未来布局宿主必须提供完整超绘画布，不能预先裁掉图片外参与模糊的像素，再宣称滤镜可在 CSS 图片盒外正常绘制。当前不消费 URL，不读文件，不自动解释 EXIF 方向，不选 GIF 帧或更改配置，不在提交后激活资源。
+
+[Filter Effects §5／§6／§13](https://www.w3.org/TR/filter-effects-1/) 规定 CSS 函数工作于 sRGB、逐项顺序与相应矩阵／Gaussian；filter 属性的 blur 外部像素为透明，与 CSS image filter() 的 duplicate 不同。[Apple workingColorSpace](https://developer.apple.com/documentation/coreimage/cicontextoption/workingcolorspace) 的默认是线性 sRGB，因此不能沿用默认上下文。[Apple CIColorMatrix 及 CIColorControls](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Reference/CoreImageFilterReference/index.html) 说明矩阵作用于非预乘颜色，而 ColorControls 的 brightness 是加法，不能冒充 CSS 亮度乘数。实现使用独立矩阵、sRGB RGBAf 中间图和每个颜色原语后的 ColorClamp；不能先合并矩阵再统一截取，否则过曝再去饱和会变亮。非空链输出为已渲染 sRGB RGBA8；空链直接保留原画布身份／色域／深度，避免清除效果反而改变 P3 图片。没有据此证明所有 HDR 或浏览器色彩管理一致。
+
+版本证据是本机 macOS 26.1、Swift 6.2.4 和已安装 SDK 的 CIContext／CIFilterBuiltins 声明，包最低目标仍 macOS 14。像素测试覆盖默认与软件上下文的亮度／半透明、64 组颜色参数与八种自有 RGBA 值的独立标量公式、逐原语截取、声明历史、PNG 实际准备到像素及原始容器不变。模糊以自有竖线测量 2／4 像素标准差下的质量、二阶矩、对称和若干分布样点，并检查有限画布边界透明性；这些容差是 8 位采样证据，不是全部半径、浏览器或最低系统的逐像素兼容证明。
+
+预先校验整条链：画布和估算模糊超绘预算默认 16 Mi 像素，模糊参数默认最多 256 设备像素；非有限换算、Float 系数不可表达、无效尺度／预算或 Core Image 不能产生图像均为显式失败。预算是原生临时资源政策，不是参考源码限制、硬内存沙箱或产品最终兼容范围；超范围保留原始配置，不悄悄夹取或发布“成功”。当前同步主线程组件还需接入后台调度／取消与联合资源准备，不能在文件提交成功后才调用可能失败的渲染并称为原子切流。
+
 ## 背景滤镜声明的历史与准入（追加阶段）
 
 固定 theme-controller.ts::applyCustomBackgroundFilters 按 blur／brightness／saturate／opacity 次序拼接非默认项，随后分别写入 filter、width、height、transform、top、position。utils/dom.ts::setStyle 对每一项单独赋给 CSSStyleDeclaration，不是整体替换 style。依据 [Filter Effects §6](https://www.w3.org/TR/filter-effects-1/#FilterFunctions) 和 [CSSOM setProperty](https://www.w3.org/TR/cssom-1/#dom-cssstyledeclaration-setproperty)，负数参数让整个 filter 声明无效并保留原来的 inline filter；空串则移除声明。直接插值的 Infinity／NaN 不是有效数值 token（与 calc(infinity) 不同）。blur 保留 rem，brightness 为乘法，saturate 可超过 1，两者没有旧原生 2／3 的上限，只有 opacity 超额值截为 1。
