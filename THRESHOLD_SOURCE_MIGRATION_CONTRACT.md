@@ -1,5 +1,13 @@
 # 阈值源状态与迁移契约
 
+## 背景滤镜声明的历史与准入（追加阶段）
+
+固定 theme-controller.ts::applyCustomBackgroundFilters 按 blur／brightness／saturate／opacity 次序拼接非默认项，随后分别写入 filter、width、height、transform、top、position。utils/dom.ts::setStyle 对每一项单独赋给 CSSStyleDeclaration，不是整体替换 style。依据 [Filter Effects §6](https://www.w3.org/TR/filter-effects-1/#FilterFunctions) 和 [CSSOM setProperty](https://www.w3.org/TR/cssom-1/#dom-cssstyledeclaration-setproperty)，负数参数让整个 filter 声明无效并保留原来的 inline filter；空串则移除声明。直接插值的 Infinity／NaN 不是有效数值 token（与 calc(infinity) 不同）。blur 保留 rem，brightness 为乘法，saturate 可超过 1，两者没有旧原生 2／3 的上限，只有 opacity 超额值截为 1。
+
+WebsiteConfigBackgroundFilter 只表示单张图片的 inline filter 链与本次更新结果，不改原始配置，不读取设置、不产生图片，也不保存全局历史。原版 applyCustomBackground 会 replaceChildren 新 img，因此替换图片必须创建新的空状态；仅设置滤镜时才复用同张图片的历史。非法 filter 不代表其余几何声明也无效；未来渲染宿主必须逐项处理，不能把本模型当成完整 CSS 状态事务。rem 到点／像素的换算与具体设备能力不在此模型内，不能直接套旧 .brightness(value - 1) 或旧 clamped filter。
+
+QA 脚本从固定干净参考工作树读取并执行完整 setter，以自有捕获边界比较显式参数和保存配置两条入口的 33 组输出（含有界／大于旧上限、科学计数、负数、负零、非有限值）。Swift 测试按官方 CSS 函数参数域解释实际输出，与原生链及历史比较；这是源码输出＋规范契约，不是浏览器 CSS 解析或像素对照。NaN 是直接调用边界探针，不宣称公开配置 schema 接受 NaN。浏览器精度／巨大有限值范围、继承／层叠扩展、模糊像素、色彩空间、几何、动画及生产宿主仍未验收。
+
 ## 准备字体的真实排版与既有入口（追加阶段）
 
 字体资源在发布前以实际 CTFont 的描述符创建有序级联，再用 CTFontCreateCopyWithAttributes 从原字体复制，仅增加 kCTFontCascadeListAttribute；size 为 0、matrix 为 nil，按 SDK 语义保留原尺寸／矩阵。没有用字体名字重新查找主面或回退面，没有全局注册。renderingFont 是准备阶段存好的值，不是 UI 读取后才执行的延迟资源操作。主字体与候选／实际字体列表继续保留用于身份和失败信息，不因增加级联丢失这些证据。
