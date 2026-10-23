@@ -5,13 +5,14 @@ enum WebsiteConfigJSONReadError: Error, Equatable {
   case invalidJSON(offset: Int)
 }
 
-/// Website JSON only. Native Typebar backup decoding is deliberately separate.
-/// Resource bounds are explicit; escaped UTF-16 units are preserved verbatim.
+/// Lossless JSON syntax only; this reader does not grant format admission.
+/// Website input keeps its default bound. A separately versioned local format
+/// can select a larger byte budget without changing website import limits.
 enum WebsiteConfigJSONReader {
   static let maximumBytes = 1_048_576
   static let maximumDepth = 128
 
-  static func read(_ json: String) throws -> WebsiteConfigValue {
+  static func read(_ json: String, maximumBytes: Int = WebsiteConfigJSONReader.maximumBytes) throws -> WebsiteConfigValue {
     guard json.utf8.count <= maximumBytes else { throw WebsiteConfigJSONReadError.tooLarge }
     var parser = Parser(bytes: Array(json.utf8))
     let value = try parser.value(depth: 0)

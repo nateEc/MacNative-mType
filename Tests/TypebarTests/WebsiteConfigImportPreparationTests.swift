@@ -2,6 +2,7 @@ import XCTest
 @testable import Typebar
 
 final class WebsiteConfigImportPreparationTests: XCTestCase {
+  @MainActor
   func testPinnedCompleteJSONImportEntryAndRuntimeProjection() throws {
     let environment = ProcessInfo.processInfo.environment
     guard let reference = environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] ?? environment["TYPEBAR_REFERENCE_ROOT"] else {
@@ -73,6 +74,7 @@ final class WebsiteConfigImportPreparationTests: XCTestCase {
       try WebsiteConfigNativeGeneratorsTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
       try WebsiteConfigNativeThemesTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
       try WebsiteConfigNativePagePreferencesTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
+      try WebsiteConfigNativeStateCodecTests.assertRoundTrip(projected.runtime)
       try WebsiteConfigNativeQuoteSelectionTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
       try WebsiteConfigNativeTestParametersTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
       try WebsiteConfigNativeKeyboardTypographyTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
