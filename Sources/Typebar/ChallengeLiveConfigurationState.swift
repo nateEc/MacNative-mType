@@ -4,7 +4,7 @@ import Foundation
 /// application of that field. Event revisions distinguish same-value writes.
 @MainActor
 struct ChallengeLiveConfigurationState {
-  enum ApplicationField { case difficulty, modifiers, font, keyboardGuide }
+  enum ApplicationField { case difficulty, modifiers, font, keyboardGuide, presentation }
   private weak var owner: AppSettings?
   private var liveDifficulty: Difficulty?
   private var liveModifiers: [TestModifier]?
@@ -14,6 +14,7 @@ struct ChallengeLiveConfigurationState {
   private var liveKeyboardGuide: KeyboardGuideMode?
   private var fontRevision: UInt64?
   private var keyboardGuideRevision: UInt64?
+  private var presentationRevision: UInt64?
 
   @discardableResult
   mutating func install(_ configuration: TestConfiguration, settings: AppSettings) -> Bool {
@@ -25,6 +26,7 @@ struct ChallengeLiveConfigurationState {
     liveModifiers = configuration.modifiers
     difficultyRevision = settings.difficultyApplicationRevision
     modifiersRevision = settings.testModifiersApplicationRevision
+    presentationRevision = settings.challengePresentationApplicationRevision
     installDisplay(configuration, settings: settings)
     owner = settings
     return true
@@ -39,6 +41,7 @@ struct ChallengeLiveConfigurationState {
     liveModifiers = nil
     difficultyRevision = settings.difficultyApplicationRevision
     modifiersRevision = settings.testModifiersApplicationRevision
+    presentationRevision = settings.challengePresentationApplicationRevision
     installDisplay(configuration, settings: settings)
     owner = settings
     return true
@@ -105,9 +108,23 @@ struct ChallengeLiveConfigurationState {
     case .keyboardGuide:
       installed = keyboardGuideRevision
       current = settings.keyboardGuideApplicationRevision
+    case .presentation:
+      installed = presentationRevision
+      current = settings.challengePresentationApplicationRevision
     }
     guard let installed else { return false }
     return eventRevision == current && installed != current
+  }
+
+  /// Completion must not rely on SwiftUI delivering an onChange before the
+  /// last keystroke or timer result. An unowned model cannot certify this attempt.
+  func isQualificationCurrent(settings: AppSettings) -> Bool {
+    guard owner === settings else { return false }
+    return difficultyRevision == settings.difficultyApplicationRevision
+      && modifiersRevision == settings.testModifiersApplicationRevision
+      && fontRevision == settings.practiceFontApplicationRevision
+      && keyboardGuideRevision == settings.keyboardGuideApplicationRevision
+      && presentationRevision == settings.challengePresentationApplicationRevision
   }
 
   mutating func normalizeModifiers(_ modifiers: [TestModifier], settings: AppSettings) {

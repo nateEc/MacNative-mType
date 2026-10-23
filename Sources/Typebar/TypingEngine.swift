@@ -4087,6 +4087,9 @@ struct ResultKeyTimingStats: Equatable {
 struct ChallengePresentationSnapshot: Codable, Equatable {
   let liveSpeedStyle: LiveMetricStyle
   let paceCaretStyle: TypingCaretStyle
+  /// The configured pace mode, not the marker's appearance or availability.
+  /// Older results remain readable but cannot prove an unrecorded mode.
+  let paceGuideMode: PaceGuideMode?
   let tapeMode: PracticeTapeMode
   /// Optional so archived challenge results from before layout-segment scoring
   /// remain readable, but cannot claim unrecorded per-layout performance.
@@ -4109,10 +4112,12 @@ struct ChallengePresentationSnapshot: Codable, Equatable {
     keyboardGuideMode: KeyboardGuideMode? = nil,
     fontStayedAvailable: Bool? = nil,
     oneHandedSelection: OneHandedChallengeSelection? = nil,
-    completedWords: Int? = nil
+    completedWords: Int? = nil,
+    paceGuideMode: PaceGuideMode? = nil
   ) {
     self.liveSpeedStyle = liveSpeedStyle
     self.paceCaretStyle = paceCaretStyle
+    self.paceGuideMode = paceGuideMode
     self.tapeMode = tapeMode
     self.layoutFluidLayouts = layoutFluidLayouts
     self.virtualKeyboardOnly = virtualKeyboardOnly

@@ -3,6 +3,169 @@ import XCTest
 
 @MainActor
 final class SourceChallengeApplicationTests: XCTestCase {
+  func testSameValuePresentationConfirmationsCancelQualificationWithoutReplacingTransientFields() throws {
+    for field in ["speed", "pace", "lines"] {
+      try withSettings { settings, _ in
+        let live = try liveState(settings: settings)
+        let before = settings.snapshot
+        let revision = settings.challengePresentationApplicationRevision
+        switch field {
+        case "speed": settings.liveSpeedStyle = before.liveSpeedStyle
+        case "pace": settings.paceGuideMode = before.paceGuideMode
+        default: settings.showAllPracticeLines = before.showAllPracticeLines
+        }
+        XCTAssertGreaterThan(settings.challengePresentationApplicationRevision, revision, field)
+        XCTAssertTrue(live.shouldClearChallenge(for: .presentation,
+          eventRevision: settings.challengePresentationApplicationRevision, settings: settings), field)
+        XCTAssertFalse(live.shouldClearChallenge(for: .presentation, eventRevision: revision, settings: settings))
+        XCTAssertEqual(settings.snapshot, before)
+        XCTAssertEqual(live.difficulty(settings: settings), .normal)
+        XCTAssertEqual(live.modifiers(settings: settings), [.roundVisual])
+      }
+    }
+  }
+
+  func testPresentationOwnSetupAndDelayedEventsDoNotCancelANewerChallenge() throws {
+    try withSettings { settings, _ in
+      let older = try liveState(settings: settings)
+      settings.liveSpeedStyle = .text
+      let delivered = settings.challengePresentationApplicationRevision
+      let newer = try liveState(settings: settings)
+      XCTAssertTrue(older.shouldClearChallenge(for: .presentation, eventRevision: delivered, settings: settings))
+      XCTAssertFalse(newer.shouldClearChallenge(for: .presentation, eventRevision: delivered, settings: settings))
+      settings.paceGuideMode = settings.snapshot.paceGuideMode
+      XCTAssertFalse(newer.shouldClearChallenge(for: .presentation, eventRevision: delivered, settings: settings))
+      XCTAssertTrue(newer.shouldClearChallenge(for: .presentation,
+        eventRevision: settings.challengePresentationApplicationRevision, settings: settings))
+    }
+  }
+
+  func testCompletionEpochRejectsUnobservedApplicationsButAcceptsNewSetup() throws {
+    try withSettings { settings, _ in
+      let older = try liveState(settings: settings)
+      XCTAssertTrue(older.isQualificationCurrent(settings: settings))
+      settings.paceGuideMode = settings.snapshot.paceGuideMode
+      XCTAssertFalse(older.isQualificationCurrent(settings: settings))
+      let newer = try liveState(settings: settings)
+      XCTAssertTrue(newer.isQualificationCurrent(settings: settings))
+      XCTAssertFalse(ChallengeLiveConfigurationState().isQualificationCurrent(settings: settings))
+      try withSettings { other, _ in
+        XCTAssertFalse(newer.isQualificationCurrent(settings: other))
+      }
+    }
+  }
+
+  func testPresentationRevisionIgnoresUnrelatedPreferencesAndOtherSettingsModels() throws {
+    try withSettings { settings, _ in
+      let live = try liveState(settings: settings)
+      let revision = settings.challengePresentationApplicationRevision
+      settings.liveAccuracyStyle = .text
+      settings.theme = .midnight
+      settings.paceCaretStyle = .outline
+      settings.paceGuideCustomWpm = 150.25
+      XCTAssertEqual(settings.challengePresentationApplicationRevision, revision)
+      XCTAssertFalse(live.shouldClearChallenge(for: .presentation, eventRevision: revision, settings: settings))
+      try withSettings { other, _ in
+        other.liveSpeedStyle = .text
+        XCTAssertFalse(live.shouldClearChallenge(for: .presentation,
+          eventRevision: other.challengePresentationApplicationRevision, settings: other))
+      }
+    }
+  }
+
+  func testRejectedPresentationSnapshotDoesNotPublishAnApplicationEvent() throws {
+    for failure in ["lock", "future"] {
+      try withSettings { settings, defaults in
+        let live = try liveState(settings: settings)
+        var snapshot = settings.snapshot
+        snapshot.liveSpeedStyle = .text
+        let revision = settings.challengePresentationApplicationRevision
+        let owner = UUID()
+        if failure == "lock" { settings.setNoQuitConfigurationLock(true, for: owner) }
+        else { defaults.set(Data("{\"version\":99}".utf8), forKey: "appSettings.v4") }
+        defer { settings.setNoQuitConfigurationLock(false, for: owner) }
+        let before = defaults.dictionaryRepresentation() as NSDictionary
+        XCTAssertFalse(settings.apply(snapshot))
+        XCTAssertEqual(settings.challengePresentationApplicationRevision, revision)
+        XCTAssertFalse(live.shouldClearChallenge(for: .presentation, eventRevision: revision, settings: settings))
+        XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
+      }
+    }
+  }
+
+  func testLegacyChallengeReceivesSameValuePresentationEventsWithoutSourceAdoption() throws {
+    try withSettings { _, defaults in
+      defaults.removeObject(forKey: "appSettings.v4")
+      let settings = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.observeLegacyChallenge(settings: settings))
+      settings.showAllPracticeLines = settings.snapshot.showAllPracticeLines
+      XCTAssertTrue(live.shouldClearChallenge(for: .presentation,
+        eventRevision: settings.challengePresentationApplicationRevision, settings: settings))
+      XCTAssertFalse(settings.hasThresholdProfile)
+    }
+  }
+
+  func testEnglishMasterBritishSelectionAlreadySurvivesFormalSetupCaptureAndColdRead() throws {
+    try withSettings { settings, defaults in
+      settings.englishVariant = .british
+      let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "english-ten-thousand-hour"))
+      var original = challenge.preset
+      original.configuration = original.configuration.with(challengeID: challenge.id)
+      let prepared = try XCTUnwrap(PresetSourcePreparation.preparing(original, to: settings, appliesGlobalSettings: true))
+      let selected = ChallengeSetupSelectionPolicy.Selection(language: .spanish, englishVariant: .british,
+        mixedLanguageComponents: [.spanish, .french], contentOptions: .init())
+      let configuration = ChallengeInputRulePolicy.applying(settings.inputRules,
+        to: ChallengeSetupSelectionPolicy.applying(selected, for: challenge))
+      XCTAssertTrue(PresetSettingsApplication.commit(original: prepared.preset, resolved: prepared.preset,
+        configuration: configuration, to: settings, appliesGlobalSettings: true,
+        expectedSourceState: prepared.baseline))
+      XCTAssertEqual(configuration.language, .english10k)
+      XCTAssertEqual(configuration.englishVariant, .british)
+      XCTAssertEqual(configuration.contentOptions, .init(includePunctuation: true, includeNumbers: true))
+      XCTAssertEqual(BritishEnglishPolicy.transformed("color", context: .init(configuration: configuration)), "colour")
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.install(configuration, settings: settings))
+      let capture = SavedTestPreset(configuration: configuration, settingsSnapshot: live.snapshot(settings: settings))
+        .capturedForLibrary(settingGroups: nil)
+      let record = try TestPresetRecord(name: "British English Master practice", definition: capture)
+      let ordinary = try XCTUnwrap(record.applicableDefinition)
+      let ready = try XCTUnwrap(PresetSourcePreparation.preparing(ordinary, to: settings, appliesGlobalSettings: true))
+      XCTAssertTrue(PresetSettingsApplication.commit(original: ready.preset, resolved: ready.preset,
+        configuration: ready.preset.configuration, to: settings, appliesGlobalSettings: true,
+        expectedSourceState: ready.baseline))
+      let reader = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+      XCTAssertEqual(reader.englishVariant, .british)
+      let session = TestSessionFactory.make(configuration: ordinary.configuration)
+      XCTAssertEqual(session.configuration.englishVariant, .british)
+      XCTAssertEqual(session.configuration.language, .english10k)
+      XCTAssertNil(session.configuration.challengeID)
+    }
+  }
+
+  func testSceneObservesAppliedPresentationEventsRatherThanOnlyChangedValues() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    XCTAssertTrue(source.contains(".onChange(of: settings.challengePresentationApplicationRevision)"))
+    XCTAssertTrue(source.contains("handleChallengeFieldApplication(.presentation, revision: revision)"))
+    XCTAssertFalse(source.contains(".onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }"))
+    XCTAssertFalse(source.contains(".onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }"))
+  }
+
+  func testCompletionChecksQualificationEpochBeforeCapturingPresentationEvidence() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
+    let begin = try XCTUnwrap(source.range(of: "case .completed, .failed, .bailedOut, .invalidAFK:"))
+    let body = source[begin.lowerBound...]
+    let epoch = try XCTUnwrap(body.range(of: "challengeLiveConfiguration.isQualificationCurrent(settings: settings)"))
+    let snapshot = try XCTUnwrap(body.range(of: "let challengePresentation ="))
+    XCTAssertLessThan(epoch.lowerBound, snapshot.lowerBound)
+  }
+
   private func wingdingsState(settings: AppSettings) throws -> (ChallengeLiveConfigurationState, TestConfiguration) {
     settings.installedPracticeFontName = "Georgia"
     settings.keyboardGuideMode = .next

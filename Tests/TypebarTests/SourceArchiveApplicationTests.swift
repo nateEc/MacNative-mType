@@ -247,6 +247,7 @@ final class SourceArchiveApplicationTests: XCTestCase {
       let generation = settings.activeTestSelectionGeneration
       let difficultyRevision = settings.difficultyApplicationRevision
       let modifierRevision = settings.testModifiersApplicationRevision
+      let presentationRevision = settings.challengePresentationApplicationRevision
       let before = defaults.dictionaryRepresentation() as NSDictionary
       let summary = try apply(incoming, settings: settings, defaults: defaults,
         context: store.mainContext, source: .cloudSync)
@@ -255,6 +256,7 @@ final class SourceArchiveApplicationTests: XCTestCase {
       XCTAssertEqual(settings.activeTestSelectionGeneration, generation)
       XCTAssertEqual(settings.difficultyApplicationRevision, difficultyRevision)
       XCTAssertEqual(settings.testModifiersApplicationRevision, modifierRevision)
+      XCTAssertEqual(settings.challengePresentationApplicationRevision, presentationRevision)
       XCTAssertFalse(settings.hasThresholdProfile)
       XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
     }
@@ -268,6 +270,7 @@ final class SourceArchiveApplicationTests: XCTestCase {
       let generation = settings.activeTestSelectionGeneration
       let difficulty = settings.difficultyApplicationRevision
       let modifiers = settings.testModifiersApplicationRevision
+      let presentation = settings.challengePresentationApplicationRevision
       let before = defaults.dictionaryRepresentation() as NSDictionary
       let merged = try apply(incoming, settings: settings, defaults: defaults,
         context: store.mainContext, source: .cloudSync)
@@ -276,6 +279,7 @@ final class SourceArchiveApplicationTests: XCTestCase {
       XCTAssertEqual(settings.activeTestSelectionGeneration, generation)
       XCTAssertEqual(settings.difficultyApplicationRevision, difficulty)
       XCTAssertEqual(settings.testModifiersApplicationRevision, modifiers)
+      XCTAssertEqual(settings.challengePresentationApplicationRevision, presentation)
       XCTAssertEqual(defaults.dictionaryRepresentation() as NSDictionary, before)
     }
   }

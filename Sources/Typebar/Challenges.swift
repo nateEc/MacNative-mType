@@ -64,6 +64,7 @@ struct ChallengeConfigurationRequirements: Equatable {
   var numbers: Bool?
   var liveSpeedStyle: LiveMetricStyle?
   var paceCaretStyle: TypingCaretStyle?
+  var paceGuideMode: PaceGuideMode?
   var tapeMode: PracticeTapeMode?
   var wordLimit: Int?
   var fontFamily: String?
@@ -131,6 +132,9 @@ struct ChallengeRequirements: Equatable {
     }
     if let paceCaretStyle = required.paceCaretStyle {
       parts.append("节奏光标 \(paceCaretStyle.displayName)")
+    }
+    if let paceGuideMode = required.paceGuideMode {
+      parts.append("节奏引导模式 \(paceGuideMode.displayName)")
     }
     if let tapeMode = required.tapeMode { parts.append("卷带 \(tapeMode.displayName)") }
     if let wordLimit = required.wordLimit { parts.append("词数 \(wordLimit)") }
@@ -347,7 +351,7 @@ enum ChallengeEvaluator {
     {
       failures.append("数字需要\(expected ? "启用" : "关闭")")
     }
-    let requiresPresentation = required.liveSpeedStyle != nil || required.paceCaretStyle != nil
+    let requiresPresentation = required.liveSpeedStyle != nil || required.paceCaretStyle != nil || required.paceGuideMode != nil
       || required.tapeMode != nil || required.fontFamily != nil
       || required.keyboardGuideMode != nil
     guard !requiresPresentation || presentation != nil else {
@@ -365,6 +369,10 @@ enum ChallengeEvaluator {
     {
       failures.append(
         "节奏光标需要为 \(expected.displayName)（本次 \(presentation?.paceCaretStyle.displayName ?? "未知")）")
+    }
+    if let expected = required.paceGuideMode, presentation?.paceGuideMode != expected {
+      failures.append(
+        "节奏引导模式需要为 \(expected.displayName)（本次 \(presentation?.paceGuideMode?.displayName ?? "未知")）")
     }
     if let expected = required.tapeMode,
       presentation?.tapeMode != expected
@@ -682,7 +690,7 @@ enum TypebarChallengeLibrary {
       preset: .init(configuration: .timed(seconds: 300), quoteID: nil, customText: nil),
       requirements: .init(
         wpm: .exact(60),
-        configuration: .init(liveSpeedStyle: .off, paceCaretStyle: .off)
+        configuration: .init(liveSpeedStyle: .off, paceGuideMode: .off)
       )
     ),
     .init(

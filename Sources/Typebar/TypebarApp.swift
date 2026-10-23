@@ -1560,8 +1560,6 @@ private struct ContentView: View {
       if settings.paceGuideMode == .accountTagPersonalBest { refreshPaceTarget() }
     }
     .onChange(of: settings.inputRules, handleInputRuleChange)
-    .onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }
-    .onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }
   }
 
@@ -1579,10 +1577,17 @@ private struct ContentView: View {
     .onChange(of: settings.keyboardGuideApplicationRevision) { _, revision in
       handleChallengeFieldApplication(.keyboardGuide, revision: revision)
     }
+    .onChange(of: settings.challengePresentationApplicationRevision) { _, revision in
+      handleChallengeFieldApplication(.presentation, revision: revision)
+    }
   }
 
   private var configuredPracticeContent: some View {
     challengeObservedPracticeContent
+    .onChange(of: settings.paceCaretStyle) { _, _ in
+      // Native style-only conditions remain distinct from the reference pace mode.
+      if activeChallenge?.requirements.configuration?.paceCaretStyle != nil { activeChallengeID = nil }
+    }
     .onChange(of: settings.promptHighlightMode) { previous, selected in
       if restoringPromptHighlightAfterFunboxConflict {
         restoringPromptHighlightAfterFunboxConflict = false
@@ -1601,7 +1606,6 @@ private struct ContentView: View {
       activeChallengeID = nil
     }
     .onChange(of: settings.showAllPracticeLines) { _, _ in
-      activeChallengeID = nil
       if isPreparingPracticePrompt { reset() }
     }
     .onChange(of: settings.practiceTapeMode) { _, _ in
@@ -1718,6 +1722,10 @@ private struct ContentView: View {
         guard ResultPresentationPolicy.shouldPresent(outcome: outcome) else { return }
         let resultPriorAttemptLedger = priorAttemptLedger
         let failureReason = session.failureReason
+        if activeChallengeID != nil,
+          !challengeLiveConfiguration.isQualificationCurrent(settings: settings) {
+          activeChallengeID = nil
+        }
         let challengePresentation = activeChallengeID == nil
           ? nil
           : ChallengePresentationSnapshot(
@@ -1737,7 +1745,8 @@ private struct ContentView: View {
             oneHandedSelection: activeChallengeID == "one-handed-bandit"
               ? oneHandedChallengeSelection : nil,
             completedWords: activeChallengeID == "one-handed-bandit"
-              ? session.completedWordCount : nil)
+              ? session.completedWordCount : nil,
+            paceGuideMode: settings.paceGuideMode)
         guard var result = session.result(
           tags: activeSessionTags,
           restartCount: resultPriorAttemptLedger.restartCount,

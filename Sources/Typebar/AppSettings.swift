@@ -1191,6 +1191,7 @@ final class AppSettings {
   private(set) var practiceWrapperRevision: UInt64 = 0
   private(set) var practiceFontApplicationRevision: UInt64 = 0
   private(set) var keyboardGuideApplicationRevision: UInt64 = 0
+  private(set) var challengePresentationApplicationRevision: UInt64 = 0
   private(set) var difficultyApplicationRevision: UInt64 = 0
   private(set) var testModifiersApplicationRevision: UInt64 = 0
 
@@ -1594,7 +1595,10 @@ final class AppSettings {
   var practiceTapeMode: PracticeTapeMode = .off { didSet { persistPracticeWrapperEvent() } }
   var practiceTapeMargin: Double = 0.5 { didSet { persistPracticeWrapperEvent() } }
   var smoothPracticeLineScroll = false { didSet { persist() } }
-  var showAllPracticeLines = false { didSet { persistPracticeWrapperEvent() } }
+  var showAllPracticeLines = false { didSet {
+    challengePresentationApplicationRevision &+= 1
+    persistPracticeWrapperEvent()
+  } }
   var smoothCaretMotion: SmoothCaretMotion = .medium { didSet { persist() } }
   var caretStyle: TypingCaretStyle = .bar { didSet { persist() } }
   var typoIndicatorStyle: TypoIndicatorStyle = .off { didSet { persistPracticeWrapperEvent() } }
@@ -1609,7 +1613,7 @@ final class AppSettings {
   var showAverage: AverageNoticeDisplay = .off { didSet { persist() } }
   var showPersonalBest = false { didSet { persist() } }
   var typedCharacterEffect: TypedCharacterEffect = .keep { didSet { persistPracticeWrapperEvent() } }
-  var liveSpeedStyle: LiveMetricStyle = .off { didSet { persist() } }
+  var liveSpeedStyle: LiveMetricStyle = .off { didSet { persistChallengePresentationApplication() } }
   var liveAccuracyStyle: LiveMetricStyle = .off { didSet { persist() } }
   var liveBurstStyle: LiveMetricStyle = .off { didSet { persist() } }
   var liveProgressStyle: LiveProgressStyle = .mini { didSet { persist() } }
@@ -1646,7 +1650,7 @@ final class AppSettings {
     }
   }
   var globalHotkeyEnabled = false { didSet { persist() } }
-  var paceGuideMode: PaceGuideMode = .off { didSet { persist() } }
+  var paceGuideMode: PaceGuideMode = .off { didSet { persistChallengePresentationApplication() } }
   var paceGuideCustomWpm: Double = 100 {
     didSet {
       if !PaceCustomSpeedPolicy.isValid(paceGuideCustomWpm) { paceGuideCustomWpm = 100 }
@@ -2889,6 +2893,11 @@ final class AppSettings {
 
   private func persistKeyboardGuideApplication() {
     keyboardGuideApplicationRevision &+= 1
+    persist()
+  }
+
+  private func persistChallengePresentationApplication() {
+    challengePresentationApplicationRevision &+= 1
     persist()
   }
 
