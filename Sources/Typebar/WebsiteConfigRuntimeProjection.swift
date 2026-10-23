@@ -1,6 +1,6 @@
 import Foundation
 
-struct WebsiteConfigRuntimeContext: Decodable {
+struct WebsiteConfigRuntimeContext: Decodable, Equatable {
   var authenticated = false
   var documentComplete = true
   var customThemeCount = 0

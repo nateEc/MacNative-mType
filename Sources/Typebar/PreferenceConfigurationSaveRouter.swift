@@ -5,6 +5,14 @@ import Observation
 @MainActor
 @Observable
 final class PreferenceConfigurationSaveRouter {
+  struct Lease: Equatable, Sendable {
+    let owner: UUID
+    fileprivate let router: UUID
+    fileprivate let generation: UUID
+  }
+  private let identity = UUID()
+  private var generation = UUID()
+  @ObservationIgnored private var leaseTransitions = 0
   private var handlers: [UUID: () -> Void] = [:]
   private var modifierProviders: [UUID: () -> [TestModifier]] = [:]
   private var languageProviders: [UUID: () -> TypingLanguage] = [:]
@@ -18,12 +26,26 @@ final class PreferenceConfigurationSaveRouter {
     keyboardGuideMode: (() -> KeyboardGuideMode)? = nil,
     fontFamilyName: (() -> String)? = nil,
     save: @escaping () -> Void) {
+    leaseTransitions += 1
+    defer { leaseTransitions -= 1 }
+    let activeBefore = priority.last
     if handlers[owner] == nil { priority.insert(owner, at: 0) }
     handlers[owner] = save
     modifierProviders[owner] = requestedModifiers
     languageProviders[owner] = selectedLanguage
     keyboardGuideProviders[owner] = keyboardGuideMode
     fontFamilyProviders[owner] = fontFamilyName
+    if activeBefore != priority.last || priority.last == owner { generation = UUID() }
+  }
+
+  func captureLease() -> Lease? {
+    guard leaseTransitions == 0, let owner = priority.last, handlers[owner] != nil else { return nil }
+    return .init(owner: owner, router: identity, generation: generation)
+  }
+
+  func isCurrent(_ lease: Lease) -> Bool {
+    leaseTransitions == 0 && lease.router == identity && lease.generation == generation
+      && lease.owner == priority.last && handlers[lease.owner] != nil
   }
 
   /// Read live state from the same owner that would receive an explicit save.
@@ -49,17 +71,24 @@ final class PreferenceConfigurationSaveRouter {
 
   func activate(owner: UUID) {
     guard handlers[owner] != nil else { return }
+    leaseTransitions += 1
+    defer { leaseTransitions -= 1 }
+    if priority.last != owner { generation = UUID() }
     priority.removeAll { $0 == owner }
     priority.append(owner)
   }
 
   func remove(owner: UUID) {
+    leaseTransitions += 1
+    defer { leaseTransitions -= 1 }
+    let activeBefore = priority.last
     handlers.removeValue(forKey: owner)
     modifierProviders.removeValue(forKey: owner)
     languageProviders.removeValue(forKey: owner)
     keyboardGuideProviders.removeValue(forKey: owner)
     fontFamilyProviders.removeValue(forKey: owner)
     priority.removeAll { $0 == owner }
+    if activeBefore != priority.last { generation = UUID() }
   }
 
   /// A true result means delivery, not successful persistence or disk durability.
