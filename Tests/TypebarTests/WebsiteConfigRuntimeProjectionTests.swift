@@ -57,7 +57,9 @@ final class WebsiteConfigRuntimeProjectionTests: XCTestCase {
           gateCalls += 1
           XCTAssertEqual(value, fixture.gate.value, "gate value \(index)")
           assertFields(current, fixture.gate.current, "gate state \(index)")
-          return fixture.gate.accepted
+          let accepted = WebsiteFunboxAdmission.accepts(value, current: current)
+          XCTAssertEqual(accepted, fixture.gate.accepted, "native gate \(index)")
+          return accepted
         })
       XCTAssertEqual(gateCalls, 1)
       assertFields(projected.runtime, fixture.runtime, "runtime \(index)")
@@ -70,6 +72,12 @@ final class WebsiteConfigRuntimeProjectionTests: XCTestCase {
       if let mismatch = zip(projected.events, fixture.events).enumerated().first(where: { $0.element.0 != $0.element.1 }) {
         XCTFail("fixture \(index) event \(mismatch.offset): \(mismatch.element)")
       }
+      let productionDefault = try WebsiteConfigRuntimeProjector.project(requested: fixture.normalized,
+        defaults: output.defaults, orderedKeys: output.orderedKeys, schema: schema, context: fixture.flags)
+      assertFields(productionDefault.runtime, projected.runtime, "default provider runtime \(index)")
+      assertFields(productionDefault.requested, projected.requested, "default provider request \(index)")
+      XCTAssertEqual(productionDefault.rejectedKeys, projected.rejectedKeys)
+      XCTAssertEqual(productionDefault.events, projected.events)
     }
     XCTAssertThrowsError(try WebsiteConfigRuntimeProjector.project(requested: output.defaults,
       defaults: output.defaults, orderedKeys: Array(repeating: output.orderedKeys[0], count: output.orderedKeys.count),

@@ -29,7 +29,7 @@ enum WebsiteConfigRuntimeProjector {
   static func project(
     requested: [String: WebsiteConfigValue], defaults: [String: WebsiteConfigValue],
     orderedKeys: [String], schema: WebsiteConfigSchema, context: WebsiteConfigRuntimeContext,
-    admitsFunbox: (WebsiteConfigValue, [String: WebsiteConfigValue]) -> Bool
+    admitsFunbox: (WebsiteConfigValue, [String: WebsiteConfigValue]) -> Bool = WebsiteFunboxAdmission.accepts
   ) throws -> WebsiteConfigRuntimeProjection {
     guard Set(requested.keys) == schema.keys, Set(defaults.keys) == schema.keys,
       requested.allSatisfy({ schema.accepts($0.value, for: $0.key) }),

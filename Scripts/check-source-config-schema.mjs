@@ -9,7 +9,8 @@ import {execFileSync} from 'node:child_process';
 const root = path.resolve(process.argv[2] ?? '');
 const zodRoot = process.env.TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT;
 const runtimeMode = process.argv[3] === '--runtime-projection';
-assert.ok(!process.argv[3] || runtimeMode);
+const funboxMode = process.argv[3] === '--funbox-admission';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -98,7 +99,40 @@ function transport(value) {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, transport(v)]));
   return value;
 }
-if (runtimeMode) {
+if (funboxMode) {
+  const funbox = await load(path.join(root, 'packages/funbox/src/index.ts'));
+  const metadata = (await load(path.join(frontend, 'config/metadata.tsx'))).configMetadata;
+  const compatibility = [];
+  function add(names) { compatibility.push({names, accepted: funbox.checkCompatibility(names)}); }
+  add([]);
+  for (const a of catalogs.funboxes) { add([a]); for (const b of catalogs.funboxes) add([a, b]); }
+  for (let a = 0; a < catalogs.funboxes.length; a++) for (let b = a; b < catalogs.funboxes.length; b++)
+    for (let c = b; c < catalogs.funboxes.length; c++) add([catalogs.funboxes[a], catalogs.funboxes[b], catalogs.funboxes[c]]);
+  for (const names of [['unknown'], ['mirror', 'unknown'], ['MIRROR']]) add(names);
+  add(Array(16).fill('no_quit')); add(Array(16).fill('rot13'));
+  const profiles = [];
+  for (const mode of ['time', 'words', 'quote', 'custom', 'zen']) for (const words of [0, 1])
+    for (const time of [0, 30]) for (const highlightMode of ['off', 'letter', 'word', 'next_word', 'next_two_words', 'next_three_words'])
+      for (const numbers of [false, true]) for (const punctuation of [false, true]) {
+        profiles.push({mode, words, time, highlightMode, numbers, punctuation, funbox: []});
+      }
+  for (const previous of ['no_quit', 'memory', 'read_ahead', 'layoutfluid', 'binary', 'arrows', 'mirror', 'tts'])
+    for (const mode of ['time', 'words', 'quote', 'custom', 'zen'])
+      for (const highlightMode of ['off', 'letter', 'word', 'next_word', 'next_two_words', 'next_three_words']) {
+        profiles.push({mode, words: 50, time: 30, highlightMode, numbers: false, punctuation: false, funbox: [previous]});
+      }
+  const admissions = catalogs.funboxes.map(name => ({names: [name], results: profiles.map(currentConfig =>
+    !metadata.funbox.isBlocked({value: [name], currentConfig}))}));
+  const combined = [];
+  for (const a of catalogs.funboxes) for (const b of catalogs.funboxes) {
+    for (const profile of [0, 143, 287, 479, profiles.length - 1]) {
+      combined.push({names: [a, b], profile,
+        accepted: !metadata.funbox.isBlocked({value: [a, b], currentConfig: profiles[profile]})});
+    }
+  }
+  verify();
+  console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
+} else if (runtimeMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
