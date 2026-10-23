@@ -1123,7 +1123,9 @@ enum TestModifierPolicy {
   /// Interactive mode changes are rejected by the reference while an active
   /// funbox requires a different mode. Imports use `modifiersCompatibleWithMode`
   /// to sanitize persisted data instead.
-  static func acceptsModeSelection(_ mode: TestMode, modifiers: [TestModifier]) -> Bool {
+  static func acceptsModeSelection(_ mode: TestMode, modifiers: [TestModifier],
+    language: TypingLanguage = .english) -> Bool {
+    guard language != .mixedLanguages || mode == .time || mode == .words else { return false }
     guard !modifiers.contains(.memory) || MemoryFunboxModePolicy.allowedModes.contains(mode) else {
       return false
     }
@@ -1134,10 +1136,18 @@ enum TestModifierPolicy {
   /// funbox, preserving the selected set. This differs from persisted-config
   /// normalization, which safely reduces legacy or imported combinations.
   static func acceptsInteractiveModifierAddition(
-    _ modifier: TestModifier, to modifiers: [TestModifier]
+    _ modifier: TestModifier, to modifiers: [TestModifier], language: TypingLanguage = .english
   ) -> Bool {
     guard !modifiers.contains(modifier) else { return false }
-    return isSourceCompatible(modifiers + [modifier])
+    let proposed = modifiers + [modifier]
+    return language == .mixedLanguages
+      ? acceptsPolyglotAddition(to: proposed) : isSourceCompatible(proposed)
+  }
+
+  static func acceptsPolyglotAddition(to modifiers: [TestModifier], mode: TestMode = .words) -> Bool {
+    acceptsModeSelection(mode, modifiers: modifiers, language: .mixedLanguages)
+      && isSourceCompatible(modifiers)
+      && sourceWordGeneratorModifiers.union(sourceFrequencyModifiers).isDisjoint(with: modifiers)
   }
 
   /// Returns whether a group would be accepted by the fixed reference
@@ -1500,12 +1510,12 @@ enum TestModifierPolicy {
 /// normalization path above.
 enum InteractiveFunboxSelectionPolicy {
   static func updatedModifiers(
-    toggling modifier: TestModifier, current: [TestModifier]
+    toggling modifier: TestModifier, current: [TestModifier], language: TypingLanguage = .english
   ) -> [TestModifier]? {
     if current.contains(modifier) {
       return current.filter { $0 != modifier }
     }
-    guard TestModifierPolicy.acceptsInteractiveModifierAddition(modifier, to: current) else {
+    guard TestModifierPolicy.acceptsInteractiveModifierAddition(modifier, to: current, language: language) else {
       return nil
     }
     return current + [modifier]

@@ -5,20 +5,28 @@ import Foundation
 final class PreferenceConfigurationSaveRouter {
   private var handlers: [UUID: () -> Void] = [:]
   private var modifierProviders: [UUID: () -> [TestModifier]] = [:]
+  private var languageProviders: [UUID: () -> TypingLanguage] = [:]
   private var priority: [UUID] = []
   private var isDelivering = false
 
   func register(owner: UUID, requestedModifiers: (() -> [TestModifier])? = nil,
+    selectedLanguage: (() -> TypingLanguage)? = nil,
     save: @escaping () -> Void) {
     if handlers[owner] == nil { priority.insert(owner, at: 0) }
     handlers[owner] = save
     modifierProviders[owner] = requestedModifiers
+    languageProviders[owner] = selectedLanguage
   }
 
   /// Read live state from the same owner that would receive an explicit save.
   var requestedModifiers: [TestModifier]? {
     guard let owner = priority.last else { return nil }
     return modifierProviders[owner]?()
+  }
+
+  var selectedLanguage: TypingLanguage? {
+    guard let owner = priority.last else { return nil }
+    return languageProviders[owner]?()
   }
 
   func activate(owner: UUID) {
@@ -30,6 +38,7 @@ final class PreferenceConfigurationSaveRouter {
   func remove(owner: UUID) {
     handlers.removeValue(forKey: owner)
     modifierProviders.removeValue(forKey: owner)
+    languageProviders.removeValue(forKey: owner)
     priority.removeAll { $0 == owner }
   }
 

@@ -55,18 +55,49 @@ final class WebsiteFunboxAdmissionTests: XCTestCase {
     }
     XCTAssertTrue(nativeFailures.isEmpty,
       "\(nativeFailures.count) native selection mismatches; first: \(Array(nativeFailures.prefix(12)))")
+    var interactiveFailures: [String] = []
+    for fixture in output.compatibility where fixture.names.contains("polyglot")
+      && Set(fixture.names).count == fixture.names.count
+      && fixture.names.allSatisfy({ $0 == "polyglot" || nativeTargets[$0] != nil }) {
+      for name in fixture.names {
+        let currentNames = fixture.names.filter { $0 != name }
+        guard WebsiteFunboxAdmission.areCompatible(currentNames) else { continue }
+        let current = currentNames.compactMap { nativeTargets[$0] }
+        let accepted: Bool
+        if name == "polyglot" {
+          accepted = TestModifierPolicy.acceptsPolyglotAddition(to: current)
+        } else {
+          let candidate = try XCTUnwrap(nativeTargets[name])
+          accepted = TestModifierPolicy.acceptsInteractiveModifierAddition(candidate, to: current,
+            language: .mixedLanguages)
+        }
+        if accepted != fixture.accepted {
+          interactiveFailures.append("\(currentNames) + \(name)")
+        }
+      }
+    }
+    XCTAssertTrue(interactiveFailures.isEmpty,
+      "\(interactiveFailures.count) interactive polyglot mismatches; first: \(Array(interactiveFailures.prefix(12)))")
     for fixture in output.compatibility where WebsiteFunboxAdmission.areCompatible(fixture.names) != fixture.accepted {
       failures.append("compatibility \(fixture.names)")
     }
+    var polyglotModeComparisons = 0
     for fixture in output.admissions {
       XCTAssertEqual(fixture.results.count, output.profiles.count)
       for (profile, accepted) in zip(output.profiles.indices, fixture.results) {
+        if fixture.names == ["polyglot"], output.profiles[profile]["funbox"] == .array([]),
+          case .string(let name)? = output.profiles[profile]["mode"], let mode = TestMode(rawValue: name) {
+          polyglotModeComparisons += 1
+          XCTAssertEqual(TestModifierPolicy.acceptsPolyglotAddition(to: [], mode: mode), accepted)
+          XCTAssertEqual(TestModifierPolicy.acceptsModeSelection(mode, modifiers: [], language: .mixedLanguages), accepted)
+        }
         let value = WebsiteConfigValue.array(fixture.names.map(WebsiteConfigValue.string))
         if WebsiteFunboxAdmission.accepts(value, current: output.profiles[profile]) != accepted {
           failures.append("admission \(fixture.names) profile \(profile)")
         }
       }
     }
+    XCTAssertEqual(polyglotModeComparisons, 480)
     for fixture in output.combined {
       if WebsiteFunboxAdmission.accepts(.array(fixture.names.map(WebsiteConfigValue.string)),
         current: output.profiles[fixture.profile]) != fixture.accepted {

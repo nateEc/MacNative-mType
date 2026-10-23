@@ -722,7 +722,8 @@ enum FunboxCommandCatalog {
 
 enum FunboxCommandPolicy {
     static func updatedModifiers(
-        for target: FunboxCommandTarget, current: [TestModifier], hasStarted: Bool
+        for target: FunboxCommandTarget, current: [TestModifier], hasStarted: Bool,
+        language: TypingLanguage = .english
     ) -> [TestModifier]? {
         guard !(hasStarted && current.contains(.noQuit)) else { return nil }
         switch target {
@@ -731,7 +732,7 @@ enum FunboxCommandPolicy {
             return current.filter { !officialModifiers.contains($0) }
         case .modifier(let modifier):
             return InteractiveFunboxSelectionPolicy.updatedModifiers(
-                toggling: modifier, current: current)
+                toggling: modifier, current: current, language: language)
         case .polyglot:
             return nil
         }

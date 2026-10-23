@@ -3071,9 +3071,10 @@ final class AppSettings {
   }
 
   @discardableResult
-  func toggleTestModifier(_ modifier: TestModifier) -> Bool {
+  func toggleTestModifier(_ modifier: TestModifier, language: TypingLanguage? = nil) -> Bool {
     guard let updated = InteractiveFunboxSelectionPolicy.updatedModifiers(
-      toggling: modifier, current: testModifiers)
+      toggling: modifier, current: testModifiers,
+      language: language ?? preferenceConfigurationSaves.selectedLanguage ?? .english)
     else { return false }
     testModifiers = updated
     return true

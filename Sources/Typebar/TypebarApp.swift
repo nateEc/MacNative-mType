@@ -1676,7 +1676,7 @@ private struct ContentView: View {
       }
       contentAppeared()
       settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,
-        requestedModifiers: { practiceRequestedModifiers }) {
+        requestedModifiers: { practiceRequestedModifiers }, selectedLanguage: { language }) {
         persistExplicitTestConfiguration()
       }
       activatePreferenceConfigurationOwnerIfKey()
@@ -4297,7 +4297,7 @@ private struct ContentView: View {
   @discardableResult
   private func selectMode(_ requested: TestMode) -> Bool {
     guard acceptsRestartingConfigurationChange() else { return false }
-    guard TestModifierPolicy.acceptsModeSelection(requested, modifiers: practiceRequestedModifiers) else {
+    guard TestModifierPolicy.acceptsModeSelection(requested, modifiers: practiceRequestedModifiers, language: language) else {
       let message = "当前修饰器不支持“\(requested.displayName)”模式；请先关闭不兼容的趣味模式。"
       modeCompatibilityMessage = message
       ConfigurationNoticeFeedback.conflict(message, notices: account.localNotices)
@@ -4328,6 +4328,12 @@ private struct ContentView: View {
     guard acceptsRestartingConfigurationChange(), availableLanguages.contains(requested) else {
       return false
     }
+    guard requested != .mixedLanguages || language == .mixedLanguages
+      || TestModifierPolicy.acceptsPolyglotAddition(to: practiceRequestedModifiers, mode: mode)
+    else {
+      reportFunboxConfigurationConflict("自选多语与当前趣味修饰器组合不兼容；已保留现有选择。")
+      return false
+    }
     polyglotReturnLanguage = nil
     language = requested
     persistExplicitTestConfiguration()
@@ -4335,7 +4341,7 @@ private struct ContentView: View {
   }
 
   private func acceptsFunboxConfiguration(_ modifiers: [TestModifier]) -> Bool {
-    guard TestModifierPolicy.acceptsModeSelection(mode, modifiers: modifiers) else {
+    guard TestModifierPolicy.acceptsModeSelection(mode, modifiers: modifiers, language: language) else {
       reportFunboxConfigurationConflict("当前模式不支持这个趣味模式；请先切换到兼容模式。")
       return false
     }
@@ -5616,13 +5622,17 @@ private struct ContentView: View {
       }
       switch target {
       case .polyglot:
+        guard language == .mixedLanguages
+          || TestModifierPolicy.acceptsPolyglotAddition(to: practiceRequestedModifiers, mode: mode)
+        else {
+          reportFunboxConfigurationConflict("自选多语与当前趣味修饰器组合不兼容；已保留现有选择。")
+          return
+        }
         activeChallengeID = nil
         if language == .mixedLanguages {
           language = PolyglotReturnLanguagePolicy.validated(polyglotReturnLanguage) ?? .english
           polyglotReturnLanguage = nil
         } else {
-          settings.testModifiers = TestModifierPolicy.modifiersCompatibleWithPolyglot(
-            practiceRequestedModifiers)
           polyglotReturnLanguage = PolyglotReturnLanguagePolicy.validated(language)
           language = .mixedLanguages
         }
@@ -5632,7 +5642,7 @@ private struct ContentView: View {
         if case .modifier(let modifier) = target,
            !practiceRequestedModifiers.contains(modifier),
            !TestModifierPolicy.acceptsInteractiveModifierAddition(
-             modifier, to: practiceRequestedModifiers)
+             modifier, to: practiceRequestedModifiers, language: language)
         {
           reportFunboxConfigurationConflict(
             "\(modifier.displayName) 与当前趣味修饰器组合不兼容；已保留现有选择。")
@@ -5640,7 +5650,7 @@ private struct ContentView: View {
         }
         guard let updated = FunboxCommandPolicy.updatedModifiers(
           for: target, current: practiceRequestedModifiers,
-          hasStarted: session.hasStarted)
+          hasStarted: session.hasStarted, language: language)
         else {
           restartLockMessage = "当前无限测试不支持这个修饰器；请先选择有限时长或字数。"
           return
