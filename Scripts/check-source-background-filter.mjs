@@ -44,5 +44,22 @@ for (const values of cases) {
   assert.equal(writes, 2);
   fixtures.push({values: values.map(value => Object.is(value, -0) ? '-0' : String(value)), css: style.filter});
 }
+const sizeStart = source.indexOf('function applyCustomBackgroundSize():');
+const sizeEnd = source.indexOf('\nexport async function applyCustomBackground()', sizeStart);
+assert.ok(sizeStart >= 0 && sizeEnd > sizeStart);
+const sizeCode = stripTypeScriptTypes(source.slice(sizeStart, sizeEnd), {mode: 'transform'});
+const fitFixtures = [];
+for (const fit of ['cover', 'contain', 'max']) {
+  let style, writes = 0;
+  const context = vm.createContext({Config: {customBackgroundSize: fit}, qs: selector => {
+    assert.equal(selector, '.customBackground img');
+    return {setStyle: value => { style = value; writes++; }};
+  }});
+  vm.runInContext(sizeCode, context, {timeout: 1000});
+  context.applyCustomBackgroundSize();
+  assert.equal(writes, 1);
+  assert.deepEqual(Object.keys(style), ['objectFit']);
+  fitFixtures.push({fit, objectFit: style.objectFit});
+}
 verify();
-console.log(JSON.stringify({pin, fixtures}));
+console.log(JSON.stringify({pin, fixtures, fitFixtures}));

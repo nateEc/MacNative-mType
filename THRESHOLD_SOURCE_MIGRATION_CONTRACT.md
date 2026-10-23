@@ -1,5 +1,15 @@
 # 阈值源状态与迁移契约
 
+## 图片盒内对象适配与调用方画布（追加阶段）
+
+固定 theme-controller.ts::applyCustomBackgroundSize 对 cover／contain 直接设置 objectFit，max 写空串；全局背景样式没有另设 object-position。[CSS Images 3 §4.5／§4.6](https://www.w3.org/TR/css-images-3/#the-object-fit) 的初始适配是 fill，位置为中心，图片内容始终裁到内容盒。QA 扩展已有背景脚本，在运行时读取并执行完整 size setter，三个合法值各捕获一次真实声明，不内嵌源函数，不把模拟 style 捕获声称为浏览器 computed layout。
+
+WebsiteConfigBackgroundObjectFit 接受已经决定的图片盒，以宽高比例产生中心 content rect，再保存调用方 CGContext 状态、裁内容盒、绘图并恢复。max 可非等比拉伸；contain 留白不主动填色，保留调用方已有背景或透明；cover 不向内容盒外泄漏。调用方拥有画布坐标、插值、色彩空间、分辨率和资源预算；组件不分配画布或自动执行 EXIF 方向，输入 CGImage 必须已由后续资源宿主按方向处理。原始图片文件不改动。CGFloat 极端数导致计算无法表达时显式失败，不把无穷结果交给 Core Graphics 或更改原配置。
+
+已安装 SDK 的 CGContextSaveGState／RestoreGState／ClipToRect／DrawImage 可用性早于包最低 macOS 14；ClipToRect 明确清空 current path，而 current path 不属于保存的图形状态。因此路径必须另行保存／重建，不能仅调用 save/restore 就声称不影响后续路径。像素测试使用自有四列分色图、透明条带、1×／2× CTM、平移／已有 clip／曲线路径，并把 contain 画布真正送入先前 sRGB 亮度处理，核对透明条带不被填满。没有比较浏览器插值，也没有证明所有色深／色域、方向或动画。
+
+这不是整个 CSS 布局引擎：图片盒的 width／height／top／transform 是独立声明，在负数、非有限或超范围原始 blur 下可能独立拒绝更新，不能靠本组件的错误结果决定它们的历史。源 blur 的 rem 扩边、绝对 flex 静态位置、滤镜后变换、超绘画布和最终 viewport 裁剪仍须实现与验证；对象内容的裁剪不应被误用于提前截掉滤镜外溢。本组件未用于旧生产背景，也未加入配置提交后才执行的失败操作。
+
 ## 背景离屏像素处理（追加阶段）
 
 WebsiteConfigBackgroundRasterizer 的输入为调用方已布局的设备像素画布，以及该图片已接受的声明状态；不是原始图片自动适配入口。pointsPerRem 和 pixelsPerPoint 必须显式为正有限值。按链顺序应用原语，最后才裁到输入画布范围；未来布局宿主必须提供完整超绘画布，不能预先裁掉图片外参与模糊的像素，再宣称滤镜可在 CSS 图片盒外正常绘制。当前不消费 URL，不读文件，不自动解释 EXIF 方向，不选 GIF 帧或更改配置，不在提交后激活资源。
