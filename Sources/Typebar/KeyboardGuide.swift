@@ -827,6 +827,30 @@ enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
   case inputEmulation
   case systemInput
   case custom
+  case websiteEmulation
+
+  // The source-only draft mode must not appear in legacy setting pickers.
+  static let allCases: [Self] = [.builtIn, .inputEmulation, .systemInput, .custom]
+
+  init(from decoder: Decoder) throws {
+    let values = try decoder.singleValueContainer()
+    let name = try values.decode(String.self)
+    guard let mode = Self(rawValue: name), mode != .websiteEmulation else {
+      throw DecodingError.dataCorruptedError(in: values, debugDescription: "Unsupported keyboard guide source generation")
+    }
+    self = mode
+  }
+
+  func encode(to encoder: Encoder) throws {
+    // No existing native archive/settings generation can retain this source
+    // intent. Keep drafts usable in memory, but never silently down-project it.
+    guard self != .websiteEmulation else {
+      throw EncodingError.invalidValue(self, .init(codingPath: encoder.codingPath,
+        debugDescription: "Website keyboard sync requires a future supporting transport"))
+    }
+    var values = encoder.singleValueContainer()
+    try values.encode(rawValue)
+  }
 
   var id: Self { self }
 
@@ -834,6 +858,7 @@ enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
     switch self {
     case .builtIn: "内置布局"
     case .inputEmulation: "跟随输入布局模拟"
+    case .websiteEmulation: "网站输入模拟同步"
     case .systemInput: "跟随 macOS 当前输入源"
     case .custom: "自定义键盘图"
     }
@@ -843,7 +868,8 @@ enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
     selectedLayout: KeyboardLayout,
     inputLayout: KeyboardInputLayout
   ) -> KeyboardLayout {
-    guard self == .inputEmulation, let emulated = inputLayout.emulatedLayout else {
+    if self == .websiteEmulation, inputLayout == .system { return .ansiQwerty }
+    guard self == .inputEmulation || self == .websiteEmulation, let emulated = inputLayout.emulatedLayout else {
       return selectedLayout
     }
     return emulated
@@ -854,7 +880,7 @@ enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
   }
 
   func usesCustomRows(inputLayout: KeyboardInputLayout) -> Bool {
-    self == .custom || (self == .inputEmulation && inputLayout == .custom)
+    self == .custom || ((self == .inputEmulation || self == .websiteEmulation) && inputLayout == .custom)
   }
 
   /// The reference's overrideSync and Layout Fluid compare the physical key;
@@ -865,7 +891,7 @@ enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
   ) -> KeyboardInputMapping {
     if layoutFluid { return .system }
     switch self {
-    case .inputEmulation, .systemInput:
+    case .inputEmulation, .websiteEmulation, .systemInput:
       return .system
     case .builtIn:
       return .builtIn(selectedLayout)

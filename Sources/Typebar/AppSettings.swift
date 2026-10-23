@@ -2511,6 +2511,9 @@ final class AppSettings {
 
   @discardableResult
   func apply(_ snapshot: AppSettingsSnapshot, groups: Set<PresetSettingGroup>? = nil) -> Bool {
+    // Website sync has distinct semantics and is not supported by any current
+    // storage generation. Reject before mutating state or selecting a writer.
+    guard snapshot.keyboardGuideLayoutSource != .websiteEmulation else { return false }
     if hasThresholdProfile || snapshot.thresholdSource != nil {
       return applySourceSnapshot(snapshot, groups: groups)
     }

@@ -70,6 +70,7 @@ final class WebsiteConfigImportPreparationTests: XCTestCase {
       }
       assertFields(projected.requested, (fixture.requested ?? [:]).mapValues(restore), "requested \(index)")
       assertFields(projected.runtime, fixture.runtime.mapValues(restore), "runtime \(index)")
+      try WebsiteConfigNativeKeyboardTypographyTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
       let nativeRules = try WebsiteConfigNativeInputRules(runtime: projected.runtime)
       assertFields(try WebsiteConfigNativeInputRulesTests.websiteFields(nativeRules), fixture.runtime.mapValues(restore).filter {
         WebsiteConfigNativeInputRules.mappedKeys.contains($0.key)
