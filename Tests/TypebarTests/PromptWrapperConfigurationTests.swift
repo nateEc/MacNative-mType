@@ -105,6 +105,42 @@ import XCTest
 
   private final class Document: NSView { override var isFlipped: Bool { true } }
 
+  func testInitialViewportLayoutIsASeparateCenteringEventFromFontFamily() throws {
+    for settleInitialLayout in [false, true] {
+      let scroll = NSScrollView(frame: .init(x: 0, y: 0, width: 240, height: 135))
+      let document = Document(frame: .init(x: 0, y: 0, width: 240, height: 600))
+      scroll.documentView = document
+      let follower = PromptAutoScrollView(frame: document.bounds)
+      document.addSubview(follower)
+      defer { follower.removeFromSuperview() }
+      let attempt = UUID()
+      var retired: [PromptWordRetirement] = []
+      func update(_ font: NSFont) {
+        follower.update(text: AttributedString("iiii iiii iiii iiii iiii iiii"),
+          characterOffset: 20, font: font, lineSpacing: 12, isRightToLeft: false,
+          lineScroll: .init(attemptID: attempt, activeWordID: 20,
+            characterOffsets: Dictionary(uniqueKeysWithValues: (0..<6).map { ($0 * 5, $0 * 5) }),
+            smoothScroll: false, reducesMotion: false,
+            words: (0..<6).map { PromptLineScrollWord(index: $0, glyphID: $0 * 5) },
+            onRetire: { retired.append($0) }, wrapperRevision: 0))
+      }
+      func drain() {
+        let completed = expectation(description: "Queued follow completed")
+        DispatchQueue.main.async { completed.fulfill() }
+        wait(for: [completed], timeout: 2)
+      }
+      update(.systemFont(ofSize: 28))
+      if settleInitialLayout { follower.layout() }
+      drain()
+      XCTAssertTrue(retired.isEmpty)
+      update(.monospacedSystemFont(ofSize: 28, weight: .regular))
+      follower.layout()
+      drain()
+      XCTAssertEqual(retired.map(\.firstRetainedWordIndex), settleInitialLayout ? [] : [2],
+        "A delayed initial width layout, unlike a font-only update, requests centering")
+    }
+  }
+
   func testFontFamilyOnlyRemeasuresButNextWrapperEventRetiresTheNewlyWrappedPrefix() throws {
     let system = NSFont.systemFont(ofSize: 28)
     let mono = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
@@ -129,7 +165,12 @@ import XCTest
         lineScroll: .init(attemptID: attempt, activeWordID: 20, characterOffsets: offsets,
           smoothScroll: false, reducesMotion: false, words: words, onRetire: { retired.append($0) },
           wrapperRevision: revision))
-      RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+      // Settle the initial viewport-width event before changing the font.
+      // Otherwise AppKit may deliver that separate centering request later.
+      follower.layout()
+      let completed = expectation(description: "Wrapper follow completed")
+      DispatchQueue.main.async { completed.fulfill() }
+      wait(for: [completed], timeout: 2)
     }
     update(system, revision: 0)
     XCTAssertTrue(retired.isEmpty)
