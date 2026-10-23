@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class SourceChallengeApplicationTests: XCTestCase {
   func testSameValuePresentationConfirmationsCancelQualificationWithoutReplacingTransientFields() throws {
-    for field in ["speed", "pace", "lines"] {
+    for field in ["speed", "pace", "lines", "highlight"] {
       try withSettings { settings, _ in
         let live = try liveState(settings: settings)
         let before = settings.snapshot
@@ -12,6 +12,7 @@ final class SourceChallengeApplicationTests: XCTestCase {
         switch field {
         case "speed": settings.liveSpeedStyle = before.liveSpeedStyle
         case "pace": settings.paceGuideMode = before.paceGuideMode
+        case "highlight": settings.promptHighlightMode = before.promptHighlightMode
         default: settings.showAllPracticeLines = before.showAllPracticeLines
         }
         XCTAssertGreaterThan(settings.challengePresentationApplicationRevision, revision, field)
@@ -22,6 +23,30 @@ final class SourceChallengeApplicationTests: XCTestCase {
         XCTAssertEqual(live.difficulty(settings: settings), .normal)
         XCTAssertEqual(live.modifiers(settings: settings), [.roundVisual])
       }
+    }
+  }
+
+  func testRejectedHighlightAndItsRestorationDoNotInvalidateQualification() throws {
+    try withSettings { _, defaults in
+      defaults.removeObject(forKey: "appSettings.v4")
+      let settings = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}),
+        localBackgroundStore: .inMemory())
+      settings.testModifiers = [.readAhead]
+      var live = ChallengeLiveConfigurationState()
+      XCTAssertTrue(live.observeLegacyChallenge(settings: settings))
+      let revision = settings.challengePresentationApplicationRevision
+      settings.promptHighlightMode = .word
+      settings.promptHighlightMode = .letter
+      XCTAssertEqual(settings.challengePresentationApplicationRevision, revision)
+      XCTAssertTrue(live.isQualificationCurrent(settings: settings))
+      settings.promptHighlightMode = .off
+      XCTAssertEqual(settings.challengePresentationApplicationRevision, revision + 1)
+      XCTAssertFalse(live.isQualificationCurrent(settings: settings))
+      let reload = AppSettings(defaults: defaults,
+        feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}),
+        localBackgroundStore: .inMemory())
+      XCTAssertEqual(reload.promptHighlightMode, .off)
     }
   }
 

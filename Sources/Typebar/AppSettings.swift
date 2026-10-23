@@ -1625,6 +1625,7 @@ final class AppSettings {
       // the rejected selection nor that restoration is a source config event.
       if FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: promptHighlightMode, modifiers: testModifiers),
         FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: oldValue, modifiers: testModifiers) {
+        challengePresentationApplicationRevision &+= 1
         persistPracticeWrapperEvent()
       } else {
         persist()
