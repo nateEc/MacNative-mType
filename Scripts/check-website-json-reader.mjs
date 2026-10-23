@@ -19,7 +19,10 @@ function describe(value) {
 }
 const fixtures = [];
 function add(json, unsupported = null) {
-  try { fixtures.push({json, accepted: true, value: describe(JSON.parse(json)), unsupported}); }
+  try {
+    const parsed = JSON.parse(json);
+    fixtures.push({json, accepted: true, value: describe(parsed), roundTrip: describe(JSON.parse(JSON.stringify(parsed))), unsupported});
+  }
   catch { fixtures.push({json, accepted: false, unsupported: null}); }
 }
 for (const json of ['null', 'true', 'false', '0', '-0', '-0.0', '1.25', '1e400', '-1E400',

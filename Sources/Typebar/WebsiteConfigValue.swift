@@ -4,10 +4,7 @@ import Foundation
 indirect enum WebsiteConfigValue: Codable, Equatable {
   case null, bool(Bool), number(Double), string(String)
   case array([Self]), object([String: Self])
-
-  static func trimmingWebsiteWhitespace(_ value: String) -> String {
-    value.trimmingCharacters(in: WebsiteConfigNumbers.whitespace)
-  }
+  case stringCodeUnits([UInt16]), objectCodeUnits([WebsiteConfigMember])
 
   init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
@@ -28,19 +25,23 @@ indirect enum WebsiteConfigValue: Codable, Equatable {
     case .string(let value): try container.encode(value)
     case .array(let values): try container.encode(values)
     case .object(let values): try container.encode(values)
+    case .stringCodeUnits, .objectCodeUnits:
+      throw EncodingError.invalidValue(self, .init(codingPath: encoder.codingPath,
+        debugDescription: "Use the website JSON writer to preserve UTF-16 units"))
     }
   }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
-    switch (lhs, rhs) {
+    if let a = lhs.stringUnits, let b = rhs.stringUnits { return a == b }
+    if let a = lhs.objectMembers, let b = rhs.objectMembers {
+      return Dictionary(a.map { ($0.key, $0.value) }, uniquingKeysWith: { _, new in new })
+        == Dictionary(b.map { ($0.key, $0.value) }, uniquingKeysWith: { _, new in new })
+    }
+    return switch (lhs, rhs) {
     case (.null, .null): true
     case (.bool(let a), .bool(let b)): a == b
     case (.number(let a), .number(let b)): a == b || (a.isNaN && b.isNaN)
-    case (.string(let a), .string(let b)): a.utf16.elementsEqual(b.utf16)
     case (.array(let a), .array(let b)): a == b
-    case (.object(let a), .object(let b)):
-      Dictionary(uniqueKeysWithValues: a.map { (Array($0.key.utf16), $0.value) })
-        == Dictionary(uniqueKeysWithValues: b.map { (Array($0.key.utf16), $0.value) })
     default: false
     }
   }
@@ -83,16 +84,17 @@ enum MonkeytypeLegacyConfigMigration {
           ? .string("mini") : output["timerStyle"]
       }
     }
-    if case .string(let value) = output["soundVolume"] {
-      output["soundVolume"] = .number(WebsiteConfigNumbers.floatPrefix(value))
+    if let units = output["soundVolume"]?.stringUnits {
+      output["soundVolume"] = .number(WebsiteConfigNumbers.floatPrefix(String(decoding: units, as: UTF16.self)))
     }
     for key in ["funbox", "customLayoutfluid"] {
-      if case .string(let value) = output[key] {
-        output[key] = .array(key == "funbox" && value == "none" ? []
-          : value.components(separatedBy: "#").map(WebsiteConfigValue.string))
+      if let units = output[key]?.stringUnits {
+        output[key] = .array(key == "funbox" && units == Array("none".utf16) ? []
+          : units.split(separator: 35, omittingEmptySubsequences: false).map { .string(units: Array($0)) })
       }
     }
-    if case .string(let value) = output["fontSize"] {
+    if let units = output["fontSize"]?.stringUnits {
+      let value = String(decoding: units, as: UTF16.self)
       let number = value == "125" ? 1.25 : value == "15" ? 1.5 : WebsiteConfigNumbers.integerPrefix(value)
       output["fontSize"] = .number(number)
     } else if let value = output["fontSize"], WebsiteConfigNumbers.coerce(value) < 0 {
@@ -180,7 +182,8 @@ private enum WebsiteConfigNumbers {
     case .null: return 0
     case .bool(let value): return value ? 1 : 0
     case .number(let value): return value
-    case .object: return .nan
+    case .object, .objectCodeUnits: return .nan
+    case .stringCodeUnits(let units): return coerce(.string(String(decoding: units, as: UTF16.self)))
     case .array(let values): return coerce(.string(values.map(arrayText).joined(separator: ",")))
     case .string(let value):
       let text = value.trimmingCharacters(in: whitespace)
@@ -220,8 +223,9 @@ private enum WebsiteConfigNumbers {
     case .number(let value): value.isNaN ? "NaN" : value == .infinity ? "Infinity"
       : value == -.infinity ? "-Infinity" : String(value)
     case .string(let value): value
+    case .stringCodeUnits(let units): String(decoding: units, as: UTF16.self)
     case .array(let values): values.map(arrayText).joined(separator: ",")
-    case .object: "[object Object]"
+    case .object, .objectCodeUnits: "[object Object]"
     }
   }
 }

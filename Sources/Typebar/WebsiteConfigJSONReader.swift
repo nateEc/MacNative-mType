@@ -1,12 +1,12 @@
 import Foundation
 
 enum WebsiteConfigJSONReadError: Error, Equatable {
-  case tooLarge, tooDeep, unsupportedUTF16, ambiguousObjectKey
+  case tooLarge, tooDeep
   case invalidJSON(offset: Int)
 }
 
 /// Website JSON only. Native Typebar backup decoding is deliberately separate.
-/// Resource bounds and non-scalar UTF-16 are explicit, not silent repair.
+/// Resource bounds are explicit; escaped UTF-16 units are preserved verbatim.
 enum WebsiteConfigJSONReader {
   static let maximumBytes = 1_048_576
   static let maximumDepth = 128
@@ -36,24 +36,17 @@ enum WebsiteConfigJSONReader {
       space()
       guard depth <= WebsiteConfigJSONReader.maximumDepth else { throw WebsiteConfigJSONReadError.tooDeep }
       switch next {
-      case 34: return .string(try string())
+      case 34: return .string(units: try string())
       case 123:
         offset += 1; space()
-        var object: [String: WebsiteConfigValue] = [:]
-        var spellings: [String: [UInt16]] = [:]
-        if consume(125) { return .object(object) }
+        var members: [WebsiteConfigMember] = []
+        if consume(125) { return .object(members: members) }
         while true {
           let key = try string()
-          // Swift canonical equivalence must not merge different JS keys.
-          let units = Array(key.utf16)
-          if let old = spellings[key], old != units {
-            throw WebsiteConfigJSONReadError.ambiguousObjectKey
-          }
-          spellings[key] = units
           space(); guard consume(58) else { throw invalid() }
-          object[key] = try value(depth: depth + 1)
+          members.append(.init(key: key, value: try value(depth: depth + 1)))
           space()
-          if consume(125) { return .object(object) }
+          if consume(125) { return .object(members: members) }
           guard consume(44) else { throw invalid() }
           space()
         }
@@ -76,25 +69,32 @@ enum WebsiteConfigJSONReader {
     mutating func literal(_ text: String) throws {
       for byte in text.utf8 { guard consume(byte) else { throw invalid() } }
     }
-    mutating func string() throws -> String {
-      let start = offset
+    mutating func string() throws -> [UInt16] {
       guard consume(34) else { throw invalid() }
+      var units: [UInt16] = []
       while let byte = next {
-        offset += 1
-        if byte == 34 {
-          do { return try JSONDecoder().decode(String.self, from: Data(bytes[start..<offset])) }
-          catch { throw WebsiteConfigJSONReadError.unsupportedUTF16 }
-        }
+        if consume(34) { return units }
         guard byte >= 32 else { throw invalid() }
-        if byte == 92 {
+        if consume(92) {
           guard let escape = next else { throw invalid() }
           offset += 1
           if escape == 117 {
+            var unit: UInt16 = 0
             for _ in 0..<4 {
               guard let hex = next, (48...57).contains(hex) || (65...70).contains(hex) || (97...102).contains(hex) else { throw invalid() }
+              unit = unit * 16 + UInt16(hex <= 57 ? hex - 48 : hex <= 70 ? hex - 55 : hex - 87)
               offset += 1
             }
-          } else if ![34, 47, 92, 98, 102, 110, 114, 116].contains(escape) { throw invalid() }
+            units.append(unit)
+          } else {
+            let escapes: [UInt8: UInt16] = [34: 34, 47: 47, 92: 92, 98: 8, 102: 12, 110: 10, 114: 13, 116: 9]
+            guard let unit = escapes[escape] else { throw invalid() }
+            units.append(unit)
+          }
+        } else {
+          let start = offset
+          while let raw = next, raw >= 32, raw != 34, raw != 92 { offset += 1 }
+          units.append(contentsOf: String(decoding: bytes[start..<offset], as: UTF8.self).utf16)
         }
       }
       throw invalid()

@@ -17,7 +17,12 @@ struct WebsiteConfigSchema {
   var keys: Set<String> { Set(rules.keys) }
 
   func accepts(_ value: WebsiteConfigValue, for key: String) -> Bool {
-    rules[key]?.accepts(value) == true
+    rule(for: key)?.accepts(value) == true
+  }
+
+  private func rule(for key: String) -> WebsiteConfigRule? {
+    guard key.utf8.allSatisfy({ $0 < 128 }) else { return nil }
+    return rules[key]
   }
 
   init(catalogs: WebsiteConfigCatalogs) {
@@ -82,13 +87,13 @@ struct WebsiteConfigSchema {
     var current = input
     for attempt in 0...2 {
       let invalid = current.keys.filter { key in
-        guard let rule = rules[key], let value = current[key] else { return false }
+        guard let rule = rule(for: key), let value = current[key] else { return false }
         return !rule.accepts(value)
       }
-      if invalid.isEmpty { return current.filter { rules[$0.key] != nil } }
+      if invalid.isEmpty { return current.filter { rule(for: $0.key) != nil } }
       guard attempt < 2 else { throw WebsiteConfigSchemaError.cannotSanitize }
       for key in invalid {
-        if let value = current[key] { current[key] = rules[key]?.repair(value) }
+        if let value = current[key] { current[key] = rule(for: key)?.repair(value) }
       }
     }
     throw WebsiteConfigSchemaError.cannotSanitize
@@ -97,17 +102,18 @@ struct WebsiteConfigSchema {
   /// The real JSON import entry first safe-parses the optional/strip schema.
   /// Unknown legacy keys disappear on success; migration is only a fallback.
   func validatingPartial(_ input: [String: WebsiteConfigValue]) -> [String: WebsiteConfigValue]? {
-    let known = input.filter { rules[$0.key] != nil }
-    guard known.allSatisfy({ rules[$0.key]?.accepts($0.value) == true }) else { return nil }
+    let known = input.filter { rule(for: $0.key) != nil }
+    guard known.allSatisfy({ rule(for: $0.key)?.accepts($0.value) == true }) else { return nil }
     return known
   }
 
   func migrating(_ input: [String: WebsiteConfigValue],
     defaults: [String: WebsiteConfigValue]) throws -> [String: WebsiteConfigValue] {
     guard Set(defaults.keys) == keys,
-      defaults.allSatisfy({ rules[$0.key]?.accepts($0.value) == true })
+      defaults.allSatisfy({ rule(for: $0.key)?.accepts($0.value) == true })
     else { throw WebsiteConfigSchemaError.invalidDefaults }
-    let sanitized = try sanitize(MonkeytypeLegacyConfigMigration.replacingLegacyValues(input))
+    let fields = input.filter { $0.key.utf8.allSatisfy({ $0 < 128 }) }
+    let sanitized = try sanitize(MonkeytypeLegacyConfigMigration.replacingLegacyValues(fields))
     return defaults.merging(sanitized) { _, incoming in incoming }
   }
 }
@@ -121,7 +127,7 @@ private indirect enum WebsiteConfigRule {
   func accepts(_ value: WebsiteConfigValue) -> Bool {
     switch self {
     case .boolean: if case .bool = value { return true }; return false
-    case .choices(let choices): if case .string(let text) = value { return choices.contains(text) }; return false
+    case .choices(let choices): if case .string(let text) = value { return containsExact(choices, text) }; return false
     case .number(let min, let max, let integer, let positive, let tenth):
       guard case .number(let number) = value, !number.isNaN,
         min.map({ number >= $0 }) ?? true, max.map({ number <= $0 }) ?? true,
@@ -130,12 +136,15 @@ private indirect enum WebsiteConfigRule {
       return !tenth || acceptsTenthStep(number)
     case .font(let known):
       guard case .string(let text) = value else { return false }
-      return known.contains(text) || (text.utf16.count <= 50 && matches(text, #"^[a-zA-Z0-9_\-+.]+$"#))
+      return containsExact(known, text) || (text.utf16.count <= 50 && matches(text, #"^[a-zA-Z0-9_\-+.]+$"#))
     case .color: if case .string(let text) = value { return matches(text, #"(?i)^#([0-9a-f]{3}){1,2}$"#) }; return false
     case .imageURL:
-      guard case .string(let text) = value else { return false }
+      guard let units = value.stringUnits else { return false }
+      // WHATWG URL consumes a USVString, but validation must not replace the
+      // original Config value. All other schema checks retain the raw units.
+      let text = String(decoding: units, as: UTF16.self)
       if text.isEmpty { return true }
-      guard text.utf16.count <= 2048, text.hasPrefix("http://") || text.hasPrefix("https://"),
+      guard units.count <= 2048, text.hasPrefix("http://") || text.hasPrefix("https://"),
         !text.contains(where: { "`'\"".contains($0) }),
         matches(text, #"(?i).+\.(png|gif|jpeg|jpg|webp)"#),
         let url = URL(string: normalizedSpecialURL(text)), let host = url.host, !host.isEmpty else { return false }
@@ -183,6 +192,10 @@ private indirect enum WebsiteConfigRule {
 
   private func matches(_ text: String, _ pattern: String) -> Bool {
     text.range(of: pattern, options: .regularExpression) != nil
+  }
+
+  private func containsExact(_ names: Set<String>, _ text: String) -> Bool {
+    return names.contains { $0.utf16.elementsEqual(text.utf16) }
   }
 
   private func acceptsTenthStep(_ number: Double) -> Bool {

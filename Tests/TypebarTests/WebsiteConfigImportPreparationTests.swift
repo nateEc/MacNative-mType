@@ -37,7 +37,7 @@ final class WebsiteConfigImportPreparationTests: XCTestCase {
     let output = try JSONDecoder().decode(Output.self, from: data)
     let schema = WebsiteConfigSchema(catalogs: .init(languages: output.catalogs.languages,
       themes: output.catalogs.themes, layouts: output.catalogs.layouts, fonts: output.catalogs.fonts, funboxes: output.catalogs.funboxes))
-    XCTAssertEqual(output.fixtures.count, 390)
+    XCTAssertEqual(output.fixtures.count, 403)
     print("Pinned complete website JSON import comparison: \(output.fixtures.count) fixtures")
     for (index, fixture) in output.fixtures.enumerated() {
       if !fixture.accepted {
@@ -90,6 +90,12 @@ final class WebsiteConfigImportPreparationTests: XCTestCase {
   private func restore(_ value: WebsiteConfigValue) -> WebsiteConfigValue {
     switch value {
     case .object(let object):
+      if object.count == 1, case .array(let units) = object["$probeUTF16"] {
+        return .string(units: units.map {
+          guard case .number(let unit) = $0 else { preconditionFailure("Invalid probe unit") }
+          return UInt16(unit)
+        })
+      }
       if object.count == 1, case .string(let number) = object["$probeNumber"] {
         if number == "Infinity" { return .number(.infinity) }
         if number == "-Infinity" { return .number(-.infinity) }

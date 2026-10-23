@@ -59,7 +59,7 @@ enum WebsiteConfigRuntimeProjector {
       case "keymapSize":
         if case .number(let number) = value { value = .number(((min(3.5, max(0.5, number)) + Double.ulpOfOne) * 10).rounded() / 10) }
       case "customBackground":
-        if case .string(let string) = value { value = .string(WebsiteConfigValue.trimmingWebsiteWhitespace(string)) }
+        value = value.trimmingWebsiteString
       case "customThemeColors":
         if case .array(let colors) = value, colors.allSatisfy({ $0 == colors.first }) {
           value = defaults[key] ?? value

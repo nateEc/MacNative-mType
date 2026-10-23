@@ -97,6 +97,9 @@ const catalogs = {
   funboxes: (await load(path.join(schemas, 'configs.ts'))).FunboxNameSchema.options,
 };
 function transport(value) {
+  if (importMode && typeof value === 'string' && !value.isWellFormed()) {
+    return {$probeUTF16: Array.from({length: value.length}, (_, i) => value.charCodeAt(i))};
+  }
   if (typeof value === 'number' && !Number.isFinite(value)) return {$probeNumber: String(value)};
   if (Array.isArray(value)) return value.map(transport);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, transport(v)]));
@@ -205,6 +208,14 @@ if (funboxMode) {
     }
     for (const json of ['', ' ', 'null', 'true', 'false', '1', '"text"', '[]', '[{}]', '{', '{"numbers":true,}', '{}{}', '/*x*/{}']) await add(json);
     await add('{}');
+    // Execute the complete entry with raw JS strings; Foundation cannot decode lone surrogates.
+    for (const json of ['{"future":"\\ud800"}', '{"\\ud800":1}', '{"é":1,"e\\u0301":2}',
+      '{"fontSize":"1\\ud800"}', '{"fontSize":"125\\ud800"}', '{"soundVolume":"0.5\\ud800"}',
+      '{"funbox":"no_quit#\\ud800"}', '{"customLayoutfluid":"qwerty#\\ud800#dvorak"}',
+      '{"customBackground":"https://example.com/\\ud800.png"}',
+      '{"customBackground":" \\ufeffhttps://example.com/\\udfff.png\\n "}',
+      '{"show\\u212AeyTips":false}', '{"fontFamily":"\\u212Aanit"}',
+      '{"keymapShowTopRow":"always","keymap\\u212Aeys":"full","numbers":"invalid"}']) await add(json);
     for (const json of ['{"numbers":false,"numbers":true}', '{"quickTab":false,"quickTab":true}',
       '{"quickTab":true,"numbers":"invalid"}', '{"quickTab":true,"numbers":true}',
       '{"ownedUnknown":{"constructor":1,"__proto__":{"x":true}}}', '{"words":-0}',
