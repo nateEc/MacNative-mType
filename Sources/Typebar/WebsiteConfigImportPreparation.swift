@@ -7,6 +7,12 @@ struct WebsiteConfigPreparedImport {
 }
 
 enum WebsiteConfigImportPreparation {
+  static func prepare(_ json: String, defaultDocument: WebsiteConfigDefaultDocument,
+    schema: WebsiteConfigSchema, context: WebsiteConfigRuntimeContext) throws -> WebsiteConfigPreparedImport {
+    try prepare(json, defaults: defaultDocument.values, orderedKeys: defaultDocument.orderedKeys,
+      schema: schema, context: context)
+  }
+
   /// Pure website-import preparation. Does not restore a Typebar backup, apply
   /// native fields, persist preferences, activate resources or emit UI events.
   static func prepare(_ json: String, defaults: [String: WebsiteConfigValue], orderedKeys: [String],

@@ -12,7 +12,8 @@ const runtimeMode = process.argv[3] === '--runtime-projection';
 const keyboardMode = process.argv[3] === '--keyboard-confirmations';
 const importMode = process.argv[3] === '--import-preparation';
 const funboxMode = process.argv[3] === '--funbox-admission';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode);
+const defaultsMode = process.argv[3] === '--default-profile';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -105,7 +106,10 @@ function transport(value) {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, transport(v)]));
   return value;
 }
-if (funboxMode) {
+if (defaultsMode) {
+  verify();
+  console.log(JSON.stringify({defaults, catalogs, orderedKeys: Object.keys(defaults)}));
+} else if (funboxMode) {
   const funbox = await load(path.join(root, 'packages/funbox/src/index.ts'));
   const metadata = (await load(path.join(frontend, 'config/metadata.tsx'))).configMetadata;
   const compatibility = [];

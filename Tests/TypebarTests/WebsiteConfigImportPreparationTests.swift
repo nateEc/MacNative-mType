@@ -2,11 +2,6 @@ import XCTest
 @testable import Typebar
 
 final class WebsiteConfigImportPreparationTests: XCTestCase {
-  private func prepare(_ json: String, defaults: [String: WebsiteConfigValue], orderedKeys: [String],
-    schema: WebsiteConfigSchema, context: WebsiteConfigRuntimeContext) throws -> WebsiteConfigPreparedImport {
-    try WebsiteConfigImportPreparation.prepare(json, defaults: defaults, orderedKeys: orderedKeys, schema: schema, context: context)
-  }
-
   func testPinnedCompleteJSONImportEntryAndRuntimeProjection() throws {
     let environment = ProcessInfo.processInfo.environment
     guard let reference = environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] ?? environment["TYPEBAR_REFERENCE_ROOT"] else {
@@ -35,17 +30,33 @@ final class WebsiteConfigImportPreparationTests: XCTestCase {
     process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus, 0)
     let output = try JSONDecoder().decode(Output.self, from: data)
-    let schema = WebsiteConfigSchema(catalogs: .init(languages: output.catalogs.languages,
-      themes: output.catalogs.themes, layouts: output.catalogs.layouts, fonts: output.catalogs.fonts, funboxes: output.catalogs.funboxes))
+    let catalogs = WebsiteConfigCatalogs(languages: output.catalogs.languages,
+      themes: output.catalogs.themes, layouts: output.catalogs.layouts, fonts: output.catalogs.fonts, funboxes: output.catalogs.funboxes)
+    let schema = WebsiteConfigSchema(catalogs: catalogs)
+    func name(_ key: String) throws -> String {
+      guard case .string(let value) = output.defaults[key] else { throw WebsiteConfigSchemaError.invalidDefaults }
+      return value
+    }
+    guard case .array(let colors) = output.defaults["customThemeColors"] else { return XCTFail("Missing QA colors") }
+    let appearance = try WebsiteConfigDefaultAppearance(theme: name("theme"), lightTheme: name("themeLight"),
+      darkTheme: name("themeDark"), fontFamily: name("fontFamily"), customThemeColors: colors.map {
+        guard case .string(let color) = $0 else { throw WebsiteConfigSchemaError.invalidDefaults }
+        return color
+      })
+    // Reference appearance is QA-only. All behavioral defaults now come from
+    // the independently implemented native provider, not this fixture.
+    let document = try WebsiteConfigDefaultDocument(appearance: appearance, catalogs: catalogs)
+    XCTAssertEqual(document.values, output.defaults)
+    XCTAssertEqual(document.orderedKeys, output.orderedKeys)
     XCTAssertEqual(output.fixtures.count, 403)
     print("Pinned complete website JSON import comparison: \(output.fixtures.count) fixtures")
     for (index, fixture) in output.fixtures.enumerated() {
       if !fixture.accepted {
-        XCTAssertThrowsError(try prepare(fixture.json, defaults: output.defaults, orderedKeys: output.orderedKeys,
+        XCTAssertThrowsError(try WebsiteConfigImportPreparation.prepare(fixture.json, defaultDocument: document,
           schema: schema, context: fixture.flags), "fixture \(index)")
         continue
       }
-      let prepared = try prepare(fixture.json, defaults: output.defaults, orderedKeys: output.orderedKeys,
+      let prepared = try WebsiteConfigImportPreparation.prepare(fixture.json, defaultDocument: document,
         schema: schema, context: fixture.flags)
       assertFields(prepared.parsed, (fixture.parsed ?? [:]).mapValues(restore), "parsed \(index)")
       let projected = prepared.projection
