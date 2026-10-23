@@ -74,6 +74,13 @@ final class WebsiteConfigImportPreparationTests: XCTestCase {
       assertFields(try WebsiteConfigNativeInputRulesTests.websiteFields(nativeRules), fixture.runtime.mapValues(restore).filter {
         WebsiteConfigNativeInputRules.mappedKeys.contains($0.key)
       }, "native input rules \(index)")
+      try WebsiteConfigNativeBehaviorTests.assertSourceRuntime(fixture.runtime.mapValues(restore))
+      if case .number(let speed) = projected.runtime["paceCaretCustomSpeed"], speed.isFinite {
+        let behavior = try WebsiteConfigNativeBehavior(runtime: projected.runtime).applying(to: .init())
+        assertFields(try WebsiteConfigNativeBehaviorTests.nativeFields(behavior), fixture.runtime.mapValues(restore).filter {
+          WebsiteConfigNativeBehavior.mappedKeys.contains($0.key)
+        }, "native sound and behavior \(index)")
+      } else { try WebsiteConfigNativeBehaviorTests.assertSourceRuntime(projected.runtime) }
       let presentation = try WebsiteConfigNativePresentation(runtime: projected.runtime).applying(to: .init())
       assertFields(WebsiteConfigNativePresentationTests.nativeFields(presentation),
         WebsiteConfigNativePresentationTests.expectedFields(fixture.runtime.mapValues(restore)), "native presentation \(index)")

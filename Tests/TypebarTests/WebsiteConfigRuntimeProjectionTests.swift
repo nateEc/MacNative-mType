@@ -63,6 +63,8 @@ final class WebsiteConfigRuntimeProjectionTests: XCTestCase {
         })
       XCTAssertEqual(gateCalls, 1)
       assertFields(projected.runtime, fixture.runtime, "runtime \(index)")
+      try WebsiteConfigNativeBehaviorTests.assertSourceRuntime(fixture.runtime)
+      try WebsiteConfigNativeBehaviorTests.assertSourceRuntime(projected.runtime)
       let presentation = try WebsiteConfigNativePresentation(runtime: projected.runtime).applying(to: .init())
       assertFields(WebsiteConfigNativePresentationTests.nativeFields(presentation),
         WebsiteConfigNativePresentationTests.expectedFields(fixture.runtime), "native presentation \(index)")
