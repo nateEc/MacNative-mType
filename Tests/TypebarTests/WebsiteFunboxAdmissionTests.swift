@@ -43,12 +43,13 @@ final class WebsiteFunboxAdmissionTests: XCTestCase {
       })
     var nativeFailures: [String] = []
     for fixture in output.compatibility {
-      // Native selections are sets; website import duplicates and polyglot's
-      // separate language selection have distinct contracts.
+      // Native selections are sets; polyglot is a separate language selection.
       guard Set(fixture.names).count == fixture.names.count,
-        fixture.names.allSatisfy({ nativeTargets[$0] != nil }) else { continue }
+        fixture.names.allSatisfy({ $0 == "polyglot" || nativeTargets[$0] != nil }) else { continue }
       let modifiers = fixture.names.compactMap { nativeTargets[$0] }
-      if TestModifierPolicy.isSourceCompatible(modifiers) != fixture.accepted {
+      let retainsPolyglotCombination = !fixture.names.contains("polyglot")
+        || Set(TestModifierPolicy.modifiersCompatibleWithPolyglot(modifiers)) == Set(modifiers)
+      if (TestModifierPolicy.isSourceCompatible(modifiers) && retainsPolyglotCombination) != fixture.accepted {
         nativeFailures.append("\(fixture.names)")
       }
     }

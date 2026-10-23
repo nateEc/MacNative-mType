@@ -1190,7 +1190,7 @@ enum TestModifierPolicy {
   /// modifier. The source still treats it as a word provider that ignores its
   /// current language, so selecting it clears only incompatible modifiers.
   static func modifiersCompatibleWithPolyglot(_ modifiers: [TestModifier]) -> [TestModifier] {
-    let incompatible = sourceWordGeneratorModifiers.union(sourceFrequencyModifiers).union([.listening])
+    let incompatible = sourceWordGeneratorModifiers.union(sourceFrequencyModifiers)
     return normalized(modifiers.filter { !incompatible.contains($0) })
   }
 

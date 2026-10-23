@@ -4168,7 +4168,7 @@ private struct ContentView: View {
           .help("依据本机完成测试中的错误字符生成离线词库练习")
       }
       Button("朗读提示") {
-        NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
+        NativeSpeech.shared.speak(session.prompt, language: session.configuration.wordPoolBaseLanguage)
       }
       .help("使用 macOS 本机语音朗读当前提示，不发送文本到网络")
     }
@@ -4629,7 +4629,7 @@ private struct ContentView: View {
     session.configurePace(wpm: activePaceTargetWpm)
     awaitViewportPresentationIfNeeded()
     if !isPreparingWholePreview, session.configuration.modifiers.contains(.listening) {
-      NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
+      NativeSpeech.shared.speak(session.prompt, language: session.configuration.wordPoolBaseLanguage)
     }
     refreshLiveContentIfNeeded(configuration: session.configuration, requestID: requestID)
     if preparesWholePreview { prepareWholePreview(configuration: configuration, requestID: requestID) }
@@ -4748,7 +4748,7 @@ private struct ContentView: View {
         }
         persistActiveTestSelection()
         if session.configuration.modifiers.contains(.listening) {
-          NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
+          NativeSpeech.shared.speak(session.prompt, language: session.configuration.wordPoolBaseLanguage)
         }
         if !isPreparingPracticePrompt { requestTypingFocus() }
       case .failure:
@@ -4873,7 +4873,7 @@ private struct ContentView: View {
       refreshPaceTarget()
       awaitViewportPresentationIfNeeded()
       if configuration.modifiers.contains(.listening) {
-        NativeSpeech.shared.speak(session.prompt, language: configuration.language)
+        NativeSpeech.shared.speak(session.prompt, language: session.configuration.wordPoolBaseLanguage)
       }
       if viewportReadinessAttemptID == nil { requestTypingFocus() }
       prefetchLiveContentIfNeeded()
@@ -5184,7 +5184,7 @@ private struct ContentView: View {
     session.configurePace(wpm: activePaceTargetWpm)
     awaitViewportPresentationIfNeeded()
     if session.configuration.modifiers.contains(.listening) {
-      NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
+      NativeSpeech.shared.speak(session.prompt, language: session.configuration.wordPoolBaseLanguage)
     }
     if viewportReadinessAttemptID == nil { requestTypingFocus() }
   }
