@@ -1654,6 +1654,11 @@ enum OfficialLayoutCommandCatalog {
     private static let officialNameByLayout = Dictionary(
         uniqueKeysWithValues: aliases.map { ($0.value, $0.key) })
 
+    static func name(for layout: KeyboardLayout) -> String? {
+        guard layout.isPinnedOfficialLayout else { return nil }
+        return officialNameByLayout[layout] ?? layout.rawValue
+    }
+
     static let items: [CommandPaletteItem] = {
         let disabled = CommandPaletteItem(
             id: "input.layout.default", title: "输入布局模拟：关闭",
@@ -1662,8 +1667,7 @@ enum OfficialLayoutCommandCatalog {
                 "input", "layout", "default", "输入", "布局", "关闭", "系统当前输入源",
             ], group: .settings)
         let layouts = KeyboardLayout.allCases.compactMap { layout -> CommandPaletteItem? in
-            guard layout.isPinnedOfficialLayout else { return nil }
-            let officialName = officialNameByLayout[layout] ?? layout.rawValue
+            guard let officialName = name(for: layout) else { return nil }
             return CommandPaletteItem(
                 id: "input.layout.\(officialName)", title: "模拟布局：\(layout.displayName)",
                 subtitle: "按此布局解释物理按键并立即重开", systemImage: "keyboard.fill",
