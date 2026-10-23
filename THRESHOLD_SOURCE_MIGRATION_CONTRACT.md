@@ -1,5 +1,21 @@
 # 阈值源状态与迁移契约
 
+## 网站生成设置与有序文本内核（后续阶段，起点 e8ff476d）
+
+WebsiteConfigNativeGenerators 保留 funbox 的有序重复目标、独立 lazy 请求、混排语言和 Layoutfluid 布局序列；累计 81/94 项模型草稿。只消费完整最终 runtime，不重放字段 setter。两个自选数组已由源 Set 覆盖去重且再次满足 min/max，非最终重复／不足两项不得交给原生默认回填；语言与布局只接受网站身份，不接受原生 raw alias。Polyglot 请求单独表示，不伪造混排主语言或丢掉另一组选择的基础语言。
+
+Funbox 原方法 list.get 使用输入顺序映射目标，applyFunboxesToWord 逐项执行；例如 rot13 两次必须回到原词。已有原生 normalize 去重且按直接控件的规范顺序执行，不能复用作网站导入路径。有序内核只执行十种 alterText 效果，其他 Funbox 目标不产生这个阶段没有的空白删除等副作用。lazy、英式拼写、数字生成与资源准入是先行阶段，不在 alterText 中再次应用；lazy 请求也不得借旧 Arabic 自动偏好改值。
+
+内核输入／中间值／输出使用 UTF-16 单元；倒序的孤立代理项保留，后续效果可继续处理，不能用 Swift String 解码修复后再传递。按代码点的随机大小写／双写与按代码单元的 SpongeCase／倒序分开；capitals 保留源多词空格折叠规则，underscore 的末词判断包含无限 bound=0。随机位注入用于语义对照，不承诺平台 RNG 种子流一致；输出规模预算和完整练习页桥接尚待准入阶段验证。
+
+默认大小写使用官方 UCD 17.0.0 的 UnicodeData、SpecialCasing 和 DerivedCoreProperties 生成，只包含标准元数据，不复用参考项目代码或资产；源码 SHA-256 固定在 generate-unicode17-case-data.rb，--check 比较生成字节。实现无语言区域的完整映射、扩展及 Final_Sigma 条件，保留孤立单元；土耳其等 locale 专用规则不属于源 toLowerCase/toUpperCase。Unicode 许可随应用包分发并做逐字节检查，不在运行时下载数据。测试解释器固定 Node 24.19.0 / Unicode 17，避免用主机随时变化的 ICU 作 oracle。
+
+版本依据：[UnicodeData 17](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt)、[SpecialCasing 17](https://www.unicode.org/Public/17.0.0/ucd/SpecialCasing.txt)、[DerivedCoreProperties 17](https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt)。代码生成输入从该官方版本目录获取，不复制网站主题、字体或词表；产品仅使用原生 Swift 算法和生成元数据，Node／参考检出只用于 QA。
+
+这是加法路径，不改变旧归一化器、旧格式、当前用户偏好或历史目标。没有给旧配置提供丢弃顺序／重复的降投影；新载体的存储、激活后 joining-script／lazy remember 变化、词表及脚本资源、完整参数组合和 UI 仍待接线。回退为丢弃新草稿，不做回填或旧数据重写；未来必须先有新代能力与真实生成验收，再切流。
+
+验证：本组六项测试包含 28,448 组实际有序函数对照、735 组身份／选项及四项无源码环境测试；字段另进入 403／671 组入口对照。相关 320 项零失败、一项未准备历史写入器的旧磁盘测试环境跳过，专用参考环境 62 项零失败零跳过。Unicode 生成核对三个官方文件哈希和最终字节；当前 QA 版本的官方发布与头文件也已核对。未验证远端新工作流执行、新配置冷读或真实设备／完整 UI，不把源模型计数当作迁移完成。
+
 ## 网站引语选择与抽样内核（后续阶段，起点 e958c68d）
 
 WebsiteConfigNativeQuoteSelection 保留 quoteLength 的有序重复数组，不投影成旧 QuoteLengthSelection 集合。仅 [-2] 走指定引语，包含 -3 走收藏，其余走非负长度分组；[-2,-2] 与空数组均产生空队列，不自动归一为全部。相同组重复次数决定本轮每条自有引语的配额。累计 77/94 项模型草稿，不表示已完成引语资源／UI 或全配置迁移。

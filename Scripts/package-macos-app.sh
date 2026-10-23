@@ -38,6 +38,7 @@ cp "$binary_dir/Typebar" "$app_path/Contents/MacOS/Typebar"
 cp "$project_root/Resources/Info.plist" "$app_path/Contents/Info.plist"
 mkdir -p "$app_path/Contents/Resources"
 cp "$project_root/Resources/ThirdPartyNotices.txt" "$app_path/Contents/Resources/ThirdPartyNotices.txt"
+cp "$project_root/Resources/UnicodeNotice.txt" "$app_path/Contents/Resources/UnicodeNotice.txt"
 cp "$project_root/Resources/EnglishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/EnglishFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt"
 if [[ -n "$bundle_identifier" ]]; then

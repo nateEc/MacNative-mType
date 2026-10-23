@@ -45,6 +45,15 @@ jobs:
       - name: Verify Go toolchain
         run: go version
 
+      - name: Prepare pinned Node QA runtime
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.19.0'
+          package-manager-cache: false
+
+      - name: Verify Unicode version for source text probes
+        run: node -e 'require("node:assert/strict").equal(process.versions.unicode, "17.0"); console.log(process.version, process.versions.unicode)'
+
       - name: Check out the pinned Monkeytype reference
         id: reference
         shell: bash

@@ -63,6 +63,9 @@ codesign --verify --deep --strict "$app_path"
 cmp "$project_root/Resources/ThirdPartyNotices.txt" \
   "$app_path/Contents/Resources/ThirdPartyNotices.txt" \
   || fail "third-party license notices missing or modified"
+cmp "$project_root/Resources/UnicodeNotice.txt" \
+  "$app_path/Contents/Resources/UnicodeNotice.txt" \
+  || fail "Unicode data license notice missing or modified"
 cmp "$project_root/Resources/EnglishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/EnglishFrequencyCorpusNotices.txt" \
   || fail "English corpus attribution missing or modified"
