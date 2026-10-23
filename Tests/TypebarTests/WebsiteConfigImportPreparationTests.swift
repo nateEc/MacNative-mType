@@ -70,6 +70,10 @@ final class WebsiteConfigImportPreparationTests: XCTestCase {
       }
       assertFields(projected.requested, (fixture.requested ?? [:]).mapValues(restore), "requested \(index)")
       assertFields(projected.runtime, fixture.runtime.mapValues(restore), "runtime \(index)")
+      let nativeRules = try WebsiteConfigNativeInputRules(runtime: projected.runtime)
+      assertFields(try WebsiteConfigNativeInputRulesTests.websiteFields(nativeRules), fixture.runtime.mapValues(restore).filter {
+        WebsiteConfigNativeInputRules.mappedKeys.contains($0.key)
+      }, "native input rules \(index)")
       XCTAssertEqual(projected.rejectedKeys, fixture.rejectedKeys, "rejected \(index)")
       XCTAssertEqual(projected.events.count, fixture.events.count, "events \(index)")
       let events = fixture.events.map { event in
