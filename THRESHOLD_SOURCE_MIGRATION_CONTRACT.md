@@ -1,5 +1,15 @@
 # 阈值源状态与迁移契约
 
+## 真实模型的上下文新鲜度（追加阶段）
+
+源为实际 AppSettings 快照及本地字体／背景、活动选择和应用版本，实际 AccountSession 当前用户、端点和会话版本；目标为协调器已有的只读 Environment。不迁移数据、不双写、不替换旧消费者，也不把本地文件存在当作资源加载成功。布局 rem 比例、文档就绪和开发环境标志由宿主显式传入，不猜固定 16 点或认证状态。
+
+同会话反证审查：只比较最终快照漏掉 A→B→A；只在异步刷新时失效会留下旧票据可提交窗口；在 willSet 中立即重新采样会借出半更新上下文。采用 macOS 14 已有的单次 Observation：同步使缓存不可用，随后在 MainActor 新任务中重新取样和重新订阅。失效期间 read 返回 nil，不自动提交或重试；新就绪上下文采用新 UUID，连续读取不换版本。停止是终态，排队的任务不能复活它。只订阅 MainActor 隔离的模型，因此同步回调使用 MainActor.assumeIsolated 检查隔离，不把回调改为延迟失效。
+
+接口核对：本机 Swift 6.2.4／macOS SDK 的 Observation.swiftinterface 将基础 withObservationTracking 标为 macOS 14；没有采用 macOS 26 新增的 Observations 流。依据 [Swift SE-0395](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0395-observability.md) 的首次变更跟踪语义和 [MainActor.assumeIsolated](https://developer.apple.com/documentation/swift/mainactor/assumeisolated(_:file:line:))。实现／测试验证同步撤销、异步重订阅和真实文件 CAS 拒绝陈旧上下文，而非依赖刷新延时猜测。
+
+限制：只允许在稳定的主线程动作中调用 read／prepare／commit，不允许从模型 setter 或任意第三方 Observation 回调内嵌套提交。Observation 不保证多个观察器回调次序，本观察器不能证明另一个先执行的 willSet 回调里已经失效；此类消费者必须先切到后续 MainActor 任务，生产接线前须审计调用点。仅覆盖上述模型的进程内变更；外进程写偏好／更改文件、系统字体注册变化、新窗口布局来源和资源加载仍需自己的观察与所有权。该观察器不接入生产 UI，不打开新配置目录，不验证字体可用性或背景像素，也不证明资源／UI 原子事务。回退只需停止该观察器，旧配置路径不受影响；后续接线不得删掉这些边界。
+
 ## 活动所有者与完整配置发布协调（后续阶段，起点 b2d4c801）
 
 同会话决策审查：单记录 CAS 不能证明窗口／认证／资源上下文仍然有效，也不能把磁盘成功与后续任意回调包成事务。追加配置值协调层，以实际 PreferenceConfigurationSaveRouter 活动窗口凭据、宿主 Environment 版本和文件票据同时约束。窗口切换 ABA、移除和活动处理器替换失效旧凭据；后台注册不抢走活动所有者，同窗口重复激活不伪造新所有者。路由变更期间不发布可用凭据。
