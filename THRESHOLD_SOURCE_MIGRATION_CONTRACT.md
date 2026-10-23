@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 准备帧到单帧视口像素（追加阶段）
+
+Rasterizer 新增 renderViewport，显式接受 prepared Frame、Geometry.Layout、独立 Filter 声明、fit、逻辑 viewport、pointsPerRem 和 pixelsPerPoint，不重读磁盘／网络或更改配置。它消费加载后的帧，不决定图片更换、声明历史、加载中／失败通知或动画时钟，也未用于旧生产界面。调用方须在文件成功提交之前准备可失败的结果，不能把此同步渲染塞到提交后的切流步骤中。
+
+Core Image 图按方向、适配、内容盒裁剪、滤镜、CSS 后变换、视口裁剪排列；见固定背景 setter 和 [Filter Effects 处理顺序](https://www.w3.org/TR/filter-effects-1/#module-interactions)。只对原始图像重采样使用边缘复制，随后立即裁回适配内容与图片盒的交集；Gaussian 输入不复制图片盒边界。不能先生成视口大小的位图再模糊，也不预分配整个放大图片盒。Core Image 自行请求实际 ROI，四倍标准差只用于保守预算估算，不作为真实图的裁剪边界或高斯尾部近似。
+
+设 device backing 为 r、整数输出高为 H，逻辑矩阵为 (a,b,c,d,tx,ty)，设备矩阵使用 (a,-b,-c,d,r×tx+c×H,H×(1-d)-r×ty)。这同时转换 CSS y 向下与 Quartz y 向上坐标；单纯将逻辑 CGRect 或其正外接矩形直接交给图形上下文，会丢失负顶部历史或负缩放。逻辑视口乘 backing 后向上取整为输出像素大小，逻辑内容不被伸展来填满取整区域；调用方显示时应按该像素跨度／backing 放置并裁到实际逻辑视口，而非再次缩放取整图像。
+
+非空滤镜继续复用既有 sRGB／浮点工作图与 RGBA8 输出。无滤镜时使用 RGB 源色彩空间；超过 8 位／浮点输入以 RGBAf 输出，不在布局中悄悄量化。非 RGB 输入转换到 sRGB 供显示，并非原始文件转码。P3 及扩展线性 RGB 的 1.5 浮点样本在放大后仍保留数值；这不是所有 ICC、灰度 HDR、增益图、实际 XDR 显示或有滤镜 HDR 的兼容性证明。默认 linear 重采样仍须与浏览器 auto 的缩小／插值质量另行比较，nearest 作为显式测试／调用方策略，不是新增的源配置字段。
+
+原有 pixels／blurPixels 上限保留，增加 renderedBytes（默认 128 MiB）；先按格式 4 或 16 字节／像素做最低占用预检，再对实际 CGImage.bytesPerRow × height 检查，不忽略行对齐填充。第二道检查发生在生成图像之后，不能保证临时分配绝不超预算，超额图不会返回；这也不是 GPU 峰值内存沙箱。处理区估算取反投影视口加 halo 与有限内容加 halo 的交集，不将大段无内容的空白计入图像预算。估算不改变图像，不跳过真实图的非空尾部计算。环境／矩阵非法、后端无法表达或限额失败均明确报错；零内容盒／不可逆变换按透明图层处理，不执行无可见贡献的滤镜。此前 canvas 入口的空链仍直接返回原 CGImage，共享滤镜图未改变其原有语义。
+
+SDK 依据为当前 macOS 26.1／Swift 6.2.4 的 CIImage clamp／采样／变换及 CIContext 显式色彩空间、格式和非延迟 CGImage 生成声明，相关接口均早于最低 macOS 14。十一项独立原生视口测试覆盖三适配、八方向、负顶部、2×、模糊外溢与视口外输入、滤镜后缩放、P3／浮点、资源错误、空白 ROI、负矩阵、非整数取整与实际行距。仍待跨浏览器／最低系统、复杂 ICC／图像格式、所有插值、完整生产资源宿主、并发取消、动画与性能验收。
+
 ## 背景图片盒的独立声明与相对长度（追加阶段）
 
 固定 applyCustomBackgroundFilters 对 filter／width／height／transform／top／position 分别赋值，背景父容器固定且 flex 居中。宽高同用 calc(100% + blur×8 rem)，top 由负号前缀拼接 blur×4，scale 为 1 + blur/100，默认变换原点为盒中心。负 blur 的 top 变成 --...rem，非法而保留旧声明；同一次有效 calc 和 scale 仍更新，不能随非法整条 filter 一起拒绝。无穷／NaN 的裸插值不是 calc(infinity)，按声明语法分别拒绝。宽高一直同表达式，可共用已准入的 rem 增量，但两个轴分别解析／归零。
