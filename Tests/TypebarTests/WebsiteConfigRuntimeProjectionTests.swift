@@ -64,6 +64,7 @@ final class WebsiteConfigRuntimeProjectionTests: XCTestCase {
       XCTAssertEqual(gateCalls, 1)
       assertFields(projected.runtime, fixture.runtime, "runtime \(index)")
       try WebsiteConfigNativeGeneratorsTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime)
+      try WebsiteConfigNativeThemesTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime)
       try WebsiteConfigNativeQuoteSelectionTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime)
       try WebsiteConfigNativeTestParametersTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime)
       try WebsiteConfigNativeKeyboardTypographyTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime)

@@ -71,6 +71,7 @@ final class WebsiteConfigImportPreparationTests: XCTestCase {
       assertFields(projected.requested, (fixture.requested ?? [:]).mapValues(restore), "requested \(index)")
       assertFields(projected.runtime, fixture.runtime.mapValues(restore), "runtime \(index)")
       try WebsiteConfigNativeGeneratorsTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
+      try WebsiteConfigNativeThemesTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
       try WebsiteConfigNativeQuoteSelectionTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
       try WebsiteConfigNativeTestParametersTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))
       try WebsiteConfigNativeKeyboardTypographyTests.assertSourceRuntime(projected.runtime, expected: fixture.runtime.mapValues(restore))

@@ -1,5 +1,13 @@
 # 阈值源状态与迁移契约
 
+## 网站主题配置：独立状态与预览边界（后续阶段，起点 44c1cc74）
+
+WebsiteConfigNativeThemes 为追加的内存草稿，八字段直接消费完整最终投影；既有 AppSettings、库和存储代不变，没有自动切换消费者或写回。autoSwitchTheme 与 customTheme 独立，完整导入后自动主题优先，后续系统事件遇 custom 则忽略；不可折叠到旧 followSystemTheme／activeTheme。源收藏顺序与重复、未激活的内联颜色也不可交给旧原生归一化器丢弃。
+
+makeCustomTheme 只构造 caller-owned ID／名称的预览值，不生成 UUID、不访问账户或保存库；它不是完整源状态的序列化。原生额外 fadedText 明确派生自 subAlt；名称不规范／空白／超过四十字符时拒绝，不静默改名。颜色保留源字符串并解析 exact 8-bit RGB，HSL 明暗边界与旧链接导入相对亮度算法分离。
+
+本阶段无数据迁移、无不可逆步骤，回退仅移除未接通草稿；未来持久格式必须能保留独立标志／收藏重复／颜色原写法，资源和 UI 失败须无部分提交。随机模式载体不代表源随机袋、账户主题资源或事件生命周期已实现。切换、跨进程及完整界面仍待验收。
+
 ## 网站生成设置与有序文本内核（后续阶段，起点 e8ff476d）
 
 WebsiteConfigNativeGenerators 保留 funbox 的有序重复目标、独立 lazy 请求、混排语言和 Layoutfluid 布局序列；累计 81/94 项模型草稿。只消费完整最终 runtime，不重放字段 setter。两个自选数组已由源 Set 覆盖去重且再次满足 min/max，非最终重复／不足两项不得交给原生默认回填；语言与布局只接受网站身份，不接受原生 raw alias。Polyglot 请求单独表示，不伪造混排主语言或丢掉另一组选择的基础语言。
