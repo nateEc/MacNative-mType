@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 准备图片到原生视口宿主（追加阶段）
+
+生产加载桥在发布前准备 ImageIO 图片，原生 NSViewRepresentable 消费同一 Image 与加载代次，不在 draw／layout 再下载、读文件或解码。新身份重新建立滤镜／几何历史及动画原点；同身份的适配、滤镜、窗口尺寸和 backing 变化仅重绘，不重播或重新解码。同身份须绑定同一准备图片，不能因文件字节相同就复用被原版重新创建的 img 寿命。全配置源事件的应用代次仍未接线。
+
+原生宿主以现有 Geometry → Rasterizer 进行方向、对象适配、滤镜和 CSS 后变换，在最后裁视口；以像素宽高／实际 backing 自然尺寸绘入 AppKit，并裁逻辑 bounds，不能把 ceil 后的缓冲拉伸回分数尺寸。翻转 NSView 的绘图坐标只做一次 CGImage 方向映射；这不是重新读取 EXIF。输出透明、不接收鼠标／键盘或辅助功能焦点；拆卸时停止播放器并清除图像，旧回调须通过播放器及宿主的图片代次检查。
+
+练习界面目前将旧控件 blur 数值按源 blurRem 传给宿主，显式根字号暂为 16 点，亮度改为源乘法而不是 SwiftUI 加法；这是源语义修正，不声称保持旧错误滤镜的像素外观。完整原版根字号环境、控件范围、全窗口 fixed 背景布局和原始配置未切流。普通图片动画不由现有装饰背景 Reduce Motion 开关推断禁止；图片媒体动画与窗口遮挡／睡眠政策仍需浏览器对照。原生显式隐藏／脱离窗口暂以暂停保留进度，拆卸为终止，不外推全部浏览器策略。
+
+NSImage 可读但 ImageIO 不能提供栅格结果的原生矢量保留明确旧绘图分支，不丢弃已有原生显示能力。实测 ImageIO 能识别 com.adobe.pdf 但帧属性为空，不能仅按类型可识别就判为坏栅格；结合公开 NSPDFImageRep 与 SVG 类型明确保留矢量兼容。已识别栅格的损坏或任何解码资源限额失败不能经旧分支绕过准入。旧分支不是 SVG／其他格式完整重写的验收证据。渲染失败清除旧像素并保留错误，后续尺寸／样式变化可以重试，原始配置与编码容器不修改。绘制失败期间继续按时钟选择当前帧，但不重复提交相同失败绘图，避免错误重试每帧消耗资源；该平台错误政策不等同浏览器全部行为。
+
+独立图层在每次 draw 先清除自身区域，之后才以 source-over 绘制当前完整帧；透明帧或 nil 图像不能擦除旧内容的反例已有直接复用 CGContext 测试。不会对父背景层执行清除。NSWindow 默认色彩环境与显式 sRGB 的缓存字节不同，坐标／backing 测试固定测试窗口为 sRGB 后保持精确断言，不扩大容差来掩盖差异；多显示器和 HDR 色彩行为另验。backing 属性变化既处理比例变化，也按 AppKit 颜色空间变化通知重新标记显示，见 [viewDidChangeBackingProperties](https://developer.apple.com/documentation/appkit/nsview/viewdidchangebackingproperties())；SwiftUI 拆卸由 [dismantleNSView](https://developer.apple.com/documentation/swiftui/nsviewrepresentable/dismantlensview(_:coordinator:)) 清理。
+
+此入口是旧属性驱动界面的显示接线，不是 WebsiteConfigCommitCoordinator 的文件 CAS／联合资源发布切流；可失败的图片准备、时间线或渲染不能伪装成严格配置提交后已原子激活。可见 GUI、最低系统、全部格式／浏览器像素、异步渲染、性能、通知反馈和完整资源宿主仍待完成。
+
 ## 原始背景字节到现有显示桥（追加阶段）
 
 检查生产 CustomPracticeBackground 时发现它按 NSImage 解码成功与否选择本地／远端，而固定 source::applyCustomBackground 按本地条目是否 undefined 选择，坏本地不允许借用远端。生产加载桥必须先取得有界的原始本地快照；nil 才表示不存在，空字节、解码失败、权限或其他读取失败不能转换为 nil。读取本应用固定背景文件时不跟随最终符号链接、不阻塞特殊文件，并在打开后检查常规文件身份；这不是对任意父目录／外部写者的文件沙箱保证。

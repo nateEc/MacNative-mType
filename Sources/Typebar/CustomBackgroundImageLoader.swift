@@ -1,6 +1,8 @@
 import AppKit
 import Foundation
+import ImageIO
 import Observation
+import UniformTypeIdentifiers
 
 enum CustomBackgroundDownload {
   enum Failure: Error, Equatable { case unsupportedURL, invalidLimit, resourceLimit, httpStatus(Int) }
@@ -63,11 +65,15 @@ final class CustomBackgroundImageLoader {
   private(set) var state: State = .empty
   private(set) var encodedData: Data?
   private(set) var image: NSImage?
+  private(set) var nativeImage: WebsiteConfigBackgroundResource.Image?
+  var imageIdentity: UUID { generation }
   private(set) var error: Error?
   @ObservationIgnored private let download: Download
+  @ObservationIgnored private let resourceLimits: WebsiteConfigBackgroundResource.Limits
   @ObservationIgnored private var generation = UUID()
-  init(download: @escaping Download = { try await CustomBackgroundDownload.data(from: $0, maximumBytes: $1) }) {
-    self.download = download
+  init(resourceLimits: WebsiteConfigBackgroundResource.Limits = .init(),
+    download: @escaping Download = { try await CustomBackgroundDownload.data(from: $0, maximumBytes: $1) }) {
+    self.download = download; self.resourceLimits = resourceLimits
   }
   func load(remoteURL: String, maximumBytes: Int = 64 * 1024 * 1024,
     local: () throws -> Data?) async {
@@ -80,18 +86,34 @@ final class CustomBackgroundImageLoader {
       let localData = try local()
       guard token == generation else { return }
       let data: Data
-      if let localData { data = localData }
+      let source: WebsiteConfigBackgroundResource.Source
+      if let localData { data = localData; source = .local }
       else if remoteURL.isEmpty { state = .empty; return }
       else {
         guard let url = URL(string: remoteURL), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
           url.host?.isEmpty == false else { throw CustomBackgroundDownload.Failure.unsupportedURL }
         data = try await download(url, maximumBytes)
+        source = .remote(.string(remoteURL))
       }
       try Task.checkCancellation()
       guard token == generation else { return }
       guard data.count <= maximumBytes else { throw CustomBackgroundDownload.Failure.resourceLimit }
       let owned = data.withUnsafeBytes { Data($0) }
       guard let image = NSImage(data: owned) else { throw LocalBackgroundError.unsupportedImage }
+      let prepared = try WebsiteConfigBackgroundResource.prepare(loadedData: owned, source: source, limits: resourceLimits)
+      switch prepared.state {
+      case .ready(let native): nativeImage = native
+      case .failed(.resourceLimit): throw LocalBackgroundError.resourceLimit
+      case .failed, .none:
+        // A PDF can be identified by ImageIO yet have no raster pixel properties.
+        // Preserve native vectors, never a quota failure or a broken raster decoder.
+        if let source = CGImageSourceCreateWithData(owned as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+          let type = CGImageSourceGetType(source) {
+          let nativePDF = image.representations.contains { $0 is NSPDFImageRep }
+          let nativeSVG = UTType(type as String)?.conforms(to: .svg) == true
+          if !nativePDF && !nativeSVG { throw LocalBackgroundError.unsupportedImage }
+        }
+      }
       encodedData = owned; self.image = image; state = .ready
     } catch {
       guard token == generation else { return }
@@ -100,6 +122,6 @@ final class CustomBackgroundImageLoader {
     }
   }
   func clear() {
-    generation = UUID(); state = .empty; image = nil; encodedData = nil; error = nil
+    generation = UUID(); state = .empty; image = nil; nativeImage = nil; encodedData = nil; error = nil
   }
 }

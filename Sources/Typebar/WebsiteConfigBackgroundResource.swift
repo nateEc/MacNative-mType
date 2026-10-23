@@ -46,6 +46,13 @@ struct WebsiteConfigBackgroundResource {
   let source: Source?
   let state: State
 
+  /// Explicit already-loaded bytes; no synthetic configuration is needed by native display hosts.
+  static func prepare(loadedData: Data, source: Source, limits: Limits = .init()) throws -> Self {
+    guard limits.encodedBytes > 0, limits.pixels > 0, limits.decodedBytes > 0, limits.frames > 0
+    else { throw WebsiteConfigBackgroundResourceError.invalidLimits }
+    return decode(loadedData, source: source, limits: limits)
+  }
+
   static func prepare(preferences: WebsiteConfigNativePagePreferences, local: Local,
     remote: Remote? = nil, limits: Limits = .init()) throws -> Self {
     guard limits.encodedBytes > 0, limits.pixels > 0, limits.decodedBytes > 0, limits.frames > 0

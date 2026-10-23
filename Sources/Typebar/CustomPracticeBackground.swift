@@ -184,7 +184,12 @@ struct CustomPracticeBackground: View {
   var body: some View {
     ZStack {
       PracticeBackdrop(style: fallbackStyle, theme: theme, reduceMotion: reduceMotion)
-      if let image = loader.image { filtered(Image(nsImage: image)) }
+      if let image = loader.nativeImage {
+        WebsiteConfigBackgroundSurface(image: image, identity: loader.imageIdentity, fit: fit,
+          filter: .init(blurRem: filter.blur, brightness: filter.brightness,
+            saturation: filter.saturation, opacity: filter.opacity))
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else if let image = loader.image { filtered(Image(nsImage: image)) }
     }
     .task(id: LoadIdentity(address: remoteURL, revision: localImageRevision,
       store: ObjectIdentifier(localBackgroundStore))) {
