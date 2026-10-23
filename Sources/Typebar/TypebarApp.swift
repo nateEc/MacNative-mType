@@ -1593,7 +1593,8 @@ private struct ContentView: View {
         restoringPromptHighlightAfterFunboxConflict = false
         return
       }
-      guard FunboxForcedContentOptionsPolicy.accepts(
+      guard settings.promptHighlightWasInteractivelyAdmitted
+        || FunboxForcedContentOptionsPolicy.accepts(
         promptHighlightMode: selected, modifiers: practiceRequestedModifiers)
       else {
         restoringPromptHighlightAfterFunboxConflict = true
@@ -1674,7 +1675,8 @@ private struct ContentView: View {
         position?.captureForFocusChange()
       }
       contentAppeared()
-      settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner) {
+      settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,
+        requestedModifiers: { practiceRequestedModifiers }) {
         persistExplicitTestConfiguration()
       }
       activatePreferenceConfigurationOwnerIfKey()
@@ -5538,7 +5540,8 @@ private struct ContentView: View {
       return
     }
     if let target = AppearanceCommandCatalog.target(for: item.id) {
-      guard target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration) else {
+      guard target.apply(to: settings, requestedModifiers: practiceRequestedModifiers,
+        onConfigurationSave: persistExplicitTestConfiguration) else {
         if case .highlight = target {
           funboxConfigurationMessage = "当前趣味模式仅支持“当前字符”或“关闭”提示高亮。"
         } else {

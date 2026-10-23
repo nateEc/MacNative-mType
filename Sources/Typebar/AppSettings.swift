@@ -1194,6 +1194,22 @@ final class AppSettings {
   private(set) var challengePresentationApplicationRevision: UInt64 = 0
   private(set) var difficultyApplicationRevision: UInt64 = 0
   private(set) var testModifiersApplicationRevision: UInt64 = 0
+  @ObservationIgnored private var acceptingPromptHighlightApplication = false
+  private(set) var promptHighlightWasInteractivelyAdmitted = false
+
+  @discardableResult
+  func applyPromptHighlightMode(_ mode: PromptHighlightMode, modifiers: [TestModifier]? = nil) -> Bool {
+    let requested = modifiers ?? preferenceConfigurationSaves.requestedModifiers ?? testModifiers
+    guard FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: mode, modifiers: requested)
+    else { return false }
+    if hasThresholdProfile {
+      guard thresholdSourceState != nil, case .available = thresholdProfileRead else { return false }
+    }
+    acceptingPromptHighlightApplication = true
+    defer { acceptingPromptHighlightApplication = false }
+    promptHighlightMode = mode
+    return true
+  }
 
   var activeTestSelection: ActiveTestSelectionDocument? {
     ActiveTestSelectionStore(defaults: defaults).load()
@@ -1621,10 +1637,12 @@ final class AppSettings {
   var liveStatsOpacity: LiveStatsOpacity = .full { didSet { persist() } }
   var promptHighlightMode: PromptHighlightMode = .letter {
     didSet {
-      // The view restores rejected funbox selections to oldValue. Neither
-      // the rejected selection nor that restoration is a source config event.
-      if FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: promptHighlightMode, modifiers: testModifiers),
-        FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: oldValue, modifiers: testModifiers) {
+      promptHighlightWasInteractivelyAdmitted = acceptingPromptHighlightApplication
+      // Interactive setters have already validated live window modifiers.
+      // Preserve the legacy bulk-assignment/rollback guard separately.
+      if acceptingPromptHighlightApplication || (
+        FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: promptHighlightMode, modifiers: testModifiers)
+        && FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: oldValue, modifiers: testModifiers)) {
         challengePresentationApplicationRevision &+= 1
         persistPracticeWrapperEvent()
       } else {

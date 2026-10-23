@@ -1248,7 +1248,8 @@ enum AppearanceCommandTarget: Equatable {
 
     @discardableResult
     @MainActor
-    func apply(to settings: AppSettings, onConfigurationSave: () -> Void = {}) -> Bool {
+    func apply(to settings: AppSettings, requestedModifiers: [TestModifier]? = nil,
+        onConfigurationSave: () -> Void = {}) -> Bool {
         switch self {
         case .progress(let style): settings.liveProgressStyle = style
         case .speed(let style): settings.liveSpeedStyle = style
@@ -1257,9 +1258,7 @@ enum AppearanceCommandTarget: Equatable {
         case .color(let color): settings.liveStatsColor = color
         case .opacity(let opacity): settings.liveStatsOpacity = opacity
         case .highlight(let mode):
-            guard FunboxForcedContentOptionsPolicy.accepts(promptHighlightMode: mode,
-                modifiers: settings.testModifiers) else { return false }
-            settings.promptHighlightMode = mode
+            guard settings.applyPromptHighlightMode(mode, modifiers: requestedModifiers) else { return false }
         case .typedEffect(let effect): settings.typedCharacterEffect = effect
         case .tape(let mode):
             settings.practiceTapeMode = mode

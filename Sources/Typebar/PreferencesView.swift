@@ -109,6 +109,13 @@ struct PreferencesView: View {
   @State private var showingInstalledFontPicker = false
   @State private var showingNoQuitConfigurationLockAlert = false
   @State private var funboxSelectionMessage: String?
+  @State private var promptHighlightMessage: String?
+
+  private var promptHighlightPreferences: PracticePromptHighlightPreferences {
+    .init(settings: settings, onResult: { accepted in
+      promptHighlightMessage = accepted ? nil : "当前趣味模式不支持此高亮，或配置不可写；已保留原设置。"
+    })
+  }
 
   var body: some View {
     @Bindable var settings = settings
@@ -747,10 +754,13 @@ struct PreferencesView: View {
               Text(opacity.displayName).tag(opacity)
             }
           }
-          Picker("提示高亮范围", selection: $settings.promptHighlightMode) {
+          Picker("提示高亮范围", selection: promptHighlightPreferences.selection) {
             ForEach(PromptHighlightMode.allCases) { mode in
               Text(mode.displayName).tag(mode)
             }
+          }
+          if let promptHighlightMessage {
+            Label(promptHighlightMessage, systemImage: "exclamationmark.triangle.fill")
           }
           Text("当前词范围只在常规空格分词提示中生效；卷带、无空格、听写、记忆与预读遮挡会安全降级为当前字符。高亮只改变呈现，不改变输入或计分。")
             .font(.caption)
