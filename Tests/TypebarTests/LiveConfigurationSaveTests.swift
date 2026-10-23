@@ -31,7 +31,7 @@ final class LiveConfigurationSaveTests: XCTestCase {
   }
 
   private func save(_ settings: AppSettings, _ live: ChallengeLiveConfigurationState) -> Bool {
-    settings.persistLiveConfiguration(live, hasActiveLocalFont: { false })
+    settings.persistLiveConfiguration(live)
   }
 
   private func revisions(_ settings: AppSettings) -> [UInt64] {
@@ -143,13 +143,10 @@ final class LiveConfigurationSaveTests: XCTestCase {
     }
   }
 
-  func testFontHandoffFailureIsReportedAsPartialWithoutReplayingFontEvents() throws {
+  func testSavingTheNamedFontHasNoLocalFileHandoffOrAdditionalFontEvents() throws {
     try withLive(source: true) { settings, defaults, live in
       let before = revisions(settings)
-      var handoffs = 0
-      XCTAssertFalse(settings.persistLiveConfiguration(live, hasActiveLocalFont: { true },
-        deactivateLocalFont: { handoffs += 1; return false }))
-      XCTAssertEqual(handoffs, 1)
+      XCTAssertTrue(settings.persistLiveConfiguration(live))
       XCTAssertEqual(revisions(settings), before)
       XCTAssertEqual(settings.installedPracticeFontName, WingdingsChallengeFont.familyName)
       XCTAssertEqual(AppSettings(defaults: defaults,

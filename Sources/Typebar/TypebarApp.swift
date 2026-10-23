@@ -1677,7 +1677,8 @@ private struct ContentView: View {
       contentAppeared()
       settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,
         requestedModifiers: { practiceRequestedModifiers }, selectedLanguage: { language },
-        keyboardGuideMode: { challengeLiveConfiguration.keyboardGuideMode(settings: settings) }) {
+        keyboardGuideMode: { challengeLiveConfiguration.keyboardGuideMode(settings: settings) },
+        fontFamilyName: { challengeLiveConfiguration.fontFamilyName(settings: settings) }) {
         persistExplicitTestConfiguration()
       }
       activatePreferenceConfigurationOwnerIfKey()
@@ -2028,10 +2029,9 @@ private struct ContentView: View {
     .sheet(isPresented: $showingInstalledFontCommandPicker) {
       NativeFontFamilyPicker(
         selection: Binding(
-          get: { settings.installedPracticeFontName },
+          get: { commandFontFamilyName },
           set: { name in
             if !FontFamilyCommandApplication.apply(.installedName(name), to: settings,
-              deactivateLocalFont: settings.deactivateLocalPracticeFont,
               onConfigurationSave: persistExplicitTestConfiguration) {
               fontFamilyCommandMessage = "此 Mac 当前无法使用所选字体。"
             }
@@ -3567,13 +3567,8 @@ private struct ContentView: View {
         for: commandFontPreview.target, size: size, fallback: settings.practiceFont) {
       return font
     }
-    if challengeLiveConfiguration.hasTransientFont(settings: settings),
-      let font = WingdingsChallengeFont.resolve(size: size)
-    {
-      return font
-    }
     return settings.practiceFont.nsFont(
-      size: size, installedFontName: settings.installedPracticeFontName,
+      size: size, installedFontName: challengeLiveConfiguration.fontFamilyName(settings: settings),
       language: session.configuration.language)
   }
 
@@ -6099,19 +6094,11 @@ private struct ContentView: View {
     } ?? challengeTemplate
     let configuration = challenge == nil ? selectedConfiguration
       : ChallengeInputRulePolicy.applying(settings.inputRules, to: selectedConfiguration)
-    let acceptedTransientFontFamily = challengeLiveConfiguration.hasTransientFont(settings: settings)
-      ? challengeLiveConfiguration.fontFamilyName(settings: settings) : nil
     guard PresetSettingsApplication.commit(original: preparedPreset, resolved: appliedPreset,
       configuration: configuration, to: settings, appliesGlobalSettings: appliesGlobalSettings,
       expectedSourceState: preparation.baseline, liveConfiguration: challengeLiveConfiguration) else {
       modeCompatibilityMessage = "本次配置未能应用，已保留当前测试；请检查配置版本或恢复状态。"
       return false
-    }
-    if TransientFontPersistencePolicy.requiresLocalFontDeactivation(
-      acceptedFamily: acceptedTransientFontFamily, persistedFamily: settings.installedPracticeFontName,
-      savesEffectiveSnapshot: appliesGlobalSettings && appliedPreset.settingsSnapshot != nil
-        && appliedPreset.configuration.challengeID == nil) {
-      settings.deactivateLocalPracticeFont()
     }
     if challenge != nil {
       let installed = settings.hasThresholdProfile
@@ -6269,7 +6256,7 @@ private struct ContentView: View {
 
   private func persistExplicitTestConfiguration() {
     guard settings.persistLiveConfiguration(challengeLiveConfiguration) else {
-      account.localNotices.post("当前实时配置未能完整保存；可能已有部分设置生效，请检查配置存储与本地字体选择。")
+      account.localNotices.post("当前实时配置未能完整保存；可能已有部分设置生效，请检查配置存储状态。")
       return
     }
     guard wordPractice != nil else { return }

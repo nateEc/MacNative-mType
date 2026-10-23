@@ -104,6 +104,7 @@ struct PreferencesView: View {
   @State private var customBackgroundMessage: String?
   @State private var showingCustomBackgroundImporter = false
   @State private var localPracticeFontMessage: String?
+  @State private var practiceFontNameDraft = ""
   @State private var showingLocalPracticeFontImporter = false
   @State private var installedFontFamilies: [String] = []
   @State private var showingInstalledFontPicker = false
@@ -119,6 +120,12 @@ struct PreferencesView: View {
 
   private var keyboardGuidePreferences: PracticeKeyboardGuidePreferences {
     .init(settings: settings)
+  }
+
+  private var fontPreferences: PracticeFontPreferences {
+    .init(settings: settings, onResult: { accepted in
+      localPracticeFontMessage = accepted ? nil : "请输入有效字体名称或选择可用字体；字号必须为有限正数。"
+    })
   }
 
   var body: some View {
@@ -532,7 +539,7 @@ struct PreferencesView: View {
           Text("每次接受输入时显示原创粒子轨迹；高档位会短暂抖动练习面板，并遵从 macOS“减少动态效果”。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Slider(value: $settings.fontSize, in: 18...42, step: 1) {
+          Slider(value: fontPreferences.size, in: 18...42, step: 1) {
             Text("练习字体大小")
           } minimumValueLabel: {
             Text("小")
@@ -541,20 +548,16 @@ struct PreferencesView: View {
           }
           Text("\(Int(settings.fontSize)) pt")
             .foregroundStyle(.secondary)
-          Picker("练习字体", selection: $settings.practiceFont) {
+          Picker("练习字体", selection: fontPreferences.design) {
             ForEach(PracticeFont.allCases) { font in
               Text(font.displayName).tag(font)
             }
           }
-          .onChange(of: settings.practiceFont) { _, _ in
-            settings.deactivateLocalPracticeFont()
-          }
           HStack {
-            TextField("本机字体名称（可选）", text: $settings.installedPracticeFontName)
+            TextField("本机字体名称（可选）", text: $practiceFontNameDraft)
               .textFieldStyle(.roundedBorder)
-              .onChange(of: settings.installedPracticeFontName) { _, _ in
-                settings.deactivateLocalPracticeFont()
-              }
+              .onSubmit { applyPracticeFontName() }
+            Button("应用") { applyPracticeFontName() }
             Button("浏览…") {
               installedFontFamilies = NativeFontCatalog.installedFamilies
               showingInstalledFontPicker = true
@@ -579,12 +582,12 @@ struct PreferencesView: View {
             Text("本地字体文件已保留但未启用；可随时重新启用或移除。")
               .font(.caption)
               .foregroundStyle(.secondary)
-          } else if settings.installedPracticeFontName.isEmpty {
+          } else if fontPreferences.familyName.isEmpty {
             Text("可输入已安装字体的家族名或 PostScript 名；留空使用上方系统设计。")
               .font(.caption)
               .foregroundStyle(.secondary)
-          } else if NativePracticeFont.isAvailable(settings.installedPracticeFontName) {
-            Text("正在使用本机字体：\(settings.installedPracticeFontName)")
+          } else if NativePracticeFont.isAvailable(fontPreferences.familyName) {
+            Text("正在使用本机字体：\(fontPreferences.familyName)")
               .font(.caption)
               .foregroundStyle(.secondary)
           } else {
@@ -2156,15 +2159,12 @@ struct PreferencesView: View {
     }
     .sheet(isPresented: $showingInstalledFontPicker) {
       NativeFontFamilyPicker(
-        selection: Binding(
-          get: { settings.installedPracticeFontName },
-          set: {
-            settings.deactivateLocalPracticeFont()
-            settings.installedPracticeFontName = $0
-          }),
+        selection: fontPreferences.installedSelection,
         families: installedFontFamilies)
     }
     .onAppear { customBackgroundURLDraft = settings.customBackgroundURL }
+    .onAppear { practiceFontNameDraft = fontPreferences.familyName }
+    .onChange(of: settings.preferenceFontFamilyName) { _, name in practiceFontNameDraft = name }
     .onDisappear { accountResultExportTask?.cancel() }
     .onChange(of: account.resultPublicationScope) { accountResultExportTask?.cancel() }
     .frame(width: 440)
@@ -2251,6 +2251,10 @@ struct PreferencesView: View {
     } catch {
       localPracticeFontMessage = error.localizedDescription
     }
+  }
+
+  private func applyPracticeFontName() {
+    if fontPreferences.applyName(practiceFontNameDraft) { practiceFontNameDraft = fontPreferences.familyName }
   }
 
   private func removeLocalPracticeFont() {

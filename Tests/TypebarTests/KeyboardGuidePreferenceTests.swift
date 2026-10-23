@@ -87,7 +87,7 @@ final class KeyboardGuidePreferenceTests: XCTestCase {
         settings.preferenceConfigurationSaves.register(owner: owner,
           keyboardGuideMode: { live.keyboardGuideMode(settings: settings) }) {
           saves += 1
-          XCTAssertTrue(settings.persistLiveConfiguration(live, hasActiveLocalFont: { false }))
+          XCTAssertTrue(settings.persistLiveConfiguration(live))
         }
         defer { settings.preferenceConfigurationSaves.remove(owner: owner) }
         let controls = PracticeKeyboardGuidePreferences(settings: settings)
@@ -148,7 +148,7 @@ final class KeyboardGuidePreferenceTests: XCTestCase {
     }
     XCTAssertTrue(preferences.contains("if settings.preferenceKeyboardGuideMode != .off"))
     let main = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    XCTAssertTrue(main.contains("keyboardGuideMode: { challengeLiveConfiguration.keyboardGuideMode(settings: settings) }"))
+    XCTAssertTrue(main.contains("keyboardGuideMode: { challengeLiveConfiguration.keyboardGuideMode(settings: settings) },"))
   }
 
   func testAllNativeKeyboardConfirmationsMatchPinnedIndividualSetters() throws {

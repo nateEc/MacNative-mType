@@ -118,8 +118,8 @@ enum NativePracticeFont {
   }
 }
 
-/// Challenge-local lookup bypasses the user's active imported font. It never
-/// installs or bundles Wingdings, and refuses a system fallback or variant.
+/// Checks availability of the requested challenge family, not the current
+/// render cascade. It never installs or bundles Wingdings or accepts a variant.
 enum WingdingsChallengeFont {
   static let familyName = "Wingdings"
 

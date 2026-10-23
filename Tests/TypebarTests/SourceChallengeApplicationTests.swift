@@ -335,7 +335,7 @@ final class SourceChallengeApplicationTests: XCTestCase {
     let begin = try XCTUnwrap(source.range(of: "private var effectiveKeyboardGuideMode:"))
     let end = try XCTUnwrap(source.range(of: "private func clearCommandFontPreview()"))
     let rendering = source[begin.lowerBound..<end.lowerBound]
-    XCTAssertTrue(rendering.contains("challengeLiveConfiguration.hasTransientFont(settings: settings)"))
+    XCTAssertTrue(rendering.contains("installedFontName: challengeLiveConfiguration.fontFamilyName(settings: settings)"))
     XCTAssertTrue(rendering.contains("challengeLiveConfiguration.keyboardGuideMode(settings: settings)"))
     XCTAssertFalse(rendering.contains("activeChallengeID =="))
     let forcedGuide = try XCTUnwrap(rendering.range(of: "modifiers.contains(.simonSays)"))
@@ -344,27 +344,23 @@ final class SourceChallengeApplicationTests: XCTestCase {
       "Inherited Wingdings visibility must not hide Simon's required guide")
   }
 
-  func testSceneHandsAcceptedFontToLocalSelectionOnlyAfterSettingsCommit() throws {
+  func testSceneSavesNamedConfigurationWithoutChangingLocalFileSelection() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     let start = try XCTUnwrap(source.range(of: "@discardableResult private func apply("))
     let body = source[start.lowerBound...]
-    let commit = try XCTUnwrap(body.range(of: "guard PresetSettingsApplication.commit("))
-    let handoff = try XCTUnwrap(body.range(of: "TransientFontPersistencePolicy.requiresLocalFontDeactivation("))
-    XCTAssertLessThan(commit.lowerBound, handoff.lowerBound)
-    XCTAssertTrue(body[handoff.lowerBound...].contains("settings.deactivateLocalPracticeFont()"))
+    XCTAssertTrue(body.contains("guard PresetSettingsApplication.commit("))
+    XCTAssertFalse(body.contains("TransientFontPersistencePolicy"))
+    XCTAssertFalse(body.contains("settings.deactivateLocalPracticeFont()"))
   }
 
-  func testFontHandoffRequiresExplicitEffectiveSnapshotAndMatchingAcceptedFamily() {
-    XCTAssertTrue(TransientFontPersistencePolicy.requiresLocalFontDeactivation(
-      acceptedFamily: "Wingdings", persistedFamily: "Wingdings", savesEffectiveSnapshot: true))
-    XCTAssertFalse(TransientFontPersistencePolicy.requiresLocalFontDeactivation(
-      acceptedFamily: "Wingdings", persistedFamily: "Wingdings", savesEffectiveSnapshot: false))
-    XCTAssertFalse(TransientFontPersistencePolicy.requiresLocalFontDeactivation(
-      acceptedFamily: nil, persistedFamily: "Wingdings", savesEffectiveSnapshot: true))
-    XCTAssertFalse(TransientFontPersistencePolicy.requiresLocalFontDeactivation(
-      acceptedFamily: "Wingdings", persistedFamily: "Georgia", savesEffectiveSnapshot: true))
+  func testChallengeNamedFontUsesTheSameLocalFileFirstCascadeAsOrdinaryPractice() {
+    let resolver = NativePracticeFont.Resolver(localFontName: { "Courier" }, installedFontName: { _ in "Menlo" })
+    for name in [WingdingsChallengeFont.familyName, "Georgia", ""] {
+      XCTAssertEqual(resolver.postScriptName(for: name), "Courier")
+      XCTAssertEqual(resolver.postScriptName(for: name, purpose: .catalogPreview), "Menlo")
+    }
   }
 
   func testWingdingsDisplaySnapshotOutlivesQualificationWithoutChangingPreferences() throws {

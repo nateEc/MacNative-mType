@@ -55,8 +55,7 @@ enum TypebarLocalPracticeFontStore {
       })
   }
 
-  /// Re-enables a font file that was deliberately retained after switching
-  /// back to a system or named font.
+  /// Re-enables a retained file, including selections disabled by older builds.
   @discardableResult
   static func activate() -> Bool {
     let preferred = storedFontURL
@@ -66,13 +65,6 @@ enum TypebarLocalPracticeFontStore {
     UserDefaults.standard.set(url.lastPathComponent, forKey: selectedDefaultsKey)
     setEnabled(true)
     return true
-  }
-
-  /// Keeps the local file private and intact while allowing an explicit font
-  /// choice to take effect.
-  static func deactivate() {
-    guard hasStoredFont else { return }
-    setEnabled(false)
   }
 
   static func remove() throws {

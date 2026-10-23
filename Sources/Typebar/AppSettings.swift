@@ -2417,9 +2417,7 @@ final class AppSettings {
   /// Persist the configuration already in use, not a replay of its setters.
   /// The separate selection store is committed by the caller after success.
   @discardableResult
-  func persistLiveConfiguration(_ live: ChallengeLiveConfigurationState,
-    hasActiveLocalFont: (() -> Bool)? = nil,
-    deactivateLocalFont: (() -> Bool)? = nil) -> Bool {
+  func persistLiveConfiguration(_ live: ChallengeLiveConfigurationState) -> Bool {
     guard !savingLiveConfiguration, live.canCaptureForPersistence(settings: self) else { return false }
     let before = snapshot
     var current = live.snapshot(settings: self)
@@ -2428,7 +2426,6 @@ final class AppSettings {
       Set(canonicalModifiers) == Set(current.testModifiers) else { return false }
     current.testModifiers = canonicalModifiers
     guard AppSettings(validating: current, defaults: defaults).snapshot == current else { return false }
-    let acceptedFont = live.hasTransientFont(settings: self) ? live.fontFamilyName(settings: self) : nil
     if hasThresholdProfile {
       guard thresholdSourceState != nil,
         case .available(let stored) = thresholdProfileRead, stored == before,
@@ -2461,17 +2458,6 @@ final class AppSettings {
     if keyboardGuideMode != current.keyboardGuideMode { keyboardGuideMode = current.keyboardGuideMode }
     if showKeyboardGuide != current.showKeyboardGuide { showKeyboardGuide = current.showKeyboardGuide }
     guard snapshot == current else { return false }
-    if TransientFontPersistencePolicy.requiresLocalFontDeactivation(acceptedFamily: acceptedFont,
-      persistedFamily: current.installedPracticeFontName, savesEffectiveSnapshot: true),
-      (hasActiveLocalFont ?? { self.isUsingLocalPracticeFont })() {
-      // The local file is retained. This is an ordered sidecar handoff, not a
-      // cross-store transaction; a failed handoff must be reported as partial.
-      let handedOff = (deactivateLocalFont ?? {
-        self.deactivateLocalPracticeFont()
-        return !self.isUsingLocalPracticeFont
-      })()
-      return handedOff && snapshot == current
-    }
     return true
   }
 
@@ -2735,32 +2721,24 @@ final class AppSettings {
     localBackgroundRevision &+= 1
   }
 
-  func importLocalPracticeFont(data: Data, originalFilename: String) throws {
-    _ = try TypebarLocalPracticeFontStore.save(data, originalFilename: originalFilename)
+  func importLocalPracticeFont(data: Data, originalFilename: String,
+    save: (Data, String) throws -> Void = { _ = try TypebarLocalPracticeFontStore.save($0, originalFilename: $1) }) throws {
+    try save(data, originalFilename)
     localPracticeFontRevision &+= 1
-    practiceFontApplicationRevision &+= 1
   }
 
   @discardableResult
-  func activateLocalPracticeFont() -> Bool {
-    let activated = TypebarLocalPracticeFontStore.activate()
+  func activateLocalPracticeFont(activate: () -> Bool = TypebarLocalPracticeFontStore.activate) -> Bool {
+    let activated = activate()
     if activated {
       localPracticeFontRevision &+= 1
-      practiceFontApplicationRevision &+= 1
     }
     return activated
   }
 
-  func deactivateLocalPracticeFont() {
-    TypebarLocalPracticeFontStore.deactivate()
+  func removeLocalPracticeFont(remove: () throws -> Void = TypebarLocalPracticeFontStore.remove) throws {
+    try remove()
     localPracticeFontRevision &+= 1
-    if !savingLiveConfiguration { practiceFontApplicationRevision &+= 1 }
-  }
-
-  func removeLocalPracticeFont() throws {
-    try TypebarLocalPracticeFontStore.remove()
-    localPracticeFontRevision &+= 1
-    practiceFontApplicationRevision &+= 1
   }
 
   func resolvedTheme(for systemColorScheme: ColorScheme) -> ResolvedTheme {
@@ -3152,5 +3130,9 @@ final class AppSettings {
 
   var preferenceKeyboardGuideMode: KeyboardGuideMode {
     preferenceConfigurationSaves.keyboardGuideMode ?? effectiveKeyboardGuideMode
+  }
+
+  var preferenceFontFamilyName: String {
+    preferenceConfigurationSaves.fontFamilyName ?? installedPracticeFontName
   }
 }

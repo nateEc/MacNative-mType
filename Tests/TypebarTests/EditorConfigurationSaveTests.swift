@@ -23,11 +23,11 @@ final class EditorConfigurationSaveTests: XCTestCase {
         XCTAssertEqual(settings.keyboardGuideScale, 1.4); calls += 1
       }))
       XCTAssertTrue(FontFamilyNameCommandPolicy.apply("Independent Font", to: settings,
-        deactivateLocalFont: {}, onConfigurationSave: {
+        onConfigurationSave: {
           XCTAssertEqual(settings.installedPracticeFontName, "Independent Font"); calls += 1
         }))
       XCTAssertTrue(FontFamilyCommandApplication.apply(.systemDesign(.monospaced), to: settings,
-        deactivateLocalFont: {}, onConfigurationSave: {
+        onConfigurationSave: {
           XCTAssertEqual(settings.installedPracticeFontName, "")
           XCTAssertEqual(settings.practiceFont, .monospaced); calls += 1
         }))
@@ -43,21 +43,18 @@ final class EditorConfigurationSaveTests: XCTestCase {
     withSettings { settings, defaults in
       let before = defaults.data(forKey: "appSettings.v1")
       var commits = 0
-      var deactivations = 0
       let commit = { commits += 1 }
       XCTAssertFalse(PaceCustomSpeedPolicy.apply(.infinity, to: settings, activateCustom: true, onConfigurationSave: commit))
       for value in [Double.nan, -1, 1.25, 3.6] {
         XCTAssertFalse(KeyboardGuideScalePolicy.apply(value, to: settings, onConfigurationSave: commit))
       }
-      XCTAssertFalse(FontFamilyNameCommandPolicy.apply("\n", to: settings,
-        deactivateLocalFont: { deactivations += 1 }, onConfigurationSave: commit))
+      XCTAssertFalse(FontFamilyNameCommandPolicy.apply("\n", to: settings, onConfigurationSave: commit))
       for target: FontFamilyCommandTarget in [.installedName("Absent Font"), .customName, .browseInstalled] {
         XCTAssertFalse(FontFamilyCommandApplication.apply(target, to: settings,
-          isFontAvailable: { _ in false }, deactivateLocalFont: { deactivations += 1 }, onConfigurationSave: commit))
+          isFontAvailable: { _ in false }, onConfigurationSave: commit))
       }
       XCTAssertFalse(CustomBackgroundCommandEditorPolicy.apply("NaN", kind: .blur, to: settings, onConfigurationSave: commit))
       XCTAssertEqual(commits, 0)
-      XCTAssertEqual(deactivations, 0)
       XCTAssertEqual(defaults.data(forKey: "appSettings.v1"), before)
     }
   }
@@ -90,21 +87,21 @@ final class EditorConfigurationSaveTests: XCTestCase {
     }
   }
 
-  func testInstalledFontAdmissionPrecedesDeactivationAndTheFinalCommit() {
+  func testInstalledFontAdmissionPrecedesTheFinalCommitWithoutChangingFileSelection() {
     withSettings { settings, _ in
       var events: [String] = []
       XCTAssertTrue(FontFamilyCommandApplication.apply(.installedName("Available Font"), to: settings,
-        isFontAvailable: { $0 == "Available Font" }, deactivateLocalFont: { events.append("deactivate") },
+        isFontAvailable: { $0 == "Available Font" },
         onConfigurationSave: {
           XCTAssertEqual(settings.installedPracticeFontName, "Available Font")
           events.append("save")
         }))
-      XCTAssertEqual(events, ["deactivate", "save"])
+      XCTAssertEqual(events, ["save"])
       XCTAssertFalse(FontFamilyCommandApplication.apply(.installedName("Removed Font"), to: settings,
-        isFontAvailable: { _ in false }, deactivateLocalFont: { events.append("unexpected deactivate") },
+        isFontAvailable: { _ in false },
         onConfigurationSave: { events.append("unexpected save") }))
       XCTAssertEqual(settings.installedPracticeFontName, "Available Font")
-      XCTAssertEqual(events, ["deactivate", "save"])
+      XCTAssertEqual(events, ["save"])
     }
   }
 }

@@ -42,16 +42,6 @@ enum FontFamilyCommandPreviewPolicy {
   }
 }
 
-/// An explicitly saved effective named font must not be hidden on relaunch
-/// by a previously enabled file. The file itself remains available to reselect.
-enum TransientFontPersistencePolicy {
-  static func requiresLocalFontDeactivation(acceptedFamily: String?, persistedFamily: String,
-    savesEffectiveSnapshot: Bool) -> Bool {
-    guard savesEffectiveSnapshot, let acceptedFamily, !acceptedFamily.isEmpty else { return false }
-    return acceptedFamily == persistedFamily
-  }
-}
-
 /// A reference preview/clear changes presentation only. Clearing uses the
 /// latest saved family (not the opening snapshot or imported-file cascade).
 struct FontFamilyCommandPreviewState {
@@ -194,21 +184,17 @@ enum FontFamilyCommandApplication {
   static func apply(
     _ target: FontFamilyCommandTarget, to settings: AppSettings,
     isFontAvailable: (String) -> Bool = NativePracticeFont.isAvailable,
-    deactivateLocalFont: () -> Void = TypebarLocalPracticeFontStore.deactivate,
     onConfigurationSave: () -> Void = {}
   ) -> Bool {
     switch target {
     case .systemDesign(let font):
-      deactivateLocalFont()
       settings.installedPracticeFontName = ""
       settings.practiceFont = font
     case .knownIdentifier(let identifier):
       guard FontFamilyCommandCatalog.fixedKnownFontIDs.contains(identifier) else { return false }
-      deactivateLocalFont()
       settings.installedPracticeFontName = identifier
     case .installedName(let name):
       guard isFontAvailable(name) else { return false }
-      deactivateLocalFont()
       settings.installedPracticeFontName = name
     case .customName, .browseInstalled, .localFile, .useLocalFile, .removeLocalFile:
       return false
@@ -230,11 +216,9 @@ enum FontFamilyNameCommandPolicy {
   @MainActor
   static func apply(
     _ rawValue: String, to settings: AppSettings,
-    deactivateLocalFont: () -> Void = TypebarLocalPracticeFontStore.deactivate,
     onConfigurationSave: () -> Void = {}
   ) -> Bool {
     guard let value = normalized(rawValue) else { return false }
-    deactivateLocalFont()
     settings.installedPracticeFontName = value
     onConfigurationSave()
     return true

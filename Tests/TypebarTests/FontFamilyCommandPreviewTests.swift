@@ -156,8 +156,9 @@ import XCTest
   }
 
   func testPinnedCompletePreviewAndDismissalSourceTrajectories() throws {
-    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned reference checkout") }
-    struct Fixture: Decodable { let local: Bool, preferred: Bool, hideRoute: String, restored: String }
+    let environment = ProcessInfo.processInfo.environment
+    guard let reference = environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] ?? environment["TYPEBAR_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned reference checkout") }
+    struct Fixture: Decodable { let local: Bool, preferred: Bool, hideRoute: String, restored: String, reapplied: String }
     struct Output: Decodable { let fixtures: [Fixture] }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let process = Process(), out = Pipe()
@@ -174,6 +175,9 @@ import XCTest
       state.clear(savedFont: .monospaced, savedName: "Menlo")
       XCTAssertEqual(state.target, .installedName("Menlo"))
       XCTAssertTrue(value.restored.hasPrefix("\"Menlo\""))
+      XCTAssertTrue(value.reapplied.hasPrefix(value.local ? "\"LOCALCUSTOM\"" : "\"Menlo\""))
+      let resolver = NativePracticeFont.Resolver(localFontName: { value.local ? "Courier" : nil }, installedFontName: { _ in "Menlo" })
+      XCTAssertEqual(resolver.postScriptName(for: "Menlo"), value.local ? "Courier" : "Menlo")
       XCTAssertFalse(value.restored.contains("LOCALCUSTOM")); XCTAssertFalse(value.restored.contains("Noto Sans Lao"))
     }
   }

@@ -78,7 +78,10 @@ for (const hideRoute of ['store', 'chain', 'legacy']) {
   assert.deepEqual(modalEvents, [hideRoute]); assert.ok(hints > 0); assert.ok(themeClears > 0);
   const afterHide = css;
   context.clearFontPreview(); assert.equal(css, afterHide, 'Repeated clear is inert');
-  fixtures.push({local, preferred, hideRoute, initial, restored: afterHide, traceCount: trace.length});
+  await context.applyFontFamily();
+  assert.ok(css.startsWith(local ? '"LOCALCUSTOM"' : '"Menlo"'));
+  assert.equal(fileReads, 2, 'A later real application still uses the retained local file');
+  fixtures.push({local, preferred, hideRoute, initial, restored: afterHide, reapplied: css, traceCount: trace.length});
 }
 verify();
 if (option) console.log(JSON.stringify({pin, fixtures}));
