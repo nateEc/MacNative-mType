@@ -1,5 +1,17 @@
 # 阈值源状态与迁移契约
 
+## 图片所有权绑定的动画时间线（追加阶段）
+
+固定 Monkeytype `theme-controller.ts::applyCustomBackground` 每次创建普通 img 并 replaceChildren，没有自行解码或按固定帧率播放。原生时间线必须绑定准备好的同一 Image，采样直接返回该 Image 的 Frame；不能在采样时传入另一张图片、按重绘次数推进或修改原始配置／容器。
+
+计时政策参考固定 [WebKit ImageDecoderCG](https://github.com/WebKit/WebKit/blob/de2d3ea41ff5d6c83696f3aedd1155dab8a0e1d5/Source/WebCore/platform/graphics/cg/ImageDecoderCG.cpp) 的 ImageIO 路径：优先未截断 delay，其次已截断 delay，缺失按 0；按 Float 精度读取后，小于 11ms 使用 100ms。读取的是 ImageIO 输出的 loop 元数据，不自行给 GIF 再加一；缺失为一遍，0 无限，正数为遍数，见同版本 [ImageFrameAnimator](https://github.com/WebKit/WebKit/blob/de2d3ea41ff5d6c83696f3aedd1155dab8a0e1d5/Source/WebCore/platform/graphics/ImageFrameAnimator.cpp) 和 [ImageTypes](https://github.com/WebKit/WebKit/blob/de2d3ea41ff5d6c83696f3aedd1155dab8a0e1d5/Source/WebCore/platform/graphics/ImageTypes.h)。这是该版本 WebKit／ImageIO 路径的契约依据，不是所有浏览器、原始 GIF 字节循环字段或当前本机 Safari 已逐帧实测的结论。
+
+确定性 elapsed 以秒传入，须有限且非负；没有创建计时器，也不决定后台暂停、Reduce Motion、加载代次或刷新率。边界使用左闭右开区间，漏掉的唤醒直接投影当前帧，不逐一补播；无限循环不把巨大 elapsed 转为整数圈数。返回下一次实际帧变化的相对等待时间，结束后保留最后一帧且不再安排无效唤醒。静态和非支持动画容器不把其他页／辅助图当成动画，其他格式的主图选择仍需另行接通。
+
+当前三种计时字典为 GIF、PNG/APNG 和 WebP。负值、非有限时长／循环或非整数循环等不受支持元数据显式失败，不借用其他图片历史；超出数值表达范围也不静默截短。帧解码仍使用既有资源准备器；完整画布的增量帧、透明 blend、disposal、多种编码器及全部系统行为必须另外建立像素证据，不因两张不透明全帧测试而宣称合成完成。生产资源宿主、时间原点／生命周期、异步准备、动画缓存和可见窗口尚未切流。
+
+自制六帧 GIF 另外以显式子矩形和逐字面 LZW 数据覆盖保留、清背景、恢复先前画布、透明索引不覆盖已有像素；像素预期独立列出，不让系统编码器消除这些增量。依据 [GIF89a Graphic Control Extension](https://www.w3.org/Graphics/GIF/spec-gif89a.txt) 的 disposal 与透明字段语义，实际准备帧和按时间投影后的视口分别校验。当前 ImageIO 已返回这些样本的完整合成画布，时间线不再自行叠加；证据仅覆盖此 GIF 样本，不外推所有 APNG／WebP blend／disposal、损坏文件和最低系统。
+
 ## 准备帧到单帧视口像素（追加阶段）
 
 Rasterizer 新增 renderViewport，显式接受 prepared Frame、Geometry.Layout、独立 Filter 声明、fit、逻辑 viewport、pointsPerRem 和 pixelsPerPoint，不重读磁盘／网络或更改配置。它消费加载后的帧，不决定图片更换、声明历史、加载中／失败通知或动画时钟，也未用于旧生产界面。调用方须在文件成功提交之前准备可失败的结果，不能把此同步渲染塞到提交后的切流步骤中。
