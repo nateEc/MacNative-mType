@@ -16,7 +16,9 @@ struct PracticePromptViewport<Content: View>: View {
   @State private var measuredHeight: CGFloat?
 
   var body: some View {
-    ScrollView {
+    // The source words wrapper clips programmatically; a native legacy
+    // scrollbar must not reserve a gutter inside its configured ch width.
+    ScrollView(.vertical, showsIndicators: false) {
       content().background {
         if measuresTextRows {
           GeometryReader { proxy in

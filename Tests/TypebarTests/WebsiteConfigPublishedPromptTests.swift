@@ -485,9 +485,28 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
       func width() -> CGFloat {
         all ? model.ready.last?.width ?? 0 : descendants(host, PromptFieldNativeView.self).first?.bounds.width ?? 0
       }
+      var boundedScroll: NSScrollView?
+      if !all {
+        wait(host) { !self.descendants(host, PromptFieldNativeView.self).isEmpty }
+        let field = try XCTUnwrap(descendants(host, PromptFieldNativeView.self).first)
+        let scroll = try XCTUnwrap(field.enclosingScrollView)
+        scroll.scrollerStyle = .legacy
+        boundedScroll = scroll
+      }
       wait(host) { abs(width() - 512.4) < 1 }
+      XCTAssertEqual(width(), 512.4, accuracy: 1, "Initial width; all=\(all), host=\(host.bounds), fields=\(descendants(host, PromptFieldNativeView.self).map(\.frame)), ready=\(model.ready.last as Any)")
       model.publication = second
       wait(host) { abs(width() - 768.6) < 1 }
+      XCTAssertEqual(width(), 768.6, accuracy: 1, "Replacement width; all=\(all), host=\(host.bounds), fields=\(descendants(host, PromptFieldNativeView.self).map(\.frame)), ready=\(model.ready.last as Any)")
+      if let scroll = boundedScroll {
+        XCTAssertEqual(scroll.contentSize.width, scroll.bounds.width, accuracy: 1,
+          "Legacy indicators must not consume the configured prompt width")
+        scroll.scrollerStyle = .overlay
+        wait(host) { abs(width() - 768.6) < 1 }
+        XCTAssertEqual(scroll.contentSize.width, scroll.bounds.width, accuracy: 1)
+        scroll.scrollerStyle = .legacy
+        wait(host) { abs(width() - 768.6) < 1 }
+      }
       XCTAssertEqual(model.session.typed, "0"); XCTAssertEqual(model.session.automaticInputAttemptID, attempt)
       XCTAssertFalse(window.isVisible)
     }

@@ -108,7 +108,8 @@ struct TypebarApp: App {
         lineSpacing: $3, rightToLeft: $4, joinsLetters: $5)
     }, promptRender: @escaping @MainActor (TypingSession, String?, PromptRenderStyle) -> PromptRendering = {
       PromptRenderPlan(session: $0, composition: $1, style: $2).render()
-    }, wholePreviewViewportEnabled: Bool = false) -> some View {
+    }, wholePreviewViewportEnabled: Bool = false,
+    publishedPresentation: WebsiteConfigPublishedPresentation? = nil) -> some View {
     ContentView(settings: settings, account: account, announcements: announcements,
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
       systemAppearance: systemAppearance, liveContentFetch: liveContentFetch,
@@ -116,7 +117,7 @@ struct TypebarApp: App {
       liveSessionPrepare: liveSessionPrepare,
       wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender,
       wholePreviewLayout: wholePreviewLayout, promptRender: promptRender,
-      wholePreviewViewportEnabled: wholePreviewViewportEnabled)
+      wholePreviewViewportEnabled: wholePreviewViewportEnabled, publishedPresentation: publishedPresentation)
   }
 
   private static let modelConfiguration = ModelConfiguration(
@@ -1242,6 +1243,7 @@ private struct ContentView: View {
   let wholePreviewLayout: @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout
   let promptRender: @MainActor (TypingSession, String?, PromptRenderStyle) -> PromptRendering
   let wholePreviewViewportEnabled: Bool
+  let publishedPresentation: WebsiteConfigPublishedPresentation?
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
@@ -1516,11 +1518,18 @@ private struct ContentView: View {
         .padding(12)
     }
     .tint(activeTheme.accent)
-    .preferredColorScheme(themePreviewPresentation.preferredColorScheme)
+    .preferredColorScheme(publishedPresentation?.appearance.theme.colorScheme ?? themePreviewPresentation.preferredColorScheme)
+  }
+
+  private var appearanceObservedPracticeLayout: some View {
+    practiceLayout
+    .onChange(of: systemColorScheme) { _, scheme in
+      _ = publishedPresentation?.updateSystemAppearance(isDark: scheme == .dark)
+    }
   }
 
   private var focusedPracticeContent: some View {
-    practiceLayout
+    appearanceObservedPracticeLayout
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: showingCommandPalette) { _, showing in
       if showing { visualFocus.retire() }
@@ -1870,17 +1879,26 @@ private struct ContentView: View {
       lifecycleContent
         .frame(maxWidth: .infinity)
     }
-    .background(
-      CustomPracticeBackground(
-        fallbackStyle: settings.practiceBackdrop, theme: activeTheme,
-        reduceMotion: settings.reducePracticeMotion,
-        remoteURL: settings.customBackgroundURL, fit: settings.customBackgroundFit,
-        filter: settings.customBackgroundFilter,
-        localImageRevision: settings.localBackgroundRevision,
-        localBackgroundStore: settings.localBackgroundStore,
-        onFailure: account.localNotices.backgroundFailureSink(),
-        applicationID: settings.customBackgroundApplicationID)
-    )
+    .background {
+      if let publishedPresentation {
+        if let background = try? publishedPresentation.background(fallbackStyle: settings.practiceBackdrop,
+          reduceMotion: settings.reducePracticeMotion, onFailure: account.localNotices.backgroundFailureSink()) {
+          background
+        } else {
+          Label("完整配置背景暂不可用，请重新应用配置。", systemImage: "exclamationmark.triangle")
+        }
+      } else {
+        CustomPracticeBackground(
+          fallbackStyle: settings.practiceBackdrop, theme: activeTheme,
+          reduceMotion: settings.reducePracticeMotion,
+          remoteURL: settings.customBackgroundURL, fit: settings.customBackgroundFit,
+          filter: settings.customBackgroundFilter,
+          localImageRevision: settings.localBackgroundRevision,
+          localBackgroundStore: settings.localBackgroundStore,
+          onFailure: account.localNotices.backgroundFailureSink(),
+          applicationID: settings.customBackgroundApplicationID)
+      }
+    }
     .modifier(PracticeAnimationFrameRate(settings: settings, timerHealth: timerHealth))
     .toolbar {
       Button("命令", systemImage: "command") { showingCommandPalette = true }
@@ -3085,7 +3103,7 @@ private struct ContentView: View {
   private var typingPanel: some View {
     // The admitted viewport owns its ink. Do not build an unused complete
     // presentation; the fallback still captures one fresh rendering here.
-    let rendering: PromptRendering? = usesWholePreviewViewport ? nil : renderedPrompt
+    let rendering: PromptRendering? = usesWholePreviewViewport || publishedPresentation != nil ? nil : renderedPrompt
     let ignoresSystemReducedMotion = !VisualFunboxReducedMotionPolicy
       .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers)
     return ZStack(alignment: .topLeading) {
@@ -3106,7 +3124,9 @@ private struct ContentView: View {
             ignoresSystemReducedMotion: ignoresSystemReducedMotion
           ) {
             Group {
-              if usesWholePreviewViewport {
+              if let publishedPresentation {
+                publishedPracticePrompt(publishedPresentation)
+              } else if usesWholePreviewViewport {
                 practicePrompt(rendering: nil)
               } else if let rendering, !PracticeLineDisplayPolicy.needsOuterViewport(showsAllLines: showsAllPracticeLines,
                 usesTape: usesTapePractice, usesASL: practiceVisualEffect.usesASL, usesChoo: practiceVisualEffect.usesChoo) {
@@ -3135,7 +3155,7 @@ private struct ContentView: View {
         }
       }
 
-      if settings.compositionDisplayStyle == .below {
+      if practiceCompositionDisplayStyle == .below {
         let focused = inputHasFocus && typingWindowHasFocus
         BelowCompositionPrompt(text: compositionText,
           font: practicePromptNSFont(size: settings.fontSize), color: NSColor(activeTheme.secondaryText),
@@ -3151,10 +3171,11 @@ private struct ContentView: View {
       }
 
       NativeTypingInput(
-        focusRequest: focusRequest, acceptsTextInput: !isPreparingPracticePrompt,
+        focusRequest: focusRequest, acceptsTextInput: !isPreparingPracticePrompt
+          && (publishedPresentation == nil || PromptFieldProjectionPolicy.supports(session.configuration)),
         insertionAnchor: promptInsertionAnchor,
         insertionAttemptID: session.automaticInputAttemptID,
-        compositionDisplayStyle: settings.compositionDisplayStyle,
+        compositionDisplayStyle: practiceCompositionDisplayStyle,
         quickRestartKey: settings.quickRestartKey,
         keyboardInputMapping: effectiveKeyboardInputMapping,
         oppositeShiftKeymap: settings.keyboardGuideLayoutSource.oppositeShiftMapping(
@@ -3207,7 +3228,7 @@ private struct ContentView: View {
         },
         onCompositionStarted: {
           guard !isPreparingPracticePrompt else { return }
-          if wholePreviewViewportEnabled, viewportFallbackAttemptID != session.automaticInputAttemptID {
+          if usesPreparedPromptViewport, viewportFallbackAttemptID != session.automaticInputAttemptID {
             viewportFallbackPosition.capture(attemptID: session.automaticInputAttemptID, targetID: session.promptTargetID)
           }
           preparedWholePreviewRendering = nil
@@ -3218,7 +3239,7 @@ private struct ContentView: View {
         },
         onCompositionChanged: {
           guard !isPreparingPracticePrompt else { return }
-          if wholePreviewViewportEnabled, !$0.isEmpty,
+          if usesPreparedPromptViewport, !$0.isEmpty,
             viewportFallbackAttemptID != session.automaticInputAttemptID {
             viewportFallbackAttemptID = session.automaticInputAttemptID
           }
@@ -3352,7 +3373,7 @@ private struct ContentView: View {
       }
     }
     .overlay(alignment: .bottomLeading) {
-      if settings.compositionDisplayStyle != .below {
+      if practiceCompositionDisplayStyle != .below {
         practiceStatusBadges.padding(12)
       }
     }
@@ -3412,6 +3433,86 @@ private struct ContentView: View {
       followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: session.configuration.mode,
         slowTimer: timerHealth.usesSlowTimer, showAllLines: settings.showAllPracticeLines),
       caretMotion: promptCaretMotion, centersActiveLine: !settings.showAllPracticeLines,
+      wrapperRevision: settings.practiceWrapperRevision)
+  }
+
+  /// Additive cutover seam: the real page keeps its input/session ownership.
+  /// Unsupported routes fail visibly rather than borrowing legacy resources.
+  private func publishedPracticePrompt(_ presentation: WebsiteConfigPublishedPresentation) -> AnyView {
+    do {
+      if usesWholePreviewViewport {
+        return AnyView(try presentation.wholePreview(session: session,
+          carets: { font, p in publishedCarets(font: font, presentation: p) },
+          wrapLayout: promptInputWrapLayout, fallbackPosition: viewportFallbackPosition,
+          onFailure: { attempt in
+            guard session.automaticInputAttemptID == attempt, viewportFallbackAttemptID != attempt else { return }
+            viewportFallbackPosition.capture(attemptID: attempt, targetID: session.promptTargetID)
+            viewportFallbackAttemptID = attempt; viewportReadinessAttemptID = nil
+          }, onReady: { ready in
+            guard viewportReadinessAttemptID == ready.attemptID,
+              session.automaticInputAttemptID == ready.attemptID, session.promptTargetID == ready.targetID,
+              promptRenderStyle == ready.style, practicePromptNSFont(size: settings.fontSize) == ready.font else { return }
+            viewportReadinessAttemptID = nil; requestTypingFocus()
+          }))
+      }
+      return AnyView(try presentation.inline(session: session, composition: compositionText,
+        carets: { _, font, p in publishedCarets(font: font, presentation: p) },
+        retirement: { rendering, p in publishedLineScroll(rendering, presentation: p) },
+        wrapLayout: promptInputWrapLayout, fallbackPosition: showsAllPracticeLines ? viewportFallbackPosition : nil,
+        latestProjection: {
+          let current = session, marked = compositionText
+          let rendering = renderedPrompt(for: current, composition: marked)
+          return TapePromptProjection.snapshot(session: current, composition: marked, rendering: rendering,
+            retirement: publishedLineScroll(rendering, presentation: presentation.publication.draft.presentation,
+              session: current))
+        }, onTapeWordsRemoved: { session.removeTapePromptWords($0) }))
+    } catch {
+      return AnyView(Label("完整配置提示暂不可用，请重新应用配置。", systemImage: "exclamationmark.triangle")
+        .accessibilityIdentifier("published-config-prompt-unavailable"))
+    }
+  }
+
+  private var publishedReducesMotion: Bool {
+    settings.reducePracticeMotion || (systemReduceMotion && VisualFunboxReducedMotionPolicy
+      .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers))
+  }
+
+  private func publishedCarets(font: NSFont, presentation p: WebsiteConfigNativePresentation) -> PromptCaretNativeView.Configuration {
+    var config = PromptCaretNativeView.Configuration(text: AttributedString(), mainOffset: nil, paceOffset: nil,
+      mainStyle: p.caretStyle, paceStyle: p.paceCaretStyle, font: font,
+      lineSpacing: session.configuration.usesJoiningScriptPrompt ? 8 : 12,
+      rightToLeft: session.configuration.usesRightToLeftPrompt,
+      accent: activeTheme.caret, motion: p.smoothCaretMotion, reducesMotion: publishedReducesMotion,
+      frameRate: timerHealth.animationFrameRate(requested: settings.animationFrameRate,
+        settingsRevision: settings.animationFrameRateRevision),
+      attemptID: session.automaticInputAttemptID, coordinator: promptCaretMotion,
+      firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
+      latestInput: { .init(attemptID: session.automaticInputAttemptID,
+        typed: session.typed, composition: compositionText, glyphID: nil) },
+      latestGlyphID: { currentPromptGlyphIndex },
+      paceFrame: p.paceCaretStyle.drawsMarker ? { paceCaretInterpolation() } : nil,
+      mainPresentation: { .init(
+        isVisible: (inputHasFocus || showsVirtualKeyboard) && typingWindowHasFocus && !session.isFinished,
+        isBlinking: visualFocus.caretIsBlinking, revision: visualFocus.caretBlinkRevision) },
+      mainGlyphID: currentPromptGlyphIndex)
+    config.fieldDirectionPerGlyph = session.configuration.mode == .zen
+      || session.configuration.mode == .custom || session.configuration.language == .mixedLanguages
+    config.automaticallyPresents = p.caretStyle.drawsMarker || p.paceCaretStyle.drawsMarker
+    config.insertionAnchor = promptInsertionAnchor
+    return config
+  }
+
+  private func publishedLineScroll(_ rendering: PromptRendering, presentation p: WebsiteConfigNativePresentation,
+    session capturedSession: TypingSession? = nil) -> PromptLineScrollContext {
+    let current = capturedSession ?? session, field = current.promptCompositionField
+    return .init(attemptID: current.automaticInputAttemptID, activeWordID: field?.index,
+      characterOffsets: rendering.compositionTextMap?.fieldCharacterOffsets ?? [:],
+      smoothScroll: p.smoothPracticeLineScroll, reducesMotion: publishedReducesMotion,
+      words: PromptLineScrollWord.compositionFields(field), firstRetainedWordIndex: current.firstRetainedPromptWordIndex,
+      onRetire: { session.retirePromptWords($0) },
+      followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: current.configuration.mode,
+        slowTimer: timerHealth.usesSlowTimer, showAllLines: p.showAllPracticeLines),
+      caretMotion: promptCaretMotion, centersActiveLine: !p.showAllPracticeLines,
       wrapperRevision: settings.practiceWrapperRevision)
   }
 
@@ -3565,6 +3666,7 @@ private struct ContentView: View {
   }
 
   private func practicePromptNSFont(size: CGFloat) -> NSFont {
+    if let font = publishedPresentation?.publication.font?.renderingFont { return font }
     if let font = FontFamilyCommandPreviewPolicy.font(
         for: commandFontPreview.target, size: size, fallback: settings.practiceFont) {
       return font
@@ -3755,7 +3857,12 @@ private struct ContentView: View {
   }
 
   private var promptRenderStyle: PromptRenderStyle {
-    PromptRenderStyle(theme: activeTheme, fontSize: settings.fontSize,
+    if let publishedPresentation,
+      let inputs = try? WebsiteConfigPublishedPromptInputs(publication: publishedPresentation.publication,
+        owner: publishedPresentation.publication.owner) {
+      return inputs.style(theme: activeTheme)
+    }
+    return PromptRenderStyle(theme: activeTheme, fontSize: settings.fontSize,
       flipTestColors: settings.flipTestColors, colorfulMode: settings.colorfulMode,
       typedCharacterEffect: settings.typedCharacterEffect,
       compositionDisplayStyle: settings.compositionDisplayStyle,
@@ -3809,18 +3916,32 @@ private struct ContentView: View {
   }
 
   private var usesTapePractice: Bool {
-    settings.practiceTapeMode != .off
+    practiceTapeMode != .off
+  }
+
+  private var practiceTapeMode: PracticeTapeMode {
+    publishedPresentation?.publication.draft.presentation.practiceTapeMode ?? settings.practiceTapeMode
+  }
+  private var practiceShowsAllSetting: Bool {
+    publishedPresentation?.publication.draft.presentation.showAllPracticeLines ?? settings.showAllPracticeLines
+  }
+  private var practiceCompositionDisplayStyle: CompositionDisplayStyle {
+    publishedPresentation?.publication.draft.presentation.compositionDisplayStyle ?? settings.compositionDisplayStyle
   }
 
   private var showsAllPracticeLines: Bool {
     PracticeLineDisplayPolicy.shouldShowAllLines(
-      settingEnabled: settings.showAllPracticeLines,
-      tapeMode: settings.practiceTapeMode,
+      settingEnabled: practiceShowsAllSetting,
+      tapeMode: practiceTapeMode,
       configuration: session.configuration)
   }
 
+  private var usesPreparedPromptViewport: Bool {
+    wholePreviewViewportEnabled || publishedPresentation != nil
+  }
+
   private var usesWholePreviewViewport: Bool {
-    wholePreviewViewportEnabled && showsAllPracticeLines && !isPreparingWholePreview
+    usesPreparedPromptViewport && showsAllPracticeLines && !isPreparingWholePreview
       && !session.isFinished && compositionText.isEmpty && !usesTapePractice
       && !practiceVisualEffect.usesASL && !practiceVisualEffect.usesChoo
       && viewportFallbackAttemptID != session.automaticInputAttemptID
@@ -4600,7 +4721,7 @@ private struct ContentView: View {
     activeSessionTags = settings.activeResultTags
     let preparesWholePreview = WholePreviewWordPreparation.usesAsyncPreparation(
       configuration: configuration,
-      showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
+      showAllLines: practiceShowsAllSetting && practiceTapeMode == .off)
     isPreparingWholePreview = preparesWholePreview
     session = preparesWholePreview
       ? TypingSession(configuration: configuration, prompt: "", weakSpotScores: weakSpotScores,
@@ -4615,7 +4736,7 @@ private struct ContentView: View {
       quote: selectedQuote,
       weakSpotScores: weakSpotScores,
       wordDecorationState: wordDecorationState,
-      showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off
+      showAllLines: practiceShowsAllSetting && practiceTapeMode == .off
     )
     session = session.withElapsedClock()
     if session.configuration.language == .mixedLanguages {
@@ -4712,7 +4833,7 @@ private struct ContentView: View {
       }
     }) { result in
       guard requestID == liveContentRequestID, isPreparingWholePreview else { return }
-      guard settings.showAllPracticeLines && settings.practiceTapeMode == .off else { reset(); return }
+      guard practiceShowsAllSetting && practiceTapeMode == .off else { reset(); return }
       guard self.configuration == configuration else { reset(); return }
       guard !session.hasStarted, session.configuration == configuration else { return }
       switch result {
@@ -4742,7 +4863,7 @@ private struct ContentView: View {
             rendering: rendering, layout: prepared.layout, style: prepared.style,
             paceGuideIndex: prepared.paceGuideIndex)
         }
-        if wholePreviewViewportEnabled, prepared.rendering != nil {
+        if usesPreparedPromptViewport, prepared.rendering != nil {
           viewportFallbackAttemptID = prepared.session.automaticInputAttemptID
         }
         session = prepared.session
@@ -4770,10 +4891,10 @@ private struct ContentView: View {
 
   private func allowsWholePreviewViewportPreparation(_ candidate: TypingSession, style: PromptRenderStyle) -> Bool {
     let effect = PracticeVisualEffect.make(modifiers: candidate.configuration.modifiers)
-    guard wholePreviewViewportEnabled, compositionText.isEmpty, !candidate.isFinished,
+    guard usesPreparedPromptViewport, compositionText.isEmpty, !candidate.isFinished,
       viewportFallbackAttemptID != candidate.automaticInputAttemptID,
-      PracticeLineDisplayPolicy.shouldShowAllLines(settingEnabled: settings.showAllPracticeLines,
-        tapeMode: settings.practiceTapeMode, configuration: candidate.configuration),
+      PracticeLineDisplayPolicy.shouldShowAllLines(settingEnabled: practiceShowsAllSetting,
+        tapeMode: practiceTapeMode, configuration: candidate.configuration),
       !style.usesTapePractice, !effect.usesASL, !effect.usesChoo,
       PromptFieldProjectionPolicy.supports(candidate.configuration)
     else { return false }
@@ -4804,7 +4925,7 @@ private struct ContentView: View {
       var preparedLiveSession: TypingSession?
       var failedGenerationAttempts = 0
       while !Task.isCancelled {
-        let wholePreview = settings.showAllPracticeLines && settings.practiceTapeMode == .off
+        let wholePreview = practiceShowsAllSetting && practiceTapeMode == .off
         if let pendingContent = content {
           content = await pendingContent.fillingInitialPrompt(for: configuration,
             showAllLines: wholePreview) {
@@ -4823,7 +4944,7 @@ private struct ContentView: View {
         }
         // Display settings can change while a later section is in flight.
         // Fill the current budget before constructing its final descriptor.
-        if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off), let current = content {
+        if wholePreview == (practiceShowsAllSetting && practiceTapeMode == .off), let current = content {
           do {
             preparedPrompt = try await livePromptPrepare(current, configuration, wholePreview)
             preparedContinuation = try await current.preparingContinuationDescriptor(
@@ -4835,7 +4956,7 @@ private struct ContentView: View {
             }
           } catch { return }
           guard !Task.isCancelled, requestID == liveContentRequestID else { return }
-          if wholePreview == (settings.showAllPracticeLines && settings.practiceTapeMode == .off) { break }
+          if wholePreview == (practiceShowsAllSetting && practiceTapeMode == .off) { break }
         }
       }
       guard !Task.isCancelled, requestID == liveContentRequestID else { return }
@@ -5328,7 +5449,7 @@ private struct ContentView: View {
   }
 
   private var activeTheme: ResolvedTheme {
-    themePreviewPresentation.theme
+    publishedPresentation?.appearance.theme ?? themePreviewPresentation.theme
   }
 
   private var themePreviewPresentation: ThemePreviewPresentation {
