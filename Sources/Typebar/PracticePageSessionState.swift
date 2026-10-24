@@ -11,6 +11,7 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
   var priorAttemptLedger = PriorAttemptLedger()
   /// Accepted departure, including an init failure. Clears on a new attempt.
   var restartDepartureAttemptID: UUID?
+  var configurationDeparture: WebsiteConfigCommitCoordinator.ConfigurationDeparture?
 
   func applying(_ presentation: WebsiteConfigPublishedPresentation, owner: UUID,
     router: PreferenceConfigurationSaveRouter) throws -> Self {
@@ -32,6 +33,7 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
     result.presentation = presentation
     result.practice = practice
     result.restartDepartureAttemptID = nil
+    result.configurationDeparture = nil
     return result
   }
 }

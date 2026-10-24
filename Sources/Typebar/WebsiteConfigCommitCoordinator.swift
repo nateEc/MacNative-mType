@@ -25,7 +25,7 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let request: UUID
     fileprivate let owner: PreferenceConfigurationSaveRouter.Lease
     fileprivate let environment: Environment
-    fileprivate let disk: WebsiteConfigFileRegister.Revision
+    fileprivate var disk: WebsiteConfigFileRegister.Revision
     fileprivate weak var sourcePage: PracticePageSessionStore?
     fileprivate var pageCapture: PracticePageSessionStore.GenerationCapture?
     fileprivate var applicationCapture: PracticePageSessionStore.ApplicationCapture?
@@ -83,6 +83,91 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let original: TypingSession
     fileprivate let previous: WebsiteConfigSessionBuilder.Prepared
     fileprivate let repetition: WebsitePracticeRepetition
+  }
+  /// Persisted setter / accepted departure, but not a new delivered attempt.
+  /// This capability is window-local; cold recovery reads the ordinary record.
+  struct ConfigurationDeparture {
+    let id: UUID
+    let draft: WebsiteConfigNativeDraft
+    fileprivate let disk: WebsiteConfigFileRegister.Revision
+    fileprivate let identity: UUID
+    fileprivate let environment: Environment
+    fileprivate weak var contentSource: WebsiteConfigPracticeScopeSource?
+    fileprivate let requiresContentSource: Bool
+  }
+  enum ConfigurationDepartureOutcome {
+    case accepted(Prepared), acceptedRetired, stale, conflict, unavailable, busy
+  }
+  func beginConfigurationRestart(_ prepared: Prepared, for page: PracticePageSessionStore,
+    action: WebsiteConfigPracticeEdit) throws -> ConfigurationDepartureOutcome {
+    guard !processing, page.restartController?.isPreparing != true else { return .busy }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    guard isCurrent(prepared), prepared.sourcePage === page,
+      let capture = prepared.pageCapture, capture.testActive,
+      page.state.configurationDeparture == nil,
+      case .edited(let edit) = prepared.draft.origin, edit.key == action.key else { return .stale }
+    // Close a value copy first. A rejected file CAS must leave the real clock,
+    // input, ledger and publication untouched.
+    var departed = page.state
+    let measurement = departed.session.abandonAndMeasure()
+    guard isCurrent(prepared) else { return .stale }
+    try Task.checkCancellation()
+    try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
+    let disk: WebsiteConfigFileRegister.Revision
+    do {
+      let result = try register.commit(prepared.draft, replacing: prepared.disk)
+      switch result {
+      case .committed(let value): disk = value
+      case .conflict: page.endCommit(); retire(prepared); return .conflict
+      case .unavailable: page.endCommit(); retire(prepared); return .unavailable
+      }
+    } catch WebsiteConfigFileRegisterError.busy { page.endCommit(); return .busy }
+    catch { page.endCommit(); throw error }
+    // Irreversible boundary: no cancellation or throwing observer after CAS.
+    // The old resource presentation remains explicitly pending, not current.
+    departed.restartDepartureAttemptID = departed.session.automaticInputAttemptID
+    if let measurement {
+      departed.priorAttemptLedger.recordRestart(engagedDuration: measurement.engagedDuration,
+        accuracy: measurement.accuracy, savingEnabled: prepared.draft.behavior.saveCompletedResults)
+    }
+    departed.configurationDeparture = .init(id: UUID(), draft: prepared.draft, disk: disk,
+      identity: identity, environment: prepared.environment, contentSource: prepared.contentSource,
+      requiresContentSource: prepared.contentCapture != nil)
+    resourceAdmission = UUID(); sessionAdmission = UUID(); sessionRequest = nil
+    page.installCommitted(departed)
+    page.endCommit()
+    guard let refreshed = try? page.captureGeneration(router: router) else { return .acceptedRetired }
+    var admitted = prepared
+    admitted.disk = disk; admitted.pageCapture = refreshed
+    return .accepted(admitted)
+  }
+  /// Retry only initialization. Never re-run the accepted setter or measure
+  /// the closed attempt again. A different coordinator must use cold restore.
+  func resumeConfigurationRestart(for page: PracticePageSessionStore) throws -> Prepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    request = UUID()
+    guard let pending = page.state.configurationDeparture, pending.identity == identity,
+      let owner = router.captureLease(), owner.owner == page.owner,
+      let context = environment(), context == pending.environment else { throw WebsiteConfigCommitCoordinatorError.stale }
+    let capture = try page.captureGeneration(router: router)
+    guard capture.configurationDeparture == pending.id,
+      capture.publication.authority === publicationAuthority,
+      latest?.applicationID == capture.publication.applicationID,
+      try register.read().revision == pending.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+    var prepared = Prepared(draft: pending.draft, identity: identity, request: request,
+      owner: owner, environment: context, disk: pending.disk)
+    prepared.sourcePage = page; prepared.pageCapture = capture
+    if pending.requiresContentSource {
+      guard let source = pending.contentSource else { throw WebsiteConfigCommitCoordinatorError.unavailable }
+      let content = try source.capture(owner: page.owner, preserving: capture.scope)
+      guard content.environment == context else { throw WebsiteConfigCommitCoordinatorError.stale }
+      prepared.contentSource = source; prepared.contentCapture = content
+    }
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return prepared
   }
   struct PreviousAttempt {
     struct Incomplete {
@@ -246,6 +331,7 @@ final class WebsiteConfigCommitCoordinator {
   private func preparePageEdit(key: String, value: WebsiteConfigValue, for page: PracticePageSessionStore,
     refreshingWith source: WebsiteConfigPracticeScopeSource?) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    guard page.state.configurationDeparture == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
     request = UUID()
     let capture = try page.captureGeneration(router: router)
     var prepared = try prepareEdit(key: key, value: value, from: capture.publication, testActive: capture.testActive)
@@ -498,6 +584,7 @@ final class WebsiteConfigCommitCoordinator {
   func cancel(_ next: NextPrepared) -> Bool { cancel(next.session) }
   private func nextResources(for page: PracticePageSessionStore) throws -> ResourcesPrepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    guard page.state.configurationDeparture == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
     processing = true; defer { processing = false }
     request = UUID()
     let capture = try page.captureGeneration(router: router)
@@ -676,6 +763,9 @@ final class WebsiteConfigCommitCoordinator {
     let applicationID = UUID()
     let appearance: WebsiteConfigPublishedPresentation.PreparedAppearance?
     if let page {
+      if let pending = page.state.configurationDeparture,
+        prepared.pageCapture?.configurationDeparture != pending.id,
+        prepared.applicationCapture?.configurationDeparture != pending.id { return .stale }
       guard let session, let practice, font != nil, background != nil,
         !session.hasStarted, !session.isFinished,
         session.automaticInputAttemptID == practice.session.automaticInputAttemptID,
@@ -693,7 +783,8 @@ final class WebsiteConfigCommitCoordinator {
     let restoringNative: Bool
     if case .restored(let value) = prepared.draft.origin, case .nativeState = value.origin { restoringNative = true }
     else { restoringNative = false }
-    do { outcome = try register.commit(prepared.draft, replacing: prepared.disk, preservingUnchanged: restoringNative) }
+    do { outcome = try register.commit(prepared.draft, replacing: prepared.disk,
+      preservingUnchanged: restoringNative || prepared.pageCapture?.configurationDeparture != nil) }
     catch WebsiteConfigFileRegisterError.busy { return .busy }
     switch outcome {
     case .committed(let disk):

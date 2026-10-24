@@ -56,6 +56,39 @@ import XCTest
       difficulty: .normal, rules: .init()))
   }
 
+  func testConfigurationDepartureResumeRecapturesRealWindowContentAndRefusesStoppedSource() async throws {
+    for stopSource in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      XCTAssertTrue(f.settings.saveCustomTextState(document("owned source text")))
+      _ = try await f.publish()
+      var state = f.page.state; state.session.insertBatch("o"); f.page.replace(state)
+      let edit = try f.coordinator.prepareEdit(key: "difficulty", value: .string("expert"),
+        for: f.page, refreshingWith: f.source)
+      guard case .accepted(let admitted) = try f.coordinator.beginConfigurationRestart(edit,
+        for: f.page, action: .difficulty(.expert)) else { return XCTFail("Departure was not accepted") }
+      XCTAssertTrue(f.coordinator.cancel(admitted))
+      let disk = try f.register.read().revision
+      f.window.value?.revision = UUID()
+      if stopSource {
+        f.source.stop()
+        XCTAssertThrowsError(try f.coordinator.resumeConfigurationRestart(for: f.page))
+        XCTAssertNotNil(f.page.state.configurationDeparture)
+      } else {
+        let resumed = try f.coordinator.resumeConfigurationRestart(for: f.page)
+        let resources = try f.coordinator.prepareResources(for: resumed, localFont: .absent, localBackground: .absent)
+        let ready = try await f.coordinator.preparePractice(for: resources)
+        XCTAssertEqual(ready.session.prompt, "owned source text")
+        XCTAssertEqual(ready.session.configuration.difficulty, .expert)
+        guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: true) else {
+          return XCTFail("Fresh source could not deliver the pending configuration")
+        }
+        XCTAssertNil(f.page.state.configurationDeparture)
+      }
+      XCTAssertEqual(try f.register.read().revision, disk)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    }
+  }
+
   func testActualStoredContentRefreshAcrossEpochBuildsNewTextAndCommitsToSamePage() async throws {
     let f = try Fixture(); defer { f.close() }
     let original = try await f.publish()

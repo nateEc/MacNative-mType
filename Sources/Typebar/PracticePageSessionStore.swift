@@ -37,6 +37,7 @@ final class PracticePageSessionStore {
     fileprivate let session: TypingSession.GenerationState
     fileprivate let repetition: WebsitePracticeRepetition
     fileprivate let restartDeparture: UUID?
+    let configurationDeparture: UUID?
     var testActive: Bool { session.started && !session.finished }
   }
 
@@ -51,6 +52,7 @@ final class PracticePageSessionStore {
     fileprivate let publication: UUID?
     fileprivate let repetition: WebsitePracticeRepetition?
     fileprivate let restartDeparture: UUID?
+    let configurationDeparture: UUID?
   }
 
   func captureApplication(router: PreferenceConfigurationSaveRouter) throws -> ApplicationCapture {
@@ -66,7 +68,8 @@ final class PracticePageSessionStore {
     scope.decorationState = session.liveWordDecorationState
     return .init(scope: scope, lease: lease, attachment: attachment, compositionActivity: compositionActivity,
       session: session.generationState, publication: state.presentation?.publication.applicationID,
-      repetition: state.practice?.repetition, restartDeparture: state.restartDepartureAttemptID)
+      repetition: state.practice?.repetition, restartDeparture: state.restartDepartureAttemptID,
+      configurationDeparture: state.configurationDeparture?.id)
   }
   func isCurrent(_ capture: ApplicationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -75,6 +78,7 @@ final class PracticePageSessionStore {
       && state.presentation?.publication.applicationID == capture.publication
       && state.practice?.repetition == capture.repetition
       && state.restartDepartureAttemptID == capture.restartDeparture
+      && state.configurationDeparture?.id == capture.configurationDeparture
   }
 
   func captureGeneration(router: PreferenceConfigurationSaveRouter) throws -> GenerationCapture {
@@ -90,7 +94,8 @@ final class PracticePageSessionStore {
     scope.decorationState = state.session.liveWordDecorationState
     return .init(publication: publication, scope: scope, lease: lease,
       attachment: attachment, compositionActivity: compositionActivity, session: state.session.generationState,
-      repetition: practice.repetition, restartDeparture: state.restartDepartureAttemptID)
+      repetition: practice.repetition, restartDeparture: state.restartDepartureAttemptID,
+      configurationDeparture: state.configurationDeparture?.id)
   }
   func isCurrent(_ capture: GenerationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -100,6 +105,7 @@ final class PracticePageSessionStore {
       && state.session.generationState == capture.session
       && state.practice?.repetition == capture.repetition
       && state.restartDepartureAttemptID == capture.restartDeparture
+      && state.configurationDeparture?.id == capture.configurationDeparture
   }
   func noteCompositionActivity(for attemptID: UUID) {
     guard acceptsInput(for: attemptID) else { return }
@@ -132,6 +138,7 @@ final class PracticePageSessionStore {
   func acceptsAttemptCallback(for attemptID: UUID) -> Bool {
     router != nil && !committing && !startupInputTransition && !startupInputSuspended
       && !legacyReturnTransition && !isReturningToTypebarSettings
+      && state.configurationDeparture == nil
       && state.session.automaticInputAttemptID == attemptID
   }
   func setStartupInputSuspended(_ suspended: Bool) {
@@ -196,13 +203,15 @@ final class PracticePageSessionStore {
     legacyReturnTransition = false
   }
   var isInputSuspendedForRestart: Bool {
-    restartController?.isPreparing == true || state.restartDepartureAttemptID == state.session.automaticInputAttemptID
+    state.configurationDeparture != nil || restartController?.isPreparing == true
+      || state.restartDepartureAttemptID == state.session.automaticInputAttemptID
   }
   @discardableResult
   func bindRestartController(using coordinator: WebsiteConfigCommitCoordinator,
     loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil)
     throws -> WebsitePracticeRestartController {
+    guard state.configurationDeparture == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
     guard let router else { throw PracticePageSessionStateError.wrongOwner }
     let capture = try captureGeneration(router: router)
     guard coordinator.publication(for: owner)?.applicationID == capture.publication.applicationID else {
@@ -242,7 +251,8 @@ final class PracticePageSessionStore {
   func installCommitted(_ state: PracticePageSessionState) {
     precondition(committing)
     clearLegacyReturn()
-    if state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID { retireRestartController() }
+    if state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID
+      || state.configurationDeparture?.id != self.state.configurationDeparture?.id { retireRestartController() }
     self.state = state
   }
 }
