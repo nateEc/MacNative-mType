@@ -90,6 +90,21 @@ struct WebsiteQuoteSampler {
     remainingTotal = cycleSize
   }
 
+  func matches(selection: WebsiteConfigNativeQuoteSelection, quotes: [OfflineQuote]) -> Bool {
+    func exact(_ lhs: String?, _ rhs: String?) -> Bool {
+      switch (lhs, rhs) {
+      case (nil, nil): true
+      case (.some(let a), .some(let b)): a.utf16.elementsEqual(b.utf16)
+      default: false
+      }
+    }
+    return self.selection == selection && self.quotes.count == quotes.count
+      && zip(self.quotes, quotes).allSatisfy { a, b in
+        a.language == b.language && a.length == b.length && exact(a.id, b.id)
+          && exact(a.title, b.title) && exact(a.text, b.text) && exact(a.britishText, b.britishText)
+      }
+  }
+
   /// Weighted draws without replacement produce the same distribution as
   /// shuffling an expanded multiset. No immediate-repeat avoidance is added.
   /// Seeded RNG stream identity with the website is deliberately not implied.

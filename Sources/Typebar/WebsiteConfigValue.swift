@@ -1,7 +1,7 @@
 import Foundation
 
 /// Staged website input, never an AppSettings snapshot or a diagnostics payload.
-indirect enum WebsiteConfigValue: Codable, Equatable {
+indirect enum WebsiteConfigValue: Codable, Equatable, Sendable {
   case null, bool(Bool), number(Double), string(String)
   case array([Self]), object([String: Self])
   case stringCodeUnits([UInt16]), objectCodeUnits([WebsiteConfigMember])

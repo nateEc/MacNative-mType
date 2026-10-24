@@ -8,6 +8,15 @@ import XCTest
 
 @MainActor
 final class BackgroundViewportHostTests: XCTestCase {
+  // Like the application's dataStore, own the container beyond individual
+  // view graphs. SwiftUI can retain a mainContext notification observer after
+  // a hidden host retires; the mainContext's container reference is weak.
+  // These fixtures never complete a result or write a preset to this store.
+  private static let processStore: Result<ModelContainer, Error> = Result {
+    try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
+      SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+  }
   @MainActor private final class Fixture {
     let suite = "typebar.background-viewport.\(UUID())"
     let defaults: UserDefaults
@@ -35,9 +44,13 @@ final class BackgroundViewportHostTests: XCTestCase {
       CGImageDestinationAddImage(encoder, image, nil)
       XCTAssertTrue(CGImageDestinationFinalize(encoder))
       try settings.importLocalBackground(data: output as Data)
-      container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
-        SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+      container = try BackgroundViewportHostTests.processStore.get()
+      let counts = try [container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()),
+        container.mainContext.fetchCount(FetchDescriptor<TestPresetRecord>()),
+        container.mainContext.fetchCount(FetchDescriptor<SavedCustomTextRecord>()),
+        container.mainContext.fetchCount(FetchDescriptor<ResultFilterPresetRecord>()),
+        container.mainContext.fetchCount(FetchDescriptor<LocalPersonalBestLedgerRecord>())]
+      XCTAssertEqual(counts, [0, 0, 0, 0, 0], "Read-only host fixtures cannot share mutable records")
       let prompt = (0..<201).map { "word\($0)" }.joined(separator: " ")
       let content = TypebarApp.practiceContent(settings: settings,
         account: AccountSession(defaults: defaults), announcements: RemoteAnnouncementCenter(defaults: defaults),
@@ -85,6 +98,26 @@ final class BackgroundViewportHostTests: XCTestCase {
       }
       return pixel
     }
+  }
+
+  func testRetiredReadOnlyHostKeepsItsStoreOwnedAcrossOtherContextSaveNotifications() throws {
+    weak var retiredContainer: ModelContainer?
+    do {
+      let fixture = try Fixture()
+      retiredContainer = fixture.container
+      fixture.waitUntil { fixture.views(TypingInputView.self).first?.acceptsTextInput == true }
+      fixture.close()
+    }
+    guard let retained = retiredContainer else { return XCTFail("Retired query observers outlived their store owner") }
+    let other = try ModelContainer(for: TestResultRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    var session = TypingSession(configuration: .words(1), prompt: "ab")
+    session.insert("ab")
+    other.mainContext.insert(TestResultRecord(result: try XCTUnwrap(session.result())))
+    try other.mainContext.save()
+    XCTAssertEqual(try other.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 1)
+    XCTAssertEqual(try retained.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0,
+      "Read-only host fixtures must remain isolated from another store's save")
   }
 
   func testProductionBackgroundCoversViewportAndDoesNotScrollWithLongDocument() throws {

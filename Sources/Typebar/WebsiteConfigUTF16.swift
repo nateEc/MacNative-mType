@@ -1,6 +1,6 @@
 import Foundation
 
-struct WebsiteConfigMember: Equatable {
+struct WebsiteConfigMember: Equatable, Sendable {
   var key: [UInt16]
   var value: WebsiteConfigValue
 }

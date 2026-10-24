@@ -35,6 +35,9 @@ final class WebsiteConfigCommitCoordinator {
     let font: WebsiteConfigFontResource?
     /// Prepared attempt seed for the session-aware path; legacy commits are nil.
     let session: TypingSession?
+    /// Whole-draft builder output, including value-owned selection memories.
+    /// nil for older explicit session producers and resource-only commits.
+    let practice: WebsiteConfigSessionBuilder.Prepared?
   }
   struct BackgroundPrepared {
     fileprivate let configuration: Prepared
@@ -52,6 +55,7 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let resources: ResourcesPrepared
     fileprivate let admission: UUID
     let session: TypingSession
+    let practice: WebsiteConfigSessionBuilder.Prepared?
   }
   enum Outcome { case committed(Publication), stale, conflict, unavailable, busy }
   private let router: PreferenceConfigurationSaveRouter
@@ -201,20 +205,51 @@ final class WebsiteConfigCommitCoordinator {
   }
   func prepareSession(for prepared: ResourcesPrepared,
     generate: @MainActor (WebsiteConfigNativeDraft) async throws -> TypingSession) async throws -> SessionPrepared {
+    try await prepareSessionBuild(for: prepared) { draft in (try await generate(draft), nil) }
+  }
+  func preparePractice(for prepared: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope,
+    loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
+    loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
+    random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> SessionPrepared {
+    // Full import dispatches quoteLength again, even for identical values.
+    // Ordinary next-attempt generation may instead continue the returned queue.
+    var importScope = scope
+    importScope.quoteSampler = nil
+    let checkedExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
+    if let loadExternal {
+      checkedExternal = { source, configuration in
+        try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
+          try await loadExternal(source, configuration)
+        }
+      }
+    } else { checkedExternal = nil }
+    return try await prepareSessionBuild(for: prepared) { draft in
+      let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: importScope,
+        loadQuotes: { language in
+          try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
+            try await loadQuotes(language)
+          }
+        }, loadExternal: checkedExternal, random: random)
+      return (practice.session, practice)
+    }
+  }
+  private func prepareSessionBuild(for prepared: ResourcesPrepared,
+    generate: @MainActor (WebsiteConfigNativeDraft) async throws -> (TypingSession, WebsiteConfigSessionBuilder.Prepared?))
+    async throws -> SessionPrepared {
     try checkAsyncResources(prepared.configuration, admission: prepared.admission)
     // A failed new producer must also retire an earlier seed. Once this
     // request opts in, resource-only commits cannot race ahead of generation.
     let admission = UUID()
     sessionAdmission = admission
     sessionRequest = prepared.configuration.request
-    let result: Result<TypingSession, Error>
+    let result: Result<(TypingSession, WebsiteConfigSessionBuilder.Prepared?), Error>
     do { result = .success(try await generate(prepared.configuration.draft)) }
     catch { result = .failure(error) }
     try checkAsyncResources(prepared.configuration, admission: prepared.admission)
     guard sessionAdmission == admission else { throw WebsiteConfigCommitCoordinatorError.stale }
-    let session = try result.get()
+    let (session, practice) = try result.get()
     guard !session.hasStarted, !session.isFinished else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
-    return .init(resources: prepared, admission: admission, session: session)
+    return .init(resources: prepared, admission: admission, session: session, practice: practice)
   }
   @discardableResult
   func cancel(_ prepared: SessionPrepared) -> Bool {
@@ -227,7 +262,7 @@ final class WebsiteConfigCommitCoordinator {
     guard prepared.admission == sessionAdmission,
       prepared.resources.admission == resourceAdmission else { return .stale }
     return try commit(prepared.resources.configuration, background: prepared.resources.background,
-      font: prepared.resources.font, session: prepared.session)
+      font: prepared.resources.font, session: prepared.session, practice: prepared.practice)
   }
   @discardableResult
   func cancel(_ prepared: BackgroundPrepared) -> Bool {
@@ -243,7 +278,8 @@ final class WebsiteConfigCommitCoordinator {
     try commit(prepared, background: nil)
   }
   private func commit(_ prepared: Prepared, background: WebsiteConfigBackgroundResource?,
-    font: WebsiteConfigFontResource? = nil, session: TypingSession? = nil) throws -> Outcome {
+    font: WebsiteConfigFontResource? = nil, session: TypingSession? = nil,
+    practice: WebsiteConfigSessionBuilder.Prepared? = nil) throws -> Outcome {
     guard !processing else { return .busy }
     processing = true
     defer { processing = false }
@@ -259,7 +295,7 @@ final class WebsiteConfigCommitCoordinator {
       // await, caller callback, legacy write, resource activation or event replay.
       let publication = Publication(draft: prepared.draft, owner: prepared.owner.owner,
         environmentRevision: prepared.environment.revision, pointsPerRem: prepared.environment.pointsPerRem,
-        disk: disk, background: background, font: font, session: session)
+        disk: disk, background: background, font: font, session: session, practice: practice)
       latest = publication
       retire(prepared)
       return .committed(publication)
