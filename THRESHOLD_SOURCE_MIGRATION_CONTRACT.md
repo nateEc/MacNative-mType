@@ -1,5 +1,21 @@
 # 阈值源状态与迁移契约
 
+## 完整发布的 ASL／Choo 专用消费（2026-10-24）
+
+已有 WebsiteConfigPublishedInlinePrompt 不再拒绝有效会话的 ASL／Choo，而按原主窗口的 ASL→Choo→卷带→普通优先级分流，复用既有独立手形组件与原生旋转字层。Snapshot 同时捕获实际会话效果、已解析主题与标准字形 ID，只有专用路径才额外构建这些字形数组，普通／卷带不增加无用副本。手形／字层仍接收同份准备字体、最终属性、虚拟组合槽、光标及已校验滚动上下文；全部行不套有界滚动，否则专用实际行度量进入既有两／三行视口，限宽作用于实际专用内容。
+
+固定 packages/funbox/src/list.ts 的两项 noJoiningScript 元数据及 Choo 的 ignoreReducedMotion 已核对；choo_choo.css 为两秒无限线性旋转，asl.css 使用 Gallaudet 字体。新路径不复制 CSS、字体或手形资产，不改既有独立绘制与动画内核；Choo 继续忽略系统减弱动态，但应用自己的减弱动态仍禁止旋转。有效会话／funbox 组合、外部变换包装、全局宽度／主题及完整配置切换由宿主负责；尚未支持的混合字段投影仍显式拒绝，不以此宣称所有效果组合兼容。
+
+先行一项准入测试对两个效果产生两处预期 requiresDifferentRenderer 失败。接线首次构建错误是有界内容闭包需 @escaping，不是行为红测；修正后 13 项提示检查只有新 ASL 光标即时读取失败。现有光标刻意延迟到呈现帧，按现有组件测试入口显式驱动该帧后，实际光标、手形尺寸和组合检查通过；没有删掉光标断言或改变生产时序。三项新增覆盖真实提交准入、手形 28→40 点布局增长且 x／xy／attempt 保留、Choo 实际私有字体 16.8 字宽与系统／应用动态策略，均为隐藏 NSHostingView，不运行 Typebar 或系统 IME。
+
+有界会话内决策复核（非独立评审）检查了专用路径优先级、普通分支额外数组、实际行度量和两种动态策略。扩大专用集合还发现四条旧源码定位未跟上可选 rendering 分支：两条 ASL 和两条 Choo。TypebarApp.swift 与起点 f4b15f01 的 SHA-256 同为 `65ec91570c1184cf160ea270c384befae83efc369fcdf24c0f41a64bcb6f7bfb`，相关测试此前本轮未改；只更新精确分支边界，保留共同 rendering、字形 ID、独立光标、词所有权与滚动配置断言。无参考运行曾有四项 oracle 跳过，不计为通过；最终显式提供固定参考的专用集合 152 项零失败／零跳过。
+
+迁移仍为只读消费入口扩展，没有切换旧主窗口、双写设置、迁移目录或退役旧注册。回退旧入口不回滚已提交意图。正式 UI／会话配置应用、外部视觉包装、全部组合、实体输入焦点／IME、可见验收与性能仍开放；先前阶段“ASL／Choo 未接入”仅为当时历史，不覆盖本节已接线的范围。日志 `/tmp/typebar-published-special-{red,focused,native,reviewed,native-final,dedicated-final,expanded,offline,package}.log`。
+
+最终含固定参考的扩大回归 569 项零失败／零跳过；无参考依赖的字体／背景／发布消费集合 197 项零失败／零跳过，范围重叠不相加。最终回归与打包期间不修改 Swift。原创性与固定参考证据（47 直接项、119 原生符号、17 支持规范）检查通过，人工清单 1,289 项仅结构检查；没有重跑完整生产宿主集，独立滚轮基线失败不因此转绿。
+
+最终 Debug 包、签名、署名和包内资源原创性检查通过；脚本清理临时 QA 包，没有运行 Typebar 主程序。参考检出保持干净。推送前 main 为 8c52fb13、开发分支为 f4b15f01，无打开的开发分支 PR，Actions 仍 826 次且最近 39118939684 成功；只集中推送 native-parity-next，不改主分支、不建 PR 或重跑门禁。完整重写目标继续 active。
+
 ## 完整发布的普通提示／组合与卷带入口（2026-10-24）
 
 新增 WebsiteConfigPublishedInlinePrompt，按同份发布的 tapeMode 分流到原有 TapePracticePrompt 或普通 PromptFieldPracticePrompt；普通分支用已有 PracticePromptViewport 保留有界两／三行高度，全部行／组合回退则不套有界滚动。原生卷带核、换行／词隐藏／退役算法不改，mode、百分比 margin 与 smoothLineScroll 直接来自 draft.presentation；固定 test-ui.ts 的卷带边距比例及 letter UTF-16 前缀推进仍由既有内核承担。

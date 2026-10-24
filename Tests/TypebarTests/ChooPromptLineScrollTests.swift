@@ -165,8 +165,8 @@ import XCTest
   func testProductionChooReceivesSharedWordScrollContextEvenWithoutCarets() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    let start = try XCTUnwrap(source.range(of: "} else if practiceVisualEffect.usesChoo {"))
-    let end = try XCTUnwrap(source.range(of: "} else if usesTapePractice {", range: start.upperBound..<source.endIndex))
+    let start = try XCTUnwrap(source.range(of: "} else if let rendering, practiceVisualEffect.usesChoo {"))
+    let end = try XCTUnwrap(source.range(of: "} else if let rendering, usesTapePractice {", range: start.upperBound..<source.endIndex))
     XCTAssertTrue(source[start.upperBound..<end.lowerBound].contains("lineScroll:"),
       "Choo must receive the same attempt/word-retirement policy as ordinary projected fields")
     XCTAssertTrue(source.contains("view.configureLineScroll(lineScroll)"),

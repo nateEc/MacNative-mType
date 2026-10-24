@@ -81,8 +81,8 @@ import XCTest
   func testProductionASLConsumesSharedRenderingAndItsOwnActualLayoutCarets() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    let branch = try XCTUnwrap(app.range(of: "if practiceVisualEffect.usesASL {"))
-    let end = try XCTUnwrap(app.range(of: "} else if practiceVisualEffect.usesChoo {", range: branch.upperBound..<app.endIndex))
+    let branch = try XCTUnwrap(app.range(of: "} else if let rendering, practiceVisualEffect.usesASL {"))
+    let end = try XCTUnwrap(app.range(of: "} else if let rendering, practiceVisualEffect.usesChoo {", range: branch.upperBound..<app.endIndex))
     let asl = String(app[branch.upperBound..<end.lowerBound])
     XCTAssertTrue(asl.contains("rendering: rendering"), "ASL must not bypass the selected theme/highlight/text presentation")
     XCTAssertTrue(asl.contains("carets: specialPromptCaretConfiguration"), "ASL needs independent main and pace carets")

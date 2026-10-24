@@ -261,8 +261,8 @@ import XCTest
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    let branchStart = try XCTUnwrap(app.range(of: "} else if practiceVisualEffect.usesChoo {"))
-    let branchEnd = try XCTUnwrap(app.range(of: "} else if usesTapePractice {", range: branchStart.upperBound..<app.endIndex))
+    let branchStart = try XCTUnwrap(app.range(of: "} else if let rendering, practiceVisualEffect.usesChoo {"))
+    let branchEnd = try XCTUnwrap(app.range(of: "} else if let rendering, usesTapePractice {", range: branchStart.upperBound..<app.endIndex))
     XCTAssertTrue(app[branchStart.upperBound..<branchEnd.lowerBound].contains("rendering: rendering"),
       "Choo must consume the same final attributes as Text, Tape and ASL")
     let layerStart = try XCTUnwrap(app.range(of: "private struct ChooLayerPrompt:"))

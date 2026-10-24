@@ -42,6 +42,7 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
     var session: TypingSession
     var ready: [PromptViewportPresentationReady] = []
     var composition = ""
+    var reducesMotion = true
     let motion = PromptCaretMotionCoordinator()
     var retirements: [PromptWordRetirement] = []
     var removals: [PromptTapeWordRemoval] = []
@@ -89,14 +90,17 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
     let model: Model
     var maximumTextWidth: CGFloat? = nil
     var body: some View {
-      try! WebsiteConfigPublishedInlinePrompt(publication: model.publication, owner: model.owner,
+      try! Self.prompt(model, maximumTextWidth: maximumTextWidth).frame(width: 220)
+    }
+    static func prompt(_ model: Model, maximumTextWidth: CGFloat? = nil) throws -> WebsiteConfigPublishedInlinePrompt {
+      try WebsiteConfigPublishedInlinePrompt(publication: model.publication, owner: model.owner,
         session: model.session, composition: model.composition, theme: AppTheme.serika_dark.resolvedTheme,
         carets: { rendering, font, p in
           var config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
             mainStyle: p.caretStyle, paceStyle: p.paceCaretStyle, font: font,
             lineSpacing: model.session.configuration.usesJoiningScriptPrompt ? 8 : 12,
             rightToLeft: model.session.configuration.usesRightToLeftPrompt, accent: .blue,
-            motion: p.smoothCaretMotion, reducesMotion: true, frameRate: 60,
+            motion: p.smoothCaretMotion, reducesMotion: model.reducesMotion, frameRate: 60,
             attemptID: model.session.automaticInputAttemptID, coordinator: model.motion,
             mainGlyphID: model.session.promptCaretGlyphIndex)
           config.latestInput = { .init(attemptID: model.session.automaticInputAttemptID,
@@ -105,14 +109,13 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
         }, retirement: { rendering, p in Self.context(model, rendering, p) },
         maximumTextWidth: maximumTextWidth,
         onTapeWordsRemoved: { model.removals.append($0); model.session.removeTapePromptWords($0) })
-        .frame(width: 220)
     }
     static func context(_ model: Model, _ rendering: PromptRendering,
       _ p: WebsiteConfigNativePresentation, wrongAttempt: Bool = false) -> PromptLineScrollContext {
       let field = model.session.promptCompositionField
       return .init(attemptID: wrongAttempt ? UUID() : model.session.automaticInputAttemptID,
         activeWordID: field?.index, characterOffsets: rendering.compositionTextMap?.fieldCharacterOffsets ?? [:],
-        smoothScroll: p.smoothPracticeLineScroll, reducesMotion: true,
+        smoothScroll: p.smoothPracticeLineScroll, reducesMotion: model.reducesMotion,
         words: PromptLineScrollWord.compositionFields(field), firstRetainedWordIndex: model.session.firstRetainedPromptWordIndex,
         onRetire: { model.retirements.append($0); model.session.retirePromptWords($0) },
         followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: model.session.configuration.mode,
@@ -347,5 +350,85 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
         }
     }
     XCTAssertEqual(builds, 0)
+  }
+
+  func testPublishedSpecialRoutesAdmitTheirExistingDedicatedConsumers() throws {
+    let f = try Fixture(); defer { f.close() }
+    for (name, modifier) in [("asl", TestModifier.aslVisual), ("choo_choo", .chooVisual)] {
+      let publication = try f.publish(#"{"showAllLines":false,"fontSize":1.75,"smoothCaret":"off","smoothLineScroll":false,"funbox":[""# + name + #""]}"#)
+      let model = Model(publication, owner: f.owner)
+      var session = TypingSession(configuration: .words(40).with(modifiers: [.noQuit, modifier]),
+        prompt: Array(repeating: "xxx", count: 40).joined(separator: " "))
+      session.insertBatch("x", at: Date(timeIntervalSince1970: 4000)); model.session = session
+      XCTAssertNoThrow(try InlineRoot.prompt(model), "A supported dedicated renderer must not be rejected: \(name)")
+    }
+  }
+
+  private func specialSession(_ modifier: TestModifier) -> TypingSession {
+    var session = TypingSession(configuration: .words(40).with(modifiers: [.noQuit, modifier]),
+      prompt: Array(repeating: "xxx", count: 40).joined(separator: " "))
+    session.insertBatch("x", at: Date(timeIntervalSince1970: 4000)); return session
+  }
+
+  func testPublishedASLActuallyMountsHandGeometryAndResizesWithoutResettingComposition() throws {
+    let f = try Fixture(); defer { f.close() }
+    let name = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let data = OwnedTestFontFixture.make(postScriptName: name, advanceWidth: 600)
+    let first = try f.publish(#"{"fontSize":1.75,"funbox":["asl"],"showAllLines":false,"smoothCaret":"off","smoothLineScroll":false}"#, font: .data(data))
+    let second = try f.publish(#"{"fontSize":2.5,"funbox":["asl"],"showAllLines":false,"smoothCaret":"off","smoothLineScroll":false}"#, font: .data(data))
+    let model = Model(first, owner: f.owner); model.session = specialSession(.aslVisual); model.composition = "xy"
+    let attempt = model.session.automaticInputAttemptID
+    let inputs = try WebsiteConfigPublishedPromptInputs(publication: first, owner: f.owner)
+    let rendering = PromptRenderPlan(session: model.session, composition: model.composition,
+      style: inputs.style(theme: AppTheme.serika_dark.resolvedTheme)).render()
+    let cell = try XCTUnwrap(rendering.compositionTextMap?.fieldRuns.first?.cells.first?.id)
+    let host = NSHostingView(rootView: InlineRoot(model: model))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 220, height: 400), styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    wait(host) { self.descendants(host, ASLPromptCaretContainer.self).first?.measuredRect(for: cell) != nil }
+    let hand = try XCTUnwrap(descendants(host, ASLPromptCaretContainer.self).first)
+    let before = try XCTUnwrap(hand.measuredRect(for: cell))
+    XCTAssertTrue(descendants(host, PromptFieldNativeView.self).isEmpty, "ASL must not silently become ordinary text")
+    model.publication = second
+    wait(host) { (self.descendants(host, ASLPromptCaretContainer.self).first?.measuredRect(for: cell)?.height ?? 0) > before.height }
+    XCTAssertEqual(model.session.typed, "x"); XCTAssertEqual(model.composition, "xy")
+    XCTAssertEqual(model.session.automaticInputAttemptID, attempt)
+    wait(host) {
+      self.descendants(host, PromptCaretNativeView.self).forEach { $0.present(at: ProcessInfo.processInfo.systemUptime) }
+      return model.motion.main.visibleRect != nil
+    }
+    XCTAssertNotNil(model.motion.main.visibleRect)
+    XCTAssertFalse(window.isVisible)
+    XCTAssertFalse((CTFontManagerCopyAvailablePostScriptNames() as? [String] ?? []).contains(name))
+  }
+
+  func testPublishedChooUsesPreparedPrivateFontAndRespectsBothMotionPolicies() throws {
+    let f = try Fixture(); defer { f.close() }
+    let name = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let publication = try f.publish(#"{"fontSize":1.75,"funbox":["choo_choo"],"showAllLines":false,"smoothCaret":"off","smoothLineScroll":false}"#,
+      font: .data(OwnedTestFontFixture.make(postScriptName: name, advanceWidth: 600)))
+    let model = Model(publication, owner: f.owner); model.session = specialSession(.chooVisual)
+    model.composition = "xx"; model.reducesMotion = false
+    let host = NSHostingView(rootView: InlineRoot(model: model).environment(\.typebarSystemReduceMotionOverride, true))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 220, height: 400), styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { self.descendants(host, ChooLayerView.self).forEach { $0.stop() }; window.contentView = nil; window.close() }
+    func layers(_ view: ChooLayerView?) -> [CATextLayer] {
+      view?.layer?.sublayers?.compactMap { $0 as? CATextLayer }.filter { $0.name != "chooHint" } ?? []
+    }
+    wait(host) { layers(self.descendants(host, ChooLayerView.self).first).contains { $0.animation(forKey: "chooRotation") != nil } }
+    let choo = try XCTUnwrap(descendants(host, ChooLayerView.self).first)
+    let layer = try XCTUnwrap(layers(choo).first)
+    let text = try XCTUnwrap(layer.string as? NSAttributedString)
+    let font = try XCTUnwrap(text.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+    XCTAssertEqual(font.fontName, name); XCTAssertEqual(try advance(font), 16.8, accuracy: 0.001)
+    XCTAssertTrue(descendants(host, PromptFieldNativeView.self).isEmpty)
+    model.reducesMotion = true
+    wait(host) { !layers(choo).isEmpty && layers(choo).allSatisfy { $0.animation(forKey: "chooRotation") == nil } }
+    XCTAssertTrue(descendants(host, ChooLayerView.self).first === choo)
+    XCTAssertEqual(model.session.typed, "x"); XCTAssertEqual(model.composition, "xx")
+    XCTAssertFalse(window.isVisible)
+    XCTAssertFalse((CTFontManagerCopyAvailablePostScriptNames() as? [String] ?? []).contains(name))
   }
 }
