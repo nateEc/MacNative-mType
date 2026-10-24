@@ -67,7 +67,7 @@ import Observation
   }
 
   func testProductionNetworkRepeatKeepsActualRandomAddressesAndDiskIdentity() async throws {
-    for name in ["IPv4", "IPv6"] {
+    for name in ["IPv4", "IPv6", "58008"] {
       let f = try Fixture(); defer { f.close() }
       try await f.publish("{\"mode\":\"words\",\"words\":3,\"punctuation\":true,\"funbox\":[\"\(name)\"]}")
       let old = f.page.state

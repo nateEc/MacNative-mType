@@ -6,12 +6,14 @@ enum WebsiteRandomWordGenerator {
   enum Kind: String, CaseIterable {
     case binary, hexadecimal, gibberish, ascii, specials
     case ipv4 = "IPv4", ipv6 = "IPv6"
+    case accounting = "58008"
     var modifier: TestModifier {
       switch self {
       case .binary: .binaryStream; case .hexadecimal: .hexadecimalStream
       case .gibberish: .gibberishStream; case .ascii: .asciiStream
       case .specials: .specialCharacterStream
       case .ipv4: .ipv4Stream; case .ipv6: .ipv6Stream
+      case .accounting: .accountingStream
       }
     }
   }
@@ -23,7 +25,7 @@ enum WebsiteRandomWordGenerator {
     return matches.count == 1 ? matches.first : nil
   }
 
-  static func word(_ kind: Kind, randomUnit: () -> Double) -> String? {
+  static func word(_ kind: Kind, language: TypingLanguage = .english, randomUnit: () -> Double) -> String? {
     func draw(_ count: Int, lower: Int = 0) -> Int? {
       let unit = randomUnit()
       guard unit.isFinite, unit >= 0, unit < 1 else { return nil }
@@ -32,6 +34,16 @@ enum WebsiteRandomWordGenerator {
       return Int((unit * Double(count) + Double(lower)).rounded(.down))
     }
     switch kind {
+    case .accounting:
+      guard let length = draw(7, lower: 1) else { return nil }
+      let name = WebsiteLanguageIdentity.name(for: language) ?? ""
+      let digitZero: UInt32 = name.hasPrefix("kurdish") ? 0x0660 : name.hasPrefix("nepali") ? 0x0966 : 0x0030
+      var result = ""
+      for index in 0..<length {
+        guard let digit = draw(index == 0 ? 9 : 10, lower: index == 0 ? 1 : 0) else { return nil }
+        result.unicodeScalars.append(UnicodeScalar(digitZero + UInt32(digit))!)
+      }
+      return result
     case .ipv4, .ipv6:
       let version6 = kind == .ipv6
       var parts: [String] = []
@@ -76,6 +88,36 @@ enum WebsiteRandomWordGenerator {
       }
       return result
     }
+  }
+
+  /// Punctuation of generated numeric words, using UTF-16 positions like the
+  /// source handler. Its zero-neighbor check is specifically ASCII zero.
+  static func punctuatedAccountingWord(_ word: String, randomUnit: () -> Double) -> String? {
+    var units = Array(word.utf16)
+    guard units.count > 3 else { return word }
+    func unit() -> Double? {
+      let value = randomUnit()
+      return value.isFinite && value >= 0 && value < 1 ? value : nil
+    }
+    func position() -> Int? {
+      guard let value = unit() else { return nil }
+      return Int((value * Double(units.count - 2) + 1).rounded(.down))
+    }
+    guard let decimalChance = unit() else { return nil }
+    if decimalChance < 0.5 {
+      guard let index = position() else { return nil }
+      units[index] = 46
+    }
+    guard let operatorChance = unit() else { return nil }
+    if operatorChance < 0.75 {
+      guard let index = position() else { return nil }
+      let next = index + 1 < units.count ? units[index + 1] : nil
+      if units[index - 1] != 46 && next != 46 && next != 48 {
+        guard let value = unit() else { return nil }
+        units[index] = Array("/*-+".utf16)[Int((value * 4).rounded(.down))]
+      }
+    }
+    return String(decoding: units, as: UTF16.self)
   }
 
   /// Called only at the website punctuation stage. Plain IPv6 stays padded;

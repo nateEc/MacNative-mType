@@ -119,6 +119,7 @@ struct NativeTypingInput: NSViewRepresentable {
     var oppositeShiftKeymap: KeyboardInputMapping
     var oppositeShiftMode: OppositeShiftMode
     var mapsArrowKeysToInput: Bool
+    var mapsEnterToSpace = false
     var acceptsNewlineInput: Bool
     var acceptsTabInput: Bool
     var discardsAutofocusInput: Bool
@@ -171,6 +172,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.oppositeShiftKeymap = oppositeShiftKeymap
         view.oppositeShiftMode = oppositeShiftMode
         view.mapsArrowKeysToInput = mapsArrowKeysToInput
+        view.mapsEnterToSpace = mapsEnterToSpace
         view.acceptsNewlineInput = acceptsNewlineInput
         view.acceptsTabInput = acceptsTabInput
         view.discardsAutofocusInput = discardsAutofocusInput
@@ -233,6 +235,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var oppositeShiftKeymap: KeyboardInputMapping = .builtIn(.ansiQwerty)
     var oppositeShiftMode: OppositeShiftMode = .off
     var mapsArrowKeysToInput = false
+    var mapsEnterToSpace = false
     var acceptsNewlineInput = false
     var acceptsTabInput = false
     var discardsAutofocusInput = true
@@ -437,6 +440,12 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             // Let the input method choose whether Escape steps back through
             // candidate conversion or sends an explicit cancellation command.
             interpretKeyEvents([event])
+            return
+        }
+        if mapsEnterToSpace, event.keyCode == 36 || event.keyCode == 76 {
+            // Website emulation precedes Enter shortcuts and ignores key
+            // repeat. The page still owns admission and attempt identity.
+            if acceptsTextInput, !event.isARepeat { onInsert(" ", false) }
             return
         }
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "r" {

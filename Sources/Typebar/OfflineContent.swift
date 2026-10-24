@@ -6265,7 +6265,8 @@ struct GeneratedCandidateContinuation {
       if nextSectionWord >= sectionWords.count {
         var section = sampledWord(initialCandidate: candidate, random: nextRandomWordIndex)
         if let websiteSource {
-          guard let generated = WebsiteRandomWordGenerator.word(websiteSource, randomUnit: nextRandomContentUnit) else {
+          guard let generated = WebsiteRandomWordGenerator.word(websiteSource,
+            language: configuration.wordPoolBaseLanguage, randomUnit: nextRandomContentUnit) else {
             sourceGenerationFailed = true
             return .init(source: "", configuration: configuration)
           }
@@ -6305,6 +6306,15 @@ struct GeneratedCandidateContinuation {
       decorationConfiguration.language = baseLanguage
       if websiteSource == .hexadecimal {
         if options.includePunctuation { word = "0x" + word }
+      } else if websiteSource == .accounting {
+        if options.includePunctuation {
+          guard let punctuated = WebsiteRandomWordGenerator.punctuatedAccountingWord(word,
+            randomUnit: nextRandomContentUnit) else {
+            sourceGenerationFailed = true
+            return .init(source: "", configuration: configuration)
+          }
+          word = punctuated
+        }
       } else if let websiteSource, websiteSource == .ipv4 || websiteSource == .ipv6 {
         if options.includePunctuation {
           guard let punctuated = WebsiteRandomWordGenerator.punctuatedNetworkWord(word,

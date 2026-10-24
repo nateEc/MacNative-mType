@@ -27,11 +27,13 @@ const numbers = module('packages/util/src/numbers.ts');
 const arrays = module('frontend/src/ts/utils/arrays.ts');
 const generate = module('frontend/src/ts/utils/generate.ts');
 const ip = module('frontend/src/ts/utils/ip-addresses.ts');
-const strings = new vm.SyntheticModule([], () => {}, {context});
+const strings = module('frontend/src/ts/utils/strings.ts');
+const languageTypes = new vm.SyntheticModule(['Language'], function() { this.setExport('Language', undefined); }, {context});
 const link = id => {
   if (id === '@monkeytype/util/numbers') return numbers;
   if (id === './arrays') return arrays;
   if (id === './strings') return strings;
+  if (id === '@monkeytype/schemas/languages') return languageTypes;
   throw Error('Unexpected primitive dependency: ' + id);
 };
 await generate.link(link);
@@ -39,15 +41,30 @@ await generate.evaluate();
 await ip.link(link);
 await ip.evaluate();
 context.IPAddresses = ip.namespace;
+context.Strings = strings.namespace;
+context.GetText = generate.namespace;
+context.Arrays = arrays.namespace;
+context.randomIntFromRange = numbers.namespace.randomIntFromRange;
+context.Config = {language: 'english'};
+// These two actual bounded conversion functions have no imports or browser
+// dependencies. Do not pretend to execute the rest of misc.ts.
+const misc = fs.readFileSync(path.join(root, 'frontend/src/ts/utils/misc.ts'), 'utf8');
+for (const name of ['convertNumberToArabic', 'convertNumberToNepali']) {
+  const start = misc.indexOf(`export function ${name}(`), end = misc.indexOf('\n}\n', start);
+  assert.ok(start >= 0 && end > start);
+  vm.runInContext(stripTypeScriptTypes(misc.slice(start, end + 2).replace(/^export /gm, ''),
+    {mode: 'transform'}), context);
+}
+context.Misc = {convertNumberToArabic: context.convertNumberToArabic, convertNumberToNepali: context.convertNumberToNepali};
 // Evaluate the complete handler table, as the existing ordered-text probe
-// does. Only the two IP getWord/punctuateWord handlers are invoked here;
+// does. Only the IP and 58008 getWord/punctuateWord handlers are invoked here;
 // dormant browser dependencies are deliberately not supplied.
 const handlers = fs.readFileSync(path.join(root, 'frontend/src/ts/test/funbox/funbox-functions.ts'), 'utf8');
 const first = handlers.indexOf('const list: Partial<Record<FunboxName, FunboxFunctions>> = {');
 assert.ok(first >= 0);
 vm.runInContext(stripTypeScriptTypes(handlers.slice(first).replace(/^export /gm, ''),
   {mode: 'transform'}), context);
-const networkFunctions = context.getFunboxFunctions();
+const functions = context.getFunboxFunctions();
 const tapes = [[0], [0.5], [1 - Number.EPSILON / 2], [0, 0.99, 0.2, 0.7]];
 for (let seed = 1; seed <= 16; seed++) {
   let state = seed;
@@ -67,7 +84,13 @@ for (const [kind, name] of [['binary', 'getBinary'], ['hexadecimal', 'getHexadec
 }
 for (const kind of ['IPv4', 'IPv6']) for (const samples of tapes) {
   tape = samples; draws = 0;
-  fixtures.push({kind, samples, word: networkFunctions[kind].getWord(), draws});
+  fixtures.push({kind, samples, word: functions[kind].getWord(), draws});
+}
+for (const language of ['english', 'kurdish_central', 'kurdish_central_2k', 'kurdish_central_4k',
+  'nepali', 'nepali_1k', 'nepali_romanized', 'hindi']) for (const samples of tapes) {
+  context.Config.language = language;
+  tape = samples; draws = 0;
+  fixtures.push({kind: '58008', language, samples, word: functions['58008'].getWord(), draws});
 }
 const punctuation = [];
 const addresses = {
@@ -80,8 +103,16 @@ const addresses = {
 const punctuationTapes = [...tapes, [0, 1 - Number.EPSILON / 2], [0.249999, 0.5], [0.25], [0.75]];
 for (const kind of ['IPv4', 'IPv6']) for (const input of addresses[kind]) for (const samples of punctuationTapes) {
   tape = samples; draws = 0;
-  const word = networkFunctions[kind].punctuateWord(input);
+  const word = functions[kind].punctuateWord(input);
   punctuation.push({kind, input, samples, word, draws});
 }
+const accountingPunctuation = [];
+const accountingTapes = [...punctuationTapes, [0, 1 - Number.EPSILON / 2, 0, 1 - Number.EPSILON / 2, 1 - Number.EPSILON / 2],
+  [0, 0, 0.5, 0.5, 0]];
+for (const input of ['', '1', '123', '1234', '1010', '1234567', '5555', '9999999',
+  '١٠١٠', '١٢٣٤٥٦٧', '१०१०', '१२३४५६७']) for (const samples of accountingTapes) {
+  tape = samples; draws = 0;
+  accountingPunctuation.push({input, samples, word: functions['58008'].punctuateWord(input), draws});
+}
 verify();
-process.stdout.write(JSON.stringify({fixtures, punctuation}) + '\n');
+process.stdout.write(JSON.stringify({fixtures, punctuation, accountingPunctuation}) + '\n');

@@ -24,6 +24,50 @@ import XCTest
     }
   }
 
+  func testAccountingSourceUsesRandomDigitsAndLanguageSpecificNumerals() async throws {
+    for (language, plain, punctuated) in [
+      ("english", "5555", "55-5"), ("kurdish_central", "٥٥٥٥", "٥٥-٥"),
+      ("nepali_romanized", "५५५५", "५५-५"),
+    ] {
+      for punctuation in [false, true] {
+        let value = try draft("{\"mode\":\"words\",\"words\":2,\"language\":\"\(language)\",\"punctuation\":\(punctuation),\"funbox\":[\"58008\"]}")
+        var draws = 0
+        let result = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+          random: .init(contentUnit: { draws += 1; return 0.5 }))
+        let expected = punctuation ? punctuated : plain
+        XCTAssertEqual(result.session.prompt, "\(expected) \(expected)", language)
+        XCTAssertEqual(draws, 2 * (punctuation ? 9 : 5))
+        XCTAssertEqual(result.session.generatedWordReplayHistory?.count, 2)
+      }
+    }
+  }
+
+  func testAccountingTimedContinuationKeepsLocalizedDigitsAndReplayHistory() async throws {
+    let value = try draft(#"{"mode":"time","time":60,"language":"nepali","funbox":["58008"]}"#)
+    let ready = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+      random: .init(contentUnit: { 0.5 }))
+    var session = ready.session
+    let initial = try XCTUnwrap(session.generatedWordReplayHistory?.count)
+    session.insertBatch("५५५५ ")
+    let history = try XCTUnwrap(session.generatedWordReplayHistory)
+    XCTAssertGreaterThan(history.count, initial)
+    let tail = try XCTUnwrap(history.word(at: history.count - 1)?.target)
+    XCTAssertTrue(tail.unicodeScalars.allSatisfy { (0x0966...0x096F).contains($0.value) })
+    let repeated = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+      attemptSource: .repeatedWords(history, repeatedPace: false),
+      random: .init(contentUnit: { XCTFail("Owned localized words cannot be regenerated"); return 0 }))
+    XCTAssertEqual(repeated.session.generatedWordReplayHistory?.word(at: history.count - 1)?.target, tail)
+  }
+
+  func testAccountingOriginalPunctuationLanguageSkipsItsPunctuationStage() async throws {
+    let value = try draft(#"{"mode":"words","words":2,"language":"typing_of_the_dead","punctuation":true,"funbox":["58008"]}"#)
+    var draws = 0
+    let ready = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+      random: .init(contentUnit: { draws += 1; return 0.5 }))
+    XCTAssertEqual(ready.session.prompt, "5555 5555")
+    XCTAssertEqual(draws, 10)
+  }
+
   func testWebsiteNetworkSourcesUseRandomSegmentsAndOnlyPunctuateWhenEnabled() async throws {
     for (name, unit, punctuation, expected, draws) in [
       ("IPv4", 0.5, false, "128.128.128.128", 4),
@@ -89,7 +133,7 @@ import XCTest
   }
 
   func testWholePreviewUsesRandomSourceAndRetainsEveryOwnedWord() async throws {
-    for (name, expected, calls) in [("binary", "10000000", 1), ("ascii", "PPPPPP", 7),
+    for (name, expected, calls) in [("binary", "10000000", 1), ("ascii", "PPPPPP", 7), ("58008", "5555", 5),
       ("IPv4", "128.128.128.128", 4),
       ("IPv6", Array(repeating: "8000", count: 8).joined(separator: ":"), 8)] {
       let value = try draft("{\"mode\":\"words\",\"words\":1001,\"showAllLines\":true,\"funbox\":[\"\(name)\"]}")
