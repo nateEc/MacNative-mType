@@ -74,6 +74,82 @@ import TypebarSystem
     XCTAssertTrue(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
   }
 
+  func testUnstartedSetterSavesBeforeInitWithoutClosingOrCountingAnAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4,"funbox":["no_quit"],"quoteLength":[0]}"#)
+    let old = f.page.state.session.automaticInputAttemptID
+    let action = WebsiteConfigPracticeEdit.mode(.quote)
+    let ticket = try f.accept(f.edit(action), action: action)
+    XCTAssertFalse(f.page.state.session.hasStarted)
+    XCTAssertEqual(f.page.state.session.outcome, .active)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, old)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertFalse(f.page.acceptsInput(for: old))
+    guard case .available(let runtime) = try f.register.read().state else { return XCTFail("Missing setter record") }
+    XCTAssertEqual(runtime["mode"], .string("quote"))
+    try await f.finish(ticket)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, old)
+  }
+
+  func testFailedQuoteSetterUsesFailureRepeatAndNeverMeasuresFinishedAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"difficulty":"master","repeatQuotes":"typing"}"#)
+    var state = f.page.state; state.session.insertBatch("§"); f.page.replace(state)
+    XCTAssertEqual(f.page.state.session.outcome, .failed)
+    let typed = f.page.state.session.typed
+    let action = WebsiteConfigPracticeEdit.difficulty(.expert)
+    let ticket = try f.accept(f.edit(action), action: action)
+    XCTAssertEqual(f.page.state.session.outcome, .failed)
+    XCTAssertEqual(f.page.state.session.typed, typed)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    let ready = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+      XCTFail("Failed matching quote should repeat its owned source"); throw Failure.generation
+    })
+    XCTAssertEqual(ready.practice?.quote?.id, "owned")
+    XCTAssertEqual(ready.practice?.repetition.repeatsWordset, true)
+    guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else { return XCTFail("Delivery failed") }
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
+  func testCompletedSetterKeepsFinishedSnapshotAndPriorLedgerUntilDelivery() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":2}"#)
+    var state = f.page.state
+    state.session.insertBatch(state.session.prompt + " ")
+    XCTAssertEqual(state.session.outcome, .completed)
+    state.priorAttemptLedger.recordRestart(engagedDuration: 2, accuracy: 90, savingEnabled: true)
+    f.page.replace(state)
+    let action = WebsiteConfigPracticeEdit.words(6)
+    let ticket = try f.accept(f.edit(action), action: action)
+    XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, state.priorAttemptLedger)
+    XCTAssertFalse(f.page.acceptsInput(for: state.session.automaticInputAttemptID))
+    try await f.finish(ticket)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, state.priorAttemptLedger)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 6)
+  }
+
+  func testCompletedQuoteSetterDrawsFreshQuoteInsteadOfUsingFailureRepeat() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"typing"}"#)
+    var state = f.page.state; state.session.insertBatch(state.session.prompt + " "); f.page.replace(state)
+    XCTAssertEqual(f.page.state.session.outcome, .completed)
+    let action = WebsiteConfigPracticeEdit.difficulty(.expert)
+    let ticket = try f.accept(f.edit(action), action: action)
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    var reads = 0
+    let ready = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+      reads += 1
+      return [.init(id: "next", title: "Own next quote", text: "cd ef", language: .english, length: .short)]
+    })
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(ready.practice?.quote?.id, "next")
+    XCTAssertEqual(ready.practice?.repetition.repeatsWordset, false)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
   func testGenerationFailureAndCancellationRetainSavedSetterAndCanResumeWithoutDoubleCounting() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.publish(); f.input()

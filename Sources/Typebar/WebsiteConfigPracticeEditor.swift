@@ -110,7 +110,7 @@ struct WebsiteConfigPracticeEditor: View {
       if pendingPreparation {
         VStack(alignment: .leading, spacing: 6) {
           Label("设置已保存", systemImage: "checkmark.circle").font(.subheadline.weight(.semibold))
-          Text("旧练习已结束，新练习尚未准备完成。取消不会撤回已保存的设置。")
+          Text("新练习尚未准备完成。取消不会撤回已保存的设置。")
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
           if let resume {
             Button("继续准备新练习") { form.resume(apply: resume) }

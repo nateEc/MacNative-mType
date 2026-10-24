@@ -111,25 +111,27 @@ final class WebsiteConfigCommitCoordinator {
     processing = true; defer { processing = false }
     try Task.checkCancellation()
     guard isCurrent(prepared), prepared.sourcePage === page,
-      let capture = prepared.pageCapture, capture.testActive,
+      let capture = prepared.pageCapture,
       page.state.configurationDeparture == nil,
       case .edited(let edit) = prepared.draft.origin, edit.key == action.key else { return .stale }
     guard let previous = page.state.practice,
       case .string(let language)? = prepared.draft.projection.runtime["language"] else {
       throw PracticePageSessionStateError.incomplete
     }
-    // The setter has already selected the new mode/language. Resolve while
-    // the old attempt is still active, then retain that decision across init
-    // failure/retry instead of consulting the now-abandoned attempt again.
+    // Resolve against the lifecycle before initialization, including failed
+    // quote repetition. Retain it across init failure/retry rather than
+    // consulting a retired attempt again.
     let repetition = WebsiteConfigRestartPolicy.resolve(requested: false, active: capture.testActive,
-      previouslyRepeated: previous.repetition.repeatsWordset, failed: false,
+      previouslyRepeated: previous.repetition.repeatsWordset,
+      failed: page.state.session.outcome == .failed
+        && page.state.restartDepartureAttemptID != page.state.session.automaticInputAttemptID,
       mode: prepared.draft.testParameters.mode, language: language,
       quoteLanguage: previous.quote.flatMap { WebsiteLanguageIdentity.name(for: $0.language) },
       repeatQuotes: prepared.draft.behavior.repeatQuotes, repeatedPace: prepared.draft.behavior.repeatedPace)
     // Close a value copy first. A rejected file CAS must leave the real clock,
     // input, ledger and publication untouched.
     var departed = page.state
-    let measurement = departed.session.abandonAndMeasure()
+    let measurement = capture.testActive ? departed.session.abandonAndMeasure() : nil
     let applied = try WebsiteConfigLazyModeLifecycle.applyingEvents(prepared.draft,
       pointsPerRem: prepared.environment.pointsPerRem)
     // The source setter saves before dispatch. Its listener can change the

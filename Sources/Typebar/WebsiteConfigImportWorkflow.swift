@@ -144,14 +144,12 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         guard operation == current, !stopped else { throw CancellationError() }
         throw WebsiteConfigImportWorkflowError.rejectedRestartFailed
       }
-      if page.state.session.hasStarted && !page.state.session.isFinished {
-        switch try coordinator.beginConfigurationRestart(ticket, for: page, action: edit) {
-        case .accepted(let admitted): ticket = admitted
-        case .acceptedRetired: return "设置已保存，旧练习已结束，但窗口已变化；请重新打开面板恢复配置。"
-        case .busy: throw WebsiteConfigImportWorkflowError.busy
-        case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
-        case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
-        }
+      switch try coordinator.beginConfigurationRestart(ticket, for: page, action: edit) {
+      case .accepted(let admitted): ticket = admitted
+      case .acceptedRetired: return "设置已保存，但窗口已变化；请重新打开面板恢复配置。"
+      case .busy: throw WebsiteConfigImportWorkflowError.busy
+      case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+      case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
       }
     case .resume:
       do { ticket = try coordinator.resumeConfigurationRestart(for: page) }

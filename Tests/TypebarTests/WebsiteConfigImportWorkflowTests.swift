@@ -73,12 +73,19 @@ import Observation
     do {
       try await f.workflow.editAndBegin(.mode(.custom), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
       XCTFail("Missing custom text applied a candidate lazy-memory restoration")
-    } catch WebsiteConfigSessionBuildError.customTextUnavailable {}
-    XCTAssertEqual(try register.read().revision, revision)
-    XCTAssertEqual(try register.read().lazyMemory, first.lazyMemory)
+    } catch let error as WebsiteConfigSavedPreparationError {
+      guard case WebsiteConfigSessionBuildError.customTextUnavailable = error.underlying else {
+        return XCTFail("Unexpected saved preparation failure: \(error)")
+      }
+    }
+    XCTAssertNotEqual(try register.read().revision, revision)
+    XCTAssertFalse(try register.read().lazyMemory.remember, "Custom init restores the remembered value before missing text is detected")
+    XCTAssertEqual(f.page.state.configurationDeparture?.draft.testParameters.mode, .custom)
     XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"hindi","lazyMode":true}"#, systemIsDark: false)
+    let restoredRevision = try register.read().revision
     try await f.workflow.apply(json: nil, systemIsDark: false)
-    XCTAssertEqual(try register.read().revision, revision, "Stable remembered state must not invalidate other windows on cold restore")
+    XCTAssertEqual(try register.read().revision, restoredRevision, "Stable remembered state must not invalidate other windows on cold restore")
     try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"spanish","lazyMode":false}"#, systemIsDark: false)
     let restored = try XCTUnwrap(f.page.state.presentation).publication.draft
     XCTAssertTrue(restored.generators.lazyMode)
@@ -269,20 +276,30 @@ import Observation
     XCTAssertEqual(f.settings.snapshot, legacy)
   }
 
-  func testEditFailureDoesNotReplacePageOrOverwriteRecordAndCanRetry() async throws {
+  func testRejectedSetterKeepsRecordButAcceptedPreparationFailureRemainsSaved() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
     let attempt = f.page.state.session.automaticInputAttemptID
     let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
     let bytes = try Data(contentsOf: path)
-    for edit in [WebsiteConfigPracticeEdit.words(Double(OfficialTestLimitInput.maximumValue) + 1), .mode(.custom)] {
-      do { try await f.workflow.editAndBegin(edit, replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false); XCTFail("Invalid edit committed") }
-      catch {}
-      XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
-      XCTAssertEqual(try Data(contentsOf: path), bytes)
+    do { try await f.workflow.editAndBegin(.words(Double(OfficialTestLimitInput.maximumValue) + 1), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false); XCTFail("Invalid edit committed") }
+    catch {}
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(try Data(contentsOf: path), bytes)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    do { try await f.workflow.editAndBegin(.mode(.custom), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false); XCTFail("Missing custom text delivered") }
+    catch let error as WebsiteConfigSavedPreparationError {
+      guard case WebsiteConfigSessionBuildError.customTextUnavailable = error.underlying else {
+        return XCTFail("Unexpected initializer failure")
+      }
     }
-    try await f.workflow.editAndBegin(.words(6), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.page.state.configurationDeparture?.draft.testParameters.mode, .custom)
+    XCTAssertNotEqual(try Data(contentsOf: path), bytes)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    try await f.workflow.apply(json: #"{"mode":"words","words":6}"#, systemIsDark: false)
     XCTAssertEqual(f.page.state.session.configuration.wordLimit, 6)
+    XCTAssertNil(f.page.state.configurationDeparture)
   }
 
   func testEditCancellationOwnerLossAndDiskConflictDoNotCommitLateGeneration() async throws {
@@ -366,6 +383,45 @@ import Observation
     XCTAssertNil(f.page.state.configurationDeparture)
     XCTAssertEqual(f.page.state.session.configuration.mode, .quote)
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testIdleAndCompletedSetterSaveBeforeLoadAndResumeWithoutIncompleteAccounting() async throws {
+    for completed in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      let gate = Gate(); defer { gate.resolve() }
+      let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+        directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in await gate.read() })
+      defer { workflow.stop() }
+      try await workflow.apply(json: #"{"mode":"words","words":2,"quoteLength":[0]}"#, systemIsDark: false)
+      var state = f.page.state
+      if completed {
+        state.session.insertBatch(state.session.prompt + " ")
+        XCTAssertEqual(state.session.outcome, .completed)
+      }
+      state.priorAttemptLedger.recordRestart(engagedDuration: 2, accuracy: 90, savingEnabled: true)
+      f.page.replace(state)
+      let publication = try XCTUnwrap(f.page.state.presentation).publication
+      let task = Task { try await workflow.editAndBegin(.mode(.quote), replacing: publication.applicationID, systemIsDark: false) }
+      try await gate.wait()
+      XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+      XCTAssertEqual(f.page.state.priorAttemptLedger, state.priorAttemptLedger)
+      XCTAssertFalse(f.page.acceptsInput(for: state.session.automaticInputAttemptID))
+      let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+      let register = WebsiteConfigFileRegister(directory: f.directory)
+      guard case .available(let runtime) = try register.read().state else { return XCTFail("Setter record missing") }
+      XCTAssertEqual(runtime["mode"], .string("quote"))
+      let disk = try register.read().revision
+      task.cancel(); gate.resolve()
+      do { _ = try await task.value; XCTFail("Cancelled preparation delivered") } catch is CancellationError {}
+      XCTAssertEqual(f.page.state.configurationDeparture?.id, pending.id)
+      XCTAssertEqual(try register.read().revision, disk)
+      let retry = Task { try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false) }
+      try await gate.wait(); gate.resolve(); _ = try await retry.value
+      XCTAssertEqual(try register.read().revision, disk)
+      XCTAssertEqual(f.page.state.priorAttemptLedger, state.priorAttemptLedger)
+      XCTAssertNil(f.page.state.configurationDeparture)
+      XCTAssertEqual(f.page.state.session.configuration.mode, .quote)
+    }
   }
 
   func testCancelledActiveEditCanResumeWithoutSetterReplayOrDuplicateLedger() async throws {
@@ -612,7 +668,7 @@ import Observation
     XCTAssertEqual(try budget(), 3)
   }
 
-  func testUnavailableQuoteGroupLeavesActualQueuePageAndFileUntouched() async throws {
+  func testUnavailableQuoteGroupSavesSelectionButKeepsUndeliveredQueueAndPage() async throws {
     let f = try Fixture(); defer { f.close() }
     let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
       directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in [
@@ -624,12 +680,19 @@ import Observation
     let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
     let bytes = try Data(contentsOf: path)
     do { try await workflow.editAndBegin(.quoteLengths([3]), replacing: publication.applicationID, systemIsDark: false); XCTFail("Missing quote group silently applied") }
-    catch WebsiteConfigSessionBuildError.reconfigurationRequired {}
+    catch let error as WebsiteConfigSavedPreparationError {
+      guard case WebsiteConfigSessionBuildError.reconfigurationRequired = error.underlying else {
+        return XCTFail("Unexpected initializer failure")
+      }
+    }
     XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
     XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
     XCTAssertEqual(f.page.state.practice?.scope.quoteSampler?.selection.groups, [0])
-    XCTAssertEqual(try Data(contentsOf: path), bytes)
-    try await workflow.editAndBegin(.punctuation(true), replacing: publication.applicationID, systemIsDark: false)
+    XCTAssertNotEqual(try Data(contentsOf: path), bytes)
+    XCTAssertEqual(f.page.state.configurationDeparture?.draft.quoteSelection.groups, [3])
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false)
+    try await workflow.editAndBegin(.punctuation(true), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
     XCTAssertFalse(f.page.state.session.configuration.contentOptions.includePunctuation)
   }
 
@@ -806,7 +869,7 @@ import Observation
     XCTAssertEqual(f.page.state.priorAttemptLedger, state.priorAttemptLedger)
   }
 
-  func testCancelledLengthPreparationKeepsPublishedWeightedQueueAndAllowsAnotherEdit() async throws {
+  func testCancelledLengthPreparationKeepsPublishedQueueAndResumesSavedSelection() async throws {
     let f = try Fixture(); defer { f.close() }
     let gate = Gate(); defer { gate.resolve() }
     var parked = false
@@ -830,12 +893,18 @@ import Observation
     let task = Task { try await workflow.editAndBegin(.quoteLengths([0,0,1]), replacing: publication.applicationID, systemIsDark: false) }
     try await gate.wait()
     XCTAssertEqual(try budget(), 4)
+    let savedBytes = try Data(contentsOf: path)
+    XCTAssertNotEqual(savedBytes, bytes, "A same-value setter still saves before preparation")
+    let pending = try XCTUnwrap(f.page.state.configurationDeparture)
     task.cancel(); gate.resolve()
     do { _ = try await task.value; XCTFail("Cancelled quote draw applied") } catch is CancellationError {}
     XCTAssertEqual(try budget(), 4)
-    XCTAssertEqual(try Data(contentsOf: path), bytes)
+    XCTAssertEqual(try Data(contentsOf: path), savedBytes)
     parked = false
-    try await workflow.editAndBegin(.difficulty(.expert), replacing: publication.applicationID, systemIsDark: false)
+    try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false)
+    XCTAssertEqual(try Data(contentsOf: path), savedBytes)
+    XCTAssertEqual(try budget(), 4, "The saved length event rebuilds the pool on eventual delivery")
+    try await workflow.editAndBegin(.difficulty(.expert), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
     XCTAssertEqual(try budget(), 3)
   }
 }
