@@ -8,6 +8,12 @@ enum WebsiteConfigSessionBuildError: Error {
 /// Whole-draft generation with explicit window/account content scope. No
 /// preference mutation, resource activation, record write or page installation.
 @MainActor enum WebsiteConfigSessionBuilder {
+  enum Reason: Equatable {
+    /// Continue already-applied settings without replaying their setter events.
+    case nextAttempt
+    /// Apply this draft's events once to a candidate scope before generation.
+    case configurationApplication
+  }
   struct Scope {
     var parameterMemory: TypebarTestParameterMemory = .defaults
     var customText = ""
@@ -47,6 +53,7 @@ enum WebsiteConfigSessionBuildError: Error {
     var parameterMemory: TypebarTestParameterMemory { scope.parameterMemory }
   }
   static func prepare(draft: WebsiteConfigNativeDraft, scope: Scope,
+    reason: Reason = .nextAttempt,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> External)? = nil,
     random: Random = .init()) async throws -> Prepared {
@@ -57,13 +64,21 @@ enum WebsiteConfigSessionBuildError: Error {
       throw WebsiteConfigSessionBuildError.unrepresentableConfiguration
     }
     var nextScope = scope
+    // The actual source listener rebuilds for every quoteLength setter event,
+    // including identical arrays and nosave=true. Other events do not reset it.
+    // Keep this candidate value-owned so cancellation/failure cannot advance or
+    // clear the caller's already-installed queue.
+    if reason == .configurationApplication,
+      draft.projection.events.contains(where: { $0.key == "quoteLength" }) {
+      nextScope.quoteSampler = nil
+    }
     nextScope.parameterMemory = draft.testParameters.parameterMemory(preserving: scope.parameterMemory)
     var selectedQuote: OfflineQuote?
     var selectedExternal: External?
     if config.mode == .quote {
       let catalog = try await read { try await loadQuotes(draft.testParameters.language) }
       var sampler: WebsiteQuoteSampler
-      if let previous = scope.quoteSampler, previous.matches(selection: draft.quoteSelection, quotes: catalog) {
+      if let previous = nextScope.quoteSampler, previous.matches(selection: draft.quoteSelection, quotes: catalog) {
         sampler = previous
       } else { sampler = try .init(selection: draft.quoteSelection, quotes: catalog) }
       switch try sampler.next(selectedQuoteID: scope.selectedQuoteID, favoriteIDs: scope.favoriteQuoteIDs,

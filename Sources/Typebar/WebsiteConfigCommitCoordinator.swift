@@ -227,10 +227,6 @@ final class WebsiteConfigCommitCoordinator {
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
     random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> SessionPrepared {
-    // Full import dispatches quoteLength again, even for identical values.
-    // Ordinary next-attempt generation may instead continue the returned queue.
-    var importScope = scope
-    importScope.quoteSampler = nil
     let checkedExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
     if let loadExternal {
       checkedExternal = { source, configuration in
@@ -240,7 +236,8 @@ final class WebsiteConfigCommitCoordinator {
       }
     } else { checkedExternal = nil }
     return try await prepareSessionBuild(for: prepared) { draft in
-      let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: importScope,
+      let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: scope,
+        reason: .configurationApplication,
         loadQuotes: { language in
           try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
             try await loadQuotes(language)

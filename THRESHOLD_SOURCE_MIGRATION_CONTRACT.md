@@ -1,5 +1,17 @@
 # 阈值源状态与迁移契约
 
+## 配置应用与下一轮的队列寿命（2026-10-24，起点 555c3817）
+
+固定 controllers/quotes-controller.ts 仅在 quoteLength 事件中调用 updateQuoteQueue，不检查 previousValue 或 nosave；fullConfigChange 起止、音量、模式及同语言事件本身不重建队列。只读 QA 执行实际监听器，新增 12 组事件对照；未载入参考引语资产。相同长度重复设置也会重建，不得以值相等优化消除。
+
+原生会话构建新增显式 Reason：普通 nextAttempt 不重放原草稿事件；configurationApplication 仅按实际 quoteLength 事件清除候选 Scope 内的 sampler。协调器移除无条件清空，改用这一共同路径；当前全量导入仍因自身 quoteLength setter 事件重置，编辑草稿可保留其他设置事件下的已用队列。非引语期间的队列也按同一事件语义保留／失效，后续回到引语再生成。目录或选择变化仍由既有 sampler.matches 检查。
+
+源与目标 Scope 都是值状态；只有返回成功结果并完成后续准入后才安装新队列。重复准备、失败和取消不得消耗原队列；成功候选下一轮不再重放原导入事件。本轮先行证据是 Reason 接口缺失的编译失败，不冒称行为红测；28 项先行相关检查通过。补充非引语与连续尝试后，最终 344 项 WebsiteConfig／WebsiteFunboxAdmission／PracticePageSession 扩大检查零失败／零跳过，83.217 秒，包含三项新队列检查及先前的导入／事务／宿主／资源回归。日志 /tmp/typebar-application-queue-expanded.log，先行集合重叠不相加。没有存储格式迁移或默认入口切流，退回前一版本不会丢持久数据。
+
+Debug 应用包／签名、包内资源与原创性检查通过，日志 /tmp/typebar-application-queue-package.log；包未启动。原创性边界及自检、固定参考行为审计（47 直接／119 测试符号／17 支持规范）、人工清单结构与自检通过；1,301 条仅结构通过，新行仍待物理验收。冻结实现 SHA256：WebsiteConfigSessionBuilder aa6fe4c5c6d5bd0901814b7d8c1561bfe98c84df047f690b679b939633b3aca2；WebsiteConfigCommitCoordinator ef17d58407afd1b18969d4024630c0d98c21304b9795c10c1f6d48227cdca912。原生测试／构建期间未编辑 Swift 输入。
+
+这不是编辑事务或重开完成：单项编辑协调器准入、原位即时副作用、资源／文件／页面交接、引语重复策略及正式 UI 仍待接线。迁移安全技能使配置应用和普通下一轮显式分离；旧导入、作用域和参数记忆保留。独立滚轮基线与物理 IME 等旧缺口仍开放，不宣称完整门禁；完整目标继续 active。未改 main／工作流／通知，不重跑 Actions 或启动主程序。以下为前批记录，不替代本轮验证。
+
 ## 单项编辑准备批次（2026-10-24，起点 df016861）
 
 源是当前完整 runtime，不是默认文档或旧 Snapshot。目标为独立 setter 投影及完整类型草稿；不得通过 JSON 全量导入冒充编辑，否则会重放无关事件、重置引语队列及参数记忆。完整导入与编辑共享值覆盖、依赖 setter 和 funbox 准入核心，但只有完整导入有 fullConfigChange 起止事件；编辑保留未涉及的 94 字段，事件沿用实际 previousValue 与 nosave。

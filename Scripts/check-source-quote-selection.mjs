@@ -128,4 +128,18 @@ for (const input of inputs) {
 }
 verify();
 assert.equal(fixtures.length, 1562);
-console.log(JSON.stringify({fixtures}));
+const applications = [];
+for (const key of ['soundVolume', 'language', 'mode', 'quoteLength', 'fullConfigChange', 'fullConfigChangeFinished']) {
+  for (const nosave of [false, true]) {
+    const selection = [0, 0, 1];
+    await controller.getQuotes('english', selection);
+    listeners.forEach(notify => notify({key:'quoteLength', newValue:selection, nosave:true}));
+    controller.getRandomQuote(); controller.getRandomQuote();
+    const before = controller.queueIndex;
+    const values = {soundVolume:0.3, language:'english', mode:'quote', quoteLength:selection};
+    listeners.forEach(notify => notify({key, newValue:values[key], nosave}));
+    applications.push({key, nosave, before, remaining:controller.quoteQueue.length - controller.queueIndex});
+  }
+}
+verify();
+console.log(JSON.stringify({fixtures, applications}));
