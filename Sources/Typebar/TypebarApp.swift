@@ -1258,7 +1258,7 @@ private struct ContentView: View {
   @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var savedPresets:
     [TestPresetRecord]
   @State private var ownedPageSessionStore = PracticePageSessionStore()
-  @State private var finalizedPracticeApplicationID: UUID?
+  @State private var finalizedPracticeAttemptID: UUID?
   private var pageSessionStore: PracticePageSessionStore { providedPageSessionStore ?? ownedPageSessionStore }
   private var pageSession: PracticePageSessionState {
     get { pageSessionStore.state }
@@ -1664,7 +1664,7 @@ private struct ContentView: View {
     .onChange(of: incomingPublishedPresentation?.publication.applicationID, initial: true) { _, _ in
       consumePublishedPractice()
     }
-    .onChange(of: pageSession.presentation?.publication.applicationID, initial: true) { _, _ in
+    .onChange(of: pageSession.practice?.session.automaticInputAttemptID, initial: true) { _, _ in
       finalizePublishedPracticeInstallation()
     }
     .background(SharedProfileWindowProbe(host: sharedProfileWindow, didAttach: {
@@ -4203,9 +4203,9 @@ private struct ContentView: View {
   }
 
   private func finalizePublishedPracticeInstallation() {
-      guard pageSession.practice != nil, let applicationID = pageSession.presentation?.publication.applicationID,
-        finalizedPracticeApplicationID != applicationID else { return }
-      finalizedPracticeApplicationID = applicationID
+      guard let practice = pageSession.practice,
+        finalizedPracticeAttemptID != practice.session.automaticInputAttemptID else { return }
+      finalizedPracticeAttemptID = practice.session.automaticInputAttemptID
       wholePreviewTask.cancel(); liveContentTask?.cancel(); liveContentTask = nil
       liveContentRequestID = UUID()
       isPreparingWholePreview = false; isLoadingLiveContent = false

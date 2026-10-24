@@ -388,6 +388,55 @@ import XCTest
     XCTAssertFalse(f.window.isVisible)
   }
 
+  private func awaitNext(_ coordinator: WebsiteConfigCommitCoordinator, page: PracticePageSessionStore) throws
+    -> WebsiteConfigCommitCoordinator.NextPrepared {
+    var result: Result<WebsiteConfigCommitCoordinator.NextPrepared, Error>?
+    let task = Task { @MainActor in
+      do { result = .success(try await coordinator.prepareNext(for: page)) }
+      catch { result = .failure(error) }
+    }
+    defer { task.cancel() }
+    let deadline = Date().addingTimeInterval(10)
+    while result == nil && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    return try XCTUnwrap(result).get()
+  }
+
+  func testOrdinaryNextClearsCompositionWithoutReapplyingTheConfiguration() throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let resources = try coordinator.prepareResources(for: coordinator.prepare(#"{"mode":"custom"}"#),
+      localFont: .absent, localBackground: .data(Fixture.png()))
+    let ready = try awaitResult(coordinator, resources: resources)
+    guard case .committed = try coordinator.commit(ready, to: f.state.page, systemIsDark: false) else {
+      return XCTFail("Initial page installation failed")
+    }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    f.wait { input.insertionAttemptID == ready.session.automaticInputAttemptID && input.acceptsTextInput }
+    let presentation = try XCTUnwrap(f.state.page.state.presentation)
+    let disk = try f.register.read().revision
+    input.setMarkedText("中", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+    f.wait { input.hasMarkedText() }
+    let staleInsert = input.onInsert
+    let next = try awaitNext(coordinator, page: f.state.page)
+    guard case .advanced = try coordinator.advance(next, to: f.state.page) else { return XCTFail("Next did not install") }
+    staleInsert("old", false)
+    XCTAssertEqual(f.state.page.state.session.typed, "")
+    let nextID = f.state.page.state.session.automaticInputAttemptID
+    f.wait { input.insertionAttemptID == nextID && input.acceptsTextInput }
+    XCTAssertFalse(input.hasMarkedText())
+    XCTAssertFalse(f.views(PromptFieldNativeView.self).contains { ($0.accessibilityValue() as? String)?.contains("中") == true },
+      "The page's composition state must retire even when the configuration publication is unchanged")
+    XCTAssertTrue(f.state.page.state.presentation === presentation)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    input.insertText("a", replacementRange: .init(location: NSNotFound, length: 0))
+    XCTAssertEqual(f.state.page.state.session.typed, "a")
+    XCTAssertFalse(f.window.isVisible)
+  }
+
   func testSynchronousCommitChecksActualStartedNoQuitPageBeforeWriting() throws {
     let f = try Fixture(); defer { f.close() }
     f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }

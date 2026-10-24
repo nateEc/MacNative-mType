@@ -1,5 +1,23 @@
 # 阈值源状态与迁移契约
 
+## 普通下一轮的独立交接（2026-10-24，起点 fbd37b19）
+
+固定 `test/test-logic.ts` 的 restart 区分普通生成、withSameWordset、活动 No Quit、未完成尝试记账及练习词返回；并不是再导入配置。新增 prepareNext／advance 只负责已发布页面的普通下一轮交接，不把它描述为完整 restart。来源必须是同一协调器 latest、同一页面和当前租约，配置文件 revision 与资源环境代次仍匹配；新环境先拒绝，须通过拥有者内容刷新／配置应用路径重新准入。
+
+准备使用当前页面的参数、引语队列、弱点簿和词形状态，按 nextAttempt 构建，不重放 draft 中的 quoteLength 等导入事件。沿用当前代次已经准备的字体／背景；不重新读文件资源或发起背景下载。显式 cancel、迟到输入／候选、页面退役／附着 ABA、新请求失败和拥有者变化会使旧候选失效；任务取消阻止当次生产／交接，生命周期拥有者仍应显式 cancel 丢弃的票据。失败的抽样不消费已安装队列。活动 No Quit 在读取引语前拒绝，交接时再次读取页面锁。
+
+advance 与配置 commit 分开：预约同一页面，最终只核对文件，不执行 register.commit，不产生新配置 ID 或持久 revision。保留同一 presentation 对象，避免把新尝试冒充重新应用主题／资源。成功后退役票据，旧输入回调不能操作新尝试；busy 释放预约后可重试原票据，冲突或不可用不替换旧会话。旧尝试和冻结的未完成用时／准确率只在成功结果中返回一次；本层不写记账、成绩或服务，也不替调用方决定 resultSaving。
+
+会话内反例复核发现：旧时钟采样是可注入回调，若放在最终文件读取之后可改写记录而仍安装候选。新反例实测 1 项／1 失败（`/tmp/typebar-next-attempt-clock-red.log`），现在先采样，再核对页面／环境／取消，最后预约并读文件，回调内外部写入产生 conflict，不覆盖旧输入。不是跨进程全局事务或独立评审。
+
+实际 ContentView 隐藏宿主还复现了同配置 ID 下残留候选文字：原 finalize 只监听配置发布 ID。校正测试夹具后，原断言单独 1 项／1 失败（`/tmp/typebar-next-attempt-host-red-fixed-fixture.log`）；现监听并去重尝试 ID，保持同一原生输入控件与同一配置 presentation，按既有流程清理候选和迟到回调。首轮 async 宿主夹具另有初始等待失败，改用该文件已有同步 RunLoop 准备方式，未延长等待或削弱断言。
+
+最初夹具缺 MainActor 与缺 API 的编译记录不算行为红测。首阶段 13 项、随后 43 项、修正时钟／宿主后的 55 项分别通过，集合重叠不相加。最终包含环境回调内任务取消的 56 项定向零失败，12.239 秒（`/tmp/typebar-next-attempt-cancellation-focused.log`），含十项新核心与一项新增实际宿主回归。冻结源码的 502 项配置／页面／设置恢复／有限文本相关扩大零失败／零跳过，225.194 秒（`/tmp/typebar-next-attempt-final-expanded.log`），原滚轮未排除；新实际宿主案例在其中 0.835 秒通过。Debug 打包／签名及包内资源／原创性通过（`/tmp/typebar-next-attempt-package.log`），包未启动。原创性及固定参考行为审计通过（47 直接／119 测试符号／17 支持规范），自检通过，1,306 条人工清单仅结构通过，不称完整客户端／服务端门禁。
+
+验证 SHA256：WebsiteConfigCommitCoordinator `4c48fe4eac74c72d255d8ad6a5e5e0e9ae5870c6324c8b29b292ca03fa456489`，TypebarApp `d14537909543e99ae665f980bccf6dbf8a7c362f12120183eb26cb67a4decf01`，WebsiteConfigNextAttemptTests `50e4bb0bade66a7ea6563a95bb1bc6cb0f6aed24476c187fba7c21b7338aef36`，WebsiteConfigPracticeHostTests `ff19083e10c5a96dafd3d91b0658fd718c40b0e5c2066ecd0a23e587a58763d8`。原生进程存活时未修改 Swift 输入。行为先行、迁移安全、会话内反例复核及根因调试决定独立交接、回调前移和尝试寿命监听，不冒称独立评审；完整目标继续 active。
+
+没有开放默认重开按钮或移除 ContentView 的保护，也没有迁移旧存储／更改 main、工作流或通知。仍须接通正式窗口控制器、重复同词与失败引语策略、未完成尝试记账、练习词返回、Funbox 重开副作用、配速／声音等完整尝试初始化与冷恢复；实体输入法、可见窗口和性能未验收。新增交接不能作为这些生命周期行为的替代。
+
 ## 实际模型的内容刷新与有限来源修正（2026-10-24，起点 60f956ce）
 
 新增只读 WebsiteConfigPracticeScopeSource，绑定同一 WebsiteConfigEnvironmentSource 的实际 AppSettings／AccountSession，而不是让调用方另外拼一个“看起来相同”的账户上下文。窗口必须提供所有者、内容应用代次、恢复确认状态及选中引语／参数；自定义来源区分原生存档、窗口明确来源和独立精确定时语料。刷新前后核对环境、模型和窗口；绑定票据弱持有刷新器，资源、会话和写盘前继续核对，停止／退役或变化后不能提交。

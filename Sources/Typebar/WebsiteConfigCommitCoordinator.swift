@@ -75,6 +75,19 @@ final class WebsiteConfigCommitCoordinator {
     let session: TypingSession
     let practice: WebsiteConfigSessionBuilder.Prepared?
   }
+  /// Ordinary generation only, not same-wordset repeat or configuration apply.
+  struct NextPrepared { fileprivate let session: SessionPrepared }
+  struct PreviousAttempt {
+    struct Incomplete {
+      let engagedDuration: TimeInterval
+      let accuracy: Double
+    }
+    let session: TypingSession
+    /// Capture before installation; a caller must not measure a live old clock
+    /// later when recording abandonment. nil for unstarted/terminal attempts.
+    let incomplete: Incomplete?
+  }
+  enum NextOutcome { case advanced(PreviousAttempt), stale, conflict, unavailable, busy }
   enum Outcome { case committed(Publication), stale, conflict, unavailable, busy }
   private let router: PreferenceConfigurationSaveRouter
   private let register: WebsiteConfigFileRegister
@@ -306,7 +319,78 @@ final class WebsiteConfigCommitCoordinator {
     random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> SessionPrepared {
     try await preparePracticeBuild(for: prepared, scope: nil, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
   }
+  func prepareNext(for page: PracticePageSessionStore,
+    loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
+    loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
+    random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> NextPrepared {
+    let resources = try nextResources(for: page)
+    let session = try await preparePracticeBuild(for: resources, scope: nil,
+      reason: .nextAttempt, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+    return .init(session: session)
+  }
+  @discardableResult
+  func cancel(_ next: NextPrepared) -> Bool { cancel(next.session) }
+  private func nextResources(for page: PracticePageSessionStore) throws -> ResourcesPrepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    request = UUID()
+    let capture = try page.captureGeneration(router: router)
+    guard let owner = router.captureLease(), owner.owner == page.owner,
+      let base = latest, base.applicationID == capture.publication.applicationID,
+      capture.publication.authority === publicationAuthority else { throw WebsiteConfigCommitCoordinatorError.stale }
+    guard let context = environment(), context.revision == base.environmentRevision,
+      context.pointsPerRem == base.pointsPerRem else { throw WebsiteConfigCommitCoordinatorError.stale }
+    guard !capture.testActive || !page.state.session.configuration.modifiers.contains(.noQuit) else {
+      throw PracticePageSessionStateError.locked
+    }
+    guard let background = base.background, let font = base.font else { throw PracticePageSessionStateError.incomplete }
+    guard let disk = try register.read().revision else { throw WebsiteConfigCommitCoordinatorError.unavailable }
+    guard disk == base.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+    var prepared = Prepared(draft: base.draft, identity: identity, request: request,
+      owner: owner, environment: context, disk: disk)
+    prepared.sourcePage = page; prepared.pageCapture = capture
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    // Already-admitted immutable resources belong to this exact environment.
+    // No preference setter, re-import, file-resource read or remote fetch.
+    resourceAdmission = UUID()
+    return .init(configuration: prepared, admission: resourceAdmission, background: background, font: font)
+  }
+  func advance(_ next: NextPrepared, to page: PracticePageSessionStore) throws -> NextOutcome {
+    guard !processing else { return .busy }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    let value = next.session, prepared = value.resources.configuration
+    guard value.admission == sessionAdmission, value.resources.admission == resourceAdmission,
+      isCurrent(prepared) else { retire(prepared); return .stale }
+    guard let source = prepared.sourcePage, page === source, let capture = prepared.pageCapture else {
+      throw PracticePageSessionStateError.wrongOwner
+    }
+    guard let practice = value.practice else { throw PracticePageSessionStateError.incomplete }
+    let old = page.state.session
+    let incomplete: PreviousAttempt.Incomplete? = old.hasStarted && !old.isFinished
+      ? .init(engagedDuration: old.activeEngagedDuration(), accuracy: old.preciseAccuracy) : nil
+    // An injected old clock is a callback too. Sample it before final page /
+    // environment / record validation, never after the last checked read.
+    guard isCurrent(prepared) else { retire(prepared); return .stale }
+    try Task.checkCancellation()
+    try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
+    defer { page.endCommit() }
+    // Last fallible operation, after all host callbacks and page reservation.
+    // A read verifies the record without generating a new durable revision.
+    let current: WebsiteConfigFileRegister.Snapshot
+    do { current = try register.read() }
+    catch WebsiteConfigFileRegisterError.busy { return .busy }
+    guard let revision = current.revision else { retire(prepared); return .unavailable }
+    guard revision == prepared.disk else { retire(prepared); return .conflict }
+    // Keep the live appearance/resource/configuration publication. A new
+    // attempt is not a new full application or a chance to replay its events.
+    page.installCommitted(.init(session: value.session.withElapsedClock(),
+      presentation: page.state.presentation, practice: practice))
+    retire(prepared)
+    return .advanced(.init(session: old, incomplete: incomplete))
+  }
   private func preparePracticeBuild(for prepared: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope?,
+    reason: WebsiteConfigSessionBuilder.Reason = .configurationApplication,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote],
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
     random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
@@ -328,7 +412,7 @@ final class WebsiteConfigCommitCoordinator {
         effectiveScope = scope
       }
       let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: effectiveScope,
-        reason: .configurationApplication,
+        reason: reason,
         loadQuotes: { language in
           try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
             try await loadQuotes(language)
