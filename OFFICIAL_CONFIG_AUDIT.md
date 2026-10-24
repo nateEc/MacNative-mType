@@ -1,5 +1,9 @@
 # 官方配置兼容性审计
 
+## 完整发布的提示字体消费（2026-10-24）
+
+已重新核对固定 ui.ts::applyFontFamily 的本地优先和有序链。新增 PromptViewportPracticePrompt 的发布入口直接消费准备好的 renderingFont，并从同份源 presentation 产生 PromptRenderStyle，校验调用方光标配置的一致性。全部行与其他路径按既有原生策略显式分流，不以普通视口冒充卷带／ASL／Choo。六项新增与相关 45 项通过，包含真实提交、同名字体实际宽度／重排、全局未注册及同根背景联合消费；旧主窗口与其他提示路径未迁移，无双写或旧注册退役。完整 UI、真实输入／IME 和全应用切流仍开放，具体边界见迁移契约。
+
 ## 完整发布的原生背景消费者（2026-10-24）
 
 固定 theme-controller 的完整背景应用会替换 img，普通 fit／filter 更新不会重新加载。Publication 新增不入档案的成功应用身份与显式 rem，WebsiteConfigPublishedBackground 校验 owner／背景准入后直接消费其图片、fit 与原始滤镜；不会退回旧夹紧模型、下载器或 NSImage 解码。nil 准入拒绝、none／failed 明确 fallback、失败分类提示、同值新寿命与卸载取消均有真实提交／隐藏宿主证据。六项新增、相关 42 项通过。新接口不是旧主窗口切流；旧矢量分支、正式配置 UI、全应用消费者与外部环境观察仍开放，详细迁移边界见契约。
