@@ -175,11 +175,13 @@ struct CustomPracticeBackground: View {
   let localBackgroundStore: TypebarLocalBackgroundStore
   @State var loader = CustomBackgroundImageLoader()
   var onFailure: BackgroundFailureFeedback.Sink = { _ in }
+  var applicationID: UUID? = nil
 
   private struct LoadIdentity: Hashable {
     let address: String
     let revision: Int
     let store: ObjectIdentifier
+    let applicationID: UUID?
   }
 
   var body: some View {
@@ -193,7 +195,7 @@ struct CustomPracticeBackground: View {
       } else if let image = loader.image { filtered(Image(nsImage: image)) }
     }
     .task(id: LoadIdentity(address: remoteURL, revision: localImageRevision,
-      store: ObjectIdentifier(localBackgroundStore))) {
+      store: ObjectIdentifier(localBackgroundStore), applicationID: applicationID)) {
       await loader.load(remoteURL: remoteURL, local: { try localBackgroundStore.encodedData() }, onFailure: onFailure)
     }
     .onDisappear { loader.clear() }

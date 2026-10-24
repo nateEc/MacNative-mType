@@ -1,5 +1,17 @@
 # 阈值源状态与迁移契约
 
+## 背景 setter 应用寿命而非值相等（追加阶段）
+
+固定 config/setters.ts::setConfig 在通过元数据、schema 与 Funbox 准入后，即使值未改变也保存并派发 configEvent；customBackground 元数据只做 trim、不要求测试重启。theme-controller 在 customBackground 事件中调用 applyCustomBackground，在 fullConfigChangeFinished 后调用一次；fit／filter 更新使用独立入口。applyCustomBackground 每次创建新 img，不能以 URL 相同或字节缓存命中把显式应用吞掉。
+
+旧属性适配器新增 customBackgroundApplicationID，作为运行期 UUID 而非计数溢出后可能 ABA 的标量；不加入 Snapshot、JSON 或设置 schema。有效 URL 属性应用（含重复与清除）建立新寿命；成功完整 Snapshot 应用同样建立应用，已拒绝的命令／Snapshot 不建立。fit／filter／背景样式和普通读取不改变此标识；不影响当前练习选择或 wrapper 事件。持久化捕获的内部投影不伪造用户应用事件。
+
+CustomPracticeBackground 的 task 键纳入显式应用标识，生产入口从 AppSettings 传入；现有 URL／本地 revision／store 身份仍共同决定来源。相同 URL 的新应用重新进入有界加载桥，退休旧请求、错误候选、声明历史及播放原点；本地条目存在时仍按本地优先，不因远端应用改为下载远端。标识默认 nil 保持未接该旧属性入口的调用方稳定，不能推断所有跨进程／所有配置协调器都已接线。
+
+WebsiteConfigEnvironmentSource 也显式观察此应用标识，不能只依赖 Snapshot 的值观察。等值 setter 可改变图片寿命而 Snapshot 相等；缺少该观察时环境仍返回旧 revision 的四处反例已复现。加入后同步退休缓存、异步稳定重采样，并使旧配置准备票据因环境不匹配而不能写文件。此为已有严格协调器的失效栅栏补齐，不代表生产宿主已完整切入该配置事务。
+
+该应用范围只补旧属性界面到现有宿主的显式事件；完整 WebsiteConfig 文件 CAS／原始地址／全部源事件仍未切流。UUID 只保证区分寿命，不能让同一 MainActor 回合里多个 setter 的中间状态逐个显现；SwiftUI 可以把它们合并为最终一次加载，不把这一点冒称已经复刻浏览器所有异步交错。
+
 ## 背景失败提示与交付范围（追加阶段）
 
 固定 theme-controller.ts 的 customBackgroundFailed 监听器调用 showNoticeNotification，显式 durationMs 为 5000；通知模块将其归为 notice。原生通过现有 LocalNoticeCenter 以普通提示和 5000 毫秒交付，不使用默认永久 error，也不创建系统通知、邮件或外部请求。远端／本地加载、资源限额、原生绘图和播放失败使用固定分类文案；不把底层 Error、URL、响应内容、凭据或文件路径写入通知及其历史 details。现有专注／截图模式的普通提示过滤规则保持不变。

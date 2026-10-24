@@ -1464,6 +1464,7 @@ final class AppSettings {
         customBackgroundURL = normalized
         return
       }
+      if !savingLiveConfiguration { customBackgroundApplicationID = UUID() }
       persist()
     }
   }
@@ -1479,6 +1480,8 @@ final class AppSettings {
     }
   }
   private(set) var localBackgroundRevision = 0
+  /// Runtime-only source application identity, never a persisted setting.
+  private(set) var customBackgroundApplicationID = UUID()
   private(set) var localPracticeFontRevision = 0
   var practiceBackdrop: PracticeBackdropStyle = .solid { didSet { persist() } }
   var reducePracticeMotion = false { didSet { persist() } }

@@ -73,6 +73,7 @@ final class WebsiteConfigEnvironmentSource {
         _ = settings.testModifiersApplicationRevision
         _ = settings.localPracticeFontRevision
         _ = settings.localBackgroundRevision
+        _ = settings.customBackgroundApplicationID
         _ = account.endpoint
         _ = account.accountPersonalBestSessionRevision
         return WebsiteConfigRuntimeContext(authenticated: account.currentUser != nil,

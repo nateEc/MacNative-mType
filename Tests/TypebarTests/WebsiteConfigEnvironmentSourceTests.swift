@@ -45,6 +45,25 @@ final class WebsiteConfigEnvironmentSourceTests: XCTestCase {
     }
   }
 
+  func testRepeatedBackgroundApplicationRetiresAnUnchangedSnapshotEnvironment() async throws {
+    try await withModels { settings, account in
+      settings.customBackgroundURL = "https://example.invalid/same.png"
+      let source = WebsiteConfigEnvironmentSource(settings: settings, account: account,
+        pointsPerRem: 16, documentComplete: true, development: false)
+      defer { source.stop() }
+      let before = try XCTUnwrap(source.read()), snapshot = settings.snapshot
+      settings.customBackgroundURL = settings.customBackgroundURL
+      XCTAssertEqual(settings.snapshot, snapshot)
+      XCTAssertNil(source.read(), "An explicit same-value image application retires pending preparation")
+      let after = try await settled(source)
+      XCTAssertNotEqual(after.revision, before.revision); XCTAssertEqual(after.context, before.context)
+      settings.customBackgroundURL = settings.customBackgroundURL
+      XCTAssertNil(source.read(), "The application observation must rearm")
+      let rearmed = try await settled(source)
+      XCTAssertNotEqual(rearmed.revision, after.revision)
+    }
+  }
+
   func testActualAccountAndThemeDirectoryProduceRuntimeContext() async throws {
     try await withModels { settings, account in
       let source = WebsiteConfigEnvironmentSource(settings: settings, account: account,
@@ -144,6 +163,14 @@ final class WebsiteConfigEnvironmentSourceTests: XCTestCase {
       XCTAssertEqual(published.environmentRevision, source.read()?.revision)
       XCTAssertEqual(try register.read().state, .available(published.draft.projection.runtime))
       XCTAssertEqual(published.draft.projection.runtime["time"], .number(43))
+      let protectedRecord = try register.read().state
+      let imageTicket = try coordinator.prepare(#"{"time":47}"#)
+      settings.customBackgroundURL = settings.customBackgroundURL
+      _ = try await settled(source)
+      guard case .stale = try coordinator.commit(imageTicket) else {
+        return XCTFail("Same-value image application allowed an old preparation to commit")
+      }
+      XCTAssertEqual(try register.read().state, protectedRecord, "Retired image context must not write the file")
     }
   }
 
