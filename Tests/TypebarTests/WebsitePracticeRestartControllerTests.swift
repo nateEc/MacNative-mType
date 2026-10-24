@@ -1,6 +1,7 @@
 import Darwin
 import TypebarSystem
 import XCTest
+import Observation
 @testable import Typebar
 
 @MainActor final class WebsitePracticeRestartControllerTests: XCTestCase {
@@ -37,6 +38,81 @@ import XCTest
     let deadline = ContinuousClock.now.advanced(by: .seconds(3))
     while !ready() && ContinuousClock.now < deadline { await Task.yield() }
     XCTAssertTrue(ready(), "Restart operation did not settle")
+  }
+
+  func testProductionCandidateRepeatKeepsConfigurationResourcesAndSourceExhaustionPolicy() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":0,"repeatedPace":true}"#)
+    let old = f.page.state, presentation = try XCTUnwrap(old.presentation)
+    let disk = try f.register.read().revision
+    let controller = try f.bind()
+    let advanced = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(advanced)
+    XCTAssertTrue(f.page.state.presentation === presentation)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.page.state.session.prompt, old.session.prompt)
+    XCTAssertEqual(f.page.state.practice?.repetition, .sameWordset(repeatedPace: true))
+    var session = f.page.state.session
+    session.insertBatch(session.prompt)
+    XCTAssertEqual(session.outcome, .failed)
+    XCTAssertEqual(session.failureReason, .wordGeneration)
+    var failed = f.page.state; failed.session = session; f.page.replace(failed)
+    let recovered = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(recovered, "Ordinary restart after the failure must allow fresh generation")
+    XCTAssertEqual(f.page.state.session.outcome, .active)
+    XCTAssertFalse(f.page.state.session.hasStarted)
+    XCTAssertEqual(f.page.state.practice?.repetition, WebsitePracticeRepetition.none)
+    XCTAssertTrue(f.page.state.presentation === presentation)
+    XCTAssertEqual(try f.register.read().revision, disk)
+  }
+
+  func testProductionRepeatKeepsPrefetchedCandidateFutureThenFailsInsteadOfDrawingPastIt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":0}"#)
+    var state = f.page.state
+    let openingCount = try XCTUnwrap(state.session.generatedWordReplayHistory?.count)
+    let first = try XCTUnwrap(state.session.prompt.components(separatedBy: " ").first)
+    state.session.insertBatch(first + " ")
+    f.page.replace(state)
+    let captured = f.page.state.session
+    XCTAssertGreaterThan(try XCTUnwrap(captured.generatedWordReplayHistory?.count), openingCount)
+    let disk = try f.register.read().revision
+    let controller = try f.bind()
+    let advanced = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(advanced)
+    var repeated = f.page.state.session
+    repeated.insertBatch(repeated.prompt)
+    XCTAssertEqual(repeated.outcome, .failed)
+    XCTAssertEqual(repeated.failureReason, .wordGeneration)
+    XCTAssertEqual(repeated.prompt, captured.prompt)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try f.register.read().revision, disk)
+  }
+
+  func testCandidateRepeatCancellationAfterDepartureCanRetryWithoutDuplicateAccounting() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4}"#); f.input("a")
+    let old = f.page.state.session, disk = try f.register.read().revision
+    let controller = try f.bind()
+    await Task { @MainActor in
+      withObservationTracking { _ = f.page.state } onChange: { withUnsafeCurrentTask { $0?.cancel() } }
+      do {
+        _ = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+        XCTFail("Cancelled repeat installed")
+      } catch is CancellationError {} catch { XCTFail("Unexpected: \(error)") }
+    }.value
+    XCTAssertFalse(controller.isPreparing)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, old.automaticInputAttemptID)
+    XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertFalse(f.page.acceptsInput(for: old.automaticInputAttemptID))
+    let retried = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(retried)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, old.automaticInputAttemptID)
+    XCTAssertEqual(f.page.state.session.prompt, old.prompt)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertNil(f.page.state.restartDepartureAttemptID)
+    XCTAssertEqual(try f.register.read().revision, disk)
   }
 
   func testAwaitedRequestSharesBusyStateAndOldCancellationCannotCancelTheNextRequest() async throws {

@@ -582,6 +582,12 @@ final class WebsiteConfigCommitCoordinator {
         reason: .nextAttempt, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
       return .init(session: session)
     }
+    if [.words, .time].contains(original.configuration.mode), let history = original.generatedWordReplayHistory {
+      let session = try await preparePracticeBuild(for: resources, scope: nil, reason: .nextAttempt,
+        repeatedSource: .repeatedWords(history, repeatedPace: repetition.repeatsPace),
+        loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+      return .init(session: session)
+    }
     let session = try await prepareSessionBuild(for: resources) { _ in
       // Restore the actual attempt's owned opening/cursors/caches, not a
       // reconstruction from the editor, its grown prompt or a fresh sampler.
@@ -660,6 +666,7 @@ final class WebsiteConfigCommitCoordinator {
   }
   private func preparePracticeBuild(for resources: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope?,
     reason: WebsiteConfigSessionBuilder.Reason = .configurationApplication,
+    repeatedSource: WebsiteConfigSessionBuilder.AttemptSource = .selection,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote],
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
     random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
@@ -707,7 +714,7 @@ final class WebsiteConfigCommitCoordinator {
         } else if let history = pending.wordHistory {
           attemptSource = .repeatedWords(history, repeatedPace: pending.repetition.repeatsPace)
         } else { throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported }
-      } else { attemptSource = .selection }
+      } else { attemptSource = repeatedSource }
       let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: effectiveScope,
         reason: reason, attemptSource: attemptSource,
         loadQuotes: { language in

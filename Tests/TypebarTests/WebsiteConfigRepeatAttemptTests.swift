@@ -143,6 +143,32 @@ import XCTest
     XCTAssertEqual(f.page.state.practice?.repetition, WebsitePracticeRepetition.none)
   }
 
+  func testOrdinaryCandidateRepeatReusesOwnedTargetsWithoutDrawsOrSetterReplay() async throws {
+    for json in [
+      #"{"mode":"words","words":4,"funbox":["rAnDoMcAsE"],"repeatedPace":true}"#,
+      #"{"mode":"words","words":4,"language":"code_javascript","funbox":["rAnDoMcAsE"]}"#,
+      #"{"mode":"words","words":1001,"showAllLines":true}"#,
+    ] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.publish(json)
+      let original = f.page.state.session
+      let presentation = try XCTUnwrap(f.page.state.presentation)
+      let disk = try f.register.read().revision
+      let next = try await f.coordinator.prepareRestart(for: f.page, repeatingRequested: true,
+        random: .init(wordIndex: { XCTFail("Repeat cannot draw a new word"); return 0 },
+          caseBit: { XCTFail("Repeat cannot alter an owned target"); return false },
+          contentUnit: { XCTFail("Repeat cannot redecorate an owned word"); return 0 }))
+      guard case .advanced = try f.coordinator.advance(next, to: f.page) else { throw Failure.notCommitted }
+      XCTAssertEqual(f.page.state.session.prompt, FinitePromptCommitPolicy.finalized(.init(text: original.prompt)).text)
+      XCTAssertEqual(f.page.state.session.configuration, original.configuration)
+      XCTAssertEqual(f.page.state.session.generatedWordReplayHistory?.count, original.generatedWordReplayHistory?.count)
+      XCTAssertEqual(f.page.state.practice?.repetition.repeatsWordset, true)
+      XCTAssertEqual(f.page.state.practice?.repetition.repeatsPace, presentation.publication.draft.behavior.repeatedPace)
+      XCTAssertTrue(f.page.state.presentation === presentation)
+      XCTAssertEqual(try f.register.read().revision, disk)
+    }
+  }
+
   func testActiveRepeatedCustomRestartsRepeatButUnstartedRepeatCanReturnToFreshGeneration() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.publish(#"{"mode":"custom","repeatedPace":false}"#)
