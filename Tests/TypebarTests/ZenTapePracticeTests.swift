@@ -300,8 +300,8 @@ import XCTest
   func testProductionUsesTheSessionConstructorInsteadOfTheTargetNewlineSignal() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    let start = try XCTUnwrap(app.range(of: "} else if usesTapePractice {"))
-    let end = try XCTUnwrap(app.range(of: "} else {", range: start.upperBound..<app.endIndex))
+    let start = try XCTUnwrap(app.range(of: "} else if let rendering, usesTapePractice {"))
+    let end = try XCTUnwrap(app.range(of: "} else if let rendering, rendering.compositionTextMap != nil {", range: start.upperBound..<app.endIndex))
     let branch = app[start.upperBound..<end.lowerBound]
     XCTAssertTrue(branch.contains("TapePracticePrompt(session: session"))
     XCTAssertFalse(branch.contains("session.hasPracticeNewlineContent ?"))

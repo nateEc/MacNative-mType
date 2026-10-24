@@ -41,6 +41,10 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
     let owner: UUID
     var session: TypingSession
     var ready: [PromptViewportPresentationReady] = []
+    var composition = ""
+    let motion = PromptCaretMotionCoordinator()
+    var retirements: [PromptWordRetirement] = []
+    var removals: [PromptTapeWordRemoval] = []
     init(_ publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID) {
       self.publication = publication; self.owner = owner
       var session = TypingSession(configuration: .words(40).with(modifiers: [.noQuit]),
@@ -80,6 +84,44 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
   private func find(_ root: NSView) -> PromptViewportPracticeNativeView? {
     if let found = root as? PromptViewportPracticeNativeView { return found }
     return root.subviews.lazy.compactMap { self.find($0) }.first
+  }
+  private struct InlineRoot: View {
+    let model: Model
+    var maximumTextWidth: CGFloat? = nil
+    var body: some View {
+      try! WebsiteConfigPublishedInlinePrompt(publication: model.publication, owner: model.owner,
+        session: model.session, composition: model.composition, theme: AppTheme.serika_dark.resolvedTheme,
+        carets: { rendering, font, p in
+          var config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
+            mainStyle: p.caretStyle, paceStyle: p.paceCaretStyle, font: font,
+            lineSpacing: model.session.configuration.usesJoiningScriptPrompt ? 8 : 12,
+            rightToLeft: model.session.configuration.usesRightToLeftPrompt, accent: .blue,
+            motion: p.smoothCaretMotion, reducesMotion: true, frameRate: 60,
+            attemptID: model.session.automaticInputAttemptID, coordinator: model.motion,
+            mainGlyphID: model.session.promptCaretGlyphIndex)
+          config.latestInput = { .init(attemptID: model.session.automaticInputAttemptID,
+            typed: model.session.typed, composition: model.composition, glyphID: model.session.promptCaretGlyphIndex) }
+          return config
+        }, retirement: { rendering, p in Self.context(model, rendering, p) },
+        maximumTextWidth: maximumTextWidth,
+        onTapeWordsRemoved: { model.removals.append($0); model.session.removeTapePromptWords($0) })
+        .frame(width: 220)
+    }
+    static func context(_ model: Model, _ rendering: PromptRendering,
+      _ p: WebsiteConfigNativePresentation, wrongAttempt: Bool = false) -> PromptLineScrollContext {
+      let field = model.session.promptCompositionField
+      return .init(attemptID: wrongAttempt ? UUID() : model.session.automaticInputAttemptID,
+        activeWordID: field?.index, characterOffsets: rendering.compositionTextMap?.fieldCharacterOffsets ?? [:],
+        smoothScroll: p.smoothPracticeLineScroll, reducesMotion: true,
+        words: PromptLineScrollWord.compositionFields(field), firstRetainedWordIndex: model.session.firstRetainedPromptWordIndex,
+        onRetire: { model.retirements.append($0); model.session.retirePromptWords($0) },
+        followsWordReflow: PromptWordReflowPolicy.isEnabled(mode: model.session.configuration.mode,
+          slowTimer: false, showAllLines: p.showAllPracticeLines), caretMotion: model.motion,
+        centersActiveLine: !p.showAllPracticeLines)
+    }
+  }
+  private func descendants<T: NSView>(_ root: NSView, _ type: T.Type) -> [T] {
+    (root as? T).map { [$0] } ?? root.subviews.flatMap { descendants($0, type) }
   }
   private func background(_ root: NSView) -> WebsiteConfigPublishedBackgroundView? {
     if let found = root as? WebsiteConfigPublishedBackgroundView { return found }
@@ -219,5 +261,91 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
           guard case WebsiteConfigPublishedPromptError.inconsistentCaret = error else { return XCTFail("Wrong rejection") }
         }
     }
+  }
+
+  func testPublishedOrdinaryFieldKeepsCompositionAndReflowsPrivateFont() throws {
+    let f = try Fixture(); defer { f.close() }
+    let name = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let json = #"{"showAllLines":false,"fontSize":1.75,"smoothCaret":"off","smoothLineScroll":false,"compositionDisplay":"replace"}"#
+    let first = try f.publish(json, font: .data(OwnedTestFontFixture.make(postScriptName: name, advanceWidth: 600)))
+    let second = try f.publish(json, font: .data(OwnedTestFontFixture.make(postScriptName: name, advanceWidth: 900)))
+    let model = Model(first, owner: f.owner); model.composition = "xy"
+    let host = NSHostingView(rootView: InlineRoot(model: model, maximumTextWidth: 175))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 220, height: 400), styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    wait(host) { self.descendants(host, PromptFieldNativeView.self).first?.intrinsicContentSize.height ?? 0 > 0 }
+    let field = try XCTUnwrap(descendants(host, PromptFieldNativeView.self).first)
+    let height = field.intrinsicContentSize.height, revision = field.geometryRevision
+    XCTAssertLessThanOrEqual(field.bounds.width, 175.01)
+    XCTAssertTrue((field.accessibilityValue() as? String ?? "").contains("xy"))
+    let attempt = model.session.automaticInputAttemptID, record = try f.register.read().state
+    model.publication = second
+    wait(host) { field.geometryRevision > revision && field.intrinsicContentSize.height > height }
+    XCTAssertTrue(descendants(host, PromptFieldNativeView.self).first === field)
+    XCTAssertEqual(model.session.typed, "x"); XCTAssertEqual(model.composition, "xy")
+    XCTAssertEqual(model.session.automaticInputAttemptID, attempt); XCTAssertEqual(try f.register.read().state, record)
+    XCTAssertFalse(window.isVisible)
+  }
+
+  func testPublishedTapeSelectsBothModesAndUsesSourceMarginWithoutRestart() throws {
+    let f = try Fixture(); defer { f.close() }
+    let name = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let data = OwnedTestFontFixture.make(postScriptName: name, advanceWidth: 600)
+    let letter = try f.publish(#"{"tapeMode":"letter","tapeMargin":25,"fontSize":1.75,"smoothCaret":"off","smoothLineScroll":false}"#, font: .data(data))
+    let word = try f.publish(#"{"tapeMode":"word","tapeMargin":40,"fontSize":1.75,"smoothCaret":"off","smoothLineScroll":false}"#, font: .data(data))
+    let model = Model(letter, owner: f.owner)
+    let host = NSHostingView(rootView: InlineRoot(model: model))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 220, height: 200), styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { descendants(host, TapePromptNativeView.self).forEach { $0.stop() }; window.contentView = nil; window.close() }
+    wait(host) { !self.descendants(host, TapePromptNativeView.self).isEmpty }
+    let tape = try XCTUnwrap(descendants(host, TapePromptNativeView.self).first)
+    tape.present(at: ProcessInfo.processInfo.systemUptime)
+    let firstOrigin = try XCTUnwrap(tape.subviews.first).frame.minX
+    let attempt = model.session.automaticInputAttemptID
+    model.publication = word
+    wait(host) {
+      tape.present(at: ProcessInfo.processInfo.systemUptime)
+      return (tape.subviews.first?.frame.minX ?? firstOrigin) > firstOrigin + 20
+    }
+    XCTAssertTrue(descendants(host, TapePromptNativeView.self).first === tape)
+    XCTAssertEqual(model.motion.wordsTapeMargin, 0, accuracy: 0.01)
+    XCTAssertEqual(model.session.automaticInputAttemptID, attempt); XCTAssertEqual(model.session.typed, "x")
+    XCTAssertFalse(window.isVisible)
+  }
+
+  func testInlineRejectsForeignOwnerBeforeCallbacksAndRejectsOldRetirement() throws {
+    let f = try Fixture(); defer { f.close() }
+    let publication = try f.publish(#"{"showAllLines":false}"#), model = Model(publication, owner: f.owner)
+    var builds = 0
+    for foreign in [true, false] {
+      XCTAssertThrowsError(try WebsiteConfigPublishedInlinePrompt(publication: publication,
+        owner: foreign ? UUID() : f.owner, session: model.session, theme: AppTheme.serika_dark.resolvedTheme,
+        carets: { _, font, p in builds += 1; return Root.carets(font: font, presentation: p, session: model.session) },
+        retirement: { rendering, p in InlineRoot.context(model, rendering, p, wrongAttempt: true) })) { error in
+          if foreign {
+            guard case WebsiteConfigPublishedPromptError.wrongOwner = error else { return XCTFail("Wrong owner rejection") }
+          } else {
+            guard case WebsiteConfigPublishedPromptError.inconsistentRetirement = error else { return XCTFail("Old retirement accepted") }
+          }
+        }
+      XCTAssertEqual(builds, foreign ? 0 : 1)
+    }
+  }
+
+  func testInlineInvalidWidthDoesNotCallInputOrRetirementBuilders() throws {
+    let f = try Fixture(); defer { f.close() }
+    let publication = try f.publish(#"{"showAllLines":false}"#), model = Model(publication, owner: f.owner)
+    var builds = 0
+    for width: CGFloat in [0, -1, .nan, .infinity] {
+      XCTAssertThrowsError(try WebsiteConfigPublishedInlinePrompt(publication: publication, owner: f.owner,
+        session: model.session, theme: AppTheme.serika_dark.resolvedTheme,
+        carets: { _, font, p in builds += 1; return Root.carets(font: font, presentation: p, session: model.session) },
+        retirement: { rendering, p in builds += 1; return InlineRoot.context(model, rendering, p) }, maximumTextWidth: width)) { error in
+          guard case WebsiteConfigPublishedPromptError.invalidGeometry = error else { return XCTFail("Wrong geometry rejection") }
+        }
+    }
+    XCTAssertEqual(builds, 0)
   }
 }

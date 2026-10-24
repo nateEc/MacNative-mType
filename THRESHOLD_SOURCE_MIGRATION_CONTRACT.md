@@ -1,5 +1,21 @@
 # 阈值源状态与迁移契约
 
+## 完整发布的普通提示／组合与卷带入口（2026-10-24）
+
+新增 WebsiteConfigPublishedInlinePrompt，按同份发布的 tapeMode 分流到原有 TapePracticePrompt 或普通 PromptFieldPracticePrompt；普通分支用已有 PracticePromptViewport 保留有界两／三行高度，全部行／组合回退则不套有界滚动。原生卷带核、换行／词隐藏／退役算法不改，mode、百分比 margin 与 smoothLineScroll 直接来自 draft.presentation；固定 test-ui.ts 的卷带边距比例及 letter UTF-16 前缀推进仍由既有内核承担。
+
+提取 WebsiteConfigPublishedPromptInputs，既有全部行入口和新入口共享 owner／字体准入、源外观及光标一致性检查。普通构造从捕获会话、组合文本和源外观生成原生字段映射，直接使用已准备字体，不按名字重建。渲染快照用只读引用持有，避免 SwiftUI 深比较完整目标。调用方提供的滚动上下文须匹配 attempt、保留边界、当前字段、字符偏移、词拓扑、滚动／减弱动态设置及光标 motion 所有者；不以旧上下文继续退役。显式宿主宽度必须有限且正，且实际限制文字视图，不只传给高度测量；新入口不私自把源 maxLineWidth 列数当作点数，完整宿主仍负责解析外部宽度／主题与全局布局。
+
+动态 input／latestProjection、retirement 和 onTapeWordsRemoved 回调保持调用方所有权。构造不生成新练习、不重置输入、不写设置或注册字体；完整会话配置仍由宿主负责，这不是完整运行期应用器。ASL／Choo 与尚不支持的混合布局明确返回 requiresDifferentRenderer，专用效果不能被默默替换。既有全部行入口仍只接受其原路线；新入口补普通／卷带，不删除或切换当前主窗口的任何原分支。
+
+新接口不存在对应旧产品红测，本阶段以新消费契约及真实提交后的隐藏宿主建立证据。首轮原有六项与三项新增均通过；有界会话内决策复核（非独立评审）发现宽度必须落到文字视图、滚动上下文需校验拓扑，补上实际宽度与无效几何用例。最终四项新增、提示组十项及相关 23 项通过：同名私有字体使普通字段重排且对象复用、组合 xy／已输入 x／attempt 保留，175 点约束实测；按字→按词与 25%→40% 边距产生实际卷带位移，字体仍为准备资源；错误 owner／旧退役／无效宽度提前拒绝。没有挂载实体输入控件或调用系统 IME，不能以组合字符串测试冒称完整 IME／焦点验收。旧入口、配置格式、旧字体注册与真实目录不变；回退旧宿主不回滚已提交记录，完整 UI、专用效果消费及正式切流仍未完成。
+
+扩大回归首次 427 项中两项静态源码定位失败。根因核对：TypebarApp.swift 与起点 81cfb87e 的 SHA-256 同为 `65ec91570c1184cf160ea270c384befae83efc369fcdf24c0f41a64bcb6f7bfb`，这两项测试本轮也未改；单独两项再次失败，均为之前可选 rendering 分支增加后，旧字符串定位没有跟进。只更新 OrdinaryTapePracticeTests 的完整分支标记和 ZenTapePracticeTests 的卷带／下一字段分支边界，保留会话构造、不排除换行目标及外层滚动策略断言，不改生产代码或跳过测试。修复后无参考定向 46 项零失败、三项因未提供固定参考而跳过，不能计作三项通过；随后扩大集合显式提供固定参考重新运行。日志 `/tmp/typebar-published-inline-{first,reviewed,expanded,static-red,tape-final,expanded-final,offline,package}.log`。
+
+最终含固定参考的扩大集合 427 项零失败／零跳过，前述三项参考用例实际执行；移除参考与外部 schema 依赖的字体／背景集合 194 项零失败／零跳过，范围重叠不相加。最终回归与打包期间不改 Swift 源码／测试。源码／资源原创性与固定参考证据（47 直接项、119 原生符号、17 支持规范）检查通过；人工清单 1,288 项仅结构检查。没有重跑完整生产宿主集，独立滚轮基线仍开放；本轮两项静态定位修复不等于全量门禁已经转绿。
+
+最终 Debug 包、签名、署名与包内资源原创性检查通过，临时 QA 包由脚本清理且未运行。固定参考保持干净；推送前 main 为 8c52fb13、开发分支为 81cfb87e，无打开的开发分支 PR，Actions 仍 826 次且最近 39118939684 成功。只集中推送开发分支，不改 main、不创建 PR 或重跑 Actions，完整重写继续 active。
+
 ## 完整发布的字体与全部行提示消费（2026-10-24）
 
 给既有 PromptViewportPracticePrompt 增加完整发布构造入口，先检查 owner 和已准备字体，再由同一 renderingFont 构建文字、视口度量和光标配置；字体不按名字重新匹配／注册。原始发布与实际字号保持绑定，PromptRenderStyle 的颜色翻转、彩色、输入效果、组合／错字显示、两种光标和高亮来自同份 draft.presentation，不借旧 AppSettings 默认。固定 ui.ts::applyFontFamily 的本地优先与有序回退仍由已准备资源负责，此处不再访问字体目录或改写选择。

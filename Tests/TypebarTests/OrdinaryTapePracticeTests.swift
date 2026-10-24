@@ -260,7 +260,7 @@ import XCTest
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     XCTAssertFalse(app.contains("settings.practiceTapeMode != .off && !session.hasPracticeNewlineContent"))
     XCTAssertTrue(app.contains("TapePracticePrompt(session: session, rendering: rendering"))
-    XCTAssertTrue(app.contains("if !PracticeLineDisplayPolicy.needsOuterViewport(showsAllLines: showsAllPracticeLines"))
+    XCTAssertTrue(app.contains("} else if let rendering, !PracticeLineDisplayPolicy.needsOuterViewport(showsAllLines: showsAllPracticeLines"))
   }
 
   func testTapeOwnsItsViewportWhileOrdinaryASLAndChooKeepTheirOuterScroller() throws {

@@ -2,7 +2,42 @@ import AppKit
 import SwiftUI
 
 enum WebsiteConfigPublishedPromptError: Error {
-  case wrongOwner, unprepared, requiresDifferentRenderer, inconsistentCaret
+  case wrongOwner, unprepared, requiresDifferentRenderer, inconsistentCaret, inconsistentRetirement, invalidGeometry
+}
+
+@MainActor
+struct WebsiteConfigPublishedPromptInputs {
+  let font: NSFont
+  let presentation: WebsiteConfigNativePresentation
+  init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID) throws {
+    guard publication.owner == owner else { throw WebsiteConfigPublishedPromptError.wrongOwner }
+    guard let resource = publication.font else { throw WebsiteConfigPublishedPromptError.unprepared }
+    font = resource.renderingFont; presentation = publication.draft.presentation
+  }
+  func validate(_ configuration: PromptCaretNativeView.Configuration, session: TypingSession) throws {
+    guard configuration.font == font,
+      configuration.attemptID == session.automaticInputAttemptID,
+      configuration.mainStyle == presentation.caretStyle,
+      configuration.paceStyle == presentation.paceCaretStyle,
+      configuration.motion == presentation.smoothCaretMotion,
+      configuration.lineSpacing == (session.configuration.usesJoiningScriptPrompt ? 8 : 12),
+      configuration.rightToLeft == session.configuration.usesRightToLeftPrompt else {
+      throw WebsiteConfigPublishedPromptError.inconsistentCaret
+    }
+  }
+  func style(theme: ResolvedTheme) -> PromptRenderStyle {
+    var style = PromptRenderStyle(theme: theme, fontSize: font.pointSize)
+    style.flipTestColors = presentation.flipTestColors
+    style.colorfulMode = presentation.colorfulMode
+    style.typedCharacterEffect = presentation.typedCharacterEffect
+    style.compositionDisplayStyle = presentation.compositionDisplayStyle
+    style.typoIndicatorStyle = presentation.typoIndicatorStyle
+    style.caretStyle = presentation.caretStyle
+    style.paceCaretStyle = presentation.paceCaretStyle
+    style.highlightMode = presentation.promptHighlightMode
+    style.usesTapePractice = presentation.practiceTapeMode != .off
+    return style
+  }
 }
 
 extension PromptViewportPracticePrompt {
@@ -15,9 +50,8 @@ extension PromptViewportPracticePrompt {
     fallbackPosition: PromptViewportFallbackPosition? = nil,
     onFailure: @escaping (UUID) -> Void,
     onReady: @escaping (PromptViewportPresentationReady) -> Void = { _ in }) throws {
-    guard publication.owner == owner else { throw WebsiteConfigPublishedPromptError.wrongOwner }
-    guard let resource = publication.font else { throw WebsiteConfigPublishedPromptError.unprepared }
-    let presentation = publication.draft.presentation
+    let inputs = try WebsiteConfigPublishedPromptInputs(publication: publication, owner: owner)
+    let presentation = inputs.presentation
     let effect = PracticeVisualEffect.make(modifiers: session.configuration.modifiers)
     guard PracticeLineDisplayPolicy.shouldShowAllLines(settingEnabled: presentation.showAllPracticeLines,
       tapeMode: presentation.practiceTapeMode, configuration: session.configuration),
@@ -25,27 +59,9 @@ extension PromptViewportPracticePrompt {
       PromptFieldProjectionPolicy.supports(session.configuration) else {
       throw WebsiteConfigPublishedPromptError.requiresDifferentRenderer
     }
-    let font = resource.renderingFont
-    let configuration = carets(font, presentation)
-    guard configuration.font == font,
-      configuration.attemptID == session.automaticInputAttemptID,
-      configuration.mainStyle == presentation.caretStyle,
-      configuration.paceStyle == presentation.paceCaretStyle,
-      configuration.motion == presentation.smoothCaretMotion,
-      configuration.lineSpacing == (session.configuration.usesJoiningScriptPrompt ? 8 : 12),
-      configuration.rightToLeft == session.configuration.usesRightToLeftPrompt else {
-      throw WebsiteConfigPublishedPromptError.inconsistentCaret
-    }
-    var style = PromptRenderStyle(theme: theme, fontSize: font.pointSize)
-    style.flipTestColors = presentation.flipTestColors
-    style.colorfulMode = presentation.colorfulMode
-    style.typedCharacterEffect = presentation.typedCharacterEffect
-    style.compositionDisplayStyle = presentation.compositionDisplayStyle
-    style.typoIndicatorStyle = presentation.typoIndicatorStyle
-    style.caretStyle = presentation.caretStyle
-    style.paceCaretStyle = presentation.paceCaretStyle
-    style.highlightMode = presentation.promptHighlightMode
-    style.usesTapePractice = presentation.practiceTapeMode != .off
+    let configuration = carets(inputs.font, presentation)
+    try inputs.validate(configuration, session: session)
+    let style = inputs.style(theme: theme), font = inputs.font
     self.init(session: session, style: style, font: font, carets: configuration,
       wrapLayout: wrapLayout, fallbackPosition: fallbackPosition,
       onFailure: onFailure, onReady: onReady)
