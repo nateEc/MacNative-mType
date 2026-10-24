@@ -436,6 +436,40 @@ import Observation
     XCTAssertNil(f.page.state.configurationDeparture)
   }
 
+  func testWorkflowCancelAndResumeKeepAlreadySavedInitCorrection() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let gate = Gate(); defer { gate.resolve() }
+    var suspend = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        if suspend { return await gate.read() }
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .hindi, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","language":"hindi","lazyMode":false,"quoteLength":[0],"repeatQuotes":"off"}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    suspend = true
+    let task = Task { try await workflow.editAndBegin(.lazyMode(true), replacing: publication.applicationID, systemIsDark: false) }
+    try await gate.wait()
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    XCTAssertTrue(try register.read().lazyMemory.remember)
+    let disk = try register.read().revision
+    let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+    XCTAssertFalse(pending.draft.generators.lazyMode)
+    workflow.cancel(); gate.resolve()
+    do { _ = try await task.value; XCTFail("Cancelled initializer delivered") } catch is CancellationError {}
+    XCTAssertEqual(f.page.state.configurationDeparture?.id, pending.id)
+    XCTAssertEqual(try register.read().revision, disk)
+    let retry = Task { try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false) }
+    try await gate.wait(); gate.resolve(); _ = try await retry.value
+    XCTAssertEqual(try register.read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.events.filter { $0.key == "lazyMode" }.count, 2)
+    XCTAssertNotNil(f.page.restartController)
+  }
+
   func testNoQuitActiveEditLeavesConfigurationAndAttemptLive() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)

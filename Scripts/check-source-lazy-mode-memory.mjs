@@ -118,5 +118,19 @@ assert.equal(savedConfig.lazyMode, true);
 assert.equal(savedConfig.language, 'arabic');
 assert.equal(savedConfig.words, 6);
 assert.equal(saves, 2);
+// The source runs support correction before awaiting WordsGenerator. A later
+// failed provider/retry must start from the corrected Config and memory.
+assert.ok(source.indexOf('  const allowLazyMode =')
+  < source.indexOf('    const gen = await WordsGenerator.generateWords(language);'));
+memory = {remember: false, prefersArabic: true}; events = []; saves = 0;
+context.Config = {language: 'hindi', lazyMode: true, mode: 'quote', funbox: []};
+context.language = {name: 'hindi', noLazyMode: true};
+await context.generate();
+assert.equal(savedConfig.lazyMode, false);
+assert.equal(memory.remember, true);
+assert.equal(saves, 1);
+await context.generate();
+assert.equal(saves, 1);
+assert.equal(memory.remember, true);
 verify();
 process.stdout.write(JSON.stringify({fixtures}));

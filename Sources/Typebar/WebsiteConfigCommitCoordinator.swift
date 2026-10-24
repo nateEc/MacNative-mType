@@ -700,6 +700,7 @@ final class WebsiteConfigCommitCoordinator {
       saved.lazyMemory = draft.lazyMemory
       configuration.savedDraft = saved
     }
+    configuration = try saveGenerationCorrection(configuration, from: original, admission: resources.admission)
     let prepared = ResourcesPrepared(configuration: configuration, admission: resources.admission,
       background: resources.background, font: resources.font)
     let checkedExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
@@ -745,6 +746,48 @@ final class WebsiteConfigCommitCoordinator {
         }, loadExternal: checkedExternal, random: random)
       return (practice.session, practice)
     }
+  }
+  /// Source init can save configuration before the text provider returns.
+  /// Advance the pending capability too, so retry starts after this durable
+  /// transition rather than repeating the listener or resurrecting its input.
+  private func saveGenerationCorrection(_ prepared: Prepared, from original: WebsiteConfigNativeDraft,
+    admission: UUID) throws -> Prepared {
+    guard prepared.pageCapture?.configurationDeparture != nil,
+      original.projection.runtime != prepared.draft.projection.runtime
+        || original.lazyMemory != prepared.draft.lazyMemory
+        || WebsiteConfigLazyModeLifecycle.savesConfigurationDuringGeneration(from: original, to: prepared.draft)
+    else { return prepared }
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    guard admission == resourceAdmission, isCurrent(prepared),
+      let page = prepared.sourcePage, let capture = prepared.pageCapture,
+      let pending = page.state.configurationDeparture, pending.id == capture.configurationDeparture,
+      pending.identity == identity, pending.disk == prepared.disk,
+      let saved = prepared.savedDraft else { throw WebsiteConfigCommitCoordinatorError.stale }
+    var state = page.state
+    try Task.checkCancellation()
+    try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
+    let disk: WebsiteConfigFileRegister.Revision
+    do {
+      switch try register.commit(saved, replacing: prepared.disk, preservingUnchanged: true) {
+      case .committed(let revision): disk = revision
+      case .conflict: retire(prepared); throw WebsiteConfigCommitCoordinatorError.stale
+      case .unavailable: retire(prepared); throw WebsiteConfigCommitCoordinatorError.unavailable
+      }
+    } catch { page.endCommit(); throw error }
+    // No throwing observer or cancellation check between durable CAS and the
+    // matching pending state. Keep the closed attempt and ledger unchanged.
+    state.configurationDeparture = .init(id: UUID(), draft: prepared.draft, savedDraft: saved, disk: disk,
+      identity: identity, environment: pending.environment, contentSource: pending.contentSource,
+      requiresContentSource: pending.requiresContentSource, repetition: pending.repetition,
+      quote: pending.quote, wordHistory: pending.wordHistory)
+    page.installCommitted(state)
+    page.endCommit()
+    var updated = prepared
+    updated.disk = disk; updated.pageCapture = try page.captureGeneration(router: router)
+    guard isCurrent(updated) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return updated
   }
   private func prepareSessionBuild(for prepared: ResourcesPrepared,
     generate: @MainActor (WebsiteConfigNativeDraft) async throws -> (TypingSession, WebsiteConfigSessionBuilder.Prepared?))

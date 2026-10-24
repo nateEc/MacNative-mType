@@ -227,12 +227,146 @@ import TypebarSystem
     let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
     let ready = try await f.coordinator.preparePractice(for: resources)
     XCTAssertFalse(ready.session.configuration.modifiers.contains(.lazyLatin))
-    XCTAssertFalse(try f.register.read().lazyMemory.remember, "A candidate is not a durable generation transition")
+    XCTAssertTrue(try f.register.read().lazyMemory.remember, "Source init saves this transition before later text generation")
     guard case .committed(let publication) = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else {
       return XCTFail("Prepared practice was not delivered")
     }
     XCTAssertTrue(publication.draft.lazyMemory.remember)
     XCTAssertTrue(try f.register.read().lazyMemory.remember)
+  }
+
+  func testLazyInitCorrectionIsDurableBeforeProviderFailureAndRetryDoesNotReplayIt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","language":"hindi","lazyMode":false,"quoteLength":[0],"repeatQuotes":"off"}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.lazyMode(true)
+    let ticket = try f.accept(f.edit(action), action: action)
+    let before = try f.register.read().revision
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    do {
+      _ = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+        XCTAssertTrue(try f.register.read().lazyMemory.remember)
+        guard case .available(let runtime) = try f.register.read().state else { throw Failure.generation }
+        XCTAssertEqual(runtime["lazyMode"], .bool(false), "Correction must precede provider invocation")
+        XCTAssertFalse(try XCTUnwrap(f.page.state.configurationDeparture).draft.generators.lazyMode)
+        throw Failure.generation
+      })
+      XCTFail("Provider failure delivered a practice")
+    } catch Failure.generation {}
+    let corrected = try f.register.read().revision
+    XCTAssertNotEqual(corrected, before)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertTrue(f.coordinator.cancel(ticket))
+    try await f.finish(f.coordinator.resumeConfigurationRestart(for: f.page))
+    XCTAssertEqual(try f.register.read().revision, corrected, "Retry and delivery do not save this correction again")
+    let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertEqual(draft.projection.events.filter { $0.key == "lazyMode" }.count, 2)
+    XCTAssertTrue(draft.lazyMemory.remember)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testBusyInitCorrectionKeepsOldPendingSnapshotAndCanRetry() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","language":"hindi","lazyMode":false,"quoteLength":[0],"repeatQuotes":"off"}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.lazyMode(true)
+    let ticket = try f.accept(f.edit(action), action: action)
+    let before = try f.register.read().revision, pending = f.page.state.configurationDeparture?.id
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    let lock = Darwin.open(f.directory.appendingPathComponent(WebsiteConfigFileRegister.lockFilename).path,
+      O_RDWR | O_CLOEXEC | O_NOFOLLOW)
+    XCTAssertGreaterThanOrEqual(lock, 0); defer { Darwin.close(lock) }
+    XCTAssertEqual(typebar_file_lock(lock, LOCK_EX | LOCK_NB), 0)
+    do {
+      _ = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+        XCTFail("Locked transition must not reach provider"); throw Failure.generation
+      })
+      XCTFail("Busy correction was accepted")
+    } catch WebsiteConfigFileRegisterError.busy {}
+    XCTAssertEqual(typebar_file_lock(lock, LOCK_UN), 0)
+    XCTAssertEqual(try f.register.read().revision, before)
+    XCTAssertEqual(f.page.state.configurationDeparture?.id, pending)
+    XCTAssertFalse(try f.register.read().lazyMemory.remember)
+    try await f.finish(f.coordinator.resumeConfigurationRestart(for: f.page))
+    XCTAssertTrue(try f.register.read().lazyMemory.remember)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testCompetingRecordCannotBeOverwrittenByInitCorrection() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","language":"hindi","lazyMode":false,"quoteLength":[0],"repeatQuotes":"off"}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.lazyMode(true)
+    let ticket = try f.accept(f.edit(action), action: action)
+    let pending = f.page.state.configurationDeparture?.id
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    let competing = try WebsiteConfigNativeProfile.prepareDraft(#"{"theme":"dracula","words":19}"#,
+      pointsPerRem: 16, context: .init())
+    guard case .committed = try f.register.commit(competing, replacing: XCTUnwrap(f.register.read().revision)) else {
+      return XCTFail("Competing write setup failed")
+    }
+    let disk = try f.register.read().revision
+    do {
+      _ = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+        XCTFail("Conflicting correction must not reach provider"); throw Failure.generation
+      })
+      XCTFail("Competing record overwritten")
+    } catch WebsiteConfigCommitCoordinatorError.stale {}
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(try f.register.read().state, .available(competing.projection.runtime))
+    XCTAssertEqual(f.page.state.configurationDeparture?.id, pending)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertThrowsError(try f.coordinator.resumeConfigurationRestart(for: f.page))
+  }
+
+  func testCancellationAfterInitSaveRetainsCorrectionAndRetiresOldResources() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","language":"hindi","lazyMode":false,"quoteLength":[0],"repeatQuotes":"off"}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.lazyMode(true)
+    let ticket = try f.accept(f.edit(action), action: action)
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    await Task { @MainActor in
+      do {
+        _ = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+          XCTAssertTrue(try f.register.read().lazyMemory.remember)
+          withUnsafeCurrentTask { $0?.cancel() }
+          throw Failure.generation
+        })
+        XCTFail("Cancelled initializer delivered")
+      } catch is CancellationError {} catch { XCTFail("Unexpected error: \(error)") }
+    }.value
+    let disk = try f.register.read().revision
+    do {
+      _ = try await f.coordinator.preparePractice(for: resources)
+      XCTFail("Pre-correction resources were reused")
+    } catch WebsiteConfigCommitCoordinatorError.stale {}
+    try await f.finish(f.coordinator.resumeConfigurationRestart(for: f.page))
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testObservationRetirementAfterInitSaveKeepsDurableCorrection() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","language":"hindi","lazyMode":false,"quoteLength":[0],"repeatQuotes":"off"}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.lazyMode(true)
+    let ticket = try f.accept(f.edit(action), action: action)
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    withObservationTracking { _ = f.page.state } onChange: {
+      MainActor.assumeIsolated { f.page.detach() }
+    }
+    do {
+      _ = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+        XCTFail("Retired window must not reach provider"); throw Failure.generation
+      })
+      XCTFail("Retired initializer delivered")
+    } catch PracticePageSessionStateError.wrongOwner {}
+    XCTAssertTrue(try f.register.read().lazyMemory.remember)
+    XCTAssertTrue(f.page.state.configurationDeparture?.draft.lazyMemory.remember == true)
+    XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertThrowsError(try f.coordinator.resumeConfigurationRestart(for: f.page))
   }
 
   func testStaleInputOwnerEnvironmentAndCompetingRecordCannotAcceptDeparture() async throws {
