@@ -195,4 +195,33 @@ final class WebsiteConfigEnvironmentSourceTests: XCTestCase {
       XCTAssertNil(released)
     }
   }
+
+  func testActualBackgroundReapplicationStopsAsyncResourcesBeforeTheNextRead() async throws {
+    try await withModels { settings, account in
+      let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-async-environment-\(UUID())")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+      defer { try? FileManager.default.removeItem(at: directory) }
+      let owner = UUID(), router = settings.preferenceConfigurationSaves
+      router.register(owner: owner, save: {})
+      let source = WebsiteConfigEnvironmentSource(settings: settings, account: account,
+        pointsPerRem: 16, documentComplete: true, development: false)
+      defer { source.stop() }
+      let register = WebsiteConfigFileRegister(directory: directory)
+      let coordinator = WebsiteConfigCommitCoordinator(router: router, register: register, environment: source.read)
+      let ticket = try coordinator.prepare("{}")
+      var backgroundReads = 0
+      do {
+        _ = try await coordinator.prepareResources(for: ticket, readLocalFont: {
+          settings.customBackgroundURL = settings.customBackgroundURL
+          await Task.yield(); return .absent
+        }, readLocalBackground: { backgroundReads += 1; return .absent })
+        XCTFail("Real model reapplication did not retire async resources")
+      } catch WebsiteConfigCommitCoordinatorError.stale {
+      }
+      XCTAssertEqual(backgroundReads, 0)
+      XCTAssertNil(coordinator.publication(for: owner))
+      XCTAssertEqual(try register.read().state, .missing)
+    }
+  }
 }

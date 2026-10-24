@@ -112,6 +112,63 @@ final class WebsiteConfigCommitCoordinator {
     guard prepared.admission == resourceAdmission else { return false }
     return cancel(prepared.configuration)
   }
+  func prepareResources(for prepared: Prepared,
+    readLocalFont: @MainActor () async throws -> WebsiteConfigFontResource.Local,
+    readLocalBackground: @MainActor () async throws -> WebsiteConfigBackgroundResource.Local,
+    fetchRemoteBackground: (@MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote)? = nil,
+    maximumFontBytes: Int = 32 * 1024 * 1024,
+    backgroundLimits: WebsiteConfigBackgroundResource.Limits = .init()) async throws -> ResourcesPrepared {
+    let admission = try beginAsyncResources(prepared)
+    guard maximumFontBytes > 0 else { throw WebsiteConfigFontResourceError.invalidLimit }
+    guard backgroundLimits.encodedBytes > 0, backgroundLimits.pixels > 0,
+      backgroundLimits.decodedBytes > 0, backgroundLimits.frames > 0
+    else { throw WebsiteConfigBackgroundResourceError.invalidLimits }
+    let localFont = try await readAsyncResource(prepared, admission: admission, operation: readLocalFont)
+    let font = try WebsiteConfigFontResource.prepare(typography: prepared.draft.keyboardTypography,
+      language: prepared.draft.testParameters.language, local: localFont, maximumBytes: maximumFontBytes)
+    let localBackground = try await readAsyncResource(prepared, admission: admission, operation: readLocalBackground)
+    var remote: WebsiteConfigBackgroundResource.Remote?
+    if case .absent = localBackground,
+      prepared.draft.pagePreferences.backgroundAddress.stringUnits?.isEmpty != true {
+      guard let fetchRemoteBackground else { throw WebsiteConfigBackgroundResourceError.remoteNotProvided }
+      remote = try await readAsyncResource(prepared, admission: admission) {
+        try await fetchRemoteBackground(prepared.draft.pagePreferences.backgroundAddress, backgroundLimits.encodedBytes)
+      }
+    }
+    let background = try WebsiteConfigBackgroundResource.prepare(preferences: prepared.draft.pagePreferences,
+      local: localBackground, remote: remote, limits: backgroundLimits)
+    try checkAsyncResources(prepared, admission: admission)
+    return .init(configuration: prepared, admission: admission, background: background, font: font)
+  }
+  private func beginAsyncResources(_ prepared: Prepared) throws -> UUID {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true
+    defer { processing = false }
+    try Task.checkCancellation()
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    try Task.checkCancellation()
+    resourceAdmission = UUID()
+    return resourceAdmission
+  }
+  private func checkAsyncResources(_ prepared: Prepared, admission: UUID) throws {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true
+    defer { processing = false }
+    try Task.checkCancellation()
+    guard admission == resourceAdmission, isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    try Task.checkCancellation()
+  }
+  private func readAsyncResource<Value>(_ prepared: Prepared, admission: UUID,
+    operation: @MainActor () async throws -> Value) async throws -> Value {
+    try checkAsyncResources(prepared, admission: admission)
+    // Never keep processing or a file lock across a caller's suspension. Check
+    // stale/cancellation before forwarding either a late value or a late error.
+    let result: Result<Value, Error>
+    do { result = .success(try await operation()) }
+    catch { result = .failure(error) }
+    try checkAsyncResources(prepared, admission: admission)
+    return try result.get()
+  }
   func commit(_ prepared: ResourcesPrepared) throws -> Outcome {
     guard !processing else { return .busy }
     guard prepared.admission == resourceAdmission else { return .stale }
