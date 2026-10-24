@@ -38,6 +38,7 @@ enum WebsiteConfigSessionBuildError: Error {
     var quoteSampler: WebsiteQuoteSampler? = nil
     var weakSpotScores: WeakSpotScores = .init()
     var decorationState: PoolWordDecorationState = .init()
+    var arrowChart: WebsiteArrowChart = .init()
   }
   struct Random {
     var wordIndex: () -> Int = { Int.random(in: Int.min...Int.max) }
@@ -104,7 +105,7 @@ enum WebsiteConfigSessionBuildError: Error {
     case .repeatedWords(let history, let repeatedPace):
       guard [.words, .time].contains(config.mode), liveSource == nil,
         history.count > 0, history.noSpace == TestModifierPolicy.usesNoSpaceInput(config.modifiers),
-        (WebsiteRandomWordGenerator.selected(for: config) != nil
+        (WebsiteRandomWordGenerator.usesCandidateStream(for: config)
           || TypebarStreamContent.prompt(configuration: config, wordCount: 1) == nil) else {
         throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported
       }
@@ -143,7 +144,7 @@ enum WebsiteConfigSessionBuildError: Error {
         showAllLines: showAllLines, nextRandomCaseBit: random.caseBit)
     } else if WholePreviewWordPreparation.usesAsyncPreparation(configuration: config, showAllLines: showAllLines) {
       session = try await WholePreviewWordPreparation.prepareSession(configuration: config,
-        weakSpotScores: scope.weakSpotScores, wordDecorationState: scope.decorationState,
+        weakSpotScores: scope.weakSpotScores, wordDecorationState: scope.decorationState, arrowChart: scope.arrowChart,
         nextRandomWordIndex: random.wordIndex, nextRandomCaseBit: random.caseBit,
         nextRandomContentUnit: random.contentUnit, nextRandomPoolShuffleIndex: random.shuffleIndex)
     } else {
@@ -156,7 +157,7 @@ enum WebsiteConfigSessionBuildError: Error {
       session = TestSessionFactory.make(configuration: config, customText: scope.customText,
         customTextIsPrepared: scope.customTextIsPrepared, preparedCustomSections: scope.preparedCustomSections,
         finiteTextSource: scope.finiteTextSource, quote: selectedQuote,
-        weakSpotScores: scope.weakSpotScores, wordDecorationState: scope.decorationState,
+        weakSpotScores: scope.weakSpotScores, wordDecorationState: scope.decorationState, arrowChart: scope.arrowChart,
         showAllLines: showAllLines, nextRandomWordIndex: random.wordIndex, nextRandomCaseBit: random.caseBit,
         nextRandomContentUnit: random.contentUnit, nextRandomPoolShuffleIndex: random.shuffleIndex)
     }
@@ -164,6 +165,7 @@ enum WebsiteConfigSessionBuildError: Error {
     guard !session.hasStarted, !session.isFinished, config.mode == .zen || !session.prompt.isEmpty else {
       throw WebsiteConfigSessionBuildError.generationFailed
     }
+    nextScope.arrowChart = session.generatedWordReplayHistory?.arrowChart ?? scope.arrowChart
     return .init(session: session, scope: nextScope, quote: selectedQuote, external: selectedExternal,
       repetition: repetition)
   }
@@ -174,6 +176,8 @@ enum WebsiteConfigSessionBuildError: Error {
     var config = preparation.configuration
     if config.language == .dockerFile { config.dockerfileUsesLiteralIndentation = true }
     let count = GeneratedPromptChunkPolicy.wordCount(for: config, showAllLines: showAllLines)
+    var history = history
+    history.arrowChart = scope.arrowChart
     var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: 100,
       showAllLines: showAllLines, weakSpotScores: scope.weakSpotScores,
       decorationState: scope.decorationState, replayHistory: history,

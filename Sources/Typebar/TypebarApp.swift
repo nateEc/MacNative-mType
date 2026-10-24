@@ -3310,6 +3310,7 @@ private struct ContentView: View {
         oppositeShiftKeymap: effectiveOppositeShiftKeymap,
         oppositeShiftMode: committedPracticeDraft?.inputRules.rules.oppositeShiftMode ?? settings.oppositeShiftMode,
         mapsArrowKeysToInput: session.configuration.modifiers.contains(.arrowStream),
+        mapsArrowLetterKeysToInput: WebsiteArrowChart.isSelected(session.configuration),
         mapsEnterToSpace: WebsiteRandomWordGenerator.selected(for: session.configuration) == .accounting,
         acceptsNewlineInput: session.acceptsNewlineInput,
         acceptsTabInput: session.acceptsTabInput,

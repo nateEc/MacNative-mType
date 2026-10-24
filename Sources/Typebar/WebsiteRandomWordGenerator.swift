@@ -25,6 +25,10 @@ enum WebsiteRandomWordGenerator {
     return matches.count == 1 ? matches.first : nil
   }
 
+  static func usesCandidateStream(for configuration: TestConfiguration) -> Bool {
+    selected(for: configuration) != nil || WebsiteArrowChart.isSelected(configuration)
+  }
+
   static func word(_ kind: Kind, language: TypingLanguage = .english, randomUnit: () -> Double) -> String? {
     func draw(_ count: Int, lower: Int = 0) -> Int? {
       let unit = randomUnit()

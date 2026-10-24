@@ -6171,6 +6171,7 @@ struct GeneratedCandidateContinuation {
   init(configuration: TestConfiguration, batchTokenCount: Int, showAllLines: Bool = false,
     weakSpotScores: WeakSpotScores = .init(), sourceWords: [String]? = nil,
     decorationState: PoolWordDecorationState = .init(),
+    arrowChart: WebsiteArrowChart = .init(),
     replayHistory: GeneratedWordReplayHistory? = nil,
     polyglotSources: [(TypingLanguage, IndexedLexicon)]? = nil,
     nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }) {
@@ -6178,7 +6179,7 @@ struct GeneratedCandidateContinuation {
     self.batchTokenCount = batchTokenCount
     self.weakSpotScores = weakSpotScores
     self.decorationState = decorationState
-    self.replayHistory = replayHistory ?? .init(noSpace: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers))
+    self.replayHistory = replayHistory ?? .init(noSpace: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), arrowChart: arrowChart)
     replaysOwnedHistory = replayHistory != nil
     if configuration.language == .mixedLanguages {
       polyglotCandidates = polyglotSources.map { NativePolyglotCandidates(sources: $0,
@@ -6264,7 +6265,14 @@ struct GeneratedCandidateContinuation {
       let candidate = drawCandidate(random: nextRandomWordIndex)
       if nextSectionWord >= sectionWords.count {
         var section = sampledWord(initialCandidate: candidate, random: nextRandomWordIndex)
-        if let websiteSource {
+        if WebsiteArrowChart.isSelected(configuration) {
+          guard let generated = replayHistory.arrowChart.word(first: emittedWords + index == 0,
+            randomUnit: nextRandomContentUnit) else {
+            sourceGenerationFailed = true
+            return .init(source: "", configuration: configuration)
+          }
+          section = generated
+        } else if let websiteSource {
           guard let generated = WebsiteRandomWordGenerator.word(websiteSource,
             language: configuration.wordPoolBaseLanguage, randomUnit: nextRandomContentUnit) else {
             sourceGenerationFailed = true
@@ -6408,6 +6416,7 @@ struct TestSessionFactory {
     defersStreamContinuationTransformation: Bool = false,
     preparedStreamPromptBatch: TransformedPromptBatch? = nil,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
+    arrowChart: WebsiteArrowChart = .init(),
     showAllLines: Bool = false,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
@@ -6467,7 +6476,7 @@ struct TestSessionFactory {
     if configuration.mode != .custom, configuration.mode != .zen, let streamPrompt {
       prompt = streamPrompt
       noSpaceBoundarySource = streamNoSpaceBoundarySource
-    } else if let streamWordCount, WebsiteRandomWordGenerator.selected(for: configuration) == nil,
+    } else if let streamWordCount, !WebsiteRandomWordGenerator.usesCandidateStream(for: configuration),
       let streamPrompt = TypebarStreamContent.prompt(
         configuration: configuration, wordCount: streamWordCount)
     {
@@ -6479,7 +6488,7 @@ struct TestSessionFactory {
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
         batchTokenCount: streamWordCount, showAllLines: showAllLines, weakSpotScores: weakSpotScores,
-        decorationState: wordDecorationState, nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex)
+        decorationState: wordDecorationState, arrowChart: arrowChart, nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex)
       let chunk = cursor.nextChunk(nextRandomWordIndex: nextRandomWordIndex, nextRandomCaseBit: nextRandomCaseBit,
         nextRandomContentUnit: nextRandomContentUnit)
       prompt = chunk.source

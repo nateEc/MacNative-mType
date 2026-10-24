@@ -24,6 +24,19 @@ import XCTest
     }
   }
 
+  func testWebsiteArrowsGenerateFourStepWordsWithActualHistoryRatherThanIndexedSingles() async throws {
+    let value = try draft(#"{"mode":"words","words":3,"funbox":["arrows"]}"#)
+    var draws = 0
+    let ready = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+      random: .init(contentUnit: { draws += 1; return 0.5 }))
+    XCTAssertEqual(ready.session.prompt.count, 12)
+    XCTAssertGreaterThan(draws, 24)
+    let history = try XCTUnwrap(ready.session.generatedWordReplayHistory)
+    XCTAssertEqual(history.count, 3)
+    XCTAssertTrue(history.noSpace)
+    for index in 0..<3 { XCTAssertEqual(history.word(at: index)?.target.count, 4) }
+  }
+
   func testAccountingSourceUsesRandomDigitsAndLanguageSpecificNumerals() async throws {
     for (language, plain, punctuated) in [
       ("english", "5555", "55-5"), ("kurdish_central", "٥٥٥٥", "٥٥-٥"),

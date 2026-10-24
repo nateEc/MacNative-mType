@@ -66,6 +66,7 @@ final class PracticePageSessionStore {
     var scope = state.practice?.scope ?? .init()
     scope.weakSpotScores = session.liveWeakSpotScores
     scope.decorationState = session.liveWordDecorationState
+    scope.arrowChart = session.generatedWordReplayHistory?.arrowChart ?? scope.arrowChart
     return .init(scope: scope, lease: lease, attachment: attachment, compositionActivity: compositionActivity,
       session: session.generationState, publication: state.presentation?.publication.applicationID,
       repetition: state.practice?.repetition, restartDeparture: state.restartDepartureAttemptID,
@@ -92,6 +93,7 @@ final class PracticePageSessionStore {
     var scope = practice.scope
     scope.weakSpotScores = state.session.liveWeakSpotScores
     scope.decorationState = state.session.liveWordDecorationState
+    scope.arrowChart = state.session.generatedWordReplayHistory?.arrowChart ?? scope.arrowChart
     return .init(publication: publication, scope: scope, lease: lease,
       attachment: attachment, compositionActivity: compositionActivity, session: state.session.generationState,
       repetition: practice.repetition, restartDeparture: state.restartDepartureAttemptID,

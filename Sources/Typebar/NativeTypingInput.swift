@@ -119,6 +119,7 @@ struct NativeTypingInput: NSViewRepresentable {
     var oppositeShiftKeymap: KeyboardInputMapping
     var oppositeShiftMode: OppositeShiftMode
     var mapsArrowKeysToInput: Bool
+    var mapsArrowLetterKeysToInput = false
     var mapsEnterToSpace = false
     var acceptsNewlineInput: Bool
     var acceptsTabInput: Bool
@@ -172,6 +173,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.oppositeShiftKeymap = oppositeShiftKeymap
         view.oppositeShiftMode = oppositeShiftMode
         view.mapsArrowKeysToInput = mapsArrowKeysToInput
+        view.mapsArrowLetterKeysToInput = mapsArrowLetterKeysToInput
         view.mapsEnterToSpace = mapsEnterToSpace
         view.acceptsNewlineInput = acceptsNewlineInput
         view.acceptsTabInput = acceptsTabInput
@@ -235,6 +237,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var oppositeShiftKeymap: KeyboardInputMapping = .builtIn(.ansiQwerty)
     var oppositeShiftMode: OppositeShiftMode = .off
     var mapsArrowKeysToInput = false
+    var mapsArrowLetterKeysToInput = false
     var mapsEnterToSpace = false
     var acceptsNewlineInput = false
     var acceptsTabInput = false
@@ -447,6 +450,17 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             // repeat. The page still owns admission and attempt identity.
             if acceptsTextInput, !event.isARepeat { onInsert(" ", false) }
             return
+        }
+        if mapsArrowLetterKeysToInput {
+            // Control produces control scalars in characters, unlike DOM key.
+            // Keep actual Option/Shift text; never lowercase logical keys.
+            let logicalKey = event.modifierFlags.contains(.control) && !event.modifierFlags.contains(.option)
+              ? event.charactersIgnoringModifiers : event.characters
+            if let arrow = ArrowKeyInputPolicy.character(forKeyCode: event.keyCode)
+              ?? ArrowKeyInputPolicy.character(forKey: logicalKey) {
+                if acceptsTextInput, !event.isARepeat { onInsert(String(arrow), false) }
+                return
+            }
         }
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "r" {
             if !event.isARepeat { onRestart() }
@@ -752,6 +766,15 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
 }
 
 enum ArrowKeyInputPolicy {
+    static func character(forKey key: String?) -> Character? {
+        switch key {
+        case "a", "j", "ArrowLeft": "←"
+        case "s", "k", "ArrowDown": "↓"
+        case "w", "i", "ArrowUp": "↑"
+        case "d", "l", "ArrowRight": "→"
+        default: nil
+        }
+    }
     static func character(forKeyCode keyCode: UInt16) -> Character? {
         switch keyCode {
         case 126: "↑"

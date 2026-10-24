@@ -24,9 +24,9 @@ import Observation
       page.attach(to: router)
     }
     func close() { page.detach(); try? FileManager.default.removeItem(at: directory) }
-    func publish(_ json: String = #"{"mode":"custom"}"#) async throws {
+    func publish(_ json: String = #"{"mode":"custom"}"#, random: WebsiteConfigSessionBuilder.Random = .init()) async throws {
       let resources = try coordinator.prepareResources(for: coordinator.prepare(json), localFont: .absent, localBackground: .absent)
-      let ready = try await coordinator.preparePractice(for: resources, scope: .init(customText: "ab cd"), loadQuotes: { _ in self.quotes })
+      let ready = try await coordinator.preparePractice(for: resources, scope: .init(customText: "ab cd"), loadQuotes: { _ in self.quotes }, random: random)
       guard case .committed = try coordinator.commit(ready, to: page, systemIsDark: true) else { throw Failure.publication }
     }
     func input(_ text: String) { var state = page.state; state.session.insert(text); page.replace(state) }
@@ -85,6 +85,33 @@ import Observation
           history.word(at: index)?.target)
       }
     }
+  }
+
+  func testArrowRepeatCapturesRealPrefetchedChartStateWithoutAdvancingIt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"time","time":60,"funbox":["arrows"]}"#,
+      random: .init(contentUnit: { 0.5 }))
+    var state = f.page.state
+    let opening = try XCTUnwrap(state.session.generatedWordReplayHistory?.count)
+    state.session.insertBatch(String(state.session.prompt.prefix(4)))
+    let history = try XCTUnwrap(state.session.generatedWordReplayHistory)
+    XCTAssertGreaterThan(history.count, opening)
+    f.page.replace(state)
+    XCTAssertEqual(try f.page.captureGeneration(router: f.router).scope.arrowChart, history.arrowChart)
+    let disk = try f.register.read().revision
+    let controller = try f.bind()
+    let repeated = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(repeated)
+    XCTAssertEqual(f.page.state.practice?.scope.arrowChart, history.arrowChart)
+    XCTAssertEqual(f.page.state.session.generatedWordReplayHistory?.count, history.count)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    var expected = history.arrowChart
+    let expectedPrompt = (0..<opening).map { expected.word(first: $0 == 0, randomUnit: { 0.5 })! }.joined()
+    let next = try await f.coordinator.prepareNext(for: f.page, random: .init(contentUnit: { 0.5 }))
+    guard case .advanced = try f.coordinator.advance(next, to: f.page) else { return XCTFail("Arrow next was not installed") }
+    XCTAssertEqual(f.page.state.session.prompt, expectedPrompt)
+    XCTAssertEqual(f.page.state.practice?.scope.arrowChart, expected)
+    XCTAssertEqual(try f.register.read().revision, disk)
   }
 
   func testProductionRepeatKeepsPrefetchedCandidateFutureThenFailsInsteadOfDrawingPastIt() async throws {

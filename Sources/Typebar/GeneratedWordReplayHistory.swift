@@ -4,8 +4,9 @@
 struct GeneratedWordReplayHistory {
   struct Word { let source, target: String }
   let noSpace: Bool
+  var arrowChart: WebsiteArrowChart
   private var words: [Word] = []
-  init(noSpace: Bool) { self.noSpace = noSpace }
+  init(noSpace: Bool, arrowChart: WebsiteArrowChart = .init()) { self.noSpace = noSpace; self.arrowChart = arrowChart }
   var count: Int { words.count }
   func word(at index: Int) -> Word? { words.indices.contains(index) ? words[index] : nil }
   mutating func append(source: String, target: String) { words.append(.init(source: source, target: target)) }
