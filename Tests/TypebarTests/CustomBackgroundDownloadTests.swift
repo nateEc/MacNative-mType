@@ -75,7 +75,7 @@ final class CustomBackgroundDownloadTests: XCTestCase {
 }
 
 /// In-memory URL loading only; all requests are intercepted and no socket is opened.
-private final class BackgroundBytesProtocol: URLProtocol, @unchecked Sendable {
+final class BackgroundBytesProtocol: URLProtocol, @unchecked Sendable {
   static let fixture = Fixture()
   final class Fixture: @unchecked Sendable {
     private let lock = NSLock()

@@ -116,4 +116,57 @@ final class WebsiteConfigModelResourceTests: XCTestCase {
     } catch { XCTAssertEqual(error as? LocalPracticeFontReadError, .resourceLimit) }
     XCTAssertEqual(requests, 0); XCTAssertEqual(try f.register.read().state, .missing)
   }
+
+  func testModelAdmissionDoesNotPromoteDOMOnlyDataAddressesToImportedSettings() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let image = try png()
+    let address = "data:image/png;base64," + image.base64EncodedString()
+    let json = String(decoding: try JSONSerialization.data(withJSONObject: ["customBackground": address]), as: UTF8.self)
+    let ticket = try f.coordinator.prepare(json)
+    XCTAssertEqual(ticket.draft.pagePreferences.backgroundAddress, .string(""))
+    var requests = 0
+    let reader = WebsiteConfigBackgroundRemoteReader { _, _ in requests += 1; return image }
+    let ready = try await f.coordinator.prepareResources(for: ticket, from: f.settings, remoteReader: reader)
+    guard case .none = ready.background.state else { return XCTFail("Import widened the original schema") }
+    XCTAssertEqual(requests, 0)
+    let publication = try success(f.coordinator.commit(ready))
+    XCTAssertEqual(publication.draft.projection.runtime["customBackground"], .string(""))
+    XCTAssertEqual(try f.register.read().state, .available(publication.draft.projection.runtime))
+  }
+
+  func testActualHTTPModelProducerCommitsFailureIntentWithoutChangingItsAddress() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let configuration = CustomBackgroundDownload.configuration(); configuration.protocolClasses = [BackgroundBytesProtocol.self]
+    let session = URLSession(configuration: configuration); defer { session.invalidateAndCancel() }
+    let reader = WebsiteConfigBackgroundRemoteReader { try await CustomBackgroundDownload.data(from: $0, maximumBytes: $1, session: session) }
+    let ticket = try f.coordinator.prepare(#"{"customBackground":"https://background-test.invalid/render.png?image=1"}"#)
+    for (status, data, reason) in [(404, Data([1]), WebsiteConfigBackgroundResource.Failure.transport),
+      (200, Data(repeating: 7, count: 4), .resourceLimit)] {
+      BackgroundBytesProtocol.fixture.set(status: status, data: data)
+      var limits = WebsiteConfigBackgroundResource.Limits(); limits.encodedBytes = 3
+      let ready = try await f.coordinator.prepareResources(for: ticket, from: f.settings, remoteReader: reader, backgroundLimits: limits)
+      guard case .failed(let failure) = ready.background.state else { return XCTFail("Failure was presented as no image") }
+      XCTAssertEqual(failure, reason)
+    }
+    let ready = try await f.coordinator.prepareResources(for: ticket, from: f.settings, remoteReader: reader)
+    let publication = try success(f.coordinator.commit(ready))
+    XCTAssertEqual(publication.background?.source, .remote(ticket.draft.pagePreferences.backgroundAddress))
+    XCTAssertEqual(try f.register.read().state, .available(publication.draft.projection.runtime))
+  }
+
+  func testActualHTTPModelProducerPreparesImageAndCommitsItsUnchangedAddress() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let image = try png()
+    let configuration = CustomBackgroundDownload.configuration(); configuration.protocolClasses = [BackgroundBytesProtocol.self]
+    let session = URLSession(configuration: configuration); defer { session.invalidateAndCancel() }
+    BackgroundBytesProtocol.fixture.set(status: 200, data: image)
+    let reader = WebsiteConfigBackgroundRemoteReader { try await CustomBackgroundDownload.data(from: $0, maximumBytes: $1, session: session) }
+    let ticket = try f.coordinator.prepare(#"{"customBackground":"https://background-test.invalid/owned.png?variant=1"}"#)
+    let ready = try await f.coordinator.prepareResources(for: ticket, from: f.settings, remoteReader: reader)
+    guard case .ready(let background) = ready.background.state else { return XCTFail("Actual remote bytes were not prepared") }
+    XCTAssertEqual(background.encodedData, image)
+    let publication = try success(f.coordinator.commit(ready))
+    XCTAssertEqual(publication.background?.source, .remote(ticket.draft.pagePreferences.backgroundAddress))
+    XCTAssertEqual(try f.register.read().state, .available(publication.draft.projection.runtime))
+  }
 }

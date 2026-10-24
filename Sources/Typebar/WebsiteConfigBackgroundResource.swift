@@ -13,7 +13,7 @@ struct WebsiteConfigBackgroundResource {
   enum Local { case absent, empty, data(Data) }
   enum Remote {
     case received(address: WebsiteConfigValue, data: Data)
-    case failed(address: WebsiteConfigValue)
+    case failed(address: WebsiteConfigValue, reason: Failure = .transport)
   }
   enum Source: Equatable { case local, remote(WebsiteConfigValue) }
   enum Failure: Equatable { case transport, undecodable, resourceLimit }
@@ -68,12 +68,12 @@ struct WebsiteConfigBackgroundResource {
     guard let remote else { throw WebsiteConfigBackgroundResourceError.remoteNotProvided }
     let address: WebsiteConfigValue
     switch remote {
-    case .received(let value, _), .failed(let value): address = value
+    case .received(let value, _), .failed(let value, _): address = value
     }
     guard let actual = address.stringUnits, actual == preferences.backgroundAddress.stringUnits
     else { throw WebsiteConfigBackgroundResourceError.wrongRemoteAddress }
     switch remote {
-    case .failed: return .init(source: .remote(address), state: .failed(.transport))
+    case .failed(_, let reason): return .init(source: .remote(address), state: .failed(reason))
     case .received(_, let data): return decode(data, source: .remote(address), limits: limits)
     }
   }

@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 完整配置的原生远程背景生产者（2026-10-24）
+
+WebsiteConfigBackgroundRemoteReader 接入协调器 from settings 重载：没有自定义远端回调时使用实际有界传输；本地背景优先及调用方显式回调不变。远端结果始终携带原始 UTF-16 地址，传输 URL 的规范化不回写配置。取消向上传播，传输、资源上限与图片解码失败分开；取得独立字节后才交给既有 ImageIO 准备和同票据提交。HTTP 使用原有隔离 ephemeral 会话，不自动借账户令牌、Cookie 或凭据存储；测试通过 URLProtocol 拦截实际 URLSession，不访问外网。
+
+固定 packages/schemas/src/configs.ts 的 CustomBackgroundSchema 仍要求 HTTP(S)、图片扩展片段、长度及引号限制。data／相对地址只是传输原语能力，不能因此扩大导入准入；实际模型测试验证 data 地址仍被原 schema 归为空。原 theme-controller 对已准入地址使用原始 src，故不套用旧 UI 更严的路径扩展策略。
+
+解码依据 [Fetch data URL](https://fetch.spec.whatwg.org/#data-urls)、[URL 基本解析](https://url.spec.whatwg.org/#concept-basic-url-parser) 和 [Infra forgiving base64](https://infra.spec.whatwg.org/#forgiving-base64-decode) 的相关规则实现有限子集：百分号字节、非表单加号、片段剔除、宽松 Base64、显式 base 解析、常见 HTTP 路径／主机规范化。file/javascript/blob 不访问文件或执行内容。36 个无窗口、非持久 WebKit／CSP 样本比较字节或序列化地址，不代表完整 WHATWG、Fetch、CSP、MIME、格式或服务端兼容。
+
+有效先行红测为 8 项、30 处失败。浏览器对照定位主机／路径／查询及冒号边界；另两处模型夹具错误源于未满足原 schema，修正夹具且没有放宽产品准入。最终定向 45 项零失败，覆盖实际 HTTP 成功提交、失败分类、取消前后头部、原始地址、配额与字节拥有。本阶段数据解码仍在 MainActor，不承诺进程硬内存上限或 I/O 时限；正式配置 UI／真实默认目录切流、外部资源观察、旧全局字体注册退役及 No Quit 生产接入仍未完成，已知独立滚轮基线失败不因此转绿。
+
+扩大相关回归 372 项零失败／零跳过；移除参考源码及外部 schema 依赖后的原生集合 158 项零失败／零跳过，集合重叠不相加。源码／资源原创性检查、固定参考证据检查（47 直接项、119 原生符号、17 支持规范）与人工清单 1,284 项结构检查通过；清单结构通过不等于人工验收。最终回归与打包期间没有改动 Swift 源码／测试；日志 `/tmp/typebar-background-remote-{final,expanded,offline,package}.log`。本轮没有启动 Typebar 主程序，不修改主分支、创建 PR 或重跑 Actions。
+
+最终 Debug 包、签名、第三方署名及包内资源原创性边界检查通过；临时 QA 包由脚本清理，没有启动其可执行程序。
+
 ## 真实模型到只读字体／背景生产者（追加阶段）
 
 固定 ui.ts::applyFontFamily 以 LocalFontFamilyFile 是否存在决定首项 LOCALCUSTOM，本地文件失败也不重新插入配置字体。新 LocalPracticeFontResourceReader 只返回 absent 或独立字节，不查询／注册字体，不把读取错误、损坏的明确选择或超预算文件伪装为不存在。真正读取成功但内容为空／坏字体仍是 data，交给既有字体准备器保留本地失败及回退链。默认读取预算 32 MiB 是可由宿主调整的原生准入政策，不是原版文件上限；读取预算／权限错误先中止准备，而不是冒充解码后的字体失败，正式导入 UI 还须处理该边界。
