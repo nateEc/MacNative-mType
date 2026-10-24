@@ -1,5 +1,23 @@
 # 阈值源状态与迁移契约
 
+## 页面绑定的实时生成作用域（2026-10-24，起点 eb32a9be）
+
+固定 weak-spot.ts 的分数簿是跨尝试的模块状态，test-logic.restart 不清除该簿；原生旧路径也在重开前读取 session.liveWeakSpotScores／liveWordDecorationState。因此完整发布最初 Prepared.scope 的统计不是后续编辑可直接复用的实时值。
+
+新增页面 GenerationCapture：从当前已安装实践 Scope 保留文本、参数记忆及引语队列，用当前会话的弱点簿和词形标记替换旧值，派生实际 testActive。新页面绑定 prepareEdit 不再接受外传活动标志；捕获当前窗口 Lease、页面附着寿命、发布身份和会话生成状态。接受输入、目标／规则／统计改变、终态及附着 ABA 均使旧票据失效；时钟／配速观察本身不使准备一直失败。输入回放数和尝试数识别输入后删回同一文本；文本按 UTF-16 精确比较，不借规范等价掩盖差异。
+
+未提交的输入法候选不一定增加回放事件；实际 ContentView 组合开始／变化回调因此额外更新页面局部活动标记，旧尝试回调仍先拒绝。标记不参与视图观察，不引入每帧会话写回。配置准备不锁住旧输入，后续读资源、生成和 CAS 前都检查捕获；新输入保留而候选拒绝，不静默覆盖它。
+
+绑定票据弱持有页面，只能用捕获 Scope 的完整构建器并提交到同一页面；任意生成器、外传 Scope、只写记录或其他页面不能绕过。禁止的新生产者也退休旧种子；实际页面保留期再次核对捕获及 No Quit，拒绝均在写盘前。旧无绑定导入接口保留，没有默认切流或存储格式迁移。
+
+先行缺少页面绑定 API 和组合活动 API 的编译失败留证，不称产品行为红测；第一阶段 27 项、随后 392 项和增加实际隐藏宿主后的 393 项检查分别通过，集合重叠不相加。新增实际 ContentView 回调检查验证已开始尝试的组合开始／候选变化：引擎生成状态仍相等，但页面捕获失效且不写盘；旧尝试回调不退休新捕获。不是物理输入法或可见窗口验收。
+
+会话内复核继续发现跨代次内容问题：EnvironmentSource 的代次同时代表账户／资源拥有者，而继承的 Scope 未重新读取。新增反例在旧候选代码下实测 1 项／1 失败（/tmp/typebar-generation-capture-epoch-red.log），证实会接受新环境下的旧内容。页面绑定准备现要求发布与当前环境同代次，不满足时先拒绝。最终冻结新源码的 394 项相关扩大零失败／零跳过，143.515 秒，含八项新捕获核心、一项新增实际隐藏宿主、旧提交／编辑／配置及 26 项视口；命令只明确排除独立滚轮基线 testWheelOverPromptScrollsPageWithoutMovingInnerClipOrReplacingInput，未改其断言。日志 /tmp/typebar-generation-capture-epoch-fixed-expanded.log；393 项旧通过不替代该修正的验证，集合不相加。
+
+原创性／固定参考行为审计及自检通过（47 直接／119 测试符号／17 支持规范），人工清单 1,303 条仅结构与自检通过。冻结实现 SHA256：TypebarApp 842464ad3afc8697a3095ad4794a33313c69f0419165f130fa79bf5b67295de3；TypingEngine a8f0504aac8d2cec8d6d5a88aff26e5711b002f8c7a7ba4dd48e3de1d813b606；PracticePageSessionStore ee2494588e32d2c1efab60a14e1dacc1ca1439fca9f1e4f21f20d969660197fe；WebsiteConfigCommitCoordinator cfd14bb51498fe8a4bb5bcdf9a5b2fff9a8bd3ce3e209671363e63779589bb4b。原生进程存活时未改 Swift 输入。Debug 打包／签名与包内资源／原创性检查通过，日志 /tmp/typebar-generation-capture-package.log；未启动包，不改 main／工作流／通知。
+
+此拒绝是临时准入门，不是账户切换／资源热变更的最终实现。本轮并非收齐账户收藏／外部内容、未完成尝试记账或全部重开策略；这些拥有者仍须各自刷新并联动环境代次，不能把继承的 Scope 内容描述为新的账户读取。长尝试捕获／比较性能、正式 UI、物理 IME 和独立滚轮仍开放。迁移安全与会话内决策复核选择“保留输入并拒绝旧候选”，行为先行反例补上跨代次缺口；不冒称独立评审或完整门禁，完整目标继续 active。
+
 ## 已发布配置的编辑准入（2026-10-24，起点 03efe46c）
 
 协调器新增 prepareEdit：只以自身 latest 发布为源，不信任调用方任意 runtime；来源 authority／applicationID 与当前所有者必须一致。重新取得当前 Lease，使用当前账户／资源环境及 rem 尺度，核对记录 revision，再以单项 setter 构建完整 edited 草稿。旧发布的交付 Lease 不复活；窗口 ABA 后可以从仍为 latest 且记录未变的发布重新准备新编辑，旧待提交请求仍失效。

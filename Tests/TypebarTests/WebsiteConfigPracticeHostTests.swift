@@ -306,6 +306,7 @@ import XCTest
       XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, ready.session.automaticInputAttemptID)
       XCTAssertEqual(f.state.page.state.presentation?.publication.applicationID, publication.applicationID)
     } catch { return XCTFail("The actual page destination must admit its prepared attempt: \(error)") }
+    let currentCapture = try f.state.page.captureGeneration(router: f.settings.preferenceConfigurationSaves)
     // Do not run the loop before these calls: the native view still carries
     // callbacks from the previous attempt while the authoritative state is new.
     staleCompositionStart()
@@ -314,6 +315,8 @@ import XCTest
     XCTAssertEqual(f.state.page.state.session.typed, "", "Cached insertion must not reach the replacement attempt")
     staleDelete(); staleComposition("stale")
     XCTAssertEqual(f.state.page.state.session.typed, "")
+    XCTAssertTrue(f.state.page.isCurrent(currentCapture, router: f.settings.preferenceConfigurationSaves),
+      "Callbacks from the old attempt must not retire a capture for the replacement")
     f.wait { input.insertionAttemptID == ready.session.automaticInputAttemptID && input.acceptsTextInput }
     XCTAssertTrue(f.views(TypingInputView.self).first === input)
     input.onInsert("a", false)
@@ -323,6 +326,38 @@ import XCTest
     staleDeleteWord(); staleBailout()
     XCTAssertEqual(f.state.page.state.session.typed, "a")
     XCTAssertFalse(f.state.page.state.session.isFinished, "Old bailout must not finish a replacement attempt")
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testActualCompositionCallbacksRetirePageBoundEditWithoutCommittedInputOrDiskWrite() throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    let router = f.settings.preferenceConfigurationSaves, epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: router, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let resources = try coordinator.prepareResources(for: coordinator.prepare(#"{"mode":"custom"}"#),
+      localFont: .absent, localBackground: .absent)
+    let ready = try awaitResult(coordinator, resources: resources)
+    guard case .committed(let publication) = try coordinator.commit(ready, to: f.state.page, systemIsDark: true) else {
+      return XCTFail("Initial full publication failed")
+    }
+    f.wait { input.insertionAttemptID == ready.session.automaticInputAttemptID && input.acceptsTextInput }
+    input.onInsert("a", false)
+    let before = f.state.page.state.session.generationState
+    let startCapture = try f.state.page.captureGeneration(router: router)
+    input.onCompositionStarted()
+    XCTAssertEqual(f.state.page.state.session.generationState, before)
+    XCTAssertFalse(f.state.page.isCurrent(startCapture, router: router))
+    let edit = try coordinator.prepareEdit(key: "difficulty", value: .string("expert"), for: f.state.page)
+    let markedCapture = try f.state.page.captureGeneration(router: router)
+    input.onCompositionChanged("中")
+    XCTAssertEqual(f.state.page.state.session.generationState, before,
+      "This exercises uncommitted candidate activity, not a replay/input counter change")
+    XCTAssertFalse(f.state.page.isCurrent(markedCapture, router: router))
+    XCTAssertThrowsError(try coordinator.prepareResources(for: edit, localFont: .absent, localBackground: .absent))
+    XCTAssertEqual(try f.register.read().revision, publication.disk)
+    XCTAssertEqual(f.state.page.state.session.typed, "a")
     XCTAssertFalse(f.window.isVisible)
   }
 

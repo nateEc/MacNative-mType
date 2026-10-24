@@ -3291,6 +3291,7 @@ private struct ContentView: View {
         onCompositionStarted: { [attemptID = session.automaticInputAttemptID] in
           guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           guard !isPreparingPracticePrompt else { return }
+          pageSessionStore.noteCompositionActivity(for: attemptID)
           if usesPreparedPromptViewport, viewportFallbackAttemptID != session.automaticInputAttemptID {
             viewportFallbackPosition.capture(attemptID: session.automaticInputAttemptID, targetID: session.promptTargetID)
           }
@@ -3303,6 +3304,7 @@ private struct ContentView: View {
         onCompositionChanged: { [attemptID = session.automaticInputAttemptID] text in
           guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           guard !isPreparingPracticePrompt else { return }
+          pageSessionStore.noteCompositionActivity(for: attemptID)
           if usesPreparedPromptViewport, !text.isEmpty,
             viewportFallbackAttemptID != session.automaticInputAttemptID {
             viewportFallbackAttemptID = session.automaticInputAttemptID

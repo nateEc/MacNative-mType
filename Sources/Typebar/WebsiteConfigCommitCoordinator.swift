@@ -26,6 +26,8 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let owner: PreferenceConfigurationSaveRouter.Lease
     fileprivate let environment: Environment
     fileprivate let disk: WebsiteConfigFileRegister.Revision
+    fileprivate weak var sourcePage: PracticePageSessionStore?
+    fileprivate var pageCapture: PracticePageSessionStore.GenerationCapture?
   }
   struct Publication {
     /// One successful full application, including repeated identical values.
@@ -130,6 +132,26 @@ final class WebsiteConfigCommitCoordinator {
       environment: context, disk: disk)
     guard isCurrent(prepared), try register.read().revision == base.disk,
       router.isCurrent(owner) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return prepared
+  }
+
+  /// Capture the actual page instead of accepting the original seed's books.
+  /// Input can continue during preparation; changed generation state rejects
+  /// the candidate before further reads or CAS rather than discarding input.
+  func prepareEdit(key: String, value: WebsiteConfigValue, for page: PracticePageSessionStore) throws -> Prepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    request = UUID()
+    let capture = try page.captureGeneration(router: router)
+    var prepared = try prepareEdit(key: key, value: value, from: capture.publication, testActive: capture.testActive)
+    // Session books are current, but inherited account/content scope is not a
+    // fresh read from a new environment. Require scoped re-preparation first;
+    // do not silently carry one account's content into another epoch.
+    guard prepared.environment.revision == capture.publication.environmentRevision else {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
+    prepared.sourcePage = page
+    prepared.pageCapture = capture
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
     return prepared
   }
   @discardableResult
@@ -250,12 +272,27 @@ final class WebsiteConfigCommitCoordinator {
   }
   func prepareSession(for prepared: ResourcesPrepared,
     generate: @MainActor (WebsiteConfigNativeDraft) async throws -> TypingSession) async throws -> SessionPrepared {
-    try await prepareSessionBuild(for: prepared) { draft in (try await generate(draft), nil) }
+    try await prepareSessionBuild(for: prepared) { draft in
+      guard prepared.configuration.pageCapture == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
+      return (try await generate(draft), nil)
+    }
   }
   func preparePractice(for prepared: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
     random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> SessionPrepared {
+    try await preparePracticeBuild(for: prepared, scope: scope, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+  }
+  func preparePractice(for prepared: ResourcesPrepared,
+    loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
+    loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
+    random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> SessionPrepared {
+    try await preparePracticeBuild(for: prepared, scope: nil, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+  }
+  private func preparePracticeBuild(for prepared: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope?,
+    loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote],
+    loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
+    random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
     let checkedExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
     if let loadExternal {
       checkedExternal = { source, configuration in
@@ -265,7 +302,15 @@ final class WebsiteConfigCommitCoordinator {
       }
     } else { checkedExternal = nil }
     return try await prepareSessionBuild(for: prepared) { draft in
-      let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: scope,
+      let effectiveScope: WebsiteConfigSessionBuilder.Scope
+      if let capture = prepared.configuration.pageCapture {
+        guard scope == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
+        effectiveScope = capture.scope
+      } else {
+        guard let scope else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
+        effectiveScope = scope
+      }
+      let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: effectiveScope,
         reason: .configurationApplication,
         loadQuotes: { language in
           try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
@@ -339,6 +384,9 @@ final class WebsiteConfigCommitCoordinator {
     defer { processing = false }
     guard session != nil || sessionRequest != prepared.request else { return .stale }
     guard isCurrent(prepared) else { retire(prepared); return .stale }
+    if prepared.pageCapture != nil {
+      guard let source = prepared.sourcePage, page === source else { throw PracticePageSessionStateError.wrongOwner }
+    }
     if session != nil { try Task.checkCancellation() }
     let applicationID = UUID()
     let appearance: WebsiteConfigPublishedPresentation.PreparedAppearance?
@@ -352,7 +400,7 @@ final class WebsiteConfigCommitCoordinator {
       }
       appearance = try WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
         applicationID: applicationID, systemIsDark: systemIsDark)
-      try page.beginCommit(owner: prepared.owner, router: router)
+      try page.beginCommit(owner: prepared.owner, router: router, capture: prepared.pageCapture)
     } else { appearance = nil }
     defer { page?.endCommit() }
     let outcome: WebsiteConfigFileRegister.Commit
@@ -385,10 +433,15 @@ final class WebsiteConfigCommitCoordinator {
   }
   private func isCurrent(_ prepared: Prepared) -> Bool {
     guard belongsToCurrentRequest(prepared), router.isCurrent(prepared.owner),
-      environment() == prepared.environment else { return false }
+      matchesPage(prepared), environment() == prepared.environment else { return false }
     // A host environment reader is a callback. Revalidate after it returns so
     // it cannot accidentally move ownership and leave an earlier check valid.
-    return belongsToCurrentRequest(prepared) && router.isCurrent(prepared.owner)
+    return belongsToCurrentRequest(prepared) && router.isCurrent(prepared.owner) && matchesPage(prepared)
+  }
+  private func matchesPage(_ prepared: Prepared) -> Bool {
+    guard let capture = prepared.pageCapture else { return true }
+    guard let page = prepared.sourcePage else { return false }
+    return page.isCurrent(capture, router: router)
   }
   private func retire(_ prepared: Prepared) {
     if belongsToCurrentRequest(prepared) { request = UUID() }

@@ -5173,6 +5173,27 @@ struct TypingSession {
     return true
   }
   var liveWeakSpotScores: WeakSpotScores { currentWeakSpotScores }
+  /// Process-local admission evidence for explicit generation, not a saved
+  /// replay or per-frame revision. Clock/pace observation alone is excluded.
+  struct GenerationState: Equatable {
+    let attempt: UUID, target: UUID
+    let events: Int, attempts: Int
+    let started: Bool, finished: Bool
+    let configuration: TestConfiguration
+    let scores: WeakSpotScores
+    let decoration: PoolWordDecorationState
+    let typed: String
+    static func == (a: Self, b: Self) -> Bool {
+      a.attempt == b.attempt && a.target == b.target && a.events == b.events && a.attempts == b.attempts
+        && a.started == b.started && a.finished == b.finished && a.configuration == b.configuration
+        && a.scores == b.scores && a.decoration == b.decoration && a.typed.utf16.elementsEqual(b.typed.utf16)
+    }
+  }
+  var generationState: GenerationState {
+    .init(attempt: automaticInputAttemptID, target: promptTargetID, events: replayEvents.count,
+      attempts: inputAttemptCount, started: hasStarted, finished: isFinished, configuration: configuration,
+      scores: liveWeakSpotScores, decoration: liveWordDecorationState, typed: typed)
+  }
   var liveWordDecorationState: PoolWordDecorationState {
     generatedCodeContinuation?.decorationState ?? currentWordDecorationState
   }
