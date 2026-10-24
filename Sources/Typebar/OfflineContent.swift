@@ -6512,11 +6512,21 @@ struct TestSessionFactory {
               prompt = verifiedScript.text
             }
           } else if configuration.customTextCompletion == .finish,
-            let finiteTextSource,
-            var stream = CustomFiniteTextStream(source: finiteTextSource)
+            let finiteTextSource
           {
-            prompt = stream.nextChunk()
-            finiteCustomTextStream = stream
+            if var stream = CustomFiniteTextStream(source: finiteTextSource) {
+              prompt = stream.nextChunk()
+              finiteCustomTextStream = stream
+            } else if finiteTextSource.utf8.count <= CustomTextPolicy.maximumLongSavedLength * 4,
+              CustomTextPolicy.isValid(finiteTextSource) {
+              // A short remainder needs no streaming cursor, but still owns
+              // its targets. Never substitute a separate editor preview.
+              prompt = finiteTextSource
+            } else {
+              return .init(configuration: configuration, prompt: "",
+                initializationFailure: "明确选择的有限文本为空、无效或超出当前预算，已停止出题；不会替换为编辑框预览。",
+                weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState)
+            }
           } else if streamsSequentialCustomText,
             var stream = CustomSequentialWordStream(
               source: source, ordering: configuration.customTextOrdering,

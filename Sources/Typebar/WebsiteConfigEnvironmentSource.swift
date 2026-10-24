@@ -28,6 +28,20 @@ final class WebsiteConfigEnvironmentSource {
   }
 
   func read() -> WebsiteConfigCommitCoordinator.Environment? { cached }
+  struct ContentModels: Equatable {
+    let custom: CustomTextStateRead
+    let customGeneration: UInt64
+    let localFavorites: [String]
+    let accountScope: ResultPublicationScope?
+    let accountGeneration: UInt64
+  }
+  /// Read the very same models that own this environment, never another
+  /// account/settings pair supplied alongside an otherwise matching context.
+  func contentModels() -> ContentModels {
+    .init(custom: settings.customTextStateRead, customGeneration: settings.customTextStateGeneration,
+      localFavorites: settings.favoriteQuoteIDs, accountScope: account.resultPublicationScope,
+      accountGeneration: account.accountPersonalBestSessionRevision)
+  }
   func updateLayout(pointsPerRem: Double?, documentComplete: Bool) {
     guard !stopped else { return }
     self.pointsPerRem = pointsPerRem
@@ -64,6 +78,7 @@ final class WebsiteConfigEnvironmentSource {
         // Reading the complete legacy snapshot tracks the values, not a hash:
         // even a change back to identical values retires the previous epoch.
         _ = settings.snapshot
+        _ = settings.customTextStateGeneration
         // Complete configuration replay includes restart-requiring fields.
         // Observe the lock even while unavailable so unlocking can rearm us.
         _ = settings.allowsRestartingConfigurationChange

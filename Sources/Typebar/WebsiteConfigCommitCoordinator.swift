@@ -28,6 +28,8 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let disk: WebsiteConfigFileRegister.Revision
     fileprivate weak var sourcePage: PracticePageSessionStore?
     fileprivate var pageCapture: PracticePageSessionStore.GenerationCapture?
+    fileprivate weak var contentSource: WebsiteConfigPracticeScopeSource?
+    fileprivate var contentCapture: WebsiteConfigPracticeScopeSource.Snapshot?
   }
   struct Publication {
     /// One successful full application, including repeated identical values.
@@ -139,6 +141,14 @@ final class WebsiteConfigCommitCoordinator {
   /// Input can continue during preparation; changed generation state rejects
   /// the candidate before further reads or CAS rather than discarding input.
   func prepareEdit(key: String, value: WebsiteConfigValue, for page: PracticePageSessionStore) throws -> Prepared {
+    try preparePageEdit(key: key, value: value, for: page, refreshingWith: nil)
+  }
+  func prepareEdit(key: String, value: WebsiteConfigValue, for page: PracticePageSessionStore,
+    refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> Prepared {
+    try preparePageEdit(key: key, value: value, for: page, refreshingWith: source)
+  }
+  private func preparePageEdit(key: String, value: WebsiteConfigValue, for page: PracticePageSessionStore,
+    refreshingWith source: WebsiteConfigPracticeScopeSource?) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     request = UUID()
     let capture = try page.captureGeneration(router: router)
@@ -146,8 +156,15 @@ final class WebsiteConfigCommitCoordinator {
     // Session books are current, but inherited account/content scope is not a
     // fresh read from a new environment. Require scoped re-preparation first;
     // do not silently carry one account's content into another epoch.
-    guard prepared.environment.revision == capture.publication.environmentRevision else {
-      throw WebsiteConfigCommitCoordinatorError.stale
+    if let source {
+      let content = try source.capture(owner: page.owner, preserving: capture.scope)
+      guard content.environment == prepared.environment else { throw WebsiteConfigCommitCoordinatorError.stale }
+      prepared.contentSource = source
+      prepared.contentCapture = content
+    } else {
+      guard prepared.environment.revision == capture.publication.environmentRevision else {
+        throw WebsiteConfigCommitCoordinatorError.stale
+      }
     }
     prepared.sourcePage = page
     prepared.pageCapture = capture
@@ -305,7 +322,7 @@ final class WebsiteConfigCommitCoordinator {
       let effectiveScope: WebsiteConfigSessionBuilder.Scope
       if let capture = prepared.configuration.pageCapture {
         guard scope == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
-        effectiveScope = capture.scope
+        effectiveScope = prepared.configuration.contentCapture?.scope ?? capture.scope
       } else {
         guard let scope else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
         effectiveScope = scope
@@ -439,6 +456,9 @@ final class WebsiteConfigCommitCoordinator {
     return belongsToCurrentRequest(prepared) && router.isCurrent(prepared.owner) && matchesPage(prepared)
   }
   private func matchesPage(_ prepared: Prepared) -> Bool {
+    if let content = prepared.contentCapture {
+      guard let source = prepared.contentSource, source.isCurrent(content) else { return false }
+    }
     guard let capture = prepared.pageCapture else { return true }
     guard let page = prepared.sourcePage else { return false }
     return page.isCurrent(capture, router: router)

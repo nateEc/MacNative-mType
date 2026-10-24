@@ -21,6 +21,8 @@ enum WebsiteConfigSessionBuildError: Error {
     var preparedCustomSections: [String]? = nil
     var finiteTextSource: String? = nil
     var customCompletion: CustomTextCompletion = .finish
+    /// Exact transient source duration, separate from legacy integer controls.
+    var customDurationOverride: TimeInterval? = nil
     var customOrdering: CustomTextOrdering = .inOrder
     var customPipeDelimiter: Bool? = nil
     var customTextRecoveryBlocked = false
@@ -140,10 +142,17 @@ enum WebsiteConfigSessionBuildError: Error {
     guard [scope.parameterMemory.customTextDuration, scope.parameterMemory.customTextWordLimit,
       scope.parameterMemory.customTextSectionLimit].allSatisfy({ (0...OfficialTestLimitInput.maximumValue).contains($0) })
     else { throw WebsiteConfigSessionBuildError.unrepresentableConfiguration }
+    if let duration = scope.customDurationOverride,
+      !duration.isFinite || duration < 0 || duration > Double(OfficialTestLimitInput.maximumValue) {
+      throw WebsiteConfigSessionBuildError.unrepresentableConfiguration
+    }
     var config = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
       customTextCompletion: scope.customCompletion, customTextSectionLimit: scope.parameterMemory.customTextSectionLimit,
       customTextOrdering: scope.customOrdering, customTextPipeDelimiter: scope.customPipeDelimiter)
     config = draft.testParameters.applying(to: config, parameterMemory: scope.parameterMemory)
+    if config.mode == .custom, scope.customCompletion == .time, let duration = scope.customDurationOverride {
+      config.duration = duration
+    }
     config = draft.inputRules.applying(to: draft.behavior.applying(to: config))
     if draft.generators.requestsPolyglot {
       let languages = draft.generators.polyglotLanguages

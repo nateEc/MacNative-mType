@@ -1229,9 +1229,13 @@ final class AppSettings {
     CustomTextStateStore(defaults: defaults).read()
   }
 
+  private(set) var customTextStateGeneration: UInt64 = 0
+
   @discardableResult
   func saveCustomTextState(_ document: CustomTextStateDocument) -> Bool {
-    CustomTextStateStore(defaults: defaults).save(document)
+    guard CustomTextStateStore(defaults: defaults).save(document) else { return false }
+    customTextStateGeneration &+= 1
+    return true
   }
 
   var allowsRestartingConfigurationChange: Bool {

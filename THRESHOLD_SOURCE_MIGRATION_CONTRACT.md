@@ -1,5 +1,21 @@
 # 阈值源状态与迁移契约
 
+## 实际模型的内容刷新与有限来源修正（2026-10-24，起点 60f956ce）
+
+新增只读 WebsiteConfigPracticeScopeSource，绑定同一 WebsiteConfigEnvironmentSource 的实际 AppSettings／AccountSession，而不是让调用方另外拼一个“看起来相同”的账户上下文。窗口必须提供所有者、内容应用代次、恢复确认状态及选中引语／参数；自定义来源区分原生存档、窗口明确来源和独立精确定时语料。刷新前后核对环境、模型和窗口；绑定票据弱持有刷新器，资源、会话和写盘前继续核对，停止／退役或变化后不能提交。
+
+prepareEdit(refreshingWith:) 可跨旧发布的环境代次重新准备，但只接受刷新器与协调器同份当前环境。新作用域替换内容字段，保留当前页面弱点簿／词形和经目录匹配的值引语队列；不把账户收藏不可用解释成本机收藏。本机原始列表须显式选 nativeLocal，保留重复和失效 ID；原版按语言分组的账户收藏读取与正式窗口供应者尚未实现，不升级这部分覆盖。当前旧不带刷新器入口仍只适用于已有固定作用域；正式编辑控制器须持续传入拥有者的刷新器。
+
+原生自定义文本成功保存新增内存 customTextStateGeneration，EnvironmentSource 同步退休旧代次；相同内容重新保存也生效，拒绝保存不变更未知版本记录。产品写入点盘点仍只有 AppSettings 包装器；直接外部 UserDefaults 写入用当前内容比较发现差异，不声称全局写入 ABA 或跨进程事务。没有新增持久字段或放宽旧格式。原生存档仍要求整数时长；固定 schemas/results.ts 的原版 limit.value 为非负 number，故独立临时定时通道经 Scope.customDurationOverride 保留 2.5 秒，2.49／2.5 秒到期有检查，旧整数记忆不截断。原版 CustomText JSON 导入、非整数词数／段数、完整归档／控件与超当前预算语义仍开放。
+
+根因调试追到工厂有限来源边界：finiteTextSource 只用于 finish，游标仅服务长文本；短文本曾落回另一份预览。定时完整语料改为真正的定时词源，不借 finish-only 字段。工厂在短有限文本无游标时仍采用完整来源；明确的空／无效／超预算来源失败，不替换成预览。原有流式游标、验证脚本路径与普通编辑框规则不变。无效休眠自定义来源标为待恢复，不阻挡普通词数模式；活动自定义来源则拒绝，不生成占位句。
+
+先行 API 缺失及夹具漏传 duration／wordLimit 的编译记录不算行为红测。定点 25 项、修正前阶段 418 项以及精确时长 9 项分别通过，集合重叠不相加；随后有限语料反例先因 invalidContent 失败，放行后仍命中错误预览，工厂直接反例实测 1 项／5 处断言失败（/tmp/typebar-scope-refresh-factory-red.log）。普通模式被空自定义内容阻挡亦有先行失败。修正后 43 项 Scope／有限流／末尾提交／空白进度零失败，66.047 秒（/tmp/typebar-scope-refresh-factory-focused-fixed.log）。最终冻结源码的 486 项配置、设置保存恢复、页面、视口及有限文本相关扩大零失败／零跳过，216.552 秒（/tmp/typebar-scope-refresh-final-expanded.log），含 14 项新测试与 26 项视口；只明确排除独立滚轮基线 testWheelOverPromptScrollsPageWithoutMovingInnerClipOrReplacingInput，未改旧断言。不把阶段旧通过计为最终验证。
+
+Debug 打包／签名、包内资源／原创性通过（/tmp/typebar-scope-refresh-package.log），未启动包。原创性／固定参考行为审计与自检通过（47 直接／119 测试符号／17 支持规范），1,305 条人工清单仅结构及自检通过。冻结实现 SHA256：AppSettings a243f799c332bee2e10e4d1196adb87b2936e08767ce775981d5ae9cf6265a27；OfflineContent 35a658f93be4ea6c5f8135ca4137223828f1db70146ea924658515d56e79e4df；WebsiteConfigCommitCoordinator b36a6be817e31b72d3006acb5bcc30f7e4814f939899a6e01961bd7e7ab47a19；WebsiteConfigEnvironmentSource d1c86d152fbf76bbbfff243d12b5f0ddb4ff547a77f0b3b0f372d031bacbb9c4；WebsiteConfigPracticeScopeSource 3b3f4be9c49c1e0b17d516e60da943374f46d73e6219e30655668d03efd58b56；WebsiteConfigSessionBuilder 49966b57ebbf20978592fa20ca6d8ad8698541fea94a09dc616c3647d1ccff5c。原生进程存活时未改 Swift 输入。
+
+迁移安全、行为先行、会话内决策复核与根因调试决定了来源优先和失败边界，不称独立审查或完整门禁。窗口供应者须在稳定 MainActor 动作读取，并为内容应用保留稳定代次，不得每次读取重建代次；正式 UI／完整源消费者、账户收藏及语言作用域、源自定义格式与归档控件、重开／记账、物理输入和性能仍开放。未改 main／工作流／通知或启动 Typebar，完整目标继续 active。
+
 ## 页面绑定的实时生成作用域（2026-10-24，起点 eb32a9be）
 
 固定 weak-spot.ts 的分数簿是跨尝试的模块状态，test-logic.restart 不清除该簿；原生旧路径也在重开前读取 session.liveWeakSpotScores／liveWordDecorationState。因此完整发布最初 Prepared.scope 的统计不是后续编辑可直接复用的实时值。
