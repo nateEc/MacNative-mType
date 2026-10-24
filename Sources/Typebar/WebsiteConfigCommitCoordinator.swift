@@ -150,6 +150,17 @@ final class WebsiteConfigCommitCoordinator {
     resourceAdmission = UUID()
     return resourceAdmission
   }
+  func prepareResources(for prepared: Prepared, from settings: AppSettings,
+    fetchRemoteBackground: (@MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote)? = nil,
+    maximumFontBytes: Int = 32 * 1024 * 1024,
+    backgroundLimits: WebsiteConfigBackgroundResource.Limits = .init()) async throws -> ResourcesPrepared {
+    try await prepareResources(for: prepared,
+      readLocalFont: { try settings.readLocalPracticeFontResource(maximumBytes: maximumFontBytes) },
+      readLocalBackground: {
+        if let data = try settings.localBackgroundStore.encodedData(maximumBytes: backgroundLimits.encodedBytes) { return .data(data) }
+        return .absent
+      }, fetchRemoteBackground: fetchRemoteBackground, maximumFontBytes: maximumFontBytes, backgroundLimits: backgroundLimits)
+  }
   private func checkAsyncResources(_ prepared: Prepared, admission: UUID) throws {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     processing = true

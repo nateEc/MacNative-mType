@@ -8,6 +8,11 @@ struct LocalPracticeFontInfo: Equatable {
   let displayName: String
 }
 
+enum LocalPracticeFontPreferenceKeys {
+  static let enabled = "typebar.local-practice-font-enabled"
+  static let selected = "typebar.local-practice-font-selected-file"
+}
+
 enum LocalPracticeFontFilePolicy {
   private static let supportedExtensions = Set(["otf", "ttf", "woff", "woff2"])
 
@@ -26,8 +31,8 @@ enum LocalPracticeFontFilePolicy {
 /// of settings snapshots or account traffic.
 enum TypebarLocalPracticeFontStore {
   private static let directoryName = "Typebar"
-  private static let enabledDefaultsKey = "typebar.local-practice-font-enabled"
-  private static let selectedDefaultsKey = "typebar.local-practice-font-selected-file"
+  private static let enabledDefaultsKey = LocalPracticeFontPreferenceKeys.enabled
+  private static let selectedDefaultsKey = LocalPracticeFontPreferenceKeys.selected
 
   static var hasStoredFont: Bool { !storedFontURLs.isEmpty }
 
@@ -200,6 +205,12 @@ enum LocalPracticeFontRegistration {
 /// File transaction with explicit native boundaries for isolated recovery tests.
 enum LocalPracticeFontImport {
   private static let filenamePrefix = "local-practice-font"
+  static let storedFilenamePrefix = "\(filenamePrefix)-active-"
+
+  static func isStoredFilename(_ name: String) -> Bool {
+    !name.contains("/") && !name.utf8.contains(0) && name.hasPrefix(storedFilenamePrefix)
+      && LocalPracticeFontFilePolicy.supports(filename: name)
+  }
 
   static func save(_ data: Data, originalFilename: String, directory: URL,
     readInfo: (URL) -> LocalPracticeFontInfo?, register: (URL) -> LocalPracticeFontInfo?,
@@ -224,7 +235,7 @@ enum LocalPracticeFontImport {
     // rediscover files and compare URL spellings across symlink aliases.
     let previousURLs = storedURLs(in: directory)
     let destinationURL = directory.appendingPathComponent(
-      "\(filenamePrefix)-active-\(UUID().uuidString).\(fileExtension)", isDirectory: false)
+      "\(storedFilenamePrefix)\(UUID().uuidString).\(fileExtension)", isDirectory: false)
     try data.write(to: destinationURL, options: .atomic)
 
     var attemptedUnloads: [URL] = []
@@ -264,10 +275,7 @@ enum LocalPracticeFontImport {
   static func storedURLs(in directory: URL) -> [URL] {
     (try? FileManager.default.contentsOfDirectory(
       at: directory.resolvingSymlinksInPath(), includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]))?
-      .filter {
-        $0.lastPathComponent.hasPrefix("\(filenamePrefix)-active-")
-          && LocalPracticeFontFilePolicy.supports(filename: $0.lastPathComponent)
-      }
+      .filter { isStoredFilename($0.lastPathComponent) }
       .sorted { $0.lastPathComponent < $1.lastPathComponent } ?? []
   }
 }

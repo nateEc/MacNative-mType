@@ -1140,6 +1140,7 @@ final class AppSettings {
   @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored private let feedbackSound: TypingFeedbackSound
   @ObservationIgnored let localBackgroundStore: TypebarLocalBackgroundStore
+  @ObservationIgnored let localPracticeFontResources: LocalPracticeFontResourceReader
   @ObservationIgnored private var batchingClickSoundConfiguration = true
   @ObservationIgnored private var initializingSettings = true
   @ObservationIgnored private var savingLiveConfiguration = false
@@ -1686,10 +1687,12 @@ final class AppSettings {
   private(set) var hasSetStreakDayBoundary = false { didSet { persist() } }
 
   init(defaults: UserDefaults = .standard, feedbackSound: TypingFeedbackSound = .shared,
-    localBackgroundStore: TypebarLocalBackgroundStore = .configured()) {
+    localBackgroundStore: TypebarLocalBackgroundStore = .configured(),
+    localPracticeFontResources: LocalPracticeFontResourceReader? = nil) {
     self.defaults = defaults
     self.feedbackSound = feedbackSound
     self.localBackgroundStore = localBackgroundStore
+    self.localPracticeFontResources = localPracticeFontResources ?? .configured(defaults: defaults)
     usingExpandedPaceStorage = defaults.object(forKey: Self.expandedPaceStorageKey) != nil
     usingAccountPaceStorage = defaults.object(forKey: Self.accountPaceStorageKey) != nil
     defer {
@@ -1826,6 +1829,7 @@ final class AppSettings {
     self.defaults = defaults
     feedbackSound = TypingFeedbackSound(loadSound: { _ in nil }, beep: {})
     localBackgroundStore = .inMemory()
+    localPracticeFontResources = .inMemory()
     thresholdSourceState = snapshot.thresholdSource
     installSnapshotFields(snapshot)
   }
@@ -2714,6 +2718,11 @@ final class AppSettings {
   }
 
   var hasLocalPracticeFont: Bool { TypebarLocalPracticeFontStore.hasStoredFont }
+
+  func readLocalPracticeFontResource(maximumBytes: Int = 32 * 1024 * 1024) throws -> WebsiteConfigFontResource.Local {
+    _ = localPracticeFontRevision
+    return try localPracticeFontResources.read(maximumBytes: maximumBytes)
+  }
 
   var isUsingLocalPracticeFont: Bool { localPracticeFontInfo != nil }
 
