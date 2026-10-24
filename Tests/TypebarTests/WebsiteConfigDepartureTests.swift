@@ -23,7 +23,9 @@ import TypebarSystem
     func close() { page.detach(); try? FileManager.default.removeItem(at: directory) }
     func publish(_ json: String = #"{"mode":"custom","resultSaving":true,"quoteLength":[0]}"#) async throws {
       let resources = try coordinator.prepareResources(for: coordinator.prepare(json), localFont: .absent, localBackground: .absent)
-      let ready = try await coordinator.preparePractice(for: resources, scope: .init(customText: "ab cd"))
+      let ready = try await coordinator.preparePractice(for: resources, scope: .init(customText: "ab cd"),
+        loadQuotes: { _ in [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)] },
+        random: .init(quoteIndex: { _ in 0 }))
       guard case .committed = try coordinator.commit(ready, to: page, systemIsDark: false) else { throw Failure.publication }
     }
     func input() { var state = page.state; state.session.insertBatch("a"); page.replace(state) }
@@ -271,5 +273,152 @@ import TypebarSystem
       XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
       XCTAssertFalse(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
     }
+  }
+
+  func testActiveQuoteEditUsesNewDifficultyButOwnedQuoteWithoutDrawingOrConsumingPool() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0,0],"repeatQuotes":"typing","repeatedPace":true}"#)
+    let retiredController = try f.page.bindRestartController(using: f.coordinator)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.difficulty(.expert)
+    let ticket = try f.accept(f.edit(action), action: action)
+    XCTAssertNil(f.page.restartController)
+    XCTAssertFalse(retiredController.request(), "The old restart capability must not cancel this phase")
+    let disk = try f.register.read().revision
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    let ready = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+      XCTFail("A repeated quote must not read another catalog")
+      throw Failure.generation
+    })
+    XCTAssertEqual(ready.session.prompt, "ab cd")
+    XCTAssertEqual(ready.session.configuration.difficulty, .expert)
+    XCTAssertEqual(ready.practice?.quote?.id, "owned")
+    XCTAssertEqual(ready.practice?.repetition, .sameWordset(repeatedPace: true))
+    guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else { throw Failure.publication }
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    var budget: Int?
+    _ = try await f.coordinator.prepareNext(for: f.page, loadQuotes: { _ in
+      [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+    }, random: .init(quoteIndex: { budget = $0; return 0 }))
+    XCTAssertEqual(budget, 1, "Configuration repeat must retain the old post-draw queue")
+  }
+
+  func testQuoteLengthEventResetsQueueButRepeatedQuoteDoesNotRequireNewGroupAvailability() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"typing"}"#); f.input()
+    let action = WebsiteConfigPracticeEdit.quoteLengths([3])
+    let ticket = try f.accept(f.edit(action), action: action)
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    let ready = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+      XCTFail("Repeat bypasses catalog selection even when the new length is unavailable")
+      throw Failure.generation
+    })
+    XCTAssertEqual(ready.practice?.quote?.id, "owned")
+    XCTAssertNil(ready.practice?.quoteSampler, "The setter's pool reset still happens")
+    XCTAssertEqual(ready.practice?.repetition.repeatsWordset, true)
+    guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else { throw Failure.publication }
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [3])
+    do {
+      _ = try await f.coordinator.prepareNext(for: f.page, loadQuotes: { _ in
+        [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+      XCTFail("Fresh generation must not silently ignore the unavailable group")
+    } catch WebsiteConfigSessionBuildError.reconfigurationRequired {}
+  }
+
+  func testConfigurationRepeatDecisionUsesNewModeAndLanguageNotClosedAttemptConfiguration() async throws {
+    for action in [WebsiteConfigPracticeEdit.mode(.words), .language("spanish"), .language("english")] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.publish(#"{"mode":"quote","language":"english_1k","quoteLength":[0],"repeatQuotes":"typing"}"#)
+      f.input()
+      let ticket = try f.accept(f.edit(action), action: action)
+      let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+      var readCount = 0
+      let ready = try await f.coordinator.preparePractice(for: resources, loadQuotes: { language in
+        readCount += 1; XCTAssertEqual(language, .spanish)
+        return [.init(id: "new-spanish", title: "Own Spanish", text: "ab cd", language: .spanish, length: .short)]
+      })
+      if action == .language("english") {
+        XCTAssertEqual(readCount, 0)
+        XCTAssertEqual(ready.practice?.repetition.repeatsWordset, true)
+        XCTAssertEqual(ready.practice?.quote?.id, "owned")
+      } else {
+        XCTAssertEqual(ready.practice?.repetition, WebsitePracticeRepetition.none)
+        if action == .mode(.words) { XCTAssertEqual(readCount, 0); XCTAssertEqual(ready.session.configuration.mode, .words) }
+        else { XCTAssertEqual(readCount, 1); XCTAssertEqual(ready.practice?.quote?.id, "new-spanish") }
+      }
+    }
+  }
+
+  func testCancelledRepeatedQuoteResamplingCanResumeWithoutDrawingOrRecounting() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"typing","funbox":["rAnDoMcAsE"]}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.difficulty(.expert)
+    let admitted = try f.accept(f.edit(action), action: action)
+    let disk = try f.register.read().revision
+    let resources = try f.coordinator.prepareResources(for: admitted, localFont: .absent, localBackground: .absent)
+    await Task { @MainActor in
+      do {
+        _ = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+          XCTFail("Repeated quote must not load a catalog"); throw Failure.generation
+        }, random: .init(caseBit: { withUnsafeCurrentTask { $0?.cancel() }; return false }))
+        XCTFail("Cancelled resampling delivered")
+      } catch is CancellationError {} catch { XCTFail("Unexpected error: \(error)") }
+    }.value
+    XCTAssertNotNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    let resumed = try f.coordinator.resumeConfigurationRestart(for: f.page)
+    let retryResources = try f.coordinator.prepareResources(for: resumed, localFont: .absent, localBackground: .absent)
+    let ready = try await f.coordinator.preparePractice(for: retryResources, loadQuotes: { _ in
+      XCTFail("Retry lost its accepted repetition choice"); throw Failure.generation
+    }, random: .init(caseBit: { false }))
+    XCTAssertEqual(ready.session.prompt, "ab cd")
+    XCTAssertEqual(ready.practice?.repetition.repeatsWordset, true)
+    guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else { throw Failure.publication }
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try f.register.read().revision, disk)
+  }
+
+  func testAlreadyRepeatedActiveQuoteKeepsOwnedPoolAcrossNonmatchingLanguageEdit() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off"}"#)
+    let repeatAttempt = try await f.coordinator.prepareRestart(for: f.page, repeatingRequested: true)
+    guard case .advanced = try f.coordinator.advance(repeatAttempt, to: f.page) else { throw Failure.publication }
+    f.input()
+    let action = WebsiteConfigPracticeEdit.language("spanish")
+    let ticket = try f.accept(f.edit(action), action: action)
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    let ready = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+      XCTFail("Previously repeated active state takes precedence over quote-language mismatch")
+      throw Failure.generation
+    })
+    XCTAssertEqual(ready.session.configuration.language, .spanish)
+    XCTAssertEqual(ready.session.prompt, "ab cd")
+    XCTAssertEqual(ready.practice?.quote?.id, "owned")
+    XCTAssertEqual(ready.practice?.repetition.repeatsWordset, true)
+    guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else { throw Failure.publication }
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testUnsupportedChangedNonQuoteRepeatCannotSilentlyFallBackToFreshGeneration() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish()
+    let repeated = try await f.coordinator.prepareRestart(for: f.page, repeatingRequested: true)
+    guard case .advanced = try f.coordinator.advance(repeated, to: f.page) else { throw Failure.publication }
+    f.input()
+    let action = WebsiteConfigPracticeEdit.difficulty(.expert)
+    let ticket = try f.accept(f.edit(action), action: action)
+    let disk = try f.register.read().revision
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    do {
+      _ = try await f.coordinator.preparePractice(for: resources)
+      XCTFail("Unimplemented cache reconfiguration silently became a fresh attempt")
+    } catch WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported {}
+    XCTAssertNotNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try f.register.read().revision, disk)
   }
 }

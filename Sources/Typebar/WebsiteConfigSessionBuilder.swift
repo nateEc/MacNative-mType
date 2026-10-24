@@ -3,6 +3,7 @@ import Foundation
 enum WebsiteConfigSessionBuildError: Error {
   case reconfigurationRequired([String: WebsiteConfigValue])
   case unrepresentableConfiguration, customTextUnavailable, externalNotProvided, invalidExternalSource, generationFailed
+  case repeatedConfigurationUnsupported
 }
 
 /// Whole-draft generation with explicit window/account content scope. No
@@ -13,6 +14,11 @@ enum WebsiteConfigSessionBuildError: Error {
     case nextAttempt
     /// Apply this draft's events once to a candidate scope before generation.
     case configurationApplication
+  }
+  enum QuoteSource {
+    case selection
+    /// Owned raw quote, not the previous transformed display or a catalog ID.
+    case repeated(OfflineQuote, repeatedPace: Bool)
   }
   struct Scope {
     var parameterMemory: TypebarTestParameterMemory = .defaults
@@ -62,6 +68,7 @@ enum WebsiteConfigSessionBuildError: Error {
   }
   static func prepare(draft: WebsiteConfigNativeDraft, scope: Scope,
     reason: Reason = .nextAttempt,
+    quoteSource: QuoteSource = .selection,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> External)? = nil,
     random: Random = .init()) async throws -> Prepared {
@@ -83,7 +90,17 @@ enum WebsiteConfigSessionBuildError: Error {
     nextScope.parameterMemory = draft.testParameters.parameterMemory(preserving: scope.parameterMemory)
     var selectedQuote: OfflineQuote?
     var selectedExternal: External?
-    if config.mode == .quote {
+    let repetition: WebsitePracticeRepetition
+    switch quoteSource {
+    case .selection: repetition = .none
+    case .repeated(let quote, let repeatedPace):
+      guard config.mode == .quote, liveSource == nil else {
+        throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported
+      }
+      selectedQuote = quote
+      repetition = .sameWordset(repeatedPace: repeatedPace)
+    }
+    if config.mode == .quote && selectedQuote == nil {
       let catalog = try await read { try await loadQuotes(draft.testParameters.language) }
       var sampler: WebsiteQuoteSampler
       if let previous = nextScope.quoteSampler, previous.matches(selection: draft.quoteSelection, quotes: catalog) {
@@ -133,7 +150,8 @@ enum WebsiteConfigSessionBuildError: Error {
     guard !session.hasStarted, !session.isFinished, config.mode == .zen || !session.prompt.isEmpty else {
       throw WebsiteConfigSessionBuildError.generationFailed
     }
-    return .init(session: session, scope: nextScope, quote: selectedQuote, external: selectedExternal)
+    return .init(session: session, scope: nextScope, quote: selectedQuote, external: selectedExternal,
+      repetition: repetition)
   }
 
   private static func read<Value>(_ operation: @MainActor () async throws -> Value) async throws -> Value {

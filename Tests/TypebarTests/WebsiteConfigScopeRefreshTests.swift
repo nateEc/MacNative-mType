@@ -34,11 +34,12 @@ import XCTest
       while environment.read() == nil && ContinuousClock.now < deadline { await Task.yield() }
       _ = try XCTUnwrap(environment.read())
     }
-    func publish() async throws -> WebsiteConfigCommitCoordinator.Publication {
+    func publish(_ json: String = #"{"mode":"custom"}"#) async throws -> WebsiteConfigCommitCoordinator.Publication {
       try await settle()
-      let resources = try coordinator.prepareResources(for: coordinator.prepare(#"{"mode":"custom"}"#),
+      let resources = try coordinator.prepareResources(for: coordinator.prepare(json),
         localFont: .absent, localBackground: .absent)
-      let ready = try await coordinator.preparePractice(for: resources, scope: .init(customText: "old"))
+      let ready = try await coordinator.preparePractice(for: resources, scope: .init(customText: "old"),
+        loadQuotes: { _ in [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)] })
       guard case .committed(let publication) = try coordinator.commit(ready, to: page, systemIsDark: true) else {
         throw Failure.notCommitted
       }
@@ -87,6 +88,27 @@ import XCTest
       XCTAssertEqual(try f.register.read().revision, disk)
       XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
     }
+  }
+
+  func testExplicitWholeApplicationCanReplacePendingQuoteRepeatWithoutInheritingItsSelection() async throws {
+    let f = try Fixture(); defer { f.close() }
+    _ = try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"typing"}"#)
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    let edit = try f.coordinator.prepareEdit(key: "difficulty", value: .string("expert"),
+      for: f.page, refreshingWith: f.source)
+    guard case .accepted = try f.coordinator.beginConfigurationRestart(edit, for: f.page,
+      action: .difficulty(.expert)) else { return XCTFail("Departure not accepted") }
+    let replacement = try f.coordinator.prepare(#"{"mode":"words","words":3}"#, for: f.page, refreshingWith: f.source)
+    let resources = try f.coordinator.prepareResources(for: replacement, localFont: .absent, localBackground: .absent)
+    let ready = try await f.coordinator.preparePractice(for: resources)
+    XCTAssertEqual(ready.session.configuration.mode, .words)
+    XCTAssertEqual(ready.session.configuration.wordLimit, 3)
+    XCTAssertEqual(ready.practice?.repetition, WebsitePracticeRepetition.none)
+    guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else {
+      return XCTFail("Explicit full application could not recover the pending page")
+    }
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
   }
 
   func testActualStoredContentRefreshAcrossEpochBuildsNewTextAndCommitsToSamePage() async throws {

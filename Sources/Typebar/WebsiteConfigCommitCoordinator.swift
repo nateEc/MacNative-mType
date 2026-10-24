@@ -94,6 +94,8 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let environment: Environment
     fileprivate weak var contentSource: WebsiteConfigPracticeScopeSource?
     fileprivate let requiresContentSource: Bool
+    let repetition: WebsitePracticeRepetition
+    fileprivate let quote: OfflineQuote?
   }
   enum ConfigurationDepartureOutcome {
     case accepted(Prepared), acceptedRetired, stale, conflict, unavailable, busy
@@ -107,6 +109,18 @@ final class WebsiteConfigCommitCoordinator {
       let capture = prepared.pageCapture, capture.testActive,
       page.state.configurationDeparture == nil,
       case .edited(let edit) = prepared.draft.origin, edit.key == action.key else { return .stale }
+    guard let previous = page.state.practice,
+      case .string(let language)? = prepared.draft.projection.runtime["language"] else {
+      throw PracticePageSessionStateError.incomplete
+    }
+    // The setter has already selected the new mode/language. Resolve while
+    // the old attempt is still active, then retain that decision across init
+    // failure/retry instead of consulting the now-abandoned attempt again.
+    let repetition = WebsiteConfigRestartPolicy.resolve(requested: false, active: capture.testActive,
+      previouslyRepeated: previous.repetition.repeatsWordset, failed: false,
+      mode: prepared.draft.testParameters.mode, language: language,
+      quoteLanguage: previous.quote.flatMap { WebsiteLanguageIdentity.name(for: $0.language) },
+      repeatQuotes: prepared.draft.behavior.repeatQuotes, repeatedPace: prepared.draft.behavior.repeatedPace)
     // Close a value copy first. A rejected file CAS must leave the real clock,
     // input, ledger and publication untouched.
     var departed = page.state
@@ -133,7 +147,7 @@ final class WebsiteConfigCommitCoordinator {
     }
     departed.configurationDeparture = .init(id: UUID(), draft: prepared.draft, disk: disk,
       identity: identity, environment: prepared.environment, contentSource: prepared.contentSource,
-      requiresContentSource: prepared.contentCapture != nil)
+      requiresContentSource: prepared.contentCapture != nil, repetition: repetition, quote: previous.quote)
     resourceAdmission = UUID(); sessionAdmission = UUID(); sessionRequest = nil
     page.installCommitted(departed)
     page.endCommit()
@@ -682,8 +696,19 @@ final class WebsiteConfigCommitCoordinator {
         guard let scope else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
         effectiveScope = scope
       }
+      let quoteSource: WebsiteConfigSessionBuilder.QuoteSource
+      if let pending = prepared.configuration.sourcePage?.state.configurationDeparture,
+        prepared.configuration.pageCapture?.configurationDeparture == pending.id,
+        pending.repetition.repeatsWordset {
+        guard draft.testParameters.mode == .quote, let quote = pending.quote else {
+          // Non-quote repeats require rebasing the original word history onto
+          // the new generator. Never silently substitute fresh generation.
+          throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported
+        }
+        quoteSource = .repeated(quote, repeatedPace: pending.repetition.repeatsPace)
+      } else { quoteSource = .selection }
       let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: effectiveScope,
-        reason: reason,
+        reason: reason, quoteSource: quoteSource,
         loadQuotes: { language in
           try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
             try await loadQuotes(language)

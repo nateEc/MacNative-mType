@@ -37,6 +37,25 @@ import XCTest
     }
   }
 
+  func testPinnedQuoteRepeatUsesOwnedPoolWithoutReadingNewLanguageOrLengthCatalog() throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
+      throw XCTSkip("Requires pinned reference")
+    }
+    struct Output: Decodable { let fixtures, nullWordset: Int }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", root.appendingPathComponent("Scripts/check-source-config-quote-repeat.mjs").path, reference]
+    process.standardOutput = pipe
+    try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0)
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    XCTAssertEqual(output.fixtures, 24)
+    XCTAssertEqual(output.nullWordset, 1)
+  }
+
   func testPinnedRestartPrefixDecisionsIncludingFailureAndLanguageMatch() throws {
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
       throw XCTSkip("Requires pinned reference")
