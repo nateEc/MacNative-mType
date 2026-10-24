@@ -2627,7 +2627,7 @@ private struct ContentView: View {
             })
             .id(publication.applicationID)
         }
-        Text("语言及其他未提供的完整配置编辑尚待接通；可在导入面板恢复配置或切回本窗口 Typebar 设置。")
+        Text("其他未提供的完整配置编辑尚待接通；可在导入面板恢复配置或切回本窗口 Typebar 设置。")
           .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)

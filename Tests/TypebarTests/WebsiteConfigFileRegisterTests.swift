@@ -88,7 +88,7 @@ final class WebsiteConfigFileRegisterTests: XCTestCase {
       let file = directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
       let valid = try Data(contentsOf: file)
       guard case .array(let parts) = try WebsiteConfigJSONReader.read(String(decoding: valid, as: UTF8.self)) else { return XCTFail("Missing register frame") }
-      var future = parts; future[1] = .number(2)
+      var future = parts; future[1] = .number(Double(WebsiteConfigFileRegister.recordVersion + 1))
       var badPayload = parts; badPayload[3] = .string(Data("owned foreign format".utf8).base64EncodedString())
       let opaque = [Data(), Data("{".utf8), Data(WebsiteConfigJSONWriter.write(.array(future)).utf8),
         Data(WebsiteConfigJSONWriter.write(.array(badPayload)).utf8), Data(repeating: 32, count: WebsiteConfigFileRegister.maximumRecordBytes + 1)]

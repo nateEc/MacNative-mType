@@ -61,6 +61,18 @@ import XCTest
     XCTAssertEqual(edits, [.quoteLengths([0,0,1])])
     XCTAssertEqual(form.quoteLengths, [0,0,1])
   }
+  func testLanguageSelectionUsesWebsiteIdentityAndDoesNotTreatNativeMixAsALanguage() async throws {
+    let form = WebsiteConfigPracticeEditForm(parameters: try parameters())
+    var edits: [WebsiteConfigPracticeEdit] = []
+    form.language = .mixedLanguages
+    form.startLanguage(apply: { edits.append($0); return "unexpected" })
+    XCTAssertFalse(form.isWorking); XCTAssertTrue(edits.isEmpty)
+    XCTAssertTrue(form.message?.contains("Polyglot") == true)
+    form.language = .arabic
+    form.startLanguage(apply: { edits.append($0); return "applied" }); await settle(form)
+    XCTAssertEqual(edits, [.language("arabic")])
+    XCTAssertFalse(WebsiteConfigPracticeEditForm.languages.contains(.mixedLanguages))
+  }
   func testEditorRendersLightAndDarkWithoutShowingWindowOrApplying() throws {
     for quoted in [false, true] {
       let draft = try WebsiteConfigNativeProfile.prepareDraft(quoted
@@ -73,11 +85,11 @@ import XCTest
           let form = WebsiteConfigPracticeEditForm(draft: draft)
           let view = WebsiteConfigPracticeEditor(form: form, parameters: parameters, canEdit: true,
             apply: { _ in calls += 1; return "unexpected" })
-            .padding(20).frame(width: CGFloat(width), height: 360)
+            .padding(20).frame(width: CGFloat(width), height: 460)
             .background(Color(nsColor: .windowBackgroundColor))
             .environment(\.colorScheme, dark ? .dark : .light)
           let host = NSHostingView(rootView: view)
-          let window = NSWindow(contentRect: .init(x: 0, y: 0, width: CGFloat(width), height: 360),
+          let window = NSWindow(contentRect: .init(x: 0, y: 0, width: CGFloat(width), height: 460),
             styleMask: .borderless, backing: .buffered, defer: false)
           window.isReleasedWhenClosed = false
           window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua); window.contentView = host

@@ -30,6 +30,7 @@ struct WebsiteConfigNativeDraft {
     }
   }
   let origin: Origin
+  var lazyMemory = WebsiteConfigLazyModeMemory()
   var projection: WebsiteConfigRuntimeProjection { origin.projection }
   /// Restore evidence is never presented as an original JSON import.
   var prepared: WebsiteConfigPreparedImport? {
@@ -79,5 +80,22 @@ struct WebsiteConfigNativeDraft {
     generators = try .init(runtime: runtime)
     themes = try .init(runtime: runtime)
     pagePreferences = try .init(runtime: runtime)
+  }
+
+  /// Add admitted listener effects without losing the original transport or
+  /// setter origin. Every typed owner is rebuilt from the resulting runtime.
+  @MainActor
+  func replacingProjection(_ projection: WebsiteConfigRuntimeProjection,
+    memory: WebsiteConfigLazyModeMemory, pointsPerRem: Double) throws -> Self {
+    let origin: Origin
+    switch self.origin {
+    case .imported(var value): value.projection = projection; origin = .imported(value)
+    case .restored(let value): origin = .restored(.init(origin: value.origin, loaded: value.loaded,
+      projection: projection, websiteStorage: value.websiteStorage))
+    case .edited(let value): origin = .edited(.init(key: value.key, previousRuntime: value.previousRuntime, projection: projection))
+    }
+    var result = try Self(origin: origin, pointsPerRem: pointsPerRem)
+    result.lazyMemory = memory
+    return result
   }
 }

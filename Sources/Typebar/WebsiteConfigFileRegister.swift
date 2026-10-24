@@ -14,6 +14,7 @@ struct WebsiteConfigFileRegister {
   static let lockFilename = ".website-config.lock"
   static let maximumRecordBytes = 12_582_912
   private static let kind = "typebar.website-config-register"
+  static let recordVersion = 2
   fileprivate struct Identity: Equatable {
     let device: Int32, inode: UInt64, bornSec: Int, bornNsec: Int
   }
@@ -26,6 +27,7 @@ struct WebsiteConfigFileRegister {
   struct Snapshot {
     let state: WebsiteConfigNativeStateRead
     let revision: Revision?
+    var lazyMemory = WebsiteConfigLazyModeMemory()
   }
   enum Commit: Equatable { case committed(Revision), conflict, unavailable }
   private let directory: URL
@@ -42,8 +44,8 @@ struct WebsiteConfigFileRegister {
   func commit(_ draft: WebsiteConfigNativeDraft, replacing expected: Revision,
     preservingUnchanged: Bool = false) throws -> Commit {
     let payload = try WebsiteConfigNativeStateCodec.encode(draft.projection.runtime)
-    let record = Data(WebsiteConfigJSONWriter.write(.array([.string(Self.kind), .number(1),
-      .string(UUID().uuidString), .string(payload.base64EncodedString())])).utf8)
+    let record = Data(WebsiteConfigJSONWriter.write(.array([.string(Self.kind), .number(Double(Self.recordVersion)),
+      .string(UUID().uuidString), .string(payload.base64EncodedString()), draft.lazyMemory.recordValue])).utf8)
     guard record.count <= Self.maximumRecordBytes else { throw WebsiteConfigNativeStateError.tooLarge }
     return try locked { fd, identity in
       let current = try snapshot(fd, identity: identity)
@@ -53,6 +55,7 @@ struct WebsiteConfigFileRegister {
       // rewriting identical settings and invalidating other live windows.
       // Still confirm the exact directory/record revision under the same lock.
       if preservingUnchanged, case .available(let runtime) = current.state,
+        current.lazyMemory == draft.lazyMemory,
         try WebsiteConfigNativeStateCodec.encode(runtime) == payload { return .committed(revision) }
       try replace(record, directoryFD: fd)
       return .committed(.init(directory: directory.path, identity: identity, bytes: record))
@@ -133,17 +136,24 @@ struct WebsiteConfigFileRegister {
       bytes.append(contentsOf: buffer.prefix(count))
     }
     guard let state = decode(bytes) else { return .init(state: .unavailable, revision: nil) }
-    return .init(state: .available(state), revision: .init(directory: directory.path, identity: identity, bytes: bytes))
+    return .init(state: .available(state.runtime), revision: .init(directory: directory.path, identity: identity, bytes: bytes),
+      lazyMemory: state.memory)
   }
 
-  private func decode(_ record: Data) -> [String: WebsiteConfigValue]? {
+  private func decode(_ record: Data) -> (runtime: [String: WebsiteConfigValue], memory: WebsiteConfigLazyModeMemory)? {
     guard let json = String(data: record, encoding: .utf8),
       let value = try? WebsiteConfigJSONReader.read(json, maximumBytes: Self.maximumRecordBytes),
-      case .array(let parts) = value, parts.count == 4, parts[0] == .string(Self.kind), parts[1] == .number(1),
+      case .array(let parts) = value, parts.count >= 4, parts[0] == .string(Self.kind),
       case .string(let generation) = parts[2], UUID(uuidString: generation)?.uuidString == generation,
       case .string(let base64) = parts[3], let payload = Data(base64Encoded: base64),
       payload.base64EncodedString() == base64 else { return nil }
-    return try? WebsiteConfigNativeStateCodec.decode(payload)
+    let memory: WebsiteConfigLazyModeMemory
+    if parts[1] == .number(1), parts.count == 4 { memory = .init() }
+    else if parts[1] == .number(Double(Self.recordVersion)), parts.count == 5,
+      let value = WebsiteConfigLazyModeMemory(recordValue: parts[4]) { memory = value }
+    else { return nil }
+    guard let runtime = try? WebsiteConfigNativeStateCodec.decode(payload) else { return nil }
+    return (runtime, memory)
   }
 
   private func replace(_ record: Data, directoryFD: Int32) throws {

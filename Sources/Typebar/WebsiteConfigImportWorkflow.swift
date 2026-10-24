@@ -1,16 +1,17 @@
 import Foundation
 
 /// Explicit test-page actions with a source restart dispatch or subscription.
-/// Not the metadata's broader changeRequiresRestart key set. Language remains
-/// separate until its persistent lazy-mode listener memory can travel too.
+/// Not the metadata's broader changeRequiresRestart key set.
 enum WebsiteConfigPracticeEdit: Equatable {
   case mode(TestMode), time(Double), words(Double)
   case difficulty(Difficulty), punctuation(Bool), numbers(Bool), quoteLengths([Int])
+  case language(String), lazyMode(Bool)
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
     case .difficulty: "difficulty"; case .punctuation: "punctuation"; case .numbers: "numbers"
     case .quoteLengths: "quoteLength"
+    case .language: "language"; case .lazyMode: "lazyMode"
     }
   }
   var value: WebsiteConfigValue {
@@ -20,6 +21,8 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .difficulty(let value): .string(value.rawValue)
     case .punctuation(let value), .numbers(let value): .bool(value)
     case .quoteLengths(let groups): .array(groups.map { .number(Double($0)) })
+    case .language(let value): .string(value)
+    case .lazyMode(let value): .bool(value)
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -27,8 +30,8 @@ enum WebsiteConfigPracticeEdit: Equatable {
   /// neither case: execution never reaches the following dispatch.
   var dispatchesRestartAfterRejection: Bool {
     switch self {
-    case .difficulty: false
-    case .mode, .time, .words, .punctuation, .numbers, .quoteLengths: true
+    case .difficulty, .language: false
+    case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode: true
     }
   }
 }

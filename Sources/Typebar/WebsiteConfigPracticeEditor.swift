@@ -6,6 +6,10 @@ import SwiftUI
   var limit: String
   var difficulty: Difficulty
   var quoteLengths: [Int]
+  var language: TypingLanguage
+  var lazyMode: Bool
+  private(set) var remembersLazyMode: Bool
+  static let languages = TypingLanguage.allCases.filter { WebsiteLanguageIdentity.name(for: $0) != nil }
   static let quoteChoices: [(label: String, groups: [Int])] = [
     ("全部长度", [0, 1, 2, 3]), ("短", [0]), ("中", [1]), ("长", [2]), ("超长", [3]),
   ]
@@ -13,14 +17,24 @@ import SwiftUI
   private(set) var message: String?
   @ObservationIgnored private var work: Task<Void, Never>?
   @ObservationIgnored private var request = UUID()
-  init(parameters: WebsiteConfigNativeTestParameters, difficulty: Difficulty = .normal, quoteLengths: [Int] = [1]) {
+  init(parameters: WebsiteConfigNativeTestParameters, difficulty: Difficulty = .normal, quoteLengths: [Int] = [1],
+    lazyMode: Bool = false, remembersLazyMode: Bool = false) {
     mode = parameters.mode
     limit = String(parameters.mode == .time ? parameters.duration : parameters.wordLimit)
     self.difficulty = difficulty; self.quoteLengths = quoteLengths
+    language = parameters.language; self.lazyMode = lazyMode; self.remembersLazyMode = remembersLazyMode
   }
   convenience init(draft: WebsiteConfigNativeDraft) {
     self.init(parameters: draft.testParameters, difficulty: draft.inputRules.difficulty,
-      quoteLengths: draft.quoteSelection.groups)
+      quoteLengths: draft.quoteSelection.groups, lazyMode: draft.generators.lazyMode,
+      remembersLazyMode: draft.lazyMemory.remember)
+  }
+  func startLanguage(apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
+    guard !isWorking else { return }
+    guard let name = WebsiteLanguageIdentity.name(for: language) else {
+      message = "这个语言组合不属于 Monkeytype 语言选项；请通过 Polyglot 配置选择组合。"; return
+    }
+    start(.language(name), apply: apply)
   }
   func start(_ edit: WebsiteConfigPracticeEdit, apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     guard !isWorking else { return }
@@ -98,6 +112,18 @@ struct WebsiteConfigPracticeEditor: View {
           }.accessibilityIdentifier("website-config-apply-limit")
         }.disabled(!canEdit || form.isWorking)
       }
+      VStack(alignment: .leading, spacing: 6) {
+        PracticeLanguagePicker(languages: WebsiteConfigPracticeEditForm.languages, selection: $form.language)
+        HStack { Spacer(); Button("应用语言") { form.startLanguage(apply: apply) }
+          .accessibilityIdentifier("website-config-apply-language") }
+      }.disabled(!canEdit || form.isWorking)
+      HStack {
+        Picker("简化输入", selection: $form.lazyMode) { Text("关闭").tag(false); Text("开启").tag(true) }
+        Button("应用并重开") { form.start(.lazyMode(form.lazyMode), apply: apply) }
+          .accessibilityIdentifier("website-config-apply-lazy-mode")
+      }.disabled(!canEdit || form.isWorking)
+      Text(form.remembersLazyMode ? "已记住简化输入；切换到支持的词源会恢复。" : "Arabic 单独记住开关；词源不支持时会临时关闭简化输入。")
+        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       HStack {
         Picker("难度", selection: $form.difficulty) {
           ForEach(Difficulty.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -131,7 +157,7 @@ struct WebsiteConfigPracticeEditor: View {
           }
         }.disabled(!canEdit || form.isWorking)
       }
-      Text(canEdit ? "应用或切换标点／数字后保存并开始新练习；其他完整配置保持不变。词数／秒数为 0 表示无限。" : "请先结束当前练习，再编辑设置。")
+      Text(canEdit ? "应用或切换标点／数字后保存并开始新练习；其他完整配置保持不变。词数／秒数为 0 表示无限。" : "请等待练习准备完成，或先结束当前练习。")
         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       if form.isWorking {
         HStack {

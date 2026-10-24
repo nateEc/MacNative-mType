@@ -20,7 +20,7 @@ final class WebsiteConfigCommitCoordinator {
     let pointsPerRem: Double
   }
   struct Prepared {
-    let draft: WebsiteConfigNativeDraft
+    fileprivate(set) var draft: WebsiteConfigNativeDraft
     fileprivate let identity: UUID
     fileprivate let request: UUID
     fileprivate let owner: PreferenceConfigurationSaveRouter.Lease
@@ -122,8 +122,10 @@ final class WebsiteConfigCommitCoordinator {
     request = UUID()
     guard let owner = router.captureLease() else { throw WebsiteConfigCommitCoordinatorError.noOwner }
     guard let context = environment() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
-    let draft = try WebsiteConfigNativeProfile.prepareDraft(json, pointsPerRem: context.pointsPerRem, context: context.context)
-    guard let disk = try register.read().revision else { throw WebsiteConfigCommitCoordinatorError.unavailable }
+    var draft = try WebsiteConfigNativeProfile.prepareDraft(json, pointsPerRem: context.pointsPerRem, context: context.context)
+    let snapshot = try register.read()
+    guard let disk = snapshot.revision else { throw WebsiteConfigCommitCoordinatorError.unavailable }
+    draft.lazyMemory = snapshot.lazyMemory
     let prepared = Prepared(draft: draft, identity: identity, request: request, owner: owner, environment: context, disk: disk)
     guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
     return prepared
@@ -151,7 +153,8 @@ final class WebsiteConfigCommitCoordinator {
     case .unavailable: return .unavailable
     case .prepared(let value):
       guard let revision = disk.revision else { return .unavailable }
-      let draft = try WebsiteConfigNativeDraft(restoration: value, pointsPerRem: context.pointsPerRem)
+      var draft = try WebsiteConfigNativeDraft(restoration: value, pointsPerRem: context.pointsPerRem)
+      draft.lazyMemory = disk.lazyMemory
       let prepared = Prepared(draft: draft, identity: identity, request: request,
         owner: owner, environment: context, disk: revision)
       guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
@@ -552,11 +555,22 @@ final class WebsiteConfigCommitCoordinator {
     retire(prepared)
     return .advanced(.init(session: old, incomplete: incomplete))
   }
-  private func preparePracticeBuild(for prepared: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope?,
+  private func preparePracticeBuild(for resources: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope?,
     reason: WebsiteConfigSessionBuilder.Reason = .configurationApplication,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote],
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
     random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
+    try checkAsyncResources(resources.configuration, admission: resources.admission)
+    let original = resources.configuration.draft
+    let draft = try WebsiteConfigLazyModeLifecycle.prepare(original,
+      pointsPerRem: resources.configuration.environment.pointsPerRem,
+      replayApplicationEvents: reason == .configurationApplication)
+    if reason == .nextAttempt, draft.lazyMemory != original.lazyMemory || draft.generators.lazyMode != original.generators.lazyMode {
+      throw WebsiteConfigSessionBuildError.reconfigurationRequired(["lazyMode": .bool(draft.generators.lazyMode)])
+    }
+    var configuration = resources.configuration; configuration.draft = draft
+    let prepared = ResourcesPrepared(configuration: configuration, admission: resources.admission,
+      background: resources.background, font: resources.font)
     let checkedExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
     if let loadExternal {
       checkedExternal = { source, configuration in

@@ -41,7 +41,9 @@ enum WebsiteConfigNativeProfile {
     let projection = try WebsiteConfigRuntimeProjector.edit(current: previous, key: key, value: value,
       defaults: defaultDocument().values, schema: .init(catalogs: catalogs), context: context,
       testActive: testActive, nosave: nosave)
-    return try .init(edit: .init(key: key, previousRuntime: previous, projection: projection), pointsPerRem: pointsPerRem)
+    var draft = try WebsiteConfigNativeDraft(edit: .init(key: key, previousRuntime: previous, projection: projection), pointsPerRem: pointsPerRem)
+    draft.lazyMemory = current.lazyMemory
+    return draft
   }
 
   static func prepareWebsiteRestoration(_ json: String?, context: WebsiteConfigRuntimeContext) throws -> WebsiteConfigPreparedRestoration {

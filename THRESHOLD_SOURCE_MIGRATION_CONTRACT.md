@@ -1,5 +1,29 @@
 # 阈值源状态与迁移契约
 
+## 独立 Lazy Mode 记忆、语言编辑与记录 v2（2026-10-24，起点 24f2a3d5）
+
+读取固定 `legacy-states/remember-lazy-mode.ts`、`test/test-logic.ts` 后，新路径现在拥有独立的 remember／prefersArabic（默认 false／true），不读取或改写旧 Typebar 的 prefersArabicLazyInput。完整 JSON 的同名未知字段仍忽略，不能用配置 JSON 覆盖独立记忆；网站配置载荷保持 94 项及原 NativeStateCodec v1 的 UTF-16／数值位语义，不添加伪网站字段。
+
+持久化改为同一 FileRegister 外层 v2：`[kind, 2, generation, base64(payload-v1), [remember, prefersArabic]]`。沿用同一文件名 `website-config.native.v1`（历史槽名，不代表外层版本），避免旧程序把新槽误认成缺失并另建默认值。外层 v1 四元组继续读取，缺失记忆使用原版默认；稳定冷恢复按配置与记忆的规范值比较保留原字节／revision，不自动升级。明确提交和真实纠正才写 v2；未知版本、坏元组和非 bool 记忆不可用且不可覆写。v2 读取仍受同一私有目录、锁、身份与完整字节 CAS；记忆单独变化也使旧 revision 失效。
+
+回退边界：旧版本只认外层 v1，遇到 v2 会拒绝而不重置或覆盖；没有可声称无损的自动降级，须保留新版记录并使用支持 v2 的版本恢复。本批不运行主程序或迁移真实用户目录，演练仅在隔离临时目录。数据未分为两个文件／两个 UserDefaults 写入；配置及独立记忆同一次 rename，沿用原“非断电全局耐久保证”的边界。
+
+事件与生成分别处理：完整应用按原投影事件顺序重放，Arabic 的语言事件可插入 nosave=true 的 lazyMode=true，但随后导入的 lazyMode 事件仍能覆盖它，nosave 不改变 Arabic 偏好。显式 Lazy Mode 写入在 Arabic 时更新独立偏好。生成阶段按当前语言、custom 例外或已激活 Polyglot 的任一语言支持度暂时关闭／恢复；最终清理刻意按基础语言，而非 Polyglot 聚合支持度。所有类型所有者从最终投影重建，保留 imported／restored／edited 来源。资源准备后、会话构建前只变更候选值；页面和文件提交仍是原完整事务。
+
+普通 next/restart 不重放历史 setter；880 个样本也检查归一状态的下一轮固定点。若普通下一轮确实需要新的持久转换，则显式返回重新配置要求，不用无写盘权限的 advance 丢弃状态。语言采用成功 setter 的订阅重开，拒绝不派发；简化输入控件明确采用命令的“应用并重开”语义，依据 commandline-metadata.ts 的 afterExec 与 util.ts 的 setConfig 后调用；不冒充设置页 SearchableAutoSetting 的原位、无重开入口。
+
+真实原生面板新增语言选择和简化输入应用，保留导入的难度、引语分组及当前记忆说明，原生 Mix 不能伪装成网站语言。只在空闲／完成态使用已有窗口工作流，Arabic 自动启用、明确关闭、语言往返、冷恢复及旧偏好独立由实际文件／页面检查。其他未提供字段仍保护；活动尝试、部分 Polyglot RTL 基础语言纠正、选定／收藏引语来源和原版恢复事务未完成。
+
+有界会话内决策复核（非独立评审）的主要反例是配置与记忆半写、仅记忆竞争被忽略、旧程序覆写、原生旧偏好泄漏、完整导入事件顺序错误，以及生成失败／取消提前保存候选。相应以同记录 CAS、记忆比较、严格版本拒绝、独立字段、事件重放和最终提交约束。当前失败／取消保留旧完整记录；原版在部分生成阶段会先写独立 LocalStorage，本轮不把这种原生原子交付边界冒称为失败时写入时序完全等价，仍需进一步审计／对齐。告警去重、实体操作、VoiceOver、账户／多窗口完整生命周期和性能也未完成，目标保持 active。
+
+先行存储红测为缺少接口的编译失败，且夹具最初缺少 MainActor 标记，不记作行为红测；修正后存储／恢复 21 项通过。随后实际生成红测一项四处失败，证明未关闭／记住 Hindi 简化输入，也不能在 Spanish 恢复；修复后整合 50 项、UI 整合 43 项通过。最终定向 63 项零失败／零跳过（15.367 秒），包含五项新记忆／协议检查、三项新工作流、一项新表单；集合不相加。源代码对照执行固定监听器与 Funbox 激活后的记忆阶段，848 项初态／单项和 32 项完整应用相关顺序，共 880 组，比较实际 lazy 值、两项记忆和事件值／顺序／nosave，并检查下一轮固定点。元数据由受控四类基础语言和两组 Polyglot 提供，不读取词表；不代表执行整个浏览器、验证 Funbox 激活／RTL 修复或通知内容。脚本 `Scripts/check-source-lazy-mode-memory.mjs` 只在 QA 从干净固定参考读取执行，未随产品打包参考代码。
+
+最终源码在最终定向、扩大及打包期间冻结。相关扩大 629 项零失败／零跳过（234.367 秒），含新增 880 组状态对照、原有参考探针及滚轮宿主（1.359 秒），没有排除项。源码原创性、原固定行为审计（47 直接／119 原生符号／17 支持规范）、人工清单 1,317 条结构、Debug 包／签名与包资源边界均通过；新增 880 组对照独立计数，不混入原审计条目。没有 Typebar 主程序、xctest 或 swift-test 遗留，不代表全量客户端及人工场景通过。
+
+八份浅色／深色、words／quote、340／520 点宽、460 高离屏图均已检查，路径 `/tmp/typebar-content-editor-{words,quote}-{340,520}-{light,dark}.png`；隐藏窗口，不计实体 GUI 验收。日志前缀 `/tmp/typebar-lazy-memory-`：red 为存储编译失败，storage 为存储／恢复，generation-red 为四处行为红测，lifecycle／integrated／final-focused／final-focused-verified／final-focused-frozen 为各轮原生检查，expanded／originality／reference／manual／package 为对应验证。
+
+关键 SHA-256：FileRegister `7052a984beadbefc1770b77ad0c12eec917b819e2605925cde0fadf96b011d8f`；Memory `17a9d06077c302d6d3821085bf1efb6a4a398a71d3fbe8c57d7f6af677416fc7`；Lifecycle `e05551dbcf5a6137c5a4b300e79c6bb6c3de58a962f63853fe98c587ffd0bf20`；CommitCoordinator `04deb112519433142130f3dd5c3f0442915fdf14512ec72caa2dacbe42ad7d0c`；PracticeEditor `c646ddd47d60d5373e0e7fdbb7dc719446c3647b37bf9ce6a44e9f10ffd7cd11`；QA 脚本 `e76961bdb4c94e1cf478623c40615909b8039a348a752e5a5b4e97ad1e6e20b0`；记忆测试 `97110a866ca83d519b75711045ac50362d57027c414f1aee5ad5b4aa4a1c476c`。推送前 main 8c52fb13、开发分支 24f2a3d5，无打开 PR；Actions 826 次、最新 39118939684 成功。本轮只集中推开发分支，不改 main、门禁或通知设置，目标保持 active。
+
 ## setter 返回 false 后的按钮重开（2026-10-24，起点 f917a287）
 
 再次核对固定 `components/pages/test/TestConfig.tsx`：模式、时长、词数、标点、数字及引语长度的直接控件在 setConfig 正常返回后均 dispatch restartTestEvent，不检查返回的 bool；`CustomTestDurationModal.tsx` 在输入验证成功后也是同样顺序。difficulty 由成功 setter 的事件订阅触发重开，不能套用这条直接派发规则。更重要的是 `config/setters.ts` 的依赖覆盖拒绝会抛异常，而不是返回 false，此时执行不到后续 dispatch。普通 No Quit／忙碌和后续生成准入仍拥有重开决定权，不因字段被拒绝而绕过。

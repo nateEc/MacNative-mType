@@ -59,6 +59,79 @@ import Observation
     guard case .restored = f.page.state.presentation?.publication.draft.origin else { return XCTFail("Restore became import") }
   }
 
+  func testUnsupportedLazyLanguageRemembersAndRestoresAcrossFullImportAndColdRestore() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"hindi","lazyMode":true}"#, systemIsDark: false)
+    let first = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertFalse(first.generators.lazyMode)
+    XCTAssertEqual(first.lazyMemory, .init(remember: true, prefersArabic: true))
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    XCTAssertEqual(try register.read().lazyMemory, first.lazyMemory)
+    let revision = try register.read().revision
+    let attempt = f.page.state.session.automaticInputAttemptID
+    do {
+      try await f.workflow.editAndBegin(.mode(.custom), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTFail("Missing custom text applied a candidate lazy-memory restoration")
+    } catch WebsiteConfigSessionBuildError.customTextUnavailable {}
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(try register.read().lazyMemory, first.lazyMemory)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    try await f.workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertEqual(try register.read().revision, revision, "Stable remembered state must not invalidate other windows on cold restore")
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"spanish","lazyMode":false}"#, systemIsDark: false)
+    let restored = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertTrue(restored.generators.lazyMode)
+    XCTAssertFalse(restored.lazyMemory.remember)
+    XCTAssertTrue(f.page.state.session.configuration.modifiers.contains(.lazyLatin))
+    XCTAssertEqual(try register.read().lazyMemory, restored.lazyMemory)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+
+  func testArabicLanguageEventAndExplicitLazyPreferencePersistWithoutUsingLegacyPreference() async throws {
+    let f = try Fixture(); defer { f.close() }
+    f.settings.prefersArabicLazyInput = false
+    let legacy = f.settings.snapshot
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"spanish","lazyMode":false}"#, systemIsDark: false)
+    func edit(_ value: WebsiteConfigPracticeEdit) async throws {
+      try await f.workflow.editAndBegin(value, replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    }
+    try await edit(.language("arabic"))
+    var draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertTrue(draft.generators.lazyMode); XCTAssertTrue(draft.lazyMemory.prefersArabic)
+    XCTAssertTrue(draft.projection.events.contains { $0.key == "lazyMode" && $0.nosave == true })
+    guard case .edited(let source) = draft.origin else { return XCTFail("Language became import") }
+    XCTAssertEqual(source.key, "language")
+    try await edit(.lazyMode(false))
+    draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertFalse(draft.generators.lazyMode); XCTAssertFalse(draft.lazyMemory.prefersArabic)
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    try await f.workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+    try await edit(.language("spanish")); try await edit(.language("arabic"))
+    draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertFalse(draft.generators.lazyMode); XCTAssertFalse(draft.lazyMemory.prefersArabic)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().lazyMemory, draft.lazyMemory)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+
+  func testCancelledGenerationCannotPersistCandidateLazyMemory() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let gate = Gate(); defer { gate.resolve() }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in await gate.read() })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
+    let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
+    let bytes = try Data(contentsOf: path), attempt = f.page.state.session.automaticInputAttemptID
+    let task = Task { try await workflow.apply(json: #"{"mode":"quote","language":"hindi","lazyMode":true,"quoteLength":[0]}"#, systemIsDark: false) }
+    try await gate.wait(); task.cancel(); gate.resolve()
+    do { _ = try await task.value; XCTFail("Cancelled lazy transition committed") } catch is CancellationError {}
+    XCTAssertEqual(try Data(contentsOf: path), bytes)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.lazyMemory, .init())
+  }
+
   func testMissingRestoreAndTypebarBackupNeverChangePageOrCreateDataRecord() async throws {
     let f = try Fixture(); defer { f.close() }
     let attempt = f.page.state.session.automaticInputAttemptID
