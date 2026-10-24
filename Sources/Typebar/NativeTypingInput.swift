@@ -159,7 +159,7 @@ struct NativeTypingInput: NSViewRepresentable {
 
     func updateNSView(_ view: TypingInputView, context: Context) {
         view.insertionAnchor = insertionAnchor
-        view.insertionAttemptID = insertionAttemptID
+        view.prepareForAttempt(insertionAttemptID)
         view.compositionDisplayStyle = compositionDisplayStyle
         view.onInsert = onInsert
         view.onDelete = onDelete
@@ -551,6 +551,16 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
 
     func resetBailoutAttempt() {
         lastBailoutAttempt = nil
+    }
+
+    /// Retain the native receiver, but not another attempt's conversion buffer.
+    /// Close admission before discarding IME state: AppKit may synchronously
+    /// call the text client while disposing of a conversion session.
+    func prepareForAttempt(_ attemptID: UUID?) {
+        guard insertionAttemptID != attemptID else { return }
+        acceptsTextInput = false
+        insertionAttemptID = attemptID
+        resetBailoutAttempt()
     }
 
     private func handleLongTestBailout() {

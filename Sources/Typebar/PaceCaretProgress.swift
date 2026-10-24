@@ -174,28 +174,31 @@ struct PaceCaretProgress {
     } else if wrongWords.insert(word).inserted { correction += length }
   }
 
-  mutating func advance(to time: TimeInterval? = nil, blind: Bool) {
+  @discardableResult
+  mutating func advance(to time: TimeInterval? = nil, blind: Bool) -> Bool {
     let time = time ?? clock.now()
-    guard !exhausted, let startedAt, time.isFinite, (time - startedAt).isFinite else { return }
+    guard !exhausted, let startedAt, time.isFinite, (time - startedAt).isFinite else { return false }
     let now = max(time, observedAt ?? startedAt)
+    let previousObservedAt = observedAt
     observedAt = now
     let elapsed = max(0, now - startedAt)
     var due = floor(elapsed / interval) + 1
     // Compare absolute deadlines at the source clock's representable precision.
     if due.isFinite, now >= startedAt + interval * due { due += 1 }
-    guard due > processedSteps else { return }
+    guard due > processedSteps else { return previousObservedAt != observedAt }
     let total = catalog.steps.last!
     let delta = min(Double(total) + 2, due - processedSteps)
     let first = currentStep + 1 + (blind ? 0 : correction)
     if !blind { correction = 0 }
     guard first >= 0, first <= total, delta - 1 <= Double(total - first) else {
-      exhausted = true; return
+      exhausted = true; return true
     }
     let count = Int(delta)
     let target = first + count - 1
     fromStep = count == 1 ? currentStep : target - 1
     currentStep = target
     processedSteps = due
+    return true
   }
 
   func frame(at time: TimeInterval? = nil, blind: Bool) -> PaceCaretFrame? {

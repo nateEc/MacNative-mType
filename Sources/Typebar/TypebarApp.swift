@@ -109,7 +109,8 @@ struct TypebarApp: App {
     }, promptRender: @escaping @MainActor (TypingSession, String?, PromptRenderStyle) -> PromptRendering = {
       PromptRenderPlan(session: $0, composition: $1, style: $2).render()
     }, wholePreviewViewportEnabled: Bool = false,
-    publishedPresentation: WebsiteConfigPublishedPresentation? = nil) -> some View {
+    publishedPresentation: WebsiteConfigPublishedPresentation? = nil,
+    practiceSessionStore: PracticePageSessionStore? = nil) -> some View {
     ContentView(settings: settings, account: account, announcements: announcements,
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
       systemAppearance: systemAppearance, liveContentFetch: liveContentFetch,
@@ -117,7 +118,8 @@ struct TypebarApp: App {
       liveSessionPrepare: liveSessionPrepare,
       wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender,
       wholePreviewLayout: wholePreviewLayout, promptRender: promptRender,
-      wholePreviewViewportEnabled: wholePreviewViewportEnabled, incomingPublishedPresentation: publishedPresentation)
+      wholePreviewViewportEnabled: wholePreviewViewportEnabled, incomingPublishedPresentation: publishedPresentation,
+      providedPageSessionStore: practiceSessionStore)
   }
 
   private static let modelConfiguration = ModelConfiguration(
@@ -1244,6 +1246,7 @@ private struct ContentView: View {
   let promptRender: @MainActor (TypingSession, String?, PromptRenderStyle) -> PromptRendering
   let wholePreviewViewportEnabled: Bool
   let incomingPublishedPresentation: WebsiteConfigPublishedPresentation?
+  let providedPageSessionStore: PracticePageSessionStore?
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
@@ -1254,7 +1257,13 @@ private struct ContentView: View {
   @Query private var personalBestLedgers: [LocalPersonalBestLedgerRecord]
   @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var savedPresets:
     [TestPresetRecord]
-  @State private var pageSession = PracticePageSessionState()
+  @State private var ownedPageSessionStore = PracticePageSessionStore()
+  @State private var finalizedPracticeApplicationID: UUID?
+  private var pageSessionStore: PracticePageSessionStore { providedPageSessionStore ?? ownedPageSessionStore }
+  private var pageSession: PracticePageSessionState {
+    get { pageSessionStore.state }
+    nonmutating set { pageSessionStore.replace(newValue) }
+  }
   private var session: TypingSession {
     get { pageSession.session }
     nonmutating set {
@@ -1348,7 +1357,7 @@ private struct ContentView: View {
   @State private var showingProfileSearchCommandEditor = false
   @State private var sharedProfileInbox = SharedProfileLinkInbox()
   @State private var sharedProfileWindow = SharedProfileWindowHost()
-  @State private var preferenceConfigurationOwner = UUID()
+  private var preferenceConfigurationOwner: UUID { pageSessionStore.owner }
   @State private var showingActiveResultTagEditor = false
   @State private var showingFontFamilyNameCommandEditor = false
   @State private var showingInstalledFontCommandPicker = false
@@ -1655,6 +1664,9 @@ private struct ContentView: View {
     .onChange(of: incomingPublishedPresentation?.publication.applicationID, initial: true) { _, _ in
       consumePublishedPractice()
     }
+    .onChange(of: pageSession.presentation?.publication.applicationID, initial: true) { _, _ in
+      finalizePublishedPracticeInstallation()
+    }
     .background(SharedProfileWindowProbe(host: sharedProfileWindow, didAttach: {
       activatePreferenceConfigurationOwnerIfKey()
       presentSharedProfileIfPossible()
@@ -1697,8 +1709,10 @@ private struct ContentView: View {
         persistExplicitTestConfiguration()
       }
       activatePreferenceConfigurationOwnerIfKey()
+      pageSessionStore.attach(to: settings.preferenceConfigurationSaves)
     }
     .onDisappear {
+      pageSessionStore.detach()
       settings.preferenceConfigurationSaves.remove(owner: preferenceConfigurationOwner)
       visualFocus.onWillCommit = nil
       interruptedWholePreview = interruptedWholePreview || isPreparingPracticePrompt
@@ -2489,7 +2503,10 @@ private struct ContentView: View {
         if session.isFinished { return }
       }
     }
-    session.tick(at: now)
+    if session.requiresClockTick {
+      var candidate = session
+      if candidate.tick(at: now) { session = candidate }
+    }
   }
 
   private var header: some View {
@@ -3225,27 +3242,40 @@ private struct ContentView: View {
           && (committedPracticeDraft?.behavior.quickRestartKey ?? settings.quickRestartKey) == .enter,
         enablesLongTestBailout: quickRestartRequiresProtection,
         finishesOnShiftEnter: session.configuration.mode == .zen,
-        onInsert: { text, forceError in
+        onInsert: { [attemptID = session.automaticInputAttemptID] text, forceError in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           guard activeChallengeID != "mouse-warrior" else { return }
           handleInsertedText(text, forceError: forceError)
         },
-        onDelete: {
+        onDelete: { [attemptID = session.automaticInputAttemptID] in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           if activeChallengeID != "mouse-warrior" { handleDeletedText(deletesWord: false) }
         },
-        onDeleteWord: {
+        onDeleteWord: { [attemptID = session.automaticInputAttemptID] in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           if activeChallengeID != "mouse-warrior" { handleDeletedText(deletesWord: true) }
         },
-        onRestart: attemptRestart,
-        onOpenCommandPalette: { showingCommandPalette = true },
-        onBailoutArmed: armLongTestBailout,
-        onBailout: {
+        onRestart: { [attemptID = session.automaticInputAttemptID] in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }; attemptRestart()
+        },
+        onOpenCommandPalette: { [attemptID = session.automaticInputAttemptID] in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }; showingCommandPalette = true
+        },
+        onBailoutArmed: { [attemptID = session.automaticInputAttemptID] in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }; armLongTestBailout()
+        },
+        onBailout: { [attemptID = session.automaticInputAttemptID] in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           guard !isPreparingPracticePrompt else { return }
           bailoutConfirmationMessage = nil
           synchronizeLiveInputRules()
           session.bailOut()
         },
-        onQuickRestartProtectionRequired: showQuickRestartProtectionNotice,
-        onFinishZen: {
+        onQuickRestartProtectionRequired: { [attemptID = session.automaticInputAttemptID] in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }; showQuickRestartProtectionNotice()
+        },
+        onFinishZen: { [attemptID = session.automaticInputAttemptID] in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           guard !isPreparingPracticePrompt else { return }
           synchronizeLiveInputRules()
           session.finishZen()
@@ -3258,7 +3288,8 @@ private struct ContentView: View {
           if !isFocused { typingCompanionHands.reset() }
           handleTypingWindowFocusChange(isFocused, hasAttachedSheet: hasAttachedSheet)
         },
-        onCompositionStarted: {
+        onCompositionStarted: { [attemptID = session.automaticInputAttemptID] in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           guard !isPreparingPracticePrompt else { return }
           if usesPreparedPromptViewport, viewportFallbackAttemptID != session.automaticInputAttemptID {
             viewportFallbackPosition.capture(attemptID: session.automaticInputAttemptID, targetID: session.promptTargetID)
@@ -3269,36 +3300,40 @@ private struct ContentView: View {
             session.beginComposition()
           }
         },
-        onCompositionChanged: {
+        onCompositionChanged: { [attemptID = session.automaticInputAttemptID] text in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           guard !isPreparingPracticePrompt else { return }
-          if usesPreparedPromptViewport, !$0.isEmpty,
+          if usesPreparedPromptViewport, !text.isEmpty,
             viewportFallbackAttemptID != session.automaticInputAttemptID {
             viewportFallbackAttemptID = session.automaticInputAttemptID
           }
           preparedWholePreviewRendering = nil
           let hadMarkedText = !compositionText.isEmpty
           let playsCompositionClick = TypingInputSoundPlan.isAudibleCompositionUpdate(
-            previous: compositionText, current: $0)
-          compositionText = $0
+            previous: compositionText, current: text)
+          compositionText = text
           if activeChallengeID != "mouse-warrior" {
             synchronizeLiveInputRules()
             session.refreshLiveAccuracyAfterComposition(
-              hadMarkedText: hadMarkedText, hasMarkedText: !$0.isEmpty)
-            visualFocus.inputDidUpdate(hasFeedback: hadMarkedText || !$0.isEmpty,
+              hadMarkedText: hadMarkedText, hasMarkedText: !text.isEmpty)
+            visualFocus.inputDidUpdate(hasFeedback: hadMarkedText || !text.isEmpty,
               textChanged: false, isFinished: session.isFinished)
             if playsCompositionClick { playInputFeedback(inputWasCorrect: true) }
           }
         },
-        shouldFinishWithComposition: { text, forceError in
+        shouldFinishWithComposition: { [attemptID = session.automaticInputAttemptID] text, forceError in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return false }
           guard !isPreparingPracticePrompt else { return false }
           guard activeChallengeID != "mouse-warrior" else { return false }
           synchronizeLiveInputRules()
           return session.shouldFinishWithComposition(effectiveInsertedText(text), forceError: forceError)
         },
-        onModifierFlagsChanged: {
-          keyboardModifierFlags = $0
+        onModifierFlagsChanged: { [attemptID = session.automaticInputAttemptID] flags in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+          keyboardModifierFlags = flags
         },
-        onKeyDown: { keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
+        onKeyDown: { [attemptID = session.automaticInputAttemptID] keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           TypingFeedbackSound.shared.recordKeyDown(keyCode: keyCode, modifierFlags: modifierFlags)
           if konamiSequenceTracker.consume(
             keyCode: keyCode,
@@ -3309,7 +3344,8 @@ private struct ContentView: View {
             NSWorkspace.shared.open(KonamiSequenceTracker.destination)
           }
         },
-        onPhysicalKey: { keyCode, isKeyDown, isRepeat in
+        onPhysicalKey: { [attemptID = session.automaticInputAttemptID] keyCode, isKeyDown, isRepeat in
+          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
           guard !isPreparingPracticePrompt else { return }
           if isKeyDown && activeChallengeID == "mouse-warrior" {
             session.recordPhysicalKeyboardActivityDuringAttempt()
@@ -4134,8 +4170,12 @@ private struct ContentView: View {
 
   private func synchronizeLiveInputRules() {
     let previous = session.configuration.rules
-    session.synchronizeLiveInputRules(pageSession.practice?.session.configuration.rules ?? settings.inputRules)
-    if session.configuration.rules != previous { preparedWholePreviewRendering = nil }
+    var candidate = session
+    candidate.synchronizeLiveInputRules(pageSession.practice?.session.configuration.rules ?? settings.inputRules)
+    if candidate.configuration.rules != previous {
+      session = candidate
+      preparedWholePreviewRendering = nil
+    }
   }
 
   private func consumePublishedPractice() {
@@ -4155,6 +4195,15 @@ private struct ContentView: View {
     do {
       let replacement = try pageSession.applying(incoming, owner: preferenceConfigurationOwner,
         router: settings.preferenceConfigurationSaves)
+      pageSession = replacement
+      finalizePublishedPracticeInstallation()
+    } catch { funboxConfigurationMessage = "完整配置会话尚未通过页面准入，当前练习保持不变。" }
+  }
+
+  private func finalizePublishedPracticeInstallation() {
+      guard pageSession.practice != nil, let applicationID = pageSession.presentation?.publication.applicationID,
+        finalizedPracticeApplicationID != applicationID else { return }
+      finalizedPracticeApplicationID = applicationID
       wholePreviewTask.cancel(); liveContentTask?.cancel(); liveContentTask = nil
       liveContentRequestID = UUID()
       isPreparingWholePreview = false; isLoadingLiveContent = false
@@ -4169,11 +4218,9 @@ private struct ContentView: View {
       isSamePromptRepeatAttempt = false; isRepeatedPaceAttempt = false
       activePaceTargetWpm = nil
       NativeSpeech.shared.stop()
-      pageSession = replacement
       synchronizeNoQuitConfigurationLock()
       awaitViewportPresentationIfNeeded()
       requestTypingFocus()
-    } catch { funboxConfigurationMessage = "完整配置会话尚未通过页面准入，当前练习保持不变。" }
   }
 
   private func handleChallengeFieldApplication(_ field: ChallengeLiveConfigurationState.ApplicationField,

@@ -9,6 +9,7 @@ import XCTest
 
 @MainActor final class WebsiteConfigPracticeHostTests: XCTestCase {
   @MainActor @Observable fileprivate final class HostState {
+    let page = PracticePageSessionStore()
     var presentation: WebsiteConfigPublishedPresentation
     var usesPublished = true
     var generations = 0
@@ -22,15 +23,15 @@ import XCTest
     let container: ModelContainer, state: HostState
     let host: NSHostingView<AnyView>, window: NSWindow
     let prompt = Array(repeating: "000", count: 201).joined(separator: " ")
-    init(followsSystem: Bool = false) throws {
+    init(followsSystem: Bool = false, legacyNoQuit: Bool = true) throws {
       directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-practice-publication-\(UUID())")
       try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = AppSettings(defaults: defaults, feedbackSound: .init(loadSound: { _ in nil }, beep: {}),
         localBackgroundStore: .inMemory())
       settings.reducePracticeMotion = true; settings.showAllPracticeLines = true
-      settings.testModifiers = [.noQuit]
-      let config = TestConfiguration.words(201).with(modifiers: [.noQuit])
+      settings.testModifiers = legacyNoQuit ? [.noQuit] : []
+      let config = TestConfiguration.words(201).with(modifiers: legacyNoQuit ? [.noQuit] : [])
       XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: config),
         testParameterMemory: .legacyDefaults(configuration: config))))
       register = .init(directory: directory)
@@ -107,7 +108,8 @@ import XCTest
         wholePreviewPrepare: { configuration, _, _ in
           state.generations += 1; return TypingSession(configuration: configuration, prompt: prompt)
         }, wholePreviewViewportEnabled: !state.usesPublished,
-        publishedPresentation: state.usesPublished ? state.presentation : nil)
+        publishedPresentation: state.usesPublished ? state.presentation : nil,
+        practiceSessionStore: state.page)
     }
   }
 
@@ -280,5 +282,118 @@ import XCTest
     let deadline = Date().addingTimeInterval(10)
     while result == nil && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     return try XCTUnwrap(result).get()
+  }
+
+  func testSynchronousCommitTargetsActualPageAndRejectsOldInputCallbacks() throws {
+    let f = try Fixture(); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    let actualOwner = try XCTUnwrap(f.settings.preferenceConfigurationSaves.captureLease()?.owner)
+    XCTAssertEqual(actualOwner, f.state.page.owner, "The destination must belong to the real page, not a detached test store")
+    XCTAssertEqual(input.insertionAttemptID, f.state.page.state.session.automaticInputAttemptID)
+    let staleInsert = input.onInsert, staleDelete = input.onDelete, staleComposition = input.onCompositionChanged
+    let staleCompositionStart = input.onCompositionStarted, staleDeleteWord = input.onDeleteWord, staleBailout = input.onBailout
+    let epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let resources = try coordinator.prepareResources(for: coordinator.prepare(#"{"mode":"custom","stopOnError":"letter"}"#),
+      localFont: .absent, localBackground: .data(Fixture.png()))
+    let ready = try awaitResult(coordinator, resources: resources)
+    do {
+      guard case .committed(let publication) = try coordinator.commit(ready, to: f.state.page, systemIsDark: false) else {
+        return XCTFail("Expected synchronous page installation")
+      }
+      XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, ready.session.automaticInputAttemptID)
+      XCTAssertEqual(f.state.page.state.presentation?.publication.applicationID, publication.applicationID)
+    } catch { return XCTFail("The actual page destination must admit its prepared attempt: \(error)") }
+    // Do not run the loop before these calls: the native view still carries
+    // callbacks from the previous attempt while the authoritative state is new.
+    staleCompositionStart()
+    XCTAssertFalse(f.state.page.state.session.hasStarted, "Old composition must not start a replacement attempt")
+    staleInsert("a", false)
+    XCTAssertEqual(f.state.page.state.session.typed, "", "Cached insertion must not reach the replacement attempt")
+    staleDelete(); staleComposition("stale")
+    XCTAssertEqual(f.state.page.state.session.typed, "")
+    f.wait { input.insertionAttemptID == ready.session.automaticInputAttemptID && input.acceptsTextInput }
+    XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    input.onInsert("a", false)
+    XCTAssertEqual(f.state.page.state.session.typed, "a")
+    staleDelete(); staleInsert("b", false)
+    XCTAssertEqual(f.state.page.state.session.typed, "a")
+    staleDeleteWord(); staleBailout()
+    XCTAssertEqual(f.state.page.state.session.typed, "a")
+    XCTAssertFalse(f.state.page.state.session.isFinished, "Old bailout must not finish a replacement attempt")
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testSynchronousAttemptTransitionDiscardsNativeMarkedTextWithoutCommittingIt() throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    input.setMarkedText("中", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+    f.wait { input.hasMarkedText() }
+    let epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let resources = try coordinator.prepareResources(for: coordinator.prepare(#"{"mode":"custom"}"#),
+      localFont: .absent, localBackground: .data(Fixture.png()))
+    let ready = try awaitResult(coordinator, resources: resources)
+    guard case .committed = try coordinator.commit(ready, to: f.state.page, systemIsDark: false) else {
+      return XCTFail("Expected replacement of the unprotected composition attempt")
+    }
+    XCTAssertEqual(f.state.page.state.session.typed, "")
+    f.wait { input.insertionAttemptID == ready.session.automaticInputAttemptID && input.acceptsTextInput }
+    XCTAssertFalse(input.hasMarkedText(), "The same native input must not carry marked text into another attempt")
+    XCTAssertEqual(input.markedRange().location, NSNotFound)
+    XCTAssertEqual(f.state.page.state.session.typed, "")
+    XCTAssertFalse(f.state.page.state.session.hasStarted)
+    XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    input.insertText("a", replacementRange: .init(location: NSNotFound, length: 0))
+    XCTAssertEqual(f.state.page.state.session.typed, "a", "The new attempt must remain usable")
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testSynchronousCommitChecksActualStartedNoQuitPageBeforeWriting() throws {
+    let f = try Fixture(); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    input.insertText("0", replacementRange: .init(location: NSNotFound, length: 0))
+    XCTAssertTrue(f.state.page.state.session.hasStarted)
+    XCTAssertEqual(f.state.page.state.session.typed, "0")
+    let old = f.state.page.state.session.automaticInputAttemptID
+    let epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let resource = try coordinator.prepareResources(for: coordinator.prepare(#"{"mode":"custom"}"#),
+      localFont: .absent, localBackground: .data(Fixture.png()))
+    let ready = try awaitResult(coordinator, resources: resource), disk = try f.register.read().revision
+    XCTAssertThrowsError(try coordinator.commit(ready, to: f.state.page, systemIsDark: false))
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, old)
+    XCTAssertEqual(f.state.page.state.session.typed, "0")
+    XCTAssertEqual(input.insertionAttemptID, old)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testRetiredActualPageRejectsPendingCommitAndCachedInput() throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first), staleInsert = input.onInsert
+    let epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let resource = try coordinator.prepareResources(for: coordinator.prepare(#"{"mode":"custom"}"#),
+      localFont: .absent, localBackground: .data(Fixture.png()))
+    let ready = try awaitResult(coordinator, resources: resource), disk = try f.register.read().revision
+    f.host.rootView = AnyView(EmptyView())
+    f.wait { f.settings.preferenceConfigurationSaves.captureLease() == nil }
+    let typed = f.state.page.state.session.typed
+    staleInsert("stale", false)
+    XCTAssertEqual(f.state.page.state.session.typed, typed)
+    guard case .stale = try coordinator.commit(ready, to: f.state.page, systemIsDark: false) else {
+      return XCTFail("A retired actual page cannot receive the pending commit")
+    }
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertFalse(f.window.isVisible)
   }
 }

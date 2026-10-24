@@ -20,16 +20,36 @@ final class WebsiteConfigPublishedPresentation {
   @ObservationIgnored private var systemIsDark: Bool
   @ObservationIgnored private var updating = false
 
-  init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID, systemIsDark: Bool) throws {
+  struct PreparedAppearance {
+    fileprivate let themes: WebsiteConfigNativeThemes
+    fileprivate let custom: ResolvedTheme
+    fileprivate let appearance: Appearance
+    fileprivate let systemIsDark: Bool
+  }
+
+  static func prepareAppearance(draft: WebsiteConfigNativeDraft, applicationID: UUID,
+    systemIsDark: Bool) throws -> PreparedAppearance {
+    let themes = draft.themes
+    let custom = try themes.makeCustomTheme(id: applicationID, name: "Imported configuration").resolvedTheme
+    return .init(themes: themes, custom: custom,
+      appearance: resolve(themes.initialSelection(systemIsDark: systemIsDark), custom: custom), systemIsDark: systemIsDark)
+  }
+
+  /// Internal synchronous handoff: resource and owner checks have already run
+  /// before the durable commit. This construction has no fallible operations.
+  init(publication: WebsiteConfigCommitCoordinator.Publication, preparedAppearance: PreparedAppearance) {
+    self.publication = publication; owner = publication.owner; themes = preparedAppearance.themes
+    customTheme = preparedAppearance.custom; systemIsDark = preparedAppearance.systemIsDark
+    appearance = preparedAppearance.appearance
+  }
+
+  convenience init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID, systemIsDark: Bool) throws {
     guard publication.owner == owner else { throw WebsiteConfigPublishedPresentationError.wrongOwner }
     guard publication.font != nil, publication.background != nil else {
       throw WebsiteConfigPublishedPresentationError.unprepared
     }
-    let themes = publication.draft.themes
-    let custom = try themes.makeCustomTheme(id: publication.applicationID, name: "Imported configuration").resolvedTheme
-    self.publication = publication; self.owner = owner; self.themes = themes
-    customTheme = custom; self.systemIsDark = systemIsDark
-    appearance = Self.resolve(themes.initialSelection(systemIsDark: systemIsDark), custom: custom)
+    self.init(publication: publication, preparedAppearance: try Self.prepareAppearance(draft: publication.draft,
+      applicationID: publication.applicationID, systemIsDark: systemIsDark))
   }
   private static func resolve(_ selection: WebsiteConfigNativeThemes.Selection, custom: ResolvedTheme) -> Appearance {
     switch selection {

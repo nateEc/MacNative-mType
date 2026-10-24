@@ -88,13 +88,17 @@ final class TimerDeliveryDiagnosticsTests: XCTestCase {
     let entry = String(source[begin.lowerBound..<end.lowerBound])
     let gate = try XCTUnwrap(entry.range(of: "guard !session.isFinished else { return }"))
     for operation in ["let elapsed =", "timerHealth.observe(", "TimerDeliveryDiagnostics.record(",
-      "TypingFeedbackSound.shared.playTimeWarning(", "session.enforceLivePracticeThresholds(", "session.tick("] {
+      "TypingFeedbackSound.shared.playTimeWarning(", "session.enforceLivePracticeThresholds(", "candidate.tick("] {
       XCTAssertLessThan(gate.lowerBound, try XCTUnwrap(entry.range(of: operation)).lowerBound)
     }
     // Native Caps Lock / live-rule / font monitoring must still run, including
     // while a terminal result is visible. Only attempt delivery is gated.
     XCTAssertLessThan(try XCTUnwrap(entry.range(of: "verifyChallengeFontAvailability()")).lowerBound,
       gate.lowerBound)
+    XCTAssertTrue(entry.contains("if session.requiresClockTick {"))
+    XCTAssertTrue(entry.contains("var candidate = session"))
+    XCTAssertTrue(entry.contains("if candidate.tick(at: now) { session = candidate }"),
+      "Clock work must preserve terminal gating and publish only a changed value")
   }
 
   func testRequiresBothQAStoreAndExplicitOptIn() {

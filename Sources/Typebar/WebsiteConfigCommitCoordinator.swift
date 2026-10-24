@@ -29,7 +29,7 @@ final class WebsiteConfigCommitCoordinator {
   }
   struct Publication {
     /// One successful full application, including repeated identical values.
-    let applicationID = UUID()
+    let applicationID: UUID
     let draft: WebsiteConfigNativeDraft
     let owner: UUID
     let environmentRevision: UUID
@@ -280,6 +280,17 @@ final class WebsiteConfigCommitCoordinator {
     return try commit(prepared.resources.configuration, background: prepared.resources.background,
       font: prepared.resources.font, session: prepared.session, practice: prepared.practice)
   }
+  func commit(_ prepared: SessionPrepared, to page: PracticePageSessionStore,
+    systemIsDark: Bool) throws -> Outcome {
+    guard !processing else { return .busy }
+    try Task.checkCancellation()
+    guard prepared.admission == sessionAdmission,
+      prepared.resources.admission == resourceAdmission else { return .stale }
+    guard prepared.practice != nil else { throw PracticePageSessionStateError.incomplete }
+    return try commit(prepared.resources.configuration, background: prepared.resources.background,
+      font: prepared.resources.font, session: prepared.session, practice: prepared.practice,
+      page: page, systemIsDark: systemIsDark)
+  }
   @discardableResult
   func cancel(_ prepared: BackgroundPrepared) -> Bool {
     guard prepared.admission == resourceAdmission else { return false }
@@ -295,24 +306,45 @@ final class WebsiteConfigCommitCoordinator {
   }
   private func commit(_ prepared: Prepared, background: WebsiteConfigBackgroundResource?,
     font: WebsiteConfigFontResource? = nil, session: TypingSession? = nil,
-    practice: WebsiteConfigSessionBuilder.Prepared? = nil) throws -> Outcome {
+    practice: WebsiteConfigSessionBuilder.Prepared? = nil,
+    page: PracticePageSessionStore? = nil, systemIsDark: Bool = false) throws -> Outcome {
     guard !processing else { return .busy }
     processing = true
     defer { processing = false }
     guard session != nil || sessionRequest != prepared.request else { return .stale }
     guard isCurrent(prepared) else { retire(prepared); return .stale }
     if session != nil { try Task.checkCancellation() }
+    let applicationID = UUID()
+    let appearance: WebsiteConfigPublishedPresentation.PreparedAppearance?
+    if let page {
+      guard let session, let practice, font != nil, background != nil,
+        !session.hasStarted, !session.isFinished,
+        session.automaticInputAttemptID == practice.session.automaticInputAttemptID,
+        session.configuration == practice.session.configuration,
+        session.prompt.utf16.elementsEqual(practice.session.prompt.utf16) else {
+        throw PracticePageSessionStateError.invalidAttempt
+      }
+      appearance = try WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
+        applicationID: applicationID, systemIsDark: systemIsDark)
+      try page.beginCommit(owner: prepared.owner, router: router)
+    } else { appearance = nil }
+    defer { page?.endCommit() }
     let outcome: WebsiteConfigFileRegister.Commit
     do { outcome = try register.commit(prepared.draft, replacing: prepared.disk) }
     catch WebsiteConfigFileRegisterError.busy { return .busy }
     switch outcome {
     case .committed(let disk):
-      // From the record's commit point to this value publication there is no
-      // await, caller callback, legacy write, resource activation or event replay.
-      let publication = Publication(draft: prepared.draft, owner: prepared.owner.owner,
+      // No await, fallible receiver, legacy write or resource activation after
+      // CAS. The optional page assignment can notify observation synchronously;
+      // both coordinator and page stay reserved until publication is complete.
+      let publication = Publication(applicationID: applicationID, draft: prepared.draft, owner: prepared.owner.owner,
         environmentRevision: prepared.environment.revision, pointsPerRem: prepared.environment.pointsPerRem,
         disk: disk, background: background, font: font, session: session, practice: practice,
         ownerLease: prepared.owner, authority: publicationAuthority)
+      if let page, let appearance, let session, let practice {
+        let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: appearance)
+        page.installCommitted(.init(session: session.withElapsedClock(), presentation: presentation, practice: practice))
+      }
       latest = publication
       publicationAuthority.latest = publication.applicationID
       retire(prepared)

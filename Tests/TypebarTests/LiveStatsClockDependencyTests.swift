@@ -86,6 +86,15 @@ import XCTest
     XCTAssertTrue(stats.contains("LiveStatsClockContent(signal: liveStatsClockSignal)"))
     XCTAssertFalse(stats.contains("_ = lastClockTickSecond"))
     XCTAssertTrue(source.contains("liveStatsClockSignal.second = lastDueSecond"))
-    XCTAssertEqual(source.components(separatedBy: "liveStatsClockSignal.second = 0").count - 1, 2)
+    // Check each real attempt-install path, not a global textual count that
+    // cannot distinguish a missing reset from a new legitimate entry point.
+    for signature in ["private func reset(restarting:", "private func startRepeatedAttempt(",
+      "private func finalizePublishedPracticeInstallation()"] {
+      let begin = try XCTUnwrap(source.range(of: signature))
+      let end = source.range(of: "\n  private ", range: begin.upperBound..<source.endIndex)?.lowerBound ?? source.endIndex
+      let installation = source[begin.lowerBound..<end]
+      XCTAssertTrue(installation.contains("lastClockTickSecond = 0"), signature)
+      XCTAssertTrue(installation.contains("liveStatsClockSignal.second = 0"), signature)
+    }
   }
 }

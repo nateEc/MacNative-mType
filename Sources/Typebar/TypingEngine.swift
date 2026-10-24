@@ -6816,14 +6816,23 @@ struct TypingSession {
     insert(suffix, at: date)
   }
 
-  mutating func tick(at date: Date = .now) {
+  /// The page's observable owner must not publish clock writes that cannot
+  /// change an attempt. Pace starts with first input; thresholds are separate.
+  var requiresClockTick: Bool {
+    hasStarted && !isFinished && (paceCaretProgress != nil || (configuration.duration ?? 0) > 0)
+  }
+
+  /// True only when the caller needs to publish the resulting session value.
+  /// Timing-operation scratch state is retired before returning to the caller.
+  @discardableResult
+  mutating func tick(at date: Date = .now) -> Bool {
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }
-    guard !isFinished else { return }
-    paceCaretProgress?.advance(blind: configuration.rules.blindMode)
-    guard !isFinished, let duration = configuration.duration, hasStarted else { return }
-    guard duration > 0 else { return }
-    if elapsedSeconds(at: date) >= duration { complete(at: date) }
+    guard !isFinished else { return false }
+    let paceChanged = paceCaretProgress?.advance(blind: configuration.rules.blindMode) ?? false
+    guard !isFinished, let duration = configuration.duration, hasStarted, duration > 0 else { return paceChanged }
+    if elapsedSeconds(at: date) >= duration { complete(at: date); return true }
+    return paceChanged
   }
 
   /// Mirrors the reference's once-per-real-second threshold evaluation. Speed
