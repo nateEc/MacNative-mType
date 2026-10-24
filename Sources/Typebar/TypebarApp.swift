@@ -2615,11 +2615,20 @@ private struct ContentView: View {
         LabeledContent("模式", value: session.configuration.mode.displayName)
         LabeledContent("语言", value: session.configuration.language.displayName)
         LabeledContent("难度", value: session.configuration.difficulty.rawValue)
-        if let duration = session.configuration.duration { LabeledContent("时间", value: "\(Int(duration)) 秒") }
+        if let duration = session.configuration.duration { LabeledContent("时间", value: "\(duration.formatted()) 秒") }
         if let words = session.configuration.wordLimit { LabeledContent("词数", value: "\(words)") }
         if let quote = practice.quote { Text(quote.title).foregroundStyle(.secondary) }
-        Text("本轮使用导入设置；编辑与重开暂未开放。")
-          .font(.caption).foregroundStyle(.secondary)
+        if let publication = pageSession.presentation?.publication {
+          WebsiteConfigPracticeEditor(parameters: publication.draft.testParameters,
+            canEdit: !session.hasStarted || session.isFinished,
+            apply: { edit in
+              try await importWorkflow().editAndBegin(edit, replacing: publication.applicationID,
+                systemIsDark: systemColorScheme == .dark)
+            })
+            .id(publication.applicationID)
+        }
+        Text("语言、难度等其他完整配置编辑尚待接通；可在导入面板恢复配置或切回本窗口 Typebar 设置。")
+          .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     } else { legacyConfigurationPanel }
@@ -4633,7 +4642,7 @@ private struct ContentView: View {
       return false
     }
     guard pageSession.practice == nil else {
-      restartLockMessage = "本轮使用完整配置；编辑尚未接通，可在配置面板切回本窗口的 Typebar 设置。"
+      restartLockMessage = "本轮使用完整配置；请在本轮设置中编辑模式、时长或词数，其他项可从导入面板恢复或切回 Typebar 设置。"
       return false
     }
     synchronizeNoQuitConfigurationLock()

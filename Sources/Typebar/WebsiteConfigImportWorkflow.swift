@@ -1,12 +1,27 @@
 import Foundation
 
+/// Explicit test-page actions whose source controls dispatch a restart. This
+/// is deliberately not the metadata's broader changeRequiresRestart key set.
+enum WebsiteConfigPracticeEdit: Equatable {
+  case mode(TestMode), time(Double), words(Double)
+  var key: String {
+    switch self { case .mode: "mode"; case .time: "time"; case .words: "words" }
+  }
+  var value: WebsiteConfigValue {
+    switch self {
+    case .mode(let mode): .string(mode.rawValue)
+    case .time(let value), .words(let value): .number(value)
+    }
+  }
+}
+
 enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
   case missing, typebarBackup, activeAttempt, unavailable, busy, conflict, unsupportedPractice
   var errorDescription: String? {
     switch self {
     case .missing: "还没有保存的 Monkeytype 配置；请先粘贴配置 JSON。"
     case .typebarBackup: "这是 Typebar 备份，请使用“导入设置 JSON”。"
-    case .activeAttempt: "请先结束当前练习，再导入或恢复配置。活动尝试的迁移记账尚未接通。"
+    case .activeAttempt: "请先结束当前练习，再修改、导入或恢复配置。活动尝试的迁移记账尚未接通。"
     case .unavailable: "配置记录或窗口当前不可用；未知记录不会被覆盖，请检查后重试。"
     case .busy: "上一项资源准备仍未结束，请稍后重试。"
     case .conflict: "配置或窗口已变化，未应用这次准备；请重新导入。"
@@ -29,6 +44,7 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
   private var applying = false
   private var stopped = false
   private var operation = UUID()
+  private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID) }
 
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
     directory: URL, readWindow: @escaping @MainActor () -> WebsiteConfigPracticeScopeSource.Window?,
@@ -45,6 +61,15 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
   /// nil selects explicit native-record restoration, never an empty import.
   @discardableResult
   func apply(json: String?, systemIsDark: Bool) async throws -> String {
+    try await perform(.application(json), systemIsDark: systemIsDark)
+  }
+
+  @discardableResult
+  func editAndBegin(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID, systemIsDark: Bool) async throws -> String {
+    try await perform(.edit(edit, applicationID), systemIsDark: systemIsDark)
+  }
+
+  private func perform(_ intent: Intent, systemIsDark: Bool) async throws -> String {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying else { throw WebsiteConfigImportWorkflowError.busy }
     guard !page.state.session.hasStarted || page.state.session.isFinished else {
@@ -66,14 +91,20 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
       throw WebsiteConfigImportWorkflowError.activeAttempt
     }
     let ticket: WebsiteConfigCommitCoordinator.Prepared
-    if let json {
+    switch intent {
+    case .edit(let edit, let applicationID):
+      guard page.state.presentation?.publication.applicationID == applicationID else {
+        throw WebsiteConfigImportWorkflowError.conflict
+      }
+      ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source)
+    case .application(.some(let json)):
       let fields = try WebsiteConfigJSONReader.read(json).importFields
       if fields?["version"] != nil, fields?["settings"] != nil, fields?["configuration"] != nil,
         fields?.keys.contains(where: { WebsiteConfigNativeDraft.mappedKeys.contains($0) }) == false {
         throw WebsiteConfigImportWorkflowError.typebarBackup
       }
       ticket = try coordinator.prepare(json, for: page, refreshingWith: source)
-    } else {
+    case .application(nil):
       switch try coordinator.prepareRestoration(for: page, refreshingWith: source) {
       case .missing: throw WebsiteConfigImportWorkflowError.missing
       case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
@@ -92,7 +123,11 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
       // No await after commit. The same coordinator/content catalog owns retry.
       do {
         try page.bindRestartController(using: coordinator, loadQuotes: loadQuotes)
-        return json == nil ? "已恢复保存的配置，新的练习已准备好。" : "配置已导入，新的练习已准备好。"
+        switch intent {
+        case .application(nil): return "已恢复保存的配置，新的练习已准备好。"
+        case .application(.some): return "配置已导入，新的练习已准备好。"
+        case .edit: return "设置已保存，新的练习已准备好。"
+        }
       } catch {
         // The durable commit already succeeded. Never report a rolled-back
         // import merely because an observer retired its receiving window.
