@@ -174,6 +174,7 @@ struct CustomPracticeBackground: View {
   let localImageRevision: Int
   let localBackgroundStore: TypebarLocalBackgroundStore
   @State var loader = CustomBackgroundImageLoader()
+  var onFailure: BackgroundFailureFeedback.Sink = { _ in }
 
   private struct LoadIdentity: Hashable {
     let address: String
@@ -187,13 +188,13 @@ struct CustomPracticeBackground: View {
       if let image = loader.nativeImage {
         WebsiteConfigBackgroundSurface(image: image, identity: loader.imageIdentity, fit: fit,
           filter: .init(blurRem: filter.blur, brightness: filter.brightness,
-            saturation: filter.saturation, opacity: filter.opacity))
+            saturation: filter.saturation, opacity: filter.opacity), feedback: loader.feedback)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else if let image = loader.image { filtered(Image(nsImage: image)) }
     }
     .task(id: LoadIdentity(address: remoteURL, revision: localImageRevision,
       store: ObjectIdentifier(localBackgroundStore))) {
-      await loader.load(remoteURL: remoteURL, local: { try localBackgroundStore.encodedData() })
+      await loader.load(remoteURL: remoteURL, local: { try localBackgroundStore.encodedData() }, onFailure: onFailure)
     }
     .onDisappear { loader.clear() }
     .accessibilityHidden(true)

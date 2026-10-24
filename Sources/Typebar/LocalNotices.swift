@@ -79,6 +79,7 @@ enum LocalNoticeDismissReason: String { case click, timeout, clear }
   typealias Sleep = @MainActor (Int) async throws -> Void
   private(set) var active: [LocalNotice] = []
   private(set) var history: [LocalNoticeEntry] = []
+  private(set) var deliveryGeneration = UUID()
   @ObservationIgnored private var timers: [UUID: Task<Void, Never>] = [:]
   @ObservationIgnored private var dismissals: [UUID: (LocalNoticeDismissReason) -> Void] = [:]
   @ObservationIgnored private let sleep: Sleep
@@ -132,6 +133,7 @@ enum LocalNoticeDismissReason: String { case click, timeout, clear }
     for callback in callbacks { callback(.clear) }
   }
   func clearForAccountChange() {
+    deliveryGeneration = UUID()
     cancelTimers(); active = []; history = []; dismissals = [:]
     // Do not run callbacks belonging to the retired account/server.
   }

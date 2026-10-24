@@ -1494,7 +1494,8 @@ private struct ContentView: View {
         remoteURL: settings.customBackgroundURL, fit: settings.customBackgroundFit,
         filter: settings.customBackgroundFilter,
         localImageRevision: settings.localBackgroundRevision,
-        localBackgroundStore: settings.localBackgroundStore)
+        localBackgroundStore: settings.localBackgroundStore,
+        onFailure: account.localNotices.backgroundFailureSink())
     )
     .background(
       WindowCloseConfirmationBridge(

@@ -71,15 +71,18 @@ final class CustomBackgroundImageLoader {
   @ObservationIgnored private let download: Download
   @ObservationIgnored private let resourceLimits: WebsiteConfigBackgroundResource.Limits
   @ObservationIgnored private var generation = UUID()
+  @ObservationIgnored let feedback = BackgroundFailureFeedback()
   init(resourceLimits: WebsiteConfigBackgroundResource.Limits = .init(),
     download: @escaping Download = { try await CustomBackgroundDownload.data(from: $0, maximumBytes: $1) }) {
     self.download = download; self.resourceLimits = resourceLimits
   }
   func load(remoteURL: String, maximumBytes: Int = 64 * 1024 * 1024,
-    local: () throws -> Data?) async {
+    local: () throws -> Data?, onFailure: @escaping BackgroundFailureFeedback.Sink = { _ in }) async {
     clear()
     let token = generation
+    feedback.begin(identity: token, sink: onFailure)
     state = .loading
+    var remoteAttempt = false
     do {
       try Task.checkCancellation()
       guard maximumBytes > 0, maximumBytes < Int.max else { throw CustomBackgroundDownload.Failure.invalidLimit }
@@ -90,6 +93,7 @@ final class CustomBackgroundImageLoader {
       if let localData { data = localData; source = .local }
       else if remoteURL.isEmpty { state = .empty; return }
       else {
+        remoteAttempt = true
         guard let url = URL(string: remoteURL), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
           url.host?.isEmpty == false else { throw CustomBackgroundDownload.Failure.unsupportedURL }
         data = try await download(url, maximumBytes)
@@ -118,10 +122,17 @@ final class CustomBackgroundImageLoader {
     } catch {
       guard token == generation else { return }
       if Task.isCancelled || error is CancellationError { clear() }
-      else { self.error = error; state = .failed }
+      else {
+        self.error = error; state = .failed
+        var kind: BackgroundFailureFeedback.Kind = remoteAttempt ? .remote : .local
+        if (error as? CustomBackgroundDownload.Failure) == .resourceLimit { kind = .resourceLimit }
+        if case .resourceLimit? = error as? LocalBackgroundError { kind = .resourceLimit }
+        feedback.report(kind, identity: token)
+      }
     }
   }
   func clear() {
+    feedback.cancel()
     generation = UUID(); state = .empty; image = nil; nativeImage = nil; encodedData = nil; error = nil
   }
 }

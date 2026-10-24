@@ -7,9 +7,10 @@ struct WebsiteConfigBackgroundSurface: NSViewRepresentable {
   let fit: CustomBackgroundFit
   let filter: WebsiteConfigNativePagePreferences.BackgroundFilter
   var pointsPerRem: Double = 16
+  var feedback: BackgroundFailureFeedback? = nil
   func makeNSView(context: Context) -> WebsiteConfigBackgroundSurfaceView { .init() }
   func updateNSView(_ view: WebsiteConfigBackgroundSurfaceView, context: Context) {
-    view.configure(image: image, identity: identity, fit: fit, filter: filter, pointsPerRem: pointsPerRem)
+    view.configure(image: image, identity: identity, fit: fit, filter: filter, pointsPerRem: pointsPerRem, feedback: feedback)
   }
   static func dismantleNSView(_ view: WebsiteConfigBackgroundSurfaceView, coordinator: ()) { view.stop() }
 }
@@ -30,6 +31,8 @@ final class WebsiteConfigBackgroundSurfaceView: NSView {
   private var fit: CustomBackgroundFit = .cover
   private var pointsPerRem: Double = 16
   private var lastViewport: CGSize?
+  private var feedback: BackgroundFailureFeedback?
+  private var feedbackGeneration = UUID()
   init(player: WebsiteConfigBackgroundPlayer = .init(), limits: WebsiteConfigBackgroundRasterizer.Limits = .init()) {
     self.player = player; self.limits = limits
     super.init(frame: .zero)
@@ -40,11 +43,14 @@ final class WebsiteConfigBackgroundSurfaceView: NSView {
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
   func configure(image: WebsiteConfigBackgroundResource.Image, identity: UUID, fit: CustomBackgroundFit,
-    filter: WebsiteConfigNativePagePreferences.BackgroundFilter, pointsPerRem: Double = 16) {
+    filter: WebsiteConfigNativePagePreferences.BackgroundFilter, pointsPerRem: Double = 16,
+    feedback: BackgroundFailureFeedback? = nil) {
+    self.feedback = feedback
     let replacing = self.identity != identity
     let changed = replacing || self.fit != fit || rawFilter != filter || self.pointsPerRem != pointsPerRem
     self.fit = fit; self.pointsPerRem = pointsPerRem
     if replacing {
+      feedbackGeneration = UUID()
       player.stop(); currentFrame = nil; renderedImage = nil; error = nil
       self.identity = identity
       geometry = .init(blurRem: filter.blurRem); filterState = .init()
@@ -61,13 +67,15 @@ final class WebsiteConfigBackgroundSurfaceView: NSView {
         }, failed: { [weak self] failure in
           guard let self, self.identity == identity else { return }
           self.error = failure; self.renderedImage = nil; self.needsDisplay = true
+          self.reportFailure(.playback)
         })
-      } catch { self.error = error; needsDisplay = true }
+      } catch { self.error = error; needsDisplay = true; reportFailure(.playback) }
     } else if changed { render(force: true) }
     synchronizeActivity()
   }
 
   func stop() {
+    feedbackGeneration = UUID(); feedback = nil
     identity = nil; player.stop(); currentFrame = nil; renderedImage = nil; error = nil
     rawFilter = nil; lastViewport = nil; needsDisplay = true
   }
@@ -106,8 +114,17 @@ final class WebsiteConfigBackgroundSurfaceView: NSView {
         filter: filterState, viewport: bounds.size, pointsPerRem: pointsPerRem,
         pixelsPerPoint: renderedScale, limits: limits)
       error = nil
-    } catch { self.error = error; renderedImage = nil }
+    } catch { self.error = error; renderedImage = nil; reportFailure(.render) }
     needsDisplay = true
+  }
+
+  private func reportFailure(_ kind: BackgroundFailureFeedback.Kind) {
+    guard let identity, let feedback else { return }
+    let token = feedbackGeneration
+    feedback.report(kind, identity: identity, isCurrent: { [weak self] in
+      guard let self else { return false }
+      return self.identity == identity && self.feedbackGeneration == token && self.error != nil
+    })
   }
 
   override func draw(_ dirtyRect: NSRect) {
