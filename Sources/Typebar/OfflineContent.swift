@@ -6163,16 +6163,22 @@ struct GeneratedCandidateContinuation {
   private var sectionWords: [String] = []
   private var nextSectionWord = 0
   private(set) var decorationState: PoolWordDecorationState
+  private(set) var replayHistory: GeneratedWordReplayHistory
+  private let replaysOwnedHistory: Bool
+  private(set) var replayExhausted = false
 
   init(configuration: TestConfiguration, batchTokenCount: Int, showAllLines: Bool = false,
     weakSpotScores: WeakSpotScores = .init(), sourceWords: [String]? = nil,
     decorationState: PoolWordDecorationState = .init(),
+    replayHistory: GeneratedWordReplayHistory? = nil,
     polyglotSources: [(TypingLanguage, IndexedLexicon)]? = nil,
     nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }) {
     self.configuration = configuration
     self.batchTokenCount = batchTokenCount
     self.weakSpotScores = weakSpotScores
     self.decorationState = decorationState
+    self.replayHistory = replayHistory ?? .init(noSpace: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers))
+    replaysOwnedHistory = replayHistory != nil
     if configuration.language == .mixedLanguages {
       polyglotCandidates = polyglotSources.map { NativePolyglotCandidates(sources: $0,
         reversingPrimaryLanguage: configuration.modifiers.contains(.backwards) ? configuration.wordPoolBaseLanguage : nil,
@@ -6191,9 +6197,9 @@ struct GeneratedCandidateContinuation {
   }
 
   var hasRemaining: Bool {
-    cache.hasPendingReplay
+    !replayExhausted && (cache.hasPendingReplay
       || configuration.mode != .words || configuration.isInfinite
-      || emittedWords < (configuration.wordLimit ?? 0)
+      || emittedWords < (configuration.wordLimit ?? 0))
   }
 
   func replayingContinuation(nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }) -> Self {
@@ -6238,6 +6244,19 @@ struct GeneratedCandidateContinuation {
     var targets: [String] = []
     var output = emittedWords > 0 && !noSpace && previousTargets.last?.hasSuffix("\n") != true ? " " : ""
     for index in 0..<count {
+      if let cached = replayHistory.word(at: emittedWords + index) {
+        sourceWords.append(cached.source)
+        output += cached.target; targets.append(cached.target)
+        previousTargets.append(cached.target)
+        if previousTargets.count > 2 { previousTargets.removeFirst() }
+        if index < count - 1 && !noSpace && !cached.target.hasSuffix("\n") { output.append(" ") }
+        continue
+      }
+      if replaysOwnedHistory, !GeneratedRepeatedWordPolicy.permitsFreshWord(configuration: configuration,
+        wordIndex: emittedWords + index, sectionIndex: emittedWords + index) {
+        replayExhausted = true
+        return .init(source: "", configuration: configuration)
+      }
       // One base draw per emitted word, including unused draws while a section
       // is pending. Gates and Weakspot run only when selecting a new section.
       let candidate = drawCandidate(random: nextRandomWordIndex)
@@ -6287,6 +6306,7 @@ struct GeneratedCandidateContinuation {
         wordIndex: emittedWords + index, wordBound: bound,
         nextRandomCaseBit: nextRandomCaseBit)
       output += target
+      replayHistory.append(source: word, target: target)
       targets.append(target)
       previousTargets.append(target)
       if previousTargets.count > 2 { previousTargets.removeFirst() }
@@ -6409,6 +6429,7 @@ struct TestSessionFactory {
     var quoteChunk: TransformedPromptBatch?
     var generatedCodeContinuation: GeneratedCodeContinuation?
     var generatedCodeChunk: GeneratedWordChunk?
+    var generatedReplayHistory: GeneratedWordReplayHistory?
     var currentDecorationState = wordDecorationState
     let streamWordCount = streamWordCount(for: configuration, showAllLines: showAllLines)
     if configuration.mode != .custom, configuration.mode != .zen, let streamPrompt {
@@ -6433,6 +6454,7 @@ struct TestSessionFactory {
       generatedCodeChunk = chunk
       currentDecorationState = cursor.decorationState
       generatedCodeContinuation = cursor.hasRemaining ? cursor : nil
+      generatedReplayHistory = cursor.replayHistory
       usesGeneratedCode = true
     } else if let streamWordCount, configuration.modifiers.contains(.weakSpot) {
       usesFreshGeneratedWords = !configuration.language.isCodeLanguage
@@ -6713,6 +6735,7 @@ struct TestSessionFactory {
       generatedWordContinuation: generatedWordContinuation,
       generatedStreamContinuation: generatedStreamContinuation,
       generatedCodeContinuation: generatedCodeContinuation,
+      generatedReplayHistory: generatedReplayHistory,
       quoteWordStream: quoteWordStream,
       sectionEndIndices: sectionEndIndices,
       noSpaceSectionWordEnds: configuration.customTextCompletion == .sections

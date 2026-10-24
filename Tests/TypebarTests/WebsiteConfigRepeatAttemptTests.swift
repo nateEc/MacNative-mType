@@ -56,6 +56,36 @@ import XCTest
     XCTAssertEqual(output.nullWordset, 1)
   }
 
+  func testPinnedRepeatedWordHistoryAndExhaustionPolicy() throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
+      throw XCTSkip("Requires pinned reference")
+    }
+    struct Fixture: Decodable { let mode: TestMode; let customMode, outcome: String; let limit, index: Int }
+    struct Output: Decodable { let fixtures: [Fixture] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", root.appendingPathComponent("Scripts/check-source-word-history.mjs").path, reference]
+    process.standardOutput = pipe
+    try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0)
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    XCTAssertEqual(output.fixtures.count, 60)
+    var history = GeneratedWordReplayHistory(noSpace: false)
+    history.append(source: "Ab", target: "Ab "); history.append(source: "cd", target: "cd\n")
+    for f in output.fixtures {
+      let completion: CustomTextCompletion = f.customMode == "time" ? .time : f.customMode == "section" ? .sections : .words
+      let config = TestConfiguration(mode: f.mode, duration: nil, wordLimit: f.limit, difficulty: .normal,
+        rules: .init(), customTextCompletion: completion, customTextSectionLimit: f.limit)
+      let actual = history.word(at: f.index) != nil ? "cached"
+        : GeneratedRepeatedWordPolicy.permitsFreshWord(configuration: config, wordIndex: f.index, sectionIndex: f.index)
+          ? "fresh" : "unavailable"
+      XCTAssertEqual(actual, f.outcome, "\(f.mode) \(f.customMode) limit=\(f.limit) index=\(f.index)")
+    }
+  }
+
   func testPinnedRestartPrefixDecisionsIncludingFailureAndLanguageMatch() throws {
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
       throw XCTSkip("Requires pinned reference")

@@ -403,6 +403,120 @@ import TypebarSystem
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
   }
 
+  private func repeatAndStart(_ f: Fixture) async throws {
+    let ready = try await f.coordinator.prepareRestart(for: f.page, repeatingRequested: true)
+    guard case .advanced = try f.coordinator.advance(ready, to: f.page) else { throw Failure.publication }
+    f.input()
+  }
+
+  private func prepareRepeatedEdit(_ action: WebsiteConfigPracticeEdit, in f: Fixture,
+    random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> WebsiteConfigCommitCoordinator.SessionPrepared {
+    let ticket = try f.accept(f.edit(action), action: action)
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    return try await f.coordinator.preparePractice(for: resources, random: random)
+  }
+
+  func testFiniteWordHistoryRepeatsUnderNewDifficultyWithoutResampling() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4,"funbox":["rAnDoMcAsE"]}"#)
+    let prompt = f.page.state.session.prompt
+    try await repeatAndStart(f)
+    let ready = try await prepareRepeatedEdit(.difficulty(.master), in: f,
+      random: .init(wordIndex: { XCTFail("Cached words must not draw"); return 0 },
+        caseBit: { XCTFail("Cached targets must not transform"); return true },
+        contentUnit: { XCTFail("Cached decoration must not rerun"); return 0 }))
+    XCTAssertTrue(ready.session.prompt.utf16.elementsEqual(prompt.utf16))
+    XCTAssertEqual(ready.session.configuration.difficulty, .master)
+    XCTAssertEqual(ready.practice?.repetition.repeatsWordset, true)
+    var session = ready.session; session.insertBatch("¤")
+    XCTAssertEqual(session.outcome, .failed)
+  }
+
+  func testShrinkingThenGrowingWordLimitKeepsHiddenFutureHistory() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4}"#)
+    let original = f.page.state.session.prompt
+    try await repeatAndStart(f)
+    let noDraw = WebsiteConfigSessionBuilder.Random(wordIndex: { XCTFail("Owned history must not draw"); return 0 })
+    let shorter = try await prepareRepeatedEdit(.words(2), in: f, random: noDraw)
+    XCTAssertEqual(shorter.session.prompt, original.components(separatedBy: " ").prefix(2).joined(separator: " "))
+    XCTAssertFalse(shorter.session.usesIncrementalPromptExtension)
+    guard case .committed = try f.coordinator.commit(shorter, to: f.page, systemIsDark: false) else { throw Failure.publication }
+    f.input()
+    let longer = try await prepareRepeatedEdit(.words(4), in: f, random: noDraw)
+    XCTAssertEqual(longer.session.prompt, original)
+    guard case .committed = try f.coordinator.commit(longer, to: f.page, systemIsDark: false) else { throw Failure.publication }
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 2)
+  }
+
+  func testWordHistoryExhaustionGeneratesOnlyMissingSuffixWithCurrentConfiguration() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4}"#)
+    let original = f.page.state.session.prompt
+    try await repeatAndStart(f)
+    var draws = 0
+    let ready = try await prepareRepeatedEdit(.words(6), in: f,
+      random: .init(wordIndex: { draws += 1; return draws }))
+    XCTAssertTrue(ready.session.prompt.hasPrefix(original + " "))
+    XCTAssertEqual(ready.session.prompt.components(separatedBy: " ").count, 6)
+    XCTAssertGreaterThan(draws, 0)
+    XCTAssertEqual(ready.session.configuration.wordLimit, 6)
+  }
+
+  func testWordHistorySurvivesLanguageChangeWithoutReinterpretingTargets() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4}"#)
+    let original = f.page.state.session.prompt
+    try await repeatAndStart(f)
+    let ready = try await prepareRepeatedEdit(.language("spanish"), in: f,
+      random: .init(wordIndex: { XCTFail("Language change cannot replace owned cached words"); return 0 }))
+    XCTAssertEqual(ready.session.configuration.language, .spanish)
+    XCTAssertEqual(ready.session.prompt, original)
+  }
+
+  func testOwnedCodeCandidateHistoryUsesNewRulesWithoutResamplingCodeOrCase() async throws {
+    for language in ["code_javascript", "code_python"] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.publish("{\"mode\":\"words\",\"words\":4,\"language\":\"\(language)\",\"funbox\":[\"rAnDoMcAsE\"]}")
+      let original = f.page.state.session.prompt
+      try await repeatAndStart(f)
+      let ready = try await prepareRepeatedEdit(.difficulty(.expert), in: f,
+        random: .init(wordIndex: { XCTFail("Owned code must not draw"); return 0 },
+          caseBit: { XCTFail("Owned code case must not resample"); return false }))
+      XCTAssertTrue(ready.session.configuration.language.isCodeLanguage)
+      XCTAssertEqual(ready.session.configuration.difficulty, .expert)
+      XCTAssertEqual(ready.session.prompt, FinitePromptCommitPolicy.finalized(.init(text: original)).text)
+      XCTAssertEqual(ready.session.generatedWordReplayHistory?.count, 4)
+    }
+  }
+
+  func testWordToTimeModeUsesOwnedPrefixAndNewModePrefill() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4}"#)
+    let original = f.page.state.session.prompt
+    try await repeatAndStart(f)
+    var draws = 0
+    let ready = try await prepareRepeatedEdit(.mode(.time), in: f,
+      random: .init(wordIndex: { draws += 1; return draws }))
+    XCTAssertEqual(ready.session.configuration.mode, .time)
+    XCTAssertTrue(ready.session.prompt.hasPrefix(original + " "))
+    XCTAssertTrue(ready.session.usesIncrementalPromptExtension)
+    XCTAssertGreaterThan(draws, 0)
+  }
+
+  func testWholePreviewRepeatKeepsHistoryAcrossCooperativePreparation() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":1001,"showAllLines":true}"#)
+    let original = f.page.state.session.prompt
+    try await repeatAndStart(f)
+    var draws = 0
+    let ready = try await prepareRepeatedEdit(.words(1002), in: f,
+      random: .init(wordIndex: { draws += 1; return draws }))
+    XCTAssertTrue(ready.session.prompt.hasPrefix(original + " "))
+    XCTAssertEqual(ready.session.prompt.components(separatedBy: " ").count, 1002)
+    XCTAssertGreaterThan(draws, 0)
+  }
+
   func testUnsupportedChangedNonQuoteRepeatCannotSilentlyFallBackToFreshGeneration() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.publish()
@@ -418,6 +532,61 @@ import TypebarSystem
       XCTFail("Unimplemented cache reconfiguration silently became a fresh attempt")
     } catch WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported {}
     XCTAssertNotNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try f.register.read().revision, disk)
+  }
+
+  func testZeroWordLimitCannotGenerateBeyondOwnedHistoryDuringInitialization() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4}"#)
+    try await repeatAndStart(f)
+    var draws = 0
+    do {
+      _ = try await prepareRepeatedEdit(.words(0), in: f,
+        random: .init(wordIndex: { draws += 1; return draws }))
+      XCTFail("Repeated words=0 unexpectedly fabricated additional history")
+    } catch WebsiteConfigSessionBuildError.generationFailed {}
+    XCTAssertEqual(draws, 0)
+    XCTAssertNotNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testZeroWordLimitHistoryExhaustionDuringInputIsAGenerationFailure() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":100}"#)
+    try await repeatAndStart(f)
+    let ready = try await prepareRepeatedEdit(.words(0), in: f)
+    var session = ready.session
+    session.insertBatch(session.prompt)
+    XCTAssertEqual(session.outcome, .failed)
+    XCTAssertEqual(session.failureReason, .wordGeneration)
+  }
+
+  func testCancelledFreshSuffixCannotMutateOwnedHistoryAndRetryPreservesPrefix() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4}"#)
+    let original = f.page.state.session.prompt
+    try await repeatAndStart(f)
+    let action = WebsiteConfigPracticeEdit.words(6)
+    let admitted = try f.accept(f.edit(action), action: action)
+    let disk = try f.register.read().revision
+    let resources = try f.coordinator.prepareResources(for: admitted, localFont: .absent, localBackground: .absent)
+    await Task { @MainActor in
+      do {
+        _ = try await f.coordinator.preparePractice(for: resources,
+          random: .init(wordIndex: { withUnsafeCurrentTask { $0?.cancel() }; return 7 }))
+        XCTFail("Cancelled suffix delivered")
+      } catch is CancellationError {} catch { XCTFail("Unexpected: \(error)") }
+    }.value
+    XCTAssertEqual(f.page.state.session.generatedWordReplayHistory?.count, 4)
+    let resumed = try f.coordinator.resumeConfigurationRestart(for: f.page)
+    let retryResources = try f.coordinator.prepareResources(for: resumed, localFont: .absent, localBackground: .absent)
+    var draws = 0
+    let ready = try await f.coordinator.preparePractice(for: retryResources,
+      random: .init(wordIndex: { draws += 1; return draws }))
+    XCTAssertTrue(ready.session.prompt.hasPrefix(original + " "))
+    XCTAssertGreaterThan(draws, 0)
+    guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else { throw Failure.publication }
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
     XCTAssertEqual(try f.register.read().revision, disk)
   }

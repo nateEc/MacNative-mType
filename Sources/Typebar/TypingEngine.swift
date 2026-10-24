@@ -4588,6 +4588,10 @@ struct TypingSession {
   private let initialGeneratedStreamContinuation: GeneratedStreamContinuation?
   private var generatedCodeContinuation: GeneratedCodeContinuation?
   private let initialGeneratedCodeContinuation: GeneratedCodeContinuation?
+  private let initialGeneratedReplayHistory: GeneratedWordReplayHistory?
+  var generatedWordReplayHistory: GeneratedWordReplayHistory? {
+    generatedCodeContinuation?.replayHistory ?? initialGeneratedReplayHistory
+  }
   private var quoteWordStream: QuoteWordStream?
   private let randomCustomSourceTokens: [String]?
   private var randomCustomPreviousWords: [String]
@@ -4812,6 +4816,7 @@ struct TypingSession {
     generatedWordContinuation: GeneratedWordContinuation? = nil,
     generatedStreamContinuation: GeneratedStreamContinuation? = nil,
     generatedCodeContinuation: GeneratedCodeContinuation? = nil,
+    generatedReplayHistory: GeneratedWordReplayHistory? = nil,
     quoteWordStream: QuoteWordStream? = nil,
     sectionEndIndices: [Int] = [], noSpaceSectionWordEnds: [Int] = [],
     randomCustomSourceTokens: [String]? = nil,
@@ -4858,6 +4863,7 @@ struct TypingSession {
     self.initialGeneratedStreamContinuation = generatedStreamContinuation
     self.generatedCodeContinuation = generatedCodeContinuation
     self.initialGeneratedCodeContinuation = generatedCodeContinuation
+    self.initialGeneratedReplayHistory = generatedReplayHistory
     self.quoteWordStream = quoteWordStream
     self.randomCustomSourceTokens = randomCustomSourceTokens
     self.randomCustomPreviousWords = randomCustomPreviousWords
@@ -4963,6 +4969,7 @@ struct TypingSession {
         generatedStreamContinuation?.replayingContinuation(after: $0) ?? $0
       },
       generatedCodeContinuation: generatedCodeContinuation?.replayingContinuation() ?? initialGeneratedCodeContinuation,
+      generatedReplayHistory: generatedWordReplayHistory,
       sectionEndIndices: initialSectionEndIndices,
       noSpaceSectionWordEnds: initialNoSpaceSectionWordEnds,
       randomCustomSourceTokens: randomCustomSourceTokens,
@@ -9041,6 +9048,7 @@ struct TypingSession {
     } else if var continuation = generatedCodeContinuation {
       generatedChunk = continuation.nextChunk(maximumWordCount: 1, weakSpotScores: currentWeakSpotScores)
       generatedCodeContinuation = continuation
+      if continuation.replayExhausted { fail(at: date, reason: .wordGeneration); return }
     }
     if let chunk = generatedChunk {
       let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)

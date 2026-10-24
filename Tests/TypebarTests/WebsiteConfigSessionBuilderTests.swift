@@ -8,6 +8,31 @@ import XCTest
   private func quote(_ id: String, _ length: QuoteLength, text: String = "ab") -> OfflineQuote {
     .init(id: id, title: "Owned builder fixture", text: text, language: .english, length: length)
   }
+  func testRebasedFiniteWordEndRemovesOnlyItsCommitWithoutMutatingHistory() async throws {
+    var history = GeneratedWordReplayHistory(noSpace: false)
+    history.append(source: "a", target: "a\n")
+    history.append(source: "b", target: "b\n")
+    history.append(source: "c", target: "c")
+    let result = try await WebsiteConfigSessionBuilder.prepare(draft: draft(#"{"mode":"words","words":2}"#),
+      scope: .init(), attemptSource: .repeatedWords(history, repeatedPace: false),
+      random: .init(wordIndex: { XCTFail("Cached target cannot draw"); return 0 }))
+    XCTAssertEqual(result.session.prompt, "a\nb")
+    XCTAssertEqual(result.session.generatedWordReplayHistory?.word(at: 1)?.target, "b\n")
+    XCTAssertEqual(result.session.generatedWordReplayHistory?.count, 3)
+  }
+  func testRebasedNoSpaceWordsKeepFusingUnicodeTargetsAsOwnedWords() async throws {
+    var history = GeneratedWordReplayHistory(noSpace: true)
+    history.append(source: "first", target: "🇺")
+    history.append(source: "second", target: "🇸")
+    history.append(source: "third", target: "z")
+    let result = try await WebsiteConfigSessionBuilder.prepare(draft: draft(#"{"mode":"words","words":2,"funbox":["nospace"]}"#),
+      scope: .init(), attemptSource: .repeatedWords(history, repeatedPace: false),
+      random: .init(wordIndex: { XCTFail("Owned Unicode targets cannot draw"); return 0 }))
+    XCTAssertTrue(result.session.prompt.utf16.elementsEqual("🇺🇸".utf16))
+    XCTAssertEqual(result.session.generatedWordReplayHistory?.count, 3)
+    XCTAssertEqual(result.session.generatedWordReplayHistory?.word(at: 0)?.target, "🇺")
+    XCTAssertEqual(result.session.generatedWordReplayHistory?.word(at: 1)?.target, "🇸")
+  }
   func testCustomSessionUsesWholeDraftRulesAndOrderedEffectsWithoutLegacySelectionLeaks() async throws {
     let value = try draft(#"{"mode":"custom","difficulty":"expert","strictSpace":true,"funbox":["ddoouubblleedd","ddoouubblleedd","rot13"],"time":47,"words":83}"#)
     let scope = WebsiteConfigSessionBuilder.Scope(customText: "ab")

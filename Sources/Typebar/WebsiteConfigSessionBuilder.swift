@@ -15,10 +15,11 @@ enum WebsiteConfigSessionBuildError: Error {
     /// Apply this draft's events once to a candidate scope before generation.
     case configurationApplication
   }
-  enum QuoteSource {
+  enum AttemptSource {
     case selection
     /// Owned raw quote, not the previous transformed display or a catalog ID.
-    case repeated(OfflineQuote, repeatedPace: Bool)
+    case repeatedQuote(OfflineQuote, repeatedPace: Bool)
+    case repeatedWords(GeneratedWordReplayHistory, repeatedPace: Bool)
   }
   struct Scope {
     var parameterMemory: TypebarTestParameterMemory = .defaults
@@ -68,7 +69,7 @@ enum WebsiteConfigSessionBuildError: Error {
   }
   static func prepare(draft: WebsiteConfigNativeDraft, scope: Scope,
     reason: Reason = .nextAttempt,
-    quoteSource: QuoteSource = .selection,
+    attemptSource: AttemptSource = .selection,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> External)? = nil,
     random: Random = .init()) async throws -> Prepared {
@@ -91,13 +92,22 @@ enum WebsiteConfigSessionBuildError: Error {
     var selectedQuote: OfflineQuote?
     var selectedExternal: External?
     let repetition: WebsitePracticeRepetition
-    switch quoteSource {
+    var wordHistory: GeneratedWordReplayHistory?
+    switch attemptSource {
     case .selection: repetition = .none
-    case .repeated(let quote, let repeatedPace):
+    case .repeatedQuote(let quote, let repeatedPace):
       guard config.mode == .quote, liveSource == nil else {
         throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported
       }
       selectedQuote = quote
+      repetition = .sameWordset(repeatedPace: repeatedPace)
+    case .repeatedWords(let history, let repeatedPace):
+      guard [.words, .time].contains(config.mode), liveSource == nil,
+        history.count > 0, history.noSpace == TestModifierPolicy.usesNoSpaceInput(config.modifiers),
+        TypebarStreamContent.prompt(configuration: config, wordCount: 1) == nil else {
+        throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported
+      }
+      wordHistory = history
       repetition = .sameWordset(repeatedPace: repeatedPace)
     }
     if config.mode == .quote && selectedQuote == nil {
@@ -116,7 +126,10 @@ enum WebsiteConfigSessionBuildError: Error {
     }
     let showAllLines = draft.presentation.showAllPracticeLines
     let session: TypingSession
-    if let source = liveSource {
+    if let wordHistory {
+      session = try await prepareWordReplay(configuration: config, history: wordHistory,
+        scope: scope, showAllLines: showAllLines, random: random)
+    } else if let source = liveSource {
       guard let loadExternal else { throw WebsiteConfigSessionBuildError.externalNotProvided }
       let external = try await read { try await loadExternal(source, config) }
       guard external.source == source, !external.initial.text.isEmpty else {
@@ -152,6 +165,40 @@ enum WebsiteConfigSessionBuildError: Error {
     }
     return .init(session: session, scope: nextScope, quote: selectedQuote, external: selectedExternal,
       repetition: repetition)
+  }
+
+  private static func prepareWordReplay(configuration: TestConfiguration, history: GeneratedWordReplayHistory,
+    scope: Scope, showAllLines: Bool, random: Random) async throws -> TypingSession {
+    let preparation = PolyglotGenerationPreparation(configuration)
+    var config = preparation.configuration
+    if config.language == .dockerFile { config.dockerfileUsesLiteralIndentation = true }
+    let count = GeneratedPromptChunkPolicy.wordCount(for: config, showAllLines: showAllLines)
+    var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: 100,
+      showAllLines: showAllLines, weakSpotScores: scope.weakSpotScores,
+      decorationState: scope.decorationState, replayHistory: history,
+      nextRandomPoolShuffleIndex: random.shuffleIndex)
+    var chunks: [GeneratedWordChunk] = []
+    var prepared = 0
+    while prepared < count {
+      try Task.checkCancellation()
+      let size = min(100, count - prepared)
+      let chunk = cursor.nextChunk(maximumWordCount: size, initialPreparationWordBound: count,
+        nextRandomWordIndex: random.wordIndex, nextRandomCaseBit: random.caseBit, nextRandomContentUnit: random.contentUnit)
+      guard !chunk.source.isEmpty else { throw WebsiteConfigSessionBuildError.generationFailed }
+      chunks.append(chunk); prepared += size
+      await Task.yield()
+    }
+    let assembled = try await WholePreviewChunkAssembly.assemble(chunks)
+    let batch = TransformedPromptBatch(text: assembled.prompt, noSpaceTargetWords: assembled.targetWords)
+    let finalized = cursor.hasRemaining ? batch : FinitePromptCommitPolicy.finalized(batch)
+    let needsCommit = cursor.hasRemaining && !history.noSpace
+      && finalized.text.last != " " && finalized.text.last != "\n"
+    try Task.checkCancellation()
+    return .init(configuration: config, prompt: finalized.text + (needsCommit ? " " : ""),
+      generatedCodeContinuation: cursor.hasRemaining ? cursor : nil, generatedReplayHistory: cursor.replayHistory,
+      noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: finalized.noSpaceWordLengths),
+      noSpaceTargetWords: finalized.noSpaceTargetWords,
+      generationNotice: preparation.notice, weakSpotScores: scope.weakSpotScores, wordDecorationState: cursor.decorationState)
   }
 
   private static func read<Value>(_ operation: @MainActor () async throws -> Value) async throws -> Value {

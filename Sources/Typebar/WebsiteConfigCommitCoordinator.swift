@@ -96,6 +96,7 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let requiresContentSource: Bool
     let repetition: WebsitePracticeRepetition
     fileprivate let quote: OfflineQuote?
+    fileprivate let wordHistory: GeneratedWordReplayHistory?
   }
   enum ConfigurationDepartureOutcome {
     case accepted(Prepared), acceptedRetired, stale, conflict, unavailable, busy
@@ -147,7 +148,8 @@ final class WebsiteConfigCommitCoordinator {
     }
     departed.configurationDeparture = .init(id: UUID(), draft: prepared.draft, disk: disk,
       identity: identity, environment: prepared.environment, contentSource: prepared.contentSource,
-      requiresContentSource: prepared.contentCapture != nil, repetition: repetition, quote: previous.quote)
+      requiresContentSource: prepared.contentCapture != nil, repetition: repetition, quote: previous.quote,
+      wordHistory: departed.session.generatedWordReplayHistory)
     resourceAdmission = UUID(); sessionAdmission = UUID(); sessionRequest = nil
     page.installCommitted(departed)
     page.endCommit()
@@ -696,19 +698,18 @@ final class WebsiteConfigCommitCoordinator {
         guard let scope else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
         effectiveScope = scope
       }
-      let quoteSource: WebsiteConfigSessionBuilder.QuoteSource
+      let attemptSource: WebsiteConfigSessionBuilder.AttemptSource
       if let pending = prepared.configuration.sourcePage?.state.configurationDeparture,
         prepared.configuration.pageCapture?.configurationDeparture == pending.id,
         pending.repetition.repeatsWordset {
-        guard draft.testParameters.mode == .quote, let quote = pending.quote else {
-          // Non-quote repeats require rebasing the original word history onto
-          // the new generator. Never silently substitute fresh generation.
-          throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported
-        }
-        quoteSource = .repeated(quote, repeatedPace: pending.repetition.repeatsPace)
-      } else { quoteSource = .selection }
+        if draft.testParameters.mode == .quote, let quote = pending.quote {
+          attemptSource = .repeatedQuote(quote, repeatedPace: pending.repetition.repeatsPace)
+        } else if let history = pending.wordHistory {
+          attemptSource = .repeatedWords(history, repeatedPace: pending.repetition.repeatsPace)
+        } else { throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported }
+      } else { attemptSource = .selection }
       let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: effectiveScope,
-        reason: reason, quoteSource: quoteSource,
+        reason: reason, attemptSource: attemptSource,
         loadQuotes: { language in
           try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
             try await loadQuotes(language)

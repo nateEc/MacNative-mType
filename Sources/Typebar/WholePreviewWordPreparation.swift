@@ -49,6 +49,7 @@ enum WholePreviewWordPreparation {
     try Task.checkCancellation()
     let session = TypingSession(configuration: result.configuration,
       prompt: assembled.prompt,
+      generatedReplayHistory: result.history,
       noSpaceWordEndIndices: assembled.endIndices,
       noSpaceTargetWords: assembled.targetWords,
       generationNotice: result.notice,
@@ -64,7 +65,7 @@ enum WholePreviewWordPreparation {
     nextRandomContentUnit: () -> Double, nextRandomPoolShuffleIndex: (Int) -> Int,
     didPrepare: (Int) -> Void
   ) async throws -> (chunks: [GeneratedWordChunk], decorationState: PoolWordDecorationState,
-    configuration: TestConfiguration, notice: String?) {
+    configuration: TestConfiguration, notice: String?, history: GeneratedWordReplayHistory?) {
     try Task.checkCancellation()
     let preparation = PolyglotGenerationPreparation(configuration)
     var configuration = preparation.configuration
@@ -78,7 +79,7 @@ enum WholePreviewWordPreparation {
     if TypebarStreamContent.prompt(configuration: configuration, wordCount: 1) != nil {
       let chunks = try await prepareStream(configuration: configuration, limit: limit,
         nextRandomCaseBit: nextRandomCaseBit, didPrepare: didPrepare)
-      return (chunks, wordDecorationState, configuration, preparation.notice)
+      return (chunks, wordDecorationState, configuration, preparation.notice, nil)
     }
     var generator = GeneratedCodeContinuation(configuration: configuration, batchTokenCount: 100,
       weakSpotScores: weakSpotScores, sourceWords: sourceWords, decorationState: wordDecorationState,
@@ -98,7 +99,7 @@ enum WholePreviewWordPreparation {
       await Task.yield()
     }
     try Task.checkCancellation()
-    return (chunks, generator.decorationState, configuration, preparation.notice)
+    return (chunks, generator.decorationState, configuration, preparation.notice, generator.replayHistory)
   }
 
   enum PreparationError: Error { case emptyGeneration, unsupportedConfiguration }
