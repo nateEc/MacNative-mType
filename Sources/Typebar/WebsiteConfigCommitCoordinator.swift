@@ -95,6 +95,7 @@ final class WebsiteConfigCommitCoordinator {
   }
   enum NextOutcome { case advanced(PreviousAttempt), stale, conflict, unavailable, busy }
   enum Outcome { case committed(Publication), stale, conflict, unavailable, busy }
+  enum Restoration { case missing, unavailable, prepared(Prepared) }
   private let router: PreferenceConfigurationSaveRouter
   private let register: WebsiteConfigFileRegister
   private let environment: () -> Environment?
@@ -125,6 +126,36 @@ final class WebsiteConfigCommitCoordinator {
     let prepared = Prepared(draft: draft, identity: identity, request: request, owner: owner, environment: context, disk: disk)
     guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
     return prepared
+  }
+
+  /// Cold native-record application, not a JSON import or an implicit reset.
+  /// Preparation never repairs missing/opaque records and does not publish or
+  /// write. Resources and practice must still be prepared before page commit.
+  /// A newer restoration intent retires older producers even when no usable
+  /// record exists. The captured record revision remains the CAS boundary.
+  func prepareRestoration() throws -> Restoration {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true
+    defer { processing = false }
+    request = UUID()
+    guard let owner = router.captureLease() else { throw WebsiteConfigCommitCoordinatorError.noOwner }
+    guard let context = environment() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+    let disk = try register.read()
+    let restoration = try WebsiteConfigNativeProfile.prepareNativeRestoration(disk.state, context: context.context)
+    guard router.isCurrent(owner), environment() == context, router.isCurrent(owner) else {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
+    switch restoration {
+    case .missing: return .missing
+    case .unavailable: return .unavailable
+    case .prepared(let value):
+      guard let revision = disk.revision else { return .unavailable }
+      let draft = try WebsiteConfigNativeDraft(restoration: value, pointsPerRem: context.pointsPerRem)
+      let prepared = Prepared(draft: draft, identity: identity, request: request,
+        owner: owner, environment: context, disk: revision)
+      guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+      return .prepared(prepared)
+    }
   }
 
   /// Admit a setter against this coordinator's latest committed document, not
