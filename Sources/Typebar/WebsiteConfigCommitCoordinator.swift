@@ -103,6 +103,35 @@ final class WebsiteConfigCommitCoordinator {
     guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
     return prepared
   }
+
+  /// Admit a setter against this coordinator's latest committed document, not
+  /// arbitrary caller-provided runtime or a stale disk snapshot. This prepares
+  /// an edit only: callers must choose the appropriate live-effect or explicit
+  /// new-attempt path. It is not permission to restart an immediate-only edit.
+  func prepareEdit(key: String, value: WebsiteConfigValue, from source: Publication,
+    testActive: Bool) throws -> Prepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true
+    defer { processing = false }
+    // A rejected newer edit must retire suspended older producers too.
+    request = UUID()
+    guard let owner = router.captureLease() else { throw WebsiteConfigCommitCoordinatorError.noOwner }
+    guard source.authority === publicationAuthority, let base = latest,
+      base.applicationID == source.applicationID, base.owner == owner.owner else {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
+    guard let context = environment() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+    guard router.isCurrent(owner) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    guard let disk = try register.read().revision else { throw WebsiteConfigCommitCoordinatorError.unavailable }
+    guard disk == base.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+    let draft = try WebsiteConfigNativeProfile.editDraft(base.draft, key: key, value: value,
+      pointsPerRem: context.pointsPerRem, context: context.context, testActive: testActive)
+    let prepared = Prepared(draft: draft, identity: identity, request: request, owner: owner,
+      environment: context, disk: disk)
+    guard isCurrent(prepared), try register.read().revision == base.disk,
+      router.isCurrent(owner) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return prepared
+  }
   @discardableResult
   func cancel(_ prepared: Prepared) -> Bool {
     guard !processing, belongsToCurrentRequest(prepared) else { return false }

@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 已发布配置的编辑准入（2026-10-24，起点 03efe46c）
+
+协调器新增 prepareEdit：只以自身 latest 发布为源，不信任调用方任意 runtime；来源 authority／applicationID 与当前所有者必须一致。重新取得当前 Lease，使用当前账户／资源环境及 rem 尺度，核对记录 revision，再以单项 setter 构建完整 edited 草稿。旧发布的交付 Lease 不复活；窗口 ABA 后可以从仍为 latest 且记录未变的发布重新准备新编辑，旧待提交请求仍失效。
+
+新请求在准入前退休旧请求，包括无效值、错误来源、缺少环境或所有者等失败。环境回调返回后重验窗口代次；最终环境检查后再读文件版本，拒绝回调内写入和外部配合写者冲突，不静默把新记录并入旧基底。后续资源／会话准备、CAS 与同步页面安装沿用既有准入链；请求取消、迟到结果和 No Quit 页面锁仍在原边界生效。
+
+testActive 是调用方必须显式提供的 setter 上下文，并非本接口自动读到了实体页面。No Quit 下音量可准备，不等于可以用它重开：实际新尝试提交还会读取页面当前会话，在 CAS 前拒绝锁定。这里只证明显式新尝试路径，不把 metadata 的 changeRequiresRestart 一概当成原版自动重开事件；固定 test-logic.ts 的语言／难度／layoutfluid 等监听仍须分别接线。
+
+先修测试夹具 MainActor 标注后，确认缺少 prepareEdit 接口的编译证据；实现后 7 项新增及相关 27 项先行检查通过。扩大补充重入回调时的 XCTAssertThrowsError 推断编译失败已改为显式 do/catch，不算产品行为红测或扩大通过。最终十项编辑准入及全部 WebsiteConfig／WebsiteFunboxAdmission／PracticePageSession 相关 354 项零失败／零跳过，81.325 秒；先行集合重叠不相加，日志 /tmp/typebar-edit-admission-expanded-fixed.log。新交接案例使用实际 PracticePageSessionStore，但未新挂实体窗口或实体输入，不能当作屏幕验收。真实测试只写显式临时私有记录，不改用户偏好或旧模型格式。
+
+固定参考行为审计（47 直接／119 测试符号／17 支持规范）、原创性与自检、1,302 条人工清单结构与自检通过；新行仍待验收。WebsiteConfigCommitCoordinator SHA256 为 a16a3530ac665aec6c27d73f4862dcfc594db163476583bfc732d9694c4c6e50，新增 WebsiteConfigEditAdmissionTests 为 4453c4c520f095f13a03326ed1601f29104b27abe9f27384345f63f0e1e746eb；原生进程存活期间未编辑 Swift 输入。Debug 打包／签名及包内资源／原创性检查通过，日志 /tmp/typebar-edit-admission-package.log；构建包未启动。
+
+迁移安全与会话内决策复核使新 Lease、已提交基底、回调二次读与最终页面锁分层；不声称跨进程全局原子性或独立审查。没有默认切流，正式 UI、即时消费者、当前尝试的实时作用域收集、重开／重复策略与完整恢复仍开放；独立滚轮与物理 IME 等旧缺口不变，不称完整门禁。未改 main／工作流／通知或启动 Typebar，完整目标继续 active；以下为旧批次记录，不替代本轮验证。
+
 ## 配置应用与下一轮的队列寿命（2026-10-24，起点 555c3817）
 
 固定 controllers/quotes-controller.ts 仅在 quoteLength 事件中调用 updateQuoteQueue，不检查 previousValue 或 nosave；fullConfigChange 起止、音量、模式及同语言事件本身不重建队列。只读 QA 执行实际监听器，新增 12 组事件对照；未载入参考引语资产。相同长度重复设置也会重建，不得以值相等优化消除。
