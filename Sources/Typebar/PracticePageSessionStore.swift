@@ -20,6 +20,7 @@ final class PracticePageSessionStore {
     fileprivate let attachment: UUID
     fileprivate let compositionActivity: UUID
     fileprivate let session: TypingSession.GenerationState
+    fileprivate let repetition: WebsitePracticeRepetition
     var testActive: Bool { session.started && !session.finished }
   }
 
@@ -35,7 +36,8 @@ final class PracticePageSessionStore {
     scope.weakSpotScores = state.session.liveWeakSpotScores
     scope.decorationState = state.session.liveWordDecorationState
     return .init(publication: publication, scope: scope, lease: lease,
-      attachment: attachment, compositionActivity: compositionActivity, session: state.session.generationState)
+      attachment: attachment, compositionActivity: compositionActivity, session: state.session.generationState,
+      repetition: practice.repetition)
   }
   func isCurrent(_ capture: GenerationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -43,6 +45,7 @@ final class PracticePageSessionStore {
       && capture.compositionActivity == compositionActivity
       && state.presentation?.publication.applicationID == capture.publication.applicationID
       && state.session.generationState == capture.session
+      && state.practice?.repetition == capture.repetition
   }
   func noteCompositionActivity(for attemptID: UUID) {
     guard acceptsInput(for: attemptID) else { return }

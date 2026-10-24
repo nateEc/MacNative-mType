@@ -75,7 +75,7 @@ final class WebsiteConfigCommitCoordinator {
     let session: TypingSession
     let practice: WebsiteConfigSessionBuilder.Prepared?
   }
-  /// Ordinary generation only, not same-wordset repeat or configuration apply.
+  /// Attempt transition only, never a configuration application.
   struct NextPrepared { fileprivate let session: SessionPrepared }
   struct PreviousAttempt {
     struct Incomplete {
@@ -326,6 +326,41 @@ final class WebsiteConfigCommitCoordinator {
     let resources = try nextResources(for: page)
     let session = try await preparePracticeBuild(for: resources, scope: nil,
       reason: .nextAttempt, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+    return .init(session: session)
+  }
+  func prepareRestart(for page: PracticePageSessionStore, repeatingRequested: Bool = false,
+    loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
+    loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
+    random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> NextPrepared {
+    let resources = try nextResources(for: page)
+    guard let previous = page.state.practice, let capture = resources.configuration.pageCapture,
+      case .string(let language)? = resources.configuration.draft.projection.runtime["language"] else {
+      throw PracticePageSessionStateError.incomplete
+    }
+    let original = page.state.session
+    let behavior = resources.configuration.draft.behavior
+    let repetition = WebsiteConfigRestartPolicy.resolve(requested: repeatingRequested,
+      active: capture.testActive, previouslyRepeated: previous.repetition.repeatsWordset,
+      failed: original.outcome == .failed, mode: original.configuration.mode, language: language,
+      quoteLanguage: previous.quote.flatMap { WebsiteLanguageIdentity.name(for: $0.language) },
+      repeatQuotes: behavior.repeatQuotes, repeatedPace: behavior.repeatedPace)
+    if !repetition.repeatsWordset {
+      let session = try await preparePracticeBuild(for: resources, scope: nil,
+        reason: .nextAttempt, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+      return .init(session: session)
+    }
+    let session = try await prepareSessionBuild(for: resources) { _ in
+      // Restore the actual attempt's owned opening/cursors/caches, not a
+      // reconstruction from the editor, its grown prompt or a fresh sampler.
+      let repeated = original.repeatedAttempt(nextRandomCaseBit: random.caseBit)
+      guard !repeated.hasStarted, !repeated.isFinished,
+        repeated.configuration.mode == .zen || !repeated.prompt.isEmpty else {
+        throw WebsiteConfigSessionBuildError.generationFailed
+      }
+      let practice = WebsiteConfigSessionBuilder.Prepared(session: repeated, scope: capture.scope,
+        quote: previous.quote, external: previous.external, repetition: repetition)
+      return (repeated, practice)
+    }
     return .init(session: session)
   }
   @discardableResult

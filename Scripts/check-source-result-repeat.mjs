@@ -36,13 +36,13 @@ const bindings = new Map([
   [local('states/test'), {
     isTestActive: () => state.active, isTestRestarting: () => state.restarting,
     isResultCalculating: () => state.calculating, getResultVisible: () => state.visible,
-    getCurrentQuote: () => null,
+    getCurrentQuote: () => state.quote ?? null, isRepeated: () => state.repeated,
     setIsTestInvalid: record('invalid'), setTestActive: set('active'),
     setBailedOut: record('bailedOut'), setKoreanStatus: record('korean'),
     setIsRepeated: set('repeated'), setIsPaceRepeat: set('pace'), setIsTestRestarting: set('restarting'),
   }],
   [local('test/practise-words'), {before: {mode: null}}],
-  [local('test/funbox/list'), {isFunboxActive: () => false}],
+  [local('test/funbox/list'), {isFunboxActive: () => state.noQuit ?? false}],
   [local('test/events/data'), {resetTestEvents: record('eventsReset')}],
   [local('test/test-timer'), {clear: record('timerClear')}],
   [local('states/modifiers'), {resetModifierState: record('modifiersReset')}],
@@ -124,8 +124,12 @@ const repeatButton = handlers.get('#restartTestButtonWithSameWordset');
 assert.ok(repeatButton);
 function reset(mode, repeatedPace = true) {
   config.mode = mode; config.repeatedPace = repeatedPace;
+  config.repeatQuotes = 'off'; config.language = 'english';
   state = {active: false, restarting: false, calculating: false, visible: true, repeated: false, pace: false};
   notices = []; mutations = []; fades = [];
+  // Public fail() sets the module-local reason. finish() immediately returns
+  // for this inactive fixture, so no timer, result calculation or I/O starts.
+  logic.namespace.fail('');
 }
 function assertRestart(repeated, pace) {
   assert.equal(state.repeated, repeated);
@@ -175,4 +179,36 @@ for (const pace of [false, true]) {
   repeatCommand.exec(); assertRestart(true, pace); count++;
 }
 reset('zen'); void logic.namespace.restart({withSameWordset: true}); assertRestart(true, true); count++;
-console.log(`${count} owned repeat-entry fixtures passed (two complete actual modules; DOM registration and restart prefix through pending fade-out only, no init/animation/storage/browser/device parity claim).`);
+if (process.argv.includes('--restart-policy')) {
+  const fixtures = [];
+  for (const mode of ['time', 'words', 'quote', 'zen', 'custom'])
+    for (const active of [false, true])
+      for (const previouslyRepeated of [false, true])
+        for (const requested of [false, true])
+          for (const failed of [false, true])
+            for (const repeatQuotes of [false, true])
+              for (const repeatedPace of [false, true])
+                for (const quoteLanguage of [null, 'english', 'french']) {
+                  reset(mode, repeatedPace);
+                  if (failed) logic.namespace.fail('owned failure fixture');
+                  const language = 'english_1k';
+                  config.language = language; config.repeatQuotes = repeatQuotes ? 'typing' : 'off';
+                  state.active = active; state.repeated = previouslyRepeated;
+                  state.quote = quoteLanguage === null ? null : {language: quoteLanguage};
+                  void logic.namespace.restart({withSameWordset: requested});
+                  assert.equal(fades.length, 1); assert.equal(notices.length, 0);
+                  fixtures.push({mode, active, previouslyRepeated, requested, failed, repeatQuotes,
+                    repeatedPace, language, quoteLanguage, repeats: state.repeated, pace: state.pace});
+                }
+  assert.equal(fixtures.length, 960);
+  let noQuitFixtures = 0;
+  for (const mode of ['time', 'words', 'quote', 'zen', 'custom']) {
+    reset(mode); state.noQuit = true; state.active = true;
+    void logic.namespace.restart({withSameWordset: true});
+    assert.equal(fades.length, 0); assert.equal(mutations.length, 0); assert.equal(notices.length, 1);
+    noQuitFixtures++;
+  }
+  console.log(JSON.stringify({entryFixtures: count, noQuitFixtures, fixtures}));
+} else {
+  console.log(`${count} owned repeat-entry fixtures passed (two complete actual modules; DOM registration and restart prefix through pending fade-out only, no init/animation/storage/browser/device parity claim).`);
+}

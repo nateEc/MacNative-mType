@@ -4217,7 +4217,8 @@ private struct ContentView: View {
       keyboardGuideFeedback = nil; typingCompanionHands.reset(); clearTypingPowerEffect()
       lastTimeWarningSecond = nil; lastClockTickSecond = 0
       liveStatsClockSignal.second = 0; timerHealth = .init()
-      isSamePromptRepeatAttempt = false; isRepeatedPaceAttempt = false
+      isSamePromptRepeatAttempt = practice.repetition.repeatsWordset
+      isRepeatedPaceAttempt = practice.repetition.repeatsPace
       activePaceTargetWpm = nil
       NativeSpeech.shared.stop()
       synchronizeNoQuitConfigurationLock()

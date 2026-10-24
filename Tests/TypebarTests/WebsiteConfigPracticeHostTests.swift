@@ -388,11 +388,16 @@ import XCTest
     XCTAssertFalse(f.window.isVisible)
   }
 
-  private func awaitNext(_ coordinator: WebsiteConfigCommitCoordinator, page: PracticePageSessionStore) throws
+  private func awaitNext(_ coordinator: WebsiteConfigCommitCoordinator, page: PracticePageSessionStore,
+    restartRequested: Bool? = nil) throws
     -> WebsiteConfigCommitCoordinator.NextPrepared {
     var result: Result<WebsiteConfigCommitCoordinator.NextPrepared, Error>?
     let task = Task { @MainActor in
-      do { result = .success(try await coordinator.prepareNext(for: page)) }
+      do {
+        if let restartRequested {
+          result = .success(try await coordinator.prepareRestart(for: page, repeatingRequested: restartRequested))
+        } else { result = .success(try await coordinator.prepareNext(for: page)) }
+      }
       catch { result = .failure(error) }
     }
     defer { task.cancel() }
@@ -432,6 +437,41 @@ import XCTest
     XCTAssertTrue(f.state.page.state.presentation === presentation)
     XCTAssertEqual(try f.register.read().revision, disk)
     XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    input.insertText("a", replacementRange: .init(location: NSNotFound, length: 0))
+    XCTAssertEqual(f.state.page.state.session.typed, "a")
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testRepeatedWordsetKeepsActualInputAndConfigurationWhileRetiringOldCallbacks() throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let resources = try coordinator.prepareResources(for: coordinator.prepare(#"{"mode":"custom","repeatedPace":true}"#),
+      localFont: .absent, localBackground: .data(Fixture.png()))
+    let ready = try awaitResult(coordinator, resources: resources)
+    guard case .committed = try coordinator.commit(ready, to: f.state.page, systemIsDark: false) else {
+      return XCTFail("Initial page installation failed")
+    }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    f.wait { input.insertionAttemptID == ready.session.automaticInputAttemptID && input.acceptsTextInput }
+    input.onInsert("a", false)
+    let staleInsert = input.onInsert
+    let presentation = f.state.page.state.presentation
+    let disk = try f.register.read().revision
+    let repeated = try awaitNext(coordinator, page: f.state.page, restartRequested: true)
+    guard case .advanced(let old) = try coordinator.advance(repeated, to: f.state.page) else { return XCTFail("Repeat did not install") }
+    XCTAssertEqual(old.session.typed, "a")
+    staleInsert("old", false)
+    XCTAssertEqual(f.state.page.state.session.typed, "")
+    let newID = f.state.page.state.session.automaticInputAttemptID
+    f.wait { input.insertionAttemptID == newID && input.acceptsTextInput }
+    XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    XCTAssertTrue(f.state.page.state.presentation === presentation)
+    XCTAssertEqual(f.state.page.state.practice?.repetition, .sameWordset(repeatedPace: true))
+    XCTAssertEqual(f.state.page.state.session.prompt, "ab")
+    XCTAssertEqual(try f.register.read().revision, disk)
     input.insertText("a", replacementRange: .init(location: NSNotFound, length: 0))
     XCTAssertEqual(f.state.page.state.session.typed, "a")
     XCTAssertFalse(f.window.isVisible)

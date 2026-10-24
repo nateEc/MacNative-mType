@@ -1,5 +1,23 @@
 # 阈值源状态与迁移契约
 
+## 原词组重复与引语重试选择（2026-10-24，起点 568a8cb5）
+
+新增 prepareRestart，在已有下一轮准入之上，从实际页面读取活动状态、尝试来源标志、失败结果及拥有的引语；调用方只提供明确重复意图，不自报这些状态。选择匹配固定原版 restart：显式重复、活动中的重复尝试、或开启 typing 且语言前缀匹配的活动／失败引语走原词源，其余走普通下一轮。prepareNext 仍是显式普通生成的低层接口，正式重开控制器应使用 prepareRestart，而非绕过该选择。
+
+重复使用当前 TypingSession.repeatedAttempt 保存的初始目标、游标和缓存，不从编辑框或已经长大的 prompt 重建，也不再抽引语／消费队列。引语重用自己的源并按原生引语路径重新采样目标；非引语缓存沿已有内核恢复。重复来源及 repeatedPace 标志只存于内存 Prepared，完整配置／普通下一轮默认为 none。页面捕获核对该标志，实际 ContentView 按尝试寿命接收标志；这不等于实际配速目标和完整初始化已接通。
+
+沿用同一资源／环境／文件检查及 advance，不新增配置事件、文件 revision、持久字段或远程调用。No Quit 先于重复选择；显式取消、新输入、迟到回调及拥有者／页面变化仍拒绝旧候选。目标转换回调内输入的反例和重复元数据变化的反例验证旧候选不会覆盖页面，失败不消费已安装队列。实际隐藏宿主验证同一输入控件、同一配置 presentation、原词源和旧回调拒绝，不作为实体输入或可见窗口验收。
+
+只读探针扩展既有两个完整固定模块，在受控依赖下执行 53 组原入口、960 组重复／活动／失败／语言／配速选择及五种模式的活动 No Quit。失败标记通过公开 fail 在非活动夹具中设置，finish 立即返回，不提取／替换业务函数；所有 restart 停在挂起的 fade-out 边界，不执行 init、动画、生成器或存储，resultSaving 保持关闭，不验证记账。原版结果按钮的 Zen 限制仍由原入口策略承担，不错误提升为内核禁令。
+
+API 缺失的先行编译失败不算行为红测。首轮六项中失败引语案例三处断言失败（`/tmp/typebar-repeat-attempt-focused.log`）：其中一处是夹具错误假设 failureReason 必非空，另两处实际再抽引语且没有重复标志。根因是原生大师难度以 outcome.failed 表示失败，typed reason 可为 nil；固定 input/handlers/insert-text.ts 的对应路径调用 TestLogic.fail("difficulty")。现以已安装尝试的失败结果映射，不重写 typed reason、历史格式或旧分数。修正后 41 项相关通过，新增交接反例与实际宿主后 56 项定向零失败，14.310 秒（`/tmp/typebar-repeat-attempt-final-focused.log`），含八项新核心及一项新增实际宿主；集合重叠不相加。
+
+冻结源码的最终扩大 529 项相关配置／页面／恢复／重复／缓存检查零失败／零跳过，212.232 秒（`/tmp/typebar-repeat-attempt-final-expanded.log`），原滚轮未排除。Debug 打包／签名及资源／原创性通过（`/tmp/typebar-repeat-attempt-package.log`），包未启动。固定参考行为审计通过（47 直接／119 测试符号／17 支持规范），原创性及人工清单自检通过，1,307 条清单仅结构通过，不作为人工完成或全客户端／服务端门禁证据。
+
+冻结实现 SHA256：WebsiteConfigRestartPolicy `5dc810a813ea1164c199ec2307dd0045598d4228067229d2da09ba5c7dc162a3`；WebsiteConfigCommitCoordinator `124dd1fdae5dec8809d09ecda73eed3bd5433d9d0a6c1481db1aaf6f53993829`；WebsiteConfigSessionBuilder `44098281ce8a76713f84670995c437080c2332dce6a64585329eea1732dab6e9`；PracticePageSessionStore `f07b4851a86066729ea7fec46b2dbb4331a5ec3f2d02df6a85ca5cd21b2142d8`；TypebarApp `0a2f243cc7f4f172b146a43217672d50ca3d487dc92411adb24c7500d031c221`。源探针 `3cff0d94ed7e76cfe218ccf9de6742e24bfc0e4b311ee3332a5d8fd007839eb6`；新核心测试 `7e66d406d44beaaaaa55d507f9ef3098204d581957a7f59be78fc8643d370291`；实际宿主测试文件 `0fcff13cede235753fbd52d67317051a11017e452d046455d5b8d37e3b500a77`。原生进程存活时未改 Swift 输入。
+
+行为先行、迁移安全、会话内反例复核与根因调试促成原词源和元数据的同步交接；不是独立评审。默认重开保护、旧 QuoteRestartPolicy 和旧结果入口尚未切换；因此本轮不宣称默认页面的失败引语行为已经修复。正式控制器、重复／下一轮后的未完成尝试记账、练习词返回、Funbox 生命周期、配速／声音初始化、冷恢复、实体输入和性能仍开放。没有改 main／工作流／通知或启动主程序，完整目标继续 active。
+
 ## 普通下一轮的独立交接（2026-10-24，起点 fbd37b19）
 
 固定 `test/test-logic.ts` 的 restart 区分普通生成、withSameWordset、活动 No Quit、未完成尝试记账及练习词返回；并不是再导入配置。新增 prepareNext／advance 只负责已发布页面的普通下一轮交接，不把它描述为完整 restart。来源必须是同一协调器 latest、同一页面和当前租约，配置文件 revision 与资源环境代次仍匹配；新环境先拒绝，须通过拥有者内容刷新／配置应用路径重新准入。

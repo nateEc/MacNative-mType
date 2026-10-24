@@ -50,6 +50,12 @@ enum WebsiteConfigSessionBuildError: Error {
     let scope: Scope
     let quote: OfflineQuote?
     let external: External?
+    let repetition: WebsitePracticeRepetition
+    init(session: TypingSession, scope: Scope, quote: OfflineQuote?, external: External?,
+      repetition: WebsitePracticeRepetition = .none) {
+      self.session = session; self.scope = scope; self.quote = quote
+      self.external = external; self.repetition = repetition
+    }
     /// A value-owned post-draw queue. Install only after successful commit.
     var quoteSampler: WebsiteQuoteSampler? { scope.quoteSampler }
     var parameterMemory: TypebarTestParameterMemory { scope.parameterMemory }
