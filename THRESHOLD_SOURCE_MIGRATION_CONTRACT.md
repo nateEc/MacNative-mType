@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 完整配置环境源的 No Quit 准入（2026-10-24）
+
+固定 config/setters.ts::setConfig 拒绝活动 no_quit 期间 changeRequiresRestart 的字段，toggleFunbox、test-logic.ts 重启及 route-controller 导航也有对应保护。lifecycle.ts::applyConfig 会将部分 JSON 迁移成完整配置，再逐字段应用；它并非本项目的完整值原子提交。本阶段不宣称复制其可能部分生效的逐字段副作用：完整候选含重启字段，原生完整配置入口在锁期间整体不可用；原有实时偏好与“保存当前值”仍走既有规则，不扩大锁范围。
+
+根因是 WebsiteConfigEnvironmentSource 只观察快照／资源／账户，没有观察已有 AppSettings 的多窗口 NoQuitConfigurationLockRegistry。快照值未变时缓存环境仍有效，使加锁期间旧票据可写盘。现将 allowsRestartingConfigurationChange 纳入同步失效观察，采样只有在全部锁释放且布局有效时才借出环境。初始锁定仍注册观察；部分窗口解锁、其他设置变化不能恢复准入；锁定→解锁 ABA 产生新环境代次，旧请求不会复活。重复释放不存在的锁由原模型忽略，不人为旋转代次。
+
+先行测试最初有一处 async XCTest 自动闭包编译错误，修正后有效红测为三项、十处失败。新增隔离测试经过真实 AppSettings、环境源、协调器、异步资源读取与临时文件寄存器，验证初始／多窗口锁、重新观察、ABA 旧票据拒绝、解锁后的新提交、锁定导入无写入，以及读取期间加锁不再读下一个资源或提交。没有启动应用，也不写真实偏好或资源目录。
+
+有界会话内决策复核（非独立评审）检查初始不可用后能否重新观察、多个锁的独立所有权、ABA、无操作释放、异步边界和旧发布保留；修复放在拥有环境准入的源，不在协调器中另建锁或重放旧设置。read 仍只能在稳定 MainActor 动作中消费，不能在 setter／任意观察回调内提交；外部锁文件、崩溃恢复及跨进程练习锁不是本阶段保证。生产 No Quit 会话到既有锁的路径未改；完整配置 UI／资源消费及真实目录切流仍未完成，此为新入口的准入保护而非正式切流验收。
+
+最终环境源定向 10 项、扩大相关回归 333 项及移除参考依赖的原生集合 55 项零失败／零跳过，范围重叠不相加。扩大集合包含既有 No Quit 隐藏宿主、实时偏好与保存当前值；未重跑完整宿主集，已知独立滚轮基线失败仍开放。原创性检查与固定参考证据检查（47 直接项、119 原生符号、17 支持规范）通过；人工清单 1,285 项仅结构检查。日志 `/tmp/typebar-config-noquit-{red,red-final,focused,expanded,offline,package}.log`；red 是夹具编译错误，red-final 才是有效行为红测。最终回归／打包期间不修改 Swift。本轮不启动 Typebar 主程序，不修改 main、创建 PR 或重跑 Actions。
+
+最终 Debug 包、签名、署名和包内资源原创性检查通过，临时 QA 包由检查脚本清理且未运行。推送前参考检出干净，main 为 8c52fb13、开发分支为 5901042b，无打开的开发分支 PR，Actions 仍 826 次且最近 39118939684 成功。仅集中推送 native-parity-next；完整重写目标继续 active。
+
 ## 完整配置的原生远程背景生产者（2026-10-24）
 
 WebsiteConfigBackgroundRemoteReader 接入协调器 from settings 重载：没有自定义远端回调时使用实际有界传输；本地背景优先及调用方显式回调不变。远端结果始终携带原始 UTF-16 地址，传输 URL 的规范化不回写配置。取消向上传播，传输、资源上限与图片解码失败分开；取得独立字节后才交给既有 ImageIO 准备和同票据提交。HTTP 使用原有隔离 ephemeral 会话，不自动借账户令牌、Cookie 或凭据存储；测试通过 URLProtocol 拦截实际 URLSession，不访问外网。

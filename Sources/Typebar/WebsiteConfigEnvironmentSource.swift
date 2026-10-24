@@ -64,6 +64,9 @@ final class WebsiteConfigEnvironmentSource {
         // Reading the complete legacy snapshot tracks the values, not a hash:
         // even a change back to identical values retires the previous epoch.
         _ = settings.snapshot
+        // Complete configuration replay includes restart-requiring fields.
+        // Observe the lock even while unavailable so unlocking can rearm us.
+        _ = settings.allowsRestartingConfigurationChange
         _ = settings.activeTestSelectionGeneration
         _ = settings.practiceWrapperRevision
         _ = settings.practiceFontApplicationRevision
@@ -84,7 +87,8 @@ final class WebsiteConfigEnvironmentSource {
         MainActor.assumeIsolated { self?.invalidateModels() }
       }
     }
-    guard let pointsPerRem, pointsPerRem.isFinite, pointsPerRem > 0 else {
+    guard settings.allowsRestartingConfigurationChange,
+      let pointsPerRem, pointsPerRem.isFinite, pointsPerRem > 0 else {
       cached = nil
       return
     }

@@ -174,6 +174,100 @@ final class WebsiteConfigEnvironmentSourceTests: XCTestCase {
     }
   }
 
+  func testNoQuitOwnersWithholdEnvironmentUntilAllLocksRelease() async throws {
+    try await withModels { settings, account in
+      let first = UUID(), second = UUID()
+      settings.setNoQuitConfigurationLock(true, for: first)
+      let source = WebsiteConfigEnvironmentSource(settings: settings, account: account,
+        pointsPerRem: 16, documentComplete: true, development: false)
+      defer { source.stop() }
+      XCTAssertNil(source.read(), "A locked initial state must not admit a full configuration")
+      settings.setNoQuitConfigurationLock(true, for: second)
+      settings.setNoQuitConfigurationLock(false, for: first)
+      for _ in 0..<5 { await Task.yield() }
+      XCTAssertNil(source.read(), "One window cannot release another window's lock")
+      settings.blindMode.toggle()
+      for _ in 0..<5 { await Task.yield() }
+      XCTAssertNil(source.read(), "Other model changes cannot reopen the admission")
+      settings.setNoQuitConfigurationLock(false, for: second)
+      let unlocked = try await settled(source)
+      settings.setNoQuitConfigurationLock(false, for: second)
+      XCTAssertEqual(source.read(), unlocked, "An absent lock release is not an event")
+      settings.setNoQuitConfigurationLock(true, for: first)
+      XCTAssertNil(source.read(), "Observation must rearm after unlocking")
+      settings.setNoQuitConfigurationLock(false, for: first)
+      let relocked = try await settled(source)
+      XCTAssertNotEqual(relocked.revision, unlocked.revision)
+    }
+  }
+
+  func testNoQuitABARejectsOldDiskTicketAndAllowsFreshConfigurationAfterUnlock() async throws {
+    try await withModels { settings, account in
+      let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-noquit-config-\(UUID())")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+      defer { try? FileManager.default.removeItem(at: directory) }
+      let owner = UUID(), lockOwner = UUID(), router = settings.preferenceConfigurationSaves
+      router.register(owner: owner, save: { XCTFail("No legacy save replay") })
+      defer { router.remove(owner: owner) }
+      let source = WebsiteConfigEnvironmentSource(settings: settings, account: account,
+        pointsPerRem: 16, documentComplete: true, development: false)
+      defer { source.stop() }
+      let register = WebsiteConfigFileRegister(directory: directory)
+      let coordinator = WebsiteConfigCommitCoordinator(router: router, register: register, environment: source.read)
+      let old = try coordinator.prepare(#"{"time":41}"#)
+      let snapshot = settings.snapshot
+      settings.setNoQuitConfigurationLock(true, for: lockOwner)
+      XCTAssertNil(source.read())
+      settings.setNoQuitConfigurationLock(false, for: lockOwner)
+      _ = try await settled(source)
+      guard case .stale = try coordinator.commit(old) else { return XCTFail("Pre-lock ticket revived") }
+      XCTAssertEqual(try register.read().state, .missing)
+      XCTAssertNil(coordinator.publication(for: owner))
+      XCTAssertEqual(settings.snapshot, snapshot)
+      let fresh = try coordinator.prepare(#"{"time":47}"#)
+      guard case .committed(let publication) = try coordinator.commit(fresh) else { return XCTFail("Fresh unlocked import rejected") }
+      XCTAssertEqual(publication.draft.projection.runtime["time"], .number(47))
+      XCTAssertEqual(try register.read().state, .available(publication.draft.projection.runtime))
+      settings.setNoQuitConfigurationLock(true, for: lockOwner)
+      defer { settings.setNoQuitConfigurationLock(false, for: lockOwner) }
+      do { _ = try coordinator.prepare(#"{"time":43}"#); XCTFail("Locked import admitted") }
+      catch WebsiteConfigCommitCoordinatorError.noEnvironment {}
+      XCTAssertEqual(try register.read().state, .available(publication.draft.projection.runtime))
+    }
+  }
+
+  func testNoQuitStartDuringAsyncReadStopsTheNextResourceAndCommit() async throws {
+    try await withModels { settings, account in
+      let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-noquit-resource-\(UUID())")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+      defer { try? FileManager.default.removeItem(at: directory) }
+      let owner = UUID(), lockOwner = UUID(), router = settings.preferenceConfigurationSaves
+      router.register(owner: owner, save: { XCTFail("No legacy replay") })
+      defer { router.remove(owner: owner); settings.setNoQuitConfigurationLock(false, for: lockOwner) }
+      let source = WebsiteConfigEnvironmentSource(settings: settings, account: account,
+        pointsPerRem: 16, documentComplete: true, development: false)
+      defer { source.stop() }
+      let register = WebsiteConfigFileRegister(directory: directory)
+      let coordinator = WebsiteConfigCommitCoordinator(router: router, register: register, environment: source.read)
+      let ticket = try coordinator.prepare("{}")
+      var backgroundReads = 0
+      do {
+        _ = try await coordinator.prepareResources(for: ticket, readLocalFont: {
+          settings.setNoQuitConfigurationLock(true, for: lockOwner)
+          await Task.yield()
+          return .absent
+        }, readLocalBackground: { backgroundReads += 1; return .absent })
+        XCTFail("No Quit did not stop resource preparation")
+      } catch WebsiteConfigCommitCoordinatorError.stale {}
+      XCTAssertEqual(backgroundReads, 0)
+      guard case .stale = try coordinator.commit(ticket) else { return XCTFail("Locked ticket committed") }
+      XCTAssertEqual(try register.read().state, .missing)
+      XCTAssertNil(coordinator.publication(for: owner))
+    }
+  }
+
   func testInitiallyUnknownLayoutTracksChangesAndQueuedTaskDoesNotRetainSource() async throws {
     try await withModels { settings, account in
       var source: WebsiteConfigEnvironmentSource? = .init(settings: settings, account: account,
