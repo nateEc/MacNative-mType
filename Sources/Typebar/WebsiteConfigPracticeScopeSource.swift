@@ -57,6 +57,33 @@ enum WebsiteConfigPracticeScopeSourceError: Error { case unavailable, wrongOwner
     var parameterMemory: TypebarTestParameterMemory = .defaults
     var custom: Custom = .stored
     var favorites: Favorites = .accountUnavailable
+
+    /// Rehydrate controls from the committed whole scope, not legacy fields
+    /// left behind by the pre-migration page. Preserve exact timed duration.
+    static func published(owner: UUID, revision: UUID,
+      scope: WebsiteConfigSessionBuilder.Scope) -> Self {
+      let source = scope.preparedCustomSections.map(CustomTextSource.prepared) ?? .editor(scope.customText)
+      let memory = scope.parameterMemory
+      let custom: Custom
+      if scope.customCompletion == .time {
+        custom = .timed(.init(source: source,
+          seconds: scope.customDurationOverride ?? Double(memory.customTextDuration),
+          ordering: scope.customOrdering, pipeDelimiter: scope.customPipeDelimiter,
+          corpus: scope.preparedCustomSections == nil ? scope.customText : nil,
+          preservesSpelling: scope.customTextIsPrepared, recoveryBlocked: scope.customTextRecoveryBlocked))
+      } else {
+        let configuration = TestConfiguration(mode: .custom, duration: nil,
+          wordLimit: scope.customCompletion == .words ? memory.customTextWordLimit : nil,
+          difficulty: .normal, rules: .init(), customTextCompletion: scope.customCompletion,
+          customTextSectionLimit: scope.customCompletion == .sections ? memory.customTextSectionLimit : nil,
+          customTextOrdering: scope.customOrdering, customTextPipeDelimiter: scope.customPipeDelimiter)
+        custom = .explicit(.init(source: source, configuration: configuration),
+          finiteTextSource: scope.finiteTextSource, preservesSpelling: scope.customTextIsPrepared,
+          recoveryBlocked: scope.customTextRecoveryBlocked)
+      }
+      return .init(owner: owner, customRecoveryBlocked: scope.customTextRecoveryBlocked,
+        revision: revision, selectedQuoteID: scope.selectedQuoteID, parameterMemory: memory, custom: custom)
+    }
   }
   struct Snapshot {
     let scope: WebsiteConfigSessionBuilder.Scope

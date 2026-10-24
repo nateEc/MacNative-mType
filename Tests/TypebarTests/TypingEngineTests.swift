@@ -15655,13 +15655,13 @@ final class TypingEngineTests: XCTestCase {
       CommandPaletteUtilityCatalog.items(randomThemeEnabled: false, authenticated: false).map(\.id),
       [
         "changeCustomModeText", "shareTestSettings", "importSettingsJSON",
-        "exportSettingsJSON",
+        "importMonkeytypeConfig", "exportSettingsJSON",
       ])
     XCTAssertEqual(
       CommandPaletteUtilityCatalog.items(randomThemeEnabled: true, authenticated: true).map(\.id),
       [
         "changeCustomModeText", "shareTestSettings", "importSettingsJSON",
-        "exportSettingsJSON", "randomizeTheme", "signOut",
+        "importMonkeytypeConfig", "exportSettingsJSON", "randomizeTheme", "signOut",
       ])
 
     XCTAssertEqual(
@@ -15670,6 +15670,7 @@ final class TypingEngineTests: XCTestCase {
       CommandPaletteUtilityCatalog.action(for: "shareTestSettings"), .shareTestSettings)
     XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "share"), .shareTestSettings)
     XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "importSettingsJSON"), .importSettingsJSON)
+    XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "importMonkeytypeConfig"), .importWebsiteConfig)
     XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "exportSettingsJSON"), .exportSettingsJSON)
     XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "randomizeTheme"), .nextRandomTheme)
     XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "signOut"), .signOut)

@@ -2057,6 +2057,7 @@ enum CommandPaletteUtilityAction: Equatable {
     case editCustomText
     case shareTestSettings
     case importSettingsJSON
+    case importWebsiteConfig
     case exportSettingsJSON
     case nextRandomTheme
     case signOut
@@ -2086,6 +2087,12 @@ enum CommandPaletteUtilityCatalog {
                 subtitle: "检查并应用另一份 Typebar 设置",
                 systemImage: "square.and.arrow.down", keywords: [
                     "importSettingsJSON", "import", "config", "settings", "导入", "设置", "JSON",
+                ], group: .data),
+            CommandPaletteItem(
+                id: "importMonkeytypeConfig", title: "导入 Monkeytype 配置",
+                subtitle: "导入原版 JSON，或手动恢复此 Mac 保存的完整配置",
+                systemImage: "curlybraces", keywords: [
+                    "monkeytype", "importMonkeytypeConfig", "import", "restore", "JSON", "原版", "导入", "恢复",
                 ], group: .data),
             CommandPaletteItem(
                 id: "exportSettingsJSON", title: "导出设置 JSON",
@@ -2118,6 +2125,7 @@ enum CommandPaletteUtilityCatalog {
         case "changeCustomModeText": .editCustomText
         case "shareTestSettings", "share": .shareTestSettings
         case "importSettingsJSON": .importSettingsJSON
+        case "importMonkeytypeConfig": .importWebsiteConfig
         case "exportSettingsJSON": .exportSettingsJSON
         case "randomizeTheme": .nextRandomTheme
         case "signOut": .signOut

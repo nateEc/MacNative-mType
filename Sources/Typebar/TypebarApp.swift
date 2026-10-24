@@ -1381,6 +1381,8 @@ private struct ContentView: View {
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
   @State private var settingsJSONCommand: SettingsJSONCommandPresentation?
+  @State private var showingWebsiteConfigImport = false
+  @State private var websiteImportWorkflow: WebsiteConfigImportWorkflow?
   @State private var showingChallenges = false
   @State private var showingOneHandedChallengeSetup = false
   @State private var queuedOneHandedChallengeSetup = false
@@ -1725,6 +1727,7 @@ private struct ContentView: View {
     }
     .onDisappear {
       pageSessionStore.detach()
+      websiteImportWorkflow?.stop(); websiteImportWorkflow = nil
       settings.preferenceConfigurationSaves.remove(owner: preferenceConfigurationOwner)
       visualFocus.onWillCommit = nil
       interruptedWholePreview = interruptedWholePreview || isPreparingPracticePrompt
@@ -2219,6 +2222,11 @@ private struct ContentView: View {
         guard apply(preset) else { return nil }
         return presetDefinition
       }
+    }
+    .sheet(isPresented: $showingWebsiteConfigImport) {
+      WebsiteConfigImportView(apply: { json in
+        try await importWorkflow().apply(json: json, systemIsDark: systemColorScheme == .dark)
+      }, cancel: { websiteImportWorkflow?.cancel() })
     }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
@@ -5788,6 +5796,8 @@ private struct ContentView: View {
       case .importSettingsJSON:
         settingsJSONCommand = .init(
           mode: .importSettings, initialJSON: "", initialError: nil)
+      case .importWebsiteConfig:
+        showingWebsiteConfigImport = true
       case .exportSettingsJSON:
         do {
           settingsJSONCommand = .init(
@@ -6613,6 +6623,34 @@ private struct ContentView: View {
     } else {
       settings.saveActiveTestSelection(current)
     }
+  }
+
+  private func importWorkflow() throws -> WebsiteConfigImportWorkflow {
+    guard !session.hasStarted || session.isFinished else { throw WebsiteConfigImportWorkflowError.activeAttempt }
+    guard activeChallengeID == nil, wordPractice == nil else {
+      throw WebsiteConfigImportWorkflowError.unsupportedPractice
+    }
+    if let websiteImportWorkflow { return websiteImportWorkflow }
+    let directory = try WebsiteConfigStorageDirectory.prepare()
+    let workflow = WebsiteConfigImportWorkflow(page: pageSessionStore, settings: settings, account: account,
+      directory: directory, readWindow: { websiteImportWindow })
+    websiteImportWorkflow = workflow
+    return workflow
+  }
+
+  private var websiteImportWindow: WebsiteConfigPracticeScopeSource.Window {
+    if let scope = pageSession.practice?.scope {
+      return .published(owner: preferenceConfigurationOwner, revision: session.automaticInputAttemptID, scope: scope)
+    }
+    // Legacy content controls reset the actual attempt when applied, including
+    // same-value applications; capture its identity as the window generation.
+    return .init(owner: preferenceConfigurationOwner, customRecoveryBlocked: customTextRecovery.blocksCustomGeneration,
+      revision: session.automaticInputAttemptID, selectedQuoteID: selectedQuoteID,
+      parameterMemory: .init(duration: duration, wordLimit: wordLimit, customTextDuration: customTextDuration,
+        customTextWordLimit: customTextWordLimit, customTextSectionLimit: customTextSectionLimit),
+      custom: .explicit(customTextStateDocument,
+        finiteTextSource: activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk },
+        preservesSpelling: preparedCustomSections != nil, recoveryBlocked: customTextRecovery.blocksCustomGeneration))
   }
 
   private var preparedCustomSections: [String]? {
