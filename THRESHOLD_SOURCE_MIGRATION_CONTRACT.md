@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 完整提交到原生背景消费（2026-10-24）
+
+Publication 现在携带每次成功提交独立的 applicationID 及准备时的 pointsPerRem；仅在既有文件 CAS 成功后创建，不入持久格式，不改变请求／资源票据规则。同值重新应用也有新身份，读取或普通视图更新不改变身份。WebsiteConfigPublishedBackground 仅接受对应 owner 的已做背景准入的 Publication；纯值提交的 nil 明确拒绝，不伪装成无图。已准入 none／failed 则正常显示 fallback，资源失败保留固定分类通知，不重试或借旧图。
+
+新 SwiftUI 消费入口将原始页面偏好和准备好的帧交给既有 AppKit Surface：不通过 CustomBackgroundFilter 的旧上限，不重新下载、读文件、用 NSImage 解码或写旧设置，不进行全局字体注册。源 theme-controller 的完整应用替换 img，而 fit／filter 普通更新沿用图片寿命；这里以成功应用身份控制新图片，以稳定身份控制普通视图更新，卸载停止播放器并取消排队提示。rem 来自同一提交上下文而非 Surface 默认 16。宿主仍负责选择当前发布、生命周期和所有者切换；传入 owner 值不是跨进程权限机制。
+
+迁移单元是一个发布值对应的背景视图。此为新配置原生消费者入口，不是当前主窗口正式切流；旧 CustomPracticeBackground 与其原生矢量兼容分支完全保留，无双写、回填或删除。撤销新宿主只停止图像／提示任务，不回滚已提交的配置意图；绘图失败也不改磁盘记录。真实默认目录、完整配置 UI、文字／布局／主题等共同消费者齐备前不启用全应用切换。根字号改变后的新准备由完整宿主管理，本视图不私自采样或改写旧 Publication。
+
+新接口此前不存在，本阶段以新消费契约和实际提交后的像素／寿命集成检查建立证据，没有把编译失败冒称旧产品行为红测。首次构建失败来自测试嵌套夹具未显式标注 MainActor 与闭包 self，修正后四项通过；有界会话内决策复核（非独立评审）再补 rem 与卸载排队通知反例，最终六项新测试和相关 42 项通过。自有 PNG／GIF 经真实文件提交及隐藏 NSHostingView／NSWindow，验证亮度 3 的 [192,96,48,255] 像素、CGImage 对象所有权、24 与 16 rem 的实际像素区别、错误所有者、nil／none／failed、重复更新不重播、同值新应用与拆卸停止。没有窗口激活或 Typebar 主程序；不代表可见 UI、全部格式／HDR、辅助功能全应用验收或性能保证。
+
+最终扩大相关回归 381 项零失败／零跳过；移除参考与外部 schema 依赖后的原生集合 167 项零失败／零跳过，范围重叠不相加。最终回归及打包期间没有改 Swift 源码／测试。源码／资源原创性与固定参考证据检查（47 直接项、119 原生符号、17 支持规范）通过，人工清单 1,286 项仅结构检查；没有重跑完整生产宿主集，独立滚轮基线失败仍开放。日志 `/tmp/typebar-published-background-{first,focused,reviewed,expanded,offline,package}.log`，first 为测试夹具编译失败，不是有效行为红测。
+
+最终 Debug 包、签名、署名和包内资源原创性检查通过，临时 QA 包由脚本清理且没有运行。参考检出保持干净；推送前 main 为 8c52fb13、开发分支为 9e0b632d，没有打开的开发分支 PR，Actions 仍为 826 次且最近 39118939684 成功。本批只集中推送 native-parity-next，不修改主分支、不重跑远端门禁；完整原生重写继续 active。
+
 ## 完整配置环境源的 No Quit 准入（2026-10-24）
 
 固定 config/setters.ts::setConfig 拒绝活动 no_quit 期间 changeRequiresRestart 的字段，toggleFunbox、test-logic.ts 重启及 route-controller 导航也有对应保护。lifecycle.ts::applyConfig 会将部分 JSON 迁移成完整配置，再逐字段应用；它并非本项目的完整值原子提交。本阶段不宣称复制其可能部分生效的逐字段副作用：完整候选含重启字段，原生完整配置入口在锁期间整体不可用；原有实时偏好与“保存当前值”仍走既有规则，不扩大锁范围。

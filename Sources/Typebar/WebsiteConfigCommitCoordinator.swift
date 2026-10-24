@@ -22,9 +22,12 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let disk: WebsiteConfigFileRegister.Revision
   }
   struct Publication {
+    /// One successful full application, including repeated identical values.
+    let applicationID = UUID()
     let draft: WebsiteConfigNativeDraft
     let owner: UUID
     let environmentRevision: UUID
+    let pointsPerRem: Double
     let disk: WebsiteConfigFileRegister.Revision
     /// nil means no background admission was attempted, not an empty image.
     let background: WebsiteConfigBackgroundResource?
@@ -213,7 +216,8 @@ final class WebsiteConfigCommitCoordinator {
       // From the record's commit point to this value publication there is no
       // await, caller callback, legacy write, resource activation or event replay.
       let publication = Publication(draft: prepared.draft, owner: prepared.owner.owner,
-        environmentRevision: prepared.environment.revision, disk: disk, background: background, font: font)
+        environmentRevision: prepared.environment.revision, pointsPerRem: prepared.environment.pointsPerRem,
+        disk: disk, background: background, font: font)
       latest = publication
       retire(prepared)
       return .committed(publication)
