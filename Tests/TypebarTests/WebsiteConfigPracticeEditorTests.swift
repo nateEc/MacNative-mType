@@ -49,28 +49,47 @@ import XCTest
     XCTAssertTrue(form.message?.contains("未应用") == true)
     XCTAssertEqual(form.limit, "4")
   }
+  func testFullDraftSeedsDifficultyAndRetainsDuplicateQuoteGroupsUntilExplicitApplication() async throws {
+    let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"quote","difficulty":"expert","quoteLength":[0,0,1]}"#,
+      pointsPerRem: 16, context: .init())
+    let form = WebsiteConfigPracticeEditForm(draft: draft)
+    XCTAssertEqual(form.difficulty, .expert); XCTAssertEqual(form.quoteLengths, [0,0,1])
+    XCTAssertEqual(WebsiteConfigPracticeEditForm.quoteChoices.map(\.groups), [[0,1,2,3], [0], [1], [2], [3]])
+    var edits: [WebsiteConfigPracticeEdit] = []
+    form.start(.quoteLengths(form.quoteLengths), apply: { edits.append($0); return "applied" })
+    await settle(form)
+    XCTAssertEqual(edits, [.quoteLengths([0,0,1])])
+    XCTAssertEqual(form.quoteLengths, [0,0,1])
+  }
   func testEditorRendersLightAndDarkWithoutShowingWindowOrApplying() throws {
-    let parameters = try parameters()
-    for dark in [false, true] {
-      var calls = 0
-      let form = WebsiteConfigPracticeEditForm(parameters: parameters)
-      let view = WebsiteConfigPracticeEditor(form: form, parameters: parameters, canEdit: true,
-        apply: { _ in calls += 1; return "unexpected" })
-        .padding(20).frame(width: 520, height: 230)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .environment(\.colorScheme, dark ? .dark : .light)
-      let host = NSHostingView(rootView: view)
-      let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 520, height: 230),
-        styleMask: .borderless, backing: .buffered, defer: false)
-      window.isReleasedWhenClosed = false
-      window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua); window.contentView = host
-      defer { window.contentView = nil; window.close() }
-      host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.1))
-      let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
-      host.cacheDisplay(in: host.bounds, to: bitmap)
-      let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
-      try png.write(to: URL(fileURLWithPath: "/tmp/typebar-parameter-editor-\(dark ? "dark" : "light").png"))
-      XCTAssertGreaterThan(png.count, 1000); XCTAssertFalse(window.isVisible); XCTAssertEqual(calls, 0)
+    for quoted in [false, true] {
+      let draft = try WebsiteConfigNativeProfile.prepareDraft(quoted
+        ? #"{"mode":"quote","difficulty":"expert","quoteLength":[0,0,1]}"#
+        : #"{"mode":"words","words":4,"difficulty":"master"}"#, pointsPerRem: 16, context: .init())
+      let parameters = draft.testParameters
+      for width in [340, 520] {
+        for dark in [false, true] {
+          var calls = 0
+          let form = WebsiteConfigPracticeEditForm(draft: draft)
+          let view = WebsiteConfigPracticeEditor(form: form, parameters: parameters, canEdit: true,
+            apply: { _ in calls += 1; return "unexpected" })
+            .padding(20).frame(width: CGFloat(width), height: 360)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .environment(\.colorScheme, dark ? .dark : .light)
+          let host = NSHostingView(rootView: view)
+          let window = NSWindow(contentRect: .init(x: 0, y: 0, width: CGFloat(width), height: 360),
+            styleMask: .borderless, backing: .buffered, defer: false)
+          window.isReleasedWhenClosed = false
+          window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua); window.contentView = host
+          defer { window.contentView = nil; window.close() }
+          host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+          let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+          host.cacheDisplay(in: host.bounds, to: bitmap)
+          let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+          try png.write(to: URL(fileURLWithPath: "/tmp/typebar-content-editor-\(quoted ? "quote" : "words")-\(width)-\(dark ? "dark" : "light").png"))
+          XCTAssertGreaterThan(png.count, 1000); XCTAssertFalse(window.isVisible); XCTAssertEqual(calls, 0)
+        }
+      }
     }
   }
 }

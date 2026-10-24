@@ -286,7 +286,7 @@ import Observation
     let ledger = f.page.state.priorAttemptLedger
     let publication = try XCTUnwrap(f.page.state.presentation).publication
     let oldAttempt = f.page.state.session.automaticInputAttemptID
-    let form = WebsiteConfigPracticeEditForm(parameters: publication.draft.testParameters)
+    let form = WebsiteConfigPracticeEditForm(draft: publication.draft)
     form.limit = "6"
     form.startLimit(timed: false, apply: {
       try await f.workflow.editAndBegin($0, replacing: publication.applicationID, systemIsDark: false)
@@ -299,5 +299,126 @@ import Observation
     XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, oldAttempt)
     XCTAssertFalse(f.page.acceptsInput(for: oldAttempt))
     XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+  }
+
+  func testDifficultyAndContentEditsApplyToRealSessionWithoutReimportingOtherFields() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    try await f.workflow.apply(json: #"{"mode":"words","words":8,"theme":"dracula","quoteLength":[0,0,1]}"#, systemIsDark: false)
+    for edit in [WebsiteConfigPracticeEdit.difficulty(.expert), .punctuation(true), .numbers(true),
+      .difficulty(.master), .punctuation(false), .numbers(false)] {
+      let publication = try XCTUnwrap(f.page.state.presentation).publication
+      let attempt = f.page.state.session.automaticInputAttemptID
+      var expected = publication.draft.projection.runtime; expected[edit.key] = edit.value
+      try await f.workflow.editAndBegin(edit, replacing: publication.applicationID, systemIsDark: false)
+      let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+      XCTAssertEqual(draft.projection.runtime, expected)
+      guard case .edited(let change) = draft.origin else { return XCTFail("Edit became import") }
+      XCTAssertEqual(change.key, edit.key)
+      XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, attempt)
+      XCTAssertEqual(f.page.state.session.configuration.difficulty, draft.inputRules.difficulty)
+      XCTAssertEqual(f.page.state.session.configuration.contentOptions, draft.testParameters.contentOptions)
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .available(expected))
+    }
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+
+  func testQuoteLengthSameValueRebuildsWeightedQueueButDifficultyPreservesIt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let quotes: [OfflineQuote] = [("one", QuoteLength.short), ("two", .short), ("three", .medium)].map {
+      .init(id: $0.0, title: "Owned editor sample", text: "ab cd", language: .english, length: $0.1)
+    }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in quotes })
+    defer { workflow.stop() }
+    func budget() throws -> Int? {
+      var sampler = try XCTUnwrap(f.page.state.practice?.scope.quoteSampler)
+      var budget: Int?
+      _ = try sampler.next(randomIndex: { budget = $0; return 0 })
+      return budget
+    }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0,0,1]}"#, systemIsDark: false)
+    XCTAssertEqual(try budget(), 4)
+    try await workflow.editAndBegin(.difficulty(.expert), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(try budget(), 3)
+    try await workflow.editAndBegin(.quoteLengths([0,0,1]), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(try budget(), 4)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [0,0,1])
+    try await workflow.editAndBegin(.mode(.words), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    try await workflow.editAndBegin(.quoteLengths([0,0]), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .quote)
+    XCTAssertEqual(try budget(), 3)
+  }
+
+  func testUnavailableQuoteGroupLeavesActualQueuePageAndFileUntouched() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in [
+        .init(id: "owned", title: "Owned", text: "ab", language: .english, length: .short)] })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    let attempt = f.page.state.session.automaticInputAttemptID
+    let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
+    let bytes = try Data(contentsOf: path)
+    do { try await workflow.editAndBegin(.quoteLengths([3]), replacing: publication.applicationID, systemIsDark: false); XCTFail("Missing quote group silently applied") }
+    catch WebsiteConfigSessionBuildError.reconfigurationRequired {}
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
+    XCTAssertEqual(f.page.state.practice?.scope.quoteSampler?.selection.groups, [0])
+    XCTAssertEqual(try Data(contentsOf: path), bytes)
+    try await workflow.editAndBegin(.punctuation(true), replacing: publication.applicationID, systemIsDark: false)
+    XCTAssertFalse(f.page.state.session.configuration.contentOptions.includePunctuation)
+  }
+
+  func testFunboxConflictsAndInvalidQuoteGroupsCannotWriteAndValidRetryStillWorks() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["binary"]}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    let attempt = f.page.state.session.automaticInputAttemptID
+    let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
+    let bytes = try Data(contentsOf: path)
+    for edit in [WebsiteConfigPracticeEdit.punctuation(true), .numbers(true), .quoteLengths([99])] {
+      do { try await f.workflow.editAndBegin(edit, replacing: publication.applicationID, systemIsDark: false); XCTFail("Rejected edit applied") }
+      catch WebsiteConfigNativeDraftError.rejectedEdit {}
+      XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+      XCTAssertEqual(try Data(contentsOf: path), bytes)
+    }
+    try await f.workflow.editAndBegin(.difficulty(.expert), replacing: publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.configuration.difficulty, .expert)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.runtime["funbox"], .array([.string("binary")]))
+  }
+
+  func testCancelledLengthPreparationKeepsPublishedWeightedQueueAndAllowsAnotherEdit() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let gate = Gate(); defer { gate.resolve() }
+    var parked = false
+    let quotes: [OfflineQuote] = [("one", QuoteLength.short), ("two", .short), ("three", .medium)].map {
+      .init(id: $0.0, title: "Owned cancellation sample", text: "ab", language: .english, length: $0.1)
+    }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        if parked { return await gate.read() }; return quotes
+      })
+    defer { workflow.stop() }
+    func budget() throws -> Int? {
+      var sampler = try XCTUnwrap(f.page.state.practice?.scope.quoteSampler)
+      var budget: Int?; _ = try sampler.next(randomIndex: { budget = $0; return 0 }); return budget
+    }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0,0,1]}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
+    let bytes = try Data(contentsOf: path)
+    parked = true
+    let task = Task { try await workflow.editAndBegin(.quoteLengths([0,0,1]), replacing: publication.applicationID, systemIsDark: false) }
+    try await gate.wait()
+    XCTAssertEqual(try budget(), 4)
+    task.cancel(); gate.resolve()
+    do { _ = try await task.value; XCTFail("Cancelled quote draw applied") } catch is CancellationError {}
+    XCTAssertEqual(try budget(), 4)
+    XCTAssertEqual(try Data(contentsOf: path), bytes)
+    parked = false
+    try await workflow.editAndBegin(.difficulty(.expert), replacing: publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(try budget(), 3)
   }
 }

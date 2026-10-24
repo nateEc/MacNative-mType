@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-24 完整配置内容编辑：新增难度、标点／数字及引语长度的实际控件和完整事务，保留重复分组；难度继续引语队列、同值长度重建，缺组／Funbox 冲突／取消不覆盖存档或消耗正式队列。五项新工作流和一项新表单纳入最终 41 项定向、614 项相关扩大，均零失败／零跳过，Debug 打包、签名与原创性通过；八份浅色／深色布局已检查，最终证据见迁移契约。语言编辑的 Arabic／Lazy Mode 独立持久记忆仍缺失，已明确记录为前置依赖；拒绝 setter 后重开、活动记账、其他字段和实际交互继续开放，不升级为全部兼容。
+
 2026-10-24 完整配置参数编辑：本轮设置接入模式、时长和词数的显式应用，保留其他字段、休眠参数及旧偏好；使用真实当前发布而非全量重新导入，旧表单身份、取消、窗口退役及文件冲突均须拒绝覆盖。最终定向 35 项及相关扩大 608 项均零失败／零跳过，Debug 打包、签名及原创性通过；浅色／深色隐藏宿主图已检查，失败边界见迁移契约。活动尝试、语言／难度、即时消费者与其他编辑仍未完成，不升级为全部兼容。
 
 2026-10-24 当前窗口回退：导入面板可明确切回本窗口的 Typebar 设置，完整存档保留、下次启动仍恢复；通过原生选择／资源准入生成新尝试后才开放输入，非空账本保留，旧回调拒绝。七项新核心、一项表单与两项真实宿主新增检查纳入最终 38 项定向及 599 项相关扩大，分别零失败／零跳过；原滚轮保留，证据见迁移契约。浅色面板布局已检查，不计物理 GUI 验收。该工具是原生迁移回退，不等于原版重置，更不代表完整配置编辑、活动尝试记账和其他缺口已完成。
@@ -1871,6 +1873,8 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-PRACTICE-CONTENT-EDIT-01 | 完整配置的难度、标点、数字和引语长度编辑 | `test/test-logic.ts`, `components/pages/test/TestConfig.tsx`, `controllers/quotes-controller.ts` | TestDomain, PreferencesDomain | 部分实现：真实设置控件经完整单项事务提交，保留其他字段及有序重复引语分组；难度继续池、同值长度重建，取消／缺组／Funbox 冲突不覆盖。五项新工作流、一项新表单、最终 41 项定向／614 项相关扩大及 Debug 打包检查通过，证据见迁移契约。拒绝 setter 后仍派发重开、活动尝试、选定／收藏引语来源、原版恢复事务和物理交互仍未完成。 |
+| CFG-LANGUAGE-LAZY-MEMORY-01 | 完整配置语言切换的独立 Lazy Mode 记忆 | `legacy-states/remember-lazy-mode.ts`, `test/test-logic.ts` | TestDomain, PreferencesDomain | 未实现：完整配置路径尚未承载 rememberLazyMode 与 prefersArabicLazyMode 的独立持久状态；language 不能只复用参数重开。需覆盖 Arabic nosave、noLazyMode／custom／polyglot、普通下一轮、导入恢复、跨窗口和重启；不得读取或改写旧 Typebar 偏好冒充完成。 |
 | CFG-PRACTICE-PARAMETER-EDIT-01 | 完整配置的模式、时长与词数编辑 | `components/pages/test/TestConfig.tsx`, `config/setters.ts` | TestDomain, PreferencesDomain | 部分实现：真实设置面板显式应用三类编辑，保留单项事件、完整字段、休眠参数与旧偏好；当前发布身份、页面／环境、取消和文件 CAS 拒绝迟到覆盖，完成态非空账本保留。最终定向 35 项及相关扩大 608 项、Debug 签名／原创性通过；浅色／深色离屏图已检查。活动尝试记账、其他字段编辑、即时消费者和物理交互未完成，详见迁移契约。 |
 | CFG-PREFERENCE-SAVE-01 | 独立设置页阈值的明确保存事件 | `config/setters.ts`, `config/persistence.ts`, `test/practise-words.ts` | PreferencesDomain, TestDomain | 部分实现：六绑定成功后同步路由到最近活跃存活主窗口，结果练习提升当前完整选择，同值有效；后台注册不抢先、关闭移除，拒绝／自动恢复不发事件。八项新增及相关 166 项检查通过，源／旧配置存储往返已验证；窗口生命周期仅静态接线，全部设置覆盖和统一写入失败提示仍开放。 |
 | CFG-THRESHOLD-PREFERENCES-01 | 设置页完整阈值模式与记忆 | `commandline/lists.ts`, `commandline/lists/min-burst.ts`, `test/test-timer.ts` | PreferencesDomain | 部分实现：已有 v4 的开关、数值及 Burst 模式绑定完整源；开启零值仍显示开启，关闭／再开不覆盖记忆；不可读新代与保存失败不回退旧写法。保留 No Quit 预检和普通配置旧语义，不自动升级；九项新增回归含实际 Binding 和生产接线静态检查，可见窗口、跨窗口和完整迁移待验收。 |

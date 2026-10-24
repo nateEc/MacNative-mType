@@ -2619,15 +2619,15 @@ private struct ContentView: View {
         if let words = session.configuration.wordLimit { LabeledContent("词数", value: "\(words)") }
         if let quote = practice.quote { Text(quote.title).foregroundStyle(.secondary) }
         if let publication = pageSession.presentation?.publication {
-          WebsiteConfigPracticeEditor(parameters: publication.draft.testParameters,
+          WebsiteConfigPracticeEditor(draft: publication.draft,
             canEdit: !session.hasStarted || session.isFinished,
-            apply: { edit in
-              try await importWorkflow().editAndBegin(edit, replacing: publication.applicationID,
+            apply: { [applicationID = publication.applicationID] edit in
+              try await importWorkflow().editAndBegin(edit, replacing: applicationID,
                 systemIsDark: systemColorScheme == .dark)
             })
             .id(publication.applicationID)
         }
-        Text("语言、难度等其他完整配置编辑尚待接通；可在导入面板恢复配置或切回本窗口 Typebar 设置。")
+        Text("语言及其他未提供的完整配置编辑尚待接通；可在导入面板恢复配置或切回本窗口 Typebar 设置。")
           .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -4642,7 +4642,7 @@ private struct ContentView: View {
       return false
     }
     guard pageSession.practice == nil else {
-      restartLockMessage = "本轮使用完整配置；请在本轮设置中编辑模式、时长或词数，其他项可从导入面板恢复或切回 Typebar 设置。"
+      restartLockMessage = "本轮使用完整配置；请在本轮设置中编辑，未提供的项目可从导入面板恢复或切回 Typebar 设置。"
       return false
     }
     synchronizeNoQuitConfigurationLock()

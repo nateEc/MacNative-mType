@@ -1,16 +1,25 @@
 import Foundation
 
-/// Explicit test-page actions whose source controls dispatch a restart. This
-/// is deliberately not the metadata's broader changeRequiresRestart key set.
+/// Explicit test-page actions with a source restart dispatch or subscription.
+/// Not the metadata's broader changeRequiresRestart key set. Language remains
+/// separate until its persistent lazy-mode listener memory can travel too.
 enum WebsiteConfigPracticeEdit: Equatable {
   case mode(TestMode), time(Double), words(Double)
+  case difficulty(Difficulty), punctuation(Bool), numbers(Bool), quoteLengths([Int])
   var key: String {
-    switch self { case .mode: "mode"; case .time: "time"; case .words: "words" }
+    switch self {
+    case .mode: "mode"; case .time: "time"; case .words: "words"
+    case .difficulty: "difficulty"; case .punctuation: "punctuation"; case .numbers: "numbers"
+    case .quoteLengths: "quoteLength"
+    }
   }
   var value: WebsiteConfigValue {
     switch self {
     case .mode(let mode): .string(mode.rawValue)
     case .time(let value), .words(let value): .number(value)
+    case .difficulty(let value): .string(value.rawValue)
+    case .punctuation(let value), .numbers(let value): .bool(value)
+    case .quoteLengths(let groups): .array(groups.map { .number(Double($0)) })
     }
   }
 }

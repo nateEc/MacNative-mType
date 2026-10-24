@@ -1,5 +1,25 @@
 # 阈值源状态与迁移契约
 
+## 难度、内容选项与引语长度编辑（2026-10-24，起点 8303bcf4）
+
+固定参考 `test/test-logic.ts` 的 difficulty 订阅仅在 `nosave` 非 true 时重开；本窗口显式编辑使用正常 setter 事件。`components/pages/test/TestConfig.tsx` 的标点／数字与引语长度控件在 setter 后派发重开；引语模式禁用两个内容按钮，Zen 隐藏它们。不是将全部 `changeRequiresRestart` 元数据泛化成重开，也不提前放开活动尝试或即时消费者。
+
+封闭编辑类型新增 difficulty、punctuation、numbers 与 quoteLength，走原有绑定页面、Scope／资源准备、文件／页面 CAS，不重导入完整 JSON。模式覆盖、Funbox 限制和 schema 拒绝由原单项投影继续拥有；失败不写盘、不换目标、不消耗已发布的引语池。引语长度保留顺序及重复权重，普通难度修改继续当前队列，同值长度事件重建队列；在非引语模式提交长度仍按原 setter 覆盖到 quote 模式。
+
+额外未完成事件语义：原版 TestConfig 的直接按钮不检查 setter 返回值，即使 setter 被拒绝仍派发 restartTestEvent；实际是否重开还受原重开准入控制。当前原生工作流在拒绝时保留本轮，未复现这条“配置不变但仍尝试重开”的后续事件。这个差异同时涉及上一批模式／时长／词数按钮，需与活动尝试记账及拒绝通知一起对齐；本批冲突不覆写测试不是原版完整失败交互验收。
+
+编辑表单从完整 Draft 而非仅基础参数初始化，故难度和带权引语分组不会被默认值覆盖。原生控件增加明确的难度应用、标点／数字开关和长度选择，非标准导入分组保留一个原样选项，不转换为 Set 或擅自均匀化。标准长度提供全部／短／中／长／超长；原版选定引语搜索、认证收藏来源与不支持组的原版恢复事务仍待接线，不能以本轮标准长度入口冒充全部引语 UI。窄版长度操作分为两行，不新增动画；父闭包仅捕获应用 ID，不保留整份大提示发布。
+
+本轮核实语言不能作为简单第八项加入：`legacy-states/remember-lazy-mode.ts` 独立保存 rememberLazyMode（默认 false）与 prefersArabicLazyMode（默认 true）；语言事件可先以 nosave 打开 Arabic Lazy Mode，生成阶段还会按语言／custom／polyglot 支持度关闭、记忆和恢复。完整配置路径现在没有这份独立持久状态，直接加 language 控件会在切换往返、跨窗口和重启后不一致。因此语言 UI 仍为未完成前置依赖，需先设计并验证记忆与配置事务的持久化关系，不读取旧 Typebar 偏好假装完成，也不把它从完整重写范围移除。
+
+行为优先首轮为缺少四个枚举入口的编译失败，不称为运行行为红测。第一批 21 项通过，加强后的定向 41 项通过，最终复验仍为 41 项零失败／零跳过（6.585 秒）；包含五项新真实工作流及一项新表单检查，覆盖完整字段保留、真实配置交付、同值队列重建／难度继续、缺组、取消后队列不变、Funbox 冲突和有效重试。浅色／深色、340／520 点宽的 words／quote 八份离屏图均已检查，路径 `/tmp/typebar-content-editor-{words,quote}-{340,520}-{light,dark}.png`；没有可见窗口或主程序。实际鼠标／键盘、VoiceOver、活动尝试记账、其他编辑与性能仍未完成；目标 active。
+
+人工清单首次校验失败，原因是新的语言场景状态写为清单不支持的“未实现”前缀；实际允许值仅“已验收／待验收／部分验收”。按根因定位只改文档为“待验收（功能未实现：…）”，原未实现说明保留，不修改校验器；复验 1,316 条结构通过，不能解释为场景执行通过。失败及修复日志分别为 `/tmp/typebar-content-edit-manual.log`、`/tmp/typebar-content-edit-manual-fixed.log`。
+
+最终相关扩大 614 项零失败／零跳过（223.067 秒），含固定参考探针与原滚轮宿主（1.365 秒），不排除原检查。固定行为审计仍为 47 直接／119 原生符号／17 支持规范；源码原创性、Debug 包、签名和包资源边界均通过，没有主程序／xctest／swift-test 遗留。不是全量客户端、实体 GUI 或所有功能验收通过。源码在最终复验、扩大与打包期间冻结；日志前缀 `/tmp/typebar-content-edit-` 的 red 为缺失接口编译失败，focused／final-focused／final-focused-verified／expanded 为各轮原生测试，originality／reference／package 为相应验证，manual 的失败及修复见上。
+
+关键 SHA-256：ImportWorkflow `1b1c7b33953aa599ce38bf838739fde9a19918a12a4cee875e25d4544dd1236e`；PracticeEditor `0cdde5c5943f876176a2238958ba1156c2e5126c56acfbc4164a4f41c440af5d`；TypebarApp `5a24605b19a2b40af8ef54d9c3c63b4f0a15df4a947e19e53a9a95af7e4c10f4`；工作流测试 `b5224ef8be5f0079308351bd0f5f905d4eadc31bee5d1ab178330d32677ca9e4`；表单测试 `c4c69ad4ec9ba62db0e7574b801cfe91124445da8c4d161c34f547a8fe5a556d`。推送前 main 仍为 8c52fb13、开发分支 8303bcf4，无打开 PR；Actions 826 次，最新 39118939684 成功。本批只集中推开发分支，不改工作流或用户通知设置。
+
 ## 完整配置的模式、时长与词数编辑（2026-10-24，起点 1f6f203a）
 
 固定参考 `frontend/src/ts/components/pages/test/TestConfig.tsx` 的 Mode、Mode2Time、Mode2Words 控件在 setter 后明确派发 restartTestEvent；这不是 `changeRequiresRestart` 元数据的通用消费者。原 `test-logic.ts` 的语言／难度订阅、实时阈值／声音等分支继续分别待接线，不允许通过本 API 将即时字段强制重开。三个参数使用封闭的 `WebsiteConfigPracticeEdit`，保留 `.edited` 来源和单项事件，不把完整配置序列化后重新导入。
