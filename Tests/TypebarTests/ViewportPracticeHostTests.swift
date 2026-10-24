@@ -14,6 +14,12 @@ import XCTest
     func finishAllSources() { while !sourceReplies.isEmpty { finishFirstSource() } }
   }
   @MainActor private final class Fixture {
+    static func verticalWheel(_ event: CGEvent) throws -> NSEvent {
+      // This fixture models an unmodified vertical wheel. AppKit remaps a
+      // Shift-bearing CGEvent to the horizontal axis during conversion.
+      event.flags = []
+      return try XCTUnwrap(NSEvent(cgEvent: event))
+    }
     let suite = "ViewportPracticeHostTests.\(UUID())"
     let defaults: UserDefaults
     let settings: AppSettings
@@ -551,12 +557,12 @@ import XCTest
       let before = page.contentView.bounds.minY
       let down = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .line,
         wheelCount: 1, wheel1: -8, wheel2: 0, wheel3: 0))
-      native.viewport.scrollView.scrollWheel(with: try XCTUnwrap(NSEvent(cgEvent: down)))
+      native.viewport.scrollView.scrollWheel(with: try Fixture.verticalWheel(down))
       fixture.waitUntil { page.contentView.bounds.minY > before }
       let afterDown = page.contentView.bounds.minY
       let up = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .line,
         wheelCount: 1, wheel1: 8, wheel2: 0, wheel3: 0))
-      native.viewport.scrollView.scrollWheel(with: try XCTUnwrap(NSEvent(cgEvent: up)))
+      native.viewport.scrollView.scrollWheel(with: try Fixture.verticalWheel(up))
       fixture.waitUntil { page.contentView.bounds.minY < afterDown }
       XCTAssertEqual(native.viewport.scrollView.contentView.bounds.minY, 0,
         "The full-height inner container must not consume page scrolling")
@@ -566,6 +572,17 @@ import XCTest
     XCTAssertEqual(fixture.counts.generation, 1)
     XCTAssertEqual(native.viewport.canvas.accessibilityValue() as? String, fixture.prompt)
     XCTAssertFalse(fixture.window.isVisible)
+  }
+
+  func testSyntheticVerticalWheelFixtureRemovesAmbientModifiersBeforeAppKitConversion() throws {
+    for flags: CGEventFlags in [[], .maskShift, .maskControl, .maskAlternate, .maskCommand] {
+      let cg = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .line,
+        wheelCount: 1, wheel1: 8, wheel2: 0, wheel3: 0))
+      cg.flags = flags
+      let event = try Fixture.verticalWheel(cg)
+      XCTAssertEqual(event.scrollingDeltaY, 8)
+      XCTAssertTrue(event.modifierFlags.intersection([.shift, .control, .option, .command]).isEmpty)
+    }
   }
 
   func testCompositionUsesCompleteRendererAndRetiresViewportWithoutResettingAttempt() throws {

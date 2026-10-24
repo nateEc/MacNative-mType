@@ -127,10 +127,11 @@ enum WebsiteConfigSessionBuildError: Error {
       nextScope.quoteSampler = sampler
     }
     let showAllLines = draft.presentation.showAllPracticeLines
+    let pseudolangModel = try await WebsitePseudolangModel.preparing(configuration: config)
     let session: TypingSession
     if let wordHistory {
       session = try await prepareWordReplay(configuration: config, history: wordHistory,
-        scope: scope, showAllLines: showAllLines, random: random)
+        scope: scope, showAllLines: showAllLines, random: random, pseudolangModel: pseudolangModel)
     } else if let source = liveSource {
       guard let loadExternal else { throw WebsiteConfigSessionBuildError.externalNotProvided }
       let external = try await read { try await loadExternal(source, config) }
@@ -145,6 +146,7 @@ enum WebsiteConfigSessionBuildError: Error {
     } else if WholePreviewWordPreparation.usesAsyncPreparation(configuration: config, showAllLines: showAllLines) {
       session = try await WholePreviewWordPreparation.prepareSession(configuration: config,
         weakSpotScores: scope.weakSpotScores, wordDecorationState: scope.decorationState, arrowChart: scope.arrowChart,
+        pseudolangModel: pseudolangModel,
         nextRandomWordIndex: random.wordIndex, nextRandomCaseBit: random.caseBit,
         nextRandomContentUnit: random.contentUnit, nextRandomPoolShuffleIndex: random.shuffleIndex)
     } else {
@@ -158,6 +160,7 @@ enum WebsiteConfigSessionBuildError: Error {
         customTextIsPrepared: scope.customTextIsPrepared, preparedCustomSections: scope.preparedCustomSections,
         finiteTextSource: scope.finiteTextSource, quote: selectedQuote,
         weakSpotScores: scope.weakSpotScores, wordDecorationState: scope.decorationState, arrowChart: scope.arrowChart,
+        pseudolangModel: pseudolangModel,
         showAllLines: showAllLines, nextRandomWordIndex: random.wordIndex, nextRandomCaseBit: random.caseBit,
         nextRandomContentUnit: random.contentUnit, nextRandomPoolShuffleIndex: random.shuffleIndex)
     }
@@ -171,7 +174,7 @@ enum WebsiteConfigSessionBuildError: Error {
   }
 
   private static func prepareWordReplay(configuration: TestConfiguration, history: GeneratedWordReplayHistory,
-    scope: Scope, showAllLines: Bool, random: Random) async throws -> TypingSession {
+    scope: Scope, showAllLines: Bool, random: Random, pseudolangModel: WebsitePseudolangModel?) async throws -> TypingSession {
     let preparation = PolyglotGenerationPreparation(configuration)
     var config = preparation.configuration
     if config.language == .dockerFile { config.dockerfileUsesLiteralIndentation = true }
@@ -180,7 +183,7 @@ enum WebsiteConfigSessionBuildError: Error {
     history.arrowChart = scope.arrowChart
     var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: 100,
       showAllLines: showAllLines, weakSpotScores: scope.weakSpotScores,
-      decorationState: scope.decorationState, replayHistory: history,
+      decorationState: scope.decorationState, pseudolangModel: pseudolangModel, replayHistory: history,
       nextRandomPoolShuffleIndex: random.shuffleIndex)
     var chunks: [GeneratedWordChunk] = []
     var prepared = 0

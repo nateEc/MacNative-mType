@@ -27,6 +27,7 @@ enum WebsiteRandomWordGenerator {
 
   static func usesCandidateStream(for configuration: TestConfiguration) -> Bool {
     selected(for: configuration) != nil || WebsiteArrowChart.isSelected(configuration)
+      || WebsitePseudolangModel.isSelected(configuration)
   }
 
   static func word(_ kind: Kind, language: TypingLanguage = .english, randomUnit: () -> Double) -> String? {

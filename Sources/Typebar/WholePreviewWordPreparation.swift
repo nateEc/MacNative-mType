@@ -16,6 +16,7 @@ enum WholePreviewWordPreparation {
     configuration: TestConfiguration, sourceWords: [String]? = nil,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
     arrowChart: WebsiteArrowChart = .init(),
+    pseudolangModel: WebsitePseudolangModel? = nil,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) },
@@ -23,7 +24,7 @@ enum WholePreviewWordPreparation {
     didPrepare: (Int) -> Void = { _ in }
   ) async throws -> [GeneratedWordChunk] {
     try await prepareResult(configuration: configuration, sourceWords: sourceWords,
-      weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState, arrowChart: arrowChart,
+      weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState, arrowChart: arrowChart, pseudolangModel: pseudolangModel,
       nextRandomWordIndex: nextRandomWordIndex, nextRandomCaseBit: nextRandomCaseBit,
       nextRandomContentUnit: nextRandomContentUnit, nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex,
       didPrepare: didPrepare).chunks
@@ -35,6 +36,7 @@ enum WholePreviewWordPreparation {
     configuration: TestConfiguration, sourceWords: [String]? = nil,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
     arrowChart: WebsiteArrowChart = .init(),
+    pseudolangModel: WebsitePseudolangModel? = nil,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) },
@@ -42,7 +44,7 @@ enum WholePreviewWordPreparation {
     didPrepare: (Int) -> Void = { _ in }
   ) async throws -> TypingSession {
     let result = try await prepareResult(configuration: configuration, sourceWords: sourceWords,
-      weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState, arrowChart: arrowChart,
+      weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState, arrowChart: arrowChart, pseudolangModel: pseudolangModel,
       nextRandomWordIndex: nextRandomWordIndex, nextRandomCaseBit: nextRandomCaseBit,
       nextRandomContentUnit: nextRandomContentUnit, nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex,
       didPrepare: didPrepare)
@@ -64,6 +66,7 @@ enum WholePreviewWordPreparation {
     configuration: TestConfiguration, sourceWords: [String]?,
     weakSpotScores: WeakSpotScores, wordDecorationState: PoolWordDecorationState,
     arrowChart: WebsiteArrowChart,
+    pseudolangModel: WebsitePseudolangModel?,
     nextRandomWordIndex: () -> Int, nextRandomCaseBit: () -> Bool,
     nextRandomContentUnit: () -> Double, nextRandomPoolShuffleIndex: (Int) -> Int,
     didPrepare: (Int) -> Void
@@ -87,6 +90,7 @@ enum WholePreviewWordPreparation {
     }
     var generator = GeneratedCodeContinuation(configuration: configuration, batchTokenCount: 100,
       weakSpotScores: weakSpotScores, sourceWords: sourceWords, decorationState: wordDecorationState, arrowChart: arrowChart,
+      pseudolangModel: pseudolangModel,
       nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex)
     var chunks: [GeneratedWordChunk] = []
     var prepared = 0

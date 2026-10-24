@@ -6165,6 +6165,7 @@ struct GeneratedCandidateContinuation {
   private(set) var decorationState: PoolWordDecorationState
   private(set) var replayHistory: GeneratedWordReplayHistory
   private let replaysOwnedHistory: Bool
+  private let pseudolangModel: WebsitePseudolangModel?
   private(set) var replayExhausted = false
   private(set) var sourceGenerationFailed = false
 
@@ -6172,6 +6173,7 @@ struct GeneratedCandidateContinuation {
     weakSpotScores: WeakSpotScores = .init(), sourceWords: [String]? = nil,
     decorationState: PoolWordDecorationState = .init(),
     arrowChart: WebsiteArrowChart = .init(),
+    pseudolangModel: WebsitePseudolangModel? = nil,
     replayHistory: GeneratedWordReplayHistory? = nil,
     polyglotSources: [(TypingLanguage, IndexedLexicon)]? = nil,
     nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }) {
@@ -6187,15 +6189,21 @@ struct GeneratedCandidateContinuation {
         nextShuffleIndex: nextRandomPoolShuffleIndex) }
         ?? NativePolyglotCandidates(configuration: configuration, nextShuffleIndex: nextRandomPoolShuffleIndex)
     } else { polyglotCandidates = nil }
-    let candidates = polyglotCandidates?.lexicon ?? sourceWords.map(IndexedLexicon.init)
-      ?? OrdinaryEntryContent.pool(for: configuration.language)
-      ?? (configuration.language.supportsQuotes
-        ? configuration.language.ownedPracticeLexicon(englishVariant: configuration.englishVariant) : nil)
-      ?? IndexedLexicon(CodePracticeContent.wordCandidates(for: configuration.language))
+    let candidates = polyglotCandidates?.lexicon ?? Self.ownedPool(configuration: configuration, sourceWords: sourceWords)
     pool = IndexedLexicon.ordered(candidates,
       reversed: polyglotCandidates == nil && configuration.modifiers.contains(.backwards))
+    self.pseudolangModel = WebsitePseudolangModel.isSelected(configuration)
+      ? (pseudolangModel ?? WebsitePseudolangModel(words: pool)) : nil
     previewsWholeFiniteWords = GeneratedPromptChunkPolicy.previewsWholeFiniteWords(
       for: configuration, showAllLines: showAllLines)
+  }
+
+  static func ownedPool(configuration: TestConfiguration, sourceWords: [String]? = nil) -> IndexedLexicon {
+    let variant: EnglishVariant = WebsitePseudolangModel.isSelected(configuration) ? .american : configuration.englishVariant
+    return sourceWords.map(IndexedLexicon.init) ?? OrdinaryEntryContent.pool(for: configuration.language)
+      ?? (configuration.language.supportsQuotes
+        ? configuration.language.ownedPracticeLexicon(englishVariant: variant) : nil)
+      ?? IndexedLexicon(CodePracticeContent.wordCandidates(for: configuration.language))
   }
 
   var hasRemaining: Bool {
@@ -6262,9 +6270,11 @@ struct GeneratedCandidateContinuation {
       }
       // One base draw per emitted word, including unused draws while a section
       // is pending. Gates and Weakspot run only when selecting a new section.
-      let candidate = drawCandidate(random: nextRandomWordIndex)
+      let candidate = drawCandidate(random: nextRandomWordIndex, contentRandom: nextRandomContentUnit)
+      guard !sourceGenerationFailed else { return .init(source: "", configuration: configuration) }
       if nextSectionWord >= sectionWords.count {
-        var section = sampledWord(initialCandidate: candidate, random: nextRandomWordIndex)
+        var section = sampledWord(initialCandidate: candidate, random: nextRandomWordIndex, contentRandom: nextRandomContentUnit)
+        guard !sourceGenerationFailed else { return .init(source: "", configuration: configuration) }
         if WebsiteArrowChart.isSelected(configuration) {
           guard let generated = replayHistory.arrowChart.word(first: emittedWords + index == 0,
             randomUnit: nextRandomContentUnit) else {
@@ -6292,6 +6302,10 @@ struct GeneratedCandidateContinuation {
       }
       var word = sectionWords[nextSectionWord]
       nextSectionWord += 1
+      if pseudolangModel != nil && word.isEmpty {
+        sourceGenerationFailed = true
+        return .init(source: "", configuration: configuration)
+      }
       // Ordinary entries lowercase ASCII-capital-bearing components, not the
       // entire candidate before selection. Code syntax keeps its case.
       let baseLanguage = configuration.wordPoolBaseLanguage
@@ -6360,7 +6374,11 @@ struct GeneratedCandidateContinuation {
     return chunk
   }
 
-  private func drawCandidate(random: () -> Int) -> String {
+  private mutating func drawCandidate(random: () -> Int, contentRandom: () -> Double) -> String {
+    if let pseudolangModel {
+      guard let word = pseudolangModel.word(randomUnit: contentRandom) else { sourceGenerationFailed = true; return "" }
+      return word
+    }
     let value = random()
     let rank = configuration.modifiers.contains(.zipf)
       ? ZipfWordSelection.index(in: pool.count, random: {
@@ -6370,7 +6388,7 @@ struct GeneratedCandidateContinuation {
     return pool[rank]
   }
 
-  private func sampledWord(initialCandidate: String, random: () -> Int) -> String {
+  private mutating func sampledWord(initialCandidate: String, random: () -> Int, contentRandom: () -> Double) -> String {
     let latest = previousTargets.last?.filter { !".?!\":-,".contains($0) }.lowercased() ?? ""
     let earlier = previousTargets.dropLast().last?.filter { !".?!\":-,'".contains($0) }.lowercased() ?? ""
     var word = initialCandidate
@@ -6382,14 +6400,16 @@ struct GeneratedCandidateContinuation {
           ?? TypingTextNormalizer.lazyLatin(value, language: configuration.language)) : value
     }
     var comparison = candidateComparison(word, firstDraw: true)
+    let comparesLatest = pseudolangModel == nil || !previousTargets.isEmpty
+    let comparesEarlier = pseudolangModel == nil || previousTargets.count > 1
     var retries = 0
-    while retries < 100 && (comparison == latest || comparison == earlier
+    while !sourceGenerationFailed && retries < 100 && ((comparesLatest && comparison == latest) || (comparesEarlier && comparison == earlier)
       || (!configuration.contentOptions.includeNumbers && word.utf8.contains { (48...57).contains($0) })
       || (!configuration.contentOptions.includePunctuation && word == "I")
       || ((!configuration.wordPoolBaseLanguage.isCodeLanguage || configuration.wordPoolBaseLanguage == .dockerFile)
         && !configuration.contentOptions.includePunctuation
         && word.contains { "-=_+[]{};'\\:\"|,./<>?".contains($0) })) {
-      word = drawCandidate(random: random)
+      word = drawCandidate(random: random, contentRandom: contentRandom)
       // The pinned generator lowercases the first comparison but preserves
       // case on a redraw. Keep this asymmetry until its source contract changes.
       comparison = candidateComparison(word, firstDraw: false)
@@ -6417,6 +6437,7 @@ struct TestSessionFactory {
     preparedStreamPromptBatch: TransformedPromptBatch? = nil,
     weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
     arrowChart: WebsiteArrowChart = .init(),
+    pseudolangModel: WebsitePseudolangModel? = nil,
     showAllLines: Bool = false,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
@@ -6488,7 +6509,8 @@ struct TestSessionFactory {
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
         batchTokenCount: streamWordCount, showAllLines: showAllLines, weakSpotScores: weakSpotScores,
-        decorationState: wordDecorationState, arrowChart: arrowChart, nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex)
+        decorationState: wordDecorationState, arrowChart: arrowChart, pseudolangModel: pseudolangModel,
+        nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex)
       let chunk = cursor.nextChunk(nextRandomWordIndex: nextRandomWordIndex, nextRandomCaseBit: nextRandomCaseBit,
         nextRandomContentUnit: nextRandomContentUnit)
       prompt = chunk.source
