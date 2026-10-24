@@ -117,7 +117,7 @@ struct TypebarApp: App {
       liveSessionPrepare: liveSessionPrepare,
       wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender,
       wholePreviewLayout: wholePreviewLayout, promptRender: promptRender,
-      wholePreviewViewportEnabled: wholePreviewViewportEnabled, publishedPresentation: publishedPresentation)
+      wholePreviewViewportEnabled: wholePreviewViewportEnabled, incomingPublishedPresentation: publishedPresentation)
   }
 
   private static let modelConfiguration = ModelConfiguration(
@@ -1243,7 +1243,7 @@ private struct ContentView: View {
   let wholePreviewLayout: @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout
   let promptRender: @MainActor (TypingSession, String?, PromptRenderStyle) -> PromptRendering
   let wholePreviewViewportEnabled: Bool
-  let publishedPresentation: WebsiteConfigPublishedPresentation?
+  let incomingPublishedPresentation: WebsiteConfigPublishedPresentation?
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
@@ -1254,8 +1254,20 @@ private struct ContentView: View {
   @Query private var personalBestLedgers: [LocalPersonalBestLedgerRecord]
   @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var savedPresets:
     [TestPresetRecord]
-  @State private var session = TestSessionFactory.make(
-    configuration: TypebarInitialTestSelection.configuration).withElapsedClock()
+  @State private var pageSession = PracticePageSessionState()
+  private var session: TypingSession {
+    get { pageSession.session }
+    nonmutating set {
+      if pageSession.practice != nil, newValue.automaticInputAttemptID != pageSession.session.automaticInputAttemptID { return }
+      pageSession.session = newValue
+    }
+  }
+  private var publishedPresentation: WebsiteConfigPublishedPresentation? {
+    pageSession.presentation ?? (incomingPublishedPresentation?.publication.practice == nil ? incomingPublishedPresentation : nil)
+  }
+  private var committedPracticeDraft: WebsiteConfigNativeDraft? {
+    pageSession.practice == nil ? nil : pageSession.presentation?.publication.draft
+  }
   @State private var noQuitConfigurationLockOwnerID = UUID()
   @State private var promptCaretMotion = PromptCaretMotionCoordinator()
   @State private var promptInsertionAnchor = PromptInsertionAnchor()
@@ -1640,6 +1652,9 @@ private struct ContentView: View {
 
   private var lifecycleContent: some View {
     configuredPracticeContent
+    .onChange(of: incomingPublishedPresentation?.publication.applicationID, initial: true) { _, _ in
+      consumePublishedPractice()
+    }
     .background(SharedProfileWindowProbe(host: sharedProfileWindow, didAttach: {
       activatePreferenceConfigurationOwnerIfKey()
       presentSharedProfileIfPossible()
@@ -1675,9 +1690,10 @@ private struct ContentView: View {
       }
       contentAppeared()
       settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,
-        requestedModifiers: { practiceRequestedModifiers }, selectedLanguage: { language },
-        keyboardGuideMode: { challengeLiveConfiguration.keyboardGuideMode(settings: settings) },
-        fontFamilyName: { challengeLiveConfiguration.fontFamilyName(settings: settings) }) {
+        requestedModifiers: { practiceRequestedModifiers },
+        selectedLanguage: { committedPracticeDraft?.testParameters.language ?? language },
+        keyboardGuideMode: { committedPracticeDraft?.keyboardTypography.guideMode ?? challengeLiveConfiguration.keyboardGuideMode(settings: settings) },
+        fontFamilyName: { committedPracticeDraft?.keyboardTypography.fontFamily ?? challengeLiveConfiguration.fontFamilyName(settings: settings) }) {
         persistExplicitTestConfiguration()
       }
       activatePreferenceConfigurationOwnerIfKey()
@@ -2487,8 +2503,9 @@ private struct ContentView: View {
         presentation: themeIndicatorPresentation,
         onActivate: handleThemeIndicatorActivation)
       .frame(maxWidth: 180)
+      .disabled(pageSession.practice != nil)
       Picker("模式", selection: Binding(
-        get: { mode },
+        get: { pageSession.practice == nil ? mode : session.configuration.mode },
         set: { _ = selectMode($0) }
       )) {
         ForEach(TestMode.allCases, id: \.self) { mode in
@@ -2509,6 +2526,24 @@ private struct ContentView: View {
 
   @ViewBuilder
   private var configurationPanel: some View {
+    if let practice = pageSession.practice {
+      VStack(alignment: .leading, spacing: 7) {
+        Text("本轮设置").font(.headline)
+        LabeledContent("模式", value: session.configuration.mode.displayName)
+        LabeledContent("语言", value: session.configuration.language.displayName)
+        LabeledContent("难度", value: session.configuration.difficulty.rawValue)
+        if let duration = session.configuration.duration { LabeledContent("时间", value: "\(Int(duration)) 秒") }
+        if let words = session.configuration.wordLimit { LabeledContent("词数", value: "\(words)") }
+        if let quote = practice.quote { Text(quote.title).foregroundStyle(.secondary) }
+        Text("本轮使用导入设置；编辑与重开暂未开放。")
+          .font(.caption).foregroundStyle(.secondary)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    } else { legacyConfigurationPanel }
+  }
+
+  @ViewBuilder
+  private var legacyConfigurationPanel: some View {
     @Bindable var settings = settings
     VStack(alignment: .leading, spacing: 14) {
       if let activeChallenge {
@@ -3176,21 +3211,18 @@ private struct ContentView: View {
         insertionAnchor: promptInsertionAnchor,
         insertionAttemptID: session.automaticInputAttemptID,
         compositionDisplayStyle: practiceCompositionDisplayStyle,
-        quickRestartKey: settings.quickRestartKey,
+        quickRestartKey: committedPracticeDraft?.behavior.quickRestartKey ?? settings.quickRestartKey,
         keyboardInputMapping: effectiveKeyboardInputMapping,
-        oppositeShiftKeymap: settings.keyboardGuideLayoutSource.oppositeShiftMapping(
-          selectedLayout: settings.keyboardLayout,
-          customLayout: settings.selectedCustomKeyboardLayout,
-          layoutFluid: session.configuration.modifiers.contains(.layoutFluid)),
-        oppositeShiftMode: settings.oppositeShiftMode,
+        oppositeShiftKeymap: effectiveOppositeShiftKeymap,
+        oppositeShiftMode: committedPracticeDraft?.inputRules.rules.oppositeShiftMode ?? settings.oppositeShiftMode,
         mapsArrowKeysToInput: session.configuration.modifiers.contains(.arrowStream),
         acceptsNewlineInput: session.acceptsNewlineInput,
         acceptsTabInput: session.acceptsTabInput,
         discardsAutofocusInput: settings.showFocusWarning,
         requiresShiftQuickRestart: quickRestartRequiresProtection
-          && settings.quickRestartKey != .enter,
+          && (committedPracticeDraft?.behavior.quickRestartKey ?? settings.quickRestartKey) != .enter,
         disablesQuickRestart: quickRestartRequiresProtection
-          && settings.quickRestartKey == .enter,
+          && (committedPracticeDraft?.behavior.quickRestartKey ?? settings.quickRestartKey) == .enter,
         enablesLongTestBailout: quickRestartRequiresProtection,
         finishesOnShiftEnter: session.configuration.mode == .zen,
         onInsert: { text, forceError in
@@ -3701,6 +3733,17 @@ private struct ContentView: View {
   }
 
   private var effectiveKeyboardLayout: KeyboardLayout {
+    if let draft = committedPracticeDraft {
+      if session.configuration.modifiers.contains(.layoutFluid) {
+        if session.configuration.mode == .time {
+          return LayoutFluidPolicy.activeLayout(elapsedSeconds: lastClockTickSecond,
+            duration: session.configuration.duration, layouts: draft.generators.layoutFluidLayouts)
+        }
+        return LayoutFluidPolicy.activeLayout(completedWords: session.completedWordCount,
+          wordLimit: session.configuration.wordLimit, layouts: draft.generators.layoutFluidLayouts)
+      }
+      return draft.keyboardTypography.guideLayout ?? draft.keyboardTypography.inputLayout.emulatedLayout ?? .ansiQwerty
+    }
     guard session.configuration.modifiers.contains(.layoutFluid) else {
       return settings.keyboardGuideLayoutSource.resolvedBuiltInLayout(
         selectedLayout: settings.keyboardLayout, inputLayout: settings.keyboardInputLayout)
@@ -3738,7 +3781,17 @@ private struct ContentView: View {
     guard !session.configuration.modifiers.contains(.layoutFluid) else {
       return .builtIn(effectiveKeyboardLayout)
     }
+    if let draft = committedPracticeDraft { return draft.keyboardTypography.inputLayout.inputMapping(for: nil) }
     return settings.keyboardInputLayout.inputMapping(for: settings.selectedCustomKeyboardLayout)
+  }
+
+  private var effectiveOppositeShiftKeymap: KeyboardInputMapping {
+    if let draft = committedPracticeDraft {
+      if session.configuration.modifiers.contains(.layoutFluid) { return .system }
+      return draft.keyboardTypography.guideLayout.map(KeyboardInputMapping.builtIn) ?? .system
+    }
+    return settings.keyboardGuideLayoutSource.oppositeShiftMapping(selectedLayout: settings.keyboardLayout,
+      customLayout: settings.selectedCustomKeyboardLayout, layoutFluid: session.configuration.modifiers.contains(.layoutFluid))
   }
 
   private var layoutFluidNotice: String? {
@@ -4081,8 +4134,46 @@ private struct ContentView: View {
 
   private func synchronizeLiveInputRules() {
     let previous = session.configuration.rules
-    session.synchronizeLiveInputRules(settings.inputRules)
+    session.synchronizeLiveInputRules(pageSession.practice?.session.configuration.rules ?? settings.inputRules)
     if session.configuration.rules != previous { preparedWholePreviewRendering = nil }
+  }
+
+  private func consumePublishedPractice() {
+    guard let incoming = incomingPublishedPresentation else {
+      if pageSession.practice == nil { pageSession.presentation = nil }
+      return
+    }
+    guard incoming.publication.practice != nil else {
+      if pageSession.practice == nil { pageSession.presentation = incoming }
+      return
+    }
+    if pageSession.presentation?.publication.applicationID == incoming.publication.applicationID { return }
+    guard settings.allowsRestartingConfigurationChange else {
+      funboxConfigurationMessage = "当前练习禁止更换配置，已保留原会话。"
+      return
+    }
+    do {
+      let replacement = try pageSession.applying(incoming, owner: preferenceConfigurationOwner,
+        router: settings.preferenceConfigurationSaves)
+      wholePreviewTask.cancel(); liveContentTask?.cancel(); liveContentTask = nil
+      liveContentRequestID = UUID()
+      isPreparingWholePreview = false; isLoadingLiveContent = false
+      viewportReadinessAttemptID = nil; preparedWholePreviewRendering = nil
+      interruptedWholePreview = false; liveContentStreamingActive = false
+      compositionText = ""; completedResult = nil; savedResultRecord = nil
+      activeChallengeID = nil; wordPractice = nil
+      activeLongSavedText = nil; activeVerifiedScript = nil
+      keyboardGuideFeedback = nil; typingCompanionHands.reset(); clearTypingPowerEffect()
+      lastTimeWarningSecond = nil; lastClockTickSecond = 0
+      liveStatsClockSignal.second = 0; timerHealth = .init()
+      isSamePromptRepeatAttempt = false; isRepeatedPaceAttempt = false
+      activePaceTargetWpm = nil
+      NativeSpeech.shared.stop()
+      pageSession = replacement
+      synchronizeNoQuitConfigurationLock()
+      awaitViewportPresentationIfNeeded()
+      requestTypingFocus()
+    } catch { funboxConfigurationMessage = "完整配置会话尚未通过页面准入，当前练习保持不变。" }
   }
 
   private func handleChallengeFieldApplication(_ field: ChallengeLiveConfigurationState.ApplicationField,
@@ -4096,6 +4187,7 @@ private struct ContentView: View {
   }
 
   private func handleInputRuleChange(_ previous: InputRules, _ current: InputRules) {
+    guard pageSession.practice == nil else { return }
     if isPreparingPracticePrompt { reset() }
     else {
       session.synchronizeLiveInputRules(current)
@@ -4389,11 +4481,15 @@ private struct ContentView: View {
   }
 
   private var isRestartingConfigurationChangeLocked: Bool {
-    !settings.allowsRestartingConfigurationChange
+    pageSession.practice != nil || !settings.allowsRestartingConfigurationChange
   }
 
   @discardableResult
   private func acceptsRestartingConfigurationChange() -> Bool {
+    guard pageSession.practice == nil else {
+      restartLockMessage = "本轮使用完整导入设置；编辑与重开接线尚未完成。"
+      return false
+    }
     synchronizeNoQuitConfigurationLock()
     guard !isRestartingConfigurationChangeLocked else {
       restartLockMessage = "锁定重开已开启：请完成或放弃本次测试。"
@@ -6042,6 +6138,7 @@ private struct ContentView: View {
   }
 
   private var configuration: TestConfiguration {
+    if pageSession.practice != nil { return session.configuration }
     let selected = baseConfiguration
     return selected.with(polyglotBaseLanguage: polyglotReturnLanguage ?? selected.polyglotBaseLanguage)
   }
@@ -6053,11 +6150,11 @@ private struct ContentView: View {
   }
 
   private var practiceDifficulty: Difficulty {
-    challengeLiveConfiguration.difficulty(settings: settings)
+    pageSession.practice == nil ? challengeLiveConfiguration.difficulty(settings: settings) : session.configuration.difficulty
   }
 
   private var practiceRequestedModifiers: [TestModifier] {
-    challengeLiveConfiguration.modifiers(settings: settings)
+    pageSession.practice == nil ? challengeLiveConfiguration.modifiers(settings: settings) : session.configuration.modifiers
   }
 
   private var practiceSettingsSnapshot: AppSettingsSnapshot {
@@ -6388,6 +6485,7 @@ private struct ContentView: View {
 
   private func persistActiveTestSelection(for selectedConfiguration: TestConfiguration? = nil,
     cause: WordPracticeTransition.PersistenceCause = .automatic) {
+    guard pageSession.practice == nil else { return }
     guard customTextRecovery.permitsAutomaticPersistence(mode: mode) else { return }
     // The selected file exists only in this process. Leave the previous safe
     // selection intact, so relaunch cannot restore a first-chunk impostor.

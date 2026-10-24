@@ -2,6 +2,12 @@ import Foundation
 
 enum WebsiteConfigCommitCoordinatorError: Error { case noOwner, noEnvironment, unavailable, reentrant, stale, sessionNotReady }
 
+@MainActor fileprivate final class WebsiteConfigPublicationAuthority {
+  var latest: UUID?
+  let register: WebsiteConfigFileRegister
+  init(register: WebsiteConfigFileRegister) { self.register = register }
+}
+
 /// Whole-value publication for the new configuration path. Not a resource
 /// loader, legacy AppSettings adapter or UI transaction. No real default path.
 @MainActor
@@ -38,6 +44,14 @@ final class WebsiteConfigCommitCoordinator {
     /// Whole-draft builder output, including value-owned selection memories.
     /// nil for older explicit session producers and resource-only commits.
     let practice: WebsiteConfigSessionBuilder.Prepared?
+    fileprivate let ownerLease: PreferenceConfigurationSaveRouter.Lease
+    fileprivate let authority: WebsiteConfigPublicationAuthority
+
+    @MainActor func isCurrentDelivery(owner: UUID, router: PreferenceConfigurationSaveRouter) -> Bool {
+      guard self.owner == owner, authority.latest == applicationID, router.isCurrent(ownerLease),
+        let current = try? authority.register.read().revision, current == disk else { return false }
+      return router.isCurrent(ownerLease)
+    }
   }
   struct BackgroundPrepared {
     fileprivate let configuration: Prepared
@@ -67,11 +81,13 @@ final class WebsiteConfigCommitCoordinator {
   private var sessionAdmission = UUID()
   private var sessionRequest: UUID?
   private var latest: Publication?
+  private let publicationAuthority: WebsiteConfigPublicationAuthority
   private var processing = false
 
   init(router: PreferenceConfigurationSaveRouter, register: WebsiteConfigFileRegister,
     environment: @escaping () -> Environment?) {
     self.router = router; self.register = register; self.environment = environment
+    publicationAuthority = .init(register: register)
   }
 
   func prepare(_ json: String) throws -> Prepared {
@@ -295,8 +311,10 @@ final class WebsiteConfigCommitCoordinator {
       // await, caller callback, legacy write, resource activation or event replay.
       let publication = Publication(draft: prepared.draft, owner: prepared.owner.owner,
         environmentRevision: prepared.environment.revision, pointsPerRem: prepared.environment.pointsPerRem,
-        disk: disk, background: background, font: font, session: session, practice: practice)
+        disk: disk, background: background, font: font, session: session, practice: practice,
+        ownerLease: prepared.owner, authority: publicationAuthority)
       latest = publication
+      publicationAuthority.latest = publication.applicationID
       retire(prepared)
       return .committed(publication)
     case .conflict: retire(prepared); return .conflict

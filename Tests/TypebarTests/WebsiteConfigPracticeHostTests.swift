@@ -201,4 +201,84 @@ import XCTest
     f.wait { f.state.presentation.appearance.selection == .builtIn(.serika) }
     XCTAssertFalse(f.window.isVisible)
   }
+
+  func testCompletePublicationInstallsItsActualAttemptAndKeepsSourceRulesOnNativeInput() throws {
+    let f = try Fixture(); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    let owner = try XCTUnwrap(f.settings.preferenceConfigurationSaves.captureLease()?.owner)
+    let epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let ticket = try coordinator.prepare(#"{"mode":"custom","difficulty":"expert","stopOnError":"letter","layout":"dvorak","keymapLayout":"dvorak","oppositeShiftMode":"keymap","quickRestart":"off","funbox":["ddoouubblleedd","ddoouubblleedd","rot13"],"theme":"dracula","fontSize":1.75,"maxLineWidth":30.5}"#)
+    let resources = try coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .data(Fixture.png()))
+    let ready = try awaitResult(coordinator, resources: resources)
+    guard case .committed(let publication) = try coordinator.commit(ready) else { throw Failure.commit }
+    let seed = try XCTUnwrap(publication.session)
+    XCTAssertEqual(seed.prompt, "nnnnoooo")
+    let previous = f.settings.snapshot
+    f.state.presentation = try .init(publication: publication, owner: owner, systemIsDark: false)
+    for _ in 0..<4 { f.host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    XCTAssertEqual(input.insertionAttemptID, seed.automaticInputAttemptID)
+    XCTAssertEqual(input.keyboardInputMapping, publication.draft.keyboardTypography.inputLayout.inputMapping(for: nil))
+    XCTAssertEqual(input.oppositeShiftMode, .keymap)
+    XCTAssertEqual(input.quickRestartKey, .off)
+    let before = try XCTUnwrap(input.insertionAnchor?.screenRect(attemptID: seed.automaticInputAttemptID, in: f.window))
+    input.onInsert("x", false)
+    for _ in 0..<3 { f.host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    let stopped = try XCTUnwrap(input.insertionAnchor?.screenRect(attemptID: seed.automaticInputAttemptID, in: f.window))
+    XCTAssertEqual(stopped.minX, before.minX, accuracy: 1, "Source letter-stop must not be replaced by legacy rules")
+    input.onInsert("n", false)
+    f.wait { (input.insertionAnchor?.screenRect(attemptID: seed.automaticInputAttemptID, in: f.window)?.minX ?? 0) > before.minX + 1 }
+    XCTAssertEqual(f.settings.snapshot, previous)
+    f.settings.stopOnErrorMode = .word
+    for _ in 0..<3 { f.host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    let advanced = try XCTUnwrap(input.insertionAnchor?.screenRect(attemptID: seed.automaticInputAttemptID, in: f.window))
+    input.onInsert("x", false)
+    for _ in 0..<3 { f.host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    XCTAssertEqual(try XCTUnwrap(input.insertionAnchor?.screenRect(attemptID: seed.automaticInputAttemptID, in: f.window)).minX,
+      advanced.minX, accuracy: 1, "Legacy change observers must also leave source rules intact")
+    XCTAssertEqual(f.state.generations, 1, "Installing an already prepared attempt must not generate again")
+    f.state.usesPublished = false
+    for _ in 0..<3 { f.host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    XCTAssertEqual(input.insertionAttemptID, seed.automaticInputAttemptID,
+      "Removing a delivery parameter is not an instruction to undo a committed attempt")
+    XCTAssertFalse(f.views(WebsiteConfigPublishedBackgroundView.self).isEmpty)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testForeignCompletePublicationCannotReplaceActualWindowAttemptOrItsDisplay() throws {
+    let f = try Fixture(); defer { f.close() }
+    f.wait { f.views(PromptViewportPracticeNativeView.self).first?.viewport.canvas.hasCompleteHeight == true
+      && f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first), attempt = input.insertionAttemptID
+    let viewport = try XCTUnwrap(f.views(PromptViewportPracticeNativeView.self).first)
+    let resources = try f.coordinator.prepareResources(for: f.coordinator.prepare(#"{"mode":"custom","fontSize":1}"#),
+      localFont: .absent, localBackground: .data(Fixture.png()))
+    let ready = try awaitResult(f.coordinator, resources: resources)
+    guard case .committed(let publication) = try f.coordinator.commit(ready) else { throw Failure.commit }
+    XCTAssertNotEqual(publication.owner, f.settings.preferenceConfigurationSaves.captureLease()?.owner)
+    f.state.presentation = try .init(publication: publication, owner: f.owner, systemIsDark: false)
+    for _ in 0..<4 { f.host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+    XCTAssertEqual(input.insertionAttemptID, attempt)
+    XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    XCTAssertTrue(f.views(PromptViewportPracticeNativeView.self).first === viewport,
+      "An incoming foreign font/mode must not appear before ownership admission")
+    XCTAssertEqual(f.state.generations, 1)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  private func awaitResult(_ coordinator: WebsiteConfigCommitCoordinator,
+    resources: WebsiteConfigCommitCoordinator.ResourcesPrepared) throws -> WebsiteConfigCommitCoordinator.SessionPrepared {
+    var result: Result<WebsiteConfigCommitCoordinator.SessionPrepared, Error>?
+    let task = Task { @MainActor in
+      do { result = .success(try await coordinator.preparePractice(for: resources, scope: .init(customText: "ab"))) }
+      catch { result = .failure(error) }
+    }
+    defer { task.cancel() }
+    let deadline = Date().addingTimeInterval(10)
+    while result == nil && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    return try XCTUnwrap(result).get()
+  }
 }
