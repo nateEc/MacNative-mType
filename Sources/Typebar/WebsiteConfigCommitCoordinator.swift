@@ -676,7 +676,10 @@ final class WebsiteConfigCommitCoordinator {
     } else { appearance = nil }
     defer { page?.endCommit() }
     let outcome: WebsiteConfigFileRegister.Commit
-    do { outcome = try register.commit(prepared.draft, replacing: prepared.disk) }
+    let restoringNative: Bool
+    if case .restored(let value) = prepared.draft.origin, case .nativeState = value.origin { restoringNative = true }
+    else { restoringNative = false }
+    do { outcome = try register.commit(prepared.draft, replacing: prepared.disk, preservingUnchanged: restoringNative) }
     catch WebsiteConfigFileRegisterError.busy { return .busy }
     switch outcome {
     case .committed(let disk):

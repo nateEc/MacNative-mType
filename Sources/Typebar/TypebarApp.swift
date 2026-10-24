@@ -10,6 +10,7 @@ struct TypebarApp: App {
   @NSApplicationDelegateAdaptor(TypebarApplicationDelegate.self) private var applicationDelegate
   @State private var settings = AppSettings()
   @State private var account = AccountSession()
+  @State private var accountStartup = AppAccountStartup()
   @State private var announcements = RemoteAnnouncementCenter()
   @State private var hotkey = GlobalHotkeyMonitor()
   @State private var systemKeyboardGuide = SystemKeyboardGuideMonitor()
@@ -66,10 +67,11 @@ struct TypebarApp: App {
   private var rootContent: some View {
     Self.practiceContent(
       settings: settings, account: account, announcements: announcements, hotkey: hotkey,
-      systemKeyboardGuide: systemKeyboardGuide, network: network, systemAppearance: systemAppearance)
+      systemKeyboardGuide: systemKeyboardGuide, network: network, systemAppearance: systemAppearance,
+      websiteConfigStartup: .init(accountReady: accountStartup.isReady))
       .frame(minWidth: 760, minHeight: 480)
       .task {
-        await account.restoreSession()
+        await accountStartup.restore { await account.restoreSession() }
         await announcements.refresh(using: account)
         hotkey.setEnabled(settings.globalHotkeyEnabled)
       }
@@ -110,7 +112,8 @@ struct TypebarApp: App {
       PromptRenderPlan(session: $0, composition: $1, style: $2).render()
     }, wholePreviewViewportEnabled: Bool = false,
     publishedPresentation: WebsiteConfigPublishedPresentation? = nil,
-    practiceSessionStore: PracticePageSessionStore? = nil) -> some View {
+    practiceSessionStore: PracticePageSessionStore? = nil,
+    websiteConfigStartup: WebsiteConfigStartupOptions? = nil) -> some View {
     ContentView(settings: settings, account: account, announcements: announcements,
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
       systemAppearance: systemAppearance, liveContentFetch: liveContentFetch,
@@ -119,7 +122,7 @@ struct TypebarApp: App {
       wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender,
       wholePreviewLayout: wholePreviewLayout, promptRender: promptRender,
       wholePreviewViewportEnabled: wholePreviewViewportEnabled, incomingPublishedPresentation: publishedPresentation,
-      providedPageSessionStore: practiceSessionStore)
+      providedPageSessionStore: practiceSessionStore, websiteConfigStartup: websiteConfigStartup)
   }
 
   private static let modelConfiguration = ModelConfiguration(
@@ -1247,6 +1250,7 @@ private struct ContentView: View {
   let wholePreviewViewportEnabled: Bool
   let incomingPublishedPresentation: WebsiteConfigPublishedPresentation?
   let providedPageSessionStore: PracticePageSessionStore?
+  let websiteConfigStartup: WebsiteConfigStartupOptions?
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
@@ -1260,6 +1264,9 @@ private struct ContentView: View {
   @State private var ownedPageSessionStore = PracticePageSessionStore()
   @State private var finalizedPracticeAttemptID: UUID?
   private var pageSessionStore: PracticePageSessionStore { providedPageSessionStore ?? ownedPageSessionStore }
+  private var startupBlocksPractice: Bool {
+    websiteConfigStartup != nil && pageSessionStore.startupController.isBlocking
+  }
   private var pageSession: PracticePageSessionState {
     get { pageSessionStore.state }
     nonmutating set { pageSessionStore.replace(newValue) }
@@ -1457,6 +1464,11 @@ private struct ContentView: View {
     VStack(spacing: 30) {
       header
       RemoteAnnouncementBannerStack(center: announcements)
+      if startupBlocksPractice {
+        WebsiteConfigStartupNotice(state: pageSessionStore.startupController.state,
+          recover: openWebsiteConfigImport,
+          continueUsingLegacy: { pageSessionStore.startupController.continueUsingLegacy() })
+      }
       if !visualFocus.isFocused {
         configurationPanel
       }
@@ -1675,6 +1687,8 @@ private struct ContentView: View {
     .onChange(of: pageSession.practice?.session.automaticInputAttemptID, initial: true) { _, _ in
       finalizePublishedPracticeInstallation()
     }
+    .onChange(of: websiteConfigStartup) { _, _ in updateConfigurationStartup() }
+    .onChange(of: settings.preferenceConfigurationSaves.captureLease()) { _, _ in updateConfigurationStartup() }
     .onChange(of: pageSession.restartDepartureAttemptID) { _, departure in
       guard departure == session.automaticInputAttemptID else { return }
       completedResult = nil; compositionText = ""; terminalNotice = nil
@@ -1724,6 +1738,7 @@ private struct ContentView: View {
       }
       activatePreferenceConfigurationOwnerIfKey()
       pageSessionStore.attach(to: settings.preferenceConfigurationSaves)
+      updateConfigurationStartup()
     }
     .onDisappear {
       pageSessionStore.detach()
@@ -2225,7 +2240,9 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingWebsiteConfigImport) {
       WebsiteConfigImportView(apply: { json in
-        try await importWorkflow().apply(json: json, systemIsDark: systemColorScheme == .dark)
+        let message = try await importWorkflow().apply(json: json, systemIsDark: systemColorScheme == .dark)
+        pageSessionStore.startupController.completedManually()
+        return message
       }, cancel: { websiteImportWorkflow?.cancel() })
     }
     .sheet(item: $settingsJSONCommand) { presentation in
@@ -3263,7 +3280,7 @@ private struct ContentView: View {
       }
 
       NativeTypingInput(
-        focusRequest: focusRequest, acceptsTextInput: !isPreparingPracticePrompt
+        focusRequest: focusRequest, acceptsTextInput: !isPreparingPracticePrompt && !startupBlocksPractice
           && !pageSessionStore.isInputSuspendedForRestart
           && (publishedPresentation == nil || PromptFieldProjectionPolicy.supports(session.configuration)),
         insertionAnchor: promptInsertionAnchor,
@@ -4601,6 +4618,10 @@ private struct ContentView: View {
 
   @discardableResult
   private func acceptsRestartingConfigurationChange() -> Bool {
+    if websiteConfigStartup != nil, pageSessionStore.startupController.state != .idle, startupBlocksPractice {
+      restartLockMessage = "请先完成配置恢复，或选择使用原生配置继续。"
+      return false
+    }
     guard pageSession.practice == nil else {
       restartLockMessage = "本轮使用完整导入设置；编辑与重开接线尚未完成。"
       return false
@@ -5797,7 +5818,7 @@ private struct ContentView: View {
         settingsJSONCommand = .init(
           mode: .importSettings, initialJSON: "", initialError: nil)
       case .importWebsiteConfig:
-        showingWebsiteConfigImport = true
+        openWebsiteConfigImport()
       case .exportSettingsJSON:
         do {
           settingsJSONCommand = .init(
@@ -6631,11 +6652,35 @@ private struct ContentView: View {
       throw WebsiteConfigImportWorkflowError.unsupportedPractice
     }
     if let websiteImportWorkflow { return websiteImportWorkflow }
-    let directory = try WebsiteConfigStorageDirectory.prepare()
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: websiteConfigStartup?.applicationSupport)
+    return configurationWorkflow(at: directory)
+  }
+
+  private func configurationWorkflow(at directory: URL) -> WebsiteConfigImportWorkflow {
+    if let websiteImportWorkflow { return websiteImportWorkflow }
     let workflow = WebsiteConfigImportWorkflow(page: pageSessionStore, settings: settings, account: account,
       directory: directory, readWindow: { websiteImportWindow })
     websiteImportWorkflow = workflow
     return workflow
+  }
+
+  private func openWebsiteConfigImport() {
+    if websiteConfigStartup != nil { pageSessionStore.startupController.prepareForManualRecovery() }
+    showingWebsiteConfigImport = true
+  }
+
+  private func updateConfigurationStartup() {
+    guard let options = websiteConfigStartup, didRestoreActiveTestSelection else { return }
+    let page = pageSessionStore
+    let ownerReady = settings.preferenceConfigurationSaves.captureLease()?.owner == page.owner
+    page.startupController.update(page: page, accountReady: options.accountReady, ownerReady: ownerReady,
+      probe: { try WebsiteConfigStorageDirectory.existing(applicationSupport: options.applicationSupport) },
+      onPending: {
+        wholePreviewTask.cancel(); liveContentTask?.cancel(); liveContentTask = nil
+        liveContentRequestID = UUID(); isPreparingWholePreview = false; isLoadingLiveContent = false
+        automaticInputScheduler.cancel(); NativeSpeech.shared.stop()
+      }, onContinue: { reset() }, makeWorkflow: { configurationWorkflow(at: $0) },
+      systemIsDark: systemColorScheme == .dark)
   }
 
   private var websiteImportWindow: WebsiteConfigPracticeScopeSource.Window {

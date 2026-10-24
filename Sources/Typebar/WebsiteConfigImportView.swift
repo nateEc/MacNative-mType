@@ -82,7 +82,7 @@ struct WebsiteConfigImportView: View {
         Label(message, systemImage: form.isError ? "exclamationmark.triangle" : "info.circle")
           .font(.callout).foregroundStyle(form.isError ? Color.red : Color.secondary)
       }
-      Text("请先结束当前练习。配置保存在此 Mac 的独立目录；自动启动恢复尚未接通，重开应用后请在此手动恢复。成绩、凭据和自定义练习文本不会从 JSON 导入。")
+      Text("请先结束当前练习。配置保存在此 Mac 的独立目录，启动时会尝试恢复；失败时可在此重试。成绩、凭据和自定义练习文本不会从 JSON 导入。")
         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       HStack {
         Button("恢复已保存配置") { form.start(restoring: true) }.disabled(form.isWorking)

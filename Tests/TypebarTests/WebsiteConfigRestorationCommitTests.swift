@@ -56,7 +56,8 @@ import XCTest
     XCTAssertEqual(f.page.state.session.prompt, "ab cd")
     XCTAssertEqual(f.page.state.practice?.session.automaticInputAttemptID, publication.session?.automaticInputAttemptID)
     XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
-    XCTAssertNotEqual(try f.register.read().revision, disk.revision)
+    XCTAssertEqual(try f.register.read().revision, disk.revision,
+      "An unchanged restoration publishes a new attempt without invalidating another window's disk authority")
     XCTAssertEqual(try f.register.read().state, .available(publication.draft.projection.runtime))
     guard case .stale = try f.coordinator.commit(practice, to: f.page, systemIsDark: true) else {
       return XCTFail("Restore committed twice")
@@ -147,6 +148,7 @@ import XCTest
     XCTAssertEqual(restored.projection.runtime["randomTheme"], .string("off"))
     XCTAssertEqual(try f.register.read().revision, disk.revision)
     guard case .committed(let publication) = try f.coordinator.commit(ticket) else { return XCTFail("Correction not committed") }
+    XCTAssertNotEqual(try f.register.read().revision, disk.revision, "Actual runtime corrections still persist")
     XCTAssertEqual(try f.register.read().state, .available(publication.draft.projection.runtime))
   }
 

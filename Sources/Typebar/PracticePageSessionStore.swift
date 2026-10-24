@@ -8,6 +8,9 @@ final class PracticePageSessionStore {
   let owner = UUID()
   private(set) var state = PracticePageSessionState()
   private(set) var restartController: WebsitePracticeRestartController?
+  private(set) var startupController = WebsiteConfigStartupController()
+  private var startupInputSuspended = false
+  @ObservationIgnored private var startupInputTransition = false
   @ObservationIgnored private weak var router: PreferenceConfigurationSaveRouter?
   @ObservationIgnored private var committing = false
   @ObservationIgnored private var pendingDetach = false
@@ -94,15 +97,16 @@ final class PracticePageSessionStore {
 
   func attach(to router: PreferenceConfigurationSaveRouter) {
     guard !committing else { return }
+    startupController.stop(); startupController = .init(); setStartupInputSuspended(false)
     retireRestartController()
     attachment = UUID()
     self.router = router
   }
   func detach() {
-    retireRestartController()
     attachment = UUID()
     if committing { pendingDetach = true }
     else { router = nil }
+    retireRestartController(); startupController.stop()
   }
   func replace(_ state: PracticePageSessionState) {
     guard !committing else { return }
@@ -113,7 +117,14 @@ final class PracticePageSessionStore {
     acceptsAttemptCallback(for: attemptID) && !isInputSuspendedForRestart
   }
   func acceptsAttemptCallback(for attemptID: UUID) -> Bool {
-    router != nil && !committing && state.session.automaticInputAttemptID == attemptID
+    router != nil && !committing && !startupInputTransition && !startupInputSuspended
+      && state.session.automaticInputAttemptID == attemptID
+  }
+  func setStartupInputSuspended(_ suspended: Bool) {
+    guard startupInputSuspended != suspended else { return }
+    startupInputTransition = true
+    startupInputSuspended = suspended
+    startupInputTransition = false
   }
   var isInputSuspendedForRestart: Bool {
     restartController?.isPreparing == true || state.restartDepartureAttemptID == state.session.automaticInputAttemptID

@@ -39,7 +39,8 @@ struct WebsiteConfigFileRegister {
   func read() throws -> Snapshot {
     try locked { fd, identity in try snapshot(fd, identity: identity) }
   }
-  func commit(_ draft: WebsiteConfigNativeDraft, replacing expected: Revision) throws -> Commit {
+  func commit(_ draft: WebsiteConfigNativeDraft, replacing expected: Revision,
+    preservingUnchanged: Bool = false) throws -> Commit {
     let payload = try WebsiteConfigNativeStateCodec.encode(draft.projection.runtime)
     let record = Data(WebsiteConfigJSONWriter.write(.array([.string(Self.kind), .number(1),
       .string(UUID().uuidString), .string(payload.base64EncodedString())])).utf8)
@@ -48,6 +49,11 @@ struct WebsiteConfigFileRegister {
       let current = try snapshot(fd, identity: identity)
       guard let revision = current.revision else { return .unavailable }
       guard revision == expected else { return .conflict }
+      // Native cold restoration can publish a new window/session without
+      // rewriting identical settings and invalidating other live windows.
+      // Still confirm the exact directory/record revision under the same lock.
+      if preservingUnchanged, case .available(let runtime) = current.state,
+        try WebsiteConfigNativeStateCodec.encode(runtime) == payload { return .committed(revision) }
       try replace(record, directoryFD: fd)
       return .committed(.init(directory: directory.path, identity: identity, bytes: record))
     }
