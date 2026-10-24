@@ -1488,17 +1488,6 @@ private struct ContentView: View {
     .padding(42)
     .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
     .background(
-      CustomPracticeBackground(
-        fallbackStyle: settings.practiceBackdrop, theme: activeTheme,
-        reduceMotion: settings.reducePracticeMotion,
-        remoteURL: settings.customBackgroundURL, fit: settings.customBackgroundFit,
-        filter: settings.customBackgroundFilter,
-        localImageRevision: settings.localBackgroundRevision,
-        localBackgroundStore: settings.localBackgroundStore,
-        onFailure: account.localNotices.backgroundFailureSink(),
-        applicationID: settings.customBackgroundApplicationID)
-    )
-    .background(
       WindowCloseConfirmationBridge(
         requiresConfirmation: LongTestCloseProtectionPolicy.requiresConfirmation(
           for: session, savedLongText: hasLockedCustomTextSource))
@@ -1509,7 +1498,6 @@ private struct ContentView: View {
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     )
-    .modifier(PracticeAnimationFrameRate(settings: settings, timerHealth: timerHealth))
     .background(TypingVisualFocusMouseBridge(onMovement: { x, y in
       visualFocus.mouseMoved(x: x, y: y)
     }).accessibilityHidden(true))
@@ -1882,6 +1870,18 @@ private struct ContentView: View {
       lifecycleContent
         .frame(maxWidth: .infinity)
     }
+    .background(
+      CustomPracticeBackground(
+        fallbackStyle: settings.practiceBackdrop, theme: activeTheme,
+        reduceMotion: settings.reducePracticeMotion,
+        remoteURL: settings.customBackgroundURL, fit: settings.customBackgroundFit,
+        filter: settings.customBackgroundFilter,
+        localImageRevision: settings.localBackgroundRevision,
+        localBackgroundStore: settings.localBackgroundStore,
+        onFailure: account.localNotices.backgroundFailureSink(),
+        applicationID: settings.customBackgroundApplicationID)
+    )
+    .modifier(PracticeAnimationFrameRate(settings: settings, timerHealth: timerHealth))
     .toolbar {
       Button("命令", systemImage: "command") { showingCommandPalette = true }
         .keyboardShortcut("k", modifiers: [.command, .shift])

@@ -1,5 +1,11 @@
 # 阈值源状态与迁移契约
 
+## 固定背景的生产视口所有权（追加阶段）
+
+固定 core.scss 的 .customBackground 是 body 子节点，fixed／left 0／top 0／100vw／100vh；其图片盒与滤镜几何依赖页面视口，不是测试内容的滚动文档。原生主练习窗口将 CustomPracticeBackground 放在外层 ScrollView 的 background，位于滚动文档之外，填满窗口内容区域；长提示、内容高度和手动滚动不能改变其视口或位置。窗口内容不包含 macOS 标题栏／工具栏等原生 chrome，不以背景覆盖这些系统控件。
+
+保留同一个背景加载宿主和应用身份，窗口尺寸变化只驱动现有 Surface 的视口重绘，不重新创建图片或当前练习。前景输入、滚动、现有适配／滤镜／提示及本地优先不改，背景保持输入穿透。原生自有纯色／网格／光晕 fallback 随同覆盖内容视口；这不是新增 Monkeytype 资产。其他独立窗口／sheet、完整页面路由和根字号环境仍须逐项验收，不能由主练习窗口的隐藏测试推断全部页面或可见 GUI 已完成。
+
 ## 背景 setter 应用寿命而非值相等（追加阶段）
 
 固定 config/setters.ts::setConfig 在通过元数据、schema 与 Funbox 准入后，即使值未改变也保存并派发 configEvent；customBackground 元数据只做 trim、不要求测试重启。theme-controller 在 customBackground 事件中调用 applyCustomBackground，在 fullConfigChangeFinished 后调用一次；fit／filter 更新使用独立入口。applyCustomBackground 每次创建新 img，不能以 URL 相同或字节缓存命中把显式应用吞掉。

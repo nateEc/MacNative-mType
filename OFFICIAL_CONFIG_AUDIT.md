@@ -1,5 +1,25 @@
 # 官方配置兼容性审计
 
+## 固定背景脱离滚动文档、使用主窗口内容视口（2026-10-24）
+
+重新读取固定 frontend/src/index.html、core.scss::.customBackground 和 theme-controller 的应用／几何入口：容器是 body 子节点，固定在视口左上，以 100vw／100vh 确定图片盒。原生产背景位于 practiceLayout 的 VStack background 内，实际属于滚动文档，导致窗口高度和提示内容高度混淆。
+
+新增测试使用真正 TypebarApp.practiceContent、内存 SwiftData／本地背景、自制红色 PNG、201 词完整提示和始终隐藏的 NSHostingView／NSWindow。首次测试夹具缺少显式 MainActor 标注造成编译错误，按诊断补齐后才取得有效红灯：两项测试五处失败，480 点内容窗口却得到 2,142 点背景，前景滚动 200 点使背景也偏移 200 点，缩放后背景仍采用 2,563 点文档高度。不是用手工缩小的替代宿主推断生产行为。
+
+只将现有 CustomPracticeBackground 从练习文档移到外层 ScrollView 的 background，原两项测试全部通过。背景与前景共享的 PracticeAnimationFrameRate 同步移到外层，避免新父子关系遗失装饰背景帧率环境；原输入／关闭保护／鼠标观察桥仍留在既有范围。主窗口原生标题栏／工具栏不纳入图片视口，自有 fallback 也随同铺满内容区域，不添加原版资产或新设计语言。
+
+后续在同一生产宿主的 AppKit 合成缓存中检查边缘像素，验证背景不只尺寸正确，而且没有被前景滚动层覆盖。缩放保留同一个 Surface 和应用身份，移除本地图片后旧 Surface 停止、清空且输入仍为原对象。其他独立窗口／sheet、完整页面路由、根字号、可见 GUI 与全部显示环境仍未完成；既有滚轮事件基线不因这一布局修正被宣称解决。
+
+合成检查初次得到两处 [255,38,0] 而非纯红：短暂诊断确认缓存 CGImage 的色彩空间是 sRGB，NSBitmapImageRep.colorAt 返回的 NSColor 却为 calibrated RGB，后续 usingColorSpace 再转换改变了数值。移除诊断，改从缓存 CGImage 通过显式 sRGB／RGBA CGContext 取像素后，原精确 [255,0,0,255] 断言通过；产品色彩与容差未修改，不外推全部显示器或 HDR。帧率类首轮因缺参考环境有一项跳过，补齐固定参考根及带完整性校验的 QA-only Anime.js archive 后，最终 27 项定向测试零失败、无跳过。
+
+带固定参考树、Zod、配置链接依赖与 Anime.js 的配置／背景／通知／帧率扩大回归共 287 项零失败、无跳过。原创边界和固定参考行为审计（47 直接行为／119 测试符号／17 支持规范）通过。新增场景首次误用既有单帧视口场景 ID，被检查器拒绝；保留原场景，给新主窗口宿主场景独立 ID 后，1,281 个唯一场景通过，不修改审计规则。
+
+另运行完整 PracticeCompositionHostTests、SpecialPracticeCompositionHostTests、TapePracticeCompositionHostTests 和 ViewportPracticeHostTests，共 77 项、约 1,101 秒、无跳过：76 项通过，唯一失败场景仍为已记录的 testWheelOverPromptScrollsPageWithoutMovingInnerClipOrReplacingInput，四处断言位于 555／560 行的两条路径，宽高仍为 856×1383／839×1473，与独立旧基线日志一致。原测试 SHA-256 仍为 6583df278cc176068d968c7a48d01639879d8bf6db942e7fb9c826d99e68ee10，未删除、跳过或修改此测试，不把本轮视口布局修正声称为滚轮修复或整门禁通过。其余组合候选、混合脚本、字体／尺寸、横向／特殊提示、源切换和阅读位置回归均通过。
+
+去掉通用／CI 参考根、Zod 和 Anime.js archive 后，既有纯原生背景／环境集合加两项主窗口宿主共 115 项离线通过、无跳过。没有把带参考依赖的对照类计入离线成功。所有源码／测试修改均在前次原生进程终止后进行，原生检查串行；生产宿主检查过程中只编辑文档。未启动 Typebar 主程序、激活窗口或修改系统通知／邮件设置。
+
+macOS 26.1／Swift 6.2.4 的 Debug 隔离打包、签名及包内资源／原创边界复检通过，临时候选由脚本清理且未运行。推送前 main 为 8c52fb13，开发分支仍无开放 PR，Actions 总数仍为 826、最新 39118939684 成功；仅合批推送 native-parity-next，不修改或重跑门禁，不触发新的失败邮件。
+
 ## 同 URL 显式应用、宿主寿命与环境失效（2026-10-24）
 
 固定源码的背景 setter 会调用应用流程，不能仅以地址值不同决定是否加载。原生 AppSettings 增加运行期 customBackgroundApplicationID：规范化后的有效 URL setter（含相同值和清空）建立新身份，命令确认和旧完整快照应用沿用该路径；错误命令输入／拒绝的快照不改变身份，样式和读取不改变图片寿命。身份不进入 Snapshot、归档或配置 schema，不改变当前练习选择或 wrapper 代次。
