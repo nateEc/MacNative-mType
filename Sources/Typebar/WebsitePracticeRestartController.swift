@@ -10,6 +10,11 @@ import Observation
     let quotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote]
     let external: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
   }
+  private struct Request {
+    let ticket: UUID
+    let accepted: WebsiteConfigCommitCoordinator.RestartAdmission
+    let readers: Readers
+  }
   @ObservationIgnored private weak var page: PracticePageSessionStore?
   @ObservationIgnored private let coordinator: WebsiteConfigCommitCoordinator
   @ObservationIgnored private var readers: Readers?
@@ -26,8 +31,29 @@ import Observation
   }
   @discardableResult
   func request(repeatingRequested: Bool = false) -> Bool {
-    guard !stopped, !isPreparing, let page, let readers else { return false }
-    let current = UUID(); ticket = current
+    guard let request = begin(repeatingRequested: repeatingRequested, current: UUID()) else { return false }
+    work = Task { [weak self] in _ = await self?.complete(request) }
+    return true
+  }
+  /// Runs in the caller's task so cancellation is checked before delivery,
+  /// while sharing the same admission/busy state as ordinary restart buttons.
+  /// The caller must supply a fresh operation ID for every invocation.
+  func requestAndWait(requestID: UUID, repeatingRequested: Bool = false) async throws -> Bool {
+    try Task.checkCancellation()
+    guard let request = begin(repeatingRequested: repeatingRequested, current: requestID) else { return false }
+    let advanced = await complete(request)
+    // Once advance installed the attempt, a synchronous delivery observer
+    // cannot retroactively turn that successful delivery into cancellation.
+    if !advanced { try Task.checkCancellation() }
+    return advanced
+  }
+  func cancel(requestID: UUID) {
+    guard isPreparing, ticket == requestID else { return }
+    cancel()
+  }
+  private func begin(repeatingRequested: Bool, current: UUID) -> Request? {
+    guard !stopped, !isPreparing, let page, let readers else { return nil }
+    ticket = current
     isPreparing = true; message = nil
     let accepted: WebsiteConfigCommitCoordinator.RestartAdmission
     do { accepted = try coordinator.beginRestart(for: page, repeatingRequested: repeatingRequested) }
@@ -36,35 +62,39 @@ import Observation
         isPreparing = false
         message = error is CancellationError ? "重开已取消。" : "当前尝试尚不能重开；请检查锁定状态或配置拥有者。"
       }
+      return nil
+    }
+    guard ticket == current, !stopped else { _ = coordinator.cancel(accepted); return nil }
+    admission = accepted
+    return .init(ticket: current, accepted: accepted, readers: readers)
+  }
+  private func complete(_ request: Request) async -> Bool {
+    let current = request.ticket, accepted = request.accepted, readers = request.readers
+    defer {
+      if ticket == current { isPreparing = false; work = nil; admission = nil }
+    }
+    do {
+      let ready = try await coordinator.prepareRestart(accepted,
+        loadQuotes: readers.quotes, loadExternal: readers.external)
+      guard ticket == current, !stopped, !Task.isCancelled, let page else {
+        _ = coordinator.cancel(ready); return false
+      }
+      switch try coordinator.advance(ready, to: page) {
+      case .advanced: message = nil; return true
+      case .busy, .conflict, .unavailable, .stale:
+        _ = coordinator.cancel(ready)
+        message = "新一轮未能开始；已接受的旧尝试不会重复记账，请重试。"
+        return false
+      }
+    } catch {
+      _ = coordinator.cancel(accepted)
+      if ticket == current && !stopped {
+        message = error is CancellationError
+          ? "重开已取消；已关闭的尝试不恢复计时，可重试。"
+          : "新一轮准备失败；旧尝试已关闭，可重试。"
+      }
       return false
     }
-    guard ticket == current, !stopped else { _ = coordinator.cancel(accepted); return false }
-    admission = accepted
-    work = Task { [weak self] in
-      guard let self else { return }
-      defer {
-        if self.ticket == current { self.isPreparing = false; self.work = nil; self.admission = nil }
-      }
-      do {
-        let ready = try await self.coordinator.prepareRestart(accepted,
-          loadQuotes: readers.quotes, loadExternal: readers.external)
-        guard self.ticket == current, !self.stopped, !Task.isCancelled, let page = self.page else {
-          _ = self.coordinator.cancel(ready); return
-        }
-        switch try self.coordinator.advance(ready, to: page) {
-        case .advanced: self.message = nil
-        case .busy, .conflict, .unavailable, .stale:
-          _ = self.coordinator.cancel(ready)
-          self.message = "新一轮未能开始；已接受的旧尝试不会重复记账，请重试。"
-        }
-      } catch {
-        _ = self.coordinator.cancel(accepted)
-        if self.ticket == current && !self.stopped {
-          self.message = "新一轮准备失败；旧尝试已关闭，可重试。"
-        }
-      }
-    }
-    return true
   }
   func cancel() {
     ticket = UUID(); work?.cancel(); work = nil

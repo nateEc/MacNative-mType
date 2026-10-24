@@ -2620,7 +2620,7 @@ private struct ContentView: View {
         if let quote = practice.quote { Text(quote.title).foregroundStyle(.secondary) }
         if let publication = pageSession.presentation?.publication {
           WebsiteConfigPracticeEditor(draft: publication.draft,
-            canEdit: !session.hasStarted || session.isFinished,
+            canEdit: (!session.hasStarted || session.isFinished) && pageSessionStore.restartController?.isPreparing != true,
             apply: { [applicationID = publication.applicationID] edit in
               try await importWorkflow().editAndBegin(edit, replacing: applicationID,
                 systemIsDark: systemColorScheme == .dark)

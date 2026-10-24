@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-24 拒绝后的重开事件：六类直接控件在 setter 返回 false 后保留配置并尝试普通重开，difficulty 的成功事件及依赖覆盖异常另行区分。复用同一重开控制器，不新建离场流程；取消限于本请求，忙碌编辑不退休正在生成的普通重开，引语池继续而不重置。五项工作流新增、一项控制器新增纳入最终 57 项定向及 620 项相关扩大，均零失败／零跳过，包含交付后取消反馈的定点修复；Debug 打包、签名和原创性通过，证据见迁移契约。活动尝试、通知细节、语言记忆与其他完整目标仍未完成。
+
 2026-10-24 完整配置内容编辑：新增难度、标点／数字及引语长度的实际控件和完整事务，保留重复分组；难度继续引语队列、同值长度重建，缺组／Funbox 冲突／取消不覆盖存档或消耗正式队列。五项新工作流和一项新表单纳入最终 41 项定向、614 项相关扩大，均零失败／零跳过，Debug 打包、签名与原创性通过；八份浅色／深色布局已检查，最终证据见迁移契约。语言编辑的 Arabic／Lazy Mode 独立持久记忆仍缺失，已明确记录为前置依赖；拒绝 setter 后重开、活动记账、其他字段和实际交互继续开放，不升级为全部兼容。
 
 2026-10-24 完整配置参数编辑：本轮设置接入模式、时长和词数的显式应用，保留其他字段、休眠参数及旧偏好；使用真实当前发布而非全量重新导入，旧表单身份、取消、窗口退役及文件冲突均须拒绝覆盖。最终定向 35 项及相关扩大 608 项均零失败／零跳过，Debug 打包、签名及原创性通过；浅色／深色隐藏宿主图已检查，失败边界见迁移契约。活动尝试、语言／难度、即时消费者与其他编辑仍未完成，不升级为全部兼容。
@@ -1873,7 +1875,8 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
-| CFG-PRACTICE-CONTENT-EDIT-01 | 完整配置的难度、标点、数字和引语长度编辑 | `test/test-logic.ts`, `components/pages/test/TestConfig.tsx`, `controllers/quotes-controller.ts` | TestDomain, PreferencesDomain | 部分实现：真实设置控件经完整单项事务提交，保留其他字段及有序重复引语分组；难度继续池、同值长度重建，取消／缺组／Funbox 冲突不覆盖。五项新工作流、一项新表单、最终 41 项定向／614 项相关扩大及 Debug 打包检查通过，证据见迁移契约。拒绝 setter 后仍派发重开、活动尝试、选定／收藏引语来源、原版恢复事务和物理交互仍未完成。 |
+| CFG-PRACTICE-REJECTED-RESTART-01 | setter 返回 false 后仍尝试重开 | `components/pages/test/TestConfig.tsx`, `components/modals/CustomTestDurationModal.tsx`, `config/setters.ts`, `test/test-logic.ts` | TestDomain, PreferencesDomain | 部分实现：六类直接动作的 false 返回在空闲／完成态走同一控制器普通重开，记录和 Publication 不变；依赖覆盖抛异常、资源／内容／陈旧错误不借此重开。57 项定向、620 项相关扩大及 Debug 打包通过，覆盖请求级取消、共享忙碌、带权池、非空账本及交付后取消不假报失败；证据见迁移契约。活动尝试记账、通知与实体 UI 仍待完成。 |
+| CFG-PRACTICE-CONTENT-EDIT-01 | 完整配置的难度、标点、数字和引语长度编辑 | `test/test-logic.ts`, `components/pages/test/TestConfig.tsx`, `controllers/quotes-controller.ts` | TestDomain, PreferencesDomain | 部分实现：真实设置控件经完整单项事务提交，保留其他字段及有序重复引语分组；难度继续池、同值长度重建，取消／缺组／Funbox 冲突不覆盖。初批最终 41 项定向／614 项相关扩大及 Debug 打包检查通过，证据见迁移契约；空闲／完成态 false 返回后的重开已由 CFG-PRACTICE-REJECTED-RESTART-01 补齐。活动尝试、选定／收藏引语来源、原版恢复事务和物理交互仍未完成。 |
 | CFG-LANGUAGE-LAZY-MEMORY-01 | 完整配置语言切换的独立 Lazy Mode 记忆 | `legacy-states/remember-lazy-mode.ts`, `test/test-logic.ts` | TestDomain, PreferencesDomain | 未实现：完整配置路径尚未承载 rememberLazyMode 与 prefersArabicLazyMode 的独立持久状态；language 不能只复用参数重开。需覆盖 Arabic nosave、noLazyMode／custom／polyglot、普通下一轮、导入恢复、跨窗口和重启；不得读取或改写旧 Typebar 偏好冒充完成。 |
 | CFG-PRACTICE-PARAMETER-EDIT-01 | 完整配置的模式、时长与词数编辑 | `components/pages/test/TestConfig.tsx`, `config/setters.ts` | TestDomain, PreferencesDomain | 部分实现：真实设置面板显式应用三类编辑，保留单项事件、完整字段、休眠参数与旧偏好；当前发布身份、页面／环境、取消和文件 CAS 拒绝迟到覆盖，完成态非空账本保留。最终定向 35 项及相关扩大 608 项、Debug 签名／原创性通过；浅色／深色离屏图已检查。活动尝试记账、其他字段编辑、即时消费者和物理交互未完成，详见迁移契约。 |
 | CFG-PREFERENCE-SAVE-01 | 独立设置页阈值的明确保存事件 | `config/setters.ts`, `config/persistence.ts`, `test/practise-words.ts` | PreferencesDomain, TestDomain | 部分实现：六绑定成功后同步路由到最近活跃存活主窗口，结果练习提升当前完整选择，同值有效；后台注册不抢先、关闭移除，拒绝／自动恢复不发事件。八项新增及相关 166 项检查通过，源／旧配置存储往返已验证；窗口生命周期仅静态接线，全部设置覆盖和统一写入失败提示仍开放。 |

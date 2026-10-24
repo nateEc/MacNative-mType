@@ -22,10 +22,19 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .quoteLengths(let groups): .array(groups.map { .number(Double($0)) })
     }
   }
+  /// TestConfig controls dispatch after a false setter return; difficulty
+  /// restarts only from its successful setter event. A thrown override is
+  /// neither case: execution never reaches the following dispatch.
+  var dispatchesRestartAfterRejection: Bool {
+    switch self {
+    case .difficulty: false
+    case .mode, .time, .words, .punctuation, .numbers, .quoteLengths: true
+    }
+  }
 }
 
 enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
-  case missing, typebarBackup, activeAttempt, unavailable, busy, conflict, unsupportedPractice
+  case missing, typebarBackup, activeAttempt, unavailable, busy, conflict, unsupportedPractice, rejectedRestartFailed
   var errorDescription: String? {
     switch self {
     case .missing: "还没有保存的 Monkeytype 配置；请先粘贴配置 JSON。"
@@ -35,6 +44,7 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
     case .busy: "上一项资源准备仍未结束，请稍后重试。"
     case .conflict: "配置或窗口已变化，未应用这次准备；请重新导入。"
     case .unsupportedPractice: "请先退出挑战或单词专项练习，再导入完整配置。"
+    case .rejectedRestartFailed: "设置未修改；重开未完成，请检查窗口或锁定状态后重试。已接受的旧尝试不会重复记账。"
     }
   }
 }
@@ -50,6 +60,7 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
   private let coordinator: WebsiteConfigCommitCoordinator
   private let loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote]
   private var prepared: WebsiteConfigCommitCoordinator.Prepared?
+  private var rejectedRestart: (controller: WebsitePracticeRestartController, request: UUID)?
   private var applying = false
   private var stopped = false
   private var operation = UUID()
@@ -81,6 +92,7 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
   private func perform(_ intent: Intent, systemIsDark: Bool) async throws -> String {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying else { throw WebsiteConfigImportWorkflowError.busy }
+    try checkRestartBusy(intent, page: page)
     guard !page.state.session.hasStarted || page.state.session.isFinished else {
       throw WebsiteConfigImportWorkflowError.activeAttempt
     }
@@ -88,6 +100,8 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
     let current = UUID(); operation = current
     defer {
       if let prepared { _ = coordinator.cancel(prepared) }
+      if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
+      rejectedRestart = nil
       prepared = nil; applying = false
     }
     try Task.checkCancellation()
@@ -96,6 +110,7 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
     guard !stopped else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard operation == current else { throw CancellationError() }
     try Task.checkCancellation()
+    try checkRestartBusy(intent, page: page)
     guard !page.state.session.hasStarted || page.state.session.isFinished else {
       throw WebsiteConfigImportWorkflowError.activeAttempt
     }
@@ -105,7 +120,16 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
       guard page.state.presentation?.publication.applicationID == applicationID else {
         throw WebsiteConfigImportWorkflowError.conflict
       }
-      ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source)
+      do { ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source) }
+      catch WebsiteConfigNativeDraftError.rejectedEdit where edit.dispatchesRestartAfterRejection {
+        guard let controller = page.restartController else { throw WebsiteConfigImportWorkflowError.unavailable }
+        rejectedRestart = (controller, current)
+        let advanced = try await controller.requestAndWait(requestID: current)
+        if advanced { return "设置未修改；已按原配置开始新的练习。" }
+        try Task.checkCancellation()
+        guard operation == current, !stopped else { throw CancellationError() }
+        throw WebsiteConfigImportWorkflowError.rejectedRestartFailed
+      }
     case .application(.some(let json)):
       let fields = try WebsiteConfigJSONReader.read(json).importFields
       if fields?["version"] != nil, fields?["settings"] != nil, fields?["configuration"] != nil,
@@ -150,6 +174,12 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
   func cancel() {
     operation = UUID()
     if let prepared { _ = coordinator.cancel(prepared) }
+    if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
+  }
+  private func checkRestartBusy(_ intent: Intent, page: PracticePageSessionStore) throws {
+    if case .edit = intent, page.restartController?.isPreparing == true {
+      throw WebsiteConfigImportWorkflowError.busy
+    }
   }
   func stop() {
     stopped = true; cancel(); source.stop(); environment.stop()

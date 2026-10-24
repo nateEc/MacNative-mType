@@ -39,6 +39,29 @@ import XCTest
     XCTAssertTrue(ready(), "Restart operation did not settle")
   }
 
+  func testAwaitedRequestSharesBusyStateAndOldCancellationCannotCancelTheNextRequest() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off"}"#)
+    var reply: CheckedContinuation<[OfflineQuote], Never>?
+    defer { reply?.resume(returning: f.quotes) }
+    let controller = try f.bind(loadQuotes: { _ in await withCheckedContinuation { reply = $0 } })
+    let old = UUID(), next = UUID()
+    let first = Task { try await controller.requestAndWait(requestID: old) }
+    await wait { reply != nil }
+    XCTAssertFalse(controller.request())
+    controller.cancel(requestID: old)
+    try XCTUnwrap(reply).resume(returning: f.quotes); reply = nil
+    let firstAdvanced = try await first.value; XCTAssertFalse(firstAdvanced)
+    let second = Task { try await controller.requestAndWait(requestID: next) }
+    await wait { reply != nil }
+    controller.cancel(requestID: old)
+    XCTAssertTrue(controller.isPreparing); XCTAssertFalse(controller.request())
+    try XCTUnwrap(reply).resume(returning: f.quotes); reply = nil
+    let secondAdvanced = try await second.value; XCTAssertTrue(secondAdvanced)
+    XCTAssertFalse(controller.isPreparing); XCTAssertNil(controller.message)
+    XCTAssertNil(f.page.state.restartDepartureAttemptID)
+  }
+
   func testDepartureIsRecordedBeforeGenerationAndFailedGenerationDoesNotEraseIt() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
