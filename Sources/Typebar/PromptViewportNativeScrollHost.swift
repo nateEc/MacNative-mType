@@ -2,8 +2,15 @@ import AppKit
 
 @MainActor private final class PromptViewportNavigationScrollView: NSScrollView {
   var willNavigate: (() -> Void)?
+  var forwardsWheelToPage = false
   override func scrollWheel(with event: NSEvent) {
     willNavigate?()
+    if forwardsWheelToPage, let page = enclosingScrollView {
+      // This container measures/draws the prompt; it does not own scrolling
+      // in page mode, even during a transient canvas/clip height mismatch.
+      page.scrollWheel(with: event)
+      return
+    }
     super.scrollWheel(with: event)
   }
 }
@@ -98,6 +105,7 @@ import AppKit
   convenience init(pageScrolling: Bool) {
     self.init(frame: .zero)
     usesPageScrolling = pageScrolling
+    (scrollView as? PromptViewportNavigationScrollView)?.forwardsWheelToPage = pageScrolling
     scrollView.hasVerticalScroller = !pageScrolling
   }
 

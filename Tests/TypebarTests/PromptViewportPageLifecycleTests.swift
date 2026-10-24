@@ -4,6 +4,10 @@ import XCTest
 
 @MainActor final class PromptViewportPageLifecycleTests: XCTestCase {
   private final class PageDocument: NSView { override var isFlipped: Bool { true } }
+  private final class RecordingPage: NSScrollView {
+    var received: [NSEvent] = []
+    override func scrollWheel(with event: NSEvent) { received.append(event) }
+  }
   private let font = NSFont.monospacedSystemFont(ofSize: 28, weight: .regular)
   private let style = PromptRenderStyle(theme: .init(background: .white, panel: .white,
     accent: .blue, colorScheme: .light))
@@ -82,5 +86,36 @@ import XCTest
     host.scrollView.scrollWheel(with: try XCTUnwrap(NSEvent(cgEvent: up)))
     XCTAssertEqual(page.contentView.bounds.minY, 0)
     XCTAssertGreaterThan(intents, 0, "A boundary wheel gesture must supersede a pending old reading anchor")
+  }
+
+  func testPageWheelRoutesToOuterOwnerEvenWhileInnerGeometryCanScroll() throws {
+    for pageScrolling in [true, false] {
+      let page = RecordingPage(frame: .init(x: 0, y: 0, width: 220, height: 120))
+      let document = PageDocument(frame: .init(x: 0, y: 0, width: 200, height: 2000))
+      page.documentView = document
+      let host = PromptViewportNativeScrollHost(pageScrolling: pageScrolling)
+      host.frame = .init(x: 0, y: 0, width: 180, height: 100)
+      document.addSubview(host)
+      // Measurement and parent layout are asynchronous. During that interval,
+      // the inner clip can be smaller than its canvas, even in page mode.
+      host.canvas.frame = .init(x: 0, y: 0, width: 180, height: 1000)
+      host.scrollView.tile()
+      defer { host.stop(); host.removeFromSuperview() }
+      var intents = 0
+      host.onExternalNavigation = { intents += 1 }
+      for delta: Int32 in [-8, 8] {
+        let cgEvent = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .line,
+          wheelCount: 1, wheel1: delta, wheel2: 0, wheel3: 0))
+        let event = try XCTUnwrap(NSEvent(cgEvent: cgEvent))
+        let before = page.received.count
+        host.scrollView.scrollWheel(with: event)
+        XCTAssertEqual(page.received.count - before, pageScrolling ? 1 : 0)
+        if pageScrolling {
+          XCTAssertTrue(page.received.last === event, "Forward the original event without rebuilding its phases or deltas")
+          XCTAssertEqual(host.scrollView.contentView.bounds.minY, 0)
+        }
+      }
+      XCTAssertEqual(intents, pageScrolling ? 2 : 0)
+    }
   }
 }
