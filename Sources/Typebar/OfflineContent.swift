@@ -6305,6 +6305,15 @@ struct GeneratedCandidateContinuation {
       decorationConfiguration.language = baseLanguage
       if websiteSource == .hexadecimal {
         if options.includePunctuation { word = "0x" + word }
+      } else if let websiteSource, websiteSource == .ipv4 || websiteSource == .ipv6 {
+        if options.includePunctuation {
+          guard let punctuated = WebsiteRandomWordGenerator.punctuatedNetworkWord(word,
+            kind: websiteSource, randomUnit: nextRandomContentUnit) else {
+            sourceGenerationFailed = true
+            return .init(source: "", configuration: configuration)
+          }
+          word = punctuated
+        }
       } else {
         word = PoolWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
         language: baseLanguage, wordIndex: emittedWords + index, wordBound: bound,
@@ -6965,7 +6974,7 @@ enum TypebarNetworkAddressStream {
     return "\(compressedIPv6(maskedIPv6(groups, prefix: prefix)))/\(prefix)"
   }
 
-  private static func maskedIPv4(_ octets: [Int], prefix: Int) -> [Int] {
+  static func maskedIPv4(_ octets: [Int], prefix: Int) -> [Int] {
     octets.enumerated().map { index, octet in
       let bitsBeforeOctet = index * 8
       if prefix >= bitsBeforeOctet + 8 { return octet }
@@ -6975,7 +6984,7 @@ enum TypebarNetworkAddressStream {
     }
   }
 
-  private static func maskedIPv6(_ groups: [UInt16], prefix: Int) -> [UInt16] {
+  static func maskedIPv6(_ groups: [UInt16], prefix: Int) -> [UInt16] {
     groups.enumerated().map { index, group in
       let bitsBeforeGroup = index * 16
       if prefix >= bitsBeforeGroup + 16 { return group }
@@ -6985,7 +6994,7 @@ enum TypebarNetworkAddressStream {
     }
   }
 
-  private static func compressedIPv6(_ groups: [UInt16]) -> String {
+  static func compressedIPv6(_ groups: [UInt16]) -> String {
     var longestStart: Int?
     var longestLength = 0
     var runStart: Int?

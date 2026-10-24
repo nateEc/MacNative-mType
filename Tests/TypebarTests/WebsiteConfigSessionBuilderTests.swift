@@ -24,6 +24,49 @@ import XCTest
     }
   }
 
+  func testWebsiteNetworkSourcesUseRandomSegmentsAndOnlyPunctuateWhenEnabled() async throws {
+    for (name, unit, punctuation, expected, draws) in [
+      ("IPv4", 0.5, false, "128.128.128.128", 4),
+      ("IPv6", 0.5, false, Array(repeating: "8000", count: 8).joined(separator: ":"), 8),
+      ("IPv4", 0.0, false, "0.0.0.0", 4),
+      ("IPv6", 0.0, false, Array(repeating: "0000", count: 8).joined(separator: ":"), 8),
+      ("IPv4", 0.0, true, "0.0.0.0/8", 6),
+      ("IPv6", 0.0, true, "::/64", 10),
+    ] {
+      let value = try draft("{\"mode\":\"words\",\"words\":2,\"punctuation\":\(punctuation),\"funbox\":[\"\(name)\"]}")
+      var samples = 0
+      let result = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+        random: .init(contentUnit: { samples += 1; return unit }))
+      XCTAssertEqual(result.session.prompt, "\(expected) \(expected)", name)
+      XCTAssertEqual(samples, draws * 2, name)
+      XCTAssertEqual(result.session.generatedWordReplayHistory?.count, 2, name)
+    }
+  }
+
+  func testTimedNetworkContinuationAppendsRandomTargetsAndRetainsPrefetchedHistory() async throws {
+    for name in ["IPv4", "IPv6"] {
+      let value = try draft("{\"mode\":\"time\",\"time\":60,\"funbox\":[\"\(name)\"]}")
+      let ready = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+        random: .init(contentUnit: { 0.5 }))
+      var session = ready.session
+      let initial = try XCTUnwrap(session.generatedWordReplayHistory?.count)
+      let first = try XCTUnwrap(session.prompt.split(separator: " ").first)
+      session.insertBatch(String(first) + " ")
+      XCTAssertEqual(session.outcome, .active)
+      let history = try XCTUnwrap(session.generatedWordReplayHistory)
+      XCTAssertGreaterThan(history.count, initial)
+      let tail = try XCTUnwrap(history.word(at: history.count - 1)?.target)
+      let parts = tail.split(separator: name == "IPv4" ? "." : ":")
+      XCTAssertEqual(parts.count, name == "IPv4" ? 4 : 8)
+      if name == "IPv6" { XCTAssertTrue(parts.allSatisfy { $0.count == 4 }) }
+      XCTAssertFalse(tail.contains("/"))
+      let repeated = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+        attemptSource: .repeatedWords(history, repeatedPace: false),
+        random: .init(contentUnit: { XCTFail("Prefetched history must not regenerate"); return 0 }))
+      XCTAssertEqual(repeated.session.generatedWordReplayHistory?.word(at: history.count - 1)?.target, tail)
+    }
+  }
+
   func testWebsiteHexadecimalPunctuationUsesItsOwnPrefixAndKeepsLowercaseBytes() async throws {
     let value = try draft(#"{"mode":"words","words":2,"funbox":["hexadecimal"],"punctuation":true}"#)
     let result = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
@@ -46,7 +89,9 @@ import XCTest
   }
 
   func testWholePreviewUsesRandomSourceAndRetainsEveryOwnedWord() async throws {
-    for (name, expected, calls) in [("binary", "10000000", 1), ("ascii", "PPPPPP", 7)] {
+    for (name, expected, calls) in [("binary", "10000000", 1), ("ascii", "PPPPPP", 7),
+      ("IPv4", "128.128.128.128", 4),
+      ("IPv6", Array(repeating: "8000", count: 8).joined(separator: ":"), 8)] {
       let value = try draft("{\"mode\":\"words\",\"words\":1001,\"showAllLines\":true,\"funbox\":[\"\(name)\"]}")
       var samples = 0
       let result = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),

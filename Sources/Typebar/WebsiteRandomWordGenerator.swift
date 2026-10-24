@@ -5,11 +5,13 @@ import Foundation
 enum WebsiteRandomWordGenerator {
   enum Kind: String, CaseIterable {
     case binary, hexadecimal, gibberish, ascii, specials
+    case ipv4 = "IPv4", ipv6 = "IPv6"
     var modifier: TestModifier {
       switch self {
       case .binary: .binaryStream; case .hexadecimal: .hexadecimalStream
       case .gibberish: .gibberishStream; case .ascii: .asciiStream
       case .specials: .specialCharacterStream
+      case .ipv4: .ipv4Stream; case .ipv6: .ipv6Stream
       }
     }
   }
@@ -30,6 +32,15 @@ enum WebsiteRandomWordGenerator {
       return Int((unit * Double(count) + Double(lower)).rounded(.down))
     }
     switch kind {
+    case .ipv4, .ipv6:
+      let version6 = kind == .ipv6
+      var parts: [String] = []
+      for _ in 0..<(version6 ? 8 : 4) {
+        guard let value = draw(version6 ? 65_536 : 256) else { return nil }
+        let digits = String(value, radix: version6 ? 16 : 10)
+        parts.append(version6 ? String(repeating: "0", count: 4 - digits.count) + digits : digits)
+      }
+      return parts.joined(separator: version6 ? ":" : ".")
     case .binary:
       guard let byte = draw(256) else { return nil }
       let digits = String(byte, radix: 2)
@@ -65,5 +76,35 @@ enum WebsiteRandomWordGenerator {
       }
       return result
     }
+  }
+
+  /// Called only at the website punctuation stage. Plain IPv6 stays padded;
+  /// punctuation compresses it even when the CIDR branch is not selected.
+  static func punctuatedNetworkWord(_ word: String, kind: Kind, randomUnit: () -> Double) -> String? {
+    guard kind == .ipv4 || kind == .ipv6 else { return nil }
+    let version6 = kind == .ipv6
+    let parts = word.components(separatedBy: version6 ? ":" : ".")
+    let values = parts.compactMap { Int($0, radix: version6 ? 16 : 10) }
+    guard parts.count == (version6 ? 8 : 4), values.count == parts.count,
+      values.allSatisfy({ $0 >= 0 && $0 < (version6 ? 65_536 : 256) }) else { return nil }
+    let chance = randomUnit()
+    guard chance.isFinite, chance >= 0, chance < 1 else { return nil }
+    var prefix: Int?
+    if chance < 0.25 {
+      let unit = randomUnit()
+      guard unit.isFinite, unit >= 0, unit < 1 else { return nil }
+      // Positive lower bound stays inside floor, including binary64 edges.
+      prefix = Int((unit * (version6 ? 17 : 25) + (version6 ? 16 : 8)).rounded(.down)) * (version6 ? 4 : 1)
+    }
+    let address: String
+    if version6 {
+      var groups = values.map { UInt16($0) }
+      if let prefix { groups = TypebarNetworkAddressStream.maskedIPv6(groups, prefix: prefix) }
+      address = TypebarNetworkAddressStream.compressedIPv6(groups)
+    } else {
+      let octets = prefix.map { TypebarNetworkAddressStream.maskedIPv4(values, prefix: $0) } ?? values
+      address = octets.map(String.init).joined(separator: ".")
+    }
+    return address + (prefix.map { "/\($0)" } ?? "")
   }
 }

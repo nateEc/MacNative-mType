@@ -66,6 +66,27 @@ import Observation
     XCTAssertEqual(try f.register.read().revision, disk)
   }
 
+  func testProductionNetworkRepeatKeepsActualRandomAddressesAndDiskIdentity() async throws {
+    for name in ["IPv4", "IPv6"] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.publish("{\"mode\":\"words\",\"words\":3,\"punctuation\":true,\"funbox\":[\"\(name)\"]}")
+      let old = f.page.state
+      let history = try XCTUnwrap(old.session.generatedWordReplayHistory)
+      XCTAssertEqual(history.count, 3)
+      let disk = try f.register.read().revision
+      let controller = try f.bind()
+      let advanced = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+      XCTAssertTrue(advanced)
+      XCTAssertEqual(f.page.state.session.prompt, old.session.prompt)
+      XCTAssertTrue(f.page.state.presentation === old.presentation)
+      XCTAssertEqual(try f.register.read().revision, disk)
+      for index in 0..<history.count {
+        XCTAssertEqual(f.page.state.session.generatedWordReplayHistory?.word(at: index)?.target,
+          history.word(at: index)?.target)
+      }
+    }
+  }
+
   func testProductionRepeatKeepsPrefetchedCandidateFutureThenFailsInsteadOfDrawingPastIt() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.publish(#"{"mode":"words","words":0}"#)
