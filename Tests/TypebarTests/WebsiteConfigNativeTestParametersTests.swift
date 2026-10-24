@@ -196,7 +196,7 @@ final class WebsiteConfigNativeTestParametersTests: XCTestCase {
     XCTAssertEqual(otherKeys.union(WebsiteConfigNativeTestParameters.mappedKeys).count, 76)
     let configuration = parameters.applying(to: behavior.applying(to: rules.applying(to: .timed(seconds: 15))), parameterMemory: .defaults)
     XCTAssertEqual(configuration, rules.applying(to: behavior.applying(to: parameters.applying(to: .timed(seconds: 15), parameterMemory: .defaults))))
-    let settings = keyboard.applying(to: presentation.applying(to: behavior.applying(to: rules.applying(to: AppSettingsSnapshot()))))
+    let settings = try keyboard.applying(to: presentation.applying(to: behavior.applying(to: rules.applying(to: AppSettingsSnapshot()))))
     let memory = parameters.parameterMemory(preserving: .defaults)
     let json = try SettingsJSONCommandCodec.export(settings: settings, configuration: configuration,
       layoutFluidLayouts: [.ansiQwerty, .ansiDvorak], testParameterMemory: memory)

@@ -9,10 +9,21 @@ enum WebsiteConfigPublishedPromptError: Error {
 struct WebsiteConfigPublishedPromptInputs {
   let font: NSFont
   let presentation: WebsiteConfigNativePresentation
+  let maximumTextWidth: CGFloat?
   init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID) throws {
     guard publication.owner == owner else { throw WebsiteConfigPublishedPromptError.wrongOwner }
     guard let resource = publication.font else { throw WebsiteConfigPublishedPromptError.unprepared }
     font = resource.renderingFont; presentation = publication.draft.presentation
+    if presentation.practiceTapeMode == .off, let columns = publication.draft.keyboardTypography.columns {
+      let width = columns * resource.chAdvance
+      guard width.isFinite, width > 0 else { throw WebsiteConfigPublishedPromptError.invalidGeometry }
+      maximumTextWidth = width
+    } else { maximumTextWidth = nil }
+  }
+  func width(limitedBy host: CGFloat?) throws -> CGFloat? {
+    guard let host else { return maximumTextWidth }
+    guard host.isFinite, host > 0 else { throw WebsiteConfigPublishedPromptError.invalidGeometry }
+    return maximumTextWidth.map { min($0, host) } ?? host
   }
   func validate(_ configuration: PromptCaretNativeView.Configuration, session: TypingSession) throws {
     guard configuration.font == font,
@@ -65,5 +76,6 @@ extension PromptViewportPracticePrompt {
     self.init(session: session, style: style, font: font, carets: configuration,
       wrapLayout: wrapLayout, fallbackPosition: fallbackPosition,
       onFailure: onFailure, onReady: onReady)
+    maximumTextWidth = inputs.maximumTextWidth
   }
 }

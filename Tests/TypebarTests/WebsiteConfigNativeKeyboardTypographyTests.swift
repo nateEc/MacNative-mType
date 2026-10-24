@@ -20,8 +20,6 @@ final class WebsiteConfigNativeKeyboardTypographyTests: XCTestCase {
     let expected = expected ?? runtime
     var gaps = Set<String>()
     if case .number(let size) = expected["fontSize"], !(size * 16).isFinite || size * 16 < 1 { gaps.insert("fontSize") }
-    if case .number(let width) = expected["maxLineWidth"],
-      width != 0 && (width < 30 || width > 140 || width.rounded(.towardZero) != width) { gaps.insert("maxLineWidth") }
     if case .number(let size) = expected["keymapSize"], KeyboardGuideScalePolicy.normalized(size) != size { gaps.insert("keymapSize") }
     if case .string(let name) = expected["fontFamily"], !InputTextIdentity.matches(NativePracticeFont.normalizedName(name), name) {
       gaps.insert("fontFamily")
@@ -35,7 +33,14 @@ final class WebsiteConfigNativeKeyboardTypographyTests: XCTestCase {
       }
       return
     }
-    let snapshot = try WebsiteConfigNativeKeyboardTypography(runtime: runtime, pointsPerRem: 16).applying(to: .init())
+    let draft = try WebsiteConfigNativeKeyboardTypography(runtime: runtime, pointsPerRem: 16)
+    if let width = draft.columns, width < 30 || width > 140 || width.rounded(.towardZero) != width {
+      XCTAssertThrowsError(try draft.applying(to: .init())) {
+        XCTAssertEqual($0 as? WebsiteConfigNativeKeyboardTypographyError, .unrepresentableField("maxLineWidth"))
+      }
+      return
+    }
+    let snapshot = try draft.applying(to: .init())
     var fields = expected.filter { WebsiteConfigNativeKeyboardTypography.mappedKeys.contains($0.key) }
     if case .number(let rem) = fields["fontSize"] { fields["fontSize"] = .number(rem * 16) }
     XCTAssertEqual(try nativeFields(snapshot), fields)
@@ -127,15 +132,14 @@ final class WebsiteConfigNativeKeyboardTypographyTests: XCTestCase {
     for base in [14.0, 16, 18] {
       var runtime = defaults
       runtime["fontSize"] = .number(2.5)
-      for width in [0, 30, 80, 140] {
-        runtime["maxLineWidth"] = .number(Double(width))
+      for width in [0.0, 20, 30, 30.5, 80, 140, 1000] {
+        runtime["maxLineWidth"] = .number(width)
         let draft = try WebsiteConfigNativeKeyboardTypography(runtime: runtime, pointsPerRem: base)
         XCTAssertEqual(draft.fontSize, 2.5 * base)
         XCTAssertEqual(draft.columns, width == 0 ? nil : width)
       }
     }
     for (key, values): (String, [WebsiteConfigValue]) in [
-      ("maxLineWidth", [.number(20), .number(1000), .number(30.5)]),
       ("fontSize", [.number(0.001), .number(.infinity)])
     ] {
       for value in values {
@@ -248,8 +252,8 @@ final class WebsiteConfigNativeKeyboardTypographyTests: XCTestCase {
     before.customKeyboardLayouts = [custom]
     before.customKeyboardLayoutID = custom.id
     before.globalHotkeyEnabled = true
-    let after = keyboard.applying(to: behavior.applying(to: presentation.applying(to: rules.applying(to: before))))
-    XCTAssertEqual(after, rules.applying(to: presentation.applying(to: behavior.applying(to: keyboard.applying(to: before)))))
+    let after = try keyboard.applying(to: behavior.applying(to: presentation.applying(to: rules.applying(to: before))))
+    XCTAssertEqual(after, try rules.applying(to: presentation.applying(to: behavior.applying(to: keyboard.applying(to: before)))))
     XCTAssertEqual(after.customKeyboardLayouts, before.customKeyboardLayouts)
     XCTAssertEqual(after.customKeyboardLayoutID, custom.id)
     XCTAssertEqual(after.practiceFont, before.practiceFont)
@@ -274,7 +278,7 @@ final class WebsiteConfigNativeKeyboardTypographyTests: XCTestCase {
   func testKeyboardInputGuideAndTypographyHaveDistinctNativeMeaning() throws {
     let prepared = try WebsiteConfigNativeProfile.prepare(#"{"layout":"colemak","keymapMode":"react","keymapStyle":"split_matrix","keymapLegendStyle":"uppercase","keymapKeys":"minimal_numrow","keymapSize":1.6,"keymapLayout":"dvorak","fontFamily":"Iosevka","fontSize":3,"maxLineWidth":120}"#, context: .init())
     let mapped = try WebsiteConfigNativeKeyboardTypography(runtime: prepared.projection.runtime, pointsPerRem: 16)
-    let snapshot = mapped.applying(to: .init())
+    let snapshot = try mapped.applying(to: .init())
     XCTAssertEqual(snapshot.keyboardInputLayout.emulatedLayout, .ansiColemak)
     XCTAssertEqual(snapshot.keyboardGuideLayoutSource, .builtIn)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiDvorak)

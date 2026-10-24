@@ -56,10 +56,11 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
   }
   private struct Root: View {
     let model: Model
+    var width: CGFloat = 220
     var body: some View {
       ScrollView {
-        makePrompt().frame(width: 220)
-      }.frame(width: 220, height: 400)
+        makePrompt().frame(width: width)
+      }.frame(width: width, height: 400)
         .background(try! WebsiteConfigPublishedBackground(publication: model.publication, owner: model.owner,
           fallbackStyle: .solid, theme: AppTheme.serika_dark.resolvedTheme, reduceMotion: true))
     }
@@ -89,8 +90,9 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
   private struct InlineRoot: View {
     let model: Model
     var maximumTextWidth: CGFloat? = nil
+    var width: CGFloat = 220
     var body: some View {
-      try! Self.prompt(model, maximumTextWidth: maximumTextWidth).frame(width: 220)
+      try! Self.prompt(model, maximumTextWidth: maximumTextWidth).frame(width: width)
     }
     static func prompt(_ model: Model, maximumTextWidth: CGFloat? = nil) throws -> WebsiteConfigPublishedInlinePrompt {
       try WebsiteConfigPublishedInlinePrompt(publication: model.publication, owner: model.owner,
@@ -362,6 +364,75 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
       session.insertBatch("x", at: Date(timeIntervalSince1970: 4000)); model.session = session
       XCTAssertNoThrow(try InlineRoot.prompt(model), "A supported dedicated renderer must not be rejected: \(name)")
     }
+  }
+
+  func testCompletePublicationAcceptsEverySourceWidthDomainBoundaryAndFraction() throws {
+    let f = try Fixture(); defer { f.close() }
+    for width in [20.0, 30.5, 1000] {
+      let publication = try f.publish("{\"maxLineWidth\":\(width)}")
+      XCTAssertEqual(publication.draft.keyboardTypography.columns, width)
+      XCTAssertEqual(publication.draft.projection.runtime["maxLineWidth"], .number(width))
+      XCTAssertEqual(try f.register.read().state, .available(publication.draft.projection.runtime))
+      XCTAssertThrowsError(try publication.draft.keyboardTypography.applying(to: .init())) {
+        XCTAssertEqual($0 as? WebsiteConfigNativeKeyboardTypographyError, .unrepresentableField("maxLineWidth"))
+      }
+    }
+  }
+
+  func testCommittedZeroAdvanceSizesBothPromptConsumersAndTracksSameNameReplacement() throws {
+    let f = try Fixture(); defer { f.close() }
+    let name = "TypebarQA" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    let firstData = OwnedTestFontFixture.make(postScriptName: name, advanceWidth: 600, character: 48)
+    let secondData = OwnedTestFontFixture.make(postScriptName: name, advanceWidth: 900, character: 48)
+    for all in [false, true] {
+      let json = "{\"fontSize\":1.75,\"showAllLines\":\(all),\"maxLineWidth\":30.5,\"smoothCaret\":\"off\",\"smoothLineScroll\":false}"
+      let first = try f.publish(json, font: .data(firstData)), second = try f.publish(json, font: .data(secondData))
+      XCTAssertEqual(try XCTUnwrap(first.font?.chAdvance), 16.8, accuracy: 0.001)
+      XCTAssertEqual(try XCTUnwrap(second.font?.chAdvance), 25.2, accuracy: 0.001)
+      let model = Model(first, owner: f.owner)
+      model.session = TypingSession(configuration: .words(40), prompt: Array(repeating: "000", count: 40).joined(separator: " "))
+      model.session.insertBatch("0", at: Date(timeIntervalSince1970: 4000))
+      let attempt = model.session.automaticInputAttemptID
+      let root = all ? AnyView(Root(model: model, width: 900)) : AnyView(InlineRoot(model: model, width: 900))
+      let host = NSHostingView(rootView: root)
+      let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 900, height: 400), styleMask: .borderless, backing: .buffered, defer: false)
+      window.isReleasedWhenClosed = false; window.contentView = host
+      defer { host.rootView = AnyView(EmptyView()); window.contentView = nil; window.close() }
+      func width() -> CGFloat {
+        all ? model.ready.last?.width ?? 0 : descendants(host, PromptFieldNativeView.self).first?.bounds.width ?? 0
+      }
+      wait(host) { abs(width() - 512.4) < 1 }
+      model.publication = second
+      wait(host) { abs(width() - 768.6) < 1 }
+      XCTAssertEqual(model.session.typed, "0"); XCTAssertEqual(model.session.automaticInputAttemptID, attempt)
+      XCTAssertFalse(window.isVisible)
+    }
+    XCTAssertFalse((CTFontManagerCopyAvailablePostScriptNames() as? [String] ?? []).contains(name))
+  }
+
+  func testSourceWidthsStayFluidForZeroAndTapeAndHostLimitCannotWidenThem() throws {
+    let f = try Fixture(); defer { f.close() }
+    for json in [#"{"maxLineWidth":0}"#, #"{"maxLineWidth":20.5,"tapeMode":"letter"}"#,
+      #"{"maxLineWidth":1000,"tapeMode":"word"}"#] {
+      let publication = try f.publish(json)
+      let inputs = try WebsiteConfigPublishedPromptInputs(publication: publication, owner: f.owner)
+      XCTAssertNil(inputs.maximumTextWidth)
+      XCTAssertEqual(try inputs.width(limitedBy: 180), 180)
+      if inputs.presentation.practiceTapeMode != .off {
+        let model = Model(publication, owner: f.owner)
+        let host = NSHostingView(rootView: InlineRoot(model: model, width: 900))
+        let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 900, height: 200), styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host
+        defer { descendants(host, TapePromptNativeView.self).forEach { $0.stop() }; window.contentView = nil; window.close() }
+        wait(host) { abs((self.descendants(host, TapePromptNativeView.self).first?.bounds.width ?? 0) - 900) < 1 }
+        XCTAssertFalse(window.isVisible)
+      }
+    }
+    let publication = try f.publish(#"{"maxLineWidth":20.5}"#)
+    let inputs = try WebsiteConfigPublishedPromptInputs(publication: publication, owner: f.owner)
+    let cap = try XCTUnwrap(inputs.maximumTextWidth)
+    XCTAssertEqual(try inputs.width(limitedBy: cap + 100), cap)
+    XCTAssertEqual(try inputs.width(limitedBy: cap / 2), cap / 2)
   }
 
   private func specialSession(_ modifier: TestModifier) -> TypingSession {

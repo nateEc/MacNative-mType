@@ -34,6 +34,7 @@ struct PromptViewportPracticePrompt: View {
   let onReady: (PromptViewportPresentationReady) -> Void
   let wrapLayout: PromptInputWrapLayout?
   let fallbackPosition: PromptViewportFallbackPosition?
+  var maximumTextWidth: CGFloat? = nil
   @State private var height: CGFloat = 1
   init(session: TypingSession, style: PromptRenderStyle, font: NSFont,
     carets: PromptCaretNativeView.Configuration, wrapLayout: PromptInputWrapLayout? = nil,
@@ -49,7 +50,7 @@ struct PromptViewportPracticePrompt: View {
   var body: some View {
     PromptViewportPracticeBridge(snapshot: snapshot, onFailure: onFailure, onReady: onReady, wrapLayout: wrapLayout,
       fallbackPosition: fallbackPosition,
-      onHeight: { height = $0 }).frame(height: height)
+      onHeight: { height = $0 }).frame(height: height).frame(maxWidth: maximumTextWidth)
   }
 }
 

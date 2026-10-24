@@ -20,6 +20,8 @@ struct WebsiteConfigFontResource {
   let localFailure: LocalFailure?
   /// Prepared before publication; layout never has to resolve these by name.
   let renderingFont: NSFont
+  /// Horizontal CSS ch basis, measured with the owned face and its cascade.
+  let chAdvance: Double
   var primary: Face { faces[0] }
 
   static func compose(primary: NSFont, fallback: [NSFont]) -> NSFont {
@@ -73,8 +75,11 @@ struct WebsiteConfigFontResource {
     }
     // The final native monospace candidate is always materialized. Keep the
     // direct face descriptors; prepare the cascade before value publication.
+    let renderingFont = compose(primary: faces[0].font, fallback: faces.dropFirst().map(\.font))
+    let zero = NSAttributedString(string: "0", attributes: [.font: renderingFont])
+    let advance = CTLineGetTypographicBounds(CTLineCreateWithAttributedString(zero as CFAttributedString), nil, nil, nil)
     return .init(candidates: candidates, faces: faces, ownedLocalData: owned, localFailure: failure,
-      renderingFont: compose(primary: faces[0].font, fallback: faces.dropFirst().map(\.font)))
+      renderingFont: renderingFont, chAdvance: advance.isFinite && advance > 0 ? advance : renderingFont.pointSize * 0.5)
   }
 
   private static let lookupOptions: CTFontOptions = [.preventAutoActivation, .preventAutoDownload]

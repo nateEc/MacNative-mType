@@ -23,7 +23,8 @@ struct WebsiteConfigNativeKeyboardTypography {
   let guideLayout: KeyboardLayout?
   let fontFamily: String
   let fontSize: Double
-  let columns: Int?
+  /// Source ch count, including fractions; nil is fluid. Not legacy UI columns.
+  let columns: Double?
 
   /// The caller supplies the native rem base explicitly. The source computes
   /// rem against its root font, not a hard-coded browser/device assumption.
@@ -92,15 +93,15 @@ struct WebsiteConfigNativeKeyboardTypography {
     fontSize = points
     let width = try number("maxLineWidth")
     if width == 0 { columns = nil }
-    else {
-      guard width.rounded(.towardZero) == width,
-        Double(PracticeLineWidth.customColumnRange.lowerBound)...Double(PracticeLineWidth.customColumnRange.upperBound) ~= width
-      else { throw WebsiteConfigNativeKeyboardTypographyError.unrepresentableField("maxLineWidth") }
-      columns = Int(width)
-    }
+    else { columns = width }
   }
 
-  func applying(to snapshot: AppSettingsSnapshot) -> AppSettingsSnapshot {
+  func applying(to snapshot: AppSettingsSnapshot) throws -> AppSettingsSnapshot {
+    if let columns {
+      guard columns.rounded(.towardZero) == columns,
+        Double(PracticeLineWidth.customColumnRange.lowerBound)...Double(PracticeLineWidth.customColumnRange.upperBound) ~= columns
+      else { throw WebsiteConfigNativeKeyboardTypographyError.unrepresentableField("maxLineWidth") }
+    }
     var result = snapshot
     result.keyboardInputLayout = inputLayout
     result.keyboardGuideMode = guideMode
@@ -117,7 +118,7 @@ struct WebsiteConfigNativeKeyboardTypography {
     result.fontSize = fontSize
     if let columns {
       result.practiceLineWidth = .custom
-      result.customPracticeLineColumns = columns
+      result.customPracticeLineColumns = Int(columns)
     } else { result.practiceLineWidth = .fluid }
     return result
   }

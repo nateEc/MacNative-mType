@@ -49,9 +49,7 @@ struct WebsiteConfigPublishedInlinePrompt: View {
     latestProjection: (() -> TapePromptProjectionSnapshot?)? = nil,
     onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil) throws {
     let inputs = try WebsiteConfigPublishedPromptInputs(publication: publication, owner: owner)
-    if let maximumTextWidth, !maximumTextWidth.isFinite || maximumTextWidth <= 0 {
-      throw WebsiteConfigPublishedPromptError.invalidGeometry
-    }
+    let resolvedWidth = try inputs.width(limitedBy: maximumTextWidth)
     guard PromptFieldProjectionPolicy.supports(session.configuration) else {
       throw WebsiteConfigPublishedPromptError.requiresDifferentRenderer
     }
@@ -74,13 +72,14 @@ struct WebsiteConfigPublishedInlinePrompt: View {
       throw WebsiteConfigPublishedPromptError.inconsistentRetirement
     }
     snapshot = .init(session: session, inputs: inputs, rendering: rendering, carets: configuration, retirement: context, theme: theme)
-    self.maximumTextWidth = maximumTextWidth; self.wrapLayout = wrapLayout
+    self.maximumTextWidth = resolvedWidth; self.wrapLayout = wrapLayout
     self.fallbackPosition = fallbackPosition; self.latestProjection = latestProjection
     self.onTapeWordsRemoved = onTapeWordsRemoved
   }
 
   var body: some View {
     let s = snapshot, p = s.inputs.presentation
+    Group {
     if s.effect.usesASL || s.effect.usesChoo {
       if s.showsAllLines { special }
       else { bounded { special } }
@@ -91,6 +90,7 @@ struct WebsiteConfigPublishedInlinePrompt: View {
         latestProjection: latestProjection, onTapeWordsRemoved: onTapeWordsRemoved)
     } else if s.showsAllLines { field }
     else { bounded { field } }
+    }.frame(maxWidth: maximumTextWidth)
   }
   private func bounded<Content: View>(@ViewBuilder _ content: @escaping () -> Content) -> some View {
     let s = snapshot
