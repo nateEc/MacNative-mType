@@ -529,6 +529,45 @@ import XCTest
     XCTAssertFalse(f.window.isVisible)
   }
 
+  func testFirstApplicationCaptureRejectsActualUncommittedNativeComposition() throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    XCTAssertNil(f.state.page.state.practice, "This must exercise the initial page, not an existing profile")
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    let attempt = input.insertionAttemptID
+    // Starting composition starts the legacy timer. Capture only after that
+    // legitimate transition so the next candidate update is composition-only.
+    input.setMarkedText("中", selectedRange: .init(location: 1, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    f.wait { input.hasMarkedText() }
+    XCTAssertTrue(f.state.page.state.session.hasStarted)
+    let environment = WebsiteConfigEnvironmentSource(settings: f.settings, account: .init(defaults: f.defaults),
+      pointsPerRem: 16, documentComplete: true, development: false)
+    defer { environment.stop() }
+    let window = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let source = WebsiteConfigPracticeScopeSource(environment: environment, readWindow: { window })
+    defer { source.stop() }
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves,
+      register: f.register, environment: { environment.read() })
+    let ticket = try coordinator.prepare(#"{"mode":"words","words":10}"#,
+      for: f.state.page, refreshingWith: source)
+    let before = f.state.page.state.session.generationState
+    let disk = try f.register.read().revision
+    input.setMarkedText("中文", selectedRange: .init(location: 2, length: 0),
+      replacementRange: .init(location: NSNotFound, length: 0))
+    f.wait { input.hasMarkedText() && input.markedRange().length == 2 }
+    XCTAssertEqual(f.state.page.state.session.generationState, before)
+    XCTAssertThrowsError(try coordinator.prepareResources(for: ticket,
+      localFont: .absent, localBackground: .absent)) { error in
+      guard case WebsiteConfigCommitCoordinatorError.stale = error else { return XCTFail("Unexpected: \(error)") }
+    }
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(input.insertionAttemptID, attempt)
+    XCTAssertTrue(input.hasMarkedText())
+    XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
   func testSynchronousCommitChecksActualStartedNoQuitPageBeforeWriting() throws {
     let f = try Fixture(); defer { f.close() }
     f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }

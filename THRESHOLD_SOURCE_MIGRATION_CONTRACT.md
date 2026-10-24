@@ -1,5 +1,23 @@
 # 阈值源状态与迁移契约
 
+## 首次页面的完整应用准入（2026-10-24，起点 947406ca）
+
+上一批只有显式的原生恢复提交，不能直接拿未绑定票据接默认窗口：尚无 practice/publication 的旧页面在异步资源／生成期间仍可能接收输入。新 ApplicationCapture 直接从实际页面捕获会话 generation、附着、输入法活动、可选配置发布身份及离场／重复状态；保留当前统计与词形书，不伪造已发布草稿或从初始种子猜当前值。纯时钟推进仍不在 generation 中，真正结束会改变 finished 而失效。
+
+协调器新增绑定页面与 WebsiteConfigPracticeScopeSource 的完整 JSON／原生恢复入口。请求一开始就退休旧意图，即使活动 No Quit 或其他准入随后失败。实际窗口内容由同一环境来源刷新，先检查拥有者与环境，再在异步读取、构建和最终页面预留处验证。绑定后只能由捕获的内容生成并提交到同一页面，不能借 raw producer、其他 scope、其他页面或仅写文件绕过；显式旧低层未绑定 API 不因本批冒称已安全自动接线。缺失恢复不读取无用内容、不创建默认记录。
+
+有界会话内决策复核（非独立评审）保留旧路径，新增专用首次应用凭据，而不是把 GenerationCapture.publication 改成任意可空并削弱原编辑／重开契约。反例覆盖首次普通输入、输入后删除回空、纯输入法候选更新、附着往返、窗口内容 ABA、Lease ABA、来源停止及内容回调重入／改页面；均须在写盘前拒绝。绑定成功以后仍沿现有 CAS，不另建偏好域或持久化格式，不更改真实用户路径和数据库。
+
+行为优先检查先出现缺少新重载的编译失败，同时修正测试误用 backspace 和回调 throws 的夹具错误，不把它们称为行为红测。首批 39 项通过。新增实际隐藏窗口检查的第一次 57 项中一项失败：首次 setMarkedText 经 ContentView.onCompositionStarted→beginComposition 启动了计时，started 从 false 变 true，不是候选更新偷偷增加输入事件。根因排查后将夹具先启动组合，再捕获并更新候选；保留 generation 全等断言、真实未提交 markedText、输入实例／尝试身份、文件版本不变及 window.isVisible=false，产品启动计时规则未改。
+
+本批实现的是正式首次导入／恢复必需的安全入口，不等于默认用户界面已经提供导入。私有目录、默认组合根、实际窗口内容供应者、默认资源／在线源、恢复提示、完整应用的源离场记账及即时消费者仍待接线；不能直接解除旧设置 JSON 或完整配置编辑保护。下一步默认入口必须使用这组绑定重载，不能退回上一批未绑定 prepareRestoration()。完整重写目标继续 active，最终验证见本节后续记录。
+
+最终定向 57 项零失败／零跳过（14.564 秒）；最终相关扩大 564 项零失败／零跳过（217.363 秒），含十一项新增核心、一项新增真实隐藏宿主及原滚轮（1.676 秒），没有排除项。首次 39 项、改夹具前 57 项和最终集合重叠不相加；中间失败不记通过。源码原创性及固定证据检查通过（47 直接、119 原生符号、17 支持规范）；1,310 条人工清单仅结构检查，不是人工验收。日志 `/tmp/typebar-initial-admission-{red,focused,final-focused,fixed-focused,expanded,originality,reference,manual,package}.log`。
+
+扩大及后续打包期间 Swift 未改。SHA-256：PracticePageSessionStore `5eccf4e39ed082376487f81ea3c0d13cbcc01374a2fb0e06ac91635bf952cb2f`；WebsiteConfigCommitCoordinator `824f4a66e4aa92565906b2bc103b7411a4ca932e441b7634b027ca3c0554e84c`；WebsiteConfigInitialPageAdmissionTests `7f33c48e906d606f25803675949299bea5aea2cec246cd102bc14097f36ab6e5`；WebsiteConfigPracticeHostTests `64ffa1a329a5bffd2b6821bab1bb6aa3a7536a91f71bfcc77121c1b7cfbbe275`。没有启动 Typebar 主程序，参考工作树保持固定 91bd24bb 且干净。
+
+Debug 打包、签名、源码／包资源原创性检查通过，未启动主程序。推送前 main 仍为 8c52fb13、开发分支为 947406ca，无开发分支打开 PR；Actions 826 次，最近 39118939684 成功。本批只集中推开发分支，不修改工作流、通知设置或 main。
+
 ## 原生记录的恢复提交链路（2026-10-24，起点 88291f38）
 
 固定参考 `config/lifecycle.ts` 的 loadFromLocalStorage 会把存储值交给 applyConfig，再保存最终运行值；不是把浏览器导入通知当成冷恢复事件。本批把已有 nativeState 恢复解析接到协调器的资源／练习／页面提交协议，不将本机二进制安全载体重新编码为网站 JSON。草稿保留 restored/nativeState 来源及 loaded 原值，并按当前账户、文档状态和布局尺度重新投影所有字段。

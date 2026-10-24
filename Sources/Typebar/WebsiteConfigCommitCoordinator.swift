@@ -28,6 +28,7 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let disk: WebsiteConfigFileRegister.Revision
     fileprivate weak var sourcePage: PracticePageSessionStore?
     fileprivate var pageCapture: PracticePageSessionStore.GenerationCapture?
+    fileprivate var applicationCapture: PracticePageSessionStore.ApplicationCapture?
     fileprivate weak var contentSource: WebsiteConfigPracticeScopeSource?
     fileprivate var contentCapture: WebsiteConfigPracticeScopeSource.Snapshot?
   }
@@ -156,6 +157,48 @@ final class WebsiteConfigCommitCoordinator {
       guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
       return .prepared(prepared)
     }
+  }
+
+  /// Full application bound to current window input/content, including the
+  /// first application where no published profile or generated scope exists.
+  func prepare(_ json: String, for page: PracticePageSessionStore,
+    refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> Prepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    request = UUID()
+    let capture = try page.captureApplication(router: router)
+    return try bindApplication(prepare(json), to: page, capture: capture, source: source)
+  }
+
+  func prepareRestoration(for page: PracticePageSessionStore,
+    refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> Restoration {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    request = UUID()
+    let capture = try page.captureApplication(router: router)
+    let restoration = try prepareRestoration()
+    guard page.isCurrent(capture, router: router) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    switch restoration {
+    case .missing, .unavailable: return restoration
+    case .prepared(let prepared):
+      return .prepared(try bindApplication(prepared, to: page, capture: capture, source: source))
+    }
+  }
+
+  private func bindApplication(_ prepared: Prepared, to page: PracticePageSessionStore,
+    capture: PracticePageSessionStore.ApplicationCapture,
+    source: WebsiteConfigPracticeScopeSource) throws -> Prepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true
+    defer { processing = false }
+    guard isCurrent(prepared), page.isCurrent(capture, router: router) else {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
+    let content = try source.capture(owner: page.owner, preserving: capture.scope)
+    guard content.environment == prepared.environment else { throw WebsiteConfigCommitCoordinatorError.stale }
+    var bound = prepared
+    bound.sourcePage = page; bound.applicationCapture = capture
+    bound.contentSource = source; bound.contentCapture = content
+    guard isCurrent(bound) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return bound
   }
 
   /// Admit a setter against this coordinator's latest committed document, not
@@ -340,7 +383,9 @@ final class WebsiteConfigCommitCoordinator {
   func prepareSession(for prepared: ResourcesPrepared,
     generate: @MainActor (WebsiteConfigNativeDraft) async throws -> TypingSession) async throws -> SessionPrepared {
     try await prepareSessionBuild(for: prepared) { draft in
-      guard prepared.configuration.pageCapture == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
+      guard prepared.configuration.pageCapture == nil, prepared.configuration.applicationCapture == nil else {
+        throw WebsiteConfigCommitCoordinatorError.sessionNotReady
+      }
       return (try await generate(draft), nil)
     }
   }
@@ -522,7 +567,14 @@ final class WebsiteConfigCommitCoordinator {
     } else { checkedExternal = nil }
     return try await prepareSessionBuild(for: prepared) { draft in
       let effectiveScope: WebsiteConfigSessionBuilder.Scope
-      if let capture = prepared.configuration.pageCapture {
+      if prepared.configuration.applicationCapture != nil {
+        guard scope == nil, let content = prepared.configuration.contentCapture else {
+          throw WebsiteConfigCommitCoordinatorError.sessionNotReady
+        }
+        // The bound source owns content; captured books remain from the actual
+        // page. Never substitute a caller-supplied scope for either one.
+        effectiveScope = content.scope
+      } else if let capture = prepared.configuration.pageCapture {
         guard scope == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
         effectiveScope = prepared.configuration.contentCapture?.scope ?? capture.scope
       } else {
@@ -603,7 +655,7 @@ final class WebsiteConfigCommitCoordinator {
     defer { processing = false }
     guard session != nil || sessionRequest != prepared.request else { return .stale }
     guard isCurrent(prepared) else { retire(prepared); return .stale }
-    if prepared.pageCapture != nil {
+    if prepared.pageCapture != nil || prepared.applicationCapture != nil {
       guard let source = prepared.sourcePage, page === source else { throw PracticePageSessionStateError.wrongOwner }
     }
     if session != nil { try Task.checkCancellation() }
@@ -619,7 +671,8 @@ final class WebsiteConfigCommitCoordinator {
       }
       appearance = try WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
         applicationID: applicationID, systemIsDark: systemIsDark)
-      try page.beginCommit(owner: prepared.owner, router: router, capture: prepared.pageCapture)
+      try page.beginCommit(owner: prepared.owner, router: router, capture: prepared.pageCapture,
+        applicationCapture: prepared.applicationCapture)
     } else { appearance = nil }
     defer { page?.endCommit() }
     let outcome: WebsiteConfigFileRegister.Commit
@@ -661,6 +714,9 @@ final class WebsiteConfigCommitCoordinator {
   private func matchesPage(_ prepared: Prepared) -> Bool {
     if let content = prepared.contentCapture {
       guard let source = prepared.contentSource, source.isCurrent(content) else { return false }
+    }
+    if let application = prepared.applicationCapture {
+      guard let page = prepared.sourcePage, page.isCurrent(application, router: router) else { return false }
     }
     guard let capture = prepared.pageCapture else { return true }
     guard let page = prepared.sourcePage else { return false }

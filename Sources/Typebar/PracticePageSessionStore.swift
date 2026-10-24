@@ -26,6 +26,43 @@ final class PracticePageSessionStore {
     var testActive: Bool { session.started && !session.finished }
   }
 
+  /// A full application may start before this window has any website profile.
+  /// This captures the actual initial/legacy attempt, not a fabricated seed.
+  struct ApplicationCapture {
+    let scope: WebsiteConfigSessionBuilder.Scope
+    fileprivate let lease: PreferenceConfigurationSaveRouter.Lease
+    fileprivate let attachment: UUID
+    fileprivate let compositionActivity: UUID
+    fileprivate let session: TypingSession.GenerationState
+    fileprivate let publication: UUID?
+    fileprivate let repetition: WebsitePracticeRepetition?
+    fileprivate let restartDeparture: UUID?
+  }
+
+  func captureApplication(router: PreferenceConfigurationSaveRouter) throws -> ApplicationCapture {
+    guard !committing, self.router === router, let lease = router.captureLease(), lease.owner == owner else {
+      throw PracticePageSessionStateError.wrongOwner
+    }
+    let session = state.session
+    guard !session.hasStarted || session.isFinished || !session.configuration.modifiers.contains(.noQuit) else {
+      throw PracticePageSessionStateError.locked
+    }
+    var scope = state.practice?.scope ?? .init()
+    scope.weakSpotScores = session.liveWeakSpotScores
+    scope.decorationState = session.liveWordDecorationState
+    return .init(scope: scope, lease: lease, attachment: attachment, compositionActivity: compositionActivity,
+      session: session.generationState, publication: state.presentation?.publication.applicationID,
+      repetition: state.practice?.repetition, restartDeparture: state.restartDepartureAttemptID)
+  }
+  func isCurrent(_ capture: ApplicationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
+    !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
+      && capture.attachment == attachment && capture.compositionActivity == compositionActivity
+      && state.session.generationState == capture.session
+      && state.presentation?.publication.applicationID == capture.publication
+      && state.practice?.repetition == capture.repetition
+      && state.restartDepartureAttemptID == capture.restartDeparture
+  }
+
   func captureGeneration(router: PreferenceConfigurationSaveRouter) throws -> GenerationCapture {
     guard !committing, self.router === router, let lease = router.captureLease(), lease.owner == owner else {
       throw PracticePageSessionStateError.wrongOwner
@@ -105,11 +142,13 @@ final class PracticePageSessionStore {
   /// No suspension or fallible receiver is permitted while this reservation
   /// lives; observation callbacks from the final assignment remain guarded.
   func beginCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
-    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture? = nil) throws {
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture? = nil,
+    applicationCapture: ApplicationCapture? = nil) throws {
     guard !committing else { throw PracticePageSessionStateError.stale }
     guard self.router === router, lease.owner == owner else { throw PracticePageSessionStateError.wrongOwner }
     guard router.isCurrent(lease) else { throw PracticePageSessionStateError.stale }
     if let capture, !isCurrent(capture, router: router) { throw PracticePageSessionStateError.stale }
+    if let applicationCapture, !isCurrent(applicationCapture, router: router) { throw PracticePageSessionStateError.stale }
     let session = state.session
     guard !session.hasStarted || session.isFinished || !session.configuration.modifiers.contains(.noQuit) else {
       throw PracticePageSessionStateError.locked
