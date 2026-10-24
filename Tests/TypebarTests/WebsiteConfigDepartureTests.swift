@@ -132,6 +132,7 @@ import TypebarSystem
     guard case .available(let runtime) = try f.register.read().state else { return XCTFail("Missing saved setter") }
     XCTAssertEqual(runtime["language"], .string("arabic"))
     XCTAssertEqual(runtime["lazyMode"], .bool(false), "The listener's nosave setter is runtime-only at departure")
+    let disk = try f.register.read().revision
     XCTAssertTrue(f.coordinator.cancel(ticket))
     let resumed = try f.coordinator.resumeConfigurationRestart(for: f.page)
     let resources = try f.coordinator.prepareResources(for: resumed, localFont: .absent, localBackground: .absent)
@@ -141,6 +142,77 @@ import TypebarSystem
     }
     XCTAssertEqual(publication.draft.projection.events.filter { $0.key == "lazyMode" }.count, 1,
       "Resuming initialization must not replay the language listener")
+    XCTAssertTrue(publication.draft.generators.lazyMode)
+    guard case .available(let deliveredRuntime) = try f.register.read().state else { return XCTFail("Missing record") }
+    XCTAssertEqual(deliveredRuntime["lazyMode"], .bool(false), "Delivery is not a source save event")
+    XCTAssertEqual(try f.register.read().revision, disk, "A runtime-only listener must not cause a second write")
+  }
+
+  func testLaterSetterSavesWholeRuntimeIncludingPreviouslyNosaveLazyValue() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4,"language":"spanish","lazyMode":false}"#)
+    f.input()
+    let language = WebsiteConfigPracticeEdit.language("arabic")
+    try await f.finish(f.accept(f.edit(language), action: language))
+    let disk = try f.register.read().revision
+    let next = try await f.coordinator.prepareNext(for: f.page)
+    guard case .advanced = try f.coordinator.advance(next, to: f.page) else { return XCTFail("Next failed") }
+    XCTAssertTrue(f.page.state.session.configuration.modifiers.contains(.lazyLatin))
+    XCTAssertEqual(try f.register.read().revision, disk, "Ordinary next does not save config")
+    f.input()
+    let words = WebsiteConfigPracticeEdit.words(6)
+    let ticket = try f.accept(f.edit(words), action: words)
+    guard case .available(let runtime) = try f.register.read().state else { return XCTFail("Missing setter record") }
+    XCTAssertEqual(runtime["words"], .number(6))
+    XCTAssertEqual(runtime["lazyMode"], .bool(true), "A saving setter serializes the complete current Config")
+    let saved = try f.register.read().revision
+    XCTAssertNotEqual(saved, disk)
+    try await f.finish(ticket)
+    XCTAssertEqual(try f.register.read().revision, saved)
+  }
+
+  func testSameValueSavingGenerationEventStillPersistsRuntimeOverride() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4,"language":"hindi","lazyMode":true}"#)
+    XCTAssertTrue(f.page.state.presentation?.publication.draft.lazyMemory.remember == true)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.language("arabic")
+    let ticket = try f.accept(f.edit(action), action: action)
+    XCTAssertTrue(ticket.draft.generators.lazyMode)
+    let disk = try f.register.read().revision
+    try await f.finish(ticket)
+    let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertTrue(draft.projection.events.contains {
+      $0.key == "lazyMode" && $0.previousValue == .bool(true) && $0.newValue == .bool(true) && $0.nosave == false
+    })
+    guard case .available(let runtime) = try f.register.read().state else { return XCTFail("Missing generation save") }
+    XCTAssertEqual(runtime["lazyMode"], .bool(true))
+    XCTAssertFalse(try f.register.read().lazyMemory.remember)
+    XCTAssertNotEqual(try f.register.read().revision, disk)
+  }
+
+  func testColdCoordinatorRestoresSavedValueInsteadOfPreviousRuntimeOverride() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4,"language":"spanish","lazyMode":false}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.language("arabic")
+    try await f.finish(f.accept(f.edit(action), action: action))
+    XCTAssertTrue(f.page.state.session.configuration.modifiers.contains(.lazyLatin))
+    let disk = try f.register.read().revision
+    let coldPage = PracticePageSessionStore()
+    let coldRouter = PreferenceConfigurationSaveRouter()
+    coldRouter.register(owner: coldPage.owner, save: { XCTFail("No legacy write") })
+    coldPage.attach(to: coldRouter); defer { coldPage.detach() }
+    let cold = WebsiteConfigCommitCoordinator(router: coldRouter, register: f.register,
+      environment: { .init(revision: f.epoch, context: .init(), pointsPerRem: 16) })
+    guard case .prepared(let ticket) = try cold.prepareRestoration() else { return XCTFail("Record unavailable") }
+    XCTAssertFalse(ticket.draft.generators.lazyMode)
+    let resources = try cold.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    let ready = try await cold.preparePractice(for: resources, scope: .init())
+    guard case .committed = try cold.commit(ready, to: coldPage, systemIsDark: false) else { return XCTFail("Cold restore failed") }
+    XCTAssertFalse(coldPage.state.session.configuration.modifiers.contains(.lazyLatin))
+    XCTAssertEqual(coldPage.state.session.configuration.language, .arabic)
+    XCTAssertEqual(try f.register.read().revision, disk, "Cold restore must not repair a deliberate runtime/storage difference")
   }
 
   func testUnsupportedLanguageLazyNormalizationWaitsUntilGeneration() async throws {

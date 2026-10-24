@@ -26,6 +26,9 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let owner: PreferenceConfigurationSaveRouter.Lease
     fileprivate let environment: Environment
     fileprivate var disk: WebsiteConfigFileRegister.Revision
+    /// The accepted setter snapshot can differ from runtime after nosave
+    /// listeners. Delivery alone must not turn those listeners into saves.
+    fileprivate var savedDraft: WebsiteConfigNativeDraft?
     fileprivate weak var sourcePage: PracticePageSessionStore?
     fileprivate var pageCapture: PracticePageSessionStore.GenerationCapture?
     fileprivate var applicationCapture: PracticePageSessionStore.ApplicationCapture?
@@ -89,6 +92,7 @@ final class WebsiteConfigCommitCoordinator {
   struct ConfigurationDeparture {
     let id: UUID
     let draft: WebsiteConfigNativeDraft
+    fileprivate let savedDraft: WebsiteConfigNativeDraft
     fileprivate let disk: WebsiteConfigFileRegister.Revision
     fileprivate let identity: UUID
     fileprivate let environment: Environment
@@ -153,7 +157,7 @@ final class WebsiteConfigCommitCoordinator {
       departed.priorAttemptLedger.recordRestart(engagedDuration: measurement.engagedDuration,
         accuracy: measurement.accuracy, savingEnabled: prepared.draft.behavior.saveCompletedResults)
     }
-    departed.configurationDeparture = .init(id: UUID(), draft: applied, disk: disk,
+    departed.configurationDeparture = .init(id: UUID(), draft: applied, savedDraft: saved, disk: disk,
       identity: identity, environment: prepared.environment, contentSource: prepared.contentSource,
       requiresContentSource: prepared.contentCapture != nil, repetition: repetition, quote: previous.quote,
       wordHistory: departed.session.generatedWordReplayHistory)
@@ -162,7 +166,7 @@ final class WebsiteConfigCommitCoordinator {
     page.endCommit()
     guard let refreshed = try? page.captureGeneration(router: router) else { return .acceptedRetired }
     var admitted = prepared
-    admitted.draft = applied; admitted.disk = disk; admitted.pageCapture = refreshed
+    admitted.draft = applied; admitted.savedDraft = saved; admitted.disk = disk; admitted.pageCapture = refreshed
     return .accepted(admitted)
   }
   /// Retry only initialization. Never re-run the accepted setter or measure
@@ -182,6 +186,7 @@ final class WebsiteConfigCommitCoordinator {
       try register.read().revision == pending.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
     var prepared = Prepared(draft: pending.draft, identity: identity, request: request,
       owner: owner, environment: context, disk: pending.disk)
+    prepared.savedDraft = pending.savedDraft
     prepared.sourcePage = page; prepared.pageCapture = capture
     if pending.requiresContentSource {
       guard let source = pending.contentSource else { throw WebsiteConfigCommitCoordinatorError.unavailable }
@@ -687,6 +692,14 @@ final class WebsiteConfigCommitCoordinator {
       throw WebsiteConfigSessionBuildError.reconfigurationRequired(["lazyMode": .bool(draft.generators.lazyMode)])
     }
     var configuration = resources.configuration; configuration.draft = draft
+    if var saved = configuration.savedDraft {
+      if WebsiteConfigLazyModeLifecycle.savesConfigurationDuringGeneration(from: original, to: draft) {
+        saved = draft
+      }
+      // Independent listener memory is durable even if no Config save occurs.
+      saved.lazyMemory = draft.lazyMemory
+      configuration.savedDraft = saved
+    }
     let prepared = ResourcesPrepared(configuration: configuration, admission: resources.admission,
       background: resources.background, font: resources.font)
     let checkedExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
@@ -824,7 +837,7 @@ final class WebsiteConfigCommitCoordinator {
     let restoringNative: Bool
     if case .restored(let value) = prepared.draft.origin, case .nativeState = value.origin { restoringNative = true }
     else { restoringNative = false }
-    do { outcome = try register.commit(prepared.draft, replacing: prepared.disk,
+    do { outcome = try register.commit(prepared.savedDraft ?? prepared.draft, replacing: prepared.disk,
       preservingUnchanged: restoringNative || prepared.pageCapture?.configurationDeparture != nil) }
     catch WebsiteConfigFileRegisterError.busy { return .busy }
     switch outcome {

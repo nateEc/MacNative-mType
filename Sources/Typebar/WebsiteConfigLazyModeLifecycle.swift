@@ -3,6 +3,13 @@ import Foundation
 /// Value-owned test-page listener and generation transition. Memory is
 /// installed only with the complete configuration, never in old defaults.
 @MainActor enum WebsiteConfigLazyModeLifecycle {
+  /// A same-value setter still saves. Compare events, not final value equality;
+  /// earlier application events must not be mistaken for new init saves.
+  static func savesConfigurationDuringGeneration(from original: WebsiteConfigNativeDraft,
+    to prepared: WebsiteConfigNativeDraft) -> Bool {
+    prepared.projection.events.dropFirst(original.projection.events.count).contains { $0.nosave == false }
+  }
+
   static func prepare(_ draft: WebsiteConfigNativeDraft, pointsPerRem: Double,
     replayApplicationEvents: Bool) throws -> WebsiteConfigNativeDraft {
     let applied = replayApplicationEvents ? try applyingEvents(draft, pointsPerRem: pointsPerRem) : draft

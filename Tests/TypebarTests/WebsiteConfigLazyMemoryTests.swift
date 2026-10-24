@@ -123,6 +123,7 @@ import XCTest
       let lazy: Bool
       let memory: WebsiteConfigLazyModeMemory
       let events: [WebsiteConfigApplicationEvent]
+      let saves: Int
     }
     struct Fixture: Decodable {
       let current: [String: WebsiteConfigValue]
@@ -133,6 +134,7 @@ import XCTest
       let lazy: Bool
       let after: WebsiteConfigLazyModeMemory
       let events: [WebsiteConfigApplicationEvent]
+      let saves: Int
     }
     struct Output: Decodable { let fixtures: [Fixture] }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -165,6 +167,8 @@ import XCTest
       let resolved = try WebsiteConfigLazyModeLifecycle.prepare(draft, pointsPerRem: 16,
         replayApplicationEvents: replay)
       let staged = try WebsiteConfigLazyModeLifecycle.prepare(applied, pointsPerRem: 16, replayApplicationEvents: false)
+      XCTAssertEqual(WebsiteConfigLazyModeLifecycle.savesConfigurationDuringGeneration(from: applied, to: staged),
+        fixture.saves > fixture.stage.saves, "source Config LS save calls \(index)")
       XCTAssertEqual(staged.projection.events, resolved.projection.events, "split and combined event order \(index)")
       XCTAssertEqual(staged.lazyMemory, resolved.lazyMemory, "split and combined memory \(index)")
       XCTAssertEqual(staged.generators.lazyMode, resolved.generators.lazyMode, "split and combined value \(index)")
