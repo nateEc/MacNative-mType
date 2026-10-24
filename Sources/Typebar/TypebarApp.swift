@@ -2619,8 +2619,15 @@ private struct ContentView: View {
         if let words = session.configuration.wordLimit { LabeledContent("词数", value: "\(words)") }
         if let quote = practice.quote { Text(quote.title).foregroundStyle(.secondary) }
         if let publication = pageSession.presentation?.publication {
+          let departureID = pageSession.configurationDeparture?.id
           WebsiteConfigPracticeEditor(draft: publication.draft,
-            canEdit: (!session.hasStarted || session.isFinished) && pageSessionStore.restartController?.isPreparing != true,
+            canEdit: pageSessionStore.restartController?.isPreparing != true,
+            pendingPreparation: pageSession.configurationDeparture != nil,
+            resume: { [departureID] in
+              guard let departureID else { throw WebsiteConfigImportWorkflowError.conflict }
+              return try await importWorkflow().resumeAndBegin(departureID: departureID,
+                systemIsDark: systemColorScheme == .dark)
+            },
             apply: { [applicationID = publication.applicationID] edit in
               try await importWorkflow().editAndBegin(edit, replacing: applicationID,
                 systemIsDark: systemColorScheme == .dark)
@@ -6668,7 +6675,6 @@ private struct ContentView: View {
   }
 
   private func importWorkflow() throws -> WebsiteConfigImportWorkflow {
-    guard !session.hasStarted || session.isFinished else { throw WebsiteConfigImportWorkflowError.activeAttempt }
     guard activeChallengeID == nil, wordPractice == nil else {
       throw WebsiteConfigImportWorkflowError.unsupportedPractice
     }

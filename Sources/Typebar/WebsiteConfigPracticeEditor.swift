@@ -37,6 +37,12 @@ import SwiftUI
     start(.language(name), apply: apply)
   }
   func start(_ edit: WebsiteConfigPracticeEdit, apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
+    startPreparation { try await apply(edit) }
+  }
+  func resume(apply: @escaping @MainActor () async throws -> String) {
+    startPreparation(apply)
+  }
+  private func startPreparation(_ apply: @escaping @MainActor () async throws -> String) {
     guard !isWorking else { return }
     let current = UUID(); request = current
     isWorking = true; message = nil
@@ -44,14 +50,15 @@ import SwiftUI
       guard let self else { return }
       defer { if self.request == current { self.isWorking = false; self.work = nil } }
       do {
-        let message = try await apply(edit)
+        let message = try await apply()
         guard self.request == current, !Task.isCancelled else { return }
         self.message = message
       } catch {
         guard self.request == current, !Task.isCancelled else { return }
         if let error = error as? WebsiteConfigImportWorkflowError { self.message = error.localizedDescription }
+        else if let error = error as? WebsiteConfigSavedPreparationError { self.message = error.localizedDescription }
         else {
-          self.message = "设置未应用。请检查参数、所选模式所需的文本或引语；窗口和配置变化后请重新打开设置。"
+          self.message = "练习准备未完成。请检查参数、文本或引语；若设置已保存，可继续准备，或在导入面板恢复配置。"
         }
       }
     }
@@ -69,7 +76,7 @@ import SwiftUI
   }
   func cancel() {
     request = UUID(); work?.cancel(); work = nil; isWorking = false
-    message = "准备已取消；未完成的设置不会应用。"
+    message = "准备已取消；已保存的设置保留，尚未保存的更改不会应用。"
   }
 }
 
@@ -80,27 +87,44 @@ struct WebsiteConfigPracticeEditor: View {
   let parameters: WebsiteConfigNativeTestParameters
   private let importedQuoteGroups: [Int]
   let canEdit: Bool
+  let pendingPreparation: Bool
+  let resume: (@MainActor () async throws -> String)?
   let apply: @MainActor (WebsiteConfigPracticeEdit) async throws -> String
-  init(draft: WebsiteConfigNativeDraft, canEdit: Bool,
+  init(draft: WebsiteConfigNativeDraft, canEdit: Bool, pendingPreparation: Bool = false,
+    resume: (@MainActor () async throws -> String)? = nil,
     apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     parameters = draft.testParameters; importedQuoteGroups = draft.quoteSelection.groups
     self.canEdit = canEdit; self.apply = apply
+    self.pendingPreparation = pendingPreparation; self.resume = resume
     _form = State(initialValue: .init(draft: draft))
   }
   init(form: WebsiteConfigPracticeEditForm, parameters: WebsiteConfigNativeTestParameters, canEdit: Bool,
+    pendingPreparation: Bool = false, resume: (@MainActor () async throws -> String)? = nil,
     apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     _form = State(initialValue: form); self.parameters = parameters; self.canEdit = canEdit; self.apply = apply
     importedQuoteGroups = form.quoteLengths
+    self.pendingPreparation = pendingPreparation; self.resume = resume
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
+      if pendingPreparation {
+        VStack(alignment: .leading, spacing: 6) {
+          Label("设置已保存", systemImage: "checkmark.circle").font(.subheadline.weight(.semibold))
+          Text("旧练习已结束，新练习尚未准备完成。取消不会撤回已保存的设置。")
+            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+          if let resume {
+            Button("继续准备新练习") { form.resume(apply: resume) }
+              .disabled(form.isWorking).accessibilityIdentifier("website-config-resume-preparation")
+          }
+        }.accessibilityIdentifier("website-config-saved-pending")
+      }
       HStack {
         Picker("模式", selection: $form.mode) {
           ForEach(TestMode.allCases, id: \.self) { Text($0.displayName).tag($0) }
         }
         Button("应用模式") { form.start(.mode(form.mode), apply: apply) }
           .accessibilityIdentifier("website-config-apply-mode")
-      }.disabled(!canEdit || form.isWorking)
+      }.disabled(!canEdit || form.isWorking || pendingPreparation)
       if parameters.mode == .time || parameters.mode == .words {
         HStack {
           Text(parameters.mode == .time ? "秒数" : "词数")
@@ -110,18 +134,18 @@ struct WebsiteConfigPracticeEditor: View {
           Button(parameters.mode == .time ? "应用时长" : "应用词数") {
             form.startLimit(timed: parameters.mode == .time, apply: apply)
           }.accessibilityIdentifier("website-config-apply-limit")
-        }.disabled(!canEdit || form.isWorking)
+        }.disabled(!canEdit || form.isWorking || pendingPreparation)
       }
       VStack(alignment: .leading, spacing: 6) {
         PracticeLanguagePicker(languages: WebsiteConfigPracticeEditForm.languages, selection: $form.language)
         HStack { Spacer(); Button("应用语言") { form.startLanguage(apply: apply) }
           .accessibilityIdentifier("website-config-apply-language") }
-      }.disabled(!canEdit || form.isWorking)
+      }.disabled(!canEdit || form.isWorking || pendingPreparation)
       HStack {
         Picker("简化输入", selection: $form.lazyMode) { Text("关闭").tag(false); Text("开启").tag(true) }
         Button("应用并重开") { form.start(.lazyMode(form.lazyMode), apply: apply) }
           .accessibilityIdentifier("website-config-apply-lazy-mode")
-      }.disabled(!canEdit || form.isWorking)
+      }.disabled(!canEdit || form.isWorking || pendingPreparation)
       Text(form.remembersLazyMode ? "已记住简化输入；切换到支持的词源会恢复。" : "Arabic 单独记住开关；词源不支持时会临时关闭简化输入。")
         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       HStack {
@@ -130,14 +154,14 @@ struct WebsiteConfigPracticeEditor: View {
         }
         Button("应用难度") { form.start(.difficulty(form.difficulty), apply: apply) }
           .accessibilityIdentifier("website-config-apply-difficulty")
-      }.disabled(!canEdit || form.isWorking)
+      }.disabled(!canEdit || form.isWorking || pendingPreparation)
       if parameters.mode != .zen {
         HStack {
           Toggle("标点", isOn: Binding(get: { parameters.contentOptions.includePunctuation },
             set: { form.start(.punctuation($0), apply: apply) }))
           Toggle("数字", isOn: Binding(get: { parameters.contentOptions.includeNumbers },
             set: { form.start(.numbers($0), apply: apply) }))
-        }.disabled(!canEdit || form.isWorking || parameters.mode == .quote)
+        }.disabled(!canEdit || form.isWorking || pendingPreparation || parameters.mode == .quote)
       }
       if parameters.mode == .quote {
         VStack(alignment: .leading, spacing: 6) {
@@ -155,9 +179,9 @@ struct WebsiteConfigPracticeEditor: View {
             Button("应用引语长度") { form.start(.quoteLengths(form.quoteLengths), apply: apply) }
               .accessibilityIdentifier("website-config-apply-quote-length")
           }
-        }.disabled(!canEdit || form.isWorking)
+        }.disabled(!canEdit || form.isWorking || pendingPreparation)
       }
-      Text(canEdit ? "应用或切换标点／数字后保存并开始新练习；其他完整配置保持不变。词数／秒数为 0 表示无限。" : "请等待练习准备完成，或先结束当前练习。")
+      Text(pendingPreparation ? "可继续准备，或在导入面板恢复配置。" : canEdit ? "应用会保存设置并重开；进行中的练习将结束。词数／秒数为 0 表示无限。" : "请等待上一项练习准备完成。")
         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       if form.isWorking {
         HStack {

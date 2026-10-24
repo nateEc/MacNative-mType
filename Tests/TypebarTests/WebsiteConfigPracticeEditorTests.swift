@@ -1,4 +1,5 @@
 import AppKit
+import Observation
 import SwiftUI
 import XCTest
 @testable import Typebar
@@ -72,6 +73,87 @@ import XCTest
     form.startLanguage(apply: { edits.append($0); return "applied" }); await settle(form)
     XCTAssertEqual(edits, [.language("arabic")])
     XCTAssertFalse(WebsiteConfigPracticeEditForm.languages.contains(.mixedLanguages))
+  }
+
+  func testResumeUsesSameSingleFlightAndCancellationDoesNotPromiseRollback() async throws {
+    let form = WebsiteConfigPracticeEditForm(parameters: try parameters())
+    var continuation: CheckedContinuation<String, Never>?
+    var calls = 0
+    form.resume { calls += 1; return await withCheckedContinuation { continuation = $0 } }
+    form.resume { calls += 1; return "unexpected" }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while continuation == nil && ContinuousClock.now < deadline { await Task.yield() }
+    XCTAssertEqual(calls, 1); XCTAssertTrue(form.isWorking)
+    form.cancel()
+    XCTAssertTrue(form.message?.contains("已保存的设置保留") == true)
+    let cancelled = form.message
+    continuation?.resume(returning: "late resume")
+    for _ in 0..<10 { await Task.yield() }
+    XCTAssertEqual(form.message, cancelled)
+    form.resume { throw WebsiteConfigSavedPreparationError(underlying: NSError(domain: "owned-provider", code: 1)) }
+    await settle(form)
+    XCTAssertTrue(form.message?.contains("设置已保存") == true)
+    XCTAssertTrue(form.message?.contains("继续准备") == true)
+  }
+
+  @MainActor @Observable final class PendingState { var pending = false }
+  private func render(_ host: NSView) {
+    host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+  }
+  @MainActor private struct RetainedEditor: View {
+    let state: PendingState
+    let form: WebsiteConfigPracticeEditForm
+    let parameters: WebsiteConfigNativeTestParameters
+    var body: some View {
+      WebsiteConfigPracticeEditor(form: form, parameters: parameters, canEdit: true,
+        pendingPreparation: state.pending, resume: { "resumed" }, apply: { _ in "applied" })
+    }
+  }
+
+  func testSavedPendingPresentationKeepsEditorTaskAliveWithoutShowingWindow() async throws {
+    let state = PendingState(), form = WebsiteConfigPracticeEditForm(parameters: try parameters())
+    let host = NSHostingView(rootView: RetainedEditor(state: state, form: form, parameters: try parameters()))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 340, height: 760),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    var continuation: CheckedContinuation<String, Never>?
+    form.start(.mode(.quote), apply: { _ in await withCheckedContinuation { continuation = $0 } })
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while continuation == nil && ContinuousClock.now < deadline { await Task.yield() }
+    XCTAssertNotNil(continuation)
+    state.pending = true
+    render(host)
+    XCTAssertTrue(form.isWorking, "Showing accepted departure must not disappear/cancel the editor")
+    XCTAssertFalse(window.isVisible)
+    continuation?.resume(returning: "ready"); await settle(form)
+    XCTAssertEqual(form.message, "ready")
+  }
+  func testPendingEditorRendersLightAndDarkWithoutDispatchingResume() throws {
+    let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":4}"#,
+      pointsPerRem: 16, context: .init())
+    for width in [340, 520] {
+      for dark in [false, true] {
+        var calls = 0
+        let view = WebsiteConfigPracticeEditor(draft: draft, canEdit: true, pendingPreparation: true,
+          resume: { calls += 1; return "unexpected" }, apply: { _ in calls += 1; return "unexpected" })
+          .padding(20).frame(width: CGFloat(width), height: 760)
+          .background(Color(nsColor: .windowBackgroundColor))
+          .environment(\.colorScheme, dark ? .dark : .light)
+        let host = NSHostingView(rootView: view)
+        let window = NSWindow(contentRect: .init(x: 0, y: 0, width: CGFloat(width), height: 760),
+          styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua); window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        render(host)
+        let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+        try png.write(to: URL(fileURLWithPath: "/tmp/typebar-active-edit-pending-\(width)-\(dark ? "dark" : "light").png"))
+        XCTAssertGreaterThan(png.count, 1000); XCTAssertFalse(window.isVisible); XCTAssertEqual(calls, 0)
+      }
+    }
   }
   func testEditorRendersLightAndDarkWithoutShowingWindowOrApplying() throws {
     for quoted in [false, true] {

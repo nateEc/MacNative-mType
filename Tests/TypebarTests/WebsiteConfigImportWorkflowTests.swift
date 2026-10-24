@@ -3,7 +3,7 @@ import Observation
 @testable import Typebar
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
-  private enum Failure: Error { case notParked }
+  private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class Gate {
     var continuation: CheckedContinuation<[OfflineQuote], Never>?
     func read() async -> [OfflineQuote] { await withCheckedContinuation { continuation = $0 } }
@@ -324,18 +324,173 @@ import Observation
     }
   }
 
-  func testEditingCannotBypassActiveAttemptOrMissingProfile() async throws {
+  func testActiveEditingClosesAndRecordsOldAttemptButCannotBypassMissingProfile() async throws {
     let f = try Fixture(); defer { f.close() }
     do { try await f.workflow.editAndBegin(.words(5), replacing: UUID(), systemIsDark: false); XCTFail("Legacy page edited") } catch {}
     XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
     try await f.workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
-    let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
-    let bytes = try Data(contentsOf: path)
+    let attempt = f.page.state.session.automaticInputAttemptID
     var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
-    do { try await f.workflow.editAndBegin(.words(5), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false); XCTFail("Active attempt discarded") }
-    catch WebsiteConfigImportWorkflowError.activeAttempt {}
+    try await f.workflow.editAndBegin(.words(5), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 5)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertFalse(f.page.acceptsAttemptCallback(for: attempt))
+    XCTAssertNotNil(f.page.restartController)
+  }
+
+  func testActiveEditPersistsAndClosesInputBeforeQuotePreparation() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let gate = Gate(); defer { gate.resolve() }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in await gate.read() })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4,"quoteLength":[0]}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    let attempt = f.page.state.session.automaticInputAttemptID
+    let task = Task { try await workflow.editAndBegin(.mode(.quote), replacing: publication.applicationID, systemIsDark: false) }
+    defer { task.cancel() }
+    try await gate.wait()
+    XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+    XCTAssertNotNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertFalse(f.page.acceptsInput(for: attempt))
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
+    guard case .available(let runtime) = try WebsiteConfigFileRegister(directory: f.directory).read().state else {
+      return XCTFail("Setter must already be durable")
+    }
+    XCTAssertEqual(runtime["mode"], .string("quote"))
+    gate.resolve(); _ = try await task.value
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .quote)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testCancelledActiveEditCanResumeWithoutSetterReplayOrDuplicateLedger() async throws {
+    for cancelTask in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      let gate = Gate(); defer { gate.resolve() }
+      let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+        directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in await gate.read() })
+      defer { workflow.stop() }
+      try await workflow.apply(json: #"{"mode":"words","words":4,"quoteLength":[0]}"#, systemIsDark: false)
+      let publication = try XCTUnwrap(f.page.state.presentation).publication
+      var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+      let task = Task { try await workflow.editAndBegin(.mode(.quote), replacing: publication.applicationID, systemIsDark: false) }
+      try await gate.wait()
+      let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+      let register = WebsiteConfigFileRegister(directory: f.directory)
+      let revision = try register.read().revision
+      do { try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false); XCTFail("Concurrent resume accepted") }
+      catch WebsiteConfigImportWorkflowError.busy {}
+      if cancelTask { task.cancel() } else { workflow.cancel() }
+      gate.resolve()
+      do { _ = try await task.value; XCTFail("Cancelled candidate delivered") } catch is CancellationError {}
+      XCTAssertEqual(f.page.state.configurationDeparture?.id, pending.id)
+      XCTAssertEqual(try register.read().revision, revision)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+      do { try await workflow.editAndBegin(.words(8), replacing: publication.applicationID, systemIsDark: false); XCTFail("Pending setter replayed") }
+      catch WebsiteConfigImportWorkflowError.preparationPending {}
+      do { try await workflow.resumeAndBegin(departureID: UUID(), systemIsDark: false); XCTFail("Stale resume accepted") }
+      catch WebsiteConfigImportWorkflowError.conflict {}
+      let retry = Task { try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false) }
+      try await gate.wait(); gate.resolve(); _ = try await retry.value
+      XCTAssertNil(f.page.state.configurationDeparture)
+      XCTAssertEqual(f.page.state.session.configuration.mode, .quote)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+      XCTAssertEqual(try register.read().revision, revision)
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.events.filter { $0.key == "mode" }.count, 1)
+      XCTAssertNotNil(f.page.restartController)
+    }
+  }
+
+  func testProviderFailureReportsSavedStateAndRetryPreservesAcceptedSetting() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var fail = true
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        if fail { throw Failure.provider }
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4,"quoteLength":[0]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    do {
+      try await workflow.editAndBegin(.mode(.quote), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTFail("Failed provider delivered")
+    } catch let error as WebsiteConfigSavedPreparationError {
+      XCTAssertEqual(error.underlying as? Failure, .provider)
+    }
+    let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let revision = try register.read().revision
+    do { try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false); XCTFail("Failed retry delivered") }
+    catch is WebsiteConfigSavedPreparationError {}
+    XCTAssertEqual(try register.read().revision, revision)
+    fail = false
+    try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertNil(f.page.state.configurationDeparture)
+  }
+
+  func testNoQuitActiveEditLeavesConfigurationAndAttemptLive() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    let id = f.page.state.session.automaticInputAttemptID
+    do { try await f.workflow.editAndBegin(.words(8), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false); XCTFail("No Quit bypassed") }
+    catch WebsiteConfigImportWorkflowError.rejectedRestartFailed {}
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, id)
     XCTAssertEqual(f.page.state.session.typed, "a")
-    XCTAssertEqual(try Data(contentsOf: path), bytes)
+    XCTAssertFalse(f.page.state.session.isFinished)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
+  func testAllPracticeSetterActionsCanRestartAnActivePublishedAttempt() async throws {
+    let actions: [WebsiteConfigPracticeEdit] = [.mode(.time), .time(17), .words(6), .difficulty(.expert),
+      .punctuation(true), .numbers(true), .quoteLengths([0]), .language("english"), .lazyMode(true)]
+    for action in actions {
+      let f = try Fixture(); defer { f.close() }
+      let legacy = f.settings.snapshot
+      try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"spanish"}"#, systemIsDark: false)
+      let old = f.page.state.session.automaticInputAttemptID
+      var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+      try await f.workflow.editAndBegin(action, replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, old, action.key)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1, action.key)
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.runtime[action.key], action.value, action.key)
+      XCTAssertEqual(f.settings.snapshot, legacy, action.key)
+      XCTAssertNil(f.page.state.configurationDeparture, action.key)
+    }
+  }
+
+  func testObservationRetirementAfterSaveDoesNotReportSetterRollback() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    withObservationTracking { _ = f.page.state } onChange: {
+      MainActor.assumeIsolated { f.page.detach() }
+    }
+    let message = try await f.workflow.editAndBegin(.words(6), replacing: publication.applicationID, systemIsDark: false)
+    XCTAssertTrue(message.contains("设置已保存"))
+    XCTAssertTrue(message.contains("窗口已变化"))
+    XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+    XCTAssertEqual(pending.draft.testParameters.wordLimit, 6)
+    guard case .available(let runtime) = try WebsiteConfigFileRegister(directory: f.directory).read().state else {
+      return XCTFail("Accepted setting lost")
+    }
+    XCTAssertEqual(runtime["words"], .number(6))
+    do { try await f.workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false); XCTFail("Detached window resumed") }
+    catch is WebsiteConfigSavedPreparationError {}
   }
 
   func testRetiredEditorCannotEditAReplacementPublication() async throws {
@@ -610,7 +765,7 @@ import Observation
     let attempt = state.session.automaticInputAttemptID
     XCTAssertTrue(state.session.hasStarted); XCTAssertFalse(state.session.isFinished)
     do { try await f.workflow.editAndBegin(.punctuation(true), replacing: publication.applicationID, systemIsDark: false); XCTFail("No Quit bypassed") }
-    catch WebsiteConfigImportWorkflowError.activeAttempt {}
+    catch WebsiteConfigImportWorkflowError.rejectedRestartFailed {}
     XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
     XCTAssertEqual(f.page.state.session.typed, "a")
     XCTAssertNil(f.page.state.restartDepartureAttemptID)

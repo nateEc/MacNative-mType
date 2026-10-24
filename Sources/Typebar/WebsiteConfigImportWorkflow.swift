@@ -38,23 +38,33 @@ enum WebsiteConfigPracticeEdit: Equatable {
 
 enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
   case missing, typebarBackup, activeAttempt, unavailable, busy, conflict, unsupportedPractice, rejectedRestartFailed
+  case preparationPending
   var errorDescription: String? {
     switch self {
     case .missing: "还没有保存的 Monkeytype 配置；请先粘贴配置 JSON。"
     case .typebarBackup: "这是 Typebar 备份，请使用“导入设置 JSON”。"
-    case .activeAttempt: "请先结束当前练习，再修改、导入或恢复配置。活动尝试的迁移记账尚未接通。"
+    case .activeAttempt: "请先结束当前练习，再导入或恢复完整配置。"
     case .unavailable: "配置记录或窗口当前不可用；未知记录不会被覆盖，请检查后重试。"
     case .busy: "上一项资源准备仍未结束，请稍后重试。"
     case .conflict: "配置或窗口已变化，未应用这次准备；请重新导入。"
     case .unsupportedPractice: "请先退出挑战或单词专项练习，再导入完整配置。"
     case .rejectedRestartFailed: "设置未修改；重开未完成，请检查窗口或锁定状态后重试。已接受的旧尝试不会重复记账。"
+    case .preparationPending:
+      "设置已保存，新练习尚未准备完成。请继续准备；如果窗口或配置已变化，请在导入面板恢复配置。"
     }
   }
 }
 
+/// Retain the diagnostic without making a failed initializer look like a
+/// rejected setter. The durable setting and departure have already succeeded.
+struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
+  let underlying: Error
+  var errorDescription: String? { WebsiteConfigImportWorkflowError.preparationPending.errorDescription }
+}
+
 /// Window-owned whole-application workflow. Does not mutate legacy preferences
-/// or silently substitute another text provider. Active-attempt cutover remains
-/// guarded until the full-configuration departure lifecycle is implemented.
+/// or silently substitute another text provider. Explicit practice setters use
+/// durable departure; full import/restoration still protects active attempts.
 @MainActor final class WebsiteConfigImportWorkflow {
   private weak var page: PracticePageSessionStore?
   private let settings: AppSettings
@@ -67,7 +77,7 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
   private var applying = false
   private var stopped = false
   private var operation = UUID()
-  private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID) }
+  private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID), resume(UUID) }
 
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
     directory: URL, readWindow: @escaping @MainActor () -> WebsiteConfigPracticeScopeSource.Window?,
@@ -92,13 +102,16 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
     try await perform(.edit(edit, applicationID), systemIsDark: systemIsDark)
   }
 
+  @discardableResult
+  func resumeAndBegin(departureID: UUID, systemIsDark: Bool) async throws -> String {
+    try await perform(.resume(departureID), systemIsDark: systemIsDark)
+  }
+
   private func perform(_ intent: Intent, systemIsDark: Bool) async throws -> String {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying else { throw WebsiteConfigImportWorkflowError.busy }
     try checkRestartBusy(intent, page: page)
-    guard !page.state.session.hasStarted || page.state.session.isFinished else {
-      throw WebsiteConfigImportWorkflowError.activeAttempt
-    }
+    try checkIntent(intent, page: page)
     applying = true
     let current = UUID(); operation = current
     defer {
@@ -114,10 +127,8 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
     guard operation == current else { throw CancellationError() }
     try Task.checkCancellation()
     try checkRestartBusy(intent, page: page)
-    guard !page.state.session.hasStarted || page.state.session.isFinished else {
-      throw WebsiteConfigImportWorkflowError.activeAttempt
-    }
-    let ticket: WebsiteConfigCommitCoordinator.Prepared
+    try checkIntent(intent, page: page)
+    var ticket: WebsiteConfigCommitCoordinator.Prepared
     switch intent {
     case .edit(let edit, let applicationID):
       guard page.state.presentation?.publication.applicationID == applicationID else {
@@ -133,6 +144,19 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
         guard operation == current, !stopped else { throw CancellationError() }
         throw WebsiteConfigImportWorkflowError.rejectedRestartFailed
       }
+      if page.state.session.hasStarted && !page.state.session.isFinished {
+        switch try coordinator.beginConfigurationRestart(ticket, for: page, action: edit) {
+        case .accepted(let admitted): ticket = admitted
+        case .acceptedRetired: return "设置已保存，旧练习已结束，但窗口已变化；请重新打开面板恢复配置。"
+        case .busy: throw WebsiteConfigImportWorkflowError.busy
+        case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+        case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+        }
+      }
+    case .resume:
+      do { ticket = try coordinator.resumeConfigurationRestart(for: page) }
+      catch is CancellationError { throw CancellationError() }
+      catch { throw WebsiteConfigSavedPreparationError(underlying: error) }
     case .application(.some(let json)):
       let fields = try WebsiteConfigJSONReader.read(json).importFields
       if fields?["version"] != nil, fields?["settings"] != nil, fields?["configuration"] != nil,
@@ -149,29 +173,40 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
     }
     prepared = ticket
     guard operation == current else { throw CancellationError() }
-    let resources = try await coordinator.prepareResources(for: ticket, from: settings)
-    let ready = try await coordinator.preparePractice(for: resources, loadQuotes: loadQuotes)
-    try Task.checkCancellation()
-    guard !stopped else { throw WebsiteConfigImportWorkflowError.unavailable }
-    guard operation == current else { throw CancellationError() }
-    switch try coordinator.commit(ready, to: page, systemIsDark: systemIsDark) {
-    case .committed:
-      // No await after commit. The same coordinator/content catalog owns retry.
-      do {
-        try page.bindRestartController(using: coordinator, loadQuotes: loadQuotes)
-        switch intent {
-        case .application(nil): return "已恢复保存的配置，新的练习已准备好。"
-        case .application(.some): return "配置已导入，新的练习已准备好。"
-        case .edit: return "设置已保存，新的练习已准备好。"
+    do {
+      let resources = try await coordinator.prepareResources(for: ticket, from: settings)
+      let ready = try await coordinator.preparePractice(for: resources, loadQuotes: loadQuotes)
+      try Task.checkCancellation()
+      guard !stopped else { throw WebsiteConfigImportWorkflowError.unavailable }
+      guard operation == current else { throw CancellationError() }
+      switch try coordinator.commit(ready, to: page, systemIsDark: systemIsDark) {
+      case .committed:
+        // No await after commit. The same coordinator/content catalog owns retry.
+        do {
+          try page.bindRestartController(using: coordinator, loadQuotes: loadQuotes)
+          switch intent {
+          case .application(nil): return "已恢复保存的配置，新的练习已准备好。"
+          case .application(.some): return "配置已导入，新的练习已准备好。"
+          case .edit: return "设置已保存，新的练习已准备好。"
+          case .resume: return "已继续准备，新的练习已准备好。"
+          }
+        } catch {
+          // The durable commit already succeeded. Never report a rolled-back
+          // import merely because an observer retired its receiving window.
+          return "配置已保存并应用，但窗口已变化，重开控制未能绑定；请重新打开此面板恢复。"
         }
-      } catch {
-        // The durable commit already succeeded. Never report a rolled-back
-        // import merely because an observer retired its receiving window.
-        return "配置已保存并应用，但窗口已变化，重开控制未能绑定；请重新打开此面板恢复。"
+      case .busy: throw WebsiteConfigImportWorkflowError.busy
+      case .conflict, .stale: throw WebsiteConfigImportWorkflowError.conflict
+      case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
       }
-    case .busy: throw WebsiteConfigImportWorkflowError.busy
-    case .conflict, .stale: throw WebsiteConfigImportWorkflowError.conflict
-    case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+    } catch {
+      // cancel() retires the coordinator ticket, so a late resource return can
+      // report stale before our post-await operation check is reached.
+      if operation != current || Task.isCancelled { throw CancellationError() }
+      if !(error is CancellationError), page.state.configurationDeparture != nil {
+        throw WebsiteConfigSavedPreparationError(underlying: error)
+      }
+      throw error
     }
   }
   func cancel() {
@@ -180,8 +215,21 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
     if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
   }
   private func checkRestartBusy(_ intent: Intent, page: PracticePageSessionStore) throws {
-    if case .edit = intent, page.restartController?.isPreparing == true {
+    if case .application = intent { return }
+    if page.restartController?.isPreparing == true {
       throw WebsiteConfigImportWorkflowError.busy
+    }
+  }
+  private func checkIntent(_ intent: Intent, page: PracticePageSessionStore) throws {
+    switch intent {
+    case .application:
+      guard !page.state.session.hasStarted || page.state.session.isFinished else {
+        throw WebsiteConfigImportWorkflowError.activeAttempt
+      }
+    case .edit:
+      guard page.state.configurationDeparture == nil else { throw WebsiteConfigImportWorkflowError.preparationPending }
+    case .resume(let id):
+      guard page.state.configurationDeparture?.id == id else { throw WebsiteConfigImportWorkflowError.conflict }
     }
   }
   func stop() {

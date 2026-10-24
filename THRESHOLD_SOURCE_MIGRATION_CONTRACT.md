@@ -1,5 +1,27 @@
 # 阈值源状态与迁移契约
 
+## 活动配置工作流和同窗恢复（2026-10-24，起点 2201a6ac）
+
+迁移单位为已有九类完整配置练习控件，从“仅未开始／结束后编辑”切换为绑定页面的保存／离场→资源准备→新练习交付。完整导入／恢复仍禁止覆盖活动尝试；没有把整个 94 键文档当作都已实时接通。固定 TestConfig.tsx 控件派发与 test-logic.ts 的语言／难度监听决定重开，不以 metadata 的更宽重开标记替代。setter 拒绝后现有派发规则不变，No Quit 仍由真实 setter／离场门禁拒绝。
+
+接受设置后文件 CAS 是不可回滚边界，旧尝试关闭并按结果保存策略记账；异步资源或生成失败保留阶段与配置。生产工作流新增按阶段 ID 继续初始化，仍使用同一协调器／内容源，恢复不执行 setter、不重新度量；过时阶段、其他窗口、已变化环境或记录不能借此恢复。失败错误保留原始诊断并明确“设置已保存”，不误报回滚。取消只终止当前准备，待旧异步操作终结前并发恢复仍拒绝；重开控制器在成功交付后重新绑定。
+
+原生面板保留相同 publication ID 下的编辑器／表单，待准备状态只增加保存提示和恢复按钮，不条件替换整个编辑器；否则其 onDisappear 会取消刚接受的实际任务。恢复闭包捕获显示时的阶段 ID。新设置在等待时禁用，取消文案明确已保存与尚未保存的区别，错误给出继续准备或导入恢复方向。前端设计技能仅用于沿用既有原生排版并澄清状态，不引入新主题、动画或额外窗口；行为优先、迁移安全及会话内有界复核（非独立评审）约束不可回滚与任务身份边界。
+
+先行两项行为测试在旧实现分别因 activeAttempt 拒绝和无法进入延迟引语加载失败。首轮编译暴露给原无关联枚举增加 Error 关联值破坏既有可比较性，改用独立诊断错误包装；下一轮隐藏夹具因异步直接 RunLoop 调用及嵌套 private 观察宏失败，修正夹具同步渲染边界及可见性，未弱化窗口不可见或任务存活断言。后续运行结果另记。已保存中间态、No Quit、提供器失败、取消／重试、九类动作和表单生命周期均需要执行证据，不能据控件存在宣称验收。
+
+修正夹具后的首轮 40 项执行有一处真实分类失败：workflow.cancel() 先退休票据，延迟提供器返回时协调器先报 stale，尚未走到操作 ID 检查，因而误报保存后的准备失败。保留该回归，只在本工作流操作 ID 已变化或 Task 已取消时转为 CancellationError；窗口／记录竞争的 stale 仍保留为失败诊断，不放宽恢复或重试条件。该修正等待后续完整定向与扩大执行确认。
+
+最终定向 42 项零失败／零跳过，7.721 秒：取消 API 和 Task 两条路径均在恢复后保持记录版本与一次记账，提供器原诊断可取，阶段 ID 不匹配与保存后观察退休不误报回滚，九类动作逐项保持旧 Typebar 偏好。隐藏宿主证明新增待准备显示不取消表单任务；四种新 pending 截图覆盖 340／520 点明暗模式，检查其中窄版亮色和宽版暗色图，保存提示、恢复按钮和禁用控件可见，无裁切重叠。截图不是可见主程序、实体点击／键盘或 VoiceOver 证据。扩大回归与打包结果另记。
+
+相关扩大 `WebsiteConfig|WebsitePracticeRestartControllerTests|PracticePage|PracticeClockWriteAdmission|AppSettings|SettingsJSON|Generated|PriorAttemptLedger|ResultIncompletePractice|ResultSavingPolicy|WholePreviewWordPreparationTests|WholePreviewChunkAssemblyTests|WholePreviewPreparationTaskTests|TypingWindowFocusDeliveryTests|PreparationTextInputAdmissionTests|CompletedResultRepeatPolicyTests|PromptViewportPageLifecycleTests|ViewportPracticeHostTests`：748 项零失败／零跳过，294.163 秒，含 28 项视口宿主与既有 880 组 Lazy 源码阶段对照。首次 Debug 打包、签名、打包资源及原创性检查通过；最终复核只调整一处说明，避免关闭成绩保存时仍声称一定记账，随后 42 项定向再次零失败／零跳过（7.131 秒），最终包重新验证。参考行为审计为 47 direct／119 native symbols／17 specs，1,328 条人工清单仅结构通过，未运行完整客户端或服务端套件。
+
+日志位于 `/tmp/typebar-active-edit-{red,focused,focused-fixed,focused-fixture-fixed,focused-green,final-focused,broad,package,final-package,originality,reference}.log`；失败轮次保留，没有跳过或放宽断言取得绿色结果。全程未启动主程序，未写真实偏好／成绩；这些子集执行证据不证明所有原版功能或实体交互已完成。
+
+文案调整后的最终 Debug 包、签名及打包资源／原创性检查同样通过；提交前本机无 Typebar 进程，远端 main 仍为 8c52fb13，开发分支无开放 PR，CI 总数仍 826。本批只推 `native-parity-next`，不创建门禁运行。
+
+记录格式／旧偏好不变，无真实域回填或删除，不启动 Typebar；只集中推开发分支，不创建 PR、不触发 main 门禁。完整 init 中途写入、nosave 值最终交付的持久边界、未支持的词源／重复组合、所有即时消费者、VoiceOver 与实体键盘／输入法／窗口仍开放。目标继续完整且 active。
+
 ## 活动离场前的同步 Lazy 事件（2026-10-24，起点 3b342bf4）
 
 源→目标单位仍是完整配置协调器的一次活动设置，不是开放整个 UI。源 setters.ts 保存字段后同步派发，test-logic.ts 的语言监听可 nosave 开启 Arabic Lazy，并在 lazyMode 非 nosave 事件更新 legacy-states/remember-lazy-mode.ts 独立偏好；语言支持度校正在稍后 init。先前把两者延迟到资源准备后，会使已接受但取消的显式关闭保留旧 Arabic 偏好。
