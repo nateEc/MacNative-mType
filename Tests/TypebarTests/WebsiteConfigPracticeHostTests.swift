@@ -477,6 +477,58 @@ import XCTest
     XCTAssertFalse(f.window.isVisible)
   }
 
+  func testBoundControllerReceivesNativeRestartAndUsesPublishedSavingAndPaceRules() throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    f.settings.saveCompletedResults = false
+    f.settings.paceGuideMode = .off
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let resources = try coordinator.prepareResources(for: coordinator.prepare(
+      #"{"mode":"custom","resultSaving":true,"paceCaret":"custom","paceCaretCustomSpeed":80}"#),
+      localFont: .absent, localBackground: .data(Fixture.png()))
+    let ready = try awaitResult(coordinator, resources: resources)
+    guard case .committed = try coordinator.commit(ready, to: f.state.page, systemIsDark: false) else { return XCTFail("Initial commit failed") }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    f.wait { input.insertionAttemptID == ready.session.automaticInputAttemptID && input.acceptsTextInput }
+    let controller = try f.state.page.bindRestartController(using: coordinator)
+    XCTAssertTrue(f.window.makeFirstResponder(input))
+    input.onInsert("a", false)
+    XCTAssertNotNil(f.state.page.state.session.paceCaretFrame(), "Published custom pace must not read legacy off")
+    let oldRestart = input.onRestart, oldInsert = input.onInsert
+    let disk = try f.register.read().revision
+    input.onRestart()
+    oldRestart()
+    XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 1)
+    let oldID = ready.session.automaticInputAttemptID
+    f.wait { !controller.isPreparing && input.insertionAttemptID != oldID && input.acceptsTextInput }
+    XCTAssertNil(controller.message)
+    XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    oldInsert("old", false); oldRestart()
+    XCTAssertEqual(f.state.page.state.session.typed, "")
+    XCTAssertFalse(controller.isPreparing)
+    XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    XCTAssertTrue(f.window.firstResponder === input)
+    input.onInsert("a", false)
+    XCTAssertNotNil(f.state.page.state.session.paceCaretFrame())
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testLegacyNativeRestartUsesTheSamePageLedgerWithoutDoubleCounting() throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    input.onInsert("0", false)
+    let oldID = input.insertionAttemptID
+    input.onRestart()
+    f.wait { input.insertionAttemptID != oldID && input.acceptsTextInput }
+    XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(f.state.page.state.priorAttemptLedger.incompletePractice?.attempts.count, 1)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
   func testSynchronousCommitChecksActualStartedNoQuitPageBeforeWriting() throws {
     let f = try Fixture(); defer { f.close() }
     f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }

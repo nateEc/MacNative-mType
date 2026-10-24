@@ -6877,6 +6877,22 @@ struct TypingSession {
     fail(at: date, reason: .timerHealth)
   }
 
+  struct RestartMeasurement {
+    let engagedDuration: TimeInterval
+    let accuracy: Double
+  }
+
+  /// One end instant for closing and measuring an accepted restart. No result
+  /// is published; the caller installs this value and its ledger atomically.
+  mutating func abandonAndMeasure(at date: Date = .now) -> RestartMeasurement? {
+    let ownsSample = beginTimingOperation(at: date)
+    defer { endTimingOperation(ownsSample) }
+    guard hasStarted, !isFinished else { return nil }
+    let measurement = RestartMeasurement(engagedDuration: activeEngagedDuration(at: date), accuracy: preciseAccuracy)
+    abandon(at: date)
+    return measurement
+  }
+
   mutating func abandon(at date: Date = .now) {
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }

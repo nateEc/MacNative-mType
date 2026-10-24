@@ -1,5 +1,23 @@
 # 阈值源状态与迁移契约
 
+## 窗口控制器与生成前离场记账（2026-10-24，起点 9c14db46）
+
+固定 test-logic.ts:239–251 在生成／fade-out 前关闭并记录活动旧尝试；不能用此前低层 advance 的“成功后返回旧快照”替代完整入口。新增 beginRestart／RestartAdmission：先做原有租约、环境、No Quit 和文件准入，再用同一个时钟样本关闭旧尝试并计算扣除空闲的用时／准确率，将离场标记和记账一起安装。准入拒绝不关闭／记账；接受后生成失败或取消不回滚，重试不再关闭或计数同一尝试。resultSaving 来自已发布草稿，不读另一份旧偏好。
+
+离场标记也消耗旧失败状态，匹配原版进入 init 前清空 failReason；失败 init 后再试不因旧历史 outcome.failed 反复触发 typing 引语重复。标记不改原成绩的 outcome／reason；新尝试或完整配置安装清除它。新旧完整安装路径及普通 advance 均保留既有 PriorAttemptLedger，账本从视图私有 State 移到同一页面值中；旧重开路径继续使用它，不新增持久格式、默认配置文件路径或服务写入。
+
+WebsitePracticeRestartController 由窗口显式绑定同一协调器和内容读取者，重复请求在准备期间不排队；离页、重新附着和新配置会退役绑定。异步结果同时受控制器票据、任务取消和原有协调器准入约束，取消／停止的迟到结果不安装或清除新状态。控制器不自动重试，也不换成另一种内容提供者；已离场的旧文本保留但不恢复输入和计时，重开命令仍可重试。
+
+真实 ContentView 的重开、结果再来一次和重复入口在绑定存在时进入控制器；没有绑定仍拒绝，不落回旧生成器。原生输入在准备或离场状态停止接收文本，命令回调按尝试身份独立验证。结果视图在接受离场后关闭，错误／进度用现有原生文字组件显示；配置编辑保护未移除。尝试初始化读取当前草稿的保存和配速字段，并恢复标签、反馈声音池及已有朗读入口；不是所有 Funbox／在线续流生命周期已完成的声明。
+
+首轮控制器四项的两处失败属于夹具：短引语没有选择短组，以及把两秒墙钟误作有效用时（实际有一秒空闲扣除）。校正选择／预期，未改扣除算法。实际隐藏窗口接线轮 56 项中一项失败（`/tmp/typebar-restart-controller-window-focused.log`）：受控离场触发旧 abandoned 提示，隐藏窗口变为可见。现在只对带当前重开离场标记的 abandoned 抑制该提示，普通放弃行为保留；未移除窗口可见性断言。修正后 56 项通过；补齐时钟／文件冲突、取消、离页和两种配置安装路径后，61 项定向零失败，13.822 秒（`/tmp/typebar-restart-controller-final-focused.log`），含十项新控制器及两项新增实际宿主检查；集合重叠不相加。
+
+冻结源码的最终配置／页面／重复／恢复／记录相关扩大 543 项零失败／零跳过，214.121 秒（`/tmp/typebar-restart-controller-final-expanded.log`），原滚轮未排除。Debug 打包／签名及包内资源／原创性检查通过（`/tmp/typebar-restart-controller-package.log`），包未启动。原创性、固定参考行为审计（47 直接／119 测试符号／17 支持规范）及自检通过，1,308 条人工清单仅结构通过；不是全客户端／服务端或人工完成声明。
+
+验证 SHA256：WebsitePracticeRestartController `1192db9c9d391486a0ae29f926f81445c0c769a21cfadb057b53540e88123ecb`；WebsiteConfigCommitCoordinator `668bfd0a774c4cf425769d114e4b2ed8919468c86a4bd1a47b002e982d401b51`；PracticePageSessionStore `c6486f716c9a3d2eb8549ecf8e48271012901774cf6d07bea76e3a1dcd5c87ae`；PracticePageSessionState `a5a8ed53232fea634277474029608dc0739610cb3ab5cfbf8bc9a007ec6d4520`；TypingEngine `03d08bd8c51160a555f863ab1fc6f57b9d2ddba42c625abcfe8895debf65b551`；TypebarApp `f30ad9a1243b045a008cdbb34c18df62a28811c2728f9b83be99a2d6afcc578c`。新控制器测试 `addce0d6e9497a10252c654b45976ede1b94fd4993bdbf2b15455e4c1771fcd9`；实际宿主测试文件 `22151fc9c65205dc76dd7db47c3a89e3153e1e13b9b14ed0c2bba5d644159b6c`。原生进程存活时未改 Swift 输入。
+
+本轮先根据源码纠正“成功才记账”的初始假设，行为先行、迁移安全、简化实现及会话内反例复核促成共享页面账本和两阶段时序；根因调试定位意外提示，未按失败去放宽原断言，不称独立评审。默认网站 JSON 导入／恢复组合根尚未绑定此能力，正式配置编辑、引语恢复提交、练习词返回、完整 Funbox 重开／在线续流／配速依赖更新、真实输入和性能仍开放；未改 main、工作流、通知或启动 Typebar 主程序，完整目标继续 active。
+
 ## 原词组重复与引语重试选择（2026-10-24，起点 568a8cb5）
 
 新增 prepareRestart，在已有下一轮准入之上，从实际页面读取活动状态、尝试来源标志、失败结果及拥有的引语；调用方只提供明确重复意图，不自报这些状态。选择匹配固定原版 restart：显式重复、活动中的重复尝试、或开启 typing 且语言前缀匹配的活动／失败引语走原词源，其余走普通下一轮。prepareNext 仍是显式普通生成的低层接口，正式重开控制器应使用 prepareRestart，而非绕过该选择。

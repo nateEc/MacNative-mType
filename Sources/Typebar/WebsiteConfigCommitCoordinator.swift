@@ -77,6 +77,12 @@ final class WebsiteConfigCommitCoordinator {
   }
   /// Attempt transition only, never a configuration application.
   struct NextPrepared { fileprivate let session: SessionPrepared }
+  struct RestartAdmission {
+    fileprivate var resources: ResourcesPrepared
+    fileprivate let original: TypingSession
+    fileprivate let previous: WebsiteConfigSessionBuilder.Prepared
+    fileprivate let repetition: WebsitePracticeRepetition
+  }
   struct PreviousAttempt {
     struct Incomplete {
       let engagedDuration: TimeInterval
@@ -332,6 +338,10 @@ final class WebsiteConfigCommitCoordinator {
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
     random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> NextPrepared {
+    try await prepareRestart(restartPlan(for: page, repeatingRequested: repeatingRequested),
+      loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+  }
+  private func restartPlan(for page: PracticePageSessionStore, repeatingRequested: Bool) throws -> RestartAdmission {
     let resources = try nextResources(for: page)
     guard let previous = page.state.practice, let capture = resources.configuration.pageCapture,
       case .string(let language)? = resources.configuration.draft.projection.runtime["language"] else {
@@ -341,9 +351,51 @@ final class WebsiteConfigCommitCoordinator {
     let behavior = resources.configuration.draft.behavior
     let repetition = WebsiteConfigRestartPolicy.resolve(requested: repeatingRequested,
       active: capture.testActive, previouslyRepeated: previous.repetition.repeatsWordset,
-      failed: original.outcome == .failed, mode: original.configuration.mode, language: language,
+      failed: original.outcome == .failed && page.state.restartDepartureAttemptID != original.automaticInputAttemptID,
+      mode: original.configuration.mode, language: language,
       quoteLanguage: previous.quote.flatMap { WebsiteLanguageIdentity.name(for: $0.language) },
       repeatQuotes: behavior.repeatQuotes, repeatedPace: behavior.repeatedPace)
+    return .init(resources: resources, original: original, previous: previous, repetition: repetition)
+  }
+  /// Accept the departure before asynchronous init, as the source restart does.
+  /// Rejected admission changes nothing; init failure cannot undo a departure.
+  func beginRestart(for page: PracticePageSessionStore, repeatingRequested: Bool = false) throws -> RestartAdmission {
+    var admission = try restartPlan(for: page, repeatingRequested: repeatingRequested)
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    var prepared = admission.resources.configuration
+    guard let capture = prepared.pageCapture else { throw PracticePageSessionStateError.incomplete }
+    var closed = admission.original
+    let measurement = page.state.restartDepartureAttemptID == closed.automaticInputAttemptID ? nil : closed.abandonAndMeasure()
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    try Task.checkCancellation()
+    try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
+    do {
+      guard try register.read().revision == prepared.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+      var departed = page.state
+      departed.session = closed
+      departed.restartDepartureAttemptID = closed.automaticInputAttemptID
+      if let measurement {
+        departed.priorAttemptLedger.recordRestart(engagedDuration: measurement.engagedDuration,
+          accuracy: measurement.accuracy, savingEnabled: prepared.draft.behavior.saveCompletedResults)
+      }
+      page.installCommitted(departed)
+    } catch { page.endCommit(); throw error }
+    page.endCommit()
+    prepared.pageCapture = try page.captureGeneration(router: router)
+    admission.resources = .init(configuration: prepared, admission: admission.resources.admission,
+      background: admission.resources.background, font: admission.resources.font)
+    return admission
+  }
+  @discardableResult
+  func cancel(_ admission: RestartAdmission) -> Bool { cancel(admission.resources.configuration) }
+  func prepareRestart(_ admission: RestartAdmission,
+    loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
+    loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
+    random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> NextPrepared {
+    let resources = admission.resources, original = admission.original, previous = admission.previous
+    let repetition = admission.repetition
+    guard let capture = resources.configuration.pageCapture else { throw PracticePageSessionStateError.incomplete }
     if !repetition.repeatsWordset {
       let session = try await preparePracticeBuild(for: resources, scope: nil,
         reason: .nextAttempt, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
@@ -420,7 +472,7 @@ final class WebsiteConfigCommitCoordinator {
     // Keep the live appearance/resource/configuration publication. A new
     // attempt is not a new full application or a chance to replay its events.
     page.installCommitted(.init(session: value.session.withElapsedClock(),
-      presentation: page.state.presentation, practice: practice))
+      presentation: page.state.presentation, practice: practice, priorAttemptLedger: page.state.priorAttemptLedger))
     retire(prepared)
     return .advanced(.init(session: old, incomplete: incomplete))
   }
@@ -553,7 +605,8 @@ final class WebsiteConfigCommitCoordinator {
         ownerLease: prepared.owner, authority: publicationAuthority)
       if let page, let appearance, let session, let practice {
         let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: appearance)
-        page.installCommitted(.init(session: session.withElapsedClock(), presentation: presentation, practice: practice))
+        page.installCommitted(.init(session: session.withElapsedClock(), presentation: presentation, practice: practice,
+          priorAttemptLedger: page.state.priorAttemptLedger))
       }
       latest = publication
       publicationAuthority.latest = publication.applicationID

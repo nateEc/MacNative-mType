@@ -1277,6 +1277,9 @@ private struct ContentView: View {
   private var committedPracticeDraft: WebsiteConfigNativeDraft? {
     pageSession.practice == nil ? nil : pageSession.presentation?.publication.draft
   }
+  private var savesCurrentPracticeResults: Bool {
+    committedPracticeDraft?.behavior.saveCompletedResults ?? settings.saveCompletedResults
+  }
   @State private var noQuitConfigurationLockOwnerID = UUID()
   @State private var promptCaretMotion = PromptCaretMotionCoordinator()
   @State private var promptInsertionAnchor = PromptInsertionAnchor()
@@ -1409,7 +1412,10 @@ private struct ContentView: View {
   @State private var modeCompatibilityMessage: String?
   @State private var funboxConfigurationMessage: String?
   @State private var restoringPromptHighlightAfterFunboxConflict = false
-  @State private var priorAttemptLedger = PriorAttemptLedger()
+  private var priorAttemptLedger: PriorAttemptLedger {
+    get { pageSession.priorAttemptLedger }
+    nonmutating set { pageSession.priorAttemptLedger = newValue }
+  }
   @State private var weakSpotScores = WeakSpotScores()
   @State private var wordDecorationState = PoolWordDecorationState()
   @State private var lastFinishedWpm: Double?
@@ -1667,6 +1673,12 @@ private struct ContentView: View {
     .onChange(of: pageSession.practice?.session.automaticInputAttemptID, initial: true) { _, _ in
       finalizePublishedPracticeInstallation()
     }
+    .onChange(of: pageSession.restartDepartureAttemptID) { _, departure in
+      guard departure == session.automaticInputAttemptID else { return }
+      completedResult = nil; compositionText = ""; terminalNotice = nil
+      wholePreviewTask.cancel(); liveContentTask?.cancel()
+      automaticInputScheduler.cancel(); NativeSpeech.shared.stop()
+    }
     .background(SharedProfileWindowProbe(host: sharedProfileWindow, didAttach: {
       activatePreferenceConfigurationOwnerIfKey()
       presentSharedProfileIfPossible()
@@ -1799,7 +1811,7 @@ private struct ContentView: View {
           for: result, samePromptRepeat: isSamePromptRepeatAttempt,
           allowsReducedAccuracyThreshold: account.currentUser?.leaderboardOptedOut == true)
         let savesResult = ResultSavingPolicy.shouldPersist(
-          outcome: result.outcome, enabled: settings.saveCompletedResults, eligibility: eligibility)
+          outcome: result.outcome, enabled: savesCurrentPracticeResults, eligibility: eligibility)
         let accountTagCompletionFeedback = account.recordAccountTagCompletion(result, eligibility: eligibility,
           at: Int64(floor(Date().timeIntervalSince1970 * 1000)))
         let resultPersonalBestFeedback = savesResult
@@ -1830,7 +1842,7 @@ private struct ContentView: View {
         } else {
           priorAttemptLedger.recordTerminalAttempt(
             engagedDuration: result.engagedDuration, outcome: result.outcome, eligibility: eligibility,
-            savingEnabled: settings.saveCompletedResults,
+            savingEnabled: savesCurrentPracticeResults,
             samePromptRepeat: isSamePromptRepeatAttempt && result.configuration.mode != .quote,
             accuracy: result.preciseAccuracy)
         }
@@ -1897,7 +1909,9 @@ private struct ContentView: View {
           publicationState = .notice("练习模式：本次成绩不会保存、本机统计、同步或发布。")
         }
       case .abandoned:
-        terminalNotice = .abandoned
+        if pageSession.restartDepartureAttemptID != session.automaticInputAttemptID {
+          terminalNotice = .abandoned
+        }
       case .active:
         break
       }
@@ -2263,6 +2277,12 @@ private struct ContentView: View {
     }
     .sheet(item: $completedResult) { result in
       completedResultSheet(result)
+        .safeAreaInset(edge: .bottom) {
+          if let message = pageSessionStore.restartController?.message {
+            Label(message, systemImage: "exclamationmark.triangle")
+              .font(.callout).foregroundStyle(.orange).padding()
+          }
+        }
         // A presentation can outlive the practice root and its environment.
         // Keep its queried context's container alive for that entire lifetime.
         .modelContainer(modelContext.container)
@@ -2287,7 +2307,11 @@ private struct ContentView: View {
         reducesMotion: settings.reducePracticeMotion,
         slowTimer: result.suppressesCelebrationForSlowTimer,
         accent: activeTheme.accent,
-        onRestart: {
+        onRestart: { [attemptID = session.automaticInputAttemptID] in
+          if pageSession.practice != nil {
+            guard pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }
+            attemptRestart(); return
+          }
           completedResult = nil
           if restoreWordPracticeIfNeeded() { return }
           attemptRestart()
@@ -2333,7 +2357,11 @@ private struct ContentView: View {
         onReportCommunity: { quoteID, reason, note in
           try await account.reportQuote(quoteID, reason: reason, note: note)
         },
-        onRestart: {
+        onRestart: { [attemptID = session.automaticInputAttemptID] in
+          if pageSession.practice != nil {
+            guard pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }
+            attemptRestart(); return
+          }
           completedResult = nil
           if restoreWordPracticeIfNeeded() { return }
           attemptRestart()
@@ -2351,7 +2379,11 @@ private struct ContentView: View {
         contextualMissedAndSlowPractice: result.contextualMissedAndSlowPractice,
         contextualMissedPractice: result.contextualMissedPractice,
         todayPractice: result.todayPractice,
-        onRepeat: {
+        onRepeat: { [attemptID = session.automaticInputAttemptID] in
+          if pageSession.practice != nil {
+            guard pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }
+            requestPublishedRestart(repeatingRequested: true); return
+          }
           completedResult = nil
           activeQuoteSource = result.result.quoteSource
           startRepeatedAttempt(result.repeatedSession, tags: result.result.tags)
@@ -3224,6 +3256,7 @@ private struct ContentView: View {
 
       NativeTypingInput(
         focusRequest: focusRequest, acceptsTextInput: !isPreparingPracticePrompt
+          && !pageSessionStore.isInputSuspendedForRestart
           && (publishedPresentation == nil || PromptFieldProjectionPolicy.supports(session.configuration)),
         insertionAnchor: promptInsertionAnchor,
         insertionAttemptID: session.automaticInputAttemptID,
@@ -3256,7 +3289,7 @@ private struct ContentView: View {
           if activeChallengeID != "mouse-warrior" { handleDeletedText(deletesWord: true) }
         },
         onRestart: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }; attemptRestart()
+          guard pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }; attemptRestart()
         },
         onOpenCommandPalette: { [attemptID = session.automaticInputAttemptID] in
           guard pageSessionStore.acceptsInput(for: attemptID) else { return }; showingCommandPalette = true
@@ -4219,10 +4252,17 @@ private struct ContentView: View {
       liveStatsClockSignal.second = 0; timerHealth = .init()
       isSamePromptRepeatAttempt = practice.repetition.repeatsWordset
       isRepeatedPaceAttempt = practice.repetition.repeatsPace
-      activePaceTargetWpm = nil
+      activeSessionTags = settings.activeResultTags
+      activePaceTargetWpm = paceGuideTarget(usingRepeatedPace:
+        isRepeatedPaceAttempt && committedPracticeDraft?.behavior.paceGuideMode == .off ? lastFinishedWpm : nil)
+      session.configurePace(wpm: activePaceTargetWpm)
+      TypingFeedbackSound.shared.beginPracticeAttempt()
       NativeSpeech.shared.stop()
       synchronizeNoQuitConfigurationLock()
       awaitViewportPresentationIfNeeded()
+      if session.configuration.modifiers.contains(.listening) {
+        NativeSpeech.shared.speak(session.prompt, language: session.configuration.wordPoolBaseLanguage)
+      }
       requestTypingFocus()
   }
 
@@ -4424,6 +4464,7 @@ private struct ContentView: View {
       }
       .keyboardShortcut("r", modifiers: .command)
       .buttonStyle(.borderedProminent)
+      .disabled(pageSessionStore.restartController?.isPreparing == true)
       if weakSpotPrompt != nil {
         Button("弱项训练") { startWeakSpotPractice() }
           .help("依据本机完成测试中的错误字符生成离线词库练习")
@@ -4444,6 +4485,12 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.orange)
           .offset(y: 24)
+      } else if pageSessionStore.restartController?.isPreparing == true {
+        Label("正在准备新一轮…", systemImage: "arrow.triangle.2.circlepath")
+          .font(.caption).foregroundStyle(.secondary).offset(y: 24)
+      } else if let message = pageSessionStore.restartController?.message {
+        Label(message, systemImage: "exclamationmark.triangle")
+          .font(.caption).foregroundStyle(.orange).offset(y: 24)
       } else if let restartLockMessage {
         Label(restartLockMessage, systemImage: "lock.fill")
           .font(.caption)
@@ -4517,8 +4564,18 @@ private struct ContentView: View {
   }
 
   private func attemptRestart() {
+    if pageSession.practice != nil { requestPublishedRestart(); return }
     guard acceptsRestartingConfigurationChange() else { return }
     reset(restarting: true)
+  }
+
+  private func requestPublishedRestart(repeatingRequested: Bool = false) {
+    guard let controller = pageSessionStore.restartController else {
+      restartLockMessage = "当前配置尚未绑定重开控制器；已保留本轮。"
+      return
+    }
+    restartLockMessage = nil
+    controller.request(repeatingRequested: repeatingRequested)
   }
 
   @discardableResult
@@ -5265,7 +5322,7 @@ private struct ContentView: View {
 
   private var hasLockedCustomTextSource: Bool {
     // Imported challenge files are ephemeral too: protect them like saved long text.
-    activeLongSavedText != nil || activeVerifiedScript != nil
+    activeLongSavedText != nil || activeVerifiedScript != nil || pageSession.practice?.scope.finiteTextSource != nil
   }
 
   private var quickRestartRequiresProtection: Bool {
@@ -5557,10 +5614,12 @@ private struct ContentView: View {
 
   private func paceGuideTarget(usingRepeatedPace repeatedWpm: Double? = nil,
     currentPrompt: String? = nil) -> Double? {
-    if settings.paceGuideMode == .off, let repeatedWpm {
+    let paceMode = committedPracticeDraft?.behavior.paceGuideMode ?? settings.paceGuideMode
+    let customWpm = committedPracticeDraft?.behavior.paceGuideCustomWpm ?? settings.paceGuideCustomWpm
+    if paceMode == .off, let repeatedWpm {
       return PaceGuidePolicy.validTarget(repeatedWpm)
     }
-    if settings.paceGuideMode == .personalBest || settings.paceGuideMode == .activeTagPersonalBest {
+    if paceMode == .personalBest || paceMode == .activeTagPersonalBest {
       guard personalBestLedgers.first?.ledger != nil else { return nil }
     }
     let samples = savedResults.compactMap { record -> PaceGuideSample? in
@@ -5568,8 +5627,8 @@ private struct ContentView: View {
       return .init(result: result)
     }
     return PaceGuidePolicy.targetWpm(
-      mode: settings.paceGuideMode,
-      customWpm: settings.paceGuideCustomWpm,
+      mode: paceMode,
+      customWpm: customWpm,
       configuration: configuration,
       samples: samples,
       activeTags: activeSessionTags,

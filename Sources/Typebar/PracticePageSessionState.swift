@@ -8,6 +8,9 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
   var session = TestSessionFactory.make(configuration: TypebarInitialTestSelection.configuration).withElapsedClock()
   var presentation: WebsiteConfigPublishedPresentation?
   private(set) var practice: WebsiteConfigSessionBuilder.Prepared?
+  var priorAttemptLedger = PriorAttemptLedger()
+  /// Accepted departure, including an init failure. Clears on a new attempt.
+  var restartDepartureAttemptID: UUID?
 
   func applying(_ presentation: WebsiteConfigPublishedPresentation, owner: UUID,
     router: PreferenceConfigurationSaveRouter) throws -> Self {
@@ -28,6 +31,7 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
     result.session = seed.withElapsedClock()
     result.presentation = presentation
     result.practice = practice
+    result.restartDepartureAttemptID = nil
     return result
   }
 }

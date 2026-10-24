@@ -7,6 +7,7 @@ import Observation
 final class PracticePageSessionStore {
   let owner = UUID()
   private(set) var state = PracticePageSessionState()
+  private(set) var restartController: WebsitePracticeRestartController?
   @ObservationIgnored private weak var router: PreferenceConfigurationSaveRouter?
   @ObservationIgnored private var committing = false
   @ObservationIgnored private var pendingDetach = false
@@ -21,6 +22,7 @@ final class PracticePageSessionStore {
     fileprivate let compositionActivity: UUID
     fileprivate let session: TypingSession.GenerationState
     fileprivate let repetition: WebsitePracticeRepetition
+    fileprivate let restartDeparture: UUID?
     var testActive: Bool { session.started && !session.finished }
   }
 
@@ -37,7 +39,7 @@ final class PracticePageSessionStore {
     scope.decorationState = state.session.liveWordDecorationState
     return .init(publication: publication, scope: scope, lease: lease,
       attachment: attachment, compositionActivity: compositionActivity, session: state.session.generationState,
-      repetition: practice.repetition)
+      repetition: practice.repetition, restartDeparture: state.restartDepartureAttemptID)
   }
   func isCurrent(_ capture: GenerationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -46,6 +48,7 @@ final class PracticePageSessionStore {
       && state.presentation?.publication.applicationID == capture.publication.applicationID
       && state.session.generationState == capture.session
       && state.practice?.repetition == capture.repetition
+      && state.restartDepartureAttemptID == capture.restartDeparture
   }
   func noteCompositionActivity(for attemptID: UUID) {
     guard acceptsInput(for: attemptID) else { return }
@@ -54,20 +57,48 @@ final class PracticePageSessionStore {
 
   func attach(to router: PreferenceConfigurationSaveRouter) {
     guard !committing else { return }
+    retireRestartController()
     attachment = UUID()
     self.router = router
   }
   func detach() {
+    retireRestartController()
     attachment = UUID()
     if committing { pendingDetach = true }
     else { router = nil }
   }
   func replace(_ state: PracticePageSessionState) {
     guard !committing else { return }
+    if state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID { retireRestartController() }
     self.state = state
   }
   func acceptsInput(for attemptID: UUID) -> Bool {
+    acceptsAttemptCallback(for: attemptID) && !isInputSuspendedForRestart
+  }
+  func acceptsAttemptCallback(for attemptID: UUID) -> Bool {
     router != nil && !committing && state.session.automaticInputAttemptID == attemptID
+  }
+  var isInputSuspendedForRestart: Bool {
+    restartController?.isPreparing == true || state.restartDepartureAttemptID == state.session.automaticInputAttemptID
+  }
+  @discardableResult
+  func bindRestartController(using coordinator: WebsiteConfigCommitCoordinator,
+    loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
+    loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil)
+    throws -> WebsitePracticeRestartController {
+    guard let router else { throw PracticePageSessionStateError.wrongOwner }
+    let capture = try captureGeneration(router: router)
+    guard coordinator.publication(for: owner)?.applicationID == capture.publication.applicationID else {
+      throw PracticePageSessionStateError.stale
+    }
+    retireRestartController()
+    let controller = WebsitePracticeRestartController(page: self, coordinator: coordinator,
+      loadQuotes: loadQuotes, loadExternal: loadExternal)
+    restartController = controller
+    return controller
+  }
+  private func retireRestartController() {
+    restartController?.stop(); restartController = nil
   }
 
   /// Called after the coordinator's environment callback and before its CAS.
@@ -91,6 +122,7 @@ final class PracticePageSessionStore {
   }
   func installCommitted(_ state: PracticePageSessionState) {
     precondition(committing)
+    if state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID { retireRestartController() }
     self.state = state
   }
 }
