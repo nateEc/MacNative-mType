@@ -18,7 +18,7 @@ final class PromptCaretNativeView: NSView {
     let font: NSFont
     let lineSpacing: CGFloat
     let rightToLeft: Bool
-    let accent: Color
+    var accent: Color
     let motion: SmoothCaretMotion
     let reducesMotion: Bool
     let frameRate: Int

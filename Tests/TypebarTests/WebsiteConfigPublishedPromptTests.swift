@@ -37,7 +37,13 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
   }
   private enum Failure: Error { case notCommitted }
   @MainActor @Observable fileprivate final class Model {
-    var publication: WebsiteConfigCommitCoordinator.Publication
+    var publication: WebsiteConfigCommitCoordinator.Publication {
+      didSet { presentation = try! .init(publication: publication, owner: owner, systemIsDark: systemIsDark) }
+    }
+    var presentation: WebsiteConfigPublishedPresentation
+    var systemIsDark = false {
+      didSet { presentation.updateSystemAppearance(isDark: systemIsDark) }
+    }
     let owner: UUID
     var session: TypingSession
     var ready: [PromptViewportPresentationReady] = []
@@ -48,6 +54,7 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
     var removals: [PromptTapeWordRemoval] = []
     init(_ publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID) {
       self.publication = publication; self.owner = owner
+      presentation = try! .init(publication: publication, owner: owner, systemIsDark: false)
       var session = TypingSession(configuration: .words(40).with(modifiers: [.noQuit]),
         prompt: Array(repeating: "xxx", count: 40).joined(separator: " "))
       session.insertBatch("x", at: Date(timeIntervalSince1970: 4000))
@@ -61,13 +68,11 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
       ScrollView {
         makePrompt().frame(width: width)
       }.frame(width: width, height: 400)
-        .background(try! WebsiteConfigPublishedBackground(publication: model.publication, owner: model.owner,
-          fallbackStyle: .solid, theme: AppTheme.serika_dark.resolvedTheme, reduceMotion: true))
+        .background(try! model.presentation.background(fallbackStyle: .solid, reduceMotion: true))
     }
     private func makePrompt() -> some View {
       // Test fixtures are known admitted; a production importer must surface rejection.
-      try! PromptViewportPracticePrompt(publication: model.publication, owner: model.owner,
-        session: model.session, theme: AppTheme.serika_dark.resolvedTheme,
+      try! model.presentation.wholePreview(session: model.session,
         carets: { font, presentation in
           Self.carets(font: font, presentation: presentation, session: model.session)
         }, onFailure: { _ in XCTFail("Published prompt failed") },
@@ -95,8 +100,7 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
       try! Self.prompt(model, maximumTextWidth: maximumTextWidth).frame(width: width)
     }
     static func prompt(_ model: Model, maximumTextWidth: CGFloat? = nil) throws -> WebsiteConfigPublishedInlinePrompt {
-      try WebsiteConfigPublishedInlinePrompt(publication: model.publication, owner: model.owner,
-        session: model.session, composition: model.composition, theme: AppTheme.serika_dark.resolvedTheme,
+      try model.presentation.inline(session: model.session, composition: model.composition,
         carets: { rendering, font, p in
           var config = PromptCaretNativeView.Configuration(text: rendering.text, mainOffset: nil, paceOffset: nil,
             mainStyle: p.caretStyle, paceStyle: p.paceCaretStyle, font: font,
@@ -152,6 +156,86 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
     XCTAssertTrue(CTFontGetGlyphsForCharacters(font as CTFont, &character, &glyph, 1))
     CTFontGetAdvancesForGlyphs(font as CTFont, .horizontal, &glyph, &value, 1)
     return value.width
+  }
+
+  func testPublicationAppearanceFollowsSourceEventPriorityWithoutSaving() throws {
+    let f = try Fixture(); defer { f.close() }
+    for follows in [false, true] {
+      for custom in [false, true] {
+        for dark in [false, true] {
+          let publication = try f.publish("{\"theme\":\"serika_dark\",\"themeLight\":\"serika\",\"themeDark\":\"dracula\",\"autoSwitchTheme\":\(follows),\"customTheme\":\(custom)}")
+          let record = try f.register.read().state
+          let presenter = try WebsiteConfigPublishedPresentation(publication: publication, owner: f.owner, systemIsDark: dark)
+          let initial: WebsiteConfigNativeThemes.Selection = follows
+            ? .builtIn(dark ? .dracula : .serika) : (custom ? .inlineCustom : .builtIn(.serika_dark))
+          XCTAssertEqual(presenter.appearance.selection, initial)
+          let changed = presenter.updateSystemAppearance(isDark: !dark)
+          XCTAssertEqual(changed, follows && !custom)
+          XCTAssertEqual(presenter.appearance.selection, follows && !custom ? .builtIn(dark ? .serika : .dracula) : initial)
+          XCTAssertFalse(presenter.updateSystemAppearance(isDark: !dark))
+          XCTAssertEqual(presenter.publication.applicationID, publication.applicationID)
+          XCTAssertEqual(try f.register.read().state, record)
+        }
+      }
+    }
+    let ready = try f.publish(), unprepared = try f.publish(resources: false)
+    XCTAssertThrowsError(try WebsiteConfigPublishedPresentation(publication: ready, owner: UUID(), systemIsDark: false)) {
+      guard case WebsiteConfigPublishedPresentationError.wrongOwner = $0 else { return XCTFail("Wrong owner error") }
+    }
+    XCTAssertThrowsError(try WebsiteConfigPublishedPresentation(publication: unprepared, owner: f.owner, systemIsDark: false)) {
+      guard case WebsiteConfigPublishedPresentationError.unprepared = $0 else { return XCTFail("Wrong resource error") }
+    }
+  }
+
+  func testAppearanceObservationCannotReenterAnIncompleteThemeTransition() throws {
+    @MainActor final class Probe { var calls = 0; var nestedResult = true }
+    let f = try Fixture(); defer { f.close() }
+    let publication = try f.publish(#"{"autoSwitchTheme":true,"customTheme":false,"themeLight":"serika","themeDark":"dracula"}"#)
+    let presenter = try WebsiteConfigPublishedPresentation(publication: publication, owner: f.owner, systemIsDark: false)
+    let probe = Probe()
+    withObservationTracking { _ = presenter.appearance } onChange: {
+      MainActor.assumeIsolated {
+        probe.calls += 1; probe.nestedResult = presenter.updateSystemAppearance(isDark: false)
+      }
+    }
+    XCTAssertTrue(presenter.updateSystemAppearance(isDark: true))
+    XCTAssertEqual(probe.calls, 1); XCTAssertFalse(probe.nestedResult)
+    XCTAssertEqual(presenter.appearance.selection, .builtIn(.dracula))
+    XCTAssertTrue(presenter.updateSystemAppearance(isDark: false))
+    XCTAssertEqual(presenter.appearance.selection, .builtIn(.serika))
+  }
+
+  func testMountedPublicationSharesPaletteAndUpdatesThemeWithoutReplacingResourcesOrAttempt() throws {
+    let f = try Fixture(); defer { f.close() }
+    let custom = try f.publish(##"{"showAllLines":true,"customTheme":true,"autoSwitchTheme":false,"customThemeColors":["#010203","#102030","#203040","#304050","#405060","#506070","#607080","#708090","#8090a0","#90a0b0"]}"##,
+      background: .data(png([32, 64, 96, 255])))
+    let model = Model(custom, owner: f.owner), host = NSHostingView(rootView: Root(model: model))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 220, height: 400), styleMask: .borderless,
+      backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    let palette = try custom.draft.themes.makeCustomTheme(id: custom.applicationID, name: "QA palette").resolvedTheme
+    wait(host) { model.ready.last?.style.theme == palette }
+    XCTAssertEqual(try model.presentation.background(fallbackStyle: .solid, reduceMotion: true).theme, palette)
+    let viewport = try XCTUnwrap(find(host)), attempt = model.session.automaticInputAttemptID
+    let next = try f.publish(#"{"showAllLines":true,"autoSwitchTheme":true,"customTheme":false,"themeLight":"serika","themeDark":"dracula"}"#,
+      background: .data(png([32, 64, 96, 255])))
+    model.publication = next
+    wait(host) { model.ready.last?.style.theme == AppTheme.serika.resolvedTheme }
+    let record = try f.register.read().state
+    guard case .ready(let image) = next.background?.state else { return XCTFail("No owned background") }
+    model.systemIsDark = true
+    wait(host) { model.ready.last?.style.theme == AppTheme.dracula.resolvedTheme }
+    XCTAssertEqual(try model.presentation.background(fallbackStyle: .solid, reduceMotion: true).theme, AppTheme.dracula.resolvedTheme)
+    XCTAssertTrue(find(host) === viewport)
+    XCTAssertTrue(background(host)?.surface.player.currentSample?.frame.image === image.frames[0].image)
+    XCTAssertEqual(model.ready.last?.font, next.font?.renderingFont)
+    XCTAssertEqual(model.presentation.publication.applicationID, next.applicationID)
+    XCTAssertEqual(model.session.automaticInputAttemptID, attempt); XCTAssertEqual(model.session.typed, "x")
+    XCTAssertEqual(try f.register.read().state, record); XCTAssertFalse(window.isVisible)
+    // A new publication must sample the current OS input, not reset to light.
+    model.publication = try f.publish(#"{"showAllLines":true,"autoSwitchTheme":true,"customTheme":false,"themeLight":"serika","themeDark":"dracula"}"#)
+    XCTAssertEqual(model.presentation.appearance.selection, .builtIn(.dracula))
   }
 
   func testActualPublicationReflowsPrivateSameNameFontWithoutReplacingViewportOrAttempt() throws {
