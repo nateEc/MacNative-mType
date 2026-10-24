@@ -101,6 +101,7 @@ struct CustomSectionWordStream {
       }
       let altered = TestModifierPolicy.transformedWord(pendingWords[pendingIndex],
         modifiers: configuration.modifiers, language: configuration.language,
+        websiteOrder: configuration.websiteTextAlterationOrder,
         wordIndex: emittedWords, wordBound: alterationBound, britishEnglish: britishEnglish,
         nextRandomCaseBit: nextRandomCaseBit)
       pendingIndex += 1

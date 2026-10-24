@@ -25511,7 +25511,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(slow.preset.configuration.difficulty, .normal)
     XCTAssertEqual(slow.requirements.wpm, .exact(60))
     XCTAssertEqual(slow.requirements.configuration?.liveSpeedStyle, .off)
-    XCTAssertEqual(slow.requirements.configuration?.paceCaretStyle, .off)
+    XCTAssertEqual(slow.requirements.configuration?.paceGuideMode, .off)
+    XCTAssertNil(slow.requirements.configuration?.paceCaretStyle)
 
     for (name, minimumSeconds) in [
       ("accuracyExpert", 600), ("accuracyMaster", 1_200), ("accuracyGod", 1_800),

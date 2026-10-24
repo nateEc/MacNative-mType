@@ -1,7 +1,7 @@
 import Foundation
 
 enum WebsiteConfigNativeGeneratorsError: Error, Equatable {
-  case missingField(String), invalidField(String), invalidWord, invalidWordPosition
+  case missingField(String), invalidField(String), invalidWord, invalidWordPosition, inconsistentTextModifiers
 }
 
 /// Final website generation intent, separate from legacy native normalization
@@ -72,5 +72,18 @@ struct WebsiteConfigNativeGenerators {
         wordBound: wordBound, nextRandomCaseBit: nextRandomCaseBit)
     }
     return .string(units: units)
+  }
+
+  /// Install only this stage on an already admitted engine configuration.
+  /// This does not apply mode/rules, source selection or global preferences.
+  func applyingTextOrder(to configuration: TestConfiguration) throws -> TestConfiguration {
+    let supported = WebsiteOrderedTextAlteration.supportedModifiers
+    let order = funboxes.compactMap(\.modifier).filter(supported.contains)
+    guard Set(order) == Set(configuration.modifiers.filter(supported.contains)) else {
+      throw WebsiteConfigNativeGeneratorsError.inconsistentTextModifiers
+    }
+    var result = configuration
+    result.websiteTextAlterationOrder = order
+    return result
   }
 }

@@ -3,6 +3,16 @@ import Foundation
 /// The imported sequence is observable: do not sort or deduplicate. UTF-16
 /// intermediate values may be non-scalar and later become valid again.
 enum WebsiteOrderedTextAlteration {
+  static let supportedModifiers: Set<TestModifier> = [.uppercase, .backwards, .titleCase,
+    .doubleCharacters, .messagingStyle, .morseStream, .randomCase, .rot13, .alternatingCase, .underscoreSeparators]
+  /// Explicit native edits can remove effects; keep the surviving sequence.
+  /// Adding an effect requires a new source plan, not an invented order.
+  static func retainedOrder(_ order: [TestModifier]?, modifiers: [TestModifier]) -> [TestModifier]? {
+    guard let order else { return nil }
+    let selected = Set(modifiers.filter(supportedModifiers.contains))
+    let retained = order.filter(selected.contains)
+    return Set(retained) == selected ? retained : nil
+  }
   static func apply(_ modifier: TestModifier, to units: [UInt16], wordIndex: Int, wordBound: Int,
     nextRandomCaseBit: () -> Bool) -> [UInt16] {
     switch modifier {

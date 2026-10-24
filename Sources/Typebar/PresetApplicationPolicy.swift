@@ -94,6 +94,9 @@ enum PresetApplicationPolicy {
     configuration.polyglotUsesPrimaryInputNormalization = testMetadata.polyglotUsesPrimaryInputNormalization
     configuration.dockerfileUsesLiteralIndentation = testMetadata.dockerfileUsesLiteralIndentation
     configuration.zenUsesSourceInputAdmission = testMetadata.zenUsesSourceInputAdmission
+    configuration.websiteTextAlterationOrder = WebsiteOrderedTextAlteration.retainedOrder(
+      usesBehavior ? sourceConfiguration.websiteTextAlterationOrder : currentConfiguration.websiteTextAlterationOrder,
+      modifiers: configuration.modifiers)
 
     var applied = current
     applied.configuration = configuration

@@ -29,7 +29,8 @@ enum LivePromptTransformation {
     for (index, word) in words.enumerated() {
       try Task.checkCancellation()
       let altered = word.isEmpty ? "" : TestModifierPolicy.transformedWord(word,
-        modifiers: modifiers, language: language, wordIndex: wordIndex, wordBound: wordBound,
+        modifiers: modifiers, language: language, websiteOrder: configuration.websiteTextAlterationOrder,
+        wordIndex: wordIndex, wordBound: wordBound,
         britishEnglish: britishEnglish, previousBritishWord: previousBritishWord,
         nextRandomCaseBit: nextRandomCaseBit)
       if !word.isEmpty, britishEnglish.isQuote {

@@ -69,7 +69,7 @@ struct QuoteWordStream {
     guard !source.isEmpty else { throw GenerationError.emptyCandidate }
     let previous = initial ? previousRaw : previousText
     let altered = TestModifierPolicy.transformedWord(source, modifiers: configuration.modifiers,
-      language: configuration.language, wordIndex: emittedWords,
+      language: configuration.language, websiteOrder: configuration.websiteTextAlterationOrder, wordIndex: emittedWords,
       wordBound: initial ? initialLimit : lookaheadBound,
       britishEnglish: britishEnglish, previousBritishWord: previous.map(BritishEnglishPolicy.previousWordKey),
       nextRandomCaseBit: nextRandomCaseBit)

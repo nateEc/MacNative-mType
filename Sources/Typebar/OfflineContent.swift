@@ -5948,7 +5948,8 @@ struct GeneratedWordChunk {
     nextRandomCaseBit: () -> Bool = { Bool.random() }) {
     self.source = source
     let batch = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
-      language: configuration.language, preservesNoSpaceBoundaries: preservesNoSpaceBoundaries,
+      language: configuration.language, websiteOrder: configuration.websiteTextAlterationOrder,
+      preservesNoSpaceBoundaries: preservesNoSpaceBoundaries,
       wordOffset: wordOffset, wordBound: GeneratedWordBoundPolicy.bound(for: configuration,
         wordOffset: wordOffset, sourceWordCount: GeneratedWordBoundPolicy.wordCount(in: source),
         showAllLines: showAllLines), preservesWordOrder: preservesWordOrder,
@@ -6282,7 +6283,8 @@ struct GeneratedCandidateContinuation {
       sourceWords.append(word)
       let modifiers = polyglotCandidates == nil ? configuration.modifiers : configuration.modifiers.filter { $0 != .lazyLatin }
       let target = TestModifierPolicy.transformedWord(word, modifiers: modifiers,
-        language: baseLanguage, wordIndex: emittedWords + index, wordBound: bound,
+        language: baseLanguage, websiteOrder: configuration.websiteTextAlterationOrder,
+        wordIndex: emittedWords + index, wordBound: bound,
         nextRandomCaseBit: nextRandomCaseBit)
       output += target
       targets.append(target)
@@ -6596,6 +6598,7 @@ struct TestSessionFactory {
       // Both batches must use the same absolute final-word index.
       batch = TestModifierPolicy.transformedBatch(noSpaceBoundarySource ?? prompt,
         modifiers: configuration.modifiers, language: configuration.language,
+        websiteOrder: configuration.websiteTextAlterationOrder,
         preservesNoSpaceBoundaries: noSpaceBoundarySource != nil,
         wordBound: externalWordBound, preservesWordOrder: true,
         capturesSourceFields: capturesLiveSourceFields,
@@ -6611,7 +6614,8 @@ struct TestSessionFactory {
       let boundarySource = continuation.noSpaceBoundarySource
       let source = boundarySource ?? continuation.text
       let prepared = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
-        language: configuration.language, preservesNoSpaceBoundaries: boundarySource != nil,
+        language: configuration.language, websiteOrder: configuration.websiteTextAlterationOrder,
+        preservesNoSpaceBoundaries: boundarySource != nil,
         wordOffset: GeneratedWordBoundPolicy.wordCount(in: streamNoSpaceBoundarySource ?? streamPrompt ?? ""),
         wordBound: externalWordBound, preservesWordOrder: true,
         capturesSourceFields: capturesLiveSourceFields,

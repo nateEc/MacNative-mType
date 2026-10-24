@@ -1384,6 +1384,7 @@ enum TestModifierPolicy {
 
   static func transformedBatch(
     _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
+    websiteOrder: [TestModifier]? = nil,
     preservesNoSpaceBoundaries: Bool = false, wordOffset: Int = 0, wordBound: Int? = nil,
     preservesWordOrder: Bool = false, formatsWordPool: Bool = false,
     capturesSourceFields: Bool = false,
@@ -1413,7 +1414,7 @@ enum TestModifierPolicy {
       // words. Keep the standalone finite-text API's legacy behavior unless
       // a caller supplies the actual generation bound.
       let altered = word.isEmpty && wordBound != nil ? "" : transformedWord(word,
-        modifiers: modifiers, language: language,
+        modifiers: modifiers, language: language, websiteOrder: websiteOrder,
         wordIndex: wordBound == nil ? index : generatedWordIndex,
         wordBound: wordBound ?? words.count, britishEnglish: britishEnglish,
         previousBritishWord: previousBritishWord, nextRandomCaseBit: nextRandomCaseBit)
@@ -1456,6 +1457,7 @@ enum TestModifierPolicy {
 
   static func transformedWord(
     _ word: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
+    websiteOrder: [TestModifier]? = nil,
     wordIndex: Int = 0, wordBound: Int = 1,
     britishEnglish: BritishEnglishPolicy.Context? = nil, previousBritishWord: String? = nil,
     nextRandomCaseBit: () -> Bool = { Bool.random() }
@@ -1465,6 +1467,14 @@ enum TestModifierPolicy {
       output = TypingTextNormalizer.lazyLatin(output, language: language)
     }
     output = BritishEnglishPolicy.transformed(output, context: britishEnglish, previousWord: previousBritishWord)
+    if let websiteOrder {
+      var units = Array(output.utf16)
+      for modifier in websiteOrder {
+        units = WebsiteOrderedTextAlteration.apply(modifier, to: units,
+          wordIndex: wordIndex, wordBound: wordBound, nextRandomCaseBit: nextRandomCaseBit)
+      }
+      return String(decoding: units, as: UTF16.self)
+    }
     for modifier in canonicalTextAlterations where modifiers.contains(modifier) {
       switch modifier {
       case .uppercase: output = output.uppercased()
@@ -2328,6 +2338,9 @@ struct TestConfiguration: Codable, Equatable {
   /// Fresh Zen attempts apply source admission before judging input. Missing
   /// markers preserve historical freeform spelling and rejected-key events.
   var zenUsesSourceInputAdmission: Bool?
+  /// Explicit imported alterText execution order. Nil retains historical
+  /// canonical execution. This belongs to an attempt, not global preferences.
+  var websiteTextAlterationOrder: [TestModifier]? = nil
   var modifiers: [TestModifier]
   var contentOptions: ContentOptions
   var challengeID: String?
@@ -2508,6 +2521,8 @@ struct TestConfiguration: Codable, Equatable {
       ? TestModifierPolicy.compatibleWithInfiniteTest(modeCompatibleModifiers) : modeCompatibleModifiers
     copy.contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(
       copy.contentOptions, modifiers: copy.modifiers)
+    copy.websiteTextAlterationOrder = WebsiteOrderedTextAlteration.retainedOrder(
+      websiteTextAlterationOrder, modifiers: copy.modifiers)
     return copy
   }
 
@@ -2542,7 +2557,7 @@ struct TestConfiguration: Codable, Equatable {
       customTextOrdering, customTextPipeDelimiter, mixedLanguageComponents, polyglotBaseLanguage,
       polyglotUsesPrimaryDirection, polyglotUsesPrimaryCodeInput,
       polyglotUsesPrimaryInputNormalization, dockerfileUsesLiteralIndentation, zenUsesSourceInputAdmission,
-      modifiers, contentOptions, challengeID
+      modifiers, contentOptions, challengeID, websiteTextAlterationOrder
   }
 
   init(from decoder: Decoder) throws {
@@ -2605,6 +2620,14 @@ struct TestConfiguration: Codable, Equatable {
     contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(
       decodedContentOptions, modifiers: modifiers)
     challengeID = try values.decodeIfPresent(String.self, forKey: .challengeID)
+    websiteTextAlterationOrder = try values.decodeIfPresent([TestModifier].self, forKey: .websiteTextAlterationOrder)
+    if let order = websiteTextAlterationOrder {
+      let supported = WebsiteOrderedTextAlteration.supportedModifiers
+      guard order.allSatisfy(supported.contains), Set(order) == Set(modifiers.filter(supported.contains)) else {
+        throw DecodingError.dataCorruptedError(forKey: .websiteTextAlterationOrder, in: values,
+          debugDescription: "Ordered text effects must match the admitted text modifiers")
+      }
+    }
   }
 
   private static func usesInfiniteLimit(
@@ -5117,6 +5140,7 @@ struct TypingSession {
     // boundary capture, but do not reverse, uppercase or decorate these words.
     var batch = TestModifierPolicy.transformedBatch(selected, modifiers: forGenerator ? configuration.modifiers : [],
       language: forGenerator ? configuration.language : nil,
+      websiteOrder: forGenerator ? configuration.websiteTextAlterationOrder : nil,
       preservesNoSpaceBoundaries: content.noSpaceBoundarySource != nil || !forGenerator && joinsWithoutSpace,
       wordOffset: loaded, wordBound: bound, preservesWordOrder: true,
       capturesSourceFields: sourceFields != nil,

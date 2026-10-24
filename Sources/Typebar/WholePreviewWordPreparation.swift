@@ -120,6 +120,7 @@ enum WholePreviewWordPreparation {
         if previousTarget != nil, !noSpace, previousTarget?.hasSuffix("\n") != true { output.append(" ") }
         var target = TestModifierPolicy.transformedWord(configuration.language.presentationText(String(word)),
           modifiers: configuration.modifiers, language: configuration.language,
+          websiteOrder: configuration.websiteTextAlterationOrder,
           wordIndex: prepared + offset, wordBound: limit, nextRandomCaseBit: nextRandomCaseBit)
         // Match the complete-prompt transform: only its final message commit
         // is removed, never a chunk boundary's newline.

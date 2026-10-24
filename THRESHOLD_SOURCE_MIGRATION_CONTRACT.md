@@ -1,5 +1,23 @@
 # 阈值源状态与迁移契约
 
+## 完整导入的文本效果进入真实生成路径（2026-10-24，起点 3af4b79d）
+
+本轮原计划衔接完整会话候选，先核对固定 lifecycle.ts 的全量默认重置／末尾字段顺序和 test-logic.ts 的语言等事件重开。审查发现不能把完整草稿直接交给旧工厂：原生 transformedWord 使用固定 canonicalTextAlterations 并按 contains 执行一次，完整导入的 active-list 则保持原数组顺序和重复。已有 NativeGenerators.alteredWord 内核通过 28,448 个固定源码 UTF-16 样本，但尚未进入实际会话。两项真实工厂先行测试都得到 nnoo 而不是重复双写后的 nnnnoooo，确认这是实际消费者缺口，不是只缺一个配置属性。解决它是完整会话事务的前置依赖，不将本阶段改称完整运行时已接通。
+
+新增单次 TestConfiguration 的可选 websiteTextAlterationOrder。nil 保留历史固定顺序；显式计划保持文本效果数组顺序与重复，所有中间阶段都使用 UInt16 数组，只在输出时构造 Swift String，不在每个效果后提前修复代理单元。配置元数据随现有 Codable 保存／恢复，解码拒绝非文本效果、未知枚举或与实际已选文本效果集合不一致的计划；旧记录缺键／null 仍为 nil，不自动升级偏好、快照、源寄存器或所有历史成绩。行为预设组拥有此元数据，单独测试参数组不应覆盖它；显式原生编辑可保留尚在的子序列，新增效果需新源计划，不能猜测其导入顺序。
+
+NativeGenerators.applyingTextOrder 只将此 alterText 阶段装到已准入的引擎配置，并拒绝效果集合不匹配；不投影到旧 AppSettingsSnapshot，不安装模式、输入规则、内容源、Polyglot、布局或全局事件。真实 GeneratedWordChunk、普通／代码候选游标、引语／自定义分段游标、协作在线准备、全行生成和 TypingSession 的生成续接传递同份计划。调用方直接旁路发布的字段继续绕过生成变换，不能误用计划重加工。原有选词／词池倒序、懒拼写、英式替换、数字标点与最终提交去除仍在各自阶段；本阶段不把仅 alterText 接线宣称为全部 funbox 生命周期完成。
+
+九项无源码定点与一项固定源码共享入口探针覆盖实际工厂、归档／非法元数据、完整草稿入口、预设组、游标续批、引语终词、自定义 205 词、201 词协作预览与重复、UTF-16 中间恢复、非交换效果顺序及在线生成／旁路边界。补测的未定义辅助类型是夹具编译错误，不算行为红测；引语末词预期空格则按既有 nextWord 的最终提交去除规则修正，在线续接也按需公布一个字段而非提前显示缓存整段，均未改产品结束／发布语义。共享入口直接复验 25,088 个输入／输出可由 Swift String 精确表示的源码样本；其余 3,360 个由原始 UTF-16 内核单独验证，不混报为实际字符串会话通过。
+
+首轮扩大回归 1,567 项有三处断言失败：两次 Go 编译因测试命令 PATH 未包含已有 /opt/homebrew/bin/go；一处旧总测试把慢速挑战的 paceCaret 模式错断言成 paceCaretStyle。已核对固定 packages/challenges/src/index.ts::slowAndSteady 的要求为 paceCaret: off、liveSpeedStyle: off，HEAD 的原生库和已有 ChallengePaceModeTests 都是 paceGuideMode 关闭而不限定样式；产品定义未改。旧断言改为同时检查模式关闭及样式 nil，未删挑战规则或降低验证；本机 Go 1.26.1 路径纳入最终命令，未安装或切换用户工具链。修正后 84 项定点含真实 Go／Java 编译、新生成计划与源码、挑战应用专项均零失败／零跳过。
+
+最终源码／测试冻结后，1,639 项扩大回归零失败／零跳过（约 461 秒），包含完整 TypingEngineTests、生成游标与配置专项、真实 Go／Java 编译及挑战模式／应用专项；另移除参考环境后，342 项离线回归零失败／零跳过，覆盖实际生成、预设归档、资源和隐藏练习宿主。两套集合有重叠，不相加为独立用例数。源码原创性与固定证据检查通过（47 直接项、119 原生符号、17 支持规范）；人工清单 1,294 项仅结构通过，不冒称人工验收。主窗口源码保持上一阶段 SHA-256 e1a755b0d24621a372db19fa283ad20f42cae8ae15ae8b390199b09ac11b3b11，未重跑或解决独立 HOST-WHEEL-BASELINE-01，不宣称完整门禁通过。
+
+Debug 打包、严格签名、许可证／署名和包内资源原创性检查通过，临时 QA 包由脚本清理；未启动 Typebar 主程序，未改用户资产。日志为 /tmp/typebar-ordered-generation-{red,first,focused,focused-final,focused-complete,live-focused,live-final,expanded,corrected-focused,expanded-final,offline,package}.log。推送前 main 仍为 8c52fb13、开发分支 3af4b79d，Actions 826 次／最近 39118939684 成功，开发分支无打开 PR；只集中推送 native-parity-next，不改 main、工作流或通知，不创建 PR、不重跑 Actions。
+
+残余边界：终态孤立代理单元的目标／判定模型仍不能仅用 Swift String 无损表达；默认 UI 没有启用此计划，完整配置模式／语言／规则、资源／会话同票据准备与页面原子切换仍未完成。重复展开可能增加输出和准备成本，本阶段不提供通用内存／时延上限，正式入口启用前仍需容量和错误恢复验收。完整目标保持 active，不因新字段或局部出题通过而宣称重写完成。不得启动多个 Typebar、绕过滚轮基线或频繁推送试探 CI；本批继续只在本地验收后集中推送开发分支。
+
 ## 完整发布进入真实练习页的可回退呈现接线（2026-10-24，起点 7229ae10）
 
 来源状态是完整 publication 已提交／资源已准备，但只有独立提示夹具消费，真实 ContentView 仍读取旧设置。目标是在 TypebarApp.practiceContent 这一个生产组合入口注入可选 WebsiteConfigPublishedPresentation；非空时，原练习页的背景、主题／色彩方案、提示字体／样式、行宽、全部行／卷带选择、光标、组合文本与退役上下文共同消费该发布，保留原 NativeTypingInput、尝试和会话。nil 仍是当前生产默认，走旧配置路径；这不是增加另一套独立练习页，也不是将 94 个完整草稿字段写回旧快照。
