@@ -37,7 +37,26 @@ import SwiftUI
     cancelOperation(); isWorking = false; isError = false
     message = "操作已取消；未完成的准备不会应用。"
   }
+  @discardableResult
+  func useTypebarSettings(_ action: () throws -> Void) -> Bool {
+    guard !isWorking else { return false }
+    do {
+      try action()
+      isError = false
+      message = "本窗口已使用 Typebar 设置；完整配置存档保留，下次启动仍会尝试恢复。"
+      return true
+    } catch {
+      isError = true; message = Self.message(for: error)
+      return false
+    }
+  }
   private static func message(for error: Error) -> String {
+    if case PracticePageSessionStateError.locked = error {
+      return "请先结束当前练习，再切换到 Typebar 设置。"
+    }
+    if case PracticePageSessionStateError.invalidAttempt = error {
+      return "Typebar 设置未能生成新的练习，切换尚未完成；请检查设置或恢复保存的完整配置。存档未删除。"
+    }
     if let error = error as? WebsiteConfigImportWorkflowError { return error.localizedDescription }
     if case WebsiteConfigSessionBuildError.reconfigurationRequired = error {
       return "当前引语来源不可用；请检查语言与引语长度后重新导入。原配置未修改。"
@@ -51,11 +70,16 @@ import SwiftUI
 
 struct WebsiteConfigImportView: View {
   @State private var form: WebsiteConfigImportForm
+  private let useTypebarSettings: (() throws -> Void)?
   @Environment(\.dismiss) private var dismiss
-  init(apply: @escaping @MainActor (String?) async throws -> String, cancel: @escaping @MainActor () -> Void) {
+  init(apply: @escaping @MainActor (String?) async throws -> String, cancel: @escaping @MainActor () -> Void,
+    useTypebarSettings: (() throws -> Void)? = nil) {
     _form = State(initialValue: .init(apply: apply, cancel: cancel))
+    self.useTypebarSettings = useTypebarSettings
   }
-  init(form: WebsiteConfigImportForm) { _form = State(initialValue: form) }
+  init(form: WebsiteConfigImportForm, useTypebarSettings: (() throws -> Void)? = nil) {
+    _form = State(initialValue: form); self.useTypebarSettings = useTypebarSettings
+  }
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       HStack(alignment: .firstTextBaseline) {
@@ -84,8 +108,17 @@ struct WebsiteConfigImportView: View {
       }
       Text("请先结束当前练习。配置保存在此 Mac 的独立目录，启动时会尝试恢复；失败时可在此重试。成绩、凭据和自定义练习文本不会从 JSON 导入。")
         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+      if useTypebarSettings != nil {
+        Text("切回仅影响本窗口，不删除完整配置存档；下次启动仍会尝试恢复它。")
+          .font(.caption).foregroundStyle(.secondary)
+      }
       HStack {
         Button("恢复已保存配置") { form.start(restoring: true) }.disabled(form.isWorking)
+        if let useTypebarSettings {
+          Button("本窗口使用 Typebar 设置") {
+            if form.useTypebarSettings(useTypebarSettings) { dismiss() }
+          }.disabled(form.isWorking)
+        }
         Spacer()
         if form.isWorking { Button("取消准备") { form.cancel() } }
         Button("导入并开始练习") { form.start() }

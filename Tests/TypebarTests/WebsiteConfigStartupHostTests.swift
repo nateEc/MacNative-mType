@@ -152,4 +152,57 @@ import XCTest
       .write(to: URL(fileURLWithPath: "/tmp/typebar-startup-recovery-notice.png"))
     XCTAssertEqual(choices, 0); XCTAssertFalse(window.isVisible)
   }
+
+  func testNormalWindowActionReturnsToActualTypebarSelectionWithoutDeletingRecord() throws {
+    let f = try Fixture(saved: true); defer { f.close() }
+    f.state.accountReady = true
+    f.wait { f.state.page.state.practice != nil && f.inputs().first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.inputs().first), oldInsert = input.onInsert
+    let stored = try Data(contentsOf: XCTUnwrap(f.record)), legacy = f.settings.snapshot
+    try f.state.page.useTypebarSettings()
+    f.wait { f.state.page.state.practice == nil && input.acceptsTextInput }
+    XCTAssertEqual(f.state.page.state.session.configuration.wordLimit, 3)
+    XCTAssertNil(f.state.page.state.presentation); XCTAssertNil(f.state.page.restartController)
+    XCTAssertTrue(f.inputs().first === input)
+    oldInsert("stale", false)
+    XCTAssertEqual(f.state.page.state.session.typed, "")
+    XCTAssertEqual(try Data(contentsOf: XCTUnwrap(f.record)), stored)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    input.onInsert("a", false)
+    XCTAssertEqual(f.state.page.state.session.typed, "a")
+    XCTAssertThrowsError(try f.state.page.useTypebarSettings())
+    XCTAssertEqual(f.state.page.state.session.typed, "a")
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testWindowCanRestoreTheKeptWholeRecordAfterReturningToTypebarSettings() throws {
+    let f = try Fixture(saved: true); defer { f.close() }
+    f.state.accountReady = true
+    f.wait { f.state.page.state.practice != nil && f.inputs().first?.acceptsTextInput == true }
+    let saved = try Data(contentsOf: XCTUnwrap(f.record))
+    try f.state.page.useTypebarSettings()
+    f.wait { f.state.page.state.practice == nil && f.inputs().first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.inputs().first), staleNativeInsert = input.onInsert
+    let directory = try XCTUnwrap(f.record).deletingLastPathComponent()
+    let window = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { window })
+    defer { workflow.stop() }
+    var result: Result<String, Error>?
+    let task = Task {
+      do { result = .success(try await workflow.apply(json: nil, systemIsDark: false)) }
+      catch { result = .failure(error) }
+    }
+    defer { task.cancel() }
+    f.wait { result != nil }
+    _ = try XCTUnwrap(result).get()
+    f.wait { f.state.page.state.practice != nil && input.acceptsTextInput }
+    XCTAssertEqual(f.state.page.state.session.configuration.wordLimit, 4)
+    XCTAssertFalse(f.state.page.isReturningToTypebarSettings)
+    XCTAssertTrue(f.inputs().first === input)
+    staleNativeInsert("stale", false)
+    XCTAssertEqual(f.state.page.state.session.typed, "")
+    XCTAssertEqual(try Data(contentsOf: XCTUnwrap(f.record)), saved)
+    XCTAssertFalse(f.window.isVisible)
+  }
 }

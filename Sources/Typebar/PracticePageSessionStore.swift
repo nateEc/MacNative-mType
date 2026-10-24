@@ -16,6 +16,17 @@ final class PracticePageSessionStore {
   @ObservationIgnored private var pendingDetach = false
   @ObservationIgnored private var attachment = UUID()
   @ObservationIgnored private var compositionActivity = UUID()
+  private(set) var isReturningToTypebarSettings = false
+  @ObservationIgnored private var legacyReturnTransition = false
+  @ObservationIgnored private var legacyReturnPermit: LegacyReturnPermit?
+  @ObservationIgnored private var typebarSettingsAction: (@MainActor () throws -> Void)?
+
+  struct LegacyReturnPermit {
+    fileprivate let request: UUID
+    fileprivate let lease: PreferenceConfigurationSaveRouter.Lease
+    fileprivate let attachment: UUID
+    fileprivate let previousAttempt: UUID
+  }
 
   struct GenerationCapture {
     let publication: WebsiteConfigCommitCoordinator.Publication
@@ -97,6 +108,7 @@ final class PracticePageSessionStore {
 
   func attach(to router: PreferenceConfigurationSaveRouter) {
     guard !committing else { return }
+    typebarSettingsAction = nil; clearLegacyReturn()
     startupController.stop(); startupController = .init(); setStartupInputSuspended(false)
     retireRestartController()
     attachment = UUID()
@@ -106,6 +118,7 @@ final class PracticePageSessionStore {
     attachment = UUID()
     if committing { pendingDetach = true }
     else { router = nil }
+    typebarSettingsAction = nil; clearLegacyReturn()
     retireRestartController(); startupController.stop()
   }
   func replace(_ state: PracticePageSessionState) {
@@ -118,6 +131,7 @@ final class PracticePageSessionStore {
   }
   func acceptsAttemptCallback(for attemptID: UUID) -> Bool {
     router != nil && !committing && !startupInputTransition && !startupInputSuspended
+      && !legacyReturnTransition && !isReturningToTypebarSettings
       && state.session.automaticInputAttemptID == attemptID
   }
   func setStartupInputSuspended(_ suspended: Bool) {
@@ -125,6 +139,61 @@ final class PracticePageSessionStore {
     startupInputTransition = true
     startupInputSuspended = suspended
     startupInputTransition = false
+  }
+
+  func bindTypebarSettingsAction(_ action: @escaping @MainActor () throws -> Void) {
+    guard !committing, router != nil else { return }
+    typebarSettingsAction = action
+  }
+  func useTypebarSettings() throws {
+    guard !committing, let router, router.captureLease()?.owner == owner else {
+      throw PracticePageSessionStateError.wrongOwner
+    }
+    guard !state.session.hasStarted || state.session.isFinished else { throw PracticePageSessionStateError.locked }
+    guard let typebarSettingsAction else { throw PracticePageSessionStateError.incomplete }
+    try typebarSettingsAction()
+  }
+
+  /// Reversible window-only cutover. No configuration record or preference is
+  /// deleted. Input stays closed until the normal native path creates a fresh
+  /// attempt; a failed native restoration can retry or restore the full profile.
+  func beginLegacyReturn() throws -> LegacyReturnPermit {
+    guard !committing, let router, let lease = router.captureLease(), lease.owner == owner else {
+      throw PracticePageSessionStateError.wrongOwner
+    }
+    guard !state.session.hasStarted || state.session.isFinished else { throw PracticePageSessionStateError.locked }
+    guard state.practice != nil || legacyReturnPermit != nil else { throw PracticePageSessionStateError.incomplete }
+    let permit = LegacyReturnPermit(request: UUID(), lease: lease, attachment: attachment,
+      previousAttempt: state.session.automaticInputAttemptID)
+    committing = true
+    legacyReturnPermit = permit
+    legacyReturnTransition = true
+    isReturningToTypebarSettings = true
+    legacyReturnTransition = false
+    retireRestartController()
+    state = .init(session: state.session, priorAttemptLedger: state.priorAttemptLedger)
+    endCommit()
+    guard self.router === router, router.isCurrent(lease), attachment == permit.attachment else {
+      throw PracticePageSessionStateError.stale
+    }
+    return permit
+  }
+  func finishLegacyReturn(_ permit: LegacyReturnPermit) throws {
+    guard !committing, let router, router.isCurrent(permit.lease), permit.lease.owner == owner,
+      attachment == permit.attachment, legacyReturnPermit?.request == permit.request else {
+      throw PracticePageSessionStateError.stale
+    }
+    guard state.practice == nil, state.presentation == nil,
+      state.session.automaticInputAttemptID != permit.previousAttempt,
+      !state.session.hasStarted, !state.session.isFinished else { throw PracticePageSessionStateError.invalidAttempt }
+    clearLegacyReturn()
+  }
+  private func clearLegacyReturn() {
+    guard isReturningToTypebarSettings || legacyReturnPermit != nil else { return }
+    legacyReturnTransition = true
+    isReturningToTypebarSettings = false
+    legacyReturnPermit = nil
+    legacyReturnTransition = false
   }
   var isInputSuspendedForRestart: Bool {
     restartController?.isPreparing == true || state.restartDepartureAttemptID == state.session.automaticInputAttemptID
@@ -172,6 +241,7 @@ final class PracticePageSessionStore {
   }
   func installCommitted(_ state: PracticePageSessionState) {
     precondition(committing)
+    clearLegacyReturn()
     if state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID { retireRestartController() }
     self.state = state
   }

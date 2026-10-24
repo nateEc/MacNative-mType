@@ -1469,6 +1469,13 @@ private struct ContentView: View {
           recover: openWebsiteConfigImport,
           continueUsingLegacy: { pageSessionStore.startupController.continueUsingLegacy() })
       }
+      if pageSessionStore.isReturningToTypebarSettings {
+        VStack(alignment: .leading, spacing: 8) {
+          Label("Typebar 设置尚未生成新的练习。请检查设置后重试，或恢复保存的完整配置。",
+            systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+          Button("打开配置面板…", action: openWebsiteConfigImport)
+        }.font(.callout)
+      }
       if !visualFocus.isFocused {
         configurationPanel
       }
@@ -1738,6 +1745,7 @@ private struct ContentView: View {
       }
       activatePreferenceConfigurationOwnerIfKey()
       pageSessionStore.attach(to: settings.preferenceConfigurationSaves)
+      pageSessionStore.bindTypebarSettingsAction { try returnToTypebarSettings() }
       updateConfigurationStartup()
     }
     .onDisappear {
@@ -2243,7 +2251,8 @@ private struct ContentView: View {
         let message = try await importWorkflow().apply(json: json, systemIsDark: systemColorScheme == .dark)
         pageSessionStore.startupController.completedManually()
         return message
-      }, cancel: { websiteImportWorkflow?.cancel() })
+      }, cancel: { websiteImportWorkflow?.cancel() },
+        useTypebarSettings: { try pageSessionStore.useTypebarSettings() })
     }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
@@ -3281,6 +3290,7 @@ private struct ContentView: View {
 
       NativeTypingInput(
         focusRequest: focusRequest, acceptsTextInput: !isPreparingPracticePrompt && !startupBlocksPractice
+          && !pageSessionStore.isReturningToTypebarSettings
           && !pageSessionStore.isInputSuspendedForRestart
           && (publishedPresentation == nil || PromptFieldProjectionPolicy.supports(session.configuration)),
         insertionAnchor: promptInsertionAnchor,
@@ -4623,7 +4633,7 @@ private struct ContentView: View {
       return false
     }
     guard pageSession.practice == nil else {
-      restartLockMessage = "本轮使用完整导入设置；编辑与重开接线尚未完成。"
+      restartLockMessage = "本轮使用完整配置；编辑尚未接通，可在配置面板切回本窗口的 Typebar 设置。"
       return false
     }
     synchronizeNoQuitConfigurationLock()
@@ -6654,6 +6664,24 @@ private struct ContentView: View {
     if let websiteImportWorkflow { return websiteImportWorkflow }
     let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: websiteConfigStartup?.applicationSupport)
     return configurationWorkflow(at: directory)
+  }
+
+  private func returnToTypebarSettings() throws {
+    let page = pageSessionStore
+    guard !session.hasStarted || session.isFinished else { throw WebsiteConfigImportWorkflowError.activeAttempt }
+    guard page.state.practice != nil || page.isReturningToTypebarSettings else {
+      page.startupController.continueUsingLegacy()
+      return
+    }
+    let permit = try page.beginLegacyReturn()
+    websiteImportWorkflow?.stop(); websiteImportWorkflow = nil
+    page.startupController.completedManually()
+    completedResult = nil; compositionText = ""; terminalNotice = nil
+    finalizedPracticeAttemptID = nil
+    // Reuse normal native selection/resource/recovery admission, not a guessed
+    // conversion of the whole website profile into old preference fields.
+    restorePersistedTestSelection()
+    try page.finishLegacyReturn(permit)
   }
 
   private func configurationWorkflow(at directory: URL) -> WebsiteConfigImportWorkflow {
