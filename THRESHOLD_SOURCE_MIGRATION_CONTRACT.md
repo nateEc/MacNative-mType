@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 单项编辑准备批次（2026-10-24，起点 df016861）
+
+源是当前完整 runtime，不是默认文档或旧 Snapshot。目标为独立 setter 投影及完整类型草稿；不得通过 JSON 全量导入冒充编辑，否则会重放无关事件、重置引语队列及参数记忆。完整导入与编辑共享值覆盖、依赖 setter 和 funbox 准入核心，但只有完整导入有 fullConfigChange 起止事件；编辑保留未涉及的 94 字段，事件沿用实际 previousValue 与 nosave。
+
+固定参考的 metadata/setters/funbox-validation 由只读 QA 模块执行，新增 1,614 个单项样本，含全部字段同值写入、22 个需重开字段、活动 No Quit、现有 funbox、依赖事件顺序和保存意图。先行证据分别为缺少 edit/restartRequiredKeys 与 editDraft 接口的编译失败，不冒充已运行的行为红测。完整草稿保留独立 edited 来源及 previousRuntime，不伪造 JSON 导入证据；拒绝与依赖异常保持原草稿，序列参数、休眠限制及孤立 UTF-16 单元有检查。
+
+冻结源码后定点 14 项零失败／零跳过，含 1,614 单项与原 671 全量投影；进一步全部 WebsiteConfig、WebsiteFunboxAdmission、PracticePageSession 相关 341 项零失败／零跳过，80.975 秒，两集合重叠不相加。日志分别为 /tmp/typebar-single-edit-draft-focused.log 与 /tmp/typebar-single-edit-expanded.log。Debug 打包／签名、包内资源与原创性检查通过，日志 /tmp/typebar-single-edit-package.log；构建包未启动。原创性／固定参考行为审计（47 直接／119 测试符号／17 支持规范）、自检及 1,300 条人工清单结构通过；人工新增行仍未验收。
+
+四份实现 SHA256 分别为：WebsiteConfigNativeDraft 41cddf759f8e65b00b5360b9fbff2d512357a44b11d6e89d0ac2c58b95579e66；WebsiteConfigNativeProfile 5ac2a917c96063b2a636cf74b7ccd386722d9b7b89a6d928f90f66673e037d25；WebsiteConfigRuntimeProjection bc340872d457e6df56d1fbd2f903d4c91309c03cb8fd91b87c2d7a6e27956ddd；WebsiteFunboxAdmission 0f873b8a06a87601b7692cfdca69b576c2ba0b62328fe841a6a81018a0e3de5a。测试／打包存活期间未编辑 Swift 输入。会话内决策复核保留了单项与全量区别、依赖失败及纯准备副作用边界；不是独立审查，不升级为完整门禁。独立滚轮基线与物理输入／IME 等旧缺口仍开放。
+
+切换单位仍是未来的已准入完整页面／配置事务；本轮纯准备不写盘、不调整资源、不执行 resize/afterSet、不发布页面或重开尝试。拒绝与依赖 setter 抛错不得改变输入草稿；源代码在异常依赖链可能已有局部副作用，不能据纯函数无外部副作用推断原版事务性。当前 UI 继续关闭完整源编辑，不破坏既有只读消费路径。后续须独立实现资源重准备、窗口／磁盘新鲜度、运行中即时字段消费者、重开策略、参数／引语队列、失败回滚与恢复交互，再开放入口；此阶段不是最终只读目标，也不是完整编辑验收。
+
+本轮不改 main／工作流／通知，不重跑 Actions，不启动 Typebar。以下为先前已推送批次的验证，不能用来冒充本轮新源码结果。
+
 ## 当前结论：同步交接批次验证（2026-10-24，起点 27601009）
 
 同一真实 ContentView 现持有窗口局部会话目标，实际保存路由／所有者与出现／退役生命周期共同准入完整提交。页面锁定、外来目标、不完整资源等拒绝发生在记录 CAS 前；成功后同一 MainActor 调用安装会话／资源／Scope。缓存输入按创建时尝试身份拒绝，尝试切换清除原生转换缓冲而保留控件；同步观察中的退役会在保留期结束时解除绑定。辅助状态／视口准备仍由页面观察收尾，不把模型安装描述为屏幕或实体输入法立即完成绘制。

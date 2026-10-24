@@ -34,6 +34,16 @@ enum WebsiteConfigNativeProfile {
     try .init(prepared: prepare(json, context: context), pointsPerRem: pointsPerRem)
   }
 
+  static func editDraft(_ current: WebsiteConfigNativeDraft, key: String, value: WebsiteConfigValue,
+    pointsPerRem: Double, context: WebsiteConfigRuntimeContext, testActive: Bool = false,
+    nosave: Bool = false) throws -> WebsiteConfigNativeDraft {
+    let previous = current.projection.runtime
+    let projection = try WebsiteConfigRuntimeProjector.edit(current: previous, key: key, value: value,
+      defaults: defaultDocument().values, schema: .init(catalogs: catalogs), context: context,
+      testActive: testActive, nosave: nosave)
+    return try .init(edit: .init(key: key, previousRuntime: previous, projection: projection), pointsPerRem: pointsPerRem)
+  }
+
   static func prepareWebsiteRestoration(_ json: String?, context: WebsiteConfigRuntimeContext) throws -> WebsiteConfigPreparedRestoration {
     try WebsiteConfigRestoration.prepareWebsiteStorage(json, defaultDocument: defaultDocument(),
       schema: .init(catalogs: catalogs), context: context)

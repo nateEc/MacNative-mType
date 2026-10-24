@@ -28,6 +28,13 @@ enum WebsiteFunboxAdmission {
     return names.allSatisfy { candidate in allows(current, active: previous + [candidate]) }
   }
 
+  /// A setter checks only the proposed field against already active funboxes;
+  /// it does not re-admit every unrelated field of the current document.
+  static func acceptsEdit(key: String, value: WebsiteConfigValue, active: WebsiteConfigValue) -> Bool {
+    guard let names = names(in: active), names.allSatisfy(knownNames.contains) else { return false }
+    return allows([key: value], active: names)
+  }
+
   private static func names(in value: WebsiteConfigValue) -> [String]? {
     guard case .array(let values) = value else { return nil }
     let names = values.compactMap { if case .string(let name) = $0 { name } else { nil } }

@@ -1,6 +1,12 @@
 import Foundation
 
-enum WebsiteConfigNativeDraftError: Error { case incompleteRuntime, inconsistentCoverage }
+enum WebsiteConfigNativeDraftError: Error { case incompleteRuntime, inconsistentCoverage, rejectedEdit }
+
+struct WebsiteConfigPreparedEdit {
+  let key: String
+  let previousRuntime: [String: WebsiteConfigValue]
+  let projection: WebsiteConfigRuntimeProjection
+}
 
 /// Complete typed preflight, NOT an applied configuration. No legacy snapshot
 /// normalization, resource activation, preference write or live event replay.
@@ -14,8 +20,13 @@ struct WebsiteConfigNativeDraft {
 
   enum Origin {
     case imported(WebsiteConfigPreparedImport), restored(WebsiteConfigPreparedRestoration)
+    case edited(WebsiteConfigPreparedEdit)
     var projection: WebsiteConfigRuntimeProjection {
-      switch self { case .imported(let value): value.projection; case .restored(let value): value.projection }
+      switch self {
+      case .imported(let value): value.projection
+      case .restored(let value): value.projection
+      case .edited(let value): value.projection
+      }
     }
   }
   let origin: Origin
@@ -42,6 +53,12 @@ struct WebsiteConfigNativeDraft {
   @MainActor
   init(restoration: WebsiteConfigPreparedRestoration, pointsPerRem: Double) throws {
     try self.init(origin: .restored(restoration), pointsPerRem: pointsPerRem)
+  }
+
+  @MainActor
+  init(edit: WebsiteConfigPreparedEdit, pointsPerRem: Double) throws {
+    guard edit.projection.rejectedKeys.isEmpty else { throw WebsiteConfigNativeDraftError.rejectedEdit }
+    try self.init(origin: .edited(edit), pointsPerRem: pointsPerRem)
   }
 
   @MainActor

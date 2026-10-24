@@ -14,7 +14,8 @@ const importMode = process.argv[3] === '--import-preparation';
 const funboxMode = process.argv[3] === '--funbox-admission';
 const defaultsMode = process.argv[3] === '--default-profile';
 const coldMode = process.argv[3] === '--cold-storage';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode);
+const editMode = process.argv[3] === '--single-edit';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -35,7 +36,7 @@ const frontend = path.join(root, 'frontend/src/ts');
 const adapters = new Map([
   [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: noop, showErrorNotification: noop}],
   [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
-  [path.join(frontend, 'states/test.ts'), {isTestActive: () => true}],
+  [path.join(frontend, 'states/test.ts'), {isTestActive: () => simulation.flags.testActive ?? true}],
   [path.join(frontend, 'collections/custom-themes.ts'), {__nonReactive: {getCustomThemes: () => Array(simulation.flags.customThemeCount ?? 0).fill({})}}],
   [path.join(frontend, 'utils/env.ts'), {isDevEnvironment: () => !!simulation.flags.development}],
   [path.join(frontend, 'utils/misc.ts'), {reloadAfter: noop, triggerResize: noop, escapeHTML: value => value}],
@@ -154,7 +155,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -166,7 +167,45 @@ if (defaultsMode) {
     return blocked;
   };
   const setters = await load(path.join(frontend, 'config/setters.ts'));
-  if (keyboardMode) {
+  if (editMode) {
+    const fixtures = [];
+    function add(key, value, patch = {}, flags = {}, nosave = false) {
+      Object.assign(simulation.Config, structuredClone(defaults), structuredClone(patch));
+      simulation.flags = {authenticated:false, documentComplete:true, customThemeCount:0,
+        development:false, testActive:false, ...flags};
+      simulation.events = []; simulation.saves = [];
+      const current = structuredClone(simulation.Config);
+      const accepted = setters.setConfig(key, structuredClone(value), {nosave});
+      fixtures.push({key, value, current, flags:simulation.flags, nosave, accepted,
+        runtime:structuredClone(simulation.Config), events:simulation.events, saves:simulation.saves});
+    }
+    // Every field, including same-value writes and active No Quit metadata.
+    for (const [key, value] of Object.entries(defaults)) {
+      add(key, value);
+      add(key, value, {funbox:['no_quit']}, {testActive:true});
+      add(key, value, {funbox:['no_quit']}, {testActive:false}, true);
+    }
+    const choices = {mode:['time','words','quote','custom','zen'], words:[0,1,120], time:[0,1,120],
+      numbers:[false,true], punctuation:[false,true], highlightMode:['off','letter','word'],
+      funbox:[[],['no_quit'],['memory'],['binary'],['mirror']],
+      confidenceMode:['off','on','max'], stopOnError:['off','word'], deleteOnError:['off','letter'],
+      freedomMode:[false,true], showAllLines:[false,true], tapeMode:['off','word'],
+      keymapSize:[-1,0.55,9], customBackground:['  owned  '], paceCaret:['pb','tagPb','custom'],
+      randomTheme:['custom'], theme:['dracula'], customThemeColors:[Array(10).fill('#123456')],
+      accountChart:[['off','off','on','off']]};
+    for (const funbox of [[],['no_quit'],['memory'],['binary'],['arrows'],['tts'],['rot13']])
+      for (const testActive of [false,true]) for (const nosave of [false,true])
+        for (const [key, values] of Object.entries(choices)) for (const value of values)
+          add(key, value, {funbox, customTheme:true}, {testActive}, nosave);
+    for (const authenticated of [false,true]) for (const documentComplete of [false,true])
+      for (const customThemeCount of [0,2]) {
+        add('paceCaret','pb',{}, {authenticated,documentComplete,customThemeCount});
+        add('randomTheme','custom',{}, {authenticated,documentComplete,customThemeCount});
+      }
+    verify();
+    console.log(JSON.stringify({defaults,catalogs,fixtures,
+      restartKeys:Object.keys(metadata).filter(key => metadata[key].changeRequiresRestart)}));
+  } else if (keyboardMode) {
     const fixtures = [];
     const options = {
       keymapMode: ['off', 'static', 'react', 'next'],

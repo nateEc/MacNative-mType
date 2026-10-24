@@ -24,6 +24,32 @@ struct WebsiteConfigRuntimeProjection {
 enum WebsiteConfigProjectionError: Error { case invalidInput, invalidOrder, failedOverride }
 
 enum WebsiteConfigRuntimeProjector {
+  static let restartRequiredKeys: Set<String> = [
+    "punctuation", "numbers", "words", "time", "mode", "quoteLength", "language", "difficulty",
+    "minWpm", "minWpmCustomSpeed", "minAcc", "minAccCustom", "minBurst", "minBurstCustomSpeed",
+    "britishEnglish", "funbox", "customLayoutfluid", "strictSpace", "stopOnError", "lazyMode",
+    "layout", "codeUnindentOnBackspace",
+  ]
+
+  /// Pure single-setter preparation. No full-config replay, persistence, resize
+  /// or restart occurs here; consumers must admit and commit the returned state.
+  static func edit(
+    current: [String: WebsiteConfigValue], key: String, value: WebsiteConfigValue,
+    defaults: [String: WebsiteConfigValue], schema: WebsiteConfigSchema,
+    context: WebsiteConfigRuntimeContext, testActive: Bool = false, nosave: Bool = false
+  ) throws -> WebsiteConfigRuntimeProjection {
+    guard schema.keys.contains(key), Set(current.keys) == schema.keys,
+      Set(defaults.keys) == schema.keys,
+      current.allSatisfy({ schema.accepts($0.value, for: $0.key) }),
+      defaults.allSatisfy({ schema.accepts($0.value, for: $0.key) })
+    else { throw WebsiteConfigProjectionError.invalidInput }
+    var requested = current
+    requested[key] = value
+    return try apply(requested: requested, initial: current, defaults: defaults,
+      keys: [key], context: context, schema: schema, fullChange: false,
+      testActive: testActive, nosave: nosave, admitsFunbox: WebsiteFunboxAdmission.accepts)
+  }
+
   /// Normalized website input only. This never installs settings, emits UI
   /// notifications, persists preferences or restores a native backup.
   static func project(
@@ -40,8 +66,19 @@ enum WebsiteConfigRuntimeProjector {
     let last = ["keymapMode", "minWpm", "minAcc", "minBurst", "paceCaret", "quoteLength",
       "words", "time", "mode", "numbers", "punctuation", "funbox"]
     let late = Set(last)
-    var result = WebsiteConfigRuntimeProjection(requested: requested, runtime: defaults,
-      rejectedKeys: [], events: [.init(key: "fullConfigChange")])
+    return try apply(requested: requested, initial: defaults, defaults: defaults,
+      keys: orderedKeys.filter({ !late.contains($0) }) + last, context: context, schema: schema,
+      fullChange: true, testActive: false, nosave: true, admitsFunbox: admitsFunbox)
+  }
+
+  private static func apply(
+    requested: [String: WebsiteConfigValue], initial: [String: WebsiteConfigValue],
+    defaults: [String: WebsiteConfigValue], keys: [String], context: WebsiteConfigRuntimeContext,
+    schema: WebsiteConfigSchema, fullChange: Bool, testActive: Bool, nosave: Bool,
+    admitsFunbox: (WebsiteConfigValue, [String: WebsiteConfigValue]) -> Bool
+  ) throws -> WebsiteConfigRuntimeProjection {
+    var result = WebsiteConfigRuntimeProjection(requested: requested, runtime: initial,
+      rejectedKeys: [], events: fullChange ? [.init(key: "fullConfigChange")] : [])
 
     func assign(_ key: String, _ proposed: WebsiteConfigValue) throws -> Bool {
       var value = proposed
@@ -75,6 +112,10 @@ enum WebsiteConfigRuntimeProjector {
       case "ads": if context.development { value = .string("off") }
       default: break
       }
+      if testActive, restartRequiredKeys.contains(key),
+        case .array(let active)? = result.runtime["funbox"], active.contains(.string("no_quit")) {
+        return false
+      }
       let blocked: Bool
       switch key {
       case "paceCaret": blocked = context.documentComplete && !context.authenticated
@@ -85,7 +126,10 @@ enum WebsiteConfigRuntimeProjector {
       case "funbox": blocked = !admitsFunbox(value, result.runtime)
       default: blocked = false
       }
-      guard !blocked, schema.accepts(value, for: key) else { return false }
+      guard !blocked, schema.accepts(value, for: key),
+        let active = result.runtime["funbox"],
+        WebsiteFunboxAdmission.acceptsEdit(key: key, value: value, active: active)
+      else { return false }
       // Dependent setters retain the same event/order semantics as top-level setters.
       let children: [(String, WebsiteConfigValue)]
       switch key {
@@ -118,13 +162,13 @@ enum WebsiteConfigRuntimeProjector {
         guard try assign(child, value) else { throw WebsiteConfigProjectionError.failedOverride }
       }
       result.runtime[key] = value
-      result.events.append(.init(key: key, previousValue: previous, newValue: value, nosave: true))
+      result.events.append(.init(key: key, previousValue: previous, newValue: value, nosave: nosave))
       return true
     }
-    for key in orderedKeys.filter({ !late.contains($0) }) + last {
+    for key in keys {
       if let value = result.requested[key], try !assign(key, value) { result.rejectedKeys.append(key) }
     }
-    result.events.append(.init(key: "fullConfigChangeFinished"))
+    if fullChange { result.events.append(.init(key: "fullConfigChangeFinished")) }
     return result
   }
 }
