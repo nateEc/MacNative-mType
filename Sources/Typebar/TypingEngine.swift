@@ -9048,7 +9048,9 @@ struct TypingSession {
     } else if var continuation = generatedCodeContinuation {
       generatedChunk = continuation.nextChunk(maximumWordCount: 1, weakSpotScores: currentWeakSpotScores)
       generatedCodeContinuation = continuation
-      if continuation.replayExhausted { fail(at: date, reason: .wordGeneration); return }
+      if continuation.replayExhausted || continuation.sourceGenerationFailed {
+        fail(at: date, reason: .wordGeneration); return
+      }
     }
     if let chunk = generatedChunk {
       let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)

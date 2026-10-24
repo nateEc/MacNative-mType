@@ -6166,6 +6166,7 @@ struct GeneratedCandidateContinuation {
   private(set) var replayHistory: GeneratedWordReplayHistory
   private let replaysOwnedHistory: Bool
   private(set) var replayExhausted = false
+  private(set) var sourceGenerationFailed = false
 
   init(configuration: TestConfiguration, batchTokenCount: Int, showAllLines: Bool = false,
     weakSpotScores: WeakSpotScores = .init(), sourceWords: [String]? = nil,
@@ -6197,7 +6198,7 @@ struct GeneratedCandidateContinuation {
   }
 
   var hasRemaining: Bool {
-    !replayExhausted && (cache.hasPendingReplay
+    !replayExhausted && !sourceGenerationFailed && (cache.hasPendingReplay
       || configuration.mode != .words || configuration.isInfinite
       || emittedWords < (configuration.wordLimit ?? 0))
   }
@@ -6238,6 +6239,7 @@ struct GeneratedCandidateContinuation {
     guard count > 0 else { return .init(source: "", configuration: configuration) }
     guard !pool.isEmpty else { return .init(source: "", configuration: configuration) }
     let noSpace = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    let websiteSource = WebsiteRandomWordGenerator.selected(for: configuration)
     let bound = initialPreparationWordBound ?? GeneratedWordBoundPolicy.bound(for: configuration, wordOffset: emittedWords,
       sourceWordCount: count, showAllLines: previewsWholeFiniteWords)
     var sourceWords: [String] = []
@@ -6262,6 +6264,13 @@ struct GeneratedCandidateContinuation {
       let candidate = drawCandidate(random: nextRandomWordIndex)
       if nextSectionWord >= sectionWords.count {
         var section = sampledWord(initialCandidate: candidate, random: nextRandomWordIndex)
+        if let websiteSource {
+          guard let generated = WebsiteRandomWordGenerator.word(websiteSource, randomUnit: nextRandomContentUnit) else {
+            sourceGenerationFailed = true
+            return .init(source: "", configuration: configuration)
+          }
+          section = generated
+        }
         section = section.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
         if section.hasPrefix(" ") { section.removeFirst() }
         if section.hasSuffix(" ") { section.removeLast() }
@@ -6278,7 +6287,7 @@ struct GeneratedCandidateContinuation {
       // entire candidate before selection. Code syntax keeps its case.
       let baseLanguage = configuration.wordPoolBaseLanguage
       let wordLanguage = polyglotCandidates?.language(for: word) ?? baseLanguage
-      if !PoolWordLanguageFamily.preservesASCIICase(wordLanguage)
+      if websiteSource == nil && !PoolWordLanguageFamily.preservesASCIICase(wordLanguage)
         && !configuration.contentOptions.includePunctuation
         && !configuration.modifiers.contains(.weakSpot)
         && word.utf8.contains(where: { (65...90).contains($0) }) {
@@ -6294,11 +6303,15 @@ struct GeneratedCandidateContinuation {
         : configuration.contentOptions
       var decorationConfiguration = configuration
       decorationConfiguration.language = baseLanguage
-      word = PoolWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
+      if websiteSource == .hexadecimal {
+        if options.includePunctuation { word = "0x" + word }
+      } else {
+        word = PoolWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
         language: baseLanguage, wordIndex: emittedWords + index, wordBound: bound,
         options: options, state: &decorationState,
         britishEnglish: .init(configuration: decorationConfiguration, authoredQuoteAlternate: false),
         random: nextRandomContentUnit)
+      }
       sourceWords.append(word)
       let modifiers = polyglotCandidates == nil ? configuration.modifiers : configuration.modifiers.filter { $0 != .lazyLatin }
       let target = TestModifierPolicy.transformedWord(word, modifiers: modifiers,
@@ -6435,7 +6448,7 @@ struct TestSessionFactory {
     if configuration.mode != .custom, configuration.mode != .zen, let streamPrompt {
       prompt = streamPrompt
       noSpaceBoundarySource = streamNoSpaceBoundarySource
-    } else if let streamWordCount,
+    } else if let streamWordCount, WebsiteRandomWordGenerator.selected(for: configuration) == nil,
       let streamPrompt = TypebarStreamContent.prompt(
         configuration: configuration, wordCount: streamWordCount)
     {

@@ -76,7 +76,8 @@ enum WholePreviewWordPreparation {
       configuration.visibleFutureWordCount == nil,
       LivePracticeContentSource.selected(for: configuration) == nil
     else { throw PreparationError.unsupportedConfiguration }
-    if TypebarStreamContent.prompt(configuration: configuration, wordCount: 1) != nil {
+    if WebsiteRandomWordGenerator.selected(for: configuration) == nil,
+      TypebarStreamContent.prompt(configuration: configuration, wordCount: 1) != nil {
       let chunks = try await prepareStream(configuration: configuration, limit: limit,
         nextRandomCaseBit: nextRandomCaseBit, didPrepare: didPrepare)
       return (chunks, wordDecorationState, configuration, preparation.notice, nil)

@@ -104,7 +104,8 @@ enum WebsiteConfigSessionBuildError: Error {
     case .repeatedWords(let history, let repeatedPace):
       guard [.words, .time].contains(config.mode), liveSource == nil,
         history.count > 0, history.noSpace == TestModifierPolicy.usesNoSpaceInput(config.modifiers),
-        TypebarStreamContent.prompt(configuration: config, wordCount: 1) == nil else {
+        (WebsiteRandomWordGenerator.selected(for: config) != nil
+          || TypebarStreamContent.prompt(configuration: config, wordCount: 1) == nil) else {
         throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported
       }
       wordHistory = history

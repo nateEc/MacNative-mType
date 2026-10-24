@@ -8,6 +8,69 @@ import XCTest
   private func quote(_ id: String, _ length: QuoteLength, text: String = "ab") -> OfflineQuote {
     .init(id: id, title: "Owned builder fixture", text: text, language: .english, length: length)
   }
+  func testWebsiteRandomFunboxesUseEntropyInsteadOfNativeIndexSequences() async throws {
+    for (name, unit, expected, calls) in [
+      ("binary", 0.5, "10000000", 1), ("gibberish", 0.0, "a", 2),
+      ("ascii", 0.5, "PPPPPP", 7), ("specials", 0.0, "`", 2),
+      ("hexadecimal", 0.5, "808080", 4),
+    ] {
+      let value = try draft("{\"mode\":\"words\",\"words\":3,\"funbox\":[\"\(name)\"]}")
+      var samples = 0, rank = 0
+      let result = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+        random: .init(wordIndex: { rank += 1; return rank }, contentUnit: { samples += 1; return unit }))
+      XCTAssertEqual(result.session.prompt, Array(repeating: expected, count: 3).joined(separator: " "), name)
+      XCTAssertEqual(samples, calls * 3, name)
+      XCTAssertEqual(result.session.generatedWordReplayHistory?.count, 3, name)
+    }
+  }
+
+  func testWebsiteHexadecimalPunctuationUsesItsOwnPrefixAndKeepsLowercaseBytes() async throws {
+    let value = try draft(#"{"mode":"words","words":2,"funbox":["hexadecimal"],"punctuation":true}"#)
+    let result = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+      random: .init(contentUnit: { 0.5 }))
+    XCTAssertEqual(result.session.prompt, "0x808080 0x808080")
+  }
+  func testWebsiteRandomSourcesReplayOwnedTargetsWithoutDrawingAgain() async throws {
+    for kind in WebsiteRandomWordGenerator.Kind.allCases {
+      let value = try draft("{\"mode\":\"words\",\"words\":3,\"funbox\":[\"\(kind.rawValue)\"]}")
+      let original = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+        random: .init(contentUnit: { 0.5 }))
+      let history = try XCTUnwrap(original.session.generatedWordReplayHistory)
+      let repeated = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+        attemptSource: .repeatedWords(history, repeatedPace: true),
+        random: .init(wordIndex: { XCTFail("Repeat cannot select another base word"); return 0 },
+          contentUnit: { XCTFail("Repeat cannot regenerate a source word"); return 0 }))
+      XCTAssertEqual(repeated.session.prompt, original.session.prompt, kind.rawValue)
+      XCTAssertEqual(repeated.session.generatedWordReplayHistory?.count, history.count)
+    }
+  }
+
+  func testWholePreviewUsesRandomSourceAndRetainsEveryOwnedWord() async throws {
+    for (name, expected, calls) in [("binary", "10000000", 1), ("ascii", "PPPPPP", 7)] {
+      let value = try draft("{\"mode\":\"words\",\"words\":1001,\"showAllLines\":true,\"funbox\":[\"\(name)\"]}")
+      var samples = 0
+      let result = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+        random: .init(contentUnit: { samples += 1; return 0.5 }))
+      XCTAssertEqual(result.session.prompt, Array(repeating: expected, count: 1001).joined(separator: " "))
+      XCTAssertEqual(samples, calls * 1001)
+      XCTAssertEqual(result.session.generatedWordReplayHistory?.count, 1001)
+    }
+  }
+  func testWebsiteHexadecimalRespectsOriginalPunctuationLanguageMetadata() async throws {
+    let value = try draft(#"{"mode":"words","words":2,"language":"typing_of_the_dead","funbox":["hexadecimal"],"punctuation":true}"#)
+    let result = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+      random: .init(contentUnit: { 0.5 }))
+    XCTAssertEqual(result.session.prompt, "808080 808080")
+  }
+
+  func testInvalidWebsiteEntropyFailsPreparationRatherThanPublishingAnEmptyAttempt() async throws {
+    let value = try draft(#"{"mode":"words","words":3,"funbox":["binary"]}"#)
+    do {
+      _ = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(),
+        random: .init(contentUnit: { .nan }))
+      XCTFail("Invalid entropy produced an attempt")
+    } catch WebsiteConfigSessionBuildError.generationFailed {}
+  }
   func testRebasedFiniteWordEndRemovesOnlyItsCommitWithoutMutatingHistory() async throws {
     var history = GeneratedWordReplayHistory(noSpace: false)
     history.append(source: "a", target: "a\n")
