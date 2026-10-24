@@ -119,11 +119,17 @@ import XCTest
       throw XCTSkip("Requires pinned reference")
     }
     struct Operation: Decodable { let key: String; let value: WebsiteConfigValue; let nosave: Bool }
+    struct Stage: Decodable {
+      let lazy: Bool
+      let memory: WebsiteConfigLazyModeMemory
+      let events: [WebsiteConfigApplicationEvent]
+    }
     struct Fixture: Decodable {
       let current: [String: WebsiteConfigValue]
       let before: WebsiteConfigLazyModeMemory
       let operation: Operation?
       let full: Bool?
+      let stage: Stage
       let lazy: Bool
       let after: WebsiteConfigLazyModeMemory
       let events: [WebsiteConfigApplicationEvent]
@@ -149,8 +155,19 @@ import XCTest
       }
       let replay = fixture.operation != nil || fixture.full == true
       let prefix = replay ? 0 : draft.projection.events.count
+      let applied = replay ? try WebsiteConfigLazyModeLifecycle.applyingEvents(draft, pointsPerRem: 16) : draft
+      XCTAssertEqual(applied.generators.lazyMode, fixture.stage.lazy, "listener stage \(index)")
+      XCTAssertEqual(applied.lazyMemory, fixture.stage.memory, "listener stage \(index)")
+      let listenerEvents = Array(applied.projection.events.dropFirst(prefix)).filter {
+        fixture.full != true || $0.key == "language" || $0.key == "lazyMode"
+      }
+      XCTAssertEqual(listenerEvents, fixture.stage.events, "listener stage \(index)")
       let resolved = try WebsiteConfigLazyModeLifecycle.prepare(draft, pointsPerRem: 16,
         replayApplicationEvents: replay)
+      let staged = try WebsiteConfigLazyModeLifecycle.prepare(applied, pointsPerRem: 16, replayApplicationEvents: false)
+      XCTAssertEqual(staged.projection.events, resolved.projection.events, "split and combined event order \(index)")
+      XCTAssertEqual(staged.lazyMemory, resolved.lazyMemory, "split and combined memory \(index)")
+      XCTAssertEqual(staged.generators.lazyMode, resolved.generators.lazyMode, "split and combined value \(index)")
       XCTAssertEqual(resolved.generators.lazyMode, fixture.lazy, "fixture \(index)")
       XCTAssertEqual(resolved.lazyMemory, fixture.after, "fixture \(index)")
       let events = Array(resolved.projection.events.dropFirst(prefix)).filter {

@@ -102,6 +102,67 @@ import TypebarSystem
     XCTAssertEqual(try f.register.read().revision, disk, "Delivering the already-saved configuration must not rewrite it")
   }
 
+  func testArabicLazyPreferenceIsSavedAtDepartureNotDelayedUntilGeneration() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4,"language":"arabic","lazyMode":true}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.lazyMode(false)
+    let ticket = try f.accept(f.edit(action), action: action)
+    XCTAssertFalse(ticket.draft.lazyMemory.prefersArabic)
+    XCTAssertFalse(try f.register.read().lazyMemory.prefersArabic)
+    XCTAssertFalse(try XCTUnwrap(f.page.state.configurationDeparture).draft.lazyMemory.prefersArabic)
+    let revision = try f.register.read().revision
+    XCTAssertTrue(f.coordinator.cancel(ticket))
+    let resumed = try f.coordinator.resumeConfigurationRestart(for: f.page)
+    XCTAssertFalse(resumed.draft.lazyMemory.prefersArabic)
+    try await f.finish(resumed)
+    XCTAssertEqual(try f.register.read().revision, revision)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testLanguageListenerRunsBeforeGenerationWithoutSavingItsNosaveLazyOverride() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4,"language":"spanish","lazyMode":false}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.language("arabic")
+    let ticket = try f.accept(f.edit(action), action: action)
+    XCTAssertTrue(ticket.draft.generators.lazyMode)
+    XCTAssertEqual(ticket.draft.projection.events.filter { $0.key == "lazyMode" }.count, 1)
+    XCTAssertEqual(ticket.draft.projection.events.last?.nosave, true)
+    guard case .available(let runtime) = try f.register.read().state else { return XCTFail("Missing saved setter") }
+    XCTAssertEqual(runtime["language"], .string("arabic"))
+    XCTAssertEqual(runtime["lazyMode"], .bool(false), "The listener's nosave setter is runtime-only at departure")
+    XCTAssertTrue(f.coordinator.cancel(ticket))
+    let resumed = try f.coordinator.resumeConfigurationRestart(for: f.page)
+    let resources = try f.coordinator.prepareResources(for: resumed, localFont: .absent, localBackground: .absent)
+    let ready = try await f.coordinator.preparePractice(for: resources)
+    guard case .committed(let publication) = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else {
+      return XCTFail("Prepared practice was not delivered")
+    }
+    XCTAssertEqual(publication.draft.projection.events.filter { $0.key == "lazyMode" }.count, 1,
+      "Resuming initialization must not replay the language listener")
+  }
+
+  func testUnsupportedLanguageLazyNormalizationWaitsUntilGeneration() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"words","words":4,"language":"spanish","lazyMode":true}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.language("hindi")
+    let ticket = try f.accept(f.edit(action), action: action)
+    XCTAssertTrue(ticket.draft.generators.lazyMode)
+    XCTAssertFalse(ticket.draft.lazyMemory.remember)
+    XCTAssertFalse(try f.register.read().lazyMemory.remember)
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    let ready = try await f.coordinator.preparePractice(for: resources)
+    XCTAssertFalse(ready.session.configuration.modifiers.contains(.lazyLatin))
+    XCTAssertFalse(try f.register.read().lazyMemory.remember, "A candidate is not a durable generation transition")
+    guard case .committed(let publication) = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else {
+      return XCTFail("Prepared practice was not delivered")
+    }
+    XCTAssertTrue(publication.draft.lazyMemory.remember)
+    XCTAssertTrue(try f.register.read().lazyMemory.remember)
+  }
+
   func testStaleInputOwnerEnvironmentAndCompetingRecordCannotAcceptDeparture() async throws {
     for change in 0..<4 {
       let f = try Fixture(); defer { f.close() }

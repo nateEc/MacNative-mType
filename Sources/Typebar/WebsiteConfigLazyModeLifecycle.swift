@@ -5,13 +5,20 @@ import Foundation
 @MainActor enum WebsiteConfigLazyModeLifecycle {
   static func prepare(_ draft: WebsiteConfigNativeDraft, pointsPerRem: Double,
     replayApplicationEvents: Bool) throws -> WebsiteConfigNativeDraft {
+    let applied = replayApplicationEvents ? try applyingEvents(draft, pointsPerRem: pointsPerRem) : draft
+    return try preparingGeneration(applied, pointsPerRem: pointsPerRem)
+  }
+
+  /// Synchronous config listeners run before restart initialization. Keep this
+  /// separate from language-support normalization, which belongs to init.
+  static func applyingEvents(_ draft: WebsiteConfigNativeDraft, pointsPerRem: Double) throws -> WebsiteConfigNativeDraft {
     func text(_ value: WebsiteConfigValue?) -> String? {
       value?.stringUnits.map { String(decoding: $0, as: UTF16.self) }
     }
     var projection = draft.projection, memory = draft.lazyMemory
     var language: String
     var lazy: Bool
-    if replayApplicationEvents {
+    do {
       let initial: [String: WebsiteConfigValue]
       if case .edited(let value) = draft.origin { initial = value.previousRuntime }
       else { initial = try WebsiteConfigNativeProfile.defaultDocument().values }
@@ -19,17 +26,13 @@ import Foundation
         throw WebsiteConfigNativeDraftError.incompleteRuntime
       }
       language = name; lazy = enabled
-    } else {
-      guard let name = text(draft.projection.runtime["language"]) else { throw WebsiteConfigNativeDraftError.incompleteRuntime }
-      language = name
-      lazy = draft.generators.lazyMode
     }
     func assignLazy(_ enabled: Bool, nosave: Bool) {
       projection.events.append(.init(key: "lazyMode", previousValue: .bool(lazy), newValue: .bool(enabled), nosave: nosave))
       lazy = enabled
       if !nosave && language.hasPrefix("arabic") { memory.prefersArabic = enabled }
     }
-    if replayApplicationEvents {
+    do {
       let events = projection.events; projection.events = []
       for var event in events {
         if event.key == "lazyMode" {
@@ -46,6 +49,23 @@ import Foundation
         }
       }
     }
+    projection.runtime["lazyMode"] = .bool(lazy)
+    return try draft.replacingProjection(projection, memory: memory, pointsPerRem: pointsPerRem)
+  }
+
+  private static func preparingGeneration(_ draft: WebsiteConfigNativeDraft,
+    pointsPerRem: Double) throws -> WebsiteConfigNativeDraft {
+    var projection = draft.projection, memory = draft.lazyMemory
+    guard let units = projection.runtime["language"]?.stringUnits else {
+      throw WebsiteConfigNativeDraftError.incompleteRuntime
+    }
+    let language = String(decoding: units, as: UTF16.self)
+    var lazy = draft.generators.lazyMode
+    func assignLazy(_ enabled: Bool) {
+      projection.events.append(.init(key: "lazyMode", previousValue: .bool(lazy), newValue: .bool(enabled), nosave: false))
+      lazy = enabled
+      if language.hasPrefix("arabic") { memory.prefersArabic = enabled }
+    }
     guard let base = WebsiteLanguageIdentity.language(for: language) else {
       throw WebsiteConfigNativeTestParametersError.invalidField("language")
     }
@@ -54,8 +74,8 @@ import Foundation
       ? draft.generators.polyglotLanguages.contains(where: \.supportsLazyLatinInput)
       : (baseSupports || draft.testParameters.mode == .custom)
     switch (lazy, allowed, memory.remember) {
-    case (true, false, _): memory.remember = true; assignLazy(false, nosave: false)
-    case (_, true, true): assignLazy(true, nosave: false); memory.remember = false
+    case (true, false, _): memory.remember = true; assignLazy(false)
+    case (_, true, true): assignLazy(true); memory.remember = false
     default: break
     }
     // Source cleanup uses the base language even for polyglot, not the

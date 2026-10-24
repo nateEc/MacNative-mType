@@ -126,12 +126,19 @@ final class WebsiteConfigCommitCoordinator {
     // input, ledger and publication untouched.
     var departed = page.state
     let measurement = departed.session.abandonAndMeasure()
+    let applied = try WebsiteConfigLazyModeLifecycle.applyingEvents(prepared.draft,
+      pointsPerRem: prepared.environment.pointsPerRem)
+    // The source setter saves before dispatch. Its listener can change the
+    // independent Arabic preference, or enable lazy mode with nosave. Carry
+    // listener memory durably, but do not persist that runtime-only override.
+    var saved = prepared.draft
+    saved.lazyMemory = applied.lazyMemory
     guard isCurrent(prepared) else { return .stale }
     try Task.checkCancellation()
     try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
     let disk: WebsiteConfigFileRegister.Revision
     do {
-      let result = try register.commit(prepared.draft, replacing: prepared.disk)
+      let result = try register.commit(saved, replacing: prepared.disk)
       switch result {
       case .committed(let value): disk = value
       case .conflict: page.endCommit(); retire(prepared); return .conflict
@@ -146,7 +153,7 @@ final class WebsiteConfigCommitCoordinator {
       departed.priorAttemptLedger.recordRestart(engagedDuration: measurement.engagedDuration,
         accuracy: measurement.accuracy, savingEnabled: prepared.draft.behavior.saveCompletedResults)
     }
-    departed.configurationDeparture = .init(id: UUID(), draft: prepared.draft, disk: disk,
+    departed.configurationDeparture = .init(id: UUID(), draft: applied, disk: disk,
       identity: identity, environment: prepared.environment, contentSource: prepared.contentSource,
       requiresContentSource: prepared.contentCapture != nil, repetition: repetition, quote: previous.quote,
       wordHistory: departed.session.generatedWordReplayHistory)
@@ -155,7 +162,7 @@ final class WebsiteConfigCommitCoordinator {
     page.endCommit()
     guard let refreshed = try? page.captureGeneration(router: router) else { return .acceptedRetired }
     var admitted = prepared
-    admitted.disk = disk; admitted.pageCapture = refreshed
+    admitted.draft = applied; admitted.disk = disk; admitted.pageCapture = refreshed
     return .accepted(admitted)
   }
   /// Retry only initialization. Never re-run the accepted setter or measure
@@ -674,7 +681,8 @@ final class WebsiteConfigCommitCoordinator {
     let original = resources.configuration.draft
     let draft = try WebsiteConfigLazyModeLifecycle.prepare(original,
       pointsPerRem: resources.configuration.environment.pointsPerRem,
-      replayApplicationEvents: reason == .configurationApplication)
+      replayApplicationEvents: reason == .configurationApplication
+        && resources.configuration.pageCapture?.configurationDeparture == nil)
     if reason == .nextAttempt, draft.lazyMemory != original.lazyMemory || draft.generators.lazyMode != original.generators.lazyMode {
       throw WebsiteConfigSessionBuildError.reconfigurationRequired(["lazyMode": .bool(draft.generators.lazyMode)])
     }

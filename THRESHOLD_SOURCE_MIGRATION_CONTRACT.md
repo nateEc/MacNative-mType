@@ -1,5 +1,17 @@
 # 阈值源状态与迁移契约
 
+## 活动离场前的同步 Lazy 事件（2026-10-24，起点 3b342bf4）
+
+源→目标单位仍是完整配置协调器的一次活动设置，不是开放整个 UI。源 setters.ts 保存字段后同步派发，test-logic.ts 的语言监听可 nosave 开启 Arabic Lazy，并在 lazyMode 非 nosave 事件更新 legacy-states/remember-lazy-mode.ts 独立偏好；语言支持度校正在稍后 init。先前把两者延迟到资源准备后，会使已接受但取消的显式关闭保留旧 Arabic 偏好。
+
+现将监听投影与生成校正分离。保存／离场前纯值计算监听结果，文件 CAS 同时接受设置与独立偏好，但首次保存仍用 setter 原运行值，不把 nosave 自动开启写入配置。CAS 失败／锁忙前不产生监听副作用，不关旧时钟或改变页面；CAS 后待准备阶段保留监听运行态与事件，取消／失败不回滚，恢复初始化不重放监听。生成继续负责支持度校正，候选未交付不持久化其临时记忆。这是原生单记录原子化适配，不宣称复现浏览器多键 LocalStorage 每一步 I/O 异常。
+
+先行三项测试有两项共八处预期失败：直接 Arabic 关闭的记录／待准备／恢复偏好过旧、交付无变化却再次写盘，以及语言监听未在离场执行。第三项支持度阶段保护先行通过。修改后首轮 34 项定向零失败／零跳过；随后扩展实际固定监听 QA，在原有 880 组自有布尔／语言样本中增加同步监听快照，同时核对分阶段和合并执行的事件顺序、记忆及运行值，保留最终与普通下一轮固定点断言。扩大验证和打包结果另记，不将这些执行证据当成手工 GUI 验收。
+
+会话内有界 decision-review（非独立评审）反例为文件锁忙、取消后恢复、nosave 被误保存、初始化支持度修正被提前，以及监听被重放；行为优先测试和迁移安全促成拆分。旧记录格式、旧偏好和原生词源不改，不启动 Typebar、不触发 main／PR CI。正式活动工作流／UI、整个初始化失败写序、nosave 运行值在最终交付时的持久边界及原版告警仍需继续实现，目标保持完整且 active。
+
+最终相关扩大 `WebsiteConfig|WebsitePracticeRestartControllerTests|PracticePage|PracticeClockWriteAdmission|AppSettings|SettingsJSON|Generated|PriorAttemptLedger|ResultIncompletePractice|ResultSavingPolicy|WholePreviewWordPreparationTests|WholePreviewChunkAssemblyTests|WholePreviewPreparationTaskTests`：694 项零失败／零跳过，213.465 秒，含全部 880 组监听中间态与最终态对照。Debug 打包、签名与打包资源／原创性检查通过，参考行为审计仍为 47 direct／119 native symbols／17 specs；1,327 条人工清单仅结构通过，本条实体验收仍待进行。日志 `/tmp/typebar-config-listener-{red,focused,broad,package,originality,reference}.log`。本轮未运行完整客户端或服务端套件，未启动主程序，不据相关子集扩大完成声明。
+
 ## pseudolang 自有语料训练与候选接线（2026-10-24，起点 dcc4a59e）
 
 源→目标单位为完整配置 words／time 的 pseudolang withWords 提供器，不以旧固定音节流替代。固定类为二阶字符模型：词尾添加空格，训练按 Unicode 码点遍历，前缀取最后两 UTF-16 单位；权重含重复项，ASCII 数字属性按数值先枚举，其他符号保持插入顺序。独立 Swift 实现以整数编码原始前缀并冻结权重，避免 Swift 字符串规范等价合并不同原始前缀；只训练 Typebar 自有词池，不读取、复制或打包参考语言资源。

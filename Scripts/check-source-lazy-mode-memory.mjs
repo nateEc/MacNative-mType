@@ -45,6 +45,7 @@ vm.runInContext('globalThis.generate = async () => {\n' + stripTypeScriptTypes(s
   '  const allowLazyMode =', '  if (Config.mode === "custom") {'), {mode: 'transform'}) + '\n}', context);
 
 const fixtures = [];
+const listenerStage = () => structuredClone({lazy: context.Config.lazyMode, memory, events});
 const operations = [null, ...['arabic', 'spanish', 'hindi'].map(value => ({key: 'language', value, nosave: false})),
   ...[false, true].flatMap(value => [false, true].map(nosave => ({key: 'lazyMode', value, nosave})))];
 for (const language of ['english', 'spanish', 'arabic', 'hindi']) {
@@ -61,9 +62,10 @@ for (const language of ['english', 'spanish', 'arabic', 'hindi']) {
           memory = structuredClone(before); events = [];
           context.Config = structuredClone(current); context.showedLazyModeNotification = false;
           if (operation) context.setConfig(operation.key, operation.value, {nosave: operation.nosave});
+          const stage = listenerStage();
           context.language = {name: context.Config.language, noLazyMode: noLazy[context.Config.language]};
           await context.generate();
-          fixtures.push({current, before, operation, lazy: context.Config.lazyMode, after: memory, events});
+          fixtures.push({current, before, operation, stage, lazy: context.Config.lazyMode, after: memory, events});
         }
       }
     }
@@ -82,9 +84,10 @@ for (const language of ['english', 'spanish', 'arabic', 'hindi']) {
     context.showedLazyModeNotification = false;
     context.setConfig('language', language, {nosave: true});
     context.setConfig('lazyMode', lazy, {nosave: true});
+    const stage = listenerStage();
     context.language = {name: language, noLazyMode: noLazy[language]};
     await context.generate();
-    fixtures.push({current, before, operation: null, full: true, lazy: context.Config.lazyMode, after: memory, events});
+    fixtures.push({current, before, operation: null, full: true, stage, lazy: context.Config.lazyMode, after: memory, events});
   }
 }
 assert.equal(fixtures.length, 880);
