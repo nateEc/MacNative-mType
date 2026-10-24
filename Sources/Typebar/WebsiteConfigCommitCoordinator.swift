@@ -1,6 +1,6 @@
 import Foundation
 
-enum WebsiteConfigCommitCoordinatorError: Error { case noOwner, noEnvironment, unavailable, reentrant, stale }
+enum WebsiteConfigCommitCoordinatorError: Error { case noOwner, noEnvironment, unavailable, reentrant, stale, sessionNotReady }
 
 /// Whole-value publication for the new configuration path. Not a resource
 /// loader, legacy AppSettings adapter or UI transaction. No real default path.
@@ -33,6 +33,8 @@ final class WebsiteConfigCommitCoordinator {
     let background: WebsiteConfigBackgroundResource?
     /// nil means font preparation was not attempted, not a failed font.
     let font: WebsiteConfigFontResource?
+    /// Prepared attempt seed for the session-aware path; legacy commits are nil.
+    let session: TypingSession?
   }
   struct BackgroundPrepared {
     fileprivate let configuration: Prepared
@@ -46,6 +48,11 @@ final class WebsiteConfigCommitCoordinator {
     let background: WebsiteConfigBackgroundResource
     let font: WebsiteConfigFontResource
   }
+  struct SessionPrepared {
+    fileprivate let resources: ResourcesPrepared
+    fileprivate let admission: UUID
+    let session: TypingSession
+  }
   enum Outcome { case committed(Publication), stale, conflict, unavailable, busy }
   private let router: PreferenceConfigurationSaveRouter
   private let register: WebsiteConfigFileRegister
@@ -53,6 +60,8 @@ final class WebsiteConfigCommitCoordinator {
   private let identity = UUID()
   private var request = UUID()
   private var resourceAdmission = UUID()
+  private var sessionAdmission = UUID()
+  private var sessionRequest: UUID?
   private var latest: Publication?
   private var processing = false
 
@@ -190,6 +199,36 @@ final class WebsiteConfigCommitCoordinator {
     guard prepared.admission == resourceAdmission else { return .stale }
     return try commit(prepared.configuration, background: prepared.background, font: prepared.font)
   }
+  func prepareSession(for prepared: ResourcesPrepared,
+    generate: @MainActor (WebsiteConfigNativeDraft) async throws -> TypingSession) async throws -> SessionPrepared {
+    try checkAsyncResources(prepared.configuration, admission: prepared.admission)
+    // A failed new producer must also retire an earlier seed. Once this
+    // request opts in, resource-only commits cannot race ahead of generation.
+    let admission = UUID()
+    sessionAdmission = admission
+    sessionRequest = prepared.configuration.request
+    let result: Result<TypingSession, Error>
+    do { result = .success(try await generate(prepared.configuration.draft)) }
+    catch { result = .failure(error) }
+    try checkAsyncResources(prepared.configuration, admission: prepared.admission)
+    guard sessionAdmission == admission else { throw WebsiteConfigCommitCoordinatorError.stale }
+    let session = try result.get()
+    guard !session.hasStarted, !session.isFinished else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
+    return .init(resources: prepared, admission: admission, session: session)
+  }
+  @discardableResult
+  func cancel(_ prepared: SessionPrepared) -> Bool {
+    guard prepared.admission == sessionAdmission else { return false }
+    return cancel(prepared.resources)
+  }
+  func commit(_ prepared: SessionPrepared) throws -> Outcome {
+    guard !processing else { return .busy }
+    try Task.checkCancellation()
+    guard prepared.admission == sessionAdmission,
+      prepared.resources.admission == resourceAdmission else { return .stale }
+    return try commit(prepared.resources.configuration, background: prepared.resources.background,
+      font: prepared.resources.font, session: prepared.session)
+  }
   @discardableResult
   func cancel(_ prepared: BackgroundPrepared) -> Bool {
     guard prepared.admission == resourceAdmission else { return false }
@@ -203,11 +242,14 @@ final class WebsiteConfigCommitCoordinator {
   func commit(_ prepared: Prepared) throws -> Outcome {
     try commit(prepared, background: nil)
   }
-  private func commit(_ prepared: Prepared, background: WebsiteConfigBackgroundResource?, font: WebsiteConfigFontResource? = nil) throws -> Outcome {
+  private func commit(_ prepared: Prepared, background: WebsiteConfigBackgroundResource?,
+    font: WebsiteConfigFontResource? = nil, session: TypingSession? = nil) throws -> Outcome {
     guard !processing else { return .busy }
     processing = true
     defer { processing = false }
+    guard session != nil || sessionRequest != prepared.request else { return .stale }
     guard isCurrent(prepared) else { retire(prepared); return .stale }
+    if session != nil { try Task.checkCancellation() }
     let outcome: WebsiteConfigFileRegister.Commit
     do { outcome = try register.commit(prepared.draft, replacing: prepared.disk) }
     catch WebsiteConfigFileRegisterError.busy { return .busy }
@@ -217,7 +259,7 @@ final class WebsiteConfigCommitCoordinator {
       // await, caller callback, legacy write, resource activation or event replay.
       let publication = Publication(draft: prepared.draft, owner: prepared.owner.owner,
         environmentRevision: prepared.environment.revision, pointsPerRem: prepared.environment.pointsPerRem,
-        disk: disk, background: background, font: font)
+        disk: disk, background: background, font: font, session: session)
       latest = publication
       retire(prepared)
       return .committed(publication)
