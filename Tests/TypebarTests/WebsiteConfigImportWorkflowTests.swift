@@ -6,6 +6,61 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testAnotherWindowsNoQuitLockCannotGrantSelectionReadToAnUnlockedAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let before = f.page.state.session.generationState
+    let original = try XCTUnwrap(f.page.state.presentation).publication
+    let lock = UUID(); f.settings.setNoQuitConfigurationLock(true, for: lock)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: lock) }
+    XCTAssertThrowsError(try f.workflow.runThresholdCommand(.minimumWpmOff, input: "", replacing: original.applicationID)) {
+      guard case WebsiteConfigCommitCoordinatorError.noEnvironment = $0 else { return XCTFail("Unexpected error: \($0)") }
+    }
+    do {
+      try await f.workflow.editAndBegin(.polyglotLanguages(["german", "spanish"]), replacing: original.applicationID, systemIsDark: false)
+      XCTFail("Another window's lock was treated as owned No Quit")
+    } catch WebsiteConfigCommitCoordinatorError.noEnvironment {}
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, original.disk)
+  }
+
+  func testLockedFuturePolyglotCASConflictKeepsAttemptAndDoesNotPostSavedNotice() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    var writes = 0, writeOnRead = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if writeOnRead {
+          writeOnRead = false
+          do {
+            guard case .committed = try register.commit(competitor, replacing: XCTUnwrap(register.read().revision)) else {
+              XCTFail("No competing write"); return f.window
+            }
+            writes += 1
+          } catch { XCTFail("Competing writer: \(error)") }
+        }
+        return f.window
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var active = f.page.state; active.session.insertBatch("x"); f.page.replace(active)
+    let old = try XCTUnwrap(f.page.state.presentation).publication
+    let before = f.page.state.session.generationState
+    let lock = UUID(); f.settings.setNoQuitConfigurationLock(true, for: lock)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: lock) }
+    let notices = f.account.localNotices.history.count
+    writeOnRead = true
+    do {
+      try await workflow.editAndBegin(.polyglotLanguages(["german", "spanish"]), replacing: old.applicationID, systemIsDark: false)
+      XCTFail("Overwrote competing record")
+    } catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(writes, 1); XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, old.applicationID)
+    XCTAssertEqual(f.account.localNotices.history.count, notices)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Competitor lost") }
+    XCTAssertEqual(saved["words"], .number(7))
+  }
   func testLiveBehaviorCASFailureDoesNotInstallItsCandidateRules() async throws {
     let f = try Fixture(); defer { f.close() }
     let register = WebsiteConfigFileRegister(directory: f.directory)

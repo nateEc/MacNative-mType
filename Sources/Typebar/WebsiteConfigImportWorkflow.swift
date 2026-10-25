@@ -153,7 +153,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       if let prepared { _ = coordinator.cancel(prepared) }
       prepared = nil; applying = false
     }
-    return try environment.withLiveBehaviorRead {
+    return try environment.withSynchronousSetterRead {
       let ticket = try coordinator.prepareEdit(key: target.websiteKey, value: target.websiteValue, for: page, refreshingWith: source)
       prepared = ticket
       try Task.checkCancellation()
@@ -171,6 +171,19 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   /// have separate durable effects; neither rejection nor a later write error
   /// rolls back an already accepted mode setter.
   func runThresholdCommand(_ target: PracticeThresholdCommandTarget, input: String,
+    replacing applicationID: UUID) throws -> WebsiteThresholdCommandReceipt {
+    if ownsActiveNoQuit {
+      return try environment.withSynchronousSetterRead {
+        try executeThresholdCommand(target, input: input, replacing: applicationID)
+      }
+    }
+    return try executeThresholdCommand(target, input: input, replacing: applicationID)
+  }
+  private var ownsActiveNoQuit: Bool {
+    guard let session = page?.state.session else { return false }
+    return session.hasStarted && !session.isFinished && session.configuration.modifiers.contains(.noQuit)
+  }
+  private func executeThresholdCommand(_ target: PracticeThresholdCommandTarget, input: String,
     replacing applicationID: UUID) throws -> WebsiteThresholdCommandReceipt {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
@@ -213,7 +226,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
           if page.state.session.hasStarted, !page.state.session.isFinished,
             page.state.session.configuration.modifiers.contains(.noQuit), let publication = page.state.presentation?.publication {
             postNoQuitSelectionNotice("阈值未修改；No Quit 保留当前练习。", publication: publication,
-              page: page, operation: current, noticeGeneration: noticeGeneration)
+              page: page, operation: current, noticeGeneration: noticeGeneration,
+              expectedEnvironment: environment.read()?.revision)
           }
         }
       }
@@ -268,6 +282,11 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     case .edit(let edit, let applicationID):
       guard page.state.presentation?.publication.applicationID == applicationID else {
         throw WebsiteConfigImportWorkflowError.conflict
+      }
+      if ownsActiveNoQuit, WebsiteConfigThresholdEdit.keys.contains(edit.key)
+        || ["customPolyglot", "customLayoutfluid"].contains(edit.key) {
+        return try performNoQuitSelection(edit, replacing: applicationID, page: page,
+          operation: current, noticeGeneration: noticeGeneration)
       }
       do {
         if failedPoetrySource { ticket = try coordinator.prepareFailedPoetrySource(for: page, refreshingWith: source) }
@@ -406,6 +425,39 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       throw error
     }
   }
+  /// Never suspend inside the read scope. Threshold/Layoutfluid setters must
+  /// reject; only the already validated future Polyglot path may save.
+  private func performNoQuitSelection(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID,
+    page: PracticePageSessionStore, operation current: UUID, noticeGeneration: UUID?) throws -> String {
+    return try environment.withSynchronousSetterRead {
+      guard ownsActiveNoQuit, operation == current, !stopped,
+        let original = page.state.presentation?.publication, original.applicationID == applicationID,
+        let context = environment.read() else { throw WebsiteConfigImportWorkflowError.conflict }
+      let ticket: WebsiteConfigCommitCoordinator.Prepared
+      do { ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source) }
+      catch WebsiteConfigNativeDraftError.rejectedEdit {
+        postNoQuitSelectionNotice("设置未修改；No Quit 保留当前练习。", publication: original,
+          page: page, operation: current, noticeGeneration: noticeGeneration, expectedEnvironment: context.revision)
+        if edit.dispatchesRestartAfterRejection { throw WebsiteConfigImportWorkflowError.rejectedRestartFailed }
+        throw WebsiteConfigNativeDraftError.rejectedEdit
+      }
+      prepared = ticket
+      try Task.checkCancellation()
+      guard ownsActiveNoQuit, operation == current, !stopped, edit.key == "customPolyglot" else {
+        throw WebsiteConfigImportWorkflowError.conflict
+      }
+      switch try coordinator.beginConfigurationRestart(ticket, for: page, action: edit) {
+      case .futureSelectionSaved(let publication):
+        let message = "多语组合已保存；No Quit 保留当前练习，下一轮使用新组合。"
+        postNoQuitSelectionNotice(message, publication: publication, page: page,
+          operation: current, noticeGeneration: noticeGeneration, expectedEnvironment: context.revision)
+        return message
+      case .busy: throw WebsiteConfigImportWorkflowError.busy
+      case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+      default: throw WebsiteConfigImportWorkflowError.conflict
+      }
+    }
+  }
   private func restorationTicket(for page: PracticePageSessionStore) throws -> WebsiteConfigCommitCoordinator.Prepared {
     switch try coordinator.prepareRestoration(for: page, refreshingWith: source) {
     case .missing: throw WebsiteConfigImportWorkflowError.missing
@@ -415,12 +467,12 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   }
   private func postNoQuitSelectionNotice(_ message: String,
     publication: WebsiteConfigCommitCoordinator.Publication, page: PracticePageSessionStore,
-    operation current: UUID, noticeGeneration: UUID?) {
+    operation current: UUID, noticeGeneration: UUID?, expectedEnvironment: UUID? = nil) {
     guard let notices, let noticeGeneration else { return }
     notices.postGuarded(message, level: .notice, options: .init(important: true, title: "锁定重开"),
       generation: noticeGeneration, whileCurrent: {
         self.operation == current && !self.stopped && !Task.isCancelled
-          && self.environment.read()?.revision == publication.environmentRevision
+          && self.environment.read()?.revision == (expectedEnvironment ?? publication.environmentRevision)
           && page.state.presentation?.publication.applicationID == publication.applicationID
           && publication.isCurrentDelivery(owner: page.owner, router: self.settings.preferenceConfigurationSaves)
       })

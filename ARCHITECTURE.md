@@ -1,5 +1,7 @@
 # Typebar 架构决策（ADR-001）
 
+2026-10-25 No Quit setter 的同步上下文：原行为读取作用域更名为 withSynchronousSetterRead，追加本窗口实际活动 No Quit 的阈值命令、阈值表单、Polyglot 与 Layoutfluid 序列入口；不跨 await，其他窗口锁与普通导入仍不开放。异步表单在 yield 后重新判断当前 No Quit 状态，再进入同步准备／拒绝或 future-selection CAS，避免开始输入与提交之间的竞态。阈值和 Layoutfluid 不获得写权限，只有原严格 Polyglot 下轮选择能力可保存。开始输入触发全局锁会旋转环境，但当前 publication 仍合法，因此拒绝提示捕获此次读取的环境 revision，并同时核对 publication、磁盘、操作与账户代次；不能只拿旧 publication 的环境版本比较。
+
 2026-10-25 原地行为命令：四字段的类型映射使用现有 BehaviorCommandTarget，完整配置先于 legacy 分支路由。共享原地发布过程保留阈值原准入，行为入口另要求 edited 来源、单个对应保存事件及除该字段外全值相同；页面只对该入口允许活动 No Quit。环境源始终观察模型与锁代次，普通 read 在锁定时仍返回 nil；同步 withLiveBehaviorRead 只为这四类命令读取新鲜上下文，绝不跨 await，异常退出恢复权限。立即刷新取消的旧排队任务检查取消状态，防止随后重采样使新 publication 无谓过期。工作流在窗口读取回调后复核取消令牌，文件 CAS 成功前不把规则装入真实页面。发布保留当前外观、控件、内容及控制器；盲打的在途文本仅忽略其反馈字段差异，不放宽首次内容替换。
 
 2026-10-25 完整配置阈值命令：命令打开时捕获 publication ID 与其单位／原始记忆值，面板退出后再展示原生窗口，提交时复核身份并读取该配置单位。纯 Swift 输入转换独立复现 Number 与 parseInt 的可观察规则，使用源码的除法因子，避免既有单位工具把非有限数转为零。Burst 在同一个同步执行中逐个 prepare／CAS／publish；下一个 setter 仅延续上一步实际返回的 publication ID，既不吞掉部分失败，也不采用竞争写者身份。普通拒绝继续执行下一步，真正存储／表示错误保留已保存步骤并停止。窗口单飞、取消与迟到回调保护独立于持久化；此路径不重开且不写旧偏好。

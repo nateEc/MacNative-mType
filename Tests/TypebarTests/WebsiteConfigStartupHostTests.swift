@@ -151,6 +151,85 @@ import XCTest
     XCTAssertFalse(f.window.isVisible)
   }
 
+  func testActualNoQuitLockKeepsThresholdRefusalsAndBothBurstNotices() async throws {
+    let f = try Fixture(saved: nil); defer { f.close(); f.account.localNotices.clearAll() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+    try XCTUnwrap(f.inputs().first).onInsert("x", false)
+    try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange }
+    let before = f.state.page.state.session.generationState
+    let id = try XCTUnwrap(f.state.page.state.presentation).publication.applicationID
+    let revision = try WebsiteConfigFileRegister(directory: directory).read().revision
+    let count = f.account.localNotices.history.count
+    XCTAssertThrowsError(try workflow.runThresholdCommand(.minimumWpmCustom, input: "-1", replacing: id)) {
+      guard case WebsiteThresholdCommandError.invalidInput = $0 else { return XCTFail("Unexpected input error: \($0)") }
+    }
+    XCTAssertEqual(f.account.localNotices.history.count, count, "Prevalidation must run before No Quit setters")
+    let receipt: WebsiteThresholdCommandReceipt
+    do { receipt = try workflow.runThresholdCommand(.minimumWordBurst(.flex), input: "73tail", replacing: id) }
+    catch { return XCTFail("Threshold refused before its setters: \(String(reflecting: error))") }
+    XCTAssertEqual(receipt.rejectedKeys, ["minBurst", "minBurstCustomSpeed"])
+    XCTAssertEqual(f.account.localNotices.history.count - count, 2)
+    XCTAssertTrue(f.account.localNotices.active.allSatisfy(\.important))
+    do {
+      try await workflow.editAndBegin(.threshold(.accuracyValue(91.5)), replacing: id, systemIsDark: false)
+      XCTFail("Threshold saved under No Quit")
+    } catch WebsiteConfigNativeDraftError.rejectedEdit {}
+    XCTAssertEqual(f.account.localNotices.history.count - count, 3)
+    XCTAssertEqual(f.state.page.state.session.generationState, before)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: directory).read().revision, revision)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testActualNoQuitLockSavesFuturePolyglotButRefusesLayoutfluid() async throws {
+    let f = try Fixture(saved: nil); defer { f.close(); f.account.localNotices.clearAll() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+    let input = try XCTUnwrap(f.inputs().first)
+    input.onInsert("x", false)
+    try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange }
+    let before = f.state.page.state.session.generationState
+    let old = try XCTUnwrap(f.state.page.state.presentation).publication.applicationID
+    let count = f.account.localNotices.history.count
+    do { try await workflow.editAndBegin(.polyglotLanguages(["german", "spanish"]), replacing: old, systemIsDark: false) }
+    catch { return XCTFail("Future Polyglot save refused: \(String(reflecting: error))") }
+    let current = try XCTUnwrap(f.state.page.state.presentation).publication
+    XCTAssertNotEqual(current.applicationID, old)
+    XCTAssertEqual(current.draft.generators.polyglotLanguages, [.german, .spanish])
+    XCTAssertEqual(f.account.localNotices.history.count - count, 1)
+    let revision = try WebsiteConfigFileRegister(directory: directory).read().revision
+    do {
+      try await workflow.editAndBegin(.layoutFluidLayouts(["colemak", "qwerty"]), replacing: current.applicationID, systemIsDark: false)
+      XCTFail("Layoutfluid saved under No Quit")
+    } catch WebsiteConfigNativeDraftError.rejectedEdit {}
+    XCTAssertEqual(f.account.localNotices.history.count - count, 2)
+    XCTAssertTrue(f.account.localNotices.active.allSatisfy(\.important))
+    XCTAssertEqual(f.state.page.state.session.generationState, before)
+    XCTAssertTrue(f.inputs().first === input); XCTAssertFalse(f.window.isVisible)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: directory).read().revision, revision)
+    do {
+      try await workflow.editAndBegin(.polyglotLanguages(["english", "english"]), replacing: current.applicationID, systemIsDark: false)
+      XCTFail("Duplicate-only list saved")
+    } catch WebsiteConfigImportWorkflowError.rejectedRestartFailed {}
+    XCTAssertEqual(f.account.localNotices.history.count - count, 3)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: directory).read().revision, revision)
+    XCTAssertEqual(f.state.page.state.session.generationState, before)
+  }
+
   func testLiveBehaviorKeepsActualInputAndUpdatesItsQuickRestartKeyDuringNoQuit() async throws {
     let f = try Fixture(saved: nil); defer { f.close() }
     f.state.accountReady = true

@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 真实 No Quit 锁下的源 setter 上下文（2026-10-25，起点 01180431）
+
+CFG-NOQUIT-SETTER-CONTEXT-01 延续阈值／Polyglot／Layoutfluid 的固定源码命令与 setter 证据。metadata 将阈值与 customLayoutfluid 标为 changeRequiresRestart，活动 No Quit 在 schema／保存前拒绝并给重要提示；customPolyglot 不带该标记，合法列表保存后命令的重开被 No Quit 阻止，只影响下轮。重复列表原输入 schema 可通过，override 去重后 setter 拒绝，后续重开仍受阻。Burst 保留两个 setter 与两条拒绝提示，速度／准确率原命令预校验失败则不进入 setter。
+
+真实隐藏页先等待实际全局锁生效。首轮异常传播在 XCTest 中显示 InvalidTransition，增加导入／锁阶段诊断确认命令前状态正常；改为调用点报告原始错误后，两项先行检查均明确失败于 WebsiteConfigCommitCoordinatorError.noEnvironment。此证据定位读取准入缺口，不把框架异常本身当作已修复。现同步作用域只扩展到本窗口实际活动 No Quit 的这三类路径；异步表单在原 yield 后再判定，不跨 await 持有读取权限。Polyglot 写入继续用既有单字段 future-selection 能力，阈值／Layoutfluid 仍拒绝，文件 CAS、页面、操作、账户与内容准入不放宽。
+
+锁生效后环境 revision 已旋转，拒绝时 publication 仍是原配置；提示现绑定本次读取的环境 revision，同时验证原 publication 身份及文件，避免合法拒绝被旧环境比较吞掉。Burst 空串不执行 setter，非法速度在预校验阶段不产生 No Quit 提示，重复 Polyglot 不保存。竞争写者在读取窗口回调中替换记录时，下轮选择 CAS 失败，不安装候选或发已保存通知；另一窗口的 No Quit 锁不会开放当前无锁尝试的配置读取。完整导入、其余命令、源全部中途失败写序及实体窗口／键盘仍开放。
+
+验证：调用点明确报告的两项先行检查在 noEnvironment 失败；修复后定向 16 项及边界 23 项通过。最终相关 920 项零失败／零跳过（238.506 秒，范围重叠不相加），含已有固定源码命令／setter 对照、原生真实宿主、取消／账户代次与重开控制器。最终回归和打包期间未改 Swift。Debug 打包、签名、资源与原创性检查通过，固定证据检查 47 直接项／119 原生符号／17 支持规范通过，人工清单 1,352 项仅结构检查。日志 `/tmp/typebar-noquit-context-{red,localize,red-explicit,focused,boundaries,broad,package,reference}.log`。未启动主程序，本批只安排开发分支的一次实质推送，不改 main／工作流、不请求 CI；完整目标继续 active。
+
 ## 完整配置的四类即时行为命令（2026-10-25，起点 ef8fd929）
 
 CFG-BEHAVIOR-COMMAND-PAGE-01 对照固定 config metadata、setters、test-logic 与 test-ui 的订阅。quickRestart 四值、blindMode／alwaysShowWordsHistory 两值、singleListCommandLine 两值没有 override 和重开 dispatch；changeRequiresRestart 均为 false，活动 No Quit 不拒绝。原生完整配置现先于 legacy apply 分支接入，使用所打开 publication 的身份，单个 setter 保存后保持尝试、输入、题面、时钟、资源、账本与控制器；不写旧 AppSettings。快捷键消费者与提示、结果历史和命令面板读取相同配置，盲打只改变未结束会话的规则，已完成结果不改，原题重复读取当前选择。

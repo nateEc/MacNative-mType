@@ -16,7 +16,7 @@ final class WebsiteConfigEnvironmentSource {
   private var needsObservation = true
   private var stopped = false
   private var refresh: Task<Void, Never>?
-  private var readingLiveBehavior = false
+  private var readingSynchronousSetter = false
 
   init(settings: AppSettings, account: AccountSession, pointsPerRem: Double?,
     documentComplete: Bool, development: Bool) {
@@ -29,17 +29,17 @@ final class WebsiteConfigEnvironmentSource {
   }
 
   func read() -> WebsiteConfigCommitCoordinator.Environment? {
-    guard readingLiveBehavior || settings.allowsRestartingConfigurationChange else { return nil }
+    guard readingSynchronousSetter || settings.allowsRestartingConfigurationChange else { return nil }
     return cached
   }
-  /// Synchronous model reads for the four non-restarting behavior setters.
+  /// Synchronous model reads for live behavior and owned No Quit setters.
   /// This grants no commit capability; the coordinator/page still validate
   /// the exact field, events, owner, attempt and file version. Never suspend
   /// while ordinary full-configuration admission is withheld.
-  func withLiveBehaviorRead<T>(_ body: () throws -> T) rethrows -> T {
-    let previous = readingLiveBehavior
-    readingLiveBehavior = true
-    defer { readingLiveBehavior = previous }
+  func withSynchronousSetterRead<T>(_ body: () throws -> T) rethrows -> T {
+    let previous = readingSynchronousSetter
+    readingSynchronousSetter = true
+    defer { readingSynchronousSetter = previous }
     if cached == nil {
       refresh?.cancel(); refresh = nil
       sample()

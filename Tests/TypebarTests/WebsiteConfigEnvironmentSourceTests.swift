@@ -14,18 +14,18 @@ final class WebsiteConfigEnvironmentSourceTests: XCTestCase {
       let lock = UUID(); settings.setNoQuitConfigurationLock(true, for: lock)
       defer { settings.setNoQuitConfigurationLock(false, for: lock) }
       XCTAssertNil(source.read())
-      let fresh = try source.withLiveBehaviorRead { try XCTUnwrap(source.read()) }
+      let fresh = try source.withSynchronousSetterRead { try XCTUnwrap(source.read()) }
       XCTAssertNotEqual(fresh.revision, original.revision)
       XCTAssertNil(source.read(), "Live context must not reopen ordinary imports")
       for _ in 0..<20 { await Task.yield() }
-      XCTAssertEqual(source.withLiveBehaviorRead { source.read() }, fresh,
+      XCTAssertEqual(source.withSynchronousSetterRead { source.read() }, fresh,
         "Retired queued resampling must not rotate a freshly captured live epoch")
-      XCTAssertThrowsError(try source.withLiveBehaviorRead { () throws -> Void in
+      XCTAssertThrowsError(try source.withSynchronousSetterRead { () throws -> Void in
         XCTAssertEqual(source.read(), fresh); throw LiveReadFailure.expected
       })
       XCTAssertNil(source.read(), "A thrown command must restore the ordinary lock")
       source.stop()
-      XCTAssertNil(source.withLiveBehaviorRead { source.read() }, "Read scope cannot revive stopped sources")
+      XCTAssertNil(source.withSynchronousSetterRead { source.read() }, "Read scope cannot revive stopped sources")
     }
   }
   private func withModels(_ body: (AppSettings, AccountSession) async throws -> Void) async throws {
