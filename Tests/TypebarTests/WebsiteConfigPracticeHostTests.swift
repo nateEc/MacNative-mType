@@ -272,16 +272,42 @@ import XCTest
   }
 
   private func awaitResult(_ coordinator: WebsiteConfigCommitCoordinator,
-    resources: WebsiteConfigCommitCoordinator.ResourcesPrepared) throws -> WebsiteConfigCommitCoordinator.SessionPrepared {
+    resources: WebsiteConfigCommitCoordinator.ResourcesPrepared, customText: String = "ab") throws -> WebsiteConfigCommitCoordinator.SessionPrepared {
     var result: Result<WebsiteConfigCommitCoordinator.SessionPrepared, Error>?
     let task = Task { @MainActor in
-      do { result = .success(try await coordinator.preparePractice(for: resources, scope: .init(customText: "ab"))) }
+      do { result = .success(try await coordinator.preparePractice(for: resources, scope: .init(customText: customText))) }
       catch { result = .failure(error) }
     }
     defer { task.cancel() }
     let deadline = Date().addingTimeInterval(10)
     while result == nil && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     return try XCTUnwrap(result).get()
+  }
+
+  func testActualPageNextHighlightUsesSourceScalarThenAcceptedInputUnitsAndDeletion() throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    let epoch = UUID()
+    let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
+      environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
+    let resources = try coordinator.prepareResources(for: coordinator.prepare(#"{"mode":"custom","keymapMode":"next","keymapLayout":"qwerty","blindMode":true}"#), localFont: .absent, localBackground: .data(Fixture.png()))
+    // The custom-text preparation path normalizes NFC. Use a combining mark
+    // without a precomposed form so this remains a multi-scalar real prompt.
+    let ready = try awaitResult(coordinator, resources: resources, customText: "e\u{35c}x tail")
+    XCTAssertEqual(Array(ready.session.prompt.utf16), Array("e\u{35c}x tail".utf16))
+    guard case .committed = try coordinator.commit(ready, to: f.state.page, systemIsDark: false) else { return XCTFail("Expected page installation") }
+    f.wait { input.insertionAttemptID == ready.session.automaticInputAttemptID && input.acceptsTextInput }
+    XCTAssertEqual(f.state.page.state.session.websiteKeymapHighlightUnits, [101])
+    input.onInsert("e", false)
+    XCTAssertEqual(f.state.page.state.session.websiteKeymapHighlightUnits, [860])
+    input.onInsert("\u{35c}", false)
+    XCTAssertEqual(f.state.page.state.session.websiteKeymapHighlightUnits, [120])
+    input.onDelete()
+    XCTAssertEqual(f.state.page.state.session.websiteKeymapHighlightUnits, [860])
+    XCTAssertEqual(input.insertionAttemptID, ready.session.automaticInputAttemptID)
+    XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    XCTAssertFalse(f.window.isVisible)
   }
 
   func testSynchronousCommitTargetsActualPageAndRejectsOldInputCallbacks() throws {

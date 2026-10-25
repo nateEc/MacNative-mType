@@ -4690,6 +4690,8 @@ struct TypingSession {
   private var latestReplayInputText: String?
   private var liveInsertionFeedback: [Bool] = []
   private(set) var keymapInputEvents: [WebsiteKeymapInputEvent] = []
+  private var websiteKeymapHighlightWasUpdated = false
+  private var websiteKeymapUpdatedHighlight: [UInt16]?
   /// A stopped letter can be drawn without entering the accepted input.
   /// Only a final input callback publishes this candidate; pre-input guards
   /// and earlier characters in a batch must not replace the visible snapshot.
@@ -5311,6 +5313,23 @@ struct TypingSession {
   var nextExpectedCharacter: Character? {
     guard !isFinished, !isAtEmptyNoSpaceWord, nextTargetIndex < promptCharacters.count else { return nil }
     return promptCharacters[nextTargetIndex]
+  }
+
+  var websiteKeymapHighlightUnits: [UInt16]? {
+    if websiteKeymapHighlightWasUpdated { return websiteKeymapUpdatedHighlight }
+    guard configuration.mode != .zen, let first = prompt.unicodeScalars.first else { return nil }
+    return Array(String(first).utf16)
+  }
+
+  private mutating func refreshWebsiteKeymapInputHighlight() {
+    guard configuration.mode != .zen else { return }
+    let previous = websiteKeymapHighlightUnits
+    let target = inputAccuracyTarget(at: nextTargetIndex)
+    let position = acceptedUnits?.activeCount ?? target.position
+    websiteKeymapHighlightWasUpdated = true
+    // An undefined source index dispatches no event and keeps the last key.
+    websiteKeymapUpdatedHighlight = target.units.indices.contains(position)
+      ? [target.units[position]] : previous
   }
 
   var promptGlyphs: [TypingPromptGlyph] {
@@ -6639,6 +6658,7 @@ struct TypingSession {
     guard !isFinished, hadMarkedText || hasMarkedText else { return }
     stoppedPromptInput = nil
     roundsLiveAccuracyForInputDisplay = true
+    refreshWebsiteKeymapInputHighlight()
   }
 
   private mutating func insertText(
@@ -6690,6 +6710,13 @@ struct TypingSession {
         || index == characters.indices.last
       let quoteWordBefore = quoteWordStream == nil ? 0 : quoteNavigationIndex
       let attemptsBeforeCharacter = inputAttemptCount
+      let keymapFieldBefore = acceptedUnits?.fieldIndex ?? replayCommittedSeparatorCount
+      defer {
+        if inputAttemptCount > attemptsBeforeCharacter,
+          evaluatesTerminalRules || keymapFieldBefore != (acceptedUnits?.fieldIndex ?? replayCommittedSeparatorCount) {
+          refreshWebsiteKeymapInputHighlight()
+        }
+      }
       stoppedPromptCandidate = nil
       let accepted = insertCharacter(
         character, forceError: forceError, at: date,
@@ -6761,6 +6788,7 @@ struct TypingSession {
     recordKeyboardActivity(at: date)
     guard !typed.isEmpty else { return }
     guard canDeleteBackward else { return }
+    defer { refreshWebsiteKeymapInputHighlight() }
     stoppedPromptInput = nil
     roundsLiveAccuracyForInputDisplay = true
     if configuration.rules.codeUnindentOnBackspace, configuration.usesCodeIndentationInput,
@@ -6785,6 +6813,7 @@ struct TypingSession {
     recordKeyboardActivity(at: date)
     guard !typed.isEmpty else { return }
     guard canDeleteBackward else { return }
+    defer { refreshWebsiteKeymapInputHighlight() }
     stoppedPromptInput = nil
     roundsLiveAccuracyForInputDisplay = true
     if configuration.rules.codeUnindentOnBackspace, configuration.usesCodeIndentationInput,

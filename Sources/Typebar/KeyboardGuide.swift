@@ -4720,6 +4720,10 @@ struct KeyboardGuideNextCharacter: Equatable {
   static func == (lhs: Self, rhs: Self) -> Bool { lhs.units == rhs.units }
 }
 
+struct WebsiteKeymapHighlight: Equatable {
+  let units: [UInt16]?
+}
+
 struct KeyboardGuide: View {
   @KeyboardGuideNextCharacter var nextCharacter: Character?
   let mode: KeyboardGuideMode
@@ -4731,6 +4735,7 @@ struct KeyboardGuide: View {
   var overrideThumbKeys: [KeyboardGuideKey]? = nil
   var websiteFeedback: WebsiteKeymapFeedbackStore? = nil
   var websitePalette: WebsiteKeymapPalette? = nil
+  var websiteHighlight: WebsiteKeymapHighlight? = nil
   let mirrored: Bool
   let scale: Double
   let legendStyle: KeyboardGuideLegendStyle
@@ -4745,6 +4750,11 @@ struct KeyboardGuide: View {
 
   private var currentWebsiteFlashes: WebsiteKeymapFlashState { websiteFeedback?.state ?? websiteFlashes }
 
+  private var websiteNextUnits: [UInt16]? {
+    if let websiteHighlight { return websiteHighlight.units }
+    return nextCharacter.map { Array(String($0).utf16) }
+  }
+
   private var usesWebsiteKeymap: Bool {
     overrideRows?.joined().contains(where: \.hasWebsiteLegends) == true
   }
@@ -4756,8 +4766,8 @@ struct KeyboardGuide: View {
     case .off, .staticGuide: return false
     case .react: return key.websiteFlash(in: currentWebsiteFlashes) != nil
     case .next:
-      guard let nextCharacter else { return false }
-      return key.matchesWebsiteLegend(String(nextCharacter))
+      guard let units = websiteNextUnits else { return false }
+      return key.websiteLegendUnits.contains(units)
     }
   }
 
@@ -4903,7 +4913,7 @@ struct KeyboardGuide: View {
     let highlighted = !sourceReact && isHighlighted(key)
     let generation = websiteFeedback?.generation ?? 0
     let completionSelection = key.websiteFlash(in: currentWebsiteFlashes)
-    let expectedMatch = nextCharacter.map { key.matchesWebsiteLegend(String($0)) } ?? false
+    let expectedMatch = websiteNextUnits.map { key.websiteLegendUnits.contains($0) } ?? false
     return KeyboardGuideKeycap(label: key.legend(style: legendStyle, modifierFlags: modifierFlags, capsLockEnabled: capsLockEnabled),
       width: key.width, scale: scale, highlighted: highlighted, highlightColor: highlightedColor(for: key),
       flash: sourceReact ? key.websiteFlash(in: currentWebsiteFlashes) : nil, legends: key.websiteLegendUnits,

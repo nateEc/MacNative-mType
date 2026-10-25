@@ -1606,6 +1606,7 @@ private struct ContentView: View {
               websitePalette: committedPracticeDraft == nil ? nil : .init(accent: activeTheme.accent,
                 panel: activeTheme.panel, background: activeTheme.background,
                 secondary: activeTheme.secondaryText, error: activeTheme.error),
+              websiteHighlight: committedPracticeDraft == nil ? nil : .init(units: session.websiteKeymapHighlightUnits),
               mirrored: committedPracticeDraft == nil && session.configuration.modifiers.contains(.mirrorKeyboard),
               scale: practiceKeyboardGuide.scale, legendStyle: practiceKeyboardGuide.legendStyle,
               keysMode: practiceKeyboardGuide.keysMode,

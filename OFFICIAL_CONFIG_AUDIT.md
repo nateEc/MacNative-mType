@@ -1,5 +1,21 @@
 # 官方配置兼容性审计
 
+## 下一键事件来源（2026-10-26，起点 74f2a35d）
+
+CFG-KEYMAP-NEXT-PRODUCER-01：固定参考 test-logic 初始化对当前词 text 展开代码点，取第一项；test-ui 的 afterAnyTestInput 及 afterTestWordChange 则按 getCurrentInput().length 索引 textWithCommit，仅在结果不是 undefined 时派发。因此分解重音的初始化可能是 e，输入 e 后可能是组合标记；初始化 Emoji 可是完整代码点，后续位置可为单个代理项。超长输入不自动清空。旧原生使用 nextExpectedCharacter，混淆了原生光标的字素与源事件。
+
+只读 check-source-input-position.mjs 新增 --keymap-next-fixtures，执行实际插入、验证、导航、日志及删除模块，并在 UI 适配器处执行实际初始化／输入后高亮表达式；24 组插入序列涵盖组合标记、Emoji、ZWJ、额外输入、连续粘贴、letter-stop、字符展开、空白及跨词，另有四组真实删除序列。DOM／textarea 编辑与生命周期仍为明确适配器，不当作浏览器证据。最初提取未去除 TypeScript 的 as string，产生语法错误，该次不作为 RED；修正后旧原生一项测试 26 处断言失败，0.273 秒（/tmp/typebar-keymap-next-red-fixed-harness.log）。
+
+原生会话独立保存原始高亮，初始化取首代码点；已处理事件的末单元或跨词更新后，使用现有已接受字段与目标单元位置生成高亮，越界保留先前值。删除及候选刷新接同一消费者；新尝试得到新会话值。生产练习页显式传入 WebsiteKeymapHighlight，键帽直接比较原始数组，显式 nil 不回退到 nextExpectedCharacter，孤立代理项不解码。旧偏好与虚拟键盘保持自身路径。
+
+四项专项最终零失败／零跳过，3.019 秒（/tmp/typebar-keymap-next-final-focused.log）。隐藏键帽 x 起点为 [178]、[354]、[]、[]，分别为 e、组合标记、孤立代理项与显式缺失；实际 Root 通过原有 TypingInputView 回调完成输入和删除，控件与尝试身份不变。初次页面夹具 e 加尖音符在准备阶段规范化为 NFC，四处期望与实际提示不符；改用无预组合形式的 U+035C，并断言准备后的原始单元，未修改规范化行为。候选专项只验证接受文本位置及不新增输入／错误，不声称全部候选时序等价。
+
+最终生产代码相关回归 1,093 项零失败／零跳过，379.954 秒（/tmp/typebar-keymap-next-broad.log）。另以 CI 使用的 TYPEBAR_LAYOUT_AUDIT_REFERENCE 单独提供参考路径，完整 TypingEngineTests 798 项及新增高亮三项全部通过、零跳过，共 801 项／335.367 秒（/tmp/typebar-keymap-next-engine-ci.log）；测试入口支持此变量及本地 TYPEBAR_REFERENCE_ROOT，未改工作流。全代码语言生成输入、全语言及引语长度用例均在完整引擎套件内通过。参考行为审计 47 个直接入口／119 个测试符号／17 份支撑规范通过，1,368 条人工清单结构通过。没有启动主程序或重复运行整个门禁，已知隐藏滚轮基线仍独立开放。
+
+Debug 应用包、严格签名验证、资源边界及固定参考原创性扫描通过（/tmp/typebar-keymap-next-package.log），测试与打包全程串行，主程序未启动。
+
+本节仍未完成全部来源：keymapMode 切换回 next 的首代码点更新、LayoutFluid／计时器 1ms 回调的 charAt 与空值映射、所有特殊字段及空输入启动、真实窗口和 IME 生命周期继续开放，整个重写目标未完成。
+
 ## 键帽动画及主题角色（2026-10-26，起点 e7d66f4f）
 
 CFG-KEYMAP-ANIMATION-01：实际 Keymap.Key 将 react 的背景／文字分别设为两端颜色数组，持续 250ms。退出 next 时依赖上一次模式及匹配状态设置 isFading，淡出期间优先于 flash；完成后清理当前键的全部别名并取消 fading。普通 next 键位变化没有退出淡出。Anime 包装暂停旧动画后应用新参数，Key 显式 respectReducedMotion=false；固定 4.2.2 引擎默认 out(2)。旧原生仅保持满亮 250ms，再立即清空，未接完整主题角色。

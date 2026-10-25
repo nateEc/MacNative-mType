@@ -35,6 +35,58 @@ function reset(words,{stop='off',strict=false,mode='words',grow=false}={}) {
 }
 function inputEvents(){return eventData.getAllTestEvents().filter(e=>e.type==='input').map(e=>e.data)}
 function positions(){return inputEvents().map(e=>e.charIndex)}
+if(process.argv[3]==='--keymap-next-fixtures'){
+ for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',()=>false);
+ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
+ const extract=(text,start,end)=>{const a=text.indexOf(start),b=text.indexOf(end,a);assert.ok(a>=0&&b>a);return text.slice(a,b)};
+ let highlighted;
+ const highlight=key=>{highlighted=key===''?' ':key};
+ const words=bindings['test/test-words'].words;
+ words.getCurrent=()=>targets[wordIndex]===undefined?undefined:{textWithCommit:targets[wordIndex],text:targets[wordIndex].replace(/[ \n]$/,'')};
+ const ui=read('test/test-ui.ts'),logic=read('test/test-logic.ts');
+ const body=extract(ui.slice(ui.indexOf('function afterAnyTestInput(')),'  if (Config.keymapMode === "next") {','\n\n  Focus.set(true);');
+ const after=vm.compileFunction(body,['Config','TestWords','getCurrentInput','highlight']);
+ const initial=vm.compileFunction(stripTypeScriptTypes(extract(logic,'  if (Config.keymapMode === "next" && Config.mode !== "zen") {','\n\n  Funbox.toggleScript'),{mode:'transform'}),['Config','TestWords','nthElementFromArray','highlight']);
+ const update=()=>after(Config,{words},eventData.getCurrentInput,highlight);
+ modules.get('test/test-ui').setExport('afterTestTextInput',()=>update());
+ modules.get('test/test-ui').setExport('afterTestWordChange',async()=>update());
+ const fixtures=[];
+ for(const [target,inputs] of [
+  ['e\u0301x',['e','\u0301','x','z','q']],['🙂x',['x','x','x','z','q']],
+  ['👩‍💻x',['x','x','x','x','x','x','q']],['éx',['e\u0301','z','q']],
+  ['ab',['a','b','z','q']],['ab',['abzz']],['ab',['a','b',' ','t']],
+  ['🙂x',['🙂','x',' ','t']],['e\u0301x',['e\u0301','x',' ','t']],
+  ['...x',['…','x']],['ab',[' ','a','\u00a0']],['ab',['ax',' ','t']],
+ ]) for(const stop of ['off','letter']){
+  reset([target+' ','tail '],{stop});Object.assign(Config,{keymapMode:'next',language:'english'});
+  highlighted=undefined;initial(Config,{words},(items,index)=>items[index],highlight);
+  const snapshots=[{units:highlighted===undefined?null:Array.from({length:highlighted.length},(_,i)=>highlighted.charCodeAt(i))}];
+  for(const input of inputs){await main.namespace.emulateInsertText({data:input,now:1});snapshots.push({units:highlighted===undefined?null:Array.from({length:highlighted.length},(_,i)=>highlighted.charCodeAt(i))});}
+  fixtures.push({target,inputs,stop,snapshots});
+ }
+ actual.add('input/handlers/delete');actual.add('input/handlers/before-delete');
+ const link=(specifier,from)=>getModule(specifier.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(from.identifier),specifier)):specifier);
+ const deletion=getModule('input/handlers/delete');await deletion.link(link);await deletion.evaluate();
+ const beforeDeletion=getModule('input/handlers/before-delete');await beforeDeletion.link(link);await beforeDeletion.evaluate();
+ const textarea=modules.get('input/input-element').namespace.getInputElement();
+ Object.defineProperty(textarea,'value',{get(){return browserDeletedSentinel?'':' '+element},set(v){browserDeletedSentinel=false;element=v.slice(1)}});
+ modules.get('test/test-ui').setExport('afterTestDelete',update);
+ const deletions=[];
+ for(const [target,input,wholeWord]of [['e\u0301x','e\u0301',false],['🙂x','🙂',false],['ab','abzz',false],['ab','abzz',true]]){
+  reset([target+' ','tail ']);Object.assign(Config,{keymapMode:'next',freedomMode:true});browserDeletedSentinel=false;
+  highlighted=undefined;initial(Config,{words},(items,index)=>items[index],highlight);
+  await main.namespace.emulateInsertText({data:input,now:1});
+  const snapshots=[];
+  for(let i=0;i<2;i++){
+   let prevented=false;beforeDeletion.namespace.onBeforeDelete({preventDefault(){prevented=true}});
+   if(!prevented){if(element===''){browserDeletedSentinel=true;element=''}else element=wholeWord?'':element.slice(0,-1);deletion.namespace.onDelete(wholeWord?'deleteWordBackward':'deleteContentBackward',2+i);}
+   snapshots.push({units:highlighted===undefined?null:Array.from({length:highlighted.length},(_,i)=>highlighted.charCodeAt(i))});
+  }
+  deletions.push({target,input,wholeWord,snapshots});
+ }
+ assert.equal(execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
+ console.log(JSON.stringify({fixtures,deletions}));process.exit(0);
+}
 if(process.argv[3]==='--keymap-fixtures'){
  for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',()=>false);
  const fixtures=[];

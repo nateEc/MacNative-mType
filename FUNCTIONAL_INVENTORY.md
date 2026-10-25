@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-KEYMAP-NEXT-PRODUCER-01 | 下一键的代码点初始化与 UTF-16 输入位置 | `test/test-logic.ts`, `test/test-ui.ts`, `input/handlers/insert-text.ts`, `input/handlers/delete.ts` | PromptDomain, PracticePage | 初始化取首个代码点，已处理输入／删除后按实际字段的 UTF-16 位置更新；越界保留上次事件，原始代理项不解码。24 组实际插入序列、四组删除序列、隐藏键帽与实际页面回调通过。候选刷新仅验证已接受文本；模式切换、延迟布局事件、所有字段及实体 IME 时序继续开放。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-KEYMAP-ANIMATION-01 | 键帽渐变与 next 退出淡出 | `components/pages/test/Keymap.tsx`, `components/common/anime/Anime.tsx`, 固定 Anime.js 引擎 | PromptDomain, PreferencesDomain | 接通 250ms 二次减速、淡出优先、完成后恢复当前模式及主题颜色角色；1,152 状态快照、六个实际引擎采样和隐藏中间色图像通过。完成回调核对代次与选中反馈，拒绝旧静止回调清理新事件。完整事件来源、模式／布局生命周期、帧率与实体操作仍待验。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
