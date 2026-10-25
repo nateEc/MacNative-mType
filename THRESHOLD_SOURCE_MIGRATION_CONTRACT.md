@@ -1,5 +1,25 @@
 # 阈值源状态与迁移契约
 
+## Funbox 选择与最早设置恢复（2026-10-25，起点 b37c0431）
+
+固定参考 funbox-memory.ts 以有序对象保留每项最早值；load 按插入顺序调用 nosave setter，普通 false 不停止，最后清空。funbox.ts 的选择包装先 load 再设 funbox；toggle 另在 load 前拒绝不兼容的新增。test-logic.ts 在初始化重试之外 rememberSettings 一次，十四个处理器覆盖 numbers、keymapMode、highlightMode、layout、keymapLayout、mode、showAllLines、punctuation，Memory 只在 next 时记住键盘模式。源实现和资产只由 QA 动态读取，不复制进原生实现或包。
+
+复用既有激活探针，实际运行固定 Memory.save/load、rememberSettings 包装与处理器、setFunbox 包装、元数据／兼容与字段约束。通用 setter、DOM／CSS、语言加载仍是明确自有端点，未冒称执行完整浏览器。新增 225 组比较：十四处理器、四种键盘模式、两种布局、清空／转 rot13、两次重开、键盘恢复依赖及 quote 中拒绝 binary 后的恢复事件；核对运行字段、nosave 与有序 setter。既有 2,304 激活样本继续保留。原生同窗完整导入不调用 load，沿原版记忆生命周期继承旧记忆；新窗口无继承。记忆不增加 schema、磁盘版本或数据库迁移，legacy 路径保持独立。
+
+两项核心先行红测复现最早键盘设置丢失（2 项 3 失败），核心实现后转绿。新增真实工作流检查普通重开保留配置身份、后续新保存退休旧命令、同窗导入／独立窗口、No Quit、拒绝选择后提供器耗尽及继续；准备失败保留旧磁盘版本／内容与一次离场账本，再继续不重写、再提示或重复记账。边界测试曾错误假设普通重开会替换配置身份，并把三条独立生成错误混为选择提示；按已有契约修正断言，未削弱产品。新增待准备二次操作的红测抓到真实“设置已保存”误报，随后按实际保存状态修正。
+
+会话内决策复核的关键反例是：源 setter 正常 false 不等于没有运行副作用；不能走旧的纯拒绝重开路径丢弃恢复，也不能把 nosave 恢复提升为持久保存。当前选择专属草稿、保存基线和原有离场 CAS 分离这些状态；继续准备读取检查点，不重新消费记忆。前端沿现有主题与表单，仅用返回箭头／勾号及具体文案区分两种状态。隐藏 NSHostingView 生成浅／深、340／520 两种宽度八份待准备快照，窗口均不显示；这不是命令面板实际点击或实体输入的验收。
+
+完整导入中途失败保存顺序、全部 Funbox start/restart/timer/speech 生命周期、来源加载降级、真实命令点击／窗口／IME 仍开放；不把本批配置状态覆盖宣称为完整重写完成。只推开发分支，不启动主程序，不创建 PR、不重跑或禁用 CI，不改用户通知。
+
+本批定向 86 项零失败／零跳过（42.188 秒），包含新增源码样本。首次扩大回归随用户中断而退出，缺最终汇总，不计通过；确认句柄丢失且无存活进程后重跑，963 项零跳过、四条失败均来自同一个既有 ViewportPracticeHostTests 滚轮用例（406.798 秒）。该用例单独复现四失败（62.616 秒），之后诊断中的长等待还触发既有 AFK 结果替换，不能混作最初滚轮根因。事件 Y=-8、X=0、无修饰键，外层文档大于滚动区，但 HostingScrollView 不移动；固定事件位置到窗口中央仍失败，已撤回该位置实验。独立纯 SwiftUI 隐藏 ScrollView 不加载 Typebar 时也不响应相同无窗口关联的合成事件；普通 AppKit 在 tile 完成后可响应双向事件。此证据将边界缩小到隐藏 SwiftUI 宿主／合成派发，但尚不能证明具体原因或物理滚轮行为，不能归为已修复或简单随机失败。保留失败日志，增强断言的外层几何诊断，不改产品滚动实现、不放宽断言、不跳过用例；扩大回归仍未通过，暂未提交推送。日志为 `/tmp/typebar-funbox-memory-{focused,broad,final-broad,wheel-repro,wheel-diagnostic,wheel-location,wheel-appkit-middle,wheel-appkit-tiled,wheel-swiftui}.log`。原创性、47 direct／119 native symbols／17 specs 行为审计和 1,341 条人工清单结构已通过，不等于实体人工验收。
+
+最终串行 Debug 打包、签名及包内原创性通过（增量构建 1.24 秒）；撤回未获支持的位置修改后，五项外层转发／边界导航及合成事件修饰键回归通过（0.060 秒），未修改原滚轮断言或产品滚动代码。五项通过不能替代失败的真实 SwiftUI 隐藏宿主用例。未启动 Typebar 主程序，全部测试／探针进程已结束，本批仍保留在工作树、尚未提交推送，整体 goal active。
+
+后续有界复核：独立隐藏 SwiftUI 探针的 private CGEventSource、line／pixel、显式阶段、NSWindow／NSApplication 派发均未移动滚动区；全局键盘修饰键及鼠标按钮读取为零。两类 CGEvent 窗口下指针字段不能使 NSEvent.windowNumber 从零变为目标窗口，因此也不能当成窗口关联修复。新增 `swift Scripts/diagnose-hidden-wheel.swift` 持久复现脚本：同一个隐藏窗口中，普通 NSScrollView 双向移动 500→420→500，HostingScrollView 两次均保持 500；不加载 Typebar、不打开用户存储、不投递系统事件、不激活或显示窗口。普通 AppKit 的第一次忽略现象可由 tile 尚未完成解释，不作为系统滚轮损坏的证据。具体 SwiftUI 派发条件及物理输入仍未证实，三轮复核后停止猜测性修复，保留原失败断言。
+
+开发快照决策（会话内复核，非独立审查）：按用户持续推送要求，仅把已实现、定向验证及打包通过的 Funbox 批次保存到 native-parity-next，明确保留扩大回归失败；不把快照当作发布候选，不合入 main、不创建 PR、不修改工作流／通知。推送前已确认该分支无打开 PR，远端 main 仍为 8c52fb13028f82fd8e8718d55cb7ed65463b034e，Actions 仍为 826、最新 39118939684 成功。此决定不撤销上轮失败记录，也不允许跳过或放宽滚轮测试；合入主分支之前仍须解决该验证缺口。整体 goal active，完整功能与实体验收继续按矩阵追踪。
+
 ## Polyglot 方向冲突的语言保存与初始化重试（2026-10-25，起点 86c5b01f）
 
 固定 polyglot.withWords 在至少两个语言载入成功后检查基础语言和所有所选语言的方向；全部相反才保存首个所选语言，发 durationMs=5000 的非重要 notice，抛空消息 WordGenError。完整 init 捕获这个失败，不弹空通知，而是消耗同一三次初始化预算后重新从语言／激活阶段开始。新增探针执行实际完整 init 与实际 withWords，使用自有词、语言元数据、加载／setter／UI 端点，不读参考语言资产；54 组基础语言和有序组合包含 LTR、RTL、混合方向及 code_python，核对最终语言、保存调用、1／2 次实际调用和通知时长／重要度。探针没有执行语言 setter 的监听，也没有执行完整 Funbox 激活；这些由既有源码阶段对照及本批真实工作流组合证据覆盖，不能借此宣称资源／词表等价。

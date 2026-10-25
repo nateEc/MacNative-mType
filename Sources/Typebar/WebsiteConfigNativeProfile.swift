@@ -43,6 +43,7 @@ enum WebsiteConfigNativeProfile {
       testActive: testActive, nosave: nosave)
     var draft = try WebsiteConfigNativeDraft(edit: .init(key: key, previousRuntime: previous, projection: projection), pointsPerRem: pointsPerRem)
     draft.lazyMemory = current.lazyMemory
+    draft.funboxMemory = current.funboxMemory
     return draft
   }
 

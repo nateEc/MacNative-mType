@@ -101,34 +101,38 @@ struct WebsiteConfigPracticeEditor: View {
   let canEdit: Bool
   let recoveries: [WebsiteQuoteSampler.Recovery]
   let pendingPreparation: Bool
+  let configurationWasSaved: Bool
   let resume: (@MainActor () async throws -> String)?
   let apply: @MainActor (WebsiteConfigPracticeEdit) async throws -> String
   init(draft: WebsiteConfigNativeDraft, canEdit: Bool, recoveries: [WebsiteQuoteSampler.Recovery] = [],
-    pendingPreparation: Bool = false,
+    pendingPreparation: Bool = false, configurationWasSaved: Bool = true,
     resume: (@MainActor () async throws -> String)? = nil,
     apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     parameters = draft.testParameters; importedQuoteGroups = draft.quoteSelection.groups
     self.canEdit = canEdit; self.apply = apply
     self.recoveries = recoveries
     self.pendingPreparation = pendingPreparation; self.resume = resume
+    self.configurationWasSaved = configurationWasSaved
     _form = State(initialValue: .init(draft: draft))
   }
   init(form: WebsiteConfigPracticeEditForm, parameters: WebsiteConfigNativeTestParameters, canEdit: Bool,
     recoveries: [WebsiteQuoteSampler.Recovery] = [],
-    pendingPreparation: Bool = false, resume: (@MainActor () async throws -> String)? = nil,
+    pendingPreparation: Bool = false, configurationWasSaved: Bool = true, resume: (@MainActor () async throws -> String)? = nil,
     apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     _form = State(initialValue: form); self.parameters = parameters; self.canEdit = canEdit; self.apply = apply
     importedQuoteGroups = form.quoteLengths
     self.recoveries = recoveries
     self.pendingPreparation = pendingPreparation; self.resume = resume
+    self.configurationWasSaved = configurationWasSaved
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       if !recoveries.isEmpty { WebsiteQuoteRecoveryNotice(recoveries: recoveries) }
       if pendingPreparation {
         VStack(alignment: .leading, spacing: 6) {
-          Label("设置已保存", systemImage: "checkmark.circle").font(.subheadline.weight(.semibold))
-          Text("新练习尚未准备完成。取消不会撤回已保存的设置。")
+          Label(configurationWasSaved ? "设置已保存" : "临时设置已恢复，选择未保存",
+            systemImage: configurationWasSaved ? "checkmark.circle" : "arrow.uturn.backward").font(.subheadline.weight(.semibold))
+          Text(configurationWasSaved ? "新练习尚未准备完成。取消不会撤回已保存的设置。" : "新练习尚未准备完成；可继续准备，磁盘配置保持不变。")
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
           if let resume {
             Button("继续准备新练习") { form.resume(apply: resume) }

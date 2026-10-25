@@ -105,7 +105,7 @@ import XCTest
       let deadline = Date().addingTimeInterval(15)
       while !ready() && Date() < deadline { flush() }
       let native = views(PromptViewportPracticeNativeView.self).first
-      XCTAssertTrue(ready(), "Practice page did not reach the expected renderer: complete=\(native?.viewport.canvas.hasCompleteHeight as Any), frame=\(native?.frame as Any), measuredHeight=\(native?.measuredHeight as Any), input=\(views(TypingInputView.self).first?.acceptsTextInput as Any)", file: file, line: line)
+      XCTAssertTrue(ready(), "Practice page did not reach the expected renderer: complete=\(native?.viewport.canvas.hasCompleteHeight as Any), frame=\(native?.frame as Any), measuredHeight=\(native?.measuredHeight as Any), input=\(views(TypingInputView.self).first?.acceptsTextInput as Any), pageBounds=\(native?.enclosingScrollView?.contentView.bounds as Any), pageDocument=\(native?.enclosingScrollView?.documentView?.frame as Any)", file: file, line: line)
     }
     func close() {
       host.rootView = AnyView(EmptyView())

@@ -31,6 +31,7 @@ struct WebsiteConfigNativeDraft {
   }
   let origin: Origin
   var lazyMemory = WebsiteConfigLazyModeMemory()
+  var funboxMemory = WebsiteConfigFunboxMemory()
   var projection: WebsiteConfigRuntimeProjection { origin.projection }
   /// Restore evidence is never presented as an original JSON import.
   var prepared: WebsiteConfigPreparedImport? {
@@ -59,6 +60,13 @@ struct WebsiteConfigNativeDraft {
   @MainActor
   init(edit: WebsiteConfigPreparedEdit, pointsPerRem: Double) throws {
     guard edit.projection.rejectedKeys.isEmpty else { throw WebsiteConfigNativeDraftError.rejectedEdit }
+    try self.init(origin: .edited(edit), pointsPerRem: pointsPerRem)
+  }
+  @MainActor
+  init(funboxSelection edit: WebsiteConfigPreparedEdit, pointsPerRem: Double) throws {
+    guard edit.key == "funbox", edit.projection.rejectedKeys.allSatisfy({ $0 == "funbox" }) else {
+      throw WebsiteConfigNativeDraftError.rejectedEdit
+    }
     try self.init(origin: .edited(edit), pointsPerRem: pointsPerRem)
   }
 
@@ -96,6 +104,7 @@ struct WebsiteConfigNativeDraft {
     }
     var result = try Self(origin: origin, pointsPerRem: pointsPerRem)
     result.lazyMemory = memory
+    result.funboxMemory = funboxMemory
     return result
   }
 }

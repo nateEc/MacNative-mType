@@ -22,7 +22,14 @@ import XCTest
       let events: [WebsiteConfigApplicationEvent], repeatedEvents: [WebsiteConfigApplicationEvent]
       let notices: [Notice], repeatedNotices: [Notice]
     }
-    struct Output: Decodable { let fixtures: [Fixture]; let rawEmptyLayoutFallback: String }
+    struct MemoryFixture: Decodable {
+      let current: [String: WebsiteConfigValue], activated: [String: WebsiteConfigValue], after: [String: WebsiteConfigValue]
+      let selection: [String], events: [WebsiteConfigApplicationEvent]
+    }
+    struct Output: Decodable {
+      let fixtures: [Fixture]; let rawEmptyLayoutFallback: String
+      let memoryFixtures: [MemoryFixture]
+    }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let process = Process(), pipe = Pipe()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -56,6 +63,22 @@ import XCTest
       XCTAssertEqual(repeated.projection.runtime, activated.projection.runtime)
       XCTAssertEqual(Array(repeated.projection.events.dropFirst(activated.projection.events.count)), fixture.repeatedEvents, "repeat \(index)")
       XCTAssertEqual(cleared, fixture.repeatedNotices.count)
+    }
+    XCTAssertEqual(output.memoryFixtures.count, 225)
+    for (index, fixture) in output.memoryFixtures.enumerated() {
+      var draft = try WebsiteConfigNativeProfile.prepareDraft(WebsiteConfigJSONWriter.write(.object(fixture.current)),
+        pointsPerRem: 16, context: .init())
+      for _ in 0..<2 {
+        draft = WebsiteConfigFunboxMemory.remembering(draft)
+        draft = try WebsiteConfigFunboxActivation.prepare(draft, pointsPerRem: 16, context: .init())
+      }
+      for (key, value) in fixture.activated { XCTAssertEqual(draft.projection.runtime[key], value, "memory activation \(index) \(key)") }
+      let selected = try WebsiteConfigFunboxMemory.selecting(.array(fixture.selection.map(WebsiteConfigValue.string)),
+        from: draft, pointsPerRem: 16, context: .init(), testActive: false)
+      XCTAssertEqual(selected.saved, fixture.events.contains { $0.key == "funbox" && $0.nosave == false })
+      for (key, value) in fixture.after { XCTAssertEqual(selected.draft.projection.runtime[key], value, "memory restoration \(index) \(key)") }
+      XCTAssertEqual(selected.draft.projection.events, fixture.events, "restoration setter order \(index)")
+      XCTAssertTrue(selected.draft.funboxMemory.entries.isEmpty)
     }
   }
 }

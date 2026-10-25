@@ -132,10 +132,11 @@ import XCTest
   func testPendingEditorRendersLightAndDarkWithoutDispatchingResume() throws {
     let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":4}"#,
       pointsPerRem: 16, context: .init())
-    for width in [340, 520] {
+    for (width, saved) in [(340, true), (340, false), (520, true), (520, false)] {
       for dark in [false, true] {
         var calls = 0
         let view = WebsiteConfigPracticeEditor(draft: draft, canEdit: true, pendingPreparation: true,
+          configurationWasSaved: saved,
           resume: { calls += 1; return "unexpected" }, apply: { _ in calls += 1; return "unexpected" })
           .padding(20).frame(width: CGFloat(width), height: 760)
           .background(Color(nsColor: .windowBackgroundColor))
@@ -150,7 +151,7 @@ import XCTest
         let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
         host.cacheDisplay(in: host.bounds, to: bitmap)
         let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
-        try png.write(to: URL(fileURLWithPath: "/tmp/typebar-active-edit-pending-\(width)-\(dark ? "dark" : "light").png"))
+        try png.write(to: URL(fileURLWithPath: "/tmp/typebar-active-edit-\(saved ? "pending" : "restored")-\(width)-\(dark ? "dark" : "light").png"))
         XCTAssertGreaterThan(png.count, 1000); XCTAssertFalse(window.isVisible); XCTAssertEqual(calls, 0)
       }
     }

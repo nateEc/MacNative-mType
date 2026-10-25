@@ -6,12 +6,14 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case mode(TestMode), time(Double), words(Double)
   case difficulty(Difficulty), punctuation(Bool), numbers(Bool), quoteLengths([Int])
   case language(String), lazyMode(Bool)
+  case funboxes([String])
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
     case .difficulty: "difficulty"; case .punctuation: "punctuation"; case .numbers: "numbers"
     case .quoteLengths: "quoteLength"
     case .language: "language"; case .lazyMode: "lazyMode"
+    case .funboxes: "funbox"
     }
   }
   var value: WebsiteConfigValue {
@@ -23,6 +25,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .quoteLengths(let groups): .array(groups.map { .number(Double($0)) })
     case .language(let value): .string(value)
     case .lazyMode(let value): .bool(value)
+    case .funboxes(let values): .array(values.map(WebsiteConfigValue.string))
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -31,7 +34,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   var dispatchesRestartAfterRejection: Bool {
     switch self {
     case .difficulty, .language: false
-    case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode: true
+    case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes: true
     }
   }
 }
@@ -60,10 +63,15 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
 struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   let underlying: Error
   let initializationMessage: String?
-  init(underlying: Error, initializationMessage: String? = nil) {
+  let configurationWasSaved: Bool
+  init(underlying: Error, initializationMessage: String? = nil, configurationWasSaved: Bool = true) {
     self.underlying = underlying; self.initializationMessage = initializationMessage
+    self.configurationWasSaved = configurationWasSaved
   }
   var errorDescription: String? {
+    if !configurationWasSaved {
+      return "可恢复的临时设置已恢复，趣味模式选择未保存。新练习尚未准备完成，可继续准备。" + (initializationMessage ?? "")
+    }
     if let initializationMessage {
       return "设置已保存，新练习尚未完成。" + initializationMessage + " 可继续准备，已接纳的旧尝试不会重复记账。"
     }
@@ -160,7 +168,11 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       }
       switch try coordinator.beginConfigurationRestart(ticket, for: page, action: edit) {
       case .accepted(let admitted): ticket = admitted
-      case .acceptedRetired: return "设置已保存，但窗口已变化；请重新打开面板恢复配置。"
+      case .acceptedRetired:
+        if ticket.draft.projection.events.contains(where: { $0.nosave == false }) {
+          return "设置已保存，但窗口已变化；请重新打开面板恢复配置。"
+        }
+        return "趣味模式选择未保存，窗口已变化；请重新打开面板恢复配置。"
       case .busy: throw WebsiteConfigImportWorkflowError.busy
       case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
       case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
@@ -168,7 +180,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     case .resume:
       do { ticket = try coordinator.resumeConfigurationRestart(for: page) }
       catch is CancellationError { throw CancellationError() }
-      catch { throw WebsiteConfigSavedPreparationError(underlying: error) }
+      catch { throw WebsiteConfigSavedPreparationError(underlying: error,
+        configurationWasSaved: page.state.configurationDeparture?.configurationWasSaved ?? true) }
     case .application(.some(let json)):
       let fields = try WebsiteConfigJSONReader.read(json).importFields
       if fields?["version"] != nil, fields?["settings"] != nil, fields?["configuration"] != nil,
@@ -203,12 +216,18 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
           switch intent {
           case .application(nil): return "已恢复保存的配置，新的练习已准备好。" + notice
           case .application(.some): return "配置已导入，新的练习已准备好。" + notice
+          case .edit where publication.draft.projection.rejectedKeys.contains("funbox"):
+            return "趣味模式选择未更改；可恢复的临时设置已恢复，新的练习已准备好。" + notice
           case .edit: return "设置已保存，新的练习已准备好。" + notice
           case .resume: return "已继续准备，新的练习已准备好。" + notice
           }
         } catch {
           // The durable commit already succeeded. Never report a rolled-back
           // import merely because an observer retired its receiving window.
+          if publication.draft.projection.rejectedKeys.contains("funbox"),
+            !publication.draft.projection.events.contains(where: { $0.nosave == false }) {
+            return "临时设置已恢复，选择未保存；窗口已变化，重开控制未能绑定，请重新打开此面板恢复。"
+          }
           return "配置已保存并应用，但窗口已变化，重开控制未能绑定；请重新打开此面板恢复。"
         }
       case .busy: throw WebsiteConfigImportWorkflowError.busy
@@ -220,7 +239,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       // report stale before our post-await operation check is reached.
       if operation != current || Task.isCancelled { throw CancellationError() }
       if !(error is CancellationError), page.state.configurationDeparture != nil {
-        throw WebsiteConfigSavedPreparationError(underlying: error, initializationMessage: initializationReport.finalMessage)
+        throw WebsiteConfigSavedPreparationError(underlying: error, initializationMessage: initializationReport.finalMessage,
+          configurationWasSaved: page.state.configurationDeparture?.configurationWasSaved ?? true)
       }
       if let message = initializationReport.finalMessage {
         throw WebsiteConfigInitializationExhaustedError(underlying: error, message: message)
@@ -246,7 +266,13 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         throw WebsiteConfigImportWorkflowError.activeAttempt
       }
     case .edit:
-      guard page.state.configurationDeparture == nil else { throw WebsiteConfigImportWorkflowError.preparationPending }
+      if let pending = page.state.configurationDeparture {
+        if !pending.configurationWasSaved {
+          throw WebsiteConfigSavedPreparationError(underlying: WebsiteConfigImportWorkflowError.preparationPending,
+            configurationWasSaved: false)
+        }
+        throw WebsiteConfigImportWorkflowError.preparationPending
+      }
     case .resume(let id):
       guard page.state.configurationDeparture?.id == id else { throw WebsiteConfigImportWorkflowError.conflict }
     }

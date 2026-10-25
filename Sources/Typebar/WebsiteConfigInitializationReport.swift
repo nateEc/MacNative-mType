@@ -42,6 +42,13 @@ struct WebsiteConfigInitializationExhaustedError: Error, LocalizedError {
       options: .init(title: "趣味模式", details: .object(["category": .string("funbox_joining_script")])),
       generation: noticeGeneration, whileCurrent: current)
   }
+  func recordFunboxSelectionRejection(whileCurrent current: () -> Bool) {
+    guard let notices, let noticeGeneration else { return }
+    notices.postGuarded("当前模式、时长、标点或数字设置不支持这次趣味模式选择，选择未保存。", level: .notice,
+      options: .init(durationMilliseconds: 5000, title: "趣味模式", details: .object([
+        "category": .string("funbox_selection_rejected")
+      ])), generation: noticeGeneration, whileCurrent: current)
+  }
   func recordPolyglotDirectionCorrection(_ language: String, whileCurrent current: () -> Bool) {
     guard let notices, let noticeGeneration else { return }
     notices.postGuarded("多语方向与主语言冲突，已切换主语言为 \(language)，保留所选语言组合。", level: .notice,

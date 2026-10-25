@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-25 Funbox 选择与窗口内记忆（CFG-FUNBOX-SELECTION-MEMORY-01）：完整配置的现有命令面板入口接入真实选择事务；在初始化前记住最早设置，切换时按插入顺序经原生 setter 以 nosave 恢复，再尝试保存选择。普通重开／同窗完整导入保留记忆，新窗口不继承；拒绝选择仍恢复并重开，不修改磁盘版本，也不误报已保存。225 组固定源码记忆阶段与实际工作流证据见迁移契约。仅限配置生命周期，命令实际点击、语音、计时器、全部实体交互和完整重写尚未完成；此前“选择记忆未实现”记录由本增量限定更新，不升级全部兼容状态。
+
 2026-10-25 普通引语重开恢复增量：明确的采样恢复可保存源 setter 并重新初始化，不再只向上抛校正请求；同一控制器保留自己的恢复能力，取消后继续不重复保存或统计，无校正路径继续保留发布／文件身份。最多三轮生成，不换语言或借用原版内容。自动化证据及限制见迁移契约；任意错误的完整递归重试、全部通知、其他词源与实体交互仍未完成。
 
 2026-10-24 语言与独立简化输入记忆：完整配置现在可编辑语言与简化输入，Arabic nosave 自动启用／明确偏好、普通／custom／Polyglot 支持度恢复均通过候选状态处理。独立记忆与原 94 项载荷在同一 v2 记录 CAS，旧 v1 可读且稳定恢复不重写，未知或坏记忆不覆盖；不借旧 Typebar 偏好。五项新记忆／协议、三项新工作流和一项新表单纳入最终 63 项定向、629 项相关扩大，均零失败／零跳过，含 880 参考样本；Debug 打包、签名和原创性通过，八份布局已检查。活动切换、失败阶段写序、通知和完整来源／物理交互仍未完成，证据见迁移契约。
@@ -1879,6 +1881,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-FUNBOX-SELECTION-MEMORY-01 | Funbox 选择与临时设置恢复 | `test/funbox/{funbox-memory,funbox,funbox-functions}.ts`, `commandline/lists/funbox.ts` | TestDomain, PreferencesDomain | 部分实现：完整配置命令切换／清空、最早值和有序 nosave 恢复、正常拒绝后继续重开、独立保存基线及可恢复准备状态。225 组固定源码记忆阶段、普通重开／同窗导入／不同窗口、旧命令／No Quit 及拒绝后失败继续的证据见迁移契约。源码通用 setter 端点为自有适配器；实际命令点击、全部拒绝提示、语音／计时器和实体 UI／IME 仍未验收。 |
 | CFG-POLYGLOT-DIRECTION-RECOVERY-01 | Polyglot 方向冲突的首语言保存与静默重试 | `test/funbox/funbox-functions.ts` 的 polyglot.withWords、`test/test-logic.ts` 的 init | TestDomain, PreferencesDomain | 部分实现：相反方向的主语言保存为所选首语言，执行同步监听并静默消耗一次三轮预算；保留组合，5 秒非重要提示，下一轮重新激活且可能触发连写整组清空。54 组实际源码调用方对照到达原生发布，取消／账户切换／竞争记录／No Quit 边界见迁移契约。少量／零个语言加载成功的降级、Funbox 选择记忆、完整导入失败写序及实体 UI／IME 未完成。 |
 | CFG-FUNBOX-ACTIVATION-CONFIG-01 | Funbox 激活时的配置处理器及连写保护 | `test/funbox/{funbox,funbox-functions,list,active}.ts`, `packages/funbox/src/{list,validation}.ts` | TestDomain, PreferencesDomain | 部分实现：五类 applyConfig 处理器进入实际初始化，按顺序应用键盘模式／布局和 Memory 显示设置；连写文字遇五类不支持模式时清空整组，非重要本地提示不占正文预算。保留 nosave、正常拒绝继续、冷恢复、后续保存提升与取消检查点；2,304 组源码阶段对照及六项工作流证据见迁移契约。模型阶段对照不代表全部组合的实际会话／视觉支持；FunboxMemory 选择恢复、其他资源／计时器生命周期和实体交互仍开放。 |
 | CFG-LAZY-NOTICE-LIFETIME-01 | 不支持 Lazy Mode 的重要提示与去重重置 | `test/test-logic.ts` 的 showedLazyModeNotification 与 post-activation Lazy 阶段 | TestDomain, PreferencesDomain | 部分实现：语言／Polyglot 自动关闭的重要提示复用本地历史，窗口内只提示一次，仅记忆恢复才重新允许；基础语言 remember 清理不误重置。工作流替换保留、不同窗口独立，取消／账户代次隔离迟到通知，不占三次生成预算。原有 880 组状态及两条连续源码序列、原生工作流证据见迁移契约；完整语言加载错误、Funbox 激活、初始化其他通知及实体交互仍开放。 |

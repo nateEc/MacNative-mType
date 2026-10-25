@@ -95,5 +95,54 @@ joining = false; events = []; notices = []; errors = [];
 await context.activate();
 assert.deepEqual(errors,[]);
 assert.equal(context.Config.layout,'qwerty'); assert.equal(context.Config.keymapLayout,'qwerty');
+const rawEmptyLayoutFallback = context.Config.layout;
+// Memory and selection are real pinned bodies. The generic setter endpoint
+// remains an owned adapter, including the separately source-tested constraints.
+load('frontend/src/ts/config/funbox-validation.ts','export function canSetConfigWithCurrentFunboxes',
+  ['canSetConfigWithCurrentFunboxes','canSetFunboxWithConfig']);
+load('frontend/src/ts/test/funbox/funbox-memory.ts','let settingsMemory', ['save','load']);
+context.FunboxMemory = {load:context.load};
+load('frontend/src/ts/test/funbox/funbox.ts','export function setFunbox(', ['setFunbox'], 'export async function clear(');
+load('frontend/src/ts/test/funbox/funbox.ts','export async function rememberSettings(', ['rememberSettings'], 'async function setFunboxBodyClasses(');
+const activationSetter = context.setConfig;
+context.setConfig = (key,value,options = {}) => {
+  if (key === 'funbox' && (!context.checkCompatibility(value) ||
+    value.some(name => !context.canSetFunboxWithConfig(name,context.Config).ok))) return false;
+  if (!context.canSetConfigWithCurrentFunboxes(key,value,context.Config.funbox)) return false;
+  return activationSetter(key,value,options);
+};
+const memoryNames = Object.values(metadata).filter(fb => fb.frontendFunctions?.includes('rememberSettings')).map(fb => fb.name);
+assert.equal(memoryNames.length,14);
+const memoryFixtures = [];
+for (const name of memoryNames) for (const keymapMode of ['off','static','next','react']) {
+  for (const layout of ['default','dvorak']) for (const selection of [[],['rot13']]) {
+    context.load();
+    const current = {mode:'words', words:4, time:15, numbers:false, punctuation:false, highlightMode:'letter',
+      funbox:[name], language:'english', keymapMode, layout, keymapLayout:'qwerty', showAllLines:false, tapeMode:'off',
+      customLayoutfluid:['qwerty','colemak'], customPolyglot:['english','german']};
+    context.Config = structuredClone(current); joining = false; events = []; notices = []; errors = [];
+    await context.rememberSettings();
+    await context.activate();
+    // Another restart must not replace the values remembered before activation.
+    await context.rememberSettings();
+    await context.activate();
+    const activated = structuredClone(context.Config);
+    events = []; context.setFunbox(selection);
+    assert.deepEqual(errors,[]);
+    memoryFixtures.push({current,activated,selection,after:structuredClone(context.Config),events:structuredClone(events)});
+  }
+}
+context.load();
+{
+  const current = {...structuredClone(memoryFixtures.find(f => f.current.funbox[0] === 'simon_says').current), mode:'quote'};
+  context.Config = structuredClone(current); events = []; notices = []; errors = [];
+  await context.rememberSettings(); await context.activate();
+  const activated = structuredClone(context.Config), selection = ['binary'];
+  events = []; context.setFunbox(selection);
+  assert.deepEqual(context.Config.funbox,['simon_says']);
+  assert.equal(context.Config.keymapMode,'off');
+  memoryFixtures.push({current,activated,selection,after:structuredClone(context.Config),events:structuredClone(events)});
+  context.load();
+}
 verify();
-process.stdout.write(JSON.stringify({fixtures, rawEmptyLayoutFallback:context.Config.layout}));
+process.stdout.write(JSON.stringify({fixtures, rawEmptyLayoutFallback, memoryFixtures}));

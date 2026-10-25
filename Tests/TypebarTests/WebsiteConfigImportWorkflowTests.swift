@@ -6,6 +6,95 @@ import Observation
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
 
+  func testFunboxClearRestoresWindowMemoryAfterFullImportWithoutInheritingItInAnotherWindow() async throws {
+    let f = try Fixture(), other = try Fixture(); defer { f.close(); other.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["simon_says"],"keymapMode":"react"}"#, systemIsDark: false)
+    let replacement = #"{"mode":"words","words":4,"funbox":["simon_says"],"keymapMode":"off"}"#
+    try await f.workflow.apply(json: replacement, systemIsDark: false)
+    try await other.workflow.apply(json: replacement, systemIsDark: false)
+    for fixture in [f, other] {
+      let id = try XCTUnwrap(fixture.page.state.presentation).publication.applicationID
+      try await fixture.workflow.editAndBegin(.funboxes([]), replacing: id, systemIsDark: false)
+    }
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideMode, .react)
+    XCTAssertEqual(other.page.state.presentation?.publication.draft.keyboardTypography.guideMode, .off)
+  }
+
+  func testFunboxClearAfterOrdinaryRestartRetainsEarliestMemoryAndRejectsOldCommand() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["simon_says"],"keymapMode":"react"}"#, systemIsDark: false)
+    let old = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let restarted = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID())
+    XCTAssertTrue(restarted)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, old, "Ordinary restarts retain the configuration identity")
+    try await f.workflow.editAndBegin(.words(5), replacing: old, systemIsDark: false)
+    let current = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    XCTAssertNotEqual(old, current)
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    do { try await f.workflow.editAndBegin(.funboxes([]), replacing: old, systemIsDark: false); XCTFail("Retired command applied") }
+    catch {}
+    XCTAssertEqual(try register.read().revision, revision)
+    try await f.workflow.editAndBegin(.funboxes([]), replacing: current, systemIsDark: false)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideMode, .react)
+  }
+
+  func testRefusedFunboxSelectionRestoresRuntimeButDoesNotSaveOrRepeatDepartureOnResume() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    var fail = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        if fail { throw Failure.provider }
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"funbox":["simon_says"],"keymapMode":"off"}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    let old = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let register = WebsiteConfigFileRegister(directory: f.directory), before = try register.read()
+    fail = true
+    do { try await workflow.editAndBegin(.funboxes(["binary"]), replacing: old, systemIsDark: false); XCTFail("Provider failure delivered") }
+    catch let error as WebsiteConfigSavedPreparationError {
+      XCTAssertFalse(error.configurationWasSaved)
+      XCTAssertTrue(error.localizedDescription.contains("选择未保存"))
+      XCTAssertFalse(error.localizedDescription.contains("设置已保存"))
+    }
+    let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+    XCTAssertFalse(pending.configurationWasSaved)
+    do { try await workflow.editAndBegin(.words(5), replacing: old, systemIsDark: false); XCTFail("Pending preparation replaced") }
+    catch let error as LocalizedError { XCTAssertFalse(error.errorDescription?.contains("设置已保存") == true) }
+    XCTAssertEqual(pending.draft.projection.runtime["funbox"], .array([.string("simon_says")]))
+    XCTAssertEqual(pending.draft.funboxMemory.entries.first?.value, .string("off"))
+    XCTAssertEqual(try register.read().revision, before.revision)
+    XCTAssertEqual(try register.read().state, before.state)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(f.account.localNotices.history.filter { $0.level == .notice }.count, 1)
+    XCTAssertEqual(f.account.localNotices.history.filter { $0.level == .error }.count, 3)
+    fail = false
+    try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false)
+    XCTAssertEqual(try register.read().revision, before.revision)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(f.account.localNotices.history.filter { $0.level == .notice }.count, 1)
+    XCTAssertEqual(f.account.localNotices.history.filter { $0.level == .error }.count, 3)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideMode, .next)
+    try await workflow.editAndBegin(.funboxes([]), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideMode, .off)
+  }
+
+  func testFunboxClearCannotRemoveActiveNoQuitOrConsumeItsMemory() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["simon_says","no_quit"],"keymapMode":"off"}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    let original = try XCTUnwrap(f.page.state.presentation).publication
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    do { try await f.workflow.editAndBegin(.funboxes([]), replacing: original.applicationID, systemIsDark: false); XCTFail("No Quit bypassed") }
+    catch {}
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, original.applicationID)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.funboxMemory, original.draft.funboxMemory)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertEqual(try register.read().revision, revision)
+  }
+
   func testPolyglotDirectionConflictSavesFirstLanguageAndRetainsArabicNosaveListener() async throws {
     let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
     try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"english","funbox":["polyglot"],"customPolyglot":["arabic","hebrew"],"lazyMode":false}"#, systemIsDark: false)

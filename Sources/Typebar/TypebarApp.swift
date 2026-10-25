@@ -1390,6 +1390,8 @@ private struct ContentView: View {
   @State private var settingsJSONCommand: SettingsJSONCommandPresentation?
   @State private var showingWebsiteConfigImport = false
   @State private var websiteImportWorkflow: WebsiteConfigImportWorkflow?
+  @State private var websiteFunboxCommandTask: Task<Void, Never>?
+  @State private var websiteFunboxCommandRequest = UUID()
   @State private var showingChallenges = false
   @State private var showingOneHandedChallengeSetup = false
   @State private var queuedOneHandedChallengeSetup = false
@@ -1754,6 +1756,7 @@ private struct ContentView: View {
     .onDisappear {
       pageSessionStore.detach()
       websiteImportWorkflow?.stop(); websiteImportWorkflow = nil
+      websiteFunboxCommandRequest = UUID(); websiteFunboxCommandTask?.cancel(); websiteFunboxCommandTask = nil
       settings.preferenceConfigurationSaves.remove(owner: preferenceConfigurationOwner)
       visualFocus.onWillCommit = nil
       interruptedWholePreview = interruptedWholePreview || isPreparingPracticePrompt
@@ -2627,6 +2630,7 @@ private struct ContentView: View {
             canEdit: pageSessionStore.restartController?.isPreparing != true,
             recoveries: publication.quoteRecoveries,
             pendingPreparation: pageSession.configurationDeparture != nil,
+            configurationWasSaved: pageSession.configurationDeparture?.configurationWasSaved ?? true,
             resume: { [departureID] in
               guard let departureID else { throw WebsiteConfigImportWorkflowError.conflict }
               return try await importWorkflow().resumeAndBegin(departureID: departureID,
@@ -5795,7 +5799,10 @@ private struct ContentView: View {
     items.append(contentsOf: PracticePreferenceCommandCatalog.items)
     items.append(contentsOf: BehaviorCommandCatalog.items)
     items.append(contentsOf: PracticeThresholdCommandCatalog.items)
-    items.append(contentsOf: FunboxCommandCatalog.items)
+    items.append(contentsOf: FunboxCommandCatalog.items.filter { item in
+      guard let draft = committedPracticeDraft, let target = FunboxCommandCatalog.target(for: item.id) else { return true }
+      return WebsiteConfigFunboxMemory.proposal(for: target, in: draft) != nil
+    })
     items.append(contentsOf: ResultTagCommandCatalog.items(
       active: settings.activeResultTags, historical: knownHistoricalResultTags))
     items.append(contentsOf: InputRuleCommandCatalog.items)
@@ -6004,6 +6011,10 @@ private struct ContentView: View {
       return
     }
     if let target = FunboxCommandCatalog.target(for: item.id) {
+      if let draft = committedPracticeDraft {
+        runWebsiteFunboxCommand(target, draft: draft)
+        return
+      }
       guard acceptsRestartingConfigurationChange() else {
         ConfigurationNoticeFeedback.conflict("锁定重开已开启：请完成或放弃本次测试。",
           notices: account.localNotices, locked: true)
@@ -6679,6 +6690,30 @@ private struct ContentView: View {
     }
   }
 
+  private func runWebsiteFunboxCommand(_ target: FunboxCommandTarget, draft: WebsiteConfigNativeDraft) {
+    guard websiteFunboxCommandTask == nil, pageSession.configurationDeparture == nil,
+      pageSessionStore.restartController?.isPreparing != true else {
+      funboxConfigurationMessage = "上一轮仍在准备，请等待完成或继续待准备的练习。"; return
+    }
+    guard settings.allowsRestartingConfigurationChange else {
+      ConfigurationNoticeFeedback.conflict("锁定重开已开启：请完成或放弃本次测试。", notices: account.localNotices, locked: true); return
+    }
+    guard let proposal = WebsiteConfigFunboxMemory.proposal(for: target, in: draft),
+      let applicationID = pageSession.presentation?.publication.applicationID else { return }
+    let request = UUID(); websiteFunboxCommandRequest = request
+    websiteFunboxCommandTask = Task { @MainActor in
+      defer { if websiteFunboxCommandRequest == request { websiteFunboxCommandTask = nil } }
+      do {
+        let message = try await importWorkflow().editAndBegin(.funboxes(proposal), replacing: applicationID,
+          systemIsDark: systemColorScheme == .dark)
+        guard websiteFunboxCommandRequest == request, !Task.isCancelled else { return }
+        funboxConfigurationMessage = message
+      } catch {
+        guard websiteFunboxCommandRequest == request, !Task.isCancelled else { return }
+        funboxConfigurationMessage = (error as? LocalizedError)?.errorDescription ?? "趣味模式未准备完成，请检查当前配置。"
+      }
+    }
+  }
   private func importWorkflow() throws -> WebsiteConfigImportWorkflow {
     guard activeChallengeID == nil, wordPractice == nil else {
       throw WebsiteConfigImportWorkflowError.unsupportedPractice

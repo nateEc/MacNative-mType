@@ -29,6 +29,7 @@ final class WebsiteConfigCommitCoordinator {
     /// The accepted setter snapshot can differ from runtime after nosave
     /// listeners. Delivery alone must not turn those listeners into saves.
     fileprivate var savedDraft: WebsiteConfigNativeDraft?
+    fileprivate var funboxSelectionSaved: Bool?
     fileprivate var quoteRecoveries: [WebsiteQuoteSampler.Recovery] = []
     fileprivate var quoteInitialization: WebsiteConfigSessionBuilder.QuoteInitialization?
     fileprivate var retainsQuoteInitialization = false
@@ -44,6 +45,7 @@ final class WebsiteConfigCommitCoordinator {
     /// One successful full application, including repeated identical values.
     let applicationID: UUID
     let draft: WebsiteConfigNativeDraft
+    let savedDraft: WebsiteConfigNativeDraft
     let owner: UUID
     let environmentRevision: UUID
     let pointsPerRem: Double
@@ -98,6 +100,7 @@ final class WebsiteConfigCommitCoordinator {
   struct ConfigurationDeparture {
     let id: UUID
     let draft: WebsiteConfigNativeDraft
+    var configurationWasSaved: Bool { draft.projection.events.contains { $0.nosave == false } }
     fileprivate let savedDraft: WebsiteConfigNativeDraft
     fileprivate let quoteRecoveries: [WebsiteQuoteSampler.Recovery]
     fileprivate let disk: WebsiteConfigFileRegister.Revision
@@ -121,6 +124,9 @@ final class WebsiteConfigCommitCoordinator {
       let capture = prepared.pageCapture,
       page.state.configurationDeparture == nil,
       case .edited(let edit) = prepared.draft.origin, edit.key == action.key else { return .stale }
+    guard !capture.testActive || !page.state.session.configuration.modifiers.contains(.noQuit) else {
+      throw PracticePageSessionStateError.locked
+    }
     guard let previous = page.state.practice,
       case .string(let language)? = prepared.draft.projection.runtime["language"] else {
       throw PracticePageSessionStateError.incomplete
@@ -145,14 +151,14 @@ final class WebsiteConfigCommitCoordinator {
     // The source setter saves before dispatch. Its listener can change the
     // independent Arabic preference, or enable lazy mode with nosave. Carry
     // listener memory durably, but do not persist that runtime-only override.
-    var saved = prepared.draft
+    var saved = prepared.funboxSelectionSaved == false ? (prepared.savedDraft ?? prepared.draft) : prepared.draft
     saved.lazyMemory = applied.lazyMemory
     guard isCurrent(prepared) else { return .stale }
     try Task.checkCancellation()
     try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
     let disk: WebsiteConfigFileRegister.Revision
     do {
-      let result = try register.commit(saved, replacing: prepared.disk)
+      let result = try register.commit(saved, replacing: prepared.disk, preservingUnchanged: prepared.funboxSelectionSaved == false)
       switch result {
       case .committed(let value): disk = value
       case .conflict: page.endCommit(); retire(prepared); return .conflict
@@ -331,6 +337,8 @@ final class WebsiteConfigCommitCoordinator {
     let content = try source.capture(owner: page.owner, preserving: capture.scope)
     guard content.environment == prepared.environment else { throw WebsiteConfigCommitCoordinatorError.stale }
     var bound = prepared
+    bound.draft.funboxMemory = page.state.configurationDeparture?.draft.funboxMemory
+      ?? page.state.presentation?.publication.draft.funboxMemory ?? .init()
     bound.sourcePage = page; bound.applicationCapture = capture
     bound.contentSource = source; bound.contentCapture = content
     guard isCurrent(bound) else { throw WebsiteConfigCommitCoordinatorError.stale }
@@ -357,10 +365,21 @@ final class WebsiteConfigCommitCoordinator {
     guard router.isCurrent(owner) else { throw WebsiteConfigCommitCoordinatorError.stale }
     guard let disk = try register.read().revision else { throw WebsiteConfigCommitCoordinatorError.unavailable }
     guard disk == base.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
-    let draft = try WebsiteConfigNativeProfile.editDraft(base.draft, key: key, value: value,
-      pointsPerRem: context.pointsPerRem, context: context.context, testActive: testActive)
-    let prepared = Prepared(draft: draft, identity: identity, request: request, owner: owner,
+    let draft: WebsiteConfigNativeDraft
+    var funboxSelectionSaved: Bool?
+    if key == "funbox" {
+      guard !testActive || !base.draft.generators.requestedModifiers.contains(.noQuit) else { throw WebsiteConfigNativeDraftError.rejectedEdit }
+      let selection = try WebsiteConfigFunboxMemory.selecting(value, from: base.draft,
+        pointsPerRem: context.pointsPerRem, context: context.context, testActive: testActive)
+      draft = selection.draft; funboxSelectionSaved = selection.saved
+    } else {
+      draft = try WebsiteConfigNativeProfile.editDraft(base.draft, key: key, value: value,
+        pointsPerRem: context.pointsPerRem, context: context.context, testActive: testActive)
+    }
+    var prepared = Prepared(draft: draft, identity: identity, request: request, owner: owner,
       environment: context, disk: disk)
+    prepared.funboxSelectionSaved = funboxSelectionSaved
+    if funboxSelectionSaved == false { prepared.savedDraft = base.savedDraft }
     guard isCurrent(prepared), try register.read().revision == base.disk,
       router.isCurrent(owner) else { throw WebsiteConfigCommitCoordinatorError.stale }
     return prepared
@@ -756,7 +775,17 @@ final class WebsiteConfigCommitCoordinator {
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote],
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
     random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
-    var current = resources
+    var configuration = resources.configuration
+    if configuration.funboxSelectionSaved == false {
+      try withInitializationReport(initializationReport, resources: resources) { report, current in
+        report.recordFunboxSelectionRejection(whileCurrent: current)
+      }
+    }
+    let beforeRemember = configuration.draft
+    configuration.draft = WebsiteConfigFunboxMemory.remembering(beforeRemember)
+    configuration = try saveGenerationCorrection(configuration, from: beforeRemember, admission: resources.admission)
+    var current = ResourcesPrepared(configuration: configuration, admission: resources.admission,
+      background: resources.background, font: resources.font)
     // Pinned init enters generation at most three times per restart. Keep the
     // actual source recovery on the last failure too, then stop explicitly.
     for attempt in 0..<3 {
@@ -1074,6 +1103,7 @@ final class WebsiteConfigCommitCoordinator {
       prepared.pageCapture?.configurationDeparture != nil || !prepared.quoteRecoveries.isEmpty || admittingSourceSetter,
       original.projection.runtime != prepared.draft.projection.runtime
         || original.lazyMemory != prepared.draft.lazyMemory
+        || original.funboxMemory != prepared.draft.funboxMemory
         || prepared.draft.projection.events.count > original.projection.events.count
         || WebsiteConfigLazyModeLifecycle.savesConfigurationDuringGeneration(from: original, to: prepared.draft)
     else { return prepared }
@@ -1230,14 +1260,15 @@ final class WebsiteConfigCommitCoordinator {
     if case .restored(let value) = prepared.draft.origin, case .nativeState = value.origin { restoringNative = true }
     else { restoringNative = false }
     do { outcome = try register.commit(prepared.savedDraft ?? prepared.draft, replacing: prepared.disk,
-      preservingUnchanged: restoringNative || prepared.pageCapture?.configurationDeparture != nil) }
+      preservingUnchanged: restoringNative || prepared.pageCapture?.configurationDeparture != nil || prepared.funboxSelectionSaved == false) }
     catch WebsiteConfigFileRegisterError.busy { return .busy }
     switch outcome {
     case .committed(let disk):
       // No await, fallible receiver, legacy write or resource activation after
       // CAS. The optional page assignment can notify observation synchronously;
       // both coordinator and page stay reserved until publication is complete.
-      let publication = Publication(applicationID: applicationID, draft: prepared.draft, owner: prepared.owner.owner,
+      let publication = Publication(applicationID: applicationID, draft: prepared.draft,
+        savedDraft: prepared.savedDraft ?? prepared.draft, owner: prepared.owner.owner,
         environmentRevision: prepared.environment.revision, pointsPerRem: prepared.environment.pointsPerRem,
         disk: disk, background: background, font: font, session: session, practice: practice,
         quoteRecoveries: prepared.quoteRecoveries,
