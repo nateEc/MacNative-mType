@@ -1,5 +1,27 @@
 # 阈值源状态与迁移契约
 
+## 完整配置的 Polyglot 命令入口（2026-10-25，起点 9ddcf47c）
+
+固定 lists.ts 将 customPolyglot 注册为输入命令，完整 buildInputCommand 产生 ID setCustomPolyglotCustom；输入、去重、false 后重开及 No Quit 的实际调用方合同沿既有 72 组源探针。原生现在在已发布完整配置、无待续准备且重开控制器空闲时提供“修改多语组合”，可搜索原版 ID／customPolyglot／polyglot／多语；旧 Typebar 设置仍走自己的组合选择，不将完整配置命令错误写入旧偏好。
+
+命令面板先关闭，onDismiss 才交付专用窗口；队列携带打开时的 publication ID 和 draft，若期间发布被替换则丢弃。窗口默认值来自保存的 draft，而非当前轮可能仍沿用的旧组合。编辑复用 WebsiteConfigPracticeEditForm.startPolyglotLanguages 与真实 editAndBegin，不重复实现转换、schema、CAS、账户校验或 No Quit 例外。显示期间配置被替换／离场准备时禁用保存，底层仍用捕获的 ID 验证，避免旧窗口编辑新配置；正常保存后的结果文字保留供阅读，关闭后重新打开取新版本。关闭或消失取消该表单任务，不取消其他配置操作者。Escape 与默认 Return 采用系统按钮快捷键，实体按键与可见 sheet 切换仍待人工验收。
+
+先行原版 ID 动作断言在 nil 处失败，证实原生入口缺失；接线后首批四项零失败（1.177 秒），包括搜索／可用性、已保存组合默认值、真实保存后旧快照拒绝，以及浅／深色可用／失效的四种隐藏布局；已查看浅色可用和深色失效图片，未见裁切。随后补充隐藏视图移除取消、迟到结果抑制及相关回归，最终结果另记。取消测试初版直接在 async 中调用 RunLoop.run，被 Swift 6 拒绝，改用与现有隐藏宿主一致的同步 render 辅助方法；此为测试编译修正，不是生产缺陷。
+
+最终相关回归 202 项零失败／零跳过（24.374 秒），包括原配置表单、导入工作流、会话构建、启动恢复、普通重开、下一轮事务、Polyglot 候选、旧命令目录及新窗口移除取消／迟到结果抑制。日志 /tmp/typebar-polyglot-command-{red,focused,regression}.log；此范围没有重跑已知 ViewportPracticeHostTests 合成滚轮失败，不替代完整门禁。原创性、47 direct／119 native symbols／17 specs 参考行为审计、1,343 条人工清单结构与空白检查通过；最初两项审计因误传相对路径拒绝，改用绝对参考路径后通过。
+
+上一轮本地计时显式重复证据随本批实质功能一并交付；仍不声称覆盖语言载入失败、所有方向／funbox 组合、实体 UI／IME、已知隐藏滚轮失败或完整目标。本轮保持开发分支批量推送，不改主分支、工作流及通知设置，不启动主程序。
+
+串行 Debug 打包、签名与包内资源／原创性边界通过（增量构建 1.03 秒），日志 /tmp/typebar-polyglot-command-package.log，未启动应用。推送前重新 fetch 确认 main 8c52fb13、开发分支 9ddcf47c；远端无开发分支打开 PR，Actions 仍 826 次且最新 39118939684 成功。只将本批提交推到 native-parity-next，并在推后复核通知相关外部状态。
+
+## No Quit 保存组合后的显式重复（2026-10-25，起点 9ddcf47c）
+
+沿固定 words-generator.generateWords 完整调用顺序复核：isRepeated 仅保留 previousGetNextWordReturns，不跳过 withWords；Polyglot 会读取最新 customPolyglot 重建当前词集。随后 getNextWord 优先返回旧历史，历史缺项且计时／词数等边界允许时才从当前词集采样。原生 prepareRestart 已将真实 generatedWordReplayHistory 交给用最新 draft 建立的 GeneratedCandidateContinuation，因此此处没有生产修复。
+
+新增真实工作流回归 testFuturePolyglotSaveRepeatsOldHistoryThenContinuesFromNewLanguages：计时 Polyglot／No Quit 开始输入并预取词组，保存另一组语言，活动时显式重复仍拒绝；当前轮到期后显式重复读新配置，逐词核对完整旧 source／target 历史，再经实际会话续写耗尽历史，检查新词属于保存后的候选集，账本不增加离场。正式页面拥有单调系统时钟，初版用未来日历日期驱动到期导致四个后续断言失败，属于测试用法错误；最终等待真实一秒期限，不增加生产时钟注入或更改时序。单项通过（1.288 秒），日志 /tmp/typebar-polyglot-repeat-focused.log。
+
+相关工作流、会话构建与 Polyglot 候选回归共 126 项零失败／零跳过（8.725 秒），日志 /tmp/typebar-polyglot-repeat-regression.log。该证据仅覆盖普通左到右语言的计时重复与历史耗尽，不覆盖载入失败、方向恢复、全部 funbox／重复组合、实体键盘或已知隐藏滚轮问题。当轮只有测试与证据修改，依仓库规则先留本地，随后随上述命令入口实质批次交付；该验证本身未提交、推送、请求 CI、改通知或启动主程序，完整目标仍 active。
+
 ## Polyglot 语言组合输入与 No Quit 的下轮保存（2026-10-25，起点 13d6cce4）
 
 源码复核改变了初始方案：语言载入失败分支存在于 polyglot.withWords 的异步 JSONData 入口，当前原生正式词源是本机目录，并没有可直接替换的同型载入接口；不能插入未接线的失败模型冒充功能完成，降级分支继续开放。再核查到旧 PolyglotWordPool 的拼接，但正式 GeneratedCandidateContinuation 已走 NativePolyglotCandidates 的 UTF-16 精确 Map 身份／首词顺序／末语言拥有权，既有测试也已覆盖，故未错误改动正式候选或词库。实际接线缺口是完整配置不能编辑 customPolyglot，只能改 JSON。

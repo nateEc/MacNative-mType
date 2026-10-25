@@ -6,6 +6,82 @@ import Observation
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
 
+  func testPolyglotCommandSnapshotUsesPublishedDraftAndCannotEditReplacement() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"customPolyglot":["german","spanish"]}"#, systemIsDark: false)
+    let opened = WebsitePolyglotCommandPresentation(publication: try XCTUnwrap(f.page.state.presentation).publication)
+    let form = WebsiteConfigPracticeEditForm(draft: opened.draft)
+    XCTAssertEqual(form.polyglotLanguages, "german spanish")
+    form.polyglotLanguages = "french english"
+    form.startPolyglotLanguages { edit in
+      try await f.workflow.editAndBegin(edit, replacing: opened.id, systemIsDark: false)
+    }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while form.isWorking && ContinuousClock.now < deadline { await Task.yield() }
+    XCTAssertFalse(form.isWorking); XCTAssertNotNil(form.message)
+    let current = try XCTUnwrap(f.page.state.presentation).publication
+    XCTAssertNotEqual(opened.id, current.applicationID)
+    XCTAssertEqual(current.draft.generators.polyglotLanguages, [.french, .english])
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    do {
+      try await f.workflow.editAndBegin(.polyglotLanguages(["german", "english"]), replacing: opened.id, systemIsDark: false)
+      XCTFail("A command opened on the old publication edited its replacement")
+    } catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+  }
+
+  func testFuturePolyglotSaveRepeatsOldHistoryThenContinuesFromNewLanguages() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"time","time":1,"funbox":["polyglot","no_quit"],"customPolyglot":["english","german"]}"#, systemIsDark: false)
+    let zero = Date.now
+    var active = f.page.state
+    let first = try XCTUnwrap(active.session.prompt.split(separator: " ").first)
+    active.session.insertBatch(String(first) + " ", at: zero)
+    f.page.replace(active)
+    let history = try XCTUnwrap(active.session.generatedWordReplayHistory)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    try await f.workflow.editAndBegin(.polyglotLanguages(["spanish", "french"]),
+      replacing: publication.applicationID, systemIsDark: false)
+    let controller = try XCTUnwrap(f.page.restartController)
+    let blocked = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertFalse(blocked, "Saving a future selection must not bypass active No Quit")
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, active.session.automaticInputAttemptID)
+    // Published sessions own a monotonic system clock. Wait for this one-second
+    // deadline instead of pretending calendar-date arguments advance that clock.
+    XCTAssertEqual(f.page.state.session.configuration.duration, 1)
+    try await Task.sleep(for: .milliseconds(1_100))
+    var finished = f.page.state
+    _ = finished.session.tick()
+    XCTAssertTrue(finished.session.isFinished); f.page.replace(finished)
+    let advanced = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(advanced)
+    XCTAssertTrue(f.page.state.practice?.repetition.repeatsWordset == true)
+    XCTAssertEqual(f.page.state.session.configuration.mixedLanguageComponents, [.spanish, .french])
+    var repeated = f.page.state.session
+    let replayStart = Date.now
+    // Consume through the opening and prefetched history, using the actual
+    // session continuation rather than constructing a replacement generator.
+    for _ in 0..<(history.count + 100) {
+      if (repeated.generatedWordReplayHistory?.count ?? 0) > history.count { break }
+      let remaining = repeated.prompt.dropFirst(repeated.typed.count)
+      guard let separator = remaining.firstIndex(of: " ") else { return XCTFail("No continuation word") }
+      repeated.insertBatch(String(remaining[...separator]), at: replayStart)
+    }
+    let replayed = try XCTUnwrap(repeated.generatedWordReplayHistory)
+    XCTAssertGreaterThan(replayed.count, history.count)
+    for index in 0..<history.count {
+      XCTAssertEqual(replayed.word(at: index)?.source, history.word(at: index)?.source)
+      XCTAssertEqual(replayed.word(at: index)?.target, history.word(at: index)?.target)
+    }
+    let candidates = NativePolyglotCandidates(configuration: repeated.configuration, nextShuffleIndex: { $0 - 1 })
+    let currentWords = Set(candidates.lexicon.materialized())
+    for index in history.count..<replayed.count {
+      XCTAssertTrue(currentWords.contains(try XCTUnwrap(replayed.word(at: index)?.source)),
+        "History exhaustion must sample the saved language list")
+    }
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
   func testPolyglotLanguageListSavesDuringActiveNoQuitWithoutChangingItsAttempt() async throws {
     let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
     try await f.workflow.apply(json: #"{"mode":"words","words":4,"theme":"dracula","funbox":["polyglot","no_quit"],"customPolyglot":["english","german"]}"#, systemIsDark: false)

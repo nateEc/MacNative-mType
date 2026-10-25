@@ -2058,6 +2058,7 @@ enum CommandPaletteUtilityAction: Equatable {
     case shareTestSettings
     case importSettingsJSON
     case importWebsiteConfig
+    case editWebsitePolyglot
     case exportSettingsJSON
     case nextRandomTheme
     case signOut
@@ -2067,7 +2068,7 @@ enum CommandPaletteUtilityAction: Equatable {
 /// Browser-only cache, advertising, diagnostics, and brand links are omitted.
 enum CommandPaletteUtilityCatalog {
     static func items(
-        randomThemeEnabled: Bool, authenticated: Bool
+        randomThemeEnabled: Bool, authenticated: Bool, websiteProfileActive: Bool = false
     ) -> [CommandPaletteItem] {
         var items = [
             CommandPaletteItem(
@@ -2101,6 +2102,14 @@ enum CommandPaletteUtilityCatalog {
                     "exportSettingsJSON", "export", "config", "settings", "导出", "设置", "JSON",
                 ], group: .data),
         ]
+        if websiteProfileActive {
+            items.append(CommandPaletteItem(
+                id: "setCustomPolyglotCustom", title: "修改多语组合",
+                subtitle: "编辑完整配置的语言 ID；No Quit 活动时保存供下轮使用",
+                systemImage: "globe", keywords: [
+                    "setCustomPolyglotCustom", "customPolyglot", "polyglot", "languages", "多语", "组合",
+                ], group: .practice))
+        }
         if randomThemeEnabled {
             items.append(CommandPaletteItem(
                 id: "randomizeTheme", title: "下一个随机主题",
@@ -2126,6 +2135,7 @@ enum CommandPaletteUtilityCatalog {
         case "shareTestSettings", "share": .shareTestSettings
         case "importSettingsJSON": .importSettingsJSON
         case "importMonkeytypeConfig": .importWebsiteConfig
+        case "setCustomPolyglotCustom": .editWebsitePolyglot
         case "exportSettingsJSON": .exportSettingsJSON
         case "randomizeTheme": .nextRandomTheme
         case "signOut": .signOut

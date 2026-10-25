@@ -1389,6 +1389,8 @@ private struct ContentView: View {
   @State private var showingTestShare = false
   @State private var settingsJSONCommand: SettingsJSONCommandPresentation?
   @State private var showingWebsiteConfigImport = false
+  @State private var websitePolyglotCommand: WebsitePolyglotCommandPresentation?
+  @State private var queuedWebsitePolyglotCommand: WebsitePolyglotCommandPresentation?
   @State private var websiteImportWorkflow: WebsiteConfigImportWorkflow?
   @State private var websiteFunboxCommandTask: Task<Void, Never>?
   @State private var websiteFunboxCommandRequest = UUID()
@@ -2086,6 +2088,12 @@ private struct ContentView: View {
       commandThemePreviewTarget = nil
       clearCommandFontPreview()
       presentQueuedReferenceScriptImport()
+      if let queued = queuedWebsitePolyglotCommand {
+        queuedWebsitePolyglotCommand = nil
+        if pageSession.presentation?.publication.applicationID == queued.id {
+          websitePolyglotCommand = queued
+        }
+      }
     }) {
       CommandPaletteView(
         items: commandPaletteItems, listMode: settings.commandPaletteListMode,
@@ -2259,6 +2267,16 @@ private struct ContentView: View {
         return message
       }, cancel: { websiteImportWorkflow?.cancel() },
         useTypebarSettings: { try pageSessionStore.useTypebarSettings() })
+    }
+    .sheet(item: $websitePolyglotCommand) { presentation in
+      WebsitePolyglotCommandView(presentation: presentation,
+        canApply: pageSession.presentation?.publication.applicationID == presentation.id
+          && pageSession.configurationDeparture == nil
+          && pageSessionStore.restartController?.isPreparing != true,
+        apply: { [applicationID = presentation.id] edit in
+          try await importWorkflow().editAndBegin(edit, replacing: applicationID,
+            systemIsDark: systemColorScheme == .dark)
+        })
     }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
@@ -5787,7 +5805,9 @@ private struct ContentView: View {
     items.append(contentsOf: NoStressResultCommandCatalog.items)
     items.append(contentsOf: CommandPaletteUtilityCatalog.items(
       randomThemeEnabled: settings.randomThemeMode.isEnabled && !settings.followSystemTheme,
-      authenticated: account.currentUser != nil))
+      authenticated: account.currentUser != nil,
+      websiteProfileActive: committedPracticeDraft != nil && pageSession.configurationDeparture == nil
+        && pageSessionStore.restartController?.isPreparing != true))
     items.append(contentsOf: NavigationCommandCatalog.items)
     if session.hasStarted, !session.isFinished, commandBailoutAvailable {
       items.append(.init(
@@ -5859,6 +5879,13 @@ private struct ContentView: View {
           mode: .importSettings, initialJSON: "", initialError: nil)
       case .importWebsiteConfig:
         openWebsiteConfigImport()
+      case .editWebsitePolyglot:
+        guard let publication = pageSession.presentation?.publication,
+          pageSession.configurationDeparture == nil,
+          pageSessionStore.restartController?.isPreparing != true else { return }
+        let presentation = WebsitePolyglotCommandPresentation(publication: publication)
+        if showingCommandPalette { queuedWebsitePolyglotCommand = presentation }
+        else { websitePolyglotCommand = presentation }
       case .exportSettingsJSON:
         do {
           settingsJSONCommand = .init(
