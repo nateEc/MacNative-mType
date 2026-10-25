@@ -109,7 +109,12 @@ final class PolyglotInteractiveSelectionTests: XCTestCase {
       .deletingLastPathComponent().deletingLastPathComponent()
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     XCTAssertTrue(app.contains("selectedLanguage: { committedPracticeDraft?.testParameters.language ?? language }"))
-    XCTAssertTrue(app.contains("guard pageSession.practice == nil else {"), "Legacy selection must not edit a complete website practice")
+    let admissionStart = try XCTUnwrap(app.range(of: "private func acceptsRestartingConfigurationChange()"))
+    let admissionEnd = try XCTUnwrap(app.range(of: "private func restartingConfigurationBinding",
+      range: admissionStart.upperBound..<app.endIndex))
+    let admission = app[admissionStart.lowerBound..<admissionEnd.lowerBound]
+    XCTAssertTrue(admission.contains("guard !pageSessionStore.ownsConfigurationSelection else {"),
+      "Legacy selection must reject both delivered and pending complete configurations")
     XCTAssertTrue(app.contains("modifier, to: practiceRequestedModifiers, language: language"))
     XCTAssertTrue(app.contains("hasStarted: session.hasStarted, language: language"))
     let commandStart = try XCTUnwrap(app.range(of: "if let target = FunboxCommandCatalog.target(for: item.id)"))

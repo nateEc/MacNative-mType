@@ -281,7 +281,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     switch try coordinator.prepareRestoration(for: page, refreshingWith: source) {
     case .missing: throw WebsiteConfigImportWorkflowError.missing
     case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
-    case .prepared(let value): return value
+    case .prepared(let value): return try coordinator.acceptApplication(value, for: page)
     }
   }
   private func postNoQuitSelectionNotice(_ message: String,

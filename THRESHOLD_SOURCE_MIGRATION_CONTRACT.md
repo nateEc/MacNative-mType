@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## 有效原生冷记录的待初始化接受（2026-10-25，起点 b065774e）
+
+固定 loadFromLocalStorage 读取已验证配置后，await applyConfig，再执行 saveFullConfigToLocalStorage(true) 和 loadDone；测试页 language 订阅者发起的初始化仍不被等待。沿既有失败写序探针增加实际冷调用方的延后成功／失败两组，共 15 组。实际生命周期、事件总线、setter、持久函数和测试页订阅者执行；已验证存储值的读取、浏览器 I/O、restart／最终初始化、网络及通知仍为自有端点。冷场景确认先保存并 loadDone，再完成或失败初始化，既不发导入成功提示，也不调用远端保存；不将 loadDone 误记为成功通知。原 13 组导入失败边界保持独立。
+
+先行真实冷恢复用例读取 [-3] 收藏长度的有效本机记录，在未登录自动校正后故意令正文读取失败；出现九处断言失败，证明冷恢复未在读取前保存校正、未保留待初始化能力，恢复时也重写了旧校正。现只允许已验证 nativeState 来源与合法 JSON 共用 acceptApplication；冷路径以 preservingUnchanged 保持未变化文件代次，网站存储候选和任意编辑不能借此入口保存。restorationTicket 在读取资源前进入该阶段，生成校正推进相同能力，失败或取消保留检查点。记录缺失／损坏／未来版本仍在原读取准入拒绝，不合成默认记录、不修复未知存档，文件格式不变。
+
+首批 16 项零失败／零跳过（5.927 秒），含新冷恢复校正反例、15 组源阶段、启动恢复／原生隐藏宿主及第二窗口无变化恢复不使第一窗口重开控制器失效。另补冷加载在读正文时取消、旧应用捕获失效、文件代次不变及由新工作流恢复的真实用例。日志 /tmp/typebar-cold-application-{red,source,focused,broad,final}.log，源样本 /tmp/typebar-cold-application-source.json。
+
+扩大 861 项／1 处失败（264.627 秒，零跳过）：上一轮 ownsConfigurationSelection 已替换直接 practice 判定，但 PolyglotInteractiveSelectionTests 仍在全文件查旧 guard 字符串。现将检查精确限定到 acceptsRestartingConfigurationChange 的共用准入函数，要求它调用同时覆盖已交付／待初始化状态的拥有权判断，保留语言／Polyglot 其余路由断言；没有因此回退或修改生产逻辑。最终相关 131 项零失败／零跳过（31.204 秒），含完整工作流、源阶段、冷恢复／启动／隐藏宿主、原生恢复提交和 Polyglot 交互准入。其余 860 项已经在扩大轮通过；未把修正后的定向结果冒称一次完整 861 项全绿，也未重跑未变的其余项。
+
+串行 Debug 打包、签名及资源／原创性边界通过（增量构建 1.05 秒），日志 /tmp/typebar-cold-application-package.log。参考行为 47 direct／119 native symbols／17 specs 和 1,345 条人工清单结构检查通过。推送前 fetch 核对主分支与开发分支，并确认开发分支无打开 PR、Actions 仍 826 次且最新 39118939684 成功；只做一次中文提交推开发分支，推后核对外部状态。
+
+完整浏览器冷存储失败分类、部分 setter 抛错、活动完整导入、全部资源失败及实体 UI／IME 继续开放，已知隐藏滚轮失败也不据此关闭。本批不改变主分支、通知设置或 CI，不启动主程序，完整目标仍 active。
+
 ## 合法完整导入的已保存待初始化能力（2026-10-25，起点 292a959a）
 
 承接下方 13 组实际源码失败写序，完整 JSON 工作流在解析／metadata／窗口内容准入后，先由 acceptApplication 做文件 CAS，再读取字体、背景与正文。失败 CAS 不改页面；成功后页面持有 SavedApplication 的窗口内存能力，包含草稿、文件代次、请求／拥有者／环境及内容捕获。ApplicationCapture 纳入该 ID，旧 GenerationCapture／重开控制器立即失效，旧输入、计时及尝试回调暂停；旧会话快照和账本保留，不伪造放弃。首次导入即使尚无 publication 也能进入这一阶段。接受后无异步或可抛回调；观察者退役不撤销磁盘。

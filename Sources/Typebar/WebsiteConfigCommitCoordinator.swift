@@ -71,7 +71,7 @@ final class WebsiteConfigCommitCoordinator {
       return router.isCurrent(ownerLease)
     }
   }
-  /// Durable complete import whose resources/text have not been delivered.
+  /// Durable full-profile application whose resources/text are not delivered.
   /// The ticket is window-local; a new coordinator uses normal cold recovery.
   struct SavedApplication {
     let id: UUID
@@ -416,20 +416,27 @@ final class WebsiteConfigCommitCoordinator {
     return bound
   }
 
-  /// Accept a complete JSON import before asynchronous resource/text loading.
+  /// Accept a complete JSON import or a valid native cold restoration before
+  /// asynchronous resource/text loading. Unchanged cold records keep their
+  /// revision, including other windows' existing publication authority.
   /// An unsuccessful CAS changes no page state; a successful one is retained
   /// even when initialization is cancelled or fails later.
   func acceptApplication(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     processing = true; defer { processing = false }
     guard isCurrent(prepared), prepared.sourcePage === page,
-      let capture = prepared.applicationCapture, prepared.savedApplicationID == nil,
-      case .imported = prepared.draft.origin else { throw WebsiteConfigCommitCoordinatorError.stale }
+      let capture = prepared.applicationCapture, prepared.savedApplicationID == nil else {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
+    let restoringNative: Bool
+    if case .imported = prepared.draft.origin { restoringNative = false }
+    else if case .restored(let value) = prepared.draft.origin, case .nativeState = value.origin { restoringNative = true }
+    else { throw WebsiteConfigCommitCoordinatorError.stale }
     try Task.checkCancellation()
     try page.beginCommit(owner: prepared.owner, router: router, applicationCapture: capture)
     defer { page.endCommit() }
     let disk: WebsiteConfigFileRegister.Revision
-    switch try register.commit(prepared.draft, replacing: prepared.disk) {
+    switch try register.commit(prepared.draft, replacing: prepared.disk, preservingUnchanged: restoringNative) {
     case .committed(let value): disk = value
     case .conflict: throw WebsiteConfigCommitCoordinatorError.stale
     case .unavailable: throw WebsiteConfigCommitCoordinatorError.unavailable

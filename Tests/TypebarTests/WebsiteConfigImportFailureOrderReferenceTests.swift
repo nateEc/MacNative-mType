@@ -15,6 +15,8 @@ final class WebsiteConfigImportFailureOrderReferenceTests: XCTestCase {
       let writes, stores, success, errors: Int
       let asyncFailure: Bool
       let trace: [String]
+      let completionKind: String
+      let remote: Int
     }
     struct Output: Decodable { let fixtures: [Fixture] }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -26,16 +28,20 @@ final class WebsiteConfigImportFailureOrderReferenceTests: XCTestCase {
     let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus, 0)
     let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
-    XCTAssertEqual(fixtures.count, 13)
-    XCTAssertEqual(Set(fixtures.map(\.scenario)).count, 13)
+    XCTAssertEqual(fixtures.count, 15)
+    XCTAssertEqual(Set(fixtures.map(\.scenario)).count, 15)
     for fixture in fixtures {
       XCTAssertEqual(fixture.success + fixture.errors, 1, fixture.scenario)
-      if fixture.scenario == "source-init-pending" || fixture.scenario == "source-init-failure" {
+      if fixture.scenario.hasPrefix("source-init-") || fixture.scenario.hasPrefix("cold-init-") {
         XCTAssertEqual(fixture.writes, 1); XCTAssertEqual(fixture.success, 1)
-        XCTAssertEqual(fixture.asyncFailure, fixture.scenario == "source-init-failure")
+        XCTAssertEqual(fixture.asyncFailure, fixture.scenario.hasSuffix("-failure"))
         let saved = try XCTUnwrap(fixture.trace.firstIndex(of: "storage-written"))
         let completed = try XCTUnwrap(fixture.trace.firstIndex(of: fixture.asyncFailure ? "async-error" : "init-complete"))
-        XCTAssertLessThan(saved, completed, "Source import saves without awaiting the test subscriber's initialization")
+        XCTAssertLessThan(saved, completed, "Source application saves without awaiting the test subscriber's initialization")
+        if fixture.scenario.hasPrefix("cold-init-") {
+          XCTAssertEqual(fixture.completionKind, "load"); XCTAssertEqual(fixture.remote, 0)
+          XCTAssertTrue(fixture.trace.contains("loaded")); XCTAssertFalse(fixture.trace.contains("success"))
+        }
       }
       if fixture.scenario == "full-storage" {
         XCTAssertEqual(fixture.stores, 1); XCTAssertEqual(fixture.writes, 0); XCTAssertEqual(fixture.errors, 1)

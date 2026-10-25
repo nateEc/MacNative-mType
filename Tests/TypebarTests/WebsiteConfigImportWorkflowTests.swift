@@ -5,6 +5,66 @@ import Observation
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
+  func testCancelledColdRestorationKeepsUnchangedRecordAndCanRecoverWithNewWorkflow() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let stored = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"quote","quoteLength":[0]}"#,
+      pointsPerRem: 16, context: .init())
+    guard case .committed = try register.commit(stored, replacing: XCTUnwrap(register.read().revision)) else {
+      return XCTFail("Cannot seed private cold record")
+    }
+    let revision = try register.read().revision
+    let capture = try f.page.captureApplication(router: f.settings.preferenceConfigurationSaves)
+    let gate = Gate(); defer { gate.resolve() }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in await gate.read() })
+    defer { workflow.stop() }
+    let task = Task { try await workflow.apply(json: nil, systemIsDark: false) }
+    try await gate.wait(); try assertPendingSavedImport(f)
+    XCTAssertFalse(f.page.isCurrent(capture, router: f.settings.preferenceConfigurationSaves))
+    XCTAssertEqual(try register.read().revision, revision)
+    task.cancel(); gate.resolve()
+    do { _ = try await task.value; XCTFail("Cancelled cold load delivered") } catch is CancellationError {}
+    XCTAssertEqual(try register.read().revision, revision); XCTAssertNil(f.page.state.practice)
+    workflow.stop()
+    let recovered = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        [.init(id: "owned", title: "Owned cold recovery", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { recovered.stop() }
+    try await recovered.apply(json: nil, systemIsDark: false)
+    XCTAssertNil(f.page.state.savedApplication)
+    XCTAssertTrue(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
+    XCTAssertEqual(try register.read().revision, revision)
+  }
+  func testColdRestorationSavesCorrectionBeforeFailedInitializationAndResumesWithoutRewriting() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let stored = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"quote","quoteLength":[-3],"theme":"dracula"}"#,
+      pointsPerRem: 16, context: .init(authenticated: true))
+    guard case .committed = try register.commit(stored, replacing: XCTUnwrap(register.read().revision)) else {
+      return XCTFail("Cannot seed private cold record")
+    }
+    var failing = true, reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        guard case .available(let fields) = try register.read().state else { throw Failure.provider }
+        XCTAssertEqual(fields["quoteLength"], .array([0,1,2,3].map { .number(Double($0)) }),
+          "Cold initialization must save the actual automatic correction before reading")
+        if failing { throw Failure.provider }
+        return [.init(id: "owned", title: "Owned cold retry", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    do { try await workflow.apply(json: nil, systemIsDark: false); XCTFail("Failed cold initialization delivered") }
+    catch { XCTAssertTrue(error is WebsiteConfigSavedPreparationError) }
+    XCTAssertEqual(reads, 3); try assertPendingSavedImport(f)
+    let revision = try register.read().revision
+    failing = false; try await workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertNil(f.page.state.savedApplication)
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .quote)
+  }
   private func assertPendingSavedImport(_ f: Fixture, file: StaticString = #filePath, line: UInt = #line) throws {
     guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else {
       return XCTFail("Accepted import lost its saved record", file: file, line: line)

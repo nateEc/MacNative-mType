@@ -252,18 +252,23 @@ if (defaultsMode) {
       'export function saveFullConfigToLocalStorage(', '\nconst saveToDatabase'), {mode:'transform'}), context);
     vm.runInContext(stripTypeScriptTypes(extract(lifecycle,
       'export async function applyConfigFromJson(', '\nexport async function loadFromLocalStorage('), {mode:'transform'}), context);
+    vm.runInContext(stripTypeScriptTypes(extract(lifecycle,
+      'export async function loadFromLocalStorage(', '\nconst lastConfigsToApply'), {mode:'transform'}), context);
     Object.assign(context, {ConfigSchemas:configSchemas, parseJsonWithSchema:parser.parseWithSchema});
     const fixtures = [];
     const testLogic = fs.readFileSync(path.join(frontend,'test/test-logic.ts'),'utf8');
     const configSubscriber = extract(testLogic,'configEvent.subscribe(','timerEvent.subscribe(').trim().replace(/;$/,'');
     const cases = ['valid','parse','override-first','override-middle','override-last','refused',
-      'correction-storage','full-storage','full-storage-after-correction','sync-listener','async-listener','source-init-pending','source-init-failure'];
+      'correction-storage','full-storage','full-storage-after-correction','sync-listener','async-listener','source-init-pending','source-init-failure',
+      'cold-init-pending','cold-init-failure'];
     const orderedKeys = [...Object.keys(defaults).filter(key => !vm.runInContext('lastConfigsToApply.has',context).call(
       vm.runInContext('lastConfigsToApply',context),key)), ...vm.runInContext('Array.from(lastConfigsToApply)',context)];
     // Each scenario also checks that a prior runtime/disk value is distinct
     // from source defaults; a failed application must not be mistaken for a
     // rollback merely because only a default-valued profile was observed.
     for (const scenario of cases) {
+      const cold = scenario.startsWith('cold-init-');
+      const usesTestSubscriber = cold || scenario.startsWith('source-init-');
       const old = {...structuredClone(defaults), fontSize:1.75, words:77};
       Object.assign(simulation.Config,structuredClone(old));
       simulation.flags = {authenticated:false,documentComplete:true,customThemeCount:0,development:false,testActive:false};
@@ -287,7 +292,7 @@ if (defaultsMode) {
         }
       });
       Object.assign(context, {
-        configLS:{set:value => {
+        configLS:{get:() => structuredClone(disk),set:value => {
           trace.push('storage-attempt');
           if (scenario === 'full-storage' || scenario === 'correction-storage'
             || (scenario === 'full-storage-after-correction' && writes.length === 1)) throw new Error('owned storage failure');
@@ -296,9 +301,10 @@ if (defaultsMode) {
         saveConfig:() => { remote++; return Promise.resolve(); }, setAccountButtonSpinner:() => {},
         showSuccessNotification:() => { success++; trace.push('success'); },
         showErrorNotification:() => { errors++; trace.push('import-error'); },
+        loadDone:() => { success++; trace.push('loaded'); },
         setFullConfigStore:value => { simulation.stores.push(structuredClone(value)); trace.push('store'); },
       });
-      if (scenario.startsWith('source-init-')) {
+      if (usesTestSubscriber) {
         // Actual test-page subscriber; restart/initialization and its eventual
         // I/O completion are owned boundaries, not the real test engine.
         Object.assign(context,{getActivePage:() => 'test',
@@ -306,7 +312,7 @@ if (defaultsMode) {
           restart:() => {
             trace.push('restart-request');
             const pending = new Promise((resolve,reject) => {
-              finishAsync = () => scenario === 'source-init-failure' ? reject(new Error('owned init failure')) : resolve();
+              finishAsync = () => scenario.endsWith('-failure') ? reject(new Error('owned init failure')) : resolve();
             });
             observedAsync = pending.then(() => trace.push('init-complete'),() => { asyncFailure = true; trace.push('async-error'); });
             return pending;
@@ -314,9 +320,13 @@ if (defaultsMode) {
         vm.runInContext(stripTypeScriptTypes(`globalThis.removeConfigSubscriber=(${configSubscriber});`,{mode:'transform'}),context);
       }
       const partial = {fontSize:2,mode:'words',words:4,numbers:true};
+      if (cold) disk = {...structuredClone(defaults),...partial};
       if (['refused','correction-storage','full-storage-after-correction'].includes(scenario)) partial.customPolyglot = ['english','english'];
-      try { await context.applyConfigFromJson(scenario === 'parse' ? '{' : JSON.stringify(partial)); }
-      finally { unsubscribe(); if (scenario.startsWith('source-init-')) context.removeConfigSubscriber(); if (metadataKey) {
+      try {
+        if (cold) await context.loadFromLocalStorage();
+        else await context.applyConfigFromJson(scenario === 'parse' ? '{' : JSON.stringify(partial));
+      }
+      finally { unsubscribe(); if (usesTestSubscriber) context.removeConfigSubscriber(); if (metadataKey) {
         if (originalOverride === undefined) delete metadata[metadataKey].overrideValue;
         else metadata[metadataKey].overrideValue = originalOverride;
       }}
@@ -341,14 +351,16 @@ if (defaultsMode) {
         assert.deepEqual(beforeAsync,{success:1,errors:0,writes:1,asyncFailure:false});
         assert.equal(asyncFailure,true); assert.ok(trace.indexOf('success') < trace.indexOf('async-error'));
       }
-      if (scenario.startsWith('source-init-')) {
+      if (usesTestSubscriber) {
         assert.deepEqual(beforeAsync,{success:1,errors:0,writes:1,asyncFailure:false});
         assert.equal(trace.filter(value => value === 'restart-request').length,1);
-        assert.ok(trace.indexOf('restart-request') < trace.indexOf('success'));
-        assert.equal(asyncFailure,scenario === 'source-init-failure');
-        assert.ok(trace.indexOf('success') < trace.indexOf(asyncFailure ? 'async-error' : 'init-complete'));
+        const complete = cold ? 'loaded' : 'success';
+        assert.ok(trace.indexOf('restart-request') < trace.indexOf(complete));
+        assert.equal(asyncFailure,scenario.endsWith('-failure'));
+        assert.ok(trace.indexOf(complete) < trace.indexOf(asyncFailure ? 'async-error' : 'init-complete'));
+        if (cold) { assert.equal(remote,0); assert.ok(!trace.includes('success')); }
       }
-      fixtures.push({scenario,metadataKey,success,errors,remote,beforeAsync,asyncFailure,
+      fixtures.push({scenario,completionKind:cold ? 'load' : 'import',metadataKey,success,errors,remote,beforeAsync,asyncFailure,
         writes:writes.length,stores:simulation.stores.length,trace,
         old,runtime:structuredClone(simulation.Config),disk});
     }
