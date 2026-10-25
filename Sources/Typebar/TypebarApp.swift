@@ -1391,6 +1391,10 @@ private struct ContentView: View {
   @State private var showingWebsiteConfigImport = false
   @State private var websiteSequenceCommand: WebsiteSequenceCommandPresentation?
   @State private var queuedWebsiteSequenceCommand: WebsiteSequenceCommandPresentation?
+  @State private var websiteThresholdCommand: WebsiteThresholdCommandPresentation?
+  @State private var queuedWebsiteThresholdCommand: WebsiteThresholdCommandPresentation?
+  @State private var websiteThresholdCommandTask: Task<Void, Never>?
+  @State private var websiteThresholdCommandRequest = UUID()
   @State private var websiteImportWorkflow: WebsiteConfigImportWorkflow?
   @State private var websiteFunboxCommandTask: Task<Void, Never>?
   @State private var websiteLiveSourceRecoveryTask: Task<Void, Never>?
@@ -1764,6 +1768,7 @@ private struct ContentView: View {
       updateConfigurationStartup()
     }
     .onDisappear {
+      websiteThresholdCommandRequest = UUID(); websiteThresholdCommandTask?.cancel(); websiteThresholdCommandTask = nil
       websiteLiveSourceRecoveryRequest = UUID()
       websiteLiveSourceRecoveryTask?.cancel(); websiteLiveSourceRecoveryTask = nil
       pageSessionStore.detach()
@@ -2104,6 +2109,10 @@ private struct ContentView: View {
           websiteSequenceCommand = queued
         }
       }
+      if let queued = queuedWebsiteThresholdCommand {
+        queuedWebsiteThresholdCommand = nil
+        if pageSession.presentation?.publication.applicationID == queued.id { websiteThresholdCommand = queued }
+      }
     }) {
       CommandPaletteView(
         items: commandPaletteItems, listMode: settings.commandPaletteListMode,
@@ -2287,6 +2296,17 @@ private struct ContentView: View {
         apply: { [applicationID = presentation.id] edit in
           try await importWorkflow().editAndBegin(edit, replacing: applicationID,
             systemIsDark: systemColorScheme == .dark)
+        })
+    }
+    .sheet(item: $websiteThresholdCommand) { presentation in
+      WebsiteThresholdCommandView(presentation: presentation,
+        canApply: pageSession.presentation?.publication.applicationID == presentation.id
+          && pageSession.savedApplication == nil && pageSession.configurationDeparture == nil
+          && pageSessionStore.restartController?.isPreparing != true,
+        apply: { input in
+          let result = try importWorkflow().runThresholdCommand(presentation.target, input: input, replacing: presentation.id)
+          reportWebsiteThresholdCommand(result)
+          return result
         })
     }
     .sheet(item: $settingsJSONCommand) { presentation in
@@ -6076,6 +6096,19 @@ private struct ContentView: View {
       return
     }
     if let target = PracticeThresholdCommandCatalog.target(for: item.id) {
+      if pageSessionStore.ownsConfigurationSelection {
+        guard let publication = pageSession.presentation?.publication,
+          pageSession.savedApplication == nil, pageSession.configurationDeparture == nil,
+          pageSessionStore.restartController?.isPreparing != true else {
+          account.localNotices.post("配置正在准备，请完成恢复后再修改阈值。"); return
+        }
+        if target.editorKind != nil {
+          guard let presentation = WebsiteThresholdCommandPresentation(publication: publication, target: target) else { return }
+          if showingCommandPalette { queuedWebsiteThresholdCommand = presentation }
+          else { websiteThresholdCommand = presentation }
+        } else { runWebsiteThresholdOffCommand(target, applicationID: publication.applicationID) }
+        return
+      }
       guard acceptsRestartingConfigurationChange() else { return }
       if let editor = target.editorKind {
         practiceThresholdEditorKind = editor
@@ -6359,6 +6392,26 @@ private struct ContentView: View {
 
   private func practiceThresholdValue(for kind: PracticeThresholdEditorKind) -> Double {
     kind.initialCanonicalValue(in: settings)
+  }
+  private func reportWebsiteThresholdCommand(_ receipt: WebsiteThresholdCommandReceipt) {
+    guard !receipt.rejectedKeys.isEmpty else { return }
+    if session.hasStarted, !session.isFinished, session.configuration.modifiers.contains(.noQuit) { return }
+    account.localNotices.post(receipt.message)
+  }
+  private func runWebsiteThresholdOffCommand(_ target: PracticeThresholdCommandTarget, applicationID: UUID) {
+    guard websiteThresholdCommandTask == nil else { return }
+    let request = UUID(); websiteThresholdCommandRequest = request
+    websiteThresholdCommandTask = Task { @MainActor in
+      defer { if websiteThresholdCommandRequest == request { websiteThresholdCommandTask = nil } }
+      do {
+        let result = try importWorkflow().runThresholdCommand(target, input: "", replacing: applicationID)
+        guard websiteThresholdCommandRequest == request, !Task.isCancelled else { return }
+        reportWebsiteThresholdCommand(result)
+      } catch {
+        guard websiteThresholdCommandRequest == request, !Task.isCancelled else { return }
+        account.localNotices.post((error as? LocalizedError)?.errorDescription ?? "阈值命令未完成，请重新打开命令。")
+      }
+    }
   }
 
   private func applyPracticeThreshold(_ value: Double, kind: PracticeThresholdEditorKind) -> Bool {

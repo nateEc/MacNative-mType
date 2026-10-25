@@ -136,6 +136,63 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     try await perform(.edit(edit, applicationID), systemIsDark: systemIsDark)
   }
 
+  /// Execute the source command synchronously. Burst's two ordinary setters
+  /// have separate durable effects; neither rejection nor a later write error
+  /// rolls back an already accepted mode setter.
+  func runThresholdCommand(_ target: PracticeThresholdCommandTarget, input: String,
+    replacing applicationID: UUID) throws -> WebsiteThresholdCommandReceipt {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil else {
+      throw WebsiteConfigImportWorkflowError.preparationPending
+    }
+    guard let publication = page.state.presentation?.publication, publication.applicationID == applicationID else {
+      throw WebsiteConfigImportWorkflowError.conflict
+    }
+    try Task.checkCancellation()
+    guard let edits = WebsiteThresholdCommandInput.edits(for: target, raw: input,
+      unit: publication.draft.presentation.typingSpeedUnit) else { throw WebsiteThresholdCommandError.invalidInput }
+    applying = true
+    let current = UUID(); operation = current
+    let noticeGeneration = notices?.deliveryGeneration
+    var accepted = 0, rejected: [String] = [], receiptID = applicationID
+    defer {
+      if let prepared { _ = coordinator.cancel(prepared) }
+      prepared = nil; applying = false
+    }
+    do {
+      for edit in edits {
+        try Task.checkCancellation()
+        guard operation == current, !stopped else { throw CancellationError() }
+        guard page.state.presentation?.publication.applicationID == receiptID else {
+          throw WebsiteConfigImportWorkflowError.conflict
+        }
+        do {
+          let ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source)
+          prepared = ticket
+          guard operation == current, !stopped else { throw CancellationError() }
+          switch try coordinator.commitLiveThreshold(ticket, for: page) {
+          case .committed(let updated): accepted += 1; receiptID = updated.applicationID
+          case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+          case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+          case .busy: throw WebsiteConfigImportWorkflowError.busy
+          }
+        } catch WebsiteConfigNativeDraftError.rejectedEdit {
+          rejected.append(edit.key)
+          if page.state.session.hasStarted, !page.state.session.isFinished,
+            page.state.session.configuration.modifiers.contains(.noQuit), let publication = page.state.presentation?.publication {
+            postNoQuitSelectionNotice("阈值未修改；No Quit 保留当前练习。", publication: publication,
+              page: page, operation: current, noticeGeneration: noticeGeneration)
+          }
+        }
+      }
+    } catch {
+      if accepted > 0 { throw WebsiteThresholdCommandError.partiallySaved(error) }
+      throw error
+    }
+    return .init(publicationID: receiptID, acceptedSetters: accepted, rejectedKeys: rejected)
+  }
+
   @discardableResult
   func resumeAndBegin(departureID: UUID, systemIsDark: Bool) async throws -> String {
     try await perform(.resume(departureID), systemIsDark: systemIsDark)

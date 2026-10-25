@@ -1,9 +1,143 @@
 import XCTest
 import Observation
+import AppKit
+import SwiftUI
 @testable import Typebar
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testThresholdCommandPresentationKeepsRawMemoryAndProfileUnitInHiddenNativeViews() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"typingSpeedUnit":"cpm","minWpmCustomSpeed":73.5,"minAccCustom":91.5,"minBurstCustomSpeed":83.5}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    for (target, text) in [(PracticeThresholdCommandTarget.minimumWpmCustom, "73.5"),
+      (.minimumAccuracyCustom, "91.5"), (.minimumWordBurst(.fixed), ""), (.minimumWordBurst(.flex), "")] {
+      let presentation = try XCTUnwrap(WebsiteThresholdCommandPresentation(publication: publication, target: target))
+      XCTAssertEqual(presentation.id, publication.applicationID)
+      XCTAssertEqual(presentation.unit, .cpm); XCTAssertEqual(presentation.initialText, text)
+      for (width, dark) in [(460.0, false), (640.0, true)] {
+        var calls = 0
+        let view = WebsiteThresholdCommandView(presentation: presentation, canApply: true, apply: { _ in
+          calls += 1; return .init(publicationID: UUID(), acceptedSetters: 0, rejectedKeys: [])
+        }).frame(width: width, height: 340).background(Color(nsColor: .windowBackgroundColor))
+          .environment(\.colorScheme, dark ? .dark : .light)
+        let host = NSHostingView(rootView: view)
+        let window = NSWindow(contentRect: .init(x: 0, y: 0, width: width, height: 340),
+          styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        host.layoutSubtreeIfNeeded()
+        let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+        try png.write(to: URL(fileURLWithPath: "/tmp/typebar-threshold-command-\(text.isEmpty ? "burst" : text)-\(Int(width)).png"))
+        XCTAssertGreaterThan(png.count, 1000); XCTAssertFalse(window.isVisible); XCTAssertEqual(calls, 0)
+      }
+    }
+    XCTAssertNil(WebsiteThresholdCommandPresentation(publication: publication, target: .minimumWpmOff))
+  }
+
+  func testThresholdCommandNonfiniteRepresentationFailureRetainsTheAcceptedBurstMode() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"minBurstCustomSpeed":83.5}"#, systemIsDark: false)
+    let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    do {
+      _ = try f.workflow.runThresholdCommand(.minimumWordBurst(.flex), input: String(repeating: "9", count: 400), replacing: id)
+      XCTFail("Native finite domain must not silently turn infinity into zero")
+    } catch WebsiteThresholdCommandError.partiallySaved {}
+    let rules = try XCTUnwrap(f.page.state.session.configuration.rules.thresholdSource).configuration
+    XCTAssertEqual(rules.minimumWordBurstMode, .flex); XCTAssertEqual(rules.minimumWordBurstCustomValue, 83.5)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+  func testThresholdCommandKeepsBurstModeWhenItsValueSetterIsRefused() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"typingSpeedUnit":"cpm","minBurstCustomSpeed":83.5}"#, systemIsDark: false)
+    var active = f.page.state
+    active.session.insertBatch(String(active.session.prompt.prefix(1))); f.page.replace(active)
+    let before = f.page.state.session
+    let first = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let partial = try f.workflow.runThresholdCommand(.minimumWordBurst(.fixed), input: "-", replacing: first)
+    XCTAssertEqual(partial.acceptedSetters, 1); XCTAssertEqual(partial.rejectedKeys, ["minBurstCustomSpeed"])
+    var rules = try XCTUnwrap(f.page.state.session.configuration.rules.thresholdSource).configuration
+    XCTAssertEqual(rules.minimumWordBurstMode, .fixed); XCTAssertEqual(rules.minimumWordBurstCustomValue, 83.5)
+    let complete = try f.workflow.runThresholdCommand(.minimumWordBurst(.flex), input: "73.5tail", replacing: partial.publicationID)
+    XCTAssertEqual(complete.acceptedSetters, 2); XCTAssertTrue(complete.rejectedKeys.isEmpty)
+    rules = try XCTUnwrap(f.page.state.session.configuration.rules.thresholdSource).configuration
+    XCTAssertEqual(rules.minimumWordBurstMode, .flex); XCTAssertEqual(rules.minimumWordBurstCustomValue, 14.6)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.automaticInputAttemptID)
+    XCTAssertEqual(f.page.state.session.typed, before.typed); XCTAssertEqual(f.page.state.session.prompt, before.prompt)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0); XCTAssertEqual(f.settings.snapshot, legacy)
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else { return XCTFail("Missing saved command") }
+    XCTAssertEqual(saved["minBurst"], .string("flex")); XCTAssertEqual(saved["minBurstCustomSpeed"], .number(14.6))
+    XCTAssertThrowsError(try f.workflow.runThresholdCommand(.minimumWpmOff, input: "", replacing: first))
+  }
+
+  func testThresholdCommandNoQuitRunsBothRefusedSettersAndEmptyBurstDoesNothing() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var active = f.page.state
+    active.session.insertBatch(String(active.session.prompt.prefix(1))); f.page.replace(active)
+    let before = f.page.state.session.generationState
+    let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    let count = f.account.localNotices.history.count
+    let empty = try f.workflow.runThresholdCommand(.minimumWordBurst(.fixed), input: "", replacing: id)
+    XCTAssertEqual(empty.acceptedSetters, 0); XCTAssertTrue(empty.rejectedKeys.isEmpty)
+    let refused = try f.workflow.runThresholdCommand(.minimumWordBurst(.fixed), input: " ", replacing: id)
+    XCTAssertEqual(refused.rejectedKeys, ["minBurst", "minBurstCustomSpeed"])
+    XCTAssertEqual(f.account.localNotices.history.count - count, 2)
+    XCTAssertTrue(f.account.localNotices.active.allSatisfy(\.important))
+    XCTAssertThrowsError(try f.workflow.runThresholdCommand(.minimumWpmCustom, input: "-1", replacing: id))
+    XCTAssertEqual(f.account.localNotices.history.count - count, 2, "Prevalidation failure must not execute No Quit setters")
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+  }
+
+  func testThresholdCommandSecondStepCannotAdoptACompetingRecord() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let other = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    var writes = 0
+    withObservationTracking { _ = f.page.state } onChange: {
+      MainActor.assumeIsolated {
+        writes += 1
+        do {
+          guard case .committed = try register.commit(other, replacing: XCTUnwrap(register.read().revision)) else {
+            return XCTFail("Cannot create competing record after mode save")
+          }
+        } catch { XCTFail("Competing writer failed: \(error)") }
+      }
+    }
+    do {
+      _ = try f.workflow.runThresholdCommand(.minimumWordBurst(.fixed), input: "50", replacing: id)
+      XCTFail("Second command step overwrote a competing record")
+    } catch WebsiteThresholdCommandError.partiallySaved {}
+    XCTAssertEqual(writes, 1)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.runtime["minBurst"], .string("fixed"))
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Competing record lost") }
+    XCTAssertEqual(saved["words"], .number(7)); XCTAssertEqual(saved["minBurst"], .string("off"))
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
+  func testThresholdCommandEmptySpeedUsesProfileUnitAndOffRetainsItsMemory() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"typingSpeedUnit":"cps"}"#, systemIsDark: false)
+    var id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let submitted = try f.workflow.runThresholdCommand(.minimumWpmCustom, input: "1.7", replacing: id)
+    let expected = 1.7 / (5.0 / 60.0)
+    XCTAssertEqual(f.page.state.session.configuration.rules.minimumWpm, expected)
+    id = submitted.publicationID
+    let off = try f.workflow.runThresholdCommand(.minimumWpmOff, input: "", replacing: id)
+    XCTAssertEqual(f.page.state.session.configuration.rules.thresholdSource?.configuration.minimumWpmCustomValue, expected)
+    let zero = try f.workflow.runThresholdCommand(.minimumWpmCustom, input: "", replacing: off.publicationID)
+    XCTAssertEqual(zero.acceptedSetters, 1)
+    XCTAssertEqual(f.page.state.session.configuration.rules.thresholdSource?.configuration.minimumWpmMode, .custom)
+    XCTAssertEqual(f.page.state.session.configuration.rules.minimumWpm, 0)
+  }
   func testThresholdEditRetainsCurrentQuoteAndItsSamplingQueueWithoutReadingAgain() async throws {
     let f = try Fixture(); defer { f.close() }
     var reads = 0

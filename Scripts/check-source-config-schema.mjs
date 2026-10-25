@@ -16,7 +16,8 @@ const defaultsMode = process.argv[3] === '--default-profile';
 const coldMode = process.argv[3] === '--cold-storage';
 const editMode = process.argv[3] === '--single-edit';
 const failureOrderMode = process.argv[3] === '--import-failure-order';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode);
+const thresholdCommandMode = process.argv[3] === '--threshold-commands';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -35,7 +36,9 @@ const modules = new Map();
 const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
 const adapters = new Map([
-  [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: noop, showErrorNotification: noop}],
+  [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: (_message, options) => {
+    if (thresholdCommandMode) simulation.notices.push(options?.important ?? false);
+  }, showErrorNotification: noop}],
   [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
   [path.join(frontend, 'states/test.ts'), {isTestActive: () => simulation.flags.testActive ?? true}],
   [path.join(frontend, 'collections/custom-themes.ts'), {__nonReactive: {getCustomThemes: () => Array(simulation.flags.customThemeCount ?? 0).fill({})}}],
@@ -61,7 +64,7 @@ function getModule(id) {
     }, {context});
   } else {
     let source = fs.readFileSync(id, 'utf8');
-    if (id === path.join(schemas, 'configs.ts')) source += '\nexport const Config = undefined; export const CustomThemeColors = undefined; export const ConfigValue = undefined; export const FunboxName = undefined;';
+    if (id === path.join(schemas, 'configs.ts')) source += '\nexport const Config = undefined; export const CustomThemeColors = undefined; export const ConfigValue = undefined; export const FunboxName = undefined; export const TypingSpeedUnit = undefined;';
     if (id === path.join(root, 'packages/funbox/src/types.ts')) source += '\nexport const FunboxMetadata = undefined; export const FunboxProperty = undefined; export const FunboxForcedConfig = undefined;';
     module = new vm.SourceTextModule(stripTypeScriptTypes(source, {mode: 'transform'}), {context, identifier: id});
   }
@@ -156,7 +159,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -168,7 +171,62 @@ if (defaultsMode) {
     return blocked;
   };
   const setters = await load(path.join(frontend, 'config/setters.ts'));
-  if (editMode) {
+  if (thresholdCommandMode) {
+    function extract(file, from, until, wrap = text => text) {
+      const source = fs.readFileSync(path.join(frontend, file), 'utf8');
+      const start = source.indexOf(from), end = source.indexOf(until, start);
+      assert.ok(start >= 0 && end > start);
+      return stripTypeScriptTypes(wrap(source.slice(start, end).replace(/^export /gm, '')), {mode:'transform'});
+    }
+    const unitModule = await load(path.join(frontend, 'utils/typing-speed-units.ts'));
+    Object.assign(context, {Config:simulation.Config, configEvent:bus,
+      getTypingSpeedUnit:unitModule.get, capitalizeFirstLetter:value => value[0].toUpperCase()+value.slice(1),
+      getActivePage:() => 'test', restart:() => { simulation.restarts++; }});
+    vm.runInContext(extract('commandline/commandline-metadata.ts', '  minWpm: {', '  minAcc: {',
+      text => `globalThis.speedInput=({${text}}).minWpm.input;`), context);
+    vm.runInContext(extract('commandline/commandline-metadata.ts', '  minAcc: {', '  // minBurst:',
+      text => `globalThis.accuracyInput=({${text}}).minAcc.input;`), context);
+    vm.runInContext(extract('commandline/util.ts', 'function buildInputCommand<', 'export const __testing'), context);
+    const burst = fs.readFileSync(path.join(frontend, 'commandline/lists/min-burst.ts'), 'utf8');
+    vm.runInContext(stripTypeScriptTypes(burst.replace(/^import .*;\r?\n/gm, '')
+      .replace('export default commands;', 'globalThis.burstCommands=commands[0].subgroup.list;'), {mode:'transform'}), context);
+    vm.runInContext(extract('test/test-logic.ts', 'configEvent.subscribe(', 'timerEvent.subscribe('), context);
+    let attempts = [];
+    context.setConfig = (key, value, options) => {
+      const accepted = setters.setConfig(key, value, options);
+      attempts.push({key, value, accepted}); return accepted;
+    };
+    const speed = context.buildInputCommand({key:'minWpmCustomSpeed', isPartOfSubgroup:true,
+      inputProps:context.speedInput, configMeta:metadata.minWpm, schema:configSchemas.ConfigSchema.shape.minWpmCustomSpeed});
+    const accuracy = context.buildInputCommand({key:'minAccCustom', isPartOfSubgroup:true,
+      inputProps:context.accuracyInput, configMeta:metadata.minAcc, schema:configSchemas.ConfigSchema.shape.minAccCustom});
+    const commands = {speed, accuracy, fixed:context.burstCommands.find(c => c.id === 'setMinBurstFixed'),
+      flex:context.burstCommands.find(c => c.id === 'setMinBurstFlex')};
+    const rawInputs = ['', ' ', '\ufeff \n', '0', '-0', '+0', '-1', '1.7', '73.5tail', '1e3', '1e-3',
+      '0x10', '0b10', '0o10', '-0x10', '0x1g', '0x', 'Infinity', '-Infinity', 'inf', 'NaN', '.5',
+      '1.', '+.5', '1e309', '1e-9999', '9007199254740993', '0xffffffffffffffff',
+      '0b'+'1'.repeat(65), '0o'+'7'.repeat(25), '1\u0085', '\u180e12', '\u200b12',
+      '\ufeff12\u00a0', '1_000', '12\rfoo', '+', '-', '.', '0XfZ'];
+    const fields = ['minWpm','minWpmCustomSpeed','minAcc','minAccCustom','minBurst','minBurstCustomSpeed'];
+    const fixtures = [];
+    for (const unit of ['wpm','cpm','wps','cps','wph']) for (const active of [false,true])
+      for (const noQuit of [false,true]) for (const [kind, command] of Object.entries(commands)) for (const raw of rawInputs) {
+        Object.assign(simulation.Config, structuredClone(defaults), {typingSpeedUnit:unit,
+          minWpm:'off', minWpmCustomSpeed:73.5, minAcc:'off', minAccCustom:91.5,
+          minBurst:'off', minBurstCustomSpeed:83.5, funbox:noQuit ? ['no_quit'] : []});
+        simulation.flags = {testActive:active, authenticated:false, documentComplete:true};
+        simulation.events = []; simulation.saves = []; simulation.notices = []; simulation.restarts = 0; attempts = [];
+        const prefill = command.defaultValue?.() ?? '';
+        const converted = command.inputValueConvert ? command.inputValueConvert(raw) : raw;
+        const canSubmit = command.validation?.schema ? command.validation.schema.safeParse(converted).success : true;
+        if (canSubmit) command.exec({input:converted});
+        assert.equal(simulation.restarts, 0);
+        fixtures.push(transport({kind, raw, unit, active, noQuit, prefill, converted, canSubmit, attempts,
+          runtime:Object.fromEntries(fields.map(key => [key, simulation.Config[key]])),
+          events:simulation.events, saves:simulation.saves, notices:simulation.notices}));
+      }
+    verify(); console.log(JSON.stringify({fixtures}));
+  } else if (editMode) {
     const fixtures = [];
     function add(key, value, patch = {}, flags = {}, nosave = false) {
       Object.assign(simulation.Config, structuredClone(defaults), structuredClone(patch));

@@ -1,5 +1,15 @@
 # 阈值源状态与迁移契约
 
+## 完整配置阈值命令（2026-10-25，起点 75f308d9）
+
+CFG-THRESHOLD-COMMAND-PAGE-01 根据固定 commandline-metadata、command builder、min-burst 命令、typing-speed-units 与实际 config 订阅验证。速度和准确率命令经 Number 转换及 schema 校验，速度按配置单位除以源码因子；二者通过 value setter 的 override 开启 custom。预填是原始 canonical 记忆值字符串，源码不先转换到展示单位。Burst 不预填且不预校验；原始空串不操作，空白等其他输入先执行 fixed/flex setter，再 parseInt 后换算并执行值 setter；模式被接受而值被拒绝时保留模式及旧值，活动 No Quit 两次拒绝并发两条重要提示。上述命令没有重开 dispatch。
+
+新增纯 Swift 转换，不复制参考代码或资产。实际固定源码探针 --threshold-commands 输出 3,200 组五单位／活动状态／No Quit／四种命令输入组合，对照输入计划、最终六字段、事件、保存意图与拒绝提示；包括进制、Unicode 空白、指数与整数前缀、负零及非有限数。真实工作流逐个保存，下一步只延续上次成功返回的 publication；竞争写者和过期命令拒绝，接受过的步骤保留，当前输入／词组／尝试／账本及旧设置不被替换。表单单飞与取消测试、460 浅色和 640 深色隐藏窗口截图通过；未启动主程序。
+
+明确开放：源 schema 接受正无穷，但当前原生六字段模型仅支持有限数；探针对比含该值不代表原生保存已支持。超大 Burst 输入的真实工作流测试验证保留先前已接受模式并报告表示失败，不能转为零。速度／准确率 value override 在既有原生 CAS 中仍合并保存，递归 setter 每次存储失败的完整顺序尚未复现。实体窗口、键盘／IME、完整门禁中的隐藏滚轮问题及全局阈值格式迁移继续开放；本批局部通过不代表完整重写完成。
+
+验证：先行输入反例在空串与整数前缀处失败，修复后定向 11 项及最终相关 882 项零失败／零跳过（225.163 秒，不与定向重复相加）。最终回归与打包期间未改 Swift。Debug 打包／签名／资源与原创性检查通过，固定参考证据检查 47 直接项／119 原生符号／17 支持规范通过，人工清单 1,350 项仅结构检查。日志 `/tmp/typebar-threshold-command-{red,focused,broad,package,reference}.log`；截图 `/tmp/typebar-threshold-command-{burst-460,73.5-640}.png`。只安排开发分支的一次实质推送，不改 main／工作流、不请求 CI、不启动主程序。
+
 ## 完整配置练习页的阈值 setter（2026-10-25，起点 8eb710ca）
 
 CFG-THRESHOLD-PAGE-01 补齐完整配置模式下的六字段原生编辑。固定 metadata 将它们标为 changeRequiresRestart，但实际 setters 仅据此阻止活动 No Quit；test-logic 的 configEvent 订阅只对 language、difficulty、已启用的 customLayoutfluid 等实际分支重开，阈值没有自动重开订阅，min-burst 命令也没有 restart dispatch。计时／词提交读取当前 Config，不能将该标记当作每次编辑都应重开。
