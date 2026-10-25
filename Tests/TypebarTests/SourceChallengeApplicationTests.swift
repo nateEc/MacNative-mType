@@ -337,10 +337,11 @@ final class SourceChallengeApplicationTests: XCTestCase {
     let end = try XCTUnwrap(source.range(of: "private func clearCommandFontPreview()"))
     let rendering = source[begin.lowerBound..<end.lowerBound]
     XCTAssertTrue(rendering.contains("installedFontName: challengeLiveConfiguration.fontFamilyName(settings: settings)"))
-    XCTAssertTrue(rendering.contains("challengeLiveConfiguration.keyboardGuideMode(settings: settings)"))
+    XCTAssertTrue(source.contains("legacyMode: challengeLiveConfiguration.keyboardGuideMode(settings: settings)"))
+    XCTAssertTrue(rendering.contains("return practiceKeyboardGuide.mode"))
     XCTAssertFalse(rendering.contains("activeChallengeID =="))
     let forcedGuide = try XCTUnwrap(rendering.range(of: "modifiers.contains(.simonSays)"))
-    let inheritedGuide = try XCTUnwrap(rendering.range(of: "challengeLiveConfiguration.keyboardGuideMode(settings: settings)"))
+    let inheritedGuide = try XCTUnwrap(rendering.range(of: "return practiceKeyboardGuide.mode"))
     XCTAssertLessThan(forcedGuide.lowerBound, inheritedGuide.lowerBound,
       "Inherited Wingdings visibility must not hide Simon's required guide")
   }

@@ -1,5 +1,7 @@
 # Typebar 架构决策（ADR-001）
 
+2026-10-26 完整配置屏幕键盘显示：PracticeKeyboardGuideSelection 从当前 publication 读取模式、缩放、标注、键帽范围与结构样式。旧设置只在无完整配置时参与选择，并保留挑战的临时模式。完整配置的布局已由独立 guideLayout／inputLayout 决定，不再叠加旧自定义或系统输入源的键盘行；Layout Fluid 原有动态布局逻辑保持独立。此次只修正显示消费者，键盘命令逐 setter 保存、布局命令显式重开与自定义大小输入仍另行追踪。
+
 2026-10-26 CFG-FINISHED-PROMPT-RENDER-01：完整配置结束态切换为页内结果，退出实时提示／指标／光标渲染。结束会话没有 promptCompositionField，实时 inline 渲染器的 compositionTextMap 准入继续保持严格；不为显示结束态虚构活动字段。结果捕获所属 websiteAttemptID，页面仅显示当前尝试的结果；旧式 sheet 的迟到清空不能擦掉新页内结果。原有键盘输入表达式固定在公共背景位置，跨实时／结束／重开过渡保留同一 NSView、焦点及生产者契约；重开沿用原控制器。没有成绩的结束态保留生成失败原因、状态与重开入口。结果内容、回放、导出复用既有组件，并在页内使用外层滚动布局。历史／排行榜导航保留页内结果，无压力页内视图不提供窗口 dismiss 控件；旧式结果 sheet 保留独立终止桥和原布局。
 
 2026-10-26 CFG-APPEARANCE-COMMAND-PAGE-01：完整配置外观命令按实际 setter 计划逐项 CAS，文字速度／准确率先关闭 companion，非 off 卷带先关闭完整行。专用能力仅允许 14 个命令字段和 monkey=false 子项的单字段差异及唯一保存事件，不同步输入规则、不重开、不写旧偏好；高亮事件单独清掉被拦截错字的临时投影，保留接受输入与计分。PracticeAppearanceSelection 将当前窗口的实时指标、单位、小数、图表零轴和 companion 读取统一到 publication；文字／辅助色使用该窗口主题，旧设置路径保持其既有解析。完成页参数与图表零轴回调也走当前完整配置。结束态主提示的渲染与原生完成 sheet 的实体显示仍单独追踪。

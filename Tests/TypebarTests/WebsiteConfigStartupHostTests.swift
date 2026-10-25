@@ -289,6 +289,66 @@ import XCTest
     XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
   }
 
+  func testProfileKeyboardIsRenderedWhenLegacyGuideIsOff() async throws {
+    let f = try Fixture(saved: true, json: #"{"mode":"words","words":10,"keymapMode":"static","keymapLegendStyle":"uppercase","keymapKeys":"full","keymapSize":1.5,"keymapLayout":"qwerty"}"#)
+    defer { f.close() }
+    f.settings.keyboardGuideMode = .off
+    f.settings.keyboardGuideLegendStyle = .blank
+    let custom = CustomKeyboardGuideLayout(name: "Legacy rows must stay dormant", numberRow: "1111111111",
+      topRow: "aaaaaaaaaa", homeRow: "aaaaaaaaa", bottomRow: "aaaaaaa")
+    f.settings.customKeyboardLayouts = [custom]; f.settings.customKeyboardLayoutID = custom.id
+    f.settings.keyboardGuideLayoutSource = .custom
+    let legacy = f.settings.snapshot
+    f.state.accountReady = true
+    try await f.waitAsync { f.state.page.state.presentation?.publication.draft != nil && f.inputs().first?.acceptsTextInput == true }
+    func scrolls(_ view: NSView) -> [NSScrollView] {
+      (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrolls($0) }
+    }
+    func scrollToEnd() {
+      for scroll in scrolls(f.host) {
+        guard let document = scroll.documentView, document.frame.height > scroll.contentView.bounds.height else { continue }
+        let clip = scroll.contentView
+        clip.scroll(to: clip.constrainBoundsRect(.init(x: 0, y: document.frame.height, width: clip.bounds.width, height: clip.bounds.height)).origin)
+        scroll.reflectScrolledClipView(clip)
+      }
+    }
+    scrollToEnd()
+    try await Task.sleep(for: .milliseconds(100)); f.host.layoutSubtreeIfNeeded()
+    let bitmap = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds))
+    f.host.cacheDisplay(in: f.host.bounds, to: bitmap)
+    try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-profile-keyboard-host.png"))
+    // Individual keycaps are separate text regions, not a single text line.
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .fast; request.recognitionLanguages = ["en-US"]
+    request.usesLanguageCorrection = false; request.minimumTextHeight = 0.005
+    request.regionOfInterest = .init(x: 0.1, y: 0.2, width: 0.8, height: 0.31)
+    try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
+    let keycaps = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+    XCTAssertTrue(keycaps.contains("Esc"), "Keyboard region: \(keycaps)")
+    request.recognitionLevel = .accurate
+    try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
+    let legends = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
+    XCTAssertTrue(legends.contains("Q") && legends.contains("W"), "Published QWERTY, not legacy custom rows: \(legends)")
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"keymapMode":"off"}"#, systemIsDark: false)
+    try await f.waitAsync { f.state.page.state.presentation?.publication.draft.keyboardTypography.guideMode == .off
+      && f.inputs().first?.acceptsTextInput == true }
+    f.settings.keyboardGuideMode = .next
+    let enabledLegacy = f.settings.snapshot
+    scrollToEnd(); try await Task.sleep(for: .milliseconds(100)); f.host.layoutSubtreeIfNeeded()
+    let off = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds))
+    f.host.cacheDisplay(in: f.host.bounds, to: off)
+    try VNImageRequestHandler(cgImage: XCTUnwrap(off.cgImage)).perform([request])
+    let offKeycaps = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+    XCTAssertFalse(offKeycaps.contains("Esc"), "Disabled keyboard region: \(offKeycaps)")
+    XCTAssertEqual(f.settings.snapshot, enabledLegacy)
+    XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
+  }
+
   func testAppearanceCommandsKeepActualMarkedInputAndRenderTheProfileHUD() async throws {
     let f = try Fixture(saved: nil); defer { f.close() }
     f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }

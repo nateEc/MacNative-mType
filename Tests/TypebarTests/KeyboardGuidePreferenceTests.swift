@@ -148,7 +148,10 @@ final class KeyboardGuidePreferenceTests: XCTestCase {
     }
     XCTAssertTrue(preferences.contains("if settings.preferenceKeyboardGuideMode != .off"))
     let main = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    XCTAssertTrue(main.contains("keyboardGuideMode: { challengeLiveConfiguration.keyboardGuideMode(settings: settings) },"))
+    XCTAssertTrue(main.contains("keyboardGuideMode: { committedPracticeDraft?.keyboardTypography.guideMode ?? challengeLiveConfiguration.keyboardGuideMode(settings: settings) },"))
+    XCTAssertTrue(main.contains("legacyMode: challengeLiveConfiguration.keyboardGuideMode(settings: settings)"))
+    XCTAssertTrue(main.contains("return practiceKeyboardGuide.mode"))
+    XCTAssertTrue(main.contains("guard practiceKeyboardGuide.allowsLegacyRows else { return nil }"))
   }
 
   func testAllNativeKeyboardConfirmationsMatchPinnedIndividualSetters() throws {

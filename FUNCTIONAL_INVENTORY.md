@@ -1,5 +1,9 @@
 # 功能盘点与追踪表
 
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
+| CFG-KEYMAP-DISPLAY-PAGE-01 | 完整配置屏幕键盘显示所有权 | `components/pages/test/Keymap.tsx`, `states/test.ts` | PromptDomain, PreferencesDomain | 实现当前 publication 的模式、缩放、标注、键帽范围与结构样式读取，隔离旧自定义／系统键盘行。命令保存／重开、自定义大小输入、响应式缩放、全部实体动画与输入法仍待验。 |
+
 2026-10-26 CFG-FINISHED-PROMPT-RENDER-01：已定位结束后主提示错误：实时投影依赖的活动字段在结束后按设计消失。完整配置结束态改为当前尝试的页内结果，实时渲染器继续拒绝结束会话；实际隐藏生产页渲染及 OCR 验证完成／失败／中止结果、CPM→CPS、计分不变、键盘重开与旧回调拒绝。无压力组件的关闭／重开控件亦有配对图像验证。实体窗口及全部导航／结果变体仍待验。
 
 2026-10-26 CFG-APPEARANCE-COMMAND-PAGE-01：14 字段、49 个格式选项／48 个可见命令接通完整配置与页面读取；依赖逐项保存、No Quit、普通拒绝提示、原生实时区、组合文本及在途内容验证见 OFFICIAL_CONFIG_AUDIT。完成页原有显示参数验证已补入实际页内结果渲染／单位更新证据；生命周期修复与剩余实体边界见 CFG-FINISHED-PROMPT-RENDER-01。

@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 完整配置键盘显示消费者（2026-10-26，起点 92d30a42）
+
+CFG-KEYMAP-DISPLAY-PAGE-01：实际参考 Keymap.tsx 读取当前配置的 keymapMode、keymapSize、keymapLegendStyle、keymapKeys、keymapStyle；states/test.ts 的 getKeymapLayout 将 overrideSync 解析为当前 layout，并将 default 回退到 QWERTY。原生页面已有布局选择，但上述五个显示字段仍读旧偏好，且旧自定义／系统来源还能覆盖行。现由 PracticeKeyboardGuideSelection 统一当前 publication 的显示字段；完整配置排除旧来源行，不修改实际输入映射。旧设置和挑战临时模式仍走原路径，listening／Simon Says 与 Layout Fluid 原有约束保留。
+
+隐藏生产页先复现完整配置开启、旧设置关闭时没有键盘；最初整行 OCR 断言不能可靠读取独立小键帽，不能将该识别失败解释为后续修复无效。已检查 /tmp/typebar-profile-keyboard-host.png，确有完整大写 QWERTY 键盘。最终使用固定隐藏夹具中键盘区域的 Esc 键及 Q／W 标注识别，并在同页导入 off、旧设置反而开启后验证键盘区域消失；旧自定义行刻意全部使用 a，避免把旧行当作正确布局。当前 publication、旧设置快照／磁盘和从未显示窗口的约束独立验证；显示选择覆盖 4 模式 × 7 结构样式与旧挑战回退。定向 3 项通过、零失败／跳过（2.025 秒）。这是页面显示修复，不是全部键盘命令完成：实际源 keymapLayout 命令另有 afterExec restart，其余 setter 的依赖保存和自定义大小 Number 转换仍待接通；源响应式 zoom 上限、实体模式与 IME 仍开放。
+
+相关回归首轮 71 项中，1 项旧源码字符串检查仍要求完整配置接入前的回调文本；已对照 HEAD 确认该文本先前已过期，更新为当前 publication／旧挑战回退的双路径检查。重跑 72 项零失败／跳过（48.182 秒）。另补跑挑战应用及输入规则 71 项，1 项源码范围检查仍直接查找旧键盘 getter；更新为公共选择器并保留 Simon Says 强制模式在继承模式之前的顺序约束，重跑 71 项零失败／跳过（4.764 秒）。真实隐藏页、585 个参考键盘／排版选项与数值边界、旧偏好保存路由、虚拟键盘及挑战应用均在上述相关范围内；没有运行全部门禁，不以这些结果声称整体功能已齐。参考行为审计通过（47 direct／119 native symbols／17 supporting），人工验收表通过结构校验（1,359 场景，并非实体验收通过）。
+
+Debug macOS 打包、签名／资源边界及固定参考原创性检查通过；检查没有启动应用。日志为 /tmp/typebar-profile-keyboard-{red,green,focused,broad,broad-final,challenge,challenge-final,reference,package}.log；初期 OCR 夹具问题与静态检查失败日志不计为通过，以 focused／broad-final／challenge-final／package 的最终结果为准。
+
 ## 完整配置结束生命周期及页内结果（2026-10-26，起点 7db1846c）
 
 CFG-FINISHED-PROMPT-RENDER-01 已定位：TypingSession.promptCompositionField 在结束后有意返回 nil，PromptRenderPlan 不再生成活动 compositionTextMap；WebsiteConfigPublishedInlinePrompt 因此以 requiresDifferentRenderer 正确拒绝。原版 test-logic.finish 结束过渡隐藏 typingTest、onTestFinish、setResultVisible(true)、setTestActive(false)。修复放在生产页生命周期，保留实时渲染器准入限制：完整配置结束后不再构造实时提示／指标，改为页内展示当前 websiteAttemptID 的既有结果组件。旧式结果 sheet 仍有独立终止桥；迟到 sheet 清空不可覆盖新页内结果。键盘输入表达式原样抽取并固定在公共位置，重开沿用原控制器，历史／排行榜导航不丢掉页内结果。无压力组件单独成文件，页内隐藏 dismiss 控件，保留重开。

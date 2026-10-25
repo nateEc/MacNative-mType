@@ -1287,6 +1287,10 @@ private struct ContentView: View {
   private var practiceAppearance: PracticeAppearanceSelection {
     .init(draft: committedPracticeDraft, settings: settings)
   }
+  private var practiceKeyboardGuide: PracticeKeyboardGuideSelection {
+    .init(draft: committedPracticeDraft, settings: settings,
+      legacyMode: challengeLiveConfiguration.keyboardGuideMode(settings: settings))
+  }
   private var savesCurrentPracticeResults: Bool {
     committedPracticeDraft?.behavior.saveCompletedResults ?? settings.saveCompletedResults
   }
@@ -1595,9 +1599,9 @@ private struct ContentView: View {
               panel: activeTheme.panel, layout: effectiveKeyboardLayout,
               overrideRows: effectiveKeyboardGuideOverrideRows,
               mirrored: session.configuration.modifiers.contains(.mirrorKeyboard),
-              scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
-              keysMode: settings.keyboardGuideKeysMode,
-              style: settings.keyboardGuideStyle,
+              scale: practiceKeyboardGuide.scale, legendStyle: practiceKeyboardGuide.legendStyle,
+              keysMode: practiceKeyboardGuide.keysMode,
+              style: practiceKeyboardGuide.style,
               modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
           }
           if showsVirtualKeyboard {
@@ -3995,7 +3999,7 @@ private struct ContentView: View {
   private var effectiveKeyboardGuideMode: KeyboardGuideMode {
     if session.configuration.modifiers.contains(.listening) { return .off }
     if session.configuration.modifiers.contains(.simonSays) { return .next }
-    return challengeLiveConfiguration.keyboardGuideMode(settings: settings)
+    return practiceKeyboardGuide.mode
   }
 
   private func practicePromptNSFont(size: CGFloat) -> NSFont {
@@ -4060,6 +4064,7 @@ private struct ContentView: View {
   }
 
   private var effectiveKeyboardGuideOverrideRows: [[KeyboardGuideKey]]? {
+    guard practiceKeyboardGuide.allowsLegacyRows else { return nil }
     guard !session.configuration.modifiers.contains(.layoutFluid) else { return nil }
     if settings.keyboardGuideLayoutSource.usesCustomRows(
       inputLayout: settings.keyboardInputLayout)
