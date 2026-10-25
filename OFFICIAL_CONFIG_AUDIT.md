@@ -1,5 +1,21 @@
 # 官方配置兼容性审计
 
+## 完整配置结束生命周期及页内结果（2026-10-26，起点 7db1846c）
+
+CFG-FINISHED-PROMPT-RENDER-01 已定位：TypingSession.promptCompositionField 在结束后有意返回 nil，PromptRenderPlan 不再生成活动 compositionTextMap；WebsiteConfigPublishedInlinePrompt 因此以 requiresDifferentRenderer 正确拒绝。原版 test-logic.finish 结束过渡隐藏 typingTest、onTestFinish、setResultVisible(true)、setTestActive(false)。修复放在生产页生命周期，保留实时渲染器准入限制：完整配置结束后不再构造实时提示／指标，改为页内展示当前 websiteAttemptID 的既有结果组件。旧式结果 sheet 仍有独立终止桥；迟到 sheet 清空不可覆盖新页内结果。键盘输入表达式原样抽取并固定在公共位置，重开沿用原控制器，历史／排行榜导航不丢掉页内结果。无压力组件单独成文件，页内隐藏 dismiss 控件，保留重开。
+
+首轮新增诊断夹具误用 1970 年的起始时间和当前结束时间，导致闲置统计分配异常；/tmp/typebar-finished-result-red.sample.txt 的进程栈定位在该测试的 insertBatch → complete → hasTrailingInactivity。确认 PID／命令属于本轮 xctest 后停止该进程，待其及父测试句柄终止才继续；该轮没有完成，不计为通过。结束时间改为同一夹具时钟 4001 后，实时渲染器拒绝结束会话的诊断用例通过。隐藏窗口不提供完整辅助功能树，因此 clock-red 的 AX 前提失败也不当作产品证据；改用只在测试目标中导入的 Vision 对实际 NSHostingView 缓存图像做只读 OCR。
+
+有效行为 RED：render-red 的两个测试中，活动字段消失／严格拒绝诊断通过，实际生产页找不到 CPM 结果文本而失败。修复后最初两项通过，随后三项生命周期验证通过；最终四项定向验证通过（4.980 秒，零跳过），包含完成、计时失败及中止页面、CPM→CPS 的真实像素更新、结束计分不变、键盘回调重开与旧输入回调拒绝，以及无压力组件有／无关闭按钮的配对图像 OCR。/tmp/typebar-finished-result-host.png 已人工检查：页内结果与 CPS、精度、词历史入口可见；窗口从未显示，未启动 Typebar 主程序。实体快捷键、全部导航／导出和全部结果变体仍待验。
+
+以下外观批次的旧截图／sheet 说明保留其发生时的反例，不再作为当前结束页状态；当前生命周期证据以本节及后续回归结果为准。
+
+第一轮相关回归 1,448 项出现 4 个断言失败，均在 testBoundControllerReceivesNativeRestartAndUsesPublishedSavingAndPaceRules：活动重开会短暂放弃旧尝试，视觉分支切换重建了键盘 NSView，使旧控件身份／第一响应者契约失效。已将同一输入表达式固定在公共背景，不再分别挂载于视觉分支；新旧尝试仍由原控制器与 attemptID 围栏管理。新测试亦改为保留真正的旧回调闭包，而非读取同一稳定控件更新后的回调。补入未开始就续取失败的路径：无成绩快照时显示真实生成失败原因，不虚构 CPM 成绩，并可重开。此修正后的 6 项重点复验全部通过（7.357 秒，零跳过），随后重新运行受公共输入位置影响的相关范围；第一轮回归不记为全绿。
+
+最终相关回归 1,449 项全部通过（266.509 秒，零跳过），包含旧控件／焦点契约、结束态实际渲染及新无成绩失败路径。参考行为审计 47 direct／119 native symbols／17 supporting 通过；人工表 1,358 个唯一场景只通过结构审计。日志 /tmp/typebar-finished-result-{red,clock-red,render-red,focused,integration,final-focused,broad,keyboard-recheck,broad-final,reference,package}.log；最终测试依据 keyboard-recheck／broad-final，不重复累计中间补跑。首轮异常进程诊断为独立 .sample.txt；初始 red 为终止运行、clock-red 的隐藏 AX 前提不成立、render-red 才是有效界面反例。实体窗口、全部导航／导出／输入法与完整门禁仍未因此完成。
+
+最终 Debug 应用打包／签名、资源边界与原创性检查通过；没有启动 Typebar 主程序。整体重写目标继续进行。
+
 ## 完整配置外观命令及页面读取（2026-10-26，起点 bd79b284）
 
 CFG-APPEARANCE-COMMAND-PAGE-01 对照实际 command metadata、subgroup builder、schema、setter、test-ui 和 test-logic 的 config 订阅。--appearance-commands 输出 1,176 组（49 个格式选项 × 两活动状态 × 两 No Quit 状态 × 六个初始配置）；源菜单隐藏 WPH，所以原生菜单保持 48 项。六配置包含普通、companion 开启／完整行开启、卷带、Memory、Arrows、TTS；记录完整 runtime、事件、保存、拒绝提示重要性、resize 请求与文字／wrapper／Joining 回调。DOM／绘制等外部端点只记录请求，不冒充浏览器像素或原资产。

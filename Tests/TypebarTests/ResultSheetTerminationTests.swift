@@ -112,7 +112,7 @@ import XCTest
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    let begin = try XCTUnwrap(source.range(of: ".sheet(item: $completedResult)"))
+    let begin = try XCTUnwrap(source.range(of: ".sheet(item: legacyCompletedResult)"))
     let end = try XCTUnwrap(source.range(of: ".alert(item: $terminalNotice)", range: begin.upperBound..<source.endIndex))
     XCTAssertTrue(source[begin.lowerBound..<end.lowerBound].contains("ResultSheetTerminationBridge()"))
     XCTAssertEqual(source.components(separatedBy: "ResultSheetTerminationBridge()").count - 1, 1)

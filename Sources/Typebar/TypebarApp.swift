@@ -1365,6 +1365,20 @@ private struct ContentView: View {
   @State private var showingWordFilter = false
   @State private var showingCustomTextGenerator = false
   @State private var completedResult: CompletedResultPresentation?
+  private var websiteCompletedResult: CompletedResultPresentation? {
+    guard pageSessionStore.ownsConfigurationSelection, let result = completedResult,
+      result.websiteAttemptID == session.automaticInputAttemptID else { return nil }
+    return result
+  }
+  private var legacyCompletedResult: Binding<CompletedResultPresentation?> {
+    .init(get: {
+      guard !pageSessionStore.ownsConfigurationSelection, completedResult?.websiteAttemptID == nil else { return nil }
+      return completedResult
+    }, set: { value in
+      // A late dismissal of an older sheet cannot erase a new page result.
+      if completedResult?.websiteAttemptID == nil { completedResult = value }
+    })
+  }
   @State private var usesNoStressResultPresentation = false
   @State private var localResultSaveState: LocalResultSaveState = .notRequested
   @State private var savedResultRecord: TestResultRecord?
@@ -1516,7 +1530,7 @@ private struct ContentView: View {
           Button("打开配置面板…", action: openWebsiteConfigImport)
         }.font(.callout)
       }
-      if !visualFocus.isFocused {
+      if !visualFocus.isFocused && !(pageSessionStore.ownsConfigurationSelection && session.isFinished) {
         configurationPanel
       }
       if let zipfNotice {
@@ -1551,40 +1565,65 @@ private struct ContentView: View {
           if pageSession.savedApplication != nil { openWebsiteConfigImport() }
           else { requestPublishedRestart() }
         }) {
-        typingPanel
-        stats
-        if effectiveKeyboardGuideMode != .off {
-          KeyboardGuide(
-            nextCharacter: session.nextExpectedCharacter, mode: effectiveKeyboardGuideMode,
-            feedback: keyboardGuideFeedback, accent: activeTheme.accent,
-            panel: activeTheme.panel, layout: effectiveKeyboardLayout,
-            overrideRows: effectiveKeyboardGuideOverrideRows,
-            mirrored: session.configuration.modifiers.contains(.mirrorKeyboard),
-            scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
-            keysMode: settings.keyboardGuideKeysMode,
-            style: settings.keyboardGuideStyle,
-            modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
+        if pageSessionStore.ownsConfigurationSelection && session.isFinished {
+          if let result = websiteCompletedResult {
+            completedResultContent(result, inline: true)
+              .id(result.id)
+              .modelContainer(modelContext.container)
+              .accessibilityIdentifier("website-practice-result")
+              .safeAreaInset(edge: .bottom) {
+                if let message = pageSessionStore.restartController?.message {
+                  Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.callout).foregroundStyle(.orange).padding()
+                }
+              }
+          } else {
+            Text(session.outcome.statusText(saveState: localResultSaveState, eligibility: nil))
+            if let notice = session.generationNotice {
+              Label(notice, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
+            controls
+            practiceKeyTips
+          }
+        } else {
+          typingPanel
+          stats
+          if effectiveKeyboardGuideMode != .off {
+            KeyboardGuide(
+              nextCharacter: session.nextExpectedCharacter, mode: effectiveKeyboardGuideMode,
+              feedback: keyboardGuideFeedback, accent: activeTheme.accent,
+              panel: activeTheme.panel, layout: effectiveKeyboardLayout,
+              overrideRows: effectiveKeyboardGuideOverrideRows,
+              mirrored: session.configuration.modifiers.contains(.mirrorKeyboard),
+              scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
+              keysMode: settings.keyboardGuideKeysMode,
+              style: settings.keyboardGuideStyle,
+              modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
+          }
+          if showsVirtualKeyboard {
+            VirtualKeyboard(
+              layout: effectiveKeyboardLayout,
+              overrideRows: effectiveKeyboardGuideOverrideRows,
+              nextCharacter: session.nextExpectedCharacter,
+              accent: activeTheme.accent, panel: activeTheme.panel,
+              allowsNewline: session.acceptsNewlineInput,
+              allowsTab: session.acceptsTabInput,
+              isEnabled: !session.isFinished && !isPreparingPracticePrompt,
+              onInsert: {
+                handleInsertedText($0, forceError: false, origin: .virtualKeyboard)
+              },
+              onDelete: { handleDeletedText(deletesWord: false) })
+          }
+          controls
+          practiceKeyTips
         }
-        if showsVirtualKeyboard {
-          VirtualKeyboard(
-            layout: effectiveKeyboardLayout,
-            overrideRows: effectiveKeyboardGuideOverrideRows,
-            nextCharacter: session.nextExpectedCharacter,
-            accent: activeTheme.accent, panel: activeTheme.panel,
-            allowsNewline: session.acceptsNewlineInput,
-            allowsTab: session.acceptsTabInput,
-            isEnabled: !session.isFinished && !isPreparingPracticePrompt,
-            onInsert: {
-              handleInsertedText($0, forceError: false, origin: .virtualKeyboard)
-            },
-            onDelete: { handleDeletedText(deletesWord: false) })
-        }
-        controls
-        practiceKeyTips
       }
     }
     .padding(42)
     .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
+    // One keyboard receiver survives active, terminal and restart-transition
+    // visuals; replacing this NSView would lose responder/producer ownership.
+    .background(alignment: .topLeading) { practiceInput }
     .background(
       WindowCloseConfirmationBridge(
         requiresConfirmation: LongTestCloseProtectionPolicy.requiresConfirmation(
@@ -1936,6 +1975,7 @@ private struct ContentView: View {
           wpm: result.wpm, elapsedDuration: result.elapsedDuration, outcome: result.outcome)
         completedResult = .init(
           result: result,
+          websiteAttemptID: committedPracticeDraft != nil ? session.automaticInputAttemptID : nil,
           suppressesCelebrationForSlowTimer: timerHealth.suppressesResultCelebration(
             configuration: session.configuration, outcome: outcome, failureReason: failureReason),
           savesResult: savesResult,
@@ -2432,8 +2472,8 @@ private struct ContentView: View {
       case .failure(let error): fontFamilyCommandMessage = error.localizedDescription
       }
     }
-    .sheet(item: $completedResult) { result in
-      completedResultSheet(result)
+    .sheet(item: legacyCompletedResult) { result in
+      completedResultContent(result)
         .safeAreaInset(edge: .bottom) {
           if let message = pageSessionStore.restartController?.message {
             Label(message, systemImage: "exclamationmark.triangle")
@@ -2456,7 +2496,7 @@ private struct ContentView: View {
   }
 
   @ViewBuilder
-  private func completedResultSheet(_ result: CompletedResultPresentation) -> some View {
+  private func completedResultContent(_ result: CompletedResultPresentation, inline: Bool = false) -> some View {
     if usesNoStressResultPresentation {
       NoStressResultView(
         isNewPersonalBest: result.savesResult && result.resultPersonalBestFeedback?.isNewPersonalBest == true,
@@ -2472,7 +2512,7 @@ private struct ContentView: View {
           completedResult = nil
           if restoreWordPracticeIfNeeded() { return }
           attemptRestart()
-        })
+        }, allowsClosing: !inline)
     } else {
       CompletedResultView(
         result: result.result,
@@ -2527,7 +2567,7 @@ private struct ContentView: View {
           attemptRestart()
         },
         onHistory: {
-          completedResult = nil
+          if !inline { completedResult = nil }
           showingHistory = true
         },
         missedWords: result.missedWords,
@@ -2562,7 +2602,7 @@ private struct ContentView: View {
           }
         },
         onOpenDailyLeaderboard: {
-          completedResult = nil
+          if !inline { completedResult = nil }
           syncInitialLeaderboard = .init(
             mode: result.result.configuration.mode,
             language: result.result.configuration.language,
@@ -2590,7 +2630,7 @@ private struct ContentView: View {
         },
         onPracticeContextualMissedAndSlowWords: { words, selectedTargetCount in
           startWordPractice(words, selectedTargetCount: selectedTargetCount)
-        }
+        }, isInline: inline
       )
     }
   }
@@ -3368,6 +3408,152 @@ private struct ContentView: View {
     }
   }
 
+  private var practiceInput: some View {
+    NativeTypingInput(
+      focusRequest: focusRequest, acceptsTextInput: !isPreparingPracticePrompt && !startupBlocksPractice
+        && !pageSessionStore.isReturningToTypebarSettings
+        && !pageSessionStore.isInputSuspendedForRestart
+        && (publishedPresentation == nil || PromptFieldProjectionPolicy.supports(session.configuration)),
+      insertionAnchor: promptInsertionAnchor,
+      insertionAttemptID: session.automaticInputAttemptID,
+      compositionDisplayStyle: practiceCompositionDisplayStyle,
+      quickRestartKey: practiceQuickRestartKey,
+      keyboardInputMapping: effectiveKeyboardInputMapping,
+      oppositeShiftKeymap: effectiveOppositeShiftKeymap,
+      oppositeShiftMode: committedPracticeDraft?.inputRules.rules.oppositeShiftMode ?? settings.oppositeShiftMode,
+      mapsArrowKeysToInput: session.configuration.modifiers.contains(.arrowStream),
+      mapsArrowLetterKeysToInput: WebsiteArrowChart.isSelected(session.configuration),
+      mapsEnterToSpace: WebsiteRandomWordGenerator.selected(for: session.configuration) == .accounting,
+      acceptsNewlineInput: session.acceptsNewlineInput,
+      acceptsTabInput: session.acceptsTabInput,
+      discardsAutofocusInput: settings.showFocusWarning,
+      requiresShiftQuickRestart: quickRestartRequiresProtection
+        && practiceQuickRestartKey != .enter,
+      disablesQuickRestart: quickRestartRequiresProtection
+        && practiceQuickRestartKey == .enter,
+      enablesLongTestBailout: quickRestartRequiresProtection,
+      finishesOnShiftEnter: session.configuration.mode == .zen,
+      onInsert: { [attemptID = session.automaticInputAttemptID] text, forceError in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        guard activeChallengeID != "mouse-warrior" else { return }
+        handleInsertedText(text, forceError: forceError)
+      },
+      onDelete: { [attemptID = session.automaticInputAttemptID] in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        if activeChallengeID != "mouse-warrior" { handleDeletedText(deletesWord: false) }
+      },
+      onDeleteWord: { [attemptID = session.automaticInputAttemptID] in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        if activeChallengeID != "mouse-warrior" { handleDeletedText(deletesWord: true) }
+      },
+      onRestart: { [attemptID = session.automaticInputAttemptID] in
+        guard pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }; attemptRestart()
+      },
+      onOpenCommandPalette: { [attemptID = session.automaticInputAttemptID] in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }; showingCommandPalette = true
+      },
+      onBailoutArmed: { [attemptID = session.automaticInputAttemptID] in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }; armLongTestBailout()
+      },
+      onBailout: { [attemptID = session.automaticInputAttemptID] in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        guard !isPreparingPracticePrompt else { return }
+        bailoutConfirmationMessage = nil
+        synchronizeLiveInputRules()
+        session.bailOut()
+      },
+      onQuickRestartProtectionRequired: { [attemptID = session.automaticInputAttemptID] in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }; showQuickRestartProtectionNotice()
+      },
+      onFinishZen: { [attemptID = session.automaticInputAttemptID] in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        guard !isPreparingPracticePrompt else { return }
+        synchronizeLiveInputRules()
+        session.finishZen()
+      },
+      onFocusChanged: { isFocused in
+        if !isFocused { typingCompanionHands.reset() }
+        handleTypingFocusChange(isFocused)
+      },
+      onWindowFocusChanged: { isFocused, hasAttachedSheet in
+        if !isFocused { typingCompanionHands.reset() }
+        handleTypingWindowFocusChange(isFocused, hasAttachedSheet: hasAttachedSheet)
+      },
+      onCompositionStarted: { [attemptID = session.automaticInputAttemptID] in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        guard !isPreparingPracticePrompt else { return }
+        pageSessionStore.noteCompositionActivity(for: attemptID)
+        if usesPreparedPromptViewport, viewportFallbackAttemptID != session.automaticInputAttemptID {
+          viewportFallbackPosition.capture(attemptID: session.automaticInputAttemptID, targetID: session.promptTargetID)
+        }
+        preparedWholePreviewRendering = nil
+        if activeChallengeID != "mouse-warrior" {
+          synchronizeLiveInputRules()
+          session.beginComposition()
+        }
+      },
+      onCompositionChanged: { [attemptID = session.automaticInputAttemptID] text in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        guard !isPreparingPracticePrompt else { return }
+        pageSessionStore.noteCompositionActivity(for: attemptID)
+        if usesPreparedPromptViewport, !text.isEmpty,
+          viewportFallbackAttemptID != session.automaticInputAttemptID {
+          viewportFallbackAttemptID = session.automaticInputAttemptID
+        }
+        preparedWholePreviewRendering = nil
+        let hadMarkedText = !compositionText.isEmpty
+        let playsCompositionClick = TypingInputSoundPlan.isAudibleCompositionUpdate(
+          previous: compositionText, current: text)
+        compositionText = text
+        if activeChallengeID != "mouse-warrior" {
+          synchronizeLiveInputRules()
+          session.refreshLiveAccuracyAfterComposition(
+            hadMarkedText: hadMarkedText, hasMarkedText: !text.isEmpty)
+          visualFocus.inputDidUpdate(hasFeedback: hadMarkedText || !text.isEmpty,
+            textChanged: false, isFinished: session.isFinished)
+          if playsCompositionClick { playInputFeedback(inputWasCorrect: true) }
+        }
+      },
+      shouldFinishWithComposition: { [attemptID = session.automaticInputAttemptID] text, forceError in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return false }
+        guard !isPreparingPracticePrompt else { return false }
+        guard activeChallengeID != "mouse-warrior" else { return false }
+        synchronizeLiveInputRules()
+        return session.shouldFinishWithComposition(effectiveInsertedText(text), forceError: forceError)
+      },
+      onModifierFlagsChanged: { [attemptID = session.automaticInputAttemptID] flags in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        keyboardModifierFlags = flags
+      },
+      onKeyDown: { [attemptID = session.automaticInputAttemptID] keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        practiceSoundPlayer().recordKeyDown(keyCode: keyCode, modifierFlags: modifierFlags)
+        if konamiSequenceTracker.consume(
+          keyCode: keyCode,
+          charactersIgnoringModifiers: charactersIgnoringModifiers,
+          modifierFlags: modifierFlags,
+          isRepeat: isRepeat)
+        {
+          NSWorkspace.shared.open(KonamiSequenceTracker.destination)
+        }
+      },
+      onPhysicalKey: { [attemptID = session.automaticInputAttemptID] keyCode, isKeyDown, isRepeat in
+        guard pageSessionStore.acceptsInput(for: attemptID) else { return }
+        guard !isPreparingPracticePrompt else { return }
+        if isKeyDown && activeChallengeID == "mouse-warrior" {
+          session.recordPhysicalKeyboardActivityDuringAttempt()
+        }
+        session.recordPhysicalKeyEvent(
+          keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
+        if isKeyDown { session.recordKeyboardActivity() }
+        guard practiceAppearance.showTypingCompanion else { return }
+        typingCompanionHands.handle(keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
+      }
+    )
+    .opacity(0.01)
+    .frame(width: 1, height: 1)
+  }
+
   private var typingPanel: some View {
     // The admitted viewport owns its ink. Do not build an unused complete
     // presentation; the fallback still captures one fresh rendering here.
@@ -3438,149 +3624,6 @@ private struct ContentView: View {
       }
       }
 
-      NativeTypingInput(
-        focusRequest: focusRequest, acceptsTextInput: !isPreparingPracticePrompt && !startupBlocksPractice
-          && !pageSessionStore.isReturningToTypebarSettings
-          && !pageSessionStore.isInputSuspendedForRestart
-          && (publishedPresentation == nil || PromptFieldProjectionPolicy.supports(session.configuration)),
-        insertionAnchor: promptInsertionAnchor,
-        insertionAttemptID: session.automaticInputAttemptID,
-        compositionDisplayStyle: practiceCompositionDisplayStyle,
-        quickRestartKey: practiceQuickRestartKey,
-        keyboardInputMapping: effectiveKeyboardInputMapping,
-        oppositeShiftKeymap: effectiveOppositeShiftKeymap,
-        oppositeShiftMode: committedPracticeDraft?.inputRules.rules.oppositeShiftMode ?? settings.oppositeShiftMode,
-        mapsArrowKeysToInput: session.configuration.modifiers.contains(.arrowStream),
-        mapsArrowLetterKeysToInput: WebsiteArrowChart.isSelected(session.configuration),
-        mapsEnterToSpace: WebsiteRandomWordGenerator.selected(for: session.configuration) == .accounting,
-        acceptsNewlineInput: session.acceptsNewlineInput,
-        acceptsTabInput: session.acceptsTabInput,
-        discardsAutofocusInput: settings.showFocusWarning,
-        requiresShiftQuickRestart: quickRestartRequiresProtection
-          && practiceQuickRestartKey != .enter,
-        disablesQuickRestart: quickRestartRequiresProtection
-          && practiceQuickRestartKey == .enter,
-        enablesLongTestBailout: quickRestartRequiresProtection,
-        finishesOnShiftEnter: session.configuration.mode == .zen,
-        onInsert: { [attemptID = session.automaticInputAttemptID] text, forceError in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          guard activeChallengeID != "mouse-warrior" else { return }
-          handleInsertedText(text, forceError: forceError)
-        },
-        onDelete: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          if activeChallengeID != "mouse-warrior" { handleDeletedText(deletesWord: false) }
-        },
-        onDeleteWord: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          if activeChallengeID != "mouse-warrior" { handleDeletedText(deletesWord: true) }
-        },
-        onRestart: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }; attemptRestart()
-        },
-        onOpenCommandPalette: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }; showingCommandPalette = true
-        },
-        onBailoutArmed: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }; armLongTestBailout()
-        },
-        onBailout: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          guard !isPreparingPracticePrompt else { return }
-          bailoutConfirmationMessage = nil
-          synchronizeLiveInputRules()
-          session.bailOut()
-        },
-        onQuickRestartProtectionRequired: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }; showQuickRestartProtectionNotice()
-        },
-        onFinishZen: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          guard !isPreparingPracticePrompt else { return }
-          synchronizeLiveInputRules()
-          session.finishZen()
-        },
-        onFocusChanged: { isFocused in
-          if !isFocused { typingCompanionHands.reset() }
-          handleTypingFocusChange(isFocused)
-        },
-        onWindowFocusChanged: { isFocused, hasAttachedSheet in
-          if !isFocused { typingCompanionHands.reset() }
-          handleTypingWindowFocusChange(isFocused, hasAttachedSheet: hasAttachedSheet)
-        },
-        onCompositionStarted: { [attemptID = session.automaticInputAttemptID] in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          guard !isPreparingPracticePrompt else { return }
-          pageSessionStore.noteCompositionActivity(for: attemptID)
-          if usesPreparedPromptViewport, viewportFallbackAttemptID != session.automaticInputAttemptID {
-            viewportFallbackPosition.capture(attemptID: session.automaticInputAttemptID, targetID: session.promptTargetID)
-          }
-          preparedWholePreviewRendering = nil
-          if activeChallengeID != "mouse-warrior" {
-            synchronizeLiveInputRules()
-            session.beginComposition()
-          }
-        },
-        onCompositionChanged: { [attemptID = session.automaticInputAttemptID] text in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          guard !isPreparingPracticePrompt else { return }
-          pageSessionStore.noteCompositionActivity(for: attemptID)
-          if usesPreparedPromptViewport, !text.isEmpty,
-            viewportFallbackAttemptID != session.automaticInputAttemptID {
-            viewportFallbackAttemptID = session.automaticInputAttemptID
-          }
-          preparedWholePreviewRendering = nil
-          let hadMarkedText = !compositionText.isEmpty
-          let playsCompositionClick = TypingInputSoundPlan.isAudibleCompositionUpdate(
-            previous: compositionText, current: text)
-          compositionText = text
-          if activeChallengeID != "mouse-warrior" {
-            synchronizeLiveInputRules()
-            session.refreshLiveAccuracyAfterComposition(
-              hadMarkedText: hadMarkedText, hasMarkedText: !text.isEmpty)
-            visualFocus.inputDidUpdate(hasFeedback: hadMarkedText || !text.isEmpty,
-              textChanged: false, isFinished: session.isFinished)
-            if playsCompositionClick { playInputFeedback(inputWasCorrect: true) }
-          }
-        },
-        shouldFinishWithComposition: { [attemptID = session.automaticInputAttemptID] text, forceError in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return false }
-          guard !isPreparingPracticePrompt else { return false }
-          guard activeChallengeID != "mouse-warrior" else { return false }
-          synchronizeLiveInputRules()
-          return session.shouldFinishWithComposition(effectiveInsertedText(text), forceError: forceError)
-        },
-        onModifierFlagsChanged: { [attemptID = session.automaticInputAttemptID] flags in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          keyboardModifierFlags = flags
-        },
-        onKeyDown: { [attemptID = session.automaticInputAttemptID] keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          practiceSoundPlayer().recordKeyDown(keyCode: keyCode, modifierFlags: modifierFlags)
-          if konamiSequenceTracker.consume(
-            keyCode: keyCode,
-            charactersIgnoringModifiers: charactersIgnoringModifiers,
-            modifierFlags: modifierFlags,
-            isRepeat: isRepeat)
-          {
-            NSWorkspace.shared.open(KonamiSequenceTracker.destination)
-          }
-        },
-        onPhysicalKey: { [attemptID = session.automaticInputAttemptID] keyCode, isKeyDown, isRepeat in
-          guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          guard !isPreparingPracticePrompt else { return }
-          if isKeyDown && activeChallengeID == "mouse-warrior" {
-            session.recordPhysicalKeyboardActivityDuringAttempt()
-          }
-          session.recordPhysicalKeyEvent(
-            keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
-          if isKeyDown { session.recordKeyboardActivity() }
-          guard practiceAppearance.showTypingCompanion else { return }
-          typingCompanionHands.handle(keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
-        }
-      )
-      .opacity(0.01)
-      .frame(width: 1, height: 1)
     }
     .overlay(alignment: .bottomTrailing) {
       if TypingCompanionVisibilityPolicy.shouldShow(
@@ -7701,6 +7744,7 @@ extension TestOutcome {
 
 private struct CompletedResultPresentation: Identifiable {
   let result: CompletedTestResult
+  let websiteAttemptID: UUID?
   let suppressesCelebrationForSlowTimer: Bool
   let savesResult: Bool
   let eligibility: ResultEligibility
@@ -7722,51 +7766,6 @@ private struct CompletedResultPresentation: Identifiable {
   let repeatedSession: TypingSession
   let challengeEvaluation: ChallengeEvaluation?
   var id: UUID { result.id }
-}
-
-private struct NoStressResultView: View {
-  let isNewPersonalBest: Bool
-  let hasZeroSpeedFeedback: Bool
-  let reducesMotion: Bool
-  let slowTimer: Bool
-  let accent: Color
-  let onRestart: () -> Void
-  @Environment(\.dismiss) private var dismiss
-
-  var body: some View {
-    VStack(spacing: 20) {
-      Image(systemName: "checkmark.circle.fill")
-        .font(.system(size: 64, weight: .medium))
-        .foregroundStyle(.green)
-        .accessibilityHidden(true)
-      Text("本轮已完成")
-        .font(.title2.weight(.semibold))
-      Text("无压力结果模式已隐藏本轮的成绩、图表、回放与导出。")
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
-        .multilineTextAlignment(.center)
-      HStack {
-        Button("关闭") { dismiss() }
-        Spacer()
-        Button("再来一次", action: onRestart)
-          .buttonStyle(.borderedProminent)
-      }
-    }
-    .padding(32)
-    .frame(width: 380)
-    .overlay {
-      ResultCelebrationView(
-        isNewPersonalBest: isNewPersonalBest,
-        hasZeroSpeedFeedback: hasZeroSpeedFeedback,
-        reducesMotion: reducesMotion,
-        slowTimer: slowTimer,
-        accent: accent,
-        text: .primary,
-        subduedText: .secondary)
-    }
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("本轮已完成。无压力结果模式已隐藏本轮的详细结果。")
-  }
 }
 
 private struct CompletedResultView: View {
@@ -7826,6 +7825,7 @@ private struct CompletedResultView: View {
   let onPracticeSlowWords: ([String], Int) -> Void
   let onPracticeMissedAndSlowWords: ([String], Int) -> Void
   let onPracticeContextualMissedAndSlowWords: ([String], Int) -> Void
+  let isInline: Bool
   @State private var exportStatus: String?
   @State private var showingLocalNoticeHistory = false
   @State private var repeatNotice: String?
@@ -8173,12 +8173,18 @@ private struct CompletedResultView: View {
     .padding(32)
   }
 
-  var body: some View {
-    ScrollView {
-      resultContents
+  @ViewBuilder private var resultViewport: some View {
+    if isInline {
+      resultContents.frame(maxWidth: .infinity)
+        .background(panel, in: RoundedRectangle(cornerRadius: 20))
+    } else {
+      ScrollView { resultContents }
+        .frame(width: 390, height: min(720, (NSScreen.main?.visibleFrame.height ?? 800) * 0.75))
+        .scrollIndicators(.visible)
     }
-    .frame(width: 390, height: min(720, (NSScreen.main?.visibleFrame.height ?? 800) * 0.75))
-    .scrollIndicators(.visible)
+  }
+  var body: some View {
+    resultViewport
     .overlay(alignment: .topTrailing) {
       LocalNoticeStack(center: account.localNotices, focused: false).padding(12)
     }

@@ -36,6 +36,18 @@ final class WebsiteConfigPublishedPromptTests: XCTestCase {
     }
   }
   private enum Failure: Error { case notCommitted }
+  func testFinishedAttemptHasNoLiveFieldAndCannotEnterTheLiveInlineRenderer() throws {
+    let f = try Fixture(); defer { f.close() }
+    let publication = try f.publish()
+    let model = Model(publication, owner: f.owner)
+    model.session.insertBatch(String(model.session.prompt.dropFirst()) + " ", at: Date(timeIntervalSince1970: 4001))
+    XCTAssertTrue(model.session.isFinished); XCTAssertNil(model.session.promptCompositionField)
+    let inputs = try WebsiteConfigPublishedPromptInputs(publication: publication, owner: f.owner)
+    XCTAssertNil(PromptRenderPlan(session: model.session, composition: "", style: inputs.style(theme: AppTheme.serika.resolvedTheme)).render().compositionTextMap)
+    XCTAssertThrowsError(try InlineRoot.prompt(model)) {
+      guard case WebsiteConfigPublishedPromptError.requiresDifferentRenderer = $0 else { return XCTFail("Unexpected rejection: \($0)") }
+    }
+  }
   @MainActor @Observable fileprivate final class Model {
     var publication: WebsiteConfigCommitCoordinator.Publication {
       didSet { presentation = try! .init(publication: publication, owner: owner, systemIsDark: systemIsDark) }

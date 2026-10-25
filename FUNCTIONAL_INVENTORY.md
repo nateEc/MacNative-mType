@@ -1,11 +1,13 @@
 # 功能盘点与追踪表
 
-2026-10-26 CFG-APPEARANCE-COMMAND-PAGE-01：14 字段、49 个格式选项／48 个可见命令接通完整配置与页面读取；依赖逐项保存、No Quit、普通拒绝提示、原生实时区、组合文本及在途内容验证见 OFFICIAL_CONFIG_AUDIT。完成页仅验证显示参数与结束计分保持，原生 sheet 的实体呈现待验；结束后主提示出现暂不可用提示，记录为独立开放缺口。
+2026-10-26 CFG-FINISHED-PROMPT-RENDER-01：已定位结束后主提示错误：实时投影依赖的活动字段在结束后按设计消失。完整配置结束态改为当前尝试的页内结果，实时渲染器继续拒绝结束会话；实际隐藏生产页渲染及 OCR 验证完成／失败／中止结果、CPM→CPS、计分不变、键盘重开与旧回调拒绝。无压力组件的关闭／重开控件亦有配对图像验证。实体窗口及全部导航／结果变体仍待验。
+
+2026-10-26 CFG-APPEARANCE-COMMAND-PAGE-01：14 字段、49 个格式选项／48 个可见命令接通完整配置与页面读取；依赖逐项保存、No Quit、普通拒绝提示、原生实时区、组合文本及在途内容验证见 OFFICIAL_CONFIG_AUDIT。完成页原有显示参数验证已补入实际页内结果渲染／单位更新证据；生命周期修复与剩余实体边界见 CFG-FINISHED-PROMPT-RENDER-01。
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
 | CFG-APPEARANCE-COMMAND-PAGE-01 | 完整配置外观命令与显示读取 | `commandline/{commandline-metadata.ts,util.ts}`, `config/{metadata.tsx,setters.ts}`, `test/{test-ui.ts,test-logic.ts}` | CommandDomain, PreferencesDomain, PromptDomain, ResultDomain | 部分实现：48 可见选项、WPH 格式值、逐项依赖保存、No Quit、实时指标及完成页参数／零轴回调；1,176 组实际源码对照。实体 sheet、所有动画与输入法仍待验。 |
-| CFG-FINISHED-PROMPT-RENDER-01 | 完整配置结束后主提示 | `test/test-ui.ts`, `test/result.ts` | PromptDomain, ResultDomain | 开放缺口：隐藏生产页完成尝试后主提示显示“完整配置提示暂不可用”；完成 sheet 未由隐藏父窗口展示，不能据此判定实体完成页是否失败。需定位并修复主提示结束态路线。 |
+| CFG-FINISHED-PROMPT-RENDER-01 | 完整配置结束后的结果页 | `test/test-logic.ts`, `test/test-ui.ts`, `test/result.ts` | PromptDomain, ResultDomain | 已修复并有自动化证据：当前尝试的页内结果替代结束会话的实时提示；完成／失败／中止、单位更新、计分不变、重开与旧回调拒绝验证。实时渲染器继续严格拒绝结束会话；实体窗口、全部结果变体／导航／导出仍待验。 |
 
 2026-10-26 CFG-PACE-COMMAND-PAGE-01：完整配置配速命令接通逐 setter 保存及显式重开，保留 No Quit 中已接受的选择、旧记忆速度初始化顺序与单独速度事件不重置光标的语义。488 组实际 command builder／setter／配速订阅／重开 No Quit guard 对照覆盖六个模式、五种单位、登录状态和输入边界；无限速度、在线账户取值及实体动画仍开放。
 

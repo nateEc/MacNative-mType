@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import SwiftData
 import SwiftUI
+import Vision
 import XCTest
 @testable import Typebar
 
@@ -53,6 +54,16 @@ import XCTest
     func inputs(_ root: NSView? = nil) -> [TypingInputView] {
       let root = root ?? host
       return (root as? TypingInputView).map { [$0] } ?? root.subviews.flatMap { inputs($0) }
+    }
+    func renderedText(languages: [String] = ["en-US"]) throws -> [String] {
+      host.layoutSubtreeIfNeeded()
+      let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+      host.cacheDisplay(in: host.bounds, to: bitmap)
+      let request = VNRecognizeTextRequest()
+      request.recognitionLevel = .accurate; request.recognitionLanguages = languages
+      request.usesLanguageCorrection = false
+      try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
+      return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
     }
     func scrollToInput() throws {
       func scrolls(_ view: NSView) -> [NSScrollView] {
@@ -165,6 +176,119 @@ import XCTest
     XCTAssertEqual(f.settings.snapshot, legacy)
     XCTAssertFalse(f.window.isVisible)
   }
+  func testFinishedWebsiteResultIsVisibleInThePageWithoutShowingAWindow() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    XCTAssertFalse(try f.renderedText().isEmpty, "The actual hidden page must render recognizable text")
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":2,"typingSpeedUnit":"cpm","liveSpeedStyle":"off","liveAccStyle":"off","liveBurstStyle":"off"}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+      && f.inputs().first?.acceptsTextInput == true }
+    try XCTUnwrap(f.inputs().first).onInsert(f.state.page.state.session.prompt + " ", false)
+    XCTAssertTrue(f.state.page.state.session.isFinished)
+    let before = f.state.page.state.session.generationState
+    try await Task.sleep(for: .milliseconds(100)); f.host.layoutSubtreeIfNeeded()
+    let text = try f.renderedText().joined(separator: " ")
+    XCTAssertTrue(text.contains("CPM"), "Actual rendered result: \(text)")
+    XCTAssertEqual(f.state.page.state.session.generationState, before)
+    XCTAssertNil(f.window.attachedSheet); XCTAssertFalse(f.window.isVisible)
+    for command in [AppearanceCommandTarget.speedUnit(.cps), .alwaysShowDecimalPlaces(true), .startGraphsAtZero(false)] {
+      try await workflow.editAndBegin(.appearance(command), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+    }
+    try await Task.sleep(for: .milliseconds(100))
+    let changed = try f.renderedText().joined(separator: " ")
+    XCTAssertTrue(changed.contains("CPS"), "Updated rendered result: \(changed)"); XCTAssertFalse(changed.contains("CPM"))
+    XCTAssertEqual(f.state.page.state.session.generationState, before)
+    let bitmap = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds)); f.host.cacheDisplay(in: f.host.bounds, to: bitmap)
+    try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-finished-result-host.png"))
+    let ended = f.state.page.state.session.automaticInputAttemptID, oldInput = try XCTUnwrap(f.inputs().first)
+    let staleInsert = oldInput.onInsert
+    oldInput.onRestart()
+    try await f.waitAsync { f.state.page.state.session.automaticInputAttemptID != ended
+      && f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+      && f.inputs().first?.acceptsTextInput == true }
+    let next = f.state.page.state.session.generationState
+    staleInsert("stale", false)
+    XCTAssertEqual(f.state.page.state.session.generationState, next)
+    XCTAssertFalse(try f.renderedText().joined(separator: " ").contains("CPS"), "The previous result must leave the new attempt")
+  }
+
+  func testFailedAndBailedOutWebsiteAttemptsShowResultsWithoutALivePrompt() async throws {
+    for bailout in [false, true] {
+      let f = try Fixture(saved: nil); defer { f.close() }
+      f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+      let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+      let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+      let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+        directory: directory, readWindow: { selection }); defer { workflow.stop() }
+      try await workflow.apply(json: #"{"mode":"time","time":120,"typingSpeedUnit":"cpm","liveSpeedStyle":"off","liveAccStyle":"off","liveBurstStyle":"off"}"#, systemIsDark: false)
+      try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+        && f.inputs().first?.acceptsTextInput == true }
+      try XCTUnwrap(f.inputs().first).onInsert(String(f.state.page.state.session.prompt.prefix(1)), false)
+      var state = f.state.page.state
+      XCTAssertTrue(state.session.hasStarted)
+      if bailout { state.session.bailOut() } else { state.session.failForTimerHealth() }
+      XCTAssertEqual(state.session.outcome, bailout ? .bailedOut : .failed)
+      f.state.page.replace(state)
+      let before = f.state.page.state.session.generationState
+      try await Task.sleep(for: .milliseconds(100))
+      let text = try f.renderedText().joined(separator: " ")
+      XCTAssertTrue(text.contains("CPM"), "Terminal rendered result: \(text)")
+      XCTAssertEqual(f.state.page.state.session.generationState, before)
+      XCTAssertNil(f.window.attachedSheet); XCTAssertFalse(f.window.isVisible)
+    }
+  }
+  func testInlineNoStressResultHasRestartButNoWindowDismissControl() throws {
+    for closing in [true, false] {
+      let view = NoStressResultView(isNewPersonalBest: false, hasZeroSpeedFeedback: false,
+        reducesMotion: true, slowTimer: false, accent: .blue, onRestart: {}, allowsClosing: closing)
+        .frame(width: 400, height: 380).background(Color(nsColor: .windowBackgroundColor))
+      let host = NSHostingView(rootView: view)
+      let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 400, height: 380), styleMask: .borderless, backing: .buffered, defer: false)
+      window.isReleasedWhenClosed = false; window.contentView = host
+      defer { window.contentView = nil; window.close() }
+      host.layoutSubtreeIfNeeded()
+      let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds)); host.cacheDisplay(in: host.bounds, to: bitmap)
+      let request = VNRecognizeTextRequest(); request.recognitionLevel = .accurate
+      request.recognitionLanguages = ["zh-Hans", "en-US"]; request.usesLanguageCorrection = false
+      try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
+      let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+      XCTAssertTrue(text.contains("再来一次"), "No-stress result: \(text)")
+      XCTAssertEqual(text.contains("关闭"), closing, "No-stress close control: \(text)")
+      XCTAssertFalse(text.contains("CPM")); XCTAssertFalse(window.isVisible)
+    }
+  }
+  func testUnstartedWebsiteFetchFailureKeepsItsReasonAndCanRestartWithoutAResult() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }, loadExternal: { _, _, _, _ in
+        .init(source: .encyclopedia, initial: .init(text: "ab cd", noSpaceBoundarySource: nil), continuation: nil)
+      }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"typingSpeedUnit":"cpm","funbox":["wikipedia"],"liveSpeedStyle":"off","liveAccStyle":"off","liveBurstStyle":"off"}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+      && f.inputs().first?.acceptsTextInput == true }
+    var state = f.state.page.state; XCTAssertFalse(state.session.hasStarted)
+    state.session.failLiveContentFetch(); XCTAssertEqual(state.session.outcome, .failed)
+    XCTAssertNil(state.session.result()); f.state.page.replace(state)
+    let ended = state.session.automaticInputAttemptID, before = state.session.generationState
+    try await Task.sleep(for: .milliseconds(100))
+    let text = try f.renderedText(languages: ["zh-Hans", "en-US"]).joined().replacingOccurrences(of: " ", with: "")
+    XCTAssertTrue(text.contains("无法续取在线内容"), "Actual failure reason: \(text)")
+    XCTAssertFalse(text.contains("CPM"), "An unstarted failure must not invent a score")
+    XCTAssertEqual(f.state.page.state.session.generationState, before)
+    try XCTUnwrap(f.inputs().first).onRestart()
+    try await f.waitAsync { f.state.page.state.session.automaticInputAttemptID != ended
+      && f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+    XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
+  }
+
   func testAppearanceCommandsKeepActualMarkedInputAndRenderTheProfileHUD() async throws {
     let f = try Fixture(saved: nil); defer { f.close() }
     f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
@@ -223,8 +347,7 @@ import XCTest
     let display = PracticeAppearanceSelection(draft: draft, settings: f.settings)
     XCTAssertEqual(display.unit, .cpm); XCTAssertTrue(display.alwaysShowDecimalPlaces); XCTAssertFalse(display.startGraphsAtZero)
     XCTAssertEqual(f.state.page.state.session.generationState, before); XCTAssertEqual(f.settings.snapshot, legacy)
-    // Completion uses a sheet. A never-visible parent cannot establish the
-    // sheet's visual readiness; this test asserts its settings/scoring inputs.
+    // Scoring invariants are separate from the rendered-page checks above.
     XCTAssertFalse(f.window.isVisible)
   }
 
