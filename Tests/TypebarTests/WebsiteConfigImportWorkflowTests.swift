@@ -6,6 +6,67 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testLayoutFluidHandlerFollowsProducingWorkflowAndRetiresOnStopOrDetach() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"time","time":10,"funbox":["layoutfluid"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let attempt = f.page.state.session.automaticInputAttemptID
+    try f.page.advanceLayoutFluid(.time(4), attemptID: attempt)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    let unrelated = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window })
+    unrelated.stop()
+    try f.page.advanceLayoutFluid(.time(5), attemptID: attempt)
+    f.workflow.stop()
+    do { try f.page.advanceLayoutFluid(.time(6), attemptID: attempt); XCTFail("Stopped handler retained") }
+    catch PracticePageSessionStateError.stale {}
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
+    f.page.detach()
+    do { try f.page.advanceLayoutFluid(.time(6), attemptID: attempt); XCTFail("Detached callback admitted") }
+    catch PracticePageSessionStateError.stale {}
+  }
+  func testLayoutFluidTimeChangesOnlyRuntimeAndWordsSaveEachAcceptedSetter() async throws {
+    for noQuit in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      let boxes = noQuit ? "[\"layoutfluid\",\"no_quit\"]" : "[\"layoutfluid\"]"
+      try await f.workflow.apply(json: "{\"mode\":\"time\",\"time\":10,\"customLayoutfluid\":[\"qwerty\",\"colemak\",\"dvorak\"],\"funbox\":\(boxes)}", systemIsDark: false)
+      var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+      let before = f.page.state.session.generationState, original = try XCTUnwrap(f.page.state.presentation).publication
+      try f.workflow.advanceLayoutFluid(.time(4), attemptID: before.attempt)
+      let changed = try XCTUnwrap(f.page.state.presentation).publication
+      XCTAssertEqual(changed.draft.keyboardTypography.inputLayout.emulatedLayout, noQuit ? .ansiQwerty : .ansiColemak)
+      XCTAssertEqual(changed.draft.keyboardTypography.guideLayout, .ansiColemak)
+      XCTAssertEqual(changed.savedDraft.projection.runtime, original.savedDraft.projection.runtime)
+      XCTAssertEqual(changed.disk, original.disk); XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, original.disk)
+      XCTAssertEqual(f.page.state.session.generationState, before)
+      try await f.workflow.editAndBegin(.keymap(.size(1.5)), replacing: changed.applicationID, systemIsDark: false)
+      guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else { return XCTFail("Missing saved runtime") }
+      XCTAssertEqual(saved["layout"], .string(noQuit ? "qwerty" : "colemak")); XCTAssertEqual(saved["keymapLayout"], .string("colemak"))
+    }
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["layoutfluid","no_quit"],"customLayoutfluid":["qwerty","colemak","dvorak"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session.generationState, disk = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    try f.workflow.advanceLayoutFluid(.words(completed: 3, total: 10), attemptID: before.attempt)
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertNotEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, disk)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.inputLayout.emulatedLayout, .ansiQwerty)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideLayout, .ansiColemak)
+    XCTAssertTrue(try XCTUnwrap(f.account.localNotices.active.first).important)
+  }
+  func testLayoutFluidLateAttemptAndCompetingFileCannotPublishVolatileChanges() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"time","time":10,"funbox":["layoutfluid"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = try XCTUnwrap(f.page.state.presentation).publication
+    do { try f.workflow.advanceLayoutFluid(.time(5), attemptID: UUID()); XCTFail("Late callback admitted") }
+    catch WebsiteConfigImportWorkflowError.unavailable {}
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let other = try WebsiteConfigNativeProfile.prepareDraft(#"{"words":7}"#, pointsPerRem: 16, context: .init())
+    _ = try register.commit(other, replacing: XCTUnwrap(register.read().revision))
+    do { try f.workflow.advanceLayoutFluid(.time(5), attemptID: f.page.state.session.automaticInputAttemptID); XCTFail("Competing file ignored") } catch {}
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, before.applicationID)
+  }
   func testKeymapSizeFormUsesPublicationAndFitsHiddenLightAndDarkLayoutsWithoutSaving() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":10,"keymapSize":2.1}"#, systemIsDark: false)

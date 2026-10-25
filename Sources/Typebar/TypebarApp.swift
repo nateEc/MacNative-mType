@@ -2737,6 +2737,7 @@ private struct ContentView: View {
           return
         }
       }
+      for second in dueSeconds { advanceWebsiteLayoutFluid(.time(second)) }
       if let duration = session.configuration.duration, duration > 0 {
         for elapsedSecond in dueSeconds {
           let remaining = ClockTickPolicy.remainingSeconds(
@@ -3439,6 +3440,10 @@ private struct ContentView: View {
       compositionDisplayStyle: practiceCompositionDisplayStyle,
       quickRestartKey: practiceQuickRestartKey,
       keyboardInputMapping: effectiveKeyboardInputMapping,
+      keyboardInputMappingProvider: { [pageSessionStore] in
+        guard pageSessionStore.ownsConfigurationSelection, pageSessionStore.state.practice != nil else { return nil }
+        return pageSessionStore.state.presentation?.publication.draft.keyboardTypography.inputLayout.inputMapping(for: nil)
+      },
       oppositeShiftKeymap: effectiveOppositeShiftKeymap,
       oppositeShiftMode: committedPracticeDraft?.inputRules.rules.oppositeShiftMode ?? settings.oppositeShiftMode,
       mapsArrowKeysToInput: session.configuration.modifiers.contains(.arrowStream),
@@ -4058,14 +4063,6 @@ private struct ContentView: View {
 
   private var effectiveKeyboardLayout: KeyboardLayout {
     if let draft = committedPracticeDraft {
-      if session.configuration.modifiers.contains(.layoutFluid) {
-        if session.configuration.mode == .time {
-          return LayoutFluidPolicy.activeLayout(elapsedSeconds: lastClockTickSecond,
-            duration: session.configuration.duration, layouts: draft.generators.layoutFluidLayouts)
-        }
-        return LayoutFluidPolicy.activeLayout(completedWords: session.completedWordCount,
-          wordLimit: session.configuration.wordLimit, layouts: draft.generators.layoutFluidLayouts)
-      }
       return draft.keyboardTypography.guideLayout ?? draft.keyboardTypography.inputLayout.emulatedLayout ?? .ansiQwerty
     }
     guard session.configuration.modifiers.contains(.layoutFluid) else {
@@ -4099,14 +4096,13 @@ private struct ContentView: View {
     return nil
   }
 
-  /// Layout Fluid deliberately switches both the visible guide and simulated
-  /// input layout, matching the reference funbox. Outside that mode, input
-  /// emulation remains an opt-in setting and the guide is presentation-only.
+  /// Full profiles receive each source setter independently, including a
+  /// physical-layout refusal under No Quit. Legacy mode keeps its old policy.
   private var effectiveKeyboardInputMapping: KeyboardInputMapping {
+    if let draft = committedPracticeDraft { return draft.keyboardTypography.inputLayout.inputMapping(for: nil) }
     guard !session.configuration.modifiers.contains(.layoutFluid) else {
       return .builtIn(effectiveKeyboardLayout)
     }
-    if let draft = committedPracticeDraft { return draft.keyboardTypography.inputLayout.inputMapping(for: nil) }
     return settings.keyboardInputLayout.inputMapping(for: settings.selectedCustomKeyboardLayout)
   }
 
@@ -4121,20 +4117,34 @@ private struct ContentView: View {
 
   private var layoutFluidNotice: String? {
     guard session.configuration.modifiers.contains(.layoutFluid) else { return nil }
+    if let draft = committedPracticeDraft {
+      let count = draft.generators.layoutFluidLayouts.count
+      guard count > 0, session.configuration.mode == .time || session.layoutFluidWordCount / count > 0 else { return nil }
+    }
     if session.configuration.mode == .time, session.hasStarted,
       let upcoming = LayoutFluidPolicy.upcomingLayout(
         elapsedSeconds: lastClockTickSecond, duration: session.configuration.duration,
-        layouts: settings.layoutFluidLayouts)
+        layouts: committedPracticeDraft?.generators.layoutFluidLayouts ?? settings.layoutFluidLayouts)
     {
       return "\(upcoming.layout.displayName) 将于 \(upcoming.secondsRemaining) 秒后切换"
     }
     if let upcoming = LayoutFluidPolicy.upcomingLayout(
-      completedWords: session.completedWordCount, wordLimit: session.configuration.wordLimit,
-      layouts: settings.layoutFluidLayouts)
+      completedWords: session.completedWordCount, wordLimit: committedPracticeDraft == nil ? session.configuration.wordLimit : session.layoutFluidWordCount,
+      layouts: committedPracticeDraft?.generators.layoutFluidLayouts ?? settings.layoutFluidLayouts)
     {
       return "\(upcoming.wordsRemaining) 个词后切换至 \(upcoming.layout.displayName)"
     }
-    return "当前布局：\(effectiveKeyboardLayout.displayName)"
+    return "当前布局：\((committedPracticeDraft?.keyboardTypography.inputLayout.emulatedLayout ?? effectiveKeyboardLayout).displayName)"
+  }
+  private func advanceWebsiteLayoutFluid(_ event: WebsiteLayoutFluidTransition.Event) {
+    guard committedPracticeDraft != nil, session.hasStarted, !session.isFinished,
+      session.configuration.modifiers.contains(.layoutFluid) else { return }
+    switch event {
+    case .time: guard session.configuration.mode == .time else { return }
+    case .words: guard session.configuration.mode != .time else { return }
+    }
+    do { try pageSessionStore.advanceLayoutFluid(event, attemptID: session.automaticInputAttemptID) }
+    catch { account.localNotices.post("布局切换未完成，请检查当前配置。") }
   }
 
   private var promptHighlightAllowsWordRanges: Bool {
@@ -4571,11 +4581,17 @@ private struct ContentView: View {
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     let typedBefore = session.typed
+    let wordsBefore = session.completedWordCount
     let previousPreview = preparedWholePreviewRendering
     let feedback = TypingLiveInputFeedback.insertBatch(
       effectiveInsertedText(text), into: &session,
       forceError: forceError, origin: origin, defersAutomaticInput: true,
       wrapAdmission: promptInputWrapAdmission)
+    if session.completedWordCount > wordsBefore {
+      for completed in (wordsBefore + 1)...session.completedWordCount {
+        advanceWebsiteLayoutFluid(.words(completed: completed, total: session.layoutFluidWordCount))
+      }
+    }
     if session.typed != typedBefore {
       let style = promptRenderStyle
       if usesWholePreviewViewport {

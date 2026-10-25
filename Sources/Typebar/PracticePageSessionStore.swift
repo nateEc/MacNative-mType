@@ -224,6 +224,19 @@ final class PracticePageSessionStore {
     state.savedApplication != nil || state.configurationDeparture != nil || restartController?.isPreparing == true
       || state.restartDepartureAttemptID == state.session.automaticInputAttemptID
   }
+  @ObservationIgnored private var layoutFluidHandlerOwner: UUID?
+  @ObservationIgnored private var layoutFluidHandler: ((WebsiteLayoutFluidTransition.Event, UUID) throws -> Void)?
+  func bindLayoutFluidHandler(owner: UUID, handler: @escaping (WebsiteLayoutFluidTransition.Event, UUID) throws -> Void) {
+    layoutFluidHandlerOwner = owner; layoutFluidHandler = handler
+  }
+  func retireLayoutFluidHandler(owner: UUID) {
+    guard layoutFluidHandlerOwner == owner else { return }
+    layoutFluidHandlerOwner = nil; layoutFluidHandler = nil
+  }
+  func advanceLayoutFluid(_ event: WebsiteLayoutFluidTransition.Event, attemptID: UUID) throws {
+    guard acceptsInput(for: attemptID), let layoutFluidHandler else { throw PracticePageSessionStateError.stale }
+    try layoutFluidHandler(event, attemptID)
+  }
   @discardableResult
   func bindRestartController(using coordinator: WebsiteConfigCommitCoordinator,
     notices: LocalNoticeCenter? = nil,
@@ -244,6 +257,7 @@ final class PracticePageSessionStore {
   }
   private func retireRestartController() {
     restartController?.stop(); restartController = nil
+    layoutFluidHandlerOwner = nil; layoutFluidHandler = nil
   }
 
   /// Called after the coordinator's environment callback and before its CAS.
@@ -293,6 +307,17 @@ final class PracticePageSessionStore {
     router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft) throws {
     guard state.configurationDeparture == nil, state.savedApplication == nil,
       WebsiteKeymapCommand.admits(draft, from: capture.publication.draft) else { throw PracticePageSessionStateError.locked }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture)
+    committing = true
+  }
+  func beginLiveLayoutFluidCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft) throws {
+    guard state.configurationDeparture == nil, state.savedApplication == nil,
+      WebsiteLayoutFluidTransition.admits(draft, from: capture.publication.draft) else { throw PracticePageSessionStateError.locked }
+    if case .edited(let edit) = draft.origin, edit.key == "layout",
+      state.session.hasStarted && !state.session.isFinished && state.session.configuration.modifiers.contains(.noQuit) {
+      throw PracticePageSessionStateError.locked
+    }
     try validateCommitOwnership(owner: lease, router: router, capture: capture)
     committing = true
   }

@@ -333,7 +333,10 @@ final class WebsiteConfigCommitCoordinator {
   func commitLiveKeymap(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
     try commitLiveEdit(prepared, for: page, kind: .keymap)
   }
-  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap }
+  func commitLiveLayoutFluid(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, kind: .layoutFluid)
+  }
+  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap, layoutFluid }
   private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind, paceTarget: Double? = nil) throws -> Outcome {
     guard !processing, page.restartController?.isPreparing != true else { return .busy }
     processing = true; defer { processing = false }
@@ -356,6 +359,8 @@ final class WebsiteConfigCommitCoordinator {
       guard WebsiteAppearanceCommand.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .keymap:
       guard WebsiteKeymapCommand.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
+    case .layoutFluid:
+      guard WebsiteLayoutFluidTransition.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .threshold:
       guard case .edited(let edit) = prepared.draft.origin, WebsiteConfigThresholdEdit.keys.contains(edit.key),
       prepared.draft.projection.rejectedKeys.isEmpty, !prepared.draft.projection.events.isEmpty,
@@ -369,7 +374,7 @@ final class WebsiteConfigCommitCoordinator {
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
     if kind == .inputRule { state.session.synchronizeWebsiteInputRules(prepared.draft.inputRules.rules) }
-    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
+    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap && kind != .layoutFluid { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
     if kind == .appearance, case .edited(let edit) = prepared.draft.origin, edit.key == "highlightMode" {
       state.session.refreshPromptPresentation()
     }
@@ -395,20 +400,28 @@ final class WebsiteConfigCommitCoordinator {
       try page.beginLiveAppearanceCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .keymap:
       try page.beginLiveKeymapCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
+    case .layoutFluid:
+      try page.beginLiveLayoutFluidCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .threshold: try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
     }
     defer { page.endCommit() }
+    let volatile = kind == .layoutFluid && prepared.draft.projection.events.first?.nosave == true
     let revision: WebsiteConfigFileRegister.Revision
     do {
-      switch try register.commit(prepared.draft, replacing: prepared.disk) {
-      case .committed(let value): revision = value
-      case .conflict: return .conflict
-      case .unavailable: return .unavailable
+      if volatile {
+        guard try register.read().revision == prepared.disk else { return .conflict }
+        revision = prepared.disk
+      } else {
+        switch try register.commit(prepared.draft, replacing: prepared.disk) {
+        case .committed(let value): revision = value
+        case .conflict: return .conflict
+        case .unavailable: return .unavailable
+        }
       }
     } catch WebsiteConfigFileRegisterError.busy { return .busy }
     // No suspension, callback, legacy preference write or fallible operation
-    // between the durable CAS and publishing the corresponding live rules.
-    let publication = Publication(applicationID: UUID(), draft: prepared.draft, savedDraft: prepared.draft,
+    // between the disk check/CAS and publishing the corresponding live rules.
+    let publication = Publication(applicationID: UUID(), draft: prepared.draft, savedDraft: volatile ? capture.publication.savedDraft : prepared.draft,
       owner: prepared.owner.owner, environmentRevision: prepared.environment.revision,
       pointsPerRem: prepared.environment.pointsPerRem, disk: revision,
       background: capture.publication.background, font: capture.publication.font,
@@ -627,7 +640,7 @@ final class WebsiteConfigCommitCoordinator {
     try preparePublicationEdit(key: key, value: value, from: source, testActive: testActive, restoringFunboxMemory: true)
   }
   private func preparePublicationEdit(key: String, value: WebsiteConfigValue, from source: Publication,
-    testActive: Bool, restoringFunboxMemory: Bool) throws -> Prepared {
+    testActive: Bool, restoringFunboxMemory: Bool, nosave: Bool = false) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     processing = true
     defer { processing = false }
@@ -651,7 +664,7 @@ final class WebsiteConfigCommitCoordinator {
       draft = selection.draft; funboxSelectionSaved = selection.saved
     } else {
       draft = try WebsiteConfigNativeProfile.editDraft(base.draft, key: key, value: value,
-        pointsPerRem: context.pointsPerRem, context: context.context, testActive: testActive)
+        pointsPerRem: context.pointsPerRem, context: context.context, testActive: testActive, nosave: nosave)
     }
     var prepared = Prepared(draft: draft, identity: identity, request: request, owner: owner,
       environment: context, disk: disk)
@@ -681,14 +694,18 @@ final class WebsiteConfigCommitCoordinator {
     return try preparePageEdit(key: "funbox", value: .array(funboxes.filter { $0 != .string("poetry") }),
       for: page, refreshingWith: source, restoringFunboxMemory: false)
   }
+  func prepareLayoutFluidStep(key: String, value: WebsiteConfigValue, nosave: Bool, for page: PracticePageSessionStore,
+    refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> Prepared {
+    try preparePageEdit(key: key, value: value, for: page, refreshingWith: source, nosave: nosave)
+  }
   private func preparePageEdit(key: String, value: WebsiteConfigValue, for page: PracticePageSessionStore,
-    refreshingWith source: WebsiteConfigPracticeScopeSource?, restoringFunboxMemory: Bool = true) throws -> Prepared {
+    refreshingWith source: WebsiteConfigPracticeScopeSource?, restoringFunboxMemory: Bool = true, nosave: Bool = false) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     guard page.state.configurationDeparture == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
     request = UUID()
     let capture = try page.captureGeneration(router: router)
     var prepared = try preparePublicationEdit(key: key, value: value, from: capture.publication,
-      testActive: capture.testActive, restoringFunboxMemory: restoringFunboxMemory)
+      testActive: capture.testActive, restoringFunboxMemory: restoringFunboxMemory, nosave: nosave)
     // Session books are current, but inherited account/content scope is not a
     // fresh read from a new environment. Require scoped re-preparation first;
     // do not silently carry one account's content into another epoch.

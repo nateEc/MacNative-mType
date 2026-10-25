@@ -127,6 +127,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   private var applying = false
   private var stopped = false
   private var operation = UUID()
+  private let layoutFluidHandlerOwner = UUID()
   private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID), resume(UUID) }
 
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
@@ -268,6 +269,53 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
     try Task.checkCancellation()
     throw WebsitePaceCommandError.restartFailed(saved: saved)
+  }
+
+  /// A synchronous source callback: every child setter is published before the
+  /// next physical key can observe its mapping. Never restarts the attempt.
+  func advanceLayoutFluid(_ event: WebsiteLayoutFluidTransition.Event, attemptID: UUID) throws {
+    guard !stopped, let page, page.acceptsInput(for: attemptID), page.state.session.hasStarted,
+      !page.state.session.isFinished, page.state.session.configuration.modifiers.contains(.layoutFluid),
+      let original = page.state.presentation?.publication else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    try Task.checkCancellation()
+    let current = UUID(); operation = current; applying = true
+    let noticeGeneration = notices?.deliveryGeneration
+    defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; applying = false }
+    try environment.withSynchronousSetterRead {
+      guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+      let plan = try WebsiteLayoutFluidTransition.plan(current: original.draft.projection.runtime, event: event,
+        context: context.context, active: true)
+      var receiptID = original.applicationID
+      for step in plan.steps {
+        try Task.checkCancellation()
+        guard operation == current, !stopped, page.state.presentation?.publication.applicationID == receiptID,
+          page.acceptsInput(for: attemptID) else { throw WebsiteConfigImportWorkflowError.conflict }
+        if !step.accepted {
+          if let noticeGeneration, let publication = page.state.presentation?.publication {
+            let locked = step.key == "layout" && ownsActiveNoQuit
+            notices?.postGuarded(locked ? "No Quit 保留当前输入布局。" : "当前趣味模式拒绝了布局切换。",
+              level: .notice, options: .init(important: locked), generation: noticeGeneration, whileCurrent: {
+                self.operation == current && !self.stopped && !Task.isCancelled
+                  && self.environment.read()?.revision == context.revision
+                  && page.state.presentation?.publication.applicationID == receiptID
+                  && publication.isCurrentDelivery(owner: page.owner, router: self.settings.preferenceConfigurationSaves)
+              })
+          }
+          continue
+        }
+        let ticket = try coordinator.prepareLayoutFluidStep(key: step.key, value: step.value, nosave: step.nosave,
+          for: page, refreshingWith: source)
+        prepared = ticket
+        switch try coordinator.commitLiveLayoutFluid(ticket, for: page) {
+        case .committed(let publication): receiptID = publication.applicationID
+        case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+        case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+        case .busy: throw WebsiteConfigImportWorkflowError.busy
+        }
+      }
+      if plan.failedOverride { throw WebsiteKeymapCommandError.failedOverride(saved: 0) }
+    }
   }
 
   private func runKeymapCommand(_ target: WebsiteKeymapCommandTarget, replacing applicationID: UUID) async throws -> String {
@@ -662,6 +710,10 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         // No await after commit. The same coordinator/content catalog owns retry.
         do {
           try page.bindRestartController(using: coordinator, notices: notices, loadQuotes: loadQuotes)
+          page.bindLayoutFluidHandler(owner: layoutFluidHandlerOwner) { [weak self] event, attempt in
+            guard let self else { throw WebsiteConfigImportWorkflowError.unavailable }
+            try self.advanceLayoutFluid(event, attemptID: attempt)
+          }
           switch intent {
           case .application(nil): return "已恢复保存的配置，新的练习已准备好。" + notice
           case .application(.some): return "配置已导入，新的练习已准备好。" + notice
@@ -784,6 +836,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
   }
   func stop() {
+    page?.retireLayoutFluidHandler(owner: layoutFluidHandlerOwner)
     stopped = true; cancel(); source.stop(); environment.stop()
   }
 }

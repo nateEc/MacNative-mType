@@ -363,6 +363,55 @@ import XCTest
     XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
   }
 
+  func testLayoutFluidMappingIsCurrentBeforeSwiftUIUpdatesTheNativeInput() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"time","time":10,"funbox":["layoutfluid"],"customLayoutfluid":["qwerty","colemak","dvorak"]}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID && f.inputs().first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.inputs().first), attempt = f.state.page.state.session.automaticInputAttemptID
+    input.onInsert("x", false)
+    try await Task.sleep(for: .milliseconds(20)); f.host.layoutSubtreeIfNeeded()
+    XCTAssertEqual(input.keyboardInputMapping, .builtIn(.ansiQwerty))
+    let before = f.state.page.state.session.typed
+    try workflow.advanceLayoutFluid(.time(4), attemptID: attempt)
+    // Deliberately no yield/layout between publication and the physical event.
+    let key = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+      windowNumber: f.window.windowNumber, context: nil, characters: "e", charactersIgnoringModifiers: "e", isARepeat: false, keyCode: 14))
+    input.keyDown(with: key)
+    XCTAssertEqual(f.state.page.state.session.typed, before + "f", "The Colemak mapping must be read at event delivery, not a later view update")
+    XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testLayoutFluidWordBoundaryKeepsNoQuitInputWhileChangingVisualLayout() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"funbox":["layoutfluid","no_quit"],"customLayoutfluid":["qwerty","colemak","dvorak"],"keymapSize":1.5,"keymapLegendStyle":"uppercase","keymapKeys":"full"}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID && f.inputs().first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.inputs().first), attempt = f.state.page.state.session.automaticInputAttemptID
+    let legacy = f.settings.snapshot
+    let prefix = f.state.page.state.session.prompt.split(separator: " ").prefix(3).joined(separator: " ") + " "
+    input.onInsert(prefix, false)
+    try await f.waitAsync { f.state.page.state.presentation?.publication.draft.keyboardTypography.guideLayout == .ansiColemak }
+    XCTAssertEqual(f.state.page.state.session.completedWordCount, 3)
+    XCTAssertEqual(f.state.page.state.presentation?.publication.draft.keyboardTypography.inputLayout.emulatedLayout, .ansiQwerty)
+    XCTAssertTrue(f.inputs().first === input); XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+    let before = f.state.page.state.session.typed
+    let key = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+      windowNumber: f.window.windowNumber, context: nil, characters: "e", charactersIgnoringModifiers: "e", isARepeat: false, keyCode: 14))
+    input.keyDown(with: key)
+    XCTAssertEqual(f.state.page.state.session.typed, before + "e", "Visual Colemak must not change refused physical QWERTY")
+    XCTAssertEqual(f.settings.snapshot, legacy); XCTAssertFalse(f.window.isVisible)
+  }
+
   func testKeymapCommandsPreserveActualMarkedInputAndNoQuitAttempt() async throws {
     let f = try Fixture(saved: nil); defer { f.close() }
     f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }

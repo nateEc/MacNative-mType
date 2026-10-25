@@ -23,7 +23,8 @@ const caretCommandMode = process.argv[3] === '--caret-commands';
 const paceCommandMode = process.argv[3] === '--pace-commands';
 const appearanceCommandMode = process.argv[3] === '--appearance-commands';
 const keymapCommandMode = process.argv[3] === '--keymap-commands';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode);
+const layoutFluidRuntimeMode = process.argv[3] === '--layoutfluid-runtime';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -43,7 +44,7 @@ const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
 const adapters = new Map([
   [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: (_message, options) => {
-    if (thresholdCommandMode || inputCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode) simulation.notices.push(options?.important ?? false);
+    if (thresholdCommandMode || inputCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode) simulation.notices.push(options?.important ?? false);
   }, showErrorNotification: noop}],
   [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
   [path.join(frontend, 'states/test.ts'), {isTestActive: () => simulation.flags.testActive ?? true}],
@@ -165,7 +166,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -307,6 +308,44 @@ if (defaultsMode) {
         for (const raw of ['', ' ', '0','80','1.5','0x50','1e2','-1','Infinity','NaN','80tail'])
           run({raw,unit,previous,active,noQuit});
     verify(); console.log(JSON.stringify({id:custom.id,fixtures}));
+  } else if (layoutFluidRuntimeMode) {
+    function extract(file, from, until, wrap = text => text) {
+      const source=fs.readFileSync(path.join(frontend,file),'utf8');
+      const start=source.indexOf(from),end=source.indexOf(until,start);assert.ok(start>=0&&end>start);
+      return stripTypeScriptTypes(wrap(source.slice(start,end)),{mode:'transform'});
+    }
+    let wordIndex=0,total=10;
+    Object.assign(context,{Config:simulation.Config,getConfig:simulation.Config,setConfig:setters.setConfig,timerDebug:false,
+      createMemo:f=>f,replaceUnderscoresWithSpaces:value=>value.replaceAll('_',' '),
+      LayoutfluidFunboxTimer:{show:noop,hide:noop,updateTime:noop,updateWords:noop},
+      TestWords:{words:{get length(){return total;},getCurrent:()=>({text:'abc'})}},
+      getActiveWordIndex:()=>wordIndex,getCurrentInput:()=>'',setTimeout:f=>f(),highlight:noop});
+    vm.runInContext(extract('test/test-timer.ts','function layoutfluid(time:','function checkIfFailed('),context);
+    vm.runInContext(extract('test/funbox/funbox-functions.ts','  layoutfluid: {','  gibberish:',
+      text=>`globalThis.fluid=({${text}}).layoutfluid;`),context);
+    vm.runInContext(extract('states/test.ts','export const getKeymapLayout = createMemo<','const [getKeymapHighlightKey',
+      text=>text.replace('export const getKeymapLayout','globalThis.getKeymapLayout')),context);
+    const fixtures=[];
+    for(const mode of ['time','words'])for(const noQuit of [false,true])for(const keymapMode of ['off','next'])
+      for(const layouts of [[],['qwerty'],['qwerty','colemak','dvorak']])for(const duration of mode==='time'?[0,10,11]:[10])
+        for(const count of mode==='words'?[2,10]:[10]){
+          Object.assign(simulation.Config,structuredClone(defaults),{mode,time:duration,customLayoutfluid:layouts,keymapMode,
+            funbox:['layoutfluid',...(noQuit?['no_quit']:[])]});
+          simulation.flags={testActive:false,authenticated:false,documentComplete:true};total=count;
+          context.fluid.applyConfig();simulation.flags.testActive=true;
+          for(const progress of mode==='time'?[0,1,2,3,4,5,6,7,8,9,10,11,12]:[1,2,3,4,5,6,7,8,9,10,11,12]){
+            // Model a visual setter between callbacks; restart belongs to the
+            // separate command oracle. These functions must read current Config.
+            setters.setConfig('keymapLayout','dvorak');
+            if(progress===3||progress===4)setters.setConfig('keymapMode','off');
+            const current=structuredClone(simulation.Config);
+            simulation.events=[];simulation.saves=[];simulation.notices=[];
+            if(mode==='time')context.layoutfluid(progress);else{wordIndex=progress-1;context.fluid.handleSpace();}
+            fixtures.push({mode,progress,total:count,current,runtime:structuredClone(simulation.Config),events:structuredClone(simulation.events),
+              saves:[...simulation.saves],notices:[...simulation.notices],guide:context.getKeymapLayout().layout});
+          }
+        }
+    verify();console.log(JSON.stringify({fixtures}));
   } else if (keymapCommandMode) {
     function extract(file, from, until, wrap = text => text) {
       const source = fs.readFileSync(path.join(frontend, file), 'utf8');

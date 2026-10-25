@@ -1,5 +1,19 @@
 # 官方配置兼容性审计
 
+## 完整配置 Layout Fluid 运行时（2026-10-26，起点 151bb65c）
+
+CFG-LAYOUTFLUID-RUNTIME-01 修正前节的消费者缺口。进一步读取实际 funbox／timer 源码后确认，这不是仅把视觉 getter 放在进度公式之前：初始化以 nosave 设置两个布局；词数 handleSpace 只在 floor(实际词数组长度／布局数) 的边界顺序保存 layout、keymapLayout；计时回调仅在当前 layout 不等于目标时以 nosave 执行同一顺序。范围外不夹取最后布局，空序列或词数少于布局数也不使用默认布局／最小分段代替。layout 元数据要求重开，故活动 No Quit 会拒绝它，随后视觉 setter 仍能成功；该自动回调没有 restart 派发。states/test.ts 的视觉选择读取当前 Config 字段。原生现在逐项发布真实字段，旧设置路径保留原进度策略。
+
+`--layoutfluid-runtime` 在只读参考 VM 中执行实际空间键／计时函数、setter、schema 与视觉 getter，比较 756 组连续回调：空／单／三布局，0／10／11 秒，两种词数、关闭／next、No Quit，并在回调之间修改视觉布局及关闭模式。第一轮测试记录直接引用事件数组，被下一轮视觉预设追加事件，产生 1,510 个断言失败；复制记录数组后源码对照通过，未改产品算法或降低断言。此夹具失败不当作产品 RED。真实隐藏控件另复现下一物理键晚一帧的问题：已发布 Colemak 后，未等待 SwiftUI 更新就按 E，实际输入 xe 而非 xf。词数自动切换还因临时工作流不拥有 publication 而未完成。按键提供器改读窗口当前 publication，自动切换交给生产工作流的弱绑定回调，停止／离页清理；7 项定向验证通过、零失败／跳过（4.066 秒），包含上述实际按键与 No Quit 下视觉 Colemak／物理 QWERTY、存储／当前状态区分、过期文件／尝试与回调生命周期。一次属性插入遗留 @discardableResult 的编译错误已在进程终止后修正，不计为通过。
+
+词数持久保存仍是每个接受 setter 的独立 CAS；计时步骤不写文件，保持 savedDraft／disk，但同样检查磁盘版本及生产者归属。后续普通保存会保存当前运行时，包括此前 nosave 布局，与源保存完整 Config 一致。不合并 No Quit 的拒绝和视觉成功，也不回滚部分已发布状态。显式显示只保留到源码真正执行下一次视觉 setter；不是永久脱离动态切换。这里尚不声称全部 IME、词组／在线内容、源计时多回调交付、倒计时动画和实体窗口均已验证。
+
+扩大回归 993 项全部通过，零失败／跳过（1,248.897 秒）；其中 PracticeCompositionHostTests 的 42 项全部通过（942.838 秒），覆盖多语言组合、长提示、窄窗口和候选布局。日志缓冲曾停留在较早用例，/tmp/typebar-layoutfluid-broad.sample.txt 的一次只读采样确认已进入后续缅甸语测试，继续等待原句柄至完成，未重启或并行运行原生测试。参考行为审计通过（47 direct／119 native symbols／17 supporting），人工表结构校验通过（1,361 场景，不等于实体验收通过）。日志为 /tmp/typebar-layoutfluid-{focused,handoff-red,handoff-green,handoff-green-final,broad,reference,package}.log；handoff-red 是实际按键／生产者边界失败，handoff-green 为属性位置编译错误，最终结果以 handoff-green-final／broad 为准。
+
+最终 Debug app 打包、签名、资源边界及固定参考原创性检查通过，全程未启动 Typebar 主程序；这些相关检查不等于整仓 Native Rewrite Gate 或全部实体功能已验收。
+
+额外源码边界已确认而未混入完成声明：input/handlers/keydown.ts 的 Opposite Shift keymap 分支，在显式 keymapLayout 时反查视觉布局；原生 effectiveOppositeShiftKeymap 仍有 Layout Fluid → system 的旧特判。应在后续独立验证该比较映射及同帧交付，不能拿本批物理文本映射的通过结果证明它已对齐。word-navigation.ts 在 goToNextWord 增加索引前调用 handleSpace，支持本批以完成词数传入 activeWordIndex+1 的约定；全流式内容的分段增长及所有提交方式仍待扩验。
+
 ## 完整配置屏幕键盘命令（2026-10-26，起点 0788afb1）
 
 CFG-KEYMAP-COMMAND-PAGE-01：先执行实际 commandline metadata／builder、setter、schema 与 test-logic.restart 的 No Quit 首段守卫，得到 980 组记录，再实现此前不存在的完整配置命令能力；未将新符号的编译失败冒充行为 RED。`--keymap-commands` 覆盖四个模式、七种结构、四种标注、三种键帽范围、三种代表性布局（overrideSync／QWERTY／Dvorak）、14 个原始大小输入，组合七种当前配置与活动／No Quit 状态。完整布局集合的导入／映射覆盖仍见既有键盘排版审计，不以三种命令布局样本声称全布局体验已验。
@@ -14,7 +28,7 @@ CFG-KEYMAP-COMMAND-PAGE-01：先执行实际 commandline metadata／builder、se
 
 模式修复后的专项回归 126 项全部通过，零失败／跳过（73.535 秒），覆盖实际生产页、键盘命令、趣味激活／记忆、旧挑战及键盘偏好。Simon Says 关闭的图像回归已通过；TTS 使用同一 publication 优先分支，但本批没有真实语音设备验收。日志为 /tmp/typebar-keymap-{focused,focused-final,broad,guide-and-layout,simon-red,funbox-final,reference,package,package-final}.log；simon-red 为稳定布局后的有效 RED，旧图像漏检和初次编译错误不计为通过。
 
-仍有明确显示缺口：Layout Fluid 的原生 effectiveKeyboardLayout 优先动态布局，并由输入映射复用；源码 states/test.ts 则在 keymapLayout 非 overrideSync 时优先显式视觉布局。当前源码命令／保存对照不能证明这个消费者已对齐；需要把动态物理输入与显式视觉布局独立验证并修复，尤其是 No Quit 拒绝重开后的显示。此次不将全趣味组合标记完成。
+本批之前的明确显示缺口是 Layout Fluid 的 effectiveKeyboardLayout 优先进度公式，并被物理输入复用，因而忽略显式视觉布局。该边界现由上方 CFG-LAYOUTFLUID-RUNTIME-01 逐 setter 运行时及物理事件验证处理；源自动回调的词数保存／计时不保存及 No Quit 分别拒绝的语义也纳入。全趣味组合仍未标记完成，特别是上方另列的 Opposite Shift 比较映射。
 
 最终 Debug app 打包／签名、资源边界与固定参考原创性检查通过，未启动主程序。这里的相关回归及检查不是整仓 Native Rewrite Gate，仍不据此宣称全部原版功能或实体验收完成。
 

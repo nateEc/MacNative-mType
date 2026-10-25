@@ -116,6 +116,7 @@ struct NativeTypingInput: NSViewRepresentable {
     var compositionDisplayStyle: CompositionDisplayStyle = .replace
     var quickRestartKey: QuickRestartKey
     var keyboardInputMapping: KeyboardInputMapping
+    var keyboardInputMappingProvider: (() -> KeyboardInputMapping?)? = nil
     var oppositeShiftKeymap: KeyboardInputMapping
     var oppositeShiftMode: OppositeShiftMode
     var mapsArrowKeysToInput: Bool
@@ -170,6 +171,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onOpenCommandPalette = onOpenCommandPalette
         view.quickRestartKey = quickRestartKey
         view.keyboardInputMapping = keyboardInputMapping
+        view.keyboardInputMappingProvider = keyboardInputMappingProvider
         view.oppositeShiftKeymap = oppositeShiftKeymap
         view.oppositeShiftMode = oppositeShiftMode
         view.mapsArrowKeysToInput = mapsArrowKeysToInput
@@ -234,6 +236,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onQuickRestartProtectionRequired: () -> Void = {}
     var quickRestartKey: QuickRestartKey = .off
     var keyboardInputMapping: KeyboardInputMapping = .system
+    var keyboardInputMappingProvider: (() -> KeyboardInputMapping?)?
     var oppositeShiftKeymap: KeyboardInputMapping = .builtIn(.ansiQwerty)
     var oppositeShiftMode: OppositeShiftMode = .off
     var mapsArrowKeysToInput = false
@@ -285,6 +288,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     /// AppKit may retain a detached input beyond its SwiftUI page's lifetime.
     /// Native callbacks must not keep that page's queries or context alive.
     func retirePageCallbacks() {
+      keyboardInputMappingProvider = nil
       isRetired = true
       removeWindowFocusObservers()
       removeLocalKeyDownMonitor()
@@ -536,7 +540,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         let forcesError = oppositeShiftMode != .off && !usesCorrectShift
         if let emulatedText = KeyboardLayoutEmulator.text(
             forKeyCode: event.keyCode, modifierFlags: event.modifierFlags,
-            mapping: keyboardInputMapping
+            mapping: keyboardInputMappingProvider?() ?? keyboardInputMapping
         ) {
             onInsert(emulatedText, forcesError)
             return
