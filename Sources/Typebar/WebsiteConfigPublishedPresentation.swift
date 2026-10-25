@@ -44,6 +44,12 @@ final class WebsiteConfigPublishedPresentation {
     appearance = preparedAppearance.appearance
   }
 
+  /// A next-attempt-only selection must not replay theme/random/system events.
+  func retainingAppearance(for publication: WebsiteConfigCommitCoordinator.Publication) -> WebsiteConfigPublishedPresentation {
+    .init(publication: publication, preparedAppearance: .init(themes: themes, custom: customTheme,
+      appearance: appearance, systemIsDark: systemIsDark))
+  }
+
   convenience init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID, systemIsDark: Bool) throws {
     guard publication.owner == owner else { throw WebsiteConfigPublishedPresentationError.wrongOwner }
     guard publication.font != nil, publication.background != nil else {

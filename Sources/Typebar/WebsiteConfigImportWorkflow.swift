@@ -7,6 +7,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case difficulty(Difficulty), punctuation(Bool), numbers(Bool), quoteLengths([Int])
   case language(String), lazyMode(Bool)
   case funboxes([String])
+  case polyglotLanguages([String])
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
@@ -14,6 +15,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .quoteLengths: "quoteLength"
     case .language: "language"; case .lazyMode: "lazyMode"
     case .funboxes: "funbox"
+    case .polyglotLanguages: "customPolyglot"
     }
   }
   var value: WebsiteConfigValue {
@@ -26,6 +28,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .language(let value): .string(value)
     case .lazyMode(let value): .bool(value)
     case .funboxes(let values): .array(values.map(WebsiteConfigValue.string))
+    case .polyglotLanguages(let values): .array(values.map(WebsiteConfigValue.string))
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -34,7 +37,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   var dispatchesRestartAfterRejection: Bool {
     switch self {
     case .difficulty, .language: false
-    case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes: true
+    case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes, .polyglotLanguages: true
     }
   }
 }
@@ -136,6 +139,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     try checkIntent(intent, page: page)
     applying = true
     let current = UUID(); operation = current
+    let noticeGeneration = notices?.deliveryGeneration
     defer {
       if let prepared { _ = coordinator.cancel(prepared) }
       if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
@@ -162,12 +166,22 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         rejectedRestart = (controller, current)
         let advanced = try await controller.requestAndWait(requestID: current)
         if advanced { return "设置未修改；已按原配置开始新的练习。" }
+        if edit.key == "customPolyglot", page.state.session.hasStarted, !page.state.session.isFinished,
+          page.state.session.configuration.modifiers.contains(.noQuit), let publication = page.state.presentation?.publication {
+          postPolyglotNoQuitNotice("多语组合未修改；No Quit 保留当前练习。", publication: publication,
+            page: page, operation: current, noticeGeneration: noticeGeneration)
+        }
         try Task.checkCancellation()
         guard operation == current, !stopped else { throw CancellationError() }
         throw WebsiteConfigImportWorkflowError.rejectedRestartFailed
       }
       switch try coordinator.beginConfigurationRestart(ticket, for: page, action: edit) {
       case .accepted(let admitted): ticket = admitted
+      case .futureSelectionSaved(let publication):
+        let message = "多语组合已保存；No Quit 保留当前练习，下一轮使用新组合。"
+        postPolyglotNoQuitNotice(message, publication: publication, page: page,
+          operation: current, noticeGeneration: noticeGeneration)
+        return message
       case .acceptedRetired:
         if ticket.draft.projection.events.contains(where: { $0.nosave == false }) {
           return "设置已保存，但窗口已变化；请重新打开面板恢复配置。"
@@ -247,6 +261,18 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       }
       throw error
     }
+  }
+  private func postPolyglotNoQuitNotice(_ message: String,
+    publication: WebsiteConfigCommitCoordinator.Publication, page: PracticePageSessionStore,
+    operation current: UUID, noticeGeneration: UUID?) {
+    guard let notices, let noticeGeneration else { return }
+    notices.postGuarded(message, level: .notice, options: .init(important: true, title: "锁定重开"),
+      generation: noticeGeneration, whileCurrent: {
+        self.operation == current && !self.stopped && !Task.isCancelled
+          && self.environment.read()?.revision == publication.environmentRevision
+          && page.state.presentation?.publication.applicationID == publication.applicationID
+          && publication.isCurrentDelivery(owner: page.owner, router: self.settings.preferenceConfigurationSaves)
+      })
   }
   func cancel() {
     operation = UUID()

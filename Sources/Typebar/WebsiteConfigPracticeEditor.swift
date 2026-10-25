@@ -20,6 +20,7 @@ struct WebsiteQuoteRecoveryNotice: View {
   var quoteLengths: [Int]
   var language: TypingLanguage
   var lazyMode: Bool
+  var polyglotLanguages: String
   private(set) var remembersLazyMode: Bool
   static let languages = TypingLanguage.allCases.filter { WebsiteLanguageIdentity.name(for: $0) != nil }
   static let quoteChoices: [(label: String, groups: [Int])] = [
@@ -30,16 +31,32 @@ struct WebsiteQuoteRecoveryNotice: View {
   @ObservationIgnored private var work: Task<Void, Never>?
   @ObservationIgnored private var request = UUID()
   init(parameters: WebsiteConfigNativeTestParameters, difficulty: Difficulty = .normal, quoteLengths: [Int] = [1],
-    lazyMode: Bool = false, remembersLazyMode: Bool = false) {
+    lazyMode: Bool = false, remembersLazyMode: Bool = false,
+    polyglotLanguages: [String] = ["english", "spanish", "french", "german"]) {
     mode = parameters.mode
     limit = String(parameters.mode == .time ? parameters.duration : parameters.wordLimit)
     self.difficulty = difficulty; self.quoteLengths = quoteLengths
     language = parameters.language; self.lazyMode = lazyMode; self.remembersLazyMode = remembersLazyMode
+    self.polyglotLanguages = polyglotLanguages.joined(separator: " ")
   }
   convenience init(draft: WebsiteConfigNativeDraft) {
     self.init(parameters: draft.testParameters, difficulty: draft.inputRules.difficulty,
       quoteLengths: draft.quoteSelection.groups, lazyMode: draft.generators.lazyMode,
-      remembersLazyMode: draft.lazyMemory.remember)
+      remembersLazyMode: draft.lazyMemory.remember,
+      polyglotLanguages: draft.generators.polyglotLanguages.compactMap(WebsiteLanguageIdentity.name))
+  }
+  func startPolyglotLanguages(apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
+    guard !isWorking else { return }
+    let trimmed = WebsiteConfigValue.string(polyglotLanguages).trimmingWebsiteString
+    guard let units = trimmed.stringUnits else { return }
+    // Match the source input's trim().split(" "), including empty middle
+    // fields. Deduplication remains the setter's later value override.
+    let names = String(decoding: units, as: UTF16.self).components(separatedBy: " ")
+    let value = WebsiteConfigValue.array(names.map(WebsiteConfigValue.string))
+    guard WebsiteConfigSchema(catalogs: WebsiteConfigNativeProfile.catalogs).accepts(value, for: "customPolyglot") else {
+      message = "至少输入两个有效语言 ID，以单个空格分隔，例如 english german。"; return
+    }
+    start(.polyglotLanguages(names), apply: apply)
   }
   func startLanguage(apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     guard !isWorking else { return }
@@ -163,6 +180,17 @@ struct WebsiteConfigPracticeEditor: View {
         HStack { Spacer(); Button("应用语言") { form.startLanguage(apply: apply) }
           .accessibilityIdentifier("website-config-apply-language") }
       }.disabled(!canEdit || form.isWorking || pendingPreparation)
+      VStack(alignment: .leading, spacing: 6) {
+        Text("多语组合（Polyglot）").font(.caption)
+        TextField("english german", text: $form.polyglotLanguages)
+          .font(.system(.body, design: .monospaced)).textFieldStyle(.roundedBorder)
+          .accessibilityLabel("多语语言 ID，以单个空格分隔")
+          .accessibilityIdentifier("website-config-polyglot-languages")
+        Button("保存组合并重开") { form.startPolyglotLanguages(apply: apply) }
+          .accessibilityIdentifier("website-config-apply-polyglot-languages")
+        Text("这里只设置组合，不自动启用 Polyglot。No Quit 活动时只保存，当前练习继续。")
+          .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+      }.disabled(!canEdit || form.isWorking || pendingPreparation)
       HStack {
         Picker("简化输入", selection: $form.lazyMode) { Text("关闭").tag(false); Text("开启").tag(true) }
         Button("应用并重开") { form.start(.lazyMode(form.lazyMode), apply: apply) }
@@ -203,7 +231,7 @@ struct WebsiteConfigPracticeEditor: View {
           }
         }.disabled(!canEdit || form.isWorking || pendingPreparation)
       }
-      Text(pendingPreparation ? "可继续准备，或在导入面板恢复配置。" : canEdit ? "应用会保存设置并重开；进行中的练习将结束。词数／秒数为 0 表示无限。" : "请等待上一项练习准备完成。")
+      Text(pendingPreparation ? "可继续准备，或在导入面板恢复配置。" : canEdit ? "重开时会结束当前练习；词数／秒数为 0 表示无限。" : "请等待上一项练习准备完成。")
         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       if form.isWorking {
         HStack {

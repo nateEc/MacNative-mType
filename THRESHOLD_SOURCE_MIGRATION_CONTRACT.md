@@ -1,5 +1,25 @@
 # 阈值源状态与迁移契约
 
+## Polyglot 语言组合输入与 No Quit 的下轮保存（2026-10-25，起点 13d6cce4）
+
+源码复核改变了初始方案：语言载入失败分支存在于 polyglot.withWords 的异步 JSONData 入口，当前原生正式词源是本机目录，并没有可直接替换的同型载入接口；不能插入未接线的失败模型冒充功能完成，降级分支继续开放。再核查到旧 PolyglotWordPool 的拼接，但正式 GeneratedCandidateContinuation 已走 NativePolyglotCandidates 的 UTF-16 精确 Map 身份／首词顺序／末语言拥有权，既有测试也已覆盖，故未错误改动正式候选或词库。实际接线缺口是完整配置不能编辑 customPolyglot，只能改 JSON。
+
+固定 commandline metadata 的 customPolyglot 输入使用 trim().split(" ")，在测试页 afterExec 无条件请求 restart；buildInputCommand 的 exec 即使 setter 返回 false 也执行 afterExec。setter metadata 对该字段 changeRequiresRestart=false，overrideValue 以 Set 保留首次顺序，因此源 No Quit 活动时可先保存字段，再由 restart 早退并发重要提示。这不同于 funbox／words 等真正要求重开的 setter，不能统一拒绝整个保存，也不能为新增控制放宽全局 No Quit 限制。
+
+新探针执行实际命令输入定义、完整 buildInputCommand、customPolyglot 值覆盖、完整 restart 的 No Quit 早退分支；普通重开服务和固定合法样本的目录／schema 端点为明确自有适配器，不冒充完整浏览器、全 setter 或实际词源。72 组覆盖九类输入（含 BOM／NBSP、重复、连续空格、换行、未知 ID 与代码语言）、活动／非活动、No Quit／普通、测试／设置页。核对前检结果、转换值、保存次数、false 后请求及重要提示；普通 NativeProfile schema／setter 另由既有全源码阶段对照和真实工作流覆盖。
+
+原生增加 polyglotLanguages 显式动作及表单字段，预检前不去重，不静默重写用户输入；字段不自动切换 funbox。合法普通编辑沿原保存／离场／准备流程；拒绝的 setter 仍经既有普通控制器派发重开。活动 No Quit 路径只允许 customPolyglot 保存事件，且其余全部运行字段逐项相等；页面命名预留入口复用原租约、拥有权、附件、组合输入、代次与捕获校验，普通 beginCommit 不接受新的绕过参数。文件 CAS 成功前不碰实际页面；成功后只换配置发布，不换当前尝试／词组／输入／scope／时钟／账本或控制器。种子取当前 practice.session 而非旧首轮发布，外观克隆当前已解析状态，不重放随机主题或系统切换。当前轮仍记录自己的原配置，正常下一轮才生成新组合。
+
+No Quit 的重要提示沿既有 LocalNoticeCenter，捕获请求前的账户通知代次，并同时检查操作、环境、发布、文件及拥有权；取消或切账户不向新上下文投递旧消息。取消发生在 CAS 前不写，发生在 CAS 后如实报告已保存，不回滚磁盘或重新计量。没有新存档字段、数据库版本或双写；已有 customPolyglot 数组可由旧版本冷读，回退只失去本原生控件。界面沿既有字段组与系统样式增加等宽 ID 输入及说明，明确 No Quit 只保存当前练习之后使用，修正页脚的统一“必重开”文案；隐藏渲染增加容纳新控制的高度，不改生产窗口尺寸。
+
+先行两项行为测试中普通路径通过，No Quit 在协调器统一 locked 处失败；加入保存路径后又在页面通用 beginCommit 的 locked 处失败，证明需要命名的字段专属预留，而非仅放开上层判断。两层修复后两项通过（0.202 秒）。首批 UI／工作流 13 项通过（6.501 秒），进一步边界 17 项通过（6.706 秒），含真实源解析表单、No Quit 保存与拒绝、正常去重／未启用仍重开、完成后新组合、旧 token、普通下一轮之后的种子一致及当前外观、竞争记录、字段专属入口拒绝其他 key、提交时账户变化。随后新增提交前／后取消再扩大范围，最终结果另记。新控件的浅／深 340／520 隐藏布局已检查，不打开或激活窗口；不把渲染图片当作实际点击／实体输入的证明。
+
+语言加载失败降级、命令面板对应快捷入口、显式重复时当前组合与新组合的全部交叉语义、完整导入失败写序、实体键盘／IME 和完整目标仍开放；只接通已证实的原生表单能力，不修改词库、生成器、源代码副本或资产，也不据此关闭既有隐藏 SwiftUI 滚轮失败。仅开发分支，main／PR／CI 与账户通知不变。
+
+最终相关扩大 839 项零失败／零跳过（234.848 秒），覆盖全部 WebsiteConfig、普通重开控制器、页面提交／时钟准入、No Quit、AppSettings／SettingsJSON、本地通知、Polyglot 及窗口输入交付；两项新增取消边界亦通过。该风险范围没有重跑旧 ViewportPracticeHostTests 的已知合成滚轮失败，也没有替代完整客户端／服务端门禁，旧失败保持开放。72 组源命令样本、120 组 Memory 调用方、225 组选择记忆及既有 2,304 激活／其他源码阶段均保留。原创性、47 direct／119 native symbols／17 specs 行为审计、1,343 条人工清单结构和空白检查通过；人工结构不等于实体验收。
+
+串行 Debug 打包、签名及包内源码／资源边界通过（增量构建 1.19 秒），没有启动主程序或打开用户数据库。本轮日志 `/tmp/typebar-polyglot-list-{red,green,ui,focused,broad,originality,reference,manual,package}.log` 和 `/tmp/typebar-polyglot-list-source.{json,log}` 区分两层红测、源码及实际工作流证据。推送前确认开发分支无打开 PR，main 仍为 8c52fb13，Actions 826 次且最新 39118939684 成功；与本地 Memory 检查点一起随本实质批次推开发分支，不修改工作流、邮件或账户通知，整体 goal active。
+
 ## Memory 完整重开调用方的计时器重置（2026-10-25，起点 5b0430fa）
 
 本轮先检查 Memory.restart 与 memory-funbox-timer，发现孤立模块会用已生成词数的 1.2 次幂取整作为秒数并递减；但继续向上追踪完整 restart 调用方发现，处理器之后立即调用 TestUI.onTestRestart，后者无条件 MemoryFunboxTimer.reset，再 showWords。startTest 依次调用 Memory.start 与 TestUI.onTestStart，后者不会重新显示词。若只按处理器新增原生等待倒计时，会偏离该固定版本的实际行为。本轮因此撤回倒计时实现计划，未修改生产计时、渲染、输入、记录格式或存储；不把一个疑似原版实现问题自行改写为“兼容”。

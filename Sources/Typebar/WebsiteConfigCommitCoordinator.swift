@@ -42,7 +42,7 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate var contentCapture: WebsiteConfigPracticeScopeSource.Snapshot?
   }
   struct Publication {
-    /// One successful full application, including repeated identical values.
+    /// One successful publication, including next-attempt-only selection saves.
     let applicationID: UUID
     let draft: WebsiteConfigNativeDraft
     let savedDraft: WebsiteConfigNativeDraft
@@ -114,6 +114,7 @@ final class WebsiteConfigCommitCoordinator {
   }
   enum ConfigurationDepartureOutcome {
     case accepted(Prepared), acceptedRetired, stale, conflict, unavailable, busy
+    case futureSelectionSaved(Publication)
   }
   func beginConfigurationRestart(_ prepared: Prepared, for page: PracticePageSessionStore,
     action: WebsiteConfigPracticeEdit) throws -> ConfigurationDepartureOutcome {
@@ -125,6 +126,9 @@ final class WebsiteConfigCommitCoordinator {
       page.state.configurationDeparture == nil,
       case .edited(let edit) = prepared.draft.origin, edit.key == action.key else { return .stale }
     guard !capture.testActive || !page.state.session.configuration.modifiers.contains(.noQuit) else {
+      if action.key == "customPolyglot" {
+        return try saveFuturePolyglotSelection(prepared, for: page, capture: capture)
+      }
       throw PracticePageSessionStateError.locked
     }
     guard let previous = page.state.practice,
@@ -191,6 +195,51 @@ final class WebsiteConfigCommitCoordinator {
     admitted.retainsQuoteInitialization = true
     admitted.draft = applied; admitted.savedDraft = saved; admitted.disk = disk; admitted.pageCapture = refreshed
     return .accepted(admitted)
+  }
+
+  /// This setter is explicitly non-restarting in the source metadata. Under
+  /// active No Quit it still saves; the command's following restart is denied.
+  /// Keep the actual attempt, clock, words, scope and appearance unchanged.
+  private func saveFuturePolyglotSelection(_ prepared: Prepared, for page: PracticePageSessionStore,
+    capture: PracticePageSessionStore.GenerationCapture) throws -> ConfigurationDepartureOutcome {
+    guard let previous = page.state.presentation, let practice = page.state.practice,
+      prepared.draft.projection.events.allSatisfy({ $0.key == "customPolyglot" && $0.nosave == false }),
+      capture.publication.draft.projection.runtime.allSatisfy({ key, value in
+        key == "customPolyglot" || prepared.draft.projection.runtime[key] == value
+      }) else { return .stale }
+    let applied = try WebsiteConfigLazyModeLifecycle.applyingEvents(prepared.draft,
+      pointsPerRem: prepared.environment.pointsPerRem)
+    var saved = prepared.draft; saved.lazyMemory = applied.lazyMemory
+    var state = page.state
+    let progress = state.currentQuoteInitialization
+    let controller = page.restartController
+    guard isCurrent(prepared) else { return .stale }
+    try Task.checkCancellation()
+    try page.beginFuturePolyglotCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
+    defer { page.endCommit() }
+    let revision: WebsiteConfigFileRegister.Revision
+    do {
+      switch try register.commit(saved, replacing: prepared.disk) {
+      case .committed(let value): revision = value
+      case .conflict: return .conflict
+      case .unavailable: return .unavailable
+      }
+    } catch WebsiteConfigFileRegisterError.busy { return .busy }
+    // No callback, suspension or throwing operation after the durable CAS.
+    let publication = Publication(applicationID: UUID(), draft: applied, savedDraft: saved,
+      owner: prepared.owner.owner, environmentRevision: prepared.environment.revision,
+      pointsPerRem: prepared.environment.pointsPerRem, disk: revision,
+      background: capture.publication.background, font: capture.publication.font,
+      session: practice.session, practice: practice,
+      quoteRecoveries: capture.publication.quoteRecoveries, ownerLease: prepared.owner,
+      authority: publicationAuthority)
+    state.presentation = previous.retainingAppearance(for: publication)
+    if let progress {
+      state.quoteInitialization = .init(publication: publication.applicationID, configurationDeparture: nil, progress: progress)
+    }
+    latest = publication; publicationAuthority.latest = publication.applicationID
+    page.installCommitted(state, retainingRestartController: controller)
+    return .futureSelectionSaved(publication)
   }
   /// Retry only initialization. Never re-run the accepted setter or measure
   /// the closed attempt again. A different coordinator must use cold restore.

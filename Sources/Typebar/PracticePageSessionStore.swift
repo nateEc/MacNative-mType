@@ -243,16 +243,36 @@ final class PracticePageSessionStore {
   func beginCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
     router: PreferenceConfigurationSaveRouter, capture: GenerationCapture? = nil,
     applicationCapture: ApplicationCapture? = nil) throws {
-    guard !committing else { throw PracticePageSessionStateError.stale }
-    guard self.router === router, lease.owner == owner else { throw PracticePageSessionStateError.wrongOwner }
-    guard router.isCurrent(lease) else { throw PracticePageSessionStateError.stale }
-    if let capture, !isCurrent(capture, router: router) { throw PracticePageSessionStateError.stale }
-    if let applicationCapture, !isCurrent(applicationCapture, router: router) { throw PracticePageSessionStateError.stale }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture, applicationCapture: applicationCapture)
     let session = state.session
     guard !session.hasStarted || session.isFinished || !session.configuration.modifiers.contains(.noQuit) else {
       throw PracticePageSessionStateError.locked
     }
     committing = true
+  }
+  /// Not a general No Quit bypass: only the next-attempt Polyglot list may
+  /// differ. The coordinator retains this exact attempt while saving it.
+  func beginFuturePolyglotCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft) throws {
+    guard state.configurationDeparture == nil, case .edited(let edit) = draft.origin,
+      edit.key == "customPolyglot", draft.projection.rejectedKeys.isEmpty,
+      !draft.projection.events.isEmpty,
+      draft.projection.events.allSatisfy({ $0.key == "customPolyglot" && $0.nosave == false }),
+      draft.projection.runtime.count == capture.publication.draft.projection.runtime.count,
+      capture.publication.draft.projection.runtime.allSatisfy({ key, value in
+        key == "customPolyglot" || draft.projection.runtime[key] == value
+      }) else { throw PracticePageSessionStateError.locked }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture)
+    committing = true
+  }
+  private func validateCommitOwnership(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture? = nil,
+    applicationCapture: ApplicationCapture? = nil) throws {
+    guard !committing else { throw PracticePageSessionStateError.stale }
+    guard self.router === router, lease.owner == owner else { throw PracticePageSessionStateError.wrongOwner }
+    guard router.isCurrent(lease) else { throw PracticePageSessionStateError.stale }
+    if let capture, !isCurrent(capture, router: router) { throw PracticePageSessionStateError.stale }
+    if let applicationCapture, !isCurrent(applicationCapture, router: router) { throw PracticePageSessionStateError.stale }
   }
   func endCommit() {
     committing = false

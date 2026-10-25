@@ -14,6 +14,35 @@ import XCTest
     while form.isWorking && ContinuousClock.now < deadline { await Task.yield() }
     XCTAssertFalse(form.isWorking)
   }
+  func testPolyglotInputMatchesPinnedCommandConversionAndPrevalidation() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
+      throw XCTSkip("Requires pinned reference")
+    }
+    struct Fixture: Decodable { let raw: String, converted: [String], canSubmit: Bool }
+    struct Output: Decodable { let fixtures: [Fixture] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", root.appendingPathComponent("Scripts/check-source-polyglot-list-command.mjs").path, reference]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0)
+    let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
+    XCTAssertEqual(fixtures.count, 72)
+    for fixture in fixtures {
+      let form = WebsiteConfigPracticeEditForm(parameters: try parameters())
+      form.polyglotLanguages = fixture.raw
+      var edits: [WebsiteConfigPracticeEdit] = []
+      form.startPolyglotLanguages { edits.append($0); return "applied" }
+      await settle(form)
+      XCTAssertEqual(edits, fixture.canSubmit ? [.polyglotLanguages(fixture.converted)] : [], fixture.raw)
+      XCTAssertEqual(form.polyglotLanguages, fixture.raw, "Invalid or normalized input must not be silently rewritten")
+      if !fixture.canSubmit { XCTAssertTrue(form.message?.contains("语言 ID") == true) }
+    }
+    let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"customPolyglot":["german","spanish"]}"#,
+      pointsPerRem: 16, context: .init())
+    XCTAssertEqual(WebsiteConfigPracticeEditForm(draft: draft).polyglotLanguages, "german spanish")
+  }
   func testLimitValidationPreservesInputAndForwardsOnlyExplicitParameter() async throws {
     let form = WebsiteConfigPracticeEditForm(parameters: try parameters())
     var edits: [WebsiteConfigPracticeEdit] = []
@@ -186,11 +215,11 @@ import XCTest
           let form = WebsiteConfigPracticeEditForm(draft: draft)
           let view = WebsiteConfigPracticeEditor(form: form, parameters: parameters, canEdit: true,
             apply: { _ in calls += 1; return "unexpected" })
-            .padding(20).frame(width: CGFloat(width), height: 460)
+            .padding(20).frame(width: CGFloat(width), height: 680)
             .background(Color(nsColor: .windowBackgroundColor))
             .environment(\.colorScheme, dark ? .dark : .light)
           let host = NSHostingView(rootView: view)
-          let window = NSWindow(contentRect: .init(x: 0, y: 0, width: CGFloat(width), height: 460),
+          let window = NSWindow(contentRect: .init(x: 0, y: 0, width: CGFloat(width), height: 680),
             styleMask: .borderless, backing: .buffered, defer: false)
           window.isReleasedWhenClosed = false
           window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua); window.contentView = host

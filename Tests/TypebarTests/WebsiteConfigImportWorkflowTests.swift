@@ -6,6 +6,199 @@ import Observation
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
 
+  func testPolyglotLanguageListSavesDuringActiveNoQuitWithoutChangingItsAttempt() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"theme":"dracula","funbox":["polyglot","no_quit"],"customPolyglot":["english","german"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session, old = try XCTUnwrap(f.page.state.presentation).publication
+    let controller = try XCTUnwrap(f.page.restartController)
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    let message = try await f.workflow.editAndBegin(.polyglotLanguages(["spanish", "french"]),
+      replacing: old.applicationID, systemIsDark: false)
+    XCTAssertTrue(message.contains("已保存")); XCTAssertTrue(message.contains("当前练习"))
+    let current = try XCTUnwrap(f.page.state.presentation).publication
+    XCTAssertNotEqual(current.applicationID, old.applicationID)
+    XCTAssertEqual(current.draft.generators.polyglotLanguages, [.spanish, .french])
+    XCTAssertEqual(f.page.state.session.generationState, before.generationState)
+    XCTAssertEqual(f.page.state.session.configuration, before.configuration)
+    XCTAssertEqual(f.page.state.session.prompt, before.prompt)
+    XCTAssertEqual(f.page.state.session.typed, before.typed)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertTrue(f.page.restartController === controller)
+    XCTAssertEqual(f.account.localNotices.history.count, 1)
+    XCTAssertTrue(try XCTUnwrap(f.account.localNotices.active.first).important)
+    XCTAssertNotEqual(try register.read().revision, revision)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Missing saved selection") }
+    XCTAssertEqual(saved["customPolyglot"], .array([.string("spanish"), .string("french")]))
+    XCTAssertEqual(saved["theme"], .string("dracula"))
+    let savedRevision = try register.read().revision
+    do { try await f.workflow.editAndBegin(.polyglotLanguages(["english", "german"]), replacing: old.applicationID, systemIsDark: false); XCTFail("Old editor applied") }
+    catch {}
+    do { try await f.workflow.editAndBegin(.words(8), replacing: current.applicationID, systemIsDark: false); XCTFail("No Quit bypassed") }
+    catch {}
+    XCTAssertEqual(try register.read().revision, savedRevision)
+    var finished = f.page.state
+    finished.session.insertBatch(String(finished.session.prompt.dropFirst(finished.session.typed.count)))
+    XCTAssertTrue(finished.session.isFinished); f.page.replace(finished)
+    let advanced = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(advanced)
+    XCTAssertEqual(f.page.state.session.configuration.mixedLanguageComponents, [.spanish, .french])
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
+  func testRejectedPolyglotListUnderNoQuitKeepsRevisionAndPostsImportantNotice() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let old = try XCTUnwrap(f.page.state.presentation).publication
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    do { try await f.workflow.editAndBegin(.polyglotLanguages(["english", "english"]), replacing: old.applicationID, systemIsDark: false); XCTFail("Rejected list saved or restarted") }
+    catch WebsiteConfigImportWorkflowError.rejectedRestartFailed {}
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, old.applicationID)
+    XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertEqual(f.account.localNotices.history.count, 1)
+    XCTAssertTrue(try XCTUnwrap(f.account.localNotices.active.first).important)
+  }
+
+  func testPolyglotLanguageListEditsUseSetterOrderingAndRestartEvenWhenInactive() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"theme":"dracula"}"#, systemIsDark: false)
+    let old = try XCTUnwrap(f.page.state.presentation).publication
+    try await f.workflow.editAndBegin(.polyglotLanguages(["german", "english", "german"]), replacing: old.applicationID, systemIsDark: false)
+    let current = try XCTUnwrap(f.page.state.presentation).publication
+    XCTAssertNotEqual(current.session?.automaticInputAttemptID, old.session?.automaticInputAttemptID)
+    XCTAssertEqual(current.draft.generators.polyglotLanguages, [.german, .english])
+    XCTAssertFalse(current.draft.generators.requestsPolyglot)
+    XCTAssertEqual(current.draft.themes.theme, .dracula)
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    let attempt = f.page.state.session.automaticInputAttemptID
+    let message = try await f.workflow.editAndBegin(.polyglotLanguages(["english", "english"]), replacing: current.applicationID, systemIsDark: false)
+    XCTAssertTrue(message.contains("设置未修改"))
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+  }
+
+  func testFuturePolyglotSaveAfterOrdinaryRoundKeepsCoherentSeedAndCurrentAppearance() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"],"customPolyglot":["english","german"]}"#, systemIsDark: false)
+    var finished = f.page.state; finished.session.insertBatch(finished.session.prompt)
+    XCTAssertTrue(finished.session.isFinished); f.page.replace(finished)
+    let advanced = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID())
+    XCTAssertTrue(advanced)
+    var active = f.page.state; active.session.insertBatch("x"); f.page.replace(active)
+    let previous = try XCTUnwrap(f.page.state.presentation)
+    _ = previous.updateSystemAppearance(isDark: true)
+    let appearance = previous.appearance, attempt = active.session.automaticInputAttemptID
+    try await f.workflow.editAndBegin(.polyglotLanguages(["german", "spanish"]), replacing: previous.publication.applicationID, systemIsDark: false)
+    let next = try XCTUnwrap(f.page.state.presentation)
+    XCTAssertEqual(next.publication.session?.automaticInputAttemptID, attempt)
+    XCTAssertEqual(next.publication.practice?.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(next.appearance, appearance)
+    XCTAssertTrue(next.currentSystemIsDark)
+    XCTAssertEqual(f.page.state.session.generationState, active.session.generationState)
+  }
+
+  func testFuturePolyglotReservationCannotBeUsedForAnotherKey() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let capture = try f.page.captureGeneration(router: f.settings.preferenceConfigurationSaves)
+    let lease = try XCTUnwrap(f.settings.preferenceConfigurationSaves.captureLease())
+    let words = try WebsiteConfigNativeProfile.editDraft(capture.publication.draft, key: "words", value: .number(8),
+      pointsPerRem: 16, context: .init(), testActive: false)
+    XCTAssertThrowsError(try f.page.beginFuturePolyglotCommit(owner: lease,
+      router: f.settings.preferenceConfigurationSaves, capture: capture, draft: words))
+    XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+    XCTAssertNoThrow(try f.page.captureGeneration(router: f.settings.preferenceConfigurationSaves))
+  }
+
+  func testFuturePolyglotSaveCannotOverwriteCompetingRecord() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7,"theme":"nord"}"#,
+      pointsPerRem: 16, context: .init())
+    var armed = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if armed {
+          armed = false
+          do {
+            guard case .committed = try register.commit(competitor, replacing: XCTUnwrap(register.read().revision)) else {
+              XCTFail("Competing writer failed"); return nil
+            }
+          } catch { XCTFail("Competing writer: \(error)"); return nil }
+        }
+        return f.window
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let old = try XCTUnwrap(f.page.state.presentation).publication
+    armed = true
+    do { try await workflow.editAndBegin(.polyglotLanguages(["english", "spanish"]), replacing: old.applicationID, systemIsDark: false); XCTFail("Competing record overwritten") }
+    catch {}
+    XCTAssertFalse(armed)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, old.applicationID)
+    XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Missing competing record") }
+    XCTAssertEqual(saved["theme"], .string("nord"))
+    XCTAssertEqual(saved["words"], .number(7))
+  }
+
+  func testFuturePolyglotNoticeDoesNotLeakIntoAccountChangedAtPublication() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let old = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    withObservationTracking { _ = f.page.state.presentation } onChange: {
+      MainActor.assumeIsolated {
+        f.account.currentUser = .init(id: UUID(), email: "owned@example.invalid", displayName: "Owned", totalExperience: 0)
+        f.account.localNotices.post("New account", options: .init(durationMilliseconds: 0))
+      }
+    }
+    let message = try await f.workflow.editAndBegin(.polyglotLanguages(["english", "spanish"]), replacing: old, systemIsDark: false)
+    XCTAssertTrue(message.contains("已保存"))
+    XCTAssertEqual(f.account.localNotices.history.map(\.message), ["New account"])
+    XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+  }
+
+  func testFuturePolyglotCancellationAfterCASReportsSavedWithoutPostingLateNotice() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let old = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let handle = WeakWorkflow(); handle.value = f.workflow
+    withObservationTracking { _ = f.page.state.presentation } onChange: {
+      MainActor.assumeIsolated { handle.value?.cancel() }
+    }
+    let message = try await f.workflow.editAndBegin(.polyglotLanguages(["german", "spanish"]), replacing: old, systemIsDark: false)
+    XCTAssertTrue(message.contains("已保存"))
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.generators.polyglotLanguages, [.german, .spanish])
+    XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+    XCTAssertTrue(f.account.localNotices.history.isEmpty)
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else { return XCTFail("Missing saved setting") }
+    XCTAssertEqual(saved["customPolyglot"], .array([.string("german"), .string("spanish")]))
+  }
+
+  func testFuturePolyglotCancellationBeforePreparationDoesNotSaveOrDepart() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let old = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    let task = Task { try await f.workflow.editAndBegin(.polyglotLanguages(["german", "spanish"]), replacing: old, systemIsDark: false) }
+    task.cancel()
+    do { _ = try await task.value; XCTFail("Cancelled setting saved") } catch is CancellationError {}
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, old)
+    XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
   func testMemoryRealPageRestartRestoresPreviewWithoutInventingAnIdleCountdown() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["memory"],"keymapMode":"next"}"#, systemIsDark: false)
