@@ -231,8 +231,9 @@ import XCTest
     do {
       _ = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(), loadQuotes: { _ in [] })
       XCTFail("Missing quotes silently became another prompt")
-    } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery) {
+    } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery, let reason) {
       XCTAssertEqual(recovery.websiteChanges, ["mode": .string("words")])
+      XCTAssertEqual(reason, .noLanguageQuotes)
     }
   }
 
@@ -293,8 +294,10 @@ import XCTest
         _ = try await WebsiteConfigSessionBuilder.prepare(draft: draft("{\"mode\":\"quote\",\"quoteLength\":\(groups)}"),
           scope: scope, loadQuotes: { _ in catalog }, random: .init(quoteIndex: { $0 - 1 }))
         XCTFail("Unavailable selection silently substituted a quote")
-      } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery) {
+      } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery, let reason) {
         XCTAssertEqual(recovery.websiteChanges, ["quoteLength": .array((0...3).map { .number(Double($0)) })])
+        XCTAssertEqual(reason, groups == "[-2]" ? .selectedQuoteUnavailable
+          : groups == "[-3,0]" ? .favoriteQuoteUnavailable : .noSelectedLengthQuotes)
       }
     }
   }

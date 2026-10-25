@@ -527,32 +527,39 @@ final class WebsiteConfigCommitCoordinator {
     }
   }
   func preparePractice(for prepared: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope,
+    initializationReport: WebsiteConfigInitializationReport? = nil,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
     random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> SessionPrepared {
-    try await preparePracticeBuild(for: prepared, scope: scope, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+    try await preparePracticeBuild(for: prepared, scope: scope, initializationReport: initializationReport,
+      loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
   }
   func preparePractice(for prepared: ResourcesPrepared,
+    initializationReport: WebsiteConfigInitializationReport? = nil,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
     random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> SessionPrepared {
-    try await preparePracticeBuild(for: prepared, scope: nil, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+    try await preparePracticeBuild(for: prepared, scope: nil, initializationReport: initializationReport,
+      loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
   }
   func prepareNext(for page: PracticePageSessionStore,
+    initializationReport: WebsiteConfigInitializationReport? = nil,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
     random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> NextPrepared {
     let resources = try nextResources(for: page)
     let session = try await preparePracticeBuild(for: resources, scope: nil,
-      reason: .nextAttempt, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+      reason: .nextAttempt, initializationReport: initializationReport,
+      loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
     return .init(session: session)
   }
   func prepareRestart(for page: PracticePageSessionStore, repeatingRequested: Bool = false,
+    initializationReport: WebsiteConfigInitializationReport? = nil,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
     random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> NextPrepared {
     try await prepareRestart(restartPlan(for: page, repeatingRequested: repeatingRequested),
-      loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+      initializationReport: initializationReport, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
   }
   private func restartPlan(for page: PracticePageSessionStore, repeatingRequested: Bool) throws -> RestartAdmission {
     let resources = try nextResources(for: page)
@@ -625,6 +632,7 @@ final class WebsiteConfigCommitCoordinator {
   @discardableResult
   func cancel(_ admission: RestartAdmission) -> Bool { cancel(admission.resources.configuration) }
   func prepareRestart(_ admission: RestartAdmission,
+    initializationReport: WebsiteConfigInitializationReport? = nil,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil,
     random: WebsiteConfigSessionBuilder.Random = .init()) async throws -> NextPrepared {
@@ -633,19 +641,20 @@ final class WebsiteConfigCommitCoordinator {
     guard let capture = resources.configuration.pageCapture else { throw PracticePageSessionStateError.incomplete }
     if !repetition.repeatsWordset {
       let session = try await preparePracticeBuild(for: resources, scope: nil,
-        reason: .nextAttempt, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+        reason: .nextAttempt, initializationReport: initializationReport,
+        loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
       return .init(session: session)
     }
     if original.configuration.mode == .quote, resources.configuration.quoteInitialization != nil {
       let session = try await preparePracticeBuild(for: resources, scope: nil, reason: .nextAttempt,
         repeatedSource: .repeatedQuote(previous.quote, repeatedPace: repetition.repeatsPace),
-        loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+        initializationReport: initializationReport, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
       return .init(session: session)
     }
     if [.words, .time].contains(original.configuration.mode), let history = original.generatedWordReplayHistory {
       let session = try await preparePracticeBuild(for: resources, scope: nil, reason: .nextAttempt,
         repeatedSource: .repeatedWords(history, repeatedPace: repetition.repeatsPace),
-        loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+        initializationReport: initializationReport, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
       return .init(session: session)
     }
     let session = try await prepareSessionBuild(for: resources) { _ in
@@ -743,6 +752,7 @@ final class WebsiteConfigCommitCoordinator {
   private func preparePracticeBuild(for resources: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope?,
     reason: WebsiteConfigSessionBuilder.Reason = .configurationApplication,
     repeatedSource: WebsiteConfigSessionBuilder.AttemptSource = .selection,
+    initializationReport: WebsiteConfigInitializationReport? = nil,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote],
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
     random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
@@ -766,6 +776,9 @@ final class WebsiteConfigCommitCoordinator {
         try Task.checkCancellation()
         try checkAsyncResources(recovery.resources.configuration, admission: recovery.resources.admission)
         current = try prepareQuoteRecovery(recovery.recovery, for: recovery.resources)
+        try reportInitializationFailure(WebsiteConfigInitializationReport.quote(attempt: attempt + 1,
+          reason: recovery.reason, selectedQuoteID: recovery.selectedQuoteID),
+          resources: current, report: initializationReport, exhausted: attempt == 2)
         if attempt == 2 { throw WebsiteConfigSessionBuildError.quoteRecoveryLimitReached }
         await Task.yield()
       } catch let failure as GenerationFailure {
@@ -780,6 +793,9 @@ final class WebsiteConfigCommitCoordinator {
         current = .init(configuration: configuration, admission: failure.resources.admission,
           background: failure.resources.background, font: failure.resources.font)
         try Task.checkCancellation()
+        try reportInitializationFailure(WebsiteConfigInitializationReport.generation(attempt: attempt + 1, error: failure.underlying,
+          quote: failure.quoteInitialization ?? current.configuration.quoteInitialization),
+          resources: current, report: initializationReport, exhausted: attempt == 2)
         if attempt == 2 { throw failure.underlying }
         await Task.yield()
       }
@@ -788,7 +804,25 @@ final class WebsiteConfigCommitCoordinator {
   }
   @MainActor private struct QuoteRecoveryRequest: Error {
     let recovery: WebsiteQuoteSampler.Recovery
+    let reason: WebsiteQuoteSampler.Reason
+    let selectedQuoteID: String?
     let resources: ResourcesPrepared
+  }
+  private func reportInitializationFailure(_ failure: @autoclosure () -> WebsiteConfigInitializationReport.Failure,
+    resources: ResourcesPrepared, report: WebsiteConfigInitializationReport?, exhausted: Bool) throws {
+    guard let report else { return }
+    let prepared = resources.configuration
+    try checkAsyncResources(prepared, admission: resources.admission)
+    guard try register.read().revision == prepared.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+    report.record(failure()) {
+      guard !self.processing, !Task.isCancelled, resources.admission == self.resourceAdmission,
+        self.isCurrent(prepared), let revision = try? self.register.read().revision else { return false }
+      return revision == prepared.disk && self.isCurrent(prepared)
+    }
+    // Posting can synchronously retire a request or switch account/server.
+    try checkAsyncResources(prepared, admission: resources.admission)
+    guard try register.read().revision == prepared.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+    if exhausted { report.finish() }
   }
   @MainActor private struct GenerationFailure: Error {
     let underlying: Error
@@ -941,8 +975,9 @@ final class WebsiteConfigCommitCoordinator {
             }
           }, loadExternal: checkedExternal, random: random)
         return (practice.session, practice)
-      } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery) {
-        throw QuoteRecoveryRequest(recovery: recovery, resources: prepared)
+      } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery, let reason) {
+        throw QuoteRecoveryRequest(recovery: recovery, reason: reason, selectedQuoteID: effectiveScope.selectedQuoteID,
+          resources: prepared)
       } catch {
         guard self.canRetryGeneration(error) else { throw error }
         throw GenerationFailure(underlying: error, resources: prepared, quoteInitialization: quoteInitialization)

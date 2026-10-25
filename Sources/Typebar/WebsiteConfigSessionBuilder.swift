@@ -3,7 +3,7 @@ import Foundation
 enum WebsiteConfigSessionBuildError: Error, LocalizedError {
   /// Emitted only by quote selection, distinct from other reconfiguration
   /// requests or a content reader's ordinary error.
-  case quoteRecoveryRequired(WebsiteQuoteSampler.Recovery)
+  case quoteRecoveryRequired(WebsiteQuoteSampler.Recovery, reason: WebsiteQuoteSampler.Reason)
   case quoteRecoveryLimitReached
   case reconfigurationRequired([String: WebsiteConfigValue])
   case unrepresentableConfiguration, customTextUnavailable, externalNotProvided, invalidExternalSource, generationFailed
@@ -141,8 +141,8 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
       switch try sampler.next(selectedQuoteID: scope.selectedQuoteID, favoriteIDs: scope.favoriteQuoteIDs,
         randomIndex: random.quoteIndex) {
       case .quote(let quote): selectedQuote = quote
-      case .unavailable(_, let recovery):
-        throw WebsiteConfigSessionBuildError.quoteRecoveryRequired(recovery)
+      case .unavailable(let reason, let recovery):
+        throw WebsiteConfigSessionBuildError.quoteRecoveryRequired(recovery, reason: reason)
       }
       nextScope.quoteSampler = sampler
       onQuoteInitialization?(sampler, selectedQuote)

@@ -4,6 +4,122 @@ import Observation
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  @MainActor private final class NoticeTransition { var calls = 0 }
+
+  func testGenerationRetriesReachLocalHistoryAndRemainAfterSuccessfulInitialization() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        if reads < 3 { throw NSError(domain: "OwnedGeneration", code: reads,
+          userInfo: [NSLocalizedDescriptionKey: "自有目录读取失败 \(reads)"]) }
+        return [.init(id: "owned", title: "Owned recovery sample", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop(); f.account.localNotices.clearAll() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false)
+    XCTAssertEqual(reads, 3)
+    let entries = f.account.localNotices.history
+    XCTAssertEqual(entries.count, 2)
+    XCTAssertEqual(entries.map(\.level), [.error, .error])
+    XCTAssertTrue(entries.first?.title.contains("1/3") == true)
+    XCTAssertTrue(entries.last?.title.contains("2/3") == true)
+    XCTAssertTrue(entries.last?.message.contains("自有目录读取失败 2") == true)
+    XCTAssertTrue(f.account.localNotices.active.allSatisfy { $0.important && $0.durationMilliseconds == 0 })
+    XCTAssertEqual(f.account.localNotices.visible(focused: true).count, 2)
+    f.account.localNotices.clearAll()
+    XCTAssertEqual(f.account.localNotices.history, entries)
+  }
+
+  func testQuoteLengthRecoveryPostsAnImportantNoticeNotAnOrdinaryError() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        [.init(id: "medium", title: "Owned length recovery", text: "ab cd", language: .english, length: .medium)]
+      })
+    defer { workflow.stop(); f.account.localNotices.clearAll() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false)
+    XCTAssertEqual(f.account.localNotices.history.count, 1)
+    XCTAssertEqual(f.account.localNotices.history.first?.level, .notice)
+    XCTAssertTrue(f.account.localNotices.history.first?.message.contains("所选长度") == true)
+    XCTAssertTrue(f.account.localNotices.history.first?.message.contains("全部长度") == true)
+    XCTAssertTrue(f.account.localNotices.active.first?.important == true)
+    XCTAssertEqual(f.account.localNotices.active.first?.durationMilliseconds, 3000)
+  }
+
+  func testExhaustedImportReportsLastCauseButDoesNotPostAFourthNotificationOrWrite() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        throw NSError(domain: "Owned", code: reads, userInfo: [NSLocalizedDescriptionKey: "自有读取失败 \(reads)"])
+      })
+    defer { workflow.stop() }
+    do { try await workflow.apply(json: #"{"mode":"quote"}"#, systemIsDark: false); XCTFail("Failed import delivered") }
+    catch let error as WebsiteConfigInitializationExhaustedError {
+      XCTAssertEqual((error.underlying as NSError).code, 3)
+      XCTAssertTrue(error.localizedDescription.contains("自有读取失败 3"))
+      XCTAssertTrue(error.localizedDescription.contains("三次"))
+    }
+    XCTAssertEqual(reads, 3); XCTAssertEqual(f.account.localNotices.history.count, 3)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+  }
+
+  func testSilentGenerationErrorsConsumeBudgetWithoutPostingBlankNotices() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1; throw WebsiteWordGenerationError(message: "")
+      })
+    defer { workflow.stop() }
+    do { try await workflow.apply(json: #"{"mode":"quote"}"#, systemIsDark: false); XCTFail("Silent failures delivered") }
+    catch let error as WebsiteConfigInitializationExhaustedError {
+      XCTAssertEqual((error.underlying as? WebsiteWordGenerationError)?.message, "")
+      XCTAssertTrue(error.localizedDescription.contains("三次"))
+    }
+    XCTAssertEqual(reads, 3); XCTAssertTrue(f.account.localNotices.history.isEmpty)
+  }
+
+  func testCancellingFromNotificationObservationWithdrawsTheRetiredReceipt() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in reads += 1; throw Failure.provider })
+    defer { workflow.stop() }
+    withObservationTracking { _ = f.account.localNotices.history } onChange: {
+      MainActor.assumeIsolated { workflow.cancel() }
+    }
+    do { try await workflow.apply(json: #"{"mode":"quote"}"#, systemIsDark: false); XCTFail("Cancelled notice operation delivered") }
+    catch is CancellationError {}
+    XCTAssertEqual(reads, 1)
+    XCTAssertTrue(f.account.localNotices.history.isEmpty); XCTAssertTrue(f.account.localNotices.active.isEmpty)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+  }
+
+  func testAccountChangeDuringNoticeDeliveryDoesNotLeakRetiredFailure() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in reads += 1; throw Failure.provider })
+    defer { workflow.stop() }
+    let transition = NoticeTransition()
+    withObservationTracking { _ = f.account.localNotices.history } onChange: {
+      MainActor.assumeIsolated {
+        guard transition.calls == 0 else { return }; transition.calls += 1
+        f.account.currentUser = .init(id: UUID(), email: "owned@example.invalid", displayName: "Owned", totalExperience: 0)
+        f.account.localNotices.post("New account", options: .init(durationMilliseconds: 0))
+      }
+    }
+    do { try await workflow.apply(json: #"{"mode":"quote"}"#, systemIsDark: false); XCTFail("Old account operation delivered") }
+    catch WebsiteConfigCommitCoordinatorError.stale {}
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(f.account.localNotices.history.map(\.message), ["New account"])
+    XCTAssertEqual(f.account.localNotices.active.map(\.entry.message), ["New account"])
+    XCTAssertEqual(transition.calls, 1)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+  }
   @MainActor private final class Gate {
     var continuation: CheckedContinuation<[OfflineQuote], Never>?
     func read() async -> [OfflineQuote] { await withCheckedContinuation { continuation = $0 } }

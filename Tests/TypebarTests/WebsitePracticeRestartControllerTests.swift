@@ -6,6 +6,27 @@ import Observation
 
 @MainActor final class WebsitePracticeRestartControllerTests: XCTestCase {
   private enum Failure: Error { case generation, publication }
+
+  func testThreeGenerationFailuresShowLastHumanReasonWithoutLosingDeparture() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let disk = try f.register.read().revision
+    var reads = 0
+    let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
+      throw NSError(domain: "OwnedGeneration", code: reads,
+        userInfo: [NSLocalizedDescriptionKey: "自有目录读取失败 \(reads)"])
+    })
+    let advanced = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertFalse(advanced)
+    XCTAssertEqual(reads, 3)
+    XCTAssertTrue(controller.message?.contains("三次") == true)
+    XCTAssertTrue(controller.message?.contains("自有目录读取失败 3") == true)
+    XCTAssertFalse(controller.message?.contains("自有目录读取失败 1") == true)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
   @MainActor private final class Fixture {
     let page = PracticePageSessionStore(), router = PreferenceConfigurationSaveRouter()
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-restart-controller-\(UUID())")

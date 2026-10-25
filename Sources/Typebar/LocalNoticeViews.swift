@@ -64,7 +64,7 @@ struct LocalNoticeHistoryContent: View {
       Text("本次会话最近 25 条，最新在前。关闭临时通知不会删除历史；切换账户或服务会清空。")
         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       if entries.isEmpty {
-        ContentUnavailableView("没有会话通知", systemImage: "bell", description: Text("复制结果或领取奖励后的提示会显示在这里，不需要登录。"))
+        ContentUnavailableView("没有会话通知", systemImage: "bell", description: Text("准备练习、复制结果或领取奖励时的提示会显示在这里，不需要登录。"))
       } else {
         ForEach(entries) { entry in
           HStack(alignment: .top, spacing: 12) {

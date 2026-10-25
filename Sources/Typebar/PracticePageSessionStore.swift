@@ -216,6 +216,7 @@ final class PracticePageSessionStore {
   }
   @discardableResult
   func bindRestartController(using coordinator: WebsiteConfigCommitCoordinator,
+    notices: LocalNoticeCenter? = nil,
     loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)? = nil)
     throws -> WebsitePracticeRestartController {
@@ -226,7 +227,7 @@ final class PracticePageSessionStore {
       throw PracticePageSessionStateError.stale
     }
     retireRestartController()
-    let controller = WebsitePracticeRestartController(page: self, coordinator: coordinator,
+    let controller = WebsitePracticeRestartController(page: self, coordinator: coordinator, notices: notices,
       loadQuotes: loadQuotes, loadExternal: loadExternal)
     restartController = controller
     return controller

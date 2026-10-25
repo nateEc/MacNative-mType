@@ -117,6 +117,26 @@ enum LocalNoticeDismissReason: String { case click, timeout, clear }
   func visible(focused: Bool, screenshotting: Bool = false) -> [LocalNotice] {
     screenshotting ? [] : active.filter { !focused || $0.important }
   }
+  /// A scoped producer can be retired by a synchronous presentation observer.
+  /// Withdraw only its receipt, not newer notices from another operation.
+  @discardableResult func postGuarded(_ message: String, level: LocalNoticeLevel,
+    options: LocalNoticeOptions, generation: UUID, whileCurrent current: () -> Bool) -> UUID? {
+    guard deliveryGeneration == generation, current() else { return nil }
+    let previousHistory = history
+    let id = post(message, level: level, options: options)
+    guard deliveryGeneration == generation, current() else {
+      timers.removeValue(forKey: id)?.cancel(); dismissals.removeValue(forKey: id)
+      active.removeAll { $0.id == id }; history.removeAll { $0.id == id }
+      if deliveryGeneration == generation {
+        let ids = Set(history.map(\.id))
+        let missing = previousHistory.filter { !ids.contains($0.id) }
+        history.insert(contentsOf: missing, at: 0)
+        if history.count > 25 { history.removeFirst(history.count - 25) }
+      }
+      return nil
+    }
+    return id
+  }
   func stickyCount(focused: Bool) -> Int {
     visible(focused: focused).filter { $0.durationMilliseconds == 0 }.count
   }

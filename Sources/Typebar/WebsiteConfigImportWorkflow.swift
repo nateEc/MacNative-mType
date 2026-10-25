@@ -59,7 +59,14 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
 /// rejected setter. The durable setting and departure have already succeeded.
 struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   let underlying: Error
+  let initializationMessage: String?
+  init(underlying: Error, initializationMessage: String? = nil) {
+    self.underlying = underlying; self.initializationMessage = initializationMessage
+  }
   var errorDescription: String? {
+    if let initializationMessage {
+      return "设置已保存，新练习尚未完成。" + initializationMessage + " 可继续准备，已接纳的旧尝试不会重复记账。"
+    }
     if case WebsiteConfigSessionBuildError.quoteRecoveryLimitReached = underlying {
       return "设置校正已保存。" + underlying.localizedDescription
     }
@@ -77,6 +84,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   private let source: WebsiteConfigPracticeScopeSource
   private let coordinator: WebsiteConfigCommitCoordinator
   private let loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote]
+  private weak var notices: LocalNoticeCenter?
   private var prepared: WebsiteConfigCommitCoordinator.Prepared?
   private var rejectedRestart: (controller: WebsitePracticeRestartController, request: UUID)?
   private var applying = false
@@ -88,6 +96,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     directory: URL, readWindow: @escaping @MainActor () -> WebsiteConfigPracticeScopeSource.Window?,
     loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) }) {
     self.page = page; self.settings = settings; self.loadQuotes = loadQuotes
+    self.notices = account.localNotices
     let environment = WebsiteConfigEnvironmentSource(settings: settings, account: account,
       pointsPerRem: 16, documentComplete: true, development: false)
     self.environment = environment
@@ -176,9 +185,11 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
     prepared = ticket
     guard operation == current else { throw CancellationError() }
+    let initializationReport = WebsiteConfigInitializationReport(notices: notices)
     do {
       let resources = try await coordinator.prepareResources(for: ticket, from: settings)
-      let ready = try await coordinator.preparePractice(for: resources, loadQuotes: loadQuotes)
+      let ready = try await coordinator.preparePractice(for: resources,
+        initializationReport: initializationReport, loadQuotes: loadQuotes)
       try Task.checkCancellation()
       guard !stopped else { throw WebsiteConfigImportWorkflowError.unavailable }
       guard operation == current else { throw CancellationError() }
@@ -188,7 +199,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         let notice = recovery.isEmpty ? "" : " " + recovery
         // No await after commit. The same coordinator/content catalog owns retry.
         do {
-          try page.bindRestartController(using: coordinator, loadQuotes: loadQuotes)
+          try page.bindRestartController(using: coordinator, notices: notices, loadQuotes: loadQuotes)
           switch intent {
           case .application(nil): return "已恢复保存的配置，新的练习已准备好。" + notice
           case .application(.some): return "配置已导入，新的练习已准备好。" + notice
@@ -209,7 +220,10 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       // report stale before our post-await operation check is reached.
       if operation != current || Task.isCancelled { throw CancellationError() }
       if !(error is CancellationError), page.state.configurationDeparture != nil {
-        throw WebsiteConfigSavedPreparationError(underlying: error)
+        throw WebsiteConfigSavedPreparationError(underlying: error, initializationMessage: initializationReport.finalMessage)
+      }
+      if let message = initializationReport.finalMessage {
+        throw WebsiteConfigInitializationExhaustedError(underlying: error, message: message)
       }
       throw error
     }

@@ -1504,36 +1504,39 @@ private struct ContentView: View {
           .background(.thinMaterial, in: Capsule())
           .accessibilityLabel(personalBestNotice)
       }
-      typingPanel
-      stats
-      if effectiveKeyboardGuideMode != .off {
-        KeyboardGuide(
-          nextCharacter: session.nextExpectedCharacter, mode: effectiveKeyboardGuideMode,
-          feedback: keyboardGuideFeedback, accent: activeTheme.accent,
-          panel: activeTheme.panel, layout: effectiveKeyboardLayout,
-          overrideRows: effectiveKeyboardGuideOverrideRows,
-          mirrored: session.configuration.modifiers.contains(.mirrorKeyboard),
-          scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
-          keysMode: settings.keyboardGuideKeysMode,
-          style: settings.keyboardGuideStyle,
-          modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
+      WebsiteConfigInitializationRegion(message: pageSessionStore.restartController?.exhaustedMessage,
+        retry: { requestPublishedRestart() }) {
+        typingPanel
+        stats
+        if effectiveKeyboardGuideMode != .off {
+          KeyboardGuide(
+            nextCharacter: session.nextExpectedCharacter, mode: effectiveKeyboardGuideMode,
+            feedback: keyboardGuideFeedback, accent: activeTheme.accent,
+            panel: activeTheme.panel, layout: effectiveKeyboardLayout,
+            overrideRows: effectiveKeyboardGuideOverrideRows,
+            mirrored: session.configuration.modifiers.contains(.mirrorKeyboard),
+            scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
+            keysMode: settings.keyboardGuideKeysMode,
+            style: settings.keyboardGuideStyle,
+            modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
+        }
+        if showsVirtualKeyboard {
+          VirtualKeyboard(
+            layout: effectiveKeyboardLayout,
+            overrideRows: effectiveKeyboardGuideOverrideRows,
+            nextCharacter: session.nextExpectedCharacter,
+            accent: activeTheme.accent, panel: activeTheme.panel,
+            allowsNewline: session.acceptsNewlineInput,
+            allowsTab: session.acceptsTabInput,
+            isEnabled: !session.isFinished && !isPreparingPracticePrompt,
+            onInsert: {
+              handleInsertedText($0, forceError: false, origin: .virtualKeyboard)
+            },
+            onDelete: { handleDeletedText(deletesWord: false) })
+        }
+        controls
+        practiceKeyTips
       }
-      if showsVirtualKeyboard {
-        VirtualKeyboard(
-          layout: effectiveKeyboardLayout,
-          overrideRows: effectiveKeyboardGuideOverrideRows,
-          nextCharacter: session.nextExpectedCharacter,
-          accent: activeTheme.accent, panel: activeTheme.panel,
-          allowsNewline: session.acceptsNewlineInput,
-          allowsTab: session.acceptsTabInput,
-          isEnabled: !session.isFinished && !isPreparingPracticePrompt,
-          onInsert: {
-            handleInsertedText($0, forceError: false, origin: .virtualKeyboard)
-          },
-          onDelete: { handleDeletedText(deletesWord: false) })
-      }
-      controls
-      practiceKeyTips
     }
     .padding(42)
     .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
@@ -4543,7 +4546,8 @@ private struct ContentView: View {
         Label("正在准备新一轮…", systemImage: "arrow.triangle.2.circlepath")
           .font(.caption).foregroundStyle(.secondary).offset(y: 24)
       } else if let message = pageSessionStore.restartController?.message {
-        Label(message, systemImage: "exclamationmark.triangle")
+        Label(pageSessionStore.restartController?.exhaustedMessage == nil ? message : "初始化未完成，请检查上方原因或会话通知。",
+          systemImage: "exclamationmark.triangle")
           .font(.caption).foregroundStyle(.orange).offset(y: 24)
       } else if let restartLockMessage {
         Label(restartLockMessage, systemImage: "lock.fill")

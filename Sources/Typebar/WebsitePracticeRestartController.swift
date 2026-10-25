@@ -6,6 +6,7 @@ import Observation
 @MainActor @Observable final class WebsitePracticeRestartController {
   private(set) var isPreparing = false
   private(set) var message: String?
+  private(set) var exhaustedMessage: String?
   private struct Readers {
     let quotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote]
     let external: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
@@ -14,9 +15,11 @@ import Observation
     let ticket: UUID
     let accepted: WebsiteConfigCommitCoordinator.RestartAdmission
     let readers: Readers
+    let initializationReport: WebsiteConfigInitializationReport
   }
   @ObservationIgnored private weak var page: PracticePageSessionStore?
   @ObservationIgnored private let coordinator: WebsiteConfigCommitCoordinator
+  @ObservationIgnored private weak var notices: LocalNoticeCenter?
   @ObservationIgnored private var readers: Readers?
   @ObservationIgnored private var work: Task<Void, Never>?
   @ObservationIgnored private var admission: WebsiteConfigCommitCoordinator.RestartAdmission?
@@ -24,9 +27,10 @@ import Observation
   @ObservationIgnored private var stopped = false
 
   init(page: PracticePageSessionStore, coordinator: WebsiteConfigCommitCoordinator,
+    notices: LocalNoticeCenter? = nil,
     loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote],
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?) {
-    self.page = page; self.coordinator = coordinator
+    self.page = page; self.coordinator = coordinator; self.notices = notices
     readers = .init(quotes: loadQuotes, external: loadExternal)
   }
   @discardableResult
@@ -54,7 +58,7 @@ import Observation
   private func begin(repeatingRequested: Bool, current: UUID) -> Request? {
     guard !stopped, !isPreparing, let page, let readers else { return nil }
     ticket = current
-    isPreparing = true; message = nil
+    isPreparing = true; message = nil; exhaustedMessage = nil
     let accepted: WebsiteConfigCommitCoordinator.RestartAdmission
     do { accepted = try coordinator.beginRestart(for: page, repeatingRequested: repeatingRequested, recoveringWith: self) }
     catch {
@@ -66,7 +70,8 @@ import Observation
     }
     guard ticket == current, !stopped else { _ = coordinator.cancel(accepted); return nil }
     admission = accepted
-    return .init(ticket: current, accepted: accepted, readers: readers)
+    return .init(ticket: current, accepted: accepted, readers: readers,
+      initializationReport: .init(notices: notices))
   }
   private func complete(_ request: Request) async -> Bool {
     let current = request.ticket, accepted = request.accepted, readers = request.readers
@@ -75,6 +80,7 @@ import Observation
     }
     do {
       let ready = try await coordinator.prepareRestart(accepted,
+        initializationReport: request.initializationReport,
         loadQuotes: readers.quotes, loadExternal: readers.external)
       guard ticket == current, !stopped, !Task.isCancelled, let page else {
         _ = coordinator.cancel(ready); return false
@@ -89,7 +95,9 @@ import Observation
     } catch {
       _ = coordinator.cancel(accepted)
       if ticket == current && !stopped {
-        if case WebsiteConfigSessionBuildError.quoteRecoveryLimitReached = error {
+        if let final = request.initializationReport.finalMessage {
+          message = final; exhaustedMessage = final
+        } else if case WebsiteConfigSessionBuildError.quoteRecoveryLimitReached = error {
           message = error.localizedDescription
         } else {
           message = error is CancellationError
@@ -101,6 +109,7 @@ import Observation
     }
   }
   func cancel() {
+    exhaustedMessage = nil
     ticket = UUID(); work?.cancel(); work = nil
     if let admission { _ = coordinator.cancel(admission) }
     admission = nil; isPreparing = false
