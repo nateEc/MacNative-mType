@@ -40,6 +40,227 @@ import Observation
     XCTAssertTrue(ready(), "Restart operation did not settle")
   }
 
+  func testQuoteRestartRecoversUnavailableLengthAndRetainsItsController() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let old = f.page.state, disk = try f.register.read().revision
+    let replacement = OfflineQuote(id: "medium", title: "Owned replacement", text: "ef gh", language: .english, length: .medium)
+    var reads = 0
+    let controller = try f.bind(loadQuotes: { _ in reads += 1; return [replacement] })
+    let advanced = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(advanced)
+    XCTAssertEqual(reads, 2)
+    XCTAssertTrue(f.page.restartController === controller)
+    XCTAssertFalse(controller.isPreparing)
+    XCTAssertNil(controller.message)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.session.prompt, replacement.text)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [0, 1, 2, 3])
+    XCTAssertEqual(f.page.state.presentation?.publication.quoteRecoveries, [.allLengths])
+    XCTAssertTrue(f.page.state.presentation?.currentSystemIsDark == true)
+    XCTAssertNotEqual(f.page.state.presentation?.publication.applicationID, old.presentation?.publication.applicationID)
+    XCTAssertNotEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    let recoveredDisk = try f.register.read().revision, presentation = f.page.state.presentation
+    let again = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(again)
+    XCTAssertEqual(reads, 3)
+    XCTAssertTrue(f.page.state.presentation === presentation)
+    XCTAssertEqual(try f.register.read().revision, recoveredDisk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testCancelledQuoteCorrectionResumesWithoutAnotherSaveOrDeparture() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let oldID = f.page.state.session.automaticInputAttemptID
+    let replacement = OfflineQuote(id: "medium", title: "Owned replacement", text: "ef gh", language: .english, length: .medium)
+    var reads = 0, reply: CheckedContinuation<[OfflineQuote], Never>?
+    defer { reply?.resume(returning: [replacement]) }
+    let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
+      if reads == 2 { return await withCheckedContinuation { reply = $0 } }
+      return [replacement]
+    })
+    let operation = UUID()
+    let task = Task { try await controller.requestAndWait(requestID: operation) }
+    await wait { reads > 0 && (reply != nil || !controller.isPreparing) }
+    guard let pendingReply = reply else { _ = try await task.value; return XCTFail("Recovery did not enter second generation") }
+    let phase = try XCTUnwrap(f.page.state.configurationDeparture)
+    let saved = try f.register.read().revision
+    XCTAssertEqual(phase.draft.quoteSelection.groups, [0, 1, 2, 3])
+    XCTAssertTrue(f.page.restartController === controller)
+    XCTAssertFalse(f.page.acceptsInput(for: oldID))
+    controller.cancel(requestID: operation)
+    pendingReply.resume(returning: [replacement]); reply = nil
+    let cancelled = try await task.value
+    XCTAssertFalse(cancelled)
+    XCTAssertEqual(f.page.state.configurationDeparture?.id, phase.id)
+    let resumed = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(resumed)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.session.prompt, replacement.text)
+    XCTAssertEqual(try f.register.read().revision, saved)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(reads, 3)
+  }
+
+  func testQuoteRecoveryBudgetStopsAtThreeAndSameControllerCanRetry() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    var invalid = true, reads = 0
+    let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
+      return [.init(id: "owned", title: "Owned budget sample", text: "ef gh", language: .english,
+        length: invalid ? .all : .short)]
+    })
+    let exhausted = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertFalse(exhausted)
+    XCTAssertEqual(reads, 3)
+    XCTAssertTrue(controller.message?.contains("三次") == true)
+    XCTAssertTrue(f.page.restartController === controller)
+    let phase = try XCTUnwrap(f.page.state.configurationDeparture)
+    XCTAssertEqual(phase.draft.quoteSelection.groups, [0, 1, 2, 3])
+    let saved = try f.register.read().revision
+    invalid = false
+    let resumed = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(resumed)
+    XCTAssertEqual(reads, 4)
+    XCTAssertEqual(f.page.state.presentation?.publication.quoteRecoveries, [.allLengths, .allLengths, .allLengths])
+    XCTAssertEqual(try f.register.read().revision, saved)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testEmptyQuoteRestartSavesWordsModeWithoutChangingLanguage() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","words":4,"quoteLength":[0],"repeatQuotes":"off"}"#)
+    let disk = try f.register.read().revision
+    let controller = try f.bind(loadQuotes: { _ in [] })
+    let advanced = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(advanced)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .words)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 4)
+    XCTAssertEqual(f.page.state.session.configuration.language, .english)
+    XCTAssertEqual(f.page.state.presentation?.publication.quoteRecoveries, [.wordsMode])
+    XCTAssertNotEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    let saved = try f.register.read().revision
+    let next = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(next)
+    XCTAssertEqual(try f.register.read().revision, saved)
+  }
+
+  func testQuoteCorrectionCannotOverwriteCompetingRecord() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let old = f.page.state.presentation, disk = try XCTUnwrap(f.register.read().revision)
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":17}"#,
+      pointsPerRem: 16, context: .init())
+    var competitorDisk: WebsiteConfigFileRegister.Revision?, reads = 0
+    let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
+      guard case .committed(let revision) = try f.register.commit(competitor, replacing: disk) else {
+        throw Failure.publication
+      }
+      competitorDisk = revision
+      return [.init(id: "medium", title: "Owned replacement", text: "ef gh", language: .english, length: .medium)]
+    })
+    let advanced = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertFalse(advanced)
+    XCTAssertEqual(reads, 1)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertTrue(f.page.state.presentation === old)
+    XCTAssertEqual(try f.register.read().revision, try XCTUnwrap(competitorDisk))
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+  }
+
+  func testDetachAfterQuoteCorrectionRejectsLateReplyAndKeepsSavedState() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let old = f.page.state.presentation
+    let replacement = OfflineQuote(id: "medium", title: "Owned replacement", text: "ef gh", language: .english, length: .medium)
+    var reads = 0, reply: CheckedContinuation<[OfflineQuote], Never>?
+    defer { reply?.resume(returning: [replacement]) }
+    let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
+      if reads == 2 { return await withCheckedContinuation { reply = $0 } }
+      return [replacement]
+    })
+    let task = Task { try await controller.requestAndWait(requestID: UUID()) }
+    await wait { reads > 0 && (reply != nil || !controller.isPreparing) }
+    guard let pendingReply = reply else { _ = try await task.value; return XCTFail("Second generation was not reached") }
+    let phase = try XCTUnwrap(f.page.state.configurationDeparture), saved = try f.register.read().revision
+    f.page.detach()
+    pendingReply.resume(returning: [replacement]); reply = nil
+    let advanced = try await task.value
+    XCTAssertFalse(advanced)
+    XCTAssertNil(f.page.restartController)
+    XCTAssertTrue(f.page.state.presentation === old)
+    XCTAssertEqual(f.page.state.configurationDeparture?.id, phase.id)
+    XCTAssertEqual(try f.register.read().revision, saved)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertFalse(controller.request())
+  }
+
+  func testDirectNextCorrectionClosesAndAccountsBeforeSecondGeneration() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let oldID = f.page.state.session.automaticInputAttemptID, oldDisk = try f.register.read().revision
+    var reads = 0
+    let ready = try await f.coordinator.prepareNext(for: f.page, loadQuotes: { _ in
+      reads += 1
+      if reads == 2 {
+        XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+        XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+        XCTAssertNotNil(f.page.state.configurationDeparture)
+        XCTAssertFalse(f.page.acceptsInput(for: oldID))
+        XCTAssertNotEqual(try f.register.read().revision, oldDisk)
+      }
+      return [.init(id: "medium", title: "Owned replacement", text: "ef gh", language: .english, length: .medium)]
+    })
+    let saved = try f.register.read().revision
+    guard case .advanced(let previous) = try f.coordinator.advance(ready, to: f.page) else { return XCTFail("No delivery") }
+    XCTAssertEqual(reads, 2)
+    XCTAssertNil(previous.incomplete, "The checkpoint already recorded the departure")
+    XCTAssertEqual(previous.session.automaticInputAttemptID, oldID)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try f.register.read().revision, saved)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertTrue(f.page.state.presentation?.currentSystemIsDark == true)
+  }
+
+  func testDirectCorrectionClockInvalidationCannotSaveOrAcceptDeparture() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    let disk = try f.register.read().revision
+    var armed = false
+    var state = f.page.state
+    state.session = try XCTUnwrap(state.practice?.session).withElapsedClock(.init {
+      if armed { armed = false; f.page.detach() }
+      return 1
+    })
+    state.session.insert("a"); f.page.replace(state)
+    armed = true
+    do {
+      _ = try await f.coordinator.prepareNext(for: f.page, loadQuotes: { _ in
+        [.init(id: "medium", title: "Owned replacement", text: "ef gh", language: .english, length: .medium)]
+      })
+      XCTFail("A detached owner accepted a correction")
+    } catch WebsiteConfigCommitCoordinatorError.stale {}
+    XCTAssertFalse(armed, "The departure clock callback was exercised")
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertEqual(f.page.state.session.outcome, .active)
+  }
+
   func testProductionCandidateRepeatKeepsConfigurationResourcesAndSourceExhaustionPolicy() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.publish(#"{"mode":"words","words":0,"repeatedPace":true}"#)

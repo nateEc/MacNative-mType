@@ -31,6 +31,8 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate var savedDraft: WebsiteConfigNativeDraft?
     fileprivate var quoteRecoveries: [WebsiteQuoteSampler.Recovery] = []
     fileprivate weak var sourcePage: PracticePageSessionStore?
+    fileprivate weak var restartController: WebsitePracticeRestartController?
+    fileprivate var requiresRestartController = false
     fileprivate var pageCapture: PracticePageSessionStore.GenerationCapture?
     fileprivate var applicationCapture: PracticePageSessionStore.ApplicationCapture?
     fileprivate weak var contentSource: WebsiteConfigPracticeScopeSource?
@@ -81,7 +83,7 @@ final class WebsiteConfigCommitCoordinator {
     let session: TypingSession
     let practice: WebsiteConfigSessionBuilder.Prepared?
   }
-  /// Attempt transition only, never a configuration application.
+  /// Normally an attempt transition; source recovery can require a saved setter.
   struct NextPrepared { fileprivate let session: SessionPrepared }
   struct RestartAdmission {
     fileprivate var resources: ResourcesPrepared
@@ -559,7 +561,24 @@ final class WebsiteConfigCommitCoordinator {
   }
   /// Accept the departure before asynchronous init, as the source restart does.
   /// Rejected admission changes nothing; init failure cannot undo a departure.
-  func beginRestart(for page: PracticePageSessionStore, repeatingRequested: Bool = false) throws -> RestartAdmission {
+  func beginRestart(for page: PracticePageSessionStore, repeatingRequested: Bool = false,
+    recoveringWith controller: WebsitePracticeRestartController? = nil) throws -> RestartAdmission {
+    if let pending = page.state.configurationDeparture {
+      // Only the still-bound controller may resume its automatic correction.
+      // An unrelated setter phase remains owned by the configuration workflow.
+      guard let controller, page.restartController === controller, controller.isPreparing,
+        !pending.quoteRecoveries.isEmpty, let previous = page.state.practice,
+        let base = latest, let background = base.background, let font = base.font else {
+        throw WebsiteConfigCommitCoordinatorError.sessionNotReady
+      }
+      var prepared = try resumeConfigurationRestart(for: page)
+      prepared.restartController = controller
+      prepared.requiresRestartController = true
+      resourceAdmission = UUID()
+      let resources = ResourcesPrepared(configuration: prepared, admission: resourceAdmission,
+        background: background, font: font)
+      return .init(resources: resources, original: page.state.session, previous: previous, repetition: pending.repetition)
+    }
     var admission = try restartPlan(for: page, repeatingRequested: repeatingRequested)
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     processing = true; defer { processing = false }
@@ -643,6 +662,9 @@ final class WebsiteConfigCommitCoordinator {
     var prepared = Prepared(draft: base.draft, identity: identity, request: request,
       owner: owner, environment: context, disk: disk)
     prepared.sourcePage = page; prepared.pageCapture = capture
+    if page.restartController?.isPreparing == true {
+      prepared.restartController = page.restartController; prepared.requiresRestartController = true
+    }
     guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
     // Already-admitted immutable resources belong to this exact environment.
     // No preference setter, re-import, file-resource read or remote fetch.
@@ -650,6 +672,18 @@ final class WebsiteConfigCommitCoordinator {
     return .init(configuration: prepared, admission: resourceAdmission, background: background, font: font)
   }
   func advance(_ next: NextPrepared, to page: PracticePageSessionStore) throws -> NextOutcome {
+    if next.session.resources.configuration.pageCapture?.configurationDeparture != nil {
+      let old = page.state.session
+      // The source setter checkpoint already closed and accounted the old
+      // attempt. Publish the corrected full configuration without recounting.
+      switch try commit(next.session, to: page, systemIsDark: page.state.presentation?.currentSystemIsDark ?? false) {
+      case .committed: return .advanced(.init(session: old, incomplete: nil))
+      case .busy: return .busy
+      case .conflict: return .conflict
+      case .unavailable: return .unavailable
+      case .stale: return .stale
+      }
+    }
     guard !processing else { return .busy }
     processing = true; defer { processing = false }
     try Task.checkCancellation()
@@ -694,7 +728,9 @@ final class WebsiteConfigCommitCoordinator {
     // actual source recovery on the last failure too, then stop explicitly.
     for attempt in 0..<3 {
       do {
-        return try await preparePracticeAttempt(for: current, scope: scope, reason: reason,
+        let effectiveReason: WebsiteConfigSessionBuilder.Reason = current.configuration.pageCapture?.configurationDeparture != nil
+          ? .configurationApplication : reason
+        return try await preparePracticeAttempt(for: current, scope: scope, reason: effectiveReason,
           replayApplicationEvents: attempt == 0, repeatedSource: repeatedSource,
           loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
       } catch let recovery as QuoteRecoveryRequest {
@@ -731,7 +767,7 @@ final class WebsiteConfigCommitCoordinator {
     var configuration = resources.configuration
     configuration.draft = draft
     configuration.quoteRecoveries.append(recovery)
-    if configuration.savedDraft != nil { configuration.savedDraft = draft }
+    if configuration.savedDraft != nil || configuration.pageCapture != nil { configuration.savedDraft = draft }
     configuration = try saveGenerationCorrection(configuration, from: original, admission: resources.admission)
     return .init(configuration: configuration, admission: resources.admission,
       background: resources.background, font: resources.font)
@@ -808,9 +844,6 @@ final class WebsiteConfigCommitCoordinator {
           }, loadExternal: checkedExternal, random: random)
         return (practice.session, practice)
       } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery) {
-        guard reason == .configurationApplication else {
-          throw WebsiteConfigSessionBuildError.quoteRecoveryRequired(recovery)
-        }
         throw QuoteRecoveryRequest(recovery: recovery, resources: prepared)
       }
     }
@@ -820,9 +853,11 @@ final class WebsiteConfigCommitCoordinator {
   /// transition rather than repeating the listener or resurrecting its input.
   private func saveGenerationCorrection(_ prepared: Prepared, from original: WebsiteConfigNativeDraft,
     admission: UUID) throws -> Prepared {
-    guard prepared.pageCapture?.configurationDeparture != nil,
+    guard prepared.pageCapture != nil,
+      prepared.pageCapture?.configurationDeparture != nil || !prepared.quoteRecoveries.isEmpty,
       original.projection.runtime != prepared.draft.projection.runtime
         || original.lazyMemory != prepared.draft.lazyMemory
+        || prepared.draft.projection.events.count > original.projection.events.count
         || WebsiteConfigLazyModeLifecycle.savesConfigurationDuringGeneration(from: original, to: prepared.draft)
     else { return prepared }
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
@@ -830,10 +865,20 @@ final class WebsiteConfigCommitCoordinator {
     try Task.checkCancellation()
     guard admission == resourceAdmission, isCurrent(prepared),
       let page = prepared.sourcePage, let capture = prepared.pageCapture,
-      let pending = page.state.configurationDeparture, pending.id == capture.configurationDeparture,
-      pending.identity == identity, pending.disk == prepared.disk,
       let saved = prepared.savedDraft else { throw WebsiteConfigCommitCoordinatorError.stale }
+    let pending = page.state.configurationDeparture
+    if let pending {
+      guard pending.id == capture.configurationDeparture, pending.identity == identity,
+        pending.disk == prepared.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+    } else if capture.configurationDeparture != nil || prepared.quoteRecoveries.isEmpty {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
     var state = page.state
+    let measurement = pending == nil && state.restartDepartureAttemptID != state.session.automaticInputAttemptID
+      ? state.session.abandonAndMeasure() : nil
+    // The old elapsed clock can call back into the host. Recheck environment,
+    // request and controller after sampling, before reserving the final CAS.
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
     try Task.checkCancellation()
     try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
     let disk: WebsiteConfigFileRegister.Revision
@@ -845,13 +890,25 @@ final class WebsiteConfigCommitCoordinator {
       }
     } catch { page.endCommit(); throw error }
     // No throwing observer or cancellation check between durable CAS and the
-    // matching pending state. Keep the closed attempt and ledger unchanged.
-    state.configurationDeparture = .init(id: UUID(), draft: prepared.draft, savedDraft: saved,
+    // matching pending state. Previously accepted departures are not recounted.
+    let recoveryEnvironment = pending?.environment ?? prepared.environment
+    let recoverySource = pending?.contentSource
+    let requiresContentSource = pending?.requiresContentSource ?? false
+    let repetition: WebsitePracticeRepetition = pending?.repetition ?? WebsitePracticeRepetition.none
+    let quote = pending?.quote ?? state.practice?.quote
+    let history = pending?.wordHistory ?? state.session.generatedWordReplayHistory
+    state.configurationDeparture = ConfigurationDeparture(id: UUID(), draft: prepared.draft, savedDraft: saved,
       quoteRecoveries: prepared.quoteRecoveries, disk: disk,
-      identity: identity, environment: pending.environment, contentSource: pending.contentSource,
-      requiresContentSource: pending.requiresContentSource, repetition: pending.repetition,
-      quote: pending.quote, wordHistory: pending.wordHistory)
-    page.installCommitted(state)
+      identity: identity, environment: recoveryEnvironment, contentSource: recoverySource,
+      requiresContentSource: requiresContentSource, repetition: repetition, quote: quote, wordHistory: history)
+    if pending == nil {
+      state.restartDepartureAttemptID = state.session.automaticInputAttemptID
+      if let measurement {
+        state.priorAttemptLedger.recordRestart(engagedDuration: measurement.engagedDuration,
+          accuracy: measurement.accuracy, savingEnabled: prepared.draft.behavior.saveCompletedResults)
+      }
+    }
+    page.installCommitted(state, retainingRestartController: prepared.restartController)
     page.endCommit()
     var updated = prepared
     updated.disk = disk; updated.pageCapture = try page.captureGeneration(router: router)
@@ -965,7 +1022,7 @@ final class WebsiteConfigCommitCoordinator {
       if let page, let appearance, let session, let practice {
         let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: appearance)
         page.installCommitted(.init(session: session.withElapsedClock(), presentation: presentation, practice: practice,
-          priorAttemptLedger: page.state.priorAttemptLedger))
+          priorAttemptLedger: page.state.priorAttemptLedger), retainingRestartController: prepared.restartController)
       }
       latest = publication
       publicationAuthority.latest = publication.applicationID
@@ -987,6 +1044,10 @@ final class WebsiteConfigCommitCoordinator {
     return belongsToCurrentRequest(prepared) && router.isCurrent(prepared.owner) && matchesPage(prepared)
   }
   private func matchesPage(_ prepared: Prepared) -> Bool {
+    if prepared.requiresRestartController {
+      guard let controller = prepared.restartController,
+        prepared.sourcePage?.restartController === controller, controller.isPreparing else { return false }
+    }
     if let content = prepared.contentCapture {
       guard let source = prepared.contentSource, source.isCurrent(content) else { return false }
     }

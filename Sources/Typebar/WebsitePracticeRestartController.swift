@@ -56,7 +56,7 @@ import Observation
     ticket = current
     isPreparing = true; message = nil
     let accepted: WebsiteConfigCommitCoordinator.RestartAdmission
-    do { accepted = try coordinator.beginRestart(for: page, repeatingRequested: repeatingRequested) }
+    do { accepted = try coordinator.beginRestart(for: page, repeatingRequested: repeatingRequested, recoveringWith: self) }
     catch {
       if ticket == current && !stopped {
         isPreparing = false
@@ -89,9 +89,13 @@ import Observation
     } catch {
       _ = coordinator.cancel(accepted)
       if ticket == current && !stopped {
-        message = error is CancellationError
-          ? "重开已取消；已关闭的尝试不恢复计时，可重试。"
-          : "新一轮准备失败；旧尝试已关闭，可重试。"
+        if case WebsiteConfigSessionBuildError.quoteRecoveryLimitReached = error {
+          message = error.localizedDescription
+        } else {
+          message = error is CancellationError
+            ? "重开已取消；已关闭的尝试不恢复计时，可重试。"
+            : "新一轮准备失败；旧尝试已关闭，可重试。"
+        }
       }
       return false
     }

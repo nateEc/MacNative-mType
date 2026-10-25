@@ -662,12 +662,13 @@ import TypebarSystem
     XCTAssertEqual(ready.practice?.repetition.repeatsWordset, true)
     guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else { throw Failure.publication }
     XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [3])
-    do {
-      _ = try await f.coordinator.prepareNext(for: f.page, loadQuotes: { _ in
-        [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
-      })
-      XCTFail("Fresh generation must not silently ignore the unavailable group")
-    } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired {}
+    let next = try await f.coordinator.prepareNext(for: f.page, loadQuotes: { _ in
+      [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+    })
+    guard case .advanced = try f.coordinator.advance(next, to: f.page) else { throw Failure.publication }
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [0, 1, 2, 3])
+    XCTAssertEqual(f.page.state.presentation?.publication.quoteRecoveries, [.allLengths])
+    XCTAssertEqual(f.page.state.practice?.quote?.id, "owned")
   }
 
   func testConfigurationRepeatDecisionUsesNewModeAndLanguageNotClosedAttemptConfiguration() async throws {

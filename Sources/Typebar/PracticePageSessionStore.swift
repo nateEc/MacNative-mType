@@ -250,11 +250,13 @@ final class PracticePageSessionStore {
     committing = false
     if pendingDetach { router = nil; pendingDetach = false }
   }
-  func installCommitted(_ state: PracticePageSessionState) {
+  func installCommitted(_ state: PracticePageSessionState,
+    retainingRestartController controller: WebsitePracticeRestartController? = nil) {
     precondition(committing)
     clearLegacyReturn()
-    if state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID
-      || state.configurationDeparture?.id != self.state.configurationDeparture?.id { retireRestartController() }
+    let retainsController = controller != nil && restartController === controller
+    if !retainsController && (state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID
+      || state.configurationDeparture?.id != self.state.configurationDeparture?.id) { retireRestartController() }
     self.state = state
   }
 }

@@ -19,6 +19,7 @@ final class WebsiteConfigPublishedPresentation {
   private(set) var appearance: Appearance
   @ObservationIgnored private var systemIsDark: Bool
   @ObservationIgnored private var updating = false
+  var currentSystemIsDark: Bool { systemIsDark }
 
   struct PreparedAppearance {
     fileprivate let themes: WebsiteConfigNativeThemes
