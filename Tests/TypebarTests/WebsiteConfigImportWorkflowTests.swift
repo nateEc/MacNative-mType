@@ -5,6 +5,191 @@ import Observation
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
+  private func assertPendingSavedImport(_ f: Fixture, file: StaticString = #filePath, line: UInt = #line) throws {
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else {
+      return XCTFail("Accepted import lost its saved record", file: file, line: line)
+    }
+    XCTAssertEqual(saved["mode"], .string("quote"), file: file, line: line)
+    XCTAssertNotNil(f.page.state.savedApplication, file: file, line: line)
+    XCTAssertTrue(f.page.ownsConfigurationSelection, file: file, line: line)
+    XCTAssertFalse(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID), file: file, line: line)
+  }
+
+  func testAcceptanceOnPublishedPageRetiresItsCaptureAndControllerWithoutChangingTheOldAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let gate = Gate(); defer { gate.resolve() }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in await gate.read() })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
+    let before = f.page.state.session.generationState, old = try f.page.captureGeneration(router: f.settings.preferenceConfigurationSaves)
+    let controller = try XCTUnwrap(f.page.restartController)
+    let task = Task { try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false) }
+    try await gate.wait()
+    try assertPendingSavedImport(f)
+    XCTAssertFalse(f.page.isCurrent(old, router: f.settings.preferenceConfigurationSaves))
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, old.publication.applicationID)
+    XCTAssertNil(f.page.restartController); XCTAssertFalse(controller.request())
+    task.cancel(); gate.resolve()
+    do { _ = try await task.value; XCTFail("Cancelled replacement delivered") } catch is CancellationError {}
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
+  func testObserverRetirementAtAcceptanceReportsSavedWithoutInstallingAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let attempt = f.page.state.session.automaticInputAttemptID
+    withObservationTracking { _ = f.page.state } onChange: {
+      MainActor.assumeIsolated { f.page.detach() }
+    }
+    do { try await f.workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false); XCTFail("Retired acceptance delivered") }
+    catch let error as WebsiteConfigSavedPreparationError {
+      XCTAssertEqual(error.underlying as? WebsiteConfigCommitCoordinatorError, .stale)
+      XCTAssertTrue(error.configurationWasSaved)
+    }
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertNil(f.page.state.practice)
+    XCTAssertNotNil(f.page.state.savedApplication)
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else {
+      return XCTFail("Accepted record lost after observer retirement")
+    }
+    XCTAssertEqual(saved["words"], .number(4))
+  }
+
+  func testCancelledSavedApplicationCanBeColdRecoveredByNewWorkflow() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let gate = Gate(); defer { gate.resolve() }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in await gate.read() })
+    defer { workflow.stop() }
+    let task = Task { try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"theme":"dracula"}"#, systemIsDark: false) }
+    try await gate.wait()
+    XCTAssertNotNil(f.page.state.savedApplication)
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    XCTAssertFalse(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
+    task.cancel(); gate.resolve()
+    do { _ = try await task.value; XCTFail("Cancelled initializer delivered") } catch is CancellationError {}
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertNotNil(f.page.state.savedApplication)
+    workflow.stop()
+    let recovered = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        [.init(id: "owned", title: "Owned cold recovery", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { recovered.stop() }
+    try await recovered.apply(json: nil, systemIsDark: false)
+    XCTAssertNil(f.page.state.savedApplication)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .quote)
+    XCTAssertEqual(try register.read().revision, revision)
+  }
+
+  func testSavedApplicationCannotOverwriteCompetingRecordAndExplicitRestoreReadsTheCompetitor() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7,"theme":"nord"}"#,
+      pointsPerRem: 16, context: .init())
+    var competed = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        if !competed {
+          competed = true
+          guard case .committed = try register.commit(competitor, replacing: XCTUnwrap(register.read().revision)) else {
+            throw Failure.provider
+          }
+        }
+        return [.init(id: "owned", title: "Owned stale reader", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    let attempt = f.page.state.session.automaticInputAttemptID
+    do { try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false); XCTFail("Competitor overwritten") }
+    catch {}
+    XCTAssertTrue(competed); XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    let revision = try register.read().revision
+    try await workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertNil(f.page.state.savedApplication)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .words)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 7)
+    XCTAssertEqual(try register.read().revision, revision)
+  }
+
+  func testReturningToTypebarDuringSavedApplicationRetiresLateInitializerWithoutDeletingRecord() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let gate = Gate(); defer { gate.resolve() }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in await gate.read() })
+    defer { workflow.stop() }
+    let task = Task { try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false) }
+    try await gate.wait()
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    let permit = try f.page.beginLegacyReturn()
+    var legacy = f.page.state
+    legacy.session = TestSessionFactory.make(configuration: .words(3))
+    f.page.replace(legacy); try f.page.finishLegacyReturn(permit)
+    let attempt = f.page.state.session.automaticInputAttemptID
+    gate.resolve()
+    do { _ = try await task.value; XCTFail("Retired initializer installed") } catch {}
+    XCTAssertNil(f.page.state.savedApplication)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertFalse(f.page.ownsConfigurationSelection)
+    XCTAssertTrue(f.page.acceptsInput(for: attempt))
+    XCTAssertEqual(try register.read().revision, revision)
+  }
+
+  func testSavedApplicationPersistsAutomaticQuoteCorrectionBeforeFailureAndDoesNotReplayItOnResume() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    var failing = true, revisions: [WebsiteConfigFileRegister.Revision?] = []
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        revisions.append(try register.read().revision)
+        guard case .available(let saved) = try register.read().state else { throw Failure.provider }
+        XCTAssertEqual(saved["quoteLength"], .array([0,1,2,3].map { .number(Double($0)) }))
+        if failing { throw Failure.provider }
+        return [.init(id: "owned", title: "Owned correction", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    do { try await workflow.apply(json: #"{"mode":"quote","quoteLength":[-3]}"#, systemIsDark: false); XCTFail("Failing reader delivered") }
+    catch { XCTAssertTrue(error is WebsiteConfigSavedPreparationError) }
+    XCTAssertEqual(revisions.count, 3); XCTAssertTrue(revisions.allSatisfy { $0 == revisions.first! })
+    let revision = try register.read().revision
+    failing = false; try await workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [0,1,2,3])
+    XCTAssertNil(f.page.state.savedApplication)
+  }
+
+  func testFullImportSavesBeforeInitializationAndRecoversItsSavedProfileAfterFailure() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    var failing = true, reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        guard case .available(let saved) = try register.read().state else { throw Failure.provider }
+        XCTAssertEqual(saved["mode"], .string("quote"), "Import must be saved before the text reader runs")
+        if failing { throw Failure.provider }
+        return [.init(id: "owned", title: "Owned recovery", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    let originalAttempt = f.page.state.session.automaticInputAttemptID
+    do {
+      try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"theme":"dracula"}"#, systemIsDark: false)
+      XCTFail("Failing initializer delivered")
+    } catch { XCTAssertTrue(error is WebsiteConfigSavedPreparationError, "Saved import must report its durable state: \(error)") }
+    XCTAssertEqual(reads, 3)
+    XCTAssertFalse(f.page.acceptsInput(for: originalAttempt))
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Accepted import disappeared") }
+    XCTAssertEqual(saved["mode"], .string("quote")); XCTAssertEqual(saved["theme"], .string("dracula"))
+    let revision = try register.read().revision
+    failing = false
+    try await workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertEqual(reads, 4)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .quote)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertEqual(try register.read().revision, revision, "Resume must not repeat the accepted import write")
+    XCTAssertTrue(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
+  }
 
   func testLayoutfluidCommandSnapshotSavesThroughCorrectLifecycleAndRejectsOldWindow() async throws {
     for enabled in [false, true] {
@@ -746,7 +931,7 @@ import Observation
     do { try await workflow.apply(json: json, systemIsDark: false); XCTFail("Retired activation delivered") }
     catch is CancellationError {}
     XCTAssertEqual(reads, 0); XCTAssertTrue(f.account.localNotices.history.isEmpty)
-    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+    try assertPendingSavedImport(f)
     try await workflow.apply(json: json, systemIsDark: false)
     XCTAssertEqual(reads, 1); XCTAssertEqual(f.account.localNotices.history.count, 1)
   }
@@ -806,14 +991,14 @@ import Observation
       do {
         try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"language":"hindi","lazyMode":true}"#, systemIsDark: false)
         XCTFail("Generation failures delivered")
-      } catch let error as WebsiteConfigInitializationExhaustedError {
+      } catch let error as WebsiteConfigSavedPreparationError {
         XCTAssertEqual(error.underlying as? Failure, .provider)
       }
     }
     XCTAssertEqual(reads, 6)
     XCTAssertEqual(f.account.localNotices.history.filter { $0.level == .notice }.count, 1)
     XCTAssertEqual(f.account.localNotices.history.filter { $0.level == .error }.count, 6)
-    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+    try assertPendingSavedImport(f)
   }
 
   func testCancellingDuringLazyNoticeWithdrawsItAndAllowsTheNextRequestToWarn() async throws {
@@ -838,7 +1023,7 @@ import Observation
     do { try await workflow.apply(json: json, systemIsDark: false); XCTFail("Cancelled notice request delivered") }
     catch is CancellationError {}
     XCTAssertEqual(reads, 0); XCTAssertTrue(f.account.localNotices.history.isEmpty)
-    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+    try assertPendingSavedImport(f)
     try await workflow.apply(json: json, systemIsDark: false)
     XCTAssertEqual(reads, 1)
     XCTAssertEqual(f.account.localNotices.history.count, 1)
@@ -1006,7 +1191,7 @@ import Observation
     XCTAssertEqual(f.account.localNotices.active.first?.durationMilliseconds, 3000)
   }
 
-  func testExhaustedImportReportsLastCauseButDoesNotPostAFourthNotificationOrWrite() async throws {
+  func testExhaustedImportReportsLastCauseWithoutFourthNotificationAndKeepsAcceptedRecord() async throws {
     let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
     var reads = 0
     let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
@@ -1016,13 +1201,13 @@ import Observation
       })
     defer { workflow.stop() }
     do { try await workflow.apply(json: #"{"mode":"quote"}"#, systemIsDark: false); XCTFail("Failed import delivered") }
-    catch let error as WebsiteConfigInitializationExhaustedError {
+    catch let error as WebsiteConfigSavedPreparationError {
       XCTAssertEqual((error.underlying as NSError).code, 3)
       XCTAssertTrue(error.localizedDescription.contains("自有读取失败 3"))
       XCTAssertTrue(error.localizedDescription.contains("三次"))
     }
     XCTAssertEqual(reads, 3); XCTAssertEqual(f.account.localNotices.history.count, 3)
-    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+    try assertPendingSavedImport(f)
   }
 
   func testSilentGenerationErrorsConsumeBudgetWithoutPostingBlankNotices() async throws {
@@ -1034,7 +1219,7 @@ import Observation
       })
     defer { workflow.stop() }
     do { try await workflow.apply(json: #"{"mode":"quote"}"#, systemIsDark: false); XCTFail("Silent failures delivered") }
-    catch let error as WebsiteConfigInitializationExhaustedError {
+    catch let error as WebsiteConfigSavedPreparationError {
       XCTAssertEqual((error.underlying as? WebsiteWordGenerationError)?.message, "")
       XCTAssertTrue(error.localizedDescription.contains("三次"))
     }
@@ -1054,7 +1239,7 @@ import Observation
     catch is CancellationError {}
     XCTAssertEqual(reads, 1)
     XCTAssertTrue(f.account.localNotices.history.isEmpty); XCTAssertTrue(f.account.localNotices.active.isEmpty)
-    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+    try assertPendingSavedImport(f)
   }
 
   func testAccountChangeDuringNoticeDeliveryDoesNotLeakRetiredFailure() async throws {
@@ -1072,12 +1257,14 @@ import Observation
       }
     }
     do { try await workflow.apply(json: #"{"mode":"quote"}"#, systemIsDark: false); XCTFail("Old account operation delivered") }
-    catch WebsiteConfigCommitCoordinatorError.stale {}
+    catch let error as WebsiteConfigSavedPreparationError {
+      XCTAssertEqual(error.underlying as? WebsiteConfigCommitCoordinatorError, .stale)
+    }
     XCTAssertEqual(reads, 1)
     XCTAssertEqual(f.account.localNotices.history.map(\.message), ["New account"])
     XCTAssertEqual(f.account.localNotices.active.map(\.entry.message), ["New account"])
     XCTAssertEqual(transition.calls, 1)
-    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+    try assertPendingSavedImport(f)
   }
   @MainActor private final class Gate {
     var continuation: CheckedContinuation<[OfflineQuote], Never>?
@@ -1197,7 +1384,7 @@ import Observation
     XCTAssertEqual(f.settings.snapshot, legacy)
   }
 
-  func testCancelledGenerationCannotPersistCandidateLazyMemory() async throws {
+  func testCancelledAcceptedImportKeepsItsSavedLazyMemoryWithoutInstallingCandidate() async throws {
     let f = try Fixture(); defer { f.close() }
     let gate = Gate(); defer { gate.resolve() }
     let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
@@ -1209,7 +1396,9 @@ import Observation
     let task = Task { try await workflow.apply(json: #"{"mode":"quote","language":"hindi","lazyMode":true,"quoteLength":[0]}"#, systemIsDark: false) }
     try await gate.wait(); task.cancel(); gate.resolve()
     do { _ = try await task.value; XCTFail("Cancelled lazy transition committed") } catch is CancellationError {}
-    XCTAssertEqual(try Data(contentsOf: path), bytes)
+    XCTAssertNotEqual(try Data(contentsOf: path), bytes)
+    try assertPendingSavedImport(f)
+    XCTAssertTrue(try WebsiteConfigFileRegister(directory: f.directory).read().lazyMemory.remember)
     XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
     XCTAssertEqual(f.page.state.presentation?.publication.draft.lazyMemory, .init())
   }
@@ -1254,7 +1443,7 @@ import Observation
     XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: directory.path)[.posixPermissions] as? NSNumber)?.intValue, 0o755)
   }
 
-  func testCancelOrNewInputDuringGenerationCannotCommitAndConcurrentApplyIsRejected() async throws {
+  func testCancelOrForcedSessionReplacementCannotDeliverAcceptedImportAndConcurrentApplyIsRejected() async throws {
     for cancel in [false, true] {
       let f = try Fixture(); defer { f.close() }
       let gate = Gate(); defer { gate.resolve() }
@@ -1267,17 +1456,21 @@ import Observation
       catch WebsiteConfigImportWorkflowError.busy {}
       if cancel { workflow.cancel() }
       else {
+        // Physical input is already suspended. Force an authoritative model
+        // replacement to retain the independent generation-staleness check.
+        XCTAssertFalse(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
         var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
       }
       gate.resolve()
       do { _ = try await task.value; XCTFail("Late generation committed") }
       catch {
-        guard error is CancellationError || (error as? WebsiteConfigCommitCoordinatorError) == .stale else {
+        let underlying = (error as? WebsiteConfigSavedPreparationError)?.underlying ?? error
+        guard underlying is CancellationError || (underlying as? WebsiteConfigCommitCoordinatorError) == .stale else {
           return XCTFail("Unexpected error: \(error)")
         }
       }
       XCTAssertNil(f.page.state.practice)
-      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+      try assertPendingSavedImport(f)
     }
   }
 
@@ -1314,12 +1507,18 @@ import Observation
 
   func testObserverRetirementAfterCommitReportsAppliedRatherThanPretendingRollback() async throws {
     let f = try Fixture(); defer { f.close() }
-    withObservationTracking { _ = f.page.state } onChange: {
-      MainActor.assumeIsolated { f.page.detach() }
-    }
-    let message = try await f.workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        // Arm after acceptance/checkpoints so this observes final delivery.
+        withObservationTracking { _ = f.page.state } onChange: {
+          MainActor.assumeIsolated { f.page.detach() }
+        }
+        return [.init(id: "owned", title: "Owned delivery", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    let message = try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false)
     XCTAssertTrue(message.contains("已保存并应用"))
-    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 4)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .quote)
     XCTAssertNotNil(f.page.state.practice)
     XCTAssertNil(f.page.restartController)
     guard case .available = try WebsiteConfigFileRegister(directory: f.directory).read().state else {
@@ -1831,9 +2030,13 @@ import Observation
       })
     defer { workflow.stop() }
     do { try await workflow.apply(json: #"{"mode":"quote","quoteLength":[3]}"#, systemIsDark: false); XCTFail("Reader failure replaced content") }
-    catch WebsiteConfigSessionBuildError.reconfigurationRequired {}
+    catch let error as WebsiteConfigSavedPreparationError {
+      guard case WebsiteConfigSessionBuildError.reconfigurationRequired = error.underlying else {
+        return XCTFail("Reader error was misclassified: \(error)")
+      }
+    }
     XCTAssertEqual(reads, 1)
-    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+    try assertPendingSavedImport(f)
   }
 
   func testCancellationDuringAutomaticQuoteRetryKeepsRecoveryAndItsExplanation() async throws {

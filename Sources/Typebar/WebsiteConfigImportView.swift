@@ -35,7 +35,7 @@ import SwiftUI
   func cancel() {
     request = UUID(); work?.cancel(); work = nil
     cancelOperation(); isWorking = false; isError = false
-    message = "操作已取消；未完成的准备不会应用。"
+    message = "操作已取消；已保存的配置保留，尚未完成的练习不会启动。"
   }
   @discardableResult
   func useTypebarSettings(_ action: () throws -> Void) -> Bool {
@@ -58,6 +58,7 @@ import SwiftUI
       return "Typebar 设置未能生成新的练习，切换尚未完成；请检查设置或恢复保存的完整配置。存档未删除。"
     }
     if let error = error as? WebsiteConfigImportWorkflowError { return error.localizedDescription }
+    if let error = error as? WebsiteConfigSavedPreparationError { return error.localizedDescription }
     if case WebsiteConfigSessionBuildError.reconfigurationRequired = error {
       return "当前引语来源不可用；请检查语言与引语长度后重新导入。原配置未修改。"
     }

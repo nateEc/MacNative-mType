@@ -1508,8 +1508,13 @@ private struct ContentView: View {
           .background(.thinMaterial, in: Capsule())
           .accessibilityLabel(personalBestNotice)
       }
-      WebsiteConfigInitializationRegion(message: pageSessionStore.restartController?.exhaustedMessage,
-        retry: { requestPublishedRestart() }) {
+      WebsiteConfigInitializationRegion(message: pageSession.savedApplication != nil
+        ? "配置已保存，练习尚未准备完成。请在配置面板恢复，或切回 Typebar 设置。"
+        : pageSessionStore.restartController?.exhaustedMessage,
+        retry: {
+          if pageSession.savedApplication != nil { openWebsiteConfigImport() }
+          else { requestPublishedRestart() }
+        }) {
         typingPanel
         stats
         if effectiveKeyboardGuideMode != .off {
@@ -2271,6 +2276,7 @@ private struct ContentView: View {
     .sheet(item: $websiteSequenceCommand) { presentation in
       WebsiteSequenceCommandView(presentation: presentation,
         canApply: pageSession.presentation?.publication.applicationID == presentation.id
+          && pageSession.savedApplication == nil
           && pageSession.configurationDeparture == nil
           && pageSessionStore.restartController?.isPreparing != true,
         apply: { [applicationID = presentation.id] edit in
@@ -2633,7 +2639,16 @@ private struct ContentView: View {
 
   @ViewBuilder
   private var configurationPanel: some View {
-    if let practice = pageSession.practice {
+    if let pending = pageSession.savedApplication {
+      VStack(alignment: .leading, spacing: 8) {
+        Text("已保存，等待初始化").font(.headline)
+        LabeledContent("模式", value: pending.draft.testParameters.mode.displayName)
+        LabeledContent("语言", value: pending.draft.testParameters.language.displayName)
+        Text("关闭或取消不会撤销已保存的配置。可恢复后继续准备练习。")
+          .font(.caption).foregroundStyle(.secondary)
+        Button("恢复已保存配置…", action: openWebsiteConfigImport)
+      }
+    } else if let practice = pageSession.practice {
       VStack(alignment: .leading, spacing: 7) {
         Text("本轮设置").font(.headline)
         LabeledContent("模式", value: session.configuration.mode.displayName)
@@ -4356,7 +4371,7 @@ private struct ContentView: View {
   }
 
   private func handleInputRuleChange(_ previous: InputRules, _ current: InputRules) {
-    guard pageSession.practice == nil else { return }
+    guard !pageSessionStore.ownsConfigurationSelection else { return }
     if isPreparingPracticePrompt { reset() }
     else {
       session.synchronizeLiveInputRules(current)
@@ -4668,7 +4683,7 @@ private struct ContentView: View {
   }
 
   private var isRestartingConfigurationChangeLocked: Bool {
-    pageSession.practice != nil || !settings.allowsRestartingConfigurationChange
+    pageSessionStore.ownsConfigurationSelection || !settings.allowsRestartingConfigurationChange
   }
 
   @discardableResult
@@ -4677,8 +4692,10 @@ private struct ContentView: View {
       restartLockMessage = "请先完成配置恢复，或选择使用原生配置继续。"
       return false
     }
-    guard pageSession.practice == nil else {
-      restartLockMessage = "本轮使用完整配置；请在本轮设置中编辑，未提供的项目可从导入面板恢复或切回 Typebar 设置。"
+    guard !pageSessionStore.ownsConfigurationSelection else {
+      restartLockMessage = pageSession.savedApplication != nil
+        ? "配置已保存，请先恢复准备，或切回 Typebar 设置。"
+        : "本轮使用完整配置；请在本轮设置中编辑，未提供的项目可从导入面板恢复或切回 Typebar 设置。"
       return false
     }
     synchronizeNoQuitConfigurationLock()
@@ -5806,7 +5823,8 @@ private struct ContentView: View {
     items.append(contentsOf: CommandPaletteUtilityCatalog.items(
       randomThemeEnabled: settings.randomThemeMode.isEnabled && !settings.followSystemTheme,
       authenticated: account.currentUser != nil,
-      websiteProfileActive: committedPracticeDraft != nil && pageSession.configurationDeparture == nil
+      websiteProfileActive: committedPracticeDraft != nil && pageSession.savedApplication == nil
+        && pageSession.configurationDeparture == nil
         && pageSessionStore.restartController?.isPreparing != true))
     items.append(contentsOf: NavigationCommandCatalog.items)
     if session.hasStarted, !session.isFinished, commandBailoutAvailable {
@@ -5881,6 +5899,7 @@ private struct ContentView: View {
         openWebsiteConfigImport()
       case .editWebsitePolyglot, .editWebsiteLayoutfluid:
         guard let publication = pageSession.presentation?.publication,
+          pageSession.savedApplication == nil,
           pageSession.configurationDeparture == nil,
           pageSessionStore.restartController?.isPreparing != true else { return }
         let presentation = WebsiteSequenceCommandPresentation(publication: publication,
@@ -6697,7 +6716,7 @@ private struct ContentView: View {
 
   private func persistActiveTestSelection(for selectedConfiguration: TestConfiguration? = nil,
     cause: WordPracticeTransition.PersistenceCause = .automatic) {
-    guard pageSession.practice == nil else { return }
+    guard !pageSessionStore.ownsConfigurationSelection else { return }
     guard customTextRecovery.permitsAutomaticPersistence(mode: mode) else { return }
     // The selected file exists only in this process. Leave the previous safe
     // selection intact, so relaunch cannot restore a first-chunk impostor.
@@ -6754,7 +6773,7 @@ private struct ContentView: View {
   private func returnToTypebarSettings() throws {
     let page = pageSessionStore
     guard !session.hasStarted || session.isFinished else { throw WebsiteConfigImportWorkflowError.activeAttempt }
-    guard page.state.practice != nil || page.isReturningToTypebarSettings else {
+    guard page.state.practice != nil || page.state.savedApplication != nil || page.isReturningToTypebarSettings else {
       page.startupController.continueUsingLegacy()
       return
     }

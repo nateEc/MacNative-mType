@@ -15,7 +15,8 @@ const funboxMode = process.argv[3] === '--funbox-admission';
 const defaultsMode = process.argv[3] === '--default-profile';
 const coldMode = process.argv[3] === '--cold-storage';
 const editMode = process.argv[3] === '--single-edit';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode);
+const failureOrderMode = process.argv[3] === '--import-failure-order';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -155,7 +156,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -234,7 +235,126 @@ if (defaultsMode) {
   const from = lifecycle.indexOf('const lastConfigsToApply:'), to = lifecycle.indexOf('\nexport async function resetConfig(', from);
   assert.ok(from >= 0 && to > from);
   new vm.Script(stripTypeScriptTypes(lifecycle.slice(from, to).replace('export async function ', 'async function '), {mode: 'transform'})).runInContext(context);
-  if (coldMode) {
+  if (failureOrderMode) {
+    // Real parser/schema/migration, setter, lifecycle, event bus and persistence
+    // functions. Failures are injected at explicit metadata/storage/listener
+    // boundaries; no browser, real initialization, disk, account or network.
+    const parser = await load(path.join(root, 'packages/util/src/json.ts'));
+    const extract = (text, begin, end) => {
+      const a = text.indexOf(begin), b = text.indexOf(end, a);
+      assert.ok(a >= 0 && b > a);
+      return text.slice(a, b).replace(/^export /gm, '');
+    };
+    const persistence = fs.readFileSync(path.join(frontend, 'config/persistence.ts'), 'utf8');
+    vm.runInContext(stripTypeScriptTypes('let configToSend = {};\n' + extract(persistence,
+      'export function saveToLocalStorage(', '\nexport function saveFullConfigToLocalStorage'), {mode:'transform'}), context);
+    vm.runInContext(stripTypeScriptTypes(extract(persistence,
+      'export function saveFullConfigToLocalStorage(', '\nconst saveToDatabase'), {mode:'transform'}), context);
+    vm.runInContext(stripTypeScriptTypes(extract(lifecycle,
+      'export async function applyConfigFromJson(', '\nexport async function loadFromLocalStorage('), {mode:'transform'}), context);
+    Object.assign(context, {ConfigSchemas:configSchemas, parseJsonWithSchema:parser.parseWithSchema});
+    const fixtures = [];
+    const testLogic = fs.readFileSync(path.join(frontend,'test/test-logic.ts'),'utf8');
+    const configSubscriber = extract(testLogic,'configEvent.subscribe(','timerEvent.subscribe(').trim().replace(/;$/,'');
+    const cases = ['valid','parse','override-first','override-middle','override-last','refused',
+      'correction-storage','full-storage','full-storage-after-correction','sync-listener','async-listener','source-init-pending','source-init-failure'];
+    const orderedKeys = [...Object.keys(defaults).filter(key => !vm.runInContext('lastConfigsToApply.has',context).call(
+      vm.runInContext('lastConfigsToApply',context),key)), ...vm.runInContext('Array.from(lastConfigsToApply)',context)];
+    // Each scenario also checks that a prior runtime/disk value is distinct
+    // from source defaults; a failed application must not be mistaken for a
+    // rollback merely because only a default-valued profile was observed.
+    for (const scenario of cases) {
+      const old = {...structuredClone(defaults), fontSize:1.75, words:77};
+      Object.assign(simulation.Config,structuredClone(old));
+      simulation.flags = {authenticated:false,documentComplete:true,customThemeCount:0,development:false,testActive:false};
+      simulation.events = []; simulation.saves = []; simulation.stores = []; simulation.gates = [];
+      const trace = [], writes = [];
+      let disk = structuredClone(old), success = 0, errors = 0, remote = 0, asyncFailure = false;
+      let finishAsync, observedAsync;
+      const metadataKey = scenario === 'override-first' ? orderedKeys[0]
+        : scenario === 'override-middle' ? orderedKeys[Math.floor(orderedKeys.length/2)]
+        : scenario === 'override-last' ? orderedKeys.at(-1) : null;
+      const originalOverride = metadataKey ? metadata[metadataKey].overrideValue : null;
+      if (metadataKey) metadata[metadataKey].overrideValue = () => { trace.push('override-error'); throw new Error('owned metadata failure'); };
+      const unsubscribe = bus.subscribe(event => {
+        trace.push('event:'+event.key);
+        if (event.key !== 'fullConfigChangeFinished') return;
+        if (scenario === 'sync-listener') throw new Error('owned synchronous listener failure');
+        if (scenario === 'async-listener') {
+          const pending = (async () => { await new Promise(resolve => { finishAsync = resolve; }); throw new Error('owned asynchronous listener failure'); })();
+          observedAsync = pending.catch(() => { asyncFailure = true; trace.push('async-error'); });
+          return pending;
+        }
+      });
+      Object.assign(context, {
+        configLS:{set:value => {
+          trace.push('storage-attempt');
+          if (scenario === 'full-storage' || scenario === 'correction-storage'
+            || (scenario === 'full-storage-after-correction' && writes.length === 1)) throw new Error('owned storage failure');
+          disk = structuredClone(value); writes.push(structuredClone(value)); trace.push('storage-written');
+        }}, saveToDatabase:() => { remote++; },
+        saveConfig:() => { remote++; return Promise.resolve(); }, setAccountButtonSpinner:() => {},
+        showSuccessNotification:() => { success++; trace.push('success'); },
+        showErrorNotification:() => { errors++; trace.push('import-error'); },
+        setFullConfigStore:value => { simulation.stores.push(structuredClone(value)); trace.push('store'); },
+      });
+      if (scenario.startsWith('source-init-')) {
+        // Actual test-page subscriber; restart/initialization and its eventual
+        // I/O completion are owned boundaries, not the real test engine.
+        Object.assign(context,{getActivePage:() => 'test',
+          LazyModeState:{getArabicPref:() => false},
+          restart:() => {
+            trace.push('restart-request');
+            const pending = new Promise((resolve,reject) => {
+              finishAsync = () => scenario === 'source-init-failure' ? reject(new Error('owned init failure')) : resolve();
+            });
+            observedAsync = pending.then(() => trace.push('init-complete'),() => { asyncFailure = true; trace.push('async-error'); });
+            return pending;
+          }});
+        vm.runInContext(stripTypeScriptTypes(`globalThis.removeConfigSubscriber=(${configSubscriber});`,{mode:'transform'}),context);
+      }
+      const partial = {fontSize:2,mode:'words',words:4,numbers:true};
+      if (['refused','correction-storage','full-storage-after-correction'].includes(scenario)) partial.customPolyglot = ['english','english'];
+      try { await context.applyConfigFromJson(scenario === 'parse' ? '{' : JSON.stringify(partial)); }
+      finally { unsubscribe(); if (scenario.startsWith('source-init-')) context.removeConfigSubscriber(); if (metadataKey) {
+        if (originalOverride === undefined) delete metadata[metadataKey].overrideValue;
+        else metadata[metadataKey].overrideValue = originalOverride;
+      }}
+      const beforeAsync = {success,errors,writes:writes.length,asyncFailure};
+      if (finishAsync) { finishAsync(); await observedAsync; }
+      const expectedFailure = ['parse','override-first','override-middle','override-last','correction-storage','full-storage','full-storage-after-correction'].includes(scenario);
+      assert.equal(errors,Number(expectedFailure),scenario); assert.equal(success,Number(!expectedFailure),scenario);
+      assert.equal(writes.length,expectedFailure && scenario !== 'full-storage-after-correction' ? 0 : scenario === 'refused' ? 2 : 1,scenario);
+      if (expectedFailure && scenario !== 'full-storage-after-correction') assert.deepEqual(disk,old,scenario);
+      if (scenario.startsWith('override-')) {
+        assert.equal(simulation.stores.length,0); assert.notDeepEqual(simulation.Config,old);
+        assert.ok(!simulation.events.some(event => event.key === 'fullConfigChangeFinished'));
+      }
+      if (scenario === 'full-storage') assert.equal(simulation.stores.length,1);
+      if (scenario === 'full-storage-after-correction') {
+        assert.equal(simulation.stores.length,1); assert.equal(disk.words,4); assert.notDeepEqual(disk,old);
+        assert.ok(trace.indexOf('storage-written') < trace.indexOf('import-error'));
+      }
+      if (scenario === 'correction-storage') assert.equal(simulation.stores.length,0);
+      if (scenario === 'sync-listener') assert.ok(trace.includes('success'));
+      if (scenario === 'async-listener') {
+        assert.deepEqual(beforeAsync,{success:1,errors:0,writes:1,asyncFailure:false});
+        assert.equal(asyncFailure,true); assert.ok(trace.indexOf('success') < trace.indexOf('async-error'));
+      }
+      if (scenario.startsWith('source-init-')) {
+        assert.deepEqual(beforeAsync,{success:1,errors:0,writes:1,asyncFailure:false});
+        assert.equal(trace.filter(value => value === 'restart-request').length,1);
+        assert.ok(trace.indexOf('restart-request') < trace.indexOf('success'));
+        assert.equal(asyncFailure,scenario === 'source-init-failure');
+        assert.ok(trace.indexOf('success') < trace.indexOf(asyncFailure ? 'async-error' : 'init-complete'));
+      }
+      fixtures.push({scenario,metadataKey,success,errors,remote,beforeAsync,asyncFailure,
+        writes:writes.length,stores:simulation.stores.length,trace,
+        old,runtime:structuredClone(simulation.Config),disk});
+    }
+    verify();
+    console.log(JSON.stringify({fixtures}));
+  } else if (coldMode) {
     const Storage = (await load(path.join(frontend, 'utils/local-storage-with-schema.ts'))).LocalStorageWithSchema;
     // Execute actual source storage/read/apply code; browser I/O and remote
     // publication are controlled adapters, never a real browser or account.

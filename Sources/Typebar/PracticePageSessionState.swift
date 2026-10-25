@@ -12,6 +12,7 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
   /// Accepted departure, including an init failure. Clears on a new attempt.
   var restartDepartureAttemptID: UUID?
   var configurationDeparture: WebsiteConfigCommitCoordinator.ConfigurationDeparture?
+  var savedApplication: WebsiteConfigCommitCoordinator.SavedApplication?
   struct QuoteInitializationCheckpoint {
     let id = UUID()
     let publication: UUID

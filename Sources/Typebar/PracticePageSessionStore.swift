@@ -56,6 +56,10 @@ final class PracticePageSessionStore {
     fileprivate let restartDeparture: UUID?
     let configurationDeparture: UUID?
     fileprivate let quoteInitialization: UUID?
+    fileprivate var savedApplication: UUID?
+    func acceptingApplication(_ id: UUID) -> Self {
+      var copy = self; copy.savedApplication = id; return copy
+    }
   }
 
   func captureApplication(router: PreferenceConfigurationSaveRouter) throws -> ApplicationCapture {
@@ -74,7 +78,8 @@ final class PracticePageSessionStore {
     return .init(scope: scope, lease: lease, attachment: attachment, compositionActivity: compositionActivity,
       session: session.generationState, publication: state.presentation?.publication.applicationID,
       repetition: state.practice?.repetition, restartDeparture: state.restartDepartureAttemptID,
-      configurationDeparture: state.configurationDeparture?.id, quoteInitialization: state.quoteInitialization?.id)
+      configurationDeparture: state.configurationDeparture?.id, quoteInitialization: state.quoteInitialization?.id,
+      savedApplication: state.savedApplication?.id)
   }
   func isCurrent(_ capture: ApplicationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -85,9 +90,11 @@ final class PracticePageSessionStore {
       && state.restartDepartureAttemptID == capture.restartDeparture
       && state.configurationDeparture?.id == capture.configurationDeparture
       && state.quoteInitialization?.id == capture.quoteInitialization
+      && state.savedApplication?.id == capture.savedApplication
   }
 
   func captureGeneration(router: PreferenceConfigurationSaveRouter) throws -> GenerationCapture {
+    guard state.savedApplication == nil else { throw PracticePageSessionStateError.incomplete }
     guard !committing, self.router === router, let lease = router.captureLease(), lease.owner == owner else {
       throw PracticePageSessionStateError.wrongOwner
     }
@@ -106,7 +113,7 @@ final class PracticePageSessionStore {
       configurationDeparture: state.configurationDeparture?.id, quoteInitialization: state.quoteInitialization?.id)
   }
   func isCurrent(_ capture: GenerationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
-    !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
+    state.savedApplication == nil && !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
       && capture.attachment == attachment
       && capture.compositionActivity == compositionActivity
       && state.presentation?.publication.applicationID == capture.publication.applicationID
@@ -144,10 +151,12 @@ final class PracticePageSessionStore {
   func acceptsInput(for attemptID: UUID) -> Bool {
     acceptsAttemptCallback(for: attemptID) && !isInputSuspendedForRestart
   }
+  var ownsConfigurationSelection: Bool { state.practice != nil || state.savedApplication != nil }
   func acceptsAttemptCallback(for attemptID: UUID) -> Bool {
     router != nil && !committing && !startupInputTransition && !startupInputSuspended
       && !legacyReturnTransition && !isReturningToTypebarSettings
       && state.configurationDeparture == nil
+      && state.savedApplication == nil
       && state.session.automaticInputAttemptID == attemptID
   }
   func setStartupInputSuspended(_ suspended: Bool) {
@@ -178,7 +187,7 @@ final class PracticePageSessionStore {
       throw PracticePageSessionStateError.wrongOwner
     }
     guard !state.session.hasStarted || state.session.isFinished else { throw PracticePageSessionStateError.locked }
-    guard state.practice != nil || legacyReturnPermit != nil else { throw PracticePageSessionStateError.incomplete }
+    guard state.practice != nil || state.savedApplication != nil || legacyReturnPermit != nil else { throw PracticePageSessionStateError.incomplete }
     let permit = LegacyReturnPermit(request: UUID(), lease: lease, attachment: attachment,
       previousAttempt: state.session.automaticInputAttemptID)
     committing = true
@@ -212,7 +221,7 @@ final class PracticePageSessionStore {
     legacyReturnTransition = false
   }
   var isInputSuspendedForRestart: Bool {
-    state.configurationDeparture != nil || restartController?.isPreparing == true
+    state.savedApplication != nil || state.configurationDeparture != nil || restartController?.isPreparing == true
       || state.restartDepartureAttemptID == state.session.automaticInputAttemptID
   }
   @discardableResult
@@ -284,7 +293,8 @@ final class PracticePageSessionStore {
     clearLegacyReturn()
     let retainsController = controller != nil && restartController === controller
     if !retainsController && (state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID
-      || state.configurationDeparture?.id != self.state.configurationDeparture?.id) { retireRestartController() }
+      || state.configurationDeparture?.id != self.state.configurationDeparture?.id
+      || state.savedApplication?.id != self.state.savedApplication?.id) { retireRestartController() }
     self.state = state
   }
 }

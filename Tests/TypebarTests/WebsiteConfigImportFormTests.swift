@@ -9,6 +9,19 @@ import XCTest
     while form.isWorking && ContinuousClock.now < deadline { await Task.yield() }
     XCTAssertFalse(form.isWorking)
   }
+  func testAcceptedImportFailureReportsSavedConfigurationInsteadOfRollback() async {
+    let form = WebsiteConfigImportForm(apply: { _ in
+      throw WebsiteConfigSavedPreparationError(underlying: NSError(domain: "owned-reader", code: 1))
+    }, cancel: {})
+    form.json = "owned JSON"; form.start()
+    await settle(form)
+    XCTAssertTrue(form.isError)
+    XCTAssertTrue(form.message?.contains("设置已保存") == true)
+    XCTAssertTrue(form.message?.contains("继续准备") == true)
+    form.cancel()
+    XCTAssertTrue(form.message?.contains("已保存的配置保留") == true)
+    XCTAssertEqual(form.json, "owned JSON")
+  }
   func testCancelRetiresLateSuccessAndAllowsRetryWithoutChangingEditor() async throws {
     var pending: CheckedContinuation<String, Never>?
     var inputs: [String?] = [], cancellations = 0

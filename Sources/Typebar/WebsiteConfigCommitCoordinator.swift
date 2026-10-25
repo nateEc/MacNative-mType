@@ -22,7 +22,7 @@ final class WebsiteConfigCommitCoordinator {
   struct Prepared {
     fileprivate(set) var draft: WebsiteConfigNativeDraft
     fileprivate let identity: UUID
-    fileprivate let request: UUID
+    fileprivate var request: UUID
     fileprivate let owner: PreferenceConfigurationSaveRouter.Lease
     fileprivate let environment: Environment
     fileprivate var disk: WebsiteConfigFileRegister.Revision
@@ -38,6 +38,8 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate var requiresRestartController = false
     fileprivate var pageCapture: PracticePageSessionStore.GenerationCapture?
     fileprivate var applicationCapture: PracticePageSessionStore.ApplicationCapture?
+    fileprivate var savedApplicationID: UUID?
+    fileprivate var applicationEventsApplied = false
     fileprivate weak var contentSource: WebsiteConfigPracticeScopeSource?
     fileprivate var contentCapture: WebsiteConfigPracticeScopeSource.Snapshot?
   }
@@ -68,6 +70,13 @@ final class WebsiteConfigCommitCoordinator {
         let current = try? authority.register.read().revision, current == disk else { return false }
       return router.isCurrent(ownerLease)
     }
+  }
+  /// Durable complete import whose resources/text have not been delivered.
+  /// The ticket is window-local; a new coordinator uses normal cold recovery.
+  struct SavedApplication {
+    let id: UUID
+    fileprivate let ticket: Prepared
+    var draft: WebsiteConfigNativeDraft { ticket.draft }
   }
   struct BackgroundPrepared {
     fileprivate let configuration: Prepared
@@ -405,6 +414,79 @@ final class WebsiteConfigCommitCoordinator {
     bound.contentSource = source; bound.contentCapture = content
     guard isCurrent(bound) else { throw WebsiteConfigCommitCoordinatorError.stale }
     return bound
+  }
+
+  /// Accept a complete JSON import before asynchronous resource/text loading.
+  /// An unsuccessful CAS changes no page state; a successful one is retained
+  /// even when initialization is cancelled or fails later.
+  func acceptApplication(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Prepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    guard isCurrent(prepared), prepared.sourcePage === page,
+      let capture = prepared.applicationCapture, prepared.savedApplicationID == nil,
+      case .imported = prepared.draft.origin else { throw WebsiteConfigCommitCoordinatorError.stale }
+    try Task.checkCancellation()
+    try page.beginCommit(owner: prepared.owner, router: router, applicationCapture: capture)
+    defer { page.endCommit() }
+    let disk: WebsiteConfigFileRegister.Revision
+    switch try register.commit(prepared.draft, replacing: prepared.disk) {
+    case .committed(let value): disk = value
+    case .conflict: throw WebsiteConfigCommitCoordinatorError.stale
+    case .unavailable: throw WebsiteConfigCommitCoordinatorError.unavailable
+    }
+    // No suspension, fallible callback or cancellation check after the CAS.
+    let id = UUID()
+    var admitted = prepared
+    admitted.disk = disk; admitted.savedDraft = prepared.draft
+    admitted.savedApplicationID = id
+    admitted.applicationCapture = capture.acceptingApplication(id)
+    var state = page.state
+    state.savedApplication = .init(id: id, ticket: admitted)
+    page.installCommitted(state)
+    return admitted
+  }
+
+  func resumeApplication(for page: PracticePageSessionStore) throws -> Prepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    guard let pending = page.state.savedApplication, pending.ticket.identity == identity,
+      let source = pending.ticket.contentSource,
+      router.isCurrent(pending.ticket.owner), environment() == pending.ticket.environment,
+      try register.read().revision == pending.ticket.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+    request = UUID()
+    var resumed = pending.ticket; resumed.request = request
+    resumed.applicationCapture = try page.captureApplication(router: router)
+    let content = try source.capture(owner: page.owner,
+      preserving: pending.ticket.contentCapture?.scope ?? .init())
+    guard content.environment == resumed.environment else { throw WebsiteConfigCommitCoordinatorError.stale }
+    resumed.contentCapture = content
+    guard isCurrent(resumed) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return resumed
+  }
+
+  private func checkpointApplication(_ prepared: Prepared, admission: UUID) throws -> Prepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    guard admission == resourceAdmission, isCurrent(prepared), let page = prepared.sourcePage,
+      let capture = prepared.applicationCapture, let id = prepared.savedApplicationID,
+      page.state.savedApplication?.id == id, let saved = prepared.savedDraft else {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
+    try page.beginCommit(owner: prepared.owner, router: router, applicationCapture: capture)
+    defer { page.endCommit() }
+    let disk: WebsiteConfigFileRegister.Revision
+    switch try register.commit(saved, replacing: prepared.disk, preservingUnchanged: true) {
+    case .committed(let value): disk = value
+    case .conflict: throw WebsiteConfigCommitCoordinatorError.stale
+    case .unavailable: throw WebsiteConfigCommitCoordinatorError.unavailable
+    }
+    var updated = prepared; updated.disk = disk
+    var state = page.state
+    state.savedApplication = .init(id: id, ticket: updated)
+    page.installCommitted(state)
+    return updated
   }
 
   /// Admit a setter against this coordinator's latest committed document, not
@@ -947,6 +1029,7 @@ final class WebsiteConfigCommitCoordinator {
     for prepared: Prepared, admission: UUID) throws -> Prepared {
     var updated = prepared
     updated.quoteInitialization = progress
+    if prepared.savedApplicationID != nil { return try checkpointApplication(updated, admission: admission) }
     guard prepared.retainsQuoteInitialization,
       let page = prepared.sourcePage, let capture = prepared.pageCapture,
       capture.configurationDeparture != nil
@@ -1071,12 +1154,14 @@ final class WebsiteConfigCommitCoordinator {
     let draft = try WebsiteConfigLazyModeLifecycle.prepare(original,
       pointsPerRem: resources.configuration.environment.pointsPerRem,
       replayApplicationEvents: replayApplicationEvents && reason == .configurationApplication
-        && resources.configuration.pageCapture?.configurationDeparture == nil,
+        && resources.configuration.pageCapture?.configurationDeparture == nil
+        && !resources.configuration.applicationEventsApplied,
       onNoticeTransition: { lazyTransition = $0 })
     if reason == .nextAttempt, draft.lazyMemory != original.lazyMemory || draft.generators.lazyMode != original.generators.lazyMode {
       throw WebsiteConfigSessionBuildError.reconfigurationRequired(["lazyMode": .bool(draft.generators.lazyMode)])
     }
     var configuration = resources.configuration; configuration.draft = draft
+    if configuration.savedApplicationID != nil { configuration.applicationEventsApplied = true }
     if var saved = configuration.savedDraft {
       if WebsiteConfigLazyModeLifecycle.savesConfigurationDuringGeneration(from: original, to: draft) {
         saved = draft
@@ -1161,6 +1246,7 @@ final class WebsiteConfigCommitCoordinator {
   /// transition rather than repeating the listener or resurrecting its input.
   private func saveGenerationCorrection(_ prepared: Prepared, from original: WebsiteConfigNativeDraft,
     admission: UUID, admittingSourceSetter: Bool = false) throws -> Prepared {
+    if prepared.savedApplicationID != nil { return try checkpointApplication(prepared, admission: admission) }
     guard prepared.pageCapture != nil,
       prepared.pageCapture?.configurationDeparture != nil || !prepared.quoteRecoveries.isEmpty || admittingSourceSetter,
       original.projection.runtime != prepared.draft.projection.runtime
@@ -1322,7 +1408,8 @@ final class WebsiteConfigCommitCoordinator {
     if case .restored(let value) = prepared.draft.origin, case .nativeState = value.origin { restoringNative = true }
     else { restoringNative = false }
     do { outcome = try register.commit(prepared.savedDraft ?? prepared.draft, replacing: prepared.disk,
-      preservingUnchanged: restoringNative || prepared.pageCapture?.configurationDeparture != nil || prepared.funboxSelectionSaved == false) }
+      preservingUnchanged: restoringNative || prepared.savedApplicationID != nil
+        || prepared.pageCapture?.configurationDeparture != nil || prepared.funboxSelectionSaved == false) }
     catch WebsiteConfigFileRegisterError.busy { return .busy }
     switch outcome {
     case .committed(let disk):

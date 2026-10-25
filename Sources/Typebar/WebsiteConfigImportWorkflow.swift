@@ -216,11 +216,13 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         throw WebsiteConfigImportWorkflowError.typebarBackup
       }
       ticket = try coordinator.prepare(json, for: page, refreshingWith: source)
+      ticket = try coordinator.acceptApplication(ticket, for: page)
     case .application(nil):
-      switch try coordinator.prepareRestoration(for: page, refreshingWith: source) {
-      case .missing: throw WebsiteConfigImportWorkflowError.missing
-      case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
-      case .prepared(let value): ticket = value
+      if page.state.savedApplication != nil {
+        do { ticket = try coordinator.resumeApplication(for: page) }
+        catch WebsiteConfigCommitCoordinatorError.stale { ticket = try restorationTicket(for: page) }
+      } else {
+        ticket = try restorationTicket(for: page)
       }
     }
     prepared = ticket
@@ -265,14 +267,21 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       // cancel() retires the coordinator ticket, so a late resource return can
       // report stale before our post-await operation check is reached.
       if operation != current || Task.isCancelled { throw CancellationError() }
-      if !(error is CancellationError), page.state.configurationDeparture != nil {
+      if !(error is CancellationError), page.state.configurationDeparture != nil || page.state.savedApplication != nil {
         throw WebsiteConfigSavedPreparationError(underlying: error, initializationMessage: initializationReport.finalMessage,
-          configurationWasSaved: page.state.configurationDeparture?.configurationWasSaved ?? true)
+          configurationWasSaved: page.state.savedApplication != nil || (page.state.configurationDeparture?.configurationWasSaved ?? true))
       }
       if let message = initializationReport.finalMessage {
         throw WebsiteConfigInitializationExhaustedError(underlying: error, message: message)
       }
       throw error
+    }
+  }
+  private func restorationTicket(for page: PracticePageSessionStore) throws -> WebsiteConfigCommitCoordinator.Prepared {
+    switch try coordinator.prepareRestoration(for: page, refreshingWith: source) {
+    case .missing: throw WebsiteConfigImportWorkflowError.missing
+    case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+    case .prepared(let value): return value
     }
   }
   private func postNoQuitSelectionNotice(_ message: String,
@@ -305,6 +314,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         throw WebsiteConfigImportWorkflowError.activeAttempt
       }
     case .edit:
+      guard page.state.savedApplication == nil else { throw WebsiteConfigImportWorkflowError.preparationPending }
       if let pending = page.state.configurationDeparture {
         if !pending.configurationWasSaved {
           throw WebsiteConfigSavedPreparationError(underlying: WebsiteConfigImportWorkflowError.preparationPending,

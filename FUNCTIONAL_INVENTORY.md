@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-25 完整导入的已保存待初始化状态（CFG-IMPORT-FAILURE-ORDER-01）：沿 13 个实际源码阶段证据，合法 JSON 现在在读资源／正文前保存，页面持有独立待初始化能力并暂停旧输入；失败／取消保留记录，可继续准备或由新工作流冷恢复，晚到结果和竞争记录受版本约束。自动引语／语言／Lazy 校正推进保存检查点，继续不重放导入事件或离场。仍未覆盖源 setter 抛错后的部分运行状态、每次拒绝保存写序、活动完整导入和全部实体交互；不升格为完整导入全部等价，见迁移契约。
+
 2026-10-25 Layoutfluid 序列编辑（CFG-LAYOUTFLUID-LIST-EDITOR-01）：完整配置表单及命令面板 setCustomLayoutfluidCustom 可输入布局 ID；保留源单空格转换与 2–15 项前检，setter 再有序去重。已启用时成功事件重开并应用新序列首布局，未启用时只保存、不改变当前尝试；No Quit 活动时拒绝并发重要提示，拒绝值不另行重开。144 组实际命令／setter／订阅者样本及真实工作流证据见迁移契约；命令窗口捕获原发布版本，与 Polyglot 共用窗口寿命但分别提交字段。可见操作及实体键盘／IME 仍待验收。
 
 2026-10-25 Polyglot 组合编辑（CFG-POLYGLOT-LIST-EDITOR-01）：完整配置现在能在原生表单修改语言 ID 列表，不必重新粘贴 JSON；正常保存重开，活动 No Quit 仅保存下轮列表、不结束或重建当前尝试。保持源单空格转换、schema 前检、setter 去重顺序和 false 后重开；新配置发布保留当前种子、外观、控制器、时钟与账本，防旧 token、取消、账户代次及竞争覆盖。72 组源命令阶段和实际工作流／表单证据见迁移契约。语言载入错误降级未实现；当前正式生成已使用 UTF-16 精确去重候选，未把旧辅助虚拟池误当正式生成器修改。
@@ -1887,6 +1889,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-IMPORT-FAILURE-ORDER-01 | 完整导入的失败保存边界 | `config/{lifecycle,setters,persistence}.ts`, `hooks/createEvent.ts`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：合法 JSON 在资源／正文前保存；待初始化期间暂停旧输入、保留记录及恢复能力，支持取消、新工作流冷恢复、竞争写入和晚到结果保护，自动校正保存后继续不重放。13 个源阶段及真实原生工作流证据见迁移契约。setter 抛错的部分运行状态、每次拒绝保存写序、活动完整导入、完整冷启动失败语义和实体 UI／IME 未验。 |
 | CFG-LAYOUTFLUID-LIST-EDITOR-01 | 完整配置的流动布局序列编辑 | `commandline/{lists,commandline-metadata,util}.ts`, `config/{metadata.tsx,setters.ts}`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：原生表单及命令面板 setCustomLayoutfluidCustom 输入、前检与 setter 去重；未启用只保存，已启用才重开并应用新首布局。No Quit 活动时拒绝且重要提示，重复值无另行重开；144 组源码阶段及真实表单／工作流证据见迁移契约。命令窗口版本与取消独立持有；全部组合与实体 UI／IME 未验。 |
 | CFG-POLYGLOT-LIST-EDITOR-01 | 完整配置的多语组合编辑 | `commandline/{lists,commandline-metadata,util}.ts`, `config/metadata.tsx`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：原生表单及命令面板 setCustomPolyglotCustom 的单空格语言 ID 输入、前检与有序去重；正常保存重开，No Quit 只保存下轮列表。命令窗口捕获发布版本，退出面板后再呈现，配置替换后旧窗口不能编辑。72 组源命令阶段、真实工作流与隐藏布局见迁移契约；计时重复回归验证旧历史逐词重放，耗尽后使用新组合。载入降级、其余重复交叉语义与实体 UI／IME 未验。 |
 | FUN-MEMORY-RESTART-LIFECYCLE-01 | 记忆提示的等待、输入与重开 | `test/test-logic.ts`, `test/test-ui.ts`, `test/funbox/{funbox-functions,memory-funbox-timer}.ts` | TestDomain, AppKitInputBridge | 部分验证：实际重开会清除处理器计时器；原生保持预览至输入、删除不重显、重开恢复。120 组固定调用链及原生状态、实际页面重开见迁移契约；未证实完整 DOM、可见窗口、全部组合及实体输入法，不增加与固定版本不同的倒计时。 |
