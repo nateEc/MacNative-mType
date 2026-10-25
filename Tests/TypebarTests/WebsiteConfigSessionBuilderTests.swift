@@ -335,8 +335,8 @@ import XCTest
       _ = try await WebsiteConfigSessionBuilder.prepare(draft: draft(
         #"{"mode":"words","words":3,"funbox":["polyglot"],"customPolyglot":["arabic","hebrew"]}"#), scope: .init())
       XCTFail("Direction-conflicting language changed without resource repreparation")
-    } catch WebsiteConfigSessionBuildError.reconfigurationRequired(let changes) {
-      XCTAssertEqual(changes, ["language": .string("arabic")])
+    } catch WebsiteConfigSessionBuildError.polyglotDirectionConflict(let language) {
+      XCTAssertEqual(language, "arabic")
     }
     let result = try await WebsiteConfigSessionBuilder.prepare(draft: draft(
       #"{"mode":"words","words":3,"funbox":["polyglot"],"customPolyglot":["english","german"]}"#), scope: .init())

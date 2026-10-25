@@ -1879,6 +1879,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-POLYGLOT-DIRECTION-RECOVERY-01 | Polyglot 方向冲突的首语言保存与静默重试 | `test/funbox/funbox-functions.ts` 的 polyglot.withWords、`test/test-logic.ts` 的 init | TestDomain, PreferencesDomain | 部分实现：相反方向的主语言保存为所选首语言，执行同步监听并静默消耗一次三轮预算；保留组合，5 秒非重要提示，下一轮重新激活且可能触发连写整组清空。54 组实际源码调用方对照到达原生发布，取消／账户切换／竞争记录／No Quit 边界见迁移契约。少量／零个语言加载成功的降级、Funbox 选择记忆、完整导入失败写序及实体 UI／IME 未完成。 |
 | CFG-FUNBOX-ACTIVATION-CONFIG-01 | Funbox 激活时的配置处理器及连写保护 | `test/funbox/{funbox,funbox-functions,list,active}.ts`, `packages/funbox/src/{list,validation}.ts` | TestDomain, PreferencesDomain | 部分实现：五类 applyConfig 处理器进入实际初始化，按顺序应用键盘模式／布局和 Memory 显示设置；连写文字遇五类不支持模式时清空整组，非重要本地提示不占正文预算。保留 nosave、正常拒绝继续、冷恢复、后续保存提升与取消检查点；2,304 组源码阶段对照及六项工作流证据见迁移契约。模型阶段对照不代表全部组合的实际会话／视觉支持；FunboxMemory 选择恢复、其他资源／计时器生命周期和实体交互仍开放。 |
 | CFG-LAZY-NOTICE-LIFETIME-01 | 不支持 Lazy Mode 的重要提示与去重重置 | `test/test-logic.ts` 的 showedLazyModeNotification 与 post-activation Lazy 阶段 | TestDomain, PreferencesDomain | 部分实现：语言／Polyglot 自动关闭的重要提示复用本地历史，窗口内只提示一次，仅记忆恢复才重新允许；基础语言 remember 清理不误重置。工作流替换保留、不同窗口独立，取消／账户代次隔离迟到通知，不占三次生成预算。原有 880 组状态及两条连续源码序列、原生工作流证据见迁移契约；完整语言加载错误、Funbox 激活、初始化其他通知及实体交互仍开放。 |
 | CFG-QUOTE-UNAUTH-PREFLIGHT-01 | 未登录收藏引语的前置校正 | `test/test-logic.ts` 的 init、`config/setters.ts` 的 setQuoteLengthAll | TestDomain, PreferencesDomain | 部分实现：quote 模式且长度含 -3 的未登录请求先改全部长度，不占正文失败预算或弹收藏错误；保存阶段在提供器前持久化，取消继续与账户退役保持原有 CAS／账本边界。已登录收藏、指定引语和非引语休眠长度保留；五类实际源码顺序探针及五项新工作流证据见迁移契约。完整语言／Funbox 前置激活、认证收藏来源、Lazy 通知和实体交互仍开放。 |

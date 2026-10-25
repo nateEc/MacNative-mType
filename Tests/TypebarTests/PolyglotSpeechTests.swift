@@ -26,7 +26,8 @@ final class PolyglotSpeechTests: XCTestCase {
       .deletingLastPathComponent().deletingLastPathComponent()
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
     let calls = app.components(separatedBy: .newlines).filter { $0.contains("NativeSpeech.shared.speak(") }
-    XCTAssertEqual(calls.count, 5)
+    // Includes the complete website-practice installation entry point.
+    XCTAssertEqual(calls.count, 6)
     for call in calls {
       XCTAssertTrue(call.contains("language: session.configuration.wordPoolBaseLanguage"), call)
     }

@@ -3,6 +3,12 @@ import Foundation
 /// Resolve the primary language before building a fresh Polyglot word pool.
 /// This is not decoding or replay: historical configurations stay unchanged.
 struct PolyglotGenerationPreparation {
+  static func directionFallback(primary: TypingLanguage, selected: [TypingLanguage]) -> TypingLanguage? {
+    guard selected.count >= 2 else { return nil }
+    let conflicts = primary.usesRightToLeftPrompt
+      ? selected.allSatisfy { !$0.usesRightToLeftPrompt } : selected.allSatisfy(\.usesRightToLeftPrompt)
+    return conflicts ? selected.first : nil
+  }
   let configuration: TestConfiguration
   let switchedPrimaryLanguage: TypingLanguage?
 
@@ -14,17 +20,14 @@ struct PolyglotGenerationPreparation {
     }
     let primary = requested.wordPoolBaseLanguage
     let selected = requested.mixedLanguageComponents
-    let conflicts = primary.usesRightToLeftPrompt
-      ? selected.allSatisfy { !$0.usesRightToLeftPrompt }
-      : selected.allSatisfy(\.usesRightToLeftPrompt)
-    // TestConfiguration has already normalized this to at least two languages.
-    let resolved = conflicts ? selected[0] : primary
+    let fallback = Self.directionFallback(primary: primary, selected: selected)
+    let resolved = fallback ?? primary
     var prepared = requested.with(polyglotBaseLanguage: resolved)
     prepared.polyglotUsesPrimaryDirection = true
     prepared.polyglotUsesPrimaryCodeInput = true
     prepared.polyglotUsesPrimaryInputNormalization = true
     configuration = prepared
-    switchedPrimaryLanguage = conflicts ? resolved : nil
+    switchedPrimaryLanguage = fallback
   }
 
   var notice: String? {

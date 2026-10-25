@@ -4,6 +4,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
   /// Emitted only by quote selection, distinct from other reconfiguration
   /// requests or a content reader's ordinary error.
   case quoteRecoveryRequired(WebsiteQuoteSampler.Recovery, reason: WebsiteQuoteSampler.Reason)
+  case polyglotDirectionConflict(String)
   case quoteRecoveryLimitReached
   case reconfigurationRequired([String: WebsiteConfigValue])
   case unrepresentableConfiguration, customTextUnavailable, externalNotProvided, invalidExternalSource, generationFailed
@@ -256,9 +257,9 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     config = draft.inputRules.applying(to: draft.behavior.applying(to: config))
     if draft.generators.requestsPolyglot {
       let languages = draft.generators.polyglotLanguages
-      if languages.allSatisfy({ $0.usesRightToLeftPrompt != config.language.usesRightToLeftPrompt }),
-        let first = languages.first, let name = WebsiteLanguageIdentity.name(for: first) {
-        throw WebsiteConfigSessionBuildError.reconfigurationRequired(["language": .string(name)])
+      if let fallback = PolyglotGenerationPreparation.directionFallback(primary: config.language, selected: languages),
+        let name = WebsiteLanguageIdentity.name(for: fallback) {
+        throw WebsiteConfigSessionBuildError.polyglotDirectionConflict(name)
       }
       guard TypingLanguage.normalizedMixedComponents(languages) == languages else {
         throw WebsiteConfigSessionBuildError.unrepresentableConfiguration

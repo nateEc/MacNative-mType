@@ -782,6 +782,18 @@ final class WebsiteConfigCommitCoordinator {
           resources: current, report: initializationReport, exhausted: attempt == 2)
         if attempt == 2 { throw WebsiteConfigSessionBuildError.quoteRecoveryLimitReached }
         await Task.yield()
+      } catch let recovery as PolyglotDirectionRecoveryRequest {
+        try Task.checkCancellation()
+        try checkAsyncResources(recovery.resources.configuration, admission: recovery.resources.admission)
+        current = try preparePolyglotDirectionRecovery(recovery.language, for: recovery.resources)
+        try withInitializationReport(initializationReport, resources: current) { report, valid in
+          report.recordPolyglotDirectionCorrection(recovery.language, whileCurrent: valid)
+        }
+        let silent = WebsiteWordGenerationError(message: "")
+        try reportInitializationFailure(WebsiteConfigInitializationReport.generation(attempt: attempt + 1, error: silent, quote: nil),
+          resources: current, report: initializationReport, exhausted: attempt == 2)
+        if attempt == 2 { throw silent }
+        await Task.yield()
       } catch let failure as GenerationFailure {
         try Task.checkCancellation()
         try checkAsyncResources(failure.resources.configuration, admission: failure.resources.admission)
@@ -807,6 +819,10 @@ final class WebsiteConfigCommitCoordinator {
     let recovery: WebsiteQuoteSampler.Recovery
     let reason: WebsiteQuoteSampler.Reason
     let selectedQuoteID: String?
+    let resources: ResourcesPrepared
+  }
+  @MainActor private struct PolyglotDirectionRecoveryRequest: Error {
+    let language: String
     let resources: ResourcesPrepared
   }
   private func reportInitializationFailure(_ failure: @autoclosure () -> WebsiteConfigInitializationReport.Failure,
@@ -870,7 +886,7 @@ final class WebsiteConfigCommitCoordinator {
     if let failure = error as? WebsiteConfigSessionBuildError {
       switch failure {
       case .generationFailed, .customTextUnavailable, .invalidExternalSource: return true
-      case .quoteRecoveryRequired, .quoteRecoveryLimitReached, .reconfigurationRequired,
+      case .quoteRecoveryRequired, .quoteRecoveryLimitReached, .reconfigurationRequired, .polyglotDirectionConflict,
         .unrepresentableConfiguration, .externalNotProvided, .repeatedConfigurationUnsupported: return false
       }
     }
@@ -901,6 +917,27 @@ final class WebsiteConfigCommitCoordinator {
     configuration = try saveGenerationCorrection(configuration, from: original, admission: resources.admission)
     return .init(configuration: configuration, admission: resources.admission,
       background: resources.background, font: resources.font)
+  }
+  private func preparePolyglotDirectionRecovery(_ language: String, for resources: ResourcesPrepared) throws -> ResourcesPrepared {
+    let original = resources.configuration.draft
+    guard original.generators.requestsPolyglot,
+      let fallback = PolyglotGenerationPreparation.directionFallback(primary: original.testParameters.language,
+        selected: original.generators.polyglotLanguages), WebsiteLanguageIdentity.name(for: fallback) == language else {
+      throw WebsiteConfigCommitCoordinatorError.sessionNotReady
+    }
+    let edited = try WebsiteConfigNativeProfile.editDraft(original, key: "language", value: .string(language),
+      pointsPerRem: resources.configuration.environment.pointsPerRem, context: resources.configuration.environment.context)
+    let applied = try WebsiteConfigLazyModeLifecycle.applyingEvents(edited, pointsPerRem: resources.configuration.environment.pointsPerRem)
+    var projection = applied.projection
+    projection.events = original.projection.events + projection.events
+    projection.rejectedKeys = original.projection.rejectedKeys + projection.rejectedKeys
+    var configuration = resources.configuration
+    configuration.draft = try original.replacingProjection(projection, memory: applied.lazyMemory,
+      pointsPerRem: resources.configuration.environment.pointsPerRem)
+    var saved = edited; saved.lazyMemory = applied.lazyMemory
+    configuration.savedDraft = saved
+    configuration = try saveGenerationCorrection(configuration, from: original, admission: resources.admission, admittingSourceSetter: true)
+    return .init(configuration: configuration, admission: resources.admission, background: resources.background, font: resources.font)
   }
   private func preparePracticeAttempt(for resources: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope?,
     reason: WebsiteConfigSessionBuilder.Reason,
@@ -1020,6 +1057,8 @@ final class WebsiteConfigCommitCoordinator {
       } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery, let reason) {
         throw QuoteRecoveryRequest(recovery: recovery, reason: reason, selectedQuoteID: effectiveScope.selectedQuoteID,
           resources: prepared)
+      } catch WebsiteConfigSessionBuildError.polyglotDirectionConflict(let language) {
+        throw PolyglotDirectionRecoveryRequest(language: language, resources: prepared)
       } catch {
         guard self.canRetryGeneration(error) else { throw error }
         throw GenerationFailure(underlying: error, resources: prepared, quoteInitialization: quoteInitialization)
@@ -1030,9 +1069,9 @@ final class WebsiteConfigCommitCoordinator {
   /// Advance the pending capability too, so retry starts after this durable
   /// transition rather than repeating the listener or resurrecting its input.
   private func saveGenerationCorrection(_ prepared: Prepared, from original: WebsiteConfigNativeDraft,
-    admission: UUID) throws -> Prepared {
+    admission: UUID, admittingSourceSetter: Bool = false) throws -> Prepared {
     guard prepared.pageCapture != nil,
-      prepared.pageCapture?.configurationDeparture != nil || !prepared.quoteRecoveries.isEmpty,
+      prepared.pageCapture?.configurationDeparture != nil || !prepared.quoteRecoveries.isEmpty || admittingSourceSetter,
       original.projection.runtime != prepared.draft.projection.runtime
         || original.lazyMemory != prepared.draft.lazyMemory
         || prepared.draft.projection.events.count > original.projection.events.count
@@ -1048,7 +1087,7 @@ final class WebsiteConfigCommitCoordinator {
     if let pending {
       guard pending.id == capture.configurationDeparture, pending.identity == identity,
         pending.disk == prepared.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
-    } else if capture.configurationDeparture != nil || prepared.quoteRecoveries.isEmpty {
+    } else if capture.configurationDeparture != nil || (prepared.quoteRecoveries.isEmpty && !admittingSourceSetter) {
       throw WebsiteConfigCommitCoordinatorError.stale
     }
     var state = page.state

@@ -42,6 +42,13 @@ struct WebsiteConfigInitializationExhaustedError: Error, LocalizedError {
       options: .init(title: "趣味模式", details: .object(["category": .string("funbox_joining_script")])),
       generation: noticeGeneration, whileCurrent: current)
   }
+  func recordPolyglotDirectionCorrection(_ language: String, whileCurrent current: () -> Bool) {
+    guard let notices, let noticeGeneration else { return }
+    notices.postGuarded("多语方向与主语言冲突，已切换主语言为 \(language)，保留所选语言组合。", level: .notice,
+      options: .init(durationMilliseconds: 5000, title: "多语练习", details: .object([
+        "category": .string("polyglot_direction"), "language": .string(language)
+      ])), generation: noticeGeneration, whileCurrent: current)
+  }
   func record(_ failure: Failure, whileCurrent current: () -> Bool) {
     guard current(), failure.attempt == failures.count + 1, failure.attempt <= 3 else { return }
     failures.append(failure)
