@@ -1495,6 +1495,7 @@ private struct ContentView: View {
   @State private var automaticInputScheduler = TypingAutomaticInputScheduler()
   @State private var keyboardGuideFeedback: KeyboardGuideFeedback?
   @State private var keyboardGuideFeedbackSequence = 0
+  @State private var websiteKeymapFeedback = WebsiteKeymapFeedbackStore()
   @State private var keyboardModifierFlags: NSEvent.ModifierFlags = []
   @State private var konamiSequenceTracker = KonamiSequenceTracker()
   @State private var typingCompanionHands = TypingCompanionHands()
@@ -1601,6 +1602,7 @@ private struct ContentView: View {
               panel: activeTheme.panel, layout: effectiveKeyboardLayout,
               overrideRows: effectiveKeyboardGuideOverrideRows,
               overrideThumbKeys: publishedKeyboardGuideThumbKeys,
+              websiteFeedback: committedPracticeDraft == nil ? nil : websiteKeymapFeedback,
               mirrored: committedPracticeDraft == nil && session.configuration.modifiers.contains(.mirrorKeyboard),
               scale: practiceKeyboardGuide.scale, legendStyle: practiceKeyboardGuide.legendStyle,
               keysMode: practiceKeyboardGuide.keysMode,
@@ -4529,7 +4531,7 @@ private struct ContentView: View {
       compositionText = ""; completedResult = nil; savedResultRecord = nil
       activeChallengeID = nil; wordPractice = nil
       activeLongSavedText = nil; activeVerifiedScript = nil
-      keyboardGuideFeedback = nil; typingCompanionHands.reset(); clearTypingPowerEffect()
+      keyboardGuideFeedback = nil; websiteKeymapFeedback.reset(); typingCompanionHands.reset(); clearTypingPowerEffect()
       lastTimeWarningSecond = nil; lastClockTickSecond = 0
       liveStatsClockSignal.second = 0; timerHealth = .init()
       isSamePromptRepeatAttempt = practice.repetition.repeatsWordset
@@ -4598,10 +4600,12 @@ private struct ContentView: View {
     let typedBefore = session.typed
     let wordsBefore = session.completedWordCount
     let previousPreview = preparedWholePreviewRendering
+    let keymapAttemptID = session.automaticInputAttemptID
     let feedback = TypingLiveInputFeedback.insertBatch(
       effectiveInsertedText(text), into: &session,
       forceError: forceError, origin: origin, defersAutomaticInput: true,
       wrapAdmission: promptInputWrapAdmission)
+    let keymapEvents = session.keymapInputEvents
     if session.completedWordCount > wordsBefore {
       for completed in (wordsBefore + 1)...session.completedWordCount {
         advanceWebsiteLayoutFluid(.words(completed: completed, total: session.layoutFluidWordCount))
@@ -4637,7 +4641,10 @@ private struct ContentView: View {
     emitTypingPowerEffect(
       isCorrect: session.errors == errorsBefore,
       acceptedCharacters: session.typed.count - typedCountBefore)
-    if effectiveKeyboardGuideMode == .react, let pressedCharacter = text.last {
+    if effectiveKeyboardGuideMode == .react, committedPracticeDraft != nil,
+      session.automaticInputAttemptID == keymapAttemptID {
+      websiteKeymapFeedback.receive(keymapEvents)
+    } else if effectiveKeyboardGuideMode == .react, committedPracticeDraft == nil, let pressedCharacter = text.last {
       keyboardGuideFeedbackSequence &+= 1
       keyboardGuideFeedback = .init(
         sequence: keyboardGuideFeedbackSequence,
@@ -4663,7 +4670,10 @@ private struct ContentView: View {
       verifyChallengeFontAvailability()
       emitTypingPowerEffect(isCorrect: feedback.last == true,
         acceptedCharacters: session.typed.count - countBefore)
-      if !feedback.isEmpty, effectiveKeyboardGuideMode == .react {
+      if !feedback.isEmpty, effectiveKeyboardGuideMode == .react, committedPracticeDraft != nil,
+        session.automaticInputAttemptID == attemptID {
+        websiteKeymapFeedback.receive(session.keymapInputEvents)
+      } else if !feedback.isEmpty, effectiveKeyboardGuideMode == .react, committedPracticeDraft == nil {
         keyboardGuideFeedbackSequence &+= 1
         keyboardGuideFeedback = .init(sequence: keyboardGuideFeedbackSequence,
           character: "\t", isCorrect: session.errors == errorsBefore)
@@ -5177,6 +5187,7 @@ private struct ContentView: View {
     quickRestartProtectionMessage = nil
     compositionText = ""
     keyboardGuideFeedback = nil
+    websiteKeymapFeedback.reset()
     typingCompanionHands.reset()
     clearTypingPowerEffect()
     lastTimeWarningSecond = nil
@@ -5808,6 +5819,7 @@ private struct ContentView: View {
     restartLockMessage = nil
     compositionText = ""
     keyboardGuideFeedback = nil
+    websiteKeymapFeedback.reset()
     lastTimeWarningSecond = nil
     lastClockTickSecond = 0
     liveStatsClockSignal.second = 0

@@ -9,6 +9,7 @@ if (!process.argv[2] || execFileSync('git',['-C',reference,'rev-parse','HEAD'],{
 if (execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim()) throw new Error('Reference checkout must be clean.');
 const root=path.join(reference,'frontend/src/ts'); const actual=new Set(['utils/strings','input/helpers/util','input/helpers/validation','input/helpers/fail-or-finish','input/handlers/before-insert-text','input/handlers/insert-text','input/helpers/word-navigation','input/input-element','test/events/data','test/events/helpers','test/events/live-cache']);
 let browserDeletedSentinel=false;
+let keymapFlashes=[];
 let growNext=false;let wordIndex=0,targets=[]; let element='',field='',target='',active=false,events=[],feedback=[],failed=false,completed=false; const noop=()=>{};
 const Config={mode:'words',language:'english',oppositeShiftMode:'off',stopOnError:'off',deleteOnError:'off',difficulty:'normal',strictSpace:false,blindMode:true,hideExtraLetters:false,keymapMode:'off',minBurst:'off',liveBurstStyle:'off',confidenceMode:'off',freedomMode:false,quickEnd:false};
 const bindings={
@@ -21,7 +22,7 @@ const bindings={
   activeWordTop:0,activeWordHeight:1,getActiveWordTopAndHeightWithDifferentData:()=>({top:0,height:1})},
  'input/state':{setAwaitingNextWord:noop,isAwaitingNextWord:()=>false,isCorrectShiftUsed:()=>true,getIncorrectShiftsInARow:()=>0,incrementIncorrectShiftsInARow:noop,resetIncorrectShiftsInARow:noop},
  'legacy-states/slow-timer':{get:()=>false},'states/test':{isTestRestarting:()=>false,getActiveWordIndex:()=>wordIndex,increaseActiveWordIndex:()=>wordIndex++,decreaseActiveWordIndex:()=>wordIndex--,isResultCalculating:()=>false,wordsHaveNewline:()=>false,isTestActive:()=>active},
- 'test/test-logic':{addWord:()=>{if(growNext && wordIndex===targets.length-1){targets.push('c');growNext=false}},startTest:()=>{active=true},fail:()=>{failed=true},finish:()=>{completed=true}},'events/keymap':{flash:noop},'test/weak-spot':{updateScore:noop},'legacy-states/composition':{getComposing:()=>false},'states/notifications':{showNoticeNotification:noop},
+ 'test/test-logic':{addWord:()=>{if(growNext && wordIndex===targets.length-1){targets.push('c');growNext=false}},startTest:()=>{active=true},fail:()=>{failed=true},finish:()=>{completed=true}},'events/keymap':{flash:(data,correct)=>keymapFlashes.push({units:Array.from({length:data.length},(_,i)=>data.charCodeAt(i)),isCorrect:correct})},'test/weak-spot':{updateScore:noop},'legacy-states/composition':{getComposing:()=>false},'states/notifications':{showNoticeNotification:noop},
  'input/helpers/word-navigation':{goToPreviousWord:noop,goToNextWord:async()=>({lastBurst:null,increasedWordIndex:true})},'test/pace-caret':{handleSpace:noop},'test/funbox/funbox':{toggleScript:noop},'states/loader-bar':{showLoaderBar:noop,hideLoaderBar:noop},'test/events/stats':{getWordBurst:()=>null},'test/words-generator':{areAllWordsGenerated:()=>Config.mode!=='time'},'utils/misc':{whorf:()=>0},'input/helpers/input-type':{DeleteInputType:{}},'@monkeytype/schemas/languages':{Language:{}}};
 Object.assign(bindings['states/test'],{getKoreanStatus:()=>false,getCurrentQuote:()=>null,getBailedOut:()=>false});Object.assign(bindings,{'constants/keys':{Keycode:{}},'test/events/types':{EVENT_LOG_VERSION:1,InputEventNoMs:{},TestEventNoMs:{},CompositionTestEvent:{},CompositionTestEventData:{},EventLog:{},InputEvent:{},InputEventData:{},KeydownEvent:{},KeydownEventData:{},KeyupEvent:{},KeyupEventData:{},TestEvent:{},TestEventData:{},TestEventType:{},TimerEvent:{},TimerEventData:{}},'test/custom-text':{getLimit:()=>({mode:'none',value:0})},'test/funbox/active':{isFunboxActiveWithProperty:p=>p==='nospace'},'@monkeytype/util/numbers':{roundTo2:v=>Math.round(v*100)/100,isSafeNumber:Number.isFinite,mean:a=>a.reduce((x,y)=>x+y,0)/a.length}});bindings['utils/misc'].getMode2=()=>2;bindings['test/funbox/list'].isFunboxActiveWithProperty=p=>p==='nospace';bindings['states/test'].wordsHaveNewline=()=>targets.some(t=>t.includes('\n'));console.debug=()=>{};globalThis.document={querySelector:()=>({get value(){return ' '+element},set value(v){element=v.slice(1)}})};const modules=new Map();function getModule(id){if(modules.has(id))return modules.get(id);let mod;if(actual.has(id))mod=new vm.SourceTextModule(stripTypeScriptTypes(fs.readFileSync(path.join(root,id+'.ts'),'utf8'),{mode:'transform'}),{identifier:id});else{const data=bindings[id];if(!data)throw new Error('Unknown import '+id);mod=new vm.SyntheticModule(Object.keys(data),function(){for(const [key,value]of Object.entries(data))this.setExport(key,value)},{identifier:id});}modules.set(id,mod);return mod;}
 const main=getModule('input/handlers/insert-text');await main.link((specifier,from)=>getModule(specifier.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(from.identifier),specifier)):specifier));await main.evaluate();
@@ -34,6 +35,20 @@ function reset(words,{stop='off',strict=false,mode='words',grow=false}={}) {
 }
 function inputEvents(){return eventData.getAllTestEvents().filter(e=>e.type==='input').map(e=>e.data)}
 function positions(){return inputEvents().map(e=>e.charIndex)}
+if(process.argv[3]==='--keymap-fixtures'){
+ for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',()=>false);
+ const fixtures=[];
+ for(const [target,input,language='english'] of [['ab','ab'],['ab','ax'],['’x',"'"],['...','…'],['…','…'],['ij','ĳ','dutch'],['ĳ','ĳ','dutch'],['🙂x','🙃'],['e\u0301x','e\u0301'],['éx','e\u0301'],['ab','\u00A0'],['ab','a\u00A0'],['ab','']]){
+  for(const stop of ['off','letter']){
+   reset([target+' ','tail '],{stop});keymapFlashes=[];
+   Object.assign(Config,{keymapMode:'react',language});
+   await main.namespace.emulateInsertText({data:input,now:0});
+   fixtures.push({target,input,language,stop,events:keymapFlashes});
+  }
+ }
+ if(execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim())throw new Error('Reference changed');
+ console.log(JSON.stringify({fixtures}));process.exit(0);
+}
 // Owned poem-shaped targets, not copied source content. Execute the actual
 // insert/validation/navigation/event modules; generation and DOM remain adapters.
 bindings['test/funbox/list'].isFunboxActiveWithProperty=()=>false;

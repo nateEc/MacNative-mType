@@ -2,6 +2,10 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| WEBSITE-KEYMAP-ALL-MATCHES-01 | 重复标注键与精确 Unicode 高亮 | 后续仅开一个隔离实例，选择有重复标注的 Snorkle／Armenian 及镜像布局，在 next／react／static／Steno 间切换；输入复合文本，检查 NFC、分解重音、空格、字符展开及快速连续输入。 | 所有相同原始标注的键一起命中；不同 UTF-16 拼写不混同，ab 反馈分别命中 a／b，原始代理项不误亮替换符，static／Steno 不提示；视图、尝试及焦点保持。 | 待验收（51,192 组源码查询通过；实际插入序列和逻辑键状态另有专项，完整生产来源、渐变及实体操作未验） |
+
+| ID | 场景 | 操作 | 期望结果 | 状态 |
+| --- | --- | --- | --- | --- |
 | WEBSITE-KEYMAP-LEGEND-LAYERS-01 | 完整配置键帽四种标注样式 | 后续只开一个隔离实例，在 QWERTY、AZERTY、Statica、阿拉伯文、Tamil、Optimot 及镜像之间切换，逐项切换 blank／lowercase／uppercase／dynamic，组合 Shift／Caps／Option；核对虚拟点击和物理输入。 | QWERTY 缺失 Option 标注为空但输入继续按原回退；uppercase 选择 Shift 层而非大写转换，单个符号保留 Base；单层键重复 Base，镜像保留整组原始层；显示变化不改计分／尝试或旧偏好。 | 待验收（737,408 组源码表达式对照已通过；实体状态、所有结构样式及动画未验） |
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |

@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-KEYMAP-ALL-MATCHES-01 | 相同标注键同时高亮与精确事件匹配 | `states/test.ts`, `components/pages/test/Keymap.tsx`, `input/handlers/insert-text.ts` | PromptDomain | 按原始 UTF-16 标注匹配全部键，下一键保留精确身份；51,192 组查询含 248 组多键命中。插入事件按实际规范化／展开后的单元记录，逻辑键独立保存，逐键 250ms 完成清理。渐变、next 退出淡出、完整事件时点／来源及实体输入仍开放。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-KEYMAP-LEGEND-LAYERS-01 | 完整配置键帽标注选层 | `components/pages/test/{Keymap.tsx,keymapConverter.ts}` | PromptDomain, PreferencesDomain | 使用独立原始显示层，缺层显示空白；四种标注样式及 macOS Caps／Shift／Option 选择由 239 布局普通／镜像的 737,408 组实际源码表达式对照覆盖。输入回退独立，全部结构样式、响应式几何、高亮动画和实体状态仍待验。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

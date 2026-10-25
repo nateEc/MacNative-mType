@@ -1077,6 +1077,7 @@ struct KeyboardGuideFeedback: Equatable {
   let sequence: Int
   let character: Character
   let isCorrect: Bool
+  var events: [WebsiteKeymapInputEvent]? = nil
 }
 
 enum KeyboardGuideScalePolicy {
@@ -1216,6 +1217,19 @@ struct KeyboardGuideKey: Identifiable, Equatable {
   let shiftedOptionLabel: String?
   let preservesDynamicBaseCase: Bool
   private let websiteLegends: [String]?
+
+  var hasWebsiteLegends: Bool { websiteLegends != nil }
+
+  func matchesWebsiteLegend(_ text: String) -> Bool {
+    websiteLegends?.contains(where: { InputTextIdentity.matches($0, text) }) == true
+  }
+
+  var websiteLegendUnits: [[UInt16]] { websiteLegends?.map { Array($0.utf16) } ?? [] }
+
+  func websiteFlash(in state: WebsiteKeymapFlashState) -> WebsiteKeymapFlashState.Selection? {
+    guard let websiteLegends else { return nil }
+    return state.first(for: websiteLegends.map { Array($0.utf16) })
+  }
 
   /// Retain physical identity/geometry while moving all authored legend layers.
   func replacingLegends(with key: Self) -> Self {
@@ -1384,6 +1398,11 @@ enum OfficialUrduPhoneticKeymap {
 }
 
 enum KeyboardGuideModel {
+  static func websiteMatchingKeys(for text: String?, rows: [[KeyboardGuideKey]], style: KeyboardGuideStyle = .staggered) -> Set<String> {
+    guard !style.isSteno, let text else { return [] }
+    let mapped = text.isEmpty ? " " : text
+    return Set(rows.flatMap { $0 }.filter { $0.matchesWebsiteLegend(mapped) }.map(\.id))
+  }
   static func websiteRows(for layout: KeyboardLayout, mirrored: Bool) -> [[KeyboardGuideKey]] {
     guard layout.isPinnedOfficialLayout else { return mirrored ? mirroredRows(for: layout) : rows(for: layout) }
     let layers = KeyboardLayoutEmulator.keymapLegendRows(for: layout)
@@ -4688,8 +4707,21 @@ extension Collection {
   }
 }
 
+/// SwiftUI must see different event spellings even when Character equality
+/// considers them canonically equivalent. Keep the view's state/identity intact.
+@propertyWrapper
+struct KeyboardGuideNextCharacter: Equatable {
+  let wrappedValue: Character?
+  private let units: [UInt16]?
+  init(wrappedValue: Character?) {
+    self.wrappedValue = wrappedValue
+    units = wrappedValue.map { Array(String($0).utf16) }
+  }
+  static func == (lhs: Self, rhs: Self) -> Bool { lhs.units == rhs.units }
+}
+
 struct KeyboardGuide: View {
-  let nextCharacter: Character?
+  @KeyboardGuideNextCharacter var nextCharacter: Character?
   let mode: KeyboardGuideMode
   let feedback: KeyboardGuideFeedback?
   let accent: Color
@@ -4697,6 +4729,7 @@ struct KeyboardGuide: View {
   let layout: KeyboardLayout
   let overrideRows: [[KeyboardGuideKey]]?
   var overrideThumbKeys: [KeyboardGuideKey]? = nil
+  var websiteFeedback: WebsiteKeymapFeedbackStore? = nil
   let mirrored: Bool
   let scale: Double
   let legendStyle: KeyboardGuideLegendStyle
@@ -4707,6 +4740,25 @@ struct KeyboardGuide: View {
 
   @State private var flashedKey: String?
   @State private var flashedKeyIsCorrect = true
+  @State private var websiteFlashes = WebsiteKeymapFlashState()
+
+  private var currentWebsiteFlashes: WebsiteKeymapFlashState { websiteFeedback?.state ?? websiteFlashes }
+
+  private var usesWebsiteKeymap: Bool {
+    overrideRows?.joined().contains(where: \.hasWebsiteLegends) == true
+  }
+
+  private func isHighlighted(_ key: KeyboardGuideKey) -> Bool {
+    guard usesWebsiteKeymap else { return key.id == highlightedKey }
+    guard !style.isSteno else { return false }
+    switch mode {
+    case .off, .staticGuide: return false
+    case .react: return key.websiteFlash(in: currentWebsiteFlashes) != nil
+    case .next:
+      guard let nextCharacter else { return false }
+      return key.matchesWebsiteLegend(String(nextCharacter))
+    }
+  }
 
   private var baseGuideRows: [[KeyboardGuideKey]] {
     overrideRows ?? KeyboardGuideModel.rows(for: layout)
@@ -4749,11 +4801,17 @@ struct KeyboardGuide: View {
     .accessibilityLabel("键盘提示")
     .accessibilityValue(accessibilityValue)
     .task(id: feedback?.sequence) {
+      if usesWebsiteKeymap, websiteFeedback != nil { return }
       guard mode == .react, let feedback else {
         flashedKey = nil
+        websiteFlashes = .init()
         return
       }
-      if let overrideRows {
+      if usesWebsiteKeymap {
+        flashedKey = nil
+        websiteFlashes.receive(feedback.events ?? [.init(units: Array(String(feedback.character).utf16), isCorrect: feedback.isCorrect)])
+        return
+      } else if let overrideRows {
         flashedKey = KeyboardGuideModel.highlightedKey(
           for: feedback.character, rows: overrideRows + (overrideThumbKeys.map { [$0] } ?? []), style: style)
       } else {
@@ -4777,7 +4835,10 @@ struct KeyboardGuide: View {
   }
 
   private var highlightedLabel: String? {
-    KeyboardGuideModel.highlightedLabel(for: highlightedKey, rows: baseGuideRows, thumbs: overrideThumbKeys ?? [])
+    if usesWebsiteKeymap {
+      return (baseGuideRows.flatMap { $0 } + (overrideThumbKeys ?? [])).first(where: isHighlighted)?.label
+    }
+    return KeyboardGuideModel.highlightedLabel(for: highlightedKey, rows: baseGuideRows, thumbs: overrideThumbKeys ?? [])
   }
 
   @ViewBuilder
@@ -4837,17 +4898,54 @@ struct KeyboardGuide: View {
   }
 
   private func keyView(_ key: KeyboardGuideKey) -> some View {
-    Text(key.legend(
-      style: legendStyle, modifierFlags: modifierFlags, capsLockEnabled: capsLockEnabled))
-      .font(.system(size: 10 * scale, weight: .semibold, design: .monospaced))
-      .foregroundStyle(key.id == highlightedKey ? .white : .secondary)
-      .frame(width: key.width * scale, height: 22 * scale)
-      .background(
-        key.id == highlightedKey ? highlightedColor : Color.primary.opacity(0.08),
-        in: RoundedRectangle(cornerRadius: 5))
+    let sourceReact = usesWebsiteKeymap && mode == .react && !style.isSteno
+    let highlighted = !sourceReact && isHighlighted(key)
+    let generation = websiteFeedback?.generation ?? 0
+    return KeyboardGuideKeycap(label: key.legend(style: legendStyle, modifierFlags: modifierFlags, capsLockEnabled: capsLockEnabled),
+      width: key.width, scale: scale, highlighted: highlighted, highlightColor: highlightedColor(for: key),
+      flash: sourceReact ? key.websiteFlash(in: currentWebsiteFlashes) : nil, legends: key.websiteLegendUnits,
+      generation: generation, accent: accent, onComplete: {
+        if let websiteFeedback { websiteFeedback.complete(legends: key.websiteLegendUnits, generation: generation) }
+        else { websiteFlashes.complete(legends: key.websiteLegendUnits) }
+      })
   }
 
-  private var highlightedColor: Color {
-    mode == .react && !flashedKeyIsCorrect ? .red : accent
+  private func highlightedColor(for key: KeyboardGuideKey) -> Color {
+    if usesWebsiteKeymap, mode == .react { return key.websiteFlash(in: currentWebsiteFlashes)?.isCorrect == false ? .red : accent }
+    return mode == .react && !flashedKeyIsCorrect ? .red : accent
+  }
+}
+
+private struct KeyboardGuideKeycap: View {
+  let label: String
+  let width: CGFloat
+  let scale: Double
+  let highlighted: Bool
+  let highlightColor: Color
+  let flash: WebsiteKeymapFlashState.Selection?
+  let legends: [[UInt16]]
+  let generation: UInt64
+  let accent: Color
+  let onComplete: @MainActor () -> Void
+
+  private struct PulseIdentity: Equatable {
+    let flash: WebsiteKeymapFlashState.Selection?
+    let legends: [[UInt16]]
+    let generation: UInt64
+  }
+
+  var body: some View {
+    Text(label)
+      .font(.system(size: 10 * scale, weight: .semibold, design: .monospaced))
+      .foregroundStyle(highlighted || flash != nil ? Color.white : Color.secondary)
+      .frame(width: width * scale, height: 22 * scale)
+      .background(flash.map { $0.isCorrect ? accent : Color.red }
+        ?? (highlighted ? highlightColor : Color.primary.opacity(0.08)), in: RoundedRectangle(cornerRadius: 5))
+      .task(id: PulseIdentity(flash: flash, legends: legends, generation: generation)) {
+        guard flash != nil else { return }
+        try? await Task.sleep(for: .milliseconds(250))
+        guard !Task.isCancelled else { return }
+        onComplete()
+      }
   }
 }

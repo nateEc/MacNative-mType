@@ -1,5 +1,25 @@
 # 官方配置兼容性审计
 
+## 全部键位精确匹配（2026-10-26，起点 1098516e）
+
+CFG-KEYMAP-ALL-MATCHES-01：states/test 的真实事件监听器将空字符串映射普通空格，保存完整 highlight 字符串；Keymap 的每个键独立对其全部 legends 做严格字符串 some，Steno 不参与 next／react。原生此前取第一个匹配键，依次尝试大小写及字符集合回退，反馈只保留 text.last。新增只读 check-source-keymap-matching.mjs 执行固定参考的真实监听器、buildLegends、镜像转换及 isNext 表达式；239 布局普通／镜像的 51,192 组查询涵盖原始层、大小写、分解重音、未知值与空值，其中 248 组原本应命中多个键。有效 RED 为 1,868 组失配（5.028 秒；red-final 日志），修复后全部通过（3.993 秒）。初次 red 日志的提取表达式尾逗号导致语法错误，不作为行为 RED。
+
+完整配置显示元数据提供精确 UTF-16 匹配，全体键位使用相同谓词。隐藏实际组件图像另产生真实 RED：NFC 下一键切换成分解重音后仍亮前两键，而非第三键（8.938 秒，render 日志）。原因是 SwiftUI 的 Character 等价比较抑制了更新；下一键改为携带 UTF-16 身份的值包装，保留视图状态，未借重建控件清除问题。
+
+只读取 flash(data) 会漏掉 onInsertText 入口的 UTF-16 拆分及字符展开；直接闪烁整段 ab 也不符合原版。现有完整真实输入模块驱动新增 --keymap-fixtures，26 组数据覆盖复合文本、标点等价、空格、省略号、荷兰语连字、分解重音与代理项，分 off／letter 两种停止规则。原生新瞬时事件字段先得到 24 个有效失败（1.041 秒，keymap-input-red 日志）；随后从实际计分原语记录规范化单元及逐单元正确性，保留音效／计分原有反馈节奏，不另猜输入数据。完整配置页面转发该序列及自动输入回调；旧偏好路径不切换。
+
+闪烁注册表按原始单元分别保存 tick 和正确性，物理键按标注顺序读取第一项，每个键帽以 250ms 完成任务清理全部别名；未匹配到键帽的项没有人为全局过期。源事件及完成表达式另有状态对照。完整渐变曲线、离开 next 的淡出、全部模式／布局切换时的状态所有权、生产事件时点及代码点／UTF-16 源位置继续开放。源码仅在 QA 读取执行，没有复制到生产资源；这些成功样本不证明 DOM、IME、空输入生命周期或整引擎全部行为等价。
+
+事件／状态专项 5 项通过（9.231 秒）：含 26 组真实插入模块数据、12 个真实监听器／按层优先／完成回调转移、51,192 查询及两项隐藏图像。图像验证 NFC 同亮两键、NFD 改亮第三键、static 不亮、ab 拆分亮 a／b 而不亮 ab，错误标注分别着色。随后窗口拥有者改为同步记录注册表，避免 SwiftUI 合帧丢弃前一次回调；同帧连续记录错误 a 和正确 b 后均实际显示，颜色像素分别 3,418／3,368，完成后归零且灰色键帽保留。状态重置增加代次，逐键任务身份及完成入口均拒绝旧代次，保留窗口／控件，不以重建输入控件处理。
+
+同会话反证检查的约束是：逐单元精确、不同逻辑键不互相覆盖、旧尝试回调不清理新状态、无操作自动回调不重放旧数据。前三项由源码数据及同帧／代次图像检查支持；第四项得到额外有效 RED：完整手动代码批次已结束时，排队回调把 6 个事件重复成 12 个（0.862 秒，automatic-red 日志）。排空和页面交付现在只消费实际执行的自动反馈；完成批次及手动／自动混合序列回归通过。最新定向 47 项通过、零失败／跳过（12.160 秒），覆盖这些状态与 DeferredCodeInput／CodeFieldIndentation；更早的 53 项含标点、空格及俄语等价规则也通过。此为同会话审视，不声称独立审查或完整发布验证。瞬时事件与注册表不进入持久化格式，原始音效／计分反馈节奏保留。
+
+最终相关回归 1,086 项全部通过、零失败／跳过（376.660 秒），覆盖完整配置、键盘显示／匹配、Caps／镜像、输入规范化、自动代码输入、窗口状态和三个组合／混合方向／窄窗口代表用例。参考行为审计通过（47 direct／119 native symbols／17 supporting），人工表结构通过（1,366 场景，不等于实体验收）；原有完整源码输入驱动默认场景也通过，新增选项不替换既有检查。本批不是整仓 Native Rewrite Gate。最终以 /tmp/typebar-keymap-final-broad.log 为准，不以中间实现的绿色结果代替最终行为证据。
+
+主要证据日志：/tmp/typebar-keymap-matching-{red-final,render,render-final}.log、/tmp/typebar-keymap-input-{red,focused,state-final}.log、/tmp/typebar-keymap-owner-final.log、/tmp/typebar-keymap-automatic-red.log、/tmp/typebar-keymap-focused-complete.log、/tmp/typebar-keymap-existing-input.log，以及 /tmp/typebar-keymap-final-{broad,package}.log 和 /tmp/typebar-keymap-matching-final-reference.log。隐藏图像为 /tmp/typebar-keymap-match-{nfc,nfd,static,compound,error}.png、/tmp/typebar-keymap-rapid-{active,ended}.png，均未显示窗口或提交为生产资产。
+
+最终 Debug 打包、签名、资源边界及固定参考原创性检查通过，未启动主程序。未修改 CI、通知或主分支，整项目及上述剩余高亮行为继续开放。
+
 ## 键帽原始显示层（2026-10-26，起点 91a63884）
 
 CFG-KEYMAP-LEGEND-LAYERS-01 与前节 Caps 输入仿真分开。实际 keymapConverter.buildLegends 将单层重复到 Base／Shift，其余缺失层补空字符串。Keymap 的 lowercase 选 Base，uppercase 选 Shift，但任一候选是单个非 Unicode 字母／数字符号时选 Base；macOS dynamic 的 Shift 或 Caps 用于字母层，符号只跟随 Shift，Option 直接选择第三／第四层。原生此前用大小写转换和输入回退生成键帽。新增只读 check-source-keymap-legends.mjs 执行固定参考的实际 buildLegends、图层 memo 和标签表达式，仅读取 macOS／修饰键／配置端点；覆盖 239 布局的普通及镜像、四种标注和八种状态，共 737,408 组，首轮有效 RED 有 104,814 组失配（2.739 秒）。这些是源表达式和原始槽位的对照，不是完整浏览器渲染或所有结构样式的几何验收。

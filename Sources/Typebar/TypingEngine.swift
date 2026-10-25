@@ -4689,6 +4689,7 @@ struct TypingSession {
   private var latestInputCorrectness: [Bool]?
   private var latestReplayInputText: String?
   private var liveInsertionFeedback: [Bool] = []
+  private(set) var keymapInputEvents: [WebsiteKeymapInputEvent] = []
   /// A stopped letter can be drawn without entering the accepted input.
   /// Only a final input callback publishes this candidate; pre-input guards
   /// and earlier characters in a batch must not replace the visible snapshot.
@@ -6531,6 +6532,7 @@ struct TypingSession {
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }
     liveInsertionFeedback.removeAll()
+    keymapInputEvents.removeAll()
     insertText(
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: false)
   }
@@ -6552,6 +6554,7 @@ struct TypingSession {
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }
     liveInsertionFeedback.removeAll()
+    keymapInputEvents.removeAll()
     insertText(
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: true,
       origin: origin, defersAutomaticInput: true)
@@ -6583,6 +6586,7 @@ struct TypingSession {
     queuedCodeInputHead += 1
     if !hasPendingAutomaticInput { cancelAutomaticInput() }
     liveInsertionFeedback.removeAll()
+    keymapInputEvents.removeAll()
     applyingAutomaticCodeInput = true
     automaticInputExecutionDate = executedAt
     let previousTimingDate = activeTimingDate
@@ -6603,10 +6607,14 @@ struct TypingSession {
 
   private mutating func drainAutomaticInput() {
     var feedback = liveInsertionFeedback
+    var keymapEvents = keymapInputEvents
     while hasPendingAutomaticInput {
-      feedback += processNextAutomaticInput(for: automaticInputAttemptID)
+      let nextFeedback = processNextAutomaticInput(for: automaticInputAttemptID)
+      feedback += nextFeedback
+      if !nextFeedback.isEmpty { keymapEvents += keymapInputEvents }
     }
     liveInsertionFeedback = feedback
+    keymapInputEvents = keymapEvents
   }
 
   /// A marked-text composition starts the reference attempt before its text is
@@ -6639,7 +6647,11 @@ struct TypingSession {
     origin: TypingInputOrigin = .physicalKeyboard, defersAutomaticInput: Bool = false
   ) {
     lastInputWasCorrect = nil
-    guard !isFinished, !text.isEmpty else { return }
+    guard !isFinished else { return }
+    guard !text.isEmpty else {
+      keymapInputEvents.append(.init(units: [], isCorrect: configuration.mode == .zen))
+      return
+    }
     // ASCII fields already have one code unit per native primitive. On the
     // first Unicode field/input, retain real units rather than decoded glyphs.
     if supportsBMPUnitInput, acceptedUnits == nil,
@@ -7413,6 +7425,12 @@ struct TypingSession {
     latestInputCorrectness = judgments ?? Array(repeating: correctUnits == units, count: units)
     latestReplayInputText = String(character)
     latestReplayInputUnits = currentInputUnit.map { [$0] }
+    let data = latestReplayInputUnits ?? Array(String(character).utf16)
+    for (index, unit) in data.enumerated() {
+      let correct = latestInputCorrectness?.indices.contains(index) == true
+        ? latestInputCorrectness![index] : correctUnits == units
+      keymapInputEvents.append(.init(units: [unit], isCorrect: correct))
+    }
     if unitTargets.noSpace, let acceptedUnits {
       let index = acceptedUnits.fieldIndex
       highestAttemptedNoSpaceField = max(highestAttemptedNoSpaceField ?? -1, index)
