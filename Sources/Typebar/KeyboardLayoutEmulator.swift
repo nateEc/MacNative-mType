@@ -94,13 +94,17 @@ enum KeyboardLayoutEmulator {
   }
 
   static func keyCode(for character: Character, mapping: KeyboardInputMapping) -> UInt16? {
+    keyCode(forOutput: String(character), mapping: mapping)
+  }
+
+  static func keyCode(forOutput output: String, mapping: KeyboardInputMapping) -> UInt16? {
     switch mapping {
     case .system:
       nil
     case let .builtIn(layout):
-      keyCode(for: character, layout: layout)
+      keyCode(forOutput: output, layout: layout)
     case let .custom(layout):
-      keyCode(for: character, keys: keys(for: layout))
+      keyCode(forOutput: output, keys: keys(for: layout))
     }
   }
 
@@ -113,7 +117,7 @@ enum KeyboardLayoutEmulator {
       guard let layers = keys[keyCode] else { return false }
       return [layers.normal, layers.shifted, layers.option, layers.shiftedOption]
         .compactMap { $0 }
-        .contains(output)
+        .contains { InputTextIdentity.matches($0, output) }
     }
     if let first = layoutSearchOrder.first(where: matches) { return first }
     return keys.keys.filter { !layoutSearchOrderSet.contains($0) }.sorted().first(where: matches)

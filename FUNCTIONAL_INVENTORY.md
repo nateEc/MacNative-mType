@@ -2,11 +2,15 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-OPPOSITE-SHIFT-CONTEXT-01 | 当前视觉键盘的 Opposite Shift 判定 | `input/handlers/keydown.ts`, `test/shift-tracker.ts`, `utils/key-converter.ts`, `constants/keys.ts` | PromptDomain, PreferencesDomain | 完整配置按键即时读取模式与视觉映射，移除 Layout Fluid 的物理比较特判；空格允许双手，完整逻辑键值及 UTF-16 精确反查。3,600 组实际源码对照；系统输入源、镜像与全部布局／IME 组合仍待扩验。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-LAYOUTFLUID-RUNTIME-01 | 完整配置 Layout Fluid 的逐项布局切换 | `test/funbox/funbox-functions.ts`, `test/test-timer.ts`, `states/test.ts`, `config/{metadata.tsx,setters.ts,persistence.ts}` | PromptDomain, PreferencesDomain, CommandDomain | 接通词数保存／计时不保存的顺序 setter，No Quit 可只拒绝物理布局；显示／输入读取当前发布字段，下一物理键即时读新映射。756 组源码记录及隐藏控件验证，实体输入法、全部内容模式／时间交付与倒计时动画仍待验。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
-| CFG-KEYMAP-COMMAND-PAGE-01 | 完整配置屏幕键盘命令 | `commandline/{commandline-metadata.ts,util.ts}`, `config/{metadata.tsx,setters.ts}`, `test/test-logic.ts` | CommandDomain, PreferencesDomain, PromptDomain | 六字段接入逐项保存；关闭时先启用静态模式，布局保存后请求重开，No Quit 保留已保存布局。大小输入前检及 Layout Fluid 运行时见专项；Opposite Shift 比较映射的组合、响应式缩放、延时高亮与实体操作仍待处理／验收。 |
+| CFG-KEYMAP-COMMAND-PAGE-01 | 完整配置屏幕键盘命令 | `commandline/{commandline-metadata.ts,util.ts}`, `config/{metadata.tsx,setters.ts}`, `test/test-logic.ts` | CommandDomain, PreferencesDomain, PromptDomain | 六字段接入逐项保存；关闭时先启用静态模式，布局保存后请求重开，No Quit 保留已保存布局。大小输入前检、Layout Fluid 与 Opposite Shift 当前上下文见专项；镜像／全部布局组合、响应式缩放、延时高亮与实体操作仍待处理／验收。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |

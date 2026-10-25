@@ -108,6 +108,11 @@ enum TypingInputNavigationPolicy {
   }
 }
 
+struct OppositeShiftInputContext: Equatable {
+    let mode: OppositeShiftMode
+    let keymap: KeyboardInputMapping
+}
+
 struct NativeTypingInput: NSViewRepresentable {
     var focusRequest: Int
     var acceptsTextInput = true
@@ -119,6 +124,7 @@ struct NativeTypingInput: NSViewRepresentable {
     var keyboardInputMappingProvider: (() -> KeyboardInputMapping?)? = nil
     var oppositeShiftKeymap: KeyboardInputMapping
     var oppositeShiftMode: OppositeShiftMode
+    var oppositeShiftContextProvider: (() -> OppositeShiftInputContext?)? = nil
     var mapsArrowKeysToInput: Bool
     var mapsArrowLetterKeysToInput = false
     var mapsEnterToSpace = false
@@ -174,6 +180,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.keyboardInputMappingProvider = keyboardInputMappingProvider
         view.oppositeShiftKeymap = oppositeShiftKeymap
         view.oppositeShiftMode = oppositeShiftMode
+        view.oppositeShiftContextProvider = oppositeShiftContextProvider
         view.mapsArrowKeysToInput = mapsArrowKeysToInput
         view.mapsArrowLetterKeysToInput = mapsArrowLetterKeysToInput
         view.mapsEnterToSpace = mapsEnterToSpace
@@ -239,6 +246,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var keyboardInputMappingProvider: (() -> KeyboardInputMapping?)?
     var oppositeShiftKeymap: KeyboardInputMapping = .builtIn(.ansiQwerty)
     var oppositeShiftMode: OppositeShiftMode = .off
+    var oppositeShiftContextProvider: (() -> OppositeShiftInputContext?)?
     var mapsArrowKeysToInput = false
     var mapsArrowLetterKeysToInput = false
     var mapsEnterToSpace = false
@@ -289,6 +297,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     /// Native callbacks must not keep that page's queries or context alive.
     func retirePageCallbacks() {
       keyboardInputMappingProvider = nil
+      oppositeShiftContextProvider = nil
       isRetired = true
       removeWindowFocusObservers()
       removeLocalKeyDownMonitor()
@@ -525,9 +534,11 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             return
         }
         let shiftComparisonKeyCode: UInt16?
-        if oppositeShiftMode == .keymap, oppositeShiftKeymap != .system {
-            shiftComparisonKeyCode = event.characters?.first.flatMap {
-                KeyboardLayoutEmulator.keyCode(for: $0, mapping: oppositeShiftKeymap)
+        let shiftContext = oppositeShiftContextProvider?()
+          ?? .init(mode: oppositeShiftMode, keymap: oppositeShiftKeymap)
+        if shiftContext.mode == .keymap, shiftContext.keymap != .system {
+            shiftComparisonKeyCode = event.characters.flatMap {
+                KeyboardLayoutEmulator.keyCode(forOutput: $0, mapping: shiftContext.keymap)
             }
         } else {
             shiftComparisonKeyCode = event.keyCode
@@ -537,7 +548,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
                 keyCode: $0, leftShiftPressed: leftShiftPressed,
                 rightShiftPressed: rightShiftPressed)
         } ?? true
-        let forcesError = oppositeShiftMode != .off && !usesCorrectShift
+        let forcesError = shiftContext.mode != .off && !usesCorrectShift
         if let emulatedText = KeyboardLayoutEmulator.text(
             forKeyCode: event.keyCode, modifierFlags: event.modifierFlags,
             mapping: keyboardInputMappingProvider?() ?? keyboardInputMapping

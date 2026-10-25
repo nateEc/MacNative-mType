@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## 当前 Opposite Shift 判定（2026-10-26，起点 5a20b91d）
+
+CFG-OPPOSITE-SHIFT-CONTEXT-01：实际 keydown.handleOppositeShift 在 keymap 且非 overrideSync 时反查当前视觉布局的完整 event.key；其余模式用 event.code 的物理位置。ShiftTracker 的 off／无 Shift／未知位置均允许，双 Shift 与两手共用位置按集合判断。完整配置原生页面却在 Layout Fluid 中始终返回 system；隐藏生产页的物理 P 配左 Shift，在视觉 Dvorak 中应拒绝却放行，切换同帧及等待一帧后均失败（1 项 3 断言，2.386 秒）。修复移除该特判，并以单个只读上下文在按键交付时取得模式和视觉映射，避免分别读取旧帧字段；控件退役清理提供器。旧偏好路径保留自身的物理／自定义回退。
+
+新增只读 check-source-opposite-shift.mjs 执行固定参考的真实 keydown 函数、key-converter、键位集合和 ShiftTracker，仅替换布局读取／状态端点。先用 1,920 组记录，再扩展到 2,400 组完整多字符键值，最终 3,600 组覆盖 off／on／keymap、overrideSync／QWERTY／Dvorak／Colemak／AZERTY、五个物理位置、十二个逻辑键值和四种 Shift 状态。原生控件逐项接收 flagsChanged／keyDown，非只比较本地纯函数。第一轮额外 40 个失败均定位于物理空格：本地手位图注释虽称双手，右手集合实际漏了 49；已补齐。完整键值新增反查入口，避免 SS／ab 被截成首字符。AZERTY 的分解重音另产生有效 RED（1 项 5 断言，1.637 秒）：Swift 字符串等价比较错误匹配 é 与 e+组合重音，现改用既有 UTF-16 身份比较，与源 includes 的精确匹配一致。
+
+真实隐藏页验证同一尝试／物理 QWERTY 下视觉 Dvorak 的错误侧判定、overrideSync 物理回退、No Quit 中显式布局与 off 的即时生效；独立控件验证 on／off 上下文覆盖旧字段及退役后不再读取。2,400 组阶段定向 8 项全部通过、零失败／跳过（2.058 秒），最终扩展矩阵及相关回归另记。没有把这些样本推断为全部 239 布局或所有系统／镜像／IME 的实体验收。
+
+最终相关回归 949 项全部通过、零失败／跳过（284.367 秒），包含最终 3,600 组源码矩阵、隐藏生产页、反向键值、输入规则、Layout Fluid、同步／物理回退、退役和三个代表性的组合／混合方向／窄窗口用例；上批完整 42 项组合布局的结果仍单独保留，不冒充本批重复运行。参考行为审计通过（47 direct／119 native symbols／17 supporting），人工表结构检查通过（1,362 场景，不等于实体验收通过）。日志为 /tmp/typebar-opposite-shift-{red,focused,focused-final,unicode-red,broad,reference,package}.log；red 是视觉布局的实际失配，focused 是空格集合失配，unicode-red 是分解重音失配，最终以 broad 为准。
+
+最终 Debug 打包、签名、资源边界和固定参考原创性检查通过，未启动主程序。上述相关回归不是整仓 Native Rewrite Gate；系统输入源、组合提交与镜像的全部组合继续保持待验收状态。
+
 ## 完整配置 Layout Fluid 运行时（2026-10-26，起点 151bb65c）
 
 CFG-LAYOUTFLUID-RUNTIME-01 修正前节的消费者缺口。进一步读取实际 funbox／timer 源码后确认，这不是仅把视觉 getter 放在进度公式之前：初始化以 nosave 设置两个布局；词数 handleSpace 只在 floor(实际词数组长度／布局数) 的边界顺序保存 layout、keymapLayout；计时回调仅在当前 layout 不等于目标时以 nosave 执行同一顺序。范围外不夹取最后布局，空序列或词数少于布局数也不使用默认布局／最小分段代替。layout 元数据要求重开，故活动 No Quit 会拒绝它，随后视觉 setter 仍能成功；该自动回调没有 restart 派发。states/test.ts 的视觉选择读取当前 Config 字段。原生现在逐项发布真实字段，旧设置路径保留原进度策略。
@@ -12,7 +24,7 @@ CFG-LAYOUTFLUID-RUNTIME-01 修正前节的消费者缺口。进一步读取实�
 
 最终 Debug app 打包、签名、资源边界及固定参考原创性检查通过，全程未启动 Typebar 主程序；这些相关检查不等于整仓 Native Rewrite Gate 或全部实体功能已验收。
 
-额外源码边界已确认而未混入完成声明：input/handlers/keydown.ts 的 Opposite Shift keymap 分支，在显式 keymapLayout 时反查视觉布局；原生 effectiveOppositeShiftKeymap 仍有 Layout Fluid → system 的旧特判。应在后续独立验证该比较映射及同帧交付，不能拿本批物理文本映射的通过结果证明它已对齐。word-navigation.ts 在 goToNextWord 增加索引前调用 handleSpace，支持本批以完成词数传入 activeWordIndex+1 的约定；全流式内容的分段增长及所有提交方式仍待扩验。
+本节曾记录 Opposite Shift 在 Layout Fluid 中错误强制 system 的边界，现由上方 CFG-OPPOSITE-SHIFT-CONTEXT-01 的真实事件及同帧回归处理；不是从物理文本映射的通过结果推断。镜像、系统输入源和全部布局组合仍未据此标记完成。word-navigation.ts 在 goToNextWord 增加索引前调用 handleSpace，支持本批以完成词数传入 activeWordIndex+1 的约定；全流式内容的分段增长及所有提交方式仍待扩验。
 
 ## 完整配置屏幕键盘命令（2026-10-26，起点 0788afb1）
 

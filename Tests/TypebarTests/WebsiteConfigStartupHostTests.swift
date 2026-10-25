@@ -363,6 +363,42 @@ import XCTest
     XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
   }
 
+  func testLayoutFluidOppositeShiftUsesCurrentVisualLayoutAndModeWithoutWaitingForAFrame() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"time","time":120,"funbox":["layoutfluid","no_quit"],"customLayoutfluid":["qwerty","dvorak"],"oppositeShiftMode":"keymap"}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID && f.inputs().first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.inputs().first), attempt = f.state.page.state.session.automaticInputAttemptID
+    input.onInsert("x", false)
+    try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange }
+    try await Task.sleep(for: .milliseconds(20)); f.host.layoutSubtreeIfNeeded()
+    let shift = try XCTUnwrap(NSEvent.keyEvent(with: .flagsChanged, location: .zero, modifierFlags: [.shift], timestamp: 0,
+      windowNumber: f.window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 56))
+    input.flagsChanged(with: shift)
+    let p = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0,
+      windowNumber: f.window.windowNumber, context: nil, characters: "P", charactersIgnoringModifiers: "p", isARepeat: false, keyCode: 35))
+    var errors: [Bool] = [], inserted: [String] = []
+    input.onInsert = { inserted.append($0); errors.append($1) }
+    input.keyDown(with: p); XCTAssertEqual(errors, [false])
+    try workflow.advanceLayoutFluid(.time(61), attemptID: attempt)
+    input.keyDown(with: p); XCTAssertEqual(errors.last, true, "Dvorak places P on the left, so left Shift must fail immediately")
+    try await Task.sleep(for: .milliseconds(20)); f.host.layoutSubtreeIfNeeded()
+    input.onInsert = { inserted.append($0); errors.append($1) }
+    input.keyDown(with: p); XCTAssertEqual(errors.last, true, "Fluid must not force physical-side comparison after a frame either")
+    try await workflow.editAndBegin(.keymap(.layout(.inputSync)), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+    input.keyDown(with: p); XCTAssertEqual(errors.last, false, "Sync uses physical P on the right")
+    try await workflow.editAndBegin(.keymap(.layout(.builtIn(.ansiDvorak))), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+    input.keyDown(with: p); XCTAssertEqual(errors.last, true)
+    try await workflow.editAndBegin(.inputRule(.oppositeShiftMode(.off)), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+    input.keyDown(with: p); XCTAssertEqual(errors.last, false, "Off must take effect without waiting for the next frame")
+    XCTAssertEqual(inserted.count, 6); XCTAssertTrue(inserted.allSatisfy { $0 == "P" })
+    XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt); XCTAssertFalse(f.window.isVisible)
+  }
+
   func testLayoutFluidMappingIsCurrentBeforeSwiftUIUpdatesTheNativeInput() async throws {
     let f = try Fixture(saved: nil); defer { f.close() }
     f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }

@@ -3446,6 +3446,12 @@ private struct ContentView: View {
       },
       oppositeShiftKeymap: effectiveOppositeShiftKeymap,
       oppositeShiftMode: committedPracticeDraft?.inputRules.rules.oppositeShiftMode ?? settings.oppositeShiftMode,
+      oppositeShiftContextProvider: { [pageSessionStore] in
+        guard pageSessionStore.ownsConfigurationSelection, pageSessionStore.state.practice != nil,
+          let draft = pageSessionStore.state.presentation?.publication.draft else { return nil }
+        return .init(mode: draft.inputRules.rules.oppositeShiftMode,
+          keymap: draft.keyboardTypography.guideLayout.map(KeyboardInputMapping.builtIn) ?? .system)
+      },
       mapsArrowKeysToInput: session.configuration.modifiers.contains(.arrowStream),
       mapsArrowLetterKeysToInput: WebsiteArrowChart.isSelected(session.configuration),
       mapsEnterToSpace: WebsiteRandomWordGenerator.selected(for: session.configuration) == .accounting,
@@ -4108,7 +4114,6 @@ private struct ContentView: View {
 
   private var effectiveOppositeShiftKeymap: KeyboardInputMapping {
     if let draft = committedPracticeDraft {
-      if session.configuration.modifiers.contains(.layoutFluid) { return .system }
       return draft.keyboardTypography.guideLayout.map(KeyboardInputMapping.builtIn) ?? .system
     }
     return settings.keyboardGuideLayoutSource.oppositeShiftMapping(selectedLayout: settings.keyboardLayout,

@@ -3,6 +3,64 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class OppositeShiftKeymapSourceTests: XCTestCase {
+  func testActualPinnedKeydownConverterAndShiftTrackerAcrossModesAndLayouts() throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned reference") }
+    struct Fixture: Decodable {
+      let mode: String, guide: String, macCode: UInt16, key: String, left: Bool, right: Bool, correct: Bool
+    }
+    struct Output: Decodable { let fixtures: [Fixture] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-opposite-shift.mjs").path, reference]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0)
+    let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
+    XCTAssertEqual(fixtures.count, 3600)
+    for f in fixtures {
+      let view = TypingInputView(frame: .zero)
+      view.keyboardInputMapping = .builtIn(.ansiQwerty)
+      view.oppositeShiftMode = try XCTUnwrap(OppositeShiftMode(rawValue: f.mode))
+      switch f.guide {
+      case "overrideSync": view.oppositeShiftKeymap = .system
+      case "qwerty": view.oppositeShiftKeymap = .builtIn(.ansiQwerty)
+      case "dvorak": view.oppositeShiftKeymap = .builtIn(.ansiDvorak)
+      case "colemak": view.oppositeShiftKeymap = .builtIn(.ansiColemak)
+      case "azerty": view.oppositeShiftKeymap = .builtIn(.frenchAzerty)
+      default: return XCTFail("Unexpected source guide")
+      }
+      for code: UInt16 in (f.left ? [56] : []) + (f.right ? [60] : []) {
+        view.flagsChanged(with: try XCTUnwrap(NSEvent.keyEvent(with: .flagsChanged, location: .zero,
+          modifierFlags: [.shift], timestamp: 0, windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)))
+      }
+      var forced: Bool?
+      view.onInsert = { _, error in forced = error }
+      view.keyDown(with: try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero,
+        modifierFlags: f.left || f.right ? [.shift] : [], timestamp: 0, windowNumber: 0, context: nil,
+        characters: f.key, charactersIgnoringModifiers: f.key, isARepeat: false, keyCode: f.macCode)))
+      XCTAssertEqual(forced, !f.correct, "\(f)")
+    }
+  }
+
+  func testCurrentShiftContextOverridesBothCachedFieldsAndRetiresWithTheControl() throws {
+    let view = TypingInputView(frame: .zero)
+    view.keyboardInputMapping = .builtIn(.ansiQwerty)
+    view.oppositeShiftMode = .off; view.oppositeShiftKeymap = .system
+    var current = OppositeShiftInputContext(mode: .keymap, keymap: .builtIn(.ansiDvorak)), calls = 0
+    view.oppositeShiftContextProvider = { calls += 1; return current }
+    view.flagsChanged(with: try XCTUnwrap(NSEvent.keyEvent(with: .flagsChanged, location: .zero, modifierFlags: [.shift],
+      timestamp: 0, windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 56)))
+    let p = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0,
+      windowNumber: 0, context: nil, characters: "P", charactersIgnoringModifiers: "p", isARepeat: false, keyCode: 35))
+    var errors: [Bool] = []; view.onInsert = { _, error in errors.append(error) }
+    view.keyDown(with: p)
+    current = .init(mode: .on, keymap: .builtIn(.ansiDvorak)); view.keyDown(with: p)
+    current = .init(mode: .off, keymap: .builtIn(.ansiDvorak)); view.keyDown(with: p)
+    XCTAssertEqual(errors, [true, false, false]); XCTAssertEqual(calls, 3)
+    view.retirePageCallbacks(); XCTAssertNil(view.oppositeShiftContextProvider)
+    view.keyDown(with: p); XCTAssertEqual(calls, 3); XCTAssertEqual(errors.count, 3)
+  }
+
   private func forcedError(
     inputMapping: KeyboardInputMapping, oppositeShiftKeymap: KeyboardInputMapping,
     mode: OppositeShiftMode = .keymap, physicalKeyCode: UInt16 = 4,
