@@ -912,6 +912,24 @@ final class WebsiteConfigCommitCoordinator {
     random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
     try checkAsyncResources(resources.configuration, admission: resources.admission)
     var resources = resources
+    let beforeActivation = resources.configuration.draft
+    var joiningScriptClear = false
+    let activated = try WebsiteConfigFunboxActivation.prepare(beforeActivation,
+      pointsPerRem: resources.configuration.environment.pointsPerRem,
+      context: resources.configuration.environment.context, onJoiningScriptClear: { joiningScriptClear = true })
+    var activation = resources.configuration
+    activation.draft = activated
+    // A complete application's saved configuration precedes nosave activation.
+    // Only a later actual saving setter may promote the runtime overrides.
+    if activation.savedDraft == nil { activation.savedDraft = beforeActivation }
+    activation = try saveGenerationCorrection(activation, from: beforeActivation, admission: resources.admission)
+    resources = .init(configuration: activation, admission: resources.admission,
+      background: resources.background, font: resources.font)
+    if joiningScriptClear {
+      try withInitializationReport(initializationReport, resources: resources) { report, current in
+        report.recordFunboxJoiningScriptClear(whileCurrent: current)
+      }
+    }
     // Pinned init repairs unauthenticated favorites before lazy normalization
     // and generation. This is a setter, not a failed sampling attempt: retain
     // its save checkpoint without spending retry budget or posting a notice.

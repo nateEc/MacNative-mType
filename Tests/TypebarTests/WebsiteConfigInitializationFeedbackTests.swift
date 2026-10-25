@@ -7,6 +7,22 @@ import XCTest
 @MainActor final class WebsiteConfigInitializationFeedbackTests: XCTestCase {
   @MainActor private final class Permit { var current = true }
 
+  func testJoiningScriptNoticeIsAccountScopedNonImportantAndOutsideTheFailureBudget() {
+    let notices = LocalNoticeCenter(); defer { notices.clearAll() }
+    let old = WebsiteConfigInitializationReport(notices: notices)
+    notices.clearForAccountChange()
+    old.recordFunboxJoiningScriptClear(whileCurrent: { true })
+    XCTAssertTrue(notices.history.isEmpty)
+    let report = WebsiteConfigInitializationReport(notices: notices)
+    report.recordFunboxJoiningScriptClear(whileCurrent: { false })
+    XCTAssertTrue(notices.history.isEmpty)
+    report.recordFunboxJoiningScriptClear(whileCurrent: { true })
+    XCTAssertEqual(notices.history.count, 1)
+    XCTAssertEqual(notices.history.first?.level, .notice)
+    XCTAssertFalse(notices.active.first?.important ?? true)
+    XCTAssertTrue(report.failures.isEmpty); XCTAssertNil(report.finalMessage)
+  }
+
   func testLazyNoticeRetiredAccountsAndRequestsCannotConsumeTheNewGenerationLatch() {
     let notices = LocalNoticeCenter(); defer { notices.clearAll() }
     let state = WebsiteConfigLazyModeNotices()

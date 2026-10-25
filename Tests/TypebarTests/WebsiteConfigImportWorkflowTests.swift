@@ -6,6 +6,134 @@ import Observation
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
 
+  func testFunboxApplyConfigOverridesReachThePublishedDraftWithoutSavingTemporaryValues() async throws {
+    let cases: [(String, [String: WebsiteConfigValue])] = [
+      (#"{"mode":"words","words":4,"funbox":["simon_says"],"keymapMode":"off"}"#, ["keymapMode": .string("next")]),
+      (#"{"mode":"words","words":4,"funbox":["tts"],"keymapMode":"next"}"#, ["keymapMode": .string("off")]),
+      (#"{"mode":"words","words":4,"funbox":["layout_mirror"],"layout":"default","keymapMode":"off"}"#,
+        ["layout": .string("qwerty"), "keymapLayout": .string("overrideSync"), "keymapMode": .string("static")]),
+      (#"{"mode":"words","words":4,"funbox":["layoutfluid"],"customLayoutfluid":["dvorak","qwerty"],"layout":"default","keymapMode":"off"}"#,
+        ["layout": .string("dvorak"), "keymapLayout": .string("dvorak"), "keymapMode": .string("static")]),
+      (#"{"mode":"words","words":4,"funbox":["memory"],"keymapMode":"next","showAllLines":false}"#,
+        ["keymapMode": .string("react"), "showAllLines": .bool(true)]),
+    ]
+    for (json, expected) in cases {
+      let f = try Fixture(); defer { f.close() }
+      let original = try WebsiteConfigNativeProfile.prepareDraft(json, pointsPerRem: 16, context: .init())
+      try await f.workflow.apply(json: json, systemIsDark: false)
+      let published = try XCTUnwrap(f.page.state.presentation).publication.draft
+      for (key, value) in expected { XCTAssertEqual(published.projection.runtime[key], value, json + " " + key) }
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .available(original.projection.runtime))
+      XCTAssertTrue(f.account.localNotices.history.isEmpty)
+      let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+      try await f.workflow.apply(json: nil, systemIsDark: false)
+      let restored = try XCTUnwrap(f.page.state.presentation).publication.draft
+      for (key, value) in expected { XCTAssertEqual(restored.projection.runtime[key], value, "restore " + key) }
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+    }
+  }
+
+  func testJoiningScriptActivationClearsTheEntireFunboxSelectionWithANonImportantNotice() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    let json = #"{"mode":"words","words":4,"language":"arabic","funbox":["rot13","ddoouubblleedd"]}"#
+    let original = try WebsiteConfigNativeProfile.prepareDraft(json, pointsPerRem: 16, context: .init())
+    try await f.workflow.apply(json: json, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    XCTAssertTrue(publication.draft.generators.funboxes.isEmpty)
+    XCTAssertEqual(f.page.state.session.configuration.language, .arabic)
+    XCTAssertFalse(f.page.state.session.configuration.modifiers.contains(.rot13))
+    XCTAssertEqual(f.account.localNotices.history.count, 1)
+    XCTAssertEqual(f.account.localNotices.history.first?.level, .notice)
+    XCTAssertFalse(try XCTUnwrap(f.account.localNotices.active.first).important)
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    XCTAssertEqual(try register.read().state, .available(original.projection.runtime), "nosave clear must stay runtime-only")
+    try await f.workflow.editAndBegin(.words(5), replacing: publication.applicationID, systemIsDark: false)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Missing later save") }
+    XCTAssertEqual(saved["funbox"], .array([]), "A later real setter saves the current entire runtime")
+  }
+
+  func testJoiningClearAfterSavedLanguageSetterSurvivesCancellationWithoutPromotingNosave() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    let handle = WeakWorkflow(), register = WebsiteConfigFileRegister(directory: f.directory)
+    var cancelArabic = true
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { language in
+        if language == .arabic, cancelArabic { handle.value?.cancel() }
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: language, length: .short)]
+      })
+    handle.value = workflow; defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"funbox":["ddoouubblleedd"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    do {
+      try await workflow.editAndBegin(.language("arabic"), replacing: id, systemIsDark: false)
+      XCTFail("Cancelled language preparation delivered")
+    } catch is CancellationError {}
+    let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+    XCTAssertTrue(pending.draft.generators.funboxes.isEmpty)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Missing setter save") }
+    XCTAssertEqual(saved["language"], .string("arabic"))
+    XCTAssertEqual(saved["funbox"], .array([.string("ddoouubblleedd")]))
+    let revision = try register.read().revision
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    cancelArabic = false
+    try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false)
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(f.account.localNotices.history.count, 1)
+  }
+
+  func testLazySavingCorrectionPromotesEarlierFunboxNosaveRuntime() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"hindi","funbox":["tts"],"keymapMode":"next","lazyMode":true}"#, systemIsDark: false)
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else { return XCTFail("Missing record") }
+    XCTAssertEqual(saved["keymapMode"], .string("off"))
+    XCTAssertEqual(saved["lazyMode"], .bool(false))
+    XCTAssertEqual(f.account.localNotices.history.count, 1)
+  }
+
+  func testMemoryActivationRepeatsOnEachGenerationAttemptWithoutSavingItsTemporaryValues() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1; if reads < 3 { throw Failure.provider }
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    let json = #"{"mode":"quote","quoteLength":[0],"funbox":["memory"],"keymapMode":"next","showAllLines":false}"#
+    let original = try WebsiteConfigNativeProfile.prepareDraft(json, pointsPerRem: 16, context: .init())
+    try await workflow.apply(json: json, systemIsDark: false)
+    let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+    let activations = draft.projection.events.filter { $0.key == "showAllLines" && $0.newValue == .bool(true) }
+    XCTAssertEqual(reads, 3); XCTAssertEqual(activations.count, 3)
+    XCTAssertTrue(activations.allSatisfy { $0.nosave == true })
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .available(original.projection.runtime))
+    XCTAssertEqual(f.account.localNotices.history.filter { $0.level == .error }.count, 2)
+  }
+
+  func testCancellingDuringJoiningScriptNoticeStopsBeforeReadingContent() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    let handle = WeakWorkflow(), once = NoticeTransition()
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { language in
+        reads += 1
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: language, length: .short)]
+      })
+    handle.value = workflow; defer { workflow.stop() }
+    withObservationTracking { _ = f.account.localNotices.history } onChange: {
+      MainActor.assumeIsolated { guard once.calls == 0 else { return }; once.calls += 1; handle.value?.cancel() }
+    }
+    let json = #"{"mode":"quote","quoteLength":[0],"language":"arabic","funbox":["ddoouubblleedd"]}"#
+    do { try await workflow.apply(json: json, systemIsDark: false); XCTFail("Retired activation delivered") }
+    catch is CancellationError {}
+    XCTAssertEqual(reads, 0); XCTAssertTrue(f.account.localNotices.history.isEmpty)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+    try await workflow.apply(json: json, systemIsDark: false)
+    XCTAssertEqual(reads, 1); XCTAssertEqual(f.account.localNotices.history.count, 1)
+  }
+
   func testLazyModeNoticeIsOncePerWindowUntilRememberedRestoration() async throws {
     let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
     let unsupported = #"{"mode":"words","words":4,"language":"hindi","lazyMode":true}"#

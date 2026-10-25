@@ -1,5 +1,21 @@
 # 阈值源状态与迁移契约
 
+## Funbox 激活的配置处理器与连写保护（2026-10-25，起点 445d9a85）
+
+固定 funbox.activate 在配置兼容及语言检查后，连写语言若遇 noJoiningScript 模式会发非重要 notice，nosave 清空整组并停止处理器；否则按活动选择顺序调用 applyConfig。固定元数据中共有五个配置处理器：Simon Says 令 keymapMode=next，TTS 令 off；Layout Mirror 将 default 输入布局变为 qwerty，再令键盘图跟随输入；Layout Fluid 使用自定义第一项设置输入及键盘图；Memory 请求显示全行，且 next 键盘模式改 react。相同值仍发 setter 事件，每次 init 都重新应用；Memory 的 Tape 拒绝不会阻断后续 setter。新 QA 执行实际 activate、处理器、活动列表、元数据、兼容／强制检查函数，DOM／CSS、语言读取和通用 setter 端点为明确的自有适配器，不加载参考词表或视觉资产。
+
+2,304 组已接纳配置覆盖单个处理器、允许的有序组合、五类连写保护与额外修饰器／Polyglot、English／Arabic 基础语言、四种键盘模式、两种布局、Tape 与两组有效 Layout Fluid 序列，分别比较第一次和第二次激活的运行字段、事件顺序、nosave 及提示重要度。通用 setter 端点仅适配已由既有全 setter 探针覆盖的键盘依赖与 Tape 拒绝；不能据此声称整个源 setter／DOM 已重新执行。空布局数组的直接开发工具篡改不通过 schema，另行验证原版 activate 的 qwerty 回退；原生导入仍走双方 min(2) 规则的默认迁移，不把原始损坏 Config 冒充已接纳的原生草稿。
+
+原生纯值激活阶段复用既有 setter 投影、类型重建及连写策略，不自行改偏好或启动输入／语音／CSS。协调器在原有资源准入之后、收藏与 Lazy 阶段之前应用；为完整准备建立激活前的保存基线，成功交付保留此基线而不是把 nosave 当作保存。后续收藏或 Lazy 的实际保存会提升当时整份运行配置，已保存 setter 的临时运行检查点沿原 CAS 保留；冷恢复重放激活而不多写稳定记录。临时覆盖不扩充存档字段，不回填、删除或升级旧偏好。这里只修正成功准备／交付的持久边界，完整导入中途失败仍沿既有事务保护，不能宣称原版全部初始保存写序已经对齐。
+
+行为先行两项红测共十个失败，包括五类覆盖未交付，以及连写组合被当作 unrepresentableConfiguration 拒绝。首批实现后两项通过（0.249 秒）。扩大初批 109 项有 324 个失败：源码夹具把无效空布局数组当作已接纳配置，导致原生按 schema 改为默认；随后 Memory Tape 正常 setter false 被 NativeDraft 的 rejectedEdit 升格为失败。先单独复现 Tape 一项／一失败，再仅捕获该正常拒绝继续处理器，不吞其他异常；把有效布局矩阵与原始篡改回退分开并保留严格字段／事件断言。修正后定向 110 项零失败／零跳过（45.047 秒），再补五种配置的冷恢复及旧账户通知隔离进入最终扩大。
+
+六项新工作流检查覆盖五类实际交付、连写整组清空、真实活动语言 setter 后取消／继续及单次账本、后续 Lazy 保存提升、三轮正文生成中的 Memory 再应用，以及通知期间取消在内容读取前停止。另有纯阶段 2,304 样本、Tape 拒绝及报告代次／预算隔离。会话内有界决策／迁移复核（非独立评审）重点反例是把 nosave 写盘、忽略正常拒绝、旧账户通知、取消后丢失运行检查点及重复记账；均保留可检验边界。未声明全部允许的组合都已在实际 TypingSession／可见窗口中支持；FunboxMemory 的选择恢复、原始篡改的全部强制修复、语言加载错误、其他全局视觉／计时器／重开副作用及实体键盘／IME／语音仍开放，整体 goal active。
+
+最终相关扩大 845 项零失败／零跳过，321.958 秒，包含五类冷恢复和最终账户通知断言，覆盖配置、页面、偏好、生成、通知、账本、输入、完整预览与视口宿主；不是完整客户端／服务端套件。2,304 组实际源码激活／再激活、独立无效原始数组回退、原有 880 状态／28 通知步骤与 1,562 引语样本均保留。原创性、47 direct／119 native symbols／17 specs 参考行为审计、1,339 条人工清单结构与工作树空白检查通过，结构检查不等于实体人工验收。日志 `/tmp/typebar-funbox-activation-{red,green,focused,tape-red,final-focused,broad,originality,reference,manual,package}.log` 与 `/tmp/typebar-funbox-activation-source.{json,log}` 区分先行失败、夹具诊断、独立反例和最终结果。
+
+最终串行 Debug 打包、签名及包内资源边界／原创性检查通过，增量构建 1.34 秒，未运行应用。推送前开发分支无打开 PR，Actions 维持 826 次运行、最新 39118939684 成功，main 为 8c52fb13。仅推 native-parity-next，不创建 PR、不改 main、工作流或账户通知。实际可见窗口与其他完整重写缺口继续开放。
+
 ## Lazy Mode 自动校正通知的窗口寿命（2026-10-25，起点 412bf885）
 
 固定 test-logic.ts 的 showedLazyModeNotification 是文档寿命的独立标记，不是 LazyModeState 的持久记忆。语言不支持或全部所选 Polyglot 语言不支持时，仅未提示过才发 important notice；随后关闭 Lazy。只有 remember 与支持度共同触发恢复开启的分支清除标记，包含 Lazy 已为 true 的同值恢复。基础语言清理 remember、手动关闭、清临时通知和普通重开都不直接清除标记。源码只读阶段探针保留 880 组监听／生成样本，新增初始提示标记 false／true 的各 14 步连续序列，共 28 步：普通／Polyglot 提示共享标记、重复抑制、同值恢复、custom 例外、混合支持度恢复，以及基础语言清理 remember 但继续抑制提示，均核对通知分类、important、状态与保存记忆。

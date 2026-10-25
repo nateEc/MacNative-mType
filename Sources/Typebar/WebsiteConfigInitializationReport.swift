@@ -36,6 +36,12 @@ struct WebsiteConfigInitializationExhaustedError: Error, LocalizedError {
     guard let notices, let noticeGeneration else { return }
     lazyModeNotices.record(transition, notices: notices, generation: noticeGeneration, whileCurrent: current)
   }
+  func recordFunboxJoiningScriptClear(whileCurrent current: () -> Bool) {
+    guard let notices, let noticeGeneration else { return }
+    notices.postGuarded("当前语言的连写文字不支持所选趣味模式，已暂时清空整组选择。", level: .notice,
+      options: .init(title: "趣味模式", details: .object(["category": .string("funbox_joining_script")])),
+      generation: noticeGeneration, whileCurrent: current)
+  }
   func record(_ failure: Failure, whileCurrent current: () -> Bool) {
     guard current(), failure.attempt == failures.count + 1, failure.attempt <= 3 else { return }
     failures.append(failure)
