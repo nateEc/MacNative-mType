@@ -1450,6 +1450,7 @@ private struct ContentView: View {
   @State private var typingPowerShakeOffset = CGSize.zero
   @State private var liveContentRequestID = UUID()
   @State private var liveContentTask: Task<Void, Never>?
+  @State private var liveContentTaskID = UUID()
   @State private var liveContentStreamingActive = false
   @State private var isLoadingLiveContent = false
   @State private var liveContentMessage: String?
@@ -5230,6 +5231,7 @@ private struct ContentView: View {
       ? "正在获取随机\(source.displayName)；失败时继续使用离线内容。"
       : "正在获取随机\(source.displayName)；初始化失败时最多尝试三次。"
     liveContentTask?.cancel()
+    liveContentTaskID = UUID()
     liveContentTask = Task {
       // A later synchronous reset can retire this task before its first turn.
       // Do not start transport work for an owner which is already obsolete.
@@ -5332,9 +5334,15 @@ private struct ContentView: View {
     let requestID = liveContentRequestID
     let attemptID = session.automaticInputAttemptID
     guard pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }
+    let taskID = UUID(); liveContentTaskID = taskID
     isLoadingLiveContent = true
     liveContentMessage = "正在续取\(source.displayName)。"
     liveContentTask = Task {
+      defer {
+        if liveContentTaskID == taskID {
+          liveContentTask = nil; isLoadingLiveContent = false
+        }
+      }
       var requestsGeneratorWord = generatesNextWord
       while !Task.isCancelled,
         pageSessionStore.acceptsAttemptCallback(for: attemptID),
@@ -5342,7 +5350,8 @@ private struct ContentView: View {
         let content = await liveContentFetch(source, configuration.language)
         guard !Task.isCancelled, requestID == liveContentRequestID,
           pageSessionStore.acceptsAttemptCallback(for: attemptID),
-          session.configuration == configuration, !session.isFinished else { return }
+          LivePracticeContentContinuationPolicy.matchesGeneration(current: session.configuration, requested: configuration),
+          !session.isFinished else { return }
         if requestsGeneratorWord {
           liveContentTask = nil
           isLoadingLiveContent = false
@@ -5357,8 +5366,8 @@ private struct ContentView: View {
             if canDisableSource && source == .poetry && pageSession.practice == nil {
               let failedModifier: TestModifier = source == .poetry ? .poetryStream : .referenceStream
               settings.testModifiers.removeAll { $0 == failedModifier }
-              persistActiveTestSelection(for: configuration.with(
-                modifiers: configuration.modifiers.filter { $0 != failedModifier }))
+              persistActiveTestSelection(for: session.configuration.with(
+                modifiers: session.configuration.modifiers.filter { $0 != failedModifier }))
             }
             liveContentStreamingActive = false
             session.failLiveContentFetch()

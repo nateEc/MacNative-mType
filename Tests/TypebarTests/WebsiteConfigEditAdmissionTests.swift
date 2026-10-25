@@ -1,8 +1,47 @@
 import XCTest
+import Darwin
+import TypebarSystem
 @testable import Typebar
 
 @MainActor final class WebsiteConfigEditAdmissionTests: XCTestCase {
   private enum Failure: Error { case notCommitted }
+  func testLiveThresholdCommitRejectsOtherFieldsAndCompetingRecordWithoutChangingRules() async throws {
+    let f = try Fixture(); defer { f.close() }
+    _ = try await f.publish()
+    let before = f.page.state.session.generationState, revision = try f.register.read().revision
+    let unrelated = try f.coordinator.prepareEdit(key: "fontSize", value: .number(2), for: f.page)
+    guard case .stale = try f.coordinator.commitLiveThreshold(unrelated, for: f.page) else {
+      return XCTFail("Threshold path accepted appearance settings")
+    }
+    XCTAssertEqual(try f.register.read().revision, revision)
+    let prepared = try f.coordinator.prepareEdit(key: "minWpmCustomSpeed", value: .number(20), for: f.page)
+    let other = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    guard case .committed = try f.register.commit(other, replacing: XCTUnwrap(revision)) else { return XCTFail("Cannot save competing record") }
+    let changed = try f.register.read().revision
+    guard case .conflict = try f.coordinator.commitLiveThreshold(prepared, for: f.page) else { return XCTFail("Ignored competing record") }
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(try f.register.read().revision, changed)
+    XCTAssertTrue(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
+  }
+
+  func testBusyThresholdSaveKeepsLiveRulesUntilTheSameProposalCanCommit() async throws {
+    let f = try Fixture(); defer { f.close() }
+    _ = try await f.publish()
+    let before = f.page.state.session.generationState
+    let attempt = f.page.state.session.automaticInputAttemptID
+    let prepared = try f.coordinator.prepareEdit(key: "minAccCustom", value: .number(0), for: f.page)
+    let descriptor = Darwin.open(f.directory.appendingPathComponent(WebsiteConfigFileRegister.lockFilename).path,
+      O_RDWR | O_CLOEXEC | O_NOFOLLOW)
+    XCTAssertGreaterThanOrEqual(descriptor, 0); defer { Darwin.close(descriptor) }
+    XCTAssertEqual(typebar_file_lock(descriptor, LOCK_EX | LOCK_NB), 0)
+    guard case .busy = try f.coordinator.commitLiveThreshold(prepared, for: f.page) else { return XCTFail("Ignored busy record") }
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertTrue(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
+    XCTAssertEqual(typebar_file_lock(descriptor, LOCK_UN), 0)
+    guard case .committed = try f.coordinator.commitLiveThreshold(prepared, for: f.page) else { return XCTFail("Could not retry threshold save") }
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.page.state.session.configuration.rules.thresholdSource?.configuration.minimumAccuracyMode, .custom)
+  }
   @MainActor private final class Fixture {
     let page = PracticePageSessionStore()
     let router = PreferenceConfigurationSaveRouter()

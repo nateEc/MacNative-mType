@@ -194,6 +194,11 @@ if (defaultsMode) {
       keymapSize:[-1,0.55,9], customBackground:['  owned  '], paceCaret:['pb','tagPb','custom'],
       randomTheme:['custom'], theme:['dracula'], customThemeColors:[Array(10).fill('#123456')],
       accountChart:[['off','off','on','off']]};
+    Object.assign(choices, {
+      minWpm:['off','custom'], minWpmCustomSpeed:[-1,0,73.5,100],
+      minAcc:['off','custom'], minAccCustom:[0,91.5,100,101],
+      minBurst:['off','fixed','flex'], minBurstCustomSpeed:[-1,0,83.5,100],
+    });
     for (const funbox of [[],['no_quit'],['memory'],['binary'],['arrows'],['tts'],['rot13']])
       for (const testActive of [false,true]) for (const nosave of [false,true])
         for (const [key, values] of Object.entries(choices)) for (const value of values)

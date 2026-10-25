@@ -29,6 +29,7 @@ struct WebsiteQuoteRecoveryNotice: View {
   ]
   private(set) var isWorking = false
   private(set) var message: String?
+  private(set) var activityText = "正在准备新练习…"
   @ObservationIgnored private var work: Task<Void, Never>?
   @ObservationIgnored private var request = UUID()
   init(parameters: WebsiteConfigNativeTestParameters, difficulty: Difficulty = .normal, quoteLengths: [Int] = [1],
@@ -81,9 +82,11 @@ struct WebsiteQuoteRecoveryNotice: View {
     start(.language(name), apply: apply)
   }
   func start(_ edit: WebsiteConfigPracticeEdit, apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
+    if !isWorking { activityText = WebsiteConfigThresholdEdit.keys.contains(edit.key) ? "正在保存阈值…" : "正在准备新练习…" }
     startPreparation { try await apply(edit) }
   }
   func resume(apply: @escaping @MainActor () async throws -> String) {
+    if !isWorking { activityText = "正在准备新练习…" }
     startPreparation(apply)
   }
   private func startPreparation(_ apply: @escaping @MainActor () async throws -> String) {
@@ -133,6 +136,7 @@ struct WebsiteConfigPracticeEditor: View {
   @State private var form: WebsiteConfigPracticeEditForm
   let parameters: WebsiteConfigNativeTestParameters
   private let importedQuoteGroups: [Int]
+  private let thresholds: PracticeThresholdConfiguration?
   let canEdit: Bool
   let recoveries: [WebsiteQuoteSampler.Recovery]
   let pendingPreparation: Bool
@@ -144,6 +148,7 @@ struct WebsiteConfigPracticeEditor: View {
     resume: (@MainActor () async throws -> String)? = nil,
     apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     parameters = draft.testParameters; importedQuoteGroups = draft.quoteSelection.groups
+    thresholds = draft.inputRules.rules.thresholdSource?.configuration
     self.canEdit = canEdit; self.apply = apply
     self.recoveries = recoveries
     self.pendingPreparation = pendingPreparation; self.resume = resume
@@ -156,6 +161,7 @@ struct WebsiteConfigPracticeEditor: View {
     apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     _form = State(initialValue: form); self.parameters = parameters; self.canEdit = canEdit; self.apply = apply
     importedQuoteGroups = form.quoteLengths
+    thresholds = nil
     self.recoveries = recoveries
     self.pendingPreparation = pendingPreparation; self.resume = resume
     self.configurationWasSaved = configurationWasSaved
@@ -234,6 +240,13 @@ struct WebsiteConfigPracticeEditor: View {
         Button("应用难度") { form.start(.difficulty(form.difficulty), apply: apply) }
           .accessibilityIdentifier("website-config-apply-difficulty")
       }.disabled(!canEdit || form.isWorking || pendingPreparation)
+      if let thresholds {
+        DisclosureGroup("自动失败阈值") {
+          WebsiteConfigThresholdEditor(configuration: thresholds,
+            canEdit: canEdit && !form.isWorking && !pendingPreparation,
+            apply: { form.start(.threshold($0), apply: apply) })
+        }.accessibilityIdentifier("website-config-threshold-settings")
+      }
       if parameters.mode != .zen {
         HStack {
           Toggle("标点", isOn: Binding(get: { parameters.contentOptions.includePunctuation },
@@ -265,7 +278,7 @@ struct WebsiteConfigPracticeEditor: View {
       if form.isWorking {
         HStack {
           ProgressView().controlSize(.small)
-          Text("正在准备新练习…").font(.caption)
+          Text(form.activityText).font(.caption)
           Button("取消准备") { form.cancel() }
         }
       }

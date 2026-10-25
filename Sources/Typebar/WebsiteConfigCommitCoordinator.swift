@@ -306,6 +306,59 @@ final class WebsiteConfigCommitCoordinator {
   }
   enum NextOutcome { case advanced(PreviousAttempt), stale, conflict, unavailable, busy }
   enum Outcome { case committed(Publication), stale, conflict, unavailable, busy }
+
+  /// A source threshold setter has no restart dispatch/subscriber. Keep the
+  /// live attempt and let the timer/word-commit consume its updated rules.
+  func commitLiveThreshold(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
+    guard !processing, page.restartController?.isPreparing != true else { return .busy }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    guard isCurrent(prepared), prepared.sourcePage === page, let capture = prepared.pageCapture,
+      page.state.configurationDeparture == nil, page.state.savedApplication == nil,
+      case .edited(let edit) = prepared.draft.origin, WebsiteConfigThresholdEdit.keys.contains(edit.key),
+      prepared.draft.projection.rejectedKeys.isEmpty, !prepared.draft.projection.events.isEmpty,
+      prepared.draft.projection.events.allSatisfy({ WebsiteConfigThresholdEdit.keys.contains($0.key) && $0.nosave == false }),
+      prepared.draft.projection.runtime.count == capture.publication.draft.projection.runtime.count,
+      capture.publication.draft.projection.runtime.allSatisfy({ key, value in
+        WebsiteConfigThresholdEdit.keys.contains(key) || prepared.draft.projection.runtime[key] == value
+      }), let previous = page.state.presentation, let practice = page.state.practice else { return .stale }
+    var state = page.state
+    let progress = state.currentQuoteInitialization
+    let controller = page.restartController
+    state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules)
+    let updatedPractice = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: practice.scope,
+      quote: practice.quote, external: practice.external, repetition: practice.repetition)
+    guard isCurrent(prepared) else { return .stale }
+    try Task.checkCancellation()
+    try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
+    defer { page.endCommit() }
+    let revision: WebsiteConfigFileRegister.Revision
+    do {
+      switch try register.commit(prepared.draft, replacing: prepared.disk) {
+      case .committed(let value): revision = value
+      case .conflict: return .conflict
+      case .unavailable: return .unavailable
+      }
+    } catch WebsiteConfigFileRegisterError.busy { return .busy }
+    // No suspension, callback, legacy preference write or fallible operation
+    // between the durable CAS and publishing the corresponding live rules.
+    let publication = Publication(applicationID: UUID(), draft: prepared.draft, savedDraft: prepared.draft,
+      owner: prepared.owner.owner, environmentRevision: prepared.environment.revision,
+      pointsPerRem: prepared.environment.pointsPerRem, disk: revision,
+      background: capture.publication.background, font: capture.publication.font,
+      session: state.session, practice: updatedPractice, quoteRecoveries: capture.publication.quoteRecoveries,
+      ownerLease: prepared.owner, authority: publicationAuthority)
+    state = .init(session: state.session, presentation: previous.retainingAppearance(for: publication),
+      practice: updatedPractice, priorAttemptLedger: state.priorAttemptLedger,
+      restartDepartureAttemptID: state.restartDepartureAttemptID, quoteInitialization: state.quoteInitialization)
+    if let progress {
+      state.quoteInitialization = .init(publication: publication.applicationID, configurationDeparture: nil, progress: progress)
+    }
+    latest = publication; publicationAuthority.latest = publication.applicationID
+    page.installCommitted(state, retainingRestartController: controller)
+    retire(prepared)
+    return .committed(publication)
+  }
   enum Restoration { case missing, unavailable, prepared(Prepared) }
   private let router: PreferenceConfigurationSaveRouter
   private let register: WebsiteConfigFileRegister
@@ -844,10 +897,11 @@ final class WebsiteConfigCommitCoordinator {
         initializationReport: initializationReport, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
       return .init(session: session)
     }
-    let session = try await prepareSessionBuild(for: resources) { _ in
+    let session = try await prepareSessionBuild(for: resources) { draft in
       // Restore the actual attempt's owned opening/cursors/caches, not a
       // reconstruction from the editor, its grown prompt or a fresh sampler.
-      let repeated = original.repeatedAttempt(nextRandomCaseBit: random.caseBit)
+      var repeated = original.repeatedAttempt(nextRandomCaseBit: random.caseBit)
+      repeated.synchronizeLiveInputRules(draft.inputRules.rules)
       guard !repeated.hasStarted, !repeated.isFinished,
         repeated.configuration.mode == .zen || !repeated.prompt.isEmpty else {
         throw WebsiteConfigSessionBuildError.generationFailed

@@ -4,6 +4,146 @@ import Observation
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testThresholdEditRetainsCurrentQuoteAndItsSamplingQueueWithoutReadingAgain() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        return [.init(id: "one", title: "Owned", text: "ab cd", language: .english, length: .short),
+          .init(id: "two", title: "Owned", text: "ef gh", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false)
+    let before = f.page.state.session.generationState
+    let quote = f.page.state.practice?.quote?.id
+    var expected = try XCTUnwrap(f.page.state.practice?.quoteSampler)
+    var expectedBounds: [Int] = []
+    let expectedNext = try expected.next(randomIndex: { expectedBounds.append($0); return 0 })
+    try await workflow.editAndBegin(.threshold(.burstMode(.fixed)),
+      replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(reads, 1); XCTAssertEqual(f.page.state.practice?.quote?.id, quote)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.attempt)
+    var actual = try XCTUnwrap(f.page.state.practice?.quoteSampler)
+    var actualBounds: [Int] = []
+    XCTAssertEqual(try actual.next(randomIndex: { actualBounds.append($0); return 0 }), expectedNext)
+    XCTAssertEqual(actualBounds, expectedBounds)
+  }
+  func testAllThresholdModesAndMemoriesSaveWithoutRestartAndOffRetainsValues() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"minWpm":"off","minWpmCustomSpeed":73.5,"minAcc":"off","minAccCustom":91.5,"minBurst":"off","minBurstCustomSpeed":83.5}"#,
+      systemIsDark: false)
+    let attempt = f.page.state.session.automaticInputAttemptID
+    let controller = try XCTUnwrap(f.page.restartController)
+    let edits: [WebsiteConfigThresholdEdit] = [.speedMode(.custom), .speedMode(.off), .speedValue(0),
+      .accuracyValue(0), .accuracyMode(.off), .burstValue(99.5), .burstMode(.flex), .burstValue(0), .burstMode(.fixed), .burstMode(.off)]
+    for edit in edits {
+      let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+      try await f.workflow.editAndBegin(.threshold(edit), replacing: id, systemIsDark: false)
+      XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+      XCTAssertTrue(f.page.restartController === controller)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+      let configuration = try XCTUnwrap(f.page.state.session.configuration.rules.thresholdSource).configuration
+      if edit == .speedMode(.off) { XCTAssertEqual(configuration.minimumWpmCustomValue, 73.5) }
+      if edit == .burstValue(99.5) { XCTAssertEqual(configuration.minimumWordBurstMode, .off) }
+      if edit == .burstValue(0) { XCTAssertEqual(configuration.minimumWordBurstMode, .flex) }
+      if edit == .burstMode(.fixed) { XCTAssertEqual(configuration.minimumWordBurstCustomValue, 0) }
+    }
+    let source = try XCTUnwrap(f.page.state.session.configuration.rules.thresholdSource).configuration
+    XCTAssertEqual(source.minimumWpmMode, .custom); XCTAssertEqual(source.minimumWpmCustomValue, 0)
+    XCTAssertEqual(source.minimumAccuracyMode, .off); XCTAssertEqual(source.minimumAccuracyCustomValue, 0)
+    XCTAssertEqual(source.minimumWordBurstMode, .off); XCTAssertEqual(source.minimumWordBurstCustomValue, 0)
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else {
+      return XCTFail("Threshold fields were not saved")
+    }
+    XCTAssertEqual(saved["minWpm"], .string("custom")); XCTAssertEqual(saved["minWpmCustomSpeed"], .number(0))
+    XCTAssertEqual(saved["minBurst"], .string("off")); XCTAssertEqual(saved["minBurstCustomSpeed"], .number(0))
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+
+  func testNoQuitRejectsEveryThresholdFieldWithoutChangingAttemptOrDisk() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var active = f.page.state
+    active.session.insertBatch(String(active.session.prompt.prefix(1))); f.page.replace(active)
+    let generation = f.page.state.session.generationState
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    let publication = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let count = f.account.localNotices.history.count
+    for edit in [WebsiteConfigThresholdEdit.speedMode(.custom), .speedValue(20), .accuracyMode(.custom),
+      .accuracyValue(90), .burstMode(.fixed), .burstValue(30)] {
+      do {
+        try await f.workflow.editAndBegin(.threshold(edit), replacing: publication, systemIsDark: false)
+        XCTFail("No Quit accepted \(edit.key)")
+      } catch WebsiteConfigNativeDraftError.rejectedEdit {}
+      XCTAssertEqual(f.page.state.session.generationState, generation)
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+    }
+    XCTAssertEqual(f.account.localNotices.history.count - count, 6)
+    XCTAssertTrue(try XCTUnwrap(f.account.localNotices.active.last).important)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
+  func testInvalidThresholdValuesNeverRestartOrSave() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let generation = f.page.state.session.generationState
+    let publication = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    for edit in [WebsiteConfigThresholdEdit.speedValue(-1), .speedValue(.infinity), .speedValue(.nan),
+      .accuracyValue(101), .burstValue(-1)] {
+      do { try await f.workflow.editAndBegin(.threshold(edit), replacing: publication, systemIsDark: false); XCTFail("Invalid threshold accepted") }
+      catch {}
+      XCTAssertEqual(f.page.state.session.generationState, generation)
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+    }
+  }
+
+  func testFinishedOnlineResultKeepsItsRulesButExplicitRepeatUsesNewThresholdSelection() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, _, _, _ in
+        reads += 1
+        return .init(source: source, initial: .init(text: "ab cd", noSpaceBoundarySource: nil), continuation: nil)
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":2,"funbox":["wikipedia"]}"#, systemIsDark: false)
+    var complete = f.page.state
+    complete.session.insertBatch(complete.session.prompt + " "); f.page.replace(complete)
+    XCTAssertEqual(f.page.state.session.outcome, .completed)
+    let original = f.page.state.session
+    try await workflow.editAndBegin(.threshold(.accuracyValue(0)),
+      replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.generationState, original.generationState)
+    let repeated = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(repeated); XCTAssertEqual(reads, 1)
+    XCTAssertEqual(f.page.state.session.prompt, original.prompt)
+    XCTAssertEqual(f.page.state.session.configuration.rules.thresholdSource?.configuration.minimumAccuracyMode, .custom)
+    XCTAssertEqual(f.page.state.session.configuration.rules.thresholdSource?.configuration.minimumAccuracyCustomValue, 0)
+  }
+  func testThresholdSetterKeepsActiveAttemptInputPromptAndLedger() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"minWpm":"off","minWpmCustomSpeed":73.5}"#,
+      systemIsDark: false)
+    var running = f.page.state
+    running.session.insertBatch(String(running.session.prompt.prefix(1)))
+    f.page.replace(running)
+    let before = f.page.state.session
+    let publication = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    try await f.workflow.editAndBegin(.threshold(.speedValue(0)), replacing: publication, systemIsDark: false)
+    let after = f.page.state.session
+    XCTAssertEqual(after.automaticInputAttemptID, before.automaticInputAttemptID)
+    XCTAssertEqual(after.typed, before.typed)
+    XCTAssertEqual(after.prompt, before.prompt)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(after.configuration.rules.thresholdSource?.configuration.minimumWpmMode, .custom)
+    XCTAssertEqual(after.configuration.rules.thresholdSource?.configuration.minimumWpmCustomValue, 0)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
   func testRetiredShortSectionDoesNotStartAnotherRequestForEitherOnlineSource() async throws {
     let cases = ["page", "record", "window", "cancel"].flatMap { retirement in
       ["poetry", "wikipedia"].map { (retirement, $0) }

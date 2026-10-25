@@ -1,7 +1,8 @@
 import Foundation
 
-/// Explicit test-page actions with a source restart dispatch or subscription.
-/// Not the metadata's broader changeRequiresRestart key set.
+/// Window-owned practice actions. Threshold setters retain the attempt;
+/// restarting actions require an actual source dispatch/subscription, not
+/// merely the metadata's broader changeRequiresRestart flag.
 enum WebsiteConfigPracticeEdit: Equatable {
   case mode(TestMode), time(Double), words(Double)
   case difficulty(Difficulty), punctuation(Bool), numbers(Bool), quoteLengths([Int])
@@ -9,6 +10,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case funboxes([String])
   case polyglotLanguages([String])
   case layoutFluidLayouts([String])
+  case threshold(WebsiteConfigThresholdEdit)
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
@@ -18,6 +20,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .funboxes: "funbox"
     case .polyglotLanguages: "customPolyglot"
     case .layoutFluidLayouts: "customLayoutfluid"
+    case .threshold(let edit): edit.key
     }
   }
   var value: WebsiteConfigValue {
@@ -32,6 +35,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .funboxes(let values): .array(values.map(WebsiteConfigValue.string))
     case .polyglotLanguages(let values): .array(values.map(WebsiteConfigValue.string))
     case .layoutFluidLayouts(let values): .array(values.map(WebsiteConfigValue.string))
+    case .threshold(let edit): edit.value
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -39,7 +43,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   /// neither case: execution never reaches the following dispatch.
   var dispatchesRestartAfterRejection: Bool {
     switch self {
-    case .difficulty, .language, .layoutFluidLayouts: false
+    case .difficulty, .language, .layoutFluidLayouts, .threshold: false
     case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes, .polyglotLanguages: true
     }
   }
@@ -89,8 +93,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
 }
 
 /// Window-owned whole-application workflow. Does not mutate legacy preferences
-/// or silently substitute another text provider. Explicit practice setters use
-/// durable departure; full import/restoration still protects active attempts.
+/// or silently substitute another text provider. Restarting setters use durable
+/// departure; thresholds retain the attempt, and imports protect active tests.
 @MainActor final class WebsiteConfigImportWorkflow {
   private weak var page: PracticePageSessionStore?
   private let settings: AppSettings
@@ -181,6 +185,14 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         if failedPoetrySource { ticket = try coordinator.prepareFailedPoetrySource(for: page, refreshingWith: source) }
         else { ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source) }
       }
+      catch WebsiteConfigNativeDraftError.rejectedEdit where WebsiteConfigThresholdEdit.keys.contains(edit.key) {
+        if page.state.session.hasStarted, !page.state.session.isFinished,
+          page.state.session.configuration.modifiers.contains(.noQuit), let publication = page.state.presentation?.publication {
+          postNoQuitSelectionNotice("阈值未修改；No Quit 保留当前练习。", publication: publication,
+            page: page, operation: current, noticeGeneration: noticeGeneration)
+        }
+        throw WebsiteConfigNativeDraftError.rejectedEdit
+      }
       catch WebsiteConfigNativeDraftError.rejectedEdit where edit.key == "customLayoutfluid" {
         if page.state.session.hasStarted, !page.state.session.isFinished,
           page.state.session.configuration.modifiers.contains(.noQuit), let publication = page.state.presentation?.publication {
@@ -202,6 +214,18 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         try Task.checkCancellation()
         guard operation == current, !stopped else { throw CancellationError() }
         throw WebsiteConfigImportWorkflowError.rejectedRestartFailed
+      }
+      if case .threshold = edit {
+        prepared = ticket
+        guard operation == current, !stopped else { throw CancellationError() }
+        try Task.checkCancellation()
+        switch try coordinator.commitLiveThreshold(ticket, for: page) {
+        case .committed:
+          return page.state.session.isFinished ? "阈值已保存，下一轮使用新设置。" : "阈值已保存，将用于当前练习的后续检查。"
+        case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+        case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+        case .busy: throw WebsiteConfigImportWorkflowError.busy
+        }
       }
       switch try coordinator.beginConfigurationRestart(ticket, for: page, action: edit) {
       case .accepted(let admitted): ticket = admitted

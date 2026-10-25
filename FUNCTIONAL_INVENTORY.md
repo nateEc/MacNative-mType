@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-25 完整配置的练习阈值编辑（CFG-THRESHOLD-PAGE-01）：原生“自动失败阈值”表单接通最低整体速度、准确率和单词速度的六个源字段。普通 setter 保存后原地更新后续检查，不重开、换词或增加账本；关闭保留记忆，速度／准确率数值 setter 启用 custom，单词速度数值只改记忆。活动 No Quit 拒绝并重要提示；完成成绩保留旧规则，原题重复读取新选择。原生输入明确按 WPM／百分比编辑，命令面板的单位／截断输入语义另行追踪。实际页面、隔离布局与源 setter 对照见迁移契约；实体输入、全部故障写序及全局阈值迁移未验。
+
 2026-10-25 在线段落的逐次读取准入（CFG-EXTERNAL-CONTENT-01）：先行真实工作流反例证明，配置被替换后，迟到的短诗／短文仍会发出一次补齐请求。加载器现接收协调器拥有的只读准入回调，在每次段落读取前后及描述符准备后复核窗口、请求与文件版本；过期／取消不转换为 Poetry false，不再开始下一段，不校正来源或覆盖新记录。页面替换、竞争记录、窗口变化、取消及两种来源的组合纳入回归。范围仅为原生段落读取边界；不据此声称已取消所有在途 HTTP 子请求或完成真实网络分布验收。
 
 2026-10-25 完整配置在线词源（CFG-EXTERNAL-CONTENT-01）：配置工作流、冷恢复及下一轮共用原生在线加载器，使用激活后的 showAllLines 准备不同段落并保留尾部；原题重复不重新拉取。Poetry false 通过普通保存 setter 移除 poetry，不恢复其他趣味模式的选择记忆；解码空段落与 Wikipedia 失败进入三次初始化预算，保留来源和恢复检查点。实际页面安装后开启续段，回调同时检查尝试身份和待应用状态，完整配置的源失败不写旧偏好。证据范围见迁移契约；公共服务持续可用、全部组合与实体输入仍未验收。
@@ -1895,6 +1897,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-THRESHOLD-PAGE-01 | 完整配置的原生练习阈值编辑 | `config/{metadata.tsx,setters.ts}`, `test/test-logic.ts`, `test/test-timer.ts` | PreferencesDomain, TestDomain | 部分实现：原生表单编辑六个字段，普通修改保持当前尝试及输入，后续检查使用新规则；关闭保留记忆，0 不等于关闭。No Quit 拒绝并重要提示，完成结果不改，重复使用新选择；文件锁／竞争记录不提前改变规则。WPM／百分比字段编辑不冒充全部命令输入协议，实体窗口／IME、源逐次失败写序与全局迁移仍开放。 |
 | CFG-EXTERNAL-CONTENT-01 | 完整配置的在线初始化、续段与源失败恢复 | `test/words-generator.ts`, `test/poetry.ts`, `test/wikipedia.ts`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：导入／冷恢复／下一轮使用原生在线加载器，保留段落尾部；重复保留原题。Poetry false 保存移除来源但不恢复选择记忆，空段落与百科错误保留来源并使用初始化预算。实际页面续段与迟到请求隔离纳入回归；全部组合、真实网络分布及实体键盘／IME 未验。 |
 | CFG-COLD-APPLICATION-01 | 有效原生记录的冷恢复与初始化失败 | `config/lifecycle.ts` 的 loadFromLocalStorage、`config/persistence.ts`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：有效原生冷记录进入待初始化能力，未变化保持文件代次；校正先保存，再读资源／正文。取消和失败可继续，双窗口不因无变化恢复而互相失效。15 组源阶段中的两组实际冷调用方、真实恢复及启动／双窗口回归见迁移契约。缺失／未知记录仍拒绝；浏览器冷存储全部边界、实体 UI／IME 未验。 |
 | CFG-IMPORT-FAILURE-ORDER-01 | 完整导入的失败保存边界 | `config/{lifecycle,setters,persistence}.ts`, `hooks/createEvent.ts`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：合法 JSON 在资源／正文前保存；待初始化期间暂停旧输入、保留记录及恢复能力，支持取消、新工作流冷恢复、竞争写入和晚到结果保护，自动校正保存后继续不重放。13 个导入源阶段与两组冷调用方、真实原生工作流证据见迁移契约。setter 抛错的部分运行状态、每次拒绝保存写序、活动完整导入及实体 UI／IME 未验；冷恢复范围另见 CFG-COLD-APPLICATION-01。 |
