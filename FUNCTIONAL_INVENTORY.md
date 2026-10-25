@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-KEYMAP-ANIMATION-01 | 键帽渐变与 next 退出淡出 | `components/pages/test/Keymap.tsx`, `components/common/anime/Anime.tsx`, 固定 Anime.js 引擎 | PromptDomain, PreferencesDomain | 接通 250ms 二次减速、淡出优先、完成后恢复当前模式及主题颜色角色；1,152 状态快照、六个实际引擎采样和隐藏中间色图像通过。完成回调核对代次与选中反馈，拒绝旧静止回调清理新事件。完整事件来源、模式／布局生命周期、帧率与实体操作仍待验。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-KEYMAP-ALL-MATCHES-01 | 相同标注键同时高亮与精确事件匹配 | `states/test.ts`, `components/pages/test/Keymap.tsx`, `input/handlers/insert-text.ts` | PromptDomain | 按原始 UTF-16 标注匹配全部键，下一键保留精确身份；51,192 组查询含 248 组多键命中。插入事件按实际规范化／展开后的单元记录，逻辑键独立保存，逐键 250ms 完成清理。渐变、next 退出淡出、完整事件时点／来源及实体输入仍开放。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

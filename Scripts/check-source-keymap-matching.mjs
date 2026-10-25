@@ -53,7 +53,14 @@ if(process.argv[3]==='--flash-state'){
     const first=context.sourceFlashEntry({legends:['b','a']},{flashState:store});
     fixtures.push({...action,expected,selected:first?{tick:first.tick,isCorrect:first.correct}:null});
   }
-  verify();console.log(JSON.stringify({fixtures}));process.exit(0);
+  config.keymapMode='react';
+  listener({mode:'flash',key:'a',correct:true});
+  const first=vm.runInContext('getKeymapFlashState.a',context);
+  context.sourceComplete({legends:['a']});
+  listener({mode:'flash',key:'a',correct:true});
+  const second=vm.runInContext('getKeymapFlashState.a',context);
+  const replay={sameTick:first.tick===second.tick,sameIdentity:first===second};
+  verify();console.log(JSON.stringify({fixtures,replay}));process.exit(0);
 }
 const layouts=[];
 for(const [id,native] of Object.entries(mapping.nativeExact)){

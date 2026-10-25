@@ -28,8 +28,8 @@ import XCTest
       for x in 0..<bitmap.pixelsWide { for y in 0..<bitmap.pixelsHigh {
         guard let c = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
         let r = c.redComponent, g = c.greenComponent, b = c.blueComponent
-        if r > 0.75 && g < 0.7 && b < 0.7 { red += 1 }
-        if b > 0.75 && r < 0.3 && g < 0.8 { blue += 1 }
+        if r > 0.5 && r - g > 0.18 && r - b > 0.18 { red += 1 }
+        if b > 0.5 && b - r > 0.18 && b - g > 0.08 { blue += 1 }
         if max(r, g, b) > 0.85 && max(r, g, b) < 0.98 { gray += 1 }
       } }
       return (red, blue, gray)
@@ -43,7 +43,7 @@ import XCTest
     XCTAssertGreaterThan(active.red, 500); XCTAssertGreaterThan(active.blue, 500)
     let oldGeneration = store.generation
     store.reset(); store.receive([.init(units: [97], isCorrect: true)])
-    store.complete(legends: [[97]], generation: oldGeneration)
+    store.complete(legends: [[97]], generation: oldGeneration, selection: store.state.first(for: [[97]]))
     XCTAssertEqual(store.state.entries[[97]]?.isCorrect, true, "Old completion cannot clear the replacement attempt")
     try await Task.sleep(for: .milliseconds(300))
     let ended = try capture("ended")
@@ -75,7 +75,7 @@ import XCTest
         legendStyle: .dynamic, keysMode: .minimal, style: .staggered, modifierFlags: [], capsLockEnabled: false)
         .frame(width: 900, height: 300).background(Color.white).environment(\.colorScheme, .light))
       host.frame = .init(x: 0, y: 0, width: 900, height: 300)
-      try await Task.sleep(for: .milliseconds(60)); host.layoutSubtreeIfNeeded()
+      try await Task.sleep(for: .milliseconds(mode == .staticGuide ? 300 : 60)); host.layoutSubtreeIfNeeded()
       let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
       host.cacheDisplay(in: host.bounds, to: bitmap)
       try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-keymap-match-\(name).png"))
@@ -83,7 +83,7 @@ import XCTest
       for x in 0..<bitmap.pixelsWide { for y in 0..<bitmap.pixelsHigh {
         guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
         let r = color.redComponent, g = color.greenComponent, b = color.blueComponent
-        if red ? (r > 0.75 && g < 0.7 && b < 0.7) : (b > 0.75 && r < 0.3 && g < 0.8) { columns[x] += 1 }
+        if red ? (r > 0.5 && r - g > 0.18 && r - b > 0.18) : (b > 0.5 && b - r > 0.18 && b - g > 0.08) { columns[x] += 1 }
         if max(r, g, b) > 0.85 && max(r, g, b) < 0.98 { backgrounds += 1 }
       } }
       let active = columns.indices.filter { columns[$0] > 5 }

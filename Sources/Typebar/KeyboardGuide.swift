@@ -4730,6 +4730,7 @@ struct KeyboardGuide: View {
   let overrideRows: [[KeyboardGuideKey]]?
   var overrideThumbKeys: [KeyboardGuideKey]? = nil
   var websiteFeedback: WebsiteKeymapFeedbackStore? = nil
+  var websitePalette: WebsiteKeymapPalette? = nil
   let mirrored: Bool
   let scale: Double
   let legendStyle: KeyboardGuideLegendStyle
@@ -4901,12 +4902,16 @@ struct KeyboardGuide: View {
     let sourceReact = usesWebsiteKeymap && mode == .react && !style.isSteno
     let highlighted = !sourceReact && isHighlighted(key)
     let generation = websiteFeedback?.generation ?? 0
+    let completionSelection = key.websiteFlash(in: currentWebsiteFlashes)
+    let expectedMatch = nextCharacter.map { key.matchesWebsiteLegend(String($0)) } ?? false
     return KeyboardGuideKeycap(label: key.legend(style: legendStyle, modifierFlags: modifierFlags, capsLockEnabled: capsLockEnabled),
       width: key.width, scale: scale, highlighted: highlighted, highlightColor: highlightedColor(for: key),
       flash: sourceReact ? key.websiteFlash(in: currentWebsiteFlashes) : nil, legends: key.websiteLegendUnits,
-      generation: generation, accent: accent, onComplete: {
-        if let websiteFeedback { websiteFeedback.complete(legends: key.websiteLegendUnits, generation: generation) }
-        else { websiteFlashes.complete(legends: key.websiteLegendUnits) }
+      generation: generation, accent: accent,
+      sourceMode: usesWebsiteKeymap ? mode : nil, steno: style.isSteno, expectedMatch: expectedMatch,
+      palette: websitePalette ?? .init(accent: accent, panel: Color.primary.opacity(0.08), background: .white, secondary: .secondary, error: .red), onComplete: {
+        if let websiteFeedback { websiteFeedback.complete(legends: key.websiteLegendUnits, generation: generation, selection: completionSelection) }
+        else if key.websiteFlash(in: websiteFlashes) == completionSelection { websiteFlashes.complete(legends: key.websiteLegendUnits) }
       })
   }
 
@@ -4926,6 +4931,10 @@ private struct KeyboardGuideKeycap: View {
   let legends: [[UInt16]]
   let generation: UInt64
   let accent: Color
+  let sourceMode: KeyboardGuideMode?
+  let steno: Bool
+  let expectedMatch: Bool
+  let palette: WebsiteKeymapPalette
   let onComplete: @MainActor () -> Void
 
   private struct PulseIdentity: Equatable {
@@ -4935,7 +4944,12 @@ private struct KeyboardGuideKeycap: View {
   }
 
   var body: some View {
-    Text(label)
+    if let sourceMode {
+      WebsiteAnimatedKeycap(label: label, width: width, scale: scale, mode: sourceMode,
+        steno: steno, matches: expectedMatch, flash: flash, legends: legends,
+        generation: generation, palette: palette, onComplete: onComplete)
+    } else {
+      Text(label)
       .font(.system(size: 10 * scale, weight: .semibold, design: .monospaced))
       .foregroundStyle(highlighted || flash != nil ? Color.white : Color.secondary)
       .frame(width: width * scale, height: 22 * scale)
@@ -4946,6 +4960,86 @@ private struct KeyboardGuideKeycap: View {
         try? await Task.sleep(for: .milliseconds(250))
         guard !Task.isCancelled else { return }
         onComplete()
+      }
+    }
+  }
+}
+
+private struct WebsiteAnimatedKeycap: View {
+  let label: String
+  let width: CGFloat
+  let scale: Double
+  let mode: KeyboardGuideMode
+  let steno: Bool
+  let matches: Bool
+  let flash: WebsiteKeymapFlashState.Selection?
+  let legends: [[UInt16]]
+  let generation: UInt64
+  let palette: WebsiteKeymapPalette
+  let onComplete: @MainActor () -> Void
+  @Environment(\.colorScheme) private var scheme
+  @State private var state = WebsiteKeymapAnimationState()
+  @State private var plan = WebsiteKeymapAnimationState.Plan(fading: false, background: [.panel], foreground: [.secondary], duration: 0)
+  @State private var signature: Signature?
+  @State private var startedAt: TimeInterval?
+  @State private var progress = 1.0
+
+  private struct Input: Equatable {
+    let mode: KeyboardGuideMode
+    let steno: Bool, matches: Bool
+    let flash: WebsiteKeymapFlashState.Selection?
+    let legends: [[UInt16]]
+    let generation: UInt64
+    let colors: [WebsiteKeymapAnimationState.Role: WebsiteKeymapRGBA]
+  }
+  private struct Signature: Equatable {
+    let plan: WebsiteKeymapAnimationState.Plan
+    let flash: WebsiteKeymapFlashState.Selection?
+    let legends: [[UInt16]]
+    let generation: UInt64
+    let colors: [WebsiteKeymapAnimationState.Role: WebsiteKeymapRGBA]
+  }
+  private func color(_ roles: [WebsiteKeymapAnimationState.Role], _ colors: [WebsiteKeymapAnimationState.Role: WebsiteKeymapRGBA]) -> Color {
+    guard let first = roles.first.flatMap({ colors[$0] }) else { return .clear }
+    guard roles.count > 1, let last = roles.last.flatMap({ colors[$0] }) else { return first.color }
+    return first.mixed(with: last, progress: progress).color
+  }
+  var body: some View {
+    let colors = palette.resolved(scheme: scheme)
+    let input = Input(mode: mode, steno: steno, matches: matches, flash: flash,
+      legends: legends, generation: generation, colors: colors)
+    Text(label)
+      .font(.system(size: 10 * scale, weight: .semibold, design: .monospaced))
+      .foregroundStyle(color(plan.foreground, colors))
+      .frame(width: width * scale, height: 22 * scale)
+      .background(color(plan.background, colors), in: RoundedRectangle(cornerRadius: 5))
+      .task(id: input) {
+        guard !Task.isCancelled else { return }
+        let next = state.update(mode: mode, steno: steno, matches: matches, tick: flash?.tick ?? 0, correct: flash?.isCorrect ?? true)
+        let identity = Signature(plan: next, flash: next.fading ? nil : (mode == .react && !steno ? flash : nil),
+          legends: legends, generation: generation, colors: colors)
+        if signature != identity {
+          signature = identity; plan = next
+          startedAt = next.duration > 0 ? ProcessInfo.processInfo.systemUptime : nil
+          progress = next.duration > 0 ? 0 : 1
+        }
+        guard let start = startedAt, next.duration > 0 else {
+          guard !Task.isCancelled else { return }
+          onComplete(); return
+        }
+        while !Task.isCancelled {
+          let elapsed = ProcessInfo.processInfo.systemUptime - start
+          progress = WebsiteKeymapAnimationState.progress(elapsed: elapsed)
+          if elapsed >= 0.25 {
+            guard !Task.isCancelled else { return }
+            state.complete()
+            plan = state.update(mode: mode, steno: steno, matches: matches, tick: 0, correct: true)
+            startedAt = nil; progress = 1
+            signature = Signature(plan: plan, flash: nil, legends: legends, generation: generation, colors: colors)
+            onComplete(); return
+          }
+          try? await Task.sleep(for: .seconds(min(1.0 / 60, 0.25 - elapsed)))
+        }
       }
   }
 }

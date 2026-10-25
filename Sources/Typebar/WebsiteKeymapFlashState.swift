@@ -12,12 +12,17 @@ struct WebsiteKeymapFlashState {
     let units: [UInt16]
     let tick: Int
     let isCorrect: Bool
+    let identity: UInt64
   }
   private(set) var entries: [[UInt16]: Entry] = [:]
+  private var identities: [[UInt16]: UInt64] = [:]
+  private var nextIdentity: UInt64 = 0
 
   mutating func receive(_ events: [WebsiteKeymapInputEvent]) {
     for event in events {
       let key = event.units.isEmpty ? [UInt16(32)] : event.units
+      nextIdentity &+= 1
+      identities[key] = nextIdentity
       entries[key] = .init(tick: (entries[key]?.tick ?? 0) + 1,
         isCorrect: event.isCorrect)
     }
@@ -25,13 +30,15 @@ struct WebsiteKeymapFlashState {
 
   func first(for legends: [[UInt16]]) -> Selection? {
     for legend in legends {
-      if let entry = entries[legend] { return .init(units: legend, tick: entry.tick, isCorrect: entry.isCorrect) }
+      if let entry = entries[legend] {
+        return .init(units: legend, tick: entry.tick, isCorrect: entry.isCorrect, identity: identities[legend] ?? 0)
+      }
     }
     return nil
   }
 
   mutating func complete(legends: [[UInt16]]) {
-    for legend in legends { entries.removeValue(forKey: legend) }
+    for legend in legends { entries.removeValue(forKey: legend); identities.removeValue(forKey: legend) }
   }
 }
 
@@ -47,8 +54,9 @@ final class WebsiteKeymapFeedbackStore {
     state.receive(events)
   }
 
-  func complete(legends: [[UInt16]], generation expected: UInt64) {
-    guard generation == expected else { return }
+  func complete(legends: [[UInt16]], generation expected: UInt64, selection: WebsiteKeymapFlashState.Selection?) {
+    guard generation == expected, state.first(for: legends) == selection,
+      legends.contains(where: { state.entries[$0] != nil }) else { return }
     state.complete(legends: legends)
   }
 
