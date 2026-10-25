@@ -5,7 +5,8 @@ enum VirtualKeyboardOutputPolicy {
   static func output(
     for key: KeyboardGuideKey, shift: Bool, option: Bool
   ) -> String? {
-    if key.id == "space" {
+    if key.id == "space" || key.label == "空格", key.characters.contains(" ") {
+      if option, let layer = shift ? key.shiftedOptionLabel : key.optionLabel { return layer }
       if shift, let shiftedLabel = key.shiftedLabel { return shiftedLabel }
       return " "
     }
@@ -49,6 +50,7 @@ enum VirtualKeyboardVisibleLegend {
 struct VirtualKeyboard: View {
   let layout: KeyboardLayout
   let overrideRows: [[KeyboardGuideKey]]?
+  var overrideThumbKeys: [KeyboardGuideKey]? = nil
   let nextCharacter: Character?
   let accent: Color
   let panel: Color
@@ -87,7 +89,7 @@ struct VirtualKeyboard: View {
           HStack(spacing: 5) {
             modifierButton("⇧", active: shift) { shift.toggle() }
             modifierButton("⌥", active: option) { option.toggle() }
-            ForEach(Array(KeyboardGuideModel.bottomRow(for: .minimal, layout: layout).enumerated()),
+            ForEach(Array(KeyboardGuideModel.bottomRow(for: .minimal, layout: layout, thumbKeys: overrideThumbKeys).enumerated()),
               id: \.element.id) { columnIndex, key in
               keyButton(key, row: nil, column: columnIndex)
             }

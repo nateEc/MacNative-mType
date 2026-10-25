@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## 完整配置镜像键盘（2026-10-26，起点 b2087576）
+
+CFG-MIRROR-KEYBOARD-01：实际 mirrorLayoutKeys 对五行分别镜像前 11／10／10／10／10 个键，所有变体整体移动；输入与视觉状态各自对当前布局应用此转换。原生完整配置却先按普通布局映射，再按 ASCII 字符替换，高亮也替换正文而不移动键帽。隐藏生产页有效 RED 为 QWERTY／Dvorak 物理 A 均得到 l，实际分别应为分号／s（1 项 2 断言，2.745 秒）。现物理输入、视觉键帽和完整逻辑键值反查读取镜像位置；完整配置取消二次正文替换，旧偏好路径不改。No Quit 下当帧切换显式视觉布局／同步的实际 Shift 事件保持同一尝试。
+
+新增只读 check-source-mirrored-keyboard.mjs 执行固定参考的真实 mirrorLayoutKeys、getCharFromEvent 与 layoutKeyToKeycode，遍历 239 个已独立编写布局的四层，共 46,060 组输入／键帽／反查记录，并检查参考提交和洁净状态。首轮只发现 AFNOR 的两个特殊空格键帽层遗漏，已补齐；Prsten 移动拇指空格另有虚拟输出有效 RED，现按载荷识别，辅助标签跟随移动后的键帽。现有 Shift 源码驱动增加 --mirror，另外 3,600 组记录核对实际 keydown 与 ShiftTracker。专项 12 项全部通过、零失败／跳过（39.276 秒）。
+
+上述四层源记录固定 caps=false；原生 Caps Lock 的仿真差异仍开放。源 layout_mirror 初始化默认布局分支有 const 重赋值问题，本批生产页用显式 QWERTY／Dvorak，不宣称完整初始化一致。没有把数据层键帽比较冒充全部样式的实际像素验收，也没有复制参考源码或资产到生产资源。实体输入源、全部样式与 IME 组合继续待验。
+
+相关回归 954 项全部通过、零失败／跳过（319.764 秒），涵盖配置、输入、键盘、Layout Fluid、镜像及三个代表性的组合／混合方向／窄窗口用例；不是整仓 Native Rewrite Gate。源码专项另外兼容现有 CI 的 TYPEBAR_LAYOUT_AUDIT_REFERENCE 路径变量，保持参考洁净及提交校验。参考行为审计通过（47 direct／119 native symbols／17 supporting），人工表结构通过（1,363 场景，不等于实体验收）。日志为 /tmp/typebar-mirror-{red,focused,focused-final,integration,broad,ci-env,reference,package}.log；前两次 focused 分别保留 AFNOR 键帽与移动空格的失配证据。
+
+仅使用 CI 现有参考路径变量、移除 TYPEBAR_REFERENCE_ROOT 后，专项 10 项全部通过、零失败／跳过（39.796 秒），包含全部 46,060 组镜像样本及普通／镜像各 3,600 组 Shift 样本。最终 Debug 打包、签名、资源边界及固定参考原创性检查通过，未启动主程序。未改 CI、通知或主分支。
+
 ## 当前 Opposite Shift 判定（2026-10-26，起点 5a20b91d）
 
 CFG-OPPOSITE-SHIFT-CONTEXT-01：实际 keydown.handleOppositeShift 在 keymap 且非 overrideSync 时反查当前视觉布局的完整 event.key；其余模式用 event.code 的物理位置。ShiftTracker 的 off／无 Shift／未知位置均允许，双 Shift 与两手共用位置按集合判断。完整配置原生页面却在 Layout Fluid 中始终返回 system；隐藏生产页的物理 P 配左 Shift，在视觉 Dvorak 中应拒绝却放行，切换同帧及等待一帧后均失败（1 项 3 断言，2.386 秒）。修复移除该特判，并以单个只读上下文在按键交付时取得模式和视觉映射，避免分别读取旧帧字段；控件退役清理提供器。旧偏好路径保留自身的物理／自定义回退。

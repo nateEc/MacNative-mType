@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-MIRROR-KEYBOARD-01 | 完整配置镜像输入与视觉布局 | `utils/key-converter.ts`, `test/layout-emulator.ts`, `states/test.ts` | PromptDomain, PreferencesDomain | 按布局五行前缀镜像所有层，物理输入、键帽及反查共用位置关系；覆盖 239 布局的 46,060 组源码记录，另有 3,600 组镜像 Shift 源码记录与隐藏生产页事件。Caps Lock、全部样式和实体 IME 组合仍待处理／验收。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-OPPOSITE-SHIFT-CONTEXT-01 | 当前视觉键盘的 Opposite Shift 判定 | `input/handlers/keydown.ts`, `test/shift-tracker.ts`, `utils/key-converter.ts`, `constants/keys.ts` | PromptDomain, PreferencesDomain | 完整配置按键即时读取模式与视觉映射，移除 Layout Fluid 的物理比较特判；空格允许双手，完整逻辑键值及 UTF-16 精确反查。3,600 组实际源码对照；系统输入源、镜像与全部布局／IME 组合仍待扩验。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

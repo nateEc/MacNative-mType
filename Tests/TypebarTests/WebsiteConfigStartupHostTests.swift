@@ -363,6 +363,48 @@ import XCTest
     XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
   }
 
+  func testPublishedMirrorShiftComparisonUsesMirroredVisualLayoutAndSyncPhysicalSide() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"layout":"qwerty","funbox":["layout_mirror","no_quit"],"oppositeShiftMode":"keymap"}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID && f.inputs().first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.inputs().first), attempt = f.state.page.state.session.automaticInputAttemptID
+    input.onInsert("x", false)
+    try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange }
+    try await Task.sleep(for: .milliseconds(20)); f.host.layoutSubtreeIfNeeded()
+    input.flagsChanged(with: try XCTUnwrap(NSEvent.keyEvent(with: .flagsChanged, location: .zero, modifierFlags: [.shift], timestamp: 0,
+      windowNumber: f.window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 56)))
+    let p = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0,
+      windowNumber: f.window.windowNumber, context: nil, characters: "P", charactersIgnoringModifiers: "p", isARepeat: false, keyCode: 35))
+    var flags: [Bool] = [], texts: [String] = []
+    input.onInsert = { texts.append($0); flags.append($1) }
+    for (layout, expected) in [(KeyboardGuideLayoutCommandTarget.builtIn(.ansiDvorak), false), (.builtIn(.ansiQwerty), true), (.inputSync, false)] {
+      try await workflow.editAndBegin(.keymap(.layout(layout)), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+      input.keyDown(with: p); XCTAssertEqual(flags.last, expected)
+    }
+    XCTAssertEqual(flags.count, 3); XCTAssertEqual(texts, ["Q", "Q", "Q"])
+    XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt); XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testPublishedMirrorUsesTheSelectedPhysicalLayoutRatherThanASCIISubstitution() async throws {
+    for (layout, expected) in [("qwerty", ";"), ("dvorak", "s")] {
+      let f = try Fixture(saved: true, json: "{\"mode\":\"words\",\"words\":10,\"layout\":\"\(layout)\",\"funbox\":[\"layout_mirror\"]}")
+      defer { f.close() }
+      f.state.accountReady = true
+      try await f.waitAsync { f.state.page.state.presentation != nil && f.inputs().first?.acceptsTextInput == true }
+      let input = try XCTUnwrap(f.inputs().first), attempt = f.state.page.state.session.automaticInputAttemptID
+      input.keyDown(with: try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+        windowNumber: f.window.windowNumber, context: nil, characters: "a", charactersIgnoringModifiers: "a", isARepeat: false, keyCode: 0)))
+      XCTAssertEqual(f.state.page.state.session.typed, expected, layout)
+      XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+      XCTAssertFalse(f.window.isVisible)
+    }
+  }
+
   func testLayoutFluidOppositeShiftUsesCurrentVisualLayoutAndModeWithoutWaitingForAFrame() async throws {
     let f = try Fixture(saved: nil); defer { f.close() }
     f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }

@@ -818,6 +818,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
 enum KeyboardInputMapping: Equatable {
   case system
   case builtIn(KeyboardLayout)
+  case mirrored(KeyboardLayout)
   case custom(CustomKeyboardGuideLayout)
 }
 
@@ -1215,6 +1216,17 @@ struct KeyboardGuideKey: Identifiable, Equatable {
   let shiftedOptionLabel: String?
   let preservesDynamicBaseCase: Bool
 
+  /// Retain physical identity/geometry while moving all authored legend layers.
+  func replacingLegends(with key: Self) -> Self {
+    Self(position: self, legends: key)
+  }
+  private init(position: Self, legends: Self) {
+    id = position.id; width = position.width
+    label = legends.label; characters = legends.characters; shiftedLabel = legends.shiftedLabel
+    optionLabel = legends.optionLabel; shiftedOptionLabel = legends.shiftedOptionLabel
+    preservesDynamicBaseCase = legends.preservesDynamicBaseCase
+  }
+
   init(
     _ id: String,
     label: String,
@@ -1330,6 +1342,22 @@ enum OfficialUrduPhoneticKeymap {
 }
 
 enum KeyboardGuideModel {
+  static func highlightedLabel(for id: String?, rows: [[KeyboardGuideKey]], thumbs: [KeyboardGuideKey] = []) -> String? {
+    if let key = (rows.flatMap { $0 } + thumbs).first(where: { $0.id == id }) { return key.label }
+    return id == "space" ? "空格" : nil
+  }
+  static func mirroredRows(for layout: KeyboardLayout) -> [[KeyboardGuideKey]] {
+    mirrorRows(rows(for: layout), prefixLengths: [11, 10, 10, 10])
+  }
+  static func mirroredThumbKeys(for layout: KeyboardLayout) -> [KeyboardGuideKey] {
+    mirrorRows([typingThumbKeys(for: layout)], prefixLengths: [10])[0]
+  }
+  private static func mirrorRows(_ rows: [[KeyboardGuideKey]], prefixLengths: [Int]) -> [[KeyboardGuideKey]] {
+    zip(rows, prefixLengths).map { row, length in
+      let limit = min(length, row.count)
+      return row.indices.map { index in row[index].replacingLegends(with: row[index < limit ? limit - 1 - index : index]) }
+    }
+  }
   static func rows(for layout: KeyboardLayout) -> [[KeyboardGuideKey]] {
     let sourceRows: [[KeyboardGuideKey]] = switch layout {
     case .ansiQwerty:
@@ -4317,7 +4345,10 @@ enum KeyboardGuideModel {
     style: KeyboardGuideStyle = .staggered
   ) -> String? {
     guard let character else { return nil }
-    if character == " " { return style.isSteno ? "steno-space" : "space" }
+    if character == " " {
+      if style.isSteno { return "steno-space" }
+      return rows.flatMap { $0 }.first(where: { $0.characters.contains(" ") })?.id ?? "space"
+    }
     let keys = style.isSteno ? stenoRows().flatMap { $0 } : rows.flatMap { $0 }
     let normalized = Character(String(character).lowercased())
     return keys.first(where: { $0.exactlyProducesCaseSensitive(character) })?.id
@@ -4355,12 +4386,14 @@ enum KeyboardGuideModel {
     keysMode: KeyboardGuideKeysMode,
     mode: KeyboardGuideMode,
     nextCharacter: Character?,
-    style: KeyboardGuideStyle = .staggered
+    style: KeyboardGuideStyle = .staggered,
+    sourceLayout: KeyboardLayout? = nil
   ) -> [[KeyboardGuideKey]] {
     if style.isSteno { return stenoRows() }
     guard rows.count == 4 else { return rows }
-    let showsNumberRow = keysMode == .minimalNumberRow || keysMode == .full
-      || (mode == .next && nextCharacter.map { "0123456789".contains($0) } == true)
+    let showsNumberRow = sourceLayout.map { keysMode.showsNumberRow(for: $0, mode: mode, nextCharacter: nextCharacter) }
+      ?? (keysMode == .minimalNumberRow || keysMode == .full
+        || (mode == .next && nextCharacter.map { "0123456789".contains($0) } == true))
     let contentRows = showsNumberRow ? rows : Array(rows.dropFirst())
     guard keysMode == .full else { return contentRows }
 
@@ -4378,10 +4411,11 @@ enum KeyboardGuideModel {
   static func bottomRow(
     for keysMode: KeyboardGuideKeysMode,
     layout: KeyboardLayout? = nil,
-    style: KeyboardGuideStyle = .staggered
+    style: KeyboardGuideStyle = .staggered,
+    thumbKeys overrideThumbKeys: [KeyboardGuideKey]? = nil
   ) -> [KeyboardGuideKey] {
     if style.isSteno { return [] }
-    let thumbKeys = typingThumbKeys(for: layout)
+    let thumbKeys = overrideThumbKeys ?? typingThumbKeys(for: layout)
     if keysMode == .full {
       return [
         nonTypingKey("left-control", label: "⌃", width: 34),
@@ -4399,6 +4433,9 @@ enum KeyboardGuideModel {
   private static func typingThumbKeys(for layout: KeyboardLayout?) -> [KeyboardGuideKey] {
     let space = KeyboardGuideKey("space", label: "空格", characters: " ", width: 120)
     switch layout {
+    case .frenchAzertyAFNOR:
+      return [KeyboardGuideKey("space", label: "空格", characters: " \u{00A0}\u{202F}", width: 170,
+        optionLabel: "\u{00A0}", shiftedOptionLabel: "\u{202F}")]
     case .beaklZi:
       return [KeyboardGuideKey("thumb-0", label: "I", characters: "iI", width: 70), space]
     case .maltron, .rsthd:
@@ -4602,6 +4639,7 @@ struct KeyboardGuide: View {
   let panel: Color
   let layout: KeyboardLayout
   let overrideRows: [[KeyboardGuideKey]]?
+  var overrideThumbKeys: [KeyboardGuideKey]? = nil
   let mirrored: Bool
   let scale: Double
   let legendStyle: KeyboardGuideLegendStyle
@@ -4623,7 +4661,7 @@ struct KeyboardGuide: View {
     let character = mode.highlightedCharacter(nextCharacter: expected, recentCharacter: nil)
     if let overrideRows {
       return KeyboardGuideModel.highlightedKey(
-        for: character, rows: overrideRows, style: style)
+        for: character, rows: overrideRows + (overrideThumbKeys.map { [$0] } ?? []), style: style)
     }
     return KeyboardGuideModel.highlightedKey(for: character, layout: layout, style: style)
   }
@@ -4631,7 +4669,7 @@ struct KeyboardGuide: View {
     if let overrideRows {
       return KeyboardGuideModel.displayRows(
         for: overrideRows, keysMode: keysMode, mode: mode,
-        nextCharacter: nextCharacter, style: style)
+        nextCharacter: nextCharacter, style: style, sourceLayout: overrideThumbKeys != nil ? layout : nil)
     }
     return KeyboardGuideModel.displayRows(
       for: layout, keysMode: keysMode, mode: mode, nextCharacter: nextCharacter, style: style)
@@ -4644,7 +4682,7 @@ struct KeyboardGuide: View {
       }
       if !style.isSteno {
         keyRow(
-          KeyboardGuideModel.bottomRow(for: keysMode, layout: layout, style: style),
+          KeyboardGuideModel.bottomRow(for: keysMode, layout: layout, style: style, thumbKeys: overrideThumbKeys),
           rowIndex: guideRows.count)
       }
     }
@@ -4660,7 +4698,7 @@ struct KeyboardGuide: View {
       }
       if let overrideRows {
         flashedKey = KeyboardGuideModel.highlightedKey(
-          for: feedback.character, rows: overrideRows, style: style)
+          for: feedback.character, rows: overrideRows + (overrideThumbKeys.map { [$0] } ?? []), style: style)
       } else {
         flashedKey = KeyboardGuideModel.highlightedKey(
           for: feedback.character, layout: layout, style: style)
@@ -4682,10 +4720,7 @@ struct KeyboardGuide: View {
   }
 
   private var highlightedLabel: String? {
-    if highlightedKey == "space" { return "空格" }
-    return baseGuideRows.flatMap { $0 }.first(where: {
-      $0.id == highlightedKey
-    })?.label
+    KeyboardGuideModel.highlightedLabel(for: highlightedKey, rows: baseGuideRows, thumbs: overrideThumbKeys ?? [])
   }
 
   @ViewBuilder

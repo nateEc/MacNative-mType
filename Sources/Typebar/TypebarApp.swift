@@ -1600,7 +1600,8 @@ private struct ContentView: View {
               feedback: keyboardGuideFeedback, accent: activeTheme.accent,
               panel: activeTheme.panel, layout: effectiveKeyboardLayout,
               overrideRows: effectiveKeyboardGuideOverrideRows,
-              mirrored: session.configuration.modifiers.contains(.mirrorKeyboard),
+              overrideThumbKeys: publishedMirrorThumbKeys,
+              mirrored: committedPracticeDraft == nil && session.configuration.modifiers.contains(.mirrorKeyboard),
               scale: practiceKeyboardGuide.scale, legendStyle: practiceKeyboardGuide.legendStyle,
               keysMode: practiceKeyboardGuide.keysMode,
               style: practiceKeyboardGuide.style,
@@ -1610,6 +1611,7 @@ private struct ContentView: View {
             VirtualKeyboard(
               layout: effectiveKeyboardLayout,
               overrideRows: effectiveKeyboardGuideOverrideRows,
+              overrideThumbKeys: publishedMirrorThumbKeys,
               nextCharacter: session.nextExpectedCharacter,
               accent: activeTheme.accent, panel: activeTheme.panel,
               allowsNewline: session.acceptsNewlineInput,
@@ -3442,7 +3444,8 @@ private struct ContentView: View {
       keyboardInputMapping: effectiveKeyboardInputMapping,
       keyboardInputMappingProvider: { [pageSessionStore] in
         guard pageSessionStore.ownsConfigurationSelection, pageSessionStore.state.practice != nil else { return nil }
-        return pageSessionStore.state.presentation?.publication.draft.keyboardTypography.inputLayout.inputMapping(for: nil)
+        guard let draft = pageSessionStore.state.presentation?.publication.draft else { return nil }
+        return draft.keyboardTypography.inputMapping(mirrored: draft.generators.requestedModifiers.contains(.mirrorKeyboard))
       },
       oppositeShiftKeymap: effectiveOppositeShiftKeymap,
       oppositeShiftMode: committedPracticeDraft?.inputRules.rules.oppositeShiftMode ?? settings.oppositeShiftMode,
@@ -3450,7 +3453,7 @@ private struct ContentView: View {
         guard pageSessionStore.ownsConfigurationSelection, pageSessionStore.state.practice != nil,
           let draft = pageSessionStore.state.presentation?.publication.draft else { return nil }
         return .init(mode: draft.inputRules.rules.oppositeShiftMode,
-          keymap: draft.keyboardTypography.guideLayout.map(KeyboardInputMapping.builtIn) ?? .system)
+          keymap: draft.keyboardTypography.shiftKeymap(mirrored: draft.generators.requestedModifiers.contains(.mirrorKeyboard)))
       },
       mapsArrowKeysToInput: session.configuration.modifiers.contains(.arrowStream),
       mapsArrowLetterKeysToInput: WebsiteArrowChart.isSelected(session.configuration),
@@ -4086,6 +4089,9 @@ private struct ContentView: View {
   }
 
   private var effectiveKeyboardGuideOverrideRows: [[KeyboardGuideKey]]? {
+    if let draft = committedPracticeDraft, draft.generators.requestedModifiers.contains(.mirrorKeyboard) {
+      return KeyboardGuideModel.mirroredRows(for: effectiveKeyboardLayout)
+    }
     guard practiceKeyboardGuide.allowsLegacyRows else { return nil }
     guard !session.configuration.modifiers.contains(.layoutFluid) else { return nil }
     if settings.keyboardGuideLayoutSource.usesCustomRows(
@@ -4102,10 +4108,14 @@ private struct ContentView: View {
     return nil
   }
 
+  private var publishedMirrorThumbKeys: [KeyboardGuideKey]? {
+    guard let draft = committedPracticeDraft, draft.generators.requestedModifiers.contains(.mirrorKeyboard) else { return nil }
+    return KeyboardGuideModel.mirroredThumbKeys(for: effectiveKeyboardLayout)
+  }
   /// Full profiles receive each source setter independently, including a
   /// physical-layout refusal under No Quit. Legacy mode keeps its old policy.
   private var effectiveKeyboardInputMapping: KeyboardInputMapping {
-    if let draft = committedPracticeDraft { return draft.keyboardTypography.inputLayout.inputMapping(for: nil) }
+    if let draft = committedPracticeDraft { return draft.keyboardTypography.inputMapping(mirrored: draft.generators.requestedModifiers.contains(.mirrorKeyboard)) }
     guard !session.configuration.modifiers.contains(.layoutFluid) else {
       return .builtIn(effectiveKeyboardLayout)
     }
@@ -4114,7 +4124,7 @@ private struct ContentView: View {
 
   private var effectiveOppositeShiftKeymap: KeyboardInputMapping {
     if let draft = committedPracticeDraft {
-      return draft.keyboardTypography.guideLayout.map(KeyboardInputMapping.builtIn) ?? .system
+      return draft.keyboardTypography.shiftKeymap(mirrored: draft.generators.requestedModifiers.contains(.mirrorKeyboard))
     }
     return settings.keyboardGuideLayoutSource.oppositeShiftMapping(selectedLayout: settings.keyboardLayout,
       customLayout: settings.selectedCustomKeyboardLayout, layoutFluid: session.configuration.modifiers.contains(.layoutFluid))
@@ -4469,7 +4479,7 @@ private struct ContentView: View {
   }
 
   private func effectiveInsertedText(_ text: String) -> String {
-    session.configuration.modifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text
+    committedPracticeDraft == nil && session.configuration.modifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text
   }
 
   private func synchronizeLiveInputRules() {

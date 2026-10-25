@@ -26,6 +26,15 @@ struct WebsiteConfigNativeKeyboardTypography {
   /// Source ch count, including fractions; nil is fluid. Not legacy UI columns.
   let columns: Double?
 
+  func inputMapping(mirrored: Bool) -> KeyboardInputMapping {
+    if mirrored, let layout = inputLayout.emulatedLayout { return .mirrored(layout) }
+    return inputLayout.inputMapping(for: nil)
+  }
+  func shiftKeymap(mirrored: Bool) -> KeyboardInputMapping {
+    guard let guideLayout else { return .system }
+    return mirrored ? .mirrored(guideLayout) : .builtIn(guideLayout)
+  }
+
   /// The caller supplies the native rem base explicitly. The source computes
   /// rem against its root font, not a hard-coded browser/device assumption.
   init(runtime: [String: WebsiteConfigValue], pointsPerRem: Double) throws {

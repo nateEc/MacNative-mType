@@ -4,7 +4,14 @@ import XCTest
 
 @MainActor final class OppositeShiftKeymapSourceTests: XCTestCase {
   func testActualPinnedKeydownConverterAndShiftTrackerAcrossModesAndLayouts() throws {
-    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned reference") }
+    try checkPinnedShiftTracker(mirrored: false)
+  }
+  func testActualPinnedMirroredVisualKeymapsUseTheirReversedPhysicalSides() throws {
+    try checkPinnedShiftTracker(mirrored: true)
+  }
+  private func checkPinnedShiftTracker(mirrored: Bool) throws {
+    let environment = ProcessInfo.processInfo.environment
+    guard let reference = environment["TYPEBAR_REFERENCE_ROOT"] ?? environment["TYPEBAR_LAYOUT_AUDIT_REFERENCE"] else { throw XCTSkip("Requires pinned reference") }
     struct Fixture: Decodable {
       let mode: String, guide: String, macCode: UInt16, key: String, left: Bool, right: Bool, correct: Bool
     }
@@ -12,6 +19,7 @@ import XCTest
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-opposite-shift.mjs").path, reference]
+      + (mirrored ? ["--mirror"] : [])
     process.standardOutput = pipe; try process.run()
     let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus, 0)
@@ -29,6 +37,7 @@ import XCTest
       case "azerty": view.oppositeShiftKeymap = .builtIn(.frenchAzerty)
       default: return XCTFail("Unexpected source guide")
       }
+      if mirrored, case .builtIn(let layout) = view.oppositeShiftKeymap { view.oppositeShiftKeymap = .mirrored(layout) }
       for code: UInt16 in (f.left ? [56] : []) + (f.right ? [60] : []) {
         view.flagsChanged(with: try XCTUnwrap(NSEvent.keyEvent(with: .flagsChanged, location: .zero,
           modifierFlags: [.shift], timestamp: 0, windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)))

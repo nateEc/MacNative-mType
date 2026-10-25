@@ -57,6 +57,8 @@ enum KeyboardLayoutEmulator {
       layers = nil
     case let .builtIn(layout):
       layers = keys(for: layout)[keyCode]
+    case let .mirrored(layout):
+      layers = mirroredKeys(for: layout)[keyCode]
     case let .custom(layout):
       layers = keys(for: layout)[keyCode]
     }
@@ -103,6 +105,8 @@ enum KeyboardLayoutEmulator {
       nil
     case let .builtIn(layout):
       keyCode(forOutput: output, layout: layout)
+    case let .mirrored(layout):
+      keyCode(forOutput: output, keys: mirroredKeys(for: layout), searchOrder: sourcePhysicalRows(for: layout).flatMap { $0 } + [49])
     case let .custom(layout):
       keyCode(forOutput: output, keys: keys(for: layout))
     }
@@ -112,14 +116,14 @@ enum KeyboardLayoutEmulator {
     keyCode(forOutput: String(character), keys: keys)
   }
 
-  private static func keyCode(forOutput output: String, keys: [UInt16: KeyLayers]) -> UInt16? {
+  private static func keyCode(forOutput output: String, keys: [UInt16: KeyLayers], searchOrder: [UInt16] = layoutSearchOrder) -> UInt16? {
     func matches(_ keyCode: UInt16) -> Bool {
       guard let layers = keys[keyCode] else { return false }
       return [layers.normal, layers.shifted, layers.option, layers.shiftedOption]
         .compactMap { $0 }
         .contains { InputTextIdentity.matches($0, output) }
     }
-    if let first = layoutSearchOrder.first(where: matches) { return first }
+    if let first = searchOrder.first(where: matches) { return first }
     return keys.keys.filter { !layoutSearchOrderSet.contains($0) }.sorted().first(where: matches)
   }
 
@@ -139,6 +143,31 @@ enum KeyboardLayoutEmulator {
         return (keyCode, layers)
       }
     })
+  }
+
+  private static func sourcePhysicalRows(for layout: KeyboardLayout) -> [[UInt16]] {
+    let rows = KeyboardGuideModel.rows(for: layout)
+    let iso = rows[3].count == physicalRows[3].count + 1
+    return iso ? [physicalRows[0], Array(physicalRows[1].dropLast()), physicalRows[2] + [42], [10] + physicalRows[3]] : physicalRows
+  }
+  private static func mirroredKeys(for layout: KeyboardLayout) -> [UInt16: KeyLayers] {
+    let original = keys(for: layout)
+    var result = original
+    for (row, length) in zip(sourcePhysicalRows(for: layout), [11, 10, 10, 10]) {
+      let limit = min(row.count, length)
+      for index in 0..<limit { result[row[index]] = original[row[limit - 1 - index]] }
+    }
+    // The source reverses the entire small thumb row as well; its first key
+    // is the one addressed by the physical Space event.
+    let thumbs = KeyboardGuideModel.mirroredThumbKeys(for: layout)
+    if let first = thumbs.first, thumbs.count > 1 {
+      func output(_ flags: NSEvent.ModifierFlags) -> String {
+        if first.characters == Set([Character(" ")]), first.label == "空格" { return " " }
+        return first.legend(style: .dynamic, modifierFlags: flags, capsLockEnabled: false)
+      }
+      result[49] = .init(normal: output([]), shifted: output(.shift), option: output(.option), shiftedOption: output([.shift, .option]))
+    }
+    return result
   }
 
   private static func casePair(for character: Character) -> KeyLayers {
