@@ -1,5 +1,15 @@
 # 阈值源状态与迁移契约
 
+## 完整配置的原生在线正文（2026-10-25，起点 1ea3f3bc）
+
+CFG-EXTERNAL-CONTENT-01 按固定源码 words-generator 的 getFunboxSection、Poetry getPoem 及 Wikipedia getSection 区分失败：Poetry 返回 false／undefined 时普通保存 setter 移除来源并使本次生成失败；解码成功但没有词并非 false，百科拒绝也不请求来源切换。自动移除不等同于 UI setFunbox 的选择记忆恢复，不能把 Memory 已激活的 showAllLines 还原为其旧值。
+
+先行真实工作流测试以原生在线内容读取器导入四词百科配置，失败于 externalNotProvided；加载器原先未进入完整配置工作流与重开控制器。现由协调器持有三参数加载器，并在 Funbox／Lazy 激活后传入实际显示预算，保留原两参数显式测试提供器的覆盖优先级。内容桥接复用已有原生 fetch／解析服务，短段落逐段补齐，保留已获取尾部与无空格边界；取消不转换为 Poetry false。初始化校正保存推进现有待应用能力，Wikipedia 失败保留来源、三次预算及原记录的继续能力。下一轮读取新文，重复复用已有文本；页面交付后开启原生续段，来源失败仅经已发布失败会话的专用配置入口校正，不修改旧偏好。异步值和错误交付前复核页面／请求／文件，页面续段另以尝试身份与 acceptsAttemptCallback 隔离退休回调。
+
+证据：WebsiteConfigExternalContentTests 覆盖分段预算、尾部、无空格边界、nil／空段落、错误来源与取消；WebsiteConfigImportWorkflowTests 覆盖真实导入／下一轮／重复、Memory 校正保存、百科失败恢复及竞争记录；WebsiteConfigStartupHostTests 经实际 practiceContent 验证冷恢复与后续取词、诗歌源失败校正和迟到请求隔离。全部夹具原创，不请求真实网络，不显示窗口或启动 Typebar。该范围不证明所有文章、语言、趣味模式组合、实体键盘／IME 或可见交互等价，相关条目继续部分实现。
+
+本批验证：先行导入反例 1 项失败于 externalNotProvided；新增定向 9 项及页面接线后的 11 项分别通过。1035 项广回归中唯一失败是新增恢复用例误用不支持 Memory 的 time 模式，其余 1034 项通过，零跳过。该测试改为合法 words 模式并断言真实失败会话后，最终相关 170 项执行零失败（169 通过，1 项因命令未带参考路径跳过）；跳过的固定源码对照随后携带参考路径单独补跑，1 项通过、零跳过。日志为 `/tmp/typebar-external-{red,focused,host,broad,final,reference-recheck}.log`。未据此宣称全量门禁通过，既有隐藏轮滚动验收缺口仍开放。
+
 ## 有效原生冷记录的待初始化接受（2026-10-25，起点 b065774e）
 
 固定 loadFromLocalStorage 读取已验证配置后，await applyConfig，再执行 saveFullConfigToLocalStorage(true) 和 loadDone；测试页 language 订阅者发起的初始化仍不被等待。沿既有失败写序探针增加实际冷调用方的延后成功／失败两组，共 15 组。实际生命周期、事件总线、setter、持久函数和测试页订阅者执行；已验证存储值的读取、浏览器 I/O、restart／最终初始化、网络及通知仍为自有端点。冷场景确认先保存并 loadDone，再完成或失败初始化，既不发导入成功提示，也不调用远端保存；不将 loadDone 误记为成功通知。原 13 组导入失败边界保持独立。

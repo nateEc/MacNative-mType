@@ -4,6 +4,149 @@ import Observation
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testPublishedPoetryRecoveryRequiresFailureAndDoesNotRestoreMemorySelection() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines in
+        try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
+          showAllLines: allLines) { _, _ in
+          .init(source: source, title: "Owned", byline: nil, tokens: Array(repeating: "ab", count: 100), separator: " ")
+        }
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":201,"showAllLines":false,"funbox":["poetry","memory"]}"#,
+      systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let revision = try register.read().revision
+    do {
+      try await workflow.recoverFailedPoetry(replacing: publication, systemIsDark: false)
+      XCTFail("An automatic correction must not remove a healthy source")
+    } catch { XCTAssertEqual(error as? WebsiteConfigCommitCoordinatorError, .sessionNotReady) }
+    XCTAssertEqual(try register.read().revision, revision)
+    var failed = f.page.state
+    failed.session.insertBatch("ab "); failed.session.failLiveContentFetch(); f.page.replace(failed)
+    XCTAssertEqual(f.page.state.session.outcome, .failed)
+    try await workflow.recoverFailedPoetry(replacing: publication, systemIsDark: false)
+    let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertEqual(draft.projection.runtime["funbox"], .array([.string("memory")]))
+    XCTAssertTrue(draft.funboxMemory.entries.contains(.init(key: "showAllLines", value: .bool(false))))
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Correction not saved") }
+    XCTAssertEqual(saved["showAllLines"], .bool(true))
+    XCTAssertEqual(saved["funbox"], .array([.string("memory")]))
+    XCTAssertNil(f.page.state.practice?.external)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+  func testLatePoetryFailureCannotCorrectACompetingAcceptedProfile() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reply: CheckedContinuation<LivePracticeContent?, Never>?
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines in
+        try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
+          showAllLines: allLines) { _, _ in await withCheckedContinuation { reply = $0 } }
+      })
+    defer { workflow.stop(); reply?.resume(returning: nil) }
+    let pending = Task { try await workflow.apply(json: #"{"mode":"words","words":4,"funbox":["poetry"]}"#,
+      systemIsDark: false) }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while reply == nil && ContinuousClock.now < deadline { await Task.yield() }
+    guard let late = reply else { pending.cancel(); return XCTFail("External read did not suspend") }
+    reply = nil
+    try await f.workflow.apply(json: #"{"mode":"words","words":7,"funbox":["rot13"]}"#, systemIsDark: false)
+    let generation = f.page.state.session.generationState
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    late.resume(returning: nil)
+    do { _ = try await pending.value; XCTFail("Late failure corrected a newer profile") }
+    catch { XCTAssertEqual(error as? WebsiteConfigCommitCoordinatorError, .stale) }
+    XCTAssertEqual(f.page.state.session.generationState, generation)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 7)
+  }
+  func testPoetryFalseSavesOnlySourceRemovalAndPreservesActivatedMemorySettings() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines in
+        XCTAssertTrue(allLines, "The loader must see Memory's activated showAllLines")
+        return try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
+          showAllLines: allLines) { _, _ in reads += 1; return nil }
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4,"showAllLines":false,"funbox":["poetry","memory"]}"#,
+      systemIsDark: false)
+    XCTAssertEqual(reads, 1)
+    let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertEqual(draft.projection.runtime["funbox"], .array([.string("memory")]))
+    XCTAssertEqual(draft.projection.runtime["showAllLines"], .bool(true))
+    XCTAssertTrue(draft.funboxMemory.entries.contains(.init(key: "showAllLines", value: .bool(false))))
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else {
+      return XCTFail("Source removal was not saved")
+    }
+    XCTAssertEqual(saved["funbox"], .array([.string("memory")]))
+    XCTAssertEqual(saved["showAllLines"], .bool(true), "Automatic toggle must not restore selection memory")
+    XCTAssertNil(f.page.state.practice?.external)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+
+  func testWikipediaFailureKeepsSavedSourceAndUsesBoundedRetryBeforeRecovery() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reads = 0, available = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines in
+        try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
+          showAllLines: allLines) { _, _ in
+          reads += 1
+          return available ? .init(source: source, title: "Recovered", byline: nil,
+            tokens: ["ab", "cd", "ef", "gh"], separator: " ") : nil
+        }
+      })
+    defer { workflow.stop() }
+    do {
+      try await workflow.apply(json: #"{"mode":"words","words":4,"funbox":["wikipedia"]}"#, systemIsDark: false)
+      XCTFail("Failed source delivered")
+    } catch let error as WebsiteConfigSavedPreparationError {
+      guard case WebsiteConfigSessionBuildError.generationFailed = error.underlying else { return XCTFail("\(error)") }
+    }
+    XCTAssertEqual(reads, 3); XCTAssertNotNil(f.page.state.savedApplication)
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let before = try register.read()
+    guard case .available(let saved) = before.state else { return XCTFail("Accepted source lost") }
+    XCTAssertEqual(saved["funbox"], .array([.string("wikipedia")]))
+    available = true
+    try await workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertEqual(reads, 4); XCTAssertEqual(f.page.state.session.prompt, "ab cd ef gh")
+    XCTAssertEqual(try register.read().revision, before.revision)
+    XCTAssertNil(f.page.state.savedApplication)
+  }
+  func testExternalProviderSurvivesImportNextAndExplicitRepetitionWithoutLegacyWrites() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, config, allLines in
+        XCTAssertEqual(source, .encyclopedia); XCTAssertEqual(config.wordLimit, 4); XCTAssertTrue(allLines)
+        reads += 1
+        return .init(source: source, initial: .init(text: reads == 1 ? "ab cd ef gh" : "ij kl mn op",
+          noSpaceBoundarySource: nil), continuation: nil, attribution: "Owned article \(reads)")
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4,"showAllLines":true,"funbox":["wikipedia"]}"#,
+      systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.prompt, "ab cd ef gh")
+    XCTAssertEqual(f.page.state.practice?.external?.attribution, "Owned article 1")
+    let controller = try XCTUnwrap(f.page.restartController)
+    let first = f.page.state.session.automaticInputAttemptID
+    let repeated = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(repeated); XCTAssertEqual(reads, 1)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, first)
+    XCTAssertEqual(f.page.state.session.prompt, "ab cd ef gh")
+    let next = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(next); XCTAssertEqual(reads, 2)
+    XCTAssertEqual(f.page.state.session.prompt, "ij kl mn op")
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
   func testCancelledColdRestorationKeepsUnchangedRecordAndCanRecoverWithNewWorkflow() async throws {
     let f = try Fixture(); defer { f.close() }

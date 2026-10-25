@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-25 完整配置在线词源（CFG-EXTERNAL-CONTENT-01）：配置工作流、冷恢复及下一轮共用原生在线加载器，使用激活后的 showAllLines 准备不同段落并保留尾部；原题重复不重新拉取。Poetry false 通过普通保存 setter 移除 poetry，不恢复其他趣味模式的选择记忆；解码空段落与 Wikipedia 失败进入三次初始化预算，保留来源和恢复检查点。实际页面安装后开启续段，回调同时检查尝试身份和待应用状态，完整配置的源失败不写旧偏好。证据范围见迁移契约；公共服务持续可用、全部组合与实体输入仍未验收。
+
 2026-10-25 有效原生记录的冷恢复初始化（CFG-COLD-APPLICATION-01）：冷恢复也先接纳配置，再读取资源／正文；未变化记录保持原文件代次，自动校正在提供器读取前保存，失败／取消保留待初始化能力，继续或新工作流恢复不重放已完成写入。新增实际 loadFromLocalStorage 的延后成功／失败两组，与原 13 组共 15 组；原生先行反例及启动／双窗口回归见迁移契约。仅有效原生记录，不自动修复缺失／损坏／未来格式；完整浏览器冷存储协议及实体 UI／IME 仍未验收。
 
 2026-10-25 完整导入的已保存待初始化状态（CFG-IMPORT-FAILURE-ORDER-01）：沿 13 个实际源码阶段证据，合法 JSON 现在在读资源／正文前保存，页面持有独立待初始化能力并暂停旧输入；失败／取消保留记录，可继续准备或由新工作流冷恢复，晚到结果和竞争记录受版本约束。自动引语／语言／Lazy 校正推进保存检查点，继续不重放导入事件或离场。仍未覆盖源 setter 抛错后的部分运行状态、每次拒绝保存写序、活动完整导入和全部实体交互；不升格为完整导入全部等价，见迁移契约。
@@ -1891,6 +1893,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-EXTERNAL-CONTENT-01 | 完整配置的在线初始化、续段与源失败恢复 | `test/words-generator.ts`, `test/poetry.ts`, `test/wikipedia.ts`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：导入／冷恢复／下一轮使用原生在线加载器，保留段落尾部；重复保留原题。Poetry false 保存移除来源但不恢复选择记忆，空段落与百科错误保留来源并使用初始化预算。实际页面续段与迟到请求隔离纳入回归；全部组合、真实网络分布及实体键盘／IME 未验。 |
 | CFG-COLD-APPLICATION-01 | 有效原生记录的冷恢复与初始化失败 | `config/lifecycle.ts` 的 loadFromLocalStorage、`config/persistence.ts`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：有效原生冷记录进入待初始化能力，未变化保持文件代次；校正先保存，再读资源／正文。取消和失败可继续，双窗口不因无变化恢复而互相失效。15 组源阶段中的两组实际冷调用方、真实恢复及启动／双窗口回归见迁移契约。缺失／未知记录仍拒绝；浏览器冷存储全部边界、实体 UI／IME 未验。 |
 | CFG-IMPORT-FAILURE-ORDER-01 | 完整导入的失败保存边界 | `config/{lifecycle,setters,persistence}.ts`, `hooks/createEvent.ts`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：合法 JSON 在资源／正文前保存；待初始化期间暂停旧输入、保留记录及恢复能力，支持取消、新工作流冷恢复、竞争写入和晚到结果保护，自动校正保存后继续不重放。13 个导入源阶段与两组冷调用方、真实原生工作流证据见迁移契约。setter 抛错的部分运行状态、每次拒绝保存写序、活动完整导入及实体 UI／IME 未验；冷恢复范围另见 CFG-COLD-APPLICATION-01。 |
 | CFG-LAYOUTFLUID-LIST-EDITOR-01 | 完整配置的流动布局序列编辑 | `commandline/{lists,commandline-metadata,util}.ts`, `config/{metadata.tsx,setters.ts}`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：原生表单及命令面板 setCustomLayoutfluidCustom 输入、前检与 setter 去重；未启用只保存，已启用才重开并应用新首布局。No Quit 活动时拒绝且重要提示，重复值无另行重开；144 组源码阶段及真实表单／工作流证据见迁移契约。命令窗口版本与取消独立持有；全部组合与实体 UI／IME 未验。 |

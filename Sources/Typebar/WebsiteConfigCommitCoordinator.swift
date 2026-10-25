@@ -310,6 +310,7 @@ final class WebsiteConfigCommitCoordinator {
   private let router: PreferenceConfigurationSaveRouter
   private let register: WebsiteConfigFileRegister
   private let environment: () -> Environment?
+  private let externalLoader: WebsiteConfigSessionBuilder.ExternalLoader?
   private let identity = UUID()
   private var request = UUID()
   private var resourceAdmission = UUID()
@@ -320,8 +321,10 @@ final class WebsiteConfigCommitCoordinator {
   private var processing = false
 
   init(router: PreferenceConfigurationSaveRouter, register: WebsiteConfigFileRegister,
+    loadExternal: WebsiteConfigSessionBuilder.ExternalLoader? = nil,
     environment: @escaping () -> Environment?) {
     self.router = router; self.register = register; self.environment = environment
+    externalLoader = loadExternal
     publicationAuthority = .init(register: register)
   }
 
@@ -502,6 +505,10 @@ final class WebsiteConfigCommitCoordinator {
   /// new-attempt path. It is not permission to restart an immediate-only edit.
   func prepareEdit(key: String, value: WebsiteConfigValue, from source: Publication,
     testActive: Bool) throws -> Prepared {
+    try preparePublicationEdit(key: key, value: value, from: source, testActive: testActive, restoringFunboxMemory: true)
+  }
+  private func preparePublicationEdit(key: String, value: WebsiteConfigValue, from source: Publication,
+    testActive: Bool, restoringFunboxMemory: Bool) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     processing = true
     defer { processing = false }
@@ -518,7 +525,7 @@ final class WebsiteConfigCommitCoordinator {
     guard disk == base.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
     let draft: WebsiteConfigNativeDraft
     var funboxSelectionSaved: Bool?
-    if key == "funbox" {
+    if key == "funbox", restoringFunboxMemory {
       guard !testActive || !base.draft.generators.requestedModifiers.contains(.noQuit) else { throw WebsiteConfigNativeDraftError.rejectedEdit }
       let selection = try WebsiteConfigFunboxMemory.selecting(value, from: base.draft,
         pointsPerRem: context.pointsPerRem, context: context.context, testActive: testActive)
@@ -546,13 +553,23 @@ final class WebsiteConfigCommitCoordinator {
     refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> Prepared {
     try preparePageEdit(key: key, value: value, for: page, refreshingWith: source)
   }
+  func prepareFailedPoetrySource(for page: PracticePageSessionStore,
+    refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> Prepared {
+    guard page.state.session.outcome == .failed,
+      LivePracticeContentSource.selected(for: page.state.session.configuration) == .poetry,
+      case .array(let funboxes)? = page.state.presentation?.publication.draft.projection.runtime["funbox"],
+      funboxes.contains(.string("poetry")) else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
+    return try preparePageEdit(key: "funbox", value: .array(funboxes.filter { $0 != .string("poetry") }),
+      for: page, refreshingWith: source, restoringFunboxMemory: false)
+  }
   private func preparePageEdit(key: String, value: WebsiteConfigValue, for page: PracticePageSessionStore,
-    refreshingWith source: WebsiteConfigPracticeScopeSource?) throws -> Prepared {
+    refreshingWith source: WebsiteConfigPracticeScopeSource?, restoringFunboxMemory: Bool = true) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     guard page.state.configurationDeparture == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
     request = UUID()
     let capture = try page.captureGeneration(router: router)
-    var prepared = try prepareEdit(key: key, value: value, from: capture.publication, testActive: capture.testActive)
+    var prepared = try preparePublicationEdit(key: key, value: value, from: capture.publication,
+      testActive: capture.testActive, restoringFunboxMemory: restoringFunboxMemory)
     // Session books are current, but inherited account/content scope is not a
     // fresh read from a new environment. Require scoped re-preparation first;
     // do not silently carry one account's content into another epoch.
@@ -985,6 +1002,9 @@ final class WebsiteConfigCommitCoordinator {
         }
         current = .init(configuration: configuration, admission: failure.resources.admission,
           background: failure.resources.background, font: failure.resources.font)
+        if failure.underlying as? WebsiteConfigExternalContentError == .poetryUnavailable {
+          current = try preparePoetryRecovery(for: current)
+        }
         try Task.checkCancellation()
         try reportInitializationFailure(WebsiteConfigInitializationReport.generation(attempt: attempt + 1, error: failure.underlying,
           quote: failure.quoteInitialization ?? current.configuration.quoteInitialization),
@@ -1120,6 +1140,33 @@ final class WebsiteConfigCommitCoordinator {
     configuration = try saveGenerationCorrection(configuration, from: original, admission: resources.admission, admittingSourceSetter: true)
     return .init(configuration: configuration, admission: resources.admission, background: resources.background, font: resources.font)
   }
+  private func preparePoetryRecovery(for resources: ResourcesPrepared) throws -> ResourcesPrepared {
+    let original = resources.configuration.draft
+    guard original.generators.requestedModifiers.contains(.poetryStream),
+      case .array(let funboxes)? = original.projection.runtime["funbox"] else {
+      throw WebsiteConfigCommitCoordinatorError.sessionNotReady
+    }
+    // A failed pull toggles the source through the ordinary saving setter.
+    // It does not restore the UI selection's remembered settings.
+    let edited = try WebsiteConfigNativeProfile.editDraft(original, key: "funbox",
+      value: .array(funboxes.filter { $0 != .string("poetry") }),
+      pointsPerRem: resources.configuration.environment.pointsPerRem,
+      context: resources.configuration.environment.context)
+    let applied = try WebsiteConfigLazyModeLifecycle.applyingEvents(edited,
+      pointsPerRem: resources.configuration.environment.pointsPerRem)
+    var projection = applied.projection
+    projection.events = original.projection.events + projection.events
+    projection.rejectedKeys = original.projection.rejectedKeys + projection.rejectedKeys
+    var configuration = resources.configuration
+    configuration.draft = try original.replacingProjection(projection, memory: applied.lazyMemory,
+      pointsPerRem: resources.configuration.environment.pointsPerRem)
+    var saved = edited; saved.lazyMemory = applied.lazyMemory
+    configuration.savedDraft = saved
+    configuration = try saveGenerationCorrection(configuration, from: original,
+      admission: resources.admission, admittingSourceSetter: true)
+    return .init(configuration: configuration, admission: resources.admission,
+      background: resources.background, font: resources.font)
+  }
   private func preparePracticeAttempt(for resources: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope?,
     reason: WebsiteConfigSessionBuilder.Reason,
     replayApplicationEvents: Bool,
@@ -1186,10 +1233,17 @@ final class WebsiteConfigCommitCoordinator {
       }
     }
     let checkedExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
-    if let loadExternal {
+    let selectedLoader: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
+    if let loadExternal { selectedLoader = loadExternal }
+    else if let externalLoader {
+      selectedLoader = { source, configuration in
+        try await externalLoader(source, configuration, draft.presentation.showAllPracticeLines)
+      }
+    } else { selectedLoader = nil }
+    if let selectedLoader {
       checkedExternal = { source, configuration in
         try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
-          try await loadExternal(source, configuration)
+          try await selectedLoader(source, configuration)
         }
       }
     } else { checkedExternal = nil }

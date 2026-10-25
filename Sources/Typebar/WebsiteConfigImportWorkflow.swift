@@ -108,6 +108,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
 
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
     directory: URL, readWindow: @escaping @MainActor () -> WebsiteConfigPracticeScopeSource.Window?,
+    loadExternal: WebsiteConfigSessionBuilder.ExternalLoader? = nil,
     loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) }) {
     self.page = page; self.settings = settings; self.loadQuotes = loadQuotes
     self.notices = account.localNotices
@@ -116,6 +117,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     self.environment = environment
     source = .init(environment: environment, readWindow: readWindow)
     coordinator = .init(router: settings.preferenceConfigurationSaves, register: .init(directory: directory),
+      loadExternal: loadExternal,
       environment: { [environment] in environment.read() })
   }
 
@@ -134,8 +136,20 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   func resumeAndBegin(departureID: UUID, systemIsDark: Bool) async throws -> String {
     try await perform(.resume(departureID), systemIsDark: systemIsDark)
   }
+  /// Automatic pull failure, distinct from the funbox selection UI's memory
+  /// restoration. The coordinator validates and derives the exact removal.
+  @discardableResult
+  func recoverFailedPoetry(replacing applicationID: UUID, systemIsDark: Bool) async throws -> String {
+    guard case .array(let values)? = page?.state.presentation?.publication.draft.projection.runtime["funbox"] else {
+      throw WebsiteConfigImportWorkflowError.unavailable
+    }
+    let remaining = values.compactMap { value -> String? in
+      guard case .string(let name) = value, name != "poetry" else { return nil }; return name
+    }
+    return try await perform(.edit(.funboxes(remaining), applicationID), systemIsDark: systemIsDark, failedPoetrySource: true)
+  }
 
-  private func perform(_ intent: Intent, systemIsDark: Bool) async throws -> String {
+  private func perform(_ intent: Intent, systemIsDark: Bool, failedPoetrySource: Bool = false) async throws -> String {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying else { throw WebsiteConfigImportWorkflowError.busy }
     try checkRestartBusy(intent, page: page)
@@ -163,7 +177,10 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       guard page.state.presentation?.publication.applicationID == applicationID else {
         throw WebsiteConfigImportWorkflowError.conflict
       }
-      do { ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source) }
+      do {
+        if failedPoetrySource { ticket = try coordinator.prepareFailedPoetrySource(for: page, refreshingWith: source) }
+        else { ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source) }
+      }
       catch WebsiteConfigNativeDraftError.rejectedEdit where edit.key == "customLayoutfluid" {
         if page.state.session.hasStarted, !page.state.session.isFinished,
           page.state.session.configuration.modifiers.contains(.noQuit), let publication = page.state.presentation?.publication {

@@ -1393,6 +1393,8 @@ private struct ContentView: View {
   @State private var queuedWebsiteSequenceCommand: WebsiteSequenceCommandPresentation?
   @State private var websiteImportWorkflow: WebsiteConfigImportWorkflow?
   @State private var websiteFunboxCommandTask: Task<Void, Never>?
+  @State private var websiteLiveSourceRecoveryTask: Task<Void, Never>?
+  @State private var websiteLiveSourceRecoveryRequest = UUID()
   @State private var websiteFunboxCommandRequest = UUID()
   @State private var showingChallenges = false
   @State private var showingOneHandedChallengeSetup = false
@@ -1761,6 +1763,8 @@ private struct ContentView: View {
       updateConfigurationStartup()
     }
     .onDisappear {
+      websiteLiveSourceRecoveryRequest = UUID()
+      websiteLiveSourceRecoveryTask?.cancel(); websiteLiveSourceRecoveryTask = nil
       pageSessionStore.detach()
       websiteImportWorkflow?.stop(); websiteImportWorkflow = nil
       websiteFunboxCommandRequest = UUID(); websiteFunboxCommandTask?.cancel(); websiteFunboxCommandTask = nil
@@ -4333,11 +4337,14 @@ private struct ContentView: View {
       guard let practice = pageSession.practice,
         finalizedPracticeAttemptID != practice.session.automaticInputAttemptID else { return }
       finalizedPracticeAttemptID = practice.session.automaticInputAttemptID
+      websiteLiveSourceRecoveryRequest = UUID()
+      websiteLiveSourceRecoveryTask?.cancel(); websiteLiveSourceRecoveryTask = nil
       wholePreviewTask.cancel(); liveContentTask?.cancel(); liveContentTask = nil
       liveContentRequestID = UUID()
       isPreparingWholePreview = false; isLoadingLiveContent = false
       viewportReadinessAttemptID = nil; preparedWholePreviewRendering = nil
       interruptedWholePreview = false; liveContentStreamingActive = false
+      liveContentMessage = practice.external?.attribution
       compositionText = ""; completedResult = nil; savedResultRecord = nil
       activeChallengeID = nil; wordPractice = nil
       activeLongSavedText = nil; activeVerifiedScript = nil
@@ -4356,6 +4363,11 @@ private struct ContentView: View {
       awaitViewportPresentationIfNeeded()
       if session.configuration.modifiers.contains(.listening) {
         NativeSpeech.shared.speak(session.prompt, language: session.configuration.wordPoolBaseLanguage)
+      }
+      if let external = practice.external {
+        liveContentStreamingActive = true
+        liveContentMessage = external.attribution
+        prefetchLiveContentIfNeeded()
       }
       requestTypingFocus()
   }
@@ -5318,14 +5330,18 @@ private struct ContentView: View {
       let source = LivePracticeContentSource.selected(for: session.configuration) else { return }
     let configuration = session.configuration
     let requestID = liveContentRequestID
+    let attemptID = session.automaticInputAttemptID
+    guard pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }
     isLoadingLiveContent = true
     liveContentMessage = "正在续取\(source.displayName)。"
     liveContentTask = Task {
       var requestsGeneratorWord = generatesNextWord
       while !Task.isCancelled,
+        pageSessionStore.acceptsAttemptCallback(for: attemptID),
         (requestsGeneratorWord ? session.needsLiveContentGeneration : session.needsLiveContentPrefetch) {
         let content = await liveContentFetch(source, configuration.language)
         guard !Task.isCancelled, requestID == liveContentRequestID,
+          pageSessionStore.acceptsAttemptCallback(for: attemptID),
           session.configuration == configuration, !session.isFinished else { return }
         if requestsGeneratorWord {
           liveContentTask = nil
@@ -5338,7 +5354,7 @@ private struct ContentView: View {
             // The pinned poetry provider converts failures to false; the
             // encyclopedia provider rejects instead. Its rejection reaches
             // generator failure without requesting a source toggle.
-            if canDisableSource && source == .poetry {
+            if canDisableSource && source == .poetry && pageSession.practice == nil {
               let failedModifier: TestModifier = source == .poetry ? .poetryStream : .referenceStream
               settings.testModifiers.removeAll { $0 == failedModifier }
               persistActiveTestSelection(for: configuration.with(
@@ -5348,6 +5364,9 @@ private struct ContentView: View {
             session.failLiveContentFetch()
             synchronizeNoQuitConfigurationLock()
             liveContentMessage = "无法生成下一个在线词，练习已停止。"
+            if canDisableSource && source == .poetry && content == nil && pageSession.practice != nil {
+              recoverPublishedPoetryFailure(attemptID: attemptID)
+            }
             return
           }
           guard !content.text.isEmpty,
@@ -5407,6 +5426,11 @@ private struct ContentView: View {
           // A restartable source failure ends the old attempt before changing
           // configuration. Keep every unrelated modifier on the new attempt.
           synchronizeNoQuitConfigurationLock()
+          if pageSession.practice != nil {
+            liveContentMessage = "无法续取\(source.displayName)，本轮练习已停止。"
+            if source == .poetry && content == nil { recoverPublishedPoetryFailure(attemptID: attemptID) }
+            return
+          }
           let failedModifier: TestModifier = source == .poetry ? .poetryStream : .referenceStream
           settings.testModifiers.removeAll { $0 == failedModifier }
           reset(restarting: true)
@@ -5415,7 +5439,8 @@ private struct ContentView: View {
         }
         liveContentMessage = "已续接\(content.attribution)。"
       }
-      guard !Task.isCancelled, requestID == liveContentRequestID else { return }
+      guard !Task.isCancelled, requestID == liveContentRequestID,
+        pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }
       liveContentTask = nil
       isLoadingLiveContent = false
     }
@@ -6790,10 +6815,33 @@ private struct ContentView: View {
 
   private func configurationWorkflow(at directory: URL) -> WebsiteConfigImportWorkflow {
     if let websiteImportWorkflow { return websiteImportWorkflow }
+    let fetch = liveContentFetch
     let workflow = WebsiteConfigImportWorkflow(page: pageSessionStore, settings: settings, account: account,
-      directory: directory, readWindow: { websiteImportWindow })
+      directory: directory, readWindow: { websiteImportWindow }, loadExternal: { source, configuration, allLines in
+        try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
+          showAllLines: allLines, fetch: fetch)
+      })
     websiteImportWorkflow = workflow
     return workflow
+  }
+
+  private func recoverPublishedPoetryFailure(attemptID: UUID) {
+    guard websiteLiveSourceRecoveryTask == nil,
+      let applicationID = pageSession.presentation?.publication.applicationID else { return }
+    let request = UUID(); websiteLiveSourceRecoveryRequest = request
+    websiteLiveSourceRecoveryTask = Task { @MainActor in
+      defer { if websiteLiveSourceRecoveryRequest == request { websiteLiveSourceRecoveryTask = nil } }
+      guard pageSessionStore.acceptsAttemptCallback(for: attemptID) else { return }
+      do {
+        _ = try await importWorkflow().recoverFailedPoetry(replacing: applicationID,
+          systemIsDark: systemColorScheme == .dark)
+      } catch {
+        guard !Task.isCancelled, websiteLiveSourceRecoveryRequest == request,
+          session.automaticInputAttemptID == attemptID,
+          pageSession.presentation?.publication.applicationID == applicationID else { return }
+        liveContentMessage = (error as? LocalizedError)?.errorDescription ?? "诗歌来源校正未完成，请在配置面板继续准备。"
+      }
+    }
   }
 
   private func openWebsiteConfigImport() {

@@ -18,7 +18,8 @@ import XCTest
     let host: NSHostingView<AnyView>, window: NSWindow
     let record: URL?
     /// nil: no directory; true: valid record; false: opaque record.
-    init(saved: Bool?) throws {
+    init(saved: Bool?, json: String = #"{"mode":"words","words":4,"theme":"dracula"}"#,
+      fetch: @escaping WebsiteConfigExternalContent.Fetch = { _, _ in nil }) throws {
       try FileManager.default.createDirectory(at: support, withIntermediateDirectories: false)
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = .init(defaults: defaults, feedbackSound: .init(loadSound: { _ in nil }, beep: {}),
@@ -30,7 +31,7 @@ import XCTest
       if let saved {
         let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: support)
         let register = WebsiteConfigFileRegister(directory: directory)
-        let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":4,"theme":"dracula"}"#,
+        let draft = try WebsiteConfigNativeProfile.prepareDraft(json,
           pointsPerRem: 16, context: .init())
         guard case .committed = try register.commit(draft, replacing: XCTUnwrap(register.read().revision)) else {
           throw WebsiteConfigImportWorkflowError.conflict
@@ -42,7 +43,7 @@ import XCTest
       container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
         ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-      let view = Root(state: state, settings: settings, account: account, support: support, defaults: defaults)
+      let view = Root(state: state, settings: settings, account: account, support: support, defaults: defaults, fetch: fetch)
         .modelContainer(container).frame(width: 1000, height: 760)
       host = NSHostingView(rootView: AnyView(view))
       window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 760), styleMask: .borderless,
@@ -69,18 +70,130 @@ import XCTest
   private struct Root: View {
     let state: HostState, settings: AppSettings, account: AccountSession, support: URL
     let announcements: RemoteAnnouncementCenter
+    let fetch: WebsiteConfigExternalContent.Fetch
     let hotkey = GlobalHotkeyMonitor(), keyboard = SystemKeyboardGuideMonitor(observesInputSourceChanges: false)
     let network = NetworkConnectivityMonitor(), appearance = SystemAppearanceMonitor()
-    init(state: HostState, settings: AppSettings, account: AccountSession, support: URL, defaults: UserDefaults) {
+    init(state: HostState, settings: AppSettings, account: AccountSession, support: URL, defaults: UserDefaults,
+      fetch: @escaping WebsiteConfigExternalContent.Fetch) {
       self.state = state; self.settings = settings; self.account = account; self.support = support
+      self.fetch = fetch
       announcements = .init(defaults: defaults)
     }
     var body: some View {
       TypebarApp.practiceContent(settings: settings, account: account, announcements: announcements,
         hotkey: hotkey, systemKeyboardGuide: keyboard, network: network, systemAppearance: appearance,
+        liveContentFetch: fetch,
         practiceSessionStore: state.page,
         websiteConfigStartup: .init(accountReady: state.accountReady, applicationSupport: support))
     }
+  }
+
+  func testColdOnlineProfileLoadsAndContinuesThroughProductionPageWithoutLegacyWrites() throws {
+    var reads = 0
+    let f = try Fixture(saved: true, json: #"{"mode":"words","words":201,"showAllLines":false,"funbox":["wikipedia"]}"#,
+      fetch: { source, _ in
+        reads += 1
+        return .init(source: source, title: "Article \(reads)", byline: nil,
+          tokens: reads == 1 ? Array(repeating: "ab", count: 100) : ["cd", "ef", "gh"], separator: " ")
+      })
+    defer { f.close() }
+    let legacy = f.settings.snapshot
+    f.state.accountReady = true
+    f.wait { f.state.page.state.practice?.external != nil && f.inputs().first?.acceptsTextInput == true }
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(f.state.page.state.session.configuration.wordLimit, 201)
+    let attempt = f.state.page.state.session.automaticInputAttemptID
+    try XCTUnwrap(f.inputs().first).onInsert("ab ", false)
+    f.wait { reads == 2 && f.state.page.state.session.prompt.contains("cd") }
+    XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.state.page.state.session.typed, "ab ")
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testLateOnlineContinuationCannotMutateNewProfileOrDisableItsSource() throws {
+    var reads = 0, returned = false
+    var reply: CheckedContinuation<LivePracticeContent?, Never>?
+    let f = try Fixture(saved: true, json: #"{"mode":"words","words":201,"funbox":["poetry"]}"#,
+      fetch: { source, _ in
+        reads += 1
+        if reads == 1 {
+          return .init(source: source, title: "Owned", byline: nil,
+            tokens: Array(repeating: "ab", count: 100), separator: " ")
+        }
+        let content = await withCheckedContinuation { reply = $0 }
+        returned = true
+        return content
+      })
+    defer { reply?.resume(returning: nil); f.close() }
+    let legacy = f.settings.snapshot
+    f.state.accountReady = true
+    f.wait { f.state.page.state.practice?.external != nil && f.inputs().first?.acceptsTextInput == true }
+    try XCTUnwrap(f.inputs().first).onInsert("ab ", false)
+    f.wait { reply != nil }
+    // A provider's obsolete reply may arrive after a different configuration
+    // has been accepted. Use the actual page/root and real durable workflow.
+    var ended = f.state.page.state
+    ended.session.failLiveContentFetch(); f.state.page.replace(ended)
+    let directory = try XCTUnwrap(WebsiteConfigStorageDirectory.existing(applicationSupport: f.support))
+    var quoteReply: CheckedContinuation<[OfflineQuote], Never>?
+    let replacementWindow = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { replacementWindow },
+      loadQuotes: { _ in await withCheckedContinuation { quoteReply = $0 } })
+    defer { quoteReply?.resume(returning: []); workflow.stop() }
+    var finished = false, failure: Error?
+    let task = Task { @MainActor in
+      do { try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false) }
+      catch { failure = error }
+      finished = true
+    }
+    defer { task.cancel() }
+    f.wait { quoteReply != nil || finished }
+    XCTAssertNil(failure)
+    guard quoteReply != nil else { return XCTFail("Replacement did not enter quote initialization: \(String(describing: failure)); startup=\(f.state.page.startupController.state)") }
+    XCTAssertNotNil(f.state.page.state.savedApplication)
+    let generation = f.state.page.state.session.generationState
+    let revision = try WebsiteConfigFileRegister(directory: directory).read().revision
+    let late = try XCTUnwrap(reply); reply = nil; late.resume(returning: nil)
+    f.wait { returned }
+    RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    XCTAssertEqual(reads, 2)
+    XCTAssertEqual(f.state.page.state.session.generationState, generation,
+      "Pending accepted configuration must fence the retired stream")
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: directory).read().revision, revision)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    let complete = try XCTUnwrap(quoteReply); quoteReply = nil
+    complete.resume(returning: [.init(id: "owned", title: "Owned", text: "cd ef", language: .english, length: .short)])
+    f.wait { finished }; XCTAssertNil(failure)
+    XCTAssertEqual(f.state.page.state.session.configuration.mode, .quote)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testPublishedPoetryFailureCorrectsFullProfileInsteadOfLegacySelection() throws {
+    var reads = 0
+    let f = try Fixture(saved: true, json: #"{"mode":"words","words":201,"funbox":["poetry"]}"#,
+      fetch: { source, _ in
+        reads += 1
+        return reads == 1 ? .init(source: source, title: "Owned poem", byline: nil,
+          tokens: Array(repeating: "ab", count: 100), separator: " ") : nil
+      })
+    defer { f.close() }
+    let legacy = f.settings.snapshot
+    f.state.accountReady = true
+    f.wait { f.state.page.state.practice?.external != nil && f.inputs().first?.acceptsTextInput == true }
+    let attempt = f.state.page.state.session.automaticInputAttemptID
+    try XCTUnwrap(f.inputs().first).onInsert("ab ", false)
+    f.wait { f.state.page.state.session.automaticInputAttemptID != attempt && f.state.page.state.practice?.external == nil }
+    XCTAssertEqual(reads, 2)
+    XCTAssertFalse(f.state.page.state.session.configuration.modifiers.contains(.poetryStream))
+    let directory = try WebsiteConfigStorageDirectory.existing(applicationSupport: f.support)
+    guard case .available(let fields) = try WebsiteConfigFileRegister(directory: XCTUnwrap(directory)).read().state else {
+      return XCTFail("Published source correction lost its record")
+    }
+    XCTAssertEqual(fields["funbox"], .array([]))
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    XCTAssertFalse(f.window.isVisible)
   }
 
   func testRealPageBlocksInputUntilAccountReadyAndRestoresExactlyOnce() throws {
