@@ -180,7 +180,8 @@ import XCTest
     XCTAssertTrue(app.contains("if hasFocus, !inputHasFocus { visualFocus.caretDidBecomeVisible() }"))
     XCTAssertTrue(app.contains("if hasFocus, !typingWindowHasFocus { visualFocus.caretDidBecomeVisible() }"))
     XCTAssertTrue(app.contains(".onChange(of: settings.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }"))
-    XCTAssertTrue(app.contains("visualFocus.inputDidUpdate(hasFeedback: hadMarkedText || !$0.isEmpty"))
+    XCTAssertTrue(app.contains(".onChange(of: committedPracticeDraft?.presentation.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }"))
+    XCTAssertTrue(app.contains("visualFocus.inputDidUpdate(hasFeedback: hadMarkedText || !text.isEmpty"))
     XCTAssertTrue(overlay.contains("paceFrame: paceFrame, mainPresentation: mainPresentation"))
   }
 

@@ -14,6 +14,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case behavior(BehaviorCommandTarget)
   case inputRule(InputRuleCommandTarget)
   case sound(SoundCommandTarget)
+  case caret(CaretCommandTarget)
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
@@ -27,6 +28,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .behavior(let edit): edit.websiteKey
     case .inputRule(let edit): edit.websiteKey
     case .sound(let edit): edit.websiteKey
+    case .caret(let edit): edit.websiteKey
     }
   }
   var value: WebsiteConfigValue {
@@ -45,6 +47,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .behavior(let edit): edit.websiteValue
     case .inputRule(let edit): edit.websiteValue
     case .sound(let edit): edit.websiteValue
+    case .caret(let edit): edit.websiteValue
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -52,7 +55,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   /// neither case: execution never reaches the following dispatch.
   var dispatchesRestartAfterRejection: Bool {
     switch self {
-    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior, .inputRule, .sound: false
+    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior, .inputRule, .sound, .caret: false
     case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes, .polyglotLanguages: true
     }
   }
@@ -143,6 +146,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   @discardableResult
   func editAndBegin(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID, systemIsDark: Bool) async throws -> String {
     if case .behavior = edit { return try runSingleLiveCommand(edit, replacing: applicationID) }
+    if case .caret = edit { return try runSingleLiveCommand(edit, replacing: applicationID) }
     if case .sound(let target) = edit {
       guard target.websiteValue != .null else { throw WebsiteSoundCommandError.unsupportedTone }
       return try runSingleLiveCommand(edit, replacing: applicationID)
@@ -174,6 +178,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       guard operation == current, !stopped else { throw CancellationError() }
       let outcome: WebsiteConfigCommitCoordinator.Outcome
       if case .sound = edit { outcome = try coordinator.commitLiveSound(ticket, for: page) }
+      else if case .caret = edit { outcome = try coordinator.commitLiveCaret(ticket, for: page) }
       else { outcome = try coordinator.commitLiveBehavior(ticket, for: page) }
       switch outcome {
       case .committed: return "设置已保存，当前练习继续。"

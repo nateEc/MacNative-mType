@@ -19,7 +19,8 @@ const failureOrderMode = process.argv[3] === '--import-failure-order';
 const thresholdCommandMode = process.argv[3] === '--threshold-commands';
 const inputCommandMode = process.argv[3] === '--input-commands';
 const soundCommandMode = process.argv[3] === '--sound-commands';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode);
+const caretCommandMode = process.argv[3] === '--caret-commands';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -161,7 +162,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -215,6 +216,36 @@ if (defaultsMode) {
         }
       }
     assert.equal(fixtures.length, 2310);
+    verify(); console.log(JSON.stringify({fixtures}));
+  } else if (caretCommandMode) {
+    function extract(file, from, until, wrap = text => text) {
+      const source = fs.readFileSync(path.join(frontend, file), 'utf8');
+      const start = source.indexOf(from), end = source.indexOf(until, start);
+      assert.ok(start >= 0 && end > start);
+      return stripTypeScriptTypes(wrap(source.slice(start, end).replace(/^export /gm, '')), {mode:'transform'});
+    }
+    let restarts = 0;
+    Object.assign(context, {Config:simulation.Config, setConfig:setters.setConfig,
+      TestLogic:{restart:() => { restarts++; }}, capitalizeFirstLetter:value => value[0].toUpperCase()+value.slice(1)});
+    vm.runInContext(extract('commandline/commandline-metadata.ts','  smoothCaret: {','  //appearence',
+      text => `globalThis.caretInputs=({${text}});`),context);
+    vm.runInContext(extract('commandline/util.ts','function buildSubgroupCommand<','export const __testing'),context);
+    const fixtures = [];
+    for (const active of [false,true]) for (const noQuit of [false,true])
+      for (const key of ['smoothCaret','caretStyle','paceCaretStyle','repeatedPace']) {
+        for (const value of key === 'repeatedPace' ? [false,true] : configSchemas.ConfigSchema.shape[key].options) {
+          const sourceValue = typeof value === 'object' ? value.value : value;
+          Object.assign(simulation.Config,structuredClone(defaults),{funbox:noQuit ? ['no_quit'] : []});
+          simulation.flags = {testActive:active,authenticated:false,documentComplete:true};
+          simulation.events = []; simulation.saves = []; restarts = 0;
+          const current = structuredClone(simulation.Config), props = context.caretInputs[key].subgroup;
+          const command = context.buildSubgroupCommand(key,sourceValue,props);
+          command.exec();
+          fixtures.push({key,value:sourceValue,current,active,runtime:structuredClone(simulation.Config),
+            events:simulation.events,saves:simulation.saves,restarts,visible:props.isVisible?.(sourceValue) ?? true});
+        }
+      }
+    assert.equal(fixtures.length,88);
     verify(); console.log(JSON.stringify({fixtures}));
   } else if (soundCommandMode) {
     function extract(file, from, until, wrap = text => text) {

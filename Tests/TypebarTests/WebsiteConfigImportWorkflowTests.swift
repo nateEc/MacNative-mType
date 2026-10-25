@@ -6,6 +6,104 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testCaretCompetingRecordDoesNotInstallItsCandidateStyle() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    var writeOnRead = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if writeOnRead {
+          writeOnRead = false
+          do {
+            guard case .committed = try register.commit(competitor, replacing: XCTUnwrap(register.read().revision)) else {
+              XCTFail("No competing record"); return f.window
+            }
+          } catch { XCTFail("Competing writer: \(error)") }
+        }
+        return f.window
+      }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"caretStyle":"underline"}"#, systemIsDark: false)
+    let original = try XCTUnwrap(f.page.state.presentation).publication, before = f.page.state.session.generationState
+    writeOnRead = true
+    do {
+      try await workflow.editAndBegin(.caret(.primary(.block)), replacing: original.applicationID, systemIsDark: false)
+      XCTFail("Caret write overwrote competitor")
+    } catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, original.applicationID)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.presentation.caretStyle, .underline)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Lost competitor") }
+    XCTAssertEqual(saved["words"], .number(7))
+  }
+  func testCaretRepeatPreferenceAppliesOnlyToExplicitNextRepeat() async throws {
+    for enabled in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      var reads = 0
+      let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+        directory: f.directory, readWindow: { f.window }, loadExternal: { _, _, _, _ in
+          reads += 1
+          return .init(source: .encyclopedia, initial: .init(text: "ab cd", noSpaceBoundarySource: nil), continuation: nil)
+        }); defer { workflow.stop() }
+      try await workflow.apply(json: #"{"mode":"words","words":2,"funbox":["wikipedia"]}"#, systemIsDark: false)
+      var complete = f.page.state
+      complete.session.insertBatch(complete.session.prompt + " "); f.page.replace(complete)
+      XCTAssertTrue(f.page.state.session.isFinished)
+      let before = f.page.state.session.generationState
+      try await workflow.editAndBegin(.caret(.repeatedPace(enabled)),
+        replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTAssertEqual(f.page.state.session.generationState, before)
+      let advanced = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID(), repeatingRequested: true)
+      XCTAssertTrue(advanced); XCTAssertEqual(reads, 1)
+      XCTAssertEqual(f.page.state.practice?.repetition.repeatsPace, enabled)
+    }
+  }
+  func testCaretStaleAndCancelledCommandsCannotReplaceTheLivePublication() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let original = try XCTUnwrap(f.page.state.presentation).publication
+    try await f.workflow.editAndBegin(.caret(.primary(.block)), replacing: original.applicationID, systemIsDark: false)
+    let current = try XCTUnwrap(f.page.state.presentation).publication
+    let before = f.page.state.session.generationState
+    do {
+      try await f.workflow.editAndBegin(.caret(.primary(.off)), replacing: original.applicationID, systemIsDark: false)
+      XCTFail("Stale caret command saved")
+    } catch WebsiteConfigImportWorkflowError.conflict {}
+    let task = Task { @MainActor in
+      try await f.workflow.editAndBegin(.caret(.primary(.off)), replacing: current.applicationID, systemIsDark: false)
+    }
+    task.cancel()
+    do { _ = try await task.value; XCTFail("Cancelled caret command saved") } catch is CancellationError {}
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, current.applicationID)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, current.disk)
+  }
+  func testCaretCommandsPublishLiveStylesWithoutRestartingOrWritingLegacySettings() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session.generationState, legacy = f.settings.snapshot
+    let controller = f.page.restartController
+    let lock = UUID(); f.settings.setNoQuitConfigurationLock(true, for: lock)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: lock) }
+    let commands = CaretCommandCatalog.items.compactMap { CaretCommandCatalog.target(for: $0.id) }
+    XCTAssertEqual(commands.count, 22)
+    for command in commands {
+      try await f.workflow.editAndBegin(.caret(command), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+      switch command {
+      case .smooth(let value): XCTAssertEqual(draft.presentation.smoothCaretMotion, value)
+      case .primary(let value): XCTAssertEqual(draft.presentation.caretStyle, value)
+      case .pace(let value): XCTAssertEqual(draft.presentation.paceCaretStyle, value)
+      case .repeatedPace(let value): XCTAssertEqual(draft.behavior.repeatedPace, value)
+      }
+      XCTAssertEqual(f.page.state.session.generationState, before)
+      XCTAssertTrue(f.page.restartController === controller)
+      XCTAssertEqual(f.settings.snapshot, legacy)
+      guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else { return XCTFail("No saved caret profile") }
+      XCTAssertEqual(saved, draft.projection.runtime)
+    }
+  }
   func testAllCanonicalSoundOptionsSaveWithoutRestartAndUnsupportedValuesCannotWrite() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)

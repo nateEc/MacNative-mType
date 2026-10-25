@@ -176,6 +176,32 @@ import XCTest
     XCTAssertEqual(f.settings.snapshot, legacy); XCTAssertEqual(trace.beeps, 0); XCTAssertFalse(f.window.isVisible)
   }
 
+  func testLiveCaretCommandsKeepActualInputDuringNoQuit() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+    let input = try XCTUnwrap(f.inputs().first), legacy = f.settings.snapshot
+    input.onInsert(String(f.state.page.state.session.prompt.prefix(1)), false)
+    XCTAssertFalse(f.state.page.state.session.typed.isEmpty)
+    try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange }
+    let before = f.state.page.state.session.generationState
+    for command in [CaretCommandTarget.primary(.block), .smooth(.fast), .pace(.underline), .repeatedPace(false), .primary(.off)] {
+      do {
+        try await workflow.editAndBegin(.caret(command), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+      } catch { return XCTFail("Caret command failed: \(String(reflecting: error))") }
+      try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+      XCTAssertTrue(f.inputs().first === input)
+      XCTAssertEqual(f.state.page.state.session.generationState, before)
+    }
+    XCTAssertEqual(f.settings.snapshot, legacy); XCTAssertFalse(f.window.isVisible)
+  }
+
   func testInputCommandsKeepActualMarkedInputAndControlsWithAndWithoutNoQuit() async throws {
     for noQuit in [false, true] {
       let f = try Fixture(saved: nil); defer { f.close() }

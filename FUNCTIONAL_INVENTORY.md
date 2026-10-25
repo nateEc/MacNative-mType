@@ -1,5 +1,11 @@
 # 功能盘点与追踪表
 
+2026-10-26 CFG-CARET-COMMAND-PAGE-01：四类光标配置命令接通完整配置的单字段保存与实时 presentation，保持本轮与旧偏好不变。22 个格式选项对应 16 个可见命令，88 组实际源码命令覆盖活动／No Quit 状态；隐藏原生页、冲突与下轮重复语义单独验证。配速模式、自定义速度命令与全部实体输入／动画验收继续开放。
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
+| CFG-CARET-COMMAND-PAGE-01 | 完整配置光标命令 | `commandline/{commandline-metadata.ts,util.ts}`, `config/{metadata.tsx,setters.ts}`, `test/{caret.ts,pace-caret.ts}` | CommandDomain, PreferencesDomain, PromptDomain | 部分实现：四字段单项原地保存、22 格式选项／16 可见命令及 No Quit；配速模式与自定义速度命令、实体动画与输入法仍开放。 |
+
 2026-10-26 CFG-SOUND-COMMAND-PAGE-01：完整配置接通四类声音的 40 个固定选项及自定义音量输入，No Quit 中保存不重开、不写旧偏好。实际键击／错误、倒计时、结束提示与完成页回放读取当前配置；盲打反馈使用本轮规则。窗口播放器隔离音量／活动声音，只共享键盘状态事件，不增加监听器；音乐预览用临时 Q，不改写之后的真实键位。160 组实际命令与 14 组数值输入对照、假设备／真实隐藏页和布局见 OFFICIAL_CONFIG_AUDIT。六种 Typebar 扩展音型保留在旧设置路径，完整配置不伪装编码；仍是原创音频替代，实体听感、全部设备／异步退役与整体迁移未验。
 
 2026-10-25 CFG-INPUT-COMMAND-PAGE-01：完整配置接通十二类输入命令的 33 个选项，不再写旧偏好。除 Lazy 的显式 afterExec 外均原地保存；strictSpace／stopOnError／codeUnindentOnBackspace 的 metadata 只用于 No Quit 准入，不能猜成重开。依赖 setter 按实际顺序逐个保存，后续拒绝／抛错保留已接受子项；单字段权限、文件竞争及取消继续约束每一步。2,310 组实际源码对照包含两组部分成功后抛错；实际隐藏页在普通／No Quit 下保留输入控件与 marked text，原题重复使用新规则，在线续取不失效。实体 IME、全部持久化异常时点和全局迁移仍开放，详见 OFFICIAL_CONFIG_AUDIT。

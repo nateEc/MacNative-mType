@@ -1651,6 +1651,7 @@ private struct ContentView: View {
     }
     .onChange(of: settings.inputRules, handleInputRuleChange)
     .onChange(of: settings.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }
+    .onChange(of: committedPracticeDraft?.presentation.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }
   }
 
   private var challengeObservedPracticeContent: some View {
@@ -5937,7 +5938,9 @@ private struct ContentView: View {
       committedPracticeDraft == nil || SoundCommandCatalog.target(for: item.id)?.websiteValue != .null
     })
     if committedPracticeDraft != nil { items.append(WebsiteSoundVolumePresentation.item) }
-    items.append(contentsOf: CaretCommandCatalog.items)
+    items.append(contentsOf: CaretCommandCatalog.items.filter { item in
+      committedPracticeDraft == nil || CaretCommandCatalog.target(for: item.id)?.visibleInWebsiteCommandPalette == true
+    })
     items.append(contentsOf: PaceCaretCommandCatalog.items)
     items.append(contentsOf: AppearanceCommandCatalog.items)
     items.append(contentsOf: KeyboardGuideCommandCatalog.items)
@@ -6075,6 +6078,7 @@ private struct ContentView: View {
       return
     }
     if let target = CaretCommandCatalog.target(for: item.id) {
+      if pageSessionStore.ownsConfigurationSelection { runWebsiteLiveCommand(.caret(target)); return }
       if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       return

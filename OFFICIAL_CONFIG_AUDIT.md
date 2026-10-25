@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 完整配置光标即时命令（2026-10-26，起点 fe5c5747）
+
+CFG-CARET-COMMAND-PAGE-01 只覆盖 smoothCaret、caretStyle、paceCaretStyle、repeatedPace。固定源码中四字段无 override、无重开要求，command subgroup 没有 afterExec；主光标订阅样式／闪烁变化，配速光标样式订阅只换样式。QA --caret-commands 运行实际 metadata、schema、setter 和 subgroup builder，输出 88 组（22 格式选项 × 两活动状态 × 两 No Quit 状态），对照完整 runtime、事件、保存与可见性。Boolean schema 以 false／true 枚举，非枚举 `.options` 不可直接读取；探针已按真实类型处理。
+
+原版两组样式菜单隐藏 banana／carrot／monkey，因此完整配置只展示 16 个命令，但导入格式仍接受 22 个值；旧 Typebar 菜单保留原有装饰扩展。新的单字段准入不允许其他字段或复合差异，也不触碰当前规则／配速时钟；保存后仍由原生 publication 渲染。配速模式及自定义速度有实际 afterExec restart，并涉及登录／单位换算与账户 tag PB，未以本次即时提交冒充覆盖。人工菜单点击、实体动画和所有输入法继续待验。
+
+定向验证：WebsiteCaretCommandTests、工作流 caret 用例与真实 StartupHost 的 7 项测试全部通过（2.742 秒，零跳过）；覆盖 88 组源码对照、22 格式选项、活动全局 No Quit 锁下的保存、实际输入控件与输入保持、取消／过期命令、捕获窗口时插入竞争记录的 CAS，以及开关只影响之后明确重复且不重新取外部文本。首次 RED 为缺少完整配置 caret 命令分支；一次实现编译发现 nosave 是可选值，已采用与其余专用能力一致的显式 false 判断修复，未降低准入。
+
+相关回归执行 1,293 项（248.500 秒），1,292 项通过、零跳过，唯一失败是 PromptCaretBlinkTests 中仍检查匿名 `$0` 的过期源码断言；提交前实际实现已使用命名参数 text。已更新其原检查并增加完整配置 smoothCaret 监听检查。首次补跑缺少 TYPEBAR_REFERENCE_ROOT，1 项参考组合测试跳过；补齐环境后的最终 22 项复验全部通过（2.924 秒，零跳过），不将前次运行记为全绿或重复累计通过数。Debug 应用打包／签名、资源边界及原创性检查通过；参考行为审计 47 direct／119 native symbols／17 supporting，人工验收表 1,355 个唯一场景仅通过结构审计，不等同于人工完成。日志 /tmp/typebar-caret-command-{red,focused,integration,broad,recheck,final-focused,package,reference}.log；源探针 /tmp/typebar-caret-command-source.json。本轮未启动 Typebar 主程序，实体体验与整体重写仍未完成。
+
 ## 完整配置声音命令与播放所有权（2026-10-26，起点 e47b18de）
 
 CFG-SOUND-COMMAND-PAGE-01 对照固定 commandline sound metadata、实际 subgroup／input builder、全 setter 和 schema。四字段没有 override 或重开要求，活动 No Quit 可保存。音量 subgroup 的 afterExec 返回 playClick 函数而没有调用，不应擅自增加试听；自定义输入 Number 转换并做 0 至 1 校验，也没有试听。键击／错误选择调用实际播放，悬停非 off 使用预览；倒计时非 off 悬停和执行均调用提示。QA --sound-commands 输出 160 组（40 选项 × 两活动状态 × 两 No Quit 状态）和 14 组自定义输入，比较完整 runtime、事件、保存与声音调用；声音端点只记录请求，不冒充原资产或真实设备播放。
