@@ -1389,8 +1389,8 @@ private struct ContentView: View {
   @State private var showingTestShare = false
   @State private var settingsJSONCommand: SettingsJSONCommandPresentation?
   @State private var showingWebsiteConfigImport = false
-  @State private var websitePolyglotCommand: WebsitePolyglotCommandPresentation?
-  @State private var queuedWebsitePolyglotCommand: WebsitePolyglotCommandPresentation?
+  @State private var websiteSequenceCommand: WebsiteSequenceCommandPresentation?
+  @State private var queuedWebsiteSequenceCommand: WebsiteSequenceCommandPresentation?
   @State private var websiteImportWorkflow: WebsiteConfigImportWorkflow?
   @State private var websiteFunboxCommandTask: Task<Void, Never>?
   @State private var websiteFunboxCommandRequest = UUID()
@@ -2088,10 +2088,10 @@ private struct ContentView: View {
       commandThemePreviewTarget = nil
       clearCommandFontPreview()
       presentQueuedReferenceScriptImport()
-      if let queued = queuedWebsitePolyglotCommand {
-        queuedWebsitePolyglotCommand = nil
+      if let queued = queuedWebsiteSequenceCommand {
+        queuedWebsiteSequenceCommand = nil
         if pageSession.presentation?.publication.applicationID == queued.id {
-          websitePolyglotCommand = queued
+          websiteSequenceCommand = queued
         }
       }
     }) {
@@ -2268,8 +2268,8 @@ private struct ContentView: View {
       }, cancel: { websiteImportWorkflow?.cancel() },
         useTypebarSettings: { try pageSessionStore.useTypebarSettings() })
     }
-    .sheet(item: $websitePolyglotCommand) { presentation in
-      WebsitePolyglotCommandView(presentation: presentation,
+    .sheet(item: $websiteSequenceCommand) { presentation in
+      WebsiteSequenceCommandView(presentation: presentation,
         canApply: pageSession.presentation?.publication.applicationID == presentation.id
           && pageSession.configurationDeparture == nil
           && pageSessionStore.restartController?.isPreparing != true,
@@ -5879,13 +5879,14 @@ private struct ContentView: View {
           mode: .importSettings, initialJSON: "", initialError: nil)
       case .importWebsiteConfig:
         openWebsiteConfigImport()
-      case .editWebsitePolyglot:
+      case .editWebsitePolyglot, .editWebsiteLayoutfluid:
         guard let publication = pageSession.presentation?.publication,
           pageSession.configurationDeparture == nil,
           pageSessionStore.restartController?.isPreparing != true else { return }
-        let presentation = WebsitePolyglotCommandPresentation(publication: publication)
-        if showingCommandPalette { queuedWebsitePolyglotCommand = presentation }
-        else { websitePolyglotCommand = presentation }
+        let presentation = WebsiteSequenceCommandPresentation(publication: publication,
+          kind: action == .editWebsitePolyglot ? .polyglot : .layoutFluid)
+        if showingCommandPalette { queuedWebsiteSequenceCommand = presentation }
+        else { websiteSequenceCommand = presentation }
       case .exportSettingsJSON:
         do {
           settingsJSONCommand = .init(

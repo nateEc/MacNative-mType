@@ -2059,6 +2059,7 @@ enum CommandPaletteUtilityAction: Equatable {
     case importSettingsJSON
     case importWebsiteConfig
     case editWebsitePolyglot
+    case editWebsiteLayoutfluid
     case exportSettingsJSON
     case nextRandomTheme
     case signOut
@@ -2109,6 +2110,12 @@ enum CommandPaletteUtilityCatalog {
                 systemImage: "globe", keywords: [
                     "setCustomPolyglotCustom", "customPolyglot", "polyglot", "languages", "多语", "组合",
                 ], group: .practice))
+            items.append(CommandPaletteItem(
+                id: "setCustomLayoutfluidCustom", title: "修改布局序列",
+                subtitle: "编辑完整配置的 Layoutfluid 布局 ID；启用时保存会重开",
+                systemImage: "keyboard", keywords: [
+                    "setCustomLayoutfluidCustom", "customLayoutfluid", "layoutfluid", "布局序列", "流动布局",
+                ], group: .practice))
         }
         if randomThemeEnabled {
             items.append(CommandPaletteItem(
@@ -2136,6 +2143,7 @@ enum CommandPaletteUtilityCatalog {
         case "importSettingsJSON": .importSettingsJSON
         case "importMonkeytypeConfig": .importWebsiteConfig
         case "setCustomPolyglotCustom": .editWebsitePolyglot
+        case "setCustomLayoutfluidCustom": .editWebsiteLayoutfluid
         case "exportSettingsJSON": .exportSettingsJSON
         case "randomizeTheme": .nextRandomTheme
         case "signOut": .signOut

@@ -1,5 +1,9 @@
 # Typebar — Monkeytype 功能兼容重写规范
 
+## 当前增量：Layoutfluid 命令入口与序列窗口（2026-10-25）
+
+完整配置可从命令面板搜索 customLayoutfluid／流动布局打开布局序列窗口，使用实际原版命令 ID setCustomLayoutfluidCustom。与 Polyglot 共用版本捕获、排队呈现及关闭取消，输入和保存分派明确区分两种序列；各自保留源转换、schema、No Quit 与重开规则，未新增持久字段。测试覆盖真实工作流中的启用／未启用及活动 No Quit、旧窗口拒绝、两种窗口的独立默认值、字段分派、取消和隐藏浅深布局。可见窗口切换、实体键盘／IME 和全部组合仍待验收，完整目标继续开放。
+
 ## 当前增量：完整配置的 Layoutfluid 布局序列编辑（2026-10-25）
 
 原生表单增加布局 ID 序列输入，先做源单空格转换与原始项数校验，再走 setter 去重。customLayoutfluid 的输入命令没有 afterExec；成功事件仅在 Layoutfluid 启用时请求重开。因此未启用时保存配置并保持当前尝试／外观／账本，启用时沿既有离场及初始化流程，活动 No Quit 则在保存前拒绝且提示。未给 Layoutfluid 添加 Polyglot 的 No Quit 例外。144 组固定源码阶段、实际表单和真实工作流证据见迁移契约；命令面板专用入口、实体操作和完整重写仍未完成。

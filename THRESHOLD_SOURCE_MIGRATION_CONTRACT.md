@@ -1,5 +1,19 @@
 # 阈值源状态与迁移契约
 
+## Layoutfluid 命令入口与两种序列窗口（2026-10-25，起点 d5f69cb0）
+
+沿上一批实际命令／setter／订阅者 144 组合同，补 setCustomLayoutfluidCustom 命令。完整配置且没有待准备事务或进行中重开时显示，可按 ID、customLayoutfluid、layoutfluid、流动布局搜索；普通 Typebar 设置的命令集保持原有范围。选中后沿既有 onDismiss 队列呈现，捕获 publication ID 与 draft，发布变化丢弃旧队列或禁用旧窗口，最终仍由工作流拒绝旧版本。
+
+两种序列现在由 WebsiteSequenceCommandKind 的两个明确分支驱动同一 WebsiteSequenceCommandView；输入绑定、默认值、标题、重要行为说明、按钮及提交函数按种类区分。Layoutfluid 调用 startLayoutFluidLayouts，Polyglot 调用 startPolyglotLanguages；源转换、前检、setter 和重开协议仍由既有表单／事务所有者处理。原 Polyglot 辅助功能 ID 保持，新布局 ID 使用独立前缀；关闭取消各自表单任务。此次仅界面／命令路由，不改文件格式、存储、布局引擎或 No Quit 准入，也没有新通用配置写入口。
+
+先行原版命令 ID 测试在 nil 处失败；接线后定向七项零失败（2.034 秒），含两种命令搜索、默认序列及八种浅／深可用／失效隐藏布局、提交字段互不混用、两个隐藏宿主移除取消与迟到结果抑制。真实布局命令按启用／未启用 × 活动 No Quit／普通四种情形验证：拒绝不写盘／不换尝试且提示，未启用只保存，启用后重开；成功发布后旧窗口提交不得改新版本。保留原 Polyglot 快照及旧窗口拒绝回归。已查看布局浅色可用、深色失效和 Polyglot 深色可用图片，未见裁切。
+
+最终相关 185 项零失败／零跳过（55.400 秒），覆盖原布局／Polyglot 工作流、表单、完整 setter 源码对照、Funbox 激活／记忆、会话构建、下一轮及普通控制器、旧命令目录和新共用窗口。日志 /tmp/typebar-sequence-command-{red,focused,regression}.log。未新增源码探针，相关表单测试仍实际执行既有 144 组与 72 组合同。原创性、47 direct／119 native symbols／17 specs 参考审计、1,344 条人工清单结构与空白检查通过。
+
+串行 Debug 打包、签名与资源／原创性边界通过（增量构建 1.06 秒），日志 /tmp/typebar-sequence-command-package.log，未打开应用。推送前 fetch 确认 main 8c52fb13、开发分支 d5f69cb0；远端无开发分支打开 PR，Actions 仍 826 次且最新 39118939684 成功。仅一次中文提交推开发分支，推后核对外部状态。
+
+该隐藏渲染不证明实体按键、可见 sheet 切换或全部组合。完整目标、已知隐藏滚轮失败及其他未验收项继续开放；不启动主程序，不修改通知或 CI。
+
 ## Layoutfluid 序列的条件重开与原生编辑（2026-10-25，起点 b9a30c8c）
 
 固定 commandline 的 customLayoutfluid 输入只做 trim().split(" ")，没有 afterExec；buildInputCommand 不会自行重开。metadata 对此字段 changeRequiresRestart=true，并以 Set 保留首次顺序；完整 config/setters 在值覆盖后、schema 前执行活动 No Quit 拒绝，成功则先保存再发事件。完整 test-logic configEvent 订阅者仅在测试页且 funbox 含 layoutfluid 时重开。故不能复用 Polyglot 的无条件后续派发，也不能在未启用时结束当前尝试。

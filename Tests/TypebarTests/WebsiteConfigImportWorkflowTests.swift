@@ -6,6 +6,52 @@ import Observation
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
 
+  func testLayoutfluidCommandSnapshotSavesThroughCorrectLifecycleAndRejectsOldWindow() async throws {
+    for enabled in [false, true] {
+      for noQuit in [false, true] {
+        let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+        let names = (enabled ? ["layoutfluid"] : []) + (noQuit ? ["no_quit"] : [])
+        let jsonNames = String(decoding: try JSONEncoder().encode(names), as: UTF8.self)
+        try await f.workflow.apply(json: "{\"mode\":\"words\",\"words\":4,\"funbox\":\(jsonNames)}", systemIsDark: false)
+        var active = f.page.state; active.session.insertBatch("x"); f.page.replace(active)
+        let before = active.session.generationState
+        let opened = WebsiteSequenceCommandPresentation(publication: try XCTUnwrap(f.page.state.presentation).publication,
+          kind: .layoutFluid)
+        let form = WebsiteConfigPracticeEditForm(draft: opened.draft)
+        XCTAssertEqual(opened.kind, .layoutFluid)
+        XCTAssertEqual(form.layoutFluidLayouts, "qwerty dvorak colemak")
+        form.layoutFluidLayouts = "colemak qwerty"
+        let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+        opened.kind.submit(form) { edit in
+          try await f.workflow.editAndBegin(edit, replacing: opened.id, systemIsDark: false)
+        }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while form.isWorking && ContinuousClock.now < deadline { await Task.yield() }
+        XCTAssertFalse(form.isWorking)
+        let current = try XCTUnwrap(f.page.state.presentation).publication
+        if noQuit {
+          XCTAssertEqual(try register.read().revision, revision)
+          XCTAssertEqual(current.applicationID, opened.id)
+          XCTAssertEqual(f.page.state.session.generationState, before)
+          XCTAssertTrue(form.message?.contains("设置未修改") == true)
+          XCTAssertEqual(f.account.localNotices.history.count, 1)
+        } else {
+          XCTAssertNotEqual(try register.read().revision, revision)
+          XCTAssertNotEqual(current.applicationID, opened.id)
+          XCTAssertEqual(current.draft.generators.layoutFluidLayouts.compactMap(OfficialLayoutCommandCatalog.name), ["colemak", "qwerty"])
+          XCTAssertEqual(f.page.state.session.automaticInputAttemptID != active.session.automaticInputAttemptID, enabled)
+          if !enabled { XCTAssertEqual(f.page.state.session.generationState, before) }
+          let saved = try register.read().revision
+          do {
+            try await f.workflow.editAndBegin(.layoutFluidLayouts(["dvorak", "qwerty"]), replacing: opened.id, systemIsDark: false)
+            XCTFail("Old command edited replacement")
+          } catch WebsiteConfigImportWorkflowError.conflict {}
+          XCTAssertEqual(try register.read().revision, saved)
+        }
+      }
+    }
+  }
+
   func testLayoutfluidSequenceWorkflowMatchesPinnedCommandAndSubscription() async throws {
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
       throw XCTSkip("Requires pinned reference")
@@ -103,7 +149,7 @@ import Observation
   func testPolyglotCommandSnapshotUsesPublishedDraftAndCannotEditReplacement() async throws {
     let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
     try await f.workflow.apply(json: #"{"mode":"words","words":4,"customPolyglot":["german","spanish"]}"#, systemIsDark: false)
-    let opened = WebsitePolyglotCommandPresentation(publication: try XCTUnwrap(f.page.state.presentation).publication)
+    let opened = WebsiteSequenceCommandPresentation(publication: try XCTUnwrap(f.page.state.presentation).publication)
     let form = WebsiteConfigPracticeEditForm(draft: opened.draft)
     XCTAssertEqual(form.polyglotLanguages, "german spanish")
     form.polyglotLanguages = "french english"
