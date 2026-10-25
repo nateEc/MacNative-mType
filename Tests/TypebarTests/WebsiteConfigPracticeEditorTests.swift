@@ -155,6 +155,24 @@ import XCTest
       }
     }
   }
+
+  func testRecoveryReasonsRenderWithoutOpeningWindow() throws {
+    let view = WebsiteQuoteRecoveryNotice(recoveries: [.allLengths, .wordsMode])
+      .padding(16).frame(width: 340, height: 160, alignment: .topLeading)
+      .background(Color(nsColor: .windowBackgroundColor))
+    let host = NSHostingView(rootView: view)
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 340, height: 160),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    render(host)
+    let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+    host.cacheDisplay(in: host.bounds, to: bitmap)
+    let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+    try png.write(to: URL(fileURLWithPath: "/tmp/typebar-quote-recovery-notice.png"))
+    XCTAssertFalse(window.isVisible)
+    XCTAssertGreaterThan(png.count, 1000)
+  }
   func testEditorRendersLightAndDarkWithoutShowingWindowOrApplying() throws {
     for quoted in [false, true] {
       let draft = try WebsiteConfigNativeProfile.prepareDraft(quoted

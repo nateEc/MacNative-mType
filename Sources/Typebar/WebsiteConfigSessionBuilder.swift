@@ -1,9 +1,19 @@
 import Foundation
 
-enum WebsiteConfigSessionBuildError: Error {
+enum WebsiteConfigSessionBuildError: Error, LocalizedError {
+  /// Emitted only by quote selection, distinct from other reconfiguration
+  /// requests or a content reader's ordinary error.
+  case quoteRecoveryRequired(WebsiteQuoteSampler.Recovery)
+  case quoteRecoveryLimitReached
   case reconfigurationRequired([String: WebsiteConfigValue])
   case unrepresentableConfiguration, customTextUnavailable, externalNotProvided, invalidExternalSource, generationFailed
   case repeatedConfigurationUnsupported
+  var errorDescription: String? {
+    if case .quoteRecoveryLimitReached = self {
+      return "引语初始化已尝试三次，仍未找到可用内容。请检查引语来源，或在导入面板恢复配置。"
+    }
+    return nil
+  }
 }
 
 /// Whole-draft generation with explicit window/account content scope. No
@@ -122,7 +132,7 @@ enum WebsiteConfigSessionBuildError: Error {
         randomIndex: random.quoteIndex) {
       case .quote(let quote): selectedQuote = quote
       case .unavailable(_, let recovery):
-        throw WebsiteConfigSessionBuildError.reconfigurationRequired(recovery.websiteChanges)
+        throw WebsiteConfigSessionBuildError.quoteRecoveryRequired(recovery)
       }
       nextScope.quoteSampler = sampler
     }

@@ -142,4 +142,35 @@ for (const key of ['soundVolume', 'language', 'mode', 'quoteLength', 'fullConfig
   }
 }
 verify();
-console.log(JSON.stringify({fixtures, applications}));
+// Execute the complete pinned init entry guard, not an invented retry count.
+const logic = read('test/test-logic.ts');
+const initStart = logic.indexOf('  console.debug("Initializing test");', logic.indexOf('async function init()'));
+const initEnd = logic.indexOf('  TestWords.words.reset();', initStart);
+assert.ok(initStart >= 0 && initEnd > initStart);
+let failedUI = 0;
+context.console = {debug() {}};
+context.Sentry = {captureException() {}};
+context.TestInitFailed = {showError() {}, show() { failedUI += 1; }};
+context.setIsTestRestarting = () => {};
+context.testReinitCount = 0;
+context.lastInitError = new Error('Owned bounded recovery sample');
+vm.runInContext('globalThis.enterInit = () => {\n' + logic.slice(initStart, initEnd) + '\nreturn true;}', context);
+const entries = [context.enterInit(), context.enterInit(), context.enterInit(), context.enterInit()];
+assert.deepEqual(entries, [true, true, true, false]);
+assert.equal(failedUI, 1);
+// Actual quote controller + generator recovery across two init entries over
+// our authored catalog. Other init stages and its DOM remain out of scope.
+context.testReinitCount = 0; context.lastInitError = null;
+context.Config = {mode: 'quote', language: 'english', quoteLength: [-2]};
+state.selected = 999; state.current = null; state.snapshot = null; state.changes = []; state.last = false;
+let attempts = 0;
+while (context.enterInit()) {
+  attempts += 1;
+  try { await context.getQuoteWordList({name: 'english'}); break; }
+  catch (error) { context.lastInitError = error; }
+}
+assert.equal(attempts, 2);
+assert.deepEqual(Array.from(context.Config.quoteLength), [0,1,2,3]);
+assert.ok(state.current !== null);
+verify();
+console.log(JSON.stringify({fixtures, applications, initializationEntries: entries, recoveryAttempts: attempts}));

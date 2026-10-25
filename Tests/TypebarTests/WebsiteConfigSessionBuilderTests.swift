@@ -231,8 +231,8 @@ import XCTest
     do {
       _ = try await WebsiteConfigSessionBuilder.prepare(draft: value, scope: .init(), loadQuotes: { _ in [] })
       XCTFail("Missing quotes silently became another prompt")
-    } catch WebsiteConfigSessionBuildError.reconfigurationRequired(let changes) {
-      XCTAssertEqual(changes, ["mode": .string("words")])
+    } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery) {
+      XCTAssertEqual(recovery.websiteChanges, ["mode": .string("words")])
     }
   }
 
@@ -293,8 +293,8 @@ import XCTest
         _ = try await WebsiteConfigSessionBuilder.prepare(draft: draft("{\"mode\":\"quote\",\"quoteLength\":\(groups)}"),
           scope: scope, loadQuotes: { _ in catalog }, random: .init(quoteIndex: { $0 - 1 }))
         XCTFail("Unavailable selection silently substituted a quote")
-      } catch WebsiteConfigSessionBuildError.reconfigurationRequired(let changes) {
-        XCTAssertEqual(changes, ["quoteLength": .array((0...3).map { .number(Double($0)) })])
+      } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery) {
+        XCTAssertEqual(recovery.websiteChanges, ["quoteLength": .array((0...3).map { .number(Double($0)) })])
       }
     }
   }

@@ -2622,6 +2622,7 @@ private struct ContentView: View {
           let departureID = pageSession.configurationDeparture?.id
           WebsiteConfigPracticeEditor(draft: publication.draft,
             canEdit: pageSessionStore.restartController?.isPreparing != true,
+            recoveries: publication.quoteRecoveries,
             pendingPreparation: pageSession.configurationDeparture != nil,
             resume: { [departureID] in
               guard let departureID else { throw WebsiteConfigImportWorkflowError.conflict }

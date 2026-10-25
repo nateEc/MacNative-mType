@@ -667,7 +667,7 @@ import TypebarSystem
         [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
       })
       XCTFail("Fresh generation must not silently ignore the unavailable group")
-    } catch WebsiteConfigSessionBuildError.reconfigurationRequired {}
+    } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired {}
   }
 
   func testConfigurationRepeatDecisionUsesNewModeAndLanguageNotClosedAttemptConfiguration() async throws {

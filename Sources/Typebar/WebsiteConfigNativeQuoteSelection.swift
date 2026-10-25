@@ -40,6 +40,13 @@ struct WebsiteQuoteSampler {
   enum Recovery: Equatable {
     case allLengths, wordsMode
 
+    var explanation: String {
+      switch self {
+      case .allLengths: "所选引语不可用，已改为全部长度。"
+      case .wordsMode: "该语言暂无可用引语，已切换为词数练习。"
+      }
+    }
+
     var websiteChanges: [String: WebsiteConfigValue] {
       switch self {
       case .allLengths: ["quoteLength": .array((0...3).map { .number(Double($0)) })]

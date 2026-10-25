@@ -1,6 +1,18 @@
 import Observation
 import SwiftUI
 
+struct WebsiteQuoteRecoveryNotice: View {
+  let recoveries: [WebsiteQuoteSampler.Recovery]
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      ForEach(recoveries.indices, id: \.self) { index in
+        Label(recoveries[index].explanation, systemImage: "arrow.triangle.2.circlepath")
+          .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+      }
+    }.accessibilityIdentifier("website-quote-recovery-notice")
+  }
+}
+
 @MainActor @Observable final class WebsiteConfigPracticeEditForm {
   var mode: TestMode
   var limit: String
@@ -87,26 +99,32 @@ struct WebsiteConfigPracticeEditor: View {
   let parameters: WebsiteConfigNativeTestParameters
   private let importedQuoteGroups: [Int]
   let canEdit: Bool
+  let recoveries: [WebsiteQuoteSampler.Recovery]
   let pendingPreparation: Bool
   let resume: (@MainActor () async throws -> String)?
   let apply: @MainActor (WebsiteConfigPracticeEdit) async throws -> String
-  init(draft: WebsiteConfigNativeDraft, canEdit: Bool, pendingPreparation: Bool = false,
+  init(draft: WebsiteConfigNativeDraft, canEdit: Bool, recoveries: [WebsiteQuoteSampler.Recovery] = [],
+    pendingPreparation: Bool = false,
     resume: (@MainActor () async throws -> String)? = nil,
     apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     parameters = draft.testParameters; importedQuoteGroups = draft.quoteSelection.groups
     self.canEdit = canEdit; self.apply = apply
+    self.recoveries = recoveries
     self.pendingPreparation = pendingPreparation; self.resume = resume
     _form = State(initialValue: .init(draft: draft))
   }
   init(form: WebsiteConfigPracticeEditForm, parameters: WebsiteConfigNativeTestParameters, canEdit: Bool,
+    recoveries: [WebsiteQuoteSampler.Recovery] = [],
     pendingPreparation: Bool = false, resume: (@MainActor () async throws -> String)? = nil,
     apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     _form = State(initialValue: form); self.parameters = parameters; self.canEdit = canEdit; self.apply = apply
     importedQuoteGroups = form.quoteLengths
+    self.recoveries = recoveries
     self.pendingPreparation = pendingPreparation; self.resume = resume
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
+      if !recoveries.isEmpty { WebsiteQuoteRecoveryNotice(recoveries: recoveries) }
       if pendingPreparation {
         VStack(alignment: .leading, spacing: 6) {
           Label("设置已保存", systemImage: "checkmark.circle").font(.subheadline.weight(.semibold))

@@ -59,7 +59,12 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
 /// rejected setter. The durable setting and departure have already succeeded.
 struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   let underlying: Error
-  var errorDescription: String? { WebsiteConfigImportWorkflowError.preparationPending.errorDescription }
+  var errorDescription: String? {
+    if case WebsiteConfigSessionBuildError.quoteRecoveryLimitReached = underlying {
+      return "设置校正已保存。" + underlying.localizedDescription
+    }
+    return WebsiteConfigImportWorkflowError.preparationPending.errorDescription
+  }
 }
 
 /// Window-owned whole-application workflow. Does not mutate legacy preferences
@@ -178,15 +183,17 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       guard !stopped else { throw WebsiteConfigImportWorkflowError.unavailable }
       guard operation == current else { throw CancellationError() }
       switch try coordinator.commit(ready, to: page, systemIsDark: systemIsDark) {
-      case .committed:
+      case .committed(let publication):
+        let recovery = publication.quoteRecoveries.map(\.explanation).joined(separator: " ")
+        let notice = recovery.isEmpty ? "" : " " + recovery
         // No await after commit. The same coordinator/content catalog owns retry.
         do {
           try page.bindRestartController(using: coordinator, loadQuotes: loadQuotes)
           switch intent {
-          case .application(nil): return "已恢复保存的配置，新的练习已准备好。"
-          case .application(.some): return "配置已导入，新的练习已准备好。"
-          case .edit: return "设置已保存，新的练习已准备好。"
-          case .resume: return "已继续准备，新的练习已准备好。"
+          case .application(nil): return "已恢复保存的配置，新的练习已准备好。" + notice
+          case .application(.some): return "配置已导入，新的练习已准备好。" + notice
+          case .edit: return "设置已保存，新的练习已准备好。" + notice
+          case .resume: return "已继续准备，新的练习已准备好。" + notice
           }
         } catch {
           // The durable commit already succeeded. Never report a rolled-back

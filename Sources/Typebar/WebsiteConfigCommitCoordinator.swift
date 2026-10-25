@@ -29,6 +29,7 @@ final class WebsiteConfigCommitCoordinator {
     /// The accepted setter snapshot can differ from runtime after nosave
     /// listeners. Delivery alone must not turn those listeners into saves.
     fileprivate var savedDraft: WebsiteConfigNativeDraft?
+    fileprivate var quoteRecoveries: [WebsiteQuoteSampler.Recovery] = []
     fileprivate weak var sourcePage: PracticePageSessionStore?
     fileprivate var pageCapture: PracticePageSessionStore.GenerationCapture?
     fileprivate var applicationCapture: PracticePageSessionStore.ApplicationCapture?
@@ -52,6 +53,7 @@ final class WebsiteConfigCommitCoordinator {
     /// Whole-draft builder output, including value-owned selection memories.
     /// nil for older explicit session producers and resource-only commits.
     let practice: WebsiteConfigSessionBuilder.Prepared?
+    let quoteRecoveries: [WebsiteQuoteSampler.Recovery]
     fileprivate let ownerLease: PreferenceConfigurationSaveRouter.Lease
     fileprivate let authority: WebsiteConfigPublicationAuthority
 
@@ -93,6 +95,7 @@ final class WebsiteConfigCommitCoordinator {
     let id: UUID
     let draft: WebsiteConfigNativeDraft
     fileprivate let savedDraft: WebsiteConfigNativeDraft
+    fileprivate let quoteRecoveries: [WebsiteQuoteSampler.Recovery]
     fileprivate let disk: WebsiteConfigFileRegister.Revision
     fileprivate let identity: UUID
     fileprivate let environment: Environment
@@ -159,7 +162,8 @@ final class WebsiteConfigCommitCoordinator {
       departed.priorAttemptLedger.recordRestart(engagedDuration: measurement.engagedDuration,
         accuracy: measurement.accuracy, savingEnabled: prepared.draft.behavior.saveCompletedResults)
     }
-    departed.configurationDeparture = .init(id: UUID(), draft: applied, savedDraft: saved, disk: disk,
+    departed.configurationDeparture = .init(id: UUID(), draft: applied, savedDraft: saved,
+      quoteRecoveries: prepared.quoteRecoveries, disk: disk,
       identity: identity, environment: prepared.environment, contentSource: prepared.contentSource,
       requiresContentSource: prepared.contentCapture != nil, repetition: repetition, quote: previous.quote,
       wordHistory: departed.session.generatedWordReplayHistory)
@@ -189,6 +193,7 @@ final class WebsiteConfigCommitCoordinator {
     var prepared = Prepared(draft: pending.draft, identity: identity, request: request,
       owner: owner, environment: context, disk: pending.disk)
     prepared.savedDraft = pending.savedDraft
+    prepared.quoteRecoveries = pending.quoteRecoveries
     prepared.sourcePage = page; prepared.pageCapture = capture
     if pending.requiresContentSource {
       guard let source = pending.contentSource else { throw WebsiteConfigCommitCoordinatorError.unavailable }
@@ -684,11 +689,65 @@ final class WebsiteConfigCommitCoordinator {
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote],
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
     random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
+    var current = resources
+    // Pinned init enters generation at most three times per restart. Keep the
+    // actual source recovery on the last failure too, then stop explicitly.
+    for attempt in 0..<3 {
+      do {
+        return try await preparePracticeAttempt(for: current, scope: scope, reason: reason,
+          replayApplicationEvents: attempt == 0, repeatedSource: repeatedSource,
+          loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+      } catch let recovery as QuoteRecoveryRequest {
+        try Task.checkCancellation()
+        try checkAsyncResources(recovery.resources.configuration, admission: recovery.resources.admission)
+        current = try prepareQuoteRecovery(recovery.recovery, for: recovery.resources)
+        if attempt == 2 { throw WebsiteConfigSessionBuildError.quoteRecoveryLimitReached }
+        await Task.yield()
+      }
+    }
+    throw WebsiteConfigSessionBuildError.quoteRecoveryLimitReached
+  }
+  @MainActor private struct QuoteRecoveryRequest: Error {
+    let recovery: WebsiteQuoteSampler.Recovery
+    let resources: ResourcesPrepared
+  }
+  private func prepareQuoteRecovery(_ recovery: WebsiteQuoteSampler.Recovery,
+    for resources: ResourcesPrepared) throws -> ResourcesPrepared {
+    let original = resources.configuration.draft
+    let changes = recovery.websiteChanges
+    // Both audited recoveries are single source setters. Do not accept an
+    // arbitrary patch from a reader or silently replace language/content.
+    guard changes.count == 1, let (key, value) = changes.first else {
+      throw WebsiteConfigCommitCoordinatorError.sessionNotReady
+    }
+    let edited = try WebsiteConfigNativeProfile.editDraft(original, key: key, value: value,
+      pointsPerRem: resources.configuration.environment.pointsPerRem,
+      context: resources.configuration.environment.context, testActive: false)
+    var projection = edited.projection
+    projection.events = original.projection.events + projection.events
+    projection.rejectedKeys = original.projection.rejectedKeys + projection.rejectedKeys
+    let draft = try original.replacingProjection(projection, memory: edited.lazyMemory,
+      pointsPerRem: resources.configuration.environment.pointsPerRem)
+    var configuration = resources.configuration
+    configuration.draft = draft
+    configuration.quoteRecoveries.append(recovery)
+    if configuration.savedDraft != nil { configuration.savedDraft = draft }
+    configuration = try saveGenerationCorrection(configuration, from: original, admission: resources.admission)
+    return .init(configuration: configuration, admission: resources.admission,
+      background: resources.background, font: resources.font)
+  }
+  private func preparePracticeAttempt(for resources: ResourcesPrepared, scope: WebsiteConfigSessionBuilder.Scope?,
+    reason: WebsiteConfigSessionBuilder.Reason,
+    replayApplicationEvents: Bool,
+    repeatedSource: WebsiteConfigSessionBuilder.AttemptSource,
+    loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote],
+    loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
+    random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
     try checkAsyncResources(resources.configuration, admission: resources.admission)
     let original = resources.configuration.draft
     let draft = try WebsiteConfigLazyModeLifecycle.prepare(original,
       pointsPerRem: resources.configuration.environment.pointsPerRem,
-      replayApplicationEvents: reason == .configurationApplication
+      replayApplicationEvents: replayApplicationEvents && reason == .configurationApplication
         && resources.configuration.pageCapture?.configurationDeparture == nil)
     if reason == .nextAttempt, draft.lazyMemory != original.lazyMemory || draft.generators.lazyMode != original.generators.lazyMode {
       throw WebsiteConfigSessionBuildError.reconfigurationRequired(["lazyMode": .bool(draft.generators.lazyMode)])
@@ -739,14 +798,21 @@ final class WebsiteConfigCommitCoordinator {
           attemptSource = .repeatedWords(history, repeatedPace: pending.repetition.repeatsPace)
         } else { throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported }
       } else { attemptSource = repeatedSource }
-      let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: effectiveScope,
-        reason: reason, attemptSource: attemptSource,
-        loadQuotes: { language in
-          try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
-            try await loadQuotes(language)
-          }
-        }, loadExternal: checkedExternal, random: random)
-      return (practice.session, practice)
+      do {
+        let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: effectiveScope,
+          reason: reason, attemptSource: attemptSource,
+          loadQuotes: { language in
+            try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
+              try await loadQuotes(language)
+            }
+          }, loadExternal: checkedExternal, random: random)
+        return (practice.session, practice)
+      } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery) {
+        guard reason == .configurationApplication else {
+          throw WebsiteConfigSessionBuildError.quoteRecoveryRequired(recovery)
+        }
+        throw QuoteRecoveryRequest(recovery: recovery, resources: prepared)
+      }
     }
   }
   /// Source init can save configuration before the text provider returns.
@@ -780,7 +846,8 @@ final class WebsiteConfigCommitCoordinator {
     } catch { page.endCommit(); throw error }
     // No throwing observer or cancellation check between durable CAS and the
     // matching pending state. Keep the closed attempt and ledger unchanged.
-    state.configurationDeparture = .init(id: UUID(), draft: prepared.draft, savedDraft: saved, disk: disk,
+    state.configurationDeparture = .init(id: UUID(), draft: prepared.draft, savedDraft: saved,
+      quoteRecoveries: prepared.quoteRecoveries, disk: disk,
       identity: identity, environment: pending.environment, contentSource: pending.contentSource,
       requiresContentSource: pending.requiresContentSource, repetition: pending.repetition,
       quote: pending.quote, wordHistory: pending.wordHistory)
@@ -893,6 +960,7 @@ final class WebsiteConfigCommitCoordinator {
       let publication = Publication(applicationID: applicationID, draft: prepared.draft, owner: prepared.owner.owner,
         environmentRevision: prepared.environment.revision, pointsPerRem: prepared.environment.pointsPerRem,
         disk: disk, background: background, font: font, session: session, practice: practice,
+        quoteRecoveries: prepared.quoteRecoveries,
         ownerLease: prepared.owner, authority: publicationAuthority)
       if let page, let appearance, let session, let practice {
         let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: appearance)

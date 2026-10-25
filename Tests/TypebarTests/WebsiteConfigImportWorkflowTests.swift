@@ -668,32 +668,156 @@ import Observation
     XCTAssertEqual(try budget(), 3)
   }
 
-  func testUnavailableQuoteGroupSavesSelectionButKeepsUndeliveredQueueAndPage() async throws {
+  func testUnavailableQuoteGroupAutomaticallySavesAllLengthsAndRetries() async throws {
     let f = try Fixture(); defer { f.close() }
+    var reads = 0
     let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
-      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in [
-        .init(id: "owned", title: "Owned", text: "ab", language: .english, length: .short)] })
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        return [.init(id: "owned", title: "Owned", text: "ab", language: .english, length: .short)]
+      })
     defer { workflow.stop() }
     try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false)
     let publication = try XCTUnwrap(f.page.state.presentation).publication
     let attempt = f.page.state.session.automaticInputAttemptID
     let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
     let bytes = try Data(contentsOf: path)
-    do { try await workflow.editAndBegin(.quoteLengths([3]), replacing: publication.applicationID, systemIsDark: false); XCTFail("Missing quote group silently applied") }
-    catch let error as WebsiteConfigSavedPreparationError {
-      guard case WebsiteConfigSessionBuildError.reconfigurationRequired = error.underlying else {
-        return XCTFail("Unexpected initializer failure")
-      }
-    }
-    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
-    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
-    XCTAssertEqual(f.page.state.practice?.scope.quoteSampler?.selection.groups, [0])
+    reads = 0
+    let message = try await workflow.editAndBegin(.quoteLengths([3]), replacing: publication.applicationID, systemIsDark: false)
+    XCTAssertTrue(message.contains("已改为全部长度"))
+    XCTAssertEqual(reads, 2, "Retry only after applying the source recovery")
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertNotEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
+    XCTAssertEqual(f.page.state.practice?.scope.quoteSampler?.selection.groups, [0,1,2,3])
     XCTAssertNotEqual(try Data(contentsOf: path), bytes)
-    XCTAssertEqual(f.page.state.configurationDeparture?.draft.quoteSelection.groups, [3])
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [0,1,2,3])
+    XCTAssertEqual(f.page.state.presentation?.publication.quoteRecoveries, [.allLengths])
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
-    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false)
     try await workflow.editAndBegin(.punctuation(true), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
     XCTAssertFalse(f.page.state.session.configuration.contentOptions.includePunctuation)
+  }
+
+  func testEmptyQuoteCatalogRecoversToWordsWithoutChangingLanguage() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in reads += 1; return [] })
+    defer { workflow.stop() }
+    let message = try await workflow.apply(json: #"{"mode":"quote","words":4,"language":"spanish"}"#, systemIsDark: false)
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .words)
+    XCTAssertEqual(f.page.state.session.configuration.language, .spanish)
+    XCTAssertEqual(f.page.state.presentation?.publication.quoteRecoveries, [.wordsMode])
+    XCTAssertTrue(message.contains("已切换为词数练习"))
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 4)
+  }
+
+  func testQuoteRecoveryStopsAfterThreeAttemptsAndRetainsSavedCorrection() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var invalid = false, reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        return [.init(id: "owned", title: "Owned bounded sample", text: "ab", language: .english,
+          length: invalid ? .all : .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false)
+    reads = 0; invalid = true
+    do {
+      try await workflow.editAndBegin(.quoteLengths([3]), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTFail("Unusable catalog delivered")
+    } catch let error as WebsiteConfigSavedPreparationError {
+      guard case WebsiteConfigSessionBuildError.quoteRecoveryLimitReached = error.underlying else {
+        return XCTFail("Unexpected failure: \(error)")
+      }
+      XCTAssertTrue(error.localizedDescription.contains("三次"))
+    }
+    XCTAssertEqual(reads, 3)
+    let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+    XCTAssertEqual(pending.draft.quoteSelection.groups, [0,1,2,3])
+    XCTAssertEqual(pending.draft.projection.events.filter { $0.key == "quoteLength" }.count, 4)
+    let disk = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    invalid = false
+    try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertNotNil(f.page.restartController)
+  }
+
+  func testReaderReconfigurationErrorIsNotMisclassifiedAsSamplerRecovery() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        throw WebsiteConfigSessionBuildError.reconfigurationRequired(["quoteLength": .array((0...3).map { .number(Double($0)) })])
+      })
+    defer { workflow.stop() }
+    do { try await workflow.apply(json: #"{"mode":"quote","quoteLength":[3]}"#, systemIsDark: false); XCTFail("Reader failure replaced content") }
+    catch WebsiteConfigSessionBuildError.reconfigurationRequired {}
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+  }
+
+  func testCancellationDuringAutomaticQuoteRetryKeepsRecoveryAndItsExplanation() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let gate = Gate(); defer { gate.resolve() }
+    var reads = 0, park = true
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        if reads > 1 && park { return await gate.read() }
+        return [.init(id: "owned", title: "Owned retry sample", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4,"quoteLength":[3]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let task = Task { try await workflow.editAndBegin(.mode(.quote), replacing: id, systemIsDark: false) }
+    try await gate.wait()
+    XCTAssertEqual(reads, 2)
+    let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+    XCTAssertEqual(pending.draft.quoteSelection.groups, [0,1,2,3])
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let disk = try register.read().revision
+    workflow.cancel(); gate.resolve()
+    do { _ = try await task.value; XCTFail("Cancelled retry delivered") } catch is CancellationError {}
+    XCTAssertEqual(try register.read().revision, disk)
+    park = false
+    let message = try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false)
+    XCTAssertTrue(message.contains("已改为全部长度"))
+    XCTAssertEqual(f.page.state.presentation?.publication.quoteRecoveries, [.allLengths])
+    XCTAssertEqual(try register.read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testCompetingRecordStopsAutomaticQuoteRecoveryBeforeRetry() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reads = 0
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":9}"#,
+      pointsPerRem: 16, context: .init())
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        guard case .committed = try register.commit(competitor, replacing: XCTUnwrap(register.read().revision)) else {
+          throw Failure.provider
+        }
+        return [.init(id: "owned", title: "Owned conflict sample", text: "ab", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4,"quoteLength":[3]}"#, systemIsDark: false)
+    do {
+      try await workflow.editAndBegin(.mode(.quote), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTFail("Recovery overwrote a competing record")
+    } catch let error as WebsiteConfigSavedPreparationError {
+      guard case WebsiteConfigCommitCoordinatorError.stale = error.underlying else { return XCTFail("Unexpected error") }
+    }
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(try register.read().state, .available(competitor.projection.runtime))
+    XCTAssertEqual(f.page.state.configurationDeparture?.draft.quoteSelection.groups, [3])
   }
 
   func testFalseSetterReturnKeepsConfigurationButStillDispatchesOrdinaryRestart() async throws {

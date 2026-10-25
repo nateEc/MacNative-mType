@@ -97,11 +97,10 @@ import XCTest
     XCTAssertEqual(try f.register.read().state, .missing)
     XCTAssertNil(f.coordinator.publication(for: f.owner))
     let fresh = try f.resources(#"{"mode":"quote"}"#)
-    do {
-      _ = try await f.coordinator.preparePractice(for: fresh, scope: .init(), loadQuotes: { _ in [] })
-      XCTFail("Missing quote recovery committed automatically")
-    } catch WebsiteConfigSessionBuildError.reconfigurationRequired {}
+    let recovered = try await f.coordinator.preparePractice(for: fresh, scope: .init(), loadQuotes: { _ in [] })
+    XCTAssertEqual(recovered.session.configuration.mode, .words)
     XCTAssertEqual(try f.register.read().state, .missing)
+    XCTAssertNil(f.coordinator.publication(for: f.owner), "Preparation is still not a publication or disk commit")
   }
 
   func testStandaloneBuilderCancellationWinsOverIgnoredCancellationAndLateReadError() async throws {
