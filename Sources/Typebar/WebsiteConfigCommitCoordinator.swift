@@ -727,6 +727,12 @@ final class WebsiteConfigCommitCoordinator {
     // Pinned init enters generation at most three times per restart. Keep the
     // actual source recovery on the last failure too, then stop explicitly.
     for attempt in 0..<3 {
+      if attempt > 0 {
+        try checkAsyncResources(current.configuration, admission: current.admission)
+        guard try register.read().revision == current.configuration.disk else {
+          throw WebsiteConfigCommitCoordinatorError.stale
+        }
+      }
       do {
         let effectiveReason: WebsiteConfigSessionBuilder.Reason = current.configuration.pageCapture?.configurationDeparture != nil
           ? .configurationApplication : reason
@@ -739,6 +745,14 @@ final class WebsiteConfigCommitCoordinator {
         current = try prepareQuoteRecovery(recovery.recovery, for: recovery.resources)
         if attempt == 2 { throw WebsiteConfigSessionBuildError.quoteRecoveryLimitReached }
         await Task.yield()
+      } catch let failure as GenerationFailure {
+        try Task.checkCancellation()
+        try checkAsyncResources(failure.resources.configuration, admission: failure.resources.admission)
+        // Keep the already-applied runtime/listener checkpoint. Reconstructing
+        // from the original import would replay events or resurrect old state.
+        current = failure.resources
+        if attempt == 2 { throw failure.underlying }
+        await Task.yield()
       }
     }
     throw WebsiteConfigSessionBuildError.quoteRecoveryLimitReached
@@ -746,6 +760,26 @@ final class WebsiteConfigCommitCoordinator {
   @MainActor private struct QuoteRecoveryRequest: Error {
     let recovery: WebsiteQuoteSampler.Recovery
     let resources: ResourcesPrepared
+  }
+  @MainActor private struct GenerationFailure: Error {
+    let underlying: Error
+    let resources: ResourcesPrepared
+  }
+  private func canRetryGeneration(_ error: Error) -> Bool {
+    // These are native admission/representation failures, not a failed source
+    // generation. In particular a retired reader must not be called again.
+    if error is CancellationError || error is WebsiteConfigCommitCoordinatorError
+      || error is PracticePageSessionStateError || error is WebsiteConfigFileRegisterError
+      || error is WebsiteConfigNativeGeneratorsError || error is WebsiteConfigNativeQuoteSelectionError { return false }
+    if let failure = error as? WebsiteConfigSessionBuildError {
+      switch failure {
+      case .generationFailed, .customTextUnavailable, .invalidExternalSource: return true
+      case .quoteRecoveryRequired, .quoteRecoveryLimitReached, .reconfigurationRequired,
+        .unrepresentableConfiguration, .externalNotProvided, .repeatedConfigurationUnsupported: return false
+      }
+    }
+    if case WholePreviewWordPreparation.PreparationError.unsupportedConfiguration = error { return false }
+    return true
   }
   private func prepareQuoteRecovery(_ recovery: WebsiteQuoteSampler.Recovery,
     for resources: ResourcesPrepared) throws -> ResourcesPrepared {
@@ -845,6 +879,9 @@ final class WebsiteConfigCommitCoordinator {
         return (practice.session, practice)
       } catch WebsiteConfigSessionBuildError.quoteRecoveryRequired(let recovery) {
         throw QuoteRecoveryRequest(recovery: recovery, resources: prepared)
+      } catch {
+        guard self.canRetryGeneration(error) else { throw error }
+        throw GenerationFailure(underlying: error, resources: prepared)
       }
     }
   }

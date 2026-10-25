@@ -40,6 +40,106 @@ import Observation
     XCTAssertTrue(ready(), "Restart operation did not settle")
   }
 
+  func testOrdinaryGenerationErrorsCanRecoverOnThirdRestartAttemptWithoutSavingAgain() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let presentation = f.page.state.presentation, disk = try f.register.read().revision
+    var reads = 0
+    let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
+      if reads < 3 { throw Failure.generation }
+      return f.quotes
+    })
+    let advanced = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(advanced)
+    XCTAssertEqual(reads, 3)
+    XCTAssertNil(controller.message)
+    XCTAssertTrue(f.page.state.presentation === presentation)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertNil(f.page.state.restartDepartureAttemptID)
+    XCTAssertFalse(f.page.state.session.hasStarted)
+  }
+
+  func testQuoteCorrectionAndOrdinaryErrorsShareOneInitializationBudget() async throws {
+    for succeeds in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+      f.input("a")
+      let replacement = OfflineQuote(id: "medium", title: "Owned replacement", text: "ef gh", language: .english, length: .medium)
+      var reads = 0
+      var saved: WebsiteConfigFileRegister.Revision?
+      let controller = try f.bind(loadQuotes: { _ in
+        reads += 1
+        if reads == 1 { return [replacement] }
+        if reads == 2 { saved = try f.register.read().revision }
+        XCTAssertEqual(try f.register.read().revision, saved)
+        if reads == 2 || !succeeds { throw Failure.generation }
+        return [replacement]
+      })
+      let advanced = try await controller.requestAndWait(requestID: UUID())
+      XCTAssertEqual(advanced, succeeds)
+      XCTAssertEqual(reads, 3, "Correction and generation errors must not get independent retry budgets")
+      XCTAssertEqual(try f.register.read().revision, try XCTUnwrap(saved))
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+      XCTAssertTrue(f.page.restartController === controller)
+      if succeeds {
+        XCTAssertNil(f.page.state.configurationDeparture)
+        XCTAssertEqual(f.page.state.presentation?.publication.quoteRecoveries, [.allLengths])
+      } else {
+        XCTAssertNotNil(f.page.state.configurationDeparture)
+        XCTAssertNotNil(controller.message)
+      }
+    }
+  }
+
+  func testGenerationFailureCannotRetryAfterCompetingConfigurationWrite() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let disk = try XCTUnwrap(f.register.read().revision), presentation = f.page.state.presentation
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"words":17}"#, pointsPerRem: 16, context: .init())
+    var reads = 0, saved: WebsiteConfigFileRegister.Revision?
+    let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
+      guard case .committed(let revision) = try f.register.commit(competitor, replacing: disk) else { throw Failure.publication }
+      saved = revision
+      throw Failure.generation
+    })
+    let advanced = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertFalse(advanced)
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(try f.register.read().revision, try XCTUnwrap(saved))
+    XCTAssertTrue(f.page.state.presentation === presentation)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertNil(f.page.state.configurationDeparture)
+  }
+
+  func testDetachedReaderErrorCannotConsumeAnotherGenerationAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let disk = try f.register.read().revision
+    var reads = 0, reply: CheckedContinuation<[OfflineQuote], Error>?
+    defer { reply?.resume(throwing: Failure.generation) }
+    let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
+      return try await withCheckedThrowingContinuation { reply = $0 }
+    })
+    let task = Task { try await controller.requestAndWait(requestID: UUID()) }
+    await wait { reply != nil }
+    f.page.detach()
+    try XCTUnwrap(reply).resume(throwing: Failure.generation); reply = nil
+    let advanced = try await task.value
+    XCTAssertFalse(advanced)
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertNil(f.page.restartController)
+  }
+
   func testQuoteRestartRecoversUnavailableLengthAndRetainsItsController() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
@@ -413,23 +513,27 @@ import Observation
     f.input("a")
     let oldID = f.page.state.session.automaticInputAttemptID, disk = try f.register.read().revision
     var reply: CheckedContinuation<[OfflineQuote], Error>?
+    var failing = false, reads = 0
     let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
       XCTAssertEqual(f.page.state.session.outcome, .abandoned)
       XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+      if failing { throw Failure.generation }
       return try await withCheckedThrowingContinuation { reply = $0 }
     })
     XCTAssertTrue(controller.request())
     XCTAssertFalse(controller.request(), "A duplicate request must not close/count twice")
     await wait { reply != nil }
     XCTAssertFalse(f.page.acceptsInput(for: oldID))
-    reply?.resume(throwing: Failure.generation); reply = nil
+    failing = true; reply?.resume(throwing: Failure.generation); reply = nil
     await wait { !controller.isPreparing }
+    XCTAssertEqual(reads, 3)
     XCTAssertNotNil(controller.message)
     XCTAssertEqual(f.page.state.session.typed, "a")
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
     XCTAssertEqual(f.page.state.restartDepartureAttemptID, oldID)
     XCTAssertEqual(try f.register.read().revision, disk)
-    XCTAssertTrue(controller.request())
+    failing = false; XCTAssertTrue(controller.request())
     await wait { reply != nil }
     reply?.resume(returning: f.quotes); reply = nil
     await wait { !controller.isPreparing }

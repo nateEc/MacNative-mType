@@ -5,7 +5,7 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WebsiteConfigSessionTransactionTests: XCTestCase {
-  private enum Failure: Error { case generation, notCommitted, gateNotEntered }
+  private enum Failure: Error { case generation, notCommitted, gateNotEntered, attempt(Int) }
   @MainActor private final class Fixture {
     let directory: URL
     let owner = UUID()
@@ -48,6 +48,58 @@ import XCTest
   private func publication(_ result: WebsiteConfigCommitCoordinator.Outcome) throws -> WebsiteConfigCommitCoordinator.Publication {
     guard case .committed(let result) = result else { throw Failure.notCommitted }
     return result
+  }
+
+  func testInitializationExhaustionReturnsLastActualErrorAndDoesNotWriteCandidate() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let resources = try f.resources(#"{"mode":"quote","quoteLength":[0]}"#)
+    var reads = 0
+    do {
+      _ = try await f.coordinator.preparePractice(for: resources, scope: .init(), loadQuotes: { _ in
+        reads += 1; throw Failure.attempt(reads)
+      })
+      XCTFail("Three failed generations delivered a candidate")
+    } catch Failure.attempt(let attempt) { XCTAssertEqual(attempt, 3) }
+    XCTAssertEqual(reads, 3)
+    XCTAssertEqual(try f.register.read().state, .missing)
+    XCTAssertNil(f.coordinator.publication(for: f.owner))
+  }
+
+  func testExternalEmptyGenerationAndReaderFailureRecoverWithinTheSameBudget() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let resources = try f.resources(#"{"mode":"words","words":3,"funbox":["wikipedia"]}"#)
+    var reads = 0
+    let ready = try await f.coordinator.preparePractice(for: resources, scope: .init(), loadExternal: { source, config in
+      reads += 1
+      XCTAssertEqual(source, .encyclopedia)
+      XCTAssertEqual(config.wordLimit, 3)
+      if reads == 2 { throw Failure.generation }
+      return .init(source: source, initial: .init(text: reads == 1 ? "" : "ab", noSpaceBoundarySource: nil),
+        continuation: .init(text: "cd ef", noSpaceBoundarySource: nil), attribution: "Owned retry source")
+    })
+    XCTAssertEqual(reads, 3)
+    XCTAssertEqual(ready.practice?.external?.attribution, "Owned retry source")
+    XCTAssertTrue(ready.session.prompt.contains("ab"))
+    XCTAssertEqual(try f.register.read().state, .missing)
+    XCTAssertNil(f.coordinator.publication(for: f.owner))
+  }
+
+  func testCancelledFailedReaderDoesNotStartAnotherInitialization() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let resources = try f.resources(#"{"mode":"quote","quoteLength":[0]}"#)
+    var reads = 0
+    await Task { @MainActor in
+      do {
+        _ = try await f.coordinator.preparePractice(for: resources, scope: .init(), loadQuotes: { _ in
+          reads += 1
+          withUnsafeCurrentTask { $0?.cancel() }
+          throw Failure.generation
+        })
+        XCTFail("Cancelled producer delivered")
+      } catch is CancellationError {} catch { XCTFail("Cancellation lost precedence: \(error)") }
+    }.value
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(try f.register.read().state, .missing)
   }
 
   func testRealAttemptAndResourcesAppearTogetherOnlyAtSuccessfulCommit() async throws {

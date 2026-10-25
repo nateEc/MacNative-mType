@@ -319,8 +319,12 @@ import TypebarSystem
     let ticket = try f.accept(f.edit(action), action: action)
     let before = try f.register.read().revision
     let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    var reads = 0, saved: WebsiteConfigFileRegister.Revision?
     do {
       _ = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+        reads += 1
+        if reads == 1 { saved = try f.register.read().revision }
+        XCTAssertEqual(try f.register.read().revision, saved, "Retries must keep the accepted correction checkpoint")
         XCTAssertTrue(try f.register.read().lazyMemory.remember)
         guard case .available(let runtime) = try f.register.read().state else { throw Failure.generation }
         XCTAssertEqual(runtime["lazyMode"], .bool(false), "Correction must precede provider invocation")
@@ -329,6 +333,7 @@ import TypebarSystem
       })
       XCTFail("Provider failure delivered a practice")
     } catch Failure.generation {}
+    XCTAssertEqual(reads, 3)
     let corrected = try f.register.read().revision
     XCTAssertNotEqual(corrected, before)
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
@@ -338,6 +343,34 @@ import TypebarSystem
     let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
     XCTAssertEqual(draft.projection.events.filter { $0.key == "lazyMode" }.count, 2)
     XCTAssertTrue(draft.lazyMemory.remember)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testRuntimeOnlyArabicOverrideSurvivesGenerationRetryWithoutAnotherSave() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","language":"spanish","lazyMode":false,"quoteLength":[0],"repeatQuotes":"off"}"#)
+    f.input()
+    let action = WebsiteConfigPracticeEdit.language("arabic")
+    let ticket = try f.accept(f.edit(action), action: action)
+    XCTAssertTrue(ticket.draft.generators.lazyMode)
+    let disk = try f.register.read().revision
+    let eventCount = ticket.draft.projection.events.count
+    let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+    var reads = 0
+    let ready = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in
+      reads += 1
+      XCTAssertEqual(try f.register.read().revision, disk)
+      XCTAssertEqual(f.page.state.configurationDeparture?.draft.projection.events.count, eventCount)
+      if reads == 1 { throw Failure.generation }
+      return [.init(id: "owned-arabic", title: "Owned Arabic", text: "اب جد", language: .arabic, length: .short)]
+    })
+    guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else { throw Failure.publication }
+    XCTAssertEqual(reads, 2)
+    XCTAssertTrue(f.page.state.presentation?.publication.draft.generators.lazyMode == true)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.events.count, eventCount)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    guard case .available(let runtime) = try f.register.read().state else { return XCTFail("Missing saved config") }
+    XCTAssertEqual(runtime["lazyMode"], .bool(false))
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
   }
 
