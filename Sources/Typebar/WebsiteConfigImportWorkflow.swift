@@ -8,6 +8,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case language(String), lazyMode(Bool)
   case funboxes([String])
   case polyglotLanguages([String])
+  case layoutFluidLayouts([String])
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
@@ -16,6 +17,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .language: "language"; case .lazyMode: "lazyMode"
     case .funboxes: "funbox"
     case .polyglotLanguages: "customPolyglot"
+    case .layoutFluidLayouts: "customLayoutfluid"
     }
   }
   var value: WebsiteConfigValue {
@@ -29,6 +31,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .lazyMode(let value): .bool(value)
     case .funboxes(let values): .array(values.map(WebsiteConfigValue.string))
     case .polyglotLanguages(let values): .array(values.map(WebsiteConfigValue.string))
+    case .layoutFluidLayouts(let values): .array(values.map(WebsiteConfigValue.string))
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -36,7 +39,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   /// neither case: execution never reaches the following dispatch.
   var dispatchesRestartAfterRejection: Bool {
     switch self {
-    case .difficulty, .language: false
+    case .difficulty, .language, .layoutFluidLayouts: false
     case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes, .polyglotLanguages: true
     }
   }
@@ -161,6 +164,14 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         throw WebsiteConfigImportWorkflowError.conflict
       }
       do { ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source) }
+      catch WebsiteConfigNativeDraftError.rejectedEdit where edit.key == "customLayoutfluid" {
+        if page.state.session.hasStarted, !page.state.session.isFinished,
+          page.state.session.configuration.modifiers.contains(.noQuit), let publication = page.state.presentation?.publication {
+          postNoQuitSelectionNotice("布局序列未修改；No Quit 保留当前练习。", publication: publication,
+            page: page, operation: current, noticeGeneration: noticeGeneration)
+        }
+        throw WebsiteConfigNativeDraftError.rejectedEdit
+      }
       catch WebsiteConfigNativeDraftError.rejectedEdit where edit.dispatchesRestartAfterRejection {
         guard let controller = page.restartController else { throw WebsiteConfigImportWorkflowError.unavailable }
         rejectedRestart = (controller, current)
@@ -168,7 +179,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         if advanced { return "设置未修改；已按原配置开始新的练习。" }
         if edit.key == "customPolyglot", page.state.session.hasStarted, !page.state.session.isFinished,
           page.state.session.configuration.modifiers.contains(.noQuit), let publication = page.state.presentation?.publication {
-          postPolyglotNoQuitNotice("多语组合未修改；No Quit 保留当前练习。", publication: publication,
+          postNoQuitSelectionNotice("多语组合未修改；No Quit 保留当前练习。", publication: publication,
             page: page, operation: current, noticeGeneration: noticeGeneration)
         }
         try Task.checkCancellation()
@@ -179,9 +190,11 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       case .accepted(let admitted): ticket = admitted
       case .futureSelectionSaved(let publication):
         let message = "多语组合已保存；No Quit 保留当前练习，下一轮使用新组合。"
-        postPolyglotNoQuitNotice(message, publication: publication, page: page,
+        postNoQuitSelectionNotice(message, publication: publication, page: page,
           operation: current, noticeGeneration: noticeGeneration)
         return message
+      case .inactiveLayoutSequenceSaved:
+        return "布局序列已保存；Layoutfluid 未启用，当前练习继续。"
       case .acceptedRetired:
         if ticket.draft.projection.events.contains(where: { $0.nosave == false }) {
           return "设置已保存，但窗口已变化；请重新打开面板恢复配置。"
@@ -262,7 +275,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       throw error
     }
   }
-  private func postPolyglotNoQuitNotice(_ message: String,
+  private func postNoQuitSelectionNotice(_ message: String,
     publication: WebsiteConfigCommitCoordinator.Publication, page: PracticePageSessionStore,
     operation current: UUID, noticeGeneration: UUID?) {
     guard let notices, let noticeGeneration else { return }

@@ -115,6 +115,7 @@ final class WebsiteConfigCommitCoordinator {
   enum ConfigurationDepartureOutcome {
     case accepted(Prepared), acceptedRetired, stale, conflict, unavailable, busy
     case futureSelectionSaved(Publication)
+    case inactiveLayoutSequenceSaved(Publication)
   }
   func beginConfigurationRestart(_ prepared: Prepared, for page: PracticePageSessionStore,
     action: WebsiteConfigPracticeEdit) throws -> ConfigurationDepartureOutcome {
@@ -127,9 +128,12 @@ final class WebsiteConfigCommitCoordinator {
       case .edited(let edit) = prepared.draft.origin, edit.key == action.key else { return .stale }
     guard !capture.testActive || !page.state.session.configuration.modifiers.contains(.noQuit) else {
       if action.key == "customPolyglot" {
-        return try saveFuturePolyglotSelection(prepared, for: page, capture: capture)
+        return try saveSelectionWithoutRestart(prepared, for: page, capture: capture, key: "customPolyglot")
       }
       throw PracticePageSessionStateError.locked
+    }
+    if action.key == "customLayoutfluid", !prepared.draft.generators.requestedModifiers.contains(.layoutFluid) {
+      return try saveSelectionWithoutRestart(prepared, for: page, capture: capture, key: "customLayoutfluid")
     }
     guard let previous = page.state.practice,
       case .string(let language)? = prepared.draft.projection.runtime["language"] else {
@@ -197,15 +201,19 @@ final class WebsiteConfigCommitCoordinator {
     return .accepted(admitted)
   }
 
-  /// This setter is explicitly non-restarting in the source metadata. Under
-  /// active No Quit it still saves; the command's following restart is denied.
-  /// Keep the actual attempt, clock, words, scope and appearance unchanged.
-  private func saveFuturePolyglotSelection(_ prepared: Prepared, for page: PracticePageSessionStore,
-    capture: PracticePageSessionStore.GenerationCapture) throws -> ConfigurationDepartureOutcome {
-    guard let previous = page.state.presentation, let practice = page.state.practice,
-      prepared.draft.projection.events.allSatisfy({ $0.key == "customPolyglot" && $0.nosave == false }),
-      capture.publication.draft.projection.runtime.allSatisfy({ key, value in
-        key == "customPolyglot" || prepared.draft.projection.runtime[key] == value
+  /// Only these two source selections may save without rebuilding the attempt:
+  /// Polyglot when No Quit blocks its following dispatch, or an inactive
+  /// Layoutfluid sequence whose successful event has no restart subscriber.
+  private func saveSelectionWithoutRestart(_ prepared: Prepared, for page: PracticePageSessionStore,
+    capture: PracticePageSessionStore.GenerationCapture, key: String) throws -> ConfigurationDepartureOutcome {
+    guard ["customPolyglot", "customLayoutfluid"].contains(key),
+      key != "customLayoutfluid" || !prepared.draft.generators.requestedModifiers.contains(.layoutFluid),
+      let previous = page.state.presentation, let practice = page.state.practice,
+      prepared.draft.projection.rejectedKeys.isEmpty, !prepared.draft.projection.events.isEmpty,
+      prepared.draft.projection.runtime.count == capture.publication.draft.projection.runtime.count,
+      prepared.draft.projection.events.allSatisfy({ $0.key == key && $0.nosave == false }),
+      capture.publication.draft.projection.runtime.allSatisfy({ field, value in
+        field == key || prepared.draft.projection.runtime[field] == value
       }) else { return .stale }
     let applied = try WebsiteConfigLazyModeLifecycle.applyingEvents(prepared.draft,
       pointsPerRem: prepared.environment.pointsPerRem)
@@ -215,7 +223,12 @@ final class WebsiteConfigCommitCoordinator {
     let controller = page.restartController
     guard isCurrent(prepared) else { return .stale }
     try Task.checkCancellation()
-    try page.beginFuturePolyglotCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
+    if key == "customPolyglot" {
+      try page.beginFuturePolyglotCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
+    } else {
+      // Layoutfluid retains ordinary No Quit admission; no bypass is added.
+      try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
+    }
     defer { page.endCommit() }
     let revision: WebsiteConfigFileRegister.Revision
     do {
@@ -239,7 +252,7 @@ final class WebsiteConfigCommitCoordinator {
     }
     latest = publication; publicationAuthority.latest = publication.applicationID
     page.installCommitted(state, retainingRestartController: controller)
-    return .futureSelectionSaved(publication)
+    return key == "customPolyglot" ? .futureSelectionSaved(publication) : .inactiveLayoutSequenceSaved(publication)
   }
   /// Retry only initialization. Never re-run the accepted setter or measure
   /// the closed attempt again. A different coordinator must use cold restore.

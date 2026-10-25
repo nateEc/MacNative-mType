@@ -6,6 +6,100 @@ import Observation
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
 
+  func testLayoutfluidSequenceWorkflowMatchesPinnedCommandAndSubscription() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
+      throw XCTSkip("Requires pinned reference")
+    }
+    struct FixtureCase: Decodable {
+      let raw: String, converted: [String], saved: [String], page: String
+      let canSubmit, enabled, active, noQuit, accepted: Bool
+      let restarts: Int
+    }
+    struct Output: Decodable { let fixtures: [FixtureCase] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", root.appendingPathComponent("Scripts/check-source-layoutfluid-list-command.mjs").path, reference]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0)
+    let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
+    XCTAssertEqual(fixtures.count, 144)
+    for fixture in fixtures where fixture.page == "test" && fixture.canSubmit {
+      let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+      let names = (fixture.enabled ? ["layoutfluid"] : []) + (fixture.noQuit ? ["no_quit"] : [])
+      let jsonNames = String(decoding: try JSONEncoder().encode(names), as: UTF8.self)
+      try await f.workflow.apply(json: "{\"mode\":\"words\",\"words\":4,\"funbox\":\(jsonNames)}", systemIsDark: false)
+      if fixture.active {
+        var active = f.page.state; active.session.insertBatch("x"); f.page.replace(active)
+        XCTAssertTrue(f.page.state.session.hasStarted)
+      }
+      let old = try XCTUnwrap(f.page.state.presentation).publication
+      let attempt = f.page.state.session.automaticInputAttemptID
+      let before = f.page.state.session.generationState
+      let register = WebsiteConfigFileRegister(directory: f.directory), disk = try register.read().revision
+      do {
+        try await f.workflow.editAndBegin(.layoutFluidLayouts(fixture.converted), replacing: old.applicationID, systemIsDark: false)
+        XCTAssertTrue(fixture.accepted, fixture.raw)
+      } catch WebsiteConfigNativeDraftError.rejectedEdit { XCTAssertFalse(fixture.accepted, fixture.raw) }
+      let current = try XCTUnwrap(f.page.state.presentation).publication
+      XCTAssertEqual(current.draft.generators.layoutFluidLayouts.compactMap(OfficialLayoutCommandCatalog.name), fixture.saved)
+      XCTAssertEqual(f.page.state.session.automaticInputAttemptID != attempt, fixture.restarts == 1, fixture.raw)
+      XCTAssertEqual(try register.read().revision != disk, fixture.accepted, fixture.raw)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, fixture.active ? fixture.restarts : 0)
+      XCTAssertNil(f.page.state.configurationDeparture)
+      if fixture.restarts == 0 { XCTAssertEqual(f.page.state.session.generationState, before) }
+      if fixture.accepted && fixture.enabled {
+        XCTAssertEqual(current.draft.projection.runtime["layout"], fixture.saved.first.map(WebsiteConfigValue.string))
+        XCTAssertEqual(current.draft.projection.runtime["keymapLayout"], fixture.saved.first.map(WebsiteConfigValue.string))
+      }
+      if fixture.active && fixture.noQuit {
+        XCTAssertEqual(f.account.localNotices.history.count, 1)
+        XCTAssertTrue(try XCTUnwrap(f.account.localNotices.active.first).important)
+      }
+    }
+  }
+
+  func testInactiveLayoutfluidSequenceSavesWithoutRestartingCurrentAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"theme":"dracula"}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let old = try XCTUnwrap(f.page.state.presentation).publication
+    let before = f.page.state.session, controller = f.page.restartController
+    let message = try await f.workflow.editAndBegin(.layoutFluidLayouts(["colemak", "qwerty", "colemak"]),
+      replacing: old.applicationID, systemIsDark: false)
+    let current = try XCTUnwrap(f.page.state.presentation).publication
+    XCTAssertEqual(current.draft.generators.layoutFluidLayouts.compactMap(OfficialLayoutCommandCatalog.name), ["colemak", "qwerty"])
+    XCTAssertNotEqual(current.applicationID, old.applicationID)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.automaticInputAttemptID)
+    XCTAssertEqual(f.page.state.session.generationState, before.generationState)
+    XCTAssertEqual(f.page.state.session.typed, before.typed)
+    XCTAssertTrue(f.page.restartController === controller)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertTrue(message.contains("当前练习继续"))
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else {
+      return XCTFail("Missing saved sequence")
+    }
+    XCTAssertEqual(saved["customLayoutfluid"], .array([.string("colemak"), .string("qwerty")]))
+    let register = WebsiteConfigFileRegister(directory: f.directory), firstRevision = try register.read().revision
+    try await f.workflow.editAndBegin(.layoutFluidLayouts(["colemak", "qwerty"]),
+      replacing: current.applicationID, systemIsDark: false)
+    let sameValue = try XCTUnwrap(f.page.state.presentation).publication
+    XCTAssertNotEqual(try register.read().revision, firstRevision, "A same-value source setter still saves")
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.automaticInputAttemptID)
+    let form = WebsiteConfigPracticeEditForm(draft: sameValue.draft)
+    form.layoutFluidLayouts = "qwerty qwerty"
+    let revision = try register.read().revision
+    form.startLayoutFluidLayouts { edit in
+      try await f.workflow.editAndBegin(edit, replacing: sameValue.applicationID, systemIsDark: false)
+    }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while form.isWorking && ContinuousClock.now < deadline { await Task.yield() }
+    XCTAssertFalse(form.isWorking); XCTAssertTrue(form.message?.contains("设置未修改") == true)
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.page.state.session.generationState, before.generationState)
+  }
+
   func testPolyglotCommandSnapshotUsesPublishedDraftAndCannotEditReplacement() async throws {
     let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
     try await f.workflow.apply(json: #"{"mode":"words","words":4,"customPolyglot":["german","spanish"]}"#, systemIsDark: false)

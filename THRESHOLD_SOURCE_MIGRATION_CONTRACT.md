@@ -1,5 +1,21 @@
 # 阈值源状态与迁移契约
 
+## Layoutfluid 序列的条件重开与原生编辑（2026-10-25，起点 b9a30c8c）
+
+固定 commandline 的 customLayoutfluid 输入只做 trim().split(" ")，没有 afterExec；buildInputCommand 不会自行重开。metadata 对此字段 changeRequiresRestart=true，并以 Set 保留首次顺序；完整 config/setters 在值覆盖后、schema 前执行活动 No Quit 拒绝，成功则先保存再发事件。完整 test-logic configEvent 订阅者仅在测试页且 funbox 含 layoutfluid 时重开。故不能复用 Polyglot 的无条件后续派发，也不能在未启用时结束当前尝试。
+
+新探针只读执行固定实际输入定义、完整 buildInputCommand、setter、metadata 与完整 configEvent 订阅者，校验命令 ID、默认值、原始前检、覆盖后接纳、保存与重开次数、No Quit 重要提示。语言／布局目录与 schema 验证、重开服务是明示自有适配器；不冒充浏览器、完整目录或实际练习生成。九类自有输入 × 启用／未启用 × 活动／未开始 × No Quit／普通 × 测试／设置页，共 144 组；BOM／NBSP、连续空格、未知布局、重复以及原始 16 项即使可去重仍先拒绝均包含。原完整 schema／setter 单编辑对照亦纳入回归。
+
+新增显式 layoutFluidLayouts 动作；其拒绝不派发重开。启用时沿原保存／离场／初始化流程并应用新序列首 layout 与 keymapLayout；未启用时仅提交序列并发布新配置 ID，保留当前 session、输入、时钟、scope、外观、账本和控制器。复用仅限两个已证实字段的私有保存实现，要求非空、仅该字段的 saving 事件、无拒绝键及其余全部运行字段相等。Layoutfluid 使用普通页面 beginCommit，No Quit 例外入口仍只接纳 Polyglot；无全局绕过标志。文件 CAS 后无异步、可抛回调，当前引语初始化检查点随新发布重绑定。No Quit 拒绝通过原账户／请求／发布／文件有效性守卫发重要提示。
+
+原生表单增加布局 ID 输入与明确说明，保留原始输入，不在前检前去重。未通过 setter 的表单现在明确显示“设置未修改”，避免误称已保存待准备。隐藏布局夹具增加容纳新字段的高度，不改生产窗口尺寸；已查看 340 浅色 words 与 520 深色 quote，未见裁切。
+
+先行测试最初误用旧布局枚举名而编译失败，改为实际官方名称映射后，真实反例出现六处断言失败：未启用时仍更换尝试、清空输入并计量离场。修复后单项通过（0.064 秒）。首批源码／真实工作流／表单与隐藏渲染四项通过（5.163 秒）；其中工作流按 144 组样本中属于测试页且能提交的 32 组校验，未启用保留生成状态、已启用新首布局、No Quit／去重拒绝不重开与不写盘、重要提示及实际保存结果。随后补同值仍保存及真实表单拒绝后的磁盘／输入不变。最终相关 181 项零失败／零跳过（49.673 秒），含 Funbox 激活／记忆、导入事务、下一轮、表单、会话构建、完整单编辑源码对照、Polyglot 命令和普通重开控制器。
+
+日志 /tmp/typebar-layoutfluid-list-{red,green,focused,regression}.log，源样本与诊断 /tmp/typebar-layoutfluid-list-source.{json,log}。原创性、47 direct／119 native symbols／17 specs 参考审计、1,344 条人工清单结构及空白检查通过。未覆盖专用命令入口、全部方向／funbox 组合、实体键盘／IME 或可见操作，不关闭已知隐藏滚轮失败，也不替代完整门禁或完成整个目标。仅开发分支批量交付，不修改通知／工作流，不启动主程序。
+
+串行 Debug 打包、签名及包内资源／原创性边界通过（增量构建 1.08 秒），日志 /tmp/typebar-layoutfluid-list-package.log，未打开应用。推送前 fetch 确认 main 8c52fb13、开发分支 b9a30c8c；开发分支无打开 PR，Actions 仍 826 次且最新 39118939684 成功。准备合并为一次中文提交推送开发分支，推后再核对外部状态。
+
 ## 完整配置的 Polyglot 命令入口（2026-10-25，起点 9ddcf47c）
 
 固定 lists.ts 将 customPolyglot 注册为输入命令，完整 buildInputCommand 产生 ID setCustomPolyglotCustom；输入、去重、false 后重开及 No Quit 的实际调用方合同沿既有 72 组源探针。原生现在在已发布完整配置、无待续准备且重开控制器空闲时提供“修改多语组合”，可搜索原版 ID／customPolyglot／polyglot／多语；旧 Typebar 设置仍走自己的组合选择，不将完整配置命令错误写入旧偏好。

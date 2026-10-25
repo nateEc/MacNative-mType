@@ -21,6 +21,7 @@ struct WebsiteQuoteRecoveryNotice: View {
   var language: TypingLanguage
   var lazyMode: Bool
   var polyglotLanguages: String
+  var layoutFluidLayouts: String
   private(set) var remembersLazyMode: Bool
   static let languages = TypingLanguage.allCases.filter { WebsiteLanguageIdentity.name(for: $0) != nil }
   static let quoteChoices: [(label: String, groups: [Int])] = [
@@ -32,18 +33,32 @@ struct WebsiteQuoteRecoveryNotice: View {
   @ObservationIgnored private var request = UUID()
   init(parameters: WebsiteConfigNativeTestParameters, difficulty: Difficulty = .normal, quoteLengths: [Int] = [1],
     lazyMode: Bool = false, remembersLazyMode: Bool = false,
-    polyglotLanguages: [String] = ["english", "spanish", "french", "german"]) {
+    polyglotLanguages: [String] = ["english", "spanish", "french", "german"],
+    layoutFluidLayouts: [String] = ["qwerty", "dvorak", "colemak"]) {
     mode = parameters.mode
     limit = String(parameters.mode == .time ? parameters.duration : parameters.wordLimit)
     self.difficulty = difficulty; self.quoteLengths = quoteLengths
     language = parameters.language; self.lazyMode = lazyMode; self.remembersLazyMode = remembersLazyMode
     self.polyglotLanguages = polyglotLanguages.joined(separator: " ")
+    self.layoutFluidLayouts = layoutFluidLayouts.joined(separator: " ")
   }
   convenience init(draft: WebsiteConfigNativeDraft) {
     self.init(parameters: draft.testParameters, difficulty: draft.inputRules.difficulty,
       quoteLengths: draft.quoteSelection.groups, lazyMode: draft.generators.lazyMode,
       remembersLazyMode: draft.lazyMemory.remember,
-      polyglotLanguages: draft.generators.polyglotLanguages.compactMap(WebsiteLanguageIdentity.name))
+      polyglotLanguages: draft.generators.polyglotLanguages.compactMap(WebsiteLanguageIdentity.name),
+      layoutFluidLayouts: draft.generators.layoutFluidLayouts.compactMap(OfficialLayoutCommandCatalog.name))
+  }
+  func startLayoutFluidLayouts(apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
+    guard !isWorking else { return }
+    let trimmed = WebsiteConfigValue.string(layoutFluidLayouts).trimmingWebsiteString
+    guard let units = trimmed.stringUnits else { return }
+    let names = String(decoding: units, as: UTF16.self).components(separatedBy: " ")
+    let value = WebsiteConfigValue.array(names.map(WebsiteConfigValue.string))
+    guard WebsiteConfigSchema(catalogs: WebsiteConfigNativeProfile.catalogs).accepts(value, for: "customLayoutfluid") else {
+      message = "请输入 2 至 15 个有效布局 ID，以单个空格分隔，例如 qwerty dvorak。"; return
+    }
+    start(.layoutFluidLayouts(names), apply: apply)
   }
   func startPolyglotLanguages(apply: @escaping @MainActor (WebsiteConfigPracticeEdit) async throws -> String) {
     guard !isWorking else { return }
@@ -86,6 +101,9 @@ struct WebsiteQuoteRecoveryNotice: View {
         guard self.request == current, !Task.isCancelled else { return }
         if let error = error as? WebsiteConfigImportWorkflowError { self.message = error.localizedDescription }
         else if let error = error as? WebsiteConfigSavedPreparationError { self.message = error.localizedDescription }
+        else if case WebsiteConfigNativeDraftError.rejectedEdit = error {
+          self.message = "设置未修改；请检查输入或当前练习的锁定状态。"
+        }
         else {
           self.message = "练习准备未完成。请检查参数、文本或引语；若设置已保存，可继续准备，或在导入面板恢复配置。"
         }
@@ -198,6 +216,17 @@ struct WebsiteConfigPracticeEditor: View {
       }.disabled(!canEdit || form.isWorking || pendingPreparation)
       Text(form.remembersLazyMode ? "已记住简化输入；切换到支持的词源会恢复。" : "Arabic 单独记住开关；词源不支持时会临时关闭简化输入。")
         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+      VStack(alignment: .leading, spacing: 6) {
+        Text("布局序列（Layoutfluid）").font(.caption)
+        TextField("qwerty dvorak colemak", text: $form.layoutFluidLayouts)
+          .font(.system(.body, design: .monospaced)).textFieldStyle(.roundedBorder)
+          .accessibilityLabel("布局 ID，以单个空格分隔")
+          .accessibilityIdentifier("website-config-layoutfluid-layouts")
+        Button("保存布局序列") { form.startLayoutFluidLayouts(apply: apply) }
+          .accessibilityIdentifier("website-config-apply-layoutfluid-layouts")
+        Text("不自动启用 Layoutfluid；启用时保存会重开，未启用时当前练习继续。No Quit 活动时不能修改。")
+          .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+      }.disabled(!canEdit || form.isWorking || pendingPreparation)
       HStack {
         Picker("难度", selection: $form.difficulty) {
           ForEach(Difficulty.allCases, id: \.self) { Text($0.rawValue).tag($0) }

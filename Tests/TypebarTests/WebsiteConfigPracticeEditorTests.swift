@@ -59,6 +59,34 @@ import XCTest
     XCTAssertEqual(edits, [.words(0), .time(30)])
     XCTAssertEqual(form.message, "saved")
   }
+  func testLayoutfluidInputMatchesSourceConversionAndRawPrevalidation() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
+      throw XCTSkip("Requires pinned reference")
+    }
+    struct Fixture: Decodable { let raw: String, converted: [String], canSubmit: Bool }
+    struct Output: Decodable { let fixtures: [Fixture] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", root.appendingPathComponent("Scripts/check-source-layoutfluid-list-command.mjs").path, reference]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0)
+    let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
+    XCTAssertEqual(fixtures.count, 144)
+    for fixture in fixtures {
+      let form = WebsiteConfigPracticeEditForm(parameters: try parameters())
+      form.layoutFluidLayouts = fixture.raw
+      var edits: [WebsiteConfigPracticeEdit] = []
+      form.startLayoutFluidLayouts { edits.append($0); return "applied" }
+      await settle(form)
+      XCTAssertEqual(edits, fixture.canSubmit ? [.layoutFluidLayouts(fixture.converted)] : [], fixture.raw)
+      XCTAssertEqual(form.layoutFluidLayouts, fixture.raw)
+      if !fixture.canSubmit { XCTAssertTrue(form.message?.contains("布局 ID") == true) }
+    }
+    let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"customLayoutfluid":["colemak","qwerty"]}"#,
+      pointsPerRem: 16, context: .init())
+    XCTAssertEqual(WebsiteConfigPracticeEditForm(draft: draft).layoutFluidLayouts, "colemak qwerty")
+  }
   func testCancellationSingleFlightAndFailureNeverShowLateSuccess() async throws {
     let form = WebsiteConfigPracticeEditForm(parameters: try parameters())
     var continuation: CheckedContinuation<String, Never>?
@@ -215,11 +243,11 @@ import XCTest
           let form = WebsiteConfigPracticeEditForm(draft: draft)
           let view = WebsiteConfigPracticeEditor(form: form, parameters: parameters, canEdit: true,
             apply: { _ in calls += 1; return "unexpected" })
-            .padding(20).frame(width: CGFloat(width), height: 680)
+            .padding(20).frame(width: CGFloat(width), height: 800)
             .background(Color(nsColor: .windowBackgroundColor))
             .environment(\.colorScheme, dark ? .dark : .light)
           let host = NSHostingView(rootView: view)
-          let window = NSWindow(contentRect: .init(x: 0, y: 0, width: CGFloat(width), height: 680),
+          let window = NSWindow(contentRect: .init(x: 0, y: 0, width: CGFloat(width), height: 800),
             styleMask: .borderless, backing: .buffered, defer: false)
           window.isReleasedWhenClosed = false
           window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua); window.contentView = host

@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-25 Layoutfluid 序列编辑（CFG-LAYOUTFLUID-LIST-EDITOR-01）：完整配置表单可输入布局 ID；保留源单空格转换与 2–15 项前检，setter 再有序去重。已启用时成功事件重开并应用新序列首布局，未启用时只保存、不改变当前尝试；No Quit 活动时拒绝并发重要提示，拒绝值不另行重开。144 组实际命令／setter／订阅者样本及真实工作流证据见迁移契约；专用命令入口、可见操作及实体键盘／IME 仍待接通或验收。
+
 2026-10-25 Polyglot 组合编辑（CFG-POLYGLOT-LIST-EDITOR-01）：完整配置现在能在原生表单修改语言 ID 列表，不必重新粘贴 JSON；正常保存重开，活动 No Quit 仅保存下轮列表、不结束或重建当前尝试。保持源单空格转换、schema 前检、setter 去重顺序和 false 后重开；新配置发布保留当前种子、外观、控制器、时钟与账本，防旧 token、取消、账户代次及竞争覆盖。72 组源命令阶段和实际工作流／表单证据见迁移契约。语言载入错误降级未实现；当前正式生成已使用 UTF-16 精确去重候选，未把旧辅助虚拟池误当正式生成器修改。
 
 2026-10-25 Memory 调用方更正（FUN-MEMORY-RESTART-LIFECYCLE-01）：固定完整 restart 会在 Memory 处理器启动 interval 后，由 onTestRestart 立即 reset；不能只读孤立计时模块就给原生增加等待倒计时。120 组实际源码生命周期、原生状态与真实页面重开验证等待／输入／删除／重复边界，生产实现未改。原审计的宽泛“等价”收紧为部分验证，实体 UI／IME 与全部组合仍待验收；详细边界见迁移契约。
@@ -1885,6 +1887,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-LAYOUTFLUID-LIST-EDITOR-01 | 完整配置的流动布局序列编辑 | `commandline/{lists,commandline-metadata,util}.ts`, `config/{metadata.tsx,setters.ts}`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：原生表单输入、前检与 setter 去重；未启用只保存，已启用才重开并应用新首布局。No Quit 活动时拒绝且重要提示，重复值无另行重开；144 组源码阶段及真实表单／工作流证据见迁移契约。专用命令入口、全部组合与实体 UI／IME 未验。 |
 | CFG-POLYGLOT-LIST-EDITOR-01 | 完整配置的多语组合编辑 | `commandline/{lists,commandline-metadata,util}.ts`, `config/metadata.tsx`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：原生表单及命令面板 setCustomPolyglotCustom 的单空格语言 ID 输入、前检与有序去重；正常保存重开，No Quit 只保存下轮列表。命令窗口捕获发布版本，退出面板后再呈现，配置替换后旧窗口不能编辑。72 组源命令阶段、真实工作流与隐藏布局见迁移契约；计时重复回归验证旧历史逐词重放，耗尽后使用新组合。载入降级、其余重复交叉语义与实体 UI／IME 未验。 |
 | FUN-MEMORY-RESTART-LIFECYCLE-01 | 记忆提示的等待、输入与重开 | `test/test-logic.ts`, `test/test-ui.ts`, `test/funbox/{funbox-functions,memory-funbox-timer}.ts` | TestDomain, AppKitInputBridge | 部分验证：实际重开会清除处理器计时器；原生保持预览至输入、删除不重显、重开恢复。120 组固定调用链及原生状态、实际页面重开见迁移契约；未证实完整 DOM、可见窗口、全部组合及实体输入法，不增加与固定版本不同的倒计时。 |
 | CFG-FUNBOX-SELECTION-MEMORY-01 | Funbox 选择与临时设置恢复 | `test/funbox/{funbox-memory,funbox,funbox-functions}.ts`, `commandline/lists/funbox.ts` | TestDomain, PreferencesDomain | 部分实现：完整配置命令切换／清空、最早值和有序 nosave 恢复、正常拒绝后继续重开、独立保存基线及可恢复准备状态。225 组固定源码记忆阶段、普通重开／同窗导入／不同窗口、旧命令／No Quit 及拒绝后失败继续的证据见迁移契约。源码通用 setter 端点为自有适配器；实际命令点击、全部拒绝提示、语音／计时器和实体 UI／IME 仍未验收。 |
