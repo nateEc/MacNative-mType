@@ -223,8 +223,8 @@ enum LivePracticeContentReplacementPolicy {
 }
 
 enum LivePracticeContentContinuationPolicy {
-  /// Threshold selection changes scoring, not this attempt's content source
-  /// or generator. All other configuration changes still retire the pull.
+  /// Thresholds and blind feedback do not change the attempt's content source
+  /// or generator. Other configuration changes still retire the pull.
   static func matchesGeneration(current: TestConfiguration, requested: TestConfiguration) -> Bool {
     var normalized = current
     normalized.rules.minimumWpm = requested.rules.minimumWpm
@@ -232,6 +232,7 @@ enum LivePracticeContentContinuationPolicy {
     normalized.rules.minimumWordBurstWpm = requested.rules.minimumWordBurstWpm
     normalized.rules.minimumWordBurstMode = requested.rules.minimumWordBurstMode
     normalized.rules.thresholdSource = requested.rules.thresholdSource
+    normalized.rules.blindMode = requested.rules.blindMode
     return normalized == requested
   }
 }

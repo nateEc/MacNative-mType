@@ -253,6 +253,8 @@ if (defaultsMode) {
       randomTheme:['custom'], theme:['dracula'], customThemeColors:[Array(10).fill('#123456')],
       accountChart:[['off','off','on','off']]};
     Object.assign(choices, {
+      quickRestart:['off','esc','tab','enter'], blindMode:[false,true],
+      alwaysShowWordsHistory:[false,true], singleListCommandLine:['manual','on'],
       minWpm:['off','custom'], minWpmCustomSpeed:[-1,0,73.5,100],
       minAcc:['off','custom'], minAccCustom:[0,91.5,100,101],
       minBurst:['off','fixed','flex'], minBurstCustomSpeed:[-1,0,83.5,100],

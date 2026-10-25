@@ -259,6 +259,15 @@ final class PracticePageSessionStore {
     }
     committing = true
   }
+  func beginLiveBehaviorCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft) throws {
+    guard state.configurationDeparture == nil, state.savedApplication == nil,
+      WebsiteConfigBehaviorEdit.admits(draft, from: capture.publication.draft) else {
+      throw PracticePageSessionStateError.locked
+    }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture)
+    committing = true
+  }
   /// Not a general No Quit bypass: only the next-attempt Polyglot list may
   /// differ. The coordinator retains this exact attempt while saving it.
   func beginFuturePolyglotCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,

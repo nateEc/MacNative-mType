@@ -16,6 +16,7 @@ final class WebsiteConfigEnvironmentSource {
   private var needsObservation = true
   private var stopped = false
   private var refresh: Task<Void, Never>?
+  private var readingLiveBehavior = false
 
   init(settings: AppSettings, account: AccountSession, pointsPerRem: Double?,
     documentComplete: Bool, development: Bool) {
@@ -27,7 +28,24 @@ final class WebsiteConfigEnvironmentSource {
     sample()
   }
 
-  func read() -> WebsiteConfigCommitCoordinator.Environment? { cached }
+  func read() -> WebsiteConfigCommitCoordinator.Environment? {
+    guard readingLiveBehavior || settings.allowsRestartingConfigurationChange else { return nil }
+    return cached
+  }
+  /// Synchronous model reads for the four non-restarting behavior setters.
+  /// This grants no commit capability; the coordinator/page still validate
+  /// the exact field, events, owner, attempt and file version. Never suspend
+  /// while ordinary full-configuration admission is withheld.
+  func withLiveBehaviorRead<T>(_ body: () throws -> T) rethrows -> T {
+    let previous = readingLiveBehavior
+    readingLiveBehavior = true
+    defer { readingLiveBehavior = previous }
+    if cached == nil {
+      refresh?.cancel(); refresh = nil
+      sample()
+    }
+    return try body()
+  }
   struct ContentModels: Equatable {
     let custom: CustomTextStateRead
     let customGeneration: UInt64
@@ -65,7 +83,7 @@ final class WebsiteConfigEnvironmentSource {
     guard refresh == nil else { return }
     // Do not resample in willSet. All observed producers are MainActor-isolated.
     refresh = Task { @MainActor [weak self] in
-      guard let self, !self.stopped else { return }
+      guard let self, !self.stopped, !Task.isCancelled else { return }
       self.refresh = nil
       self.sample()
     }
@@ -102,8 +120,7 @@ final class WebsiteConfigEnvironmentSource {
         MainActor.assumeIsolated { self?.invalidateModels() }
       }
     }
-    guard settings.allowsRestartingConfigurationChange,
-      let pointsPerRem, pointsPerRem.isFinite, pointsPerRem > 0 else {
+    guard let pointsPerRem, pointsPerRem.isFinite, pointsPerRem > 0 else {
       cached = nil
       return
     }

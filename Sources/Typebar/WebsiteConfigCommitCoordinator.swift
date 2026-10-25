@@ -310,18 +310,29 @@ final class WebsiteConfigCommitCoordinator {
   /// A source threshold setter has no restart dispatch/subscriber. Keep the
   /// live attempt and let the timer/word-commit consume its updated rules.
   func commitLiveThreshold(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, behavior: false)
+  }
+  func commitLiveBehavior(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, behavior: true)
+  }
+  private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, behavior: Bool) throws -> Outcome {
     guard !processing, page.restartController?.isPreparing != true else { return .busy }
     processing = true; defer { processing = false }
     try Task.checkCancellation()
     guard isCurrent(prepared), prepared.sourcePage === page, let capture = prepared.pageCapture,
       page.state.configurationDeparture == nil, page.state.savedApplication == nil,
-      case .edited(let edit) = prepared.draft.origin, WebsiteConfigThresholdEdit.keys.contains(edit.key),
+      let previous = page.state.presentation, let practice = page.state.practice else { return .stale }
+    if behavior {
+      guard WebsiteConfigBehaviorEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
+    } else {
+      guard case .edited(let edit) = prepared.draft.origin, WebsiteConfigThresholdEdit.keys.contains(edit.key),
       prepared.draft.projection.rejectedKeys.isEmpty, !prepared.draft.projection.events.isEmpty,
       prepared.draft.projection.events.allSatisfy({ WebsiteConfigThresholdEdit.keys.contains($0.key) && $0.nosave == false }),
       prepared.draft.projection.runtime.count == capture.publication.draft.projection.runtime.count,
       capture.publication.draft.projection.runtime.allSatisfy({ key, value in
         WebsiteConfigThresholdEdit.keys.contains(key) || prepared.draft.projection.runtime[key] == value
-      }), let previous = page.state.presentation, let practice = page.state.practice else { return .stale }
+      }) else { return .stale }
+    }
     var state = page.state
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
@@ -330,7 +341,9 @@ final class WebsiteConfigCommitCoordinator {
       quote: practice.quote, external: practice.external, repetition: practice.repetition)
     guard isCurrent(prepared) else { return .stale }
     try Task.checkCancellation()
-    try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
+    if behavior {
+      try page.beginLiveBehaviorCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
+    } else { try page.beginCommit(owner: prepared.owner, router: router, capture: capture) }
     defer { page.endCommit() }
     let revision: WebsiteConfigFileRegister.Revision
     do {

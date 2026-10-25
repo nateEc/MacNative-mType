@@ -11,6 +11,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case polyglotLanguages([String])
   case layoutFluidLayouts([String])
   case threshold(WebsiteConfigThresholdEdit)
+  case behavior(BehaviorCommandTarget)
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
@@ -21,6 +22,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .polyglotLanguages: "customPolyglot"
     case .layoutFluidLayouts: "customLayoutfluid"
     case .threshold(let edit): edit.key
+    case .behavior(let edit): edit.websiteKey
     }
   }
   var value: WebsiteConfigValue {
@@ -36,6 +38,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .polyglotLanguages(let values): .array(values.map(WebsiteConfigValue.string))
     case .layoutFluidLayouts(let values): .array(values.map(WebsiteConfigValue.string))
     case .threshold(let edit): edit.value
+    case .behavior(let edit): edit.websiteValue
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -43,7 +46,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   /// neither case: execution never reaches the following dispatch.
   var dispatchesRestartAfterRejection: Bool {
     switch self {
-    case .difficulty, .language, .layoutFluidLayouts, .threshold: false
+    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior: false
     case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes, .polyglotLanguages: true
     }
   }
@@ -133,7 +136,35 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
 
   @discardableResult
   func editAndBegin(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID, systemIsDark: Bool) async throws -> String {
-    try await perform(.edit(edit, applicationID), systemIsDark: systemIsDark)
+    if case .behavior(let target) = edit { return try runBehaviorCommand(target, replacing: applicationID) }
+    return try await perform(.edit(edit, applicationID), systemIsDark: systemIsDark)
+  }
+
+  private func runBehaviorCommand(_ target: BehaviorCommandTarget, replacing applicationID: UUID) throws -> String {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil else {
+      throw WebsiteConfigImportWorkflowError.preparationPending
+    }
+    guard page.state.presentation?.publication.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
+    try Task.checkCancellation()
+    let current = UUID(); applying = true; operation = current
+    defer {
+      if let prepared { _ = coordinator.cancel(prepared) }
+      prepared = nil; applying = false
+    }
+    return try environment.withLiveBehaviorRead {
+      let ticket = try coordinator.prepareEdit(key: target.websiteKey, value: target.websiteValue, for: page, refreshingWith: source)
+      prepared = ticket
+      try Task.checkCancellation()
+      guard operation == current, !stopped else { throw CancellationError() }
+      switch try coordinator.commitLiveBehavior(ticket, for: page) {
+      case .committed: return "行为设置已保存，当前练习继续。"
+      case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+      case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+      case .busy: throw WebsiteConfigImportWorkflowError.busy
+      }
+    }
   }
 
   /// Execute the source command synchronously. Burst's two ordinary setters

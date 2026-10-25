@@ -6,6 +6,160 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testLiveBehaviorCASFailureDoesNotInstallItsCandidateRules() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    var writes = 0, writeOnRead = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if writeOnRead {
+          writeOnRead = false
+          do {
+            guard case .committed = try register.commit(competitor, replacing: XCTUnwrap(register.read().revision)) else {
+              XCTFail("No competing CAS"); return f.window
+            }
+            writes += 1
+          } catch { XCTFail("Competing writer: \(error)") }
+        }
+        return f.window
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let before = f.page.state.session.generationState
+    let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    writeOnRead = true
+    do {
+      _ = try await workflow.editAndBegin(.behavior(.blindMode(true)), replacing: id, systemIsDark: false)
+      XCTFail("Candidate replaced competing record")
+    } catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(writes, 1); XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, id)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Competitor lost") }
+    XCTAssertEqual(saved["words"], .number(7)); XCTAssertEqual(saved["blindMode"], .bool(false))
+  }
+  func testLiveBehaviorCancellationFromWindowCaptureCannotSave() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var cancelOnRead = false
+    var workflow: WebsiteConfigImportWorkflow?
+    workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if cancelOnRead { workflow?.cancel() }
+        return f.window
+      })
+    let owned = try XCTUnwrap(workflow)
+    defer { owned.stop(); workflow = nil }
+    try await owned.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    let before = f.page.state.session.generationState
+    cancelOnRead = true
+    do {
+      _ = try await owned.editAndBegin(.behavior(.blindMode(true)), replacing: publication.applicationID, systemIsDark: false)
+      XCTFail("Retired callback committed")
+    } catch is CancellationError {}
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, publication.disk)
+  }
+  func testLiveBehaviorAdmissionCannotBypassNoQuitForOtherFieldsOrImports() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var active = f.page.state
+    active.session.insertBatch(String(active.session.prompt.prefix(1))); f.page.replace(active)
+    let router = f.settings.preferenceConfigurationSaves
+    let capture = try f.page.captureGeneration(router: router)
+    let lease = try XCTUnwrap(router.captureLease())
+    for (key, value) in [("words", WebsiteConfigValue.number(20)), ("minWpmCustomSpeed", .number(73)),
+      ("customPolyglot", .array([.string("german"), .string("spanish")]))] {
+      let draft = try WebsiteConfigNativeProfile.editDraft(capture.publication.draft, key: key, value: value,
+        pointsPerRem: 16, context: .init(), testActive: false)
+      XCTAssertThrowsError(try f.page.beginLiveBehaviorCommit(owner: lease, router: router, capture: capture, draft: draft))
+      XCTAssertTrue(f.page.acceptsAttemptCallback(for: active.session.automaticInputAttemptID))
+    }
+    let imported = try WebsiteConfigNativeProfile.prepareDraft(#"{"blindMode":true}"#, pointsPerRem: 16, context: .init())
+    XCTAssertThrowsError(try f.page.beginLiveBehaviorCommit(owner: lease, router: router, capture: capture, draft: imported))
+    let allowed = try WebsiteConfigNativeProfile.editDraft(capture.publication.draft, key: "blindMode", value: .bool(true),
+      pointsPerRem: 16, context: .init(), testActive: true)
+    try f.page.beginLiveBehaviorCommit(owner: lease, router: router, capture: capture, draft: allowed)
+    XCTAssertFalse(f.page.acceptsAttemptCallback(for: active.session.automaticInputAttemptID)); f.page.endCommit()
+    XCTAssertTrue(f.page.acceptsAttemptCallback(for: active.session.automaticInputAttemptID))
+    XCTAssertEqual(f.page.state.session.typed, active.session.typed)
+    XCTAssertFalse(f.page.state.session.configuration.rules.blindMode)
+  }
+
+  func testLiveBehaviorCompetingRecordAndCancelledTaskLeaveTheCurrentAttemptUntouched() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    let before = f.page.state.session.generationState
+    let task = Task { @MainActor in
+      try await f.workflow.editAndBegin(.behavior(.blindMode(true)), replacing: publication.applicationID, systemIsDark: false)
+    }
+    task.cancel()
+    do { _ = try await task.value; XCTFail("Cancelled command saved") } catch is CancellationError {}
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    XCTAssertEqual(try register.read().revision, publication.disk)
+    let other = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    guard case .committed = try register.commit(other, replacing: publication.disk) else { return XCTFail("No competitor") }
+    do {
+      _ = try await f.workflow.editAndBegin(.behavior(.blindMode(true)), replacing: publication.applicationID, systemIsDark: false)
+      XCTFail("Competing record overwritten")
+    } catch {}
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Record lost") }
+    XCTAssertEqual(saved["words"], .number(7)); XCTAssertEqual(saved["blindMode"], .bool(false))
+  }
+
+  func testFinishedResultKeepsBlindRuleButExplicitRepeatUsesSavedBehavior() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadExternal: { _, _, _, _ in
+        reads += 1
+        return .init(source: .encyclopedia, initial: .init(text: "ab cd", noSpaceBoundarySource: nil), continuation: nil)
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":2,"funbox":["wikipedia"]}"#, systemIsDark: false)
+    var complete = f.page.state
+    complete.session.insertBatch(complete.session.prompt + " "); f.page.replace(complete)
+    XCTAssertTrue(f.page.state.session.isFinished)
+    let before = f.page.state.session
+    try await workflow.editAndBegin(.behavior(.blindMode(true)),
+      replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.generationState, before.generationState)
+    XCTAssertFalse(f.page.state.session.configuration.rules.blindMode)
+    let advanced = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(advanced); XCTAssertEqual(reads, 1)
+    XCTAssertEqual(f.page.state.session.prompt, before.prompt)
+    XCTAssertTrue(f.page.state.session.configuration.rules.blindMode)
+  }
+  func testLiveBehaviorCommandsSaveWithoutRestartingAnActiveNoQuitAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var active = f.page.state
+    active.session.insertBatch(String(active.session.prompt.prefix(1))); f.page.replace(active)
+    let original = f.page.state.session
+    let controller = f.page.restartController
+    for command in [BehaviorCommandTarget.blindMode(true), .quickRestart(.escape),
+      .alwaysShowWordsHistory(true), .commandPaletteListMode(.singleList), .blindMode(false)] {
+      let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+      _ = try await f.workflow.editAndBegin(.behavior(command), replacing: id, systemIsDark: false)
+      let publication = try XCTUnwrap(f.page.state.presentation).publication
+      XCTAssertEqual(publication.draft.projection.runtime[command.websiteKey], command.websiteValue)
+      XCTAssertEqual(f.page.state.session.automaticInputAttemptID, original.automaticInputAttemptID)
+      XCTAssertEqual(f.page.state.session.typed, original.typed); XCTAssertEqual(f.page.state.session.prompt, original.prompt)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+      XCTAssertTrue(f.page.restartController === controller)
+      guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else { return XCTFail("No saved behavior") }
+      XCTAssertEqual(saved[command.websiteKey], command.websiteValue)
+      if case .blindMode(let enabled) = command {
+        XCTAssertEqual(f.page.state.session.configuration.rules.blindMode, enabled)
+      }
+    }
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
   func testThresholdCommandPresentationKeepsRawMemoryAndProfileUnitInHiddenNativeViews() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":10,"typingSpeedUnit":"cpm","minWpmCustomSpeed":73.5,"minAccCustom":91.5,"minBurstCustomSpeed":83.5}"#, systemIsDark: false)

@@ -2,6 +2,13 @@ import XCTest
 @testable import Typebar
 
 final class LivePracticeContentContinuationPolicyTests: XCTestCase {
+  func testBlindFeedbackDoesNotRetireTheContentPullButInitialReplacementStaysStrict() {
+    let original = TestConfiguration.words(201).with(modifiers: [.referenceStream])
+    var changed = original; changed.rules.blindMode = true
+    XCTAssertTrue(LivePracticeContentContinuationPolicy.matchesGeneration(current: changed, requested: original))
+    XCTAssertFalse(LivePracticeContentReplacementPolicy.shouldApply(hasStarted: false,
+      currentConfiguration: changed, requestedConfiguration: original))
+  }
   func testThresholdModesMemoriesAndProjectionsDoNotRetireAnExistingContentPull() throws {
     var original = TestConfiguration.words(201).with(modifiers: [.referenceStream])
     original.rules = PracticeThresholdSource(configuration: .init()).applying(to: original.rules)

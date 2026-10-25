@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-25 CFG-BEHAVIOR-COMMAND-PAGE-01：完整配置下的 quickRestart、blindMode、alwaysShowWordsHistory、singleListCommandLine 十项命令保存到拥有的原生配置，不再写旧偏好；活动 No Quit 可原地修改，保留输入、题面、时钟、账本和资源。快速重开键贯通真实输入与提示，结果历史及两个命令面板读取完整配置；盲打不使已发出的在线续取失效，完成成绩规则保持，原题重复使用新选择。作用域读取不开放普通导入／重开，字段和文件 CAS 继续复核。实际源码 292 组行为 setter 对照及隐藏页／工作流证据见 OFFICIAL_CONFIG_AUDIT；实体操作、其他命令和全局迁移未因此完成。
+
 2026-10-25 CFG-THRESHOLD-COMMAND-PAGE-01：完整配置的阈值命令转入原生专用窗口，按所打开配置的速度单位解释输入，保留当前尝试。速度／准确率采用完整数字转换；Burst 采用整数前缀且逐个 setter 保存，拒绝数值时保留已接受的模式。固定源码 3,200 组对照覆盖五单位、空白／进制／非有限数、No Quit 和保存意图；真实工作流验证文件竞争与部分保存，隐藏窗口验证布局。非有限值的原生表示、递归 override 的逐次存储故障、实体交互及全局迁移仍开放。
 
 2026-10-25 完整配置的练习阈值编辑（CFG-THRESHOLD-PAGE-01）：原生“自动失败阈值”表单接通最低整体速度、准确率和单词速度的六个源字段。普通 setter 保存后原地更新后续检查，不重开、换词或增加账本；关闭保留记忆，速度／准确率数值 setter 启用 custom，单词速度数值只改记忆。活动 No Quit 拒绝并重要提示；完成成绩保留旧规则，原题重复读取新选择。原生输入明确按 WPM／百分比编辑，命令面板的单位／截断输入语义另行追踪。实际页面、隔离布局与源 setter 对照见迁移契约；实体输入、全部故障写序及全局阈值迁移未验。
@@ -1899,6 +1901,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-BEHAVIOR-COMMAND-PAGE-01 | 完整配置的即时行为命令 | `config/metadata.tsx`, `config/setters.ts`, `test/{test-logic.ts,test-ui.ts}` | CommandDomain, PreferencesDomain, TestDomain | 部分实现：十项行为命令保存完整记录，活动 No Quit 可修改且保持尝试／输入／资源／账本；消费者统一读取新配置，盲打不丢在途文本，旧完成成绩不变。严格单字段准入与同步上下文、取消和文件竞争已验证；实体交互、其他命令及全局迁移仍开放。 |
 | CFG-THRESHOLD-COMMAND-PAGE-01 | 完整配置的原生阈值命令 | `commandline/commandline-metadata.ts`, `commandline/lists/min-burst.ts`, `utils/typing-speed-units.ts` | CommandDomain, PreferencesDomain, TestDomain | 部分实现：配置单位与原始记忆预填、完整数字／整数前缀转换、Burst 分步保存与部分拒绝、No Quit 逐次重要提示、版本校验及取消保护已接通；3,200 组实际源码对照与真实保存／隐藏窗口验证。非有限数表示、递归 override 存储故障、实体交互及全局迁移仍开放。 |
 | CFG-THRESHOLD-PAGE-01 | 完整配置的原生练习阈值编辑 | `config/{metadata.tsx,setters.ts}`, `test/test-logic.ts`, `test/test-timer.ts` | PreferencesDomain, TestDomain | 部分实现：原生表单编辑六个字段，普通修改保持当前尝试及输入，后续检查使用新规则；关闭保留记忆，0 不等于关闭。No Quit 拒绝并重要提示，完成结果不改，重复使用新选择；文件锁／竞争记录不提前改变规则。WPM／百分比字段编辑不冒充全部命令输入协议，实体窗口／IME、源逐次失败写序与全局迁移仍开放。 |
 | CFG-EXTERNAL-CONTENT-01 | 完整配置的在线初始化、续段与源失败恢复 | `test/words-generator.ts`, `test/poetry.ts`, `test/wikipedia.ts`, `test/test-logic.ts` | PreferencesDomain, TestDomain | 部分实现：导入／冷恢复／下一轮使用原生在线加载器，保留段落尾部；重复保留原题。Poetry false 保存移除来源但不恢复选择记忆，空段落与百科错误保留来源并使用初始化预算。实际页面续段与迟到请求隔离纳入回归；全部组合、真实网络分布及实体键盘／IME 未验。 |

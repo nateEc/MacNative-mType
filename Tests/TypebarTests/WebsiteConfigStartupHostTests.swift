@@ -151,7 +151,44 @@ import XCTest
     XCTAssertFalse(f.window.isVisible)
   }
 
+  func testLiveBehaviorKeepsActualInputAndUpdatesItsQuickRestartKeyDuringNoQuit() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    try await f.waitAsync { f.state.page.state.practice != nil && f.inputs().first?.acceptsTextInput == true
+      && f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+    let input = try XCTUnwrap(f.inputs().first), legacy = f.settings.snapshot
+    input.onInsert(String(f.state.page.state.session.prompt.prefix(1)), false)
+    XCTAssertFalse(f.state.page.state.session.typed.isEmpty)
+    let attempt = f.state.page.state.session.automaticInputAttemptID, typed = f.state.page.state.session.typed
+    try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange }
+    for command in [BehaviorCommandTarget.blindMode(true), .quickRestart(.escape),
+      .alwaysShowWordsHistory(true), .commandPaletteListMode(.singleList)] {
+      try await workflow.editAndBegin(.behavior(command),
+        replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+    }
+    try await f.waitAsync { f.inputs().first?.quickRestartKey == .escape }
+    XCTAssertTrue(f.inputs().first === input); XCTAssertTrue(input.acceptsTextInput)
+    XCTAssertEqual(f.state.page.state.session.typed, typed)
+    XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertTrue(f.state.page.state.session.configuration.rules.blindMode)
+    XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertEqual(f.settings.snapshot, legacy); XCTAssertFalse(f.window.isVisible)
+  }
+
   func testThresholdChangeDuringOnlinePullKeepsValidSectionAndAllowsTheNextPull() async throws {
+    try await assertLiveEditDuringOnlinePull(.threshold(.speedValue(0)))
+  }
+  func testBlindChangeDuringOnlinePullKeepsValidSectionAndAllowsTheNextPull() async throws {
+    try await assertLiveEditDuringOnlinePull(.behavior(.blindMode(true)))
+  }
+  private func assertLiveEditDuringOnlinePull(_ edit: WebsiteConfigPracticeEdit) async throws {
     var reads = 0, returned = false
     var reply: CheckedContinuation<LivePracticeContent?, Never>?
     let fetch: WebsiteConfigExternalContent.Fetch = { source, _ in
@@ -189,14 +226,14 @@ import XCTest
       let current = f.state.page.state.session
       return XCTFail("No stream request: reads=\(reads), completed=\(current.completedWordCount), generation=\(current.needsLiveContentGeneration), side=\(current.needsLiveContentPrefetch), source=\(String(describing: LivePracticeContentSource.selected(for: current.configuration)))")
     }
-    try await workflow.editAndBegin(.threshold(.speedValue(0)),
+    try await workflow.editAndBegin(edit,
       replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
     let delayed = try XCTUnwrap(reply); reply = nil
     delayed.resume(returning: .init(source: .encyclopedia, title: "Delayed", byline: nil,
       tokens: ["cd", "ef"], separator: " "))
     try await f.waitAsync { returned }
     try await Task.sleep(for: .milliseconds(50))
-    XCTAssertTrue(f.state.page.state.session.prompt.contains("cd"), "Threshold changes must not retire valid content")
+    XCTAssertTrue(f.state.page.state.session.prompt.contains("cd"), "Live feedback/scoring changes must not retire valid content")
     try XCTUnwrap(f.inputs().first).onInsert("ab ab ", false)
     try await f.waitAsync { reads >= 3 && f.state.page.state.session.prompt.contains("gh") }
     XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)

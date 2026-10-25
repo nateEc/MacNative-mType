@@ -1287,6 +1287,12 @@ private struct ContentView: View {
   private var savesCurrentPracticeResults: Bool {
     committedPracticeDraft?.behavior.saveCompletedResults ?? settings.saveCompletedResults
   }
+  private var practiceQuickRestartKey: QuickRestartKey {
+    committedPracticeDraft?.behavior.quickRestartKey ?? settings.quickRestartKey
+  }
+  private var practiceCommandPaletteListMode: CommandPaletteListMode {
+    committedPracticeDraft?.behavior.commandPaletteListMode ?? settings.commandPaletteListMode
+  }
   @State private var noQuitConfigurationLockOwnerID = UUID()
   @State private var promptCaretMotion = PromptCaretMotionCoordinator()
   @State private var promptInsertionAnchor = PromptInsertionAnchor()
@@ -1395,6 +1401,8 @@ private struct ContentView: View {
   @State private var queuedWebsiteThresholdCommand: WebsiteThresholdCommandPresentation?
   @State private var websiteThresholdCommandTask: Task<Void, Never>?
   @State private var websiteThresholdCommandRequest = UUID()
+  @State private var websiteBehaviorCommandTask: Task<Void, Never>?
+  @State private var websiteBehaviorCommandRequest = UUID()
   @State private var websiteImportWorkflow: WebsiteConfigImportWorkflow?
   @State private var websiteFunboxCommandTask: Task<Void, Never>?
   @State private var websiteLiveSourceRecoveryTask: Task<Void, Never>?
@@ -1769,6 +1777,7 @@ private struct ContentView: View {
     }
     .onDisappear {
       websiteThresholdCommandRequest = UUID(); websiteThresholdCommandTask?.cancel(); websiteThresholdCommandTask = nil
+      websiteBehaviorCommandRequest = UUID(); websiteBehaviorCommandTask?.cancel(); websiteBehaviorCommandTask = nil
       websiteLiveSourceRecoveryRequest = UUID()
       websiteLiveSourceRecoveryTask?.cancel(); websiteLiveSourceRecoveryTask = nil
       pageSessionStore.detach()
@@ -2115,7 +2124,7 @@ private struct ContentView: View {
       }
     }) {
       CommandPaletteView(
-        items: commandPaletteItems, listMode: settings.commandPaletteListMode,
+        items: commandPaletteItems, listMode: practiceCommandPaletteListMode,
         onSelect: runCommand,
         onPreview: { item in
           commandThemePreviewTarget = ThemeCommandPreviewPolicy.target(for: item)
@@ -2415,7 +2424,8 @@ private struct ContentView: View {
         zeroSpeedFeedback: result.zeroSpeedFeedback,
         typingSpeedUnit: settings.typingSpeedUnit,
         alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces,
-        alwaysShowWordsHistory: settings.alwaysShowWordsHistory,
+        alwaysShowWordsHistory: committedPracticeDraft?.presentation.alwaysShowWordsHistory ?? settings.alwaysShowWordsHistory,
+        commandPaletteListMode: practiceCommandPaletteListMode,
         showWordBurstHeatmap: settings.showWordBurstHeatmap,
         startGraphsAtZero: settings.startGraphsAtZero,
         resultPerformanceVisibility: settings.resultPerformanceVisibility,
@@ -3378,7 +3388,7 @@ private struct ContentView: View {
         insertionAnchor: promptInsertionAnchor,
         insertionAttemptID: session.automaticInputAttemptID,
         compositionDisplayStyle: practiceCompositionDisplayStyle,
-        quickRestartKey: committedPracticeDraft?.behavior.quickRestartKey ?? settings.quickRestartKey,
+        quickRestartKey: practiceQuickRestartKey,
         keyboardInputMapping: effectiveKeyboardInputMapping,
         oppositeShiftKeymap: effectiveOppositeShiftKeymap,
         oppositeShiftMode: committedPracticeDraft?.inputRules.rules.oppositeShiftMode ?? settings.oppositeShiftMode,
@@ -3389,9 +3399,9 @@ private struct ContentView: View {
         acceptsTabInput: session.acceptsTabInput,
         discardsAutofocusInput: settings.showFocusWarning,
         requiresShiftQuickRestart: quickRestartRequiresProtection
-          && (committedPracticeDraft?.behavior.quickRestartKey ?? settings.quickRestartKey) != .enter,
+          && practiceQuickRestartKey != .enter,
         disablesQuickRestart: quickRestartRequiresProtection
-          && (committedPracticeDraft?.behavior.quickRestartKey ?? settings.quickRestartKey) == .enter,
+          && practiceQuickRestartKey == .enter,
         enablesLongTestBailout: quickRestartRequiresProtection,
         finishesOnShiftEnter: session.configuration.mode == .zen,
         onInsert: { [attemptID = session.automaticInputAttemptID] text, forceError in
@@ -4824,14 +4834,14 @@ private struct ContentView: View {
   private var restartInstruction: String {
     if quickRestartRequiresProtection {
       let bailout = "双击 Shift+Enter 中止并显示结果"
-      switch settings.quickRestartKey {
+      switch practiceQuickRestartKey {
       case .escape: return "按任意键开始，Shift+Esc 可重新开始；\(bailout)"
       case .tab: return "按任意键开始，Shift+Tab 可重新开始；\(bailout)"
       case .enter: return "按任意键开始，⌘R 可重开；\(bailout)"
       case .off: return "按任意键开始，可用 ⌘R 重开；\(bailout)"
       }
     }
-    switch settings.quickRestartKey {
+    switch practiceQuickRestartKey {
     case .off: return "按任意键开始，可使用 ⌘R 重新开始"
     case .escape: return "按任意键开始，Esc 可重新开始"
     case .tab: return "按任意键开始，Tab 可重新开始"
@@ -4855,7 +4865,7 @@ private struct ContentView: View {
 
   private var keyTipRestartShortcut: String {
     guard !quickRestartRequiresProtection else { return "⌘R" }
-    switch settings.quickRestartKey {
+    switch practiceQuickRestartKey {
     case .off: return "⌘R"
     case .escape: return "Esc / ⌘R"
     case .tab: return "Tab / ⌘R"
@@ -4865,7 +4875,7 @@ private struct ContentView: View {
 
   private var commandPaletteShortcutInstruction: String {
     let dynamic = CommandPaletteDynamicShortcut.resolve(
-      quickRestartKey: settings.quickRestartKey,
+      quickRestartKey: practiceQuickRestartKey,
       promptAcceptsTab: session.acceptsTabInput)
     return "\(dynamic.displayName) / ⇧⌘P / ⇧⌘K"
   }
@@ -5625,7 +5635,7 @@ private struct ContentView: View {
 
   private func showQuickRestartProtectionNotice() {
     let shortcut: String
-    switch settings.quickRestartKey {
+    switch practiceQuickRestartKey {
     case .escape: shortcut = "Shift+Esc"
     case .tab: shortcut = "Shift+Tab"
     case .enter: shortcut = "Shift+Enter"
@@ -6088,6 +6098,10 @@ private struct ContentView: View {
       return
     }
     if let target = BehaviorCommandCatalog.target(for: item.id) {
+      if pageSessionStore.ownsConfigurationSelection {
+        runWebsiteBehaviorCommand(target)
+        return
+      }
       target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       if case .blindMode(let enabled) = target {
         session.setBlindMode(enabled)
@@ -6387,6 +6401,27 @@ private struct ContentView: View {
       guard mode == .quote, availableQuotes.contains(where: { $0.id == selectedQuoteID }) else { return }
       toggleSelectedQuoteFavorite()
     default: break
+    }
+  }
+
+  private func runWebsiteBehaviorCommand(_ target: BehaviorCommandTarget) {
+    guard websiteBehaviorCommandTask == nil, let publication = pageSession.presentation?.publication,
+      pageSession.savedApplication == nil, pageSession.configurationDeparture == nil,
+      pageSessionStore.restartController?.isPreparing != true else {
+      account.localNotices.post("配置正在准备，请完成后再修改行为设置。"); return
+    }
+    let request = UUID(); websiteBehaviorCommandRequest = request
+    websiteBehaviorCommandTask = Task { @MainActor in
+      defer { if websiteBehaviorCommandRequest == request { websiteBehaviorCommandTask = nil } }
+      do {
+        _ = try await importWorkflow().editAndBegin(.behavior(target), replacing: publication.applicationID,
+          systemIsDark: systemColorScheme == .dark)
+        guard websiteBehaviorCommandRequest == request, !Task.isCancelled else { return }
+        preparedWholePreviewRendering = nil
+      } catch {
+        guard websiteBehaviorCommandRequest == request, !Task.isCancelled else { return }
+        account.localNotices.post((error as? LocalizedError)?.errorDescription ?? "行为设置未保存，请重新打开命令。")
+      }
     }
   }
 
@@ -7636,6 +7671,7 @@ private struct CompletedResultView: View {
   let typingSpeedUnit: TypingSpeedUnit
   let alwaysShowDecimalPlaces: Bool
   let alwaysShowWordsHistory: Bool
+  let commandPaletteListMode: CommandPaletteListMode
   let showWordBurstHeatmap: Bool
   let startGraphsAtZero: Bool
   let resultPerformanceVisibility: ResultPerformanceVisibility
@@ -8060,7 +8096,7 @@ private struct CompletedResultView: View {
     .sheet(isPresented: $showingCommandPalette) {
       CommandPaletteView(
         items: resultCommandItems,
-        listMode: settings.commandPaletteListMode,
+        listMode: commandPaletteListMode,
         onSelect: runResultCommand)
     }
     .sheet(isPresented: $showingLocalNoticeHistory) { LocalNoticeHistoryView(center: account.localNotices) }

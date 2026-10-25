@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## 完整配置的四类即时行为命令（2026-10-25，起点 ef8fd929）
+
+CFG-BEHAVIOR-COMMAND-PAGE-01 对照固定 config metadata、setters、test-logic 与 test-ui 的订阅。quickRestart 四值、blindMode／alwaysShowWordsHistory 两值、singleListCommandLine 两值没有 override 和重开 dispatch；changeRequiresRestart 均为 false，活动 No Quit 不拒绝。原生完整配置现先于 legacy apply 分支接入，使用所打开 publication 的身份，单个 setter 保存后保持尝试、输入、题面、时钟、资源、账本与控制器；不写旧 AppSettings。快捷键消费者与提示、结果历史和命令面板读取相同配置，盲打只改变未结束会话的规则，已完成结果不改，原题重复读取当前选择。
+
+先行工作流反例在 No Quit 下进入 beginConfigurationRestart 并抛 locked。原地发布入口仅允许四个键、单个对应事件和单字段变化；阈值仍使用原准入，不能借行为入口提交阈值／词数／语言列表或整份导入。真实隐藏练习页还要求等待实际全局 No Quit 锁生效后再操作。环境读取使用同步作用域，普通 read 仍在锁定时返回 nil，模型／账户／资源 ABA 仍退役旧代；同步作用域内刷新时取消的排队任务不能随后旋转新代，回调取消在保存前复核。此读取不是新写能力，文件 CAS 与页面验证继续生效，不引入后台程序或轮询。
+
+单字段固定源码探针从 2,146 扩到 2,426 组，其中 292 组覆盖上述行为字段（含默认值／同值、七种 Funbox、活动状态与 nosave），全部被实际 setter 接受且不属于 restartRequiredKeys。原生对照继续比较完整 runtime、事件、拒绝及保存意图。隐藏实际输入页检查控件身份、快速重开键、No Quit 生效、保留输入及无旧偏好写入；在线续取夹具检查切盲打后有效段落与下一次请求均保留。没有启动主程序。实体键盘／IME、可见命令点击、其余命令及完整重写验收仍开放，不能用本批替代全量门禁或既有隐藏滚轮缺口。
+
+范围限制：同步读取作用域目前只供四类行为命令使用。其他完整配置命令在真实页面的全局 No Quit 锁生效后，仍需逐项验证拒绝反馈或下轮选择保存，不能把独立工作流测试当作全部真实宿主已接通。中间 13 项集成检查有两个失败：准入测试误用仅一个语言的 Polyglot 夹具（已改为合法两语言），另有宿主抛框架 InvalidTransition；未取得该框架异常的独立根因，不宣称修复。最终检查显式等锁生效再操作，后续通过仅证明所运行范围。
+
+验证：先行一项真实工作流在 locked 处失败；接线后定向 25 项零失败／零跳过，增加 CAS 窗口竞争后最终相关 999 项零失败／零跳过（411.066 秒，范围重叠不相加）。最终回归与打包期间未改 Swift；Debug 打包、签名、资源与原创性检查通过，固定证据检查 47 直接项／119 原生符号／17 支持规范通过，人工清单 1,351 项仅结构检查。日志 `/tmp/typebar-live-behavior-{red,focused,integration,integration-fixed,final-focused,broad,package,reference}.log`；实际源码输出 `/tmp/typebar-live-behavior-source.json`。完整目标继续 active，只安排开发分支的一次实质推送，不改 main／工作流、不请求 CI，也不启动主程序。
+
 ## 引语采样恢复与三轮初始化上限（2026-10-25）
 
 固定 getQuoteWordList 在空目录时 setConfig(mode, words)，在缺指定引语／收藏／长度时 setQuoteLengthAll；test-logic 的 init 错误分支递归进入，入口计数超过三次停止。原生完整配置准备现仅自动处理采样器产生的这两类领域恢复，不把其他 reconfiguration 或读取错误吞成默认文本。校正走原 setter 投影，保持原始输入来源、追加真实事件、保存整份运行快照；资源与原语言不替换。已保存阶段借既有 CAS 推进，恢复原因随待准备状态、成功发布及界面保留；未绑定候选仍由上层决定提交。源码探针增加实际入口守卫与实际控制器／生成器的两轮恢复，沿用 1,562 个采样样本。尚非所有错误或所有入口都自动重试，完整导入持久时点、普通下一轮与通知体系仍开放。
