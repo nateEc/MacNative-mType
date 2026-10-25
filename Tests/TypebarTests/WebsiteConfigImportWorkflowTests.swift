@@ -6,6 +6,102 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testAllCanonicalSoundOptionsSaveWithoutRestartAndUnsupportedValuesCannotWrite() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session.generationState, legacy = f.settings.snapshot
+    let targets = SoundCommandCatalog.items.compactMap { SoundCommandCatalog.target(for: $0.id) }.filter { $0.websiteValue != .null }
+    XCTAssertEqual(targets.count, 40)
+    for target in targets {
+      try await f.workflow.editAndBegin(.sound(target), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.runtime[target.websiteKey], target.websiteValue)
+      XCTAssertEqual(f.page.state.session.generationState, before)
+    }
+    let current = try XCTUnwrap(f.page.state.presentation).publication
+    for value in [-0.1, 1.1, Double.infinity, Double.nan] {
+      do {
+        try await f.workflow.editAndBegin(.sound(.volume(value)), replacing: current.applicationID, systemIsDark: false)
+        XCTFail("Invalid volume saved")
+      } catch WebsiteConfigNativeDraftError.rejectedEdit {}
+    }
+    do {
+      try await f.workflow.editAndBegin(.sound(.click(.ripple)), replacing: current.applicationID, systemIsDark: false)
+      XCTFail("Native extension written into canonical profile")
+    } catch WebsiteSoundCommandError.unsupportedTone {}
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, current.disk)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+  func testSoundCASConflictDoesNotInstallCandidateOrChangeTheCompetingRecord() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    var writeOnRead = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if writeOnRead {
+          writeOnRead = false
+          do {
+            guard case .committed = try register.commit(competitor, replacing: XCTUnwrap(register.read().revision)) else {
+              XCTFail("No competing record"); return f.window
+            }
+          } catch { XCTFail("Competing writer: \(error)") }
+        }
+        return f.window
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"soundVolume":0.37}"#, systemIsDark: false)
+    let original = try XCTUnwrap(f.page.state.presentation).publication, before = f.page.state.session.generationState
+    writeOnRead = true
+    do {
+      try await workflow.editAndBegin(.sound(.volume(0.1)), replacing: original.applicationID, systemIsDark: false)
+      XCTFail("Sound write overwrote competitor")
+    } catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, original.applicationID)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Lost competitor") }
+    XCTAssertEqual(saved["words"], .number(7))
+  }
+  func testVolumeCommandSnapshotAndHiddenLayoutDoNotApplyOrPlayAudio() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"soundVolume":0.37}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    let presentation = WebsiteSoundVolumePresentation(publication: publication)
+    XCTAssertEqual(presentation.id, publication.applicationID); XCTAssertEqual(presentation.initialText, "0.37")
+    for (width, dark) in [(440.0, false), (640.0, true)] {
+      var calls = 0
+      let view = WebsiteSoundVolumeCommandView(presentation: presentation, canApply: true, apply: { _ in calls += 1 })
+        .frame(width: width, height: 260).background(Color(nsColor: .windowBackgroundColor))
+        .environment(\.colorScheme, dark ? .dark : .light)
+      let host = NSHostingView(rootView: view)
+      let window = NSWindow(contentRect: .init(x: 0, y: 0, width: width, height: 260), styleMask: .borderless, backing: .buffered, defer: false)
+      window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua); window.contentView = host
+      defer { window.contentView = nil; window.close() }
+      host.layoutSubtreeIfNeeded()
+      let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds)); host.cacheDisplay(in: host.bounds, to: bitmap)
+      let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+      try png.write(to: URL(fileURLWithPath: "/tmp/typebar-sound-volume-\(Int(width))-\(dark ? "dark" : "light").png"))
+      XCTAssertGreaterThan(png.count, 1000); XCTAssertFalse(window.isVisible); XCTAssertEqual(calls, 0)
+    }
+  }
+  func testSoundCommandsRetainActiveNoQuitAttemptAndSaveOnlyTheOwnedProfile() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session.generationState
+    let lock = UUID(); f.settings.setNoQuitConfigurationLock(true, for: lock)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: lock) }
+    for target in [SoundCommandTarget.volume(0.37), .click(.pianoSine), .error(.basso), .timeWarning(.threeSeconds), .click(nil)] {
+      try await f.workflow.editAndBegin(.sound(target), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.runtime[target.websiteKey], target.websiteValue)
+      XCTAssertEqual(f.page.state.session.generationState, before)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    }
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else { return XCTFail("Missing sound profile") }
+    XCTAssertEqual(saved["soundVolume"], .number(0.37)); XCTAssertEqual(saved["playSoundOnClick"], .string("off"))
+  }
   func testInputStepAdmissionRejectsRestartMarkedFieldsAndCompoundOverridesDuringNoQuit() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":10,"freedomMode":true,"stopOnError":"word","funbox":["no_quit"]}"#, systemIsDark: false)

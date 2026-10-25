@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## 完整配置声音命令与播放所有权（2026-10-26，起点 e47b18de）
+
+CFG-SOUND-COMMAND-PAGE-01 对照固定 commandline sound metadata、实际 subgroup／input builder、全 setter 和 schema。四字段没有 override 或重开要求，活动 No Quit 可保存。音量 subgroup 的 afterExec 返回 playClick 函数而没有调用，不应擅自增加试听；自定义输入 Number 转换并做 0 至 1 校验，也没有试听。键击／错误选择调用实际播放，悬停非 off 使用预览；倒计时非 off 悬停和执行均调用提示。QA --sound-commands 输出 160 组（40 选项 × 两活动状态 × 两 No Quit 状态）和 14 组自定义输入，比较完整 runtime、事件、保存与声音调用；声音端点只记录请求，不冒充原资产或真实设备播放。
+
+先行真实工作流在实际 No Quit 锁下失败于 noEnvironment。现四字段经独立单字段／单保存事件准入和 CAS 后发布；不换尝试、题面、时钟、账本或输入规则。非法值、过期命令、不可编码原生扩展和竞争记录不改配置。自定义音量有独立原生窗口，捕获 publication、原记忆预填，保存单飞，取消抑制迟到完成，源空输入按零处理。40 原选项均保留；六个 Typebar 扩展音型继续在旧偏好路径使用，完整原配置无法表示它们，菜单过滤且 API 拒绝，不把点击偷偷写到旧偏好。
+
+原播放路径另有 legacy 音量缓存覆盖显式音量的问题。窗口使用从既有加载端点创建的独立播放器，缓存、样本池和 gain 不互改；旧播放器继续服务 Typebar 偏好。弱引用转发现有键盘事件到窗口播放器，既不增加监听器也不由事件播放声音。音乐 hover 使用临时 Q，不修改真实当前键；Shift 重置后，仍按旧规则要求真实新按下事件才能升八度。实际输入依据当前会话盲打规则选择 click/error，倒计时／16 号结束提示／完成页回放读取相同选择与播放器。音量变动更新本窗口活动样本，既有已调度音乐包络不变，离窗只清理自己样本及 pending generation。
+
+所有新播放证据使用不接触设备的 voice doubles。真实隐藏练习页确认输入按完整配置 0.2 而非旧偏好 0.9 播放，保存音量到 0.4 改现有样本而不新增播放，No Quit 输入控件与本轮保持。隔离双播放器验证旧音量更新和其他窗口不改自身 gain，定向输入／预览／倒计时／结束路由及单飞取消均覆盖；440 浅色与 640 深色窗口已离屏检查。中间音高与结束提示失败来自测试夹具（A 不是音符键、Shift 后未发送字母 keyDown、reverb 仅 16 号），定位后改用有效事件／音型，保留断言，不放宽产品。仍使用原创替代音频，未声称与原波形相同；实体听感／设备、真实菜单焦点／IME、全部迟到加载退役和其他结果历史入口的完整配置作用域仍开放。没有启动主程序、发声、增加后台进程或修改配置格式。
+
+验证：先行一项在 noEnvironment 失败，接线后与原音乐行为定向 23 项通过；修正测试夹具并补齐原生音量窗口／真实输入后，最终定向 10 项通过。扩大 1,164 项零失败，其中 1,162 项通过、2 项因未提供 QA Howler 归档跳过（227.336 秒）；补齐固定 2.2.3 归档后，按脚本核对参考锁文件与 SHA-512，两项单独补跑零失败／零跳过（0.400 秒），不把先前跳过写成通过或重复相加。最终回归与打包期间未改 Swift。Debug 包、签名、资源与原创性检查通过，固定证据检查 47 直接项／119 原生符号／17 支持规范通过，人工清单 1,354 项仅结构检查。日志 `/tmp/typebar-sound-command-{red,focused,integration,host,final-focused,broad,howler-recheck,package,reference}.log`，源码输出 `/tmp/typebar-sound-command-source.json`；截图 `/tmp/typebar-sound-volume-{440-light,640-dark}.png`。本批只安排开发分支的一次实质推送，不改 main／工作流、不请求 CI；完整目标继续 active。
+
 ## 完整配置输入命令与递归 setter（2026-10-25，起点 306f4ef6）
 
 CFG-INPUT-COMMAND-PAGE-01 根据实际 commandline input subgroup、buildSubgroupCommand、config metadata／setters 与 test-logic 订阅执行。33 个选项覆盖十二类命令；只有 lazyMode afterExec 请求重开。strictSpace、stopOnError、codeUnindentOnBackspace 标记 changeRequiresRestart 但没有重开 afterExec／订阅，应在本轮更新，其标记仍用于活动 No Quit 拒绝。freedom、confidence、deleteOnError、stopOnError 的依赖 setter 按顺序执行，后续拒绝抛错不会回滚早先接受的子项。

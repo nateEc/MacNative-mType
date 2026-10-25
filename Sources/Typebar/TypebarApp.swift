@@ -1293,6 +1293,22 @@ private struct ContentView: View {
   private var practiceCommandPaletteListMode: CommandPaletteListMode {
     committedPracticeDraft?.behavior.commandPaletteListMode ?? settings.commandPaletteListMode
   }
+  @State private var websiteSoundOutput: WebsitePracticeSoundOutput?
+  @State private var websiteSoundVolume: WebsiteSoundVolumePresentation?
+  @State private var queuedWebsiteSoundVolume: WebsiteSoundVolumePresentation?
+  private var practiceSoundSelection: PracticeSoundSelection {
+    .init(draft: committedPracticeDraft, settings: settings, blindMode: session.configuration.rules.blindMode)
+  }
+  private func practiceSoundPlayer() -> TypingFeedbackSound {
+    guard committedPracticeDraft != nil else {
+      websiteSoundOutput?.stop(); websiteSoundOutput = nil
+      return settings.practiceFeedbackSound
+    }
+    let output = websiteSoundOutput ?? WebsitePracticeSoundOutput(parent: settings.practiceFeedbackSound)
+    if websiteSoundOutput == nil { websiteSoundOutput = output }
+    output.apply(practiceSoundSelection)
+    return output.player
+  }
   @State private var noQuitConfigurationLockOwnerID = UUID()
   @State private var promptCaretMotion = PromptCaretMotionCoordinator()
   @State private var promptInsertionAnchor = PromptInsertionAnchor()
@@ -1700,6 +1716,10 @@ private struct ContentView: View {
     .onChange(of: settings.typingPowerMode) { _, mode in
       if !mode.isEnabled { clearTypingPowerEffect() }
     }
+    .onChange(of: practiceSoundSelection) { _, selection in
+      if committedPracticeDraft != nil { _ = practiceSoundPlayer() }
+      else { websiteSoundOutput?.stop(); websiteSoundOutput = nil }
+    }
     .modifier(
       NoQuitConfigurationLockSynchronizer(
         session: session, settings: settings, ownerID: noQuitConfigurationLockOwnerID))
@@ -1777,6 +1797,7 @@ private struct ContentView: View {
     }
     .onDisappear {
       websiteThresholdCommandRequest = UUID(); websiteThresholdCommandTask?.cancel(); websiteThresholdCommandTask = nil
+      websiteSoundOutput?.stop(); websiteSoundOutput = nil
       websiteBehaviorCommandRequest = UUID(); websiteBehaviorCommandTask?.cancel(); websiteBehaviorCommandTask = nil
       websiteLiveSourceRecoveryRequest = UUID()
       websiteLiveSourceRecoveryTask?.cancel(); websiteLiveSourceRecoveryTask = nil
@@ -1813,10 +1834,8 @@ private struct ContentView: View {
         isLoadingLiveContent = false
       }
       if outcome != .active { visualFocus.retire() }
-      TypingFeedbackSound.shared.playPracticeFinish(
-        previousOutcome: previousOutcome, outcome: outcome, hasStarted: session.hasStarted,
-        clickEnabled: settings.playKeyclickSound, style: settings.clickSoundStyle,
-        volume: settings.soundVolume)
+      practiceSoundSelection.playFinish(previous: previousOutcome, outcome: outcome, started: session.hasStarted,
+        on: practiceSoundPlayer())
       defer {
         if outcome != .active { timerHealth = .init() }
       }
@@ -2122,6 +2141,10 @@ private struct ContentView: View {
         queuedWebsiteThresholdCommand = nil
         if pageSession.presentation?.publication.applicationID == queued.id { websiteThresholdCommand = queued }
       }
+      if let queued = queuedWebsiteSoundVolume {
+        queuedWebsiteSoundVolume = nil
+        if pageSession.presentation?.publication.applicationID == queued.id { websiteSoundVolume = queued }
+      }
     }) {
       CommandPaletteView(
         items: commandPaletteItems, listMode: practiceCommandPaletteListMode,
@@ -2130,6 +2153,9 @@ private struct ContentView: View {
           commandThemePreviewTarget = ThemeCommandPreviewPolicy.target(for: item)
           commandFontPreview.select(item, savedFont: settings.practiceFont,
             savedName: commandFontFamilyName)
+          if committedPracticeDraft != nil, let item, let target = SoundCommandCatalog.target(for: item.id) {
+            practiceSoundSelection.hover(target, on: practiceSoundPlayer())
+          }
         })
     }
     .sheet(item: $themeQuickPickerScope, onDismiss: { quickPickerThemePreviewTarget = nil }) { scope in
@@ -2318,6 +2344,17 @@ private struct ContentView: View {
           return result
         })
     }
+    .sheet(item: $websiteSoundVolume) { presentation in
+      WebsiteSoundVolumeCommandView(presentation: presentation,
+        canApply: pageSession.presentation?.publication.applicationID == presentation.id
+          && pageSession.savedApplication == nil && pageSession.configurationDeparture == nil
+          && pageSessionStore.restartController?.isPreparing != true,
+        apply: { value in
+          try await importWorkflow().editAndBegin(.sound(.volume(value)), replacing: presentation.id,
+            systemIsDark: systemColorScheme == .dark)
+          _ = practiceSoundPlayer()
+        })
+    }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
         guard acceptsRestartingConfigurationChange() else { throw SettingsJSONCommandError.configurationLocked }
@@ -2426,6 +2463,8 @@ private struct ContentView: View {
         alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces,
         alwaysShowWordsHistory: committedPracticeDraft?.presentation.alwaysShowWordsHistory ?? settings.alwaysShowWordsHistory,
         commandPaletteListMode: practiceCommandPaletteListMode,
+        soundConfiguration: .init(selection: practiceSoundSelection,
+          player: websiteSoundOutput?.player ?? settings.practiceFeedbackSound),
         showWordBurstHeatmap: settings.showWordBurstHeatmap,
         startGraphsAtZero: settings.startGraphsAtZero,
         resultPerformanceVisibility: settings.resultPerformanceVisibility,
@@ -2617,13 +2656,7 @@ private struct ContentView: View {
         for elapsedSecond in dueSeconds {
           let remaining = ClockTickPolicy.remainingSeconds(
             duration: duration, elapsedSecond: elapsedSecond)
-          if TimeWarningPolicy.shouldPlay(
-            remainingSeconds: remaining, previousSecond: lastTimeWarningSecond,
-            offset: settings.timeWarningOffset)
-          {
-            TypingFeedbackSound.shared.playTimeWarning(
-              style: settings.timeWarningSoundStyle, volume: settings.soundVolume)
-          }
+          practiceSoundSelection.playWarning(remaining: remaining, previous: lastTimeWarningSecond, on: practiceSoundPlayer())
           lastTimeWarningSecond = remaining
         }
       }
@@ -3498,7 +3531,7 @@ private struct ContentView: View {
         },
         onKeyDown: { [attemptID = session.automaticInputAttemptID] keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
           guard pageSessionStore.acceptsInput(for: attemptID) else { return }
-          TypingFeedbackSound.shared.recordKeyDown(keyCode: keyCode, modifierFlags: modifierFlags)
+          practiceSoundPlayer().recordKeyDown(keyCode: keyCode, modifierFlags: modifierFlags)
           if konamiSequenceTracker.consume(
             keyCode: keyCode,
             charactersIgnoringModifiers: charactersIgnoringModifiers,
@@ -4388,7 +4421,7 @@ private struct ContentView: View {
       activePaceTargetWpm = paceGuideTarget(usingRepeatedPace:
         isRepeatedPaceAttempt && committedPracticeDraft?.behavior.paceGuideMode == .off ? lastFinishedWpm : nil)
       session.configurePace(wpm: activePaceTargetWpm)
-      TypingFeedbackSound.shared.beginPracticeAttempt()
+      practiceSoundPlayer().beginPracticeAttempt()
       NativeSpeech.shared.stop()
       synchronizeNoQuitConfigurationLock()
       awaitViewportPresentationIfNeeded()
@@ -4543,16 +4576,7 @@ private struct ContentView: View {
   }
 
   private func playInputFeedback(inputWasCorrect: Bool?) {
-    let plan = TypingInputSoundPlan(inputWasCorrect: inputWasCorrect, blindMode: settings.blindMode,
-      clickEnabled: settings.playKeyclickSound, errorEnabled: settings.playErrorBeep)
-    if plan.playsClick {
-      TypingFeedbackSound.shared.playClick(
-        style: settings.clickSoundStyle, volume: settings.soundVolume)
-    }
-    if plan.playsError {
-      TypingFeedbackSound.shared.playError(
-        style: settings.errorSoundStyle, volume: settings.soundVolume)
-    }
+    practiceSoundSelection.playInput(inputWasCorrect, on: practiceSoundPlayer())
   }
 
   private var controls: some View {
@@ -5050,7 +5074,7 @@ private struct ContentView: View {
     liveContentMessage = nil
     if mode != .custom { activeLongSavedText = nil }
     NativeSpeech.shared.stop()
-    TypingFeedbackSound.shared.beginPracticeAttempt()
+    practiceSoundPlayer().beginPracticeAttempt()
     if restarting, mode == .quote,
       !QuoteRestartPolicy.shouldKeepCurrent(
         repeatWhileTyping: settings.repeatQuotes, hasStarted: session.hasStarted,
@@ -5340,7 +5364,7 @@ private struct ContentView: View {
       }
       guard let content else { return }
       guard let preparedLiveSession else { return }
-      TypingFeedbackSound.shared.beginPracticeAttempt()
+      practiceSoundPlayer().beginPracticeAttempt()
       session = preparedLiveSession.withElapsedClock()
       liveContentStreamingActive = true
       liveContentMessage = "已载入\(content.attribution)。"
@@ -5666,7 +5690,7 @@ private struct ContentView: View {
     liveStatsClockSignal.second = 0
     timerHealth = .init()
     NativeSpeech.shared.stop()
-    TypingFeedbackSound.shared.beginPracticeAttempt()
+    practiceSoundPlayer().beginPracticeAttempt()
     absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
     session = repeatedSession.withWeakSpotScores(weakSpotScores).withWordDecorationState(wordDecorationState).withElapsedClock()
@@ -5909,7 +5933,10 @@ private struct ContentView: View {
       active: settings.activeResultTags, historical: knownHistoricalResultTags))
     items.append(contentsOf: InputRuleCommandCatalog.items)
     items.append(contentsOf: OfficialLayoutCommandCatalog.items)
-    items.append(contentsOf: SoundCommandCatalog.items)
+    items.append(contentsOf: SoundCommandCatalog.items.filter { item in
+      committedPracticeDraft == nil || SoundCommandCatalog.target(for: item.id)?.websiteValue != .null
+    })
+    if committedPracticeDraft != nil { items.append(WebsiteSoundVolumePresentation.item) }
     items.append(contentsOf: CaretCommandCatalog.items)
     items.append(contentsOf: PaceCaretCommandCatalog.items)
     items.append(contentsOf: AppearanceCommandCatalog.items)
@@ -6023,7 +6050,16 @@ private struct ContentView: View {
       }
       return
     }
+    if item.id == WebsiteSoundVolumePresentation.item.id {
+      guard let publication = pageSession.presentation?.publication,
+        pageSession.savedApplication == nil, pageSession.configurationDeparture == nil,
+        pageSessionStore.restartController?.isPreparing != true else { return }
+      let presentation = WebsiteSoundVolumePresentation(publication: publication)
+      if showingCommandPalette { queuedWebsiteSoundVolume = presentation } else { websiteSoundVolume = presentation }
+      return
+    }
     if let target = SoundCommandCatalog.target(for: item.id) {
+      if pageSessionStore.ownsConfigurationSelection { runWebsiteLiveCommand(.sound(target)); return }
       target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       switch target.preview {
       case .click(let style):
@@ -6421,6 +6457,7 @@ private struct ContentView: View {
         _ = try await importWorkflow().editAndBegin(edit, replacing: publication.applicationID,
           systemIsDark: systemColorScheme == .dark)
         guard websiteBehaviorCommandRequest == request, !Task.isCancelled else { return }
+        if case .sound(let target) = edit { practiceSoundSelection.afterCommand(target, on: practiceSoundPlayer()) }
       } catch {
         guard websiteBehaviorCommandRequest == request, !Task.isCancelled else { return }
         if case .inputRule(.lazyMode) = edit,
@@ -7678,6 +7715,7 @@ private struct CompletedResultView: View {
   let alwaysShowDecimalPlaces: Bool
   let alwaysShowWordsHistory: Bool
   let commandPaletteListMode: CommandPaletteListMode
+  let soundConfiguration: ReplaySoundConfiguration
   let showWordBurstHeatmap: Bool
   let startGraphsAtZero: Bool
   let resultPerformanceVisibility: ResultPerformanceVisibility
@@ -7987,7 +8025,7 @@ private struct CompletedResultView: View {
           configuration: result.configuration,
           targetWordDirectory: result.targetWordDirectory,
           sourceScoringBasis: result.characterStats.sourceUnitBasis,
-          soundConfiguration: .init(settings: settings))
+          soundConfiguration: soundConfiguration)
           .id(result.id)
       }
 
@@ -8816,6 +8854,13 @@ private struct ReplaySoundConfiguration {
   let clickStyle: TypingClickSoundStyle
   let errorStyle: TypingErrorSoundStyle
   let volume: Double
+  let player: TypingFeedbackSound
+
+  init(selection: PracticeSoundSelection, player: TypingFeedbackSound) {
+    playsClicks = selection.click != nil; playsErrors = selection.error != nil
+    clickStyle = selection.click ?? .tink; errorStyle = selection.error ?? .basso
+    volume = selection.volume; self.player = player
+  }
 
   @MainActor init(settings: AppSettings) {
     playsClicks = settings.playKeyclickSound
@@ -8823,6 +8868,7 @@ private struct ReplaySoundConfiguration {
     clickStyle = settings.clickSoundStyle
     errorStyle = settings.errorSoundStyle
     volume = settings.soundVolume
+    player = settings.practiceFeedbackSound
   }
 }
 
@@ -9026,10 +9072,10 @@ private struct ReplayTimelineView: View {
       case .none:
         break
       case .click:
-        TypingFeedbackSound.shared.playClick(
+        soundConfiguration.player.playClick(
           style: soundConfiguration.clickStyle, volume: soundConfiguration.volume)
       case .error:
-        TypingFeedbackSound.shared.playError(
+        soundConfiguration.player.playError(
           style: soundConfiguration.errorStyle, volume: soundConfiguration.volume)
       }
     }

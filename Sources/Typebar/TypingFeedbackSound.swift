@@ -573,6 +573,15 @@ final class TypingFeedbackSound {
   private var scaleStates: [TypingMusicMode: TypingMusicScaleState] = [:]
   private var previewScaleStates: [TypingMusicMode: TypingMusicScaleState] = [:]
   private var configuredVolume: Double?
+  private final class WeakPlayer {
+    weak var value: TypingFeedbackSound?
+    init(_ value: TypingFeedbackSound) { self.value = value }
+  }
+  private var keyboardChildren: [WeakPlayer] = []
+  private func forwardKeyboard(_ action: (TypingFeedbackSound) -> Void) {
+    keyboardChildren.removeAll { $0.value == nil }
+    for child in keyboardChildren.compactMap(\.value) { action(child) }
+  }
   private weak var warningVoice: (any TypingSoundVoice)?
   private weak var finishVoice: (any TypingSoundVoice)?
   private enum RestartingSampleChannel { case timeWarning, finishReverb }
@@ -588,6 +597,15 @@ final class TypingFeedbackSound {
     self.loadSampleSound = loadSampleSound
     self.beep = beep
     self.randomUnit = randomUnit
+  }
+
+  /// Independent voices/gain, sharing only the app keyboard event stream.
+  func makeIsolatedPlayer() -> TypingFeedbackSound {
+    let child = TypingFeedbackSound(loadSound: loadSound, beep: beep, randomUnit: randomUnit, loadSampleSound: loadSampleSound)
+    child.currentKeyCode = currentKeyCode; child.currentModifierFlags = currentModifierFlags
+    child.practiceShiftKeys = practiceShiftKeys
+    keyboardChildren.append(.init(child))
+    return child
   }
 
   /// Configuration changes affect already playing sample voices and future
@@ -670,6 +688,7 @@ final class TypingFeedbackSound {
   func resetPracticeShift() {
     practiceShiftKeys.removeAll(keepingCapacity: true)
     currentModifierFlags.remove(.shift)
+    forwardKeyboard { $0.resetPracticeShift() }
   }
 
   private func playbackVolume(_ requested: Double) -> Double? {
@@ -693,12 +712,14 @@ final class TypingFeedbackSound {
     // A letter's raw Shift flag is not a new Shift press. After a practice
     // reset, an already held physical Shift must stay logically clear.
     synchronizeCapsLock(modifierFlags.contains(.capsLock))
+    forwardKeyboard { $0.recordKeyDown(keyCode: keyCode, modifierFlags: modifierFlags) }
   }
 
   /// Explicit context initialization, not observation of ordinary key flags.
   func updateModifierFlags(_ flags: NSEvent.ModifierFlags) {
     currentModifierFlags = flags
     practiceShiftKeys = flags.contains(.shift) ? [56] : []
+    forwardKeyboard { $0.updateModifierFlags(flags) }
   }
 
   func recordModifierTransition(keyCode: UInt16, isDown: Bool, modifierFlags: NSEvent.ModifierFlags,
@@ -711,17 +732,19 @@ final class TypingFeedbackSound {
     }
     synchronizeCapsLock(modifierFlags.contains(.capsLock))
     if isDown { currentKeyCode = keyCode }
+    forwardKeyboard { $0.recordModifierTransition(keyCode: keyCode, isDown: isDown, modifierFlags: modifierFlags,
+      tracksPracticeShift: tracksPracticeShift) }
   }
 
   func synchronizeCapsLock(_ isEnabled: Bool) {
     if isEnabled { currentModifierFlags.insert(.capsLock) }
     else { currentModifierFlags.remove(.capsLock) }
+    forwardKeyboard { $0.synchronizeCapsLock(isEnabled) }
   }
 
   func previewClick(style: TypingClickSoundStyle, volume: Double, usesPracticeShift: Bool = true) {
     if let mode = style.musicMode {
-      if case .keys = mode { currentKeyCode = 12 }
-      playMusic(mode: mode, requestedVolume: volume, isPreview: true, usesPracticeShift: usesPracticeShift)
+      playMusic(mode: mode, requestedVolume: volume, isPreview: true, usesPracticeShift: usesPracticeShift, keyCodeOverride: 12)
     } else {
       prepareClickSamples(style: configuredClickStyle)
       requestSample(source: style.playbackSource, volume: volume)
@@ -729,11 +752,11 @@ final class TypingFeedbackSound {
   }
 
   private func playMusic(mode: TypingMusicMode, requestedVolume: Double, isPreview: Bool,
-    usesPracticeShift: Bool = true) {
+    usesPracticeShift: Bool = true, keyCodeOverride: UInt16? = nil) {
     let tone: TypingMusicTone
     switch mode {
     case .keys(let waveform):
-      guard let semitone = TypingMusicPitch.semitone(keyCode: currentKeyCode) else { return }
+      guard let semitone = TypingMusicPitch.semitone(keyCode: keyCodeOverride ?? currentKeyCode) else { return }
       let raised = currentModifierFlags.contains(.capsLock)
         || (usesPracticeShift && currentModifierFlags.contains(.shift))
       tone = .key(waveform: waveform, semitone: semitone, octave: raised ? 4 : 3)

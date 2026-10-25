@@ -13,6 +13,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case threshold(WebsiteConfigThresholdEdit)
   case behavior(BehaviorCommandTarget)
   case inputRule(InputRuleCommandTarget)
+  case sound(SoundCommandTarget)
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
@@ -25,6 +26,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .threshold(let edit): edit.key
     case .behavior(let edit): edit.websiteKey
     case .inputRule(let edit): edit.websiteKey
+    case .sound(let edit): edit.websiteKey
     }
   }
   var value: WebsiteConfigValue {
@@ -42,6 +44,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .threshold(let edit): edit.value
     case .behavior(let edit): edit.websiteValue
     case .inputRule(let edit): edit.websiteValue
+    case .sound(let edit): edit.websiteValue
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -49,7 +52,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   /// neither case: execution never reaches the following dispatch.
   var dispatchesRestartAfterRejection: Bool {
     switch self {
-    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior, .inputRule: false
+    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior, .inputRule, .sound: false
     case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes, .polyglotLanguages: true
     }
   }
@@ -139,7 +142,11 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
 
   @discardableResult
   func editAndBegin(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID, systemIsDark: Bool) async throws -> String {
-    if case .behavior(let target) = edit { return try runBehaviorCommand(target, replacing: applicationID) }
+    if case .behavior = edit { return try runSingleLiveCommand(edit, replacing: applicationID) }
+    if case .sound(let target) = edit {
+      guard target.websiteValue != .null else { throw WebsiteSoundCommandError.unsupportedTone }
+      return try runSingleLiveCommand(edit, replacing: applicationID)
+    }
     if case .inputRule(let target) = edit {
       if case .lazyMode(let enabled) = target { return try await perform(.edit(.lazyMode(enabled), applicationID), systemIsDark: systemIsDark) }
       return try runInputCommand(target, replacing: applicationID)
@@ -147,7 +154,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     return try await perform(.edit(edit, applicationID), systemIsDark: systemIsDark)
   }
 
-  private func runBehaviorCommand(_ target: BehaviorCommandTarget, replacing applicationID: UUID) throws -> String {
+  private func runSingleLiveCommand(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID) throws -> String {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
     guard page.state.savedApplication == nil, page.state.configurationDeparture == nil else {
@@ -161,12 +168,15 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       prepared = nil; applying = false
     }
     return try environment.withSynchronousSetterRead {
-      let ticket = try coordinator.prepareEdit(key: target.websiteKey, value: target.websiteValue, for: page, refreshingWith: source)
+      let ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source)
       prepared = ticket
       try Task.checkCancellation()
       guard operation == current, !stopped else { throw CancellationError() }
-      switch try coordinator.commitLiveBehavior(ticket, for: page) {
-      case .committed: return "行为设置已保存，当前练习继续。"
+      let outcome: WebsiteConfigCommitCoordinator.Outcome
+      if case .sound = edit { outcome = try coordinator.commitLiveSound(ticket, for: page) }
+      else { outcome = try coordinator.commitLiveBehavior(ticket, for: page) }
+      switch outcome {
+      case .committed: return "设置已保存，当前练习继续。"
       case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
       case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
       case .busy: throw WebsiteConfigImportWorkflowError.busy

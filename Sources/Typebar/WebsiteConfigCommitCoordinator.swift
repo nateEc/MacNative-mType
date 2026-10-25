@@ -318,7 +318,10 @@ final class WebsiteConfigCommitCoordinator {
   func commitLiveInputRule(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
     try commitLiveEdit(prepared, for: page, kind: .inputRule)
   }
-  private enum LiveEditKind { case threshold, behavior, inputRule }
+  func commitLiveSound(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, kind: .sound)
+  }
+  private enum LiveEditKind { case threshold, behavior, inputRule, sound }
   private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind) throws -> Outcome {
     guard !processing, page.restartController?.isPreparing != true else { return .busy }
     processing = true; defer { processing = false }
@@ -331,6 +334,8 @@ final class WebsiteConfigCommitCoordinator {
       guard WebsiteConfigBehaviorEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .inputRule:
       guard WebsiteConfigInputCommand.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
+    case .sound:
+      guard WebsiteConfigSoundEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .threshold:
       guard case .edited(let edit) = prepared.draft.origin, WebsiteConfigThresholdEdit.keys.contains(edit.key),
       prepared.draft.projection.rejectedKeys.isEmpty, !prepared.draft.projection.events.isEmpty,
@@ -344,7 +349,7 @@ final class WebsiteConfigCommitCoordinator {
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
     if kind == .inputRule { state.session.synchronizeWebsiteInputRules(prepared.draft.inputRules.rules) }
-    else { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
+    else if kind != .sound { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
     let updatedPractice = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: practice.scope,
       quote: practice.quote, external: practice.external, repetition: practice.repetition)
     guard isCurrent(prepared) else { return .stale }
@@ -354,6 +359,8 @@ final class WebsiteConfigCommitCoordinator {
       try page.beginLiveBehaviorCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .inputRule:
       try page.beginLiveInputRuleCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
+    case .sound:
+      try page.beginLiveSoundCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .threshold: try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
     }
     defer { page.endCommit() }

@@ -1139,6 +1139,7 @@ final class AppSettings {
   @ObservationIgnored let preferenceConfigurationSaves = PreferenceConfigurationSaveRouter()
   @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored private let feedbackSound: TypingFeedbackSound
+  var practiceFeedbackSound: TypingFeedbackSound { feedbackSound }
   @ObservationIgnored let localBackgroundStore: TypebarLocalBackgroundStore
   @ObservationIgnored let localPracticeFontResources: LocalPracticeFontResourceReader
   @ObservationIgnored private var batchingClickSoundConfiguration = true

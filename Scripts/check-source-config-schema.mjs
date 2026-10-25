@@ -18,7 +18,8 @@ const editMode = process.argv[3] === '--single-edit';
 const failureOrderMode = process.argv[3] === '--import-failure-order';
 const thresholdCommandMode = process.argv[3] === '--threshold-commands';
 const inputCommandMode = process.argv[3] === '--input-commands';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode);
+const soundCommandMode = process.argv[3] === '--sound-commands';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -160,7 +161,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -215,6 +216,51 @@ if (defaultsMode) {
       }
     assert.equal(fixtures.length, 2310);
     verify(); console.log(JSON.stringify({fixtures}));
+  } else if (soundCommandMode) {
+    function extract(file, from, until, wrap = text => text) {
+      const source = fs.readFileSync(path.join(frontend, file), 'utf8');
+      const start = source.indexOf(from), end = source.indexOf(until, start);
+      assert.ok(start >= 0 && end > start);
+      return stripTypeScriptTypes(wrap(source.slice(start, end).replace(/^export /gm, '')), {mode:'transform'});
+    }
+    let calls = [];
+    const controller = Object.fromEntries(['playClick','playError','playTimeWarning','previewClick','previewError'].map(name =>
+      [name, (...args) => { calls.push({name,args,volume:simulation.Config.soundVolume}); }]));
+    Object.assign(context, {Config:simulation.Config, setConfig:setters.setConfig, SoundController:controller,
+      capitalizeFirstLetter:value => value[0].toUpperCase()+value.slice(1)});
+    vm.runInContext(extract('commandline/commandline-metadata.ts','  soundVolume: {','  //caret',
+      text => `globalThis.soundInputs=({${text}});`),context);
+    vm.runInContext(extract('commandline/util.ts','function buildSubgroupCommand<','export const __testing'),context);
+    const fixtures = [];
+    for (const active of [false,true]) for (const noQuit of [false,true])
+      for (const key of ['soundVolume','playSoundOnClick','playSoundOnError','playTimeWarning']) {
+        const options = key === 'soundVolume' ? context.soundInputs[key].subgroup.options : configSchemas.ConfigSchema.shape[key].options;
+        for (const value of options) {
+          Object.assign(simulation.Config,structuredClone(defaults),{funbox:noQuit ? ['no_quit'] : [],soundVolume:0.37,
+            playSoundOnClick:'8',playSoundOnError:'2',playTimeWarning:'3'});
+          simulation.flags = {testActive:active,authenticated:false,documentComplete:true};
+          simulation.events = []; simulation.saves = []; calls = [];
+          const current = structuredClone(simulation.Config);
+          const command = context.buildSubgroupCommand(key,value,context.soundInputs[key].subgroup);
+          command.hover?.(); const hover = structuredClone(calls); calls = [];
+          assert.deepEqual(simulation.Config,current);
+          command.exec();
+          fixtures.push({key,value,current,active,runtime:structuredClone(simulation.Config),events:simulation.events,
+            saves:simulation.saves,hover,after:structuredClone(calls)});
+        }
+      }
+    const custom = [];
+    const command = context.buildInputCommand({key:'soundVolume',isPartOfSubgroup:true,
+      inputProps:context.soundInputs.soundVolume.input,configMeta:metadata.soundVolume,schema:configSchemas.ConfigSchema.shape.soundVolume});
+    for (const raw of ['', ' ', '0', '-0', '0.37', '1', '0x1', '.5', '1e-1', '-1', '1.1', 'Infinity', 'NaN', '0.5tail']) {
+      Object.assign(simulation.Config,structuredClone(defaults),{soundVolume:0.37});
+      calls = []; simulation.events = []; simulation.saves = [];
+      const converted = command.inputValueConvert(raw), canSubmit = command.validation.schema.safeParse(converted).success;
+      if (canSubmit) command.exec({input:converted});
+      custom.push({raw,canSubmit,value:canSubmit ? converted : null,runtime:simulation.Config.soundVolume,calls:structuredClone(calls)});
+    }
+    assert.equal(fixtures.length,160);
+    verify(); console.log(JSON.stringify({fixtures,custom}));
   } else if (thresholdCommandMode) {
     function extract(file, from, until, wrap = text => text) {
       const source = fs.readFileSync(path.join(frontend, file), 'utf8');

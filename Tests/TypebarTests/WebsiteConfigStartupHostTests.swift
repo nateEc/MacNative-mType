@@ -19,10 +19,10 @@ import XCTest
     let record: URL?
     /// nil: no directory; true: valid record; false: opaque record.
     init(saved: Bool?, json: String = #"{"mode":"words","words":4,"theme":"dracula"}"#,
-      fetch: @escaping WebsiteConfigExternalContent.Fetch = { _, _ in nil }) throws {
+      fetch: @escaping WebsiteConfigExternalContent.Fetch = { _, _ in nil }, feedbackSound: TypingFeedbackSound? = nil) throws {
       try FileManager.default.createDirectory(at: support, withIntermediateDirectories: false)
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-      settings = .init(defaults: defaults, feedbackSound: .init(loadSound: { _ in nil }, beep: {}),
+      settings = .init(defaults: defaults, feedbackSound: feedbackSound ?? .init(loadSound: { _ in nil }, beep: {}),
         localBackgroundStore: .inMemory())
       settings.reducePracticeMotion = true; settings.showAllPracticeLines = false
       XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: .words(3)),
@@ -149,6 +149,31 @@ import XCTest
     XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 0)
     XCTAssertEqual(f.settings.snapshot, legacy)
     XCTAssertFalse(f.window.isVisible)
+  }
+  func testProfileSoundIsUsedByActualInputAndLiveVolumeWithoutAudibleDevices() async throws {
+    let trace = SoundRecordingTrace(), parent = trace.player()
+    let f = try Fixture(saved: nil, feedbackSound: parent); defer { f.close() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    f.settings.soundVolume = 0.9
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"],"soundVolume":0.2,"playSoundOnClick":"1","playSoundOnError":"1"}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+    let input = try XCTUnwrap(f.inputs().first), legacy = f.settings.snapshot
+    input.onInsert(String(f.state.page.state.session.prompt.prefix(1)), false)
+    XCTAssertEqual(trace.events.count, 1); XCTAssertEqual(trace.events.last?.volume, 0.2)
+    let voice = try XCTUnwrap(trace.voices.last?.value)
+    try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange }
+    let before = f.state.page.state.session.generationState
+    do { try await workflow.editAndBegin(.sound(.volume(0.4)), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false) }
+    catch { return XCTFail("Sound volume failed: \(String(reflecting: error))") }
+    try await f.waitAsync { voice.volume == 0.4 }
+    XCTAssertEqual(trace.events.count, 1, "Saving volume does not preview")
+    XCTAssertEqual(f.state.page.state.session.generationState, before); XCTAssertTrue(f.inputs().first === input)
+    XCTAssertEqual(f.settings.snapshot, legacy); XCTAssertEqual(trace.beeps, 0); XCTAssertFalse(f.window.isVisible)
   }
 
   func testInputCommandsKeepActualMarkedInputAndControlsWithAndWithoutNoQuit() async throws {

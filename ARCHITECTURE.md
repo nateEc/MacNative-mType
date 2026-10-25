@@ -1,5 +1,7 @@
 # Typebar 架构决策（ADR-001）
 
+2026-10-26 完整配置声音所有权：四字段的单事件／单字段变化能力独立验证，再复用原地 CAS 发布；声音提交不触碰本轮输入规则或初始化资源。播放入口使用同一 PracticeSoundSelection，完成页回放携带相同选择及播放器。AppSettings 只提供原播放器工厂；每个完整配置窗口复制加载端点、独立缓存／声音池／音量，避免共享服务 configuredVolume 覆盖显式配置音量。播放器以弱引用转发既有键盘事件，不复制音量或启动另一监听器；预览 Q 是临时参数，不更改后续当前键。声音选择变更立即更新自己已播放的样本增益，既有音乐包络策略不变；离开窗口清理自己样本，迟到加载由既有 generation 保护。自定义音量编辑器捕获 publication 身份，单飞、取消、数值前检及延后展示沿现有命令窗口模式。
+
 2026-10-25 输入命令的逐 setter 发布：纯投影器的可选观察回调只报告实际接受／拒绝步骤，默认 nil 的导入／恢复行为不变；失败 override 仍抛错，调用者可保留此前完成的步骤。WebsiteConfigInputCommand 将此轨迹变成同步执行计划，不在观察回调中写盘。每个接受步骤重新从同一 publication 链准备，单字段事件／差异检查后做文件 CAS 并发布，再推进到返回的新身份；已接受子项保留，后续记录竞争不采用新写者身份。页面单字段入口另检查 No Quit 的 metadata，不能把复合 override 或其他设置当作即时子项提交。Lazy 使用既有保存离场／初始化流程，No Quit 下 setter 和随后重开各给提示。完整配置专用规则同步增加 strictSpace、stopOnError 和 codeUnindentOnBackspace，旧同步入口保持原语义；完成结果不改，重复新尝试读取全套当前输入规则。续段比较只忽略这些即时输入字段，首次内容替换仍严格。
 
 2026-10-25 No Quit setter 的同步上下文：原行为读取作用域更名为 withSynchronousSetterRead，追加本窗口实际活动 No Quit 的阈值命令、阈值表单、Polyglot 与 Layoutfluid 序列入口；不跨 await，其他窗口锁与普通导入仍不开放。异步表单在 yield 后重新判断当前 No Quit 状态，再进入同步准备／拒绝或 future-selection CAS，避免开始输入与提交之间的竞态。阈值和 Layoutfluid 不获得写权限，只有原严格 Polyglot 下轮选择能力可保存。开始输入触发全局锁会旋转环境，但当前 publication 仍合法，因此拒绝提示捕获此次读取的环境 revision，并同时核对 publication、磁盘、操作与账户代次；不能只拿旧 publication 的环境版本比较。
