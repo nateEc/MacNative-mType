@@ -1,5 +1,19 @@
 # 官方配置兼容性审计
 
+## 完整配置配速命令（2026-10-26，起点 6d186bee）
+
+CFG-PACE-COMMAND-PAGE-01 对照实际配速 metadata、subgroup／input builder、setter、pace-caret config 订阅及 restart 开头的 No Quit guard。QA --pace-commands 生成 488 组：48 个模式／活动／No Quit／登录组合，440 个原模式 off／custom × 11 输入 × 五单位 × 两活动状态 × 两 No Quit 状态。记录完整 runtime、事件、保存、通知重要性、初始化请求读取的模式／记忆速度与重开请求／No Quit 准入；只替换实际声音／DOM／账户等外部端点，不把截取的首个重开 guard 当作完整重开过程覆盖。
+
+paceCaret 与 paceCaretCustomSpeed 的 metadata 均不要求重开，因此 No Quit 允许保存；重开发生于命令 afterExec，未登录 PB／tagPb setter 拒绝后也会执行。自定义速度 setter 的 override 先写 custom，再写速度；配速订阅仅响应 paceCaret，所以中间初始化读旧速度，已是 custom 时只有速度事件而不初始化。原生按逐 setter CAS 保存，模式事件更新候选会话配速，之后才发布；速度事件保留现有配速状态。普通成功再由现有控制器完整重开，活动 No Quit 只发一条重要拒绝提示；账户拒绝另有普通提示。Root 读取账户稳定标签身份，不把 tagPb 降级为本机文字标签。
+
+原输入命令 ID setPaceCaretCustomSpeedCustom；默认输入是原始 canonical WPM 记忆值，即便当前单位是 CPM／CPS，也不先换算显示值。Number 空串为 0，单位转换遵循原实现除法；输入接受前校验不小于 0。源 schema 允许 Infinity，原生持久格式仍不能保存，现明确拒绝而不写入或冒充零，保留兼容缺口。原项目在线账户异步获取、所有存储异常时点、实体菜单／动画／输入法仍未由本次自动化证明完成。
+
+定向验证 10 项通过（5.013 秒，零跳过）：488 组命令对照、严格单项准入、表单单次提交及取消迟到完成、无效／过期／预取消命令、登录拒绝后仍重开、第二 setter 文件竞争保留第一个已接受的选择，以及真实 StartupHost 的普通重开至新速度／No Quit 保留原控件、组合文本与旧配速。输入页 440 light／640 dark 截图已人工检查，窗口从未显示。相关回归 1,303 项全部通过（240.476 秒，零跳过）。初始 RED 是缺少配速命令和目标读取入口；测试使用了错误的 history.important 字段，已改为实际 active 通知重要性读取，未改变期望提示次数。
+
+审阅重复测试上下文时补入 Root 的当前 isRepeatedPaceAttempt／lastFinishedWpm：off 在重复配速这一轮仍应回退至上一轮速度，而 custom／PB 等模式保持自身优先级。既有完整源码探针 check-source-pace-selection.mjs 通过 46 selection／19 progression fixtures，包含 off／重复及 NaN 的边界；其 Query DSL、账户与计时端点是有界替代，不是在线账户或实体页面证据。这一特定重复页面的实体交互仍待人工验收。
+
+补传重复上下文后最终 26 项配速／选择专项复验通过（4.811 秒，零跳过）；未重复累计此前通过数量。Debug 应用打包／签名、资源边界、原创性检查通过；参考行为审计 47 direct／119 native symbols／17 supporting 通过；人工表 1,356 个唯一场景只完成结构审计。日志 /tmp/typebar-pace-command-{red,focused,integration,final-focused,broad,repeat-recheck,selection,package,reference}.log，源命令探针 /tmp/typebar-pace-command-source.json；布局 /tmp/typebar-pace-speed-{440-light,640-dark}.png。本轮没有启动 Typebar 主程序，完整目标继续进行，不把这一批结果视作全功能或完整门禁已完成。
+
 ## 完整配置光标即时命令（2026-10-26，起点 fe5c5747）
 
 CFG-CARET-COMMAND-PAGE-01 只覆盖 smoothCaret、caretStyle、paceCaretStyle、repeatedPace。固定源码中四字段无 override、无重开要求，command subgroup 没有 afterExec；主光标订阅样式／闪烁变化，配速光标样式订阅只换样式。QA --caret-commands 运行实际 metadata、schema、setter 和 subgroup builder，输出 88 组（22 格式选项 × 两活动状态 × 两 No Quit 状态），对照完整 runtime、事件、保存与可见性。Boolean schema 以 false／true 枚举，非枚举 `.options` 不可直接读取；探针已按真实类型处理。

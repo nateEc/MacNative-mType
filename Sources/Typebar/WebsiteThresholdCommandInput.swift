@@ -21,7 +21,7 @@ enum WebsiteThresholdCommandInput {
     }
   }
 
-  private static func toWpm(_ value: Double, unit: TypingSpeedUnit) -> Double {
+  static func toWpm(_ value: Double, unit: TypingSpeedUnit) -> Double {
     let factor: Double
     switch unit {
     case .wpm: factor = 1

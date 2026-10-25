@@ -20,7 +20,8 @@ const thresholdCommandMode = process.argv[3] === '--threshold-commands';
 const inputCommandMode = process.argv[3] === '--input-commands';
 const soundCommandMode = process.argv[3] === '--sound-commands';
 const caretCommandMode = process.argv[3] === '--caret-commands';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode);
+const paceCommandMode = process.argv[3] === '--pace-commands';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -40,7 +41,7 @@ const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
 const adapters = new Map([
   [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: (_message, options) => {
-    if (thresholdCommandMode || inputCommandMode) simulation.notices.push(options?.important ?? false);
+    if (thresholdCommandMode || inputCommandMode || paceCommandMode) simulation.notices.push(options?.important ?? false);
   }, showErrorNotification: noop}],
   [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
   [path.join(frontend, 'states/test.ts'), {isTestActive: () => simulation.flags.testActive ?? true}],
@@ -162,7 +163,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -217,6 +218,55 @@ if (defaultsMode) {
       }
     assert.equal(fixtures.length, 2310);
     verify(); console.log(JSON.stringify({fixtures}));
+  } else if (paceCommandMode) {
+    function extract(file, from, until, wrap = text => text) {
+      const source = fs.readFileSync(path.join(frontend, file), 'utf8');
+      const start = source.indexOf(from), end = until ? source.indexOf(until, start) : source.length;
+      assert.ok(start >= 0 && end > start);
+      return stripTypeScriptTypes(wrap(source.slice(start, end).replace(/^export /gm, '')), {mode:'transform'});
+    }
+    const units = (await load(path.join(frontend, 'utils/typing-speed-units.ts'))).get;
+    let restarts = 0, restartAllowed = false, inits = [];
+    Object.assign(context, {Config:simulation.Config, setConfig:setters.setConfig, configEvent:bus,
+      getTypingSpeedUnit:units, TestLogic:{restart:() => { restarts++; restartAllowed = !!context.tryPaceRestart(); }},
+      isFunboxActive:name => simulation.Config.funbox.includes(name), isTestActive:() => simulation.flags.testActive,
+      showNoticeNotification:(_message,options) => simulation.notices.push(options?.important ?? false),
+      init:() => { inits.push({mode:simulation.Config.paceCaret,speed:simulation.Config.paceCaretCustomSpeed}); },
+      caret:{setStyle:noop}, capitalizeFirstLetter:value => value[0].toUpperCase()+value.slice(1)});
+    vm.runInContext(extract('test/test-logic.ts','  const noQuit = isFunboxActive("no_quit");','  if (isTestRestarting()',
+      text => `globalThis.tryPaceRestart=()=>{const options={};${text}return true;};`),context);
+    vm.runInContext(extract('commandline/commandline-metadata.ts','  paceCaret: {','  repeatedPace:',
+      text => `globalThis.paceInput=({${text}}).paceCaret;`),context);
+    vm.runInContext(extract('commandline/util.ts','function buildSubgroupCommand<','export const __testing'),context);
+    vm.runInContext(extract('test/pace-caret.ts','configEvent.subscribe(',null),context);
+    const fixtures = [];
+    const custom = context.buildInputCommand({key:'paceCaretCustomSpeed',isPartOfSubgroup:true,
+      inputProps:context.paceInput.input,configMeta:metadata.paceCaret,schema:configSchemas.ConfigSchema.shape.paceCaretCustomSpeed});
+    function run({mode,raw,unit='wpm',previous='last',active,noQuit,authenticated=false}) {
+      Object.assign(simulation.Config,structuredClone(defaults),{paceCaret:previous,paceCaretCustomSpeed:80,
+        typingSpeedUnit:unit,funbox:noQuit ? ['no_quit'] : []});
+      simulation.flags = {testActive:active,authenticated,documentComplete:true};
+      simulation.events=[]; simulation.saves=[]; simulation.notices=[]; restarts=0; restartAllowed=false; inits=[];
+      const current=structuredClone(simulation.Config);
+      const initialText=custom.defaultValue();
+      const value = raw === undefined ? mode : custom.inputValueConvert(raw);
+      const canSubmit = raw === undefined || custom.validation.schema.safeParse(value).success;
+      if (canSubmit) {
+        if (raw === undefined) context.buildSubgroupCommand('paceCaret',mode,context.paceInput.subgroup).exec();
+        else custom.exec({input:value});
+      }
+      fixtures.push({mode:mode ?? null,raw:raw ?? null,unit,active,authenticated,current,canSubmit,
+        value:Number.isFinite(value) ? value : null,nonfinite:typeof value==='number' && !Number.isFinite(value),
+        runtime:structuredClone(simulation.Config),events:simulation.events,saves:simulation.saves,
+        notices:simulation.notices,restarts,restartAllowed,inits,initialText});
+    }
+    for (const active of [false,true]) for (const noQuit of [false,true]) for (const authenticated of [false,true])
+      for (const mode of context.paceInput.subgroup.options) run({mode,active,noQuit,authenticated});
+    for (const active of [false,true]) for (const noQuit of [false,true]) for (const previous of ['off','custom'])
+      for (const unit of ['wpm','cpm','wps','cps','wph'])
+        for (const raw of ['', ' ', '0','80','1.5','0x50','1e2','-1','Infinity','NaN','80tail'])
+          run({raw,unit,previous,active,noQuit});
+    verify(); console.log(JSON.stringify({id:custom.id,fixtures}));
   } else if (caretCommandMode) {
     function extract(file, from, until, wrap = text => text) {
       const source = fs.readFileSync(path.join(frontend, file), 'utf8');

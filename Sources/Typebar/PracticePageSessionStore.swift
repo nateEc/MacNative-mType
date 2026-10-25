@@ -282,6 +282,13 @@ final class PracticePageSessionStore {
     try validateCommitOwnership(owner: lease, router: router, capture: capture)
     committing = true
   }
+  func beginLivePaceCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft) throws {
+    guard state.configurationDeparture == nil, state.savedApplication == nil,
+      WebsitePaceCommand.admits(draft, from: capture.publication.draft) else { throw PracticePageSessionStateError.locked }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture)
+    committing = true
+  }
   func beginLiveInputRuleCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
     router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft) throws {
     guard state.configurationDeparture == nil, state.savedApplication == nil,

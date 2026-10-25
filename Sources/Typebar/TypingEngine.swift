@@ -4905,6 +4905,8 @@ struct TypingSession {
       asciiSeparatorCount: promptSeparatorUnitCount, sourceFields: sourceFields)
   }
 
+  var paceCaretTargetWpm: Double? { paceCaretProgress?.wpm }
+
   mutating func configurePace(wpm: Double?, clock: PaceCaretClock = .system) {
     guard configuration.mode != .zen, let wpm,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) || hasNoSpaceWordSegmentation

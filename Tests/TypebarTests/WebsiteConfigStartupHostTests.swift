@@ -150,6 +150,47 @@ import XCTest
     XCTAssertEqual(f.settings.snapshot, legacy)
     XCTAssertFalse(f.window.isVisible)
   }
+  func testPaceCustomCommandRestartsNormallyButKeepsActualMarkedInputDuringNoQuit() async throws {
+    for noQuit in [false, true] {
+      let f = try Fixture(saved: nil); defer { f.close() }
+      f.state.accountReady = true
+      try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+      let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+      let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+      let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+        directory: directory, readWindow: { selection }); defer { workflow.stop() }
+      let json = noQuit
+        ? #"{"mode":"words","words":10,"funbox":["no_quit"],"paceCaret":"off","paceCaretCustomSpeed":80}"#
+        : #"{"mode":"words","words":10,"paceCaret":"off","paceCaretCustomSpeed":80}"#
+      try await workflow.apply(json: json, systemIsDark: false)
+      try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+      let input = try XCTUnwrap(f.inputs().first), legacy = f.settings.snapshot
+      input.onInsert("x", false)
+      XCTAssertEqual(f.state.page.state.session.typed, "x")
+      if noQuit { try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange } }
+      input.setMarkedText("é", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+      let marked = input.markedRange(), attempt = f.state.page.state.session.automaticInputAttemptID
+      do {
+        try await workflow.runPaceCommand(.customSpeed, input: "120", replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID)
+      } catch { return XCTFail("Pace command failed: \(String(reflecting: error))") }
+      if noQuit {
+        try await f.waitAsync { f.state.page.state.session.paceCaretTargetWpm == 80 }
+        XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+        XCTAssertEqual(f.state.page.state.session.typed, "x")
+        XCTAssertTrue(f.inputs().first === input); XCTAssertTrue(input.hasMarkedText()); XCTAssertEqual(input.markedRange(), marked)
+        XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 0)
+      } else {
+        try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+          && f.state.page.state.session.paceCaretTargetWpm == 120 }
+        XCTAssertNotEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+        XCTAssertTrue(f.state.page.state.session.typed.isEmpty)
+        XCTAssertFalse(try XCTUnwrap(f.inputs().first).hasMarkedText())
+        XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 1)
+      }
+      XCTAssertEqual(f.settings.snapshot, legacy); XCTAssertFalse(f.window.isVisible)
+    }
+  }
+
   func testProfileSoundIsUsedByActualInputAndLiveVolumeWithoutAudibleDevices() async throws {
     let trace = SoundRecordingTrace(), parent = trace.player()
     let f = try Fixture(saved: nil, feedbackSound: parent); defer { f.close() }

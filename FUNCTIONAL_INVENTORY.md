@@ -1,5 +1,11 @@
 # 功能盘点与追踪表
 
+2026-10-26 CFG-PACE-COMMAND-PAGE-01：完整配置配速命令接通逐 setter 保存及显式重开，保留 No Quit 中已接受的选择、旧记忆速度初始化顺序与单独速度事件不重置光标的语义。488 组实际 command builder／setter／配速订阅／重开 No Quit guard 对照覆盖六个模式、五种单位、登录状态和输入边界；无限速度、在线账户取值及实体动画仍开放。
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
+| CFG-PACE-COMMAND-PAGE-01 | 完整配置配速模式与速度命令 | `commandline/{commandline-metadata.ts,util.ts}`, `config/{metadata.tsx,setters.ts}`, `test/{pace-caret.ts,test-logic.ts}` | CommandDomain, PreferencesDomain, PromptDomain | 部分实现：六个模式、有限速度输入、逐项保存与显式重开，No Quit 与登录拒绝语义；Infinity、在线账户异步取值及实体体验仍开放。 |
+
 2026-10-26 CFG-CARET-COMMAND-PAGE-01：四类光标配置命令接通完整配置的单字段保存与实时 presentation，保持本轮与旧偏好不变。22 个格式选项对应 16 个可见命令，88 组实际源码命令覆盖活动／No Quit 状态；隐藏原生页、冲突与下轮重复语义单独验证。配速模式、自定义速度命令与全部实体输入／动画验收继续开放。
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

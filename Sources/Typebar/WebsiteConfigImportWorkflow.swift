@@ -117,6 +117,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   private weak var notices: LocalNoticeCenter?
   private var prepared: WebsiteConfigCommitCoordinator.Prepared?
   private var rejectedRestart: (controller: WebsitePracticeRestartController, request: UUID)?
+  private let paceTarget: @MainActor (WebsiteConfigNativeDraft, TypingSession) -> Double?
   private var applying = false
   private var stopped = false
   private var operation = UUID()
@@ -125,9 +126,13 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
     directory: URL, readWindow: @escaping @MainActor () -> WebsiteConfigPracticeScopeSource.Window?,
     loadExternal: WebsiteConfigSessionBuilder.ExternalLoader? = nil,
+    paceTarget: @escaping @MainActor (WebsiteConfigNativeDraft, TypingSession) -> Double? = { draft, _ in
+      draft.behavior.paceGuideMode == .custom ? PaceGuidePolicy.validTarget(draft.behavior.paceGuideCustomWpm) : nil
+    },
     loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) }) {
     self.page = page; self.settings = settings; self.loadQuotes = loadQuotes
     self.notices = account.localNotices
+    self.paceTarget = paceTarget
     let environment = WebsiteConfigEnvironmentSource(settings: settings, account: account,
       pointsPerRem: 16, documentComplete: true, development: false)
     self.environment = environment
@@ -187,6 +192,74 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       case .busy: throw WebsiteConfigImportWorkflowError.busy
       }
     }
+  }
+
+  @discardableResult
+  func runPaceCommand(_ target: PaceCaretCommandTarget, input: String? = nil, replacing applicationID: UUID) async throws -> String {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil else { throw WebsiteConfigImportWorkflowError.preparationPending }
+    guard let original = page.state.presentation?.publication, original.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
+    try Task.checkCancellation()
+    let current = UUID(); applying = true; operation = current
+    let noticeGeneration = notices?.deliveryGeneration
+    var saved = 0, receiptID = applicationID
+    defer {
+      if let prepared { _ = coordinator.cancel(prepared) }
+      if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
+      prepared = nil; rejectedRestart = nil; applying = false
+    }
+    let locked = try environment.withSynchronousSetterRead {
+      guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+      let plan = try WebsitePaceCommand.plan(current: original.draft.projection.runtime, target: target, input: input,
+        context: context.context, active: page.state.session.hasStarted && !page.state.session.isFinished)
+      do {
+        for step in plan.steps {
+          try Task.checkCancellation()
+          guard operation == current, !stopped, page.state.presentation?.publication.applicationID == receiptID else { throw WebsiteConfigImportWorkflowError.conflict }
+          if !step.accepted {
+            notices?.postGuarded("个人最佳与账户标签配速需要登录账户。", level: .notice, options: .init(), generation: noticeGeneration ?? UUID(), whileCurrent: {
+              self.operation == current && !self.stopped && !Task.isCancelled
+                && self.environment.read()?.revision == context.revision
+                && page.state.presentation?.publication.applicationID == receiptID
+                && original.isCurrentDelivery(owner: page.owner, router: self.settings.preferenceConfigurationSaves)
+            })
+            continue
+          }
+          let ticket = try coordinator.prepareEdit(key: step.key, value: step.value, for: page, refreshingWith: source)
+          prepared = ticket
+          let wpm = step.key == "paceCaret" ? paceTarget(ticket.draft, page.state.session) : nil
+          guard operation == current, !stopped else { throw CancellationError() }
+          switch try coordinator.commitLivePaceSelection(ticket, for: page, targetWpm: wpm) {
+          case .committed(let publication): saved += 1; receiptID = publication.applicationID
+          case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+          case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+          case .busy: throw WebsiteConfigImportWorkflowError.busy
+          }
+        }
+      } catch {
+        if saved > 0 { throw WebsitePaceCommandError.interrupted(saved: saved, underlying: error) }
+        throw error
+      }
+      if ownsActiveNoQuit, let publication = page.state.presentation?.publication {
+        postNoQuitSelectionNotice("配速选择已处理；No Quit 保留当前练习，未执行重开。", publication: publication,
+          page: page, operation: current, noticeGeneration: noticeGeneration, expectedEnvironment: context.revision)
+        return true
+      }
+      return false
+    }
+    try Task.checkCancellation()
+    guard operation == current, !stopped else { throw CancellationError() }
+    if locked { return saved > 0 ? "配速设置已保存；No Quit 保留当前练习。" : "设置未修改；No Quit 保留当前练习。" }
+    try Task.checkCancellation()
+    guard operation == current, !stopped, page.state.presentation?.publication.applicationID == receiptID,
+      let controller = page.restartController else { throw WebsiteConfigImportWorkflowError.conflict }
+    rejectedRestart = (controller, current)
+    if try await controller.requestAndWait(requestID: current) {
+      return saved > 0 ? "配速设置已保存，新的练习已准备好。" : "设置未修改；已按原配置开始新的练习。"
+    }
+    try Task.checkCancellation()
+    throw WebsitePaceCommandError.restartFailed(saved: saved)
   }
 
   private func runInputCommand(_ target: InputRuleCommandTarget, replacing applicationID: UUID) throws -> String {

@@ -1296,6 +1296,8 @@ private struct ContentView: View {
   @State private var websiteSoundOutput: WebsitePracticeSoundOutput?
   @State private var websiteSoundVolume: WebsiteSoundVolumePresentation?
   @State private var queuedWebsiteSoundVolume: WebsiteSoundVolumePresentation?
+  @State private var websitePaceSpeed: WebsitePaceSpeedPresentation?
+  @State private var queuedWebsitePaceSpeed: WebsitePaceSpeedPresentation?
   private var practiceSoundSelection: PracticeSoundSelection {
     .init(draft: committedPracticeDraft, settings: settings, blindMode: session.configuration.rules.blindMode)
   }
@@ -1652,6 +1654,9 @@ private struct ContentView: View {
     .onChange(of: settings.inputRules, handleInputRuleChange)
     .onChange(of: settings.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }
     .onChange(of: committedPracticeDraft?.presentation.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }
+    .onChange(of: session.paceCaretTargetWpm) { _, value in
+      if committedPracticeDraft != nil { activePaceTargetWpm = value }
+    }
   }
 
   private var challengeObservedPracticeContent: some View {
@@ -2146,6 +2151,10 @@ private struct ContentView: View {
         queuedWebsiteSoundVolume = nil
         if pageSession.presentation?.publication.applicationID == queued.id { websiteSoundVolume = queued }
       }
+      if let queued = queuedWebsitePaceSpeed {
+        queuedWebsitePaceSpeed = nil
+        if pageSession.presentation?.publication.applicationID == queued.id { websitePaceSpeed = queued }
+      }
     }) {
       CommandPaletteView(
         items: commandPaletteItems, listMode: practiceCommandPaletteListMode,
@@ -2354,6 +2363,15 @@ private struct ContentView: View {
           try await importWorkflow().editAndBegin(.sound(.volume(value)), replacing: presentation.id,
             systemIsDark: systemColorScheme == .dark)
           _ = practiceSoundPlayer()
+        })
+    }
+    .sheet(item: $websitePaceSpeed) { presentation in
+      WebsitePaceSpeedCommandView(presentation: presentation,
+        canApply: pageSession.presentation?.publication.applicationID == presentation.id
+          && pageSession.savedApplication == nil && pageSession.configurationDeparture == nil
+          && pageSessionStore.restartController?.isPreparing != true,
+        apply: { raw in
+          try await importWorkflow().runPaceCommand(.customSpeed, input: raw, replacing: presentation.id)
         })
     }
     .sheet(item: $settingsJSONCommand) { presentation in
@@ -5803,9 +5821,9 @@ private struct ContentView: View {
   }
 
   private func paceGuideTarget(usingRepeatedPace repeatedWpm: Double? = nil,
-    currentPrompt: String? = nil) -> Double? {
-    let paceMode = committedPracticeDraft?.behavior.paceGuideMode ?? settings.paceGuideMode
-    let customWpm = committedPracticeDraft?.behavior.paceGuideCustomWpm ?? settings.paceGuideCustomWpm
+    currentPrompt: String? = nil, draft: WebsiteConfigNativeDraft? = nil) -> Double? {
+    let paceMode = (draft ?? committedPracticeDraft)?.behavior.paceGuideMode ?? settings.paceGuideMode
+    let customWpm = (draft ?? committedPracticeDraft)?.behavior.paceGuideCustomWpm ?? settings.paceGuideCustomWpm
     if paceMode == .off, let repeatedWpm {
       return PaceGuidePolicy.validTarget(repeatedWpm)
     }
@@ -5941,7 +5959,14 @@ private struct ContentView: View {
     items.append(contentsOf: CaretCommandCatalog.items.filter { item in
       committedPracticeDraft == nil || CaretCommandCatalog.target(for: item.id)?.visibleInWebsiteCommandPalette == true
     })
-    items.append(contentsOf: PaceCaretCommandCatalog.items)
+    items.append(contentsOf: PaceCaretCommandCatalog.items.map { item in
+      guard committedPracticeDraft != nil else { return item }
+      let target = PaceCaretCommandCatalog.target(for: item.id)
+      if target == .customSpeed { return WebsitePaceSpeedPresentation.item }
+      return .init(id: item.id,
+        title: target?.websiteMode == "tagPb" ? "节奏引导：账户标签个人最佳" : item.title,
+        subtitle: "保存配速模式并请求重开", systemImage: item.systemImage, keywords: item.keywords, group: item.group)
+    })
     items.append(contentsOf: AppearanceCommandCatalog.items)
     items.append(contentsOf: KeyboardGuideCommandCatalog.items)
     items.append(KeyboardGuideSizeCommand.item)
@@ -6083,7 +6108,16 @@ private struct ContentView: View {
       target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
       return
     }
+    if item.id == WebsitePaceSpeedPresentation.item.id {
+      guard let publication = pageSession.presentation?.publication,
+        pageSession.savedApplication == nil, pageSession.configurationDeparture == nil,
+        pageSessionStore.restartController?.isPreparing != true else { return }
+      let presentation = WebsitePaceSpeedPresentation(publication: publication)
+      if showingCommandPalette { queuedWebsitePaceSpeed = presentation } else { websitePaceSpeed = presentation }
+      return
+    }
     if let target = PaceCaretCommandCatalog.target(for: item.id) {
+      if pageSessionStore.ownsConfigurationSelection { runWebsitePaceCommand(target); return }
       switch target {
       case .mode:
         target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
@@ -6445,6 +6479,23 @@ private struct ContentView: View {
       guard mode == .quote, availableQuotes.contains(where: { $0.id == selectedQuoteID }) else { return }
       toggleSelectedQuoteFavorite()
     default: break
+    }
+  }
+
+  private func runWebsitePaceCommand(_ target: PaceCaretCommandTarget) {
+    guard websiteBehaviorCommandTask == nil, let publication = pageSession.presentation?.publication,
+      pageSession.savedApplication == nil, pageSession.configurationDeparture == nil,
+      pageSessionStore.restartController?.isPreparing != true else {
+      account.localNotices.post("配置正在准备，请完成后再修改设置。"); return
+    }
+    let request = UUID(); websiteBehaviorCommandRequest = request
+    websiteBehaviorCommandTask = Task { @MainActor in
+      defer { if websiteBehaviorCommandRequest == request { websiteBehaviorCommandTask = nil; preparedWholePreviewRendering = nil } }
+      do { _ = try await importWorkflow().runPaceCommand(target, replacing: publication.applicationID) }
+      catch {
+        guard websiteBehaviorCommandRequest == request, !Task.isCancelled else { return }
+        account.localNotices.post((error as? LocalizedError)?.errorDescription ?? "配速命令未完成，请重新打开命令。")
+      }
     }
   }
 
@@ -6964,6 +7015,9 @@ private struct ContentView: View {
       directory: directory, readWindow: { websiteImportWindow }, loadExternal: { source, configuration, allLines, check in
         try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
           showAllLines: allLines, checkCurrent: check, fetch: fetch)
+      }, paceTarget: { draft, candidate in
+        paceGuideTarget(usingRepeatedPace: isRepeatedPaceAttempt ? lastFinishedWpm : nil,
+          currentPrompt: candidate.prompt, draft: draft)
       })
     websiteImportWorkflow = workflow
     return workflow

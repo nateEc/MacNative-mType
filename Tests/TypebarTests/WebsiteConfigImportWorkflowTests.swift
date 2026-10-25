@@ -6,6 +6,110 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testPaceFormSnapshotAndHiddenLayoutDoNotApplyConfiguration() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"typingSpeedUnit":"cpm","paceCaretCustomSpeed":80}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    let presentation = WebsitePaceSpeedPresentation(publication: publication)
+    XCTAssertEqual(presentation.id, publication.applicationID); XCTAssertEqual(presentation.initialText, "80"); XCTAssertEqual(presentation.unit, .cpm)
+    for (width, dark) in [(440.0, false), (640.0, true)] {
+      var calls = 0
+      let view = WebsitePaceSpeedCommandView(presentation: presentation, canApply: true, apply: { _ in calls += 1 })
+        .frame(width: width, height: 280).background(Color(nsColor: .windowBackgroundColor))
+        .environment(\.colorScheme, dark ? .dark : .light)
+      let host = NSHostingView(rootView: view)
+      let window = NSWindow(contentRect: .init(x: 0, y: 0, width: width, height: 280), styleMask: .borderless, backing: .buffered, defer: false)
+      window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua); window.contentView = host
+      defer { window.contentView = nil; window.close() }
+      host.layoutSubtreeIfNeeded()
+      let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds)); host.cacheDisplay(in: host.bounds, to: bitmap)
+      try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-pace-speed-\(Int(width))-\(dark ? "dark" : "light").png"))
+      XCTAssertFalse(window.isVisible); XCTAssertEqual(calls, 0)
+    }
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, publication.disk)
+  }
+  func testCancelledPaceCommandCannotSaveOrRestart() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let original = try XCTUnwrap(f.page.state.presentation).publication, before = f.page.state.session.automaticInputAttemptID
+    let task = Task { @MainActor in try await f.workflow.runPaceCommand(.mode(.off), replacing: original.applicationID) }
+    task.cancel()
+    do { _ = try await task.value; XCTFail("Cancelled pace command saved") } catch is CancellationError {}
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, original.disk)
+  }
+  func testPaceRejectedAccountSelectionStillRestartsTheOriginalConfiguration() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"paceCaret":"last"}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session.automaticInputAttemptID, legacy = f.settings.snapshot
+    try await f.workflow.runPaceCommand(.mode(.personalBest), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.behavior.paceGuideMode, .lastTest)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    XCTAssertTrue(f.account.localNotices.active.contains { !$0.important })
+  }
+  func testPaceCommandsRejectInvalidAndStaleInputsBeforeWritingAndUseProfileUnit() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"typingSpeedUnit":"cpm"}"#, systemIsDark: false)
+    let original = try XCTUnwrap(f.page.state.presentation).publication
+    for input in ["-1", "NaN", "80tail", "Infinity"] {
+      do { try await f.workflow.runPaceCommand(.customSpeed, input: input, replacing: original.applicationID); XCTFail("Invalid pace saved") }
+      catch is WebsitePaceCommandError {}
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, original.disk)
+    }
+    try await f.workflow.runPaceCommand(.customSpeed, input: "600", replacing: original.applicationID)
+    let current = try XCTUnwrap(f.page.state.presentation).publication
+    XCTAssertEqual(current.draft.behavior.paceGuideCustomWpm, 120); XCTAssertEqual(current.draft.behavior.paceGuideMode, .custom)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, original.session?.automaticInputAttemptID)
+    do { try await f.workflow.runPaceCommand(.mode(.off), replacing: original.applicationID); XCTFail("Stale command saved") }
+    catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, current.applicationID)
+  }
+  func testPaceSecondSetterConflictRetainsTheFirstAcceptedSelection() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let other = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    var compete = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if compete, f.page.state.presentation?.publication.draft.behavior.paceGuideMode == .custom {
+          compete = false
+          do { _ = try register.commit(other, replacing: XCTUnwrap(register.read().revision)) }
+          catch { XCTFail("Competing writer: \(error)") }
+        }
+        return f.window
+      }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"paceCaret":"off","paceCaretCustomSpeed":80}"#, systemIsDark: false)
+    let before = f.page.state.session.automaticInputAttemptID
+    compete = true
+    do { try await workflow.runPaceCommand(.customSpeed, input: "120", replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID); XCTFail("Overwrote competitor") }
+    catch WebsitePaceCommandError.interrupted(let saved, _) { XCTAssertEqual(saved, 1) }
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.behavior.paceGuideMode, .custom)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.behavior.paceGuideCustomWpm, 80)
+    XCTAssertEqual(f.page.state.session.paceCaretTargetWpm, 80)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Lost competitor") }
+    XCTAssertEqual(saved["words"], .number(7))
+  }
+  func testPaceCustomSavesInSourceOrderWhileNoQuitBlocksOnlyRestart() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"],"paceCaret":"off","paceCaretCustomSpeed":80}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session, legacy = f.settings.snapshot
+    let lock = UUID(); f.settings.setNoQuitConfigurationLock(true, for: lock)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: lock) }
+    try await f.workflow.runPaceCommand(.customSpeed, input: "120", replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.automaticInputAttemptID)
+    XCTAssertEqual(f.page.state.session.typed, before.typed)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.behavior.paceGuideCustomWpm, 120)
+    XCTAssertEqual(f.page.state.session.paceCaretTargetWpm, 80, "The mode event initializes before the speed setter")
+    try await f.workflow.runPaceCommand(.customSpeed, input: "160", replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID)
+    XCTAssertEqual(f.page.state.session.paceCaretTargetWpm, 80, "A speed-only event does not initialize pace")
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    XCTAssertEqual(f.account.localNotices.active.filter { $0.important }.count, 2)
+  }
   func testCaretCompetingRecordDoesNotInstallItsCandidateStyle() async throws {
     let f = try Fixture(); defer { f.close() }
     let register = WebsiteConfigFileRegister(directory: f.directory)

@@ -324,8 +324,11 @@ final class WebsiteConfigCommitCoordinator {
   func commitLiveCaret(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
     try commitLiveEdit(prepared, for: page, kind: .caret)
   }
-  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret }
-  private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind) throws -> Outcome {
+  func commitLivePaceSelection(_ prepared: Prepared, for page: PracticePageSessionStore, targetWpm: Double?) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, kind: .pace, paceTarget: targetWpm)
+  }
+  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace }
+  private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind, paceTarget: Double? = nil) throws -> Outcome {
     guard !processing, page.restartController?.isPreparing != true else { return .busy }
     processing = true; defer { processing = false }
     try Task.checkCancellation()
@@ -341,6 +344,8 @@ final class WebsiteConfigCommitCoordinator {
       guard WebsiteConfigSoundEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .caret:
       guard WebsiteConfigCaretEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
+    case .pace:
+      guard WebsitePaceCommand.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .threshold:
       guard case .edited(let edit) = prepared.draft.origin, WebsiteConfigThresholdEdit.keys.contains(edit.key),
       prepared.draft.projection.rejectedKeys.isEmpty, !prepared.draft.projection.events.isEmpty,
@@ -354,7 +359,10 @@ final class WebsiteConfigCommitCoordinator {
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
     if kind == .inputRule { state.session.synchronizeWebsiteInputRules(prepared.draft.inputRules.rules) }
-    else if kind != .sound && kind != .caret { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
+    else if kind != .sound && kind != .caret && kind != .pace { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
+    if kind == .pace, case .edited(let edit) = prepared.draft.origin, edit.key == "paceCaret" {
+      state.session.configurePace(wpm: paceTarget)
+    }
     let updatedPractice = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: practice.scope,
       quote: practice.quote, external: practice.external, repetition: practice.repetition)
     guard isCurrent(prepared) else { return .stale }
@@ -368,6 +376,8 @@ final class WebsiteConfigCommitCoordinator {
       try page.beginLiveSoundCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .caret:
       try page.beginLiveCaretCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
+    case .pace:
+      try page.beginLivePaceCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .threshold: try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
     }
     defer { page.endCommit() }
