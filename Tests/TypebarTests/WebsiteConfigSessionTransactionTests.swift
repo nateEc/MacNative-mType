@@ -65,6 +65,24 @@ import XCTest
     XCTAssertNil(f.coordinator.publication(for: f.owner))
   }
 
+  func testQuoteDrawIsConsumedWhenItsEmptyTextFailsBeforeDelivery() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let resources = try f.resources(#"{"mode":"quote","quoteLength":[0]}"#)
+    let quotes: [OfflineQuote] = [
+      .init(id: "bad", title: "Owned empty sample", text: "", language: .english, length: .short),
+      .init(id: "good", title: "Owned valid sample", text: "ab cd", language: .english, length: .short),
+    ]
+    var bounds: [Int] = [], reads = 0
+    let ready = try await f.coordinator.preparePractice(for: resources, scope: .init(), loadQuotes: { _ in
+      reads += 1; return quotes
+    }, random: .init(quoteIndex: { bounds.append($0); return 0 }))
+    XCTAssertEqual(reads, 2)
+    XCTAssertEqual(bounds, [2, 1])
+    XCTAssertEqual(ready.practice?.quote?.id, "good")
+    XCTAssertEqual(try f.register.read().state, .missing)
+    XCTAssertNil(f.coordinator.publication(for: f.owner))
+  }
+
   func testExternalEmptyGenerationAndReaderFailureRecoverWithinTheSameBudget() async throws {
     let f = try Fixture(); defer { f.close() }
     let resources = try f.resources(#"{"mode":"words","words":3,"funbox":["wikipedia"]}"#)

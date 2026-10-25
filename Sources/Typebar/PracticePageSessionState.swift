@@ -12,6 +12,19 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
   /// Accepted departure, including an init failure. Clears on a new attempt.
   var restartDepartureAttemptID: UUID?
   var configurationDeparture: WebsiteConfigCommitCoordinator.ConfigurationDeparture?
+  struct QuoteInitializationCheckpoint {
+    let id = UUID()
+    let publication: UUID
+    let configurationDeparture: UUID?
+    let progress: WebsiteConfigSessionBuilder.QuoteInitialization
+  }
+  var quoteInitialization: QuoteInitializationCheckpoint?
+  var currentQuoteInitialization: WebsiteConfigSessionBuilder.QuoteInitialization? {
+    guard let checkpoint = quoteInitialization,
+      checkpoint.publication == presentation?.publication.applicationID,
+      checkpoint.configurationDeparture == configurationDeparture?.id else { return nil }
+    return checkpoint.progress
+  }
 
   func applying(_ presentation: WebsiteConfigPublishedPresentation, owner: UUID,
     router: PreferenceConfigurationSaveRouter) throws -> Self {
@@ -34,6 +47,7 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
     result.practice = practice
     result.restartDepartureAttemptID = nil
     result.configurationDeparture = nil
+    result.quoteInitialization = nil
     return result
   }
 }

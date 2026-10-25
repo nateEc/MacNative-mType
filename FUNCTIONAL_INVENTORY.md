@@ -1879,6 +1879,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-QUOTE-INIT-PROGRESS-01 | 引语抽取后的失败进度与再次重开 | `controllers/quotes-controller.ts`, `test/words-generator.ts`, `test/test-logic.ts` | QuoteDomain, TestDomain | 部分实现：下游空正文失败仍消费抽样队列，同一初始化或下一次已接纳重开继续；窗口内检查点保护版本与拥有权，不落盘、不提前替换旧题面或重复记账。失败引语的真实重复、空当前引语、取消、竞争、新 setter 重置与继续已纳入原生回归；源码实际抽样与空词失败探针见迁移契约。更多 Funbox 中间状态、完整初始化通知、导入写序与实体 UI／IME 仍未完成。 |
 | CFG-INIT-GENERATION-RETRY-01 | 初始化生成错误的共享预算 | `test/test-logic.ts` 的完整 init、`test/words-generator.ts` | TestDomain, PreferencesDomain | 部分实现：运行时生成错误与引语校正共用三次实际生成预算，第三次可恢复；保留本轮运行草稿与保存检查点，耗尽保留最后错误，不重复离场。原生准入／配置能力错误和取消直接拒绝，记录竞争在下一轮前拦截。完整源码调用方探针与原生回归见迁移契约；前置语言／Funbox 激活、失败中间采样状态、完整通知历史与实体交互未完成。 |
 | CFG-QUOTE-RESTART-RECOVERY-01 | 普通重开与下一轮的引语恢复 | `test/words-generator.ts`, `test/test-logic.ts`, `controllers/quotes-controller.ts`, `config/setters.ts` | TestDomain, PreferencesDomain | 部分实现：采样器明确恢复先保存全部长度或原语言 words，再初始化；同一控制器可在取消／三轮失败后继续，无校正保持原发布与文件版本。校正阶段已计量的旧尝试不再统计，失去拥有权、竞争记录及晚到结果不交付。八项新增回归及最终验证见迁移契约；其他初始化错误、完整通知、未登录收藏前置顺序与实体交互仍未完成。 |
 | CFG-PRACTICE-REJECTED-RESTART-01 | setter 返回 false 后仍尝试重开 | `components/pages/test/TestConfig.tsx`, `components/modals/CustomTestDurationModal.tsx`, `config/setters.ts`, `test/test-logic.ts` | TestDomain, PreferencesDomain | 部分实现：六类直接动作的 false 返回在空闲／完成态走同一控制器普通重开，记录和 Publication 不变；依赖覆盖抛异常、资源／内容／陈旧错误不借此重开。57 项定向、620 项相关扩大及 Debug 打包通过，覆盖请求级取消、共享忙碌、带权池、非空账本及交付后取消不假报失败；证据见迁移契约。活动尝试记账、通知与实体 UI 仍待完成。 |

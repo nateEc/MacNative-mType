@@ -120,7 +120,10 @@ final class WebsiteConfigNativeQuoteSelectionTests: XCTestCase {
       let groups: [Int], pool: [String], draws: [String], failure: String?, recovery: [String: WebsiteConfigValue]
       let selectedQuoteID: String?, favoriteIDs: [String]?, randomLast: Bool?, emptyCatalog: Bool?
     }
-    struct Output: Decodable { let fixtures: [Fixture] }
+    struct FailedDrawProgress: Decodable {
+      let indices: [Int], failures: [String], continuedIndex: Int, uniqueDraws: Int
+    }
+    struct Output: Decodable { let fixtures: [Fixture]; let failedDrawProgress: FailedDrawProgress }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let process = Process(), pipe = Pipe()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -130,7 +133,12 @@ final class WebsiteConfigNativeQuoteSelectionTests: XCTestCase {
     let data = pipe.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus, 0)
-    let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    XCTAssertEqual(output.failedDrawProgress.indices, [1, 2, 3])
+    XCTAssertEqual(output.failedDrawProgress.failures, Array(repeating: "Random word is empty", count: 3))
+    XCTAssertEqual(output.failedDrawProgress.continuedIndex, 4)
+    XCTAssertEqual(output.failedDrawProgress.uniqueDraws, 4)
+    let fixtures = output.fixtures
     XCTAssertEqual(fixtures.count, 1562)
     for (index, fixture) in fixtures.enumerated() {
       let selection = try Self.selection(fixture.groups)

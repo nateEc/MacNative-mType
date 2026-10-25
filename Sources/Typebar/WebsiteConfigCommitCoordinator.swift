@@ -30,6 +30,8 @@ final class WebsiteConfigCommitCoordinator {
     /// listeners. Delivery alone must not turn those listeners into saves.
     fileprivate var savedDraft: WebsiteConfigNativeDraft?
     fileprivate var quoteRecoveries: [WebsiteQuoteSampler.Recovery] = []
+    fileprivate var quoteInitialization: WebsiteConfigSessionBuilder.QuoteInitialization?
+    fileprivate var retainsQuoteInitialization = false
     fileprivate weak var sourcePage: PracticePageSessionStore?
     fileprivate weak var restartController: WebsitePracticeRestartController?
     fileprivate var requiresRestartController = false
@@ -136,6 +138,7 @@ final class WebsiteConfigCommitCoordinator {
     // Close a value copy first. A rejected file CAS must leave the real clock,
     // input, ledger and publication untouched.
     var departed = page.state
+    let inheritedQuoteInitialization = departed.currentQuoteInitialization
     let measurement = capture.testActive ? departed.session.abandonAndMeasure() : nil
     let applied = try WebsiteConfigLazyModeLifecycle.applyingEvents(prepared.draft,
       pointsPerRem: prepared.environment.pointsPerRem)
@@ -169,11 +172,17 @@ final class WebsiteConfigCommitCoordinator {
       identity: identity, environment: prepared.environment, contentSource: prepared.contentSource,
       requiresContentSource: prepared.contentCapture != nil, repetition: repetition, quote: previous.quote,
       wordHistory: departed.session.generatedWordReplayHistory)
+    if var progress = inheritedQuoteInitialization {
+      progress.appliedQuoteLengthEvents = nil
+      departed.quoteInitialization = .init(publication: capture.publication.applicationID,
+        configurationDeparture: departed.configurationDeparture?.id, progress: progress)
+    } else { departed.quoteInitialization = nil }
     resourceAdmission = UUID(); sessionAdmission = UUID(); sessionRequest = nil
     page.installCommitted(departed)
     page.endCommit()
     guard let refreshed = try? page.captureGeneration(router: router) else { return .acceptedRetired }
     var admitted = prepared
+    admitted.retainsQuoteInitialization = true
     admitted.draft = applied; admitted.savedDraft = saved; admitted.disk = disk; admitted.pageCapture = refreshed
     return .accepted(admitted)
   }
@@ -196,6 +205,8 @@ final class WebsiteConfigCommitCoordinator {
       owner: owner, environment: context, disk: pending.disk)
     prepared.savedDraft = pending.savedDraft
     prepared.quoteRecoveries = pending.quoteRecoveries
+    prepared.retainsQuoteInitialization = true
+    prepared.quoteInitialization = page.state.currentQuoteInitialization
     prepared.sourcePage = page; prepared.pageCapture = capture
     if pending.requiresContentSource {
       guard let source = pending.contentSource else { throw WebsiteConfigCommitCoordinatorError.unavailable }
@@ -545,11 +556,15 @@ final class WebsiteConfigCommitCoordinator {
   }
   private func restartPlan(for page: PracticePageSessionStore, repeatingRequested: Bool) throws -> RestartAdmission {
     let resources = try nextResources(for: page)
-    guard let previous = page.state.practice, let capture = resources.configuration.pageCapture,
+    guard var previous = page.state.practice, let capture = resources.configuration.pageCapture,
       case .string(let language)? = resources.configuration.draft.projection.runtime["language"] else {
       throw PracticePageSessionStateError.incomplete
     }
     let original = page.state.session
+    if original.configuration.mode == .quote, let progress = resources.configuration.quoteInitialization {
+      previous = .init(session: previous.session, scope: capture.scope, quote: progress.quote,
+        external: previous.external, repetition: previous.repetition)
+    }
     let behavior = resources.configuration.draft.behavior
     let repetition = WebsiteConfigRestartPolicy.resolve(requested: repeatingRequested,
       active: capture.testActive, previouslyRepeated: previous.repetition.repeatsWordset,
@@ -601,6 +616,7 @@ final class WebsiteConfigCommitCoordinator {
       page.installCommitted(departed)
     } catch { page.endCommit(); throw error }
     page.endCommit()
+    prepared.retainsQuoteInitialization = true
     prepared.pageCapture = try page.captureGeneration(router: router)
     admission.resources = .init(configuration: prepared, admission: admission.resources.admission,
       background: admission.resources.background, font: admission.resources.font)
@@ -618,6 +634,12 @@ final class WebsiteConfigCommitCoordinator {
     if !repetition.repeatsWordset {
       let session = try await preparePracticeBuild(for: resources, scope: nil,
         reason: .nextAttempt, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
+      return .init(session: session)
+    }
+    if original.configuration.mode == .quote, resources.configuration.quoteInitialization != nil {
+      let session = try await preparePracticeBuild(for: resources, scope: nil, reason: .nextAttempt,
+        repeatedSource: .repeatedQuote(previous.quote, repeatedPace: repetition.repeatsPace),
+        loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
       return .init(session: session)
     }
     if [.words, .time].contains(original.configuration.mode), let history = original.generatedWordReplayHistory {
@@ -662,6 +684,7 @@ final class WebsiteConfigCommitCoordinator {
     var prepared = Prepared(draft: base.draft, identity: identity, request: request,
       owner: owner, environment: context, disk: disk)
     prepared.sourcePage = page; prepared.pageCapture = capture
+    prepared.quoteInitialization = page.state.currentQuoteInitialization
     if page.restartController?.isPreparing == true {
       prepared.restartController = page.restartController; prepared.requiresRestartController = true
     }
@@ -750,7 +773,13 @@ final class WebsiteConfigCommitCoordinator {
         try checkAsyncResources(failure.resources.configuration, admission: failure.resources.admission)
         // Keep the already-applied runtime/listener checkpoint. Reconstructing
         // from the original import would replay events or resurrect old state.
-        current = failure.resources
+        var configuration = failure.resources.configuration
+        if let progress = failure.quoteInitialization {
+          configuration = try retainQuoteInitialization(progress, for: configuration, admission: failure.resources.admission)
+        }
+        current = .init(configuration: configuration, admission: failure.resources.admission,
+          background: failure.resources.background, font: failure.resources.font)
+        try Task.checkCancellation()
         if attempt == 2 { throw failure.underlying }
         await Task.yield()
       }
@@ -764,6 +793,32 @@ final class WebsiteConfigCommitCoordinator {
   @MainActor private struct GenerationFailure: Error {
     let underlying: Error
     let resources: ResourcesPrepared
+    let quoteInitialization: WebsiteConfigSessionBuilder.QuoteInitialization?
+  }
+  private func retainQuoteInitialization(_ progress: WebsiteConfigSessionBuilder.QuoteInitialization,
+    for prepared: Prepared, admission: UUID) throws -> Prepared {
+    var updated = prepared
+    updated.quoteInitialization = progress
+    guard prepared.retainsQuoteInitialization,
+      let page = prepared.sourcePage, let capture = prepared.pageCapture,
+      capture.configurationDeparture != nil
+        || page.state.restartDepartureAttemptID == page.state.session.automaticInputAttemptID else { return updated }
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    guard admission == resourceAdmission, isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
+    do {
+      guard try register.read().revision == prepared.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+      var state = page.state
+      state.quoteInitialization = .init(publication: capture.publication.applicationID,
+        configurationDeparture: state.configurationDeparture?.id, progress: progress)
+      page.installCommitted(state, retainingRestartController: prepared.restartController)
+    } catch { page.endCommit(); throw error }
+    page.endCommit()
+    updated.pageCapture = try page.captureGeneration(router: router)
+    guard isCurrent(updated) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return updated
   }
   private func canRetryGeneration(_ error: Error) -> Bool {
     // These are native admission/representation failures, not a failed source
@@ -843,7 +898,7 @@ final class WebsiteConfigCommitCoordinator {
       }
     } else { checkedExternal = nil }
     return try await prepareSessionBuild(for: prepared) { draft in
-      let effectiveScope: WebsiteConfigSessionBuilder.Scope
+      var effectiveScope: WebsiteConfigSessionBuilder.Scope
       if prepared.configuration.applicationCapture != nil {
         guard scope == nil, let content = prepared.configuration.contentCapture else {
           throw WebsiteConfigCommitCoordinatorError.sessionNotReady
@@ -858,6 +913,11 @@ final class WebsiteConfigCommitCoordinator {
         guard let scope else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
         effectiveScope = scope
       }
+      if let progress = prepared.configuration.quoteInitialization { effectiveScope.quoteSampler = progress.sampler }
+      let quoteLengthEvents = draft.projection.events.filter { $0.key == "quoteLength" }.count
+      let applyQuoteLengthEvents = reason == .configurationApplication && quoteLengthEvents > 0
+        && prepared.configuration.quoteInitialization?.appliedQuoteLengthEvents != quoteLengthEvents
+      var quoteInitialization: WebsiteConfigSessionBuilder.QuoteInitialization?
       let attemptSource: WebsiteConfigSessionBuilder.AttemptSource
       if let pending = prepared.configuration.sourcePage?.state.configurationDeparture,
         prepared.configuration.pageCapture?.configurationDeparture == pending.id,
@@ -871,6 +931,10 @@ final class WebsiteConfigCommitCoordinator {
       do {
         let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: effectiveScope,
           reason: reason, attemptSource: attemptSource,
+          applyQuoteLengthEvents: applyQuoteLengthEvents,
+          onQuoteInitialization: { sampler, quote in
+            quoteInitialization = .init(sampler: sampler, quote: quote, appliedQuoteLengthEvents: quoteLengthEvents)
+          },
           loadQuotes: { language in
             try await self.readAsyncResource(prepared.configuration, admission: prepared.admission) {
               try await loadQuotes(language)
@@ -881,7 +945,7 @@ final class WebsiteConfigCommitCoordinator {
         throw QuoteRecoveryRequest(recovery: recovery, resources: prepared)
       } catch {
         guard self.canRetryGeneration(error) else { throw error }
-        throw GenerationFailure(underlying: error, resources: prepared)
+        throw GenerationFailure(underlying: error, resources: prepared, quoteInitialization: quoteInitialization)
       }
     }
   }
@@ -911,6 +975,7 @@ final class WebsiteConfigCommitCoordinator {
       throw WebsiteConfigCommitCoordinatorError.stale
     }
     var state = page.state
+    let inheritedQuoteInitialization = state.currentQuoteInitialization
     let measurement = pending == nil && state.restartDepartureAttemptID != state.session.automaticInputAttemptID
       ? state.session.abandonAndMeasure() : nil
     // The old elapsed clock can call back into the host. Recheck environment,
@@ -938,6 +1003,10 @@ final class WebsiteConfigCommitCoordinator {
       quoteRecoveries: prepared.quoteRecoveries, disk: disk,
       identity: identity, environment: recoveryEnvironment, contentSource: recoverySource,
       requiresContentSource: requiresContentSource, repetition: repetition, quote: quote, wordHistory: history)
+    if let progress = inheritedQuoteInitialization {
+      state.quoteInitialization = .init(publication: capture.publication.applicationID,
+        configurationDeparture: state.configurationDeparture?.id, progress: progress)
+    } else { state.quoteInitialization = nil }
     if pending == nil {
       state.restartDepartureAttemptID = state.session.automaticInputAttemptID
       if let measurement {
@@ -949,6 +1018,7 @@ final class WebsiteConfigCommitCoordinator {
     page.endCommit()
     var updated = prepared
     updated.disk = disk; updated.pageCapture = try page.captureGeneration(router: router)
+    updated.retainsQuoteInitialization = true
     guard isCurrent(updated) else { throw WebsiteConfigCommitCoordinatorError.stale }
     return updated
   }

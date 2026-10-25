@@ -38,6 +38,7 @@ final class PracticePageSessionStore {
     fileprivate let repetition: WebsitePracticeRepetition
     fileprivate let restartDeparture: UUID?
     let configurationDeparture: UUID?
+    fileprivate let quoteInitialization: UUID?
     var testActive: Bool { session.started && !session.finished }
   }
 
@@ -53,6 +54,7 @@ final class PracticePageSessionStore {
     fileprivate let repetition: WebsitePracticeRepetition?
     fileprivate let restartDeparture: UUID?
     let configurationDeparture: UUID?
+    fileprivate let quoteInitialization: UUID?
   }
 
   func captureApplication(router: PreferenceConfigurationSaveRouter) throws -> ApplicationCapture {
@@ -64,13 +66,14 @@ final class PracticePageSessionStore {
       throw PracticePageSessionStateError.locked
     }
     var scope = state.practice?.scope ?? .init()
+    if let progress = state.currentQuoteInitialization { scope.quoteSampler = progress.sampler }
     scope.weakSpotScores = session.liveWeakSpotScores
     scope.decorationState = session.liveWordDecorationState
     scope.arrowChart = session.generatedWordReplayHistory?.arrowChart ?? scope.arrowChart
     return .init(scope: scope, lease: lease, attachment: attachment, compositionActivity: compositionActivity,
       session: session.generationState, publication: state.presentation?.publication.applicationID,
       repetition: state.practice?.repetition, restartDeparture: state.restartDepartureAttemptID,
-      configurationDeparture: state.configurationDeparture?.id)
+      configurationDeparture: state.configurationDeparture?.id, quoteInitialization: state.quoteInitialization?.id)
   }
   func isCurrent(_ capture: ApplicationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -80,6 +83,7 @@ final class PracticePageSessionStore {
       && state.practice?.repetition == capture.repetition
       && state.restartDepartureAttemptID == capture.restartDeparture
       && state.configurationDeparture?.id == capture.configurationDeparture
+      && state.quoteInitialization?.id == capture.quoteInitialization
   }
 
   func captureGeneration(router: PreferenceConfigurationSaveRouter) throws -> GenerationCapture {
@@ -91,13 +95,14 @@ final class PracticePageSessionStore {
       state.session.automaticInputAttemptID == practice.session.automaticInputAttemptID
     else { throw PracticePageSessionStateError.incomplete }
     var scope = practice.scope
+    if let progress = state.currentQuoteInitialization { scope.quoteSampler = progress.sampler }
     scope.weakSpotScores = state.session.liveWeakSpotScores
     scope.decorationState = state.session.liveWordDecorationState
     scope.arrowChart = state.session.generatedWordReplayHistory?.arrowChart ?? scope.arrowChart
     return .init(publication: publication, scope: scope, lease: lease,
       attachment: attachment, compositionActivity: compositionActivity, session: state.session.generationState,
       repetition: practice.repetition, restartDeparture: state.restartDepartureAttemptID,
-      configurationDeparture: state.configurationDeparture?.id)
+      configurationDeparture: state.configurationDeparture?.id, quoteInitialization: state.quoteInitialization?.id)
   }
   func isCurrent(_ capture: GenerationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -108,6 +113,7 @@ final class PracticePageSessionStore {
       && state.practice?.repetition == capture.repetition
       && state.restartDepartureAttemptID == capture.restartDeparture
       && state.configurationDeparture?.id == capture.configurationDeparture
+      && state.quoteInitialization?.id == capture.quoteInitialization
   }
   func noteCompositionActivity(for attemptID: UUID) {
     guard acceptsInput(for: attemptID) else { return }

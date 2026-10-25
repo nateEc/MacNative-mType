@@ -40,6 +40,54 @@ import Observation
     XCTAssertTrue(ready(), "Restart operation did not settle")
   }
 
+  func testFailedQuoteDrawKeepsControllerAndCanRecoverAfterCatalogChanges() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let disk = try f.register.read().revision
+    var empty = true, reads = 0
+    let controller = try f.bind(loadQuotes: { _ in
+      reads += 1
+      return [.init(id: "owned", title: "Owned changing sample", text: empty ? "" : "ef gh", language: .english, length: .short)]
+    })
+    let failed = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertFalse(failed)
+    XCTAssertEqual(reads, 3)
+    XCTAssertTrue(f.page.restartController === controller)
+    XCTAssertNotNil(f.page.state.quoteInitialization)
+    XCTAssertEqual(f.page.state.currentQuoteInitialization?.quote?.text, "")
+    XCTAssertEqual(try f.register.read().revision, disk)
+    empty = false
+    let recovered = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(recovered)
+    XCTAssertEqual(reads, 4)
+    XCTAssertEqual(f.page.state.session.prompt, "ef gh")
+    XCTAssertNil(f.page.state.quoteInitialization)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try f.register.read().revision, disk)
+  }
+
+  func testRepeatAfterFailedCatalogReadDoesNotReviveTheOldVisibleQuote() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+    f.input("a")
+    let oldID = f.page.state.session.automaticInputAttemptID, disk = try f.register.read().revision
+    var reads = 0
+    let controller = try f.bind(loadQuotes: { _ in reads += 1; throw Failure.generation })
+    let failed = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertFalse(failed)
+    XCTAssertNotNil(f.page.state.quoteInitialization)
+    XCTAssertNil(f.page.state.currentQuoteInitialization?.quote)
+    XCTAssertEqual(reads, 3)
+    let repeated = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertFalse(repeated)
+    XCTAssertEqual(reads, 3, "Failed repeat must not fetch a replacement quote")
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, oldID)
+    XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(try f.register.read().revision, disk)
+  }
+
   func testOrdinaryGenerationErrorsCanRecoverOnThirdRestartAttemptWithoutSavingAgain() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)

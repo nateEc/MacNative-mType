@@ -172,5 +172,46 @@ while (context.enterInit()) {
 assert.equal(attempts, 2);
 assert.deepEqual(Array.from(context.Config.quoteLength), [0,1,2,3]);
 assert.ok(state.current !== null);
+// Execute the pinned post-selection empty-word failure, not an injected
+// throw after a pretend draw. Wordset/Funbox are owned, minimal adapters;
+// later transformations and successful full generation remain out of scope.
+vm.runInContext(stripTypeScriptTypes(extract(read('test/words-generator.ts'),
+  'export async function getNextWord(', '\nexport function appendCommitCharacter'), {mode: 'transform'}), context);
+context.getFunboxWordsFrequency = () => undefined;
+context.getFunboxSection = async () => [];
+context.getFunboxWord = word => word;
+context.isCurrentlyUsingFunboxSection = false;
+context.currentLanguage = {name: 'english'};
+context.previousGetNextWordReturns = [];
+context.sectionHistory = [];
+context.currentSection = [];
+context.sectionIndex = 0;
+context.Config = {mode: 'quote', language: 'english', quoteLength: [0,1,2,3]};
+state.current = null; state.snapshot = null; state.last = false;
+await controller.getQuotes('english', context.Config.quoteLength);
+context.setQuoteLengthAll();
+assert.equal(controller.quoteQueue.length, 5);
+for (const quote of controller.quoteQueue.slice(0, 3)) quote.text = '';
+context.testReinitCount = 0;
+const indices = [], failures = [], drawnIDs = [];
+while (context.enterInit()) {
+  const words = await context.getQuoteWordList({name:'english'});
+  drawnIDs.push(String(state.current.id)); indices.push(controller.queueIndex);
+  context.currentWordset = {randomWord: () => words[0], nextWord: () => words[0]};
+  context.currentSection = [];
+  await assert.rejects(() => context.getNextWord(0, 1, '', ''), error => {
+    failures.push(error.message); context.lastInitError = error;
+    return error.message === 'Random word is empty';
+  });
+}
+assert.deepEqual(indices, [1,2,3]);
+context.testReinitCount = 0;
+assert.equal(context.enterInit(), true);
+const continued = await context.getQuoteWordList({name:'english'});
+drawnIDs.push(String(state.current.id));
+assert.ok(continued.every(word => word.length > 0));
+assert.equal(controller.queueIndex, 4);
+assert.equal(new Set(drawnIDs).size, 4);
+const failedDrawProgress = {indices, failures, continuedIndex: controller.queueIndex, uniqueDraws: new Set(drawnIDs).size};
 verify();
-console.log(JSON.stringify({fixtures, applications, initializationEntries: entries, recoveryAttempts: attempts}));
+console.log(JSON.stringify({fixtures, applications, initializationEntries: entries, recoveryAttempts: attempts, failedDrawProgress}));

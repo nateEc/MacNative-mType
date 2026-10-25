@@ -6,6 +6,49 @@ import TypebarSystem
 
 @MainActor final class WebsiteConfigDepartureTests: XCTestCase {
   private enum Failure: Error { case admission, publication, generation }
+
+  func testQuoteLengthSetterResumeKeepsDrawProgressButNewSetterResetsIt() async throws {
+    for newSetter in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.publish(#"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off","resultSaving":true}"#)
+      f.input()
+      let action = WebsiteConfigPracticeEdit.quoteLengths([0])
+      let ticket = try f.accept(f.edit(action), action: action)
+      let disk = try f.register.read().revision
+      let quotes = (0..<4).map { index in
+        OfflineQuote(id: "owned-\(index)", title: "Owned setter-progress sample", text: index < 3 ? "" : "ef gh",
+          language: .english, length: .short)
+      }
+      var bounds: [Int] = []
+      let resources = try f.coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .absent)
+      do {
+        _ = try await f.coordinator.preparePractice(for: resources, loadQuotes: { _ in quotes },
+          random: .init(quoteIndex: { bounds.append($0); return 0 }))
+        XCTFail("Empty quotes delivered")
+      } catch WebsiteConfigSessionBuildError.generationFailed {}
+      XCTAssertEqual(bounds, [4, 3, 2])
+      XCTAssertEqual(try f.register.read().revision, disk)
+      let resumed = try f.coordinator.resumeConfigurationRestart(for: f.page)
+      let ready = try await f.coordinator.preparePractice(for: f.coordinator.prepareResources(for: resumed,
+        localFont: .absent, localBackground: .absent), loadQuotes: { _ in quotes },
+        random: .init(quoteIndex: { bounds.append($0); return 0 }))
+      guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else { throw Failure.publication }
+      XCTAssertEqual(bounds, [4, 3, 2, 1])
+      XCTAssertNil(f.page.state.quoteInitialization)
+      XCTAssertEqual(try f.register.read().revision, disk)
+      if newSetter {
+        let next = try f.accept(f.edit(action), action: action)
+        let nextResources = try f.coordinator.prepareResources(for: next, localFont: .absent, localBackground: .absent)
+        do {
+          _ = try await f.coordinator.preparePractice(for: nextResources, loadQuotes: { _ in quotes },
+            random: .init(quoteIndex: { bounds.append($0); return 0 }))
+          XCTFail("The source setter failed to reset its consumed queue")
+        } catch WebsiteConfigSessionBuildError.generationFailed {}
+        XCTAssertEqual(Array(bounds.suffix(3)), [4, 3, 2])
+      }
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    }
+  }
   @MainActor private final class Fixture {
     let page = PracticePageSessionStore(), router = PreferenceConfigurationSaveRouter()
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-config-departure-\(UUID())")

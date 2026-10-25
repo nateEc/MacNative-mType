@@ -28,8 +28,14 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
   enum AttemptSource {
     case selection
     /// Owned raw quote, not the previous transformed display or a catalog ID.
-    case repeatedQuote(OfflineQuote, repeatedPace: Bool)
+    /// nil retains a failed initialization's cleared current-quote state.
+    case repeatedQuote(OfflineQuote?, repeatedPace: Bool)
     case repeatedWords(GeneratedWordReplayHistory, repeatedPace: Bool)
+  }
+  struct QuoteInitialization {
+    var sampler: WebsiteQuoteSampler?
+    var quote: OfflineQuote?
+    var appliedQuoteLengthEvents: Int?
   }
   struct Scope {
     var parameterMemory: TypebarTestParameterMemory = .defaults
@@ -81,6 +87,8 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
   static func prepare(draft: WebsiteConfigNativeDraft, scope: Scope,
     reason: Reason = .nextAttempt,
     attemptSource: AttemptSource = .selection,
+    applyQuoteLengthEvents: Bool? = nil,
+    onQuoteInitialization: ((WebsiteQuoteSampler?, OfflineQuote?) -> Void)? = nil,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) },
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> External)? = nil,
     random: Random = .init()) async throws -> Prepared {
@@ -93,10 +101,10 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     var nextScope = scope
     // The actual source listener rebuilds for every quoteLength setter event,
     // including identical arrays and nosave=true. Other events do not reset it.
-    // Keep this candidate value-owned so cancellation/failure cannot advance or
-    // clear the caller's already-installed queue.
-    if reason == .configurationApplication,
-      draft.projection.events.contains(where: { $0.key == "quoteLength" }) {
+    // Report value-owned selection progress separately from a deliverable
+    // attempt. The caller decides whether an accepted restart may retain it.
+    if applyQuoteLengthEvents ?? (reason == .configurationApplication
+      && draft.projection.events.contains(where: { $0.key == "quoteLength" })) {
       nextScope.quoteSampler = nil
     }
     nextScope.parameterMemory = draft.testParameters.parameterMemory(preserving: scope.parameterMemory)
@@ -110,6 +118,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
       guard config.mode == .quote, liveSource == nil else {
         throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported
       }
+      guard let quote else { throw WebsiteConfigSessionBuildError.generationFailed }
       selectedQuote = quote
       repetition = .sameWordset(repeatedPace: repeatedPace)
     case .repeatedWords(let history, let repeatedPace):
@@ -122,6 +131,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
       wordHistory = history
       repetition = .sameWordset(repeatedPace: repeatedPace)
     }
+    if config.mode == .quote { onQuoteInitialization?(nextScope.quoteSampler, selectedQuote) }
     if config.mode == .quote && selectedQuote == nil {
       let catalog = try await read { try await loadQuotes(draft.testParameters.language) }
       var sampler: WebsiteQuoteSampler
@@ -135,6 +145,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
         throw WebsiteConfigSessionBuildError.quoteRecoveryRequired(recovery)
       }
       nextScope.quoteSampler = sampler
+      onQuoteInitialization?(sampler, selectedQuote)
     }
     let showAllLines = draft.presentation.showAllPracticeLines
     let pseudolangModel = try await WebsitePseudolangModel.preparing(configuration: config)
