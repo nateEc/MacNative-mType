@@ -17,20 +17,35 @@ const begin = source.indexOf('async function init(): Promise<boolean> {');
 const end = source.indexOf('//add word during the test', begin);
 assert.ok(begin >= 0 && end > begin);
 const actualInit = stripTypeScriptTypes(source.slice(begin, end), {mode: 'transform'});
+const setters = fs.readFileSync(path.join(root, 'frontend/src/ts/config/setters.ts'), 'utf8');
+const setterBegin = setters.indexOf('export function setQuoteLengthAll(');
+const setterEnd = setters.indexOf('\nexport function toggleFunbox', setterBegin);
+assert.ok(setterBegin >= 0 && setterEnd > setterBegin);
+const actualAllSetter = stripTypeScriptTypes(setters.slice(setterBegin, setterEnd).replace(/^export /, ''), {mode:'transform'});
 
 const results = [];
+const preflightResults = [];
 for (const fixture of [
   {name: 'three rejected generations', outcomes: ['reject', 'reject', 'reject'], success: false},
   {name: 'empty and rejected generations share the bound', outcomes: ['empty', 'reject', 'empty'], success: false},
   {name: 'third generation recovers', outcomes: ['reject', 'empty', 'valid'], success: true},
   {name: 'blank WordGenError suppresses its notice', outcomes: ['blank', 'reject', 'valid'], success: true},
   {name: 'blank WordGenError still reaches final failure', outcomes: ['blank', 'blank', 'blank'], success: false},
+  ...[
+    {mode:'quote', groups:[-3], authenticated:false},
+    {mode:'quote', groups:[-2,-3,0], authenticated:false},
+    {mode:'quote', groups:[-3], authenticated:true},
+    {mode:'words', groups:[-3], authenticated:false},
+    {mode:'quote', groups:[-2], authenticated:false},
+  ].map(preflight => ({name:'favorite preflight ' + JSON.stringify(preflight), preflight,
+    outcomes:['reject','reject','valid'], success:true})),
 ]) {
   let calls = 0, resets = 0, failureViews = 0, captured = 0, notices = 0, errors = 0;
   let words = [];
   const restarting = [];
   const notifications = [], finalErrors = [], capturedMessages = [];
-  const config = {mode: 'words', words: 2, language: 'english', lazyMode: false,
+  const stages = [], selectionAtGeneration = [];
+  const config = {mode: fixture.preflight?.mode ?? 'words', quoteLength: fixture.preflight?.groups ?? [0], words: 2, language: 'english', lazyMode: false,
     keymapMode: 'off', funbox: ['wikipedia']};
   class WordGenError extends Error {}
   const noop = () => {};
@@ -49,7 +64,12 @@ for (const fixture of [
     resetActiveWordIndex: noop, showLoaderBar: noop, hideLoaderBar: noop,
     tryCatch: async promise => ({data: await promise, error: null}),
     JSONData: {getLanguage: async () => ({name: 'english', words: ['owned'], noLazyMode: false})},
-    getActivePage: () => 'test', Funbox: {activate: async () => {}, toggleScript: noop},
+    getActivePage: () => 'test', Funbox: {activate: async () => { stages.push('activate'); }, toggleScript: noop},
+    isAuthenticated: () => fixture.preflight?.authenticated ?? false,
+    setConfig: (key, value, options) => {
+      assert.equal(key, 'quoteLength'); assert.equal(options.nosave, undefined);
+      stages.push('all'); config[key] = [...value]; return true;
+    },
     getActiveFunboxNames: () => ['wikipedia'],
     LazyModeState: {getRemember: () => false, setRemember: noop},
     CustomText: {getData: () => ({}), getText: () => []},
@@ -62,6 +82,7 @@ for (const fixture of [
     },
     WordsGenerator: {
       generateWords: async () => {
+        stages.push('generate'); selectionAtGeneration.push([...config.quoteLength]);
         assert.ok(calls < fixture.outcomes.length, 'No fourth generation is allowed');
         const outcome = fixture.outcomes[calls++];
         if (outcome === 'reject') throw new Error('Owned generation rejection');
@@ -75,6 +96,7 @@ for (const fixture of [
     TestUI: {setJoiningClass: noop}, setIsLanguageRightToLeft: noop,
     setIsDirectionReversed: noop, isFunboxActiveWithProperty: () => false,
   });
+  vm.runInContext(actualAllSetter, context);
   const module = new vm.SourceTextModule(
     'let lastInitError = null; let showedLazyModeNotification = false; let testReinitCount = 0;\n'
       + actualInit + '\nexport {init};', {context});
@@ -96,8 +118,15 @@ for (const fixture of [
   assert.deepEqual(finalErrors, fixture.success ? [] : [`Error: ${lastMessage}`]);
   assert.deepEqual(words, fixture.success ? ['north ', 'south'] : []);
   assert.deepEqual(config.funbox, ['wikipedia']);
-  results.push({name:fixture.name, outcomes:fixture.outcomes, success:fixture.success, calls, notifications, finalErrors, capturedMessages});
+  if (fixture.preflight) {
+    const corrected = fixture.preflight.mode === 'quote' && fixture.preflight.groups.includes(-3) && !fixture.preflight.authenticated;
+    const expected = corrected ? [0,1,2,3] : fixture.preflight.groups;
+    assert.deepEqual(selectionAtGeneration, [expected,expected,expected]);
+    assert.deepEqual(stages, corrected ? ['activate','all','generate','activate','generate','activate','generate']
+      : ['activate','generate','activate','generate','activate','generate']);
+    preflightResults.push({...fixture.preflight, corrected, calls, stages, selectionAtGeneration});
+  } else results.push({name:fixture.name, outcomes:fixture.outcomes, success:fixture.success, calls, notifications, finalErrors, capturedMessages});
   if (!process.argv.includes('--json')) console.log(`PASS ${fixture.name}`);
 }
-if (process.argv.includes('--json')) console.log(JSON.stringify({cases:results}));
-else console.log('Complete pinned init: 5 caller retry/feedback cases passed; networking and generator implementation are adapter boundaries.');
+if (process.argv.includes('--json')) console.log(JSON.stringify({cases:results, preflightCases:preflightResults}));
+else console.log('Complete pinned init: 5 retry/feedback and 5 favorites preflight cases passed; networking and generator implementation are adapter boundaries.');

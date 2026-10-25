@@ -4,6 +4,126 @@ import Observation
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
+
+  func testUnauthenticatedFavoritesCorrectionDoesNotConsumeGenerationBudgetOrPostARecoveryNotice() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        if reads < 3 { throw Failure.provider }
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[-3,-2,0]}"#, systemIsDark: false)
+    XCTAssertEqual(reads, 3)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [0,1,2,3])
+    XCTAssertEqual(f.account.localNotices.history.map(\.level), [.error, .error])
+  }
+
+  func testUnauthenticatedFavoritesSetterSavesBeforeProviderAndResumesWithoutAnotherCorrection() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    var reads = 0
+    let handle = WeakWorkflow()
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        guard case .available(let runtime) = try register.read().state else { throw Failure.provider }
+        XCTAssertEqual(runtime["quoteLength"], .array((0...3).map { .number(Double($0)) }), "Correct before the first provider read")
+        if reads == 1 { handle.value?.cancel() }
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    handle.value = workflow
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("a"); f.page.replace(state)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    do {
+      try await workflow.editAndBegin(.quoteLengths([-3]), replacing: publication, systemIsDark: false)
+      XCTFail("Cancelled preparation delivered")
+    } catch is CancellationError {}
+    let pending = try XCTUnwrap(f.page.state.configurationDeparture)
+    XCTAssertEqual(pending.draft.quoteSelection.groups, [0,1,2,3])
+    let revision = try register.read().revision
+    let ledger = f.page.state.priorAttemptLedger
+    XCTAssertEqual(ledger.restartCount, 1)
+    try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false)
+    XCTAssertEqual(reads, 2)
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, ledger.restartCount)
+    XCTAssertTrue(f.account.localNotices.history.isEmpty)
+  }
+
+  func testAuthenticatedFavoritesAndDormantWordsSelectionDoNotReceiveThePreflightCorrection() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    f.account.currentUser = .init(id: UUID(), email: "owned@example.invalid", displayName: "Owned", totalExperience: 0)
+    f.window.favorites = .nativeLocal
+    f.settings.favoriteQuoteIDs = ["favorite"]
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        return [.init(id: "favorite", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[-3]}"#, systemIsDark: false)
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [-3])
+    XCTAssertEqual(f.page.state.practice?.quote?.id, "favorite")
+    f.account.currentUser = nil
+    try await workflow.apply(json: #"{"mode":"words","words":4,"quoteLength":[-3]}"#, systemIsDark: false)
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, [-3])
+    XCTAssertTrue(f.account.localNotices.history.isEmpty)
+  }
+
+  func testUnauthenticatedNativeLocalFavoritesCannotBypassPreflightButSelectedQuoteIsPreserved() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    f.window.favorites = .nativeLocal; f.window.selectedQuoteID = "owned"
+    f.settings.favoriteQuoteIDs = ["owned"]
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    for (groups, expected) in [("[-3]", [0,1,2,3]), ("[-2,-3,0]", [0,1,2,3]), ("[-2]", [-2])] {
+      try await workflow.apply(json: "{\"mode\":\"quote\",\"quoteLength\":\(groups)}", systemIsDark: false)
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.quoteSelection.groups, expected)
+      XCTAssertEqual(f.page.state.practice?.quote?.id, "owned")
+    }
+    XCTAssertEqual(reads, 3); XCTAssertTrue(f.account.localNotices.history.isEmpty)
+  }
+
+  func testAccountChangeAfterFavoritesCorrectionRejectsDeliveryWithoutRevertingItsSavedSetting() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    var reads = 0
+    var savedRevision: WebsiteConfigFileRegister.Revision?
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1; savedRevision = try register.read().revision
+        f.account.currentUser = .init(id: UUID(), email: "owned@example.invalid", displayName: "Owned", totalExperience: 0)
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    do {
+      try await workflow.editAndBegin(.quoteLengths([-3]), replacing: publication, systemIsDark: false)
+      XCTFail("Old account request delivered")
+    } catch let error as WebsiteConfigSavedPreparationError {
+      guard case WebsiteConfigCommitCoordinatorError.stale = error.underlying else { return XCTFail("Unexpected error: \(error)") }
+    }
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication)
+    XCTAssertEqual(try register.read().revision, savedRevision)
+    XCTAssertEqual(f.page.state.configurationDeparture?.draft.quoteSelection.groups, [0,1,2,3])
+    XCTAssertTrue(f.account.localNotices.history.isEmpty)
+  }
   @MainActor private final class NoticeTransition { var calls = 0 }
 
   func testGenerationRetriesReachLocalHistoryAndRemainAfterSuccessfulInitialization() async throws {

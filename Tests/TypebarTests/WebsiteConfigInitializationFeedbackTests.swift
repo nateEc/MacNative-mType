@@ -133,7 +133,11 @@ import XCTest
     struct Case: Decodable {
       let outcomes: [String], success: Bool, calls: Int, notifications: [Notice], finalErrors: [String], capturedMessages: [String]
     }
-    struct Output: Decodable { let cases: [Case] }
+    struct PreflightCase: Decodable {
+      let mode: String, groups: [Int], authenticated: Bool, corrected: Bool, calls: Int
+      let selectionAtGeneration: [[Int]]
+    }
+    struct Output: Decodable { let cases: [Case]; let preflightCases: [PreflightCase] }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let process = Process(), pipe = Pipe()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -143,7 +147,15 @@ import XCTest
     try process.run()
     let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus, 0)
-    let cases = try JSONDecoder().decode(Output.self, from: data).cases
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    let cases = output.cases
+    XCTAssertEqual(output.preflightCases.count, 5)
+    for fixture in output.preflightCases {
+      let corrected = fixture.mode == "quote" && fixture.groups.contains(-3) && !fixture.authenticated
+      XCTAssertEqual(fixture.corrected, corrected)
+      XCTAssertEqual(fixture.calls, 3)
+      XCTAssertEqual(fixture.selectionAtGeneration, Array(repeating: corrected ? [0,1,2,3] : fixture.groups, count: 3))
+    }
     XCTAssertEqual(cases.count, 5)
     for fixture in cases {
       let center = LocalNoticeCenter(); defer { center.clearAll() }

@@ -903,6 +903,15 @@ final class WebsiteConfigCommitCoordinator {
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
     random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
     try checkAsyncResources(resources.configuration, admission: resources.admission)
+    var resources = resources
+    // Pinned init repairs unauthenticated favorites before lazy normalization
+    // and generation. This is a setter, not a failed sampling attempt: retain
+    // its save checkpoint without spending retry budget or posting a notice.
+    if resources.configuration.draft.testParameters.mode == .quote,
+      resources.configuration.draft.quoteSelection.groups.contains(-3),
+      !resources.configuration.environment.context.authenticated {
+      resources = try prepareQuoteRecovery(.allLengths, for: resources)
+    }
     let original = resources.configuration.draft
     let draft = try WebsiteConfigLazyModeLifecycle.prepare(original,
       pointsPerRem: resources.configuration.environment.pointsPerRem,
