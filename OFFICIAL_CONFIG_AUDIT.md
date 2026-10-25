@@ -1,5 +1,21 @@
 # 官方配置兼容性审计
 
+## 完整配置外观命令及页面读取（2026-10-26，起点 bd79b284）
+
+CFG-APPEARANCE-COMMAND-PAGE-01 对照实际 command metadata、subgroup builder、schema、setter、test-ui 和 test-logic 的 config 订阅。--appearance-commands 输出 1,176 组（49 个格式选项 × 两活动状态 × 两 No Quit 状态 × 六个初始配置）；源菜单隐藏 WPH，所以原生菜单保持 48 项。六配置包含普通、companion 开启／完整行开启、卷带、Memory、Arrows、TTS；记录完整 runtime、事件、保存、拒绝提示重要性、resize 请求与文字／wrapper／Joining 回调。DOM／绘制等外部端点只记录请求，不冒充浏览器像素或原资产。
+
+这些命令没有显式或 config 订阅重开。文字速度／准确率先保存 monkey=false，非 off 卷带先保存 showAllLines=false；父 setter 后续竞争不得回滚子项。独立单字段提交准入拒绝复合差异、无关字段和 monkey=true。原生高亮事件调用当前会话的接受输入重绘，只清临时停止错字，不改输入、计分或尝试；其他外观字段不会借此同步输入规则。实时指标、companion、单位、完成页精度／零轴以及图表菜单回调读取当前 publication，文字／辅助色绑定窗口主题。
+
+首次 RED 为缺少完整配置 appearance 路径与映射；实现中 draft edit 不包含 value，准入改为读取候选 runtime 的 monkey=false。初次定向测试中的三处失败来自两个错误夹具前提：默认 timerColor 已为 main，所谓复合差异只有一个字段；Memory 实际允许 word 高亮，限制来自 Arrows／TTS。已用不同初始颜色及实际受限趣味模式修正夹具，保留原复合拒绝和普通提示断言；1,176 组源对照本身已通过，未修改产品去迎合错误前提。
+
+真实隐藏页验证输入控件／组合文本保持及卷带修改期间的在途内容衔接。/tmp/typebar-appearance-live-host.png 已滚动至实际输入／实时区并检查，CPS、Raw CPS、Burst CPS 可见；隐藏截图中的部分系统控件和透明背景不作为实体窗口像素验收。完成结果通过原生 sheet 呈现，隐藏父窗口既不能以控件移除、也不能以控件禁用推断 sheet readiness；结束态用例只验证显示参数与计分／尝试保持。诊断截图 /tmp/typebar-appearance-result-host.png 显示结束后主提示“暂不可用”，记录 CFG-FINISHED-PROMPT-RENDER-01，原因尚未定位，不把它记为完成 UI 验证。
+
+一次较早的组合文本末尾断言失败，未区分标记未安装和命令导致丢失；已增加输入已就绪、尝试已开始、初始 marked 确实存在的前置检查，并在每条命令交付后分别验证控件身份与标记保持。最终两项实时／结束态专项复验通过（2.676 秒，零跳过），随后相关回归 1,415 项全部通过（253.458 秒，零跳过）；不将此前失败／部分补跑记为全绿，也不据此声称修复了独立实体输入法根因。参考行为审计 47 direct／119 native symbols／17 supporting 通过；人工表 1,357 个唯一场景仅完成结构审计。
+
+日志 /tmp/typebar-appearance-command-{red,focused,integration,host,final-focused,host-recheck,broad,reference,package}.log，原源码探针 /tmp/typebar-appearance-command-source.json。中间测试日志包含上述失败前提和隐藏 sheet 观测失败，最终证据为 broad／host-recheck；完整门禁及全部实体交互仍未完成。
+
+最终 Debug 应用打包／签名、资源边界和原创性检查通过。本轮没有启动 Typebar 主程序；结束态主提示缺口与整体功能验收仍开放。
+
 ## 完整配置配速命令（2026-10-26，起点 6d186bee）
 
 CFG-PACE-COMMAND-PAGE-01 对照实际配速 metadata、subgroup／input builder、setter、pace-caret config 订阅及 restart 开头的 No Quit guard。QA --pace-commands 生成 488 组：48 个模式／活动／No Quit／登录组合，440 个原模式 off／custom × 11 输入 × 五单位 × 两活动状态 × 两 No Quit 状态。记录完整 runtime、事件、保存、通知重要性、初始化请求读取的模式／记忆速度与重开请求／No Quit 准入；只替换实际声音／DOM／账户等外部端点，不把截取的首个重开 guard 当作完整重开过程覆盖。

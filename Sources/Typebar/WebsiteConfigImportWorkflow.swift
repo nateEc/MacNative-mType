@@ -15,6 +15,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case inputRule(InputRuleCommandTarget)
   case sound(SoundCommandTarget)
   case caret(CaretCommandTarget)
+  case appearance(AppearanceCommandTarget)
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
@@ -29,6 +30,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .inputRule(let edit): edit.websiteKey
     case .sound(let edit): edit.websiteKey
     case .caret(let edit): edit.websiteKey
+    case .appearance(let edit): edit.websiteKey
     }
   }
   var value: WebsiteConfigValue {
@@ -48,6 +50,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .inputRule(let edit): edit.websiteValue
     case .sound(let edit): edit.websiteValue
     case .caret(let edit): edit.websiteValue
+    case .appearance(let edit): edit.websiteValue
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -55,7 +58,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   /// neither case: execution never reaches the following dispatch.
   var dispatchesRestartAfterRejection: Bool {
     switch self {
-    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior, .inputRule, .sound, .caret: false
+    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior, .inputRule, .sound, .caret, .appearance: false
     case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes, .polyglotLanguages: true
     }
   }
@@ -152,6 +155,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   func editAndBegin(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID, systemIsDark: Bool) async throws -> String {
     if case .behavior = edit { return try runSingleLiveCommand(edit, replacing: applicationID) }
     if case .caret = edit { return try runSingleLiveCommand(edit, replacing: applicationID) }
+    if case .appearance(let target) = edit { return try runAppearanceCommand(target, replacing: applicationID) }
     if case .sound(let target) = edit {
       guard target.websiteValue != .null else { throw WebsiteSoundCommandError.unsupportedTone }
       return try runSingleLiveCommand(edit, replacing: applicationID)
@@ -260,6 +264,60 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
     try Task.checkCancellation()
     throw WebsitePaceCommandError.restartFailed(saved: saved)
+  }
+
+  private func runAppearanceCommand(_ target: AppearanceCommandTarget, replacing applicationID: UUID) throws -> String {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil else { throw WebsiteConfigImportWorkflowError.preparationPending }
+    guard let original = page.state.presentation?.publication, original.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
+    try Task.checkCancellation()
+    let current = UUID(); applying = true; operation = current
+    let noticeGeneration = notices?.deliveryGeneration
+    defer {
+      if let prepared { _ = coordinator.cancel(prepared) }
+      prepared = nil; applying = false
+    }
+    return try environment.withSynchronousSetterRead {
+      guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+      let plan = try WebsiteAppearanceCommand.plan(current: original.draft.projection.runtime, target: target,
+        context: context.context, active: page.state.session.hasStarted && !page.state.session.isFinished)
+      var receiptID = applicationID, saved = 0
+      do {
+        for step in plan.steps {
+          try Task.checkCancellation()
+          guard operation == current, !stopped, page.state.presentation?.publication.applicationID == receiptID else { throw WebsiteConfigImportWorkflowError.conflict }
+          if !step.accepted {
+            if let publication = page.state.presentation?.publication, let noticeGeneration {
+              let message = target == .showAllLines(true) ? "卷带模式不支持显示完整提示行。" : "当前趣味模式不支持这个显示选项。"
+              notices?.postGuarded(message, level: .notice, options: .init(), generation: noticeGeneration, whileCurrent: {
+                self.operation == current && !self.stopped && !Task.isCancelled
+                  && self.environment.read()?.revision == context.revision
+                  && page.state.presentation?.publication.applicationID == publication.applicationID
+                  && publication.isCurrentDelivery(owner: page.owner, router: self.settings.preferenceConfigurationSaves)
+              })
+            }
+            continue
+          }
+          let ticket = try coordinator.prepareEdit(key: step.key, value: step.value, for: page, refreshingWith: source)
+          prepared = ticket
+          guard operation == current, !stopped else { throw CancellationError() }
+          switch try coordinator.commitLiveAppearance(ticket, for: page) {
+          case .committed(let publication): saved += 1; receiptID = publication.applicationID
+          case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+          case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+          case .busy: throw WebsiteConfigImportWorkflowError.busy
+          }
+        }
+      } catch {
+        if saved > 0 { throw WebsiteAppearanceCommandError.interrupted(saved: saved, underlying: error) }
+        throw error
+      }
+      try Task.checkCancellation()
+      guard operation == current, !stopped else { throw CancellationError() }
+      if plan.failedOverride { throw WebsiteAppearanceCommandError.failedOverride(saved: saved) }
+      return saved == 0 ? "显示设置未修改。" : "显示设置已保存，当前练习继续。"
+    }
   }
 
   private func runInputCommand(_ target: InputRuleCommandTarget, replacing applicationID: UUID) throws -> String {

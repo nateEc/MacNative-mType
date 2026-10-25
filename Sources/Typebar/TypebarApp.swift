@@ -1284,6 +1284,9 @@ private struct ContentView: View {
   private var committedPracticeDraft: WebsiteConfigNativeDraft? {
     pageSession.practice == nil ? nil : pageSession.presentation?.publication.draft
   }
+  private var practiceAppearance: PracticeAppearanceSelection {
+    .init(draft: committedPracticeDraft, settings: settings)
+  }
   private var savesCurrentPracticeResults: Bool {
     committedPracticeDraft?.behavior.saveCompletedResults ?? settings.saveCompletedResults
   }
@@ -2478,14 +2481,14 @@ private struct ContentView: View {
         eligibility: result.eligibility,
         failureReason: result.failureReason,
         zeroSpeedFeedback: result.zeroSpeedFeedback,
-        typingSpeedUnit: settings.typingSpeedUnit,
-        alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces,
+        typingSpeedUnit: practiceAppearance.unit,
+        alwaysShowDecimalPlaces: practiceAppearance.alwaysShowDecimalPlaces,
         alwaysShowWordsHistory: committedPracticeDraft?.presentation.alwaysShowWordsHistory ?? settings.alwaysShowWordsHistory,
         commandPaletteListMode: practiceCommandPaletteListMode,
         soundConfiguration: .init(selection: practiceSoundSelection,
           player: websiteSoundOutput?.player ?? settings.practiceFeedbackSound),
         showWordBurstHeatmap: settings.showWordBurstHeatmap,
-        startGraphsAtZero: settings.startGraphsAtZero,
+        startGraphsAtZero: practiceAppearance.startGraphsAtZero,
         resultPerformanceVisibility: settings.resultPerformanceVisibility,
         background: activeTheme.background,
         panel: activeTheme.panel,
@@ -2547,7 +2550,10 @@ private struct ContentView: View {
         },
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
-        onResultGraphScaleChange: { settings.startGraphsAtZero = $0 },
+        onResultGraphScaleChange: { value in
+          if pageSessionStore.ownsConfigurationSelection { runWebsiteLiveCommand(.appearance(.startGraphsAtZero(value))) }
+          else { settings.startGraphsAtZero = value }
+        },
         onRetryPublication: { publishIfEnabled(result.result) },
         onRetryLocalSave: {
           saveCompletedResultLocally(result.result)
@@ -3569,7 +3575,7 @@ private struct ContentView: View {
           session.recordPhysicalKeyEvent(
             keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
           if isKeyDown { session.recordKeyboardActivity() }
-          guard settings.showTypingCompanion else { return }
+          guard practiceAppearance.showTypingCompanion else { return }
           typingCompanionHands.handle(keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
         }
       )
@@ -3578,7 +3584,7 @@ private struct ContentView: View {
     }
     .overlay(alignment: .bottomTrailing) {
       if TypingCompanionVisibilityPolicy.shouldShow(
-        isEnabled: settings.showTypingCompanion, hasStarted: session.hasStarted,
+        isEnabled: practiceAppearance.showTypingCompanion, hasStarted: session.hasStarted,
         isFinished: session.isFinished)
       {
         TypingCompanion(
@@ -4269,24 +4275,24 @@ private struct ContentView: View {
   private var liveStatsContent: some View {
     let now = Date.now
     let live = LiveTypingMetrics(
-      session: session, at: now, blindMode: settings.blindMode, unit: settings.typingSpeedUnit)
-    let progressStyle = settings.liveProgressStyle
+      session: session, at: now, blindMode: session.configuration.rules.blindMode, unit: practiceAppearance.unit)
+    let progressStyle = practiceAppearance.progress
     let isProgressFlashHidden = !progressStyle.showsProgressValue(
       isTimed: session.configuration.duration != nil,
       remainingSeconds: session.remainingSeconds(at: now))
 
     return HStack(spacing: 0) {
       metric(
-        settings.typingSpeedUnit.displayName,
-        value: live.speed, style: settings.liveSpeedStyle, usesLiveAppearance: true)
+        practiceAppearance.unit.displayName,
+        value: live.speed, style: practiceAppearance.speed, usesLiveAppearance: true)
       metric(
-        "Raw \(settings.typingSpeedUnit.displayName)",
-        value: live.rawSpeed, style: settings.liveSpeedStyle, usesLiveAppearance: true)
+        "Raw \(practiceAppearance.unit.displayName)",
+        value: live.rawSpeed, style: practiceAppearance.speed, usesLiveAppearance: true)
       metric(
-        "Burst \(settings.typingSpeedUnit.displayName)",
-        value: live.burst, style: settings.liveBurstStyle, usesLiveAppearance: true)
+        "Burst \(practiceAppearance.unit.displayName)",
+        value: live.burst, style: practiceAppearance.burst, usesLiveAppearance: true)
       metric(
-        "准确率", value: live.accuracy, style: settings.liveAccuracyStyle,
+        "准确率", value: live.accuracy, style: practiceAppearance.accuracy,
         usesLiveAppearance: true)
       if progressStyle == .bar {
         progressMetricBar
@@ -4338,7 +4344,7 @@ private struct ContentView: View {
     if style != .off {
       let isMini = style == .mini
       let foreground = usesLiveAppearance
-        ? settings.liveStatsColor.resolved(accent: activeTheme.accent) : Color.primary
+        ? practiceAppearance.foreground(theme: activeTheme) : Color.primary
       let labelForeground = usesLiveAppearance ? foreground.opacity(0.76) : Color.secondary
       VStack(spacing: isMini ? 2 : 5) {
         Text(value).font(
@@ -4346,14 +4352,14 @@ private struct ContentView: View {
         Text(title).font(isMini ? .caption2 : .caption).foregroundStyle(labelForeground)
       }
       .foregroundStyle(foreground)
-      .opacity((usesLiveAppearance ? settings.liveStatsOpacity.rawValue : 1) * (isHidden ? 0 : 1))
+      .opacity((usesLiveAppearance ? practiceAppearance.opacity.rawValue : 1) * (isHidden ? 0 : 1))
       .frame(maxWidth: .infinity)
       .padding(.vertical, isMini ? 8 : 14)
     }
   }
 
   private var progressMetricBar: some View {
-    let foreground = settings.liveStatsColor.resolved(accent: activeTheme.accent)
+    let foreground = practiceAppearance.foreground(theme: activeTheme)
     let progress = session.progressFraction(at: .now) ?? 0
     return VStack(spacing: 6) {
       HStack {
@@ -4367,7 +4373,7 @@ private struct ContentView: View {
         .animation(progressBarAnimation, value: progress)
     }
     .foregroundStyle(foreground)
-    .opacity(settings.liveStatsOpacity.rawValue)
+    .opacity(practiceAppearance.opacity.rawValue)
     .frame(maxWidth: .infinity)
     .padding(.horizontal, 14)
     .padding(.vertical, 16)
@@ -5764,10 +5770,10 @@ private struct ContentView: View {
     var metrics = [String]()
     if settings.showAverage.showsSpeed {
       metrics.append(
-        "\(settings.typingSpeedUnit.formatted(wpm: average.wpm)) \(settings.typingSpeedUnit.displayName)")
+        "\(practiceAppearance.unit.formatted(wpm: average.wpm)) \(practiceAppearance.unit.displayName)")
     }
     if settings.showAverage.showsAccuracy {
-      metrics.append("\(ResultMetricPresentation.accuracy(average.accuracy, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces)) 准确率")
+      metrics.append("\(ResultMetricPresentation.accuracy(average.accuracy, alwaysShowDecimalPlaces: practiceAppearance.alwaysShowDecimalPlaces)) 准确率")
     }
     return "近 \(average.count) 次平均：\(metrics.joined(separator: " · "))"
   }
@@ -5795,7 +5801,7 @@ private struct ContentView: View {
     else {
       return "本机个人最佳：暂无符合资格的同类成绩"
     }
-    return "本机个人最佳：\(settings.typingSpeedUnit.formatted(wpm: personalBest.wpm, alwaysShowDecimalPlaces: true)) \(settings.typingSpeedUnit.displayName) · \(ResultMetricPresentation.accuracy(personalBest.accuracy, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces)) 准确率"
+    return "本机个人最佳：\(practiceAppearance.unit.formatted(wpm: personalBest.wpm, alwaysShowDecimalPlaces: true)) \(practiceAppearance.unit.displayName) · \(ResultMetricPresentation.accuracy(personalBest.accuracy, alwaysShowDecimalPlaces: practiceAppearance.alwaysShowDecimalPlaces)) 准确率"
   }
 
   private func startWeakSpotPractice() {
@@ -6127,6 +6133,7 @@ private struct ContentView: View {
       return
     }
     if let target = AppearanceCommandCatalog.target(for: item.id) {
+      if pageSessionStore.ownsConfigurationSelection { runWebsiteLiveCommand(.appearance(target)); return }
       guard target.apply(to: settings, requestedModifiers: practiceRequestedModifiers,
         onConfigurationSave: persistExplicitTestConfiguration) else {
         if case .highlight = target {

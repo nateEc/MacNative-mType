@@ -6,6 +6,113 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testAppearanceHighlightRedrawClearsStoppedGlyphWithoutChangingAcceptedInput() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"stopOnError":"letter"}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("☃"); f.page.replace(state)
+    let before = f.page.state.session
+    XCTAssertTrue(before.promptGlyphs.contains { $0.typedCharacter == "☃" }); XCTAssertTrue(before.typed.isEmpty)
+    try await f.workflow.editAndBegin(.appearance(.color(.accent)), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertTrue(f.page.state.session.promptGlyphs.contains { $0.typedCharacter == "☃" })
+    try await f.workflow.editAndBegin(.appearance(.highlight(.word)), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertFalse(f.page.state.session.promptGlyphs.contains { $0.typedCharacter == "☃" })
+    XCTAssertEqual(f.page.state.session.typed, before.typed)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.automaticInputAttemptID)
+    XCTAssertEqual(f.page.state.session.characterStats, before.characterStats)
+  }
+  func testAppearanceBlockedOptionsDoNotSaveAndPostOneOrdinaryNotice() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["arrows","no_quit"],"tapeMode":"word"}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    for command in [AppearanceCommandTarget.showAllLines(true), .highlight(.word)] {
+      let publication = try XCTUnwrap(f.page.state.presentation).publication, before = f.page.state.session.generationState
+      let count = f.account.localNotices.history.count
+      try await f.workflow.editAndBegin(.appearance(command), replacing: publication.applicationID, systemIsDark: false)
+      XCTAssertEqual(f.account.localNotices.history.count, count + 1)
+      XCTAssertFalse(try XCTUnwrap(f.account.localNotices.active.first).important)
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, publication.disk)
+      XCTAssertEqual(f.page.state.session.generationState, before)
+    }
+  }
+  func testAllAppearanceMenuOptionsSaveWithoutRestartAndWphStaysImportable() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session.generationState, legacy = f.settings.snapshot
+    let commands = AppearanceCommandCatalog.items.compactMap { AppearanceCommandCatalog.target(for: $0.id) }
+    XCTAssertEqual(commands.count, 48)
+    for command in commands + [.speedUnit(.wph)] {
+      if command == .showAllLines(true) {
+        try await f.workflow.editAndBegin(.appearance(.tape(.off)), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      }
+      try await f.workflow.editAndBegin(.appearance(command), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.runtime[command.websiteKey], command.websiteValue)
+      XCTAssertEqual(f.page.state.session.generationState, before)
+    }
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+  func testAppearanceSecondSetterConflictRetainsItsAcceptedCompanionChange() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let other = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    var compete = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if compete, f.page.state.presentation?.publication.draft.presentation.showTypingCompanion == false {
+          compete = false
+          do { _ = try register.commit(other, replacing: XCTUnwrap(register.read().revision)) }
+          catch { XCTFail("Competing writer: \(error)") }
+        }
+        return f.window
+      }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"monkey":true,"liveSpeedStyle":"mini"}"#, systemIsDark: false)
+    let before = f.page.state.session.generationState, legacy = f.settings.snapshot
+    compete = true
+    do {
+      try await workflow.editAndBegin(.appearance(.speed(.text)), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTFail("Appearance overwrote competitor")
+    } catch WebsiteAppearanceCommandError.interrupted(let saved, _) { XCTAssertEqual(saved, 1) }
+    XCTAssertFalse(try XCTUnwrap(f.page.state.presentation).publication.draft.presentation.showTypingCompanion)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.presentation.liveSpeedStyle, .mini)
+    XCTAssertEqual(f.page.state.session.generationState, before); XCTAssertEqual(f.settings.snapshot, legacy)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Lost competitor") }
+    XCTAssertEqual(saved["words"], .number(7))
+  }
+  func testCancelledAndStaleAppearanceCommandsCannotWriteOrReplaceTheAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let original = try XCTUnwrap(f.page.state.presentation).publication, before = f.page.state.session.generationState
+    let task = Task { @MainActor in try await f.workflow.editAndBegin(.appearance(.color(.black)), replacing: original.applicationID, systemIsDark: false) }
+    task.cancel()
+    do { _ = try await task.value; XCTFail("Cancelled appearance saved") } catch is CancellationError {}
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, original.disk)
+    try await f.workflow.editAndBegin(.appearance(.color(.black)), replacing: original.applicationID, systemIsDark: false)
+    let current = try XCTUnwrap(f.page.state.presentation).publication
+    do { try await f.workflow.editAndBegin(.appearance(.speedUnit(.cpm)), replacing: original.applicationID, systemIsDark: false); XCTFail("Stale appearance saved") }
+    catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, current.disk)
+    XCTAssertEqual(f.page.state.session.generationState, before)
+  }
+  func testAppearanceCommandsSaveOwnedProfileWithoutRestartingActiveNoQuit() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"],"monkey":true,"showAllLines":true}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session.generationState, legacy = f.settings.snapshot, controller = f.page.restartController
+    let lock = UUID(); f.settings.setNoQuitConfigurationLock(true, for: lock)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: lock) }
+    for command in [AppearanceCommandTarget.speed(.text), .tape(.word), .speedUnit(.cpm), .color(.accent), .opacity(.half), .progress(.mini)] {
+      try await f.workflow.editAndBegin(.appearance(command), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+      XCTAssertEqual(draft.projection.runtime[command.websiteKey], command.websiteValue)
+      XCTAssertEqual(f.page.state.session.generationState, before); XCTAssertTrue(f.page.restartController === controller)
+      XCTAssertEqual(f.settings.snapshot, legacy)
+    }
+    let draft = try XCTUnwrap(f.page.state.presentation).publication.draft
+    XCTAssertFalse(draft.presentation.showTypingCompanion); XCTAssertFalse(draft.presentation.showAllPracticeLines)
+    XCTAssertEqual(draft.presentation.practiceTapeMode, .word)
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else { return XCTFail("No appearance profile") }
+    XCTAssertEqual(saved, draft.projection.runtime)
+  }
   func testPaceFormSnapshotAndHiddenLayoutDoNotApplyConfiguration() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":10,"typingSpeedUnit":"cpm","paceCaretCustomSpeed":80}"#, systemIsDark: false)

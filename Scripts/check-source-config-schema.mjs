@@ -21,7 +21,8 @@ const inputCommandMode = process.argv[3] === '--input-commands';
 const soundCommandMode = process.argv[3] === '--sound-commands';
 const caretCommandMode = process.argv[3] === '--caret-commands';
 const paceCommandMode = process.argv[3] === '--pace-commands';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode);
+const appearanceCommandMode = process.argv[3] === '--appearance-commands';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -41,13 +42,13 @@ const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
 const adapters = new Map([
   [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: (_message, options) => {
-    if (thresholdCommandMode || inputCommandMode || paceCommandMode) simulation.notices.push(options?.important ?? false);
+    if (thresholdCommandMode || inputCommandMode || paceCommandMode || appearanceCommandMode) simulation.notices.push(options?.important ?? false);
   }, showErrorNotification: noop}],
   [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
   [path.join(frontend, 'states/test.ts'), {isTestActive: () => simulation.flags.testActive ?? true}],
   [path.join(frontend, 'collections/custom-themes.ts'), {__nonReactive: {getCustomThemes: () => Array(simulation.flags.customThemeCount ?? 0).fill({})}}],
   [path.join(frontend, 'utils/env.ts'), {isDevEnvironment: () => !!simulation.flags.development}],
-  [path.join(frontend, 'utils/misc.ts'), {reloadAfter: noop, triggerResize: noop, escapeHTML: value => value}],
+  [path.join(frontend, 'utils/misc.ts'), {reloadAfter: noop, triggerResize: () => { if (appearanceCommandMode) simulation.resizes++; }, escapeHTML: value => value}],
   [path.join(frontend, 'utils/strings.ts'), {capitalizeFirstLetter: value => value, camelCaseToWords: value => value}],
   [path.join(frontend, 'utils/zod.ts'), {getOptions: () => []}],
   [path.join(frontend, 'types/font-awesome.ts'), {FaObject: undefined}],
@@ -163,7 +164,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -218,6 +219,44 @@ if (defaultsMode) {
       }
     assert.equal(fixtures.length, 2310);
     verify(); console.log(JSON.stringify({fixtures}));
+  } else if (appearanceCommandMode) {
+    function extract(file, from, until, wrap = text => text) {
+      const source = fs.readFileSync(path.join(frontend, file), 'utf8');
+      const start = source.indexOf(from), end = until ? source.indexOf(until, start) : source.length;
+      assert.ok(start >= 0 && end > start);
+      return stripTypeScriptTypes(wrap(source.slice(start, end).replace(/^export /gm, '')), {mode:'transform'});
+    }
+    let restarts = 0, ui = [];
+    Object.assign(context, {Config:simulation.Config,setConfig:setters.setConfig,configEvent:bus,
+      TestLogic:{restart:() => { restarts++; }},restart:()=>{restarts++;},capitalizeFirstLetter:value => value[0].toUpperCase()+value.slice(1),
+      replaceUnderscoresWithSpaces:value => value.replaceAll('_',' '),getActivePage:()=>'test',
+      getCurrentInput:()=>'owned input',getActiveWordIndex:()=>0,CompositionState:{getData:()=>({})},
+      updateWordLetters:()=>{ui.push('letters');},updateWordWrapperClasses:()=>{ui.push('wrapper');},
+      Joining:{update:key=>{ui.push('joining:'+key);}},wordsEl:{}});
+    vm.runInContext(extract('commandline/commandline-metadata.ts','  liveSpeedStyle: {','  maxLineWidth:',
+      text=>`globalThis.appearanceInputs=({${text}});`),context);
+    vm.runInContext(extract('commandline/util.ts','function buildSubgroupCommand<','export const __testing'),context);
+    vm.runInContext(extract('test/test-ui.ts','configEvent.subscribe(',null),context);
+    vm.runInContext(extract('test/test-logic.ts','configEvent.subscribe(','timerEvent.subscribe('),context);
+    const keys=['timerStyle','liveSpeedStyle','liveAccStyle','liveBurstStyle','timerColor','timerOpacity',
+      'highlightMode','typedEffect','tapeMode','smoothLineScroll','showAllLines','typingSpeedUnit','alwaysShowDecimalPlaces','startGraphsAtZero'];
+    const booleanKeys=['smoothLineScroll','showAllLines','alwaysShowDecimalPlaces','startGraphsAtZero'];
+    const profiles=[{}, {monkey:true,liveSpeedStyle:'mini',liveAccStyle:'mini',showAllLines:true},
+      {tapeMode:'word'}, {funbox:['memory']}, {funbox:['arrows']}, {funbox:['tts']}];
+    const fixtures=[];
+    for (const active of [false,true]) for (const noQuit of [false,true]) for (const profile of profiles)
+      for (const key of keys) for (const value of booleanKeys.includes(key) ? [false,true] : configSchemas.ConfigSchema.shape[key].options) {
+        Object.assign(simulation.Config,structuredClone(defaults),structuredClone(profile),
+          {funbox:[...(profile.funbox??[]),...(noQuit?['no_quit']:[])]});
+        simulation.flags={testActive:active,authenticated:false,documentComplete:true};
+        simulation.events=[];simulation.saves=[];simulation.notices=[];simulation.resizes=0;restarts=0;ui=[];
+        const current=structuredClone(simulation.Config),props=context.appearanceInputs[key].subgroup;
+        context.buildSubgroupCommand(key,value,props).exec();
+        fixtures.push({key,value,current,active,runtime:structuredClone(simulation.Config),events:simulation.events,
+          saves:simulation.saves,notices:simulation.notices,resizes:simulation.resizes,restarts,ui,
+          visible:props.isVisible?.(value)??true});
+      }
+    verify();console.log(JSON.stringify({keys,fixtures}));
   } else if (paceCommandMode) {
     function extract(file, from, until, wrap = text => text) {
       const source = fs.readFileSync(path.join(frontend, file), 'utf8');

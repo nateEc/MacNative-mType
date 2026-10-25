@@ -54,6 +54,21 @@ import XCTest
       let root = root ?? host
       return (root as? TypingInputView).map { [$0] } ?? root.subviews.flatMap { inputs($0) }
     }
+    func scrollToInput() throws {
+      func scrolls(_ view: NSView) -> [NSScrollView] {
+        (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrolls($0) }
+      }
+      host.layoutSubtreeIfNeeded()
+      let input = try XCTUnwrap(inputs().first)
+      let scroll = try XCTUnwrap(scrolls(host).filter { scroll in
+        scroll.documentView.map { input.isDescendant(of: $0) } ?? false
+      }.max { ($0.documentView?.frame.height ?? 0) < ($1.documentView?.frame.height ?? 0) })
+      let document = try XCTUnwrap(scroll.documentView), clip = scroll.contentView
+      let rect = input.convert(input.bounds, to: document)
+      var bounds = clip.bounds; bounds.origin.y = max(0, rect.minY - 150)
+      clip.scroll(to: clip.constrainBoundsRect(bounds).origin); scroll.reflectScrolledClipView(clip)
+      host.layoutSubtreeIfNeeded()
+    }
     func wait(_ ready: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
       let deadline = Date().addingTimeInterval(10)
       repeat { host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
@@ -150,6 +165,69 @@ import XCTest
     XCTAssertEqual(f.settings.snapshot, legacy)
     XCTAssertFalse(f.window.isVisible)
   }
+  func testAppearanceCommandsKeepActualMarkedInputAndRenderTheProfileHUD() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"funbox":["no_quit"],"monkey":true,"showAllLines":true,"theme":"dracula"}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+      && f.inputs().first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.inputs().first), legacy = f.settings.snapshot
+    input.onInsert(String(f.state.page.state.session.prompt.prefix(1)), false)
+    try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange }
+    try await Task.sleep(for: .milliseconds(20)); f.host.layoutSubtreeIfNeeded()
+    XCTAssertFalse(f.state.page.state.session.typed.isEmpty, "The actual attempt must have started")
+    input.setMarkedText("é", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+    XCTAssertTrue(input.hasMarkedText(), "Initial marked input must be installed before any command")
+    let marked = input.markedRange(), before = f.state.page.state.session.generationState
+    for command in [AppearanceCommandTarget.speed(.text), .accuracy(.mini), .burst(.mini), .speedUnit(.cps), .progress(.text),
+      .color(.accent), .opacity(.full), .tape(.word), .typedEffect(.hide), .highlight(.word), .smoothLineScroll(true)] {
+      do {
+        try await workflow.editAndBegin(.appearance(command), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+      } catch { return XCTFail("Appearance command failed: \(String(reflecting: error))") }
+      try await Task.sleep(for: .milliseconds(20)); f.host.layoutSubtreeIfNeeded()
+      XCTAssertTrue(f.inputs().first === input, "Input identity after \(command)")
+      XCTAssertTrue(input.hasMarkedText(), "Marked input after \(command)")
+    }
+    try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    XCTAssertTrue(f.inputs().first === input, "Final input identity")
+    XCTAssertTrue(input.hasMarkedText(), "Final marked input"); XCTAssertEqual(input.markedRange(), marked)
+    XCTAssertEqual(f.state.page.state.session.generationState, before); XCTAssertEqual(f.settings.snapshot, legacy)
+    f.window.appearance = NSAppearance(named: .darkAqua)
+    try f.scrollToInput()
+    try await Task.sleep(for: .milliseconds(50))
+    f.host.layoutSubtreeIfNeeded()
+    let bitmap = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds)); f.host.cacheDisplay(in: f.host.bounds, to: bitmap)
+    try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-appearance-live-host.png"))
+    XCTAssertFalse(f.window.isVisible)
+  }
+  func testFinishedProfileAppearanceUpdatesResultSettingsWithoutChangingScoring() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":2}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+    try XCTUnwrap(f.inputs().first).onInsert(f.state.page.state.session.prompt + " ", false)
+    XCTAssertTrue(f.state.page.state.session.isFinished)
+    let before = f.state.page.state.session.generationState, legacy = f.settings.snapshot
+    for command in [AppearanceCommandTarget.speedUnit(.cpm), .alwaysShowDecimalPlaces(true), .startGraphsAtZero(false)] {
+      try await workflow.editAndBegin(.appearance(command), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+    }
+    let draft = try XCTUnwrap(f.state.page.state.presentation).publication.draft
+    let display = PracticeAppearanceSelection(draft: draft, settings: f.settings)
+    XCTAssertEqual(display.unit, .cpm); XCTAssertTrue(display.alwaysShowDecimalPlaces); XCTAssertFalse(display.startGraphsAtZero)
+    XCTAssertEqual(f.state.page.state.session.generationState, before); XCTAssertEqual(f.settings.snapshot, legacy)
+    // Completion uses a sheet. A never-visible parent cannot establish the
+    // sheet's visual readiness; this test asserts its settings/scoring inputs.
+    XCTAssertFalse(f.window.isVisible)
+  }
+
   func testPaceCustomCommandRestartsNormallyButKeepsActualMarkedInputDuringNoQuit() async throws {
     for noQuit in [false, true] {
       let f = try Fixture(saved: nil); defer { f.close() }
@@ -395,6 +473,9 @@ import XCTest
   }
   func testInputRuleChangeDuringOnlinePullKeepsValidSectionAndAllowsTheNextPull() async throws {
     try await assertLiveEditDuringOnlinePull(.inputRule(.confidenceMode(.on)))
+  }
+  func testTapeAppearanceChangeDuringOnlinePullKeepsValidSectionAndAllowsTheNextPull() async throws {
+    try await assertLiveEditDuringOnlinePull(.appearance(.tape(.word)))
   }
   private func assertLiveEditDuringOnlinePull(_ edit: WebsiteConfigPracticeEdit) async throws {
     var reads = 0, returned = false

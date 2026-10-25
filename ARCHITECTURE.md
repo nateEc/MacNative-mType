@@ -1,5 +1,7 @@
 # Typebar 架构决策（ADR-001）
 
+2026-10-26 CFG-APPEARANCE-COMMAND-PAGE-01：完整配置外观命令按实际 setter 计划逐项 CAS，文字速度／准确率先关闭 companion，非 off 卷带先关闭完整行。专用能力仅允许 14 个命令字段和 monkey=false 子项的单字段差异及唯一保存事件，不同步输入规则、不重开、不写旧偏好；高亮事件单独清掉被拦截错字的临时投影，保留接受输入与计分。PracticeAppearanceSelection 将当前窗口的实时指标、单位、小数、图表零轴和 companion 读取统一到 publication；文字／辅助色使用该窗口主题，旧设置路径保持其既有解析。完成页参数与图表零轴回调也走当前完整配置。结束态主提示的渲染与原生完成 sheet 的实体显示仍单独追踪。
+
 2026-10-26 CFG-PACE-COMMAND-PAGE-01：完整配置配速命令分离 setter 与 afterExec 重开。原生纯计划记录 paceCaret／paceCaretCustomSpeed 的逐项赋值；每个成功项独立 CAS／发布，不回滚已接受子项。专用页面能力只准入一个原字段、唯一保存事件且无其他 runtime 差异，不同步输入规则。模式事件在候选会话初始化配速，速度事件不初始化；custom 子模式因此读取旧记忆速度，之后速度保存并不改变当前光标。Root 提供实际 PB／账户标签／历史选择读取器，读取后仍重新验证拥有者与页面捕获；CAS 前只修改会话值副本。保存后请求现有重开控制器；No Quit 只拒绝重开并提示，保留已接受设置与当前输入／计时。自定义页捕获 publication、单位及原始记忆值，Number 转换与单位除法后提交；不写旧偏好。无限速度持久化、异步账户配速获取与所有实体输入法／动画时序继续开放。
 
 2026-10-26 CFG-CARET-COMMAND-PAGE-01：完整配置的 smoothCaret、caretStyle、paceCaretStyle、repeatedPace 使用独立单字段即时提交能力。准入要求原字段唯一保存事件且其他 runtime 完全一致；不放行 paceCaret 模式或自定义速度。CAS 后发布新配置并保留资源、主题、当前尝试和重开控制器，不同步输入规则、不写旧偏好。主／配速光标继续读取 publication 的 presentation，平滑选项变化更新闪烁；重复配速只供之后明确重复使用。命令菜单隐藏源码隐藏的六个装饰选项，导入格式与原生旧菜单仍保留其表达能力。配速模式的显式 restart、账户 PB 与自定义速度命令另行追踪。
