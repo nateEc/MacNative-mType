@@ -6,6 +6,37 @@ import XCTest
 
 @MainActor final class WebsiteConfigInitializationFeedbackTests: XCTestCase {
   @MainActor private final class Permit { var current = true }
+
+  func testLazyNoticeRetiredAccountsAndRequestsCannotConsumeTheNewGenerationLatch() {
+    let notices = LocalNoticeCenter(); defer { notices.clearAll() }
+    let state = WebsiteConfigLazyModeNotices()
+    let old = WebsiteConfigInitializationReport(notices: notices, lazyModeNotices: state)
+    notices.clearForAccountChange()
+    old.recordLazyMode(.disabled(polyglot: false), whileCurrent: { true })
+    XCTAssertTrue(notices.history.isEmpty)
+    let current = WebsiteConfigInitializationReport(notices: notices, lazyModeNotices: state)
+    current.recordLazyMode(.disabled(polyglot: false), whileCurrent: { false })
+    XCTAssertTrue(notices.history.isEmpty)
+    current.recordLazyMode(.disabled(polyglot: false), whileCurrent: { true })
+    XCTAssertEqual(notices.history.count, 1)
+    current.recordLazyMode(.restored, whileCurrent: { true })
+    let once = Permit()
+    withObservationTracking { _ = notices.history } onChange: {
+      MainActor.assumeIsolated {
+        guard once.current else { return }; once.current = false
+        notices.clearForAccountChange()
+      }
+    }
+    current.recordLazyMode(.disabled(polyglot: true), whileCurrent: { true })
+    XCTAssertTrue(notices.history.isEmpty)
+    current.recordLazyMode(.disabled(polyglot: false), whileCurrent: { true })
+    XCTAssertTrue(notices.history.isEmpty)
+    let next = WebsiteConfigInitializationReport(notices: notices, lazyModeNotices: state)
+    next.recordLazyMode(.disabled(polyglot: true), whileCurrent: { true })
+    XCTAssertEqual(notices.history.count, 1)
+    XCTAssertTrue(notices.history.first?.message.contains("所选多语") == true)
+    XCTAssertTrue(next.failures.isEmpty); XCTAssertNil(next.finalMessage)
+  }
   @MainActor private final class RegionLifetime { var entered = 0; var left = 0 }
   @MainActor private struct TypingProbe: View {
     let lifetime: RegionLifetime

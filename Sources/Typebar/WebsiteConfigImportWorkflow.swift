@@ -185,7 +185,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
     prepared = ticket
     guard operation == current else { throw CancellationError() }
-    let initializationReport = WebsiteConfigInitializationReport(notices: notices)
+    let initializationReport = WebsiteConfigInitializationReport(notices: notices, lazyModeNotices: page.lazyModeNotices)
     do {
       let resources = try await coordinator.prepareResources(for: ticket, from: settings)
       let ready = try await coordinator.preparePractice(for: resources,

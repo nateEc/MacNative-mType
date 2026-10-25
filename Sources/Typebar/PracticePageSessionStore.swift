@@ -6,6 +6,7 @@ import Observation
 @MainActor @Observable
 final class PracticePageSessionStore {
   let owner = UUID()
+  @ObservationIgnored let lazyModeNotices = WebsiteConfigLazyModeNotices()
   private(set) var state = PracticePageSessionState()
   private(set) var restartController: WebsitePracticeRestartController?
   private(set) var startupController = WebsiteConfigStartupController()

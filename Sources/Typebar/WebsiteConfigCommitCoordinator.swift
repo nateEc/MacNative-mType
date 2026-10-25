@@ -771,6 +771,7 @@ final class WebsiteConfigCommitCoordinator {
           ? .configurationApplication : reason
         return try await preparePracticeAttempt(for: current, scope: scope, reason: effectiveReason,
           replayApplicationEvents: attempt == 0, repeatedSource: repeatedSource,
+          initializationReport: initializationReport,
           loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
       } catch let recovery as QuoteRecoveryRequest {
         try Task.checkCancellation()
@@ -810,11 +811,18 @@ final class WebsiteConfigCommitCoordinator {
   }
   private func reportInitializationFailure(_ failure: @autoclosure () -> WebsiteConfigInitializationReport.Failure,
     resources: ResourcesPrepared, report: WebsiteConfigInitializationReport?, exhausted: Bool) throws {
+    try withInitializationReport(report, resources: resources) { report, current in
+      report.record(failure(), whileCurrent: current)
+    }
+    if exhausted { report?.finish() }
+  }
+  private func withInitializationReport(_ report: WebsiteConfigInitializationReport?, resources: ResourcesPrepared,
+    deliver: (WebsiteConfigInitializationReport, () -> Bool) -> Void) throws {
     guard let report else { return }
     let prepared = resources.configuration
     try checkAsyncResources(prepared, admission: resources.admission)
     guard try register.read().revision == prepared.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
-    report.record(failure()) {
+    deliver(report) {
       guard !self.processing, !Task.isCancelled, resources.admission == self.resourceAdmission,
         self.isCurrent(prepared), let revision = try? self.register.read().revision else { return false }
       return revision == prepared.disk && self.isCurrent(prepared)
@@ -822,7 +830,6 @@ final class WebsiteConfigCommitCoordinator {
     // Posting can synchronously retire a request or switch account/server.
     try checkAsyncResources(prepared, admission: resources.admission)
     guard try register.read().revision == prepared.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
-    if exhausted { report.finish() }
   }
   @MainActor private struct GenerationFailure: Error {
     let underlying: Error
@@ -899,6 +906,7 @@ final class WebsiteConfigCommitCoordinator {
     reason: WebsiteConfigSessionBuilder.Reason,
     replayApplicationEvents: Bool,
     repeatedSource: WebsiteConfigSessionBuilder.AttemptSource,
+    initializationReport: WebsiteConfigInitializationReport?,
     loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote],
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?,
     random: WebsiteConfigSessionBuilder.Random) async throws -> SessionPrepared {
@@ -913,10 +921,12 @@ final class WebsiteConfigCommitCoordinator {
       resources = try prepareQuoteRecovery(.allLengths, for: resources)
     }
     let original = resources.configuration.draft
+    var lazyTransition: WebsiteConfigLazyModeLifecycle.NoticeTransition?
     let draft = try WebsiteConfigLazyModeLifecycle.prepare(original,
       pointsPerRem: resources.configuration.environment.pointsPerRem,
       replayApplicationEvents: replayApplicationEvents && reason == .configurationApplication
-        && resources.configuration.pageCapture?.configurationDeparture == nil)
+        && resources.configuration.pageCapture?.configurationDeparture == nil,
+      onNoticeTransition: { lazyTransition = $0 })
     if reason == .nextAttempt, draft.lazyMemory != original.lazyMemory || draft.generators.lazyMode != original.generators.lazyMode {
       throw WebsiteConfigSessionBuildError.reconfigurationRequired(["lazyMode": .bool(draft.generators.lazyMode)])
     }
@@ -932,6 +942,11 @@ final class WebsiteConfigCommitCoordinator {
     configuration = try saveGenerationCorrection(configuration, from: original, admission: resources.admission)
     let prepared = ResourcesPrepared(configuration: configuration, admission: resources.admission,
       background: resources.background, font: resources.font)
+    if let lazyTransition {
+      try withInitializationReport(initializationReport, resources: prepared) { report, current in
+        report.recordLazyMode(lazyTransition, whileCurrent: current)
+      }
+    }
     let checkedExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> WebsiteConfigSessionBuilder.External)?
     if let loadExternal {
       checkedExternal = { source, configuration in

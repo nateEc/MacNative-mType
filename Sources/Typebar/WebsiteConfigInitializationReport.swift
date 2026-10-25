@@ -27,8 +27,14 @@ struct WebsiteConfigInitializationExhaustedError: Error, LocalizedError {
   private(set) var exhausted = false
   private weak var notices: LocalNoticeCenter?
   private let noticeGeneration: UUID?
-  init(notices: LocalNoticeCenter? = nil) {
+  private let lazyModeNotices: WebsiteConfigLazyModeNotices
+  init(notices: LocalNoticeCenter? = nil, lazyModeNotices: WebsiteConfigLazyModeNotices? = nil) {
     self.notices = notices; noticeGeneration = notices?.deliveryGeneration
+    self.lazyModeNotices = lazyModeNotices ?? .init()
+  }
+  func recordLazyMode(_ transition: WebsiteConfigLazyModeLifecycle.NoticeTransition, whileCurrent current: () -> Bool) {
+    guard let notices, let noticeGeneration else { return }
+    lazyModeNotices.record(transition, notices: notices, generation: noticeGeneration, whileCurrent: current)
   }
   func record(_ failure: Failure, whileCurrent current: () -> Bool) {
     guard current(), failure.attempt == failures.count + 1, failure.attempt <= 3 else { return }

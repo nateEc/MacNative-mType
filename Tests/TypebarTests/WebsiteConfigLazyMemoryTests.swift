@@ -136,7 +136,15 @@ import XCTest
       let events: [WebsiteConfigApplicationEvent]
       let saves: Int
     }
-    struct Output: Decodable { let fixtures: [Fixture] }
+    struct Notice: Decodable { let scope: String; let important: Bool }
+    struct NoticeStep: Decodable {
+      let current: [String: WebsiteConfigValue]
+      let before: WebsiteConfigLazyModeMemory, after: WebsiteConfigLazyModeMemory
+      let lazy: Bool
+      let notices: [Notice]
+    }
+    struct NoticeSequence: Decodable { let initialShown: Bool; let steps: [NoticeStep] }
+    struct Output: Decodable { let fixtures: [Fixture]; let noticeSequences: [NoticeSequence] }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let process = Process(), pipe = Pipe()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -145,7 +153,8 @@ import XCTest
     try process.run()
     let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus, 0)
-    let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    let fixtures = output.fixtures
     XCTAssertEqual(fixtures.count, 880)
     for (index, fixture) in fixtures.enumerated() {
       var draft = try WebsiteConfigNativeProfile.prepareDraft(WebsiteConfigJSONWriter.write(.object(fixture.current)),
@@ -181,6 +190,33 @@ import XCTest
       let next = try WebsiteConfigLazyModeLifecycle.prepare(resolved, pointsPerRem: 16, replayApplicationEvents: false)
       XCTAssertEqual(next.lazyMemory, resolved.lazyMemory, "Admitted state must be stable for ordinary next: \(index)")
       XCTAssertEqual(next.generators.lazyMode, resolved.generators.lazyMode)
+    }
+    XCTAssertEqual(output.noticeSequences.count, 2)
+    for sequence in output.noticeSequences {
+      let notices = LocalNoticeCenter(); defer { notices.clearAll() }
+      let state = WebsiteConfigLazyModeNotices(), generation = notices.deliveryGeneration
+      if sequence.initialShown {
+        state.record(.disabled(polyglot: false), notices: notices, generation: generation, whileCurrent: { true })
+      }
+      var memory = WebsiteConfigLazyModeMemory()
+      XCTAssertEqual(sequence.steps.count, 14)
+      for step in sequence.steps {
+        XCTAssertEqual(memory, step.before)
+        var draft = try WebsiteConfigNativeProfile.prepareDraft(WebsiteConfigJSONWriter.write(.object(step.current)),
+          pointsPerRem: 16, context: .init())
+        draft.lazyMemory = memory
+        var transition: WebsiteConfigLazyModeLifecycle.NoticeTransition?
+        let resolved = try WebsiteConfigLazyModeLifecycle.prepare(draft, pointsPerRem: 16,
+          replayApplicationEvents: false, onNoticeTransition: { transition = $0 })
+        let count = notices.history.count
+        if let transition { state.record(transition, notices: notices, generation: generation, whileCurrent: { true }) }
+        let posted = Array(notices.history.dropFirst(count))
+        XCTAssertEqual(posted.map { $0.message.contains("所选多语") ? "polyglot" : "language" }, step.notices.map(\.scope))
+        XCTAssertTrue(posted.allSatisfy { $0.level == .notice })
+        XCTAssertTrue(notices.active.allSatisfy(\.important)); XCTAssertTrue(step.notices.allSatisfy(\.important))
+        XCTAssertEqual(resolved.generators.lazyMode, step.lazy)
+        memory = resolved.lazyMemory; XCTAssertEqual(memory, step.after)
+      }
     }
   }
 }

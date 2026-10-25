@@ -6,6 +6,100 @@ import Observation
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
 
+  func testLazyModeNoticeIsOncePerWindowUntilRememberedRestoration() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    let unsupported = #"{"mode":"words","words":4,"language":"hindi","lazyMode":true}"#
+    try await f.workflow.apply(json: unsupported, systemIsDark: false)
+    let center = f.account.localNotices
+    XCTAssertEqual(center.history.count, 1)
+    XCTAssertEqual(center.history.first?.level, .notice)
+    XCTAssertTrue(center.history.first?.message.contains("语言不支持") == true)
+    XCTAssertTrue(center.active.first?.important == true)
+    center.clearAll()
+    try await f.workflow.apply(json: unsupported, systemIsDark: false)
+    XCTAssertEqual(center.history.count, 1, "Re-enabling on an unsupported language does not reset the latch")
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"spanish","lazyMode":false}"#, systemIsDark: false)
+    XCTAssertTrue(f.page.state.presentation?.publication.draft.generators.lazyMode == true)
+    try await f.workflow.apply(json: unsupported, systemIsDark: false)
+    XCTAssertEqual(center.history.count, 2)
+  }
+
+  func testPolyglotLazyModeNoticeNamesTheUnsupportedSelection() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"language":"english","funbox":["polyglot"],"customPolyglot":["hindi","thai"],"lazyMode":true}"#, systemIsDark: false)
+    XCTAssertEqual(f.account.localNotices.history.count, 1)
+    XCTAssertTrue(f.account.localNotices.history.first?.message.contains("所选多语") == true)
+    XCTAssertTrue(f.account.localNotices.active.first?.important == true)
+    XCTAssertFalse(try XCTUnwrap(f.page.state.presentation).publication.draft.generators.lazyMode)
+  }
+
+  func testLazyNoticeSurvivesWorkflowReplacementButIsIndependentInAnotherWindow() async throws {
+    let f = try Fixture(), other = try Fixture()
+    defer { f.close(); other.close(); f.account.localNotices.clearAll() }
+    let json = #"{"mode":"words","words":4,"language":"hindi","lazyMode":true}"#
+    try await f.workflow.apply(json: json, systemIsDark: false)
+    f.workflow.stop()
+    let replacement = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window })
+    defer { replacement.stop() }
+    try await replacement.apply(json: json, systemIsDark: false)
+    XCTAssertEqual(f.account.localNotices.history.count, 1)
+    let secondWindow = WebsiteConfigImportWorkflow(page: other.page, settings: other.settings, account: f.account,
+      directory: other.directory, readWindow: { other.window })
+    defer { secondWindow.stop() }
+    try await secondWindow.apply(json: json, systemIsDark: false)
+    XCTAssertEqual(f.account.localNotices.history.count, 2)
+  }
+
+  func testLazyNoticeDoesNotRepeatOrSpendTheThreeGenerationFailuresBudget() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in reads += 1; throw Failure.provider })
+    defer { workflow.stop() }
+    for _ in 0..<2 {
+      do {
+        try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"language":"hindi","lazyMode":true}"#, systemIsDark: false)
+        XCTFail("Generation failures delivered")
+      } catch let error as WebsiteConfigInitializationExhaustedError {
+        XCTAssertEqual(error.underlying as? Failure, .provider)
+      }
+    }
+    XCTAssertEqual(reads, 6)
+    XCTAssertEqual(f.account.localNotices.history.filter { $0.level == .notice }.count, 1)
+    XCTAssertEqual(f.account.localNotices.history.filter { $0.level == .error }.count, 6)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+  }
+
+  func testCancellingDuringLazyNoticeWithdrawsItAndAllowsTheNextRequestToWarn() async throws {
+    let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+    let handle = WeakWorkflow()
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .hindi, length: .short)]
+      })
+    handle.value = workflow
+    defer { workflow.stop() }
+    let transition = NoticeTransition()
+    withObservationTracking { _ = f.account.localNotices.history } onChange: {
+      MainActor.assumeIsolated {
+        guard transition.calls == 0 else { return }; transition.calls += 1
+        handle.value?.cancel()
+      }
+    }
+    let json = #"{"mode":"quote","quoteLength":[0],"language":"hindi","lazyMode":true}"#
+    do { try await workflow.apply(json: json, systemIsDark: false); XCTFail("Cancelled notice request delivered") }
+    catch is CancellationError {}
+    XCTAssertEqual(reads, 0); XCTAssertTrue(f.account.localNotices.history.isEmpty)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
+    try await workflow.apply(json: json, systemIsDark: false)
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(f.account.localNotices.history.count, 1)
+    XCTAssertEqual(f.account.localNotices.history.first?.level, .notice)
+  }
+
   func testUnauthenticatedFavoritesCorrectionDoesNotConsumeGenerationBudgetOrPostARecoveryNotice() async throws {
     let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
     var reads = 0

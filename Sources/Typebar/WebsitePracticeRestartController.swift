@@ -71,7 +71,7 @@ import Observation
     guard ticket == current, !stopped else { _ = coordinator.cancel(accepted); return nil }
     admission = accepted
     return .init(ticket: current, accepted: accepted, readers: readers,
-      initializationReport: .init(notices: notices))
+      initializationReport: .init(notices: notices, lazyModeNotices: page.lazyModeNotices))
   }
   private func complete(_ request: Request) async -> Bool {
     let current = request.ticket, accepted = request.accepted, readers = request.readers

@@ -21,12 +21,14 @@ function section(start, end) {
   return source.slice(a, b);
 }
 const noLazy = {english: true, spanish: false, arabic: false, hindi: true, thai: true};
-let memory, events, listener, saves, savedConfig;
+let memory, events, listener, saves, savedConfig, notices = [];
 const context = vm.createContext({
   Config: {}, language: {}, showedLazyModeNotification: false,
   configEvent: {subscribe: callback => { listener = callback; }},
   getActivePage: () => 'test', restart() {}, debouncedZipfCheck() {},
-  showNoticeNotification() {}, showErrorNotification() {},
+  showNoticeNotification(message, options) {
+    notices.push({scope: message.includes('polyglot') ? 'polyglot' : 'language', important: options.important});
+  }, showErrorNotification() {},
   configLS: {set: value => { saves += 1; savedConfig = structuredClone(value); }},
   configToSend: {}, saveToDatabase() {},
   LazyModeState: {
@@ -132,5 +134,37 @@ assert.equal(saves, 1);
 await context.generate();
 assert.equal(saves, 1);
 assert.equal(memory.remember, true);
+const noticeSequences = [];
+for (const initialShown of [false, true]) {
+  memory = {remember:false, prefersArabic:true}; context.showedLazyModeNotification = initialShown;
+  const steps = [];
+  for (const step of [
+    {language:'hindi', lazyMode:true}, {language:'hindi', lazyMode:true},
+    {language:'spanish', lazyMode:true},
+    {language:'english', lazyMode:true, components:['hindi','thai']},
+    {language:'hindi', lazyMode:true},
+    {language:'english', lazyMode:false, components:['spanish','hindi']},
+    {language:'hindi', lazyMode:true},
+    {language:'hindi', mode:'custom', lazyMode:false},
+    {language:'hindi', lazyMode:true}, {language:'spanish', lazyMode:false},
+    // Base-language cleanup clears remember, not the notification latch.
+    {language:'spanish', lazyMode:true, components:['hindi','thai']},
+    {language:'spanish', lazyMode:false}, {language:'hindi', lazyMode:true},
+    {language:'spanish', lazyMode:false},
+  ]) {
+    const current = {mode:step.mode ?? 'words', words:4, language:step.language, lazyMode:step.lazyMode,
+      funbox:step.components ? ['polyglot'] : [], customPolyglot:step.components ?? []};
+    const before = structuredClone(memory);
+    context.Config = structuredClone(current); context.language = {name:step.language, noLazyMode:noLazy[step.language]};
+    notices = []; events = []; saves = 0;
+    await context.generate();
+    steps.push({current, before, after:structuredClone(memory), lazy:context.Config.lazyMode,
+      showed:context.showedLazyModeNotification, notices:structuredClone(notices)});
+  }
+  assert.deepEqual(steps.map(step => step.notices.length), [initialShown ? 0 : 1,0,0,1,0,0,1,0,1,0,1,0,0,0]);
+  assert.ok(steps.flatMap(step => step.notices).every(notice => notice.important === true));
+  assert.deepEqual(steps.map(step => step.showed), [true,true,false,true,true,false,true,false,true,false,true,true,true,false]);
+  noticeSequences.push({initialShown, steps});
+}
 verify();
-process.stdout.write(JSON.stringify({fixtures}));
+process.stdout.write(JSON.stringify({fixtures, noticeSequences}));

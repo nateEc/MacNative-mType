@@ -3,6 +3,7 @@ import Foundation
 /// Value-owned test-page listener and generation transition. Memory is
 /// installed only with the complete configuration, never in old defaults.
 @MainActor enum WebsiteConfigLazyModeLifecycle {
+  enum NoticeTransition: Equatable { case disabled(polyglot: Bool), restored }
   /// A same-value setter still saves. Compare events, not final value equality;
   /// earlier application events must not be mistaken for new init saves.
   static func savesConfigurationDuringGeneration(from original: WebsiteConfigNativeDraft,
@@ -11,9 +12,9 @@ import Foundation
   }
 
   static func prepare(_ draft: WebsiteConfigNativeDraft, pointsPerRem: Double,
-    replayApplicationEvents: Bool) throws -> WebsiteConfigNativeDraft {
+    replayApplicationEvents: Bool, onNoticeTransition: ((NoticeTransition) -> Void)? = nil) throws -> WebsiteConfigNativeDraft {
     let applied = replayApplicationEvents ? try applyingEvents(draft, pointsPerRem: pointsPerRem) : draft
-    return try preparingGeneration(applied, pointsPerRem: pointsPerRem)
+    return try preparingGeneration(applied, pointsPerRem: pointsPerRem, onNoticeTransition: onNoticeTransition)
   }
 
   /// Synchronous config listeners run before restart initialization. Keep this
@@ -61,7 +62,7 @@ import Foundation
   }
 
   private static func preparingGeneration(_ draft: WebsiteConfigNativeDraft,
-    pointsPerRem: Double) throws -> WebsiteConfigNativeDraft {
+    pointsPerRem: Double, onNoticeTransition: ((NoticeTransition) -> Void)?) throws -> WebsiteConfigNativeDraft {
     var projection = draft.projection, memory = draft.lazyMemory
     guard let units = projection.runtime["language"]?.stringUnits else {
       throw WebsiteConfigNativeDraftError.incompleteRuntime
@@ -81,8 +82,13 @@ import Foundation
       ? draft.generators.polyglotLanguages.contains(where: \.supportsLazyLatinInput)
       : (baseSupports || draft.testParameters.mode == .custom)
     switch (lazy, allowed, memory.remember) {
-    case (true, false, _): memory.remember = true; assignLazy(false)
-    case (_, true, true): assignLazy(true); memory.remember = false
+    case (true, false, _):
+      memory.remember = true
+      onNoticeTransition?(.disabled(polyglot: draft.generators.requestsPolyglot))
+      assignLazy(false)
+    case (_, true, true):
+      assignLazy(true); memory.remember = false
+      onNoticeTransition?(.restored)
     default: break
     }
     // Source cleanup uses the base language even for polyglot, not the
