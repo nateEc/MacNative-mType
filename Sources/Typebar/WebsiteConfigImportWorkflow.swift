@@ -16,6 +16,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case sound(SoundCommandTarget)
   case caret(CaretCommandTarget)
   case appearance(AppearanceCommandTarget)
+  case keymap(WebsiteKeymapCommandTarget)
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
@@ -31,6 +32,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .sound(let edit): edit.websiteKey
     case .caret(let edit): edit.websiteKey
     case .appearance(let edit): edit.websiteKey
+    case .keymap(let edit): edit.key
     }
   }
   var value: WebsiteConfigValue {
@@ -51,6 +53,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .sound(let edit): edit.websiteValue
     case .caret(let edit): edit.websiteValue
     case .appearance(let edit): edit.websiteValue
+    case .keymap(let edit): edit.value
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -58,7 +61,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   /// neither case: execution never reaches the following dispatch.
   var dispatchesRestartAfterRejection: Bool {
     switch self {
-    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior, .inputRule, .sound, .caret, .appearance: false
+    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior, .inputRule, .sound, .caret, .appearance, .keymap: false
     case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes, .polyglotLanguages: true
     }
   }
@@ -156,6 +159,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     if case .behavior = edit { return try runSingleLiveCommand(edit, replacing: applicationID) }
     if case .caret = edit { return try runSingleLiveCommand(edit, replacing: applicationID) }
     if case .appearance(let target) = edit { return try runAppearanceCommand(target, replacing: applicationID) }
+    if case .keymap(let target) = edit { return try await runKeymapCommand(target, replacing: applicationID) }
     if case .sound(let target) = edit {
       guard target.websiteValue != .null else { throw WebsiteSoundCommandError.unsupportedTone }
       return try runSingleLiveCommand(edit, replacing: applicationID)
@@ -264,6 +268,71 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
     try Task.checkCancellation()
     throw WebsitePaceCommandError.restartFailed(saved: saved)
+  }
+
+  private func runKeymapCommand(_ target: WebsiteKeymapCommandTarget, replacing applicationID: UUID) async throws -> String {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil else { throw WebsiteConfigImportWorkflowError.preparationPending }
+    guard let original = page.state.presentation?.publication, original.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
+    try Task.checkCancellation()
+    let current = UUID(); applying = true; operation = current
+    let noticeGeneration = notices?.deliveryGeneration
+    var saved = 0, receiptID = applicationID
+    defer {
+      if let prepared { _ = coordinator.cancel(prepared) }
+      if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
+      prepared = nil; rejectedRestart = nil; applying = false
+    }
+    let locked = try environment.withSynchronousSetterRead {
+      guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+      let plan = try WebsiteKeymapCommand.plan(current: original.draft.projection.runtime, target: target,
+        context: context.context, active: page.state.session.hasStarted && !page.state.session.isFinished)
+      do {
+        for step in plan.steps {
+          try Task.checkCancellation()
+          guard operation == current, !stopped, page.state.presentation?.publication.applicationID == receiptID else { throw WebsiteConfigImportWorkflowError.conflict }
+          if !step.accepted {
+            if let noticeGeneration {
+              notices?.postGuarded("当前趣味模式不支持这个键盘选项。", level: .notice, options: .init(), generation: noticeGeneration, whileCurrent: {
+                self.operation == current && !self.stopped && !Task.isCancelled
+                  && self.environment.read()?.revision == context.revision
+                  && page.state.presentation?.publication.applicationID == receiptID
+                  && original.isCurrentDelivery(owner: page.owner, router: self.settings.preferenceConfigurationSaves)
+              })
+            }
+            continue
+          }
+          let ticket = try coordinator.prepareEdit(key: step.key, value: step.value, for: page, refreshingWith: source)
+          prepared = ticket
+          guard operation == current, !stopped else { throw CancellationError() }
+          switch try coordinator.commitLiveKeymap(ticket, for: page) {
+          case .committed(let publication): saved += 1; receiptID = publication.applicationID
+          case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+          case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+          case .busy: throw WebsiteConfigImportWorkflowError.busy
+          }
+        }
+      } catch {
+        if saved > 0 { throw WebsiteKeymapCommandError.interrupted(saved: saved, underlying: error) }
+        throw error
+      }
+      if plan.failedOverride { throw WebsiteKeymapCommandError.failedOverride(saved: saved) }
+      if target.requestsRestart, ownsActiveNoQuit, let publication = page.state.presentation?.publication {
+        postNoQuitSelectionNotice("键盘布局已处理；No Quit 保留当前练习，未执行重开。", publication: publication,
+          page: page, operation: current, noticeGeneration: noticeGeneration, expectedEnvironment: context.revision)
+        return true
+      }
+      return false
+    }
+    try Task.checkCancellation()
+    guard operation == current, !stopped, page.state.presentation?.publication.applicationID == receiptID else { throw WebsiteConfigImportWorkflowError.conflict }
+    if !target.requestsRestart || locked { return saved > 0 ? "键盘设置已保存，当前练习继续。" : "键盘设置未修改。" }
+    guard let controller = page.restartController else { throw WebsiteConfigImportWorkflowError.unavailable }
+    rejectedRestart = (controller, current)
+    if try await controller.requestAndWait(requestID: current) { return "键盘布局已处理，新的练习已准备好。" }
+    try Task.checkCancellation()
+    throw WebsiteKeymapCommandError.restartFailed(saved: saved)
   }
 
   private func runAppearanceCommand(_ target: AppearanceCommandTarget, replacing applicationID: UUID) throws -> String {

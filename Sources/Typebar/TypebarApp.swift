@@ -1305,6 +1305,8 @@ private struct ContentView: View {
   @State private var queuedWebsiteSoundVolume: WebsiteSoundVolumePresentation?
   @State private var websitePaceSpeed: WebsitePaceSpeedPresentation?
   @State private var queuedWebsitePaceSpeed: WebsitePaceSpeedPresentation?
+  @State private var websiteKeymapSize: WebsiteKeymapSizePresentation?
+  @State private var queuedWebsiteKeymapSize: WebsiteKeymapSizePresentation?
   private var practiceSoundSelection: PracticeSoundSelection {
     .init(draft: committedPracticeDraft, settings: settings, blindMode: session.configuration.rules.blindMode)
   }
@@ -2202,6 +2204,10 @@ private struct ContentView: View {
         queuedWebsitePaceSpeed = nil
         if pageSession.presentation?.publication.applicationID == queued.id { websitePaceSpeed = queued }
       }
+      if let queued = queuedWebsiteKeymapSize {
+        queuedWebsiteKeymapSize = nil
+        if pageSession.presentation?.publication.applicationID == queued.id { websiteKeymapSize = queued }
+      }
     }) {
       CommandPaletteView(
         items: commandPaletteItems, listMode: practiceCommandPaletteListMode,
@@ -2419,6 +2425,16 @@ private struct ContentView: View {
           && pageSessionStore.restartController?.isPreparing != true,
         apply: { raw in
           try await importWorkflow().runPaceCommand(.customSpeed, input: raw, replacing: presentation.id)
+        })
+    }
+    .sheet(item: $websiteKeymapSize) { presentation in
+      WebsiteKeymapSizeCommandView(presentation: presentation,
+        canApply: pageSession.presentation?.publication.applicationID == presentation.id
+          && pageSession.savedApplication == nil && pageSession.configurationDeparture == nil
+          && pageSessionStore.restartController?.isPreparing != true,
+        apply: { value in
+          try await importWorkflow().editAndBegin(.keymap(.size(value)), replacing: presentation.id,
+            systemIsDark: systemColorScheme == .dark)
         })
     }
     .sheet(item: $settingsJSONCommand) { presentation in
@@ -3997,6 +4013,9 @@ private struct ContentView: View {
   }
 
   private var effectiveKeyboardGuideMode: KeyboardGuideMode {
+    // Source funbox activation already publishes its initial mode. Later
+    // accepted commands own this field instead of replaying that activation.
+    if let draft = committedPracticeDraft { return draft.keyboardTypography.guideMode }
     if session.configuration.modifiers.contains(.listening) { return .off }
     if session.configuration.modifiers.contains(.simonSays) { return .next }
     return practiceKeyboardGuide.mode
@@ -6023,8 +6042,12 @@ private struct ContentView: View {
     })
     items.append(contentsOf: AppearanceCommandCatalog.items)
     items.append(contentsOf: KeyboardGuideCommandCatalog.items)
-    items.append(KeyboardGuideSizeCommand.item)
-    items.append(contentsOf: KeyboardGuideLayoutCommandCatalog.items)
+    items.append(pageSessionStore.ownsConfigurationSelection ? WebsiteKeymapSizePresentation.item : KeyboardGuideSizeCommand.item)
+    items.append(contentsOf: KeyboardGuideLayoutCommandCatalog.items.map { item in
+      guard pageSessionStore.ownsConfigurationSelection else { return item }
+      return .init(id: item.id, title: item.title, subtitle: "保存键盘布局并请求重开",
+        systemImage: item.systemImage, keywords: item.keywords, group: item.group)
+    })
     items.append(contentsOf: FontFamilyCommandCatalog.items(
       hasLocalFont: settings.hasLocalPracticeFont,
       usesLocalFont: settings.isUsingLocalPracticeFont))
@@ -6195,8 +6218,17 @@ private struct ContentView: View {
       return
     }
     if let target = KeyboardGuideCommandCatalog.target(for: item.id) {
+      if pageSessionStore.ownsConfigurationSelection { runWebsiteLiveCommand(.keymap(.display(target))); return }
       if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
+      return
+    }
+    if item.id == WebsiteKeymapSizePresentation.item.id || (item.id == KeyboardGuideSizeCommand.item.id && pageSessionStore.ownsConfigurationSelection) {
+      guard let publication = pageSession.presentation?.publication,
+        pageSession.savedApplication == nil, pageSession.configurationDeparture == nil,
+        pageSessionStore.restartController?.isPreparing != true else { return }
+      let presentation = WebsiteKeymapSizePresentation(publication: publication)
+      if showingCommandPalette { queuedWebsiteKeymapSize = presentation } else { websiteKeymapSize = presentation }
       return
     }
     if item.id == KeyboardGuideSizeCommand.item.id {
@@ -6204,6 +6236,7 @@ private struct ContentView: View {
       return
     }
     if let target = KeyboardGuideLayoutCommandCatalog.target(for: item.id) {
+      if pageSessionStore.ownsConfigurationSelection { runWebsiteLiveCommand(.keymap(.layout(target))); return }
       if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)

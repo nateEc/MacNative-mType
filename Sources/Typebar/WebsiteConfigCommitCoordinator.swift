@@ -330,7 +330,10 @@ final class WebsiteConfigCommitCoordinator {
   func commitLiveAppearance(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
     try commitLiveEdit(prepared, for: page, kind: .appearance)
   }
-  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance }
+  func commitLiveKeymap(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, kind: .keymap)
+  }
+  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap }
   private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind, paceTarget: Double? = nil) throws -> Outcome {
     guard !processing, page.restartController?.isPreparing != true else { return .busy }
     processing = true; defer { processing = false }
@@ -351,6 +354,8 @@ final class WebsiteConfigCommitCoordinator {
       guard WebsitePaceCommand.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .appearance:
       guard WebsiteAppearanceCommand.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
+    case .keymap:
+      guard WebsiteKeymapCommand.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .threshold:
       guard case .edited(let edit) = prepared.draft.origin, WebsiteConfigThresholdEdit.keys.contains(edit.key),
       prepared.draft.projection.rejectedKeys.isEmpty, !prepared.draft.projection.events.isEmpty,
@@ -364,7 +369,7 @@ final class WebsiteConfigCommitCoordinator {
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
     if kind == .inputRule { state.session.synchronizeWebsiteInputRules(prepared.draft.inputRules.rules) }
-    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
+    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
     if kind == .appearance, case .edited(let edit) = prepared.draft.origin, edit.key == "highlightMode" {
       state.session.refreshPromptPresentation()
     }
@@ -388,6 +393,8 @@ final class WebsiteConfigCommitCoordinator {
       try page.beginLivePaceCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .appearance:
       try page.beginLiveAppearanceCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
+    case .keymap:
+      try page.beginLiveKeymapCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .threshold: try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
     }
     defer { page.endCommit() }

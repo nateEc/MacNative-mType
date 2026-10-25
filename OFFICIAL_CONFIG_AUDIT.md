@@ -1,5 +1,23 @@
 # 官方配置兼容性审计
 
+## 完整配置屏幕键盘命令（2026-10-26，起点 0788afb1）
+
+CFG-KEYMAP-COMMAND-PAGE-01：先执行实际 commandline metadata／builder、setter、schema 与 test-logic.restart 的 No Quit 首段守卫，得到 980 组记录，再实现此前不存在的完整配置命令能力；未将新符号的编译失败冒充行为 RED。`--keymap-commands` 覆盖四个模式、七种结构、四种标注、三种键帽范围、三种代表性布局（overrideSync／QWERTY／Dvorak）、14 个原始大小输入，组合七种当前配置与活动／No Quit 状态。完整布局集合的导入／映射覆盖仍见既有键盘排版审计，不以三种命令布局样本声称全布局体验已验。
+
+原版外观依赖在 keymapMode=off 时先保存 static，再保存目标字段；原生计划逐 setter 提交，单字段能力拒绝将两事件合并为一个保存。仅 keymapLayout 的 subgroup afterExec 请求重开；元数据 changeRequiresRestart=false 不能替代这一显式行为。No Quit 中接受布局与依赖保存，再提示并保留尝试。其余命令原地更新 publication，不同步输入规则或实际输入映射，不写旧偏好。大小输入由实际 Number 转换后先通过 0.5–3.5、step 0.1 的 schema；空串、空白、0、0.51、3.6、Infinity、NaN 及尾随文字无效，0x1／1e0 有效。setter 的 clamp／round 不等于命令输入容错，原生不提前夹取无效输入。
+
+定向 8 项通过、零失败／跳过（6.865 秒），包含源码执行记录与逐项重放、真实工作流所有固定显示选项、No Quit 布局保存、普通布局重开、第二次 CAS 竞争保留已启用静态模式、过期／取消／无效输入拒绝、大小表单单飞及迟到完成围栏；实际隐藏生产页保留同一 NSView、组合文本、输入 attemptID 与计分。初次编译因测试引用 GenerationState 错误字段名未通过，待该原生进程终止后修正为 attempt；不计为产品行为失败或通过。新增大小页继承当前 publication 身份与大小，菜单关闭后延后展示时重查身份。下节显示消费者的“命令待接通”描述是本批前的边界，本批以此节为准；源延时 next 高亮、全部实体菜单／sheet／IME、响应式 zoom 和完整趣味组合仍开放。
+
+较大相关回归执行 898 项：897 通过、1 跳过、零失败（239.139 秒）。跳过项为匹配到 VirtualKeyboard 名称的既有全布局键帽层审计，补入 TYPEBAR_LAYOUT_GUIDE_AUDIT_REFERENCE 后与大小页布局重跑，两项通过、零跳过／失败（0.560 秒）。大小页的 440 浅色／640 深色图像已检查；初版透明背景不适合检查浅色文字，测试场景补齐背景并等待布局后重新渲染，标题、说明、2.1 预填及关闭／应用按钮均可读，未显示窗口或调用保存。截图位于 /tmp/typebar-keymap-size-{440-light,640-dark}.png。参考行为审计通过（47 direct／119 native symbols／17 supporting），人工表结构校验通过（1,360 场景，并非实体验收通过）。
+
+补充实际显示 RED：源 funbox-functions.ts 的 Simon Says／TTS 只在 applyConfig 时以 nosave 设置初始键盘模式，后续合法键盘命令仍由当前配置控制；原生页面却在每次读取时强制 next／off。隐藏页确认 Simon Says 当前 draft 已保存 off，但仍渲染键盘 Esc。最初沿用旧页面的图像区域会漏检，因为新配置布局尚未稳定，截图显示键盘实际位于视口底部；等待布局并重新滚动后，RED 确切失败一次。修复使完整配置先读取已发布模式；旧设置路径仍保留其强制模式。未把先前漏检的绿色运行当作该行为已正确的证据。
+
+模式修复后的专项回归 126 项全部通过，零失败／跳过（73.535 秒），覆盖实际生产页、键盘命令、趣味激活／记忆、旧挑战及键盘偏好。Simon Says 关闭的图像回归已通过；TTS 使用同一 publication 优先分支，但本批没有真实语音设备验收。日志为 /tmp/typebar-keymap-{focused,focused-final,broad,guide-and-layout,simon-red,funbox-final,reference,package,package-final}.log；simon-red 为稳定布局后的有效 RED，旧图像漏检和初次编译错误不计为通过。
+
+仍有明确显示缺口：Layout Fluid 的原生 effectiveKeyboardLayout 优先动态布局，并由输入映射复用；源码 states/test.ts 则在 keymapLayout 非 overrideSync 时优先显式视觉布局。当前源码命令／保存对照不能证明这个消费者已对齐；需要把动态物理输入与显式视觉布局独立验证并修复，尤其是 No Quit 拒绝重开后的显示。此次不将全趣味组合标记完成。
+
+最终 Debug app 打包／签名、资源边界与固定参考原创性检查通过，未启动主程序。这里的相关回归及检查不是整仓 Native Rewrite Gate，仍不据此宣称全部原版功能或实体验收完成。
+
 ## 完整配置键盘显示消费者（2026-10-26，起点 92d30a42）
 
 CFG-KEYMAP-DISPLAY-PAGE-01：实际参考 Keymap.tsx 读取当前配置的 keymapMode、keymapSize、keymapLegendStyle、keymapKeys、keymapStyle；states/test.ts 的 getKeymapLayout 将 overrideSync 解析为当前 layout，并将 default 回退到 QWERTY。原生页面已有布局选择，但上述五个显示字段仍读旧偏好，且旧自定义／系统来源还能覆盖行。现由 PracticeKeyboardGuideSelection 统一当前 publication 的显示字段；完整配置排除旧来源行，不修改实际输入映射。旧设置和挑战临时模式仍走原路径，listening／Simon Says 与 Layout Fluid 原有约束保留。

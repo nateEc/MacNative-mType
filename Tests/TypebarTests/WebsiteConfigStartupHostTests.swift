@@ -345,8 +345,50 @@ import XCTest
     try VNImageRequestHandler(cgImage: XCTUnwrap(off.cgImage)).perform([request])
     let offKeycaps = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
     XCTAssertFalse(offKeycaps.contains("Esc"), "Disabled keyboard region: \(offKeycaps)")
+    try await workflow.apply(json: #"{"mode":"words","words":10,"funbox":["simon_says"],"keymapSize":1.5,"keymapKeys":"full","keymapLegendStyle":"uppercase"}"#, systemIsDark: false)
+    XCTAssertEqual(f.state.page.state.presentation?.publication.draft.keyboardTypography.guideMode, .next)
+    XCTAssertTrue(f.state.page.state.session.configuration.modifiers.contains(.simonSays))
+    try await workflow.editAndBegin(.keymap(.display(.mode(.off))), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.state.page.state.presentation?.publication.draft.keyboardTypography.guideMode, .off)
+    scrollToEnd(); try await Task.sleep(for: .milliseconds(100)); f.host.layoutSubtreeIfNeeded()
+    let simon = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds))
+    scrollToEnd(); try await Task.sleep(for: .milliseconds(50)); f.host.layoutSubtreeIfNeeded()
+    f.host.cacheDisplay(in: f.host.bounds, to: simon)
+    try XCTUnwrap(simon.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-keymap-simon-host.png"))
+    request.recognitionLevel = .fast
+    try VNImageRequestHandler(cgImage: XCTUnwrap(simon.cgImage)).perform([request])
+    let simonKeys = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+    XCTAssertFalse(simonKeys.contains("Esc"), "Saved off must override Simon's initial next mode: \(simonKeys)")
     XCTAssertEqual(f.settings.snapshot, enabledLegacy)
     XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
+  }
+
+  func testKeymapCommandsPreserveActualMarkedInputAndNoQuitAttempt() async throws {
+    let f = try Fixture(saved: nil); defer { f.close() }
+    f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"layout":"colemak","funbox":["no_quit"]}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID && f.inputs().first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.inputs().first), legacy = f.settings.snapshot
+    input.onInsert(String(f.state.page.state.session.prompt.prefix(1)), false)
+    try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange }
+    try await Task.sleep(for: .milliseconds(20)); f.host.layoutSubtreeIfNeeded()
+    input.setMarkedText("é", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+    XCTAssertTrue(input.hasMarkedText())
+    let marked = input.markedRange(), before = f.state.page.state.session.generationState
+    let targets: [WebsiteKeymapCommandTarget] = [.display(.style(.matrix)), .display(.legend(.uppercase)),
+      .display(.keys(.full)), .size(1.5), .display(.mode(.next)), .layout(.builtIn(.ansiDvorak)), .layout(.inputSync)]
+    for target in targets {
+      try await workflow.editAndBegin(.keymap(target), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+      try await Task.sleep(for: .milliseconds(20)); f.host.layoutSubtreeIfNeeded()
+      XCTAssertTrue(f.inputs().first === input); XCTAssertTrue(input.hasMarkedText()); XCTAssertEqual(input.markedRange(), marked)
+      XCTAssertEqual(f.state.page.state.session.generationState, before)
+      XCTAssertEqual(f.inputs().first?.insertionAttemptID, before.attempt)
+    }
+    XCTAssertEqual(f.settings.snapshot, legacy); XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
   }
 
   func testAppearanceCommandsKeepActualMarkedInputAndRenderTheProfileHUD() async throws {

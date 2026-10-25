@@ -6,6 +6,108 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testKeymapSizeFormUsesPublicationAndFitsHiddenLightAndDarkLayoutsWithoutSaving() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"keymapSize":2.1}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    let presentation = WebsiteKeymapSizePresentation(publication: publication)
+    XCTAssertEqual(presentation.id, publication.applicationID); XCTAssertEqual(presentation.initialText, "2.1")
+    var calls = 0
+    for (width, dark) in [(440.0, false), (640.0, true)] {
+      let view = WebsiteKeymapSizeCommandView(presentation: presentation, canApply: true, apply: { _ in calls += 1 })
+        .frame(width: width, height: 320).background(dark ? Color(white: 0.12) : .white)
+        .environment(\.colorScheme, dark ? .dark : .light)
+      let host = NSHostingView(rootView: view)
+      let window = NSWindow(contentRect: .init(x: 0, y: 0, width: width, height: 320), styleMask: .borderless, backing: .buffered, defer: false)
+      window.isReleasedWhenClosed = false; window.contentView = host
+      window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+      try await Task.sleep(for: .milliseconds(50))
+      host.layoutSubtreeIfNeeded()
+      let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds)); host.cacheDisplay(in: host.bounds, to: bitmap)
+      try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-keymap-size-\(Int(width))-\(dark ? "dark" : "light").png"))
+      XCTAssertFalse(window.isVisible); XCTAssertEqual(calls, 0)
+      window.contentView = nil; window.close()
+    }
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, publication.disk)
+  }
+  func testKeymapDisplayCommandsSaveDuringNoQuitWithoutChangingTheAttemptOrInputMapping() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"layout":"colemak","funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session.generationState, legacy = f.settings.snapshot
+    let lock = UUID(); f.settings.setNoQuitConfigurationLock(true, for: lock)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: lock) }
+    let targets = KeyboardGuideCommandCatalog.items.compactMap { KeyboardGuideCommandCatalog.target(for: $0.id) }.map(WebsiteKeymapCommandTarget.display)
+    for target in targets + [.size(1.6), .layout(.builtIn(.ansiDvorak)), .layout(.inputSync)] {
+      let count = f.account.localNotices.history.count
+      try await f.workflow.editAndBegin(.keymap(target), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      let publication = try XCTUnwrap(f.page.state.presentation).publication
+      XCTAssertEqual(publication.draft.projection.runtime[target.key], target.value)
+      XCTAssertEqual(publication.draft.keyboardTypography.inputLayout.emulatedLayout, .ansiColemak)
+      XCTAssertEqual(f.page.state.session.generationState, before); XCTAssertEqual(f.settings.snapshot, legacy)
+      XCTAssertEqual(f.account.localNotices.history.count, count + (target.requestsRestart ? 1 : 0))
+      if target.requestsRestart { XCTAssertTrue(try XCTUnwrap(f.account.localNotices.active.first).important) }
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .available(publication.draft.projection.runtime))
+    }
+  }
+  func testKeymapLayoutSavesThenRestartsButDisplayAndSizeRetainTheActiveAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"layout":"colemak"}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session.generationState, legacy = f.settings.snapshot
+    try await f.workflow.editAndBegin(.keymap(.display(.style(.matrix))), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideMode, .staticGuide)
+    try await f.workflow.editAndBegin(.keymap(.layout(.builtIn(.ansiDvorak))), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, before.attempt)
+    XCTAssertTrue(f.page.state.session.typed.isEmpty)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideLayout, .ansiDvorak)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.inputLayout.emulatedLayout, .ansiColemak)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+  func testKeymapSecondSetterConflictRetainsTheAcceptedEnable() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let other = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    var compete = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if compete, f.page.state.presentation?.publication.draft.keyboardTypography.guideMode == .staticGuide {
+          compete = false
+          do { _ = try register.commit(other, replacing: XCTUnwrap(register.read().revision)) } catch { XCTFail("Competitor: \(error)") }
+        }
+        return f.window
+      }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"keymapMode":"off"}"#, systemIsDark: false)
+    let before = f.page.state.session.generationState
+    compete = true
+    do { try await workflow.editAndBegin(.keymap(.display(.style(.matrix))), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false); XCTFail("Overwrote competitor") }
+    catch WebsiteKeymapCommandError.interrupted(let saved, _) { XCTAssertEqual(saved, 1) }
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideMode, .staticGuide)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideStyle, .staggered)
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Missing competitor") }
+    XCTAssertEqual(saved["words"], .number(7))
+  }
+  func testKeymapInvalidCancelledAndStaleCommandsCannotWriteOrRestart() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    let original = try XCTUnwrap(f.page.state.presentation).publication, before = f.page.state.session.generationState
+    for value in [0.0, 0.51, 3.6, Double.infinity] {
+      do { try await f.workflow.editAndBegin(.keymap(.size(value)), replacing: original.applicationID, systemIsDark: false); XCTFail("Invalid size saved") }
+      catch WebsiteKeymapCommandError.invalidInput {}
+    }
+    let task = Task { @MainActor in try await f.workflow.editAndBegin(.keymap(.layout(.inputSync)), replacing: original.applicationID, systemIsDark: false) }
+    task.cancel(); do { _ = try await task.value; XCTFail("Cancelled keymap saved") } catch is CancellationError {}
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, original.disk)
+    try await f.workflow.editAndBegin(.keymap(.size(1.5)), replacing: original.applicationID, systemIsDark: false)
+    let current = try XCTUnwrap(f.page.state.presentation).publication
+    do { try await f.workflow.editAndBegin(.keymap(.layout(.inputSync)), replacing: original.applicationID, systemIsDark: false); XCTFail("Stale keymap saved") }
+    catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, current.disk)
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(WebsiteKeymapSizePresentation(publication: current).initialText, "1.5")
+  }
   func testAppearanceHighlightRedrawClearsStoppedGlyphWithoutChangingAcceptedInput() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":10,"stopOnError":"letter"}"#, systemIsDark: false)
