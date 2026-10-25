@@ -6,6 +6,28 @@ import Observation
   private enum Failure: Error, Equatable { case notParked, provider }
   @MainActor private final class WeakWorkflow { weak var value: WebsiteConfigImportWorkflow? }
 
+  func testMemoryRealPageRestartRestoresPreviewWithoutInventingAnIdleCountdown() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["memory"],"keymapMode":"next"}"#, systemIsDark: false)
+    let publication = try XCTUnwrap(f.page.state.presentation).publication
+    XCTAssertEqual(publication.draft.keyboardTypography.guideMode, .react)
+    XCTAssertTrue(publication.draft.presentation.showAllPracticeLines)
+    let attempt = f.page.state.session.automaticInputAttemptID
+    var state = f.page.state
+    XCTAssertFalse(state.session.tick(at: Date.now.addingTimeInterval(100_000)))
+    XCTAssertTrue(state.session.promptGlyphs.allSatisfy { $0.state != .hidden })
+    state.session.insertBatch(String(state.session.prompt.prefix(1)))
+    XCTAssertTrue(state.session.promptGlyphs.allSatisfy { $0.state == .hidden })
+    f.page.replace(state)
+    let restarted = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID())
+    XCTAssertTrue(restarted)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertFalse(f.page.state.session.hasStarted)
+    XCTAssertTrue(f.page.state.session.promptGlyphs.allSatisfy { $0.state != .hidden })
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, publication.applicationID)
+  }
+
   func testFunboxClearRestoresWindowMemoryAfterFullImportWithoutInheritingItInAnotherWindow() async throws {
     let f = try Fixture(), other = try Fixture(); defer { f.close(); other.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["simon_says"],"keymapMode":"react"}"#, systemIsDark: false)

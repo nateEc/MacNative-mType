@@ -1,5 +1,17 @@
 # 阈值源状态与迁移契约
 
+## Memory 完整重开调用方的计时器重置（2026-10-25，起点 5b0430fa）
+
+本轮先检查 Memory.restart 与 memory-funbox-timer，发现孤立模块会用已生成词数的 1.2 次幂取整作为秒数并递减；但继续向上追踪完整 restart 调用方发现，处理器之后立即调用 TestUI.onTestRestart，后者无条件 MemoryFunboxTimer.reset，再 showWords。startTest 依次调用 Memory.start 与 TestUI.onTestStart，后者不会重新显示词。若只按处理器新增原生等待倒计时，会偏离该固定版本的实际行为。本轮因此撤回倒计时实现计划，未修改生产计时、渲染、输入、记录格式或存储；不把一个疑似原版实现问题自行改写为“兼容”。
+
+新增 QA 实际执行完整 restart 与 startTest 函数、完整 onTestRestart／onTestStart／showWords、真实 Memory 处理器及计时模块；仅 init／词生成、DOM／布局和无关服务是明确自有适配器，不读取参考词表、音频或视觉资产。120 组覆盖 words／quote／custom、五种词数、四种键盘模式、练习页／结果页入口；断言每轮只注册一次 interval、被 UI 清除一次、未留下待执行计时器，推进自有调度器不再产生超时隐藏，输入后隐藏、再次重开恢复。它不是完整浏览器或真实文本生成的证明。
+
+对应原生用例逐组验证长期等待不启动 WPM／不隐藏提示、有效输入后全部目标隐藏、删除首字符不恢复预览、重复尝试保留词组并重新显示；另用真实完整配置导入／页面重开检查 Memory 的 react 键盘模式、全行显示、一次离场统计、旧配置发布身份保留和新尝试身份。两项新测试通过（0.468 秒、零跳过），不是人为制造旧接口编译失败的红测：本轮是先用实际调用方探针排除一个错误需求，再为已存在行为建立可观察回归。独立源模块计时器不能据此升级为用户可见已实现功能；实体键盘、可见提示区域、全部组合与动画仍开放。审计中原先宽泛的“等价实现”改为“部分验证”，整体 goal active。
+
+本轮扩大首次 136 项有一条旧源码文本断言失败及一项耐久测试跳过（39.792 秒）。失败断言要求 ContentView 直接拼接 PromptRenderPlan(session: session, ...)，而 HEAD／工作树都已改为工厂默认闭包的 $0／$1／$2 与 promptRender(session, composition, style) 显式转发；现分别严格核对默认闭包、传入生产路径和实际调用，保留其余共享呈现／几何断言，不修改产品。耐久测试按已有 TYPEBAR_ENDURANCE_TESTS=1 开关启用后，同一 136 项最终零失败／零跳过（34.391 秒），包括十万词目标目录、Memory／IME 候选隐藏、配置激活和完整工作流。它不覆盖或撤销上轮已记录的隐藏 SwiftUI 滚轮失败，不能据此宣称完整客户端门禁通过。
+
+原创性、47 direct／119 native symbols／17 specs 行为审计和 1,342 条人工清单结构通过；实体人工验收仍未执行。本轮无生产源码变化，不重复打包或启动应用，最近生产包验证仍为 5b0430fa 对应工作树的已记录结果。源码输出与日志为 `/tmp/typebar-memory-lifecycle-source.{json,log}`、`/tmp/typebar-memory-lifecycle-{native,regression,final-regression,originality,reference,manual}.log`。按仓库零散诊断／文档应随下一实质批次推送的规则，本批先作本地测试检查点，不单独推送或触发 CI；完整目标与既有缺口继续开放。
+
 ## Funbox 选择与最早设置恢复（2026-10-25，起点 b37c0431）
 
 固定参考 funbox-memory.ts 以有序对象保留每项最早值；load 按插入顺序调用 nosave setter，普通 false 不停止，最后清空。funbox.ts 的选择包装先 load 再设 funbox；toggle 另在 load 前拒绝不兼容的新增。test-logic.ts 在初始化重试之外 rememberSettings 一次，十四个处理器覆盖 numbers、keymapMode、highlightMode、layout、keymapLayout、mode、showAllLines、punctuation，Memory 只在 next 时记住键盘模式。源实现和资产只由 QA 动态读取，不复制进原生实现或包。

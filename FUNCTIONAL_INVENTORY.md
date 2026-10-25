@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-25 Memory 调用方更正（FUN-MEMORY-RESTART-LIFECYCLE-01）：固定完整 restart 会在 Memory 处理器启动 interval 后，由 onTestRestart 立即 reset；不能只读孤立计时模块就给原生增加等待倒计时。120 组实际源码生命周期、原生状态与真实页面重开验证等待／输入／删除／重复边界，生产实现未改。原审计的宽泛“等价”收紧为部分验证，实体 UI／IME 与全部组合仍待验收；详细边界见迁移契约。
+
 2026-10-25 Funbox 选择与窗口内记忆（CFG-FUNBOX-SELECTION-MEMORY-01）：完整配置的现有命令面板入口接入真实选择事务；在初始化前记住最早设置，切换时按插入顺序经原生 setter 以 nosave 恢复，再尝试保存选择。普通重开／同窗完整导入保留记忆，新窗口不继承；拒绝选择仍恢复并重开，不修改磁盘版本，也不误报已保存。225 组固定源码记忆阶段与实际工作流证据见迁移契约。仅限配置生命周期，命令实际点击、语音、计时器、全部实体交互和完整重写尚未完成；此前“选择记忆未实现”记录由本增量限定更新，不升级全部兼容状态。
 
 2026-10-25 普通引语重开恢复增量：明确的采样恢复可保存源 setter 并重新初始化，不再只向上抛校正请求；同一控制器保留自己的恢复能力，取消后继续不重复保存或统计，无校正路径继续保留发布／文件身份。最多三轮生成，不换语言或借用原版内容。自动化证据及限制见迁移契约；任意错误的完整递归重试、全部通知、其他词源与实体交互仍未完成。
@@ -1881,6 +1883,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| FUN-MEMORY-RESTART-LIFECYCLE-01 | 记忆提示的等待、输入与重开 | `test/test-logic.ts`, `test/test-ui.ts`, `test/funbox/{funbox-functions,memory-funbox-timer}.ts` | TestDomain, AppKitInputBridge | 部分验证：实际重开会清除处理器计时器；原生保持预览至输入、删除不重显、重开恢复。120 组固定调用链及原生状态、实际页面重开见迁移契约；未证实完整 DOM、可见窗口、全部组合及实体输入法，不增加与固定版本不同的倒计时。 |
 | CFG-FUNBOX-SELECTION-MEMORY-01 | Funbox 选择与临时设置恢复 | `test/funbox/{funbox-memory,funbox,funbox-functions}.ts`, `commandline/lists/funbox.ts` | TestDomain, PreferencesDomain | 部分实现：完整配置命令切换／清空、最早值和有序 nosave 恢复、正常拒绝后继续重开、独立保存基线及可恢复准备状态。225 组固定源码记忆阶段、普通重开／同窗导入／不同窗口、旧命令／No Quit 及拒绝后失败继续的证据见迁移契约。源码通用 setter 端点为自有适配器；实际命令点击、全部拒绝提示、语音／计时器和实体 UI／IME 仍未验收。 |
 | CFG-POLYGLOT-DIRECTION-RECOVERY-01 | Polyglot 方向冲突的首语言保存与静默重试 | `test/funbox/funbox-functions.ts` 的 polyglot.withWords、`test/test-logic.ts` 的 init | TestDomain, PreferencesDomain | 部分实现：相反方向的主语言保存为所选首语言，执行同步监听并静默消耗一次三轮预算；保留组合，5 秒非重要提示，下一轮重新激活且可能触发连写整组清空。54 组实际源码调用方对照到达原生发布，取消／账户切换／竞争记录／No Quit 边界见迁移契约。少量／零个语言加载成功的降级、Funbox 选择记忆、完整导入失败写序及实体 UI／IME 未完成。 |
 | CFG-FUNBOX-ACTIVATION-CONFIG-01 | Funbox 激活时的配置处理器及连写保护 | `test/funbox/{funbox,funbox-functions,list,active}.ts`, `packages/funbox/src/{list,validation}.ts` | TestDomain, PreferencesDomain | 部分实现：五类 applyConfig 处理器进入实际初始化，按顺序应用键盘模式／布局和 Memory 显示设置；连写文字遇五类不支持模式时清空整组，非重要本地提示不占正文预算。保留 nosave、正常拒绝继续、冷恢复、后续保存提升与取消检查点；2,304 组源码阶段对照及六项工作流证据见迁移契约。模型阶段对照不代表全部组合的实际会话／视觉支持；FunboxMemory 选择恢复、其他资源／计时器生命周期和实体交互仍开放。 |
