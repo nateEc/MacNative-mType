@@ -363,6 +363,33 @@ import XCTest
     XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
   }
 
+  func testPublishedCapsLockEventsReachNormalAndMirroredPracticeWithoutDoubleTransformation() async throws {
+    for mirrored in [false, true] {
+      let json = mirrored
+        ? #"{"mode":"words","words":10,"layout":"qwerty","funbox":["layout_mirror"]}"#
+        : #"{"mode":"words","words":10,"layout":"qwerty"}"#
+      let f = try Fixture(saved: true, json: json); defer { f.close() }
+      f.state.accountReady = true
+      try await f.waitAsync { f.state.page.state.presentation != nil && f.inputs().first?.acceptsTextInput == true }
+      let input = try XCTUnwrap(f.inputs().first), attempt = f.state.page.state.session.automaticInputAttemptID
+      let keys: [(UInt16, String, String)] = mirrored
+        ? [(12, "q", "Pp"), (0, "a", ";:")]
+        : [(0, "a", "Aa"), (21, "4", "$4"), (19, "2", "2@")]
+      var expected = ""
+      for (code, logical, outputs) in keys {
+        for (shift, output) in zip([false, true], outputs) {
+          let flags: NSEvent.ModifierFlags = shift ? [.capsLock, .shift] : [.capsLock]
+          input.keyDown(with: try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+            windowNumber: f.window.windowNumber, context: nil, characters: logical, charactersIgnoringModifiers: logical, isARepeat: false, keyCode: code)))
+          expected.append(output)
+          XCTAssertEqual(f.state.page.state.session.typed, expected)
+          XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+        }
+      }
+      XCTAssertFalse(f.window.isVisible)
+    }
+  }
+
   func testPublishedMirrorShiftComparisonUsesMirroredVisualLayoutAndSyncPhysicalSide() async throws {
     let f = try Fixture(saved: nil); defer { f.close() }
     f.state.accountReady = true; try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }

@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-CAPS-LOCK-EMULATION-01 | 显式布局 Caps Lock 输入选层 | `test/layout-emulator.ts` | PromptDomain | 按原始 Base／Shift 或 AltGr 对的 Unicode 标点决定是否反转 Shift，再执行缺层回退；239 布局普通／镜像的 92,120 组实际源码样本通过。屏幕键帽采用独立 macOS 显示规则，全部样式、实体 Caps Lock 状态及 IME 仍待验。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-MIRROR-KEYBOARD-01 | 完整配置镜像输入与视觉布局 | `utils/key-converter.ts`, `test/layout-emulator.ts`, `states/test.ts` | PromptDomain, PreferencesDomain | 按布局五行前缀镜像所有层，物理输入、键帽及反查共用位置关系；覆盖 239 布局的 46,060 组源码记录，另有 3,600 组镜像 Shift 源码记录与隐藏生产页事件。Caps Lock、全部样式和实体 IME 组合仍待处理／验收。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

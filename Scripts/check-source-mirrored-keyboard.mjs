@@ -6,6 +6,8 @@ import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import {execFileSync} from 'node:child_process';
 const root=path.resolve(process.argv[2]??''),repo=path.resolve(import.meta.dirname,'..');
+const caps=process.argv[3]==='--caps-lock';
+assert.ok(!process.argv[3]||caps);
 const map=JSON.parse(fs.readFileSync(path.join(repo,'Compatibility/official-layouts.json'),'utf8'));
 function verify(){assert.equal(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),map.referenceCommit);
   assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');}
@@ -13,7 +15,7 @@ verify();
 function source(file,from){const text=fs.readFileSync(path.join(root,'frontend/src/ts',file),'utf8'),start=from?text.indexOf(from):0;
   assert.ok(start>=0);return stripTypeScriptTypes(text.slice(start).replace(/^export /gm,''),{mode:'transform'});}
 let current;
-const context=vm.createContext({isCapsLockOn:()=>false,showErrorNotification:()=>assert.fail('Unexpected layout failure'),
+const context=vm.createContext({isCapsLockOn:()=>caps,showErrorNotification:()=>assert.fail('Unexpected layout failure'),
   navigator:{userAgent:'Mac'},document:{addEventListener:()=>{}},__nonReactive:{getInputLayout:()=>Promise.resolve(current)}});
 vm.runInContext(source('constants/keys.ts'),context);
 vm.runInContext(source('utils/key-converter.ts','export function layoutKeyToKeycode('),context);
@@ -29,7 +31,8 @@ domToMac.IntlBackslash=10;domToMac.Space=49;
 const layouts=[];
 for(const [id,native] of Object.entries(map.nativeExact)){
   const original=JSON.parse(fs.readFileSync(path.join(root,'frontend/static/layouts',id+'.json'),'utf8'));
-  current=context.mirrorLayoutKeys(original);
+  for(const mirrored of caps?[false,true]:[true]){
+  current=mirrored?context.mirrorLayoutKeys(original):original;
   const iso=original.type==='iso';
   const rows=iso?[domRows[0],domRows[1].slice(0,-1),[...domRows[2],'Backslash'],['IntlBackslash',...domRows[3]]]:domRows;
   const fixtures=[];
@@ -41,6 +44,7 @@ for(const [id,native] of Object.entries(map.nativeExact)){
     const column=row===4?0:rows[row].indexOf(code);
     fixtures.push({macCode:domToMac[code],row,column,flags,text,reverse:domToMac[reverse]??null});
   }
-  layouts.push({id,native,fixtures});
+  layouts.push({id,native,mirrored,fixtures});
+  }
 }
 verify();console.log(JSON.stringify({layouts}));

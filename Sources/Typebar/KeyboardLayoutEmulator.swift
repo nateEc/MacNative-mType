@@ -9,15 +9,20 @@ enum KeyboardLayoutEmulator {
     let shifted: String
     let option: String?
     let shiftedOption: String?
+    let capsInvertsBase: Bool
+    let capsInvertsOption: Bool
 
     init(
       normal: String, shifted: String, option: String? = nil,
-      shiftedOption: String? = nil
+      shiftedOption: String? = nil,
+      capsInvertsBase: Bool = false, capsInvertsOption: Bool = false
     ) {
       self.normal = normal
       self.shifted = shifted
       self.option = option
       self.shiftedOption = shiftedOption
+      self.capsInvertsBase = capsInvertsBase
+      self.capsInvertsOption = capsInvertsOption
     }
   }
 
@@ -63,10 +68,15 @@ enum KeyboardLayoutEmulator {
       layers = keys(for: layout)[keyCode]
     }
     guard let layers else { return nil }
-    if modifierFlags.contains(.option) {
-      return modifierFlags.contains(.shift) ? layers.shiftedOption : layers.option
+    var shifted = modifierFlags.contains(.shift)
+    let option = modifierFlags.contains(.option)
+    if modifierFlags.contains(.capsLock), option ? layers.capsInvertsOption : layers.capsInvertsBase {
+      shifted.toggle()
     }
-    return modifierFlags.contains(.shift) ? layers.shifted : layers.normal
+    if option {
+      return shifted ? layers.shiftedOption : layers.option
+    }
+    return shifted ? layers.shifted : layers.normal
   }
 
   static func character(
@@ -165,7 +175,11 @@ enum KeyboardLayoutEmulator {
         if first.characters == Set([Character(" ")]), first.label == "空格" { return " " }
         return first.legend(style: .dynamic, modifierFlags: flags, capsLockEnabled: false)
       }
-      result[49] = .init(normal: output([]), shifted: output(.shift), option: output(.option), shiftedOption: output([.shift, .option]))
+      let base = output([]), shifted = output(.shift)
+      let option = output(.option), shiftedOption = output([.shift, .option])
+      result[49] = .init(normal: base, shifted: shifted, option: option, shiftedOption: shiftedOption,
+        capsInvertsBase: layout.isPinnedOfficialLayout && capsCanInvert(base + shifted),
+        capsInvertsOption: layout.isPinnedOfficialLayout && capsCanInvert(option + shiftedOption))
     }
     return result
   }
@@ -182,6 +196,18 @@ enum KeyboardLayoutEmulator {
     return characters[0]
   }
 
+  /// The input emulator tests Unicode punctuation in the selected raw pair,
+  /// before missing-layer fallback. Symbols such as $ are deliberately allowed.
+  private static func capsCanInvert(_ pair: String) -> Bool {
+    !pair.unicodeScalars.contains { scalar in
+      switch scalar.properties.generalCategory {
+      case .connectorPunctuation, .dashPunctuation, .openPunctuation, .closePunctuation,
+        .initialPunctuation, .finalPunctuation, .otherPunctuation: true
+      default: false
+      }
+    }
+  }
+
   private static func keys(for layout: KeyboardLayout) -> [UInt16: KeyLayers] {
     let raw = rawKeys(for: layout)
     guard layout.isPinnedOfficialLayout else { return raw }
@@ -193,10 +219,14 @@ enum KeyboardLayoutEmulator {
       let shifted = layers.shifted.isEmpty ? layers.normal : layers.shifted
       let option = layout.hasPinnedAltGrLayer ? layers.option : nil
       let shiftedOption = layout.hasPinnedAltGrLayer ? layers.shiftedOption : nil
+      let baseCaps = capsCanInvert(layers.normal + layers.shifted)
+      let optionCaps = option != nil || shiftedOption != nil
+        ? capsCanInvert((option ?? "") + (shiftedOption ?? "")) : baseCaps
       resolved[keyCode] = .init(
         normal: layers.normal, shifted: shifted,
         option: option.flatMap { $0.isEmpty ? nil : $0 } ?? layers.normal,
-        shiftedOption: shiftedOption.flatMap { $0.isEmpty ? nil : $0 } ?? shifted)
+        shiftedOption: shiftedOption.flatMap { $0.isEmpty ? nil : $0 } ?? shifted,
+        capsInvertsBase: baseCaps, capsInvertsOption: optionCaps)
     }
     // All pinned layouts without an explicit thumb output use ordinary Space.
     if resolved[49] == nil {
@@ -2199,8 +2229,8 @@ enum KeyboardLayoutEmulator {
           KeyLayers(
             normal: normal,
             shifted: shifted,
-            option: layers.indices.contains(2) ? layers[2] : normal,
-            shiftedOption: layers.indices.contains(3) ? layers[3] : shifted))
+            option: layers.indices.contains(2) ? layers[2] : nil,
+            shiftedOption: layers.indices.contains(3) ? layers[3] : nil))
       }
     })
   }

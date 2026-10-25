@@ -2,6 +2,10 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| WEBSITE-CAPS-LOCK-EMULATION-01 | 普通与镜像布局 Caps Lock 输入 | 后续只开一个隔离实例，使用 QWERTY、AFNOR、Optimot 和多字符布局，切换 Caps Lock、Shift、Option 及镜像；核对缺层、标点／符号、拇指键，再切回系统输入源与 IME。 | QWERTY Caps+A 为 A，Caps+Shift+A 为 a；Caps+4 为 $，Caps+Shift+4 为 4，含标点的 2／@ 不反转；镜像按移动后的原始层判断，缺层回退一致；系统输入源仍走 AppKit，键帽按独立显示规则验收。 | 待验收（239 布局四层普通／镜像的 92,120 组源码记录通过；实体状态及完整 IME／显示组合未验） |
+
+| ID | 场景 | 操作 | 期望结果 | 状态 |
+| --- | --- | --- | --- | --- |
 | WEBSITE-MIRROR-KEYBOARD-01 | 镜像布局全部层与 Shift 比较 | 后续仅开一个隔离实例，在 QWERTY、Dvorak、ISO、Prsten 与 AFNOR 下启用镜像；核对四层键帽、物理输入、拇指空格与虚拟点击；活动 No Quit 下切换视觉布局和同步，再测试 Caps Lock、样式与 IME。 | QWERTY 物理 A 输出分号，Dvorak 输出 s；所有层随键位移动，逻辑提交不二次替换；Shift 使用当前镜像视觉位置，同步仍用物理侧，移动空格正确输出与播报。 | 待验收（239 布局四层及镜像 Shift 源码对照、隐藏真实事件已自动化；Caps Lock、全部样式及实体 IME 未验） |
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
