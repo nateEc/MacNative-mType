@@ -6089,6 +6089,10 @@ private struct ContentView: View {
       return
     }
     if let target = InputRuleCommandCatalog.target(for: item.id) {
+      if pageSessionStore.ownsConfigurationSelection {
+        runWebsiteLiveCommand(.inputRule(target))
+        return
+      }
       if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
       var savesConfiguration = false
@@ -6099,7 +6103,7 @@ private struct ContentView: View {
     }
     if let target = BehaviorCommandCatalog.target(for: item.id) {
       if pageSessionStore.ownsConfigurationSelection {
-        runWebsiteBehaviorCommand(target)
+        runWebsiteLiveCommand(.behavior(target))
         return
       }
       target.apply(to: settings, onConfigurationSave: persistExplicitTestConfiguration)
@@ -6404,23 +6408,25 @@ private struct ContentView: View {
     }
   }
 
-  private func runWebsiteBehaviorCommand(_ target: BehaviorCommandTarget) {
+  private func runWebsiteLiveCommand(_ edit: WebsiteConfigPracticeEdit) {
     guard websiteBehaviorCommandTask == nil, let publication = pageSession.presentation?.publication,
       pageSession.savedApplication == nil, pageSession.configurationDeparture == nil,
       pageSessionStore.restartController?.isPreparing != true else {
-      account.localNotices.post("配置正在准备，请完成后再修改行为设置。"); return
+      account.localNotices.post("配置正在准备，请完成后再修改设置。"); return
     }
     let request = UUID(); websiteBehaviorCommandRequest = request
     websiteBehaviorCommandTask = Task { @MainActor in
-      defer { if websiteBehaviorCommandRequest == request { websiteBehaviorCommandTask = nil } }
+      defer { if websiteBehaviorCommandRequest == request { websiteBehaviorCommandTask = nil; preparedWholePreviewRendering = nil } }
       do {
-        _ = try await importWorkflow().editAndBegin(.behavior(target), replacing: publication.applicationID,
+        _ = try await importWorkflow().editAndBegin(edit, replacing: publication.applicationID,
           systemIsDark: systemColorScheme == .dark)
         guard websiteBehaviorCommandRequest == request, !Task.isCancelled else { return }
-        preparedWholePreviewRendering = nil
       } catch {
         guard websiteBehaviorCommandRequest == request, !Task.isCancelled else { return }
-        account.localNotices.post((error as? LocalizedError)?.errorDescription ?? "行为设置未保存，请重新打开命令。")
+        if case .inputRule(.lazyMode) = edit,
+          (error as? WebsiteConfigImportWorkflowError) == .rejectedRestartFailed,
+          session.hasStarted, !session.isFinished, session.configuration.modifiers.contains(.noQuit) { return }
+        account.localNotices.post((error as? LocalizedError)?.errorDescription ?? "设置未完成，请重新打开命令。")
       }
     }
   }

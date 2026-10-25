@@ -2,6 +2,21 @@ import XCTest
 @testable import Typebar
 
 final class LivePracticeContentContinuationPolicyTests: XCTestCase {
+  @MainActor func testAllImmediateWebsiteInputOptionsRetainContentButNotInitialReplacementAdmission() throws {
+    let draft = try WebsiteConfigNativeProfile.prepareDraft("{}", pointsPerRem: 16, context: .init())
+    let original = TestConfiguration.words(201).with(modifiers: [.referenceStream])
+    for target in InputRuleCommandCatalog.items.compactMap({ InputRuleCommandCatalog.target(for: $0.id) }) {
+      if case .lazyMode = target { continue }
+      let edited = try WebsiteConfigNativeProfile.editDraft(draft, key: target.websiteKey, value: target.websiteValue,
+        pointsPerRem: 16, context: .init(), testActive: false)
+      let changed = edited.inputRules.applying(to: original)
+      XCTAssertTrue(LivePracticeContentContinuationPolicy.matchesGeneration(current: changed, requested: original), target.websiteKey)
+      if changed != original {
+        XCTAssertFalse(LivePracticeContentReplacementPolicy.shouldApply(hasStarted: false,
+          currentConfiguration: changed, requestedConfiguration: original))
+      }
+    }
+  }
   func testBlindFeedbackDoesNotRetireTheContentPullButInitialReplacementStaysStrict() {
     let original = TestConfiguration.words(201).with(modifiers: [.referenceStream])
     var changed = original; changed.rules.blindMode = true
@@ -25,7 +40,7 @@ final class LivePracticeContentContinuationPolicyTests: XCTestCase {
 
   func testOtherRulesLanguageLimitsAndGeneratorsStillRetireThePull() {
     let original = TestConfiguration.words(201).with(modifiers: [.referenceStream])
-    var changed = original; changed.rules.strictSpace = true
+    var changed = original; changed.difficulty = .expert
     XCTAssertFalse(LivePracticeContentContinuationPolicy.matchesGeneration(current: changed, requested: original))
     changed = original; changed.language = .spanish
     XCTAssertFalse(LivePracticeContentContinuationPolicy.matchesGeneration(current: changed, requested: original))

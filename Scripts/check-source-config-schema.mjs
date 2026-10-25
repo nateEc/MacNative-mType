@@ -17,7 +17,8 @@ const coldMode = process.argv[3] === '--cold-storage';
 const editMode = process.argv[3] === '--single-edit';
 const failureOrderMode = process.argv[3] === '--import-failure-order';
 const thresholdCommandMode = process.argv[3] === '--threshold-commands';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode);
+const inputCommandMode = process.argv[3] === '--input-commands';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -37,7 +38,7 @@ const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
 const adapters = new Map([
   [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: (_message, options) => {
-    if (thresholdCommandMode) simulation.notices.push(options?.important ?? false);
+    if (thresholdCommandMode || inputCommandMode) simulation.notices.push(options?.important ?? false);
   }, showErrorNotification: noop}],
   [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
   [path.join(frontend, 'states/test.ts'), {isTestActive: () => simulation.flags.testActive ?? true}],
@@ -159,7 +160,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -171,7 +172,50 @@ if (defaultsMode) {
     return blocked;
   };
   const setters = await load(path.join(frontend, 'config/setters.ts'));
-  if (thresholdCommandMode) {
+  if (inputCommandMode) {
+    function extract(file, from, until, wrap = text => text) {
+      const source = fs.readFileSync(path.join(frontend, file), 'utf8');
+      const start = source.indexOf(from), end = source.indexOf(until, start);
+      assert.ok(start >= 0 && end > start);
+      return stripTypeScriptTypes(wrap(source.slice(start, end).replace(/^export /gm, '')), {mode:'transform'});
+    }
+    Object.assign(context, {Config:simulation.Config, configEvent:bus, setConfig:setters.setConfig,
+      capitalizeFirstLetter:value => value[0].toUpperCase()+value.slice(1), getActivePage:() => 'test',
+      isFunboxActive:name => simulation.Config.funbox.includes(name), isTestActive:() => simulation.flags.testActive,
+      showNoticeNotification:(_message,options) => simulation.notices.push(options?.important ?? false)});
+    vm.runInContext(extract('commandline/commandline-metadata.ts', '  freedomMode: {', '  //sound',
+      text => `globalThis.inputs=({${text}});`), context);
+    vm.runInContext(extract('commandline/util.ts', 'function buildSubgroupCommand<', 'function buildInputCommand<'), context);
+    vm.runInContext(extract('test/test-logic.ts', 'configEvent.subscribe(', 'timerEvent.subscribe('), context);
+    vm.runInContext(extract('test/test-logic.ts', 'export async function restart(', 'let lastInitError:'), context);
+    let restartRequests = 0;
+    context.TestLogic = {restart:() => {
+      restartRequests++;
+      return simulation.flags.testActive && simulation.Config.funbox.includes('no_quit') ? context.restart() : Promise.resolve();
+    }};
+    const keys = ['freedomMode','strictSpace','oppositeShiftMode','stopOnError','deleteOnError','confidenceMode',
+      'quickEnd','indicateTypos','compositionDisplay','hideExtraLetters','lazyMode','codeUnindentOnBackspace'];
+    const profiles = [{}, {freedomMode:true,stopOnError:'word'}, {confidenceMode:'on'},
+      {deleteOnError:'word'}, {stopOnError:'word'}];
+    const fixtures = [];
+    for (const funbox of [[],['no_quit'],['memory'],['binary'],['arrows'],['tts'],['rot13']])
+      for (const active of [false,true]) for (const patch of profiles) for (const key of keys) {
+        const values = configSchemas.ConfigSchema.shape[key].options ?? [false,true];
+        for (const value of values) {
+          Object.assign(simulation.Config, structuredClone(defaults), structuredClone(patch), {funbox});
+          const current = structuredClone(simulation.Config);
+          simulation.flags = {testActive:active, authenticated:false, documentComplete:true};
+          simulation.events = []; simulation.saves = []; simulation.notices = []; restartRequests = 0;
+          const command = context.buildSubgroupCommand(key, value, context.inputs[key].subgroup);
+          let threw = false;
+          try { command.exec(); } catch { threw = true; }
+          fixtures.push({key,value,current,active,threw,restartRequests,events:simulation.events,
+            runtime:structuredClone(simulation.Config),saves:simulation.saves,notices:simulation.notices});
+        }
+      }
+    assert.equal(fixtures.length, 2310);
+    verify(); console.log(JSON.stringify({fixtures}));
+  } else if (thresholdCommandMode) {
     function extract(file, from, until, wrap = text => text) {
       const source = fs.readFileSync(path.join(frontend, file), 'utf8');
       const start = source.indexOf(from), end = source.indexOf(until, start);

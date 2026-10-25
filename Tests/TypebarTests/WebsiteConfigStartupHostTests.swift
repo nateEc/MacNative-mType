@@ -151,6 +151,40 @@ import XCTest
     XCTAssertFalse(f.window.isVisible)
   }
 
+  func testInputCommandsKeepActualMarkedInputAndControlsWithAndWithoutNoQuit() async throws {
+    for noQuit in [false, true] {
+      let f = try Fixture(saved: nil); defer { f.close() }
+      f.state.accountReady = true
+      try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
+      let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+      let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+      let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+        directory: directory, readWindow: { selection })
+      defer { workflow.stop() }
+      try await workflow.apply(json: noQuit ? #"{"mode":"words","words":10,"funbox":["no_quit"]}"# : #"{"mode":"words","words":10}"#, systemIsDark: false)
+      try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+      let input = try XCTUnwrap(f.inputs().first), legacy = f.settings.snapshot
+      input.onInsert("x", false)
+      if noQuit { try await f.waitAsync { !f.settings.allowsRestartingConfigurationChange } }
+      input.setMarkedText("é", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+      let marked = input.markedRange(), before = f.state.page.state.session.generationState
+      XCTAssertTrue(input.hasMarkedText())
+      for target in [InputRuleCommandTarget.freedomMode(true), .deleteOnError(.letter), .confidenceMode(.on),
+        .hideExtraLetters(true), .indicateTypos(.both), .compositionDisplay(.below)] {
+        do {
+          try await workflow.editAndBegin(.inputRule(target), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+        } catch { return XCTFail("Input command failed: \(String(reflecting: error))") }
+      }
+      try await f.waitAsync { f.inputs().first?.compositionDisplayStyle == .below }
+      XCTAssertTrue(f.inputs().first === input); XCTAssertTrue(input.acceptsTextInput)
+      XCTAssertTrue(input.hasMarkedText()); XCTAssertEqual(input.markedRange(), marked)
+      XCTAssertEqual(f.state.page.state.session.typed, "x")
+      XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, before.attempt)
+      XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 0)
+      XCTAssertEqual(f.settings.snapshot, legacy); XCTAssertFalse(f.window.isVisible)
+    }
+  }
+
   func testActualNoQuitLockKeepsThresholdRefusalsAndBothBurstNotices() async throws {
     let f = try Fixture(saved: nil); defer { f.close(); f.account.localNotices.clearAll() }
     f.state.accountReady = true
@@ -266,6 +300,9 @@ import XCTest
   }
   func testBlindChangeDuringOnlinePullKeepsValidSectionAndAllowsTheNextPull() async throws {
     try await assertLiveEditDuringOnlinePull(.behavior(.blindMode(true)))
+  }
+  func testInputRuleChangeDuringOnlinePullKeepsValidSectionAndAllowsTheNextPull() async throws {
+    try await assertLiveEditDuringOnlinePull(.inputRule(.confidenceMode(.on)))
   }
   private func assertLiveEditDuringOnlinePull(_ edit: WebsiteConfigPracticeEdit) async throws {
     var reads = 0, returned = false

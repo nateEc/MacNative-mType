@@ -36,7 +36,8 @@ enum WebsiteConfigRuntimeProjector {
   static func edit(
     current: [String: WebsiteConfigValue], key: String, value: WebsiteConfigValue,
     defaults: [String: WebsiteConfigValue], schema: WebsiteConfigSchema,
-    context: WebsiteConfigRuntimeContext, testActive: Bool = false, nosave: Bool = false
+    context: WebsiteConfigRuntimeContext, testActive: Bool = false, nosave: Bool = false,
+    observeAssignment: ((String, WebsiteConfigValue, Bool) -> Void)? = nil
   ) throws -> WebsiteConfigRuntimeProjection {
     guard schema.keys.contains(key), Set(current.keys) == schema.keys,
       Set(defaults.keys) == schema.keys,
@@ -47,7 +48,7 @@ enum WebsiteConfigRuntimeProjector {
     requested[key] = value
     return try apply(requested: requested, initial: current, defaults: defaults,
       keys: [key], context: context, schema: schema, fullChange: false,
-      testActive: testActive, nosave: nosave, admitsFunbox: WebsiteFunboxAdmission.accepts)
+      testActive: testActive, nosave: nosave, admitsFunbox: WebsiteFunboxAdmission.accepts, observeAssignment: observeAssignment)
   }
 
   /// Normalized website input only. This never installs settings, emits UI
@@ -75,7 +76,8 @@ enum WebsiteConfigRuntimeProjector {
     requested: [String: WebsiteConfigValue], initial: [String: WebsiteConfigValue],
     defaults: [String: WebsiteConfigValue], keys: [String], context: WebsiteConfigRuntimeContext,
     schema: WebsiteConfigSchema, fullChange: Bool, testActive: Bool, nosave: Bool,
-    admitsFunbox: (WebsiteConfigValue, [String: WebsiteConfigValue]) -> Bool
+    admitsFunbox: (WebsiteConfigValue, [String: WebsiteConfigValue]) -> Bool,
+    observeAssignment: ((String, WebsiteConfigValue, Bool) -> Void)? = nil
   ) throws -> WebsiteConfigRuntimeProjection {
     var result = WebsiteConfigRuntimeProjection(requested: requested, runtime: initial,
       rejectedKeys: [], events: fullChange ? [.init(key: "fullConfigChange")] : [])
@@ -114,6 +116,7 @@ enum WebsiteConfigRuntimeProjector {
       }
       if testActive, restartRequiredKeys.contains(key),
         case .array(let active)? = result.runtime["funbox"], active.contains(.string("no_quit")) {
+        observeAssignment?(key, value, false)
         return false
       }
       let blocked: Bool
@@ -129,7 +132,7 @@ enum WebsiteConfigRuntimeProjector {
       guard !blocked, schema.accepts(value, for: key),
         let active = result.runtime["funbox"],
         WebsiteFunboxAdmission.acceptsEdit(key: key, value: value, active: active)
-      else { return false }
+      else { observeAssignment?(key, value, false); return false }
       // Dependent setters retain the same event/order semantics as top-level setters.
       let children: [(String, WebsiteConfigValue)]
       switch key {
@@ -163,6 +166,7 @@ enum WebsiteConfigRuntimeProjector {
       }
       result.runtime[key] = value
       result.events.append(.init(key: key, previousValue: previous, newValue: value, nosave: nosave))
+      observeAssignment?(key, value, true)
       return true
     }
     for key in keys {

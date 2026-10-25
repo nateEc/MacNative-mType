@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## 完整配置输入命令与递归 setter（2026-10-25，起点 306f4ef6）
+
+CFG-INPUT-COMMAND-PAGE-01 根据实际 commandline input subgroup、buildSubgroupCommand、config metadata／setters 与 test-logic 订阅执行。33 个选项覆盖十二类命令；只有 lazyMode afterExec 请求重开。strictSpace、stopOnError、codeUnindentOnBackspace 标记 changeRequiresRestart 但没有重开 afterExec／订阅，应在本轮更新，其标记仍用于活动 No Quit 拒绝。freedom、confidence、deleteOnError、stopOnError 的依赖 setter 按顺序执行，后续拒绝抛错不会回滚早先接受的子项。
+
+先行两个真实工作流出现五处失败：严格空格换尝试、清空输入并增加重开账本；No Quit 下 freedom=true／stopOnError=word 时开启 confidence，源先保存 freedom=false，再拒绝 stopOnError=off 并抛错，原生却丢掉前一步。现从纯投影轨迹记录每个接受／拒绝（可选观察回调不做 I/O），普通调用保持原返回／异常；原生工作流逐步骤重新准备、CAS、发布，下一步只延续实际返回的 publication，单字段权限拒绝复合 override 与无关设置。后续失败明确报告部分保存，不回滚已成功步骤，不覆盖竞争记录。
+
+QA 新模式 --input-commands 执行固定源码的实际命令 builder、输入 metadata、全 setter／schema、事件订阅及重开的 No Quit 早退。普通重开只记录请求，不模拟原版整轮生成；保存与 UI 是自有端点。2,310 组为 33 选项 × 五组合法初态 × 七种 Funbox × 两种活动状态，比较完整 runtime、接受事件顺序、保存意图、抛错和重要通知；12 组抛错，2 组含先前已接受事件。原生独立重开／生成、No Quit 依赖与部分保存竞争另由真实工作流验证，不以轨迹对照代替真实执行。
+
+实际隐藏输入页在普通／No Quit 全局锁下切换即时规则及显示选项，控件身份、输入、marked text／范围保留；代码／严格空格／遇错停下的完整配置同步与原题重复使用新规则，旧完成成绩配置不改。在线续取在即时规则变更后保留有效段落并可再次请求，初始替换仍严格，其他语言／限制／难度变化仍退役。未启动主程序，不写旧 AppSettings，不引入新格式或参考源码／资产。源持久化抛错发生在运行赋值与事件之间等全部异常时点、实体键盘／IME、可见菜单与全局迁移仍开放；本批部分成功的 CAS 顺序不代表这些边界已经全部等价。
+
+验证：先行两项五处断言失败；实现后定向六项及真实宿主加入后的 13 项零失败／零跳过。最终相关 1,819 项零失败／零跳过（740.039 秒，范围重叠不相加），含 2,310 组输入命令源码对照、原输入引擎、在线替换、配置与旧命令回归。扩大期间测试进程持续活跃，没有因输出等待而重启或中断；最终回归和打包期间未改 Swift。Debug 包、签名、资源与原创性检查通过，固定证据检查 47 直接项／119 原生符号／17 支持规范通过，人工清单 1,353 项仅结构检查。日志 `/tmp/typebar-input-command-{red,focused,integration,host,broad,package,reference}.log`，实际源码输出 `/tmp/typebar-input-command-source.json`。本批只安排开发分支的一次实质推送，不改 main／工作流、不请求 CI、不启动主程序；完整目标继续 active。
+
 ## 真实 No Quit 锁下的源 setter 上下文（2026-10-25，起点 01180431）
 
 CFG-NOQUIT-SETTER-CONTEXT-01 延续阈值／Polyglot／Layoutfluid 的固定源码命令与 setter 证据。metadata 将阈值与 customLayoutfluid 标为 changeRequiresRestart，活动 No Quit 在 schema／保存前拒绝并给重要提示；customPolyglot 不带该标记，合法列表保存后命令的重开被 No Quit 阻止，只影响下轮。重复列表原输入 schema 可通过，override 去重后 setter 拒绝，后续重开仍受阻。Burst 保留两个 setter 与两条拒绝提示，速度／准确率原命令预校验失败则不进入 setter。

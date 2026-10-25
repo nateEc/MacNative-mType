@@ -268,6 +268,17 @@ final class PracticePageSessionStore {
     try validateCommitOwnership(owner: lease, router: router, capture: capture)
     committing = true
   }
+  func beginLiveInputRuleCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft) throws {
+    guard state.configurationDeparture == nil, state.savedApplication == nil,
+      WebsiteConfigInputCommand.admits(draft, from: capture.publication.draft), case .edited(let edit) = draft.origin else {
+      throw PracticePageSessionStateError.locked
+    }
+    let activeNoQuit = state.session.hasStarted && !state.session.isFinished && state.session.configuration.modifiers.contains(.noQuit)
+    guard !activeNoQuit || !WebsiteConfigRuntimeProjector.restartRequiredKeys.contains(edit.key) else { throw PracticePageSessionStateError.locked }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture)
+    committing = true
+  }
   /// Not a general No Quit bypass: only the next-attempt Polyglot list may
   /// differ. The coordinator retains this exact attempt while saving it.
   func beginFuturePolyglotCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,

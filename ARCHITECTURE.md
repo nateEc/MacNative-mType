@@ -1,5 +1,7 @@
 # Typebar 架构决策（ADR-001）
 
+2026-10-25 输入命令的逐 setter 发布：纯投影器的可选观察回调只报告实际接受／拒绝步骤，默认 nil 的导入／恢复行为不变；失败 override 仍抛错，调用者可保留此前完成的步骤。WebsiteConfigInputCommand 将此轨迹变成同步执行计划，不在观察回调中写盘。每个接受步骤重新从同一 publication 链准备，单字段事件／差异检查后做文件 CAS 并发布，再推进到返回的新身份；已接受子项保留，后续记录竞争不采用新写者身份。页面单字段入口另检查 No Quit 的 metadata，不能把复合 override 或其他设置当作即时子项提交。Lazy 使用既有保存离场／初始化流程，No Quit 下 setter 和随后重开各给提示。完整配置专用规则同步增加 strictSpace、stopOnError 和 codeUnindentOnBackspace，旧同步入口保持原语义；完成结果不改，重复新尝试读取全套当前输入规则。续段比较只忽略这些即时输入字段，首次内容替换仍严格。
+
 2026-10-25 No Quit setter 的同步上下文：原行为读取作用域更名为 withSynchronousSetterRead，追加本窗口实际活动 No Quit 的阈值命令、阈值表单、Polyglot 与 Layoutfluid 序列入口；不跨 await，其他窗口锁与普通导入仍不开放。异步表单在 yield 后重新判断当前 No Quit 状态，再进入同步准备／拒绝或 future-selection CAS，避免开始输入与提交之间的竞态。阈值和 Layoutfluid 不获得写权限，只有原严格 Polyglot 下轮选择能力可保存。开始输入触发全局锁会旋转环境，但当前 publication 仍合法，因此拒绝提示捕获此次读取的环境 revision，并同时核对 publication、磁盘、操作与账户代次；不能只拿旧 publication 的环境版本比较。
 
 2026-10-25 原地行为命令：四字段的类型映射使用现有 BehaviorCommandTarget，完整配置先于 legacy 分支路由。共享原地发布过程保留阈值原准入，行为入口另要求 edited 来源、单个对应保存事件及除该字段外全值相同；页面只对该入口允许活动 No Quit。环境源始终观察模型与锁代次，普通 read 在锁定时仍返回 nil；同步 withLiveBehaviorRead 只为这四类命令读取新鲜上下文，绝不跨 await，异常退出恢复权限。立即刷新取消的旧排队任务检查取消状态，防止随后重采样使新 publication 无谓过期。工作流在窗口读取回调后复核取消令牌，文件 CAS 成功前不把规则装入真实页面。发布保留当前外观、控件、内容及控制器；盲打的在途文本仅忽略其反馈字段差异，不放宽首次内容替换。

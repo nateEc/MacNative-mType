@@ -12,6 +12,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   case layoutFluidLayouts([String])
   case threshold(WebsiteConfigThresholdEdit)
   case behavior(BehaviorCommandTarget)
+  case inputRule(InputRuleCommandTarget)
   var key: String {
     switch self {
     case .mode: "mode"; case .time: "time"; case .words: "words"
@@ -23,6 +24,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .layoutFluidLayouts: "customLayoutfluid"
     case .threshold(let edit): edit.key
     case .behavior(let edit): edit.websiteKey
+    case .inputRule(let edit): edit.websiteKey
     }
   }
   var value: WebsiteConfigValue {
@@ -39,6 +41,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
     case .layoutFluidLayouts(let values): .array(values.map(WebsiteConfigValue.string))
     case .threshold(let edit): edit.value
     case .behavior(let edit): edit.websiteValue
+    case .inputRule(let edit): edit.websiteValue
     }
   }
   /// TestConfig controls dispatch after a false setter return; difficulty
@@ -46,7 +49,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
   /// neither case: execution never reaches the following dispatch.
   var dispatchesRestartAfterRejection: Bool {
     switch self {
-    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior: false
+    case .difficulty, .language, .layoutFluidLayouts, .threshold, .behavior, .inputRule: false
     case .mode, .time, .words, .punctuation, .numbers, .quoteLengths, .lazyMode, .funboxes, .polyglotLanguages: true
     }
   }
@@ -137,6 +140,10 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   @discardableResult
   func editAndBegin(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID, systemIsDark: Bool) async throws -> String {
     if case .behavior(let target) = edit { return try runBehaviorCommand(target, replacing: applicationID) }
+    if case .inputRule(let target) = edit {
+      if case .lazyMode(let enabled) = target { return try await perform(.edit(.lazyMode(enabled), applicationID), systemIsDark: systemIsDark) }
+      return try runInputCommand(target, replacing: applicationID)
+    }
     return try await perform(.edit(edit, applicationID), systemIsDark: systemIsDark)
   }
 
@@ -165,6 +172,56 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       case .busy: throw WebsiteConfigImportWorkflowError.busy
       }
     }
+  }
+
+  private func runInputCommand(_ target: InputRuleCommandTarget, replacing applicationID: UUID) throws -> String {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil else { throw WebsiteConfigImportWorkflowError.preparationPending }
+    guard let original = page.state.presentation?.publication, original.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
+    try Task.checkCancellation()
+    let current = UUID(); applying = true; operation = current
+    let noticeGeneration = notices?.deliveryGeneration
+    defer {
+      if let prepared { _ = coordinator.cancel(prepared) }
+      prepared = nil; applying = false
+    }
+    func execute() throws -> String {
+      guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+      let plan = try WebsiteConfigInputCommand.plan(current: original.draft.projection.runtime, target: target,
+        context: context.context, active: page.state.session.hasStarted && !page.state.session.isFinished)
+      var receiptID = applicationID, saved = 0
+      do {
+        for step in plan.steps {
+          try Task.checkCancellation()
+          guard operation == current, !stopped, page.state.presentation?.publication.applicationID == receiptID else { throw WebsiteConfigImportWorkflowError.conflict }
+          if !step.accepted {
+            if ownsActiveNoQuit, WebsiteConfigRuntimeProjector.restartRequiredKeys.contains(step.key),
+              let publication = page.state.presentation?.publication {
+              postNoQuitSelectionNotice("输入规则未修改；No Quit 保留当前练习。", publication: publication,
+                page: page, operation: current, noticeGeneration: noticeGeneration, expectedEnvironment: context.revision)
+            }
+            continue
+          }
+          let ticket = try coordinator.prepareEdit(key: step.key, value: step.value, for: page, refreshingWith: source)
+          prepared = ticket
+          guard operation == current, !stopped else { throw CancellationError() }
+          switch try coordinator.commitLiveInputRule(ticket, for: page) {
+          case .committed(let publication): saved += 1; receiptID = publication.applicationID
+          case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+          case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+          case .busy: throw WebsiteConfigImportWorkflowError.busy
+          }
+        }
+      } catch {
+        if saved > 0 { throw WebsiteInputCommandError.interrupted(saved: saved, underlying: error) }
+        throw error
+      }
+      if plan.failedOverride { throw WebsiteInputCommandError.failedOverride(saved: saved) }
+      return saved == 0 ? "输入规则未修改。" : "输入规则已保存，当前练习继续。"
+    }
+    if ownsActiveNoQuit { return try environment.withSynchronousSetterRead { try execute() } }
+    return try execute()
   }
 
   /// Execute the source command synchronously. Burst's two ordinary setters
@@ -284,7 +341,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         throw WebsiteConfigImportWorkflowError.conflict
       }
       if ownsActiveNoQuit, WebsiteConfigThresholdEdit.keys.contains(edit.key)
-        || ["customPolyglot", "customLayoutfluid"].contains(edit.key) {
+        || ["customPolyglot", "customLayoutfluid", "lazyMode"].contains(edit.key) {
         return try performNoQuitSelection(edit, replacing: applicationID, page: page,
           operation: current, noticeGeneration: noticeGeneration)
       }
@@ -438,6 +495,10 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       catch WebsiteConfigNativeDraftError.rejectedEdit {
         postNoQuitSelectionNotice("设置未修改；No Quit 保留当前练习。", publication: original,
           page: page, operation: current, noticeGeneration: noticeGeneration, expectedEnvironment: context.revision)
+        if edit.key == "lazyMode" {
+          postNoQuitSelectionNotice("No Quit 保留当前练习，未执行重开。", publication: original,
+            page: page, operation: current, noticeGeneration: noticeGeneration, expectedEnvironment: context.revision)
+        }
         if edit.dispatchesRestartAfterRejection { throw WebsiteConfigImportWorkflowError.rejectedRestartFailed }
         throw WebsiteConfigNativeDraftError.rejectedEdit
       }

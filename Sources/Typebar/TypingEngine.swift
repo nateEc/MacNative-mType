@@ -5874,6 +5874,16 @@ struct TypingSession {
     setBlindMode(live.blindMode)
     setHideExtraLetters(live.hideExtraLetters)
   }
+  /// Website setters have no restart subscription for these three fields.
+  /// Keep legacy synchronization's existing admission semantics separate.
+  mutating func synchronizeWebsiteInputRules(_ rules: InputRules) {
+    guard !isFinished else { return }
+    configuration.rules.strictSpace = rules.strictSpace
+    configuration.rules.stopOnErrorMode = rules.stopOnErrorMode
+    configuration.rules.stopOnError = rules.stopOnErrorMode.isEnabled
+    configuration.rules.codeUnindentOnBackspace = rules.codeUnindentOnBackspace
+    synchronizeLiveInputRules(rules)
+  }
 
   var completedPromptCharacterIndices: Set<Int> {
     TypedCharacterEffectPolicy.completedCharacterIndices(

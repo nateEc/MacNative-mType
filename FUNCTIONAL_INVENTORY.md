@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+2026-10-25 CFG-INPUT-COMMAND-PAGE-01：完整配置接通十二类输入命令的 33 个选项，不再写旧偏好。除 Lazy 的显式 afterExec 外均原地保存；strictSpace／stopOnError／codeUnindentOnBackspace 的 metadata 只用于 No Quit 准入，不能猜成重开。依赖 setter 按实际顺序逐个保存，后续拒绝／抛错保留已接受子项；单字段权限、文件竞争及取消继续约束每一步。2,310 组实际源码对照包含两组部分成功后抛错；实际隐藏页在普通／No Quit 下保留输入控件与 marked text，原题重复使用新规则，在线续取不失效。实体 IME、全部持久化异常时点和全局迁移仍开放，详见 OFFICIAL_CONFIG_AUDIT。
+
 2026-10-25 CFG-NOQUIT-SETTER-CONTEXT-01：完整配置真实页面的 No Quit 全局锁生效后，阈值与 Layoutfluid 进入实际 setter 拒绝并重要提示，Burst 两次拒绝给两条提示；Polyglot 合法列表仅保存下轮选择，重复语言被 override 拒绝后仅反馈重开受阻。同步读取在本窗口实际活动 No Quit 下开放，不跨 await、不放行另一窗口的锁或完整导入；通知核对当前读取代次、原页面、文件与账户代次。隐藏真实页及竞争写入／取消证据见 OFFICIAL_CONFIG_AUDIT。其余命令、完整导入失败语义及实体交互仍开放。
 
 2026-10-25 CFG-BEHAVIOR-COMMAND-PAGE-01：完整配置下的 quickRestart、blindMode、alwaysShowWordsHistory、singleListCommandLine 十项命令保存到拥有的原生配置，不再写旧偏好；活动 No Quit 可原地修改，保留输入、题面、时钟、账本和资源。快速重开键贯通真实输入与提示，结果历史及两个命令面板读取完整配置；盲打不使已发出的在线续取失效，完成成绩规则保持，原题重复使用新选择。作用域读取不开放普通导入／重开，字段和文件 CAS 继续复核。实际源码 292 组行为 setter 对照及隐藏页／工作流证据见 OFFICIAL_CONFIG_AUDIT；实体操作、其他命令和全局迁移未因此完成。
@@ -1903,6 +1905,7 @@ Morse／下划线审计状态改为部分覆盖，明确保留零目标词、其
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-INPUT-COMMAND-PAGE-01 | 完整配置的输入规则命令 | `commandline/{commandline-metadata.ts,util.ts}`, `config/{metadata.tsx,setters.ts}`, `test/test-logic.ts` | CommandDomain, PreferencesDomain, TypingDomain | 部分实现：十二类 33 选项接通，只有 Lazy 显式重开；依赖逐 setter 保存及部分抛错保留、No Quit 逐层准入、原题新规则与在线续取已验证。2,310 组实际源码轨迹及真实隐藏页保留控件／marked text；实体 IME、全部存储异常时点与全局迁移仍开放。 |
 | CFG-NOQUIT-SETTER-CONTEXT-01 | 真实 No Quit 锁下的配置命令上下文 | `config/{metadata.tsx,setters.ts}`, `commandline/lists/min-burst.ts`, `test/test-logic.ts` | CommandDomain, PreferencesDomain, TestDomain | 部分实现：本窗口实际全局锁下，阈值／Layoutfluid 拒绝且重要提示，合法 Polyglot 仅保存下轮列表；原始预校验、Burst 两次拒绝及去重后失败保留。通知使用此次读取代次，另一窗口锁、竞争记录及取消仍受保护；实体交互、其他命令及完整导入仍开放。 |
 | CFG-BEHAVIOR-COMMAND-PAGE-01 | 完整配置的即时行为命令 | `config/metadata.tsx`, `config/setters.ts`, `test/{test-logic.ts,test-ui.ts}` | CommandDomain, PreferencesDomain, TestDomain | 部分实现：十项行为命令保存完整记录，活动 No Quit 可修改且保持尝试／输入／资源／账本；消费者统一读取新配置，盲打不丢在途文本，旧完成成绩不变。严格单字段准入与同步上下文、取消和文件竞争已验证；实体交互、其他命令及全局迁移仍开放。 |
 | CFG-THRESHOLD-COMMAND-PAGE-01 | 完整配置的原生阈值命令 | `commandline/commandline-metadata.ts`, `commandline/lists/min-burst.ts`, `utils/typing-speed-units.ts` | CommandDomain, PreferencesDomain, TestDomain | 部分实现：配置单位与原始记忆预填、完整数字／整数前缀转换、Burst 分步保存与部分拒绝、No Quit 逐次重要提示、版本校验及取消保护已接通；3,200 组实际源码对照与真实保存／隐藏窗口验证。非有限数表示、递归 override 存储故障、实体交互及全局迁移仍开放。 |

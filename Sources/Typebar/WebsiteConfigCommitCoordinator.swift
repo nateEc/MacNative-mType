@@ -310,21 +310,28 @@ final class WebsiteConfigCommitCoordinator {
   /// A source threshold setter has no restart dispatch/subscriber. Keep the
   /// live attempt and let the timer/word-commit consume its updated rules.
   func commitLiveThreshold(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
-    try commitLiveEdit(prepared, for: page, behavior: false)
+    try commitLiveEdit(prepared, for: page, kind: .threshold)
   }
   func commitLiveBehavior(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
-    try commitLiveEdit(prepared, for: page, behavior: true)
+    try commitLiveEdit(prepared, for: page, kind: .behavior)
   }
-  private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, behavior: Bool) throws -> Outcome {
+  func commitLiveInputRule(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, kind: .inputRule)
+  }
+  private enum LiveEditKind { case threshold, behavior, inputRule }
+  private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind) throws -> Outcome {
     guard !processing, page.restartController?.isPreparing != true else { return .busy }
     processing = true; defer { processing = false }
     try Task.checkCancellation()
     guard isCurrent(prepared), prepared.sourcePage === page, let capture = prepared.pageCapture,
       page.state.configurationDeparture == nil, page.state.savedApplication == nil,
       let previous = page.state.presentation, let practice = page.state.practice else { return .stale }
-    if behavior {
+    switch kind {
+    case .behavior:
       guard WebsiteConfigBehaviorEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
-    } else {
+    case .inputRule:
+      guard WebsiteConfigInputCommand.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
+    case .threshold:
       guard case .edited(let edit) = prepared.draft.origin, WebsiteConfigThresholdEdit.keys.contains(edit.key),
       prepared.draft.projection.rejectedKeys.isEmpty, !prepared.draft.projection.events.isEmpty,
       prepared.draft.projection.events.allSatisfy({ WebsiteConfigThresholdEdit.keys.contains($0.key) && $0.nosave == false }),
@@ -336,14 +343,19 @@ final class WebsiteConfigCommitCoordinator {
     var state = page.state
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
-    state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules)
+    if kind == .inputRule { state.session.synchronizeWebsiteInputRules(prepared.draft.inputRules.rules) }
+    else { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
     let updatedPractice = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: practice.scope,
       quote: practice.quote, external: practice.external, repetition: practice.repetition)
     guard isCurrent(prepared) else { return .stale }
     try Task.checkCancellation()
-    if behavior {
+    switch kind {
+    case .behavior:
       try page.beginLiveBehaviorCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
-    } else { try page.beginCommit(owner: prepared.owner, router: router, capture: capture) }
+    case .inputRule:
+      try page.beginLiveInputRuleCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
+    case .threshold: try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
+    }
     defer { page.endCommit() }
     let revision: WebsiteConfigFileRegister.Revision
     do {
@@ -914,7 +926,7 @@ final class WebsiteConfigCommitCoordinator {
       // Restore the actual attempt's owned opening/cursors/caches, not a
       // reconstruction from the editor, its grown prompt or a fresh sampler.
       var repeated = original.repeatedAttempt(nextRandomCaseBit: random.caseBit)
-      repeated.synchronizeLiveInputRules(draft.inputRules.rules)
+      repeated.synchronizeWebsiteInputRules(draft.inputRules.rules)
       guard !repeated.hasStarted, !repeated.isFinished,
         repeated.configuration.mode == .zen || !repeated.prompt.isEmpty else {
         throw WebsiteConfigSessionBuildError.generationFailed

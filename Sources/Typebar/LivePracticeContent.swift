@@ -223,8 +223,8 @@ enum LivePracticeContentReplacementPolicy {
 }
 
 enum LivePracticeContentContinuationPolicy {
-  /// Thresholds and blind feedback do not change the attempt's content source
-  /// or generator. Other configuration changes still retire the pull.
+  /// Scoring and immediate input rules do not change this attempt's content
+  /// source or generator. Other configuration changes retire the pull.
   static func matchesGeneration(current: TestConfiguration, requested: TestConfiguration) -> Bool {
     var normalized = current
     normalized.rules.minimumWpm = requested.rules.minimumWpm
@@ -233,6 +233,17 @@ enum LivePracticeContentContinuationPolicy {
     normalized.rules.minimumWordBurstMode = requested.rules.minimumWordBurstMode
     normalized.rules.thresholdSource = requested.rules.thresholdSource
     normalized.rules.blindMode = requested.rules.blindMode
+    normalized.rules.strictSpace = requested.rules.strictSpace
+    normalized.rules.stopOnErrorMode = requested.rules.stopOnErrorMode
+    normalized.rules.stopOnError = requested.rules.stopOnError
+    normalized.rules.deleteOnErrorMode = requested.rules.deleteOnErrorMode
+    normalized.rules.deleteOnError = requested.rules.deleteOnError
+    normalized.rules.freedomMode = requested.rules.freedomMode
+    normalized.rules.confidenceMode = requested.rules.confidenceMode
+    normalized.rules.oppositeShiftMode = requested.rules.oppositeShiftMode
+    normalized.rules.quickEnd = requested.rules.quickEnd
+    normalized.rules.hideExtraLetters = requested.rules.hideExtraLetters
+    normalized.rules.codeUnindentOnBackspace = requested.rules.codeUnindentOnBackspace
     return normalized == requested
   }
 }

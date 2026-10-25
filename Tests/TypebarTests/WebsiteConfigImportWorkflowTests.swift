@@ -6,6 +6,146 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testInputStepAdmissionRejectsRestartMarkedFieldsAndCompoundOverridesDuringNoQuit() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"freedomMode":true,"stopOnError":"word","funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let router = f.settings.preferenceConfigurationSaves, lease = try XCTUnwrap(f.settings.preferenceConfigurationSaves.captureLease())
+    let capture = try f.page.captureGeneration(router: router)
+    for (key, value) in [("strictSpace", WebsiteConfigValue.bool(true)), ("codeUnindentOnBackspace", .bool(true)),
+      ("stopOnError", .string("off")), ("confidenceMode", .string("on")), ("minWpmCustomSpeed", .number(0))] {
+      let draft = try WebsiteConfigNativeProfile.editDraft(capture.publication.draft, key: key, value: value,
+        pointsPerRem: 16, context: .init(), testActive: false)
+      XCTAssertThrowsError(try f.page.beginLiveInputRuleCommit(owner: lease, router: router, capture: capture, draft: draft))
+      XCTAssertTrue(f.page.acceptsAttemptCallback(for: state.session.automaticInputAttemptID))
+    }
+    let allowed = try WebsiteConfigNativeProfile.editDraft(capture.publication.draft, key: "freedomMode", value: .bool(false),
+      pointsPerRem: 16, context: .init(), testActive: true)
+    try f.page.beginLiveInputRuleCommit(owner: lease, router: router, capture: capture, draft: allowed)
+    f.page.endCommit()
+    XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+  }
+  func testInputLazyCommandAloneRestartsAndNoQuitProducesBothRefusals() async throws {
+    for noQuit in [false, true] {
+      let f = try Fixture(); defer { f.close(); f.account.localNotices.clearAll() }
+      let json = noQuit ? #"{"mode":"words","words":10,"language":"german","funbox":["no_quit"]}"# : #"{"mode":"words","words":10,"language":"german"}"#
+      try await f.workflow.apply(json: json, systemIsDark: false)
+      var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+      let old = try XCTUnwrap(f.page.state.presentation).publication
+      let count = f.account.localNotices.history.count
+      if noQuit {
+        let lock = UUID(); f.settings.setNoQuitConfigurationLock(true, for: lock)
+        defer { f.settings.setNoQuitConfigurationLock(false, for: lock) }
+        do {
+          try await f.workflow.editAndBegin(.inputRule(.lazyMode(true)), replacing: old.applicationID, systemIsDark: false)
+          XCTFail("No Quit restarted")
+        } catch WebsiteConfigImportWorkflowError.rejectedRestartFailed {}
+        XCTAssertEqual(f.account.localNotices.history.count - count, 2)
+        XCTAssertEqual(f.page.state.session.generationState, state.session.generationState)
+        XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, old.disk)
+      } else {
+        try await f.workflow.editAndBegin(.inputRule(.lazyMode(true)), replacing: old.applicationID, systemIsDark: false)
+        XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, state.session.automaticInputAttemptID)
+        XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+        XCTAssertTrue(f.page.state.session.configuration.modifiers.contains(.lazyLatin))
+      }
+    }
+  }
+  func testInputCommandsSaveAllNonLazyOptionsWithoutRestartingTheAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session, legacy = f.settings.snapshot
+    let controller = f.page.restartController
+    for target in InputRuleCommandCatalog.items.compactMap({ InputRuleCommandCatalog.target(for: $0.id) }) {
+      if case .lazyMode = target { continue }
+      try await f.workflow.editAndBegin(.inputRule(target), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      let publication = try XCTUnwrap(f.page.state.presentation).publication
+      XCTAssertEqual(publication.draft.projection.runtime[target.websiteKey], target.websiteValue)
+      XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.automaticInputAttemptID)
+      XCTAssertEqual(f.page.state.session.typed, before.typed); XCTAssertEqual(f.page.state.session.prompt, before.prompt)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0); XCTAssertTrue(f.page.restartController === controller)
+      XCTAssertEqual(f.page.state.session.configuration.rules, publication.draft.inputRules.rules)
+    }
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+  func testInputCommandLaterCASConflictRetainsFirstSavedChildAndCompetingRecord() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"freedomMode":true,"stopOnError":"word"}"#, systemIsDark: false)
+    let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    let competitor = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"words","words":7}"#, pointsPerRem: 16, context: .init())
+    withObservationTracking { _ = f.page.state } onChange: {
+      MainActor.assumeIsolated {
+        do {
+          guard case .committed = try register.commit(competitor, replacing: XCTUnwrap(register.read().revision)) else { return XCTFail("No competitor") }
+        } catch { XCTFail("Competing record: \(error)") }
+      }
+    }
+    do {
+      try await f.workflow.editAndBegin(.inputRule(.confidenceMode(.on)), replacing: id, systemIsDark: false)
+      XCTFail("Competing record overwritten")
+    } catch WebsiteInputCommandError.interrupted(let saved, _) { XCTAssertEqual(saved, 1) }
+    XCTAssertFalse(f.page.state.session.configuration.rules.freedomMode)
+    XCTAssertEqual(f.page.state.session.configuration.rules.stopOnErrorMode, .word)
+    XCTAssertEqual(f.page.state.session.configuration.rules.confidenceMode, .off)
+    guard case .available(let runtime) = try register.read().state else { return XCTFail("Lost record") }
+    XCTAssertEqual(runtime["words"], .number(7))
+  }
+  func testFinishedInputRulesStayImmutableAndRepeatUsesCurrentStrictStopAndCodeRules() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadExternal: { _, _, _, _ in
+        reads += 1; return .init(source: .encyclopedia, initial: .init(text: "ab cd", noSpaceBoundarySource: nil), continuation: nil)
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":2,"funbox":["wikipedia"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch(state.session.prompt + " "); f.page.replace(state)
+    let before = f.page.state.session
+    XCTAssertTrue(before.isFinished)
+    for target in [InputRuleCommandTarget.strictSpace(true), .stopOnError(.word), .codeUnindentOnBackspace(true)] {
+      try await workflow.editAndBegin(.inputRule(target), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTAssertEqual(f.page.state.session.generationState, before.generationState)
+    }
+    let repeated = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(repeated); XCTAssertEqual(reads, 1); XCTAssertEqual(f.page.state.session.prompt, before.prompt)
+    XCTAssertTrue(f.page.state.session.configuration.rules.strictSpace)
+    XCTAssertEqual(f.page.state.session.configuration.rules.stopOnErrorMode, .word)
+    XCTAssertTrue(f.page.state.session.configuration.rules.codeUnindentOnBackspace)
+  }
+  func testInputCommandStrictSpaceDoesNotRestartOrWriteLegacyPreferences() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let legacy = f.settings.snapshot
+    try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let before = f.page.state.session
+    try await f.workflow.editAndBegin(.inputRule(.strictSpace(true)),
+      replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.automaticInputAttemptID)
+    XCTAssertEqual(f.page.state.session.typed, before.typed)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+    XCTAssertTrue(f.page.state.session.configuration.rules.strictSpace)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+  }
+  func testInputCommandFailedOverrideKeepsPreviouslySavedChild() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":10,"freedomMode":true,"stopOnError":"word","funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    XCTAssertTrue(f.page.state.session.configuration.rules.freedomMode)
+    let before = f.page.state.session.automaticInputAttemptID
+    do {
+      try await f.workflow.editAndBegin(.inputRule(.confidenceMode(.on)),
+        replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTFail("Blocked override reported success")
+    } catch {}
+    XCTAssertFalse(f.page.state.session.configuration.rules.freedomMode)
+    XCTAssertEqual(f.page.state.session.configuration.rules.stopOnErrorMode, .word)
+    XCTAssertEqual(f.page.state.session.configuration.rules.confidenceMode, .off)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before)
+    guard case .available(let saved) = try WebsiteConfigFileRegister(directory: f.directory).read().state else { return XCTFail("Lost record") }
+    XCTAssertEqual(saved["freedomMode"], .bool(false))
+  }
   func testAnotherWindowsNoQuitLockCannotGrantSelectionReadToAnUnlockedAttempt() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":10}"#, systemIsDark: false)
