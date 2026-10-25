@@ -2,6 +2,10 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| WEBSITE-KEYMAP-LEGEND-LAYERS-01 | 完整配置键帽四种标注样式 | 后续只开一个隔离实例，在 QWERTY、AZERTY、Statica、阿拉伯文、Tamil、Optimot 及镜像之间切换，逐项切换 blank／lowercase／uppercase／dynamic，组合 Shift／Caps／Option；核对虚拟点击和物理输入。 | QWERTY 缺失 Option 标注为空但输入继续按原回退；uppercase 选择 Shift 层而非大写转换，单个符号保留 Base；单层键重复 Base，镜像保留整组原始层；显示变化不改计分／尝试或旧偏好。 | 待验收（737,408 组源码表达式对照已通过；实体状态、所有结构样式及动画未验） |
+
+| ID | 场景 | 操作 | 期望结果 | 状态 |
+| --- | --- | --- | --- | --- |
 | WEBSITE-CAPS-LOCK-EMULATION-01 | 普通与镜像布局 Caps Lock 输入 | 后续只开一个隔离实例，使用 QWERTY、AFNOR、Optimot 和多字符布局，切换 Caps Lock、Shift、Option 及镜像；核对缺层、标点／符号、拇指键，再切回系统输入源与 IME。 | QWERTY Caps+A 为 A，Caps+Shift+A 为 a；Caps+4 为 $，Caps+Shift+4 为 4，含标点的 2／@ 不反转；镜像按移动后的原始层判断，缺层回退一致；系统输入源仍走 AppKit，键帽按独立显示规则验收。 | 待验收（239 布局四层普通／镜像的 92,120 组源码记录通过；实体状态及完整 IME／显示组合未验） |
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |

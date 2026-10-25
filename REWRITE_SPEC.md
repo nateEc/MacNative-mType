@@ -1,5 +1,7 @@
 # Typebar — Monkeytype 功能兼容重写规范
 
+2026-10-26 CFG-KEYMAP-LEGEND-LAYERS-01：完整配置键帽显示必须使用原始标注层，不能借输入仿真的缺层回退。单层键的 Shift 标注重复 Base，其余缺失层为空；lowercase／uppercase 选择原始 Base／Shift，不能对字符串做大小写转换，uppercase 遇任一单个非字母／数字符号时保留 Base。macOS dynamic 无 Option 时按 Shift 或 Caps 选层，但符号仍按实际 Shift；Option 直接选第三／第四层且不回退。镜像移动整组显示层，旧偏好、自定义及点击式虚拟键盘的输入规则保持各自路径。显示选层证据不替代全部结构样式、响应式尺寸和高亮动画的验收。
+
 2026-10-26 CFG-CAPS-LOCK-EMULATION-01：显式官方布局的 Caps Lock 输入遵守实际 layout-emulator 的选层规则：先选择原始 Base／Shift 或存在的 AltGr 两层，若两层连接文本不含 Unicode 标点则反转 Shift，再执行原有缺层回退。不能用字母大小写转换替代，也不能用已经回退后的层检测标点；镜像后保持相同规则。系统输入源继续交付 AppKit，原生扩展与自定义布局保持原有策略。原版屏幕键帽在 macOS 使用不同显示规则，不得把本输入规则强加给键帽。实体 Caps Lock 状态、全部显示及 IME 组合另行验收。
 
 2026-10-26 CFG-MIRROR-KEYBOARD-01：完整配置 layout_mirror 必须镜像当前输入和视觉布局的键位及所有层，五行分别反转前 11／10／10／10／10 个键，保留其余键与物理身份。不能把已映射或输入法提交的逻辑正文再经过 ASCII 替换。Opposite Shift 的视觉反查读取镜像后的当前布局，overrideSync 继续比较物理侧；移动的拇指空格按载荷识别，原位置编号不得决定输出或辅助标签。旧偏好镜像路径保留原行为。Caps Lock、全部结构样式与实体输入法仍开放，专项无 Caps Lock 的层矩阵不能证明这些边界完成。

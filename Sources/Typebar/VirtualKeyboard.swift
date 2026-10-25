@@ -16,7 +16,7 @@ enum VirtualKeyboardOutputPolicy {
       candidate = layer
     } else {
       let flags: NSEvent.ModifierFlags = shift ? [.shift] : []
-      candidate = key.legend(
+      candidate = key.inputLegend(
         style: .dynamic, modifierFlags: flags, capsLockEnabled: false)
     }
     // Some official keys intentionally draw no glyph while typing a Space.

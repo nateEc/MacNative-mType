@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-KEYMAP-LEGEND-LAYERS-01 | 完整配置键帽标注选层 | `components/pages/test/{Keymap.tsx,keymapConverter.ts}` | PromptDomain, PreferencesDomain | 使用独立原始显示层，缺层显示空白；四种标注样式及 macOS Caps／Shift／Option 选择由 239 布局普通／镜像的 737,408 组实际源码表达式对照覆盖。输入回退独立，全部结构样式、响应式几何、高亮动画和实体状态仍待验。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-CAPS-LOCK-EMULATION-01 | 显式布局 Caps Lock 输入选层 | `test/layout-emulator.ts` | PromptDomain | 按原始 Base／Shift 或 AltGr 对的 Unicode 标点决定是否反转 Shift，再执行缺层回退；239 布局普通／镜像的 92,120 组实际源码样本通过。屏幕键帽采用独立 macOS 显示规则，全部样式、实体 Caps Lock 状态及 IME 仍待验。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

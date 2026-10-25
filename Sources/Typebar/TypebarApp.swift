@@ -1600,7 +1600,7 @@ private struct ContentView: View {
               feedback: keyboardGuideFeedback, accent: activeTheme.accent,
               panel: activeTheme.panel, layout: effectiveKeyboardLayout,
               overrideRows: effectiveKeyboardGuideOverrideRows,
-              overrideThumbKeys: publishedMirrorThumbKeys,
+              overrideThumbKeys: publishedKeyboardGuideThumbKeys,
               mirrored: committedPracticeDraft == nil && session.configuration.modifiers.contains(.mirrorKeyboard),
               scale: practiceKeyboardGuide.scale, legendStyle: practiceKeyboardGuide.legendStyle,
               keysMode: practiceKeyboardGuide.keysMode,
@@ -1611,7 +1611,7 @@ private struct ContentView: View {
             VirtualKeyboard(
               layout: effectiveKeyboardLayout,
               overrideRows: effectiveKeyboardGuideOverrideRows,
-              overrideThumbKeys: publishedMirrorThumbKeys,
+              overrideThumbKeys: publishedKeyboardGuideThumbKeys,
               nextCharacter: session.nextExpectedCharacter,
               accent: activeTheme.accent, panel: activeTheme.panel,
               allowsNewline: session.acceptsNewlineInput,
@@ -4089,8 +4089,8 @@ private struct ContentView: View {
   }
 
   private var effectiveKeyboardGuideOverrideRows: [[KeyboardGuideKey]]? {
-    if let draft = committedPracticeDraft, draft.generators.requestedModifiers.contains(.mirrorKeyboard) {
-      return KeyboardGuideModel.mirroredRows(for: effectiveKeyboardLayout)
+    if let draft = committedPracticeDraft {
+      return KeyboardGuideModel.websiteRows(for: effectiveKeyboardLayout, mirrored: draft.generators.requestedModifiers.contains(.mirrorKeyboard))
     }
     guard practiceKeyboardGuide.allowsLegacyRows else { return nil }
     guard !session.configuration.modifiers.contains(.layoutFluid) else { return nil }
@@ -4108,9 +4108,9 @@ private struct ContentView: View {
     return nil
   }
 
-  private var publishedMirrorThumbKeys: [KeyboardGuideKey]? {
-    guard let draft = committedPracticeDraft, draft.generators.requestedModifiers.contains(.mirrorKeyboard) else { return nil }
-    return KeyboardGuideModel.mirroredThumbKeys(for: effectiveKeyboardLayout)
+  private var publishedKeyboardGuideThumbKeys: [KeyboardGuideKey]? {
+    guard let draft = committedPracticeDraft else { return nil }
+    return KeyboardGuideModel.websiteThumbKeys(for: effectiveKeyboardLayout, mirrored: draft.generators.requestedModifiers.contains(.mirrorKeyboard))
   }
   /// Full profiles receive each source setter independently, including a
   /// physical-layout refusal under No Quit. Legacy mode keeps its old policy.

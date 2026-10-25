@@ -1215,16 +1215,21 @@ struct KeyboardGuideKey: Identifiable, Equatable {
   let optionLabel: String?
   let shiftedOptionLabel: String?
   let preservesDynamicBaseCase: Bool
+  private let websiteLegends: [String]?
 
   /// Retain physical identity/geometry while moving all authored legend layers.
   func replacingLegends(with key: Self) -> Self {
     Self(position: self, legends: key)
   }
-  private init(position: Self, legends: Self) {
+  func withWebsiteLegends(_ layers: [String]) -> Self {
+    Self(position: self, legends: self, websiteLegends: layers)
+  }
+  private init(position: Self, legends: Self, websiteLegends: [String]? = nil) {
     id = position.id; width = position.width
     label = legends.label; characters = legends.characters; shiftedLabel = legends.shiftedLabel
     optionLabel = legends.optionLabel; shiftedOptionLabel = legends.shiftedOptionLabel
     preservesDynamicBaseCase = legends.preservesDynamicBaseCase
+    self.websiteLegends = websiteLegends ?? legends.websiteLegends
   }
 
   init(
@@ -1249,6 +1254,7 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     self.optionLabel = optionLabel
     self.shiftedOptionLabel = shiftedOptionLabel
     self.preservesDynamicBaseCase = preservesDynamicBaseCase
+    self.websiteLegends = nil
   }
 
   private static func typedCharacters(for character: Character) -> [Character] {
@@ -1286,6 +1292,33 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     modifierFlags: NSEvent.ModifierFlags,
     capsLockEnabled: Bool
   ) -> String {
+    guard let websiteLegends else {
+      return inputLegend(style: style, modifierFlags: modifierFlags, capsLockEnabled: capsLockEnabled)
+    }
+    let shift = modifierFlags.contains(.shift), option = modifierFlags.contains(.option)
+    let index: Int
+    let symbolIndex: Int?
+    switch style {
+    case .blank: return ""
+    case .lowercase: index = 0; symbolIndex = nil
+    case .uppercase: index = 1; symbolIndex = 0
+    case .dynamic:
+      if option { index = shift ? 3 : 2; symbolIndex = nil }
+      else { index = shift || capsLockEnabled ? 1 : 0; symbolIndex = shift ? 1 : 0 }
+    }
+    func layer(_ index: Int) -> String { websiteLegends.indices.contains(index) ? websiteLegends[index] : "" }
+    if let symbolIndex, [layer(index), layer(symbolIndex)].contains(where: Self.isSingleSymbol) {
+      return layer(symbolIndex)
+    }
+    return layer(index)
+  }
+
+  /// Input fallback is independent of the website's display-only empty layers.
+  func inputLegend(
+    style: KeyboardGuideLegendStyle,
+    modifierFlags: NSEvent.ModifierFlags,
+    capsLockEnabled: Bool
+  ) -> String {
     if characters.isEmpty, style != .blank { return label }
     switch style {
     case .blank: return ""
@@ -1305,6 +1338,15 @@ struct KeyboardGuideKey: Identifiable, Equatable {
       }
       return (modifierFlags.contains(.shift) || capsLockEnabled) ? label.uppercased()
         : preservesDynamicBaseCase ? label : label.lowercased()
+    }
+  }
+
+  private static func isSingleSymbol(_ text: String) -> Bool {
+    guard text.unicodeScalars.count == 1, let scalar = text.unicodeScalars.first else { return false }
+    switch scalar.properties.generalCategory {
+    case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,
+      .decimalNumber, .letterNumber, .otherNumber: return false
+    default: return true
     }
   }
 
@@ -1342,6 +1384,21 @@ enum OfficialUrduPhoneticKeymap {
 }
 
 enum KeyboardGuideModel {
+  static func websiteRows(for layout: KeyboardLayout, mirrored: Bool) -> [[KeyboardGuideKey]] {
+    guard layout.isPinnedOfficialLayout else { return mirrored ? mirroredRows(for: layout) : rows(for: layout) }
+    let layers = KeyboardLayoutEmulator.keymapLegendRows(for: layout)
+    let decorated = zip(rows(for: layout), layers).map { row, layers in
+      zip(row, layers).map { key, layers in key.withWebsiteLegends(layers) }
+    }
+    return mirrored ? mirrorRows(decorated, prefixLengths: [11, 10, 10, 10]) : decorated
+  }
+  static func websiteThumbKeys(for layout: KeyboardLayout, mirrored: Bool) -> [KeyboardGuideKey] {
+    let thumbs = typingThumbKeys(for: layout)
+    guard layout.isPinnedOfficialLayout else { return mirrored ? mirroredThumbKeys(for: layout) : thumbs }
+    let layers = KeyboardLayoutEmulator.keymapThumbLegends(for: layout, thumbs: thumbs)
+    let decorated = zip(thumbs, layers).map { key, layers in key.withWebsiteLegends(layers) }
+    return mirrored ? mirrorRows([decorated], prefixLengths: [10])[0] : decorated
+  }
   static func highlightedLabel(for id: String?, rows: [[KeyboardGuideKey]], thumbs: [KeyboardGuideKey] = []) -> String? {
     if let key = (rows.flatMap { $0 } + thumbs).first(where: { $0.id == id }) { return key.label }
     return id == "space" ? "空格" : nil

@@ -11,11 +11,16 @@ enum KeyboardLayoutEmulator {
     let shiftedOption: String?
     let capsInvertsBase: Bool
     let capsInvertsOption: Bool
+    let optionIsAuthored: Bool
+    let shiftedOptionIsAuthored: Bool
+    let displayShiftAsBase: Bool
 
     init(
       normal: String, shifted: String, option: String? = nil,
       shiftedOption: String? = nil,
-      capsInvertsBase: Bool = false, capsInvertsOption: Bool = false
+      capsInvertsBase: Bool = false, capsInvertsOption: Bool = false,
+      optionIsAuthored: Bool? = nil, shiftedOptionIsAuthored: Bool? = nil,
+      displayShiftAsBase: Bool = false
     ) {
       self.normal = normal
       self.shifted = shifted
@@ -23,6 +28,9 @@ enum KeyboardLayoutEmulator {
       self.shiftedOption = shiftedOption
       self.capsInvertsBase = capsInvertsBase
       self.capsInvertsOption = capsInvertsOption
+      self.optionIsAuthored = optionIsAuthored ?? (option != nil)
+      self.shiftedOptionIsAuthored = shiftedOptionIsAuthored ?? (shiftedOption != nil)
+      self.displayShiftAsBase = displayShiftAsBase
     }
   }
 
@@ -173,7 +181,7 @@ enum KeyboardLayoutEmulator {
     if let first = thumbs.first, thumbs.count > 1 {
       func output(_ flags: NSEvent.ModifierFlags) -> String {
         if first.characters == Set([Character(" ")]), first.label == "空格" { return " " }
-        return first.legend(style: .dynamic, modifierFlags: flags, capsLockEnabled: false)
+        return first.inputLegend(style: .dynamic, modifierFlags: flags, capsLockEnabled: false)
       }
       let base = output([]), shifted = output(.shift)
       let option = output(.option), shiftedOption = output([.shift, .option])
@@ -206,6 +214,33 @@ enum KeyboardLayoutEmulator {
       default: false
       }
     }
+  }
+
+  /// Raw display layers are padded with blanks rather than input fallbacks.
+  static func keymapLegendRows(for layout: KeyboardLayout) -> [[[String]]] {
+    let raw = rawKeys(for: layout)
+    return sourcePhysicalRows(for: layout).map { row in
+      row.map { keymapLegends(raw[$0], layout: layout) }
+    }
+  }
+
+  static func keymapThumbLegends(for layout: KeyboardLayout, thumbs: [KeyboardGuideKey]) -> [[String]] {
+    let raw = rawKeys(for: layout)
+    return thumbs.enumerated().map { index, key in
+      if index == 0 { return keymapLegends(raw[49] ?? .init(normal: " ", shifted: " "), layout: layout) }
+      if key.label == "空格" { return [" ", " ", "", ""] }
+      return [key.inputLegend(style: .dynamic, modifierFlags: [], capsLockEnabled: false),
+        key.inputLegend(style: .dynamic, modifierFlags: .shift, capsLockEnabled: false),
+        layout.hasPinnedAltGrLayer ? key.optionLabel ?? "" : "",
+        layout.hasPinnedAltGrLayer ? key.shiftedOptionLabel ?? "" : ""]
+    }
+  }
+
+  private static func keymapLegends(_ layers: KeyLayers?, layout: KeyboardLayout) -> [String] {
+    guard let layers else { return ["", "", "", ""] }
+    return [layers.normal, layers.displayShiftAsBase ? layers.normal : layers.shifted,
+      layout.hasPinnedAltGrLayer && layers.optionIsAuthored ? layers.option ?? "" : "",
+      layout.hasPinnedAltGrLayer && layers.shiftedOptionIsAuthored ? layers.shiftedOption ?? "" : ""]
   }
 
   private static func keys(for layout: KeyboardLayout) -> [UInt16: KeyLayers] {
@@ -1292,7 +1327,7 @@ enum KeyboardLayoutEmulator {
           3: ("ù", "Ù"), 5: ("–", nil), 4: ("`", nil), 38: ("&", nil),
           40: ("∞", nil), 37: ("ℓ", nil), 41: ("õ", nil), 39: ("ö", "¡"),
           42: ("ơ", nil), 10: ("ø", nil), 6: ("ȯ", nil), 7: ("ò", nil),
-          8: ("…", "·"), 45: ("Ω", nil), 46: ("ǫ", nil), 43: ("ō", nil),
+          8: ("…", "·"), 11: ("⌫", "⌫"), 45: ("Ω", nil), 46: ("ǫ", nil), 43: ("ō", nil),
           47: ("ŏ", nil), 44: ("ǒ", nil),
         ])
     case .graphiteAngleVC:
@@ -1538,7 +1573,7 @@ enum KeyboardLayoutEmulator {
             [["a", "A", "<", "⩽"], ["i", "I", ">", "⩾"], ["e", "E", "{", "ᵉ"], ["u", "U", "}"], [".", ":", ":", "·"], ["v", "V", "|", "¦"], ["s", "S", "(", "—"], ["n", "N", ")", "–"], ["t", "T", "["], ["r", "R", "["], ["q", "Q", "’"], ["^", "!", "!", "¡"]],
             [["ê", "Ê"], ["é", "É", "/", "÷"], ["à", "À", "\\", "ᵢ"], ["j", "J", "\""], [",", ";", ";"], ["k", "K", "…"], ["m", "M", "&", "−"], ["d", "D", "$", "§"], ["l", "L", "=", "≠"], ["p", "P", "+", "±"], ["'", "?", "?", "¿"]],
           ]),
-        normal: " ", shifted: "-", option: " ", shiftedOption: "-")
+        normal: " ", shifted: "-")
     case .rulemak:
       withThumbKey(
         variableLayerMap(
@@ -1549,7 +1584,7 @@ enum KeyboardLayoutEmulator {
             [["а", "А", "'", "ʼ"], ["р", "Р", "®"], ["с", "С", "@"], ["т", "Т", "ћ", "Ћ"], ["д", "Д", "ђ", "Ђ"], ["ч", "Ч", "џ", "Џ"], ["н", "Н", "њ", "Њ"], ["е", "Е", "є", "Є"], ["и", "И", "і", "І"], ["о", "О", "о", "О"], ["ь", "Ь", "ъ", "Ъ"]],
             [["з", "З", "ѕ", "Ѕ"], ["х", "Х", "х", "Х"], ["ц", "Ц", "©"], ["в", "В", "в", "В"], ["б", "Б", "ѓ", "Ѓ"], ["к", "К", "ќ", "Ќ"], ["м", "М", "м", "М"], [",", ";", "<"], [".", ":", ">"], ["/", "?", "\\", "|"]],
           ]),
-        normal: " ", shifted: " ", option: " ", shiftedOption: " ")
+        normal: " ", shifted: " ")
     case .gralmakS:
       withThumbKey(
         variableLayerMap(
@@ -1560,7 +1595,7 @@ enum KeyboardLayoutEmulator {
             [["n", "N", "–", "↑"], ["r", "R", "®", "™"], ["t", "T", "þ", "Þ"], ["s", "S", "ß", "§"], ["g", "G", "ŋ", "Ŋ"], ["y", "Y", "º", "ª"], ["h", "H", "ħ", "Ħ"], ["a", "A", "đ", "α"], ["e", "E", "€", "←"], ["i", "I", "—", "→"], [";", ":", "¨", "…"]],
             [["z", "Z", "ʒ", "Ʒ"], ["x", "X", "†", "‡"], ["m", "M", "×", "↓"], ["c", "C", "©", "¢"], ["v", "V", "÷", "γ"], ["k", "K", "ç", "Ç"], ["p", "P", "π", "¶"], [".", ">", "˙", "≥"], ["/", "?", "/", "¿"], [",", "<", "¸", "≤"]],
           ]),
-        normal: " ", shifted: " ", option: " ", shiftedOption: " ")
+        normal: " ", shifted: " ")
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
@@ -2185,7 +2220,7 @@ enum KeyboardLayoutEmulator {
       guard let existing = layeredKeys[keyCode] else { continue }
       layeredKeys[keyCode] = .init(
         normal: existing.normal, shifted: existing.shifted, option: option.normal,
-        shiftedOption: option.shifted)
+        shiftedOption: option.shifted, displayShiftAsBase: existing.displayShiftAsBase)
     }
     return layeredKeys
   }
@@ -2200,7 +2235,9 @@ enum KeyboardLayoutEmulator {
         normal: layers.normal,
         shifted: layers.shifted,
         option: override?.normal ?? layers.normal,
-        shiftedOption: override?.shifted ?? layers.shifted)
+        shiftedOption: override?.shifted ?? layers.shifted,
+        optionIsAuthored: override?.normal != nil,
+        shiftedOptionIsAuthored: override?.shifted != nil)
     }
     return layeredKeys
   }
@@ -2274,7 +2311,7 @@ enum KeyboardLayoutEmulator {
       guard let existing = layeredKeys[keyCode] else { continue }
       layeredKeys[keyCode] = .init(
         normal: existing.normal, shifted: "", option: existing.option,
-        shiftedOption: existing.shiftedOption)
+        shiftedOption: existing.shiftedOption, displayShiftAsBase: true)
     }
     return layeredKeys
   }

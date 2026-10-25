@@ -1,5 +1,19 @@
 # 官方配置兼容性审计
 
+## 键帽原始显示层（2026-10-26，起点 91a63884）
+
+CFG-KEYMAP-LEGEND-LAYERS-01 与前节 Caps 输入仿真分开。实际 keymapConverter.buildLegends 将单层重复到 Base／Shift，其余缺失层补空字符串。Keymap 的 lowercase 选 Base，uppercase 选 Shift，但任一候选是单个非 Unicode 字母／数字符号时选 Base；macOS dynamic 的 Shift 或 Caps 用于字母层，符号只跟随 Shift，Option 直接选择第三／第四层。原生此前用大小写转换和输入回退生成键帽。新增只读 check-source-keymap-legends.mjs 执行固定参考的实际 buildLegends、图层 memo 和标签表达式，仅读取 macOS／修饰键／配置端点；覆盖 239 布局的普通及镜像、四种标注和八种状态，共 737,408 组，首轮有效 RED 有 104,814 组失配（2.739 秒）。这些是源表达式和原始槽位的对照，不是完整浏览器渲染或所有结构样式的几何验收。
+
+完整配置页面现在发布带原始显示层的键帽，原生扩展／自定义及旧偏好仍用原有路径。输入型标注单独保留，点击式虚拟键盘明确读取输入型标注。镜像同时移动显示元数据。第一轮修复剩 890 组，定位于此前已填充的 AltGr 回退；记录各层是否真正提供后，剩 186 组集中于单层键、Optimot 删除符号和三个拇指空格层。补齐单层显示重复与真实空层，物理输入仍执行原有回退。最终专项 12 项全部通过、零失败／跳过（22.503 秒），含全部显示样本、虚拟键盘及 92,120 组 Caps 输入源码样本。
+
+没有复制参考源码或资产到生产资源。实体修饰键状态、所有结构样式、整套响应式几何、精确高亮与动画仍开放；不能用本节的标注选层通过结果覆盖这些未验范围。
+
+隐藏的实际 KeyboardGuide 成对渲染使用同一 NSHostingView，验证普通层确有文字，Option 空层清空文字且键帽背景保留：文字像素 2,095→0，键帽背景 95,646→98,036（单项 1.632 秒）。面积断言同时拒绝整张空白截图，窗口始终未显示；虚拟 Q 键仍输出 q。完整配置生产页的既有键盘区域 OCR 亦通过，证实页面读取当前配置而非旧自定义布局。图像为 /tmp/typebar-keymap-display-{base,option}.png，相关日志 /tmp/typebar-keymap-legend-{red,focused,focused-final,all-layers,render,render-pair,broad,reference,package}.log；最终回归包含修正后的成对图像断言。
+
+最终相关回归 997 项全部通过、零失败／跳过（362.544 秒），含完整配置页面、源码显示矩阵、隐藏组件图像、普通布局输出、Caps Lock、镜像、Shift、Layout Fluid、虚拟键盘及三个组合／混合方向／窄窗口代表用例。参考行为审计通过（47 direct／119 native symbols／17 supporting），人工表结构通过（1,365 场景，不等于实体通过）；这不是整仓 Native Rewrite Gate。实际源逐键 some 匹配可同时高亮多个相同标注键，当前原生多处仍取 first，这一已定位的高亮差异留作后续实现，不能因显示层通过而关闭。
+
+最终 Debug 打包、签名、资源边界和固定参考原创性检查通过，未启动主程序；未修改 CI、通知或主分支。整项目重写及前述剩余验收保持开放。
+
 ## Caps Lock 显式布局仿真（2026-10-26，起点 eb3078e7）
 
 CFG-CAPS-LOCK-EMULATION-01 处理上一批镜像专项明确留下的输入缺口。实际 layout-emulator 先以原始变体的长度决定 AltGr 偏移，连接当前两层并用 Unicode P 类检查；Caps Lock 开启且无标点时反转 Shift，再按 AltGr／非 AltGr／Base 顺序回退。因此 QWERTY 的 4／$ 和反引号／波浪线会反转，2／@ 与分号／冒号不会，不能套用只处理字母的系统惯例。现有原生映射完全忽略 Caps Lock；源驱动有效 RED 为 92,120 组中的 58,248 组失配（1 项失败，19.702 秒）。
