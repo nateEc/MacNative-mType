@@ -11,15 +11,21 @@ enum WebsiteConfigExternalContentError: Error, Equatable, LocalizedError {
   typealias Fetch = @MainActor (LivePracticeContentSource, TypingLanguage) async -> LivePracticeContent?
 
   static func prepare(source: LivePracticeContentSource, configuration: TestConfiguration,
-    showAllLines: Bool, fetch: Fetch) async throws -> WebsiteConfigSessionBuilder.External {
-    try Task.checkCancellation()
+    showAllLines: Bool, checkCurrent: WebsiteConfigSessionBuilder.ExternalReadAdmission = {},
+    fetch: Fetch) async throws -> WebsiteConfigSessionBuilder.External {
+    func check() throws {
+      try Task.checkCancellation()
+      try checkCurrent()
+      try Task.checkCancellation()
+    }
+    try check()
     guard LivePracticeContentSource.selected(for: configuration) == source else {
       throw WebsiteConfigSessionBuildError.invalidExternalSource
     }
     func read() async throws -> LivePracticeContent {
-      try Task.checkCancellation()
+      try check()
       let content = await fetch(source, configuration.language)
-      try Task.checkCancellation()
+      try check()
       guard let content else {
         if source == .poetry { throw WebsiteConfigExternalContentError.poetryUnavailable }
         throw WebsiteConfigSessionBuildError.generationFailed
@@ -33,12 +39,13 @@ enum WebsiteConfigExternalContentError: Error, Equatable, LocalizedError {
       do { return try await read() }
       catch { sectionError = error; return nil }
     }
-    try Task.checkCancellation()
+    try check()
     if let sectionError { throw sectionError }
     guard let filled, !filled.text.isEmpty else { throw WebsiteConfigSessionBuildError.generationFailed }
     let initial = try await filled.preparingPromptDescriptor(for: configuration, showAllLines: showAllLines)
+    try check()
     let continuation = try await filled.preparingContinuationDescriptor(for: configuration, showAllLines: showAllLines)
-    try Task.checkCancellation()
+    try check()
     return .init(source: source, initial: initial, continuation: continuation, attribution: filled.attribution)
   }
 }

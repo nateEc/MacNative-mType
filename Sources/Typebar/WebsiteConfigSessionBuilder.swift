@@ -70,7 +70,8 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     let continuation: LivePracticePrompt?
     var attribution: String? = nil
   }
-  typealias ExternalLoader = @MainActor (LivePracticeContentSource, TestConfiguration, Bool) async throws -> External
+  typealias ExternalReadAdmission = @MainActor () throws -> Void
+  typealias ExternalLoader = @MainActor (LivePracticeContentSource, TestConfiguration, Bool, ExternalReadAdmission) async throws -> External
   struct Prepared {
     let session: TypingSession
     let scope: Scope

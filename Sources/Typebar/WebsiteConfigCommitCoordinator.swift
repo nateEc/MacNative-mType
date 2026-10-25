@@ -1237,7 +1237,13 @@ final class WebsiteConfigCommitCoordinator {
     if let loadExternal { selectedLoader = loadExternal }
     else if let externalLoader {
       selectedLoader = { source, configuration in
-        try await externalLoader(source, configuration, draft.presentation.showAllPracticeLines)
+        try await externalLoader(source, configuration, draft.presentation.showAllPracticeLines) {
+          try self.checkAsyncResources(prepared.configuration, admission: prepared.admission)
+          guard try self.register.read().revision == prepared.configuration.disk else {
+            throw WebsiteConfigCommitCoordinatorError.stale
+          }
+          try self.checkAsyncResources(prepared.configuration, admission: prepared.admission)
+        }
       }
     } else { selectedLoader = nil }
     if let selectedLoader {

@@ -6817,9 +6817,9 @@ private struct ContentView: View {
     if let websiteImportWorkflow { return websiteImportWorkflow }
     let fetch = liveContentFetch
     let workflow = WebsiteConfigImportWorkflow(page: pageSessionStore, settings: settings, account: account,
-      directory: directory, readWindow: { websiteImportWindow }, loadExternal: { source, configuration, allLines in
+      directory: directory, readWindow: { websiteImportWindow }, loadExternal: { source, configuration, allLines, check in
         try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
-          showAllLines: allLines, fetch: fetch)
+          showAllLines: allLines, checkCurrent: check, fetch: fetch)
       })
     websiteImportWorkflow = workflow
     return workflow

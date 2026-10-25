@@ -2,6 +2,21 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WebsiteConfigExternalContentTests: XCTestCase {
+  private enum AdmissionFailure: Error, Equatable { case retired }
+  func testAdmissionRunsBeforeTransportAndBeforeInterpretingFailedReply() async throws {
+    for initiallyRetired in [false, true] {
+      var current = !initiallyRetired, reads = 0
+      do {
+        _ = try await WebsiteConfigExternalContent.prepare(source: .poetry,
+          configuration: .words(4).with(modifiers: [.poetryStream]), showAllLines: true,
+          checkCurrent: { if !current { throw AdmissionFailure.retired } }) { _, _ in
+          reads += 1; current = false; return nil
+        }
+        XCTFail("Retired read was admitted")
+      } catch { XCTAssertEqual(error as? AdmissionFailure, .retired) }
+      XCTAssertEqual(reads, initiallyRetired ? 0 : 1)
+    }
+  }
   func testInitialBudgetRetainsSectionTailAndWholePreviewReadsDistinctSections() async throws {
     let configuration = TestConfiguration.words(201).with(modifiers: [.referenceStream])
     for allLines in [false, true] {

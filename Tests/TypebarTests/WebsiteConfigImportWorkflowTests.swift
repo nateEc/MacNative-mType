@@ -4,13 +4,69 @@ import Observation
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testRetiredShortSectionDoesNotStartAnotherRequestForEitherOnlineSource() async throws {
+    let cases = ["page", "record", "window", "cancel"].flatMap { retirement in
+      ["poetry", "wikipedia"].map { (retirement, $0) }
+    }
+    for (retirement, name) in cases {
+      let f = try Fixture(); defer { f.close() }
+      var reads = 0
+      var reply: CheckedContinuation<LivePracticeContent?, Never>?
+      let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+        directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines, check in
+          try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
+            showAllLines: allLines, checkCurrent: check) { _, _ in
+            reads += 1
+            if reads == 1 { return await withCheckedContinuation { reply = $0 } }
+            return .init(source: source, title: "Unwanted follow-up", byline: nil,
+              tokens: ["cd", "ef", "gh"], separator: " ")
+          }
+        })
+      defer { workflow.stop(); reply?.resume(returning: nil) }
+      let old = Task { try await workflow.apply(json: "{\"mode\":\"words\",\"words\":4,\"funbox\":[\"\(name)\"]}",
+        systemIsDark: false) }
+      let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+      while reply == nil && ContinuousClock.now < deadline { await Task.yield() }
+      guard let delayed = reply else { old.cancel(); return XCTFail("Initial source request did not suspend") }
+      reply = nil
+      let register = WebsiteConfigFileRegister(directory: f.directory)
+      let replacement = #"{"mode":"words","words":7,"funbox":["rot13"]}"#
+      switch retirement {
+      case "page": try await f.workflow.apply(json: replacement, systemIsDark: false)
+      case "record":
+        let draft = try WebsiteConfigNativeProfile.prepareDraft(replacement, pointsPerRem: 16, context: .init())
+        guard case .committed = try register.commit(draft, replacing: XCTUnwrap(register.read().revision)) else {
+          delayed.resume(returning: nil); return XCTFail("Competing record not saved")
+        }
+      case "window": f.window.revision = UUID()
+      default: workflow.cancel()
+      }
+      let before = f.page.state.session.generationState
+      let revision = try register.read().revision
+      delayed.resume(returning: .init(source: name == "poetry" ? .poetry : .encyclopedia,
+        title: "Retired short section", byline: nil, tokens: ["ab"], separator: " "))
+      do { _ = try await old.value; XCTFail("Retired initialization delivered") }
+      catch is CancellationError { XCTAssertEqual(retirement, "cancel") }
+      catch let error as WebsiteConfigSavedPreparationError {
+        XCTAssertTrue(retirement == "record" || retirement == "window")
+        XCTAssertEqual(error.underlying as? WebsiteConfigCommitCoordinatorError, .stale)
+      }
+      catch {
+        XCTAssertEqual(retirement, "page")
+        XCTAssertEqual(error as? WebsiteConfigCommitCoordinatorError, .stale)
+      }
+      XCTAssertEqual(reads, 1, "\(retirement): a retired short section must not issue another \(name) request")
+      XCTAssertEqual(f.page.state.session.generationState, before)
+      XCTAssertEqual(try register.read().revision, revision)
+    }
+  }
   func testPublishedPoetryRecoveryRequiresFailureAndDoesNotRestoreMemorySelection() async throws {
     let f = try Fixture(); defer { f.close() }
     let legacy = f.settings.snapshot
     let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
-      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines in
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines, check in
         try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
-          showAllLines: allLines) { _, _ in
+          showAllLines: allLines, checkCurrent: check) { _, _ in
           .init(source: source, title: "Owned", byline: nil, tokens: Array(repeating: "ab", count: 100), separator: " ")
         }
       })
@@ -42,9 +98,9 @@ import Observation
     let f = try Fixture(); defer { f.close() }
     var reply: CheckedContinuation<LivePracticeContent?, Never>?
     let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
-      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines in
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines, check in
         try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
-          showAllLines: allLines) { _, _ in await withCheckedContinuation { reply = $0 } }
+          showAllLines: allLines, checkCurrent: check) { _, _ in await withCheckedContinuation { reply = $0 } }
       })
     defer { workflow.stop(); reply?.resume(returning: nil) }
     let pending = Task { try await workflow.apply(json: #"{"mode":"words","words":4,"funbox":["poetry"]}"#,
@@ -68,10 +124,10 @@ import Observation
     let legacy = f.settings.snapshot
     var reads = 0
     let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
-      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines in
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines, check in
         XCTAssertTrue(allLines, "The loader must see Memory's activated showAllLines")
         return try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
-          showAllLines: allLines) { _, _ in reads += 1; return nil }
+          showAllLines: allLines, checkCurrent: check) { _, _ in reads += 1; return nil }
       })
     defer { workflow.stop() }
     try await workflow.apply(json: #"{"mode":"words","words":4,"showAllLines":false,"funbox":["poetry","memory"]}"#,
@@ -94,9 +150,9 @@ import Observation
     let f = try Fixture(); defer { f.close() }
     var reads = 0, available = false
     let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
-      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines in
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, configuration, allLines, check in
         try await WebsiteConfigExternalContent.prepare(source: source, configuration: configuration,
-          showAllLines: allLines) { _, _ in
+          showAllLines: allLines, checkCurrent: check) { _, _ in
           reads += 1
           return available ? .init(source: source, title: "Recovered", byline: nil,
             tokens: ["ab", "cd", "ef", "gh"], separator: " ") : nil
@@ -125,7 +181,7 @@ import Observation
     let legacy = f.settings.snapshot
     var reads = 0
     let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
-      directory: f.directory, readWindow: { f.window }, loadExternal: { source, config, allLines in
+      directory: f.directory, readWindow: { f.window }, loadExternal: { source, config, allLines, _ in
         XCTAssertEqual(source, .encyclopedia); XCTAssertEqual(config.wordLimit, 4); XCTAssertTrue(allLines)
         reads += 1
         return .init(source: source, initial: .init(text: reads == 1 ? "ab cd ef gh" : "ij kl mn op",
