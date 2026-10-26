@@ -4162,10 +4162,19 @@ private struct ContentView: View {
       session.configuration.modifiers.contains(.layoutFluid) else { return }
     switch event {
     case .time: guard session.configuration.mode == .time else { return }
-    case .words: guard session.configuration.mode != .time else { return }
+    case .words, .wordNavigation: guard session.configuration.mode != .time else { return }
     }
     do { try pageSessionStore.advanceLayoutFluid(event, attemptID: session.automaticInputAttemptID) }
     catch { account.localNotices.post("布局切换未完成，请检查当前配置。") }
+  }
+
+  private func deliverWebsiteWordNavigationEvents() {
+    guard committedPracticeDraft != nil, session.configuration.modifiers.contains(.layoutFluid),
+      session.configuration.mode != .time else { return }
+    for event in session.websiteWordNavigationEvents {
+      do { try pageSessionStore.advanceLayoutFluid(.wordNavigation(event), attemptID: event.attemptID) }
+      catch { account.localNotices.post("布局切换未完成，请检查当前配置。"); break }
+    }
   }
 
   private var promptHighlightAllowsWordRanges: Bool {
@@ -4602,7 +4611,6 @@ private struct ContentView: View {
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     let typedBefore = session.typed
-    let wordsBefore = session.completedWordCount
     let previousPreview = preparedWholePreviewRendering
     let keymapAttemptID = session.automaticInputAttemptID
     let feedback = TypingLiveInputFeedback.insertBatch(
@@ -4610,11 +4618,7 @@ private struct ContentView: View {
       forceError: forceError, origin: origin, defersAutomaticInput: true,
       wrapAdmission: promptInputWrapAdmission)
     let keymapEvents = session.keymapInputEvents
-    if session.completedWordCount > wordsBefore {
-      for completed in (wordsBefore + 1)...session.completedWordCount {
-        advanceWebsiteLayoutFluid(.words(completed: completed, total: session.layoutFluidWordCount))
-      }
-    }
+    deliverWebsiteWordNavigationEvents()
     if session.typed != typedBefore {
       let style = promptRenderStyle
       if usesWholePreviewViewport {
@@ -4669,6 +4673,7 @@ private struct ContentView: View {
       let countBefore = session.typed.count
       let feedback = session.processNextAutomaticInput(for: attemptID, executedAt: .now,
         wrapAdmission: promptInputWrapAdmission)
+      if !feedback.isEmpty { deliverWebsiteWordNavigationEvents() }
       visualFocus.inputDidUpdate(hasFeedback: !feedback.isEmpty,
         textChanged: session.typed.count != countBefore, isFinished: session.isFinished)
       verifyChallengeFontAvailability()

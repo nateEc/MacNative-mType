@@ -4690,6 +4690,9 @@ struct TypingSession {
   private var latestReplayInputText: String?
   private var liveInsertionFeedback: [Bool] = []
   private(set) var keymapInputEvents: [WebsiteKeymapInputEvent] = []
+  private(set) var websiteWordNavigationEvents: [WebsiteWordNavigationEvent] = []
+  private var latestInputMayFinish = false
+  private var latestInputNavigatedWord = false
   private var websiteKeymapHighlightWasUpdated = false
   private var websiteKeymapUpdatedHighlight: [UInt16]?
   private var websiteKeymapMode: KeyboardGuideMode?
@@ -6580,6 +6583,7 @@ struct TypingSession {
     defer { endTimingOperation(ownsSample) }
     liveInsertionFeedback.removeAll()
     keymapInputEvents.removeAll()
+    websiteWordNavigationEvents.removeAll()
     insertText(
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: false)
   }
@@ -6602,6 +6606,7 @@ struct TypingSession {
     defer { endTimingOperation(ownsSample) }
     liveInsertionFeedback.removeAll()
     keymapInputEvents.removeAll()
+    websiteWordNavigationEvents.removeAll()
     insertText(
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: true,
       origin: origin, defersAutomaticInput: true)
@@ -6634,6 +6639,7 @@ struct TypingSession {
     if !hasPendingAutomaticInput { cancelAutomaticInput() }
     liveInsertionFeedback.removeAll()
     keymapInputEvents.removeAll()
+    websiteWordNavigationEvents.removeAll()
     applyingAutomaticCodeInput = true
     automaticInputExecutionDate = executedAt
     let previousTimingDate = activeTimingDate
@@ -6655,19 +6661,31 @@ struct TypingSession {
   private mutating func drainAutomaticInput() {
     var feedback = liveInsertionFeedback
     var keymapEvents = keymapInputEvents
+    var navigationEvents = websiteWordNavigationEvents
     while hasPendingAutomaticInput {
       let nextFeedback = processNextAutomaticInput(for: automaticInputAttemptID)
       feedback += nextFeedback
-      if !nextFeedback.isEmpty { keymapEvents += keymapInputEvents }
+      if !nextFeedback.isEmpty { keymapEvents += keymapInputEvents; navigationEvents += websiteWordNavigationEvents }
     }
     liveInsertionFeedback = feedback
     keymapInputEvents = keymapEvents
+    websiteWordNavigationEvents = navigationEvents
+  }
+
+  func ownsWebsiteWordNavigation(_ event: WebsiteWordNavigationEvent) -> Bool {
+    event.attemptID == automaticInputAttemptID && websiteWordNavigationEvents.first == event
+  }
+
+  @discardableResult mutating func consumeWebsiteWordNavigation(_ event: WebsiteWordNavigationEvent) -> Bool {
+    guard ownsWebsiteWordNavigation(event) else { return false }
+    websiteWordNavigationEvents.removeFirst(); return true
   }
 
   /// A marked-text composition starts the reference attempt before its text is
   /// committed. It intentionally leaves scoring and replay untouched until
   /// the text input system confirms the composition through `insertBatch`.
   mutating func beginComposition(at date: Date = .now) {
+    websiteWordNavigationEvents.removeAll()
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return }
@@ -6713,6 +6731,7 @@ struct TypingSession {
     let attemptsBeforeEvent = inputAttemptCount
     for (index, character) in characters.enumerated() {
       guard !isFinished else { break }
+      latestInputMayFinish = false; latestInputNavigatedWord = false
       currentInputUnit = inputUnits?[index]
       defer { currentInputUnit = nil }
       if shouldExpandReferenceEllipsis(character, at: date) {
@@ -6807,10 +6826,14 @@ struct TypingSession {
       // an extra, blind keypress before exposing the next generated target.
       extendPromptIfNeeded(at: date)
     }
-    finishIfNeeded(at: date)
+    if !usesWordCommitInput || tracksNoSpaceWordBursts || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+      || latestInputMayFinish || latestInputNavigatedWord {
+      finishIfNeeded(at: date)
+    }
   }
 
   mutating func deleteBackward(at date: Date = .now) {
+    websiteWordNavigationEvents.removeAll()
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return }
@@ -6836,6 +6859,7 @@ struct TypingSession {
   /// without bypassing the same confidence and committed-word protections as
   /// ordinary backspace. Each removed character stays visible to replay.
   mutating func deleteWordBackward(at date: Date = .now) {
+    websiteWordNavigationEvents.removeAll()
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return }
@@ -7164,19 +7188,21 @@ struct TypingSession {
       latestNoSpaceFinishDecision = attempted == target || quick || !stopped
         && shouldCommitNoSpaceUnit(currentInputUnit ?? String(inputCharacter).utf16.first!)
     }
-    let commitsCurrentWord = isPromptWordSeparator(inputCharacter) && !inputWordIsEmpty
-    let retainsLeadingSeparator = isPromptWordSeparator(inputCharacter) && inputWordIsEmpty
+    let validationWordIsEmpty = acceptedUnits.map { $0.validationCount == 0 } ?? inputWordIsEmpty
+    let commitsCurrentWord = isPromptWordSeparator(inputCharacter) && !validationWordIsEmpty
+    let retainsLeadingSeparator = isPromptWordSeparator(inputCharacter) && validationWordIsEmpty
       && (unitTargets.noSpace || usesWordCommitInput && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers))
       && (configuration.rules.strictSpace || configuration.difficulty != .normal)
     // Ignore an ordinary leading space before word-stop can retain it.
     // Strict space and expert/master instead keep it in the current field.
     if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator,
-      currentTargetIndex < promptCharacters.count,
-      promptCharacters[currentTargetIndex] != " " { return false }
+      acceptedUnits?.terminalElementCleared == true || currentTargetIndex >= promptCharacters.count
+        || promptCharacters[currentTargetIndex] != " " { return false }
     let retainsStoppedSeparator = configuration.rules.stopOnErrorMode == .word
       && !retainsLeadingSeparator
       && usesWordCommitInput && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
-      && isPromptWordSeparator(inputCharacter) && !currentWordIsCorrect
+      && isPromptWordSeparator(inputCharacter)
+      && (!currentWordIsCorrect || !currentInputFieldMatches(adding: inputCharacter))
     if let inputLimit = currentSpaceDelimitedWordInputLimit,
       activeInputWordUTF16Length >= inputLimit,
       !commitsCurrentWord || retainsStoppedSeparator
@@ -7349,12 +7375,19 @@ struct TypingSession {
     let hasGeneratedCursor = generatedWordContinuation != nil || generatedStreamContinuation != nil
       || generatedCodeContinuation != nil || streamsLiveContent
     let generatedWordBefore = hasGeneratedCursor ? quoteNavigationIndex : 0
+    let fluidNavigation = configuration.modifiers.contains(.layoutFluid) && configuration.mode != .time
+      ? replayInputField(kind: .delete, inputStopped: false).map { (index: $0.index, total: layoutFluidWordCount) } : nil
     appendTypedCharacter(
       inputCharacter, targetIndex: targetIndex,
       forceError: forceError || earlyWordCommitTargetIndex != nil
         || (followsRetainedLeadingSeparator && !isCorrect && InputTextIdentity.matches(inputCharacter, expected)),
       countsAsExtraError: retainsCurrentWordAsExtra || (retainsEmptySlot && !isCorrect)
         || (pastTargetEnd && !isPromptWordSeparator(inputCharacter)), at: date)
+    latestInputNavigatedWord = lastInputCommitsWord
+    if let fluidNavigation, lastInputCommitsWord {
+      websiteWordNavigationEvents.append(.init(attemptID: automaticInputAttemptID,
+        completed: fluidNavigation.index + 1, total: fluidNavigation.total, wasActive: hasStarted && !isFinished))
+    }
     if let commitErrorStart { committedErrorWordStarts.insert(commitErrorStart) }
     if hasGeneratedCursor, quoteNavigationIndex > generatedWordBefore {
       refillGeneratedIfNeeded(activeWordBefore: generatedWordBefore, at: date)
@@ -7484,6 +7517,18 @@ struct TypingSession {
     latestReplayInputText = String(character)
     latestReplayInputUnits = currentInputUnit.map { [$0] }
     let data = latestReplayInputUnits ?? Array(String(character).utf16)
+    if usesWordCommitInput, !tracksNoSpaceWordBursts, !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+      var target = inputAccuracyTarget(at: nextTargetIndex).units
+      // A finite word budget may end before a displayed separator or before
+      // prefetched words. Keep that semantic endpoint in the input gate.
+      if let limit = finiteCompletionWordLimit, limit > 0,
+        (acceptedUnits?.fieldIndex ?? replayCommittedSeparatorCount) >= limit - 1,
+        target.count > 1, target.last == 32 || target.last == 10 { target.removeLast() }
+      let input = acceptedUnits.map { $0.field($0.fieldIndex) } ?? Array(inputWordText().utf16)
+      latestInputMayFinish = input + data == target || configuration.rules.quickEnd
+        && !configuration.rules.stopOnError && !configuration.rules.deleteOnError
+        && input.count + data.count == target.count
+    }
     clearWebsiteKeymapHighlightForFlash()
     for (index, unit) in data.enumerated() {
       let correct = latestInputCorrectness?.indices.contains(index) == true
@@ -7544,6 +7589,12 @@ struct TypingSession {
       position = activeInputWordUTF16Length
     }
     return (Array(target.utf16), position)
+  }
+
+  private func currentInputFieldMatches(adding character: Character) -> Bool {
+    let input = acceptedUnits.map { $0.field($0.fieldIndex) } ?? Array(inputWordText().utf16)
+    let data = currentInputUnit.map { [$0] } ?? Array(String(character).utf16)
+    return input + data == inputAccuracyTarget(at: nextTargetIndex).units
   }
 
   /// Zen accepts the user's own text rather than comparing it to a generated
@@ -8385,10 +8436,10 @@ struct TypingSession {
   ) {
     let unit = currentInputUnit ?? String(character).utf16.first!
     let commits = unitTargets.noSpace ? shouldCommitNoSpaceUnit(unit) : nil
+    let retained = retainedWordSeparatorTypedIndices.contains(typedGraphemeCount)
     discardTerminalElementIfNeeded()
     let oldTail = String(typed.suffix(2))
     let start = acceptedUnits!.entries.count - oldTail.utf16.count
-    let retained = retainedWordSeparatorTypedIndices.contains(typedGraphemeCount)
     // A correct LF inside a provider field is not a complete-word match.
     // Error guards retain that unit without navigating to the next field.
     let retainsIncompleteSourceSeparator = sourceFields != nil && !unitTargets.noSpace
@@ -9339,6 +9390,8 @@ struct TypingSession {
         sourceFields != nil || !unitTargets.field($0, withoutCommit: true).isEmpty
       }
       guard targets.count >= wordLimit, acceptedUnits.fieldIndex >= targets[wordLimit - 1] else { return false }
+      if latestInputNavigatedWord, acceptedUnits.terminalElementCleared,
+        targets.count == wordLimit, latestReplayInputPosition?.lastWord == true { return true }
       let input = acceptedUnits.starts.indices.filter {
         !acceptedUnits.field($0, withoutCommit: sourceFields == nil).isEmpty
       }
@@ -9376,6 +9429,8 @@ struct TypingSession {
   /// entered, unless the optional quick-end rule explicitly applies.
   private var shouldFinishFiniteSpaceDelimitedTest: Bool {
     if unitTargets.noSpace { return reachedInputTargetEnd || noSpaceTerminalFieldMatches }
+    if latestInputNavigatedWord, acceptedUnits?.terminalElementCleared == true,
+      !usesIncrementalPromptExtension, latestReplayInputPosition?.lastWord == true { return true }
     let reachedTargetEnd = nextTargetIndex >= promptCharacters.count
     guard usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)

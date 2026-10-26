@@ -35,6 +35,26 @@ function reset(words,{stop='off',strict=false,mode='words',grow=false}={}) {
 }
 function inputEvents(){return eventData.getAllTestEvents().filter(e=>e.type==='input').map(e=>e.data)}
 function positions(){return inputEvents().map(e=>e.charIndex)}
+if(process.argv[3]==='--word-navigation-fixtures'){
+ for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',()=>false);
+ let navigation=[];
+ modules.get('test/funbox/list').setExport('getActiveFunboxesWithFunction',name=>name==='handleSpace'?[{functions:{handleSpace(){
+  navigation.push({completed:wordIndex+1,total:targets.length,wasActive:active});
+ }}}]:[]);
+ const fixtures=[];
+ for(const input of ['ab','ab ','ab cd','ab cd ','ab cd xx ','ab cd  ','ax cd ','ab cx ','ab\u00a0cd ',' ab cd ','ab\ncd']){
+  for(const [stop,difficulty,strict]of [['off','normal',false],['word','normal',false],['letter','normal',false],['off','expert',false],['off','normal',true]]){
+   reset(['ab ','cd'],{stop,strict});Object.assign(Config,{difficulty,keymapMode:'static',language:'english'});navigation=[];
+   await main.namespace.emulateInsertText({data:input,now:1});
+   const currentInput=eventData.getCurrentInput();
+   fixtures.push({input,stop,difficulty,strict,events:navigation,finished:completed,failed,
+    wordIndex,inputUnits:Array.from({length:element.length},(_,i)=>element.charCodeAt(i)),
+    validationUnits:Array.from({length:currentInput.length},(_,i)=>currentInput.charCodeAt(i))});
+  }
+ }
+ assert.equal(execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
+ console.log(JSON.stringify({fixtures}));process.exit(0);
+}
 if(process.argv[3]==='--keymap-next-fixtures'){
  for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',()=>false);
  const read=file=>fs.readFileSync(path.join(root,file),'utf8');

@@ -42,6 +42,7 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate var applicationEventsApplied = false
     fileprivate weak var contentSource: WebsiteConfigPracticeScopeSource?
     fileprivate var contentCapture: WebsiteConfigPracticeScopeSource.Snapshot?
+    fileprivate var wordNavigation: WebsiteWordNavigationEvent?
   }
   struct Publication {
     /// One successful publication, including next-attempt-only selection saves.
@@ -344,6 +345,9 @@ final class WebsiteConfigCommitCoordinator {
     guard isCurrent(prepared), prepared.sourcePage === page, let capture = prepared.pageCapture,
       page.state.configurationDeparture == nil, page.state.savedApplication == nil,
       let previous = page.state.presentation, let practice = page.state.practice else { return .stale }
+    if let navigation = prepared.wordNavigation {
+      guard kind == .layoutFluid, page.state.session.ownsWebsiteWordNavigation(navigation) else { return .stale }
+    }
     switch kind {
     case .behavior:
       guard WebsiteConfigBehaviorEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
@@ -695,8 +699,12 @@ final class WebsiteConfigCommitCoordinator {
       for: page, refreshingWith: source, restoringFunboxMemory: false)
   }
   func prepareLayoutFluidStep(key: String, value: WebsiteConfigValue, nosave: Bool, for page: PracticePageSessionStore,
-    refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> Prepared {
-    try preparePageEdit(key: key, value: value, for: page, refreshingWith: source, nosave: nosave)
+    refreshingWith source: WebsiteConfigPracticeScopeSource, navigation: WebsiteWordNavigationEvent? = nil) throws -> Prepared {
+    if let navigation, !page.state.session.ownsWebsiteWordNavigation(navigation) { throw WebsiteConfigCommitCoordinatorError.stale }
+    var prepared = try preparePageEdit(key: key, value: value, for: page, refreshingWith: source, nosave: nosave)
+    if let navigation, !page.state.session.ownsWebsiteWordNavigation(navigation) { throw WebsiteConfigCommitCoordinatorError.stale }
+    prepared.wordNavigation = navigation
+    return prepared
   }
   private func preparePageEdit(key: String, value: WebsiteConfigValue, for page: PracticePageSessionStore,
     refreshingWith source: WebsiteConfigPracticeScopeSource?, restoringFunboxMemory: Bool = true, nosave: Bool = false) throws -> Prepared {

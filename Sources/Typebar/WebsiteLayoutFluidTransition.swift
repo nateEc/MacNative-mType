@@ -3,7 +3,17 @@ import Foundation
 /// Source callbacks operate on the current configuration, rather than deriving
 /// both input and visual layout unconditionally from elapsed progress.
 @MainActor enum WebsiteLayoutFluidTransition {
-  enum Event { case time(Int), words(completed: Int, total: Int) }
+  enum Event {
+    case time(Int), words(completed: Int, total: Int), wordNavigation(WebsiteWordNavigationEvent)
+    var navigation: WebsiteWordNavigationEvent? { if case .wordNavigation(let value) = self { return value }; return nil }
+    var wordProgress: (completed: Int, total: Int)? {
+      switch self {
+      case .words(let completed, let total): (completed, total)
+      case .wordNavigation(let value): (value.completed, value.total)
+      case .time: nil
+      }
+    }
+  }
   struct Step { let key: String; let value: WebsiteConfigValue; let accepted: Bool; let nosave: Bool }
   struct Plan { let steps: [Step]; let failedOverride: Bool }
   static func plan(current: [String: WebsiteConfigValue], event: Event,
@@ -13,8 +23,13 @@ import Foundation
       return .init(steps: [], failedOverride: false)
     }
     let index: Int, nosave: Bool
-    switch event {
-    case .time(let second):
+    if let progress = event.wordProgress {
+      let (completed, total) = progress
+      guard current["mode"] != .string("time"), completed > 0, total > 0 else { return .init(steps: [], failedOverride: false) }
+      let segment = total / layouts.count
+      guard segment > 0, completed % segment == 0, completed / segment < layouts.count else { return .init(steps: [], failedOverride: false) }
+      index = completed / segment; nosave = false
+    } else if case .time(let second) = event {
       guard current["mode"] == .string("time"), second >= 0, case .number(let duration) = current["time"], duration > 0 else {
         return .init(steps: [], failedOverride: false)
       }
@@ -22,12 +37,7 @@ import Foundation
       guard quotient.isFinite, quotient >= 0, quotient < Double(layouts.count) else { return .init(steps: [], failedOverride: false) }
       index = Int(quotient); nosave = true
       guard current["layout"] != layouts[index] else { return .init(steps: [], failedOverride: false) }
-    case .words(let completed, let total):
-      guard current["mode"] != .string("time"), completed > 0, total > 0 else { return .init(steps: [], failedOverride: false) }
-      let segment = total / layouts.count
-      guard segment > 0, completed % segment == 0, completed / segment < layouts.count else { return .init(steps: [], failedOverride: false) }
-      index = completed / segment; nosave = false
-    }
+    } else { return .init(steps: [], failedOverride: false) }
     var runtime = current, steps: [Step] = []
     do {
       for key in ["layout", "keymapLayout"] {

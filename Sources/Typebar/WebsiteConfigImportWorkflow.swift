@@ -283,17 +283,27 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   /// next physical key can observe its mapping. Never restarts the attempt.
   func advanceLayoutFluid(_ event: WebsiteLayoutFluidTransition.Event, attemptID: UUID) throws {
     guard !stopped, let page, page.acceptsInput(for: attemptID), page.state.session.hasStarted,
-      !page.state.session.isFinished, page.state.session.configuration.modifiers.contains(.layoutFluid),
+      page.state.session.configuration.modifiers.contains(.layoutFluid),
       let original = page.state.presentation?.publication else { throw WebsiteConfigImportWorkflowError.unavailable }
+    let navigation = event.navigation
+    if let navigation {
+      guard navigation.wasActive, page.state.session.ownsWebsiteWordNavigation(navigation) else { throw WebsiteConfigImportWorkflowError.unavailable }
+    } else if page.state.session.isFinished { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
     try Task.checkCancellation()
     let current = UUID(); operation = current; applying = true
     let noticeGeneration = notices?.deliveryGeneration
     defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; applying = false }
+    defer {
+      if let navigation {
+        var state = page.state
+        if state.session.consumeWebsiteWordNavigation(navigation) { page.replace(state) }
+      }
+    }
     try environment.withSynchronousSetterRead {
       guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
       let plan = try WebsiteLayoutFluidTransition.plan(current: original.draft.projection.runtime, event: event,
-        context: context.context, active: true)
+        context: context.context, active: navigation?.wasActive ?? true)
       var receiptID = original.applicationID
       for step in plan.steps {
         try Task.checkCancellation()
@@ -301,7 +311,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
           page.acceptsInput(for: attemptID) else { throw WebsiteConfigImportWorkflowError.conflict }
         if !step.accepted {
           if let noticeGeneration, let publication = page.state.presentation?.publication {
-            let locked = step.key == "layout" && ownsActiveNoQuit
+            let locked = step.key == "layout" && (navigation?.wasActive ?? true)
+              && original.draft.generators.requestedModifiers.contains(.noQuit)
             notices?.postGuarded(locked ? "No Quit 保留当前输入布局。" : "当前趣味模式拒绝了布局切换。",
               level: .notice, options: .init(important: locked), generation: noticeGeneration, whileCurrent: {
                 self.operation == current && !self.stopped && !Task.isCancelled
@@ -313,7 +324,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
           continue
         }
         let ticket = try coordinator.prepareLayoutFluidStep(key: step.key, value: step.value, nosave: step.nosave,
-          for: page, refreshingWith: source)
+          for: page, refreshingWith: source, navigation: navigation)
         prepared = ticket
         switch try coordinator.commitLiveLayoutFluid(ticket, for: page) {
         case .committed(let publication): receiptID = publication.applicationID
@@ -323,12 +334,11 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         }
       }
       if plan.failedOverride { throw WebsiteKeymapCommandError.failedOverride(saved: 0) }
-      switch event {
-      case .words(let completed, _):
-        if completed > 0, original.draft.projection.runtime["mode"] != .string("time") {
+      if let progress = event.wordProgress {
+        if progress.completed > 0, original.draft.projection.runtime["mode"] != .string("time") {
           scheduleKeymapHighlight(.layoutPosition, milliseconds: 1)
         }
-      case .time:
+      } else {
         if !plan.steps.isEmpty, page.state.presentation?.publication.draft.keyboardTypography.guideMode == .next {
           scheduleKeymapHighlight(.layoutPosition, milliseconds: 1)
         }

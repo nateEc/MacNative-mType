@@ -6,6 +6,79 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testOwnedNavigationAfterCompletionKeepsHookTimeNoQuitAndRejectsForgedOrReplayedEvents() async throws {
+    for noQuit in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      let boxes = noQuit ? #"["layoutfluid","no_quit"]"# : #"["layoutfluid"]"#
+      try await f.workflow.apply(json: "{\"mode\":\"words\",\"words\":2,\"keymapMode\":\"static\",\"funbox\":\(boxes),\"customLayoutfluid\":[\"qwerty\",\"colemak\"]}", systemIsDark: false)
+      var state = f.page.state; state.session.insertBatch(state.session.prompt + " "); f.page.replace(state)
+      let generation = f.page.state.session.generationState, events = f.page.state.session.websiteWordNavigationEvents
+      XCTAssertEqual(events.count, 2); XCTAssertTrue(events.allSatisfy(\.wasActive))
+      XCTAssertTrue(f.page.state.session.isFinished)
+      let first = try XCTUnwrap(events.first), last = try XCTUnwrap(events.last)
+      let disk = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+      let forged = WebsiteWordNavigationEvent(attemptID: first.attemptID, completed: first.completed, total: first.total, wasActive: true)
+      XCTAssertThrowsError(try f.workflow.advanceLayoutFluid(.wordNavigation(forged), attemptID: first.attemptID))
+      XCTAssertThrowsError(try f.workflow.advanceLayoutFluid(.wordNavigation(last), attemptID: last.attemptID))
+      XCTAssertThrowsError(try f.workflow.advanceLayoutFluid(.words(completed: first.completed, total: first.total), attemptID: first.attemptID))
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, disk)
+      for event in events { try f.workflow.advanceLayoutFluid(.wordNavigation(event), attemptID: event.attemptID) }
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.inputLayout.emulatedLayout, noQuit ? .ansiQwerty : .ansiColemak)
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.keyboardTypography.guideLayout, .ansiColemak)
+      if noQuit { XCTAssertTrue(f.account.localNotices.active.contains(where: \.important)) }
+      XCTAssertEqual(f.page.state.session.generationState, generation)
+      XCTAssertTrue(f.page.state.session.websiteWordNavigationEvents.isEmpty)
+      XCTAssertThrowsError(try f.workflow.advanceLayoutFluid(.wordNavigation(first), attemptID: first.attemptID))
+    }
+  }
+
+  func testOwnedNavigationRetiresOnLaterInputWithinTheSameAttempt() async throws {
+    for input in ["insert", "delete", "word-delete", "composition"] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.workflow.apply(json: #"{"mode":"words","words":10,"funbox":["layoutfluid"]}"#, systemIsDark: false)
+      var state = f.page.state; state.session.insertBatch("x "); f.page.replace(state)
+      let event = try XCTUnwrap(f.page.state.session.websiteWordNavigationEvents.first)
+      state = f.page.state
+      switch input {
+      case "insert": state.session.insertBatch("y")
+      case "delete": state.session.deleteBackward()
+      case "word-delete": state.session.deleteWordBackward()
+      case "composition": state.session.beginComposition()
+      default: XCTFail("Unknown input")
+      }
+      f.page.replace(state)
+      XCTAssertEqual(f.page.state.session.automaticInputAttemptID, event.attemptID)
+      let disk = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+      XCTAssertThrowsError(try f.workflow.advanceLayoutFluid(.wordNavigation(event), attemptID: event.attemptID))
+      XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, disk)
+    }
+  }
+
+  func testOwnedNavigationLostDuringScopeReadCannotPublishAStep() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var consumeOnRead = false, consumed = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: {
+        if consumeOnRead {
+          consumeOnRead = false
+          var state = f.page.state
+          if let event = state.session.websiteWordNavigationEvents.first {
+            consumed = state.session.consumeWebsiteWordNavigation(event); f.page.replace(state)
+          }
+        }
+        return f.window
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":2,"funbox":["layoutfluid"],"customLayoutfluid":["qwerty","colemak"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch(state.session.prompt + " "); f.page.replace(state)
+    let event = try XCTUnwrap(f.page.state.session.websiteWordNavigationEvents.first)
+    let original = try XCTUnwrap(f.page.state.presentation).publication
+    consumeOnRead = true
+    XCTAssertThrowsError(try workflow.advanceLayoutFluid(.wordNavigation(event), attemptID: event.attemptID))
+    XCTAssertTrue(consumed)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, original.applicationID)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, original.disk)
+  }
   func testDeferredNextModeReadsCurrentWordAfterAcceptedSetterAndKeepsAttempt() async throws {
     let f = try Fixture(); defer { f.close() }
     var pending: [(Int, @MainActor () -> Void)] = []

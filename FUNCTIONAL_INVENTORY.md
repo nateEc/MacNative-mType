@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-LAYOUTFLUID-NAVIGATION-01 | 按真实导航处理完成粘贴的布局事件 | `input/helpers/word-navigation.ts`, `input/handlers/insert-text.ts`, `test/funbox/funbox-functions.ts` | PromptDomain, PracticePage | 引擎记录实际导航及当时词表长度／活动状态，页面按本次输入的未消费事件顺序处理；末词匹配不伪造导航，已完成批次仍按导航时 No Quit 拒绝物理布局切换。修正末词 word-stop 额外提交符、空元素准入及末次输入完成判断。55 组有限普通词序列及验证详见官方审计；生成／IO 中途时序、特殊字段与实体操作仍开放。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-KEYMAP-DEFERRED-01 | next 设置与布局延迟事件、模式准入 | `test/test-logic.ts`, `test/test-timer.ts`, `test/funbox/funbox-functions.ts`, `states/test.ts` | PromptDomain, PracticePage | 接入真实设置工作流的 0／1ms 回调，执行时读取当前词；布局 charAt 越界映射空格，模式事件取首代码点。static／off 输入不更新，react 闪烁清除下一键；回调按窗口和尝试准入，停止退休。源码样本与本地回归见官方审计；真实 IME、终末／多词批次及完整浏览器调度仍未验收。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
