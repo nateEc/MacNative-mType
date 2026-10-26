@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+## 隐藏字段的 Layout Fluid 分母（2026-10-26，起点 949f6b6a）
+
+CFG-LAYOUTFLUID-HIDDEN-FIELDS-01：实际 layoutfluid.handleSpace 以 TestWords.words.length 为分母划分布局区间，不以可见文本的空白分词计数。此前原生 layoutFluidWordCount 使用完成预算的 promptWordCount；nospace 的多个目标拼接后被误算成一个词，两个布局时区间长度成为零，实际页面不会在应有词界切换。
+
+只读 --hidden-word-navigation-fixtures 执行固定参考的实际输入、验证、日志和导航模块，在 handleSpace 分发点观察字段进度、词表长度与活动状态；词表和 DOM 是明确的夹具适配，不是生成器或浏览器证明。四种目标目录（普通、首空、末空、中间空）各十种输入与三种 stop-on-error，共 120 组。新增对照同时检查事件、终末状态和未完成字段的索引／输入 UTF-16；有效 RED 为 75 处失败，既有 55 组普通词仍通过（/tmp/typebar-hidden-navigation-red.log，1.614 秒）。失败事件使用分母 1，而实际源目录为 2 或 3。
+
+layoutFluidWordCount 现在读取已经验证并随补词更新的 UnitInputTargets.sourceFieldCount，保留隐藏空字段及提供方字段边界，不改成绩预算、生成器或完成计数。120 组新样本、55 组既有样本及补词回归共 15 项通过（/tmp/typebar-hidden-navigation-count.log，9.400 秒）。新增实际 Root／TypingInputView 隐藏宿主导入四词 nospace + layoutfluid：第一词后保持 QWERTY，第二词后切换 Colemak，事件队列消费完，尝试和输入控件身份不变，错误为零且尚未完成；与上述对照共 16 项通过（/tmp/typebar-hidden-navigation-host.log，10.362 秒）。
+
+最终扩大到导航拥有权、布局转换、完整配置练习宿主、补词、空目标、隐藏单位输入、字段回放及结果复制，共 99 项零失败／零跳过（/tmp/typebar-hidden-navigation-broad.log，32.966 秒），包含 756 组实际布局 setter 对照。随后在实际生产页补强物理布局断言，与视觉布局共同验证第一／第二词界，独立通过（/tmp/typebar-hidden-navigation-final-host.log，1.684 秒）。Debug 应用包、严格签名、资源边界及固定参考原创性检查通过（/tmp/typebar-hidden-navigation-package.log）；参考行为审计 47 个直接入口／119 个测试符号／17 份支撑规范及 1,371 条人工清单结构通过。没有启动主程序或显示窗口。生成与外部 IO 的批次中途顺序、所有特殊字段、完整倒计时显示、实体设备及 IME 仍独立开放；本批不把有限夹具扩大为整个导航管线或完整重写已完成。
+
 ## 隐藏页面滚轮夹具初始化（2026-10-26，起点 c81862cb）
 
 HOST-WHEEL-BASELINE-01：原始滚轮用例在独立 XCTest 进程中复现四处失败（62.925 秒，/tmp/typebar-wheel-red.log）；再次独立运行仍有两处失败（34.308 秒，/tmp/typebar-wheel-isolated-recheck.log）。两种样式原有的上下滚动、内层偏移、输入焦点、词源代次和隐藏窗口断言全部保留。

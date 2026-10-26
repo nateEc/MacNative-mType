@@ -6444,7 +6444,7 @@ struct TypingSession {
   }
 
   /// Current loaded word array used by the source's Layout Fluid space hook.
-  var layoutFluidWordCount: Int { promptWordCount }
+  var layoutFluidWordCount: Int { unitTargets.sourceFieldCount }
   var completedWordCount: Int {
     if let acceptedUnits {
       let committed = acceptedUnits.completedFieldCount

@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-LAYOUTFLUID-HIDDEN-FIELDS-01 | 无空格词表的布局区间 | layoutfluid.handleSpace／goToNextWord | TypingSession／UnitInputTargets／实际练习页 | 布局分母按已加载目标目录计数，保留首／中／末空字段，不按拼接文本或完成预算计数。120 组新源码序列、55 组普通词及四词实际隐藏页通过；扩大 99 项零失败零跳过。生成与 IO 中途顺序、倒计时完整显示和实体操作仍开放，见官方审计。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-LAYOUTFLUID-NAVIGATION-01 | 按真实导航处理完成粘贴的布局事件 | `input/helpers/word-navigation.ts`, `input/handlers/insert-text.ts`, `test/funbox/funbox-functions.ts` | PromptDomain, PracticePage | 引擎记录实际导航及当时词表长度／活动状态，页面按本次输入的未消费事件顺序处理；末词匹配不伪造导航，已完成批次仍按导航时 No Quit 拒绝物理布局切换。修正末词 word-stop 额外提交符、空元素准入及末次输入完成判断。55 组有限普通词序列及验证详见官方审计；生成／IO 中途时序、特殊字段与实体操作仍开放。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

@@ -310,6 +310,43 @@ import XCTest
     XCTAssertFalse(f.window.isVisible)
   }
 
+  func testActualPageHiddenFieldsSwitchLayoutAtTheLoadedWordBoundary() async throws {
+    let f = try Fixture(legacyNoQuit: false); defer { f.close() }
+    func settle(_ ready: () -> Bool) async throws {
+      let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+      while !ready(), ContinuousClock.now < deadline {
+        f.host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(10))
+      }
+      XCTAssertTrue(ready())
+    }
+    try await settle { f.views(TypingInputView.self).first?.acceptsTextInput == true }
+    let input = try XCTUnwrap(f.views(TypingInputView.self).first)
+    let account = AccountSession(defaults: f.defaults)
+    let window = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: account,
+      directory: f.directory, readWindow: { window })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4,"blindMode":true,"keymapMode":"static","funbox":["layoutfluid","nospace"],"customLayoutfluid":["qwerty","colemak"]}"#, systemIsDark: false)
+    let attempt = f.state.page.state.session.automaticInputAttemptID
+    try await settle { input.insertionAttemptID == attempt && input.acceptsTextInput }
+    XCTAssertEqual(f.state.page.state.session.layoutFluidWordCount, 4)
+    for completed in 1...2 {
+      let field = try XCTUnwrap(f.state.page.state.session.promptCompositionField)
+      input.onInsert(String(decoding: field.targetUTF16, as: UTF16.self), false)
+      XCTAssertEqual(f.state.page.state.session.completedWordCount, completed)
+      XCTAssertEqual(f.state.page.state.presentation?.publication.draft.keyboardTypography.guideLayout,
+        completed == 1 ? .ansiQwerty : .ansiColemak)
+      XCTAssertEqual(f.state.page.state.presentation?.publication.draft.keyboardTypography.inputLayout.emulatedLayout,
+        completed == 1 ? .ansiQwerty : .ansiColemak)
+      XCTAssertTrue(f.state.page.state.session.websiteWordNavigationEvents.isEmpty)
+      XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+      XCTAssertTrue(f.views(TypingInputView.self).first === input)
+    }
+    XCTAssertFalse(f.state.page.state.session.isFinished)
+    XCTAssertEqual(f.state.page.state.session.errors, 0)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
   func testActualPageFinishedPasteDeliversOnlyOwnedNavigationAndKeepsNoQuitAtHookTime() async throws {
     for trailingCommit in [false, true] {
       let f = try Fixture(legacyNoQuit: false); defer { f.close() }
