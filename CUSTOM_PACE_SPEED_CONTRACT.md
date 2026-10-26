@@ -12,7 +12,7 @@
 - [设置表单](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/components/pages/settings/custom-setting/PaceCaret.tsx) 同值提交不变；修改时仅 off 切 custom，PB 等模式保留。[命令元数据](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/config/metadata.tsx) 指定 custom override、caret 设置组和不重开。两条原生入口共用校验，但保留各自模式规则；只刷新目标，不清空当前输入。TSX、InputField 和元数据仅静态取证，没有执行浏览器表单。
 - 完整 pace-caret／collections/results／db 三模块探针新增十组 custom 夹具，总计 46 组通过。初始化按原版保留非负小数及巨大值，不足 1 返回无目标。Query DSL、标签 PB、认证、时钟、Caret 等仍是有界适配，不能视为浏览器端到端。
 
-原版裸初始化可接受 Infinity；原生显式拒绝负数、NaN 和无穷值，作为安全差异，不声称非有限值完全等价。导入错误直接拒绝；程序内部非法赋值恢复默认 100。单位支持 WPM／CPM／WPS／CPS／WPH，拒绝换算溢出及正数下溢为零；使用完整 Double 字符串而非固定两位小数。初始单位不可表示时明确退回 WPM，未修改草稿直接保留原始 WPM，避免往返换算舍入。原生多单位编辑是补充能力。
+固定源码的命令校验和配速初始化均接受 Infinity，并非只有绕过输入校验的裸状态能进入。2026-10-27 执行实际 LocalStorageWithSchema 和迁移逻辑确认：同一存储对象保留 Infinity，写入 JSON 为 null，新建存储对象冷读后恢复默认 100；普通值及最大有限值保留。原生目前仍拒绝无穷值，这是尚未实现的功能差异，继续列入完整重写目标，不能以“安全差异”替代功能验收。负数和 NaN 仍拒绝；程序内部非法赋值恢复默认 100。单位支持 WPM／CPM／WPS／CPS／WPH，目前拒绝换算溢出及正数下溢为零；使用完整 Double 字符串而非固定两位小数。初始单位不可表示时明确退回 WPM，未修改草稿直接保留原始 WPM，避免往返换算舍入。原生多单位编辑是补充能力。
 
 ## 持久化和切换合同
 

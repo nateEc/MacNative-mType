@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| PACE-FIRST-REQUEST-01 | 舍入截止点下的首次配速请求 | pace-caret.start／update／handleSpace 与完整词目录 | PaceCaretProgress／TypingSession／PromptCaretNativeView | 48 组源码请求及三项原生反例先红后绿；扩大 136 项零失败零跳过，应用包与原创性检查通过。同一时刻仍指向首字符，错词修正等待后续推进。巨大有限值后续零延迟循环、无限配速与实体首帧未完成，见首次请求合同。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-KEYMAP-REACTIVITY-01 | 中断重播、清理与同毫秒采样 | 真实 Solid core/store／Key／Anime effects | WebsiteKeymapAnimationTiming／真实反应链 QA | 15 场景／1072 角色标量帧、实际隐藏重播与注册表寿命检查；区分创建与零 elapsed tick，两项反例先红后绿。扩大 149 项、两组依赖失败契约通过；完整 DOM／界面反应链、首帧和全局栅格仍开放。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

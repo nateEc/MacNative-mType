@@ -183,8 +183,10 @@ struct PaceCaretProgress {
     observedAt = now
     let elapsed = max(0, now - startedAt)
     var due = floor(elapsed / interval) + 1
-    // Compare absolute deadlines at the source clock's representable precision.
-    if due.isFinite, now >= startedAt + interval * due { due += 1 }
+    // Compare absolute deadlines at the clock's representable precision only
+    // after time advances. A tiny interval can round back to the origin;
+    // creation and repeated reads at that origin still issue just step one.
+    if elapsed > 0, due.isFinite, now >= startedAt + interval * due { due += 1 }
     guard due > processedSteps else { return previousObservedAt != observedAt }
     let total = catalog.steps.last!
     let delta = min(Double(total) + 2, due - processedSteps)
