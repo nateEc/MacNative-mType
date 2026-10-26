@@ -6,6 +6,136 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testDeferredNextModeReadsCurrentWordAfterAcceptedSetterAndKeepsAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var pending: [(Int, @MainActor () -> Void)] = []
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, dispatchKeymapHighlight: { pending.append(($0, $1)) },
+      loadQuotes: { _ in [.init(id: "owned", title: "Owned", text: "ab 🙂x tail", language: .english, length: .short)] })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"keymapMode":"static","blindMode":true}"#, systemIsDark: false)
+    let words = f.page.state.session.prompt.split(separator: " ").map(String.init)
+    var state = f.page.state; state.session.insertBatch(words[0]); f.page.replace(state)
+    let attempt = f.page.state.session.automaticInputAttemptID
+    try await workflow.editAndBegin(.keymap(.display(.mode(.next))), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(pending.map(\.0), [0])
+    XCTAssertNil(f.page.state.session.websiteKeymapHighlightUnits, "Static input has no event; next setter must defer its callback")
+    state = f.page.state; state.session.insertBatch(" "); f.page.replace(state)
+    XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, [55357], "Word-change input update uses one UTF-16 unit")
+    try await workflow.editAndBegin(.keymap(.display(.mode(.staticGuide))), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    pending.forEach { $0.1() }
+    XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, words[1].unicodeScalars.first.map { Array(String($0).utf16) })
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+  }
+
+  func testDeferredFluidWordsSchedulesWithoutLayoutBoundaryAndMapsPastWordToSpace() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var pending: [(Int, @MainActor () -> Void)] = []
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, dispatchKeymapHighlight: { pending.append(($0, $1)) })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":10,"keymapMode":"static","blindMode":true,"funbox":["layoutfluid"],"customLayoutfluid":["qwerty","colemak"]}"#, systemIsDark: false)
+    let words = f.page.state.session.prompt.split(separator: " ").map(String.init)
+    var state = f.page.state; state.session.insertBatch(words[0] + " "); f.page.replace(state)
+    let original = try XCTUnwrap(f.page.state.presentation).publication.applicationID
+    try workflow.advanceLayoutFluid(.words(completed: 1, total: 10), attemptID: f.page.state.session.automaticInputAttemptID)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, original)
+    XCTAssertEqual(pending.map(\.0), [1])
+    state = f.page.state; state.session.insertBatch(String(repeating: "x", count: words[1].utf16.count + 2)); f.page.replace(state)
+    pending.forEach { $0.1() }
+    XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, [32])
+  }
+
+  func testDeferredFluidTimerSchedulesOnlyChangedLayoutWithNextEnabled() async throws {
+    for mode in ["static", "next"] {
+      let f = try Fixture(); defer { f.close() }
+      var pending: [(Int, @MainActor () -> Void)] = []
+      let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+        directory: f.directory, readWindow: { f.window }, dispatchKeymapHighlight: { pending.append(($0, $1)) })
+      defer { workflow.stop() }
+      try await workflow.apply(json: "{\"mode\":\"time\",\"time\":10,\"keymapMode\":\"\(mode)\",\"blindMode\":true,\"funbox\":[\"layoutfluid\"],\"customLayoutfluid\":[\"qwerty\",\"colemak\"]}", systemIsDark: false)
+      var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+      let attempt = f.page.state.session.automaticInputAttemptID
+      try workflow.advanceLayoutFluid(.time(1), attemptID: attempt)
+      XCTAssertTrue(pending.isEmpty)
+      try workflow.advanceLayoutFluid(.time(5), attemptID: attempt)
+      XCTAssertEqual(pending.map(\.0), mode == "next" ? [1] : [])
+      state = f.page.state; state.session.insertBatch(String(repeating: "x", count: 30)); f.page.replace(state)
+      pending.forEach { $0.1() }
+      if mode == "next" { XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, [32]) }
+      else { XCTAssertNil(f.page.state.session.websiteKeymapHighlightUnits) }
+      XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    }
+  }
+
+  func testDeferredCallbacksRejectRetiredOwnershipButKeepAcceptedWorkAfterFormCancel() async throws {
+    for retirement in ["stop", "detach", "reattach", "attempt", "ownerABA", "window", "cancel"] {
+      let f = try Fixture(); defer { f.close() }
+      var pending: [@MainActor () -> Void] = [], windowAvailable = true
+      let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+        directory: f.directory, readWindow: { windowAvailable ? f.window : nil }, dispatchKeymapHighlight: { _, action in pending.append(action) })
+      defer { workflow.stop() }
+      try await workflow.apply(json: #"{"mode":"words","words":10,"keymapMode":"static"}"#, systemIsDark: false)
+      try await workflow.editAndBegin(.keymap(.display(.mode(.next))), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+      XCTAssertEqual(pending.count, 1)
+      switch retirement {
+      case "stop": workflow.stop()
+      case "detach": f.page.detach()
+      case "reattach": f.page.detach(); f.page.attach(to: f.settings.preferenceConfigurationSaves)
+      case "attempt":
+        var state = f.page.state; state.session = TypingSession(configuration: .words(100), prompt: "fresh tail")
+        state.session.insertBatch("x"); f.page.replace(state)
+      case "ownerABA":
+        let other = UUID(), router = f.settings.preferenceConfigurationSaves
+        router.register(owner: other, save: {}); router.activate(owner: other); router.activate(owner: f.page.owner)
+      case "window": windowAvailable = false
+      case "cancel": workflow.cancel()
+      default: XCTFail("Unknown retirement")
+      }
+      let before = f.page.state.session.websiteKeymapHighlightUnits
+      pending.forEach { $0() }
+      if retirement == "cancel" {
+        XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, f.page.state.session.prompt.unicodeScalars.first.map { Array(String($0).utf16) })
+      } else { XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, before, retirement) }
+    }
+  }
+
+  func testDeferredAcceptedCallbackIsOneShotWithoutCoalescing() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var pending: [@MainActor () -> Void] = []
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, dispatchKeymapHighlight: { _, action in pending.append(action) },
+      loadQuotes: { _ in [.init(id: "owned", title: "Owned", text: "ab cd tail", language: .english, length: .short)] })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"keymapMode":"static"}"#, systemIsDark: false)
+    for _ in 0..<2 {
+      try await workflow.editAndBegin(.keymap(.display(.mode(.next))), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    }
+    XCTAssertEqual(pending.count, 2, "Accepted equal setters keep separate source events")
+    pending.first?()
+    XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, [97])
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, [98])
+    pending.first?()
+    XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, [98], "Replayed delivery cannot reset input")
+    pending.last?()
+    XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, [97], "A distinct accepted delivery still executes")
+  }
+
+  func testDeferredDefaultMainQueueDispatchUpdatesTheActualWorkflow() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window },
+      loadQuotes: { _ in [.init(id: "owned", title: "Owned", text: "ab cd tail", language: .english, length: .short)] })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"keymapMode":"static"}"#, systemIsDark: false)
+    try await workflow.editAndBegin(.keymap(.display(.mode(.next))), replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while f.page.state.session.websiteKeymapHighlightUnits != [97], ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(5))
+    }
+    XCTAssertEqual(f.page.state.session.websiteKeymapHighlightUnits, [97])
+  }
   func testLayoutFluidHandlerFollowsProducingWorkflowAndRetiresOnStopOrDetach() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"time","time":10,"funbox":["layoutfluid"]}"#, systemIsDark: false)

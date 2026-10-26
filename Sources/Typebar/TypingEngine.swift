@@ -4692,6 +4692,7 @@ struct TypingSession {
   private(set) var keymapInputEvents: [WebsiteKeymapInputEvent] = []
   private var websiteKeymapHighlightWasUpdated = false
   private var websiteKeymapUpdatedHighlight: [UInt16]?
+  private var websiteKeymapMode: KeyboardGuideMode?
   /// A stopped letter can be drawn without entering the accepted input.
   /// Only a final input callback publishes this candidate; pre-input guards
   /// and earlier characters in a batch must not replace the visible snapshot.
@@ -5322,7 +5323,8 @@ struct TypingSession {
   }
 
   private mutating func refreshWebsiteKeymapInputHighlight() {
-    guard configuration.mode != .zen else { return }
+    guard websiteKeymapMode == nil || websiteKeymapMode == .next,
+      configuration.mode != .zen else { return }
     let previous = websiteKeymapHighlightUnits
     let target = inputAccuracyTarget(at: nextTargetIndex)
     let position = acceptedUnits?.activeCount ?? target.position
@@ -5330,6 +5332,32 @@ struct TypingSession {
     // An undefined source index dispatches no event and keeps the last key.
     websiteKeymapUpdatedHighlight = target.units.indices.contains(position)
       ? [target.units[position]] : previous
+  }
+
+  mutating func refreshWebsiteKeymapDeferredHighlight(_ kind: WebsiteKeymapDeferredHighlight) {
+    let target = inputAccuracyTarget(at: nextTargetIndex)
+    var word = target.units
+    if !unitTargets.noSpace, word.last == 32 || word.last == 10 { word.removeLast() }
+    websiteKeymapHighlightWasUpdated = true
+    switch kind {
+    case .firstScalar:
+      websiteKeymapUpdatedHighlight = String(decoding: word, as: UTF16.self).unicodeScalars.first.map { Array(String($0).utf16) }
+    case .layoutPosition:
+      let position = acceptedUnits?.activeCount ?? target.position
+      websiteKeymapUpdatedHighlight = word.indices.contains(position) ? [word[position]] : [32]
+    }
+  }
+
+  mutating func synchronizeWebsiteKeymapMode(_ mode: KeyboardGuideMode) {
+    if websiteKeymapMode == nil, mode != .next {
+      websiteKeymapHighlightWasUpdated = true; websiteKeymapUpdatedHighlight = nil
+    }
+    websiteKeymapMode = mode
+  }
+
+  private mutating func clearWebsiteKeymapHighlightForFlash() {
+    guard websiteKeymapMode == .react else { return }
+    websiteKeymapHighlightWasUpdated = true; websiteKeymapUpdatedHighlight = nil
   }
 
   var promptGlyphs: [TypingPromptGlyph] {
@@ -6670,6 +6698,7 @@ struct TypingSession {
     guard !isFinished else { return }
     guard !text.isEmpty else {
       keymapInputEvents.append(.init(units: [], isCorrect: configuration.mode == .zen))
+      clearWebsiteKeymapHighlightForFlash()
       return
     }
     // ASCII fields already have one code unit per native primitive. On the
@@ -7455,6 +7484,7 @@ struct TypingSession {
     latestReplayInputText = String(character)
     latestReplayInputUnits = currentInputUnit.map { [$0] }
     let data = latestReplayInputUnits ?? Array(String(character).utf16)
+    clearWebsiteKeymapHighlightForFlash()
     for (index, unit) in data.enumerated() {
       let correct = latestInputCorrectness?.indices.contains(index) == true
         ? latestInputCorrectness![index] : correctUnits == units

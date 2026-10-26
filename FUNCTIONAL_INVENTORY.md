@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-KEYMAP-DEFERRED-01 | next 设置与布局延迟事件、模式准入 | `test/test-logic.ts`, `test/test-timer.ts`, `test/funbox/funbox-functions.ts`, `states/test.ts` | PromptDomain, PracticePage | 接入真实设置工作流的 0／1ms 回调，执行时读取当前词；布局 charAt 越界映射空格，模式事件取首代码点。static／off 输入不更新，react 闪烁清除下一键；回调按窗口和尝试准入，停止退休。源码样本与本地回归见官方审计；真实 IME、终末／多词批次及完整浏览器调度仍未验收。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-KEYMAP-NEXT-PRODUCER-01 | 下一键的代码点初始化与 UTF-16 输入位置 | `test/test-logic.ts`, `test/test-ui.ts`, `input/handlers/insert-text.ts`, `input/handlers/delete.ts` | PromptDomain, PracticePage | 初始化取首个代码点，已处理输入／删除后按实际字段的 UTF-16 位置更新；越界保留上次事件，原始代理项不解码。24 组实际插入序列、四组删除序列、隐藏键帽与实际页面回调通过。候选刷新仅验证已接受文本；模式切换、延迟布局事件、所有字段及实体 IME 时序继续开放。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

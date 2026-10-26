@@ -1,5 +1,23 @@
 # 官方配置兼容性审计
 
+## 延迟高亮与模式事件（2026-10-26，起点 4caa2083）
+
+CFG-KEYMAP-DEFERRED-01：实际 test-logic 在 keymapMode 设置为 next 且 Config.mode 非 zen 时 setTimeout(0)，回调再从当前词 text 取首代码点；回调不重新检查 keymapMode。LayoutFluid 词数 handleSpace 在非 time 模式的每次处理末尾安排 setTimeout(1)，包括未切换布局的词；时间事件只在布局不同且 setters 执行后、当前 keymapMode 为 next 时安排 1ms 回调。两种布局回调均使用 text.charAt(getCurrentInput().length) ?? ""，不是带提交符索引，空值经实际监听器映射空格。config/setters.ts 对显式同值设置仍派发配置事件，依赖字段的相同值跳过不是外层设置去重。
+
+只读 check-source-keymap-deferred.mjs 执行固定源码的模式条件及三处延迟回调，安排时使用旧文本、执行前替换成真实样本并切换模式，216 个样本覆盖首代码点／原始代理项／组合标记、越界和模式随后改变。另执行实际 states/test 监听器、初始化及 afterAnyTestInput 高亮表达式，24 个模式／输入／候选样本区分 static／off 不更新、react 闪烁清除及 next 单元更新。此 VM 驱动不替代完整事件循环、DOM、Solid、IME 或浏览器性能证据。源码与引擎仅由 QA 读取，未复制进生产资源。
+
+第一轮有效 RED 为三项测试 114 处断言失败，1.436 秒（/tmp/typebar-keymap-deferred-red.log），其中工作流没有安排零／1ms 回调，普通输入缓存也不能替代布局的空格回退。首轮修复三项通过，0.568 秒；随后本会话内决策复核发现非 next 模式仍错误更新缓存，24 个实际源模式样本产生 36 处失败，1.131 秒（/tmp/typebar-keymap-deferred-mode-red.log），补接页面发布的模式同步、react 闪烁清理及输入／候选准入。
+
+回调在实际配置工作流接受设置后安排，默认使用主队列，测试可控制仅调度这一不稳定边界。捕获窗口拥有者、路由凭据、附件代次与尝试 ID，执行时再读取会话字段；不捕获输入位置、发布 ID 或模式，从而允许同尝试内继续输入及后续设置。工作流停止会退休待投递身份，队列弱持有工作流和页面；每个接受事件独立且仅执行一次。取消后续表单不回滚此前已接受设置的回调。此处为本会话内有界复核，未声称独立审查。
+
+最终专项 12 项零失败／零跳过，4.661 秒（/tmp/typebar-keymap-deferred-final-focused.log），仅使用 CI 的 TYPEBAR_LAYOUT_AUDIT_REFERENCE 即正常执行。覆盖 216 个延迟回调样本、24 个模式样本、此前插入／删除原始单元序列、隐藏键帽及实际练习页回调。六项工作流测试分别验证：设置后仍是 nil、延迟期间跨到 Emoji 单词后读取完整首代码点、随后切 static 仍投递；词数未到边界也安排；计时布局未变或非 next 不安排；停止、解绑／重绑、替换尝试、拥有者 ABA、窗口消失拒绝旧投递；取消后续表单保留已接受回调；同值设置产生独立事件且重复投递只执行一次；默认主队列实际送达。模式同步只改变会话瞬时元数据，不改变生成状态或持久化设置。
+
+相关扩大回归 1,101 项零失败／零跳过，386.348 秒（/tmp/typebar-keymap-deferred-broad.log）；完整 TypingEngineTests 798 项及本轮两项源码测试亦零失败／零跳过，共 800 项／319.684 秒，仅提供 CI 参考路径变量（/tmp/typebar-keymap-deferred-engine-ci.log）。参考行为审计 47 个直接入口／119 个测试符号／17 份支撑规范及 1,369 条人工清单结构通过。未绑定完整配置的纯引擎继续采集默认 next 元数据，完整配置由实际页面发布同步模式；计分、存储与旧偏好策略保留。新增人工场景未声称实机验收。
+
+Debug 应用包、严格签名验证、资源边界及固定参考原创性扫描通过（/tmp/typebar-keymap-deferred-package.log）；全部原生检查串行，没有启动主程序。
+
+完整终末／多词批次的 handleSpace 时点、跨尝试初始化及原版全局信号保留、所有特殊字段、真实 IME 与实体窗口、后台调度及浏览器整体仍开放；模式样本为全新信号上下文，不证明跨重开的全局生命周期。未重复整个门禁，已知隐藏滚轮基线继续独立追踪，整个重写目标未完成。
+
 ## 下一键事件来源（2026-10-26，起点 74f2a35d）
 
 CFG-KEYMAP-NEXT-PRODUCER-01：固定参考 test-logic 初始化对当前词 text 展开代码点，取第一项；test-ui 的 afterAnyTestInput 及 afterTestWordChange 则按 getCurrentInput().length 索引 textWithCommit，仅在结果不是 undefined 时派发。因此分解重音的初始化可能是 e，输入 e 后可能是组合标记；初始化 Emoji 可是完整代码点，后续位置可为单个代理项。超长输入不自动清空。旧原生使用 nextExpectedCharacter，混淆了原生光标的字素与源事件。

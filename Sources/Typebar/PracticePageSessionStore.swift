@@ -145,6 +145,8 @@ final class PracticePageSessionStore {
   }
   func replace(_ state: PracticePageSessionState) {
     guard !committing else { return }
+    var state = state
+    if let mode = state.presentation?.publication.draft.keyboardTypography.guideMode { state.session.synchronizeWebsiteKeymapMode(mode) }
     if state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID { retireRestartController() }
     self.state = state
   }
@@ -158,6 +160,17 @@ final class PracticePageSessionStore {
       && state.configurationDeparture == nil
       && state.savedApplication == nil
       && state.session.automaticInputAttemptID == attemptID
+  }
+
+  func captureDeferredKeymapHighlight(_ kind: WebsiteKeymapDeferredHighlight) -> (@MainActor () -> Void)? {
+    let attempt = state.session.automaticInputAttemptID, attachment = attachment
+    guard acceptsAttemptCallback(for: attempt), let router,
+      let lease = router.captureLease(), lease.owner == owner, router.isCurrent(lease) else { return nil }
+    return { [weak self, weak router] in
+      guard let self, let router, self.router === router, router.isCurrent(lease),
+        self.attachment == attachment, self.acceptsAttemptCallback(for: attempt) else { return }
+      self.state.session.refreshWebsiteKeymapDeferredHighlight(kind)
+    }
   }
   func setStartupInputSuspended(_ suspended: Bool) {
     guard startupInputSuspended != suspended else { return }
@@ -370,6 +383,8 @@ final class PracticePageSessionStore {
   func installCommitted(_ state: PracticePageSessionState,
     retainingRestartController controller: WebsitePracticeRestartController? = nil) {
     precondition(committing)
+    var state = state
+    if let mode = state.presentation?.publication.draft.keyboardTypography.guideMode { state.session.synchronizeWebsiteKeymapMode(mode) }
     clearLegacyReturn()
     let retainsController = controller != nil && restartController === controller
     if !retainsController && (state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID

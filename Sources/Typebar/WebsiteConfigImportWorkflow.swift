@@ -128,6 +128,9 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   private var stopped = false
   private var operation = UUID()
   private let layoutFluidHandlerOwner = UUID()
+  private let dispatchKeymapHighlight: @MainActor (Int, @escaping @MainActor () -> Void) -> Void
+  private var pendingKeymapHighlights: Set<UUID> = []
+  private var readKeymapWindow: (@MainActor () -> WebsiteConfigPracticeScopeSource.Window?)?
   private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID), resume(UUID) }
 
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
@@ -136,10 +139,15 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     paceTarget: @escaping @MainActor (WebsiteConfigNativeDraft, TypingSession) -> Double? = { draft, _ in
       draft.behavior.paceGuideMode == .custom ? PaceGuidePolicy.validTarget(draft.behavior.paceGuideCustomWpm) : nil
     },
+    dispatchKeymapHighlight: @escaping @MainActor (Int, @escaping @MainActor () -> Void) -> Void = { delay, action in
+      DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) { action() }
+    },
     loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) }) {
     self.page = page; self.settings = settings; self.loadQuotes = loadQuotes
     self.notices = account.localNotices
     self.paceTarget = paceTarget
+    self.dispatchKeymapHighlight = dispatchKeymapHighlight
+    self.readKeymapWindow = readWindow
     let environment = WebsiteConfigEnvironmentSource(settings: settings, account: account,
       pointsPerRem: 16, documentComplete: true, development: false)
     self.environment = environment
@@ -315,6 +323,27 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         }
       }
       if plan.failedOverride { throw WebsiteKeymapCommandError.failedOverride(saved: 0) }
+      switch event {
+      case .words(let completed, _):
+        if completed > 0, original.draft.projection.runtime["mode"] != .string("time") {
+          scheduleKeymapHighlight(.layoutPosition, milliseconds: 1)
+        }
+      case .time:
+        if !plan.steps.isEmpty, page.state.presentation?.publication.draft.keyboardTypography.guideMode == .next {
+          scheduleKeymapHighlight(.layoutPosition, milliseconds: 1)
+        }
+      }
+    }
+  }
+
+  private func scheduleKeymapHighlight(_ kind: WebsiteKeymapDeferredHighlight, milliseconds: Int) {
+    guard !stopped, let page, readKeymapWindow?()?.owner == page.owner,
+      let apply = page.captureDeferredKeymapHighlight(kind) else { return }
+    let id = UUID(); pendingKeymapHighlights.insert(id)
+    dispatchKeymapHighlight(milliseconds) { [weak self, weak page] in
+      guard let self, self.pendingKeymapHighlights.remove(id) != nil, !self.stopped,
+        let page, self.readKeymapWindow?()?.owner == page.owner else { return }
+      apply()
     }
   }
 
@@ -355,7 +384,12 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
           prepared = ticket
           guard operation == current, !stopped else { throw CancellationError() }
           switch try coordinator.commitLiveKeymap(ticket, for: page) {
-          case .committed(let publication): saved += 1; receiptID = publication.applicationID
+          case .committed(let publication):
+            saved += 1; receiptID = publication.applicationID
+            if step.key == "keymapMode", step.value == .string("next"),
+              publication.draft.projection.runtime["mode"] != .string("zen") {
+              scheduleKeymapHighlight(.firstScalar, milliseconds: 0)
+            }
           case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
           case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
           case .busy: throw WebsiteConfigImportWorkflowError.busy
@@ -837,6 +871,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   }
   func stop() {
     page?.retireLayoutFluidHandler(owner: layoutFluidHandlerOwner)
+    pendingKeymapHighlights.removeAll(); readKeymapWindow = nil
     stopped = true; cancel(); source.stop(); environment.stop()
   }
 }
