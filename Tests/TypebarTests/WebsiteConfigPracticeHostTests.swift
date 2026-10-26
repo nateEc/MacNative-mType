@@ -331,6 +331,8 @@ import XCTest
     try await settle { input.insertionAttemptID == attempt && input.acceptsTextInput }
     XCTAssertEqual(f.state.page.state.session.layoutFluidWordCount, 4)
     XCTAssertEqual(f.state.page.layoutFluidCountdown, .init())
+    let cadenceReader = try XCTUnwrap(f.views(WebsiteLayoutFluidDisplayCadenceView.self).first)
+    XCTAssertTrue(cadenceReader.window === f.window, "The actual badge must read its own window's display")
     for completed in 1...2 {
       let field = try XCTUnwrap(f.state.page.state.session.promptCompositionField)
       input.onInsert(String(decoding: field.targetUTF16, as: UTF16.self), false)

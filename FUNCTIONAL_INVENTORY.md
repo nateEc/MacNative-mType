@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-LAYOUTFLUID-CADENCE-BINDING-01 | 新动画上下文接收当前屏幕上限 | anim.ts 全局帧率／原生窗口投影 | WebsiteLayoutFluidDisplayCadenceView／Cadence | 同屏换绑重新交付能力值，绑定和附着代次隔离排队报告，弱持有退休上下文；实际 Root 读取器绑定当前窗口。先红后绿，116 项扩大零失败零跳过；真实跨屏与刷新测量仍开放。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-LAYOUTFLUID-FADE-01 | 布局倒计时淡入淡出与同值中断 | layoutfluid-funbox-timer／applyReducedMotion／Anime.js 4.2.2 | WebsiteLayoutFluidFade／CountdownBadge／动画身份与窗口帧率读取 | 接通 125ms 二次 ease-out、零时长、同值 show／hide 重新开始、文本不重开及实时身份退休检查；96 个引擎标量采样、隐藏像素和扩大结果见官方审计。系统偏好切换、实际帧节奏／后台／跨屏、完整徽章与辅助功能仍开放。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

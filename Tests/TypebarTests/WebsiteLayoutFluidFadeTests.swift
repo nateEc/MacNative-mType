@@ -5,6 +5,57 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WebsiteLayoutFluidFadeTests: XCTestCase {
+  func testChangingCadenceConsumerReceivesCurrentScreenWithoutAScreenChange() async throws {
+    _ = NSApplication.shared
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 120, height: 60),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    let reader = WebsiteLayoutFluidDisplayCadenceView()
+    let first = WebsiteLayoutFluidFadeCadence(), second = WebsiteLayoutFluidFadeCadence()
+    first.displayFrameRate = -1; second.displayFrameRate = -1
+    reader.bind(to: first); window.contentView = reader
+    defer { window.contentView = nil; window.close() }
+    func settle(_ ready: () -> Bool) async throws {
+      let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+      while !ready(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+      XCTAssertTrue(ready())
+    }
+    try await settle { first.displayFrameRate > 0 }
+    reader.bind(to: second)
+    try await settle { second.displayFrameRate > 0 }
+    XCTAssertEqual(second.displayFrameRate, window.screen?.maximumFramesPerSecond ?? 60)
+    XCTAssertFalse(window.isVisible)
+  }
+
+  func testQueuedCadenceReportCannotWriteToReplacedOrDetachedConsumer() async throws {
+    _ = NSApplication.shared
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 120, height: 60),
+      styleMask: .borderless, backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    let reader = WebsiteLayoutFluidDisplayCadenceView()
+    window.contentView = reader
+    defer { window.contentView = nil; window.close() }
+    let first = WebsiteLayoutFluidFadeCadence(), second = WebsiteLayoutFluidFadeCadence()
+    first.displayFrameRate = -1; second.displayFrameRate = -2
+    reader.bind(to: first); reader.bind(to: second)
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while second.displayFrameRate < 0, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+    XCTAssertEqual(first.displayFrameRate, -1, "An already queued delivery belongs to its original binding")
+    XCTAssertEqual(second.displayFrameRate, window.screen?.maximumFramesPerSecond ?? 60)
+    let detached = WebsiteLayoutFluidFadeCadence(); detached.displayFrameRate = -3
+    reader.bind(to: detached); window.contentView = nil
+    try await Task.sleep(for: .milliseconds(20))
+    XCTAssertEqual(detached.displayFrameRate, -3, "Detachment must retire an already queued delivery")
+    window.contentView = reader
+    weak var released: WebsiteLayoutFluidFadeCadence?
+    do {
+      let transient = WebsiteLayoutFluidFadeCadence(); released = transient
+      reader.bind(to: transient)
+    }
+    XCTAssertNil(released, "The reader must not keep a retired animation context alive")
+    XCTAssertFalse(window.isVisible)
+  }
+
   func testCadenceUsesCurrentSettingsAndTheOwningHiddenWindow() async throws {
     let cadence = WebsiteLayoutFluidFadeCadence()
     cadence.displayFrameRate = 120
@@ -16,17 +67,17 @@ import XCTest
       styleMask: .borderless, backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
     let reader = WebsiteLayoutFluidDisplayCadenceView()
-    var reports: [Int] = []; reader.onRate = { reports.append($0) }
+    cadence.displayFrameRate = -1; reader.bind(to: cadence)
     window.contentView = reader
     defer { window.contentView = nil; window.close() }
     let deadline = ContinuousClock.now.advanced(by: .seconds(3))
-    while reports.isEmpty, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
-    XCTAssertEqual(reports.last, window.screen?.maximumFramesPerSecond ?? 60)
-    let count = reports.count
+    while cadence.displayFrameRate < 0, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+    XCTAssertEqual(cadence.displayFrameRate, window.screen?.maximumFramesPerSecond ?? 60)
     reader.report(); window.contentView = nil
+    cadence.displayFrameRate = -1
     NotificationCenter.default.post(name: NSWindow.didChangeScreenNotification, object: window)
     try await Task.sleep(for: .milliseconds(20))
-    XCTAssertEqual(reports.count, count, "A detached reader must not deliver a screen update")
+    XCTAssertEqual(cadence.displayFrameRate, -1, "A detached reader must not deliver a screen update")
     XCTAssertFalse(window.isVisible)
   }
 

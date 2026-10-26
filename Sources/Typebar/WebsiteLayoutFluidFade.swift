@@ -61,7 +61,7 @@ struct WebsiteLayoutFluidCountdownBadge: View {
       .padding(.top, 10)
       .modifier(WebsiteLayoutFluidFadeModifier(request: state.animationRequest, currentRequestID: currentRequestID, reducedMotion: reducedMotion,
         collapsesWhenHidden: true, frameInterval: { cadence.interval }))
-      .background { WebsiteLayoutFluidDisplayCadence(onRate: { cadence.displayFrameRate = $0 }).frame(width: 0, height: 0) }
+      .background { WebsiteLayoutFluidDisplayCadence(cadence: cadence).frame(width: 0, height: 0) }
       .onChange(of: frameRate, initial: true) { _, value in cadence.frameRate = value }
       .allowsHitTesting(false)
   }
@@ -76,19 +76,28 @@ struct WebsiteLayoutFluidCountdownBadge: View {
 }
 
 private struct WebsiteLayoutFluidDisplayCadence: NSViewRepresentable {
-  let onRate: @MainActor (Int) -> Void
+  let cadence: WebsiteLayoutFluidFadeCadence
   func makeNSView(context: Context) -> WebsiteLayoutFluidDisplayCadenceView { .init() }
   func updateNSView(_ view: WebsiteLayoutFluidDisplayCadenceView, context: Context) {
-    view.onRate = onRate; view.report()
+    view.bind(to: cadence)
   }
 }
 
 @MainActor final class WebsiteLayoutFluidDisplayCadenceView: NSView {
-  var onRate: (@MainActor (Int) -> Void)?
+  private weak var consumer: WebsiteLayoutFluidFadeCadence?
   private var reported: Int?
+  private var generation = UUID()
+  func bind(to consumer: WebsiteLayoutFluidFadeCadence) {
+    if self.consumer !== consumer {
+      self.consumer = consumer
+      generation = UUID(); reported = nil
+    }
+    report()
+  }
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     NotificationCenter.default.removeObserver(self)
+    generation = UUID()
     reported = nil
     if let window {
       NotificationCenter.default.addObserver(self, selector: #selector(report), name: NSWindow.didChangeScreenNotification, object: window)
@@ -97,14 +106,16 @@ private struct WebsiteLayoutFluidDisplayCadence: NSViewRepresentable {
     report()
   }
   @objc func report() {
-    guard let window else { return }
+    guard let window, let consumer else { return }
     let rate = window.screen?.maximumFramesPerSecond ?? 60
     guard reported != rate else { return }
     reported = rate
-    Task { @MainActor [weak self, weak window] in
-      guard let self, let window, self.window === window,
+    let capturedGeneration = generation
+    Task { @MainActor [weak self, weak window, weak consumer] in
+      guard let self, let window, let consumer, self.window === window,
+        self.generation == capturedGeneration, self.consumer === consumer,
         self.reported == rate, (window.screen?.maximumFramesPerSecond ?? 60) == rate else { return }
-      self.onRate?(rate)
+      consumer.displayFrameRate = rate
     }
   }
   deinit { NotificationCenter.default.removeObserver(self) }
