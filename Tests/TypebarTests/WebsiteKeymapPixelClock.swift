@@ -7,9 +7,11 @@ import XCTest
   var time: TimeInterval = 0
   var samples: [Sample] = []
   var waits: [TimeInterval] = []
+  var creations: [Sample] = []
   var environment: WebsiteKeymapAnimationClock {
     .init(now: { self.time }, didSample: { self.samples.append(.init(plan: $0, progress: $1)) },
-      didWait: { self.waits.append($0) })
+      didWait: { self.waits.append($0) },
+      didCreate: { self.creations.append(.init(plan: $0, progress: $1)) })
   }
   func wait(_ host: NSView, until ready: () -> Bool,
     file: StaticString = #filePath, line: UInt = #line) async throws {

@@ -26,7 +26,7 @@ final class WebsiteKeymapAutoplaySourceTests: XCTestCase {
     XCTAssertEqual(fixtures.count, 45)
     var failures = 0, checked = 0, examples: [String] = []
     for fixture in fixtures {
-      let initial = WebsiteKeymapAnimationTiming.sample(elapsed: 0, duration: fixture.duration / 1000)
+      let initial = WebsiteKeymapAnimationTiming.initial(duration: fixture.duration / 1000)
       XCTAssertEqual(initial.progress, fixture.initial)
       XCTAssertEqual(initial.complete, fixture.completedAt == 0)
       if fixture.duration > 0 { XCTAssertFalse(fixture.frames.isEmpty) }

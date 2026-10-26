@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-KEYMAP-REACTIVITY-01 | 中断重播、清理与同毫秒采样 | 真实 Solid core/store／Key／Anime effects | WebsiteKeymapAnimationTiming／真实反应链 QA | 15 场景／1072 角色标量帧、实际隐藏重播与注册表寿命检查；区分创建与零 elapsed tick，两项反例先红后绿。扩大 149 项、两组依赖失败契约通过；完整 DOM／界面反应链、首帧和全局栅格仍开放。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-KEYMAP-AUTOPLAY-01 | 键帽自动播放的启动进度与完成门槛 | Keymap／Anime.applyAnimation／固定引擎 update | WebsiteKeymapAnimationTiming | 创建点起始值、零时长终态和后续 12ms 提前量与纯 seek 分开。45 种组合／1795 来源帧及隐藏中间色、完成门槛先红后绿，扩大 145 项通过；全局栅格、整数毫秒节流、真实首帧和完整反应生命周期仍开放。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

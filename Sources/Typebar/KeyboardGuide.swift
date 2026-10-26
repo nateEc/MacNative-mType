@@ -5043,7 +5043,8 @@ private struct WebsiteAnimatedKeycap: View {
           signature = identity; plan = next
           capturedFrameRate = frameRate
           startedAt = next.duration > 0 ? clock.now() : nil
-          progress = next.duration > 0 ? 0 : 1
+          progress = WebsiteKeymapAnimationTiming.initial(duration: next.duration / 1000).progress
+          clock.didCreate(plan, progress)
         }
         guard let start = startedAt, next.duration > 0 else {
           guard !Task.isCancelled else { return }

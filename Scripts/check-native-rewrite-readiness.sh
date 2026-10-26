@@ -330,6 +330,10 @@ run_logged_check "preparing verified QA-only animation archive" "$temporary_dire
   env TMPDIR="$temporary_directory" zsh "$project_root/Scripts/prepare-animation-engine-qa.sh"
 line_scroll_anime_archive="$(tail -n 1 "$temporary_directory/line-scroll-source-runtime.log")"
 [[ -f "$line_scroll_anime_archive" ]] || fail "missing QA-only line scroll animation archive"
+run_logged_check "preparing verified QA-only keymap reactivity archive" "$temporary_directory/keymap-reactivity-runtime.log" \
+  env TMPDIR="$temporary_directory" zsh "$project_root/Scripts/prepare-keymap-reactivity-qa.sh"
+keymap_reactivity_archive="$(tail -n 1 "$temporary_directory/keymap-reactivity-runtime.log")"
+[[ -f "$keymap_reactivity_archive" ]] || fail "missing QA-only keymap reactivity archive"
 run_logged_check "executing complete pinned tape scrolling and caret composition" \
   "$temporary_directory/tape-presentation-source-check.log" \
   env TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
@@ -446,6 +450,7 @@ run_logged_check "running native client test suite" "$temporary_directory/client
   TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE="$daily_trend_source_archive" \
   TYPEBAR_HOWLER_SOURCE_ARCHIVE="$howler_source_archive" \
   TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
+  TYPEBAR_SOLID_QA_ARCHIVE="$keymap_reactivity_archive" \
   TYPEBAR_DISK_FIXTURE_ROOT="$temporary_directory/disk-model-fixtures" swift test
 
 require_no_conflicting_processes || fail "stop the listed process before running service tests"

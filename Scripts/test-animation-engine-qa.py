@@ -8,12 +8,14 @@ import tempfile
 import unittest
 
 SCRIPT = Path(__file__).resolve().with_name("prepare-animation-engine-qa.sh")
+ARCHIVE_KEY = "TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE"
+TEMP_PREFIX = "typebar-anime-qa."
 
 
-class AnimationQA(unittest.TestCase):
+class ArchiveQA(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.valid = Path(os.environ["TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE"]).resolve()
+        cls.valid = Path(os.environ[ARCHIVE_KEY]).resolve()
         if not cls.valid.is_file():
             raise AssertionError("Provide a verified QA archive before running these checks")
 
@@ -40,21 +42,21 @@ cp -- "$TYPEBAR_TEST_DOWNLOAD" "$output"
 """)
         curl.chmod(0o755)
         self.env = os.environ.copy()
-        self.env.pop("TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE", None)
+        self.env.pop(ARCHIVE_KEY, None)
         self.env.update(TMPDIR=str(self.root), PATH=str(self.binary) + os.pathsep + self.env["PATH"],
                         TYPEBAR_TEST_DOWNLOAD=str(self.valid))
 
     def run_preparation(self, archive=None, arguments=()):
         env = self.env.copy()
         if archive is not None:
-            env["TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE"] = str(archive)
+            env[ARCHIVE_KEY] = str(archive)
         return subprocess.run(["zsh", str(SCRIPT), *arguments], env=env, text=True, capture_output=True, timeout=30)
 
     def assert_rejected_without_download_artifacts(self, result):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, "")
         self.assertTrue(result.stderr)
-        self.assertEqual(list(self.root.glob("typebar-anime-qa.*")), [])
+        self.assertEqual(list(self.root.glob(TEMP_PREFIX + "*")), [])
 
     def test_verified_cached_archive_with_spaces_is_preserved(self):
         archive = self.root / "verified archive.tgz"

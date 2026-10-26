@@ -8,6 +8,7 @@ struct WebsiteKeymapAnimationClock: Sendable {
   var now: @MainActor @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
   var didSample: @MainActor @Sendable (WebsiteKeymapAnimationState.Plan, Double) -> Void = { _, _ in }
   var didWait: @MainActor @Sendable (TimeInterval) -> Void = { _ in }
+  var didCreate: @MainActor @Sendable (WebsiteKeymapAnimationState.Plan, Double) -> Void = { _, _ in }
 }
 private struct WebsiteKeymapAnimationClockKey: EnvironmentKey {
   static let defaultValue = WebsiteKeymapAnimationClock()
@@ -79,10 +80,13 @@ enum WebsiteKeymapAnimationTiming {
     let progress: Double
     let complete: Bool
   }
+  static func initial(duration: TimeInterval) -> Sample {
+    .init(progress: duration > 0 ? 0 : 1, complete: duration <= 0)
+  }
   static func sample(elapsed: TimeInterval, duration: TimeInterval) -> Sample {
-    // Construction publishes the starting value. Subsequent engine ticks
-    // include the pinned engine's autoplay lead; seek curves do not.
-    let phase = elapsed > 0 && duration > 0 ? elapsed + autoplayLead : elapsed
+    // Construction uses initial(). A real engine tick may have the same
+    // millisecond timestamp and still includes the autoplay lead.
+    let phase = duration > 0 ? elapsed + autoplayLead : elapsed
     return .init(progress: WebsiteKeymapAnimationState.progress(elapsed: phase, duration: duration),
       complete: phase >= duration)
   }

@@ -1,5 +1,19 @@
 # 官方配置兼容性审计
 
+## 真实反应链下的键帽中断与同毫秒 tick（2026-10-26，起点 b05d3af0）
+
+CFG-KEYMAP-REACTIVITY-01：为了复核中断时谁负责暂停与清理，新增 check-source-keymap-interruption.mjs。读取固定参考中的真实状态监听器、首图例选择器、Key memo/effect、完整 Anime.applyAnimation、挂载／响应 effect 和 onCleanup，连接实际 Solid 1.9.13 浏览器 core/store 及 Anime.js 4.2.2。三个 fps 与重复按键、静态切换、淡出期间恢复 react/next、卸载五种动作，共 15 个场景、1072 个角色标量帧。原暂停分支、零时长后续更新和卸载清理实际执行；重复动作的旧动画没有完成回调，淡出保持原始起点并清理后来到达的输入，卸载留下注册表数据且停止动画。配置信号、主题标量、元素和外部时钟驱动为自有边界，没有运行完整 JSX/DOM、真实输入源、配置副作用或浏览器 RAF。
+
+复核时发现跨 VM 对象可能改变真实 store 的对象合并条件，故将源码、core 与 store 放到同一 realm，检查根对象原型及深层代理后重新取证。只以 /tmp/typebar-keymap-interruption-verified-red.log 作为最终反例：4 项中两项失败，4.756 秒；原生数值对照有一个同毫秒 tick 不一致，实际隐藏键帽的重复输入也未发布该进度，其余淡出及静态／卸载路径本来通过，不计作反例。来源在 80ms 重播并于同一个时间戳执行 update，创建值仍为起始值，tick 已达到 0.093696；旧 helper 用 elapsed == 0 同时表示创建与采样，错误保留零进度。这是时间 API 的边界差异，不据此宣称已复现真实设备上的可见故障。
+
+原生现在显式区分 initial(duration:) 与采样，生产构造路径使用前者，tick 即使零 elapsed 也应用提前量。新增 didCreate 观察与 didSample 分开，保留已有像素夹具的采样计数意义；没有通过增加等待或放宽像素阈值获得通过。隐藏组件验证新错误脉冲从创建值开始、同毫秒推进，旧期限不清掉 tick 2，新期限完成才清除；淡出保持原起点，恢复 next/react 不重播，静态切换即清理，卸载不继续交付帧或完成回调。
+
+聚焦 10 项零失败零跳过（7.200 秒），扩大 149 项零失败零跳过（135.395 秒），包含实际配置发布／启动页及按类名选中的键盘、帧率、倒计时和滚动组。1072 个来源角色标量帧以 1e-8 对照，创建值和真实同毫秒 tick 分别验证；生命周期结果另由源码断言与隐藏组件核对，不把数值比较冒称全部调度或像素等价。日志 /tmp/typebar-keymap-interruption-focused.log、/tmp/typebar-keymap-interruption-expanded.log。
+
+prepare-keymap-reactivity-qa.sh 只准备并核对固定 Solid 归档，拒绝损坏或不存在的显式缓存，失败清理本次目录并保留外部文件／下载退出码；不安装模块或执行安装钩子。复用现有归档八项契约，两组各 8 项通过。清除继承 TYPEBAR 变量后，在独立临时目录执行实际工作流准备步骤，四个依赖环境值全部导出，两组契约在这些全新归档上再次通过（2.093／1.326 秒）。环境记录 /tmp/typebar-keymap-reactivity-ci-env.json；扩大原生验证使用这些新依赖，另显式提供通用参考根以执行更多来源检查。CI 与 readiness 均提供 Solid 依赖，CI 另运行准备失败契约；工作流触发、权限、超时和测试阈值不变。
+
+Debug 隔离打包、严格签名、实际包资源边界与原创性边界检查通过（/tmp/typebar-keymap-interruption-package.log）；参考索引及 1380 项人工目录校验通过。完整客户端、完整 readiness 和实际 GitHub runner 未重跑。真实首帧、全局采样栅格、整数毫秒节流、完整界面反应链、后台与跨屏仍未证明等价，目标继续进行；未启动 Typebar 主程序。
+
 ## 键帽自动播放进度与完成门槛（2026-10-26，起点 dfaf79a2）
 
 CFG-KEYMAP-AUTOPLAY-01：上一批对运行中引擎的探针提示纯 seek 曲线不能直接当自动播放曲线。本批新增 check-source-keymap-autoplay.mjs，校验固定参考和 Anime.js 4.2.2 指纹后，在内存执行实际 Keymap 的角色／时长／完成参数、完整 Anime.applyAnimation 以及实际引擎 update。五种 fps、0／37／120ms 预热和 react／static／next 退出共 45 种组合，记录 1795 个实际 onRender 帧；原完成回调实际清理两个图例并结束 fading。动画创建点保持起始值，零时长立即结束，后续进度有 12ms 提前量。角色数值、元素、信号、Date.now 和外部 update 驱动为自有适配器，未执行完整 Solid 反应链、浏览器 CSS、height:auto／exit 或中断重播路径，不将该函数完整执行冒称分支全覆盖。

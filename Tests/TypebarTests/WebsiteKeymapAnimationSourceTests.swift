@@ -70,7 +70,7 @@ import SwiftUI
     let initial = try capture("initial")
     clock.samples.removeAll()
     update(.staticGuide)
-    try await clock.wait(host) { clock.samples.contains { $0.plan.fading && $0.progress == 0 } }
+    try await clock.wait(host) { clock.creations.contains { $0.plan.fading && $0.progress == 0 } }
     clock.samples.removeAll(); clock.time = 0.0505
     try await clock.wait(host) { clock.samples.contains { $0.plan.fading && $0.progress == 0.4375 } }
     let middle = try capture("middle")
