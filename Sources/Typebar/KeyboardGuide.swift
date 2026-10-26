@@ -4725,6 +4725,8 @@ struct WebsiteKeymapHighlight: Equatable {
 }
 
 struct KeyboardGuide: View {
+  @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
+  @State private var animationCadence = WebsiteKeymapAnimationCadence()
   @KeyboardGuideNextCharacter var nextCharacter: Character?
   let mode: KeyboardGuideMode
   let feedback: KeyboardGuideFeedback?
@@ -4811,6 +4813,11 @@ struct KeyboardGuide: View {
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("键盘提示")
     .accessibilityValue(accessibilityValue)
+    .environment(\.websiteKeymapAnimationScheduling, .init(interval: {
+      animationCadence.interval(capturedFrameRate: $0)
+    }))
+    .background { PracticeDisplayCadence(consumer: animationCadence).frame(width: 0, height: 0) }
+    .onChange(of: animationFrameRate, initial: true) { _, value in animationCadence.frameRate = value }
     .task(id: feedback?.sequence) {
       if usesWebsiteKeymap, websiteFeedback != nil { return }
       guard mode == .react, let feedback else {
@@ -4989,10 +4996,13 @@ private struct WebsiteAnimatedKeycap: View {
   let onComplete: @MainActor () -> Void
   @Environment(\.colorScheme) private var scheme
   @Environment(\.websiteKeymapAnimationClock) private var clock
+  @Environment(\.websiteKeymapAnimationScheduling) private var scheduling
+  @Environment(\.typebarAnimationFrameRate) private var frameRate
   @State private var state = WebsiteKeymapAnimationState()
   @State private var plan = WebsiteKeymapAnimationState.Plan(fading: false, background: [.panel], foreground: [.secondary], duration: 0)
   @State private var signature: Signature?
   @State private var startedAt: TimeInterval?
+  @State private var capturedFrameRate = AnimationFrameRatePolicy.nativeFrameRate
   @State private var progress = 1.0
 
   private struct Input: Equatable {
@@ -5031,6 +5041,7 @@ private struct WebsiteAnimatedKeycap: View {
           legends: legends, generation: generation, colors: colors)
         if signature != identity {
           signature = identity; plan = next
+          capturedFrameRate = frameRate
           startedAt = next.duration > 0 ? clock.now() : nil
           progress = next.duration > 0 ? 0 : 1
         }
@@ -5052,7 +5063,9 @@ private struct WebsiteAnimatedKeycap: View {
             clock.didSample(plan, progress)
             onComplete(); return
           }
-          try? await Task.sleep(for: .seconds(min(1.0 / 60, 0.25 - elapsed)))
+          let interval = scheduling.interval(capturedFrameRate)
+          clock.didWait(interval)
+          try? await Task.sleep(for: .seconds(interval))
         }
       }
   }

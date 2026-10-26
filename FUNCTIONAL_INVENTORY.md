@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-KEYMAP-FPS-01 | 全局帧率限制键帽并保留当前动画上限 | anim.ts／Keymap／固定 Anime.js | WebsiteKeymapAnimationCadence／PracticeDisplayCadence | 15fps 与末帧绕过上限的先行反例已修复；旧动画保留创建值，新动画捕获当前值，实时上限和所属屏幕继续限制。550 次真实引擎设置转移、4400 次间隔投影及扩大 144 项零失败零跳过；整数毫秒量化、启动相位与真实刷新仍未证明等价。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | SND-PIANO-PREVIEW-KEY-01 | 钢琴试听保留后续点击键 | sound-controller.previewClick／playNote／playClick | TypingFeedbackSound | 32 组实际源码轨迹先红后绿，按源码保存试听覆盖键，普通按键仍覆盖；相关原生回归通过，音色与实体试听未验收。 |
 | GATE-CLIENT-PIXEL-01 | 客户端失败清单与隐藏像素验证 | 固定源码／实际客户端 CI 环境 | 偏好生命周期／渲染／背景与键盘 QA | 基线 6327 项发现 14 个失败测试，已全部复验通过；同屏背景控制、受控动画采样和逻辑点比较保留严格像素要求。修复后相关用例去重 344 项通过，2 项额外耐久检查按原条件跳过；完整修复后门禁未重跑，不计为新用户功能覆盖。 |
 
@@ -11,7 +15,7 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
-| CFG-LAYOUTFLUID-CADENCE-BINDING-01 | 新动画上下文接收当前屏幕上限 | anim.ts 全局帧率／原生窗口投影 | WebsiteLayoutFluidDisplayCadenceView／Cadence | 同屏换绑重新交付能力值，绑定和附着代次隔离排队报告，弱持有退休上下文；实际 Root 读取器绑定当前窗口。先红后绿，116 项扩大零失败零跳过；真实跨屏与刷新测量仍开放。 |
+| CFG-LAYOUTFLUID-CADENCE-BINDING-01 | 新动画上下文接收当前屏幕上限 | anim.ts 全局帧率／原生窗口投影 | PracticeDisplayCadenceView／WebsiteLayoutFluidFadeCadence | 同屏换绑重新交付能力值，绑定和附着代次隔离排队报告，弱持有退休上下文；实际 Root 读取器绑定当前窗口。先红后绿，116 项扩大零失败零跳过；读取器现供键盘共用，真实跨屏与刷新测量仍开放。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |

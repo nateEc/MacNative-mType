@@ -24,7 +24,7 @@ assert.equal(integrity, 'sha512-Ys3RuvLdAeI14fsdKCQy7ytu4057QX6Bb7m4jwmfd6iKmUmL
 assert.ok(fs.readFileSync(path.join(root, 'pnpm-lock.yaml'), 'utf8').includes(integrity));
 const bundle = execFileSync('tar', ['-xOf', archive, 'package/dist/bundles/anime.esm.js'],
   {encoding: 'utf8', maxBuffer: 2**21});
-const {engine} = await import('data:text/javascript;base64,' + Buffer.from(bundle).toString('base64'));
+const {engine, animate} = await import('data:text/javascript;base64,' + Buffer.from(bundle).toString('base64'));
 const animFile = path.join(root, 'frontend/src/ts/anim.ts');
 const animationCode = stripTypeScriptTypes(fs.readFileSync(animFile, 'utf8'), {mode: 'transform'});
 const timerSource = fs.readFileSync(path.join(root, 'frontend/src/ts/test/test-timer.ts'), 'utf8');
@@ -80,6 +80,8 @@ for (const initial of [15, 24, 30, 120, 1_000]) {
       SlowTimer: slowModule.namespace});
     new vm.Script(timerCode).runInContext(context, {timeout: 1_000});
     api.applyEngineSettings();
+    const existingAnimation = animate({value: 0}, {value: 1, duration: 250, autoplay: false});
+    assert.equal(existingAnimation.fps, initial);
     const actions = [{kind: 'observe', value: 125}, {kind: 'observe', value: 125.01},
       {kind: 'observe', value: 0}, {kind: 'set', value: 60}, {kind: 'observe', value: 0},
       {kind: 'observe', value: 250.01}, {kind: 'set', value: 1_000},
@@ -93,8 +95,13 @@ for (const initial of [15, 24, 30, 120, 1_000]) {
         new vm.Script('checkIfTimerIsSlow(drift)').runInContext(context, {timeout: 1_000}); }
       assert.equal(engine.fps, engine.defaults.frameRate);
       assert.equal(api.getfpsLimit(), requested);
+      const freshAnimation = animate({value: 0}, {value: 1, duration: 250, autoplay: false});
+      assert.equal(existingAnimation.fps, initial, 'Global FPS changes do not rewrite a running animation clock');
+      assert.equal(freshAnimation.fps, engine.defaults.frameRate, 'New animations capture the current default');
       steps.push({action, frameRate: engine.fps, requested, severeDrifts: context.slowTimerCount,
-        failed, slowTimer: slowModule.namespace.get()});
+        failed, slowTimer: slowModule.namespace.get(), existingAnimationFrameRate: existingAnimation.fps,
+        freshAnimationFrameRate: freshAnimation.fps});
+      freshAnimation.cancel();
     }
     assert.equal(steps[0].frameRate, initial);
     if ((config.mode === 'time' && config.limit > 0 && config.limit < 130)
@@ -107,6 +114,7 @@ for (const initial of [15, 24, 30, 120, 1_000]) {
     assert.equal(steps[3].frameRate, 60);
     assert.equal(steps[8].frameRate, 1_000, 'Repeated native selection reapplies the setting');
     assert.equal(steps.at(-1).frameRate, requested);
+    existingAnimation.cancel();
     fixtures.push({initial, ...config, steps});
   }
 }

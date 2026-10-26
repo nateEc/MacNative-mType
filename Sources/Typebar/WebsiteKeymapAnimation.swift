@@ -7,6 +7,7 @@ import SwiftUI
 struct WebsiteKeymapAnimationClock: Sendable {
   var now: @MainActor @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
   var didSample: @MainActor @Sendable (WebsiteKeymapAnimationState.Plan, Double) -> Void = { _, _ in }
+  var didWait: @MainActor @Sendable (TimeInterval) -> Void = { _ in }
 }
 private struct WebsiteKeymapAnimationClockKey: EnvironmentKey {
   static let defaultValue = WebsiteKeymapAnimationClock()
@@ -15,6 +16,31 @@ extension EnvironmentValues {
   var websiteKeymapAnimationClock: WebsiteKeymapAnimationClock {
     get { self[WebsiteKeymapAnimationClockKey.self] }
     set { self[WebsiteKeymapAnimationClockKey.self] = newValue }
+  }
+}
+
+@MainActor final class WebsiteKeymapAnimationCadence: PracticeDisplayFrameRateConsumer {
+  var frameRate = AnimationFrameRatePolicy.nativeFrameRate
+  var displayFrameRate = 60
+  func interval(capturedFrameRate: Int) -> TimeInterval {
+    PromptLineScrollMotion.frameInterval(
+      frameRate: min(AnimationFrameRatePolicy.normalized(capturedFrameRate),
+        AnimationFrameRatePolicy.normalized(frameRate)), displayFrameRate: displayFrameRate)
+  }
+}
+
+struct WebsiteKeymapAnimationScheduling: Sendable {
+  var interval: @MainActor @Sendable (Int) -> TimeInterval = {
+    PromptLineScrollMotion.frameInterval(frameRate: $0, displayFrameRate: 60)
+  }
+}
+private struct WebsiteKeymapAnimationSchedulingKey: EnvironmentKey {
+  static let defaultValue = WebsiteKeymapAnimationScheduling()
+}
+extension EnvironmentValues {
+  var websiteKeymapAnimationScheduling: WebsiteKeymapAnimationScheduling {
+    get { self[WebsiteKeymapAnimationSchedulingKey.self] }
+    set { self[WebsiteKeymapAnimationSchedulingKey.self] = newValue }
   }
 }
 

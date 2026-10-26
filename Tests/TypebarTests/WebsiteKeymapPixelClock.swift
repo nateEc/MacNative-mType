@@ -6,8 +6,10 @@ import XCTest
   struct Sample { let plan: WebsiteKeymapAnimationState.Plan; let progress: Double }
   var time: TimeInterval = 0
   var samples: [Sample] = []
+  var waits: [TimeInterval] = []
   var environment: WebsiteKeymapAnimationClock {
-    .init(now: { self.time }, didSample: { self.samples.append(.init(plan: $0, progress: $1)) })
+    .init(now: { self.time }, didSample: { self.samples.append(.init(plan: $0, progress: $1)) },
+      didWait: { self.waits.append($0) })
   }
   func wait(_ host: NSView, until ready: () -> Bool,
     file: StaticString = #filePath, line: UInt = #line) async throws {

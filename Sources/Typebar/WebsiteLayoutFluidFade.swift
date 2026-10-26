@@ -11,7 +11,6 @@ enum WebsiteLayoutFluidFade {
     return from + (target - from) * progress
   }
 }
-
 @MainActor struct WebsiteLayoutFluidFadeModifier: ViewModifier {
   let request: WebsiteLayoutFluidCountdown.AnimationRequest?
   let currentRequestID: () -> UUID?
@@ -61,62 +60,16 @@ struct WebsiteLayoutFluidCountdownBadge: View {
       .padding(.top, 10)
       .modifier(WebsiteLayoutFluidFadeModifier(request: state.animationRequest, currentRequestID: currentRequestID, reducedMotion: reducedMotion,
         collapsesWhenHidden: true, frameInterval: { cadence.interval }))
-      .background { WebsiteLayoutFluidDisplayCadence(cadence: cadence).frame(width: 0, height: 0) }
+      .background { PracticeDisplayCadence(consumer: cadence).frame(width: 0, height: 0) }
       .onChange(of: frameRate, initial: true) { _, value in cadence.frameRate = value }
       .allowsHitTesting(false)
   }
 }
 
-@MainActor final class WebsiteLayoutFluidFadeCadence {
+@MainActor final class WebsiteLayoutFluidFadeCadence: PracticeDisplayFrameRateConsumer {
   var frameRate = AnimationFrameRatePolicy.nativeFrameRate
   var displayFrameRate = 60
   var interval: TimeInterval {
     PromptLineScrollMotion.frameInterval(frameRate: frameRate, displayFrameRate: displayFrameRate)
   }
-}
-
-private struct WebsiteLayoutFluidDisplayCadence: NSViewRepresentable {
-  let cadence: WebsiteLayoutFluidFadeCadence
-  func makeNSView(context: Context) -> WebsiteLayoutFluidDisplayCadenceView { .init() }
-  func updateNSView(_ view: WebsiteLayoutFluidDisplayCadenceView, context: Context) {
-    view.bind(to: cadence)
-  }
-}
-
-@MainActor final class WebsiteLayoutFluidDisplayCadenceView: NSView {
-  private weak var consumer: WebsiteLayoutFluidFadeCadence?
-  private var reported: Int?
-  private var generation = UUID()
-  func bind(to consumer: WebsiteLayoutFluidFadeCadence) {
-    if self.consumer !== consumer {
-      self.consumer = consumer
-      generation = UUID(); reported = nil
-    }
-    report()
-  }
-  override func viewDidMoveToWindow() {
-    super.viewDidMoveToWindow()
-    NotificationCenter.default.removeObserver(self)
-    generation = UUID()
-    reported = nil
-    if let window {
-      NotificationCenter.default.addObserver(self, selector: #selector(report), name: NSWindow.didChangeScreenNotification, object: window)
-      NotificationCenter.default.addObserver(self, selector: #selector(report), name: NSApplication.didChangeScreenParametersNotification, object: nil)
-    }
-    report()
-  }
-  @objc func report() {
-    guard let window, let consumer else { return }
-    let rate = window.screen?.maximumFramesPerSecond ?? 60
-    guard reported != rate else { return }
-    reported = rate
-    let capturedGeneration = generation
-    Task { @MainActor [weak self, weak window, weak consumer] in
-      guard let self, let window, let consumer, self.window === window,
-        self.generation == capturedGeneration, self.consumer === consumer,
-        self.reported == rate, (window.screen?.maximumFramesPerSecond ?? 60) == rate else { return }
-      consumer.displayFrameRate = rate
-    }
-  }
-  deinit { NotificationCenter.default.removeObserver(self) }
 }

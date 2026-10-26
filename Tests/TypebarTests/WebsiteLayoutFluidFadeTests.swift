@@ -10,7 +10,7 @@ import XCTest
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 120, height: 60),
       styleMask: .borderless, backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
-    let reader = WebsiteLayoutFluidDisplayCadenceView()
+    let reader = PracticeDisplayCadenceView()
     let first = WebsiteLayoutFluidFadeCadence(), second = WebsiteLayoutFluidFadeCadence()
     first.displayFrameRate = -1; second.displayFrameRate = -1
     reader.bind(to: first); window.contentView = reader
@@ -32,7 +32,7 @@ import XCTest
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 120, height: 60),
       styleMask: .borderless, backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
-    let reader = WebsiteLayoutFluidDisplayCadenceView()
+    let reader = PracticeDisplayCadenceView()
     window.contentView = reader
     defer { window.contentView = nil; window.close() }
     let first = WebsiteLayoutFluidFadeCadence(), second = WebsiteLayoutFluidFadeCadence()
@@ -66,7 +66,7 @@ import XCTest
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 120, height: 60),
       styleMask: .borderless, backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
-    let reader = WebsiteLayoutFluidDisplayCadenceView()
+    let reader = PracticeDisplayCadenceView()
     cadence.displayFrameRate = -1; reader.bind(to: cadence)
     window.contentView = reader
     defer { window.contentView = nil; window.close() }

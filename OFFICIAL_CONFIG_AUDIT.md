@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## 键帽全局帧率与当前动画上限（2026-10-26，起点 a5e9b1b0）
+
+CFG-KEYMAP-FPS-01：检查生产键帽循环发现仍固定 1/60 秒，尽管实际父级已发布全局帧率。隐藏生产键帽通过 PracticeAnimationFrameRate 设置 15fps，等待回调实际为 0.0166667 而非 0.0666667 秒，1 项先行反例失败（/tmp/typebar-keymap-cadence-red.log，1.090 秒）。只新增等待观察钩子而未改变调度，失败不是桩假定。补充末帧反例发现原 min(interval, remaining) 会在最后 1ms 绕过 30fps 上限（/tmp/typebar-keymap-cadence-tail-red.log，1.187 秒），随后取消这个缩短等待。
+
+扩展原 check-source-animation-frame-rate.mjs：执行实际完整 anim.ts 与固定 Anime.js 4.2.2，50 组／550 次设置变化中保留现有动画对象并在每步创建新对象。证明现有 fps 不被全局改写，新 fps 读取当前 defaults.frameRate；包括慢计时临时 30、手动重复设置与清除。对象不启用真实调度，不能把 fps 字段检查冒称实际播放帧数。原生捕获每次新逻辑动画的有效值，后续按其与实时引擎值和所属窗口屏幕能力的最小值请求采样，修改上限不重开进度；不引入自有图片或参考资产。
+
+将已有布局倒计时的窗口能力读取器提取为 PracticeDisplayCadenceView，共用弱接收者协议，保留原有换绑、附着代次、排队报告核对与弱引用生命周期。键盘只挂载一个读取器，向所有键帽提供同一调度上下文。倒计时实际 Root 检查现按 consumer 类型定位，继续证明徽章自己的窗口关联，没有因增加键盘读取器而降低要求。
+
+聚焦 17 项零失败零跳过（5.682 秒）后增加末帧反例；修复后扩大 144 项零失败零跳过（127.676 秒），包含完整实际配置发布／启动页、键盘各测试族、公共屏幕读取器的原换绑／退休／弱引用检查，以及布局倒计时、计时健康和滚动相关选中检查。实际键帽检查 15→120 仍保留旧 15，新 flash 才捕获 120 并受窗口能力限制，再降至 30 保留 0.4375 进度且末帧等待仍为 1/30 秒。550 次实际引擎转移的现有／新动画 fps 与四种屏幕能力输入产生 4400 次原生间隔对照；它们是计算投影，不冒称 4400 次可见或真实屏幕操作。日志为 /tmp/typebar-keymap-cadence-focused.log 与 /tmp/typebar-keymap-cadence-expanded.log。参考行为索引和 1378 项人工目录校验通过；Debug 隔离打包、严格签名、实际包资源边界与原创性边界检查通过（/tmp/typebar-keymap-cadence-package.log）。完整客户端、完整 readiness 与实际 runner 未重跑。提交前 fetch 确认 main 保持 8c52fb13、开发分支基线保持 a5e9b1b0。
+
+实现和验证边界见 KEYMAP_ANIMATION_CADENCE_CONTRACT.md。额外只读的真实引擎 update 探针显示 15fps 示例渲染发生在 1／68／135／202／269ms，60fps 示例在 239ms 完成；提示原引擎整数毫秒量化和启动提前相位仍需独立对齐。这只是自有时钟和对象适配下的引擎观察，不是完整 Anime 组件或浏览器；本次不以请求频率修复宣称完成时间和物理刷新已经等价。探针文件与输出在 /tmp/typebar-anime-cadence-probe.mjs、/tmp/typebar-anime-cadence-probe.log。未启动 Typebar 主程序，未触发或调整 GitHub 门禁。
+
 ## 客户端扩大回归与钢琴试听按键（2026-10-26，起点 175e4692）
 
 SND-PIANO-PREVIEW-KEY-01／GATE-CLIENT-PIXEL-01：在清除继承 TYPEBAR 变量后，使用实际 CI 准备步骤导出的参考、Zod 和动画归档，加上工作流内存库／布局变量运行客户端。为遵守本机不可见验证约束，明确排除 ResultSheetTerminationTests 的 testActualSwiftUISheetDoesNotPreventTermination 和 testBridgeRemainsNonblockingWhenAttachedWindowBecomesASheet；测试及 CI 配置没有删改。这不是完整门禁。基线执行 6327 项，110 项按原条件跳过，14 个失败测试共 21 条失败（其中一条 unexpected），2353.523 秒；核心 TypingEngineTests 的 798 项通过。日志为 /tmp/typebar-client-ci-local-scoped-20261026.log。最初只排除一项的尝试在到达 sheet 组之前主动中断，确认原进程退出后才启动这一轮；不把中断尝试当作完成或超时重启。
