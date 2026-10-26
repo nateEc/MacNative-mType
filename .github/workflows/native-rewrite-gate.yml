@@ -105,13 +105,18 @@ jobs:
             exit 1
           fi
 
-      - name: Prepare pinned website config schema QA dependency
+      - name: Prepare pinned website source QA dependencies
         shell: bash
         run: |
           set -euo pipefail
           schema_qa_root="$(zsh Scripts/prepare-website-config-schema-qa.sh)"
+          animation_qa_archive="$(zsh Scripts/prepare-animation-engine-qa.sh)"
           printf 'TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT=%s\n' "$schema_qa_root" >> "$GITHUB_ENV"
           printf 'TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT=%s\n' "${{ steps.reference.outputs.path }}" >> "$GITHUB_ENV"
+          printf 'TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE=%s\n' "$animation_qa_archive" >> "$GITHUB_ENV"
+
+      - name: Verify animation QA preparation failure boundaries
+        run: python3 Scripts/test-animation-engine-qa.py
 
       - name: Run native client tests without launching the app
         shell: bash

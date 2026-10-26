@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| GATE-ANIMATION-DEPENDENCY-01 | 固定源码动画对照的可复现依赖 | Native Rewrite Gate／readiness／参考 lockfile | prepare-animation-engine-qa.sh／失败契约与 CI 环境导出 | 修复有参考却无动画归档时的真实失败；校验版本和 SHA-512，失败不发布、不删除外部缓存，CI 与 readiness 共用。8 项契约及干净依赖下 24 项选定原生检查通过；完整两套门禁与实际 runner 未验证，不增加用户功能覆盖声明。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-LAYOUTFLUID-CADENCE-BINDING-01 | 新动画上下文接收当前屏幕上限 | anim.ts 全局帧率／原生窗口投影 | WebsiteLayoutFluidDisplayCadenceView／Cadence | 同屏换绑重新交付能力值，绑定和附着代次隔离排队报告，弱持有退休上下文；实际 Root 读取器绑定当前窗口。先红后绿，116 项扩大零失败零跳过；真实跨屏与刷新测量仍开放。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

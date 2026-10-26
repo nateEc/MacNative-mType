@@ -326,11 +326,9 @@ run_logged_check "executing pinned whole-line wrapper mode and limit decisions" 
 run_logged_check "executing pinned complete slow-word copy callback" \
   "$temporary_directory/slow-word-copy-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-slow-word-copy.mjs" "$reference_root"
-line_scroll_anime_archive="${TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE:-$temporary_directory/animejs-4.2.2.tgz}"
-if [[ ! -f "$line_scroll_anime_archive" ]]; then
-  run_logged_check "preparing pinned QA-only line scroll animation archive" "$temporary_directory/line-scroll-source-runtime.log" \
-    npm pack --ignore-scripts --pack-destination "$temporary_directory" animejs@4.2.2
-fi
+run_logged_check "preparing verified QA-only animation archive" "$temporary_directory/line-scroll-source-runtime.log" \
+  env TMPDIR="$temporary_directory" zsh "$project_root/Scripts/prepare-animation-engine-qa.sh"
+line_scroll_anime_archive="$(tail -n 1 "$temporary_directory/line-scroll-source-runtime.log")"
 [[ -f "$line_scroll_anime_archive" ]] || fail "missing QA-only line scroll animation archive"
 run_logged_check "executing complete pinned tape scrolling and caret composition" \
   "$temporary_directory/tape-presentation-source-check.log" \
@@ -431,9 +429,17 @@ run_logged_check "executing pinned complete initial generation retry bounds" \
   "$project_root/Scripts/check-source-initial-generation-retries.mjs" "$reference_root"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
+website_schema_qa_root="${TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT:-}"
+if [[ -z "$website_schema_qa_root" ]]; then
+  run_logged_check "preparing pinned website schema QA dependency" "$temporary_directory/website-schema-runtime.log" \
+    env TMPDIR="$temporary_directory" zsh "$project_root/Scripts/prepare-website-config-schema-qa.sh"
+  website_schema_qa_root="$(tail -n 1 "$temporary_directory/website-schema-runtime.log")"
+fi
+[[ -f "$website_schema_qa_root/package.json" ]] || fail "missing QA-only website config schema dependency"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
 run_logged_check "running native client test suite" "$temporary_directory/client-tests.log" \
   env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_ENDURANCE_TESTS=1 TYPEBAR_REFERENCE_ROOT="$reference_root" \
+  TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT="$reference_root" TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT="$website_schema_qa_root" \
   TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES="$config_link_source_dependencies" \
   TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   TYPEBAR_INBOX_SOURCE_PACKAGE="$inbox_source_package" \

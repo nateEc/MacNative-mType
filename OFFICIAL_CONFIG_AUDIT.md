@@ -1,5 +1,19 @@
 # 官方配置兼容性审计
 
+## 源码动画依赖的门禁准备（2026-10-26，起点 05091346）
+
+GATE-ANIMATION-DEPENDENCY-01：当前门禁已提供 TYPEBAR_LAYOUT_AUDIT_REFERENCE 与网站配置 Zod，却没有提供键盘动画源码对照所需的 TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE。本地扩大回归一直显式传入该归档。按现有 CI 的缺失变量组合单独运行实际动画对照，Node 在归档断言处退出，继而出现退出码和空 JSON 两处失败（/tmp/typebar-ci-animation-dependency-red.log，1.147 秒）。这是当前开发代码的前置缺口，历史邮件仍以各次实际运行日志为准。
+
+新增 prepare-animation-engine-qa.sh：默认下载固定 Anime.js 4.2.2 到独立临时目录，先核对 SHA-512，再读取包名／版本，成功后只输出归档绝对路径；也可验证显式给定的只读缓存。完整性或下载失败不发布路径并删除本次拥有的临时目录，保留外部缓存和下载退出码；输出路径拒绝换行，避免破坏环境文件。没有执行安装生命周期脚本或把归档放入应用／参考检出。
+
+8 项离线契约检查覆盖有效下载、含空格的有效缓存、缓存篡改／缺失、下载篡改／中断、多行路径和错误参数。首次中断夹具发现脚本没有自己的诊断文字（8 项／1 处失败）；补充明确错误后 8 项通过，1.479 秒（/tmp/typebar-ci-animation-preparation-contracts-final.log），HTTP 退出码 22 和清理断言保留。
+
+门禁准备步骤现在明确准备并导出归档，并在客户端测试前运行上述契约检查；main／PR 触发范围、并发、超时、原测试与失败判定保持。readiness 使用相同归档准备器，客户端前在自身临时目录准备缺失 Zod 并传递网站配置参考／Zod 根目录，原有其他 QA 依赖及全量检查保留。
+
+本地从实际 workflow YAML 读取准备步骤，在清空已有 TYPEBAR_* 依赖变量后执行原 bash 代码并真实下载两份固定依赖，以临时 GITHUB_ENV 收集三项导出；Node 为 24.19.0（路径记录 /tmp/typebar-ci-animation-prepared-env.json）。随后只传这些导出与现有 CI 的布局／内存测试变量：8 项准备契约再次通过，1.858 秒；24 项选定原生回归零失败／零跳过，26.779 秒（/tmp/typebar-ci-animation-native-green.log），包含 403 组完整 JSON 导入、69 组声音／行为边界、756 组倒计时及 1,152 个键盘动画状态快照。zsh 语法与 workflow YAML 解析通过。
+
+Debug 应用包、严格签名、资源边界和固定参考原创性检查通过（/tmp/typebar-ci-animation-package.log）；参考行为审计 47 个直接入口／119 个测试符号／17 份支撑规范及 1,375 条人工清单结构通过。这里只证明准备阶段和选定用例；整个 readiness、完整客户端／服务端套件以及实际 GitHub runner 尚未运行。没有启动主程序、推送 main、创建 PR 或调度／重跑 CI，完整重写仍未完成。
+
 ## 倒计时屏幕帧率接收方换绑（2026-10-26，起点 2d323e23）
 
 CFG-LAYOUTFLUID-CADENCE-BINDING-01：实际 Root 的倒计时使用所属窗口帧率读取器；新增真实练习页检查确认该 NSView 确实存在并附着当前隐藏窗口，未因初始透明和零高度而被省去。源 anim.ts 的 fpsLimit／临时低帧率行为仍沿既有环境传播，本批不改变原版算法或用户设置。
