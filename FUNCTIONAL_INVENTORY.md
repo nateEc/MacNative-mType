@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-LAYOUTFLUID-COUNTDOWN-01 | 布局切换倒计时的持续显隐与文字 | layoutfluid-funbox-timer／test-timer.layoutfluid／handleSpace | WebsiteLayoutFluidCountdown／PracticePageSessionStore／Root | 时间与词数事件更新显隐和文字，隐藏保留文字，更新不擅自显示；新尝试和拥有者退休清空。756 组实际源码动作／状态、工作流与实际隐藏页及 101 项扩大通过。动画、可见与辅助功能、全局信号及 IO 中途顺序仍开放，见官方审计。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-LAYOUTFLUID-HIDDEN-FIELDS-01 | 无空格词表的布局区间 | layoutfluid.handleSpace／goToNextWord | TypingSession／UnitInputTargets／实际练习页 | 布局分母按已加载目标目录计数，保留首／中／末空字段，不按拼接文本或完成预算计数。120 组新源码序列、55 组普通词及四词实际隐藏页通过；扩大 99 项零失败零跳过。生成与 IO 中途顺序、倒计时完整显示和实体操作仍开放，见官方审计。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

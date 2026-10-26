@@ -6,6 +6,30 @@ import SwiftUI
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
   private enum Failure: Error, Equatable { case notParked, provider }
+  func testLayoutFluidCountdownRetainsHiddenTextAndRetiresOnReplacementOrStop() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let json = #"{"mode":"time","time":10,"keymapMode":"static","funbox":["layoutfluid"],"customLayoutfluid":["qwerty","colemak","dvorak"]}"#
+    try await f.workflow.apply(json: json, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let attempt = f.page.state.session.automaticInputAttemptID
+    XCTAssertEqual(f.page.layoutFluidCountdown, .init())
+    for second in 0...5 { try f.workflow.advanceLayoutFluid(.time(second), attemptID: attempt) }
+    XCTAssertFalse(f.page.layoutFluidCountdown.visible)
+    XCTAssertEqual(f.page.layoutFluidCountdown.text, "Dvorak in: 1s",
+      "Updating a hidden timer's text must not implicitly show it")
+    state = f.page.state; state.session.bailOut(); f.page.replace(state)
+    try await f.workflow.apply(json: json, systemIsDark: false)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.page.layoutFluidCountdown, .init())
+    XCTAssertThrowsError(try f.workflow.advanceLayoutFluid(.time(0), attemptID: attempt))
+    XCTAssertEqual(f.page.layoutFluidCountdown, .init())
+    state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    try f.workflow.advanceLayoutFluid(.time(0), attemptID: state.session.automaticInputAttemptID)
+    XCTAssertTrue(f.page.layoutFluidCountdown.visible)
+    f.workflow.stop()
+    XCTAssertEqual(f.page.layoutFluidCountdown, .init())
+  }
+
   func testOwnedNavigationAfterCompletionKeepsHookTimeNoQuitAndRejectsForgedOrReplayedEvents() async throws {
     for noQuit in [false, true] {
       let f = try Fixture(); defer { f.close() }

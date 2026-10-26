@@ -304,6 +304,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
       let plan = try WebsiteLayoutFluidTransition.plan(current: original.draft.projection.runtime, event: event,
         context: context.context, active: navigation?.wasActive ?? true)
+      page.updateLayoutFluidCountdown(WebsiteLayoutFluidCountdown.actions(current: original.draft.projection.runtime, event: event),
+        attemptID: attemptID)
       var receiptID = original.applicationID
       for step in plan.steps {
         try Task.checkCancellation()

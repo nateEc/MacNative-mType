@@ -4138,9 +4138,8 @@ private struct ContentView: View {
 
   private var layoutFluidNotice: String? {
     guard session.configuration.modifiers.contains(.layoutFluid) else { return nil }
-    if let draft = committedPracticeDraft {
-      let count = draft.generators.layoutFluidLayouts.count
-      guard count > 0, session.configuration.mode == .time || session.layoutFluidWordCount / count > 0 else { return nil }
+    if committedPracticeDraft != nil {
+      return pageSessionStore.layoutFluidCountdown.visible ? pageSessionStore.layoutFluidCountdown.text : nil
     }
     if session.configuration.mode == .time, session.hasStarted,
       let upcoming = LayoutFluidPolicy.upcomingLayout(

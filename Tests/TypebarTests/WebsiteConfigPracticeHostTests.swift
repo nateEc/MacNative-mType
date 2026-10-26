@@ -330,6 +330,7 @@ import XCTest
     let attempt = f.state.page.state.session.automaticInputAttemptID
     try await settle { input.insertionAttemptID == attempt && input.acceptsTextInput }
     XCTAssertEqual(f.state.page.state.session.layoutFluidWordCount, 4)
+    XCTAssertEqual(f.state.page.layoutFluidCountdown, .init())
     for completed in 1...2 {
       let field = try XCTUnwrap(f.state.page.state.session.promptCompositionField)
       input.onInsert(String(decoding: field.targetUTF16, as: UTF16.self), false)
@@ -338,6 +339,8 @@ import XCTest
         completed == 1 ? .ansiQwerty : .ansiColemak)
       XCTAssertEqual(f.state.page.state.presentation?.publication.draft.keyboardTypography.inputLayout.emulatedLayout,
         completed == 1 ? .ansiQwerty : .ansiColemak)
+      XCTAssertEqual(f.state.page.layoutFluidCountdown.visible, completed == 1)
+      XCTAssertEqual(f.state.page.layoutFluidCountdown.text, "Colemak starting next word")
       XCTAssertTrue(f.state.page.state.session.websiteWordNavigationEvents.isEmpty)
       XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
       XCTAssertTrue(f.views(TypingInputView.self).first === input)

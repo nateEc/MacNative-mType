@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## Layout Fluid 倒计时事件与隐藏状态（2026-10-26，起点 77fcfc13）
+
+CFG-LAYOUTFLUID-COUNTDOWN-01：原版计时器的 show／hide 与 updateTime／updateWords 是独立操作，隐藏不清除文字，更新文字也不意味着显示。时间模式按向下取整的切换秒点依次检查 3、2、1 秒；只有 3 秒分支显式 show，物理布局将改变时先 hide。词数模式使用实际导航进度及加载词表，下一布局存在且余量不大于三时显示，余量为一使用 starting next word；无区间或没有下一布局时隐藏。时间与词数模式对布局名下划线的格式处理不同。
+
+原生完整配置页此前从完成词数／当前秒重新推导提示，并在没有倒计时时显示“当前布局”，丢失了隐藏状态。现在由 WebsiteLayoutFluidCountdown 保留显隐与最后文字；受当前工作流和尝试准入保护的导航／时钟事件更新窗口本地状态，Root 读取该状态，旧原生设置路径保持原有策略。附着、脱离、停止拥有该处理器的工作流及发布新尝试时清空提示；同尝试的布局 setter 发布不清空它。
+
+源码夹具在既有 756 组运行时样本中额外执行固定参考的实际 layoutfluid-funbox-timer 和大小写格式函数，以明确的 DOM 节点适配记录动作与持续显隐／文字；只把动画调用视为显隐意图，不证明浏览器动画。适配器的初始 null 文字是有界夹具哨兵，与原 HTML 的隐藏占位文字不同；该初值及辅助功能树仍未对齐，不作等价声明。空模型有效 RED 为 560 处断言失败（/tmp/typebar-layout-countdown-red.log，1.926 秒），实现后的 756 组动作及状态、既有布局 setter 对照共三项通过（/tmp/typebar-layout-countdown-focused.log，2.556 秒）。包含空／单／三布局、零时长、10／11 秒非整除边界、词数不足分段及 No Quit。
+
+实际四词 nospace 生产隐藏页同时检查首词后显示 Colemak starting next word、第二词布局切换后隐藏但保留文字，输入身份和错误断言保留。工作流测试检查 10 秒／三布局在第 4 秒隐藏后第 5 秒只更新 Dvorak in: 1s 而不重新显示，完成旧尝试后正式重新应用配置清空提示，旧尝试回调拒绝且停止工作流清空。中间夹具错误保留：第一次倒退到第 3 秒却期待显示并在活动尝试应用配置，出现两处失败（/tmp/typebar-layout-countdown-integration.log）；随后直接替换 repeatedAttempt 没有重建发布作用域，出现 incomplete（/tmp/typebar-layout-countdown-broad.log，101 项／1 处失败，35.501 秒）。最终使用正常 bailOut 后的配置应用流程，不放宽生产准入。
+
+最终冻结代码扩大回归 101 项零失败／零跳过，32.411 秒（/tmp/typebar-layout-countdown-final-broad.log）。Debug 应用包、严格签名、资源边界和固定参考原创性检查通过（/tmp/typebar-layout-countdown-package.log）；参考行为审计 47 个直接入口／119 个测试符号／17 份支撑规范及 1,372 条人工清单结构通过。这不是完整重写完成声明：淡入淡出曲线／时长、真实显示与辅助功能验收、跨尝试的原版全局信号、生成与外部 IO 批次中途顺序及实体设备继续开放。没有显示窗口或启动 Typebar 主程序。
+
 ## 隐藏字段的 Layout Fluid 分母（2026-10-26，起点 949f6b6a）
 
 CFG-LAYOUTFLUID-HIDDEN-FIELDS-01：实际 layoutfluid.handleSpace 以 TestWords.words.length 为分母划分布局区间，不以可见文本的空白分词计数。此前原生 layoutFluidWordCount 使用完成预算的 promptWordCount；nospace 的多个目标拼接后被误算成一个词，两个布局时区间长度成为零，实际页面不会在应有词界切换。

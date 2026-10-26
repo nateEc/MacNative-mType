@@ -8,6 +8,7 @@ final class PracticePageSessionStore {
   let owner = UUID()
   @ObservationIgnored let lazyModeNotices = WebsiteConfigLazyModeNotices()
   private(set) var state = PracticePageSessionState()
+  private(set) var layoutFluidCountdown = WebsiteLayoutFluidCountdown()
   private(set) var restartController: WebsitePracticeRestartController?
   private(set) var startupController = WebsiteConfigStartupController()
   private var startupInputSuspended = false
@@ -130,6 +131,7 @@ final class PracticePageSessionStore {
 
   func attach(to router: PreferenceConfigurationSaveRouter) {
     guard !committing else { return }
+    layoutFluidCountdown = .init()
     typebarSettingsAction = nil; clearLegacyReturn()
     startupController.stop(); startupController = .init(); setStartupInputSuspended(false)
     retireRestartController()
@@ -137,6 +139,7 @@ final class PracticePageSessionStore {
     self.router = router
   }
   func detach() {
+    layoutFluidCountdown = .init()
     attachment = UUID()
     if committing { pendingDetach = true }
     else { router = nil }
@@ -145,6 +148,7 @@ final class PracticePageSessionStore {
   }
   func replace(_ state: PracticePageSessionState) {
     guard !committing else { return }
+    if state.session.automaticInputAttemptID != self.state.session.automaticInputAttemptID { layoutFluidCountdown = .init() }
     var state = state
     if let mode = state.presentation?.publication.draft.keyboardTypography.guideMode { state.session.synchronizeWebsiteKeymapMode(mode) }
     if state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID { retireRestartController() }
@@ -244,11 +248,16 @@ final class PracticePageSessionStore {
   }
   func retireLayoutFluidHandler(owner: UUID) {
     guard layoutFluidHandlerOwner == owner else { return }
+    layoutFluidCountdown = .init()
     layoutFluidHandlerOwner = nil; layoutFluidHandler = nil
   }
   func advanceLayoutFluid(_ event: WebsiteLayoutFluidTransition.Event, attemptID: UUID) throws {
     guard acceptsInput(for: attemptID), let layoutFluidHandler else { throw PracticePageSessionStateError.stale }
     try layoutFluidHandler(event, attemptID)
+  }
+  func updateLayoutFluidCountdown(_ actions: [WebsiteLayoutFluidCountdown.Action], attemptID: UUID) {
+    guard !committing, acceptsInput(for: attemptID) else { return }
+    layoutFluidCountdown.apply(actions)
   }
   @discardableResult
   func bindRestartController(using coordinator: WebsiteConfigCommitCoordinator,
@@ -383,6 +392,7 @@ final class PracticePageSessionStore {
   func installCommitted(_ state: PracticePageSessionState,
     retainingRestartController controller: WebsitePracticeRestartController? = nil) {
     precondition(committing)
+    if state.session.automaticInputAttemptID != self.state.session.automaticInputAttemptID { layoutFluidCountdown = .init() }
     var state = state
     if let mode = state.presentation?.publication.draft.keyboardTypography.guideMode { state.session.synchronizeWebsiteKeymapMode(mode) }
     clearLegacyReturn()

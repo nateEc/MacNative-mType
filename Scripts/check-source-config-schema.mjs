@@ -314,12 +314,20 @@ if (defaultsMode) {
       const start=source.indexOf(from),end=source.indexOf(until,start);assert.ok(start>=0&&end>start);
       return stripTypeScriptTypes(wrap(source.slice(start,end)),{mode:'transform'});
     }
-    let wordIndex=0,total=10;
+    let wordIndex=0,total=10,countdownActions=[];
+    let countdown={visible:false,text:null};
+    const countdownNode={animate({opacity}){countdown.visible=opacity===1;countdownActions.push(opacity===1?'show':'hide')},
+      setText(text){countdown.text=text;countdownActions.push('text:'+text)},setStyle:noop};
     Object.assign(context,{Config:simulation.Config,getConfig:simulation.Config,setConfig:setters.setConfig,timerDebug:false,
       createMemo:f=>f,replaceUnderscoresWithSpaces:value=>value.replaceAll('_',' '),
-      LayoutfluidFunboxTimer:{show:noop,hide:noop,updateTime:noop,updateWords:noop},
+      qs:()=>countdownNode,applyReducedMotion:value=>value,
       TestWords:{words:{get length(){return total;},getCurrent:()=>({text:'abc'})}},
       getActiveWordIndex:()=>wordIndex,getCurrentInput:()=>'',setTimeout:f=>f(),highlight:noop});
+    vm.runInContext(extract('utils/strings.ts','export function capitalizeFirstLetter(str:',
+      'export function normalizeName',text=>text.replace('export function','function')),context);
+    const countdownSource=fs.readFileSync(path.join(frontend,'test/funbox/layoutfluid-funbox-timer.ts'),'utf8');
+    vm.runInContext(stripTypeScriptTypes(countdownSource.slice(countdownSource.indexOf('const timerEl =')).replaceAll('export function','function'),{mode:'transform'})+
+      ';globalThis.LayoutfluidFunboxTimer={show,hide,updateTime,updateWords};',context);
     vm.runInContext(extract('test/test-timer.ts','function layoutfluid(time:','function checkIfFailed('),context);
     vm.runInContext(extract('test/funbox/funbox-functions.ts','  layoutfluid: {','  gibberish:',
       text=>`globalThis.fluid=({${text}}).layoutfluid;`),context);
@@ -332,17 +340,18 @@ if (defaultsMode) {
           Object.assign(simulation.Config,structuredClone(defaults),{mode,time:duration,customLayoutfluid:layouts,keymapMode,
             funbox:['layoutfluid',...(noQuit?['no_quit']:[])]});
           simulation.flags={testActive:false,authenticated:false,documentComplete:true};total=count;
-          context.fluid.applyConfig();simulation.flags.testActive=true;
+          context.fluid.applyConfig();simulation.flags.testActive=true;countdown={visible:false,text:null};
           for(const progress of mode==='time'?[0,1,2,3,4,5,6,7,8,9,10,11,12]:[1,2,3,4,5,6,7,8,9,10,11,12]){
             // Model a visual setter between callbacks; restart belongs to the
             // separate command oracle. These functions must read current Config.
             setters.setConfig('keymapLayout','dvorak');
             if(progress===3||progress===4)setters.setConfig('keymapMode','off');
             const current=structuredClone(simulation.Config);
-            simulation.events=[];simulation.saves=[];simulation.notices=[];
+            simulation.events=[];simulation.saves=[];simulation.notices=[];countdownActions=[];
             if(mode==='time')context.layoutfluid(progress);else{wordIndex=progress-1;context.fluid.handleSpace();}
             fixtures.push({mode,progress,total:count,current,runtime:structuredClone(simulation.Config),events:structuredClone(simulation.events),
-              saves:[...simulation.saves],notices:[...simulation.notices],guide:context.getKeymapLayout().layout});
+              saves:[...simulation.saves],notices:[...simulation.notices],guide:context.getKeymapLayout().layout,
+              countdownActions:[...countdownActions],countdown:structuredClone(countdown)});
           }
         }
     verify();console.log(JSON.stringify({fixtures}));
