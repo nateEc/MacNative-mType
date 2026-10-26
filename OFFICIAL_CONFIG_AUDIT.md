@@ -1,5 +1,21 @@
 # 官方配置兼容性审计
 
+## Layout Fluid 淡入淡出与中断（2026-10-26，起点 2dce092e）
+
+CFG-LAYOUTFLUID-FADE-01：只读核对 layoutfluid-funbox-timer → ElementWithUtils.animate → Anime.js 4.2.2。普通 show／hide 使用 125ms，实际 applyReducedMotion 在媒体偏好启用时返回零，固定引擎默认 ease 为 out(2)。新 QA 执行实际计时器与媒体偏好函数，并校验参考 lockfile 及引擎归档 SHA-512；DOM 绑定为标量透明度，非浏览器 CSS。三种初值、两个端点和两个减少动态效果标志各八个 seek，共 96 个采样；零时长在 seek(0) 仍为初值，后续采样到端点。
+
+瞬时跳变模型有效 RED 为 20 处中间采样失败（/tmp/typebar-layout-fade-red.log，1.253 秒）。原生实现二次 ease-out 插值，模型给每次 show／hide 独立身份，重复同值操作也重新开始，单纯改文字不重新开始。实际 Root 的完整配置提示改为保留在树内淡出，透明度归零后折叠；新操作从当前已发布透明度继续，重置／退休撤销旧任务。SwiftUI task(id:) 的取消与重建语义沿用本项目已有实现方式，并增加每帧读取实际页面当前身份的检查；因此不依赖 SwiftUI 先处理视图更新。未加入 JS 动画引擎或参考资产。
+
+隐藏 NSHostingView 使用实际生产 modifier 与可控时钟采集像素：淡入 31.25ms 为 0.4375，同值 show 再过 31.25ms 为 0.68359375，转为 hide 后再过 31.25ms 为 0.384521484375；文字更新不换动画身份，退休后旧任务不再发布帧。显式减少动态效果标志检查零时长到达端点。首次像素夹具因私有嵌套 Observable 宏及只读环境键导致编译失败，不作行为 RED；系统红色和绝对 RGB 阈值分别暴露端点色彩假设问题，随后改用同画面的原始不透明色块与白色色块校准，保留端点相等及中间变化断言。两项通过（/tmp/typebar-layout-fade-pixels-controls.log，0.548 秒），已查看 showing／hiding／零时长图；这不证明系统媒体偏好的真实切换或完整徽章视觉验收。
+
+渲染采样接入现有 typebarAnimationFrameRate 环境与 TimerHealth 策略，使用所属 NSWindow 屏幕的最大帧率限制，移动屏幕／屏幕参数变化时刷新，异步报告检查仍附着同一窗口；脱离移除观察。设置变化不重启透明度过渡。新增检查覆盖 15／1000 配置与 60／120 屏幕上限、隐藏窗口所属屏幕读取及脱离后不报告。首次扩大 106 项通过（37.477 秒）；接入帧率后 107 项零失败／零跳过（/tmp/typebar-layout-fade-final-broad.log，38.458 秒），包括既有倒计时／导航／配置宿主、756 组计时器动作及 1,152 个键盘动画状态快照。
+
+随后单独令当前身份退休而保持视图快照不变，旧任务在 SwiftUI 取消前多发布一帧，形成有效 RED（/tmp/typebar-layout-fade-owner-red.log，3 项／1 处失败，1.432 秒）。实时身份检查后，该间隙不再发布帧。这补充了 [Apple 文档所述的视图 task 身份取消机制](https://developer.apple.com/documentation/swiftui/view/task%28id%3Aname%3Apriority%3Afile%3Aline%3A_%3A%29)，不将视图更新的调度等同于同步退休。最终冻结代码扩大 114 项零失败，其中既有帧率源码用例因缺少其专用 TYPEBAR_REFERENCE_ROOT 变量跳过一项（/tmp/typebar-layout-fade-owned-final-broad.log，37.822 秒）；新增淡入淡出三项全部通过，0.423 秒。补齐该变量后仅单独运行遗漏项，通过且未跳过（/tmp/typebar-layout-fade-fps-source.log，0.319 秒）；114 条路径均已执行，不把两次运行表述为一次零跳过全量。
+
+最终代码 Debug 应用包、严格签名、资源边界和固定参考原创性检查通过（/tmp/typebar-layout-fade-owned-package.log）；先前 package 日志属于退休检查加入前的阶段，不替代最终包。参考行为审计 47 个直接入口／119 个测试符号／17 份支撑规范及 1,373 条人工清单结构通过。
+
+仍未证明原浏览器 CSS 透明度量化、首帧精确时点、真实刷新节奏与后台调度、跨屏实机移动、完整徽章／辅助功能及原始隐藏 DOM 初值。原生零时长分支在首次任务处理时直接提交端点，不能用标量 seek(0) 的证据宣称浏览器与原生首帧相同。没有显示窗口或启动 Typebar 主程序，完整重写目标继续开放。
+
 ## Layout Fluid 倒计时事件与隐藏状态（2026-10-26，起点 77fcfc13）
 
 CFG-LAYOUTFLUID-COUNTDOWN-01：原版计时器的 show／hide 与 updateTime／updateWords 是独立操作，隐藏不清除文字，更新文字也不意味着显示。时间模式按向下取整的切换秒点依次检查 3、2、1 秒；只有 3 秒分支显式 show，物理布局将改变时先 hide。词数模式使用实际导航进度及加载词表，下一布局存在且余量不大于三时显示，余量为一使用 starting next word；无区间或没有下一布局时隐藏。时间与词数模式对布局名下划线的格式处理不同。

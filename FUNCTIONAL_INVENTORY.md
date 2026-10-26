@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-LAYOUTFLUID-FADE-01 | 布局倒计时淡入淡出与同值中断 | layoutfluid-funbox-timer／applyReducedMotion／Anime.js 4.2.2 | WebsiteLayoutFluidFade／CountdownBadge／动画身份与窗口帧率读取 | 接通 125ms 二次 ease-out、零时长、同值 show／hide 重新开始、文本不重开及实时身份退休检查；96 个引擎标量采样、隐藏像素和扩大结果见官方审计。系统偏好切换、实际帧节奏／后台／跨屏、完整徽章与辅助功能仍开放。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | CFG-LAYOUTFLUID-COUNTDOWN-01 | 布局切换倒计时的持续显隐与文字 | layoutfluid-funbox-timer／test-timer.layoutfluid／handleSpace | WebsiteLayoutFluidCountdown／PracticePageSessionStore／Root | 时间与词数事件更新显隐和文字，隐藏保留文字，更新不擅自显示；新尝试和拥有者退休清空。756 组实际源码动作／状态、工作流与实际隐藏页及 101 项扩大通过。动画、可见与辅助功能、全局信号及 IO 中途顺序仍开放，见官方审计。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

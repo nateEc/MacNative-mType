@@ -1,6 +1,10 @@
 import Foundation
 
 struct WebsiteLayoutFluidCountdown: Equatable {
+  struct AnimationRequest: Equatable {
+    let id = UUID()
+    let target: Double
+  }
   enum Action: Equatable {
     case show, hide, text(String)
     var trace: String {
@@ -9,9 +13,14 @@ struct WebsiteLayoutFluidCountdown: Equatable {
   }
   private(set) var visible = false
   private(set) var text: String?
+  private(set) var animationRequest: AnimationRequest?
   mutating func apply(_ actions: [Action]) {
     for action in actions {
-      switch action { case .show: visible = true; case .hide: visible = false; case .text(let value): text = value }
+      switch action {
+      case .show: visible = true; animationRequest = .init(target: 1)
+      case .hide: visible = false; animationRequest = .init(target: 0)
+      case .text(let value): text = value
+      }
     }
   }
   @MainActor static func actions(current: [String: WebsiteConfigValue], event: WebsiteLayoutFluidTransition.Event) -> [Action] {

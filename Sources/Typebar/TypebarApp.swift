@@ -3724,7 +3724,10 @@ private struct ContentView: View {
         .background(.thinMaterial, in: Capsule())
           .padding(.top, 10)
       }
-      if let layoutFluidNotice {
+      if committedPracticeDraft != nil, session.configuration.modifiers.contains(.layoutFluid) {
+        WebsiteLayoutFluidCountdownBadge(state: pageSessionStore.layoutFluidCountdown,
+          currentRequestID: { pageSessionStore.layoutFluidCountdown.animationRequest?.id })
+      } else if let layoutFluidNotice {
         Label(layoutFluidNotice, systemImage: "keyboard.badge.ellipsis")
           .font(.caption.weight(.medium))
           .padding(.horizontal, 12)
