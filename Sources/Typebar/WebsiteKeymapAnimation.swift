@@ -66,9 +66,25 @@ struct WebsiteKeymapAnimationState {
       foreground: [.background, next ? .background : .secondary], duration: 250) }
     return .init(fading: false, background: [next ? .accent : .panel], foreground: [next ? .background : .secondary], duration: 0)
   }
-  static func progress(elapsed: Double) -> Double {
-    let t = min(1, max(0, elapsed / 0.25))
+  static func progress(elapsed: Double, duration: Double = 0.25) -> Double {
+    guard duration > 0 else { return 1 }
+    let t = min(1, max(0, elapsed / duration))
     return 1 - (1 - t) * (1 - t)
+  }
+}
+
+enum WebsiteKeymapAnimationTiming {
+  static let autoplayLead: TimeInterval = 0.012
+  struct Sample: Equatable {
+    let progress: Double
+    let complete: Bool
+  }
+  static func sample(elapsed: TimeInterval, duration: TimeInterval) -> Sample {
+    // Construction publishes the starting value. Subsequent engine ticks
+    // include the pinned engine's autoplay lead; seek curves do not.
+    let phase = elapsed > 0 && duration > 0 ? elapsed + autoplayLead : elapsed
+    return .init(progress: WebsiteKeymapAnimationState.progress(elapsed: phase, duration: duration),
+      complete: phase >= duration)
   }
 }
 

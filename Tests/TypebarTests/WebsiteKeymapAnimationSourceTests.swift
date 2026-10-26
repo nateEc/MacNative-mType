@@ -71,10 +71,10 @@ import SwiftUI
     clock.samples.removeAll()
     update(.staticGuide)
     try await clock.wait(host) { clock.samples.contains { $0.plan.fading && $0.progress == 0 } }
-    clock.samples.removeAll(); clock.time = 0.0625
+    clock.samples.removeAll(); clock.time = 0.0505
     try await clock.wait(host) { clock.samples.contains { $0.plan.fading && $0.progress == 0.4375 } }
     let middle = try capture("middle")
-    clock.samples.removeAll(); clock.time = 0.25
+    clock.samples.removeAll(); clock.time = 0.238
     try await clock.wait(host) { clock.samples.contains { !$0.plan.fading && $0.progress == 1 } }
     let ended = try capture("ended")
     XCTAssertGreaterThan(initial.blue, 0.9)

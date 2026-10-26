@@ -40,12 +40,12 @@ import XCTest
     clock.waits.removeAll(); host.rootView = content(sequence: 2)
     let expected = 1 / Double(min(120, window.screen?.maximumFramesPerSecond ?? 60))
     try await clock.wait(host) { clock.waits.contains { abs($0 - expected) < 0.000_001 } }
-    clock.samples.removeAll(); clock.time = 0.0625
+    clock.samples.removeAll(); clock.time = 0.0505
     try await clock.wait(host) { clock.samples.contains { $0.progress == 0.4375 } }
     clock.waits.removeAll(); clock.samples.removeAll(); settings.animationFrameRate = 30
     try await clock.wait(host) { clock.waits.contains { abs($0 - 1.0 / 30) < 0.000_001 } }
     XCTAssertTrue(clock.samples.contains { $0.progress == 0.4375 }, "Changing the cap must not restart the fade")
-    clock.waits.removeAll(); clock.time = 0.249
+    clock.waits.removeAll(); clock.time = 0.237
     try await clock.wait(host) { !clock.waits.isEmpty }
     XCTAssertEqual(try XCTUnwrap(clock.waits.first), 1.0 / 30, accuracy: 0.000_001,
       "The final frame must remain subject to the FPS cap")

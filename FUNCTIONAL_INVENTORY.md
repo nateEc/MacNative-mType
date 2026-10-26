@@ -2,7 +2,11 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
-| CFG-KEYMAP-FPS-01 | 全局帧率限制键帽并保留当前动画上限 | anim.ts／Keymap／固定 Anime.js | WebsiteKeymapAnimationCadence／PracticeDisplayCadence | 15fps 与末帧绕过上限的先行反例已修复；旧动画保留创建值，新动画捕获当前值，实时上限和所属屏幕继续限制。550 次真实引擎设置转移、4400 次间隔投影及扩大 144 项零失败零跳过；整数毫秒量化、启动相位与真实刷新仍未证明等价。 |
+| CFG-KEYMAP-AUTOPLAY-01 | 键帽自动播放的启动进度与完成门槛 | Keymap／Anime.applyAnimation／固定引擎 update | WebsiteKeymapAnimationTiming | 创建点起始值、零时长终态和后续 12ms 提前量与纯 seek 分开。45 种组合／1795 来源帧及隐藏中间色、完成门槛先红后绿，扩大 145 项通过；全局栅格、整数毫秒节流、真实首帧和完整反应生命周期仍开放。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
+| CFG-KEYMAP-FPS-01 | 全局帧率限制键帽并保留当前动画上限 | anim.ts／Keymap／固定 Anime.js | WebsiteKeymapAnimationCadence／PracticeDisplayCadence | 15fps 与末帧绕过上限的先行反例已修复；旧动画保留创建值，新动画捕获当前值，实时上限和所属屏幕继续限制。550 次真实引擎设置转移、4400 次间隔投影及扩大 144 项零失败零跳过；启动进度另见 AUTOPLAY 项，全局栅格、整数毫秒量化与真实刷新仍未证明等价。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |

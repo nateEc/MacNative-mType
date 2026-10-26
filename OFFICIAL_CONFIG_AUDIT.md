@@ -1,5 +1,17 @@
 # 官方配置兼容性审计
 
+## 键帽自动播放进度与完成门槛（2026-10-26，起点 dfaf79a2）
+
+CFG-KEYMAP-AUTOPLAY-01：上一批对运行中引擎的探针提示纯 seek 曲线不能直接当自动播放曲线。本批新增 check-source-keymap-autoplay.mjs，校验固定参考和 Anime.js 4.2.2 指纹后，在内存执行实际 Keymap 的角色／时长／完成参数、完整 Anime.applyAnimation 以及实际引擎 update。五种 fps、0／37／120ms 预热和 react／static／next 退出共 45 种组合，记录 1795 个实际 onRender 帧；原完成回调实际清理两个图例并结束 fading。动画创建点保持起始值，零时长立即结束，后续进度有 12ms 提前量。角色数值、元素、信号、Date.now 和外部 update 驱动为自有适配器，未执行完整 Solid 反应链、浏览器 CSS、height:auto／exit 或中断重播路径，不将该函数完整执行冒称分支全覆盖。
+
+仅抽取原生时间采样函数并保持旧行为，再运行新证据：筛选 4 项产生 23 条预期失败（9.645 秒），其中来源帧聚合对照有 1768／1795 帧不一致，已有帧率对象值对照本来通过，不将其记作反例。实际隐藏键帽也无法在 50.5ms 发布 0.4375 进度或在逻辑 238ms 完成。日志 /tmp/typebar-keymap-autoplay-red.log。
+
+WebsiteKeymapAnimationTiming 现在把自动播放相位与纯曲线分开：创建点不提前，后续采样加 12ms；按实际计划时长计算进度与完成，零时长归终态。键帽生产循环使用这个采样，纯 seek 默认 250ms 曲线保持原定义。隐藏中间色仍是相同的 0.4375 曲线点，但对应自动播放的逻辑 50.5ms；帧率变化仍不重开相位，末帧上限测试移至逻辑 237ms，避免把已到完成门槛的时刻误当作待采样末帧。
+
+聚焦 18 项零失败零跳过（6.268 秒），扩大 145 项零失败零跳过（129.374 秒），包括实际配置发布／启动页、按类名选取的键盘测试族、帧率与倒计时及相关选中滚动检查。45 种组合中全部 1795 个来源帧的两个角色进度与完成标志通过 1e-8 对照，创建值和来源完成帧也通过；该精度用于数值投影，不是颜色像素阈值。日志 /tmp/typebar-keymap-autoplay-focused.log、/tmp/typebar-keymap-autoplay-expanded.log。Debug 隔离打包、严格签名、实际包资源边界与原创性边界检查通过（/tmp/typebar-keymap-autoplay-package.log）；参考索引及 1379 项人工目录校验通过。提交前 fetch 确认 main 保持 8c52fb13、开发分支基线保持 dfaf79a2。完整客户端、readiness 和实际 runner 未重跑。
+
+仍未证明相同的全局采样栅格、整数毫秒节流或真实设备的帧分布；本批只证明在已观察引擎帧时刻的原生数值和门槛。Native 自有采样循环何时实际醒来与浏览器 RAF 不同，不能由 1795 个数值对照宣称整条播放时间线已完全等价。可见窗口、后台、跨屏、真实首帧、中断重播与完整 Solid 反应生命周期继续验收。未启动 Typebar 主程序或调整 GitHub 门禁。
+
 ## 键帽全局帧率与当前动画上限（2026-10-26，起点 a5e9b1b0）
 
 CFG-KEYMAP-FPS-01：检查生产键帽循环发现仍固定 1/60 秒，尽管实际父级已发布全局帧率。隐藏生产键帽通过 PracticeAnimationFrameRate 设置 15fps，等待回调实际为 0.0166667 而非 0.0666667 秒，1 项先行反例失败（/tmp/typebar-keymap-cadence-red.log，1.090 秒）。只新增等待观察钩子而未改变调度，失败不是桩假定。补充末帧反例发现原 min(interval, remaining) 会在最后 1ms 绕过 30fps 上限（/tmp/typebar-keymap-cadence-tail-red.log，1.187 秒），随后取消这个缩短等待。

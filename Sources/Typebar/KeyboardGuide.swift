@@ -5052,9 +5052,10 @@ private struct WebsiteAnimatedKeycap: View {
         }
         while !Task.isCancelled {
           let elapsed = clock.now() - start
-          progress = WebsiteKeymapAnimationState.progress(elapsed: elapsed)
+          let sample = WebsiteKeymapAnimationTiming.sample(elapsed: elapsed, duration: next.duration / 1000)
+          progress = sample.progress
           clock.didSample(plan, progress)
-          if elapsed >= 0.25 {
+          if sample.complete {
             guard !Task.isCancelled else { return }
             state.complete()
             plan = state.update(mode: mode, steno: steno, matches: matches, tick: 0, correct: true)
