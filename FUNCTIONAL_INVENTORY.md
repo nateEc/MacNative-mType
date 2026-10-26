@@ -2,6 +2,11 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| SND-PIANO-PREVIEW-KEY-01 | 钢琴试听保留后续点击键 | sound-controller.previewClick／playNote／playClick | TypingFeedbackSound | 32 组实际源码轨迹先红后绿，按源码保存试听覆盖键，普通按键仍覆盖；相关原生回归通过，音色与实体试听未验收。 |
+| GATE-CLIENT-PIXEL-01 | 客户端失败清单与隐藏像素验证 | 固定源码／实际客户端 CI 环境 | 偏好生命周期／渲染／背景与键盘 QA | 基线 6327 项发现 14 个失败测试，已全部复验通过；同屏背景控制、受控动画采样和逻辑点比较保留严格像素要求。修复后相关用例去重 344 项通过，2 项额外耐久检查按原条件跳过；完整修复后门禁未重跑，不计为新用户功能覆盖。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | GATE-ANIMATION-DEPENDENCY-01 | 固定源码动画对照的可复现依赖 | Native Rewrite Gate／readiness／参考 lockfile | prepare-animation-engine-qa.sh／失败契约与 CI 环境导出 | 修复有参考却无动画归档时的真实失败；校验版本和 SHA-512，失败不发布、不删除外部缓存，CI 与 readiness 共用。8 项契约及干净依赖下 24 项选定原生检查通过；完整两套门禁与实际 runner 未验证，不增加用户功能覆盖声明。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

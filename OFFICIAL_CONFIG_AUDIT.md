@@ -1,5 +1,21 @@
 # 官方配置兼容性审计
 
+## 客户端扩大回归与钢琴试听按键（2026-10-26，起点 175e4692）
+
+SND-PIANO-PREVIEW-KEY-01／GATE-CLIENT-PIXEL-01：在清除继承 TYPEBAR 变量后，使用实际 CI 准备步骤导出的参考、Zod 和动画归档，加上工作流内存库／布局变量运行客户端。为遵守本机不可见验证约束，明确排除 ResultSheetTerminationTests 的 testActualSwiftUISheetDoesNotPreventTermination 和 testBridgeRemainsNonblockingWhenAttachedWindowBecomesASheet；测试及 CI 配置没有删改。这不是完整门禁。基线执行 6327 项，110 项按原条件跳过，14 个失败测试共 21 条失败（其中一条 unexpected），2353.523 秒；核心 TypingEngineTests 的 798 项通过。日志为 /tmp/typebar-client-ci-local-scoped-20261026.log。最初只排除一项的尝试在到达 sheet 组之前主动中断，确认原进程退出后才启动这一轮；不把中断尝试当作完成或超时重启。
+
+实际声音差异：固定 sound-controller 的完整 previewClick → playNote 会将 KeyQ 写回 currentCode，随后 playClick 沿用该键。此前原生只临时覆盖，原有修饰键监听测试少一次发声。新增只读 check-source-piano-preview.mjs 执行实际按键监听、音符映射、初始化、previewClick／playClick／playNote；音频上下文、配置选择和修饰状态是自有适配器。32 组频率轨迹在旧原生实现上全部失败（/tmp/typebar-piano-preview-red.log，1.132 秒），随后仅在钢琴分支保存覆盖键，不改变音阶或样本分支。已有“试听不改变最近键”的旧测试与实际源码相反，现要求试听后 Q、之后普通键覆盖、Shift 重开规则保留。具体边界见 PIANO_PREVIEW_KEY_CONTRACT.md；不宣称真实浏览器、音色或硬件时序等价。
+
+旧断言的核对：CJK 自定义目标已按普通字段目录保存，复制全文行为本身正确，改为严格核对目录及 JSON／记录往返；偏好拥有者已归属页面会话，当前草稿提供字体／语言／键盘，卸载先 detach 后移除；渲染入口已通过保留同一 style 的闭包传递，计时提示已走选中播放器；专注状态的结构性移除条件额外排除源配置结果页。更新这些具体入口断言，并增强实际隐藏 Root 的字体读取、拥有者及卸载检查，没有删除相关行为要求。
+
+像素失败另有实测证据：背景控制表面没有窗口，得到 1600 字节，而附着 Retina 的实际表面为 6400 字节；控制表面现附着同一隐藏窗口，并明确断言倍率和尺寸后逐字节比较，仍须能区分 24 与 16 points/rem。键盘三项原测试单独执行也有 6 条失败（/tmp/typebar-keymap-baseline-isolated.log，23.009 秒）：先等待再首次布局会留下旧计划，瞬态在同步像素扫描时又可能自然结束，位置还使用了 1 倍像素常量。新增单调时钟依赖的默认值仍是系统 uptime，曲线、250ms 时长和帧间隔不变；隐藏测试通过实际采样回调控制逻辑帧，独立案例隔离视图身份，再将像素位置换算为逻辑点，保留颜色、数量及距离断言。
+
+隐藏启动页截图实际包含 QWERTY。独立 Vision 探针在整个稀疏键盘范围漏读 Q，在固定窗口的顶行范围正确识别 Q/W，故将该字母断言限定到顶行，Esc 与关闭／Simon 的检查继续使用原区域。保存的原图为 /tmp/typebar-profile-keyboard-host.png，探针输出 /tmp/typebar-keyboard-ocr-probe.log。此处仍是固定尺寸隐藏页验证，不能代替实体窗口、辅助功能或各显示器的完整验收。
+
+修复后聚焦 110 项零失败零跳过（35.853 秒），覆盖基线全部 14 个失败测试；实际隐藏 Root 新增当前字体读取、页面拥有者与卸载后租约消失检查。扩大 204 项零失败零跳过（67.313 秒），包含完整启动页／配置发布及声音、偏好、渲染和目录相关组。另按类名前缀运行完整键盘／声音命令／渲染族 164 项，零失败，2 项保留原有十万词及渲染耐久开关而跳过（49.670 秒）；没有开启它们或把跳过记为通过。三轮去重共 344 个测试通过，日志分别为 /tmp/typebar-client-repairs-focused.log、/tmp/typebar-client-repairs-expanded.log、/tmp/typebar-client-repairs-related-prefix.log。中间帧实际 sRGB 蓝色均值由 1 降至 0.6289，最后为 0.00029；原始 next-key 逻辑位置为 178／354 点，差 176 点。完整修复后客户端、服务端、实际 GitHub runner 和完整 readiness 尚未重跑。没有启动 Typebar 主程序或改变通知、工作流触发与门禁阈值。
+
+参考行为索引 47 direct／119 原生符号／17 support 通过，人工目录 1377 项通过。Debug 隔离打包、严格签名、实际包资源边界及固定参考的原创性边界检查均通过（/tmp/typebar-client-repairs-package.log），没有运行应用。逐项比较基线失败名称与三轮通过记录，14 项均已复验。提交前 fetch 确认 main 仍为 8c52fb13、开发分支基线 175e4692，Actions 总数 826、最近 main 成功；这些只证明未新增远端运行，不将旧 main 成功冒称本批 runner 验证。
+
 ## 源码动画依赖的门禁准备（2026-10-26，起点 05091346）
 
 GATE-ANIMATION-DEPENDENCY-01：当前门禁已提供 TYPEBAR_LAYOUT_AUDIT_REFERENCE 与网站配置 Zod，却没有提供键盘动画源码对照所需的 TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE。本地扩大回归一直显式传入该归档。按现有 CI 的缺失变量组合单独运行实际动画对照，Node 在归档断言处退出，继而出现退出码和空 JSON 两处失败（/tmp/typebar-ci-animation-dependency-red.log，1.147 秒）。这是当前开发代码的前置缺口，历史邮件仍以各次实际运行日志为准。

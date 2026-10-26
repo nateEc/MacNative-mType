@@ -209,10 +209,11 @@ import XCTest
     f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
     let input = try XCTUnwrap(f.views(TypingInputView.self).first)
     let owner = try XCTUnwrap(f.settings.preferenceConfigurationSaves.captureLease()?.owner)
+    XCTAssertEqual(owner, f.state.page.owner)
     let epoch = UUID()
     let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
       environment: { .init(revision: epoch, context: .init(), pointsPerRem: 16) })
-    let ticket = try coordinator.prepare(#"{"mode":"custom","difficulty":"expert","stopOnError":"letter","layout":"dvorak","keymapLayout":"dvorak","oppositeShiftMode":"keymap","quickRestart":"off","funbox":["ddoouubblleedd","ddoouubblleedd","rot13"],"theme":"dracula","fontSize":1.75,"maxLineWidth":30.5}"#)
+    let ticket = try coordinator.prepare(#"{"mode":"custom","difficulty":"expert","stopOnError":"letter","layout":"dvorak","keymapLayout":"dvorak","oppositeShiftMode":"keymap","quickRestart":"off","funbox":["ddoouubblleedd","ddoouubblleedd","rot13"],"theme":"dracula","fontFamily":"Georgia","fontSize":1.75,"maxLineWidth":30.5}"#)
     let resources = try coordinator.prepareResources(for: ticket, localFont: .absent, localBackground: .data(Fixture.png()))
     let ready = try awaitResult(coordinator, resources: resources)
     guard case .committed(let publication) = try coordinator.commit(ready) else { throw Failure.commit }
@@ -226,6 +227,8 @@ import XCTest
     XCTAssertEqual(input.keyboardInputMapping, publication.draft.keyboardTypography.inputLayout.inputMapping(for: nil))
     XCTAssertEqual(input.oppositeShiftMode, .keymap)
     XCTAssertEqual(input.quickRestartKey, .off)
+    XCTAssertEqual(f.settings.preferenceFontFamilyName, "Georgia")
+    XCTAssertNotEqual(previous.installedPracticeFontName, "Georgia")
     let before = try XCTUnwrap(input.insertionAnchor?.screenRect(attemptID: seed.automaticInputAttemptID, in: f.window))
     input.onInsert("x", false)
     for _ in 0..<3 { f.host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
@@ -248,6 +251,8 @@ import XCTest
       "Removing a delivery parameter is not an instruction to undo a committed attempt")
     XCTAssertFalse(f.views(WebsiteConfigPublishedBackgroundView.self).isEmpty)
     XCTAssertFalse(f.window.isVisible)
+    f.host.rootView = AnyView(EmptyView())
+    f.wait { f.settings.preferenceConfigurationSaves.captureLease() == nil }
   }
 
   func testForeignCompletePublicationCannotReplaceActualWindowAttemptOrItsDisplay() throws {

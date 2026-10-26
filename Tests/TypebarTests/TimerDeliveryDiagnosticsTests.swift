@@ -88,7 +88,7 @@ final class TimerDeliveryDiagnosticsTests: XCTestCase {
     let entry = String(source[begin.lowerBound..<end.lowerBound])
     let gate = try XCTUnwrap(entry.range(of: "guard !session.isFinished else { return }"))
     for operation in ["let elapsed =", "timerHealth.observe(", "TimerDeliveryDiagnostics.record(",
-      "TypingFeedbackSound.shared.playTimeWarning(", "session.enforceLivePracticeThresholds(", "candidate.tick("] {
+      "practiceSoundSelection.playWarning(", "session.enforceLivePracticeThresholds(", "candidate.tick("] {
       XCTAssertLessThan(gate.lowerBound, try XCTUnwrap(entry.range(of: operation)).lowerBound)
     }
     // Native Caps Lock / live-rule / font monitoring must still run, including

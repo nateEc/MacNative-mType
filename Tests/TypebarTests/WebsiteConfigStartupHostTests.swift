@@ -326,9 +326,14 @@ import XCTest
     let keycaps = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
     XCTAssertTrue(keycaps.contains("Esc"), "Keyboard region: \(keycaps)")
     request.recognitionLevel = .accurate
+    // Sparse rows merge incorrectly when Vision segments the whole keyboard.
+    // This fixed host's top letter row must contain Q and W; legacy custom
+    // rows contain only a, and Dvorak places Q/W outside this row.
+    request.regionOfInterest = .init(x: 0.2, y: 0.39, width: 0.6, height: 0.04)
     try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
     let legends = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
     XCTAssertTrue(legends.contains("Q") && legends.contains("W"), "Published QWERTY, not legacy custom rows: \(legends)")
+    request.regionOfInterest = .init(x: 0.1, y: 0.2, width: 0.8, height: 0.31)
     XCTAssertEqual(f.settings.snapshot, legacy)
     let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
     let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)

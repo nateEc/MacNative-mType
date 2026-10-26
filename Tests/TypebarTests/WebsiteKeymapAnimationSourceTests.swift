@@ -29,6 +29,7 @@ import SwiftUI
   }
 
   func testHiddenKeycapKeepsNextExitTransitionAndUsesThemeRoles() async throws {
+    let clock = WebsiteKeymapPixelClock()
     let rows: [[KeyboardGuideKey]] = [[], [KeyboardGuideKey("a", label: "a", width: 40).withWebsiteLegends(["a", "A", "", ""])], [], []]
     let palette = WebsiteKeymapPalette(accent: .blue, panel: Color(red: 0, green: 1, blue: 0), background: .white, secondary: .black, error: .red)
     let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 500, height: 200), styleMask: .borderless, backing: .buffered, defer: false)
@@ -39,7 +40,8 @@ import SwiftUI
       host.rootView = AnyView(KeyboardGuide(nextCharacter: "a", mode: mode, feedback: nil, accent: .blue, panel: .white,
         layout: .ansiQwerty, overrideRows: rows, overrideThumbKeys: [], websitePalette: palette,
         mirrored: false, scale: 2, legendStyle: .dynamic, keysMode: .minimal, style: .staggered,
-        modifierFlags: [], capsLockEnabled: false).frame(width: 500, height: 200).background(Color.white).environment(\.colorScheme, .light))
+        modifierFlags: [], capsLockEnabled: false).frame(width: 500, height: 200).background(Color.white).environment(\.colorScheme, .light)
+        .environment(\.websiteKeymapAnimationClock, clock.environment))
       host.frame = .init(x: 0, y: 0, width: 500, height: 200)
     }
     func capture(_ name: String) throws -> (green: Double, blue: Double) {
@@ -63,11 +65,17 @@ import SwiftUI
       XCTAssertGreaterThan(count, 2000, "Keyboard must actually be drawn")
       return (green / Double(max(1, count)), blue / Double(max(1, count)))
     }
-    update(.next); try await Task.sleep(for: .milliseconds(50))
+    update(.next)
+    try await clock.wait(host) { clock.samples.contains { $0.plan.background == [.accent] } }
     let initial = try capture("initial")
-    update(.staticGuide); try await Task.sleep(for: .milliseconds(60))
+    clock.samples.removeAll()
+    update(.staticGuide)
+    try await clock.wait(host) { clock.samples.contains { $0.plan.fading && $0.progress == 0 } }
+    clock.samples.removeAll(); clock.time = 0.0625
+    try await clock.wait(host) { clock.samples.contains { $0.plan.fading && $0.progress == 0.4375 } }
     let middle = try capture("middle")
-    try await Task.sleep(for: .milliseconds(300))
+    clock.samples.removeAll(); clock.time = 0.25
+    try await clock.wait(host) { clock.samples.contains { !$0.plan.fading && $0.progress == 1 } }
     let ended = try capture("ended")
     XCTAssertGreaterThan(initial.blue, 0.9)
     XCTAssertGreaterThan(middle.blue, 0.1); XCTAssertLessThan(middle.blue, 0.9)

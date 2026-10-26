@@ -46,6 +46,48 @@ final class MusicalClickSoundTests: XCTestCase {
     return nil
   }
 
+  @MainActor func testPinnedPianoPreviewCommitsTheKeyForSubsequentLiveClicks() throws {
+    let environment = ProcessInfo.processInfo.environment
+    guard let reference = environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] ?? environment["TYPEBAR_REFERENCE_ROOT"] else {
+      throw XCTSkip("Requires pinned reference checkout")
+    }
+    struct Fixture: Decodable {
+      let waveform: String, initial: String, raised: Bool, frequencies: [Double]
+    }
+    struct Output: Decodable { let fixtures: [Fixture] }
+    let project = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), output = Pipe()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", project.appendingPathComponent("Scripts/check-source-piano-preview.mjs").path, reference]
+    process.standardOutput = output
+    try process.run()
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0)
+    let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
+    XCTAssertEqual(fixtures.count, 32)
+    let styles: [String: TypingClickSoundStyle] = ["sine": .pianoSine, "square": .pianoSquare,
+      "sawtooth": .pianoSaw, "triangle": .pianoTriangle]
+    let keys: [String: UInt16] = ["KeyZ": 6, "Space": 49, "ShiftLeft": 56, "CapsLock": 57]
+    for fixture in fixtures {
+      var sources: [TypingClickPlaybackSource] = []
+      let player = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+      let style = try XCTUnwrap(styles[fixture.waveform])
+      player.updateModifierFlags(fixture.raised ? .shift : [])
+      player.recordKeyDown(keyCode: try XCTUnwrap(keys[fixture.initial]), modifierFlags: [])
+      player.playClick(style: style, volume: 0.5)
+      player.previewClick(style: style, volume: 0.5)
+      player.playClick(style: style, volume: 0.5)
+      player.recordKeyDown(keyCode: 49, modifierFlags: [])
+      player.playClick(style: style, volume: 0.5)
+      player.recordKeyDown(keyCode: 6, modifierFlags: [])
+      player.playClick(style: style, volume: 0.5)
+      XCTAssertEqual(sources.compactMap(pitch), fixture.frequencies,
+        "\(fixture.waveform) / \(fixture.initial) / raised=\(fixture.raised)")
+    }
+  }
+
   @MainActor func testFourOfficialOscillatorPreviewsPlayQAtMiddleCForHalfASecond() throws {
     for id in 8...11 {
       var sources: [TypingClickPlaybackSource] = []

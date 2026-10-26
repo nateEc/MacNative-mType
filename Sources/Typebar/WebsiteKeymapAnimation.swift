@@ -2,6 +2,22 @@ import Foundation
 import AppKit
 import SwiftUI
 
+/// Production uses monotonic time. Hidden pixel fixtures can hold a frame
+/// while AppKit rasterizes it, without changing the animation's curve or plan.
+struct WebsiteKeymapAnimationClock: Sendable {
+  var now: @MainActor @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+  var didSample: @MainActor @Sendable (WebsiteKeymapAnimationState.Plan, Double) -> Void = { _, _ in }
+}
+private struct WebsiteKeymapAnimationClockKey: EnvironmentKey {
+  static let defaultValue = WebsiteKeymapAnimationClock()
+}
+extension EnvironmentValues {
+  var websiteKeymapAnimationClock: WebsiteKeymapAnimationClock {
+    get { self[WebsiteKeymapAnimationClockKey.self] }
+    set { self[WebsiteKeymapAnimationClockKey.self] = newValue }
+  }
+}
+
 struct WebsiteKeymapAnimationState {
   enum Role: String, Decodable, Hashable { case accent, panel, background, secondary, error }
   struct Plan: Equatable, Decodable {

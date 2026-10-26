@@ -26,9 +26,13 @@ final class CJKSingleFieldPromptCopyTests: XCTestCase {
     session.insertBatch("晴", at: start)
     session.bailOut(at: start.addingTimeInterval(2))
     let value = try XCTUnwrap(session.result())
-    XCTAssertNil(value.targetWordDirectory)
+    XCTAssertEqual(value.targetWordDirectory, .init(words: ["晴岚海"], noSpace: false))
     XCTAssertTrue(value.replayEvents.allSatisfy { $0.inputField != nil })
     XCTAssertEqual(ResultPromptText.make(for: value, reviews: session.wordReviews), "晴岚海")
+    let restored = try JSONDecoder().decode(CompletedTestResult.self, from: JSONEncoder().encode(value))
+    XCTAssertEqual(restored, value)
+    XCTAssertEqual(TestResultRecord(result: value).portableResult, value)
+    XCTAssertEqual(ResultPromptText.make(for: restored, reviews: []), "晴岚海")
   }
 
   func testLegacyPrimitiveHistoryKeepsFallbackDespiteLateFieldMetadata() {

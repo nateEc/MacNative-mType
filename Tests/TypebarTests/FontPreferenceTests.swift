@@ -71,7 +71,7 @@ final class FontPreferenceTests: XCTestCase {
     XCTAssertTrue(preferences.contains("NativePracticeFont.isAvailable(fontPreferences.familyName)"))
     XCTAssertFalse(preferences.contains("NativePracticeFont.isAvailable(settings.installedPracticeFontName)"))
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    XCTAssertTrue(app.contains("fontFamilyName: { challengeLiveConfiguration.fontFamilyName(settings: settings) }"))
+    XCTAssertTrue(app.contains("fontFamilyName: { committedPracticeDraft?.keyboardTypography.fontFamily ?? challengeLiveConfiguration.fontFamilyName(settings: settings) }"))
     XCTAssertTrue(app.contains("size: size, installedFontName: challengeLiveConfiguration.fontFamilyName(settings: settings)"))
     XCTAssertFalse(app.contains("if challengeLiveConfiguration.hasTransientFont(settings: settings),"))
     XCTAssertFalse(app.contains("settings.deactivateLocalPracticeFont()"))

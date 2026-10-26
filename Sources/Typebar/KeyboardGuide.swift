@@ -4988,6 +4988,7 @@ private struct WebsiteAnimatedKeycap: View {
   let palette: WebsiteKeymapPalette
   let onComplete: @MainActor () -> Void
   @Environment(\.colorScheme) private var scheme
+  @Environment(\.websiteKeymapAnimationClock) private var clock
   @State private var state = WebsiteKeymapAnimationState()
   @State private var plan = WebsiteKeymapAnimationState.Plan(fading: false, background: [.panel], foreground: [.secondary], duration: 0)
   @State private var signature: Signature?
@@ -5030,22 +5031,25 @@ private struct WebsiteAnimatedKeycap: View {
           legends: legends, generation: generation, colors: colors)
         if signature != identity {
           signature = identity; plan = next
-          startedAt = next.duration > 0 ? ProcessInfo.processInfo.systemUptime : nil
+          startedAt = next.duration > 0 ? clock.now() : nil
           progress = next.duration > 0 ? 0 : 1
         }
         guard let start = startedAt, next.duration > 0 else {
           guard !Task.isCancelled else { return }
+          clock.didSample(plan, progress)
           onComplete(); return
         }
         while !Task.isCancelled {
-          let elapsed = ProcessInfo.processInfo.systemUptime - start
+          let elapsed = clock.now() - start
           progress = WebsiteKeymapAnimationState.progress(elapsed: elapsed)
+          clock.didSample(plan, progress)
           if elapsed >= 0.25 {
             guard !Task.isCancelled else { return }
             state.complete()
             plan = state.update(mode: mode, steno: steno, matches: matches, tick: 0, correct: true)
             startedAt = nil; progress = 1
             signature = Signature(plan: plan, flash: nil, legends: legends, generation: generation, colors: colors)
+            clock.didSample(plan, progress)
             onComplete(); return
           }
           try? await Task.sleep(for: .seconds(min(1.0 / 60, 0.25 - elapsed)))

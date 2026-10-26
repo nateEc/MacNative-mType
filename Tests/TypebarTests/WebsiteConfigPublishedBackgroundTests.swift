@@ -134,10 +134,15 @@ final class WebsiteConfigPublishedBackgroundTests: XCTestCase {
     let consumer = try await mounted(host)
     guard case .ready(let image) = publication.background?.state else { return XCTFail("Missing image") }
     let control = WebsiteConfigBackgroundSurfaceView()
-    defer { control.stop() }
+    consumer.addSubview(control)
+    defer { control.stop(); control.removeFromSuperview() }
     control.setFrameSize(consumer.surface.bounds.size)
     control.configure(image: image, identity: UUID(), fit: publication.draft.pagePreferences.backgroundFit,
       filter: publication.draft.pagePreferences.backgroundFilter, pointsPerRem: 24)
+    XCTAssertTrue(control.window === consumer.window)
+    XCTAssertEqual(control.renderedScale, consumer.surface.renderedScale)
+    XCTAssertEqual(control.renderedImage?.width, consumer.surface.renderedImage?.width)
+    XCTAssertEqual(control.renderedImage?.height, consumer.surface.renderedImage?.height)
     XCTAssertEqual(try pixels(consumer.surface.renderedImage), try pixels(control.renderedImage))
     control.configure(image: image, identity: UUID(), fit: publication.draft.pagePreferences.backgroundFit,
       filter: publication.draft.pagePreferences.backgroundFilter, pointsPerRem: 16)

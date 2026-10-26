@@ -756,7 +756,10 @@ final class TypingFeedbackSound {
     let tone: TypingMusicTone
     switch mode {
     case .keys(let waveform):
-      guard let semitone = TypingMusicPitch.semitone(keyCode: keyCodeOverride ?? currentKeyCode) else { return }
+      // The pinned piano preview writes its override back to the page's key
+      // context; the next ordinary click uses it until a new keydown arrives.
+      if let keyCodeOverride { currentKeyCode = keyCodeOverride }
+      guard let semitone = TypingMusicPitch.semitone(keyCode: currentKeyCode) else { return }
       let raised = currentModifierFlags.contains(.capsLock)
         || (usesPracticeShift && currentModifierFlags.contains(.shift))
       tone = .key(waveform: waveform, semitone: semitone, octave: raised ? 4 : 3)

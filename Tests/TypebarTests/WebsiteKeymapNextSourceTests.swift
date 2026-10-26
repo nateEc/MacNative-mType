@@ -67,14 +67,16 @@ import SwiftUI
     let host = NSHostingView(rootView: AnyView(Color.white))
     window.contentView = host; defer { window.contentView = nil; window.close() }
     var starts: [[Int]] = []
-    for units: [UInt16]? in [[101], [769], [55357], nil] {
+    for (index, units) in ([[101], [769], [55357], nil] as [[UInt16]?]).enumerated() {
+      let clock = WebsiteKeymapPixelClock()
       host.rootView = AnyView(KeyboardGuide(nextCharacter: "e\u{301}", mode: .next, feedback: nil,
         accent: .blue, panel: .white, layout: .ansiQwerty, overrideRows: rows, overrideThumbKeys: [],
         websiteHighlight: .init(units: units), mirrored: false, scale: 2, legendStyle: .dynamic,
         keysMode: .minimal, style: .staggered, modifierFlags: [], capsLockEnabled: false)
-        .frame(width: 700, height: 200).background(Color.white).environment(\.colorScheme, .light))
+        .frame(width: 700, height: 200).background(Color.white).environment(\.colorScheme, .light)
+        .environment(\.websiteKeymapAnimationClock, clock.environment).id(index))
       host.frame = .init(x: 0, y: 0, width: 700, height: 200)
-      try await Task.sleep(for: .milliseconds(60)); host.layoutSubtreeIfNeeded()
+      try await clock.wait(host) { clock.samples.count >= 4 }
       let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
       host.cacheDisplay(in: host.bounds, to: bitmap)
       var columns = Array(repeating: 0, count: bitmap.pixelsWide)
@@ -82,7 +84,9 @@ import SwiftUI
         guard let c = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
         if c.blueComponent > 0.5, c.blueComponent - c.redComponent > 0.18, c.blueComponent - c.greenComponent > 0.08 { columns[x] += 1 }
       } }
-      starts.append(columns.indices.filter { columns[$0] > 5 && ($0 == 0 || columns[$0 - 1] <= 5) })
+      let pixelsPerPoint = Double(bitmap.pixelsWide) / Double(host.bounds.width)
+      starts.append(columns.indices.filter { columns[$0] > 5 && ($0 == 0 || columns[$0 - 1] <= 5) }
+        .map { Int((Double($0) / pixelsPerPoint).rounded()) })
       XCTAssertFalse(window.isVisible)
     }
     XCTAssertEqual(starts.map(\.count), [1, 1, 0, 0])

@@ -204,17 +204,19 @@ final class PreferenceConfigurationSaveTests: XCTestCase {
       .deletingLastPathComponent().deletingLastPathComponent()
     let app = try String(
       contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    XCTAssertTrue(app.contains("@State private var preferenceConfigurationOwner = UUID()"))
+    XCTAssertTrue(app.contains("private var preferenceConfigurationOwner: UUID { pageSessionStore.owner }"))
     XCTAssertTrue(
       app.contains(
-        "settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,\n        requestedModifiers: { practiceRequestedModifiers }, selectedLanguage: { language },\n        keyboardGuideMode: { challengeLiveConfiguration.keyboardGuideMode(settings: settings) },\n        fontFamilyName: { challengeLiveConfiguration.fontFamilyName(settings: settings) }) {\n        persistExplicitTestConfiguration()"
+        "settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,\n        requestedModifiers: { practiceRequestedModifiers },\n        selectedLanguage: { committedPracticeDraft?.testParameters.language ?? language },\n        keyboardGuideMode: { committedPracticeDraft?.keyboardTypography.guideMode ?? challengeLiveConfiguration.keyboardGuideMode(settings: settings) },\n        fontFamilyName: { committedPracticeDraft?.keyboardTypography.fontFamily ?? challengeLiveConfiguration.fontFamilyName(settings: settings) }) {\n        persistExplicitTestConfiguration()"
       ))
     XCTAssertTrue(
       app.contains(
         "settings.preferenceConfigurationSaves.activate(owner: preferenceConfigurationOwner)"))
-    XCTAssertTrue(
-      app.contains(
-        ".onDisappear {\n      settings.preferenceConfigurationSaves.remove(owner: preferenceConfigurationOwner)"
-      ))
+    let registration = try XCTUnwrap(app.range(of: "settings.preferenceConfigurationSaves.register(owner: preferenceConfigurationOwner,"))
+    let disappearance = try XCTUnwrap(app.range(of: ".onDisappear {", range: registration.upperBound..<app.endIndex))
+    let removal = try XCTUnwrap(app.range(of: "settings.preferenceConfigurationSaves.remove(owner: preferenceConfigurationOwner)",
+      range: disappearance.upperBound..<app.endIndex))
+    let detach = try XCTUnwrap(app.range(of: "pageSessionStore.detach()", range: disappearance.upperBound..<removal.lowerBound))
+    XCTAssertLessThan(detach.lowerBound, removal.lowerBound)
   }
 }

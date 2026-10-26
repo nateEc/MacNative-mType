@@ -70,12 +70,18 @@ import XCTest
     ]
     var starts: [[Int]] = []
     for (name, mode, next, feedback, count, red) in cases {
+      let clock = WebsiteKeymapPixelClock()
       host.rootView = AnyView(KeyboardGuide(nextCharacter: next, mode: mode, feedback: feedback, accent: .blue, panel: .white,
         layout: .ansiQwerty, overrideRows: rows, overrideThumbKeys: [], mirrored: false, scale: 2,
         legendStyle: .dynamic, keysMode: .minimal, style: .staggered, modifierFlags: [], capsLockEnabled: false)
-        .frame(width: 900, height: 300).background(Color.white).environment(\.colorScheme, .light))
+        .frame(width: 900, height: 300).background(Color.white).environment(\.colorScheme, .light)
+        .environment(\.websiteKeymapAnimationClock, clock.environment).id(name))
       host.frame = .init(x: 0, y: 0, width: 900, height: 300)
-      try await Task.sleep(for: .milliseconds(mode == .staticGuide ? 300 : 60)); host.layoutSubtreeIfNeeded()
+      try await clock.wait(host) {
+        mode == .react
+          ? clock.samples.contains { $0.plan.duration > 0 && $0.plan.background.first == (red ? .error : .accent) }
+          : clock.samples.count >= 6
+      }
       let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
       host.cacheDisplay(in: host.bounds, to: bitmap)
       try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-keymap-match-\(name).png"))
@@ -90,7 +96,9 @@ import XCTest
       let clusters = active.filter { $0 == 0 || columns[$0 - 1] <= 5 }
       XCTAssertEqual(clusters.count, count, "\(name): \(clusters)")
       XCTAssertGreaterThan(backgrounds, 2000, "Keyboard must remain drawn: \(name)")
-      starts.append(clusters); XCTAssertFalse(window.isVisible)
+      let pixelsPerPoint = Double(bitmap.pixelsWide) / Double(host.bounds.width)
+      starts.append(clusters.map { Int((Double($0) / pixelsPerPoint).rounded()) })
+      XCTAssertFalse(window.isVisible)
     }
     if starts[1].count == 1, starts[3].count == 2 {
       XCTAssertEqual(starts[3][0] - starts[1][0], 176, accuracy: 5, "Source splits compound insertion into primitive events")
