@@ -110,7 +110,8 @@ import AppKit
       return
     }
     let hasMainAnchor = measuredMainCaretRect(style: .bar) != nil
-    let hasPaceFrame = configuration.paceStyle.drawsMarker && configuration.paceFrame != nil
+    let hasPaceFrame = (configuration.paceStyle.drawsMarker && configuration.paceFrame != nil)
+      || (configuration.paceUsesSessionCallbacks && configuration.paceIsVisible?() == true)
     guard hasMainAnchor || hasPaceFrame else {
       caret.stop()
       caret.isHidden = true

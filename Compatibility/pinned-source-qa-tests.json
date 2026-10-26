@@ -3,6 +3,18 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.WebsitePaceStyleAdmissionTests/testDefaultOffTransitionsAgainstCompletePinnedCaretAndRAF",
+      "file": "Tests/TypebarTests/WebsitePaceStyleAdmissionTests.swift"
+    },
+    {
+      "id": "TypebarTests.WebsitePaceCallbackRenderingTests/testCallbackFramesAgainstCompletePinnedCaretRAFAndLockedAnime",
+      "file": "Tests/TypebarTests/WebsitePaceCallbackRenderingTests.swift"
+    },
+    {
+      "id": "TypebarTests.WebsitePaceSessionDeliveryTests/testActualInputAndCallbackDeliveryAgainstPinnedRequests",
+      "file": "Tests/TypebarTests/WebsitePaceSessionDeliveryTests.swift"
+    },
+    {
       "id": "TypebarTests.WebsitePaceTimerStateTests/testAllDeliveredRequestsAgainstCompletePinnedPaceAndWordModules",
       "file": "Tests/TypebarTests/WebsitePaceTimerStateTests.swift"
     },

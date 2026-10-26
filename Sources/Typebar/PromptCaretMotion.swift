@@ -72,7 +72,7 @@ struct PromptCaretChannel {
     }
   }
   mutating func goTo(_ target: CGRect?, at time: TimeInterval,
-    duration: TimeInterval, curve: Curve = .position) {
+    duration: TimeInterval, curve: Curve = .position, preservesNegativeDuration: Bool = false) {
     guard let target else { return }
     // Requests replace animation targets from the last presented state. A
     // timer/input callback between frames must not render either channel or
@@ -88,6 +88,7 @@ struct PromptCaretChannel {
       tapeMargin = 0; tapeMarginReady = false
     }
     let destination = target.offsetBy(dx: -tapeMargin, dy: -margin)
+    if preservesNegativeDuration, duration < 0 { positionTween = nil; return }
     if duration > 0, let position {
       positionTween = .init(from: position, to: destination, started: time,
         duration: duration, curve: curve)
@@ -191,7 +192,8 @@ struct PromptCaretChannel {
   }
 
   func positionPace(at rect: CGRect?, time: TimeInterval, duration: TimeInterval) {
-    pace.goTo(rect?.offsetBy(dx: words.tapeMargin, dy: words.margin), at: time, duration: duration, curve: .linear)
+    pace.goTo(rect?.offsetBy(dx: words.tapeMargin, dy: words.margin), at: time, duration: duration,
+      curve: .linear, preservesNegativeDuration: true)
   }
 
   func rebasePaceHorizontalEdge(fromRTL: Bool, toRTL: Bool) {

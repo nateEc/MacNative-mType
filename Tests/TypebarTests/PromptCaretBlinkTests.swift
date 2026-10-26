@@ -182,7 +182,9 @@ import XCTest
     XCTAssertTrue(app.contains(".onChange(of: settings.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }"))
     XCTAssertTrue(app.contains(".onChange(of: committedPracticeDraft?.presentation.smoothCaretMotion) { _, _ in visualFocus.startCaretBlinking() }"))
     XCTAssertTrue(app.contains("visualFocus.inputDidUpdate(hasFeedback: hadMarkedText || !text.isEmpty"))
-    XCTAssertTrue(overlay.contains("paceFrame: paceFrame, mainPresentation: mainPresentation"))
+    XCTAssertTrue(overlay.contains("paceFrame: paceFrame"))
+    XCTAssertTrue(overlay.contains("paceUsesSessionCallbacks: paceUsesSessionCallbacks"))
+    XCTAssertTrue(overlay.contains("mainPresentation: mainPresentation"))
   }
 
   func testNativeCaretPhasesRenderInOneNeverVisibleComponentWindow() throws {

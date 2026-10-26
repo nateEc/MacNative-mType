@@ -10,6 +10,7 @@ import XCTest
     }
     struct Fixture: Decodable {
       let speed: Double, origin: Double
+      let durationMilliseconds: Double
       let rawWords: [String]
       let word: Int, letter: Int, requestsAfterWrongCommit: Int
     }
@@ -41,6 +42,18 @@ import XCTest
         XCTAssertEqual(progress.frame(at: fixture.origin, blind: false), first, context)
       }
       XCTAssertFalse(progress.advance(to: fixture.origin, blind: false), context)
+      var live = try XCTUnwrap(WebsitePaceSession(wpm: fixture.speed,
+        catalog: .init(prompt: "", noSpaceWords: fixture.rawWords), clock: .init { fixture.origin }))
+      live.start(blind: false)
+      let request = try XCTUnwrap(live.frame(), context)
+      XCTAssertEqual(request.target, .init(word: fixture.word, letter: fixture.letter), context)
+      XCTAssertEqual(request.from, .init(word: 0, letter: 0), context)
+      XCTAssertEqual(request.sequence, 1, context)
+      XCTAssertEqual(request.stepDuration * 1000, fixture.durationMilliseconds, accuracy: 1e-9, context)
+      XCTAssertEqual(live.presentationFrame(), request, context)
+      live.handleCommit(word: 0, correct: false, blind: false)
+      XCTAssertEqual(live.frame(), request, context)
+      XCTAssertEqual(live.presentationFrame(), request, context)
       XCTAssertEqual(fixture.requestsAfterWrongCommit, 1)
     }
   }

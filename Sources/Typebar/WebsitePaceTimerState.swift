@@ -16,6 +16,7 @@ struct WebsitePaceTimerState {
   struct Scheduled: Equatable {
     let ticket: Ticket
     let delayMilliseconds: Double
+    let scheduledAtMilliseconds: Double
     fileprivate let expectedEndMilliseconds: Double
   }
 
@@ -40,6 +41,7 @@ struct WebsitePaceTimerState {
   }
 
   mutating func appendWords(_ words: [String]) { catalog.appendWords(words) }
+  mutating func append(_ text: String) { catalog.append(text) }
 
   mutating func start(atMilliseconds now: Double, blind: Bool) {
     guard alive, origin == nil, now.isFinite, now >= 0 else { return }
@@ -86,8 +88,83 @@ struct WebsitePaceTimerState {
     lastRequest = .init(target: next, durationMilliseconds: duration)
     sequence += 1
     nextTimeout = .init(ticket: .init(generation: generation, sequence: sequence),
-      delayMilliseconds: max(0, duration), expectedEndMilliseconds: expectedEnd)
+      delayMilliseconds: max(0, duration), scheduledAtMilliseconds: now, expectedEndMilliseconds: expectedEnd)
   }
 
   private mutating func retire() { alive = false; nextTimeout = nil; isVisible = false }
+}
+
+/// Value-owned live session adapter; the page owns scheduling, never this value.
+struct WebsitePaceSession {
+  private var state: WebsitePaceTimerState
+  let wpm: Double
+  private let clock: PaceCaretClock
+  private var from = PaceCaretPosition(word: 0, letter: 0)
+  private var revision = 0
+  private var publishedRevision = 0
+  private var rendersRequests: Bool
+  private var acceptedPresentation: PaceCaretFrame?
+  var catalog: PaceCaretCatalog { state.catalog }
+  var isVisible: Bool { state.isVisible }
+  var pendingTicket: WebsitePaceTimerState.Ticket? { state.nextTimeout?.ticket }
+
+  init?(wpm: Double, catalog: PaceCaretCatalog, clock: PaceCaretClock, rendersRequests: Bool = true) {
+    guard let state = WebsitePaceTimerState(wpm: wpm, catalog: catalog) else { return nil }
+    self.state = state; self.wpm = wpm; self.clock = clock
+    self.rendersRequests = rendersRequests
+  }
+
+  var pendingDelay: TimeInterval? {
+    guard let timeout = state.nextTimeout else { return nil }
+    let now = clock.now() * 1000
+    guard now.isFinite, timeout.delayMilliseconds.isFinite else { return nil }
+    // HTML timer initialization clamps nesting levels above five before
+    // incrementing the new level. The seventh chained timeout is the first
+    // with a 4ms minimum. This is a minimum, not an exact wake-time promise.
+    let minimum = timeout.ticket.sequence > 6 ? 4.0 : 0
+    // setTimeout's Web IDL long conversion precedes timer initialization.
+    let unsigned = timeout.delayMilliseconds.rounded(.towardZero).truncatingRemainder(dividingBy: 4_294_967_296)
+    let converted = unsigned >= 2_147_483_648 ? unsigned - 4_294_967_296 : unsigned
+    let elapsed = max(0, now - timeout.scheduledAtMilliseconds)
+    return max(0, max(minimum, converted) - elapsed) / 1000
+  }
+
+  mutating func start(blind: Bool) {
+    state.start(atMilliseconds: clock.now() * 1000, blind: blind)
+    if state.lastRequest != nil { revision = 1; publishedRevision = 1 }
+    acceptPresentationIfEnabled()
+  }
+  @discardableResult mutating func deliver(_ ticket: WebsitePaceTimerState.Ticket, blind: Bool) -> Bool {
+    guard let pending = state.nextTimeout, pending.ticket == ticket else { return false }
+    let previous = state.lastRequest?.target ?? from
+    state.deliver(ticket, atMilliseconds: clock.now() * 1000, blind: blind)
+    guard state.nextTimeout?.ticket != ticket else { return false }
+    from = previous
+    revision += 1
+    acceptPresentationIfEnabled()
+    return true
+  }
+  mutating func claimClockPublication() -> Bool {
+    guard publishedRevision != revision else { return false }
+    publishedRevision = revision
+    return true
+  }
+  mutating func append(_ text: String) { state.append(text) }
+  mutating func synchronizePresentation(_ enabled: Bool) { rendersRequests = enabled }
+  mutating func appendWords(_ words: [String]) { state.appendWords(words) }
+  mutating func handleCommit(word: Int, correct: Bool, blind: Bool) {
+    state.handleCommit(word: word, correct: correct, blind: blind)
+  }
+  func frame() -> PaceCaretFrame? {
+    guard state.isVisible, let request = state.lastRequest, let pending = state.nextTimeout else { return nil }
+    return .init(from: from, target: request.target, fraction: 0,
+      stepDuration: request.durationMilliseconds / 1000, sequence: Double(pending.ticket.sequence))
+  }
+  func presentationFrame() -> PaceCaretFrame? { state.isVisible ? acceptedPresentation : nil }
+  private mutating func acceptPresentationIfEnabled() {
+    guard rendersRequests, var request = frame(), request.sequence != acceptedPresentation?.sequence else { return }
+    request = .init(from: acceptedPresentation?.target ?? .init(word: 0, letter: 0),
+      target: request.target, fraction: 0, stepDuration: request.stepDuration, sequence: request.sequence)
+    acceptedPresentation = request
+  }
 }

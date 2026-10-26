@@ -326,19 +326,37 @@ import XCTest
     let keycaps = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
     XCTAssertTrue(keycaps.contains("Esc"), "Keyboard region: \(keycaps)")
     request.recognitionLevel = .accurate
-    // Even a whole sparse letter row can drop W despite its visible pixels.
-    // Isolate the Q/W pair in this fixed host, keeping both glyph assertions;
-    // legacy custom rows contain only a, and Dvorak puts Q/W in other rows.
-    request.regionOfInterest = .init(x: 0.22, y: 0.39, width: 0.10, height: 0.04)
+    // The captured full-suite failure has visible Q/W pixels, but Vision's
+    // text detector returns no observations for that two-key crop. Give the
+    // detector five keys of context, keeping the region within this row.
+    // Require their exact order, not a loose match elsewhere in the keyboard.
+    request.regionOfInterest = .init(x: 0.23, y: 0.38, width: 0.23, height: 0.06)
     try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
     let legends = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
-    XCTAssertTrue(legends.contains("Q") && legends.contains("W"), "Published QWERTY, not legacy custom rows: \(legends)")
+    XCTAssertEqual(legends.replacingOccurrences(of: " ", with: ""), "QWERT", "Published QWERTY, not legacy custom rows: \(legends)")
     request.regionOfInterest = .init(x: 0.1, y: 0.2, width: 0.8, height: 0.31)
     XCTAssertEqual(f.settings.snapshot, legacy)
     let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
     let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
     let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
       directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    // Exercise the same detector against an actual alternate published layout;
+    // a passing QWERTY crop must not simply reflect dormant legacy settings.
+    try await workflow.apply(json: #"{"mode":"words","words":10,"keymapMode":"static","keymapLegendStyle":"uppercase","keymapKeys":"full","keymapSize":1.5,"keymapLayout":"dvorak"}"#, systemIsDark: false)
+    try await f.waitAsync { f.state.page.state.presentation?.publication.draft.keyboardTypography.guideLayout == .ansiDvorak
+      && f.inputs().first?.acceptsTextInput == true }
+    scrollToEnd(); try await Task.sleep(for: .milliseconds(100)); f.host.layoutSubtreeIfNeeded()
+    let alternate = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds))
+    f.host.cacheDisplay(in: f.host.bounds, to: alternate)
+    request.regionOfInterest = .init(x: 0.23, y: 0.38, width: 0.23, height: 0.06)
+    try VNImageRequestHandler(cgImage: XCTUnwrap(alternate.cgImage)).perform([request])
+    let alternateLegends = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
+    XCTAssertFalse(alternateLegends.contains("Q") || alternateLegends.contains("W"), "Dvorak first keys: \(alternateLegends)")
+    // Y is inside the Dvorak crop but outside the QWERTY crop. Do not rely
+    // on recognition of Dvorak's isolated punctuation as text.
+    XCTAssertTrue(alternateLegends.contains("Y"), "Actual Dvorak positive control: \(alternateLegends)")
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    request.regionOfInterest = .init(x: 0.1, y: 0.2, width: 0.8, height: 0.31)
     try await workflow.apply(json: #"{"mode":"words","words":10,"keymapMode":"off"}"#, systemIsDark: false)
     try await f.waitAsync { f.state.page.state.presentation?.publication.draft.keyboardTypography.guideMode == .off
       && f.inputs().first?.acceptsTextInput == true }

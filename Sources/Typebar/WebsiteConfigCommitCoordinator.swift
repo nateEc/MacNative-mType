@@ -383,7 +383,7 @@ final class WebsiteConfigCommitCoordinator {
       state.session.refreshPromptPresentation()
     }
     if kind == .pace, case .edited(let edit) = prepared.draft.origin, edit.key == "paceCaret" {
-      state.session.configurePace(wpm: paceTarget)
+      state.session.configurePace(wpm: paceTarget, style: prepared.draft.presentation.paceCaretStyle)
     }
     let updatedPractice = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: practice.scope,
       quote: practice.quote, external: practice.external, repetition: practice.repetition)

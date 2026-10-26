@@ -44,7 +44,7 @@ final class PracticeClockWriteAdmissionTests: XCTestCase {
     XCTAssertFalse(session.isFinished)
   }
 
-  func testPacePublishesRealClockProgressButNotFrozenOrExhaustedSamples() {
+  func testPaceClockPublishesDeliveredRequestsWithoutAdvancingThem() {
     let clock = PaceCaretTestClock()
     var session = TypingSession(configuration: .words(2), prompt: "ab cd")
     session.configurePace(wpm: 60, clock: clock.source)
@@ -52,10 +52,18 @@ final class PracticeClockWriteAdmissionTests: XCTestCase {
     session.insert("a")
     XCTAssertFalse(session.tick())
     clock.time = 0.1
-    XCTAssertTrue(session.tick(), "Observed time still owns sub-letter interpolation")
+    XCTAssertFalse(session.tick(), "Elapsed time cannot deliver a pace callback")
     XCTAssertFalse(session.tick(), "An identical owned sample must not publish again")
     clock.time = 100
-    XCTAssertTrue(session.tick())
+    XCTAssertFalse(session.tick())
+    session.deliverPaceCaretTimer(session.paceCaretPendingTicket!)
+    XCTAssertTrue(session.tick(), "A delivered request refreshes status without driving the caret")
+    XCTAssertFalse(session.tick())
+    for _ in 0..<10 {
+      if let ticket = session.paceCaretPendingTicket { session.deliverPaceCaretTimer(ticket) }
+    }
+    XCTAssertNil(session.paceCaretFrame())
+    XCTAssertTrue(session.tick(), "Exhaustion visibility is published once")
     clock.time = 101
     XCTAssertFalse(session.tick(), "An exhausted pace has no further clock mutation")
   }

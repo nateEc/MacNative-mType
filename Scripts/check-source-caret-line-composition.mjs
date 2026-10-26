@@ -10,7 +10,9 @@ import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 
 const [argument, option] = process.argv.slice(2);
-assert.ok(argument && (!option || ['--emit-fixtures', '--emit-sparse-fixtures', '--emit-late-fixtures', '--emit-late-correction-fixtures'].includes(option)));
+assert.ok(argument && (!option || ['--emit-fixtures', '--emit-sparse-fixtures', '--emit-late-fixtures', '--emit-late-correction-fixtures', '--emit-infinite-fixtures', '--emit-style-fixtures'].includes(option)));
+const infinite = option === '--emit-infinite-fixtures';
+const styleMode = option === '--emit-style-fixtures';
 const correction = option === '--emit-late-correction-fixtures';
 const late = option === '--emit-late-fixtures' || correction;
 const frameIntervals = option === '--emit-sparse-fixtures' ? [16, 33, 100] : late ? [16] : [1];
@@ -43,15 +45,18 @@ assert.ok(promiseStart >= 0 && promiseEnd > promiseStart);
 const adapter = stripTypeScriptTypes('class Adapter {\n' + dom.slice(promiseStart, promiseEnd) + '\n}', {mode: 'transform'});
 const fixtures = [];
 for (const frameInterval of frameIntervals)
+for (const startsOff of styleMode ? [false, true] : [false])
+for (const firstRAF of styleMode ? (startsOff ? [0] : [0, 16]) : infinite ? [0, 16] : [0])
 for (const delivery of late ? ['separate', 'coalesced'] : ['regular'])
 for (const resumeTime of late ? [80, 175, 245] : [null])
-for (const smooth of late ? [false] : [false, true])
-for (const motion of late ? ['off'] : ['off', 'slow', 'medium', 'fast'])
-for (const style of ['default', 'block', 'underline']) for (const overlap of late ? [false] : [false, true]) {
+for (const smooth of late || infinite || styleMode ? [false] : [false, true])
+for (const motion of late || infinite || styleMode ? ['off'] : ['off', 'slow', 'medium', 'fast'])
+for (const style of styleMode ? ['default'] : ['default', 'block', 'underline'])
+for (const overlap of late || infinite || styleMode ? [false] : [false, true]) {
   let clock = 10_000, active = 1, input = '', frameID = 0, timeoutID = 0;
   const frames = new Map(), timeouts = new Map(), animations = [], writes = [], trace = [];
   const Config = {mode: 'words', smoothCaret: motion, smoothLineScroll: smooth,
-    caretStyle: style, paceCaretStyle: style, paceCaret: 'custom', paceCaretCustomSpeed: 300,
+    caretStyle: style, paceCaretStyle: style, paceCaret: 'custom', paceCaretCustomSpeed: infinite ? Infinity : 300,
     tapeMode: 'off', tapeMargin: 50, blindMode: false, hideExtraLetters: false,
     showAllLines: false, funbox: [], keymapMode: 'off'};
   class ControlledDate extends Date { static now() { return clock; } }
@@ -86,7 +91,7 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of lat
     hasClass(value) { return this.classes.has(value); }
     show() { this.removeClass('hidden'); }
     hide() { this.addClass('hidden'); }
-    getOffsetWidth() { return this.native.width; }
+    getOffsetWidth() { return styleMode && this.hasClass('off') ? 0 : this.native.width; }
     getOffsetHeight() { return this.hasClass('underline') ? 2 : 33; }
     getStyle() { return Object.fromEntries(['left', 'top', 'marginTop', 'marginLeft', 'width'].map(key => [key, `${this.native[key]}px`])); }
     setStyle(value) {
@@ -177,7 +182,7 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of lat
   // Geometry is captured before source margin folding, not reconstructed from
   // the rendered result that the native replay is supposed to verify.
   for (const [caret, element] of [[Caret.caret, mainElement], [PaceCaret.caret, paceElement]]) {
-    if (late && element === paceElement) {
+    if ((late || infinite || styleMode) && element === paceElement) {
       const goTo = caret.goTo.bind(caret);
       caret.goTo = options => {
         trace.push({type: 'request', time: clock - 10_000, word: options.wordIndex,
@@ -194,7 +199,7 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of lat
         assert.ok(target, 'Position must follow actual source geometry');
         trace.push({type: 'position', id: element.native.id, time: clock - 10_000,
           left: target.left, top: target.top,
-          width: caret.isFullWidth() ? target.width : element.native.width,
+          width: caret.isFullWidth() ? target.width : element.getOffsetWidth(),
           height: element.getOffsetHeight(),
           duration: method === 'setPosition' ? 0 : options.duration ?? {off: 0, slow: 150, medium: 100, fast: 85}[motion],
           linear: options.easing === 'linear'});
@@ -250,7 +255,7 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of lat
   }
   function marker(element, caret) {
     const record = channel => animations.filter(item => item.id === element.native.id && item.channel === channel).at(-1);
-    return {left: element.native.left, top: element.native.top, width: element.native.width,
+    return {left: element.native.left, top: element.native.top, width: element.getOffsetWidth(),
       margin: element.native.marginTop, visibleTop: element.native.top + element.native.marginTop,
       ready: caret.readyToResetMarginTop,
       positionTime: record('position')?.animation.currentTime ?? null,
@@ -259,7 +264,70 @@ for (const style of ['default', 'block', 'underline']) for (const overlap of lat
   function snapshot(time) { return {time, first: first(), wordMargin: wordsEl.native.marginTop,
     activeTop: words[active].getOffsetTop(), main: marker(mainElement, Caret.caret),
     pace: marker(paceElement, PaceCaret.caret), lineTransition: context.lineTransition}; }
-  Caret.updatePosition(true); await PaceCaret.init(); PaceCaret.start(); await flush();
+  Caret.updatePosition(true); await PaceCaret.init();
+  if (startsOff) { Config.paceCaretStyle = 'off'; PaceCaret.caret.setStyle('off'); }
+  PaceCaret.start();
+  if (firstRAF === 0) await flush(); else await drain();
+  if (styleMode) {
+    // The owned CSS adapter models only default/off width. Source goTo and
+    // actual Anime/RAF decide admission and animation; no browser pixels.
+    const observations = [{...snapshot(0), style: Config.paceCaretStyle}];
+    const times = firstRAF === 16 ? [1, 16, 40, 48, 64, 65, 80, 96] : [16, 25, 40, 48, 64, 65, 80, 96];
+    for (const time of times) {
+      clock = 10_000 + time;
+      anime.namespace.engine.update(); await drain();
+      if (time === (firstRAF === 16 ? 1 : 25)) {
+        Config.paceCaretStyle = 'off'; PaceCaret.caret.setStyle('off');
+      }
+      if (time === 65) { Config.paceCaretStyle = 'default'; PaceCaret.caret.setStyle('default'); }
+      for (const [id, timeout] of [...timeouts]) if (timeout.at <= clock) {
+        timeouts.delete(id); timeout.callback(); await drain();
+      }
+      if (time >= firstRAF) await flush();
+      observations.push({...snapshot(time), style: Config.paceCaretStyle});
+    }
+    const requests = trace.filter(event => event.type === 'request');
+    const resolved = trace.filter(event => event.type === 'position' && event.id === 'paceCaret');
+    // Query geometry independently of the rendered observations. For off
+    // geometry, accept while visible, hide, then resolve the actual RAF.
+    const geometryRequests = [];
+    for (const request of requests) for (const queryStyle of ['default', 'off']) {
+      PaceCaret.caret.setStyle('default');
+      const count = trace.filter(event => event.type === 'position' && event.id === 'paceCaret').length;
+      PaceCaret.caret.goTo({wordIndex: request.word, letterIndex: request.letter,
+        isLanguageRightToLeft: false, isDirectionReversed: false, animate: true,
+        animationOptions: {duration: 0, easing: 'linear'}});
+      if (queryStyle === 'off') PaceCaret.caret.setStyle('off');
+      await flush();
+      const positions = trace.filter(event => event.type === 'position' && event.id === 'paceCaret');
+      assert.equal(positions.length, count + 1);
+      geometryRequests.push({word: request.word, letter: request.letter, style: queryStyle, ...positions.at(-1)});
+    }
+    Caret.caret.stopAllAnimations(); PaceCaret.caret.stopAllAnimations(); PaceCaret.reset();
+    for (const {animation} of animations) animation.cancel();
+    assert.equal(timeouts.size, 0);
+    fixtures.push({firstRAF, startsOff, observations, requests, resolved, geometryRequests});
+    continue;
+  }
+  if (infinite) {
+    const observations = [{...snapshot(0), hidden: PaceCaret.caret.isHidden()}];
+    for (const time of [4, 8, 12, 16, 20, 24, 28, 32]) {
+      clock = 10_000 + time;
+      anime.namespace.engine.update(); await drain();
+      const pending = [...timeouts][0];
+      assert.ok(pending, 'Expected one queued pace callback');
+      timeouts.delete(pending[0]); pending[1].callback(); await drain();
+      if (time >= firstRAF) await flush();
+      observations.push({...snapshot(time), hidden: PaceCaret.caret.isHidden()});
+    }
+    Caret.caret.stopAllAnimations(); PaceCaret.caret.stopAllAnimations(); PaceCaret.reset();
+    for (const {animation} of animations) animation.cancel();
+    assert.equal(timeouts.size, 0);
+    fixtures.push({firstRAF, style, observations,
+      requests: trace.filter(event => event.type === 'request'),
+      resolved: trace.filter(event => event.type === 'position' && event.id === 'paceCaret')});
+    continue;
+  }
   if (late) {
     // A blocked loop has neither animation frames nor timer callbacks. Resume
     // at a fixed clock; explicitly vary RAF delivery between overdue timers.

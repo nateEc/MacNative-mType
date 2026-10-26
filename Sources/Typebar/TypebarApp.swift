@@ -1854,6 +1854,7 @@ private struct ContentView: View {
       }
       activatePreferenceConfigurationOwnerIfKey()
       pageSessionStore.attach(to: settings.preferenceConfigurationSaves)
+      pageSessionStore.bindPaceStyleSettings(settings)
       pageSessionStore.bindTypebarSettingsAction { try returnToTypebarSettings() }
       updateConfigurationStartup()
     }
@@ -3866,14 +3867,16 @@ private struct ContentView: View {
       latestInput: { .init(attemptID: session.automaticInputAttemptID,
         typed: session.typed, composition: compositionText, glyphID: nil) },
       latestGlyphID: { currentPromptGlyphIndex },
-      paceFrame: p.paceCaretStyle.drawsMarker ? { paceCaretInterpolation() } : nil,
+      paceFrame: session.paceCaretTargetWpm != nil ? { paceCaretInterpolation() } : nil,
+      paceUsesSessionCallbacks: true,
+      paceIsVisible: { session.paceCaretIsVisible },
       mainPresentation: { .init(
         isVisible: (inputHasFocus || showsVirtualKeyboard) && typingWindowHasFocus && !session.isFinished,
         isBlinking: visualFocus.caretIsBlinking, revision: visualFocus.caretBlinkRevision) },
       mainGlyphID: currentPromptGlyphIndex)
     config.fieldDirectionPerGlyph = session.configuration.mode == .zen
       || session.configuration.mode == .custom || session.configuration.language == .mixedLanguages
-    config.automaticallyPresents = p.caretStyle.drawsMarker || p.paceCaretStyle.drawsMarker
+    config.automaticallyPresents = p.caretStyle.drawsMarker || p.paceCaretStyle.drawsMarker || session.paceCaretIsVisible
     config.insertionAnchor = promptInsertionAnchor
     return config
   }
@@ -4009,6 +4012,8 @@ private struct ContentView: View {
                 accent: activeTheme.caret,
                 motion: settings.smoothCaretMotion,
                 paceFrame: paceCaretFrameProvider,
+                paceUsesSessionCallbacks: true,
+                paceIsVisible: { session.paceCaretIsVisible },
                 reducesPaceMotion: settings.reducePracticeMotion,
                 coordinator: promptCaretMotion, attemptID: session.automaticInputAttemptID,
                 firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
@@ -4217,13 +4222,15 @@ private struct ContentView: View {
       latestInput: { .init(attemptID: session.automaticInputAttemptID,
         typed: session.typed, composition: compositionText, glyphID: nil) },
       latestGlyphID: { currentPromptGlyphIndex }, paceFrame: paceCaretFrameProvider,
+      paceUsesSessionCallbacks: true,
+      paceIsVisible: { session.paceCaretIsVisible },
       mainPresentation: { .init(
         isVisible: (inputHasFocus || showsVirtualKeyboard) && typingWindowHasFocus && !session.isFinished,
         isBlinking: visualFocus.caretIsBlinking, revision: visualFocus.caretBlinkRevision) },
       mainGlyphID: currentPromptGlyphIndex)
     configuration.fieldDirectionPerGlyph = session.configuration.mode == .zen
       || session.configuration.mode == .custom || session.configuration.language == .mixedLanguages
-    configuration.automaticallyPresents = settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker
+    configuration.automaticallyPresents = settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker || session.paceCaretIsVisible
     configuration.insertionAnchor = promptInsertionAnchor
     return configuration
   }
@@ -4242,7 +4249,7 @@ private struct ContentView: View {
   }
 
   private func paceCaretInterpolation() -> PromptPaceCaretInterpolation? {
-    guard let frame = session.paceCaretFrame() else { return nil }
+    guard let frame = session.paceCaretPresentationFrame() else { return nil }
     let from = session.paceCaretGlyphAnchor(for: frame.from)
     let target = session.paceCaretGlyphAnchor(for: frame.target)
     return .init(fromCharacterOffset: nil, targetCharacterOffset: nil,
@@ -4252,7 +4259,7 @@ private struct ContentView: View {
   }
 
   private var paceCaretFrameProvider: (() -> PromptPaceCaretInterpolation?)? {
-    guard settings.paceCaretStyle.drawsMarker else { return nil }
+    guard session.paceCaretTargetWpm != nil else { return nil }
     return { paceCaretInterpolation() }
   }
 
@@ -4554,7 +4561,7 @@ private struct ContentView: View {
       activeSessionTags = settings.activeResultTags
       activePaceTargetWpm = paceGuideTarget(usingRepeatedPace:
         isRepeatedPaceAttempt && committedPracticeDraft?.behavior.paceGuideMode == .off ? lastFinishedWpm : nil)
-      session.configurePace(wpm: activePaceTargetWpm)
+      session.configurePace(wpm: activePaceTargetWpm, style: committedPracticeDraft?.presentation.paceCaretStyle ?? settings.paceCaretStyle)
       practiceSoundPlayer().beginPracticeAttempt()
       NativeSpeech.shared.stop()
       synchronizeNoQuitConfigurationLock()
@@ -5268,7 +5275,7 @@ private struct ContentView: View {
     isSamePromptRepeatAttempt = false
     isRepeatedPaceAttempt = false
     activePaceTargetWpm = paceGuideTarget()
-    session.configurePace(wpm: activePaceTargetWpm)
+    session.configurePace(wpm: activePaceTargetWpm, style: committedPracticeDraft?.presentation.paceCaretStyle ?? settings.paceCaretStyle)
     awaitViewportPresentationIfNeeded()
     if !isPreparingWholePreview, session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.wordPoolBaseLanguage)
@@ -5304,7 +5311,7 @@ private struct ContentView: View {
         let style = promptRenderStyle
         let paceTarget = paceGuideTarget(currentPrompt: base.prompt)
         var candidate = base
-        candidate.configurePace(wpm: paceTarget)
+        candidate.configurePace(wpm: paceTarget, style: style.paceCaretStyle)
         let pacePolicy = PromptRenderSessionPolicy(session: candidate,
           highlightMode: style.highlightMode, usesTapePractice: style.usesTapePractice,
           mainCaretDrawsMarker: style.caretStyle.drawsMarker,
@@ -5845,7 +5852,7 @@ private struct ContentView: View {
     let shouldUseRepeatedPace = isRepeatedPaceAttempt && settings.paceGuideMode == .off
     activePaceTargetWpm = paceGuideTarget(
       usingRepeatedPace: shouldUseRepeatedPace ? lastFinishedWpm : nil)
-    session.configurePace(wpm: activePaceTargetWpm)
+    session.configurePace(wpm: activePaceTargetWpm, style: committedPracticeDraft?.presentation.paceCaretStyle ?? settings.paceCaretStyle)
     awaitViewportPresentationIfNeeded()
     if session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.wordPoolBaseLanguage)
@@ -5860,7 +5867,7 @@ private struct ContentView: View {
 
   private func refreshPaceTarget() {
     activePaceTargetWpm = paceGuideTarget()
-    session.configurePace(wpm: activePaceTargetWpm)
+    session.configurePace(wpm: activePaceTargetWpm, style: committedPracticeDraft?.presentation.paceCaretStyle ?? settings.paceCaretStyle)
   }
 
   private func requestTypingFocus() {

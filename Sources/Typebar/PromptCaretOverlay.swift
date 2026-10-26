@@ -702,6 +702,8 @@ struct PromptCaretOverlay: NSViewRepresentable {
   let accent: Color
   let motion: SmoothCaretMotion
   var paceFrame: (() -> PromptPaceCaretInterpolation?)? = nil
+  var paceUsesSessionCallbacks = false
+  var paceIsVisible: (() -> Bool)? = nil
   var reducesPaceMotion = false
   let coordinator: PromptCaretMotionCoordinator
   let attemptID: UUID
@@ -725,8 +727,11 @@ struct PromptCaretOverlay: NSViewRepresentable {
       frameRate: animationFrameRate, attemptID: attemptID, coordinator: coordinator,
       firstRetainedWordIndex: firstRetainedWordIndex,
       latestInput: latestInput, latestGlyphID: latestGlyphID,
-      latestRendering: latestRendering, paceFrame: paceFrame, mainPresentation: mainPresentation,
-      automaticallyPresents: mainStyle.drawsMarker || paceStyle.drawsMarker,
+      latestRendering: latestRendering, paceFrame: paceFrame, paceUsesSessionCallbacks: paceUsesSessionCallbacks,
+      paceIsVisible: paceIsVisible,
+      mainPresentation: mainPresentation,
+      automaticallyPresents: mainStyle.drawsMarker || paceStyle.drawsMarker
+        || (paceUsesSessionCallbacks && paceIsVisible?() == true),
       insertionAnchor: insertionAnchor))
   }
 

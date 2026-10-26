@@ -4562,7 +4562,7 @@ struct TypingSession {
   private var unitTargets = UnitInputTargets("")
   private var sourceFields: [String]?
   private let initialSourceFields: [String]?
-  private var paceCaretProgress: PaceCaretProgress?
+  private var paceCaretProgress: WebsitePaceSession?
   /// Source initialization selects this once; input or later prompt growth
   /// cannot switch the scoring basis. It is not a language-menu preference.
   private let initialKoreanScoring: Bool
@@ -4914,17 +4914,36 @@ struct TypingSession {
 
   var paceCaretTargetWpm: Double? { paceCaretProgress?.wpm }
 
-  mutating func configurePace(wpm: Double?, clock: PaceCaretClock = .system) {
+  mutating func configurePace(wpm: Double?, clock: PaceCaretClock = .system, style: TypingCaretStyle = .bar) {
     guard configuration.mode != .zen, let wpm,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) || hasNoSpaceWordSegmentation
     else { paceCaretProgress = nil; return }
     paceCaretProgress = .init(wpm: wpm, catalog: .init(prompt: prompt,
-      noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil), clock: clock)
+      noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil),
+      clock: clock, rendersRequests: style.drawsMarker)
   }
 
   func paceCaretFrame() -> PaceCaretFrame? {
     guard !isFinished else { return nil }
-    return paceCaretProgress?.frame(blind: configuration.rules.blindMode)
+    return paceCaretProgress?.frame()
+  }
+  var paceCaretIsVisible: Bool { !isFinished && paceCaretProgress?.isVisible == true }
+  func paceCaretPresentationFrame() -> PaceCaretFrame? {
+    isFinished ? nil : paceCaretProgress?.presentationFrame()
+  }
+  mutating func synchronizePaceCaretStyle(_ style: TypingCaretStyle) {
+    paceCaretProgress?.synchronizePresentation(style.drawsMarker)
+  }
+
+  var paceCaretPendingTicket: WebsitePaceTimerState.Ticket? {
+    isFinished ? nil : paceCaretProgress?.pendingTicket
+  }
+  var paceCaretPendingDelay: TimeInterval? {
+    isFinished ? nil : paceCaretProgress?.pendingDelay
+  }
+  @discardableResult mutating func deliverPaceCaretTimer(_ ticket: WebsitePaceTimerState.Ticket) -> Bool {
+    guard !isFinished else { return false }
+    return paceCaretProgress?.deliver(ticket, blind: configuration.rules.blindMode) ?? false
   }
 
   func paceCaretGlyphIndex(for position: PaceCaretPosition) -> Int? {
@@ -6965,7 +6984,7 @@ struct TypingSession {
     let ownsSample = beginTimingOperation(at: date)
     defer { endTimingOperation(ownsSample) }
     guard !isFinished else { return false }
-    let paceChanged = paceCaretProgress?.advance(blind: configuration.rules.blindMode) ?? false
+    let paceChanged = paceCaretProgress?.claimClockPublication() ?? false
     guard !isFinished, let duration = configuration.duration, hasStarted, duration > 0 else { return paceChanged }
     if elapsedSeconds(at: date) >= duration { complete(at: date); return true }
     return paceChanged
@@ -7741,7 +7760,6 @@ struct TypingSession {
     if kind == .insert, inputStopped { discardTerminalElementIfNeeded() }
     let field = replayInputField(kind: kind, inputStopped: inputStopped)
     if paceCaretProgress != nil, kind == .insert, !inputStopped, lastInputCommitsWord, let field {
-      paceCaretProgress?.advance(blind: configuration.rules.blindMode)
       let correct = paceCommittedFieldIsCorrect(field)
       paceCaretProgress?.handleCommit(word: field.index, correct: correct,
         blind: configuration.rules.blindMode)

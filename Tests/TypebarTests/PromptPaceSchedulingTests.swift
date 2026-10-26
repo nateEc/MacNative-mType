@@ -33,7 +33,7 @@ import XCTest
       uniqueKeysWithValues: (0..<text.count).map { ($0, $0) }))
   }
 
-  func testActualDeadlineWakePreservesAnOverdueZeroDurationTargetBeforeTheLatestStep() throws {
+  func testActualCallbackDoesNotPaintBeforeItsZeroDurationRequestIsPresented() throws {
     let clock = PaceCaretTestClock()
     var session = TypingSession(configuration: .words(100), prompt: text)
     session.configurePace(wpm: 300, clock: clock.source)
@@ -44,6 +44,7 @@ import XCTest
     func config(_ frameRate: Int) -> PromptCaretNativeView.Configuration {
       var value = configuration(motion, attempt: attempt, frameRate: frameRate)
       value.paceFrame = { self.interpolation(session) }
+      value.paceUsesSessionCallbacks = true
       value.latestRendering = { self.rendering }
       return value
     }
@@ -53,12 +54,15 @@ import XCTest
     // deadline wake between presentation frames, excluding hosting warm-up.
     view.update(config(15))
     clock.time = 0.08
-    RunLoop.main.run(until: Date().addingTimeInterval(0.015))
+    session.deliverPaceCaretTimer(try XCTUnwrap(session.paceCaretPendingTicket))
     let overdue = try XCTUnwrap(PromptCaretLayout.rect(in: AttributedString(text), characterOffset: 2,
       containerSize: view.bounds.size, font: font, lineSpacing: 12, isRightToLeft: false))
     XCTAssertNotEqual(before, overdue)
+    XCTAssertEqual(motion.pace.position, before)
+    XCTAssertEqual(view.subviews.map(\.frame), painted, "Callback delivery does not paint")
+    view.present(at: 0.08)
     XCTAssertEqual(motion.pace.position, overdue)
-    XCTAssertEqual(view.subviews.map(\.frame), painted, "The deadline request does not paint")
+    XCTAssertNil(view.scheduledTimerIntervals.pace)
   }
 
   func testOnlyAnExactSkippedDeadlineWritesThePredecessorAndDuplicateReadsDoNotRestart() throws {
@@ -116,7 +120,7 @@ import XCTest
     }
   }
 
-  func testProductionWordEndPredecessorUsesItsOwnGapWidthAndDirection() throws {
+  func testCoalescedCallbacksDoNotInventAWordEndPresentation() throws {
     for style in [TypingCaretStyle.bar, .block, .underline] {
       for rtl in [false, true] {
         let clock = PaceCaretTestClock()
@@ -128,15 +132,25 @@ import XCTest
         defer { view.stop() }
         var config = configuration(motion, paceStyle: style, rightToLeft: rtl)
         config.paceFrame = { self.interpolation(session) }; config.latestRendering = { self.rendering }
+        config.paceUsesSessionCallbacks = true
         view.update(config); view.layout(); view.present(at: 0)
-        clock.time = 0.2
+        for step in 1...5 {
+          clock.time = Double(step) * 0.04
+          session.deliverPaceCaretTimer(try XCTUnwrap(session.paceCaretPendingTicket))
+        }
         let frame = try XCTUnwrap(interpolation(session))
         XCTAssertEqual(frame.zeroDeadlinePredecessor, .init(glyphIndex: 4, after: true))
-        view.requestPacePosition(at: 0.2, fromDeadline: true)
-        let rect = try XCTUnwrap(PromptCaretLayout.rect(in: AttributedString(text), characterOffset: 4,
+        // Source engine sampling precedes the coalesced RAF request. The old
+        // first-letter tween may finish on this frame before being replaced.
+        motion.sample(at: 0.2)
+        let before = motion.pace.position
+        view.present(at: 0.2)
+        XCTAssertEqual(motion.pace.position, before, "A coalesced request starts from the last presented position")
+        view.present(at: 0.25)
+        let rect = try XCTUnwrap(PromptCaretLayout.rect(in: AttributedString(text), characterOffset: 6,
           containerSize: view.bounds.size, font: font, lineSpacing: 12, isRightToLeft: rtl))
-        let expected = PromptPaceCaretGeometry.rect(from: rect, to: rect, fromAfter: true,
-          toAfter: true, style: style, rightToLeft: rtl, fraction: 1, reducesMotion: true,
+        let expected = PromptPaceCaretGeometry.rect(from: rect, to: rect, fromAfter: false,
+          toAfter: false, style: style, rightToLeft: rtl, fraction: 1, reducesMotion: true,
           afterWidth: (" " as NSString).size(withAttributes: [.font: font]).width)
         XCTAssertEqual(motion.pace.position, expected)
       }
@@ -192,13 +206,15 @@ import XCTest
     defer { view.stop() }
     var config = configuration(motion)
     config.paceFrame = { self.interpolation(session) }; config.latestRendering = { self.rendering }
+    config.paceUsesSessionCallbacks = true
     view.update(config); view.layout(); view.present(at: 0)
     clock.time = 0.06
     session.insertBatch("ax ", at: Date(timeIntervalSince1970: 0.06))
     clock.time = 0.08
+    session.deliverPaceCaretTimer(try XCTUnwrap(session.paceCaretPendingTicket))
     let frame = try XCTUnwrap(session.paceCaretFrame())
-    XCTAssertEqual(frame.from, .init(word: 0, letter: 2))
-    XCTAssertEqual(frame.target, .init(word: 1, letter: 3))
+    XCTAssertEqual(frame.from, .init(word: 0, letter: 1))
+    XCTAssertEqual(frame.target, .init(word: 1, letter: 2))
     view.requestPacePosition(at: 0.08, fromDeadline: true)
     let predecessor = PromptCaretLayout.rect(in: AttributedString(text), characterOffset: 8,
       containerSize: view.bounds.size, font: font, lineSpacing: 12, isRightToLeft: false)
@@ -214,10 +230,14 @@ import XCTest
     var session = TypingSession(configuration: .words(100), prompt: text)
     session.configurePace(wpm: 300, clock: .init { origin.map { max(0, clock.now() - $0) } ?? 0 })
     session.beginComposition(at: Date(timeIntervalSince1970: 0))
+    let page = PracticePageSessionStore(), router = PreferenceConfigurationSaveRouter()
+    page.attach(to: router); defer { page.detach() }
+    var state = page.state; state.session = session; page.replace(state)
     var supplied = 0, requests: [Int] = []
     var config = configuration(motion)
+    config.paceUsesSessionCallbacks = true
     config.paceFrame = {
-      let frame = self.interpolation(session)
+      let frame = self.interpolation(page.state.session)
       supplied = Int(frame?.sequence ?? 0)
       return frame
     }
@@ -230,9 +250,10 @@ import XCTest
     XCTAssertEqual(intervals.drawing ?? -1, 1.0 / 15, accuracy: 0.000001)
     // The initial target may request an immediate wake (zero); later targets
     // use 40ms deadlines. Neither may inherit the 67ms presentation cadence.
-    XCTAssertNotNil(intervals.pace)
-    XCTAssertGreaterThanOrEqual(intervals.pace ?? -1, 0)
-    XCTAssertLessThanOrEqual(intervals.pace ?? .infinity, 0.04 + 0.000001)
+    XCTAssertNil(intervals.pace, "The view never owns a second logical pace timer")
+    XCTAssertNotNil(page.scheduledPaceTimerInterval)
+    XCTAssertGreaterThanOrEqual(page.scheduledPaceTimerInterval ?? -1, 0)
+    XCTAssertLessThanOrEqual(page.scheduledPaceTimerInterval ?? .infinity, 0.04 + 0.000001)
     origin = clock.now() // Exclude initial native hosting/layout warm-up.
     RunLoop.main.run(until: Date().addingTimeInterval(0.26))
     XCTAssertTrue(requests.contains(where: { $0 > 1 }),
@@ -266,11 +287,13 @@ import XCTest
     let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 600, height: 400))
     defer { view.stop() }
     var config = configuration(motion), reads = 0
+    config.paceUsesSessionCallbacks = true
     config.paceFrame = { self.interpolation(session) }
     config.latestRendering = { reads += 1; return self.rendering }
     view.update(config); view.layout(); view.present(at: 0)
     let before = motion.pace.position
     clock.time = 0.055
+    session.deliverPaceCaretTimer(try XCTUnwrap(session.paceCaretPendingTicket))
     view.requestPacePosition(at: 0.055)
     XCTAssertEqual(motion.pace.position, before, "Requesting a later step does not present it")
     clock.time = 0.06

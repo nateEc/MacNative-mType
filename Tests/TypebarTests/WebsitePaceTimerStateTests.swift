@@ -15,7 +15,7 @@ final class WebsitePaceTimerStateTests: XCTestCase {
   struct Scenario: Decodable { let speed: String; let rawWords: [String]; let events: [Event] }
   struct Output: Decodable { let revision: String; let actualModules: Int; let scenarios: [Scenario] }
 
-  func source() throws -> Output {
+  static func source() throws -> Output {
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
       throw XCTSkip("Requires pinned clean reference")
     }
@@ -37,7 +37,7 @@ final class WebsitePaceTimerStateTests: XCTestCase {
   }
 
   func testElapsedFrameReadDoesNotDeliverSourceTimers() throws {
-    let scenario = try XCTUnwrap(source().scenarios.first { $0.speed == "300" && $0.rawWords == ["ab ", "cd ", "efg"] })
+    let scenario = try XCTUnwrap(Self.source().scenarios.first { $0.speed == "300" && $0.rawWords == ["ab ", "cd ", "efg"] })
     let start = try XCTUnwrap(scenario.events.first { $0.kind == "start" })
     let read = try XCTUnwrap(scenario.events.first { $0.kind == "read" })
     let expected = try XCTUnwrap(read.request)
@@ -53,7 +53,7 @@ final class WebsitePaceTimerStateTests: XCTestCase {
   }
 
   func testAllDeliveredRequestsAgainstCompletePinnedPaceAndWordModules() throws {
-    let output = try source()
+    let output = try Self.source()
     XCTAssertEqual(output.scenarios.count, 40)
     XCTAssertEqual(output.scenarios.reduce(0) { $0 + $1.events.count }, 1840)
     for scenario in output.scenarios {

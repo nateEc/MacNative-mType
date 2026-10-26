@@ -7,7 +7,24 @@ import Observation
 final class PracticePageSessionStore {
   let owner = UUID()
   @ObservationIgnored let lazyModeNotices = WebsiteConfigLazyModeNotices()
-  private(set) var state = PracticePageSessionState()
+  @ObservationIgnored private var storedState = PracticePageSessionState()
+  private(set) var state: PracticePageSessionState {
+    get {
+      access(keyPath: \.state)
+      var snapshot = storedState
+      if let style = effectivePaceStyle { snapshot.session.synchronizePaceCaretStyle(style) }
+      return snapshot
+    }
+    set {
+      withMutation(keyPath: \.state) { storedState = newValue }
+      synchronizePaceTimer()
+    }
+  }
+  @ObservationIgnored private var paceTimer: Timer?
+  @ObservationIgnored private var paceTicket: WebsitePaceTimerState.Ticket?
+  @ObservationIgnored private var paceScheduledDelay: TimeInterval?
+  @ObservationIgnored private weak var paceStyleSettings: AppSettings?
+  var scheduledPaceTimerInterval: TimeInterval? { paceTimer?.isValid == true ? paceScheduledDelay : nil }
   private(set) var layoutFluidCountdown = WebsiteLayoutFluidCountdown()
   private(set) var restartController: WebsitePracticeRestartController?
   private(set) var startupController = WebsiteConfigStartupController()
@@ -131,14 +148,18 @@ final class PracticePageSessionStore {
 
   func attach(to router: PreferenceConfigurationSaveRouter) {
     guard !committing else { return }
+    stopPaceTimer()
     layoutFluidCountdown = .init()
     typebarSettingsAction = nil; clearLegacyReturn()
     startupController.stop(); startupController = .init(); setStartupInputSuspended(false)
     retireRestartController()
     attachment = UUID()
     self.router = router
+    synchronizePaceTimer()
   }
   func detach() {
+    stopPaceTimer()
+    paceStyleSettings = nil
     layoutFluidCountdown = .init()
     attachment = UUID()
     if committing { pendingDetach = true }
@@ -181,6 +202,7 @@ final class PracticePageSessionStore {
     startupInputTransition = true
     startupInputSuspended = suspended
     startupInputTransition = false
+    synchronizePaceTimer()
   }
 
   func bindTypebarSettingsAction(_ action: @escaping @MainActor () throws -> Void) {
@@ -388,6 +410,7 @@ final class PracticePageSessionStore {
   func endCommit() {
     committing = false
     if pendingDetach { router = nil; pendingDetach = false }
+    synchronizePaceTimer()
   }
   func installCommitted(_ state: PracticePageSessionState,
     retainingRestartController controller: WebsitePracticeRestartController? = nil) {
@@ -401,5 +424,51 @@ final class PracticePageSessionStore {
       || state.configurationDeparture?.id != self.state.configurationDeparture?.id
       || state.savedApplication?.id != self.state.savedApplication?.id) { retireRestartController() }
     self.state = state
+  }
+
+  private func stopPaceTimer() {
+    paceTimer?.invalidate(); paceTimer = nil; paceTicket = nil; paceScheduledDelay = nil
+  }
+
+  func bindPaceStyleSettings(_ settings: AppSettings) { paceStyleSettings = settings }
+  private var effectivePaceStyle: TypingCaretStyle? {
+    if storedState.practice != nil { return storedState.presentation?.publication.draft.presentation.paceCaretStyle }
+    return paceStyleSettings?.paceCaretStyle
+  }
+
+  private func synchronizePaceTimer() {
+    let attempt = storedState.session.automaticInputAttemptID
+    guard acceptsAttemptCallback(for: attempt),
+      let ticket = storedState.session.paceCaretPendingTicket,
+      let delay = storedState.session.paceCaretPendingDelay, delay.isFinite else {
+      stopPaceTimer(); return
+    }
+    if paceTicket == ticket, paceTimer?.isValid == true { return }
+    stopPaceTimer()
+    let timer = Timer(timeInterval: delay, target: PracticePaceTimerTarget(owner: self),
+      selector: #selector(PracticePaceTimerTarget.tick(_:)), userInfo: nil, repeats: false)
+    paceTicket = ticket; paceTimer = timer; paceScheduledDelay = delay
+    RunLoop.main.add(timer, forMode: .common)
+  }
+
+  fileprivate func advancePace(_ timer: Timer) {
+    guard timer === paceTimer else { timer.invalidate(); return }
+    let ticket = paceTicket
+    stopPaceTimer()
+    guard acceptsAttemptCallback(for: storedState.session.automaticInputAttemptID), let ticket else { return }
+    if let style = effectivePaceStyle { storedState.session.synchronizePaceCaretStyle(style) }
+    // Frame providers see the latest value without invalidating the entire
+    // practice page at every (potentially 4ms) timer delivery.
+    storedState.session.deliverPaceCaretTimer(ticket)
+    synchronizePaceTimer()
+  }
+}
+
+@MainActor private final class PracticePaceTimerTarget: NSObject {
+  private weak var owner: PracticePageSessionStore?
+  init(owner: PracticePageSessionStore) { self.owner = owner }
+  @objc func tick(_ timer: Timer) {
+    guard let owner else { timer.invalidate(); return }
+    owner.advancePace(timer)
   }
 }

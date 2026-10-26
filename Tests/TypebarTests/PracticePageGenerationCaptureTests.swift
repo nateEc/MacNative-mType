@@ -99,8 +99,12 @@ import XCTest
     f.input("a")
     let capture = try f.page.captureGeneration(router: f.router)
     var state = f.page.state
-    clock.time = 0.1
-    XCTAssertTrue(state.session.tick(), "Exercise real pace progress, not a no-op tick")
+    let before = try XCTUnwrap(state.session.paceCaretFrame())
+    clock.time = 0.2
+    XCTAssertTrue(state.session.deliverPaceCaretTimer(try XCTUnwrap(state.session.paceCaretPendingTicket)))
+    XCTAssertGreaterThan(try XCTUnwrap(state.session.paceCaretFrame()).sequence, before.sequence)
+    XCTAssertTrue(state.session.tick(), "Publish a real delivered request without driving the timer")
+    XCTAssertFalse(state.session.tick(), "The same delivered request is published only once")
     f.page.replace(state)
     XCTAssertTrue(f.page.isCurrent(capture, router: f.router))
     state = f.page.state

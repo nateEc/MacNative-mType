@@ -14,7 +14,7 @@ final class PaceCaretClockTests: XCTestCase {
     session.tick(at: date.addingTimeInterval(3_600))
     let jumped = try XCTUnwrap(session.paceCaretFrame())
     XCTAssertEqual(jumped.target, initial.target)
-    XCTAssertEqual(jumped.fraction, 0.5, accuracy: 1e-8)
+    XCTAssertEqual(jumped.fraction, 0, "The request remains frozen until its callback")
   }
 
   func testForwardDatedCommitDoesNotConsumeWallClockHoursOfPace() throws {
@@ -27,7 +27,7 @@ final class PaceCaretClockTests: XCTestCase {
     XCTAssertEqual(session.typed, "ab ")
     let frame = try XCTUnwrap(session.paceCaretFrame())
     XCTAssertEqual(frame.target, .init(word: 0, letter: 1))
-    XCTAssertEqual(frame.fraction, 0.5, accuracy: 1e-8)
+    XCTAssertEqual(frame.fraction, 0)
   }
   func testBackwardWallClockDoesNotFreezeAdvancingPace() throws {
     let clock = PaceCaretTestClock()
@@ -35,10 +35,11 @@ final class PaceCaretClockTests: XCTestCase {
     session.configurePace(wpm: 60, clock: clock.source)
     session.beginComposition(at: date)
     clock.time = 0.2
+    session.deliverPaceCaretTimer(session.paceCaretPendingTicket!)
     session.tick(at: date.addingTimeInterval(-3_600))
     XCTAssertEqual(session.paceCaretFrame()?.target, .init(word: 0, letter: 2))
     clock.time = 0.3
-    XCTAssertEqual(try XCTUnwrap(session.paceCaretFrame()).fraction, 0.5, accuracy: 1e-8)
+    XCTAssertEqual(try XCTUnwrap(session.paceCaretFrame()).fraction, 0)
   }
 
   func testClockOriginIsFirstAcceptedInputNotConfigurationTime() throws {
@@ -54,7 +55,7 @@ final class PaceCaretClockTests: XCTestCase {
     XCTAssertEqual(first.target, .init(word: 0, letter: 1))
     XCTAssertEqual(first.fraction, 0)
     clock.time = 600.1
-    XCTAssertEqual(try XCTUnwrap(session.paceCaretFrame()).fraction, 0.5, accuracy: 1e-8)
+    XCTAssertEqual(try XCTUnwrap(session.paceCaretFrame()).fraction, 0)
   }
 
   func testWrongCommitUsesClockDeadlineAndBlindRetainsPendingCorrection() {
@@ -66,11 +67,13 @@ final class PaceCaretClockTests: XCTestCase {
     rules.blindMode = true
     session.synchronizeLiveInputRules(rules)
     clock.time = 0.2
+    session.deliverPaceCaretTimer(session.paceCaretPendingTicket!)
     session.tick(at: date.addingTimeInterval(3_600))
     XCTAssertEqual(session.paceCaretFrame()?.target, .init(word: 0, letter: 2))
     rules.blindMode = false
     session.synchronizeLiveInputRules(rules)
     clock.time = 0.4
+    session.deliverPaceCaretTimer(session.paceCaretPendingTicket!)
     session.tick(at: date.addingTimeInterval(-3_600))
     XCTAssertEqual(session.paceCaretFrame()?.target, .init(word: 2, letter: 0))
   }
@@ -81,6 +84,7 @@ final class PaceCaretClockTests: XCTestCase {
     session.configurePace(wpm: 60, clock: old.source)
     session.insertBatch("a", at: date)
     old.time = 0.2
+    session.deliverPaceCaretTimer(session.paceCaretPendingTicket!)
     XCTAssertEqual(session.paceCaretFrame()?.target, .init(word: 0, letter: 2))
     session.configurePace(wpm: 60, clock: fresh.source)
     fresh.time = 9_999

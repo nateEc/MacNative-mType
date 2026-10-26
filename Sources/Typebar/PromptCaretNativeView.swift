@@ -29,6 +29,8 @@ final class PromptCaretNativeView: NSView {
     var latestGlyphID: (() -> Int?)? = nil
     var latestRendering: (() -> PromptRendering)? = nil
     var paceFrame: (() -> PromptPaceCaretInterpolation?)? = nil
+    var paceUsesSessionCallbacks = false
+    var paceIsVisible: (() -> Bool)? = nil
     var mainPresentation: (() -> PromptCaretBlinkPresentation)? = nil
     // Custom renderers supply their actual untransformed glyph boxes by
     // canonical ID. Never reinterpret those IDs as text-character offsets.
@@ -101,10 +103,12 @@ final class PromptCaretNativeView: NSView {
       // A new marker or style does not own the sibling's running words tween.
       // prepare handles real attempt changes; only geometry invalidates both.
       if layoutChanged { next.coordinator.resetLayout() }
-      input = nil; mainOffset = nil; paceSequence = nil
+      input = nil; mainOffset = nil
       needsPosition = true; needsSnap = true
-      paceTargetRect = nil
-      mainRightToLeft = nil; paceRightToLeft = nil
+      mainRightToLeft = nil
+      if layoutChanged || restarted || !next.paceUsesSessionCallbacks {
+        paceSequence = nil; paceTargetRect = nil; paceRightToLeft = nil
+      }
     }
     if old?.geometryRevision != next.geometryRevision {
       needsPosition = true; paceGeometryNeedsUpdate = true
@@ -175,7 +179,8 @@ final class PromptCaretNativeView: NSView {
 
   private func schedulePaceTimer(after delay: TimeInterval) {
     paceTimer?.invalidate(); paceTimer = nil
-    guard let config = configuration, config.paceStyle.drawsMarker, config.paceFrame != nil,
+    guard let config = configuration, !config.paceUsesSessionCallbacks,
+      config.paceStyle.drawsMarker, config.paceFrame != nil,
       bounds.width > 0, delay.isFinite, delay >= 0 else { return }
     let timer = Timer(timeInterval: delay, target: PromptCaretTimerTarget(owner: self),
       selector: #selector(PromptCaretTimerTarget.paceTick(_:)), userInfo: nil, repeats: false)
@@ -221,7 +226,8 @@ final class PromptCaretNativeView: NSView {
     paint(coordinator.documentRect(isPace: false), style: config.mainStyle,
       accent: config.accent, rightToLeft: mainRightToLeft ?? config.rightToLeft, isPace: false, host: &mainHost)
     mainHost?.alphaValue = opacity
-    paint(paceFrame == nil && config.paceOffset == nil ? nil : coordinator.documentRect(isPace: true),
+    let paceVisible = config.paceIsVisible?() ?? (paceFrame != nil || config.paceOffset != nil)
+    paint(paceVisible ? coordinator.documentRect(isPace: true) : nil,
       style: config.paceStyle, accent: config.accent.opacity(0.72), rightToLeft: paceRightToLeft ?? config.rightToLeft,
       isPace: true, host: &paceHost)
   }
@@ -230,7 +236,8 @@ final class PromptCaretNativeView: NSView {
   /// presentation frames, reading the same fresh providers as the draw path.
   @discardableResult func requestPacePosition(at time: TimeInterval,
     fromDeadline: Bool = false) -> PromptPaceCaretInterpolation? {
-    guard let config = configuration, bounds.width > 0, config.paceStyle.drawsMarker else { return nil }
+    guard let config = configuration, bounds.width > 0,
+      config.paceStyle.drawsMarker || config.paceUsesSessionCallbacks else { return nil }
     let attempt = config.latestInput?().attemptID ?? config.attemptID
     guard configuration?.attemptID == config.attemptID,
       configuration?.coordinator === config.coordinator else { return nil }
@@ -245,12 +252,18 @@ final class PromptCaretNativeView: NSView {
     let lostGeometry = coordinator.pace.position == nil
     if lostGeometry {
       paceRightToLeft = direction(config.firstGlyphID, after: false)
-      coordinator.positionPace(at: measure(0, text: config.text, config: config, glyphID: config.firstGlyphID), time: time, duration: 0)
+      var initial = measure(0, text: config.text, config: config, glyphID: config.firstGlyphID)
+      if config.paceUsesSessionCallbacks { initial?.origin = .zero }
+      coordinator.positionPace(at: initial, time: time, duration: 0)
     }
     if let frame {
-      let rawRemaining = (1 - frame.fraction) * frame.stepDuration
-      let remaining = rawRemaining.isFinite ? max(0, rawRemaining) : 0
+      let rawRemaining = config.paceUsesSessionCallbacks ? frame.stepDuration : (1 - frame.fraction) * frame.stepDuration
+      let remaining = rawRemaining.isFinite ? (config.paceUsesSessionCallbacks ? rawRemaining : max(0, rawRemaining)) : 0
       let changed = frame.sequence != paceSequence || lostGeometry
+      if config.paceUsesSessionCallbacks, !changed {
+        paceGeometryNeedsUpdate = false
+        return frame
+      }
       if changed || paceGeometryNeedsUpdate {
         // A missing/pruned target preserves the old position and folding flag.
         let rendering = config.latestRendering?()
@@ -274,7 +287,7 @@ final class PromptCaretNativeView: NSView {
         // At an exact deadline, a skipped predecessor has zero (not negative)
         // duration. A resolved timer request writes it before starting the
         // latest tween; a coalesced draw read must not invent that write.
-        if fromDeadline, !lostGeometry, !config.reducesMotion, frame.fraction == 0,
+        if !config.paceUsesSessionCallbacks, fromDeadline, !lostGeometry, !config.reducesMotion, frame.fraction == 0,
           remaining > 0, let previous = paceSequence, frame.sequence.isFinite,
           frame.sequence > previous + 1 {
           let predecessor = frame.zeroDeadlinePredecessor
@@ -305,7 +318,7 @@ final class PromptCaretNativeView: NSView {
         paceSequence = frame.sequence
         paceGeometryNeedsUpdate = false
       }
-      if changed || paceTimer == nil {
+      if !config.paceUsesSessionCallbacks, changed || paceTimer == nil {
         if remaining > 0 { schedulePaceTimer(after: remaining) }
         else { paceTimer?.invalidate(); paceTimer = nil }
       }

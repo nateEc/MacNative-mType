@@ -586,6 +586,7 @@ import XCTest
     let f = try Fixture(legacyNoQuit: false); defer { f.close() }
     f.settings.saveCompletedResults = false
     f.settings.paceGuideMode = .off
+    f.settings.paceCaretStyle = .off
     f.wait { f.views(TypingInputView.self).first?.acceptsTextInput == true }
     let epoch = UUID()
     let coordinator = WebsiteConfigCommitCoordinator(router: f.settings.preferenceConfigurationSaves, register: f.register,
@@ -601,6 +602,7 @@ import XCTest
     XCTAssertTrue(f.window.makeFirstResponder(input))
     input.onInsert("a", false)
     XCTAssertNotNil(f.state.page.state.session.paceCaretFrame(), "Published custom pace must not read legacy off")
+    XCTAssertNotNil(f.state.page.state.session.paceCaretPresentationFrame(), "Published caret style must take priority over legacy off")
     let oldRestart = input.onRestart, oldInsert = input.onInsert
     let disk = try f.register.read().revision
     input.onRestart()
