@@ -31,6 +31,9 @@ import XCTest
     init(unicode: Bool = false, promptOverride: String? = nil,
       gatesSource: Bool = false, viewportEnabled: Bool = true, wordCount: Int = 201,
       hostSize: CGSize = .init(width: 1000, height: 720)) throws {
+      // XCTest does not run NSApplicationMain. Initialize AppKit before the
+      // hidden hierarchy so native wheel handling never depends on test order.
+      _ = NSApplication.shared
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = AppSettings(defaults: defaults)
       settings.reducePracticeMotion = true

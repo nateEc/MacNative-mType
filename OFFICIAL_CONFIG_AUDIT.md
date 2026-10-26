@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+## 隐藏页面滚轮夹具初始化（2026-10-26，起点 c81862cb）
+
+HOST-WHEEL-BASELINE-01：原始滚轮用例在独立 XCTest 进程中复现四处失败（62.925 秒，/tmp/typebar-wheel-red.log）；再次独立运行仍有两处失败（34.308 秒，/tmp/typebar-wheel-isolated-recheck.log）。两种样式原有的上下滚动、内层偏移、输入焦点、词源代次和隐藏窗口断言全部保留。
+
+临时诊断发现进入夹具时 NSApp 为 nil。补事件窗口信息、固定位置及异步等待的实验没有单独证明修复；普通 AppKit 与 SwiftUI 页面都曾不响应。先初始化 NSApplication.shared 的诊断与原用例同进程运行时两项通过，但随后只运行原用例仍失败，排除了把同进程偶然通过当作独立证据。最终仅在 Fixture 初始化、创建界面前调用 NSApplication.shared，原用例独立运行通过（2.957 秒，/tmp/typebar-wheel-initialization-only.log）。这与 Apple 对 [shared 初始化显示环境与窗口服务器连接](https://developer.apple.com/documentation/appkit/nsapplication/shared) 的要求一致；修复属于测试环境初始化，不是生产滚动算法变更。
+
+所有临时诊断、事件字段改写和固定等待均已移除。最终相关组共 58 项、零失败，其中 3 项十万词耐力测试按原有环境开关跳过（70.454 秒，/tmp/typebar-wheel-final-related.log）；完整 ViewportPracticeHostTests 的 28 项全部通过，68.969 秒，包含原滚轮用例。删除诊断后的最终独立进程再次通过原用例（3.216 秒，/tmp/typebar-wheel-final-isolated.log），1,370 条人工清单结构检查通过。没有手动滚动代替滚轮断言，没有跳过或放宽原用例，也没有显示窗口或启动 Typebar 主程序。实体鼠标／触控板、惯性、可见窗口与完整重写目标继续开放；后文“滚轮基线仍失败”保留为历史阶段证据。
+
 ## 真实导航与完成批次（2026-10-26，起点 60cb97f1）
 
 CFG-LAYOUTFLUID-NAVIGATION-01：实际 goToNextWord 在增加活动词索引、补充词表和终末难度／完成检查之前调用 handleSpace。普通词最后一个文字匹配可完成测试而没有导航；同一多单元事件中的终末提交清空输入后，后续单元仍可能在相同末词索引再次导航。原生此前在整批插入后按 completedWordCount 差值回放，使用批次末尾词表长度，且完成／失败后 guard 阻止全部回放。
