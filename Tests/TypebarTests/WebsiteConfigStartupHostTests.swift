@@ -326,10 +326,10 @@ import XCTest
     let keycaps = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
     XCTAssertTrue(keycaps.contains("Esc"), "Keyboard region: \(keycaps)")
     request.recognitionLevel = .accurate
-    // Sparse rows merge incorrectly when Vision segments the whole keyboard.
-    // This fixed host's top letter row must contain Q and W; legacy custom
-    // rows contain only a, and Dvorak places Q/W outside this row.
-    request.regionOfInterest = .init(x: 0.2, y: 0.39, width: 0.6, height: 0.04)
+    // Even a whole sparse letter row can drop W despite its visible pixels.
+    // Isolate the Q/W pair in this fixed host, keeping both glyph assertions;
+    // legacy custom rows contain only a, and Dvorak puts Q/W in other rows.
+    request.regionOfInterest = .init(x: 0.22, y: 0.39, width: 0.10, height: 0.04)
     try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
     let legends = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
     XCTAssertTrue(legends.contains("Q") && legends.contains("W"), "Published QWERTY, not legacy custom rows: \(legends)")

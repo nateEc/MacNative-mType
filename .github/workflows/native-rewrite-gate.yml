@@ -123,6 +123,25 @@ jobs:
       - name: Verify keymap reactivity QA preparation failure boundaries
         run: python3 Scripts/test-keymap-reactivity-qa.py
 
+      - name: Prepare remaining pinned source QA dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_qa_root="$(mktemp -d "${RUNNER_TEMP}/typebar-source-parity.XXXXXX")"
+          npm install --prefix "$source_qa_root/libraries" --ignore-scripts --no-save --package-lock=false --no-fund --no-audit \
+            date-fns@3.6.0 @date-fns/utc@1.2.0 lz-ts@1.1.2 @tanstack/db@0.6.8
+          npm pack --ignore-scripts --pack-destination "$source_qa_root" howler@2.2.3
+          npm pack --ignore-scripts --pack-destination "$source_qa_root" chartjs-plugin-trendline@3.2.4
+          printf 'TYPEBAR_REFERENCE_ROOT=%s\n' "${{ steps.reference.outputs.path }}" >> "$GITHUB_ENV"
+          printf 'TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES=%s\n' "$source_qa_root/libraries" >> "$GITHUB_ENV"
+          printf 'TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES=%s\n' "$source_qa_root/libraries" >> "$GITHUB_ENV"
+          printf 'TYPEBAR_INBOX_SOURCE_PACKAGE=%s\n' "$source_qa_root/libraries/node_modules/@tanstack/db" >> "$GITHUB_ENV"
+          printf 'TYPEBAR_HOWLER_SOURCE_ARCHIVE=%s\n' "$source_qa_root/howler-2.2.3.tgz" >> "$GITHUB_ENV"
+          printf 'TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE=%s\n' "$source_qa_root/chartjs-plugin-trendline-3.2.4.tgz" >> "$GITHUB_ENV"
+
+      - name: Verify pinned source QA evidence failure boundaries
+        run: python3 Scripts/test-source-qa-evidence.py
+
       - name: Run native client tests without launching the app
         shell: bash
         run: |
@@ -149,6 +168,10 @@ jobs:
             diagnosis="$(printf '%s' "$diagnosis" | tr '\n' ' ' | tail -c 1200)"
             printf '::error title=Native client test failed::swift test exited %s; %s\n' "$test_status" "$diagnosis"
             exit "$test_status"
+          fi
+          if ! python3 Scripts/check-source-qa-evidence.py "$test_log"; then
+            printf '%s\n' '::error title=Missing pinned source QA evidence::Required source comparisons were skipped, missing, duplicated, or failed'
+            exit 1
           fi
           if pgrep -x Typebar >/dev/null; then
             printf '%s\n' '::error title=Native app launch detected::Typebar was unexpectedly launched by the client test suite'

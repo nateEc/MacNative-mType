@@ -2,6 +2,10 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| GATE-SOURCE-EXECUTION-01 | 固定源码对照必须实际执行 | 已登记的 85 个原生源码兼容性检查 | Native Rewrite Gate／readiness／源码执行证据检查器 | 实际工作流导出下完整客户端 6,338 项、25 跳过、0 失败，85 项执行证据与 13 项失败契约通过。修正稀疏键盘 OCR 分区并保留 Q／W 双断言；CI 和 readiness 不再仅凭进程成功放行跳过项。真实 CI runner、完整 readiness 与其余验收未完成，见执行证据合同。 |
+
+| ID | 功能 | 参考 | 原生模块 | 状态 |
+| --- | --- | --- | --- | --- |
 | PACE-FIRST-REQUEST-01 | 舍入截止点下的首次配速请求 | pace-caret.start／update／handleSpace 与完整词目录 | PaceCaretProgress／TypingSession／PromptCaretNativeView | 48 组源码请求及三项原生反例先红后绿；扩大 136 项零失败零跳过，应用包与原创性检查通过。同一时刻仍指向首字符，错词修正等待后续推进。巨大有限值后续零延迟循环、无限配速与实体首帧未完成，见首次请求合同。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |

@@ -440,6 +440,9 @@ if [[ -z "$website_schema_qa_root" ]]; then
   website_schema_qa_root="$(tail -n 1 "$temporary_directory/website-schema-runtime.log")"
 fi
 [[ -f "$website_schema_qa_root/package.json" ]] || fail "missing QA-only website config schema dependency"
+run_logged_check "checking pinned source execution evidence failure contracts" \
+  "$temporary_directory/source-evidence-contracts.log" \
+  python3 "$project_root/Scripts/test-source-qa-evidence.py"
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
 run_logged_check "running native client test suite" "$temporary_directory/client-tests.log" \
   env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_ENDURANCE_TESTS=1 TYPEBAR_REFERENCE_ROOT="$reference_root" \
@@ -452,6 +455,10 @@ run_logged_check "running native client test suite" "$temporary_directory/client
   TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
   TYPEBAR_SOLID_QA_ARCHIVE="$keymap_reactivity_archive" \
   TYPEBAR_DISK_FIXTURE_ROOT="$temporary_directory/disk-model-fixtures" swift test
+
+run_logged_check "verifying required pinned source comparisons executed" \
+  "$temporary_directory/source-evidence.log" \
+  python3 "$project_root/Scripts/check-source-qa-evidence.py" "$temporary_directory/client-tests.log"
 
 require_no_conflicting_processes || fail "stop the listed process before running service tests"
 run_logged_check "running self-hosted service test suite" "$temporary_directory/service-tests.log" \

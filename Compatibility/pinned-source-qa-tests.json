@@ -1,0 +1,346 @@
+{
+  "schemaVersion": 1,
+  "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
+  "tests": [
+    {
+      "id": "TypebarTests.ASLPromptCaretTests/testActualASLBoxesAgainstCompletePinnedCaretResolver",
+      "file": "Tests/TypebarTests/ASLPromptCaretTests.swift"
+    },
+    {
+      "id": "TypebarTests.ASLPromptControlLayoutTests/testNativeControlMarkersAgainstCompletePinnedWordBuildAndUpdate",
+      "file": "Tests/TypebarTests/ASLPromptControlLayoutTests.swift"
+    },
+    {
+      "id": "TypebarTests.ASLPromptLineScrollTests/testActualHandRowMetricsAgainstCompletePinnedLineJumpAndRemoval",
+      "file": "Tests/TypebarTests/ASLPromptLineScrollTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountActivityYearTests/testYearProjectionMatchesCompletePinnedCalendarAndRecordsHistoricalGetterDefect",
+      "file": "Tests/TypebarTests/AccountActivityYearTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountDailyActivityTests/testPinnedPluginFitAndCompleteClippingUsingOwnedAffineScaleAdapters",
+      "file": "Tests/TypebarTests/AccountDailyActivityTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountHistoryAnalyticsTests/testStatisticsAgainstCompletePinnedQueryNormalizationAndAggregationFunctions",
+      "file": "Tests/TypebarTests/AccountHistoryAnalyticsTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountHistoryGraphTests/testPinnedCompleteSourceFunctionsMatchNativeSequencesAndFiveUnits",
+      "file": "Tests/TypebarTests/AccountHistoryGraphTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountHistoryResultInformationTests/testCharacterInformationAgainstCompletePinnedTableCallbackAndCSVControls",
+      "file": "Tests/TypebarTests/AccountHistoryResultInformationTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountPersonalBestTableTests/testCompletePinnedBuildRowsAgainstAllNativeModeProjections",
+      "file": "Tests/TypebarTests/AccountPersonalBestTableTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountProfileEditorTests/testDraftDefaultsAndSaveMappingMatchPinnedEditorSubmitFixtures",
+      "file": "Tests/TypebarTests/AccountProfileEditorTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountProfileOverviewTests/testOwnerLifetimeFormattingMatchesCompletePinnedProfileFunctions",
+      "file": "Tests/TypebarTests/AccountProfileOverviewTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountResultChartTests/testPinnedSourceDatasetsUnitsPositiveErrorsAndTimeLabels",
+      "file": "Tests/TypebarTests/AccountResultChartTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountTagCompletionTests/testInitialFeedbackMatchesPinnedFullFunctionsAcross6912Cases",
+      "file": "Tests/TypebarTests/AccountTagCompletionTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountTagHistoryCacheTests/testCachedReconciliationAndPaceAgainstActualPinnedHistoryEditAction",
+      "file": "Tests/TypebarTests/AccountTagHistoryCacheTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountTagHistoryFilterTests/testStableIDFilteringAgainstCompletePinnedFunctions",
+      "file": "Tests/TypebarTests/AccountTagHistoryFilterTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountTagLastResultTests/testReturnedAwardsAgainstCompletePinnedUnreadyEditAndSaveFunctions",
+      "file": "Tests/TypebarTests/AccountTagLastResultTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountTagPaceTests/testNativeGetterAgainstActualPinnedTagPBAndPaceInitFunctions",
+      "file": "Tests/TypebarTests/AccountTagPaceTests.swift"
+    },
+    {
+      "id": "TypebarTests.AccountTagResultEditorTests/testAgainstPinnedCompleteCallbacksAndDisplayUpdater",
+      "file": "Tests/TypebarTests/AccountTagResultEditorTests.swift"
+    },
+    {
+      "id": "TypebarTests.AsyncSampleSoundTests/testPinnedLoadingCommandsWaitForReadinessAndNativeDrainsEachAcceptedRequestOnce",
+      "file": "Tests/TypebarTests/AsyncSampleSoundTests.swift"
+    },
+    {
+      "id": "TypebarTests.BulkHighlightSourceTests/testPinnedBulkLifecycleDistinguishesRuntimeFromRequestedStore",
+      "file": "Tests/TypebarTests/BulkHighlightSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testBoundedProductionProjectionMatchesCoalescedLateFramesWithSharedGeometry",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testCompleteSourcePositionChannelsUseNativeSpeedChoicesButDifferentEasings",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testImmediateLineJumpSkipsMainMarginButRetainsPaceMarginUntilItsOwnGoTo",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testIndependentSourceRequestsBetweenSparseFramesPreserveRenderedState",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testLateSourceTimersCatchUpButRAFDeterminesWhichRequestsResolve",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testNativeChannelsReplayEveryRecordedSourceFrameAndResolvedRequest",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testNativeMainChannelsMatchCompleteSourceBeforeOverlapAcrossAllFixtureChoices",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testNegativeOverdueSourceAnimationsDoNotSnapButZeroDurationCan",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testSmoothCompletionFoldsAtNextPositionUpdateAndOnlyNewestMarginCompletes",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testSourceCaretMarginsShareWordsCurveBeforeOverlapWhilePositionIsIndependent",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CaretLineCompositionSourceTests/testZeroPredecessorAndLatestProjectionMatchSeparateRAFWithSharedGeometry",
+      "file": "Tests/TypebarTests/CaretLineCompositionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.ChooPromptLineScrollTests/testActualChooRowsMatchCompletePinnedLineJumpAndRemoval",
+      "file": "Tests/TypebarTests/ChooPromptLineScrollTests.swift"
+    },
+    {
+      "id": "TypebarTests.CompositionProjectionSourceTests/testActualReturnFieldCellsMatchPinnedUpdateWithoutDuplicatingWrongInput",
+      "file": "Tests/TypebarTests/CompositionProjectionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CompositionProjectionSourceTests/testActualSessionFieldsMatchCompletePinnedWordsAndEventGetters",
+      "file": "Tests/TypebarTests/CompositionProjectionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CompositionProjectionSourceTests/testGlobalMarkedOwnershipAndReferenceCaretMatchCompletePinnedFieldUpdates",
+      "file": "Tests/TypebarTests/CompositionProjectionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CompositionProjectionSourceTests/testMarkedTailAndCaretMatchCompletePinnedUpdateForAllBMPFixtures",
+      "file": "Tests/TypebarTests/CompositionProjectionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CompositionProjectionSourceTests/testPinnedUnicodeMixedUnitsAreExplicitAndNotCalledNativeGraphemeParity",
+      "file": "Tests/TypebarTests/CompositionProjectionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.CompositionProjectionSourceTests/testSourceProbeCountsScalarLettersButAppendsIndividualUTF16Units",
+      "file": "Tests/TypebarTests/CompositionProjectionSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.ConfigurationNoticeTests/testNativeFormattingAndLegacyFieldMaskAgainstCompletePinnedProducers",
+      "file": "Tests/TypebarTests/ConfigurationNoticeTests.swift"
+    },
+    {
+      "id": "TypebarTests.ConnectionsManagementTests/testNativeManagerAddAvailabilityMatchesPinnedActualSourcePredicates",
+      "file": "Tests/TypebarTests/ConnectionsManagementTests.swift"
+    },
+    {
+      "id": "TypebarTests.FriendComparisonTests/testPinnedFriendReducersAndFormattingOnOwnedInputs",
+      "file": "Tests/TypebarTests/FriendComparisonTests.swift"
+    },
+    {
+      "id": "TypebarTests.FriendNameValidationTests/testNativeNamePreflightAvailabilityMatchesActualPinnedModalAndRemoteValidator",
+      "file": "Tests/TypebarTests/FriendNameValidationTests.swift"
+    },
+    {
+      "id": "TypebarTests.LiveThresholdRulesTests/testPinnedTimerAndWordCommitReadCurrentConfigurationAfterStart",
+      "file": "Tests/TypebarTests/LiveThresholdRulesTests.swift"
+    },
+    {
+      "id": "TypebarTests.LocalFontCommandSourceTests/testPinnedStorageTransitionsMatchNativeCommandAvailability",
+      "file": "Tests/TypebarTests/LocalFontCommandSourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.LocalNoticeTests/testNativeStateAgainstCompletePinnedNotificationModuleTransitions",
+      "file": "Tests/TypebarTests/LocalNoticeTests.swift"
+    },
+    {
+      "id": "TypebarTests.MonkeytypeLegacyConfigMigrationTests/testCompletePinnedLegacyReplacementFixtures",
+      "file": "Tests/TypebarTests/MonkeytypeLegacyConfigMigrationTests.swift"
+    },
+    {
+      "id": "TypebarTests.OfficialChallengeCoverageTests/testPinnedReferenceScriptsCompleteNativeChallengeSessions",
+      "file": "Tests/TypebarTests/OfficialChallengeCoverageTests.swift"
+    },
+    {
+      "id": "TypebarTests.OrdinaryTapePracticeTests/testNativeThreeRowViewportAgainstTheCompletePinnedWrapperFunction",
+      "file": "Tests/TypebarTests/OrdinaryTapePracticeTests.swift"
+    },
+    {
+      "id": "TypebarTests.PracticeAnimationFrameRateTests/testCompletePinnedAnimationModuleAndTimerFunctionsMatchNativeLifecycle",
+      "file": "Tests/TypebarTests/PracticeAnimationFrameRateTests.swift"
+    },
+    {
+      "id": "TypebarTests.PracticeLineModeTests/testPinnedWrapperHeightModeDecisionsMatchNativeConfiguration",
+      "file": "Tests/TypebarTests/PracticeLineModeTests.swift"
+    },
+    {
+      "id": "TypebarTests.PracticePromptViewportTests/testCompletePinnedHeightFunctionMatchesNativeRowReduction",
+      "file": "Tests/TypebarTests/PracticePromptViewportTests.swift"
+    },
+    {
+      "id": "TypebarTests.ProfileProgressTests/testNativeProgressAndClaimsAgainstCompletePinnedSourceWithRecordedCorrections",
+      "file": "Tests/TypebarTests/ProfileProgressTests.swift"
+    },
+    {
+      "id": "TypebarTests.ProfileRelationshipTests/testNativeSendAvailabilityAndFriendFlagMatchCompletePinnedFunctions",
+      "file": "Tests/TypebarTests/ProfileRelationshipTests.swift"
+    },
+    {
+      "id": "TypebarTests.PromptCaretBlinkTests/testComposedPinnedCaretFocusAndInputStates",
+      "file": "Tests/TypebarTests/PromptCaretBlinkTests.swift"
+    },
+    {
+      "id": "TypebarTests.PromptInputWrapTests/testFullPinnedBeforeInputAndHelperModulesMatchEngineAdmission",
+      "file": "Tests/TypebarTests/PromptInputWrapTests.swift"
+    },
+    {
+      "id": "TypebarTests.PromptLineOverlapTests/testCompletePinnedEngineCompositionAndPromisesMatchNativeTargetsAndTiming",
+      "file": "Tests/TypebarTests/PromptLineOverlapTests.swift"
+    },
+    {
+      "id": "TypebarTests.PromptLineRecenteringTests/testPinnedCompleteCenterAndForcedJumpMatchNativeWordBoundaries",
+      "file": "Tests/TypebarTests/PromptLineRecenteringTests.swift"
+    },
+    {
+      "id": "TypebarTests.PromptLineScrollTests/testPinnedCompleteLineJumpAndActualAnimationSeekMatchNativePolicy",
+      "file": "Tests/TypebarTests/PromptLineScrollTests.swift"
+    },
+    {
+      "id": "TypebarTests.PromptPrefixBaselineTests/testPinnedComposedCallbacksKeepDifferentAnchorsAndFollowupDecisions",
+      "file": "Tests/TypebarTests/PromptPrefixBaselineTests.swift"
+    },
+    {
+      "id": "TypebarTests.PromptWordReflowTests/testPinnedCompleteWordUpdateAndRealRAFMatchNativeReflowGate",
+      "file": "Tests/TypebarTests/PromptWordReflowTests.swift"
+    },
+    {
+      "id": "TypebarTests.PromptWordRetirementTests/testCompletePinnedDeletionAndLineTimingMatchNativePolicies",
+      "file": "Tests/TypebarTests/PromptWordRetirementTests.swift"
+    },
+    {
+      "id": "TypebarTests.PromptWrapperConfigurationTests/testPinnedSetterSubscriberAndResizeFixturesMatchNativeInteractiveEvents",
+      "file": "Tests/TypebarTests/PromptWrapperConfigurationTests.swift"
+    },
+    {
+      "id": "TypebarTests.PublicProfileLeaderboardTests/testPinnedCompleteProfileRankingProjectionAndPercentages",
+      "file": "Tests/TypebarTests/PublicProfileLeaderboardTests.swift"
+    },
+    {
+      "id": "TypebarTests.PublicProfilePersonalBestTests/testPinnedCompleteSummaryMemoAndFormattingAgainstOwnedProfiles",
+      "file": "Tests/TypebarTests/PublicProfilePersonalBestTests.swift"
+    },
+    {
+      "id": "TypebarTests.RankingEvidencePublicationTests/testEveryNativeFunboxPBFlagAgainstActualSourceCatalog",
+      "file": "Tests/TypebarTests/RankingEvidencePublicationTests.swift"
+    },
+    {
+      "id": "TypebarTests.ResultCSVFieldCoverageTests/testAllOriginalCSVFieldsAgainstCompletePinnedFormatter",
+      "file": "Tests/TypebarTests/ResultCSVFieldCoverageTests.swift"
+    },
+    {
+      "id": "TypebarTests.ResultHistoryFilterChoiceTests/testEveryFiniteGroupAgainstPinnedActivationCallback",
+      "file": "Tests/TypebarTests/ResultHistoryFilterChoiceTests.swift"
+    },
+    {
+      "id": "TypebarTests.RewardInboxPresentationTests/testActualPinnedDependencyTitleOrderingAcrossFourLocales",
+      "file": "Tests/TypebarTests/RewardInboxPresentationTests.swift"
+    },
+    {
+      "id": "TypebarTests.SampleSoundPoolTests/testPinnedWebAudioSeekPlayAndDrainMatchNativeSlotsAndPositions",
+      "file": "Tests/TypebarTests/SampleSoundPoolTests.swift"
+    },
+    {
+      "id": "TypebarTests.SlowTimerEffectsTests/testFullPinnedSlowStateAndEffectGatesMatchNativePolicies",
+      "file": "Tests/TypebarTests/SlowTimerEffectsTests.swift"
+    },
+    {
+      "id": "TypebarTests.SlowWordCopySourceTests/testCompletePinnedCallbackMatchesNativeSelectionAndThreshold",
+      "file": "Tests/TypebarTests/SlowWordCopySourceTests.swift"
+    },
+    {
+      "id": "TypebarTests.SpecialPromptCaretTests/testCustomHorizontalGeometryAgainstCompletePinnedCaretResolver",
+      "file": "Tests/TypebarTests/SpecialPromptCaretTests.swift"
+    },
+    {
+      "id": "TypebarTests.SpeedPrecisionPublicationTests/testCalculationAndRoundingAgainstCompletePinnedSourceModules",
+      "file": "Tests/TypebarTests/SpeedPrecisionPublicationTests.swift"
+    },
+    {
+      "id": "TypebarTests.TapeLineMotionCompositionTests/testCompleteSourceVerticalAndTapeCompositionMatchesAllNativeMotionChannels",
+      "file": "Tests/TypebarTests/TapeLineMotionCompositionTests.swift"
+    },
+    {
+      "id": "TypebarTests.TapeLineMotionCompositionTests/testSourceWaitsForVerticalCompletionThenRemovesOnlyTheLeadingFiller",
+      "file": "Tests/TypebarTests/TapeLineMotionCompositionTests.swift"
+    },
+    {
+      "id": "TypebarTests.TapeNewlineFlowTests/testPersistentNativeTopologyAndFillersAgainstTwoCompletePinnedScrollRequests",
+      "file": "Tests/TypebarTests/TapeNewlineFlowTests.swift"
+    },
+    {
+      "id": "TypebarTests.TapeNewlineLayoutTests/testCompletePinnedNewlineScrollMatchesNativeCumulativeLayout",
+      "file": "Tests/TypebarTests/TapeNewlineLayoutTests.swift"
+    },
+    {
+      "id": "TypebarTests.TapeNewlinePrefixTests/testNativeTextKitPrefixAndFillerFramesAgainstCompletePinnedScrollTape",
+      "file": "Tests/TypebarTests/TapeNewlinePrefixTests.swift"
+    },
+    {
+      "id": "TypebarTests.TapeNewlineTransitionTests/testActualNativeOwnerAgainstCompleteSourceVerticalAndHorizontalSequence",
+      "file": "Tests/TypebarTests/TapeNewlineTransitionTests.swift"
+    },
+    {
+      "id": "TypebarTests.TapePromptPresentationTests/testCompletePinnedTapeScrollAndCaretTraceMatchesNativeHorizontalChannels",
+      "file": "Tests/TypebarTests/TapePromptPresentationTests.swift"
+    },
+    {
+      "id": "TypebarTests.TapeWordVisibilityTests/testIndependentPreviousWordIdentityAgainstCompletePinnedDeleteGuards",
+      "file": "Tests/TypebarTests/TapeWordVisibilityTests.swift"
+    },
+    {
+      "id": "TypebarTests.ThresholdConfigurationTests/testDefaultsAndCompleteBurstCommandsMatchThePinnedSource",
+      "file": "Tests/TypebarTests/ThresholdConfigurationTests.swift"
+    },
+    {
+      "id": "TypebarTests.TypingVisualFocusTests/testNativeStateAgainstCompletePinnedFocusAndDebouncedFrameModules",
+      "file": "Tests/TypebarTests/TypingVisualFocusTests.swift"
+    },
+    {
+      "id": "TypebarTests.WeeklyExperienceMetadataTests/testActualPinnedFrontendDurationFormatter",
+      "file": "Tests/TypebarTests/WeeklyExperienceMetadataTests.swift"
+    },
+    {
+      "id": "TypebarTests.ZenTapePracticeTests/testTwoRowNativeViewportAgainstCompletePinnedWrapperHeight",
+      "file": "Tests/TypebarTests/ZenTapePracticeTests.swift"
+    }
+  ]
+}
