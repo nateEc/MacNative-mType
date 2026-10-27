@@ -5,11 +5,11 @@ import AppKit
 @MainActor final class WebsiteConfigClipboardExportTests: XCTestCase {
   func testClipboardOutcomesMatchSourceAndFallbackReadsCurrentConfiguration() throws {
     for fixture in try WebsiteConfigExportSourceOracle.load() {
-      let export = WebsiteConfigClipboardExport()
       var current = fixture.settingsJSON
       var copied: [String] = [], delays: [Int] = [], callbacks: [@MainActor () -> Void] = []
-      export.copy(read: { current }, write: { copied.append($0); return !fixture.failure },
+      let export = WebsiteConfigClipboardExport(write: { copied.append($0); return !fixture.failure },
         schedule: { delay, callback in delays.append(delay); callbacks.append(callback) })
+      export.copy(read: { current })
       XCTAssertEqual(copied, [fixture.settingsJSON])
       XCTAssertEqual(delays, fixture.delays)
       XCTAssertNil(export.manualCopy)
@@ -28,11 +28,15 @@ import AppKit
 
   func testManualCopyUsesSelectableReadOnlyTextAndPreservesUTF16() {
     let text = WebsiteConfigCopyTextView(frame: .init(x: 0, y: 0, width: 500, height: 300))
-    text.string = #"{"customBackground":"字😀\ud800"}"#
+    let json = #"{"customBackground":"字😀\ud800"}"#
+    text.string = json
+    XCTAssertNotNil(text.textStorage)
+    XCTAssertNotNil(text.layoutManager)
+    XCTAssertTrue(text.string.utf8.elementsEqual(json.utf8))
     XCTAssertFalse(text.isEditable)
     XCTAssertTrue(text.isSelectable)
     text.selectAll(nil)
-    XCTAssertEqual(text.selectedRange(), NSRange(location: 0, length: text.string.utf16.count))
+    XCTAssertEqual(text.selectedRange(), NSRange(location: 0, length: json.utf16.count))
     XCTAssertEqual(text.accessibilityIdentifier(), "website-config-manual-copy")
   }
 }

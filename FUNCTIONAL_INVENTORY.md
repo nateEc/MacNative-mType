@@ -4,7 +4,7 @@
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
-| CFG-EXPORT-CURRENT-01 | 当前配置 JSON 的两个导出入口 | commandline/lists.ts exportSettingsJSON；设置页 ImportExport.tsx；config/store.ts／setters.ts／lifecycle.ts | WebsiteConfigExport／WebsiteConfigClipboardExport；TypebarApp 命令派发与设置页按钮；CONFIG_EXPORT_CONTRACT.md | 部分完成：216 组实际源码快照的两种状态、字段及 JSON 文本对照通过；独立保留设置 store 分歧，失败 250ms 后重读，提供只读可选择的手动复制框。扩大回归 957 项零失败零跳过，同日志 96 项源码证据及 debug 打包／原创性通过；实体窗口及标记文本焦点交互待验收，本批未运行整套客户端或完整 readiness。 |
+| CFG-EXPORT-CURRENT-01 | 当前配置 JSON 的两个导出入口 | commandline/lists.ts exportSettingsJSON；设置页 ImportExport.tsx；config/store.ts／setters.ts／lifecycle.ts | WebsiteConfigExport／WebsiteConfigClipboardExport；TypebarApp 命令派发与设置页按钮；CONFIG_EXPORT_CONTRACT.md；CONFIG_EXPORT_NATIVE_UI_CONTRACT.md | 部分完成：216 组源快照通过；真实窗口发现并修复空白复制框，补完整文字系统及内容断言。真实命令交接、No Quit、暖无限记忆和生产 Root 延迟回退／控件全选通过。最终扩大 959 项零失败零跳过，同日志 96 项源码证据及 debug 打包／原创性通过；系统鼠标、真实剪贴板拒绝及 IME 焦点交互待验收，整套客户端和完整 readiness 未跑。 |
 | THRESHOLD-INPUT-NUMBER-01 | 阈值输入文本、无限速度与冷恢复 | 实际命令构造器／元数据／单位／Zod／冷存储迁移 | 网站规则映射／协调器／冷投影／本机成绩配置版本 2 | 1,380 例输入、20 组冷恢复、真实宿主与实际完成／保存反例先红后绿；整套客户端 6,370 项、25 项跳过、0 失败，同日志全部 94 项来源证据及不启动应用的打包通过，另排除两窗口项。归档／分享无限值交互和实体窗口未完成，见阈值输入数字合同。 |
 | PACE-INPUT-NUMBER-01 | 配速默认文本、换算与无限值准入 | 实际输入命令构造器／元数据／五种单位／Zod | WebsiteNumberText／WebsitePaceSpeedPresentation／表单与命令 | 1,380 例及实际目标反例先红后绿；八组来源冷存储及文件 CAS／拒绝保护通过，宿主验证冷启动／暖导入和有限值／Infinity 与 No Quit 四组。完整客户端 6,359 项、25 项跳过、0 失败，同日志全部 92 项来源证据通过，另排除两个可见窗口用例；不启动应用的 debug 打包检查通过，实体窗口仍待验，见配速输入数字合同。 |
 | PACE-STYLE-ADMISSION-01 | 隐藏样式的逻辑与呈现请求 | 完整 Caret.goTo／RAF／锁定 Anime 与 off 宽度规则 | WebsitePaceSession／页面样式绑定／三个生产光标配置 | 三组轨迹先产生 15 处原生失败，再转为通过；扩大 227 项零失败零跳过。覆盖恢复不补播、隐藏前已准入请求、从 off 开始的可见性、实际绑定与完整配置优先级。最终完整客户端 6,353 项、25 项跳过、0 失败，同日志 90 项源码证据和原生打包通过；其他样式组合、真实窗口、CI 与完整 readiness 未完成，见样式准入合同。 |

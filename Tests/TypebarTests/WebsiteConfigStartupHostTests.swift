@@ -20,7 +20,8 @@ import XCTest
     let record: URL?
     /// nil: no directory; true: valid record; false: opaque record.
     init(saved: Bool?, json: String = #"{"mode":"words","words":4,"theme":"dracula"}"#,
-      fetch: @escaping WebsiteConfigExternalContent.Fetch = { _, _ in nil }, feedbackSound: TypingFeedbackSound? = nil) throws {
+      fetch: @escaping WebsiteConfigExternalContent.Fetch = { _, _ in nil }, feedbackSound: TypingFeedbackSound? = nil,
+      clipboardExport: WebsiteConfigClipboardExport? = nil) throws {
       try FileManager.default.createDirectory(at: support, withIntermediateDirectories: false)
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = .init(defaults: defaults, feedbackSound: feedbackSound ?? .init(loadSound: { _ in nil }, beep: {}),
@@ -44,7 +45,8 @@ import XCTest
       container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
         ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-      let view = Root(state: state, settings: settings, account: account, support: support, defaults: defaults, fetch: fetch)
+      let view = Root(state: state, settings: settings, account: account, support: support, defaults: defaults, fetch: fetch,
+        clipboardExport: clipboardExport)
         .modelContainer(container).frame(width: 1000, height: 760)
       host = NSHostingView(rootView: AnyView(view))
       window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 760), styleMask: .borderless,
@@ -105,12 +107,14 @@ import XCTest
     let state: HostState, settings: AppSettings, account: AccountSession, support: URL
     let announcements: RemoteAnnouncementCenter
     let fetch: WebsiteConfigExternalContent.Fetch
+    let clipboardExport: WebsiteConfigClipboardExport?
     let hotkey = GlobalHotkeyMonitor(), keyboard = SystemKeyboardGuideMonitor(observesInputSourceChanges: false)
     let network = NetworkConnectivityMonitor(), appearance = SystemAppearanceMonitor()
     init(state: HostState, settings: AppSettings, account: AccountSession, support: URL, defaults: UserDefaults,
-      fetch: @escaping WebsiteConfigExternalContent.Fetch) {
+      fetch: @escaping WebsiteConfigExternalContent.Fetch, clipboardExport: WebsiteConfigClipboardExport?) {
       self.state = state; self.settings = settings; self.account = account; self.support = support
       self.fetch = fetch
+      self.clipboardExport = clipboardExport
       announcements = .init(defaults: defaults)
     }
     var body: some View {
@@ -118,8 +122,127 @@ import XCTest
         hotkey: hotkey, systemKeyboardGuide: keyboard, network: network, systemAppearance: appearance,
         liveContentFetch: fetch,
         practiceSessionStore: state.page,
-        websiteConfigStartup: .init(accountReady: state.accountReady, applicationSupport: support))
+        websiteConfigStartup: .init(accountReady: state.accountReady, applicationSupport: support),
+        configClipboardExport: clipboardExport)
     }
+  }
+
+  func testActualCommandPaletteHandsOffToCurrentConfigurationExportSheet() async throws {
+    for noQuit in [false, true] {
+      let boxes = noQuit ? #"["no_quit"]"# : "[]"
+      let json = "{\"mode\":\"words\",\"words\":17,\"keymapSize\":1.4000000000000001,\"singleListCommandLine\":\"on\",\"minWpmCustomSpeed\":1e999,\"funbox\":\(boxes)}"
+      let f = try Fixture(saved: true, json: json)
+      defer { f.close() }
+      f.state.accountReady = true
+      try await f.waitAsync { f.state.page.state.presentation != nil && f.inputs().first?.acceptsTextInput == true }
+      let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+      let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+      let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+        directory: directory, readWindow: { selection }); defer { workflow.stop() }
+      try await workflow.apply(json: json, systemIsDark: false)
+      try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+        && f.inputs().first?.acceptsTextInput == true }
+      XCTAssertEqual(f.state.page.state.session.configuration.rules.thresholdSource?.configuration.minimumWpmCustomValue, .infinity)
+      func views<T: NSView>(_ root: NSView, of type: T.Type) -> [T] {
+        (root as? T).map { [$0] } ?? root.subviews.flatMap { views($0, of: type) }
+      }
+      f.window.orderFront(nil)
+      let input = try XCTUnwrap(f.inputs().first)
+      input.onInsert("a", false)
+      let before = f.state.page.state.session
+      let path = try XCTUnwrap(f.record), disk = try Data(contentsOf: path)
+      input.onOpenCommandPalette()
+      try await f.waitAsync { f.window.attachedSheet != nil }
+      let palette = try XCTUnwrap(f.window.attachedSheet)
+      defer { if let sheet = f.window.attachedSheet { f.window.endSheet(sheet) } }
+      let search = try XCTUnwrap(views(XCTUnwrap(palette.contentView), of: NSTextField.self).first { $0.isEditable })
+      XCTAssertTrue(palette.makeFirstResponder(search))
+      let editor = try XCTUnwrap(search.currentEditor() as? NSTextView)
+      editor.selectAll(nil)
+      editor.insertText("exportSettingsJSON", replacementRange: editor.selectedRange())
+      editor.insertNewline(nil)
+      try await f.waitAsync { f.window.attachedSheet != nil && f.window.attachedSheet !== palette }
+      let sheet = try XCTUnwrap(f.window.attachedSheet)
+      let expected = try WebsiteConfigExport.json(XCTUnwrap(f.state.page.state.presentation).publication.draft, surface: .command)
+      XCTAssertTrue(try views(XCTUnwrap(sheet.contentView), of: NSTextView.self).contains { $0.string.utf8.elementsEqual(expected.utf8) })
+      XCTAssertEqual(f.state.page.state.session.configuration.wordLimit, 17)
+      XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, before.automaticInputAttemptID)
+      XCTAssertEqual(f.state.page.state.session.typed, before.typed)
+      XCTAssertEqual(try Data(contentsOf: path), disk)
+    }
+  }
+
+  func testSettingsExportActionPresentsLatestStoreInProductionManualCopySheet() async throws {
+    var copies: [String] = [], delays: [Int] = [], callbacks: [@MainActor () -> Void] = []
+    let exporter = WebsiteConfigClipboardExport(write: { copies.append($0); return false },
+      schedule: { delays.append($0); callbacks.append($1) })
+    let json = #"{"mode":"words","words":17,"keymapSize":1.4000000000000001,"paceCaret":"pb","randomTheme":"custom","tapeMode":"letter","showAllLines":true,"minWpmCustomSpeed":1e999}"#
+    let f = try Fixture(saved: true, json: json,
+      clipboardExport: exporter)
+    defer { f.close() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.state.page.state.presentation != nil && f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: json, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+      && f.inputs().first?.acceptsTextInput == true }
+    func views<T: NSView>(_ root: NSView, of type: T.Type) -> [T] {
+      (root as? T).map { [$0] } ?? root.subviews.flatMap { views($0, of: type) }
+    }
+    func clickText(_ text: NSTextView, at point: NSPoint, in window: NSWindow) throws {
+      let time = ProcessInfo.processInfo.systemUptime
+      let down = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: point,
+        modifierFlags: [], timestamp: time, windowNumber: window.windowNumber, context: nil,
+        eventNumber: 1, clickCount: 1, pressure: 1))
+      let up = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseUp, location: point,
+        modifierFlags: [], timestamp: time + 0.01, windowNumber: window.windowNumber, context: nil,
+        eventNumber: 2, clickCount: 1, pressure: 0))
+      NSApp.postEvent(up, atStart: true)
+      text.mouseDown(with: down)
+      if let remaining = NSApp.nextEvent(matching: .leftMouseUp, until: .now, inMode: .default, dequeue: true) {
+        text.mouseUp(with: remaining)
+      }
+    }
+    f.window.orderFront(nil)
+    let path = try XCTUnwrap(f.record), before = try Data(contentsOf: path)
+    let attempt = f.state.page.state.session.automaticInputAttemptID
+    let initial = try WebsiteConfigExport.json(XCTUnwrap(f.state.page.state.presentation).publication.draft, surface: .settings)
+    XCTAssertNotEqual(initial, try WebsiteConfigExport.json(XCTUnwrap(f.state.page.state.presentation).publication.draft, surface: .command))
+    WebsiteConfigExport.copySettings(in: f.state.page, using: exporter)
+    try await f.waitAsync { copies.count == 1 }
+    guard copies.count == 1 else { return }
+    XCTAssertEqual(copies, [initial]); XCTAssertEqual(delays, [250]); XCTAssertNil(exporter.manualCopy)
+    XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(try Data(contentsOf: path), before)
+
+    try await workflow.editAndBegin(.words(77), replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+    let latest = try WebsiteConfigExport.json(XCTUnwrap(f.state.page.state.presentation).publication.draft, surface: .settings)
+    XCTAssertNotEqual(latest, initial)
+    let current = f.state.page.state.session, currentDisk = try Data(contentsOf: path)
+    try XCTUnwrap(callbacks.first)()
+    XCTAssertEqual(exporter.manualCopy?.json, latest)
+    try await f.waitAsync { f.window.attachedSheet != nil }
+    defer { if let sheet = f.window.attachedSheet { f.window.endSheet(sheet) } }
+    let sheet = try XCTUnwrap(f.window.attachedSheet)
+    let text = try XCTUnwrap(views(XCTUnwrap(sheet.contentView), of: WebsiteConfigCopyTextView.self).first)
+    try await f.waitAsync {
+      sheet.contentView?.layoutSubtreeIfNeeded()
+      return text.string.utf8.elementsEqual(latest.utf8)
+    }
+    XCTAssertTrue(text.string.utf8.elementsEqual(latest.utf8), "Manual JSON length \(text.string.utf8.count), expected \(latest.utf8.count); prefix \(text.string.prefix(140))")
+    XCTAssertFalse(text.isEditable); XCTAssertTrue(text.isSelectable)
+    text.setSelectedRange(.init(location: 0, length: 0))
+    let visible = text.visibleRect
+    XCTAssertGreaterThan(visible.width, 300)
+    XCTAssertGreaterThan(visible.height, 100)
+    try clickText(text, at: text.convert(.init(x: visible.midX, y: visible.midY), to: nil), in: sheet)
+    XCTAssertEqual(text.selectedRange(), NSRange(location: 0, length: text.string.utf16.count))
+    XCTAssertEqual(f.state.page.state.session.automaticInputAttemptID, current.automaticInputAttemptID)
+    XCTAssertEqual(f.state.page.state.session.typed, current.typed)
+    XCTAssertEqual(try Data(contentsOf: path), currentDisk)
   }
 
   func testColdOnlineProfileLoadsAndContinuesThroughProductionPageWithoutLegacyWrites() throws {
@@ -422,6 +545,13 @@ import XCTest
     try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
     let legends = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
     XCTAssertEqual(legends.replacingOccurrences(of: " ", with: ""), "QWERT", "Published QWERTY, not legacy custom rows: \(legends)")
+    // Calibrate four complete letter keys in the same region in both layouts.
+    // Exclude Dvorak's leading punctuation and the following key at the edge.
+    let calibrationRegion = CGRect(x: 0.37, y: 0.38, width: 0.20, height: 0.06)
+    request.regionOfInterest = calibrationRegion
+    try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
+    let calibration = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
+    XCTAssertEqual(calibration.replacingOccurrences(of: " ", with: ""), "RTYU", "QWERTY calibration: \(calibration)")
     request.regionOfInterest = .init(x: 0.1, y: 0.2, width: 0.8, height: 0.31)
     XCTAssertEqual(f.settings.snapshot, legacy)
     let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
@@ -436,13 +566,13 @@ import XCTest
     scrollToEnd(); try await Task.sleep(for: .milliseconds(100)); f.host.layoutSubtreeIfNeeded()
     let alternate = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds))
     f.host.cacheDisplay(in: f.host.bounds, to: alternate)
-    request.regionOfInterest = .init(x: 0.23, y: 0.38, width: 0.23, height: 0.06)
+    try XCTUnwrap(alternate.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-profile-keyboard-dvorak-host.png"))
+    request.regionOfInterest = calibrationRegion
     try VNImageRequestHandler(cgImage: XCTUnwrap(alternate.cgImage)).perform([request])
     let alternateLegends = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
     XCTAssertFalse(alternateLegends.contains("Q") || alternateLegends.contains("W"), "Dvorak first keys: \(alternateLegends)")
-    // Y is inside the Dvorak crop but outside the QWERTY crop. Do not rely
-    // on recognition of Dvorak's isolated punctuation as text.
-    XCTAssertTrue(alternateLegends.contains("Y"), "Actual Dvorak positive control: \(alternateLegends)")
+    XCTAssertEqual(alternateLegends.replacingOccurrences(of: " ", with: ""), "PYFG",
+      "Actual Dvorak letter order: \(alternateLegends)")
     XCTAssertEqual(f.settings.snapshot, legacy)
     request.regionOfInterest = .init(x: 0.1, y: 0.2, width: 0.8, height: 0.31)
     try await workflow.apply(json: #"{"mode":"words","words":10,"keymapMode":"off"}"#, systemIsDark: false)

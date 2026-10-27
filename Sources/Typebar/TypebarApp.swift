@@ -113,7 +113,8 @@ struct TypebarApp: App {
     }, wholePreviewViewportEnabled: Bool = false,
     publishedPresentation: WebsiteConfigPublishedPresentation? = nil,
     practiceSessionStore: PracticePageSessionStore? = nil,
-    websiteConfigStartup: WebsiteConfigStartupOptions? = nil) -> some View {
+    websiteConfigStartup: WebsiteConfigStartupOptions? = nil,
+    configClipboardExport: WebsiteConfigClipboardExport? = nil) -> some View {
     ContentView(settings: settings, account: account, announcements: announcements,
       hotkey: hotkey, systemKeyboardGuide: systemKeyboardGuide, network: network,
       systemAppearance: systemAppearance, liveContentFetch: liveContentFetch,
@@ -122,7 +123,8 @@ struct TypebarApp: App {
       wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender,
       wholePreviewLayout: wholePreviewLayout, promptRender: promptRender,
       wholePreviewViewportEnabled: wholePreviewViewportEnabled, incomingPublishedPresentation: publishedPresentation,
-      providedPageSessionStore: practiceSessionStore, websiteConfigStartup: websiteConfigStartup)
+      providedPageSessionStore: practiceSessionStore, websiteConfigStartup: websiteConfigStartup,
+      providedConfigClipboardExport: configClipboardExport)
   }
 
   private static let modelConfiguration = ModelConfiguration(
@@ -1251,6 +1253,7 @@ private struct ContentView: View {
   let incomingPublishedPresentation: WebsiteConfigPublishedPresentation?
   let providedPageSessionStore: PracticePageSessionStore?
   let websiteConfigStartup: WebsiteConfigStartupOptions?
+  let providedConfigClipboardExport: WebsiteConfigClipboardExport?
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
@@ -1435,7 +1438,10 @@ private struct ContentView: View {
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
   @State private var settingsJSONCommand: SettingsJSONCommandPresentation?
-  @State private var websiteConfigClipboardExport = WebsiteConfigClipboardExport()
+  @State private var ownedConfigClipboardExport = WebsiteConfigClipboardExport()
+  private var websiteConfigClipboardExport: WebsiteConfigClipboardExport {
+    providedConfigClipboardExport ?? ownedConfigClipboardExport
+  }
   @State private var showingWebsiteConfigImport = false
   @State private var websiteSequenceCommand: WebsiteSequenceCommandPresentation?
   @State private var queuedWebsiteSequenceCommand: WebsiteSequenceCommandPresentation?
@@ -2061,7 +2067,8 @@ private struct ContentView: View {
   }
 
   private var presentedContent: some View {
-    ScrollView(.vertical) {
+    @Bindable var configExport = websiteConfigClipboardExport
+    return ScrollView(.vertical) {
       lifecycleContent
         .frame(maxWidth: .infinity)
     }
@@ -2447,7 +2454,7 @@ private struct ContentView: View {
             systemIsDark: systemColorScheme == .dark)
         })
     }
-    .sheet(item: $websiteConfigClipboardExport.manualCopy) { presentation in
+    .sheet(item: $configExport.manualCopy) { presentation in
       WebsiteConfigManualCopyView(json: presentation.json)
     }
     .sheet(item: $settingsJSONCommand) { presentation in
@@ -2854,12 +2861,7 @@ private struct ContentView: View {
   @ViewBuilder
   private var websiteConfigurationExportControl: some View {
     Button("导出配置 JSON") {
-      websiteConfigClipboardExport.copy {
-        guard let draft = WebsiteConfigExport.draft(in: pageSessionStore.state) else {
-          throw WebsiteConfigExport.Failure.incompleteConfiguration
-        }
-        return try WebsiteConfigExport.json(draft, surface: .settings)
-      }
+      WebsiteConfigExport.copySettings(in: pageSessionStore, using: websiteConfigClipboardExport)
     }
     .accessibilityIdentifier("website-config-export")
     if let message = websiteConfigClipboardExport.message {

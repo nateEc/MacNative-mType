@@ -6,6 +6,12 @@ import Foundation
   static func draft(in page: PracticePageSessionState) -> WebsiteConfigNativeDraft? {
     page.savedApplication?.draft ?? page.configurationDeparture?.draft ?? page.presentation?.publication.draft
   }
+  static func copySettings(in page: PracticePageSessionStore, using exporter: WebsiteConfigClipboardExport) {
+    exporter.copy {
+      guard let draft = draft(in: page.state) else { throw Failure.incompleteConfiguration }
+      return try json(draft, surface: .settings)
+    }
+  }
   static func values(_ draft: WebsiteConfigNativeDraft, surface: Surface) -> [String: WebsiteConfigValue] {
     surface == .command ? draft.projection.runtime : draft.settingsStoreValues
   }

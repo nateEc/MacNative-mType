@@ -10,20 +10,25 @@ import Observation
   private(set) var message: String?
   private(set) var noticeID = UUID()
   private(set) var noticeDurationMilliseconds: Int?
+  @ObservationIgnored private let writeClipboard: @MainActor (String) -> Bool
+  @ObservationIgnored private let deliver: @MainActor (Int, @escaping @MainActor () -> Void) -> Void
 
-  func copy(read: @escaping @MainActor () throws -> String,
-    write: @MainActor (String) -> Bool = WebsiteConfigClipboardExport.write,
-    schedule: @MainActor (Int, @escaping @MainActor () -> Void) -> Void = WebsiteConfigClipboardExport.schedule) {
+  init(write: @escaping @MainActor (String) -> Bool = WebsiteConfigClipboardExport.write,
+    schedule: @escaping @MainActor (Int, @escaping @MainActor () -> Void) -> Void = WebsiteConfigClipboardExport.schedule) {
+    writeClipboard = write; deliver = schedule
+  }
+
+  func copy(read: @escaping @MainActor () throws -> String) {
     do {
       let json = try read()
       noticeID = UUID()
-      if write(json) {
+      if writeClipboard(json) {
         message = "设置 JSON 已复制。"
         noticeDurationMilliseconds = nil
       } else {
         message = "无法写入剪贴板，请手动复制设置 JSON。"
         noticeDurationMilliseconds = 5000
-        schedule(250) { [weak self] in
+        deliver(250) { [weak self] in
           guard let self else { return }
           do { self.manualCopy = .init(json: try read()) }
           catch { self.message = "无法生成设置 JSON：\(error.localizedDescription)" }

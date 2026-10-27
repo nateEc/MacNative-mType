@@ -2,6 +2,8 @@
 
 2026-10-27，起点为已推送的 `71bea956`。本批已接通两个原生入口；扩大回归与打包通过，完整重写目标保持开放。
 
+后续更强的原生窗口检查发现 `c9ac0daa` 的手动复制框实际为空。该批“只读全选”单元检查没有核对真实字符串，不能作为内容显示的证明；其 957 项结果仍是当时范围的历史证据。修复及真实窗口的检查范围见 [原生窗口合同](CONFIG_EXPORT_NATIVE_UI_CONTRACT.md)，系统鼠标与真实剪贴板拒绝仍待人工验收。
+
 ## 固定源码与实际执行
 
 固定只读参考 `91bd24bb8513785c7364cbea29296ff7adafac41`：命令 `exportSettingsJSON.defaultValue` 返回 `JSON.stringify(Config)`；设置页按钮复制 `JSON.stringify(getConfig)`。失败时先提示，再在 250ms 后重新读取 getConfig，显示 readOnly／clickToSelect 的手动复制框；因此失败前复制尝试和后来的手动框可能是不同快照。

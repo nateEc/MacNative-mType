@@ -35,11 +35,21 @@ struct WebsiteConfigReadOnlyText: NSViewRepresentable {
 
 final class WebsiteConfigCopyTextView: NSTextView {
   override init(frame frameRect: NSRect, textContainer container: NSTextContainer? = nil) {
-    super.init(frame: frameRect, textContainer: container)
+    let resolved = container ?? NSTextContainer(size: .init(width: frameRect.width, height: .greatestFiniteMagnitude))
+    let storage = container == nil ? NSTextStorage() : nil
+    if let storage {
+      let layout = NSLayoutManager()
+      storage.addLayoutManager(layout)
+      layout.addTextContainer(resolved)
+    }
+    super.init(frame: frameRect, textContainer: resolved)
+    // The text view must adopt the complete network before its temporary owner is released.
+    withExtendedLifetime(storage) {}
     isEditable = false
     isSelectable = true
     isRichText = false
     isVerticallyResizable = true
+    isHorizontallyResizable = false
     autoresizingMask = [.width]
     textContainer?.widthTracksTextView = true
     textContainerInset = NSSize(width: 10, height: 10)
