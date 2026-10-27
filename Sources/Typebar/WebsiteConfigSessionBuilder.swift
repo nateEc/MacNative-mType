@@ -50,6 +50,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     var customOrdering: CustomTextOrdering = .inOrder
     var customPipeDelimiter: Bool? = nil
     var customTextRecoveryBlocked = false
+    var websiteCustomText: WebsiteCustomTextSettings? = nil
     var selectedQuoteID: String? = nil
     var favoriteQuoteIDs: [String]? = nil
     var quoteSampler: WebsiteQuoteSampler? = nil
@@ -87,7 +88,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     var quoteSampler: WebsiteQuoteSampler? { scope.quoteSampler }
     var parameterMemory: TypebarTestParameterMemory { scope.parameterMemory }
   }
-  static func prepare(draft: WebsiteConfigNativeDraft, scope: Scope,
+  static func prepare(draft: WebsiteConfigNativeDraft, scope initialScope: Scope,
     reason: Reason = .nextAttempt,
     attemptSource: AttemptSource = .selection,
     applyQuoteLengthEvents: Bool? = nil,
@@ -96,6 +97,11 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     loadExternal: (@MainActor (LivePracticeContentSource, TestConfiguration) async throws -> External)? = nil,
     random: Random = .init()) async throws -> Prepared {
     try Task.checkCancellation()
+    if let raw = initialScope.websiteCustomText, (try? WebsiteCustomTextSettings(value: raw.value)) == nil {
+      throw WebsiteConfigSessionBuildError.unrepresentableConfiguration
+    }
+    var scope = initialScope.websiteCustomText?.applying(to: initialScope) ?? initialScope
+    scope.customTextRecoveryBlocked = scope.customTextRecoveryBlocked || initialScope.customTextRecoveryBlocked
     let config = try configuration(draft: draft, scope: scope)
     let liveSource = LivePracticeContentSource.selected(for: config)
     if liveSource == nil && (config.modifiers.contains(.poetryStream) || config.modifiers.contains(.referenceStream)) {
@@ -245,7 +251,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     guard [scope.parameterMemory.customTextDuration, scope.parameterMemory.customTextWordLimit,
       scope.parameterMemory.customTextSectionLimit].allSatisfy({ (0...OfficialTestLimitInput.maximumValue).contains($0) })
     else { throw WebsiteConfigSessionBuildError.unrepresentableConfiguration }
-    if let duration = scope.customDurationOverride,
+    if scope.websiteCustomText == nil, let duration = scope.customDurationOverride,
       !duration.isFinite || duration < 0 || duration > Double(OfficialTestLimitInput.maximumValue) {
       throw WebsiteConfigSessionBuildError.unrepresentableConfiguration
     }
@@ -256,6 +262,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     if config.mode == .custom, scope.customCompletion == .time, let duration = scope.customDurationOverride {
       config.duration = duration
     }
+    if let custom = scope.websiteCustomText { config = try custom.applyingLimit(to: config) }
     config = draft.inputRules.applying(to: draft.behavior.applying(to: config))
     if draft.generators.requestsPolyglot {
       let languages = draft.generators.polyglotLanguages

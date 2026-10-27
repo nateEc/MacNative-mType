@@ -1232,6 +1232,17 @@ final class AppSettings {
 
   private(set) var customTextStateGeneration: UInt64 = 0
 
+  var websiteCustomTextStateRead: WebsiteCustomTextStateRead {
+    WebsiteCustomTextStateStore(defaults: defaults).read()
+  }
+  private(set) var websiteCustomTextStateGeneration: UInt64 = 0
+  @discardableResult
+  func saveWebsiteCustomTextState(_ value: WebsiteCustomTextSettings) -> Bool {
+    guard WebsiteCustomTextStateStore(defaults: defaults).save(value) else { return false }
+    websiteCustomTextStateGeneration &+= 1
+    return true
+  }
+
   @discardableResult
   func saveCustomTextState(_ document: CustomTextStateDocument) -> Bool {
     guard CustomTextStateStore(defaults: defaults).save(document) else { return false }

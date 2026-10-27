@@ -49,6 +49,8 @@ final class WebsiteConfigEnvironmentSource {
   struct ContentModels: Equatable {
     let custom: CustomTextStateRead
     let customGeneration: UInt64
+    let websiteCustom: WebsiteCustomTextStateRead
+    let websiteCustomGeneration: UInt64
     let localFavorites: [String]
     let accountScope: ResultPublicationScope?
     let accountGeneration: UInt64
@@ -57,6 +59,7 @@ final class WebsiteConfigEnvironmentSource {
   /// account/settings pair supplied alongside an otherwise matching context.
   func contentModels() -> ContentModels {
     .init(custom: settings.customTextStateRead, customGeneration: settings.customTextStateGeneration,
+      websiteCustom: settings.websiteCustomTextStateRead, websiteCustomGeneration: settings.websiteCustomTextStateGeneration,
       localFavorites: settings.favoriteQuoteIDs, accountScope: account.resultPublicationScope,
       accountGeneration: account.accountPersonalBestSessionRevision)
   }
@@ -97,6 +100,7 @@ final class WebsiteConfigEnvironmentSource {
         // even a change back to identical values retires the previous epoch.
         _ = settings.snapshot
         _ = settings.customTextStateGeneration
+        _ = settings.websiteCustomTextStateGeneration
         // Complete configuration replay includes restart-requiring fields.
         // Observe the lock even while unavailable so unlocking can rearm us.
         _ = settings.allowsRestartingConfigurationChange

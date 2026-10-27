@@ -77,6 +77,7 @@ enum WebsiteTestSettingsShare {
   /// The independent custom source is read even while an ordinary mode is
   /// selected. It is never replaced by the current generated/displayed prompt.
   static func customText(in scope: WebsiteConfigSessionBuilder.Scope) -> WebsiteConfigValue? {
+    if let raw = scope.websiteCustomText { return raw.value }
     guard !scope.customTextRecoveryBlocked else { return nil }
     let pipe = scope.customPipeDelimiter ?? (scope.customCompletion == .sections)
     let pieces: [String]
@@ -105,6 +106,21 @@ enum WebsiteTestSettingsShare {
   /// attached to this configuration before the native link validates it.
   static func nativeSelection(configuration: TestConfiguration,
     scope: WebsiteConfigSessionBuilder.Scope, quote: OfflineQuote?) -> SavedTestPreset {
+    if configuration.mode == .custom, let raw = scope.websiteCustomText {
+      let represented: Double?
+      switch configuration.customTextCompletion {
+      case .words: represented = configuration.wordLimit.map(Double.init)
+      case .sections: represented = configuration.customTextSectionLimit.map(Double.init)
+      case .time: represented = configuration.duration
+      case .finish: represented = nil
+      }
+      if represented != raw.limitValue || raw.text.contains(where: {
+        guard let units = $0.stringUnits else { return true }
+        return Array(String(decoding: units, as: UTF16.self).utf16) != units
+      }) {
+        return .init(configuration: configuration, customText: nil)
+      }
+    }
     let custom: String?
     if configuration.mode != .custom { custom = nil }
     else if configuration.customTextCompletion == .finish, !configuration.usesCustomTextPipeDelimiter,

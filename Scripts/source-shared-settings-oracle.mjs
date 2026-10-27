@@ -132,5 +132,13 @@ export async function runSharedSettingsOracle({frontend,context,load,simulation,
   await run('legacy-funbox-empty',[null,null,null,null,null,null,null,'']);
   await run('quote-infinite-number',['quote',Infinity,null,null,null,null,null,null]);
   await run('numeric-exponential-mode2',[null,1e21,null,null,null,null,null,null]);
+  await run('custom-code-units',['custom',null,{text:['','a|b','\ud800','e\u0301','é'],mode:'repeat',
+    limit:{mode:'section',value:2.5},pipeDelimiter:true},null,null,null,null,null]);
+  await run('custom-subunit',['custom',null,{text:['aa','bb'],mode:'repeat',
+    limit:{mode:'word',value:0.5},pipeDelimiter:false},null,null,null,null,null]);
+  await run('custom-large-limit',['custom',null,{text:['aa','bb'],mode:'shuffle',
+    limit:{mode:'section',value:1e99},pipeDelimiter:false},null,null,null,null,null]);
+  await run('custom-signed-zero',['custom',null,{text:['aa','bb'],mode:'repeat',
+    limit:{mode:'time',value:-0},pipeDelimiter:false},null,null,null,null,null]);
   verify();await new Promise((resolve,reject)=>process.stdout.write(JSON.stringify({fixtures}),error=>error?reject(error):resolve()));
 }

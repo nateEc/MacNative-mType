@@ -26,7 +26,7 @@ import XCTest
 
   func testOrderedReceiverAgainstCompletePinnedHandlerSettersStoreAndCustomModule() throws {
     let output = try oracle()
-    XCTAssertEqual(output.fixtures.count, 1304)
+    XCTAssertEqual(output.fixtures.count, 1308)
     for f in output.fixtures {
       let result = WebsiteSharedSettingsReceiver.receive(json: f.json, current: try state(f))
       let runtime = try XCTUnwrap(WebsiteConfigJSONReader.read(f.runtime).importFields)

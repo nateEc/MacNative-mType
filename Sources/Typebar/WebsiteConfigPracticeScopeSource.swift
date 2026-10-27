@@ -32,10 +32,12 @@ enum WebsiteConfigPracticeScopeSourceError: Error { case unavailable, wrongOwner
     case stored
     case explicit(CustomTextStateDocument, finiteTextSource: String?, preservesSpelling: Bool, recoveryBlocked: Bool)
     case timed(TimedContent)
+    case website(WebsiteCustomTextSettings)
     static func == (a: Self, b: Self) -> Bool {
       switch (a, b) {
       case (.stored, .stored): return true
       case (.timed(let a), .timed(let b)): return a == b
+      case (.website(let a), .website(let b)): return a == b
       case let (.explicit(ad, af, ap, ab), .explicit(bd, bf, bp, bb)):
         let finiteMatches: Bool
         switch (af, bf) {
@@ -65,7 +67,8 @@ enum WebsiteConfigPracticeScopeSourceError: Error { case unavailable, wrongOwner
       let source = scope.preparedCustomSections.map(CustomTextSource.prepared) ?? .editor(scope.customText)
       let memory = scope.parameterMemory
       let custom: Custom
-      if scope.customCompletion == .time {
+      if let value = scope.websiteCustomText { custom = .website(value) }
+      else if scope.customCompletion == .time {
         custom = .timed(.init(source: source,
           seconds: scope.customDurationOverride ?? Double(memory.customTextDuration),
           ordering: scope.customOrdering, pipeDelimiter: scope.customPipeDelimiter,
@@ -120,9 +123,21 @@ enum WebsiteConfigPracticeScopeSourceError: Error { case unavailable, wrongOwner
     scope.customTextIsPrepared = false; scope.customTextRecoveryBlocked = true
     scope.customCompletion = .finish; scope.customOrdering = .inOrder; scope.customPipeDelimiter = nil
     scope.customDurationOverride = nil
+    scope.websiteCustomText = nil
     let document: CustomTextStateDocument?
     switch window.custom {
-    case .stored: document = models.custom.document
+    case .stored:
+      switch models.websiteCustom {
+      case .missing: document = models.custom.document
+      case .unavailable: document = nil
+      case .available(let value):
+        document = nil; scope = value.applying(to: scope)
+        scope.customTextRecoveryBlocked = scope.customTextRecoveryBlocked || window.customRecoveryBlocked
+      }
+    case .website(let value):
+      guard (try? WebsiteCustomTextSettings(value: value.value)) != nil else { throw WebsiteConfigPracticeScopeSourceError.invalidContent }
+      document = nil; scope = value.applying(to: scope)
+      scope.customTextRecoveryBlocked = scope.customTextRecoveryBlocked || window.customRecoveryBlocked
     case .explicit(let value, let finite, let prepared, let blocked):
       document = value; scope.finiteTextSource = finite
       scope.customTextIsPrepared = prepared

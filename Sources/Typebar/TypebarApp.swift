@@ -7269,11 +7269,12 @@ private struct ContentView: View {
     }
     // Legacy content controls reset the actual attempt when applied, including
     // same-value applications; capture its identity as the window generation.
-    return .init(owner: preferenceConfigurationOwner, customRecoveryBlocked: customTextRecovery.blocksCustomGeneration,
+    let hasWebsiteCustom = settings.websiteCustomTextStateRead != .missing
+    return .init(owner: preferenceConfigurationOwner, customRecoveryBlocked: hasWebsiteCustom ? false : customTextRecovery.blocksCustomGeneration,
       revision: session.automaticInputAttemptID, selectedQuoteID: selectedQuoteID,
       parameterMemory: .init(duration: duration, wordLimit: wordLimit, customTextDuration: customTextDuration,
         customTextWordLimit: customTextWordLimit, customTextSectionLimit: customTextSectionLimit),
-      custom: .explicit(customTextStateDocument,
+      custom: hasWebsiteCustom ? .stored : .explicit(customTextStateDocument,
         finiteTextSource: activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk },
         preservesSpelling: preparedCustomSections != nil, recoveryBlocked: customTextRecovery.blocksCustomGeneration))
   }
