@@ -36,6 +36,19 @@ const producer=context.ShareTestSettings();
 const keys=['mode','mode2','customText','punctuation','numbers','language','difficulty','funbox'];
 assert.deepEqual(Object.keys(values),keys);
 assert.ok(Object.values(values).every(value=>value===false));
+if(process.argv[3]==='--native-captures'){
+  const captures=JSON.parse(fs.readFileSync(0,'utf8')), fixtures=[];
+  captures.forEach((capture,index)=>{
+    Object.assign(runtime,capture.runtime);custom=capture.custom;
+    for(let mask=0;mask<256;mask++){
+      if(runtime.mode==='quote'&&(mask&2))continue; // Native quote IDs are explicitly unavailable.
+      keys.forEach((key,bit)=>values[key]=Boolean(mask&(1<<bit)));
+      const url=producer.url();
+      fixtures.push({capture:index,mask,tupleJSON:decompressFromURI(url.slice(url.indexOf('=')+1))});
+    }
+  });
+  fs.writeFileSync(1,JSON.stringify({fixtures}));process.exit(0);
+}
 const fixtures=[];
 for(const mode of ['time','words','custom','zen','quote']) {
   runtime.mode=mode;

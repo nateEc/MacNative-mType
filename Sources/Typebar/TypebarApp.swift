@@ -7269,18 +7269,18 @@ private struct ContentView: View {
   }
 
   private var websiteTestSettingsSnapshot: WebsiteTestSettingsShare.Snapshot? {
-    if let receipt = pageSession.sharedReceipt {
-      return .init(runtime: receipt.outcome.state.settingsStore,
-        customText: WebsiteTestSettingsShare.customText(in: receipt.scope),
-        hasUnmappedQuote: receipt.outcome.state.settingsStore["mode"] == .string("quote"))
+    WebsiteTestSettingsShare.pageSnapshot(pageSession) {
+      var scope = WebsiteConfigSessionBuilder.Scope()
+      scope.parameterMemory = .init(duration: duration, wordLimit: wordLimit, customTextDuration: customTextDuration,
+        customTextWordLimit: customTextWordLimit, customTextSectionLimit: customTextSectionLimit)
+      scope.customText = customText; scope.preparedCustomSections = preparedCustomSections
+      scope.customTextIsPrepared = preparedCustomSections != nil
+      scope.customCompletion = customTextCompletion; scope.customOrdering = customTextOrdering
+      scope.customPipeDelimiter = customTextPipeDelimiter
+      scope.finiteTextSource = activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk }
+      scope.customTextRecoveryBlocked = customTextRecovery.blocksCustomGeneration
+      return WebsiteTestSettingsShare.nativeSnapshot(configuration: session.configuration, scope: scope)
     }
-    guard let draft = WebsiteConfigExport.draft(in: pageSession), let practice = pageSession.practice else { return nil }
-    let hasQuote: Bool
-    if let current = pageSession.currentQuoteInitialization { hasQuote = current.quote != nil }
-    else { hasQuote = practice.quote != nil }
-    return .init(runtime: WebsiteConfigExport.values(draft, surface: .settings),
-      customText: WebsiteTestSettingsShare.customText(in: practice.scope),
-      hasUnmappedQuote: hasQuote)
   }
 
   private var sharePresetDefinition: SavedTestPreset {

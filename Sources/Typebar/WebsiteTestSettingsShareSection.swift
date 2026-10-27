@@ -30,6 +30,7 @@ import SwiftUI
       ?? WebsiteTestSettingsShare.Failure.unavailable.errorDescription }
   }
   func isEnabled(_ field: WebsiteTestSettingsShare.Field) -> Bool {
+    if snapshot?.unavailableFields.contains(field) == true { return false }
     if field.requiresModeSelection && !selected.contains(.mode) { return false }
     if field == .parameter, mode == "quote", snapshot?.hasUnmappedQuote == true { return false }
     return true
@@ -59,7 +60,14 @@ struct WebsiteTestSettingsShareSection: View {
         Toggle(field.title, isOn: Binding(get: { controller.selected.contains(field) }, set: { enabled in
           if enabled { controller.selected.insert(field) } else { controller.selected.remove(field) }
         }))
-        .disabled(!controller.isEnabled(field))
+        .disabled(!controller.isEnabled(field) && !controller.selected.contains(field))
+      }
+      if let snapshot = controller.snapshot, !snapshot.unavailableFields.isEmpty {
+        let titles = controller.visibleFields.filter(snapshot.unavailableFields.contains).map(\.title)
+        if !titles.isEmpty {
+          Text("八项格式无法表达：" + titles.joined(separator: "、") + "。完整测试链接可保留原生设置。")
+            .font(.caption).foregroundStyle(.secondary)
+        }
       }
       if controller.mode == "quote", controller.snapshot?.hasUnmappedQuote == true {
         Text(WebsiteTestSettingsShare.Failure.unmappedQuote.errorDescription!)

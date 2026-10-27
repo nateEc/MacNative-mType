@@ -429,6 +429,44 @@ import Observation
     XCTAssertEqual(continued.completedWordCount, 17)
   }
 
+  func testIncompleteFullApplicationDoesNotShareTheOldNativeFallback() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = try f.makeWorkflow(loadQuotes: { _ in throw WebsiteConfigImportWorkflowError.unavailable })
+    defer { workflow.stop() }
+    do {
+      _ = try await workflow.apply(json: #"{"mode":"quote"}"#, systemIsDark: false)
+      XCTFail("Quote preparation must fail")
+    } catch is WebsiteConfigSavedPreparationError {}
+    XCTAssertNotNil(f.page.state.savedApplication)
+    XCTAssertNil(f.page.state.practice)
+    XCTAssertNil(WebsiteTestSettingsShare.pageSnapshot(f.page.state) {
+      XCTFail("A saved but undelivered application must not share the old native selection")
+      return .init(runtime: [:])
+    })
+  }
+
+  func testShareSnapshotPrioritizesPublicationAndReceiptOverNativeFallback() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.publish()
+    let initial = try XCTUnwrap(WebsiteTestSettingsShare.pageSnapshot(f.page.state) {
+      XCTFail("Published profile must own sharing"); return .init(runtime: [:])
+    })
+    XCTAssertEqual(initial.runtime["words"], .number(5))
+    XCTAssertEqual(initial.customText?.importFields?["text"], .array([.string("aa"), .string("bb")]))
+    let before = f.page.state.session.generationState
+    let receipt = try f.coordinator.acceptSharedReceipt(
+      #"["words","17",{"text":["receipt-owned"],"mode":"repeat","limit":{"mode":"word","value":1},"pipeDelimiter":false},null,null,null,null,null]"#,
+      for: f.page, settings: f.settings, refreshingWith: f.source)
+    let pending = try XCTUnwrap(WebsiteTestSettingsShare.pageSnapshot(f.page.state) {
+      XCTFail("Receipt must own sharing"); return .init(runtime: [:])
+    })
+    XCTAssertEqual(pending.runtime, receipt.outcome.state.settingsStore)
+    XCTAssertEqual(pending.runtime["words"], .number(17))
+    XCTAssertEqual(pending.customText?.importFields?["text"], .array([.string("receipt-owned")]))
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.sharedReceipt?.id, receipt.id)
+  }
+
   func testUnrepresentableLiveLimitKeepsRawReceiptWithoutChangingAttemptOrRepeatingWrites() async throws {
     let f = try Fixture(); defer { f.close() }
     let workflow = try f.makeWorkflow(); defer { workflow.stop() }

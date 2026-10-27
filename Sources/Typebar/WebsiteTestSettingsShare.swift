@@ -25,18 +25,21 @@ enum WebsiteTestSettingsShare {
     var customText: WebsiteConfigValue?
     var quoteID: Int?
     var hasUnmappedQuote = false
+    var unavailableFields = Set<Field>()
   }
   enum Failure: Error, LocalizedError {
-    case unavailable, tooLarge, unmappedQuote
+    case unavailable, tooLarge, unmappedQuote, unrepresentableSelection
     var errorDescription: String? {
       switch self {
       case .unavailable: "当前分享内容不可用，请重新选择。"
       case .tooLarge: "自定义文本超过链接的本机处理范围，请缩短文本后再分享。"
       case .unmappedQuote: "当前引语是 Typebar 独立内容；请使用完整测试链接保留这条引语。"
+      case .unrepresentableSelection: "所选项目包含八项格式无法表达的原生设置；请取消该项，或使用完整测试链接。"
       }
     }
   }
   static func link(_ snapshot: Snapshot, selected: Set<Field>, origin: String = "typebar://test") throws -> String {
+    guard selected.isDisjoint(with: snapshot.unavailableFields) else { throw Failure.unrepresentableSelection }
     var values = Array(repeating: WebsiteConfigValue.null, count: 8)
     for field in selected {
       let value: WebsiteConfigValue
