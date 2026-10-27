@@ -92,6 +92,24 @@ import XCTest
     }
   }
   private enum StorageError: Error { case rejected }
+  func testReceivedDraftPreservesPinnedSnapshotsWithoutReplayingLanguageListeners() throws {
+    let output = try oracle()
+    XCTAssertEqual(output.fixtures.count, 1308)
+    for f in output.fixtures {
+      let outcome = WebsiteSharedSettingsReceiver.receive(json: f.json, current: try state(f))
+      if outcome.parseRejected {
+        XCTAssertThrowsError(try WebsiteConfigNativeDraft(received: outcome, pointsPerRem: 16), f.label); continue
+      }
+      let draft = try WebsiteConfigNativeDraft(received: outcome, pointsPerRem: 16)
+      XCTAssertNil(draft.prepared, "Receipt is not a full import")
+      XCTAssertEqual(draft.projection.runtime, try WebsiteConfigJSONReader.read(f.runtime).importFields, f.label)
+      XCTAssertEqual(draft.settingsStoreValues, try WebsiteConfigJSONReader.read(f.store).importFields, f.label)
+      let applied = try WebsiteConfigLazyModeLifecycle.applyingEvents(draft, pointsPerRem: 16)
+      XCTAssertEqual(applied.projection.events, outcome.events, f.label)
+      XCTAssertEqual(applied.projection.runtime, draft.projection.runtime, f.label)
+      XCTAssertEqual(applied.settingsStoreValues, draft.settingsStoreValues, f.label)
+    }
+  }
   func testReceiverBindsActualNativeStoresWithoutPromotingNosaveOrOverwritingOpaqueData() throws {
     let fixtures = try oracle(storageFailures: true).fixtures
     for (label, policy) in [("custom-failure-quota-2", "second-custom"),

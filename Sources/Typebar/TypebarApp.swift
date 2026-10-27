@@ -7264,6 +7264,9 @@ private struct ContentView: View {
   }
 
   private var websiteImportWindow: WebsiteConfigPracticeScopeSource.Window {
+    if let receipt = pageSession.sharedReceipt {
+      return .published(owner: preferenceConfigurationOwner, revision: session.automaticInputAttemptID, scope: receipt.scope)
+    }
     if let scope = pageSession.practice?.scope {
       return .published(owner: preferenceConfigurationOwner, revision: session.automaticInputAttemptID, scope: scope)
     }

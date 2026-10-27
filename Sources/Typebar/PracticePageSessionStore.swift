@@ -57,6 +57,7 @@ final class PracticePageSessionStore {
     fileprivate let repetition: WebsitePracticeRepetition
     fileprivate let restartDeparture: UUID?
     let configurationDeparture: UUID?
+    let sharedReceipt: UUID?
     fileprivate let quoteInitialization: UUID?
     var testActive: Bool { session.started && !session.finished }
   }
@@ -75,6 +76,7 @@ final class PracticePageSessionStore {
     let configurationDeparture: UUID?
     fileprivate let quoteInitialization: UUID?
     fileprivate var savedApplication: UUID?
+    fileprivate let sharedReceipt: UUID?
     func acceptingApplication(_ id: UUID) -> Self {
       var copy = self; copy.savedApplication = id; return copy
     }
@@ -88,7 +90,7 @@ final class PracticePageSessionStore {
     guard !session.hasStarted || session.isFinished || !session.configuration.modifiers.contains(.noQuit) else {
       throw PracticePageSessionStateError.locked
     }
-    var scope = state.practice?.scope ?? .init()
+    var scope = state.sharedReceipt?.scope ?? state.practice?.scope ?? .init()
     if let progress = state.currentQuoteInitialization { scope.quoteSampler = progress.sampler }
     scope.weakSpotScores = session.liveWeakSpotScores
     scope.decorationState = session.liveWordDecorationState
@@ -97,7 +99,7 @@ final class PracticePageSessionStore {
       session: session.generationState, publication: state.presentation?.publication.applicationID,
       repetition: state.practice?.repetition, restartDeparture: state.restartDepartureAttemptID,
       configurationDeparture: state.configurationDeparture?.id, quoteInitialization: state.quoteInitialization?.id,
-      savedApplication: state.savedApplication?.id)
+      savedApplication: state.savedApplication?.id, sharedReceipt: state.sharedReceipt?.id)
   }
   func isCurrent(_ capture: ApplicationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -109,6 +111,7 @@ final class PracticePageSessionStore {
       && state.configurationDeparture?.id == capture.configurationDeparture
       && state.quoteInitialization?.id == capture.quoteInitialization
       && state.savedApplication?.id == capture.savedApplication
+      && state.sharedReceipt?.id == capture.sharedReceipt
   }
 
   func captureGeneration(router: PreferenceConfigurationSaveRouter) throws -> GenerationCapture {
@@ -120,7 +123,7 @@ final class PracticePageSessionStore {
       let practice = state.practice,
       state.session.automaticInputAttemptID == practice.session.automaticInputAttemptID
     else { throw PracticePageSessionStateError.incomplete }
-    var scope = practice.scope
+    var scope = state.sharedReceipt?.scope ?? practice.scope
     if let progress = state.currentQuoteInitialization { scope.quoteSampler = progress.sampler }
     scope.weakSpotScores = state.session.liveWeakSpotScores
     scope.decorationState = state.session.liveWordDecorationState
@@ -128,7 +131,8 @@ final class PracticePageSessionStore {
     return .init(publication: publication, scope: scope, lease: lease,
       attachment: attachment, compositionActivity: compositionActivity, session: state.session.generationState,
       repetition: practice.repetition, restartDeparture: state.restartDepartureAttemptID,
-      configurationDeparture: state.configurationDeparture?.id, quoteInitialization: state.quoteInitialization?.id)
+      configurationDeparture: state.configurationDeparture?.id, sharedReceipt: state.sharedReceipt?.id,
+      quoteInitialization: state.quoteInitialization?.id)
   }
   func isCurrent(_ capture: GenerationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     state.savedApplication == nil && !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -139,6 +143,7 @@ final class PracticePageSessionStore {
       && state.practice?.repetition == capture.repetition
       && state.restartDepartureAttemptID == capture.restartDeparture
       && state.configurationDeparture?.id == capture.configurationDeparture
+      && state.sharedReceipt?.id == capture.sharedReceipt
       && state.quoteInitialization?.id == capture.quoteInitialization
   }
   func noteCompositionActivity(for attemptID: UUID) {
@@ -180,10 +185,14 @@ final class PracticePageSessionStore {
   }
   var ownsConfigurationSelection: Bool { state.practice != nil || state.savedApplication != nil }
   func acceptsAttemptCallback(for attemptID: UUID) -> Bool {
-    router != nil && !committing && !startupInputTransition && !startupInputSuspended
+    if let receipt = state.sharedReceipt {
+      guard let router, receipt.authorizesInput(owner: owner, router: router) else { return false }
+    }
+    return router != nil && !committing && !startupInputTransition && !startupInputSuspended
       && !legacyReturnTransition && !isReturningToTypebarSettings
       && state.configurationDeparture == nil
       && state.savedApplication == nil
+      && state.sharedReceipt?.requiresInitialization != true
       && state.session.automaticInputAttemptID == attemptID
   }
 
@@ -317,6 +326,24 @@ final class PracticePageSessionStore {
     }
     committing = true
   }
+
+  /// Receipt parsing/setters may save custom text while No Quit withholds
+  /// restart. Reserve the actual window without granting a new attempt.
+  func beginSharedReceipt(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture) throws {
+    guard state.sharedReceipt == nil, state.configurationDeparture == nil, state.savedApplication == nil else {
+      throw PracticePageSessionStateError.incomplete
+    }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture)
+    committing = true
+  }
+  func ownsSharedReceiptReservation(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture) -> Bool {
+    committing && !pendingDetach && self.router === router && router.isCurrent(lease)
+      && capture.attachment == attachment && capture.compositionActivity == compositionActivity
+      && state.session.generationState == capture.session
+      && state.presentation?.publication.applicationID == capture.publication.applicationID
+  }
   func beginLiveBehaviorCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
     router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft) throws {
     guard state.configurationDeparture == nil, state.savedApplication == nil,
@@ -422,7 +449,8 @@ final class PracticePageSessionStore {
     let retainsController = controller != nil && restartController === controller
     if !retainsController && (state.presentation?.publication.applicationID != self.state.presentation?.publication.applicationID
       || state.configurationDeparture?.id != self.state.configurationDeparture?.id
-      || state.savedApplication?.id != self.state.savedApplication?.id) { retireRestartController() }
+      || state.savedApplication?.id != self.state.savedApplication?.id
+      || state.sharedReceipt?.id != self.state.sharedReceipt?.id) { retireRestartController() }
     self.state = state
   }
 

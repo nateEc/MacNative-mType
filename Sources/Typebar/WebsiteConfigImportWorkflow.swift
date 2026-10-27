@@ -70,6 +70,7 @@ enum WebsiteConfigPracticeEdit: Equatable {
 enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
   case missing, typebarBackup, activeAttempt, unavailable, busy, conflict, unsupportedPractice, rejectedRestartFailed
   case preparationPending
+  case receiptRestartWithheld
   var errorDescription: String? {
     switch self {
     case .missing: "还没有保存的 Monkeytype 配置；请先粘贴配置 JSON。"
@@ -82,8 +83,14 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
     case .rejectedRestartFailed: "设置未修改；重开未完成，请检查窗口或锁定状态后重试。已接受的旧尝试不会重复记账。"
     case .preparationPending:
       "设置已保存，新练习尚未准备完成。请继续准备；如果窗口或配置已变化，请在导入面板恢复配置。"
+    case .receiptRestartWithheld: "链接设置已接收；当前练习状态未允许重开。"
     }
   }
+}
+
+struct WebsiteSharedReceiptPreparationError: Error, LocalizedError {
+  let underlying: Error
+  var errorDescription: String? { "链接设置已保留，新练习尚未准备好，可继续准备。" }
 }
 
 /// Retain the diagnostic without making a failed initializer look like a
@@ -131,7 +138,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   private let dispatchKeymapHighlight: @MainActor (Int, @escaping @MainActor () -> Void) -> Void
   private var pendingKeymapHighlights: Set<UUID> = []
   private var readKeymapWindow: (@MainActor () -> WebsiteConfigPracticeScopeSource.Window?)?
-  private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID), resume(UUID) }
+  private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID), resume(UUID), received(UUID) }
 
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
     directory: URL, readWindow: @escaping @MainActor () -> WebsiteConfigPracticeScopeSource.Window?,
@@ -161,6 +168,30 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   @discardableResult
   func apply(json: String?, systemIsDark: Bool) async throws -> String {
     try await perform(.application(json), systemIsDark: systemIsDark)
+  }
+
+  /// Receipt acceptance is synchronous. The retained checkpoint, not the link,
+  /// is supplied to the later asynchronous preparation action.
+  func acceptSharedSettings(json: String, replacing applicationID: UUID) throws -> WebsiteConfigCommitCoordinator.SharedReceipt {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.presentation?.publication.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
+    applying = true; operation = UUID(); defer { applying = false }
+    return try coordinator.acceptSharedReceipt(json, for: page, settings: settings, refreshingWith: source)
+  }
+
+  @discardableResult
+  func continueSharedSettings(receiptID: UUID, systemIsDark: Bool) async throws -> String {
+    do { return try await perform(.received(receiptID), systemIsDark: systemIsDark) }
+    catch {
+      if stopped || Task.isCancelled || error is CancellationError { throw CancellationError() }
+      if error is WebsiteSharedReceiptPreparationError { throw error }
+      if case WebsiteConfigImportWorkflowError.receiptRestartWithheld = error { throw error }
+      if page?.state.sharedReceipt?.id == receiptID || page?.state.configurationDeparture?.isSharedReceipt == true {
+        throw WebsiteSharedReceiptPreparationError(underlying: error)
+      }
+      throw error
+    }
   }
 
   @discardableResult
@@ -629,6 +660,9 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     applying = true
     let current = UUID(); operation = current
     let noticeGeneration = notices?.deliveryGeneration
+    let receivedSettings = page.state.sharedReceipt != nil || page.state.configurationDeparture?.isSharedReceipt == true
+    let receiptFailureCount = page.state.sharedReceipt?.outcome.storageFailures.count
+      ?? page.state.configurationDeparture?.sharedStorageFailureCount ?? 0
     defer {
       if let prepared { _ = coordinator.cancel(prepared) }
       if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
@@ -645,6 +679,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     try checkIntent(intent, page: page)
     var ticket: WebsiteConfigCommitCoordinator.Prepared
     switch intent {
+    case .received(let id): ticket = try coordinator.resumeSharedReceipt(id, for: page)
     case .edit(let edit, let applicationID):
       guard page.state.presentation?.publication.applicationID == applicationID else {
         throw WebsiteConfigImportWorkflowError.conflict
@@ -761,16 +796,20 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
             try self.advanceLayoutFluid(event, attemptID: attempt)
           }
           switch intent {
+          case .received: return "链接设置已应用，新的练习已准备好。"
+            + (receiptFailureCount > 0 ? " 部分设置未能保存，已保留成功的部分。" : "") + notice
           case .application(nil): return "已恢复保存的配置，新的练习已准备好。" + notice
           case .application(.some): return "配置已导入，新的练习已准备好。" + notice
           case .edit where publication.draft.projection.rejectedKeys.contains("funbox"):
             return "趣味模式选择未更改；可恢复的临时设置已恢复，新的练习已准备好。" + notice
           case .edit: return "设置已保存，新的练习已准备好。" + notice
-          case .resume: return "已继续准备，新的练习已准备好。" + notice
+          case .resume: return "已继续准备，新的练习已准备好。"
+            + (receivedSettings && receiptFailureCount > 0 ? " 部分设置未能保存，已保留成功的部分。" : "") + notice
           }
         } catch {
           // The durable commit already succeeded. Never report a rolled-back
           // import merely because an observer retired its receiving window.
+          if receivedSettings { return "链接设置已应用；窗口已变化，请重新打开设置面板。" }
           if publication.draft.projection.rejectedKeys.contains("funbox"),
             !publication.draft.projection.events.contains(where: { $0.nosave == false }) {
             return "临时设置已恢复，选择未保存；窗口已变化，重开控制未能绑定，请重新打开此面板恢复。"
@@ -785,6 +824,9 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       // cancel() retires the coordinator ticket, so a late resource return can
       // report stale before our post-await operation check is reached.
       if operation != current || Task.isCancelled { throw CancellationError() }
+      if !(error is CancellationError), page.state.sharedReceipt != nil || page.state.configurationDeparture?.isSharedReceipt == true {
+        throw WebsiteSharedReceiptPreparationError(underlying: error)
+      }
       if !(error is CancellationError), page.state.configurationDeparture != nil || page.state.savedApplication != nil {
         throw WebsiteConfigSavedPreparationError(underlying: error, initializationMessage: initializationReport.finalMessage,
           configurationWasSaved: page.state.savedApplication != nil || (page.state.configurationDeparture?.configurationWasSaved ?? true))
@@ -864,6 +906,9 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   }
   private func checkIntent(_ intent: Intent, page: PracticePageSessionStore) throws {
     switch intent {
+    case .received(let id):
+      guard let receipt = page.state.sharedReceipt, receipt.id == id else { throw WebsiteConfigImportWorkflowError.conflict }
+      guard receipt.requiresInitialization else { throw WebsiteConfigImportWorkflowError.receiptRestartWithheld }
     case .application:
       guard !page.state.session.hasStarted || page.state.session.isFinished else {
         throw WebsiteConfigImportWorkflowError.activeAttempt

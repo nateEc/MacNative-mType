@@ -79,6 +79,145 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let ticket: Prepared
     var draft: WebsiteConfigNativeDraft { ticket.draft }
   }
+  struct SharedReceipt {
+    let id = UUID()
+    let outcome: WebsiteSharedSettingsReceiver.Outcome
+    let scope: WebsiteConfigSessionBuilder.Scope
+    fileprivate let identity: UUID
+    fileprivate let owner: PreferenceConfigurationSaveRouter.Lease
+    fileprivate let base: Publication
+    fileprivate let disk: WebsiteConfigFileRegister.Revision
+    fileprivate weak var contentSource: WebsiteConfigPracticeScopeSource?
+    fileprivate let contentCapture: WebsiteConfigPracticeScopeSource.Snapshot
+    fileprivate let wasActive: Bool
+    fileprivate let wasFailed: Bool
+    var requiresInitialization: Bool { outcome.restartStarts > 0 }
+    var basePointsPerRem: Double { base.pointsPerRem }
+    @MainActor func authorizesInput(owner id: UUID, router: PreferenceConfigurationSaveRouter) -> Bool {
+      owner.owner == id && router.isCurrent(owner)
+    }
+  }
+
+  func acceptSharedReceipt(_ json: String, for page: PracticePageSessionStore, settings: AppSettings,
+    refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> SharedReceipt {
+    try source.withReceiptRead { try acceptSharedReceiptBody(json, for: page, settings: settings, refreshingWith: source) }
+  }
+  private func acceptSharedReceiptBody(_ json: String, for page: PracticePageSessionStore, settings: AppSettings,
+    refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> SharedReceipt {
+    guard !processing, page.restartController?.isPreparing != true else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    request = UUID()
+    guard settings.preferenceConfigurationSaves === router, let lease = router.captureLease(), lease.owner == page.owner,
+      let context = environment() else { throw WebsiteConfigCommitCoordinatorError.noOwner }
+    let capture = try page.captureGeneration(router: router)
+    guard let base = latest, base.applicationID == capture.publication.applicationID,
+      base.authority === publicationAuthority, try register.read().revision == base.disk else {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
+    let content = try source.capture(owner: page.owner, preserving: capture.scope)
+    guard content.environment == context, page.isCurrent(capture, router: router), environment() == context else {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
+    let custom: WebsiteCustomTextSettings
+    if let raw = content.scope.websiteCustomText { custom = raw }
+    else if let raw = WebsiteTestSettingsShare.customText(in: content.scope) { custom = try .init(value: raw) }
+    else {
+      // Independently authored fallback: never copy the source's sample text.
+      custom = try .init(value: .object(["text": .array(["quiet", "harbor", "cedar", "cloud", "river", "stone", "meadow", "orbit", "lantern"].map(WebsiteConfigValue.string)),
+        "mode": .string("repeat"), "limit": .object(["mode": .string("word"), "value": .number(9)]), "pipeDelimiter": .bool(false)]))
+    }
+    try Task.checkCancellation()
+    try page.beginSharedReceipt(owner: lease, router: router, capture: capture)
+    defer { page.endCommit() }
+    var disk = base.disk
+    func ownsWindow() -> Bool {
+      page.ownsSharedReceiptReservation(owner: lease, router: router, capture: capture) && source.ownsReceiptIdentity(content)
+    }
+    let outcome = WebsiteSharedSettingsReceiver.receive(json: json,
+      current: .init(runtime: base.draft.projection.runtime, settingsStore: base.draft.settingsStoreValues,
+        custom: custom, active: capture.testActive, lazyMemory: base.draft.lazyMemory,
+        savedConfig: base.savedDraft.projection.runtime), context: context.context,
+      storage: .init(writeCustom: { value in
+        ownsWindow() && settings.saveWebsiteCustomTextState(value)
+      }, writeConfiguration: { save in
+        guard ownsWindow() else { return false }
+        switch try self.register.commit(runtime: save.runtime, lazyMemory: base.draft.lazyMemory, replacing: disk) {
+        case .committed(let next): disk = next; return true
+        case .conflict, .unavailable: return false
+        }
+      }))
+    guard !outcome.parseRejected else { throw WebsiteSharedSettingsReceiver.Failure.invalidPayload }
+    // From the first accepted write onward, retain partial effects even when
+    // a synchronous observer retires this owner. Resume will recheck authority.
+    var state = page.state
+    let wasFailed = state.session.outcome == .failed
+    var scope = outcome.state.custom.applying(to: content.scope)
+    if outcome.state.selectedQuote != nil { scope.selectedQuoteID = nil }
+    if outcome.events.contains(where: { $0.key == "quoteLength" }) { scope.quoteSampler = nil }
+    let receipt = SharedReceipt(outcome: outcome, scope: scope, identity: identity, owner: lease, base: base,
+      disk: disk, contentSource: source, contentCapture: content, wasActive: capture.testActive, wasFailed: wasFailed)
+    if receipt.requiresInitialization {
+      if capture.testActive, let measurement = state.session.abandonAndMeasure() {
+        state.priorAttemptLedger.recordRestart(engagedDuration: measurement.engagedDuration,
+          accuracy: measurement.accuracy, savingEnabled: base.draft.behavior.saveCompletedResults)
+      }
+      state.restartDepartureAttemptID = state.session.automaticInputAttemptID
+    }
+    state.sharedReceipt = receipt; state.quoteInitialization = nil
+    resourceAdmission = UUID(); sessionAdmission = UUID(); sessionRequest = nil
+    page.installCommitted(state)
+    return receipt
+  }
+
+  /// Consume the checkpoint into the existing preparation/retry machinery.
+  /// No URL parsing, setter replay or receipt storage callback occurs here.
+  func resumeSharedReceipt(_ id: UUID, for page: PracticePageSessionStore) throws -> Prepared {
+    guard let source = page.state.sharedReceipt?.contentSource else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return try source.withReceiptRead { try resumeSharedReceiptBody(id, for: page) }
+  }
+  private func resumeSharedReceiptBody(_ id: UUID, for page: PracticePageSessionStore) throws -> Prepared {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    request = UUID()
+    guard let receipt = page.state.sharedReceipt, receipt.id == id, receipt.identity == identity,
+      receipt.requiresInitialization, router.isCurrent(receipt.owner), let context = environment(),
+      let source = receipt.contentSource, source.ownsReceiptIdentity(receipt.contentCapture),
+      latest?.applicationID == receipt.base.applicationID,
+      try register.read().revision == receipt.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+    let capture = try page.captureGeneration(router: router)
+    let content = try source.capture(owner: page.owner, preserving: receipt.scope)
+    guard content.environment == context else { throw WebsiteConfigCommitCoordinatorError.stale }
+    var draft = try WebsiteConfigNativeDraft(received: receipt.outcome, pointsPerRem: context.pointsPerRem)
+    draft.funboxMemory = receipt.base.draft.funboxMemory
+    var savedOutcome = receipt.outcome
+    savedOutcome.state.runtime = receipt.outcome.state.savedConfig ?? receipt.base.savedDraft.projection.runtime
+    savedOutcome.state.settingsStore = savedOutcome.state.runtime; savedOutcome.events = []
+    let saved = try WebsiteConfigNativeDraft(received: savedOutcome, pointsPerRem: context.pointsPerRem)
+    let previous = try unwrappedPractice(page)
+    guard let languageUnits = draft.projection.runtime["language"]?.stringUnits else { throw WebsiteConfigNativeDraftError.incompleteRuntime }
+    let repetition = WebsiteConfigRestartPolicy.resolve(requested: false, active: receipt.wasActive,
+      previouslyRepeated: previous.repetition.repeatsWordset, failed: receipt.wasFailed,
+      mode: draft.testParameters.mode, language: String(decoding: languageUnits, as: UTF16.self),
+      quoteLanguage: previous.quote.flatMap { WebsiteLanguageIdentity.name(for: $0.language) },
+      repeatQuotes: draft.behavior.repeatQuotes, repeatedPace: draft.behavior.repeatedPace)
+    try Task.checkCancellation()
+    try page.beginCommit(owner: receipt.owner, router: router, capture: capture)
+    var state = page.state
+    state.retainingSharedScope(receipt.scope)
+    state.sharedReceipt = nil
+    state.configurationDeparture = .init(id: UUID(), draft: draft, savedDraft: saved, quoteRecoveries: [], disk: receipt.disk,
+      identity: identity, environment: context, contentSource: source, requiresContentSource: true,
+      repetition: repetition, quote: previous.quote, wordHistory: state.session.generatedWordReplayHistory, sharedReceipt: receipt)
+    page.installCommitted(state); page.endCommit()
+    var prepared = Prepared(draft: draft, identity: identity, request: request, owner: receipt.owner, environment: context, disk: receipt.disk)
+    prepared.savedDraft = saved; prepared.sourcePage = page; prepared.pageCapture = try page.captureGeneration(router: router)
+    prepared.contentSource = source; prepared.contentCapture = content
+    prepared.applicationEventsApplied = true; prepared.retainsQuoteInitialization = true
+    return prepared
+  }
+  private func unwrappedPractice(_ page: PracticePageSessionStore) throws -> WebsiteConfigSessionBuilder.Prepared {
+    guard let practice = page.state.practice else { throw PracticePageSessionStateError.incomplete }; return practice
+  }
   struct BackgroundPrepared {
     fileprivate let configuration: Prepared
     fileprivate let admission: UUID
@@ -110,7 +249,15 @@ final class WebsiteConfigCommitCoordinator {
   struct ConfigurationDeparture {
     let id: UUID
     let draft: WebsiteConfigNativeDraft
-    var configurationWasSaved: Bool { draft.projection.events.contains { $0.nosave == false } }
+    var configurationWasSaved: Bool {
+      if let receipt = sharedReceipt {
+        return !receipt.outcome.configWrites.isEmpty
+          || draft.projection.events.dropFirst(receipt.outcome.events.count).contains { $0.nosave == false }
+      }
+      return draft.projection.events.contains { $0.nosave == false }
+    }
+    var isSharedReceipt: Bool { sharedReceipt != nil }
+    var sharedStorageFailureCount: Int { sharedReceipt?.outcome.storageFailures.count ?? 0 }
     fileprivate let savedDraft: WebsiteConfigNativeDraft
     fileprivate let quoteRecoveries: [WebsiteQuoteSampler.Recovery]
     fileprivate let disk: WebsiteConfigFileRegister.Revision
@@ -121,6 +268,7 @@ final class WebsiteConfigCommitCoordinator {
     let repetition: WebsitePracticeRepetition
     fileprivate let quote: OfflineQuote?
     fileprivate let wordHistory: GeneratedWordReplayHistory?
+    fileprivate var sharedReceipt: SharedReceipt? = nil
   }
   enum ConfigurationDepartureOutcome {
     case accepted(Prepared), acceptedRetired, stale, conflict, unavailable, busy
@@ -711,7 +859,7 @@ final class WebsiteConfigCommitCoordinator {
   private func preparePageEdit(key: String, value: WebsiteConfigValue, for page: PracticePageSessionStore,
     refreshingWith source: WebsiteConfigPracticeScopeSource?, restoringFunboxMemory: Bool = true, nosave: Bool = false) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
-    guard page.state.configurationDeparture == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
+    guard page.state.configurationDeparture == nil, page.state.sharedReceipt == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
     request = UUID()
     let capture = try page.captureGeneration(router: router)
     var prepared = try preparePublicationEdit(key: key, value: value, from: capture.publication,
@@ -1009,7 +1157,7 @@ final class WebsiteConfigCommitCoordinator {
   func cancel(_ next: NextPrepared) -> Bool { cancel(next.session) }
   private func nextResources(for page: PracticePageSessionStore) throws -> ResourcesPrepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
-    guard page.state.configurationDeparture == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
+    guard page.state.configurationDeparture == nil, page.state.sharedReceipt == nil else { throw WebsiteConfigCommitCoordinatorError.sessionNotReady }
     processing = true; defer { processing = false }
     request = UUID()
     let capture = try page.captureGeneration(router: router)
@@ -1510,7 +1658,8 @@ final class WebsiteConfigCommitCoordinator {
     state.configurationDeparture = ConfigurationDeparture(id: UUID(), draft: prepared.draft, savedDraft: saved,
       quoteRecoveries: prepared.quoteRecoveries, disk: disk,
       identity: identity, environment: recoveryEnvironment, contentSource: recoverySource,
-      requiresContentSource: requiresContentSource, repetition: repetition, quote: quote, wordHistory: history)
+      requiresContentSource: requiresContentSource, repetition: repetition, quote: quote, wordHistory: history,
+      sharedReceipt: pending?.sharedReceipt)
     if let progress = inheritedQuoteInitialization {
       state.quoteInitialization = .init(publication: capture.publication.applicationID,
         configurationDeparture: state.configurationDeparture?.id, progress: progress)

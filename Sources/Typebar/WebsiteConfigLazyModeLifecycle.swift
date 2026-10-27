@@ -28,7 +28,8 @@ import Foundation
     var lazy: Bool
     do {
       let initial: [String: WebsiteConfigValue]
-      if case .edited(let value) = draft.origin { initial = value.previousRuntime }
+      if case .received(let value) = draft.origin { initial = value.runtimeAtBoundary }
+      else if case .edited(let value) = draft.origin { initial = value.previousRuntime }
       else { initial = try WebsiteConfigNativeProfile.defaultDocument().values }
       guard let name = text(initial["language"]), case .bool(let enabled)? = initial["lazyMode"] else {
         throw WebsiteConfigNativeDraftError.incompleteRuntime
@@ -41,7 +42,11 @@ import Foundation
       if !nosave && language.hasPrefix("arabic") { memory.prefersArabic = enabled }
     }
     do {
-      let events = projection.events; projection.events = []
+      let events: ArraySlice<WebsiteConfigApplicationEvent>
+      if case .received(let value) = draft.origin {
+        events = projection.events.dropFirst(value.appliedEventCount)
+        projection.events = Array(projection.events.prefix(value.appliedEventCount))
+      } else { events = projection.events[...]; projection.events = [] }
       for var event in events {
         if event.key == "lazyMode" {
           event.previousValue = .bool(lazy)
@@ -59,6 +64,7 @@ import Foundation
     }
     projection.runtime["lazyMode"] = .bool(lazy)
     return try draft.replacingProjection(projection, memory: memory, pointsPerRem: pointsPerRem)
+      .markingReceivedEventsApplied(pointsPerRem: pointsPerRem)
   }
 
   private static func preparingGeneration(_ draft: WebsiteConfigNativeDraft,

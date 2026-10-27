@@ -104,6 +104,9 @@ enum WebsiteConfigPracticeScopeSourceError: Error { case unavailable, wrongOwner
     self.environment = environment; self.readWindow = readWindow
   }
   func stop() { readWindow = nil }
+  func withReceiptRead<T>(_ body: () throws -> T) rethrows -> T {
+    try environment.withSynchronousSetterRead(body)
+  }
 
   func capture(owner: UUID, preserving previous: WebsiteConfigSessionBuilder.Scope) throws -> Snapshot {
     guard !reading, let context = environment.read(), let readWindow else {
@@ -206,6 +209,16 @@ enum WebsiteConfigPracticeScopeSourceError: Error { case unavailable, wrongOwner
     guard !reading else { return false }
     reading = true; defer { reading = false }
     return matches(snapshot)
+  }
+  /// An accepted receipt's own website-custom writes rotate the ordinary
+  /// environment. They must not authorize crossing account/window epochs.
+  func ownsReceiptIdentity(_ snapshot: Snapshot) -> Bool {
+    guard snapshot.source == identity, let window = readWindow?(), window.owner == snapshot.window.owner,
+      window.revision == snapshot.window.revision else { return false }
+    let current = environment.contentModels()
+    return current.custom == snapshot.models.custom && current.customGeneration == snapshot.models.customGeneration
+      && current.localFavorites == snapshot.models.localFavorites && current.accountScope == snapshot.models.accountScope
+      && current.accountGeneration == snapshot.models.accountGeneration
   }
   private func matches(_ snapshot: Snapshot) -> Bool {
     guard snapshot.source == identity, readWindow != nil, environment.read() == snapshot.environment,

@@ -4,12 +4,21 @@ import Foundation
   enum Surface { case command, settings }
   enum Failure: Error { case incompleteConfiguration, unsupportedValue }
   static func draft(in page: PracticePageSessionState) -> WebsiteConfigNativeDraft? {
-    page.savedApplication?.draft ?? page.configurationDeparture?.draft ?? page.presentation?.publication.draft
+    if let receipt = page.sharedReceipt, page.savedApplication == nil {
+      return try? .init(received: receipt.outcome, pointsPerRem: receipt.basePointsPerRem)
+    }
+    return page.savedApplication?.draft ?? page.configurationDeparture?.draft ?? page.presentation?.publication.draft
+  }
+  static func json(in page: PracticePageSessionState, surface: Surface) throws -> String {
+    if let receipt = page.sharedReceipt, page.savedApplication == nil {
+      return try json(values: surface == .command ? receipt.outcome.state.runtime : receipt.outcome.state.settingsStore)
+    }
+    guard let draft = draft(in: page) else { throw Failure.incompleteConfiguration }
+    return try json(draft, surface: surface)
   }
   static func copySettings(in page: PracticePageSessionStore, using exporter: WebsiteConfigClipboardExport) {
     exporter.copy {
-      guard let draft = draft(in: page.state) else { throw Failure.incompleteConfiguration }
-      return try json(draft, surface: .settings)
+      try json(in: page.state, surface: .settings)
     }
   }
   static func values(_ draft: WebsiteConfigNativeDraft, surface: Surface) -> [String: WebsiteConfigValue] {

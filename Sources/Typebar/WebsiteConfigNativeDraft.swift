@@ -14,6 +14,13 @@ struct WebsiteConfigPreparedEdit {
   }
 }
 
+struct WebsiteConfigReceivedProjection {
+  var projection: WebsiteConfigRuntimeProjection
+  var runtimeAtBoundary: [String: WebsiteConfigValue]
+  var storeAtBoundary: [String: WebsiteConfigValue]
+  var appliedEventCount: Int
+}
+
 /// Complete typed preflight, NOT an applied configuration. No legacy snapshot
 /// normalization, resource activation, preference write or live event replay.
 struct WebsiteConfigNativeDraft {
@@ -27,11 +34,13 @@ struct WebsiteConfigNativeDraft {
   enum Origin {
     case imported(WebsiteConfigPreparedImport), restored(WebsiteConfigPreparedRestoration)
     case edited(WebsiteConfigPreparedEdit)
+    case received(WebsiteConfigReceivedProjection)
     var projection: WebsiteConfigRuntimeProjection {
       switch self {
       case .imported(let value): value.projection
       case .restored(let value): value.projection
       case .edited(let value): value.projection
+      case .received(let value): value.projection
       }
     }
   }
@@ -45,6 +54,13 @@ struct WebsiteConfigNativeDraft {
   /// This is window-owned state, not an extra persisted configuration.
   var settingsStoreValues: [String: WebsiteConfigValue] {
     let projection = projection
+    if case .received(let value) = origin {
+      var store = value.storeAtBoundary
+      for event in projection.events.dropFirst(value.appliedEventCount) {
+        if let new = event.newValue, store[event.key] != nil { store[event.key] = new }
+      }
+      return store
+    }
     var values: [String: WebsiteConfigValue]
     let events: ArraySlice<WebsiteConfigApplicationEvent>
     if let finish = projection.events.lastIndex(where: { $0.key == "fullConfigChangeFinished" }) {
@@ -98,6 +114,16 @@ struct WebsiteConfigNativeDraft {
   }
 
   @MainActor
+  init(received outcome: WebsiteSharedSettingsReceiver.Outcome, pointsPerRem: Double) throws {
+    guard !outcome.parseRejected else { throw WebsiteSharedSettingsReceiver.Failure.invalidPayload }
+    try self.init(origin: .received(.init(projection: .init(requested: outcome.state.runtime,
+      runtime: outcome.state.runtime, rejectedKeys: [], events: outcome.events),
+      runtimeAtBoundary: outcome.state.runtime, storeAtBoundary: outcome.state.settingsStore,
+      appliedEventCount: outcome.events.count)), pointsPerRem: pointsPerRem)
+    lazyMemory = outcome.state.lazyMemory
+  }
+
+  @MainActor
   private init(origin: Origin, pointsPerRem: Double) throws {
     let keys = WebsiteConfigSchema(catalogs: WebsiteConfigNativeProfile.catalogs).keys
     guard Self.mappedKeys == keys, Self.fieldGroups.reduce(0, { $0 + $1.count }) == keys.count else {
@@ -129,10 +155,21 @@ struct WebsiteConfigNativeDraft {
       projection: projection, websiteStorage: value.websiteStorage))
     case .edited(let value): origin = .edited(.init(key: value.key, previousRuntime: value.previousRuntime,
       projection: projection, previousStore: value.previousStore))
+    case .received(var value): value.projection = projection; origin = .received(value)
     }
     var result = try Self(origin: origin, pointsPerRem: pointsPerRem)
     result.lazyMemory = memory
     result.funboxMemory = funboxMemory
+    return result
+  }
+
+  @MainActor
+  func markingReceivedEventsApplied(pointsPerRem: Double) throws -> Self {
+    guard case .received(var value) = origin else { return self }
+    value.runtimeAtBoundary = projection.runtime; value.storeAtBoundary = settingsStoreValues
+    value.appliedEventCount = projection.events.count
+    var result = try Self(origin: .received(value), pointsPerRem: pointsPerRem)
+    result.lazyMemory = lazyMemory; result.funboxMemory = funboxMemory
     return result
   }
 }

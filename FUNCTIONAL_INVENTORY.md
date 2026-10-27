@@ -1,5 +1,7 @@
 # 功能盘点与追踪表
 
+窗口接收增量：增加 SharedReceipt、received 草稿来源、实际窗口准入和 accept／continue 工作流。扩大回归 1370 项、1 跳过、零失败，同日志全部 101 项必需来源证据通过，含 10 项窗口检查及 1308 组来源适配。共享链接面板尚未接新接口，0 次重开时的即时运行时绑定及内容／极端输入缺口仍开放，SHARE-SOURCE-EIGHT-SLOTS-01 保持部分完成；见 TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md。
+
 存储失败增量：接收内核通过同步回调逐步接纳实际存储结果；18 组完整来源故障对照、1308 组原有输入及真实本机存储绑定通过。扩大回归 799 项、1 项跳过、零失败，同日志全部 100 项必需来源证据通过。失败缓存不提升，后续 nosave 不进入早期保存，CAS 冲突与未知文本记录保留。窗口准入与完整批量接收仍未接入 GUI／提交，SHARE-SOURCE-EIGHT-SLOTS-01 保持部分完成，见 TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md。
 
 独立文本增量：完整配置内容捕获与发布窗口增加原始 WebsiteCustomTextSettings，独立版本化记录保留 UTF-16 数组、分数／无限／负零限制；生成与分享分别使用派生值和原始状态。来源接收对照增至 1308 组；扩大回归 787 项、1 项跳过、零失败，同日志全部 99 项必需来源证据与不启动应用的 debug 打包通过。完整批量接收尚未接入 GUI／提交，极端范围及孤立代理项生成仍受限，SHARE-SOURCE-EIGHT-SLOTS-01 保持部分完成；见 TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md。

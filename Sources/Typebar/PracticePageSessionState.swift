@@ -13,6 +13,7 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
   var restartDepartureAttemptID: UUID?
   var configurationDeparture: WebsiteConfigCommitCoordinator.ConfigurationDeparture?
   var savedApplication: WebsiteConfigCommitCoordinator.SavedApplication?
+  var sharedReceipt: WebsiteConfigCommitCoordinator.SharedReceipt?
   struct QuoteInitializationCheckpoint {
     let id = UUID()
     let publication: UUID
@@ -25,6 +26,12 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
       checkpoint.publication == presentation?.publication.applicationID,
       checkpoint.configurationDeparture == configurationDeparture?.id else { return nil }
     return checkpoint.progress
+  }
+
+  mutating func retainingSharedScope(_ scope: WebsiteConfigSessionBuilder.Scope) {
+    guard let previous = practice else { return }
+    practice = .init(session: previous.session, scope: scope, quote: previous.quote,
+      external: previous.external, repetition: previous.repetition)
   }
 
   func applying(_ presentation: WebsiteConfigPublishedPresentation, owner: UUID,

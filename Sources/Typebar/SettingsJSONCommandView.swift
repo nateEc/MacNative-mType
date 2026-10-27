@@ -24,12 +24,15 @@ struct SettingsJSONCommandPresentation: Identifiable, Equatable {
     legacy: () throws -> String) -> Self {
     let draft = WebsiteConfigExport.draft(in: page)
     do {
+      if page.sharedReceipt != nil, page.savedApplication == nil {
+        return .init(mode: .exportWebsiteConfig, initialJSON: try WebsiteConfigExport.json(in: page, surface: .command), initialError: nil)
+      }
       if let draft {
         return .init(mode: .exportWebsiteConfig, initialJSON: try WebsiteConfigExport.json(draft, surface: .command), initialError: nil)
       }
       return .init(mode: .exportSettings, initialJSON: try legacy(), initialError: nil)
     } catch {
-      return .init(mode: draft == nil ? .exportSettings : .exportWebsiteConfig, initialJSON: "",
+      return .init(mode: draft == nil && page.sharedReceipt == nil ? .exportSettings : .exportWebsiteConfig, initialJSON: "",
         initialError: "无法生成设置 JSON：\(error.localizedDescription)")
     }
   }
