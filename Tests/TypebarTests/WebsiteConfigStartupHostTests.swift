@@ -289,6 +289,37 @@ import XCTest
     XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
   }
 
+  func testInfinitePaceColdStartupAndWarmImportReachTheActualPracticeHost() async throws {
+    let f = try Fixture(saved: true, json: #"{"mode":"words","words":100,"paceCaret":"custom","paceCaretCustomSpeed":1e999}"#)
+    defer { f.close() }
+    f.settings.paceGuideMode = .off
+    let legacy = f.settings.snapshot
+    let path = try XCTUnwrap(f.record), before = try Data(contentsOf: path)
+    f.state.accountReady = true
+    try await f.waitAsync { f.state.page.state.presentation?.publication.draft != nil && f.inputs().first?.acceptsTextInput == true }
+    XCTAssertEqual(f.state.page.state.presentation?.publication.draft.behavior.paceGuideCustomWpm, 100)
+    XCTAssertEqual(f.state.page.state.session.paceCaretTargetWpm, 100)
+    XCTAssertNotEqual(try Data(contentsOf: path), before)
+
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":100,"paceCaret":"custom","paceCaretCustomSpeed":1e999}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+      && f.inputs().first?.acceptsTextInput == true }
+    XCTAssertEqual(f.state.page.state.presentation?.publication.draft.behavior.paceGuideCustomWpm, .infinity)
+    XCTAssertEqual(f.state.page.state.session.paceCaretTargetWpm, .infinity)
+    let input = try XCTUnwrap(f.inputs().first)
+    input.onInsert(String(f.state.page.state.session.prompt.prefix(1)), false)
+    XCTAssertNotNil(f.state.page.state.session.paceCaretPendingTicket)
+    XCTAssertTrue(f.state.page.state.session.paceCaretIsVisible)
+    try await Task.sleep(for: .milliseconds(40)); f.host.layoutSubtreeIfNeeded()
+    XCTAssertEqual(f.state.page.state.session.paceCaretTargetWpm, .infinity)
+    XCTAssertEqual(f.settings.snapshot, legacy)
+    XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
+  }
+
   func testProfileKeyboardIsRenderedWhenLegacyGuideIsOff() async throws {
     let f = try Fixture(saved: true, json: #"{"mode":"words","words":10,"keymapMode":"static","keymapLegendStyle":"uppercase","keymapKeys":"full","keymapSize":1.5,"keymapLayout":"qwerty"}"#)
     defer { f.close() }
@@ -631,7 +662,8 @@ import XCTest
   }
 
   func testPaceCustomCommandRestartsNormallyButKeepsActualMarkedInputDuringNoQuit() async throws {
-    for noQuit in [false, true] {
+    for (noQuit, raw, target) in [(false, "120", 120.0), (true, "120", 120.0),
+      (false, "Infinity", Double.infinity), (true, "Infinity", Double.infinity)] {
       let f = try Fixture(saved: nil); defer { f.close() }
       f.state.accountReady = true
       try await f.waitAsync { f.inputs().first?.acceptsTextInput == true }
@@ -651,7 +683,7 @@ import XCTest
       input.setMarkedText("é", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
       let marked = input.markedRange(), attempt = f.state.page.state.session.automaticInputAttemptID
       do {
-        try await workflow.runPaceCommand(.customSpeed, input: "120", replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID)
+        try await workflow.runPaceCommand(.customSpeed, input: raw, replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID)
       } catch { return XCTFail("Pace command failed: \(String(reflecting: error))") }
       if noQuit {
         try await f.waitAsync { f.state.page.state.session.paceCaretTargetWpm == 80 }
@@ -661,7 +693,7 @@ import XCTest
         XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 0)
       } else {
         try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
-          && f.state.page.state.session.paceCaretTargetWpm == 120 }
+          && f.state.page.state.session.paceCaretTargetWpm == target }
         XCTAssertNotEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
         XCTAssertTrue(f.state.page.state.session.typed.isEmpty)
         XCTAssertFalse(try XCTUnwrap(f.inputs().first).hasMarkedText())

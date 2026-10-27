@@ -13,14 +13,16 @@ const keyboardMode = process.argv[3] === '--keyboard-confirmations';
 const importMode = process.argv[3] === '--import-preparation';
 const funboxMode = process.argv[3] === '--funbox-admission';
 const defaultsMode = process.argv[3] === '--default-profile';
-const coldMode = process.argv[3] === '--cold-storage';
+const paceStorageMode = process.argv[3] === '--pace-storage';
+const coldMode = process.argv[3] === '--cold-storage' || paceStorageMode;
 const editMode = process.argv[3] === '--single-edit';
 const failureOrderMode = process.argv[3] === '--import-failure-order';
 const thresholdCommandMode = process.argv[3] === '--threshold-commands';
 const inputCommandMode = process.argv[3] === '--input-commands';
 const soundCommandMode = process.argv[3] === '--sound-commands';
 const caretCommandMode = process.argv[3] === '--caret-commands';
-const paceCommandMode = process.argv[3] === '--pace-commands';
+const paceInputNotationMode = process.argv[3] === '--pace-input-notation';
+const paceCommandMode = process.argv[3] === '--pace-commands' || paceInputNotationMode;
 const appearanceCommandMode = process.argv[3] === '--appearance-commands';
 const keymapCommandMode = process.argv[3] === '--keymap-commands';
 const layoutFluidRuntimeMode = process.argv[3] === '--layoutfluid-runtime';
@@ -283,6 +285,43 @@ if (defaultsMode) {
     const fixtures = [];
     const custom = context.buildInputCommand({key:'paceCaretCustomSpeed',isPartOfSubgroup:true,
       inputProps:context.paceInput.input,configMeta:metadata.paceCaret,schema:configSchemas.ConfigSchema.shape.paceCaretCustomSpeed});
+    const numberView = new DataView(new ArrayBuffer(8));
+    function numberBits(value) {
+      numberView.setFloat64(0,value); return numberView.getBigUint64(0).toString(16).padStart(16,'0');
+    }
+    if (paceInputNotationMode) {
+      const values = [-0, 0, Number.MIN_VALUE, 0.1, 1e-7, 1e-6, 1e20, 1e21,
+        1000000000000000100, 59.123456789, Number.MAX_VALUE, Infinity];
+      const view = new DataView(new ArrayBuffer(8));
+      for (const boundary of [1e-6, 1e21]) {
+        view.setFloat64(0, boundary); const center = view.getBigUint64(0);
+        for (const delta of [-2n,-1n,1n,2n]) {
+          view.setBigUint64(0, center + delta); values.push(view.getFloat64(0));
+        }
+      }
+      let seed = 0x51a0f9d3c7b2e641n;
+      for (let i=0; i<256; i++) {
+        seed = BigInt.asUintN(64, seed * 6364136223846793005n + 1442695040888963407n);
+        view.setBigUint64(0, seed & 0x7fffffffffffffffn);
+        const value = view.getFloat64(0);
+        if (Number.isFinite(value)) values.push(value);
+      }
+      function bits(value) {
+        view.setFloat64(0, value); return view.getBigUint64(0).toString(16).padStart(16,'0');
+      }
+      const initialCases = [];
+      for (const initial of values) for (const unit of ['wpm','cpm','wps','cps','wph']) {
+        Object.assign(simulation.Config, structuredClone(defaults),
+          {paceCaret:'custom',paceCaretCustomSpeed:initial,typingSpeedUnit:unit});
+        const initialText = custom.defaultValue(), converted = custom.inputValueConvert(initialText);
+        initialCases.push({unit, initialBits:bits(initial), initialText,
+          convertedBits:bits(converted), canSubmit:custom.validation.schema.safeParse(converted).success});
+      }
+      verify();
+      await new Promise((resolve,reject) => process.stdout.write(JSON.stringify({id:custom.id,initialCases})+'\n',
+        error => error ? reject(error) : resolve()));
+      process.exit(0);
+    }
     function run({mode,raw,unit='wpm',previous='last',active,noQuit,authenticated=false}) {
       Object.assign(simulation.Config,structuredClone(defaults),{paceCaret:previous,paceCaretCustomSpeed:80,
         typingSpeedUnit:unit,funbox:noQuit ? ['no_quit'] : []});
@@ -299,7 +338,12 @@ if (defaultsMode) {
       fixtures.push({mode:mode ?? null,raw:raw ?? null,unit,active,authenticated,current,canSubmit,
         value:Number.isFinite(value) ? value : null,nonfinite:typeof value==='number' && !Number.isFinite(value),
         runtime:structuredClone(simulation.Config),events:simulation.events,saves:simulation.saves,
-        notices:simulation.notices,restarts,restartAllowed,inits,initialText});
+        notices:simulation.notices,restarts,restartAllowed,
+        runtimePaceBits:numberBits(simulation.Config.paceCaretCustomSpeed),
+        eventNumbers:simulation.events.map(e => ({
+          previous:typeof e.previousValue === 'number' ? numberBits(e.previousValue) : null,
+          next:typeof e.newValue === 'number' ? numberBits(e.newValue) : null})),
+        inits:inits.map(i => ({mode:i.mode,speedBits:numberBits(i.speed)})),initialText});
     }
     for (const active of [false,true]) for (const noQuit of [false,true]) for (const authenticated of [false,true])
       for (const mode of context.paceInput.subgroup.options) run({mode,active,noQuit,authenticated});
@@ -734,6 +778,30 @@ if (defaultsMode) {
     console.log(JSON.stringify({fixtures}));
   } else if (coldMode) {
     const Storage = (await load(path.join(frontend, 'utils/local-storage-with-schema.ts'))).LocalStorageWithSchema;
+    if (paceStorageMode) {
+      const view = new DataView(new ArrayBuffer(8));
+      function bits(value) { view.setFloat64(0,value); return view.getBigUint64(0).toString(16).padStart(16,'0'); }
+      const fixtures = [];
+      for (const mode of ['off','custom']) for (const speed of [0,100,Number.MAX_VALUE,Infinity]) {
+        let disk = null; const writes = [];
+        context.window = {localStorage:{getItem:()=>disk, setItem:(_key,value)=>{disk=value;writes.push(value);}}};
+        const options = {key:'config',schema:configSchemas.ConfigSchema,fallback:structuredClone(defaults),
+          migrate:value=>migration.migrateConfig(value)};
+        const warm = new Storage(options);
+        const original = {...structuredClone(defaults),paceCaret:mode,paceCaretCustomSpeed:speed,
+          words:77,numbers:true,typingSpeedUnit:'cpm',paceCaretStyle:'off'};
+        assert.equal(warm.set(original),true);
+        const persisted = JSON.parse(disk).paceCaretCustomSpeed;
+        const cold = new Storage(options), restored = cold.get();
+        const expected = {...original,paceCaretCustomSpeed:speed===Infinity?defaults.paceCaretCustomSpeed:speed};
+        assert.deepEqual(restored,expected); assert.deepEqual(JSON.parse(disk),expected);
+        restored.words = 22; assert.equal(cold.get().words,77);
+        assert.equal(warm.get().paceCaretCustomSpeed,speed);
+        fixtures.push({mode,warmBits:bits(speed),coldBits:bits(cold.get().paceCaretCustomSpeed),
+          persistedNull:persisted===null,writes:writes.length,unrelatedKeysPreserved:true,warmCachePreserved:true});
+      }
+      verify(); console.log(JSON.stringify({fixtures})); process.exit(0);
+    }
     // Execute actual source storage/read/apply code; browser I/O and remote
     // publication are controlled adapters, never a real browser or account.
     const extract = (text, begin, end) => {

@@ -551,7 +551,7 @@ import SwiftUI
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":10,"typingSpeedUnit":"cpm"}"#, systemIsDark: false)
     let original = try XCTUnwrap(f.page.state.presentation).publication
-    for input in ["-1", "NaN", "80tail", "Infinity"] {
+    for input in ["-1", "NaN", "80tail"] {
       do { try await f.workflow.runPaceCommand(.customSpeed, input: input, replacing: original.applicationID); XCTFail("Invalid pace saved") }
       catch is WebsitePaceCommandError {}
       XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, original.disk)
@@ -563,6 +563,16 @@ import SwiftUI
     do { try await f.workflow.runPaceCommand(.mode(.off), replacing: original.applicationID); XCTFail("Stale command saved") }
     catch WebsiteConfigImportWorkflowError.conflict {}
     XCTAssertEqual(f.page.state.presentation?.publication.applicationID, current.applicationID)
+    try await f.workflow.runPaceCommand(.customSpeed, input: "Infinity", replacing: current.applicationID)
+    let infinite = try XCTUnwrap(f.page.state.presentation).publication
+    XCTAssertEqual(infinite.draft.behavior.paceGuideCustomWpm, .infinity)
+    XCTAssertEqual(infinite.draft.presentation.typingSpeedUnit, .cpm)
+    // This fixture owns transactions only. Actual restart-to-pace activation
+    // is checked by the production SwiftUI host, for finite and infinite input.
+    XCTAssertNotEqual(infinite.applicationID, current.applicationID)
+    do { try await f.workflow.runPaceCommand(.mode(.off), replacing: current.applicationID); XCTFail("Stale finite command saved after Infinity") }
+    catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, infinite.disk)
   }
   func testPaceSecondSetterConflictRetainsTheFirstAcceptedSelection() async throws {
     let f = try Fixture(); defer { f.close() }

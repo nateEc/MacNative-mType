@@ -9,8 +9,7 @@ struct WebsitePaceSpeedPresentation: Identifiable {
   let unit: TypingSpeedUnit
   init(publication: WebsiteConfigCommitCoordinator.Publication) {
     id = publication.applicationID; unit = publication.draft.presentation.typingSpeedUnit
-    let text = String(publication.draft.behavior.paceGuideCustomWpm)
-    initialText = text.hasSuffix(".0") ? String(text.dropLast(2)) : text
+    initialText = WebsiteNumberText.decimal(publication.draft.behavior.paceGuideCustomWpm)
   }
 }
 
@@ -22,7 +21,7 @@ struct WebsitePaceSpeedPresentation: Identifiable {
   @ObservationIgnored private var task: Task<Void, Never>?
   @ObservationIgnored private var request = UUID()
   init(text: String, unit: TypingSpeedUnit) { self.text = text; self.unit = unit }
-  var canSubmit: Bool { WebsitePaceCommand.speed(text, unit: unit)?.isFinite == true }
+  var canSubmit: Bool { WebsitePaceCommand.speed(text, unit: unit) != nil }
   func submit(apply: @escaping @MainActor (String) async throws -> Void, completed: @escaping @MainActor () -> Void) {
     guard !isWorking, canSubmit else { return }
     let current = UUID(), captured = text; request = current; isWorking = true; message = nil
@@ -64,7 +63,7 @@ struct WebsitePaceSpeedCommandView: View {
         .accessibilityIdentifier("website-pace-speed-input").disabled(!canApply || form.isWorking).onSubmit(submit)
       if let message = form.message { Text(message).fixedSize(horizontal: false, vertical: true) }
       else if !canApply { Text("配置已变化，请关闭后重新打开命令。").font(.caption) }
-      else if !form.canSubmit { Text("请输入不小于 0 的有限速度。").font(.caption).foregroundStyle(.red) }
+      else if !form.canSubmit { Text("请输入不小于 0 的有效速度。").font(.caption).foregroundStyle(.red) }
       HStack {
         if form.isWorking { ProgressView().controlSize(.small) }
         Spacer()

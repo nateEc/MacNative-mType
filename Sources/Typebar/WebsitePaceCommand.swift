@@ -1,12 +1,11 @@
 import Foundation
 
 enum WebsitePaceCommandError: Error, LocalizedError {
-  case invalidInput, unrepresentableSpeed, unsupportedMode
+  case invalidInput, unsupportedMode
   case interrupted(saved: Int, underlying: Error), restartFailed(saved: Int)
   var errorDescription: String? {
     switch self {
     case .invalidInput: "请输入不小于 0 的有效速度。"
-    case .unrepresentableSpeed: "当前原生配置不能保存无限速度，设置未修改。"
     case .unsupportedMode: "当前完整配置不支持这个原生扩展配速模式。"
     case .interrupted(let saved, _): "前面 \(saved) 项配速设置已保存，后续修改未完成；请重新打开命令。"
     case .restartFailed(let saved): saved > 0 ? "配速设置已保存，新一轮尚未开始；请重试重开。" : "设置未修改，重开未完成。"
@@ -32,7 +31,6 @@ enum WebsitePaceCommand {
     case .customSpeed:
       guard case .string(let unitName)? = current["typingSpeedUnit"], let unit = TypingSpeedUnit(rawValue: unitName),
         let input, let speed = speed(input, unit: unit) else { throw WebsitePaceCommandError.invalidInput }
-      guard speed.isFinite else { throw WebsitePaceCommandError.unrepresentableSpeed }
       key = "paceCaretCustomSpeed"; value = .number(speed)
     }
     var steps: [Step] = []

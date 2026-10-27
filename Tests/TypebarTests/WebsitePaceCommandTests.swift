@@ -4,12 +4,15 @@ import XCTest
 @MainActor final class WebsitePaceCommandTests: XCTestCase {
   func testPinnedPaceCommandsUnitsSetterEventsAndRestartAdmission() throws {
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned reference") }
-    struct Init: Decodable, Equatable { let mode: String; let speed: Double }
+    struct Init: Equatable { let mode: String; let speed: Double }
+    struct SourceInit: Decodable { let mode: String; let speedBits: String }
+    struct EventNumbers: Decodable { let previous: String?, next: String? }
     struct Fixture: Decodable {
       let mode: String?, raw: String?, unit: String, active: Bool, authenticated: Bool
       let current: [String:WebsiteConfigValue], runtime: [String:WebsiteConfigValue], canSubmit: Bool, nonfinite: Bool
       let events: [WebsiteConfigApplicationEvent], saves: [String], notices: [Bool], restarts: Int, restartAllowed: Bool
-      let inits: [Init], initialText: String
+      let inits: [SourceInit], initialText: String, runtimePaceBits: String
+      let eventNumbers: [EventNumbers]
     }
     struct Output: Decodable { let id: String; let fixtures: [Fixture] }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -29,12 +32,6 @@ import XCTest
         XCTAssertEqual(f.restarts, 0); XCTAssertEqual(f.runtime, f.current); continue
       }
       let context = WebsiteConfigRuntimeContext(authenticated: f.authenticated)
-      if f.nonfinite {
-        XCTAssertThrowsError(try WebsitePaceCommand.plan(current: f.current, target: target, input: f.raw, context: context, active: f.active)) {
-          guard case WebsitePaceCommandError.unrepresentableSpeed = $0 else { return XCTFail("Unexpected infinite-speed error: \($0)") }
-        }
-        continue // Source runtime permits Infinity; native durable format remains an explicit gap.
-      }
       let plan = try WebsitePaceCommand.plan(current: f.current, target: target, input: f.raw, context: context, active: f.active)
       var runtime = f.current, events: [WebsiteConfigApplicationEvent] = [], inits: [Init] = []
       for step in plan.steps where step.accepted {
@@ -45,8 +42,18 @@ import XCTest
           inits.append(.init(mode: mode, speed: speed))
         }
       }
-      XCTAssertEqual(runtime, f.runtime); XCTAssertEqual(events, f.events); XCTAssertEqual(events.map(\.key), f.saves)
-      XCTAssertEqual(inits, f.inits); XCTAssertEqual(f.restarts, 1)
+      func number(_ bits: String) throws -> Double { Double(bitPattern: try XCTUnwrap(UInt64(bits, radix: 16))) }
+      var expectedRuntime = f.runtime
+      expectedRuntime["paceCaretCustomSpeed"] = .number(try number(f.runtimePaceBits))
+      XCTAssertEqual(f.events.count, f.eventNumbers.count)
+      let expectedEvents = try zip(f.events, f.eventNumbers).map { event, bits in
+        var event = event
+        if let previous = bits.previous { event.previousValue = .number(try number(previous)) }
+        if let next = bits.next { event.newValue = .number(try number(next)) }
+        return event
+      }
+      XCTAssertEqual(runtime, expectedRuntime); XCTAssertEqual(events, expectedEvents); XCTAssertEqual(events.map(\.key), f.saves)
+      XCTAssertEqual(inits, try f.inits.map { Init(mode: $0.mode, speed: try number($0.speedBits)) }); XCTAssertEqual(f.restarts, 1)
       let noQuit = f.active && f.current["funbox"] == .array([.string("no_quit")])
       XCTAssertEqual(f.restartAllowed, !noQuit)
       XCTAssertEqual(f.notices, (plan.steps.contains { !$0.accepted } ? [false] : []) + (noQuit ? [true] : []))
@@ -78,6 +85,6 @@ import XCTest
     XCTAssertFalse(completed); XCTAssertFalse(form.isWorking)
     form.text = "-1"; XCTAssertFalse(form.canSubmit)
     form.text = ""; XCTAssertTrue(form.canSubmit)
-    form.text = "Infinity"; XCTAssertFalse(form.canSubmit)
+    form.text = "Infinity"; XCTAssertTrue(form.canSubmit)
   }
 }

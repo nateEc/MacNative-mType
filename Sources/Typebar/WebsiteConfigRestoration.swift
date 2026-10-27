@@ -99,8 +99,15 @@ enum WebsiteConfigRestoration {
       guard Set(loaded.keys) == schema.keys, schema.validatingComplete(loaded) != nil else {
         throw WebsiteConfigRestorationError.invalidNativeState
       }
+      // Warm native records retain the lossless value. A new cold reader must
+      // get the source's effective pace value after JSON null migration, while
+      // keeping raw archive evidence and every unrelated field intact.
+      var effective = loaded
+      if case .number(let speed)? = loaded["paceCaretCustomSpeed"], speed == .infinity {
+        effective["paceCaretCustomSpeed"] = defaultDocument.values["paceCaretCustomSpeed"]
+      }
       return .prepared(.init(origin: .nativeState, loaded: loaded,
-        projection: try applyLoaded(loaded, defaultDocument: defaultDocument, schema: schema, context: context),
+        projection: try applyLoaded(effective, defaultDocument: defaultDocument, schema: schema, context: context),
         websiteStorage: nil))
     }
   }

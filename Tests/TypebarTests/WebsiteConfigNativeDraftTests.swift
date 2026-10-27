@@ -38,9 +38,11 @@ final class WebsiteConfigNativeDraftTests: XCTestCase {
     prepared = try WebsiteConfigNativeProfile.prepare("{}", context: .init())
     prepared.projection.runtime["unexpected"] = .bool(true)
     XCTAssertThrowsError(try WebsiteConfigNativeDraft(prepared: prepared, pointsPerRem: 16))
-    XCTAssertThrowsError(try WebsiteConfigNativeProfile.prepareDraft(#"{"paceCaretCustomSpeed":1e400}"#, pointsPerRem: 16, context: .init())) {
-      XCTAssertEqual($0 as? WebsiteConfigNativeBehaviorError, .unrepresentableField("paceCaretCustomSpeed"))
-    }
+    // Positive infinity is valid source pace memory, not an unsupported field.
+    let infinite = try WebsiteConfigNativeProfile.prepareDraft(#"{"paceCaretCustomSpeed":1e400}"#,
+      pointsPerRem: 16, context: .init())
+    XCTAssertEqual(infinite.behavior.paceGuideCustomWpm, .infinity)
+    XCTAssertEqual(infinite.projection.runtime["paceCaretCustomSpeed"], .number(.infinity))
     XCTAssertThrowsError(try WebsiteConfigNativeProfile.prepareDraft(#"{"words":9007199254740992}"#, pointsPerRem: 16, context: .init())) {
       XCTAssertEqual($0 as? WebsiteConfigNativeTestParametersError, .unrepresentableField("words"))
     }

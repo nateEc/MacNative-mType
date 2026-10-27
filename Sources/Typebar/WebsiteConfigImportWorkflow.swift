@@ -137,7 +137,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     directory: URL, readWindow: @escaping @MainActor () -> WebsiteConfigPracticeScopeSource.Window?,
     loadExternal: WebsiteConfigSessionBuilder.ExternalLoader? = nil,
     paceTarget: @escaping @MainActor (WebsiteConfigNativeDraft, TypingSession) -> Double? = { draft, _ in
-      draft.behavior.paceGuideMode == .custom ? PaceGuidePolicy.validTarget(draft.behavior.paceGuideCustomWpm) : nil
+      draft.behavior.paceGuideMode == .custom ? PaceGuidePolicy.validCustomTarget(draft.behavior.paceGuideCustomWpm) : nil
     },
     dispatchKeymapHighlight: @escaping @MainActor (Int, @escaping @MainActor () -> Void) -> Void = { delay, action in
       DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) { action() }

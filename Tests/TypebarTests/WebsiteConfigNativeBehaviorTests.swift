@@ -43,14 +43,8 @@ final class WebsiteConfigNativeBehaviorTests: XCTestCase {
   }
 
   static func assertSourceRuntime(_ runtime: [String: WebsiteConfigValue]) throws {
-    if case .number(let speed) = runtime["paceCaretCustomSpeed"], speed == .infinity {
-      XCTAssertThrowsError(try WebsiteConfigNativeBehavior(runtime: runtime)) {
-        XCTAssertEqual($0 as? WebsiteConfigNativeBehaviorError, .unrepresentableField("paceCaretCustomSpeed"))
-      }
-    } else {
-      let snapshot = try WebsiteConfigNativeBehavior(runtime: runtime).applying(to: .init())
-      XCTAssertEqual(try nativeFields(snapshot), runtime.filter { WebsiteConfigNativeBehavior.mappedKeys.contains($0.key) })
-    }
+    let snapshot = try WebsiteConfigNativeBehavior(runtime: runtime).applying(to: .init())
+    XCTAssertEqual(try nativeFields(snapshot), runtime.filter { WebsiteConfigNativeBehavior.mappedKeys.contains($0.key) })
   }
 
   @MainActor

@@ -102,7 +102,7 @@ enum PaceGuidePolicy {
         case .off:
             return nil
         case .custom:
-            return validTarget(customWpm)
+            return validCustomTarget(customWpm)
         case .personalBest:
             guard CurrentPersonalBestPolicy.isConfigurationEligible(configuration) else { return nil }
             if let personalBestLedger {
@@ -154,6 +154,10 @@ enum PaceGuidePolicy {
         case .lastTest:
             return validTarget(lastTestWpm)
         }
+    }
+
+    static func validCustomTarget(_ speed: Double) -> Double? {
+        speed >= 1 ? speed : nil
     }
 
     static func validTarget(_ speed: Double?) -> Double? {

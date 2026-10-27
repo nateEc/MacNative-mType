@@ -38,10 +38,10 @@ struct WebsiteConfigNativeBehavior {
       else { throw WebsiteConfigNativeBehaviorError.invalidField(key) }
       return result
     }
-    func number(_ key: String, maximum: Double? = nil) throws -> Double {
+    func number(_ key: String, maximum: Double? = nil, allowsInfinity: Bool = false) throws -> Double {
       guard case .number(let result) = try value(key), result >= 0,
         maximum.map({ result <= $0 }) ?? true else { throw WebsiteConfigNativeBehaviorError.invalidField(key) }
-      guard result.isFinite else { throw WebsiteConfigNativeBehaviorError.unrepresentableField(key) }
+      guard result.isFinite || (allowsInfinity && result == .infinity) else { throw WebsiteConfigNativeBehaviorError.unrepresentableField(key) }
       return result
     }
     guard let click = try SoundCommandCatalog.target(for: "sound.playSoundOnClick.\(text("playSoundOnClick"))"),
@@ -67,7 +67,7 @@ struct WebsiteConfigNativeBehavior {
     }
     // Config stores canonical WPM even when the displayed unit is CPS/WPH.
     // The disabled mode also retains its custom memory, including zero.
-    paceGuideCustomWpm = try number("paceCaretCustomSpeed")
+    paceGuideCustomWpm = try number("paceCaretCustomSpeed", allowsInfinity: true)
     repeatedPace = try boolean("repeatedPace")
     switch try text("quickRestart") {
     case "off": quickRestartKey = .off
