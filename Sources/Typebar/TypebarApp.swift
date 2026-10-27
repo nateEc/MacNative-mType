@@ -1453,6 +1453,9 @@ private struct ContentView: View {
   @State private var websiteBehaviorCommandTask: Task<Void, Never>?
   @State private var websiteBehaviorCommandRequest = UUID()
   @State private var websiteImportWorkflow: WebsiteConfigImportWorkflow?
+  @State private var websiteArchiveRestoreTask: Task<Void, Never>?
+  @State private var websiteArchiveHandledGeneration: UInt64 = 0
+  @State private var isRestoringWebsiteArchive = false
   @State private var websiteFunboxCommandTask: Task<Void, Never>?
   @State private var websiteLiveSourceRecoveryTask: Task<Void, Never>?
   @State private var websiteLiveSourceRecoveryRequest = UUID()
@@ -1866,6 +1869,7 @@ private struct ContentView: View {
         fontFamilyName: { committedPracticeDraft?.keyboardTypography.fontFamily ?? challengeLiveConfiguration.fontFamilyName(settings: settings) }) {
         persistExplicitTestConfiguration()
       }
+      installWebsiteArchiveAdmission()
       activatePreferenceConfigurationOwnerIfKey()
       pageSessionStore.attach(to: settings.preferenceConfigurationSaves)
       pageSessionStore.bindPaceStyleSettings(settings)
@@ -1898,8 +1902,14 @@ private struct ContentView: View {
       session.cancelAutomaticInput()
     }
     .onChange(of: settings.activeTestSelectionGeneration) { _, _ in
+      guard !isRestoringWebsiteArchive,
+        settings.websiteProfileArchiveLease.map({ settings.preferenceConfigurationSaves.isCurrent($0) }) != true
+          || settings.websiteProfileArchiveOwner != preferenceConfigurationOwner
+          || settings.websiteProfileArchiveGeneration == websiteArchiveHandledGeneration else { return }
       restorePersistedTestSelection(explicitSelectionImport: true)
     }
+    .onChange(of: settings.websiteProfileArchiveGeneration) { _, _ in restoreWebsiteProfileArchiveIfOwned() }
+    .onDisappear { websiteArchiveRestoreTask?.cancel(); websiteArchiveRestoreTask = nil }
     .onChange(of: session.outcome) { previousOutcome, outcome in
       if outcome != .active {
         wholePreviewTask.cancel()
@@ -2183,11 +2193,12 @@ private struct ContentView: View {
       }
     }
     .sheet(isPresented: $showingDataMigration) {
-      ArchiveManagementView(settings: settings)
+      ArchiveManagementView(settings: settings, profileApplicationSupport: websiteConfigStartup?.applicationSupport)
     }
     .sheet(isPresented: $showingSync, onDismiss: { syncInitialLeaderboard = nil }) {
       CloudSyncView(
-        settings: settings, account: account, initialLeaderboard: syncInitialLeaderboard)
+        settings: settings, account: account, initialLeaderboard: syncInitialLeaderboard,
+        profileApplicationSupport: websiteConfigStartup?.applicationSupport)
     }
     .sheet(isPresented: $showingConnections) {
             ConnectionsView(account: account, settings: settings)
@@ -7083,7 +7094,48 @@ private struct ContentView: View {
 
   private func activatePreferenceConfigurationOwnerIfKey() {
     guard sharedProfileWindow.window?.isKeyWindow == true else { return }
+    installWebsiteArchiveAdmission()
     settings.preferenceConfigurationSaves.activate(owner: preferenceConfigurationOwner)
+    restoreWebsiteProfileArchiveIfOwned()
+  }
+
+  private func installWebsiteArchiveAdmission() {
+    let page = pageSessionStore
+    settings.preferenceConfigurationSaves.setWebsiteArchiveAdmission(owner: preferenceConfigurationOwner, check: { [weak page] in
+      guard let page else { return false }
+      return (!page.state.session.hasStarted || page.state.session.isFinished)
+        && page.state.savedApplication == nil && page.state.configurationDeparture == nil && page.state.sharedReceipt == nil
+    })
+  }
+
+  private func restoreWebsiteProfileArchiveIfOwned() {
+    let generation = settings.websiteProfileArchiveGeneration
+    guard generation != websiteArchiveHandledGeneration, !isRestoringWebsiteArchive,
+      settings.websiteProfileArchiveOwner == preferenceConfigurationOwner,
+      settings.websiteProfileArchiveLease.map({ settings.preferenceConfigurationSaves.isCurrent($0) }) == true,
+      settings.preferenceConfigurationSaves.captureLease()?.owner == preferenceConfigurationOwner else { return }
+    isRestoringWebsiteArchive = true
+    websiteArchiveRestoreTask = Task { @MainActor in
+      defer {
+        websiteArchiveHandledGeneration = generation
+        isRestoringWebsiteArchive = false; websiteArchiveRestoreTask = nil
+      }
+      do {
+        let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: websiteConfigStartup?.applicationSupport)
+        guard try WebsiteConfigFileRegister(directory: directory).read().revision == settings.websiteProfileArchiveRevision else { return }
+        websiteImportWorkflow?.stop(); websiteImportWorkflow = nil
+        _ = try await configurationWorkflow(at: directory).apply(json: nil, systemIsDark: systemColorScheme == .dark)
+        pageSessionStore.startupController.completedManually()
+      } catch {
+        guard !Task.isCancelled, settings.preferenceConfigurationSaves.captureLease()?.owner == preferenceConfigurationOwner else { return }
+        liveContentMessage = "完整配置已保存，但练习尚未准备好。" + error.localizedDescription
+        pageSessionStore.startupController.savedArchivePreparationFailed(liveContentMessage!, page: pageSessionStore, onContinue: {
+          if pageSession.practice == nil && pageSession.savedApplication == nil {
+            restorePersistedTestSelection(explicitSelectionImport: true)
+          } else { try? returnToTypebarSettings() }
+        })
+      }
+    }
   }
 
   private func persistExplicitTestConfiguration() {
@@ -7292,6 +7344,11 @@ private struct ContentView: View {
   }
 
   private var websiteImportWindow: WebsiteConfigPracticeScopeSource.Window {
+    if isRestoringWebsiteArchive {
+      return .init(owner: preferenceConfigurationOwner, customRecoveryBlocked: false,
+        revision: session.automaticInputAttemptID, selectedQuoteID: settings.activeTestSelection?.preset.quoteID,
+        parameterMemory: settings.activeTestSelection?.testParameterMemory ?? .defaults, custom: .stored)
+    }
     if let receipt = pageSession.sharedReceipt {
       return .published(owner: preferenceConfigurationOwner, revision: session.automaticInputAttemptID, scope: receipt.scope)
     }

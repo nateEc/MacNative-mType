@@ -31,7 +31,13 @@ import Foundation
     }
     var dataInfo = stat()
     if Darwin.lstat(directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename).path, &dataInfo) != 0 {
-      if errno == ENOENT { return nil }
+      if errno == ENOENT {
+        var journal = stat()
+        if Darwin.lstat(directory.appendingPathComponent(WebsiteConfigFileRegister.archiveJournalFilename).path, &journal) == 0 {
+          return directory
+        }
+        if errno == ENOENT { return nil }
+      }
       throw WebsiteConfigFileRegisterError.io(errno)
     }
     // Unknown/special data entries are deliberately returned for explicit

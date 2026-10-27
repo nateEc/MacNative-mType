@@ -138,6 +138,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   private let dispatchKeymapHighlight: @MainActor (Int, @escaping @MainActor () -> Void) -> Void
   private var pendingKeymapHighlights: Set<UUID> = []
   private var readKeymapWindow: (@MainActor () -> WebsiteConfigPracticeScopeSource.Window?)?
+  private let archiveRegister: WebsiteConfigFileRegister
   private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID), resume(UUID), received(UUID) }
 
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
@@ -151,6 +152,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     },
     loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) }) {
     self.page = page; self.settings = settings; self.loadQuotes = loadQuotes
+    self.archiveRegister = .init(directory: directory)
     self.notices = account.localNotices
     self.paceTarget = paceTarget
     self.dispatchKeymapHighlight = dispatchKeymapHighlight
@@ -914,6 +916,13 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
   }
   private func restorationTicket(for page: PracticePageSessionStore) throws -> WebsiteConfigCommitCoordinator.Prepared {
+    guard settings.allowsRestartingConfigurationChange else { throw WebsiteConfigImportWorkflowError.activeAttempt }
+    if try archiveRegister.recoverArchiveRestore(customStore: settings.websiteCustomArchiveStore) {
+      settings.websiteArchiveCustomStateWasRestored()
+      // Recovery changes observed model generations synchronously. Finish the
+      // invalidated environment sample before capturing the restoration ticket.
+      source.withReceiptRead {}
+    }
     switch try coordinator.prepareRestoration(for: page, refreshingWith: source) {
     case .missing: throw WebsiteConfigImportWorkflowError.missing
     case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable

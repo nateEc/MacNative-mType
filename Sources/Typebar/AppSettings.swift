@@ -1236,6 +1236,21 @@ final class AppSettings {
     WebsiteCustomTextStateStore(defaults: defaults).read()
   }
   private(set) var websiteCustomTextStateGeneration: UInt64 = 0
+  private(set) var websiteProfileArchiveGeneration: UInt64 = 0
+  private(set) var websiteProfileArchiveOwner: UUID?
+  private(set) var websiteProfileArchiveLease: PreferenceConfigurationSaveRouter.Lease?
+  private(set) var websiteProfileArchiveRevision: WebsiteConfigFileRegister.Revision?
+  var websiteCustomArchiveStore: WebsiteCustomTextStateStore { .init(defaults: defaults) }
+  func websiteArchiveCustomStateWasRestored() {
+    websiteCustomTextStateGeneration &+= 1; customTextStateGeneration &+= 1
+  }
+  func websiteProfileArchiveWasRestored(revision: WebsiteConfigFileRegister.Revision) {
+    websiteProfileArchiveLease = preferenceConfigurationSaves.captureLease()
+    websiteProfileArchiveOwner = websiteProfileArchiveLease?.owner
+    websiteProfileArchiveRevision = revision
+    websiteArchiveCustomStateWasRestored()
+    websiteProfileArchiveGeneration &+= 1
+  }
   @discardableResult
   func saveWebsiteCustomTextState(_ value: WebsiteCustomTextSettings) -> Bool {
     guard WebsiteCustomTextStateStore(defaults: defaults).save(value) else { return false }

@@ -369,7 +369,9 @@ struct TypebarArchive: Codable, Equatable {
     // website infinite speeds through a separately validated finite payload.
     // Version 37 explicitly adopts the settings and preset codecs for the
     // same website speed memories, without broadening ordinary JSON.
-    static let currentVersion = 37
+    // Version 38 also carries the complete saved website profile and both
+    // custom-text stores, independently of transient window configuration.
+    static let currentVersion = 38
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -385,6 +387,7 @@ struct TypebarArchive: Codable, Equatable {
     let deletedResultFilterPresetIDs: [UUID]
     let activeTestSelection: ActiveTestSelectionDocument?
     let localPersonalBestLedger: LocalPersonalBestLedger?
+    let websiteProfile: WebsiteProfileArchive?
 
     init(
         version: Int = TypebarArchive.currentVersion,
@@ -401,7 +404,8 @@ struct TypebarArchive: Codable, Equatable {
         resultFilterPresets: [NamedResultFilterPreset] = [],
         deletedResultFilterPresetIDs: [UUID] = [],
         activeTestSelection: ActiveTestSelectionDocument? = nil,
-        localPersonalBestLedger: LocalPersonalBestLedger? = nil
+        localPersonalBestLedger: LocalPersonalBestLedger? = nil,
+        websiteProfile: WebsiteProfileArchive? = nil
     ) {
         let hasFields = results.contains { $0.replayEvents.contains { $0.inputField != nil } }
         let hasJudgments = results.contains { $0.replayEvents.contains { $0.inputCorrectness != nil } }
@@ -434,6 +438,7 @@ struct TypebarArchive: Codable, Equatable {
         self.exportedAt = exportedAt
         let payloadVersion = hasPolyglotFilters || hasQuoteLength || hasAccountTagFilters || hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
         self.localPersonalBestLedger = localPersonalBestLedger
+        self.websiteProfile = websiteProfile
         let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = payloadVersion >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
         self.deletedCustomThemeIDs = deletedThemes.sorted { $0.uuidString < $1.uuidString }
@@ -484,9 +489,11 @@ struct TypebarArchive: Codable, Equatable {
         case localPersonalBestLedgerData
         case thresholdSettingsData, thresholdResultsData, thresholdPresetsData, websiteResultsData
         case websiteSettingsData, websitePresetsData
+        case websiteProfileData
     }
 
     func encode(to encoder: Encoder) throws {
+        guard websiteProfile == nil || version >= 38 else { throw DataTransferError.unsupportedVersion(version) }
         let hasActiveSource = activeTestSelection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false
         let hasSource = settings.thresholdSource != nil
             || presets.contains(where: { PracticeThresholdSource.isPresent(in: $0.definition) })
@@ -501,6 +508,7 @@ struct TypebarArchive: Codable, Equatable {
         else { throw DataTransferError.unsupportedVersion(version) }
         try Self.validateSourcePresets(presets)
         var values = encoder.container(keyedBy: CodingKeys.self)
+        if let websiteProfile { try values.encode(websiteProfile.archiveData(), forKey: .websiteProfileData) }
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(results)
         guard version >= 31 || !resultFilterPresets.contains(where: { $0.filter.accountTagFilter != nil })
         else { throw DataTransferError.unsupportedVersion(version) }
@@ -556,6 +564,10 @@ struct TypebarArchive: Codable, Equatable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decode(Int.self, forKey: .version)
         guard (1...Self.currentVersion).contains(version) else { throw DataTransferError.unsupportedVersion(version) }
+        if values.contains(.websiteProfileData) {
+            guard version >= 38 else { throw DataTransferError.unsupportedVersion(version) }
+            websiteProfile = try WebsiteProfileArchive.decode(values.decode(Data.self, forKey: .websiteProfileData))
+        } else { websiteProfile = nil }
         let hasWebsiteResults = values.contains(.websiteResultsData)
         let hasWebsiteSettings = values.contains(.websiteSettingsData)
         let hasWebsitePresets = values.contains(.websitePresetsData)
@@ -1226,6 +1238,7 @@ enum TypebarDataTransfer {
         deletedResultFilterPresetIDs: [UUID] = [],
         activeTestSelection: ActiveTestSelectionDocument? = nil,
         localPersonalBestLedger: LocalPersonalBestLedger? = nil,
+        websiteProfile: WebsiteProfileArchive? = nil,
         at date: Date = .now
     ) throws -> Data {
         try JSONEncoder.typebar.encode(TypebarArchive(
@@ -1243,7 +1256,8 @@ enum TypebarDataTransfer {
             resultFilterPresets: resultFilterPresets,
             deletedResultFilterPresetIDs: deletedResultFilterPresetIDs,
             activeTestSelection: activeTestSelection,
-            localPersonalBestLedger: localPersonalBestLedger))
+            localPersonalBestLedger: localPersonalBestLedger,
+            websiteProfile: websiteProfile))
     }
 
     static func importArchive(from data: Data) throws -> TypebarArchive {
@@ -1706,7 +1720,8 @@ enum TypebarArchiveConflictMerge {
                 resultFilterPresets: resultFilterPresets,
                 deletedResultFilterPresetIDs: Array(deletedResultFilterPresetIDs),
                 activeTestSelection: local.activeTestSelection,
-                localPersonalBestLedger: ledger),
+                localPersonalBestLedger: ledger,
+                websiteProfile: local.websiteProfile ?? remote.websiteProfile),
             conflicts: conflicts)
     }
 
@@ -1800,6 +1815,7 @@ struct ArchiveImportSummary: Equatable {
     let insertedResultFilterPresets: Int
     let deletedResultFilterPresets: Int
     let restoredActiveTestSelection: Bool
+    var restoredWebsiteProfile: Bool = false
 }
 
 enum ArchiveImportSource {
@@ -1862,6 +1878,7 @@ enum LocalArchiveImport {
         resultFilterPresets: [ResultFilterPresetRecord] = [],
         tombstoneStore: ResultFilterPresetTombstoneStore = .init(),
         source: ArchiveImportSource = .localFile,
+        websiteProfileApplicationSupport: URL? = nil,
         selectionResourcesAvailable: @escaping @MainActor (TestConfiguration) -> Bool = ArchiveSourceAdmission.resourcesAvailable,
         modelContext: ModelContext
     ) throws -> ArchiveImportSummary {
@@ -1902,7 +1919,11 @@ enum LocalArchiveImport {
             deletedKeyboardLayoutIDs: effectiveDeletedCustomKeyboardLayoutIDs)
         let sourcePlan = try ArchiveSourceAdmission.preparing(importedSettings,
             selection: archive.activeTestSelection, to: settings, importSource: source,
+            allowsIndependentSourceSelection: archive.websiteProfile != nil,
             selectionResourcesAvailable: selectionResourcesAvailable)
+        let profilePlan = try archive.websiteProfile.map {
+            try WebsiteProfileArchiveTarget.prepare($0, settings: settings, applicationSupport: websiteProfileApplicationSupport)
+        }
         let storedDeletedResultIDs = Set(resultTombstoneStore.deletedIDs)
         let archiveDeletedResultIDs = Set(archive.deletedResultIDs)
         let resultingDeletedResultIDs: Set<UUID>
@@ -2013,6 +2034,7 @@ enum LocalArchiveImport {
         }
         for result in newResults { _ = try LocalResultConfigurationCodec.encode(result.configuration) }
         try sourcePlan.validateBeforeRecords(to: settings)
+        try profilePlan?.validate(settings: settings)
         let personalBestCheckpoint = try LocalPersonalBestStore.checkpoint(in: modelContext)
         do {
             if let ledger = archive.localPersonalBestLedger {
@@ -2052,6 +2074,9 @@ enum LocalArchiveImport {
             resultingDeletedCustomKeyboardLayoutIDs)
         tombstoneStore.replaceDeletedIDs(resultingDeletedFilterPresetIDs)
         let restoredActiveTestSelection = try sourcePlan.applyAfterRecords(to: settings)
+        let restoredWebsiteProfile: Bool
+        do { restoredWebsiteProfile = try profilePlan?.commit(settings: settings) ?? false }
+        catch { throw WebsiteProfileArchiveImportFailure(underlying: error) }
         return .init(
             insertedResults: newResults.count,
             deletedResults: resultRecordsToDelete.count,
@@ -2061,7 +2086,8 @@ enum LocalArchiveImport {
             deletedSavedTexts: savedTextRecordsToDelete.count,
             insertedResultFilterPresets: newResultFilterPresetRecords.count,
             deletedResultFilterPresets: filterPresetRecordsToDelete.count,
-            restoredActiveTestSelection: restoredActiveTestSelection)
+            restoredActiveTestSelection: restoredActiveTestSelection,
+            restoredWebsiteProfile: restoredWebsiteProfile)
     }
 }
 
@@ -2099,6 +2125,7 @@ struct TypebarArchiveDocument: FileDocument {
             deletedResultFilterPresetIDs: archive.deletedResultFilterPresetIDs,
             activeTestSelection: archive.activeTestSelection,
             localPersonalBestLedger: archive.localPersonalBestLedger,
+            websiteProfile: archive.websiteProfile,
             at: archive.exportedAt
         )
     }

@@ -13,6 +13,7 @@ struct CloudSyncView: View {
     let settings: AppSettings
     let account: AccountSession
     let initialLeaderboard: RemoteLeaderboardSelection?
+    let profileApplicationSupport: URL?
     private let conflictAuditStore = SyncConflictAuditStore()
     private let resultTombstones = ResultTombstoneStore()
     private let presetTombstones = PresetTombstoneStore()
@@ -59,11 +60,13 @@ struct CloudSyncView: View {
 
     init(
         settings: AppSettings, account: AccountSession,
-        initialLeaderboard: RemoteLeaderboardSelection? = nil
+        initialLeaderboard: RemoteLeaderboardSelection? = nil,
+        profileApplicationSupport: URL? = nil
     ) {
         self.settings = settings
         self.account = account
         self.initialLeaderboard = initialLeaderboard
+        self.profileApplicationSupport = profileApplicationSupport
         let initialParameter = LeaderboardParameterFilterPolicy.filter(
             mode: initialLeaderboard?.mode,
             durationSeconds: initialLeaderboard?.durationSeconds,
@@ -467,6 +470,7 @@ struct CloudSyncView: View {
                         customizationTombstoneStore: customizationTombstones,
                         resultFilterPresets: resultFilterPresets,
                         tombstoneStore: resultFilterPresetTombstones, source: .cloudSync,
+                        websiteProfileApplicationSupport: profileApplicationSupport,
                         modelContext: modelContext)
                     if let scope = account.resultPublicationScope {
                         conflictAuditStore.append(mergeResult.conflicts, for: scope)
@@ -514,10 +518,11 @@ struct CloudSyncView: View {
                     savedTextTombstoneStore: savedTextTombstones,
                     customizationTombstoneStore: customizationTombstones,
                     resultFilterPresets: resultFilterPresets, tombstoneStore: resultFilterPresetTombstones,
-                    source: .cloudSync, modelContext: modelContext)
+                    source: .cloudSync, websiteProfileApplicationSupport: profileApplicationSupport, modelContext: modelContext)
                 account.confirmPulledArchive(pulled)
                 let selectionDetail = summary.restoredActiveTestSelection ? "，并已恢复测试选择" : ""
-                message = "已合并 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩、\(summary.deletedPresets) 个预设、\(summary.deletedSavedTexts) 篇文本和 \(summary.deletedResultFilterPresets) 个成绩筛选预设\(selectionDetail)。"
+                let profileDetail = summary.restoredWebsiteProfile ? " 完整网站配置已保存，主窗口仍需完成资源准备。" : ""
+                message = "已合并 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩、\(summary.deletedPresets) 个预设、\(summary.deletedSavedTexts) 篇文本和 \(summary.deletedResultFilterPresets) 个成绩筛选预设\(selectionDetail)。\(profileDetail)"
             } catch {
                 message = error.localizedDescription
             }
@@ -758,14 +763,12 @@ struct CloudSyncView: View {
 
     private func localArchive() throws -> TypebarArchive {
         let ledger = try LocalPersonalBestStore.exportLedger(in: modelContext)
-        let portableResults = results.compactMap(\.portableResult)
-        let namedPresets = presets.compactMap { record in
-            record.definition.map { NamedPreset(id: record.id, name: record.name, definition: $0) }
-        }
+        let portableResults = try LocalArchiveRecordCapture.results(results)
+        let namedPresets = try LocalArchiveRecordCapture.presets(presets)
         let namedSavedTexts = savedTexts.map {
             NamedSavedText(id: $0.id, title: $0.title, text: $0.text, longProgress: $0.longProgress)
         }
-        let namedResultFilterPresets = resultFilterPresets.compactMap(\.portablePreset)
+        let namedResultFilterPresets = try LocalArchiveRecordCapture.filters(resultFilterPresets)
         return .init(
             exportedAt: .now,
             settings: settings.snapshot,
@@ -780,7 +783,8 @@ struct CloudSyncView: View {
             resultFilterPresets: namedResultFilterPresets,
             deletedResultFilterPresetIDs: resultFilterPresetTombstones.deletedIDs,
             activeTestSelection: settings.activeTestSelection,
-            localPersonalBestLedger: ledger)
+            localPersonalBestLedger: ledger,
+            websiteProfile: try WebsiteProfileArchiveTarget.captureSaved(settings: settings, applicationSupport: profileApplicationSupport))
     }
 }
 

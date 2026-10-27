@@ -10,6 +10,7 @@ struct WebsiteConfigStartupOptions: Equatable {
 @MainActor @Observable final class WebsiteConfigStartupController {
   enum State: Equatable { case idle, waiting, restoring, failed(String), finished }
   private(set) var state: State = .idle
+  @ObservationIgnored private(set) var lastFailure: Error?
   var isBlocking: Bool { state != .finished }
   var isRestoring: Bool { state == .restoring }
   var failureMessage: String? { if case .failed(let text) = state { text } else { nil } }
@@ -58,6 +59,7 @@ struct WebsiteConfigStartupOptions: Equatable {
         self.finish()
       } catch {
         guard self.request == current, !self.stopped else { return }
+        self.lastFailure = error
         self.fail("保存的配置未能恢复，原记录未被重置。请在配置面板检查来源后重试，或明确选择使用 Typebar 设置继续。")
       }
     }
@@ -80,6 +82,12 @@ struct WebsiteConfigStartupOptions: Equatable {
     request = UUID(); work?.cancel(); work = nil; workflow = nil
     finish()
   }
+  func savedArchivePreparationFailed(_ message: String, page: PracticePageSessionStore,
+    onContinue: @escaping @MainActor () -> Void) {
+    guard !stopped else { return }
+    cancelWork(); self.page = page; self.onContinue = onContinue
+    fail(message)
+  }
   func stop() {
     stopped = true; cancelWork(); onContinue = nil
     state = .finished
@@ -89,6 +97,7 @@ struct WebsiteConfigStartupOptions: Equatable {
     page?.setStartupInputSuspended(true); state = .failed(message)
   }
   private func finish() {
+    lastFailure = nil
     state = .finished; page?.setStartupInputSuspended(false)
     onContinue = nil
   }

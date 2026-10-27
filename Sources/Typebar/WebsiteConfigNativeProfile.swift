@@ -5,7 +5,7 @@ import SwiftUI
 /// activate a word source or apply/persist native settings.
 @MainActor
 enum WebsiteConfigNativeProfile {
-  static let catalogs = WebsiteConfigCatalogs(
+  nonisolated static let catalogs = WebsiteConfigCatalogs(
     languages: Set(WebsiteLanguageIdentity.byWebsiteName.keys),
     // Grove is Typebar-only. Shared names identify independently drawn themes,
     // not pixel-identical reference palettes.

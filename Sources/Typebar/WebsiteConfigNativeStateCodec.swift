@@ -7,7 +7,6 @@ enum WebsiteConfigNativeStateError: Error, Equatable {
 /// Dedicated local preference format, not website JSON or a Typebar backup.
 /// A successful decode proves schema-level retention, not resource admission
 /// or that the decoded state can already be applied to the native interface.
-@MainActor
 enum WebsiteConfigNativeStateCodec {
   static let kind = "typebar.website-config-state"
   static let version = 1

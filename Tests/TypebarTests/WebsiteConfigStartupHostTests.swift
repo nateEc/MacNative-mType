@@ -7,6 +7,11 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WebsiteConfigStartupHostTests: XCTestCase {
+  // Match the application's process-owned dataStore. Retired SwiftUI @Query
+  // observers can receive later context-save notifications; their contexts
+  // must not outlive a weakly referenced container. Keep fixture stores
+  // independent while giving them the same lifetime as the actual app store.
+  private static var ownedFixtureStores: [ModelContainer] = []
   @MainActor @Observable fileprivate final class HostState {
     let page = PracticePageSessionStore()
     var accountReady = false
@@ -21,7 +26,7 @@ import XCTest
     /// nil: no directory; true: valid record; false: opaque record.
     init(saved: Bool?, json: String = #"{"mode":"words","words":4,"theme":"dracula"}"#,
       fetch: @escaping WebsiteConfigExternalContent.Fetch = { _, _ in nil }, feedbackSound: TypingFeedbackSound? = nil,
-      clipboardExport: WebsiteConfigClipboardExport? = nil) throws {
+      clipboardExport: WebsiteConfigClipboardExport? = nil, interruptedArchive: WebsiteProfileArchive? = nil) throws {
       try FileManager.default.createDirectory(at: support, withIntermediateDirectories: false)
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = .init(defaults: defaults, feedbackSound: feedbackSound ?? .init(loadSound: { _ in nil }, beep: {}),
@@ -30,6 +35,17 @@ import XCTest
       XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: .words(3)),
         testParameterMemory: .legacyDefaults(configuration: .words(3)))))
       account = .init(defaults: defaults)
+      if let interruptedArchive {
+        let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: support)
+        let register = WebsiteConfigFileRegister(directory: directory)
+        let plan = try register.prepareArchiveRestore(interruptedArchive, customStore: settings.websiteCustomArchiveStore)
+        do {
+          try register.restoreArchive(plan, customStore: settings.websiteCustomArchiveStore, checkpoint: {
+            if $0 == .journalWritten { throw WebsiteProfileArchiveError.pendingRecovery }
+          })
+          XCTFail("Setup did not interrupt the journal")
+        } catch WebsiteProfileArchiveError.pendingRecovery {}
+      }
       if let saved {
         let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: support)
         let register = WebsiteConfigFileRegister(directory: directory)
@@ -45,6 +61,7 @@ import XCTest
       container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
         ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+      WebsiteConfigStartupHostTests.ownedFixtureStores.append(container)
       let view = Root(state: state, settings: settings, account: account, support: support, defaults: defaults, fetch: fetch,
         clipboardExport: clipboardExport)
         .modelContainer(container).frame(width: 1000, height: 760)
@@ -103,6 +120,94 @@ import XCTest
       try? FileManager.default.removeItem(at: support)
     }
   }
+  func testArchiveProfileRetiredHostKeepsItsStoreAcrossLaterSaveNotifications() async throws {
+    weak var retired: ModelContainer?
+    do {
+      let f = try Fixture(saved: nil)
+      retired = f.container
+      f.state.accountReady = true
+      try await f.waitAsync { f.state.page.startupController.state == .finished }
+      f.close()
+    }
+    XCTAssertNotNil(retired)
+    let other = try ModelContainer(for: TestResultRecord.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    try other.mainContext.save()
+  }
+
+  func testArchiveProfileColdStartupFinishesJournalEvenWithoutAnOldProfileFile() async throws {
+    var runtime = try WebsiteConfigNativeProfile.defaultDocument().values
+    runtime["mode"] = .string("custom")
+    let text = try WebsiteCustomTextSettings(value: .object(["text": .array([.string("aa"), .string("bb")]),
+      "mode": .string("repeat"), "limit": .object(["mode": .string("word"), "value": .number(3)]), "pipeDelimiter": .bool(false)]))
+    let profile = try WebsiteProfileArchive(runtime: runtime, lazyMemory: .init(remember: true, prefersArabic: false),
+      customTextData: XCTUnwrap(WebsiteCustomTextStateStore.encodeDocument(text)))
+    let f = try Fixture(saved: nil, interruptedArchive: profile)
+    defer { f.close() }
+    let directory = try XCTUnwrap(WebsiteConfigStorageDirectory.existing(applicationSupport: f.support))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename).path))
+    f.state.accountReady = true
+    try await f.waitAsync { f.state.page.state.practice != nil || f.state.page.startupController.failureMessage != nil }
+    XCTAssertNil(f.state.page.startupController.lastFailure, "\(String(describing: f.state.page.startupController.lastFailure))")
+    XCTAssertEqual(f.state.page.startupController.state, .finished)
+    XCTAssertEqual(f.state.page.state.practice?.scope.websiteCustomText?.value, text.value)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent(WebsiteConfigFileRegister.archiveJournalFilename).path))
+    // Pinned test-logic.ts restores remembered Lazy Mode during custom-test
+    // initialization, then clears remember. Archive storage itself retains both
+    // flags exactly; this assertion observes the subsequent live lifecycle.
+    let initialized = try WebsiteConfigFileRegister(directory: directory).read()
+    guard case .available(let initializedRuntime) = initialized.state else { return XCTFail("Initialized profile is unavailable") }
+    XCTAssertEqual(initializedRuntime["lazyMode"], .bool(true))
+    XCTAssertEqual(initialized.lazyMemory, .init(remember: false, prefersArabic: false))
+  }
+
+  func testArchiveProfileDeliveryUsesRestoredIndependentTextInActualRoot() async throws {
+    let f = try Fixture(saved: nil)
+    defer { f.close() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.state.page.startupController.state == .finished && f.inputs().first?.acceptsTextInput == true }
+    let text = try WebsiteCustomTextSettings(value: .object(["text": .array([.string("aa"), .string("bb")]),
+      "mode": .string("repeat"), "limit": .object(["mode": .string("word"), "value": .number(3.5)]), "pipeDelimiter": .bool(false)]))
+    let runtime = try WebsiteConfigNativeProfile.prepare(#"{"mode":"custom","words":17,"time":42}"#, context: .init()).projection.runtime
+    let profile = try WebsiteProfileArchive(runtime: runtime, lazyMemory: .init(remember: true, prefersArabic: false),
+      customTextData: XCTUnwrap(WebsiteCustomTextStateStore.encodeDocument(text)))
+    let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(settings: f.settings.snapshot,
+      results: [], presets: [], websiteProfile: profile))
+    let summary = try LocalArchiveImport.apply(archive, settings: f.settings, results: [], presets: [], savedTexts: [],
+      resultTombstoneStore: .init(defaults: f.defaults), presetTombstoneStore: .init(defaults: f.defaults),
+      savedTextTombstoneStore: .init(defaults: f.defaults), customizationTombstoneStore: .init(defaults: f.defaults),
+      tombstoneStore: .init(defaults: f.defaults), websiteProfileApplicationSupport: f.support, modelContext: f.container.mainContext)
+    XCTAssertTrue(summary.restoredWebsiteProfile)
+    try await f.waitAsync { f.state.page.state.practice != nil && f.inputs().first?.acceptsTextInput == true
+      && f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+    XCTAssertEqual(f.state.page.state.session.configuration.mode, .custom)
+    XCTAssertEqual(f.state.page.state.session.configuration.wordLimit, 4)
+    XCTAssertEqual(f.state.page.state.practice?.scope.websiteCustomText?.value, text.value)
+    XCTAssertTrue(f.state.page.state.session.prompt.split(separator: " ").allSatisfy { ["aa", "bb"].contains(String($0)) })
+    let input = try XCTUnwrap(f.inputs().first)
+    input.onInsert(f.state.page.state.session.prompt, false)
+    try await f.waitAsync { f.state.page.state.session.isFinished }
+  }
+
+  func testArchiveProfilePreparationRefusalIsVisibleAndKeepsSavedValues() async throws {
+    let f = try Fixture(saved: nil)
+    defer { f.close() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.state.page.startupController.state == .finished }
+    var runtime = try WebsiteConfigNativeProfile.defaultDocument().values
+    runtime["fontSize"] = .number(.infinity)
+    let profile = try WebsiteProfileArchive(runtime: runtime, lazyMemory: .init(), customTextData: nil)
+    let archive = TypebarArchive(exportedAt: .now, settings: f.settings.snapshot, results: [], presets: [], websiteProfile: profile)
+    _ = try LocalArchiveImport.apply(archive, settings: f.settings, results: [], presets: [], savedTexts: [],
+      resultTombstoneStore: .init(defaults: f.defaults), presetTombstoneStore: .init(defaults: f.defaults),
+      savedTextTombstoneStore: .init(defaults: f.defaults), customizationTombstoneStore: .init(defaults: f.defaults),
+      tombstoneStore: .init(defaults: f.defaults), websiteProfileApplicationSupport: f.support, modelContext: f.container.mainContext)
+    try await f.waitAsync { f.state.page.startupController.failureMessage != nil }
+    XCTAssertNil(f.state.page.state.practice)
+    XCTAssertTrue(f.state.page.startupController.isBlocking)
+    let saved = try XCTUnwrap(WebsiteProfileArchiveTarget.captureSaved(settings: f.settings, applicationSupport: f.support))
+    XCTAssertEqual(saved.runtime["fontSize"], .number(.infinity))
+  }
+
   private struct Root: View {
     let state: HostState, settings: AppSettings, account: AccountSession, support: URL
     let announcements: RemoteAnnouncementCenter

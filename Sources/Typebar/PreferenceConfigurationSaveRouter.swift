@@ -14,6 +14,12 @@ final class PreferenceConfigurationSaveRouter {
   private var generation = UUID()
   @ObservationIgnored private var leaseTransitions = 0
   private var handlers: [UUID: () -> Void] = [:]
+  private var archiveAdmissions: [UUID: () -> Bool] = [:]
+  func setWebsiteArchiveAdmission(owner: UUID, check: @escaping () -> Bool) { archiveAdmissions[owner] = check }
+  var allowsWebsiteProfileArchiveRestore: Bool {
+    guard let owner = priority.last else { return true }
+    return archiveAdmissions[owner]?() ?? true
+  }
   private var modifierProviders: [UUID: () -> [TestModifier]] = [:]
   private var languageProviders: [UUID: () -> TypingLanguage] = [:]
   private var keyboardGuideProviders: [UUID: () -> KeyboardGuideMode] = [:]
@@ -79,6 +85,7 @@ final class PreferenceConfigurationSaveRouter {
   }
 
   func remove(owner: UUID) {
+    archiveAdmissions.removeValue(forKey: owner)
     leaseTransitions += 1
     defer { leaseTransitions -= 1 }
     let activeBefore = priority.last

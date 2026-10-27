@@ -2,7 +2,7 @@ import Foundation
 
 /// Identifier catalogs and the default document belong to the import adapter.
 /// No reference themes, fonts or default palette assets are bundled here.
-struct WebsiteConfigCatalogs {
+struct WebsiteConfigCatalogs: Sendable {
   var languages: Set<String>
   var themes: Set<String>
   var layouts: Set<String>

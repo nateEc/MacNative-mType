@@ -17,20 +17,24 @@ struct WebsiteCustomTextStateStore {
   init(defaults: UserDefaults) { self.defaults = defaults }
   func read() -> WebsiteCustomTextStateRead {
     guard defaults.object(forKey: Self.storageKey) != nil else { return .missing }
-    guard let data = defaults.data(forKey: Self.storageKey), data.count <= Self.maximumBytes,
+    guard let data = defaults.data(forKey: Self.storageKey), let settings = Self.decodeDocument(data) else { return .unavailable }
+    return .available(settings)
+  }
+  static func decodeDocument(_ data: Data) -> WebsiteCustomTextSettings? {
+    guard data.count <= Self.maximumBytes,
       let record = try? PropertyListDecoder().decode(Record.self, from: data),
       record.kind == "typebar.website-custom-text", record.version == 1,
       record.limitBits.utf8.count == 16,
       record.limitBits.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
-      let bits = UInt64(record.limitBits, radix: 16), record.text.allSatisfy({ $0.count.isMultiple(of: 2) }) else { return .unavailable }
+      let bits = UInt64(record.limitBits, radix: 16), record.text.allSatisfy({ $0.count.isMultiple(of: 2) }) else { return nil }
     let pieces = record.text.map { data -> WebsiteConfigValue in
       let bytes = Array(data)
       return .string(units: stride(from: 0, to: bytes.count, by: 2).map { UInt16(bytes[$0]) | UInt16(bytes[$0 + 1]) << 8 })
     }
     guard let settings = try? WebsiteCustomTextSettings(value: .object(["text": .array(pieces),
       "mode": .string(record.mode), "limit": .object(["mode": .string(record.limitMode),
-        "value": .number(Double(bitPattern: bits))]), "pipeDelimiter": .bool(record.pipe)])) else { return .unavailable }
-    return .available(settings)
+        "value": .number(Double(bitPattern: bits))]), "pipeDelimiter": .bool(record.pipe)])) else { return nil }
+    return settings
   }
   @discardableResult func save(_ settings: WebsiteCustomTextSettings) -> Bool {
     guard (try? WebsiteCustomTextSettings(value: settings.value)) != nil else { return false }
@@ -39,10 +43,16 @@ struct WebsiteCustomTextStateStore {
     case .available(let existing) where existing == settings && existing.limitValue.bitPattern == settings.limitValue.bitPattern: return true
     default: break
     }
+    guard let data = Self.encodeDocument(settings) else { return false }
+    defaults.set(data, forKey: Self.storageKey)
+    return defaults.data(forKey: Self.storageKey) == data
+  }
+  static func encodeDocument(_ settings: WebsiteCustomTextSettings) -> Data? {
+    guard (try? WebsiteCustomTextSettings(value: settings.value)) != nil else { return nil }
     var budget = Self.maximumBytes - 1024
     var text: [Data] = []
     for value in settings.text {
-      guard let units = value.stringUnits, units.count <= (budget - 32) / 2 else { return false }
+      guard let units = value.stringUnits, units.count <= (budget - 32) / 2 else { return nil }
       budget -= units.count * 2 + 32
       text.append(Data(units.flatMap { [UInt8(truncatingIfNeeded: $0), UInt8(truncatingIfNeeded: $0 >> 8)] }))
     }
@@ -50,8 +60,50 @@ struct WebsiteCustomTextStateStore {
     let record = Record(kind: "typebar.website-custom-text", version: 1, text: text, mode: settings.mode,
       limitMode: settings.limitMode, limitBits: String(repeating: "0", count: 16 - bits.count) + bits, pipe: settings.pipeDelimiter)
     let encoder = PropertyListEncoder(); encoder.outputFormat = .binary
-    guard let data = try? encoder.encode(record), data.count <= Self.maximumBytes else { return false }
-    defaults.set(data, forKey: Self.storageKey)
-    return defaults.data(forKey: Self.storageKey) == data
+    guard let data = try? encoder.encode(record), data.count <= Self.maximumBytes else { return nil }
+    return data
+  }
+
+  func recordForArchive() throws -> Data? {
+    switch read() {
+    case .missing: return nil
+    case .unavailable: throw WebsiteConfigNativeStateError.invalidEnvelope
+    case .available: return defaults.data(forKey: Self.storageKey)
+    }
+  }
+  static func acceptsFallbackArchiveDocument(_ data: Data?) -> Bool {
+    guard let data else { return true }
+    return data.count <= maximumBytes && (try? JSONDecoder().decode(CustomTextStateDocument.self, from: data).isValid) == true
+  }
+  func fallbackRecordForArchive() throws -> Data? {
+    guard defaults.object(forKey: CustomTextStateStore.storageKey) != nil else { return nil }
+    guard let data = defaults.data(forKey: CustomTextStateStore.storageKey), Self.acceptsFallbackArchiveDocument(data)
+    else { throw WebsiteConfigNativeStateError.invalidEnvelope }
+    return data
+  }
+  func restoreFallbackArchiveDocument(_ after: Data?, replacing before: Data?) -> Bool {
+    guard Self.acceptsFallbackArchiveDocument(before), Self.acceptsFallbackArchiveDocument(after) else { return false }
+    let current: Data?
+    do { current = try fallbackRecordForArchive() } catch { return false }
+    if current == after { return true }
+    guard current == before else { return false }
+    if let after { defaults.set(after, forKey: CustomTextStateStore.storageKey) }
+    else { defaults.removeObject(forKey: CustomTextStateStore.storageKey) }
+    return defaults.object(forKey: CustomTextStateStore.storageKey) == nil
+      ? after == nil : defaults.data(forKey: CustomTextStateStore.storageKey) == after
+  }
+
+  /// Called under the profile register's restore lock. This is a staged
+  /// UserDefaults read/write check, not cross-process CAS for other writers.
+  func restoreArchiveDocument(_ after: Data?, replacing before: Data?) -> Bool {
+    guard before == nil || Self.decodeDocument(before!) != nil,
+      after == nil || Self.decodeDocument(after!) != nil else { return false }
+    let current: Data?
+    do { current = try recordForArchive() } catch { return false }
+    if current == after { return true }
+    guard current == before else { return false }
+    if let after { defaults.set(after, forKey: Self.storageKey) }
+    else { defaults.removeObject(forKey: Self.storageKey) }
+    return defaults.object(forKey: Self.storageKey) == nil ? after == nil : defaults.data(forKey: Self.storageKey) == after
   }
 }

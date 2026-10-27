@@ -1,5 +1,9 @@
 # 固定源码对照的执行证据
 
+完整配置归档同版 debug 包、签名、资源和原创性检查通过（32.927 秒，输入哈希不变；`/tmp/typebar-website-profile-archive-package.log` 及同名 JSON），未启动主程序。
+
+2026-10-28 完整保存配置归档 v38：必需清单保持 108 项，新检查针对原生保存、日志与隐藏生产 Root，不增加来源比较方法。最终扩大 2679 项、1 可选十万词耐久跳过、0 失败（727.762 秒，驱动 738.095 秒），同日志全部 108 项证据通过、输入哈希不变（`/tmp/typebar-website-profile-archive-regression.log` 及同名 JSON／evidence.log）。定向 39 项、三个中断阶段、两份独立文本、负零保真和冷启动环境修正见 [完整配置备份合同](WEBSITE_PROFILE_ARCHIVE_CONTRACT.md)。未启动可见应用；实体文件对话框、真实云服务、独立进程、整套客户端和完整 readiness 未验，不以跳过计通过。以下为历史批次。
+
 2026-10-28 源归档首次采用：必需清单保持 108 项，新增证据验证原生配置身份迁移，不增加来源方法。新安装／旧偏好的 12 组模式、基线与部分失败保护、实际文件首次恢复和 SQLite 重开见 [阈值迁移合同](THRESHOLD_SOURCE_MIGRATION_CONTRACT.md)。最终扩大 2650 项、1 可选十万词耐久跳过、0 失败（670.205 秒，驱动 681.091 秒），同日志全部 108 项必需证据通过、输入哈希不变（`/tmp/typebar-archive-adoption-regression.log` 及同名 JSON／evidence.log）。同版 debug 包／签名／资源／原创性通过（32.724 秒，`/tmp/typebar-archive-adoption-package.log` 及同名 JSON），没有启动主程序。没有运行独立进程恢复、整套客户端或完整 readiness；跳过项不计通过。以下为历史批次。
 
 2026-10-28 无限设置／预设接入归档 v37：必需清单保持 108 项，本轮新增证据验证原生归档和恢复路径，不增加来源执行方法。18 组数值／模式、版本与墓碑拒绝、真实文件／设置冷读／SQLite 重开和重复导入见 [预设记忆合同](WEBSITE_PRESET_MEMORY_CONTRACT.md)。最终扩大 2642 项、1 可选十万词耐久检查跳过、0 失败（718.556 秒，驱动 728.704 秒），同日志全部 108 项必需证据通过、输入哈希不变（`/tmp/typebar-website-settings-archive-regression.log` 及同名 JSON／evidence.log）。debug 包／签名／资源／原创性检查通过（32.596 秒，`/tmp/typebar-website-settings-archive-package.log` 及同名 JSON），没有启动主程序。没有运行独立进程恢复、整套客户端或完整 readiness；跳过项不计通过。以下为历史批次。

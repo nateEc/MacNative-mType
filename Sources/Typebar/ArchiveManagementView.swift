@@ -11,6 +11,7 @@ struct ArchiveManagementView: View {
     private var resultFilterPresets: [ResultFilterPresetRecord]
 
     let settings: AppSettings
+    var profileApplicationSupport: URL? = nil
     private let resultTombstones = ResultTombstoneStore()
     private let presetTombstones = PresetTombstoneStore()
     private let savedTextTombstones = SavedTextTombstoneStore()
@@ -31,7 +32,7 @@ struct ArchiveManagementView: View {
                     LabeledContent(
                         "当前测试选择",
                         value: settings.activeTestSelection == nil ? "尚未生成" : "会迁移")
-                    Text("导出文件包含当前测试选择和本机个人／标签最佳账本，但不含账户或远程服务数据，可用于迁移到另一台 Mac。")
+                    Text("导出文件包含已保存的完整配置、独立文本、当前测试选择和本机最佳账本，但不含账户或远程服务数据。配置引用的外部资源可能需要重新准备。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -82,14 +83,12 @@ struct ArchiveManagementView: View {
     private func beginExport() {
         do {
             let ledger = try LocalPersonalBestStore.exportLedger(in: modelContext)
-            let portableResults = results.compactMap(\.portableResult)
-            let namedPresets = presets.compactMap { record in
-                record.definition.map { NamedPreset(id: record.id, name: record.name, definition: $0) }
-            }
+            let portableResults = try LocalArchiveRecordCapture.results(results)
+            let namedPresets = try LocalArchiveRecordCapture.presets(presets)
             let namedSavedTexts = savedTexts.map {
                 NamedSavedText(id: $0.id, title: $0.title, text: $0.text, longProgress: $0.longProgress)
             }
-            let namedResultFilterPresets = resultFilterPresets.compactMap(\.portablePreset)
+            let namedResultFilterPresets = try LocalArchiveRecordCapture.filters(resultFilterPresets)
             exportDocument = TypebarArchiveDocument(archive: .init(
                 version: TypebarArchive.currentVersion,
                 exportedAt: .now,
@@ -105,7 +104,8 @@ struct ArchiveManagementView: View {
                 resultFilterPresets: namedResultFilterPresets,
                 deletedResultFilterPresetIDs: resultFilterPresetTombstones.deletedIDs,
                 activeTestSelection: settings.activeTestSelection,
-                localPersonalBestLedger: ledger
+                localPersonalBestLedger: ledger,
+                websiteProfile: try WebsiteProfileArchiveTarget.captureSaved(settings: settings, applicationSupport: profileApplicationSupport)
             ))
         } catch { message = .init(title: "无法导出", detail: error.localizedDescription) }
     }
@@ -125,9 +125,10 @@ struct ArchiveManagementView: View {
                 savedTextTombstoneStore: savedTextTombstones,
                 customizationTombstoneStore: customizationTombstones,
                 resultFilterPresets: resultFilterPresets, tombstoneStore: resultFilterPresetTombstones,
-                source: .localFile, modelContext: modelContext)
+                source: .localFile, websiteProfileApplicationSupport: profileApplicationSupport, modelContext: modelContext)
             let selectionDetail = summary.restoredActiveTestSelection ? "，并已恢复测试选择" : ""
-            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩、\(summary.deletedPresets) 个预设、\(summary.deletedSavedTexts) 篇文本和 \(summary.deletedResultFilterPresets) 个成绩筛选预设，已应用文件中的设置\(selectionDetail)。")
+            let profileDetail = summary.restoredWebsiteProfile ? " 完整配置已保存到本机，主窗口将继续准备练习；准备结果以主窗口为准。" : ""
+            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩、\(summary.deletedPresets) 个预设、\(summary.deletedSavedTexts) 篇文本和 \(summary.deletedResultFilterPresets) 个成绩筛选预设，已应用文件中的设置\(selectionDetail)。\(profileDetail)")
         } catch {
             message = .init(title: "无法导入", detail: error.localizedDescription)
         }

@@ -10,10 +10,11 @@ enum ArchiveSourceAdmission {
     let adoptionBaseline: AppSettings.ArchiveSourceAdoptionBaseline?
     let selectionBaseline: ActiveTestSelectionRead?
     let preservesUnchangedSettings: Bool
+    let independentSourceSelection: Bool
     let selectionResourcesAvailable: @MainActor (TestConfiguration) -> Bool
 
     private var hasSourceChallenge: Bool {
-      (baseline != nil || adoptionBaseline != nil) && selection?.preset.configuration.challengeID != nil
+      (baseline != nil || adoptionBaseline != nil || independentSourceSelection) && selection?.preset.configuration.challengeID != nil
     }
 
     @MainActor private func hasAppliedSnapshot(_ settings: AppSettings) -> Bool {
@@ -98,12 +99,13 @@ enum ArchiveSourceAdmission {
   static func preparing(_ incoming: AppSettingsSnapshot, selection: ActiveTestSelectionDocument?,
     to settings: AppSettings,
     importSource: ArchiveImportSource = .localFile,
+    allowsIndependentSourceSelection: Bool = false,
     selectionResourcesAvailable: @escaping @MainActor (TestConfiguration) -> Bool = resourcesAvailable) throws -> Plan {
     guard settings.allowsRestartingConfigurationChange else { throw LocalArchiveImportError.noQuitConfigurationLocked }
     let sourceSelection = selection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false
     let hasSource = settings.hasThresholdProfile
     let adoptsSource = !hasSource && incoming.thresholdSource != nil
-    guard hasSource || adoptsSource || !sourceSelection else {
+    guard hasSource || adoptsSource || !sourceSelection || allowsIndependentSourceSelection else {
       throw LocalArchiveImportError.thresholdSourceNotReady
     }
     var snapshot = incoming
@@ -142,7 +144,7 @@ enum ArchiveSourceAdmission {
       guard let validated = ActiveTestSelectionPolicy.validated(selection),
         settings.activeTestSelectionRead != .unavailable
       else { throw LocalArchiveImportError.invalidActiveTestSelection }
-      if hasSource || adoptsSource, validated.preset.configuration.challengeID != nil,
+      if hasSource || adoptsSource || (allowsIndependentSourceSelection && sourceSelection), validated.preset.configuration.challengeID != nil,
         !SourceChallengeAdmission.accepts(validated.preset) {
         throw LocalArchiveImportError.invalidActiveTestSelection
       }
@@ -170,6 +172,7 @@ enum ArchiveSourceAdmission {
     let plan = Plan(snapshot: snapshot, selection: preparedSelection, baseline: baseline, adoptionBaseline: adoptionBaseline,
       selectionBaseline: hasSource || adoptsSource || selection != nil ? settings.activeTestSelectionRead : nil,
       preservesUnchangedSettings: preservesUnchangedSettings,
+      independentSourceSelection: allowsIndependentSourceSelection && sourceSelection,
       selectionResourcesAvailable: selectionResourcesAvailable)
     try plan.validateBeforeRecords(to: settings)
     return plan

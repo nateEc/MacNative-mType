@@ -69,7 +69,7 @@ import XCTest
     let owner = try source(), snapshot = owner.applying(to: AppSettingsSnapshot(fontSize: 31))
     let presets = [named(owner)]
     let root = try object(TypebarDataTransfer.exportArchive(settings: snapshot, results: [], presets: presets, at: date))
-    XCTAssertEqual(root["version"] as? Int, 37)
+    XCTAssertEqual(root["version"] as? Int, TypebarArchive.currentVersion)
     XCTAssertNil(root["thresholdSettingsData"])
     XCTAssertNil(root["thresholdPresetsData"])
     let encoder = JSONEncoder(); encoder.userInfo[PracticeThresholdSource.codingCapability] = true
