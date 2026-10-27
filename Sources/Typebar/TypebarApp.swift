@@ -1416,6 +1416,7 @@ private struct ContentView: View {
   @State private var quickPickerThemePreviewTarget: ThemeCommandTarget?
   @State private var showingProfileSearchCommandEditor = false
   @State private var sharedProfileInbox = SharedProfileLinkInbox()
+  @State private var testSettingsInbox = TestSettingsLinkInbox()
   @State private var sharedProfileWindow = SharedProfileWindowHost()
   private var preferenceConfigurationOwner: UUID { pageSessionStore.owner }
   @State private var showingActiveResultTagEditor = false
@@ -1796,9 +1797,12 @@ private struct ContentView: View {
 
   private var sharedProfilePresentationAllowed: Bool {
     settings.allowsRestartingConfigurationChange && sharedProfileWindow.canPresent
+      && sharedProfileInbox.presented == nil && testSettingsInbox.presented == nil
+      && !showingTestShare && !showingOneHandedChallengeSetup && !showingReferenceScriptImport
   }
 
   private func presentSharedProfileIfPossible() {
+    testSettingsInbox.presentNext(allowed: sharedProfilePresentationAllowed)
     sharedProfileInbox.presentNext(allowed: sharedProfilePresentationAllowed)
   }
 
@@ -1823,7 +1827,10 @@ private struct ContentView: View {
       presentSharedProfileIfPossible()
     })
       .frame(width: 0, height: 0).allowsHitTesting(false).accessibilityHidden(true))
-    .onOpenURL { sharedProfileInbox.receive($0, allowed: sharedProfilePresentationAllowed) }
+    .onOpenURL { url in
+      if testSettingsInbox.receive(url, allowed: sharedProfilePresentationAllowed) { return }
+      sharedProfileInbox.receive(url, allowed: sharedProfilePresentationAllowed)
+    }
     .onChange(of: settings.allowsRestartingConfigurationChange) { presentSharedProfileIfPossible() }
     .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { notification in
       guard notification.object as? NSWindow === sharedProfileWindow.window else { return }
@@ -2369,30 +2376,11 @@ private struct ContentView: View {
     } message: {
       Text("符合保存资格且开启保存时，中止结果会进入本机历史；不计入 PB 或挑战，发布需服务支持中止协议并通过独立校验。")
     }
-    .sheet(isPresented: $showingTestShare, onDismiss: {
-      if queuedOneHandedChallengeSetup {
-        queuedOneHandedChallengeSetup = false
-        showingOneHandedChallengeSetup = true
-      }
-      presentQueuedReferenceScriptImport()
-    }) {
-      TestConfigurationShareView(
-        currentPreset: presetDefinition,
-        latestPreset: { presetDefinition },
-        legacyCustomTextFallback: .init(
-          text: customText, completion: customTextCompletion,
-          duration: customTextCompletion == .time ? TimeInterval(customTextDuration) : nil,
-          wordLimit: customTextCompletion == .words ? customTextWordLimit : nil,
-          sectionLimit: customTextCompletion == .sections
-            ? customTextSectionLimit : nil,
-          ordering: customTextOrdering, pipeDelimiter: customTextPipeDelimiter),
-        challengeLibrary: TypebarChallengeLibrary.all,
-        notices: account.localNotices,
-        onLoadChallenge: loadChallenge
-      ) { preset in
-        guard apply(preset) else { return nil }
-        return presetDefinition
-      }
+    .sheet(isPresented: $showingTestShare, onDismiss: testShareDidDismiss) {
+      testShareContent()
+    }
+    .sheet(item: $testSettingsInbox.presented, onDismiss: testShareDidDismiss) { route in
+      testShareContent(initialLink: route.link)
     }
     .sheet(isPresented: $showingWebsiteConfigImport) {
       WebsiteConfigImportView(apply: { json in
@@ -7234,6 +7222,47 @@ private struct ContentView: View {
       systemIsDark: systemColorScheme == .dark)
   }
 
+  private func testShareContent(initialLink: String = "") -> some View {
+    TestConfigurationShareView(currentPreset: sharePresetDefinition,
+      latestPreset: { sharePresetDefinition }, initialPastedLink: initialLink,
+      legacyCustomTextFallback: .init(text: customText, completion: customTextCompletion,
+        duration: customTextCompletion == .time ? TimeInterval(customTextDuration) : nil,
+        wordLimit: customTextCompletion == .words ? customTextWordLimit : nil,
+        sectionLimit: customTextCompletion == .sections ? customTextSectionLimit : nil,
+        ordering: customTextOrdering, pipeDelimiter: customTextPipeDelimiter),
+      websiteSnapshot: { websiteTestSettingsSnapshot }, challengeLibrary: TypebarChallengeLibrary.all,
+      notices: account.localNotices, onLoadChallenge: loadChallenge) { preset in
+        guard apply(preset) else { return nil }
+        return sharePresetDefinition
+      }
+  }
+
+  private func testShareDidDismiss() {
+    if queuedOneHandedChallengeSetup {
+      queuedOneHandedChallengeSetup = false; showingOneHandedChallengeSetup = true
+    }
+    presentQueuedReferenceScriptImport()
+    presentSharedProfileIfPossible()
+  }
+
+  private var websiteTestSettingsSnapshot: WebsiteTestSettingsShare.Snapshot? {
+    guard let draft = WebsiteConfigExport.draft(in: pageSession), let practice = pageSession.practice else { return nil }
+    let hasQuote: Bool
+    if let current = pageSession.currentQuoteInitialization { hasQuote = current.quote != nil }
+    else { hasQuote = practice.quote != nil }
+    return .init(runtime: WebsiteConfigExport.values(draft, surface: .settings),
+      customText: WebsiteTestSettingsShare.customText(in: practice.scope),
+      hasUnmappedQuote: hasQuote)
+  }
+
+  private var sharePresetDefinition: SavedTestPreset {
+    guard let practice = pageSession.practice else { return presetDefinition }
+    let quote: OfflineQuote?
+    if let current = pageSession.currentQuoteInitialization { quote = current.quote }
+    else { quote = practice.quote }
+    return WebsiteTestSettingsShare.nativeSelection(configuration: session.configuration, scope: practice.scope, quote: quote)
+  }
+
   private var websiteImportWindow: WebsiteConfigPracticeScopeSource.Window {
     if let scope = pageSession.practice?.scope {
       return .published(owner: preferenceConfigurationOwner, revision: session.automaticInputAttemptID, scope: scope)
@@ -7312,7 +7341,7 @@ private struct ContentView: View {
     guard acceptsRestartingConfigurationChange() else { return .rejected }
     if challenge.requirements.referenceScriptSpecification != nil {
       pendingReferenceScriptChallenge = challenge
-      if showingChallenges || showingTestShare || showingCommandPalette {
+      if showingChallenges || showingTestShare || testSettingsInbox.presented != nil || showingCommandPalette {
         queuedReferenceScriptImport = true
       } else {
         showingReferenceScriptImport = true
@@ -7320,7 +7349,7 @@ private struct ContentView: View {
       return .requiresSetup
     }
     if challenge.id == "one-handed-bandit" {
-      if showingChallenges || showingTestShare {
+      if showingChallenges || showingTestShare || testSettingsInbox.presented != nil {
         queuedOneHandedChallengeSetup = true
       } else {
         showingOneHandedChallengeSetup = true

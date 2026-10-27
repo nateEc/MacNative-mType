@@ -1,12 +1,12 @@
 # 功能盘点与追踪表
 
-当前预设存储／原生传输增量通过扩大回归：867 项、1 项跳过、0 失败，同日志 96 项必需源码证据通过；真实全局无限值应用仍拒绝并保持原状态，原版八项分享仍未实现。此前成绩归档 v36 的 2664 项、阈值／本机成绩的 6370 项整套及原生导出窗口的 959 项属于各自历史批次，不能替代本批整套验证；完整重写继续。
+当前八项选择分享增量已通过最终扩大回归：704 项、1 项跳过、0 失败，同日志全部 97 项必需源码证据及不启动主程序的 debug 打包通过。采用自有协议、默认全关、只读链接、最新快照复制和本机接收预填，不依赖原站服务。完整网站 nosave 接收、实体操作及自有引语跨端应用仍待完成；此前 867／2664／6370／959 项属于各自历史批次，不能替代本批整套验证，完整重写继续。
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
 | THRESHOLD-PRESET-MEMORY-02 | 网站无限速度记忆的预设存储与原生传输 | 合法网站阈值数值域；原版八项分享不携带阈值，此处是原生格式补全 | LocalPresetCodec v2；原生链接 v4；活动选择外层 v2；WEBSITE_PRESET_MEMORY_CONTRACT.md | 部分完成：真实记录创建／更新、18 组模式与数值、SQLite 重开、活动选择保存、链接解码与隐私拒绝通过。扩大 867 项、1 项跳过、0 失败，同日志 96 项源码证据及不启动应用的打包／原创性通过。真实全局设置应用仍明确拒绝并保留原状态，不能把假回调成功视为生产应用通过；无限预设归档、完整网站备份及原版八项分享仍未完成。 |
 | THRESHOLD-RESULT-ARCHIVE-01 | 含无限速度记忆的成绩备份与恢复 | 原版成绩 CSV 不含阈值记忆；本机成绩 v2 已接纳合法网站状态，通用 JSON 归档仍直接编码其配置 | DataTransfer 归档 v36／websiteResultsData；LocalResultConfigurationCodec 有限载体；WEBSITE_RESULT_ARCHIVE_CONTRACT.md | 部分完成：三处实际反例后新增独立版本化载荷，18 组模式、旧有限归档、完整元数据、拒绝边界、SQLite 重开及重复恢复通过。扩大 2664 项、2 项跳过、0 失败，同日志 96 项源码证据及打包／原创性通过；完整网站配置文件、无限预设／活动选择／旧设置和分享仍未完成，实体文件流程与独立进程恢复待验。 |
-| SHARE-SOURCE-EIGHT-SLOTS-01 | 原版八项可选分享与默认空载荷 | components/modals/ShareTestSettings.tsx 的完整 form／url；utils/misc.ts getMode2；lz-ts 1.1.2 | 当前 TestConfigurationShareView 固定生成自有 typebar://test 载荷，未提供原版八个选择项 | 未完成：原版八项默认全关，按 getConfig／当前引语／独立 CustomText.getData 选择后压缩，阈值记忆不在该载荷内。当前原生格式携带不同字段，不能用其往返通过宣称原版选择、隐藏状态或 URL 行为已实现。需保持自有引语身份及禁止复制原版资产的约束，另行验证发送与接收。 |
+| SHARE-SOURCE-EIGHT-SLOTS-01 | 原版八项可选分享与默认空载荷 | components/modals/ShareTestSettings.tsx 的 form／完整 url；完整 getMode2；lz-ts 1.1.2 | WebsiteTestSettingsShare／Section／Controller；TestSettingsLinkInbox；Root 当前配置；URI 压缩器；TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md | 部分完成：默认全关发送面板、自有协议接收预填与真实旧设置提交、1280 组来源值、真实库八组压缩字节、暖无限记忆、最新复制与隐藏窗口通过。修复 Unicode 转义膨胀及混用旧快照，保护不可表达的预分段文本。最终 704 项、1 跳过、零失败，同日志 97 项必需源码及打包／原创性通过。完整网站 nosave 接收、原版 DOM 生命周期、实体／OS 唤起与自有引语跨端应用仍未完成。 |
 | CFG-EXPORT-CURRENT-01 | 当前配置 JSON 的两个导出入口 | commandline/lists.ts exportSettingsJSON；设置页 ImportExport.tsx；config/store.ts／setters.ts／lifecycle.ts | WebsiteConfigExport／WebsiteConfigClipboardExport；TypebarApp 命令派发与设置页按钮；CONFIG_EXPORT_CONTRACT.md；CONFIG_EXPORT_NATIVE_UI_CONTRACT.md | 部分完成：216 组源快照通过；真实窗口发现并修复空白复制框，补完整文字系统及内容断言。真实命令交接、No Quit、暖无限记忆和生产 Root 延迟回退／控件全选通过。最终扩大 959 项零失败零跳过，同日志 96 项源码证据及 debug 打包／原创性通过；系统鼠标、真实剪贴板拒绝及 IME 焦点交互待验收，整套客户端和完整 readiness 未跑。 |
 | THRESHOLD-INPUT-NUMBER-01 | 阈值输入文本、无限速度与冷恢复 | 实际命令构造器／元数据／单位／Zod／冷存储迁移 | 网站规则映射／协调器／冷投影／本机成绩配置版本 2 | 1,380 例输入、20 组冷恢复、真实宿主与实际完成／保存反例先红后绿；整套客户端 6,370 项、25 项跳过、0 失败，同日志全部 94 项来源证据及不启动应用的打包通过，另排除两窗口项。归档／分享无限值交互和实体窗口未完成，见阈值输入数字合同。 |
 | PACE-INPUT-NUMBER-01 | 配速默认文本、换算与无限值准入 | 实际输入命令构造器／元数据／五种单位／Zod | WebsiteNumberText／WebsitePaceSpeedPresentation／表单与命令 | 1,380 例及实际目标反例先红后绿；八组来源冷存储及文件 CAS／拒绝保护通过，宿主验证冷启动／暖导入和有限值／Infinity 与 No Quit 四组。完整客户端 6,359 项、25 项跳过、0 失败，同日志全部 92 项来源证据通过，另排除两个可见窗口用例；不启动应用的 debug 打包检查通过，实体窗口仍待验，见配速输入数字合同。 |

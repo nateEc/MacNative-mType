@@ -22,6 +22,8 @@ struct WebsiteConfigManualCopyView: View {
 
 struct WebsiteConfigReadOnlyText: NSViewRepresentable {
   let json: String
+  var accessibilityLabel = "只读配置 JSON"
+  var accessibilityIdentifier = "website-config-manual-copy"
   func makeNSView(context: Context) -> NSScrollView {
     let scroll = NSScrollView()
     scroll.hasVerticalScroller = true
@@ -29,7 +31,10 @@ struct WebsiteConfigReadOnlyText: NSViewRepresentable {
     return scroll
   }
   func updateNSView(_ scroll: NSScrollView, context: Context) {
-    (scroll.documentView as? WebsiteConfigCopyTextView)?.string = json
+    guard let text = scroll.documentView as? WebsiteConfigCopyTextView else { return }
+    text.string = json
+    text.setAccessibilityLabel(accessibilityLabel)
+    text.setAccessibilityIdentifier(accessibilityIdentifier)
   }
 }
 

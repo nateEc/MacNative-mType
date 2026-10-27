@@ -39,14 +39,16 @@ struct TestConfigurationShareActionResult: Equatable {
     do {
       let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
       let preset: SavedTestPreset, fields: [TestConfigurationNoticeField]
-      let isNativeLink = URLComponents(string: trimmed)?.scheme?.lowercased() == "typebar"
-      if isNativeLink {
+      let components = URLComponents(string: trimmed)
+      let isNativeLink = components?.scheme?.lowercased() == "typebar"
+      let isEightSlotLink = isNativeLink && components?.queryItems?.contains(where: { $0.name == "testSettings" }) == true
+      if isNativeLink && !isEightSlotLink {
         preset = try TestConfigurationShare.preset(from: trimmed)
         fields = TestConfigurationNoticeField.allCases.filter {
           $0 != .customText || preset.customText != nil
         }
       } else {
-        if let challenge = try LegacyChallengeLinkImporter.challenge(from: trimmed, challenges: challenges) {
+        if !isNativeLink, let challenge = try LegacyChallengeLinkImporter.challenge(from: trimmed, challenges: challenges) {
           guard !PracticeThresholdSource.isPresent(in: current) else {
             return rejected(TestConfigurationShareError.thresholdSourceChallengeNotReady.errorDescription
               ?? "未应用挑战链接。")
@@ -67,7 +69,7 @@ struct TestConfigurationShareActionResult: Equatable {
       let prepared = try ShareThresholdAdmission.preparing(preset, current: current)
       guard let applied = applyPreset(prepared) else { return rejected(rejection, important: true) }
       if !fields.isEmpty {
-        notices.post(summary(applied, fields: fields, includesThresholds: isNativeLink), level: .success,
+        notices.post(summary(applied, fields: fields, includesThresholds: isNativeLink && !isEightSlotLink), level: .success,
           options: .init(durationMilliseconds: 10_000))
       }
       return .init(outcome: .applied, status: nil)

@@ -195,6 +195,7 @@ struct TestConfigurationShareView: View {
   let onApply: (SavedTestPreset) -> SavedTestPreset?
     @State private var pastedLink = ""
     @State private var status: String?
+    @State private var websiteShare: WebsiteTestSettingsShareController?
 
     var effectiveCurrentPreset: SavedTestPreset { latestPreset?() ?? currentPreset }
     private var currentLink: String? { try? TestConfigurationShare.link(for: effectiveCurrentPreset) }
@@ -202,7 +203,9 @@ struct TestConfigurationShareView: View {
   init(
     currentPreset: SavedTestPreset,
     latestPreset: (() -> SavedTestPreset)? = nil,
+    initialPastedLink: String = "",
     legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback? = nil,
+    websiteSnapshot: (@MainActor () -> WebsiteTestSettingsShare.Snapshot?)? = nil,
     challengeLibrary: [TypebarChallenge] = [],
     notices: LocalNoticeCenter,
     onLoadChallenge: @escaping (TypebarChallenge) -> TestConfigurationApplyOutcome = { _ in .rejected },
@@ -215,12 +218,17 @@ struct TestConfigurationShareView: View {
     self.notices = notices
     self.onLoadChallenge = onLoadChallenge
     self.onApply = onApply
+    _pastedLink = State(initialValue: initialPastedLink)
+    _websiteShare = State(initialValue: websiteSnapshot.flatMap { read in
+      read() == nil ? nil : WebsiteTestSettingsShareController(read: read, notices: notices)
+    })
   }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("分享当前测试") {
+                if let websiteShare { WebsiteTestSettingsShareSection(controller: websiteShare) }
+                Section("分享完整测试") {
                     Text("链接包含测试规则、所选引语 ID 或自定义文本；完整阈值链接还包含关闭时保留的自定义数值。不包含账户、成绩、活动标签或外观。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -250,7 +258,7 @@ struct TestConfigurationShareView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } }
             }
         }
-        .frame(width: 520, height: 380)
+        .frame(width: 560, height: websiteShare == nil ? 380 : 720)
     }
 
     private func copyCurrentLink() {

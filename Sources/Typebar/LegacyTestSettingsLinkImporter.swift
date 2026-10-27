@@ -79,7 +79,11 @@ enum LegacyTestSettingsLinkImporter {
     guard trimmed.count <= maximumURLLength,
           let components = URLComponents(string: trimmed),
           let scheme = components.scheme?.lowercased(),
-          scheme == "http" || scheme == "https",
+          (scheme == "http" || scheme == "https"
+            || (scheme == "typebar" && components.host?.lowercased() == "test"
+              && components.path.isEmpty && components.user == nil && components.password == nil
+              && components.port == nil && components.fragment == nil
+              && components.queryItems?.count == 1 && components.queryItems?.first?.name == "testSettings")),
           components.host != nil,
           let compressed = components.queryItems?.first(where: { $0.name == "testSettings" })?.value,
           !compressed.isEmpty,
@@ -281,7 +285,8 @@ enum LegacyTestSettingsLinkImporter {
 
   private static func parseLanguage(_ value: Any) throws -> TypingLanguage? {
     if value is NSNull { return nil }
-    guard let raw = value as? String, let language = TypingLanguage(rawValue: raw) else {
+    guard let raw = value as? String,
+      let language = WebsiteLanguageIdentity.byWebsiteName[raw] ?? TypingLanguage(rawValue: raw) else {
       throw ImportError.unsupportedSetting
     }
     return language
@@ -465,12 +470,63 @@ enum LegacyTestSettingsLinkImporter {
   }
 }
 
-/// A bounded URI-safe LZ decoder. It is deliberately decode-only because
-/// Typebar's own links use its native, versioned share format.
-private enum URICompressedPayload {
+/// Bounded URI-safe LZ transport for the website's eight-slot test links.
+/// Native full-selection links retain their separate versioned format.
+enum URICompressedPayload {
   private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$"
   private static let lookup = Dictionary(uniqueKeysWithValues: alphabet.utf8.enumerated().map { ($0.element, $0.offset) })
   private static let maximumDecodedUTF16Length = 65_536
+
+  static func compress(_ input: String) -> String? {
+    let units = Array(input.utf16)
+    guard units.count <= maximumDecodedUTF16Length else { return nil }
+    var phrases: [[UInt16]: Int] = [:], literals = Set<UInt16>()
+    var next = 3, width = 2, remaining = 2
+    var writer = BitWriter(), prefix: [UInt16] = []
+    func advance() {
+      remaining -= 1
+      if remaining == 0 { remaining = 1 << width; width += 1 }
+    }
+    func emit(_ phrase: [UInt16]) {
+      if phrase.count == 1, let unit = phrase.first, literals.remove(unit) != nil {
+        writer.write(unit < 256 ? 0 : 1, bits: width)
+        writer.write(Int(unit), bits: unit < 256 ? 8 : 16)
+        advance()
+      } else { writer.write(phrases[phrase]!, bits: width) }
+      advance()
+    }
+    for unit in units {
+      let single = [unit]
+      if phrases[single] == nil { phrases[single] = next; next += 1; literals.insert(unit) }
+      let candidate = prefix + single
+      if phrases[candidate] != nil { prefix = candidate }
+      else {
+        emit(prefix)
+        phrases[candidate] = next; next += 1
+        prefix = single
+      }
+    }
+    if !prefix.isEmpty { emit(prefix) }
+    writer.write(2, bits: width)
+    return writer.finish()
+  }
+
+  private struct BitWriter {
+    private var output: [UInt8] = []
+    private var value = 0, count = 0
+    private let symbols = Array(URICompressedPayload.alphabet.utf8)
+    mutating func write(_ integer: Int, bits: Int) {
+      var integer = integer
+      for _ in 0..<bits {
+        value = (value << 1) | (integer & 1); integer >>= 1; count += 1
+        if count == 6 { output.append(symbols[value]); count = 0; value = 0 }
+      }
+    }
+    mutating func finish() -> String {
+      repeat { write(0, bits: 1) } while count != 0
+      return String(decoding: output, as: UTF8.self)
+    }
+  }
 
   static func decompress(_ input: String) -> String? {
     let bytes = Array(input.utf8)

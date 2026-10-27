@@ -16986,8 +16986,8 @@ final class TypingEngineTests: XCTestCase {
       from: "https://share.example.test/practice?testSettings=not-a-valid-payload", current: current))
     XCTAssertThrowsError(try LegacyTestSettingsLinkImporter.preset(
       from: "https://share.example.test/practice?testSettings=NoIg7g9gTgJgziANAVkQOwK4Bsvu7zHPIw3UNCAFwH0oBTAQyxAF0Wg", current: current))
-    XCTAssertThrowsError(try LegacyTestSettingsLinkImporter.preset(
-      from: "typebar://test?testSettings=NoIg7g9gTgJgziANAVgAyIHYFcA2PEAuUWApogGYCGOcZIJGA5jgJZwAWSIAtpXASShcAxlAIBiYewgQA+lJkgAukA", current: current))
+    XCTAssertEqual(try LegacyTestSettingsLinkImporter.preset(
+      from: "typebar://test?testSettings=NoIg7g9gTgJgziANAVgAyIHYFcA2PEAuUWApogGYCGOcZIJGA5jgJZwAWSIAtpXASShcAxlAIBiYewgQA+lJkgAukA", current: current), words)
     XCTAssertEqual(current, SavedTestPreset(
       configuration: .timed(seconds: 30, difficulty: .normal, language: .german),
       quoteID: nil, customText: nil))

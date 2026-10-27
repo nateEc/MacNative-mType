@@ -70,33 +70,48 @@ extension WebsiteConfigValue {
 /// nonfinite numbers and negative zero follow JSON.stringify's value behavior.
 /// Key order/number spelling are deterministic, not byte-identical JS output.
 enum WebsiteConfigJSONWriter {
-  static func write(_ value: WebsiteConfigValue) -> String {
-    if let units = value.stringUnits { return quoted(units) }
+  static func write(_ value: WebsiteConfigValue, asciiOnly: Bool = true) -> String {
+    if let units = value.stringUnits { return quoted(units, asciiOnly: asciiOnly) }
     if let members = value.objectMembers {
       let unique = Dictionary(members.map { ($0.key, $0.value) }, uniquingKeysWith: { _, new in new })
       return "{" + unique.keys.sorted { $0.lexicographicallyPrecedes($1) }
-        .map { quoted($0) + ":" + write(unique[$0]!) }.joined(separator: ",") + "}"
+        .map { quoted($0, asciiOnly: asciiOnly) + ":" + write(unique[$0]!, asciiOnly: asciiOnly) }.joined(separator: ",") + "}"
     }
     switch value {
     case .null: return "null"
     case .bool(let flag): return flag ? "true" : "false"
-    case .number(let number): return !number.isFinite ? "null" : number == 0 ? "0" : String(number)
-    case .array(let values): return "[" + values.map(write).joined(separator: ",") + "]"
+    case .number(let number): return !number.isFinite ? "null" : number == 0 ? "0"
+      : asciiOnly ? String(number) : WebsiteNumberText.decimal(number)
+    case .array(let values): return "[" + values.map { write($0, asciiOnly: asciiOnly) }.joined(separator: ",") + "]"
     default: preconditionFailure("String and object cases are handled above")
     }
   }
 
-  private static func quoted(_ units: [UInt16]) -> String {
-    var result = "\""
-    for unit in units {
+  private static func quoted(_ units: [UInt16], asciiOnly: Bool) -> String {
+    var result = "\"", index = 0
+    while index < units.count {
+      let unit = units[index]
+      if !asciiOnly, (0xd800...0xdbff).contains(unit), index + 1 < units.count,
+        (0xdc00...0xdfff).contains(units[index + 1]) {
+        let scalar = 0x10000 + (UInt32(unit) - 0xd800) * 0x400 + UInt32(units[index + 1]) - 0xdc00
+        result.unicodeScalars.append(UnicodeScalar(scalar)!); index += 2; continue
+      }
       switch unit {
       case 34: result += "\\\""
       case 92: result += "\\\\"
+      case 8 where !asciiOnly: result += "\\b"
+      case 9 where !asciiOnly: result += "\\t"
+      case 10 where !asciiOnly: result += "\\n"
+      case 12 where !asciiOnly: result += "\\f"
+      case 13 where !asciiOnly: result += "\\r"
       case 32...126: result.unicodeScalars.append(UnicodeScalar(unit)!)
+      case 127...0xffff where !asciiOnly && !(0xd800...0xdfff).contains(unit):
+        result.unicodeScalars.append(UnicodeScalar(unit)!)
       default:
         let hex = String(unit, radix: 16)
         result += "\\u" + String(repeating: "0", count: 4 - hex.count) + hex
       }
+      index += 1
     }
     return result + "\""
   }
