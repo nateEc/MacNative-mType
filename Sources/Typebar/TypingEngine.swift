@@ -5995,7 +5995,7 @@ struct TypingSession {
     guard !isFinished, [.words, .time].contains(configuration.mode), [.words, .time].contains(projected.mode),
       configuration.language == projected.language,
       configuration.wordPoolBaseLanguage == projected.wordPoolBaseLanguage,
-      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers),
+      (!TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) || unitTargets.noSpace || hasNoSpaceWordSegmentation),
       configuration.modifiers.filter({ $0 != .noQuit }) == projected.modifiers.filter({ $0 != .noQuit }),
       !streamsLiveContent, var cursor = generatedCodeContinuation ?? retainedCandidateContinuation else { return false }
     var next = configuration

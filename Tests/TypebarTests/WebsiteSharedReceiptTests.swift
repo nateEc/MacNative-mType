@@ -395,15 +395,22 @@ import Observation
   }
 
   func testNewNoQuitAppliesWordLimitToSameAttemptWithoutRestartOrSavingNosave() async throws {
+    try await compareLiveWordLimitReceipt(noSpace: false)
+    try await compareLiveWordLimitReceipt(noSpace: true)
+  }
+
+  private func compareLiveWordLimitReceipt(noSpace: Bool) async throws {
     let f = try Fixture(); defer { f.close() }
     let workflow = try f.makeWorkflow(); defer { workflow.stop() }
-    try await workflow.apply(json: #"{"mode":"words","words":5}"#, systemIsDark: false)
+    try await workflow.apply(json: noSpace ? #"{"mode":"words","words":5,"funbox":["nospace"]}"#
+      : #"{"mode":"words","words":5}"#, systemIsDark: false)
     var active = f.page.state; active.session.insertBatch("a"); f.page.replace(active)
     let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
     let before = f.page.state.session.generationState
     let prompt = f.page.state.session.prompt, disk = try f.register.read().revision
     guard case .applied = try await workflow.applySharedSettings(json:
-      #"["words","17",null,null,null,null,null,["no_quit"]]"#,
+      noSpace ? #"["words","17",null,null,null,null,null,["nospace","no_quit"]]"#
+        : #"["words","17",null,null,null,null,null,["no_quit"]]"#,
       replacing: application, systemIsDark: false) else { return XCTFail("New word limit was withheld") }
     XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.attempt)
     XCTAssertEqual(f.page.state.session.promptTargetID, before.target)

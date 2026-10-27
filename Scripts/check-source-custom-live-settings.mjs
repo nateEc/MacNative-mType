@@ -20,8 +20,11 @@ assert.ok(begin > 0);
 const timer = read('frontend/src/ts/test/test-timer.ts');
 const timerBegin = timer.indexOf('function checkIfTimeIsUp('), timerEnd = timer.indexOf('\nfunction playTimeWarning(', timerBegin);
 assert.ok(timerBegin >= 0 && timerEnd > timerBegin);
-const ordinary = process.argv[3] === '--ordinary';
-const pool = ordinary ? ['alpha bravo charlie delta echo foxtrot golf hotel india']
+const unicode = process.argv[3] === '--ordinary-unicode';
+const noSpace = process.argv[3] === '--ordinary-no-space' || unicode;
+const ordinary = process.argv[3] === '--ordinary' || noSpace;
+// Two initial letters leave an active prefix even in the one-word fixture.
+const pool = ordinary ? [unicode ? 'ae \u0301 🙂 x' : 'alpha bravo charlie delta echo foxtrot golf hotel india']
   : [Array.from({length:111}, (_,i)=>'old'+i).join(' '), 'harbor stone'];
 const cases = ordinary ? [['words',5,'words',17.5], ['words',5,'words',3], ['words',5,'words',0],
   ['words',5,'time',2.5], ['time',100,'words',3], ['time',100,'words',105],
@@ -37,13 +40,13 @@ for (const entry of cases) {
   const live = {mode:'repeat',limitMode:'word',limit:100}, records = [], events = [];
   const context = vm.createContext({Math:math, console:{debug(){}}, Config:{mode:ordinary ? mode : 'custom',
     words:initialCount,time:30,language:'english',
-    punctuation:false,numbers:false,funbox:['no_quit']},
+    punctuation:false,numbers:false,funbox:noSpace?['nospace','no_quit']:['no_quit']},
     CustomText:{getMode:()=>live.mode,getLimitMode:()=>live.limitMode,getLimitValue:()=>live.limit},
     TestWords:{words:records}, isRepeated:()=>false, currentLanguage:{originalPunctuation:false},
     PolyglotWordset:class {}, WordGenError:Error, PractiseWords:{before:{mode:null}},
     getFunboxWordsFrequency:()=>undefined, getFunboxSection:async()=>[],
     getFunboxWord:value=>value, isCurrentlyUsingFunboxSection:false,
-    isFunboxActiveWithFunction:()=>false, isFunboxActiveWithProperty:()=>false,
+    isFunboxActiveWithFunction:()=>false, isFunboxActiveWithProperty:p=>noSpace&&p==='nospace',
     applyLazyModeToWord:value=>value, applyBritishEnglishToWord:async value=>value,
     applyFunboxesToWord:value=>value, getCurrentQuote:()=>null,
     timer:null,timerDebug:false,slowTimerCount:0,clearTimeout(){},Caret:{hide(){}},SlowTimer:{clear(){}},

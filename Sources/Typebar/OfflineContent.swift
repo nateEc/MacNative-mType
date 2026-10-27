@@ -6303,7 +6303,7 @@ struct GeneratedCandidateContinuation {
           section = WeakSpotWordSelection.word(from: pool, scores: weakSpotScores ?? self.weakSpotScores,
             random: nextRandomWordIndex) ?? section
         }
-        sectionWords = section.components(separatedBy: " ")
+        sectionWords = section.unicodeScalars.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
         nextSectionWord = 0
       }
       var word = sectionWords[nextSectionWord]
@@ -6399,7 +6399,7 @@ struct GeneratedCandidateContinuation {
     let earlier = previousTargets.dropLast().last?.filter { !".?!\":-,'".contains($0) }.lowercased() ?? ""
     var word = initialCandidate
     func candidateComparison(_ candidate: String, firstDraw: Bool) -> String {
-      let first = candidate.components(separatedBy: " ")[0]
+      let first = String(candidate.unicodeScalars.prefix { $0 != " " })
       let value = firstDraw ? first.lowercased() : first
       return configuration.modifiers.contains(.lazyLatin)
         ? (polyglotCandidates?.lazyWord(value)
