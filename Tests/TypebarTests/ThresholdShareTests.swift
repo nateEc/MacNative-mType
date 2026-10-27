@@ -122,9 +122,9 @@ final class ThresholdShareTests: XCTestCase {
     var invalid = root
     invalid["selectionData"] = try JSONSerialization.data(withJSONObject: inner).base64EncodedString()
     XCTAssertThrowsError(try TestConfigurationShare.preset(from: link(invalid)))
-    invalid["version"] = 4
+    invalid["version"] = 5
     XCTAssertThrowsError(try TestConfigurationShare.preset(from: link(invalid))) {
-      XCTAssertEqual($0 as? TestConfigurationShareError, .unsupportedVersion(4))
+      XCTAssertEqual($0 as? TestConfigurationShareError, .unsupportedVersion(5))
     }
     invalid = root
     invalid["selectionData"] = try JSONEncoder().encode(SavedTestPreset(configuration: .words(25))).base64EncodedString()

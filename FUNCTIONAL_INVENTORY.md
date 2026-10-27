@@ -1,9 +1,10 @@
 # 功能盘点与追踪表
 
-当前成绩归档增量已通过扩大回归：2664 项、2 项跳过、0 失败，同日志 96 项必需源码证据及不启动应用的打包检查通过。新增 v36 解决合法无限记忆阻断成绩备份；完整配置、预设／旧设置／分享交互仍待完成，原版八项选择分享另记缺口。此前 6370 项整套结果属于阈值／本机成绩批次，959 项扩大属于原生导出窗口批次，均不能替代本批整套验证；完整重写继续。
+当前预设存储／原生传输增量通过扩大回归：867 项、1 项跳过、0 失败，同日志 96 项必需源码证据通过；真实全局无限值应用仍拒绝并保持原状态，原版八项分享仍未实现。此前成绩归档 v36 的 2664 项、阈值／本机成绩的 6370 项整套及原生导出窗口的 959 项属于各自历史批次，不能替代本批整套验证；完整重写继续。
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| THRESHOLD-PRESET-MEMORY-02 | 网站无限速度记忆的预设存储与原生传输 | 合法网站阈值数值域；原版八项分享不携带阈值，此处是原生格式补全 | LocalPresetCodec v2；原生链接 v4；活动选择外层 v2；WEBSITE_PRESET_MEMORY_CONTRACT.md | 部分完成：真实记录创建／更新、18 组模式与数值、SQLite 重开、活动选择保存、链接解码与隐私拒绝通过。扩大 867 项、1 项跳过、0 失败，同日志 96 项源码证据及不启动应用的打包／原创性通过。真实全局设置应用仍明确拒绝并保留原状态，不能把假回调成功视为生产应用通过；无限预设归档、完整网站备份及原版八项分享仍未完成。 |
 | THRESHOLD-RESULT-ARCHIVE-01 | 含无限速度记忆的成绩备份与恢复 | 原版成绩 CSV 不含阈值记忆；本机成绩 v2 已接纳合法网站状态，通用 JSON 归档仍直接编码其配置 | DataTransfer 归档 v36／websiteResultsData；LocalResultConfigurationCodec 有限载体；WEBSITE_RESULT_ARCHIVE_CONTRACT.md | 部分完成：三处实际反例后新增独立版本化载荷，18 组模式、旧有限归档、完整元数据、拒绝边界、SQLite 重开及重复恢复通过。扩大 2664 项、2 项跳过、0 失败，同日志 96 项源码证据及打包／原创性通过；完整网站配置文件、无限预设／活动选择／旧设置和分享仍未完成，实体文件流程与独立进程恢复待验。 |
 | SHARE-SOURCE-EIGHT-SLOTS-01 | 原版八项可选分享与默认空载荷 | components/modals/ShareTestSettings.tsx 的完整 form／url；utils/misc.ts getMode2；lz-ts 1.1.2 | 当前 TestConfigurationShareView 固定生成自有 typebar://test 载荷，未提供原版八个选择项 | 未完成：原版八项默认全关，按 getConfig／当前引语／独立 CustomText.getData 选择后压缩，阈值记忆不在该载荷内。当前原生格式携带不同字段，不能用其往返通过宣称原版选择、隐藏状态或 URL 行为已实现。需保持自有引语身份及禁止复制原版资产的约束，另行验证发送与接收。 |
 | CFG-EXPORT-CURRENT-01 | 当前配置 JSON 的两个导出入口 | commandline/lists.ts exportSettingsJSON；设置页 ImportExport.tsx；config/store.ts／setters.ts／lifecycle.ts | WebsiteConfigExport／WebsiteConfigClipboardExport；TypebarApp 命令派发与设置页按钮；CONFIG_EXPORT_CONTRACT.md；CONFIG_EXPORT_NATIVE_UI_CONTRACT.md | 部分完成：216 组源快照通过；真实窗口发现并修复空白复制框，补完整文字系统及内容断言。真实命令交接、No Quit、暖无限记忆和生产 Root 延迟回退／控件全选通过。最终扩大 959 项零失败零跳过，同日志 96 项源码证据及 debug 打包／原创性通过；系统鼠标、真实剪贴板拒绝及 IME 焦点交互待验收，整套客户端和完整 readiness 未跑。 |

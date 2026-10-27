@@ -24,7 +24,7 @@ enum TestConfigurationShareError: Error, Equatable, LocalizedError {
 enum TestConfigurationShare {
     private static let scheme = "typebar"
     private static let host = "test"
-    private static let version = 3
+    private static let version = 4
     private static let maximumPayloadLength = 16_384
 
     private struct Payload: Codable, Equatable {
@@ -58,11 +58,17 @@ enum TestConfigurationShare {
         guard isValid(sharedPreset) else { throw TestConfigurationShareError.invalidConfiguration }
         let data: Data
         if hasSource {
-            let encoder = JSONEncoder()
-            encoder.userInfo[PracticeThresholdSource.codingCapability] = true
-            let selection = try encoder.encode(sharedPreset)
-            guard try decodeSourceSelection(selection) == sharedPreset else { throw TestConfigurationShareError.invalidConfiguration }
-            data = try JSONEncoder().encode(SourcePayload(version: version, selectionData: selection))
+            if LocalResultConfigurationCodec.containsWebsiteInfiniteSpeedMemory(sharedPreset.configuration) {
+                let selection = try LocalPresetCodec.encode(sharedPreset)
+                guard try decodeWebsiteSelection(selection) == sharedPreset else { throw TestConfigurationShareError.invalidConfiguration }
+                data = try JSONEncoder().encode(SourcePayload(version: 4, selectionData: selection))
+            } else {
+                let encoder = JSONEncoder()
+                encoder.userInfo[PracticeThresholdSource.codingCapability] = true
+                let selection = try encoder.encode(sharedPreset)
+                guard try decodeSourceSelection(selection) == sharedPreset else { throw TestConfigurationShareError.invalidConfiguration }
+                data = try JSONEncoder().encode(SourcePayload(version: 3, selectionData: selection))
+            }
         } else {
             data = try JSONEncoder().encode(Payload(version: 2, preset: sharedPreset))
         }
@@ -95,10 +101,12 @@ enum TestConfigurationShare {
         guard (1...version).contains(header.version) else { throw TestConfigurationShareError.unsupportedVersion(header.version) }
         let decoded: SavedTestPreset
         do {
-            if header.version == 3 {
+            if header.version == 3 || header.version == 4 {
                 guard header.hasSource, !header.hasPreset else { throw TestConfigurationShareError.invalidPayload }
                 let payload = try JSONDecoder().decode(SourcePayload.self, from: data)
-                decoded = try decodeSourceSelection(payload.selectionData)
+                decoded = header.version == 4
+                    ? try decodeWebsiteSelection(payload.selectionData)
+                    : try decodeSourceSelection(payload.selectionData)
             } else {
                 guard header.hasPreset, !header.hasSource else { throw TestConfigurationShareError.invalidPayload }
                 decoded = try JSONDecoder().decode(Payload.self, from: data).preset
@@ -107,6 +115,14 @@ enum TestConfigurationShare {
         let sharedPreset = testConfigurationOnly(decoded)
         guard isValid(sharedPreset) else { throw TestConfigurationShareError.invalidConfiguration }
         return sharedPreset
+    }
+
+    private static func decodeWebsiteSelection(_ data: Data) throws -> SavedTestPreset {
+        let preset = try LocalPresetCodec.decode(data)
+        guard LocalResultConfigurationCodec.containsWebsiteInfiniteSpeedMemory(preset.configuration),
+              preset.settingsSnapshot == nil, preset.activeResultTags == nil, preset.settingGroups == nil,
+              isValid(preset) else { throw TestConfigurationShareError.invalidConfiguration }
+        return preset
     }
 
     private static func decodeSourceSelection(_ data: Data) throws -> SavedTestPreset {

@@ -1,6 +1,7 @@
 import Foundation
 
-/// Only result configuration bytes (and their value-only workers) use this format.
+/// Versioned configuration bytes for result records and explicitly adopting
+/// transports. Ordinary TestConfiguration JSON stays strict.
 enum LocalResultConfigurationCodec {
   enum Failure: Error { case invalidConfiguration }
   private static let kind = "typebar.result-configuration"
