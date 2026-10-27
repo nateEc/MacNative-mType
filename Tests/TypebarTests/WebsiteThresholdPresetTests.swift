@@ -136,7 +136,7 @@ import XCTest
     XCTAssertThrowsError(try LocalPresetCodec.encode(bad))
   }
 
-  func testExistingFiniteSettingsApplicationStillRejectsWithoutPublishingSuccessOrMutation() throws {
+  func testNativeLinkAppliesInfiniteMemoriesToExistingProfileAndSurvivesColdReload() throws {
     let suite = "typebar.website-preset-admission.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     let notices = LocalNoticeCenter()
@@ -146,19 +146,24 @@ import XCTest
     let settings = AppSettings(defaults: defaults,
       feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
     let before = settings.snapshot
-    let stored = defaults.data(forKey: ThresholdSettingsStore.storageKey)
     let link = try TestConfigurationShare.link(for: preset(speedMode: .custom, burstMode: .flex))
     let result = TestConfigurationShareActions.apply(link, current: .init(configuration: .words(25, rules: settings.inputRules)),
       challenges: [], notices: notices, applyPreset: { value in
-        guard PresetSettingsApplication.commit(original: value, resolved: value,
-          configuration: value.configuration, to: settings, appliesGlobalSettings: true) else { return nil }
-        return value
+        guard let prepared = PresetSourcePreparation.preparing(value, to: settings, appliesGlobalSettings: true),
+          PresetSettingsApplication.commit(original: value, resolved: prepared.preset,
+          configuration: prepared.preset.configuration, to: settings, appliesGlobalSettings: true,
+          expectedSourceState: prepared.baseline) else { return nil }
+        return prepared.preset
       }, loadChallenge: { _ in .rejected })
-    XCTAssertEqual(result.outcome, .rejected)
-    XCTAssertFalse(result.shouldDismiss)
-    XCTAssertEqual(settings.snapshot, before)
-    XCTAssertEqual(defaults.data(forKey: ThresholdSettingsStore.storageKey), stored)
-    XCTAssertFalse(notices.history.contains { $0.level == .success })
+    XCTAssertEqual(result.outcome, .applied)
+    XCTAssertTrue(result.shouldDismiss)
+    let source = try XCTUnwrap(preset(speedMode: .custom, burstMode: .flex).configuration.rules.thresholdSource)
+    let expected = source.applying(to: before)
+    XCTAssertEqual(settings.snapshot, expected)
+    let reopened = AppSettings(defaults: defaults,
+      feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+    XCTAssertEqual(reopened.snapshot, expected)
+    XCTAssertTrue(notices.history.contains { $0.level == .success })
   }
 
   private func link(_ object: [String: Any]) throws -> String {

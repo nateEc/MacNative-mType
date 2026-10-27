@@ -1,5 +1,7 @@
 # 固定源码对照的执行证据
 
+2026-10-28 无限速度预设实际应用与偏好冷读：必需清单保持 108 项，不增加来源比较方法；新增证据针对原生存储与生产应用路径。先行反例、有限 v4／带标签 v5 边界和后续编辑语义见 [预设记忆合同](WEBSITE_PRESET_MEMORY_CONTRACT.md)。最终扩大 445 项、1 历史磁盘迁移跳过、0 失败（287.793 秒，驱动 296.074 秒），同日志全部 108 项必需证据通过、输入哈希不变（`/tmp/typebar-infinite-settings-regression.log` 及同名 JSON／evidence.log）。debug 包／签名／资源／原创性检查通过（33.158 秒，`/tmp/typebar-infinite-settings-package.log` 及同名 JSON），没有启动主程序。设置对象冷读不称独立进程恢复；跳过项、整套客户端及完整 readiness 不计完成。以下为历史批次。
+
 2026-10-28 普通原生窗口分享捕获新增必需方法，清单 108 项。八种原生快照和 1920 个可表达选择掩码与完整固定 URL 生产函数／getMode2／实际 lz-ts 比较；自有引语参数的 128 个掩码排除并由原生拒绝检查覆盖，不称网页引语 ID 等价。最终扩大 680 项、1 历史磁盘迁移跳过、0 失败（362.863 秒，驱动 398.090 秒），同日志全部 108 项必需证据通过、输入哈希不变（`/tmp/typebar-native-share-publication-final.log` 及同名 JSON／evidence.log）。debug 包／签名／资源／原创性检查通过（32.976 秒，`/tmp/typebar-native-share-package.log` 及同名 JSON），没有启动主程序。form store／平台适配器边界、parseInt 保值及文本归属修正、探针截断故障见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。跳过项、整套客户端及完整 readiness 不计完成。以下为历史批次。
 
 2026-10-28 段首空格／组合音标边界修正：新增一项必需生成／计时方法，清单 107 项，新增普通与无空格共 18 组完整来源对照。原生三词完成另核对精确 UTF-16 和准确率；最终扩大回归 660 项零失败／零跳过（524.134 秒，驱动 532.427 秒），同日志全部 107 项必需证据通过、输入哈希不变（`/tmp/typebar-section-edge-final.log` 及同名 JSON／evidence.log）。debug 包／签名／资源／原创性通过（33.505 秒，`/tmp/typebar-section-edge-package.log` 及同名 JSON），没有启动主程序。产品红例与比较夹具纠正见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。未跑整套客户端或完整 readiness，不继承上一批整套结果。以下为历史记录。

@@ -1159,7 +1159,7 @@ final class AppSettings {
   func updateThresholdConfiguration(_ change: PracticeThresholdConfiguration.Change) -> Bool {
     guard allowsRestartingConfigurationChange, let current = thresholdSourceState else { return false }
     var configuration = current.configuration
-    do { try configuration.apply(change) } catch { return false }
+    do { try configuration.apply(change, allowingWebsiteValues: true) } catch { return false }
     let next = PracticeThresholdSource(configuration: configuration)
     guard ThresholdSettingsStore(defaults: defaults).save(next.applying(to: snapshot)) else { return false }
     thresholdSourceState = next
@@ -2428,11 +2428,11 @@ final class AppSettings {
   }
 
   /// Replace an existing complete source profile only after lossless staging
-  /// and a successful v4 save. Legacy adoption/downgrade is a separate policy.
+  /// and a successful versioned save. Legacy adoption is a separate policy.
   func canApplySourceSnapshot(_ incoming: AppSettingsSnapshot) -> Bool {
     guard allowsRestartingConfigurationChange, thresholdSourceState != nil,
       case .available = thresholdProfileRead,
-      let source = incoming.thresholdSource, source.configuration.isValid, source.matches(incoming)
+      let source = incoming.thresholdSource, source.configuration.isValidWebsite, source.matches(incoming)
     else { return false }
     return AppSettings(validating: incoming, defaults: defaults).snapshot == incoming
   }

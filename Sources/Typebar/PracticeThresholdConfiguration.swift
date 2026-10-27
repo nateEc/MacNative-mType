@@ -40,7 +40,7 @@ struct PracticeThresholdConfiguration: Codable, Equatable {
       && minimumAccuracyCustomValue.isFinite && (0...100).contains(minimumAccuracyCustomValue)
   }
 
-  mutating func apply(_ change: Change) throws {
+  mutating func apply(_ change: Change, allowingWebsiteValues: Bool = false) throws {
     var updated = self
     switch change {
     case .minimumWpm(let mode, let value):
@@ -53,7 +53,7 @@ struct PracticeThresholdConfiguration: Codable, Equatable {
       if let mode { updated.minimumWordBurstMode = mode }
       if let value { updated.minimumWordBurstCustomValue = value }
     }
-    guard updated.isValid else { throw ValidationError.invalidCustomValue }
+    guard allowingWebsiteValues ? updated.isValidWebsite : updated.isValid else { throw ValidationError.invalidCustomValue }
     self = updated
   }
 

@@ -94,7 +94,10 @@ enum PresetSettingsApplication {
       minimumAccuracy: snapshot.minimumAccuracy, minimumWpm: snapshot.minimumWpm,
       minimumWordBurstWpm: snapshot.minimumWordBurstWpm,
       minimumWordBurstMode: snapshot.minimumWordBurstMode)
-    rules.thresholdSource = snapshot.thresholdSource
+    if let source = snapshot.thresholdSource {
+      guard source.configuration.isValidWebsite, source.matches(snapshot) else { return false }
+      rules = source.applying(to: rules)
+    }
     return configuration.rules == rules && configuration.difficulty == snapshot.difficulty
       && configuration.englishVariant == snapshot.englishVariant
       && configuration == configuration.with(modifiers: EffectiveTestModifierPolicy.modifiers(
