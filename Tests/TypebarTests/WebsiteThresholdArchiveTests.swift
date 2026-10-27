@@ -90,7 +90,7 @@ import XCTest
 
   func testVersionBoundaryAndLegacyResultEncodingRemainStrict() throws {
     let bytes = try archiveData(), root = try object(bytes)
-    XCTAssertEqual(root["version"] as? Int, 36)
+    XCTAssertEqual(root["version"] as? Int, TypebarArchive.currentVersion)
     XCTAssertNotNil(root["websiteResultsData"])
     XCTAssertNil(root["thresholdResultsData"])
     XCTAssertNil(root["results"])
@@ -109,7 +109,7 @@ import XCTest
       XCTAssertEqual(try TypebarDataTransfer.importArchive(from: JSONSerialization.data(withJSONObject: old)).results, [finite])
     }
     for (key, value): (String, Any) in [("thresholdResultsData", Data("[]".utf8).base64EncodedString()),
-      ("results", []), ("websiteResultsData", NSNull()), ("version", 37)] {
+      ("results", []), ("websiteResultsData", NSNull()), ("version", TypebarArchive.currentVersion + 1)] {
       var invalid = root; invalid[key] = value
       XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: JSONSerialization.data(withJSONObject: invalid)), key)
     }

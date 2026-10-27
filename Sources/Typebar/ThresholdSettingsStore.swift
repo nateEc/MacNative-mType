@@ -39,7 +39,7 @@ struct ThresholdSettingsStore {
     let infiniteSpeedMemory: InfiniteSpeedMemory
   }
 
-  private func replacing(_ snapshot: AppSettingsSnapshot, speed: Double, burst: Double) throws -> AppSettingsSnapshot {
+  private static func replacing(_ snapshot: AppSettingsSnapshot, speed: Double, burst: Double) throws -> AppSettingsSnapshot {
     guard let source = snapshot.thresholdSource, source.configuration.isValidWebsite, source.matches(snapshot)
     else { throw CocoaError(.coderInvalidValue) }
     let raw = source.configuration
@@ -51,14 +51,22 @@ struct ThresholdSettingsStore {
 
   func read() -> ThresholdSettingsRead {
     guard let value = defaults.object(forKey: Self.storageKey) else { return .missing }
-    guard let data = value as? Data, let snapshot = decode(data) else { return .unavailable }
+    guard let data = value as? Data, let snapshot = Self.decodeDocument(data) else { return .unavailable }
     return .available(snapshot)
   }
 
   @discardableResult
   func save(_ snapshot: AppSettingsSnapshot) -> Bool {
-    guard let source = snapshot.thresholdSource, source.configuration.isValidWebsite, source.matches(snapshot) else { return false }
     if case .unavailable = read() { return false }
+    guard let data = Self.encodeDocument(snapshot) else { return false }
+    defaults.set(data, forKey: Self.storageKey)
+    return defaults.data(forKey: Self.storageKey) == data
+  }
+
+  /// Pure document codec, also explicitly adopted by versioned archives.
+  /// No preference access or source adoption happens here.
+  static func encodeDocument(_ snapshot: AppSettingsSnapshot) -> Data? {
+    guard let source = snapshot.thresholdSource, source.configuration.isValidWebsite, source.matches(snapshot) else { return nil }
     let encoder = JSONEncoder()
     encoder.userInfo[PracticeThresholdSource.codingCapability] = true
     let memory = InfiniteSpeedMemory(minimumWpm: source.configuration.minimumWpmCustomValue == .infinity,
@@ -71,13 +79,12 @@ struct ThresholdSettingsStore {
           burst: memory.minimumWordBurst ? 100 : source.configuration.minimumWordBurstCustomValue)
         data = try encoder.encode(WebsiteDocument(version: 5, settings: finite, infiniteSpeedMemory: memory))
       } else { data = try encoder.encode(Document(version: Self.currentVersion, settings: snapshot)) }
-    } catch { return false }
-    guard decode(data) == snapshot else { return false }
-    defaults.set(data, forKey: Self.storageKey)
-    return defaults.data(forKey: Self.storageKey) == data
+    } catch { return nil }
+    guard decodeDocument(data) == snapshot else { return nil }
+    return data
   }
 
-  private func decode(_ data: Data) -> AppSettingsSnapshot? {
+  static func decodeDocument(_ data: Data) -> AppSettingsSnapshot? {
     // Inspect only the generation before allowing any source-aware decoding.
     guard let header = try? JSONDecoder().decode(Header.self, from: data) else { return nil }
     let decoder = JSONDecoder()

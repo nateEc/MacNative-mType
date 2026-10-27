@@ -1,5 +1,7 @@
 # 固定源码对照的执行证据
 
+2026-10-28 无限设置／预设接入归档 v37：必需清单保持 108 项，本轮新增证据验证原生归档和恢复路径，不增加来源执行方法。18 组数值／模式、版本与墓碑拒绝、真实文件／设置冷读／SQLite 重开和重复导入见 [预设记忆合同](WEBSITE_PRESET_MEMORY_CONTRACT.md)。最终扩大 2642 项、1 可选十万词耐久检查跳过、0 失败（718.556 秒，驱动 728.704 秒），同日志全部 108 项必需证据通过、输入哈希不变（`/tmp/typebar-website-settings-archive-regression.log` 及同名 JSON／evidence.log）。debug 包／签名／资源／原创性检查通过（32.596 秒，`/tmp/typebar-website-settings-archive-package.log` 及同名 JSON），没有启动主程序。没有运行独立进程恢复、整套客户端或完整 readiness；跳过项不计通过。以下为历史批次。
+
 2026-10-28 无限速度预设实际应用与偏好冷读：必需清单保持 108 项，不增加来源比较方法；新增证据针对原生存储与生产应用路径。先行反例、有限 v4／带标签 v5 边界和后续编辑语义见 [预设记忆合同](WEBSITE_PRESET_MEMORY_CONTRACT.md)。最终扩大 445 项、1 历史磁盘迁移跳过、0 失败（287.793 秒，驱动 296.074 秒），同日志全部 108 项必需证据通过、输入哈希不变（`/tmp/typebar-infinite-settings-regression.log` 及同名 JSON／evidence.log）。debug 包／签名／资源／原创性检查通过（33.158 秒，`/tmp/typebar-infinite-settings-package.log` 及同名 JSON），没有启动主程序。设置对象冷读不称独立进程恢复；跳过项、整套客户端及完整 readiness 不计完成。以下为历史批次。
 
 2026-10-28 普通原生窗口分享捕获新增必需方法，清单 108 项。八种原生快照和 1920 个可表达选择掩码与完整固定 URL 生产函数／getMode2／实际 lz-ts 比较；自有引语参数的 128 个掩码排除并由原生拒绝检查覆盖，不称网页引语 ID 等价。最终扩大 680 项、1 历史磁盘迁移跳过、0 失败（362.863 秒，驱动 398.090 秒），同日志全部 108 项必需证据通过、输入哈希不变（`/tmp/typebar-native-share-publication-final.log` 及同名 JSON／evidence.log）。debug 包／签名／资源／原创性检查通过（32.976 秒，`/tmp/typebar-native-share-package.log` 及同名 JSON），没有启动主程序。form store／平台适配器边界、parseInt 保值及文本归属修正、探针截断故障见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。跳过项、整套客户端及完整 readiness 不计完成。以下为历史批次。

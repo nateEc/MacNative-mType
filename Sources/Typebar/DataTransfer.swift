@@ -367,7 +367,9 @@ struct TypebarArchive: Codable, Equatable {
     // Reject this archive generation there rather than silently misderive it.
     // Version 36 additionally carries result configurations with remembered
     // website infinite speeds through a separately validated finite payload.
-    static let currentVersion = 36
+    // Version 37 explicitly adopts the settings and preset codecs for the
+    // same website speed memories, without broadening ordinary JSON.
+    static let currentVersion = 37
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -481,6 +483,7 @@ struct TypebarArchive: Codable, Equatable {
         case exportedAtReferenceTime
         case localPersonalBestLedgerData
         case thresholdSettingsData, thresholdResultsData, thresholdPresetsData, websiteResultsData
+        case websiteSettingsData, websitePresetsData
     }
 
     func encode(to encoder: Encoder) throws {
@@ -492,6 +495,10 @@ struct TypebarArchive: Codable, Equatable {
         else { throw DataTransferError.unsupportedVersion(version) }
         let hasWebsiteResults = results.contains { LocalResultConfigurationCodec.containsWebsiteInfiniteSpeedMemory($0.configuration) }
         guard !hasWebsiteResults || version >= 36 else { throw DataTransferError.unsupportedVersion(version) }
+        let hasWebsiteSettings = WebsiteArchiveSettingsPayload.containsInfiniteMemory(settings)
+        let hasWebsitePresets = WebsiteArchivePresetPayload.containsInfiniteMemory(presets)
+        guard !(hasWebsiteSettings || hasWebsitePresets) || version >= 37
+        else { throw DataTransferError.unsupportedVersion(version) }
         try Self.validateSourcePresets(presets)
         var values = encoder.container(keyedBy: CodingKeys.self)
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(results)
@@ -514,13 +521,21 @@ struct TypebarArchive: Codable, Equatable {
         if hasSource {
             // Required legacy fields are absent: an old decoder cannot accept
             // a lossy projection by silently ignoring the new source state.
-            try values.encode(ThresholdArchivePayload.encode(settings), forKey: .thresholdSettingsData)
+            if hasWebsiteSettings {
+                try values.encode(WebsiteArchiveSettingsPayload.encode(settings), forKey: .websiteSettingsData)
+            } else {
+                try values.encode(ThresholdArchivePayload.encode(settings), forKey: .thresholdSettingsData)
+            }
             if hasWebsiteResults {
                 try values.encode(WebsiteArchiveResultPayload.encode(results), forKey: .websiteResultsData)
             } else {
                 try values.encode(ThresholdArchivePayload.encode(results), forKey: .thresholdResultsData)
             }
-            try values.encode(ThresholdArchivePayload.encode(presets), forKey: .thresholdPresetsData)
+            if hasWebsitePresets {
+                try values.encode(WebsiteArchivePresetPayload.encode(presets), forKey: .websitePresetsData)
+            } else {
+                try values.encode(ThresholdArchivePayload.encode(presets), forKey: .thresholdPresetsData)
+            }
         } else {
             try values.encode(settings, forKey: .settings)
             try values.encode(results, forKey: .results)
@@ -542,8 +557,14 @@ struct TypebarArchive: Codable, Equatable {
         version = try values.decode(Int.self, forKey: .version)
         guard (1...Self.currentVersion).contains(version) else { throw DataTransferError.unsupportedVersion(version) }
         let hasWebsiteResults = values.contains(.websiteResultsData)
+        let hasWebsiteSettings = values.contains(.websiteSettingsData)
+        let hasWebsitePresets = values.contains(.websitePresetsData)
+        guard (!hasWebsiteSettings || (version >= 37 && !values.contains(.thresholdSettingsData))),
+            (!hasWebsitePresets || (version >= 37 && !values.contains(.thresholdPresetsData)))
+        else { throw DataTransferError.unsupportedVersion(version) }
         let sourcePayload = values.contains(.thresholdSettingsData)
             || values.contains(.thresholdResultsData) || values.contains(.thresholdPresetsData) || hasWebsiteResults
+            || hasWebsiteSettings || hasWebsitePresets
         guard !hasWebsiteResults || (version >= 36 && !values.contains(.thresholdResultsData))
         else { throw DataTransferError.unsupportedVersion(version) }
         if sourcePayload {
@@ -559,7 +580,9 @@ struct TypebarArchive: Codable, Equatable {
         } else { localPersonalBestLedger = nil }
         exportedAt = try CompatibleDatePrecision.decode(from: values,
             legacyKey: .exportedAt, precisionKey: .exportedAtReferenceTime)
-        let decodedSettings = sourcePayload
+        let decodedSettings = hasWebsiteSettings
+            ? try WebsiteArchiveSettingsPayload.decode(values.decode(Data.self, forKey: .websiteSettingsData))
+            : sourcePayload
             ? try ThresholdArchivePayload.decode(AppSettingsSnapshot.self, from: values.decode(Data.self, forKey: .thresholdSettingsData))
             : try values.decode(AppSettingsSnapshot.self, forKey: .settings)
         guard sourcePayload || decodedSettings.thresholdSource == nil else { throw DataTransferError.unsupportedVersion(version) }
@@ -601,7 +624,9 @@ struct TypebarArchive: Codable, Equatable {
             : []
         deletedResultIDs = deletedResults.sorted { $0.uuidString < $1.uuidString }
         results = decodedResults.filter { !deletedResults.contains($0.id) }
-        let decodedPresets = sourcePayload
+        let decodedPresets = hasWebsitePresets
+            ? try WebsiteArchivePresetPayload.decode(values.decode(Data.self, forKey: .websitePresetsData))
+            : sourcePayload
             ? try ThresholdArchivePayload.decode([NamedPreset].self, from: values.decode(Data.self, forKey: .thresholdPresetsData))
             : try values.decode([NamedPreset].self, forKey: .presets)
         guard sourcePayload || !decodedPresets.contains(where: { PracticeThresholdSource.isPresent(in: $0.definition) })
@@ -2138,6 +2163,62 @@ private enum WebsiteArchiveResultPayload {
             tags: result.tags, accountTagSnapshot: result.accountTagSnapshot, quoteSource: result.quoteSource,
             prompt: result.prompt, replayEvents: result.replayEvents, targetWordDirectory: result.targetWordDirectory,
             challengePresentation: result.challengePresentation)
+    }
+}
+
+/// Only v37 adopts these document codecs. Both alternatives require actual
+/// infinite speed memory, preventing a finite payload from masquerading as it.
+private enum WebsiteArchiveSettingsPayload {
+    enum Failure: Error { case invalidPayload }
+    static func containsInfiniteMemory(_ snapshot: AppSettingsSnapshot) -> Bool {
+        guard let raw = snapshot.thresholdSource?.configuration else { return false }
+        return raw.minimumWpmCustomValue == .infinity || raw.minimumWordBurstCustomValue == .infinity
+    }
+    static func encode(_ snapshot: AppSettingsSnapshot) throws -> Data {
+        guard containsInfiniteMemory(snapshot), let data = ThresholdSettingsStore.encodeDocument(snapshot)
+        else { throw Failure.invalidPayload }
+        return data
+    }
+    static func decode(_ data: Data) throws -> AppSettingsSnapshot {
+        guard let snapshot = ThresholdSettingsStore.decodeDocument(data), containsInfiniteMemory(snapshot)
+        else { throw Failure.invalidPayload }
+        return snapshot
+    }
+}
+
+private enum WebsiteArchivePresetPayload {
+    enum Failure: Error { case invalidPayload }
+    private static let kind = "typebar.archive.website-presets"
+    private struct Record: Codable {
+        let id: UUID?
+        let name: String
+        let definitionData: Data
+    }
+    private struct Document: Codable {
+        let kind: String
+        let version: Int
+        let records: [Record]
+    }
+    static func containsInfiniteMemory(_ presets: [NamedPreset]) -> Bool {
+        presets.contains { LocalResultConfigurationCodec.containsWebsiteInfiniteSpeedMemory($0.definition.configuration) }
+    }
+    static func encode(_ presets: [NamedPreset]) throws -> Data {
+        guard containsInfiniteMemory(presets) else { throw Failure.invalidPayload }
+        let records = try presets.map {
+            Record(id: $0.id, name: $0.name, definitionData: try LocalPresetCodec.encode($0.definition))
+        }
+        let data = try JSONEncoder().encode(Document(kind: kind, version: 1, records: records))
+        guard try decode(data) == presets else { throw Failure.invalidPayload }
+        return data
+    }
+    static func decode(_ data: Data) throws -> [NamedPreset] {
+        let document = try JSONDecoder().decode(Document.self, from: data)
+        guard document.kind == kind, document.version == 1 else { throw Failure.invalidPayload }
+        let presets = try document.records.map {
+            NamedPreset(id: $0.id, name: $0.name, definition: try LocalPresetCodec.decode($0.definitionData))
+        }
+        guard containsInfiniteMemory(presets) else { throw Failure.invalidPayload }
+        return presets
     }
 }
 
