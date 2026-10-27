@@ -365,7 +365,9 @@ struct TypebarArchive: Codable, Equatable {
     // and the selected quote classification, not its streamed prompt length,
     // and independent Polyglot filter choices, including explicit exclusion.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 35
+    // Version 36 additionally carries result configurations with remembered
+    // website infinite speeds through a separately validated finite payload.
+    static let currentVersion = 36
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -478,7 +480,7 @@ struct TypebarArchive: Codable, Equatable {
             deletedResultFilterPresetIDs, activeTestSelection
         case exportedAtReferenceTime
         case localPersonalBestLedgerData
-        case thresholdSettingsData, thresholdResultsData, thresholdPresetsData
+        case thresholdSettingsData, thresholdResultsData, thresholdPresetsData, websiteResultsData
     }
 
     func encode(to encoder: Encoder) throws {
@@ -488,6 +490,8 @@ struct TypebarArchive: Codable, Equatable {
             || results.contains(where: { $0.configuration.rules.thresholdSource != nil })
         guard (!hasActiveSource || version >= 35), !hasSource || (34...Self.currentVersion).contains(version)
         else { throw DataTransferError.unsupportedVersion(version) }
+        let hasWebsiteResults = results.contains { LocalResultConfigurationCodec.containsWebsiteInfiniteSpeedMemory($0.configuration) }
+        guard !hasWebsiteResults || version >= 36 else { throw DataTransferError.unsupportedVersion(version) }
         try Self.validateSourcePresets(presets)
         var values = encoder.container(keyedBy: CodingKeys.self)
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(results)
@@ -511,7 +515,11 @@ struct TypebarArchive: Codable, Equatable {
             // Required legacy fields are absent: an old decoder cannot accept
             // a lossy projection by silently ignoring the new source state.
             try values.encode(ThresholdArchivePayload.encode(settings), forKey: .thresholdSettingsData)
-            try values.encode(ThresholdArchivePayload.encode(results), forKey: .thresholdResultsData)
+            if hasWebsiteResults {
+                try values.encode(WebsiteArchiveResultPayload.encode(results), forKey: .websiteResultsData)
+            } else {
+                try values.encode(ThresholdArchivePayload.encode(results), forKey: .thresholdResultsData)
+            }
             try values.encode(ThresholdArchivePayload.encode(presets), forKey: .thresholdPresetsData)
         } else {
             try values.encode(settings, forKey: .settings)
@@ -533,8 +541,11 @@ struct TypebarArchive: Codable, Equatable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decode(Int.self, forKey: .version)
         guard (1...Self.currentVersion).contains(version) else { throw DataTransferError.unsupportedVersion(version) }
+        let hasWebsiteResults = values.contains(.websiteResultsData)
         let sourcePayload = values.contains(.thresholdSettingsData)
-            || values.contains(.thresholdResultsData) || values.contains(.thresholdPresetsData)
+            || values.contains(.thresholdResultsData) || values.contains(.thresholdPresetsData) || hasWebsiteResults
+        guard !hasWebsiteResults || (version >= 36 && !values.contains(.thresholdResultsData))
+        else { throw DataTransferError.unsupportedVersion(version) }
         if sourcePayload {
             guard version >= 34, !values.contains(.settings), !values.contains(.results), !values.contains(.presets)
             else { throw DataTransferError.unsupportedVersion(version) }
@@ -564,9 +575,13 @@ struct TypebarArchive: Codable, Equatable {
         }
         settings = Self.sanitizedSettings(
             decodedSettings, deletedThemeIDs: deletedThemes, deletedKeyboardLayoutIDs: deletedKeyboardLayouts)
-        let decodedResults = sourcePayload
-            ? try ThresholdArchivePayload.decode([CompletedTestResult].self, from: values.decode(Data.self, forKey: .thresholdResultsData))
-            : try values.decode([CompletedTestResult].self, forKey: .results)
+        let decodedResults: [CompletedTestResult]
+        if hasWebsiteResults {
+            decodedResults = try WebsiteArchiveResultPayload.decode(values.decode(Data.self, forKey: .websiteResultsData))
+        } else if sourcePayload {
+            decodedResults = try ThresholdArchivePayload.decode([CompletedTestResult].self,
+                from: values.decode(Data.self, forKey: .thresholdResultsData))
+        } else { decodedResults = try values.decode([CompletedTestResult].self, forKey: .results) }
         guard sourcePayload || !decodedResults.contains(where: { $0.configuration.rules.thresholdSource != nil })
         else { throw DataTransferError.unsupportedVersion(version) }
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(decodedResults)
@@ -2065,6 +2080,67 @@ struct TypebarArchiveDocument: FileDocument {
 }
 
 /// Private to the v34 archive fields, not a capability for any other format.
+private enum WebsiteArchiveResultPayload {
+    enum Failure: Error { case invalidPayload }
+    private static let kind = "typebar.archive.website-results"
+    private struct Record: Codable, Equatable {
+        let finiteResult: CompletedTestResult
+        let configurationData: Data
+    }
+    private struct Document: Codable, Equatable {
+        let kind: String
+        let version: Int
+        let records: [Record]
+    }
+
+    static func encode(_ results: [CompletedTestResult]) throws -> Data {
+        guard results.contains(where: { LocalResultConfigurationCodec.containsWebsiteInfiniteSpeedMemory($0.configuration) })
+        else { throw Failure.invalidPayload }
+        let records = try results.map { result in
+            let configuration = try LocalResultConfigurationCodec.finiteWebsiteSpeedMemoryCarrier(result.configuration)
+            return Record(finiteResult: configuration == result.configuration ? result : replacingConfiguration(in: result, with: configuration),
+                configurationData: try LocalResultConfigurationCodec.encode(result.configuration))
+        }
+        let data = try ThresholdArchivePayload.encode(Document(kind: kind, version: 1, records: records))
+        guard try decode(data) == results else { throw Failure.invalidPayload }
+        return data
+    }
+
+    static func decode(_ data: Data) throws -> [CompletedTestResult] {
+        let document = try ThresholdArchivePayload.decode(Document.self, from: data)
+        guard document.kind == kind, document.version == 1 else { throw Failure.invalidPayload }
+        let results = try document.records.map { record in
+            let configuration = try LocalResultConfigurationCodec.decode(record.configurationData)
+            let carrier = try LocalResultConfigurationCodec.finiteWebsiteSpeedMemoryCarrier(configuration)
+            guard carrier == record.finiteResult.configuration else { throw Failure.invalidPayload }
+            return configuration == carrier ? record.finiteResult
+                : replacingConfiguration(in: record.finiteResult, with: configuration)
+        }
+        guard results.contains(where: { LocalResultConfigurationCodec.containsWebsiteInfiniteSpeedMemory($0.configuration) })
+        else { throw Failure.invalidPayload }
+        return results
+    }
+
+    /// The only changed property is configuration. The encode round-trip
+    /// guard detects any future captured metadata omitted from this copy.
+    private static func replacingConfiguration(in result: CompletedTestResult,
+        with configuration: TestConfiguration) -> CompletedTestResult {
+        .init(id: result.id, configuration: configuration, outcome: result.outcome,
+            startedAt: result.startedAt, finishedAt: result.finishedAt, afkDuration: result.afkDuration,
+            terminalTiming: result.terminalTiming, elapsedTime: result.elapsedTime,
+            typedCharacterCount: result.typedCharacterCount, correctCharacterCount: result.correctCharacterCount,
+            errorCount: result.errorCount, wpm: result.wpm, rawWpm: result.rawWpm, accuracy: result.accuracy,
+            preciseWpm: result.preciseWpm, preciseRawWpm: result.preciseRawWpm, preciseAccuracy: result.preciseAccuracy,
+            inputMetrics: result.inputMetrics, restartCount: result.restartCount,
+            priorAttemptEngagedDuration: result.priorAttemptEngagedDuration, incompletePractice: result.incompletePractice,
+            characterStats: result.characterStats, keyDurationSamples: result.keyDurationSamples,
+            keySpacingSamples: result.keySpacingSamples, keyOverlapDuration: result.keyOverlapDuration,
+            tags: result.tags, accountTagSnapshot: result.accountTagSnapshot, quoteSource: result.quoteSource,
+            prompt: result.prompt, replayEvents: result.replayEvents, targetWordDirectory: result.targetWordDirectory,
+            challengePresentation: result.challengePresentation)
+    }
+}
+
 private enum ThresholdArchivePayload {
     enum Failure: Error { case noncanonicalValue }
     static func encode<T: Codable & Equatable>(_ value: T) throws -> Data {

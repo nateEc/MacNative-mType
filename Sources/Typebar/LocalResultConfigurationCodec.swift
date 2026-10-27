@@ -30,6 +30,23 @@ enum LocalResultConfigurationCodec {
     let infiniteSpeedMemory: InfiniteSpeedMemory
   }
 
+  static func containsWebsiteInfiniteSpeedMemory(_ configuration: TestConfiguration) -> Bool {
+    guard let source = configuration.rules.thresholdSource else { return false }
+    return source.configuration.minimumWpmCustomValue == .infinity
+      || source.configuration.minimumWordBurstCustomValue == .infinity
+  }
+
+  /// Finite carrier for a separately tagged archive configuration. No other
+  /// fields are normalized; callers must retain and validate the original.
+  static func finiteWebsiteSpeedMemoryCarrier(_ configuration: TestConfiguration) throws -> TestConfiguration {
+    guard containsWebsiteInfiniteSpeedMemory(configuration), let source = configuration.rules.thresholdSource
+    else { return configuration }
+    let raw = source.configuration
+    return try replacingSpeedMemories(in: configuration,
+      speed: raw.minimumWpmCustomValue == .infinity ? 100 : raw.minimumWpmCustomValue,
+      burst: raw.minimumWordBurstCustomValue == .infinity ? 100 : raw.minimumWordBurstCustomValue)
+  }
+
   private static func replacingSpeedMemories(in configuration: TestConfiguration,
     speed: Double, burst: Double) throws -> TestConfiguration {
     guard let source = configuration.rules.thresholdSource, source.configuration.isValidWebsite,

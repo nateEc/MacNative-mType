@@ -1,9 +1,11 @@
 # 功能盘点与追踪表
 
-当前阈值输入／冷恢复与本机成绩格式批次已通过整套客户端：6,370 项、25 项跳过、0 失败，同日志 94 项必需来源证据及不启动应用的打包检查通过，另排除两个可见窗口用例。原版 Config／getConfig 导出路径的差异与归档／分享无限值交互仍未完成；完整重写继续。下方 92／90 项记录分别属于 7c7554e1／d922b508 的历史批次。
+当前成绩归档增量已通过扩大回归：2664 项、2 项跳过、0 失败，同日志 96 项必需源码证据及不启动应用的打包检查通过。新增 v36 解决合法无限记忆阻断成绩备份；完整配置、预设／旧设置／分享交互仍待完成，原版八项选择分享另记缺口。此前 6370 项整套结果属于阈值／本机成绩批次，959 项扩大属于原生导出窗口批次，均不能替代本批整套验证；完整重写继续。
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| THRESHOLD-RESULT-ARCHIVE-01 | 含无限速度记忆的成绩备份与恢复 | 原版成绩 CSV 不含阈值记忆；本机成绩 v2 已接纳合法网站状态，通用 JSON 归档仍直接编码其配置 | DataTransfer 归档 v36／websiteResultsData；LocalResultConfigurationCodec 有限载体；WEBSITE_RESULT_ARCHIVE_CONTRACT.md | 部分完成：三处实际反例后新增独立版本化载荷，18 组模式、旧有限归档、完整元数据、拒绝边界、SQLite 重开及重复恢复通过。扩大 2664 项、2 项跳过、0 失败，同日志 96 项源码证据及打包／原创性通过；完整网站配置文件、无限预设／活动选择／旧设置和分享仍未完成，实体文件流程与独立进程恢复待验。 |
+| SHARE-SOURCE-EIGHT-SLOTS-01 | 原版八项可选分享与默认空载荷 | components/modals/ShareTestSettings.tsx 的完整 form／url；utils/misc.ts getMode2；lz-ts 1.1.2 | 当前 TestConfigurationShareView 固定生成自有 typebar://test 载荷，未提供原版八个选择项 | 未完成：原版八项默认全关，按 getConfig／当前引语／独立 CustomText.getData 选择后压缩，阈值记忆不在该载荷内。当前原生格式携带不同字段，不能用其往返通过宣称原版选择、隐藏状态或 URL 行为已实现。需保持自有引语身份及禁止复制原版资产的约束，另行验证发送与接收。 |
 | CFG-EXPORT-CURRENT-01 | 当前配置 JSON 的两个导出入口 | commandline/lists.ts exportSettingsJSON；设置页 ImportExport.tsx；config/store.ts／setters.ts／lifecycle.ts | WebsiteConfigExport／WebsiteConfigClipboardExport；TypebarApp 命令派发与设置页按钮；CONFIG_EXPORT_CONTRACT.md；CONFIG_EXPORT_NATIVE_UI_CONTRACT.md | 部分完成：216 组源快照通过；真实窗口发现并修复空白复制框，补完整文字系统及内容断言。真实命令交接、No Quit、暖无限记忆和生产 Root 延迟回退／控件全选通过。最终扩大 959 项零失败零跳过，同日志 96 项源码证据及 debug 打包／原创性通过；系统鼠标、真实剪贴板拒绝及 IME 焦点交互待验收，整套客户端和完整 readiness 未跑。 |
 | THRESHOLD-INPUT-NUMBER-01 | 阈值输入文本、无限速度与冷恢复 | 实际命令构造器／元数据／单位／Zod／冷存储迁移 | 网站规则映射／协调器／冷投影／本机成绩配置版本 2 | 1,380 例输入、20 组冷恢复、真实宿主与实际完成／保存反例先红后绿；整套客户端 6,370 项、25 项跳过、0 失败，同日志全部 94 项来源证据及不启动应用的打包通过，另排除两窗口项。归档／分享无限值交互和实体窗口未完成，见阈值输入数字合同。 |
 | PACE-INPUT-NUMBER-01 | 配速默认文本、换算与无限值准入 | 实际输入命令构造器／元数据／五种单位／Zod | WebsiteNumberText／WebsitePaceSpeedPresentation／表单与命令 | 1,380 例及实际目标反例先红后绿；八组来源冷存储及文件 CAS／拒绝保护通过，宿主验证冷启动／暖导入和有限值／Infinity 与 No Quit 四组。完整客户端 6,359 项、25 项跳过、0 失败，同日志全部 92 项来源证据通过，另排除两个可见窗口用例；不启动应用的 debug 打包检查通过，实体窗口仍待验，见配速输入数字合同。 |
