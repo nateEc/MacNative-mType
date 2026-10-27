@@ -86,8 +86,8 @@ struct AcceptedUnitInput {
 struct UnitInputTargets {
   let units: [UInt16]
   let glyphs: [Int]
-  let fields: [Range<Int>]
-  let requiresUnitInput: Bool
+  private(set) var fields: [Range<Int>]
+  private(set) var requiresUnitInput: Bool
   let hasNewline: Bool
   let noSpace: Bool
   let sourceFieldCount: Int
@@ -152,6 +152,21 @@ struct UnitInputTargets {
     if start < units.count || ranges.isEmpty { ranges.append(start..<units.count) }
     fields = ranges
     sourceFieldCount = ranges.count
+  }
+
+  /// A formerly final generated field keeps its removed commit even after a
+  /// visual gap is appended for another field. The gap is not a target unit.
+  func maskingRemovedCommits(_ indices: Set<Int>) -> Self {
+    guard !indices.isEmpty, !noSpace else { return self }
+    var result = self
+    for index in indices where fields.indices.contains(index) {
+      let range = fields[index]
+      if let last = range.last, units[last] == 32 || units[last] == 10 {
+        result.fields[index] = range.lowerBound..<last
+      }
+    }
+    result.requiresUnitInput = true
+    return result
   }
 
   func field(_ index: Int, withoutCommit: Bool = false) -> [UInt16] {

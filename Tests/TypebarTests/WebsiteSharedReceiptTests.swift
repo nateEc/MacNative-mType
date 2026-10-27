@@ -394,18 +394,32 @@ import Observation
     XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.attempt)
   }
 
-  func testNewNoQuitWithOtherRuntimeChangesRemainsExplicitlyPending() async throws {
+  func testNewNoQuitAppliesWordLimitToSameAttemptWithoutRestartOrSavingNosave() async throws {
     let f = try Fixture(); defer { f.close() }
     let workflow = try f.makeWorkflow(); defer { workflow.stop() }
     try await workflow.apply(json: #"{"mode":"words","words":5}"#, systemIsDark: false)
     var active = f.page.state; active.session.insertBatch("a"); f.page.replace(active)
     let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
     let before = f.page.state.session.generationState
-    guard case .retained = try await workflow.applySharedSettings(json:
+    let prompt = f.page.state.session.prompt, disk = try f.register.read().revision
+    guard case .applied = try await workflow.applySharedSettings(json:
       #"["words","17",null,null,null,null,null,["no_quit"]]"#,
-      replacing: application, systemIsDark: false) else { return XCTFail("Cannot substitute a new attempt") }
-    XCTAssertEqual(f.page.state.session.generationState, before)
-    XCTAssertEqual(f.page.state.sharedReceipt?.outcome.state.runtime["words"], .number(17))
+      replacing: application, systemIsDark: false) else { return XCTFail("New word limit was withheld") }
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.attempt)
+    XCTAssertEqual(f.page.state.session.promptTargetID, before.target)
+    XCTAssertEqual(f.page.state.session.typed, before.typed)
+    XCTAssertEqual(f.page.state.session.prompt, prompt)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 17)
+    XCTAssertTrue(f.page.state.session.configuration.modifiers.contains(.noQuit))
+    XCTAssertNil(f.page.state.sharedReceipt)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(f.page.state.presentation?.publication.savedDraft.testParameters.wordLimit, 5)
+    var continued = f.page.state.session
+    for _ in 0..<500 where !continued.isFinished {
+      continued.insertBatch(continued.nextExpectedCharacter.map(String.init) ?? " ")
+    }
+    XCTAssertEqual(continued.outcome, .completed)
+    XCTAssertEqual(continued.completedWordCount, 17)
   }
 
   func testUnrepresentableLiveLimitKeepsRawReceiptWithoutChangingAttemptOrRepeatingWrites() async throws {

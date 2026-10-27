@@ -4588,6 +4588,11 @@ struct TypingSession {
   private let initialGeneratedStreamContinuation: GeneratedStreamContinuation?
   private var generatedCodeContinuation: GeneratedCodeContinuation?
   private let initialGeneratedCodeContinuation: GeneratedCodeContinuation?
+  private var retainedCandidateContinuation: GeneratedCandidateContinuation?
+  private let initialRetainedCandidateContinuation: GeneratedCandidateContinuation?
+  private var liveWordLimitFloor: Int?
+  private var liveRemovedGeneratedCommits: Set<Int> = []
+  private var liveAwaitingGeneratedCommit = false
   private let initialGeneratedReplayHistory: GeneratedWordReplayHistory?
   var generatedWordReplayHistory: GeneratedWordReplayHistory? {
     generatedCodeContinuation?.replayHistory ?? initialGeneratedReplayHistory
@@ -4823,6 +4828,7 @@ struct TypingSession {
     generatedWordContinuation: GeneratedWordContinuation? = nil,
     generatedStreamContinuation: GeneratedStreamContinuation? = nil,
     generatedCodeContinuation: GeneratedCodeContinuation? = nil,
+    retainedCandidateContinuation: GeneratedCandidateContinuation? = nil,
     generatedReplayHistory: GeneratedWordReplayHistory? = nil,
     quoteWordStream: QuoteWordStream? = nil,
     sectionEndIndices: [Int] = [], noSpaceSectionWordEnds: [Int] = [],
@@ -4870,6 +4876,8 @@ struct TypingSession {
     self.initialGeneratedStreamContinuation = generatedStreamContinuation
     self.generatedCodeContinuation = generatedCodeContinuation
     self.initialGeneratedCodeContinuation = generatedCodeContinuation
+    self.retainedCandidateContinuation = retainedCandidateContinuation
+    self.initialRetainedCandidateContinuation = retainedCandidateContinuation
     self.initialGeneratedReplayHistory = generatedReplayHistory
     self.quoteWordStream = quoteWordStream
     self.randomCustomSourceTokens = randomCustomSourceTokens
@@ -4907,9 +4915,10 @@ struct TypingSession {
   }
 
   private mutating func refreshUnitTargets() {
-    unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: acceptedUnits != nil,
+    unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: acceptedUnits != nil || !liveRemovedGeneratedCommits.isEmpty,
       noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil,
       asciiSeparatorCount: promptSeparatorUnitCount, sourceFields: sourceFields)
+      .maskingRemovedCommits(liveRemovedGeneratedCommits)
   }
 
   var paceCaretTargetWpm: Double? { paceCaretProgress?.wpm }
@@ -4997,6 +5006,9 @@ struct TypingSession {
         generatedStreamContinuation?.replayingContinuation(after: $0) ?? $0
       },
       generatedCodeContinuation: generatedCodeContinuation?.replayingContinuation() ?? initialGeneratedCodeContinuation,
+      retainedCandidateContinuation: initialRetainedCandidateContinuation.map {
+        var copy = $0; copy.synchronizeConfiguration(configuration); return copy
+      },
       generatedReplayHistory: generatedWordReplayHistory,
       sectionEndIndices: initialSectionEndIndices,
       noSpaceSectionWordEnds: initialNoSpaceSectionWordEnds,
@@ -5097,6 +5109,7 @@ struct TypingSession {
   }
   private var finiteCompletionWordLimit: Int? {
     guard let limit = configuration.wordLimit, limit > 0 else { return configuration.wordLimit }
+    if configuration.mode == .words, let floor = liveWordLimitFloor { return max(limit, floor) }
     return streamsLiveContent && configuration.mode == .words ? max(limit, livePublishedWordCount) : limit
   }
   private var loadedLiveContentWordCount: Int {
@@ -5334,6 +5347,7 @@ struct TypingSession {
     return (total == 0 ? completed : min(completed, total), total)
   }
   var nextExpectedCharacter: Character? {
+    if !isFinished, liveAwaitingGeneratedCommit, reachedInputTargetEnd { return " " }
     guard !isFinished, !isAtEmptyNoSpaceWord, nextTargetIndex < promptCharacters.count else { return nil }
     return promptCharacters[nextTargetIndex]
   }
@@ -5975,6 +5989,38 @@ struct TypingSession {
     return true
   }
 
+  /// Used only after the window admits an actual zero-restart receipt. No
+  /// candidate pool is reconstructed, including an exhausted finite opening.
+  mutating func synchronizeWebsiteGeneratedConfiguration(_ projected: TestConfiguration) -> Bool {
+    guard !isFinished, [.words, .time].contains(configuration.mode), [.words, .time].contains(projected.mode),
+      configuration.language == projected.language,
+      configuration.wordPoolBaseLanguage == projected.wordPoolBaseLanguage,
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers),
+      configuration.modifiers.filter({ $0 != .noQuit }) == projected.modifiers.filter({ $0 != .noQuit }),
+      !streamsLiveContent, var cursor = generatedCodeContinuation ?? retainedCandidateContinuation else { return false }
+    var next = configuration
+    next.mode = projected.mode; next.duration = projected.duration; next.wordLimit = projected.wordLimit
+    next.difficulty = projected.difficulty; next.contentOptions = projected.contentOptions
+    next = next.with(modifiers: projected.modifiers)
+    cursor.synchronizeConfiguration(next)
+    liveWordLimitFloor = livePublishedWordCount
+    if !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers),
+      prompt.last.map({ $0 != " " && $0 != "\n" }) == true {
+      liveRemovedGeneratedCommits.insert(unitTargets.sourceFieldCount - 1)
+      liveAwaitingGeneratedCommit = cursor.hasRemaining
+    }
+    if generatedCodeContinuation != nil || cursor.hasRemaining {
+      generatedCodeContinuation = cursor; retainedCandidateContinuation = nil
+    } else { retainedCandidateContinuation = cursor }
+    configuration = next
+    if !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+      if acceptedUnits == nil { beginUnitInput() } else { refreshUnitTargets() }
+    }
+    let progress = Self.wordProgress(finiteCompletionWordLimit, in: promptCharacters)
+    requiredWordStartIndex = progress.startIndex; promptWordCount = progress.count
+    return true
+  }
+
   var completedPromptCharacterIndices: Set<Int> {
     TypedCharacterEffectPolicy.completedCharacterIndices(
       target: prompt, typed: typed, typedTargetIndices: typedTargetIndices, isFinished: isFinished)
@@ -6494,6 +6540,8 @@ struct TypingSession {
       if outcome == .completed, configuration.mode == .custom,
         configuration.customTextCompletion == .words, !acceptedUnits.lastCommits
       { return committed + 1 }
+      if outcome == .completed, configuration.mode == .words, liveWordLimitFloor != nil,
+        (finiteCompletionWordLimit ?? 0) > 0, !acceptedUnits.lastCommits { return committed + 1 }
       return committed + (nextTargetIndex >= promptCharacters.count
         && unitTargets.units.last.map({ $0 != 32 && $0 != 10 }) == true ? 1 : 0)
     }
@@ -6515,6 +6563,8 @@ struct TypingSession {
     let targetCharacters = promptCharacters
     let committed = canUseCachedWordProgress
       ? cachedCommittedWordCount : scannedCommittedWordCount
+    if outcome == .completed, configuration.mode == .words, liveWordLimitFloor != nil,
+      (finiteCompletionWordLimit ?? 0) > 0, !lastInputCommitsWord { return committed + 1 }
     if outcome == .completed, isAtFinalBlankTarget,
       retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
         || configuration.mode == .words && configuration.rules.quickEnd
@@ -8418,7 +8468,7 @@ struct TypingSession {
   private mutating func beginUnitInput() {
     unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: true,
       noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil,
-      sourceFields: sourceFields)
+      sourceFields: sourceFields).maskingRemovedCommits(liveRemovedGeneratedCommits)
     var buffer = AcceptedUnitInput()
     for (index, character) in typed.enumerated() {
       let target = typedTargetIndices[index]
@@ -9000,7 +9050,7 @@ struct TypingSession {
   }
 
   private mutating func extendPromptIfNeeded(at date: Date) {
-    guard !isAtEmptyNoSpaceWord, reachedInputTargetEnd else { return }
+    guard !liveAwaitingGeneratedCommit, !isAtEmptyNoSpaceWord, reachedInputTargetEnd else { return }
     if let chunk = externalPromptContinuation {
       if streamsLiveContent {
         guard hasUnloadedLiveContentTargets else { return }
@@ -9231,6 +9281,7 @@ struct TypingSession {
       }
     }
     if let chunk = generatedChunk {
+      if !chunk.transformed.isEmpty { liveAwaitingGeneratedCommit = false }
       let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       var text = chunk.transformed
       if generatedCodeContinuation != nil, prompt.last == " ", text.first == " " { text.removeFirst() }
@@ -9254,6 +9305,7 @@ struct TypingSession {
   }
 
   private var quoteNavigationIndex: Int {
+    if liveWordLimitFloor != nil, let acceptedUnits { return acceptedUnits.completedFieldCount }
     if tracksNoSpaceWordBursts { return completedWordCount }
     return canUseCachedWordProgress ? cachedCommittedWordCount : scannedCommittedWordCount
   }
@@ -9410,6 +9462,15 @@ struct TypingSession {
 
   private var shouldFinishEnglishWordsTest: Bool {
     guard let wordLimit = finiteCompletionWordLimit, wordLimit > 0 else { return false }
+    if liveWordLimitFloor != nil, !unitTargets.noSpace, let acceptedUnits {
+      guard !usesIncrementalPromptExtension else { return false }
+      let index = acceptedUnits.lastCommits ? acceptedUnits.submittedFieldIndex : acceptedUnits.fieldIndex
+      guard index == unitTargets.sourceFieldCount - 1 else { return false }
+      let input = acceptedUnits.field(index), target = unitTargets.field(index)
+      return input == target || lastInputCommitsWord
+        || configuration.rules.quickEnd && !configuration.rules.stopOnError
+          && !configuration.rules.deleteOnError && input.count == target.count
+    }
     // Strict-space/difficulty can retain a correct LF in the final blank
     // field without navigation. Correctness still completes that word.
     if sourceFields?.count == wordLimit, isAtFinalBlankTarget,

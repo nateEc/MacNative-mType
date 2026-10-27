@@ -6151,7 +6151,7 @@ typealias GeneratedCodeContinuation = GeneratedCandidateContinuation
 /// Samples owned language/code/entry pools and emits section words in order. Saved
 /// prompts, Polyglot, and authored custom programs keep separate contracts.
 struct GeneratedCandidateContinuation {
-  let configuration: TestConfiguration
+  private(set) var configuration: TestConfiguration
   let batchTokenCount: Int
   private let previewsWholeFiniteWords: Bool
   private var pool: IndexedLexicon
@@ -6210,6 +6210,12 @@ struct GeneratedCandidateContinuation {
     !replayExhausted && !sourceGenerationFailed && (cache.hasPendingReplay
       || configuration.mode != .words || configuration.isInfinite
       || emittedWords < (configuration.wordLimit ?? 0))
+  }
+
+  /// Config reads are live; the initialized pool, pending section, decoration
+  /// history and cached generated targets belong to the current attempt.
+  mutating func synchronizeConfiguration(_ next: TestConfiguration) {
+    configuration = next
   }
 
   func replayingContinuation(nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }) -> Self {
@@ -6490,6 +6496,7 @@ struct TestSessionFactory {
     var quoteWordStream: QuoteWordStream?
     var quoteChunk: TransformedPromptBatch?
     var generatedCodeContinuation: GeneratedCodeContinuation?
+    var retainedCandidateContinuation: GeneratedCandidateContinuation?
     var generatedCodeChunk: GeneratedWordChunk?
     var generatedReplayHistory: GeneratedWordReplayHistory?
     var currentDecorationState = wordDecorationState
@@ -6517,6 +6524,7 @@ struct TestSessionFactory {
       generatedCodeChunk = chunk
       currentDecorationState = cursor.decorationState
       generatedCodeContinuation = cursor.hasRemaining ? cursor : nil
+      retainedCandidateContinuation = cursor.hasRemaining ? nil : cursor
       generatedReplayHistory = cursor.replayHistory
       usesGeneratedCode = true
     } else if let streamWordCount, configuration.modifiers.contains(.weakSpot) {
@@ -6798,6 +6806,7 @@ struct TestSessionFactory {
       generatedWordContinuation: generatedWordContinuation,
       generatedStreamContinuation: generatedStreamContinuation,
       generatedCodeContinuation: generatedCodeContinuation,
+      retainedCandidateContinuation: retainedCandidateContinuation,
       generatedReplayHistory: generatedReplayHistory,
       quoteWordStream: quoteWordStream,
       sectionEndIndices: sectionEndIndices,

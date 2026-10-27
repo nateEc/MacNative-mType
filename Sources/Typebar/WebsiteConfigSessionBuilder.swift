@@ -247,7 +247,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     return try result.get()
   }
 
-  private static func configuration(draft: WebsiteConfigNativeDraft, scope: Scope) throws -> TestConfiguration {
+  static func configuration(draft: WebsiteConfigNativeDraft, scope: Scope) throws -> TestConfiguration {
     guard [scope.parameterMemory.customTextDuration, scope.parameterMemory.customTextWordLimit,
       scope.parameterMemory.customTextSectionLimit].allSatisfy({ (0...OfficialTestLimitInput.maximumValue).contains($0) })
     else { throw WebsiteConfigSessionBuildError.unrepresentableConfiguration }

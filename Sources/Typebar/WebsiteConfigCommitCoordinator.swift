@@ -170,10 +170,9 @@ final class WebsiteConfigCommitCoordinator {
     return receipt
   }
 
-  /// The existing No Quit case has no accepted Config changes, but independent
-  /// custom setters still run. Deliver their actual cache without a restart.
-  /// A later No Quit selection with other Config changes remains a checkpoint
-  /// until all of its generator transitions can be delivered faithfully.
+  /// Deliver actual zero-restart settings to the initialized generator. Both
+  /// independent custom setters and ordinary words/time transitions retain
+  /// the old pool and attempt; unsupported generator changes keep the receipt.
   func commitSharedLiveReceipt(_ id: UUID, for page: PracticePageSessionStore) throws -> Publication? {
     guard let source = page.state.sharedReceipt?.contentSource else { throw WebsiteConfigCommitCoordinatorError.stale }
     return try source.withReceiptRead {
@@ -184,23 +183,45 @@ final class WebsiteConfigCommitCoordinator {
         source.ownsReceiptIdentity(receipt.contentCapture), latest?.applicationID == receipt.base.applicationID,
         try register.read().revision == receipt.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
       let capture = try page.captureGeneration(router: router)
-      guard receipt.outcome.state.runtime == receipt.base.draft.projection.runtime,
-        capture.testActive, page.state.session.configuration.modifiers.contains(.noQuit),
+      guard capture.testActive,
         let previous = page.state.presentation, let practice = page.state.practice else { return nil }
+      let unchanged = receipt.outcome.state.runtime == receipt.base.draft.projection.runtime
+      if !unchanged {
+        let allowed: Set<String> = ["mode", "time", "words", "punctuation", "numbers", "difficulty", "funbox"]
+        guard receipt.base.draft.projection.runtime.allSatisfy({ allowed.contains($0.key)
+          || receipt.outcome.state.runtime[$0.key] == $0.value }),
+          case .array(let oldBoxes)? = receipt.base.draft.projection.runtime["funbox"],
+          case .array(let boxes)? = receipt.outcome.state.runtime["funbox"], boxes.contains(.string("no_quit")),
+          oldBoxes.filter({ $0 != .string("no_quit") }) == boxes.filter({ $0 != .string("no_quit") }) else { return nil }
+      } else if !page.state.session.configuration.modifiers.contains(.noQuit) { return nil }
+      let draftValue: WebsiteConfigNativeDraft
+      do { draftValue = try WebsiteConfigNativeDraft(received: receipt.outcome, pointsPerRem: context.pointsPerRem) }
+      catch WebsiteConfigNativeTestParametersError.unrepresentableField { return nil }
+      var draft = draftValue
+      draft.funboxMemory = receipt.base.draft.funboxMemory
+      var scope = receipt.scope
+      scope.parameterMemory = draft.testParameters.parameterMemory(preserving: scope.parameterMemory)
       var state = page.state
-      if state.session.configuration.mode == .custom {
+      if !unchanged {
+        let projected: TestConfiguration
+        do { projected = try WebsiteConfigSessionBuilder.configuration(draft: draft, scope: scope) }
+        catch WebsiteConfigSessionBuildError.unrepresentableConfiguration { return nil }
+        guard state.session.synchronizeWebsiteGeneratedConfiguration(projected) else { return nil }
+      } else if state.session.configuration.mode == .custom {
         do {
           guard try state.session.synchronizeWebsiteCustomText(receipt.outcome.state.custom) else { return nil }
         } catch WebsiteConfigSessionBuildError.unrepresentableConfiguration { return nil }
       }
-      var draft = try WebsiteConfigNativeDraft(received: receipt.outcome, pointsPerRem: context.pointsPerRem)
-      draft.funboxMemory = receipt.base.draft.funboxMemory
-      let updated = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: receipt.scope,
+      var savedOutcome = receipt.outcome
+      savedOutcome.state.runtime = receipt.outcome.state.savedConfig ?? receipt.base.savedDraft.projection.runtime
+      savedOutcome.state.settingsStore = savedOutcome.state.runtime; savedOutcome.events = []
+      let saved = try WebsiteConfigNativeDraft(received: savedOutcome, pointsPerRem: context.pointsPerRem)
+      let updated = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: scope,
         quote: practice.quote, external: practice.external, repetition: practice.repetition)
       try Task.checkCancellation()
       try page.beginLiveSharedReceiptCommit(id, owner: receipt.owner, router: router, capture: capture)
       defer { page.endCommit() }
-      let publication = Publication(applicationID: UUID(), draft: draft, savedDraft: receipt.base.savedDraft,
+      let publication = Publication(applicationID: UUID(), draft: draft, savedDraft: saved,
         owner: receipt.owner.owner, environmentRevision: context.revision, pointsPerRem: context.pointsPerRem,
         disk: receipt.disk, background: receipt.base.background, font: receipt.base.font,
         session: state.session, practice: updated, quoteRecoveries: receipt.base.quoteRecoveries,

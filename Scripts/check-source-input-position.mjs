@@ -25,6 +25,7 @@ const bindings={
  'test/test-logic':{addWord:()=>{if(growNext && wordIndex===targets.length-1){targets.push('c');growNext=false}},startTest:()=>{active=true},fail:()=>{failed=true},finish:()=>{completed=true}},'events/keymap':{flash:(data,correct)=>keymapFlashes.push({units:Array.from({length:data.length},(_,i)=>data.charCodeAt(i)),isCorrect:correct})},'test/weak-spot':{updateScore:noop},'legacy-states/composition':{getComposing:()=>false},'states/notifications':{showNoticeNotification:noop},
  'input/helpers/word-navigation':{goToPreviousWord:noop,goToNextWord:async()=>({lastBurst:null,increasedWordIndex:true})},'test/pace-caret':{handleSpace:noop},'test/funbox/funbox':{toggleScript:noop},'states/loader-bar':{showLoaderBar:noop,hideLoaderBar:noop},'test/events/stats':{getWordBurst:()=>null},'test/words-generator':{areAllWordsGenerated:()=>Config.mode!=='time'},'utils/misc':{whorf:()=>0},'input/helpers/input-type':{DeleteInputType:{}},'@monkeytype/schemas/languages':{Language:{}}};
 Object.assign(bindings['states/test'],{getKoreanStatus:()=>false,getCurrentQuote:()=>null,getBailedOut:()=>false});Object.assign(bindings,{'constants/keys':{Keycode:{}},'test/events/types':{EVENT_LOG_VERSION:1,InputEventNoMs:{},TestEventNoMs:{},CompositionTestEvent:{},CompositionTestEventData:{},EventLog:{},InputEvent:{},InputEventData:{},KeydownEvent:{},KeydownEventData:{},KeyupEvent:{},KeyupEventData:{},TestEvent:{},TestEventData:{},TestEventType:{},TimerEvent:{},TimerEventData:{}},'test/custom-text':{getLimit:()=>({mode:'none',value:0})},'test/funbox/active':{isFunboxActiveWithProperty:p=>p==='nospace'},'@monkeytype/util/numbers':{roundTo2:v=>Math.round(v*100)/100,isSafeNumber:Number.isFinite,mean:a=>a.reduce((x,y)=>x+y,0)/a.length}});bindings['utils/misc'].getMode2=()=>2;bindings['test/funbox/list'].isFunboxActiveWithProperty=p=>p==='nospace';bindings['states/test'].wordsHaveNewline=()=>targets.some(t=>t.includes('\n'));console.debug=()=>{};globalThis.document={querySelector:()=>({get value(){return ' '+element},set value(v){element=v.slice(1)}})};const modules=new Map();function getModule(id){if(modules.has(id))return modules.get(id);let mod;if(actual.has(id))mod=new vm.SourceTextModule(stripTypeScriptTypes(fs.readFileSync(path.join(root,id+'.ts'),'utf8'),{mode:'transform'}),{identifier:id});else{const data=bindings[id];if(!data)throw new Error('Unknown import '+id);mod=new vm.SyntheticModule(Object.keys(data),function(){for(const [key,value]of Object.entries(data))this.setExport(key,value)},{identifier:id});}modules.set(id,mod);return mod;}
+if(process.argv[3]==='--ordinary-live-growth-fixtures')actual.add('test/test-words');
 const main=getModule('input/handlers/insert-text');await main.link((specifier,from)=>getModule(specifier.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(from.identifier),specifier)):specifier));await main.evaluate();
 
 const eventData=modules.get('test/events/data').namespace;
@@ -35,6 +36,44 @@ function reset(words,{stop='off',strict=false,mode='words',grow=false}={}) {
 }
 function inputEvents(){return eventData.getAllTestEvents().filter(e=>e.type==='input').map(e=>e.data)}
 function positions(){return inputEvents().map(e=>e.charIndex)}
+if(process.argv[3]==='--ordinary-live-growth-fixtures'){
+ for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',()=>false);
+ const words=modules.get('test/test-words').namespace.words;
+ modules.get('test/words-generator').setExport('areAllWordsGenerated',()=>Config.mode==='words'&&Config.words>0&&words.length>=Config.words);
+ const pool=['alpha','bravo','charlie','delta','echo','foxtrot','golf','hotel','india'];
+ // Run the complete source prefetch caller as well as its catalog and input
+ // modules. Only token selection and DOM effects are owned neutral adapters.
+ const logic=fs.readFileSync(path.join(root,'test/test-logic.ts'),'utf8');
+ const begin=logic.indexOf('export async function addWord():');
+ const end=logic.indexOf('\ntype RetrySaving =',begin);assert.ok(begin>=0&&end>begin);
+ const context=vm.createContext({Config,console:{debug(){}},getActiveWordIndex:()=>wordIndex,
+  getActiveFunboxes:()=>[],findSingleActiveFunboxWithFunction:()=>undefined,
+  TestWords:{words},TestUI:{addWord:noop},WordsGenerator:{
+   areAllWordsGenerated:()=>Config.mode==='words'&&Config.words>0&&words.length>=Config.words,
+   getNextWord:async()=>{const text=pool[words.length%pool.length];targets.push(text);return {word:text+' ',sectionIndex:0}}
+  },timerEvent:{dispatch(){throw Error('Unexpected source generation failure')}},
+  showErrorNotification(){throw Error('Unexpected source notification')}});
+ vm.runInContext(stripTypeScriptTypes(logic.slice(begin,end),{mode:'transform'}).replace(/^export /gm,''),context);
+ modules.get('test/test-logic').setExport('addWord',()=>context.addWord());
+ const fixtures=[];
+ for(const [count,prefix,suffix,initialMode='words',nextCount=count+1] of [
+  [1,'a','lpha bravo'],[1,'a','lphaX bravo'],[2,'alpha b','ravo charlie'],[5,'a','lpha bravo charlie delta echo foxtrot'],
+  [5,'a','lpha bravo charlie delta echo','time',3],[5,'a','lpha bravo charlie delta echo ','time',3],
+  [5,'a','lpha bravo charlie delta echo','words',3]]){
+  for(const [difficulty,stop]of [['normal','off'],['expert','off'],['master','off'],['normal','word'],['normal','letter']]){
+  reset(pool.slice(0,count),{mode:initialMode,stop});Object.assign(Config,{words:count,blindMode:false,difficulty,funbox:[]});
+  words.reset();for(const text of targets)words.push(text+' ',0);
+  if(initialMode==='words')words.removeCommitCharacterFromLastWord();
+  for(const data of prefix){if(completed||failed)break;await main.namespace.emulateInsertText({data,now:1});}
+  Config.mode='words';Config.words=nextCount;Config.funbox=['no_quit'];
+  for(const data of suffix){if(completed||failed)break;await main.namespace.emulateInsertText({data,now:1});}
+  fixtures.push({count,prefix,suffix,initialMode,nextCount,difficulty,stop,finished:completed,failed,events:inputEvents().map(e=>({
+   wordIndex:e.wordIndex,charIndex:e.charIndex,lastWord:!!e.lastWord,correct:e.correct
+  }))});
+  }
+ }
+ console.log(JSON.stringify({fixtures}));process.exit(0);
+}
 if(process.argv[3]==='--hidden-word-navigation-fixtures'){
  for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',p=>p==='nospace');
  let navigation=[];

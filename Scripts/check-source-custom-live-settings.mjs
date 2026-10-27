@@ -20,15 +20,23 @@ assert.ok(begin > 0);
 const timer = read('frontend/src/ts/test/test-timer.ts');
 const timerBegin = timer.indexOf('function checkIfTimeIsUp('), timerEnd = timer.indexOf('\nfunction playTimeWarning(', timerBegin);
 assert.ok(timerBegin >= 0 && timerEnd > timerBegin);
-const pool = [Array.from({length:111}, (_,i)=>'old'+i).join(' '), 'harbor stone'];
-const cases = [['repeat','word',112.5], ['shuffle','word',112], ['random','word',112],
+const ordinary = process.argv[3] === '--ordinary';
+const pool = ordinary ? ['alpha bravo charlie delta echo foxtrot golf hotel india']
+  : [Array.from({length:111}, (_,i)=>'old'+i).join(' '), 'harbor stone'];
+const cases = ordinary ? [['words',5,'words',17.5], ['words',5,'words',3], ['words',5,'words',0],
+  ['words',5,'time',2.5], ['time',100,'words',3], ['time',100,'words',105],
+  ['time',100,'words',0], ['words',100,'words',17], ['words',1,'words',2]]
+  : [['repeat','word',112.5], ['shuffle','word',112], ['random','word',112],
   ['repeat','section',2], ['repeat','section',2.5], ['shuffle','section',2.5],
   ['random','section',2], ['repeat','word',0], ['repeat','time',2.5]];
 const fixtures = [];
-for (const [mode,limitMode,limit] of cases) {
+for (const entry of cases) {
+  const [mode,limitMode,limit] = ordinary ? [entry[0],entry[2],entry[3]] : entry;
+  const initialCount = ordinary ? entry[1] : 100;
   const math = Object.create(Math); math.random = ()=>0;
   const live = {mode:'repeat',limitMode:'word',limit:100}, records = [], events = [];
-  const context = vm.createContext({Math:math, console:{debug(){}}, Config:{mode:'custom',language:'english',
+  const context = vm.createContext({Math:math, console:{debug(){}}, Config:{mode:ordinary ? mode : 'custom',
+    words:initialCount,time:30,language:'english',
     punctuation:false,numbers:false,funbox:['no_quit']},
     CustomText:{getMode:()=>live.mode,getLimitMode:()=>live.limitMode,getLimitValue:()=>live.limit},
     TestWords:{words:records}, isRepeated:()=>false, currentLanguage:{originalPunctuation:false},
@@ -63,8 +71,9 @@ for (const [mode,limitMode,limit] of cases) {
     }
     return result;
   }
-  const initial = await next(100);
-  Object.assign(live,{mode,limitMode,limit});
+  const initial = await next(initialCount);
+  if(ordinary)Object.assign(context.Config,{mode:limitMode,words:limit,time:limit});
+  else Object.assign(live,{mode,limitMode,limit});
   const chunks=[];
   do {
     const words=await next(100), remaining=!vm.runInContext('areAllWordsGenerated()',context);
@@ -77,6 +86,6 @@ for (const [mode,limitMode,limit] of cases) {
     return {elapsed,finished:events.some(event=>event.key==='finish')};
   });
   assert.deepEqual(context.currentWordset.words,pool);
-  fixtures.push({mode,limitMode,limit,initial,chunks,timeChecks});
+  fixtures.push({mode,limitMode,limit,initialCount,initial,chunks,timeChecks});
 }
 process.stdout.write(JSON.stringify({pool,fixtures}));
