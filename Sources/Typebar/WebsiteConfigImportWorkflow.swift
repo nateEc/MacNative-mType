@@ -194,6 +194,28 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
   }
 
+  func applySharedSettings(json: String, replacing applicationID: UUID,
+    systemIsDark: Bool) async throws -> WebsiteSharedLinkApplication {
+    _ = try acceptSharedSettings(json: json, replacing: applicationID)
+    return try await continuePendingSharedSettings(systemIsDark: systemIsDark)
+  }
+
+  /// The panel resumes the retained checkpoint, never replays the pasted URL.
+  func continuePendingSharedSettings(systemIsDark: Bool) async throws -> WebsiteSharedLinkApplication {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    if let receipt = page.state.sharedReceipt {
+      guard receipt.requiresInitialization else {
+        return .retained("链接设置已保留；当前练习禁止重开，练习参数尚未更新。可在配置面板导出保留的设置。"
+          + (receipt.outcome.storageFailures.isEmpty ? "" : " 部分设置未能保存，已保留成功的部分。"))
+      }
+      return .applied(try await continueSharedSettings(receiptID: receipt.id, systemIsDark: systemIsDark))
+    }
+    guard let pending = page.state.configurationDeparture, pending.isSharedReceipt else {
+      throw WebsiteConfigImportWorkflowError.conflict
+    }
+    return .applied(try await resumeAndBegin(departureID: pending.id, systemIsDark: systemIsDark))
+  }
+
   @discardableResult
   func editAndBegin(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID, systemIsDark: Bool) async throws -> String {
     if case .behavior = edit { return try runSingleLiveCommand(edit, replacing: applicationID) }
@@ -660,7 +682,12 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     applying = true
     let current = UUID(); operation = current
     let noticeGeneration = notices?.deliveryGeneration
-    let receivedSettings = page.state.sharedReceipt != nil || page.state.configurationDeparture?.isSharedReceipt == true
+    let receivedSettings: Bool
+    switch intent {
+    case .received: receivedSettings = true
+    case .resume: receivedSettings = page.state.configurationDeparture?.isSharedReceipt == true
+    case .application, .edit: receivedSettings = false
+    }
     let receiptFailureCount = page.state.sharedReceipt?.outcome.storageFailures.count
       ?? page.state.configurationDeparture?.sharedStorageFailureCount ?? 0
     defer {
@@ -824,7 +851,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       // cancel() retires the coordinator ticket, so a late resource return can
       // report stale before our post-await operation check is reached.
       if operation != current || Task.isCancelled { throw CancellationError() }
-      if !(error is CancellationError), page.state.sharedReceipt != nil || page.state.configurationDeparture?.isSharedReceipt == true {
+      if receivedSettings, !(error is CancellationError),
+        page.state.sharedReceipt != nil || page.state.configurationDeparture?.isSharedReceipt == true {
         throw WebsiteSharedReceiptPreparationError(underlying: error)
       }
       if !(error is CancellationError), page.state.configurationDeparture != nil || page.state.savedApplication != nil {

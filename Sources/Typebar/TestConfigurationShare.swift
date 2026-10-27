@@ -193,12 +193,22 @@ struct TestConfigurationShareView: View {
   let notices: LocalNoticeCenter
   let onLoadChallenge: (TypebarChallenge) -> TestConfigurationApplyOutcome
   let onApply: (SavedTestPreset) -> SavedTestPreset?
+  let onApplyWebsiteSettings: (@MainActor (String) async throws -> WebsiteSharedLinkApplication)?
+  let hasPendingWebsiteSettings: @MainActor () -> Bool
+  let canContinueWebsiteSettings: @MainActor () -> Bool
+  let onContinueWebsiteSettings: (@MainActor () async throws -> WebsiteSharedLinkApplication)?
+  let canShareNative: @MainActor () -> Bool
     @State private var pastedLink = ""
     @State private var status: String?
     @State private var websiteShare: WebsiteTestSettingsShareController?
+    @State private var importTask: Task<Void, Never>?
+    @State private var importRequest = UUID()
 
     var effectiveCurrentPreset: SavedTestPreset { latestPreset?() ?? currentPreset }
-    private var currentLink: String? { try? TestConfigurationShare.link(for: effectiveCurrentPreset) }
+    private var currentLink: String? {
+      guard canShareNative() else { return nil }
+      return try? TestConfigurationShare.link(for: effectiveCurrentPreset)
+    }
 
   init(
     currentPreset: SavedTestPreset,
@@ -206,6 +216,11 @@ struct TestConfigurationShareView: View {
     initialPastedLink: String = "",
     legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback? = nil,
     websiteSnapshot: (@MainActor () -> WebsiteTestSettingsShare.Snapshot?)? = nil,
+    onApplyWebsiteSettings: (@MainActor (String) async throws -> WebsiteSharedLinkApplication)? = nil,
+    hasPendingWebsiteSettings: @escaping @MainActor () -> Bool = { false },
+    canContinueWebsiteSettings: @escaping @MainActor () -> Bool = { false },
+    onContinueWebsiteSettings: (@MainActor () async throws -> WebsiteSharedLinkApplication)? = nil,
+    canShareNative: @escaping @MainActor () -> Bool = { true },
     challengeLibrary: [TypebarChallenge] = [],
     notices: LocalNoticeCenter,
     onLoadChallenge: @escaping (TypebarChallenge) -> TestConfigurationApplyOutcome = { _ in .rejected },
@@ -218,6 +233,11 @@ struct TestConfigurationShareView: View {
     self.notices = notices
     self.onLoadChallenge = onLoadChallenge
     self.onApply = onApply
+    self.onApplyWebsiteSettings = onApplyWebsiteSettings
+    self.hasPendingWebsiteSettings = hasPendingWebsiteSettings
+    self.canContinueWebsiteSettings = canContinueWebsiteSettings
+    self.onContinueWebsiteSettings = onContinueWebsiteSettings
+    self.canShareNative = canShareNative
     _pastedLink = State(initialValue: initialPastedLink)
     _websiteShare = State(initialValue: websiteSnapshot.flatMap { read in
       read() == nil ? nil : WebsiteTestSettingsShareController(read: read, notices: notices)
@@ -246,8 +266,22 @@ struct TestConfigurationShareView: View {
                         .foregroundStyle(.secondary)
                     TextField("粘贴测试设置链接", text: $pastedLink, axis: .vertical)
                         .lineLimit(2...4)
+                        .disabled(importTask != nil || hasPendingWebsiteSettings())
                     Button("应用导入的测试") { applyPastedLink() }
-                        .disabled(pastedLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(importTask != nil || hasPendingWebsiteSettings()
+                          || pastedLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if hasPendingWebsiteSettings() {
+                        Text("链接设置已保留，尚未准备好新的练习。继续准备不会再次导入或重复保存文本。")
+                            .font(.caption).foregroundStyle(.secondary)
+                        if onContinueWebsiteSettings != nil {
+                            Button("继续准备") { continueWebsiteSettings() }
+                                .disabled(importTask != nil || !canContinueWebsiteSettings())
+                        }
+                    }
+                    if importTask != nil {
+                        ProgressView("正在准备练习…")
+                        Button("取消准备") { importTask?.cancel() }
+                    }
                     if let status {
                         Text(status).font(.caption).foregroundStyle(.secondary)
                     }
@@ -259,6 +293,7 @@ struct TestConfigurationShareView: View {
             }
         }
         .frame(width: 560, height: websiteShare == nil ? 380 : 720)
+        .onDisappear { importRequest = UUID(); importTask?.cancel(); importTask = nil }
     }
 
     private func copyCurrentLink() {
@@ -270,10 +305,38 @@ struct TestConfigurationShareView: View {
     }
 
     private func applyPastedLink() {
-        let result = TestConfigurationShareActions.apply(pastedLink, current: effectiveCurrentPreset,
-            customTextFallback: legacyCustomTextFallback, challenges: challengeLibrary,
-            notices: notices, applyPreset: onApply, loadChallenge: onLoadChallenge)
-        status = result.status
-        if result.shouldDismiss { dismiss() }
+        guard importTask == nil else { return }
+        let request = UUID(); importRequest = request
+        let link = pastedLink
+        importTask = Task { @MainActor in
+            let result = await TestConfigurationShareActions.applyAsync(link, current: effectiveCurrentPreset,
+                customTextFallback: legacyCustomTextFallback, challenges: challengeLibrary,
+                notices: notices, applyWebsiteSettings: onApplyWebsiteSettings,
+                applyPreset: onApply, loadChallenge: onLoadChallenge)
+            guard importRequest == request else { return }
+            importTask = nil; status = result.status
+            if result.shouldDismiss && !Task.isCancelled { dismiss() }
+        }
+    }
+
+    private func continueWebsiteSettings() {
+        guard importTask == nil, let onContinueWebsiteSettings else { return }
+        let request = UUID(); importRequest = request
+        importTask = Task { @MainActor in
+            defer { if importRequest == request { importTask = nil } }
+            do {
+                let result = try await onContinueWebsiteSettings()
+                guard importRequest == request, !Task.isCancelled else { return }
+                switch result {
+                case .applied(let message): notices.post(message, level: .success); dismiss()
+                case .retained(let message): status = message
+                }
+            } catch {
+                guard importRequest == request else { return }
+                status = error is CancellationError ? "准备已取消，已接收的设置会保留。"
+                  : (error as? LocalizedError)?.errorDescription ?? "尚未准备完成，请重试。"
+            }
+            if importRequest == request { importTask = nil }
+        }
     }
 }

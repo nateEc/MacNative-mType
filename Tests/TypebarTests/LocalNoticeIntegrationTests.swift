@@ -16,7 +16,7 @@ final class LocalNoticeIntegrationTests: XCTestCase {
     let share = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TestConfigurationShare.swift"), encoding: .utf8)
     let views = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/LocalNoticeViews.swift"), encoding: .utf8)
     let app = try String(contentsOf: root.appendingPathComponent("Sources/Typebar/TypebarApp.swift"), encoding: .utf8)
-    XCTAssertTrue(share.contains("TestConfigurationShareActions.apply("), "Import feedback must follow the actual application outcome")
+    XCTAssertTrue(share.contains("await TestConfigurationShareActions.applyAsync("), "Import feedback must follow the awaited application outcome")
     XCTAssertTrue(views.contains("LocalNoticeMessageView("), "Both live and historical known HTML messages need native presentation")
     XCTAssertTrue(app.contains("reportFunboxConfigurationConflict("), "Funbox rejection must remain visible in session history")
   }

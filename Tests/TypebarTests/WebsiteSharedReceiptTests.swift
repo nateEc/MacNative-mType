@@ -244,6 +244,97 @@ import Observation
     f.settings.setNoQuitConfigurationLock(false, for: f.page.owner)
   }
 
+  func testSharePanelRouteDeliversActualSessionWithoutFlatteningOrSavingTemporarySettings() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":5}"#, systemIsDark: false)
+    let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    let disk = try f.register.read().revision
+    let json = #"["words","17",null,true,false,null,"expert",null]"#
+    let link = "typebar://test?testSettings=" + (try XCTUnwrap(URICompressedPayload.compress(json)))
+    let result = await TestConfigurationShareActions.applyAsync(link, current: .init(configuration: .words(5)),
+      challenges: [], notices: f.account.localNotices, applyWebsiteSettings: { value in
+        try await workflow.applySharedSettings(json: value, replacing: application, systemIsDark: false)
+      }, applyPreset: { _ in XCTFail("Whole-profile links cannot use legacy presets"); return nil },
+      loadChallenge: { _ in .rejected })
+    XCTAssertTrue(result.shouldDismiss)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 17)
+    XCTAssertEqual(f.page.state.session.configuration.difficulty, .expert)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertNil(f.page.state.sharedReceipt); XCTAssertNil(f.page.state.configurationDeparture)
+  }
+
+  func testSharePanelCancellationKeepsCheckpointAndContinuationDoesNotReplayCustomWrites() async throws {
+    let f = try Fixture(); defer { f.close() }
+    @MainActor final class Gate {
+      var waiting: CheckedContinuation<[OfflineQuote], Error>?
+      var suspend = true
+    }
+    let gate = Gate()
+    let workflow = try f.makeWorkflow(loadQuotes: { _ in
+      if gate.suspend { return try await withCheckedThrowingContinuation { gate.waiting = $0 } }
+      return [.init(id: "owned", title: "Owned", text: "aa bb cc", language: .english, length: .short)]
+    }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":5}"#, systemIsDark: false)
+    let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    let task = Task { @MainActor in
+      try await workflow.applySharedSettings(json:
+        #"["quote","42",{"text":["cc","dd"],"mode":"shuffle","limit":{"mode":"word","value":3.5},"pipeDelimiter":true},null,null,null,null,null]"#,
+        replacing: application, systemIsDark: false)
+    }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    while gate.waiting == nil && ContinuousClock.now < deadline { await Task.yield() }
+    guard let continuation = gate.waiting else { task.cancel(); return XCTFail("Quote preparation never started") }
+    let generation = f.settings.websiteCustomTextStateGeneration, ledger = f.page.state.priorAttemptLedger
+    task.cancel(); continuation.resume(throwing: CancellationError())
+    do { _ = try await task.value; XCTFail("Cancelled preparation succeeded") } catch is CancellationError {}
+    XCTAssertTrue(f.page.state.configurationDeparture?.isSharedReceipt == true)
+    gate.suspend = false
+    guard case .applied = try await workflow.continuePendingSharedSettings(systemIsDark: false) else {
+      return XCTFail("Checkpoint did not continue")
+    }
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    XCTAssertNil(f.page.state.configurationDeparture)
+  }
+
+  func testSharePanelRetainsNoQuitReceiptAndDoesNotClaimNewSessionWasApplied() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":5,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var active = f.page.state; active.session.insertBatch("a"); f.page.replace(active)
+    f.settings.setNoQuitConfigurationLock(true, for: f.page.owner)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: f.page.owner) }
+    let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    let before = f.page.state.session.generationState
+    guard case .retained = try await workflow.applySharedSettings(json:
+      #"[null,null,{"text":["cc"],"mode":"repeat","limit":{"mode":"word","value":7.5},"pipeDelimiter":false},null,null,null,null,null]"#,
+      replacing: application, systemIsDark: false) else { return XCTFail("Cannot report a new session") }
+    let generation = f.settings.websiteCustomTextStateGeneration
+    guard case .retained = try await workflow.continuePendingSharedSettings(systemIsDark: false) else {
+      return XCTFail("Cannot initialize while source restart was withheld")
+    }
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+    XCTAssertNotNil(f.page.state.sharedReceipt)
+  }
+
+  func testFullJSONSupersedingReceiptReportsItsOwnSavedPreparationFailure() async throws {
+    enum OwnedError: Error { case offline }
+    let f = try Fixture(); defer { f.close() }
+    let workflow = try f.makeWorkflow(loadQuotes: { _ in throw OwnedError.offline }); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":5}"#, systemIsDark: false)
+    let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    _ = try workflow.acceptSharedSettings(json: #"["words","17",null,null,null,null,null,null]"#, replacing: application)
+    do {
+      try await workflow.apply(json: #"{"mode":"quote"}"#, systemIsDark: false)
+      XCTFail("Owned offline quote loader must fail")
+    } catch is WebsiteSharedReceiptPreparationError {
+      XCTFail("A full JSON import must not be reported as the older link")
+    } catch is WebsiteConfigSavedPreparationError {}
+    XCTAssertNotNil(f.page.state.savedApplication)
+  }
+
   func testReceivedBoundaryStillAppliesLaterSavingListenerEventsExactlyOnce() async throws {
     let f = try Fixture(); defer { f.close() }; try await f.publish()
     let receipt = try f.coordinator.acceptSharedReceipt(#"[null,null,null,null,null,"arabic",null,null]"#,

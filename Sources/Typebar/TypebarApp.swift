@@ -7230,11 +7230,34 @@ private struct ContentView: View {
         wordLimit: customTextCompletion == .words ? customTextWordLimit : nil,
         sectionLimit: customTextCompletion == .sections ? customTextSectionLimit : nil,
         ordering: customTextOrdering, pipeDelimiter: customTextPipeDelimiter),
-      websiteSnapshot: { websiteTestSettingsSnapshot }, challengeLibrary: TypebarChallengeLibrary.all,
+      websiteSnapshot: { websiteTestSettingsSnapshot },
+      onApplyWebsiteSettings: websiteSettingsLinkApplication,
+      hasPendingWebsiteSettings: {
+        pageSession.sharedReceipt != nil || pageSession.configurationDeparture?.isSharedReceipt == true
+      },
+      canContinueWebsiteSettings: {
+        pageSession.sharedReceipt?.requiresInitialization == true || pageSession.configurationDeparture?.isSharedReceipt == true
+      },
+      onContinueWebsiteSettings: {
+        try await importWorkflow().continuePendingSharedSettings(systemIsDark: systemColorScheme == .dark)
+      },
+      canShareNative: { pageSession.sharedReceipt == nil && pageSession.configurationDeparture == nil },
+      challengeLibrary: TypebarChallengeLibrary.all,
       notices: account.localNotices, onLoadChallenge: loadChallenge) { preset in
         guard apply(preset) else { return nil }
         return sharePresetDefinition
       }
+  }
+
+  private var websiteSettingsLinkApplication: (@MainActor (String) async throws -> WebsiteSharedLinkApplication)? {
+    guard pageSession.practice != nil else { return nil }
+    return { json in
+      guard let applicationID = pageSession.presentation?.publication.applicationID else {
+        throw WebsiteConfigImportWorkflowError.unavailable
+      }
+      return try await importWorkflow().applySharedSettings(json: json, replacing: applicationID,
+        systemIsDark: systemColorScheme == .dark)
+    }
   }
 
   private func testShareDidDismiss() {
@@ -7246,6 +7269,11 @@ private struct ContentView: View {
   }
 
   private var websiteTestSettingsSnapshot: WebsiteTestSettingsShare.Snapshot? {
+    if let receipt = pageSession.sharedReceipt {
+      return .init(runtime: receipt.outcome.state.settingsStore,
+        customText: WebsiteTestSettingsShare.customText(in: receipt.scope),
+        hasUnmappedQuote: receipt.outcome.state.settingsStore["mode"] == .string("quote"))
+    }
     guard let draft = WebsiteConfigExport.draft(in: pageSession), let practice = pageSession.practice else { return nil }
     let hasQuote: Bool
     if let current = pageSession.currentQuoteInitialization { hasQuote = current.quote != nil }

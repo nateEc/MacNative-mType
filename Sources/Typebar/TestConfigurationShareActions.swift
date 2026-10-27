@@ -17,10 +17,54 @@ enum TestConfigurationNoticeField: Int, CaseIterable {
 struct TestConfigurationShareActionResult: Equatable {
   let outcome: TestConfigurationApplyOutcome
   let status: String?
-  var shouldDismiss: Bool { outcome != .rejected }
+  var keepPanel = false
+  var shouldDismiss: Bool { outcome != .rejected && !keepPanel }
 }
 
 @MainActor enum TestConfigurationShareActions {
+  static func applyAsync(_ link: String, current: SavedTestPreset,
+    customTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback? = nil,
+    challenges: [TypebarChallenge], notices: LocalNoticeCenter,
+    applyWebsiteSettings: (@MainActor (String) async throws -> WebsiteSharedLinkApplication)?,
+    applyPreset: (SavedTestPreset) -> SavedTestPreset?,
+    loadChallenge: (TypebarChallenge) -> TestConfigurationApplyOutcome
+  ) async -> TestConfigurationShareActionResult {
+    do {
+      try Task.checkCancellation()
+      let url = URLComponents(string: link.trimmingCharacters(in: .whitespacesAndNewlines))
+      let isNative = url?.scheme?.lowercased() == "typebar"
+      // Preserve the legacy web challenge branch, including its rejection
+      // behavior, before considering a testSettings payload on the same URL.
+      if !isNative, url?.queryItems?.contains(where: { $0.name == "challenge" }) == true {
+        return apply(link, current: current, customTextFallback: customTextFallback,
+          challenges: challenges, notices: notices, applyPreset: applyPreset, loadChallenge: loadChallenge)
+      }
+      if let applyWebsiteSettings, let json = try WebsiteSharedLinkImport.json(from: link) {
+        let result = try await applyWebsiteSettings(json)
+        try Task.checkCancellation()
+        switch result {
+        case .applied(let message):
+          notices.post(message, level: .success)
+          return .init(outcome: .applied, status: message)
+        case .retained(let message):
+          notices.post(message)
+          return .init(outcome: .requiresSetup, status: message, keepPanel: true)
+        }
+      }
+      if applyWebsiteSettings != nil, !isNative {
+        throw LegacyTestSettingsLinkImporter.ImportError.invalidLink
+      }
+      return apply(link, current: current, customTextFallback: customTextFallback,
+        challenges: challenges, notices: notices, applyPreset: applyPreset, loadChallenge: loadChallenge)
+    } catch is CancellationError {
+      return .init(outcome: .rejected, status: "准备已取消；已接收的设置会保留，可继续准备。")
+    } catch {
+      let message = (error as? LocalizedError)?.errorDescription ?? "无法导入该测试链接。"
+      notices.post(message)
+      return .init(outcome: .rejected, status: message)
+    }
+  }
+
   static func copy(_ link: String, notices: LocalNoticeCenter, write: (String) -> Bool) -> String {
     LocalNoticeClipboard.copyText(link, center: notices, success: "测试链接已复制。", write: write)
   }
