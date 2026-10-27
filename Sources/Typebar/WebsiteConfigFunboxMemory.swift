@@ -57,7 +57,7 @@ struct WebsiteConfigFunboxMemory: Equatable {
       context: context, testActive: testActive)
     var combined = projection; combined.events = events + projection.events
     var result = try WebsiteConfigNativeDraft(funboxSelection: .init(key: "funbox", previousRuntime: original.projection.runtime,
-      projection: combined), pointsPerRem: pointsPerRem)
+      projection: combined, previousStore: original.settingsStoreValues), pointsPerRem: pointsPerRem)
     result.lazyMemory = original.lazyMemory
     result.funboxMemory = .init()
     return (result, projection.rejectedKeys.isEmpty)

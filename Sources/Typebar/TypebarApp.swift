@@ -1435,6 +1435,7 @@ private struct ContentView: View {
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
   @State private var settingsJSONCommand: SettingsJSONCommandPresentation?
+  @State private var websiteConfigClipboardExport = WebsiteConfigClipboardExport()
   @State private var showingWebsiteConfigImport = false
   @State private var websiteSequenceCommand: WebsiteSequenceCommandPresentation?
   @State private var queuedWebsiteSequenceCommand: WebsiteSequenceCommandPresentation?
@@ -2446,6 +2447,9 @@ private struct ContentView: View {
             systemIsDark: systemColorScheme == .dark)
         })
     }
+    .sheet(item: $websiteConfigClipboardExport.manualCopy) { presentation in
+      WebsiteConfigManualCopyView(json: presentation.json)
+    }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
         guard acceptsRestartingConfigurationChange() else { throw SettingsJSONCommandError.configurationLocked }
@@ -2810,10 +2814,12 @@ private struct ContentView: View {
         Text("关闭或取消不会撤销已保存的配置。可恢复后继续准备练习。")
           .font(.caption).foregroundStyle(.secondary)
         Button("恢复已保存配置…", action: openWebsiteConfigImport)
+        websiteConfigurationExportControl
       }
     } else if let practice = pageSession.practice {
       VStack(alignment: .leading, spacing: 7) {
         Text("本轮设置").font(.headline)
+        websiteConfigurationExportControl
         LabeledContent("模式", value: session.configuration.mode.displayName)
         LabeledContent("语言", value: session.configuration.language.displayName)
         LabeledContent("难度", value: session.configuration.difficulty.rawValue)
@@ -2843,6 +2849,29 @@ private struct ContentView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     } else { legacyConfigurationPanel }
+  }
+
+  @ViewBuilder
+  private var websiteConfigurationExportControl: some View {
+    Button("导出配置 JSON") {
+      websiteConfigClipboardExport.copy {
+        guard let draft = WebsiteConfigExport.draft(in: pageSessionStore.state) else {
+          throw WebsiteConfigExport.Failure.incompleteConfiguration
+        }
+        return try WebsiteConfigExport.json(draft, surface: .settings)
+      }
+    }
+    .accessibilityIdentifier("website-config-export")
+    if let message = websiteConfigClipboardExport.message {
+      Text(message).font(.caption).foregroundStyle(.secondary)
+        .task(id: websiteConfigClipboardExport.noticeID) {
+          let id = websiteConfigClipboardExport.noticeID
+          guard let duration = websiteConfigClipboardExport.noticeDurationMilliseconds else { return }
+          do { try await Task.sleep(for: .milliseconds(duration)) }
+          catch { return }
+          websiteConfigClipboardExport.clearNotice(id)
+        }
+    }
   }
 
   @ViewBuilder
@@ -6164,10 +6193,8 @@ private struct ContentView: View {
         if showingCommandPalette { queuedWebsiteSequenceCommand = presentation }
         else { websiteSequenceCommand = presentation }
       case .exportSettingsJSON:
-        do {
-          settingsJSONCommand = .init(
-            mode: .exportSettings,
-            initialJSON: try SettingsJSONCommandCodec.export(
+        settingsJSONCommand = .exporting(page: pageSession) {
+          try SettingsJSONCommandCodec.export(
               settings: practiceSettingsSnapshot,
               configuration: configuration,
               layoutFluidLayouts: settings.layoutFluidLayouts,
@@ -6176,12 +6203,7 @@ private struct ContentView: View {
                 wordLimit: wordLimit,
                 customTextDuration: customTextDuration,
                 customTextWordLimit: customTextWordLimit,
-                customTextSectionLimit: customTextSectionLimit)),
-            initialError: nil)
-        } catch {
-          settingsJSONCommand = .init(
-            mode: .exportSettings, initialJSON: "",
-            initialError: "无法生成设置 JSON：\(error.localizedDescription)")
+                customTextSectionLimit: customTextSectionLimit))
         }
       case .nextRandomTheme:
         guard settings.randomThemeMode.isEnabled, !settings.followSystemTheme else { return }

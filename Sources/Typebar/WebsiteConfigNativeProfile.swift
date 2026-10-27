@@ -41,7 +41,8 @@ enum WebsiteConfigNativeProfile {
     let projection = try WebsiteConfigRuntimeProjector.edit(current: previous, key: key, value: value,
       defaults: defaultDocument().values, schema: .init(catalogs: catalogs), context: context,
       testActive: testActive, nosave: nosave)
-    var draft = try WebsiteConfigNativeDraft(edit: .init(key: key, previousRuntime: previous, projection: projection), pointsPerRem: pointsPerRem)
+    var draft = try WebsiteConfigNativeDraft(edit: .init(key: key, previousRuntime: previous,
+      projection: projection, previousStore: current.settingsStoreValues), pointsPerRem: pointsPerRem)
     draft.lazyMemory = current.lazyMemory
     draft.funboxMemory = current.funboxMemory
     return draft

@@ -3,6 +3,14 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.WebsiteConfigExportTests/testBothSourceSnapshotsSurviveFullImportsAndEverySingleDefaultSetter",
+      "file": "Tests/TypebarTests/WebsiteConfigExportTests.swift"
+    },
+    {
+      "id": "TypebarTests.WebsiteConfigClipboardExportTests/testClipboardOutcomesMatchSourceAndFallbackReadsCurrentConfiguration",
+      "file": "Tests/TypebarTests/WebsiteConfigClipboardExportTests.swift"
+    },
+    {
       "id": "TypebarTests.WebsiteThresholdColdStorageTests/testActualPinnedStorageMigrationAgainstNativeThresholdColdValues",
       "file": "Tests/TypebarTests/WebsiteThresholdColdStorageTests.swift"
     },

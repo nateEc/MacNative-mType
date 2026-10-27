@@ -6,6 +6,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {createRequire, stripTypeScriptTypes} from 'node:module';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 const root = path.resolve(process.argv[2] ?? '');
 const zodRoot = process.env.TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT;
 const runtimeMode = process.argv[3] === '--runtime-projection';
@@ -28,7 +29,8 @@ const paceCommandMode = process.argv[3] === '--pace-commands' || paceInputNotati
 const appearanceCommandMode = process.argv[3] === '--appearance-commands';
 const keymapCommandMode = process.argv[3] === '--keymap-commands';
 const layoutFluidRuntimeMode = process.argv[3] === '--layoutfluid-runtime';
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode);
+const exportMode = process.argv[3] === '--export-config';
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode || exportMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -43,6 +45,26 @@ const noop = () => {};
 const context = vm.createContext({structuredClone, URL,
   document: {get readyState() { return simulation.flags.documentComplete ? 'complete' : 'loading'; }},
   console: {warn: noop, error: noop, log: noop, debug: noop}});
+let solidCode, solidStoreCode;
+if (exportMode) {
+  const archive = process.env.TYPEBAR_SOLID_QA_ARCHIVE;
+  assert.ok(archive, 'TYPEBAR_SOLID_QA_ARCHIVE required for actual config store');
+  const integrity = 'sha512-' + createHash('sha512').update(fs.readFileSync(archive)).digest('base64');
+  assert.equal(integrity, 'sha512-6hJeJMOcEX8ktqjpDoJZEmld3ijvcvWBDtiXBm7f4332SiFN66QeAQI1REQshvyUoISsSeJ4PHDauKYbwao9JQ==');
+  assert.ok(fs.readFileSync(path.join(root,'pnpm-lock.yaml'),'utf8').includes(integrity));
+  const unpack = file => execFileSync('tar',['-xOf',archive,file],{encoding:'utf8',maxBuffer:2**21});
+  assert.equal(JSON.parse(unpack('package/package.json')).version,'1.9.13');
+  solidCode = unpack('package/dist/solid.js') + '\nexport const JSXElement = undefined;';
+  solidStoreCode = unpack('package/store/dist/store.js');
+  // Config cloning stays in the same realm as the real Solid store. The
+  // adapter is bounded to the configuration's JSON-shaped primitive domain.
+  context.structuredClone = vm.runInContext(`(function copy(value) {
+    if (Array.isArray(value)) return Array.from(value, copy);
+    if (value !== null && typeof value === 'object')
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, copy(item)]));
+    return value;
+  })`,context);
+}
 const modules = new Map();
 const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
@@ -65,7 +87,10 @@ const adapters = new Map([
 function getModule(id) {
   if (modules.has(id)) return modules.get(id);
   let module;
-  if (id === 'zod' || id === 'store-adapter' || adapters.has(id)) {
+  if (exportMode && (id === 'solid-js' || id === 'solid-js/store')) {
+    module = new vm.SourceTextModule(id === 'solid-js' ? solidCode : solidStoreCode,
+      {context,identifier:id});
+  } else if (id === 'zod' || id === 'store-adapter' || adapters.has(id)) {
     const values = id === 'zod' ? {...zod, ZodErrorMap: undefined, ZodTypeAny: undefined, ZodIssue: undefined}
       : id === 'store-adapter' ? {Config: simulation.Config,
         setConfigStore: noop, setFullConfigStore: value => simulation.stores.push(structuredClone(value))}
@@ -83,8 +108,9 @@ function getModule(id) {
   return module;
 }
 function resolve(id, importer) {
-  if (id === 'zod' || id === 'solid-js') return id;
-  if (id.endsWith('/store') && importer.startsWith(path.join(frontend, 'config/'))) return 'store-adapter';
+  if (id === 'zod' || id === 'solid-js' || (exportMode && id === 'solid-js/store')) return id;
+  if (id.endsWith('/store') && importer.startsWith(path.join(frontend, 'config/')))
+    return exportMode ? path.join(frontend,'config/store.ts') : 'store-adapter';
   if (id === '@monkeytype/schemas/configs') return path.join(schemas, 'configs.ts');
   if (id === '@monkeytype/util/objects') return path.join(root, 'packages/util/src/objects.ts');
   if (id === '@monkeytype/util/numbers') return path.join(root, 'packages/util/src/numbers.ts');
@@ -170,7 +196,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode || exportMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -181,8 +207,105 @@ if (defaultsMode) {
     simulation.gates.push({value: structuredClone(options.value), current: structuredClone(options.currentConfig), accepted: !blocked});
     return blocked;
   };
+  const actualStore = exportMode ? await load(path.join(frontend,'config/store.ts')) : null;
+  if (actualStore) simulation.Config = actualStore.Config;
   const setters = await load(path.join(frontend, 'config/setters.ts'));
-  if (inputCommandMode) {
+  if (exportMode) {
+    function extract(file,from,to,wrap=value=>value) {
+      const source=fs.readFileSync(path.join(frontend,file),'utf8'),start=source.indexOf(from),end=source.indexOf(to,start);
+      assert.ok(start>=0&&end>start,from);
+      return stripTypeScriptTypes(wrap(source.slice(start,end).replace(/^export /gm,'')),{mode:'transform'});
+    }
+    const sourceDefaults = (await load(path.join(frontend,'constants/default-config.ts'))).getDefaultConfig;
+    Object.assign(context,{Config:actualStore.Config,getConfig:actualStore.getConfig,
+      setConfig:setters.setConfig,configEvent:bus,getDefaultConfig:sourceDefaults,
+      migrateConfig:migration.migrateConfig,typedKeys:Object.keys,
+      saveToLocalStorage:key=>simulation.saves.push(key),setFullConfigStore:actualStore.setFullConfigStore,z:zod.z});
+    vm.runInContext(extract('config/lifecycle.ts','const lastConfigsToApply:','\nexport async function resetConfig('),context);
+    vm.runInContext(extract('commandline/lists.ts','    {\n      id: "exportSettingsJSON",','    {\n      id: "clearNotifications",',
+      text=>'globalThis.exportCommand=('+text.trim().replace(/,$/,'')+');'),context);
+    const ui=fs.readFileSync(path.join(frontend,'components/pages/settings/custom-setting/ImportExport.tsx'),'utf8');
+    const clipboard=ui.indexOf('navigator.clipboard'),start=ui.lastIndexOf('() => {',clipboard);
+    const end=ui.indexOf('\n            }}\n          >',clipboard);
+    assert.ok(clipboard>=0&&start>=0&&end>clipboard);
+    vm.runInContext('globalThis.exportSettingsClick=('+ui.slice(start,end)+'\n});',context);
+    assert.equal(vm.runInContext('Object.getPrototypeOf(getConfig) === Object.prototype',context),true);
+    let copies=[],successes=[],notices=[],timers=[],modals=[],rejectCopy=false;
+    Object.assign(context,{navigator:{clipboard:{writeText:text=>{
+      copies.push(text);return rejectCopy?Promise.reject(new Error('owned clipboard failure')):Promise.resolve();
+    }}},showSuccessNotification:message=>successes.push(message),
+      showNoticeNotification:(message,options)=>notices.push({message,options}),
+      showSimpleModal:options=>modals.push(options),setTimeout:(action,delay)=>{timers.push({action,delay});return timers.length;}});
+    let steps=[];
+    Object.assign(context,{getActivePage:()=> 'test',restart:()=>Promise.resolve(),
+      LazyModeState:{getArabicPref:()=>true,setArabicPref:noop},debouncedZipfCheck:noop});
+    vm.runInContext(extract('test/test-logic.ts','configEvent.subscribe(', 'timerEvent.subscribe('),context);
+    const initialJSON=vm.runInContext('JSON.stringify(getDefaultConfig())',context);
+    const fresh = () => {
+      vm.runInContext('Object.assign(Config,getDefaultConfig());setFullConfigStore(getDefaultConfig());',context);
+      simulation.flags={testActive:false,authenticated:false,documentComplete:true};simulation.events=[];simulation.saves=[];steps=[];
+    };
+    async function full(json) {
+      steps.push({kind:'full',json,active:simulation.flags.testActive});context.inputJSON=json;
+      await vm.runInContext('applyConfig(JSON.parse(inputJSON))',context);
+    }
+    function single(key,value) {
+      const json=JSON.stringify(value);steps.push({kind:'single',key,json,active:simulation.flags.testActive});
+      context.inputKey=key;context.inputJSON=json;
+      return vm.runInContext('setConfig(inputKey,JSON.parse(inputJSON))',context);
+    }
+    const fixtures=[];
+    async function snapshot(label,mutateDuringFallback=false) {
+      const commandJSON=context.exportCommand.defaultValue();
+      for(const failure of [false,true]) {
+        copies=[];successes=[];notices=[];timers=[];modals=[];rejectCopy=failure;
+        const before={events:simulation.events.length,saves:simulation.saves.length};
+        context.exportSettingsClick();for(let i=0;i<8;i++)await Promise.resolve();
+        if(failure&&mutateDuringFallback)vm.runInContext('setConfig("words",77)',context);
+        for(const timer of timers)timer.action();
+        const modal=modals[0];
+        fixtures.push({label,failure,initialJSON,steps:structuredClone(steps),commandJSON,settingsJSON:copies[0],
+          fallbackJSON:modal?.inputs.json.initVal??null,readOnly:modal?.inputs.json.readOnly??null,
+          clickToSelect:modal?.inputs.json.clickToSelect??null,delays:timers.map(t=>t.delay),
+          successes:successes.length,notices:notices.length,
+          changedByExport:!mutateDuringFallback&&(simulation.events.length!==before.events||simulation.saves.length!==before.saves)});
+      }
+    }
+    fresh();await snapshot('defaults');
+    for(const [label,json]of [
+      ['full-adjusted','{"keymapSize":1.4000000000000001,"customBackground":"  https://example.com/a.png  "}'],
+      ['full-rejected','{"paceCaret":"pb","randomTheme":"custom","tapeMode":"letter","showAllLines":true}'],
+      ['full-override','{"minWpm":"off","minWpmCustomSpeed":73.5,"confidenceMode":"on","freedomMode":true,"stopOnError":"word"}'],
+      ['nonfinite','{"paceCaretCustomSpeed":1e999,"minWpmCustomSpeed":1e999,"minBurstCustomSpeed":1e999,"soundVolume":1e-7}'],
+      ['unicode','{"customBackground":"https://example.com/字\\ud800.png","fontFamily":"é"}'],
+      ['unicode-pair-low','{"customBackground":"https://example.com/😀\\udc00.png"}'],
+      ['controls','{"customBackground":"https://example.com/a\\b\\t\\n\\f\\r\\u0000\\\"\\\\z"}'],
+      ['number-boundaries','{"paceCaretCustomSpeed":1.7976931348623157e308,"minWpmCustomSpeed":5e-324,"minBurstCustomSpeed":1e21,"soundVolume":-0}']]) {
+      fresh();await full(json);await snapshot(label);
+    }
+    fresh();single('keymapSize',1.4000000000000001);single('minWpmCustomSpeed',60);await snapshot('single-adjusted');
+    fresh();single('funbox',['no_quit']);simulation.flags.testActive=true;
+    single('words',77);await snapshot('no-quit-rejected');
+    fresh();single('language','arabic');await snapshot('nested-language-nosave');
+    fresh();await snapshot('fallback-later-value',true);
+    fresh();await full('{"mode":"words","words":17}');
+    steps.push({kind:'failed-full',json:'{',active:false});context.inputJSON='{';
+    assert.throws(()=>vm.runInContext('applyConfig(JSON.parse(inputJSON))',context));
+    await snapshot('failed-parse-retains-config');
+    for(const key of Object.keys(defaults)) {
+      fresh();await full('{"keymapSize":1.4000000000000001,"paceCaret":"pb","randomTheme":"custom","tapeMode":"letter","showAllLines":true}');
+      single(key,defaults[key]);await snapshot('after-divergent-full/'+key);
+    }
+    for(const f of fixtures) {
+      assert.equal(f.changedByExport,false);assert.equal(f.successes,f.failure?0:1);assert.equal(f.notices,f.failure?1:0);
+      assert.deepEqual(f.delays,f.failure?[250]:[]);
+      if(f.failure){assert.equal(f.readOnly,true);assert.equal(f.clickToSelect,true);}
+    }
+    assert.notEqual(fixtures.find(f=>f.label==='full-rejected').commandJSON,fixtures.find(f=>f.label==='full-rejected').settingsJSON);
+    assert.notEqual(fixtures.find(f=>f.label==='fallback-later-value'&&f.failure).settingsJSON,
+      fixtures.find(f=>f.label==='fallback-later-value'&&f.failure).fallbackJSON);
+    verify();console.log(JSON.stringify({fixtures}));
+  } else if (inputCommandMode) {
     function extract(file, from, until, wrap = text => text) {
       const source = fs.readFileSync(path.join(frontend, file), 'utf8');
       const start = source.indexOf(from), end = source.indexOf(until, start);

@@ -4,11 +4,12 @@ import SwiftUI
 enum SettingsJSONCommandMode: String, Equatable {
   case importSettings
   case exportSettings
+  case exportWebsiteConfig
 
   var title: String {
     switch self {
     case .importSettings: "导入设置 JSON"
-    case .exportSettings: "导出设置 JSON"
+    case .exportSettings, .exportWebsiteConfig: "导出设置 JSON"
     }
   }
 }
@@ -18,6 +19,20 @@ struct SettingsJSONCommandPresentation: Identifiable, Equatable {
   let mode: SettingsJSONCommandMode
   let initialJSON: String
   let initialError: String?
+
+  @MainActor static func exporting(page: PracticePageSessionState,
+    legacy: () throws -> String) -> Self {
+    let draft = WebsiteConfigExport.draft(in: page)
+    do {
+      if let draft {
+        return .init(mode: .exportWebsiteConfig, initialJSON: try WebsiteConfigExport.json(draft, surface: .command), initialError: nil)
+      }
+      return .init(mode: .exportSettings, initialJSON: try legacy(), initialError: nil)
+    } catch {
+      return .init(mode: draft == nil ? .exportSettings : .exportWebsiteConfig, initialJSON: "",
+        initialError: "无法生成设置 JSON：\(error.localizedDescription)")
+    }
+  }
 }
 
 struct SettingsJSONCommandView: View {
@@ -73,7 +88,7 @@ struct SettingsJSONCommandView: View {
       }
 
       HStack {
-        Text("仅包含偏好设置与自定义主题、键盘布局；不含成绩、练习文本、凭据或本地文件。")
+        Text(presentation.mode == .exportWebsiteConfig ? "当前完整配置，不包含本机成绩或练习正文。" : "仅包含偏好设置与自定义主题、键盘布局；不含成绩、练习文本、凭据或本地文件。")
           .font(.caption)
           .foregroundStyle(.secondary)
         Spacer()
@@ -90,6 +105,8 @@ struct SettingsJSONCommandView: View {
       "粘贴由 Typebar 导出的完整文档。内容通过校验后才会应用。"
     case .exportSettings:
       "复制这份版本化文档，可在另一台 Mac 的 Typebar 中导入。"
+    case .exportWebsiteConfig:
+      "复制当前配置 JSON，可通过 Monkeytype 配置导入入口使用。"
     }
   }
 
@@ -108,7 +125,7 @@ struct SettingsJSONCommandView: View {
         }
       }
       .keyboardShortcut(.defaultAction)
-    case .exportSettings:
+    case .exportSettings, .exportWebsiteConfig:
       Button("复制 JSON") {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()

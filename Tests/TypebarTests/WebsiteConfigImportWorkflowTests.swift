@@ -5,6 +5,50 @@ import SwiftUI
 @testable import Typebar
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
+  func testActualExportDispatchReadsThePublishedWebsiteConfiguration() async throws {
+    let fixtures = try WebsiteConfigExportSourceOracle.load()
+    let source = try XCTUnwrap(fixtures.first { $0.label == "full-override" && !$0.failure })
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: source.commandJSON, systemIsDark: false)
+    let generation = f.page.state.session.generationState, revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    var legacyReads = 0
+    let presentation = SettingsJSONCommandPresentation.exporting(page: f.page.state) {
+      legacyReads += 1
+      return try SettingsJSONCommandCodec.export(settings: ChallengeLiveConfigurationState().snapshot(settings: f.settings),
+        configuration: f.page.state.session.configuration, layoutFluidLayouts: f.settings.layoutFluidLayouts,
+        testParameterMemory: .defaults)
+    }
+    XCTAssertEqual(legacyReads, 0, "Website-owned export must not read the legacy Typebar document")
+    XCTAssertNil(presentation.initialError, "The actual source command returns complete Config JSON")
+    if presentation.initialError == nil {
+      let expected = try JSONSerialization.jsonObject(with: Data(source.commandJSON.utf8)) as? NSDictionary
+      let actual = try JSONSerialization.jsonObject(with: Data(presentation.initialJSON.utf8)) as? NSDictionary
+      XCTAssertEqual(actual, expected)
+    }
+    XCTAssertEqual(f.page.state.session.generationState, generation)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+    do { try await f.workflow.apply(json: "{", systemIsDark: false); XCTFail("Invalid import accepted") }
+    catch {}
+    let retained = SettingsJSONCommandPresentation.exporting(page: f.page.state) { XCTFail("Legacy read after rejected import"); return "" }
+    XCTAssertEqual(retained.initialJSON, presentation.initialJSON)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+  }
+
+  private func assertCurrentExportIsReadOnly(_ f: Fixture, draft: WebsiteConfigNativeDraft,
+    file: StaticString = #filePath, line: UInt = #line) throws {
+    let before = f.page.state, disk = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    let command = SettingsJSONCommandPresentation.exporting(page: before) {
+      XCTFail("Website export read legacy preferences", file: file, line: line); return ""
+    }
+    XCTAssertEqual(command.initialJSON, try WebsiteConfigExport.json(draft, surface: .command), file: file, line: line)
+    let current = try XCTUnwrap(WebsiteConfigExport.draft(in: f.page.state), file: file, line: line)
+    XCTAssertEqual(try WebsiteConfigExport.json(current, surface: .settings),
+      try WebsiteConfigExport.json(draft, surface: .settings), file: file, line: line)
+    XCTAssertEqual(f.page.state.session.generationState, before.session.generationState, file: file, line: line)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.session.automaticInputAttemptID, file: file, line: line)
+    XCTAssertEqual(f.page.state.session.typed, before.session.typed, file: file, line: line)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, disk, file: file, line: line)
+  }
   private enum Failure: Error, Equatable { case notParked, provider }
   func testLayoutFluidCountdownRetainsHiddenTextAndRetiresOnReplacementOrStop() async throws {
     let f = try Fixture(); defer { f.close() }
@@ -1594,6 +1638,7 @@ import SwiftUI
       guard case WebsiteConfigSessionBuildError.generationFailed = error.underlying else { return XCTFail("\(error)") }
     }
     XCTAssertEqual(reads, 3); XCTAssertNotNil(f.page.state.savedApplication)
+    try assertCurrentExportIsReadOnly(f, draft: XCTUnwrap(f.page.state.savedApplication).draft)
     let register = WebsiteConfigFileRegister(directory: f.directory)
     let before = try register.read()
     guard case .available(let saved) = before.state else { return XCTFail("Accepted source lost") }
@@ -3443,6 +3488,7 @@ import SwiftUI
     let pending = try XCTUnwrap(f.page.state.configurationDeparture)
     let register = WebsiteConfigFileRegister(directory: f.directory)
     let revision = try register.read().revision
+    try assertCurrentExportIsReadOnly(f, draft: pending.draft)
     do { try await workflow.resumeAndBegin(departureID: pending.id, systemIsDark: false); XCTFail("Failed retry delivered") }
     catch is WebsiteConfigSavedPreparationError {}
     XCTAssertEqual(try register.read().revision, revision)
@@ -3499,6 +3545,8 @@ import SwiftUI
     XCTAssertNil(f.page.state.configurationDeparture)
     XCTAssertEqual(f.page.state.session.automaticInputAttemptID, id)
     XCTAssertEqual(f.page.state.session.typed, "a")
+    var composing = f.page.state; composing.session.beginComposition(); f.page.replace(composing)
+    try assertCurrentExportIsReadOnly(f, draft: XCTUnwrap(f.page.state.presentation).publication.draft)
     XCTAssertFalse(f.page.state.session.isFinished)
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
   }

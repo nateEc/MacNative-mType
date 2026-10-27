@@ -6,6 +6,12 @@ struct WebsiteConfigPreparedEdit {
   let key: String
   let previousRuntime: [String: WebsiteConfigValue]
   let projection: WebsiteConfigRuntimeProjection
+  let previousStore: [String: WebsiteConfigValue]
+  init(key: String, previousRuntime: [String: WebsiteConfigValue], projection: WebsiteConfigRuntimeProjection,
+    previousStore: [String: WebsiteConfigValue]? = nil) {
+    self.key = key; self.previousRuntime = previousRuntime; self.projection = projection
+    self.previousStore = previousStore ?? previousRuntime
+  }
 }
 
 /// Complete typed preflight, NOT an applied configuration. No legacy snapshot
@@ -33,6 +39,27 @@ struct WebsiteConfigNativeDraft {
   var lazyMemory = WebsiteConfigLazyModeMemory()
   var funboxMemory = WebsiteConfigFunboxMemory()
   var projection: WebsiteConfigRuntimeProjection { origin.projection }
+  /// Separate value state for the settings store. Full application publishes
+  /// its requested snapshot after synchronous events; later ordinary setters
+  /// update just their assigned fields, retaining unrelated store differences.
+  /// This is window-owned state, not an extra persisted configuration.
+  var settingsStoreValues: [String: WebsiteConfigValue] {
+    let projection = projection
+    var values: [String: WebsiteConfigValue]
+    let events: ArraySlice<WebsiteConfigApplicationEvent>
+    if let finish = projection.events.lastIndex(where: { $0.key == "fullConfigChangeFinished" }) {
+      values = projection.requested
+      events = projection.events.suffix(from: finish + 1)
+    } else {
+      if case .edited(let edit) = origin { values = edit.previousStore }
+      else { values = projection.requested }
+      events = projection.events[...]
+    }
+    for event in events {
+      if let value = event.newValue, values[event.key] != nil { values[event.key] = value }
+    }
+    return values
+  }
   /// Restore evidence is never presented as an original JSON import.
   var prepared: WebsiteConfigPreparedImport? {
     guard case .imported(let prepared) = origin else { return nil }; return prepared
@@ -100,7 +127,8 @@ struct WebsiteConfigNativeDraft {
     case .imported(var value): value.projection = projection; origin = .imported(value)
     case .restored(let value): origin = .restored(.init(origin: value.origin, loaded: value.loaded,
       projection: projection, websiteStorage: value.websiteStorage))
-    case .edited(let value): origin = .edited(.init(key: value.key, previousRuntime: value.previousRuntime, projection: projection))
+    case .edited(let value): origin = .edited(.init(key: value.key, previousRuntime: value.previousRuntime,
+      projection: projection, previousStore: value.previousStore))
     }
     var result = try Self(origin: origin, pointsPerRem: pointsPerRem)
     result.lazyMemory = memory
