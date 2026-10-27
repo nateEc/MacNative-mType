@@ -139,6 +139,11 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   private var pendingKeymapHighlights: Set<UUID> = []
   private var readKeymapWindow: (@MainActor () -> WebsiteConfigPracticeScopeSource.Window?)?
   private let archiveRegister: WebsiteConfigFileRegister
+  private var localFontUpdates: WebsiteLocalFontUpdates?
+  var localFontFailure: String? { localFontUpdates?.failure }
+  var localFontPublication: UUID? { localFontUpdates?.publication }
+  func retryLocalFontResources() { localFontUpdates?.retry() }
+  private func finishedApplying() { applying = false; localFontUpdates?.operationEnded() }
   private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID), resume(UUID), received(UUID) }
 
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
@@ -164,6 +169,30 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     coordinator = .init(router: settings.preferenceConfigurationSaves, register: .init(directory: directory),
       loadExternal: loadExternal,
       environment: { [environment] in environment.read() })
+    localFontUpdates = .init(page: page, settings: settings, refresh: { [weak self] in
+      guard let self else { return .deferred }
+      return self.refreshLocalFontResources()
+    })
+  }
+
+  private func refreshLocalFontResources() -> WebsiteLocalFontUpdates.Outcome {
+    guard !stopped, let page, !applying, page.restartController?.isPreparing != true,
+      page.state.savedApplication == nil, page.state.configurationDeparture == nil, page.state.sharedReceipt == nil,
+      page.state.presentation != nil else { return .deferred }
+    applying = true; defer { finishedApplying() }
+    do {
+      return try environment.withSynchronousSetterRead {
+        let font = try coordinator.prepareFontRefresh(for: page, local: settings.readLocalPracticeFontResource())
+        switch try coordinator.commitFontRefresh(font, for: page) {
+        case .committed(let p): return .applied(p.applicationID)
+        case .busy: return .deferred
+        case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+        case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+        }
+      }
+    } catch {
+      return .failed("本地字体文件已更新，但当前练习尚未更新。请重试字体更新。")
+    }
   }
 
   /// nil selects explicit native-record restoration, never an empty import.
@@ -178,7 +207,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
     guard page.state.presentation?.publication.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
-    applying = true; operation = UUID(); defer { applying = false }
+    applying = true; operation = UUID(); defer { finishedApplying() }
     return try coordinator.acceptSharedReceipt(json, for: page, settings: settings, refreshingWith: source)
   }
 
@@ -230,7 +259,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       guard receipt.canInitialize(after: page.state.session) else {
         guard !applying else { throw WebsiteConfigImportWorkflowError.busy }
         applying = true; let current = UUID(); operation = current
-        defer { applying = false }
+        defer { finishedApplying() }
         try Task.checkCancellation()
         guard !stopped, operation == current else { throw CancellationError() }
         if try coordinator.commitSharedLiveReceipt(receipt.id, for: page) != nil {
@@ -276,7 +305,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     guard page.state.presentation?.publication.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
     try Task.checkCancellation()
     applying = true; operation = UUID()
-    defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; applying = false }
+    defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; finishedApplying() }
     return try environment.withSynchronousSetterRead {
       guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
       let key: String, value: WebsiteConfigValue
@@ -309,7 +338,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     let current = UUID(); applying = true; operation = current
     defer {
       if let prepared { _ = coordinator.cancel(prepared) }
-      prepared = nil; applying = false
+      prepared = nil; finishedApplying()
     }
     return try environment.withSynchronousSetterRead {
       let ticket = try coordinator.prepareEdit(key: edit.key, value: edit.value, for: page, refreshingWith: source)
@@ -342,7 +371,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     defer {
       if let prepared { _ = coordinator.cancel(prepared) }
       if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
-      prepared = nil; rejectedRestart = nil; applying = false
+      prepared = nil; rejectedRestart = nil; finishedApplying()
     }
     let locked = try environment.withSynchronousSetterRead {
       guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
@@ -411,7 +440,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     try Task.checkCancellation()
     let current = UUID(); operation = current; applying = true
     let noticeGeneration = notices?.deliveryGeneration
-    defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; applying = false }
+    defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; finishedApplying() }
     defer {
       if let navigation {
         var state = page.state
@@ -489,7 +518,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     defer {
       if let prepared { _ = coordinator.cancel(prepared) }
       if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
-      prepared = nil; rejectedRestart = nil; applying = false
+      prepared = nil; rejectedRestart = nil; finishedApplying()
     }
     let locked = try environment.withSynchronousSetterRead {
       guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
@@ -557,7 +586,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     let noticeGeneration = notices?.deliveryGeneration
     defer {
       if let prepared { _ = coordinator.cancel(prepared) }
-      prepared = nil; applying = false
+      prepared = nil; finishedApplying()
     }
     return try environment.withSynchronousSetterRead {
       guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
@@ -611,7 +640,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     let noticeGeneration = notices?.deliveryGeneration
     defer {
       if let prepared { _ = coordinator.cancel(prepared) }
-      prepared = nil; applying = false
+      prepared = nil; finishedApplying()
     }
     func execute() throws -> String {
       guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
@@ -686,7 +715,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     var accepted = 0, rejected: [String] = [], receiptID = applicationID
     defer {
       if let prepared { _ = coordinator.cancel(prepared) }
-      prepared = nil; applying = false
+      prepared = nil; finishedApplying()
     }
     do {
       for edit in edits {
@@ -759,7 +788,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       if let prepared { _ = coordinator.cancel(prepared) }
       if let rejectedRestart { rejectedRestart.controller.cancel(requestID: rejectedRestart.request) }
       rejectedRestart = nil
-      prepared = nil; applying = false
+      prepared = nil; finishedApplying()
     }
     try Task.checkCancellation()
     // Let a prior observed preference mutation finish its MainActor resample.
@@ -1027,6 +1056,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
   }
   func stop() {
+    localFontUpdates?.stop()
     page?.retireLayoutFluidHandler(owner: layoutFluidHandlerOwner)
     pendingKeymapHighlights.removeAll(); readKeymapWindow = nil
     stopped = true; cancel(); source.stop(); environment.stop()

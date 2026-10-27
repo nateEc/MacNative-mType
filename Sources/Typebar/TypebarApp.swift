@@ -1537,6 +1537,12 @@ private struct ContentView: View {
     VStack(spacing: 30) {
       header
       RemoteAnnouncementBannerStack(center: announcements)
+      if let message = websiteImportWorkflow?.localFontFailure {
+        HStack {
+          Label(message, systemImage: "textformat")
+          Button("重试字体") { websiteImportWorkflow?.retryLocalFontResources() }
+        }.font(.callout)
+      }
       if startupBlocksPractice {
         WebsiteConfigStartupNotice(state: pageSessionStore.startupController.state,
           recover: openWebsiteConfigImport,
@@ -1698,6 +1704,9 @@ private struct ContentView: View {
     }
     .onChange(of: settings.practiceFontApplicationRevision) { _, _ in commandFontPreview.appliedFontFamily() }
     .onChange(of: settings.localPracticeFontRevision) { _, _ in commandFontPreview.appliedFontFamily() }
+    .onChange(of: websiteImportWorkflow?.localFontPublication) { _, _ in
+      commandFontPreview.appliedFontFamily(); preparedWholePreviewRendering = nil
+    }
     .onChange(of: session.configuration.language) { _, _ in commandFontPreview.appliedFontFamily() }
     .onChange(of: activeChallengeID) { _, _ in commandFontPreview.appliedFontFamily() }
     .onChange(of: session.hasStarted) { _, started in

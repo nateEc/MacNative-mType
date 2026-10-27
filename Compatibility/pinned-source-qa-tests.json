@@ -271,6 +271,10 @@
       "file": "Tests/TypebarTests/LocalFontCommandSourceTests.swift"
     },
     {
+      "id": "TypebarTests.WebsiteConfigFontCascadeSourceTests/testEveryPinnedLanguageAndLocalPresenceUsesActualApplicationCascade",
+      "file": "Tests/TypebarTests/WebsiteConfigFontCascadeSourceTests.swift"
+    },
+    {
       "id": "TypebarTests.LocalNoticeTests/testNativeStateAgainstCompletePinnedNotificationModuleTransitions",
       "file": "Tests/TypebarTests/LocalNoticeTests.swift"
     },

@@ -743,6 +743,70 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let admission: UUID
     fileprivate let font: WebsiteConfigFontResource
   }
+  struct FontRefreshPrepared {
+    fileprivate let configuration: Prepared
+    fileprivate let admission: UUID
+    fileprivate let font: WebsiteConfigFontResource
+  }
+  /// A file change is not a configuration setter. Capture the latest page
+  /// under the new resource epoch, retaining its separate saved snapshot.
+  func prepareFontRefresh(for page: PracticePageSessionStore, local: WebsiteConfigFontResource.Local) throws -> FontRefreshPrepared {
+    let prepared = try fontRefreshTicket(for: page)
+    let admission = try beginAsyncResources(prepared)
+    let font = try WebsiteConfigFontResource.prepare(typography: prepared.draft.keyboardTypography,
+      language: prepared.draft.testParameters.language, local: local)
+    try checkAsyncResources(prepared, admission: admission)
+    return .init(configuration: prepared, admission: admission, font: font)
+  }
+  private func fontRefreshTicket(for page: PracticePageSessionStore) throws -> Prepared {
+    guard !processing, page.restartController?.isPreparing != true else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    guard page.state.configurationDeparture == nil, page.state.savedApplication == nil, page.state.sharedReceipt == nil
+    else { throw WebsiteConfigCommitCoordinatorError.stale }
+    request = UUID()
+    guard let owner = router.captureLease(), owner.owner == page.owner, let context = environment()
+    else { throw WebsiteConfigCommitCoordinatorError.noOwner }
+    let capture = try page.captureGeneration(router: router)
+    let base = capture.publication
+    guard base.authority === publicationAuthority, latest?.applicationID == base.applicationID,
+      try register.read().revision == base.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+    var prepared = Prepared(draft: base.draft, identity: identity, request: request,
+      owner: owner, environment: context, disk: base.disk)
+    prepared.savedDraft = base.savedDraft; prepared.sourcePage = page; prepared.pageCapture = capture
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return prepared
+  }
+  func commitFontRefresh(_ resources: FontRefreshPrepared, for page: PracticePageSessionStore) throws -> Outcome {
+    guard !processing, page.restartController?.isPreparing != true else { return .busy }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    let prepared = resources.configuration
+    guard resources.admission == resourceAdmission, isCurrent(prepared), prepared.sourcePage === page,
+      let capture = prepared.pageCapture, let previous = page.state.presentation, let practice = page.state.practice,
+      page.state.configurationDeparture == nil, page.state.savedApplication == nil, page.state.sharedReceipt == nil
+    else { return .stale }
+    try page.beginFontResourceCommit(owner: prepared.owner, router: router, capture: capture)
+    defer { page.endCommit() }
+    guard try register.read().revision == prepared.disk else { return .conflict }
+    var state = page.state
+    let progress = state.currentQuoteInitialization, controller = page.restartController
+    let updated = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: practice.scope,
+      quote: practice.quote, external: practice.external, repetition: practice.repetition)
+    let publication = Publication(applicationID: UUID(), draft: capture.publication.draft,
+      savedDraft: capture.publication.savedDraft, owner: prepared.owner.owner,
+      environmentRevision: prepared.environment.revision, pointsPerRem: prepared.environment.pointsPerRem,
+      disk: prepared.disk, background: capture.publication.background, font: resources.font,
+      session: state.session, practice: updated, quoteRecoveries: capture.publication.quoteRecoveries,
+      ownerLease: prepared.owner, authority: publicationAuthority)
+    state = .init(session: state.session, presentation: previous.retainingAppearance(for: publication),
+      practice: updated, priorAttemptLedger: state.priorAttemptLedger,
+      restartDepartureAttemptID: state.restartDepartureAttemptID, quoteInitialization: state.quoteInitialization)
+    if let progress { state.quoteInitialization = .init(publication: publication.applicationID, configurationDeparture: nil, progress: progress) }
+    latest = publication; publicationAuthority.latest = publication.applicationID
+    page.installCommitted(state, retainingRestartController: controller)
+    retire(prepared)
+    return .committed(publication)
+  }
   func prepareLiveFont(_ prepared: Prepared, local: WebsiteConfigFontResource.Local) throws -> LiveFontPrepared {
     guard let capture = prepared.pageCapture,
       WebsiteConfigFontEdit.admits(prepared.draft, from: capture.publication.draft) else { throw WebsiteConfigCommitCoordinatorError.stale }
