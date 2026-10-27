@@ -3,6 +3,10 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.WebsiteSharedSettingsReceiverTests/testOrderedReceiverAgainstCompletePinnedHandlerSettersStoreAndCustomModule",
+      "file": "Tests/TypebarTests/WebsiteSharedSettingsReceiverTests.swift"
+    },
+    {
       "id": "TypebarTests.WebsiteTestSettingsShareTests/testSelectedFieldsAgainstCompletePinnedURLProducer",
       "file": "Tests/TypebarTests/WebsiteTestSettingsShareTests.swift"
     },

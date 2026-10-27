@@ -29,7 +29,8 @@ const paceCommandMode = process.argv[3] === '--pace-commands' || paceInputNotati
 const appearanceCommandMode = process.argv[3] === '--appearance-commands';
 const keymapCommandMode = process.argv[3] === '--keymap-commands';
 const layoutFluidRuntimeMode = process.argv[3] === '--layoutfluid-runtime';
-const exportMode = process.argv[3] === '--export-config';
+const sharedSettingsMode = process.argv[3] === '--shared-test-settings';
+const exportMode = process.argv[3] === '--export-config' || sharedSettingsMode;
 assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode || exportMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
@@ -81,7 +82,11 @@ const adapters = new Map([
   [path.join(frontend, 'utils/zod.ts'), {getOptions: () => []}],
   [path.join(frontend, 'types/font-awesome.ts'), {FaObject: undefined}],
   [path.join(frontend, 'sentry.ts'), {captureException: noop}],
-  [path.join(frontend, 'config/persistence.ts'), {saveToLocalStorage: key => simulation.saves.push(key)}],
+  [path.join(frontend, 'config/persistence.ts'), {saveToLocalStorage: key => {
+    simulation.saves.push(key);
+    if (sharedSettingsMode) simulation.configCheckpoints?.push({key, value: structuredClone(simulation.Config)});
+    if (sharedSettingsMode) simulation.persistConfig?.(key);
+  }}],
   ['solid-js', {onCleanup: noop, JSXElement: undefined}],
 ]);
 function getModule(id) {
@@ -102,6 +107,13 @@ function getModule(id) {
     let source = fs.readFileSync(id, 'utf8');
     if (id === path.join(schemas, 'configs.ts')) source += '\nexport const Config = undefined; export const CustomThemeColors = undefined; export const ConfigValue = undefined; export const FunboxName = undefined; export const TypingSpeedUnit = undefined;';
     if (id === path.join(root, 'packages/funbox/src/types.ts')) source += '\nexport const FunboxMetadata = undefined; export const FunboxProperty = undefined; export const FunboxForcedConfig = undefined;';
+    // Type-only exports are erased by Node's transformer while unmarked type
+    // imports remain. Supply only the erased binding; execute runtime code intact.
+    if (sharedSettingsMode && id === path.join(root, 'packages/funbox/src/index.ts')) source += '\nexport { FunboxProperty };';
+    if (sharedSettingsMode && ['results.ts','shared.ts','util.ts'].some(file=>id===path.join(schemas,file))) {
+      for(const name of ['CustomTextSettings','CustomTextLimitMode','CustomTextMode','Mode','Mode2'])
+        if(new RegExp('export type '+name+'\\b').test(source)) source+='\nexport const '+name+' = undefined;';
+    }
     module = new vm.SourceTextModule(stripTypeScriptTypes(source, {mode: 'transform'}), {context, identifier: id});
   }
   modules.set(id, module);
@@ -112,6 +124,7 @@ function resolve(id, importer) {
   if (id.endsWith('/store') && importer.startsWith(path.join(frontend, 'config/')))
     return exportMode ? path.join(frontend,'config/store.ts') : 'store-adapter';
   if (id === '@monkeytype/schemas/configs') return path.join(schemas, 'configs.ts');
+  if (sharedSettingsMode && id.startsWith('@monkeytype/schemas/')) return path.join(schemas,id.slice('@monkeytype/schemas/'.length)+'.ts');
   if (id === '@monkeytype/util/objects') return path.join(root, 'packages/util/src/objects.ts');
   if (id === '@monkeytype/util/numbers') return path.join(root, 'packages/util/src/numbers.ts');
   if (id === '@monkeytype/util/arrays') return path.join(root, 'packages/util/src/arrays.ts');
@@ -253,6 +266,11 @@ if (defaultsMode) {
       const json=JSON.stringify(value);steps.push({kind:'single',key,json,active:simulation.flags.testActive});
       context.inputKey=key;context.inputJSON=json;
       return vm.runInContext('setConfig(inputKey,JSON.parse(inputJSON))',context);
+    }
+    if(sharedSettingsMode) {
+      const {runSharedSettingsOracle}=await import('./source-shared-settings-oracle.mjs');
+      await runSharedSettingsOracle({root,frontend,context,load,simulation,fresh,full,verify});
+      process.exit(0);
     }
     const fixtures=[];
     async function snapshot(label,mutateDuringFallback=false) {
