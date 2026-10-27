@@ -92,6 +92,10 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let wasActive: Bool
     fileprivate let wasFailed: Bool
     var requiresInitialization: Bool { outcome.restartStarts > 0 }
+    // A restart withheld at receipt time is not a permanent veto. An explicit
+    // later continue may initialize after that same attempt has ended; the
+    // coordinator still verifies the owner, publication, content and disk.
+    func canInitialize(after session: TypingSession) -> Bool { requiresInitialization || session.isFinished }
     var basePointsPerRem: Double { base.pointsPerRem }
     @MainActor func authorizesInput(owner id: UUID, router: PreferenceConfigurationSaveRouter) -> Bool {
       owner.owner == id && router.isCurrent(owner)
@@ -251,7 +255,7 @@ final class WebsiteConfigCommitCoordinator {
     processing = true; defer { processing = false }
     request = UUID()
     guard let receipt = page.state.sharedReceipt, receipt.id == id, receipt.identity == identity,
-      receipt.requiresInitialization, router.isCurrent(receipt.owner), let context = environment(),
+      receipt.canInitialize(after: page.state.session), router.isCurrent(receipt.owner), let context = environment(),
       let source = receipt.contentSource, source.ownsReceiptIdentity(receipt.contentCapture),
       latest?.applicationID == receipt.base.applicationID,
       try register.read().revision == receipt.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
@@ -266,19 +270,24 @@ final class WebsiteConfigCommitCoordinator {
     let saved = try WebsiteConfigNativeDraft(received: savedOutcome, pointsPerRem: context.pointsPerRem)
     let previous = try unwrappedPractice(page)
     guard let languageUnits = draft.projection.runtime["language"]?.stringUnits else { throw WebsiteConfigNativeDraftError.incompleteRuntime }
-    let repetition = WebsiteConfigRestartPolicy.resolve(requested: false, active: receipt.wasActive,
-      previouslyRepeated: previous.repetition.repeatsWordset, failed: receipt.wasFailed,
+    let deferredUntilFinished = !receipt.requiresInitialization
+    let previousQuote = (deferredUntilFinished ? page.state.currentQuoteInitialization?.quote : nil) ?? previous.quote
+    let repetition = WebsiteConfigRestartPolicy.resolve(requested: false,
+      active: deferredUntilFinished ? capture.testActive : receipt.wasActive,
+      previouslyRepeated: previous.repetition.repeatsWordset,
+      failed: deferredUntilFinished ? page.state.session.outcome == .failed : receipt.wasFailed,
       mode: draft.testParameters.mode, language: String(decoding: languageUnits, as: UTF16.self),
-      quoteLanguage: previous.quote.flatMap { WebsiteLanguageIdentity.name(for: $0.language) },
+      quoteLanguage: previousQuote.flatMap { WebsiteLanguageIdentity.name(for: $0.language) },
       repeatQuotes: draft.behavior.repeatQuotes, repeatedPace: draft.behavior.repeatedPace)
     try Task.checkCancellation()
     try page.beginCommit(owner: receipt.owner, router: router, capture: capture)
     var state = page.state
+    if deferredUntilFinished { state.restartDepartureAttemptID = state.session.automaticInputAttemptID }
     state.retainingSharedScope(receipt.scope)
     state.sharedReceipt = nil
     state.configurationDeparture = .init(id: UUID(), draft: draft, savedDraft: saved, quoteRecoveries: [], disk: receipt.disk,
       identity: identity, environment: context, contentSource: source, requiresContentSource: true,
-      repetition: repetition, quote: previous.quote, wordHistory: state.session.generatedWordReplayHistory, sharedReceipt: receipt)
+      repetition: repetition, quote: previousQuote, wordHistory: state.session.generatedWordReplayHistory, sharedReceipt: receipt)
     page.installCommitted(state); page.endCommit()
     var prepared = Prepared(draft: draft, identity: identity, request: request, owner: receipt.owner, environment: context, disk: receipt.disk)
     prepared.savedDraft = saved; prepared.sourcePage = page; prepared.pageCapture = try page.captureGeneration(router: router)

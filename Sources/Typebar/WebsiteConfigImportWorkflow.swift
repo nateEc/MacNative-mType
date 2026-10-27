@@ -206,7 +206,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   func continuePendingSharedSettings(systemIsDark: Bool) async throws -> WebsiteSharedLinkApplication {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     if let receipt = page.state.sharedReceipt {
-      guard receipt.requiresInitialization else {
+      guard receipt.canInitialize(after: page.state.session) else {
         guard !applying else { throw WebsiteConfigImportWorkflowError.busy }
         applying = true; let current = UUID(); operation = current
         defer { applying = false }
@@ -956,7 +956,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     switch intent {
     case .received(let id):
       guard let receipt = page.state.sharedReceipt, receipt.id == id else { throw WebsiteConfigImportWorkflowError.conflict }
-      guard receipt.requiresInitialization else { throw WebsiteConfigImportWorkflowError.receiptRestartWithheld }
+      guard receipt.canInitialize(after: page.state.session) else { throw WebsiteConfigImportWorkflowError.receiptRestartWithheld }
     case .application:
       guard !page.state.session.hasStarted || page.state.session.isFinished else {
         throw WebsiteConfigImportWorkflowError.activeAttempt

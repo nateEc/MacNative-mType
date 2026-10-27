@@ -1,5 +1,9 @@
 # 功能盘点与追踪表
 
+| ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
+| --- | --- | --- | --- | --- |
+| SHARE-FINISHED-RECEIPT-04 | 旧尝试结束后继续暂存链接 | 固定 restart 的活动 No Quit 限制与当下引语重复条件 | WebsiteConfigCommitCoordinator／WebsiteConfigImportWorkflow；TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md | 部分完成：真实工作流可在旧尝试完成／失败后开始下一练习，保留 nosave 与独立文本写入，准备失败可继续且不重复记账；过期租约、外来磁盘和另一已结束尝试仍拒绝。定向 23 项通过，实体面板、普通原生页完整接收与其他实时生成缺口保留。 |
+
 2026-10-28 完整保存配置归档 v38：真实数据迁移及云同步捕获独立文件的 94 项保存值、两项 Lazy Mode 记忆和网站／原生后备文本；不提升窗口 nosave，坏本机记录不静默省略。持久恢复日志与旧 reader 屏障保护中断状态，按精确窗口租约和磁盘 revision 继续原生冷恢复；资源未准备不得报告可练习。最终定向 39 项零失败、无可见 Typebar 启动；扩大回归及包结果见 WEBSITE_PROFILE_ARCHIVE_CONTRACT.md。实体文件对话框、真实云服务、独立进程及多窗口验收仍开放，完整 goal active；旧批次的“完整配置备份未完成”由此项范围取代。
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |

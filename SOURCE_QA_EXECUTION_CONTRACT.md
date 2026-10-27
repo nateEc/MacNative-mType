@@ -1,5 +1,9 @@
 # 固定源码对照的执行证据
 
+终态回执恢复同版 debug 包、签名、资源与原创性检查通过（33.145 秒，输入哈希不变；`/tmp/typebar-finished-receipt-package.log` 及同名 JSON），未启动主程序。
+
+2026-10-28 旧尝试结束后继续零重开回执：来源条件核对固定 test-logic.ts 的 restart 与引语重复分支；必需清单保持 108 项，不增加来源比较方法。实际工作流先行反例、23 项定向及当前终态重复策略见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。扩大回归 486 项零失败零跳过（314.125 秒，驱动 322.542 秒），同日志全部 108 项证据通过，输入哈希不变（`/tmp/typebar-finished-receipt-regression.log` 及同名 JSON／evidence.log）。没有选择可见窗口用例；普通原生窗口完整接收、整套客户端及完整 readiness 未验。以下为历史批次。
+
 完整配置归档同版 debug 包、签名、资源和原创性检查通过（32.927 秒，输入哈希不变；`/tmp/typebar-website-profile-archive-package.log` 及同名 JSON），未启动主程序。
 
 2026-10-28 完整保存配置归档 v38：必需清单保持 108 项，新检查针对原生保存、日志与隐藏生产 Root，不增加来源比较方法。最终扩大 2679 项、1 可选十万词耐久跳过、0 失败（727.762 秒，驱动 738.095 秒），同日志全部 108 项证据通过、输入哈希不变（`/tmp/typebar-website-profile-archive-regression.log` 及同名 JSON／evidence.log）。定向 39 项、三个中断阶段、两份独立文本、负零保真和冷启动环境修正见 [完整配置备份合同](WEBSITE_PROFILE_ARCHIVE_CONTRACT.md)。未启动可见应用；实体文件对话框、真实云服务、独立进程、整套客户端和完整 readiness 未验，不以跳过计通过。以下为历史批次。

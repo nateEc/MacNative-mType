@@ -429,6 +429,150 @@ import Observation
     XCTAssertEqual(continued.completedWordCount, 17)
   }
 
+  func testFinishedAttemptContinuesRetainedCrossModeReceiptWithoutReplayingWrites() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":2}"#, systemIsDark: false)
+    var active = f.page.state
+    active.session.insertBatch(active.session.nextExpectedCharacter.map(String.init) ?? " ")
+    f.page.replace(active)
+    let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    let before = f.page.state.session.automaticInputAttemptID, disk = try f.register.read().revision
+    guard case .retained = try await workflow.applySharedSettings(json:
+      #"["custom",null,{"text":["cc","dd"],"mode":"repeat","limit":{"mode":"word","value":3.5},"pipeDelimiter":false},null,null,null,null,["no_quit"]]"#,
+      replacing: application, systemIsDark: false) else { return XCTFail("Cross-mode live receipt must retain the old attempt") }
+    let receipt = try XCTUnwrap(f.page.state.sharedReceipt)
+    XCTAssertFalse(receipt.requiresInitialization)
+    let generation = f.settings.websiteCustomTextStateGeneration
+    guard case .retained = try await workflow.continuePendingSharedSettings(systemIsDark: false) else {
+      return XCTFail("Active attempt must still withhold this transition")
+    }
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before)
+    var complete = f.page.state
+    for _ in 0..<500 where !complete.session.isFinished {
+      complete.session.insertBatch(complete.session.nextExpectedCharacter.map(String.init) ?? " ")
+    }
+    XCTAssertEqual(complete.session.outcome, .completed)
+    f.page.replace(complete)
+    let ledger = f.page.state.priorAttemptLedger
+    guard case .applied = try await workflow.continuePendingSharedSettings(systemIsDark: false) else {
+      return XCTFail("A completed attempt must allow the retained selection to initialize")
+    }
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, before)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .custom)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 4)
+    XCTAssertTrue(f.page.state.session.configuration.modifiers.contains(.noQuit))
+    XCTAssertEqual(f.page.state.practice?.scope.websiteCustomText?.limitValue, 3.5)
+    XCTAssertEqual(f.page.state.presentation?.publication.savedDraft.testParameters.wordLimit, 2)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertNil(f.page.state.sharedReceipt); XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertNotNil(f.page.restartController)
+  }
+
+  func testFinishedQuoteReceiptUsesCurrentCompletionOrFailureAndRetainsPreparationRetry() async throws {
+    enum Offline: Error { case unavailable }
+    @MainActor final class Loader {
+      var reads = 0
+      var offline = false
+    }
+    for failed in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      let loader = Loader()
+      let workflow = try f.makeWorkflow(loadQuotes: { _ in
+        loader.reads += 1
+        if loader.offline { throw Offline.unavailable }
+        return [.init(id: "owned-\(loader.reads)", title: "Own quote", text: "aa bb cc", language: .english, length: .short)]
+      }); defer { workflow.stop() }
+      try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"difficulty":"master","repeatQuotes":"typing"}"#, systemIsDark: false)
+      var active = f.page.state; active.session.insertBatch("a"); f.page.replace(active)
+      let originalQuote = try XCTUnwrap(f.page.state.practice?.quote?.id)
+      let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+      guard case .retained = try await workflow.applySharedSettings(json:
+        #"[null,null,{"text":["cc","dd"],"mode":"repeat","limit":{"mode":"word","value":3.5},"pipeDelimiter":false},null,null,null,null,["no_quit"]]"#,
+        replacing: application, systemIsDark: false) else { return XCTFail("Quote transition must wait for the old attempt") }
+      let generation = f.settings.websiteCustomTextStateGeneration, disk = try f.register.read().revision
+      var complete = f.page.state
+      if failed { complete.session.insertBatch("§") }
+      else {
+        for _ in 0..<500 where !complete.session.isFinished {
+          complete.session.insertBatch(complete.session.nextExpectedCharacter.map(String.init) ?? " ")
+        }
+      }
+      XCTAssertEqual(complete.session.outcome, failed ? .failed : .completed)
+      f.page.replace(complete)
+      let ledger = complete.priorAttemptLedger, attempt = complete.session.automaticInputAttemptID, beforeReads = loader.reads
+      if !failed {
+        loader.offline = true
+        do {
+          _ = try await workflow.continuePendingSharedSettings(systemIsDark: false)
+          XCTFail("Completed quote must prepare a fresh source and expose its failure")
+        } catch is WebsiteSharedReceiptPreparationError {}
+        XCTAssertEqual(loader.reads, beforeReads + 3)
+        XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+        XCTAssertTrue(f.page.state.configurationDeparture?.isSharedReceipt == true)
+        XCTAssertFalse(f.page.acceptsInput(for: attempt))
+        loader.offline = false
+      }
+      guard case .applied = try await workflow.continuePendingSharedSettings(systemIsDark: false) else {
+        return XCTFail("Terminal quote receipt did not continue")
+      }
+      XCTAssertEqual(f.page.state.practice?.repetition.repeatsWordset, failed)
+      if failed {
+        XCTAssertEqual(loader.reads, beforeReads)
+        XCTAssertEqual(f.page.state.practice?.quote?.id, originalQuote)
+      } else {
+        XCTAssertEqual(loader.reads, beforeReads + 4)
+        XCTAssertNotEqual(f.page.state.practice?.quote?.id, originalQuote)
+      }
+      XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, attempt)
+      XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+      XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+      XCTAssertEqual(try f.register.read().revision, disk)
+      XCTAssertNil(f.page.state.sharedReceipt); XCTAssertNil(f.page.state.configurationDeparture)
+    }
+  }
+
+  func testFinishedReceiptStillRejectsRetiredOwnerLeaseForeignSavedConfigurationOrDifferentAttempt() async throws {
+    for change in ["owner", "disk", "attempt"] {
+      let f = try Fixture(); defer { f.close() }; try await f.publish(#"{"mode":"words","words":2}"#)
+      var active = f.page.state; active.session.insertBatch(active.session.nextExpectedCharacter.map(String.init) ?? " "); f.page.replace(active)
+      let receipt = try f.coordinator.acceptSharedReceipt(#"["custom",null,null,null,null,null,null,["no_quit"]]"#,
+        for: f.page, settings: f.settings, refreshingWith: f.source)
+      var complete = f.page.state
+      for _ in 0..<500 where !complete.session.isFinished {
+        complete.session.insertBatch(complete.session.nextExpectedCharacter.map(String.init) ?? " ")
+      }
+      XCTAssertEqual(complete.session.outcome, .completed); f.page.replace(complete)
+      if change == "disk" {
+        let snapshot = try f.register.read()
+        guard case .available(var runtime) = snapshot.state else { return XCTFail("Missing saved profile") }
+        runtime["words"] = .number(88)
+        guard case .committed = try f.register.commit(runtime: runtime, lazyMemory: snapshot.lazyMemory,
+          replacing: XCTUnwrap(snapshot.revision)) else { return XCTFail("Foreign write failed") }
+      } else if change == "owner" {
+        let other = UUID()
+        f.settings.preferenceConfigurationSaves.register(owner: other, save: {})
+        f.settings.preferenceConfigurationSaves.activate(owner: other)
+        f.settings.preferenceConfigurationSaves.activate(owner: f.page.owner)
+      } else {
+        var other = f.page.state
+        other.session = TypingSession(configuration: .words(2), prompt: "aa bb")
+        other.session.insertBatch(other.session.prompt + " ")
+        XCTAssertTrue(other.session.isFinished)
+        f.page.replace(other)
+      }
+      let disk = try f.register.read().revision, before = f.page.state.session.generationState
+      XCTAssertThrowsError(try f.coordinator.resumeSharedReceipt(receipt.id, for: f.page))
+      XCTAssertEqual(f.page.state.session.generationState, before)
+      XCTAssertEqual(f.page.state.priorAttemptLedger, complete.priorAttemptLedger)
+      XCTAssertEqual(f.page.state.sharedReceipt?.id, receipt.id)
+      XCTAssertNil(f.page.state.configurationDeparture)
+      XCTAssertEqual(try f.register.read().revision, disk)
+    }
+  }
+
   func testIncompleteFullApplicationDoesNotShareTheOldNativeFallback() async throws {
     let f = try Fixture(); defer { f.close() }
     let workflow = try f.makeWorkflow(loadQuotes: { _ in throw WebsiteConfigImportWorkflowError.unavailable })
