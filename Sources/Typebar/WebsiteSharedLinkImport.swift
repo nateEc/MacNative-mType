@@ -4,6 +4,10 @@ enum WebsiteSharedLinkApplication {
   case applied(String), retained(String)
 }
 
+/// Emitted only by the read-only native baseline preflight, before URL writes.
+/// Existing native extensions may keep using their legacy selection receiver.
+struct WebsiteNativeSharedCompatibilityRequired: Error {}
+
 /// Transport admission only. Keep the JSON intact for the ordered receiver;
 /// JSONSerialization would replace raw UTF-16 and reject overflowing numbers.
 enum WebsiteSharedLinkImport {

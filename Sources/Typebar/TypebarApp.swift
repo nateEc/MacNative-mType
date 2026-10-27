@@ -1375,13 +1375,13 @@ private struct ContentView: View {
   @State private var showingCustomTextGenerator = false
   @State private var completedResult: CompletedResultPresentation?
   private var websiteCompletedResult: CompletedResultPresentation? {
-    guard pageSessionStore.ownsConfigurationSelection, let result = completedResult,
+    guard pageSessionStore.ownsPresentedConfigurationSelection, let result = completedResult,
       result.websiteAttemptID == session.automaticInputAttemptID else { return nil }
     return result
   }
   private var legacyCompletedResult: Binding<CompletedResultPresentation?> {
     .init(get: {
-      guard !pageSessionStore.ownsConfigurationSelection, completedResult?.websiteAttemptID == nil else { return nil }
+      guard !pageSessionStore.ownsPresentedConfigurationSelection, completedResult?.websiteAttemptID == nil else { return nil }
       return completedResult
     }, set: { value in
       // A late dismissal of an older sheet cannot erase a new page result.
@@ -1456,6 +1456,7 @@ private struct ContentView: View {
   @State private var websiteArchiveRestoreTask: Task<Void, Never>?
   @State private var websiteArchiveHandledGeneration: UInt64 = 0
   @State private var isRestoringWebsiteArchive = false
+  @State private var isAcceptingNativeSharedSettings = false
   @State private var websiteFunboxCommandTask: Task<Void, Never>?
   @State private var websiteLiveSourceRecoveryTask: Task<Void, Never>?
   @State private var websiteLiveSourceRecoveryRequest = UUID()
@@ -1548,7 +1549,7 @@ private struct ContentView: View {
           Button("打开配置面板…", action: openWebsiteConfigImport)
         }.font(.callout)
       }
-      if !visualFocus.isFocused && !(pageSessionStore.ownsConfigurationSelection && session.isFinished) {
+      if !visualFocus.isFocused && !(pageSessionStore.ownsPresentedConfigurationSelection && session.isFinished) {
         configurationPanel
       }
       if let zipfNotice {
@@ -1583,7 +1584,7 @@ private struct ContentView: View {
           if pageSession.savedApplication != nil { openWebsiteConfigImport() }
           else { requestPublishedRestart() }
         }) {
-        if pageSessionStore.ownsConfigurationSelection && session.isFinished {
+        if pageSessionStore.ownsPresentedConfigurationSelection && session.isFinished {
           if let result = websiteCompletedResult {
             completedResultContent(result, inline: true)
               .id(result.id)
@@ -7206,7 +7207,7 @@ private struct ContentView: View {
   private func returnToTypebarSettings() throws {
     let page = pageSessionStore
     guard !session.hasStarted || session.isFinished else { throw WebsiteConfigImportWorkflowError.activeAttempt }
-    guard page.state.practice != nil || page.state.savedApplication != nil || page.isReturningToTypebarSettings else {
+    guard page.ownsConfigurationSelection || page.isReturningToTypebarSettings else {
       page.startupController.continueUsingLegacy()
       return
     }
@@ -7302,12 +7303,42 @@ private struct ContentView: View {
   }
 
   private var websiteSettingsLinkApplication: (@MainActor (String) async throws -> WebsiteSharedLinkApplication)? {
-    guard pageSession.practice != nil else { return nil }
+    if pageSession.practice == nil, activeChallengeID != nil || wordPractice != nil { return nil }
     return { json in
-      guard let applicationID = pageSession.presentation?.publication.applicationID else {
-        throw WebsiteConfigImportWorkflowError.unavailable
+      let workflow = try importWorkflow()
+      if let applicationID = pageSession.presentation?.publication.applicationID {
+        return try await workflow.applySharedSettings(json: json, replacing: applicationID,
+          systemIsDark: systemColorScheme == .dark)
       }
-      return try await importWorkflow().applySharedSettings(json: json, replacing: applicationID,
+      let baseline: WebsiteConfigNativeBaseline.Capture
+      do {
+        guard session.configuration.mode != .quote || quoteSource == .builtIn else { throw WebsiteNativeSharedCompatibilityRequired() }
+        let font = settings.practiceFont.nsFont(size: settings.fontSize,
+          installedFontName: settings.installedPracticeFontName, language: session.configuration.language)
+        let family: String
+        if !TypebarLocalPracticeFontStore.isActive {
+          guard settings.installedPracticeFontName.isEmpty || NativePracticeFont.postScriptName(for: settings.installedPracticeFontName) != nil
+          else { throw WebsiteConfigNativeBaseline.Failure.unrepresentable("fontFamily") }
+          if let system = NativeSystemPracticeFont.identifier(matching: font) { family = system }
+          else {
+            guard !font.fontName.hasPrefix(".") else { throw WebsiteConfigNativeBaseline.Failure.unrepresentable("fontFamily") }
+            family = font.fontName
+          }
+        } else { family = font.fontName }
+        baseline = try workflow.captureNativeBaseline(preferences: settings.snapshot, configuration: session.configuration,
+          scope: nativeWebsitePracticeScope, layoutFluidLayouts: settings.layoutFluidLayouts, fontFamily: family)
+      } catch is WebsiteNativeSharedCompatibilityRequired {
+        throw WebsiteNativeSharedCompatibilityRequired()
+      } catch is WebsiteConfigNativeBaseline.Failure {
+        // Capture is read-only. A failed conversion preflight must not remove
+        // the old receiver's support for native-only settings/extensions.
+        throw WebsiteNativeSharedCompatibilityRequired()
+      }
+      let quote = session.configuration.mode == .quote ? currentSourceQuotes.first { $0.id == selectedQuoteID } : nil
+      isAcceptingNativeSharedSettings = true
+      defer { isAcceptingNativeSharedSettings = false }
+      return try await workflow.applyNativeSharedSettings(json: json, baseline: baseline, quote: quote,
+        repetition: isSamePromptRepeatAttempt ? .sameWordset(repeatedPace: isRepeatedPaceAttempt) : .none,
         systemIsDark: systemColorScheme == .dark)
     }
   }
@@ -7322,17 +7353,22 @@ private struct ContentView: View {
 
   private var websiteTestSettingsSnapshot: WebsiteTestSettingsShare.Snapshot? {
     WebsiteTestSettingsShare.pageSnapshot(pageSession) {
-      var scope = WebsiteConfigSessionBuilder.Scope()
-      scope.parameterMemory = .init(duration: duration, wordLimit: wordLimit, customTextDuration: customTextDuration,
-        customTextWordLimit: customTextWordLimit, customTextSectionLimit: customTextSectionLimit)
-      scope.customText = customText; scope.preparedCustomSections = preparedCustomSections
-      scope.customTextIsPrepared = preparedCustomSections != nil
-      scope.customCompletion = customTextCompletion; scope.customOrdering = customTextOrdering
-      scope.customPipeDelimiter = customTextPipeDelimiter
-      scope.finiteTextSource = activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk }
-      scope.customTextRecoveryBlocked = customTextRecovery.blocksCustomGeneration
-      return WebsiteTestSettingsShare.nativeSnapshot(configuration: session.configuration, scope: scope)
+      WebsiteTestSettingsShare.nativeSnapshot(configuration: session.configuration, scope: nativeWebsitePracticeScope)
     }
+  }
+
+  private var nativeWebsitePracticeScope: WebsiteConfigSessionBuilder.Scope {
+    var scope = WebsiteConfigSessionBuilder.Scope()
+    scope.parameterMemory = .init(duration: duration, wordLimit: wordLimit, customTextDuration: customTextDuration,
+      customTextWordLimit: customTextWordLimit, customTextSectionLimit: customTextSectionLimit)
+    scope.customText = customText; scope.preparedCustomSections = preparedCustomSections
+    scope.customTextIsPrepared = preparedCustomSections != nil
+    scope.customCompletion = customTextCompletion; scope.customOrdering = customTextOrdering
+    scope.customPipeDelimiter = customTextPipeDelimiter
+    scope.selectedQuoteID = selectedQuoteID; scope.favoriteQuoteIDs = settings.favoriteQuoteIDs
+    scope.finiteTextSource = activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk }
+    scope.customTextRecoveryBlocked = customTextRecovery.blocksCustomGeneration
+    return (try? WebsiteConfigNativeBaseline.currentNativeScope(configuration: session.configuration, preserving: scope)) ?? scope
   }
 
   private var sharePresetDefinition: SavedTestPreset {
@@ -7352,8 +7388,14 @@ private struct ContentView: View {
     if let receipt = pageSession.sharedReceipt {
       return .published(owner: preferenceConfigurationOwner, revision: session.automaticInputAttemptID, scope: receipt.scope)
     }
+    if let pending = pageSession.configurationDeparture, pending.isNativeSharedReceipt, let scope = pending.sharedScope {
+      return .published(owner: preferenceConfigurationOwner, revision: session.automaticInputAttemptID, scope: scope)
+    }
     if let scope = pageSession.practice?.scope {
       return .published(owner: preferenceConfigurationOwner, revision: session.automaticInputAttemptID, scope: scope)
+    }
+    if isAcceptingNativeSharedSettings {
+      return .published(owner: preferenceConfigurationOwner, revision: session.automaticInputAttemptID, scope: nativeWebsitePracticeScope)
     }
     // Legacy content controls reset the actual attempt when applied, including
     // same-value applications; capture its identity as the window generation.

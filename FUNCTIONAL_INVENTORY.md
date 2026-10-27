@@ -2,6 +2,10 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| SHARE-NATIVE-RECEIVER-05 | 普通原生窗口无损建立完整分享接收基线 | 固定八项接收核；原生转换写入与来源 nosave 分离 | WebsiteConfigNativeBaseline／WebsiteConfigNativeSharedStorage、Root 分享接线；NATIVE_SHARED_RECEIVER_CONTRACT.md | 部分完成：43 项定向通过，94 项由实际设置捕获，保留旧保存值及原生后备文本；支持失败续接、日志恢复、结束后继续与返回原生。原生专属设置保留兼容路径；完整配置的字体／主题／背景实时控制、实体操作和多窗口验收仍开放。以下旧批次“普通原生窗口完整接收未实现”仅由本条已验证范围取代，整项目标仍 active。 |
+
+| ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
+| --- | --- | --- | --- | --- |
 | SHARE-FINISHED-RECEIPT-04 | 旧尝试结束后继续暂存链接 | 固定 restart 的活动 No Quit 限制与当下引语重复条件 | WebsiteConfigCommitCoordinator／WebsiteConfigImportWorkflow；TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md | 部分完成：真实工作流可在旧尝试完成／失败后开始下一练习，保留 nosave 与独立文本写入，准备失败可继续且不重复记账；过期租约、外来磁盘和另一已结束尝试仍拒绝。定向 23 项通过，实体面板、普通原生页完整接收与其他实时生成缺口保留。 |
 
 2026-10-28 完整保存配置归档 v38：真实数据迁移及云同步捕获独立文件的 94 项保存值、两项 Lazy Mode 记忆和网站／原生后备文本；不提升窗口 nosave，坏本机记录不静默省略。持久恢复日志与旧 reader 屏障保护中断状态，按精确窗口租约和磁盘 revision 继续原生冷恢复；资源未准备不得报告可练习。最终定向 39 项零失败、无可见 Typebar 启动；扩大回归及包结果见 WEBSITE_PROFILE_ARCHIVE_CONTRACT.md。实体文件对话框、真实云服务、独立进程及多窗口验收仍开放，完整 goal active；旧批次的“完整配置备份未完成”由此项范围取代。

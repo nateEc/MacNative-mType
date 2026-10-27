@@ -63,6 +63,7 @@ struct WebsiteCustomTextSettings: Equatable {
     var storageAttempts: [StorageAttempt] = []
     var storageFailures: [String] = []
   }
+  static func validatePayload(_ json: String) throws { _ = try parse(json) }
   static func receive(json: String, current: State, context: WebsiteConfigRuntimeContext = .init(),
     storage: Storage = .init()) -> Outcome {
     var result = Outcome(state: current)

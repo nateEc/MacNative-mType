@@ -3,21 +3,27 @@ import Observation
 @testable import Typebar
 
 @MainActor final class WebsiteSharedReceiptTests: XCTestCase {
+  private final class RejectingWebsiteDefaults: UserDefaults, @unchecked Sendable {
+    override func set(_ value: Any?, forKey key: String) {
+      if key != WebsiteCustomTextStateStore.storageKey { super.set(value, forKey: key) }
+    }
+  }
   @MainActor private final class Fixture {
     let suite = "typebar.shared-receipt.\(UUID())"
     let defaults: UserDefaults, settings: AppSettings, account: AccountSession
     let page = PracticePageSessionStore()
+    var nativeWindowScope: WebsiteConfigSessionBuilder.Scope?
     let environment: WebsiteConfigEnvironmentSource
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-shared-receipt-\(UUID())")
     let register: WebsiteConfigFileRegister
-    lazy var source = WebsiteConfigPracticeScopeSource(environment: environment, readWindow: { [page] in
+    lazy var source = WebsiteConfigPracticeScopeSource(environment: environment, readWindow: { [page, weak self] in
       .published(owner: page.owner, revision: page.state.session.automaticInputAttemptID,
-        scope: page.state.sharedReceipt?.scope ?? page.state.practice?.scope ?? .init())
+        scope: page.state.sharedReceipt?.scope ?? page.state.configurationDeparture?.sharedScope ?? page.state.practice?.scope ?? self?.nativeWindowScope ?? .init())
     })
     lazy var coordinator = WebsiteConfigCommitCoordinator(router: settings.preferenceConfigurationSaves,
       register: register, environment: { [environment] in environment.read() })
-    init() throws {
-      defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    init(rejectWebsiteWrites: Bool = false) throws {
+      defaults = try XCTUnwrap(rejectWebsiteWrites ? RejectingWebsiteDefaults(suiteName: suite) : UserDefaults(suiteName: suite))
       settings = .init(defaults: defaults, localBackgroundStore: .inMemory()); account = .init(defaults: defaults)
       environment = .init(settings: settings, account: account, pointsPerRem: 16, documentComplete: true, development: false)
       try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
@@ -37,6 +43,17 @@ import Observation
       source.stop(); environment.stop(); page.detach(); defaults.removePersistentDomain(forName: suite)
       try? FileManager.default.removeItem(at: directory)
     }
+    func nativeBaseline(active: Bool = false) throws -> WebsiteConfigNativeBaseline.Capture {
+      settings.fontSize = 40
+      let configuration = TestConfiguration.words(3)
+      var state = page.state; state.session = .init(configuration: configuration, prompt: "aa bb cc")
+      if active { state.session.insertBatch("a") }
+      page.replace(state)
+      var scope = WebsiteConfigSessionBuilder.Scope(); scope.customText = "cedar river"
+      nativeWindowScope = scope
+      return try WebsiteConfigNativeBaseline.capture(preferences: settings.snapshot, configuration: configuration, scope: scope,
+        layoutFluidLayouts: settings.layoutFluidLayouts, fontFamily: "Courier", pointsPerRem: 16)
+    }
     func settle() async throws {
       let deadline = ContinuousClock.now.advanced(by: .seconds(2))
       while environment.read() == nil && ContinuousClock.now < deadline { await Task.yield() }
@@ -47,12 +64,318 @@ import Observation
     }) throws -> WebsiteConfigImportWorkflow {
       let seed = try WebsiteCustomTextSettings(value: .object(["text": .array([.string("aa"), .string("bb")]),
         "mode": .string("repeat"), "limit": .object(["mode": .string("word"), "value": .number(2)]), "pipeDelimiter": .bool(false)]))
-      return .init(page: page, settings: settings, account: account, directory: directory, readWindow: { [page] in
+      return .init(page: page, settings: settings, account: account, directory: directory, readWindow: { [page, weak self] in
         .published(owner: page.owner, revision: page.state.session.automaticInputAttemptID,
-          scope: page.state.sharedReceipt?.scope ?? page.state.practice?.scope ?? .init(websiteCustomText: seed))
+          scope: page.state.sharedReceipt?.scope ?? page.state.configurationDeparture?.sharedScope ?? page.state.practice?.scope ?? self?.nativeWindowScope ?? .init(websiteCustomText: seed))
       }, loadQuotes: loadQuotes)
     }
   }
+  func testOrdinaryNativeShareActionPublishesWholeRuntimeWithoutSavingIncomingNosaveValues() async throws {
+    let f = try Fixture(); defer { f.close() }
+    f.settings.fontSize = 40
+    let configuration = TestConfiguration.words(3)
+    var state = f.page.state; state.session = .init(configuration: configuration, prompt: "aa bb cc"); f.page.replace(state)
+    var scope = WebsiteConfigSessionBuilder.Scope(); scope.customText = "cedar river"
+    f.nativeWindowScope = scope
+    let preferences = f.settings.snapshot
+    let baseline = try WebsiteConfigNativeBaseline.capture(preferences: preferences, configuration: configuration,
+      scope: scope, layoutFluidLayouts: f.settings.layoutFluidLayouts, fontFamily: "Courier", pointsPerRem: 16)
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    let before = f.page.state.session.automaticInputAttemptID
+    let json = #"["words","17",null,null,true,"spanish",null,null]"#
+    let link = "typebar://test?testSettings=" + (try XCTUnwrap(URICompressedPayload.compress(json)))
+    let result = await TestConfigurationShareActions.applyAsync(link, current: .init(configuration: configuration),
+      challenges: [], notices: f.account.localNotices, applyWebsiteSettings: { json in
+        try await workflow.applyNativeSharedSettings(json: json, baseline: baseline, systemIsDark: false)
+      }, applyPreset: { _ in XCTFail("Ordinary website links must use the whole receiver"); return nil },
+      loadChallenge: { _ in .rejected })
+    guard result.shouldDismiss else { return XCTFail("Ordinary native receiver did not deliver the full practice: \(result.status ?? "")") }
+    let publication = try XCTUnwrap(f.page.state.presentation?.publication)
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, before)
+    XCTAssertEqual(publication.draft.projection.runtime["words"], .number(17))
+    XCTAssertEqual(publication.draft.projection.runtime["language"], .string("spanish"))
+    XCTAssertEqual(publication.draft.projection.runtime["fontSize"], .number(2.5))
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 17)
+    XCTAssertEqual(f.page.state.session.configuration.language, .spanish)
+    XCTAssertEqual(f.page.state.practice?.scope.websiteCustomText?.text, [.string("cedar"), .string("river")])
+    XCTAssertEqual(f.settings.snapshot, preferences)
+    guard case .available(let saved) = try f.register.read().state else { return XCTFail("Native baseline was not saved") }
+    XCTAssertEqual(saved["words"], .number(3))
+    XCTAssertEqual(saved["language"], .string("english"))
+    XCTAssertEqual(saved["fontSize"], .number(2.5))
+    XCTAssertNil(f.page.state.sharedReceipt); XCTAssertNil(f.page.state.configurationDeparture)
+  }
+
+  func testNativeReceiverRejectsAStaleBufferOrParameterMemoryBeforeConversion() async throws {
+    for changesText in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      let baseline = try f.nativeBaseline()
+      var current = try XCTUnwrap(f.nativeWindowScope)
+      if changesText { current.customText = "new actual native text" }
+      else {
+        let m = current.parameterMemory
+        current.parameterMemory = .init(duration: 83, wordLimit: m.wordLimit, customTextDuration: m.customTextDuration,
+          customTextWordLimit: m.customTextWordLimit, customTextSectionLimit: m.customTextSectionLimit)
+      }
+      f.nativeWindowScope = current
+      let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+      let before = f.page.state.session.generationState, generation = f.settings.websiteCustomTextStateGeneration
+      do {
+        _ = try await workflow.applyNativeSharedSettings(json: #"["words","17",null,null,null,null,null,null]"#,
+          baseline: baseline, systemIsDark: false)
+        XCTFail("A stale native capture must not replace the window's newer input")
+      } catch is WebsiteConfigCommitCoordinatorError {}
+      XCTAssertEqual(try f.register.read().state, .missing)
+      XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+      XCTAssertEqual(f.page.state.session.generationState, before)
+      XCTAssertNil(f.page.state.sharedReceipt)
+    }
+  }
+
+  func testNativeReceiverIncompleteConversionKeepsJournalAndHealthyRetryDoesNotReplayURL() async throws {
+    let f = try Fixture(rejectWebsiteWrites: true); defer { f.close() }
+    let baseline = try f.nativeBaseline()
+    let workflow = try f.makeWorkflow()
+    let before = f.page.state.session.generationState
+    let json = #"["words","17",null,null,null,null,null,null]"#
+    do {
+      _ = try await workflow.applyNativeSharedSettings(json: json, baseline: baseline, systemIsDark: false)
+      XCTFail("Dropped text write cannot complete conversion")
+    } catch let error as WebsiteNativeSharedStorageError { XCTAssertFalse(error.recovered) }
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertNil(f.page.state.sharedReceipt); XCTAssertFalse(f.page.ownsConfigurationSelection)
+    XCTAssertEqual(try f.register.read().state, .unavailable)
+    let journal = f.directory.appendingPathComponent(WebsiteConfigFileRegister.archiveJournalFilename)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: journal.path))
+    workflow.stop(); f.page.detach()
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: f.suite))
+    let settings = AppSettings(defaults: defaults, feedbackSound: .init(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory())
+    let account = AccountSession(defaults: defaults)
+    settings.preferenceConfigurationSaves.register(owner: f.page.owner, save: { XCTFail("No legacy save") })
+    f.page.attach(to: settings.preferenceConfigurationSaves)
+    let nativeWindow = try XCTUnwrap(f.nativeWindowScope)
+    let retry = WebsiteConfigImportWorkflow(page: f.page, settings: settings, account: account, directory: f.directory,
+      readWindow: { [page = f.page, scope = nativeWindow] in
+        .published(owner: page.owner, revision: page.state.session.automaticInputAttemptID,
+          scope: page.state.sharedReceipt?.scope ?? page.state.configurationDeparture?.sharedScope ?? page.state.practice?.scope ?? scope)
+      })
+    defer { retry.stop() }
+    do {
+      _ = try await retry.applyNativeSharedSettings(json: json, baseline: baseline, systemIsDark: false)
+      XCTFail("Recovery must finish the old conversion before accepting a new link")
+    } catch let error as WebsiteNativeSharedStorageError { XCTAssertTrue(error.recovered) }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: journal.path))
+    XCTAssertNil(f.page.state.sharedReceipt)
+    guard case .available(let converted) = try f.register.read().state else { return XCTFail("Conversion did not recover") }
+    XCTAssertEqual(converted["words"], .number(3))
+    let generation = settings.websiteCustomTextStateGeneration
+    guard case .applied = try await retry.applyNativeSharedSettings(json: json, baseline: baseline, systemIsDark: false)
+    else { return XCTFail("Native conversion retry failed") }
+    XCTAssertEqual(settings.websiteCustomTextStateGeneration, generation)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 17)
+    guard case .available(let saved) = try f.register.read().state else { return XCTFail("Converted baseline disappeared") }
+    XCTAssertEqual(saved["words"], .number(3))
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
+  }
+
+  func testNativeReceiverRejectsChangedPreferencesOrRetiredOwnerBeforeAnyConversion() async throws {
+    for changesPreferences in [false, true] {
+      let f = try Fixture(); defer { f.close() }; let baseline = try f.nativeBaseline()
+      let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+      if changesPreferences { f.settings.fontSize = 44 }
+      else {
+        let other = UUID(); f.settings.preferenceConfigurationSaves.register(owner: other, save: {})
+        f.settings.preferenceConfigurationSaves.activate(owner: other)
+      }
+      do {
+        _ = try await workflow.applyNativeSharedSettings(json: #"["words","17",null,null,null,null,null,null]"#,
+          baseline: baseline, systemIsDark: false)
+        XCTFail("Retired native frame cannot establish a profile")
+      } catch is WebsiteConfigCommitCoordinatorError {}
+      XCTAssertEqual(try f.register.read().state, .missing)
+      XCTAssertEqual(f.settings.websiteCustomTextStateRead, .missing)
+      XCTAssertNil(f.page.state.sharedReceipt)
+    }
+  }
+
+  func testNativeReceiverRetainsExistingSavedProfileAndOwnFallbackText() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var saved = try WebsiteConfigNativeProfile.defaultDocument().values
+    saved["words"] = .number(9); saved["theme"] = .string("dracula")
+    guard case .committed = try f.register.commit(runtime: saved, lazyMemory: .init(), replacing: XCTUnwrap(f.register.read().revision))
+    else { return XCTFail("Seed failed") }
+    let baseline = try f.nativeBaseline()
+    let fallback = try f.settings.websiteCustomArchiveStore.fallbackRecordForArchive()
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    guard case .applied = try await workflow.applyNativeSharedSettings(json: #"["words","17",null,null,null,null,null,null]"#,
+      baseline: baseline, systemIsDark: false) else { return XCTFail("Native receiver did not apply") }
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.testParameters.wordLimit, 17)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.projection.runtime["theme"], .string("paper"))
+    XCTAssertEqual(f.page.state.presentation?.publication.savedDraft.testParameters.wordLimit, 9)
+    guard case .available(let after) = try f.register.read().state else { return XCTFail("Saved profile disappeared") }
+    XCTAssertTrue(WebsiteProfileArchive.sameRuntime(after, saved))
+    XCTAssertEqual(try f.settings.websiteCustomArchiveStore.fallbackRecordForArchive(), fallback)
+    XCTAssertEqual(f.settings.websiteCustomTextStateRead.settings?.text, [.string("cedar"), .string("river")])
+  }
+
+  func testNativeReceiverInvalidPayloadHasNoConversionEffects() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let baseline = try f.nativeBaseline()
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    let before = f.page.state.session.generationState, generation = f.settings.websiteCustomTextStateGeneration
+    do {
+      _ = try await workflow.applyNativeSharedSettings(json: "[null]", baseline: baseline, systemIsDark: false)
+      XCTFail("Invalid payload must fail before conversion")
+    } catch WebsiteSharedSettingsReceiver.Failure.invalidPayload {}
+    XCTAssertEqual(try f.register.read().state, .missing)
+    XCTAssertEqual(f.settings.websiteCustomTextStateRead, .missing)
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertNil(f.page.state.sharedReceipt); XCTAssertFalse(f.page.ownsConfigurationSelection)
+  }
+
+  func testNativeReceiverDoesNotMergeForeignLazyMemoryOrWriteItsText() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let saved = try WebsiteConfigNativeProfile.defaultDocument().values
+    let foreignMemory = WebsiteConfigLazyModeMemory(remember: true, prefersArabic: false)
+    guard case .committed = try f.register.commit(runtime: saved, lazyMemory: foreignMemory,
+      replacing: XCTUnwrap(f.register.read().revision)) else { return XCTFail("Seed failed") }
+    let baseline = try f.nativeBaseline()
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    let disk = try f.register.read(), generation = f.settings.websiteCustomTextStateGeneration
+    let session = f.page.state.session.generationState, preferences = f.settings.snapshot
+    do {
+      _ = try await workflow.applyNativeSharedSettings(json: #"["words","17",null,null,null,null,null,null]"#,
+        baseline: baseline, systemIsDark: false)
+      XCTFail("Different independent memory must not be silently adopted")
+    } catch WebsiteConfigNativeBaseline.Failure.unrepresentable("lazyModeMemory") {}
+    let after = try f.register.read()
+    XCTAssertEqual(after.revision, disk.revision); XCTAssertEqual(after.lazyMemory, foreignMemory)
+    guard case .available(let values) = after.state else { return XCTFail("Saved profile disappeared") }
+    XCTAssertTrue(WebsiteProfileArchive.sameRuntime(values, saved))
+    XCTAssertEqual(f.settings.websiteCustomTextStateRead, .missing)
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+    XCTAssertEqual(f.settings.snapshot, preferences)
+    XCTAssertEqual(f.page.state.session.generationState, session)
+    XCTAssertNil(f.page.state.sharedReceipt); XCTAssertFalse(f.page.ownsConfigurationSelection)
+  }
+
+  func testNativePendingReceiptCanReturnWithoutDeletingSavedProfileOrFallback() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let baseline = try f.nativeBaseline(active: true)
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    guard case .retained = try await workflow.applyNativeSharedSettings(json:
+      #"["custom",null,null,null,null,null,null,["no_quit"]]"#,
+      baseline: baseline, systemIsDark: false) else { return XCTFail("Expected pending receipt") }
+    var state = f.page.state
+    for _ in 0..<500 where !state.session.isFinished {
+      state.session.insertBatch(state.session.nextExpectedCharacter.map(String.init) ?? " ")
+    }
+    XCTAssertTrue(state.session.isFinished); f.page.replace(state)
+    let disk = try f.register.read().revision, preferences = f.settings.snapshot
+    let fallback = try f.settings.websiteCustomArchiveStore.fallbackRecordForArchive()
+    let generation = f.settings.websiteCustomTextStateGeneration, ledger = f.page.state.priorAttemptLedger
+    let oldAttempt = f.page.state.session.automaticInputAttemptID
+    let permit = try f.page.beginLegacyReturn()
+    XCTAssertNil(f.page.state.sharedReceipt); XCTAssertNil(f.page.state.configurationDeparture)
+    XCTAssertFalse(f.page.acceptsInput(for: oldAttempt))
+    var native = f.page.state; native.session = .init(configuration: baseline.configuration, prompt: "aa bb cc")
+    f.page.replace(native); try f.page.finishLegacyReturn(permit)
+    XCTAssertFalse(f.page.ownsConfigurationSelection)
+    XCTAssertTrue(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertEqual(try f.settings.websiteCustomArchiveStore.fallbackRecordForArchive(), fallback)
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+    XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+  }
+
+  func testNativeReceiverNoQuitWaitKeepsOldResultOriginThenContinuesAfterCompletion() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let baseline = try f.nativeBaseline(active: true)
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    let attempt = f.page.state.session.automaticInputAttemptID
+    guard case .retained = try await workflow.applyNativeSharedSettings(json:
+      #"["custom",null,{"text":["cc","dd"],"mode":"repeat","limit":{"mode":"word","value":3.5},"pipeDelimiter":false},null,null,null,null,["no_quit"]]"#,
+      baseline: baseline, systemIsDark: false) else { return XCTFail("Native No Quit must retain its attempt") }
+    XCTAssertTrue(f.page.ownsConfigurationSelection)
+    XCTAssertFalse(f.page.ownsPresentedConfigurationSelection)
+    XCTAssertTrue(f.page.acceptsInput(for: attempt))
+    let generation = f.settings.websiteCustomTextStateGeneration
+    var complete = f.page.state
+    for _ in 0..<500 where !complete.session.isFinished { complete.session.insertBatch(complete.session.nextExpectedCharacter.map(String.init) ?? " ") }
+    XCTAssertEqual(complete.session.outcome, .completed); f.page.replace(complete)
+    XCTAssertFalse(f.page.ownsPresentedConfigurationSelection)
+    let ledger = f.page.state.priorAttemptLedger
+    guard case .applied = try await workflow.continuePendingSharedSettings(systemIsDark: false) else { return XCTFail("Native receipt did not continue") }
+    XCTAssertTrue(f.page.ownsPresentedConfigurationSelection)
+    XCTAssertEqual(f.page.state.session.configuration.mode, .custom)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 4)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+  }
+
+  func testNativeReceiverCancelledPreparationKeepsOneDepartureAndContinuesWithoutReplay() async throws {
+    @MainActor final class Gate { var waiting: CheckedContinuation<[OfflineQuote], Error>?; var suspend = true }
+    let f = try Fixture(); defer { f.close() }; let gate = Gate()
+    let baseline = try f.nativeBaseline(active: true)
+    let workflow = try f.makeWorkflow(loadQuotes: { _ in
+      if gate.suspend { return try await withCheckedThrowingContinuation { gate.waiting = $0 } }
+      return [.init(id: "owned", title: "Owned", text: "cc dd ee", language: .english, length: .short)]
+    }); defer { workflow.stop() }
+    let task = Task { @MainActor in
+      try await workflow.applyNativeSharedSettings(json:
+        #"["quote","42",{"text":["cc","dd"],"mode":"repeat","limit":{"mode":"word","value":3.5},"pipeDelimiter":false},null,null,null,null,null]"#,
+        baseline: baseline, systemIsDark: false)
+    }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    while gate.waiting == nil && ContinuousClock.now < deadline { await Task.yield() }
+    guard let waiting = gate.waiting else { task.cancel(); return XCTFail("Native quote preparation never started") }
+    let generation = f.settings.websiteCustomTextStateGeneration, ledger = f.page.state.priorAttemptLedger, disk = try f.register.read().revision
+    XCTAssertEqual(ledger.restartCount, 1)
+    XCTAssertTrue(f.page.state.configurationDeparture?.isNativeSharedReceipt == true)
+    task.cancel(); waiting.resume(throwing: CancellationError())
+    do { _ = try await task.value; XCTFail("Cancelled native preparation succeeded") } catch is CancellationError {}
+    gate.suspend = false
+    guard case .applied = try await workflow.continuePendingSharedSettings(systemIsDark: false) else { return XCTFail("Native retry failed") }
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    // ID 42 is not an owned quote ID. The actual source all-length recovery
+    // saves quoteLength after the retried catalog loads; that is a new saving
+    // event, not a replay of the URL's earlier custom/configuration setters.
+    let after = try f.register.read()
+    XCTAssertNotEqual(after.revision, disk)
+    guard case .available(let saved) = after.state else { return XCTFail("Recovery was not saved") }
+    XCTAssertEqual(saved["quoteLength"], .array((0...3).map { .number(Double($0)) }))
+    XCTAssertEqual(saved["fontSize"], .number(2.5))
+    XCTAssertNotNil(f.page.state.practice?.quote)
+    XCTAssertNil(f.page.state.configurationDeparture)
+    do { _ = try await workflow.continuePendingSharedSettings(systemIsDark: false); XCTFail("Receipt was consumed twice") }
+    catch WebsiteConfigImportWorkflowError.conflict {}
+    XCTAssertEqual(try f.register.read().revision, after.revision)
+  }
+
+  func testReadOnlyNativeCompatibilityFallbackKeepsLegacyExtensionsAndCanBeCancelled() async throws {
+    for cancel in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      let current = SavedTestPreset(configuration: .words(3))
+      let json = #"["words","17",null,null,null,null,null,null]"#
+      let link = "typebar://test?testSettings=" + (try XCTUnwrap(URICompressedPayload.compress(json)))
+      var applied = 0
+      let task = Task { @MainActor in
+        await TestConfigurationShareActions.applyAsync(link, current: current, challenges: [], notices: f.account.localNotices,
+          applyWebsiteSettings: { _ in
+            if cancel { withUnsafeCurrentTask { $0?.cancel() } }
+            throw WebsiteNativeSharedCompatibilityRequired()
+          }, applyPreset: { preset in applied += 1; return preset }, loadChallenge: { _ in .rejected })
+      }
+      let result = await task.value
+      XCTAssertEqual(applied, cancel ? 0 : 1)
+      XCTAssertEqual(result.shouldDismiss, !cancel)
+      XCTAssertEqual(try f.register.read().state, .missing)
+      XCTAssertEqual(f.settings.websiteCustomTextStateRead, .missing)
+    }
+  }
+
   func testAcceptsWindowReceiptAndRetainsSourceOrderedRuntimeInsteadOfSavingFinalState() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.publish()

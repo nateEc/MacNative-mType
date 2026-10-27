@@ -220,6 +220,11 @@ enum WebsiteConfigPracticeScopeSourceError: Error { case unavailable, wrongOwner
       && current.localFavorites == snapshot.models.localFavorites && current.accountScope == snapshot.models.accountScope
       && current.accountGeneration == snapshot.models.accountGeneration
   }
+  /// Before the native receipt is installed, its actual editor/control window
+  /// must still match. Its own website-cache writes may rotate the environment.
+  func ownsNativeReceiptWindow(_ snapshot: Snapshot) -> Bool {
+    ownsReceiptIdentity(snapshot) && readWindow?() == snapshot.window
+  }
   private func matches(_ snapshot: Snapshot) -> Bool {
     guard snapshot.source == identity, readWindow != nil, environment.read() == snapshot.environment,
       environment.contentModels() == snapshot.models, let window = readWindow?(), window == snapshot.window else { return false }

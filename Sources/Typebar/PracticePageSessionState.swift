@@ -16,7 +16,7 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
   var sharedReceipt: WebsiteConfigCommitCoordinator.SharedReceipt?
   struct QuoteInitializationCheckpoint {
     let id = UUID()
-    let publication: UUID
+    let publication: UUID?
     let configurationDeparture: UUID?
     let progress: WebsiteConfigSessionBuilder.QuoteInitialization
   }

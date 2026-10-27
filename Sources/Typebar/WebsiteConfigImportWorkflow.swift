@@ -202,6 +202,27 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     return try await continuePendingSharedSettings(systemIsDark: systemIsDark)
   }
 
+  func captureNativeBaseline(preferences: AppSettingsSnapshot, configuration: TestConfiguration,
+    scope: WebsiteConfigSessionBuilder.Scope, layoutFluidLayouts: [KeyboardLayout], fontFamily: String) throws -> WebsiteConfigNativeBaseline.Capture {
+    try environment.withSynchronousSetterRead {
+      guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+      return try WebsiteConfigNativeBaseline.capture(preferences: preferences, configuration: configuration,
+        scope: scope, layoutFluidLayouts: layoutFluidLayouts, fontFamily: fontFamily, pointsPerRem: context.pointsPerRem)
+    }
+  }
+
+  func applyNativeSharedSettings(json: String, baseline: WebsiteConfigNativeBaseline.Capture,
+    quote: OfflineQuote? = nil, repetition: WebsitePracticeRepetition = .none,
+    systemIsDark: Bool) async throws -> WebsiteSharedLinkApplication {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard !page.state.session.hasStarted || page.state.session.isFinished || !page.state.session.configuration.modifiers.contains(.noQuit)
+    else { throw WebsiteConfigImportWorkflowError.activeAttempt }
+    _ = try coordinator.acceptNativeSharedReceipt(json, baseline: baseline, quote: quote, repetition: repetition,
+      for: page, settings: settings, refreshingWith: source)
+    return try await continuePendingSharedSettings(systemIsDark: systemIsDark)
+  }
+
   /// The panel resumes the retained checkpoint, never replays the pasted URL.
   func continuePendingSharedSettings(systemIsDark: Bool) async throws -> WebsiteSharedLinkApplication {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }

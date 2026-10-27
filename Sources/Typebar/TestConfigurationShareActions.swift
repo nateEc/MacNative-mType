@@ -56,6 +56,10 @@ struct TestConfigurationShareActionResult: Equatable {
       }
       return apply(link, current: current, customTextFallback: customTextFallback,
         challenges: challenges, notices: notices, applyPreset: applyPreset, loadChallenge: loadChallenge)
+    } catch is WebsiteNativeSharedCompatibilityRequired {
+      guard !Task.isCancelled else { return .init(outcome: .rejected, status: "准备已取消。") }
+      return apply(link, current: current, customTextFallback: customTextFallback,
+        challenges: challenges, notices: notices, applyPreset: applyPreset, loadChallenge: loadChallenge)
     } catch is CancellationError {
       return .init(outcome: .rejected, status: "准备已取消；已接收的设置会保留，可继续准备。")
     } catch {

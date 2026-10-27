@@ -84,6 +84,7 @@ struct WebsiteConfigFontResource {
 
   private static let lookupOptions: CTFontOptions = [.preventAutoActivation, .preventAutoDownload]
   private static func installed(_ identifier: String, size: Double) -> NSFont? {
+    if let native = NativeSystemPracticeFont.resolve(identifier, size: size) { return native }
     let name = identifier.replacingOccurrences(of: "_", with: " ")
     guard !name.hasPrefix(".") else { return nil } // Private UI fonts require AppKit APIs.
     let font = CTFontCreateWithNameAndOptions(name as CFString, size, nil, lookupOptions)

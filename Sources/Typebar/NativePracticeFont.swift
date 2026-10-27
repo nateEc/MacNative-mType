@@ -116,6 +116,26 @@ enum NativePracticeFont {
   }
 }
 
+/// Stable native identifiers for AppKit-owned system designs. Their private
+/// PostScript names vary with macOS and cannot be loaded as CoreText families.
+@MainActor enum NativeSystemPracticeFont {
+  private static let prefix = "TypebarNativeSystem_"
+  static func identifier(for design: PracticeFont) -> String { prefix + design.rawValue }
+  static func resolve(_ identifier: String, size: Double) -> NSFont? {
+    guard identifier.hasPrefix(prefix), let design = PracticeFont(rawValue: String(identifier.dropFirst(prefix.count))),
+      identifier == self.identifier(for: design), size.isFinite, size > 0 else { return nil }
+    return design.nsFont(size: size, resolver: .init(localFont: { _ in nil }, installedFontName: { _ in nil }), purpose: .catalogPreview)
+  }
+  static func identifier(matching font: NSFont) -> String? {
+    for design in PracticeFont.allCases {
+      let identifier = self.identifier(for: design)
+      if let candidate = resolve(identifier, size: font.pointSize), candidate.fontName == font.fontName,
+        candidate.fontDescriptor.symbolicTraits == font.fontDescriptor.symbolicTraits { return identifier }
+    }
+    return nil
+  }
+}
+
 /// Checks availability of the requested challenge family, not the current
 /// render cascade. It never installs or bundles Wingdings or accepts a variant.
 enum WingdingsChallengeFont {

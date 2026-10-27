@@ -183,7 +183,10 @@ final class PracticePageSessionStore {
   func acceptsInput(for attemptID: UUID) -> Bool {
     acceptsAttemptCallback(for: attemptID) && !isInputSuspendedForRestart
   }
-  var ownsConfigurationSelection: Bool { state.practice != nil || state.savedApplication != nil }
+  var ownsPresentedConfigurationSelection: Bool { state.practice != nil || state.savedApplication != nil }
+  var ownsConfigurationSelection: Bool {
+    ownsPresentedConfigurationSelection || state.sharedReceipt?.isNative == true || state.configurationDeparture?.isNativeSharedReceipt == true
+  }
   func acceptsAttemptCallback(for attemptID: UUID) -> Bool {
     if let receipt = state.sharedReceipt {
       guard let router, receipt.authorizesInput(owner: owner, router: router) else { return false }
@@ -235,7 +238,7 @@ final class PracticePageSessionStore {
       throw PracticePageSessionStateError.wrongOwner
     }
     guard !state.session.hasStarted || state.session.isFinished else { throw PracticePageSessionStateError.locked }
-    guard state.practice != nil || state.savedApplication != nil || legacyReturnPermit != nil else { throw PracticePageSessionStateError.incomplete }
+    guard ownsConfigurationSelection || legacyReturnPermit != nil else { throw PracticePageSessionStateError.incomplete }
     let permit = LegacyReturnPermit(request: UUID(), lease: lease, attachment: attachment,
       previousAttempt: state.session.automaticInputAttemptID)
     committing = true
@@ -343,6 +346,16 @@ final class PracticePageSessionStore {
       && capture.attachment == attachment && capture.compositionActivity == compositionActivity
       && state.session.generationState == capture.session
       && state.presentation?.publication.applicationID == capture.publication.applicationID
+  }
+  func ownsApplicationReceiptReservation(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: ApplicationCapture) -> Bool {
+    committing && !pendingDetach && self.router === router && router.isCurrent(lease)
+      && capture.attachment == attachment && capture.compositionActivity == compositionActivity
+      && state.session.generationState == capture.session
+      && state.presentation?.publication.applicationID == capture.publication
+      && state.sharedReceipt?.id == capture.sharedReceipt
+      && state.configurationDeparture?.id == capture.configurationDeparture
+      && state.savedApplication?.id == capture.savedApplication
   }
   func beginLiveSharedReceiptCommit(_ id: UUID, owner lease: PreferenceConfigurationSaveRouter.Lease,
     router: PreferenceConfigurationSaveRouter, capture: GenerationCapture) throws {

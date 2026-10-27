@@ -1,5 +1,9 @@
 # 固定源码对照的执行证据
 
+普通原生接收同版 debug 包、签名、资源与原创性检查通过（31.955 秒，输入哈希不变；`/tmp/typebar-native-receiver-package.log` 及同名 JSON），没有启动主程序。相关扩大与补跑按实际方法去重 566 项，全部 108 项来源证据通过；没有新增来源必需方法，未执行整套客户端或完整 readiness。
+
+2026-10-28 普通原生窗口完整接收基线：扩大 497 项零失败零跳过（306.712 秒，驱动 315.645 秒），同日志全部 108 项必需来源证据通过，输入哈希不变（`/tmp/typebar-native-receiver-regression.log` 及同名 JSON／evidence.log）。新增八类过滤条件过度转义未选中，核对后单独补跑 70 项零失败零跳过（2.749 秒，驱动 6.600 秒；`/tmp/typebar-native-receiver-supplemental.log` 及同名 JSON），两轮实际 XCTest 方法去重 566 项；不把缺失选择当成通过。43 项定向、系统字体／过期窗口先行反例和恢复夹具纠正见 [原生接收合同](NATIVE_SHARED_RECEIVER_CONTRACT.md)。没有新增必需来源方法，也没有选择可见 StartupHost 用例；实体操作、全部外观实时控制、整套客户端及完整 readiness 未验。以下为历史批次。
+
 终态回执恢复同版 debug 包、签名、资源与原创性检查通过（33.145 秒，输入哈希不变；`/tmp/typebar-finished-receipt-package.log` 及同名 JSON），未启动主程序。
 
 2026-10-28 旧尝试结束后继续零重开回执：来源条件核对固定 test-logic.ts 的 restart 与引语重复分支；必需清单保持 108 项，不增加来源比较方法。实际工作流先行反例、23 项定向及当前终态重复策略见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。扩大回归 486 项零失败零跳过（314.125 秒，驱动 322.542 秒），同日志全部 108 项证据通过，输入哈希不变（`/tmp/typebar-finished-receipt-regression.log` 及同名 JSON／evidence.log）。没有选择可见窗口用例；普通原生窗口完整接收、整套客户端及完整 readiness 未验。以下为历史批次。
