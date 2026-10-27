@@ -6297,8 +6297,10 @@ struct GeneratedCandidateContinuation {
           section = generated
         }
         section = section.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
-        if section.hasPrefix(" ") { section.removeFirst() }
-        if section.hasSuffix(" ") { section.removeLast() }
+        var sectionScalars = section.unicodeScalars
+        if sectionScalars.first == " " { sectionScalars.removeFirst() }
+        if sectionScalars.last == " " { sectionScalars.removeLast() }
+        section = String(sectionScalars)
         if configuration.modifiers.contains(.weakSpot) {
           section = WeakSpotWordSelection.word(from: pool, scores: weakSpotScores ?? self.weakSpotScores,
             random: nextRandomWordIndex) ?? section

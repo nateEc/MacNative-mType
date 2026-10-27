@@ -1,5 +1,7 @@
 # 固定源码对照的执行证据
 
+2026-10-28 段首空格／组合音标边界修正：新增一项必需生成／计时方法，清单 107 项，新增普通与无空格共 18 组完整来源对照。原生三词完成另核对精确 UTF-16 和准确率；最终扩大回归 660 项零失败／零跳过（524.134 秒，驱动 532.427 秒），同日志全部 107 项必需证据通过、输入哈希不变（`/tmp/typebar-section-edge-final.log` 及同名 JSON／evidence.log）。debug 包／签名／资源／原创性通过（33.505 秒，`/tmp/typebar-section-edge-package.log` 及同名 JSON），没有启动主程序。产品红例与比较夹具纠正见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。未跑整套客户端或完整 readiness，不继承上一批整套结果。以下为历史记录。
+
 无空格 No Quit 即时交付把必需清单增至 106 项。完整来源输入／导航／Words／addWord 新增 40 组无空格轨迹，含组合字符与 emoji；生成／计时方法扩展为三种词池 27 组。41 项定向检查零失败、冻结输入不变（`/tmp/typebar-nospace-live-fixtures.log` 及同名 JSON）。最终扩大回归 658 项、零失败、零跳过（533.910 秒，驱动 542.278 秒），同日志全部 106 项必需证据通过、输入哈希不变（`/tmp/typebar-nospace-live-final.log` 及同名 JSON／evidence.log）。debug 包／签名／资源／原创性检查通过（33.933 秒，`/tmp/typebar-nospace-live-package.log` 及同名 JSON），没有启动主程序。字面空格分词与 UTF-16 字段准入的红例及夹具纠正见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。未运行整套客户端或完整 readiness，不继承上一批整套结论。以下为历史记录。
 
 新加入 No Quit 的普通生成即时交付新增两项必需来源检查，当前清单 105 项。九组普通词池／计时转换、完整 Words 目录及完整 addWord 配合完整输入／导航模块的 35 组逐键轨迹已随定向 29 项通过，冻结输入不变（`/tmp/typebar-ordinary-live-errors.log` 及同名 JSON）。对照包括每键正确性、源位置、完成／失败及原始末词 commit；词选择／DOM 仍为适配器，不称浏览器端到端证明。最终扩大回归 2269 项、1 项历史磁盘迁移跳过、0 失败（5876.792 秒，驱动 5885.750 秒），同日志全部 105 项必需证据通过、输入哈希不变（`/tmp/typebar-ordinary-live-final.log` 及同名 JSON／evidence.log）；长墙钟不作为性能基线，只读采样保留。debug 包、签名、资源及原创性检查通过（32.731 秒，`/tmp/typebar-ordinary-live-package.log` 及同名 JSON），没有启动主程序。跳过项、整套客户端及完整 readiness 不计通过，见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。以下为历史批次。

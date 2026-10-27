@@ -90,7 +90,32 @@ final class GeneratedLiveSettingsTests: XCTestCase {
     try compareGeneratorWithSource(noSpace: true, unicode: true)
   }
 
-  private func compareGeneratorWithSource(noSpace: Bool, unicode: Bool = false) throws {
+  func testLeadingCombiningSectionSpacesAgainstCompletePinnedGenerator() throws {
+    try compareGeneratorWithSource(noSpace: false, edgeSpace: true)
+    try compareGeneratorWithSource(noSpace: true, edgeSpace: true)
+  }
+
+  func testTrimmedCombiningPoolCompletesEveryFieldWithBothCommitStyles() {
+    for noSpace in [false, true] {
+      let config = TestConfiguration.words(3).with(modifiers: noSpace ? [.noSpaces] : [])
+      var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: 3,
+        sourceWords: ["  \u{301}alpha   bravo  "])
+      let chunk = cursor.nextChunk(nextRandomWordIndex: { 0 })
+      let expected = ["\u{301}alpha", "bravo", "\u{301}alpha"].joined(separator: noSpace ? "" : " ")
+      XCTAssertEqual(Array(chunk.transformed.utf16), Array(expected.utf16))
+      var session = TypingSession(configuration: config, prompt: chunk.transformed,
+        retainedCandidateContinuation: cursor,
+        noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: chunk.noSpaceWordLengths),
+        noSpaceTargetWords: chunk.noSpaceTargetWords)
+      session.insertBatch(expected, at: start)
+      XCTAssertEqual(session.outcome, .completed)
+      XCTAssertEqual(session.completedWordCount, 3)
+      XCTAssertEqual(session.preciseAccuracy, 100)
+      XCTAssertEqual(Array(session.typed.utf16), Array(expected.utf16))
+    }
+  }
+
+  private func compareGeneratorWithSource(noSpace: Bool, unicode: Bool = false, edgeSpace: Bool = false) throws {
     struct Output: Decodable {
       struct Fixture: Decodable {
         struct Chunk: Decodable { let words: [String], remaining: Bool }
@@ -107,7 +132,8 @@ final class GeneratedLiveSettingsTests: XCTestCase {
     let process = Process(), pipe = Pipe()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-custom-live-settings.mjs").path,
-      reference, unicode ? "--ordinary-unicode" : noSpace ? "--ordinary-no-space" : "--ordinary"]
+      reference, edgeSpace ? (noSpace ? "--ordinary-edge-space" : "--ordinary-edge-space-normal")
+        : unicode ? "--ordinary-unicode" : noSpace ? "--ordinary-no-space" : "--ordinary"]
     process.standardOutput = pipe
     try process.run()
     let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
@@ -121,7 +147,8 @@ final class GeneratedLiveSettingsTests: XCTestCase {
       var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: fixture.initialCount,
         sourceWords: output.pool)
       let chunk = cursor.nextChunk(nextRandomWordIndex: { 0 })
-      XCTAssertEqual(noSpace ? chunk.noSpaceTargetWords : chunk.transformed.split(separator: " ").map(String.init), fixture.initial)
+      XCTAssertEqual(noSpace ? chunk.noSpaceTargetWords
+        : chunk.transformed.unicodeScalars.split(separator: " ").map(String.init), fixture.initial)
       let hadFuture = cursor.hasRemaining
       var next = TestConfiguration.words(Int(fixture.limit.rounded(.up)))
         .with(modifiers: noSpace ? [.noSpaces, .noQuit] : [.noQuit])
@@ -129,7 +156,8 @@ final class GeneratedLiveSettingsTests: XCTestCase {
       cursor.synchronizeConfiguration(next)
       for chunk in fixture.chunks {
         let generated = cursor.nextChunk(maximumWordCount: 100, nextRandomWordIndex: { 0 })
-        XCTAssertEqual(noSpace ? generated.noSpaceTargetWords : generated.transformed.split(separator: " ").map(String.init), chunk.words,
+        XCTAssertEqual(noSpace ? generated.noSpaceTargetWords
+          : generated.transformed.unicodeScalars.split(separator: " ").map(String.init), chunk.words,
           "\(fixture.mode) → \(fixture.limitMode)/\(fixture.limit)")
         XCTAssertEqual(cursor.hasRemaining, chunk.remaining)
       }

@@ -20,11 +20,12 @@ assert.ok(begin > 0);
 const timer = read('frontend/src/ts/test/test-timer.ts');
 const timerBegin = timer.indexOf('function checkIfTimeIsUp('), timerEnd = timer.indexOf('\nfunction playTimeWarning(', timerBegin);
 assert.ok(timerBegin >= 0 && timerEnd > timerBegin);
-const unicode = process.argv[3] === '--ordinary-unicode';
-const noSpace = process.argv[3] === '--ordinary-no-space' || unicode;
-const ordinary = process.argv[3] === '--ordinary' || noSpace;
+const edgeSpace = ['--ordinary-edge-space','--ordinary-edge-space-normal'].includes(process.argv[3]);
+const unicode = process.argv[3] === '--ordinary-unicode' || edgeSpace;
+const noSpace = process.argv[3] === '--ordinary-no-space' || unicode && process.argv[3] !== '--ordinary-edge-space-normal';
+const ordinary = process.argv[3] === '--ordinary' || noSpace || edgeSpace;
 // Two initial letters leave an active prefix even in the one-word fixture.
-const pool = ordinary ? [unicode ? 'ae \u0301 🙂 x' : 'alpha bravo charlie delta echo foxtrot golf hotel india']
+const pool = ordinary ? [edgeSpace ? '  \u0301alpha   bravo  ' : unicode ? 'ae \u0301 🙂 x' : 'alpha bravo charlie delta echo foxtrot golf hotel india']
   : [Array.from({length:111}, (_,i)=>'old'+i).join(' '), 'harbor stone'];
 const cases = ordinary ? [['words',5,'words',17.5], ['words',5,'words',3], ['words',5,'words',0],
   ['words',5,'time',2.5], ['time',100,'words',3], ['time',100,'words',105],
