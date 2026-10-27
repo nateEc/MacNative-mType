@@ -43,9 +43,18 @@ struct WebsiteConfigFileRegister {
   }
   func commit(_ draft: WebsiteConfigNativeDraft, replacing expected: Revision,
     preservingUnchanged: Bool = false) throws -> Commit {
-    let payload = try WebsiteConfigNativeStateCodec.encode(draft.projection.runtime)
+    try commit(runtime: draft.projection.runtime, lazyMemory: draft.lazyMemory,
+      replacing: expected, preservingUnchanged: preservingUnchanged)
+  }
+
+  /// A source saving setter captures the complete admitted runtime at that
+  /// point, before later nosave edits. Do not re-import it through setters or
+  /// require resource/UI preflight merely to retain its valid raw values.
+  func commit(runtime: [String: WebsiteConfigValue], lazyMemory: WebsiteConfigLazyModeMemory,
+    replacing expected: Revision, preservingUnchanged: Bool = false) throws -> Commit {
+    let payload = try WebsiteConfigNativeStateCodec.encode(runtime)
     let record = Data(WebsiteConfigJSONWriter.write(.array([.string(Self.kind), .number(Double(Self.recordVersion)),
-      .string(UUID().uuidString), .string(payload.base64EncodedString()), draft.lazyMemory.recordValue])).utf8)
+      .string(UUID().uuidString), .string(payload.base64EncodedString()), lazyMemory.recordValue])).utf8)
     guard record.count <= Self.maximumRecordBytes else { throw WebsiteConfigNativeStateError.tooLarge }
     return try locked { fd, identity in
       let current = try snapshot(fd, identity: identity)
@@ -55,7 +64,7 @@ struct WebsiteConfigFileRegister {
       // rewriting identical settings and invalidating other live windows.
       // Still confirm the exact directory/record revision under the same lock.
       if preservingUnchanged, case .available(let runtime) = current.state,
-        current.lazyMemory == draft.lazyMemory,
+        current.lazyMemory == lazyMemory,
         try WebsiteConfigNativeStateCodec.encode(runtime) == payload { return .committed(revision) }
       try replace(record, directoryFD: fd)
       return .committed(.init(directory: directory.path, identity: identity, bytes: record))

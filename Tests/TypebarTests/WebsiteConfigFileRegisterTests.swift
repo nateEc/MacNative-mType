@@ -4,6 +4,31 @@ import TypebarSystem
 @testable import Typebar
 
 final class WebsiteConfigFileRegisterTests: XCTestCase {
+  @MainActor
+  func testRawSavingSnapshotPreservesValuesWithoutTypedResourcePreflightAndRejectsInvalidFields() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-raw-saving-\(UUID())")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let register = WebsiteConfigFileRegister(directory: directory)
+    var raw = try WebsiteConfigNativeProfile.defaultDocument().values
+    let urlUnits = Array("https://example.com/".utf16) + [UInt16(0xd800)] + Array(".png".utf16)
+    raw["customBackground"] = .string(units: urlUnits)
+    raw["customBackgroundFilter"] = .array([.number(-0.0), .number(.infinity), .number(-.infinity), .number(1)])
+    guard case .committed(let revision) = try register.commit(runtime: raw, lazyMemory: .init(),
+      replacing: XCTUnwrap(register.read().revision)) else { return XCTFail("Raw snapshot was not saved") }
+    let path = directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename), bytes = try Data(contentsOf: path)
+    guard case .available(let reopened) = try register.read().state else { return XCTFail("Raw snapshot did not reopen") }
+    XCTAssertEqual(reopened, raw)
+    XCTAssertEqual(reopened["customBackground"]?.stringUnits, urlUnits)
+    guard case .array(let filters)? = reopened["customBackgroundFilter"], case .number(let first) = filters[0] else {
+      return XCTFail("Raw filter numbers were replaced")
+    }
+    XCTAssertEqual(first.bitPattern, (-0.0).bitPattern)
+    XCTAssertEqual(try register.commit(runtime: raw, lazyMemory: .init(), replacing: revision, preservingUnchanged: true), .committed(revision))
+    raw.removeValue(forKey: "time")
+    XCTAssertThrowsError(try register.commit(runtime: raw, lazyMemory: .init(), replacing: revision))
+    XCTAssertEqual(try Data(contentsOf: path), bytes)
+  }
   private enum Failure: Error { case expectedCommit, timeout }
   @MainActor
   private func draft(_ time: Int = 30) throws -> WebsiteConfigNativeDraft {

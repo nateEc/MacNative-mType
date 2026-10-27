@@ -72,7 +72,7 @@ const frontend = path.join(root, 'frontend/src/ts');
 const adapters = new Map([
   [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: (_message, options) => {
     if (thresholdCommandMode || inputCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode) simulation.notices.push(options?.important ?? false);
-  }, showErrorNotification: noop}],
+  }, showErrorNotification: message => { if (sharedSettingsMode) simulation.storageError?.(message); }}],
   [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
   [path.join(frontend, 'states/test.ts'), {isTestActive: () => simulation.flags.testActive ?? true}],
   [path.join(frontend, 'collections/custom-themes.ts'), {__nonReactive: {getCustomThemes: () => Array(simulation.flags.customThemeCount ?? 0).fill({})}}],

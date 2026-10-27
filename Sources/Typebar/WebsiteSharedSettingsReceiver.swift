@@ -22,8 +22,8 @@ struct WebsiteCustomTextSettings: Equatable {
 }
 
 /// Ordered source effects for an incoming eight-slot selection. This kernel
-/// does not write preferences, initialize a session or apply a GUI transaction.
-/// Native integration must preserve partial effects and restart admission.
+/// performs only the supplied synchronous storage effects. Session initialization
+/// and GUI publication remain the caller's responsibility.
 @MainActor enum WebsiteSharedSettingsReceiver {
   enum Failure: Error { case invalidPayload }
   struct State {
@@ -42,6 +42,14 @@ struct WebsiteCustomTextSettings: Equatable {
     let key: String
     let runtime: [String: WebsiteConfigValue]
   }
+  struct Storage {
+    var writeCustom: @MainActor (WebsiteCustomTextSettings) throws -> Bool = { _ in true }
+    var writeConfiguration: @MainActor (ConfigSave) throws -> Bool = { _ in true }
+  }
+  struct StorageAttempt {
+    let key: String, json: String
+    let accepted: Bool
+  }
   struct Outcome {
     var state: State
     var events: [WebsiteConfigApplicationEvent] = []
@@ -52,8 +60,11 @@ struct WebsiteCustomTextSettings: Equatable {
     var restartStarts = 0
     var parseRejected = false
     var threw = false
+    var storageAttempts: [StorageAttempt] = []
+    var storageFailures: [String] = []
   }
-  static func receive(json: String, current: State, context: WebsiteConfigRuntimeContext = .init()) -> Outcome {
+  static func receive(json: String, current: State, context: WebsiteConfigRuntimeContext = .init(),
+    storage: Storage = .init()) -> Outcome {
     var result = Outcome(state: current)
     let values: [WebsiteConfigValue]
     do { values = try parse(json) }
@@ -81,8 +92,12 @@ struct WebsiteCustomTextSettings: Equatable {
             let serialized = WebsiteConfigJSONWriter.write(.object(result.state.runtime), asciiOnly: false)
             let cached = result.state.savedConfig.map { WebsiteConfigJSONWriter.write(.object($0), asciiOnly: false) }
             if serialized != cached {
-              result.configWrites.append(serialized)
-              result.state.savedConfig = result.state.runtime
+              let accepted = (try? storage.writeConfiguration(.init(key: key, runtime: result.state.runtime))) ?? false
+              result.storageAttempts.append(.init(key: "config", json: serialized, accepted: accepted))
+              if accepted {
+                result.configWrites.append(serialized)
+                result.state.savedConfig = result.state.runtime
+              } else { result.storageFailures.append("config") }
             }
           }
           result.events.append(.init(key: key, previousValue: previous, newValue: value, nosave: nosave))
@@ -101,11 +116,14 @@ struct WebsiteCustomTextSettings: Equatable {
     func changeCustom(_ change: (inout WebsiteCustomTextSettings) -> Void) {
       var candidate = result.state.custom
       change(&candidate)
-      guard candidate.limitValue >= 0 else { return }
+      guard candidate.limitValue >= 0 else { result.storageFailures.append("customTextSettings"); return }
       let proposed = WebsiteConfigJSONWriter.write(candidate.value, asciiOnly: false)
       // Source LocalStorageWithSchema compares JSON before updating its cache;
       // an unchanged serialization is not another durable write.
       guard proposed != WebsiteConfigJSONWriter.write(result.state.custom.value, asciiOnly: false) else { return }
+      let accepted = (try? storage.writeCustom(candidate)) ?? false
+      result.storageAttempts.append(.init(key: "customTextSettings", json: proposed, accepted: accepted))
+      guard accepted else { result.storageFailures.append("customTextSettings"); return }
       result.state.custom = candidate; result.customWrites.append(proposed)
     }
     do {

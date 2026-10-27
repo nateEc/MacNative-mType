@@ -3,6 +3,10 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.WebsiteSharedSettingsReceiverTests/testStorageFailuresAgainstPinnedReceiverAndActualStorageModule",
+      "file": "Tests/TypebarTests/WebsiteSharedSettingsReceiverTests.swift"
+    },
+    {
       "id": "TypebarTests.WebsiteCustomTextStateTests/testCompletePinnedReceiverCustomStatesSurviveNativeStorageAndScope",
       "file": "Tests/TypebarTests/WebsiteCustomTextStateTests.swift"
     },
