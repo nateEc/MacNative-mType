@@ -271,7 +271,7 @@ struct TestConfigurationShareView: View {
                         .disabled(importTask != nil || hasPendingWebsiteSettings()
                           || pastedLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     if hasPendingWebsiteSettings() {
-                        Text("链接设置已保留，尚未准备好新的练习。继续准备不会再次导入或重复保存文本。")
+                        Text("链接设置已保留，尚未完成应用。继续处理不会再次导入或重复保存文本。")
                             .font(.caption).foregroundStyle(.secondary)
                         if onContinueWebsiteSettings != nil {
                             Button("继续准备") { continueWebsiteSettings() }

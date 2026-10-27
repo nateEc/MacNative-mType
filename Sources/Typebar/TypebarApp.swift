@@ -7236,7 +7236,7 @@ private struct ContentView: View {
         pageSession.sharedReceipt != nil || pageSession.configurationDeparture?.isSharedReceipt == true
       },
       canContinueWebsiteSettings: {
-        pageSession.sharedReceipt?.requiresInitialization == true || pageSession.configurationDeparture?.isSharedReceipt == true
+        pageSession.sharedReceipt != nil || pageSession.configurationDeparture?.isSharedReceipt == true
       },
       onContinueWebsiteSettings: {
         try await importWorkflow().continuePendingSharedSettings(systemIsDark: systemColorScheme == .dark)

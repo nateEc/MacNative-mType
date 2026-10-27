@@ -5958,6 +5958,23 @@ struct TypingSession {
     synchronizeLiveInputRules(rules, websiteThresholds: true)
   }
 
+  /// A custom-text save does not replace the initialized wordset. Apply its
+  /// live ordering/limit while retaining this attempt and every generated word.
+  mutating func synchronizeWebsiteCustomText(_ raw: WebsiteCustomTextSettings) throws -> Bool {
+    guard !isFinished, configuration.mode == .custom, customSectionWordStream != nil else { return false }
+    var next = configuration
+    next.customTextCompletion = raw.limitMode == "word" ? .words : raw.limitMode == "time" ? .time : .sections
+    next.customTextOrdering = raw.mode == "repeat" ? .inOrder : raw.mode == "shuffle" ? .shuffled : .random
+    next.customTextPipeDelimiter = raw.pipeDelimiter
+    next.duration = nil; next.wordLimit = nil; next.customTextSectionLimit = nil
+    next = try raw.applyingLimit(to: next)
+    customSectionWordStream?.synchronizeConfiguration(next)
+    configuration = next
+    let progress = Self.wordProgress(next.wordLimit, in: promptCharacters)
+    requiredWordStartIndex = progress.startIndex; promptWordCount = progress.count
+    return true
+  }
+
   var completedPromptCharacterIndices: Set<Int> {
     TypedCharacterEffectPolicy.completedCharacterIndices(
       target: prompt, typed: typed, typedTargetIndices: typedTargetIndices, isFinished: isFinished)
@@ -9001,12 +9018,12 @@ struct TypingSession {
     if var stream = customSectionWordStream, stream.hasRemaining {
       let chunk = stream.nextChunk()
       customSectionWordStream = stream
-      let previousEnd = promptCharacters.count
-      appendPrompt(chunk.text)
-      if configuration.customTextCompletion == .sections {
-        sectionEndIndices += chunk.sectionEndOffsets.map { previousEnd + $0 }
-        noSpaceSectionWordEnds += chunk.sectionWordEnds
-      }
+      let separator = !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+        && prompt.last?.isWhitespace == false ? " " : ""
+      let previousEnd = promptCharacters.count + separator.count
+      appendPrompt(separator + chunk.text)
+      sectionEndIndices += chunk.sectionEndOffsets.map { previousEnd + $0 }
+      noSpaceSectionWordEnds += chunk.sectionWordEnds
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
         var end = previousEnd
         for length in chunk.noSpaceWordLengths {

@@ -163,10 +163,60 @@ final class WebsiteConfigCommitCoordinator {
       }
       state.restartDepartureAttemptID = state.session.automaticInputAttemptID
     }
-    state.sharedReceipt = receipt; state.quoteInitialization = nil
+    state.sharedReceipt = receipt
+    if receipt.requiresInitialization { state.quoteInitialization = nil }
     resourceAdmission = UUID(); sessionAdmission = UUID(); sessionRequest = nil
-    page.installCommitted(state)
+    page.installCommitted(state, retainingRestartController: receipt.requiresInitialization ? nil : page.restartController)
     return receipt
+  }
+
+  /// The existing No Quit case has no accepted Config changes, but independent
+  /// custom setters still run. Deliver their actual cache without a restart.
+  /// A later No Quit selection with other Config changes remains a checkpoint
+  /// until all of its generator transitions can be delivered faithfully.
+  func commitSharedLiveReceipt(_ id: UUID, for page: PracticePageSessionStore) throws -> Publication? {
+    guard let source = page.state.sharedReceipt?.contentSource else { throw WebsiteConfigCommitCoordinatorError.stale }
+    return try source.withReceiptRead {
+      guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+      processing = true; defer { processing = false }
+      guard let receipt = page.state.sharedReceipt, receipt.id == id, receipt.identity == identity,
+        !receipt.requiresInitialization, router.isCurrent(receipt.owner), let context = environment(),
+        source.ownsReceiptIdentity(receipt.contentCapture), latest?.applicationID == receipt.base.applicationID,
+        try register.read().revision == receipt.disk else { throw WebsiteConfigCommitCoordinatorError.stale }
+      let capture = try page.captureGeneration(router: router)
+      guard receipt.outcome.state.runtime == receipt.base.draft.projection.runtime,
+        capture.testActive, page.state.session.configuration.modifiers.contains(.noQuit),
+        let previous = page.state.presentation, let practice = page.state.practice else { return nil }
+      var state = page.state
+      if state.session.configuration.mode == .custom {
+        do {
+          guard try state.session.synchronizeWebsiteCustomText(receipt.outcome.state.custom) else { return nil }
+        } catch WebsiteConfigSessionBuildError.unrepresentableConfiguration { return nil }
+      }
+      var draft = try WebsiteConfigNativeDraft(received: receipt.outcome, pointsPerRem: context.pointsPerRem)
+      draft.funboxMemory = receipt.base.draft.funboxMemory
+      let updated = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: receipt.scope,
+        quote: practice.quote, external: practice.external, repetition: practice.repetition)
+      try Task.checkCancellation()
+      try page.beginLiveSharedReceiptCommit(id, owner: receipt.owner, router: router, capture: capture)
+      defer { page.endCommit() }
+      let publication = Publication(applicationID: UUID(), draft: draft, savedDraft: receipt.base.savedDraft,
+        owner: receipt.owner.owner, environmentRevision: context.revision, pointsPerRem: context.pointsPerRem,
+        disk: receipt.disk, background: receipt.base.background, font: receipt.base.font,
+        session: state.session, practice: updated, quoteRecoveries: receipt.base.quoteRecoveries,
+        ownerLease: receipt.owner, authority: publicationAuthority)
+      let progress = state.currentQuoteInitialization
+      state = .init(session: state.session, presentation: previous.retainingAppearance(for: publication),
+        practice: updated, priorAttemptLedger: state.priorAttemptLedger,
+        restartDepartureAttemptID: state.restartDepartureAttemptID)
+      if let progress {
+        state.quoteInitialization = .init(publication: publication.applicationID, configurationDeparture: nil, progress: progress)
+      }
+      latest = publication; publicationAuthority.latest = publication.applicationID
+      resourceAdmission = UUID(); sessionAdmission = UUID(); sessionRequest = nil
+      page.installCommitted(state)
+      return publication
+    }
   }
 
   /// Consume the checkpoint into the existing preparation/retry machinery.

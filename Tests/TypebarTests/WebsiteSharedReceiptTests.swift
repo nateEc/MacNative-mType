@@ -239,6 +239,8 @@ import Observation
     XCTAssertEqual(f.settings.websiteCustomTextStateRead.settings?.mode, "repeat")
     XCTAssertEqual(receipt.outcome.restartStarts, 0)
     XCTAssertFalse(f.page.acceptsInput(for: f.page.state.session.automaticInputAttemptID))
+    XCTAssertThrowsError(try f.coordinator.commitSharedLiveReceipt(receipt.id, for: f.page))
+    XCTAssertThrowsError(try f.coordinator.commitSharedLiveReceipt(receipt.id, for: f.page))
     XCTAssertThrowsError(try f.coordinator.resumeSharedReceipt(receipt.id, for: f.page))
     XCTAssertEqual(f.page.state.sharedReceipt?.id, receipt.id)
     f.settings.setNoQuitConfigurationLock(false, for: f.page.owner)
@@ -298,7 +300,7 @@ import Observation
     XCTAssertNil(f.page.state.configurationDeparture)
   }
 
-  func testSharePanelRetainsNoQuitReceiptAndDoesNotClaimNewSessionWasApplied() async throws {
+  func testExistingNoQuitOrdinaryModePublishesIndependentTextWithoutRestartOrReplay() async throws {
     let f = try Fixture(); defer { f.close() }
     let workflow = try f.makeWorkflow(); defer { workflow.stop() }
     try await workflow.apply(json: #"{"mode":"words","words":5,"funbox":["no_quit"]}"#, systemIsDark: false)
@@ -307,16 +309,16 @@ import Observation
     defer { f.settings.setNoQuitConfigurationLock(false, for: f.page.owner) }
     let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
     let before = f.page.state.session.generationState
-    guard case .retained = try await workflow.applySharedSettings(json:
+    guard case .applied = try await workflow.applySharedSettings(json:
       #"[null,null,{"text":["cc"],"mode":"repeat","limit":{"mode":"word","value":7.5},"pipeDelimiter":false},null,null,null,null,null]"#,
-      replacing: application, systemIsDark: false) else { return XCTFail("Cannot report a new session") }
+      replacing: application, systemIsDark: false) else { return XCTFail("Independent text was not published") }
     let generation = f.settings.websiteCustomTextStateGeneration
-    guard case .retained = try await workflow.continuePendingSharedSettings(systemIsDark: false) else {
-      return XCTFail("Cannot initialize while source restart was withheld")
-    }
+    do { _ = try await workflow.continuePendingSharedSettings(systemIsDark: false); XCTFail("Cannot consume a receipt twice") }
+    catch WebsiteConfigImportWorkflowError.conflict {}
     XCTAssertEqual(f.page.state.session.generationState, before)
     XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
-    XCTAssertNotNil(f.page.state.sharedReceipt)
+    XCTAssertNil(f.page.state.sharedReceipt)
+    XCTAssertEqual(f.page.state.practice?.scope.websiteCustomText?.limitValue, 7.5)
   }
 
   func testFullJSONSupersedingReceiptReportsItsOwnSavedPreparationFailure() async throws {
@@ -333,6 +335,98 @@ import Observation
       XCTFail("A full JSON import must not be reported as the older link")
     } catch is WebsiteConfigSavedPreparationError {}
     XCTAssertNotNil(f.page.state.savedApplication)
+  }
+
+  func testExistingNoQuitCustomReceiptUpdatesLiveLimitWithoutReplacingPoolOrAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"custom","funbox":["no_quit"]}"#, systemIsDark: false)
+    var active = f.page.state; active.session.insertBatch("a"); f.page.replace(active)
+    f.settings.setNoQuitConfigurationLock(true, for: f.page.owner)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: f.page.owner) }
+    let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    let before = f.page.state.session.generationState, prompt = f.page.state.session.prompt
+    let disk = try f.register.read().revision, ledger = f.page.state.priorAttemptLedger
+    guard case .applied = try await workflow.applySharedSettings(json:
+      #"[null,null,{"text":["cc","dd"],"mode":"repeat","limit":{"mode":"word","value":7.5},"pipeDelimiter":false},null,null,null,null,null]"#,
+      replacing: application, systemIsDark: false) else { return XCTFail("Live settings were withheld") }
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 8)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.attempt)
+    XCTAssertEqual(f.page.state.session.promptTargetID, before.target)
+    XCTAssertEqual(f.page.state.session.typed, before.typed)
+    XCTAssertEqual(f.page.state.session.prompt, prompt)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    XCTAssertEqual(try f.register.read().revision, disk)
+    XCTAssertNil(f.page.state.sharedReceipt); XCTAssertNotNil(f.page.restartController)
+    var continued = f.page.state.session
+    for _ in 0..<80 where !continued.isFinished {
+      continued.insertBatch(continued.nextExpectedCharacter.map(String.init) ?? " ")
+    }
+    XCTAssertEqual(continued.outcome, .completed)
+    XCTAssertEqual(continued.completedWordCount, 8)
+    XCTAssertFalse(continued.prompt.contains("cc")); XCTAssertFalse(continued.prompt.contains("dd"))
+    XCTAssertEqual(f.page.state.practice?.scope.websiteCustomText?.text, [.string("cc"), .string("dd")])
+  }
+
+  func testCancelledLiveReceiptCanContinueWithoutReplayingWrites() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"custom","funbox":["no_quit"]}"#, systemIsDark: false)
+    var active = f.page.state; active.session.insertBatch("a"); f.page.replace(active)
+    f.settings.setNoQuitConfigurationLock(true, for: f.page.owner)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: f.page.owner) }
+    let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    let receipt = try workflow.acceptSharedSettings(json:
+      #"[null,null,{"text":["cc"],"mode":"repeat","limit":{"mode":"time","value":2.5},"pipeDelimiter":false},null,null,null,null,null]"#,
+      replacing: application)
+    let generation = f.settings.websiteCustomTextStateGeneration
+    let before = f.page.state.session.generationState
+    let task = Task { @MainActor in try await workflow.continuePendingSharedSettings(systemIsDark: false) }
+    task.cancel()
+    do { _ = try await task.value; XCTFail("Cancelled delivery was applied") } catch is CancellationError {}
+    XCTAssertEqual(f.page.state.sharedReceipt?.id, receipt.id)
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    guard case .applied = try await workflow.continuePendingSharedSettings(systemIsDark: false) else {
+      return XCTFail("Live receipt did not continue")
+    }
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
+    XCTAssertEqual(f.page.state.session.configuration.duration, 2.5)
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, before.attempt)
+  }
+
+  func testNewNoQuitWithOtherRuntimeChangesRemainsExplicitlyPending() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":5}"#, systemIsDark: false)
+    var active = f.page.state; active.session.insertBatch("a"); f.page.replace(active)
+    let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    let before = f.page.state.session.generationState
+    guard case .retained = try await workflow.applySharedSettings(json:
+      #"["words","17",null,null,null,null,null,["no_quit"]]"#,
+      replacing: application, systemIsDark: false) else { return XCTFail("Cannot substitute a new attempt") }
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.sharedReceipt?.outcome.state.runtime["words"], .number(17))
+  }
+
+  func testUnrepresentableLiveLimitKeepsRawReceiptWithoutChangingAttemptOrRepeatingWrites() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let workflow = try f.makeWorkflow(); defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"custom","funbox":["no_quit"]}"#, systemIsDark: false)
+    var active = f.page.state; active.session.insertBatch("a"); f.page.replace(active)
+    f.settings.setNoQuitConfigurationLock(true, for: f.page.owner)
+    defer { f.settings.setNoQuitConfigurationLock(false, for: f.page.owner) }
+    let application = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    let before = f.page.state.session.generationState
+    guard case .retained = try await workflow.applySharedSettings(json:
+      #"[null,null,{"text":["cc"],"mode":"shuffle","limit":{"mode":"word","value":1e30},"pipeDelimiter":false},null,null,null,null,null]"#,
+      replacing: application, systemIsDark: false) else { return XCTFail("Cannot truncate a valid raw limit") }
+    let generation = f.settings.websiteCustomTextStateGeneration
+    guard case .retained = try await workflow.continuePendingSharedSettings(systemIsDark: false) else {
+      return XCTFail("Cannot silently apply an unrepresentable limit")
+    }
+    XCTAssertEqual(f.page.state.session.generationState, before)
+    XCTAssertEqual(f.page.state.sharedReceipt?.scope.websiteCustomText?.limitValue, 1e30)
+    XCTAssertEqual(f.settings.websiteCustomTextStateGeneration, generation)
   }
 
   func testReceivedBoundaryStillAppliesLaterSavingListenerEventsExactlyOnce() async throws {

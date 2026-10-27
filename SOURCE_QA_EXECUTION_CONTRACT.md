@@ -1,5 +1,7 @@
 # 固定源码对照的执行证据
 
+当前 No Quit 独立文本增量将必需清单增至 103 项。新增完整 Wordset／数组／数值模块、getNextWord／areAllWordsGenerated 及计时结束函数的九组受控熵对照，覆盖活动生成器保留旧词池与未消费分段、排序及分数限制切换；不是完整浏览器预取、全局 RNG 或实机时钟证明。49 项定向检查通过；中断运行没有最终汇总，不计为通过。冻结输入一致后恢复的最终扩大回归 2261 项、1 项历史迁移跳过、零失败（986.800 秒，驱动 999.522 秒），同日志全部 103 项来源证据通过，输入哈希不变，见 `/tmp/typebar-custom-live-recovered.log` 及同名 JSON／evidence.log。同版 debug 包、签名、资源及原创性通过（37.178 秒），见 `/tmp/typebar-custom-live-package.log` 及同名 JSON；未启动主程序。现有 No Quit 且 Config 未变的独立文本可即时交付，新加入 No Quit 时的其他运行时变化仍保留检查点；见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。以下为历史批次结果。
+
 当前分享面板增量将必需清单增至 102 项，新增实际固定来源的完整 findGetParameter 查询函数，对照十种重复参数、编码、原始键名、额外等号及坏编码分支；不以 URLComponents 的键解码取代原版。53 项定向回归通过，包含实际工作流与取消续接。最终扩大回归 1381 项、1 项历史迁移跳过、零失败（564.132 秒，驱动 604.253 秒），同日志全部 102 项来源证据通过，非 Markdown 输入哈希不变，见 `/tmp/typebar-shared-link-verified.log` 及同名 JSON／evidence.log。同版 debug 包、签名、资源及原创性检查通过（36.771 秒），未启动主程序，见 `/tmp/typebar-shared-link-package.log` 及同名 JSON。0 次重开即时交付和普通本机窗口的完整接收仍未完成，见 [八项分享合同](TEST_SETTINGS_SELECTION_SHARE_CONTRACT.md)。以下为历史批次结果。
 
 当前预设存储／原生传输批次：扩大 867 项、1 项跳过、0 失败（262.569 秒，驱动 298.247 秒），同日志全部 96 项必需源码执行证据通过，记录的非 Markdown 输入哈希不变。跳过项为需历史磁盘写入器的 Polyglot 迁移，不能计为通过；新增实际 SQLite 重开和七项阈值预设检查执行通过。debug 打包（34.186 秒）含签名、资源及原创性通过，没有启动主应用。13 项证据契约、1392 条人工记录及参考审计通过。本批未跑整套客户端或完整 readiness；全局无限值应用仍拒绝，原版八项分享未完成，不能把本机存储／编解码当作这两条流程通过，见 [预设记忆合同](WEBSITE_PRESET_MEMORY_CONTRACT.md)。下方 2664 项仅属于上一批成绩归档。

@@ -205,6 +205,17 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     if let receipt = page.state.sharedReceipt {
       guard receipt.requiresInitialization else {
+        guard !applying else { throw WebsiteConfigImportWorkflowError.busy }
+        applying = true; let current = UUID(); operation = current
+        defer { applying = false }
+        try Task.checkCancellation()
+        guard !stopped, operation == current else { throw CancellationError() }
+        if try coordinator.commitSharedLiveReceipt(receipt.id, for: page) != nil {
+          do { try page.bindRestartController(using: coordinator, notices: notices, loadQuotes: loadQuotes) }
+          catch { return .applied("链接设置已即时应用；窗口已变化，请重新打开面板。") }
+          return .applied("链接设置已即时应用，当前练习继续，未重开。"
+            + (receipt.outcome.storageFailures.isEmpty ? "" : " 部分设置未能保存，已保留成功的部分。"))
+        }
         return .retained("链接设置已保留；当前练习禁止重开，练习参数尚未更新。可在配置面板导出保留的设置。"
           + (receipt.outcome.storageFailures.isEmpty ? "" : " 部分设置未能保存，已保留成功的部分。"))
       }

@@ -12,8 +12,8 @@ struct CustomSectionPromptChunk {
 /// batches. The cursor, including its random state, is value-owned by one
 /// attempt so a repeat does not share mutable generation state.
 struct CustomSectionWordStream {
-  let sectionLimit: Int
-  private let configuration: TestConfiguration
+  private(set) var sectionLimit: Int
+  private var configuration: TestConfiguration
   private let sections: [String]
   private let words: [[String]]
   private var selectedSections = 0
@@ -65,6 +65,17 @@ struct CustomSectionWordStream {
     if configuration.customTextCompletion == .words, let limit = configuration.wordLimit,
       limit > 0, emittedWords >= limit { return false }
     return hasSectionWordsRemaining
+  }
+
+  /// Keep the initialized wordset, ordered/shuffled cursors and pending
+  /// section. Only the source's live settings change between generated words.
+  mutating func synchronizeConfiguration(_ next: TestConfiguration) {
+    configuration = next
+    switch next.customTextCompletion {
+    case .sections: sectionLimit = next.customTextSectionLimit ?? sections.count
+    case .finish: sectionLimit = sections.count
+    case .time, .words: sectionLimit = 0
+    }
   }
 
   private var hasSectionWordsRemaining: Bool {

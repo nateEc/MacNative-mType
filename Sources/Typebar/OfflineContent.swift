@@ -6576,7 +6576,7 @@ struct TestSessionFactory {
               stream.nextChunk(random: random, nextRandomCaseBit: nextRandomCaseBit)
             }
             prompt = chunk.text
-            if configuration.customTextCompletion == .sections { sectionEndIndices = chunk.sectionEndOffsets }
+            sectionEndIndices = chunk.sectionEndOffsets
             customSectionChunk = chunk
             customSectionWordStream = stream
           } else {
@@ -6801,8 +6801,7 @@ struct TestSessionFactory {
       generatedReplayHistory: generatedReplayHistory,
       quoteWordStream: quoteWordStream,
       sectionEndIndices: sectionEndIndices,
-      noSpaceSectionWordEnds: configuration.customTextCompletion == .sections
-        ? customSectionChunk?.sectionWordEnds ?? [] : [],
+      noSpaceSectionWordEnds: customSectionChunk?.sectionWordEnds ?? [],
       randomCustomSourceTokens: streamsRandomCustomText ? randomCustomSourceTokens : nil,
       randomCustomPreviousWords: randomCustomPreviousWords,
       sequentialCustomWordStream: sequentialCustomWordStream,

@@ -344,6 +344,13 @@ final class PracticePageSessionStore {
       && state.session.generationState == capture.session
       && state.presentation?.publication.applicationID == capture.publication.applicationID
   }
+  func beginLiveSharedReceiptCommit(_ id: UUID, owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture) throws {
+    guard let receipt = state.sharedReceipt, receipt.id == id, !receipt.requiresInitialization,
+      state.configurationDeparture == nil, state.savedApplication == nil else { throw PracticePageSessionStateError.incomplete }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture)
+    committing = true
+  }
   func beginLiveBehaviorCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
     router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft) throws {
     guard state.configurationDeparture == nil, state.savedApplication == nil,
