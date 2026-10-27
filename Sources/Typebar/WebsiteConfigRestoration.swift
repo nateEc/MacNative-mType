@@ -100,11 +100,13 @@ enum WebsiteConfigRestoration {
         throw WebsiteConfigRestorationError.invalidNativeState
       }
       // Warm native records retain the lossless value. A new cold reader must
-      // get the source's effective pace value after JSON null migration, while
+      // get the source's effective speed memories after JSON null migration, while
       // keeping raw archive evidence and every unrelated field intact.
       var effective = loaded
-      if case .number(let speed)? = loaded["paceCaretCustomSpeed"], speed == .infinity {
-        effective["paceCaretCustomSpeed"] = defaultDocument.values["paceCaretCustomSpeed"]
+      for key in ["paceCaretCustomSpeed", "minWpmCustomSpeed", "minBurstCustomSpeed"] {
+        if case .number(let speed)? = loaded[key], speed == .infinity {
+          effective[key] = defaultDocument.values[key]
+        }
       }
       return .prepared(.init(origin: .nativeState, loaded: loaded,
         projection: try applyLoaded(effective, defaultDocument: defaultDocument, schema: schema, context: context),

@@ -16,9 +16,7 @@ struct WebsiteThresholdCommandPresentation: Identifiable {
     }
   }
   private static func text(_ value: Double) -> String {
-    if value == 0 { return "0" }
-    let text = String(value)
-    return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
+    WebsiteNumberText.decimal(value)
   }
 }
 
@@ -49,9 +47,7 @@ struct WebsiteThresholdCommandPresentation: Identifiable {
         guard request == current, !Task.isCancelled else { return }
         if let error = error as? WebsiteThresholdCommandError { message = error.localizedDescription }
         else if let error = error as? WebsiteConfigImportWorkflowError { message = error.localizedDescription }
-        else if case WebsiteConfigNativeRuleError.unrepresentableField = error {
-          message = "该数值超出当前原生阈值支持范围，请输入有限数值。"
-        } else { message = "阈值命令未完成，请检查配置或重新打开命令。" }
+        else { message = "阈值命令未完成，请检查配置或重新打开命令。" }
       }
     }
   }

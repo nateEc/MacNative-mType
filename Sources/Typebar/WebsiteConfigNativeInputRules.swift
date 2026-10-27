@@ -1,7 +1,7 @@
 import Foundation
 
 enum WebsiteConfigNativeRuleError: Error, Equatable {
-  case missingField(String), invalidField(String), unrepresentableField(String), incompatibleModes
+  case missingField(String), invalidField(String), incompatibleModes
 }
 
 /// Only the input-rule group of a website runtime projection. Not a complete
@@ -35,9 +35,6 @@ struct WebsiteConfigNativeInputRules {
     func number(_ key: String, maximum: Double? = nil) throws -> Double {
       guard case .number(let result) = try value(key), result >= 0,
         maximum.map({ result <= $0 }) ?? true else { throw WebsiteConfigNativeRuleError.invalidField(key) }
-      // Website schemas admit +Infinity for speed memories, while native
-      // source carriers currently require finite values. Never turn it into 0.
-      guard result.isFinite else { throw WebsiteConfigNativeRuleError.unrepresentableField(key) }
       return result
     }
     difficulty = try option("difficulty", Difficulty.self)
@@ -64,13 +61,11 @@ struct WebsiteConfigNativeInputRules {
     guard !(stop.isEnabled && deletion.isEnabled),
       confidence == .off || (!freedom && !stop.isEnabled && !deletion.isEnabled)
     else { throw WebsiteConfigNativeRuleError.incompatibleModes }
-    var thresholds = PracticeThresholdConfiguration()
-    try thresholds.apply(.minimumWpm(mode: option("minWpm", PracticeThresholdConfiguration.Mode.self),
-      customValue: number("minWpmCustomSpeed")))
-    try thresholds.apply(.minimumAccuracy(mode: option("minAcc", PracticeThresholdConfiguration.Mode.self),
-      customValue: number("minAccCustom", maximum: 100)))
-    try thresholds.apply(.minimumWordBurst(mode: option("minBurst", MinimumWordBurstMode.self),
-      customValue: number("minBurstCustomSpeed")))
+    let thresholds = try PracticeThresholdConfiguration(
+      websiteMinimumWpmMode: option("minWpm", PracticeThresholdConfiguration.Mode.self),
+      speed: number("minWpmCustomSpeed"), accuracyMode: option("minAcc", PracticeThresholdConfiguration.Mode.self),
+      accuracy: number("minAccCustom", maximum: 100),
+      burstMode: option("minBurst", MinimumWordBurstMode.self), burst: number("minBurstCustomSpeed"))
     let native = try InputRules(strictSpace: boolean("strictSpace"), stopOnErrorMode: stop,
       deleteOnErrorMode: deletion, hideExtraLetters: boolean("hideExtraLetters"), blindMode: boolean("blindMode"),
       quickEnd: boolean("quickEnd"), freedomMode: freedom, confidenceMode: confidence,

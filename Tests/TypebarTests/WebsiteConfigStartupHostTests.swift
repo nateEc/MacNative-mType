@@ -320,6 +320,63 @@ import XCTest
     XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
   }
 
+  func testInfiniteThresholdColdStartupAndWarmCommandsReachActualPracticeHost() async throws {
+    var stage = "fixture"
+    do {
+      let f = try Fixture(saved: true, json: #"{"mode":"words","words":100,"minWpmCustomSpeed":1e999,"minBurstCustomSpeed":1e999}"#)
+      defer { f.close() }
+      let legacy = f.settings.snapshot, path = try XCTUnwrap(f.record), before = try Data(contentsOf: path)
+      f.state.accountReady = true
+      stage = "cold startup"
+      try await f.waitAsync { f.state.page.state.presentation?.publication.draft != nil && f.inputs().first?.acceptsTextInput == true }
+      let cold = try XCTUnwrap(f.state.page.state.presentation).publication.draft.inputRules.rules.thresholdSource?.configuration
+      XCTAssertEqual(cold?.minimumWpmCustomValue, 100); XCTAssertEqual(cold?.minimumWordBurstCustomValue, 100)
+      XCTAssertNotEqual(try Data(contentsOf: path), before)
+      let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+      let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+      let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+        directory: directory, readWindow: { selection }); defer { workflow.stop() }
+      stage = "warm import"
+      try await workflow.apply(json: #"{"mode":"words","words":100,"minWpmCustomSpeed":1e999,"minBurstCustomSpeed":1e999}"#, systemIsDark: false)
+      try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+        && f.inputs().first?.acceptsTextInput == true }
+      let warm = f.state.page.state.session.configuration.rules.thresholdSource?.configuration
+      XCTAssertEqual(warm?.minimumWpmCustomValue, .infinity); XCTAssertEqual(warm?.minimumWordBurstCustomValue, .infinity)
+      stage = "live commands"
+      let input = try XCTUnwrap(f.inputs().first)
+      input.onInsert(String(f.state.page.state.session.prompt.prefix(1)), false)
+      input.setMarkedText("é", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+      let marked = input.markedRange(), generation = f.state.page.state.session.generationState
+      var id = try XCTUnwrap(f.state.page.state.presentation).publication.applicationID
+      let speed = try workflow.runThresholdCommand(.minimumWpmCustom, input: "Infinity", replacing: id)
+      XCTAssertEqual(speed.acceptedSetters, 1); XCTAssertTrue(speed.rejectedKeys.isEmpty)
+      XCTAssertEqual(f.state.page.state.session.configuration.rules.minimumWpm, .infinity)
+      id = try XCTUnwrap(f.state.page.state.presentation).publication.applicationID
+      let burst = try workflow.runThresholdCommand(.minimumWordBurst(.flex), input: String(repeating: "9", count: 400), replacing: id)
+      XCTAssertEqual(burst.acceptedSetters, 2); XCTAssertTrue(burst.rejectedKeys.isEmpty)
+      XCTAssertEqual(f.state.page.state.session.configuration.rules.minimumWordBurstWpm, .infinity)
+      XCTAssertEqual(f.state.page.state.session.configuration.rules.minimumWordBurstMode, .flex)
+      let saved = try WebsiteConfigFileRegister(directory: directory).read()
+      guard case .available(let values) = saved.state else { return XCTFail("Expected actual file record") }
+      XCTAssertEqual(values["minWpmCustomSpeed"], .number(.infinity))
+      XCTAssertEqual(values["minBurstCustomSpeed"], .number(.infinity))
+      var expectedConfiguration = generation.configuration
+      expectedConfiguration.rules.minimumWpm = .infinity
+      expectedConfiguration.rules.minimumWordBurstWpm = .infinity
+      expectedConfiguration.rules.minimumWordBurstMode = .flex
+      expectedConfiguration.rules.thresholdSource = .init(configuration: try .init(
+        websiteMinimumWpmMode: .custom, speed: .infinity, accuracyMode: .off, accuracy: 90,
+        burstMode: .flex, burst: .infinity))
+      XCTAssertEqual(f.state.page.state.session.generationState, .init(
+        attempt: generation.attempt, target: generation.target, events: generation.events, attempts: generation.attempts,
+        started: generation.started, finished: generation.finished, configuration: expectedConfiguration,
+        scores: generation.scores, decoration: generation.decoration, typed: generation.typed))
+      XCTAssertTrue(f.inputs().first === input); XCTAssertTrue(input.hasMarkedText()); XCTAssertEqual(input.markedRange(), marked)
+      XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 0)
+      XCTAssertEqual(f.settings.snapshot, legacy); XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
+    } catch { XCTFail("Threshold host \(stage): \(String(reflecting: error))") }
+  }
+
   func testProfileKeyboardIsRenderedWhenLegacyGuideIsOff() async throws {
     let f = try Fixture(saved: true, json: #"{"mode":"words","words":10,"keymapMode":"static","keymapLegendStyle":"uppercase","keymapKeys":"full","keymapSize":1.5,"keymapLayout":"qwerty"}"#)
     defer { f.close() }
@@ -821,6 +878,12 @@ import XCTest
       XCTFail("Threshold saved under No Quit")
     } catch WebsiteConfigNativeDraftError.rejectedEdit {}
     XCTAssertEqual(f.account.localNotices.history.count - count, 3)
+    let infiniteSpeed = try workflow.runThresholdCommand(.minimumWpmCustom, input: "Infinity", replacing: id)
+    XCTAssertEqual(infiniteSpeed.rejectedKeys, ["minWpmCustomSpeed"])
+    let infiniteBurst = try workflow.runThresholdCommand(.minimumWordBurst(.fixed),
+      input: String(repeating: "9", count: 400), replacing: id)
+    XCTAssertEqual(infiniteBurst.rejectedKeys, ["minBurst", "minBurstCustomSpeed"])
+    XCTAssertEqual(f.account.localNotices.history.count - count, 6)
     XCTAssertEqual(f.state.page.state.session.generationState, before)
     XCTAssertEqual(try WebsiteConfigFileRegister(directory: directory).read().revision, revision)
     XCTAssertFalse(f.window.isVisible)

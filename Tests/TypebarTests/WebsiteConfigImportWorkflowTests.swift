@@ -1192,16 +1192,16 @@ import SwiftUI
     XCTAssertNil(WebsiteThresholdCommandPresentation(publication: publication, target: .minimumWpmOff))
   }
 
-  func testThresholdCommandNonfiniteRepresentationFailureRetainsTheAcceptedBurstMode() async throws {
+  func testThresholdCommandKeepsOverflowedBurstValueInPublishedAndLiveRules() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":10,"minBurstCustomSpeed":83.5}"#, systemIsDark: false)
     let id = try XCTUnwrap(f.page.state.presentation).publication.applicationID
-    do {
-      _ = try f.workflow.runThresholdCommand(.minimumWordBurst(.flex), input: String(repeating: "9", count: 400), replacing: id)
-      XCTFail("Native finite domain must not silently turn infinity into zero")
-    } catch WebsiteThresholdCommandError.partiallySaved {}
+    let receipt = try f.workflow.runThresholdCommand(.minimumWordBurst(.flex), input: String(repeating: "9", count: 400), replacing: id)
+    XCTAssertEqual(receipt.acceptedSetters, 2); XCTAssertTrue(receipt.rejectedKeys.isEmpty)
     let rules = try XCTUnwrap(f.page.state.session.configuration.rules.thresholdSource).configuration
-    XCTAssertEqual(rules.minimumWordBurstMode, .flex); XCTAssertEqual(rules.minimumWordBurstCustomValue, 83.5)
+    XCTAssertEqual(rules.minimumWordBurstMode, .flex); XCTAssertEqual(rules.minimumWordBurstCustomValue, .infinity)
+    XCTAssertEqual(f.page.state.session.configuration.rules.minimumWordBurstWpm, .infinity)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.inputRules.rules.minimumWordBurstWpm, .infinity)
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 0)
   }
   func testThresholdCommandKeepsBurstModeWhenItsValueSetterIsRefused() async throws {
@@ -1379,8 +1379,8 @@ import SwiftUI
     let generation = f.page.state.session.generationState
     let publication = try XCTUnwrap(f.page.state.presentation).publication.applicationID
     let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
-    for edit in [WebsiteConfigThresholdEdit.speedValue(-1), .speedValue(.infinity), .speedValue(.nan),
-      .accuracyValue(101), .burstValue(-1)] {
+    for edit in [WebsiteConfigThresholdEdit.speedValue(-1), .speedValue(-.infinity), .speedValue(.nan),
+      .accuracyValue(101), .accuracyValue(.infinity), .burstValue(-1), .burstValue(.nan)] {
       do { try await f.workflow.editAndBegin(.threshold(edit), replacing: publication, systemIsDark: false); XCTFail("Invalid threshold accepted") }
       catch {}
       XCTAssertEqual(f.page.state.session.generationState, generation)

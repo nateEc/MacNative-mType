@@ -84,9 +84,12 @@ final class WebsiteConfigNativeInputRulesTests: XCTestCase {
         let json = "{\"\(key)\":1e400,\"\(key == "minWpmCustomSpeed" ? "minWpm" : "minBurst")\":\"\(mode)\"}"
         let prepared = try WebsiteConfigNativeProfile.prepare(json, context: .init())
         XCTAssertEqual(prepared.projection.runtime[key], .number(.infinity))
-        XCTAssertThrowsError(try WebsiteConfigNativeInputRules(runtime: prepared.projection.runtime)) {
-          XCTAssertEqual($0 as? WebsiteConfigNativeRuleError, .unrepresentableField(key))
-        }
+        let mapped = try WebsiteConfigNativeInputRules(runtime: prepared.projection.runtime)
+        let raw = try XCTUnwrap(mapped.rules.thresholdSource).configuration
+        XCTAssertTrue(raw.isValidWebsite); XCTAssertFalse(raw.isValid, "Legacy codecs remain finite-only")
+        XCTAssertEqual(try Self.websiteFields(mapped)[key], .number(.infinity))
+        XCTAssertEqual(key == "minWpmCustomSpeed" ? mapped.rules.minimumWpm : mapped.rules.minimumWordBurstWpm,
+          mode == "off" ? 0 : .infinity)
       }
     }
     var invalidAccuracy = baseline

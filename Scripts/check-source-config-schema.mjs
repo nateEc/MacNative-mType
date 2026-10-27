@@ -14,10 +14,12 @@ const importMode = process.argv[3] === '--import-preparation';
 const funboxMode = process.argv[3] === '--funbox-admission';
 const defaultsMode = process.argv[3] === '--default-profile';
 const paceStorageMode = process.argv[3] === '--pace-storage';
-const coldMode = process.argv[3] === '--cold-storage' || paceStorageMode;
+const thresholdStorageMode = process.argv[3] === '--threshold-storage';
+const coldMode = process.argv[3] === '--cold-storage' || paceStorageMode || thresholdStorageMode;
 const editMode = process.argv[3] === '--single-edit';
 const failureOrderMode = process.argv[3] === '--import-failure-order';
-const thresholdCommandMode = process.argv[3] === '--threshold-commands';
+const thresholdInputNotationMode = process.argv[3] === '--threshold-input-notation';
+const thresholdCommandMode = process.argv[3] === '--threshold-commands' || thresholdInputNotationMode;
 const inputCommandMode = process.argv[3] === '--input-commands';
 const soundCommandMode = process.argv[3] === '--sound-commands';
 const caretCommandMode = process.argv[3] === '--caret-commands';
@@ -547,9 +549,39 @@ if (defaultsMode) {
       inputProps:context.accuracyInput, configMeta:metadata.minAcc, schema:configSchemas.ConfigSchema.shape.minAccCustom});
     const commands = {speed, accuracy, fixed:context.burstCommands.find(c => c.id === 'setMinBurstFixed'),
       flex:context.burstCommands.find(c => c.id === 'setMinBurstFlex')};
+    if (thresholdInputNotationMode) {
+      const values = [-0, 0, Number.MIN_VALUE, 0.1, 1e-7, 1e-6, 1e20, 1e21,
+        1000000000000000100, 59.123456789, Number.MAX_VALUE, Infinity];
+      const view = new DataView(new ArrayBuffer(8));
+      function bits(value) { view.setFloat64(0,value); return view.getBigUint64(0).toString(16).padStart(16,'0'); }
+      for (const boundary of [1e-6,1e21]) {
+        view.setFloat64(0,boundary); const center = view.getBigUint64(0);
+        for (const delta of [-2n,-1n,1n,2n]) {
+          view.setBigUint64(0,center+delta); values.push(view.getFloat64(0));
+        }
+      }
+      let seed = 0x51a0f9d3c7b2e641n;
+      for (let i=0;i<256;i++) {
+        seed = BigInt.asUintN(64,seed*6364136223846793005n+1442695040888963407n);
+        view.setBigUint64(0,seed&0x7fffffffffffffffn);
+        const value = view.getFloat64(0); if (Number.isFinite(value)) values.push(value);
+      }
+      const initialCases = [];
+      for (const initial of values) for (const unit of ['wpm','cpm','wps','cps','wph']) {
+        Object.assign(simulation.Config,structuredClone(defaults),
+          {minWpm:'custom',minWpmCustomSpeed:initial,typingSpeedUnit:unit});
+        const initialText = speed.defaultValue(), converted = speed.inputValueConvert(initialText);
+        initialCases.push({unit,initialBits:bits(initial),initialText,convertedBits:bits(converted),
+          canSubmit:speed.validation.schema.safeParse(converted).success});
+      }
+      verify();
+      await new Promise((resolve,reject)=>process.stdout.write(JSON.stringify({id:speed.id,initialCases})+'\n',
+        error=>error?reject(error):resolve()));
+      process.exit(0);
+    }
     const rawInputs = ['', ' ', '\ufeff \n', '0', '-0', '+0', '-1', '1.7', '73.5tail', '1e3', '1e-3',
       '0x10', '0b10', '0o10', '-0x10', '0x1g', '0x', 'Infinity', '-Infinity', 'inf', 'NaN', '.5',
-      '1.', '+.5', '1e309', '1e-9999', '9007199254740993', '0xffffffffffffffff',
+      '1.', '+.5', '1e309', '9'.repeat(400), '1e-9999', '9007199254740993', '0xffffffffffffffff',
       '0b'+'1'.repeat(65), '0o'+'7'.repeat(25), '1\u0085', '\u180e12', '\u200b12',
       '\ufeff12\u00a0', '1_000', '12\rfoo', '+', '-', '.', '0XfZ'];
     const fields = ['minWpm','minWpmCustomSpeed','minAcc','minAccCustom','minBurst','minBurstCustomSpeed'];
@@ -778,26 +810,29 @@ if (defaultsMode) {
     console.log(JSON.stringify({fixtures}));
   } else if (coldMode) {
     const Storage = (await load(path.join(frontend, 'utils/local-storage-with-schema.ts'))).LocalStorageWithSchema;
-    if (paceStorageMode) {
+    if (paceStorageMode || thresholdStorageMode) {
       const view = new DataView(new ArrayBuffer(8));
       function bits(value) { view.setFloat64(0,value); return view.getBigUint64(0).toString(16).padStart(16,'0'); }
       const fixtures = [];
-      for (const mode of ['off','custom']) for (const speed of [0,100,Number.MAX_VALUE,Infinity]) {
+      const targets = paceStorageMode ? [{modeKey:'paceCaret',speedKey:'paceCaretCustomSpeed',modes:['off','custom']}]
+        : [{modeKey:'minWpm',speedKey:'minWpmCustomSpeed',modes:['off','custom']},
+          {modeKey:'minBurst',speedKey:'minBurstCustomSpeed',modes:['off','fixed','flex']}];
+      for (const {modeKey,speedKey,modes} of targets) for (const mode of modes) for (const speed of [0,100,Number.MAX_VALUE,Infinity]) {
         let disk = null; const writes = [];
         context.window = {localStorage:{getItem:()=>disk, setItem:(_key,value)=>{disk=value;writes.push(value);}}};
         const options = {key:'config',schema:configSchemas.ConfigSchema,fallback:structuredClone(defaults),
           migrate:value=>migration.migrateConfig(value)};
         const warm = new Storage(options);
-        const original = {...structuredClone(defaults),paceCaret:mode,paceCaretCustomSpeed:speed,
+        const original = {...structuredClone(defaults),[modeKey]:mode,[speedKey]:speed,
           words:77,numbers:true,typingSpeedUnit:'cpm',paceCaretStyle:'off'};
         assert.equal(warm.set(original),true);
-        const persisted = JSON.parse(disk).paceCaretCustomSpeed;
+        const persisted = JSON.parse(disk)[speedKey];
         const cold = new Storage(options), restored = cold.get();
-        const expected = {...original,paceCaretCustomSpeed:speed===Infinity?defaults.paceCaretCustomSpeed:speed};
+        const expected = {...original,[speedKey]:speed===Infinity?defaults[speedKey]:speed};
         assert.deepEqual(restored,expected); assert.deepEqual(JSON.parse(disk),expected);
         restored.words = 22; assert.equal(cold.get().words,77);
-        assert.equal(warm.get().paceCaretCustomSpeed,speed);
-        fixtures.push({mode,warmBits:bits(speed),coldBits:bits(cold.get().paceCaretCustomSpeed),
+        assert.equal(warm.get()[speedKey],speed);
+        fixtures.push({modeKey,speedKey,mode,warmBits:bits(speed),coldBits:bits(cold.get()[speedKey]),
           persistedNull:persisted===null,writes:writes.length,unrelatedKeysPreserved:true,warmCachePreserved:true});
       }
       verify(); console.log(JSON.stringify({fixtures})); process.exit(0);

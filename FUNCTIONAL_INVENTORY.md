@@ -1,14 +1,16 @@
 # 功能盘点与追踪表
 
-当前工作批次新增配速输入与冷存储两项对照；修正后的完整客户端 6,359 项、25 项跳过、0 失败，同一完整日志的 92 项必需来源证据通过，另排除两个可见窗口用例。本批不启动应用的 debug 打包检查也通过；下方历史 90 项记录属于已推送的 d922b508。
+当前阈值输入／冷恢复与本机成绩格式批次已通过整套客户端：6,370 项、25 项跳过、0 失败，同日志 94 项必需来源证据及不启动应用的打包检查通过，另排除两个可见窗口用例。原版 Config／getConfig 导出路径的差异与归档／分享无限值交互仍未完成；完整重写继续。下方 92／90 项记录分别属于 7c7554e1／d922b508 的历史批次。
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| CFG-EXPORT-CURRENT-01 | 当前配置 JSON 的两个导出入口 | commandline/lists.ts exportSettingsJSON；设置页 ImportExport.tsx；config/store.ts／setters.ts／lifecycle.ts | 当前 TypebarApp 导出分支仍调用 SettingsJSONCommandCodec | 未完成：固定源码命令序列化原始 Config，设置页复制 Solid getConfig；原生同名命令仍生成 Typebar 版本化文档。已有只读源码证据，尚未建立原生反例或修复。后续须覆盖完整应用、单字段调整、拒绝／失败、待交付状态、No Quit 与剪贴板回退；不能用单一快照替代两条源路径。 |
+| THRESHOLD-INPUT-NUMBER-01 | 阈值输入文本、无限速度与冷恢复 | 实际命令构造器／元数据／单位／Zod／冷存储迁移 | 网站规则映射／协调器／冷投影／本机成绩配置版本 2 | 1,380 例输入、20 组冷恢复、真实宿主与实际完成／保存反例先红后绿；整套客户端 6,370 项、25 项跳过、0 失败，同日志全部 94 项来源证据及不启动应用的打包通过，另排除两窗口项。归档／分享无限值交互和实体窗口未完成，见阈值输入数字合同。 |
 | PACE-INPUT-NUMBER-01 | 配速默认文本、换算与无限值准入 | 实际输入命令构造器／元数据／五种单位／Zod | WebsiteNumberText／WebsitePaceSpeedPresentation／表单与命令 | 1,380 例及实际目标反例先红后绿；八组来源冷存储及文件 CAS／拒绝保护通过，宿主验证冷启动／暖导入和有限值／Infinity 与 No Quit 四组。完整客户端 6,359 项、25 项跳过、0 失败，同日志全部 92 项来源证据通过，另排除两个可见窗口用例；不启动应用的 debug 打包检查通过，实体窗口仍待验，见配速输入数字合同。 |
 | PACE-STYLE-ADMISSION-01 | 隐藏样式的逻辑与呈现请求 | 完整 Caret.goTo／RAF／锁定 Anime 与 off 宽度规则 | WebsitePaceSession／页面样式绑定／三个生产光标配置 | 三组轨迹先产生 15 处原生失败，再转为通过；扩大 227 项零失败零跳过。覆盖恢复不补播、隐藏前已准入请求、从 off 开始的可见性、实际绑定与完整配置优先级。最终完整客户端 6,353 项、25 项跳过、0 失败，同日志 90 项源码证据和原生打包通过；其他样式组合、真实窗口、CI 与完整 readiness 未完成，见样式准入合同。 |
-| GATE-SOURCE-EXECUTION-01 | 固定源码对照必须实际执行 | 当前已登记的 92 个原生源码兼容性检查 | Native Rewrite Gate／readiness／源码执行证据检查器 | 当前完整客户端 6,359 项、25 项跳过、0 失败（2696.033 秒），另排除两个可见窗口用例；同一完整日志的全部 92 项证据及 13 项失败契约通过。历史 d922b508 的 6,353 项与 90 项证据仅代表旧批次。真实 CI runner 和完整 readiness 未完成，见执行证据合同。 |
-| PACE-TIMER-STATE-01 | 回调驱动的配速请求状态基础 | pace-caret.start／update／handleSpace／reset 与完整词目录 | WebsitePaceTimerState／源码计时器探针 | 基础 40 组、1,840 个事件对照通过；后续已接入实际会话、页面计时器和光标，见 PACE-CALLBACK-RUNTIME-01。无限速度的设置准入、冷恢复及完整实体体验仍未完成，基础历史见回调状态合同。 |
-| PACE-CALLBACK-RUNTIME-01 | 实际会话与显示帧的回调配速 | pace-caret／Caret／RAF 与锁定 Anime，HTML 计时器转换和嵌套下限 | TypingSession／PracticePageSessionStore／PromptCaretNativeView | 真实会话四处行为反例后接入显式回调与页面唯一计时器，普通 tick 只发布已交付状态；扩大 201 项通过。最终完整客户端 6,353 项、25 项跳过、0 失败，同日志 90 项证据及原生打包通过；default／off 请求准入见样式合同，其他组合、无限速度设置／冷恢复、真实窗口仍未完成，见运行合同。 |
+| GATE-SOURCE-EXECUTION-01 | 固定源码对照必须实际执行 | 当前已登记的 94 个原生源码兼容性检查 | Native Rewrite Gate／readiness／源码执行证据检查器 | 当前完整客户端 6,370 项、25 项跳过、0 失败（2740.449 秒），另排除两窗口项；同一完整日志的全部 94 项证据通过。13 项失败契约通过，历史 92／90 项仅代表旧批次；真实 CI runner 和完整 readiness 未完成，见执行证据合同。 |
+| PACE-TIMER-STATE-01 | 回调驱动的配速请求状态基础 | pace-caret.start／update／handleSpace／reset 与完整词目录 | WebsitePaceTimerState／源码计时器探针 | 基础 40 组、1,840 个事件对照通过；后续已接入实际会话、页面计时器和光标，见 PACE-CALLBACK-RUNTIME-01。设置准入和冷恢复见 PACE-INPUT-NUMBER-01；完整实体体验仍未完成，基础历史见回调状态合同。 |
+| PACE-CALLBACK-RUNTIME-01 | 实际会话与显示帧的回调配速 | pace-caret／Caret／RAF 与锁定 Anime，HTML 计时器转换和嵌套下限 | TypingSession／PracticePageSessionStore／PromptCaretNativeView | 真实会话四处行为反例后接入显式回调与页面唯一计时器，普通 tick 只发布已交付状态；扩大 201 项通过。最终完整客户端 6,353 项、25 项跳过、0 失败，同日志 90 项证据及原生打包通过；default／off 请求准入见样式合同，无限速度设置／冷恢复见 PACE-INPUT-NUMBER-01；其他组合和真实窗口仍未完成，见运行合同。 |
 
 | ID | 功能 | 参考 | 原生模块 | 状态 |
 | --- | --- | --- | --- | --- |

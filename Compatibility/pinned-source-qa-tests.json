@@ -3,6 +3,14 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.WebsiteThresholdColdStorageTests/testActualPinnedStorageMigrationAgainstNativeThresholdColdValues",
+      "file": "Tests/TypebarTests/WebsiteThresholdColdStorageTests.swift"
+    },
+    {
+      "id": "TypebarTests.WebsiteThresholdInputNotationTests/testPinnedMinimumSpeedInputTextAndAdmissionAcrossFiveUnits",
+      "file": "Tests/TypebarTests/WebsiteThresholdInputNotationTests.swift"
+    },
+    {
       "id": "TypebarTests.WebsitePaceColdStorageTests/testActualPinnedStorageMigrationAgainstNativeEffectiveColdValues",
       "file": "Tests/TypebarTests/WebsitePaceColdStorageTests.swift"
     },

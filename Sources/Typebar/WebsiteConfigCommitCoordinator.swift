@@ -378,7 +378,9 @@ final class WebsiteConfigCommitCoordinator {
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
     if kind == .inputRule { state.session.synchronizeWebsiteInputRules(prepared.draft.inputRules.rules) }
-    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap && kind != .layoutFluid { state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules) }
+    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap && kind != .layoutFluid {
+      state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules, websiteThresholds: true)
+    }
     if kind == .appearance, case .edited(let edit) = prepared.draft.origin, edit.key == "highlightMode" {
       state.session.refreshPromptPresentation()
     }

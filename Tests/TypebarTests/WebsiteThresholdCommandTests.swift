@@ -48,7 +48,7 @@ import XCTest
     let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus, 0)
     let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
-    XCTAssertEqual(fixtures.count, 3200)
+    XCTAssertEqual(fixtures.count, 3280)
     let defaults = try WebsiteConfigNativeProfile.defaultDocument().values
     let schema = WebsiteConfigSchema(catalogs: WebsiteConfigNativeProfile.catalogs)
     func same(_ actual: WebsiteConfigValue?, _ expected: WebsiteConfigValue, _ label: String) {

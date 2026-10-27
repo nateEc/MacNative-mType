@@ -4,12 +4,16 @@ import SwiftData
 
 @MainActor
 final class ThresholdResultStorageTests: XCTestCase {
-  private func result(source: Bool, conflict: Bool = false) throws -> CompletedTestResult {
+  private func result(source: Bool, conflict: Bool = false, infinite: Bool = false) throws -> CompletedTestResult {
     var configuration = TestConfiguration.timed(seconds: 15)
     if source {
       var raw = PracticeThresholdConfiguration()
       try raw.apply(.minimumWpm(mode: .off, customValue: 37))
       try raw.apply(.minimumWordBurst(mode: .flex, customValue: 0))
+      if infinite {
+        raw = try .init(websiteMinimumWpmMode: .off, speed: .infinity, accuracyMode: .off, accuracy: 90,
+          burstMode: .flex, burst: 0)
+      }
       configuration.rules = PracticeThresholdSource(configuration: raw).applying(to: configuration.rules)
     }
     if conflict { configuration.rules.minimumWpm = 99 }
@@ -33,6 +37,42 @@ final class ThresholdResultStorageTests: XCTestCase {
     XCTAssertEqual(try JSONDecoder().decode(TestConfiguration.self, from: bytes), legacy.configuration)
     XCTAssertEqual(old.portableResult, legacy)
     XCTAssertEqual(old.configurationData, bytes)
+  }
+
+  func testInfiniteWebsiteSpeedMemoriesSurviveActualCompletionAndOfficialSave() throws {
+    for (speedMode, burstMode, prompt, count) in [("off", "off", "ab cd", 2),
+      ("custom", "off", "ab cd", 2), ("off", "fixed", "ab", 1), ("off", "flex", "ab", 1)] {
+      let draft = try WebsiteConfigNativeProfile.prepareDraft(
+        "{\"minWpm\":\"\(speedMode)\",\"minWpmCustomSpeed\":1e999,\"minBurst\":\"\(burstMode)\",\"minBurstCustomSpeed\":1e999}",
+        pointsPerRem: 16, context: .init())
+      let start = Date(timeIntervalSince1970: 1_000)
+      var session = TypingSession(configuration: draft.inputRules.applying(to: .words(count)), prompt: prompt)
+      session.insert("a", at: start)
+      session.insert(String(prompt.dropFirst()) + " ", at: start.addingTimeInterval(1))
+      XCTAssertEqual(session.outcome, .completed, "\(speedMode)/\(burstMode)")
+      let result = try XCTUnwrap(session.result())
+      XCTAssertEqual(result.configuration.rules.thresholdSource?.configuration.minimumWpmCustomValue, .infinity)
+      XCTAssertEqual(result.configuration.rules.thresholdSource?.configuration.minimumWordBurstCustomValue, .infinity)
+      XCTAssertNoThrow(try LocalResultConfigurationCodec.encode(result.configuration))
+      let record = TestResultRecord(result: result)
+      XCTAssertFalse(record.configurationData.isEmpty)
+      XCTAssertEqual(record.portableResult, result)
+      let direct = try ResultWPMConsistencyInput(prompt: result.prompt, events: result.replayEvents,
+        duration: result.chartDuration, configuration: result.configuration,
+        targetWordDirectory: result.targetWordDirectory, sourceScoringBasis: result.characterStats.sourceUnitBasis)
+      let persisted = ResultWPMConsistencyInput(prompt: result.prompt, duration: result.chartDuration,
+        configurationData: record.configurationData, replayEventsData: record.replayEventsData,
+        targetWordDirectoryData: record.targetWordDirectoryData, sourceScoringBasis: result.characterStats.sourceUnitBasis)
+      XCTAssertNotNil(direct.calculate()); XCTAssertEqual(persisted.calculate(), direct.calculate())
+      XCTAssertNotNil(try AccountResultChartInput(result).calculate())
+      let container = try ModelContainer(for: TestResultRecord.self, LocalPersonalBestLedgerRecord.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+      do {
+        let saved = try LocalPersonalBestStore.save(result, in: container.mainContext)
+        XCTAssertEqual(saved.portableResult, result)
+        XCTAssertEqual(try container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).count, 1)
+      } catch { XCTFail("Actual completed result could not be saved: \(String(reflecting: error))") }
+    }
   }
 
   func testWorkerInputsRetainSameChartAndConsistencyAcrossSourceEnvelope() throws {
@@ -142,7 +182,7 @@ final class ThresholdResultStorageTests: XCTestCase {
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("results.store")
-    let expected = [try result(source: false), try result(source: true)]
+    let expected = [try result(source: false), try result(source: true), try result(source: true, infinite: true)]
     var bytes: [UUID: Data] = [:]
     func open() throws -> ModelContainer {
       let container = try ModelContainer(for: TestResultRecord.self,
@@ -161,7 +201,7 @@ final class ThresholdResultStorageTests: XCTestCase {
     }
     let container = try open()
     let records = try container.mainContext.fetch(FetchDescriptor<TestResultRecord>())
-    XCTAssertEqual(records.count, 2)
+    XCTAssertEqual(records.count, expected.count)
     for result in expected {
       let record = try XCTUnwrap(records.first { $0.id == result.id })
       XCTAssertEqual(record.portableResult, result)

@@ -19,12 +19,25 @@ struct PracticeThresholdConfiguration: Codable, Equatable {
 
   init() {}
 
+  /// The complete website profile has a lossless numeric archive. Existing
+  /// settings/JSON formats and their editors retain finite-only admission.
+  init(websiteMinimumWpmMode: Mode, speed: Double, accuracyMode: Mode, accuracy: Double,
+    burstMode: MinimumWordBurstMode, burst: Double) throws {
+    minimumWpmMode = websiteMinimumWpmMode; minimumWpmCustomValue = speed
+    minimumAccuracyMode = accuracyMode; minimumAccuracyCustomValue = accuracy
+    minimumWordBurstMode = burstMode; minimumWordBurstCustomValue = burst
+    guard isValidWebsite else { throw ValidationError.invalidCustomValue }
+  }
+
   enum ValidationError: Error { case invalidCustomValue }
 
   var isValid: Bool {
-    minimumWpmCustomValue.isFinite && minimumWpmCustomValue >= 0
+    isValidWebsite && minimumWpmCustomValue.isFinite && minimumWordBurstCustomValue.isFinite
+  }
+
+  var isValidWebsite: Bool {
+    minimumWpmCustomValue >= 0 && minimumWordBurstCustomValue >= 0
       && minimumAccuracyCustomValue.isFinite && (0...100).contains(minimumAccuracyCustomValue)
-      && minimumWordBurstCustomValue.isFinite && minimumWordBurstCustomValue >= 0
   }
 
   mutating func apply(_ change: Change) throws {

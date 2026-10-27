@@ -5908,7 +5908,7 @@ struct TypingSession {
 
   /// Synchronizes rules read live by reference input/timer code. Admission
   /// checks (including No Quit) remain the caller's responsibility.
-  mutating func synchronizeLiveInputRules(_ rules: InputRules) {
+  mutating func synchronizeLiveInputRules(_ rules: InputRules, websiteThresholds: Bool = false) {
     guard !isFinished else { return }
     var live = rules
     live.normalizeErrorHandlingModes()
@@ -5930,7 +5930,8 @@ struct TypingSession {
     // replace the active thresholds or strip their remembered source state.
     let validThresholds: Bool
     if let source = rules.thresholdSource {
-      validThresholds = source.configuration.isValid && source.matches(rules)
+      validThresholds = (websiteThresholds ? source.configuration.isValidWebsite : source.configuration.isValid)
+        && source.matches(rules)
     } else {
       validThresholds = live.minimumAccuracy.isFinite && (0...100).contains(live.minimumAccuracy)
         && live.minimumWpm.isFinite && live.minimumWpm >= 0
@@ -5954,7 +5955,7 @@ struct TypingSession {
     configuration.rules.stopOnErrorMode = rules.stopOnErrorMode
     configuration.rules.stopOnError = rules.stopOnErrorMode.isEnabled
     configuration.rules.codeUnindentOnBackspace = rules.codeUnindentOnBackspace
-    synchronizeLiveInputRules(rules)
+    synchronizeLiveInputRules(rules, websiteThresholds: true)
   }
 
   var completedPromptCharacterIndices: Set<Int> {
