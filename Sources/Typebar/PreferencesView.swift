@@ -546,8 +546,12 @@ struct PreferencesView: View {
           } maximumValueLabel: {
             Text("大")
           }
-          Text("\(Int(settings.fontSize)) pt")
-            .foregroundStyle(.secondary)
+          HStack {
+            Text("字号（pt）")
+            TextField("字号", value: fontPreferences.size, format: .number.precision(.significantDigits(1...17)))
+              .textFieldStyle(.roundedBorder)
+              .frame(width: 120)
+          }
           Picker("练习字体", selection: fontPreferences.design) {
             ForEach(PracticeFont.allCases) { font in
               Text(font.displayName).tag(font)

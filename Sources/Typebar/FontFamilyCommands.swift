@@ -186,6 +186,18 @@ enum FontFamilyCommandApplication {
     isFontAvailable: (String) -> Bool = NativePracticeFont.isAvailable,
     onConfigurationSave: () -> Void = {}
   ) -> Bool {
+    let family: String
+    switch target {
+    case .systemDesign(let font): family = NativeSystemPracticeFont.identifier(for: font)
+    case .knownIdentifier(let identifier):
+      guard FontFamilyCommandCatalog.fixedKnownFontIDs.contains(identifier) else { return false }
+      family = identifier
+    case .installedName(let name):
+      guard isFontAvailable(name) else { return false }
+      family = name.replacingOccurrences(of: " ", with: "_")
+    default: return false
+    }
+    if let accepted = settings.preferenceConfigurationSaves.applyFontEdit(.family(family)) { return accepted }
     switch target {
     case .systemDesign(let font):
       settings.installedPracticeFontName = ""
@@ -194,7 +206,6 @@ enum FontFamilyCommandApplication {
       guard FontFamilyCommandCatalog.fixedKnownFontIDs.contains(identifier) else { return false }
       settings.installedPracticeFontName = identifier
     case .installedName(let name):
-      guard isFontAvailable(name) else { return false }
       settings.installedPracticeFontName = name
     case .customName, .browseInstalled, .localFile, .useLocalFile, .removeLocalFile:
       return false
@@ -219,6 +230,7 @@ enum FontFamilyNameCommandPolicy {
     onConfigurationSave: () -> Void = {}
   ) -> Bool {
     guard let value = normalized(rawValue) else { return false }
+    if let accepted = settings.preferenceConfigurationSaves.applyFontEdit(.family(value.replacingOccurrences(of: " ", with: "_"))) { return accepted }
     settings.installedPracticeFontName = value
     onConfigurationSave()
     return true

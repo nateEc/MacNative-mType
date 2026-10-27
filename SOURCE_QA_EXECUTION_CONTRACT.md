@@ -1,5 +1,9 @@
 # 固定源码对照的执行证据
 
+完整配置字体实时操作同版 debug 包、签名、资源与原创性检查通过（33.282 秒，输入哈希不变；`/tmp/typebar-font-command-package.log` 及同名 JSON），未启动主程序。当前扩大回归为 646 项、固定来源清单 108 项；实机交互、其他未绑定控制与完整 readiness 不计完成。
+
+2026-10-28 完整配置字体实时操作：最终扩大 646 项零失败零跳过（318.757 秒，驱动 328.036 秒），同日志全部 108 项必需来源方法通过、输入哈希不变（`/tmp/typebar-font-command-regression-verified.log` 及同名 JSON／evidence.log）。确认新选十八类实际运行；55 项定向与窗口注册重入先行反例、旧接线字符串断言修正见 [字体实时操作合同](WEBSITE_FONT_LIVE_CONTRACT.md)。清单保持 108 项，没有以增加弱检查替代来源证据。命令悬停预览、本地文件变更后的实时绑定、实体操作、整套客户端和完整 readiness 未验。以下为历史批次。
+
 普通原生接收同版 debug 包、签名、资源与原创性检查通过（31.955 秒，输入哈希不变；`/tmp/typebar-native-receiver-package.log` 及同名 JSON），没有启动主程序。相关扩大与补跑按实际方法去重 566 项，全部 108 项来源证据通过；没有新增来源必需方法，未执行整套客户端或完整 readiness。
 
 2026-10-28 普通原生窗口完整接收基线：扩大 497 项零失败零跳过（306.712 秒，驱动 315.645 秒），同日志全部 108 项必需来源证据通过，输入哈希不变（`/tmp/typebar-native-receiver-regression.log` 及同名 JSON／evidence.log）。新增八类过滤条件过度转义未选中，核对后单独补跑 70 项零失败零跳过（2.749 秒，驱动 6.600 秒；`/tmp/typebar-native-receiver-supplemental.log` 及同名 JSON），两轮实际 XCTest 方法去重 566 项；不把缺失选择当成通过。43 项定向、系统字体／过期窗口先行反例和恢复夹具纠正见 [原生接收合同](NATIVE_SHARED_RECEIVER_CONTRACT.md)。没有新增必需来源方法，也没有选择可见 StartupHost 用例；实体操作、全部外观实时控制、整套客户端及完整 readiness 未验。以下为历史批次。

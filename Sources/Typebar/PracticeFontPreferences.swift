@@ -5,17 +5,23 @@ struct PracticeFontPreferences {
   let settings: AppSettings
   var onResult: (Bool) -> Void = { _ in }
 
-  var familyName: String { settings.preferenceFontFamilyName }
+  private var selectedSystemDesign: PracticeFont? {
+    PracticeFont.allCases.first { NativeSystemPracticeFont.identifier(for: $0) == settings.preferenceFontFamilyName }
+  }
+  var familyName: String { selectedSystemDesign == nil ? settings.preferenceFontFamilyName : "" }
 
   var design: Binding<PracticeFont> {
-    Binding(get: { settings.practiceFont }, set: {
+    Binding(get: {
+      selectedSystemDesign ?? settings.practiceFont
+    }, set: {
       onResult(FontFamilyCommandApplication.apply(.systemDesign($0), to: settings, onConfigurationSave: save))
     })
   }
 
   var size: Binding<Double> {
-    Binding(get: { settings.fontSize }, set: { value in
+    Binding(get: { settings.preferenceConfigurationSaves.fontPointSize ?? settings.fontSize }, set: { value in
       guard value.isFinite, value >= PracticeFontSizePolicy.minimumSize else { onResult(false); return }
+      if let accepted = settings.preferenceConfigurationSaves.applyFontEdit(.size(value)) { onResult(accepted); return }
       settings.fontSize = value
       save()
       onResult(true)
@@ -32,7 +38,7 @@ struct PracticeFontPreferences {
   func applyName(_ raw: String) -> Bool {
     let accepted: Bool
     if raw.isEmpty || raw.allSatisfy({ $0 == " " }) {
-      accepted = FontFamilyCommandApplication.apply(.systemDesign(settings.practiceFont), to: settings, onConfigurationSave: save)
+      accepted = FontFamilyCommandApplication.apply(.systemDesign(design.wrappedValue), to: settings, onConfigurationSave: save)
     } else {
       accepted = FontFamilyNameCommandPolicy.apply(raw, to: settings, onConfigurationSave: save)
     }

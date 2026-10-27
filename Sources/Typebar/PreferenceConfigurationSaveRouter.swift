@@ -24,6 +24,9 @@ final class PreferenceConfigurationSaveRouter {
   private var languageProviders: [UUID: () -> TypingLanguage] = [:]
   private var keyboardGuideProviders: [UUID: () -> KeyboardGuideMode] = [:]
   private var fontFamilyProviders: [UUID: () -> String] = [:]
+  private var fontSizeProviders: [UUID: () -> Double?] = [:]
+  private var fontEditHandlers: [UUID: (PracticeFontEdit) -> Bool?] = [:]
+  private var deliveringFontEdit = false
   private var priority: [UUID] = []
   private var isDelivering = false
 
@@ -31,6 +34,8 @@ final class PreferenceConfigurationSaveRouter {
     selectedLanguage: (() -> TypingLanguage)? = nil,
     keyboardGuideMode: (() -> KeyboardGuideMode)? = nil,
     fontFamilyName: (() -> String)? = nil,
+    fontPointSize: (() -> Double?)? = nil,
+    fontEdit: ((PracticeFontEdit) -> Bool?)? = nil,
     save: @escaping () -> Void) {
     leaseTransitions += 1
     defer { leaseTransitions -= 1 }
@@ -41,6 +46,8 @@ final class PreferenceConfigurationSaveRouter {
     languageProviders[owner] = selectedLanguage
     keyboardGuideProviders[owner] = keyboardGuideMode
     fontFamilyProviders[owner] = fontFamilyName
+    fontSizeProviders[owner] = fontPointSize
+    fontEditHandlers[owner] = fontEdit
     if activeBefore != priority.last || priority.last == owner { generation = UUID() }
   }
 
@@ -75,6 +82,19 @@ final class PreferenceConfigurationSaveRouter {
     return fontFamilyProviders[owner]?()
   }
 
+  var fontPointSize: Double? {
+    guard let owner = priority.last else { return nil }
+    return fontSizeProviders[owner]?()
+  }
+  /// nil selects the legacy native path; false is an owned rejection and must
+  /// never fall through to mutating another configuration.
+  func applyFontEdit(_ edit: PracticeFontEdit) -> Bool? {
+    guard !deliveringFontEdit, !isDelivering, leaseTransitions == 0 else { return false }
+    guard captureLease() != nil, let owner = priority.last, let action = fontEditHandlers[owner] else { return nil }
+    deliveringFontEdit = true; defer { deliveringFontEdit = false }
+    return action(edit)
+  }
+
   func activate(owner: UUID) {
     guard handlers[owner] != nil else { return }
     leaseTransitions += 1
@@ -94,6 +114,8 @@ final class PreferenceConfigurationSaveRouter {
     languageProviders.removeValue(forKey: owner)
     keyboardGuideProviders.removeValue(forKey: owner)
     fontFamilyProviders.removeValue(forKey: owner)
+    fontSizeProviders.removeValue(forKey: owner)
+    fontEditHandlers.removeValue(forKey: owner)
     priority.removeAll { $0 == owner }
     if activeBefore != priority.last { generation = UUID() }
   }

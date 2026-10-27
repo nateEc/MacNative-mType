@@ -267,6 +267,37 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     return try await perform(.edit(edit, applicationID), systemIsDark: systemIsDark)
   }
 
+  @discardableResult
+  func runFontCommand(_ edit: PracticeFontEdit, replacing applicationID: UUID) throws -> String {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil, page.state.sharedReceipt == nil
+    else { throw WebsiteConfigImportWorkflowError.preparationPending }
+    guard page.state.presentation?.publication.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
+    try Task.checkCancellation()
+    applying = true; operation = UUID()
+    defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; applying = false }
+    return try environment.withSynchronousSetterRead {
+      guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+      let key: String, value: WebsiteConfigValue
+      switch edit {
+      case .family(let name): key = "fontFamily"; value = .string(name)
+      case .size(let points):
+        guard points.isFinite, points > 0 else { throw WebsiteConfigNativeKeyboardTypographyError.invalidFontScale }
+        key = "fontSize"; value = .number(points / context.pointsPerRem)
+      }
+      let ticket = try coordinator.prepareEdit(key: key, value: value, for: page, refreshingWith: source)
+      prepared = ticket
+      let font = try coordinator.prepareLiveFont(ticket, local: settings.readLocalPracticeFontResource())
+      switch try coordinator.commitLiveFont(font, for: page) {
+      case .committed: return "字体设置已保存，当前练习继续。"
+      case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+      case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+      case .busy: throw WebsiteConfigImportWorkflowError.busy
+      }
+    }
+  }
+
   private func runSingleLiveCommand(_ edit: WebsiteConfigPracticeEdit, replacing applicationID: UUID) throws -> String {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }

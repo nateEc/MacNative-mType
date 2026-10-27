@@ -738,8 +738,27 @@ final class WebsiteConfigCommitCoordinator {
   func commitLiveLayoutFluid(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
     try commitLiveEdit(prepared, for: page, kind: .layoutFluid)
   }
-  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap, layoutFluid }
-  private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind, paceTarget: Double? = nil) throws -> Outcome {
+  struct LiveFontPrepared {
+    fileprivate let configuration: Prepared
+    fileprivate let admission: UUID
+    fileprivate let font: WebsiteConfigFontResource
+  }
+  func prepareLiveFont(_ prepared: Prepared, local: WebsiteConfigFontResource.Local) throws -> LiveFontPrepared {
+    guard let capture = prepared.pageCapture,
+      WebsiteConfigFontEdit.admits(prepared.draft, from: capture.publication.draft) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    let admission = try beginAsyncResources(prepared)
+    let font = try WebsiteConfigFontResource.prepare(typography: prepared.draft.keyboardTypography,
+      language: prepared.draft.testParameters.language, local: local)
+    try checkAsyncResources(prepared, admission: admission)
+    return .init(configuration: prepared, admission: admission, font: font)
+  }
+  func commitLiveFont(_ prepared: LiveFontPrepared, for page: PracticePageSessionStore) throws -> Outcome {
+    guard prepared.admission == resourceAdmission else { return .stale }
+    return try commitLiveEdit(prepared.configuration, for: page, kind: .font, font: prepared.font)
+  }
+  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap, layoutFluid, font }
+  private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind,
+    paceTarget: Double? = nil, font: WebsiteConfigFontResource? = nil) throws -> Outcome {
     guard !processing, page.restartController?.isPreparing != true else { return .busy }
     processing = true; defer { processing = false }
     try Task.checkCancellation()
@@ -750,6 +769,8 @@ final class WebsiteConfigCommitCoordinator {
       guard kind == .layoutFluid, page.state.session.ownsWebsiteWordNavigation(navigation) else { return .stale }
     }
     switch kind {
+    case .font:
+      guard font != nil, WebsiteConfigFontEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .behavior:
       guard WebsiteConfigBehaviorEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .inputRule:
@@ -779,7 +800,7 @@ final class WebsiteConfigCommitCoordinator {
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
     if kind == .inputRule { state.session.synchronizeWebsiteInputRules(prepared.draft.inputRules.rules) }
-    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap && kind != .layoutFluid {
+    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap && kind != .layoutFluid && kind != .font {
       state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules, websiteThresholds: true)
     }
     if kind == .appearance, case .edited(let edit) = prepared.draft.origin, edit.key == "highlightMode" {
@@ -793,6 +814,8 @@ final class WebsiteConfigCommitCoordinator {
     guard isCurrent(prepared) else { return .stale }
     try Task.checkCancellation()
     switch kind {
+    case .font:
+      try page.beginLiveFontCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .behavior:
       try page.beginLiveBehaviorCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .inputRule:
@@ -831,7 +854,7 @@ final class WebsiteConfigCommitCoordinator {
     let publication = Publication(applicationID: UUID(), draft: prepared.draft, savedDraft: volatile ? capture.publication.savedDraft : prepared.draft,
       owner: prepared.owner.owner, environmentRevision: prepared.environment.revision,
       pointsPerRem: prepared.environment.pointsPerRem, disk: revision,
-      background: capture.publication.background, font: capture.publication.font,
+      background: capture.publication.background, font: font ?? capture.publication.font,
       session: state.session, practice: updatedPractice, quoteRecoveries: capture.publication.quoteRecoveries,
       ownerLease: prepared.owner, authority: publicationAuthority)
     state = .init(session: state.session, presentation: previous.retainingAppearance(for: publication),

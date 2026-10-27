@@ -1867,7 +1867,9 @@ private struct ContentView: View {
         requestedModifiers: { practiceRequestedModifiers },
         selectedLanguage: { committedPracticeDraft?.testParameters.language ?? language },
         keyboardGuideMode: { committedPracticeDraft?.keyboardTypography.guideMode ?? challengeLiveConfiguration.keyboardGuideMode(settings: settings) },
-        fontFamilyName: { committedPracticeDraft?.keyboardTypography.fontFamily ?? challengeLiveConfiguration.fontFamilyName(settings: settings) }) {
+        fontFamilyName: { committedPracticeDraft?.keyboardTypography.fontFamily ?? challengeLiveConfiguration.fontFamilyName(settings: settings) },
+        fontPointSize: { committedPracticeDraft?.keyboardTypography.fontSize },
+        fontEdit: { applyWebsiteFontEdit($0) }) {
         persistExplicitTestConfiguration()
       }
       installWebsiteArchiveAdmission()
@@ -2276,9 +2278,9 @@ private struct ContentView: View {
       }
     }
     .sheet(isPresented: $showingFontFamilyNameCommandEditor) {
-      FontFamilyNameCommandEditor(initialName: settings.installedPracticeFontName) { name in
+      FontFamilyNameCommandEditor(initialName: commandFontFamilyEditorName) { name in
         if FontFamilyNameCommandPolicy.apply(name, to: settings, onConfigurationSave: persistExplicitTestConfiguration) {
-          fontFamilyCommandMessage = settings.hasLocalPracticeFont
+          fontFamilyCommandMessage = !pageSessionStore.ownsConfigurationSelection && settings.hasLocalPracticeFont
             ? "已保存所选字体；本地字体文件已保留但未启用。" : nil
         }
       }
@@ -4097,7 +4099,28 @@ private struct ContentView: View {
   }
 
   private var commandFontFamilyName: String {
-    challengeLiveConfiguration.fontFamilyName(settings: settings)
+    committedPracticeDraft?.keyboardTypography.fontFamily ?? challengeLiveConfiguration.fontFamilyName(settings: settings)
+  }
+  private var commandFontFamilyEditorName: String {
+    guard !PracticeFont.allCases.contains(where: { NativeSystemPracticeFont.identifier(for: $0) == commandFontFamilyName }) else { return "" }
+    return commandFontFamilyName.replacingOccurrences(of: "_", with: " ")
+  }
+
+  private func applyWebsiteFontEdit(_ edit: PracticeFontEdit) -> Bool? {
+    guard pageSessionStore.ownsConfigurationSelection else { return nil }
+    guard let publication = pageSession.presentation?.publication else {
+      fontFamilyCommandMessage = "配置正在准备，请完成后再修改字体。"; return false
+    }
+    do {
+      _ = try importWorkflow().runFontCommand(edit, replacing: publication.applicationID)
+      commandFontPreview.appliedFontFamily(); preparedWholePreviewRendering = nil
+      fontFamilyCommandMessage = nil
+      return true
+    } catch {
+      fontFamilyCommandMessage = (error as? LocalizedError)?.errorDescription ?? "字体设置未完成，已保留原配置。"
+      account.localNotices.post(fontFamilyCommandMessage ?? "字体设置未完成。")
+      return false
+    }
   }
 
   private func verifyChallengeFontAvailability() {
@@ -6551,6 +6574,10 @@ private struct ContentView: View {
         if !FontFamilyCommandApplication.apply(target, to: settings,
           onConfigurationSave: persistExplicitTestConfiguration) {
           fontFamilyCommandMessage = "此 Mac 当前无法使用所选字体。"
+        } else if pageSessionStore.ownsConfigurationSelection {
+          // The published resource keeps the source's local-file override.
+          // Do not claim the legacy local file was disabled by this command.
+          fontFamilyCommandMessage = nil
         } else if settings.hasLocalPracticeFont {
           fontFamilyCommandMessage = "已保存所选字体；本地字体文件已保留但未启用。"
         } else if case .knownIdentifier(let identifier) = target,
