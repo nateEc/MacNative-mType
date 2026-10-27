@@ -104,21 +104,22 @@ final class ThresholdArchiveTests: XCTestCase {
   }
 
   @MainActor
-  func testUnmigratedGlobalSettingsRestoreFailsBeforeAnyMutation() throws {
+  func testLegacyGlobalTargetCanExplicitlyRestoreFiniteSourceArchive() throws {
     let suite = "typebar.threshold-archive.\(UUID().uuidString)"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
     let settings = AppSettings(defaults: defaults)
-    let before = settings.snapshot
     let archive = TypebarArchive(version: 34, exportedAt: date,
       settings: try source().applying(to: .init(fontSize: 42)), results: [], presets: [])
     let container = try ModelContainer(for: TestPresetRecord.self, TestResultRecord.self,
       LocalPersonalBestLedgerRecord.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-    XCTAssertThrowsError(try LocalArchiveImport.apply(archive, settings: settings, results: [], presets: [], savedTexts: [],
-      modelContext: container.mainContext)) {
-        XCTAssertEqual($0 as? LocalArchiveImportError, .thresholdSourceNotReady)
-    }
-    XCTAssertEqual(settings.snapshot, before)
+    _ = try LocalArchiveImport.apply(archive, settings: settings, results: [], presets: [], savedTexts: [],
+      resultTombstoneStore: .init(defaults: defaults), presetTombstoneStore: .init(defaults: defaults),
+      savedTextTombstoneStore: .init(defaults: defaults), customizationTombstoneStore: .init(defaults: defaults),
+      tombstoneStore: .init(defaults: defaults), modelContext: container.mainContext)
+    XCTAssertEqual(settings.snapshot, archive.settings)
+    XCTAssertEqual(AppSettings(defaults: defaults).snapshot, archive.settings)
+    XCTAssertTrue(settings.hasThresholdProfile)
     XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<TestPresetRecord>()).isEmpty)
   }
 

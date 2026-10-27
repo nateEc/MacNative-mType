@@ -7,16 +7,17 @@ enum ArchiveSourceAdmission {
     let snapshot: AppSettingsSnapshot
     let selection: ActiveTestSelectionDocument?
     let baseline: PresetSourcePreparation.Baseline?
+    let adoptionBaseline: AppSettings.ArchiveSourceAdoptionBaseline?
     let selectionBaseline: ActiveTestSelectionRead?
     let preservesUnchangedSettings: Bool
     let selectionResourcesAvailable: @MainActor (TestConfiguration) -> Bool
 
     private var hasSourceChallenge: Bool {
-      baseline != nil && selection?.preset.configuration.challengeID != nil
+      (baseline != nil || adoptionBaseline != nil) && selection?.preset.configuration.challengeID != nil
     }
 
     @MainActor private func hasAppliedSnapshot(_ settings: AppSettings) -> Bool {
-      if baseline != nil {
+      if baseline != nil || adoptionBaseline != nil {
         guard settings.snapshot == snapshot,
           case .available(let stored) = settings.thresholdProfileRead, stored == snapshot else { return false }
         return true
@@ -28,6 +29,8 @@ enum ArchiveSourceAdmission {
       guard settings.allowsRestartingConfigurationChange else { return false }
       if let baseline {
         guard baseline.matches(settings) else { return false }
+      } else if let adoptionBaseline {
+        guard settings.archiveSourceAdoptionBaseline == adoptionBaseline else { return false }
       } else if settings.hasThresholdProfile { return false }
       if let selectionBaseline, settings.activeTestSelectionRead != selectionBaseline { return false }
       return true
@@ -51,7 +54,11 @@ enum ArchiveSourceAdmission {
         throw LocalArchiveImportError.recordsImportedSettingsNotApplied
       }
       let appliesSettings = !(preservesUnchangedSettings && settings.snapshot == snapshot)
-      if appliesSettings, !settings.apply(snapshot) { throw LocalArchiveImportError.recordsImportedSettingsNotApplied }
+      if appliesSettings {
+        let applied = adoptionBaseline.map { settings.adoptArchivedSourceSnapshot(snapshot, expected: $0) }
+          ?? settings.apply(snapshot)
+        guard applied else { throw LocalArchiveImportError.recordsImportedSettingsNotApplied }
+      }
       guard hasAppliedSnapshot(settings) else {
         throw LocalArchiveImportError.recordsImportedSettingsNotApplied
       }
@@ -95,12 +102,15 @@ enum ArchiveSourceAdmission {
     guard settings.allowsRestartingConfigurationChange else { throw LocalArchiveImportError.noQuitConfigurationLocked }
     let sourceSelection = selection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false
     let hasSource = settings.hasThresholdProfile
-    guard hasSource || (incoming.thresholdSource == nil && !sourceSelection) else {
+    let adoptsSource = !hasSource && incoming.thresholdSource != nil
+    guard hasSource || adoptsSource || !sourceSelection else {
       throw LocalArchiveImportError.thresholdSourceNotReady
     }
     var snapshot = incoming
     let baseline: PresetSourcePreparation.Baseline?
+    let adoptionBaseline: AppSettings.ArchiveSourceAdoptionBaseline?
     if hasSource {
+      adoptionBaseline = nil
       let current = settings.snapshot
       guard let owner = current.thresholdSource,
         case .available(let stored) = settings.thresholdProfileRead, stored.thresholdSource == owner,
@@ -119,17 +129,24 @@ enum ArchiveSourceAdmission {
         snapshot = source.applying(to: incoming)
       }
       guard settings.canApplySourceSnapshot(snapshot) else { throw LocalArchiveImportError.invalidSourceSettings }
-    } else { baseline = nil }
+    } else if adoptsSource {
+      baseline = nil
+      guard let current = settings.archiveSourceAdoptionBaseline else {
+        throw LocalArchiveImportError.sourceStateUnavailable
+      }
+      guard settings.canAdoptArchivedSourceSnapshot(snapshot) else { throw LocalArchiveImportError.invalidSourceSettings }
+      adoptionBaseline = current
+    } else { baseline = nil; adoptionBaseline = nil }
     let preparedSelection: ActiveTestSelectionDocument?
     if let selection {
       guard let validated = ActiveTestSelectionPolicy.validated(selection),
         settings.activeTestSelectionRead != .unavailable
       else { throw LocalArchiveImportError.invalidActiveTestSelection }
-      if hasSource, validated.preset.configuration.challengeID != nil,
+      if hasSource || adoptsSource, validated.preset.configuration.challengeID != nil,
         !SourceChallengeAdmission.accepts(validated.preset) {
         throw LocalArchiveImportError.invalidActiveTestSelection
       }
-      if hasSource, validated.preset.configuration.rules.thresholdSource == nil,
+      if hasSource || adoptsSource, validated.preset.configuration.rules.thresholdSource == nil,
         let source = snapshot.thresholdSource {
         var preset = validated.preset
         // Source restoration uses the imported global owner, not stale rule
@@ -150,8 +167,8 @@ enum ArchiveSourceAdmission {
     case .localFile: preservesUnchangedSettings = false
     case .cloudSync: preservesUnchangedSettings = true
     }
-    let plan = Plan(snapshot: snapshot, selection: preparedSelection, baseline: baseline,
-      selectionBaseline: hasSource || selection != nil ? settings.activeTestSelectionRead : nil,
+    let plan = Plan(snapshot: snapshot, selection: preparedSelection, baseline: baseline, adoptionBaseline: adoptionBaseline,
+      selectionBaseline: hasSource || adoptsSource || selection != nil ? settings.activeTestSelectionRead : nil,
       preservesUnchangedSettings: preservesUnchangedSettings,
       selectionResourcesAvailable: selectionResourcesAvailable)
     try plan.validateBeforeRecords(to: settings)

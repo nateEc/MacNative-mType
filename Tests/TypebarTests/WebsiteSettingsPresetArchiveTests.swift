@@ -165,8 +165,6 @@ import XCTest
     defer { defaults.removePersistentDomain(forName: suite) }
     let legacy = try JSONEncoder().encode(AppSettingsSnapshot(fontSize: 22))
     defaults.set(legacy, forKey: AppSettings.legacyStorageKey)
-    XCTAssertTrue(ThresholdSettingsStore(defaults: defaults).save(
-      PracticeThresholdSource(configuration: .init()).applying(to: .init(fontSize: 31))))
     func settings() -> AppSettings { .init(defaults: defaults,
       feedbackSound: TypingFeedbackSound(loadSound: { _ in nil }, beep: {}), localBackgroundStore: .inMemory()) }
     func open() throws -> ModelContainer {
@@ -187,6 +185,7 @@ import XCTest
     var presetBytes = Data(), resultBytes = Data()
     try autoreleasepool {
       let target = settings(), container = try open()
+      XCTAssertFalse(target.hasThresholdProfile)
       let archive = try TypebarDataTransfer.importArchive(from: Data(contentsOf: file))
       let summary = try apply(archive, target, container)
       XCTAssertEqual(summary.insertedResults, 1); XCTAssertEqual(summary.insertedPresets, 1)

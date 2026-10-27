@@ -2427,6 +2427,40 @@ final class AppSettings {
     }
   }
 
+  struct ArchiveSourceAdoptionBaseline: Equatable {
+    let current: AppSettingsSnapshot
+    let legacySettings: [String: Data]
+  }
+
+  /// Archive restoration owns the explicit first adoption. Keep the old
+  /// preference families intact, and refuse unreadable or concurrently changed
+  /// state rather than treating a loader fallback as a migration baseline.
+  var archiveSourceAdoptionBaseline: ArchiveSourceAdoptionBaseline? {
+    guard !hasThresholdProfile, activeTestSelectionRead != .unavailable else { return nil }
+    var stored: [String: Data] = [:]
+    for key in [Self.legacyStorageKey, Self.expandedPaceStorageKey, Self.accountPaceStorageKey] {
+      guard let value = defaults.object(forKey: key) else { continue }
+      guard let data = value as? Data,
+        (try? JSONDecoder().decode(AppSettingsSnapshot.self, from: data)) != nil else { return nil }
+      stored[key] = data
+    }
+    return .init(current: snapshot, legacySettings: stored)
+  }
+
+  func canAdoptArchivedSourceSnapshot(_ incoming: AppSettingsSnapshot) -> Bool {
+    guard allowsRestartingConfigurationChange, archiveSourceAdoptionBaseline != nil,
+      incoming.keyboardGuideLayoutSource != .websiteEmulation,
+      let source = incoming.thresholdSource, source.configuration.isValidWebsite, source.matches(incoming)
+    else { return false }
+    return AppSettings(validating: incoming, defaults: defaults).snapshot == incoming
+  }
+
+  @discardableResult
+  func adoptArchivedSourceSnapshot(_ incoming: AppSettingsSnapshot,
+    expected: ArchiveSourceAdoptionBaseline) -> Bool {
+    applySourceSnapshot(incoming, archiveAdoptionBaseline: expected)
+  }
+
   /// Replace an existing complete source profile only after lossless staging
   /// and a successful versioned save. Legacy adoption is a separate policy.
   func canApplySourceSnapshot(_ incoming: AppSettingsSnapshot) -> Bool {
@@ -2486,9 +2520,16 @@ final class AppSettings {
 
   private func applySourceSnapshot(_ incoming: AppSettingsSnapshot,
     configuration: TestConfiguration? = nil, activeResultTags: [String]? = nil,
-    groups: Set<PresetSettingGroup>? = nil) -> Bool {
-    guard let source = incoming.thresholdSource, canApplySourceSnapshot(incoming)
-    else { return false }
+    groups: Set<PresetSettingGroup>? = nil,
+    archiveAdoptionBaseline: ArchiveSourceAdoptionBaseline? = nil) -> Bool {
+    guard let source = incoming.thresholdSource else { return false }
+    if let archiveAdoptionBaseline {
+      guard configuration == nil, activeResultTags == nil, groups == nil,
+        self.archiveSourceAdoptionBaseline == archiveAdoptionBaseline,
+        canAdoptArchivedSourceSnapshot(incoming) else { return false }
+    } else {
+      guard canApplySourceSnapshot(incoming) else { return false }
+    }
     if let groups {
       guard !groups.isEmpty,
         snapshot.applyingPresetSettings(from: incoming, groups: groups) == incoming
