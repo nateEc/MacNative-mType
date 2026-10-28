@@ -41,7 +41,7 @@
 
 ### 配置准备层增量
 
-`WebsiteRandomThemeConfiguration` 将序列状态与完整 typed draft 连接，但仍是可复制、可放弃的准备值，尚未安装到页面事务或 Root。`modeChanged` 必须在模式 setter 的原始快照保存后使用：它只更新运行时收藏顺序，保留设置快照及原始事件，不能把结果倒过来用于保存该模式 setter。收藏 setter 或全量替换须显式调用 `favoritesReplaced`，即使内容相等也断开旧候选关联。活动随机覆盖的清除与实际恢复绘制仍由后续接线负责。
+`WebsiteRandomThemeConfiguration` 将序列状态与完整 typed draft 连接，准备值可复制、可放弃。后续发布增量已将模式和收藏事件接入页面事务（详见下节），抽取本身尚未接入 Root。`modeChanged` 的结果必须在模式 setter 的原始快照保存后发布：它只更新运行时收藏顺序，保留设置快照及原始事件，不能把结果倒过来用于保存该模式 setter。收藏 setter 或全量替换须显式调用 `favoritesReplaced`，即使内容相等也断开旧候选关联。活动随机覆盖的实际恢复绘制仍由后续接线负责。
 
 `draw` 的步骤首先是 `customTheme=false, nosave=true`。如果跟随系统外观，还产生独立的 `autoSwitchTheme=false` 保存步骤；不把它们合成一个事务，从而允许后续提交层保留成功前缀。最终颜色在该分支由自动关闭事件重新应用手动主题，不能仅使用抽到的主题。准备层不执行磁盘保存、通知或颜色渲染；自定义碰撞 ID 的颜色应用仍由调用方处理，普通无效 ID 与非终止范围继续使用序列核心的明确错误边界。
 
@@ -51,7 +51,20 @@
 
 最终 `/tmp/typebar-random-config-final-focused.log` 23 项定向测试通过，驱动 54.993 秒；`/tmp/typebar-random-config-final-regression.log` 787 项相关回归零失败、零跳过，独立证据检查确认 114 项必需来源测试全部执行，驱动 382.156 秒；两次原生作业均确认非 Markdown 输入哈希未变化。`/tmp/typebar-random-config-package.log` debug 包、签名、包资源边界和固定参考原创性扫描通过，驱动 38.103 秒，输入哈希未变化。13 项来源证据检查自身测试、元数据重生成、行为审计和 1,404 项人工账本结构检查通过。没有启动可见应用，也未改变工作流或触发 main 门禁。
 
-- 将候选和收藏关联状态作为窗口主题发布的一部分保留，按真实模式事件重建，正确保留全量导入时旧候选及新收藏数组的区别。
-- 在保存 randomTheme 等字段之后产生的收藏数组洗牌，需要区分 Config 运行时、请求／设置存储快照和磁盘保存值，不能多发一个 favThemes setter 来替代原地变更。
+### 实际模式发布增量
+
+以 `37df95c5` 为起点，`WebsiteConfigPublishedPresentation` 开始持有窗口自己的随机序列与收藏关联。实际主题命令调用 `prepareThemeChange`，在 CAS 前为监听器计算独立准备副本；保存和页面 admission 仍使用已被原有单字段检查接受的 setter draft，不放宽检查以接收任意多字段变更。CAS 成功后无回调地发布监听器 draft 与随机状态，`savedDraft` 则精确保留刚刚写入的 setter 快照。磁盘发生竞争时不发布准备的洗牌或候选列表。
+
+普通字体、背景等保留外观的发布同时复制随机状态；普通重开继续保留原发布。真正完整应用在准备阶段替换收藏身份并清除活动覆盖，保留旧候选列表；收藏 setter 也替换身份，内容相等同样如此。模式事件按实际原生自定义库 ID 重建候选；目录按名称排序，仅包含完整配置可接收的 187 个内置名称，深浅色分类来自原生独立配色的背景 HSL，不读取参考配色资产。参考完整控制器的颜色分类算法与原生目录的独立颜色是两个明确边界，不能据此声称原版配色复刻。
+
+`/tmp/typebar-random-publication-red.log` 在可编译的实际 workflow 测试中先出现三项快照断言失败，均为旧实现未发布运行时收藏洗牌。实现后 `/tmp/typebar-random-publication-green.log` 26 项定向测试通过（驱动 109.075 秒，输入哈希不变）。新增场景从真实配置导入、当前输入和主题命令出发，检查保存顺序、下一次无关设置保存、字体资源、普通重开、完整导入、相等收藏替换以及准备期间竞争磁盘写入；抽取保留状态的检查运行在发布值的副本上，不假装实际页面已经换色。后续再将首项场景扩展为输入中的 no_quit，最终回归另记。
+
+显式随机命令、结果页重开触发、活动随机覆盖进入预览／页脚／收藏、失败抽取的状态前缀和实际 nosave 提交仍未接入，完整随机功能继续开放。
+
+初次相关回归 `/tmp/typebar-random-publication-final-regression.log` 790 项通过、114 项必需来源方法通过、驱动 416.855 秒，输入哈希不变；这不是最终提交的充分证据。随后代码审查发现资源发布入口也用于普通词数 setter，其来源为 edited，并不意味着 fullConfigChangeFinished。新增 `/tmp/typebar-random-setter-alias-red.log` 从真实 `editAndBegin(.words(6))` 出发，在候选循环末尾复现一项数组关联断言失败（驱动 22.326 秒）。已按 draft 的真实导入／恢复来源替换收藏并清除活动状态，edited／received 路径保留原随机状态；最终定向及整体回归须覆盖这一修正后再记为通过。
+
+修正后 `/tmp/typebar-random-publication-final-focused.log` 27 项定向通过（驱动 68.190 秒）；最终 `/tmp/typebar-random-publication-setter-regression.log` 791 项相关回归零失败、零跳过，独立证据检查确认 114 项必需来源方法通过（驱动 412.546 秒）；`/tmp/typebar-random-publication-package.log` debug 构建、签名、包资源及固定参考原创性检查通过（驱动 37.168 秒）。三次原生作业串行且非 Markdown 输入哈希未变。来源证据检查自身 13 项、元数据和行为审计、1,404 项人工账本结构检查通过。未启动可见 Typebar；推送前开发分支无开放 PR，main 仍停留在已通过的第 826 次门禁，没有用远端 CI 重试本批代码。
+
+- 模式发布已保留窗口候选、收藏关联和三份快照；下一步将真实 draw 的成功和故障前缀接入同一所有者及磁盘校验，保留这些区别，不能另发一个 favThemes setter 代替原地变更。
 - 接入 customTheme=false 的 nosave 事件及异步自动关闭系统跟随，保存成功前缀并保护原生后备、输入、字体、背景与当前所有者；活动随机覆盖还应进入预览关闭、页脚与收藏命令。
 - 按完整 onTestRestart(resultPage) 和显式命令触发，覆盖完成和失败结果返回、普通重开、取消、资源失败、回执与跨窗口，不沿用完成时换色。实体产品验收和整体重写目标继续开放。

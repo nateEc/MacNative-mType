@@ -820,12 +820,14 @@ final class WebsiteConfigCommitCoordinator {
     guard prepared.admission == resourceAdmission else { return .stale }
     return try commitLiveEdit(prepared.configuration, for: page, kind: .font, font: prepared.font)
   }
-  func commitLiveTheme(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
-    try commitLiveEdit(prepared, for: page, kind: .theme)
+  func commitLiveTheme(_ prepared: Prepared, for page: PracticePageSessionStore, customThemeIDs: [String] = [],
+    chooseThemeIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, kind: .theme, customThemeIDs: customThemeIDs, chooseThemeIndex: chooseThemeIndex)
   }
   private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap, layoutFluid, font, theme }
   private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind,
-    paceTarget: Double? = nil, font: WebsiteConfigFontResource? = nil) throws -> Outcome {
+    paceTarget: Double? = nil, font: WebsiteConfigFontResource? = nil, customThemeIDs: [String] = [],
+    chooseThemeIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> Outcome {
     guard !processing, page.restartController?.isPreparing != true else { return .busy }
     processing = true; defer { processing = false }
     try Task.checkCancellation()
@@ -866,9 +868,13 @@ final class WebsiteConfigCommitCoordinator {
       }) else { return .stale }
     }
     var state = page.state
+    var publishedDraft = prepared.draft
     let themeAppearance: WebsiteConfigPublishedPresentation.PreparedAppearance?
     if kind == .theme, case .edited(let edit) = prepared.draft.origin {
-      themeAppearance = try previous.prepareThemeChange(draft: prepared.draft, key: edit.key)
+      let effect = try previous.prepareThemeChange(draft: prepared.draft, key: edit.key,
+        customThemeIDs: customThemeIDs, chooseIndex: chooseThemeIndex)
+      publishedDraft = effect.draft
+      themeAppearance = effect.appearance
     } else { themeAppearance = nil }
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
@@ -926,7 +932,7 @@ final class WebsiteConfigCommitCoordinator {
     } catch WebsiteConfigFileRegisterError.busy { return .busy }
     // No suspension, callback, legacy preference write or fallible operation
     // between the disk check/CAS and publishing the corresponding live rules.
-    let publication = Publication(applicationID: UUID(), draft: prepared.draft, savedDraft: volatile ? capture.publication.savedDraft : prepared.draft,
+    let publication = Publication(applicationID: UUID(), draft: publishedDraft, savedDraft: volatile ? capture.publication.savedDraft : prepared.draft,
       owner: prepared.owner.owner, environmentRevision: prepared.environment.revision,
       pointsPerRem: prepared.environment.pointsPerRem, disk: revision,
       background: capture.publication.background, font: font ?? capture.publication.font,
@@ -2124,7 +2130,7 @@ final class WebsiteConfigCommitCoordinator {
         throw PracticePageSessionStateError.invalidAttempt
       }
       appearance = try WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
-        applicationID: applicationID, systemIsDark: systemIsDark)
+        applicationID: applicationID, systemIsDark: systemIsDark, previousRandomThemes: page.state.presentation?.randomThemes)
       try page.beginCommit(owner: prepared.owner, router: router, capture: prepared.pageCapture,
         applicationCapture: prepared.applicationCapture)
     } else { appearance = nil }

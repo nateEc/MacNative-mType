@@ -12,6 +12,14 @@ import Foundation
   private var favorites: WebsiteRandomThemeSequence.Favorites
   var active: String? { sequence.active }
 
+  static func nativeCatalog() -> [WebsiteRandomThemeSequence.Entry] {
+    AppTheme.allCases.filter { $0 != .grove }.sorted { $0.rawValue < $1.rawValue }.map { theme in
+      let color = ThemeColor(color: theme.resolvedTheme.background)
+      let channels = [color.red, color.green, color.blue].map { Int(($0 * 255).rounded()) }
+      return .init(name: theme.rawValue, isDark: channels.max()! + channels.min()! < 255)
+    }
+  }
+
   init(entries: [WebsiteRandomThemeSequence.Entry], draft: WebsiteConfigNativeDraft) throws {
     sequence = try .init(entries: entries)
     favorites = .init(draft.themes.favorites.map(\.rawValue))

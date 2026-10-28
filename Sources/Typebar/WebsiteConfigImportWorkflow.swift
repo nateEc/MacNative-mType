@@ -297,7 +297,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   }
 
   @discardableResult
-  func runThemeCommand(_ edit: PracticeThemeEdit, replacing applicationID: UUID) throws -> WebsiteThemeCommand.Completion {
+  func runThemeCommand(_ edit: PracticeThemeEdit, replacing applicationID: UUID,
+    chooseThemeIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> WebsiteThemeCommand.Completion {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
     guard page.state.savedApplication == nil, page.state.configurationDeparture == nil, page.state.sharedReceipt == nil
@@ -323,7 +324,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
           guard step.accepted else { throw WebsiteThemeCommandError.unsupported }
           let ticket = try coordinator.prepareEdit(key: step.key, value: step.value, for: page, refreshingWith: source)
           prepared = ticket
-          switch try coordinator.commitLiveTheme(ticket, for: page) {
+          switch try coordinator.commitLiveTheme(ticket, for: page, customThemeIDs: settings.customThemes.map { $0.id.uuidString },
+            chooseThemeIndex: chooseThemeIndex) {
           case .committed(let publication): saved += 1; receiptID = publication.applicationID
           case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
           case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable

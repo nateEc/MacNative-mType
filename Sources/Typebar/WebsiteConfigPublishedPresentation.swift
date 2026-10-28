@@ -26,6 +26,7 @@ final class WebsiteConfigPublishedPresentation {
   private let customTheme: ResolvedTheme
   private(set) var appearance: Appearance
   private(set) var themeChanges: ThemeChanges
+  let randomThemes: WebsiteRandomThemeConfiguration
   @ObservationIgnored private var systemIsDark: Bool
   @ObservationIgnored private var updating = false
   var currentSystemIsDark: Bool { systemIsDark }
@@ -36,15 +37,25 @@ final class WebsiteConfigPublishedPresentation {
     fileprivate let appearance: Appearance
     fileprivate let systemIsDark: Bool
     fileprivate let changes: ThemeChanges
+    fileprivate let randomThemes: WebsiteRandomThemeConfiguration
   }
 
   static func prepareAppearance(draft: WebsiteConfigNativeDraft, applicationID: UUID,
-    systemIsDark: Bool) throws -> PreparedAppearance {
+    systemIsDark: Bool, previousRandomThemes: WebsiteRandomThemeConfiguration? = nil) throws -> PreparedAppearance {
     let themes = draft.themes
     let custom = try themes.makeCustomTheme(id: applicationID, name: "Imported configuration").resolvedTheme
+    var random = try previousRandomThemes ?? .init(entries: WebsiteRandomThemeConfiguration.nativeCatalog(), draft: draft)
+    // Restarting setters and received test settings share this resource
+    // handoff, but do not dispatch the full configuration lifecycle.
+    switch draft.origin {
+    case .imported, .restored:
+      random.favoritesReplaced(draft: draft)
+      random.clearActive()
+    case .edited, .received: break
+    }
     return .init(themes: themes, custom: custom,
       appearance: resolve(themes.initialSelection(systemIsDark: systemIsDark), custom: custom), systemIsDark: systemIsDark,
-      changes: .init(systemIndicator: themes.followsSystem ? (systemIsDark ? themes.darkTheme : themes.lightTheme) : nil))
+      changes: .init(systemIndicator: themes.followsSystem ? (systemIsDark ? themes.darkTheme : themes.lightTheme) : nil), randomThemes: random)
   }
 
   /// Internal synchronous handoff: resource and owner checks have already run
@@ -54,15 +65,25 @@ final class WebsiteConfigPublishedPresentation {
     customTheme = preparedAppearance.custom; systemIsDark = preparedAppearance.systemIsDark
     appearance = preparedAppearance.appearance
     themeChanges = preparedAppearance.changes
+    randomThemes = preparedAppearance.randomThemes
   }
 
   /// A next-attempt-only selection must not replay theme/random/system events.
   func retainingAppearance(for publication: WebsiteConfigCommitCoordinator.Publication) -> WebsiteConfigPublishedPresentation {
     .init(publication: publication, preparedAppearance: .init(themes: themes, custom: customTheme,
-      appearance: appearance, systemIsDark: systemIsDark, changes: themeChanges))
+      appearance: appearance, systemIsDark: systemIsDark, changes: themeChanges, randomThemes: randomThemes))
   }
 
-  func prepareThemeChange(draft: WebsiteConfigNativeDraft, key: String) throws -> PreparedAppearance {
+  struct PreparedThemeEdit { let draft: WebsiteConfigNativeDraft; let appearance: PreparedAppearance }
+  func prepareThemeChange(draft original: WebsiteConfigNativeDraft, key: String, customThemeIDs: [String],
+    chooseIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> PreparedThemeEdit {
+    var random = randomThemes, draft = original
+    if key == "favThemes" { random.favoritesReplaced(draft: draft) }
+    if key == "randomTheme" {
+      draft = try random.modeChanged(draft: draft, customIDs: customThemeIDs,
+        pointsPerRem: publication.pointsPerRem, chooseIndex: chooseIndex)
+    }
+    if key == "theme" || (key == "randomTheme" && draft.themes.randomMode == .off) { random.clearActive() }
     let themes = draft.themes
     let custom = try themes.makeCustomTheme(id: owner, name: "Imported configuration").resolvedTheme
     let selection = themes.selectionAfterSaving(key: key, visible: appearance.selection, systemIsDark: systemIsDark)
@@ -77,7 +98,8 @@ final class WebsiteConfigPublishedPresentation {
     if ["theme", "customTheme", "customThemeColors", "favThemes", "randomTheme"].contains(key) {
       changes.indicator = UUID(); changes.systemIndicator = nil
     }
-    return .init(themes: themes, custom: custom, appearance: Self.resolve(selection, custom: custom), systemIsDark: systemIsDark, changes: changes)
+    return .init(draft: draft, appearance: .init(themes: themes, custom: custom,
+      appearance: Self.resolve(selection, custom: custom), systemIsDark: systemIsDark, changes: changes, randomThemes: random))
   }
 
   convenience init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID, systemIsDark: Bool) throws {
