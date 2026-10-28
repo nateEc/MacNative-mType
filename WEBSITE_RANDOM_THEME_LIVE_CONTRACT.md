@@ -1,5 +1,7 @@
 # 完整配置的显式随机主题命令
 
+后续结果页返回接线与验收边界见 `WEBSITE_RANDOM_THEME_RESTART_CONTRACT.md`；下文保留显式命令阶段的证据与当时待办。
+
 起点 `0f9c0221`，参考固定在 `91bd24bb8513785c7364cbea29296ff7adafac41`。本批将显式 Next random theme 接入实际窗口发布，不再使用原生后备的随机设置。结果页重开触发仍待接线，整个随机功能和整体重写目标均未完成。序列、数组关联及三份快照的早期依据见 `WEBSITE_RANDOM_THEME_SEQUENCE_CONTRACT.md`。
 
 ## 来源与可见行为

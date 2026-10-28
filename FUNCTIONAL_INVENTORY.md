@@ -2,7 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| THEME-RANDOM-SEQUENCE-11 | 随机候选、游标、收藏数组关联与故障边界 | 固定完整随机函数、真实 Solid 配置存储、洗牌和背景分类；自有目录／随机数输入 | WebsiteRandomThemeSequence、WebsiteRandomThemeConfiguration、主题发布事务、来源探针；WEBSITE_RANDOM_THEME_SEQUENCE_CONTRACT.md、WEBSITE_RANDOM_THEME_LIVE_CONTRACT.md | 部分完成：模式／收藏和显式抽取已接实际页面；临时标记不保存，后续关闭系统跟随按独立 setter 保存，保留成功／故障前缀及三份快照；预览关闭、页脚和收藏使用活动随机状态。普通发布和重开保留候选及外观，完整导入替换收藏身份。结果页返回触发、故障后实体交互及全部人工场景仍待完成，不能据此称整体随机功能已验收。 |
+| THEME-RANDOM-SEQUENCE-11 | 随机候选、游标、收藏数组关联与故障边界 | 固定完整随机函数、真实 Solid 配置存储、restart 与 onTestRestart；自有目录／随机数及初始化输入 | WebsiteRandomThemeSequence、WebsiteRandomThemeConfiguration、重开交付／主题事务、来源探针；WEBSITE_RANDOM_THEME_RESTART_CONTRACT.md 及前序两份合同 | 部分完成：显式抽取及结果页普通／失败／重复返回、普通 setter 和分享初始化已接真实发布；临时与后续保存分开，成功／故障前缀、预览、页脚和收藏保持活动候选语义。初始化失败、取消、窗口过期不抽取，后续重试不重复使用旧结果来源。完整导入的隐式 restart 交叉、故障后实体交互及全部人工场景仍待完成，不能据此称整体随机功能已验收。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |

@@ -140,10 +140,56 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   private var readKeymapWindow: (@MainActor () -> WebsiteConfigPracticeScopeSource.Window?)?
   private let archiveRegister: WebsiteConfigFileRegister
   private var localFontUpdates: WebsiteLocalFontUpdates?
+  private var pendingRandomRestart: WebsitePracticeRestartController.Delivery?
+  private var deferredRandomRestart: Task<Void, Never>?
+  private var lastRandomRestartAttempt: UUID?
+  private var sharedRestartOrigins: [UUID: WebsiteRestartSource] = [:]
   var localFontFailure: String? { localFontUpdates?.failure }
   var localFontPublication: UUID? { localFontUpdates?.publication }
   func retryLocalFontResources() { localFontUpdates?.retry() }
-  private func finishedApplying() { applying = false; localFontUpdates?.operationEnded() }
+  private func finishedApplying() {
+    applying = false
+    drainRandomRestart()
+    localFontUpdates?.operationEnded()
+  }
+  private func receivedRestart(_ delivery: WebsitePracticeRestartController.Delivery) {
+    guard !stopped, delivery.source == .resultPage, let page, delivery.owner == page.owner,
+      page.state.session.automaticInputAttemptID == delivery.attempt,
+      page.state.presentation?.publication.applicationID == delivery.publication else { return }
+    pendingRandomRestart = delivery
+    drainRandomRestart()
+  }
+  private func drainRandomRestart() {
+    guard !applying, !stopped, let delivery = pendingRandomRestart else { return }
+    pendingRandomRestart = nil
+    guard let page, delivery.owner == page.owner,
+      page.state.session.automaticInputAttemptID == delivery.attempt,
+      let publication = page.state.presentation?.publication, publication.applicationID == delivery.publication,
+      settings.preferenceConfigurationSaves.captureLease()?.owner == page.owner,
+      page.restartController?.isPreparing != true, lastRandomRestartAttempt != delivery.attempt else { return }
+    if Task.isCancelled {
+      // This event is owed by an already-delivered attempt. Do not inherit a
+      // late caller cancellation, and do not weaken explicit-command checks.
+      // The fresh task revalidates identity/ownership and is retired on stop.
+      deferredRandomRestart?.cancel()
+      deferredRandomRestart = Task { @MainActor [weak self] in
+        guard let self, !Task.isCancelled else { return }
+        self.deferredRandomRestart = nil
+        self.receivedRestart(delivery)
+      }
+      return
+    }
+    lastRandomRestartAttempt = delivery.attempt
+    guard delivery.source.drawsRandomTheme(mode: publication.draft.themes.randomMode) else { return }
+    do {
+      let completion = try runRandomThemeCommand(replacing: delivery.publication)
+      if completion.disabledSystemFollowing { notices?.post("已关闭系统外观跟随。") }
+    } catch { notices?.post((error as? LocalizedError)?.errorDescription ?? "随机主题未完成，请重试。") }
+  }
+  private func bindRestartController(to page: PracticePageSessionStore) throws {
+    try page.bindRestartController(using: coordinator, notices: notices, loadQuotes: loadQuotes,
+      didRestart: { [weak self] delivery in self?.receivedRestart(delivery) })
+  }
   private enum Intent { case application(String?), edit(WebsiteConfigPracticeEdit, UUID), resume(UUID), received(UUID) }
 
   init(page: PracticePageSessionStore, settings: AppSettings, account: AccountSession,
@@ -208,7 +254,11 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
     guard page.state.presentation?.publication.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
     applying = true; operation = UUID(); defer { finishedApplying() }
-    return try coordinator.acceptSharedReceipt(json, for: page, settings: settings, refreshingWith: source)
+    let origin = WebsiteRestartSource.capture(outcome: page.state.session.outcome,
+      alreadyDeparted: page.state.restartDepartureAttemptID == page.state.session.automaticInputAttemptID)
+    let receipt = try coordinator.acceptSharedReceipt(json, for: page, settings: settings, refreshingWith: source)
+    sharedRestartOrigins = [receipt.id: origin]
+    return receipt
   }
 
   @discardableResult
@@ -247,8 +297,11 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
     guard !page.state.session.hasStarted || page.state.session.isFinished || !page.state.session.configuration.modifiers.contains(.noQuit)
     else { throw WebsiteConfigImportWorkflowError.activeAttempt }
-    _ = try coordinator.acceptNativeSharedReceipt(json, baseline: baseline, quote: quote, repetition: repetition,
+    let origin = WebsiteRestartSource.capture(outcome: page.state.session.outcome,
+      alreadyDeparted: page.state.restartDepartureAttemptID == page.state.session.automaticInputAttemptID)
+    let receipt = try coordinator.acceptNativeSharedReceipt(json, baseline: baseline, quote: quote, repetition: repetition,
       for: page, settings: settings, refreshingWith: source)
+    sharedRestartOrigins = [receipt.id: origin]
     return try await continuePendingSharedSettings(systemIsDark: systemIsDark)
   }
 
@@ -263,7 +316,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         try Task.checkCancellation()
         guard !stopped, operation == current else { throw CancellationError() }
         if try coordinator.commitSharedLiveReceipt(receipt.id, for: page) != nil {
-          do { try page.bindRestartController(using: coordinator, notices: notices, loadQuotes: loadQuotes) }
+          sharedRestartOrigins.removeValue(forKey: receipt.id)
+          do { try bindRestartController(to: page) }
           catch { return .applied("链接设置已即时应用；窗口已变化，请重新打开面板。") }
           return .applied("链接设置已即时应用，当前练习继续，未重开。"
             + (receipt.outcome.storageFailures.isEmpty ? "" : " 部分设置未能保存，已保留成功的部分。"))
@@ -885,9 +939,16 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     try Task.checkCancellation()
     try checkRestartBusy(intent, page: page)
     try checkIntent(intent, page: page)
+    var restartSource = WebsiteRestartSource.capture(outcome: page.state.session.outcome,
+      alreadyDeparted: page.state.restartDepartureAttemptID == page.state.session.automaticInputAttemptID)
     var ticket: WebsiteConfigCommitCoordinator.Prepared
     switch intent {
-    case .received(let id): ticket = try coordinator.resumeSharedReceipt(id, for: page)
+    case .received(let id):
+      let currentResult = WebsiteRestartSource.capture(outcome: page.state.session.outcome, alreadyDeparted: false)
+      ticket = try coordinator.resumeSharedReceipt(id, for: page)
+      if let original = sharedRestartOrigins.removeValue(forKey: id) {
+        restartSource = original == .resultPage || currentResult == .resultPage ? .resultPage : .testPage
+      }
     case .edit(let edit, let applicationID):
       guard page.state.presentation?.publication.applicationID == applicationID else {
         throw WebsiteConfigImportWorkflowError.conflict
@@ -998,7 +1059,13 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         let notice = recovery.isEmpty ? "" : " " + recovery
         // No await after commit. The same coordinator/content catalog owns retry.
         do {
-          try page.bindRestartController(using: coordinator, notices: notices, loadQuotes: loadQuotes)
+          try bindRestartController(to: page)
+          switch intent {
+          case .edit, .received:
+            receivedRestart(.init(source: restartSource, owner: page.owner,
+              attempt: page.state.session.automaticInputAttemptID, publication: publication.applicationID))
+          case .application, .resume: break
+          }
           page.bindLayoutFluidHandler(owner: layoutFluidHandlerOwner) { [weak self] event, attempt in
             guard let self else { throw WebsiteConfigImportWorkflowError.unavailable }
             try self.advanceLayoutFluid(event, attemptID: attempt)
@@ -1143,6 +1210,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
   }
   func stop() {
+    deferredRandomRestart?.cancel(); deferredRandomRestart = nil
+    pendingRandomRestart = nil; sharedRestartOrigins.removeAll()
     localFontUpdates?.stop()
     page?.retireLayoutFluidHandler(owner: layoutFluidHandlerOwner)
     pendingKeymapHighlights.removeAll(); readKeymapWindow = nil

@@ -12,7 +12,7 @@ import XCTest
     let defaults: UserDefaults, settings: AppSettings, account: AccountSession, page: PracticePageSessionStore
     let workflow: WebsiteConfigImportWorkflow
     let probe: ReadProbe
-    init() throws {
+    init(loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) }) throws {
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       let settings = AppSettings(defaults: defaults, localBackgroundStore: .inMemory())
       let page = PracticePageSessionStore(), account = AccountSession(defaults: defaults)
@@ -26,7 +26,7 @@ import XCTest
           probe.action?()
           return .published(owner: page.owner, revision: page.state.session.automaticInputAttemptID,
             scope: page.state.sharedReceipt?.scope ?? page.state.practice?.scope ?? .init())
-        })
+        }, loadQuotes: loadQuotes)
       let workflow = workflow
       settings.preferenceConfigurationSaves.register(owner: page.owner, themes: { page.state.presentation?.publication.draft.themes },
         themeEdit: { edit in
@@ -101,6 +101,200 @@ import XCTest
     XCTAssertEqual(f.page.state.priorAttemptLedger, ledger); XCTAssertTrue(f.page.restartController === controller)
     XCTAssertEqual(after.publication.font?.renderingFont, before.publication.font?.renderingFont)
     XCTAssertEqual(after.publication.background?.source, before.publication.background?.source)
+  }
+
+  func testResultPageRestartDrawsOnceAfterSuccessfulInitializationIncludingFailureAndRepeat() async throws {
+    for failed in [false, true] { for repeated in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      let config = #"{"mode":"words","words":2,"fontFamily":"Courier","difficulty":"master","customTheme":true,"theme":"nord","favThemes":["nord","serika","dracula"]}"#
+      try await f.workflow.apply(json: failed ? config : config.replacingOccurrences(of: #""difficulty":"master""#, with: #""difficulty":"normal""#), systemIsDark: false)
+      try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+      let register = WebsiteConfigFileRegister(directory: f.directory), disk = try register.read().revision
+      let preferences = f.settings.snapshot
+      func finish() {
+        var state = f.page.state
+        state.session.insertBatch(failed ? "§" : state.session.prompt + " ")
+        XCTAssertEqual(state.session.outcome, failed ? .failed : .completed)
+        f.page.replace(state)
+      }
+      finish(); XCTAssertNil(f.page.state.presentation?.randomThemes.active, "Completion alone must not draw")
+      let ledger = f.page.state.priorAttemptLedger, oldAttempt = f.page.state.session.automaticInputAttemptID
+      let controller = try XCTUnwrap(f.page.restartController)
+      let advanced = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: repeated)
+      XCTAssertTrue(advanced); XCTAssertFalse(controller.isPreparing)
+      XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, oldAttempt)
+      XCTAssertEqual(f.page.state.presentation?.randomThemes.active, "serika")
+      XCTAssertEqual(f.page.state.presentation?.appearance.selection, .builtIn(.serika))
+      XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+      XCTAssertEqual(try register.read().revision, disk)
+      let ordinary = try await controller.requestAndWait(requestID: UUID())
+      XCTAssertTrue(ordinary); XCTAssertEqual(f.page.state.presentation?.randomThemes.active, "serika", "A test-page restart must not advance the bag")
+      finish()
+      let next = try await controller.requestAndWait(requestID: UUID())
+      XCTAssertTrue(next); XCTAssertEqual(f.page.state.presentation?.randomThemes.active, "dracula")
+      XCTAssertEqual(try register.read().revision, disk); XCTAssertEqual(f.settings.snapshot, preferences)
+    } }
+  }
+
+  func testPinnedRestartAndUIOrderOnlyDispatchesRandomAfterResultInitialization() throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned source") }
+    struct Frame: Decodable { let source: String?, randomCount: Int, resultVisible: Bool, initializations: Int, trace: [String] }
+    struct Sample: Decodable { let initialResult: Bool, mode: String, repeated: Bool, failFirst: Bool, guarded: Bool, frames: [Frame] }
+    struct Output: Decodable { let fixtures: [Sample] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", root.appendingPathComponent("Scripts/check-source-random-theme-restart.mjs").path, reference]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit(); XCTAssertEqual(process.terminationStatus, 0)
+    let samples = try JSONDecoder().decode(Output.self, from: data).fixtures
+    XCTAssertEqual(samples.count, 57); XCTAssertEqual(samples.reduce(0) { $0 + $1.frames.count }, 114)
+    for sample in samples {
+      var draws = 0
+      let mode = try XCTUnwrap(RandomThemeMode(rawValue: sample.mode))
+      for (index, frame) in sample.frames.enumerated() {
+        let source = WebsiteRestartSource.capture(outcome: sample.initialResult ? .completed : .active, alreadyDeparted: index != 0)
+        if let actual = frame.source {
+          XCTAssertEqual(actual, source.rawValue)
+          if source.drawsRandomTheme(mode: mode) { draws += 1 }
+        }
+        XCTAssertEqual(draws, frame.randomCount)
+        XCTAssertFalse(frame.resultVisible && !sample.guarded)
+        if sample.guarded { XCTAssertEqual(frame.initializations, 0); XCTAssertNil(frame.source) }
+        if sample.failFirst && index == 0 { XCTAssertNil(frame.source) }
+      }
+    }
+    for outcome in [TestOutcome.completed, .failed, .invalidAFK, .bailedOut] {
+      XCTAssertEqual(WebsiteRestartSource.capture(outcome: outcome, alreadyDeparted: false), .resultPage)
+      XCTAssertEqual(WebsiteRestartSource.capture(outcome: outcome, alreadyDeparted: true), .testPage)
+    }
+    for outcome in [TestOutcome.active, .abandoned] { XCTAssertEqual(WebsiteRestartSource.capture(outcome: outcome, alreadyDeparted: false), .testPage) }
+  }
+
+  @MainActor private final class RestartQuotes {
+    enum Failure: Error { case unavailable }
+    var fail = false, hold = false
+    var waiting: CheckedContinuation<[OfflineQuote], Never>?
+    func read(_ language: TypingLanguage) async throws -> [OfflineQuote] {
+      if fail { throw Failure.unavailable }
+      if hold { return await withCheckedContinuation { waiting = $0 } }
+      return OfflineContent.quotes(for: language)
+    }
+    func release() { let pending = waiting; waiting = nil; hold = false; pending?.resume(returning: OfflineContent.quotes(for: .english)) }
+    func wait() async throws {
+      let end = Date().addingTimeInterval(3)
+      while waiting == nil && Date() < end { try await Task.sleep(for: .milliseconds(5)) }
+      XCTAssertNotNil(waiting)
+    }
+  }
+
+  func testFailedCancelledAndRetiredResultInitializationsDoNotDrawOnTheRetry() async throws {
+    for kind in ["failure", "cancel", "owner"] {
+      let quotes = RestartQuotes(), f = try Fixture(loadQuotes: quotes.read)
+      defer { quotes.release(); f.close() }
+      try await f.workflow.apply(json: #"{"mode":"quote","quoteLength":[-2],"repeatQuotes":"off","fontFamily":"Courier","difficulty":"master","customTheme":true,"favThemes":["nord","serika"]}"#, systemIsDark: false)
+      try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+      var state = f.page.state; state.session.insertBatch("§"); XCTAssertEqual(state.session.outcome, .failed); f.page.replace(state)
+      let controller = try XCTUnwrap(f.page.restartController), ledger = f.page.state.priorAttemptLedger
+      let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+      if kind == "failure" {
+        quotes.fail = true
+        let delivered = try await controller.requestAndWait(requestID: UUID()); XCTAssertFalse(delivered)
+        quotes.fail = false
+      } else {
+        quotes.hold = true
+        let requestID = UUID(), task = Task { try await controller.requestAndWait(requestID: requestID) }
+        try await quotes.wait()
+        let other = UUID()
+        if kind == "cancel" { task.cancel(); controller.cancel(requestID: requestID) }
+        else { f.settings.preferenceConfigurationSaves.register(owner: other, save: {}); f.settings.preferenceConfigurationSaves.activate(owner: other) }
+        quotes.release()
+        do { let delivered = try await task.value; XCTAssertFalse(delivered) } catch { XCTAssertTrue(error is CancellationError) }
+        if kind == "owner" {
+          f.settings.preferenceConfigurationSaves.activate(owner: f.page.owner)
+          f.settings.preferenceConfigurationSaves.remove(owner: other)
+        }
+      }
+      XCTAssertNil(f.page.state.presentation?.randomThemes.active)
+      XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+      let retry = try await controller.requestAndWait(requestID: UUID()); XCTAssertTrue(retry)
+      XCTAssertNil(f.page.state.presentation?.randomThemes.active, "The result page was already left before failed init")
+      XCTAssertEqual(try register.read().revision, revision)
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.themes.customEnabled, true)
+    }
+  }
+
+  func testResultRestartInsideSetterAndShareWorkflowsDrainsAfterTheirReservation() async throws {
+    for shared in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.workflow.apply(json: #"{"mode":"words","words":2,"fontFamily":"Courier","theme":"dracula","autoSwitchTheme":true,"customTheme":true,"favThemes":["nord","serika"]}"#, systemIsDark: false)
+      try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+      var state = f.page.state; state.session.insertBatch(state.session.prompt + " "); XCTAssertEqual(state.session.outcome, .completed); f.page.replace(state)
+      let id = try XCTUnwrap(f.page.state.presentation?.publication.applicationID), preferences = f.settings.snapshot
+      if shared {
+        _ = try await f.workflow.applySharedSettings(json: #"["words","6",null,false,false,null,"normal",null]"#, replacing: id, systemIsDark: false)
+      } else { try await f.workflow.editAndBegin(.words(6), replacing: id, systemIsDark: false) }
+      let after = try XCTUnwrap(f.page.state.presentation)
+      XCTAssertEqual(after.randomThemes.active, "serika")
+      XCTAssertFalse(after.publication.draft.themes.followsSystem)
+      XCTAssertFalse(after.publication.draft.themes.customEnabled)
+      XCTAssertEqual(after.appearance.selection, .builtIn(.dracula))
+      XCTAssertEqual(f.page.state.session.configuration.wordLimit, 6)
+      XCTAssertEqual(f.settings.snapshot, preferences)
+      let register = WebsiteConfigFileRegister(directory: f.directory)
+      guard case .available(let saved) = try register.read().state else { return XCTFail("Missing saved config") }
+      XCTAssertEqual(saved["customTheme"], .bool(false)); XCTAssertEqual(saved["autoSwitchTheme"], .bool(false))
+      XCTAssertTrue(f.account.localNotices.history.contains { $0.message == "已关闭系统外观跟随。" })
+    }
+  }
+
+  func testCancellationFromTheSuccessfulDeliveryObserverCannotUndoItsRandomRestartEvent() async throws {
+    for cancelTask in [false, true] {
+    let quotes = RestartQuotes(), f = try Fixture(loadQuotes: quotes.read)
+    defer { quotes.release(); f.close() }
+    try await f.workflow.apply(json: #"{"mode":"quote","quoteLength":[-2],"repeatQuotes":"off","fontFamily":"Courier","difficulty":"master","customTheme":true,"favThemes":["nord","serika"]}"#, systemIsDark: false)
+    try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+    var state = f.page.state; state.session.insertBatch("§"); f.page.replace(state)
+    let controller = try XCTUnwrap(f.page.restartController), requestID = UUID()
+    quotes.hold = true
+    let task = Task { try await controller.requestAndWait(requestID: requestID) }
+    try await quotes.wait()
+    var cancelled = false
+    withObservationTracking { _ = f.page.state.session.automaticInputAttemptID } onChange: {
+      MainActor.assumeIsolated {
+        cancelled = true; controller.cancel(requestID: requestID)
+        if cancelTask { task.cancel() }
+      }
+    }
+    quotes.release()
+    let delivered = try await task.value
+    let end = Date().addingTimeInterval(2)
+    while f.page.state.presentation?.randomThemes.active == nil && Date() < end { try await Task.sleep(for: .milliseconds(5)) }
+    XCTAssertTrue(delivered); XCTAssertTrue(cancelled)
+    XCTAssertFalse(controller.isPreparing); XCTAssertNil(controller.message)
+    XCTAssertEqual(f.page.state.presentation?.randomThemes.active, "serika")
+    XCTAssertFalse(f.page.state.session.isFinished)
+    }
+  }
+
+  func testRandomFailureAfterResultRestartKeepsTheNewAttemptAndReportsTheFault() async throws {
+    let f = try Fixture(); defer { f.close() }
+    f.account.currentUser = .init(id: UUID(), email: "owned@example.invalid", displayName: "Owned", totalExperience: 0)
+    let colors = try WebsiteConfigNativeProfile.prepareDraft("{}", pointsPerRem: 16, context: .init()).themes
+    let custom = try colors.makeCustomTheme(id: UUID(), name: "Owned")
+    f.settings.customThemes = [custom]
+    try await f.workflow.apply(json: #"{"mode":"words","words":2,"fontFamily":"Courier","difficulty":"master","customTheme":true}"#, systemIsDark: false)
+    try f.workflow.runThemeCommand(.random(.custom), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+    var state = f.page.state; state.session.insertBatch("§"); f.page.replace(state)
+    let before = state.session.automaticInputAttemptID, ledger = state.priorAttemptLedger
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    let controller = try XCTUnwrap(f.page.restartController)
+    let delivered = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(delivered); XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, before)
+    XCTAssertFalse(f.page.state.session.isFinished); XCTAssertNil(controller.message)
+    XCTAssertEqual(f.page.state.presentation?.randomThemes.active, custom.id.uuidString)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertTrue(f.account.localNotices.history.contains { $0.message == WebsiteRandomThemeSequence.Failure.missingBuiltIn(custom.id.uuidString).errorDescription })
   }
 
   func testPublishedRandomDrawsAgainstPinnedControllerRealStoreAndDiskCheckpoints() async throws {
