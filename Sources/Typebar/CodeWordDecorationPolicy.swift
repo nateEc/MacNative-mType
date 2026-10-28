@@ -57,6 +57,14 @@ enum PoolWordDecorationPolicy {
     wordIndex: Int, wordBound: Int, options: ContentOptions, state: inout PoolWordDecorationState,
     britishEnglish: BritishEnglishPolicy.Context? = nil,
     random: () -> Double = { Double.random(in: 0..<1) }) -> String {
+    decorated(word, previousTarget: previousTarget, language: language, wordIndex: wordIndex,
+      wordBound: Double(wordBound), options: options, state: &state, britishEnglish: britishEnglish, random: random)
+  }
+
+  static func decorated(_ word: String, previousTarget: String?, language: TypingLanguage,
+    wordIndex: Int, wordBound: Double, options: ContentOptions, state: inout PoolWordDecorationState,
+    britishEnglish: BritishEnglishPolicy.Context? = nil,
+    random: () -> Double = { Double.random(in: 0..<1) }) -> String {
     var result = word
     if options.includePunctuation {
       result = punctuated(word, previous: previousTarget, language: language,
@@ -84,7 +92,7 @@ enum PoolWordDecorationPolicy {
   }
 
   private static func punctuated(_ word: String, previous: String?, language: TypingLanguage,
-    index: Int, bound: Int, state: inout PoolWordDecorationState, random: () -> Double) -> String {
+    index: Int, bound: Double, state: inout PoolWordDecorationState, random: () -> Double) -> String {
     let isCode = language.isCodeLanguage && language != .dockerFile
     let family = PoolWordLanguageFamily(language)
     let last = previous?.last
@@ -105,7 +113,7 @@ enum PoolWordDecorationPolicy {
     }
     // Draw before the guards, including the forced terminal branch. Fixed
     // unit fixtures must not accidentally shift all following decisions.
-    if (random() < 0.1 && canWrap && index != bound - 2) || index == bound - 1 {
+    if (random() < 0.1 && canWrap && Double(index) != bound - 2) || Double(index) == bound - 1 {
       if family == .spanish {
         guard let closing = state.spanishClosing, closing == "?" || closing == "!" else { return word }
         state.spanishClosing = nil

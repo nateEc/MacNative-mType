@@ -15,6 +15,10 @@ enum WebsiteOrderedTextAlteration {
   }
   static func apply(_ modifier: TestModifier, to units: [UInt16], wordIndex: Int, wordBound: Int,
     nextRandomCaseBit: () -> Bool) -> [UInt16] {
+    apply(modifier, to: units, wordIndex: wordIndex, wordBound: Double(wordBound), nextRandomCaseBit: nextRandomCaseBit)
+  }
+  static func apply(_ modifier: TestModifier, to units: [UInt16], wordIndex: Int, wordBound: Double,
+    nextRandomCaseBit: () -> Bool) -> [UInt16] {
     switch modifier {
     case .backwards: return Array(units.reversed())
     case .uppercase: return WebsiteUnicode17Case.converted(units, upper: true)
@@ -66,7 +70,7 @@ enum WebsiteOrderedTextAlteration {
       // Unsupported lone code units have no Morse symbol. They delimit valid
       // normalization runs but must not become replacement characters.
       return validRuns(units, map: MorseTextPolicy.transformed)
-    case .underscoreSeparators: return wordIndex == wordBound - 1 ? units : units + [95]
+    case .underscoreSeparators: return Double(wordIndex) == wordBound - 1 ? units : units + [95]
     default: return units
     }
   }

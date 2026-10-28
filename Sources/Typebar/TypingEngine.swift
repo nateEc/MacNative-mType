@@ -1462,6 +1462,18 @@ enum TestModifierPolicy {
     britishEnglish: BritishEnglishPolicy.Context? = nil, previousBritishWord: String? = nil,
     nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> String {
+    transformedWord(word, modifiers: modifiers, language: language, websiteOrder: websiteOrder,
+      wordIndex: wordIndex, wordBound: Double(wordBound), britishEnglish: britishEnglish,
+      previousBritishWord: previousBritishWord, nextRandomCaseBit: nextRandomCaseBit)
+  }
+
+  static func transformedWord(
+    _ word: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
+    websiteOrder: [TestModifier]? = nil,
+    wordIndex: Int = 0, wordBound: Double,
+    britishEnglish: BritishEnglishPolicy.Context? = nil, previousBritishWord: String? = nil,
+    nextRandomCaseBit: () -> Bool = { Bool.random() }
+  ) -> String {
     var output = language?.presentationText(word) ?? word
     if modifiers.contains(.lazyLatin) {
       output = TypingTextNormalizer.lazyLatin(output, language: language)
@@ -1505,7 +1517,7 @@ enum TestModifierPolicy {
         }
       case .alternatingCase: output = AlternatingCasePolicy.transformed(output)
       case .underscoreSeparators:
-        if wordIndex != wordBound - 1 { output.append("_") }
+        if Double(wordIndex) != wordBound - 1 { output.append("_") }
       default: break
       }
     }

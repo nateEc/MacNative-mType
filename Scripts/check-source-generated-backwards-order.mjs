@@ -14,6 +14,12 @@ assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'ut
 const actual=new Set(['test/words-generator','test/funbox/funbox-functions','test/wordset','test/weak-spot','test/test-words','input/helpers/fail-or-finish','input/handlers/insert-text','input/handlers/before-insert-text','input/helpers/validation','input/helpers/util']);
 const config={mode:'words',words:3,language:'english',showAllLines:false,lazyMode:false,
   punctuation:false,numbers:false,britishEnglish:false};
+const rawBoundProbe=process.argv[3]==='--custom-raw-bound';
+const spanishRepeatProbe=process.argv[3]==='--spanish-repeat-gate';
+if(rawBoundProbe||spanishRepeatProbe){actual.add('utils/strings');actual.add('test/english-punctuation');}
+let ownedContentUnit=0.5;
+const probeMath=Object.create(Math);probeMath.random=()=>ownedContentUnit;
+const probeContext=rawBoundProbe||spanishRepeatProbe?vm.createContext({Math:probeMath,console}):undefined;
 let activeNames=['backwards','binary'], functions, drawIndex=0;
 let ownedIndexes=[], spacingMs=0, ownedRepeated=false;
 let ownedCustom={text:[],mode:'repeat',limitMode:'word',limitValue:0,pipe:false};
@@ -105,14 +111,14 @@ for(const id of actual){
   // inert names repairs single-file stripping, leaving all functions intact.
   const extras=id==='test/wordset'?'\nexport const FunboxWordsFrequency=undefined;':'';
   modules.set(id,new vm.SourceTextModule(code+extras,{identifier:id,
-    context:undefined}));
+    context:probeContext}));
 }
 function moduleFor(id){
   if(modules.has(id))return modules.get(id);
   const values={...Object.fromEntries([...(requested.get(id)??[])].map(name=>[name,unexpected])),...bindings[id]};
   const mod=new vm.SyntheticModule(Object.keys(values),function(){
     for(const[key,value]of Object.entries(values))this.setExport(key,value);
-  },{identifier:id});
+  },{identifier:id,context:probeContext});
   modules.set(id,mod);return mod;
 }
 const main=moduleFor('test/words-generator');
@@ -124,6 +130,92 @@ const addStart=logicSource.indexOf('export async function addWord(): Promise<voi
 const addEnd=logicSource.indexOf('\ntype RetrySaving = {',addStart);
 assert.ok(addStart>=0&&addEnd>addStart,'Pinned complete addWord range must exist');
 const addBody=stripTypeScriptTypes(logicSource.slice(addStart,addEnd),{mode:'transform'}).replace(/^export /,'');
+if(spanishRepeatProbe){
+  const fixtures=[],language={name:'spanish',words:['node','bay']};
+  const debug=console.debug;console.debug=()=>{};
+  try{
+    for(const mode of ['words','time']){
+      Object.assign(config,{mode:'words',words:1,language:'spanish',punctuation:true,showAllLines:false});
+      activeNames=[];ownedRepeated=false;ownedIndexes=[0];ownedContentUnit=0.95;
+      const first=await main.namespace.generateWords(language);
+      ownedIndexes=[1];
+      const second=await main.namespace.getNextWord(1,100,first.words[0].trim(),undefined);
+      ownedContentUnit=0.85;
+      assert.equal(await main.namespace.punctuateWord(undefined,'owned',0,100),'¡Owned');
+      ownedRepeated=true;config.words=2;
+      const cached=await main.namespace.generateWords(language);
+      Object.assign(config,{mode,words:0,time:30});ownedIndexes=[0];ownedContentUnit=0;
+      let fresh,error;
+      try{fresh=(await main.namespace.getNextWord(2,100,'bay','¿Node')).word;}
+      catch(caught){error=caught.message;}
+      const after=await main.namespace.punctuateWord('bay','node',3,100);
+      fixtures.push({mode,opening:[...first.words,second.word],cached:cached.words,fresh,error,after});
+    }
+  }finally{console.debug=debug;}
+  assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
+  process.stdout.write(JSON.stringify({fixtures})+'\n');process.exit(0);
+}
+if(rawBoundProbe){
+  const words=modules.get('test/test-words').namespace.words,failures=[];
+  const continuation=vm.compileFunction(addBody+'\nreturn addWord;',[
+    'Config','TestWords','WordsGenerator','TestUI','getActiveFunboxes','getActiveWordIndex',
+    'findSingleActiveFunboxWithFunction','showErrorNotification','toggleFunbox','restart','timerEvent',
+  ])(config,modules.get('test/test-words').namespace,main.namespace,
+    {addWord:()=>{},appendEmptyWordElement:unexpected},active,()=>ownedActiveWordIndex,
+    name=>active().find(value=>typeof value.functions[name]==='function'),unexpected,unexpected,unexpected,
+    {dispatch:value=>failures.push(value)});
+  const fixtures=[],reconfigured=[],text=['ab cd','ef gh','ij kl'];
+  const plans=[[],['underscore_spaces'],['backwards','underscore_spaces'],['underscore_spaces','backwards'],
+    ...focusNames.map(name=>[name])];
+  const debug=console.debug;console.debug=()=>{};
+  try{
+    for(const unit of [0.05,0.5])for(const boxes of plans)for(const punctuation of [false,true])for(const limitMode of ['word','section','time'])
+      for(const limit of [0,0.5,1,1.5,2,2.5,4.5,99.5,100,100.5,101,Infinity])for(const pipe of [false,true]){
+        ownedContentUnit=unit;
+        Object.assign(config,{mode:'custom',language:'english',punctuation,showAllLines:false});
+        activeNames=boxes.slice();ownedRepeated=false;ownedIndexes=[];
+        ownedCustom={text:text.slice(),mode:'repeat',limitMode,limitValue:limit,pipe};
+        const bound=main.namespace.getLimit();
+        const generated=await main.namespace.generateWords({name:'english',words:['unused']});
+        words.reset();generated.words.forEach((word,index)=>words.push(word,generated.sectionIndexes[index]));
+        if(main.namespace.areAllWordsGenerated())words.removeCommitCharacterFromLastWord();
+        const fields=Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit);
+        const allGenerated=main.namespace.areAllWordsGenerated();failures.length=0;let calls=0;
+        const bounded=limit===0||!Number.isFinite(limit)||limitMode==='time';
+        for(let i=0;i<(bounded?3:512)&&!main.namespace.areAllWordsGenerated()&&!failures.length;i++){
+          ownedActiveWordIndex=words.length-1;await continuation();calls++;
+        }
+        assert.equal(failures.length,0);
+        if(!bounded)assert.equal(main.namespace.areAllWordsGenerated(),true);
+        const finalFields=Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit);
+        ownedRepeated=true;
+        const repeated=await main.namespace.generateWords({name:'english',words:['unused']});
+        words.reset();repeated.words.forEach((word,index)=>words.push(word,repeated.sectionIndexes[index]));
+        if(main.namespace.areAllWordsGenerated())words.removeCommitCharacterFromLastWord();
+        fixtures.push({unit,boxes,punctuation,limitMode,limit:String(limit),pipe,bound,fields,allGenerated,calls,finalFields,
+          repeatedFields:Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit)});
+      }
+    for(const unit of [0.05,0.5])for(const boxes of plans.slice(0,4))for(const punctuation of [false,true])
+      for(const limitMode of ['word','section'])for(const limit of [1.5,4.5,100.5]){
+        ownedContentUnit=unit;
+        Object.assign(config,{mode:'words',words:2,language:'english',punctuation:false,showAllLines:false});
+        activeNames=[];ownedRepeated=false;ownedIndexes=[0,1];
+        const opening=await main.namespace.generateWords({name:'english',words:['old','kept']});
+        assert.equal(ownedIndexes.length,0);
+        Object.assign(config,{mode:'custom',punctuation});activeNames=boxes.slice();ownedRepeated=true;
+        ownedCustom={text:text.slice(),mode:'repeat',limitMode,limitValue:limit,pipe:false};
+        const generated=await main.namespace.generateWords({name:'english',words:['unused']});
+        words.reset();generated.words.forEach((word,index)=>words.push(word,generated.sectionIndexes[index]));
+        if(main.namespace.areAllWordsGenerated())words.removeCommitCharacterFromLastWord();
+        reconfigured.push({unit,boxes,punctuation,limitMode,limit,opening:opening.words,
+          fields:Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit)});
+      }
+  }finally{console.debug=debug;}
+  assert.equal(fixtures.length,2304);assert.equal(reconfigured.length,96);
+  assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
+  await new Promise((resolve,reject)=>process.stdout.write(JSON.stringify({text,fixtures,reconfigured})+'\n',error=>error?reject(error):resolve()));
+  process.exit(0);
+}
 if(process.argv[3]==='--section-indices') {
   const debug=console.debug;console.debug=()=>{};
   let first,repeated;

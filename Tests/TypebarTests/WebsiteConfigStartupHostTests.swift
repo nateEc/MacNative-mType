@@ -7,8 +7,27 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WebsiteConfigStartupHostTests: XCTestCase {
+  func testFreshFractionalUnderscoreTargetRequiresFinalSuffixThroughActualInputView() async throws {
+    let f = try Fixture(saved: true, json: #"{"mode":"custom","funbox":["underscore_spaces"]}"#)
+    defer { f.close() }
+    let custom = try WebsiteCustomTextSettings(value: .object([
+      "text": .array([.string("ab cd"), .string("ef gh"), .string("ij kl")]), "mode": .string("repeat"),
+      "limit": .object(["mode": .string("word"), "value": .number(4.5)]), "pipeDelimiter": .bool(false)]))
+    XCTAssertTrue(f.settings.saveWebsiteCustomTextState(custom)); f.state.accountReady = true
+    try await f.waitAsync { f.inputs().first?.acceptsTextInput == true
+      && f.state.page.state.session.generatedWordReplayHistory != nil }
+    XCTAssertEqual(f.state.page.state.session.prompt, "ab_cd_ef_gh_ij_")
+    try XCTUnwrap(f.inputs().first).onInsert("ab_cd_ef_gh_ij", false)
+    f.wait { f.state.page.state.session.typed == "ab_cd_ef_gh_ij" }
+    XCTAssertEqual(f.state.page.state.session.outcome, .active)
+    try XCTUnwrap(f.inputs().first).onInsert("_", false)
+    f.wait { f.state.page.state.session.outcome == .completed }
+    XCTAssertEqual(f.state.page.state.session.completedWordCount, 5)
+    XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
+  }
+
   func testFreshCustomSectionCounterRendersFromSavedSourceInHiddenRoot() async throws {
-    let f = try Fixture(saved: true, json: #"{"mode":"custom","timerStyle":"text"}"#, viewportHeight: 3200)
+    let f = try Fixture(saved: true, json: #"{"mode":"custom","timerStyle":"text"}"#, viewportHeight: 1600)
     defer { f.close() }
     let custom = try WebsiteCustomTextSettings(value: .object([
       "text": .array([.string("Aa Bb"), .string("Cc")]), "mode": .string("repeat"),
@@ -20,14 +39,15 @@ import XCTest
     try XCTUnwrap(f.inputs().first).onInsert("Aa Bb ", false)
     f.wait { f.state.page.state.session.progressText() == "1/2" }
     try f.scrollToInput()
-    let text = try f.renderedText().joined(separator: " ").replacingOccurrences(of: " ", with: "")
+    let text = try f.renderedText(capture: URL(fileURLWithPath: "/tmp/typebar-fresh-custom-section-host-progress.png"))
+      .joined(separator: " ").replacingOccurrences(of: " ", with: "")
     XCTAssertTrue(text.contains("1/2"), text)
     XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
   }
 
   func testRepeatedCustomSectionCounterRendersInActualHiddenRootAfterWordNavigation() async throws {
     let f = try Fixture(saved: true, json: #"{"mode":"words","words":3,"timerStyle":"text"}"#,
-      viewportHeight: 3200)
+      viewportHeight: 1600)
     defer { f.close() }
     let custom = try WebsiteCustomTextSettings(value: .object([
       "text": .array([.string("Aa Bb"), .string("Cc")]), "mode": .string("repeat"),
@@ -58,17 +78,12 @@ import XCTest
     f.wait { f.state.page.state.session.progressText() == "3/5" }
     try f.scrollToInput()
     let text: String
-    do { text = try f.renderedText().joined(separator: " ").replacingOccurrences(of: " ", with: "") }
+    do { text = try f.renderedText(capture: URL(fileURLWithPath: "/tmp/typebar-generated-section-host-progress.png"))
+      .joined(separator: " ").replacingOccurrences(of: " ", with: "") }
     catch {
       let failure = error as NSError
       XCTFail("Hidden section recognition: \(failure.domain) \(failure.code) \(failure.userInfo)")
       return
-    }
-    if !text.contains("3/5") {
-      let bitmap = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds))
-      f.host.cacheDisplay(in: f.host.bounds, to: bitmap)
-      try bitmap.representation(using: .png, properties: [:])?.write(
-        to: URL(fileURLWithPath: "/tmp/typebar-generated-section-host-progress.png"))
     }
     XCTAssertTrue(text.contains("3/5"), text)
     XCTAssertFalse(f.window.isVisible)
@@ -220,10 +235,13 @@ import XCTest
       let root = root ?? host
       return (root as? TypingInputView).map { [$0] } ?? root.subviews.flatMap { inputs($0) }
     }
-    func renderedText(languages: [String] = ["en-US"]) throws -> [String] {
+    func renderedText(languages: [String] = ["en-US"], capture: URL? = nil) throws -> [String] {
       host.layoutSubtreeIfNeeded()
       let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
       host.cacheDisplay(in: host.bounds, to: bitmap)
+      if let capture {
+        try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: capture)
+      }
       let request = VNRecognizeTextRequest()
       request.recognitionLevel = .accurate; request.recognitionLanguages = languages
       request.usesLanguageCorrection = false

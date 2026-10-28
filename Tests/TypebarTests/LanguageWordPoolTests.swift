@@ -143,7 +143,7 @@ final class LanguageWordPoolTests: XCTestCase {
   }
 
   func testSpanishCachePreservesLatestAppMarkerAndUncachedContinuationUsesIt() {
-    let config = TestConfiguration.words(0, language: .spanish, contentOptions: .init(includePunctuation: true))
+    let config = TestConfiguration.timed(seconds: 30, language: .spanish, contentOptions: .init(includePunctuation: true))
     var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: 1, sourceWords: ["node", "bay"])
     XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: { 0 }, nextRandomContentUnit: { 0.95 }).transformed, "¿Node")
     var units = Array(repeating: 0.5, count: 10)
@@ -157,6 +157,45 @@ final class LanguageWordPoolTests: XCTestCase {
     let session = TypingSession(configuration: config, prompt: "¿Node ", generatedCodeContinuation: cursor)
       .withWordDecorationState(.init(spanishClosing: "!"))
     XCTAssertEqual(session.repeatedAttempt().liveWordDecorationState.spanishClosing, "!")
+  }
+
+  func testSpanishRepeatZeroAndTimeAgainstPinnedGeneratorAndPunctuation() throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else {
+      throw XCTSkip("Requires pinned reference")
+    }
+    struct Fixture: Decodable { let mode: String, opening: [String], cached: [String], fresh: String?, error: String?, after: String }
+    struct Output: Decodable { let fixtures: [Fixture] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-generated-backwards-order.mjs").path, reference, "--spanish-repeat-gate"]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0)
+    let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
+    XCTAssertEqual(fixtures.count, 2)
+    for item in fixtures {
+      let config = item.mode == "words"
+        ? TestConfiguration.words(0, language: .spanish, contentOptions: .init(includePunctuation: true))
+        : .timed(seconds: 30, language: .spanish, contentOptions: .init(includePunctuation: true))
+      var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: 1, sourceWords: ["node", "bay"])
+      let first = cursor.nextChunk(nextRandomWordIndex: { 0 }, nextRandomContentUnit: { 0.95 })
+      let second = cursor.nextChunk(nextRandomWordIndex: { 1 }, nextRandomContentUnit: { 0.5 })
+      XCTAssertEqual([first.transformed + " ", second.transformed.trimmingCharacters(in: .whitespaces) + " "], item.opening)
+      XCTAssertEqual(item.cached, item.opening)
+      var repeated = cursor.replayingContinuation().withDecorationState(.init(spanishClosing: "!"))
+      _ = repeated.nextChunk(nextRandomWordIndex: { XCTFail("Cached rank"); return 0 }, nextRandomContentUnit: { XCTFail("Cached unit"); return 0 })
+      let extra = repeated.nextChunk(nextRandomWordIndex: { 0 }, nextRandomContentUnit: { 0 })
+      if item.error != nil {
+        XCTAssertEqual(item.error, "Repeated word is undefined")
+        XCTAssertTrue(repeated.replayExhausted); XCTAssertTrue(extra.transformed.isEmpty)
+        XCTAssertEqual(repeated.decorationState.spanishClosing, "!")
+        XCTAssertEqual(item.after, "node!")
+      } else {
+        XCTAssertEqual(extra.transformed.trimmingCharacters(in: .whitespaces) + " ", item.fresh)
+        XCTAssertNil(repeated.decorationState.spanishClosing); XCTAssertEqual(item.after, "node")
+      }
+    }
   }
 
   func testNonASCIIGuardsAndSwissPreDecorationConversion() {

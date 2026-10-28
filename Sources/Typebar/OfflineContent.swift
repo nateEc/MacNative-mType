@@ -6226,6 +6226,18 @@ struct GeneratedCandidateContinuation {
     }
   }
 
+  /// getLimit's numeric value is distinct from the integer request count.
+  /// addWord later supplies its own lookahead bound, not the custom quota.
+  private func alterationBound(fallback: Int) -> Double {
+    guard configuration.mode == .custom, emittedWords == 0, let limit = customLimitValue else {
+      return Double(fallback)
+    }
+    var bound = limit == 0 || configuration.customTextCompletion == .time ? 100 : min(100, limit)
+    if let visible = configuration.visibleFutureWordCount { bound = Double(visible + 1) }
+    if configuration.customTextCompletion == .words, limit != 0 { bound = min(bound, limit) }
+    return bound
+  }
+
   var hasRemaining: Bool {
     if configuration.mode == .custom {
       guard !replayExhausted && !sourceGenerationFailed else { return false }
@@ -6301,6 +6313,7 @@ struct GeneratedCandidateContinuation {
     let websiteSource = WebsiteRandomWordGenerator.selected(for: configuration)
     let bound = initialPreparationWordBound ?? GeneratedWordBoundPolicy.bound(for: configuration, wordOffset: emittedWords,
       sourceWordCount: count, showAllLines: previewsWholeFiniteWords)
+    let transformationBound = alterationBound(fallback: bound)
     var sourceWords: [String] = []
     var targets: [String] = []
     let explicitFraming = replayHistory.preservesCommitFraming
@@ -6435,7 +6448,7 @@ struct GeneratedCandidateContinuation {
         }
       } else {
         word = PoolWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
-        language: baseLanguage, wordIndex: emittedWords + index, wordBound: bound,
+        language: baseLanguage, wordIndex: emittedWords + index, wordBound: transformationBound,
         options: options, state: &decorationState,
         britishEnglish: .init(configuration: decorationConfiguration, authoredQuoteAlternate: false),
         random: nextRandomContentUnit)
@@ -6444,7 +6457,7 @@ struct GeneratedCandidateContinuation {
       let modifiers = polyglotCandidates == nil ? configuration.modifiers : configuration.modifiers.filter { $0 != .lazyLatin }
       let target = TestModifierPolicy.transformedWord(word, modifiers: modifiers,
         language: baseLanguage, websiteOrder: configuration.websiteTextAlterationOrder,
-        wordIndex: emittedWords + index, wordBound: bound,
+        wordIndex: emittedWords + index, wordBound: transformationBound,
         nextRandomCaseBit: nextRandomCaseBit)
       let committed = target + (!noSpace && !target.hasSuffix("\n") ? " " : "")
       output += explicitFraming ? committed : target
