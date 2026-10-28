@@ -2,6 +2,10 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| FONT-PUBLISHED-PREVIEW-08 | 完整配置的悬停字体、关闭恢复及共享几何 | 固定 preview／clear／apply 生命周期；只改变显示 | WebsiteConfigFontPreview、共享提示输入和 Root；WEBSITE_PUBLISHED_FONT_PREVIEW_CONTRACT.md | 部分完成：临时票据贯穿文字、光标与行宽，保留输入／配置，实际隐藏菜单和 TextKit 已验证文件字体→预览→名称恢复；必需来源 110 项。完整产品实体操作、多窗口与待处理回执仍开放；先前“完整配置悬停未绑定”的描述仅在本条范围内取代。 |
+
+| ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
+| --- | --- | --- | --- | --- |
 | FONT-LOCAL-RESOURCE-07 | 本地字体导入／启用／移除后的完整练习资源更新 | 固定完整字体候选链；独立文件变化不保存 Config | WebsiteLocalFontUpdates、配置工作流、字体刷新准入；WEBSITE_LOCAL_FONT_REFRESH_CONTRACT.md | 部分完成：实际文件方法触发重新准备与发布，保留输入、nosave、保存快照、主题和背景；支持租约等待、失败重试和停止，来源清单 109 项。实体文件对话框、可见重排及多窗口操作仍待验，旧全量检查点跨文件 epoch 继续仍拒绝。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |

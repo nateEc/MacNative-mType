@@ -10,12 +10,19 @@ struct WebsiteConfigPublishedPromptInputs {
   let font: NSFont
   let presentation: WebsiteConfigNativePresentation
   let maximumTextWidth: CGFloat?
-  init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID) throws {
+  init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID,
+    fontPreview: WebsiteConfigFontPreview.Prepared? = nil) throws {
     guard publication.owner == owner else { throw WebsiteConfigPublishedPromptError.wrongOwner }
     guard let resource = publication.font else { throw WebsiteConfigPublishedPromptError.unprepared }
-    font = resource.renderingFont; presentation = publication.draft.presentation
+    let advance: Double
+    if let fontPreview {
+      guard fontPreview.owner == owner else { throw WebsiteConfigPublishedPromptError.wrongOwner }
+      guard fontPreview.font.pointSize == publication.draft.keyboardTypography.fontSize else { throw WebsiteConfigPublishedPromptError.invalidGeometry }
+      font = fontPreview.font; advance = fontPreview.chAdvance
+    } else { font = resource.renderingFont; advance = resource.chAdvance }
+    presentation = publication.draft.presentation
     if presentation.practiceTapeMode == .off, let columns = publication.draft.keyboardTypography.columns {
-      let width = columns * resource.chAdvance
+      let width = columns * advance
       guard width.isFinite, width > 0 else { throw WebsiteConfigPublishedPromptError.invalidGeometry }
       maximumTextWidth = width
     } else { maximumTextWidth = nil }
@@ -56,12 +63,13 @@ extension PromptViewportPracticePrompt {
   /// The caller still owns the session, input providers and resolved theme.
   init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID,
     session: TypingSession, theme: ResolvedTheme,
+    fontPreview: WebsiteConfigFontPreview.Prepared? = nil,
     carets: (NSFont, WebsiteConfigNativePresentation) -> PromptCaretNativeView.Configuration,
     wrapLayout: PromptInputWrapLayout? = nil,
     fallbackPosition: PromptViewportFallbackPosition? = nil,
     onFailure: @escaping (UUID) -> Void,
     onReady: @escaping (PromptViewportPresentationReady) -> Void = { _ in }) throws {
-    let inputs = try WebsiteConfigPublishedPromptInputs(publication: publication, owner: owner)
+    let inputs = try WebsiteConfigPublishedPromptInputs(publication: publication, owner: owner, fontPreview: fontPreview)
     let presentation = inputs.presentation
     let effect = PracticeVisualEffect.make(modifiers: session.configuration.modifiers)
     guard PracticeLineDisplayPolicy.shouldShowAllLines(settingEnabled: presentation.showAllPracticeLines,

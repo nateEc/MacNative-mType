@@ -175,6 +175,15 @@ import XCTest
       state.clear(savedFont: .monospaced, savedName: "Menlo")
       XCTAssertEqual(state.target, .installedName("Menlo"))
       XCTAssertTrue(value.restored.hasPrefix("\"Menlo\""))
+      let preview = try WebsiteConfigFontResource.preview(family: "Menlo", size: 28)
+      let names = preview.candidates.map { candidate in
+        switch candidate {
+        case .family(let name): "\"\(name.replacingOccurrences(of: "_", with: " "))\""
+        case .monospace: "\"monospace\""
+        case .local: "\"LOCALCUSTOM\""
+        }
+      }
+      XCTAssertEqual(names.joined(separator: ", "), value.restored)
       XCTAssertTrue(value.reapplied.hasPrefix(value.local ? "\"LOCALCUSTOM\"" : "\"Menlo\""))
       let resolver = NativePracticeFont.Resolver(localFont: { value.local ? NSFont(name: "Courier", size: $0) : nil }, installedFontName: { _ in "Menlo" })
       XCTAssertEqual(resolver.font(for: "Menlo", size: 28)?.fontName, NSFont(name: value.local ? "Courier" : "Menlo", size: 28)?.fontName)

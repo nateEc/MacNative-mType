@@ -1,5 +1,9 @@
 # 固定源码对照的执行证据
 
+完整配置字体预览同版 debug 包、签名、资源和原创性检查通过（32.747 秒，输入哈希不变；`/tmp/typebar-published-font-preview-package.log` 及同名 JSON），未启动主程序。当前扩大 690 项、必需来源 110 项；实体操作及完整 readiness 不计完成。
+
+2026-10-28 完整配置的字体悬停预览：清单 110 项，新增已有完整 preview／活动行／关闭路径的 12 组轨迹，比较临时候选链与关闭恢复语义。最终扩大 690 项零失败零跳过（322.957 秒，驱动 333.078 秒），同日志全部 110 项必需方法通过、输入哈希不变（`/tmp/typebar-published-font-preview-regression.log` 及同名 JSON／evidence.log）。51 项定向、真实隐藏菜单与 TextKit 三阶段以及夹具修正见 [完整配置预览合同](WEBSITE_PUBLISHED_FONT_PREVIEW_CONTRACT.md)。未选择可见窗口测试；实体操作、待处理回执的即时重绑定、整套客户端与完整 readiness 仍未验。以下为历史批次。
+
 本地字体文件刷新同版 debug 包、签名、资源与原创性检查通过（32.811 秒，输入哈希不变；`/tmp/typebar-font-refresh-package.log` 及同名 JSON），未启动主程序。当前扩大回归 660 项、必需来源方法 109 项；其他未验路径和完整 readiness 不计完成。
 
 2026-10-28 本地字体文件实时资源更新：必需来源清单 109 项，新增原有完整 applyFontFamily 的 446 语言 × 三种文件状态候选链方法，1338 组候选对照；DOM／文件读取仍为明确适配器，不称完整浏览器证明。最终扩大 660 项零失败零跳过（322.864 秒，驱动 332.702 秒），同日志全部 109 项必需方法通过，输入哈希不变（`/tmp/typebar-font-refresh-regression.log` 及同名 JSON／evidence.log）。35 项定向和真实文件／保存值不变／并发交接证据见 [本地字体刷新合同](WEBSITE_LOCAL_FONT_REFRESH_CONTRACT.md)。无可见应用启动；未验实体选择器、未消费回执中的旧字体即时重绑定、整套客户端或完整 readiness。以下为历史批次。

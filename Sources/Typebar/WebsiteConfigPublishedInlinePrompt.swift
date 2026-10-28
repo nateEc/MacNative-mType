@@ -42,13 +42,14 @@ struct WebsiteConfigPublishedInlinePrompt: View {
 
   init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID,
     session: TypingSession, composition: String = "", theme: ResolvedTheme,
+    fontPreview: WebsiteConfigFontPreview.Prepared? = nil,
     carets: (PromptRendering, NSFont, WebsiteConfigNativePresentation) -> PromptCaretNativeView.Configuration,
     retirement: (PromptRendering, WebsiteConfigNativePresentation) -> PromptLineScrollContext,
     maximumTextWidth: CGFloat? = nil, wrapLayout: PromptInputWrapLayout? = nil,
     fallbackPosition: PromptViewportFallbackPosition? = nil,
     latestProjection: (() -> TapePromptProjectionSnapshot?)? = nil,
     onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil) throws {
-    let inputs = try WebsiteConfigPublishedPromptInputs(publication: publication, owner: owner)
+    let inputs = try WebsiteConfigPublishedPromptInputs(publication: publication, owner: owner, fontPreview: fontPreview)
     let resolvedWidth = try inputs.width(limitedBy: maximumTextWidth)
     guard PromptFieldProjectionPolicy.supports(session.configuration) else {
       throw WebsiteConfigPublishedPromptError.requiresDifferentRenderer

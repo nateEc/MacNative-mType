@@ -275,6 +275,10 @@
       "file": "Tests/TypebarTests/WebsiteConfigFontCascadeSourceTests.swift"
     },
     {
+      "id": "TypebarTests.FontFamilyCommandPreviewTests/testPinnedCompletePreviewAndDismissalSourceTrajectories",
+      "file": "Tests/TypebarTests/FontFamilyCommandPreviewTests.swift"
+    },
+    {
       "id": "TypebarTests.LocalNoticeTests/testNativeStateAgainstCompletePinnedNotificationModuleTransitions",
       "file": "Tests/TypebarTests/LocalNoticeTests.swift"
     },

@@ -1,7 +1,7 @@
 import AppKit
 import CoreText
 
-enum WebsiteConfigFontResourceError: Error, Equatable { case invalidLimit }
+enum WebsiteConfigFontResourceError: Error, Equatable { case invalidLimit, invalidSize }
 
 /// Owned font faces and ordered fallback intent, not a global registration,
 /// settings mutation or proof of browser/native shaping equivalence.
@@ -64,12 +64,23 @@ struct WebsiteConfigFontResource {
       }
     }
     let candidates = candidates(family: typography.fontFamily, language: language, hasLocal: hasLocal)
+    return assemble(candidates: candidates, size: typography.fontSize, localFont: localFont, owned: owned, failure: failure)
+  }
+  /// The complete source preview ignores both local files and the language's
+  /// preferred face. Closing the palette uses this same candidate chain.
+  static func preview(family: String, size: Double) throws -> Self {
+    guard size.isFinite, size > 0 else { throw WebsiteConfigFontResourceError.invalidSize }
+    return assemble(candidates: [.family(family), .family("Roboto_Mono"), .family("Vazirharf"), .monospace],
+      size: size, localFont: nil, owned: nil, failure: nil)
+  }
+  private static func assemble(candidates: [Candidate], size: Double, localFont: NSFont?,
+    owned: Data?, failure: LocalFailure?) -> Self {
     let faces: [Face] = candidates.compactMap { candidate in
       let font: NSFont?
       switch candidate {
       case .local: font = localFont
-      case .family(let identifier): font = installed(identifier, size: typography.fontSize)
-      case .monospace: font = .monospacedSystemFont(ofSize: typography.fontSize, weight: .regular)
+      case .family(let identifier): font = installed(identifier, size: size)
+      case .monospace: font = .monospacedSystemFont(ofSize: size, weight: .regular)
       }
       return font.map { Face(candidate: candidate, font: $0) }
     }

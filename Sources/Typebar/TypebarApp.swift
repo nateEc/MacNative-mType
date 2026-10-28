@@ -1413,6 +1413,7 @@ private struct ContentView: View {
   @State private var themeQuickSwitchMessage: String?
   @State private var commandThemePreviewTarget: ThemeCommandTarget?
   @State private var commandFontPreview = FontFamilyCommandPreviewState()
+  @State private var websiteFontPreviewCache = WebsiteConfigFontPreview()
   @State private var quickPickerThemePreviewTarget: ThemeCommandTarget?
   @State private var showingProfileSearchCommandEditor = false
   @State private var sharedProfileInbox = SharedProfileLinkInbox()
@@ -1695,7 +1696,7 @@ private struct ContentView: View {
     }
   }
 
-  private var focusedPracticeContent: some View {
+  private var fontObservedPracticeLayout: some View {
     appearanceObservedPracticeLayout
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: showingCommandPalette) { _, showing in
@@ -1704,11 +1705,20 @@ private struct ContentView: View {
     }
     .onChange(of: settings.practiceFontApplicationRevision) { _, _ in commandFontPreview.appliedFontFamily() }
     .onChange(of: settings.localPracticeFontRevision) { _, _ in commandFontPreview.appliedFontFamily() }
+    .onChange(of: pageSession.presentation?.publication.applicationID) { _, _ in
+      if pageSession.presentation?.publication.draft.projection.events.contains(where: { $0.key == "fontFamily" || $0.key == "language" }) == true {
+        commandFontPreview.appliedFontFamily(); preparedWholePreviewRendering = nil
+      }
+    }
     .onChange(of: websiteImportWorkflow?.localFontPublication) { _, _ in
       commandFontPreview.appliedFontFamily(); preparedWholePreviewRendering = nil
     }
     .onChange(of: session.configuration.language) { _, _ in commandFontPreview.appliedFontFamily() }
     .onChange(of: activeChallengeID) { _, _ in commandFontPreview.appliedFontFamily() }
+  }
+
+  private var focusedPracticeContent: some View {
+    fontObservedPracticeLayout
     .onChange(of: session.hasStarted) { _, started in
       if started {
         if preparedWholePreviewRendering?.typedSnapshot != session.typed {
@@ -2263,6 +2273,7 @@ private struct ContentView: View {
           commandThemePreviewTarget = ThemeCommandPreviewPolicy.target(for: item)
           commandFontPreview.select(item, savedFont: settings.practiceFont,
             savedName: commandFontFamilyName)
+          preparedWholePreviewRendering = nil
           if committedPracticeDraft != nil, let item, let target = SoundCommandCatalog.target(for: item.id) {
             practiceSoundSelection.hover(target, on: practiceSoundPlayer())
           }
@@ -3858,13 +3869,16 @@ private struct ContentView: View {
   /// Additive cutover seam: the real page keeps its input/session ownership.
   /// Unsupported routes fail visibly rather than borrowing legacy resources.
   private func publishedPracticePrompt(_ presentation: WebsiteConfigPublishedPresentation) -> AnyView {
+    let fontPreview = publishedFontPreview
+    let renderedFont = fontPreview?.font ?? presentation.publication.font?.renderingFont
     do {
       if usesWholePreviewViewport {
-        return AnyView(try presentation.wholePreview(session: session,
+        return AnyView(try presentation.wholePreview(session: session, fontPreview: fontPreview,
           carets: { font, p in publishedCarets(font: font, presentation: p) },
           wrapLayout: promptInputWrapLayout, fallbackPosition: viewportFallbackPosition,
           onFailure: { attempt in
-            guard session.automaticInputAttemptID == attempt, viewportFallbackAttemptID != attempt else { return }
+            guard let renderedFont, renderedFont == practicePromptNSFont(size: settings.fontSize),
+              session.automaticInputAttemptID == attempt, viewportFallbackAttemptID != attempt else { return }
             viewportFallbackPosition.capture(attemptID: attempt, targetID: session.promptTargetID)
             viewportFallbackAttemptID = attempt; viewportReadinessAttemptID = nil
           }, onReady: { ready in
@@ -3874,7 +3888,7 @@ private struct ContentView: View {
             viewportReadinessAttemptID = nil; requestTypingFocus()
           }))
       }
-      return AnyView(try presentation.inline(session: session, composition: compositionText,
+      return AnyView(try presentation.inline(session: session, composition: compositionText, fontPreview: fontPreview,
         carets: { _, font, p in publishedCarets(font: font, presentation: p) },
         retirement: { rendering, p in publishedLineScroll(rendering, presentation: p) },
         wrapLayout: promptInputWrapLayout, fallbackPosition: showsAllPracticeLines ? viewportFallbackPosition : nil,
@@ -4092,6 +4106,7 @@ private struct ContentView: View {
   }
 
   private func practicePromptNSFont(size: CGFloat) -> NSFont {
+    if let font = publishedFontPreview?.font { return font }
     if let font = publishedPresentation?.publication.font?.renderingFont { return font }
     if let font = FontFamilyCommandPreviewPolicy.font(
         for: commandFontPreview.target, size: size, fallback: settings.practiceFont) {
@@ -4105,6 +4120,12 @@ private struct ContentView: View {
   private func clearCommandFontPreview() {
     commandFontPreview.clear(savedFont: settings.practiceFont,
       savedName: commandFontFamilyName)
+    preparedWholePreviewRendering = nil
+  }
+
+  private var publishedFontPreview: WebsiteConfigFontPreview.Prepared? {
+    guard let publication = publishedPresentation?.publication else { return nil }
+    return websiteFontPreviewCache.prepare(commandFontPreview, publication: publication, owner: preferenceConfigurationOwner)
   }
 
   private var commandFontFamilyName: String {
