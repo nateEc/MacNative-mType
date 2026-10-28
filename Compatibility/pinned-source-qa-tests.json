@@ -3,6 +3,10 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.InputCommitCaptureTests/testFreshCommitEvidenceAgainstCompletePinnedInputHandlersAndStatistics",
+      "file": "Tests/TypebarTests/InputCommitCaptureTests.swift"
+    },
+    {
       "id": "TypebarTests.ReplayScoringCombinationTests/testCapturedTargetChartsMatchCompletePinnedWPMAndRawHistories",
       "file": "Tests/TypebarTests/ReplayScoringCombinationTests.swift"
     },

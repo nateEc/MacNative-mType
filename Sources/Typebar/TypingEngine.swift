@@ -3296,7 +3296,8 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable, Sendable {
   let text: String
   let forceError: Bool
   let automatic: Bool
-  /// Missing in older archives; false preserves a separator in its input
+  /// New recordings keep true when this insertion submits a word. Missing
+  /// legacy evidence is not backfilled. False preserves a separator in its input
   /// field when word-stop accepts the key but prevents navigation.
   let commitsWord: Bool?
   /// The first primitive of one whole-word deletion. Old readers still
@@ -7909,8 +7910,11 @@ struct TypingSession {
       .init(
         offset: max(0, timingDate(at: date).timeIntervalSince(startedAt)), kind: kind, text: text,
         forceError: forceError, automatic: automatic || applyingAutomaticCodeInput,
-        commitsWord: kind == .insert && retainsSeparator
-          ? false : nil, inputStopped: inputStopped ? true : nil,
+        // New recordings retain positive navigation evidence as well as the
+        // existing literal-separator veto. Stopped input cannot submit a word.
+        commitsWord: kind == .insert && retainsSeparator ? false
+          : kind == .insert && !inputStopped && lastInputCommitsWord ? true : nil,
+        inputStopped: inputStopped ? true : nil,
         inputField: recordedField, inputCorrectness: kind == .insert ? latestInputCorrectness : nil,
         textUTF16: raw ? (kind == .insert ? latestReplayInputUnits ?? Array(text.utf16) : []) : nil,
         inputPosition: kind == .insert ? latestReplayInputPosition : nil,

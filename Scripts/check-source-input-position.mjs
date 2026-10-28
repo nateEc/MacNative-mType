@@ -24,8 +24,12 @@ const bindings={
  'legacy-states/slow-timer':{get:()=>false},'states/test':{isTestRestarting:()=>false,getActiveWordIndex:()=>wordIndex,increaseActiveWordIndex:()=>wordIndex++,decreaseActiveWordIndex:()=>wordIndex--,isResultCalculating:()=>false,wordsHaveNewline:()=>false,isTestActive:()=>active},
  'test/test-logic':{addWord:()=>{if(growNext && wordIndex===targets.length-1){targets.push('c');growNext=false}},startTest:()=>{active=true},fail:()=>{failed=true},finish:()=>{completed=true}},'events/keymap':{flash:(data,correct)=>keymapFlashes.push({units:Array.from({length:data.length},(_,i)=>data.charCodeAt(i)),isCorrect:correct})},'test/weak-spot':{updateScore:noop},'legacy-states/composition':{getComposing:()=>false},'states/notifications':{showNoticeNotification:noop},
  'input/helpers/word-navigation':{goToPreviousWord:noop,goToNextWord:async()=>({lastBurst:null,increasedWordIndex:true})},'test/pace-caret':{handleSpace:noop},'test/funbox/funbox':{toggleScript:noop},'states/loader-bar':{showLoaderBar:noop,hideLoaderBar:noop},'test/events/stats':{getWordBurst:()=>null},'test/words-generator':{areAllWordsGenerated:()=>Config.mode!=='time'},'utils/misc':{whorf:()=>0},'input/helpers/input-type':{DeleteInputType:{}},'@monkeytype/schemas/languages':{Language:{}}};
-Object.assign(bindings['states/test'],{getKoreanStatus:()=>false,getCurrentQuote:()=>null,getBailedOut:()=>false});Object.assign(bindings,{'constants/keys':{Keycode:{}},'test/events/types':{EVENT_LOG_VERSION:1,InputEventNoMs:{},TestEventNoMs:{},CompositionTestEvent:{},CompositionTestEventData:{},EventLog:{},InputEvent:{},InputEventData:{},KeydownEvent:{},KeydownEventData:{},KeyupEvent:{},KeyupEventData:{},TestEvent:{},TestEventData:{},TestEventType:{},TimerEvent:{},TimerEventData:{}},'test/custom-text':{getLimit:()=>({mode:'none',value:0})},'test/funbox/active':{isFunboxActiveWithProperty:p=>p==='nospace'},'@monkeytype/util/numbers':{roundTo2:v=>Math.round(v*100)/100,isSafeNumber:Number.isFinite,mean:a=>a.reduce((x,y)=>x+y,0)/a.length}});bindings['utils/misc'].getMode2=()=>2;bindings['test/funbox/list'].isFunboxActiveWithProperty=p=>p==='nospace';bindings['states/test'].wordsHaveNewline=()=>targets.some(t=>t.includes('\n'));console.debug=()=>{};globalThis.document={querySelector:()=>({get value(){return ' '+element},set value(v){element=v.slice(1)}})};const modules=new Map();function getModule(id){if(modules.has(id))return modules.get(id);let mod;if(actual.has(id))mod=new vm.SourceTextModule(stripTypeScriptTypes(fs.readFileSync(path.join(root,id+'.ts'),'utf8'),{mode:'transform'}),{identifier:id});else{const data=bindings[id];if(!data)throw new Error('Unknown import '+id);mod=new vm.SyntheticModule(Object.keys(data),function(){for(const [key,value]of Object.entries(data))this.setExport(key,value)},{identifier:id});}modules.set(id,mod);return mod;}
+Object.assign(bindings['states/test'],{getKoreanStatus:()=>false,getCurrentQuote:()=>null,getBailedOut:()=>false});Object.assign(bindings,{'constants/keys':{Keycode:{}},'test/events/types':{EVENT_LOG_VERSION:1,InputEventNoMs:{},TestEventNoMs:{},CompositionTestEvent:{},CompositionTestEventData:{},EventLog:{},InputEvent:{},InputEventData:{},KeydownEvent:{},KeydownEventData:{},KeyupEvent:{},KeyupEventData:{},TestEvent:{},TestEventData:{},TestEventType:{},TimerEvent:{},TimerEventData:{}},'test/custom-text':{getLimit:()=>({mode:'none',value:0})},'test/funbox/active':{isFunboxActiveWithProperty:p=>p==='nospace'},'@monkeytype/util/numbers':{roundTo2:v=>Math.round(v*100)/100,isSafeNumber:Number.isFinite,mean:a=>a.reduce((x,y)=>x+y,0)/a.length}});bindings['utils/misc'].getMode2=()=>2;bindings['test/funbox/list'].isFunboxActiveWithProperty=p=>p==='nospace';bindings['states/test'].wordsHaveNewline=()=>targets.some(t=>t.includes('\n'));console.debug=()=>{};globalThis.document={querySelector:()=>({get value(){return ' '+element},set value(v){element=v.slice(1)}})};const modules=new Map();function getModule(id){if(modules.has(id))return modules.get(id);let mod;if(actual.has(id))mod=new vm.SourceTextModule(stripTypeScriptTypes(fs.readFileSync(id==='@monkeytype/util/numbers'?path.join(reference,'packages/util/src/numbers.ts'):path.join(root,id+'.ts'),'utf8').replace('import { CharCounts, countChars, isSpace }','import { countChars, isSpace }'),{mode:'transform'}),{identifier:id});else{const data=bindings[id];if(!data)throw new Error('Unknown import '+id);mod=new vm.SyntheticModule(Object.keys(data),function(){for(const [key,value]of Object.entries(data))this.setExport(key,value)},{identifier:id});}modules.set(id,mod);return mod;}
 if(['--ordinary-live-growth-fixtures','--no-space-live-fixtures'].includes(process.argv[3]))actual.add('test/test-words');
+if(process.argv[3]==='--commit-capture-fixtures') {
+ for(const id of ['test/events/stats','utils/numbers','@monkeytype/util/numbers'])actual.add(id);
+ bindings['hangul-js']={default:{disassemble(){throw Error('Korean outside ordinary capture probe');}}};
+}
 const main=getModule('input/handlers/insert-text');await main.link((specifier,from)=>getModule(specifier.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(from.identifier),specifier)):specifier));await main.evaluate();
 
 const eventData=modules.get('test/events/data').namespace;
@@ -36,6 +40,36 @@ function reset(words,{stop='off',strict=false,mode='words',grow=false}={}) {
 }
 function inputEvents(){return eventData.getAllTestEvents().filter(e=>e.type==='input').map(e=>e.data)}
 function positions(){return inputEvents().map(e=>e.charIndex)}
+if(process.argv[3]==='--commit-capture-fixtures') {
+ let noSpace=false;
+ modules.get('test/funbox/list').setExport('isFunboxActiveWithProperty',p=>p==='nospace'&&noSpace);
+ modules.get('test/funbox/active').setExport('isFunboxActiveWithProperty',p=>p==='nospace'&&noSpace);
+ const units=text=>Array.from({length:text.length},(_,i)=>text.charCodeAt(i));
+ const fixtures=[];
+ for(const [words,suffixes,hidden=false] of [
+  [['ab'],['b ',' ','x ','b','']],
+  [['ab ','cd'],['b c ','b cd','b cd ','x c ','b  cd','b\u3000c ']],
+  [['ab','cd'],['bcd','bcd ','bxd','bxc','b c'],true],
+ ])for(const stop of ['off','word','letter'])for(const suffix of suffixes) {
+  reset(words,{stop});
+  noSpace=hidden;
+  Object.assign(Config,{blindMode:false,difficulty:'normal',quickEnd:false,deleteOnError:'off',oppositeShiftMode:'off',funbox:noSpace?['nospace']:[]});
+  await main.namespace.emulateInsertText({data:'a',now:0});
+  if(suffix.length>0)await main.namespace.emulateInsertText({data:suffix,now:2500});
+  const tape=eventData.getAllTestEvents();
+  assert.ok(tape.every(e=>Number.isFinite(e.testMs)));
+  const log={events:[...tape,{type:'timer',testMs:2500,data:{event:'end'}}],
+   context:{mode:'words',mode2:String(words.length),bailedOut:false,koreanStatus:false,
+    isFunboxWithNospacePropertyActive:noSpace,targetWords:words}};
+  const stats=modules.get('test/events/stats').namespace;
+  fixtures.push({words,suffix,stop,noSpace,finished:completed,failed,wpm:stats.getWpmHistory(log),raw:stats.getRawHistory(log),
+   events:tape.filter(e=>e.type==='input').map(e=>({offset:e.testMs/1000,payload:units(e.data.data),
+    field:e.data.wordIndex,value:units(e.data.inputValue),correct:e.data.correct,
+    stopped:!!e.data.inputStopped,commit:!!e.data.commitsWord,last:!!e.data.lastWord,charIndex:e.data.charIndex}))});
+ }
+ assert.equal(fixtures.length,48);
+ console.log(JSON.stringify({fixtures}));process.exit(0);
+}
 if(['--ordinary-live-growth-fixtures','--no-space-live-fixtures'].includes(process.argv[3])){
  const noSpace=process.argv[3]==='--no-space-live-fixtures';
  for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',p=>noSpace&&p==='nospace');
