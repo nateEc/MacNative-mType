@@ -41,6 +41,36 @@ final class WebsiteConfigPublishedPresentation {
     fileprivate let randomThemes: WebsiteRandomThemeConfiguration
   }
 
+  /// Full-config theme effects precede asynchronous practice initialization.
+  /// This owns colors only; it cannot publish fonts, media, input or a session.
+  @MainActor @Observable final class PendingTheme {
+    let owner: UUID
+    private let values: [String: WebsiteConfigValue]
+    private var prepared: PreparedAppearance
+    var appearance: Appearance { prepared.appearance }
+    var themes: WebsiteConfigNativeThemes { prepared.themes }
+    var systemIndicator: AppTheme? { prepared.changes.systemIndicator }
+    init(owner: UUID, draft: WebsiteConfigNativeDraft, prepared: PreparedAppearance) {
+      self.owner = owner; self.prepared = prepared
+      values = draft.projection.runtime.filter { WebsiteConfigNativeThemes.mappedKeys.contains($0.key) }
+    }
+    func matching(_ draft: WebsiteConfigNativeDraft) -> PreparedAppearance? {
+      values == draft.projection.runtime.filter { WebsiteConfigNativeThemes.mappedKeys.contains($0.key) } ? prepared : nil
+    }
+    func updateSystemAppearance(isDark: Bool) {
+      guard isDark != prepared.systemIsDark else { return }
+      var changes = prepared.changes
+      let selection = prepared.themes.systemAppearanceChange(systemIsDark: isDark)
+      if selection != nil {
+        changes.applied = UUID(); changes.indicator = UUID()
+        changes.systemIndicator = isDark ? themes.darkTheme : themes.lightTheme
+      }
+      prepared = .init(themes: themes, custom: prepared.custom,
+        appearance: selection.map { WebsiteConfigPublishedPresentation.resolve($0, custom: prepared.custom) } ?? prepared.appearance,
+        systemIsDark: isDark, changes: changes, randomThemes: prepared.randomThemes)
+    }
+  }
+
   static func prepareAppearance(draft: WebsiteConfigNativeDraft, applicationID: UUID,
     systemIsDark: Bool, previous: WebsiteConfigPublishedPresentation? = nil) throws -> PreparedAppearance {
     let themes = draft.themes
@@ -175,9 +205,11 @@ final class WebsiteConfigPublishedPresentation {
     return changed
   }
   func background(fallbackStyle: PracticeBackdropStyle, reduceMotion: Bool, themePreview: WebsiteThemePreview.Prepared? = nil,
+    pendingTheme: PendingTheme? = nil,
     onFailure: @escaping BackgroundFailureFeedback.Sink = { _ in }) throws -> WebsiteConfigPublishedBackground {
-    try .init(publication: publication, owner: owner, fallbackStyle: fallbackStyle,
-      theme: themePreview?.resolve(publication: publication, owner: owner, applied: themeChanges.applied) ?? appearance.theme, reduceMotion: reduceMotion, onFailure: onFailure)
+    if let pendingTheme, pendingTheme.owner != owner { throw WebsiteConfigPublishedPresentationError.wrongOwner }
+    return try .init(publication: publication, owner: owner, fallbackStyle: fallbackStyle,
+      theme: pendingTheme?.appearance.theme ?? themePreview?.resolve(publication: publication, owner: owner, applied: themeChanges.applied) ?? appearance.theme, reduceMotion: reduceMotion, onFailure: onFailure)
   }
   func wholePreview(session: TypingSession, fontPreview: WebsiteConfigFontPreview.Prepared? = nil,
     themePreview: WebsiteThemePreview.Prepared? = nil,

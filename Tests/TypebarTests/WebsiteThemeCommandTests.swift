@@ -185,6 +185,154 @@ import XCTest
       XCTAssertEqual(name, expected.shown); XCTAssertEqual(actual.randomThemes.active, expected.active)
       XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
     }
+    let failures = output.fixtures.filter { $0.activePage == "test" && $0.initialization == "fail" }
+    XCTAssertEqual(failures.count, 16)
+    for sample in failures {
+      let quotes = RestartQuotes(), f = try Fixture(loadQuotes: quotes.read)
+      defer { f.close() }
+      try await f.publish(); quotes.fail = true
+      // Source initialization is an owned failing adapter. Use the native
+      // quote provider as that fault boundary, preserving all theme fields.
+      var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(sample.json.utf8)) as? [String: Any])
+      json["mode"] = "quote"; json["quoteLength"] = [0, 1, 2, 3]
+      do {
+        try await f.workflow.apply(json: String(decoding: JSONSerialization.data(withJSONObject: json), as: UTF8.self), systemIsDark: false)
+        XCTFail("Initialization must fail")
+      } catch { XCTAssertNotNil(f.page.state.savedApplication) }
+      let actual = try XCTUnwrap(f.page.state.displayedAppearance), expected = try XCTUnwrap(sample.frames.last)
+      let name: String; switch actual.selection { case .inlineCustom: name = "custom"; case .builtIn(let theme): name = theme.rawValue }
+      XCTAssertEqual(name, expected.shown)
+    }
+  }
+
+  func testPendingThemeObservesMediaWhileInitializationIsSuspendedWithoutReplayingOnDelivery() async throws {
+    for custom in [false, true] {
+      let quotes = RestartQuotes(), f = try Fixture(loadQuotes: quotes.read)
+      defer { quotes.release(); f.close() }
+      try await f.publish(); quotes.hold = true
+      let old = try XCTUnwrap(f.page.state.presentation), generation = f.page.state.session.generationState
+      let task = Task { @MainActor in
+        try await f.workflow.apply(json: """
+          {"mode":"quote","quoteLength":[0,1,2,3],"repeatQuotes":"off","fontFamily":"Courier",
+           "theme":"nord","themeLight":"serika","themeDark":"dracula","autoSwitchTheme":true,"customTheme":\(custom)}
+          """, systemIsDark: false)
+      }
+      try await quotes.wait()
+      let pending = try XCTUnwrap(f.page.state.savedApplication?.theme)
+      XCTAssertEqual(f.page.state.displayedAppearance?.selection, .builtIn(.serika))
+      XCTAssertTrue(f.page.state.presentation === old); XCTAssertEqual(f.page.state.session.generationState, generation)
+      pending.updateSystemAppearance(isDark: true)
+      let expected: WebsiteConfigNativeThemes.Selection = .builtIn(custom ? .serika : .dracula)
+      XCTAssertEqual(f.page.state.displayedAppearance?.selection, expected)
+      let indicator = WebsiteThemePreview.indicator(themes: pending.themes,
+        indicatorOverride: pending.systemIndicator.map(ThemeCommandTarget.builtIn), customThemes: [])
+      XCTAssertEqual(indicator.name, custom ? "serika" : "dracula")
+      quotes.release(); try await task.value
+      XCTAssertNil(f.page.state.savedApplication)
+      XCTAssertEqual(f.page.state.displayedAppearance?.selection, expected)
+      XCTAssertEqual(f.page.state.presentation?.currentSystemIsDark, true)
+    }
+  }
+
+  func testFailedImportDisplaysItsThemeBeforeResourcesAndRetainsItOnRecovery() async throws {
+    for followsSystem in [false, true] {
+      let quotes = RestartQuotes(), f = try Fixture(loadQuotes: quotes.read)
+      defer { quotes.release(); f.close() }
+      try await f.publish()
+      let old = try XCTUnwrap(f.page.state.presentation), generation = f.page.state.session.generationState
+      let preferences = f.settings.snapshot, ledger = f.page.state.priorAttemptLedger
+      quotes.fail = true
+      do {
+        try await f.workflow.apply(json: """
+          {"mode":"quote","quoteLength":[0,1,2,3],"repeatQuotes":"off","fontFamily":"Courier",
+           "theme":"nord","themeLight":"serika","themeDark":"dracula","autoSwitchTheme":\(followsSystem),"customTheme":false}
+          """, systemIsDark: false)
+        XCTFail("Quote provider must fail after the full import is saved")
+      } catch { XCTAssertNotNil(f.page.state.savedApplication) }
+      XCTAssertEqual(f.page.state.displayedAppearance?.selection, .builtIn(followsSystem ? .serika : .nord))
+      XCTAssertTrue(f.page.state.presentation === old)
+      XCTAssertEqual(f.page.state.session.generationState, generation)
+      XCTAssertEqual(f.page.state.priorAttemptLedger, ledger); XCTAssertEqual(f.settings.snapshot, preferences)
+      let register = WebsiteConfigFileRegister(directory: f.directory), saved = try register.read()
+      quotes.fail = false
+      try await f.workflow.apply(json: nil, systemIsDark: false)
+      XCTAssertNil(f.page.state.savedApplication)
+      XCTAssertEqual(f.page.state.displayedAppearance?.selection, .builtIn(followsSystem ? .serika : .nord))
+      XCTAssertEqual(try register.read().revision, saved.revision)
+    }
+  }
+
+  func testColdFailedImportUsesTheActualSchemeAndReplacementRetiresTheOldPendingColors() async throws {
+    let quotes = RestartQuotes(), f = try Fixture(loadQuotes: quotes.read)
+    defer { f.close() }; quotes.fail = true
+    do {
+      try await f.workflow.apply(json: #"{"mode":"quote","quoteLength":[0,1,2,3],"fontFamily":"Courier","autoSwitchTheme":true,"themeLight":"serika","themeDark":"dracula"}"#, systemIsDark: true)
+      XCTFail("Initialization must fail")
+    } catch {}
+    XCTAssertNil(f.page.state.presentation)
+    XCTAssertEqual(f.page.state.displayedAppearance?.selection, .builtIn(.dracula))
+    let retired = try XCTUnwrap(f.page.state.savedApplication?.theme)
+    do {
+      try await f.workflow.apply(json: #"{"mode":"quote","quoteLength":[0,1,2,3],"fontFamily":"Courier","autoSwitchTheme":false,"theme":"nord"}"#, systemIsDark: false)
+      XCTFail("Replacement initialization must fail")
+    } catch {}
+    let current = try XCTUnwrap(f.page.state.savedApplication?.theme)
+    XCTAssertFalse(current === retired)
+    retired.updateSystemAppearance(isDark: false)
+    XCTAssertEqual(retired.appearance.selection, .builtIn(.serika))
+    XCTAssertEqual(f.page.state.displayedAppearance?.selection, .builtIn(.nord))
+    XCTAssertNil(f.page.state.presentation)
+  }
+
+  private struct PendingBackgroundRoot: View {
+    let page: PracticePageSessionStore
+    var body: some View {
+      if let presentation = page.state.presentation,
+        let background = try? presentation.background(fallbackStyle: .solid, reduceMotion: true,
+          pendingTheme: page.state.savedApplication?.theme) {
+        // ImageRenderer cannot draw the AppKit media surface. Render the
+        // production SwiftUI base layer; native media has separate pixel tests.
+        background.backdrop.frame(width: 160, height: 100)
+      }
+    }
+  }
+  func testBackgroundColorsRenderBeforeTheNewPracticeIsReady() async throws {
+    let quotes = RestartQuotes(), f = try Fixture(loadQuotes: quotes.read)
+    defer { quotes.release(); f.close() }; try await f.publish()
+    let old = try XCTUnwrap(f.page.state.presentation)
+    func pixel<V: View>(_ view: V) throws -> NSColor {
+      let renderer = ImageRenderer(content: view)
+      let data = try XCTUnwrap(renderer.nsImage?.tiffRepresentation)
+      let bitmap = try XCTUnwrap(NSBitmapImageRep(data: data))
+      return try XCTUnwrap(bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?.usingColorSpace(.sRGB))
+    }
+    func waitForColor(_ color: Color) async throws {
+      // Both samples pass through the same renderer and TIFF color profile.
+      let expected = try pixel(color.frame(width: 160, height: 100))
+      let end = Date().addingTimeInterval(2)
+      var actual: NSColor?
+      repeat {
+        try await Task.sleep(for: .milliseconds(20))
+        actual = try pixel(PendingBackgroundRoot(page: f.page))
+        if let actual, abs(actual.redComponent - expected.redComponent) < 0.01,
+          abs(actual.greenComponent - expected.greenComponent) < 0.01,
+          abs(actual.blueComponent - expected.blueComponent) < 0.01 { return }
+      } while Date() < end
+      XCTFail("Expected background \(expected), got \(String(describing: actual))")
+    }
+    try await waitForColor(AppTheme.dracula.resolvedTheme.background)
+    quotes.hold = true
+    let task = Task { @MainActor in
+      try await f.workflow.apply(json: #"{"mode":"quote","quoteLength":[0,1,2,3],"repeatQuotes":"off","fontFamily":"Courier","theme":"nord"}"#, systemIsDark: false)
+    }
+    try await quotes.wait()
+    try await waitForColor(AppTheme.nord.resolvedTheme.background)
+    XCTAssertTrue(f.page.state.presentation === old)
+    task.cancel(); quotes.release()
+    do { _ = try await task.value; XCTFail("Cancelled preparation must not deliver") } catch {}
+    XCTAssertNotNil(f.page.state.savedApplication)
+    try await waitForColor(AppTheme.nord.resolvedTheme.background)
+    XCTAssertTrue(f.page.state.presentation === old)
   }
 
   func testResumingAnImportedProfileAfterFailedInitializationDoesNotReuseTheOldResultSource() async throws {

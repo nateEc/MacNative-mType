@@ -78,6 +78,7 @@ final class WebsiteConfigCommitCoordinator {
   struct SavedApplication {
     let id: UUID
     fileprivate let ticket: Prepared
+    let theme: WebsiteConfigPublishedPresentation.PendingTheme
     var draft: WebsiteConfigNativeDraft { ticket.draft }
   }
   fileprivate struct NativeSharedBase {
@@ -1144,7 +1145,7 @@ final class WebsiteConfigCommitCoordinator {
   /// revision, including other windows' existing publication authority.
   /// An unsuccessful CAS changes no page state; a successful one is retained
   /// even when initialization is cancelled or fails later.
-  func acceptApplication(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Prepared {
+  func acceptApplication(_ prepared: Prepared, for page: PracticePageSessionStore, systemIsDark: Bool = false) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     processing = true; defer { processing = false }
     guard isCurrent(prepared), prepared.sourcePage === page,
@@ -1155,6 +1156,10 @@ final class WebsiteConfigCommitCoordinator {
     if case .imported = prepared.draft.origin { restoringNative = false }
     else if case .restored(let value) = prepared.draft.origin, case .nativeState = value.origin { restoringNative = true }
     else { throw WebsiteConfigCommitCoordinatorError.stale }
+    let id = UUID()
+    let theme = try WebsiteConfigPublishedPresentation.PendingTheme(owner: page.owner, draft: prepared.draft,
+      prepared: WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
+        applicationID: id, systemIsDark: systemIsDark, previous: page.state.presentation))
     try Task.checkCancellation()
     try page.beginCommit(owner: prepared.owner, router: router, applicationCapture: capture)
     defer { page.endCommit() }
@@ -1165,13 +1170,12 @@ final class WebsiteConfigCommitCoordinator {
     case .unavailable: throw WebsiteConfigCommitCoordinatorError.unavailable
     }
     // No suspension, fallible callback or cancellation check after the CAS.
-    let id = UUID()
     var admitted = prepared
     admitted.disk = disk; admitted.savedDraft = prepared.draft
     admitted.savedApplicationID = id
     admitted.applicationCapture = capture.acceptingApplication(id)
     var state = page.state
-    state.savedApplication = .init(id: id, ticket: admitted)
+    state.savedApplication = .init(id: id, ticket: admitted, theme: theme)
     page.installCommitted(state)
     return admitted
   }
@@ -1201,7 +1205,7 @@ final class WebsiteConfigCommitCoordinator {
     try Task.checkCancellation()
     guard admission == resourceAdmission, isCurrent(prepared), let page = prepared.sourcePage,
       let capture = prepared.applicationCapture, let id = prepared.savedApplicationID,
-      page.state.savedApplication?.id == id, let saved = prepared.savedDraft else {
+      let pending = page.state.savedApplication, pending.id == id, let saved = prepared.savedDraft else {
       throw WebsiteConfigCommitCoordinatorError.stale
     }
     try page.beginCommit(owner: prepared.owner, router: router, applicationCapture: capture)
@@ -1214,7 +1218,7 @@ final class WebsiteConfigCommitCoordinator {
     }
     var updated = prepared; updated.disk = disk
     var state = page.state
-    state.savedApplication = .init(id: id, ticket: updated)
+    state.savedApplication = .init(id: id, ticket: updated, theme: pending.theme)
     page.installCommitted(state)
     return updated
   }
@@ -2204,8 +2208,13 @@ final class WebsiteConfigCommitCoordinator {
         session.prompt.utf16.elementsEqual(practice.session.prompt.utf16) else {
         throw PracticePageSessionStateError.invalidAttempt
       }
-      appearance = try WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
-        applicationID: applicationID, systemIsDark: systemIsDark, previous: page.state.presentation)
+      if let pending = page.state.savedApplication, pending.id == prepared.savedApplicationID,
+        let acceptedTheme = pending.theme.matching(prepared.draft) {
+        appearance = acceptedTheme
+      } else {
+        appearance = try WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
+          applicationID: applicationID, systemIsDark: systemIsDark, previous: page.state.presentation)
+      }
       try page.beginCommit(owner: prepared.owner, router: router, capture: prepared.pageCapture,
         applicationCapture: prepared.applicationCapture)
     } else { appearance = nil }

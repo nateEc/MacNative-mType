@@ -13,6 +13,7 @@ enum PracticePageSessionStateError: Error { case wrongOwner, stale, incomplete, 
   var restartDepartureAttemptID: UUID?
   var configurationDeparture: WebsiteConfigCommitCoordinator.ConfigurationDeparture?
   var savedApplication: WebsiteConfigCommitCoordinator.SavedApplication?
+  var displayedAppearance: WebsiteConfigPublishedPresentation.Appearance? { savedApplication?.theme.appearance ?? presentation?.appearance }
   var sharedReceipt: WebsiteConfigCommitCoordinator.SharedReceipt?
   struct QuoteInitializationCheckpoint {
     let id = UUID()

@@ -1687,13 +1687,14 @@ private struct ContentView: View {
         .padding(12)
     }
     .tint(activeTheme.accent)
-    .preferredColorScheme(publishedThemePreview?.theme.colorScheme ?? publishedPresentation?.appearance.theme.colorScheme ?? themePreviewPresentation.preferredColorScheme)
+    .preferredColorScheme(pendingTheme?.appearance.theme.colorScheme ?? publishedThemePreview?.theme.colorScheme ?? publishedPresentation?.appearance.theme.colorScheme ?? themePreviewPresentation.preferredColorScheme)
   }
 
   private var appearanceObservedPracticeLayout: some View {
     practiceLayout
     .onChange(of: systemColorScheme) { _, scheme in
-      if let publishedPresentation { websiteThemePreview.systemAppearanceChanged(publishedPresentation, isDark: scheme == .dark) }
+      if let pendingTheme { pendingTheme.updateSystemAppearance(isDark: scheme == .dark) }
+      else if let publishedPresentation { websiteThemePreview.systemAppearanceChanged(publishedPresentation, isDark: scheme == .dark) }
     }
   }
 
@@ -1703,6 +1704,7 @@ private struct ContentView: View {
       .onDisappear { websiteThemePreview.stop() }
       .onChange(of: publishedPresentation?.publication.applicationID) { _, _ in websiteThemePreview.synchronize(publishedPresentation) }
       .onChange(of: publishedPresentation?.themeChanges) { _, _ in websiteThemePreview.synchronize(publishedPresentation) }
+      .onChange(of: pageSession.savedApplication?.id) { _, _ in websiteThemePreview.stop(); websiteThemePreview.synchronize(publishedPresentation) }
       .onChange(of: showingCommandPalette) { _, showing in if !showing { clearPublishedThemePreview() } }
       .onChange(of: themeQuickPickerScope) { _, scope in if scope == nil { clearPublishedThemePreview() } }
       .onChange(of: publishedThemePreview?.theme) { _, _ in preparedWholePreviewRendering = nil }
@@ -2128,11 +2130,13 @@ private struct ContentView: View {
     .background {
       if let publishedPresentation {
         if let background = try? publishedPresentation.background(fallbackStyle: settings.practiceBackdrop,
-          reduceMotion: settings.reducePracticeMotion, themePreview: publishedThemePreview, onFailure: account.localNotices.backgroundFailureSink()) {
+          reduceMotion: settings.reducePracticeMotion, themePreview: publishedThemePreview, pendingTheme: pendingTheme, onFailure: account.localNotices.backgroundFailureSink()) {
           background
         } else {
           Label("完整配置背景暂不可用，请重新应用配置。", systemImage: "exclamationmark.triangle")
         }
+      } else if let pendingTheme {
+        PracticeBackdrop(style: settings.practiceBackdrop, theme: pendingTheme.appearance.theme, reduceMotion: settings.reducePracticeMotion)
       } else {
         CustomPracticeBackground(
           fallbackStyle: settings.practiceBackdrop, theme: activeTheme,
@@ -4968,6 +4972,10 @@ private struct ContentView: View {
   }
 
   private var themeIndicatorPresentation: ThemeIndicatorPresentation {
+    if let pendingTheme {
+      return WebsiteThemePreview.indicator(themes: pendingTheme.themes,
+        indicatorOverride: pendingTheme.systemIndicator.map(ThemeCommandTarget.builtIn), customThemes: settings.customThemes)
+    }
     if let presentation = publishedPresentation,
       let indicator = websiteThemePreview.indicator(for: presentation, customThemes: settings.customThemes) { return indicator }
     return themePreviewPresentation.indicator
@@ -6147,11 +6155,13 @@ private struct ContentView: View {
   }
 
   private var activeTheme: ResolvedTheme {
-    publishedThemePreview?.theme ?? publishedPresentation?.appearance.theme ?? themePreviewPresentation.theme
+    pendingTheme?.appearance.theme ?? publishedThemePreview?.theme ?? pageSession.displayedAppearance?.theme ?? publishedPresentation?.appearance.theme ?? themePreviewPresentation.theme
   }
 
+  private var pendingTheme: WebsiteConfigPublishedPresentation.PendingTheme? { pageSession.savedApplication?.theme }
+
   private var publishedThemePreview: WebsiteThemePreview.Prepared? {
-    guard let presentation = publishedPresentation else { return nil }
+    guard pendingTheme == nil, let presentation = publishedPresentation else { return nil }
     return websiteThemePreview.prepared(for: presentation, owner: pageSessionStore.owner)
   }
   private func clearPublishedThemePreview() {

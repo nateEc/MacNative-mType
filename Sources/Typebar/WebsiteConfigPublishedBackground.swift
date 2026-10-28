@@ -23,9 +23,12 @@ struct WebsiteConfigPublishedBackground: View {
     self.onFailure = onFailure
   }
 
+  var backdrop: PracticeBackdrop {
+    PracticeBackdrop(style: fallbackStyle, theme: theme, reduceMotion: reduceMotion)
+  }
   var body: some View {
     ZStack {
-      PracticeBackdrop(style: fallbackStyle, theme: theme, reduceMotion: reduceMotion)
+      backdrop
       PublishedBackgroundSurface(publication: publication, resource: resource, onFailure: onFailure)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

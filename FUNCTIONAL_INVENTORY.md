@@ -2,7 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| THEME-RANDOM-SEQUENCE-11 | 随机候选、游标、收藏数组关联与故障边界 | 固定完整随机函数、真实 Solid 存储、完整导入入口／总线、restart 与 onTestRestart；自有目录／随机数及初始化输入 | WebsiteRandomThemeSequence、WebsiteRandomThemeConfiguration、重开交付／主题事务、来源探针；WEBSITE_THEME_IMPORT_RESTART_CONTRACT.md 及前序合同 | 部分完成：显式抽取、结果页普通／失败／重复返回、setter／分享及练习窗口完整导入成功后的隐式重开均已接发布；整份导入保存先于抽取，临时与后续保存分开，保留候选游标与新收藏身份。失败、取消、窗口过期不抽取，恢复待应用配置不重用旧结果。初始化失败阶段的即时展示时机、其他上下文交互及全部人工场景仍待完成，不能据此称整体随机功能已验收。 |
+| THEME-RANDOM-SEQUENCE-11 | 随机候选、游标、收藏数组关联与故障边界 | 固定完整随机函数、真实 Solid 存储、完整导入入口／总线、restart 与 onTestRestart；自有目录／随机数及初始化输入 | WebsiteRandomThemeSequence、WebsiteRandomThemeConfiguration、重开交付／主题事务、来源探针；WEBSITE_THEME_IMPORT_RESTART_CONTRACT.md、WEBSITE_THEME_PENDING_APPLICATION_CONTRACT.md 及前序合同 | 部分完成：显式抽取、结果页普通／失败／重复返回、setter／分享及练习窗口完整导入成功后的隐式重开均已接发布；整份导入保存先于抽取，临时与后续保存分开，保留候选游标与新收藏身份。失败、取消、窗口过期不抽取，恢复待应用配置不重用旧结果。初始化期间和失败后的配色提前显示，系统外观变化与恢复交付不重放完整主题事件；新媒体／字体的故障阶段显示、其他上下文交互及全部人工场景仍待完成，不能据此称整体随机功能已验收。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |

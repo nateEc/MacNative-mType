@@ -1034,13 +1034,13 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         throw WebsiteConfigImportWorkflowError.typebarBackup
       }
       ticket = try coordinator.prepare(json, for: page, refreshingWith: source)
-      ticket = try coordinator.acceptApplication(ticket, for: page)
+      ticket = try coordinator.acceptApplication(ticket, for: page, systemIsDark: systemIsDark)
     case .application(nil):
       if page.state.savedApplication != nil {
         do { ticket = try coordinator.resumeApplication(for: page) }
-        catch WebsiteConfigCommitCoordinatorError.stale { ticket = try restorationTicket(for: page) }
+        catch WebsiteConfigCommitCoordinatorError.stale { ticket = try restorationTicket(for: page, systemIsDark: systemIsDark) }
       } else {
-        ticket = try restorationTicket(for: page)
+        ticket = try restorationTicket(for: page, systemIsDark: systemIsDark)
       }
     }
     prepared = ticket
@@ -1150,7 +1150,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       }
     }
   }
-  private func restorationTicket(for page: PracticePageSessionStore) throws -> WebsiteConfigCommitCoordinator.Prepared {
+  private func restorationTicket(for page: PracticePageSessionStore, systemIsDark: Bool) throws -> WebsiteConfigCommitCoordinator.Prepared {
     guard settings.allowsRestartingConfigurationChange else { throw WebsiteConfigImportWorkflowError.activeAttempt }
     if try archiveRegister.recoverArchiveRestore(customStore: settings.websiteCustomArchiveStore) {
       settings.websiteArchiveCustomStateWasRestored()
@@ -1161,7 +1161,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     switch try coordinator.prepareRestoration(for: page, refreshingWith: source) {
     case .missing: throw WebsiteConfigImportWorkflowError.missing
     case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
-    case .prepared(let value): return try coordinator.acceptApplication(value, for: page)
+    case .prepared(let value): return try coordinator.acceptApplication(value, for: page, systemIsDark: systemIsDark)
     }
   }
   private func postNoQuitSelectionNotice(_ message: String,

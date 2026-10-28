@@ -111,6 +111,12 @@ import Observation
       ? self.indicatorOverride : next.themeChanges.systemIndicator.map(ThemeCommandTarget.builtIn)
     let themes = publication.draft.themes
     let randomIndicator = next.themeChanges.randomIndicator
+    return Self.indicator(themes: themes, randomIndicator: randomIndicator,
+      indicatorOverride: indicatorOverride, customThemes: customThemes)
+  }
+
+  static func indicator(themes: WebsiteConfigNativeThemes, randomIndicator: String? = nil,
+    indicatorOverride: ThemeCommandTarget?, customThemes: [CustomThemeDefinition]) -> ThemeIndicatorPresentation {
     var name = randomIndicator ?? themes.theme.rawValue, isCustom = themes.customEnabled
     if themes.customEnabled {
       let match = WebsiteThemeCommand.matchingCustomTheme(themes, in: customThemes)
