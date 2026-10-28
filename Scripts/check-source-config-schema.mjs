@@ -231,7 +231,7 @@ if (defaultsMode) {
   if (actualStore) simulation.Config = actualStore.Config;
   const setters = await load(path.join(frontend, 'config/setters.ts'));
   if (randomRuntimeMode || themeImportMode || backgroundCommandMode) {
-    if (backgroundSettingsMode) Object.assign(context, await load('solid-js'));
+    if (backgroundSettingsMode) Object.assign(context, await load('solid-js'), {CustomBackgroundSchema: configSchemas.CustomBackgroundSchema});
     if (themeImportMode) {
       Object.assign(context,{Config:actualStore.Config,getConfig:actualStore.getConfig,setConfig:setters.setConfig,
         configEvent:bus,getDefaultConfig:(await load(path.join(frontend,'constants/default-config.ts'))).getDefaultConfig,migrateConfig:migration.migrateConfig,

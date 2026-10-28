@@ -59,18 +59,26 @@ struct BackgroundSettingsSlider: NSViewRepresentable {
 struct BackgroundSettingsControls: View {
   let settings: AppSettings
   @State private var model: BackgroundSettingsPreferences
-  @State private var url = ""
   @State private var importing = false
   @State private var message: String?
+  @FocusState private var addressFocused: Bool
   init(settings: AppSettings) {
     self.settings = settings; _model = State(initialValue: .init(settings: settings))
   }
   var body: some View {
     Group {
       if model.source == nil || !settings.hasLocalBackground {
-        TextField("背景图片 URL", text: $url).textFieldStyle(.roundedBorder)
+        TextField("背景图片 URL", text: $model.addressDraft).textFieldStyle(.roundedBorder)
+          .focused($addressFocused)
+          .onSubmit { applyURL(model.addressDraft) }
+          .onChange(of: addressFocused) { before, focused in
+            if before && !focused && model.source != nil { applyURL(model.addressDraft) }
+          }
+          .onChange(of: model.addressDraft) { _, value in
+            if model.source != nil { message = model.isAddressValid(value) ? nil : "请输入有效的 HTTP(S) 图片地址。" }
+          }
         HStack {
-          Button("应用 URL") { applyURL(url) }
+          Button("应用 URL") { applyURL(model.addressDraft) }
           if !model.url.isEmpty { Button("移除 URL") { applyURL("") } }
         }
       }
@@ -101,10 +109,10 @@ struct BackgroundSettingsControls: View {
       if let message { Text(message).font(.caption).foregroundStyle(.red) }
     }
     .disabled(!model.canEdit)
-    .onAppear { model.synchronize(); url = model.url }
+    .onAppear { model.synchronize() }
     .onChange(of: model.source) { _, _ in model.synchronize() }
     .onChange(of: settings.customBackgroundFilter) { _, _ in model.synchronize() }
-    .onChange(of: model.url) { _, value in url = value }
+    .onChange(of: model.url) { _, _ in model.synchronize() }
     .fileImporter(isPresented: $importing, allowedContentTypes: [.image]) { result in
       do {
         let file = try result.get(), access = file.startAccessingSecurityScopedResource()
@@ -117,8 +125,7 @@ struct BackgroundSettingsControls: View {
     }
   }
   private func applyURL(_ value: String) {
-    guard value != model.url else { return }
-    if CustomBackgroundCommandEditorPolicy.apply(value, kind: .remoteURL, to: settings) { url = model.url; message = nil }
+    if model.submitAddress(value) { message = nil }
     else { message = "请输入有效的 HTTP(S) 图片 URL，或重新选择当前练习窗口。" }
   }
   private func removeLocal() {

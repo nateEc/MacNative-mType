@@ -495,6 +495,122 @@ import XCTest
     XCTAssertTrue(f.page.state.presentation?.backgroundDisplay === display)
     XCTAssertEqual(gate.reads, 1); XCTAssertEqual(try register.read().revision, revision)
   }
+  func testSettingsAddressValidatesRawFormInputBeforeCommandTrimming() async throws {
+    let f = try Fixture(fetchRemoteBackground: { address, _ in .failed(address: address) })
+    defer { f.close() }; try await f.publish()
+    let model = BackgroundSettingsPreferences(settings: f.settings)
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+    for raw in [" https://example.invalid/after.png", " ", "\u{FEFF}https://example.invalid/after.png"] {
+      XCTAssertFalse(model.submitAddress(raw), raw)
+      XCTAssertEqual(try register.read().revision, revision)
+    }
+    XCTAssertEqual(model.url, ""); XCTAssertEqual(f.settings.snapshot, preferences)
+    XCTAssertEqual(f.page.state.session.generationState, generation)
+  }
+
+  func testSettingsAddressAgainstPinnedFormInputBlurSubmitSchemaAndSetterCallbacks() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned source") }
+    struct Frame: Decodable { let runtime, settings, draft: String; let valid: Bool; let saves, flashes, prevented, stopped: Int }
+    struct Sample: Decodable { let event, raw: String; let frames: [Frame] }
+    struct Output: Decodable { let addressFixtures: [Sample] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-config-schema.mjs").path, reference, "--background-settings"]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit(); XCTAssertEqual(process.terminationStatus, 0)
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    XCTAssertEqual(output.addressFixtures.count, 32)
+    XCTAssertEqual(output.addressFixtures.reduce(0) { $0 + $1.frames.count }, 128)
+    for sample in output.addressFixtures {
+      let f = try Fixture(fetchRemoteBackground: { address, _ in .failed(address: address) })
+      defer { f.close() }
+      try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","customBackground":"https://example.invalid/before.png"}"#, systemIsDark: false)
+      await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+      let model = BackgroundSettingsPreferences(settings: f.settings)
+      let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+      let register = WebsiteConfigFileRegister(directory: f.directory), initialRevision = try register.read().revision
+      XCTAssertEqual(model.addressDraft, sample.frames[0].draft)
+      model.addressDraft = sample.raw
+      XCTAssertEqual(model.isAddressValid(sample.raw), sample.frames[1].valid, sample.raw)
+      XCTAssertEqual(try register.read().revision, initialRevision)
+      var previousRevision = initialRevision
+      for index in 2...3 {
+        XCTAssertEqual(model.submitAddress(sample.raw), sample.frames[index].valid, sample.raw)
+        await f.page.state.presentation?.backgroundDisplay?.waitForCompletion(); model.synchronize()
+        let publication = try XCTUnwrap(f.page.state.presentation?.publication)
+        XCTAssertEqual(publication.draft.projection.runtime["customBackground"], .string(sample.frames[index].runtime))
+        XCTAssertEqual(publication.draft.settingsStoreValues["customBackground"], .string(sample.frames[index].settings))
+        XCTAssertEqual(model.addressDraft, sample.frames[index].draft)
+        let revision = try register.read().revision
+        if sample.frames[index].saves == sample.frames[index-1].saves { XCTAssertEqual(revision, previousRevision) }
+        else { XCTAssertNotEqual(revision, previousRevision) }
+        previousRevision = revision
+        XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
+        XCTAssertEqual(sample.frames[index].flashes, sample.frames[index].saves)
+        XCTAssertEqual(sample.frames[index].prevented, sample.event == "submit" ? index-1 : 0)
+        XCTAssertEqual(sample.frames[index].stopped, sample.frames[index].prevented)
+      }
+    }
+  }
+
+  func testSettingsAddressNativeFieldSubmitsAndBlursWithoutOpeningAWindow() async throws {
+    let f = try Fixture(fetchRemoteBackground: { address, _ in .failed(address: address) })
+    defer { f.close() }; try await f.publish()
+    let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+    let host = NSHostingView(rootView: AnyView(BackgroundSettingsControls(settings: f.settings).frame(width: 500).padding()))
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 550, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { host.rootView = AnyView(EmptyView()); window.contentView = nil; window.close() }
+    func fields(_ view: NSView) -> [NSTextField] { (view as? NSTextField).map { [$0] } ?? view.subviews.flatMap(fields) }
+    for _ in 0..<100 where fields(host).allSatisfy({ $0.placeholderString != "背景图片 URL" }) {
+      host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(10))
+    }
+    let field = try XCTUnwrap(fields(host).first { $0.placeholderString == "背景图片 URL" })
+    func type(_ value: String) async throws {
+      field.stringValue = value; field.currentEditor()?.string = value
+      field.delegate?.controlTextDidChange?(.init(name: NSControl.textDidChangeNotification, object: field))
+      try await Task.sleep(for: .milliseconds(40)); host.layoutSubtreeIfNeeded()
+    }
+    XCTAssertFalse(window.isVisible)
+    try await type("https://example.invalid/enter.png")
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress, .string(""))
+    XCTAssertTrue(field.sendAction(field.action, to: field.target))
+    for _ in 0..<100 where f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress != .string("https://example.invalid/enter.png") {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress, .string("https://example.invalid/enter.png"))
+    XCTAssertTrue(window.makeFirstResponder(field)); try await Task.sleep(for: .milliseconds(40))
+    try await type("https://example.invalid/blur.png")
+    XCTAssertTrue(window.makeFirstResponder(nil))
+    for _ in 0..<100 where f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress != .string("https://example.invalid/blur.png") {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress, .string("https://example.invalid/blur.png"))
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    XCTAssertTrue(window.makeFirstResponder(field)); try await Task.sleep(for: .milliseconds(40))
+    let invalid = " https://example.invalid/rejected.png"
+    try await type(invalid); XCTAssertTrue(window.makeFirstResponder(nil))
+    try await Task.sleep(for: .milliseconds(60)); host.layoutSubtreeIfNeeded()
+    XCTAssertEqual(field.stringValue, invalid)
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress, .string("https://example.invalid/blur.png"))
+    XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
+    XCTAssertFalse(window.isVisible)
+  }
+
+  func testSettingsAddressKeepsInvalidDraftAndRejectsAnOwnedRefusal() async throws {
+    let f = try Fixture(); defer { f.close() }; try await f.publish()
+    let model = BackgroundSettingsPreferences(settings: f.settings), preferences = f.settings.snapshot
+    model.addressDraft = "invalid typed URL"
+    XCTAssertFalse(model.submitAddress(model.addressDraft)); model.synchronize()
+    XCTAssertEqual(model.addressDraft, "invalid typed URL"); XCTAssertEqual(model.url, "")
+    f.settings.preferenceConfigurationSaves.register(owner: f.page.owner,
+      backgroundEdit: { _ in false }, save: { XCTFail("Rejected URL saved fallback") })
+    XCTAssertFalse(model.submitAddress("https://example.invalid/after.png"))
+    XCTAssertEqual(model.addressDraft, "invalid typed URL"); XCTAssertEqual(f.settings.snapshot, preferences)
+  }
+
   func testSettingsFilterInputPreviewsWithoutSavingOrChangingNativeFallback() async throws {
     let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read)
     defer { f.close() }

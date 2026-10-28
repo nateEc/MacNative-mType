@@ -9,8 +9,8 @@ import XCTest
 @MainActor
 final class BackgroundApplicationTests: XCTestCase {
   private let address = "https://example.invalid/same.png"
-  func testNativeSettingsSlidersKeepLegacyBoundsAndImmediatePersistence() throws {
-    try withSettings { settings, _ in
+  func testNativeSettingsSlidersKeepLegacyBoundsAndImmediatePersistence() {
+    withSettings { settings, _ in
       settings.customBackgroundURL = address
       let model = BackgroundSettingsPreferences(settings: settings)
       XCTAssertNil(model.source); XCTAssertEqual(model.target, .native)
@@ -20,6 +20,9 @@ final class BackgroundApplicationTests: XCTestCase {
       XCTAssertTrue(model.input(component: 0, value: 8.5)); XCTAssertTrue(model.commit(component: 0, value: 8.5))
       XCTAssertEqual(settings.customBackgroundFilter.blur, 8.5)
       XCTAssertEqual(settings.customBackgroundApplicationID, identity)
+      XCTAssertTrue(model.submitAddress(" https://example.invalid/native.png "))
+      XCTAssertEqual(model.addressDraft, "https://example.invalid/native.png")
+      XCTAssertEqual(settings.customBackgroundURL, model.addressDraft)
       XCTAssertTrue(CustomBackgroundCommandEditorPolicy.apply("", kind: .remoteURL, to: settings))
       XCTAssertEqual(settings.customBackgroundURL, ""); XCTAssertFalse(model.filtersVisible)
     }

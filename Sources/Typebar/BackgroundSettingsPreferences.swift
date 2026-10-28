@@ -38,6 +38,9 @@ extension PracticePageSessionStore {
   let settings: AppSettings
   private(set) var refs: [Double] = [0, 1, 1, 1]
   private(set) var labels: [Double] = [0, 1, 1, 1]
+  var addressDraft = ""
+  @ObservationIgnored private var lastAddress = ""
+  @ObservationIgnored private var addressOwner: UUID?
   @ObservationIgnored private var lastTarget: BackgroundSettingsTarget?
   @ObservationIgnored private var lastValues: [Double] = []
   var source: WebsiteBackgroundSettingsState? { settings.preferenceConfigurationSaves.backgroundSettingsState }
@@ -50,6 +53,17 @@ extension PracticePageSessionStore {
   var canEdit: Bool { source?.canEdit ?? true }
   var filtersVisible: Bool { source?.imageLoaded ?? (settings.hasLocalBackground || !settings.customBackgroundURL.isEmpty) }
   init(settings: AppSettings) { self.settings = settings; synchronize() }
+  func isAddressValid(_ value: String) -> Bool {
+    if source != nil { return WebsiteConfigSchema(catalogs: WebsiteConfigNativeProfile.catalogs).accepts(.string(value), for: "customBackground") }
+    return CustomBackgroundCommandEditorPolicy.value(from: value, kind: .remoteURL) != nil
+  }
+  func submitAddress(_ value: String) -> Bool {
+    guard canEdit, isAddressValid(value) else { return false }
+    if value == url { return true }
+    guard CustomBackgroundCommandEditorPolicy.apply(value, kind: .remoteURL, to: settings) else { return false }
+    addressDraft = source == nil ? url : value; lastAddress = url
+    return true
+  }
   func range(_ index: Int) -> ClosedRange<Double> {
     let maxima: [Double] = source == nil ? [20, 2, 3, 1] : [5, 2, 2, 1]
     return 0...maxima[index]
@@ -64,6 +78,10 @@ extension PracticePageSessionStore {
     return min(range.upperBound, NSDecimalNumber(decimal: base + rounded * stride).doubleValue)
   }
   func synchronize() {
+    let owner = source?.token?.owner
+    if url != lastAddress || owner != addressOwner {
+      addressDraft = url; lastAddress = url; addressOwner = owner
+    }
     let f = settings.customBackgroundFilter
     let values = source?.values ?? [f.blur, f.brightness, f.saturation, f.opacity]
     guard values.count == 4 else { return }

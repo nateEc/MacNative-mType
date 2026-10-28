@@ -2,6 +2,10 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| BACKGROUND-ADDRESS-15 | 设置页背景地址的原始校验与自动提交 | 固定 TSX 表单／输入回调、fromSchema、真实 Zod 与 setter／Solid；自有表单 API 适配，隐藏原生文本框 | BackgroundSettingsPreferences、TextField 提交及焦点接线；WEBSITE_BACKGROUND_ADDRESS_FORM_CONTRACT.md | 部分完成：原始值校验、输入错误提示、提交／失焦保存、原始草稿保留与已保存值无变化时不保存。TanStack 全部状态、原版指示时序和实体跨窗口操作仍开放。 |
+
+| ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
+| --- | --- | --- | --- | --- |
 | BACKGROUND-SETTINGS-14 | 完整配置背景设置页的预览和保存 | 固定 TSX 回调、真实 Solid effect／store、setter 和背景控制器；自有 DOM refs，隐藏 WebKit range | BackgroundSettingsPreferences、BackgroundSettingsControls 和当前图片预览覆盖；WEBSITE_BACKGROUND_SETTINGS_CONTRACT.md | 部分完成：四滑块 input 预览与 change 保存、来源范围／步长、旧图片目标拒绝、设置页本地移除保留 URL。真实鼠标手势、跨窗口实体交互、文件选择器延迟和全部异步故障组合仍开放。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
