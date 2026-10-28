@@ -14,6 +14,8 @@ final class WebsiteConfigEnvironmentSource {
   private var cached: WebsiteConfigCommitCoordinator.Environment?
   private var modelContext = WebsiteConfigRuntimeContext()
   private var needsObservation = true
+  private var needsLockObservation = true
+  private var backgroundRevision = UUID()
   private var stopped = false
   private var refresh: Task<Void, Never>?
   private var readingSynchronousSetter = false
@@ -32,6 +34,8 @@ final class WebsiteConfigEnvironmentSource {
     guard readingSynchronousSetter || settings.allowsRestartingConfigurationChange else { return nil }
     return cached
   }
+  /// Observing an admitted image grants no configuration/restart capability.
+  func backgroundDisplayRevision() -> UUID? { stopped ? nil : backgroundRevision }
   /// Synchronous model reads for live behavior and owned No Quit setters.
   /// This grants no commit capability; the coordinator/page still validate
   /// the exact field, events, owner, attempt and file version. Never suspend
@@ -67,6 +71,7 @@ final class WebsiteConfigEnvironmentSource {
     guard !stopped else { return }
     self.pointsPerRem = pointsPerRem
     self.documentComplete = documentComplete
+    backgroundRevision = UUID()
     invalidate()
   }
   func stop() {
@@ -78,6 +83,7 @@ final class WebsiteConfigEnvironmentSource {
 
   private func invalidateModels() {
     guard !stopped else { return }
+    backgroundRevision = UUID()
     needsObservation = true
     invalidate()
   }
@@ -93,6 +99,14 @@ final class WebsiteConfigEnvironmentSource {
   }
   private func sample() {
     guard !stopped else { return }
+    if needsLockObservation {
+      needsLockObservation = false
+      withObservationTracking { _ = settings.allowsRestartingConfigurationChange } onChange: { [weak self] in
+        MainActor.assumeIsolated {
+          self?.needsLockObservation = true; self?.invalidate()
+        }
+      }
+    }
     if needsObservation {
       needsObservation = false
       modelContext = withObservationTracking {
@@ -101,9 +115,8 @@ final class WebsiteConfigEnvironmentSource {
         _ = settings.snapshot
         _ = settings.customTextStateGeneration
         _ = settings.websiteCustomTextStateGeneration
-        // Complete configuration replay includes restart-requiring fields.
-        // Observe the lock even while unavailable so unlocking can rearm us.
-        _ = settings.allowsRestartingConfigurationChange
+        // The restart lock is observed separately: it retires full replay,
+        // but does not change an already admitted background's resources.
         _ = settings.activeTestSelectionGeneration
         _ = settings.practiceWrapperRevision
         _ = settings.practiceFontApplicationRevision

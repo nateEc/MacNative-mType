@@ -23,8 +23,15 @@ final class WebsiteConfigPublishedPresentation {
   }
   let publication: WebsiteConfigCommitCoordinator.Publication
   let backgroundDisplay: WebsiteConfigBackgroundDisplay?
+  let backgroundFallback: WebsiteConfigBackgroundDisplay.Snapshot?
+  let backgroundFitOverride: CustomBackgroundFit?
   var backgroundSnapshot: WebsiteConfigBackgroundDisplay.Snapshot? {
+    let snapshot = unmodifiedBackgroundSnapshot
+    return backgroundFitOverride.flatMap { snapshot?.fitting($0) } ?? snapshot
+  }
+  private var unmodifiedBackgroundSnapshot: WebsiteConfigBackgroundDisplay.Snapshot? {
     if let backgroundDisplay { return backgroundDisplay.snapshot }
+    if let backgroundFallback { return backgroundFallback }
     guard let resource = publication.background else { return nil }
     return .init(owner: owner, identity: publication.applicationID, resource: resource,
       preferences: publication.draft.pagePreferences, pointsPerRem: publication.pointsPerRem)
@@ -104,8 +111,10 @@ final class WebsiteConfigPublishedPresentation {
   /// Internal synchronous handoff: resource and owner checks have already run
   /// before the durable commit. This construction has no fallible operations.
   init(publication: WebsiteConfigCommitCoordinator.Publication, preparedAppearance: PreparedAppearance,
-    backgroundDisplay: WebsiteConfigBackgroundDisplay? = nil) {
+    backgroundDisplay: WebsiteConfigBackgroundDisplay? = nil,
+    backgroundFallback: WebsiteConfigBackgroundDisplay.Snapshot? = nil, backgroundFitOverride: CustomBackgroundFit? = nil) {
     self.backgroundDisplay = backgroundDisplay
+    self.backgroundFallback = backgroundFallback; self.backgroundFitOverride = backgroundFitOverride
     self.publication = publication; owner = publication.owner; themes = preparedAppearance.themes
     customTheme = preparedAppearance.custom; systemIsDark = preparedAppearance.systemIsDark
     appearance = preparedAppearance.appearance
@@ -117,7 +126,17 @@ final class WebsiteConfigPublishedPresentation {
   func retainingAppearance(for publication: WebsiteConfigCommitCoordinator.Publication) -> WebsiteConfigPublishedPresentation {
     .init(publication: publication, preparedAppearance: .init(themes: themes, custom: customTheme,
       appearance: appearance, systemIsDark: systemIsDark, changes: themeChanges, randomThemes: randomThemes),
-      backgroundDisplay: backgroundDisplay)
+      backgroundDisplay: backgroundDisplay, backgroundFallback: backgroundFallback ?? (backgroundDisplay == nil ? backgroundSnapshot : nil),
+      backgroundFitOverride: backgroundFitOverride)
+  }
+  func changingBackground(for publication: WebsiteConfigCommitCoordinator.Publication,
+    display: WebsiteConfigBackgroundDisplay?, fit: CustomBackgroundFit?, fallback: WebsiteConfigBackgroundDisplay.Snapshot?) -> WebsiteConfigPublishedPresentation {
+    .init(publication: publication, preparedAppearance: .init(themes: themes, custom: customTheme,
+      appearance: appearance, systemIsDark: systemIsDark, changes: themeChanges, randomThemes: randomThemes),
+      backgroundDisplay: display, backgroundFallback: fallback, backgroundFitOverride: fit)
+  }
+  func hasSameBackgroundConfiguration(as draft: WebsiteConfigNativeDraft) -> Bool {
+    WebsiteBackgroundCommand.keys.allSatisfy { publication.draft.projection.runtime[$0] == draft.projection.runtime[$0] }
   }
 
   struct PreparedThemeEdit { let draft: WebsiteConfigNativeDraft; let appearance: PreparedAppearance }

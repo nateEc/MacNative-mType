@@ -34,6 +34,10 @@ import XCTest
           guard page.ownsConfigurationSelection else { return nil }
           guard let id = page.state.presentation?.publication.applicationID else { return false }
           do { try workflow.runThemeCommand(edit, replacing: id); return true } catch { return false }
+        }, background: { page.state.presentation?.publication.draft.pagePreferences }, backgroundEdit: { edit in
+          guard page.ownsConfigurationSelection else { return nil }
+          guard let id = page.state.presentation?.publication.applicationID else { return false }
+          do { try workflow.runBackgroundCommand(edit, replacing: id); return true } catch { return false }
         }, save: { XCTFail("Theme must not save native preferences") })
     }
     func publish() async throws {
@@ -382,6 +386,91 @@ import XCTest
       pending?.resume(returning: data.map { .received(address: address, data: $0) } ?? .failed(address: address))
     }
   }
+  func testBackgroundFitCommandEditsThePublishedProfileWithoutChangingNativeFallbackOrInput() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch(String(state.session.nextExpectedCharacter!)); f.page.replace(state)
+    f.settings.setNoQuitConfigurationLock(true, for: f.page.owner)
+    let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+    let controller = f.page.restartController, ledger = f.page.state.priorAttemptLedger
+    XCTAssertTrue(CustomBackgroundCommandApplication.applyImmediate(.fit(.contain), to: f.settings))
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundFit, .contain)
+    XCTAssertEqual(f.settings.snapshot, preferences)
+    XCTAssertEqual(f.page.state.session.generationState, generation); XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    XCTAssertTrue(f.page.restartController === controller)
+  }
+  @MainActor private final class BackgroundData {
+    let data: Data
+    var reads = 0
+    init() throws { data = try OwnedBackgroundImageFixture.make() }
+    func read(_ address: WebsiteConfigValue, _ budget: Int) async -> WebsiteConfigBackgroundResource.Remote {
+      reads += 1; return .received(address: address, data: data)
+    }
+  }
+  func testBackgroundFilterFitAndAddressCommandsAgainstTheActualStoreAndControllers() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned source") }
+    struct Values: Decodable { let address: String, fit: String, filter: [String] }
+    struct Frame: Decodable { let runtime: Values, settings: Values; let restarts: Int }
+    struct Sample: Decodable { let component: Int, input: String, rawAddress: String; let representable: Bool; let frames: [Frame] }
+    struct Output: Decodable { let fixtures: [Sample] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-config-schema.mjs").path, reference, "--background-commands"]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit(); XCTAssertEqual(process.terminationStatus, 0)
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    XCTAssertEqual(output.fixtures.count, 36); XCTAssertEqual(output.fixtures.reduce(0) { $0 + $1.frames.count }, 180)
+    let samples = output.fixtures.filter(\.representable); XCTAssertEqual(samples.count, 24)
+    for sample in samples {
+      let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read)
+      defer { f.close() }
+      try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","funbox":["no_quit"],"customBackground":"https://example.invalid/before.png","customBackgroundSize":"cover","customBackgroundFilter":[0,1,1,1]}"#, systemIsDark: false)
+      let original = try XCTUnwrap(f.page.state.presentation?.backgroundDisplay); await original.waitForCompletion()
+      let imageID = try XCTUnwrap(f.page.state.presentation?.backgroundSnapshot?.identity)
+      var state = f.page.state; state.session.insertBatch(String(state.session.nextExpectedCharacter!)); f.page.replace(state)
+      f.settings.setNoQuitConfigurationLock(true, for: f.page.owner)
+      let preferences = f.settings.snapshot, generation = f.page.state.session.generationState, ledger = f.page.state.priorAttemptLedger
+      let kinds: [CustomBackgroundCommandEditorKind] = [.blur, .brightness, .saturation, .opacity]
+      func numbers(_ actual: WebsiteConfigValue?, _ expected: [String]) throws {
+        guard case .array(let values) = actual else { return XCTFail("Missing filter array") }
+        XCTAssertEqual(values.count, expected.count)
+        for (value, token) in zip(values, expected) {
+          guard case .number(let number) = value else { return XCTFail("Missing numeric filter") }
+          XCTAssertEqual(number, WebsiteConfigValue.parseFloat(token))
+          if token == "-0" { XCTAssertEqual(number.sign, .minus) }
+          else if number == 0 { XCTAssertEqual(number.sign, .plus) }
+        }
+      }
+      func verify(_ frame: Frame) throws {
+        let publication = try XCTUnwrap(f.page.state.presentation?.publication)
+        XCTAssertEqual(publication.draft.pagePreferences.backgroundAddress, .string(frame.runtime.address))
+        XCTAssertEqual(publication.draft.pagePreferences.backgroundFit.rawValue, frame.runtime.fit)
+        try numbers(publication.draft.projection.runtime["customBackgroundFilter"], frame.runtime.filter)
+        try numbers(publication.draft.settingsStoreValues["customBackgroundFilter"], frame.settings.filter)
+        XCTAssertEqual(frame.restarts, 0); XCTAssertEqual(f.page.state.session.generationState, generation)
+        XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+      }
+      XCTAssertTrue(CustomBackgroundCommandEditorPolicy.apply(sample.input, kind: kinds[sample.component], to: f.settings))
+      try verify(sample.frames[1])
+      XCTAssertEqual(f.page.state.presentation?.backgroundSnapshot?.identity, imageID)
+      XCTAssertEqual(f.page.state.presentation?.backgroundSnapshot?.preferences.backgroundFilter.brightness, 1)
+      try f.workflow.runFontCommand(.size(32), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+      try verify(sample.frames[2])
+      XCTAssertTrue(CustomBackgroundCommandApplication.applyImmediate(.fit(.contain), to: f.settings))
+      try verify(sample.frames[3]); XCTAssertEqual(loader.reads, 1)
+      XCTAssertEqual(f.page.state.presentation?.backgroundSnapshot?.identity, imageID)
+      XCTAssertEqual(f.page.state.presentation?.backgroundSnapshot?.fitOverride, .contain)
+      XCTAssertTrue(CustomBackgroundCommandEditorPolicy.apply(sample.rawAddress, kind: .remoteURL, to: f.settings))
+      let next = try XCTUnwrap(f.page.state.presentation?.backgroundDisplay); await next.waitForCompletion()
+      try verify(sample.frames[4]); XCTAssertEqual(loader.reads, 2)
+      XCTAssertNotEqual(f.page.state.presentation?.backgroundSnapshot?.identity, imageID)
+      guard case .ready(let image) = next.snapshot.resource.state else { return XCTFail("Replacement image did not arrive under No Quit") }
+      XCTAssertEqual(image.encodedData, loader.data)
+      let register = WebsiteConfigFileRegister(directory: f.directory)
+      guard case .available(let saved) = try register.read().state else { return XCTFail("Missing saved background command") }
+      XCTAssertEqual(saved["customBackground"], .string("https://example.invalid/after.png"))
+    }
+  }
   func testCancellingTextInitializationKeepsTheAcceptedBackgroundDownloadAndRecoveryReusesIt() async throws {
     let gate = BackgroundGate(), quotes = RestartQuotes()
     let f = try Fixture(fetchRemoteBackground: gate.read, loadQuotes: quotes.read)
@@ -404,6 +493,72 @@ import XCTest
     try await f.workflow.apply(json: nil, systemIsDark: false)
     XCTAssertTrue(f.page.state.presentation?.backgroundDisplay === display)
     XCTAssertEqual(gate.reads, 1); XCTAssertEqual(try register.read().revision, revision)
+  }
+  func testBackgroundAddressTrimsBeforeSchemaAdmissionWithoutChangingNativeFallback() async throws {
+    let f = try Fixture(fetchRemoteBackground: { address, _ in .failed(address: address) }); defer { f.close() }; try await f.publish()
+    let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+    XCTAssertTrue(CustomBackgroundCommandEditorPolicy.apply("\u{FEFF}  https://example.invalid/after.png \n", kind: .remoteURL, to: f.settings))
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress, .string("https://example.invalid/after.png"))
+    XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
+  }
+  func testBackgroundFitDuringDownloadSurvivesNoQuitLockWithoutApplyingSavedFilters() async throws {
+    let gate = BackgroundGate(), f = try Fixture(fetchRemoteBackground: gate.read)
+    defer { gate.release(nil); f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","funbox":["no_quit"],"customBackground":"https://example.invalid/before.png"}"#, systemIsDark: false)
+    try await gate.wait()
+    let display = try XCTUnwrap(f.page.state.presentation?.backgroundDisplay)
+    var state = f.page.state; state.session.insertBatch(String(state.session.nextExpectedCharacter!)); f.page.replace(state)
+    f.settings.setNoQuitConfigurationLock(true, for: f.page.owner)
+    XCTAssertFalse(f.settings.allowsRestartingConfigurationChange)
+    let generation = f.page.state.session.generationState
+    XCTAssertTrue(CustomBackgroundCommandEditorPolicy.apply("0.5suffix", kind: .brightness, to: f.settings))
+    XCTAssertTrue(CustomBackgroundCommandApplication.applyImmediate(.fit(.contain), to: f.settings))
+    gate.release(try OwnedBackgroundImageFixture.make()); await display.waitForCompletion()
+    guard case .ready? = f.page.state.presentation?.backgroundSnapshot?.resource.state else { return XCTFail("No Quit lock retired an admitted image") }
+    XCTAssertEqual(f.page.state.presentation?.backgroundSnapshot?.fitOverride, .contain)
+    XCTAssertEqual(f.page.state.presentation?.backgroundSnapshot?.preferences.backgroundFilter.brightness, 1)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundFilter.brightness, 0.5)
+    XCTAssertEqual(gate.reads, 1); XCTAssertEqual(f.page.state.session.generationState, generation)
+  }
+  func testLocalBackgroundImportAndRemovalUseTheProfileWithoutSavingNativeFallback() async throws {
+    let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read)
+    defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","funbox":["no_quit"],"customBackground":"https://example.invalid/before.png"}"#, systemIsDark: false)
+    await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+    var state = f.page.state; state.session.insertBatch(String(state.session.nextExpectedCharacter!)); f.page.replace(state)
+    f.settings.setNoQuitConfigurationLock(true, for: f.page.owner)
+    let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    let savedDraft = try XCTUnwrap(f.page.state.presentation?.publication.savedDraft.projection.runtime)
+    XCTAssertEqual(f.settings.preferenceConfigurationSaves.applyBackgroundEdit(.localFile(loader.data)), true)
+    let local = try XCTUnwrap(f.page.state.presentation?.backgroundDisplay); await local.waitForCompletion()
+    XCTAssertEqual(local.snapshot.resource.source, .local); XCTAssertEqual(loader.reads, 1)
+    guard case .ready(let image) = local.snapshot.resource.state else { return XCTFail("Local background did not arrive") }
+    XCTAssertEqual(image.encodedData, loader.data); XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.page.state.presentation?.publication.savedDraft.projection.runtime, savedDraft)
+    CustomBackgroundCommandApplication.removeBackground(from: f.settings) { XCTFail("Owned removal called the native fallback") }
+    let removed = try XCTUnwrap(f.page.state.presentation?.backgroundDisplay); await removed.waitForCompletion()
+    guard case .none = removed.snapshot.resource.state else { return XCTFail("Remove kept image pixels") }
+    XCTAssertFalse(f.settings.hasLocalBackground); XCTAssertEqual(loader.reads, 1)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress, .string(""))
+    XCTAssertNotEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
+  }
+  func testBackgroundConflictAndOwnedRejectionCannotFallThroughToNativeSettings() async throws {
+    let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read)
+    defer { f.close() }; try await f.publish()
+    let before = try XCTUnwrap(f.page.state.presentation), preferences = f.settings.snapshot
+    let generation = f.page.state.session.generationState
+    let register = WebsiteConfigFileRegister(directory: f.directory)
+    f.probe.action = {
+      f.probe.action = nil
+      XCTAssertFalse(CustomBackgroundCommandApplication.applyImmediate(.fit(.max), to: f.settings))
+      let draft = try! WebsiteConfigNativeProfile.prepareDraft(#"{"fontFamily":"Courier","theme":"nord"}"#, pointsPerRem: 16, context: .init())
+      _ = try! register.commit(draft, replacing: XCTUnwrap(register.read().revision))
+    }
+    XCTAssertFalse(CustomBackgroundCommandEditorPolicy.apply("https://example.invalid/after.png", kind: .remoteURL, to: f.settings))
+    XCTAssertTrue(f.page.state.presentation === before); XCTAssertEqual(loader.reads, 0)
+    XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
   }
   func testBackgroundDownloadDoesNotBlockPracticeAndLateResultsRespectItsCurrentAuthority() async throws {
     for outcome in ["success", "failure", "retry", "owner", "disk", "replacement", "stop"] {

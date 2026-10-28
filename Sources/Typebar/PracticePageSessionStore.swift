@@ -395,6 +395,16 @@ final class PracticePageSessionStore {
     try validateCommitOwnership(owner: lease, router: router, capture: capture)
     committing = true
   }
+  func beginLiveBackgroundCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture, draft: WebsiteConfigNativeDraft,
+    resourceOnly: Bool = false) throws {
+    guard state.configurationDeparture == nil, state.savedApplication == nil, state.sharedReceipt == nil,
+      resourceOnly ? draft.projection.runtime == capture.publication.draft.projection.runtime
+        : WebsiteBackgroundCommand.admits(draft, from: capture.publication.draft)
+    else { throw PracticePageSessionStateError.locked }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture)
+    committing = true
+  }
   func beginRandomThemeCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
     router: PreferenceConfigurationSaveRouter, capture: GenerationCapture) throws {
     guard state.configurationDeparture == nil, state.savedApplication == nil, state.sharedReceipt == nil

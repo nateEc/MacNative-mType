@@ -112,6 +112,7 @@ enum CustomBackgroundCommandApplication {
     onConfigurationSave: () -> Void = {}
   ) -> Bool {
     guard case .fit(let fit) = target else { return false }
+    if let accepted = settings.preferenceConfigurationSaves.applyBackgroundEdit(.fit(fit)) { return accepted }
     settings.customBackgroundFit = fit
     onConfigurationSave()
     return true
@@ -121,6 +122,7 @@ enum CustomBackgroundCommandApplication {
   static func removeBackground(
     from settings: AppSettings, onConfigurationSave: () -> Void = {}, removeLocal: () throws -> Void
   ) rethrows {
+    if settings.preferenceConfigurationSaves.applyBackgroundEdit(.remove) != nil { return }
     try removeLocal()
     settings.customBackgroundURL = ""
     onConfigurationSave()
@@ -150,6 +152,8 @@ enum CustomBackgroundCommandEditorPolicy {
     _ rawValue: String, kind: CustomBackgroundCommandEditorKind, to settings: AppSettings,
     onConfigurationSave: () -> Void = {}
   ) -> Bool {
+    let edit: PracticeBackgroundEdit = kind == .remoteURL ? .address(rawValue) : .filter(kind, rawValue)
+    if let accepted = settings.preferenceConfigurationSaves.applyBackgroundEdit(edit) { return accepted }
     guard let value = value(from: rawValue, kind: kind) else { return false }
     switch value {
     case .remoteURL(let url):
@@ -186,21 +190,26 @@ struct CustomBackgroundCommandEditor: View {
   @Environment(\.dismiss) private var dismiss
   let kind: CustomBackgroundCommandEditorKind
   let onApply: (String) -> Void
+  let validate: ((String) -> Bool)?
+  let detail: String?
   @State private var text: String
   @FocusState private var inputFocused: Bool
 
   init(
     kind: CustomBackgroundCommandEditorKind, initialText: String,
+    validate: ((String) -> Bool)? = nil, detail: String? = nil,
     onApply: @escaping (String) -> Void
   ) {
     self.kind = kind
     self.onApply = onApply
+    self.validate = validate; self.detail = detail
     _text = State(initialValue: initialText)
   }
 
   private var value: CustomBackgroundCommandEditorValue? {
     CustomBackgroundCommandEditorPolicy.value(from: text, kind: kind)
   }
+  private var valid: Bool { validate?(text) ?? (value != nil) }
 
   var body: some View {
     NavigationStack {
@@ -208,7 +217,7 @@ struct CustomBackgroundCommandEditor: View {
         Section(kind.title) {
           TextField(kind == .remoteURL ? "https://…/image.jpg" : "数值", text: $text)
             .focused($inputFocused)
-          if value == nil {
+          if !valid {
             Text(validationMessage)
               .foregroundStyle(.red)
           }
@@ -228,12 +237,12 @@ struct CustomBackgroundCommandEditor: View {
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("应用") {
-            guard value != nil else { return }
+            guard valid else { return }
             onApply(text)
             dismiss()
           }
           .keyboardShortcut(.defaultAction)
-          .disabled(value == nil)
+          .disabled(!valid)
         }
       }
     }
@@ -242,6 +251,7 @@ struct CustomBackgroundCommandEditor: View {
   }
 
   private var validationMessage: String {
+    if validate != nil, kind != .remoteURL { return "请输入有效数值。" }
     if kind == .remoteURL {
       return "请输入 HTTP(S) 的 PNG、JPG、GIF 或 WebP 图片 URL；留空可移除 URL。"
     }
@@ -250,6 +260,7 @@ struct CustomBackgroundCommandEditor: View {
   }
 
   private var explanation: String {
+    if let detail { return detail }
     if kind == .remoteURL {
       return "只有应用 URL 后 Typebar 才会访问该图片地址；本地图片仍优先显示。"
     }

@@ -30,6 +30,9 @@ final class PreferenceConfigurationSaveRouter {
   private var themeProviders: [UUID: () -> WebsiteConfigNativeThemes?] = [:]
   private var themeEditHandlers: [UUID: (PracticeThemeEdit) -> Bool?] = [:]
   private var deliveringThemeEdit = false
+  private var backgroundProviders: [UUID: () -> WebsiteConfigNativePagePreferences?] = [:]
+  private var backgroundEditHandlers: [UUID: (PracticeBackgroundEdit) -> Bool?] = [:]
+  private var deliveringBackgroundEdit = false
   private var priority: [UUID] = []
   private var isDelivering = false
 
@@ -41,6 +44,8 @@ final class PreferenceConfigurationSaveRouter {
     fontEdit: ((PracticeFontEdit) -> Bool?)? = nil,
     themes: (() -> WebsiteConfigNativeThemes?)? = nil,
     themeEdit: ((PracticeThemeEdit) -> Bool?)? = nil,
+    background: (() -> WebsiteConfigNativePagePreferences?)? = nil,
+    backgroundEdit: ((PracticeBackgroundEdit) -> Bool?)? = nil,
     save: @escaping () -> Void) {
     leaseTransitions += 1
     defer { leaseTransitions -= 1 }
@@ -55,6 +60,7 @@ final class PreferenceConfigurationSaveRouter {
     fontEditHandlers[owner] = fontEdit
     themeProviders[owner] = themes
     themeEditHandlers[owner] = themeEdit
+    backgroundProviders[owner] = background; backgroundEditHandlers[owner] = backgroundEdit
     if activeBefore != priority.last || priority.last == owner { generation = UUID() }
   }
 
@@ -96,7 +102,7 @@ final class PreferenceConfigurationSaveRouter {
   /// nil selects the legacy native path; false is an owned rejection and must
   /// never fall through to mutating another configuration.
   func applyFontEdit(_ edit: PracticeFontEdit) -> Bool? {
-    guard !deliveringFontEdit, !deliveringThemeEdit, !isDelivering, leaseTransitions == 0 else { return false }
+    guard !deliveringFontEdit, !deliveringThemeEdit, !deliveringBackgroundEdit, !isDelivering, leaseTransitions == 0 else { return false }
     guard captureLease() != nil, let owner = priority.last, let action = fontEditHandlers[owner] else { return nil }
     deliveringFontEdit = true; defer { deliveringFontEdit = false }
     return action(edit)
@@ -107,12 +113,21 @@ final class PreferenceConfigurationSaveRouter {
     return themeProviders[owner]?()
   }
   func applyThemeEdit(_ edit: PracticeThemeEdit) -> Bool? {
-    guard !deliveringThemeEdit, !deliveringFontEdit, !isDelivering, leaseTransitions == 0 else { return false }
+    guard !deliveringThemeEdit, !deliveringFontEdit, !deliveringBackgroundEdit, !isDelivering, leaseTransitions == 0 else { return false }
     guard captureLease() != nil, let owner = priority.last, let action = themeEditHandlers[owner] else { return nil }
     deliveringThemeEdit = true; defer { deliveringThemeEdit = false }
     return action(edit)
   }
 
+  var background: WebsiteConfigNativePagePreferences? {
+    guard let owner = priority.last else { return nil }; return backgroundProviders[owner]?()
+  }
+  func applyBackgroundEdit(_ edit: PracticeBackgroundEdit) -> Bool? {
+    guard !deliveringBackgroundEdit, !deliveringThemeEdit, !deliveringFontEdit, !isDelivering, leaseTransitions == 0 else { return false }
+    guard captureLease() != nil, let owner = priority.last, let action = backgroundEditHandlers[owner] else { return nil }
+    deliveringBackgroundEdit = true; defer { deliveringBackgroundEdit = false }
+    return action(edit)
+  }
   func activate(owner: UUID) {
     guard handlers[owner] != nil else { return }
     leaseTransitions += 1
@@ -136,6 +151,7 @@ final class PreferenceConfigurationSaveRouter {
     fontEditHandlers.removeValue(forKey: owner)
     themeProviders.removeValue(forKey: owner)
     themeEditHandlers.removeValue(forKey: owner)
+    backgroundProviders.removeValue(forKey: owner); backgroundEditHandlers.removeValue(forKey: owner)
     priority.removeAll { $0 == owner }
     if activeBefore != priority.last { generation = UUID() }
   }
@@ -143,7 +159,7 @@ final class PreferenceConfigurationSaveRouter {
   /// A true result means delivery, not successful persistence or disk durability.
   @discardableResult
   func deliver() -> Bool {
-    guard !isDelivering, let owner = priority.last, let save = handlers[owner] else { return false }
+    guard !isDelivering, !deliveringBackgroundEdit, let owner = priority.last, let save = handlers[owner] else { return false }
     isDelivering = true
     defer { isDelivering = false }
     save()

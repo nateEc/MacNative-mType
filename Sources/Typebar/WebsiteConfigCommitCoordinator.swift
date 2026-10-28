@@ -753,14 +753,14 @@ final class WebsiteConfigCommitCoordinator {
   /// A file change is not a configuration setter. Capture the latest page
   /// under the new resource epoch, retaining its separate saved snapshot.
   func prepareFontRefresh(for page: PracticePageSessionStore, local: WebsiteConfigFontResource.Local) throws -> FontRefreshPrepared {
-    let prepared = try fontRefreshTicket(for: page)
+    let prepared = try resourceRefreshTicket(for: page)
     let admission = try beginAsyncResources(prepared)
     let font = try WebsiteConfigFontResource.prepare(typography: prepared.draft.keyboardTypography,
       language: prepared.draft.testParameters.language, local: local)
     try checkAsyncResources(prepared, admission: admission)
     return .init(configuration: prepared, admission: admission, font: font)
   }
-  private func fontRefreshTicket(for page: PracticePageSessionStore) throws -> Prepared {
+  private func resourceRefreshTicket(for page: PracticePageSessionStore) throws -> Prepared {
     guard !processing, page.restartController?.isPreparing != true else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     processing = true; defer { processing = false }
     guard page.state.configurationDeparture == nil, page.state.savedApplication == nil, page.state.sharedReceipt == nil
@@ -887,7 +887,8 @@ final class WebsiteConfigCommitCoordinator {
       session: state.session, practice: updatedPractice, quoteRecoveries: capture.publication.quoteRecoveries,
       ownerLease: prepared.owner, authority: publicationAuthority)
     let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: value.appearance,
-      backgroundDisplay: state.presentation?.backgroundDisplay)
+      backgroundDisplay: state.presentation?.backgroundDisplay, backgroundFallback: state.presentation?.backgroundFallback,
+      backgroundFitOverride: state.presentation?.backgroundFitOverride)
     state = .init(session: state.session, presentation: presentation, practice: updatedPractice,
       priorAttemptLedger: state.priorAttemptLedger, restartDepartureAttemptID: state.restartDepartureAttemptID,
       quoteInitialization: state.quoteInitialization)
@@ -902,7 +903,17 @@ final class WebsiteConfigCommitCoordinator {
     chooseThemeIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> Outcome {
     try commitLiveEdit(prepared, for: page, kind: .theme, customThemeIDs: customThemeIDs, chooseThemeIndex: chooseThemeIndex)
   }
-  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap, layoutFluid, font, theme }
+  struct BackgroundRefreshPrepared { fileprivate let configuration: Prepared }
+  func prepareBackgroundRefresh(for page: PracticePageSessionStore) throws -> BackgroundRefreshPrepared {
+    .init(configuration: try resourceRefreshTicket(for: page))
+  }
+  func commitBackgroundRefresh(_ prepared: BackgroundRefreshPrepared, for page: PracticePageSessionStore) throws -> Outcome {
+    try commitLiveEdit(prepared.configuration, for: page, kind: .backgroundResource)
+  }
+  func commitLiveBackground(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, kind: .background)
+  }
+  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap, layoutFluid, font, theme, background, backgroundResource }
   private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind,
     paceTarget: Double? = nil, font: WebsiteConfigFontResource? = nil, customThemeIDs: [String] = [],
     chooseThemeIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> Outcome {
@@ -916,6 +927,12 @@ final class WebsiteConfigCommitCoordinator {
       guard kind == .layoutFluid, page.state.session.ownsWebsiteWordNavigation(navigation) else { return .stale }
     }
     switch kind {
+    case .background:
+      guard WebsiteBackgroundCommand.admits(prepared.draft, from: capture.publication.draft), page.state.sharedReceipt == nil else { return .stale }
+    case .backgroundResource:
+      guard prepared.draft.projection.runtime == capture.publication.draft.projection.runtime,
+        prepared.draft.settingsStoreValues == capture.publication.draft.settingsStoreValues,
+        page.state.sharedReceipt == nil else { return .stale }
     case .theme:
       guard WebsiteThemeCommand.admits(prepared.draft, from: capture.publication.draft), page.state.sharedReceipt == nil else { return .stale }
     case .font:
@@ -954,10 +971,20 @@ final class WebsiteConfigCommitCoordinator {
       publishedDraft = effect.draft
       themeAppearance = effect.appearance
     } else { themeAppearance = nil }
+    var backgroundDisplay = previous.backgroundDisplay
+    var backgroundFit = previous.backgroundFitOverride
+    var backgroundFallback = previous.backgroundFallback ?? (backgroundDisplay == nil ? previous.backgroundSnapshot : nil)
+    if kind == .backgroundResource || (kind == .background && prepared.draft.projection.events.first?.key == "customBackground") {
+      backgroundDisplay = .init(owner: page.owner, preferences: prepared.draft.pagePreferences,
+        pointsPerRem: prepared.environment.pointsPerRem, previous: previous.backgroundSnapshot)
+      backgroundFit = nil; backgroundFallback = nil
+    } else if kind == .background, prepared.draft.projection.events.first?.key == "customBackgroundSize" {
+      backgroundFit = prepared.draft.pagePreferences.backgroundFit
+    }
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
     if kind == .inputRule { state.session.synchronizeWebsiteInputRules(prepared.draft.inputRules.rules) }
-    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap && kind != .layoutFluid && kind != .font && kind != .theme {
+    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap && kind != .layoutFluid && kind != .font && kind != .theme && kind != .background && kind != .backgroundResource {
       state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules, websiteThresholds: true)
     }
     if kind == .appearance, case .edited(let edit) = prepared.draft.origin, edit.key == "highlightMode" {
@@ -971,6 +998,9 @@ final class WebsiteConfigCommitCoordinator {
     guard isCurrent(prepared) else { return .stale }
     try Task.checkCancellation()
     switch kind {
+    case .background, .backgroundResource:
+      try page.beginLiveBackgroundCommit(owner: prepared.owner, router: router, capture: capture,
+        draft: prepared.draft, resourceOnly: kind == .backgroundResource)
     case .theme:
       try page.beginLiveThemeCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .font:
@@ -994,7 +1024,7 @@ final class WebsiteConfigCommitCoordinator {
     case .threshold: try page.beginCommit(owner: prepared.owner, router: router, capture: capture)
     }
     defer { page.endCommit() }
-    let volatile = kind == .layoutFluid && prepared.draft.projection.events.first?.nosave == true
+    let volatile = kind == .backgroundResource || (kind == .layoutFluid && prepared.draft.projection.events.first?.nosave == true)
     let revision: WebsiteConfigFileRegister.Revision
     do {
       if volatile {
@@ -1016,9 +1046,14 @@ final class WebsiteConfigCommitCoordinator {
       background: capture.publication.background, font: font ?? capture.publication.font,
       session: state.session, practice: updatedPractice, quoteRecoveries: capture.publication.quoteRecoveries,
       ownerLease: prepared.owner, authority: publicationAuthority)
-    let presentation = themeAppearance.map { WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: $0,
-      backgroundDisplay: previous.backgroundDisplay) }
-      ?? previous.retainingAppearance(for: publication)
+    let presentation: WebsiteConfigPublishedPresentation
+    if kind == .background || kind == .backgroundResource {
+      presentation = previous.changingBackground(for: publication, display: backgroundDisplay, fit: backgroundFit, fallback: backgroundFallback)
+    } else {
+      presentation = themeAppearance.map { WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: $0,
+        backgroundDisplay: previous.backgroundDisplay, backgroundFallback: backgroundFallback, backgroundFitOverride: backgroundFit) }
+        ?? previous.retainingAppearance(for: publication)
+    }
     state = .init(session: state.session, presentation: presentation,
       practice: updatedPractice, priorAttemptLedger: state.priorAttemptLedger,
       restartDepartureAttemptID: state.restartDepartureAttemptID, quoteInitialization: state.quoteInitialization)
@@ -1034,6 +1069,7 @@ final class WebsiteConfigCommitCoordinator {
   private let router: PreferenceConfigurationSaveRouter
   private let register: WebsiteConfigFileRegister
   private let environment: () -> Environment?
+  private let backgroundRevision: () -> UUID?
   private let externalLoader: WebsiteConfigSessionBuilder.ExternalLoader?
   private let identity = UUID()
   private var request = UUID()
@@ -1048,8 +1084,10 @@ final class WebsiteConfigCommitCoordinator {
 
   init(router: PreferenceConfigurationSaveRouter, register: WebsiteConfigFileRegister,
     loadExternal: WebsiteConfigSessionBuilder.ExternalLoader? = nil,
+    backgroundRevision: (() -> UUID?)? = nil,
     environment: @escaping () -> Environment?) {
     self.router = router; self.register = register; self.environment = environment
+    self.backgroundRevision = backgroundRevision ?? { environment()?.revision }
     externalLoader = loadExternal
     publicationAuthority = .init(register: register)
   }
@@ -1420,16 +1458,8 @@ final class WebsiteConfigCommitCoordinator {
         backgroundLimits.decodedBytes > 0, backgroundLimits.frames > 0
       else { throw WebsiteConfigBackgroundResourceError.invalidLimits }
       let display = pending.background
-      let lease = prepared.owner
-      if backgroundWork !== display { backgroundWork?.cancel(); backgroundWork = display }
-      display.start(readLocal: {
-        if let data = try settings.localBackgroundStore.encodedData(maximumBytes: backgroundLimits.encodedBytes) { return .data(data) }
-        return .absent
-      }, fetchRemote: fetchRemoteBackground ?? { try await remoteReader.read(address: $0, maximumBytes: $1) },
-        limits: backgroundLimits, whileCurrent: { [weak self, weak page, weak display] in
-          guard let self, let page, let display else { return false }
-          return self.backgroundIsCurrent(display, for: page, lease: lease)
-        })
+      startBackground(display, for: page, lease: prepared.owner, from: settings,
+        fetchRemote: fetchRemoteBackground ?? { try await remoteReader.read(address: $0, maximumBytes: $1) }, limits: backgroundLimits)
       let localFont = try await readAsyncResource(prepared, admission: admission) {
         try settings.readLocalPracticeFontResource(maximumBytes: maximumFontBytes)
       }
@@ -1448,17 +1478,40 @@ final class WebsiteConfigCommitCoordinator {
       }, fetchRemoteBackground: fetchRemoteBackground ?? { try await remoteReader.read(address: $0, maximumBytes: $1) },
       maximumFontBytes: maximumFontBytes, backgroundLimits: backgroundLimits)
   }
+  func startPublishedBackground(for page: PracticePageSessionStore, from settings: AppSettings,
+    fetchRemote: (@MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote)? = nil) {
+    guard let p = page.state.presentation, let display = p.backgroundDisplay else { return }
+    startBackground(display, for: page, lease: p.publication.ownerLease, from: settings,
+      fetchRemote: fetchRemote ?? { try await WebsiteConfigBackgroundRemoteReader().read(address: $0, maximumBytes: $1) }, limits: .init())
+  }
+  private func startBackground(_ display: WebsiteConfigBackgroundDisplay, for page: PracticePageSessionStore,
+    lease: PreferenceConfigurationSaveRouter.Lease, from settings: AppSettings,
+    fetchRemote: @escaping @MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote,
+    limits: WebsiteConfigBackgroundResource.Limits) {
+    if backgroundWork !== display { backgroundWork?.cancel(); backgroundWork = display }
+    let revision = backgroundRevision()
+    display.start(readLocal: {
+      if let data = try settings.localBackgroundStore.encodedData(maximumBytes: limits.encodedBytes) { return .data(data) }
+      return .absent
+    }, fetchRemote: fetchRemote, limits: limits, preferencesNow: { [weak page] in
+      guard let draft = page?.state.savedApplication?.draft ?? page?.state.presentation?.publication.draft else { return nil }
+      var runtime = draft.projection.runtime
+      runtime["customBackgroundFilter"] = draft.settingsStoreValues["customBackgroundFilter"]
+      return try? WebsiteConfigNativePagePreferences(runtime: runtime)
+    }, whileCurrent: { [weak self, weak page, weak display] in
+      guard let self, let page, let display else { return false }
+      return self.backgroundIsCurrent(display, for: page, lease: lease, revision: revision)
+    })
+  }
   private func backgroundIsCurrent(_ display: WebsiteConfigBackgroundDisplay, for page: PracticePageSessionStore,
-    lease: PreferenceConfigurationSaveRouter.Lease) -> Bool {
+    lease: PreferenceConfigurationSaveRouter.Lease, revision: UUID?) -> Bool {
     guard backgroundWork === display, router.isCurrent(lease) else { return false }
-    let currentEnvironment = environment()
+    guard let revision, backgroundRevision() == revision else { return false }
     guard backgroundWork === display, router.isCurrent(lease) else { return false }
     if let pending = page.state.savedApplication, pending.background === display {
-      return currentEnvironment == pending.ticket.environment
-        && (try? register.read().revision) == pending.ticket.disk && router.isCurrent(lease)
+      return (try? register.read().revision) == pending.ticket.disk && router.isCurrent(lease)
     }
-    guard let presentation = page.state.presentation, presentation.backgroundDisplay === display,
-      currentEnvironment?.revision == presentation.publication.environmentRevision else { return false }
+    guard let presentation = page.state.presentation, presentation.backgroundDisplay === display else { return false }
     return presentation.publication.isCurrentDelivery(owner: page.owner, router: router)
   }
   private func checkAsyncResources(_ prepared: Prepared, admission: UUID) throws {
@@ -2247,6 +2300,8 @@ final class WebsiteConfigCommitCoordinator {
     let applicationID = UUID()
     let appearance: WebsiteConfigPublishedPresentation.PreparedAppearance?
     let backgroundDisplay: WebsiteConfigBackgroundDisplay?
+    let backgroundFallback: WebsiteConfigBackgroundDisplay.Snapshot?
+    let backgroundFit: CustomBackgroundFit?
     if let page {
       if let pending = page.state.configurationDeparture,
         prepared.pageCapture?.configurationDeparture != pending.id,
@@ -2265,11 +2320,16 @@ final class WebsiteConfigCommitCoordinator {
         appearance = try WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
           applicationID: applicationID, systemIsDark: systemIsDark, previous: page.state.presentation)
       }
-      let display = page.state.savedApplication?.background ?? page.state.presentation?.backgroundDisplay
-      backgroundDisplay = display?.matches(prepared.draft) == true ? display : nil
+      if let pending = page.state.savedApplication, pending.background.matches(prepared.draft) {
+        backgroundDisplay = pending.background; backgroundFallback = nil; backgroundFit = nil
+      } else if let previous = page.state.presentation, previous.hasSameBackgroundConfiguration(as: prepared.draft) {
+        backgroundDisplay = previous.backgroundDisplay
+        backgroundFallback = previous.backgroundFallback ?? (previous.backgroundDisplay == nil ? previous.backgroundSnapshot : nil)
+        backgroundFit = previous.backgroundFitOverride
+      } else { backgroundDisplay = nil; backgroundFallback = nil; backgroundFit = nil }
       try page.beginCommit(owner: prepared.owner, router: router, capture: prepared.pageCapture,
         applicationCapture: prepared.applicationCapture)
-    } else { appearance = nil; backgroundDisplay = nil }
+    } else { appearance = nil; backgroundDisplay = nil; backgroundFallback = nil; backgroundFit = nil }
     defer { page?.endCommit() }
     let outcome: WebsiteConfigFileRegister.Commit
     let restoringNative: Bool
@@ -2292,7 +2352,7 @@ final class WebsiteConfigCommitCoordinator {
         ownerLease: prepared.owner, authority: publicationAuthority)
       if let page, let appearance, let session, let practice {
         let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: appearance,
-          backgroundDisplay: backgroundDisplay)
+          backgroundDisplay: backgroundDisplay, backgroundFallback: backgroundFallback, backgroundFitOverride: backgroundFit)
         page.installCommitted(.init(session: session.withElapsedClock(), presentation: presentation, practice: practice,
           priorAttemptLedger: page.state.priorAttemptLedger), retainingRestartController: prepared.restartController)
       }

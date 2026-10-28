@@ -1904,7 +1904,9 @@ private struct ContentView: View {
         fontPointSize: { committedPracticeDraft?.keyboardTypography.fontSize },
         fontEdit: { applyWebsiteFontEdit($0) },
         themes: { committedPracticeDraft?.themes },
-        themeEdit: { applyWebsiteThemeEdit($0) }) {
+        themeEdit: { applyWebsiteThemeEdit($0) },
+        background: { committedPracticeDraft?.pagePreferences },
+        backgroundEdit: { applyWebsiteBackgroundEdit($0) }) {
         persistExplicitTestConfiguration()
       }
       installWebsiteArchiveAdmission()
@@ -2348,9 +2350,14 @@ private struct ContentView: View {
     .sheet(item: $customBackgroundCommandEditorKind) { kind in
       CustomBackgroundCommandEditor(
         kind: kind,
-        initialText: CustomBackgroundCommandEditorPolicy.initialText(
-          kind: kind, remoteURL: settings.customBackgroundURL,
-          filter: settings.customBackgroundFilter)
+        initialText: committedPracticeDraft.map { WebsiteBackgroundCommand.initialText(kind, preferences: $0.pagePreferences) }
+          ?? CustomBackgroundCommandEditorPolicy.initialText(kind: kind, remoteURL: settings.customBackgroundURL, filter: settings.customBackgroundFilter),
+        validate: pageSessionStore.ownsConfigurationSelection ? { text in
+          guard let draft = committedPracticeDraft else { return false }
+          let edit: PracticeBackgroundEdit = kind == .remoteURL ? .address(text) : .filter(kind, text)
+          return (try? WebsiteBackgroundCommand.field(edit, current: draft)) != nil
+        } : nil,
+        detail: committedPracticeDraft != nil && kind != .remoteURL ? "过滤器命令会保存数值，下次应用背景图片时显示。" : nil
       ) { value in
         if CustomBackgroundCommandEditorPolicy.apply(value, kind: kind, to: settings,
           onConfigurationSave: persistExplicitTestConfiguration) {
@@ -4165,6 +4172,19 @@ private struct ContentView: View {
     return commandFontFamilyName.replacingOccurrences(of: "_", with: " ")
   }
 
+  private func applyWebsiteBackgroundEdit(_ edit: PracticeBackgroundEdit) -> Bool? {
+    guard pageSessionStore.ownsConfigurationSelection else { return nil }
+    guard let publication = pageSession.presentation?.publication else {
+      customBackgroundCommandMessage = "配置正在准备，请完成后再修改背景。"; return false
+    }
+    do {
+      try importWorkflow().runBackgroundCommand(edit, replacing: publication.applicationID)
+      customBackgroundCommandMessage = nil; return true
+    } catch {
+      customBackgroundCommandMessage = (error as? LocalizedError)?.errorDescription ?? "背景设置未完成，请重新应用。"
+      return false
+    }
+  }
   private func applyWebsiteThemeEdit(_ edit: PracticeThemeEdit) -> Bool? {
     guard pageSessionStore.ownsConfigurationSelection else { return nil }
     guard let publication = pageSession.presentation?.publication else {
@@ -6292,7 +6312,8 @@ private struct ContentView: View {
         theme: theme, isFavorite: committedPracticeDraft?.themes.favorites.contains(theme) ?? settings.isFavoriteTheme(theme)))
     }
     items.append(contentsOf: CustomBackgroundCommandCatalog.items(
-      hasBackground: settings.hasLocalBackground || !settings.customBackgroundURL.isEmpty))
+      hasBackground: settings.hasLocalBackground || (committedPracticeDraft.map { $0.pagePreferences.backgroundAddress.stringUnits?.isEmpty == false } ?? !settings.customBackgroundURL.isEmpty))
+      .filter { committedPracticeDraft == nil || !settings.hasLocalBackground || $0.id != "customLocalBackground" })
     items.append(contentsOf: PresetCommandCatalog.items(
       presets: savedPresets.compactMap { preset in
         guard let definition = preset.applicableDefinition else { return nil }
@@ -6891,7 +6912,9 @@ private struct ContentView: View {
       if canAccess { url.stopAccessingSecurityScopedResource() }
     }
     do {
-      try settings.importLocalBackground(data: Data(contentsOf: url))
+      let data = try Data(contentsOf: url)
+      if settings.preferenceConfigurationSaves.applyBackgroundEdit(.localFile(data)) != nil { return }
+      try settings.importLocalBackground(data: data)
       customBackgroundCommandMessage = nil
     } catch {
       customBackgroundCommandMessage = error.localizedDescription

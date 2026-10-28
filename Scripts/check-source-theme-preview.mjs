@@ -8,7 +8,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
-export async function checkThemePreview({context, simulation, frontend, bus, setters, defaults, verify, store, themeImportMode}) {
+export async function checkThemePreview({context, simulation, frontend, bus, setters, defaults, verify, store, themeImportMode, backgroundCommandMode, metadata}) {
   const archive=process.env.TYPEBAR_THEME_DEBOUNCE_ARCHIVE;
   assert.ok(archive,'TYPEBAR_THEME_DEBOUNCE_ARCHIVE required');
   const integrity='sha512-'+createHash('sha512').update(fs.readFileSync(archive)).digest('base64');
@@ -61,6 +61,10 @@ export async function checkThemePreview({context, simulation, frontend, bus, set
     // The real Solid store exposes array proxies; copy JSON config values by
     // enumeration in its own realm instead of structuredClone(proxy).
     const pick=value=>Object.fromEntries(keys.map(key=>[key,context.structuredClone(value[key])]));
+    if(backgroundCommandMode) {
+      const {checkBackgroundCommands}=await import('./check-source-background-commands.mjs');
+      return await checkBackgroundCommands({context,simulation,bus,setters,defaults,verify,store,extract,drain,metadata});
+    }
     if(themeImportMode) {
       const {checkThemeImportRestart}=await import('./check-source-theme-import-restart.mjs');
       return await checkThemeImportRestart({context,simulation,frontend,bus,setters,defaults,verify,store,extract,drain,pick,

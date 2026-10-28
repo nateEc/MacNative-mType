@@ -84,7 +84,7 @@ final class WebsiteConfigPublishedBackgroundView: NSView {
     switch resource.state {
     case .ready(let image):
       surface.configure(image: image, identity: snapshot.identity,
-        fit: snapshot.preferences.backgroundFit, filter: snapshot.preferences.backgroundFilter,
+        fit: snapshot.fitOverride ?? snapshot.preferences.backgroundFit, filter: snapshot.preferences.backgroundFilter,
         pointsPerRem: snapshot.pointsPerRem, feedback: feedback)
     case .none: surface.stop()
     case .failed(let reason):

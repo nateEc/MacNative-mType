@@ -57,7 +57,7 @@ struct WebsiteConfigNativeDraft {
     if case .received(let value) = origin {
       var store = value.storeAtBoundary
       for event in projection.events.dropFirst(value.appliedEventCount) {
-        if let new = event.newValue, store[event.key] != nil { store[event.key] = new }
+        if let new = event.newValue, let old = store[event.key] { store[event.key] = Self.storeValue(key: event.key, old: old, new: new) }
       }
       return store
     }
@@ -72,9 +72,18 @@ struct WebsiteConfigNativeDraft {
       events = projection.events[...]
     }
     for event in events {
-      if let value = event.newValue, values[event.key] != nil { values[event.key] = value }
+      if let value = event.newValue, let old = values[event.key] { values[event.key] = Self.storeValue(key: event.key, old: old, new: value) }
     }
     return values
+  }
+  private static func storeValue(key: String, old: WebsiteConfigValue, new: WebsiteConfigValue) -> WebsiteConfigValue {
+    guard key == "customBackgroundFilter", case .array(let previous) = old, case .array(let next) = new else { return new }
+    // Solid reconcile keeps numeric slots when === succeeds, including an
+    // existing +0 when Config's aliased filter array was changed to -0.
+    return .array(next.enumerated().map { index, value in
+      guard index < previous.count, case .number(let a) = previous[index], case .number(let b) = value, a == b else { return value }
+      return previous[index]
+    })
   }
   /// Restore evidence is never presented as an original JSON import.
   var prepared: WebsiteConfigPreparedImport? {

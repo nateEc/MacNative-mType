@@ -2,6 +2,10 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| BACKGROUND-COMMAND-13 | 完整配置的背景命令和显示保存边界 | 固定命令、构造器、真实配置总线／Solid、背景和 TestLogic 监听器；自有图片／DOM 适配 | WebsiteBackgroundCommand、活动窗口路由、背景实时提交与显示覆盖；WEBSITE_BACKGROUND_COMMAND_CONTRACT.md | 部分完成：地址、尺寸、过滤器、本地文件与移除接当前完整配置；命令只保存过滤器，尺寸即时更新，输入和有效下载保留。设置页滑块、无效输入的别名故障副作用、全部文件命令来源故障及实体交互仍开放。 |
+
+| ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
+| --- | --- | --- | --- | --- |
 | BACKGROUND-APPLICATION-12 | 完整导入期间的独立背景选择与加载 | 固定完整 applyCustomBackground／尺寸／过滤器及图片回调，受控本地存储和 DOM；图片为自有 PNG | WebsiteConfigBackgroundDisplay、独立资源流和 Root；WEBSITE_BACKGROUND_APPLICATION_LIFECYCLE_CONTRACT.md | 部分完成：背景加载与字体／文本初始化分离，挂起时保留旧图、选择后替换或清空，练习可先准备好；迟到值受窗口和配置版本约束。恢复不重复下载。过滤器区域的设置页交互、所有背景命令及实体验收仍开放。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |

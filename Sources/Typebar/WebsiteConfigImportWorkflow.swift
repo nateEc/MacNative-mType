@@ -217,6 +217,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     source = .init(environment: environment, readWindow: readWindow)
     coordinator = .init(router: settings.preferenceConfigurationSaves, register: .init(directory: directory),
       loadExternal: loadExternal,
+      backgroundRevision: { [environment] in environment.backgroundDisplayRevision() },
       environment: { [environment] in environment.read() })
     localFontUpdates = .init(page: page, settings: settings, refresh: { [weak self] in
       guard let self else { return .deferred }
@@ -440,6 +441,45 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
   }
 
+  @discardableResult
+  func runBackgroundCommand(_ edit: PracticeBackgroundEdit, replacing applicationID: UUID) throws -> String {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil, page.state.sharedReceipt == nil
+    else { throw WebsiteConfigImportWorkflowError.preparationPending }
+    guard let original = page.state.presentation?.publication, original.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
+    try Task.checkCancellation()
+    applying = true; operation = UUID()
+    defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; finishedApplying() }
+    if case .localFile(let data) = edit {
+      let resource = try WebsiteConfigBackgroundResource.prepare(loadedData: data, source: .local)
+      guard case .ready(let image) = resource.state,
+        ["public.png", "public.jpeg", "com.compuserve.gif", "org.webmproject.webp"].contains(image.type)
+      else { throw WebsiteBackgroundCommandError.invalidInput }
+      try settings.importLocalBackground(data: data)
+    } else if case .remove = edit { try settings.removeLocalBackground() }
+    return try environment.withSynchronousSetterRead {
+      let outcome: WebsiteConfigCommitCoordinator.Outcome
+      if case .localFile = edit {
+        outcome = try coordinator.commitBackgroundRefresh(coordinator.prepareBackgroundRefresh(for: page), for: page)
+      } else {
+        let (key, value) = try WebsiteBackgroundCommand.field(edit, current: original.draft)
+        let ticket = try coordinator.prepareEdit(key: key, value: value, for: page, refreshingWith: source)
+        prepared = ticket; outcome = try coordinator.commitLiveBackground(ticket, for: page)
+      }
+      switch outcome {
+      case .committed:
+        switch edit {
+        case .address, .remove, .localFile: coordinator.startPublishedBackground(for: page, from: settings, fetchRemote: fetchRemoteBackground)
+        case .fit, .filter: break
+        }
+        return "背景设置已应用。"
+      case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+      case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+      case .busy: throw WebsiteConfigImportWorkflowError.busy
+      }
+    }
+  }
   @discardableResult
   func runFontCommand(_ edit: PracticeFontEdit, replacing applicationID: UUID) throws -> String {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }

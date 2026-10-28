@@ -1,5 +1,7 @@
 # 完整导入背景的独立生命周期
 
+后续命令接线及背景资源版本与 No Quit 重开锁的拆分见 `WEBSITE_BACKGROUND_COMMAND_CONTRACT.md`。下文保留本批完整导入的证据与当时的边界。
+
 固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`，承接 `WEBSITE_THEME_PENDING_APPLICATION_CONTRACT.md` 中尚未完成的背景阶段。范围为完整导入和冷恢复；不将其扩大为所有背景菜单、字体显示或实体 UI 已验收。
 
 ## 顺序与边界

@@ -10,6 +10,8 @@ import Observation
     let resource: WebsiteConfigBackgroundResource
     let preferences: WebsiteConfigNativePagePreferences
     let pointsPerRem: Double
+    var fitOverride: CustomBackgroundFit? = nil
+    func fitting(_ fit: CustomBackgroundFit) -> Self { var copy = self; copy.fitOverride = fit; return copy }
   }
   enum Phase { case readingLocal, loading, settled, localReadFailed, retired }
   let owner: UUID
@@ -33,6 +35,7 @@ import Observation
   func start(readLocal: @escaping @MainActor () async throws -> WebsiteConfigBackgroundResource.Local,
     fetchRemote: @escaping @MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote,
     limits: WebsiteConfigBackgroundResource.Limits = .init(),
+    preferencesNow: (@MainActor () -> WebsiteConfigNativePagePreferences?)? = nil,
     whileCurrent: @escaping @MainActor () -> Bool) {
     guard !started else { return }; started = true
     phase = .readingLocal
@@ -56,9 +59,12 @@ import Observation
       }
       guard current() else { return }
       let identity = UUID()
+      // The source captures the URL before getFile, but reads filters and fit
+      // when that read completes. Later filter commands do not repaint img.
+      let selectedPreferences = preferencesNow?() ?? target
       @MainActor func publish(_ resource: WebsiteConfigBackgroundResource, phase: Phase) {
         snapshot = .init(owner: owner, identity: identity, resource: resource,
-          preferences: target, pointsPerRem: pointsPerRem)
+          preferences: selectedPreferences, pointsPerRem: pointsPerRem)
         self.phase = phase
       }
       do {

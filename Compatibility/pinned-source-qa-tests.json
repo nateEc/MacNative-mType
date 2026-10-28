@@ -471,6 +471,10 @@
       "file": "Tests/TypebarTests/WebsiteConfigBackgroundDisplayTests.swift"
     },
     {
+      "id": "TypebarTests.WebsiteThemeCommandTests/testBackgroundFilterFitAndAddressCommandsAgainstTheActualStoreAndControllers",
+      "file": "Tests/TypebarTests/WebsiteThemeCommandTests.swift"
+    },
+    {
       "id": "TypebarTests.ZenTapePracticeTests/testTwoRowNativeViewportAgainstCompletePinnedWrapperHeight",
       "file": "Tests/TypebarTests/ZenTapePracticeTests.swift"
     }
