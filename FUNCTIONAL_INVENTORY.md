@@ -2,7 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| THEME-RANDOM-SEQUENCE-11 | 随机候选、游标、收藏数组关联与故障边界 | 固定完整随机函数、洗牌和背景分类；自有目录／随机数输入 | WebsiteRandomThemeSequence、来源探针；WEBSITE_RANDOM_THEME_SEQUENCE_CONTRACT.md | 部分完成：纯值序列核心已建立并对照，含来源自定义 ID 故障和有界防卡住例外；尚未接入实际配置事件、随机覆盖、界面或重开，不能据此称随机轮换已完成。 |
+| THEME-RANDOM-SEQUENCE-11 | 随机候选、游标、收藏数组关联与故障边界 | 固定完整随机函数、真实 Solid 配置存储、洗牌和背景分类；自有目录／随机数输入 | WebsiteRandomThemeSequence、WebsiteRandomThemeConfiguration、来源探针；WEBSITE_RANDOM_THEME_SEQUENCE_CONTRACT.md | 部分完成：序列核心与配置准备层已建立；对照运行时／设置快照／保存值及 nosave、系统跟随关闭步骤，含来源自定义 ID 故障和有界防卡住例外；尚未接入实际页面提交、随机覆盖、界面或重开，不能据此称随机轮换已完成。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |

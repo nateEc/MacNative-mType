@@ -8,7 +8,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
-export async function checkThemePreview({context, simulation, frontend, bus, setters, defaults, verify}) {
+export async function checkThemePreview({context, simulation, frontend, bus, setters, defaults, verify, store}) {
   const archive=process.env.TYPEBAR_THEME_DEBOUNCE_ARCHIVE;
   assert.ok(archive,'TYPEBAR_THEME_DEBOUNCE_ARCHIVE required');
   const integrity='sha512-'+createHash('sha512').update(fs.readFileSync(archive)).digest('base64');
@@ -51,6 +51,39 @@ export async function checkThemePreview({context, simulation, frontend, bus, set
     +'\nglobalThis.favoriteCommands=commands;',context);
   async function drain() {
     for(let count=0;pending.length;count++) {assert.ok(count<30);const batch=pending;pending=[];await Promise.all(batch);}
+  }
+  if(store) {
+    vm.runInContext(extract('../../../packages/util/src/numbers.ts','export function randomIntFromRange','\n}\n'),context);
+    vm.runInContext(extract('utils/arrays.ts','export function shuffle','\n}\n'),context);
+    context.Arrays.shuffle=context.shuffle;
+    Object.assign(context,{ceil:Math.ceil,floor:Math.floor,random:()=>0});
+    const keys=['theme','themeLight','themeDark','autoSwitchTheme','customTheme','customThemeColors','favThemes','randomTheme','fontSize'];
+    // The real Solid store exposes array proxies; copy JSON config values by
+    // enumeration in its own realm instead of structuredClone(proxy).
+    const pick=value=>Object.fromEntries(keys.map(key=>[key,context.structuredClone(value[key])]));
+    const fixtures=[];
+    for(const auto of [false,true])for(const mode of ['on','fav']) {
+      timers.clear();pending=[];dark=false;
+      Object.assign(simulation.Config,context.structuredClone(defaults),{theme:'serika_dark',themeLight:'serika',themeDark:'dracula',
+        autoSwitchTheme:auto,customTheme:true,customThemeColors:context.structuredClone(colors),randomTheme:'off',
+        favThemes:context.structuredClone(['nord','serika','dracula']),fontSize:2});
+      store.setFullConfigStore(context.structuredClone(simulation.Config));
+      simulation.flags={testActive:false,authenticated:false,customThemeCount:0};
+      simulation.events=[];simulation.saves=[];simulation.notices=[];simulation.configCheckpoints=[];
+      vm.runInContext('randomTheme=null;themesList=[];randomThemeIndex=0;previewState=null;isPreviewingTheme=false;',context);
+      const frames=[];
+      const snapshot=()=>({runtime:pick(simulation.Config),settings:pick(store.getConfig),
+        saved:simulation.configCheckpoints.map(item=>({key:item.key,value:pick(item.value)})),
+        events:structuredClone(simulation.events),shown:shown?.name,active:vm.runInContext('randomTheme',context)});
+      bus.dispatch({key:'fullConfigChangeFinished'});await drain();frames.push(snapshot());
+      setters.setConfig('randomTheme',mode);await drain();frames.push(snapshot());
+      for(let draw=0;draw<4;draw++) {
+        await context.randomizeTheme();await drain();frames.push(snapshot());
+      }
+      setters.setConfig('fontSize',1.5);await drain();frames.push(snapshot());
+      fixtures.push({auto,mode,frames});
+    }
+    verify();return {fixtures};
   }
   async function advance(delta) {
     const end=now+delta;

@@ -29,10 +29,11 @@ const paceCommandMode = process.argv[3] === '--pace-commands' || paceInputNotati
 const appearanceCommandMode = process.argv[3] === '--appearance-commands';
 const themeCommandMode = process.argv[3] === '--theme-commands';
 const themePreviewMode = process.argv[3] === '--theme-preview';
+const randomRuntimeMode = process.argv[3] === '--random-theme-runtime';
 const keymapCommandMode = process.argv[3] === '--keymap-commands';
 const layoutFluidRuntimeMode = process.argv[3] === '--layoutfluid-runtime';
 const sharedSettingsMode = process.argv[3] === '--shared-test-settings';
-const exportMode = process.argv[3] === '--export-config' || sharedSettingsMode;
+const exportMode = process.argv[3] === '--export-config' || sharedSettingsMode || randomRuntimeMode;
 assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || (themeCommandMode || themePreviewMode) || keymapCommandMode || layoutFluidRuntimeMode || exportMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
@@ -87,7 +88,7 @@ const adapters = new Map([
   [path.join(frontend, 'config/persistence.ts'), {saveToLocalStorage: key => {
     simulation.saves.push(key);
     if (sharedSettingsMode) simulation.configCheckpoints?.push({key, value: structuredClone(simulation.Config)});
-    if ((themeCommandMode || themePreviewMode)) simulation.configCheckpoints.push({key, value: structuredClone(simulation.Config)});
+    if ((themeCommandMode || themePreviewMode || randomRuntimeMode)) simulation.configCheckpoints.push({key, value: structuredClone(simulation.Config)});
     if (sharedSettingsMode) simulation.persistConfig?.(key);
   }}],
   ['solid-js', {onCleanup: noop, JSXElement: undefined}],
@@ -226,7 +227,10 @@ if (defaultsMode) {
   const actualStore = exportMode ? await load(path.join(frontend,'config/store.ts')) : null;
   if (actualStore) simulation.Config = actualStore.Config;
   const setters = await load(path.join(frontend, 'config/setters.ts'));
-  if (exportMode) {
+  if (randomRuntimeMode) {
+    const {checkThemePreview}=await import('./check-source-theme-preview.mjs');
+    console.log(JSON.stringify(await checkThemePreview({context,simulation,frontend,bus,setters,defaults,verify,store:actualStore})));
+  } else if (exportMode) {
     function extract(file,from,to,wrap=value=>value) {
       const source=fs.readFileSync(path.join(frontend,file),'utf8'),start=source.indexOf(from),end=source.indexOf(to,start);
       assert.ok(start>=0&&end>start,from);
