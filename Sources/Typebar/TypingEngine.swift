@@ -9282,6 +9282,25 @@ struct TypingSession {
     }
     if let chunk = generatedChunk {
       if !chunk.transformed.isEmpty { liveAwaitingGeneratedCommit = false }
+      if let fields = chunk.sourceFields {
+        guard let previous = sourceFields else { fail(at: date, reason: .wordGeneration); return }
+        var batch = TransformedPromptBatch(text: chunk.transformed,
+          noSpaceTargetWords: chunk.noSpaceTargetWords, sourceFields: fields)
+        if generatedCodeContinuation?.hasRemaining != true { batch = FinitePromptCommitPolicy.finalized(batch) }
+        guard let nextFields = batch.sourceFields else { fail(at: date, reason: .wordGeneration); return }
+        sourceFields = previous + nextFields
+        let previousEnd = promptCharacters.count
+        appendPrompt(batch.text)
+        if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+          var end = previousEnd
+          for length in batch.noSpaceWordLengths {
+            end += length
+            noSpaceWordEndIndices.append(end)
+          }
+          noSpaceTargetWords += batch.noSpaceTargetWords
+        }
+        return
+      }
       let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       var text = chunk.transformed
       if generatedCodeContinuation != nil, prompt.last == " ", text.first == " " { text.removeFirst() }

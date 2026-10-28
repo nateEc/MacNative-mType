@@ -2,14 +2,19 @@
 /// configuration change that shortens the opening or selects another pool.
 /// Value-owned and process-local; never a website field or persisted record.
 struct GeneratedWordReplayHistory {
-  struct Word { let source, target: String }
+  struct Word { let source, target, committedText: String }
   let noSpace: Bool
   var arrowChart: WebsiteArrowChart
   private var words: [Word] = []
+  private(set) var preservesCommitFraming = false
   init(noSpace: Bool, arrowChart: WebsiteArrowChart = .init()) { self.noSpace = noSpace; self.arrowChart = arrowChart }
   var count: Int { words.count }
   func word(at index: Int) -> Word? { words.indices.contains(index) ? words[index] : nil }
-  mutating func append(source: String, target: String) { words.append(.init(source: source, target: target)) }
+  mutating func preserveCommitFraming() { preservesCommitFraming = true }
+  mutating func append(source: String, target: String, committedText: String? = nil) {
+    words.append(.init(source: source, target: target,
+      committedText: committedText ?? target + (!noSpace && !target.hasSuffix("\n") ? " " : "")))
+  }
 }
 
 /// Permission after a repeated history miss, not ordinary fresh generation.

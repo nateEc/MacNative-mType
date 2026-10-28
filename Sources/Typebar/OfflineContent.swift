@@ -6182,6 +6182,9 @@ struct GeneratedCandidateContinuation {
     self.weakSpotScores = weakSpotScores
     self.decorationState = decorationState
     self.replayHistory = replayHistory ?? .init(noSpace: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), arrowChart: arrowChart)
+    if let replayHistory, replayHistory.noSpace != TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+      self.replayHistory.preserveCommitFraming()
+    }
     replaysOwnedHistory = replayHistory != nil
     if configuration.language == .mixedLanguages {
       polyglotCandidates = polyglotSources.map { NativePolyglotCandidates(sources: $0,
@@ -6259,14 +6262,17 @@ struct GeneratedCandidateContinuation {
       sourceWordCount: count, showAllLines: previewsWholeFiniteWords)
     var sourceWords: [String] = []
     var targets: [String] = []
-    var output = emittedWords > 0 && !noSpace && previousTargets.last?.hasSuffix("\n") != true ? " " : ""
+    let explicitFraming = replayHistory.preservesCommitFraming
+    var fields: [String] = []
+    var output = !explicitFraming && emittedWords > 0 && !noSpace && previousTargets.last?.hasSuffix("\n") != true ? " " : ""
     for index in 0..<count {
       if let cached = replayHistory.word(at: emittedWords + index) {
         sourceWords.append(cached.source)
-        output += cached.target; targets.append(cached.target)
+        output += explicitFraming ? cached.committedText : cached.target
+        fields.append(cached.committedText); targets.append(cached.target)
         previousTargets.append(cached.target)
         if previousTargets.count > 2 { previousTargets.removeFirst() }
-        if index < count - 1 && !noSpace && !cached.target.hasSuffix("\n") { output.append(" ") }
+        if !explicitFraming && index < count - 1 && !noSpace && !cached.target.hasSuffix("\n") { output.append(" ") }
         continue
       }
       if replaysOwnedHistory, !GeneratedRepeatedWordPolicy.permitsFreshWord(configuration: configuration,
@@ -6367,17 +6373,24 @@ struct GeneratedCandidateContinuation {
         language: baseLanguage, websiteOrder: configuration.websiteTextAlterationOrder,
         wordIndex: emittedWords + index, wordBound: bound,
         nextRandomCaseBit: nextRandomCaseBit)
-      output += target
-      replayHistory.append(source: word, target: target)
+      let committed = target + (!noSpace && !target.hasSuffix("\n") ? " " : "")
+      output += explicitFraming ? committed : target
+      fields.append(committed)
+      replayHistory.append(source: word, target: target, committedText: committed)
       targets.append(target)
       previousTargets.append(target)
       if previousTargets.count > 2 { previousTargets.removeFirst() }
-      if index < count - 1 && !noSpace && !target.hasSuffix("\n") { output.append(" ") }
+      if !explicitFraming && index < count - 1 && !noSpace && !target.hasSuffix("\n") { output.append(" ") }
     }
     let source = (emittedWords > 0 ? " " : "") + sourceWords.joined(separator: " ")
     emittedWords += count
-    let chunk = GeneratedWordChunk(source: source, batch: .init(text: output,
-      noSpaceTargetWords: noSpace ? targets : []))
+    let batch = TransformedPromptBatch(text: output,
+      noSpaceTargetWords: noSpace ? (explicitFraming ? fields : targets) : [], sourceFields: explicitFraming ? fields : nil)
+    if explicitFraming && batch.sourceFields == nil {
+      sourceGenerationFailed = true
+      return .init(source: "", configuration: configuration)
+    }
+    let chunk = GeneratedWordChunk(source: source, batch: batch)
     cache.append(chunk)
     return chunk
   }

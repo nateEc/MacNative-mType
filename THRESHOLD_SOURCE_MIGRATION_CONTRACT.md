@@ -1,5 +1,9 @@
 # 阈值源状态与迁移契约
 
+## 重复词组空间规则切换（2026-10-28，起点 d0a6dfbe）
+
+`REPLAY-COMMIT-FRAMING-21` 依据实际缓存返回与当前输入 helper，保留旧字段的完整提交字符；新字段遵守新设置。No Space 切换后旧字段可能需要一个错误按键推进，这是来源行为，不通过重新排版缓存消除。进程内历史和续批补充显式字段，不改变磁盘格式或已有结果。范围、来源适配器与剩余缺口见 `GENERATED_REPLAY_FRAMING_CONTRACT.md`。
+
 ## 活动练习的显式完整 JSON 导入（2026-10-28，起点 15f5ff69）
 
 `CFG-FULL-IMPORT-ACTIVE-20` 补齐原版完整应用在活动尝试上的语言重开入口，详见 `WEBSITE_ACTIVE_IMPORT_CONTRACT.md`。固定真实生命周期、setter、Solid、测试订阅者及完整 restart 的 128 组轨迹确认：首语言事件看到默认空 Funbox、开启的 resultSaving／repeatedPace 及 time 模式，不能用导入完成后的字段结算旧尝试。显式 JSON 因此可离开旧 No Quit，普通恢复与其他设置仍保留原锁。

@@ -34,7 +34,8 @@ const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuff
 const bindings={
   'utils/strings':{removeLanguageSize:value=>value,isSpace:value=>value===' ',
     areCharactersVisuallyEqual:(a,b)=>a===b},
-  'test/test-ui':{afterTestTextInput:()=>{}},
+  'test/test-ui':{afterTestTextInput:()=>{},pendingWordData:new Map(),activeWordTop:0,activeWordHeight:10,
+    getActiveWordTopAndHeightWithDifferentData:()=>({top:0,height:10})},
   'test/test-logic':{finish:()=>{ownedFinished++;},startTest:()=>{}},
   'input/input-element':{getInputElementValue:()=>({inputValue:ownedInput}),
     setInputElementValue:value=>{ownedInput=value;},
@@ -109,6 +110,74 @@ const main=moduleFor('test/words-generator');
 await main.link((id,from)=>moduleFor(resolve(id,from.identifier)));
 await main.evaluate();
 functions=modules.get('test/funbox/funbox-functions').namespace.getFunboxFunctions();
+if(process.argv[3]==='--replay-framing') {
+  const admission=moduleFor('input/handlers/before-insert-text');
+  await admission.link((id,from)=>moduleFor(resolve(id,from.identifier)));
+  await admission.evaluate();
+  const finish=moduleFor('input/helpers/fail-or-finish');
+  await finish.link((id,from)=>moduleFor(resolve(id,from.identifier)));
+  await finish.evaluate();
+  const fixtures=[], words=modules.get('test/test-words').namespace.words;
+  const debug=console.debug;console.debug=()=>{};
+  try {
+    for(const pool of [['ab','cd','ef'],['é','界','🙂']])for(const oldNoSpace of [false,true])for(const newNoSpace of [false,true]) {
+      config.language='english';config.words=3;config.showAllLines=false;
+      ownedRepeated=false;activeNames=oldNoSpace?['nospace']:[];ownedIndexes=[0,1,2];
+      const opening=await main.namespace.generateWords({name:'english',words:pool.slice()});
+      assert.equal(ownedIndexes.length,0);
+      ownedRepeated=true;activeNames=newNoSpace?['nospace']:[];config.words=5;ownedIndexes=[0,1];
+      const generated=await main.namespace.generateWords({name:'english',words:pool.slice()});
+      assert.deepEqual(generated.words.slice(0,3),opening.words,'Cached commit characters are not re-appended under new settings');
+      assert.deepEqual(generated.words.slice(3),pool.slice(0,2).map(word=>word+(newNoSpace?'':' ')));
+      assert.equal(ownedIndexes.length,0,'Exactly two fresh draws after the three cached fields');
+      words.reset();generated.words.forEach((word,index)=>words.push(word,index));
+      words.removeCommitCharacterFromLastWord();
+      const fields=Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit);
+      Object.assign(config,{difficulty:'normal',deleteOnError:'off',stopOnError:'off',strictSpace:false});
+      ownedActiveWordIndex=0;ownedInput='';ownedCurrentInput='';
+      // Physical input and navigation are owned. Admission, commit classification,
+      // correctness and permission to advance execute the complete source helpers.
+      const tape=(newNoSpace?' ':'')+fields.map((field,index)=>{
+        if(index===fields.length-1)return field;
+        if(newNoSpace)return field.endsWith(' ')?field.slice(0,-1)+'x':field;
+        return field.endsWith(' ')?field:field+' ';
+      }).join('');
+      const events=[];let completed=false;
+      for(const data of tape.split('')) {
+        const blocked=modules.get('input/handlers/before-insert-text').namespace.onBeforeInsertText(data);
+        if(blocked){events.push({data,blocked});continue;}
+        const targetWord=fields[ownedActiveWordIndex];
+        const options={data,inputValue:ownedInput,targetWord};
+        const commit=modules.get('input/helpers/util').namespace.getCommitCharacterType(options);
+        const validation=modules.get('input/helpers/validation').namespace;
+        const correct=validation.isCharCorrect({...options,correctShiftUsed:null});
+        const advances=validation.shouldGoToNextWord({...options,commitCharacterType:commit});
+        completed=finish.namespace.checkIfFinished({goingToNextWord:advances,
+          testInputWithData:ownedInput+data,currentWord:targetWord,
+          allWordsTyped:ownedActiveWordIndex===fields.length-1,
+          allWordsGenerated:main.namespace.areAllWordsGenerated()});
+        events.push({data,blocked,correct,advances,completed});
+        ownedInput+=data;ownedCurrentInput=ownedInput;
+        if(advances){ownedActiveWordIndex++;ownedInput='';ownedCurrentInput='';}
+      }
+      assert.equal(events.filter(event=>!event.blocked&&!event.correct).length,
+        oldNoSpace===newNoSpace?0:3);
+      assert.equal(completed,true);
+      activeNames=oldNoSpace?['nospace']:[];config.words=7;ownedIndexes=[2,0];
+      const returned=await main.namespace.generateWords({name:'english',words:pool.slice()});
+      assert.deepEqual(returned.words.slice(0,5),generated.words);
+      assert.deepEqual(returned.words.slice(5),[pool[2],pool[0]].map(word=>word+(oldNoSpace?'':' ')));
+      assert.equal(ownedIndexes.length,0);
+      words.reset();returned.words.forEach((word,index)=>words.push(word,index));
+      words.removeCommitCharacterFromLastWord();
+      fixtures.push({pool,oldNoSpace,newNoSpace,opening:opening.words,generated:generated.words,
+        fields,tape,events,returnedFields:Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit)});
+    }
+  } finally {console.debug=debug;}
+  assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
+  process.stdout.write(JSON.stringify({fixtures})+'\n');
+  process.exit(0);
+}
 // Run the replay fixture first so the real generator's retained results begin
 // at index zero. Only the external repeated flag and rank draws are adapters.
 config.language='code_swift';activeNames=[];ownedIndexes=[0,2,1];

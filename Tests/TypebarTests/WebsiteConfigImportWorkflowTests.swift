@@ -123,6 +123,35 @@ import TypebarSystem
     XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
   }
 
+  func testActiveFullImportKeepsRepeatedCommitFieldsAcrossNoSpaceChanges() async throws {
+    for oldNoSpace in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.workflow.apply(json:
+        "{\"mode\":\"words\",\"words\":4,\"funbox\":\(oldNoSpace ? "[\"nospace\"]" : "[]")}", systemIsDark: false)
+      let repeated = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID(), repeatingRequested: true)
+      XCTAssertTrue(repeated)
+      let prompt = f.page.state.session.prompt
+      let history = try XCTUnwrap(f.page.state.session.generatedWordReplayHistory)
+      var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+      try await f.workflow.apply(json:
+        "{\"mode\":\"words\",\"words\":4,\"funbox\":\(oldNoSpace ? "[]" : "[\"nospace\"]")}", systemIsDark: false)
+      XCTAssertEqual(f.page.state.session.prompt, prompt)
+      XCTAssertTrue(try XCTUnwrap(f.page.state.practice).repetition.repeatsWordset)
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+      XCTAssertEqual(TestModifierPolicy.usesNoSpaceInput(f.page.state.session.configuration.modifiers), !oldNoSpace)
+      let words = try (0..<4).map { try XCTUnwrap(history.word(at: $0)).target }
+      let tape = words.enumerated().map { index, word in
+        word + (index == 3 ? "" : oldNoSpace ? " " : "x")
+      }.joined()
+      state = f.page.state
+      state.session.insertBatch(tape)
+      f.page.replace(state)
+      XCTAssertEqual(f.page.state.session.outcome, .completed)
+      XCTAssertEqual(f.page.state.session.completedWordCount, 4)
+      XCTAssertEqual(f.page.state.session.errors, 3)
+    }
+  }
+
   func testFullImportSupersedesBusyRestartWithoutRecountingOrLateDelivery() async throws {
     let f = try Fixture(); defer { f.close() }
     let gate = Gate(); defer { gate.resolve() }

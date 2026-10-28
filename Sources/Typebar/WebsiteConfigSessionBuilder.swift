@@ -132,7 +132,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
       repetition = .sameWordset(repeatedPace: repeatedPace)
     case .repeatedWords(let history, let repeatedPace):
       guard [.words, .time].contains(config.mode), liveSource == nil,
-        history.count > 0, history.noSpace == TestModifierPolicy.usesNoSpaceInput(config.modifiers),
+        history.count > 0,
         (WebsiteRandomWordGenerator.usesCandidateStream(for: config)
           || TypebarStreamContent.prompt(configuration: config, wordCount: 1) == nil) else {
         throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported
@@ -227,12 +227,13 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
       await Task.yield()
     }
     let assembled = try await WholePreviewChunkAssembly.assemble(chunks)
-    let batch = TransformedPromptBatch(text: assembled.prompt, noSpaceTargetWords: assembled.targetWords)
+    let fields = cursor.replayHistory.preservesCommitFraming ? chunks.flatMap { $0.sourceFields ?? [] } : nil
+    let batch = TransformedPromptBatch(text: assembled.prompt, noSpaceTargetWords: assembled.targetWords, sourceFields: fields)
     let finalized = cursor.hasRemaining ? batch : FinitePromptCommitPolicy.finalized(batch)
-    let needsCommit = cursor.hasRemaining && !history.noSpace
+    let needsCommit = !cursor.replayHistory.preservesCommitFraming && cursor.hasRemaining && !history.noSpace
       && finalized.text.last != " " && finalized.text.last != "\n"
     try Task.checkCancellation()
-    return .init(configuration: config, prompt: finalized.text + (needsCommit ? " " : ""),
+    return .init(configuration: config, prompt: finalized.text + (needsCommit ? " " : ""), sourceFields: finalized.sourceFields,
       generatedCodeContinuation: cursor.hasRemaining ? cursor : nil, generatedReplayHistory: cursor.replayHistory,
       noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: finalized.noSpaceWordLengths),
       noSpaceTargetWords: finalized.noSpaceTargetWords,
