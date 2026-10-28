@@ -2,9 +2,172 @@ import XCTest
 import Observation
 import AppKit
 import SwiftUI
+import Darwin
+import TypebarSystem
 @testable import Typebar
 
 @MainActor final class WebsiteConfigImportWorkflowTests: XCTestCase {
+  func testExplicitFullJSONImportClosesActiveAttemptsIncludingOldNoQuit() async throws {
+    for oldNoQuit in [false, true] { for oldSaving in [false, true] {
+      for newNoQuit in [false, true] { for newSaving in [false, true] {
+        let f = try Fixture(); defer { f.close() }
+        let old = "{\"mode\":\"words\",\"words\":4,\"resultSaving\":\(oldSaving),\"funbox\":\(oldNoQuit ? "[\"no_quit\"]" : "[]")}"
+        try await f.workflow.apply(json: old, systemIsDark: false)
+        var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+        let attempt = state.session.automaticInputAttemptID, legacy = f.settings.snapshot
+        let json = "{\"mode\":\"words\",\"words\":7,\"resultSaving\":\(newSaving),\"funbox\":\(newNoQuit ? "[\"no_quit\"]" : "[]")}"
+        do { _ = try await f.workflow.apply(json: json, systemIsDark: false) }
+        catch { XCTFail("Explicit bulk import rejected an active attempt: \(error)"); continue }
+        XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, attempt)
+        XCTAssertEqual(f.page.state.session.configuration.wordLimit, 7)
+        XCTAssertEqual(f.page.state.session.configuration.modifiers.contains(.noQuit), newNoQuit)
+        XCTAssertEqual(f.page.state.presentation?.publication.draft.behavior.saveCompletedResults, newSaving)
+        XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1,
+          "The language restart sees default resultSaving before the requested setter")
+        XCTAssertEqual(f.settings.snapshot, legacy)
+      }}
+    }}
+  }
+
+  func testMalformedExplicitImportPreservesActiveNoQuitWhileRestoreRemainsProtected() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let generation = state.session.generationState
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    do { _ = try await f.workflow.apply(json: "{", systemIsDark: false); XCTFail("Invalid JSON accepted") } catch {}
+    XCTAssertEqual(f.page.state.session.generationState, generation)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+    do { _ = try await f.workflow.apply(json: nil, systemIsDark: false); XCTFail("Active restoration accepted") }
+    catch WebsiteConfigImportWorkflowError.activeAttempt {}
+    XCTAssertEqual(f.page.state.session.generationState, generation)
+    _ = try await f.workflow.apply(json: #"{"mode":"words","words":2}"#, systemIsDark: false)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertFalse(f.page.state.session.configuration.modifiers.contains(.noQuit))
+  }
+
+  func testCancelledActiveImportKeepsClosedAttemptAndResumesWithoutDoubleAccounting() async throws {
+    for cancelTask in [false, true] {
+      let f = try Fixture(); defer { f.close() }
+      let gate = Gate(); defer { gate.resolve() }
+      var parked = true
+      let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+        directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+          if parked { return await gate.read() }
+          return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+        })
+      defer { workflow.stop() }
+      try await workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"],"resultSaving":false}"#, systemIsDark: false)
+      var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+      let attempt = state.session.automaticInputAttemptID
+      let task = Task { _ = try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0]}"#, systemIsDark: false) }
+      try await gate.wait()
+      XCTAssertNotNil(f.page.state.savedApplication)
+      XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+      XCTAssertEqual(f.page.state.session.typed, "x")
+      XCTAssertFalse(f.page.acceptsInput(for: attempt)); XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+      let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
+      let saved = try Data(contentsOf: path)
+      if cancelTask { task.cancel() } else { workflow.cancel() }
+      gate.resolve()
+      do { try await task.value; XCTFail("Cancelled import delivered") } catch is CancellationError {}
+      XCTAssertEqual(try Data(contentsOf: path), saved)
+      XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+      XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+      parked = false
+      _ = try await workflow.apply(json: nil, systemIsDark: false)
+      XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, attempt)
+      XCTAssertEqual(f.page.state.session.prompt, "ab cd")
+      XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    }
+  }
+
+  func testFailedActiveImportRetainsPriorLedgerAndContinuesOnlyGeneration() async throws {
+    let f = try Fixture(); defer { f.close() }
+    var failing = true, reads = 0
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        reads += 1
+        if failing { throw Failure.provider }
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x")
+    state.priorAttemptLedger.recordRestart(engagedDuration: 2, accuracy: 50, savingEnabled: true)
+    f.page.replace(state)
+    do { _ = try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"resultSaving":false}"#, systemIsDark: false); XCTFail("Failed generation delivered") }
+    catch is WebsiteConfigSavedPreparationError {}
+    XCTAssertEqual(reads, 3); XCTAssertEqual(f.page.state.session.outcome, .abandoned)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 2)
+    failing = false
+    _ = try await workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertEqual(reads, 4); XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 2)
+    XCTAssertEqual(f.page.state.session.prompt, "ab cd")
+    XCTAssertFalse(try XCTUnwrap(f.page.state.presentation).publication.draft.behavior.saveCompletedResults)
+  }
+
+  func testActiveFullImportPreservesAnAlreadyRepeatedWordset() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4}"#, systemIsDark: false)
+    let repeated = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(repeated)
+    let prompt = f.page.state.session.prompt
+    XCTAssertTrue(try XCTUnwrap(f.page.state.practice).repetition.repeatsWordset)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    _ = try await f.workflow.apply(json: #"{"mode":"words","words":4,"repeatedPace":false}"#, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.prompt, prompt)
+    XCTAssertEqual(f.page.state.practice?.repetition, .sameWordset(repeatedPace: true),
+      "The first restart sees default repeatedPace, before the imported value")
+    XCTAssertFalse(try XCTUnwrap(f.page.state.presentation).publication.draft.behavior.repeatedPace)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testFullImportSupersedesBusyRestartWithoutRecountingOrLateDelivery() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let gate = Gate(); defer { gate.resolve() }
+    var parked = false, resumed = false
+    let workflow = WebsiteConfigImportWorkflow(page: f.page, settings: f.settings, account: f.account,
+      directory: f.directory, readWindow: { f.window }, loadQuotes: { _ in
+        if parked { let value = await gate.read(); resumed = true; return value }
+        return [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)]
+      })
+    defer { workflow.stop() }
+    try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"repeatQuotes":"off"}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let controller = try XCTUnwrap(f.page.restartController)
+    parked = true; XCTAssertTrue(controller.request()); try await gate.wait()
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    _ = try await workflow.apply(json: #"{"mode":"words","words":7}"#, systemIsDark: false)
+    let attempt = f.page.state.session.automaticInputAttemptID
+    gate.resolve()
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while !resumed && ContinuousClock.now < deadline { await Task.yield() }
+    XCTAssertTrue(resumed)
+    for _ in 0..<10 { await Task.yield() }
+    XCTAssertEqual(f.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.page.state.session.configuration.wordLimit, 7)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+  }
+
+  func testBusyFileLeavesAnActiveNoQuitAttemptAndSavedBytesUnchanged() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    let generation = state.session.generationState, ledger = state.priorAttemptLedger
+    let path = f.directory.appendingPathComponent(WebsiteConfigFileRegister.dataFilename)
+    let bytes = try Data(contentsOf: path)
+    let fd = Darwin.open(f.directory.appendingPathComponent(WebsiteConfigFileRegister.lockFilename).path, O_RDWR | O_CLOEXEC)
+    guard fd >= 0 else { return XCTFail("Could not open the real register lock") }
+    defer { _ = typebar_file_lock(fd, LOCK_UN); Darwin.close(fd) }
+    XCTAssertEqual(typebar_file_lock(fd, LOCK_EX | LOCK_NB), 0)
+    do { _ = try await f.workflow.apply(json: #"{"mode":"words","words":7}"#, systemIsDark: false); XCTFail("Busy file accepted") }
+    catch WebsiteConfigFileRegisterError.busy {}
+    XCTAssertEqual(f.page.state.session.generationState, generation)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    XCTAssertEqual(try Data(contentsOf: path), bytes); XCTAssertNil(f.page.state.savedApplication)
+  }
+
   func testActualExportDispatchReadsThePublishedWebsiteConfiguration() async throws {
     let fixtures = try WebsiteConfigExportSourceOracle.load()
     let source = try XCTUnwrap(fixtures.first { $0.label == "full-override" && !$0.failure })
@@ -3148,12 +3311,12 @@ import SwiftUI
     XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().state, .missing)
   }
 
-  func testActiveAttemptAndStoppedWorkflowRefuseWithoutWriting() async throws {
+  func testActiveRestorationAndStoppedWorkflowRefuseWithoutWriting() async throws {
     let f = try Fixture(); defer { f.close() }
     var state = f.page.state
     state.session = TypingSession(configuration: .words(2), prompt: "ab cd")
     state.session.insertBatch("a"); f.page.replace(state)
-    do { try await f.workflow.apply(json: "{}", systemIsDark: false); XCTFail("Active attempt overwritten") }
+    do { try await f.workflow.apply(json: nil, systemIsDark: false); XCTFail("Active attempt overwritten") }
     catch WebsiteConfigImportWorkflowError.activeAttempt {}
     f.workflow.stop()
     do { try await f.workflow.apply(json: "{}", systemIsDark: false); XCTFail("Stopped window accepted") }

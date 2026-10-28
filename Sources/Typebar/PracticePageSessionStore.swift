@@ -39,6 +39,26 @@ final class PracticePageSessionStore {
   @ObservationIgnored private var legacyReturnTransition = false
   @ObservationIgnored private var legacyReturnPermit: LegacyReturnPermit?
   @ObservationIgnored private var typebarSettingsAction: (@MainActor () throws -> Void)?
+  @ObservationIgnored private weak var noQuitLockSettings: AppSettings?
+  @ObservationIgnored private var noQuitLockOwner: UUID?
+
+  func bindNoQuitConfigurationLock(settings: AppSettings, owner: UUID) {
+    if let previous = noQuitLockOwner, previous != owner || noQuitLockSettings !== settings {
+      noQuitLockSettings?.setNoQuitConfigurationLock(false, for: previous)
+    }
+    noQuitLockSettings = settings; noQuitLockOwner = owner
+    synchronizeCommittedNoQuitLock()
+  }
+  func unbindNoQuitConfigurationLock(owner: UUID) {
+    guard noQuitLockOwner == owner else { return }
+    noQuitLockSettings?.setNoQuitConfigurationLock(false, for: owner)
+    noQuitLockSettings = nil; noQuitLockOwner = nil
+  }
+  private func synchronizeCommittedNoQuitLock() {
+    guard let owner = noQuitLockOwner else { return }
+    noQuitLockSettings?.setNoQuitConfigurationLock(
+      !NoQuitConfigurationChangePolicy.allowsRestartingChange(for: storedState.session), for: owner)
+  }
 
   struct LegacyReturnPermit {
     fileprivate let request: UUID
@@ -69,25 +89,34 @@ final class PracticePageSessionStore {
     fileprivate let lease: PreferenceConfigurationSaveRouter.Lease
     fileprivate let attachment: UUID
     fileprivate let compositionActivity: UUID
-    fileprivate let session: TypingSession.GenerationState
+    fileprivate var session: TypingSession.GenerationState
     fileprivate let publication: UUID?
     fileprivate let repetition: WebsitePracticeRepetition?
-    fileprivate let restartDeparture: UUID?
+    fileprivate var restartDeparture: UUID?
     let configurationDeparture: UUID?
     fileprivate let quoteInitialization: UUID?
     fileprivate var savedApplication: UUID?
     fileprivate let sharedReceipt: UUID?
-    func acceptingApplication(_ id: UUID) -> Self {
-      var copy = self; copy.savedApplication = id; return copy
+    fileprivate var explicitFullImport = false
+    func acceptingApplication(_ id: UUID, session: TypingSession, restartDeparture: UUID?) -> Self {
+      var copy = self; copy.savedApplication = id
+      copy.session = session.generationState; copy.restartDeparture = restartDeparture
+      return copy
     }
   }
 
   func captureApplication(router: PreferenceConfigurationSaveRouter) throws -> ApplicationCapture {
+    try captureApplication(router: router, explicitFullImport: false)
+  }
+  func captureFullJSONImport(router: PreferenceConfigurationSaveRouter) throws -> ApplicationCapture {
+    try captureApplication(router: router, explicitFullImport: true)
+  }
+  private func captureApplication(router: PreferenceConfigurationSaveRouter, explicitFullImport: Bool) throws -> ApplicationCapture {
     guard !committing, self.router === router, let lease = router.captureLease(), lease.owner == owner else {
       throw PracticePageSessionStateError.wrongOwner
     }
     let session = state.session
-    guard !session.hasStarted || session.isFinished || !session.configuration.modifiers.contains(.noQuit) else {
+    guard explicitFullImport || !session.hasStarted || session.isFinished || !session.configuration.modifiers.contains(.noQuit) else {
       throw PracticePageSessionStateError.locked
     }
     var scope = state.sharedReceipt?.scope ?? state.practice?.scope ?? .init()
@@ -99,7 +128,8 @@ final class PracticePageSessionStore {
       session: session.generationState, publication: state.presentation?.publication.applicationID,
       repetition: state.practice?.repetition, restartDeparture: state.restartDepartureAttemptID,
       configurationDeparture: state.configurationDeparture?.id, quoteInitialization: state.quoteInitialization?.id,
-      savedApplication: state.savedApplication?.id, sharedReceipt: state.sharedReceipt?.id)
+      savedApplication: state.savedApplication?.id, sharedReceipt: state.sharedReceipt?.id,
+      explicitFullImport: explicitFullImport)
   }
   func isCurrent(_ capture: ApplicationCapture, router: PreferenceConfigurationSaveRouter) -> Bool {
     !committing && self.router === router && capture.lease.owner == owner && router.isCurrent(capture.lease)
@@ -163,6 +193,7 @@ final class PracticePageSessionStore {
     synchronizePaceTimer()
   }
   func detach() {
+    if let owner = noQuitLockOwner { unbindNoQuitConfigurationLock(owner: owner) }
     stopPaceTimer()
     paceStyleSettings = nil
     layoutFluidCountdown = .init()
@@ -328,6 +359,16 @@ final class PracticePageSessionStore {
     guard !session.hasStarted || session.isFinished || !session.configuration.modifiers.contains(.noQuit) else {
       throw PracticePageSessionStateError.locked
     }
+    committing = true
+  }
+
+  /// Only an explicit full JSON lifecycle clears the old No Quit setting
+  /// before its language listener runs. Ordinary commits and recovery retain
+  /// their existing lock; this capture cannot be forged by the coordinator.
+  func beginFullJSONImportCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: ApplicationCapture) throws {
+    guard capture.explicitFullImport else { throw PracticePageSessionStateError.locked }
+    try validateCommitOwnership(owner: lease, router: router, applicationCapture: capture)
     committing = true
   }
 
@@ -511,6 +552,9 @@ final class PracticePageSessionStore {
       || state.savedApplication?.id != self.state.savedApplication?.id
       || state.sharedReceipt?.id != self.state.sharedReceipt?.id) { retireRestartController() }
     self.state = state
+    // The UI observer runs on a later render. Release this window's old lock
+    // while the accepting workflow still owns its environment-read lease.
+    synchronizeCommittedNoQuitLock()
   }
 
   private func stopPaceTimer() {

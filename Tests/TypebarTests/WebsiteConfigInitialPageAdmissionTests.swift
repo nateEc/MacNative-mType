@@ -160,16 +160,14 @@ import XCTest
     XCTAssertEqual(try f.register.read().revision, disk)
   }
 
-  func testNoQuitRejectionRetiresOldIntentBeforeAnyContentRead() throws {
+  func testMalformedFullImportRetiresOldIntentBeforeAnyContentReadEvenWithNoQuit() throws {
     let f = try Fixture(); defer { f.close() }
     let old = try f.coordinator.prepare("{}")
     var state = f.page.state
     state.session = TypingSession(configuration: .words(3).with(modifiers: [.noQuit]), prompt: "ab cd ef")
     state.session.insertBatch("a"); f.page.replace(state)
-    f.onRead = { XCTFail("Locked initial page read content") }
-    XCTAssertThrowsError(try f.ticket()) { error in
-      guard case PracticePageSessionStateError.locked = error else { return XCTFail("Unexpected: \(error)") }
-    }
+    f.onRead = { XCTFail("Malformed initial import read content") }
+    XCTAssertThrowsError(try f.coordinator.prepare("{", for: f.page, refreshingWith: f.source))
     guard case .stale = try f.coordinator.commit(old) else { return XCTFail("Old intent survived rejected new import") }
     XCTAssertEqual(try f.register.read().state, .missing)
     XCTAssertEqual(f.page.state.session.typed, "a")

@@ -31,12 +31,13 @@ const themeCommandMode = process.argv[3] === '--theme-commands';
 const themePreviewMode = process.argv[3] === '--theme-preview';
 const randomRuntimeMode = process.argv[3] === '--random-theme-runtime';
 const themeImportMode = process.argv[3] === '--theme-import-restart';
+const activeImportMode = process.argv[3] === '--active-config-import';
 const backgroundSettingsMode = process.argv[3] === '--background-settings';
 const backgroundCommandMode = process.argv[3] === '--background-commands' || backgroundSettingsMode;
 const keymapCommandMode = process.argv[3] === '--keymap-commands';
 const layoutFluidRuntimeMode = process.argv[3] === '--layoutfluid-runtime';
 const sharedSettingsMode = process.argv[3] === '--shared-test-settings';
-const exportMode = process.argv[3] === '--export-config' || sharedSettingsMode || randomRuntimeMode || themeImportMode || backgroundCommandMode;
+const exportMode = process.argv[3] === '--export-config' || sharedSettingsMode || randomRuntimeMode || themeImportMode || activeImportMode || backgroundCommandMode;
 assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || (themeCommandMode || themePreviewMode) || keymapCommandMode || layoutFluidRuntimeMode || exportMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
@@ -230,9 +231,9 @@ if (defaultsMode) {
   const actualStore = exportMode ? await load(path.join(frontend,'config/store.ts')) : null;
   if (actualStore) simulation.Config = actualStore.Config;
   const setters = await load(path.join(frontend, 'config/setters.ts'));
-  if (randomRuntimeMode || themeImportMode || backgroundCommandMode) {
+  if (randomRuntimeMode || themeImportMode || activeImportMode || backgroundCommandMode) {
     if (backgroundSettingsMode) Object.assign(context, await load('solid-js'), {CustomBackgroundSchema: configSchemas.CustomBackgroundSchema});
-    if (themeImportMode) {
+    if (themeImportMode || activeImportMode) {
       Object.assign(context,{Config:actualStore.Config,getConfig:actualStore.getConfig,setConfig:setters.setConfig,
         configEvent:bus,getDefaultConfig:(await load(path.join(frontend,'constants/default-config.ts'))).getDefaultConfig,migrateConfig:migration.migrateConfig,
         typedKeys:Object.keys,setFullConfigStore:actualStore.setFullConfigStore,ConfigSchemas:configSchemas,
@@ -245,8 +246,13 @@ if (defaultsMode) {
       assert.ok(a>=0&&b>a);
       vm.runInContext(stripTypeScriptTypes(source.slice(a,b).replace(/^export /gm,''),{mode:'transform'}),context);
     }
-    const {checkThemePreview}=await import('./check-source-theme-preview.mjs');
-    console.log(JSON.stringify(await checkThemePreview({context,simulation,frontend,bus,setters,defaults,verify,store:actualStore,themeImportMode,backgroundCommandMode,backgroundSettingsMode,metadata})));
+    if (activeImportMode) {
+      const {checkActiveConfigImport}=await import('./check-source-active-config-import.mjs');
+      console.log(JSON.stringify(await checkActiveConfigImport({context,simulation,frontend,bus,defaults,verify,store:actualStore})));
+    } else {
+      const {checkThemePreview}=await import('./check-source-theme-preview.mjs');
+      console.log(JSON.stringify(await checkThemePreview({context,simulation,frontend,bus,setters,defaults,verify,store:actualStore,themeImportMode,backgroundCommandMode,backgroundSettingsMode,metadata})));
+    }
   } else if (exportMode) {
     function extract(file,from,to,wrap=value=>value) {
       const source=fs.readFileSync(path.join(frontend,file),'utf8'),start=source.indexOf(from),end=source.indexOf(to,start);

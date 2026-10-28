@@ -19,6 +19,7 @@ final class WebsiteConfigEnvironmentSource {
   private var stopped = false
   private var refresh: Task<Void, Never>?
   private var readingSynchronousSetter = false
+  private var fullJSONImportRead: UUID?
 
   init(settings: AppSettings, account: AccountSession, pointsPerRem: Double?,
     documentComplete: Bool, development: Bool) {
@@ -31,8 +32,22 @@ final class WebsiteConfigEnvironmentSource {
   }
 
   func read() -> WebsiteConfigCommitCoordinator.Environment? {
-    guard readingSynchronousSetter || settings.allowsRestartingConfigurationChange else { return nil }
+    guard readingSynchronousSetter || fullJSONImportRead != nil || settings.allowsRestartingConfigurationChange else { return nil }
     return cached
+  }
+  /// Private workflow admission only: full application resets the old No Quit
+  /// before restarting. A lock-only change during that departure must not
+  /// retire its own accepted ticket. Model/account changes still invalidate.
+  func beginFullJSONImportRead() -> UUID {
+    precondition(fullJSONImportRead == nil && !stopped)
+    let token = UUID(); fullJSONImportRead = token
+    if cached == nil { refresh?.cancel(); refresh = nil; sample() }
+    return token
+  }
+  func endFullJSONImportRead(_ token: UUID) {
+    guard fullJSONImportRead == token else { return }
+    fullJSONImportRead = nil
+    observeRestartLock()
   }
   /// Observing an admitted image grants no configuration/restart capability.
   func backgroundDisplayRevision() -> UUID? { stopped ? nil : backgroundRevision }
@@ -76,6 +91,7 @@ final class WebsiteConfigEnvironmentSource {
   }
   func stop() {
     stopped = true
+    fullJSONImportRead = nil
     cached = nil
     refresh?.cancel()
     refresh = nil
@@ -97,16 +113,22 @@ final class WebsiteConfigEnvironmentSource {
       self.sample()
     }
   }
-  private func sample() {
+  private func observeRestartLock() {
     guard !stopped else { return }
     if needsLockObservation {
       needsLockObservation = false
       withObservationTracking { _ = settings.allowsRestartingConfigurationChange } onChange: { [weak self] in
         MainActor.assumeIsolated {
-          self?.needsLockObservation = true; self?.invalidate()
+          guard let self else { return }
+          self.needsLockObservation = true
+          if self.fullJSONImportRead == nil { self.invalidate() }
         }
       }
     }
+  }
+  private func sample() {
+    guard !stopped else { return }
+    observeRestartLock()
     if needsObservation {
       needsObservation = false
       modelContext = withObservationTracking {

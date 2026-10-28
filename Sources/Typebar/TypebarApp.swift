@@ -1199,13 +1199,18 @@ private struct NoQuitConfigurationLockSynchronizer: ViewModifier {
   let session: TypingSession
   let settings: AppSettings
   let ownerID: UUID
+  let page: PracticePageSessionStore
 
   func body(content: Content) -> some View {
     content
+      .onAppear { page.bindNoQuitConfigurationLock(settings: settings, owner: ownerID) }
       .onChange(of: session.hasStarted) { _, _ in synchronize() }
       .onChange(of: session.isFinished) { _, _ in synchronize() }
       .onChange(of: session.configuration.modifiers) { _, _ in synchronize() }
-      .onDisappear { settings.setNoQuitConfigurationLock(false, for: ownerID) }
+      .onDisappear {
+        settings.setNoQuitConfigurationLock(false, for: ownerID)
+        page.unbindNoQuitConfigurationLock(owner: ownerID)
+      }
   }
 
   private func synchronize() {
@@ -1829,7 +1834,7 @@ private struct ContentView: View {
     }
     .modifier(
       NoQuitConfigurationLockSynchronizer(
-        session: session, settings: settings, ownerID: noQuitConfigurationLockOwnerID))
+        session: session, settings: settings, ownerID: noQuitConfigurationLockOwnerID, page: pageSessionStore))
   }
 
   private var sharedProfilePresentationAllowed: Bool {

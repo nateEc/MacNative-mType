@@ -75,7 +75,7 @@ enum WebsiteConfigImportWorkflowError: Error, LocalizedError {
     switch self {
     case .missing: "还没有保存的 Monkeytype 配置；请先粘贴配置 JSON。"
     case .typebarBackup: "这是 Typebar 备份，请使用“导入设置 JSON”。"
-    case .activeAttempt: "请先结束当前练习，再导入或恢复完整配置。"
+    case .activeAttempt: "当前练习不允许这项配置操作；请先结束练习。"
     case .unavailable: "配置记录或窗口当前不可用；未知记录不会被覆盖，请检查后重试。"
     case .busy: "上一项资源准备仍未结束，请稍后重试。"
     case .conflict: "配置或窗口已变化，未应用这次准备；请重新导入。"
@@ -1006,6 +1006,14 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     try Task.checkCancellation()
     try checkRestartBusy(intent, page: page)
     try checkIntent(intent, page: page)
+    let fullImportRead: UUID?
+    switch intent {
+    case .application(.some): fullImportRead = environment.beginFullJSONImportRead()
+    case .application(nil) where page.state.savedApplication?.isExplicitJSONImport == true:
+      fullImportRead = environment.beginFullJSONImportRead()
+    default: fullImportRead = nil
+    }
+    defer { if let fullImportRead { environment.endFullJSONImportRead(fullImportRead) } }
     var restartSource = WebsiteRestartSource.capture(outcome: page.state.session.outcome,
       alreadyDeparted: page.state.restartDepartureAttemptID == page.state.session.automaticInputAttemptID || page.state.savedApplication != nil)
     var ticket: WebsiteConfigCommitCoordinator.Prepared
@@ -1259,7 +1267,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     case .received(let id):
       guard let receipt = page.state.sharedReceipt, receipt.id == id else { throw WebsiteConfigImportWorkflowError.conflict }
       guard receipt.canInitialize(after: page.state.session) else { throw WebsiteConfigImportWorkflowError.receiptRestartWithheld }
-    case .application:
+    case .application(.some): break
+    case .application(nil):
       guard !page.state.session.hasStarted || page.state.session.isFinished else {
         throw WebsiteConfigImportWorkflowError.activeAttempt
       }

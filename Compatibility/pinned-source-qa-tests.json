@@ -3,6 +3,10 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.WebsiteFullImportRestartTests/testFirstRestartStateAgainstPinnedLifecycleSettersSubscriberAndCompleteRestart",
+      "file": "Tests/TypebarTests/WebsiteFullImportRestartTests.swift"
+    },
+    {
       "id": "TypebarTests.WebsiteThemeCommandTests/testBackgroundRemovalAgainstActualCallbacksAndIndependentReadCompletionOrders",
       "file": "Tests/TypebarTests/WebsiteThemeCommandTests.swift"
     },

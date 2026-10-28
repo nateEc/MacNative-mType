@@ -7,6 +7,83 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WebsiteConfigStartupHostTests: XCTestCase {
+  func testImmediateNoQuitImportLeavesTheActualHostAbleToRestartNormally() async throws {
+    let f = try Fixture(saved: true, json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#)
+    defer { f.close() }
+    f.state.accountReady = true
+    try await f.waitAsync { f.state.page.state.presentation != nil && f.inputs().first?.acceptsTextInput == true }
+    try XCTUnwrap(f.inputs().first).onInsert("x", false)
+    XCTAssertFalse(f.settings.allowsRestartingConfigurationChange)
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection })
+    defer { workflow.stop() }
+    _ = try await workflow.apply(json: #"{"mode":"words","words":7}"#, systemIsDark: false)
+    XCTAssertTrue(f.settings.allowsRestartingConfigurationChange,
+      "Committed inactive page must release its owning No Quit lock synchronously")
+    try await f.waitAsync { f.settings.allowsRestartingConfigurationChange
+      && f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+      && f.inputs().first?.acceptsTextInput == true }
+    let attempt = f.state.page.state.session.automaticInputAttemptID
+    let controller = try XCTUnwrap(f.state.page.restartController)
+    let advanced = try await controller.requestAndWait(requestID: UUID())
+    XCTAssertTrue(advanced, controller.message ?? "Ordinary restart failed after full import")
+    XCTAssertNotEqual(f.state.page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 1)
+    XCTAssertEqual(f.state.page.state.session.configuration.wordLimit, 7)
+    XCTAssertFalse(f.window.isVisible)
+  }
+
+  func testActiveFullImportRetiresActualInputAndKeepsOneLedgerEntryWithoutShowingAWindow() async throws {
+    for noQuit in [false, true] {
+      let boxes = noQuit ? #"["no_quit"]"# : "[]"
+      let f = try Fixture(saved: true,
+        json: "{\"mode\":\"words\",\"words\":4,\"resultSaving\":false,\"funbox\":\(boxes)}")
+      defer { f.close() }
+      f.state.accountReady = true
+      try await f.waitAsync { f.state.page.state.presentation != nil && f.inputs().first?.acceptsTextInput == true }
+      let input = try XCTUnwrap(f.inputs().first), oldInsert = input.onInsert
+      oldInsert("x", false)
+      let attempt = f.state.page.state.session.automaticInputAttemptID
+      XCTAssertTrue(f.state.page.state.session.hasStarted)
+      let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+      let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+      var continuation: CheckedContinuation<[OfflineQuote], Never>?
+      defer { continuation?.resume(returning: []) }
+      let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+        directory: directory, readWindow: { selection }, loadQuotes: { _ in
+          await withCheckedContinuation { continuation = $0 }
+        })
+      defer { workflow.stop() }
+      var finished = false
+      let task = Task {
+        defer { finished = true }
+        _ = try await workflow.apply(json: #"{"mode":"quote","quoteLength":[0],"resultSaving":false}"#, systemIsDark: false)
+      }
+      defer { task.cancel() }
+      try await f.waitAsync { continuation != nil || finished }
+      if continuation == nil { try await task.value; return XCTFail("Import finished without reaching the controlled reader") }
+      XCTAssertEqual(f.state.page.state.session.outcome, .abandoned)
+      XCTAssertNotNil(f.state.page.state.savedApplication)
+      XCTAssertFalse(f.state.page.acceptsInput(for: attempt))
+      oldInsert("stale", false)
+      XCTAssertEqual(f.state.page.state.session.typed, "x")
+      XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 1)
+      let pending = try XCTUnwrap(continuation); continuation = nil
+      pending.resume(returning: [.init(id: "owned", title: "Owned", text: "ab cd", language: .english, length: .short)])
+      try await task.value
+      try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+        && f.inputs().first?.acceptsTextInput == true }
+      oldInsert("late", false)
+      XCTAssertEqual(f.state.page.state.session.typed, "")
+      XCTAssertEqual(f.state.page.state.session.prompt, "ab cd")
+      XCTAssertEqual(f.state.page.state.priorAttemptLedger.restartCount, 1)
+      XCTAssertEqual(try f.container.mainContext.fetchCount(FetchDescriptor<TestResultRecord>()), 0)
+      XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
+    }
+  }
+
   // Match the application's process-owned dataStore. Retired SwiftUI @Query
   // observers can receive later context-save notifications; their contexts
   // must not outlive a weakly referenced container. Keep fixture stores

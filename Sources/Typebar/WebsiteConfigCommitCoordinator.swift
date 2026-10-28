@@ -39,11 +39,17 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate var pageCapture: PracticePageSessionStore.GenerationCapture?
     fileprivate var applicationCapture: PracticePageSessionStore.ApplicationCapture?
     fileprivate var savedApplicationID: UUID?
+    /// An application capture can mention an old pending departure solely to
+    /// reject stale pages. Only native receipt continuation inherits it.
+    fileprivate var inheritsNativeSharedDeparture = false
     fileprivate var applicationEventsApplied = false
     fileprivate weak var contentSource: WebsiteConfigPracticeScopeSource?
     fileprivate var contentCapture: WebsiteConfigPracticeScopeSource.Snapshot?
     fileprivate var wordNavigation: WebsiteWordNavigationEvent?
-    fileprivate var departureID: UUID? { pageCapture?.configurationDeparture ?? applicationCapture?.configurationDeparture }
+    fileprivate var departureID: UUID? {
+      pageCapture?.configurationDeparture
+        ?? (inheritsNativeSharedDeparture ? applicationCapture?.configurationDeparture : nil)
+    }
   }
   struct Publication {
     /// One successful publication, including next-attempt-only selection saves.
@@ -80,7 +86,12 @@ final class WebsiteConfigCommitCoordinator {
     fileprivate let ticket: Prepared
     let theme: WebsiteConfigPublishedPresentation.PendingTheme
     let background: WebsiteConfigBackgroundDisplay
+    var restartSource: WebsiteConfigSessionBuilder.AttemptSource = .selection
     var draft: WebsiteConfigNativeDraft { ticket.draft }
+    var isExplicitJSONImport: Bool {
+      if case .imported = ticket.draft.origin { return true }
+      return false
+    }
   }
   fileprivate struct NativeSharedBase {
     let draft: WebsiteConfigNativeDraft
@@ -421,6 +432,7 @@ final class WebsiteConfigCommitCoordinator {
     page.installCommitted(state); page.endCommit()
     var prepared = Prepared(draft: draft, identity: identity, request: request, owner: receipt.owner, environment: context, disk: receipt.disk)
     prepared.savedDraft = saved; prepared.sourcePage = page; prepared.applicationCapture = try page.captureApplication(router: router)
+    prepared.inheritsNativeSharedDeparture = true
     prepared.contentSource = source; prepared.contentCapture = content
     prepared.applicationEventsApplied = true; prepared.retainsQuoteInitialization = true
     return prepared
@@ -687,6 +699,7 @@ final class WebsiteConfigCommitCoordinator {
     prepared.retainsQuoteInitialization = true
     prepared.quoteInitialization = page.state.currentQuoteInitialization
     prepared.sourcePage = page; prepared.pageCapture = capture; prepared.applicationCapture = application
+    prepared.inheritsNativeSharedDeparture = pending.isNativeSharedReceipt
     if pending.requiresContentSource {
       guard let source = pending.contentSource else { throw WebsiteConfigCommitCoordinatorError.unavailable }
       guard let scope = pending.isNativeSharedReceipt ? (pending.sharedScope ?? application?.scope) : capture?.scope
@@ -1158,7 +1171,7 @@ final class WebsiteConfigCommitCoordinator {
     refreshingWith source: WebsiteConfigPracticeScopeSource) throws -> Prepared {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
     request = UUID()
-    let capture = try page.captureApplication(router: router)
+    let capture = try page.captureFullJSONImport(router: router)
     return try bindApplication(prepare(json), to: page, capture: capture, source: source)
   }
 
@@ -1219,8 +1232,32 @@ final class WebsiteConfigCommitCoordinator {
     let previousBackground = page.state.savedApplication?.background.snapshot ?? page.state.presentation?.backgroundSnapshot
     let background = WebsiteConfigBackgroundDisplay(owner: page.owner, preferences: prepared.draft.pagePreferences,
       pointsPerRem: prepared.environment.pointsPerRem, previous: previousBackground)
+    // Prepare a value copy before CAS. Invalid input, stale ownership and
+    // failed storage must not close the live clock or append an incomplete.
+    var state = page.state
+    var restartSource: WebsiteConfigSessionBuilder.AttemptSource = .selection
+    if !restoringNative {
+      let restart = try WebsiteFullImportRestart(projection: prepared.draft.projection,
+        defaults: WebsiteConfigNativeProfile.defaultDocument().values)
+      if state.session.hasStarted, !state.session.isFinished {
+        if state.practice?.repetition.repeatsWordset == true {
+          if prepared.draft.testParameters.mode == .quote, let quote = state.practice?.quote {
+            restartSource = .repeatedQuote(quote, repeatedPace: restart.repeatedPace)
+          } else if let history = state.session.generatedWordReplayHistory {
+            restartSource = .repeatedWords(history, repeatedPace: restart.repeatedPace)
+          }
+        }
+        if let measurement = state.session.abandonAndMeasure() {
+          state.priorAttemptLedger.recordRestart(engagedDuration: measurement.engagedDuration,
+            accuracy: measurement.accuracy, savingEnabled: restart.savesIncomplete)
+        }
+        state.restartDepartureAttemptID = state.session.automaticInputAttemptID
+      }
+    }
+    guard isCurrent(prepared) else { throw WebsiteConfigCommitCoordinatorError.stale }
     try Task.checkCancellation()
-    try page.beginCommit(owner: prepared.owner, router: router, applicationCapture: capture)
+    if restoringNative { try page.beginCommit(owner: prepared.owner, router: router, applicationCapture: capture) }
+    else { try page.beginFullJSONImportCommit(owner: prepared.owner, router: router, capture: capture) }
     defer { page.endCommit() }
     let disk: WebsiteConfigFileRegister.Revision
     switch try register.commit(prepared.draft, replacing: prepared.disk, preservingUnchanged: restoringNative) {
@@ -1232,9 +1269,9 @@ final class WebsiteConfigCommitCoordinator {
     var admitted = prepared
     admitted.disk = disk; admitted.savedDraft = prepared.draft
     admitted.savedApplicationID = id
-    admitted.applicationCapture = capture.acceptingApplication(id)
-    var state = page.state
-    state.savedApplication = .init(id: id, ticket: admitted, theme: theme, background: background)
+    admitted.applicationCapture = capture.acceptingApplication(id, session: state.session,
+      restartDeparture: state.restartDepartureAttemptID)
+    state.savedApplication = .init(id: id, ticket: admitted, theme: theme, background: background, restartSource: restartSource)
     page.installCommitted(state)
     return admitted
   }
@@ -1277,7 +1314,8 @@ final class WebsiteConfigCommitCoordinator {
     }
     var updated = prepared; updated.disk = disk
     var state = page.state
-    state.savedApplication = .init(id: id, ticket: updated, theme: pending.theme, background: pending.background)
+    state.savedApplication = .init(id: id, ticket: updated, theme: pending.theme, background: pending.background,
+      restartSource: pending.restartSource)
     page.installCommitted(state)
     return updated
   }
@@ -1912,7 +1950,7 @@ final class WebsiteConfigCommitCoordinator {
     var updated = prepared
     updated.quoteInitialization = progress
     if prepared.savedApplicationID != nil { return try checkpointApplication(updated, admission: admission) }
-    if prepared.applicationCapture?.configurationDeparture != nil {
+    if prepared.inheritsNativeSharedDeparture, prepared.applicationCapture?.configurationDeparture != nil {
       return try checkpointNativeSharedDeparture(updated, admission: admission)
     }
     guard prepared.retainsQuoteInitialization,
@@ -2141,6 +2179,9 @@ final class WebsiteConfigCommitCoordinator {
         } else if let history = pending.wordHistory {
           attemptSource = .repeatedWords(history, repeatedPace: pending.repetition.repeatsPace)
         } else { throw WebsiteConfigSessionBuildError.repeatedConfigurationUnsupported }
+      } else if let pending = prepared.configuration.sourcePage?.state.savedApplication,
+        pending.id == prepared.configuration.savedApplicationID {
+        attemptSource = pending.restartSource
       } else { attemptSource = repeatedSource }
       do {
         let practice = try await WebsiteConfigSessionBuilder.prepare(draft: draft, scope: effectiveScope,
@@ -2172,7 +2213,7 @@ final class WebsiteConfigCommitCoordinator {
   private func saveGenerationCorrection(_ prepared: Prepared, from original: WebsiteConfigNativeDraft,
     admission: UUID, admittingSourceSetter: Bool = false) throws -> Prepared {
     if prepared.savedApplicationID != nil { return try checkpointApplication(prepared, admission: admission) }
-    if prepared.applicationCapture?.configurationDeparture != nil,
+    if prepared.inheritsNativeSharedDeparture, prepared.applicationCapture?.configurationDeparture != nil,
       original.projection.runtime != prepared.draft.projection.runtime || original.lazyMemory != prepared.draft.lazyMemory
         || original.funboxMemory != prepared.draft.funboxMemory
         || prepared.draft.projection.events.count > original.projection.events.count

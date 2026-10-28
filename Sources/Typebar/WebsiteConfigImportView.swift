@@ -107,7 +107,7 @@ struct WebsiteConfigImportView: View {
         Label(message, systemImage: form.isError ? "exclamationmark.triangle" : "info.circle")
           .font(.callout).foregroundStyle(form.isError ? Color.red : Color.secondary)
       }
-      Text("请先结束当前练习。配置保存在此 Mac 的独立目录，启动时会尝试恢复；失败时可在此重试。成绩、凭据和自定义练习文本不会从 JSON 导入。")
+      Text("导入会关闭当前练习（包括 No Quit）并开始新练习；恢复已保存配置需先结束练习。配置保存在此 Mac，启动时会尝试恢复。成绩、凭据和自定义练习文本不会从 JSON 导入。")
         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       if useTypebarSettings != nil {
         Text("切回仅影响本窗口，不删除完整配置存档；下次启动仍会尝试恢复它。")
