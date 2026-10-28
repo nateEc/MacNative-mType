@@ -136,6 +136,82 @@ import XCTest
     } }
   }
 
+  func testFullImportFromResultAppliesItsImplicitRandomRestartAgainstTheActualBus() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned source") }
+    struct Save: Decodable { let key: String; let value: [String: WebsiteConfigValue] }
+    struct Frame: Decodable {
+      let runtime: [String: WebsiteConfigValue], settings: [String: WebsiteConfigValue], saved: [Save]
+      let shown: String?, active: String?, drawCount: Int
+    }
+    struct Sample: Decodable {
+      let activePage: String, fromResult: Bool, auto: Bool, oldBag: Bool, mode: String, initialization: String, json: String
+      let frames: [Frame]
+    }
+    struct Output: Decodable { let fixtures: [Sample] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-config-schema.mjs").path, reference, "--theme-import-restart"]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit(); XCTAssertEqual(process.terminationStatus, 0)
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    XCTAssertEqual(output.fixtures.count, 96); XCTAssertEqual(output.fixtures.reduce(0) { $0 + $1.frames.count }, 192)
+    for sample in output.fixtures {
+      XCTAssertEqual(sample.frames.first?.drawCount, 0)
+      XCTAssertEqual(sample.frames.first?.saved.last?.key, "full")
+      let expectedDraws = sample.activePage == "test" && sample.fromResult && sample.mode != "off" && sample.initialization != "fail" ? 1 : 0
+      XCTAssertEqual(sample.frames.last?.drawCount, expectedDraws)
+    }
+    let samples = output.fixtures.filter { $0.activePage == "test" && $0.initialization == "immediate" }
+    XCTAssertEqual(samples.count, 16)
+    for sample in samples {
+      let f = try Fixture(); defer { f.close() }
+      try await f.workflow.apply(json: #"{"mode":"words","words":2,"fontFamily":"Courier","theme":"serika_dark","customTheme":true,"favThemes":["nord","serika","dracula"]}"#, systemIsDark: false)
+      if sample.oldBag {
+        try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+        try f.workflow.runRandomThemeCommand(replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+      }
+      if sample.fromResult {
+        var state = f.page.state; state.session.insertBatch(state.session.prompt + " "); XCTAssertEqual(state.session.outcome, .completed); f.page.replace(state)
+      }
+      let preferences = f.settings.snapshot, ledger = f.page.state.priorAttemptLedger
+      try await f.workflow.apply(json: sample.json, systemIsDark: false)
+      let actual = try XCTUnwrap(f.page.state.presentation), expected = try XCTUnwrap(sample.frames.last)
+      for (key, value) in expected.runtime { XCTAssertEqual(actual.publication.draft.projection.runtime[key], value, "runtime \(sample.fromResult) \(sample.auto) \(sample.oldBag) \(key)") }
+      for (key, value) in expected.settings { XCTAssertEqual(actual.publication.draft.settingsStoreValues[key], value, "store \(key)") }
+      let saved = try XCTUnwrap(expected.saved.last?.value), register = WebsiteConfigFileRegister(directory: f.directory)
+      guard case .available(let disk) = try register.read().state else { return XCTFail("Missing imported record") }
+      for (key, value) in saved { XCTAssertEqual(disk[key], value, "disk \(key)"); XCTAssertEqual(actual.publication.savedDraft.projection.runtime[key], value) }
+      let name: String; switch actual.appearance.selection { case .inlineCustom: name = "custom"; case .builtIn(let theme): name = theme.rawValue }
+      XCTAssertEqual(name, expected.shown); XCTAssertEqual(actual.randomThemes.active, expected.active)
+      XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    }
+  }
+
+  func testResumingAnImportedProfileAfterFailedInitializationDoesNotReuseTheOldResultSource() async throws {
+    let quotes = RestartQuotes(), f = try Fixture(loadQuotes: quotes.read)
+    defer { quotes.release(); f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":2,"fontFamily":"Courier","favThemes":["nord","serika"]}"#, systemIsDark: false)
+    var state = f.page.state; state.session.insertBatch(state.session.prompt + " "); XCTAssertEqual(state.session.outcome, .completed); f.page.replace(state)
+    let ledger = f.page.state.priorAttemptLedger
+    quotes.fail = true
+    do {
+      try await f.workflow.apply(json: #"{"mode":"quote","quoteLength":[0,1,2,3],"repeatQuotes":"off","fontFamily":"Courier","randomTheme":"fav","favThemes":["nord"],"customTheme":true,"autoSwitchTheme":true}"#, systemIsDark: false)
+      XCTFail("Provider failure must retain pending application")
+    } catch { XCTAssertNotNil(f.page.state.savedApplication) }
+    XCTAssertNil(f.page.state.presentation?.randomThemes.active)
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    guard case .available(let saved) = try register.read().state else { return XCTFail("Import must already be saved") }
+    XCTAssertEqual(saved["customTheme"], .bool(true)); XCTAssertEqual(saved["autoSwitchTheme"], .bool(true))
+    quotes.fail = false
+    try await f.workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertNil(f.page.state.savedApplication); XCTAssertNil(f.page.state.presentation?.randomThemes.active)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.themes.customEnabled, true)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.themes.followsSystem, true)
+    let resumed = try register.read()
+    XCTAssertEqual(resumed.state, .available(saved))
+    XCTAssertEqual(resumed.revision, revision); XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+  }
+
   func testPinnedRestartAndUIOrderOnlyDispatchesRandomAfterResultInitialization() throws {
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned source") }
     struct Frame: Decodable { let source: String?, randomCount: Int, resultVisible: Bool, initializations: Int, trace: [String] }

@@ -8,7 +8,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
-export async function checkThemePreview({context, simulation, frontend, bus, setters, defaults, verify, store}) {
+export async function checkThemePreview({context, simulation, frontend, bus, setters, defaults, verify, store, themeImportMode}) {
   const archive=process.env.TYPEBAR_THEME_DEBOUNCE_ARCHIVE;
   assert.ok(archive,'TYPEBAR_THEME_DEBOUNCE_ARCHIVE required');
   const integrity='sha512-'+createHash('sha512').update(fs.readFileSync(archive)).digest('base64');
@@ -40,7 +40,7 @@ export async function checkThemePreview({context, simulation, frontend, bus, set
     qs:()=>({addClass:()=>{},removeClass:()=>{}}),setTheme:theme=>{shown=structuredClone(theme);},
     setThemeIndicator:value=>{indicator=structuredClone(value);},prefersColorSchemeDark:()=>dark,
     window:{matchMedia:()=>({matches:dark,addEventListener:(_,callback)=>{media=callback;}})},
-    configEvent:{subscribe:callback=>bus.subscribe(event=>pending.push(Promise.resolve(callback(event))))},
+    configEvent:{dispatch:event=>bus.dispatch(event),subscribe:callback=>bus.subscribe(event=>pending.push(Promise.resolve(callback(event))))},
     applyCustomBackground:async()=>{},applyCustomBackgroundSize:()=>{},showNoticeNotification:()=>simulation.notices.push(false),
     isAuthenticated:()=>!!simulation.flags.authenticated,setCommandlineSubgroup:value=>{subgroup=value;},showModal:()=>{}});
   vm.runInContext(extract('controllers/theme-controller.ts','export let randomTheme:','function applyCustomBackgroundSize(')
@@ -61,6 +61,11 @@ export async function checkThemePreview({context, simulation, frontend, bus, set
     // The real Solid store exposes array proxies; copy JSON config values by
     // enumeration in its own realm instead of structuredClone(proxy).
     const pick=value=>Object.fromEntries(keys.map(key=>[key,context.structuredClone(value[key])]));
+    if(themeImportMode) {
+      const {checkThemeImportRestart}=await import('./check-source-theme-import-restart.mjs');
+      return await checkThemeImportRestart({context,simulation,frontend,bus,setters,defaults,verify,store,extract,drain,pick,
+        shown:()=>shown?.name,indicator:()=>indicator,reset:()=>{timers.clear();pending=[];dark=false;shown=null;indicator=null;}});
+    }
     const fixtures=[];
     for(const auto of [false,true])for(const mode of ['on','fav']) {
       timers.clear();pending=[];dark=false;

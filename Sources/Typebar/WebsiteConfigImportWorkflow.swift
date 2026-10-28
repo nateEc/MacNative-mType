@@ -940,7 +940,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     try checkRestartBusy(intent, page: page)
     try checkIntent(intent, page: page)
     var restartSource = WebsiteRestartSource.capture(outcome: page.state.session.outcome,
-      alreadyDeparted: page.state.restartDepartureAttemptID == page.state.session.automaticInputAttemptID)
+      alreadyDeparted: page.state.restartDepartureAttemptID == page.state.session.automaticInputAttemptID || page.state.savedApplication != nil)
     var ticket: WebsiteConfigCommitCoordinator.Prepared
     switch intent {
     case .received(let id):
@@ -1061,10 +1061,10 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         do {
           try bindRestartController(to: page)
           switch intent {
-          case .edit, .received:
+          case .edit, .received, .application:
             receivedRestart(.init(source: restartSource, owner: page.owner,
               attempt: page.state.session.automaticInputAttemptID, publication: publication.applicationID))
-          case .application, .resume: break
+          case .resume: break
           }
           page.bindLayoutFluidHandler(owner: layoutFluidHandlerOwner) { [weak self] event, attempt in
             guard let self else { throw WebsiteConfigImportWorkflowError.unavailable }
