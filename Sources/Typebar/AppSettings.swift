@@ -2782,7 +2782,10 @@ final class AppSettings {
     return activeCustomThemeID
   }
 
-  var hasLocalBackground: Bool { localBackgroundStore.hasImage }
+  var hasLocalBackground: Bool {
+    _ = localBackgroundRevision
+    return localBackgroundStore.hasImage
+  }
 
   var localPracticeFontInfo: LocalPracticeFontInfo? {
     _ = localPracticeFontRevision
@@ -2800,6 +2803,11 @@ final class AppSettings {
 
   func importLocalBackground(data: Data) throws {
     try localBackgroundStore.save(data)
+    localBackgroundRevision &+= 1
+  }
+
+  func importSelectedBackground(data: Data, mimeType: String) throws {
+    try localBackgroundStore.saveSelectedFile(data, mimeType: mimeType)
     localBackgroundRevision &+= 1
   }
 

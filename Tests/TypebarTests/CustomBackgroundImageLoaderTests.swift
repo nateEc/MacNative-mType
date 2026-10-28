@@ -16,6 +16,25 @@ final class CustomBackgroundImageLoaderTests: XCTestCase {
   }
   private func settle() async { for _ in 0..<40 { await Task.yield() } }
 
+  func testSelectedFileStorageOwnsBytesAndKeepsDecodeFailuresAcrossColdReads() throws {
+    let store = TypebarLocalBackgroundStore.inMemory(), original = try imageData()
+    let mutable = NSMutableData(data: original)
+    try store.saveSelectedFile(Data(referencing: mutable), mimeType: "image/png")
+    mutable.replaceBytes(in: NSRange(location: 0, length: mutable.length), withBytes: [UInt8](repeating: 0, count: mutable.length))
+    XCTAssertEqual(try store.encodedData(), original)
+    XCTAssertThrowsError(try store.saveSelectedFile(original, mimeType: "image/svg+xml"))
+    XCTAssertEqual(try store.encodedData(), original)
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-selected-cold-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: root) }
+    for bytes in [Data(), Data("owned corrupt png".utf8)] {
+      try TypebarLocalBackgroundStore(directoryURL: root).saveSelectedFile(bytes, mimeType: "image/png")
+      let cold = TypebarLocalBackgroundStore(directoryURL: root)
+      XCTAssertTrue(cold.hasImage); XCTAssertNil(cold.image()); XCTAssertEqual(try cold.encodedData(), bytes)
+    }
+    XCTAssertEqual(BackgroundSelectedFileImport.mimeType(for: URL(fileURLWithPath: "/owned/image.PNG")), "image/png")
+    XCTAssertEqual(BackgroundSelectedFileImport.mimeType(for: URL(fileURLWithPath: "/owned/image.webp")), "image/webp")
+  }
+
   func testPresentLocalDataWinsAndOriginalBytesRemainAvailable() async throws {
     let data = try imageData()
     let store = TypebarLocalBackgroundStore.inMemory()

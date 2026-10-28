@@ -26,6 +26,44 @@ final class WebsiteConfigBackgroundGeometryBrowserTests: XCTestCase {
     }
   }
 
+  func testSelectedFileDataURLsAgainstActualHiddenBrowserImageDecode() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned source") }
+    struct Frame: Decodable { let stored: String? }
+    struct Sample: Decodable { let frames: [Frame] }
+    struct Output: Decodable { let fileFixtures: [Sample] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), output = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-config-schema.mjs").path, reference, "--background-settings"]
+    process.standardOutput = output; try process.run()
+    let data = output.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit(); XCTAssertEqual(process.terminationStatus, 0)
+    let payload = try JSONDecoder().decode(Output.self, from: data)
+    let addresses = payload.fileFixtures.compactMap { $0.frames.last?.stored }; XCTAssertEqual(addresses.count, 18)
+    let json = String(decoding: try JSONEncoder().encode(addresses), as: UTF8.self)
+    let configuration = WKWebViewConfiguration(); configuration.websiteDataStore = .nonPersistent()
+    let web = WKWebView(frame: .zero, configuration: configuration)
+    let completion = expectation(description: "owned selected file data URLs")
+    let probe = Probe(completed: completion); web.navigationDelegate = probe
+    defer { web.stopLoading(); web.navigationDelegate = nil }
+    web.loadHTMLString("""
+      <!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; script-src 'unsafe-inline'">
+      <script>window.geometryReady=(async()=>{
+        const rows=[];for(const address of \(json)) {
+          const image=new Image();image.src=address;let ready=true;
+          try{await image.decode();}catch{ready=false;}rows.push({ready});
+        }return rows;
+      })();</script>
+      """, baseURL: nil)
+    await fulfillment(of: [completion], timeout: 20)
+    XCTAssertNil(probe.error); XCTAssertNil(web.window)
+    let rows = try XCTUnwrap(probe.values); XCTAssertEqual(rows.count, addresses.count)
+    for (address, row) in zip(addresses, rows) {
+      let bytes = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(address.components(separatedBy: ",").last)))
+      let resource = try WebsiteConfigBackgroundResource.prepare(loadedData: bytes, source: .local)
+      let ready: Bool; if case .ready = resource.state { ready = true } else { ready = false }
+      XCTAssertEqual(ready, try XCTUnwrap(row["ready"] as? Bool), address.prefix(48).description)
+    }
+  }
+
   func testSettingsRangeSanitationAgainstActualHiddenBrowser() async throws {
     let configuration = WKWebViewConfiguration(); configuration.websiteDataStore = .nonPersistent()
     let web = WKWebView(frame: .zero, configuration: configuration)

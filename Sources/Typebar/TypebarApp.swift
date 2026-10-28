@@ -6913,8 +6913,8 @@ private struct ContentView: View {
       if canAccess { url.stopAccessingSecurityScopedResource() }
     }
     do {
-      let data = try Data(contentsOf: url)
-      if settings.preferenceConfigurationSaves.applyBackgroundEdit(.localFile(data)) != nil { return }
+      let (data, mimeType) = try BackgroundSelectedFileImport.read(url, for: settings)
+      if BackgroundSelectedFileImport.apply(data, mimeType: mimeType, to: settings) != nil { return }
       try settings.importLocalBackground(data: data)
       customBackgroundCommandMessage = nil
     } catch {

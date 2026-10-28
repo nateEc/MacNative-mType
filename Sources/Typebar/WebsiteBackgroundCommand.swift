@@ -3,6 +3,7 @@ import Foundation
 enum PracticeBackgroundEdit: Equatable {
   case address(String), fit(CustomBackgroundFit), filter(CustomBackgroundCommandEditorKind, String)
   case localFile(Data), remove
+  case selectedFile(Data, String)
   case removeLocal
   case settingsFilter(WebsiteBackgroundSettingsState.Token, Int, Double)
   case previewFilter(WebsiteBackgroundSettingsState.Token, [Double])
@@ -45,7 +46,7 @@ enum WebsiteBackgroundCommand {
       guard !input.isEmpty, !number.isNaN, case .array(var values) = current.projection.runtime["customBackgroundFilter"], values.count == 4
       else { throw WebsiteBackgroundCommandError.invalidInput }
       values[index] = .number(number); key = "customBackgroundFilter"; value = .array(values)
-    case .localFile, .removeLocal, .previewFilter: throw WebsiteBackgroundCommandError.invalidInput
+    case .localFile, .selectedFile, .removeLocal, .previewFilter: throw WebsiteBackgroundCommandError.invalidInput
     }
     let admitted = key == "customBackground" ? value.trimmingWebsiteString : value
     guard WebsiteConfigSchema(catalogs: WebsiteConfigNativeProfile.catalogs).accepts(admitted, for: key) else { throw WebsiteBackgroundCommandError.invalidInput }

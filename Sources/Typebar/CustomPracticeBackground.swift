@@ -123,8 +123,20 @@ final class TypebarLocalBackgroundStore {
 
   func save(_ data: Data) throws {
     guard NSImage(data: data) != nil else { throw LocalBackgroundError.unsupportedImage }
+    try persist(data)
+  }
+
+  /// File selection admits the declared MIME type before image loading. A
+  /// failed decode remains a stored local choice instead of restoring remote.
+  func saveSelectedFile(_ data: Data, mimeType: String) throws {
+    guard BackgroundSelectedFileImport.accepts(mimeType: mimeType) else { throw LocalBackgroundError.unsupportedMIMEType }
+    guard data.count <= 64 * 1024 * 1024 else { throw LocalBackgroundError.resourceLimit }
+    try persist(data)
+  }
+
+  private func persist(_ data: Data) throws {
     guard let directoryURL, let fileURL else {
-      memoryData = data
+      memoryData = data.withUnsafeBytes { Data($0) }
       return
     }
     try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
@@ -150,12 +162,14 @@ final class TypebarLocalBackgroundStore {
 
 enum LocalBackgroundError: LocalizedError {
   case unsupportedImage
+  case unsupportedMIMEType
   case unexpectedDirectory
   case unsupportedFile, resourceLimit, invalidLimit
 
   var errorDescription: String? {
     switch self {
     case .unsupportedImage: "请选择 macOS 可以读取的图片文件。"
+    case .unsupportedMIMEType: "请选择 PNG、JPEG、GIF 或 WebP 图片文件。"
     case .unexpectedDirectory: "本地背景路径不是图片文件；已保留该目录，请检查后重试。"
     case .unsupportedFile: "本地背景必须是普通文件；未读取链接或特殊文件。"
     case .resourceLimit: "背景文件超过读取大小限额。"

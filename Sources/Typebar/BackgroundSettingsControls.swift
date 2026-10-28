@@ -117,8 +117,8 @@ struct BackgroundSettingsControls: View {
       do {
         let file = try result.get(), access = file.startAccessingSecurityScopedResource()
         defer { if access { file.stopAccessingSecurityScopedResource() } }
-        let data = try Data(contentsOf: file)
-        if let accepted = settings.preferenceConfigurationSaves.applyBackgroundEdit(.localFile(data)) {
+        let (data, mimeType) = try BackgroundSelectedFileImport.read(file, for: settings)
+        if let accepted = BackgroundSelectedFileImport.apply(data, mimeType: mimeType, to: settings) {
           message = accepted ? nil : "当前本地背景未能更新。"
         } else { try settings.importLocalBackground(data: data); message = nil }
       } catch { message = error.localizedDescription }

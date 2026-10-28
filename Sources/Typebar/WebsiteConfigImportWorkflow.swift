@@ -461,7 +461,9 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     }
     applying = true; operation = UUID()
     defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; finishedApplying() }
-    if case .localFile(let data) = edit {
+    if case .selectedFile(let data, let mimeType) = edit {
+      try settings.importSelectedBackground(data: data, mimeType: mimeType)
+    } else if case .localFile(let data) = edit {
       let resource = try WebsiteConfigBackgroundResource.prepare(loadedData: data, source: .local)
       guard case .ready(let image) = resource.state,
         ["public.png", "public.jpeg", "com.compuserve.gif", "org.webmproject.webp"].contains(image.type)
@@ -470,7 +472,9 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     } else if edit == .remove || edit == .removeLocal { try settings.removeLocalBackground() }
     return try environment.withSynchronousSetterRead {
       let outcome: WebsiteConfigCommitCoordinator.Outcome
-      if case .localFile = edit {
+      if case .selectedFile = edit {
+        outcome = try coordinator.commitBackgroundRefresh(coordinator.prepareBackgroundRefresh(for: page), for: page)
+      } else if case .localFile = edit {
         outcome = try coordinator.commitBackgroundRefresh(coordinator.prepareBackgroundRefresh(for: page), for: page)
       } else if edit == .removeLocal {
         outcome = try coordinator.commitBackgroundRefresh(coordinator.prepareBackgroundRefresh(for: page), for: page)
@@ -482,7 +486,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       switch outcome {
       case .committed:
         switch edit {
-        case .address, .remove, .localFile, .removeLocal: coordinator.startPublishedBackground(for: page, from: settings, fetchRemote: fetchRemoteBackground)
+        case .address, .remove, .localFile, .selectedFile, .removeLocal: coordinator.startPublishedBackground(for: page, from: settings, fetchRemote: fetchRemoteBackground)
         case .fit, .filter, .settingsFilter, .previewFilter: break
         }
         return "背景设置已应用。"

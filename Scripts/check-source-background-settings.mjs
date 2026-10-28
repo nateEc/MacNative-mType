@@ -6,6 +6,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import {checkBackgroundAddressForm} from './check-source-background-address-form.mjs';
+import {checkBackgroundFileSelection} from './check-source-background-file-selection.mjs';
 
 export async function checkBackgroundSettings({context,simulation,bus,setters,defaults,verify,store,drain,frontend,image}) {
   const read=file=>fs.readFileSync(path.join(frontend,file),'utf8');
@@ -58,5 +59,6 @@ export async function checkBackgroundSettings({context,simulation,bus,setters,de
     mounted.dispose();fixtures.push({initial,component,second,frames});
   }
   const addressFixtures=await checkBackgroundAddressForm({context,simulation,bus,defaults,store,drain,read,expression});
-  verify();return {fixtures,addressFixtures};
+  const fileFixtures=await checkBackgroundFileSelection({context,simulation,bus,defaults,store,drain,read,expression});
+  verify();return {fixtures,addressFixtures,fileFixtures};
 }

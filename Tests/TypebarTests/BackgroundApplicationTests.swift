@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import ImageIO
+import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 import XCTest
@@ -9,6 +10,31 @@ import XCTest
 @MainActor
 final class BackgroundApplicationTests: XCTestCase {
   private let address = "https://example.invalid/same.png"
+  func testSelectedFilePreflightKeepsNativeLegacyImageAdmission() throws {
+    try withSettings { settings, _ in
+      let bytes = try OwnedBackgroundImageFixture.make()
+      let selection = try BackgroundSelectedFileImport.read(URL(fileURLWithPath: "/owned/legacy.tiff"), for: settings, load: { _ in bytes })
+      XCTAssertEqual(selection.mimeType, "image/tiff"); XCTAssertEqual(selection.data, bytes)
+      XCTAssertNil(BackgroundSelectedFileImport.apply(selection.data, mimeType: selection.mimeType, to: settings))
+      try settings.importLocalBackground(data: selection.data); XCTAssertTrue(settings.hasLocalBackground)
+    }
+  }
+  func testLocalFilePresenceIsObservableForSelectionAndRemovalControls() throws {
+    @MainActor final class Probe { var calls = 0 }
+    try withSettings { settings, _ in
+      let probe = Probe()
+      @MainActor func observe() {
+        withObservationTracking { _ = settings.hasLocalBackground } onChange: {
+          MainActor.assumeIsolated { probe.calls += 1 }
+        }
+      }
+      XCTAssertFalse(settings.hasLocalBackground); observe()
+      try settings.importSelectedBackground(data: Data(), mimeType: "image/png")
+      XCTAssertTrue(settings.hasLocalBackground); XCTAssertEqual(probe.calls, 1)
+      observe(); try settings.removeLocalBackground()
+      XCTAssertFalse(settings.hasLocalBackground); XCTAssertEqual(probe.calls, 2)
+    }
+  }
   func testNativeSettingsSlidersKeepLegacyBoundsAndImmediatePersistence() {
     withSettings { settings, _ in
       settings.customBackgroundURL = address

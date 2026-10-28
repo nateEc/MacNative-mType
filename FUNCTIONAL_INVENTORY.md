@@ -2,6 +2,10 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| BACKGROUND-FILE-16 | 本地背景文件的 MIME 准入与保存后解码 | 固定设置页／命令上传回调、实际 FileStorage 与 Solid 信号；自有数据库／FileReader／DOM，隐藏 WebKit 解码 | BackgroundSelectedFileImport、原始本地文件保存与独立背景流；WEBSITE_BACKGROUND_FILE_SELECTION_CONTRACT.md | 部分完成：损坏或空的受支持文件保留本地选择，无效 MIME 不写文件；验证保存与解码分离和成功前缀。实体文件面板、全部 MIME 映射与异步删除交错仍开放。 |
+
+| ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
+| --- | --- | --- | --- | --- |
 | BACKGROUND-ADDRESS-15 | 设置页背景地址的原始校验与自动提交 | 固定 TSX 表单／输入回调、fromSchema、真实 Zod 与 setter／Solid；自有表单 API 适配，隐藏原生文本框 | BackgroundSettingsPreferences、TextField 提交及焦点接线；WEBSITE_BACKGROUND_ADDRESS_FORM_CONTRACT.md | 部分完成：原始值校验、输入错误提示、提交／失焦保存、原始草稿保留与已保存值无变化时不保存。TanStack 全部状态、原版指示时序和实体跨窗口操作仍开放。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |

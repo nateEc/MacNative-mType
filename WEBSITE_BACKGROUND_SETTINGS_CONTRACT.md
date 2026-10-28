@@ -28,4 +28,6 @@
 
 后续背景地址字段的原始值校验、提交／失焦接线和草稿保留，另见 `WEBSITE_BACKGROUND_ADDRESS_FORM_CONTRACT.md` 与 BACKGROUND-ADDRESS-15；这一后续证据不关闭下面的实体与异步文件验收项。
 
+本地图片的 MIME 预检、保存后解码和文件存在通知另见 `WEBSITE_BACKGROUND_FILE_SELECTION_CONTRACT.md` 与 BACKGROUND-FILE-16；实体文件面板与删除命令的全部交错仍开放。
+
 鼠标真实拖动循环、拖动后返回初始位置、设置窗口跨多练习窗口切换时的实体操作、文件选择器延迟返回、所有文件读写故障与原版异步 UI 回调组合仍待验证。隐藏控件 action 不代替这些人工场景。NaN 命令别名副作用仍按上一批记录为开放差异；原生后台模型不会接受该故障值。人工验收保持待验收，目标保持未完成。
