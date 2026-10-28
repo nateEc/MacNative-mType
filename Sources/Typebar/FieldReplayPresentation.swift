@@ -44,7 +44,19 @@ struct FieldReplayPlan {
     var glyphs: [TypingPromptGlyph] = []
     var coordinates: [Coordinate] = []
     var errorIndices: Set<Int> = []
+    var displayGapIndices: Set<Int> = []
     var text: String { String(glyphs.map(\.character)) }
+
+    func reachableIndices(upTo maximum: Coordinate?) -> Set<Int> {
+      Set(coordinates.indices.filter { index in
+        !displayGapIndices.contains(index) && (maximum.map { coordinates[index] <= $0 } ?? false)
+      })
+    }
+
+    func selectedIndex(for coordinate: Coordinate?) -> Int? {
+      guard let coordinate else { return nil }
+      return coordinates.indices.first { !displayGapIndices.contains($0) && coordinates[$0] == coordinate }
+    }
   }
 
   struct Frame: Equatable {
@@ -69,6 +81,7 @@ struct FieldReplayPlan {
         // An entered extra separator already occupies the native visual gap;
         // keep its source letter/action, without drawing a second space.
         if displayGaps.contains(word), field.letters.last?.text.hasSuffix(" ") != true {
+          result.displayGapIndices.insert(result.glyphs.count)
           result.glyphs.append(.init(character: " ", state: .pending))
           result.coordinates.append(.init(word: word, position: field.letters.count))
         }

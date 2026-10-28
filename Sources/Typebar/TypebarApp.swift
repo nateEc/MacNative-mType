@@ -9491,10 +9491,8 @@ private struct ReplayTimelineView: View {
           .foregroundStyle(.secondary)
         ReplayCharacterPicker(
           text: presentation.text,
-          reachableIndices: Set(presentation.coordinates.indices.filter { index in
-            fieldPlan.maximumSeekCoordinate.map { presentation.coordinates[index] <= $0 } ?? false
-          }),
-          selectedIndex: presentation.coordinates.firstIndex { $0 == selectedFieldCoordinate },
+          reachableIndices: presentation.reachableIndices(upTo: fieldPlan.maximumSeekCoordinate),
+          selectedIndex: presentation.selectedIndex(for: selectedFieldCoordinate),
           glyphs: presentation.glyphs, errorIndices: presentation.errorIndices
         ) { index in
           guard presentation.coordinates.indices.contains(index),
