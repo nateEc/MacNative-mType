@@ -1,5 +1,7 @@
 # 结果图表的字段计分与逐秒历史
 
+后续 RESULT-INTERVAL-SERIES-34 补齐区间 Burst 的毫秒计算及源运算顺序，并对 326 组实际处理器轨迹的完整系列取证，见 RESULT_INTERVAL_SERIES_CONTRACT.md；实体输入与全页显示仍未完成。
+
 `RESULT-CHART-SCORING-32`，起点 `b75d9b7a`，固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。整体原生重写仍未完成。
 
 ## 来源与问题

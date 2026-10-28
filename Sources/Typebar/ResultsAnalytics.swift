@@ -1775,9 +1775,14 @@ enum ResultPerformanceTrace {
       }
       previousBoundary = elapsed
       let counts = fields.counts
+      // The source subtracts boundary milliseconds before converting the
+      // interval to seconds. Subtracting fractional seconds first can move a
+      // half-integer Burst across its rounding boundary.
+      let intervalSeconds = fields.sourceClassification
+        ? (elapsed * 1_000 - start * 1_000) / 1_000 : elapsed - start
       return .init(elapsed: elapsed, wpm: wpm(characters: counts.credit, elapsed: elapsed, sourceOrder: fields.sourceClassification),
         rawWpm: wpm(characters: counts.raw, elapsed: elapsed, sourceOrder: fields.sourceClassification),
-        burstWpm: intervalBurst(inputUnits: attempts, seconds: elapsed - start), errorCount: errors)
+        burstWpm: intervalBurst(inputUnits: attempts, seconds: intervalSeconds, sourceOrder: fields.sourceClassification), errorCount: errors)
     }
   }
 
@@ -2024,9 +2029,10 @@ enum ResultPerformanceTrace {
     return Int(speed)
   }
 
-  private static func intervalBurst(inputUnits: Int, seconds: TimeInterval) -> Double {
+  private static func intervalBurst(inputUnits: Int, seconds: TimeInterval, sourceOrder: Bool = false) -> Double {
     guard seconds.isFinite, seconds > 0 else { return 0 }
-    let speed = (Double(inputUnits) / 5 / seconds * 60).rounded()
+    let speed = sourceOrder ? sourceRoundedWPM(credit: inputUnits, elapsed: seconds)
+      : (Double(inputUnits) / 5 / seconds * 60).rounded()
     // Keep the existing Int-range ceiling for raw interval metrics. Fractional
     // display precision must not expand the imported-speed domain.
     guard speed.isFinite, speed < Double(Int.max) else { return 0 }
