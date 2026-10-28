@@ -820,7 +820,10 @@ final class WebsiteConfigCommitCoordinator {
     guard prepared.admission == resourceAdmission else { return .stale }
     return try commitLiveEdit(prepared.configuration, for: page, kind: .font, font: prepared.font)
   }
-  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap, layoutFluid, font }
+  func commitLiveTheme(_ prepared: Prepared, for page: PracticePageSessionStore) throws -> Outcome {
+    try commitLiveEdit(prepared, for: page, kind: .theme)
+  }
+  private enum LiveEditKind { case threshold, behavior, inputRule, sound, caret, pace, appearance, keymap, layoutFluid, font, theme }
   private func commitLiveEdit(_ prepared: Prepared, for page: PracticePageSessionStore, kind: LiveEditKind,
     paceTarget: Double? = nil, font: WebsiteConfigFontResource? = nil) throws -> Outcome {
     guard !processing, page.restartController?.isPreparing != true else { return .busy }
@@ -833,6 +836,8 @@ final class WebsiteConfigCommitCoordinator {
       guard kind == .layoutFluid, page.state.session.ownsWebsiteWordNavigation(navigation) else { return .stale }
     }
     switch kind {
+    case .theme:
+      guard WebsiteThemeCommand.admits(prepared.draft, from: capture.publication.draft), page.state.sharedReceipt == nil else { return .stale }
     case .font:
       guard font != nil, WebsiteConfigFontEdit.admits(prepared.draft, from: capture.publication.draft) else { return .stale }
     case .behavior:
@@ -861,10 +866,14 @@ final class WebsiteConfigCommitCoordinator {
       }) else { return .stale }
     }
     var state = page.state
+    let themeAppearance: WebsiteConfigPublishedPresentation.PreparedAppearance?
+    if kind == .theme, case .edited(let edit) = prepared.draft.origin {
+      themeAppearance = try previous.prepareThemeChange(draft: prepared.draft, key: edit.key)
+    } else { themeAppearance = nil }
     let progress = state.currentQuoteInitialization
     let controller = page.restartController
     if kind == .inputRule { state.session.synchronizeWebsiteInputRules(prepared.draft.inputRules.rules) }
-    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap && kind != .layoutFluid && kind != .font {
+    else if kind != .sound && kind != .caret && kind != .pace && kind != .appearance && kind != .keymap && kind != .layoutFluid && kind != .font && kind != .theme {
       state.session.synchronizeLiveInputRules(prepared.draft.inputRules.rules, websiteThresholds: true)
     }
     if kind == .appearance, case .edited(let edit) = prepared.draft.origin, edit.key == "highlightMode" {
@@ -878,6 +887,8 @@ final class WebsiteConfigCommitCoordinator {
     guard isCurrent(prepared) else { return .stale }
     try Task.checkCancellation()
     switch kind {
+    case .theme:
+      try page.beginLiveThemeCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .font:
       try page.beginLiveFontCommit(owner: prepared.owner, router: router, capture: capture, draft: prepared.draft)
     case .behavior:
@@ -921,7 +932,9 @@ final class WebsiteConfigCommitCoordinator {
       background: capture.publication.background, font: font ?? capture.publication.font,
       session: state.session, practice: updatedPractice, quoteRecoveries: capture.publication.quoteRecoveries,
       ownerLease: prepared.owner, authority: publicationAuthority)
-    state = .init(session: state.session, presentation: previous.retainingAppearance(for: publication),
+    let presentation = themeAppearance.map { WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: $0) }
+      ?? previous.retainingAppearance(for: publication)
+    state = .init(session: state.session, presentation: presentation,
       practice: updatedPractice, priorAttemptLedger: state.priorAttemptLedger,
       restartDepartureAttemptID: state.restartDepartureAttemptID, quoteInitialization: state.quoteInitialization)
     if let progress {

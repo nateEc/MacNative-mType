@@ -27,6 +27,9 @@ final class PreferenceConfigurationSaveRouter {
   private var fontSizeProviders: [UUID: () -> Double?] = [:]
   private var fontEditHandlers: [UUID: (PracticeFontEdit) -> Bool?] = [:]
   private var deliveringFontEdit = false
+  private var themeProviders: [UUID: () -> WebsiteConfigNativeThemes?] = [:]
+  private var themeEditHandlers: [UUID: (PracticeThemeEdit) -> Bool?] = [:]
+  private var deliveringThemeEdit = false
   private var priority: [UUID] = []
   private var isDelivering = false
 
@@ -36,6 +39,8 @@ final class PreferenceConfigurationSaveRouter {
     fontFamilyName: (() -> String)? = nil,
     fontPointSize: (() -> Double?)? = nil,
     fontEdit: ((PracticeFontEdit) -> Bool?)? = nil,
+    themes: (() -> WebsiteConfigNativeThemes?)? = nil,
+    themeEdit: ((PracticeThemeEdit) -> Bool?)? = nil,
     save: @escaping () -> Void) {
     leaseTransitions += 1
     defer { leaseTransitions -= 1 }
@@ -48,6 +53,8 @@ final class PreferenceConfigurationSaveRouter {
     fontFamilyProviders[owner] = fontFamilyName
     fontSizeProviders[owner] = fontPointSize
     fontEditHandlers[owner] = fontEdit
+    themeProviders[owner] = themes
+    themeEditHandlers[owner] = themeEdit
     if activeBefore != priority.last || priority.last == owner { generation = UUID() }
   }
 
@@ -89,9 +96,20 @@ final class PreferenceConfigurationSaveRouter {
   /// nil selects the legacy native path; false is an owned rejection and must
   /// never fall through to mutating another configuration.
   func applyFontEdit(_ edit: PracticeFontEdit) -> Bool? {
-    guard !deliveringFontEdit, !isDelivering, leaseTransitions == 0 else { return false }
+    guard !deliveringFontEdit, !deliveringThemeEdit, !isDelivering, leaseTransitions == 0 else { return false }
     guard captureLease() != nil, let owner = priority.last, let action = fontEditHandlers[owner] else { return nil }
     deliveringFontEdit = true; defer { deliveringFontEdit = false }
+    return action(edit)
+  }
+
+  var themes: WebsiteConfigNativeThemes? {
+    guard let owner = priority.last else { return nil }
+    return themeProviders[owner]?()
+  }
+  func applyThemeEdit(_ edit: PracticeThemeEdit) -> Bool? {
+    guard !deliveringThemeEdit, !deliveringFontEdit, !isDelivering, leaseTransitions == 0 else { return false }
+    guard captureLease() != nil, let owner = priority.last, let action = themeEditHandlers[owner] else { return nil }
+    deliveringThemeEdit = true; defer { deliveringThemeEdit = false }
     return action(edit)
   }
 
@@ -116,6 +134,8 @@ final class PreferenceConfigurationSaveRouter {
     fontFamilyProviders.removeValue(forKey: owner)
     fontSizeProviders.removeValue(forKey: owner)
     fontEditHandlers.removeValue(forKey: owner)
+    themeProviders.removeValue(forKey: owner)
+    themeEditHandlers.removeValue(forKey: owner)
     priority.removeAll { $0 == owner }
     if activeBefore != priority.last { generation = UUID() }
   }

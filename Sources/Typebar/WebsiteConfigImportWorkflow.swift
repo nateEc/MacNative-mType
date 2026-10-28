@@ -297,6 +297,48 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   }
 
   @discardableResult
+  func runThemeCommand(_ edit: PracticeThemeEdit, replacing applicationID: UUID) throws -> WebsiteThemeCommand.Completion {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil, page.state.sharedReceipt == nil
+    else { throw WebsiteConfigImportWorkflowError.preparationPending }
+    guard let original = page.state.presentation?.publication, original.applicationID == applicationID else {
+      throw WebsiteConfigImportWorkflowError.conflict
+    }
+    let fields = try WebsiteThemeCommand.fields(for: edit, customThemes: settings.customThemes)
+    try Task.checkCancellation()
+    let current = UUID(); applying = true; operation = current
+    defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; finishedApplying() }
+    return try environment.withSynchronousSetterRead {
+      guard let context = environment.read() else { throw WebsiteConfigCommitCoordinatorError.noEnvironment }
+      let plan = try WebsiteThemeCommand.plan(current: original.draft.projection.runtime, fields: fields,
+        context: context.context, active: page.state.session.hasStarted && !page.state.session.isFinished)
+      var receiptID = applicationID, saved = 0
+      do {
+        for step in plan.steps {
+          try Task.checkCancellation()
+          guard operation == current, !stopped, page.state.presentation?.publication.applicationID == receiptID else {
+            throw WebsiteConfigImportWorkflowError.conflict
+          }
+          guard step.accepted else { throw WebsiteThemeCommandError.unsupported }
+          let ticket = try coordinator.prepareEdit(key: step.key, value: step.value, for: page, refreshingWith: source)
+          prepared = ticket
+          switch try coordinator.commitLiveTheme(ticket, for: page) {
+          case .committed(let publication): saved += 1; receiptID = publication.applicationID
+          case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+          case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+          case .busy: throw WebsiteConfigImportWorkflowError.busy
+          }
+        }
+      } catch {
+        if saved > 0 { throw WebsiteThemeCommandError.interrupted(saved: saved, underlying: error) }
+        throw error
+      }
+      return .init(disabledSystemFollowing: plan.disablesSystem)
+    }
+  }
+
+  @discardableResult
   func runFontCommand(_ edit: PracticeFontEdit, replacing applicationID: UUID) throws -> String {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }

@@ -27,11 +27,12 @@ const caretCommandMode = process.argv[3] === '--caret-commands';
 const paceInputNotationMode = process.argv[3] === '--pace-input-notation';
 const paceCommandMode = process.argv[3] === '--pace-commands' || paceInputNotationMode;
 const appearanceCommandMode = process.argv[3] === '--appearance-commands';
+const themeCommandMode = process.argv[3] === '--theme-commands';
 const keymapCommandMode = process.argv[3] === '--keymap-commands';
 const layoutFluidRuntimeMode = process.argv[3] === '--layoutfluid-runtime';
 const sharedSettingsMode = process.argv[3] === '--shared-test-settings';
 const exportMode = process.argv[3] === '--export-config' || sharedSettingsMode;
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode || exportMode);
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || themeCommandMode || keymapCommandMode || layoutFluidRuntimeMode || exportMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -71,7 +72,7 @@ const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
 const adapters = new Map([
   [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: (_message, options) => {
-    if (thresholdCommandMode || inputCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode) simulation.notices.push(options?.important ?? false);
+    if (thresholdCommandMode || inputCommandMode || paceCommandMode || appearanceCommandMode || themeCommandMode || keymapCommandMode || layoutFluidRuntimeMode) simulation.notices.push(options?.important ?? false);
   }, showErrorNotification: message => { if (sharedSettingsMode) simulation.storageError?.(message); }}],
   [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
   [path.join(frontend, 'states/test.ts'), {isTestActive: () => simulation.flags.testActive ?? true}],
@@ -85,6 +86,7 @@ const adapters = new Map([
   [path.join(frontend, 'config/persistence.ts'), {saveToLocalStorage: key => {
     simulation.saves.push(key);
     if (sharedSettingsMode) simulation.configCheckpoints?.push({key, value: structuredClone(simulation.Config)});
+    if (themeCommandMode) simulation.configCheckpoints.push({key, value: structuredClone(simulation.Config)});
     if (sharedSettingsMode) simulation.persistConfig?.(key);
   }}],
   ['solid-js', {onCleanup: noop, JSXElement: undefined}],
@@ -209,7 +211,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || keymapCommandMode || layoutFluidRuntimeMode || exportMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || themeCommandMode || keymapCommandMode || layoutFluidRuntimeMode || exportMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -323,6 +325,53 @@ if (defaultsMode) {
     assert.notEqual(fixtures.find(f=>f.label==='fallback-later-value'&&f.failure).settingsJSON,
       fixtures.find(f=>f.label==='fallback-later-value'&&f.failure).fallbackJSON);
     verify();console.log(JSON.stringify({fixtures}));
+  } else if (themeCommandMode) {
+    // Run the complete pinned setter, metadata, async theme subscriber, set and
+    // clearRandom functions. Only rendering/DOM, inactive hover and shuffle-list
+    // construction are adapters. There is no active random draw in this probe.
+    const controller = fs.readFileSync(path.join(frontend,'controllers/theme-controller.ts'),'utf8');
+    function extract(from,to) {
+      const start=controller.indexOf(from),end=controller.indexOf(to,start);
+      assert.ok(start>=0&&end>start,from);
+      return stripTypeScriptTypes(controller.slice(start,end),{mode:'transform'});
+    }
+    let dark=false,shown=null,pending=[];
+    Object.assign(context,{Config:simulation.Config,setConfig:setters.setConfig,
+      prefersColorSchemeDark:()=>dark,window:{matchMedia:()=>({matches:dark})},
+      apply:async name=>{shown=name;},clearPreview:async()=>{},preview:noop,
+      changeThemeList:async()=>{},applyCustomBackground:async()=>{},applyCustomBackgroundSize:noop,
+      updateThemeIndicator:noop,showNoticeNotification:()=>simulation.notices.push(false),
+      configEvent:{subscribe:callback=>bus.subscribe(event=>{pending.push(Promise.resolve(callback(event)));})}});
+    vm.runInContext('let randomTheme = null;\n'+extract('async function clearRandom(', 'function applyCustomBackgroundSize(')
+      +extract('async function set(', 'export async function clearPreview(')
+      +extract('let ignoreConfigEvent = false;', 'window.addEventListener("customBackgroundFailed"'),context);
+    const colors=Array.from({length:10},(_,i)=>'#'+(0x102030+i*0x090909).toString(16).padStart(6,'0'));
+    const fields=(key,value)=>[{key,value}];
+    const fixtures=[];
+    async function add(command,{auto=false,custom=false,systemDark=false,active=false,authenticated=false,count=0}={}) {
+      dark=systemDark;shown=auto?(dark?'dracula':'serika'):(custom?'custom':'serika_dark');pending=[];
+      Object.assign(simulation.Config,structuredClone(defaults),{theme:'serika_dark',themeLight:'serika',themeDark:'dracula',
+        autoSwitchTheme:auto,customTheme:custom,customThemeColors:colors,funbox:active?['no_quit']:[]});
+      simulation.flags={testActive:active,authenticated,customThemeCount:count};
+      simulation.events=[];simulation.saves=[];simulation.notices=[];simulation.configCheckpoints=[];
+      const current=structuredClone(simulation.Config),results=command.map(({key,value})=>setters.setConfig(key,value));
+      for(let rounds=0;pending.length;rounds++) {
+        assert.ok(rounds<20,'Theme event queue must settle');const batch=pending;pending=[];await Promise.all(batch);
+      }
+      fixtures.push({fields:command,current,active,authenticated,count,systemDark,results,
+        runtime:structuredClone(simulation.Config),events:simulation.events,saves:simulation.saves,
+        checkpoints:simulation.configCheckpoints,shown,notices:simulation.notices});
+    }
+    const commands=[fields('theme','nord'),fields('themeLight','serika_dark'),fields('themeDark','serika'),
+      ...[true,false].map(x=>fields('autoSwitchTheme',x)),...[true,false].map(x=>fields('customTheme',x)),
+      fields('customThemeColors',colors.slice().reverse()),fields('favThemes',['dracula','serika']),fields('favThemes',[]),
+      ...['off','on','fav','light','dark','auto','custom'].map(x=>fields('randomTheme',x)),
+      [{key:'customTheme',value:true},{key:'customThemeColors',value:colors.slice().reverse()}]];
+    for(const auto of [false,true])for(const custom of [false,true])for(const systemDark of [false,true])for(const active of [false,true])
+      for(const command of commands)await add(command,{auto,custom,systemDark,active});
+    for(const key of ['theme','themeLight','themeDark'])for(const name of catalogs.themes)await add(fields(key,name),{auto:true,systemDark:key==='themeDark'});
+    for(const authenticated of [false,true])for(const count of [0,2])await add(fields('randomTheme','custom'),{authenticated,count});
+    verify();console.log(JSON.stringify({fixtures,themeCount:catalogs.themes.length}));
   } else if (inputCommandMode) {
     function extract(file, from, until, wrap = text => text) {
       const source = fs.readFileSync(path.join(frontend, file), 'utf8');

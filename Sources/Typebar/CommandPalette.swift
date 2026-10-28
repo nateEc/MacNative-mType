@@ -1828,6 +1828,7 @@ enum ThemeCommandApplication {
         {
             return false
         }
+        if let accepted = settings.preferenceConfigurationSaves.applyThemeEdit(.select(target)) { return accepted }
         settings.followSystemTheme = false
         switch target {
         case .builtIn(let theme):

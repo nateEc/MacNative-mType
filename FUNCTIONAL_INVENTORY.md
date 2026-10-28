@@ -2,6 +2,10 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| THEME-LIVE-SETTINGS-09 | 完整配置主题选择、系统跟随和收藏设置 | 固定元数据、逐项 setter 及异步主题控制器 | WebsiteThemeCommand、活动窗口路由、PracticeThemePreferences；WEBSITE_THEME_LIVE_CONTRACT.md | 部分完成：接入实际主题发布、系统深浅事件和已有自定义主题的十色选择；随机范围可保存，但完成后轮换、主题悬停、快捷选择器全部状态、创建／导入联合写入和实体交互仍开放。不得以本条代替整体主题兼容性验收。 |
+
+| ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
+| --- | --- | --- | --- | --- |
 | FONT-PUBLISHED-PREVIEW-08 | 完整配置的悬停字体、关闭恢复及共享几何 | 固定 preview／clear／apply 生命周期；只改变显示 | WebsiteConfigFontPreview、共享提示输入和 Root；WEBSITE_PUBLISHED_FONT_PREVIEW_CONTRACT.md | 部分完成：临时票据贯穿文字、光标与行宽，保留输入／配置，实际隐藏菜单和 TextKit 已验证文件字体→预览→名称恢复；必需来源 110 项。完整产品实体操作、多窗口与待处理回执仍开放；先前“完整配置悬停未绑定”的描述仅在本条范围内取代。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |

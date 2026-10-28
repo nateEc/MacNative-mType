@@ -111,6 +111,12 @@ struct PreferencesView: View {
   @State private var showingNoQuitConfigurationLockAlert = false
   @State private var funboxSelectionMessage: String?
   @State private var promptHighlightMessage: String?
+  @State private var themeControlMessage: String?
+  private var themePreferences: PracticeThemePreferences {
+    .init(settings: settings, onResult: { accepted in
+      themeControlMessage = accepted ? nil : "主题修改未完成：配置正在准备、不可写，或主题无法无损转换。"
+    })
+  }
 
   private var promptHighlightPreferences: PracticePromptHighlightPreferences {
     .init(settings: settings, onResult: { accepted in
@@ -374,59 +380,59 @@ struct PreferencesView: View {
 
       if displaySectionVisible {
         Section("显示") {
-          Picker("主题", selection: $settings.theme) {
-            ForEach(AppTheme.allCases, id: \.self) { theme in
+          Picker("主题", selection: themePreferences.theme) {
+            ForEach(themePreferences.availableThemes, id: \.self) { theme in
               Text(theme.displayName).tag(theme)
             }
           }
           LabeledContent("收藏内置主题") {
             HStack(spacing: 8) {
-              ForEach(AppTheme.allCases, id: \.self) { theme in
+              ForEach(themePreferences.availableThemes, id: \.self) { theme in
                 Button {
-                  settings.toggleFavoriteTheme(theme)
+                  themePreferences.toggleFavorite(theme)
                 } label: {
-                  Image(systemName: settings.isFavoriteTheme(theme) ? "star.fill" : "star")
-                    .foregroundStyle(settings.isFavoriteTheme(theme) ? theme.accent : .secondary)
+                  Image(systemName: themePreferences.favorites.contains(theme) ? "star.fill" : "star")
+                    .foregroundStyle(themePreferences.favorites.contains(theme) ? theme.accent : .secondary)
                 }
                 .buttonStyle(.borderless)
                 .help(
-                  settings.isFavoriteTheme(theme)
+                  themePreferences.favorites.contains(theme)
                     ? "取消收藏 \(theme.displayName)" : "收藏 \(theme.displayName)"
                 )
                 .accessibilityLabel(
-                  settings.isFavoriteTheme(theme)
+                  themePreferences.favorites.contains(theme)
                     ? "取消收藏 \(theme.displayName)" : "收藏 \(theme.displayName)")
               }
             }
           }
-          if !settings.favoriteThemeIDs.isEmpty {
+          if !themePreferences.favorites.isEmpty || (themePreferences.showsNativeCustomFavorites && !settings.favoriteThemeIDs.isEmpty) {
             VStack(alignment: .leading, spacing: 6) {
               Label("收藏主题", systemImage: "star.fill")
                 .font(.caption.weight(.medium))
               ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 7) {
-                  ForEach(AppTheme.allCases.filter(settings.isFavoriteTheme), id: \.self) { theme in
-                    Button(theme.displayName) { settings.selectBuiltInTheme(theme) }
+                  ForEach(themePreferences.favorites, id: \.self) { theme in
+                    Button(theme.displayName) { themePreferences.select(.builtIn(theme)) }
                       .buttonStyle(.bordered)
                   }
-                  ForEach(settings.customThemes.filter { settings.isFavoriteCustomTheme($0.id) }) {
+                  ForEach(settings.customThemes.filter { themePreferences.showsNativeCustomFavorites && settings.isFavoriteCustomTheme($0.id) }) {
                     theme in
-                    Button(theme.name) { settings.selectCustomTheme(theme.id) }
+                    Button(theme.name) { themePreferences.select(.custom(theme.id)) }
                       .buttonStyle(.bordered)
                   }
                 }
               }
             }
           }
-          Toggle("跟随 macOS 深浅色自动切换", isOn: $settings.followSystemTheme)
-          if settings.followSystemTheme {
-            Picker("浅色外观主题", selection: $settings.systemLightTheme) {
-              ForEach(AppTheme.allCases, id: \.self) { theme in
+          Toggle("跟随 macOS 深浅色自动切换", isOn: themePreferences.followsSystem)
+          if themePreferences.followsSystem.wrappedValue {
+            Picker("浅色外观主题", selection: themePreferences.light) {
+              ForEach(themePreferences.availableThemes, id: \.self) { theme in
                 Text(theme.displayName).tag(theme)
               }
             }
-            Picker("深色外观主题", selection: $settings.systemDarkTheme) {
-              ForEach(AppTheme.allCases, id: \.self) { theme in
+            Picker("深色外观主题", selection: themePreferences.dark) {
+              ForEach(themePreferences.availableThemes, id: \.self) { theme in
                 Text(theme.displayName).tag(theme)
               }
             }
@@ -434,12 +440,13 @@ struct PreferencesView: View {
           Text("开启后会按 macOS 深浅色使用这里选择的内置主题；手动主题和自定义主题会保留，关闭自动切换后恢复。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Picker("完成后随机主题", selection: $settings.randomThemeMode) {
+          Picker("完成后随机主题", selection: themePreferences.random) {
             ForEach(RandomThemeMode.allCases) { mode in
               Text(mode.displayName).tag(mode)
             }
           }
-          .disabled(settings.followSystemTheme)
+          .disabled(themePreferences.followsSystem.wrappedValue)
+          if let themeControlMessage { Text(themeControlMessage).foregroundStyle(.orange) }
           Text("完成测试后从所选范围轮换主题；随机结果只留在当前运行，不会改写手动主题。收藏范围含内置和自定义收藏；“跟随当前系统深浅色”只用对应色调的内置主题。")
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -1074,7 +1081,7 @@ struct PreferencesView: View {
               Text(theme.name).lineLimit(1)
               Spacer()
               if settings.activeCustomThemeID == theme.id { Text("当前").foregroundStyle(.secondary) }
-              Button("应用") { settings.selectCustomTheme(theme.id) }
+              Button("应用") { themePreferences.select(.custom(theme.id)) }
               Button("编辑") { beginEditingCustomTheme(theme) }
               Button("分享") { shareCustomTheme(theme) }
               Button {
@@ -2309,8 +2316,7 @@ struct PreferencesView: View {
         customThemeMessage = "主题名称需为 1–40 个字符。"
         return
       }
-      settings.selectCustomTheme(id)
-      customThemeMessage = "已更新并应用自定义主题。"
+      customThemeMessage = themePreferences.select(.custom(id)) ? "已更新并应用自定义主题。" : "主题已更新，但当前完整配置未能应用。"
     } else {
       guard settings.addCustomTheme(
         name: customThemeName, background: customThemeBackground,

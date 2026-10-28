@@ -1888,7 +1888,9 @@ private struct ContentView: View {
         keyboardGuideMode: { committedPracticeDraft?.keyboardTypography.guideMode ?? challengeLiveConfiguration.keyboardGuideMode(settings: settings) },
         fontFamilyName: { committedPracticeDraft?.keyboardTypography.fontFamily ?? challengeLiveConfiguration.fontFamilyName(settings: settings) },
         fontPointSize: { committedPracticeDraft?.keyboardTypography.fontSize },
-        fontEdit: { applyWebsiteFontEdit($0) }) {
+        fontEdit: { applyWebsiteFontEdit($0) },
+        themes: { committedPracticeDraft?.themes },
+        themeEdit: { applyWebsiteThemeEdit($0) }) {
         persistExplicitTestConfiguration()
       }
       installWebsiteArchiveAdmission()
@@ -4134,6 +4136,24 @@ private struct ContentView: View {
   private var commandFontFamilyEditorName: String {
     guard !PracticeFont.allCases.contains(where: { NativeSystemPracticeFont.identifier(for: $0) == commandFontFamilyName }) else { return "" }
     return commandFontFamilyName.replacingOccurrences(of: "_", with: " ")
+  }
+
+  private func applyWebsiteThemeEdit(_ edit: PracticeThemeEdit) -> Bool? {
+    guard pageSessionStore.ownsConfigurationSelection else { return nil }
+    guard let publication = pageSession.presentation?.publication else {
+      account.localNotices.post("配置正在准备，请完成后再修改主题。"); return false
+    }
+    do {
+      let completion = try importWorkflow().runThemeCommand(edit, replacing: publication.applicationID)
+      preparedWholePreviewRendering = nil
+      if completion.disabledSystemFollowing {
+        account.localNotices.post("主题已保存，已关闭系统外观跟随。")
+      }
+      return true
+    } catch {
+      account.localNotices.post((error as? LocalizedError)?.errorDescription ?? "主题设置未完成，已保留原配置。")
+      return false
+    }
   }
 
   private func applyWebsiteFontEdit(_ edit: PracticeFontEdit) -> Bool? {

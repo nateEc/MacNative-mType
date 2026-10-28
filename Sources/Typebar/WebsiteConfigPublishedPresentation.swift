@@ -50,6 +50,13 @@ final class WebsiteConfigPublishedPresentation {
       appearance: appearance, systemIsDark: systemIsDark))
   }
 
+  func prepareThemeChange(draft: WebsiteConfigNativeDraft, key: String) throws -> PreparedAppearance {
+    let themes = draft.themes
+    let custom = try themes.makeCustomTheme(id: owner, name: "Imported configuration").resolvedTheme
+    let selection = themes.selectionAfterSaving(key: key, visible: appearance.selection, systemIsDark: systemIsDark)
+    return .init(themes: themes, custom: custom, appearance: Self.resolve(selection, custom: custom), systemIsDark: systemIsDark)
+  }
+
   convenience init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID, systemIsDark: Bool) throws {
     guard publication.owner == owner else { throw WebsiteConfigPublishedPresentationError.wrongOwner }
     guard publication.font != nil, publication.background != nil else {

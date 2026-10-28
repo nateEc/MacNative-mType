@@ -83,6 +83,18 @@ struct WebsiteConfigNativeThemes {
     return .builtIn(systemIsDark ? darkTheme : lightTheme)
   }
 
+  func selectionAfterSaving(key: String, visible: Selection, systemIsDark: Bool) -> Selection {
+    switch key {
+    case "theme": return .builtIn(theme)
+    case "customTheme": return customEnabled ? .inlineCustom : .builtIn(theme)
+    case "customThemeColors": return .inlineCustom
+    case "autoSwitchTheme": return followsSystem ? .builtIn(systemIsDark ? darkTheme : lightTheme) : .builtIn(theme)
+    case "themeLight" where followsSystem && !systemIsDark: return .builtIn(lightTheme)
+    case "themeDark" where followsSystem && systemIsDark: return .builtIn(darkTheme)
+    default: return visible
+    }
+  }
+
   /// Explicit, caller-owned preview only. Does not save or activate a theme.
   func makeCustomTheme(id: UUID, name: String) throws -> CustomThemeDefinition {
     guard name == name.trimmingCharacters(in: .whitespacesAndNewlines),
