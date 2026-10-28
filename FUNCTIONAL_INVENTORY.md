@@ -2,6 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| REPLAY-TERMINAL-29 | 按实际回放动作确定终点 | 固定完整回放／DOM、实际按钮及受控任务，六组末尾停止／提交／回退／删除轨迹 | 动作时间与准入分离、隐藏生产按钮／滑杆绑定及旧缺字段路径；REPLAY_TERMINAL_BOUNDARY_CONTRACT.md | 部分完成：同字段停止不延长播放，真实提交／回退仍决定终点；无动作禁用保留错误呈现差异，零时长动作可播放，真实调度／音频和全部录制组合仍开放。 |
 | REPLAY-PLAYBACK-LIFECYCLE-28 | 回放暂停、继续和重新播放 | 固定完整回放／DOM、实际按钮与可取消受控定时任务，四组错误／删除及起始空闲轨迹 | 播放起点按当前坐标重建，首动作立即执行；NSButton 角色、状态及生产隐藏宿主；REPLAY_PLAYBACK_LIFECYCLE_CONTRACT.md | 部分完成：来源过渡及生产按钮 target/action 闭环通过，重置、重播与零时长不丢动作；真实调度／音频、全部模式及停止输入末尾／不完整录制仍开放。 |
 | REPLAY-DISPLAY-GAP-27 | 回放排版空隙的点击与选中 | 固定完整 replay-ui 和 DOM onChild 委托；四组自有目标及真实字母点击 | 字形空隙索引、生产结果页共享准入与高亮、隐藏 TextKit 鼠标命中；REPLAY_DISPLAY_GAP_INTERACTION_CONTRACT.md | 部分完成：纯显示空隙不定位或高亮，真实提交／额外空格保留字母交互；实际实体鼠标、整页布局和全部录制组合仍开放。 |
 | RESULT-LIVE-DIRECTORY-26 | 活动改限结果的目标目录与显示间距 | 固定实际生成／输入已验证 bb 无提交；复制／回放读取原 textWithCommit，原生存储格式独立 | 可选 displayGaps、归档 v39、可移植与 SwiftData 冷恢复、字节保留和严格拒绝；LIVE_TARGET_DIRECTORY_CONTRACT.md | 部分完成：完整录制保留真实验证字段与视觉间距，冻结指标、复制、回放及图表可恢复；旧归档不回填，损坏目录不降级。真实界面、所有缺失／截断录制及旧库组合仍开放。 |

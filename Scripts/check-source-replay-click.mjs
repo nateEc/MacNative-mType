@@ -38,7 +38,7 @@ globalThis.document={
     selector==='#replayStats'?stats:selector==='.pageTest #playpauseReplayButton'?playButton:null,
 };
 let clock=0, timerID=0;const timers=new Map();
-if(process.argv.includes('--lifecycle')) {
+if(process.argv.includes('--lifecycle') || process.argv.includes('--terminal')) {
   globalThis.setTimeout=(callback,delay)=>{const id=++timerID;timers.set(id,{callback,due:clock+Math.max(0,delay)});return id;};
   globalThis.clearTimeout=id=>timers.delete(id);
 }
@@ -89,7 +89,33 @@ const main=moduleFor('test/replay-ui');
 await main.link((id,from)=>moduleFor(id.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(from.identifier),id)):id));
 await main.evaluate();
 const probe=main.namespace.ownedProbe;
-if(process.argv.includes('--lifecycle')) {
+if(process.argv.includes('--terminal')) {
+  const input=(index,value,text,time,extra={})=>({index,value,text,time,correct:true,...extra});
+  const fixtures=[];
+  const scenarios=[
+    {targets:['ab'],tape:[input(0,'a','a',0),input(0,'ab','b',50),input(0,'ab','x',1000,{stopped:true})]},
+    {targets:['a ','b'],tape:[input(0,'a','a',0),input(1,'','x',1000,{stopped:true})]},
+    {targets:['ab'],tape:[input(0,'','x',1000,{stopped:true})]},
+    {targets:['ab'],tape:[input(0,'a','a',0),input(0,'ab','b',0),input(0,'ab','x',1000,{stopped:true})]},
+    {targets:['ab'],tape:[input(0,'a','a',0),input(0,'ab','b',20),input(0,'a','',50,{deletion:true}),input(0,'a','x',1000,{stopped:true})]},
+    {targets:['a ','b'],tape:[input(0,'a','a',0),input(0,'a ',' ',20),input(1,'b','b',50),input(0,'a','x',1000,{stopped:true})]},
+  ];
+  for(const {targets,tape} of scenarios) {
+    words=targets;clock=0;timers.clear();sounds=[];playIcon.className='fas fa-play';
+    events=tape.map(e=>({type:'input',testMs:e.time,data:{wordIndex:e.index,inputValue:e.value,data:e.text,
+      inputType:e.deletion?'deleteContentBackward':'insertText',correct:e.correct,inputStopped:e.stopped}}));
+    probe.opening();const actions=probe.actions();let error=null;
+    try {playButton.dispatch('click',playButton);}catch(caught){error=caught.message;}
+    const lastOffset=actions.at(-1)?.time??0;
+    if(actions.length) {
+      assert.equal(error,null);runThrough(lastOffset-actions[0].time);
+      assert.equal(playButton.getAttribute('aria-label'),'Start replay');assert.equal(timers.size,0);
+    } else {assert.equal(error,'Failed to load old replay: datatime is undefined');}
+    fixtures.push({targets,tape,lastOffset,actionCount:actions.length,error,frame:probe.frame(),sounds:sounds.slice()});
+    main.namespace.pauseReplay();assert.equal(timers.size,0);
+  }
+  console.log(JSON.stringify({fixtures}));
+} else if(process.argv.includes('--lifecycle')) {
   const fixtures=[];
   for(const leadingTime of [0,700])for(const target of ['ab ','e\u0301 ']) {
     words=[target,'cd'];clock=0;timers.clear();sounds=[];playIcon.className='fas fa-play';

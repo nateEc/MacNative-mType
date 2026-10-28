@@ -63,11 +63,11 @@ final class ZenReplayAccessTests: XCTestCase {
   func testZeroTimeLegacyInsertionCanPlayWithoutInventingFieldActions() {
     let events: [TypingReplayEvent] = [.init(offset: 0, kind: .insert, text: "ab")]
     XCTAssertNil(FieldReplayPlan.make(prompt: "", events: events, configuration: configuration))
-    XCTAssertTrue(ResultReplayAvailability.canPlay(duration: 0, events: events, fieldPlan: nil))
+    XCTAssertTrue(ResultReplayAvailability.canPlay(events: events, fieldPlan: nil))
     let stopped: [TypingReplayEvent] = [.init(offset: 0, kind: .insert, text: "x", inputStopped: true)]
-    XCTAssertFalse(ResultReplayAvailability.canPlay(duration: 0, events: stopped, fieldPlan: nil))
-    XCTAssertFalse(ResultReplayAvailability.canPlay(duration: 0, events: [], fieldPlan: nil))
-    XCTAssertTrue(ResultReplayAvailability.canPlay(duration: 1, events: stopped, fieldPlan: nil))
+    XCTAssertFalse(ResultReplayAvailability.canPlay(events: stopped, fieldPlan: nil))
+    XCTAssertFalse(ResultReplayAvailability.canPlay(events: [], fieldPlan: nil))
+    XCTAssertEqual(ResultReplayAvailability.duration(events: stopped, fieldPlan: nil), 0)
   }
 
   func testHistoryRecordUsesItsStoredZenConfigurationWithoutChangingPayloads() throws {
@@ -106,7 +106,7 @@ final class ZenReplayAccessTests: XCTestCase {
       inputField: .init(index: 0, value: ""))]
     let plan = try XCTUnwrap(FieldReplayPlan.make(prompt: "", events: events, configuration: configuration))
     XCTAssertTrue(ResultReplayAvailability.isAvailable(prompt: "", events: events, configuration: configuration))
-    XCTAssertFalse(ResultReplayAvailability.canPlay(duration: 0, events: events, fieldPlan: plan))
+    XCTAssertFalse(ResultReplayAvailability.canPlay(events: events, fieldPlan: plan))
     XCTAssertEqual(plan.frame(through: 1).presentation.text, "")
     XCTAssertTrue(plan.actions.isEmpty)
     XCTAssertTrue(TypingReplay.soundTimeline(prompt: "", events: events, configuration: configuration).isEmpty)
@@ -132,7 +132,7 @@ final class ZenReplayAccessTests: XCTestCase {
     let saved = try result()
     let plan = try XCTUnwrap(FieldReplayPlan.make(prompt: "", events: saved.replayEvents,
       configuration: saved.configuration))
-    XCTAssertTrue(ResultReplayAvailability.canPlay(duration: 0, events: saved.replayEvents, fieldPlan: plan))
+    XCTAssertTrue(ResultReplayAvailability.canPlay(events: saved.replayEvents, fieldPlan: plan))
     let seek = try XCTUnwrap(plan.seek(.init(word: 1, position: 0)))
     XCTAssertEqual(seek.frame.coordinate, .init(word: 1, position: 0))
     var frame = seek.frame
@@ -198,7 +198,7 @@ final class ZenReplayAccessTests: XCTestCase {
       XCTAssertEqual(plan.advance(&frame, through: 0), [.click])
       XCTAssertEqual(frame.coordinate, .init(word: 0, position: 1))
       XCTAssertEqual(frame.presentation.text, "")
-      XCTAssertTrue(ResultReplayAvailability.canPlay(duration: 0, events: events, fieldPlan: plan))
+      XCTAssertTrue(ResultReplayAvailability.canPlay(events: events, fieldPlan: plan))
     }
   }
 

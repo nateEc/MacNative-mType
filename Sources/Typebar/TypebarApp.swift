@@ -9435,8 +9435,8 @@ struct ReplayTimelineView: View {
   private let replaySoundTimeline: [TypingReplayTimedSoundCue]
   private let fieldPlan: FieldReplayPlan?
   private let canPlay: Bool
+  private let duration: TimeInterval
 
-  private var duration: TimeInterval { events.last?.offset ?? 0 }
   private var replayedGlyphs: [TypingPromptGlyph] {
     TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed, configuration: configuration)
   }
@@ -9467,8 +9467,8 @@ struct ReplayTimelineView: View {
     let fieldPlan = FieldReplayPlan.make(prompt: prompt, events: chronologicalEvents,
       configuration: configuration, targetWordDirectory: targetWordDirectory)
     self.fieldPlan = fieldPlan
-    self.canPlay = ResultReplayAvailability.canPlay(duration: chronologicalEvents.last?.offset ?? 0,
-      events: chronologicalEvents, fieldPlan: fieldPlan)
+    self.duration = ResultReplayAvailability.duration(events: chronologicalEvents, fieldPlan: fieldPlan)
+    self.canPlay = ResultReplayAvailability.canPlay(events: chronologicalEvents, fieldPlan: fieldPlan)
     self._fieldFrame = State(initialValue: fieldPlan?.initialFrame)
   }
 
@@ -9578,6 +9578,7 @@ struct ReplayTimelineView: View {
             ? ProcessInfo.processInfo.systemUptime - elapsed : nil
         }
         .fixedSize()
+        .help(canPlay ? "播放或暂停输入回放" : "这条录制没有可播放的输入动作")
         ReplayTransportButton(title: "重置",
           enabled: !(elapsed == 0 && !isPlaying && (fieldFrame?.nextActionIndex ?? 0) == 0)) {
           elapsed = 0
