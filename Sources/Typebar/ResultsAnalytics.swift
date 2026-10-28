@@ -1642,7 +1642,7 @@ enum ResultPerformanceTrace {
         }
       }
       if usesKoreanScoring || sourceClassification {
-        let input = RecordedInputFieldStats.classificationInput(for: event)
+        let input = RecordedInputFieldStats.classificationInput(for: event, sourceEventFlags: sourceClassification)
         let scoringTarget = configuration?.mode == .zen ? input : target
         let basis: ResultScoringUnitBasis = usesKoreanScoring ? .koreanJamo : .utf16
         let full = ResultUnitCharacterStats.classify(input: input, target: scoringTarget,

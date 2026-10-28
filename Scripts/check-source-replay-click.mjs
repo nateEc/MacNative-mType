@@ -1,6 +1,7 @@
 // Execute the complete pinned replay UI and DOM delegation modules.
 // Owned DOM/event/storage/sound adapters; no browser geometry or real audio.
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,6 +12,22 @@ assert.ok(process.argv[2]);
 assert.equal(execFileSync('git', ['-C', reference, 'rev-parse', 'HEAD'], {encoding:'utf8'}).trim(),
   '91bd24bb8513785c7364cbea29296ff7adafac41');
 assert.equal(execFileSync('git', ['-C', reference, 'status', '--porcelain'], {encoding:'utf8'}).trim(), '');
+const combinations = process.argv.includes('--combinations');
+const statistics = process.argv.includes('--statistics') || combinations;
+let koreanOracle;
+if(combinations) {
+  const archive=process.env.TYPEBAR_REPLAY_HANGUL_ARCHIVE;
+  assert.ok(archive,'Pinned QA-only Hangul archive required');
+  const locked=fs.readFileSync(path.join(reference,'pnpm-lock.yaml'),'utf8')
+    .match(/hangul-js@0\.2\.6:\r?\n\s+resolution: \{integrity: sha512-([^}]+)\}/)?.[1];
+  assert.ok(locked);
+  assert.equal(crypto.createHash('sha512').update(fs.readFileSync(archive)).digest('base64'),locked);
+  const code=execFileSync('tar',['-xOf',archive,'package/hangul.js']);
+  assert.equal(crypto.createHash('sha256').update(code).digest('hex'),'94362dfdd81723a3cb94e5d27c7c0ef09b6949dc25002ecc06aff5448602bfc8');
+  assert.equal(JSON.parse(execFileSync('tar',['-xOf',archive,'package/package.json'],{encoding:'utf8'})).version,'0.2.6');
+  const sandbox={module:{exports:{}}};vm.runInNewContext(code.toString('utf8'),sandbox,{timeout:1000});
+  koreanOracle=sandbox.module.exports;
+}
 class Element {
   children=[]; parentNode=null; names=new Set(); text=''; listeners=new Map(); attributes=new Map();
   constructor(tagName='div') { this.tagName=tagName; }
@@ -61,13 +78,13 @@ const bindings={
   'test/test-words':{words:{get:index=>index===undefined?words.map(textWithCommit=>({textWithCommit})):
     words[index]===undefined?undefined:{textWithCommit:words[index]}}},
   'test/events/data':{buildEventLog:()=>({events,context:eventContext}),getAllTestEvents:()=>events,
-    getInputForWord:index=>process.argv.includes('--statistics')
+    getInputForWord:index=>statistics
       ? modules.get('test/events/helpers').namespace.getInputFromDom(modules.get('test/events/helpers').namespace.getEventsForWord(events,index))
       : events.filter(e=>e.data.wordIndex===index).at(-1)?.data.inputValue??''},
   'test/events/stats':{getInputHistory:()=>{throw Error('Zen outside probe');},getWpmHistory:()=>[]},
   'constants/keys':{Keycode:{}},'@monkeytype/schemas/languages':{Language:{}},
   'test/events/types':{InputEventNoMs:{},TestEventNoMs:{},EventLog:{}},
-  'hangul-js':{default:{disassemble(){throw Error('Korean outside statistics probe');}}},
+  'hangul-js':{default:koreanOracle??{disassemble(){throw Error('Korean outside statistics probe');}}},
 };
 const bridge=`export const ownedProbe={
   opening(){refreshReplayFromEvents();wordPos=0;curPos=0;initializeReplayPrompt();},
@@ -78,7 +95,7 @@ const bridge=`export const ownedProbe={
 };`;
 const modules=new Map();
 const actual=new Set(['test/replay-ui','utils/dom']);
-if(process.argv.includes('--statistics'))for(const id of ['test/events/stats','test/events/helpers','utils/strings','utils/numbers','@monkeytype/util/numbers'])actual.add(id);
+if(statistics)for(const id of ['test/events/stats','test/events/helpers','utils/strings','utils/numbers','@monkeytype/util/numbers'])actual.add(id);
 function moduleFor(id) {
   if(modules.has(id)) return modules.get(id);
   let mod;
@@ -98,7 +115,43 @@ const main=moduleFor('test/replay-ui');
 await main.link((id,from)=>moduleFor(id.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(from.identifier),id)):id));
 await main.evaluate();
 const probe=main.namespace.ownedProbe;
-if(process.argv.includes('--statistics')) {
+if(combinations) {
+  const units=text=>Array.from({length:text.length},(_,i)=>text.charCodeAt(i));
+  const fixtures=[];
+  function emit(targets,tape,{noSpace=false,korean=false,zen=false}={}) {
+    words=targets;
+    eventContext={mode:zen?'zen':'words',mode2:zen?'zen':String(targets.length),bailedOut:false,koreanStatus:korean,
+      isFunboxWithNospacePropertyActive:noSpace,targetWords:targets};
+    bindings['config/store'].Config.mode=eventContext.mode;
+    bindings['config/store'].Config.funbox=noSpace?['nospace']:[];
+    const inputEvents=tape.map(e=>({type:'input',testMs:e.time*1000,data:{wordIndex:e.field,inputValue:e.value,data:e.payload,
+      inputType:e.deletion?'deleteContentBackward':'insertText',correct:e.correct,inputStopped:e.stopped||undefined,
+      lastWord:e.last||undefined,commitsWord:e.commit||undefined,charIndex:Math.max(0,e.value.length-e.payload.length)}}));
+    events=[...inputEvents,{type:'timer',testMs:2500,data:{event:'end'}}];
+    const log={events,context:eventContext},statsModule=modules.get('test/events/stats').namespace;
+    const history=statsModule.getWpmHistory(log),numbers=modules.get('@monkeytype/util/numbers').namespace;
+    const value=numbers.roundTo2(numbers.kogasa(numbers.stdDev(history)/numbers.mean(history)));
+    fixtures.push({targets:targets.map(units),noSpace,korean,zen,duration:2.5,history,consistency:Number.isNaN(value)?0:value,
+      tape:tape.map(e=>({...e,value:units(e.value),payload:units(e.payload)}))});
+  }
+  for(const target of ['ab','괅','🙂','e\u0301'])for(const tail of [' ','\u3000','\u0085'])
+    for(const stopped of [false,true])for(const commit of [null,false,true])for(const last of [false,true])
+      for(const correct of [false,true])for(const noSpace of [false,true])
+        emit([target],[{time:0,field:0,value:target+tail,payload:' ',stopped,commit,last,correct}],
+          {noSpace,korean:target==='괅'});
+  emit(['🙂'],[{time:0,field:0,value:'\ud83d',payload:'\ud83d',correct:true}]);
+  emit(['가🙂'],[{time:0,field:0,value:'가\ud83d',payload:'\ud83d',correct:false}],{korean:true,noSpace:true});
+  emit(['','ab'],[{time:0,field:1,value:'ab',payload:'b',correct:true}],{noSpace:true});
+  emit(['괅','x'],[{time:0,field:0,value:'괅',payload:'괅',correct:true},
+    {time:2,field:1,value:'x',payload:'x',correct:true}],{korean:true,noSpace:true});
+  emit(['각'],[{time:0,field:0,value:'가',payload:'가',correct:false},
+    {time:1.5,field:0,value:'각',payload:'각',correct:true}],{korean:true});
+  emit(['괅x','가'],[{time:0,field:0,value:'괅x',payload:'x',correct:true},
+    {time:0.5,field:1,value:'가',payload:'가',correct:true},
+    {time:1.5,field:0,value:'괅',payload:'',correct:true,deletion:true}],{korean:true,noSpace:true});
+  emit(['괅'],[{time:0,field:0,value:'괅',payload:'괅',correct:true}],{zen:true});
+  console.log(JSON.stringify({fixtures}));
+} else if(process.argv.includes('--statistics')) {
   const fixtures=[];
   const cases=[
     [0,2.49,2.49,'words','abcd'],[0.49,2.5,2.5,'words','abcd'],

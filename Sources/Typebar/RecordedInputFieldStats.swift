@@ -41,10 +41,14 @@ struct RecordedInputFieldStats {
 
   /// Source getInputFromDom trims only an incorrect final SPACE commit.
   /// Terminal and interval readers share this rule, never the saved buffer.
-  static func classificationInput(for event: TypingReplayEvent) -> [UInt16] {
+  static func classificationInput(for event: TypingReplayEvent, sourceEventFlags: Bool = false) -> [UInt16] {
     var units = event.inputField?.units ?? []
-    if event.kind == .insert, event.inputUnits == [32], !event.isStoppedInsertion,
-      event.commitsWord != false, event.inputPosition?.lastWord == true,
+    // Whole source-history readers use the literal optional flag: absence is
+    // not a commit, and inputStopped is not part of getInputFromDom's trim gate.
+    // Existing recording readers keep their legacy missing-flag convention.
+    let commit = event.commitsWord == true
+      || (!sourceEventFlags && event.commitsWord == nil && !event.isStoppedInsertion)
+    if event.kind == .insert, event.inputUnits == [32], commit, event.inputPosition?.lastWord == true,
       event.inputCorrectness?.last == false {
       while let unit = units.last, let scalar = UnicodeScalar(UInt32(unit)),
         QuoteSourcePolicy.isBoundaryWhitespace(scalar) { units.removeLast() }

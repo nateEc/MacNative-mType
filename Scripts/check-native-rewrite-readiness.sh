@@ -305,6 +305,17 @@ run_logged_check "executing pinned daily minute fit and complete trend clipping"
 run_logged_check "executing pinned account result chart data, options and callbacks" \
   "$temporary_directory/account-result-chart-source-check.log" \
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" "$project_root/Scripts/check-source-account-result-chart.mjs" "$reference_root"
+replay_hangul_archive="${TYPEBAR_REPLAY_HANGUL_ARCHIVE:-$temporary_directory/hangul-js-0.2.6.tgz}"
+if [[ ! -f "$replay_hangul_archive" ]]; then
+  run_logged_check "preparing pinned QA-only Hangul archive" "$temporary_directory/replay-hangul-runtime.log" \
+    npm pack --ignore-scripts --pack-destination "$temporary_directory" hangul-js@0.2.6
+fi
+[[ -f "$replay_hangul_archive" ]] || fail "missing QA-only Hangul archive"
+run_logged_check "executing pinned Korean and no-space replay statistic combinations" \
+  "$temporary_directory/replay-statistics-combinations.log" \
+  env TYPEBAR_REPLAY_HANGUL_ARCHIVE="$replay_hangul_archive" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-replay-click.mjs" "$reference_root" --combinations
 howler_source_archive="${TYPEBAR_HOWLER_SOURCE_ARCHIVE:-$temporary_directory/howler-2.2.3.tgz}"
 if [[ ! -f "$howler_source_archive" ]]; then
   run_logged_check "preparing pinned QA-only Howler archive" "$temporary_directory/howler-source-runtime.log" \
@@ -452,6 +463,7 @@ run_logged_check "running native client test suite" "$temporary_directory/client
   TYPEBAR_INBOX_SOURCE_PACKAGE="$inbox_source_package" \
   TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE="$daily_trend_source_archive" \
   TYPEBAR_HOWLER_SOURCE_ARCHIVE="$howler_source_archive" \
+  TYPEBAR_REPLAY_HANGUL_ARCHIVE="$replay_hangul_archive" \
   TYPEBAR_LINE_SCROLL_ANIME_ARCHIVE="$line_scroll_anime_archive" \
   TYPEBAR_SOLID_QA_ARCHIVE="$keymap_reactivity_archive" \
   TYPEBAR_DISK_FIXTURE_ROOT="$temporary_directory/disk-model-fixtures" swift test

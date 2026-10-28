@@ -3,6 +3,10 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.ReplayScoringCombinationTests/testExplicitInputFlagsKoreanAndNoSpaceAgainstCompletePinnedStatistics",
+      "file": "Tests/TypebarTests/ReplayScoringCombinationTests.swift"
+    },
+    {
       "id": "TypebarTests.ReplayStatisticsTests/testStatisticsAgainstCompletePinnedReplayStatsAndStopwatches",
       "file": "Tests/TypebarTests/ReplayStatisticsTests.swift"
     },

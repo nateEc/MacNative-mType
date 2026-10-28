@@ -135,6 +135,7 @@ jobs:
           npm pack --ignore-scripts --pack-destination "$source_qa_root" howler@2.2.3
           npm pack --ignore-scripts --pack-destination "$source_qa_root" chartjs-plugin-trendline@3.2.4
           npm pack --ignore-scripts --pack-destination "$source_qa_root" throttle-debounce@5.0.2
+          npm pack --ignore-scripts --pack-destination "$source_qa_root" hangul-js@0.2.6
           printf 'TYPEBAR_REFERENCE_ROOT=%s\n' "${{ steps.reference.outputs.path }}" >> "$GITHUB_ENV"
           printf 'TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES=%s\n' "$source_qa_root/libraries" >> "$GITHUB_ENV"
           printf 'TYPEBAR_CONFIG_LINK_SOURCE_DEPENDENCIES=%s\n' "$source_qa_root/libraries" >> "$GITHUB_ENV"
@@ -142,6 +143,7 @@ jobs:
           printf 'TYPEBAR_HOWLER_SOURCE_ARCHIVE=%s\n' "$source_qa_root/howler-2.2.3.tgz" >> "$GITHUB_ENV"
           printf 'TYPEBAR_DAILY_TREND_SOURCE_ARCHIVE=%s\n' "$source_qa_root/chartjs-plugin-trendline-3.2.4.tgz" >> "$GITHUB_ENV"
           printf 'TYPEBAR_THEME_DEBOUNCE_ARCHIVE=%s\n' "$source_qa_root/throttle-debounce-5.0.2.tgz" >> "$GITHUB_ENV"
+          printf 'TYPEBAR_REPLAY_HANGUL_ARCHIVE=%s\n' "$source_qa_root/hangul-js-0.2.6.tgz" >> "$GITHUB_ENV"
 
       - name: Verify pinned source QA evidence failure boundaries
         run: python3 Scripts/test-source-qa-evidence.py
