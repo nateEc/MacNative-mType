@@ -1414,6 +1414,7 @@ private struct ContentView: View {
   @State private var commandThemePreviewTarget: ThemeCommandTarget?
   @State private var commandFontPreview = FontFamilyCommandPreviewState()
   @State private var websiteFontPreviewCache = WebsiteConfigFontPreview()
+  @State private var websiteThemePreview = WebsiteThemePreview()
   @State private var quickPickerThemePreviewTarget: ThemeCommandTarget?
   @State private var showingProfileSearchCommandEditor = false
   @State private var sharedProfileInbox = SharedProfileLinkInbox()
@@ -1686,18 +1687,29 @@ private struct ContentView: View {
         .padding(12)
     }
     .tint(activeTheme.accent)
-    .preferredColorScheme(publishedPresentation?.appearance.theme.colorScheme ?? themePreviewPresentation.preferredColorScheme)
+    .preferredColorScheme(publishedThemePreview?.theme.colorScheme ?? publishedPresentation?.appearance.theme.colorScheme ?? themePreviewPresentation.preferredColorScheme)
   }
 
   private var appearanceObservedPracticeLayout: some View {
     practiceLayout
     .onChange(of: systemColorScheme) { _, scheme in
-      _ = publishedPresentation?.updateSystemAppearance(isDark: scheme == .dark)
+      if let publishedPresentation { websiteThemePreview.systemAppearanceChanged(publishedPresentation, isDark: scheme == .dark) }
     }
   }
 
-  private var fontObservedPracticeLayout: some View {
+  private var themeObservedPracticeLayout: some View {
     appearanceObservedPracticeLayout
+      .onAppear { websiteThemePreview.synchronize(publishedPresentation) }
+      .onDisappear { websiteThemePreview.stop() }
+      .onChange(of: publishedPresentation?.publication.applicationID) { _, _ in websiteThemePreview.synchronize(publishedPresentation) }
+      .onChange(of: publishedPresentation?.themeChanges) { _, _ in websiteThemePreview.synchronize(publishedPresentation) }
+      .onChange(of: showingCommandPalette) { _, showing in if !showing { clearPublishedThemePreview() } }
+      .onChange(of: themeQuickPickerScope) { _, scope in if scope == nil { clearPublishedThemePreview() } }
+      .onChange(of: publishedThemePreview?.theme) { _, _ in preparedWholePreviewRendering = nil }
+  }
+
+  private var fontObservedPracticeLayout: some View {
+    themeObservedPracticeLayout
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: showingCommandPalette) { _, showing in
       if showing { visualFocus.retire() }
@@ -2116,7 +2128,7 @@ private struct ContentView: View {
     .background {
       if let publishedPresentation {
         if let background = try? publishedPresentation.background(fallbackStyle: settings.practiceBackdrop,
-          reduceMotion: settings.reducePracticeMotion, onFailure: account.localNotices.backgroundFailureSink()) {
+          reduceMotion: settings.reducePracticeMotion, themePreview: publishedThemePreview, onFailure: account.localNotices.backgroundFailureSink()) {
           background
         } else {
           Label("完整配置背景暂不可用，请重新应用配置。", systemImage: "exclamationmark.triangle")
@@ -2243,6 +2255,7 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingCommandPalette, onDismiss: {
       commandThemePreviewTarget = nil
+      clearPublishedThemePreview()
       clearCommandFontPreview()
       presentQueuedReferenceScriptImport()
       if let queued = queuedWebsiteSequenceCommand {
@@ -2273,6 +2286,9 @@ private struct ContentView: View {
         onSelect: runCommand,
         onPreview: { item in
           commandThemePreviewTarget = ThemeCommandPreviewPolicy.target(for: item)
+          if themeQuickPickerScope == nil {
+            websiteThemePreview.select(commandThemePreviewTarget, presentation: publishedPresentation, customThemes: settings.customThemes)
+          }
           commandFontPreview.select(item, savedFont: settings.practiceFont,
             savedName: commandFontFamilyName)
           preparedWholePreviewRendering = nil
@@ -2281,12 +2297,15 @@ private struct ContentView: View {
           }
         })
     }
-    .sheet(item: $themeQuickPickerScope, onDismiss: { quickPickerThemePreviewTarget = nil }) { scope in
+    .sheet(item: $themeQuickPickerScope, onDismiss: { quickPickerThemePreviewTarget = nil; clearPublishedThemePreview() }) { scope in
       ThemeQuickPickerView(
-        scope: scope, customThemes: settings.customThemes,
-        favoriteThemeIDs: settings.favoriteThemeIDs, selectedTheme: selectedThemeQuickPickerTarget,
+        scope: scope, builtInThemes: selectableBuiltInThemes, customThemes: settings.customThemes,
+        favoriteThemeIDs: selectedThemeFavoriteIDs, selectedTheme: selectedThemeQuickPickerTarget,
         onSelect: applyThemeQuickPickerSelection,
-        onPreview: { quickPickerThemePreviewTarget = $0 })
+        onPreview: {
+          quickPickerThemePreviewTarget = $0
+          websiteThemePreview.select($0, presentation: publishedPresentation, customThemes: settings.customThemes)
+        })
     }
     .sheet(isPresented: $showingProfileSearchCommandEditor) {
       ProfileSearchCommandView(account: account, settings: settings)
@@ -3872,10 +3891,11 @@ private struct ContentView: View {
   /// Unsupported routes fail visibly rather than borrowing legacy resources.
   private func publishedPracticePrompt(_ presentation: WebsiteConfigPublishedPresentation) -> AnyView {
     let fontPreview = publishedFontPreview
+    let themePreview = publishedThemePreview
     let renderedFont = fontPreview?.font ?? presentation.publication.font?.renderingFont
     do {
       if usesWholePreviewViewport {
-        return AnyView(try presentation.wholePreview(session: session, fontPreview: fontPreview,
+        return AnyView(try presentation.wholePreview(session: session, fontPreview: fontPreview, themePreview: themePreview,
           carets: { font, p in publishedCarets(font: font, presentation: p) },
           wrapLayout: promptInputWrapLayout, fallbackPosition: viewportFallbackPosition,
           onFailure: { attempt in
@@ -3890,7 +3910,7 @@ private struct ContentView: View {
             viewportReadinessAttemptID = nil; requestTypingFocus()
           }))
       }
-      return AnyView(try presentation.inline(session: session, composition: compositionText, fontPreview: fontPreview,
+      return AnyView(try presentation.inline(session: session, composition: compositionText, fontPreview: fontPreview, themePreview: themePreview,
         carets: { _, font, p in publishedCarets(font: font, presentation: p) },
         retirement: { rendering, p in publishedLineScroll(rendering, presentation: p) },
         wrapLayout: promptInputWrapLayout, fallbackPosition: showsAllPracticeLines ? viewportFallbackPosition : nil,
@@ -4948,15 +4968,40 @@ private struct ContentView: View {
   }
 
   private var themeIndicatorPresentation: ThemeIndicatorPresentation {
-    themePreviewPresentation.indicator
+    if let presentation = publishedPresentation,
+      let indicator = websiteThemePreview.indicator(for: presentation, customThemes: settings.customThemes) { return indicator }
+    return themePreviewPresentation.indicator
   }
 
-  private var selectedThemeQuickPickerTarget: ThemeCommandTarget {
-    settings.currentThemeQuickPickerTarget(for: systemColorScheme)
+  private var selectedThemeQuickPickerTarget: ThemeCommandTarget? {
+    guard let themes = committedPracticeDraft?.themes else { return settings.currentThemeQuickPickerTarget(for: systemColorScheme) }
+    return themes.customEnabled
+      ? WebsiteThemeCommand.matchingCustomTheme(themes, in: settings.customThemes).map { .custom($0.id) } : .builtIn(themes.theme)
+  }
+
+  private var selectableBuiltInThemes: [AppTheme] {
+    AppTheme.allCases.filter { committedPracticeDraft == nil || $0 != .grove }
+  }
+  private var selectedThemeFavoriteIDs: [String] {
+    committedPracticeDraft?.themes.favorites.map(ThemeFavoritePolicy.builtInID) ?? settings.favoriteThemeIDs
+  }
+  private var currentThemeForFavoriteCommand: AppTheme? {
+    guard let themes = committedPracticeDraft?.themes else { return settings.currentBuiltInThemeForFavoriteCommand(for: systemColorScheme) }
+    return themes.customEnabled ? nil : themes.theme
   }
 
   private func handleThemeIndicatorActivation() {
     themeQuickSwitchMessage = nil
+    if let themes = committedPracticeDraft?.themes {
+      switch WebsiteThemeFooterAction.action(shift: NSEvent.modifierFlags.contains(.shift), customEnabled: themes.customEnabled,
+        authenticated: account.currentUser != nil, libraryCount: settings.customThemes.count) {
+      case .picker(let scope): themeQuickPickerScope = scope
+      case .custom(let enabled, let emptyNotice):
+        if emptyNotice { account.localNotices.post("还没有自定义主题。") }
+        _ = applyWebsiteThemeEdit(.customEnabled(enabled))
+      }
+      return
+    }
     guard NSEvent.modifierFlags.contains(.shift) else {
       themeQuickPickerScope = ThemeQuickSwitchPolicy.pickerScope(settings: settings)
       return
@@ -6100,7 +6145,16 @@ private struct ContentView: View {
   }
 
   private var activeTheme: ResolvedTheme {
-    publishedPresentation?.appearance.theme ?? themePreviewPresentation.theme
+    publishedThemePreview?.theme ?? publishedPresentation?.appearance.theme ?? themePreviewPresentation.theme
+  }
+
+  private var publishedThemePreview: WebsiteThemePreview.Prepared? {
+    guard let presentation = publishedPresentation else { return nil }
+    return websiteThemePreview.prepared(for: presentation, owner: pageSessionStore.owner)
+  }
+  private func clearPublishedThemePreview() {
+    websiteThemePreview.synchronize(publishedPresentation)
+    websiteThemePreview.clear()
   }
 
   private var themePreviewPresentation: ThemePreviewPresentation {
@@ -6217,10 +6271,10 @@ private struct ContentView: View {
       hasLocalFont: settings.hasLocalPracticeFont,
       usesLocalFont: settings.isUsingLocalPracticeFont))
     items.append(contentsOf: ThemeCommandCatalog.items(
-      customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
-    if let theme = settings.currentBuiltInThemeForFavoriteCommand(for: systemColorScheme) {
+      builtInThemes: selectableBuiltInThemes, customThemes: settings.customThemes, favoriteThemeIDs: selectedThemeFavoriteIDs))
+    if let theme = currentThemeForFavoriteCommand {
       items.append(CurrentThemeFavoriteCommandCatalog.item(
-        theme: theme, isFavorite: settings.isFavoriteTheme(theme)))
+        theme: theme, isFavorite: committedPracticeDraft?.themes.favorites.contains(theme) ?? settings.isFavoriteTheme(theme)))
     }
     items.append(contentsOf: CustomBackgroundCommandCatalog.items(
       hasBackground: settings.hasLocalBackground || !settings.customBackgroundURL.isEmpty))

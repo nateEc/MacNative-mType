@@ -20,6 +20,14 @@ enum WebsiteThemeCommand {
   struct Field: Equatable { let key: String; let value: WebsiteConfigValue }
   struct Step: Equatable { let key: String; let value: WebsiteConfigValue; let accepted: Bool }
   struct Plan { let steps: [Step]; let disablesSystem: Bool }
+  @MainActor static func matchingCustomTheme(_ themes: WebsiteConfigNativeThemes,
+    in library: [CustomThemeDefinition]) -> CustomThemeDefinition? {
+    library.first { custom in
+      guard let assignments = try? fields(for: .select(.custom(custom.id)), customThemes: [custom]),
+        case .array(let values) = assignments.last?.value else { return false }
+      return values == themes.customColorHex.map(WebsiteConfigValue.string)
+    }
+  }
   @MainActor static func fields(for edit: PracticeThemeEdit, customThemes: [CustomThemeDefinition]) throws -> [Field] {
     func theme(_ key: String, _ theme: AppTheme) throws -> [Field] {
       guard theme != .grove else { throw WebsiteThemeCommandError.unsupported }

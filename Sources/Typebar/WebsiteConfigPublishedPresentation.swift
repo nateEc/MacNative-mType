@@ -2,7 +2,7 @@ import AppKit
 import Observation
 import SwiftUI
 
-enum WebsiteConfigPublishedPresentationError: Error { case wrongOwner, unprepared }
+enum WebsiteConfigPublishedPresentationError: Error { case wrongOwner, unprepared, staleThemePreview }
 
 /// One immutable resource publication, with source-ordered visible theme state.
 /// No library activation, configuration write, input ownership or OS observer.
@@ -12,11 +12,20 @@ final class WebsiteConfigPublishedPresentation {
     let selection: WebsiteConfigNativeThemes.Selection
     let theme: ResolvedTheme
   }
+  /// Carries source theme effects across several synchronous publications;
+  /// SwiftUI may observe only the final setter in a compound command.
+  struct ThemeChanges: Equatable {
+    var previewReset = UUID()
+    var applied = UUID()
+    var indicator = UUID()
+    var systemIndicator: AppTheme?
+  }
   let publication: WebsiteConfigCommitCoordinator.Publication
   private let owner: UUID
   private let themes: WebsiteConfigNativeThemes
   private let customTheme: ResolvedTheme
   private(set) var appearance: Appearance
+  private(set) var themeChanges: ThemeChanges
   @ObservationIgnored private var systemIsDark: Bool
   @ObservationIgnored private var updating = false
   var currentSystemIsDark: Bool { systemIsDark }
@@ -26,6 +35,7 @@ final class WebsiteConfigPublishedPresentation {
     fileprivate let custom: ResolvedTheme
     fileprivate let appearance: Appearance
     fileprivate let systemIsDark: Bool
+    fileprivate let changes: ThemeChanges
   }
 
   static func prepareAppearance(draft: WebsiteConfigNativeDraft, applicationID: UUID,
@@ -33,7 +43,8 @@ final class WebsiteConfigPublishedPresentation {
     let themes = draft.themes
     let custom = try themes.makeCustomTheme(id: applicationID, name: "Imported configuration").resolvedTheme
     return .init(themes: themes, custom: custom,
-      appearance: resolve(themes.initialSelection(systemIsDark: systemIsDark), custom: custom), systemIsDark: systemIsDark)
+      appearance: resolve(themes.initialSelection(systemIsDark: systemIsDark), custom: custom), systemIsDark: systemIsDark,
+      changes: .init(systemIndicator: themes.followsSystem ? (systemIsDark ? themes.darkTheme : themes.lightTheme) : nil))
   }
 
   /// Internal synchronous handoff: resource and owner checks have already run
@@ -42,19 +53,31 @@ final class WebsiteConfigPublishedPresentation {
     self.publication = publication; owner = publication.owner; themes = preparedAppearance.themes
     customTheme = preparedAppearance.custom; systemIsDark = preparedAppearance.systemIsDark
     appearance = preparedAppearance.appearance
+    themeChanges = preparedAppearance.changes
   }
 
   /// A next-attempt-only selection must not replay theme/random/system events.
   func retainingAppearance(for publication: WebsiteConfigCommitCoordinator.Publication) -> WebsiteConfigPublishedPresentation {
     .init(publication: publication, preparedAppearance: .init(themes: themes, custom: customTheme,
-      appearance: appearance, systemIsDark: systemIsDark))
+      appearance: appearance, systemIsDark: systemIsDark, changes: themeChanges))
   }
 
   func prepareThemeChange(draft: WebsiteConfigNativeDraft, key: String) throws -> PreparedAppearance {
     let themes = draft.themes
     let custom = try themes.makeCustomTheme(id: owner, name: "Imported configuration").resolvedTheme
     let selection = themes.selectionAfterSaving(key: key, visible: appearance.selection, systemIsDark: systemIsDark)
-    return .init(themes: themes, custom: custom, appearance: Self.resolve(selection, custom: custom), systemIsDark: systemIsDark)
+    var changes = themeChanges
+    if key == "theme" { changes.previewReset = UUID() }
+    let systemApplies = themes.followsSystem && ((key == "themeLight" && !systemIsDark) || (key == "themeDark" && systemIsDark))
+    if ["theme", "customTheme", "customThemeColors", "autoSwitchTheme"].contains(key) || systemApplies {
+      changes.applied = UUID(); changes.indicator = UUID()
+      changes.systemIndicator = systemApplies || (key == "autoSwitchTheme" && themes.followsSystem)
+        ? (systemIsDark ? themes.darkTheme : themes.lightTheme) : nil
+    }
+    if ["theme", "customTheme", "customThemeColors", "favThemes", "randomTheme"].contains(key) {
+      changes.indicator = UUID(); changes.systemIndicator = nil
+    }
+    return .init(themes: themes, custom: custom, appearance: Self.resolve(selection, custom: custom), systemIsDark: systemIsDark, changes: changes)
   }
 
   convenience init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID, systemIsDark: Bool) throws {
@@ -81,34 +104,38 @@ final class WebsiteConfigPublishedPresentation {
     systemIsDark = isDark
     guard let selection = themes.systemAppearanceChange(systemIsDark: isDark) else { return false }
     let next = Self.resolve(selection, custom: customTheme)
-    guard next != appearance else { return false }
+    let changed = next != appearance
+    themeChanges.applied = UUID(); themeChanges.indicator = UUID()
+    themeChanges.systemIndicator = isDark ? themes.darkTheme : themes.lightTheme
     appearance = next
-    return true
+    return changed
   }
-  func background(fallbackStyle: PracticeBackdropStyle, reduceMotion: Bool,
+  func background(fallbackStyle: PracticeBackdropStyle, reduceMotion: Bool, themePreview: WebsiteThemePreview.Prepared? = nil,
     onFailure: @escaping BackgroundFailureFeedback.Sink = { _ in }) throws -> WebsiteConfigPublishedBackground {
     try .init(publication: publication, owner: owner, fallbackStyle: fallbackStyle,
-      theme: appearance.theme, reduceMotion: reduceMotion, onFailure: onFailure)
+      theme: themePreview?.resolve(publication: publication, owner: owner, applied: themeChanges.applied) ?? appearance.theme, reduceMotion: reduceMotion, onFailure: onFailure)
   }
   func wholePreview(session: TypingSession, fontPreview: WebsiteConfigFontPreview.Prepared? = nil,
+    themePreview: WebsiteThemePreview.Prepared? = nil,
     carets: (NSFont, WebsiteConfigNativePresentation) -> PromptCaretNativeView.Configuration,
     wrapLayout: PromptInputWrapLayout? = nil, fallbackPosition: PromptViewportFallbackPosition? = nil,
     onFailure: @escaping (UUID) -> Void,
     onReady: @escaping (PromptViewportPresentationReady) -> Void = { _ in }) throws -> PromptViewportPracticePrompt {
-    let theme = appearance.theme
+    let theme = try themePreview?.resolve(publication: publication, owner: owner, applied: themeChanges.applied) ?? appearance.theme
     return try .init(publication: publication, owner: owner, session: session, theme: theme, fontPreview: fontPreview,
       carets: { font, p in
         var config = carets(font, p); config.accent = theme.caret; return config
       }, wrapLayout: wrapLayout, fallbackPosition: fallbackPosition, onFailure: onFailure, onReady: onReady)
   }
   func inline(session: TypingSession, composition: String = "", fontPreview: WebsiteConfigFontPreview.Prepared? = nil,
+    themePreview: WebsiteThemePreview.Prepared? = nil,
     carets: (PromptRendering, NSFont, WebsiteConfigNativePresentation) -> PromptCaretNativeView.Configuration,
     retirement: (PromptRendering, WebsiteConfigNativePresentation) -> PromptLineScrollContext,
     maximumTextWidth: CGFloat? = nil, wrapLayout: PromptInputWrapLayout? = nil,
     fallbackPosition: PromptViewportFallbackPosition? = nil,
     latestProjection: (() -> TapePromptProjectionSnapshot?)? = nil,
     onTapeWordsRemoved: ((PromptTapeWordRemoval) -> Void)? = nil) throws -> WebsiteConfigPublishedInlinePrompt {
-    let theme = appearance.theme
+    let theme = try themePreview?.resolve(publication: publication, owner: owner, applied: themeChanges.applied) ?? appearance.theme
     return try .init(publication: publication, owner: owner, session: session, composition: composition, theme: theme, fontPreview: fontPreview,
       carets: { rendering, font, p in
         var config = carets(rendering, font, p); config.accent = theme.caret; return config

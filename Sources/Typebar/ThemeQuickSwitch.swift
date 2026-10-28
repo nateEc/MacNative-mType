@@ -207,15 +207,16 @@ struct ThemeQuickPickerView: View {
   @State private var searchText = ""
   @State private var activeIndex = 0
   let scope: ThemeQuickPickerScope
+  var builtInThemes: [AppTheme] = AppTheme.allCases
   let customThemes: [CustomThemeDefinition]
   let favoriteThemeIDs: [String]
-  let selectedTheme: ThemeCommandTarget
+  let selectedTheme: ThemeCommandTarget?
   let onSelect: (ThemeCommandTarget) -> Void
   let onPreview: (ThemeCommandTarget?) -> Void
 
   private var searchResults: ThemeQuickPickerResults {
     ThemeQuickPickerSearch.results(
-      scope: scope, query: searchText, builtInThemes: AppTheme.allCases,
+      scope: scope, query: searchText, builtInThemes: builtInThemes,
       customThemes: customThemes, favoriteThemeIDs: favoriteThemeIDs)
   }
 

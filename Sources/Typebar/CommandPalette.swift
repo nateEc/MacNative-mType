@@ -1875,12 +1875,17 @@ enum CurrentThemeFavoriteCommandApplication {
         _ target: CurrentThemeFavoriteCommandTarget, to settings: AppSettings,
         colorScheme: ColorScheme, onConfigurationSave: () -> Void = {}
     ) -> Bool {
-        guard let theme = settings.currentBuiltInThemeForFavoriteCommand(for: colorScheme) else {
+        let source = settings.preferenceConfigurationSaves.themes
+        guard source?.customEnabled != true,
+          let theme = source?.theme ?? settings.currentBuiltInThemeForFavoriteCommand(for: colorScheme) else {
             return false
         }
-        let isFavorite = settings.isFavoriteTheme(theme)
+        let isFavorite = source?.favorites.contains(theme) ?? settings.isFavoriteTheme(theme)
         switch target {
         case .add where !isFavorite, .remove where isFavorite:
+            var favorites = source?.favorites ?? AppTheme.allCases.filter(settings.isFavoriteTheme)
+            if target == .add { favorites.append(theme) } else { favorites.removeAll { $0 == theme } }
+            if let accepted = settings.preferenceConfigurationSaves.applyThemeEdit(.favorites(favorites)) { return accepted }
             settings.toggleFavoriteTheme(theme)
             onConfigurationSave()
             return true

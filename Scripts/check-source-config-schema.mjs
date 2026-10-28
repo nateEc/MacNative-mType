@@ -28,11 +28,12 @@ const paceInputNotationMode = process.argv[3] === '--pace-input-notation';
 const paceCommandMode = process.argv[3] === '--pace-commands' || paceInputNotationMode;
 const appearanceCommandMode = process.argv[3] === '--appearance-commands';
 const themeCommandMode = process.argv[3] === '--theme-commands';
+const themePreviewMode = process.argv[3] === '--theme-preview';
 const keymapCommandMode = process.argv[3] === '--keymap-commands';
 const layoutFluidRuntimeMode = process.argv[3] === '--layoutfluid-runtime';
 const sharedSettingsMode = process.argv[3] === '--shared-test-settings';
 const exportMode = process.argv[3] === '--export-config' || sharedSettingsMode;
-assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || themeCommandMode || keymapCommandMode || layoutFluidRuntimeMode || exportMode);
+assert.ok(!process.argv[3] || runtimeMode || funboxMode || keyboardMode || importMode || defaultsMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || (themeCommandMode || themePreviewMode) || keymapCommandMode || layoutFluidRuntimeMode || exportMode);
 assert.ok(process.argv[2] && zodRoot, 'Pinned reference and TYPEBAR_WEBSITE_CONFIG_ZOD_ROOT required');
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
@@ -72,7 +73,7 @@ const schemas = path.join(root, 'packages/schemas/src');
 const frontend = path.join(root, 'frontend/src/ts');
 const adapters = new Map([
   [path.join(frontend, 'states/notifications.ts'), {showNoticeNotification: (_message, options) => {
-    if (thresholdCommandMode || inputCommandMode || paceCommandMode || appearanceCommandMode || themeCommandMode || keymapCommandMode || layoutFluidRuntimeMode) simulation.notices.push(options?.important ?? false);
+    if (thresholdCommandMode || inputCommandMode || paceCommandMode || appearanceCommandMode || (themeCommandMode || themePreviewMode) || keymapCommandMode || layoutFluidRuntimeMode) simulation.notices.push(options?.important ?? false);
   }, showErrorNotification: message => { if (sharedSettingsMode) simulation.storageError?.(message); }}],
   [path.join(frontend, 'states/core.ts'), {isAuthenticated: () => !!simulation.flags.authenticated}],
   [path.join(frontend, 'states/test.ts'), {isTestActive: () => simulation.flags.testActive ?? true}],
@@ -86,7 +87,7 @@ const adapters = new Map([
   [path.join(frontend, 'config/persistence.ts'), {saveToLocalStorage: key => {
     simulation.saves.push(key);
     if (sharedSettingsMode) simulation.configCheckpoints?.push({key, value: structuredClone(simulation.Config)});
-    if (themeCommandMode) simulation.configCheckpoints.push({key, value: structuredClone(simulation.Config)});
+    if ((themeCommandMode || themePreviewMode)) simulation.configCheckpoints.push({key, value: structuredClone(simulation.Config)});
     if (sharedSettingsMode) simulation.persistConfig?.(key);
   }}],
   ['solid-js', {onCleanup: noop, JSXElement: undefined}],
@@ -211,7 +212,7 @@ if (defaultsMode) {
   }
   verify();
   console.log(JSON.stringify({names: catalogs.funboxes, compatibility, profiles, admissions, combined}));
-} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || themeCommandMode || keymapCommandMode || layoutFluidRuntimeMode || exportMode) {
+} else if (runtimeMode || keyboardMode || importMode || coldMode || editMode || failureOrderMode || thresholdCommandMode || inputCommandMode || soundCommandMode || caretCommandMode || paceCommandMode || appearanceCommandMode || (themeCommandMode || themePreviewMode) || keymapCommandMode || layoutFluidRuntimeMode || exportMode) {
   const bus = (await load(path.join(frontend, 'hooks/createEvent.ts'))).createEvent();
   adapters.set('config-event-adapter', {configEvent: bus});
   bus.subscribe(event => simulation.events.push(structuredClone(event)));
@@ -325,6 +326,9 @@ if (defaultsMode) {
     assert.notEqual(fixtures.find(f=>f.label==='fallback-later-value'&&f.failure).settingsJSON,
       fixtures.find(f=>f.label==='fallback-later-value'&&f.failure).fallbackJSON);
     verify();console.log(JSON.stringify({fixtures}));
+  } else if (themePreviewMode) {
+    const {checkThemePreview}=await import('./check-source-theme-preview.mjs');
+    console.log(JSON.stringify(await checkThemePreview({context,simulation,frontend,bus,setters,defaults,verify})));
   } else if (themeCommandMode) {
     // Run the complete pinned setter, metadata, async theme subscriber, set and
     // clearRandom functions. Only rendering/DOM, inactive hover and shuffle-list
