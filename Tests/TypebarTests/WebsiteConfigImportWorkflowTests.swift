@@ -152,6 +152,39 @@ import TypebarSystem
     }
   }
 
+  func testRepeatedGeneratedWordsCanEnterCustomTextAndRepeatThroughProductionController() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let custom = try WebsiteCustomTextSettings(value: .object([
+      "text": .array([.string("Aa Bb"), .string("Cc")]), "mode": .string("repeat"),
+      "limit": .object(["mode": .string("word"), "value": .number(5)]), "pipeDelimiter": .bool(false)]))
+    XCTAssertTrue(f.settings.saveWebsiteCustomTextState(custom))
+    try await f.workflow.apply(json: #"{"mode":"words","words":3}"#, systemIsDark: false)
+    var repeated = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(repeated)
+    let old = f.page.state.session.prompt
+    var state = f.page.state; state.session.insertBatch("x"); f.page.replace(state)
+    try await f.workflow.editAndBegin(.mode(.custom),
+      replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.prompt, old + " Aa Bb")
+    XCTAssertTrue(try XCTUnwrap(f.page.state.practice).repetition.repeatsWordset)
+    XCTAssertEqual(f.page.state.priorAttemptLedger.restartCount, 1)
+    let prompt = f.page.state.session.prompt
+    repeated = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(repeated)
+    XCTAssertEqual(f.page.state.session.prompt, prompt)
+    state = f.page.state
+    state.session.insert(String(try XCTUnwrap(prompt.first)))
+    f.page.replace(state)
+    try await f.workflow.editAndBegin(.difficulty(.expert),
+      replacing: XCTUnwrap(f.page.state.presentation).publication.applicationID, systemIsDark: false)
+    XCTAssertEqual(f.page.state.session.configuration.difficulty, .expert)
+    XCTAssertEqual(f.page.state.session.prompt, prompt)
+    state = f.page.state; state.session.insertBatch(prompt); f.page.replace(state)
+    XCTAssertEqual(f.page.state.session.outcome, .completed)
+    XCTAssertEqual(f.page.state.session.completedWordCount, 5)
+    XCTAssertEqual(f.page.state.session.errors, 0)
+  }
+
   func testFullImportSupersedesBusyRestartWithoutRecountingOrLateDelivery() async throws {
     let f = try Fixture(); defer { f.close() }
     let gate = Gate(); defer { gate.resolve() }

@@ -6162,6 +6162,10 @@ struct GeneratedCandidateContinuation {
   private var cache = GeneratedPromptCache()
   private var sectionWords: [String] = []
   private var nextSectionWord = 0
+  private var customSectionIndex = 0
+  private var customOrderedIndex = 0
+  private var customShuffledIndices: [Int] = []
+  private var customRecentSections: [String] = []
   private(set) var decorationState: PoolWordDecorationState
   private(set) var replayHistory: GeneratedWordReplayHistory
   private let replaysOwnedHistory: Bool
@@ -6182,7 +6186,7 @@ struct GeneratedCandidateContinuation {
     self.weakSpotScores = weakSpotScores
     self.decorationState = decorationState
     self.replayHistory = replayHistory ?? .init(noSpace: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), arrowChart: arrowChart)
-    if let replayHistory, replayHistory.noSpace != TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+    if configuration.mode == .custom || replayHistory.map({ $0.noSpace != TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) }) == true {
       self.replayHistory.preserveCommitFraming()
     }
     replaysOwnedHistory = replayHistory != nil
@@ -6210,7 +6214,21 @@ struct GeneratedCandidateContinuation {
   }
 
   var hasRemaining: Bool {
-    !replayExhausted && !sourceGenerationFailed && (cache.hasPendingReplay
+    if configuration.mode == .custom {
+      guard !replayExhausted && !sourceGenerationFailed else { return false }
+      if cache.hasPendingReplay { return true }
+      switch configuration.customTextCompletion {
+      case .time: return true
+      case .words: return configuration.wordLimit == 0 || emittedWords < (configuration.wordLimit ?? 0)
+      case .sections:
+        return configuration.customTextSectionLimit == 0 || customSectionIndex < (configuration.customTextSectionLimit ?? 0)
+          || nextSectionWord < sectionWords.count
+      case .finish:
+        return configuration.usesCustomTextPipeDelimiter
+          ? customSectionIndex < pool.count || nextSectionWord < sectionWords.count : emittedWords < pool.count
+      }
+    }
+    return !replayExhausted && !sourceGenerationFailed && (cache.hasPendingReplay
       || configuration.mode != .words || configuration.isInfinite
       || emittedWords < (configuration.wordLimit ?? 0))
   }
@@ -6230,6 +6248,12 @@ struct GeneratedCandidateContinuation {
     // but after that cache ends generation starts a fresh candidate section.
     copy.sectionWords = []
     copy.nextSectionWord = 0
+    if configuration.mode == .custom {
+      copy.customSectionIndex = replayHistory.count
+      copy.customOrderedIndex = 0
+      copy.customShuffledIndices = []
+      copy.customRecentSections = []
+    }
     if let polyglotCandidates {
       let refreshed = polyglotCandidates.reshuffled(nextShuffleIndex: nextRandomPoolShuffleIndex)
       copy.polyglotCandidates = refreshed
@@ -6250,6 +6274,8 @@ struct GeneratedCandidateContinuation {
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) }) -> GeneratedWordChunk {
     if let chunk = cache.nextReplayedChunk() { return chunk }
+    let isCustom = configuration.mode == .custom
+    let initialCustomPipe = isCustom && emittedWords == 0 && configuration.usesCustomTextPipeDelimiter
     let remaining = configuration.mode == .words && !configuration.isInfinite
       ? max(0, (configuration.wordLimit ?? 0) - emittedWords) : 100
     let chunkLimit = previewsWholeFiniteWords && emittedWords == 0 ? batchTokenCount : 100
@@ -6266,7 +6292,20 @@ struct GeneratedCandidateContinuation {
     var fields: [String] = []
     var output = !explicitFraming && emittedWords > 0 && !noSpace && previousTargets.last?.hasSuffix("\n") != true ? " " : ""
     for index in 0..<count {
+      if isCustom {
+        let atSectionEnd = nextSectionWord >= sectionWords.count
+        if initialCustomPipe, atSectionEnd, customSectionIndex >= bound { break }
+        if !initialCustomPipe {
+          if configuration.customTextCompletion == .words, let limit = configuration.wordLimit,
+            limit > 0, emittedWords + index >= limit { break }
+          if configuration.customTextCompletion == .sections, let limit = configuration.customTextSectionLimit,
+            limit > 0, atSectionEnd, customSectionIndex >= limit { break }
+          if configuration.customTextCompletion == .finish,
+            (configuration.usesCustomTextPipeDelimiter ? atSectionEnd && customSectionIndex >= pool.count : emittedWords + index >= pool.count) { break }
+        }
+      }
       if let cached = replayHistory.word(at: emittedWords + index) {
+        if isCustom { customSectionIndex += 1 }
         sourceWords.append(cached.source)
         output += explicitFraming ? cached.committedText : cached.target
         fields.append(cached.committedText); targets.append(cached.target)
@@ -6275,8 +6314,11 @@ struct GeneratedCandidateContinuation {
         if !explicitFraming && index < count - 1 && !noSpace && !cached.target.hasSuffix("\n") { output.append(" ") }
         continue
       }
-      if replaysOwnedHistory, !GeneratedRepeatedWordPolicy.permitsFreshWord(configuration: configuration,
-        wordIndex: emittedWords + index, sectionIndex: emittedWords + index) {
+      let permitsFresh = isCustom && configuration.customTextCompletion == .finish
+        ? (configuration.usesCustomTextPipeDelimiter ? customSectionIndex < pool.count : emittedWords + index < pool.count)
+        : GeneratedRepeatedWordPolicy.permitsFreshWord(configuration: configuration,
+          wordIndex: emittedWords + index, sectionIndex: isCustom ? customSectionIndex : emittedWords + index)
+      if replaysOwnedHistory, !permitsFresh {
         replayExhausted = true
         return .init(source: "", configuration: configuration)
       }
@@ -6285,7 +6327,10 @@ struct GeneratedCandidateContinuation {
       let candidate = drawCandidate(random: nextRandomWordIndex, contentRandom: nextRandomContentUnit)
       guard !sourceGenerationFailed else { return .init(source: "", configuration: configuration) }
       if nextSectionWord >= sectionWords.count {
-        var section = sampledWord(initialCandidate: candidate, random: nextRandomWordIndex, contentRandom: nextRandomContentUnit)
+        var section = isCustom ? customSection(initialCandidate: candidate, random: nextRandomWordIndex,
+          contentRandom: nextRandomContentUnit)
+          : sampledWord(initialCandidate: candidate, random: nextRandomWordIndex, contentRandom: nextRandomContentUnit)
+        if isCustom { customSectionIndex += 1 }
         guard !sourceGenerationFailed else { return .init(source: "", configuration: configuration) }
         if WebsiteArrowChart.isSelected(configuration) {
           guard let generated = replayHistory.arrowChart.word(first: emittedWords + index == 0,
@@ -6316,7 +6361,7 @@ struct GeneratedCandidateContinuation {
       }
       var word = sectionWords[nextSectionWord]
       nextSectionWord += 1
-      if pseudolangModel != nil && word.isEmpty {
+      if (pseudolangModel != nil || isCustom) && word.isEmpty {
         sourceGenerationFailed = true
         return .init(source: "", configuration: configuration)
       }
@@ -6324,7 +6369,7 @@ struct GeneratedCandidateContinuation {
       // entire candidate before selection. Code syntax keeps its case.
       let baseLanguage = configuration.wordPoolBaseLanguage
       let wordLanguage = polyglotCandidates?.language(for: word) ?? baseLanguage
-      if websiteSource == nil && !PoolWordLanguageFamily.preservesASCIICase(wordLanguage)
+      if !isCustom && websiteSource == nil && !PoolWordLanguageFamily.preservesASCIICase(wordLanguage)
         && !configuration.contentOptions.includePunctuation
         && !configuration.modifiers.contains(.weakSpot)
         && word.utf8.contains(where: { (65...90).contains($0) }) {
@@ -6383,7 +6428,10 @@ struct GeneratedCandidateContinuation {
       if !explicitFraming && index < count - 1 && !noSpace && !target.hasSuffix("\n") { output.append(" ") }
     }
     let source = (emittedWords > 0 ? " " : "") + sourceWords.joined(separator: " ")
-    emittedWords += count
+    // The source releases section filtering history when generateWords returns.
+    // Its pending section and wordset cursors still belong to the attempt.
+    if isCustom && emittedWords == 0 { customRecentSections = [] }
+    emittedWords += sourceWords.count
     let batch = TransformedPromptBatch(text: output,
       noSpaceTargetWords: noSpace ? (explicitFraming ? fields : targets) : [], sourceFields: explicitFraming ? fields : nil)
     if explicitFraming && batch.sourceFields == nil {
@@ -6425,9 +6473,9 @@ struct GeneratedCandidateContinuation {
     let comparesEarlier = pseudolangModel == nil || previousTargets.count > 1
     var retries = 0
     while !sourceGenerationFailed && retries < 100 && ((comparesLatest && comparison == latest) || (comparesEarlier && comparison == earlier)
-      || (!configuration.contentOptions.includeNumbers && word.utf8.contains { (48...57).contains($0) })
-      || (!configuration.contentOptions.includePunctuation && word == "I")
-      || ((!configuration.wordPoolBaseLanguage.isCodeLanguage || configuration.wordPoolBaseLanguage == .dockerFile)
+      || (configuration.mode != .custom && !configuration.contentOptions.includeNumbers && word.utf8.contains { (48...57).contains($0) })
+      || (configuration.mode != .custom && !configuration.contentOptions.includePunctuation && word == "I")
+      || (configuration.mode != .custom && (!configuration.wordPoolBaseLanguage.isCodeLanguage || configuration.wordPoolBaseLanguage == .dockerFile)
         && !configuration.contentOptions.includePunctuation
         && word.contains { "-=_+[]{};'\\:\"|,./<>?".contains($0) })) {
       word = drawCandidate(random: random, contentRandom: contentRandom)
@@ -6437,6 +6485,39 @@ struct GeneratedCandidateContinuation {
       retries += 1
     }
     return word
+  }
+
+  private mutating func customSection(initialCandidate: String, random: () -> Int, contentRandom: () -> Double) -> String {
+    let section: String
+    switch configuration.customTextOrdering {
+    case .inOrder:
+      section = pool[customOrderedIndex]
+      customOrderedIndex = (customOrderedIndex + 1) % pool.count
+    case .shuffled:
+      if customShuffledIndices.isEmpty {
+        customShuffledIndices = Array(0..<pool.count)
+        if pool.count > 1 {
+          for index in stride(from: pool.count - 1, through: 1, by: -1) {
+            customShuffledIndices.swapAt(index, Int(random().magnitude % UInt(index + 1)))
+          }
+        }
+      }
+      section = pool[customShuffledIndices.removeLast()]
+    case .random:
+      if pool.count < 4 {
+        section = drawCandidate(random: random, contentRandom: contentRandom)
+      } else if configuration.customTextCompletion == .sections {
+        var candidate = drawCandidate(random: random, contentRandom: contentRandom), retries = 0
+        while retries < 100 && customRecentSections.contains(where: { InputTextIdentity.matches($0, candidate) }) {
+          candidate = drawCandidate(random: random, contentRandom: contentRandom); retries += 1
+        }
+        section = candidate
+      } else {
+        section = sampledWord(initialCandidate: initialCandidate, random: random, contentRandom: contentRandom)
+      }
+    }
+    customRecentSections = Array((customRecentSections + [section]).suffix(2))
+    return section
   }
 }
 

@@ -2,6 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| REPLAY-CUSTOM-CURSOR-22 | 生成历史切入自定义文本及再次重开 | 固定完整生成器／Wordset／TestWords／addWord；216 组初始与有限续词轨迹，输入位置和抽样适配 | 自定义排序与段游标、实际重复控制器、词数／时间／段数与空间规则测试；CUSTOM_GENERATED_REPLAY_CONTRACT.md | 部分完成：保留缓存，新文本游标从零开始，继续或按原版边界失败，活动难度编辑及计时续批可用。段进度、零重开限制编辑、全部变换和实体输入仍开放。 |
 | REPLAY-COMMIT-FRAMING-21 | 重复词组切换 No Space 的旧提交字符 | 固定完整生成器、TestWords、准入／提交／验证／完成模块；八组及切回轨迹，自有词池与导航适配 | 缓存完整提交字段、混合续词与实际构建入口；GENERATED_REPLAY_FRAMING_CONTRACT.md | 部分完成：保留旧字段与当前输入规则，跨百词续批和再次重复。全部跨模式、空候选、变换／提供者组合、配速／回放界面和实体输入仍开放。 |
 | CFG-FULL-IMPORT-ACTIVE-20 | 活动尝试显式导入完整 JSON | 固定完整生命周期／setter／Solid／测试订阅与 restart，128 组来源轨迹 | 首重开运行快照、专用页面捕获、保存阶段离场与账本；WEBSITE_ACTIVE_IMPORT_CONTRACT.md | 部分完成：显式导入清除旧 No Quit，按首语言事件结算，取消／失败可继续；恢复和普通操作仍有原锁。完整故障写序、成功提示时序、跨模式重复及实体操作仍开放。 |
 | LANG-FRENCH-SCALES-19 | 法语 1k／2k／10k 独立实际词汇 | 固定 wordfreq 法语观察 token、明确地名大小写、六个自写表达；参考仅聚合及生成合同 | FrenchFrequencyCorpus、固定来源复现、实际字段／续批／历史回归；OFFICIAL_LANGUAGE_AUDIT.md | 部分完成：三档替换合成词根，保留短语与复合词、基础池及旧历史；词频／难度／短语分布不等同原版，语言质量与实体输入待验收，600k 仍开放。 |

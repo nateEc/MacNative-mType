@@ -131,7 +131,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
       selectedQuote = quote
       repetition = .sameWordset(repeatedPace: repeatedPace)
     case .repeatedWords(let history, let repeatedPace):
-      guard [.words, .time].contains(config.mode), liveSource == nil,
+      guard [.words, .time, .custom].contains(config.mode), liveSource == nil,
         history.count > 0,
         (WebsiteRandomWordGenerator.usesCandidateStream(for: config)
           || TypebarStreamContent.prompt(configuration: config, wordCount: 1) == nil) else {
@@ -208,11 +208,31 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     let preparation = PolyglotGenerationPreparation(configuration)
     var config = preparation.configuration
     if config.language == .dockerFile { config.dockerfileUsesLiteralIndentation = true }
-    let count = GeneratedPromptChunkPolicy.wordCount(for: config, showAllLines: showAllLines)
+    let customCandidates: [String]?
+    let count: Int
+    if config.mode == .custom {
+      guard !scope.customTextRecoveryBlocked else { throw WebsiteConfigSessionBuildError.customTextUnavailable }
+      let candidates = scope.preparedCustomSections ?? CustomSectionWordStream.sourceSections(
+        from: scope.finiteTextSource ?? scope.customText, usesPipe: config.usesCustomTextPipeDelimiter,
+        preservesSourceSpelling: scope.customTextIsPrepared)
+      guard !candidates.isEmpty else { throw WebsiteConfigSessionBuildError.customTextUnavailable }
+      customCandidates = candidates
+      let limit: Int
+      switch config.customTextCompletion {
+      case .time: limit = 0
+      case .words: limit = config.wordLimit ?? 0
+      case .sections: limit = config.customTextSectionLimit ?? 0
+      case .finish: limit = candidates.count
+      }
+      count = limit == 0 ? 100 : min(100, limit)
+    } else {
+      customCandidates = nil
+      count = GeneratedPromptChunkPolicy.wordCount(for: config, showAllLines: showAllLines)
+    }
     var history = history
     history.arrowChart = scope.arrowChart
     var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: 100,
-      showAllLines: showAllLines, weakSpotScores: scope.weakSpotScores,
+      showAllLines: showAllLines, weakSpotScores: scope.weakSpotScores, sourceWords: customCandidates,
       decorationState: scope.decorationState, pseudolangModel: pseudolangModel, replayHistory: history,
       nextRandomPoolShuffleIndex: random.shuffleIndex)
     var chunks: [GeneratedWordChunk] = []
@@ -220,7 +240,8 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     while prepared < count {
       try Task.checkCancellation()
       let size = min(100, count - prepared)
-      let chunk = cursor.nextChunk(maximumWordCount: size, initialPreparationWordBound: count,
+      let requestCount = config.mode == .custom && config.usesCustomTextPipeDelimiter ? 100 : size
+      let chunk = cursor.nextChunk(maximumWordCount: requestCount, initialPreparationWordBound: count,
         nextRandomWordIndex: random.wordIndex, nextRandomCaseBit: random.caseBit, nextRandomContentUnit: random.contentUnit)
       guard !chunk.source.isEmpty else { throw WebsiteConfigSessionBuildError.generationFailed }
       chunks.append(chunk); prepared += size

@@ -16,6 +16,7 @@ const config={mode:'words',words:3,language:'english',showAllLines:false,lazyMod
   punctuation:false,numbers:false,britishEnglish:false};
 let activeNames=['backwards','binary'], functions, drawIndex=0;
 let ownedIndexes=[], spacingMs=0, ownedRepeated=false;
+let ownedCustom={text:[],mode:'repeat',limitMode:'word',limitValue:0,pipe:false};
 let ownedActiveWordIndex=0;
 let ownedSection, sectionCalls=0;
 let ownedSectionQueue=[];
@@ -29,7 +30,12 @@ const binary=i=>(i%256).toString(2).padStart(8,'0');
 const unexpected=()=>{throw Error('Unexpected adapter call outside ordering probe')};
 const active=()=>activeNames.map(name=>({name,properties:name==='backwards'?['wordOrder:reverse']:
   ['underscore_spaces','nospace'].includes(name)?['nospace']:[],functions:functions[name]}));
-const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuffle:words=>words,
+const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuffle:words=>{
+    if(process.argv[3]==='--custom-replay')for(let i=words.length-1;i>0;i--){
+      const j=(ownedIndexes.shift()??0)%(i+1);[words[i],words[j]]=[words[j],words[i]];
+    }
+    return words;
+  },
   nthElementFromArray:(words,index)=>words.at(index)};
 const bindings={
   'utils/strings':{removeLanguageSize:value=>value,isSpace:value=>value===' ',
@@ -50,7 +56,8 @@ const bindings={
   'config/store':{Config:config},
   'config/setters':{toggleFunbox:name=>toggledSources.push(name)},
   'test/poetry':{getPoem:async()=>{sectionCalls++;if(ownedSectionError)throw ownedSectionError;return ownedSectionQueue.length?ownedSectionQueue.shift():ownedSection}},
-  'test/custom-text':{getPipeDelimiter:()=>false},
+  'test/custom-text':{getPipeDelimiter:()=>ownedCustom.pipe,getText:()=>ownedCustom.text,
+    getMode:()=>ownedCustom.mode,getLimitMode:()=>ownedCustom.limitMode,getLimitValue:()=>ownedCustom.limitValue},
   'test/practise-words':{before:{mode:null}},
   'controllers/quotes-controller':{default:{}},
   'states/test':{isRepeated:()=>ownedRepeated,getCurrentQuote:()=>null,setCurrentQuote:()=>{},getSelectedQuoteId:()=>null,
@@ -110,6 +117,67 @@ const main=moduleFor('test/words-generator');
 await main.link((id,from)=>moduleFor(resolve(id,from.identifier)));
 await main.evaluate();
 functions=modules.get('test/funbox/funbox-functions').namespace.getFunboxFunctions();
+const logicSource=fs.readFileSync(path.join(root,'frontend/src/ts/test/test-logic.ts'),'utf8');
+const addStart=logicSource.indexOf('export async function addWord(): Promise<void> {');
+const addEnd=logicSource.indexOf('\ntype RetrySaving = {',addStart);
+assert.ok(addStart>=0&&addEnd>addStart,'Pinned complete addWord range must exist');
+const addBody=stripTypeScriptTypes(logicSource.slice(addStart,addEnd),{mode:'transform'}).replace(/^export /,'');
+if(process.argv[3]==='--custom-replay') {
+  const fixtures=[], words=modules.get('test/test-words').namespace.words;
+  const failures=[];
+  const continueWords=vm.compileFunction(addBody+'\nreturn addWord;',[
+    'Config','TestWords','WordsGenerator','TestUI','getActiveFunboxes','getActiveWordIndex',
+    'findSingleActiveFunboxWithFunction','showErrorNotification','toggleFunbox','restart','timerEvent',
+  ])(config,modules.get('test/test-words').namespace,main.namespace,
+    {addWord:()=>{},appendEmptyWordElement:unexpected},active,()=>ownedActiveWordIndex,
+    name=>active().find(value=>typeof value.functions[name]==='function'),()=>{},unexpected,unexpected,
+    {dispatch:value=>failures.push(value)});
+  const debug=console.debug;console.debug=()=>{};
+  try {
+    for(const text of [['Aa Bb','Cc','I','x2','Ω'],['Aa Bb','I']])
+      for(const mode of ['repeat','random','shuffle'])for(const limitMode of ['word','time','section'])
+      for(const limitValue of [0,2,4,5,101,103])for(const pipe of [false,true]) {
+        config.mode='words';config.words=3;config.language='english';config.showAllLines=false;
+        activeNames=[];ownedRepeated=false;ownedIndexes=[0,1,2];
+        const opening=await main.namespace.generateWords({name:'english',words:['ab','cd','ef']});
+        config.mode='custom';ownedRepeated=true;
+        ownedCustom={text:text.slice(),mode,limitMode,limitValue,pipe};
+        const draws=Array.from({length:1000},(_,i)=>i%text.length);ownedIndexes=draws.slice();
+        words.reset();let generated,error;
+        try {
+          generated=await main.namespace.generateWords({name:'english',words:['unused']});
+          generated.words.forEach((word,index)=>words.push(word,generated.sectionIndexes[index]));
+          if(main.namespace.areAllWordsGenerated())words.removeCommitCharacterFromLastWord();
+        }catch(caught){error=caught.message;}
+        const fields=Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit);
+        const allGenerated=main.namespace.areAllWordsGenerated(),drawsUsed=draws.length-ownedIndexes.length;
+        const tailDraws=Array.from({length:3000},(_,i)=>i%text.length);
+        if(mode==='random'&&limitMode==='section'&&limitValue>100&&!error){
+          const last=words.get(words.length-1).text;
+          const rank=text.findIndex(section=>section.split(' ').includes(last));
+          assert.ok(rank>=0);
+          tailDraws.unshift(...Array(16).fill(rank));
+        }
+        ownedIndexes=tailDraws.slice();
+        failures.length=0;
+        if(!error&&limitMode!=='time')for(let i=0;i<256&&!main.namespace.areAllWordsGenerated()&&!failures.length;i++){
+          ownedActiveWordIndex=words.length-1;await continueWords();
+        }
+        if(!error&&limitMode!=='time'&&!failures.length)assert.equal(main.namespace.areAllWordsGenerated(),true);
+        fixtures.push({text,mode,limitMode,limitValue,pipe,opening:opening.words,
+          generated:generated?.words,sectionIndexes:generated?.sectionIndexes,
+          fields,finalFields:Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit),
+          currentSection:Array.from(main.namespace.currentSection),sectionIndex:main.namespace.sectionIndex,
+          allGenerated,drawsUsed,finalDrawsUsed:drawsUsed+tailDraws.length-ownedIndexes.length,
+          tailRanks:tailDraws.slice(0,tailDraws.length-ownedIndexes.length),
+          continuationFailed:failures.length>0,error});
+      }
+  } finally {console.debug=debug;}
+  assert.equal(fixtures.length,216);
+  assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
+  await new Promise((resolve,reject)=>process.stdout.write(JSON.stringify({fixtures})+'\n',error=>error?reject(error):resolve()));
+  process.exit(0);
+}
 if(process.argv[3]==='--replay-framing') {
   const admission=moduleFor('input/handlers/before-insert-text');
   await admission.link((id,from)=>moduleFor(resolve(id,from.identifier)));
@@ -303,12 +371,6 @@ console.log('4 pinned section-admission cases passed (actual generator and funbo
 // Execute the complete actual addWord function, not a paraphrase of its branch
 // conditions. Its surrounding module/startup is deliberately outside this
 // probe. The exact pinned source range is read only and remains in memory.
-const logicSource=fs.readFileSync(path.join(root,'frontend/src/ts/test/test-logic.ts'),'utf8');
-const addStart=logicSource.indexOf('export async function addWord(): Promise<void> {');
-const addEnd=logicSource.indexOf('\ntype RetrySaving = {',addStart);
-assert.ok(addStart>=0&&addEnd>addStart,'Pinned complete addWord range must exist');
-const addBody=stripTypeScriptTypes(logicSource.slice(addStart,addEnd),{mode:'transform'})
-  .replace(/^export /,'');
 const testWords=modules.get('test/test-words').namespace;
 let restarts=0;
 const failures=[],notices=[],displayed=[];

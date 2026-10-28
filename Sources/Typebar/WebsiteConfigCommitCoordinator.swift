@@ -1730,7 +1730,7 @@ final class WebsiteConfigCommitCoordinator {
         initializationReport: initializationReport, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
       return .init(session: session)
     }
-    if [.words, .time].contains(original.configuration.mode), let history = original.generatedWordReplayHistory {
+    if [.words, .time, .custom].contains(original.configuration.mode), let history = original.generatedWordReplayHistory {
       let session = try await preparePracticeBuild(for: resources, scope: nil, reason: .nextAttempt,
         repeatedSource: .repeatedWords(history, repeatedPace: repetition.repeatsPace),
         initializationReport: initializationReport, loadQuotes: loadQuotes, loadExternal: loadExternal, random: random)
