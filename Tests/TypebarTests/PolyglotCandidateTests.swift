@@ -170,7 +170,9 @@ final class PolyglotCandidateTests: XCTestCase {
   }
 
   func testRepeatReshufflesFuturePoolWithoutChangingItsCachedTarget() {
-    var generator = cursor(config(), [(.english, ["node", "bay"]), (.german, ["oak"])])
+    // A finite attempt with an ungenerated third word permits fresh repeat
+    // generation. words=0 stops at history exhaustion in the pinned source.
+    var generator = cursor(config(3), [(.english, ["node", "bay"]), (.german, ["oak"])])
     XCTAssertEqual(generator.nextChunk(nextRandomWordIndex: { 0 }).transformed, "node")
     XCTAssertEqual(generator.nextChunk(nextRandomWordIndex: { 1 }).transformed, " bay")
     var calls = 0
@@ -178,6 +180,17 @@ final class PolyglotCandidateTests: XCTestCase {
     XCTAssertEqual(calls, 2)
     XCTAssertEqual(repeatCursor.nextChunk(nextRandomWordIndex: { XCTFail("Cached rank"); return 0 }).transformed, " bay")
     XCTAssertEqual(repeatCursor.nextChunk(nextRandomWordIndex: { 1 }).transformed, " oak")
+  }
+
+  func testZeroLimitRepeatKeepsCachedPolyglotTargetThenStopsWithoutDrawing() {
+    var generator = cursor(config(), [(.english, ["node", "bay"]), (.german, ["oak"])])
+    XCTAssertEqual(generator.nextChunk(nextRandomWordIndex: { 0 }).transformed, "node")
+    XCTAssertEqual(generator.nextChunk(nextRandomWordIndex: { 1 }).transformed, " bay")
+    var repeated = generator.replayingContinuation(nextRandomPoolShuffleIndex: { _ in 0 })
+    XCTAssertEqual(repeated.nextChunk(nextRandomWordIndex: { XCTFail("Cached rank"); return 0 }).transformed, " bay")
+    XCTAssertEqual(repeated.nextChunk(nextRandomWordIndex: { XCTFail("Exhausted repeat rank"); return 0 }).transformed, "")
+    XCTAssertTrue(repeated.replayExhausted)
+    XCTAssertFalse(repeated.hasRemaining)
   }
 
   func testPrimaryBritishAndSwissStagesApplyRegardlessOfCandidateOwner() {

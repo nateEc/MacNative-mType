@@ -15477,15 +15477,11 @@ enum StarterLexicon {
   }
 
   static var italian1kLexicon: IndexedLexicon {
-    italianScaleLexicon(.init(
-      marker: "a", count: 1_159, minimumToken: "q", maximumLength: 14,
-      uppercaseCount: 1, punctuationCount: 0, symbolCount: 0, nonASCIICount: 34))
+    IndexedLexicon(ItalianFrequencyCorpus.words1k)
   }
 
   static var italian7kLexicon: IndexedLexicon {
-    italianScaleLexicon(.init(
-      marker: "b", count: 7_154, minimumToken: "q", maximumLength: 18,
-      uppercaseCount: 2, punctuationCount: 0, symbolCount: 0, nonASCIICount: 136))
+    IndexedLexicon(ItalianFrequencyCorpus.words7k)
   }
 
   static var italian60kLexicon: IndexedLexicon {

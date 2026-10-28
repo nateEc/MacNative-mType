@@ -2,6 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-ITALIAN-SCALES-36 | Italian 1k／7k 的独立实际词汇 | 固定 wordfreq 3.1.1 Italian 观察 token，仅参考聚合；五个明确专名编辑 | 两档替换合成串，固定准备器／署名、真实选词输入／153 词续批及旧历史；ITALIAN_SCALES_CORPUS_CONTRACT.md | 部分完成：38 项定向、固定源重建及最终 920 项／144 项来源证据通过，完整引擎 798 项另轮通过；首次扩大轮的旧多语夹具失败与修正已记录。词频／难度／内容不等同原版，语言审校、60k／280k、全部组合与实体输入仍开放。 |
 | RECOVERY-SOURCE-POSITION-35 | 自动恢复删除的位置证据 | 完整输入／导航／事件／统计 14 模块，72 组有效设置，含 No Space／代理／组合音标 | 词内前长度与退回目的长度分离，整词仅最后原语记录；AUTOMATIC_RECOVERY_POSITION_CONTRACT.md | 部分完成：位置补齐与 JSON／归档／模型转换、761 项回归及 144 项来源证据通过；设备、韩文和全部输入交错仍开放。 |
 | RESULT-INTERVAL-SERIES-34 | 图表区间 Burst 与错误系列 | 完整输入／事件／统计 14 模块，326 组真实处理器轨迹，含 UTF-16、停止、有限／计时尾段 | 来源字段图表按毫秒区间及源顺序计算 Burst，错误计数及账户生产者同步对照；RESULT_INTERVAL_SERIES_CONTRACT.md | 部分完成：九处取整差异修正，743 项扩大回归及 143 项来源证据通过；物理 IME、composition 类型及全部显示／输入组合仍开放。 |
 | INPUT-COMMIT-CAPTURE-33 | 新录制的明确词提交证据 | 完整输入处理器／事件／统计共 14 模块，48 组普通与 No Space 实际录制及 WPM／Raw 对照 | 真实提交记录 true，保留分隔符 false 优先；JSON／归档／模型与旧 nil 守卫；INPUT_COMMIT_CAPTURE_CONTRACT.md | 部分完成：93 项定向／741 项扩大检查及 142 项来源证据通过，新记录不再依赖缺失标记推断；全部自动输入、跨模式／语言、实体 IME 和旧二进制仍开放。 |

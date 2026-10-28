@@ -42,6 +42,7 @@ cp "$project_root/Resources/UnicodeNotice.txt" "$app_path/Contents/Resources/Uni
 cp "$project_root/Resources/EnglishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/EnglishFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/FrenchFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/FrenchFrequencyCorpusNotices.txt"
+cp "$project_root/Resources/ItalianFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/ItalianFrequencyCorpusNotices.txt"
 if [[ -n "$bundle_identifier" ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $bundle_identifier" "$app_path/Contents/Info.plist"
 fi
