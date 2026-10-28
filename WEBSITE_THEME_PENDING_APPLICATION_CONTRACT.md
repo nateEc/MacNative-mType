@@ -1,5 +1,7 @@
 # 完整导入初始化期间的主题
 
+背景资源的后续独立交付见 `WEBSITE_BACKGROUND_APPLICATION_LIFECYCLE_CONTRACT.md`。下文保留本批仅提前交付配色时的证据和边界。
+
 固定参考 `91bd24bb8513785c7364cbea29296ff7adafac41`。承接 `WEBSITE_THEME_IMPORT_RESTART_CONTRACT.md`，本批处理完整配置已保存、练习资源尚未交付时的主题显示；整体功能和实体交互验收仍未完成。
 
 ## 来源与行为

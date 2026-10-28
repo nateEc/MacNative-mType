@@ -22,6 +22,13 @@ final class WebsiteConfigPublishedPresentation {
     var randomIndicator: String?
   }
   let publication: WebsiteConfigCommitCoordinator.Publication
+  let backgroundDisplay: WebsiteConfigBackgroundDisplay?
+  var backgroundSnapshot: WebsiteConfigBackgroundDisplay.Snapshot? {
+    if let backgroundDisplay { return backgroundDisplay.snapshot }
+    guard let resource = publication.background else { return nil }
+    return .init(owner: owner, identity: publication.applicationID, resource: resource,
+      preferences: publication.draft.pagePreferences, pointsPerRem: publication.pointsPerRem)
+  }
   private let owner: UUID
   private let themes: WebsiteConfigNativeThemes
   private let customTheme: ResolvedTheme
@@ -96,7 +103,9 @@ final class WebsiteConfigPublishedPresentation {
 
   /// Internal synchronous handoff: resource and owner checks have already run
   /// before the durable commit. This construction has no fallible operations.
-  init(publication: WebsiteConfigCommitCoordinator.Publication, preparedAppearance: PreparedAppearance) {
+  init(publication: WebsiteConfigCommitCoordinator.Publication, preparedAppearance: PreparedAppearance,
+    backgroundDisplay: WebsiteConfigBackgroundDisplay? = nil) {
+    self.backgroundDisplay = backgroundDisplay
     self.publication = publication; owner = publication.owner; themes = preparedAppearance.themes
     customTheme = preparedAppearance.custom; systemIsDark = preparedAppearance.systemIsDark
     appearance = preparedAppearance.appearance
@@ -107,7 +116,8 @@ final class WebsiteConfigPublishedPresentation {
   /// A next-attempt-only selection must not replay theme/random/system events.
   func retainingAppearance(for publication: WebsiteConfigCommitCoordinator.Publication) -> WebsiteConfigPublishedPresentation {
     .init(publication: publication, preparedAppearance: .init(themes: themes, custom: customTheme,
-      appearance: appearance, systemIsDark: systemIsDark, changes: themeChanges, randomThemes: randomThemes))
+      appearance: appearance, systemIsDark: systemIsDark, changes: themeChanges, randomThemes: randomThemes),
+      backgroundDisplay: backgroundDisplay)
   }
 
   struct PreparedThemeEdit { let draft: WebsiteConfigNativeDraft; let appearance: PreparedAppearance }
@@ -206,9 +216,11 @@ final class WebsiteConfigPublishedPresentation {
   }
   func background(fallbackStyle: PracticeBackdropStyle, reduceMotion: Bool, themePreview: WebsiteThemePreview.Prepared? = nil,
     pendingTheme: PendingTheme? = nil,
+    pendingBackground: WebsiteConfigBackgroundDisplay? = nil,
     onFailure: @escaping BackgroundFailureFeedback.Sink = { _ in }) throws -> WebsiteConfigPublishedBackground {
     if let pendingTheme, pendingTheme.owner != owner { throw WebsiteConfigPublishedPresentationError.wrongOwner }
-    return try .init(publication: publication, owner: owner, fallbackStyle: fallbackStyle,
+    guard let snapshot = pendingBackground?.snapshot ?? backgroundSnapshot else { throw WebsiteConfigPublishedPresentationError.unprepared }
+    return try .init(snapshot: snapshot, owner: owner, fallbackStyle: fallbackStyle,
       theme: pendingTheme?.appearance.theme ?? themePreview?.resolve(publication: publication, owner: owner, applied: themeChanges.applied) ?? appearance.theme, reduceMotion: reduceMotion, onFailure: onFailure)
   }
   func wholePreview(session: TypingSession, fontPreview: WebsiteConfigFontPreview.Prepared? = nil,

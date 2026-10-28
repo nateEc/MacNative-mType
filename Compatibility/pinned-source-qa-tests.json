@@ -467,6 +467,10 @@
       "file": "Tests/TypebarTests/WeeklyExperienceMetadataTests.swift"
     },
     {
+      "id": "TypebarTests.WebsiteConfigBackgroundDisplayTests/testIndependentBackgroundPhasesAgainstCompletePinnedSelectionAndCallbacks",
+      "file": "Tests/TypebarTests/WebsiteConfigBackgroundDisplayTests.swift"
+    },
+    {
       "id": "TypebarTests.ZenTapePracticeTests/testTwoRowNativeViewportAgainstCompletePinnedWrapperHeight",
       "file": "Tests/TypebarTests/ZenTapePracticeTests.swift"
     }

@@ -6,8 +6,7 @@ enum WebsiteConfigPublishedBackgroundError: Error { case wrongOwner, unprepared 
 /// Consumes committed bytes and source numbers, never the legacy snapshot or loader.
 /// The full-configuration host still owns publication selection and cutover.
 struct WebsiteConfigPublishedBackground: View {
-  private let publication: WebsiteConfigCommitCoordinator.Publication
-  private let resource: WebsiteConfigBackgroundResource
+  private let snapshot: WebsiteConfigBackgroundDisplay.Snapshot
   let fallbackStyle: PracticeBackdropStyle
   let theme: ResolvedTheme
   let reduceMotion: Bool
@@ -18,7 +17,15 @@ struct WebsiteConfigPublishedBackground: View {
     onFailure: @escaping BackgroundFailureFeedback.Sink = { _ in }) throws {
     guard publication.owner == owner else { throw WebsiteConfigPublishedBackgroundError.wrongOwner }
     guard let resource = publication.background else { throw WebsiteConfigPublishedBackgroundError.unprepared }
-    self.publication = publication; self.resource = resource
+    try self.init(snapshot: .init(owner: owner, identity: publication.applicationID, resource: resource,
+      preferences: publication.draft.pagePreferences, pointsPerRem: publication.pointsPerRem), owner: owner,
+      fallbackStyle: fallbackStyle, theme: theme, reduceMotion: reduceMotion, onFailure: onFailure)
+  }
+  init(snapshot: WebsiteConfigBackgroundDisplay.Snapshot, owner: UUID,
+    fallbackStyle: PracticeBackdropStyle, theme: ResolvedTheme, reduceMotion: Bool,
+    onFailure: @escaping BackgroundFailureFeedback.Sink = { _ in }) throws {
+    guard snapshot.owner == owner else { throw WebsiteConfigPublishedBackgroundError.wrongOwner }
+    self.snapshot = snapshot
     self.fallbackStyle = fallbackStyle; self.theme = theme; self.reduceMotion = reduceMotion
     self.onFailure = onFailure
   }
@@ -29,7 +36,7 @@ struct WebsiteConfigPublishedBackground: View {
   var body: some View {
     ZStack {
       backdrop
-      PublishedBackgroundSurface(publication: publication, resource: resource, onFailure: onFailure)
+      PublishedBackgroundSurface(snapshot: snapshot, onFailure: onFailure)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .accessibilityHidden(true)
@@ -38,12 +45,11 @@ struct WebsiteConfigPublishedBackground: View {
 }
 
 private struct PublishedBackgroundSurface: NSViewRepresentable {
-  let publication: WebsiteConfigCommitCoordinator.Publication
-  let resource: WebsiteConfigBackgroundResource
+  let snapshot: WebsiteConfigBackgroundDisplay.Snapshot
   let onFailure: BackgroundFailureFeedback.Sink
   func makeNSView(context: Context) -> WebsiteConfigPublishedBackgroundView { .init() }
   func updateNSView(_ view: WebsiteConfigPublishedBackgroundView, context: Context) {
-    view.configure(publication: publication, resource: resource, onFailure: onFailure)
+    view.configure(snapshot: snapshot, onFailure: onFailure)
   }
   static func dismantleNSView(_ view: WebsiteConfigPublishedBackgroundView, coordinator: ()) { view.stop() }
 }
@@ -65,23 +71,27 @@ final class WebsiteConfigPublishedBackgroundView: NSView {
 
   func configure(publication: WebsiteConfigCommitCoordinator.Publication,
     resource: WebsiteConfigBackgroundResource, onFailure: @escaping BackgroundFailureFeedback.Sink) {
-    if identity != publication.applicationID {
+    configure(snapshot: .init(owner: publication.owner, identity: publication.applicationID, resource: resource,
+      preferences: publication.draft.pagePreferences, pointsPerRem: publication.pointsPerRem), onFailure: onFailure)
+  }
+  func configure(snapshot: WebsiteConfigBackgroundDisplay.Snapshot, onFailure: @escaping BackgroundFailureFeedback.Sink) {
+    if identity != snapshot.identity {
       stop()
-      identity = publication.applicationID
-      feedback.begin(identity: publication.applicationID, sink: onFailure)
+      identity = snapshot.identity
+      feedback.begin(identity: snapshot.identity, sink: onFailure)
     }
+    let resource = snapshot.resource
     switch resource.state {
     case .ready(let image):
-      surface.configure(image: image, identity: publication.applicationID,
-        fit: publication.draft.pagePreferences.backgroundFit,
-        filter: publication.draft.pagePreferences.backgroundFilter,
-        pointsPerRem: publication.pointsPerRem, feedback: feedback)
+      surface.configure(image: image, identity: snapshot.identity,
+        fit: snapshot.preferences.backgroundFit, filter: snapshot.preferences.backgroundFilter,
+        pointsPerRem: snapshot.pointsPerRem, feedback: feedback)
     case .none: surface.stop()
     case .failed(let reason):
       surface.stop()
       let kind: BackgroundFailureFeedback.Kind = reason == .resourceLimit ? .resourceLimit
         : resource.source == .local ? .local : .remote
-      feedback.report(kind, identity: publication.applicationID)
+      feedback.report(kind, identity: snapshot.identity)
     }
   }
   func stop() { identity = nil; feedback.cancel(); surface.stop() }

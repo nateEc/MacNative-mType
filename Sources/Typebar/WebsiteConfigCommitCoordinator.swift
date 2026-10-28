@@ -79,6 +79,7 @@ final class WebsiteConfigCommitCoordinator {
     let id: UUID
     fileprivate let ticket: Prepared
     let theme: WebsiteConfigPublishedPresentation.PendingTheme
+    let background: WebsiteConfigBackgroundDisplay
     var draft: WebsiteConfigNativeDraft { ticket.draft }
   }
   fileprivate struct NativeSharedBase {
@@ -885,7 +886,8 @@ final class WebsiteConfigCommitCoordinator {
       background: capture.publication.background, font: capture.publication.font,
       session: state.session, practice: updatedPractice, quoteRecoveries: capture.publication.quoteRecoveries,
       ownerLease: prepared.owner, authority: publicationAuthority)
-    let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: value.appearance)
+    let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: value.appearance,
+      backgroundDisplay: state.presentation?.backgroundDisplay)
     state = .init(session: state.session, presentation: presentation, practice: updatedPractice,
       priorAttemptLedger: state.priorAttemptLedger, restartDepartureAttemptID: state.restartDepartureAttemptID,
       quoteInitialization: state.quoteInitialization)
@@ -1014,7 +1016,8 @@ final class WebsiteConfigCommitCoordinator {
       background: capture.publication.background, font: font ?? capture.publication.font,
       session: state.session, practice: updatedPractice, quoteRecoveries: capture.publication.quoteRecoveries,
       ownerLease: prepared.owner, authority: publicationAuthority)
-    let presentation = themeAppearance.map { WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: $0) }
+    let presentation = themeAppearance.map { WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: $0,
+      backgroundDisplay: previous.backgroundDisplay) }
       ?? previous.retainingAppearance(for: publication)
     state = .init(session: state.session, presentation: presentation,
       practice: updatedPractice, priorAttemptLedger: state.priorAttemptLedger,
@@ -1040,6 +1043,8 @@ final class WebsiteConfigCommitCoordinator {
   private var latest: Publication?
   private let publicationAuthority: WebsiteConfigPublicationAuthority
   private var processing = false
+  private var backgroundWork: WebsiteConfigBackgroundDisplay?
+  func stopBackgroundWork() { backgroundWork?.cancel(); backgroundWork = nil }
 
   init(router: PreferenceConfigurationSaveRouter, register: WebsiteConfigFileRegister,
     loadExternal: WebsiteConfigSessionBuilder.ExternalLoader? = nil,
@@ -1160,6 +1165,9 @@ final class WebsiteConfigCommitCoordinator {
     let theme = try WebsiteConfigPublishedPresentation.PendingTheme(owner: page.owner, draft: prepared.draft,
       prepared: WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
         applicationID: id, systemIsDark: systemIsDark, previous: page.state.presentation))
+    let previousBackground = page.state.savedApplication?.background.snapshot ?? page.state.presentation?.backgroundSnapshot
+    let background = WebsiteConfigBackgroundDisplay(owner: page.owner, preferences: prepared.draft.pagePreferences,
+      pointsPerRem: prepared.environment.pointsPerRem, previous: previousBackground)
     try Task.checkCancellation()
     try page.beginCommit(owner: prepared.owner, router: router, applicationCapture: capture)
     defer { page.endCommit() }
@@ -1175,7 +1183,7 @@ final class WebsiteConfigCommitCoordinator {
     admitted.savedApplicationID = id
     admitted.applicationCapture = capture.acceptingApplication(id)
     var state = page.state
-    state.savedApplication = .init(id: id, ticket: admitted, theme: theme)
+    state.savedApplication = .init(id: id, ticket: admitted, theme: theme, background: background)
     page.installCommitted(state)
     return admitted
   }
@@ -1218,7 +1226,7 @@ final class WebsiteConfigCommitCoordinator {
     }
     var updated = prepared; updated.disk = disk
     var state = page.state
-    state.savedApplication = .init(id: id, ticket: updated, theme: pending.theme)
+    state.savedApplication = .init(id: id, ticket: updated, theme: pending.theme, background: pending.background)
     page.installCommitted(state)
     return updated
   }
@@ -1404,13 +1412,54 @@ final class WebsiteConfigCommitCoordinator {
     remoteReader: WebsiteConfigBackgroundRemoteReader = .init(),
     maximumFontBytes: Int = 32 * 1024 * 1024,
     backgroundLimits: WebsiteConfigBackgroundResource.Limits = .init()) async throws -> ResourcesPrepared {
-    try await prepareResources(for: prepared,
+    if let id = prepared.savedApplicationID, let page = prepared.sourcePage,
+      let pending = page.state.savedApplication, pending.id == id {
+      let admission = try beginAsyncResources(prepared)
+      guard maximumFontBytes > 0 else { throw WebsiteConfigFontResourceError.invalidLimit }
+      guard backgroundLimits.encodedBytes > 0, backgroundLimits.pixels > 0,
+        backgroundLimits.decodedBytes > 0, backgroundLimits.frames > 0
+      else { throw WebsiteConfigBackgroundResourceError.invalidLimits }
+      let display = pending.background
+      let lease = prepared.owner
+      if backgroundWork !== display { backgroundWork?.cancel(); backgroundWork = display }
+      display.start(readLocal: {
+        if let data = try settings.localBackgroundStore.encodedData(maximumBytes: backgroundLimits.encodedBytes) { return .data(data) }
+        return .absent
+      }, fetchRemote: fetchRemoteBackground ?? { try await remoteReader.read(address: $0, maximumBytes: $1) },
+        limits: backgroundLimits, whileCurrent: { [weak self, weak page, weak display] in
+          guard let self, let page, let display else { return false }
+          return self.backgroundIsCurrent(display, for: page, lease: lease)
+        })
+      let localFont = try await readAsyncResource(prepared, admission: admission) {
+        try settings.readLocalPracticeFontResource(maximumBytes: maximumFontBytes)
+      }
+      let font = try WebsiteConfigFontResource.prepare(typography: prepared.draft.keyboardTypography,
+        language: prepared.draft.testParameters.language, local: localFont, maximumBytes: maximumFontBytes)
+      try checkAsyncResources(prepared, admission: admission)
+      // A settled snapshot is available for non-display consumers; the live
+      // renderer keeps the independently owned stream across this handoff.
+      return .init(configuration: prepared, admission: admission, background: display.snapshot.resource, font: font)
+    }
+    return try await prepareResources(for: prepared,
       readLocalFont: { try settings.readLocalPracticeFontResource(maximumBytes: maximumFontBytes) },
       readLocalBackground: {
         if let data = try settings.localBackgroundStore.encodedData(maximumBytes: backgroundLimits.encodedBytes) { return .data(data) }
         return .absent
       }, fetchRemoteBackground: fetchRemoteBackground ?? { try await remoteReader.read(address: $0, maximumBytes: $1) },
       maximumFontBytes: maximumFontBytes, backgroundLimits: backgroundLimits)
+  }
+  private func backgroundIsCurrent(_ display: WebsiteConfigBackgroundDisplay, for page: PracticePageSessionStore,
+    lease: PreferenceConfigurationSaveRouter.Lease) -> Bool {
+    guard backgroundWork === display, router.isCurrent(lease) else { return false }
+    let currentEnvironment = environment()
+    guard backgroundWork === display, router.isCurrent(lease) else { return false }
+    if let pending = page.state.savedApplication, pending.background === display {
+      return currentEnvironment == pending.ticket.environment
+        && (try? register.read().revision) == pending.ticket.disk && router.isCurrent(lease)
+    }
+    guard let presentation = page.state.presentation, presentation.backgroundDisplay === display,
+      currentEnvironment?.revision == presentation.publication.environmentRevision else { return false }
+    return presentation.publication.isCurrentDelivery(owner: page.owner, router: router)
   }
   private func checkAsyncResources(_ prepared: Prepared, admission: UUID) throws {
     guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
@@ -2197,6 +2246,7 @@ final class WebsiteConfigCommitCoordinator {
     if session != nil { try Task.checkCancellation() }
     let applicationID = UUID()
     let appearance: WebsiteConfigPublishedPresentation.PreparedAppearance?
+    let backgroundDisplay: WebsiteConfigBackgroundDisplay?
     if let page {
       if let pending = page.state.configurationDeparture,
         prepared.pageCapture?.configurationDeparture != pending.id,
@@ -2215,9 +2265,11 @@ final class WebsiteConfigCommitCoordinator {
         appearance = try WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
           applicationID: applicationID, systemIsDark: systemIsDark, previous: page.state.presentation)
       }
+      let display = page.state.savedApplication?.background ?? page.state.presentation?.backgroundDisplay
+      backgroundDisplay = display?.matches(prepared.draft) == true ? display : nil
       try page.beginCommit(owner: prepared.owner, router: router, capture: prepared.pageCapture,
         applicationCapture: prepared.applicationCapture)
-    } else { appearance = nil }
+    } else { appearance = nil; backgroundDisplay = nil }
     defer { page?.endCommit() }
     let outcome: WebsiteConfigFileRegister.Commit
     let restoringNative: Bool
@@ -2239,7 +2291,8 @@ final class WebsiteConfigCommitCoordinator {
         quoteRecoveries: prepared.quoteRecoveries,
         ownerLease: prepared.owner, authority: publicationAuthority)
       if let page, let appearance, let session, let practice {
-        let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: appearance)
+        let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: appearance,
+          backgroundDisplay: backgroundDisplay)
         page.installCommitted(.init(session: session.withElapsedClock(), presentation: presentation, practice: practice,
           priorAttemptLedger: page.state.priorAttemptLedger), retainingRestartController: prepared.restartController)
       }

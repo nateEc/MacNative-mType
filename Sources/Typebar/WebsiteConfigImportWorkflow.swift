@@ -127,6 +127,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   private let source: WebsiteConfigPracticeScopeSource
   private let coordinator: WebsiteConfigCommitCoordinator
   private let loadQuotes: @MainActor (TypingLanguage) async throws -> [OfflineQuote]
+  private let fetchRemoteBackground: (@MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote)?
   private weak var notices: LocalNoticeCenter?
   private var prepared: WebsiteConfigCommitCoordinator.Prepared?
   private var rejectedRestart: (controller: WebsitePracticeRestartController, request: UUID)?
@@ -201,7 +202,9 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     dispatchKeymapHighlight: @escaping @MainActor (Int, @escaping @MainActor () -> Void) -> Void = { delay, action in
       DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) { action() }
     },
+    fetchRemoteBackground: (@MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote)? = nil,
     loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) }) {
+    self.fetchRemoteBackground = fetchRemoteBackground
     self.page = page; self.settings = settings; self.loadQuotes = loadQuotes
     self.archiveRegister = .init(directory: directory)
     self.notices = account.localNotices
@@ -1047,7 +1050,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     guard operation == current else { throw CancellationError() }
     let initializationReport = WebsiteConfigInitializationReport(notices: notices, lazyModeNotices: page.lazyModeNotices)
     do {
-      let resources = try await coordinator.prepareResources(for: ticket, from: settings)
+      let resources = try await coordinator.prepareResources(for: ticket, from: settings, fetchRemoteBackground: fetchRemoteBackground)
       let ready = try await coordinator.preparePractice(for: resources,
         initializationReport: initializationReport, loadQuotes: loadQuotes)
       try Task.checkCancellation()
@@ -1213,6 +1216,7 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     deferredRandomRestart?.cancel(); deferredRandomRestart = nil
     pendingRandomRestart = nil; sharedRestartOrigins.removeAll()
     localFontUpdates?.stop()
+    coordinator.stopBackgroundWork()
     page?.retireLayoutFluidHandler(owner: layoutFluidHandlerOwner)
     pendingKeymapHighlights.removeAll(); readKeymapWindow = nil
     stopped = true; cancel(); source.stop(); environment.stop()

@@ -2130,13 +2130,16 @@ private struct ContentView: View {
     .background {
       if let publishedPresentation {
         if let background = try? publishedPresentation.background(fallbackStyle: settings.practiceBackdrop,
-          reduceMotion: settings.reducePracticeMotion, themePreview: publishedThemePreview, pendingTheme: pendingTheme, onFailure: account.localNotices.backgroundFailureSink()) {
+          reduceMotion: settings.reducePracticeMotion, themePreview: publishedThemePreview, pendingTheme: pendingTheme,
+          pendingBackground: pageSession.savedApplication?.background, onFailure: account.localNotices.backgroundFailureSink()) {
           background
         } else {
           Label("完整配置背景暂不可用，请重新应用配置。", systemImage: "exclamationmark.triangle")
         }
-      } else if let pendingTheme {
-        PracticeBackdrop(style: settings.practiceBackdrop, theme: pendingTheme.appearance.theme, reduceMotion: settings.reducePracticeMotion)
+      } else if let pending = pageSession.savedApplication {
+        if let background = try? WebsiteConfigPublishedBackground(snapshot: pending.background.snapshot, owner: pageSessionStore.owner,
+          fallbackStyle: settings.practiceBackdrop, theme: pending.theme.appearance.theme,
+          reduceMotion: settings.reducePracticeMotion, onFailure: account.localNotices.backgroundFailureSink()) { background }
       } else {
         CustomPracticeBackground(
           fallbackStyle: settings.practiceBackdrop, theme: activeTheme,

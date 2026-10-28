@@ -12,7 +12,8 @@ import XCTest
     let defaults: UserDefaults, settings: AppSettings, account: AccountSession, page: PracticePageSessionStore
     let workflow: WebsiteConfigImportWorkflow
     let probe: ReadProbe
-    init(loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) }) throws {
+    init(fetchRemoteBackground: (@MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote)? = nil,
+      loadQuotes: @escaping @MainActor (TypingLanguage) async throws -> [OfflineQuote] = { OfflineContent.quotes(for: $0) }) throws {
       let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       let settings = AppSettings(defaults: defaults, localBackgroundStore: .inMemory())
       let page = PracticePageSessionStore(), account = AccountSession(defaults: defaults)
@@ -26,7 +27,7 @@ import XCTest
           probe.action?()
           return .published(owner: page.owner, revision: page.state.session.automaticInputAttemptID,
             scope: page.state.sharedReceipt?.scope ?? page.state.practice?.scope ?? .init())
-        }, loadQuotes: loadQuotes)
+        }, fetchRemoteBackground: fetchRemoteBackground, loadQuotes: loadQuotes)
       let workflow = workflow
       settings.preferenceConfigurationSaves.register(owner: page.owner, themes: { page.state.presentation?.publication.draft.themes },
         themeEdit: { edit in
@@ -333,6 +334,130 @@ import XCTest
     XCTAssertNotNil(f.page.state.savedApplication)
     try await waitForColor(AppTheme.nord.resolvedTheme.background)
     XCTAssertTrue(f.page.state.presentation === old)
+  }
+
+  func testFullImportDeliversBackgroundWhileQuoteInitializationIsStillSuspended() async throws {
+    let data = try OwnedBackgroundImageFixture.make()
+    let quotes = RestartQuotes(), f = try Fixture(fetchRemoteBackground: { address, _ in .received(address: address, data: data) }, loadQuotes: quotes.read)
+    defer { quotes.release(); f.close() }; try await f.publish()
+    let address = "https://example.invalid/owned.png"
+    let old = try XCTUnwrap(f.page.state.presentation), generation = f.page.state.session.generationState
+    quotes.hold = true
+    let task = Task { @MainActor in
+      try await f.workflow.apply(json: """
+        {"mode":"quote","quoteLength":[0,1,2,3],"repeatQuotes":"off","fontFamily":"Courier",
+         "customBackground":"\(address)","customBackgroundSize":"contain","customBackgroundFilter":[0,0.5,1,1]}
+        """, systemIsDark: false)
+    }
+    try await quotes.wait()
+    let pending = try XCTUnwrap(f.page.state.savedApplication?.background)
+    XCTAssertEqual(f.page.state.savedApplication?.draft.pagePreferences.backgroundAddress, .string(address))
+    let end = Date().addingTimeInterval(2)
+    while pending.phase == .readingLocal && Date() < end { try await Task.sleep(for: .milliseconds(5)) }
+    XCTAssertEqual(pending.phase, .settled)
+    if case .ready(let image) = pending.snapshot.resource.state { XCTAssertEqual(image.encodedData, data) }
+    else { XCTFail("The new background must already be decoded while text initialization is suspended: \(pending.snapshot.resource.state)") }
+    XCTAssertEqual(pending.snapshot.preferences.backgroundFit, .contain)
+    XCTAssertEqual(pending.snapshot.preferences.backgroundFilter.brightness, 0.5)
+    XCTAssertTrue(f.page.state.presentation === old); XCTAssertEqual(f.page.state.session.generationState, generation)
+    quotes.release(); _ = try await task.value
+    XCTAssertTrue(f.page.state.presentation?.backgroundDisplay === pending)
+  }
+
+  @MainActor private final class BackgroundGate {
+    var continuation: CheckedContinuation<WebsiteConfigBackgroundResource.Remote, Never>?
+    var address: WebsiteConfigValue = .string("")
+    var reads = 0
+    func read(_ address: WebsiteConfigValue, _ budget: Int) async -> WebsiteConfigBackgroundResource.Remote {
+      self.address = address; reads += 1; XCTAssertEqual(budget, 64 * 1024 * 1024)
+      return await withCheckedContinuation { continuation = $0 }
+    }
+    func wait() async throws {
+      let end = Date().addingTimeInterval(2)
+      while continuation == nil && Date() < end { try await Task.sleep(for: .milliseconds(5)) }
+      XCTAssertNotNil(continuation)
+    }
+    func release(_ data: Data?) {
+      let pending = continuation; continuation = nil
+      pending?.resume(returning: data.map { .received(address: address, data: $0) } ?? .failed(address: address))
+    }
+  }
+  func testCancellingTextInitializationKeepsTheAcceptedBackgroundDownloadAndRecoveryReusesIt() async throws {
+    let gate = BackgroundGate(), quotes = RestartQuotes()
+    let f = try Fixture(fetchRemoteBackground: gate.read, loadQuotes: quotes.read)
+    defer { quotes.release(); gate.release(nil); f.close() }; try await f.publish()
+    quotes.hold = true
+    let task = Task { @MainActor in
+      try await f.workflow.apply(json: #"{"mode":"quote","quoteLength":[0,1,2,3],"repeatQuotes":"off","fontFamily":"Courier","customBackground":"https://example.invalid/owned.png"}"#, systemIsDark: false)
+    }
+    try await quotes.wait(); try await gate.wait()
+    let display = try XCTUnwrap(f.page.state.savedApplication?.background)
+    XCTAssertEqual(display.phase, .loading)
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    task.cancel(); quotes.release()
+    do { _ = try await task.value; XCTFail("Cancelled text must not deliver") } catch {}
+    XCTAssertTrue(f.page.state.savedApplication?.background === display)
+    let data = try OwnedBackgroundImageFixture.make()
+    gate.release(data); await display.waitForCompletion()
+    guard case .ready(let image) = display.snapshot.resource.state else { return XCTFail("Text cancellation cancelled the independent background") }
+    XCTAssertEqual(image.encodedData, data); XCTAssertEqual(try register.read().revision, revision)
+    try await f.workflow.apply(json: nil, systemIsDark: false)
+    XCTAssertTrue(f.page.state.presentation?.backgroundDisplay === display)
+    XCTAssertEqual(gate.reads, 1); XCTAssertEqual(try register.read().revision, revision)
+  }
+  func testBackgroundDownloadDoesNotBlockPracticeAndLateResultsRespectItsCurrentAuthority() async throws {
+    for outcome in ["success", "failure", "retry", "owner", "disk", "replacement", "stop"] {
+      let gate = BackgroundGate(), quotes = RestartQuotes()
+      let f = try Fixture(fetchRemoteBackground: gate.read, loadQuotes: quotes.read)
+      defer { gate.release(nil); f.close() }; try await f.publish()
+      let preferences = f.settings.snapshot, ledger = f.page.state.priorAttemptLedger
+      quotes.fail = outcome == "retry"
+      let mode = outcome == "retry" ? "quote" : "words"
+      let json = """
+        {"mode":"\(mode)","words":5,"quoteLength":[0,1,2,3],"repeatQuotes":"off","fontFamily":"Courier",
+         "customBackground":"https://example.invalid/owned.png","customBackgroundSize":"contain"}
+        """
+      if outcome == "retry" {
+        do { try await f.workflow.apply(json: json, systemIsDark: false); XCTFail("Quote provider must fail") }
+        catch { XCTAssertNotNil(f.page.state.savedApplication) }
+      } else { try await f.workflow.apply(json: json, systemIsDark: false) }
+      try await gate.wait()
+      let display = try XCTUnwrap(f.page.state.savedApplication?.background ?? f.page.state.presentation?.backgroundDisplay)
+      XCTAssertEqual(display.phase, .loading)
+      if case .none = display.snapshot.resource.state {} else { XCTFail("Loading replacement must clear old pixels") }
+      if outcome == "retry" {
+        quotes.fail = false; try await f.workflow.apply(json: nil, systemIsDark: false)
+        XCTAssertTrue(f.page.state.presentation?.backgroundDisplay === display); XCTAssertEqual(gate.reads, 1)
+      }
+      let generation = f.page.state.session.generationState
+      XCTAssertNil(f.page.state.savedApplication, "Practice must finish initialization before the image returns")
+      let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+      switch outcome {
+      case "owner":
+        let otherOwner = UUID()
+        f.settings.preferenceConfigurationSaves.register(owner: otherOwner, save: { XCTFail("No preference save") })
+        f.settings.preferenceConfigurationSaves.activate(owner: otherOwner)
+      case "disk":
+        let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"fontFamily":"Courier","theme":"nord"}"#, pointsPerRem: 16, context: .init())
+        guard case .committed = try register.commit(draft, replacing: XCTUnwrap(revision)) else { return XCTFail("External write failed") }
+      case "replacement": try await f.workflow.apply(json: #"{"mode":"words","words":7,"fontFamily":"Courier","customBackground":""}"#, systemIsDark: false)
+      case "stop": f.workflow.stop()
+      default: break
+      }
+      let data = try OwnedBackgroundImageFixture.make()
+      gate.release(outcome == "failure" ? nil : data); await display.waitForCompletion()
+      if ["success", "retry"].contains(outcome) {
+        guard case .ready(let image)? = f.page.state.presentation?.backgroundSnapshot?.resource.state else { return XCTFail("Late image was not displayed") }
+        XCTAssertEqual(image.encodedData, data)
+      } else if outcome == "failure" {
+        guard case .failed(.transport) = display.snapshot.resource.state else { return XCTFail("Failure was hidden") }
+      } else {
+        guard case .none = display.snapshot.resource.state else { return XCTFail("Stale or cancelled image reached the display: \(outcome)") }
+      }
+      if outcome != "replacement" { XCTAssertEqual(f.page.state.session.generationState, generation) }
+      if outcome != "disk" && outcome != "replacement" { XCTAssertEqual(try register.read().revision, revision) }
+      XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+    }
   }
 
   func testResumingAnImportedProfileAfterFailedInitializationDoesNotReuseTheOldResultSource() async throws {
