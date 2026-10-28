@@ -1350,6 +1350,48 @@ enum ResultIntervalSamplingPolicy {
 enum ResultPerformanceTrace {
   static let maximumChartDuration: TimeInterval = 122
 
+  struct ReplayWPMHistory {
+    struct Change { let offset: Double; let credit: Int }
+    let duration: Double
+    let includesTail: Bool
+    let changes: [Change]
+
+    func wpm(at second: Double) -> Double {
+      guard second.isFinite, second >= 1, second == second.rounded(.down) else { return 0 }
+      let whole = duration.rounded(.down)
+      let boundary: Double
+      if second <= whole { boundary = second }
+      else if includesTail, second == whole + 1 { boundary = duration }
+      else { return 0 }
+      var low = 0, high = changes.count
+      while low < high {
+        let middle = (low + high) / 2
+        if changes[middle].offset <= boundary { low = middle + 1 } else { high = middle }
+      }
+      return low == 0 ? 0 : ResultPerformanceTrace.sourceRoundedWPM(credit: changes[low - 1].credit, elapsed: boundary)
+    }
+  }
+
+  /// Same whole-test classification as WPM consistency, without a per-second
+  /// allocation or the 122-second presentation-chart limit.
+  static func replayWPMHistory(prompt: String, events: [TypingReplayEvent], duration: Double,
+    configuration: TestConfiguration?, targetWordDirectory: ResultTargetWordDirectory?,
+    sourceScoringBasis: ResultScoringUnitBasis? = nil) -> ReplayWPMHistory? {
+    guard configuration != nil, duration.isFinite, duration >= 0,
+      configuration?.mode == .zen || targetWordDirectory != nil else { return nil }
+    let ordered = validOrderedEvents(events)
+    guard var fields = FieldActivityCursor(prompt: prompt, events: ordered, configuration: configuration,
+      targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis, sourceClassification: true) else { return nil }
+    var changes: [ReplayWPMHistory.Change] = []
+    for event in ordered where event.offset <= duration {
+      _ = fields.apply(event)
+      let credit = fields.counts.credit
+      if credit != (changes.last?.credit ?? 0) { changes.append(.init(offset: event.offset, credit: credit)) }
+    }
+    return .init(duration: duration, includesTail: !ResultIntervalSamplingPolicy.isTimed(configuration)
+      && TestInactivityPolicy.retainsFractionalTail(duration: duration), changes: changes)
+  }
+
   /// Independent from input-cadence consistency; requires captured fields.
   static func wpmConsistency(
     prompt: String, events: [TypingReplayEvent], duration: TimeInterval,

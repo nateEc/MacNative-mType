@@ -38,7 +38,7 @@ globalThis.document={
     selector==='#replayStats'?stats:selector==='.pageTest #playpauseReplayButton'?playButton:null,
 };
 let clock=0, timerID=0;const timers=new Map();
-if(process.argv.includes('--lifecycle') || process.argv.includes('--terminal')) {
+if(process.argv.includes('--lifecycle') || process.argv.includes('--terminal') || process.argv.includes('--statistics')) {
   globalThis.setTimeout=(callback,delay)=>{const id=++timerID;timers.set(id,{callback,due:clock+Math.max(0,delay)});return id;};
   globalThis.clearTimeout=id=>timers.delete(id);
 }
@@ -51,6 +51,7 @@ function runThrough(time) {
   clock=time;
 }
 let words=[], events=[], sounds=[];
+let eventContext={mode:'words',mode2:'1',bailedOut:false,koreanStatus:false,targetWords:[]};
 const bindings={
   animejs:{animate:()=>{throw Error('Animation outside probe');},AnimationParams:{},JSAnimation:{}},
   'states/banners':{addBanner:()=>{throw Error('Banner outside probe');}},
@@ -59,9 +60,14 @@ const bindings={
   'config/store':{Config:{mode:'words',funbox:[],playSoundOnError:'error'}},
   'test/test-words':{words:{get:index=>index===undefined?words.map(textWithCommit=>({textWithCommit})):
     words[index]===undefined?undefined:{textWithCommit:words[index]}}},
-  'test/events/data':{buildEventLog:()=>({events}),getAllTestEvents:()=>events,
-    getInputForWord:index=>events.filter(e=>e.data.wordIndex===index).at(-1)?.data.inputValue??''},
+  'test/events/data':{buildEventLog:()=>({events,context:eventContext}),getAllTestEvents:()=>events,
+    getInputForWord:index=>process.argv.includes('--statistics')
+      ? modules.get('test/events/helpers').namespace.getInputFromDom(modules.get('test/events/helpers').namespace.getEventsForWord(events,index))
+      : events.filter(e=>e.data.wordIndex===index).at(-1)?.data.inputValue??''},
   'test/events/stats':{getInputHistory:()=>{throw Error('Zen outside probe');},getWpmHistory:()=>[]},
+  'constants/keys':{Keycode:{}},'@monkeytype/schemas/languages':{Language:{}},
+  'test/events/types':{InputEventNoMs:{},TestEventNoMs:{},EventLog:{}},
+  'hangul-js':{default:{disassemble(){throw Error('Korean outside statistics probe');}}},
 };
 const bridge=`export const ownedProbe={
   opening(){refreshReplayFromEvents();wordPos=0;curPos=0;initializeReplayPrompt();},
@@ -71,11 +77,14 @@ const bridge=`export const ownedProbe={
   frame(){return {word:wordPos,position:curPos,fields:[...document.getElementById('replayWords').children].map(word=>({error:word.classList.contains('error'),letters:[...word.children].map(letter=>({text:letter.text,extra:letter.classList.contains('extra'),correct:letter.classList.contains('correct'),incorrect:letter.classList.contains('incorrect')}))}))};}
 };`;
 const modules=new Map();
+const actual=new Set(['test/replay-ui','utils/dom']);
+if(process.argv.includes('--statistics'))for(const id of ['test/events/stats','test/events/helpers','utils/strings','utils/numbers','@monkeytype/util/numbers'])actual.add(id);
 function moduleFor(id) {
   if(modules.has(id)) return modules.get(id);
   let mod;
-  if(id==='test/replay-ui'||id==='utils/dom') {
-    const source=fs.readFileSync(path.join(reference,'frontend/src/ts',id+'.ts'),'utf8');
+  if(actual.has(id)) {
+    const file=id==='@monkeytype/util/numbers'?path.join(reference,'packages/util/src/numbers.ts'):path.join(reference,'frontend/src/ts',id+'.ts');
+    const source=fs.readFileSync(file,'utf8').replace('import { CharCounts, countChars, isSpace }','import { countChars, isSpace }');
     mod=new vm.SourceTextModule(stripTypeScriptTypes(source,{mode:'transform'})+(id==='test/replay-ui'?'\n'+bridge:''),
       {identifier:id,initializeImportMeta:meta=>{meta.env={DEV:false};}});
   } else {
@@ -89,7 +98,80 @@ const main=moduleFor('test/replay-ui');
 await main.link((id,from)=>moduleFor(id.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(from.identifier),id)):id));
 await main.evaluate();
 const probe=main.namespace.ownedProbe;
-if(process.argv.includes('--terminal')) {
+if(process.argv.includes('--statistics')) {
+  const fixtures=[];
+  const cases=[
+    [0,2.49,2.49,'words','abcd'],[0.49,2.5,2.5,'words','abcd'],
+    [0.5,2.6,2.6,'words','abcd'],[0.7,2.6,2.9,'words','abcd'],
+    [1.49,2.6,2.6,'time','abcd'],[1.5,2.6,2.6,'zen','abcd'],
+    [0,150.6,150.6,'words','abcd'],[0,2.6,2.6,'words','e\u0301xy'],
+    [0,2.6,2.6,'words','🙂abc'],
+    [0,2.495,2.495,'words','abcd'],[0,2.499,2.499,'words','abcd'],[0,2.995,2.995,'words','abcd'],
+  ];
+  for(const [first,last,end,mode,target] of cases) {
+    words=[target];clock=0;timers.clear();sounds=[];playIcon.className='fas fa-play';
+    bindings['config/store'].Config.mode=mode;
+    eventContext={mode,mode2:mode==='time'?'30':mode==='zen'?'zen':'1',bailedOut:false,koreanStatus:false,targetWords:words};
+    const times=[first,first+0.1,last-0.1,last],tape=[];let value='';
+    for(const [i,text] of [...target].entries()){value+=text;tape.push({time:times[i],index:0,value,text,correct:true});}
+    events=tape.map(e=>({type:'input',testMs:e.time*1000,data:{wordIndex:e.index,inputValue:e.value,data:e.text,inputType:'insertText',correct:true}}));
+    events.push({type:'timer',testMs:end*1000,data:{event:'end'}});
+    const history=modules.get('test/events/stats').namespace.getWpmHistory({events,context:eventContext});
+    const trace=[];
+    const capture=(kind,extra={})=>trace.push({kind,now:clock/1000,label:stats.textContent,...extra});
+    probe.opening();let index=probe.resumeIndex();capture('load',{offset:probe.actions()[index].time/1000});
+    playButton.dispatch('click',playButton);index=probe.resumeIndex();capture('play',{offset:probe.actions()[index].time/1000,end:last});
+    for(const time of [...new Set([0,0.25,0.55,0.95,1.25,last-first,last-first+0.5])].sort((a,b)=>a-b)){
+      runThrough(time*1000);capture('advance');
+    }
+    main.namespace.pauseReplay();
+    fixtures.push({mode,target,end,tape,history,trace});
+  }
+  for(const scenario of [
+    {targets:['ab ','cd'],tape:[
+      {time:0,index:0,value:'a',text:'a',correct:true},{time:0.1,index:0,value:'ab',text:'b',correct:true},
+      {time:0.2,index:0,value:'ab ',text:' ',correct:true},{time:0.3,index:1,value:'x',text:'x',correct:false},
+      {time:0.5,index:1,value:'',text:'',deletion:true,correct:true},
+      {time:1.2,index:1,value:'c',text:'c',correct:true},{time:2.6,index:1,value:'cd',text:'d',correct:true}]},
+    {targets:['a ','b ','cd'],tape:[
+      {time:0,index:0,value:'a',text:'a',correct:true},{time:0.1,index:1,value:'b',text:'b',correct:true},
+      {time:0.2,index:0,value:'a',text:'',deletion:true,correct:true},
+      {time:1.2,index:2,value:'c',text:'c',correct:true},{time:1.3,index:1,value:'b',text:'b',correct:true},
+      {time:2.6,index:2,value:'cd',text:'d',correct:true}]},
+  ]) {
+    const mode='words',end=2.6,target=scenario.targets.join(''),tape=scenario.tape;
+    words=scenario.targets;clock=0;timers.clear();sounds=[];playIcon.className='fas fa-play';bindings['config/store'].Config.mode=mode;
+    eventContext={mode,mode2:String(words.length),bailedOut:false,koreanStatus:false,targetWords:words};
+    events=tape.map(e=>({type:'input',testMs:e.time*1000,data:{wordIndex:e.index,inputValue:e.value,data:e.text,
+      inputType:e.deletion?'deleteContentBackward':'insertText',correct:e.correct}}));
+    events.push({type:'timer',testMs:end*1000,data:{event:'end'}});
+    const history=modules.get('test/events/stats').namespace.getWpmHistory({events,context:eventContext}),trace=[];
+    const capture=(kind,extra={})=>trace.push({kind,now:clock/1000,label:stats.textContent,...extra});
+    probe.opening();let index=probe.resumeIndex();capture('load',{offset:probe.actions()[index].time/1000});
+    playButton.dispatch('click',playButton);index=probe.resumeIndex();capture('play',{offset:probe.actions()[index].time/1000,end});
+    for(const time of [0,0.25,0.55,0.95,1.25,2.6,3.1]){runThrough(time*1000);capture('advance');}
+    main.namespace.pauseReplay();fixtures.push({mode,target,targets:words,end,tape,history,trace});
+  }
+  // The old fractional-tail stopwatch survives completion. A new run can
+  // share its deadline; the later registered stopwatch wins that tie.
+  const target='abcd',first=0.7,last=2.6,end=2.6,mode='words';words=[target];
+  clock=0;timers.clear();sounds=[];playIcon.className='fas fa-play';bindings['config/store'].Config.mode=mode;
+  eventContext={mode,mode2:'1',bailedOut:false,koreanStatus:false,targetWords:words};
+  const tape=[...target].map((text,i)=>({time:[first,0.8,2.5,last][i],index:0,value:target.slice(0,i+1),text,correct:true}));
+  events=tape.map(e=>({type:'input',testMs:e.time*1000,data:{wordIndex:e.index,inputValue:e.value,data:e.text,inputType:'insertText',correct:true}}));
+  events.push({type:'timer',testMs:end*1000,data:{event:'end'}});
+  const history=modules.get('test/events/stats').namespace.getWpmHistory({events,context:eventContext}),trace=[];
+  const capture=(kind,extra={})=>trace.push({kind,now:clock/1000,label:stats.textContent,...extra});
+  probe.opening();let index=probe.resumeIndex();capture('load',{offset:probe.actions()[index].time/1000});
+  function play(){playButton.dispatch('click',playButton);const index=probe.resumeIndex();capture('play',{offset:probe.actions()[index].time/1000,end:last});}
+  function advance(time){runThrough(time*1000);capture('advance');}
+  play();advance(2);play();advance(2.3);
+  playButton.dispatch('click',playButton);capture('pause');assert.equal(timers.size,0);
+  advance(2.4);play();advance(2.5);advance(3);
+  main.namespace.pauseReplay();
+  fixtures.push({mode,target,end,tape,history,trace});
+  console.log(JSON.stringify({fixtures}));
+} else if(process.argv.includes('--terminal')) {
   const input=(index,value,text,time,extra={})=>({index,value,text,time,correct:true,...extra});
   const fixtures=[];
   const scenarios=[

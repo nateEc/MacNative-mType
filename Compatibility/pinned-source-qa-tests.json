@@ -3,6 +3,10 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.ReplayStatisticsTests/testStatisticsAgainstCompletePinnedReplayStatsAndStopwatches",
+      "file": "Tests/TypebarTests/ReplayStatisticsTests.swift"
+    },
+    {
       "id": "TypebarTests.ReplayTerminalBoundaryTests/testActionEndAgainstCompletePinnedReplayButtonAndTimerQueue",
       "file": "Tests/TypebarTests/ReplayTerminalBoundaryTests.swift"
     },

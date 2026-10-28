@@ -641,6 +641,19 @@ final class TestResultRecord {
   }
   var chartDuration: TimeInterval { terminalTiming?.boundaryDuration ?? capturedDuration }
 
+  var replayStatisticsDuration: TimeInterval? {
+    let measured = elapsedTime, terminal = terminalTiming
+    guard elapsedTimeData == nil || measured != nil, terminalTimingData == nil || terminal != nil,
+      targetWordDirectoryData == nil || targetWordDirectory != nil,
+      measured != nil || terminal != nil else { return nil }
+    if let terminal {
+      guard let configuration, let parsedOutcome = TestOutcome(rawValue: outcome),
+        terminal.isValid(wallClockDuration: measured?.seconds ?? wallClockDuration,
+          mode: configuration.mode, outcome: parsedOutcome) else { return nil }
+    }
+    return terminal?.boundaryDuration ?? measured?.seconds
+  }
+
   var totalEngagedDuration: TimeInterval {
     engagedDuration + priorAttemptEngagedDuration
   }

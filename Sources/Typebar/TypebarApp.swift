@@ -8561,6 +8561,7 @@ private struct CompletedResultView: View {
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
           configuration: result.configuration,
           targetWordDirectory: result.targetWordDirectory,
+          statisticsDuration: result.replayStatisticsDuration,
           sourceScoringBasis: result.characterStats.sourceUnitBasis,
           soundConfiguration: soundConfiguration)
           .id(result.id)
@@ -9436,6 +9437,15 @@ struct ReplayTimelineView: View {
   private let fieldPlan: FieldReplayPlan?
   private let canPlay: Bool
   private let duration: TimeInterval
+  private let statisticsHistory: ResultPerformanceTrace.ReplayWPMHistory?
+  @State private var statisticsClock: ReplayStatisticsClock
+
+  private var statisticsText: String {
+    if let statisticsHistory {
+      return "\(speedUnit.formatted(wpm: statisticsHistory.wpm(at: statisticsClock.seconds))) \(speedUnit.displayName) · \(String(format: "%.0f", statisticsClock.seconds)) 秒"
+    }
+    return "\(speedUnit.formatted(wpm: performance.wpm)) \(speedUnit.displayName) · \(String(format: "%.1f", elapsed)) / \(String(format: "%.1f", duration)) 秒"
+  }
 
   private var replayedGlyphs: [TypingPromptGlyph] {
     TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed, configuration: configuration)
@@ -9449,6 +9459,7 @@ struct ReplayTimelineView: View {
     prompt: String, events: [TypingReplayEvent], speedUnit: TypingSpeedUnit,
     configuration: TestConfiguration?,
     targetWordDirectory: ResultTargetWordDirectory?,
+    statisticsDuration: TimeInterval? = nil,
     sourceScoringBasis: ResultScoringUnitBasis?,
     soundConfiguration: ReplaySoundConfiguration
   ) {
@@ -9469,6 +9480,11 @@ struct ReplayTimelineView: View {
     self.fieldPlan = fieldPlan
     self.duration = ResultReplayAvailability.duration(events: chronologicalEvents, fieldPlan: fieldPlan)
     self.canPlay = ResultReplayAvailability.canPlay(events: chronologicalEvents, fieldPlan: fieldPlan)
+    self.statisticsHistory = fieldPlan == nil ? nil : statisticsDuration.flatMap {
+      ResultPerformanceTrace.replayWPMHistory(prompt: prompt, events: chronologicalEvents, duration: $0,
+        configuration: configuration, targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis)
+    }
+    self._statisticsClock = State(initialValue: .init(firstOffset: fieldPlan?.actions.first?.offset ?? 0))
     self._fieldFrame = State(initialValue: fieldPlan?.initialFrame)
   }
 
@@ -9478,11 +9494,9 @@ struct ReplayTimelineView: View {
         Label("输入回放", systemImage: "play.rectangle")
           .font(.caption.weight(.medium))
         Spacer()
-        Text(
-          "\(speedUnit.formatted(wpm: performance.wpm)) \(speedUnit.displayName) · \(String(format: "%.1f", elapsed)) / \(String(format: "%.1f", duration)) 秒"
-        )
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
+        ReplayStatisticsLabel(text: statisticsText,
+          position: "回放位置 \(String(format: "%.1f", elapsed)) / \(String(format: "%.1f", duration)) 秒")
+          .fixedSize()
       }
       if let fieldPlan, let fieldFrame {
         let presentation = fieldFrame.presentation
@@ -9500,6 +9514,7 @@ struct ReplayTimelineView: View {
           selectedFieldCoordinate = presentation.coordinates[index]
           self.fieldFrame = seek.frame
           elapsed = min(duration, seek.nextOffset)
+          statisticsClock.seek(to: seek.nextOffset)
           isPlaying = false
           playbackStartedAt = nil
         }
@@ -9523,6 +9538,7 @@ struct ReplayTimelineView: View {
               guard let targetOffset = characterSeekOffsets[index] else { return }
               selectedPromptIndex = index
               elapsed = min(duration, targetOffset)
+              statisticsClock.seek(to: targetOffset)
               isPlaying = false
               playbackStartedAt = nil
               includesCurrentOffsetOnNextTick = false
@@ -9537,9 +9553,11 @@ struct ReplayTimelineView: View {
           elapsed = min(duration, value)
           fieldFrame = fieldPlan?.frame(through: elapsed)
           selectedFieldCoordinate = nil
+          statisticsClock.seek(to: elapsed)
         }), in: 0...max(duration, 0.01),
         onEditingChanged: { editing in
           if editing {
+            statisticsClock.pause(at: ProcessInfo.processInfo.systemUptime)
             isPlaying = false
             playbackStartedAt = nil
             selectedPromptIndex = nil
@@ -9552,10 +9570,13 @@ struct ReplayTimelineView: View {
           : "调整回放位置；目标文本也支持鼠标点选字符定位")
       HStack {
         ReplayTransportButton(title: isPlaying ? "暂停" : "播放", enabled: canPlay) {
+          let now = ProcessInfo.processInfo.systemUptime
+          if isPlaying { statisticsClock.pause(at: now) }
           if let fieldPlan, let frame = fieldFrame, !isPlaying {
             guard let start = fieldPlan.playbackStart(from: frame) else { return }
             var next = start.frame
             elapsed = min(duration, start.nextOffset)
+            statisticsClock.play(from: start.nextOffset, through: duration, at: now)
             let cues = fieldPlan.advance(&next, through: elapsed)
             fieldFrame = next
             selectedPromptIndex = nil
@@ -9582,6 +9603,7 @@ struct ReplayTimelineView: View {
         ReplayTransportButton(title: "重置",
           enabled: !(elapsed == 0 && !isPlaying && (fieldFrame?.nextActionIndex ?? 0) == 0)) {
           elapsed = 0
+          statisticsClock.seek(to: fieldPlan?.actions.first?.offset ?? 0)
           isPlaying = false
           playbackStartedAt = nil
           selectedPromptIndex = nil
@@ -9594,6 +9616,9 @@ struct ReplayTimelineView: View {
       }
     }
     .onReceive(timer) { _ in
+      if statisticsHistory != nil, statisticsClock.hasPending {
+        statisticsClock.advance(to: ProcessInfo.processInfo.systemUptime)
+      }
       guard isPlaying, let playbackStartedAt else { return }
       let previousElapsed = elapsed
       elapsed = TypingReplay.playbackElapsed(
@@ -11809,6 +11834,7 @@ private struct ResultDetailView: View {
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
           configuration: result.configuration,
           targetWordDirectory: result.targetWordDirectory,
+          statisticsDuration: result.replayStatisticsDuration,
           sourceScoringBasis: result.characterStats.sourceUnitBasis,
           soundConfiguration: .init(settings: settings))
           .id(result.id)

@@ -4301,6 +4301,13 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   var capturedDuration: TimeInterval { elapsedTime?.seconds ?? wallClockDuration }
   var chartDuration: TimeInterval { terminalTiming?.boundaryDuration ?? capturedDuration }
 
+  var replayStatisticsDuration: TimeInterval? {
+    guard elapsedTime != nil || terminalTiming != nil, elapsedTime?.isValid != false else { return nil }
+    if let terminalTiming, !terminalTiming.isValid(wallClockDuration: capturedDuration,
+      mode: configuration.mode, outcome: outcome) { return nil }
+    return chartDuration
+  }
+
   var engagedDuration: TimeInterval {
     max(0, elapsedDuration - afkDuration)
   }
