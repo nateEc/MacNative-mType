@@ -243,7 +243,7 @@ final class CustomSectionStreamTests: XCTestCase {
     let session = TestSessionFactory.make(configuration: configuration(OfficialTestLimitInput.maximumValue),
       customText: "bay | cedar")
     XCTAssertEqual(session.prompt.split(separator: " ").count, 100)
-    XCTAssertEqual(session.sectionProgress?.total, OfficialTestLimitInput.maximumValue)
+    XCTAssertEqual(session.sectionProgress?.total, Double(OfficialTestLimitInput.maximumValue))
     XCTAssertTrue(session.usesIncrementalPromptExtension)
   }
 

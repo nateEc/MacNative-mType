@@ -4581,7 +4581,7 @@ private struct ContentView: View {
           isHidden: isProgressFlashHidden && progressStyle == .flashMini)
       }
       if let sections = session.sectionProgress {
-        metric("段落", value: sections.total == 0 ? "\(sections.completed)" : "\(sections.completed)/\(sections.total)")
+        metric("段落", value: sections.total == 0 ? "\(sections.completed)" : "\(sections.completed)/\(WebsiteNumberText.decimal(sections.total))")
       }
       if let errorCount = live.errorCount { metric("错误", value: "\(errorCount)") }
     }
@@ -4655,6 +4655,9 @@ private struct ContentView: View {
   }
 
   private var progressBarAnimation: Animation? {
+    if let duration = session.generatedSectionBarDuration {
+      return duration == 0 ? nil : .easeInOut(duration: duration)
+    }
     if let duration = session.configuration.duration {
       return duration == 0 ? nil : .linear(duration: 1)
     }

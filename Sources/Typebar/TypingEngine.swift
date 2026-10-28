@@ -4594,6 +4594,7 @@ struct TypingSession {
   private var liveRemovedGeneratedCommits: Set<Int> = []
   private var liveAwaitingGeneratedCommit = false
   private let initialGeneratedReplayHistory: GeneratedWordReplayHistory?
+  private let generatedSectionLimit: Double?
   var generatedWordReplayHistory: GeneratedWordReplayHistory? {
     generatedCodeContinuation?.replayHistory ?? initialGeneratedReplayHistory
   }
@@ -4830,6 +4831,7 @@ struct TypingSession {
     generatedCodeContinuation: GeneratedCodeContinuation? = nil,
     retainedCandidateContinuation: GeneratedCandidateContinuation? = nil,
     generatedReplayHistory: GeneratedWordReplayHistory? = nil,
+    generatedSectionLimit: Double? = nil,
     quoteWordStream: QuoteWordStream? = nil,
     sectionEndIndices: [Int] = [], noSpaceSectionWordEnds: [Int] = [],
     randomCustomSourceTokens: [String]? = nil,
@@ -4846,6 +4848,7 @@ struct TypingSession {
     wordDecorationState: PoolWordDecorationState = .init(), elapsedClock: SessionElapsedClock? = nil
   ) {
     self.elapsedClock = elapsedClock
+    self.generatedSectionLimit = generatedSectionLimit
     self.currentWeakSpotScores = weakSpotScores
     self.currentWordDecorationState = generatedCodeContinuation?.decorationState ?? wordDecorationState
     self.configuration = configuration
@@ -5010,6 +5013,7 @@ struct TypingSession {
         var copy = $0; copy.synchronizeConfiguration(configuration); return copy
       },
       generatedReplayHistory: generatedWordReplayHistory,
+      generatedSectionLimit: generatedSectionLimit,
       sectionEndIndices: initialSectionEndIndices,
       noSpaceSectionWordEnds: initialNoSpaceSectionWordEnds,
       randomCustomSourceTokens: randomCustomSourceTokens,
@@ -5317,8 +5321,26 @@ struct TypingSession {
       at: measured, modifiers: configuration.modifiers)
   }
 
-  var sectionProgress: (completed: Int, total: Int)? {
+  private var generatedSectionProgress: GeneratedSectionProgress? {
+    guard configuration.mode == .custom, configuration.customTextCompletion == .sections,
+      let history = generatedWordReplayHistory else { return nil }
+    return .init(history: history, publishedWords: sourceFields?.count ?? unitTargets.sourceFieldCount,
+      activeWord: acceptedUnits?.fieldIndex ?? quoteNavigationIndex,
+      total: generatedSectionLimit ?? Double(configuration.customTextSectionLimit ?? 0))
+  }
+
+  var generatedSectionBarDuration: TimeInterval? {
+    generatedSectionBarTarget?.duration
+  }
+
+  private var generatedSectionBarTarget: (fraction: Double, duration: TimeInterval)? {
+    generatedSectionProgress?.bar(hasElapsed: hasStarted,
+      calculating: [.completed, .failed, .invalidAFK, .bailedOut].contains(outcome), bailedOut: outcome == .bailedOut)
+  }
+
+  var sectionProgress: (completed: Int, total: Double)? {
     guard configuration.customTextCompletion == .sections else { return nil }
+    if let generated = generatedSectionProgress { return (generated.completed, generated.total) }
     guard customSectionWordStream != nil || !sectionEndIndices.isEmpty else { return nil }
     if unitTargets.noSpace || hasNoSpaceWordSegmentation, !noSpaceSectionWordEnds.isEmpty {
       let committed = completedWordCount
@@ -5330,7 +5352,7 @@ struct TypingSession {
         else { upper = middle }
       }
       let total = customSectionWordStream?.sectionLimit ?? noSpaceSectionWordEnds.count
-      return (total == 0 ? lower : min(lower, total), total)
+      return (total == 0 ? lower : min(lower, total), Double(total))
     }
     let targetIndex = nextTargetIndex
     var lower = 0
@@ -5344,7 +5366,7 @@ struct TypingSession {
       && !isFinished && !lastInputCommitsWord
     let completed = lower - (awaitingFinalCommit ? 1 : 0)
     let total = customSectionWordStream?.sectionLimit ?? sectionEndIndices.count
-    return (total == 0 ? completed : min(completed, total), total)
+    return (total == 0 ? completed : min(completed, total), Double(total))
   }
   var nextExpectedCharacter: Character? {
     if !isFinished, liveAwaitingGeneratedCommit, reachedInputTargetEnd { return " " }
@@ -6478,7 +6500,8 @@ struct TypingSession {
       return "\(min(quoteNavigationIndex, max(0, stream.totalWords - 1)))/\(stream.totalWords)"
     }
     if let sections = sectionProgress {
-      return sections.total == 0 ? "\(sections.completed)" : "\(sections.completed)/\(sections.total)"
+      if let generated = generatedSectionProgress { return generated.text }
+      return sections.total == 0 ? "\(sections.completed)" : "\(sections.completed)/\(WebsiteNumberText.decimal(sections.total))"
     }
     if configuration.duration == 0 {
       guard hasStarted else { return "0s" }
@@ -6494,7 +6517,9 @@ struct TypingSession {
 
   var progressLabel: String {
     if quoteWordStream != nil { return "进度" }
-    if sectionProgress != nil { return "段数" }
+    if let sections = sectionProgress {
+      return generatedSectionProgress != nil && sections.total == 0 ? "词数" : "段数"
+    }
     if configuration.duration == 0 { return "用时" }
     if configuration.wordLimit == 0 { return "词数" }
     return configuration.duration == nil && configuration.wordLimit != nil ? "进度" : "剩余"
@@ -6507,6 +6532,7 @@ struct TypingSession {
       return floor(Double(quoteNavigationIndex) / Double(stream.totalWords) * 100) / 100
     }
     if let sections = sectionProgress {
+      if let generated = generatedSectionBarTarget { return generated.fraction }
       return sections.total == 0 ? 0 : Double(sections.completed) / Double(sections.total)
     }
     if let duration = configuration.duration {

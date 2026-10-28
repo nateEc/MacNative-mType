@@ -7,6 +7,56 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WebsiteConfigStartupHostTests: XCTestCase {
+  func testRepeatedCustomSectionCounterRendersInActualHiddenRootAfterWordNavigation() async throws {
+    let f = try Fixture(saved: true, json: #"{"mode":"words","words":3,"timerStyle":"text"}"#,
+      viewportHeight: 3200)
+    defer { f.close() }
+    let custom = try WebsiteCustomTextSettings(value: .object([
+      "text": .array([.string("Aa Bb"), .string("Cc")]), "mode": .string("repeat"),
+      "limit": .object(["mode": .string("section"), "value": .number(5)]), "pipeDelimiter": .bool(false)]))
+    XCTAssertTrue(f.settings.saveWebsiteCustomTextState(custom))
+    f.state.accountReady = true
+    try await f.waitAsync { f.state.page.state.presentation != nil && f.inputs().first?.acceptsTextInput == true }
+    let directory = try WebsiteConfigStorageDirectory.prepare(applicationSupport: f.support)
+    let selection = WebsiteConfigPracticeScopeSource.Window(owner: f.state.page.owner, customRecoveryBlocked: false)
+    let workflow = WebsiteConfigImportWorkflow(page: f.state.page, settings: f.settings, account: f.account,
+      directory: directory, readWindow: { selection })
+    defer { workflow.stop() }
+    // This workflow must first own an application before editing it; an
+    // independent coordinator cannot edit the startup coordinator's ticket.
+    try await workflow.apply(json: #"{"mode":"words","words":3,"timerStyle":"text"}"#, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+      && f.inputs().first?.acceptsTextInput == true }
+    let repeated = try await XCTUnwrap(f.state.page.restartController).requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(repeated)
+    let old = f.state.page.state.session.prompt
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID }
+    try XCTUnwrap(f.inputs().first).onInsert("x", false)
+    try await workflow.editAndBegin(.mode(.custom),
+      replacing: XCTUnwrap(f.state.page.state.presentation).publication.applicationID, systemIsDark: false)
+    try await f.waitAsync { f.inputs().first?.insertionAttemptID == f.state.page.state.session.automaticInputAttemptID
+      && f.inputs().first?.acceptsTextInput == true }
+    try XCTUnwrap(f.inputs().first).onInsert(old + " Aa ", false)
+    f.wait { f.state.page.state.session.progressText() == "3/5" }
+    try f.scrollToInput()
+    let text: String
+    do { text = try f.renderedText().joined(separator: " ").replacingOccurrences(of: " ", with: "") }
+    catch {
+      let failure = error as NSError
+      XCTFail("Hidden section recognition: \(failure.domain) \(failure.code) \(failure.userInfo)")
+      return
+    }
+    if !text.contains("3/5") {
+      let bitmap = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds))
+      f.host.cacheDisplay(in: f.host.bounds, to: bitmap)
+      try bitmap.representation(using: .png, properties: [:])?.write(
+        to: URL(fileURLWithPath: "/tmp/typebar-generated-section-host-progress.png"))
+    }
+    XCTAssertTrue(text.contains("3/5"), text)
+    XCTAssertFalse(f.window.isVisible)
+    XCTAssertNil(f.window.attachedSheet)
+  }
+
   func testImmediateNoQuitImportLeavesTheActualHostAbleToRestartNormally() async throws {
     let f = try Fixture(saved: true, json: #"{"mode":"words","words":4,"funbox":["no_quit"]}"#)
     defer { f.close() }
@@ -103,7 +153,8 @@ import XCTest
     /// nil: no directory; true: valid record; false: opaque record.
     init(saved: Bool?, json: String = #"{"mode":"words","words":4,"theme":"dracula"}"#,
       fetch: @escaping WebsiteConfigExternalContent.Fetch = { _, _ in nil }, feedbackSound: TypingFeedbackSound? = nil,
-      clipboardExport: WebsiteConfigClipboardExport? = nil, interruptedArchive: WebsiteProfileArchive? = nil) throws {
+      clipboardExport: WebsiteConfigClipboardExport? = nil, interruptedArchive: WebsiteProfileArchive? = nil,
+      viewportHeight: CGFloat = 760) throws {
       try FileManager.default.createDirectory(at: support, withIntermediateDirectories: false)
       defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
       settings = .init(defaults: defaults, feedbackSound: feedbackSound ?? .init(loadSound: { _ in nil }, beep: {}),
@@ -141,9 +192,9 @@ import XCTest
       WebsiteConfigStartupHostTests.ownedFixtureStores.append(container)
       let view = Root(state: state, settings: settings, account: account, support: support, defaults: defaults, fetch: fetch,
         clipboardExport: clipboardExport)
-        .modelContainer(container).frame(width: 1000, height: 760)
+        .modelContainer(container).frame(width: 1000, height: viewportHeight)
       host = NSHostingView(rootView: AnyView(view))
-      window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: 760), styleMask: .borderless,
+      window = NSWindow(contentRect: .init(x: 0, y: 0, width: 1000, height: viewportHeight), styleMask: .borderless,
         backing: .buffered, defer: false)
       window.isReleasedWhenClosed = false; window.contentView = host
     }
@@ -719,20 +770,31 @@ import XCTest
     let keycaps = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
     XCTAssertTrue(keycaps.contains("Esc"), "Keyboard region: \(keycaps)")
     request.recognitionLevel = .accurate
-    // The captured full-suite failure has visible Q/W pixels, but Vision's
-    // text detector returns no observations for that two-key crop. Give the
-    // detector five keys of context, keeping the region within this row.
-    // Require their exact order, not a loose match elsewhere in the keyboard.
-    request.regionOfInterest = .init(x: 0.23, y: 0.38, width: 0.23, height: 0.06)
-    try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
-    let legends = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
+    // At native resolution Vision omitted visible 15px key legends in the
+    // saved full-suite raster. Crop the same row and resample it at 2x before
+    // detection; keep exact QWERTY and Dvorak order assertions below.
+    func recognizedLegends(_ bitmap: NSBitmapImageRep, region: CGRect) throws -> String {
+      let original = try XCTUnwrap(bitmap.cgImage)
+      let crop = try XCTUnwrap(original.cropping(to: .init(
+        x: region.minX * CGFloat(original.width), y: (1 - region.maxY) * CGFloat(original.height),
+        width: region.width * CGFloat(original.width), height: region.height * CGFloat(original.height))))
+      let context = try XCTUnwrap(CGContext(data: nil, width: crop.width * 2, height: crop.height * 2,
+        bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+      context.interpolationQuality = .high
+      context.draw(crop, in: .init(x: 0, y: 0, width: context.width, height: context.height))
+      let detector = VNRecognizeTextRequest()
+      detector.recognitionLevel = .accurate; detector.recognitionLanguages = ["en-US"]
+      detector.usesLanguageCorrection = false
+      try VNImageRequestHandler(cgImage: XCTUnwrap(context.makeImage())).perform([detector])
+      return (detector.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
+    }
+    let legends = try recognizedLegends(bitmap, region: .init(x: 0.23, y: 0.38, width: 0.23, height: 0.06))
     XCTAssertEqual(legends.replacingOccurrences(of: " ", with: ""), "QWERT", "Published QWERTY, not legacy custom rows: \(legends)")
     // Calibrate four complete letter keys in the same region in both layouts.
     // Exclude Dvorak's leading punctuation and the following key at the edge.
     let calibrationRegion = CGRect(x: 0.37, y: 0.38, width: 0.20, height: 0.06)
-    request.regionOfInterest = calibrationRegion
-    try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
-    let calibration = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
+    let calibration = try recognizedLegends(bitmap, region: calibrationRegion)
     XCTAssertEqual(calibration.replacingOccurrences(of: " ", with: ""), "RTYU", "QWERTY calibration: \(calibration)")
     request.regionOfInterest = .init(x: 0.1, y: 0.2, width: 0.8, height: 0.31)
     XCTAssertEqual(f.settings.snapshot, legacy)
@@ -749,9 +811,7 @@ import XCTest
     let alternate = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds))
     f.host.cacheDisplay(in: f.host.bounds, to: alternate)
     try XCTUnwrap(alternate.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-profile-keyboard-dvorak-host.png"))
-    request.regionOfInterest = calibrationRegion
-    try VNImageRequestHandler(cgImage: XCTUnwrap(alternate.cgImage)).perform([request])
-    let alternateLegends = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
+    let alternateLegends = try recognizedLegends(alternate, region: calibrationRegion)
     XCTAssertFalse(alternateLegends.contains("Q") || alternateLegends.contains("W"), "Dvorak first keys: \(alternateLegends)")
     XCTAssertEqual(alternateLegends.replacingOccurrences(of: " ", with: ""), "PYFG",
       "Actual Dvorak letter order: \(alternateLegends)")

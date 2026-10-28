@@ -6162,10 +6162,11 @@ struct GeneratedCandidateContinuation {
   private var cache = GeneratedPromptCache()
   private var sectionWords: [String] = []
   private var nextSectionWord = 0
-  private var customSectionIndex = 0
+  private var generatedSectionIndex = 0
   private var customOrderedIndex = 0
   private var customShuffledIndices: [Int] = []
   private var customRecentSections: [String] = []
+  private var customLimitValue: Double?
   private(set) var decorationState: PoolWordDecorationState
   private(set) var replayHistory: GeneratedWordReplayHistory
   private let replaysOwnedHistory: Bool
@@ -6179,9 +6180,11 @@ struct GeneratedCandidateContinuation {
     arrowChart: WebsiteArrowChart = .init(),
     pseudolangModel: WebsitePseudolangModel? = nil,
     replayHistory: GeneratedWordReplayHistory? = nil,
+    customLimitValue: Double? = nil,
     polyglotSources: [(TypingLanguage, IndexedLexicon)]? = nil,
     nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }) {
     self.configuration = configuration
+    self.customLimitValue = customLimitValue
     self.batchTokenCount = batchTokenCount
     self.weakSpotScores = weakSpotScores
     self.decorationState = decorationState
@@ -6213,19 +6216,29 @@ struct GeneratedCandidateContinuation {
       ?? IndexedLexicon(CodePracticeContent.wordCandidates(for: configuration.language))
   }
 
+  private var sourceCustomLimit: Double {
+    if let customLimitValue { return customLimitValue }
+    switch configuration.customTextCompletion {
+    case .words: return Double(configuration.wordLimit ?? 0)
+    case .sections: return Double(configuration.customTextSectionLimit ?? 0)
+    case .time: return configuration.duration ?? 0
+    case .finish: return Double(pool.count)
+    }
+  }
+
   var hasRemaining: Bool {
     if configuration.mode == .custom {
       guard !replayExhausted && !sourceGenerationFailed else { return false }
       if cache.hasPendingReplay { return true }
       switch configuration.customTextCompletion {
       case .time: return true
-      case .words: return configuration.wordLimit == 0 || emittedWords < (configuration.wordLimit ?? 0)
+      case .words: return sourceCustomLimit == 0 || Double(emittedWords) < sourceCustomLimit
       case .sections:
-        return configuration.customTextSectionLimit == 0 || customSectionIndex < (configuration.customTextSectionLimit ?? 0)
+        return sourceCustomLimit == 0 || Double(generatedSectionIndex) < sourceCustomLimit
           || nextSectionWord < sectionWords.count
       case .finish:
         return configuration.usesCustomTextPipeDelimiter
-          ? customSectionIndex < pool.count || nextSectionWord < sectionWords.count : emittedWords < pool.count
+          ? generatedSectionIndex < pool.count || nextSectionWord < sectionWords.count : emittedWords < pool.count
       }
     }
     return !replayExhausted && !sourceGenerationFailed && (cache.hasPendingReplay
@@ -6235,8 +6248,9 @@ struct GeneratedCandidateContinuation {
 
   /// Config reads are live; the initialized pool, pending section, decoration
   /// history and cached generated targets belong to the current attempt.
-  mutating func synchronizeConfiguration(_ next: TestConfiguration) {
+  mutating func synchronizeConfiguration(_ next: TestConfiguration, customLimitValue: Double? = nil) {
     configuration = next
+    self.customLimitValue = customLimitValue
   }
 
   func replayingContinuation(nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }) -> Self {
@@ -6248,8 +6262,8 @@ struct GeneratedCandidateContinuation {
     // but after that cache ends generation starts a fresh candidate section.
     copy.sectionWords = []
     copy.nextSectionWord = 0
+    copy.generatedSectionIndex = replayHistory.count
     if configuration.mode == .custom {
-      copy.customSectionIndex = replayHistory.count
       copy.customOrderedIndex = 0
       copy.customShuffledIndices = []
       copy.customRecentSections = []
@@ -6294,18 +6308,18 @@ struct GeneratedCandidateContinuation {
     for index in 0..<count {
       if isCustom {
         let atSectionEnd = nextSectionWord >= sectionWords.count
-        if initialCustomPipe, atSectionEnd, customSectionIndex >= bound { break }
+        if initialCustomPipe, atSectionEnd, generatedSectionIndex >= bound { break }
         if !initialCustomPipe {
-          if configuration.customTextCompletion == .words, let limit = configuration.wordLimit,
-            limit > 0, emittedWords + index >= limit { break }
-          if configuration.customTextCompletion == .sections, let limit = configuration.customTextSectionLimit,
-            limit > 0, atSectionEnd, customSectionIndex >= limit { break }
+          if configuration.customTextCompletion == .words,
+            sourceCustomLimit > 0, Double(emittedWords + index) >= sourceCustomLimit { break }
+          if configuration.customTextCompletion == .sections,
+            sourceCustomLimit > 0, atSectionEnd, Double(generatedSectionIndex) >= sourceCustomLimit { break }
           if configuration.customTextCompletion == .finish,
-            (configuration.usesCustomTextPipeDelimiter ? atSectionEnd && customSectionIndex >= pool.count : emittedWords + index >= pool.count) { break }
+            (configuration.usesCustomTextPipeDelimiter ? atSectionEnd && generatedSectionIndex >= pool.count : emittedWords + index >= pool.count) { break }
         }
       }
       if let cached = replayHistory.word(at: emittedWords + index) {
-        if isCustom { customSectionIndex += 1 }
+        generatedSectionIndex += 1
         sourceWords.append(cached.source)
         output += explicitFraming ? cached.committedText : cached.target
         fields.append(cached.committedText); targets.append(cached.target)
@@ -6314,10 +6328,20 @@ struct GeneratedCandidateContinuation {
         if !explicitFraming && index < count - 1 && !noSpace && !cached.target.hasSuffix("\n") { output.append(" ") }
         continue
       }
-      let permitsFresh = isCustom && configuration.customTextCompletion == .finish
-        ? (configuration.usesCustomTextPipeDelimiter ? customSectionIndex < pool.count : emittedWords + index < pool.count)
-        : GeneratedRepeatedWordPolicy.permitsFreshWord(configuration: configuration,
-          wordIndex: emittedWords + index, sectionIndex: isCustom ? customSectionIndex : emittedWords + index)
+      let permitsFresh: Bool
+      if isCustom {
+        switch configuration.customTextCompletion {
+        case .time: permitsFresh = true
+        case .words: permitsFresh = Double(emittedWords + index) < sourceCustomLimit
+        case .sections: permitsFresh = Double(generatedSectionIndex) < sourceCustomLimit
+        case .finish:
+          permitsFresh = configuration.usesCustomTextPipeDelimiter
+            ? generatedSectionIndex < pool.count : emittedWords + index < pool.count
+        }
+      } else {
+        permitsFresh = GeneratedRepeatedWordPolicy.permitsFreshWord(configuration: configuration,
+          wordIndex: emittedWords + index, sectionIndex: generatedSectionIndex)
+      }
       if replaysOwnedHistory, !permitsFresh {
         replayExhausted = true
         return .init(source: "", configuration: configuration)
@@ -6330,7 +6354,7 @@ struct GeneratedCandidateContinuation {
         var section = isCustom ? customSection(initialCandidate: candidate, random: nextRandomWordIndex,
           contentRandom: nextRandomContentUnit)
           : sampledWord(initialCandidate: candidate, random: nextRandomWordIndex, contentRandom: nextRandomContentUnit)
-        if isCustom { customSectionIndex += 1 }
+        generatedSectionIndex += 1
         guard !sourceGenerationFailed else { return .init(source: "", configuration: configuration) }
         if WebsiteArrowChart.isSelected(configuration) {
           guard let generated = replayHistory.arrowChart.word(first: emittedWords + index == 0,
@@ -6421,7 +6445,7 @@ struct GeneratedCandidateContinuation {
       let committed = target + (!noSpace && !target.hasSuffix("\n") ? " " : "")
       output += explicitFraming ? committed : target
       fields.append(committed)
-      replayHistory.append(source: word, target: target, committedText: committed)
+      replayHistory.append(source: word, target: target, committedText: committed, sectionIndex: generatedSectionIndex)
       targets.append(target)
       previousTargets.append(target)
       if previousTargets.count > 2 { previousTargets.removeFirst() }

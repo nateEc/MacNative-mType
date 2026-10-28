@@ -234,6 +234,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: 100,
       showAllLines: showAllLines, weakSpotScores: scope.weakSpotScores, sourceWords: customCandidates,
       decorationState: scope.decorationState, pseudolangModel: pseudolangModel, replayHistory: history,
+      customLimitValue: config.mode == .custom ? scope.websiteCustomText?.limitValue : nil,
       nextRandomPoolShuffleIndex: random.shuffleIndex)
     var chunks: [GeneratedWordChunk] = []
     var prepared = 0
@@ -256,6 +257,8 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     try Task.checkCancellation()
     return .init(configuration: config, prompt: finalized.text + (needsCommit ? " " : ""), sourceFields: finalized.sourceFields,
       generatedCodeContinuation: cursor.hasRemaining ? cursor : nil, generatedReplayHistory: cursor.replayHistory,
+      generatedSectionLimit: config.mode == .custom && config.customTextCompletion == .sections
+        ? scope.websiteCustomText?.limitValue : nil,
       noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: finalized.noSpaceWordLengths),
       noSpaceTargetWords: finalized.noSpaceTargetWords,
       generationNotice: preparation.notice, weakSpotScores: scope.weakSpotScores, wordDecorationState: cursor.decorationState)

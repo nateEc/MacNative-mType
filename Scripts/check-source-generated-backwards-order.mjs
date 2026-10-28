@@ -122,6 +122,22 @@ const addStart=logicSource.indexOf('export async function addWord(): Promise<voi
 const addEnd=logicSource.indexOf('\ntype RetrySaving = {',addStart);
 assert.ok(addStart>=0&&addEnd>addStart,'Pinned complete addWord range must exist');
 const addBody=stripTypeScriptTypes(logicSource.slice(addStart,addEnd),{mode:'transform'}).replace(/^export /,'');
+if(process.argv[3]==='--section-indices') {
+  const debug=console.debug;console.debug=()=>{};
+  let first,repeated;
+  try {
+    config.mode='words';config.words=4;config.language='english';config.showAllLines=false;
+    activeNames=[];ownedRepeated=false;ownedIndexes=[0,1,2,0];
+    first=await main.namespace.generateWords({name:'english',words:['ab cd','ef gh','ij kl']});
+    assert.equal(ownedIndexes.length,0);
+    ownedRepeated=true;config.words=6;ownedIndexes=[0,0];
+    repeated=await main.namespace.generateWords({name:'english',words:['ab cd','ef gh','ij kl']});
+    assert.equal(ownedIndexes.length,0);
+  } finally {console.debug=debug;}
+  assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
+  await new Promise((resolve,reject)=>process.stdout.write(JSON.stringify({first:first.sectionIndexes,repeated:repeated.sectionIndexes})+'\n',error=>error?reject(error):resolve()));
+  process.exit(0);
+}
 if(process.argv[3]==='--custom-replay') {
   const fixtures=[], words=modules.get('test/test-words').namespace.words;
   const failures=[];
@@ -136,7 +152,7 @@ if(process.argv[3]==='--custom-replay') {
   try {
     for(const text of [['Aa Bb','Cc','I','x2','Ω'],['Aa Bb','I']])
       for(const mode of ['repeat','random','shuffle'])for(const limitMode of ['word','time','section'])
-      for(const limitValue of [0,2,4,5,101,103])for(const pipe of [false,true]) {
+      for(const limitValue of [0,2,4,4.5,5,101,103,Infinity])for(const pipe of [false,true]) {
         config.mode='words';config.words=3;config.language='english';config.showAllLines=false;
         activeNames=[];ownedRepeated=false;ownedIndexes=[0,1,2];
         const opening=await main.namespace.generateWords({name:'english',words:['ab','cd','ef']});
@@ -160,20 +176,22 @@ if(process.argv[3]==='--custom-replay') {
         }
         ownedIndexes=tailDraws.slice();
         failures.length=0;
-        if(!error&&limitMode!=='time')for(let i=0;i<256&&!main.namespace.areAllWordsGenerated()&&!failures.length;i++){
-          ownedActiveWordIndex=words.length-1;await continueWords();
+        let continuationCalls=0;
+        if(!error&&limitMode!=='time')for(let i=0;i<(Number.isFinite(limitValue)?256:3)&&!main.namespace.areAllWordsGenerated()&&!failures.length;i++){
+          ownedActiveWordIndex=words.length-1;await continueWords();continuationCalls++;
         }
-        if(!error&&limitMode!=='time'&&!failures.length)assert.equal(main.namespace.areAllWordsGenerated(),true);
-        fixtures.push({text,mode,limitMode,limitValue,pipe,opening:opening.words,
+        if(!error&&limitMode!=='time'&&!failures.length&&Number.isFinite(limitValue))assert.equal(main.namespace.areAllWordsGenerated(),true);
+        fixtures.push({text,mode,limitMode,limitValue:String(limitValue),pipe,opening:opening.words,
           generated:generated?.words,sectionIndexes:generated?.sectionIndexes,
           fields,finalFields:Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit),
+          finalSectionIndexes:Array.from({length:words.length},(_,i)=>words.get(i).sectionIndex),
           currentSection:Array.from(main.namespace.currentSection),sectionIndex:main.namespace.sectionIndex,
           allGenerated,drawsUsed,finalDrawsUsed:drawsUsed+tailDraws.length-ownedIndexes.length,
           tailRanks:tailDraws.slice(0,tailDraws.length-ownedIndexes.length),
-          continuationFailed:failures.length>0,error});
+          continuationFailed:failures.length>0,continuationCalls,error});
       }
   } finally {console.debug=debug;}
-  assert.equal(fixtures.length,216);
+  assert.equal(fixtures.length,288);
   assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
   await new Promise((resolve,reject)=>process.stdout.write(JSON.stringify({fixtures})+'\n',error=>error?reject(error):resolve()));
   process.exit(0);

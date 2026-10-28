@@ -8,10 +8,12 @@ import XCTest
       throw XCTSkip("Requires pinned reference")
     }
     struct Fixture: Decodable {
-      let text: [String], mode: String, limitMode: String, limitValue: Int, pipe: Bool
+      let text: [String], mode: String, limitMode: String, limitValue: String, pipe: Bool
       let fields: [String], allGenerated: Bool, drawsUsed: Int, error: String?
       let finalFields: [String], finalDrawsUsed: Int, continuationFailed: Bool
       let tailRanks: [Int]
+      let sectionIndexes: [Int]?, finalSectionIndexes: [Int]
+      let continuationCalls: Int
     }
     struct Output: Decodable { let fixtures: [Fixture] }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -23,14 +25,17 @@ import XCTest
     let data = pipe.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit(); XCTAssertEqual(process.terminationStatus, 0)
     let fixtures = try JSONDecoder().decode(Output.self, from: data).fixtures
-    XCTAssertEqual(fixtures.count, 216)
+    XCTAssertEqual(fixtures.count, 288)
     let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"mode":"custom"}"#, pointsPerRem: 16, context: .init())
     for item in fixtures {
+      let limit: Double
+      if item.limitValue == "Infinity" { limit = .infinity }
+      else { limit = try XCTUnwrap(Double(item.limitValue)) }
       var history = GeneratedWordReplayHistory(noSpace: false)
       ["ab", "cd", "ef"].forEach { history.append(source: $0, target: $0) }
       let custom = try WebsiteCustomTextSettings(value: .object([
         "text": .array(item.text.map(WebsiteConfigValue.string)), "mode": .string(item.mode),
-        "limit": .object(["mode": .string(item.limitMode), "value": .number(Double(item.limitValue))]),
+        "limit": .object(["mode": .string(item.limitMode), "value": .number(limit)]),
         "pipeDelimiter": .bool(item.pipe)]))
       var draws = 0
       do {
@@ -39,13 +44,16 @@ import XCTest
           random: .init(wordIndex: { defer { draws += 1 }; return draws % item.text.count }))
         XCTAssertNil(item.error, "\(item)")
         XCTAssertEqual(ready.session.prompt, item.fields.joined(), "\(item)")
+        let initialHistory = try XCTUnwrap(ready.session.generatedWordReplayHistory)
+        XCTAssertEqual((0..<item.fields.count).map { initialHistory.word(at: $0)?.sectionIndex },
+          item.sectionIndexes?.map(Optional.some), "\(item)")
         XCTAssertEqual(ready.session.usesIncrementalPromptExtension, !item.allGenerated, "\(item)")
         if item.limitMode != "time" {
           var cursor = GeneratedCandidateContinuation(configuration: ready.session.configuration,
-            batchTokenCount: 100, sourceWords: item.text, replayHistory: history)
+            batchTokenCount: 100, sourceWords: item.text, replayHistory: history, customLimitValue: limit)
           var directDraws = 0
           func rank() -> Int { defer { directDraws += 1 }; return directDraws % item.text.count }
-          let bound = item.limitValue == 0 ? 100 : min(100, item.limitValue)
+          let bound = limit == 0 || limit.isInfinite ? 100 : min(100, Int(limit.rounded(.up)))
           var chunk = cursor.nextChunk(maximumWordCount: item.pipe ? 100 : bound,
             initialPreparationWordBound: bound, nextRandomWordIndex: rank)
           var fields = chunk.sourceFields ?? []
@@ -58,13 +66,16 @@ import XCTest
             defer { directDraws += 1; tailDrawIndex += 1 }
             return item.tailRanks.indices.contains(tailDrawIndex) ? item.tailRanks[tailDrawIndex] : 0
           }
-          for _ in 0..<256 where cursor.hasRemaining {
+          for _ in 0..<item.continuationCalls {
+            guard cursor.hasRemaining else { XCTFail("Native continuation ended early: \(item)"); break }
             chunk = cursor.nextChunk(maximumWordCount: 1, nextRandomWordIndex: tailRank)
             if cursor.replayExhausted || cursor.sourceGenerationFailed { break }
             let batch = TransformedPromptBatch(text: chunk.transformed, sourceFields: chunk.sourceFields)
             fields += (cursor.hasRemaining ? batch : FinitePromptCommitPolicy.finalized(batch)).sourceFields ?? []
           }
           XCTAssertEqual(fields, item.finalFields, "\(item)")
+          XCTAssertEqual((0..<fields.count).map { cursor.replayHistory.word(at: $0)?.sectionIndex },
+            item.finalSectionIndexes.map(Optional.some), "\(item)")
           XCTAssertEqual(cursor.replayExhausted, item.continuationFailed, "\(item)")
           XCTAssertEqual(directDraws, item.finalDrawsUsed, "\(item)")
         }

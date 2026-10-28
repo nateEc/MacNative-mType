@@ -2,7 +2,10 @@
 /// configuration change that shortens the opening or selects another pool.
 /// Value-owned and process-local; never a website field or persisted record.
 struct GeneratedWordReplayHistory {
-  struct Word { let source, target, committedText: String }
+  struct Word {
+    let source, target, committedText: String
+    let sectionIndex: Int
+  }
   let noSpace: Bool
   var arrowChart: WebsiteArrowChart
   private var words: [Word] = []
@@ -11,9 +14,10 @@ struct GeneratedWordReplayHistory {
   var count: Int { words.count }
   func word(at index: Int) -> Word? { words.indices.contains(index) ? words[index] : nil }
   mutating func preserveCommitFraming() { preservesCommitFraming = true }
-  mutating func append(source: String, target: String, committedText: String? = nil) {
+  mutating func append(source: String, target: String, committedText: String? = nil, sectionIndex: Int? = nil) {
     words.append(.init(source: source, target: target,
-      committedText: committedText ?? target + (!noSpace && !target.hasSuffix("\n") ? " " : "")))
+      committedText: committedText ?? target + (!noSpace && !target.hasSuffix("\n") ? " " : ""),
+      sectionIndex: sectionIndex ?? (words.count + 1)))
   }
 }
 
