@@ -91,7 +91,7 @@ final class DeletionPositionCaptureTests: XCTestCase {
     XCTAssertEqual(input.typed.count, 1)
   }
 
-  func testBlockedAndUnknownOrAutomaticPathsNeverInventPositions() throws {
+  func testBlockedAndUnknownPositionsStayMissingAndKnownAutomaticWordRecordsSourceLength() throws {
     var blocked = TypingSession(configuration: .words(2, rules: .init(confidenceMode: .maximum)), prompt: "abcd tail")
     blocked.insertBatch("ab", at: start); blocked.deleteBackward(at: start.addingTimeInterval(1))
     XCTAssertTrue(try result(blocked).replayEvents.allSatisfy { $0.kind != .delete })
@@ -103,7 +103,8 @@ final class DeletionPositionCaptureTests: XCTestCase {
     automatic.insertBatch("ax", at: start)
     let recovery = try result(automatic).replayEvents.filter { $0.kind == .delete }
     XCTAssertFalse(recovery.isEmpty)
-    XCTAssertTrue(recovery.allSatisfy { $0.automatic && $0.deletionCharIndex == nil })
+    XCTAssertTrue(recovery.allSatisfy(\.automatic))
+    XCTAssertEqual(recovery.map(\.deletionCharIndex), [nil,2])
   }
 
   func testDeletionThenNewInsertionKeepsPositionKindsSeparate() throws {

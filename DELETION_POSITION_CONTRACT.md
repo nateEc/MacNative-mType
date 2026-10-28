@@ -1,5 +1,7 @@
 # 删除源位置与格式 20 合同
 
+后续 RECOVERY-SOURCE-POSITION-35 已为四种自动恢复的已知字段动作接入词内前长度和退回目的长度，并对照 72 条完整处理器轨迹，见 AUTOMATIC_RECOVERY_POSITION_CONTRACT.md。未知字段及旧自动位置仍不回填；下文保留手动位置阶段的证据与当时开放项。
+
 固定只读参考：91bd24bb8513785c7364cbea29296ff7adafac41。依据完整 input/handlers/delete.ts、before-delete.ts、input/helpers/word-navigation.ts、input/input-element.ts 与 events/data 的当前快照读取。原生代码与夹具独立编写，没有参考代码／资产进入实现。
 
 ## 一个动作，两个位置时点

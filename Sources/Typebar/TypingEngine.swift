@@ -7822,6 +7822,7 @@ struct TypingSession {
     // word boundary, including when the failed key is itself a separator.
     guard !typed.isEmpty else { return }
     let deletionStart = replayEvents.count
+    let previousField = replayInputField(kind: .delete, inputStopped: false)
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", automatic: true, at: date)
 
@@ -7830,6 +7831,7 @@ struct TypingSession {
         && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)) || tracksNoSpaceWordBursts), !typed.isEmpty
     {
       if mode.clearsWholeWord { markDeletion(since: deletionStart) }
+      recordDeletionPosition(since: deletionStart, previousField: previousField)
       removePreviousWordForHardDelete(
         clearingWord: mode.clearsWholeWord, automatic: true, at: date)
       return
@@ -7837,7 +7839,9 @@ struct TypingSession {
     if mode.clearsWholeWord {
       clearCurrentWord(at: date, automatic: true)
       markDeletion(since: deletionStart)
+      recordDeletionPosition(since: deletionStart, previousField: previousField)
     } else {
+      recordDeletionPosition(since: deletionStart, previousField: previousField)
       removeLastCharacterFromCurrentWord(at: date, automatic: true)
     }
   }
@@ -7848,8 +7852,11 @@ struct TypingSession {
     if isAtEmptyNoSpaceWord, typedGraphemeCount == emptyNoSpaceWordBoundary { return }
     if let range = activeNoSpaceWordRange, typedGraphemeCount == range.lowerBound { return }
     guard !typed.isEmpty, !lastInputCommitsWord else { return }
+    let deletionStart = replayEvents.count
+    let previousField = replayInputField(kind: .delete, inputStopped: false)
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
+    recordDeletionPosition(since: deletionStart, previousField: previousField)
   }
 
   private mutating func removePreviousWordForHardDelete(
@@ -7859,7 +7866,13 @@ struct TypingSession {
       let field = replayInputField(kind: .delete, inputStopped: false),
       previousPromptWordIsUnavailable(before: field.index) { return }
     let deletionStart = replayEvents.count
-    defer { if clearingWord { markDeletion(since: deletionStart) } }
+    let previousField = automatic ? replayInputField(kind: .delete, inputStopped: false) : nil
+    defer {
+      if clearingWord { markDeletion(since: deletionStart) }
+      if automatic {
+        recordDeletionPosition(since: deletionStart, previousField: previousField, usesDestinationPosition: true)
+      }
+    }
     if tracksNoSpaceWordBursts, acceptedUnits == nil,
       let wordIndex = noSpaceWordEndIndices.firstIndex(of: typed.count),
       let previousRange = noSpaceWordRange(for: wordIndex)
