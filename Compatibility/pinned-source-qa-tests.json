@@ -3,6 +3,10 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.WebsiteThemeCommandTests/testPublishedRandomDrawsAgainstPinnedControllerRealStoreAndDiskCheckpoints",
+      "file": "Tests/TypebarTests/WebsiteThemeCommandTests.swift"
+    },
+    {
       "id": "TypebarTests.WebsiteRandomThemeConfigurationTests/testPinnedRandomControllerWithRealSolidStoreAndSavedConfiguration",
       "file": "Tests/TypebarTests/WebsiteRandomThemeConfigurationTests.swift"
     },

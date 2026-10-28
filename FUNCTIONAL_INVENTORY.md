@@ -2,7 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| THEME-RANDOM-SEQUENCE-11 | 随机候选、游标、收藏数组关联与故障边界 | 固定完整随机函数、真实 Solid 配置存储、洗牌和背景分类；自有目录／随机数输入 | WebsiteRandomThemeSequence、WebsiteRandomThemeConfiguration、主题发布事务、来源探针；WEBSITE_RANDOM_THEME_SEQUENCE_CONTRACT.md | 部分完成：模式和收藏事件已接实际页面发布，保存前快照与运行时洗牌分开，普通发布和重开保留候选，完整导入替换收藏身份；来源对照含三份状态、nosave 准备步骤、自定义 ID 故障和有界防卡住例外。实际抽取提交、随机覆盖、显式命令及结果页重开触发仍未接入，不能据此称随机轮换已完成。 |
+| THEME-RANDOM-SEQUENCE-11 | 随机候选、游标、收藏数组关联与故障边界 | 固定完整随机函数、真实 Solid 配置存储、洗牌和背景分类；自有目录／随机数输入 | WebsiteRandomThemeSequence、WebsiteRandomThemeConfiguration、主题发布事务、来源探针；WEBSITE_RANDOM_THEME_SEQUENCE_CONTRACT.md、WEBSITE_RANDOM_THEME_LIVE_CONTRACT.md | 部分完成：模式／收藏和显式抽取已接实际页面；临时标记不保存，后续关闭系统跟随按独立 setter 保存，保留成功／故障前缀及三份快照；预览关闭、页脚和收藏使用活动随机状态。普通发布和重开保留候选及外观，完整导入替换收藏身份。结果页返回触发、故障后实体交互及全部人工场景仍待完成，不能据此称整体随机功能已验收。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |

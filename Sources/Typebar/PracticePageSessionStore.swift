@@ -394,6 +394,13 @@ final class PracticePageSessionStore {
     try validateCommitOwnership(owner: lease, router: router, capture: capture)
     committing = true
   }
+  func beginRandomThemeCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
+    router: PreferenceConfigurationSaveRouter, capture: GenerationCapture) throws {
+    guard state.configurationDeparture == nil, state.savedApplication == nil, state.sharedReceipt == nil
+    else { throw PracticePageSessionStateError.locked }
+    try validateCommitOwnership(owner: lease, router: router, capture: capture)
+    committing = true
+  }
   func beginFontResourceCommit(owner lease: PreferenceConfigurationSaveRouter.Lease,
     router: PreferenceConfigurationSaveRouter, capture: GenerationCapture) throws {
     guard state.configurationDeparture == nil, state.savedApplication == nil, state.sharedReceipt == nil

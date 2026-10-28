@@ -297,6 +297,49 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   }
 
   @discardableResult
+  func runRandomThemeCommand(replacing applicationID: UUID,
+    chooseThemeIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> WebsiteThemeCommand.Completion {
+    guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
+    guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
+    guard page.state.savedApplication == nil, page.state.configurationDeparture == nil, page.state.sharedReceipt == nil
+    else { throw WebsiteConfigImportWorkflowError.preparationPending }
+    guard page.state.presentation?.publication.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
+    let current = UUID(); applying = true; operation = current
+    var random: WebsiteConfigCommitCoordinator.RandomThemePrepared?
+    defer {
+      if let random { coordinator.cancelRandomTheme(random) }
+      if let prepared { coordinator.cancel(prepared) }; prepared = nil; finishedApplying()
+    }
+    return try environment.withSynchronousSetterRead {
+      random = try coordinator.prepareRandomTheme(for: page, refreshingWith: source,
+        customThemes: settings.customThemes, chooseIndex: chooseThemeIndex)
+      guard let random else { return .init(disabledSystemFollowing: false) }
+      let receiptID: UUID
+      switch try coordinator.commitRandomTheme(random, for: page) {
+      case .committed(let publication): receiptID = publication.applicationID
+      case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict
+      case .unavailable: throw WebsiteConfigImportWorkflowError.unavailable
+      case .busy: throw WebsiteConfigImportWorkflowError.busy
+      }
+      if let failure = random.failure { throw failure }
+      if random.disablesSystemFollowing {
+        do {
+          try Task.checkCancellation()
+          guard operation == current, !stopped, page.state.presentation?.publication.applicationID == receiptID else {
+            throw WebsiteConfigImportWorkflowError.conflict
+          }
+          let ticket = try coordinator.prepareEdit(key: "autoSwitchTheme", value: .bool(false), for: page, refreshingWith: source)
+          prepared = ticket
+          guard case .committed = try coordinator.commitLiveTheme(ticket, for: page) else {
+            throw WebsiteConfigImportWorkflowError.conflict
+          }
+        } catch { throw WebsiteRandomThemeCommandError.interrupted }
+      }
+      return .init(disabledSystemFollowing: random.disablesSystemFollowing)
+    }
+  }
+
+  @discardableResult
   func runThemeCommand(_ edit: PracticeThemeEdit, replacing applicationID: UUID,
     chooseThemeIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> WebsiteThemeCommand.Completion {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }

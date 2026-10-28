@@ -8,6 +8,11 @@ import Foundation
     let draw: WebsiteRandomThemeSequence.Draw?
     let disablesSystemFollowing: Bool
   }
+  struct Attempt {
+    let draft: WebsiteConfigNativeDraft
+    let result: Result?
+    let failure: WebsiteRandomThemeSequence.Failure?
+  }
   private var sequence: WebsiteRandomThemeSequence
   private var favorites: WebsiteRandomThemeSequence.Favorites
   var active: String? { sequence.active }
@@ -39,6 +44,26 @@ import Foundation
     favorites.replace(with: draft.themes.favorites.map(\.rawValue))
   }
   @discardableResult mutating func clearActive() -> Bool { sequence.clearActive() }
+
+  mutating func attemptDraw(draft: WebsiteConfigNativeDraft, customIDs: [String], systemIsDark: Bool,
+    pointsPerRem: Double, context: WebsiteConfigRuntimeContext,
+    chooseIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> Attempt {
+    do {
+      let result = try draw(draft: draft, customIDs: customIDs, systemIsDark: systemIsDark,
+        pointsPerRem: pointsPerRem, context: context, chooseIndex: chooseIndex)
+      return .init(draft: try result.steps.first ?? applyingFavoriteOrder(to: draft, pointsPerRem: pointsPerRem), result: result, failure: nil)
+    } catch let failure as WebsiteRandomThemeSequence.Failure {
+      guard case .missingBuiltIn = failure else {
+        if failure != .noMatchingScheme { throw failure }
+        let prefix = try applyingFavoriteOrder(to: draft, pointsPerRem: pointsPerRem)
+        return .init(draft: try draft.receivingRuntimeEffect(prefix.projection.runtime, pointsPerRem: pointsPerRem), result: nil, failure: failure)
+      }
+      // The source advances the cursor/active ID and may shuffle favorites
+      // before reading a missing background. Preserve that prefix, no setter.
+      let prefix = try applyingFavoriteOrder(to: draft, pointsPerRem: pointsPerRem)
+      return .init(draft: try draft.receivingRuntimeEffect(prefix.projection.runtime, pointsPerRem: pointsPerRem), result: nil, failure: failure)
+    }
+  }
 
   mutating func draw(draft: WebsiteConfigNativeDraft, customIDs: [String], systemIsDark: Bool,
     pointsPerRem: Double, context: WebsiteConfigRuntimeContext,

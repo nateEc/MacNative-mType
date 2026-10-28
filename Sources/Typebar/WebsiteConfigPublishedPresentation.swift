@@ -19,6 +19,7 @@ final class WebsiteConfigPublishedPresentation {
     var applied = UUID()
     var indicator = UUID()
     var systemIndicator: AppTheme?
+    var randomIndicator: String?
   }
   let publication: WebsiteConfigCommitCoordinator.Publication
   private let owner: UUID
@@ -41,21 +42,26 @@ final class WebsiteConfigPublishedPresentation {
   }
 
   static func prepareAppearance(draft: WebsiteConfigNativeDraft, applicationID: UUID,
-    systemIsDark: Bool, previousRandomThemes: WebsiteRandomThemeConfiguration? = nil) throws -> PreparedAppearance {
+    systemIsDark: Bool, previous: WebsiteConfigPublishedPresentation? = nil) throws -> PreparedAppearance {
     let themes = draft.themes
     let custom = try themes.makeCustomTheme(id: applicationID, name: "Imported configuration").resolvedTheme
-    var random = try previousRandomThemes ?? .init(entries: WebsiteRandomThemeConfiguration.nativeCatalog(), draft: draft)
+    var random = try previous?.randomThemes ?? .init(entries: WebsiteRandomThemeConfiguration.nativeCatalog(), draft: draft)
     // Restarting setters and received test settings share this resource
     // handoff, but do not dispatch the full configuration lifecycle.
     switch draft.origin {
     case .imported, .restored:
       random.favoritesReplaced(draft: draft)
       random.clearActive()
-    case .edited, .received: break
+    case .edited, .received:
+      if let previous {
+        return .init(themes: themes, custom: custom, appearance: previous.appearance,
+          systemIsDark: systemIsDark, changes: previous.themeChanges, randomThemes: random)
+      }
     }
     return .init(themes: themes, custom: custom,
       appearance: resolve(themes.initialSelection(systemIsDark: systemIsDark), custom: custom), systemIsDark: systemIsDark,
-      changes: .init(systemIndicator: themes.followsSystem ? (systemIsDark ? themes.darkTheme : themes.lightTheme) : nil), randomThemes: random)
+      changes: .init(systemIndicator: themes.followsSystem ? (systemIsDark ? themes.darkTheme : themes.lightTheme) : nil,
+        randomIndicator: random.active), randomThemes: random)
   }
 
   /// Internal synchronous handoff: resource and owner checks have already run
@@ -83,14 +89,16 @@ final class WebsiteConfigPublishedPresentation {
       draft = try random.modeChanged(draft: draft, customIDs: customThemeIDs,
         pointsPerRem: publication.pointsPerRem, chooseIndex: chooseIndex)
     }
-    if key == "theme" || (key == "randomTheme" && draft.themes.randomMode == .off) { random.clearActive() }
+    let clearedRandom = key == "theme" || (key == "randomTheme" && draft.themes.randomMode == .off)
+      ? random.clearActive() : false
     let themes = draft.themes
     let custom = try themes.makeCustomTheme(id: owner, name: "Imported configuration").resolvedTheme
-    let selection = themes.selectionAfterSaving(key: key, visible: appearance.selection, systemIsDark: systemIsDark)
+    var selection = themes.selectionAfterSaving(key: key, visible: appearance.selection, systemIsDark: systemIsDark)
+    if key == "randomTheme" && clearedRandom { selection = themes.customEnabled ? .inlineCustom : .builtIn(themes.theme) }
     var changes = themeChanges
     if key == "theme" { changes.previewReset = UUID() }
     let systemApplies = themes.followsSystem && ((key == "themeLight" && !systemIsDark) || (key == "themeDark" && systemIsDark))
-    if ["theme", "customTheme", "customThemeColors", "autoSwitchTheme"].contains(key) || systemApplies {
+    if ["theme", "customTheme", "customThemeColors", "autoSwitchTheme"].contains(key) || systemApplies || clearedRandom {
       changes.applied = UUID(); changes.indicator = UUID()
       changes.systemIndicator = systemApplies || (key == "autoSwitchTheme" && themes.followsSystem)
         ? (systemIsDark ? themes.darkTheme : themes.lightTheme) : nil
@@ -98,8 +106,41 @@ final class WebsiteConfigPublishedPresentation {
     if ["theme", "customTheme", "customThemeColors", "favThemes", "randomTheme"].contains(key) {
       changes.indicator = UUID(); changes.systemIndicator = nil
     }
+    if changes.indicator != themeChanges.indicator { changes.randomIndicator = random.active }
     return .init(draft: draft, appearance: .init(themes: themes, custom: custom,
       appearance: Self.resolve(selection, custom: custom), systemIsDark: systemIsDark, changes: changes, randomThemes: random))
+  }
+
+  func prepareRandomEffect(draft: WebsiteConfigNativeDraft, random: WebsiteRandomThemeConfiguration,
+    draw: WebsiteRandomThemeSequence.Draw?, customColors: WebsiteConfigValue?) throws -> PreparedAppearance {
+    let themes = draft.themes
+    let custom = try themes.makeCustomTheme(id: owner, name: "Imported configuration").resolvedTheme
+    var visible = appearance, changes = themeChanges
+    if let draw {
+      if draw.theme == "custom" {
+        var runtime = draft.projection.runtime
+        if let customColors { runtime["customThemeColors"] = customColors }
+        let override = try WebsiteConfigNativeThemes(runtime: runtime).makeCustomTheme(id: owner, name: "Random theme").resolvedTheme
+        visible = .init(selection: .inlineCustom, theme: override)
+      } else {
+        guard let theme = AppTheme(rawValue: draw.theme), theme != .grove else { throw WebsiteThemeCommandError.unsupported }
+        visible = Self.resolve(.builtIn(theme), custom: custom)
+      }
+      changes.applied = UUID(); changes.indicator = UUID(); changes.systemIndicator = nil
+      changes.randomIndicator = random.active
+    }
+    return .init(themes: themes, custom: custom, appearance: visible, systemIsDark: systemIsDark,
+      changes: changes, randomThemes: random)
+  }
+
+  /// clearPreview applies the active random ID again, without a custom color
+  /// override; it deliberately ignores system-following priority.
+  var previewRestorationTheme: ResolvedTheme? {
+    if let active = randomThemes.active {
+      if active == "custom" { return customTheme }
+      return AppTheme(rawValue: active).map(\.resolvedTheme)
+    }
+    return themes.customEnabled ? customTheme : themes.theme.resolvedTheme
   }
 
   convenience init(publication: WebsiteConfigCommitCoordinator.Publication, owner: UUID, systemIsDark: Bool) throws {
@@ -129,6 +170,7 @@ final class WebsiteConfigPublishedPresentation {
     let changed = next != appearance
     themeChanges.applied = UUID(); themeChanges.indicator = UUID()
     themeChanges.systemIndicator = isDark ? themes.darkTheme : themes.lightTheme
+    themeChanges.randomIndicator = randomThemes.active
     appearance = next
     return changed
   }

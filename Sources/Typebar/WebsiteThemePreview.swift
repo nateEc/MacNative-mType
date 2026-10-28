@@ -89,9 +89,7 @@ import Observation
     guard isPreviewing else { return }
     isPreviewing = false
     if applyTheme, let presentation {
-      let themes = presentation.publication.draft.themes
-      visible = themes.customEnabled
-        ? try? themes.makeCustomTheme(id: UUID(), name: "Theme preview").resolvedTheme : themes.theme.resolvedTheme
+      visible = presentation.previewRestorationTheme
       indicatorOverride = nil
     } else { visible = nil; indicatorOverride = nil }
   }
@@ -112,12 +110,13 @@ import Observation
     let indicatorOverride = changes?.indicator == next.themeChanges.indicator
       ? self.indicatorOverride : next.themeChanges.systemIndicator.map(ThemeCommandTarget.builtIn)
     let themes = publication.draft.themes
-    var name = themes.theme.rawValue, isCustom = themes.customEnabled
+    let randomIndicator = next.themeChanges.randomIndicator
+    var name = randomIndicator ?? themes.theme.rawValue, isCustom = themes.customEnabled
     if themes.customEnabled {
       let match = WebsiteThemeCommand.matchingCustomTheme(themes, in: customThemes)
       name = match.map { "\($0.name) (custom)" } ?? "custom"
     }
-    var favoriteTheme = themes.theme
+    var favoriteTheme: AppTheme? = randomIndicator != nil ? randomIndicator.flatMap(AppTheme.init(rawValue:)) : themes.theme
     if let indicatorOverride {
       switch indicatorOverride {
       case .builtIn(let theme): name = theme.rawValue; favoriteTheme = theme; isCustom = false
@@ -125,7 +124,7 @@ import Observation
       }
     }
     return .init(name: name.replacingOccurrences(of: "_", with: " "), isCustom: isCustom,
-      isFavorite: !themes.customEnabled && themes.favorites.contains(favoriteTheme) && !isCustom)
+      isFavorite: !themes.customEnabled && (favoriteTheme.map(themes.favorites.contains) ?? false) && !isCustom)
   }
 }
 

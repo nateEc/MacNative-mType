@@ -15,6 +15,16 @@ enum WebsiteThemeCommandError: Error, LocalizedError {
   }
 }
 
+enum WebsiteRandomThemeCommandError: Error, LocalizedError {
+  case disabled, interrupted
+  var errorDescription: String? {
+    switch self {
+    case .disabled: "请先开启随机主题范围。"
+    case .interrupted: "随机主题已切换，但后续系统外观设置未完成，请重新打开主题设置。"
+    }
+  }
+}
+
 enum WebsiteThemeCommand {
   struct Completion { let disabledSystemFollowing: Bool }
   struct Field: Equatable { let key: String; let value: WebsiteConfigValue }

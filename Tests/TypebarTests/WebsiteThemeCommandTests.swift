@@ -80,6 +80,216 @@ import XCTest
     XCTAssertEqual(later["favThemes"], shuffled)
   }
 
+  func testExplicitRandomDrawPublishesVolatileThemeWithoutSavingOrReplacingTheAttempt() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","theme":"dracula","favThemes":["nord","serika"],"customTheme":true,"funbox":["no_quit"]}"#, systemIsDark: false)
+    try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+    var state = f.page.state; state.session.insertBatch(String(state.session.nextExpectedCharacter!)); f.page.replace(state)
+    let before = try XCTUnwrap(f.page.state.presentation), generation = f.page.state.session.generationState
+    let preferences = f.settings.snapshot, ledger = f.page.state.priorAttemptLedger, controller = f.page.restartController
+    let register = WebsiteConfigFileRegister(directory: f.directory), disk = try register.read()
+    let completion = try f.workflow.runRandomThemeCommand(replacing: before.publication.applicationID, chooseThemeIndex: { _ in 0 })
+    XCTAssertFalse(completion.disabledSystemFollowing)
+    let after = try XCTUnwrap(f.page.state.presentation)
+    XCTAssertEqual(after.appearance.selection, .builtIn(.serika))
+    XCTAssertEqual(after.randomThemes.active, "serika")
+    XCTAssertFalse(after.publication.draft.themes.customEnabled)
+    XCTAssertEqual(after.publication.draft.projection.events, [.init(key: "customTheme", previousValue: .bool(true), newValue: .bool(false), nosave: true)])
+    XCTAssertEqual(try register.read().revision, disk.revision); XCTAssertEqual(try register.read().state, disk.state)
+    XCTAssertEqual(after.publication.savedDraft.projection.runtime, before.publication.savedDraft.projection.runtime)
+    XCTAssertEqual(f.page.state.session.generationState, generation); XCTAssertEqual(f.settings.snapshot, preferences)
+    XCTAssertEqual(f.page.state.priorAttemptLedger, ledger); XCTAssertTrue(f.page.restartController === controller)
+    XCTAssertEqual(after.publication.font?.renderingFont, before.publication.font?.renderingFont)
+    XCTAssertEqual(after.publication.background?.source, before.publication.background?.source)
+  }
+
+  func testPublishedRandomDrawsAgainstPinnedControllerRealStoreAndDiskCheckpoints() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned source") }
+    struct Save: Decodable { let value: [String: WebsiteConfigValue] }
+    struct Indicator: Decodable { let text: String; let isFavorite: Bool }
+    struct Frame: Decodable {
+      let runtime: [String: WebsiteConfigValue], settings: [String: WebsiteConfigValue], saved: [Save]
+      let shown: String?, active: String?, indicator: Indicator
+    }
+    struct Sample: Decodable { let auto: Bool, mode: String, frames: [Frame] }
+    struct Output: Decodable { let fixtures: [Sample] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-config-schema.mjs").path, reference, "--random-theme-runtime"]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit(); XCTAssertEqual(process.terminationStatus, 0)
+    let samples = try JSONDecoder().decode(Output.self, from: data).fixtures.filter { $0.mode == "fav" }
+    XCTAssertEqual(samples.count, 2)
+    for sample in samples {
+      let f = try Fixture(); defer { f.close() }
+      var initial = sample.frames[0].runtime; initial["mode"] = .string("words"); initial["words"] = .number(5); initial["fontFamily"] = .string("Courier")
+      let config = String(decoding: try JSONEncoder().encode(initial), as: UTF8.self)
+      let draft = try WebsiteConfigNativeProfile.prepareDraft(config, pointsPerRem: 16, context: .init())
+      f.settings.customThemes = [try draft.themes.makeCustomTheme(id: UUID(), name: "Owned_One")]
+      try await f.workflow.apply(json: config, systemIsDark: false)
+      let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+      let preview = WebsiteThemePreview(), register = WebsiteConfigFileRegister(directory: f.directory)
+      for index in 0..<7 {
+        if index == 1 {
+          try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+        } else if (2...5).contains(index) {
+          let result = try f.workflow.runRandomThemeCommand(replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+          XCTAssertEqual(result.disabledSystemFollowing, sample.auto && index == 2)
+        } else if index == 6 {
+          try f.workflow.runFontCommand(.size(24), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+        }
+        let actual = try XCTUnwrap(f.page.state.presentation), expected = sample.frames[index]
+        for (key, value) in expected.runtime { XCTAssertEqual(actual.publication.draft.projection.runtime[key], value, "runtime \(sample.auto) \(index) \(key)") }
+        for (key, value) in expected.settings { XCTAssertEqual(actual.publication.draft.settingsStoreValues[key], value, "store \(sample.auto) \(index) \(key)") }
+        let saved = expected.saved.last?.value ?? sample.frames[0].runtime
+        guard case .available(let disk) = try register.read().state else { return XCTFail("Missing disk") }
+        for (key, value) in saved {
+          XCTAssertEqual(disk[key], value, "disk \(sample.auto) \(index) \(key)")
+          XCTAssertEqual(actual.publication.savedDraft.projection.runtime[key], value)
+        }
+        let name: String; switch actual.appearance.selection { case .inlineCustom: name = "custom"; case .builtIn(let theme): name = theme.rawValue }
+        XCTAssertEqual(name, expected.shown); XCTAssertEqual(actual.randomThemes.active, expected.active)
+        preview.synchronize(actual)
+        let indicator = try XCTUnwrap(preview.indicator(for: actual, customThemes: f.settings.customThemes))
+        XCTAssertEqual(indicator.name, expected.indicator.text); XCTAssertEqual(indicator.isFavorite, expected.indicator.isFavorite)
+        XCTAssertEqual(f.page.state.session.generationState, generation); XCTAssertEqual(f.settings.snapshot, preferences)
+      }
+      preview.stop()
+    }
+  }
+
+  func testRandomAutoOffFailureKeepsTheVolatilePrefixWithoutPromotingItIntoTheForeignSave() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","theme":"dracula","autoSwitchTheme":true,"customTheme":true,"favThemes":["nord","serika"]}"#, systemIsDark: false)
+    try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+    let register = WebsiteConfigFileRegister(directory: f.directory), preferences = f.settings.snapshot
+    var injected = false
+    f.probe.action = {
+      guard !injected, f.page.state.presentation?.randomThemes.active != nil else { return }
+      injected = true
+      do {
+        let disk = try register.read()
+        guard case .available(var foreign) = disk.state else { return XCTFail("Missing disk") }
+        foreign["words"] = .number(9)
+        guard case .committed = try register.commit(runtime: foreign, lazyMemory: disk.lazyMemory, replacing: XCTUnwrap(disk.revision)) else { return XCTFail("Foreign save failed") }
+      } catch { XCTFail("Foreign save: \(error)") }
+    }
+    XCTAssertThrowsError(try f.workflow.runRandomThemeCommand(replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))) {
+      guard case .interrupted = $0 as? WebsiteRandomThemeCommandError else { return XCTFail("Missing prefix diagnosis") }
+    }
+    f.probe.action = nil; XCTAssertTrue(injected)
+    let after = try XCTUnwrap(f.page.state.presentation)
+    XCTAssertFalse(after.publication.draft.themes.customEnabled); XCTAssertTrue(after.publication.draft.themes.followsSystem)
+    XCTAssertEqual(after.randomThemes.active, "serika"); XCTAssertEqual(after.appearance.selection, .builtIn(.serika))
+    guard case .available(let disk) = try register.read().state else { return XCTFail("Missing foreign disk") }
+    XCTAssertEqual(disk["words"], .number(9)); XCTAssertEqual(disk["customTheme"], .bool(true))
+    XCTAssertEqual(disk["autoSwitchTheme"], .bool(true)); XCTAssertEqual(f.settings.snapshot, preferences)
+  }
+
+  func testRandomPreviewFavoritesAndRestartingSetterUseTheActiveCandidate() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","theme":"dracula","favThemes":["nord","serika"]}"#, systemIsDark: false)
+    try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { _ in 0 })
+    try f.workflow.runRandomThemeCommand(replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+    let original = try XCTUnwrap(f.page.state.presentation), preferences = f.settings.snapshot
+    let preview = WebsiteThemePreview(schedule: { _, action in action(); return {} }); defer { preview.stop() }
+    XCTAssertTrue(preview.select(.builtIn(.nord), presentation: original, customThemes: []))
+    XCTAssertEqual(preview.prepared(for: original, owner: f.page.owner)?.theme, AppTheme.nord.resolvedTheme)
+    preview.clear()
+    XCTAssertEqual(preview.prepared(for: original, owner: f.page.owner)?.theme, AppTheme.serika.resolvedTheme)
+    XCTAssertEqual(preview.indicator(for: original, customThemes: [])?.name, "serika")
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    let ordinary = try await XCTUnwrap(f.page.restartController).requestAndWait(requestID: UUID())
+    XCTAssertTrue(ordinary); XCTAssertEqual(f.page.state.presentation?.publication.applicationID, original.publication.applicationID)
+    XCTAssertEqual(f.page.state.presentation?.appearance.selection, .builtIn(.serika)); XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertTrue(CurrentThemeFavoriteCommandApplication.apply(.remove, to: f.settings, colorScheme: .light, presentation: original))
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.themes.favorites, [.nord])
+    try await f.workflow.editAndBegin(.words(6), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), systemIsDark: false)
+    let restarted = try XCTUnwrap(f.page.state.presentation)
+    XCTAssertEqual(restarted.randomThemes.active, "serika"); XCTAssertEqual(restarted.appearance.selection, .builtIn(.serika))
+    try f.workflow.runThemeCommand(.random(.off), replacing: restarted.publication.applicationID)
+    let off = try XCTUnwrap(f.page.state.presentation)
+    XCTAssertNil(off.randomThemes.active); XCTAssertEqual(off.appearance.selection, .builtIn(.dracula))
+    try f.workflow.runThemeCommand(.random(.favorites), replacing: off.publication.applicationID)
+    try f.workflow.runRandomThemeCommand(replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+    XCTAssertEqual(f.page.state.presentation?.randomThemes.active, "nord")
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","theme":"serika","randomTheme":"fav","favThemes":["dracula"]}"#, systemIsDark: false)
+    let imported = try XCTUnwrap(f.page.state.presentation)
+    XCTAssertNil(imported.randomThemes.active); XCTAssertEqual(imported.appearance.selection, .builtIn(.serika))
+    try f.workflow.runRandomThemeCommand(replacing: imported.publication.applicationID)
+    XCTAssertEqual(f.page.state.presentation?.randomThemes.active, "nord", "A full import retains the old bag")
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.themes.favorites, [.dracula])
+    XCTAssertEqual(f.settings.snapshot, preferences)
+  }
+
+  func testEmptyAndDisabledRandomCommandsDoNotPublishAndOpaqueCustomFaultsKeepTheirCursorPrefix() async throws {
+    let f = try Fixture(); defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","randomTheme":"fav","favThemes":[],"customTheme":true}"#, systemIsDark: false)
+    let empty = try XCTUnwrap(f.page.state.presentation), register = WebsiteConfigFileRegister(directory: f.directory)
+    let emptyDisk = try register.read().revision
+    try f.workflow.runRandomThemeCommand(replacing: empty.publication.applicationID)
+    XCTAssertEqual(f.page.state.presentation?.publication.applicationID, empty.publication.applicationID)
+    XCTAssertEqual(try register.read().revision, emptyDisk)
+    try f.workflow.runThemeCommand(.random(.off), replacing: empty.publication.applicationID)
+    let offID = try XCTUnwrap(f.page.state.presentation?.publication.applicationID)
+    XCTAssertThrowsError(try f.workflow.runRandomThemeCommand(replacing: offID))
+    XCTAssertThrowsError(try f.workflow.runRandomThemeCommand(replacing: empty.publication.applicationID))
+    f.account.currentUser = .init(id: UUID(), email: "owned@example.invalid", displayName: "Owned", totalExperience: 0)
+    let colors = try WebsiteConfigNativeProfile.prepareDraft("{}", pointsPerRem: 16, context: .init()).themes
+    let a = try colors.makeCustomTheme(id: UUID(), name: "Owned A"), b = try colors.makeCustomTheme(id: UUID(), name: "Owned B")
+    f.settings.customThemes = [a, b]
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","customTheme":true}"#, systemIsDark: false)
+    try f.workflow.runThemeCommand(.random(.custom), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { $0 })
+    let saved = try register.read(), appearance = f.page.state.presentation?.appearance
+    for id in [a.id, b.id] {
+      XCTAssertThrowsError(try f.workflow.runRandomThemeCommand(replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), chooseThemeIndex: { $0 })) {
+        XCTAssertEqual($0 as? WebsiteRandomThemeSequence.Failure, .missingBuiltIn(id.uuidString))
+      }
+      XCTAssertEqual(f.page.state.presentation?.randomThemes.active, id.uuidString)
+      XCTAssertEqual(f.page.state.presentation?.appearance, appearance)
+      XCTAssertEqual(f.page.state.presentation?.publication.draft.themes.customEnabled, true)
+      XCTAssertTrue(try XCTUnwrap(f.page.state.presentation).publication.draft.projection.events.isEmpty,
+        "A failed draw must not replay the preceding mode/font/import setters")
+      XCTAssertEqual(try register.read().revision, saved.revision); XCTAssertEqual(try register.read().state, saved.state)
+    }
+  }
+
+  func testRandomPreparationCannotPublishAfterDiskOwnershipOrInputChanges() async throws {
+    for kind in ["disk", "owner", "input"] {
+      let f = try Fixture(); defer { f.close() }
+      try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","randomTheme":"fav","customTheme":true,"favThemes":["nord","serika"]}"#, systemIsDark: false)
+      let before = try XCTUnwrap(f.page.state.presentation), register = WebsiteConfigFileRegister(directory: f.directory)
+      let disk = try register.read(), preferences = f.settings.snapshot, other = UUID()
+      var injected = false
+      XCTAssertThrowsError(try f.workflow.runRandomThemeCommand(replacing: before.publication.applicationID, chooseThemeIndex: { _ in
+        if !injected {
+          injected = true
+          if kind == "owner" {
+            f.settings.preferenceConfigurationSaves.register(owner: other, save: { XCTFail("No legacy save") })
+            f.settings.preferenceConfigurationSaves.activate(owner: other)
+          } else if kind == "input" {
+            var state = f.page.state; state.session.insertBatch(String(state.session.nextExpectedCharacter!)); f.page.replace(state)
+          } else {
+            do {
+              guard case .available(var foreign) = disk.state else { XCTFail("Missing disk"); return 0 }
+              foreign["words"] = .number(9)
+              guard case .committed = try register.commit(runtime: foreign, lazyMemory: disk.lazyMemory, replacing: XCTUnwrap(disk.revision)) else { XCTFail("Foreign write failed"); return 0 }
+            } catch { XCTFail("Foreign write: \(error)") }
+          }
+        }
+        return 0
+      }))
+      XCTAssertTrue(injected)
+      XCTAssertEqual(f.page.state.presentation?.publication.applicationID, before.publication.applicationID)
+      XCTAssertNil(f.page.state.presentation?.randomThemes.active)
+      XCTAssertTrue(try XCTUnwrap(f.page.state.presentation).publication.draft.themes.customEnabled)
+      XCTAssertEqual(f.settings.snapshot, preferences)
+      if kind != "disk" { XCTAssertEqual(try register.read().revision, disk.revision) }
+      if kind == "input" { XCTAssertTrue(f.page.state.session.hasStarted) }
+      f.settings.preferenceConfigurationSaves.remove(owner: other)
+    }
+  }
+
   func testRandomBagSurvivesFontRestartAndFullImportWithoutOverwritingNewFavorites() async throws {
     let f = try Fixture(); defer { f.close() }
     try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","favThemes":["nord","serika","dracula"]}"#, systemIsDark: false)
@@ -386,6 +596,11 @@ import XCTest
     XCTAssertTrue(ThemeCommandApplication.apply(.builtIn(.nord), to: f.settings))
     await wait(AppTheme.nord.resolvedTheme)
     XCTAssertEqual(model.ready.last?.style.theme, AppTheme.nord.resolvedTheme)
+    try f.workflow.runThemeCommand(.favorites([.serika]), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+    try f.workflow.runThemeCommand(.random(.favorites), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+    try f.workflow.runRandomThemeCommand(replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+    await wait(AppTheme.serika.resolvedTheme)
+    XCTAssertEqual(model.ready.last?.style.theme, AppTheme.serika.resolvedTheme)
     XCTAssertEqual(f.page.state.session.generationState, generation); XCTAssertFalse(window.isVisible)
   }
 }

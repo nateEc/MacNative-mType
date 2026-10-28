@@ -74,7 +74,7 @@ export async function checkThemePreview({context, simulation, frontend, bus, set
       const frames=[];
       const snapshot=()=>({runtime:pick(simulation.Config),settings:pick(store.getConfig),
         saved:simulation.configCheckpoints.map(item=>({key:item.key,value:pick(item.value)})),
-        events:structuredClone(simulation.events),shown:shown?.name,active:vm.runInContext('randomTheme',context)});
+        events:structuredClone(simulation.events),shown:shown?.name,active:vm.runInContext('randomTheme',context),indicator:structuredClone(indicator)});
       bus.dispatch({key:'fullConfigChangeFinished'});await drain();frames.push(snapshot());
       setters.setConfig('randomTheme',mode);await drain();frames.push(snapshot());
       for(let draw=0;draw<4;draw++) {

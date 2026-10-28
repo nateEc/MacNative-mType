@@ -2034,7 +2034,7 @@ private struct ContentView: View {
         if CurrentProcessPracticePolicy.shouldRecord(outcome: result.outcome) {
           currentProcessPractice.append(.init(result: result))
         }
-        if result.outcome == .completed {
+        if result.outcome == .completed && !pageSessionStore.ownsConfigurationSelection {
           settings.randomizeTheme(for: systemColorScheme)
         }
         if savesResult {
@@ -4987,7 +4987,9 @@ private struct ContentView: View {
   }
   private var currentThemeForFavoriteCommand: AppTheme? {
     guard let themes = committedPracticeDraft?.themes else { return settings.currentBuiltInThemeForFavoriteCommand(for: systemColorScheme) }
-    return themes.customEnabled ? nil : themes.theme
+    guard !themes.customEnabled else { return nil }
+    if let random = publishedPresentation?.randomThemes.active { return AppTheme(rawValue: random) }
+    return themes.theme
   }
 
   private func handleThemeIndicatorActivation() {
@@ -6220,7 +6222,7 @@ private struct ContentView: View {
     ]
     items.append(contentsOf: NoStressResultCommandCatalog.items)
     items.append(contentsOf: CommandPaletteUtilityCatalog.items(
-      randomThemeEnabled: settings.randomThemeMode.isEnabled && !settings.followSystemTheme,
+      randomThemeEnabled: committedPracticeDraft?.themes.randomMode.isEnabled ?? (settings.randomThemeMode.isEnabled && !settings.followSystemTheme),
       authenticated: account.currentUser != nil,
       websiteProfileActive: committedPracticeDraft != nil && pageSession.savedApplication == nil
         && pageSession.configurationDeparture == nil
@@ -6335,6 +6337,15 @@ private struct ContentView: View {
                 customTextSectionLimit: customTextSectionLimit))
         }
       case .nextRandomTheme:
+        if pageSessionStore.ownsConfigurationSelection {
+          guard let publication = publishedPresentation?.publication else { return }
+          do {
+            let completion = try importWorkflow().runRandomThemeCommand(replacing: publication.applicationID)
+            preparedWholePreviewRendering = nil
+            if completion.disabledSystemFollowing { account.localNotices.post("已关闭系统外观跟随。") }
+          } catch { account.localNotices.post((error as? LocalizedError)?.errorDescription ?? "随机主题未完成，请重试。") }
+          return
+        }
         guard settings.randomThemeMode.isEnabled, !settings.followSystemTheme else { return }
         settings.randomizeTheme(for: systemColorScheme)
       case .signOut:
@@ -6711,7 +6722,7 @@ private struct ContentView: View {
     }
     if let target = CurrentThemeFavoriteCommandCatalog.target(for: item.id) {
       _ = CurrentThemeFavoriteCommandApplication.apply(
-        target, to: settings, colorScheme: systemColorScheme, onConfigurationSave: persistExplicitTestConfiguration)
+        target, to: settings, colorScheme: systemColorScheme, presentation: publishedPresentation, onConfigurationSave: persistExplicitTestConfiguration)
       return
     }
     if let target = CustomBackgroundCommandCatalog.target(for: item.id) {

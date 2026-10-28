@@ -820,6 +820,81 @@ final class WebsiteConfigCommitCoordinator {
     guard prepared.admission == resourceAdmission else { return .stale }
     return try commitLiveEdit(prepared.configuration, for: page, kind: .font, font: prepared.font)
   }
+  struct RandomThemePrepared {
+    fileprivate let configuration: Prepared
+    fileprivate let appearance: WebsiteConfigPublishedPresentation.PreparedAppearance
+    let failure: WebsiteRandomThemeSequence.Failure?
+    let disablesSystemFollowing: Bool
+  }
+
+  func prepareRandomTheme(for page: PracticePageSessionStore, refreshingWith source: WebsiteConfigPracticeScopeSource,
+    customThemes: [CustomThemeDefinition], chooseIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> RandomThemePrepared? {
+    guard let previous = page.state.presentation, previous.publication.draft.themes.randomMode != .off else {
+      throw WebsiteRandomThemeCommandError.disabled
+    }
+    var configuration = try preparePageEdit(key: "customTheme", value: .bool(false), for: page, refreshingWith: source, nosave: true)
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    guard isCurrent(configuration), configuration.pageCapture?.publication.applicationID == previous.publication.applicationID else {
+      throw WebsiteConfigCommitCoordinatorError.stale
+    }
+    var random = previous.randomThemes
+    let attempt = try random.attemptDraw(draft: previous.publication.draft,
+      customIDs: customThemes.map { $0.id.uuidString }, systemIsDark: previous.currentSystemIsDark,
+      pointsPerRem: configuration.environment.pointsPerRem, context: configuration.environment.context, chooseIndex: chooseIndex)
+    guard attempt.result?.draw != nil || attempt.failure != nil else { retire(configuration); return nil }
+    var customColors: WebsiteConfigValue?
+    if let id = attempt.result?.draw?.customSourceID,
+      let custom = customThemes.first(where: { $0.id.uuidString == id }) {
+      customColors = try WebsiteThemeCommand.fields(for: .select(.custom(custom.id)), customThemes: [custom]).last?.value
+    }
+    let appearance = try previous.prepareRandomEffect(draft: attempt.draft, random: random,
+      draw: attempt.result?.draw, customColors: customColors)
+    try Task.checkCancellation()
+    guard isCurrent(configuration) else { throw WebsiteConfigCommitCoordinatorError.stale }
+    configuration.draft = attempt.draft
+    return .init(configuration: configuration, appearance: appearance, failure: attempt.failure,
+      disablesSystemFollowing: attempt.result?.disablesSystemFollowing ?? false)
+  }
+
+  @discardableResult func cancelRandomTheme(_ prepared: RandomThemePrepared) -> Bool { cancel(prepared.configuration) }
+
+  func commitRandomTheme(_ value: RandomThemePrepared, for page: PracticePageSessionStore) throws -> Outcome {
+    guard !processing, page.restartController?.isPreparing != true else { return .busy }
+    processing = true; defer { processing = false }
+    let prepared = value.configuration
+    try Task.checkCancellation()
+    guard isCurrent(prepared), prepared.sourcePage === page, let capture = prepared.pageCapture,
+      page.state.savedApplication == nil, page.state.configurationDeparture == nil, page.state.sharedReceipt == nil,
+      let practice = page.state.practice else { return .stale }
+    var state = page.state
+    let progress = state.currentQuoteInitialization, controller = page.restartController
+    let updatedPractice = WebsiteConfigSessionBuilder.Prepared(session: state.session, scope: practice.scope,
+      quote: practice.quote, external: practice.external, repetition: practice.repetition)
+    guard isCurrent(prepared) else { return .stale }
+    try page.beginRandomThemeCommit(owner: prepared.owner, router: router, capture: capture)
+    defer { page.endCommit() }
+    // Draws (including source fault prefixes) are volatile. Check the record
+    // without promoting a temporary flag or favorite shuffle into a save.
+    do { guard try register.read().revision == prepared.disk else { return .conflict } }
+    catch WebsiteConfigFileRegisterError.busy { return .busy }
+    let publication = Publication(applicationID: UUID(), draft: prepared.draft, savedDraft: capture.publication.savedDraft,
+      owner: prepared.owner.owner, environmentRevision: prepared.environment.revision,
+      pointsPerRem: prepared.environment.pointsPerRem, disk: prepared.disk,
+      background: capture.publication.background, font: capture.publication.font,
+      session: state.session, practice: updatedPractice, quoteRecoveries: capture.publication.quoteRecoveries,
+      ownerLease: prepared.owner, authority: publicationAuthority)
+    let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: value.appearance)
+    state = .init(session: state.session, presentation: presentation, practice: updatedPractice,
+      priorAttemptLedger: state.priorAttemptLedger, restartDepartureAttemptID: state.restartDepartureAttemptID,
+      quoteInitialization: state.quoteInitialization)
+    if let progress { state.quoteInitialization = .init(publication: publication.applicationID, configurationDeparture: nil, progress: progress) }
+    latest = publication; publicationAuthority.latest = publication.applicationID
+    page.installCommitted(state, retainingRestartController: controller)
+    retire(prepared)
+    return .committed(publication)
+  }
+
   func commitLiveTheme(_ prepared: Prepared, for page: PracticePageSessionStore, customThemeIDs: [String] = [],
     chooseThemeIndex: (Int) -> Int = { Int.random(in: 0...$0) }) throws -> Outcome {
     try commitLiveEdit(prepared, for: page, kind: .theme, customThemeIDs: customThemeIDs, chooseThemeIndex: chooseThemeIndex)
@@ -2130,7 +2205,7 @@ final class WebsiteConfigCommitCoordinator {
         throw PracticePageSessionStateError.invalidAttempt
       }
       appearance = try WebsiteConfigPublishedPresentation.prepareAppearance(draft: prepared.draft,
-        applicationID: applicationID, systemIsDark: systemIsDark, previousRandomThemes: page.state.presentation?.randomThemes)
+        applicationID: applicationID, systemIsDark: systemIsDark, previous: page.state.presentation)
       try page.beginCommit(owner: prepared.owner, router: router, capture: prepared.pageCapture,
         applicationCapture: prepared.applicationCapture)
     } else { appearance = nil }

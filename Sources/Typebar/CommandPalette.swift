@@ -1873,11 +1873,14 @@ enum CurrentThemeFavoriteCommandApplication {
     @MainActor
     static func apply(
         _ target: CurrentThemeFavoriteCommandTarget, to settings: AppSettings,
-        colorScheme: ColorScheme, onConfigurationSave: () -> Void = {}
+        colorScheme: ColorScheme, presentation: WebsiteConfigPublishedPresentation? = nil, onConfigurationSave: () -> Void = {}
     ) -> Bool {
         let source = settings.preferenceConfigurationSaves.themes
+        if let presentation, settings.preferenceConfigurationSaves.captureLease()?.owner != presentation.publication.owner { return false }
+        let random = presentation?.randomThemes.active
+        if let random, AppTheme(rawValue: random) == nil { return false }
         guard source?.customEnabled != true,
-          let theme = source?.theme ?? settings.currentBuiltInThemeForFavoriteCommand(for: colorScheme) else {
+          let theme = random.flatMap(AppTheme.init(rawValue:)) ?? source?.theme ?? settings.currentBuiltInThemeForFavoriteCommand(for: colorScheme) else {
             return false
         }
         let isFavorite = source?.favorites.contains(theme) ?? settings.isFavoriteTheme(theme)

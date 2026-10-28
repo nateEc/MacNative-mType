@@ -164,6 +164,18 @@ struct WebsiteConfigNativeDraft {
   }
 
   @MainActor
+  func receivingRuntimeEffect(_ runtime: [String: WebsiteConfigValue], pointsPerRem: Double) throws -> Self {
+    // A listener prefix is a new runtime boundary, not a replay of the prior
+    // import/setter. Reuse the received-projection shape to freeze its store;
+    // this does not create a shared receipt or mark any new setter accepted.
+    var result = try Self(origin: .received(.init(projection: .init(requested: projection.requested,
+      runtime: runtime, rejectedKeys: [], events: []), runtimeAtBoundary: runtime,
+      storeAtBoundary: settingsStoreValues, appliedEventCount: 0)), pointsPerRem: pointsPerRem)
+    result.lazyMemory = lazyMemory; result.funboxMemory = funboxMemory
+    return result
+  }
+
+  @MainActor
   func markingReceivedEventsApplied(pointsPerRem: Double) throws -> Self {
     guard case .received(var value) = origin else { return self }
     value.runtimeAtBoundary = projection.runtime; value.storeAtBoundary = settingsStoreValues
