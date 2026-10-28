@@ -39,6 +39,7 @@ import XCTest
           guard let id = page.state.presentation?.publication.applicationID else { return false }
           do { try workflow.runBackgroundCommand(edit, replacing: id); return true } catch { return false }
         }, save: { XCTFail("Theme must not save native preferences") })
+      settings.preferenceConfigurationSaves.setBackgroundSettingsProvider(owner: page.owner) { page.backgroundSettingsState }
     }
     func publish() async throws {
       try await workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","theme":"dracula"}"#, systemIsDark: false)
@@ -494,6 +495,117 @@ import XCTest
     XCTAssertTrue(f.page.state.presentation?.backgroundDisplay === display)
     XCTAssertEqual(gate.reads, 1); XCTAssertEqual(try register.read().revision, revision)
   }
+  func testSettingsFilterInputPreviewsWithoutSavingOrChangingNativeFallback() async throws {
+    let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read)
+    defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","customBackground":"https://example.invalid/before.png"}"#, systemIsDark: false)
+    await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+    let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+    let revision = try WebsiteConfigFileRegister(directory: f.directory).read().revision
+    let model = BackgroundSettingsPreferences(settings: f.settings)
+    XCTAssertTrue(model.input(component: 1, value: 0.5))
+    XCTAssertEqual(f.page.state.presentation?.backgroundSnapshot?.filterOverride?.brightness, 0.5)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundFilter.brightness, 1)
+    XCTAssertEqual(try WebsiteConfigFileRegister(directory: f.directory).read().revision, revision)
+    XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
+  }
+  func testSettingsSlidersAgainstPinnedTSXCallbacksRealSolidStoreAndController() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned source") }
+    struct Frame: Decodable { let runtime, settings, refs: [Double]; let labels: [String]; let saves: Int; let style: [String: String] }
+    struct Sample: Decodable { let initial: [Double]; let component, second: Int; let frames: [Frame] }
+    struct Output: Decodable { let fixtures: [Sample] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-config-schema.mjs").path, reference, "--background-settings"]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit(); XCTAssertEqual(process.terminationStatus, 0)
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    XCTAssertEqual(output.fixtures.count, 8); XCTAssertEqual(output.fixtures.reduce(0) { $0 + $1.frames.count }, 48)
+    for sample in output.fixtures {
+      let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read)
+      defer { f.close() }
+      let filters = sample.initial.map(String.init(describing:)).joined(separator: ",")
+      try await f.workflow.apply(json: "{\"mode\":\"words\",\"words\":5,\"fontFamily\":\"Courier\",\"customBackground\":\"https://example.invalid/before.png\",\"customBackgroundFilter\":[\(filters)]}", systemIsDark: false)
+      await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+      let model = BackgroundSettingsPreferences(settings: f.settings)
+      let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+      let register = WebsiteConfigFileRegister(directory: f.directory), originalRevision = try register.read().revision
+      func values(_ value: WebsiteConfigValue?) throws -> [Double] {
+        guard case .array(let items) = value else { throw NSError(domain: "Missing filter", code: 1) }
+        return try items.map { guard case .number(let n) = $0 else { throw NSError(domain: "Missing number", code: 1) }; return n }
+      }
+      func verify(_ frame: Frame, preview: Bool) throws {
+        model.synchronize()
+        let publication = try XCTUnwrap(f.page.state.presentation?.publication)
+        XCTAssertEqual(try values(publication.draft.projection.runtime["customBackgroundFilter"]), frame.runtime)
+        XCTAssertEqual(try values(publication.draft.settingsStoreValues["customBackgroundFilter"]), frame.settings)
+        XCTAssertEqual(model.refs, frame.refs); XCTAssertEqual(model.labels, frame.labels.compactMap(Double.init))
+        if preview {
+          let actual = try XCTUnwrap(f.page.state.presentation?.backgroundSnapshot?.filterOverride)
+          XCTAssertEqual([actual.blurRem, actual.brightness, actual.saturation, actual.opacity], frame.refs)
+        }
+        XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
+      }
+      try verify(sample.frames[0], preview: false)
+      XCTAssertTrue(model.input(component: sample.component, value: 0.5)); try verify(sample.frames[1], preview: true)
+      XCTAssertEqual(try register.read().revision, originalRevision)
+      XCTAssertTrue(model.commit(component: sample.component, value: 0.5)); try verify(sample.frames[2], preview: true)
+      let savedRevision = try register.read().revision; XCTAssertNotEqual(savedRevision, originalRevision)
+      XCTAssertTrue(model.commit(component: sample.component, value: 0.5)); try verify(sample.frames[3], preview: true)
+      XCTAssertEqual(try register.read().revision, savedRevision)
+      XCTAssertTrue(model.input(component: sample.second, value: 0.8)); try verify(sample.frames[4], preview: true)
+      try f.workflow.runFontCommand(.size(32), replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID))
+      try verify(sample.frames[5], preview: true); XCTAssertEqual(loader.reads, 1)
+    }
+  }
+
+  func testSettingsSliderRejectsOldImageAndHiddenNativeActionSavesCurrentTarget() async throws {
+    let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read)
+    defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","customBackground":"https://example.invalid/before.png"}"#, systemIsDark: false)
+    await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+    let model = BackgroundSettingsPreferences(settings: f.settings), oldTarget = try XCTUnwrap(model.target)
+    let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+    let slider = BackgroundSettingsSliderView(frame: .init(x: 0, y: 0, width: 200, height: 24))
+    slider.configure(value: model.refs[1], range: model.range(1), step: model.step(1), target: model.target, enabled: true)
+    slider.input = { model.input(component: 1, value: $0, target: $1) }
+    slider.commit = { model.commit(component: 1, value: $0, target: $1) }
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 240, height: 60), styleMask: [.borderless], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView?.addSubview(slider)
+    defer { window.close() }; XCTAssertFalse(window.isVisible)
+    slider.doubleValue = 0.7; XCTAssertTrue(slider.sendAction(slider.action, to: slider.target))
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundFilter.brightness, 0.7)
+    XCTAssertEqual(f.page.state.presentation?.backgroundSnapshot?.filterOverride?.brightness, 0.7)
+    XCTAssertTrue(CustomBackgroundCommandEditorPolicy.apply("https://example.invalid/after.png", kind: .remoteURL, to: f.settings))
+    await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+    XCTAssertNotEqual(model.target, oldTarget)
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    XCTAssertFalse(model.input(component: 1, value: 0.2, target: oldTarget))
+    XCTAssertFalse(model.commit(component: 1, value: 0.2, target: oldTarget))
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertNil(f.page.state.presentation?.backgroundSnapshot?.filterOverride)
+    XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
+    XCTAssertFalse(window.isVisible)
+  }
+
+  func testSettingsLocalRemovalRetainsRemoteAddressWithoutSavingTheProfile() async throws {
+    let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read)
+    defer { f.close() }
+    try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","customBackground":"https://example.invalid/before.png"}"#, systemIsDark: false)
+    await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+    let preferences = f.settings.snapshot, generation = f.page.state.session.generationState
+    let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+    XCTAssertEqual(f.settings.preferenceConfigurationSaves.applyBackgroundEdit(.localFile(loader.data)), true)
+    await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+    XCTAssertTrue(f.settings.hasLocalBackground); XCTAssertEqual(loader.reads, 1)
+    XCTAssertEqual(f.settings.preferenceConfigurationSaves.applyBackgroundEdit(.removeLocal), true)
+    await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+    XCTAssertFalse(f.settings.hasLocalBackground); XCTAssertEqual(loader.reads, 2)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress, .string("https://example.invalid/before.png"))
+    XCTAssertEqual(try register.read().revision, revision)
+    XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
+  }
+
   func testBackgroundAddressTrimsBeforeSchemaAdmissionWithoutChangingNativeFallback() async throws {
     let f = try Fixture(fetchRemoteBackground: { address, _ in .failed(address: address) }); defer { f.close() }; try await f.publish()
     let preferences = f.settings.snapshot, generation = f.page.state.session.generationState

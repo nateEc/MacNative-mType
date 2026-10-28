@@ -25,9 +25,16 @@ final class WebsiteConfigPublishedPresentation {
   let backgroundDisplay: WebsiteConfigBackgroundDisplay?
   let backgroundFallback: WebsiteConfigBackgroundDisplay.Snapshot?
   let backgroundFitOverride: CustomBackgroundFit?
+  struct BackgroundFilterPreview { let image: UUID; let filter: WebsiteConfigNativePagePreferences.BackgroundFilter }
+  private(set) var backgroundFilterPreview: BackgroundFilterPreview?
   var backgroundSnapshot: WebsiteConfigBackgroundDisplay.Snapshot? {
     let snapshot = unmodifiedBackgroundSnapshot
-    return backgroundFitOverride.flatMap { snapshot?.fitting($0) } ?? snapshot
+    let fitted = backgroundFitOverride.flatMap { snapshot?.fitting($0) } ?? snapshot
+    if let preview = backgroundFilterPreview, fitted?.identity == preview.image { return fitted?.filtering(preview.filter) }
+    return fitted
+  }
+  func previewBackgroundFilter(_ filter: WebsiteConfigNativePagePreferences.BackgroundFilter, image: UUID) {
+    backgroundFilterPreview = .init(image: image, filter: filter)
   }
   private var unmodifiedBackgroundSnapshot: WebsiteConfigBackgroundDisplay.Snapshot? {
     if let backgroundDisplay { return backgroundDisplay.snapshot }
@@ -112,9 +119,11 @@ final class WebsiteConfigPublishedPresentation {
   /// before the durable commit. This construction has no fallible operations.
   init(publication: WebsiteConfigCommitCoordinator.Publication, preparedAppearance: PreparedAppearance,
     backgroundDisplay: WebsiteConfigBackgroundDisplay? = nil,
-    backgroundFallback: WebsiteConfigBackgroundDisplay.Snapshot? = nil, backgroundFitOverride: CustomBackgroundFit? = nil) {
+    backgroundFallback: WebsiteConfigBackgroundDisplay.Snapshot? = nil, backgroundFitOverride: CustomBackgroundFit? = nil,
+    backgroundFilterPreview: BackgroundFilterPreview? = nil) {
     self.backgroundDisplay = backgroundDisplay
     self.backgroundFallback = backgroundFallback; self.backgroundFitOverride = backgroundFitOverride
+    self.backgroundFilterPreview = backgroundFilterPreview
     self.publication = publication; owner = publication.owner; themes = preparedAppearance.themes
     customTheme = preparedAppearance.custom; systemIsDark = preparedAppearance.systemIsDark
     appearance = preparedAppearance.appearance
@@ -127,13 +136,13 @@ final class WebsiteConfigPublishedPresentation {
     .init(publication: publication, preparedAppearance: .init(themes: themes, custom: customTheme,
       appearance: appearance, systemIsDark: systemIsDark, changes: themeChanges, randomThemes: randomThemes),
       backgroundDisplay: backgroundDisplay, backgroundFallback: backgroundFallback ?? (backgroundDisplay == nil ? backgroundSnapshot : nil),
-      backgroundFitOverride: backgroundFitOverride)
+      backgroundFitOverride: backgroundFitOverride, backgroundFilterPreview: backgroundFilterPreview)
   }
   func changingBackground(for publication: WebsiteConfigCommitCoordinator.Publication,
     display: WebsiteConfigBackgroundDisplay?, fit: CustomBackgroundFit?, fallback: WebsiteConfigBackgroundDisplay.Snapshot?) -> WebsiteConfigPublishedPresentation {
     .init(publication: publication, preparedAppearance: .init(themes: themes, custom: customTheme,
       appearance: appearance, systemIsDark: systemIsDark, changes: themeChanges, randomThemes: randomThemes),
-      backgroundDisplay: display, backgroundFallback: fallback, backgroundFitOverride: fit)
+      backgroundDisplay: display, backgroundFallback: fallback, backgroundFitOverride: fit, backgroundFilterPreview: backgroundFilterPreview)
   }
   func hasSameBackgroundConfiguration(as draft: WebsiteConfigNativeDraft) -> Bool {
     WebsiteBackgroundCommand.keys.allSatisfy { publication.draft.projection.runtime[$0] == draft.projection.runtime[$0] }

@@ -3,6 +3,9 @@ import Foundation
 enum PracticeBackgroundEdit: Equatable {
   case address(String), fit(CustomBackgroundFit), filter(CustomBackgroundCommandEditorKind, String)
   case localFile(Data), remove
+  case removeLocal
+  case settingsFilter(WebsiteBackgroundSettingsState.Token, Int, Double)
+  case previewFilter(WebsiteBackgroundSettingsState.Token, [Double])
 }
 enum WebsiteBackgroundCommandError: Error, LocalizedError {
   case invalidInput
@@ -27,6 +30,11 @@ enum WebsiteBackgroundCommand {
   static func field(_ edit: PracticeBackgroundEdit, current: WebsiteConfigNativeDraft) throws -> (String, WebsiteConfigValue) {
     let key: String, value: WebsiteConfigValue
     switch edit {
+    case .settingsFilter(_, let index, let number):
+      guard (0..<4).contains(index), number.isFinite,
+        case .array(var values) = current.settingsStoreValues["customBackgroundFilter"], values.count == 4
+      else { throw WebsiteBackgroundCommandError.invalidInput }
+      values[index] = .number(number); key = "customBackgroundFilter"; value = .array(values)
     case .address(let address): key = "customBackground"; value = .string(address)
     case .remove: key = "customBackground"; value = .string("")
     case .fit(let fit): key = "customBackgroundSize"; value = .string(fit.rawValue)
@@ -37,7 +45,7 @@ enum WebsiteBackgroundCommand {
       guard !input.isEmpty, !number.isNaN, case .array(var values) = current.projection.runtime["customBackgroundFilter"], values.count == 4
       else { throw WebsiteBackgroundCommandError.invalidInput }
       values[index] = .number(number); key = "customBackgroundFilter"; value = .array(values)
-    case .localFile: throw WebsiteBackgroundCommandError.invalidInput
+    case .localFile, .removeLocal, .previewFilter: throw WebsiteBackgroundCommandError.invalidInput
     }
     let admitted = key == "customBackground" ? value.trimmingWebsiteString : value
     guard WebsiteConfigSchema(catalogs: WebsiteConfigNativeProfile.catalogs).accepts(admitted, for: key) else { throw WebsiteBackgroundCommandError.invalidInput }

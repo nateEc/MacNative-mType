@@ -2,6 +2,10 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| BACKGROUND-SETTINGS-14 | 完整配置背景设置页的预览和保存 | 固定 TSX 回调、真实 Solid effect／store、setter 和背景控制器；自有 DOM refs，隐藏 WebKit range | BackgroundSettingsPreferences、BackgroundSettingsControls 和当前图片预览覆盖；WEBSITE_BACKGROUND_SETTINGS_CONTRACT.md | 部分完成：四滑块 input 预览与 change 保存、来源范围／步长、旧图片目标拒绝、设置页本地移除保留 URL。真实鼠标手势、跨窗口实体交互、文件选择器延迟和全部异步故障组合仍开放。 |
+
+| ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
+| --- | --- | --- | --- | --- |
 | BACKGROUND-COMMAND-13 | 完整配置的背景命令和显示保存边界 | 固定命令、构造器、真实配置总线／Solid、背景和 TestLogic 监听器；自有图片／DOM 适配 | WebsiteBackgroundCommand、活动窗口路由、背景实时提交与显示覆盖；WEBSITE_BACKGROUND_COMMAND_CONTRACT.md | 部分完成：地址、尺寸、过滤器、本地文件与移除接当前完整配置；命令只保存过滤器，尺寸即时更新，输入和有效下载保留。设置页滑块、无效输入的别名故障副作用、全部文件命令来源故障及实体交互仍开放。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |

@@ -9,6 +9,21 @@ import XCTest
 @MainActor
 final class BackgroundApplicationTests: XCTestCase {
   private let address = "https://example.invalid/same.png"
+  func testNativeSettingsSlidersKeepLegacyBoundsAndImmediatePersistence() throws {
+    try withSettings { settings, _ in
+      settings.customBackgroundURL = address
+      let model = BackgroundSettingsPreferences(settings: settings)
+      XCTAssertNil(model.source); XCTAssertEqual(model.target, .native)
+      XCTAssertEqual(model.range(0), 0...20); XCTAssertEqual(model.range(2), 0...3)
+      XCTAssertEqual(model.step(0), 0.5); XCTAssertEqual(model.step(2), 0.05)
+      let identity = settings.customBackgroundApplicationID
+      XCTAssertTrue(model.input(component: 0, value: 8.5)); XCTAssertTrue(model.commit(component: 0, value: 8.5))
+      XCTAssertEqual(settings.customBackgroundFilter.blur, 8.5)
+      XCTAssertEqual(settings.customBackgroundApplicationID, identity)
+      XCTAssertTrue(CustomBackgroundCommandEditorPolicy.apply("", kind: .remoteURL, to: settings))
+      XCTAssertEqual(settings.customBackgroundURL, ""); XCTAssertFalse(model.filtersVisible)
+    }
+  }
   private func withSettings(_ body: (AppSettings, UserDefaults) throws -> Void) rethrows {
     let suite = "typebar.background-application.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!

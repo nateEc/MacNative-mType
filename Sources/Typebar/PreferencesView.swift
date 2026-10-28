@@ -100,9 +100,6 @@ struct PreferencesView: View {
   @State private var customKeyboardShiftedBottomRow = ""
   @State private var customKeyboardLayoutMessage: String?
   @State private var searchQuery = ""
-  @State private var customBackgroundURLDraft = ""
-  @State private var customBackgroundMessage: String?
-  @State private var showingCustomBackgroundImporter = false
   @State private var localPracticeFontMessage: String?
   @State private var practiceFontNameDraft = ""
   @State private var showingLocalPracticeFontImporter = false
@@ -458,48 +455,7 @@ struct PreferencesView: View {
           Text("开启后，已输入文本使用当前主题强调色；与翻转颜色组合时，后续提示使用强调色。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          TextField("背景图片 URL", text: $customBackgroundURLDraft)
-            .textFieldStyle(.roundedBorder)
-          HStack {
-            Button("应用 URL") { applyCustomBackgroundURL() }
-            if !settings.customBackgroundURL.isEmpty {
-              Button("移除 URL") {
-                settings.customBackgroundURL = ""
-                customBackgroundURLDraft = ""
-              }
-            }
-            Spacer()
-            Button(settings.hasLocalBackground ? "替换本地图片…" : "选择本地图片…") {
-              showingCustomBackgroundImporter = true
-            }
-            if settings.hasLocalBackground {
-              Button("移除本地图片", role: .destructive) { removeLocalBackground() }
-            }
-          }
-          Picker("背景图片适配", selection: $settings.customBackgroundFit) {
-            ForEach(CustomBackgroundFit.allCases) { fit in
-              Text(fit.displayName).tag(fit)
-            }
-          }
-          if settings.hasLocalBackground || !settings.customBackgroundURL.isEmpty {
-            Slider(value: $settings.customBackgroundFilter.blur, in: 0...20, step: 0.5) {
-              Text("背景模糊")
-            }
-            Slider(value: $settings.customBackgroundFilter.brightness, in: 0...2, step: 0.05) {
-              Text("背景亮度")
-            }
-            Slider(value: $settings.customBackgroundFilter.saturation, in: 0...3, step: 0.05) {
-              Text("背景饱和度")
-            }
-            Slider(value: $settings.customBackgroundFilter.opacity, in: 0...1, step: 0.05) {
-              Text("背景不透明度")
-            }
-          }
-          if let customBackgroundMessage {
-            Text(customBackgroundMessage)
-              .font(.caption)
-              .foregroundStyle(.red)
-          }
+          BackgroundSettingsControls(settings: settings)
           Text("可使用 HTTP(S) 的 PNG、JPG、GIF 或 WebP 图片 URL，或导入本地图片。本地图片只保存在这台 Mac 且优先于 URL；只有在你填写 URL 时才会访问网络。URL、适配和滤镜会随设置归档，本地图片不会导出。")
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -2148,12 +2104,6 @@ struct PreferencesView: View {
     } message: {
       Text("封禁会立即排除共享 WPM 与 XP 榜、隐藏扩展公开资料，并阻止资料更新与账户重置；登录、同步、本机练习、成绩历史、密码和删号保持可用。")
     }
-    .fileImporter(isPresented: $showingCustomBackgroundImporter, allowedContentTypes: [.image]) { result in
-      switch result {
-      case .success(let url): importLocalBackground(from: url)
-      case .failure(let error): customBackgroundMessage = error.localizedDescription
-      }
-    }
     .fileImporter(
       isPresented: $showingLocalPracticeFontImporter,
       allowedContentTypes: LocalPracticeFontFilePolicy.supportedContentTypes
@@ -2173,7 +2123,6 @@ struct PreferencesView: View {
         selection: fontPreferences.installedSelection,
         families: installedFontFamilies)
     }
-    .onAppear { customBackgroundURLDraft = settings.customBackgroundURL }
     .onAppear { practiceFontNameDraft = fontPreferences.familyName }
     .onChange(of: settings.preferenceFontFamilyName) { _, name in practiceFontNameDraft = name }
     .onDisappear { accountResultExportTask?.cancel() }
@@ -2212,38 +2161,6 @@ struct PreferencesView: View {
     let magnitude = offset.magnitude.formatted(.number.precision(.fractionLength(0...1)))
     let sign = offset > 0 ? "+" : (offset < 0 ? "−" : "")
     return "\(sign)\(magnitude) 小时"
-  }
-
-  private func applyCustomBackgroundURL() {
-    guard let normalized = CustomBackgroundURLPolicy.normalizedRemoteURL(customBackgroundURLDraft) else {
-      customBackgroundMessage = "请输入 HTTP(S) 的 PNG、JPG、GIF 或 WebP 图片 URL。"
-      return
-    }
-    settings.customBackgroundURL = normalized
-    customBackgroundURLDraft = normalized
-    customBackgroundMessage = nil
-  }
-
-  private func importLocalBackground(from url: URL) {
-    let canAccess = url.startAccessingSecurityScopedResource()
-    defer {
-      if canAccess { url.stopAccessingSecurityScopedResource() }
-    }
-    do {
-      try settings.importLocalBackground(data: Data(contentsOf: url))
-      customBackgroundMessage = nil
-    } catch {
-      customBackgroundMessage = error.localizedDescription
-    }
-  }
-
-  private func removeLocalBackground() {
-    do {
-      try settings.removeLocalBackground()
-      customBackgroundMessage = nil
-    } catch {
-      customBackgroundMessage = error.localizedDescription
-    }
   }
 
   private func importLocalPracticeFont(from url: URL) {
@@ -2346,10 +2263,6 @@ struct PreferencesView: View {
         return
       }
       customThemeImportLink = ""
-      if let backgroundURL = imported.remoteBackgroundURL {
-        customBackgroundURLDraft = backgroundURL
-        customBackgroundMessage = nil
-      }
       resetCustomThemeEditor(keepingMessage: true)
       customThemeMessage = imported.skippedBackground
         ? "已导入并应用“\(applied.name)”。链接中的背景图片不符合本机安全限制，未导入。"

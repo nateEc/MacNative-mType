@@ -1910,6 +1910,7 @@ private struct ContentView: View {
         persistExplicitTestConfiguration()
       }
       installWebsiteArchiveAdmission()
+      settings.preferenceConfigurationSaves.setBackgroundSettingsProvider(owner: preferenceConfigurationOwner) { pageSessionStore.backgroundSettingsState }
       activatePreferenceConfigurationOwnerIfKey()
       pageSessionStore.attach(to: settings.preferenceConfigurationSaves)
       pageSessionStore.bindPaceStyleSettings(settings)

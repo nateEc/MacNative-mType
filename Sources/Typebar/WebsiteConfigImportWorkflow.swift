@@ -449,6 +449,16 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
     else { throw WebsiteConfigImportWorkflowError.preparationPending }
     guard let original = page.state.presentation?.publication, original.applicationID == applicationID else { throw WebsiteConfigImportWorkflowError.conflict }
     try Task.checkCancellation()
+    switch edit {
+    case .previewFilter(let token, let values):
+      try coordinator.previewBackgroundFilter(values, token: token, for: page); return "背景预览已更新。"
+    case .settingsFilter(let token, let index, let value):
+      guard token.owner == page.owner, page.state.presentation?.backgroundSnapshot?.identity == token.image,
+        (0..<4).contains(index), case .array(let old) = original.draft.settingsStoreValues["customBackgroundFilter"], old.count == 4
+      else { throw WebsiteConfigImportWorkflowError.conflict }
+      if old[index] == .number(value) { return "背景设置未变化。" }
+    default: break
+    }
     applying = true; operation = UUID()
     defer { if let prepared { _ = coordinator.cancel(prepared) }; prepared = nil; finishedApplying() }
     if case .localFile(let data) = edit {
@@ -457,10 +467,12 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
         ["public.png", "public.jpeg", "com.compuserve.gif", "org.webmproject.webp"].contains(image.type)
       else { throw WebsiteBackgroundCommandError.invalidInput }
       try settings.importLocalBackground(data: data)
-    } else if case .remove = edit { try settings.removeLocalBackground() }
+    } else if edit == .remove || edit == .removeLocal { try settings.removeLocalBackground() }
     return try environment.withSynchronousSetterRead {
       let outcome: WebsiteConfigCommitCoordinator.Outcome
       if case .localFile = edit {
+        outcome = try coordinator.commitBackgroundRefresh(coordinator.prepareBackgroundRefresh(for: page), for: page)
+      } else if edit == .removeLocal {
         outcome = try coordinator.commitBackgroundRefresh(coordinator.prepareBackgroundRefresh(for: page), for: page)
       } else {
         let (key, value) = try WebsiteBackgroundCommand.field(edit, current: original.draft)
@@ -470,8 +482,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       switch outcome {
       case .committed:
         switch edit {
-        case .address, .remove, .localFile: coordinator.startPublishedBackground(for: page, from: settings, fetchRemote: fetchRemoteBackground)
-        case .fit, .filter: break
+        case .address, .remove, .localFile, .removeLocal: coordinator.startPublishedBackground(for: page, from: settings, fetchRemote: fetchRemoteBackground)
+        case .fit, .filter, .settingsFilter, .previewFilter: break
         }
         return "背景设置已应用。"
       case .stale, .conflict: throw WebsiteConfigImportWorkflowError.conflict

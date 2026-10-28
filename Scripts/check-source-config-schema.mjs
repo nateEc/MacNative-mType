@@ -31,7 +31,8 @@ const themeCommandMode = process.argv[3] === '--theme-commands';
 const themePreviewMode = process.argv[3] === '--theme-preview';
 const randomRuntimeMode = process.argv[3] === '--random-theme-runtime';
 const themeImportMode = process.argv[3] === '--theme-import-restart';
-const backgroundCommandMode = process.argv[3] === '--background-commands';
+const backgroundSettingsMode = process.argv[3] === '--background-settings';
+const backgroundCommandMode = process.argv[3] === '--background-commands' || backgroundSettingsMode;
 const keymapCommandMode = process.argv[3] === '--keymap-commands';
 const layoutFluidRuntimeMode = process.argv[3] === '--layoutfluid-runtime';
 const sharedSettingsMode = process.argv[3] === '--shared-test-settings';
@@ -230,6 +231,7 @@ if (defaultsMode) {
   if (actualStore) simulation.Config = actualStore.Config;
   const setters = await load(path.join(frontend, 'config/setters.ts'));
   if (randomRuntimeMode || themeImportMode || backgroundCommandMode) {
+    if (backgroundSettingsMode) Object.assign(context, await load('solid-js'));
     if (themeImportMode) {
       Object.assign(context,{Config:actualStore.Config,getConfig:actualStore.getConfig,setConfig:setters.setConfig,
         configEvent:bus,getDefaultConfig:(await load(path.join(frontend,'constants/default-config.ts'))).getDefaultConfig,migrateConfig:migration.migrateConfig,
@@ -244,7 +246,7 @@ if (defaultsMode) {
       vm.runInContext(stripTypeScriptTypes(source.slice(a,b).replace(/^export /gm,''),{mode:'transform'}),context);
     }
     const {checkThemePreview}=await import('./check-source-theme-preview.mjs');
-    console.log(JSON.stringify(await checkThemePreview({context,simulation,frontend,bus,setters,defaults,verify,store:actualStore,themeImportMode,backgroundCommandMode,metadata})));
+    console.log(JSON.stringify(await checkThemePreview({context,simulation,frontend,bus,setters,defaults,verify,store:actualStore,themeImportMode,backgroundCommandMode,backgroundSettingsMode,metadata})));
   } else if (exportMode) {
     function extract(file,from,to,wrap=value=>value) {
       const source=fs.readFileSync(path.join(frontend,file),'utf8'),start=source.indexOf(from),end=source.indexOf(to,start);

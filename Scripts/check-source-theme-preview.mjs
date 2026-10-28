@@ -8,7 +8,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
-export async function checkThemePreview({context, simulation, frontend, bus, setters, defaults, verify, store, themeImportMode, backgroundCommandMode, metadata}) {
+export async function checkThemePreview({context, simulation, frontend, bus, setters, defaults, verify, store, themeImportMode, backgroundCommandMode, backgroundSettingsMode, metadata}) {
   const archive=process.env.TYPEBAR_THEME_DEBOUNCE_ARCHIVE;
   assert.ok(archive,'TYPEBAR_THEME_DEBOUNCE_ARCHIVE required');
   const integrity='sha512-'+createHash('sha512').update(fs.readFileSync(archive)).digest('base64');
@@ -63,7 +63,7 @@ export async function checkThemePreview({context, simulation, frontend, bus, set
     const pick=value=>Object.fromEntries(keys.map(key=>[key,context.structuredClone(value[key])]));
     if(backgroundCommandMode) {
       const {checkBackgroundCommands}=await import('./check-source-background-commands.mjs');
-      return await checkBackgroundCommands({context,simulation,bus,setters,defaults,verify,store,extract,drain,metadata});
+      return await checkBackgroundCommands({context,simulation,bus,setters,defaults,verify,store,extract,drain,metadata,frontend,backgroundSettingsMode});
     }
     if(themeImportMode) {
       const {checkThemeImportRestart}=await import('./check-source-theme-import-restart.mjs');

@@ -888,7 +888,7 @@ final class WebsiteConfigCommitCoordinator {
       ownerLease: prepared.owner, authority: publicationAuthority)
     let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: value.appearance,
       backgroundDisplay: state.presentation?.backgroundDisplay, backgroundFallback: state.presentation?.backgroundFallback,
-      backgroundFitOverride: state.presentation?.backgroundFitOverride)
+      backgroundFitOverride: state.presentation?.backgroundFitOverride, backgroundFilterPreview: state.presentation?.backgroundFilterPreview)
     state = .init(session: state.session, presentation: presentation, practice: updatedPractice,
       priorAttemptLedger: state.priorAttemptLedger, restartDepartureAttemptID: state.restartDepartureAttemptID,
       quoteInitialization: state.quoteInitialization)
@@ -904,6 +904,18 @@ final class WebsiteConfigCommitCoordinator {
     try commitLiveEdit(prepared, for: page, kind: .theme, customThemeIDs: customThemeIDs, chooseThemeIndex: chooseThemeIndex)
   }
   struct BackgroundRefreshPrepared { fileprivate let configuration: Prepared }
+  func previewBackgroundFilter(_ values: [Double], token: WebsiteBackgroundSettingsState.Token,
+    for page: PracticePageSessionStore) throws {
+    guard !processing else { throw WebsiteConfigCommitCoordinatorError.reentrant }
+    processing = true; defer { processing = false }
+    try Task.checkCancellation()
+    guard values.count == 4, values.allSatisfy(\.isFinite), token.owner == page.owner,
+      page.state.savedApplication == nil, page.state.configurationDeparture == nil, page.state.sharedReceipt == nil,
+      let p = page.state.presentation, p.backgroundSnapshot?.identity == token.image,
+      p.publication.isCurrentDelivery(owner: page.owner, router: router), page.state.presentation === p
+    else { throw WebsiteConfigCommitCoordinatorError.stale }
+    p.previewBackgroundFilter(.init(blurRem: values[0], brightness: values[1], saturation: values[2], opacity: values[3]), image: token.image)
+  }
   func prepareBackgroundRefresh(for page: PracticePageSessionStore) throws -> BackgroundRefreshPrepared {
     .init(configuration: try resourceRefreshTicket(for: page))
   }
@@ -1051,7 +1063,8 @@ final class WebsiteConfigCommitCoordinator {
       presentation = previous.changingBackground(for: publication, display: backgroundDisplay, fit: backgroundFit, fallback: backgroundFallback)
     } else {
       presentation = themeAppearance.map { WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: $0,
-        backgroundDisplay: previous.backgroundDisplay, backgroundFallback: backgroundFallback, backgroundFitOverride: backgroundFit) }
+        backgroundDisplay: previous.backgroundDisplay, backgroundFallback: backgroundFallback, backgroundFitOverride: backgroundFit,
+        backgroundFilterPreview: previous.backgroundFilterPreview) }
         ?? previous.retainingAppearance(for: publication)
     }
     state = .init(session: state.session, presentation: presentation,
@@ -2352,7 +2365,8 @@ final class WebsiteConfigCommitCoordinator {
         ownerLease: prepared.owner, authority: publicationAuthority)
       if let page, let appearance, let session, let practice {
         let presentation = WebsiteConfigPublishedPresentation(publication: publication, preparedAppearance: appearance,
-          backgroundDisplay: backgroundDisplay, backgroundFallback: backgroundFallback, backgroundFitOverride: backgroundFit)
+          backgroundDisplay: backgroundDisplay, backgroundFallback: backgroundFallback, backgroundFitOverride: backgroundFit,
+          backgroundFilterPreview: backgroundDisplay === page.state.presentation?.backgroundDisplay ? page.state.presentation?.backgroundFilterPreview : nil)
         page.installCommitted(.init(session: session.withElapsedClock(), presentation: presentation, practice: practice,
           priorAttemptLedger: page.state.priorAttemptLedger), retainingRestartController: prepared.restartController)
       }

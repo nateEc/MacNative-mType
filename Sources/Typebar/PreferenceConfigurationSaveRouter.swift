@@ -32,6 +32,13 @@ final class PreferenceConfigurationSaveRouter {
   private var deliveringThemeEdit = false
   private var backgroundProviders: [UUID: () -> WebsiteConfigNativePagePreferences?] = [:]
   private var backgroundEditHandlers: [UUID: (PracticeBackgroundEdit) -> Bool?] = [:]
+  private var backgroundSettingsProviders: [UUID: () -> WebsiteBackgroundSettingsState?] = [:]
+  func setBackgroundSettingsProvider(owner: UUID, provider: @escaping () -> WebsiteBackgroundSettingsState?) {
+    backgroundSettingsProviders[owner] = provider
+  }
+  var backgroundSettingsState: WebsiteBackgroundSettingsState? {
+    guard let owner = priority.last else { return nil }; return backgroundSettingsProviders[owner]?()
+  }
   private var deliveringBackgroundEdit = false
   private var priority: [UUID] = []
   private var isDelivering = false
@@ -152,6 +159,7 @@ final class PreferenceConfigurationSaveRouter {
     themeProviders.removeValue(forKey: owner)
     themeEditHandlers.removeValue(forKey: owner)
     backgroundProviders.removeValue(forKey: owner); backgroundEditHandlers.removeValue(forKey: owner)
+    backgroundSettingsProviders.removeValue(forKey: owner)
     priority.removeAll { $0 == owner }
     if activeBefore != priority.last { generation = UUID() }
   }

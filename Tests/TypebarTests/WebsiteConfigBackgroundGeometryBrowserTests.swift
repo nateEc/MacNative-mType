@@ -26,6 +26,34 @@ final class WebsiteConfigBackgroundGeometryBrowserTests: XCTestCase {
     }
   }
 
+  func testSettingsRangeSanitationAgainstActualHiddenBrowser() async throws {
+    let configuration = WKWebViewConfiguration(); configuration.websiteDataStore = .nonPersistent()
+    let web = WKWebView(frame: .zero, configuration: configuration)
+    let completion = expectation(description: "owned local range sanitation")
+    let probe = Probe(completed: completion); web.navigationDelegate = probe
+    defer { web.stopLoading(); web.navigationDelegate = nil }
+    web.loadHTMLString("""
+      <!doctype html><meta charset="utf-8">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'">
+      <script>window.geometryReady=Promise.resolve((()=>{
+        const rows=[];
+        for(const max of [5,2,2,1])for(const token of ['NaN','Infinity','-Infinity','-0','0.05','0.15','0.35','0.75','1e-7','200','-1']) {
+          const input=document.createElement('input');input.type='range';input.min='0';input.max=String(max);input.step='0.1';input.value=token;
+          rows.push({max,token,value:input.valueAsNumber});
+        }
+        return rows;
+      })());</script>
+      """, baseURL: nil)
+    await fulfillment(of: [completion], timeout: 20)
+    XCTAssertNil(probe.error); XCTAssertNil(web.window)
+    let rows = try XCTUnwrap(probe.values); XCTAssertEqual(rows.count, 44)
+    for row in rows {
+      let token = try XCTUnwrap(row["token"] as? String), max = try XCTUnwrap(row["max"] as? Double)
+      let input: Double = token == "NaN" ? .nan : token == "Infinity" ? .infinity : token == "-Infinity" ? -.infinity : try XCTUnwrap(Double(token))
+      XCTAssertEqual(BackgroundSettingsPreferences.sanitized(input, range: 0...max, step: 0.1), try XCTUnwrap(row["value"] as? Double), "\(max):\(token)")
+    }
+  }
+
   func testPinnedDeclarationsInActualCSSOMWithoutOpeningWindow() async throws {
     let environment = ProcessInfo.processInfo.environment
     guard let reference = environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] ?? environment["TYPEBAR_REFERENCE_ROOT"]

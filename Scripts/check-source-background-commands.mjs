@@ -2,7 +2,7 @@
 // All image/DOM/storage implementations and URI inputs here are owned adapters.
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-export async function checkBackgroundCommands({context,simulation,bus,setters,defaults,verify,store,extract,drain,metadata}) {
+export async function checkBackgroundCommands({context,simulation,bus,setters,defaults,verify,store,extract,drain,metadata,frontend,backgroundSettingsMode}) {
   let image=null,nextID=0,restarts=0,reads=0;
   const number=value=>Object.is(value,-0)?'-0':String(value);
   const filters=value=>Array.from(value,number);
@@ -24,6 +24,10 @@ export async function checkBackgroundCommands({context,simulation,bus,setters,de
   vm.runInContext(extract('commandline/util.ts','function buildSubgroupCommand<','export const __testing'),context);
   vm.runInContext(extract('test/test-logic.ts','configEvent.subscribe(','timerEvent.subscribe('),context);
   for(const key of ['customBackground','customBackgroundSize','customBackgroundFilter'])assert.equal(metadata[key].changeRequiresRestart,false);
+  if(backgroundSettingsMode) {
+    const {checkBackgroundSettings}=await import('./check-source-background-settings.mjs');
+    return await checkBackgroundSettings({context,simulation,bus,setters,defaults,verify,store,drain,frontend,image:()=>image});
+  }
   const fixtures=[];
   for(let component=0;component<4;component++)for(const input of ['0.75','-1.25suffix','2.5e2','Infinity','-0','0x10','',' ','invalid']){
     Object.assign(simulation.Config,context.structuredClone(defaults),{mode:'words',words:5,fontFamily:'Courier',funbox:['no_quit'],

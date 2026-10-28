@@ -3,6 +3,14 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.WebsiteThemeCommandTests/testSettingsSlidersAgainstPinnedTSXCallbacksRealSolidStoreAndController",
+      "file": "Tests/TypebarTests/WebsiteThemeCommandTests.swift"
+    },
+    {
+      "id": "TypebarTests.WebsiteConfigBackgroundGeometryBrowserTests/testSettingsRangeSanitationAgainstActualHiddenBrowser",
+      "file": "Tests/TypebarTests/WebsiteConfigBackgroundGeometryBrowserTests.swift"
+    },
+    {
       "id": "TypebarTests.WebsiteThemeCommandTests/testFullImportFromResultAppliesItsImplicitRandomRestartAgainstTheActualBus",
       "file": "Tests/TypebarTests/WebsiteThemeCommandTests.swift"
     },

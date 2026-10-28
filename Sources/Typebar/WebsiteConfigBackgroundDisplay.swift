@@ -11,7 +11,9 @@ import Observation
     let preferences: WebsiteConfigNativePagePreferences
     let pointsPerRem: Double
     var fitOverride: CustomBackgroundFit? = nil
+    var filterOverride: WebsiteConfigNativePagePreferences.BackgroundFilter? = nil
     func fitting(_ fit: CustomBackgroundFit) -> Self { var copy = self; copy.fitOverride = fit; return copy }
+    func filtering(_ filter: WebsiteConfigNativePagePreferences.BackgroundFilter) -> Self { var copy = self; copy.filterOverride = filter; return copy }
   }
   enum Phase { case readingLocal, loading, settled, localReadFailed, retired }
   let owner: UUID
