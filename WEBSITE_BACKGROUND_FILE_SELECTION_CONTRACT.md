@@ -36,4 +36,6 @@
 
 ## 仍需验收
 
+删除的重复应用、读取完成顺序与取消恢复已有后续来源和原生轨迹，见 `WEBSITE_BACKGROUND_REMOVAL_CONTRACT.md` 与 BACKGROUND-REMOVE-17；下面的实体文件面板与全部交错仍未关闭。
+
 真实系统文件选择器的取消、延迟返回与跨窗口交错、浏览器提供 MIME 与 macOS UTType 的全部映射差异、真实 IndexedDB／FileReader 故障、原版失败提示和保存指示时序仍待验证。命令删除会同时通过 setter 和显式 apply 触发背景应用，其全部重入、重复选择和失败顺序继续开放。本批不声称所有文件工作流或完整原生重写已完成。

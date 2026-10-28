@@ -496,6 +496,139 @@ import XCTest
     XCTAssertTrue(f.page.state.presentation?.backgroundDisplay === display)
     XCTAssertEqual(gate.reads, 1); XCTAssertEqual(try register.read().revision, revision)
   }
+  @MainActor private final class RemovalReads {
+    var count = 0
+    var pending: [Int: CheckedContinuation<WebsiteConfigBackgroundResource.Local, Error>] = [:]
+    func read() async throws -> WebsiteConfigBackgroundResource.Local {
+      let index = count; count += 1
+      return try await withCheckedThrowingContinuation { pending[index] = $0 }
+    }
+    func finish(_ index: Int, kind: String, bytes: Data) {
+      let continuation = pending.removeValue(forKey: index)
+      switch kind {
+      case "error": continuation?.resume(throwing: CocoaError(.fileReadUnknown))
+      case "empty": continuation?.resume(returning: .empty)
+      case "file": continuation?.resume(returning: .data(bytes))
+      default: continuation?.resume(returning: .absent)
+      }
+    }
+  }
+  func testBackgroundRemovalAgainstActualCallbacksAndIndependentReadCompletionOrders() async throws {
+    guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_WEBSITE_CONFIG_REFERENCE_ROOT"] else { throw XCTSkip("Requires pinned source") }
+    struct Frame: Decodable { let address, settings: String; let stored: Bool; let version, reads, saves, notices: Int; let selected: String? }
+    struct Sample: Decodable { let entry, address: String; let local, available: Bool; let deleteFail: Bool?; let results: [String]; let order: [Int]; let frames: [Frame] }
+    struct Output: Decodable { let removalFixtures: [Sample] }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process(), pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--experimental-vm-modules", root.appendingPathComponent("Scripts/check-source-config-schema.mjs").path, reference, "--background-settings"]
+    process.standardOutput = pipe; try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit(); XCTAssertEqual(process.terminationStatus, 0)
+    let output = try JSONDecoder().decode(Output.self, from: data)
+    XCTAssertEqual(output.removalFixtures.count, 78); XCTAssertEqual(output.removalFixtures.reduce(0) { $0 + $1.frames.count }, 294)
+    let samples = output.removalFixtures.filter { $0.available && $0.deleteFail != true }; XCTAssertEqual(samples.count, 73)
+    for sample in samples {
+      let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read), reads = RemovalReads()
+      defer { f.close() }
+      if sample.local { try f.settings.importSelectedBackground(data: loader.data, mimeType: "image/png") }
+      let json = try JSONSerialization.data(withJSONObject: ["mode":"words", "words":5, "fontFamily":"Courier", "customBackground":sample.address])
+      try await f.workflow.apply(json: String(decoding: json, as: UTF8.self), systemIsDark: false)
+      await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+      var state = f.page.state; state.session.insertBatch(String(state.session.nextExpectedCharacter!)); f.page.replace(state)
+      let preferences = f.settings.snapshot, generation = f.page.state.session.generationState, ledger = f.page.state.priorAttemptLedger
+      let originalVersion = f.settings.localBackgroundRevision, notices = f.account.localNotices.history.count
+      let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+      let edit: PracticeBackgroundEdit = sample.entry == "command" ? .remove : .removeLocal
+      try f.workflow.runBackgroundCommand(edit, replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), readLocalBackground: reads.read)
+      let display = try XCTUnwrap(f.page.state.presentation?.backgroundDisplay)
+      let end = Date().addingTimeInterval(2)
+      while reads.count < sample.results.count && Date() < end { try await Task.sleep(for: .milliseconds(2)) }
+      XCTAssertEqual(reads.count, sample.results.count)
+      guard reads.count == sample.results.count else {
+        for index in Array(reads.pending.keys) { reads.finish(index, kind: "absent", bytes: loader.data) }
+        await display.waitForCompletion(); continue
+      }
+      func verify(_ frame: Frame) throws {
+        let draft = try XCTUnwrap(f.page.state.presentation?.publication.draft)
+        XCTAssertEqual(draft.pagePreferences.backgroundAddress, .string(frame.address))
+        XCTAssertEqual(draft.settingsStoreValues["customBackground"], .string(frame.settings))
+        XCTAssertEqual(f.settings.hasLocalBackground, frame.stored)
+        XCTAssertEqual(f.settings.localBackgroundRevision - originalVersion, frame.version)
+        XCTAssertEqual(reads.count, frame.reads)
+        let selected: String?
+        switch display.snapshot.resource.source {
+        case .local?: selected = "file"
+        case .remote(let address)?: selected = String(decoding: address.stringUnits ?? [], as: UTF16.self)
+        case nil: selected = nil
+        }
+        XCTAssertEqual(selected, frame.selected, "\(sample.entry) \(sample.results) \(sample.order)")
+        XCTAssertEqual(f.account.localNotices.history.count - notices, frame.notices)
+        XCTAssertEqual(f.settings.snapshot, preferences); XCTAssertEqual(f.page.state.session.generationState, generation)
+        XCTAssertEqual(f.page.state.priorAttemptLedger, ledger)
+      }
+      try verify(sample.frames[1])
+      if sample.entry == "command" { XCTAssertNotEqual(try register.read().revision, revision) }
+      else { XCTAssertEqual(try register.read().revision, revision) }
+      for (step, index) in sample.order.enumerated() {
+        let previous = display.snapshot.identity, kind = sample.results[index]
+        reads.finish(index, kind: kind, bytes: loader.data)
+        if step == sample.order.count-1 { await display.waitForCompletion() }
+        else {
+          let deadline = Date().addingTimeInterval(2)
+          while Date() < deadline {
+            if kind == "error" { if case .localReadFailed = display.phase { break } }
+            else if display.snapshot.identity != previous { break }
+            try await Task.sleep(for: .milliseconds(2))
+          }
+        }
+        try verify(sample.frames[step+2])
+        if kind == "error" { XCTAssertEqual(display.snapshot.identity, previous) }
+      }
+    }
+  }
+
+  func testStoppingPendingRemovalSuppressesStaleReadNoticesAndKeepsAcceptedDeletion() async throws {
+    let f = try Fixture(), reads = RemovalReads(); defer { f.close() }
+    try f.settings.importSelectedBackground(data: OwnedBackgroundImageFixture.make(), mimeType: "image/png")
+    try await f.publish(); await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+    let notices = f.account.localNotices.history.count
+    try f.workflow.runBackgroundCommand(.remove, replacing: XCTUnwrap(f.page.state.presentation?.publication.applicationID), readLocalBackground: reads.read)
+    let display = try XCTUnwrap(f.page.state.presentation?.backgroundDisplay), original = display.snapshot.identity
+    let end = Date().addingTimeInterval(2)
+    while reads.count < 2 && Date() < end { try await Task.sleep(for: .milliseconds(2)) }
+    XCTAssertEqual(reads.count, 2); f.workflow.stop()
+    for index in Array(reads.pending.keys) { reads.finish(index, kind: "error", bytes: Data()) }
+    await display.waitForCompletion()
+    XCTAssertEqual(display.phase, .retired); XCTAssertEqual(display.snapshot.identity, original)
+    XCTAssertEqual(f.account.localNotices.history.count, notices); XCTAssertFalse(f.settings.hasLocalBackground)
+    XCTAssertEqual(f.page.state.presentation?.publication.draft.pagePreferences.backgroundAddress, .string(""))
+  }
+
+  func testBackgroundDeletionFailureKeepsFileConfigurationPixelsAndInput() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-remove-failure-\(UUID())")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let loader = try BackgroundData()
+    for edit in [PracticeBackgroundEdit.remove, .removeLocal] {
+      let store = TypebarLocalBackgroundStore(directoryURL: directory), f = try Fixture(backgroundStore: store, fetchRemoteBackground: loader.read)
+      defer { f.close() }
+      try f.settings.importSelectedBackground(data: loader.data, mimeType: "image/png")
+      try await f.workflow.apply(json: #"{"mode":"words","words":5,"fontFamily":"Courier","customBackground":"https://example.invalid/before.png"}"#, systemIsDark: false)
+      await f.page.state.presentation?.backgroundDisplay?.waitForCompletion()
+      let before = try XCTUnwrap(f.page.state.presentation), generation = f.page.state.session.generationState
+      let register = WebsiteConfigFileRegister(directory: f.directory), revision = try register.read().revision
+      let resourceVersion = f.settings.localBackgroundRevision
+      let file = directory.appendingPathComponent("local-practice-background")
+      try FileManager.default.removeItem(at: file); try FileManager.default.createDirectory(at: file, withIntermediateDirectories: false)
+      let marker = file.appendingPathComponent("owned-sentinel"); try Data("keep directory".utf8).write(to: marker)
+      XCTAssertThrowsError(try f.workflow.runBackgroundCommand(edit, replacing: before.publication.applicationID))
+      XCTAssertTrue(f.page.state.presentation === before); XCTAssertTrue(f.settings.hasLocalBackground)
+      XCTAssertEqual(f.settings.localBackgroundRevision, resourceVersion)
+      XCTAssertEqual(try register.read().revision, revision); XCTAssertEqual(f.page.state.session.generationState, generation)
+      XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path))
+      try FileManager.default.removeItem(at: file)
+    }
+  }
+
   func testSelectedCorruptPNGIsStoredAndFailsAsLocalWithoutFetchingRemoteOrSavingConfiguration() async throws {
     for data in [Data(), Data("owned corrupt png".utf8)] {
       let loader = try BackgroundData(), f = try Fixture(fetchRemoteBackground: loader.read)

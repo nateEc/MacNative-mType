@@ -59,6 +59,6 @@ export async function checkBackgroundSettings({context,simulation,bus,setters,de
     mounted.dispose();fixtures.push({initial,component,second,frames});
   }
   const addressFixtures=await checkBackgroundAddressForm({context,simulation,bus,defaults,store,drain,read,expression});
-  const fileFixtures=await checkBackgroundFileSelection({context,simulation,bus,defaults,store,drain,read,expression});
-  verify();return {fixtures,addressFixtures,fileFixtures};
+  const {fileFixtures,removalFixtures}=await checkBackgroundFileSelection({context,simulation,bus,defaults,store,drain,read,expression});
+  verify();return {fixtures,addressFixtures,fileFixtures,removalFixtures};
 }

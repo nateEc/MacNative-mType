@@ -1492,18 +1492,25 @@ final class WebsiteConfigCommitCoordinator {
       maximumFontBytes: maximumFontBytes, backgroundLimits: backgroundLimits)
   }
   func startPublishedBackground(for page: PracticePageSessionStore, from settings: AppSettings,
+    invocations: [WebsiteConfigBackgroundDisplay.Invocation] = [.event],
+    readLocal: (@MainActor () async throws -> WebsiteConfigBackgroundResource.Local)? = nil,
+    onReadFailure: (@MainActor (WebsiteConfigBackgroundDisplay.Invocation, Error) -> Void)? = nil,
     fetchRemote: (@MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote)? = nil) {
     guard let p = page.state.presentation, let display = p.backgroundDisplay else { return }
     startBackground(display, for: page, lease: p.publication.ownerLease, from: settings,
-      fetchRemote: fetchRemote ?? { try await WebsiteConfigBackgroundRemoteReader().read(address: $0, maximumBytes: $1) }, limits: .init())
+      fetchRemote: fetchRemote ?? { try await WebsiteConfigBackgroundRemoteReader().read(address: $0, maximumBytes: $1) }, limits: .init(),
+      invocations: invocations, readLocal: readLocal, onReadFailure: onReadFailure)
   }
   private func startBackground(_ display: WebsiteConfigBackgroundDisplay, for page: PracticePageSessionStore,
     lease: PreferenceConfigurationSaveRouter.Lease, from settings: AppSettings,
     fetchRemote: @escaping @MainActor (WebsiteConfigValue, Int) async throws -> WebsiteConfigBackgroundResource.Remote,
-    limits: WebsiteConfigBackgroundResource.Limits) {
+    limits: WebsiteConfigBackgroundResource.Limits,
+    invocations: [WebsiteConfigBackgroundDisplay.Invocation] = [.event],
+    readLocal: (@MainActor () async throws -> WebsiteConfigBackgroundResource.Local)? = nil,
+    onReadFailure: (@MainActor (WebsiteConfigBackgroundDisplay.Invocation, Error) -> Void)? = nil) {
     if backgroundWork !== display { backgroundWork?.cancel(); backgroundWork = display }
     let revision = backgroundRevision()
-    display.start(readLocal: {
+    display.start(readLocal: readLocal ?? {
       if let data = try settings.localBackgroundStore.encodedData(maximumBytes: limits.encodedBytes) { return .data(data) }
       return .absent
     }, fetchRemote: fetchRemote, limits: limits, preferencesNow: { [weak page] in
@@ -1511,7 +1518,7 @@ final class WebsiteConfigCommitCoordinator {
       var runtime = draft.projection.runtime
       runtime["customBackgroundFilter"] = draft.settingsStoreValues["customBackgroundFilter"]
       return try? WebsiteConfigNativePagePreferences(runtime: runtime)
-    }, whileCurrent: { [weak self, weak page, weak display] in
+    }, invocations: invocations, onReadFailure: onReadFailure, whileCurrent: { [weak self, weak page, weak display] in
       guard let self, let page, let display else { return false }
       return self.backgroundIsCurrent(display, for: page, lease: lease, revision: revision)
     })

@@ -4182,7 +4182,9 @@ private struct ContentView: View {
       try importWorkflow().runBackgroundCommand(edit, replacing: publication.applicationID)
       customBackgroundCommandMessage = nil; return true
     } catch {
-      customBackgroundCommandMessage = (error as? LocalizedError)?.errorDescription ?? "背景设置未完成，请重新应用。"
+      let message = (error as? LocalizedError)?.errorDescription ?? "背景设置未完成，请重新应用。"
+      if edit == .remove { account.localNotices.post(message); customBackgroundCommandMessage = nil }
+      else { customBackgroundCommandMessage = message }
       return false
     }
   }

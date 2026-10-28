@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import {deflateSync} from 'node:zlib';
+import {checkBackgroundRemoval} from './check-source-background-removal.mjs';
 
 export async function checkBackgroundFileSelection({context,simulation,bus,defaults,store,drain,read,expression}) {
   // Independently constructed one-pixel RGBA PNG, never a reference asset.
@@ -90,5 +91,7 @@ export async function checkBackgroundFileSelection({context,simulation,bus,defau
     fixtures.push({entry,name:sample.name,mimeType:sample.type,base64:bytes.toString('base64'),
       representable:!sample.noFile&&!sample.readFail&&!sample.storeFail&&!sample.backgroundReadFail,frames});
   }
-  assert.equal(fixtures.length,32);return fixtures;
+  assert.equal(fixtures.length,32);
+  const removalFixtures=await checkBackgroundRemoval({context,simulation,bus,defaults,store,drain,read,expression,actualApply,body,commandBody,png});
+  return {fileFixtures:fixtures,removalFixtures};
 }

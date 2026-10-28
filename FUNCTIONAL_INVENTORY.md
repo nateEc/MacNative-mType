@@ -2,6 +2,10 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| BACKGROUND-REMOVE-17 | 背景删除的重复应用、完成顺序与失败提示 | 固定删除回调、FileStorage、setter／总线、完整背景函数；受控数据库与 DOM | 主线程背景应用任务、事件／显式调用区分、运行和图片身份保护；WEBSITE_BACKGROUND_REMOVAL_CONTRACT.md | 部分完成：命令两次读取、设置页一次读取，按完成顺序选择，读取失败保留画面，已有输入不重开。配置写入失败、实体提示及跨窗口／上传删除交错仍开放。 |
+
+| ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
+| --- | --- | --- | --- | --- |
 | BACKGROUND-FILE-16 | 本地背景文件的 MIME 准入与保存后解码 | 固定设置页／命令上传回调、实际 FileStorage 与 Solid 信号；自有数据库／FileReader／DOM，隐藏 WebKit 解码 | BackgroundSelectedFileImport、原始本地文件保存与独立背景流；WEBSITE_BACKGROUND_FILE_SELECTION_CONTRACT.md | 部分完成：损坏或空的受支持文件保留本地选择，无效 MIME 不写文件；验证保存与解码分离和成功前缀。实体文件面板、全部 MIME 映射与异步删除交错仍开放。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |

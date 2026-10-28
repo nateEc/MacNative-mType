@@ -15,6 +15,100 @@ import XCTest
     }
   }
   @MainActor private final class Admission { var valid = true }
+  @MainActor private final class Reads {
+    var count = 0
+    var pending: [Int: CheckedContinuation<WebsiteConfigBackgroundResource.Local, Error>] = [:]
+    func read() async throws -> WebsiteConfigBackgroundResource.Local {
+      let id = count; count += 1
+      return try await withCheckedThrowingContinuation { pending[id] = $0 }
+    }
+    func finish(_ id: Int, _ value: WebsiteConfigBackgroundResource.Local?) {
+      let continuation = pending.removeValue(forKey: id)
+      if let value { continuation?.resume(returning: value) } else { continuation?.resume(throwing: Failure.local) }
+    }
+  }
+  func testDeletionStartsBothBackgroundReadsBeforeEitherCompletes() async throws {
+    let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"fontFamily":"Courier"}"#, pointsPerRem: 16, context: .init())
+    let display = WebsiteConfigBackgroundDisplay(owner: UUID(), preferences: draft.pagePreferences, pointsPerRem: 16, previous: nil)
+    let reads = Reads()
+    display.start(readLocal: reads.read, fetchRemote: { _, _ in XCTFail("Empty address fetched remote"); throw Failure.local },
+      invocations: [.event, .command], whileCurrent: { true })
+    let end = Date().addingTimeInterval(1)
+    while reads.count < 2 && Date() < end { try await Task.sleep(for: .milliseconds(2)) }
+    XCTAssertEqual(reads.count, 2)
+    for id in Array(reads.pending.keys) { reads.finish(id, .absent) }
+    await display.waitForCompletion()
+  }
+  func testCancellingBeforeApplicationsStartRetiresWithoutReadingAndCanRearm() async throws {
+    let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"fontFamily":"Courier"}"#, pointsPerRem: 16, context: .init())
+    let display = WebsiteConfigBackgroundDisplay(owner: UUID(), preferences: draft.pagePreferences, pointsPerRem: 16, previous: nil)
+    var reads = 0
+    display.start(readLocal: { reads += 1; return .absent }, fetchRemote: { _, _ in throw Failure.local },
+      invocations: [.event, .command], whileCurrent: { true })
+    display.cancel(); await display.waitForCompletion()
+    XCTAssertEqual(reads, 0); XCTAssertEqual(display.phase, .retired)
+    display.start(readLocal: { reads += 1; return .empty }, fetchRemote: { _, _ in throw Failure.local }, whileCurrent: { true })
+    await display.waitForCompletion(); XCTAssertEqual(reads, 1); XCTAssertEqual(display.phase, .settled)
+  }
+
+  func testCancellingBothReadsSuppressesLatePixelsAndFailureCallbacks() async throws {
+    let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"fontFamily":"Courier"}"#, pointsPerRem: 16, context: .init())
+    let display = WebsiteConfigBackgroundDisplay(owner: UUID(), preferences: draft.pagePreferences, pointsPerRem: 16, previous: nil)
+    let reads = Reads(), original = display.snapshot.identity
+    var failures = 0
+    display.start(readLocal: reads.read, fetchRemote: { _, _ in throw Failure.local }, invocations: [.event, .command],
+      onReadFailure: { _, _ in failures += 1 }, whileCurrent: { true })
+    let end = Date().addingTimeInterval(2)
+    while reads.count < 2 && Date() < end { try await Task.sleep(for: .milliseconds(2)) }
+    XCTAssertEqual(reads.count, 2); display.cancel()
+    reads.finish(0, .data(try OwnedBackgroundImageFixture.make())); reads.finish(1, nil)
+    await display.waitForCompletion(); XCTAssertEqual(display.snapshot.identity, original); XCTAssertEqual(failures, 0)
+    XCTAssertEqual(display.phase, .retired)
+  }
+
+  func testRetiredOverlappingReadCannotWriteAfterARearmedApplication() async throws {
+    let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"fontFamily":"Courier"}"#, pointsPerRem: 16, context: .init())
+    let display = WebsiteConfigBackgroundDisplay(owner: UUID(), preferences: draft.pagePreferences, pointsPerRem: 16, previous: nil)
+    let reads = Reads(), admission = Admission()
+    display.start(readLocal: reads.read, fetchRemote: { _, _ in throw Failure.local }, invocations: [.event, .command], whileCurrent: { admission.valid })
+    let end = Date().addingTimeInterval(2)
+    while reads.count < 2 && Date() < end { try await Task.sleep(for: .milliseconds(2)) }
+    admission.valid = false; reads.finish(0, .absent)
+    for _ in 0..<100 where display.phase != .retired { try await Task.sleep(for: .milliseconds(2)) }
+    XCTAssertEqual(display.phase, .retired); admission.valid = true
+    display.start(readLocal: { .empty }, fetchRemote: { _, _ in throw Failure.local }, whileCurrent: { admission.valid })
+    await display.waitForCompletion(); let current = display.snapshot.identity
+    reads.finish(1, .data(try OwnedBackgroundImageFixture.make()))
+    try await Task.sleep(for: .milliseconds(20))
+    XCTAssertEqual(display.snapshot.identity, current); XCTAssertEqual(display.phase, .settled)
+    guard case .none = display.snapshot.resource.state else { return XCTFail("Old run restored pixels") }
+  }
+
+  func testLateDownloadCannotReplaceTheImageChosenByAnotherLocalRead() async throws {
+    @MainActor final class Remote {
+      var pending: CheckedContinuation<WebsiteConfigBackgroundResource.Remote, Never>?
+      func read(_ address: WebsiteConfigValue, _ budget: Int) async -> WebsiteConfigBackgroundResource.Remote {
+        await withCheckedContinuation { pending = $0 }
+      }
+    }
+    let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"fontFamily":"Courier","customBackground":"https://example.invalid/old.png"}"#, pointsPerRem: 16, context: .init())
+    let display = WebsiteConfigBackgroundDisplay(owner: UUID(), preferences: draft.pagePreferences, pointsPerRem: 16, previous: nil)
+    let reads = Reads(), remote = Remote()
+    display.start(readLocal: reads.read, fetchRemote: remote.read, invocations: [.event, .command], whileCurrent: { true })
+    let end = Date().addingTimeInterval(2)
+    while reads.count < 2 && Date() < end { try await Task.sleep(for: .milliseconds(2)) }
+    reads.finish(0, .absent)
+    while remote.pending == nil && Date() < end { try await Task.sleep(for: .milliseconds(2)) }
+    XCTAssertNotNil(remote.pending); let previous = display.snapshot.identity
+    reads.finish(1, .empty)
+    while display.snapshot.identity == previous && Date() < end { try await Task.sleep(for: .milliseconds(2)) }
+    let current = display.snapshot.identity
+    remote.pending?.resume(returning: .received(address: draft.pagePreferences.backgroundAddress, data: try OwnedBackgroundImageFixture.make()))
+    remote.pending = nil; await display.waitForCompletion()
+    XCTAssertEqual(display.snapshot.identity, current)
+    guard case .none = display.snapshot.resource.state else { return XCTFail("Late remote image replaced a newer selection") }
+  }
+
   func testRetiredReadCanBeExplicitlyPreparedAgainWithoutAcceptingItsLatePixels() async throws {
     let draft = try WebsiteConfigNativeProfile.prepareDraft(#"{"fontFamily":"Courier"}"#, pointsPerRem: 16, context: .init())
     let display = WebsiteConfigBackgroundDisplay(owner: UUID(), preferences: draft.pagePreferences, pointsPerRem: 16, previous: nil)

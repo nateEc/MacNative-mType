@@ -442,7 +442,8 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
   }
 
   @discardableResult
-  func runBackgroundCommand(_ edit: PracticeBackgroundEdit, replacing applicationID: UUID) throws -> String {
+  func runBackgroundCommand(_ edit: PracticeBackgroundEdit, replacing applicationID: UUID,
+    readLocalBackground: (@MainActor () async throws -> WebsiteConfigBackgroundResource.Local)? = nil) throws -> String {
     guard !stopped, let page else { throw WebsiteConfigImportWorkflowError.unavailable }
     guard !applying, page.restartController?.isPreparing != true else { throw WebsiteConfigImportWorkflowError.busy }
     guard page.state.savedApplication == nil, page.state.configurationDeparture == nil, page.state.sharedReceipt == nil
@@ -486,7 +487,14 @@ struct WebsiteConfigSavedPreparationError: Error, LocalizedError {
       switch outcome {
       case .committed:
         switch edit {
-        case .address, .remove, .localFile, .selectedFile, .removeLocal: coordinator.startPublishedBackground(for: page, from: settings, fetchRemote: fetchRemoteBackground)
+        case .remove:
+          coordinator.startPublishedBackground(for: page, from: settings, invocations: [.event, .command],
+            readLocal: readLocalBackground, onReadFailure: { [weak self] invocation, _ in
+              guard invocation == .command, let self, !self.stopped else { return }
+              self.notices?.post("背景移除后未能完成本地图片读取，请重试。")
+            }, fetchRemote: fetchRemoteBackground)
+        case .address, .localFile, .selectedFile, .removeLocal:
+          coordinator.startPublishedBackground(for: page, from: settings, readLocal: readLocalBackground, fetchRemote: fetchRemoteBackground)
         case .fit, .filter, .settingsFilter, .previewFilter: break
         }
         return "背景设置已应用。"
