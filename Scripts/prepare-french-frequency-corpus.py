@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Prepare independent French corpus tokens; no reference words or downloads.
+
+msgpack==1.1.2 is preparation-only. --check-bundled uses the standard library.
+"""
+import argparse
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import re
+import unicodedata
+import zipfile
+
+WHEEL_SHA = "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+MEMBER = "wordfreq/data/large_fr.msgpack.gz"
+MEMBER_SHA = "6f16cd80b9b66c5698ed002becea83ae30d0584c3205f1cf01714ad562c00c8b"
+COUNTS = {"1k": 1394, "2k": 2041, "10k": 10251}
+REVISION = "wordfreq-3.1.1-fr-v1"
+SWIFT = Path("Sources/Typebar/FrenchFrequencyCorpus.generated.swift")
+MANIFEST = Path("Compatibility/french-frequency-corpus.json")
+NOTICES = Path("Resources/FrenchFrequencyCorpusNotices.txt")
+NOTICE_MARKER = "=== wordfreq 3.1.1 release metadata ===\n"
+EXCLUDED = frozenset("the of and in to is for with you your are was not from that this have etc www http com fr st ii iii qu aujourd hui".split())
+# Independently authored expressions and geographic case variants. Observed
+# frequency belongs to lowercase source tokens, not separately measured names.
+PROPER = {word.lower(): word for word in ["France", "Paris", "Belgique", "Suisse", "Canada"]}
+ADDITIONS = ["tout à fait", "par exemple", "en effet", "bien sûr", "s'il vous plaît", "peut-être"]
+OBSERVED_COUNT = max(COUNTS.values()) - len(ADDITIONS)
+
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def eligible(word):
+    return (word == unicodedata.normalize("NFC", word) and len(word) <= 20
+            and re.fullmatch(r"(?:[a-zàâçéèêëîïôùûüÿœæ]{2,}|[aàyô])", word) is not None
+            and word not in EXCLUDED)
+
+
+def select(bins, count=OBSERVED_COUNT):
+    if type(count) is not int or count < 1 or not isinstance(bins, list):
+        raise ValueError("invalid selection request")
+    words, bands, seen = [], [], set()
+    for band, tokens in enumerate(bins):
+        if (not isinstance(tokens, list) or any(type(x) is not str for x in tokens)
+                or tokens != sorted(tokens) or len(set(tokens)) != len(tokens)):
+            raise ValueError("frequency bins must contain sorted unique strings")
+        for word in tokens:
+            if word in seen:
+                raise ValueError("token occurs in multiple frequency bins")
+            seen.add(word)
+            if eligible(word):
+                words.append(word); bands.append(band)
+    if len(words) < count:
+        raise ValueError("insufficient observed tokens; never pad")
+    return words[:count], bands[:count], len(words)
+
+
+def read_source(wheel):
+    if digest(wheel.read_bytes()) != WHEEL_SHA:
+        raise ValueError("wordfreq wheel SHA-256 mismatch")
+    import msgpack
+    if msgpack.__version__ != "1.1.2":
+        raise ValueError("preparation requires msgpack==1.1.2")
+    with zipfile.ZipFile(wheel) as archive:
+        packed = archive.read(MEMBER)
+        if digest(packed) != MEMBER_SHA:
+            raise ValueError("French member SHA-256 mismatch")
+        decoded = msgpack.unpackb(gzip.decompress(packed), raw=False)
+        if not isinstance(decoded, list) or not decoded or decoded[0] != {"format": "cB", "version": 1}:
+            raise ValueError("unexpected frequency format")
+        metadata = archive.read("wordfreq-3.1.1.dist-info/METADATA").decode("utf-8")
+    return decoded[1:], metadata[metadata.index("## License"):].strip() + "\n"
+
+
+def curate(words):
+    return [PROPER.get(word, word) for word in words]
+
+
+def scale_words(raw, count):
+    return curate(raw[:count-len(ADDITIONS)]) + ADDITIONS
+
+
+def statistics(words):
+    return {"count": len(words), "uniqueCount": len(set(words)),
+            "minimumLength": min(map(len, words)), "maximumLength": max(map(len, words)),
+            "uppercaseCount": sum(any(c.isupper() for c in word) for word in words),
+            "nonLetterCount": sum(any(not c.isalpha() for c in word) for word in words),
+            "punctuationCount": sum(any(c in "'-" for c in word) for word in words),
+            "multiwordCount": sum(" " in word for word in words),
+            "nonASCIICount": sum(not word.isascii() for word in words),
+            "wordsSHA256": digest(("\n".join(words)+"\n").encode())}
+
+
+def artifacts(raw, bands, candidate_count, source_notices):
+    if (len(raw) != OBSERVED_COUNT or len(set(raw)) != OBSERVED_COUNT or not all(map(eligible, raw))
+            or len(bands) != OBSERVED_COUNT or bands != sorted(bands)
+            or any(type(x) is not int or x < 0 for x in bands)
+            or type(candidate_count) is not int or candidate_count < OBSERVED_COUNT):
+        raise ValueError("invalid observed French data")
+    observed = curate(raw)
+    scales = {name: scale_words(raw, count) for name, count in COUNTS.items()}
+    if any(len(words) != COUNTS[name] or len(set(words)) != COUNTS[name] for name, words in scales.items()):
+        raise ValueError("French scale count or uniqueness mismatch")
+    swift = ("// Generated by Scripts/prepare-french-frequency-corpus.py; do not edit.\n"
+             "// Independent wordfreq data and Typebar editorial contributions, CC BY-SA 4.0.\n"
+             "// Attribution: Resources/FrenchFrequencyCorpusNotices.txt. No Monkeytype data.\n"
+             "enum FrenchFrequencyCorpus {\n"
+             f'  static let revision = "{REVISION}"\n'
+             '  static let observedWords: [String] = """\n' + "\n".join(observed) + '\n""".split(separator: "\\n").map(String.init)\n'
+             '  static let editorialAdditions: [String] = """\n' + "\n".join(ADDITIONS) + '\n""".split(separator: "\\n").map(String.init)\n')
+    for name, count in COUNTS.items():
+        swift += f'  static let words{name} = Array(observedWords.prefix({count-len(ADDITIONS)})) + editorialAdditions\n'
+    swift += "}\n"
+    notices = ("Typebar French corpus tokens, revision 1\n"
+               "Adapted selection and editorial contributions by Typebar contributors (2026), CC BY-SA 4.0.\n"
+               "https://creativecommons.org/licenses/by-sa/4.0/\n"
+               "Source: Robyn Speer / wordfreq 3.1.1\nhttps://pypi.org/project/wordfreq/3.1.1/\n"
+               "Changes: select NFC lowercase French-letter tokens of at most 20 characters;\n"
+               "single a/à/y/ô only; preserve frequency-band order and apply explicit exclusions.\n"
+               "Independently authored geographic case variants refer to lowercase source\n"
+               "frequency evidence. Six independently authored unranked expressions are appended\n"
+               "to each scale. Editorial contributions share the data license.\n"
+               "Names, loans, brands and colloquial/vulgar tokens may remain. Not a certified\n"
+               "dictionary or equivalent reference distribution. No reference words or assets.\n"
+               "The data license is CC BY-SA 4.0, not wordfreq code's Apache license.\n\n"
+               + NOTICE_MARKER + source_notices)
+    manifest = {"schemaVersion": 1, "revision": REVISION, "observedCount": len(raw),
+                "candidateCount": candidate_count, "observedFrequencyBands": bands,
+                "selection": "NFC lowercase French letters; maximum 20; single a/à/y/ô; explicit exclusions; frequency-bin order",
+                "excludedTokens": sorted(EXCLUDED), "properNameVariants": PROPER,
+                "unrankedEditorialAdditions": ADDITIONS,
+                "qualityBoundary": "observed corpus tokens and explicit editorial forms, not dictionary certification or reference parity",
+                "scales": {name: statistics(words) for name, words in scales.items()},
+                "wordfreq": {"version": "3.1.1", "wheelSHA256": WHEEL_SHA,
+                             "member": MEMBER, "memberSHA256": MEMBER_SHA},
+                "preparationDependency": "msgpack==1.1.2 (build-time only)",
+                "dataLicense": "CC-BY-SA-4.0; retain full wordfreq source credits",
+                "swiftSHA256": digest(swift.encode()), "noticesSHA256": digest(notices.encode())}
+    return {SWIFT: swift.encode(), NOTICES: notices.encode(),
+            MANIFEST: (json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)+"\n").encode()}
+
+
+def publish(outputs, root, check=False):
+    if check:
+        for path, data in outputs.items():
+            if not (root/path).is_file() or (root/path).read_bytes() != data:
+                raise ValueError(f"generated artifact mismatch: {path}")
+    else:
+        if any((root/path).exists() for path in outputs):
+            raise ValueError("refusing to overwrite artifacts; use --check or a fresh output root")
+        for path, data in outputs.items():
+            (root/path).parent.mkdir(parents=True, exist_ok=True)
+            (root/path).write_bytes(data)
+
+
+def verify_bundled(root):
+    swift = (root/SWIFT).read_text()
+    match = re.search(r'static let observedWords: \[String\] = """\n(.*?)\n"""', swift, re.S)
+    if not match:
+        raise ValueError("missing observed French data")
+    words = match.group(1).splitlines()
+    raw = [word.lower() for word in words]
+    if curate(raw) != words:
+        raise ValueError("French editorial case mismatch")
+    manifest = json.loads((root/MANIFEST).read_text())
+    notices = (root/NOTICES).read_text().split(NOTICE_MARKER)
+    if len(notices) != 2 or not notices[1].startswith("## License\n"):
+        raise ValueError("missing French source attribution")
+    publish(artifacts(raw, manifest["observedFrequencyBands"], manifest["candidateCount"], notices[1]), root, check=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--wordfreq-wheel", type=Path)
+    parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--check-bundled", action="store_true")
+    args = parser.parse_args()
+    if args.check_bundled:
+        if args.check or args.wordfreq_wheel:
+            parser.error("--check-bundled is a separate offline integrity mode")
+        verify_bundled(args.output_root)
+        print("Bundled French corpus integrity passed (not upstream reproduction)")
+    else:
+        if not args.wordfreq_wheel:
+            parser.error("--wordfreq-wheel is required")
+        bins, notices = read_source(args.wordfreq_wheel)
+        raw, bands, candidates = select(bins)
+        publish(artifacts(raw, bands, candidates, notices), args.output_root, args.check)
+        print("French corpus source preparation verified" if args.check else "French corpus prepared")
+
+
+if __name__ == "__main__":
+    main()

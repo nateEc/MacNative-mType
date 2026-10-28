@@ -11063,22 +11063,13 @@ enum StarterLexicon {
   }
 
   static var french1kLexicon: IndexedLexicon {
-    frenchScaleLexicon(
-      marker: "qfr", count: 1_394, minimumToken: "q", maximumLength: 14,
-      uppercaseCount: 0, punctuationCount: 6, spaceCount: 6,
-      punctuationSpaceOverlap: 0, nonASCIICount: 257)
+    IndexedLexicon(FrenchFrequencyCorpus.words1k)
   }
   static var french2kLexicon: IndexedLexicon {
-    frenchScaleLexicon(
-      marker: "wfr", count: 2_041, minimumToken: "w", maximumLength: 14,
-      uppercaseCount: 3, punctuationCount: 10, spaceCount: 11,
-      punctuationSpaceOverlap: 0, nonASCIICount: 503)
+    IndexedLexicon(FrenchFrequencyCorpus.words2k)
   }
   static var french10kLexicon: IndexedLexicon {
-    frenchScaleLexicon(
-      marker: "xfr", count: 10_251, minimumToken: "x", maximumLength: 15,
-      uppercaseCount: 4, punctuationCount: 73, spaceCount: 60,
-      punctuationSpaceOverlap: 2, nonASCIICount: 3_224)
+    IndexedLexicon(FrenchFrequencyCorpus.words10k)
   }
   static var french600kLexicon: IndexedLexicon {
     frenchScaleLexicon(

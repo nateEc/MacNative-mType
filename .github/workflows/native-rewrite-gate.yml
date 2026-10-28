@@ -92,6 +92,8 @@ jobs:
           run_check "bundled English corpus integrity" python3 Scripts/prepare-english-frequency-corpus.py --output-root . --check-bundled
           run_check "Spanish corpus preparation contracts" python3 Scripts/test-spanish-frequency-corpus.py
           run_check "bundled Spanish corpus integrity" python3 Scripts/prepare-spanish-frequency-corpus.py --output-root . --check-bundled
+          run_check "French corpus preparation contracts" python3 Scripts/test-french-frequency-corpus.py
+          run_check "bundled French corpus integrity" python3 Scripts/prepare-french-frequency-corpus.py --output-root . --check-bundled
           run_check "Western vocabulary audit contracts" python3 Scripts/test-western-basic-corpora.py
           run_check "Western vocabulary integrity" python3 Scripts/check-western-basic-corpora.py
           run_check "working-tree whitespace check" git diff --check

@@ -32,3 +32,17 @@ https://creativecommons.org/licenses/by-sa/4.0/
 See the accompanying EnglishFrequencyCorpusNotices.txt for the full SCOWL
 copyright, Robyn Speer / wordfreq attribution, source credits and SUBTLEX terms.
 This data license is separate from the license of Typebar's native code.
+
+Spanish frequency corpus (1k / 10k choices)
+Independent wordfreq 3.1.1 selection and explicit Typebar editorial contributions.
+Adapted data: Creative Commons Attribution-ShareAlike 4.0.
+See SpanishFrequencyCorpusNotices.txt for full attribution, source credits,
+SUBTLEX terms and the changes made to the corpus.
+
+French frequency corpus (1k / 2k / 10k choices)
+Independent wordfreq 3.1.1 selection and explicit Typebar editorial contributions.
+Adapted data: Creative Commons Attribution-ShareAlike 4.0.
+https://creativecommons.org/licenses/by-sa/4.0/
+See FrenchFrequencyCorpusNotices.txt for full attribution, source credits,
+SUBTLEX terms and the changes made to the corpus.
+These data licenses are separate from the license of Typebar's native code.

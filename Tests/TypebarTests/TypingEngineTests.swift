@@ -12550,11 +12550,12 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testFrenchScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testFrenchScaleChoicesPreserveIndependentIDsAndCurrentCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
-      ("french1k", 1_394, 1, 14, 0, 12, 6, 6, 257),
-      ("french2k", 2_041, 1, 14, 3, 21, 10, 11, 503),
-      ("french10k", 10_251, 1, 15, 4, 131, 73, 60, 3_224),
+      // Independently observed/edited vocabulary; 600k remains synthetic.
+      ("french1k", 1_394, 1, 16, 5, 6, 2, 5, 260),
+      ("french2k", 2_041, 1, 16, 5, 6, 2, 5, 425),
+      ("french10k", 10_251, 1, 18, 5, 6, 2, 5, 2_700),
       ("french600k", 633_941, 1, 33, 0, 34, 34, 0, 282_793),
     ]
 

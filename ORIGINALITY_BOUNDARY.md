@@ -1,5 +1,7 @@
 # 原创性边界与验证
 
+2026-10-28 后续：French 1k／2k／10k 使用固定 wordfreq 法语统计 token，加上明确标注的独立专名大小写和六个自写表达；没有导入参考词值或按参考词值筛选。完整来源、编辑规则、固定哈希和署名交付见 `OFFICIAL_LANGUAGE_AUDIT.md` 当前节与 `Compatibility/french-frequency-corpus.json`。基础法语和默认四语不改；数据 CC BY-SA 4.0 与原生实现分别记录。当前真实候选不证明词典审校、原版频率／分布或 600k 已完成。
+
 2026-10-20 后续：Spanish 1k 用固定独立 wordfreq 西语语料替换标记合成串；只读参考聚合，不读取参考词值用于选词。该入口与基础西／法／德／意的独立手写词库不同：这次 wordfreq 实际是数据来源，而非仅 QA；生成物及完整发行署名按数据 CC BY-SA 4.0 单独交付。未导入查阅过的 Hunspell 字典；具体规则、输入哈希、语料质量边界及仍为合成的其他规模见 `OFFICIAL_LANGUAGE_AUDIT.md` 当前节，不宣称词典认证或源分布等价。
 
 2026-10-20 后续：西语／法语／德语基础池以本项目独立编写的常用词及短语扩充；参考仅提供聚合容量和行为约束。wordfreq 仅为可选 QA 拼写旁证，不生成这些词值；未引入查阅过的其他字典文件。实际源哈希、571 个候选的验证和默认合并的去重边界见 `Compatibility/western-basic-corpora.json` 与 `OFFICIAL_LANGUAGE_AUDIT.md` 当前节，不把统计匹配当作词库、分布或人工语言验收完成。
