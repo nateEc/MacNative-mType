@@ -118,7 +118,7 @@ const probe=main.namespace.ownedProbe;
 if(combinations) {
   const units=text=>Array.from({length:text.length},(_,i)=>text.charCodeAt(i));
   const fixtures=[];
-  function emit(targets,tape,{noSpace=false,korean=false,zen=false}={}) {
+  function emit(targets,tape,{noSpace=false,korean=false,zen=false,duration=2.5}={}) {
     words=targets;
     eventContext={mode:zen?'zen':'words',mode2:zen?'zen':String(targets.length),bailedOut:false,koreanStatus:korean,
       isFunboxWithNospacePropertyActive:noSpace,targetWords:targets};
@@ -127,11 +127,11 @@ if(combinations) {
     const inputEvents=tape.map(e=>({type:'input',testMs:e.time*1000,data:{wordIndex:e.field,inputValue:e.value,data:e.payload,
       inputType:e.deletion?'deleteContentBackward':'insertText',correct:e.correct,inputStopped:e.stopped||undefined,
       lastWord:e.last||undefined,commitsWord:e.commit||undefined,charIndex:Math.max(0,e.value.length-e.payload.length)}}));
-    events=[...inputEvents,{type:'timer',testMs:2500,data:{event:'end'}}];
+    events=[...inputEvents,{type:'timer',testMs:duration*1000,data:{event:'end'}}];
     const log={events,context:eventContext},statsModule=modules.get('test/events/stats').namespace;
     const history=statsModule.getWpmHistory(log),numbers=modules.get('@monkeytype/util/numbers').namespace;
     const value=numbers.roundTo2(numbers.kogasa(numbers.stdDev(history)/numbers.mean(history)));
-    fixtures.push({targets:targets.map(units),noSpace,korean,zen,duration:2.5,history,consistency:Number.isNaN(value)?0:value,
+    fixtures.push({targets:targets.map(units),noSpace,korean,zen,duration,history,rawHistory:statsModule.getRawHistory(log),consistency:Number.isNaN(value)?0:value,
       tape:tape.map(e=>({...e,value:units(e.value),payload:units(e.payload)}))});
   }
   for(const target of ['ab','괅','🙂','e\u0301'])for(const tail of [' ','\u3000','\u0085'])
@@ -150,7 +150,27 @@ if(combinations) {
     {time:0.5,field:1,value:'가',payload:'가',correct:true},
     {time:1.5,field:0,value:'괅',payload:'',correct:true,deletion:true}],{korean:true,noSpace:true});
   emit(['괅'],[{time:0,field:0,value:'괅',payload:'괅',correct:true}],{zen:true});
-  console.log(JSON.stringify({fixtures}));
+  const baseCount=fixtures.length;
+  for(const [count,duration] of [[19,24],[23,24],[29,24],[38,48],[43,24],[46,48],[51,24],[53,24]]) {
+    const value='a'.repeat(count);
+    emit([value],[{time:0,field:0,value,payload:value,correct:true}],{duration});
+  }
+  emit(['ab ','cd'],[{time:0,field:1,value:'c',payload:'c',correct:true},
+    {time:1,field:0,value:'ab ',payload:' ',correct:true}]);
+  emit(['a ','b ','c'],[{time:0,field:0,value:'a ',payload:' ',correct:true},
+    {time:1,field:2,value:'c',payload:'c',correct:true}]);
+  emit(['ab','cd'],[{time:0,field:0,value:'ab',payload:'ab',correct:true},
+    {time:0.5,field:1,value:'cd',payload:'cd',correct:true},
+    {time:1.5,field:1,value:'',payload:'',correct:true,deletion:true}],{noSpace:true});
+  emit(['괅','가','x'],[{time:0,field:2,value:'x',payload:'x',correct:true},
+    {time:0.5,field:0,value:'괅',payload:'괅',correct:true},
+    {time:1.5,field:2,value:'',payload:'',correct:true,deletion:true}],{noSpace:true,korean:true});
+  for(const space of ['\u3000','\u00a0','\u2002','\u202f']) {
+    const value='a'+space+'괅';
+    emit([],[{time:0,field:0,value,payload:value,correct:true}],{zen:true});
+  }
+  const chartFixtures=fixtures.splice(baseCount);
+  console.log(JSON.stringify({fixtures,chartFixtures}));
 } else if(process.argv.includes('--statistics')) {
   const fixtures=[];
   const cases=[

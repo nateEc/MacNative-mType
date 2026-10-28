@@ -1519,8 +1519,12 @@ enum ResultPerformanceTrace {
     let sampleTimes = samplingTimes(for: duration, configuration: configuration)
     let orderedEvents = validOrderedEvents(events)
     guard !orderedEvents.isEmpty else { return [] }
+    // Captured targets and context let chart samples use the same literal
+    // event classification as replay statistics. Legacy target reconstruction
+    // retains its earlier reader convention; no saved scores are rewritten.
+    let sourceChart = configuration != nil && (configuration?.mode == .zen || targetWordDirectory != nil)
     if let fields = FieldActivityCursor(prompt: prompt, events: orderedEvents, configuration: configuration,
-      targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis) {
+      targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis, sourceClassification: sourceChart) {
       return fieldSamples(fields, events: orderedEvents, times: sampleTimes, singleWindow: false)
     }
     if containsRawUnits(orderedEvents) {
@@ -1643,7 +1647,9 @@ enum ResultPerformanceTrace {
       }
       if usesKoreanScoring || sourceClassification {
         let input = RecordedInputFieldStats.classificationInput(for: event, sourceEventFlags: sourceClassification)
-        let scoringTarget = configuration?.mode == .zen ? input : target
+        // Zen has no generated target. Let classification fall back to its
+        // normalized input, rather than comparing that input to raw spaces.
+        let scoringTarget: [UInt16]? = configuration?.mode == .zen ? nil : target
         let basis: ResultScoringUnitBasis = usesKoreanScoring ? .koreanJamo : .utf16
         let full = ResultUnitCharacterStats.classify(input: input, target: scoringTarget,
           creditsPartial: false, basis: basis)
@@ -1769,8 +1775,8 @@ enum ResultPerformanceTrace {
       }
       previousBoundary = elapsed
       let counts = fields.counts
-      return .init(elapsed: elapsed, wpm: wpm(characters: counts.credit, elapsed: elapsed),
-        rawWpm: wpm(characters: counts.raw, elapsed: elapsed),
+      return .init(elapsed: elapsed, wpm: wpm(characters: counts.credit, elapsed: elapsed, sourceOrder: fields.sourceClassification),
+        rawWpm: wpm(characters: counts.raw, elapsed: elapsed, sourceOrder: fields.sourceClassification),
         burstWpm: intervalBurst(inputUnits: attempts, seconds: elapsed - start), errorCount: errors)
     }
   }
@@ -2010,9 +2016,10 @@ enum ResultPerformanceTrace {
       retainedSeparatorIndices: retainedSeparatorIndices).inputUnits
   }
 
-  private static func wpm(characters: Int, elapsed: TimeInterval) -> Int {
+  private static func wpm(characters: Int, elapsed: TimeInterval, sourceOrder: Bool = false) -> Int {
     guard elapsed.isFinite, elapsed > 0 else { return 0 }
-    let speed = (Double(characters) / 5 / elapsed * 60).rounded()
+    let speed = sourceOrder ? sourceRoundedWPM(credit: characters, elapsed: elapsed)
+      : (Double(characters) / 5 / elapsed * 60).rounded()
     guard speed.isFinite, speed < Double(Int.max) else { return 0 }
     return Int(speed)
   }

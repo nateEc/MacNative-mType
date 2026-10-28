@@ -141,12 +141,14 @@ final class KoreanPerformanceTraceTests: XCTestCase {
   }
 
   func testTrimRequiresAllSourceEvidenceAndPreservesTheRawBuffer() {
-    for (correct, stopped, last, commits) in [(true,false,true,true), (false,true,true,true),
-      (false,false,false,true), (false,false,true,false)] {
+    // getInputFromDom requires the explicit commit evidence, but does not
+    // exclude inputStopped. A stopped explicit commit trims the scoring copy.
+    for (correct, stopped, last, commits, raw) in [(true,false,true,true,72), (false,true,true,true,60),
+      (false,false,false,true,72), (false,false,true,false,72)] {
       let events = [insert(32, snapshot: [0xad05,32], correct: correct, stopped: stopped,
         lastWord: last, commits: commits)]
       XCTAssertEqual(ResultPerformanceTrace.point(prompt: "괅", events: events, elapsed: 1,
-        sourceScoringBasis: .koreanJamo).rawWpm, 72)
+        sourceScoringBasis: .koreanJamo).rawWpm, raw)
       XCTAssertEqual(events[0].inputField?.units, [0xad05,32])
     }
   }
