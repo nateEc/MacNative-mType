@@ -37,7 +37,10 @@ final class SpanishFrequencyCorpusTests: XCTestCase {
   }
 
   func testSpanish10kLongAttemptGrowsAcrossTheTailAndRepeatsCapturedWords() {
-    let words = TypingLanguage.spanish10k.ownedPracticeWords(), owned = Set(TypingLanguage.spanish10k.ownedPracticeWords())
+    let words = TypingLanguage.spanish10k.ownedPracticeWords()
+    // Punctuation-off generation lowercases ASCII capitals, including proper
+    // names that random continuation may select after the fixed opening.
+    let ownedTargets = Set(words.map { $0.lowercased() })
     var index = 9_900
     var session = TestSessionFactory.make(configuration: .words(153, language: .spanish10k),
       nextRandomWordIndex: { defer { index += 1 }; return index % words.count })
@@ -49,7 +52,7 @@ final class SpanishFrequencyCorpusTests: XCTestCase {
     XCTAssertEqual(session.completedWordCount, 100); XCTAssertEqual(session.outcome, .active)
     session.insert(String(session.prompt.dropFirst(session.typed.count)), at: Date(timeIntervalSince1970: 11))
     XCTAssertEqual(session.completedWordCount, 153); XCTAssertEqual(session.outcome, .completed); XCTAssertEqual(session.errors, 0)
-    XCTAssertTrue(session.prompt.split(separator: " ").allSatisfy { owned.contains(String($0)) })
+    XCTAssertEqual(session.prompt.split(separator: " ").map(String.init).filter { !ownedTargets.contains($0) }, [])
     var replay = session.repeatedAttempt(); XCTAssertEqual(replay.prompt, opening)
     replay.insert(opening, at: Date(timeIntervalSince1970: 12))
     replay.insert(String(replay.prompt.dropFirst(replay.typed.count)), at: Date(timeIntervalSince1970: 13))

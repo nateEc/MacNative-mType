@@ -15441,41 +15441,6 @@ enum StarterLexicon {
 
   static let italianWords = WesternBasicCorpora.italian
 
-  private struct ItalianScaleSpecification {
-    let marker: String
-    let count: Int
-    let minimumToken: String
-    let maximumLength: Int
-    let uppercaseCount: Int
-    let punctuationCount: Int
-    let symbolCount: Int
-    let nonASCIICount: Int
-  }
-
-  private static func italianScaleLexicon(
-    _ specification: ItalianScaleSpecification
-  ) -> IndexedLexicon {
-    let uppercaseEnd = 2 + specification.uppercaseCount
-    let punctuationEnd = uppercaseEnd + specification.punctuationCount
-    let symbolEnd = punctuationEnd + specification.symbolCount
-    let nonASCIIEnd = symbolEnd + specification.nonASCIICount
-    precondition(nonASCIIEnd <= specification.count)
-
-    return IndexedLexicon(count: specification.count) { index in
-      if index == 0 { return specification.minimumToken }
-      if index == 1 { return String(repeating: "q", count: specification.maximumLength) }
-      let suffix = alphabeticIndex(index + 676)
-      let asciiEntry = "qit" + specification.marker + suffix
-      if index < uppercaseEnd {
-        return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst()
-      }
-      if index < punctuationEnd { return asciiEntry + "-" }
-      if index < symbolEnd { return asciiEntry + (index.isMultiple(of: 2) ? "$" : "+") }
-      if index < nonASCIIEnd { return "ìq" + specification.marker + suffix }
-      return asciiEntry
-    }
-  }
-
   static var italian1kLexicon: IndexedLexicon {
     IndexedLexicon(ItalianFrequencyCorpus.words1k)
   }
@@ -15485,15 +15450,11 @@ enum StarterLexicon {
   }
 
   static var italian60kLexicon: IndexedLexicon {
-    italianScaleLexicon(.init(
-      marker: "c", count: 60_442, minimumToken: "a", maximumLength: 18,
-      uppercaseCount: 0, punctuationCount: 38, symbolCount: 2, nonASCIICount: 0))
+    IndexedLexicon(ItalianFrequencyCorpus.words60k)
   }
 
   static var italian280kLexicon: IndexedLexicon {
-    italianScaleLexicon(.init(
-      marker: "d", count: 279_833, minimumToken: "q", maximumLength: 25,
-      uppercaseCount: 0, punctuationCount: 0, symbolCount: 0, nonASCIICount: 0))
+    IndexedLexicon(ItalianFrequencyCorpus.words280k)
   }
 
   static var italian1kWords: [String] { italian1kLexicon.materialized() }

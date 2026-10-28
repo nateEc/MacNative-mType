@@ -18,9 +18,9 @@ class ItalianPreparationTests(unittest.TestCase):
         self.assertEqual(bands, [0, 0, 1]); self.assertEqual(count, 4)
 
     def test_filter_keeps_italian_accents_but_rejects_fragments_and_foreign_functions(self):
-        for word in ["a", "e", "i", "o", "è", "perché", "città", "più", "sì", "famiglia"]:
+        for word in ["a", "e", "i", "o", "è", "perché", "città", "più", "sì", "famiglia", "a" * 25]:
             self.assertTrue(italian.eligible(word), word)
-        for word in ["b", "u", "the", "and", "www", "http", "it", "Italia", "e\u0300", "ciao2", "a" * 19, ""]:
+        for word in ["b", "u", "the", "and", "www", "http", "it", "Italia", "e\u0300", "ciao2", "a" * 26, ""]:
             self.assertFalse(italian.eligible(word), word)
 
     def test_invalid_bins_and_shortages_never_generate_padding(self):
@@ -55,13 +55,39 @@ class ItalianPreparationTests(unittest.TestCase):
 
     def test_manifest_records_real_counts_bounds_and_no_padding(self):
         m = json.loads((ROOT/italian.MANIFEST).read_text())
-        self.assertEqual(m["observedCount"], 7154)
+        self.assertEqual(m["observedCount"], 279833)
+        self.assertEqual(m["schemaVersion"], 2)
         self.assertEqual(m["unrankedEditorialAdditions"], [])
+        self.assertEqual(m["technicalEditorialNames60k"], ["C++", "C#"])
         for name, count in italian.COUNTS.items():
             self.assertEqual(m["scales"][name]["count"], count)
             self.assertEqual(m["scales"][name]["uniqueCount"], count)
             self.assertEqual(m["scales"][name]["multiwordCount"], 0)
-            self.assertLessEqual(m["scales"][name]["maximumLength"], 14 if name == "1k" else 18)
+            self.assertLessEqual(m["scales"][name]["maximumLength"], italian.LIMITS[name])
+
+    def test_band_runs_preserve_ranks_and_reject_corrupt_or_excessive_sizes(self):
+        bands = italian.expand_band_runs([[1, 10], [5, italian.OBSERVED_COUNT - 10]])
+        self.assertEqual(bands[:10], [1] * 10); self.assertEqual(bands[10:], [5] * (italian.OBSERVED_COUNT - 10))
+        for runs in [None, [], [[-1, italian.OBSERVED_COUNT]], [[1, 1]], [[1, 0]],
+                     [[1, True]], [[1, italian.OBSERVED_COUNT + 1]], [[1, 1], [1, italian.OBSERVED_COUNT - 1]],
+                     [[3, 1], [2, italian.OBSERVED_COUNT - 1]], [[1]], [[1, 2, 3]], [[False, italian.OBSERVED_COUNT]]]:
+            with self.assertRaises(ValueError): italian.expand_band_runs(runs)
+
+    def test_each_scale_filters_before_taking_the_count(self):
+        raw = ["a" * 15, "a" * 19, "a" * 25, "di", "perché"]
+        self.assertEqual(italian.scale_words(raw, 1159), ["di", "perché"])
+        self.assertEqual(italian.scale_words(raw, 7154), ["a" * 15, "di", "perché"])
+        self.assertEqual(italian.scale_words(raw, 60442), ["a" * 15, "di", "perché"])
+        self.assertEqual(italian.scale_words(raw, 279833), raw)
+
+    def test_punctuated_observations_have_a_distinct_frequency_cutoff(self):
+        bins = [[] for _ in range(452)]
+        bins[450] = sorted(["com'è", "all'interno", "l'", "ciao--mondo", "C++", "com'e\u0300"])
+        bins[451] = ["dell'anno"]
+        rows = italian.punctuated_observations(bins)
+        self.assertEqual(rows, [["all'interno", 450], ["com'è", 450]])
+        self.assertEqual(italian.scale_words(["di", "e"], 60442, rows),
+                         ["di", "e", "all'interno", "com'è", "C++", "C#"])
 
 
 if __name__ == "__main__":

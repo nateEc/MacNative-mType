@@ -1,13 +1,16 @@
-Typebar Italian corpus tokens, revision 1
+Typebar Italian corpus tokens, revision 2
 Adapted selection and editorial contributions by Typebar contributors (2026), CC BY-SA 4.0.
 https://creativecommons.org/licenses/by-sa/4.0/
 Source: Robyn Speer / wordfreq 3.1.1
 https://pypi.org/project/wordfreq/3.1.1/
-Changes: select NFC lowercase Italian-letter tokens of at most 18 characters;
+Changes: select NFC lowercase Italian-letter tokens of at most 25 characters;
 single a/e/i/o/è only; preserve frequency-band order and apply explicit exclusions.
 Independently authored geographic case variants refer to lowercase source
-frequency evidence. The 1k selection caps words at 14 characters; 7k at 18.
-No unranked expressions or padding tokens are appended. Editorial contributions share the data license.
+frequency evidence. Caps: 1k at 14 characters; 7k and 60k at 18; 280k at 25.
+The 60k selection reserves room for observed Italian apostrophe/hyphen tokens
+in frequency bands up to 450, plus C++ and C# as explicitly unranked technical
+editorial names. These are not measured frequency claims. No padding tokens.
+Editorial contributions share the data license.
 Names, loans, brands and colloquial/vulgar tokens may remain. Not a certified
 dictionary or equivalent reference distribution. No reference words or assets.
 The data license is CC BY-SA 4.0, not wordfreq code's Apache license.

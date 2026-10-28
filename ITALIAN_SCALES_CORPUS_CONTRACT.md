@@ -1,5 +1,7 @@
 # Italian 1k／7k 的独立实际词汇
 
+后续状态：60k／280k 的实际语料替换及准备 manifest v2 见 [Italian 大词库合同](ITALIAN_LARGE_CORPUS_CONTRACT.md)。下文保留本阶段快照；1k／7k 词数据哈希在后续阶段保持。
+
 `LANG-ITALIAN-SCALES-36`，起点 `58f33ba0`。本项替换合成词候选，不代表完整重写或全部 Italian 档位完成。
 
 ## 数据来源与规则

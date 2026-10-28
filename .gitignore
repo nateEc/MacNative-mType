@@ -10,6 +10,10 @@ DerivedData/
 *.app/
 .DS_Store
 
+# Preparation-only Python bytecode
+__pycache__/
+*.pyc
+
 # Deployment-only secrets
 .env
 .env.*

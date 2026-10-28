@@ -13417,8 +13417,8 @@ final class TypingEngineTests: XCTestCase {
     let cases: [(String, String, Int, Int, Int, Int, Int, Int)] = [
       ("italian1k", "Italiano · 1k · Typebar", 1_159, 14, 4, 0, 0, 37),
       ("italian7k", "Italiano · 7k · Typebar", 7_154, 18, 5, 0, 0, 168),
-      ("italian60k", "Italiano · 60k · Typebar", 60_442, 18, 0, 38, 2, 0),
-      ("italian280k", "Italiano · 280k · Typebar", 279_833, 25, 0, 0, 0, 0),
+      ("italian60k", "Italiano · 60k · Typebar", 60_442, 18, 7, 18, 1, 1_536),
+      ("italian280k", "Italiano · 280k · Typebar", 279_833, 23, 5, 0, 0, 8_510),
     ]
 
     for (
