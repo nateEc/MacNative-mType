@@ -9391,7 +9391,7 @@ private struct ChallengeResultView: View {
   }
 }
 
-private struct ReplaySoundConfiguration {
+struct ReplaySoundConfiguration {
   let playsClicks: Bool
   let playsErrors: Bool
   let clickStyle: TypingClickSoundStyle
@@ -9415,7 +9415,7 @@ private struct ReplaySoundConfiguration {
   }
 }
 
-private struct ReplayTimelineView: View {
+struct ReplayTimelineView: View {
   let prompt: String
   let events: [TypingReplayEvent]
   let speedUnit: TypingSpeedUnit
@@ -9551,7 +9551,21 @@ private struct ReplayTimelineView: View {
           ? "调整回放位置；字段记录完整时也可点按字符定位"
           : "调整回放位置；目标文本也支持鼠标点选字符定位")
       HStack {
-        Button(isPlaying ? "暂停" : "播放") {
+        ReplayTransportButton(title: isPlaying ? "暂停" : "播放", enabled: canPlay) {
+          if let fieldPlan, let frame = fieldFrame, !isPlaying {
+            guard let start = fieldPlan.playbackStart(from: frame) else { return }
+            var next = start.frame
+            elapsed = min(duration, start.nextOffset)
+            let cues = fieldPlan.advance(&next, through: elapsed)
+            fieldFrame = next
+            selectedPromptIndex = nil
+            selectedFieldCoordinate = nil
+            includesCurrentOffsetOnNextTick = false
+            isPlaying = next.nextActionIndex < fieldPlan.actions.count
+            playbackStartedAt = isPlaying ? ProcessInfo.processInfo.systemUptime - elapsed : nil
+            playSounds(cues)
+            return
+          }
           if elapsed >= duration && (fieldPlan == nil || fieldFrame?.nextActionIndex == fieldPlan?.actions.count) {
             elapsed = 0
             fieldFrame = fieldPlan?.initialFrame
@@ -9563,8 +9577,9 @@ private struct ReplayTimelineView: View {
           playbackStartedAt = isPlaying
             ? ProcessInfo.processInfo.systemUptime - elapsed : nil
         }
-        .disabled(!canPlay)
-        Button("重置") {
+        .fixedSize()
+        ReplayTransportButton(title: "重置",
+          enabled: !(elapsed == 0 && !isPlaying && (fieldFrame?.nextActionIndex ?? 0) == 0)) {
           elapsed = 0
           isPlaying = false
           playbackStartedAt = nil
@@ -9573,7 +9588,7 @@ private struct ReplayTimelineView: View {
           fieldFrame = fieldPlan?.initialFrame
           includesCurrentOffsetOnNextTick = true
         }
-        .disabled(elapsed == 0 && !isPlaying && (fieldFrame?.nextActionIndex ?? 0) == 0)
+        .fixedSize()
         Spacer()
       }
     }

@@ -147,6 +147,12 @@ struct FieldReplayPlan {
     return frame
   }
 
+  func playbackStart(from frame: Frame) -> Seek? {
+    // A pause stores the cursor, not the action index. Rebuilding uses its
+    // first crossing, including earlier mistakes cleared by later deletion.
+    seek(actions.indices.contains(frame.nextActionIndex) ? frame.coordinate : initialFrame.coordinate)
+  }
+
   /// Resume by action index, not timestamp: a character seek may stop in the
   /// middle of several actions sharing the same original input timestamp.
   func advance(_ frame: inout Frame, through elapsed: TimeInterval) -> [TypingReplaySoundCue] {

@@ -3,6 +3,10 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.ReplayPlaybackLifecycleTests/testPauseResumeAndRestartAgainstCompletePinnedButtonTimersAndDOM",
+      "file": "Tests/TypebarTests/ReplayPlaybackLifecycleTests.swift"
+    },
+    {
       "id": "TypebarTests.ReplayDisplayGapInteractionTests/testClickTargetsAgainstCompletePinnedReplayAndDOMDelegation",
       "file": "Tests/TypebarTests/ReplayDisplayGapInteractionTests.swift"
     },
