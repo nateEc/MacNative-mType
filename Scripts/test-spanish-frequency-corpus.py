@@ -12,6 +12,23 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class SpanishPreparationTests(unittest.TestCase):
+    def test_scale_editorial_forms_are_explicit_and_do_not_change_the_base_policy(self):
+        words = ["de", "méxico", "niño", "pablo"]
+        self.assertEqual(spanish.curate_scale(words), ["de", "México", "niño", "Pablo", "teórico-práctico"])
+        self.assertEqual(words, ["de", "méxico", "niño", "pablo"])
+        self.assertTrue(spanish.eligible("mexico"))
+        self.assertFalse(spanish.eligible("mexico", scale=True))
+        self.assertTrue(spanish.eligible("a" * 21))
+        self.assertFalse(spanish.eligible("a" * 21, scale=True))
+
+    def test_scale_selection_is_independent_of_the_unchanged_base_selection(self):
+        bins = [["de", "mexico", "méxico", "niño", "pablo"]]
+        base = spanish.select(bins, 3)
+        scale = spanish.select(bins, 3, scale=True)
+        self.assertEqual(base[0], ["de", "mexico", "méxico"])
+        self.assertEqual(scale[0], ["de", "méxico", "niño"])
+        self.assertEqual(base, spanish.select(bins, 3))
+
     def test_frequency_order_and_within_band_order_are_preserved(self):
         words, bands, candidates = spanish.select([["de", "la"], ["a", "niño", "árbol"]], 4)
         self.assertEqual(words, ["de", "la", "a", "niño"])
@@ -74,6 +91,19 @@ class SpanishPreparationTests(unittest.TestCase):
                     target.write_text(json.dumps(manifest))
                 else:
                     target.write_bytes(target.read_bytes() + b"tampered\n")
+                with self.assertRaises(ValueError):
+                    spanish.verify_bundled(root)
+
+    def test_scale_count_case_and_editorial_addition_cannot_be_silently_changed(self):
+        for old, new in [('México', 'méxico'), ('teórico-práctico', 'teóricopráctico')]:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for path in [spanish.SWIFT, spanish.NOTICES, spanish.MANIFEST]:
+                    target = root / path; target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes((ROOT / path).read_bytes())
+                text = (root / spanish.SWIFT).read_text()
+                self.assertIn(old, text)
+                (root / spanish.SWIFT).write_text(text.replace(old, new))
                 with self.assertRaises(ValueError):
                     spanish.verify_bundled(root)
 

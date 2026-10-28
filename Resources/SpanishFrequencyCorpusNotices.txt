@@ -1,11 +1,16 @@
-Typebar Spanish corpus tokens, revision 1
+Typebar Spanish corpus tokens, revision 2
 Adapted selection by Typebar contributors (2026), CC BY-SA 4.0.
 https://creativecommons.org/licenses/by-sa/4.0/
 Source: Robyn Speer / wordfreq 3.1.1
 https://pypi.org/project/wordfreq/3.1.1/
 Changes: retain frequency-band order; select NFC lowercase Spanish-letter
 tokens; retain single a/e/o/u/y only; apply the explicit editorial
-exclusions in the preparation script; retain the first 998 tokens.
+exclusions in the preparation script; retain the original 998 base tokens.
+Spanish 10k: select 9989 observed tokens of at most 20 characters, with
+additional explicit missing-accent exclusions. Independently authored
+proper-name variants restore case; their frequency evidence is for the
+lowercase form. Append the independently authored, unranked compound
+teórico-práctico. These editorial contributions share the data license.
 Names, loans, brands and colloquial/vulgar language may remain. This is
 observed corpus vocabulary, not dictionary certification or source parity.
 No reference-project values, code or assets are imported.

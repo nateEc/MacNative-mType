@@ -11008,9 +11008,7 @@ enum StarterLexicon {
     IndexedLexicon(SpanishFrequencyCorpus.words)
   }
   static var spanish10kLexicon: IndexedLexicon {
-    spanishScaleLexicon(
-      marker: "wx", count: 9_990, minimumToken: "w", maximumLength: 20,
-      uppercaseCount: 433, punctuationCount: 1, spaceCount: 0, nonASCIICount: 2_062)
+    IndexedLexicon(SpanishFrequencyCorpus.extendedWords)
   }
   static var spanish650kLexicon: IndexedLexicon {
     spanishScaleLexicon(

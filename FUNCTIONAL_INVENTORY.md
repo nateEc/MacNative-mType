@@ -2,6 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-SPANISH-10K-18 | Spanish 10k 独立实际词汇 | wordfreq 3.1.1 固定西语 token、明确专名映射与独立复合词；参考仅聚合和生成合同 | SpanishFrequencyCorpus.extendedWords、准备器复现与原生续批／历史测试；OFFICIAL_LANGUAGE_AUDIT.md | 部分完成：9,990 个唯一候选替换合成串，1k 哈希不漂移，旧提示与回放保留；不声称原词值／频率／分布相同，词汇审校和实体输入待验收。 |
 | BACKGROUND-REMOVE-17 | 背景删除的重复应用、完成顺序与失败提示 | 固定删除回调、FileStorage、setter／总线、完整背景函数；受控数据库与 DOM | 主线程背景应用任务、事件／显式调用区分、运行和图片身份保护；WEBSITE_BACKGROUND_REMOVAL_CONTRACT.md | 部分完成：命令两次读取、设置页一次读取，按完成顺序选择，读取失败保留画面，已有输入不重开。配置写入失败、实体提示及跨窗口／上传删除交错仍开放。 |
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |

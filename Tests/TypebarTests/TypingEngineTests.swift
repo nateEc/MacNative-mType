@@ -12508,10 +12508,10 @@ final class TypingEngineTests: XCTestCase {
 
   func testSpanishScaleChoicesPreserveIndependentIDsAndCurrentCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int)] = [
-      // Independent observed 1k corpus; the larger pools still preserve only
-      // reference aggregate shapes with synthetic entries, not real vocabulary.
+      // Independent observed/edited 1k and 10k corpora. The 650k pool still
+      // preserves only aggregate shapes with synthetic entries.
       ("spanish1k", 998, 1, 14, 0, 0, 0, 152),
-      ("spanish10k", 9_990, 1, 20, 433, 1, 0, 2_062),
+      ("spanish10k", 9_990, 1, 18, 111, 1, 0, 1_728),
       ("spanish650k", 646_579, 1, 26, 3, 239, 162, 247_122),
     ]
 
@@ -12528,7 +12528,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(Set(words).count, count)
       XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
       XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
-      XCTAssertEqual(words.filter { $0.range(of: "[A-Z]", options: .regularExpression) != nil }.count, uppercase)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, uppercase)
       XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, punctuation)
       XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaces)
       XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCII)
