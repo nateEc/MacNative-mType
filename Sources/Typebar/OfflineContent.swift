@@ -6169,7 +6169,7 @@ struct GeneratedCandidateContinuation {
   private var customLimitValue: Double?
   private(set) var decorationState: PoolWordDecorationState
   private(set) var replayHistory: GeneratedWordReplayHistory
-  private let replaysOwnedHistory: Bool
+  private var replaysOwnedHistory: Bool
   private let pseudolangModel: WebsitePseudolangModel?
   private(set) var replayExhausted = false
   private(set) var sourceGenerationFailed = false
@@ -6258,6 +6258,7 @@ struct GeneratedCandidateContinuation {
     // The original opening is already restored by TypingSession. Replay only
     // the exact chunks generated after it, including sampled case and targets.
     copy.cache = cache.replaying(after: 1)
+    copy.replaysOwnedHistory = true
     // The source resets its section on repeat. Cached actual targets survive,
     // but after that cache ends generation starts a fresh candidate section.
     copy.sectionWords = []
@@ -6309,7 +6310,10 @@ struct GeneratedCandidateContinuation {
       if isCustom {
         let atSectionEnd = nextSectionWord >= sectionWords.count
         if initialCustomPipe, atSectionEnd, generatedSectionIndex >= bound { break }
-        if !initialCustomPipe {
+        // Non-pipe generateWords fills its initial word request even when
+        // a visibility push exceeds the section quota. The quota gates later
+        // addWord calls, not this initialization loop.
+        if emittedWords > 0 {
           if configuration.customTextCompletion == .words,
             sourceCustomLimit > 0, Double(emittedWords + index) >= sourceCustomLimit { break }
           if configuration.customTextCompletion == .sections,

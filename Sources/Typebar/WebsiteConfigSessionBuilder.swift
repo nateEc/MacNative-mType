@@ -162,6 +162,9 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     if let wordHistory {
       session = try await prepareWordReplay(configuration: config, history: wordHistory,
         scope: scope, showAllLines: showAllLines, random: random, pseudolangModel: pseudolangModel)
+    } else if config.mode == .custom, scope.websiteCustomText != nil, liveSource == nil {
+      session = try await prepareWordReplay(configuration: config, history: nil,
+        scope: scope, showAllLines: showAllLines, random: random, pseudolangModel: pseudolangModel)
     } else if let source = liveSource {
       guard let loadExternal else { throw WebsiteConfigSessionBuildError.externalNotProvided }
       let external = try await read { try await loadExternal(source, config) }
@@ -203,7 +206,7 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
       repetition: repetition)
   }
 
-  private static func prepareWordReplay(configuration: TestConfiguration, history: GeneratedWordReplayHistory,
+  private static func prepareWordReplay(configuration: TestConfiguration, history: GeneratedWordReplayHistory?,
     scope: Scope, showAllLines: Bool, random: Random, pseudolangModel: WebsitePseudolangModel?) async throws -> TypingSession {
     let preparation = PolyglotGenerationPreparation(configuration)
     var config = preparation.configuration
@@ -224,16 +227,19 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
       case .sections: limit = config.customTextSectionLimit ?? 0
       case .finish: limit = candidates.count
       }
-      count = limit == 0 ? 100 : min(100, limit)
+      if let visible = config.visibleFutureWordCount {
+        count = config.customTextCompletion == .words && limit > 0 ? min(visible + 1, limit) : visible + 1
+      } else { count = limit == 0 ? 100 : min(100, limit) }
     } else {
       customCandidates = nil
       count = GeneratedPromptChunkPolicy.wordCount(for: config, showAllLines: showAllLines)
     }
     var history = history
-    history.arrowChart = scope.arrowChart
+    history?.arrowChart = scope.arrowChart
     var cursor = GeneratedCandidateContinuation(configuration: config, batchTokenCount: 100,
       showAllLines: showAllLines, weakSpotScores: scope.weakSpotScores, sourceWords: customCandidates,
-      decorationState: scope.decorationState, pseudolangModel: pseudolangModel, replayHistory: history,
+      decorationState: scope.decorationState, arrowChart: scope.arrowChart,
+      pseudolangModel: pseudolangModel, replayHistory: history,
       customLimitValue: config.mode == .custom ? scope.websiteCustomText?.limitValue : nil,
       nextRandomPoolShuffleIndex: random.shuffleIndex)
     var chunks: [GeneratedWordChunk] = []
@@ -252,11 +258,13 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     let fields = cursor.replayHistory.preservesCommitFraming ? chunks.flatMap { $0.sourceFields ?? [] } : nil
     let batch = TransformedPromptBatch(text: assembled.prompt, noSpaceTargetWords: assembled.targetWords, sourceFields: fields)
     let finalized = cursor.hasRemaining ? batch : FinitePromptCommitPolicy.finalized(batch)
-    let needsCommit = !cursor.replayHistory.preservesCommitFraming && cursor.hasRemaining && !history.noSpace
+    let needsCommit = !cursor.replayHistory.preservesCommitFraming && cursor.hasRemaining
+      && !(history?.noSpace ?? TestModifierPolicy.usesNoSpaceInput(config.modifiers))
       && finalized.text.last != " " && finalized.text.last != "\n"
     try Task.checkCancellation()
     return .init(configuration: config, prompt: finalized.text + (needsCommit ? " " : ""), sourceFields: finalized.sourceFields,
-      generatedCodeContinuation: cursor.hasRemaining ? cursor : nil, generatedReplayHistory: cursor.replayHistory,
+      generatedCodeContinuation: cursor.hasRemaining ? cursor : nil,
+      retainedCandidateContinuation: cursor.hasRemaining ? nil : cursor, generatedReplayHistory: cursor.replayHistory,
       generatedSectionLimit: config.mode == .custom && config.customTextCompletion == .sections
         ? scope.websiteCustomText?.limitValue : nil,
       noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: finalized.noSpaceWordLengths),
@@ -304,6 +312,13 @@ enum WebsiteConfigSessionBuildError: Error, LocalizedError {
     }
     let requested = draft.generators.requestedModifiers
     config = config.with(modifiers: requested)
+    // Source checkForcedConfig's noInfiniteDuration gate reads Config.words
+    // and Config.time only, not CustomText's independent raw limit. Legacy
+    // native infinite-limit sanitation must not erase admitted source boxes.
+    if config.mode == .custom, scope.websiteCustomText != nil,
+      TestModifierPolicy.modifiersCompatibleWithMode(requested, mode: .custom) == requested {
+      config.modifiers = requested
+    }
     guard config.mode == draft.testParameters.mode, Set(config.modifiers) == Set(requested),
       config.contentOptions == draft.testParameters.contentOptions else {
       throw WebsiteConfigSessionBuildError.unrepresentableConfiguration

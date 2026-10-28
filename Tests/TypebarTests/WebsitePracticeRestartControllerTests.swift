@@ -5,6 +5,32 @@ import Observation
 @testable import Typebar
 
 @MainActor final class WebsitePracticeRestartControllerTests: XCTestCase {
+  func testFreshCustomRepeatUsesItsGeneratedRecordsAndSourceSectionQuota() async throws {
+    let f = try Fixture(); defer { f.close() }
+    let resources = try f.coordinator.prepareResources(for: f.coordinator.prepare(#"{"mode":"custom","repeatedPace":false}"#),
+      localFont: .absent, localBackground: .absent)
+    let custom = try WebsiteCustomTextSettings(value: .object([
+      "text": .array([.string("Aa Bb"), .string("I")]), "mode": .string("repeat"),
+      "limit": .object(["mode": .string("word"), "value": .number(2)]), "pipeDelimiter": .bool(true)]))
+    let ready = try await f.coordinator.preparePractice(for: resources, scope: .init(websiteCustomText: custom))
+    guard case .committed = try f.coordinator.commit(ready, to: f.page, systemIsDark: false) else {
+      return XCTFail("Fresh custom publication failed")
+    }
+    XCTAssertEqual(f.page.state.session.prompt, "Aa Bb I")
+    let disk = try f.register.read().revision
+    f.input("A")
+    let old = f.page.state.session.automaticInputAttemptID
+    let controller = try f.bind()
+    let repeated = try await controller.requestAndWait(requestID: UUID(), repeatingRequested: true)
+    XCTAssertTrue(repeated)
+    XCTAssertEqual(f.page.state.practice?.repetition, .sameWordset(repeatedPace: false))
+    XCTAssertEqual(f.page.state.session.prompt, "Aa Bb")
+    XCTAssertNotEqual(f.page.state.session.automaticInputAttemptID, old)
+    XCTAssertEqual(f.page.state.session.typed, "")
+    XCTAssertEqual(f.page.state.session.generatedWordReplayHistory?.count, 3)
+    XCTAssertEqual(try f.register.read().revision, disk)
+  }
+
   private enum Failure: Error { case generation, publication }
 
   func testThreeGenerationFailuresShowLastHumanReasonWithoutLosingDeparture() async throws {

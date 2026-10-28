@@ -4594,7 +4594,7 @@ struct TypingSession {
   private var liveRemovedGeneratedCommits: Set<Int> = []
   private var liveAwaitingGeneratedCommit = false
   private let initialGeneratedReplayHistory: GeneratedWordReplayHistory?
-  private let generatedSectionLimit: Double?
+  private var generatedSectionLimit: Double?
   var generatedWordReplayHistory: GeneratedWordReplayHistory? {
     generatedCodeContinuation?.replayHistory ?? initialGeneratedReplayHistory
   }
@@ -5115,6 +5115,9 @@ struct TypingSession {
     guard let limit = configuration.wordLimit, limit > 0 else { return configuration.wordLimit }
     if configuration.mode == .words, let floor = liveWordLimitFloor { return max(limit, floor) }
     return streamsLiveContent && configuration.mode == .words ? max(limit, livePublishedWordCount) : limit
+  }
+  private var hasGeneratedCustomFields: Bool {
+    configuration.mode == .custom && generatedWordReplayHistory != nil
   }
   private var loadedLiveContentWordCount: Int {
     let pending = externalPromptContinuation.map {
@@ -5997,7 +6000,8 @@ struct TypingSession {
   /// A custom-text save does not replace the initialized wordset. Apply its
   /// live ordering/limit while retaining this attempt and every generated word.
   mutating func synchronizeWebsiteCustomText(_ raw: WebsiteCustomTextSettings) throws -> Bool {
-    guard !isFinished, configuration.mode == .custom, customSectionWordStream != nil else { return false }
+    guard !isFinished, configuration.mode == .custom,
+      customSectionWordStream != nil || generatedCodeContinuation != nil || retainedCandidateContinuation != nil else { return false }
     var next = configuration
     next.customTextCompletion = raw.limitMode == "word" ? .words : raw.limitMode == "time" ? .time : .sections
     next.customTextOrdering = raw.mode == "repeat" ? .inOrder : raw.mode == "shuffle" ? .shuffled : .random
@@ -6005,7 +6009,22 @@ struct TypingSession {
     next.duration = nil; next.wordLimit = nil; next.customTextSectionLimit = nil
     next = try raw.applyingLimit(to: next)
     customSectionWordStream?.synchronizeConfiguration(next)
+    if var cursor = generatedCodeContinuation ?? retainedCandidateContinuation {
+      cursor.synchronizeConfiguration(next, customLimitValue: raw.limitValue)
+      if !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers),
+        prompt.last.map({ $0 != " " && $0 != "\n" }) == true {
+        liveRemovedGeneratedCommits.insert(unitTargets.sourceFieldCount - 1)
+        liveAwaitingGeneratedCommit = cursor.hasRemaining
+      }
+      if generatedCodeContinuation != nil || cursor.hasRemaining {
+        generatedCodeContinuation = cursor; retainedCandidateContinuation = nil
+      } else { retainedCandidateContinuation = cursor }
+      generatedSectionLimit = raw.limitValue
+    }
     configuration = next
+    if hasGeneratedCustomFields, !TestModifierPolicy.usesNoSpaceInput(next.modifiers) {
+      if acceptedUnits == nil { beginUnitInput() } else { refreshUnitTargets() }
+    }
     let progress = Self.wordProgress(next.wordLimit, in: promptCharacters)
     requiredWordStartIndex = progress.startIndex; promptWordCount = progress.count
     return true
@@ -9009,7 +9028,7 @@ struct TypingSession {
       // external previews may oversupply it: honor the finite word budget.
       let wordBudget = configuration.mode == .words
         || configuration.mode == .custom && configuration.customTextCompletion == .words
-          && customSectionWordStream == nil ? finiteCompletionWordLimit : nil
+          && customSectionWordStream == nil && !hasGeneratedCustomFields ? finiteCompletionWordLimit : nil
       let finalFieldCount = wordBudget.flatMap { $0 > 0 ? min($0, unitTargets.fields.count) : nil }
         ?? unitTargets.fields.count
       guard latestNoSpaceFinishDecision, let attemptedField = latestNoSpaceAttemptFieldIndex,
@@ -9021,7 +9040,7 @@ struct TypingSession {
       case .custom:
         guard configuration.customTextCompletion != .time, !configuration.isInfinite else { return }
         if !usesIncrementalPromptExtension || configuration.customTextCompletion == .words
-          && customSectionWordStream == nil && reachedConfiguredWordLimit { complete(at: date) }
+          && customSectionWordStream == nil && !hasGeneratedCustomFields && reachedConfiguredWordLimit { complete(at: date) }
       case .quote:
         if !usesIncrementalPromptExtension { complete(at: date) }
       }
@@ -9055,7 +9074,7 @@ struct TypingSession {
       case .time:
         break
       case .words:
-        if customSectionWordStream != nil {
+        if customSectionWordStream != nil || hasGeneratedCustomFields {
           // Pipe initialization can prefetch whole sections past wordLimit;
           // non-pipe initialization includes newline-only candidate words.
           // Match the generated queue, not an earlier configured word index;
@@ -9309,14 +9328,22 @@ struct TypingSession {
     if let chunk = generatedChunk {
       if !chunk.transformed.isEmpty { liveAwaitingGeneratedCommit = false }
       if let fields = chunk.sourceFields {
-        guard let previous = sourceFields else { fail(at: date, reason: .wordGeneration); return }
+        guard var previous = sourceFields else { fail(at: date, reason: .wordGeneration); return }
         var batch = TransformedPromptBatch(text: chunk.transformed,
           noSpaceTargetWords: chunk.noSpaceTargetWords, sourceFields: fields)
         if generatedCodeContinuation?.hasRemaining != true { batch = FinitePromptCommitPolicy.finalized(batch) }
         guard let nextFields = batch.sourceFields else { fail(at: date, reason: .wordGeneration); return }
+        // The old final word keeps its removed commit in the source record.
+        // A newly published neighbor still needs a visual word gap. Retain
+        // that gap in the display catalog while the mask excludes it from
+        // the old field's validation target, as on the ordinary live path.
+        let needsGap = !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+          && liveRemovedGeneratedCommits.contains(previous.count - 1)
+          && previous.last?.last.map({ $0 != " " && $0 != "\n" }) == true
+        if needsGap { previous[previous.count - 1].append(" ") }
         sourceFields = previous + nextFields
         let previousEnd = promptCharacters.count
-        appendPrompt(batch.text)
+        appendPrompt((needsGap ? " " : "") + batch.text)
         if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
           var end = previousEnd
           for length in batch.noSpaceWordLengths {
@@ -9495,7 +9522,8 @@ struct TypingSession {
   private var noSpaceTerminalFieldMatches: Bool {
     guard unitTargets.noSpace, let acceptedUnits, !acceptedUnits.lastCommits else { return false }
     let limit = configuration.mode == .words
-      || configuration.mode == .custom && configuration.customTextCompletion == .words && customSectionWordStream == nil
+      || configuration.mode == .custom && configuration.customTextCompletion == .words
+        && customSectionWordStream == nil && !hasGeneratedCustomFields
       ? finiteCompletionWordLimit : nil
     let count = limit.flatMap { $0 > 0 ? $0 : nil } ?? unitTargets.fields.count
     let index = acceptedUnits.fieldIndex

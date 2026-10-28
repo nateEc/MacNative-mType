@@ -7,6 +7,24 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WebsiteConfigStartupHostTests: XCTestCase {
+  func testFreshCustomSectionCounterRendersFromSavedSourceInHiddenRoot() async throws {
+    let f = try Fixture(saved: true, json: #"{"mode":"custom","timerStyle":"text"}"#, viewportHeight: 3200)
+    defer { f.close() }
+    let custom = try WebsiteCustomTextSettings(value: .object([
+      "text": .array([.string("Aa Bb"), .string("Cc")]), "mode": .string("repeat"),
+      "limit": .object(["mode": .string("section"), "value": .number(2)]), "pipeDelimiter": .bool(false)]))
+    XCTAssertTrue(f.settings.saveWebsiteCustomTextState(custom))
+    f.state.accountReady = true
+    try await f.waitAsync { f.inputs().first?.acceptsTextInput == true
+      && f.state.page.state.session.generatedWordReplayHistory != nil }
+    try XCTUnwrap(f.inputs().first).onInsert("Aa Bb ", false)
+    f.wait { f.state.page.state.session.progressText() == "1/2" }
+    try f.scrollToInput()
+    let text = try f.renderedText().joined(separator: " ").replacingOccurrences(of: " ", with: "")
+    XCTAssertTrue(text.contains("1/2"), text)
+    XCTAssertFalse(f.window.isVisible); XCTAssertNil(f.window.attachedSheet)
+  }
+
   func testRepeatedCustomSectionCounterRendersInActualHiddenRootAfterWordNavigation() async throws {
     let f = try Fixture(saved: true, json: #"{"mode":"words","words":3,"timerStyle":"text"}"#,
       viewportHeight: 3200)

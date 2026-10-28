@@ -28,10 +28,12 @@ const languages={english:{name:'english',words:['ab','cd'],rightToLeft:false},
   owned:{name:'owned',words:['ef','gh'],rightToLeft:false}};
 const binary=i=>(i%256).toString(2).padStart(8,'0');
 const unexpected=()=>{throw Error('Unexpected adapter call outside ordering probe')};
+const focusNames=['plus_zero','plus_one','plus_two','plus_three'];
 const active=()=>activeNames.map(name=>({name,properties:name==='backwards'?['wordOrder:reverse']:
-  ['underscore_spaces','nospace'].includes(name)?['nospace']:[],functions:functions[name]}));
+  focusNames.includes(name)?['toPush:'+String(focusNames.indexOf(name)+1)]:
+  ['underscore_spaces','nospace'].includes(name)?['nospace']:[],functions:functions[name]??{}}));
 const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuffle:words=>{
-    if(process.argv[3]==='--custom-replay')for(let i=words.length-1;i>0;i--){
+    if(['--custom-replay','--custom-fresh','--custom-fresh-focus'].includes(process.argv[3]))for(let i=words.length-1;i>0;i--){
       const j=(ownedIndexes.shift()??0)%(i+1);[words[i],words[j]]=[words[j],words[i]];
     }
     return words;
@@ -138,7 +140,14 @@ if(process.argv[3]==='--section-indices') {
   await new Promise((resolve,reject)=>process.stdout.write(JSON.stringify({first:first.sectionIndexes,repeated:repeated.sectionIndexes})+'\n',error=>error?reject(error):resolve()));
   process.exit(0);
 }
-if(process.argv[3]==='--custom-replay') {
+if(['--custom-replay','--custom-fresh','--custom-fresh-focus'].includes(process.argv[3])) {
+  const focused=process.argv[3]==='--custom-fresh-focus';
+  const fresh=process.argv[3]!=='--custom-replay';
+  if(focused){
+    const catalog=fs.readFileSync(path.join(root,'packages/funbox/src/list.ts'),'utf8');
+    for(const [index,name] of focusNames.entries())assert.ok(
+      catalog.slice(catalog.indexOf('  '+name+': {')).split('\n  },')[0].includes('"toPush:'+String(index+1)+'"'));
+  }
   const fixtures=[], words=modules.get('test/test-words').namespace.words;
   const failures=[];
   const continueWords=vm.compileFunction(addBody+'\nreturn addWord;',[
@@ -150,13 +159,14 @@ if(process.argv[3]==='--custom-replay') {
     {dispatch:value=>failures.push(value)});
   const debug=console.debug;console.debug=()=>{};
   try {
-    for(const text of [['Aa Bb','Cc','I','x2','Ω'],['Aa Bb','I']])
+    for(const focus of focused?focusNames:[null])for(const text of [['Aa Bb','Cc','I','x2','Ω'],['Aa Bb','I']])
       for(const mode of ['repeat','random','shuffle'])for(const limitMode of ['word','time','section'])
       for(const limitValue of [0,2,4,4.5,5,101,103,Infinity])for(const pipe of [false,true]) {
         config.mode='words';config.words=3;config.language='english';config.showAllLines=false;
         activeNames=[];ownedRepeated=false;ownedIndexes=[0,1,2];
         const opening=await main.namespace.generateWords({name:'english',words:['ab','cd','ef']});
-        config.mode='custom';ownedRepeated=true;
+        config.mode='custom';ownedRepeated=!fresh;
+        activeNames=focus?[focus]:[];
         ownedCustom={text:text.slice(),mode,limitMode,limitValue,pipe};
         const draws=Array.from({length:1000},(_,i)=>i%text.length);ownedIndexes=draws.slice();
         words.reset();let generated,error;
@@ -177,26 +187,37 @@ if(process.argv[3]==='--custom-replay') {
         ownedIndexes=tailDraws.slice();
         failures.length=0;
         let continuationCalls=0;
-        if(!error&&limitMode!=='time')for(let i=0;i<(Number.isFinite(limitValue)?256:3)&&!main.namespace.areAllWordsGenerated()&&!failures.length;i++){
+        if(!error&&limitMode!=='time')for(let i=0;i<(Number.isFinite(limitValue)&&limitValue>0?256:3)&&!main.namespace.areAllWordsGenerated()&&!failures.length;i++){
           ownedActiveWordIndex=words.length-1;await continueWords();continuationCalls++;
         }
-        if(!error&&limitMode!=='time'&&!failures.length&&Number.isFinite(limitValue))assert.equal(main.namespace.areAllWordsGenerated(),true);
-        fixtures.push({text,mode,limitMode,limitValue:String(limitValue),pipe,opening:opening.words,
+        if(!error&&limitMode!=='time'&&!failures.length&&Number.isFinite(limitValue)&&limitValue>0)assert.equal(main.namespace.areAllWordsGenerated(),true);
+        const fixture={focus,text,mode,limitMode,limitValue:String(limitValue),pipe,opening:opening.words,
           generated:generated?.words,sectionIndexes:generated?.sectionIndexes,
           fields,finalFields:Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit),
           finalSectionIndexes:Array.from({length:words.length},(_,i)=>words.get(i).sectionIndex),
           currentSection:Array.from(main.namespace.currentSection),sectionIndex:main.namespace.sectionIndex,
           allGenerated,drawsUsed,finalDrawsUsed:drawsUsed+tailDraws.length-ownedIndexes.length,
           tailRanks:tailDraws.slice(0,tailDraws.length-ownedIndexes.length),
-          continuationFailed:failures.length>0,continuationCalls,error});
+          continuationFailed:failures.length>0,continuationCalls,error};
+        if(fresh){
+          ownedRepeated=true;ownedIndexes=draws.slice();words.reset();
+          const repeated=await main.namespace.generateWords({name:'english',words:['unused']});
+          repeated.words.forEach((word,index)=>words.push(word,repeated.sectionIndexes[index]));
+          if(main.namespace.areAllWordsGenerated())words.removeCommitCharacterFromLastWord();
+          fixture.repeatedFields=Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit);
+          fixture.repeatedSectionIndexes=repeated.sectionIndexes;
+          fixture.repeatedAllGenerated=main.namespace.areAllWordsGenerated();
+          assert.equal(ownedIndexes.length,draws.length,'Same-settings repeat must use cached targets');
+        }
+        fixtures.push(fixture);
       }
   } finally {console.debug=debug;}
-  assert.equal(fixtures.length,288);
+  assert.equal(fixtures.length,focused?1152:288);
   assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
   await new Promise((resolve,reject)=>process.stdout.write(JSON.stringify({fixtures})+'\n',error=>error?reject(error):resolve()));
   process.exit(0);
 }
-if(process.argv[3]==='--replay-framing') {
+if(['--replay-framing','--custom-live-framing'].includes(process.argv[3])) {
   const admission=moduleFor('input/handlers/before-insert-text');
   await admission.link((id,from)=>moduleFor(resolve(id,from.identifier)));
   await admission.evaluate();
@@ -204,6 +225,45 @@ if(process.argv[3]==='--replay-framing') {
   await finish.link((id,from)=>moduleFor(resolve(id,from.identifier)));
   await finish.evaluate();
   const fixtures=[], words=modules.get('test/test-words').namespace.words;
+  if(process.argv[3]==='--custom-live-framing'){
+    const debug=console.debug;console.debug=()=>{};
+    let result;
+    try{
+      config.mode='custom';config.language='english';ownedRepeated=false;activeNames=[];
+      Object.assign(config,{difficulty:'normal',deleteOnError:'off',stopOnError:'off',strictSpace:false});
+      ownedCustom={text:['aa bb cc dd ee ff gg hh ii','jj'],mode:'repeat',limitMode:'word',limitValue:2,pipe:false};
+      const opening=await main.namespace.generateWords({name:'english',words:['unused']});
+      words.reset();opening.words.forEach((word,index)=>words.push(word,opening.sectionIndexes[index]));
+      words.removeCommitCharacterFromLastWord();
+      ownedCustom={text:['replacement'],mode:'repeat',limitMode:'word',limitValue:7.5,pipe:false};
+      const continuation=vm.compileFunction(addBody+'\nreturn addWord;',[
+        'Config','TestWords','WordsGenerator','TestUI','getActiveFunboxes','getActiveWordIndex',
+        'findSingleActiveFunboxWithFunction','showErrorNotification','toggleFunbox','restart','timerEvent',
+      ])(config,modules.get('test/test-words').namespace,main.namespace,
+        {addWord:()=>{},appendEmptyWordElement:unexpected},active,()=>ownedActiveWordIndex,
+        name=>active().find(value=>typeof value.functions[name]==='function'),unexpected,unexpected,unexpected,
+        {dispatch:unexpected});
+      for(let i=0;i<10&&!main.namespace.areAllWordsGenerated();i++)await continuation();
+      assert.equal(main.namespace.areAllWordsGenerated(),true);
+      const fields=Array.from({length:words.length},(_,i)=>words.get(i).textWithCommit);
+      const tape=fields.map((field,index)=>index===fields.length-1||field.endsWith(' ')?field:field+' ').join('');
+      ownedActiveWordIndex=0;ownedInput='';ownedCurrentInput='';const events=[];
+      for(const data of tape.split('')){
+        const blocked=admission.namespace.onBeforeInsertText(data);assert.equal(blocked,false);
+        const targetWord=fields[ownedActiveWordIndex],options={data,inputValue:ownedInput,targetWord};
+        const commit=modules.get('input/helpers/util').namespace.getCommitCharacterType(options);
+        const validation=modules.get('input/helpers/validation').namespace;
+        const correct=validation.isCharCorrect({...options,correctShiftUsed:null});
+        const advances=validation.shouldGoToNextWord({...options,commitCharacterType:commit});
+        events.push({data,correct,advances});ownedInput+=data;ownedCurrentInput=ownedInput;
+        if(advances){ownedActiveWordIndex++;ownedInput='';ownedCurrentInput='';}
+      }
+      assert.equal(events.filter(event=>!event.correct).length,1,'Former final field keeps its missing commit');
+      result={fields,tape,events};
+    }finally{console.debug=debug;}
+    assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
+    process.stdout.write(JSON.stringify(result)+'\n');process.exit(0);
+  }
   const debug=console.debug;console.debug=()=>{};
   try {
     for(const pool of [['ab','cd','ef'],['é','界','🙂']])for(const oldNoSpace of [false,true])for(const newNoSpace of [false,true]) {

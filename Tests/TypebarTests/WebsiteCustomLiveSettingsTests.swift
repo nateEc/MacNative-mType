@@ -42,10 +42,21 @@ import XCTest
       next.customTextOrdering = fixture.mode == "repeat" ? .inOrder : fixture.mode == "shuffle" ? .shuffled : .random
       next = try settings.applyingLimit(to: next)
       stream.synchronizeConfiguration(next)
+      var generated = GeneratedCandidateContinuation(configuration: configuration(), batchTokenCount: 100,
+        sourceWords: output.pool, customLimitValue: 100)
+      _ = generated.nextChunk(nextRandomWordIndex: { 0 })
+      XCTAssertEqual((0..<generated.replayHistory.count).map { generated.replayHistory.word(at: $0)?.source },
+        fixture.initial.map(Optional.some))
+      generated.synchronizeConfiguration(next, customLimitValue: fixture.limit)
       for chunk in fixture.chunks {
         XCTAssertEqual(stream.nextChunk(random: { 0 }).text.split(separator: " ").map(String.init), chunk.words,
           "\(fixture.mode)/\(fixture.limitMode)")
         XCTAssertEqual(stream.hasRemaining, chunk.remaining)
+        let offset = generated.replayHistory.count
+        _ = generated.nextChunk(nextRandomWordIndex: { 0 })
+        XCTAssertEqual((offset..<generated.replayHistory.count).map { generated.replayHistory.word(at: $0)?.source },
+          chunk.words.map(Optional.some), "Generated cursor: \(fixture.mode)/\(fixture.limitMode)")
+        XCTAssertEqual(generated.hasRemaining, chunk.remaining)
       }
       for check in fixture.timeChecks {
         let start = Date(timeIntervalSince1970: 100)

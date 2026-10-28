@@ -3,6 +3,18 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.CustomGeneratedSelectionTests/testFocusedCustomSelectionAgainstPinnedGeneratorAndContinuation",
+      "file": "Tests/TypebarTests/CustomGeneratedSelectionTests.swift"
+    },
+    {
+      "id": "TypebarTests.CustomGeneratedSelectionTests/testFreshCustomSelectionAgainstCompletePinnedGeneratorWordsetAndContinuation",
+      "file": "Tests/TypebarTests/CustomGeneratedSelectionTests.swift"
+    },
+    {
+      "id": "TypebarTests.CustomGeneratedSelectionTests/testLiveGrowthFramingAgainstPinnedGeneratorAndInputHelpers",
+      "file": "Tests/TypebarTests/CustomGeneratedSelectionTests.swift"
+    },
+    {
       "id": "TypebarTests.GeneratedSectionProgressTests/testCounterBarAndMemoUpdatesAgainstCompletePinnedLiveStatsAndActualSolid",
       "file": "Tests/TypebarTests/GeneratedSectionProgressTests.swift"
     },
