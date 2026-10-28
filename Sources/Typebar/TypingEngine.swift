@@ -8881,6 +8881,7 @@ struct TypingSession {
   private var capturedTargetWordDirectory: ResultTargetWordDirectory? {
     let noSpace = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     let words: [String]
+    var displayGaps: [Int] = []
     if noSpace {
       words = noSpaceTargetWords
     } else {
@@ -8889,8 +8890,13 @@ struct TypingSession {
       // boundaries. Grapheme splitting cannot recover a space fused to a mark.
       let targets = sourceStatsTargets
       words = targets.fields.map { String(decoding: targets.units[$0], as: UTF16.self) }
+      for (index, range) in targets.fields.enumerated() {
+        let next = index + 1 < targets.fields.count ? targets.fields[index + 1].lowerBound : targets.units.count
+        if next == range.upperBound + 1, targets.units[range.upperBound] == 32 { displayGaps.append(index) }
+      }
     }
-    let directory = ResultTargetWordDirectory(words: words, noSpace: noSpace)
+    let directory = ResultTargetWordDirectory(words: words, noSpace: noSpace,
+      displayGaps: displayGaps.isEmpty ? nil : displayGaps)
     return directory.matches(prompt: prompt, noSpace: noSpace) ? directory : nil
   }
 

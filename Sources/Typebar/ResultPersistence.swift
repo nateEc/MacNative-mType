@@ -660,6 +660,9 @@ final class TestResultRecord {
 
   var portableResult: CompletedTestResult? {
     guard let configuration, let parsedOutcome = TestOutcome(rawValue: outcome) else { return nil }
+    let directory = targetWordDirectory
+    guard targetWordDirectoryData == nil || directory?.matches(prompt: prompt,
+      noSpace: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)) == true else { return nil }
     guard terminalTimingData == nil || terminalTiming != nil else { return nil }
     guard elapsedTimeData == nil || elapsedTime != nil else { return nil }
     guard incompletePracticeData == nil || incompletePractice != nil else { return nil }
@@ -697,7 +700,7 @@ final class TestResultRecord {
       quoteSource: quoteSource,
       prompt: prompt,
       replayEvents: replayEvents,
-      targetWordDirectory: targetWordDirectory,
+      targetWordDirectory: directory,
       challengePresentation: challengePresentation
     )
   }

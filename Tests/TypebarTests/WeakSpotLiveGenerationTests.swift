@@ -76,7 +76,7 @@ final class WeakSpotLiveGenerationTests: XCTestCase {
   }
 
   func testLearningKeepsCapturedRepeatTargetsButChangesFutureUncachedSections() {
-    var cursor = GeneratedCandidateContinuation(configuration: .words(0, language: .codeSwift)
+    var cursor = GeneratedCandidateContinuation(configuration: .words(3, language: .codeSwift)
       .with(modifiers: [.weakSpot]), batchTokenCount: 1, weakSpotScores: scores("a", 1),
       sourceWords: ["aa", "bb"])
     XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: drawPair()).transformed, "aa")
@@ -87,6 +87,21 @@ final class WeakSpotLiveGenerationTests: XCTestCase {
       nextRandomWordIndex: { XCTFail("Cached target must not draw"); return 0 }).transformed, " aa")
     XCTAssertEqual(replay.nextChunk(weakSpotScores: current,
       nextRandomWordIndex: drawPair()).transformed, " bb")
+  }
+
+  func testZeroLimitRepeatKeepsCachedTargetsButNeverDrawsAfterCacheEnd() {
+    var cursor = GeneratedCandidateContinuation(configuration: .words(0, language: .codeSwift)
+      .with(modifiers: [.weakSpot]), batchTokenCount: 1, weakSpotScores: scores("a", 1),
+      sourceWords: ["aa", "bb"])
+    XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: drawPair()).transformed, "aa")
+    XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: drawPair()).transformed, " aa")
+    var replay = cursor.replayingContinuation()
+    let current = scores("b", 5)
+    let noDraw = { XCTFail("Zero-limit repeat must not draw fresh targets"); return 0 }
+    XCTAssertEqual(replay.nextChunk(weakSpotScores: current, nextRandomWordIndex: noDraw).transformed, " aa")
+    XCTAssertTrue(replay.nextChunk(weakSpotScores: current, nextRandomWordIndex: noDraw).transformed.isEmpty)
+    XCTAssertTrue(replay.replayExhausted)
+    XCTAssertFalse(replay.hasRemaining)
   }
 
   func testRepeatedAttemptCarriesScoresExactlyOnceAndResetsFirstInputTiming() {

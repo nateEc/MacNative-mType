@@ -371,7 +371,7 @@ struct TypebarArchive: Codable, Equatable {
     // same website speed memories, without broadening ordinary JSON.
     // Version 38 also carries the complete saved website profile and both
     // custom-text stores, independently of transient window configuration.
-    static let currentVersion = 38
+    static let currentVersion = 39
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -412,6 +412,7 @@ struct TypebarArchive: Codable, Equatable {
         let hasRawUTF16 = results.contains { $0.replayEvents.contains(where: \.hasRawUTF16Metadata) }
         let hasStoppedInput = results.contains { $0.replayEvents.contains(where: \.isStoppedInsertion) }
         let hasTargets = results.contains { $0.targetWordDirectory != nil }
+        let hasDisplayGaps = results.contains { $0.targetWordDirectory?.displayGaps != nil }
         let hasPositions = results.contains { $0.replayEvents.contains { $0.inputPosition != nil } }
         let hasContractions = results.contains { $0.replayEvents.contains { $0.discardedInputUnits != nil } }
         let hasClearedNextWord = results.contains { $0.replayEvents.contains { $0.clearedNextWord != nil } }
@@ -434,9 +435,10 @@ struct TypebarArchive: Codable, Equatable {
         let paceVersion = hasAccountPace ? max(30, baseVersion) : baseVersion
         let filterVersion = hasAccountTagFilters ? max(31, paceVersion) : paceVersion
         let quoteVersion = hasQuoteLength ? max(32, filterVersion) : filterVersion
-        self.version = hasPolyglotFilters ? max(33, quoteVersion) : quoteVersion
+        let directoryVersion = hasPolyglotFilters ? max(33, quoteVersion) : quoteVersion
+        self.version = hasDisplayGaps ? max(39, directoryVersion) : directoryVersion
         self.exportedAt = exportedAt
-        let payloadVersion = hasPolyglotFilters || hasQuoteLength || hasAccountTagFilters || hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
+        let payloadVersion = hasDisplayGaps || hasPolyglotFilters || hasQuoteLength || hasAccountTagFilters || hasAccountPace || hasAccountTagSnapshot || localPersonalBestLedger != nil || hasExpandedPace || hasElapsedTime || hasIncompletePractice || hasQuoteIdentity ? self.version : version
         self.localPersonalBestLedger = localPersonalBestLedger
         self.websiteProfile = websiteProfile
         let deletedThemes = payloadVersion >= 9 ? Set(deletedCustomThemeIDs) : []
@@ -493,6 +495,8 @@ struct TypebarArchive: Codable, Equatable {
     }
 
     func encode(to encoder: Encoder) throws {
+        guard version >= 39 || !results.contains(where: { $0.targetWordDirectory?.displayGaps != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         guard websiteProfile == nil || version >= 38 else { throw DataTransferError.unsupportedVersion(version) }
         let hasActiveSource = activeTestSelection.map { PracticeThresholdSource.isPresent(in: $0.preset) } ?? false
         let hasSource = settings.thresholdSource != nil
@@ -621,6 +625,8 @@ struct TypebarArchive: Codable, Equatable {
         else { throw DataTransferError.unsupportedVersion(version) }
         try ResultAccountTagSnapshotPolicy.validateUniqueResultIdentities(decodedResults)
         // Inspect the raw payload before tombstones can hide new evidence.
+        guard version >= 39 || !decodedResults.contains(where: { $0.targetWordDirectory?.displayGaps != nil })
+        else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 32 || !decodedResults.contains(where: { $0.quoteSource?.actualLength != nil })
         else { throw DataTransferError.unsupportedVersion(version) }
         guard version >= 29 || !decodedResults.contains(where: { $0.accountTagSnapshot != nil })

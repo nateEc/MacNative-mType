@@ -47,6 +47,8 @@ struct ResultWPMConsistencyInput: Sendable {
       guard let decoded = try? JSONDecoder().decode(ResultTargetWordDirectory.self, from: recordedDirectoryData) else { return nil }
       decodedDirectory = decoded
     }
+    if let decodedDirectory, !decodedDirectory.matches(prompt: prompt,
+      noSpace: TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? [])) { return nil }
     return ResultPerformanceTrace.wpmConsistency(prompt: prompt, events: decodedEvents, duration: duration,
       configuration: configuration, targetWordDirectory: decodedDirectory, sourceScoringBasis: sourceScoringBasis)
   }

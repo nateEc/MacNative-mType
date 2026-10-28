@@ -169,7 +169,9 @@ final class TargetWordDirectoryTests: XCTestCase {
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any])
     for directory in [ResultTargetWordDirectory(words: ["ab", "cx"], noSpace: true),
       .init(words: ["ab", "cd"], noSpace: false), .init(words: [], noSpace: true)] {
-      object["targetWordDirectory"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(directory))
+      // Construct untrusted legacy JSON directly: the writer now refuses an
+      // empty catalog before it can reach this import-boundary check.
+      object["targetWordDirectory"] = ["words": directory.words, "noSpace": directory.noSpace]
       XCTAssertThrowsError(try JSONDecoder().decode(CompletedTestResult.self,
         from: JSONSerialization.data(withJSONObject: object)))
     }

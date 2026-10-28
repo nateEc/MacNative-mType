@@ -49,6 +49,7 @@ struct FieldReplayPlan {
 
   struct Frame: Equatable {
     var fields: [Field]
+    var displayGaps: Set<Int> = []
     var word = 0
     var position = 0
     var nextActionIndex = 0
@@ -64,6 +65,12 @@ struct FieldReplayPlan {
             result.glyphs.append(.init(character: character, state: letter.state))
             result.coordinates.append(.init(word: word, position: position))
           }
+        }
+        // An entered extra separator already occupies the native visual gap;
+        // keep its source letter/action, without drawing a second space.
+        if displayGaps.contains(word), field.letters.last?.text.hasSuffix(" ") != true {
+          result.glyphs.append(.init(character: " ", state: .pending))
+          result.coordinates.append(.init(word: word, position: field.letters.count))
         }
       }
       return result
@@ -111,7 +118,7 @@ struct FieldReplayPlan {
     let fields = targets.prefix(min(targets.count, wordCount + 1)).map { target in
       Field(letters: target.unicodeScalars.map { Letter(text: String($0), extra: false) })
     }
-    let initial = Frame(fields: fields)
+    let initial = Frame(fields: fields, displayGaps: Set(targetWordDirectory?.displayGaps ?? []))
     var probe = initial
     var maximum: Coordinate?
     for action in actions {
