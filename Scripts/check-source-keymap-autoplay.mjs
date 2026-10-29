@@ -8,6 +8,8 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {stripTypeScriptTypes} from 'node:module';
 const root = path.resolve(process.argv[2] ?? '');
+const quantizedClock = process.argv[3] === '--quantized-clock';
+assert.ok(!process.argv[3] || quantizedClock);
 function verify() {
   assert.equal(execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(),
     '91bd24bb8513785c7364cbea29296ff7adafac41');
@@ -33,13 +35,14 @@ const applyCode = stripTypeScriptTypes(section(wrapper, '  const applyAnimation 
 const paramsCode = '{' + section(keymap, '      animation={{', '\n      }}').slice('      animation={{'.length) + '\n}';
 assert.ok(keymap.includes('respectReducedMotion={false}'));
 const fixtures = [];
-for (const rate of [15, 30, 60, 120, 1000]) for (const warmup of [0, 37, 120]) {
+for (const rate of [15, 30, 60, 120, 1000]) for (const warmup of
+  (quantizedClock ? [0.125, 0.875, 37.625, 120.375] : [0, 37, 120])) {
   for (const mode of ['react', 'static', 'nextExit']) {
     let time = 10000;
     const originalNow = Date.now;
     let anime;
     try {
-      Date.now = () => time;
+      Date.now = () => quantizedClock ? Math.floor(time) : time;
       anime = await import('data:text/javascript;base64,' + Buffer.from(bundle).toString('base64') +
         `#keymap-autoplay-${rate}-${warmup}-${mode}`);
     } finally { Date.now = originalNow; }
@@ -64,20 +67,22 @@ for (const rate of [15, 30, 60, 120, 1000]) for (const warmup of [0, 37, 120]) {
     assert.equal(params.duration, mode === 'static' ? 0 : 250);
     const started = time, originalComplete = params.onComplete;
     params.onComplete = animation => { completions.push(time - started); originalComplete(animation); };
-    params.onRender = () => frames.push({elapsed: time - started,
+    params.onRender = () => frames.push({elapsed: time - started, clockTime: time,
       progress: element['--keybgcolor'], foreground: element['--keycolor']});
     context.params = params;
     const animation = vm.runInContext('applyAnimation(params)', context, {timeout: 1000});
     const initial = element['--keybgcolor'];
-    for (time = started + 1; time <= started + 400; time++) engine.update();
+    const step = quantizedClock ? 0.25 : 1;
+    for (time = started + step; time <= started + 400; time += step) engine.update();
     assert.equal(completions.length, 1);
     assert.equal(element['--keybgcolor'], 1);
     assert.deepEqual(clears.map(x => x[0]), ['a', 'A']);
     const fading = vm.runInContext('isFading()', context);
     assert.equal(fading, false);
-    fixtures.push({rate, warmup, mode, duration: params.duration, initial, frames, completedAt: completions[0]});
+    fixtures.push({rate, warmup, mode, startedAt: started,
+      duration: params.duration, initial, frames, completedAt: completions[0]});
     animation.cancel(); engine.pause();
   }
 }
 verify();
-console.log(JSON.stringify({fixtures}));
+process.stdout.write(JSON.stringify({fixtures}) + '\n', () => {});

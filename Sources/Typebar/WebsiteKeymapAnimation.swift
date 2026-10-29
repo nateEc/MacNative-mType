@@ -83,6 +83,12 @@ enum WebsiteKeymapAnimationTiming {
   static func initial(duration: TimeInterval) -> Sample {
     .init(progress: duration > 0 ? 0 : 1, complete: duration <= 0)
   }
+  static func sample(startedAt: TimeInterval, now: TimeInterval, duration: TimeInterval) -> Sample {
+    // The pinned engine captures Date.now, whose two absolute readings are
+    // integer milliseconds. Rounding their difference loses boundary crossings.
+    let elapsedMilliseconds = floor(now * 1000) - floor(startedAt * 1000)
+    return sample(elapsed: elapsedMilliseconds / 1000, duration: duration)
+  }
   static func sample(elapsed: TimeInterval, duration: TimeInterval) -> Sample {
     // Construction uses initial(). A real engine tick may have the same
     // millisecond timestamp and still includes the autoplay lead.

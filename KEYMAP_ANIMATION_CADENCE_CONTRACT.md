@@ -1,5 +1,7 @@
 # 键帽动画的帧率上限
 
+后续整数时间读数修正见 [键帽整数时钟合同](KEYMAP_INTEGER_CLOCK_CONTRACT.md)。本合同关于全局栅格、节流周期和实体显示的未完成边界继续保留，早期 50.5ms 直接相减的中间色证据由新合同限定取代。
+
 固定参考：Monkeytype `91bd24bb8513785c7364cbea29296ff7adafac41`。`anim.ts` 同时设置实际 Anime.js 引擎 fps 和 defaults.frameRate；Keymap 的动画入口使用这个默认值。实际引擎的现有动画保留自身 fps，新动画读取当前默认值，运行时引擎仍限制当前动画的更新。
 
 原生投影保留三层上限：

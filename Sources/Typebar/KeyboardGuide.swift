@@ -5052,8 +5052,7 @@ private struct WebsiteAnimatedKeycap: View {
           onComplete(); return
         }
         while !Task.isCancelled {
-          let elapsed = clock.now() - start
-          let sample = WebsiteKeymapAnimationTiming.sample(elapsed: elapsed, duration: next.duration / 1000)
+          let sample = WebsiteKeymapAnimationTiming.sample(startedAt: start, now: clock.now(), duration: next.duration / 1000)
           progress = sample.progress
           clock.didSample(plan, progress)
           if sample.complete {

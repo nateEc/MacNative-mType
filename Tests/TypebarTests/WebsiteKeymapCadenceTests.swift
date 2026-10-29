@@ -41,10 +41,10 @@ import XCTest
     let expected = 1 / Double(min(120, window.screen?.maximumFramesPerSecond ?? 60))
     try await clock.wait(host) { clock.waits.contains { abs($0 - expected) < 0.000_001 } }
     clock.samples.removeAll(); clock.time = 0.0505
-    try await clock.wait(host) { clock.samples.contains { $0.progress == 0.4375 } }
+    try await clock.wait(host) { clock.samples.contains { abs($0.progress - 0.434496) < 1e-10 } }
     clock.waits.removeAll(); clock.samples.removeAll(); settings.animationFrameRate = 30
     try await clock.wait(host) { clock.waits.contains { abs($0 - 1.0 / 30) < 0.000_001 } }
-    XCTAssertTrue(clock.samples.contains { $0.progress == 0.4375 }, "Changing the cap must not restart the fade")
+    XCTAssertTrue(clock.samples.contains { abs($0.progress - 0.434496) < 1e-10 }, "Changing the cap must not restart the fade")
     clock.waits.removeAll(); clock.time = 0.237
     try await clock.wait(host) { !clock.waits.isEmpty }
     XCTAssertEqual(try XCTUnwrap(clock.waits.first), 1.0 / 30, accuracy: 0.000_001,
