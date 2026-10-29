@@ -12552,11 +12552,11 @@ final class TypingEngineTests: XCTestCase {
 
   func testFrenchScaleChoicesPreserveIndependentIDsAndCurrentCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
-      // Independently observed/edited vocabulary; 600k remains synthetic.
+      // Independently sourced vocabulary; these are owned corpus statistics.
       ("french1k", 1_394, 1, 16, 5, 6, 2, 5, 260),
       ("french2k", 2_041, 1, 16, 5, 6, 2, 5, 425),
       ("french10k", 10_251, 1, 18, 5, 6, 2, 5, 2_700),
-      ("french600k", 633_941, 1, 33, 0, 34, 34, 0, 282_793),
+      ("french600k", 633_941, 1, 33, 0, 34, 34, 0, 323_380),
     ]
 
     for (rawValue, count, minimum, maximum, uppercase, nonLetters, punctuation, spaces, nonASCII) in cases {

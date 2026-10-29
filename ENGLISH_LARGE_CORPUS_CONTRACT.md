@@ -38,6 +38,8 @@ SCOWL 的大档包含 UK Advanced Cryptics Dictionary；其来源许可要求应
 
 后续 `LANG-GERMAN-SCALES-44` 在同一原生阅读器新增第八个 Deutsch 许可选项，并随包加入 German 的逐词来源映射；本节原始七个文档及首次包检查保留为本项落地时的历史范围，新增部分另见 GERMAN_SCALES_CORPUS_CONTRACT.md。
 
+`LANG-FRENCH-LARGE-45` 随后新增第九个 Français · 600k 许可选项及其随包来源映射，见 FRENCH_LARGE_CORPUS_CONTRACT.md；各阶段包检查数量按当时范围保留。
+
 隐藏 NSHostingView 不导出有效 AX 树，首次测试的空标签失败不说明界面缺字。改为识别实际缓存像素，不给 Vision 预设词表或自定义词；About 中来源全名与完整版权行均须原样识别且位于首屏上半部。阅读器先检查实际文档开头，再通过真实 NSScrollView 滚至末尾检查最终 DOI；完整文档字节另由读取／打包／源复现保护。截图 `/tmp/typebar-large-english-about.png`、`/tmp/typebar-large-english-license-reader.png` 和末尾截图已保留；人工查看首两张确认实际内容。此证据不等于实体窗口、VoiceOver、按钮打开 sheet 的完整人工验收。
 
 ## 验证与开放范围

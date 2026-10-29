@@ -96,6 +96,9 @@ jobs:
           run_check "German corpus preparation contracts" python3 Scripts/prepare-german-frequency-corpus.py --self-test
           run_check "German optimized preparation contracts" python3 -O Scripts/prepare-german-frequency-corpus.py --self-test
           run_check "bundled German corpus integrity" python3 Scripts/prepare-german-frequency-corpus.py --check-bundled
+          run_check "large French preparation contracts" python3 Scripts/prepare-french-large-corpus.py --self-test
+          run_check "large French optimized preparation contracts" python3 -O Scripts/prepare-french-large-corpus.py --self-test
+          run_check "bundled large French integrity" python3 Scripts/prepare-french-large-corpus.py --check-bundled
           run_check "Spanish corpus preparation contracts" python3 Scripts/test-spanish-frequency-corpus.py
           run_check "bundled Spanish corpus integrity" python3 Scripts/prepare-spanish-frequency-corpus.py --output-root . --check-bundled
           run_check "French corpus preparation contracts" python3 Scripts/test-french-frequency-corpus.py

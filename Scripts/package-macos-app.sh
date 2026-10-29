@@ -43,6 +43,8 @@ cp "$project_root/Resources/EnglishFrequencyCorpusNotices.txt" "$app_path/Conten
 cp "$project_root/Resources/EnglishLargeCorpusNotices.txt" "$app_path/Contents/Resources/EnglishLargeCorpusNotices.txt"
 cp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/FrenchFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/FrenchFrequencyCorpusNotices.txt"
+cp "$project_root/Resources/FrenchLargeCorpusNotices.txt" "$app_path/Contents/Resources/FrenchLargeCorpusNotices.txt"
+cp "$project_root/Resources/FrenchLargeCorpusSources.txt" "$app_path/Contents/Resources/FrenchLargeCorpusSources.txt"
 cp "$project_root/Resources/ItalianFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/ItalianFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/GermanFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/GermanFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/GermanCorpusSources.txt" "$app_path/Contents/Resources/GermanCorpusSources.txt"

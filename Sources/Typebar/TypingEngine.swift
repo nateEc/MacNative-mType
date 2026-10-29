@@ -11105,48 +11105,6 @@ enum StarterLexicon {
   static var spanish10kWords: [String] { spanish10kLexicon.materialized() }
   static var spanish650kWords: [String] { spanish650kLexicon.materialized() }
 
-  private static let frenchScaleRoots = [
-    "arc", "bois", "ciel", "dune", "fil", "lac", "rive", "vent",
-  ]
-
-  private static func frenchScaleLexicon(
-    marker: String, count: Int, minimumToken: String, maximumLength: Int,
-    uppercaseCount: Int, punctuationCount: Int, spaceCount: Int,
-    punctuationSpaceOverlap: Int, nonASCIICount: Int
-  ) -> IndexedLexicon {
-    let minimumNonASCIICount = minimumToken.unicodeScalars.contains { !$0.isASCII } ? 1 : 0
-    let generatedNonASCIICount = nonASCIICount - minimumNonASCIICount
-    precondition(generatedNonASCIICount >= 0)
-    precondition(count > max(uppercaseCount + 2, generatedNonASCIICount + 2))
-    precondition(punctuationSpaceOverlap <= min(punctuationCount, spaceCount))
-    let punctuationOnlyCount = punctuationCount - punctuationSpaceOverlap
-    return IndexedLexicon(count: count) { index in
-      var entry = marker + frenchScaleRoots[index % frenchScaleRoots.count]
-        + alphabeticIndex(index)
-      if index == 0 {
-        entry = minimumToken
-      } else if index == 1 {
-        entry = String(repeating: marker.first!, count: maximumLength)
-      } else {
-        if index < uppercaseCount + 2 {
-          entry = entry.prefix(1).uppercased() + entry.dropFirst()
-        }
-        if index < generatedNonASCIICount + 2 {
-          entry += "é"
-        }
-      }
-      if index >= count - spaceCount {
-        entry += " x"
-        if index >= count - punctuationSpaceOverlap {
-          entry += "-"
-        }
-      } else if index >= count - spaceCount - punctuationOnlyCount {
-        entry += "-"
-      }
-      return entry
-    }
-  }
-
   static var french1kLexicon: IndexedLexicon {
     IndexedLexicon(FrenchFrequencyCorpus.words1k)
   }
@@ -11157,10 +11115,7 @@ enum StarterLexicon {
     IndexedLexicon(FrenchFrequencyCorpus.words10k)
   }
   static var french600kLexicon: IndexedLexicon {
-    frenchScaleLexicon(
-      marker: "qvfr", count: 633_941, minimumToken: "ǿ", maximumLength: 33,
-      uppercaseCount: 0, punctuationCount: 34, spaceCount: 0,
-      punctuationSpaceOverlap: 0, nonASCIICount: 282_793)
+    IndexedLexicon(count: 633_941) { FrenchLargeCorpus.words[$0] }
   }
 
   static var french1kWords: [String] { french1kLexicon.materialized() }

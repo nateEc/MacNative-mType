@@ -78,6 +78,12 @@ cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
 cmp "$project_root/Resources/FrenchFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/FrenchFrequencyCorpusNotices.txt" \
   || fail "French corpus attribution missing or modified"
+cmp "$project_root/Resources/FrenchLargeCorpusNotices.txt" \
+  "$app_path/Contents/Resources/FrenchLargeCorpusNotices.txt" \
+  || fail "large French attribution missing or modified"
+cmp "$project_root/Resources/FrenchLargeCorpusSources.txt" \
+  "$app_path/Contents/Resources/FrenchLargeCorpusSources.txt" \
+  || fail "large French source map missing or modified"
 cmp "$project_root/Resources/ItalianFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/ItalianFrequencyCorpusNotices.txt" \
   || fail "Italian corpus attribution missing or modified"

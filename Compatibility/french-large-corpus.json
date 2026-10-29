@@ -1,0 +1,253 @@
+{
+  "apostropheObservations": [
+    {
+      "band": 338,
+      "dictionarySpelling": "aujourd’hui",
+      "sourceTitle": "aujourd’hui",
+      "word": "aujourd'hui"
+    },
+    {
+      "band": 352,
+      "dictionarySpelling": "jusqu’à",
+      "sourceTitle": "jusqu’à",
+      "word": "jusqu'à"
+    },
+    {
+      "band": 355,
+      "dictionarySpelling": "quelqu’un",
+      "sourceTitle": "quelqu’un",
+      "word": "quelqu'un"
+    },
+    {
+      "band": 471,
+      "dictionarySpelling": "jusqu’ici",
+      "sourceTitle": "jusqu’ici",
+      "word": "jusqu'ici"
+    },
+    {
+      "band": 512,
+      "dictionarySpelling": "p’tit",
+      "sourceTitle": "p’tit",
+      "word": "p'tit"
+    },
+    {
+      "band": 517,
+      "dictionarySpelling": "jusqu’alors",
+      "sourceTitle": "jusqu’alors",
+      "word": "jusqu'alors"
+    },
+    {
+      "band": 543,
+      "dictionarySpelling": "j’te",
+      "sourceTitle": "j’te",
+      "word": "j'te"
+    },
+    {
+      "band": 554,
+      "dictionarySpelling": "d’la",
+      "sourceTitle": "d’la",
+      "word": "d'la"
+    },
+    {
+      "band": 561,
+      "dictionarySpelling": "prud’hommes",
+      "sourceTitle": "prud’hommes",
+      "word": "prud'hommes"
+    },
+    {
+      "band": 567,
+      "dictionarySpelling": "p’tite",
+      "sourceTitle": "p’tite",
+      "word": "p'tite"
+    },
+    {
+      "band": 567,
+      "dictionarySpelling": "presqu’île",
+      "sourceTitle": "presqu’île",
+      "word": "presqu'île"
+    },
+    {
+      "band": 571,
+      "dictionarySpelling": "p’tits",
+      "sourceTitle": "p’tits",
+      "word": "p'tits"
+    },
+    {
+      "band": 590,
+      "dictionarySpelling": "c’que",
+      "sourceTitle": "c’que",
+      "word": "c'que"
+    },
+    {
+      "band": 597,
+      "dictionarySpelling": "m’sieur",
+      "sourceTitle": "m’sieur",
+      "word": "m'sieur"
+    },
+    {
+      "band": 605,
+      "dictionarySpelling": "c’te",
+      "sourceTitle": "c’te",
+      "word": "c'te"
+    },
+    {
+      "band": 615,
+      "dictionarySpelling": "ch’tis",
+      "sourceTitle": "ch’tis",
+      "word": "ch'tis"
+    },
+    {
+      "band": 616,
+      "dictionarySpelling": "v’là",
+      "sourceTitle": "v’là",
+      "word": "v'là"
+    },
+    {
+      "band": 620,
+      "dictionarySpelling": "prud’homme",
+      "sourceTitle": "prud’homme",
+      "word": "prud'homme"
+    },
+    {
+      "band": 624,
+      "dictionarySpelling": "p’tites",
+      "sourceTitle": "p’tites",
+      "word": "p'tites"
+    },
+    {
+      "band": 630,
+      "dictionarySpelling": "pin’s",
+      "sourceTitle": "pin’s",
+      "word": "pin's"
+    },
+    {
+      "band": 634,
+      "dictionarySpelling": "inch’allah",
+      "sourceTitle": "inch’allah",
+      "word": "inch'allah"
+    },
+    {
+      "band": 642,
+      "dictionarySpelling": "c’qui",
+      "sourceTitle": "c’qui",
+      "word": "c'qui"
+    },
+    {
+      "band": 647,
+      "dictionarySpelling": "ch’ti",
+      "sourceTitle": "ch’ti",
+      "word": "ch'ti"
+    },
+    {
+      "band": 653,
+      "dictionarySpelling": "s’pas",
+      "sourceTitle": "s’pas",
+      "word": "s'pas"
+    },
+    {
+      "band": 654,
+      "dictionarySpelling": "p’tain",
+      "sourceTitle": "p’tain",
+      "word": "p'tain"
+    },
+    {
+      "band": 661,
+      "dictionarySpelling": "mam’zelle",
+      "sourceTitle": "mam’zelle",
+      "word": "mam'zelle"
+    },
+    {
+      "band": 662,
+      "dictionarySpelling": "n’golo",
+      "sourceTitle": "n’golo",
+      "word": "n'golo"
+    },
+    {
+      "band": 666,
+      "dictionarySpelling": "diam’s",
+      "sourceTitle": "diam’s",
+      "word": "diam's"
+    },
+    {
+      "band": 673,
+      "dictionarySpelling": "quelqu’une",
+      "sourceTitle": "quelqu’une",
+      "word": "quelqu'une"
+    },
+    {
+      "band": 675,
+      "dictionarySpelling": "grand’mère",
+      "sourceTitle": "grand’mère",
+      "word": "grand'mère"
+    },
+    {
+      "band": 680,
+      "dictionarySpelling": "presqu’ile",
+      "sourceTitle": "presqu’ile",
+      "word": "presqu'ile"
+    },
+    {
+      "band": 686,
+      "dictionarySpelling": "grand’chose",
+      "sourceTitle": "grand’chose",
+      "word": "grand'chose"
+    },
+    {
+      "band": 687,
+      "dictionarySpelling": "prem’s",
+      "sourceTitle": "prem’s",
+      "word": "prem's"
+    },
+    {
+      "band": 692,
+      "dictionarySpelling": "prud’homales",
+      "sourceTitle": "prud’homales",
+      "word": "prud'homales"
+    }
+  ],
+  "available": {
+    "apostropheHeadwords": 4765,
+    "letters": 1558967,
+    "matchedApostropheObservations": 88
+  },
+  "dataLicense": "CC-BY-SA-4.0 adapted selection; retain notices and entry map",
+  "dictionary": {
+    "languageCode": "fr",
+    "retrievedDate": "2026-10-29",
+    "sha256": "823fa6f488e23850075747762d946c730c798d971e93b37fe645863b8f25e377",
+    "url": "https://kaikki.org/dictionary/downloads/fr/fr-extract.jsonl.gz"
+  },
+  "filesSHA256": {
+    "Resources/FrenchLargeCorpusNotices.txt": "e2d4a87a95d12baa8d237ef255238a6d182ebb599291fe6f69b4e6a72e4dd34d",
+    "Resources/FrenchLargeCorpusSources.txt": "5368a9228f493cdb70bd0f9ce60d88828a6e0b5f66ca268296ab5cd3b2cf4a31",
+    "Sources/Typebar/FrenchLargeCorpus.generated.swift": "0a77f8961171289a61097d83255effd342e55e0b6f8f8617df9dd2daf277ba74"
+  },
+  "limits": "Source attestation and counts do not prove extraction quality, difficulty or distribution parity.",
+  "maximumLengthWitness": "cyclopentanoperhydrophénanthrènes",
+  "preparation": {
+    "msgpackVersion": "1.1.2",
+    "runtimeDependencies": [],
+    "unicodeVersion": "15.0.0"
+  },
+  "revision": "kaikki-fr-20261029-wordfreq-3.1.1-large-v1",
+  "schemaVersion": 1,
+  "shape": {
+    "asciiApostrophes": 34,
+    "count": 633941,
+    "maximumLength": 33,
+    "minimumLength": 1,
+    "nonASCIICount": 323380,
+    "punctuationEntries": 34,
+    "spaceEntries": 0,
+    "uniqueCount": 633941,
+    "uppercaseCount": 0
+  },
+  "sourceMapCount": 633941,
+  "wordfreq": {
+    "member": "wordfreq/data/large_fr.msgpack.gz",
+    "memberSHA256": "6f16cd80b9b66c5698ed002becea83ae30d0584c3205f1cf01714ad562c00c8b",
+    "version": "3.1.1",
+    "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+  },
+  "wordsSHA256": "79b3b724dff36403f2a73b7f8434df803757cadebba39f835e29e659eb11996f"
+}

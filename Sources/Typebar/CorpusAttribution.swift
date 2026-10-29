@@ -6,6 +6,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case englishFrequency = "EnglishFrequencyCorpusNotices"
   case spanishFrequency = "SpanishFrequencyCorpusNotices"
   case frenchFrequency = "FrenchFrequencyCorpusNotices"
+  case frenchLarge = "FrenchLargeCorpusNotices"
   case italianFrequency = "ItalianFrequencyCorpusNotices"
   case germanFrequency = "GermanFrequencyCorpusNotices"
   case unicode = "UnicodeNotice"
@@ -18,6 +19,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     case .englishFrequency: "基础 English 与频率词库"
     case .spanishFrequency: "Spanish 频率词库"
     case .frenchFrequency: "French 频率词库"
+    case .frenchLarge: "Français · 600k"
     case .italianFrequency: "Italian 频率词库"
     case .germanFrequency: "Deutsch 词库"
     case .unicode: "Unicode"
@@ -54,6 +56,8 @@ struct CorpusAttributionSummary: View {
         .textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
       Text("German 大档语料来自 German Wiktionary contributors，经 Kaikki.org / Wiktextract 提取。")
+        .fixedSize(horizontal: false, vertical: true)
+      Text("French 600k 来自 Wiktionnaire contributors、Kaikki.org / Wiktextract 和 wordfreq。")
         .fixedSize(horizontal: false, vertical: true)
       Button("查看完整许可…") { showingNotices = true }
         .buttonStyle(.link)

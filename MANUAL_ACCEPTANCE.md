@@ -2,6 +2,8 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-FRENCH-LARGE-45 | French 600k 的重音／连字、ASCII 撇号和旧记录 | 单个隔离实例选择大档，输入 être／cœur、长词及 ASCII 撇号候选，切换 Lazy Latin／No Space／Backwards；完成超百词并重复，打开旧结果。 | 保留字面词形与普通键盘撇号，旧提示／事件／成绩和小档数据保持。 | 待验收（原生核心／隐藏宿主见 FRENCH_LARGE_CORPUS_CONTRACT.md；质量、物理键盘／IME 和完整性能仍开放） |
+| LANG-FRENCH-LICENSE-45 | French 600k 本地许可和逐词来源 | 同一个隔离实例打开 About 和 Français · 600k 许可，核对署名、源页／贡献者历史映射及观察拼写对应证据；关闭返回练习。 | 许可和映射随包，删改后重算清单仍被拒绝；大映射不整段挂入许可布局。 | 待验收（复现、负对照和包保护见 FRENCH_LARGE_CORPUS_CONTRACT.md；实体 sheet、VoiceOver 和语言审校仍开放） |
 | LANG-GERMAN-SCALES-44 | German 三档字面词形、长词、ß 与旧历史 | 单个隔离实例逐一选择 1k／10k／250k，输入大写名词、Straße／weiß 和最长词，切换 Lazy Latin、No Space、Backwards；完成多词表达、标点及超百词续批后重复，重开旧合成提示结果。 | 保留来源拼写与德语大小写规则，转换按现有规则执行；旧提示／事件／成绩保持，基本 German 与 Swiss German 基本池不变。 | 待验收（原生核心及三档隐藏生产宿主见 GERMAN_SCALES_CORPUS_CONTRACT.md；语言质量／分布、物理输入和完整性能仍开放） |
 | LANG-GERMAN-LICENSE-44 | Deutsch 完整许可与逐词来源映射随包交付 | 同一个隔离实例打开 About，查看 German 署名并选择 Deutsch 许可，检查本地完整说明、关闭恢复；核对包内来源映射与原页／贡献者历史链接。 | 原生许可文档可读，逐词来源随应用交付；丢失／截断署名或映射不能被自洽的新 manifest 校验值掩盖。 | 待验收（源复现、反例和包字节保护见 GERMAN_SCALES_CORPUS_CONTRACT.md；实体按钮／sheet、VoiceOver 和人工来源审校仍开放） |
 | LANG-ENGLISH-LARGE-43 | English 450k 的实际词汇和旧练习 | 单个隔离实例选择大档，输入带大小写、撇号、连字符及句点的词，切换 Backwards／No Space，完成超过百词并重复；打开旧合成提示的结果。 | 新练习来自独立语料，续批／重复保留目标，旧捕获提示／事件／成绩不回算；小档保持既有数据。 | 待验收（固定来源复现、原生生成和隐藏生产宿主首词输入见 ENGLISH_LARGE_CORPUS_CONTRACT.md；语言质量、物理输入及完整性能仍开放） |

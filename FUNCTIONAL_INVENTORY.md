@@ -2,11 +2,12 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-FRENCH-LARGE-45 | French 600k 实际词形与 ASCII 撇号练习 | 固定独立 French Wiktionnaire／Kaikki 与 wordfreq；原版仅聚合和行为 | 移除合成器，小档哈希保持，原生输入／续批／历史与来源署名；FRENCH_LARGE_CORPUS_CONTRACT.md | 部分完成：29 项定向、实际隐藏宿主、1,002 项扩大／145 项源码证据、固定源复现、篡改反例和 Debug 包检查通过。质量／难度／分布、实体输入和完整性能仍开放。 |
 | LANG-GERMAN-SCALES-44 | German 1k／10k／250k 的字面词形与实际输入 | 固定独立 German Wiktionary／Kaikki 与 wordfreq；只参考元数据和实际生成规则 | 移除三档合成构造器，保留大小写／ß／长词边界、多词／标点、独立来源映射和原生许可；GERMAN_SCALES_CORPUS_CONTRACT.md | 部分完成：20 项定向、三档实际隐藏宿主、987 项扩大／145 项源码证据、源复现、署名反例及 Debug 包检查通过。词频、语言质量／难度／分布、全部交错、实体输入和完整性能仍开放。 |
 | LANG-ENGLISH-LARGE-43 | English 450k 的独立实际语料、显著署名和完整许可阅读 | 固定 SCOWL 95 与 wordfreq 3.1.1，仅参考数量／字符聚合与行为，不读取原版词值 | 移除 English 合成构造器；450,029 项静态数据、可复现准备器、About 首屏版权、原生许可滚动阅读、实际生成／输入／旧记录；ENGLISH_LARGE_CORPUS_CONTRACT.md | 部分完成：27 项定向、975 项扩大／145 项固定源码证据、来源复现和 Debug 包检查通过。观察 token 不等于词典认证，语言质量／难度／分布、全部组合、真实设备及完整性能仍开放。 |
 | KEYBOARD-PIXEL-42 | 发布键盘的独立键帽像素验收 | 真实完整范围裁片、旧整行识别红例及擦除可见 E 的负对照 | 每键固定读取，保留 QWERT／RTYU／Dvorak PYFG 与 legacy 不变断言；KEYBOARD_LEGEND_OCR_CONTRACT.md | 部分验证：旧读取器真实红例、新读取器及缺字反例、实际发布配置和滚轮四项通过；扩大 250 项／145 来源证据通过，不将读取修正说成产品缺字修复，未重新认定完整客户端或实体窗口通过。 |
 | WHEEL-DISPLAY-41 | 原生滚轮集成测试的可绘制显示器前提 | 历史电源事件、未修改原用例重跑、CGDisplayIsAsleep 与 IOPM 公开契约 | 用例范围内准备／释放显示器断言，保留原滚轮及全部行为断言；NATIVE_WHEEL_DISPLAY_CONTRACT.md | 部分验证：原滚轮在 6,751 项范围及后续定向通过，完整范围因另一 OCR 假阴性仍红；实际 wasAsleep=false，休眠分支未实际覆盖，不宣称产品滚动已修复或重写完成。 |
-| LANG-CONTENT-BASELINE-40 | 语言身份与实际词汇内容分开验收 | 固定历史源码直接 ScaleLexicon／字母编号构造及生产路由，只读审计 | 历史识别 118 个入口；English 大档及 German 三档迁移后同范围仍余 114 个，声明数量不能视为真实词数；LANGUAGE_CONTENT_BASELINE_20261029.md | 未完成：清单不是全量内容审校，需逐入口取得独立数据、复现、署名及实际生成／输入／旧记录证据，不随测试绿灯升级。 |
+| LANG-CONTENT-BASELINE-40 | 语言身份与实际词汇内容分开验收 | 固定历史源码直接 ScaleLexicon／字母编号构造及生产路由，只读审计 | 历史识别 118 个入口；English／French 大档及 German 三档迁移后同范围仍余 113 个，声明数量不能视为真实词数；LANGUAGE_CONTENT_BASELINE_20261029.md | 未完成：清单不是全量内容审校，需逐入口取得独立数据、复现、署名及实际生成／输入／旧记录证据，不随测试绿灯升级。 |
 | GATE-CLIENT-BASELINE-39 | 完整客户端测试范围的本地基线 | 冻结 1,288 个非 Markdown 文件，启用耐久与历史模型写入器；排除三项明确显示窗口的测试 | CLIENT_BASELINE_20261029.md，实际进程及不可变输入跟踪 | 原 6,750 项／六失败方法留档；随后 6,751 项仅一处键帽 OCR 假阴性，原五处旧夹具与滚轮通过。保存裁片独立复现后修正读取，四项聚焦及扩大 250 项／145 来源证据通过；未再次完整重跑，历史红基线保留。服务端 501 项已有独立通过证据，不认定实体窗口或完整重写通过。 |
 | KEYMAP-CLOCK-38 | 键帽采样的独立整数毫秒时间读数 | 固定 Keymap 参数、完整 Anime.applyAnimation 与 Anime.js 4.2.2，60 组／2,406 个实际帧 | 起点及当前 monotonic 时间分别量化，保留创建态、同毫秒真实 tick、自动播放提前量及完成清理；KEYMAP_INTEGER_CLOCK_CONTRACT.md | 部分完成：35 项定向、隐藏像素及 961 项扩大／145 项来源证据通过；全局采样栅格、整数节流周期、真实首帧／跨屏与完整播放时间线仍开放。 |
 | LANG-ITALIAN-LARGE-37 | Italian 60k／280k 的实际词汇与内部标点 | 固定独立 Italian 观察语料；17 个高频桶省音词及两项明确未排名技术名称；仅参考聚合 | 移除 Italian 合成生成器，小档静态段／哈希保持，大档选词、懒输入／无空格、符号、续批／重复和旧记录；ITALIAN_LARGE_CORPUS_CONTRACT.md | 部分完成：45 项定向、927 项扩大／144 项来源证据、11 项准备自测及固定源复现通过；词频／难度／内容分布及语言审校、实体输入、全量性能仍开放。 |
@@ -27,7 +28,7 @@
 | REPLAY-CUSTOM-CURSOR-22 | 生成历史切入自定义文本及再次重开 | 固定完整生成器／Wordset／TestWords／addWord；216 组初始与有限续词轨迹，输入位置和抽样适配 | 自定义排序与段游标、实际重复控制器、词数／时间／段数与空间规则测试；CUSTOM_GENERATED_REPLAY_CONTRACT.md | 部分完成：保留缓存，新文本游标从零开始，继续或按原版边界失败，活动难度编辑及计时续批可用。段进度、零重开限制编辑、全部变换和实体输入仍开放。 |
 | REPLAY-COMMIT-FRAMING-21 | 重复词组切换 No Space 的旧提交字符 | 固定完整生成器、TestWords、准入／提交／验证／完成模块；八组及切回轨迹，自有词池与导航适配 | 缓存完整提交字段、混合续词与实际构建入口；GENERATED_REPLAY_FRAMING_CONTRACT.md | 部分完成：保留旧字段与当前输入规则，跨百词续批和再次重复。全部跨模式、空候选、变换／提供者组合、配速／回放界面和实体输入仍开放。 |
 | CFG-FULL-IMPORT-ACTIVE-20 | 活动尝试显式导入完整 JSON | 固定完整生命周期／setter／Solid／测试订阅与 restart，128 组来源轨迹 | 首重开运行快照、专用页面捕获、保存阶段离场与账本；WEBSITE_ACTIVE_IMPORT_CONTRACT.md | 部分完成：显式导入清除旧 No Quit，按首语言事件结算，取消／失败可继续；恢复和普通操作仍有原锁。完整故障写序、成功提示时序、跨模式重复及实体操作仍开放。 |
-| LANG-FRENCH-SCALES-19 | 法语 1k／2k／10k 独立实际词汇 | 固定 wordfreq 法语观察 token、明确地名大小写、六个自写表达；参考仅聚合及生成合同 | FrenchFrequencyCorpus、固定来源复现、实际字段／续批／历史回归；OFFICIAL_LANGUAGE_AUDIT.md | 部分完成：三档替换合成词根，保留短语与复合词、基础池及旧历史；词频／难度／短语分布不等同原版，语言质量与实体输入待验收，600k 仍开放。 |
+| LANG-FRENCH-SCALES-19 | 法语 1k／2k／10k 独立实际词汇 | 固定 wordfreq 法语观察 token、明确地名大小写、六个自写表达；参考仅聚合及生成合同 | FrenchFrequencyCorpus、固定来源复现、实际字段／续批／历史回归；OFFICIAL_LANGUAGE_AUDIT.md | 部分完成：三档替换合成词根，保留短语与复合词、基础池及旧历史；词频／难度／短语分布不等同原版，语言质量与实体输入待验收，600k 后续见 LANG-FRENCH-LARGE-45。 |
 | LANG-SPANISH-10K-18 | Spanish 10k 独立实际词汇 | wordfreq 3.1.1 固定西语 token、明确专名映射与独立复合词；参考仅聚合和生成合同 | SpanishFrequencyCorpus.extendedWords、准备器复现与原生续批／历史测试；OFFICIAL_LANGUAGE_AUDIT.md | 部分完成：9,990 个唯一候选替换合成串，1k 哈希不漂移，旧提示与回放保留；不声称原词值／频率／分布相同，词汇审校和实体输入待验收。 |
 | BACKGROUND-REMOVE-17 | 背景删除的重复应用、完成顺序与失败提示 | 固定删除回调、FileStorage、setter／总线、完整背景函数；受控数据库与 DOM | 主线程背景应用任务、事件／显式调用区分、运行和图片身份保护；WEBSITE_BACKGROUND_REMOVAL_CONTRACT.md | 部分完成：命令两次读取、设置页一次读取，按完成顺序选择，读取失败保留画面，已有输入不重开。配置写入失败、实体提示及跨窗口／上传删除交错仍开放。 |
 
