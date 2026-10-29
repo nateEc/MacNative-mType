@@ -13475,20 +13475,20 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testEsperantoScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testEsperantoScaleChoicesPreserveIndependentIDsAndOwnedCorpusShapes() throws {
     let cases: [(String, String, Int, Int, Int, Bool, ZipfFrequencySupport, String)] = [
-      ("esperanto1k", "Esperanto · 1k · Typebar", 1_000, 15, 137, true, .supported, "esperanto"),
-      ("esperanto10k", "Esperanto · 10k · Typebar", 10_000, 17, 1_560, true, .supported, "esperanto"),
-      ("esperanto25k", "Esperanto · 25k · Typebar", 24_998, 17, 4_528, true, .supported, "esperanto"),
-      ("esperanto36k", "Esperanto · 36k · Typebar", 36_342, 40, 6_843, true, .supported, "esperanto"),
-      ("esperantoXSystem1k", "Esperanto · X-sistemo · 1k · Typebar", 999, 15, 4, false, .supported, "esperantoXSystem"),
-      ("esperantoXSystem10k", "Esperanto · X-sistemo · 10k · Typebar", 9_993, 17, 38, false, .unknown, "esperantoXSystem"),
-      ("esperantoXSystem25k", "Esperanto · X-sistemo · 25k · Typebar", 24_970, 18, 213, false, .unknown, "esperantoXSystem"),
-      ("esperantoXSystem36k", "Esperanto · X-sistemo · 36k · Typebar", 36_296, 40, 277, false, .unknown, "esperantoXSystem"),
-      ("esperantoHSystem1k", "Esperanto · H-sistemo · 1k · Typebar", 999, 15, 4, false, .supported, "esperantoHSystem"),
-      ("esperantoHSystem10k", "Esperanto · H-sistemo · 10k · Typebar", 9_969, 17, 38, false, .supported, "esperantoHSystem"),
-      ("esperantoHSystem25k", "Esperanto · H-sistemo · 25k · Typebar", 24_922, 18, 213, false, .supported, "esperantoHSystem"),
-      ("esperantoHSystem36k", "Esperanto · H-sistemo · 36k · Typebar", 36_131, 40, 277, false, .supported, "esperantoHSystem"),
+      ("esperanto1k", "Esperanto · 1k · Typebar", 1_000, 15, 140, true, .supported, "esperanto"),
+      ("esperanto10k", "Esperanto · 10k · Typebar", 10_000, 17, 1_526, true, .supported, "esperanto"),
+      ("esperanto25k", "Esperanto · 25k · Typebar", 24_998, 17, 3_924, true, .supported, "esperanto"),
+      ("esperanto36k", "Esperanto · 36k · Typebar", 36_342, 19, 5_739, true, .supported, "esperanto"),
+      ("esperantoXSystem1k", "Esperanto · X-sistemo · 1k · Typebar", 999, 15, 0, false, .supported, "esperantoXSystem"),
+      ("esperantoXSystem10k", "Esperanto · X-sistemo · 10k · Typebar", 9_993, 17, 0, false, .unknown, "esperantoXSystem"),
+      ("esperantoXSystem25k", "Esperanto · X-sistemo · 25k · Typebar", 24_970, 18, 0, false, .unknown, "esperantoXSystem"),
+      ("esperantoXSystem36k", "Esperanto · X-sistemo · 36k · Typebar", 36_296, 19, 0, false, .unknown, "esperantoXSystem"),
+      ("esperantoHSystem1k", "Esperanto · H-sistemo · 1k · Typebar", 999, 15, 0, false, .supported, "esperantoHSystem"),
+      ("esperantoHSystem10k", "Esperanto · H-sistemo · 10k · Typebar", 9_969, 17, 0, false, .supported, "esperantoHSystem"),
+      ("esperantoHSystem25k", "Esperanto · H-sistemo · 25k · Typebar", 24_922, 18, 0, false, .supported, "esperantoHSystem"),
+      ("esperantoHSystem36k", "Esperanto · H-sistemo · 36k · Typebar", 36_131, 19, 0, false, .supported, "esperantoHSystem"),
     ]
 
     for (

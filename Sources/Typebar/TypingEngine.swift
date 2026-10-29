@@ -12136,63 +12136,41 @@ enum StarterLexicon {
     "chielo", "hhoro", "jhurnalo", "shipo", "autuno",
   ]
 
-  private struct EsperantoScaleSpecification {
-    let marker: String
-    let count: Int
-    let maximumLength: Int
-    let nonASCIICount: Int
-  }
-
-  private static func esperantoScaleLexicon(
-    _ specification: EsperantoScaleSpecification
-  ) -> IndexedLexicon {
-    precondition(specification.nonASCIICount <= specification.count - 2)
-    let nonASCIIEnd = 2 + specification.nonASCIICount
-
-    return IndexedLexicon(count: specification.count) { index in
-      if index == 0 { return "q" }
-      if index == 1 { return String(repeating: "q", count: specification.maximumLength) }
-      let suffix = alphabeticIndex(index + 676)
-      if index < nonASCIIEnd { return "ĵq" + specification.marker + suffix }
-      return "qeo" + specification.marker + suffix
-    }
-  }
-
   static var esperanto1kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "a", count: 1_000, maximumLength: 15, nonASCIICount: 137))
+    IndexedLexicon(count: 1_000) { EsperantoCorpus.native1k[$0] }
   }
   static var esperanto10kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "b", count: 10_000, maximumLength: 17, nonASCIICount: 1_560))
+    IndexedLexicon(count: 10_000) { EsperantoCorpus.native10k[$0] }
   }
   static var esperanto25kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "c", count: 24_998, maximumLength: 17, nonASCIICount: 4_528))
+    IndexedLexicon(count: 24_998) { EsperantoCorpus.native25k[$0] }
   }
   static var esperanto36kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "d", count: 36_342, maximumLength: 40, nonASCIICount: 6_843))
+    IndexedLexicon(count: 36_342) { EsperantoCorpus.native36k[$0] }
   }
   static var esperantoXSystem1kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "e", count: 999, maximumLength: 15, nonASCIICount: 4))
+    IndexedLexicon(count: 999) { EsperantoCorpus.x1k[$0] }
   }
   static var esperantoXSystem10kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "f", count: 9_993, maximumLength: 17, nonASCIICount: 38))
+    IndexedLexicon(count: 9_993) { EsperantoCorpus.x10k[$0] }
   }
   static var esperantoXSystem25kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "g", count: 24_970, maximumLength: 18, nonASCIICount: 213))
+    IndexedLexicon(count: 24_970) { EsperantoCorpus.x25k[$0] }
   }
   static var esperantoXSystem36kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "h", count: 36_296, maximumLength: 40, nonASCIICount: 277))
+    IndexedLexicon(count: 36_296) { EsperantoCorpus.x36k[$0] }
   }
   static var esperantoHSystem1kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "i", count: 999, maximumLength: 15, nonASCIICount: 4))
+    IndexedLexicon(count: 999) { EsperantoCorpus.h1k[$0] }
   }
   static var esperantoHSystem10kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "j", count: 9_969, maximumLength: 17, nonASCIICount: 38))
+    IndexedLexicon(count: 9_969) { EsperantoCorpus.h10k[$0] }
   }
   static var esperantoHSystem25kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "k", count: 24_922, maximumLength: 18, nonASCIICount: 213))
+    IndexedLexicon(count: 24_922) { EsperantoCorpus.h25k[$0] }
   }
   static var esperantoHSystem36kLexicon: IndexedLexicon {
-    esperantoScaleLexicon(.init(marker: "l", count: 36_131, maximumLength: 40, nonASCIICount: 277))
+    IndexedLexicon(count: 36_131) { EsperantoCorpus.h36k[$0] }
   }
 
   static var esperanto1kWords: [String] { esperanto1kLexicon.materialized() }

@@ -111,6 +111,9 @@ jobs:
           run_check "Portuguese preparation contracts" python3 Scripts/prepare-portuguese-corpus.py --self-test
           run_check "Portuguese optimized preparation contracts" python3 -O Scripts/prepare-portuguese-corpus.py --self-test
           run_check "bundled Portuguese integrity" python3 Scripts/prepare-portuguese-corpus.py --check-bundled
+          run_check "Esperanto preparation contracts" python3 Scripts/prepare-esperanto-corpus.py --self-test
+          run_check "Esperanto optimized preparation contracts" python3 -O Scripts/prepare-esperanto-corpus.py --self-test
+          run_check "bundled Esperanto integrity" python3 Scripts/prepare-esperanto-corpus.py --check-bundled
           run_check "Spanish corpus preparation contracts" python3 Scripts/test-spanish-frequency-corpus.py
           run_check "bundled Spanish corpus integrity" python3 Scripts/prepare-spanish-frequency-corpus.py --output-root . --check-bundled
           run_check "French corpus preparation contracts" python3 Scripts/test-french-frequency-corpus.py

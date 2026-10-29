@@ -2,6 +2,8 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-ESPERANTO-SCALES-50 | Esperanto 十二档实际词形与六个字母 | 单个隔离实例逐档练习 ĉielo／ĝardeno／ĥoro／ĵurnalo／ŝipo／aŭtuno，切换 X／H、Lazy Latin／No Space／Backwards，超过百词并重复和打开旧记录。 | 原字母与 X／H 实际拼写正确；H 的 ŭ → u；简化输入资格和捕获旧数据保持，大档长度及额外字母缺口明确。 | 待验收（见 ESPERANTO_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、语言质量及完整性能开放） |
+| LANG-ESPERANTO-LICENSE-50 | Esperanto 词形、频率与贡献者署名 | 同一实例打开 About 和 Esperanto 规模词库许可，核对独立字典／Tatoeba 来源、完整 owner 署名、原词／次数／句子链接及碰撞说明。 | 频率有实际源证据，派生拼写不冒充原始词典拼写；不声称与参考词频／难度等价，来源映射完整随包。 | 待验收（实体 sheet、VoiceOver 和人工来源审校开放） |
 | LANG-PORTUGUESE-SCALES-49 | Portuguese 五档字面词形、标点、多词和单位 | 只用单个隔离实例逐档练习 não／coração、连字符／撇号／句点、多词与长字段；5k 输入 2d，大档输入 m²／m³，超百词并重复和打开旧记录。 | 真实字段输入和旧捕获数据保持；标点／多连字符覆盖差距明确，不把自写单位当字典词。 | 待验收（见 PORTUGUESE_SCALES_CORPUS_CONTRACT.md；语言质量、实体键盘／IME 和完整性能开放） |
 | LANG-PORTUGUESE-LAZY-49 | 新练习资格、自定义例外及历史隔离 | 同一实例比较 1k／3k 与 5k／大档 lazy，建立支持与不支持的多语组合，再使用自定义 não 并重复旧捕获提示。 | 仅支持的候选去重音；全部不支持时新练习关闭 lazy；custom 例外保留，历史请求与捕获提示不回算。 | 待验收（固定源码／自动化不代替实体交互） |
 | LANG-PORTUGUESE-LICENSE-49 | Portuguese 本地许可与三种来源类型 | 同一实例打开 About 和 Português 规模词库许可，核对字典页／观察 token／自写 SI 单位的区分和源页／贡献者历史模板。 | 完整署名和来源映射随包，不把观察数据称为字典认证；不复制参考词值及损坏控制字符。 | 待验收（实体 sheet、VoiceOver、人工来源审校开放） |

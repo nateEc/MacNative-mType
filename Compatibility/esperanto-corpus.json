@@ -1,0 +1,168 @@
+{
+  "availableObservedForms": {
+    "h10k": 50011,
+    "h1k": 49921,
+    "h25k": 50019,
+    "h36k": 50021,
+    "native10k": 50029,
+    "native1k": 49966,
+    "native25k": 50029,
+    "native36k": 50036,
+    "x10k": 50019,
+    "x1k": 49903,
+    "x25k": 50030,
+    "x36k": 50035
+  },
+  "dictionary": {
+    "edition": "en",
+    "languageCode": "eo",
+    "postprocessed": true,
+    "sha256": "564df5523507921c3d6b2f94c49418a3ace682671e7425ae7aa4652ad5fcfc1b",
+    "url": "https://kaikki.org/dictionary/Esperanto/kaikki.org-dictionary-Esperanto.jsonl"
+  },
+  "dictionaryForms": 195762,
+  "filesSHA256": {
+    "Resources/EsperantoCorpusNotices.txt": "6f3173797b596e4cb3c69f1cfda4af059f40bb79e20807ca71eeb72ac3b9ce7f",
+    "Resources/EsperantoCorpusSources.txt": "a69fa7d10e8d4a88c9f58a49bee8ac0b747c172165c77afa2c320bf761058e70",
+    "Sources/Typebar/EsperantoCorpus.generated.swift": "9ddab7089c18c3a47975057712629ce0d95b4b592ee325410ca82fe61bf15fb5"
+  },
+  "frequency": {
+    "contributors": 949,
+    "distinctTokens": 157717,
+    "languageCode": "epo",
+    "sentences": 823873,
+    "sha256": "c7c3d234e5156596028a0a79ed669b137538966a8058373494e0c7836178ea7d",
+    "tokens": 5844336,
+    "url": "https://downloads.tatoeba.org/exports/per_language/epo/epo_sentences_detailed.tsv.bz2"
+  },
+  "limits": "Original long-field, accent distribution and language-quality parity remain open; never pad.",
+  "preparation": {
+    "runtimeDependencies": [],
+    "unicodeVersion": "15.0.0"
+  },
+  "revision": "kaikki-en-esperanto-tatoeba-20261029-v1",
+  "scales": {
+    "h10k": {
+      "shape": {
+        "count": 9969,
+        "maximumLength": 17,
+        "minimumLength": 1,
+        "nonASCIIEntries": 0,
+        "uniqueCount": 9969
+      },
+      "wordsSHA256": "76fe9564b173f7c3bec8de6b06b18112dce431a8c5c0cbda9a0e020b2378e9b8"
+    },
+    "h1k": {
+      "shape": {
+        "count": 999,
+        "maximumLength": 15,
+        "minimumLength": 1,
+        "nonASCIIEntries": 0,
+        "uniqueCount": 999
+      },
+      "wordsSHA256": "5e63ef501061b222581f4a1fc414e4f8be8f3ddbdff0f74859be6cb25534d7af"
+    },
+    "h25k": {
+      "shape": {
+        "count": 24922,
+        "maximumLength": 18,
+        "minimumLength": 1,
+        "nonASCIIEntries": 0,
+        "uniqueCount": 24922
+      },
+      "wordsSHA256": "7169c822caf7c29e4845a48fde25e23f76b0293ab095e52c2c8f2d583f612e17"
+    },
+    "h36k": {
+      "shape": {
+        "count": 36131,
+        "maximumLength": 19,
+        "minimumLength": 1,
+        "nonASCIIEntries": 0,
+        "uniqueCount": 36131
+      },
+      "wordsSHA256": "a589240ce9d68dfba2e378570840c042bfaa49528f6d4f8b85be5c4c1e6a8992"
+    },
+    "native10k": {
+      "shape": {
+        "count": 10000,
+        "maximumLength": 17,
+        "minimumLength": 1,
+        "nonASCIIEntries": 1526,
+        "uniqueCount": 10000
+      },
+      "wordsSHA256": "fa771b616b83bc8a67b1b817f376e5984e9af012e9c1ca1e1aaae21d2c79363f"
+    },
+    "native1k": {
+      "shape": {
+        "count": 1000,
+        "maximumLength": 15,
+        "minimumLength": 1,
+        "nonASCIIEntries": 140,
+        "uniqueCount": 1000
+      },
+      "wordsSHA256": "f908922896a841b7aa5d5fc0a300c660fc2e979c3a795721f30a20186776a678"
+    },
+    "native25k": {
+      "shape": {
+        "count": 24998,
+        "maximumLength": 17,
+        "minimumLength": 1,
+        "nonASCIIEntries": 3924,
+        "uniqueCount": 24998
+      },
+      "wordsSHA256": "de4827041de2c52d036d613085d68ebffe3a013a8d52f74182f195d8140f030f"
+    },
+    "native36k": {
+      "shape": {
+        "count": 36342,
+        "maximumLength": 19,
+        "minimumLength": 1,
+        "nonASCIIEntries": 5739,
+        "uniqueCount": 36342
+      },
+      "wordsSHA256": "896f30594fe50822350c8bcfe9b034f64281da67b7c822cfa7c9552b562fa6ba"
+    },
+    "x10k": {
+      "shape": {
+        "count": 9993,
+        "maximumLength": 17,
+        "minimumLength": 1,
+        "nonASCIIEntries": 0,
+        "uniqueCount": 9993
+      },
+      "wordsSHA256": "4494ec342373f6e852627c1fdc70499f32d2d43bf8e778a7506af9656eaf23b3"
+    },
+    "x1k": {
+      "shape": {
+        "count": 999,
+        "maximumLength": 15,
+        "minimumLength": 1,
+        "nonASCIIEntries": 0,
+        "uniqueCount": 999
+      },
+      "wordsSHA256": "4e03d81937f4ca02c2254f52a099ec2644ada80ea5b119595890c163f54a97a8"
+    },
+    "x25k": {
+      "shape": {
+        "count": 24970,
+        "maximumLength": 18,
+        "minimumLength": 1,
+        "nonASCIIEntries": 0,
+        "uniqueCount": 24970
+      },
+      "wordsSHA256": "40032e44a9aacc97fe2764c9c560f438815d9dbef2b0d49fb71adf2a672a4f41"
+    },
+    "x36k": {
+      "shape": {
+        "count": 36296,
+        "maximumLength": 19,
+        "minimumLength": 1,
+        "nonASCIIEntries": 0,
+        "uniqueCount": 36296
+      },
+      "wordsSHA256": "d360213bb5436d94bb6e77e5d0ccad256a42f46d7e81fddc606f3c318c907e78"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceMapCount": 108769
+}

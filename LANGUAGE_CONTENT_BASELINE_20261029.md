@@ -4,6 +4,8 @@
 
 ## 后续迁移状态
 
+最新 `LANG-ESPERANTO-SCALES-50` 已移除 Esperanto 十二档的 216,619 个占位位置，使用同时有独立字典和 Tatoeba 观察的实际词形，包含 X／H 拼写。原历史范围当前余 82 个直接合成入口，声明数量之和 438,685；复核 `/tmp/typebar-esperanto-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `3aef72f8d8fb7137a5f9c6f730e0849bc62d55402d25601487907af3777544a8`。大档长字段、X／H 额外字母及词频／难度／质量差距仍开放，见 ESPERANTO_SCALES_CORPUS_CONTRACT.md。以下数字按各迁移阶段保留，不能混用为当前总数。
+
 `LANG-ENGLISH-LARGE-43` 已将 English 450k 的 450,029 个合成候选替换为独立实际来源选集，移除 `englishScaleLexicon`；来源、原生输入、旧记录及署名边界见 ENGLISH_LARGE_CORPUS_CONTRACT.md。按下列历史 118 项逐入口复核，目前同范围仍有 117 个直接合成入口，声明数量之和为 3,740,882。复核记录 `/tmp/typebar-english-large-remaining-synthetic-20261029.json`，当前 TypingEngine SHA-256 `ed4df6fd2ff445465c6708c51c148b22d1e23c17f6b494311e3008cf54fa240d`。该数字不是全部语言缺口总量。
 
 随后 `LANG-GERMAN-SCALES-44` 将 German 1k／10k／250k 的 250,225 个候选迁至独立字面词形，移除 `germanScaleLexicon`，来源和实际输入见 GERMAN_SCALES_CORPUS_CONTRACT.md。当前同一历史范围余 114 个直接合成入口，声明数量之和 3,490,657；复核 `/tmp/typebar-german-remaining-synthetic-20261029.json`，当前 TypingEngine SHA-256 `a62cc92a8867e9429d997b0262ed153c2f484924a197424485c77ff71e06db40`。
@@ -18,9 +20,36 @@
 
 `LANG-PORTUGUESE-SCALES-49` 移除五档 Portuguese 合成器，共 886,516 个候选位置，改用独立字典、观察 token 和两个明确自写单位练习。当前同范围余 94 个直接合成入口，声明数量之和 655,304；复核 `/tmp/typebar-portuguese-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `258cfef2746e395ed42e38ac6f0269c6f2271818aae2f2a27ce051caa5211bd1`。大档标点／多连字符仍有差距，基本 24／重音 67 项仍少于参考 201／1,999 项。来源、独立输入资格红例与验证边界见 PORTUGUESE_SCALES_CORPUS_CONTRACT.md；下表保留原始 118 项历史范围。
 
-以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English、German、French、Spanish 大档、Romanian 七档及 Polish 六档已移除对应合成器，但语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
+以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English、German、French、Spanish 大档、Romanian 七档、Polish 六档、Portuguese 五档及 Esperanto 十二档已移除对应合成器，但语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
 
 ## 历史起点确认的范围
+
+### 2026-10-29 的扩大结构复核
+
+在 `LANG-ESPERANTO-SCALES-50` 的不可变输入期间，另行读取当前 TypingEngine（SHA-256 `3aef72f8d8fb7137a5f9c6f730e0849bc62d55402d25601487907af3777544a8`），扫描**所有** `static var <selection>Lexicon: IndexedLexicon` 属性中直接调用具名 `*ScaleLexicon(...)` 的路由，不再要求被调用函数显式出现旧审计的两个字母编号函数名。逐属性配对花括号取函数体，提取具名字面 count，并核对 `case .<selection>: StarterLexicon.<selection>Lexicon` 生产路由。
+
+结果为 **139 个入口、声明数量之和 2,866,074**，无未解析 count 或未找到的生产路由。旧历史范围当前 82 个只是其中一部分；另有 **57 个入口、声明数量之和 2,427,389** 以前未进入该历史表。完整只读报告 `/tmp/typebar-esperanto-all-scale-helper-audit-20261029.json`；这是结构路由审计，不是逐词质量认证或全部语言内容缺口总账。
+
+| 原历史表之外的具名 helper | 当前入口 | 声明数量之和 |
+| --- | ---: | ---: |
+| simplifiedChineseScaleLexicon | 4 | 66,000 |
+| traditionalChineseScaleLexicon | 4 | 65,890 |
+| russianScaleLexicon | 6 | 469,774 |
+| ukrainianScaleLexicon | 3 | 60,989 |
+| tatarScaleLexicon | 3 | 15,039 |
+| crimeanTatarCyrillicScaleLexicon | 4 | 31,082 |
+| greekScaleLexicon | 4 | 40,728 |
+| hebrewScaleLexicon | 3 | 16,000 |
+| plainArabicScriptScaleLexicon | 2 | 6,000 |
+| thaiScaleLexicon | 6 | 144,737 |
+| belarusianScaleLexicon | 6 | 200,097 |
+| kurdishCentralScaleLexicon | 2 | 5,742 |
+| norwegianBokmalScaleLexicon | 5 | 773,908 |
+| norwegianNynorskScaleLexicon | 5 | 531,403 |
+
+实际读取 Chinese、Russian、Ukrainian、Greek、Bokmål 的 helper 已确认有按编号编码字符、重复字符强行制造最长项或给词根拼编号等生产行为；Bokmål／Nynorsk 两组的声明数量之和已达 1,305,311，后续需要取得独立真实数据，不能被旧 82 项数字掩盖。其他具名路由需继续逐组核实。该扩展仍不覆盖匿名 `IndexedLexicon(count:)` 生成器、未以 ScaleLexicon 命名的函数、基础短词池、形态变化正确性或所有语言质量问题，不能把未匹配路由判成真实完整内容。
+
+### 原历史表
 
 审计 `Sources/Typebar/TypingEngine.swift`，SHA-256 为 `5ae7e4b0d62c0f791b6a5e6b33f9945c5eb58e43802843e110ca467399bd305c`。只识别直接调用 `*ScaleLexicon` 且函数内显式使用 alphabeticIndex／paddedAlphabeticIndex 拼接的声明；118 个匹配声明均可找到生产 `StarterLexicon.<selection>Lexicon` 路由。结果保存于 `/tmp/typebar-current-synthetic-scale-audit.json`。
 
@@ -82,18 +111,18 @@ Italian 四档已经改用独立实际观察语料，相关数据、编辑、复
 | swissGerman2k | 2000 | swissGermanScaleLexicon | 未提取 |
 | afrikaans1k | 1000 | afrikaansScaleLexicon | 未提取 |
 | afrikaans10k | 8164 | afrikaansScaleLexicon | 未提取 |
-| esperanto1k | 1000 | esperantoScaleLexicon | a |
-| esperanto10k | 10000 | esperantoScaleLexicon | b |
-| esperanto25k | 24998 | esperantoScaleLexicon | c |
-| esperanto36k | 36342 | esperantoScaleLexicon | d |
-| esperantoXSystem1k | 999 | esperantoScaleLexicon | e |
-| esperantoXSystem10k | 9993 | esperantoScaleLexicon | f |
-| esperantoXSystem25k | 24970 | esperantoScaleLexicon | g |
-| esperantoXSystem36k | 36296 | esperantoScaleLexicon | h |
-| esperantoHSystem1k | 999 | esperantoScaleLexicon | i |
-| esperantoHSystem10k | 9969 | esperantoScaleLexicon | j |
-| esperantoHSystem25k | 24922 | esperantoScaleLexicon | k |
-| esperantoHSystem36k | 36131 | esperantoScaleLexicon | l |
+| esperanto1k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 1000 | 历史 esperantoScaleLexicon | a |
+| esperanto10k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 10000 | 历史 esperantoScaleLexicon | b |
+| esperanto25k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 24998 | 历史 esperantoScaleLexicon | c |
+| esperanto36k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 36342 | 历史 esperantoScaleLexicon | d |
+| esperantoXSystem1k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 999 | 历史 esperantoScaleLexicon | e |
+| esperantoXSystem10k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 9993 | 历史 esperantoScaleLexicon | f |
+| esperantoXSystem25k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 24970 | 历史 esperantoScaleLexicon | g |
+| esperantoXSystem36k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 36296 | 历史 esperantoScaleLexicon | h |
+| esperantoHSystem1k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 999 | 历史 esperantoScaleLexicon | i |
+| esperantoHSystem10k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 9969 | 历史 esperantoScaleLexicon | j |
+| esperantoHSystem25k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 24922 | 历史 esperantoScaleLexicon | k |
+| esperantoHSystem36k（已移除占位，见 LANG-ESPERANTO-SCALES-50） | 36131 | 历史 esperantoScaleLexicon | l |
 | tatarCrimean1k | 1000 | crimeanTatarLatinScaleLexicon | a |
 | tatarCrimean5k | 5000 | crimeanTatarLatinScaleLexicon | b |
 | tatarCrimean10k | 10000 | crimeanTatarLatinScaleLexicon | c |
@@ -214,3 +243,25 @@ ASCII 字母及内部单引号／连字符、长度不超过 31 的只读可用�
 新候选须走实际生成、续批、修饰器、输入及重复路径；旧记录必须继续使用捕获的提示、事件和冻结成绩。保留基础词库、语言 ID、配置／分享、语音／百科和多语归属的兼容证据。语言审校、词频／难度及内容分布的未证明差异保持开放。
 
 客户端冻结基线已结束，6,750 项中六个方法失败，详见 CLIENT_BASELINE_20261029.md。本审计没有修改生产代码、清单或词数据，也未启动并行原生作业。不得因后续测试通过而关闭这里的内容缺口，完整 goal 仍未达成。
+
+## Norwegian 下一批的独立来源可用性
+
+扩大回归保持不可变输入时，仅在临时目录下载并读取官方 [Bokmål 2005](https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-5/) 和 [Nynorsk 2012](https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-41/) 的 **2022-02-01 Norsk ordbank** 快照。官方目录的许可链接为 CC BY 4.0；该日期是数据库快照日期，2026-10-29 只是下载日，不冒充当前规范数据库。目录明确指出全词形也包括语法可构成但实际很少或从未使用的形式，因此不能将数据库容量说成实测频率或完整语言质量认证。
+
+| 官方下载文件 | 压缩字节 | SHA-256 |
+| --- | ---: | --- |
+| `20220201_norsk_ordbank_nob_2005.tar.gz` | 15,288,065 | `57d91cb3f17b85befa50a3b56fcaed9800ca665b39486fe97b668add914d5f60` |
+| `20220201_norsk_ordbank_nno_2012.tar.gz` | 8,954,350 | `32987494b77c54b5c3890e891b99e35d5a45a16643a5c1820cd5e02fd55b1b8d` |
+
+文件均来自 `https://www.nb.no/sbfil/leksikalske_databaser/ordbank/`。只读 tar 成员，不解包／执行脚本。Bokmål 的 `fullformsliste.txt` 为 102,410,706 字节、SHA-256 `45a648b51ed22741acc3e4fc8d17178dfcce0e9622ea2ce12204f11d8c6bcfaf`；Nynorsk 实际成员名是 `fullformer_2012.txt`，48,498,975 字节、SHA-256 `654bcfcf11374947a0be0d27173a94a4f7d75671d792de439bea1fba07ef8e36`。最初误用相同成员名而失败的统计不计作有效证据，改按各自清单后重新读取。两者 ISO-8859-1、tab 表；有效运行使用 Unicode 15.0.0，9.379 秒。
+
+| 只读统计 | Bokmål | Nynorsk |
+| --- | ---: | ---: |
+| 全词形行 | 1,143,887 | 584,298 |
+| 唯一字面形式 | 619,067 | 415,085 |
+| NFC Latin 字母形式 | 606,054 | 407,087 |
+| 其中字面小写／大小写 | 600,831／5,223 | 401,803／5,284 |
+| 含标点／空格形式 | 12,011／1,186 | 6,930／1,330 |
+| 纯字母最长 | 33 | 31 |
+
+当前快照所有行均 `NORMERING=normert`、`TILDATO=4000`；这只是源字段筛选事实。报告 `/tmp/typebar-norwegian-ordbank-availability-20261029.json` 保留各长度界限容量，尚未选词、核实词频、逐字段形状覆盖、编写原生数据或接入新许可。受限的新闻文本语料没有被混入本批。可用性证明下一批有独立字面来源路径，**不代表 Norwegian 已交付**。
