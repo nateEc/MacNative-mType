@@ -1,4 +1,5 @@
 import AppKit
+import IOKit.pwr_mgt
 import SwiftData
 import SwiftUI
 import XCTest
@@ -542,8 +543,28 @@ import XCTest
   }
 
   func testWheelOverPromptScrollsPageWithoutMovingInnerClipOrReplacingInput() throws {
+    // Hosting-backed AppKit scrolling completes through the display pipeline.
+    // A hidden window does not make that pipeline drawable while the display
+    // sleeps. Keep this integration test's display prerequisite explicit,
+    // without replacing native wheel delivery with manual clip movement.
+    var displayAssertion = IOPMAssertionID(0)
+    let displayStatus = IOPMAssertionCreateWithName(kIOPMAssertPreventUserIdleDisplaySleep as CFString,
+      IOPMAssertionLevel(kIOPMAssertionLevelOn), "Typebar native wheel integration test" as CFString,
+      &displayAssertion)
+    XCTAssertEqual(displayStatus, kIOReturnSuccess)
+    defer { if displayStatus == kIOReturnSuccess { IOPMAssertionRelease(displayAssertion) } }
+    var activityAssertion = IOPMAssertionID(0)
+    let wasAsleep = CGDisplayIsAsleep(CGMainDisplayID()) != 0
+    if wasAsleep {
+      let wakeStatus = IOPMAssertionDeclareUserActivity("Typebar native wheel integration test" as CFString,
+        kIOPMUserActiveLocal, &activityAssertion)
+      XCTAssertEqual(wakeStatus, kIOReturnSuccess)
+    }
+    defer { if activityAssertion != 0 { IOPMAssertionRelease(activityAssertion) } }
     let fixture = try Fixture()
     defer { fixture.close() }
+    fixture.waitUntil { CGDisplayIsAsleep(CGMainDisplayID()) == 0 }
+    print("Native wheel display prerequisite: wasAsleep=\(wasAsleep), drawable=\(CGDisplayIsAsleep(CGMainDisplayID()) == 0)")
     fixture.waitUntil { fixture.promptReady }
     let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
     let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)

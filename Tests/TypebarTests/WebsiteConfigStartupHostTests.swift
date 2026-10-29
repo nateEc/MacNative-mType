@@ -7,6 +7,146 @@ import XCTest
 @testable import Typebar
 
 @MainActor final class WebsiteConfigStartupHostTests: XCTestCase {
+  private func recognizedLegends(_ bitmap: NSBitmapImageRep, region: CGRect, keyCount: Int) throws -> String {
+    let original = try XCTUnwrap(bitmap.cgImage)
+    let crop = try XCTUnwrap(original.cropping(to: .init(
+      x: region.minX * CGFloat(original.width), y: (1 - region.maxY) * CGFloat(original.height),
+      width: region.width * CGFloat(original.width), height: region.height * CGFloat(original.height))))
+    // These regions contain equally spaced letter keys. Whole-row detection
+    // can discard isolated visible glyphs; read each cell without supplying
+    // expected letters, layout names, correction words, or fallback answers.
+    var legends = ""
+    let width = CGFloat(crop.width) / CGFloat(keyCount)
+    for index in 0..<keyCount {
+      let cell = try XCTUnwrap(crop.cropping(to: .init(x: CGFloat(index) * width, y: 0,
+        width: width, height: CGFloat(crop.height))))
+      let context = try XCTUnwrap(CGContext(data: nil, width: cell.width * 4, height: cell.height * 4,
+        bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+      context.interpolationQuality = .high
+      context.draw(cell, in: .init(x: 0, y: 0, width: context.width, height: context.height))
+      let detector = VNRecognizeTextRequest()
+      detector.recognitionLevel = .accurate; detector.recognitionLanguages = ["en-US"]
+      detector.usesLanguageCorrection = false
+      try VNImageRequestHandler(cgImage: XCTUnwrap(context.makeImage())).perform([detector])
+      legends += (detector.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
+    }
+    return legends
+  }
+
+  func testCapturedPublishedKeyboardRasterKeepsItsVisibleE() throws {
+    // Lossless crop from this app's failed full-suite raster (460x92).
+    // The old whole-row 2x detector returns QWRT although the E is visible.
+    let encoded = """
+    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
+    """
+    let data = try XCTUnwrap(Data(base64Encoded: encoded, options: .ignoreUnknownCharacters))
+    let bitmap = try XCTUnwrap(NSBitmapImageRep(data: data))
+    let region = CGRect(x: 0, y: 0, width: 1, height: 1)
+    let legends = try recognizedLegends(bitmap, region: region, keyCount: 5)
+    XCTAssertEqual(legends.replacingOccurrences(of: " ", with: ""), "QWERT")
+    // A missing middle glyph must remain missing; known slot count must not
+    // make the reader reconstruct E from its position in a familiar layout.
+    let image = try XCTUnwrap(bitmap.cgImage)
+    let context = try XCTUnwrap(CGContext(data: nil, width: image.width, height: image.height,
+      bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+    context.draw(image, in: .init(x: 0, y: 0, width: image.width, height: image.height))
+    let cellWidth = CGFloat(image.width) / 5
+    context.clear(.init(x: cellWidth * 2, y: 0, width: cellWidth, height: CGFloat(image.height)))
+    let missingE = NSBitmapImageRep(cgImage: try XCTUnwrap(context.makeImage()))
+    XCTAssertEqual(try recognizedLegends(missingE, region: region, keyCount: 5)
+      .replacingOccurrences(of: " ", with: ""), "QWRT")
+  }
+
   func testFreshFractionalUnderscoreTargetRequiresFinalSuffixThroughActualInputView() async throws {
     let f = try Fixture(saved: true, json: #"{"mode":"custom","funbox":["underscore_spaces"]}"#)
     defer { f.close() }
@@ -806,31 +946,14 @@ import XCTest
     let keycaps = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
     XCTAssertTrue(keycaps.contains("Esc"), "Keyboard region: \(keycaps)")
     request.recognitionLevel = .accurate
-    // At native resolution Vision omitted visible 15px key legends in the
-    // saved full-suite raster. Crop the same row and resample it at 2x before
-    // detection; keep exact QWERTY and Dvorak order assertions below.
-    func recognizedLegends(_ bitmap: NSBitmapImageRep, region: CGRect) throws -> String {
-      let original = try XCTUnwrap(bitmap.cgImage)
-      let crop = try XCTUnwrap(original.cropping(to: .init(
-        x: region.minX * CGFloat(original.width), y: (1 - region.maxY) * CGFloat(original.height),
-        width: region.width * CGFloat(original.width), height: region.height * CGFloat(original.height))))
-      let context = try XCTUnwrap(CGContext(data: nil, width: crop.width * 2, height: crop.height * 2,
-        bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-      context.interpolationQuality = .high
-      context.draw(crop, in: .init(x: 0, y: 0, width: context.width, height: context.height))
-      let detector = VNRecognizeTextRequest()
-      detector.recognitionLevel = .accurate; detector.recognitionLanguages = ["en-US"]
-      detector.usesLanguageCorrection = false
-      try VNImageRequestHandler(cgImage: XCTUnwrap(context.makeImage())).perform([detector])
-      return (detector.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined()
-    }
-    let legends = try recognizedLegends(bitmap, region: .init(x: 0.23, y: 0.38, width: 0.23, height: 0.06))
+    // Preserve exact QWERTY and Dvorak order checks while reading separate
+    // keycaps as independent glyph regions, as in the saved-raster regression.
+    let legends = try recognizedLegends(bitmap, region: .init(x: 0.23, y: 0.38, width: 0.23, height: 0.06), keyCount: 5)
     XCTAssertEqual(legends.replacingOccurrences(of: " ", with: ""), "QWERT", "Published QWERTY, not legacy custom rows: \(legends)")
     // Calibrate four complete letter keys in the same region in both layouts.
     // Exclude Dvorak's leading punctuation and the following key at the edge.
     let calibrationRegion = CGRect(x: 0.37, y: 0.38, width: 0.20, height: 0.06)
-    let calibration = try recognizedLegends(bitmap, region: calibrationRegion)
+    let calibration = try recognizedLegends(bitmap, region: calibrationRegion, keyCount: 4)
     XCTAssertEqual(calibration.replacingOccurrences(of: " ", with: ""), "RTYU", "QWERTY calibration: \(calibration)")
     request.regionOfInterest = .init(x: 0.1, y: 0.2, width: 0.8, height: 0.31)
     XCTAssertEqual(f.settings.snapshot, legacy)
@@ -847,7 +970,7 @@ import XCTest
     let alternate = try XCTUnwrap(f.host.bitmapImageRepForCachingDisplay(in: f.host.bounds))
     f.host.cacheDisplay(in: f.host.bounds, to: alternate)
     try XCTUnwrap(alternate.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: "/tmp/typebar-profile-keyboard-dvorak-host.png"))
-    let alternateLegends = try recognizedLegends(alternate, region: calibrationRegion)
+    let alternateLegends = try recognizedLegends(alternate, region: calibrationRegion, keyCount: 4)
     XCTAssertFalse(alternateLegends.contains("Q") || alternateLegends.contains("W"), "Dvorak first keys: \(alternateLegends)")
     XCTAssertEqual(alternateLegends.replacingOccurrences(of: " ", with: ""), "PYFG",
       "Actual Dvorak letter order: \(alternateLegends)")
