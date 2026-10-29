@@ -11642,91 +11642,19 @@ enum StarterLexicon {
     "ові", "еві", "ого", "ому", "ими", "ів", "їв", "ення", "ання",
   ]
 
-  // Typebar-authored ASCII prompts for Ukrainian Latin keyboard practice.
-  // This is a native learning mode, not a copied word list or an automatic
-  // transliteration service.
-  static let ukrainianLatinWords = [
-    "ranok", "vikno", "papir", "bereh", "viter", "vprava", "uvaha", "spokii",
-    "yasno", "ozero", "vulytsia", "stil", "svitlo", "doroha", "terpinnia", "khvylyna",
-    "misto", "doshch", "tysha", "napriamok", "zirka", "notatka", "sad", "podikh",
-    "yizha", "yednist", "grunt",
-  ]
-
-  private struct UkrainianLatynkaScaleSpecification {
-    let count: Int
-    let maximumLength: Int
-    let uppercaseASCIIPlainCount: Int
-    let uppercaseNonASCIIPlainCount: Int
-    let uppercaseASCIIPunctuationCount: Int
-    let uppercaseNonASCIIPunctuationCount: Int
-    let numericASCIIPunctuationCount: Int
-    let lowerASCIIPunctuationCount: Int
-    let lowerNonASCIIPunctuationCount: Int
-    let lowerNonASCIIPlainCount: Int
-  }
-
-  private static func ukrainianLatynkaScaleLexicon(
-    _ specification: UkrainianLatynkaScaleSpecification
-  ) -> IndexedLexicon {
-    let upperASCIIPlainEnd = 2 + specification.uppercaseASCIIPlainCount
-    let upperNonASCIIPlainEnd = upperASCIIPlainEnd + specification.uppercaseNonASCIIPlainCount
-    let upperASCIIPunctuationEnd = upperNonASCIIPlainEnd
-      + specification.uppercaseASCIIPunctuationCount
-    let upperNonASCIIPunctuationEnd = upperASCIIPunctuationEnd
-      + specification.uppercaseNonASCIIPunctuationCount
-    let numericASCIIPunctuationEnd = upperNonASCIIPunctuationEnd
-      + specification.numericASCIIPunctuationCount
-    let lowerASCIIPunctuationEnd = numericASCIIPunctuationEnd
-      + specification.lowerASCIIPunctuationCount
-    let lowerNonASCIIPunctuationEnd = lowerASCIIPunctuationEnd
-      + specification.lowerNonASCIIPunctuationCount
-    let lowerNonASCIIPlainEnd = lowerNonASCIIPunctuationEnd
-      + specification.lowerNonASCIIPlainCount
-    precondition(lowerNonASCIIPlainEnd <= specification.count)
-
-    return IndexedLexicon(count: specification.count) { index in
-      if index == 0 { return "q" }
-      if index == 1 { return String(repeating: "q", count: specification.maximumLength) }
-      let suffix = alphabeticIndex(index + 676)
-      let asciiEntry = "qz" + suffix
-      let nonASCIIEntry = "žq" + suffix
-      if index < upperASCIIPlainEnd { return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst() }
-      if index < upperNonASCIIPlainEnd { return nonASCIIEntry.prefix(1).uppercased() + nonASCIIEntry.dropFirst() }
-      if index < upperASCIIPunctuationEnd { return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst() + "-" }
-      if index < upperNonASCIIPunctuationEnd { return nonASCIIEntry.prefix(1).uppercased() + nonASCIIEntry.dropFirst() + "-" }
-      if index < numericASCIIPunctuationEnd { return asciiEntry + "-1" }
-      if index < lowerASCIIPunctuationEnd { return asciiEntry + "-" }
-      if index < lowerNonASCIIPunctuationEnd { return nonASCIIEntry + "-" }
-      if index < lowerNonASCIIPlainEnd { return nonASCIIEntry }
-      return asciiEntry
-    }
-  }
+  // Explicitly adapted independent Ukrainian corpus; original spellings are retained.
+  static var ukrainianLatinWords: [String] { UkrainianLatynkaCorpus.basic }
 
   static var ukrainianLatynka1kLexicon: IndexedLexicon {
-    ukrainianLatynkaScaleLexicon(.init(
-      count: 1_000, maximumLength: 18,
-      uppercaseASCIIPlainCount: 0, uppercaseNonASCIIPlainCount: 0,
-      uppercaseASCIIPunctuationCount: 0, uppercaseNonASCIIPunctuationCount: 0,
-      numericASCIIPunctuationCount: 0, lowerASCIIPunctuationCount: 16,
-      lowerNonASCIIPunctuationCount: 0, lowerNonASCIIPlainCount: 288))
+    IndexedLexicon(count: 1_000) { UkrainianLatynkaCorpus.words1k[$0] }
   }
 
   static var ukrainianLatynka10kLexicon: IndexedLexicon {
-    ukrainianLatynkaScaleLexicon(.init(
-      count: 9_998, maximumLength: 30,
-      uppercaseASCIIPlainCount: 0, uppercaseNonASCIIPlainCount: 0,
-      uppercaseASCIIPunctuationCount: 0, uppercaseNonASCIIPunctuationCount: 0,
-      numericASCIIPunctuationCount: 0, lowerASCIIPunctuationCount: 168,
-      lowerNonASCIIPunctuationCount: 46, lowerNonASCIIPlainCount: 3_168))
+    IndexedLexicon(count: 9_998) { UkrainianLatynkaCorpus.words10k[$0] }
   }
 
   static var ukrainianLatynka50kLexicon: IndexedLexicon {
-    ukrainianLatynkaScaleLexicon(.init(
-      count: 49_991, maximumLength: 31,
-      uppercaseASCIIPlainCount: 4, uppercaseNonASCIIPlainCount: 3,
-      uppercaseASCIIPunctuationCount: 1, uppercaseNonASCIIPunctuationCount: 2,
-      numericASCIIPunctuationCount: 2, lowerASCIIPunctuationCount: 1_216,
-      lowerNonASCIIPunctuationCount: 784, lowerNonASCIIPlainCount: 17_881))
+    IndexedLexicon(count: 49_991) { UkrainianLatynkaCorpus.words50k[$0] }
   }
 
   static var ukrainianLatynka1kWords: [String] { ukrainianLatynka1kLexicon.materialized() }

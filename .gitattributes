@@ -1,2 +1,3 @@
 # Empty final TSV fields mean absent observations; preserve their delimiter.
 Resources/UkrainianCorpusSources.txt whitespace=-blank-at-eol
+Resources/UkrainianLatynkaCorpusSources.txt whitespace=-blank-at-eol

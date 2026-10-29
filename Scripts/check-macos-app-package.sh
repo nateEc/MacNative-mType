@@ -84,6 +84,12 @@ cmp "$project_root/Resources/UkrainianCorpusNotices.txt" \
 cmp "$project_root/Resources/UkrainianCorpusSources.txt" \
   "$app_path/Contents/Resources/UkrainianCorpusSources.txt" \
   || fail "Ukrainian spelling sources missing or modified"
+cmp "$project_root/Resources/UkrainianLatynkaCorpusNotices.txt" \
+  "$app_path/Contents/Resources/UkrainianLatynkaCorpusNotices.txt" \
+  || fail "Ukrainian Latynka corpus attribution missing or modified"
+cmp "$project_root/Resources/UkrainianLatynkaCorpusSources.txt" \
+  "$app_path/Contents/Resources/UkrainianLatynkaCorpusSources.txt" \
+  || fail "Ukrainian Latynka spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

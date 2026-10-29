@@ -22295,8 +22295,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.ukrainianWords.contains("ґрунт"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.ukrainianLatin))
     XCTAssertTrue(StarterLexicon.ukrainianLatinWords.allSatisfy {
-      $0.unicodeScalars.allSatisfy { $0.isASCII }
+      $0.allSatisfy { Set("abcdefghijklmnopqrstuvwxyzïčğŝšž").contains($0) }
     })
+    XCTAssertTrue(StarterLexicon.ukrainianLatinWords.contains("ïža"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.japaneseRomaji))
     XCTAssertTrue(StarterLexicon.japaneseRomajiWords.allSatisfy {
       $0.unicodeScalars.allSatisfy { $0.isASCII }

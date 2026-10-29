@@ -1,0 +1,206 @@
+{
+  "artifacts": {
+    "Resources/UkrainianLatynkaCorpusNotices.txt": "db53b0d8054b33f20541dd93e85055667f315ee2f33ec73e0498312e90cf9666",
+    "Resources/UkrainianLatynkaCorpusSources.txt": "a05734486714c45d357d3262a184a2849deb3fbf4aac2404c5dd451a9cef9d49",
+    "Sources/Typebar/UkrainianLatynkaCorpus.generated.swift": "d7d132e094293c8833add720ef3cd48cec8a7a736f1d1ab2734f5c6d47b54ad4"
+  },
+  "dictionarySHA256": "31e8e39f48feae391478f1fe2c37d003053cf88f2dd4f2d97d5d19c7bc432a90",
+  "evidenceSHA256": "9eb303b6217b5906b42ed2474b29c43f2e7abb2235e84ee5446acad26677a6ef",
+  "frequencyBasis": "Cyrillic source observations; all Latin forms are adaptations",
+  "mapping": {
+    "а": "a",
+    "б": "b",
+    "в": "v",
+    "г": "ğ",
+    "д": "d",
+    "е": "e",
+    "ж": "ž",
+    "з": "z",
+    "и": "y",
+    "й": "j",
+    "к": "k",
+    "л": "l",
+    "м": "m",
+    "н": "n",
+    "о": "o",
+    "п": "p",
+    "р": "r",
+    "с": "s",
+    "т": "t",
+    "у": "u",
+    "ф": "f",
+    "х": "x",
+    "ц": "c",
+    "ч": "č",
+    "ш": "š",
+    "щ": "ŝ",
+    "ь": "j",
+    "ю": "ju",
+    "я": "ja",
+    "є": "je",
+    "і": "i",
+    "ї": "ï",
+    "ґ": "g"
+  },
+  "paperSHA256": "b1cfb854a93130a2d8f0bea4c08d7e997a8568e8885b7bd1e9a6c520cf601fe0",
+  "paperURL": "https://www.qeios.com/read/VH8DLJ/pdf",
+  "parentReaderSHA256": "cc669764a43586326a9997356c34aa9254052510c68f6f7ee50828baa9fb0f13",
+  "pools": {
+    "10k": {
+      "curatedText": 0,
+      "eligibleByClass": {
+        "LA": 258736,
+        "LU": 179818,
+        "PA": 5668,
+        "PU": 3057
+      },
+      "shape": {
+        "LA": [
+          6616,
+          1,
+          20
+        ],
+        "LU": [
+          3168,
+          1,
+          22
+        ],
+        "PA": [
+          168,
+          4,
+          30
+        ],
+        "PU": [
+          46,
+          5,
+          21
+        ]
+      },
+      "sourceCyrillicWholeObserved": 9997,
+      "sourceStressAdapted": 2600,
+      "wordsSHA256": "c928c3906e56656bff3161648019756bc9a64c737c8857cc35d1212cc9fe373c"
+    },
+    "1k": {
+      "curatedText": 0,
+      "eligibleByClass": {
+        "LA": 253748,
+        "LU": 154525,
+        "PA": 5196
+      },
+      "shape": {
+        "LA": [
+          696,
+          1,
+          16
+        ],
+        "LU": [
+          288,
+          1,
+          13
+        ],
+        "PA": [
+          16,
+          5,
+          18
+        ]
+      },
+      "sourceCyrillicWholeObserved": 1000,
+      "sourceStressAdapted": 32,
+      "wordsSHA256": "ff6dabf788f058491f9e02fde4c166b1d0fb0fab880a3bfc302f699149f6757d"
+    },
+    "50k": {
+      "curatedText": 3,
+      "eligibleByClass": {
+        "CA": 587,
+        "CPA": 48,
+        "CPU": 20,
+        "CU": 18,
+        "LA": 258976,
+        "LU": 179855,
+        "PA": 5669,
+        "PNA": 2,
+        "PU": 3259
+      },
+      "shape": {
+        "CA": [
+          4,
+          2,
+          4
+        ],
+        "CPA": [
+          1,
+          12,
+          12
+        ],
+        "CPU": [
+          2,
+          7,
+          8
+        ],
+        "CU": [
+          3,
+          3,
+          3
+        ],
+        "LA": [
+          30098,
+          1,
+          23
+        ],
+        "LU": [
+          17881,
+          1,
+          23
+        ],
+        "PA": [
+          1216,
+          4,
+          31
+        ],
+        "PNA": [
+          2,
+          6,
+          7
+        ],
+        "PU": [
+          784,
+          5,
+          30
+        ]
+      },
+      "sourceCyrillicWholeObserved": 49767,
+      "sourceStressAdapted": 25135,
+      "wordsSHA256": "2a343a00de72aad0a3be1590341b9de96630d444d9736d9f78eb6b76306056a3"
+    },
+    "basic": {
+      "curatedText": 0,
+      "eligibleByClass": {
+        "LA": 36038,
+        "LU": 18385
+      },
+      "shape": {
+        "LA": [
+          143,
+          1,
+          13
+        ],
+        "LU": [
+          56,
+          1,
+          12
+        ]
+      },
+      "sourceCyrillicWholeObserved": 199,
+      "sourceStressAdapted": 0,
+      "wordsSHA256": "8eff07baf1b2222728f1011dbe898dbd972d84e9ab9cc2479e45f40b667d6fc6"
+    }
+  },
+  "revision": "ukrainian-latynka-vakulenko-modern-a-ascii-apostrophe-v1",
+  "russianDictionarySHA256": "7e30fc4e4b21ff16cde09a501494f25287ae66f9a0f94e770ae826e5003c7698",
+  "schemaVersion": 1,
+  "sourceRows": {
+    "englishEdition": 60297,
+    "russianEdition": 2729136
+  },
+  "wordfreqWheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+}

@@ -13,7 +13,8 @@ import XCTest
   }
 
   func testActualPracticePagePreparesTheLargeChoiceAndAcceptsItsFirstWord() async throws {
-    for language: TypingLanguage in [.ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k] {
+    for language: TypingLanguage in [.ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k,
+      .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k] {
       try await PracticeHostLifetime.withModelContainer { container, track in
         try await verifyActualPage(language: language, container: container, trackCallbacks: track)
       }

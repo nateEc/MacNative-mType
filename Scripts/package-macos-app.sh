@@ -45,6 +45,8 @@ cp "$project_root/Resources/EnglishFiveLetterCorpusNotices.txt" "$app_path/Conte
 cp "$project_root/Resources/EnglishFiveLetterCorpusSources.txt" "$app_path/Contents/Resources/EnglishFiveLetterCorpusSources.txt"
 cp "$project_root/Resources/UkrainianCorpusNotices.txt" "$app_path/Contents/Resources/UkrainianCorpusNotices.txt"
 cp "$project_root/Resources/UkrainianCorpusSources.txt" "$app_path/Contents/Resources/UkrainianCorpusSources.txt"
+cp "$project_root/Resources/UkrainianLatynkaCorpusNotices.txt" "$app_path/Contents/Resources/UkrainianLatynkaCorpusNotices.txt"
+cp "$project_root/Resources/UkrainianLatynkaCorpusSources.txt" "$app_path/Contents/Resources/UkrainianLatynkaCorpusSources.txt"
 cp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/SpanishLargeCorpusNotices.txt" "$app_path/Contents/Resources/SpanishLargeCorpusNotices.txt"
 cp "$project_root/Resources/SpanishLargeCorpusSources.txt" "$app_path/Contents/Resources/SpanishLargeCorpusSources.txt"

@@ -4,7 +4,9 @@
 
 ## 后续迁移状态
 
-最新 `LANG-UKRAINIAN-CYRILLIC-56` 移除西里尔乌克兰语三档 60,989 个合成位置，使用两版词典的 uk 词条及有出处的少量文本形式，基础 27→199；注音改编保留原始追踪。当前直接具名 ScaleLexicon 属性路由余 119 项／1,029,000 个声明位置，复核 /tmp/typebar-ukrainian-scale-audit-20261030.json，TypingEngine SHA-256 `f5297d0810d61931d59f2569c66d6a7ed998498515025555d98936bc40bb1cda`。50k 的双撇号＋连字符组合已由独立文本原样补齐；分布及语言质量仍开放，详见 UKRAINIAN_CORPUS_CONTRACT.md。该结构范围不覆盖全部构造器、基础池或实际词数；下文保留迁移时的历史数字。
+最新 `LANG-UKRAINIAN-LATYNKA-57` 将 Latynka 三档 60,989 个 qz 占位位置替换为独立乌克兰语形式的明确拉丁化改编，基础 27→199。保留西里尔原词、注音改编及原词频率范围，不冒充 Latin 使用观察。当前直接具名 ScaleLexicon 路由余 116 项／968,011 个声明位置；只读复核 /tmp/typebar-latynka-scale-audit-20261030.json，TypingEngine SHA `899c34a31d7c56f7e38e2851d185da64f80a16eee230fb1ee576c3dac7fe8a15`。细粒度字符频次、分布、语言质量及实体／性能仍开放，详见 UKRAINIAN_LATYNKA_CORPUS_CONTRACT.md。
+
+上一批 `LANG-UKRAINIAN-CYRILLIC-56` 移除西里尔乌克兰语三档 60,989 个合成位置，使用两版词典的 uk 词条及有出处的少量文本形式，基础 27→199；注音改编保留原始追踪。当前直接具名 ScaleLexicon 属性路由余 119 项／1,029,000 个声明位置，复核 /tmp/typebar-ukrainian-scale-audit-20261030.json，TypingEngine SHA-256 `f5297d0810d61931d59f2569c66d6a7ed998498515025555d98936bc40bb1cda`。50k 的双撇号＋连字符组合已由独立文本原样补齐；分布及语言质量仍开放，详见 UKRAINIAN_CORPUS_CONTRACT.md。该结构范围不覆盖全部构造器、基础池或实际词数；下文保留迁移时的历史数字。
 
 此前 `LANG-ENGLISH-FIVE-55` 移除五字母英语 1k 的编号合成，并将基础 40 项扩为 201 项，使用字典与整词观察交集。该阶段直接具名 ScaleLexicon 属性路由余 122 项／1,089,989 个声明位置，复核 /tmp/typebar-english-five-letter-scale-audit-20261030.json；TypingEngine SHA-256 `d763249482238ea6cf67db68549bec1c710a4a013c0e0a26b8a7734086c96025`。详情见 ENGLISH_FIVE_LETTER_CORPUS_CONTRACT.md。默认俄语和挪威语基础池的后续扩充分别见各 BASIC 合同。
 
