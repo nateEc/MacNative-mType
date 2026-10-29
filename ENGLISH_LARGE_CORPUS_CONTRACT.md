@@ -44,6 +44,8 @@ SCOWL 的大档包含 UK Advanced Cryptics Dictionary；其来源许可要求应
 
 `LANG-ROMANIAN-SCALES-47` 随后新增第十一个 Română 规模词库许可及来源映射，见 ROMANIAN_SCALES_CORPUS_CONTRACT.md；阶段包检查数量保留当时范围。
 
+`LANG-POLISH-SCALES-48` 随后新增第十二个 Polski 规模词库许可及来源映射，见 POLISH_SCALES_CORPUS_CONTRACT.md；English 显著版权位置保持。
+
 隐藏 NSHostingView 不导出有效 AX 树，首次测试的空标签失败不说明界面缺字。改为识别实际缓存像素，不给 Vision 预设词表或自定义词；About 中来源全名与完整版权行均须原样识别且位于首屏上半部。阅读器先检查实际文档开头，再通过真实 NSScrollView 滚至末尾检查最终 DOI；完整文档字节另由读取／打包／源复现保护。截图 `/tmp/typebar-large-english-about.png`、`/tmp/typebar-large-english-license-reader.png` 和末尾截图已保留；人工查看首两张确认实际内容。此证据不等于实体窗口、VoiceOver、按钮打开 sheet 的完整人工验收。
 
 ## 验证与开放范围

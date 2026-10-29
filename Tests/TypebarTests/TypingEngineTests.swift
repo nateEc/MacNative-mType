@@ -15333,14 +15333,14 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testPolishScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testPolishScaleChoicesPreserveIndependentIDsAndOwnedCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int)] = [
-      ("polish2k", 2_338, 1, 17, 50, 3, 1_078),
-      ("polish5k", 5_000, 1, 18, 0, 0, 2_386),
-      ("polish10k", 10_000, 1, 18, 0, 0, 4_698),
-      ("polish20k", 20_000, 1, 21, 0, 0, 9_204),
-      ("polish40k", 40_000, 1, 21, 0, 0, 18_318),
-      ("polish200k", 199_979, 1, 33, 38_649, 0, 76_066),
+      ("polish2k", 2_338, 1, 17, 50, 3, 946),
+      ("polish5k", 5_000, 1, 18, 0, 0, 2_101),
+      ("polish10k", 10_000, 1, 18, 0, 0, 4_278),
+      ("polish20k", 20_000, 1, 21, 0, 0, 8_692),
+      ("polish40k", 40_000, 1, 21, 0, 0, 17_575),
+      ("polish200k", 199_979, 1, 33, 38_649, 0, 82_095),
     ]
 
     for (rawValue, count, minimum, maximum, uppercase, punctuation, nonASCII) in cases {

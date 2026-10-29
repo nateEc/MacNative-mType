@@ -11129,67 +11129,23 @@ enum StarterLexicon {
   static var romanian100kWords: [String] { romanian100kLexicon.materialized() }
   static var romanian200kWords: [String] { romanian200kLexicon.materialized() }
 
-  private static let polishScaleRoots = [
-    "las", "nurt", "most", "brzeg", "szlak", "blask", "wiatr", "pole",
-  ]
-
-  private static func polishScaleLexicon(
-    marker: String, count: Int, maximumLength: Int,
-    uppercaseCount: Int, punctuationCount: Int, nonASCIICount: Int
-  ) -> IndexedLexicon {
-    precondition(count > max(uppercaseCount + 2, nonASCIICount + 1))
-    precondition(punctuationCount < count)
-    return IndexedLexicon(count: count) { index in
-      var entry = marker + polishScaleRoots[index % polishScaleRoots.count]
-        + alphabeticIndex(index)
-      if index == 0 {
-        entry = "ǫ"
-      } else if index == 1 {
-        entry = String(repeating: marker.first!, count: maximumLength)
-      } else {
-        if index < uppercaseCount + 2 {
-          entry = entry.prefix(1).uppercased() + entry.dropFirst()
-        }
-        if index < nonASCIICount + 1 {
-          entry += "ł"
-        }
-      }
-      if index >= count - punctuationCount {
-        entry += "-"
-      }
-      return entry
-    }
-  }
-
   static var polish2kLexicon: IndexedLexicon {
-    polishScaleLexicon(
-      marker: "qpl", count: 2_338, maximumLength: 17,
-      uppercaseCount: 50, punctuationCount: 3, nonASCIICount: 1_078)
+    IndexedLexicon(count: 2_338) { PolishCorpus.words2k[$0] }
   }
   static var polish5kLexicon: IndexedLexicon {
-    polishScaleLexicon(
-      marker: "wpl", count: 5_000, maximumLength: 18,
-      uppercaseCount: 0, punctuationCount: 0, nonASCIICount: 2_386)
+    IndexedLexicon(count: 5_000) { PolishCorpus.words5k[$0] }
   }
   static var polish10kLexicon: IndexedLexicon {
-    polishScaleLexicon(
-      marker: "xpl", count: 10_000, maximumLength: 18,
-      uppercaseCount: 0, punctuationCount: 0, nonASCIICount: 4_698)
+    IndexedLexicon(count: 10_000) { PolishCorpus.words10k[$0] }
   }
   static var polish20kLexicon: IndexedLexicon {
-    polishScaleLexicon(
-      marker: "zpl", count: 20_000, maximumLength: 21,
-      uppercaseCount: 0, punctuationCount: 0, nonASCIICount: 9_204)
+    IndexedLexicon(count: 20_000) { PolishCorpus.words20k[$0] }
   }
   static var polish40kLexicon: IndexedLexicon {
-    polishScaleLexicon(
-      marker: "vpl", count: 40_000, maximumLength: 21,
-      uppercaseCount: 0, punctuationCount: 0, nonASCIICount: 18_318)
+    IndexedLexicon(count: 40_000) { PolishCorpus.words40k[$0] }
   }
   static var polish200kLexicon: IndexedLexicon {
-    polishScaleLexicon(
-      marker: "kpl", count: 199_979, maximumLength: 33,
-      uppercaseCount: 38_649, punctuationCount: 0, nonASCIICount: 76_066)
+    IndexedLexicon(count: 199_979) { PolishCorpus.words200k[$0] }
   }
 
   static var polish2kWords: [String] { polish2kLexicon.materialized() }

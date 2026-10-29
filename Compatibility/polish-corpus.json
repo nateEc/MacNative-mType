@@ -1,0 +1,137 @@
+{
+  "available": {
+    "abbreviations": 3,
+    "cased": 69422,
+    "lower": 879810
+  },
+  "casedLengthLimits": {
+    "200k": 22,
+    "2k": 10
+  },
+  "dataLicense": "CC-BY-SA-4.0 adapted selection; retain notices and entry map",
+  "dictionary": {
+    "edition": "pl",
+    "languageCode": "pl",
+    "postprocessed": false,
+    "retrievedDate": "2026-10-29",
+    "sha256": "15bfa944d77f8cc25b3597c4c08c26025f33fbdc60b9f68be16b84874042453e",
+    "url": "https://kaikki.org/dictionary/downloads/pl/pl-extract.jsonl.gz"
+  },
+  "filesSHA256": {
+    "Resources/PolishCorpusNotices.txt": "0fbf25994170d9616c82a1379643a826f27c3783ee39c03ecff5daa4dd7d1a99",
+    "Resources/PolishCorpusSources.txt": "ab2970669aefae320181ddba3d516fb1f240298635797aabbf33e9262162f523",
+    "Sources/Typebar/PolishCorpus.generated.swift": "b76a7a9539d0e1160c88ed80cc637fabaacaab9ffe1e630c4148c38f89c787ce"
+  },
+  "limits": "Literal spelling and aggregate counts are not extraction quality, frequency, difficulty or distribution parity.",
+  "literalAbbreviations": [
+    "np.",
+    "m.in.",
+    "itd."
+  ],
+  "preparation": {
+    "msgpackVersion": "1.1.2",
+    "runtimeDependencies": [],
+    "unicodeVersion": "15.0.0"
+  },
+  "requiredLiteralNames": [
+    "Polska",
+    "Warszawa",
+    "Kraków",
+    "Łódź"
+  ],
+  "revision": "kaikki-pl-20261029-wordfreq-3.1.1-v1",
+  "scales": {
+    "10k": {
+      "shape": {
+        "count": 10000,
+        "maximumCasedLength": 0,
+        "maximumLength": 18,
+        "minimumLength": 1,
+        "nonASCIICount": 4278,
+        "periodCount": 0,
+        "punctuationCount": 0,
+        "uniqueCount": 10000,
+        "uppercaseCount": 0
+      },
+      "wordsSHA256": "923e5458d5943ab7e53e1f617ae931db19dbc4809a8022c71c4b82d9c71ff685"
+    },
+    "200k": {
+      "shape": {
+        "count": 199979,
+        "maximumCasedLength": 22,
+        "maximumLength": 33,
+        "minimumLength": 1,
+        "nonASCIICount": 82095,
+        "periodCount": 0,
+        "punctuationCount": 0,
+        "uniqueCount": 199979,
+        "uppercaseCount": 38649
+      },
+      "wordsSHA256": "1f208ecf7022d1206f9d55408760fbdbcb528c990cd62929d94f118fb8842c50"
+    },
+    "20k": {
+      "shape": {
+        "count": 20000,
+        "maximumCasedLength": 0,
+        "maximumLength": 21,
+        "minimumLength": 1,
+        "nonASCIICount": 8692,
+        "periodCount": 0,
+        "punctuationCount": 0,
+        "uniqueCount": 20000,
+        "uppercaseCount": 0
+      },
+      "wordsSHA256": "0415a5b8b7c47054cf890a964d7a9d2ddea694ce6bfdbb30320f48ccfa3431e8"
+    },
+    "2k": {
+      "shape": {
+        "count": 2338,
+        "maximumCasedLength": 10,
+        "maximumLength": 17,
+        "minimumLength": 1,
+        "nonASCIICount": 946,
+        "periodCount": 4,
+        "punctuationCount": 3,
+        "uniqueCount": 2338,
+        "uppercaseCount": 50
+      },
+      "wordsSHA256": "439d2edb7220d5bdb9ccd69335256bd08ad55d4668ac72bf65a56f35b44698ca"
+    },
+    "40k": {
+      "shape": {
+        "count": 40000,
+        "maximumCasedLength": 0,
+        "maximumLength": 21,
+        "minimumLength": 1,
+        "nonASCIICount": 17575,
+        "periodCount": 0,
+        "punctuationCount": 0,
+        "uniqueCount": 40000,
+        "uppercaseCount": 0
+      },
+      "wordsSHA256": "fa10d471c9d05a754ce77204f120f4f8eda239a1bf9e03d1428681d34538253d"
+    },
+    "5k": {
+      "shape": {
+        "count": 5000,
+        "maximumCasedLength": 0,
+        "maximumLength": 18,
+        "minimumLength": 1,
+        "nonASCIICount": 2101,
+        "periodCount": 0,
+        "punctuationCount": 0,
+        "uniqueCount": 5000,
+        "uppercaseCount": 0
+      },
+      "wordsSHA256": "5a9447a72756917745904fa17212f480ed2266f8f613aea1146012ca56a5512c"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceMapCount": 199982,
+  "wordfreq": {
+    "member": "wordfreq/data/large_pl.msgpack.gz",
+    "memberSHA256": "fac63e49c49ea2e39dd8a48152d7e54cec0920abbc59993088063ed5d9b528c2",
+    "version": "3.1.1",
+    "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+  }
+}
