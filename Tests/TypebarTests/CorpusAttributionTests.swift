@@ -93,8 +93,11 @@ import XCTest
     defer { host.rootView = AnyView(EmptyView()); window.contentView = nil; window.close() }
     let lines = try visibleLines(in: host, capture: "/tmp/typebar-large-english-license-reader.png")
     let text = lines.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
-    XCTAssertTrue(text.contains("Typebar independent large English corpus"), text)
-    XCTAssertTrue(text.contains("Includes material from the UK Advanced Cryptics Dictionary."), text)
+    // Vision may split one rendered sentence into separate observations.
+    // Normalize only whitespace; keep the actual wording and raw diagnostics.
+    let readableText = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    XCTAssertTrue(readableText.contains("Typebar independent large English corpus"), text)
+    XCTAssertTrue(readableText.contains("Includes material from the UK Advanced Cryptics Dictionary."), text)
     XCTAssertFalse(text.contains("此安装包的许可文件无法读取"), text)
     let scroll = try XCTUnwrap(scrollView(in: host))
     let document = try XCTUnwrap(scroll.documentView)
