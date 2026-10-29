@@ -16,6 +16,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case esperanto = "EsperantoCorpusNotices"
   case norwegian = "NorwegianCorpusNotices"
   case russian = "RussianCorpusNotices"
+  case russianBasic = "RussianBasicCorpusNotices"
   case unicode = "UnicodeNotice"
   case other = "ThirdPartyNotices"
 
@@ -36,6 +37,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     case .esperanto: "Esperanto · 规模词库"
     case .norwegian: "Norsk · Bokmål／Nynorsk"
     case .russian: "Русский · 规模词库"
+    case .russianBasic: "Русский · 基础词库"
     case .unicode: "Unicode"
     case .other: "其他开源组件"
     }

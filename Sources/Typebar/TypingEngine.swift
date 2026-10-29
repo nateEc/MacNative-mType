@@ -11511,12 +11511,9 @@ enum StarterLexicon {
   static var traditionalChinese10kWords: [String] { traditionalChinese10kLexicon.materialized() }
   static var traditionalChinese50kWords: [String] { traditionalChinese50kLexicon.materialized() }
 
-  // Original Typebar content for Cyrillic keyboard practice.
-  static let russianWords = [
-    "утро", "окно", "бумага", "берег", "ветер", "практика", "внимание", "тихо",
-    "ясно", "озеро", "улица", "стол", "свет", "дорога", "терпение", "минута",
-    "город", "дождь", "спокойно", "направление", "звезда", "записка", "сад", "дыхание",
-  ]
+  // Independently sourced literal forms; the 24 earlier authored words remain
+  // available. Provenance and licenses accompany the unopened application.
+  static let russianWords = RussianBasicCorpus.words
 
   static var russian1kLexicon: IndexedLexicon {
     IndexedLexicon(count: 996) { RussianCorpus.words1k[$0] }

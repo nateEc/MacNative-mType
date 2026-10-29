@@ -2,6 +2,8 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-RUSSIAN-BASIC-53 | 默认俄语 200 词与旧历史 | 单个隔离实例选择默认 Русский，练习新旧候选及单字／12 字长词，切换 No Space／Backwards、重复并打开旧 24 词时期的结果。 | 新候选真实可输入，旧自有词仍可选，提示与重复一致；旧提示、指标、回放不按新词库回算。 | 待验收（见 RUSSIAN_BASIC_CORPUS_CONTRACT.md；实体键盘／IME、VoiceOver、语言质量及完整性能开放） |
+| LANG-RUSSIAN-BASIC-LICENSE-53 | 基础俄语许可与逐词出处 | 同一实例打开“Русский · 基础词库”许可，核对 CC BY-SA、字典来源与完整词形频率说明，并查验包内 200 行词形／页面／band 映射。 | 新入口与规模词库许可分别清楚；band 不冒充计数，不把来源、词频或语义质量差异称作等价。 | 待验收（自动化来源读取不是实体许可 sheet 或人工语言审校） |
 | LANG-RUSSIAN-SCALES-52 | Russian 六档词形、字段和输入 | 单个隔离实例逐档练习 ё／е 和专名大小写；5k 输入句点缩写、连字符及两个多词；切换 No Space／Backwards，超百词续批、重复及旧记录。 | 实词与字段正确，别名输入和历史保持；不把 375k 长词及撇号／prime 缺口称为完成。 | 待验收（见 RUSSIAN_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、全部组合及语言质量开放） |
 | LANG-RUSSIAN-LICENSE-52 | Russian 来源署名与频率依据 | 同一实例打开 About 和 Русский 许可，核对俄语版字典、wordfreq 来源、贡献者 URL 模板和逐词整词／分段 band。 | CC BY-SA 来源及改编明确，band 不冒充计数、词典形式不冒充实际使用；许可及映射完整随包。 | 待验收（实体 sheet、VoiceOver、人工来源与语言审校开放） |
 | LANG-NORWEGIAN-SCALES-51 | Norwegian 十档真实词形、大小写和复杂字段 | 单个隔离实例逐档练习 æ／ø／å 和 ikke／ikkje，输入真实多连字符、撇号、数字词和 Nynorsk 多词；切换 Lazy Latin／No Space／Backwards，超百词并重复、打开旧记录。 | 原词与字母规则正确，数字／标点交集和多字段不被拆丢；旧提示／指标不回算，不把分布差异冒充完整对齐。 | 待验收（证据见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、语言审校及完整性能开放） |

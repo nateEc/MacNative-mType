@@ -135,6 +135,12 @@ cmp "$project_root/Resources/RussianCorpusNotices.txt" \
 cmp "$project_root/Resources/RussianCorpusSources.txt" \
   "$app_path/Contents/Resources/RussianCorpusSources.txt" \
   || fail "Russian spelling sources missing or modified"
+cmp "$project_root/Resources/RussianBasicCorpusNotices.txt" \
+  "$app_path/Contents/Resources/RussianBasicCorpusNotices.txt" \
+  || fail "Basic Russian corpus attribution missing or modified"
+cmp "$project_root/Resources/RussianBasicCorpusSources.txt" \
+  "$app_path/Contents/Resources/RussianBasicCorpusSources.txt" \
+  || fail "Basic Russian spelling sources missing or modified"
 if [[ -n "$reference_root" ]]; then
   zsh "$project_root/Scripts/check-originality-boundaries.sh" \
     --reference "$reference_root" \

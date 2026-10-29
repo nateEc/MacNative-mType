@@ -1,0 +1,53 @@
+{
+  "dictionary": {
+    "edition": "ru",
+    "eligibleForms": 614218,
+    "languageCode": "ru",
+    "rows": 2729136,
+    "sha256": "7e30fc4e4b21ff16cde09a501494f25287ae66f9a0f94e770ae826e5003c7698",
+    "url": "https://kaikki.org/dictionary/downloads/ru/ru-extract.jsonl.gz"
+  },
+  "filesSHA256": {
+    "Resources/RussianBasicCorpusNotices.txt": "b9f4d3a8ba642bbbde7d028171fef5e8654c768a018023dacb6c6d5e4c371184",
+    "Resources/RussianBasicCorpusSources.txt": "990fb153c05d1299da8d144b671bf2f4a05949d65032e5cc8bf3e375e048231e",
+    "Sources/Typebar/RussianBasicCorpus.generated.swift": "75f09a45a6718aa52be3a2606558dbfeccc87335974b49b3c83290bf9a7a5bdf"
+  },
+  "frequency": {
+    "member": "wordfreq/data/large_ru.msgpack.gz",
+    "memberSHA256": "0440613cc765c14a20fb9483225f2fec4d85e66672809076bcec9b29119f9b43",
+    "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+  },
+  "referenceAggregate": {
+    "count": 200,
+    "maximumLength": 12,
+    "minimumLength": 1,
+    "punctuation": 0,
+    "spaces": 0,
+    "uppercase": 0
+  },
+  "revision": "kaikki-ru-20261029-wordfreq-3.1.1-basic-v1",
+  "runtimeDependencies": [],
+  "schemaVersion": 1,
+  "selection": {
+    "eligibleCandidates": 83731,
+    "retainedAuthoredCount": 24,
+    "shape": {
+      "count": 200,
+      "groups": {
+        "L": [
+          200,
+          1,
+          12,
+          1,
+          12
+        ]
+      },
+      "maximumHyphens": 0,
+      "punctuationScalars": {},
+      "uniqueCount": 200
+    },
+    "wholeFormFrequencyRequired": true
+  },
+  "sharedReaderSHA256": "66c968199417e0d869eabb4af7ce9458c1765f1f8f1491559de308dfacb06a6e",
+  "wordsSHA256": "5406abd9ecb107e72bc0deb84b2e910796e87abf6dbf6c36111f56db8dc42838"
+}

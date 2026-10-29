@@ -22,7 +22,7 @@ final class RussianCorpusTests: XCTestCase {
     return key.isEmpty ? "L" : key
   }
 
-  func testPublishedWordsAreExactAndBasicPoolStaysUnchanged() throws {
+  func testPublishedSixScalesAndBasicPoolHavePinnedLiteralContent() throws {
     let hashes: [TypingLanguage: String] = [
       .russian1k: "6cb468c0bbbec1e5403e6ea2011a735bf2bbdf9261945e441453494783e9b06e",
       .russian5k: "3ac08a85b31863548b45998f792e9ac9a370ee7a5becce26f2cc7adfd9ca31e4",
@@ -30,7 +30,7 @@ final class RussianCorpusTests: XCTestCase {
       .russian25k: "664ff8c19ff66c7f60ce197ae4788307e707c1d342736c753a3a46e7b64db07a",
       .russian50k: "78e1c9afc79349cae3f2fbc9bcf60b23a0a06ab70038e93221d091257afd5859",
       .russian375k: "c31c98e6ccff917a88c2bfbd76e45ab9a259ecf44a45edeb1b670b298e63c369",
-      .russian: "c1efe8fabc0aaf6ce2f1617e30875220c830a7afd0d5f02134b2c0ffc42494e2",
+      .russian: "5406abd9ecb107e72bc0deb84b2e910796e87abf6dbf6c36111f56db8dc42838",
     ]
     for (language, expected) in hashes {
       let words = language.ownedPracticeWords()
@@ -38,7 +38,7 @@ final class RussianCorpusTests: XCTestCase {
         .map { String(format: "%02x", $0) }.joined()
       XCTAssertEqual(actual, expected)
     }
-    XCTAssertEqual(TypingLanguage.russian.ownedPracticeWords().count, 24)
+    XCTAssertEqual(TypingLanguage.russian.ownedPracticeWords().count, 200)
     XCTAssertTrue(Self.languages.allSatisfy { !TypingLanguage.defaultMixedComponents.contains($0) })
   }
 
