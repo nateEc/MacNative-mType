@@ -578,6 +578,13 @@ config.lazyMode = true; config.words = 3;
 await polyglotGenerate(['area ', 'oak ', 'écho '], [0, 0, 1, 2]);
 ownedPolyglot('english', [['french', ['ÁRea'], false], ['english', ['oak']]]); config.lazyMode = true;
 await polyglotGenerate(['área '], [0]);
+for (const noSpaces of [false, true]) {
+  ownedPolyglot('english', [['portuguese_5k', ['não'], true], ['portuguese_1k', ['ação'], false]]);
+  config.lazyMode = true; config.words = 2;
+  if (noSpaces) activeNames = ['polyglot', 'nospace'];
+  await polyglotGenerate(noSpaces ? ['não', 'acao'] : ['não ', 'acao '], [0, 1]);
+}
+console.log('lazy eligibility fixtures passed');
 ownedPolyglot('english', [['code_swift', ['node:', 'Bay']], ['german', ['oak']]]);
 await polyglotGenerate(['Bay '], [0, 1]);
 ownedPolyglot('code_swift', [['english', ['Node:']], ['german', ['oak']]]);

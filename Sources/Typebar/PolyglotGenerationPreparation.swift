@@ -1,6 +1,6 @@
 import Foundation
 
-/// Resolve the primary language before building a fresh Polyglot word pool.
+/// Resolve input eligibility and the primary language before fresh generation.
 /// This is not decoding or replay: historical configurations stay unchanged.
 struct PolyglotGenerationPreparation {
   static func directionFallback(primary: TypingLanguage, selected: [TypingLanguage]) -> TypingLanguage? {
@@ -13,6 +13,10 @@ struct PolyglotGenerationPreparation {
   let switchedPrimaryLanguage: TypingLanguage?
 
   init(_ requested: TestConfiguration) {
+    var requested = requested
+    requested.modifiers = ArabicLazyInputPolicy.effectiveModifiers(requested.modifiers,
+      language: requested.language, mode: requested.mode,
+      mixedLanguageComponents: requested.mixedLanguageComponents, automaticallyEnabled: false)
     guard requested.language == .mixedLanguages else {
       configuration = requested
       switchedPrimaryLanguage = nil

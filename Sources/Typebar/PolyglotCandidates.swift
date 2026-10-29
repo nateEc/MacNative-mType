@@ -53,8 +53,9 @@ struct NativePolyglotCandidates {
 
   /// A split or lowercased word absent from the original whole-candidate map
   /// has no Lazy properties; it must not inherit the pool's primary language.
-  func lazyWord(_ word: String) -> String {
-    guard let language = language(for: word) else { return word }
+  func lazyWord(_ word: String, allowUnsupported: Bool = false) -> String {
+    guard let language = language(for: word),
+      allowUnsupported || language.supportsLazyLatinInput else { return word }
     return TypingTextNormalizer.lazyLatin(word, language: language)
   }
 }

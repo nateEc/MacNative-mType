@@ -1,0 +1,165 @@
+{
+  "available": {
+    "apostrophe": 10,
+    "cased": 10026,
+    "hyphen": 4126,
+    "letters": 449288,
+    "period": 39,
+    "phrases": 6946
+  },
+  "dataLicense": "CC-BY-SA-4.0 adapted selection; retain full notices and evidence map",
+  "dictionary": {
+    "edition": "pt",
+    "languageCode": "pt",
+    "retrievedDate": "2026-10-29",
+    "sha256": "9a244407ef90051e8c3292bd896a830f69429872059dc52da2a6eaecfd771faa",
+    "url": "https://kaikki.org/dictionary/downloads/pt/pt-extract.jsonl.gz"
+  },
+  "filesSHA256": {
+    "Resources/PortugueseCorpusNotices.txt": "ba2571fcaf2a8f27a37b179a1c67b63a82c7bf92f384f823ffbc0f8b52dee5ee",
+    "Resources/PortugueseCorpusSources.txt": "3c2a24ef184070fc0e6035f9c8c048ceaaecf23e3a744042890a4c2f91e3227b",
+    "Sources/Typebar/PortugueseCorpus.generated.swift": "7f011b2441e82de1f2fe82a5d4cab430ca41ad18ab7afb7a8ce55dec7baf7b59"
+  },
+  "limits": "Original punctuation coverage, max-hyphen count and distribution remain open; no controls or synthetic filler.",
+  "notationAuthority": "https://doi.org/10.59161/AUEZ1291",
+  "preparation": {
+    "msgpackVersion": "1.1.2",
+    "runtimeDependencies": [],
+    "unicodeVersion": "15.0.0"
+  },
+  "revision": "kaikki-pt-20261029-wordfreq-3.1.1-v1",
+  "scales": {
+    "1k": {
+      "evidenceCounts": {
+        "dictionaryLiteral": 1000
+      },
+      "shape": {
+        "controlCount": 0,
+        "count": 1000,
+        "digitCount": 0,
+        "maximumHyphens": 1,
+        "maximumLength": 16,
+        "maximumLetterLength": 16,
+        "maximumPhraseFields": 0,
+        "maximumPunctuationLength": 13,
+        "minimumLength": 1,
+        "nonASCIICount": 175,
+        "nonLetterCount": 3,
+        "punctuationCount": 3,
+        "spaceCount": 0,
+        "uniqueCount": 1000,
+        "uppercaseCount": 0
+      },
+      "wordsSHA256": "e3f9296e5b671b9127a3586aaa4c2ad39c8a8696049d9fce1e2ce7ca417a602d"
+    },
+    "320k": {
+      "evidenceCounts": {
+        "authoredSIUnit": 2,
+        "dictionaryLiteral": 318599
+      },
+      "shape": {
+        "controlCount": 0,
+        "count": 318601,
+        "digitCount": 2,
+        "maximumHyphens": 5,
+        "maximumLength": 41,
+        "maximumLetterLength": 33,
+        "maximumPhraseFields": 5,
+        "maximumPunctuationLength": 41,
+        "minimumLength": 2,
+        "nonASCIICount": 83209,
+        "nonLetterCount": 4296,
+        "punctuationCount": 4175,
+        "spaceCount": 119,
+        "uniqueCount": 318601,
+        "uppercaseCount": 0
+      },
+      "wordsSHA256": "1adb29311d8997310143b9d642f727dcb9684f8ca4f25a3f161ade8bb0de08e3"
+    },
+    "3k": {
+      "evidenceCounts": {
+        "dictionaryLiteral": 3043
+      },
+      "shape": {
+        "controlCount": 0,
+        "count": 3043,
+        "digitCount": 0,
+        "maximumHyphens": 1,
+        "maximumLength": 17,
+        "maximumLetterLength": 17,
+        "maximumPhraseFields": 0,
+        "maximumPunctuationLength": 14,
+        "minimumLength": 1,
+        "nonASCIICount": 600,
+        "nonLetterCount": 16,
+        "punctuationCount": 16,
+        "spaceCount": 0,
+        "uniqueCount": 3043,
+        "uppercaseCount": 0
+      },
+      "wordsSHA256": "a82e622f7a7a5e808400c213619bdea465b2c0c690d2065b6e87f3adaf2c2093"
+    },
+    "550k": {
+      "evidenceCounts": {
+        "authoredSIUnit": 2,
+        "dictionaryLiteral": 453548,
+        "frequencyObservation": 104657
+      },
+      "shape": {
+        "controlCount": 0,
+        "count": 558207,
+        "digitCount": 2,
+        "maximumHyphens": 5,
+        "maximumLength": 41,
+        "maximumLetterLength": 33,
+        "maximumPhraseFields": 5,
+        "maximumPunctuationLength": 41,
+        "minimumLength": 2,
+        "nonASCIICount": 135462,
+        "nonLetterCount": 4296,
+        "punctuationCount": 4175,
+        "spaceCount": 119,
+        "uniqueCount": 558207,
+        "uppercaseCount": 0
+      },
+      "wordsSHA256": "6bd8bc1ff80c65b514193c8838f4f8af3fc731af7ddd9238f5ddfb43bf7aa4d0"
+    },
+    "5k": {
+      "evidenceCounts": {
+        "dictionaryLiteral": 5664,
+        "frequencyObservation": 1
+      },
+      "shape": {
+        "controlCount": 0,
+        "count": 5665,
+        "digitCount": 1,
+        "maximumHyphens": 1,
+        "maximumLength": 19,
+        "maximumLetterLength": 18,
+        "maximumPhraseFields": 3,
+        "maximumPunctuationLength": 15,
+        "minimumLength": 1,
+        "nonASCIICount": 1118,
+        "nonLetterCount": 52,
+        "punctuationCount": 15,
+        "spaceCount": 36,
+        "uniqueCount": 5665,
+        "uppercaseCount": 1
+      },
+      "wordsSHA256": "dd71b9f65f0ffb65207a2f2d5d7b8acabce3f89912c6ca435a556978a3c09987"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceMapCount": 558234,
+  "technicalObservation": "2d",
+  "unitExamples": [
+    "m²",
+    "m³"
+  ],
+  "wordfreq": {
+    "member": "wordfreq/data/large_pt.msgpack.gz",
+    "memberSHA256": "7d764586bca6262f554d5fa77ad8e6841ef42534776e70558065140853660ce2",
+    "version": "3.1.1",
+    "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+  }
+}

@@ -2,6 +2,9 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-PORTUGUESE-SCALES-49 | Portuguese 五档字面词形、标点、多词和单位 | 只用单个隔离实例逐档练习 não／coração、连字符／撇号／句点、多词与长字段；5k 输入 2d，大档输入 m²／m³，超百词并重复和打开旧记录。 | 真实字段输入和旧捕获数据保持；标点／多连字符覆盖差距明确，不把自写单位当字典词。 | 待验收（见 PORTUGUESE_SCALES_CORPUS_CONTRACT.md；语言质量、实体键盘／IME 和完整性能开放） |
+| LANG-PORTUGUESE-LAZY-49 | 新练习资格、自定义例外及历史隔离 | 同一实例比较 1k／3k 与 5k／大档 lazy，建立支持与不支持的多语组合，再使用自定义 não 并重复旧捕获提示。 | 仅支持的候选去重音；全部不支持时新练习关闭 lazy；custom 例外保留，历史请求与捕获提示不回算。 | 待验收（固定源码／自动化不代替实体交互） |
+| LANG-PORTUGUESE-LICENSE-49 | Portuguese 本地许可与三种来源类型 | 同一实例打开 About 和 Português 规模词库许可，核对字典页／观察 token／自写 SI 单位的区分和源页／贡献者历史模板。 | 完整署名和来源映射随包，不把观察数据称为字典认证；不复制参考词值及损坏控制字符。 | 待验收（实体 sheet、VoiceOver、人工来源审校开放） |
 | LANG-POLISH-SCALES-48 | Polish 六档重音、句点缩写、专名和长字段 | 单个隔离实例逐档练习 się／człowiek／świat；2k 输入 np.／m.in.／itd.，2k／200k 练习 Polska／Łódź 及最长专名；切换 Lazy Latin／No Space／Backwards，超百词并重复，打开旧记录。 | 真实缩写句点保留；ASCII 大写规则与 Unicode 单独大写分别验证；旧提示／事件／成绩保持。 | 待验收（自动化与来源证据见 POLISH_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、语言质量及完整性能开放） |
 | LANG-POLISH-LICENSE-48 | Polish 本地完整许可及逐词来源 | 同一个隔离实例打开 About、Polski 规模词库许可，核对原始 pl 版快照、字面大小写／缩写和源页／贡献者历史模板，关闭返回练习。 | 完整署名与映射随包，不把 English 版网页提取日期或小写频率当作新造专名的依据；截断署名不能靠重算清单掩盖。 | 待验收（实体 sheet、VoiceOver 和人工来源审校开放） |
 | LANG-ROMANIAN-SCALES-47 | Romanian 七档字面词汇、连字符、重音及旧历史 | 单个隔离实例逐档练习 și／țară／cuvânt、末尾及多个连字符和实际长词；切换 Lazy Latin／No Space／Backwards，完成超百词并重复，打开旧结果。 | 规则与捕获旧数据保持，模板／错误标签不进入词库；明确记录 200k 长度和标点覆盖差异。 | 待验收（证据与缺口见 ROMANIAN_SCALES_CORPUS_CONTRACT.md；实体键盘／IME、语言质量及全量性能开放） |

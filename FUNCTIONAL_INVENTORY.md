@@ -2,6 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-PORTUGUESE-SCALES-49 | Portuguese 五档独立字面语料及新练习 lazy 资格 | 固定独立 Portuguese Wiktionary／Kaikki、wordfreq，两个声明的单位练习；参考仅聚合和行为 | 移除五档合成器，保留历史，补齐 fresh／多语逐词资格保护；PORTUGUESE_SCALES_CORPUS_CONTRACT.md | 部分完成：来源重建、十项准备合同／篡改反例、46 项定向、五档隐藏宿主、1,076 项扩大／146 项源码证据及 Debug 包检查通过；大档标点／多连字符、语言质量／分布、实体输入及完整性能仍开放。 |
 | LANG-POLISH-SCALES-48 | Polish 六档实际词形、句点缩写及专名长度 | 固定独立 Polish Wiktionary／Kaikki 与 wordfreq，参考仅聚合和行为 | 移除六档合成器，保留字面缩写／大小写和独立专名长度边界、旧历史及来源许可；POLISH_SCALES_CORPUS_CONTRACT.md | 部分完成：九项准备合同、15 项最终定向、六档隐藏宿主、1,039 项扩大／145 项源码证据、来源复现／篡改反例及 Debug 包检查通过；语言质量、分布、实体输入和完整性能开放。 |
 | LANG-ROMANIAN-SCALES-47 | Romanian 七档的字面词形和真实连字符练习 | 固定独立 English Wiktionary／Kaikki Romanian 与 wordfreq，参考仅聚合和行为 | 移除七档合成器，严格过滤模板及错误标签，保留旧数据／输入规则、许可及来源页；ROMANIAN_SCALES_CORPUS_CONTRACT.md | 部分完成：13 项定向、七档隐藏宿主、1,026 项扩大／145 项源码证据、固定源复现、篡改反例及 Debug 包检查通过。200k 最长 47 与原版 50、多连字符／标点覆盖及语言质量／分布仍有明确缺口。 |
 | LANG-SPANISH-LARGE-46 | Spanish 650k 独立字面词形与特殊标点练习 | 固定双版 Wiktionary／Kaikki 与 wordfreq，只取西语；参考仅聚合及行为 | 移除合成器，646,566 个字面形式和 13 个明确编辑练习；小档／旧历史保持，许可及逐词映射；SPANISH_LARGE_CORPUS_CONTRACT.md | 部分完成：31 项定向、隐藏实际宿主、1,016 项扩大／145 项源码证据、固定源重建、署名篡改反例及 Debug 包检查通过；语言质量／分布、实体输入与完整性能仍开放。 |

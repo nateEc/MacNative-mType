@@ -15471,13 +15471,13 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testPortugueseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testPortugueseScaleChoicesPreserveIndependentIDsAndOwnedCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int, Bool, String)] = [
-      ("portuguese1k", 1_000, 1, 16, 0, 3, 0, 0, 180, true, "pt-BR"),
-      ("portuguese3k", 3_043, 1, 17, 0, 16, 0, 0, 927, true, "pt-PT"),
-      ("portuguese5k", 5_665, 1, 19, 1, 15, 36, 1, 1_724, false, "pt"),
-      ("portuguese320k", 318_601, 2, 38, 0, 50_480, 119, 2, 116_192, false, "pt"),
-      ("portuguese550k", 558_207, 2, 38, 0, 50_480, 119, 2, 177_953, false, "pt"),
+      ("portuguese1k", 1_000, 1, 16, 0, 3, 0, 0, 175, true, "pt-BR"),
+      ("portuguese3k", 3_043, 1, 17, 0, 16, 0, 0, 600, true, "pt-PT"),
+      ("portuguese5k", 5_665, 1, 19, 1, 15, 36, 1, 1_118, false, "pt"),
+      ("portuguese320k", 318_601, 2, 41, 0, 4_175, 119, 2, 83_209, false, "pt"),
+      ("portuguese550k", 558_207, 2, 41, 0, 4_175, 119, 2, 135_462, false, "pt"),
     ]
 
     for (rawValue, count, minimum, maximum, uppercase, punctuation, spaces, digits, nonASCII, supportsLazyInput, locale) in cases {
@@ -15499,7 +15499,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuation)
       XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaces)
       XCTAssertEqual(words.filter { $0.contains(where: \.isNumber) }.count, digits)
-      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, punctuation + spaces + digits + (count > 300_000 ? 1 : 0))
+      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, punctuation + spaces + digits)
       XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCII)
 
       let configuration = TestConfiguration.words(25, language: language)

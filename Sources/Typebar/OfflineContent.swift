@@ -6417,7 +6417,7 @@ struct GeneratedCandidateContinuation {
         word = word.lowercased()
       }
       if configuration.modifiers.contains(.lazyLatin) {
-        word = polyglotCandidates?.lazyWord(word)
+        word = polyglotCandidates?.lazyWord(word, allowUnsupported: configuration.mode == .custom)
           ?? TypingTextNormalizer.lazyLatin(word, language: configuration.language)
       }
       word = baseLanguage.presentationText(word)
@@ -6506,7 +6506,7 @@ struct GeneratedCandidateContinuation {
       let first = String(candidate.unicodeScalars.prefix { $0 != " " })
       let value = firstDraw ? first.lowercased() : first
       return configuration.modifiers.contains(.lazyLatin)
-        ? (polyglotCandidates?.lazyWord(value)
+        ? (polyglotCandidates?.lazyWord(value, allowUnsupported: configuration.mode == .custom)
           ?? TypingTextNormalizer.lazyLatin(value, language: configuration.language)) : value
     }
     var comparison = candidateComparison(word, firstDraw: true)

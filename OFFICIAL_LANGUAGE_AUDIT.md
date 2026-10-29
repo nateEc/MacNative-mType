@@ -1,5 +1,7 @@
 # 官方语言覆盖审计
 
+最新增量 `LANG-PORTUGUESE-SCALES-49`：Portuguese 五档已移除合成器，同范围当前余 94 个直接合成入口、声明数量之和 655,304。独立字典／观察 token／两个自写单位练习分开标注；大档标点与多连字符仍有明确差距，基本池 24／重音池 67 项仍少于参考 201／1,999 项。新练习 lazy 资格缺陷按固定生成源码修复，保留自定义例外和历史捕获；最终验证与边界见 PORTUGUESE_SCALES_CORPUS_CONTRACT.md。下一段的 99 项是此前 Polish 阶段状态。
+
 当前内容缺口复核：历史只读审计识别 118 个 ScaleLexicon 生产占位入口；English 450k、German 三档、French 600k、Spanish 650k、Romanian 七档及 Polish 六档已先后移除对应合成器，同范围仍余 99 个直接合成入口。Polish 的整体／专名长度与缩写字符合同已分别审计，词汇／难度／分布仍未等价，见 POLISH_SCALES_CORPUS_CONTRACT.md；基本 Polish 24 项与参考 183 项的差距也保留。Romanian 的 200k 最长 47／原版 50 和多连字符／标点覆盖差异仍开放；去占位不能说成无功能损失。详见 [当前内容基线](LANGUAGE_CONTENT_BASELINE_20261029.md)。Spanish 大档含 646,566 个独立字面词形和 13 个明确标注的书写／排版练习改编。该范围不是全量审校，完整 goal 继续保持未完成。下方各阶段的“仍是合成池”描述是历史状态。
 
 ## Italian 60k／280k 后续实际语料（2026-10-29）

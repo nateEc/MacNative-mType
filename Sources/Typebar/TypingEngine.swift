@@ -15230,76 +15230,20 @@ enum StarterLexicon {
     "montanha", "semente", "ritmo", "janela", "margem", "memória", "lápis", "atenção",
   ]
 
-  private static let portugueseScaleRoots = [
-    "mar", "luz", "ponte", "vento", "campo", "nuvem", "trilha", "porto",
-  ]
-
-  private static func portugueseScaleLexicon(
-    marker: String, count: Int, minimumToken: String, maximumLength: Int,
-    uppercaseCount: Int, punctuationCount: Int, spaceCount: Int,
-    digitCount: Int, symbolCount: Int, nonASCIICount: Int
-  ) -> IndexedLexicon {
-    let structuralCount = punctuationCount + spaceCount + digitCount + symbolCount
-    precondition(
-      count > max(max(uppercaseCount + 2, structuralCount + 2), nonASCIICount + 1))
-    return IndexedLexicon(count: count) { index in
-      var entry = marker + portugueseScaleRoots[index % portugueseScaleRoots.count]
-        + alphabeticIndex(index)
-      if index == 0 {
-        entry = minimumToken
-      } else if index == 1 {
-        entry = String(repeating: marker.last!, count: maximumLength)
-      } else {
-        if index < uppercaseCount + 2 {
-          entry = entry.prefix(1).uppercased() + entry.dropFirst()
-        }
-        if index < nonASCIICount + 1 {
-          entry += "ã"
-        }
-      }
-
-      if index >= count - punctuationCount {
-        entry += "-"
-      } else if index >= count - punctuationCount - spaceCount {
-        entry += " a"
-      } else if index >= count - punctuationCount - spaceCount - digitCount {
-        entry += "7"
-      } else if index >= count - structuralCount {
-        entry += "$"
-      }
-      return entry
-    }
-  }
-
   static var portuguese1kLexicon: IndexedLexicon {
-    portugueseScaleLexicon(
-      marker: "qpt", count: 1_000, minimumToken: "ǭ", maximumLength: 16,
-      uppercaseCount: 0, punctuationCount: 3, spaceCount: 0,
-      digitCount: 0, symbolCount: 0, nonASCIICount: 180)
+    IndexedLexicon(count: 1_000) { PortugueseCorpus.words1k[$0] }
   }
   static var portuguese3kLexicon: IndexedLexicon {
-    portugueseScaleLexicon(
-      marker: "wpt", count: 3_043, minimumToken: "ǭ", maximumLength: 17,
-      uppercaseCount: 0, punctuationCount: 16, spaceCount: 0,
-      digitCount: 0, symbolCount: 0, nonASCIICount: 927)
+    IndexedLexicon(count: 3_043) { PortugueseCorpus.words3k[$0] }
   }
   static var portuguese5kLexicon: IndexedLexicon {
-    portugueseScaleLexicon(
-      marker: "xpt", count: 5_665, minimumToken: "ǭ", maximumLength: 19,
-      uppercaseCount: 1, punctuationCount: 15, spaceCount: 36,
-      digitCount: 1, symbolCount: 0, nonASCIICount: 1_724)
+    IndexedLexicon(count: 5_665) { PortugueseCorpus.words5k[$0] }
   }
   static var portuguese320kLexicon: IndexedLexicon {
-    portugueseScaleLexicon(
-      marker: "zpt", count: 318_601, minimumToken: "ǭǭ", maximumLength: 38,
-      uppercaseCount: 0, punctuationCount: 50_480, spaceCount: 119,
-      digitCount: 2, symbolCount: 1, nonASCIICount: 116_192)
+    IndexedLexicon(count: 318_601) { PortugueseCorpus.words320k[$0] }
   }
   static var portuguese550kLexicon: IndexedLexicon {
-    portugueseScaleLexicon(
-      marker: "vpt", count: 558_207, minimumToken: "ǭǭ", maximumLength: 38,
-      uppercaseCount: 0, punctuationCount: 50_480, spaceCount: 119,
-      digitCount: 2, symbolCount: 1, nonASCIICount: 177_953)
+    IndexedLexicon(count: 558_207) { PortugueseCorpus.words550k[$0] }
   }
 
   static var portuguese1kWords: [String] { portuguese1kLexicon.materialized() }

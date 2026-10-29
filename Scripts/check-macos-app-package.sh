@@ -111,6 +111,12 @@ cmp "$project_root/Resources/PolishCorpusNotices.txt" \
 cmp "$project_root/Resources/PolishCorpusSources.txt" \
   "$app_path/Contents/Resources/PolishCorpusSources.txt" \
   || fail "Polish source mapping missing or modified"
+cmp "$project_root/Resources/PortugueseCorpusNotices.txt" \
+  "$app_path/Contents/Resources/PortugueseCorpusNotices.txt" \
+  || fail "Portuguese corpus attribution missing or modified"
+cmp "$project_root/Resources/PortugueseCorpusSources.txt" \
+  "$app_path/Contents/Resources/PortugueseCorpusSources.txt" \
+  || fail "Portuguese evidence mapping missing or modified"
 if [[ -n "$reference_root" ]]; then
   zsh "$project_root/Scripts/check-originality-boundaries.sh" \
     --reference "$reference_root" \

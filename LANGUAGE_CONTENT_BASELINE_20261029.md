@@ -14,7 +14,9 @@
 
 随后 `LANG-ROMANIAN-SCALES-47` 将 Romanian 七个规模档的 391,000 个候选位置迁至独立字面词形，移除 `romanianScaleLexicon`，严格过滤提取模板及错误标签。同范围余 105 个直接合成入口，声明数量之和 1,819,137；复核 `/tmp/typebar-romanian-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `04f785a056480c738095941fcbc0851bbee73a8b2c2b3f664b7519327ac1b161`。200k 最长 47／原版 50 和多连字符／标点覆盖差异仍开放，见 ROMANIAN_SCALES_CORPUS_CONTRACT.md；移除占位不等于达到无功能损失。
 
-随后 `LANG-POLISH-SCALES-48` 将 Polish 六档的 277,317 个候选位置迁至独立字面词形，移除 `polishScaleLexicon`。2k 的真实句点缩写和 2k／200k 单独的专名长度边界均保留，不能只看整体长度绿灯。同范围余 99 个直接合成入口，声明数量之和 1,541,820；复核 `/tmp/typebar-polish-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `0403e5d776d3fca32521da707191d4a13fe0d63b612b00d410e7987e62d0b481`。来源、先行红例和分布差异见 POLISH_SCALES_CORPUS_CONTRACT.md。
+随后 `LANG-POLISH-SCALES-48` 将 Polish 六档的 277,317 个候选位置迁至独立字面词形，移除 `polishScaleLexicon`。2k 的真实句点缩写和 2k／200k 单独的专名长度边界均保留，不能只看整体长度绿灯。该阶段同范围余 99 个直接合成入口，声明数量之和 1,541,820；复核 `/tmp/typebar-polish-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `0403e5d776d3fca32521da707191d4a13fe0d63b612b00d410e7987e62d0b481`。来源、先行红例和分布差异见 POLISH_SCALES_CORPUS_CONTRACT.md。
+
+`LANG-PORTUGUESE-SCALES-49` 移除五档 Portuguese 合成器，共 886,516 个候选位置，改用独立字典、观察 token 和两个明确自写单位练习。当前同范围余 94 个直接合成入口，声明数量之和 655,304；复核 `/tmp/typebar-portuguese-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `258cfef2746e395ed42e38ac6f0269c6f2271818aae2f2a27ce051caa5211bd1`。大档标点／多连字符仍有差距，基本 24／重音 67 项仍少于参考 201／1,999 项。来源、独立输入资格红例与验证边界见 PORTUGUESE_SCALES_CORPUS_CONTRACT.md；下表保留原始 118 项历史范围。
 
 以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English、German、French、Spanish 大档、Romanian 七档及 Polish 六档已移除对应合成器，但语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
 
@@ -167,11 +169,11 @@ Italian 四档已经改用独立实际观察语料，相关数据、编辑、复
 | shona1k | 816 | europeanScaleLexicon | q |
 | englishFiveLetter1k | 1000 | europeanScaleLexicon | q |
 | xhosa3k | 2935 | europeanScaleLexicon | q |
-| portuguese1k | 1000 | portugueseScaleLexicon | qpt |
-| portuguese3k | 3043 | portugueseScaleLexicon | wpt |
-| portuguese5k | 5665 | portugueseScaleLexicon | xpt |
-| portuguese320k | 318601 | portugueseScaleLexicon | zpt |
-| portuguese550k | 558207 | portugueseScaleLexicon | vpt |
+| portuguese1k（已移除占位，见 LANG-PORTUGUESE-SCALES-49） | 1000 | 历史 portugueseScaleLexicon | qpt |
+| portuguese3k（已移除占位，见 LANG-PORTUGUESE-SCALES-49） | 3043 | 历史 portugueseScaleLexicon | wpt |
+| portuguese5k（已移除占位，见 LANG-PORTUGUESE-SCALES-49） | 5665 | 历史 portugueseScaleLexicon | xpt |
+| portuguese320k（已移除占位，见 LANG-PORTUGUESE-SCALES-49） | 318601 | 历史 portugueseScaleLexicon | zpt |
+| portuguese550k（已移除占位，见 LANG-PORTUGUESE-SCALES-49） | 558207 | 历史 portugueseScaleLexicon | vpt |
 
 ## English 450k 的来源可用性准备
 
