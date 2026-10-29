@@ -11518,58 +11518,23 @@ enum StarterLexicon {
     "город", "дождь", "спокойно", "направление", "звезда", "записка", "сад", "дыхание",
   ]
 
-  private static func russianScaleLexicon(
-    marker: String, count: Int, maximumLength: Int,
-    uppercaseCount: Int, punctuationCount: Int, spaceCount: Int
-  ) -> IndexedLexicon {
-    precondition(count > max(uppercaseCount + 2, punctuationCount + spaceCount + 2))
-    return IndexedLexicon(count: count) { index in
-      var entry = marker + cyrillicIndex(index)
-      if index == 0 {
-        entry = "ѿ"
-      } else if index == 1 {
-        entry = String(repeating: marker.first!, count: maximumLength)
-      } else if index < uppercaseCount + 2 {
-        entry = entry.prefix(1).uppercased() + entry.dropFirst()
-      }
-      if index >= count - punctuationCount {
-        entry += "-"
-      } else if index >= count - punctuationCount - spaceCount {
-        entry += " а"
-      }
-      return entry
-    }
-  }
-
   static var russian1kLexicon: IndexedLexicon {
-    russianScaleLexicon(
-      marker: "ѹ", count: 996, maximumLength: 15,
-      uppercaseCount: 2, punctuationCount: 1, spaceCount: 0)
+    IndexedLexicon(count: 996) { RussianCorpus.words1k[$0] }
   }
   static var russian5kLexicon: IndexedLexicon {
-    russianScaleLexicon(
-      marker: "ѽ", count: 4_971, maximumLength: 20,
-      uppercaseCount: 42, punctuationCount: 2, spaceCount: 2)
+    IndexedLexicon(count: 4_971) { RussianCorpus.words5k[$0] }
   }
   static var russian10kLexicon: IndexedLexicon {
-    russianScaleLexicon(
-      marker: "ꙁ", count: 9_996, maximumLength: 24,
-      uppercaseCount: 0, punctuationCount: 62, spaceCount: 0)
+    IndexedLexicon(count: 9_996) { RussianCorpus.words10k[$0] }
   }
   static var russian25kLexicon: IndexedLexicon {
-    russianScaleLexicon(
-      marker: "ꙃ", count: 26_037, maximumLength: 34,
-      uppercaseCount: 1_218, punctuationCount: 522, spaceCount: 0)
+    IndexedLexicon(count: 26_037) { RussianCorpus.words25k[$0] }
   }
   static var russian50kLexicon: IndexedLexicon {
-    russianScaleLexicon(
-      marker: "ꙅ", count: 51_682, maximumLength: 34,
-      uppercaseCount: 2_396, punctuationCount: 1_052, spaceCount: 0)
+    IndexedLexicon(count: 51_682) { RussianCorpus.words50k[$0] }
   }
   static var russian375kLexicon: IndexedLexicon {
-    russianScaleLexicon(
-      marker: "ꙉ", count: 376_092, maximumLength: 49,
-      uppercaseCount: 0, punctuationCount: 34, spaceCount: 0)
+    IndexedLexicon(count: 376_092) { RussianCorpus.words375k[$0] }
   }
 
   static var russian1kWords: [String] { russian1kLexicon.materialized() }

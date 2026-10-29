@@ -2,6 +2,8 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-RUSSIAN-SCALES-52 | Russian 六档词形、字段和输入 | 单个隔离实例逐档练习 ё／е 和专名大小写；5k 输入句点缩写、连字符及两个多词；切换 No Space／Backwards，超百词续批、重复及旧记录。 | 实词与字段正确，别名输入和历史保持；不把 375k 长词及撇号／prime 缺口称为完成。 | 待验收（见 RUSSIAN_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、全部组合及语言质量开放） |
+| LANG-RUSSIAN-LICENSE-52 | Russian 来源署名与频率依据 | 同一实例打开 About 和 Русский 许可，核对俄语版字典、wordfreq 来源、贡献者 URL 模板和逐词整词／分段 band。 | CC BY-SA 来源及改编明确，band 不冒充计数、词典形式不冒充实际使用；许可及映射完整随包。 | 待验收（实体 sheet、VoiceOver、人工来源与语言审校开放） |
 | LANG-NORWEGIAN-SCALES-51 | Norwegian 十档真实词形、大小写和复杂字段 | 单个隔离实例逐档练习 æ／ø／å 和 ikke／ikkje，输入真实多连字符、撇号、数字词和 Nynorsk 多词；切换 Lazy Latin／No Space／Backwards，超百词并重复、打开旧记录。 | 原词与字母规则正确，数字／标点交集和多字段不被拆丢；旧提示／指标不回算，不把分布差异冒充完整对齐。 | 待验收（证据见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、语言审校及完整性能开放） |
 | LANG-NORWEGIAN-LICENSE-51 | Norwegian 官方来源与测量／估计区分 | 同一实例打开 About 和 Norsk 许可，核对两套字典／频率的独立归属、快照年代、完整许可及字典行 ID／整词次数／分段估计映射。 | CC BY 字典和 CC0 unigram 来源明确；未知计数不冒充实测零，语法可能词形不冒充有实际用例，原始数据包不随包发布。 | 待验收（实体 sheet／VoiceOver、人工来源和语言质量审校开放） |
 | LANG-ESPERANTO-SCALES-50 | Esperanto 十二档实际词形与六个字母 | 单个隔离实例逐档练习 ĉielo／ĝardeno／ĥoro／ĵurnalo／ŝipo／aŭtuno，切换 X／H、Lazy Latin／No Space／Backwards，超过百词并重复和打开旧记录。 | 原字母与 X／H 实际拼写正确；H 的 ŭ → u；简化输入资格和捕获旧数据保持，大档长度及额外字母缺口明确。 | 待验收（见 ESPERANTO_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、语言质量及完整性能开放） |

@@ -4,7 +4,9 @@
 
 ## 后续迁移状态
 
-最新 `LANG-NORWEGIAN-SCALES-51` 移除两种 Norwegian 各五档、共 1,305,311 个词根编号占位位置。独立官方字典及各自 unigram 选集保留真实字面大小写、数字／标点／多词交集和最长字段；基本池与历史保持，分布／语言质量仍开放。当前扩大具名路由范围余 129 项、声明数量之和 1,560,763；旧历史范围仍为 82 项／438,685，因为本轮十项来自之前扩展发现的额外路由。复核 `/tmp/typebar-norwegian-all-scale-helper-audit-20261029.json`，TypingEngine SHA-256 `eec384229642daca1185d31e9c6bac08360f5211bff39fd481bc0ea03a7dcbad`。详情见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md；以下保留各自阶段数字。
+最新 `LANG-RUSSIAN-SCALES-52` 移除 Russian 六档 469,774 个编号／重复字符占位位置，改用独立字典词形和 wordfreq，专名、多词、5k 句点及各类字段有实际候选。375k 长词 46／参考 49、撇号／prime、分布／语言质量和基本池仍开放。扩大具名范围余 123 项／1,090,989，旧历史范围 82 项／438,685 不变；复核 `/tmp/typebar-russian-all-scale-helper-audit-20261029.json`，TypingEngine SHA-256 `97b14206b658597f5ac75d86dc95012220a9fac22cbc14ec1fec8aa39fb2dd92`。详情见 RUSSIAN_SCALES_CORPUS_CONTRACT.md；下文为各阶段历史数字。
+
+此前 `LANG-NORWEGIAN-SCALES-51` 移除两种 Norwegian 各五档、共 1,305,311 个词根编号占位位置。独立官方字典及各自 unigram 选集保留真实字面大小写、数字／标点／多词交集和最长字段；基本池与历史保持，分布／语言质量仍开放。该阶段扩大具名路由范围余 129 项、声明数量之和 1,560,763；旧历史范围仍为 82 项／438,685，因为本轮十项来自之前扩展发现的额外路由。复核 `/tmp/typebar-norwegian-all-scale-helper-audit-20261029.json`，TypingEngine SHA-256 `eec384229642daca1185d31e9c6bac08360f5211bff39fd481bc0ea03a7dcbad`。详情见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md；以下保留各自阶段数字。
 
 此前 `LANG-ESPERANTO-SCALES-50` 已移除 Esperanto 十二档的 216,619 个占位位置，使用同时有独立字典和 Tatoeba 观察的实际词形，包含 X／H 拼写。原历史范围当前余 82 个直接合成入口，声明数量之和 438,685；复核 `/tmp/typebar-esperanto-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `3aef72f8d8fb7137a5f9c6f730e0849bc62d55402d25601487907af3777544a8`。大档长字段、X／H 额外字母及词频／难度／质量差距仍开放，见 ESPERANTO_SCALES_CORPUS_CONTRACT.md。以下数字按各迁移阶段保留，不能混用为当前总数。
 

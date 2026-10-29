@@ -60,6 +60,8 @@ cp "$project_root/Resources/EsperantoCorpusNotices.txt" "$app_path/Contents/Reso
 cp "$project_root/Resources/EsperantoCorpusSources.txt" "$app_path/Contents/Resources/EsperantoCorpusSources.txt"
 cp "$project_root/Resources/NorwegianCorpusNotices.txt" "$app_path/Contents/Resources/NorwegianCorpusNotices.txt"
 cp "$project_root/Resources/NorwegianCorpusSources.txt" "$app_path/Contents/Resources/NorwegianCorpusSources.txt"
+cp "$project_root/Resources/RussianCorpusNotices.txt" "$app_path/Contents/Resources/RussianCorpusNotices.txt"
+cp "$project_root/Resources/RussianCorpusSources.txt" "$app_path/Contents/Resources/RussianCorpusSources.txt"
 if [[ -n "$bundle_identifier" ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $bundle_identifier" "$app_path/Contents/Info.plist"
 fi

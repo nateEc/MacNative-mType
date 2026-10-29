@@ -15425,14 +15425,14 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testRussianScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testRussianScaleChoicesPreserveIndependentIDsAndOwnedCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Bool, ZipfFrequencySupport)] = [
       ("russian1k", 996, 1, 15, 2, 1, 0, true, .supported),
       ("russian5k", 4_971, 1, 20, 42, 2, 2, false, .supported),
       ("russian10k", 9_996, 1, 24, 0, 62, 0, true, .unknown),
       ("russian25k", 26_037, 1, 34, 1_218, 522, 0, true, .unknown),
       ("russian50k", 51_682, 1, 34, 2_396, 1_052, 0, true, .unknown),
-      ("russian375k", 376_092, 1, 49, 0, 34, 0, true, .unknown),
+      ("russian375k", 376_092, 1, 46, 0, 34, 0, true, .unknown),
     ]
 
     for (rawValue, count, minimum, maximum, uppercase, punctuation, spaces, supportsLazyInput, zipf) in cases {

@@ -1,6 +1,8 @@
 # 官方语言覆盖审计
 
-最新 `LANG-NORWEGIAN-SCALES-51` 将两种 Norwegian 各五档的根词编号占位迁至独立官方 Norsk ordbank／unigram 选集，合计 1,305,311 个候选位置；大小写／标点／数字／多词交集、各类最长字段有实际字面候选，基础短词池和历史保持。当前扩大具名路由范围余 129 项／1,560,763，旧历史范围的 82 项／438,685 不变。词频／语言质量／分布、基本池 28／32 对参考 200／250 项及实体验收仍开放，见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md。
+最新 `LANG-RUSSIAN-SCALES-52` 将 Russian 六档 469,774 个占位位置迁至独立 Russian Wiktionary／wordfreq，实际专名、多词、句点缩写及各类字段有独立来源。375k 最长 46／参考 49、撇号／prime、分布和基本池 24／参考 200 仍开放，见 RUSSIAN_SCALES_CORPUS_CONTRACT.md。当前扩大具名范围余 123 项／1,090,989，不能据此声称全部语言完成。
+
+此前 `LANG-NORWEGIAN-SCALES-51` 将两种 Norwegian 各五档的根词编号占位迁至独立官方 Norsk ordbank／unigram 选集，合计 1,305,311 个候选位置；大小写／标点／数字／多词交集、各类最长字段有实际字面候选，基础短词池和历史保持。该阶段扩大具名路由范围余 129 项／1,560,763，旧历史范围的 82 项／438,685 不变。词频／语言质量／分布、基本池 28／32 对参考 200／250 项及实体验收仍开放，见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md。
 
 此前 Norwegian 迁移前的扩大结构复核确认：当时共有 139 个直接具名 `*ScaleLexicon` 生产路由，声明数量之和 2,866,074；旧历史清单之外另有 57 个路由，包括仍拼接编号的两组 Norwegian。它不是词汇认证或全部问题总账，但证明不能把下方 82 项旧范围剩余量称为全部缺口。方法、逐 helper 数量及限制见 LANGUAGE_CONTENT_BASELINE_20261029.md。
 

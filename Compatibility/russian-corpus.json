@@ -1,0 +1,495 @@
+{
+  "available": {
+    "10k": {
+      "L": 503568,
+      "P": 11683
+    },
+    "1k": {
+      "C": 13726,
+      "L": 468494,
+      "P": 52
+    },
+    "25k": {
+      "C": 79096,
+      "CP": 1796,
+      "L": 504456,
+      "P": 12452
+    },
+    "375k": {
+      "L": 504569,
+      "P": 8216
+    },
+    "50k": {
+      "C": 79096,
+      "CP": 1919,
+      "L": 504456,
+      "P": 12452
+    },
+    "5k": {
+      "C": 74080,
+      "CS": 634,
+      "L": 492206,
+      "P": 1255
+    }
+  },
+  "dictionary": {
+    "edition": "ru",
+    "eligibleForms": 614218,
+    "languageCode": "ru",
+    "postprocessed": false,
+    "retrievedDate": "2026-10-29",
+    "rows": 2729136,
+    "sha256": "7e30fc4e4b21ff16cde09a501494f25287ae66f9a0f94e770ae826e5003c7698",
+    "url": "https://kaikki.org/dictionary/downloads/ru/ru-extract.jsonl.gz"
+  },
+  "filesSHA256": {
+    "Resources/RussianCorpusNotices.txt": "c37063392a3eed9ad77d8ba25d3c1f727a413c05dd420341bf1c6ff83d5cc4f7",
+    "Resources/RussianCorpusSources.txt": "e39ccaf5e7e7d31989b91265b721e9d131b93ed07787cd8ccbd778b68c8204ab",
+    "Sources/Typebar/RussianCorpus.generated.swift": "b8d9d14b0d087522bb5a5ca8f75937e469a0922bd985566dfa0296142f3a048a"
+  },
+  "frequency": {
+    "format": "cB v1",
+    "member": "wordfreq/data/large_ru.msgpack.gz",
+    "memberSHA256": "0440613cc765c14a20fb9483225f2fec4d85e66672809076bcec9b29119f9b43",
+    "tokens": 713447,
+    "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+  },
+  "preparation": {
+    "msgpackVersion": "1.1.2",
+    "runtimeDependencies": [],
+    "unicodeVersion": "15.0.0"
+  },
+  "punctuationScalarDifferences": {
+    "10k": {},
+    "1k": {},
+    "25k": {
+      "'": [
+        0,
+        1
+      ],
+      "-": [
+        544,
+        543
+      ]
+    },
+    "375k": {
+      "-": [
+        39,
+        33
+      ],
+      "′": [
+        0,
+        2
+      ]
+    },
+    "50k": {
+      "'": [
+        0,
+        2
+      ],
+      "-": [
+        1089,
+        1086
+      ]
+    },
+    "5k": {}
+  },
+  "referenceGroups": {
+    "10k": {
+      "L": [
+        9934,
+        1,
+        21,
+        1,
+        21
+      ],
+      "P": [
+        62,
+        5,
+        24,
+        1,
+        24
+      ]
+    },
+    "1k": {
+      "C": [
+        2,
+        6,
+        6,
+        1,
+        6
+      ],
+      "L": [
+        993,
+        1,
+        15,
+        1,
+        15
+      ],
+      "P": [
+        1,
+        6,
+        6,
+        1,
+        6
+      ]
+    },
+    "25k": {
+      "C": [
+        1209,
+        2,
+        17,
+        1,
+        17
+      ],
+      "CP": [
+        9,
+        8,
+        16,
+        1,
+        16
+      ],
+      "L": [
+        24306,
+        1,
+        24,
+        1,
+        24
+      ],
+      "P": [
+        513,
+        3,
+        34,
+        1,
+        34
+      ]
+    },
+    "375k": {
+      "L": [
+        376058,
+        1,
+        49,
+        1,
+        49
+      ],
+      "P": [
+        34,
+        5,
+        16,
+        1,
+        16
+      ]
+    },
+    "50k": {
+      "C": [
+        2377,
+        2,
+        17,
+        1,
+        17
+      ],
+      "CP": [
+        19,
+        8,
+        18,
+        1,
+        18
+      ],
+      "L": [
+        48253,
+        1,
+        24,
+        1,
+        24
+      ],
+      "P": [
+        1033,
+        3,
+        34,
+        1,
+        34
+      ]
+    },
+    "5k": {
+      "C": [
+        40,
+        2,
+        10,
+        1,
+        10
+      ],
+      "CS": [
+        2,
+        14,
+        20,
+        2,
+        10
+      ],
+      "L": [
+        4927,
+        1,
+        17,
+        1,
+        17
+      ],
+      "P": [
+        2,
+        3,
+        9,
+        1,
+        9
+      ]
+    }
+  },
+  "referencePunctuationScalars": {
+    "10k": {
+      "-": 62
+    },
+    "1k": {
+      "-": 1
+    },
+    "25k": {
+      "'": 1,
+      "-": 543
+    },
+    "375k": {
+      "-": 33,
+      "′": 2
+    },
+    "50k": {
+      "'": 2,
+      "-": 1086
+    },
+    "5k": {
+      "-": 1,
+      ".": 1
+    }
+  },
+  "remainingBoundaryGaps": {
+    "375k.L.maximumFieldLength": [
+      46,
+      49
+    ],
+    "375k.L.maximumLength": [
+      46,
+      49
+    ]
+  },
+  "revision": "kaikki-ru-20261029-wordfreq-3.1.1-v1",
+  "scales": {
+    "10k": {
+      "shape": {
+        "count": 9996,
+        "groups": {
+          "L": [
+            9934,
+            1,
+            21,
+            1,
+            21
+          ],
+          "P": [
+            62,
+            5,
+            24,
+            1,
+            24
+          ]
+        },
+        "maximumHyphens": 1,
+        "punctuationScalars": {
+          "-": 62
+        },
+        "uniqueCount": 9996
+      },
+      "wordsSHA256": "48e6b00aaf45e31d8f3766f7040b2b3df4a294349987cf633a0628debf766027"
+    },
+    "1k": {
+      "shape": {
+        "count": 996,
+        "groups": {
+          "C": [
+            2,
+            6,
+            6,
+            1,
+            6
+          ],
+          "L": [
+            993,
+            1,
+            15,
+            1,
+            15
+          ],
+          "P": [
+            1,
+            6,
+            6,
+            1,
+            6
+          ]
+        },
+        "maximumHyphens": 1,
+        "punctuationScalars": {
+          "-": 1
+        },
+        "uniqueCount": 996
+      },
+      "wordsSHA256": "6cb468c0bbbec1e5403e6ea2011a735bf2bbdf9261945e441453494783e9b06e"
+    },
+    "25k": {
+      "shape": {
+        "count": 26037,
+        "groups": {
+          "C": [
+            1209,
+            2,
+            17,
+            1,
+            17
+          ],
+          "CP": [
+            9,
+            8,
+            16,
+            1,
+            16
+          ],
+          "L": [
+            24306,
+            1,
+            24,
+            1,
+            24
+          ],
+          "P": [
+            513,
+            3,
+            34,
+            1,
+            34
+          ]
+        },
+        "maximumHyphens": 3,
+        "punctuationScalars": {
+          "-": 544
+        },
+        "uniqueCount": 26037
+      },
+      "wordsSHA256": "664ff8c19ff66c7f60ce197ae4788307e707c1d342736c753a3a46e7b64db07a"
+    },
+    "375k": {
+      "shape": {
+        "count": 376092,
+        "groups": {
+          "L": [
+            376058,
+            1,
+            46,
+            1,
+            46
+          ],
+          "P": [
+            34,
+            5,
+            16,
+            1,
+            16
+          ]
+        },
+        "maximumHyphens": 2,
+        "punctuationScalars": {
+          "-": 39
+        },
+        "uniqueCount": 376092
+      },
+      "wordsSHA256": "c31c98e6ccff917a88c2bfbd76e45ab9a259ecf44a45edeb1b670b298e63c369"
+    },
+    "50k": {
+      "shape": {
+        "count": 51682,
+        "groups": {
+          "C": [
+            2377,
+            2,
+            17,
+            1,
+            17
+          ],
+          "CP": [
+            19,
+            8,
+            18,
+            1,
+            18
+          ],
+          "L": [
+            48253,
+            1,
+            24,
+            1,
+            24
+          ],
+          "P": [
+            1033,
+            3,
+            34,
+            1,
+            34
+          ]
+        },
+        "maximumHyphens": 3,
+        "punctuationScalars": {
+          "-": 1089
+        },
+        "uniqueCount": 51682
+      },
+      "wordsSHA256": "78e1c9afc79349cae3f2fbc9bcf60b23a0a06ab70038e93221d091257afd5859"
+    },
+    "5k": {
+      "shape": {
+        "count": 4971,
+        "groups": {
+          "C": [
+            40,
+            2,
+            10,
+            1,
+            10
+          ],
+          "CS": [
+            2,
+            14,
+            20,
+            2,
+            10
+          ],
+          "L": [
+            4927,
+            1,
+            17,
+            1,
+            17
+          ],
+          "P": [
+            2,
+            3,
+            9,
+            1,
+            9
+          ]
+        },
+        "maximumHyphens": 1,
+        "punctuationScalars": {
+          "-": 1,
+          ".": 1
+        },
+        "uniqueCount": 4971
+      },
+      "wordsSHA256": "3ac08a85b31863548b45998f792e9ac9a370ee7a5becce26f2cc7adfd9ca31e4"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceMapCount": 379491
+}
