@@ -1,0 +1,190 @@
+{
+  "filesSHA256": {
+    "Resources/NorwegianBasicCorpusNotices.txt": "76ff513a994df50d6ec757f201ade440675279570b9f2c36db17489e84829489",
+    "Resources/NorwegianBasicCorpusSources.txt": "1cc2314b9f241acba2b077dbdc4604a03c837c3bd26a2725ec522bf11ae5fcdf",
+    "Sources/Typebar/NorwegianBasicCorpus.generated.swift": "65fa72315466d52b2f8fe2e38913f8cc90b7153323702f99c371eb2cc719dbd3"
+  },
+  "pools": {
+    "nno": {
+      "authoredOutsideFreshPool": {
+        "andning": "no_whole_count"
+      },
+      "dictionaryRows": 584298,
+      "eligibleCandidates": 75259,
+      "frequency": {
+        "matchedCasefoldKeys": 126421,
+        "matchedTokenCount": 53807310,
+        "rows": 472256
+      },
+      "retainedAuthored": [
+        "morgon",
+        "vindauge",
+        "papir",
+        "strand",
+        "vind",
+        "øving",
+        "merksemd",
+        "roleg",
+        "klår",
+        "vatn",
+        "gate",
+        "bord",
+        "lys",
+        "reise",
+        "tolmod",
+        "stund",
+        "by",
+        "regn",
+        "stille",
+        "retning",
+        "stjerne",
+        "notat",
+        "hage",
+        "liten",
+        "tid",
+        "vår",
+        "øy",
+        "ven",
+        "ikkje",
+        "kvar",
+        "noko"
+      ],
+      "shape": {
+        "count": 250,
+        "groups": {
+          "L": {
+            "count": 250,
+            "max": 10,
+            "maxFieldLength": 10,
+            "maxFields": 1,
+            "min": 1
+          }
+        },
+        "maximumHyphens": 0,
+        "maximumLength": 10,
+        "minimumLength": 1,
+        "nonASCIIEntries": 34,
+        "nonLetterEntries": 0,
+        "numericEntries": 0,
+        "punctuationEntries": 0,
+        "punctuationScalars": {},
+        "spaceEntries": 0,
+        "uniqueCount": 250,
+        "uppercaseEntries": 0
+      },
+      "wordsSHA256": "06230a76ca39678135559e1645cddf377eb2caee9ca95eae9b40da6633e621b1"
+    },
+    "nob": {
+      "authoredOutsideFreshPool": {
+        "oppmerksomhet": "length",
+        "tålmodighet": "length"
+      },
+      "dictionaryRows": 1143887,
+      "eligibleCandidates": 107498,
+      "frequency": {
+        "matchedCasefoldKeys": 345121,
+        "matchedTokenCount": 1068298928,
+        "rows": 3307461
+      },
+      "retainedAuthored": [
+        "morgen",
+        "vindu",
+        "papir",
+        "kyst",
+        "vind",
+        "øvelse",
+        "rolig",
+        "klar",
+        "sjø",
+        "gate",
+        "bord",
+        "lys",
+        "reise",
+        "øyeblikk",
+        "by",
+        "regn",
+        "stillhet",
+        "retning",
+        "stjerne",
+        "notat",
+        "hage",
+        "åndedrag",
+        "liten",
+        "tid",
+        "vær",
+        "fjær"
+      ],
+      "shape": {
+        "count": 200,
+        "groups": {
+          "L": {
+            "count": 200,
+            "max": 9,
+            "maxFieldLength": 9,
+            "maxFields": 1,
+            "min": 1
+          }
+        },
+        "maximumHyphens": 0,
+        "maximumLength": 9,
+        "minimumLength": 1,
+        "nonASCIIEntries": 33,
+        "nonLetterEntries": 0,
+        "numericEntries": 0,
+        "punctuationEntries": 0,
+        "punctuationScalars": {},
+        "spaceEntries": 0,
+        "uniqueCount": 200,
+        "uppercaseEntries": 0
+      },
+      "wordsSHA256": "ba611dc8083aa620a694367dd100485efa0a31ce27046a4de6f4f26412b0d72c"
+    }
+  },
+  "referenceAggregate": {
+    "nno": [
+      250,
+      1,
+      10,
+      1,
+      10
+    ],
+    "nob": [
+      200,
+      1,
+      9,
+      1,
+      9
+    ]
+  },
+  "revision": "ordbank-20220201-nb-unigrams-basic-v1",
+  "runtimeDependencies": [],
+  "schemaVersion": 1,
+  "sharedReaderSHA256": "0df8e1a39edb41f69ca82278660409846494ac4cf1543da2007403b5afee1082",
+  "sourceInputs": {
+    "nno": {
+      "dictionaryCatalogue": "https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-41/",
+      "dictionaryMember": "fullformer_2012.txt",
+      "dictionaryMemberSHA256": "654bcfcf11374947a0be0d27173a94a4f7d75671d792de439bea1fba07ef8e36",
+      "dictionarySHA256": "32987494b77c54b5c3890e891b99e35d5a45a16643a5c1820cd5e02fd55b1b8d",
+      "dictionaryURL": "https://www.nb.no/sbfil/leksikalske_databaser/ordbank/20220201_norsk_ordbank_nno_2012.tar.gz",
+      "frequencyCatalogue": "https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-8/",
+      "frequencyMember": "1gram_nno_f1_f.frk",
+      "frequencyMemberSHA256": "375a5726670950500bd94e4baea3ede88aeab8e3f366926a43cf9a269068ead6",
+      "frequencySHA256": "2c53d0073b0b7036e94029251e51e58fc98d7e1adbc1d390f191e5d30c291cee",
+      "frequencyURL": "https://www.nb.no/sbfil/tekst/1gram_nno_f1_freq.zip"
+    },
+    "nob": {
+      "dictionaryCatalogue": "https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-5/",
+      "dictionaryMember": "fullformsliste.txt",
+      "dictionaryMemberSHA256": "45a648b51ed22741acc3e4fc8d17178dfcce0e9622ea2ce12204f11d8c6bcfaf",
+      "dictionarySHA256": "57d91cb3f17b85befa50a3b56fcaed9800ca665b39486fe97b668add914d5f60",
+      "dictionaryURL": "https://www.nb.no/sbfil/leksikalske_databaser/ordbank/20220201_norsk_ordbank_nob_2005.tar.gz",
+      "frequencyCatalogue": "https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-12/",
+      "frequencyMember": "1gram_nob_f1_freq.frk",
+      "frequencyMemberSHA256": "acb8b7c20d61628f10a4a9b229dffdea0d43ab285f97ac93b7b1e3ddb717e44d",
+      "frequencySHA256": "cda1477a11fc98bcf61e8152fe1a09a4d5f9ae04b16c4ed9dc86ee224c2284e3",
+      "frequencyURL": "https://www.nb.no/sbfil/tekst/1gram_nob_f1_freq.zip"
+    }
+  },
+  "wholeTokenObservationsRequired": true
+}

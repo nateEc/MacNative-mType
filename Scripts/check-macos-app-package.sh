@@ -129,6 +129,12 @@ cmp "$project_root/Resources/NorwegianCorpusNotices.txt" \
 cmp "$project_root/Resources/NorwegianCorpusSources.txt" \
   "$app_path/Contents/Resources/NorwegianCorpusSources.txt" \
   || fail "Norwegian row provenance missing or modified"
+cmp "$project_root/Resources/NorwegianBasicCorpusNotices.txt" \
+  "$app_path/Contents/Resources/NorwegianBasicCorpusNotices.txt" \
+  || fail "Basic Norwegian attribution missing or modified"
+cmp "$project_root/Resources/NorwegianBasicCorpusSources.txt" \
+  "$app_path/Contents/Resources/NorwegianBasicCorpusSources.txt" \
+  || fail "Basic Norwegian row provenance missing or modified"
 cmp "$project_root/Resources/RussianCorpusNotices.txt" \
   "$app_path/Contents/Resources/RussianCorpusNotices.txt" \
   || fail "Russian corpus attribution missing or modified"

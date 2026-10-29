@@ -23493,7 +23493,12 @@ final class TypingEngineTests: XCTestCase {
       WeakSpotPractice.prompt(
         results: [norwegianBokmalResult], language: .norwegianBokmal, englishVariant: .american,
         wordCount: 1),
-      "vær")
+      "være")
+    // Equal character priorities retain the new independent pool's order.
+    // The historical error still belongs to the expected æ, never entered a.
+    XCTAssertEqual(
+      WeakSpotPractice.characterScores(results: [norwegianBokmalResult], language: .norwegianBokmal),
+      ["æ": 1])
     let swedishResult = CompletedTestResult(
       id: UUID(), configuration: .words(1, language: .swedish), outcome: .completed,
       startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 3,

@@ -1,0 +1,47 @@
+Typebar independent basic Norwegian corpora
+Revision: ordbank-20220201-nb-unigrams-basic-v1
+
+Norsk ordbank: Nasjonalbiblioteket / Språkbanken; Språkrådet and Universitetet i Bergen.
+Adapted selection under Creative Commons Attribution 4.0 International (CC BY 4.0).
+https://creativecommons.org/licenses/by/4.0/
+N-gram unigrams: Nasjonalbiblioteket / Språkbanken, CC0 1.0.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Changes: choose 200 Bokmål and 250 Nynorsk literal normert dictionary forms
+with TILDATO=4000, modern lowercase letters, lengths 1–9 and 1–10.
+Use each standard's own positive whole-token unigram counts; aggregate
+original case variants, never borrow counts from the other standard or
+component estimates. Keep eligible earlier authored words and real length
+boundaries. Two earlier Bokmål words exceed the new basic length bound;
+one earlier Nynorsk word has no whole-form observation in its snapshot.
+Their saved historical prompts, metrics and replay remain literal.
+These fixed 2022 dictionaries are not the live normative database;
+historical observations do not establish current frequency or lexical quality.
+No reference words, recasing, suffix synthesis, spelling normalization or
+padding. Matching candidate counts and bounds is not word-value, frequency,
+difficulty or semantic equivalence. The ten scale corpora retain their own
+revision and bytes. Raw dictionaries, frequency lists and media not bundled.
+
+nob (snapshots retrieved 2026-10-29):
+dictionaryURL: https://www.nb.no/sbfil/leksikalske_databaser/ordbank/20220201_norsk_ordbank_nob_2005.tar.gz
+dictionarySHA256: 57d91cb3f17b85befa50a3b56fcaed9800ca665b39486fe97b668add914d5f60
+dictionaryMember: fullformsliste.txt
+dictionaryMemberSHA256: 45a648b51ed22741acc3e4fc8d17178dfcce0e9622ea2ce12204f11d8c6bcfaf
+frequencyURL: https://www.nb.no/sbfil/tekst/1gram_nob_f1_freq.zip
+frequencySHA256: cda1477a11fc98bcf61e8152fe1a09a4d5f9ae04b16c4ed9dc86ee224c2284e3
+frequencyMember: 1gram_nob_f1_freq.frk
+frequencyMemberSHA256: acb8b7c20d61628f10a4a9b229dffdea0d43ab285f97ac93b7b1e3ddb717e44d
+dictionaryCatalogue: https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-5/
+frequencyCatalogue: https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-12/
+
+nno (snapshots retrieved 2026-10-29):
+dictionaryURL: https://www.nb.no/sbfil/leksikalske_databaser/ordbank/20220201_norsk_ordbank_nno_2012.tar.gz
+dictionarySHA256: 32987494b77c54b5c3890e891b99e35d5a45a16643a5c1820cd5e02fd55b1b8d
+dictionaryMember: fullformer_2012.txt
+dictionaryMemberSHA256: 654bcfcf11374947a0be0d27173a94a4f7d75671d792de439bea1fba07ef8e36
+frequencyURL: https://www.nb.no/sbfil/tekst/1gram_nno_f1_freq.zip
+frequencySHA256: 2c53d0073b0b7036e94029251e51e58fc98d7e1adbc1d390f191e5d30c291cee
+frequencyMember: 1gram_nno_f1_f.frk
+frequencyMemberSHA256: 375a5726670950500bd94e4baea3ede88aeab8e3f366926a43cf9a269068ead6
+dictionaryCatalogue: https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-41/
+frequencyCatalogue: https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-8/

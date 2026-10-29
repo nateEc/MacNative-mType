@@ -2,6 +2,8 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-NORWEGIAN-BASIC-54 | 两种挪威语基础池与旧历史 | 单个隔离实例分别选择默认 Bokmål／Nynorsk，练习 200／250 池的短词、长词、æ／ø／å 和各自拼写，切换 Lazy Latin／No Space／Backwards，再打开旧长词与 andning 结果。 | 新练习边界分别 1–9／1–10，简化输入按现有规则呈现；三个退出新池的旧词仍保留在历史提示、指标与回放。 | 待验收（见 NORWEGIAN_BASIC_CORPUS_CONTRACT.md；实体输入、VoiceOver、语言质量与完整性能开放） |
+| LANG-NORWEGIAN-BASIC-LICENSE-54 | 基础挪威语来源与各自整词次数 | 同一实例打开“Norsk · 基础词库”，核对各自字典／unigram 快照、CC BY／CC0、450 行标准／词形／lemma／行号／整词次数。 | 两种书面语不借对方次数，所有新候选有自身标准的正数整词观察；不以历史次数或候选量冒充当下规范与语言质量等价。 | 待验收（自动化资源读取不是实体许可 sheet 和人工审校） |
 | LANG-RUSSIAN-BASIC-53 | 默认俄语 200 词与旧历史 | 单个隔离实例选择默认 Русский，练习新旧候选及单字／12 字长词，切换 No Space／Backwards、重复并打开旧 24 词时期的结果。 | 新候选真实可输入，旧自有词仍可选，提示与重复一致；旧提示、指标、回放不按新词库回算。 | 待验收（见 RUSSIAN_BASIC_CORPUS_CONTRACT.md；实体键盘／IME、VoiceOver、语言质量及完整性能开放） |
 | LANG-RUSSIAN-BASIC-LICENSE-53 | 基础俄语许可与逐词出处 | 同一实例打开“Русский · 基础词库”许可，核对 CC BY-SA、字典来源与完整词形频率说明，并查验包内 200 行词形／页面／band 映射。 | 新入口与规模词库许可分别清楚；band 不冒充计数，不把来源、词频或语义质量差异称作等价。 | 待验收（自动化来源读取不是实体许可 sheet 或人工语言审校） |
 | LANG-RUSSIAN-SCALES-52 | Russian 六档词形、字段和输入 | 单个隔离实例逐档练习 ё／е 和专名大小写；5k 输入句点缩写、连字符及两个多词；切换 No Space／Backwards，超百词续批、重复及旧记录。 | 实词与字段正确，别名输入和历史保持；不把 375k 长词及撇号／prime 缺口称为完成。 | 待验收（见 RUSSIAN_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、全部组合及语言质量开放） |

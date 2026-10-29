@@ -51,10 +51,10 @@ final class NorwegianCorpusTests: XCTestCase {
     }
   }
 
-  func testBasicWrittenStandardsKeepTheirSeparateAuthoredData() {
+  func testBasicWrittenStandardsKeepSeparatePinnedLiteralData() {
     for (language, count, expected): (TypingLanguage, Int, String) in [
-      (.norwegianBokmal, 28, "641375c30b241b96c4e5208ae33baacc76fe15c781b1d5cc46867ec6baeaa084"),
-      (.norwegianNynorsk, 32, "152f5073f6d98eabbe26dae9f37424cc230547f72b058f22ca47f854698d72a6"),
+      (.norwegianBokmal, 200, "ba611dc8083aa620a694367dd100485efa0a31ce27046a4de6f4f26412b0d72c"),
+      (.norwegianNynorsk, 250, "06230a76ca39678135559e1645cddf377eb2caee9ca95eae9b40da6633e621b1"),
     ] {
       XCTAssertEqual(language.ownedPracticeWords().count, count)
       XCTAssertEqual(hash(language.ownedPracticeWords()), expected)

@@ -14,7 +14,7 @@ import XCTest
   }
 
   func testActualPracticePagePreparesTheLargeChoiceAndAcceptsItsFirstWord() async throws {
-    for language in NorwegianCorpusTests.scales.map(\.language) {
+    for language in [TypingLanguage.norwegianBokmal, .norwegianNynorsk] + NorwegianCorpusTests.scales.map(\.language) {
       try await PracticeHostLifetime.withModelContainer { container, track in
         try await verifyPracticePage(language, container: container, trackCallbacks: track)
       }

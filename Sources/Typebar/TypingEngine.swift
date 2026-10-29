@@ -14074,14 +14074,8 @@ enum StarterLexicon {
     "lille", "tid", "én",
   ]
 
-  // Typebar-authored Norwegian Bokmål starter words. The corpus deliberately
-  // includes æ, ø and å for normal macOS composed-text input practice.
-  static let norwegianBokmalWords = [
-    "morgen", "vindu", "papir", "kyst", "vind", "øvelse", "oppmerksomhet", "rolig",
-    "klar", "sjø", "gate", "bord", "lys", "reise", "tålmodighet", "øyeblikk",
-    "by", "regn", "stillhet", "retning", "stjerne", "notat", "hage", "åndedrag",
-    "liten", "tid", "vær", "fjær",
-  ]
+  // Independent Bokmål dictionary forms, ranked by its own observed unigrams.
+  static let norwegianBokmalWords = NorwegianBasicCorpus.nob
 
   static var norwegianBokmal1kLexicon: IndexedLexicon {
     IndexedLexicon(count: 1_000) { NorwegianCorpus.nob1k[$0] }
@@ -14105,14 +14099,8 @@ enum StarterLexicon {
   static var norwegianBokmal150kWords: [String] { norwegianBokmal150kLexicon.materialized() }
   static var norwegianBokmal600kWords: [String] { norwegianBokmal600kLexicon.materialized() }
 
-  // Typebar-authored Norwegian Nynorsk starter words. These are independent
-  // from the Bokmål corpus and include Nynorsk-specific spelling practice.
-  static let norwegianNynorskWords = [
-    "morgon", "vindauge", "papir", "strand", "vind", "øving", "merksemd", "roleg",
-    "klår", "vatn", "gate", "bord", "lys", "reise", "tolmod", "stund",
-    "by", "regn", "stille", "retning", "stjerne", "notat", "hage", "andning",
-    "liten", "tid", "vår", "øy", "ven", "ikkje", "kvar", "noko",
-  ]
+  // Nynorsk has its own dictionary and frequency source, never Bokmål counts.
+  static let norwegianNynorskWords = NorwegianBasicCorpus.nno
 
   static var norwegianNynorsk1kLexicon: IndexedLexicon {
     IndexedLexicon(count: 1_000) { NorwegianCorpus.nno1k[$0] }
