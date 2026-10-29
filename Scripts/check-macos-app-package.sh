@@ -69,6 +69,9 @@ cmp "$project_root/Resources/UnicodeNotice.txt" \
 cmp "$project_root/Resources/EnglishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/EnglishFrequencyCorpusNotices.txt" \
   || fail "English corpus attribution missing or modified"
+cmp "$project_root/Resources/EnglishLargeCorpusNotices.txt" \
+  "$app_path/Contents/Resources/EnglishLargeCorpusNotices.txt" \
+  || fail "large English corpus attribution missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

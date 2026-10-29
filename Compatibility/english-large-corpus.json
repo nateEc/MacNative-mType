@@ -1,0 +1,64 @@
+{
+  "dataLicense": "CC-BY-SA-4.0; retain all source notices, including prominent UKACD credit",
+  "limits": "Source observations and matching aggregate shape do not prove language quality, difficulty or distribution parity.",
+  "noticesSHA256": "7bbca2ef448dcad490837886e2f6748afe7e1315a887676299b2189d34abf048",
+  "preparationDependency": "msgpack==1.1.2; no native runtime dependency",
+  "revision": "scowl95-wordfreq-3.1.1-english450k-v2",
+  "schemaVersion": 1,
+  "scowl": {
+    "categories": [
+      ""
+    ],
+    "commit": "7e99edab8e32f9f9ea2b15f249ca8d4d67237410",
+    "copyrightSHA256": "090575a131b4260926c7a6b30a90aca0f5db5fbb5c46778e0c5855227bf6ebc3",
+    "dot": true,
+    "hyphen": true,
+    "rawSHA256": "c8f999c724e322801d94348a90f940e28f8bbbd19e53a4ffed18346d83ae52ad",
+    "size": 95,
+    "spellings": [
+      "A",
+      "B",
+      "Z",
+      "C"
+    ],
+    "variantLevel": 1
+  },
+  "selection": {
+    "available": {
+      "casedDictionary": 36956,
+      "extraObserved": 168135,
+      "lowerDictionary": 249445,
+      "punctuationGroups": [
+        12642,
+        4596,
+        1566
+      ]
+    },
+    "lastOutsideObservationBand": 799,
+    "rejectedUnattestedRepetitions": 629,
+    "selectedDictionary": 282593,
+    "selectedObservedOutsideDictionary": 167436
+  },
+  "shape": {
+    "casefoldUniqueCount": 443056,
+    "count": 450029,
+    "maximumLength": 31,
+    "minimumLength": 1,
+    "punctuationEntries": 176,
+    "punctuationGroups": [
+      44,
+      44,
+      88
+    ],
+    "uniqueCount": 450029,
+    "uppercaseEntries": 33021
+  },
+  "swiftSHA256": "cf4cdc05997b14696b5b55942eac6de89d4c64bab930d8f7e092ce9f9d9092c8",
+  "wordfreq": {
+    "member": "wordfreq/data/large_en.msgpack.gz",
+    "memberSHA256": "dffae8066b78dce0a6667cf5f58e567054f902674667090a7ac8a8a44628b05c",
+    "version": "3.1.1",
+    "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+  },
+  "wordsSHA256": "5ed42403f79db93db4db581fe3388d3992e7f648b630c8a14408a451176bbd59"
+}

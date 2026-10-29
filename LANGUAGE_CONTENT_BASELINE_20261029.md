@@ -2,7 +2,13 @@
 
 `LANG-CONTENT-BASELINE-40`，只读审计起点 `1ee242d7f74be670025afa7018c106263558f7ec`。语言 ID／元数据映射、候选数量或长度形状通过，不足以证明可用实际词汇已交付。本项记录未完成工作，不是替换实现或内容质量验收。
 
-## 已确认的范围
+## 后续迁移状态
+
+`LANG-ENGLISH-LARGE-43` 已将 English 450k 的 450,029 个合成候选替换为独立实际来源选集，移除 `englishScaleLexicon`；来源、原生输入、旧记录及署名边界见 ENGLISH_LARGE_CORPUS_CONTRACT.md。按下列历史 118 项逐入口复核，目前同范围仍有 117 个直接合成入口，声明数量之和为 3,740,882。复核记录 `/tmp/typebar-english-large-remaining-synthetic-20261029.json`，当前 TypingEngine SHA-256 `ed4df6fd2ff445465c6708c51c148b22d1e23c17f6b494311e3008cf54fa240d`。该数字不是全部语言缺口总量。
+
+以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English 行已迁移，但其语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
+
+## 历史起点确认的范围
 
 审计 `Sources/Typebar/TypingEngine.swift`，SHA-256 为 `5ae7e4b0d62c0f791b6a5e6b33f9945c5eb58e43802843e110ca467399bd305c`。只识别直接调用 `*ScaleLexicon` 且函数内显式使用 alphabeticIndex／paddedAlphabeticIndex 拼接的声明；118 个匹配声明均可找到生产 `StarterLexicon.<selection>Lexicon` 路由。结果保存于 `/tmp/typebar-current-synthetic-scale-audit.json`。
 
@@ -32,13 +38,13 @@
 
 Italian 四档已经改用独立实际观察语料，相关数据、编辑、复现、许可和分布差异见 ITALIAN_SCALES_CORPUS_CONTRACT.md／ITALIAN_LARGE_CORPUS_CONTRACT.md；本清单不否定这些已验证替换，但也不把其证据外推到其他语言。
 
-## 可逐入口追踪的当前占位清单
+## 可逐入口追踪的历史占位清单
 
-以下仅记录当前自有实现的入口、声明数量及构造器，不含参考项目词值。每一行都保持未完成；未来替换应以实际语料证据逐项迁移，不能只删除本表记录。marker 未提取不代表没有合成内容。
+以下记录固定历史起点自有实现的入口、声明数量及构造器，不含参考项目词值。当时每一行均未完成；后续替换以实际语料证据逐项迁移，不能只删除本表记录。当前迁移状态见上节及 English 行注记。marker 未提取不代表没有合成内容。
 
 | 入口 | 声明数量 | 当前构造器 | marker |
 | --- | ---: | --- | --- |
-| english450k | 450029 | englishScaleLexicon | yu |
+| english450k（后续已迁移，见 LANG-ENGLISH-LARGE-43） | 450029 | 历史 englishScaleLexicon | yu |
 | spanish650k | 646579 | spanishScaleLexicon | qzv |
 | french600k | 633941 | frenchScaleLexicon | qvfr |
 | german1k | 988 | germanScaleLexicon | qgd |

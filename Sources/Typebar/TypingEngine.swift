@@ -10990,12 +10990,6 @@ enum TurkishPunctuationPolicy {
 }
 
 enum StarterLexicon {
-  private static let englishScaleRoots = [
-    "amber", "birch", "cairn", "delta", "ember", "field", "grove", "harbor",
-    "islet", "juniper", "keel", "lumen", "meadow", "north", "orbit", "pebble",
-    "quill", "river", "solar", "trail", "upland", "vivid", "willow", "zephyr",
-  ]
-
   private static func alphabeticIndex(_ index: Int) -> String {
     var value = index
     var scalars: [UnicodeScalar] = []
@@ -11033,28 +11027,6 @@ enum StarterLexicon {
     characterIndex(index, alphabet: cyrillicScaleAlphabet)
   }
 
-  private static func englishScaleLexicon(
-    marker: String, count: Int, minimumToken: String, maximumLength: Int,
-    uppercaseCount: Int, punctuationCount: Int
-  ) -> IndexedLexicon {
-    precondition(count > max(uppercaseCount + 2, punctuationCount + 2))
-    return IndexedLexicon(count: count) { index in
-      var entry = marker + englishScaleRoots[index % englishScaleRoots.count]
-        + alphabeticIndex(index)
-      if index == 0 {
-        entry = minimumToken
-      } else if index == 1 {
-        entry = String(repeating: marker.last!, count: maximumLength)
-      } else if index < uppercaseCount + 2 {
-        entry = entry.prefix(1).uppercased() + entry.dropFirst()
-      }
-      if index >= count - punctuationCount {
-        entry += "-"
-      }
-      return entry
-    }
-  }
-
   // Independently sourced real dictionary entries, ordered by frequency.
   // Provenance and data attribution accompany the generated native corpus.
   static var english1kLexicon: IndexedLexicon {
@@ -11069,11 +11041,9 @@ enum StarterLexicon {
   static var english25kLexicon: IndexedLexicon {
     IndexedLexicon(count: 24_141) { EnglishFrequencyCorpus.words[$0] }
   }
-  // Still synthetic: this larger pool is NOT real vocabulary parity.
+  // Independently sourced large data is separate from the small frequency pools.
   static var english450kLexicon: IndexedLexicon {
-    englishScaleLexicon(
-      marker: "yu", count: 450_029, minimumToken: "b", maximumLength: 31,
-      uppercaseCount: 33_021, punctuationCount: 176)
+    IndexedLexicon(count: 450_029) { EnglishLargeCorpus.words[$0] }
   }
 
   static var english1kWords: [String] { english1kLexicon.materialized() }

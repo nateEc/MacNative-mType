@@ -71,6 +71,7 @@ struct AboutTypebarView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 26) {
         identity
+        CorpusAttributionSummary()
         principles
         metrics
         publicPracticeStatistics
