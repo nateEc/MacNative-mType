@@ -151,7 +151,8 @@ final class OrdinaryEntryGenerationTests: XCTestCase {
   }
 
   func testRepeatedEntryCacheEndsAtAFreshSectionWithoutMutatingOriginalPendingTail() {
-    var cursor = GeneratedCandidateContinuation(configuration: .words(0, language: .arenaStrategy),
+    // The third finite word permits a fresh section after replaying the cache.
+    var cursor = GeneratedCandidateContinuation(configuration: .words(3, language: .arenaStrategy),
       batchTokenCount: 1, sourceWords: ["Node Bay Elm", "Oak"])
     XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: { 0 }).transformed, "node")
     XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: { 1 }).transformed, " bay")

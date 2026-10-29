@@ -76,7 +76,8 @@ final class CodeSectionGenerationTests: XCTestCase {
   }
 
   func testRepeatCopiesTargetsThenStartsFreshSectionInsteadOfOldPendingTail() {
-    var cursor = GeneratedCodeContinuation(configuration: configuration(0, modifiers: [.noSpaces]),
+    // Keep a finite third word available after the captured two-word history.
+    var cursor = GeneratedCodeContinuation(configuration: configuration(3, modifiers: [.noSpaces]),
       batchTokenCount: 1, sourceWords: ["node bay elm", "oak"])
     XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: { 0 }).transformed, "node")
     let captured = cursor.nextChunk(nextRandomWordIndex: { 1 })
@@ -88,6 +89,31 @@ final class CodeSectionGenerationTests: XCTestCase {
     XCTAssertEqual(repeatCursor.nextChunk(nextRandomWordIndex: { 1 }).transformed, "oak")
     // Copy-on-write state must not clear the original cursor's pending tail.
     XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: { 1 }).transformed, "elm")
+  }
+
+  func testZeroLimitRepeatKeepsCachedSectionThenStopsWithoutMutatingOriginalPendingTail() {
+    for language: TypingLanguage in [.codeSwift, .arenaStrategy] {
+      for modifiers: [TestModifier] in [[], [.noSpaces]] {
+        let compact = modifiers.contains(.noSpaces)
+        var cursor = GeneratedCandidateContinuation(configuration: .words(0, language: language)
+          .with(modifiers: modifiers), batchTokenCount: 1, sourceWords: ["node bay elm", "oak"])
+        XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: { 0 }).transformed, "node")
+        let cached = cursor.nextChunk(nextRandomWordIndex: { 1 })
+        XCTAssertEqual(cached.transformed, compact ? "bay" : " bay")
+        var replay = cursor.replayingContinuation()
+        let restored = replay.nextChunk(nextRandomWordIndex: { XCTFail("Cached section must not draw"); return 0 })
+        XCTAssertEqual(restored.transformed, cached.transformed)
+        XCTAssertEqual(restored.noSpaceTargetWords, cached.noSpaceTargetWords)
+        XCTAssertEqual(replay.nextChunk(nextRandomWordIndex: {
+          XCTFail("A zero-limit repeat must stop at source history exhaustion"); return 0
+        }).transformed, "")
+        XCTAssertTrue(replay.replayExhausted)
+        XCTAssertFalse(replay.hasRemaining)
+        XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: { 1 }).transformed, compact ? "elm" : " elm",
+          "Repeat exhaustion must preserve the original cursor's pending section")
+        XCTAssertFalse(cursor.replayExhausted)
+      }
+    }
   }
 
   func testMainFactoryCanSelectOwnedVimPhraseInsteadOfFlatteningIt() {

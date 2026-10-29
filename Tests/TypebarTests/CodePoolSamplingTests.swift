@@ -100,7 +100,9 @@ final class CodePoolSamplingTests: XCTestCase {
   }
 
   func testReplayCanGenerateNewWordsAfterItsCapturedFutureAndRepeatAgain() {
-    var cursor = GeneratedCodeContinuation(configuration: configuration(0), batchTokenCount: 1,
+    // Fresh repeat generation requires a remaining finite budget; words=0
+    // stops when the captured source history ends.
+    var cursor = GeneratedCodeContinuation(configuration: configuration(4), batchTokenCount: 1,
       sourceWords: ["ab", "cd", "ef"])
     XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: { 0 }).transformed, "ab")
     XCTAssertEqual(cursor.nextChunk(nextRandomWordIndex: { 1 }).transformed, " cd")
