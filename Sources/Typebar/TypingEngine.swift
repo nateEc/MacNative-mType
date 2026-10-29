@@ -11099,67 +11099,26 @@ enum StarterLexicon {
   static var german10kWords: [String] { german10kLexicon.materialized() }
   static var german250kWords: [String] { german250kLexicon.materialized() }
 
-  private static let romanianScaleRoots = [
-    "mal", "fir", "nor", "lac", "pas", "zori", "deal", "drum",
-  ]
-
-  private static func romanianScaleLexicon(
-    marker: String, count: Int, maximumLength: Int,
-    punctuationCount: Int, nonASCIICount: Int
-  ) -> IndexedLexicon {
-    precondition(count > nonASCIICount + 1)
-    precondition(punctuationCount < count)
-    return IndexedLexicon(count: count) { index in
-      var entry = marker + romanianScaleRoots[index % romanianScaleRoots.count]
-        + alphabeticIndex(index)
-      if index == 0 {
-        entry = "ș"
-      } else if index == 1 {
-        entry = String(repeating: marker.first!, count: maximumLength)
-      } else if index < nonASCIICount + 1 {
-        entry += "ă"
-      }
-      if index >= count - punctuationCount {
-        entry += "-"
-      }
-      return entry
-    }
-  }
-
   static var romanian1kLexicon: IndexedLexicon {
-    romanianScaleLexicon(
-      marker: "qro", count: 1_000, maximumLength: 19,
-      punctuationCount: 21, nonASCIICount: 364)
+    IndexedLexicon(count: 1000) { RomanianCorpus.words1k[$0] }
   }
   static var romanian5kLexicon: IndexedLexicon {
-    romanianScaleLexicon(
-      marker: "wro", count: 5_000, maximumLength: 23,
-      punctuationCount: 95, nonASCIICount: 1_981)
+    IndexedLexicon(count: 5000) { RomanianCorpus.words5k[$0] }
   }
   static var romanian10kLexicon: IndexedLexicon {
-    romanianScaleLexicon(
-      marker: "xro", count: 10_000, maximumLength: 25,
-      punctuationCount: 202, nonASCIICount: 3_941)
+    IndexedLexicon(count: 10000) { RomanianCorpus.words10k[$0] }
   }
   static var romanian25kLexicon: IndexedLexicon {
-    romanianScaleLexicon(
-      marker: "zro", count: 25_000, maximumLength: 34,
-      punctuationCount: 474, nonASCIICount: 9_931)
+    IndexedLexicon(count: 25000) { RomanianCorpus.words25k[$0] }
   }
   static var romanian50kLexicon: IndexedLexicon {
-    romanianScaleLexicon(
-      marker: "vro", count: 50_000, maximumLength: 25,
-      punctuationCount: 957, nonASCIICount: 19_705)
+    IndexedLexicon(count: 50000) { RomanianCorpus.words50k[$0] }
   }
   static var romanian100kLexicon: IndexedLexicon {
-    romanianScaleLexicon(
-      marker: "jro", count: 100_000, maximumLength: 31,
-      punctuationCount: 1_912, nonASCIICount: 39_497)
+    IndexedLexicon(count: 100000) { RomanianCorpus.words100k[$0] }
   }
   static var romanian200kLexicon: IndexedLexicon {
-    romanianScaleLexicon(
-      marker: "kro", count: 200_000, maximumLength: 50,
-      punctuationCount: 3_891, nonASCIICount: 79_168)
+    IndexedLexicon(count: 200000) { RomanianCorpus.words200k[$0] }
   }
 
   static var romanian1kWords: [String] { romanian1kLexicon.materialized() }

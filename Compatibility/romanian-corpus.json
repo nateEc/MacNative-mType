@@ -1,0 +1,137 @@
+{
+  "available": {
+    "hyphen": 1762,
+    "letters": 598095
+  },
+  "dataLicense": "CC-BY-SA-4.0 adapted selection; retain notices and entry map",
+  "dictionary": {
+    "edition": "en",
+    "languageCode": "ro",
+    "postprocessed": true,
+    "retrievedDate": "2026-10-29",
+    "sha256": "ffe246750b41118a22f10f9a3e38fd2811528b6a850bf433104da297d1767b9d",
+    "url": "https://kaikki.org/dictionary/Romanian/kaikki.org-dictionary-Romanian.jsonl"
+  },
+  "filesSHA256": {
+    "Resources/RomanianCorpusNotices.txt": "10f2182bae65b351531bd71fabff0f2cb5b9d7d9265b397c8f00f2bbc5c5a36b",
+    "Resources/RomanianCorpusSources.txt": "6e09fd1384e5a807584b21a573298c195593bcc707f8c88d1db35013b1f76d15",
+    "Sources/Typebar/RomanianCorpus.generated.swift": "a358ae630c5851339649ff054571d2eb068037dc531a7ac8f058e7848181f4a4"
+  },
+  "limits": "Literal spelling is not extraction quality, frequency, difficulty or distribution parity; 200k longest field remains below reference 50.",
+  "preparation": {
+    "msgpackVersion": "1.1.2",
+    "runtimeDependencies": [],
+    "unicodeVersion": "15.0.0"
+  },
+  "requiredLiteralHyphens": [
+    "într-o",
+    "s-a",
+    "mi-a",
+    "dă-mi",
+    "n-am",
+    "anti-",
+    "cha-cha-cha-uri"
+  ],
+  "revision": "kaikki-en-ro-20261029-wordfreq-3.1.1-v1",
+  "scales": {
+    "100k": {
+      "shape": {
+        "count": 100000,
+        "maximumHyphens": 3,
+        "maximumLength": 31,
+        "minimumLength": 1,
+        "nonASCIICount": 41701,
+        "punctuationCount": 1762,
+        "trailingHyphenCount": 64,
+        "uniqueCount": 100000
+      },
+      "wordsSHA256": "2a653b427afdec53b178eb27e4d08ed75f25eb6ea7122878f7401cfe4c407478"
+    },
+    "10k": {
+      "shape": {
+        "count": 10000,
+        "maximumHyphens": 3,
+        "maximumLength": 25,
+        "minimumLength": 1,
+        "nonASCIICount": 3622,
+        "punctuationCount": 202,
+        "trailingHyphenCount": 11,
+        "uniqueCount": 10000
+      },
+      "wordsSHA256": "ebb014ea9967a28ac31cc55854a68a2964041e7f40e1bfbfdd64c9018255f035"
+    },
+    "1k": {
+      "shape": {
+        "count": 1000,
+        "maximumHyphens": 3,
+        "maximumLength": 19,
+        "minimumLength": 1,
+        "nonASCIICount": 285,
+        "punctuationCount": 21,
+        "trailingHyphenCount": 3,
+        "uniqueCount": 1000
+      },
+      "wordsSHA256": "b7b685e85fd22cae3fa4ce2351c671b72d54b804a0274be18d3e7585fd87f947"
+    },
+    "200k": {
+      "shape": {
+        "count": 200000,
+        "maximumHyphens": 3,
+        "maximumLength": 47,
+        "minimumLength": 1,
+        "nonASCIICount": 93148,
+        "punctuationCount": 1762,
+        "trailingHyphenCount": 64,
+        "uniqueCount": 200000
+      },
+      "wordsSHA256": "a96fd69ccafef50040ff5afa56e972de8658a685781b4b388b6e33141e82dfaf"
+    },
+    "25k": {
+      "shape": {
+        "count": 25000,
+        "maximumHyphens": 3,
+        "maximumLength": 34,
+        "minimumLength": 1,
+        "nonASCIICount": 9473,
+        "punctuationCount": 474,
+        "trailingHyphenCount": 20,
+        "uniqueCount": 25000
+      },
+      "wordsSHA256": "25f1488a0650490e25701757f8c40d678b262dcb63a91fc3713205a58383426f"
+    },
+    "50k": {
+      "shape": {
+        "count": 50000,
+        "maximumHyphens": 3,
+        "maximumLength": 25,
+        "minimumLength": 1,
+        "nonASCIICount": 19810,
+        "punctuationCount": 957,
+        "trailingHyphenCount": 44,
+        "uniqueCount": 50000
+      },
+      "wordsSHA256": "36da864b637be519f82d6a93539dd588c1bf07213917e52d8a082bad3d8d170f"
+    },
+    "5k": {
+      "shape": {
+        "count": 5000,
+        "maximumHyphens": 3,
+        "maximumLength": 23,
+        "minimumLength": 1,
+        "nonASCIICount": 1749,
+        "punctuationCount": 95,
+        "trailingHyphenCount": 6,
+        "uniqueCount": 5000
+      },
+      "wordsSHA256": "05c7c8c4867a7af6d447ea51e03bd42127c2e7d35b7e8eee6fd01a017f50094e"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceMapCount": 200002,
+  "wordfreq": {
+    "member": "wordfreq/data/small_ro.msgpack.gz",
+    "memberSHA256": "c17fe82952ed209bb45b95c56cb5c7f077ca921a84578c3807d48ddc1dd842e2",
+    "version": "3.1.1",
+    "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+  }
+}

@@ -12,7 +12,9 @@
 
 随后 `LANG-SPANISH-LARGE-46` 移除 Spanish 650k 的合成构造器，使用 646,566 个独立字面词形和 13 个明确标注的书写／排版练习改编。同范围余 112 个直接合成入口，声明数量之和 2,210,137；复核 `/tmp/typebar-spanish-large-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `b4b596d35c331deeaffcf08de9577712e528d30ed03fdc53dd287b8d2685b620`。来源与限制见 SPANISH_LARGE_CORPUS_CONTRACT.md。
 
-以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English、German、French 与 Spanish 大档行已迁移，但语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
+随后 `LANG-ROMANIAN-SCALES-47` 将 Romanian 七个规模档的 391,000 个候选位置迁至独立字面词形，移除 `romanianScaleLexicon`，严格过滤提取模板及错误标签。同范围余 105 个直接合成入口，声明数量之和 1,819,137；复核 `/tmp/typebar-romanian-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `04f785a056480c738095941fcbc0851bbee73a8b2c2b3f664b7519327ac1b161`。200k 最长 47／原版 50 和多连字符／标点覆盖差异仍开放，见 ROMANIAN_SCALES_CORPUS_CONTRACT.md；移除占位不等于达到无功能损失。
+
+以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English、German、French、Spanish 大档及 Romanian 七档已移除对应合成器，但语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
 
 ## 历史起点确认的范围
 
@@ -56,13 +58,13 @@ Italian 四档已经改用独立实际观察语料，相关数据、编辑、复
 | german1k（已迁移，见 LANG-GERMAN-SCALES-44） | 988 | 历史 germanScaleLexicon | qgd |
 | german10k（已迁移，见 LANG-GERMAN-SCALES-44） | 9994 | 历史 germanScaleLexicon | wgd |
 | german250k（已迁移，见 LANG-GERMAN-SCALES-44） | 239243 | 历史 germanScaleLexicon | xgd |
-| romanian1k | 1000 | romanianScaleLexicon | qro |
-| romanian5k | 5000 | romanianScaleLexicon | wro |
-| romanian10k | 10000 | romanianScaleLexicon | xro |
-| romanian25k | 25000 | romanianScaleLexicon | zro |
-| romanian50k | 50000 | romanianScaleLexicon | vro |
-| romanian100k | 100000 | romanianScaleLexicon | jro |
-| romanian200k | 200000 | romanianScaleLexicon | kro |
+| romanian1k（已移除占位，见 LANG-ROMANIAN-SCALES-47） | 1000 | 历史 romanianScaleLexicon | qro |
+| romanian5k（已移除占位，见 LANG-ROMANIAN-SCALES-47） | 5000 | 历史 romanianScaleLexicon | wro |
+| romanian10k（已移除占位，见 LANG-ROMANIAN-SCALES-47） | 10000 | 历史 romanianScaleLexicon | xro |
+| romanian25k（已移除占位，见 LANG-ROMANIAN-SCALES-47） | 25000 | 历史 romanianScaleLexicon | zro |
+| romanian50k（已移除占位，见 LANG-ROMANIAN-SCALES-47） | 50000 | 历史 romanianScaleLexicon | vro |
+| romanian100k（已移除占位，见 LANG-ROMANIAN-SCALES-47） | 100000 | 历史 romanianScaleLexicon | jro |
+| romanian200k（已移除占位，见 LANG-ROMANIAN-SCALES-47） | 200000 | 历史 romanianScaleLexicon | kro |
 | polish2k | 2338 | polishScaleLexicon | qpl |
 | polish5k | 5000 | polishScaleLexicon | wpl |
 | polish10k | 10000 | polishScaleLexicon | xpl |

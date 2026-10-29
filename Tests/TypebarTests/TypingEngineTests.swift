@@ -15287,15 +15287,15 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testRomanianScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testRomanianScaleChoicesPreserveIndependentIDsAndOwnedCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int)] = [
-      ("romanian1k", 1_000, 1, 19, 21, 364),
-      ("romanian5k", 5_000, 1, 23, 95, 1_981),
-      ("romanian10k", 10_000, 1, 25, 202, 3_941),
-      ("romanian25k", 25_000, 1, 34, 474, 9_931),
-      ("romanian50k", 50_000, 1, 25, 957, 19_705),
-      ("romanian100k", 100_000, 1, 31, 1_912, 39_497),
-      ("romanian200k", 200_000, 1, 50, 3_891, 79_168),
+      ("romanian1k", 1_000, 1, 19, 21, 285),
+      ("romanian5k", 5_000, 1, 23, 95, 1_749),
+      ("romanian10k", 10_000, 1, 25, 202, 3_622),
+      ("romanian25k", 25_000, 1, 34, 474, 9_473),
+      ("romanian50k", 50_000, 1, 25, 957, 19_810),
+      ("romanian100k", 100_000, 1, 31, 1_762, 41_701),
+      ("romanian200k", 200_000, 1, 47, 1_762, 93_148),
     ]
 
     for (rawValue, count, minimum, maximum, punctuation, nonASCII) in cases {
