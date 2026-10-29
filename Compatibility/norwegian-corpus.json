@@ -1,0 +1,558 @@
+{
+  "available": {
+    "nno100k": {
+      "C": 659,
+      "CP": 1315,
+      "L": 401796,
+      "P": 2507,
+      "PN": 2
+    },
+    "nno10k": {
+      "L": 401786
+    },
+    "nno1k": {
+      "L": 393266
+    },
+    "nno400k": {
+      "C": 5255,
+      "CN": 13,
+      "CP": 1384,
+      "CPN": 123,
+      "L": 401803,
+      "N": 3,
+      "P": 2517,
+      "PN": 4,
+      "PS": 69,
+      "S": 656
+    },
+    "nno5k": {
+      "L": 401786
+    },
+    "nob10k": {
+      "C": 709,
+      "L": 600778
+    },
+    "nob150k": {
+      "CP": 4567,
+      "L": 600821,
+      "P": 4583,
+      "PN": 2
+    },
+    "nob1k": {
+      "L": 496816
+    },
+    "nob5k": {
+      "L": 600778
+    },
+    "nob600k": {
+      "C": 5194,
+      "CN": 10,
+      "CP": 4966,
+      "CPN": 121,
+      "L": 600831,
+      "N": 3,
+      "P": 4609,
+      "PN": 9
+    }
+  },
+  "filesSHA256": {
+    "Resources/NorwegianCorpusNotices.txt": "9f4f38944278f000ce2176fb072e66c6c8d2f68360a8349878f8f2f77a381df7",
+    "Resources/NorwegianCorpusSources.txt": "0ac83d52fecc28a648daca9bcdf9c3480b6b474b084abbff8cd8a234d69ad6b3",
+    "Sources/Typebar/NorwegianCorpus.generated.swift": "ad94ff044a09eebcd871f7d2e28dfe392c3af0f73c87d14db52cdf149e50f523"
+  },
+  "inputs": {
+    "nno": {
+      "dictionaryCatalogue": "https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-41/",
+      "dictionaryMember": "fullformer_2012.txt",
+      "dictionaryMemberSHA256": "654bcfcf11374947a0be0d27173a94a4f7d75671d792de439bea1fba07ef8e36",
+      "dictionarySHA256": "32987494b77c54b5c3890e891b99e35d5a45a16643a5c1820cd5e02fd55b1b8d",
+      "dictionaryURL": "https://www.nb.no/sbfil/leksikalske_databaser/ordbank/20220201_norsk_ordbank_nno_2012.tar.gz",
+      "frequencyCatalogue": "https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-8/",
+      "frequencyMember": "1gram_nno_f1_f.frk",
+      "frequencyMemberSHA256": "375a5726670950500bd94e4baea3ede88aeab8e3f366926a43cf9a269068ead6",
+      "frequencySHA256": "2c53d0073b0b7036e94029251e51e58fc98d7e1adbc1d390f191e5d30c291cee",
+      "frequencyURL": "https://www.nb.no/sbfil/tekst/1gram_nno_f1_freq.zip"
+    },
+    "nob": {
+      "dictionaryCatalogue": "https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-5/",
+      "dictionaryMember": "fullformsliste.txt",
+      "dictionaryMemberSHA256": "45a648b51ed22741acc3e4fc8d17178dfcce0e9622ea2ce12204f11d8c6bcfaf",
+      "dictionarySHA256": "57d91cb3f17b85befa50a3b56fcaed9800ca665b39486fe97b668add914d5f60",
+      "dictionaryURL": "https://www.nb.no/sbfil/leksikalske_databaser/ordbank/20220201_norsk_ordbank_nob_2005.tar.gz",
+      "frequencyCatalogue": "https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-12/",
+      "frequencyMember": "1gram_nob_f1_freq.frk",
+      "frequencyMemberSHA256": "acb8b7c20d61628f10a4a9b229dffdea0d43ab285f97ac93b7b1e3ddb717e44d",
+      "frequencySHA256": "cda1477a11fc98bcf61e8152fe1a09a4d5f9ae04b16c4ed9dc86ee224c2284e3",
+      "frequencyURL": "https://www.nb.no/sbfil/tekst/1gram_nob_f1_freq.zip"
+    }
+  },
+  "limits": "Independent literal forms and aggregate input boundaries do not prove frequency, quality or full behavioral parity.",
+  "preparation": {
+    "encoding": "ISO-8859-1",
+    "runtimeDependencies": [],
+    "unicodeVersion": "15.0.0"
+  },
+  "revision": "ordbank-20220201-nb-unigrams-norwegian-v1",
+  "scales": {
+    "nno100k": {
+      "shape": {
+        "count": 104745,
+        "groups": {
+          "C": {
+            "count": 1,
+            "max": 5,
+            "maxFieldLength": 5,
+            "maxFields": 1,
+            "min": 5
+          },
+          "CP": {
+            "count": 27,
+            "max": 19,
+            "maxFieldLength": 19,
+            "maxFields": 1,
+            "min": 5
+          },
+          "L": {
+            "count": 104068,
+            "max": 28,
+            "maxFieldLength": 28,
+            "maxFields": 1,
+            "min": 1
+          },
+          "P": {
+            "count": 648,
+            "max": 29,
+            "maxFieldLength": 29,
+            "maxFields": 1,
+            "min": 4
+          },
+          "PN": {
+            "count": 1,
+            "max": 17,
+            "maxFieldLength": 17,
+            "maxFields": 1,
+            "min": 17
+          }
+        },
+        "maximumHyphens": 4,
+        "maximumLength": 29,
+        "minimumLength": 1,
+        "nonASCIIEntries": 18134,
+        "nonLetterEntries": 676,
+        "numericEntries": 1,
+        "punctuationEntries": 676,
+        "punctuationScalars": {
+          "-": 757
+        },
+        "spaceEntries": 0,
+        "uniqueCount": 104745,
+        "uppercaseEntries": 28
+      },
+      "wordsSHA256": "87b730a75d488900c09616669d837a0da6f781cf2a831d8566b6b864ef439a8f"
+    },
+    "nno10k": {
+      "shape": {
+        "count": 9939,
+        "groups": {
+          "L": {
+            "count": 9939,
+            "max": 27,
+            "maxFieldLength": 27,
+            "maxFields": 1,
+            "min": 1
+          }
+        },
+        "maximumHyphens": 0,
+        "maximumLength": 27,
+        "minimumLength": 1,
+        "nonASCIIEntries": 1377,
+        "nonLetterEntries": 0,
+        "numericEntries": 0,
+        "punctuationEntries": 0,
+        "punctuationScalars": {},
+        "spaceEntries": 0,
+        "uniqueCount": 9939,
+        "uppercaseEntries": 0
+      },
+      "wordsSHA256": "c8bece4c9860fd2866f097de136492f6a7f63195ee233960f12e238dc16bde43"
+    },
+    "nno1k": {
+      "shape": {
+        "count": 1000,
+        "groups": {
+          "L": {
+            "count": 1000,
+            "max": 18,
+            "maxFieldLength": 18,
+            "maxFields": 1,
+            "min": 1
+          }
+        },
+        "maximumHyphens": 0,
+        "maximumLength": 18,
+        "minimumLength": 1,
+        "nonASCIIEntries": 123,
+        "nonLetterEntries": 0,
+        "numericEntries": 0,
+        "punctuationEntries": 0,
+        "punctuationScalars": {},
+        "spaceEntries": 0,
+        "uniqueCount": 1000,
+        "uppercaseEntries": 0
+      },
+      "wordsSHA256": "3dd6492ff1452021407e8bacd1e90aa6494bc2d729aba93a70347d7279654f6e"
+    },
+    "nno400k": {
+      "shape": {
+        "count": 410719,
+        "groups": {
+          "C": {
+            "count": 5254,
+            "max": 23,
+            "maxFieldLength": 23,
+            "maxFields": 1,
+            "min": 2
+          },
+          "CN": {
+            "count": 13,
+            "max": 3,
+            "maxFieldLength": 3,
+            "maxFields": 1,
+            "min": 2
+          },
+          "CP": {
+            "count": 1384,
+            "max": 22,
+            "maxFieldLength": 22,
+            "maxFields": 1,
+            "min": 3
+          },
+          "CPN": {
+            "count": 123,
+            "max": 17,
+            "maxFieldLength": 17,
+            "maxFields": 1,
+            "min": 5
+          },
+          "L": {
+            "count": 401404,
+            "max": 31,
+            "maxFieldLength": 31,
+            "maxFields": 1,
+            "min": 1
+          },
+          "N": {
+            "count": 3,
+            "max": 3,
+            "maxFieldLength": 3,
+            "maxFields": 1,
+            "min": 2
+          },
+          "P": {
+            "count": 2515,
+            "max": 31,
+            "maxFieldLength": 31,
+            "maxFields": 1,
+            "min": 3
+          },
+          "PN": {
+            "count": 4,
+            "max": 19,
+            "maxFieldLength": 19,
+            "maxFields": 1,
+            "min": 17
+          },
+          "PS": {
+            "count": 14,
+            "max": 23,
+            "maxFieldLength": 18,
+            "maxFields": 3,
+            "min": 15
+          },
+          "S": {
+            "count": 5,
+            "max": 12,
+            "maxFieldLength": 7,
+            "maxFields": 3,
+            "min": 4
+          }
+        },
+        "maximumHyphens": 4,
+        "maximumLength": 31,
+        "minimumLength": 1,
+        "nonASCIIEntries": 81730,
+        "nonLetterEntries": 4061,
+        "numericEntries": 143,
+        "punctuationEntries": 4040,
+        "punctuationScalars": {
+          "'": 8,
+          "-": 4420
+        },
+        "spaceEntries": 19,
+        "uniqueCount": 410719,
+        "uppercaseEntries": 6774
+      },
+      "wordsSHA256": "afc6cfa11c22854eb2369a99603791d2f18351b9378131f258469b36be05005b"
+    },
+    "nno5k": {
+      "shape": {
+        "count": 5000,
+        "groups": {
+          "L": {
+            "count": 5000,
+            "max": 27,
+            "maxFieldLength": 27,
+            "maxFields": 1,
+            "min": 1
+          }
+        },
+        "maximumHyphens": 0,
+        "maximumLength": 27,
+        "minimumLength": 1,
+        "nonASCIIEntries": 649,
+        "nonLetterEntries": 0,
+        "numericEntries": 0,
+        "punctuationEntries": 0,
+        "punctuationScalars": {},
+        "spaceEntries": 0,
+        "uniqueCount": 5000,
+        "uppercaseEntries": 0
+      },
+      "wordsSHA256": "1b141756f4a003c72bdf14d14ca2f70e729fa8c3e51364c52d7d4dde1b6f6096"
+    },
+    "nob10k": {
+      "shape": {
+        "count": 10000,
+        "groups": {
+          "C": {
+            "count": 1,
+            "max": 8,
+            "maxFieldLength": 8,
+            "maxFields": 1,
+            "min": 8
+          },
+          "L": {
+            "count": 9999,
+            "max": 28,
+            "maxFieldLength": 28,
+            "maxFields": 1,
+            "min": 1
+          }
+        },
+        "maximumHyphens": 0,
+        "maximumLength": 28,
+        "minimumLength": 1,
+        "nonASCIIEntries": 1381,
+        "nonLetterEntries": 0,
+        "numericEntries": 0,
+        "punctuationEntries": 0,
+        "punctuationScalars": {},
+        "spaceEntries": 0,
+        "uniqueCount": 10000,
+        "uppercaseEntries": 1
+      },
+      "wordsSHA256": "26601ab18b0f0128dd1128c879484585e1b436c6018542dddc4f3a52fc93966c"
+    },
+    "nob150k": {
+      "shape": {
+        "count": 142938,
+        "groups": {
+          "CP": {
+            "count": 100,
+            "max": 17,
+            "maxFieldLength": 17,
+            "maxFields": 1,
+            "min": 5
+          },
+          "L": {
+            "count": 141691,
+            "max": 30,
+            "maxFieldLength": 30,
+            "maxFields": 1,
+            "min": 1
+          },
+          "P": {
+            "count": 1146,
+            "max": 26,
+            "maxFieldLength": 26,
+            "maxFields": 1,
+            "min": 4
+          },
+          "PN": {
+            "count": 1,
+            "max": 16,
+            "maxFieldLength": 16,
+            "maxFields": 1,
+            "min": 16
+          }
+        },
+        "maximumHyphens": 3,
+        "maximumLength": 30,
+        "minimumLength": 1,
+        "nonASCIIEntries": 25652,
+        "nonLetterEntries": 1247,
+        "numericEntries": 1,
+        "punctuationEntries": 1247,
+        "punctuationScalars": {
+          "-": 1335
+        },
+        "spaceEntries": 0,
+        "uniqueCount": 142938,
+        "uppercaseEntries": 100
+      },
+      "wordsSHA256": "5659747f47fe0d973cff8c3f68f50b7e13e1543be0810bc5515a41ef9a661585"
+    },
+    "nob1k": {
+      "shape": {
+        "count": 1000,
+        "groups": {
+          "L": {
+            "count": 1000,
+            "max": 15,
+            "maxFieldLength": 15,
+            "maxFields": 1,
+            "min": 1
+          }
+        },
+        "maximumHyphens": 0,
+        "maximumLength": 15,
+        "minimumLength": 1,
+        "nonASCIIEntries": 141,
+        "nonLetterEntries": 0,
+        "numericEntries": 0,
+        "punctuationEntries": 0,
+        "punctuationScalars": {},
+        "spaceEntries": 0,
+        "uniqueCount": 1000,
+        "uppercaseEntries": 0
+      },
+      "wordsSHA256": "71c77536bb8cabae3c88fe7817f1a685128e46125de681c2720d432378965503"
+    },
+    "nob5k": {
+      "shape": {
+        "count": 5000,
+        "groups": {
+          "L": {
+            "count": 5000,
+            "max": 28,
+            "maxFieldLength": 28,
+            "maxFields": 1,
+            "min": 1
+          }
+        },
+        "maximumHyphens": 0,
+        "maximumLength": 28,
+        "minimumLength": 1,
+        "nonASCIIEntries": 659,
+        "nonLetterEntries": 0,
+        "numericEntries": 0,
+        "punctuationEntries": 0,
+        "punctuationScalars": {},
+        "spaceEntries": 0,
+        "uniqueCount": 5000,
+        "uppercaseEntries": 0
+      },
+      "wordsSHA256": "38f046c5316414f64ee26dbb7be801e86ec99a71b6d2654a868bcf7a54774504"
+    },
+    "nob600k": {
+      "shape": {
+        "count": 614970,
+        "groups": {
+          "C": {
+            "count": 5194,
+            "max": 23,
+            "maxFieldLength": 23,
+            "maxFields": 1,
+            "min": 2
+          },
+          "CN": {
+            "count": 10,
+            "max": 3,
+            "maxFieldLength": 3,
+            "maxFields": 1,
+            "min": 2
+          },
+          "CP": {
+            "count": 4966,
+            "max": 29,
+            "maxFieldLength": 29,
+            "maxFields": 1,
+            "min": 4
+          },
+          "CPN": {
+            "count": 121,
+            "max": 17,
+            "maxFieldLength": 17,
+            "maxFields": 1,
+            "min": 6
+          },
+          "L": {
+            "count": 600063,
+            "max": 33,
+            "maxFieldLength": 33,
+            "maxFields": 1,
+            "min": 1
+          },
+          "N": {
+            "count": 3,
+            "max": 3,
+            "maxFieldLength": 3,
+            "maxFields": 1,
+            "min": 2
+          },
+          "P": {
+            "count": 4604,
+            "max": 28,
+            "maxFieldLength": 28,
+            "maxFields": 1,
+            "min": 3
+          },
+          "PN": {
+            "count": 9,
+            "max": 18,
+            "maxFieldLength": 18,
+            "maxFields": 1,
+            "min": 8
+          }
+        },
+        "maximumHyphens": 3,
+        "maximumLength": 33,
+        "minimumLength": 1,
+        "nonASCIIEntries": 122574,
+        "nonLetterEntries": 9713,
+        "numericEntries": 143,
+        "punctuationEntries": 9700,
+        "punctuationScalars": {
+          "'": 18,
+          "-": 10323
+        },
+        "spaceEntries": 0,
+        "uniqueCount": 614970,
+        "uppercaseEntries": 10291
+      },
+      "wordsSHA256": "02cd79baf255e3ac0eb6083e04913308f29e8748248f7a0b47800b803751c2cb"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceDetails": {
+    "nno": {
+      "dictionaryForms": 412288,
+      "dictionaryRows": 584298,
+      "frequency": {
+        "matchedCasefoldKeys": 126421,
+        "matchedTokenCount": 53807310,
+        "rows": 472256
+      }
+    },
+    "nob": {
+      "dictionaryForms": 616914,
+      "dictionaryRows": 1143887,
+      "frequency": {
+        "matchedCasefoldKeys": 345121,
+        "matchedTokenCount": 1068298928,
+        "rows": 3307461
+      }
+    }
+  },
+  "sourceMapCount": 1025689
+}

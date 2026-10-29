@@ -4,7 +4,9 @@
 
 ## 后续迁移状态
 
-最新 `LANG-ESPERANTO-SCALES-50` 已移除 Esperanto 十二档的 216,619 个占位位置，使用同时有独立字典和 Tatoeba 观察的实际词形，包含 X／H 拼写。原历史范围当前余 82 个直接合成入口，声明数量之和 438,685；复核 `/tmp/typebar-esperanto-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `3aef72f8d8fb7137a5f9c6f730e0849bc62d55402d25601487907af3777544a8`。大档长字段、X／H 额外字母及词频／难度／质量差距仍开放，见 ESPERANTO_SCALES_CORPUS_CONTRACT.md。以下数字按各迁移阶段保留，不能混用为当前总数。
+最新 `LANG-NORWEGIAN-SCALES-51` 移除两种 Norwegian 各五档、共 1,305,311 个词根编号占位位置。独立官方字典及各自 unigram 选集保留真实字面大小写、数字／标点／多词交集和最长字段；基本池与历史保持，分布／语言质量仍开放。当前扩大具名路由范围余 129 项、声明数量之和 1,560,763；旧历史范围仍为 82 项／438,685，因为本轮十项来自之前扩展发现的额外路由。复核 `/tmp/typebar-norwegian-all-scale-helper-audit-20261029.json`，TypingEngine SHA-256 `eec384229642daca1185d31e9c6bac08360f5211bff39fd481bc0ea03a7dcbad`。详情见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md；以下保留各自阶段数字。
+
+此前 `LANG-ESPERANTO-SCALES-50` 已移除 Esperanto 十二档的 216,619 个占位位置，使用同时有独立字典和 Tatoeba 观察的实际词形，包含 X／H 拼写。原历史范围当前余 82 个直接合成入口，声明数量之和 438,685；复核 `/tmp/typebar-esperanto-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `3aef72f8d8fb7137a5f9c6f730e0849bc62d55402d25601487907af3777544a8`。大档长字段、X／H 额外字母及词频／难度／质量差距仍开放，见 ESPERANTO_SCALES_CORPUS_CONTRACT.md。以下数字按各迁移阶段保留，不能混用为当前总数。
 
 `LANG-ENGLISH-LARGE-43` 已将 English 450k 的 450,029 个合成候选替换为独立实际来源选集，移除 `englishScaleLexicon`；来源、原生输入、旧记录及署名边界见 ENGLISH_LARGE_CORPUS_CONTRACT.md。按下列历史 118 项逐入口复核，目前同范围仍有 117 个直接合成入口，声明数量之和为 3,740,882。复核记录 `/tmp/typebar-english-large-remaining-synthetic-20261029.json`，当前 TypingEngine SHA-256 `ed4df6fd2ff445465c6708c51c148b22d1e23c17f6b494311e3008cf54fa240d`。该数字不是全部语言缺口总量。
 
@@ -24,7 +26,7 @@
 
 ## 历史起点确认的范围
 
-### 2026-10-29 的扩大结构复核
+### 2026-10-29 的扩大结构复核（Norwegian 迁移前阶段）
 
 在 `LANG-ESPERANTO-SCALES-50` 的不可变输入期间，另行读取当前 TypingEngine（SHA-256 `3aef72f8d8fb7137a5f9c6f730e0849bc62d55402d25601487907af3777544a8`），扫描**所有** `static var <selection>Lexicon: IndexedLexicon` 属性中直接调用具名 `*ScaleLexicon(...)` 的路由，不再要求被调用函数显式出现旧审计的两个字母编号函数名。逐属性配对花括号取函数体，提取具名字面 count，并核对 `case .<selection>: StarterLexicon.<selection>Lexicon` 生产路由。
 
@@ -244,7 +246,7 @@ ASCII 字母及内部单引号／连字符、长度不超过 31 的只读可用�
 
 客户端冻结基线已结束，6,750 项中六个方法失败，详见 CLIENT_BASELINE_20261029.md。本审计没有修改生产代码、清单或词数据，也未启动并行原生作业。不得因后续测试通过而关闭这里的内容缺口，完整 goal 仍未达成。
 
-## Norwegian 下一批的独立来源可用性
+## Norwegian 的来源可用性准备（迁移前阶段）
 
 扩大回归保持不可变输入时，仅在临时目录下载并读取官方 [Bokmål 2005](https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-5/) 和 [Nynorsk 2012](https://www.nb.no/sprakbanken/ressurskatalog/oai-nb-no-sbr-41/) 的 **2022-02-01 Norsk ordbank** 快照。官方目录的许可链接为 CC BY 4.0；该日期是数据库快照日期，2026-10-29 只是下载日，不冒充当前规范数据库。目录明确指出全词形也包括语法可构成但实际很少或从未使用的形式，因此不能将数据库容量说成实测频率或完整语言质量认证。
 
@@ -265,3 +267,5 @@ ASCII 字母及内部单引号／连字符、长度不超过 31 的只读可用�
 | 纯字母最长 | 33 | 31 |
 
 当前快照所有行均 `NORMERING=normert`、`TILDATO=4000`；这只是源字段筛选事实。报告 `/tmp/typebar-norwegian-ordbank-availability-20261029.json` 保留各长度界限容量，尚未选词、核实词频、逐字段形状覆盖、编写原生数据或接入新许可。受限的新闻文本语料没有被混入本批。可用性证明下一批有独立字面来源路径，**不代表 Norwegian 已交付**。
+
+后续 `LANG-NORWEGIAN-SCALES-51` 已按更严格的实际输入类别筛选并接入这两个固定字典与各自的官方 CC0 unigram；最终选集、发布 pin、原生证据和分布边界见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md。以上原始可用性数字仍保留为此前准备证据，不能冒充最终词数或完整质量验收。

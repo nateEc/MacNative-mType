@@ -2,6 +2,8 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-NORWEGIAN-SCALES-51 | Norwegian 十档真实词形、大小写和复杂字段 | 单个隔离实例逐档练习 æ／ø／å 和 ikke／ikkje，输入真实多连字符、撇号、数字词和 Nynorsk 多词；切换 Lazy Latin／No Space／Backwards，超百词并重复、打开旧记录。 | 原词与字母规则正确，数字／标点交集和多字段不被拆丢；旧提示／指标不回算，不把分布差异冒充完整对齐。 | 待验收（证据见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、语言审校及完整性能开放） |
+| LANG-NORWEGIAN-LICENSE-51 | Norwegian 官方来源与测量／估计区分 | 同一实例打开 About 和 Norsk 许可，核对两套字典／频率的独立归属、快照年代、完整许可及字典行 ID／整词次数／分段估计映射。 | CC BY 字典和 CC0 unigram 来源明确；未知计数不冒充实测零，语法可能词形不冒充有实际用例，原始数据包不随包发布。 | 待验收（实体 sheet／VoiceOver、人工来源和语言质量审校开放） |
 | LANG-ESPERANTO-SCALES-50 | Esperanto 十二档实际词形与六个字母 | 单个隔离实例逐档练习 ĉielo／ĝardeno／ĥoro／ĵurnalo／ŝipo／aŭtuno，切换 X／H、Lazy Latin／No Space／Backwards，超过百词并重复和打开旧记录。 | 原字母与 X／H 实际拼写正确；H 的 ŭ → u；简化输入资格和捕获旧数据保持，大档长度及额外字母缺口明确。 | 待验收（见 ESPERANTO_SCALES_CORPUS_CONTRACT.md；物理键盘／IME、语言质量及完整性能开放） |
 | LANG-ESPERANTO-LICENSE-50 | Esperanto 词形、频率与贡献者署名 | 同一实例打开 About 和 Esperanto 规模词库许可，核对独立字典／Tatoeba 来源、完整 owner 署名、原词／次数／句子链接及碰撞说明。 | 频率有实际源证据，派生拼写不冒充原始词典拼写；不声称与参考词频／难度等价，来源映射完整随包。 | 待验收（实体 sheet、VoiceOver 和人工来源审校开放） |
 | LANG-PORTUGUESE-SCALES-49 | Portuguese 五档字面词形、标点、多词和单位 | 只用单个隔离实例逐档练习 não／coração、连字符／撇号／句点、多词与长字段；5k 输入 2d，大档输入 m²／m³，超百词并重复和打开旧记录。 | 真实字段输入和旧捕获数据保持；标点／多连字符覆盖差距明确，不把自写单位当字典词。 | 待验收（见 PORTUGUESE_SCALES_CORPUS_CONTRACT.md；语言质量、实体键盘／IME 和完整性能开放） |

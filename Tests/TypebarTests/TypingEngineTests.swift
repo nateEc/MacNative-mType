@@ -12701,15 +12701,15 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testNorwegianBokmalScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testNorwegianBokmalScaleChoicesPreserveIndependentIDsAndOwnedCorpusShapes() throws {
     let cases: [(
       String, Int, Int, Int, Int, Int, Int, Int, Int, ZipfFrequencySupport
     )] = [
-      ("norwegianBokmal1k", 1_000, 1, 15, 0, 0, 0, 0, 136, .supported),
-      ("norwegianBokmal5k", 5_000, 1, 28, 0, 0, 0, 0, 654, .supported),
-      ("norwegianBokmal10k", 10_000, 1, 28, 1, 0, 0, 0, 1_383, .supported),
-      ("norwegianBokmal150k", 142_938, 1, 30, 100, 1_247, 1_247, 1, 28_688, .unknown),
-      ("norwegianBokmal600k", 614_970, 1, 33, 10_291, 9_713, 9_700, 143, 123_229, .unknown),
+      ("norwegianBokmal1k", 1_000, 1, 15, 0, 0, 0, 0, 141, .supported),
+      ("norwegianBokmal5k", 5_000, 1, 28, 0, 0, 0, 0, 659, .supported),
+      ("norwegianBokmal10k", 10_000, 1, 28, 1, 0, 0, 0, 1_381, .supported),
+      ("norwegianBokmal150k", 142_938, 1, 30, 100, 1_247, 1_247, 1, 25_652, .unknown),
+      ("norwegianBokmal600k", 614_970, 1, 33, 10_291, 9_713, 9_700, 143, 122_574, .unknown),
     ]
 
     for (
@@ -12759,15 +12759,15 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testNorwegianNynorskScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testNorwegianNynorskScaleChoicesPreserveIndependentIDsAndOwnedCorpusShapes() throws {
     let cases: [(
       String, Int, Int, Int, Int, Int, Int, Int, Int, Int, ZipfFrequencySupport
     )] = [
-      ("norwegianNynorsk1k", 1_000, 1, 18, 0, 0, 0, 0, 0, 132, .supported),
-      ("norwegianNynorsk5k", 5_000, 1, 27, 0, 0, 0, 0, 0, 714, .supported),
-      ("norwegianNynorsk10k", 9_939, 1, 27, 0, 0, 0, 0, 0, 1_492, .supported),
-      ("norwegianNynorsk100k", 104_745, 1, 29, 28, 676, 676, 0, 1, 21_255, .unknown),
-      ("norwegianNynorsk400k", 410_719, 1, 31, 6_774, 4_061, 4_040, 19, 143, 82_101, .unknown),
+      ("norwegianNynorsk1k", 1_000, 1, 18, 0, 0, 0, 0, 0, 123, .supported),
+      ("norwegianNynorsk5k", 5_000, 1, 27, 0, 0, 0, 0, 0, 649, .supported),
+      ("norwegianNynorsk10k", 9_939, 1, 27, 0, 0, 0, 0, 0, 1_377, .supported),
+      ("norwegianNynorsk100k", 104_745, 1, 29, 28, 676, 676, 0, 1, 18_134, .unknown),
+      ("norwegianNynorsk400k", 410_719, 1, 31, 6_774, 4_061, 4_040, 19, 143, 81_730, .unknown),
     ]
 
     for (

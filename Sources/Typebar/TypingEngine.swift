@@ -14121,95 +14121,20 @@ enum StarterLexicon {
     "liten", "tid", "vær", "fjær",
   ]
 
-  private struct NorwegianBokmalScaleSpecification {
-    let marker: String
-    let count: Int
-    let maximumLength: Int
-    let uppercaseCount: Int
-    let punctuationCount: Int
-    let digitCount: Int
-    let punctuationDigitOverlap: Int
-    let nonASCIICount: Int
-  }
-
-  private static let norwegianBokmalScaleRoots = [
-    "nord", "skog", "vind", "spor", "lykt", "havn",
-  ]
-
-  private static func norwegianBokmalScaleIndex(_ index: Int) -> String {
-    let encoded = alphabeticIndex(index)
-    return String(repeating: "a", count: 5 - encoded.count) + encoded
-  }
-
-  private static func norwegianBokmalScaleLexicon(
-    _ specification: NorwegianBokmalScaleSpecification
-  ) -> IndexedLexicon {
-    let punctuationStart = specification.count - specification.punctuationCount
-    let standaloneDigits = specification.digitCount - specification.punctuationDigitOverlap
-    let digitStart = punctuationStart - standaloneDigits
-    precondition(specification.punctuationDigitOverlap <= specification.punctuationCount)
-    precondition(standaloneDigits >= 0)
-    precondition(specification.nonASCIICount > 0)
-
-    return IndexedLexicon(count: specification.count) { index in
-      var entry: String
-      if index == 0 {
-        entry = "ǿ"
-      } else if index == 1 {
-        entry = String(repeating: specification.marker.last!, count: specification.maximumLength)
-      } else {
-        entry = specification.marker
-          + norwegianBokmalScaleRoots[index % norwegianBokmalScaleRoots.count]
-          + norwegianBokmalScaleIndex(index)
-        if index < specification.uppercaseCount + 2 {
-          entry = entry.prefix(1).uppercased() + entry.dropFirst()
-        }
-        if index < specification.nonASCIICount + 1 {
-          entry += "ø"
-        }
-      }
-
-      let hasPunctuation = index >= punctuationStart
-      let hasDigit = (index >= digitStart && index < punctuationStart)
-        || (index >= punctuationStart
-          && index < punctuationStart + specification.punctuationDigitOverlap)
-      if hasPunctuation { entry += "-" }
-      if hasDigit { entry += "7" }
-      return entry
-    }
-  }
-
-  // Typebar-authored deterministic Bokmål scale corpora preserve the pinned
-  // aggregate input shapes without importing any reference words.
   static var norwegianBokmal1kLexicon: IndexedLexicon {
-    norwegianBokmalScaleLexicon(.init(
-      marker: "qnb", count: 1_000, maximumLength: 15, uppercaseCount: 0,
-      punctuationCount: 0, digitCount: 0, punctuationDigitOverlap: 0,
-      nonASCIICount: 136))
+    IndexedLexicon(count: 1_000) { NorwegianCorpus.nob1k[$0] }
   }
   static var norwegianBokmal5kLexicon: IndexedLexicon {
-    norwegianBokmalScaleLexicon(.init(
-      marker: "vnb", count: 5_000, maximumLength: 28, uppercaseCount: 0,
-      punctuationCount: 0, digitCount: 0, punctuationDigitOverlap: 0,
-      nonASCIICount: 654))
+    IndexedLexicon(count: 5_000) { NorwegianCorpus.nob5k[$0] }
   }
   static var norwegianBokmal10kLexicon: IndexedLexicon {
-    norwegianBokmalScaleLexicon(.init(
-      marker: "xnb", count: 10_000, maximumLength: 28, uppercaseCount: 1,
-      punctuationCount: 0, digitCount: 0, punctuationDigitOverlap: 0,
-      nonASCIICount: 1_383))
+    IndexedLexicon(count: 10_000) { NorwegianCorpus.nob10k[$0] }
   }
   static var norwegianBokmal150kLexicon: IndexedLexicon {
-    norwegianBokmalScaleLexicon(.init(
-      marker: "znb", count: 142_938, maximumLength: 30, uppercaseCount: 100,
-      punctuationCount: 1_247, digitCount: 1, punctuationDigitOverlap: 1,
-      nonASCIICount: 28_688))
+    IndexedLexicon(count: 142_938) { NorwegianCorpus.nob150k[$0] }
   }
   static var norwegianBokmal600kLexicon: IndexedLexicon {
-    norwegianBokmalScaleLexicon(.init(
-      marker: "ynb", count: 614_970, maximumLength: 33, uppercaseCount: 10_291,
-      punctuationCount: 9_700, digitCount: 143, punctuationDigitOverlap: 130,
-      nonASCIICount: 123_229))
+    IndexedLexicon(count: 614_970) { NorwegianCorpus.nob600k[$0] }
   }
 
   static var norwegianBokmal1kWords: [String] { norwegianBokmal1kLexicon.materialized() }
@@ -14227,102 +14152,20 @@ enum StarterLexicon {
     "liten", "tid", "vår", "øy", "ven", "ikkje", "kvar", "noko",
   ]
 
-  private struct NorwegianNynorskScaleSpecification {
-    let marker: String
-    let count: Int
-    let maximumLength: Int
-    let uppercaseCount: Int
-    let punctuationCount: Int
-    let spaceCount: Int
-    let digitCount: Int
-    let punctuationSpaceOverlap: Int
-    let punctuationDigitOverlap: Int
-    let nonASCIICount: Int
-  }
-
-  private static let norwegianNynorskScaleRoots = [
-    "nord", "skog", "vind", "spor", "lykt", "havn",
-  ]
-
-  private static func norwegianNynorskScaleLexicon(
-    _ specification: NorwegianNynorskScaleSpecification
-  ) -> IndexedLexicon {
-    let punctuationStart = specification.count - specification.punctuationCount
-    let standaloneSpaces = specification.spaceCount - specification.punctuationSpaceOverlap
-    let spaceStart = punctuationStart - standaloneSpaces
-    let standaloneDigits = specification.digitCount - specification.punctuationDigitOverlap
-    let digitStart = spaceStart - standaloneDigits
-    precondition(specification.punctuationSpaceOverlap <= specification.punctuationCount)
-    precondition(
-      specification.punctuationSpaceOverlap + specification.punctuationDigitOverlap
-        <= specification.punctuationCount)
-    precondition(standaloneSpaces >= 0 && standaloneDigits >= 0)
-
-    return IndexedLexicon(count: specification.count) { index in
-      var entry: String
-      if index == 0 {
-        entry = "ǿ"
-      } else if index == 1 {
-        entry = String(repeating: specification.marker.last!, count: specification.maximumLength)
-      } else {
-        entry = specification.marker
-          + norwegianNynorskScaleRoots[index % norwegianNynorskScaleRoots.count]
-          + norwegianBokmalScaleIndex(index)
-        if index < specification.uppercaseCount + 2 {
-          entry = entry.prefix(1).uppercased() + entry.dropFirst()
-        }
-        if index < specification.nonASCIICount + 1 {
-          entry += "ø"
-        }
-      }
-
-      let hasPunctuation = index >= punctuationStart
-      let hasSpace = (index >= spaceStart && index < punctuationStart)
-        || (index >= punctuationStart
-          && index < punctuationStart + specification.punctuationSpaceOverlap)
-      let digitOverlapStart = punctuationStart + specification.punctuationSpaceOverlap
-      let hasDigit = (index >= digitStart && index < spaceStart)
-        || (index >= digitOverlapStart
-          && index < digitOverlapStart + specification.punctuationDigitOverlap)
-      if hasPunctuation { entry += "-" }
-      if hasSpace { entry += " a" }
-      if hasDigit { entry += "7" }
-      return entry
-    }
-  }
-
-  // Typebar-authored deterministic Nynorsk scale corpora preserve the pinned
-  // aggregate input shapes without importing any reference words.
   static var norwegianNynorsk1kLexicon: IndexedLexicon {
-    norwegianNynorskScaleLexicon(.init(
-      marker: "qnn", count: 1_000, maximumLength: 18, uppercaseCount: 0,
-      punctuationCount: 0, spaceCount: 0, digitCount: 0,
-      punctuationSpaceOverlap: 0, punctuationDigitOverlap: 0, nonASCIICount: 132))
+    IndexedLexicon(count: 1_000) { NorwegianCorpus.nno1k[$0] }
   }
   static var norwegianNynorsk5kLexicon: IndexedLexicon {
-    norwegianNynorskScaleLexicon(.init(
-      marker: "vnn", count: 5_000, maximumLength: 27, uppercaseCount: 0,
-      punctuationCount: 0, spaceCount: 0, digitCount: 0,
-      punctuationSpaceOverlap: 0, punctuationDigitOverlap: 0, nonASCIICount: 714))
+    IndexedLexicon(count: 5_000) { NorwegianCorpus.nno5k[$0] }
   }
   static var norwegianNynorsk10kLexicon: IndexedLexicon {
-    norwegianNynorskScaleLexicon(.init(
-      marker: "xnn", count: 9_939, maximumLength: 27, uppercaseCount: 0,
-      punctuationCount: 0, spaceCount: 0, digitCount: 0,
-      punctuationSpaceOverlap: 0, punctuationDigitOverlap: 0, nonASCIICount: 1_492))
+    IndexedLexicon(count: 9_939) { NorwegianCorpus.nno10k[$0] }
   }
   static var norwegianNynorsk100kLexicon: IndexedLexicon {
-    norwegianNynorskScaleLexicon(.init(
-      marker: "znn", count: 104_745, maximumLength: 29, uppercaseCount: 28,
-      punctuationCount: 676, spaceCount: 0, digitCount: 1,
-      punctuationSpaceOverlap: 0, punctuationDigitOverlap: 1, nonASCIICount: 21_255))
+    IndexedLexicon(count: 104_745) { NorwegianCorpus.nno100k[$0] }
   }
   static var norwegianNynorsk400kLexicon: IndexedLexicon {
-    norwegianNynorskScaleLexicon(.init(
-      marker: "ynn", count: 410_719, maximumLength: 31, uppercaseCount: 6_774,
-      punctuationCount: 4_040, spaceCount: 19, digitCount: 143,
-      punctuationSpaceOverlap: 14, punctuationDigitOverlap: 127,
-      nonASCIICount: 82_101))
+    IndexedLexicon(count: 410_719) { NorwegianCorpus.nno400k[$0] }
   }
 
   static var norwegianNynorsk1kWords: [String] { norwegianNynorsk1kLexicon.materialized() }

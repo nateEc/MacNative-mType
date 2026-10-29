@@ -14,6 +14,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case polish = "PolishCorpusNotices"
   case portuguese = "PortugueseCorpusNotices"
   case esperanto = "EsperantoCorpusNotices"
+  case norwegian = "NorwegianCorpusNotices"
   case unicode = "UnicodeNotice"
   case other = "ThirdPartyNotices"
 
@@ -32,6 +33,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     case .polish: "Polski · 规模词库"
     case .portuguese: "Português · 规模词库"
     case .esperanto: "Esperanto · 规模词库"
+    case .norwegian: "Norsk · Bokmål／Nynorsk"
     case .unicode: "Unicode"
     case .other: "其他开源组件"
     }
@@ -78,6 +80,8 @@ struct CorpusAttributionSummary: View {
       Text("Português 规模词库来自 Wikcionário contributors、Kaikki.org / Wiktextract 和 wordfreq，另含两个明确标注的单位书写示例。")
         .fixedSize(horizontal: false, vertical: true)
       Text("Esperanto 规模词库来自 English Wiktionary contributors、Kaikki.org / Wiktextract，按 Tatoeba contributors 的句子词频选编，包含独立的 X／H 拼写转换。")
+        .fixedSize(horizontal: false, vertical: true)
+      Text("Norsk bokmål／nynorsk 规模词库来自 Norsk ordbank，由 Nasjonalbiblioteket / Språkbanken 发布；两种书面语分别按其官方 unigram 数据选编。")
         .fixedSize(horizontal: false, vertical: true)
       Button("查看完整许可…") { showingNotices = true }
         .buttonStyle(.link)

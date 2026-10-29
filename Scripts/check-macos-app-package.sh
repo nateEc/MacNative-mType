@@ -123,6 +123,12 @@ cmp "$project_root/Resources/EsperantoCorpusNotices.txt" \
 cmp "$project_root/Resources/EsperantoCorpusSources.txt" \
   "$app_path/Contents/Resources/EsperantoCorpusSources.txt" \
   || fail "Esperanto spelling sources missing or modified"
+cmp "$project_root/Resources/NorwegianCorpusNotices.txt" \
+  "$app_path/Contents/Resources/NorwegianCorpusNotices.txt" \
+  || fail "Norwegian corpus attribution missing or modified"
+cmp "$project_root/Resources/NorwegianCorpusSources.txt" \
+  "$app_path/Contents/Resources/NorwegianCorpusSources.txt" \
+  || fail "Norwegian row provenance missing or modified"
 if [[ -n "$reference_root" ]]; then
   zsh "$project_root/Scripts/check-originality-boundaries.sh" \
     --reference "$reference_root" \
