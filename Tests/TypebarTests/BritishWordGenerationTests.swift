@@ -95,7 +95,24 @@ final class BritishWordGenerationTests: XCTestCase {
   }
 
   func testLazyNormalizationRunsBeforeBritishReplacement() {
-    XCTAssertEqual(quote("cólór", config: configuration(modifiers: [.lazyLatin])).prompt, "colour")
+    XCTAssertTrue(TypingLanguage.englishLegal.supportsLazyLatinInput)
+    XCTAssertEqual(quote("cólór", config: configuration(language: .englishLegal, modifiers: [.lazyLatin])).prompt, "colour")
+  }
+
+  func testUnsupportedEnglishQuoteKeepsAccentsWhilePlainSpellingStillConverts() {
+    XCTAssertFalse(TypingLanguage.english.supportsLazyLatinInput)
+    let requested = configuration(modifiers: [.lazyLatin])
+    let session = quote("cólór color", config: requested)
+    XCTAssertTrue(requested.modifiers.contains(.lazyLatin))
+    XCTAssertFalse(session.configuration.modifiers.contains(.lazyLatin))
+    XCTAssertEqual(session.prompt, "cólór colour")
+  }
+
+  func testCustomEnglishRetainsItsLazyExceptionBeforeBritishReplacement() {
+    let requested = configuration(mode: .custom, modifiers: [.lazyLatin])
+    let session = TestSessionFactory.make(configuration: requested, customText: "cólór")
+    XCTAssertTrue(session.configuration.modifiers.contains(.lazyLatin))
+    XCTAssertEqual(session.prompt, "colour")
   }
 
   func testNoSpaceTargetsUseActualBritishWordLengthsAndCanComplete() {

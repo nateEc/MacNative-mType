@@ -12,13 +12,15 @@ import XCTest
     var typed = ""
   }
 
-  func testActualPracticePagePreparesEveryGermanScaleAndAcceptsItsFirstWord() throws {
+  func testActualPracticePagePreparesEveryGermanScaleAndAcceptsItsFirstWord() async throws {
     for language: TypingLanguage in [.german1k, .german10k, .german250k] {
-      try verifyActualPage(language: language)
+      try await PracticeHostLifetime.withModelContainer { container, track in
+        try await verifyActualPage(language: language, container: container, trackCallbacks: track)
+      }
     }
   }
 
-  private func verifyActualPage(language: TypingLanguage) throws {
+  private func verifyActualPage(language: TypingLanguage, container: ModelContainer, trackCallbacks: (AnyObject) -> Void) async throws {
     _ = NSApplication.shared
     let suite = "GermanPracticeHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -31,10 +33,8 @@ import XCTest
     let configuration = TestConfiguration.words(153, language: language)
     XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: configuration),
       testParameterMemory: .legacyDefaults(configuration: configuration))))
-    let container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
-      SavedCustomTextRecord.self, ResultFilterPresetRecord.self, LocalPersonalBestLedgerRecord.self,
-      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let preparation = Preparation()
+    trackCallbacks(preparation)
     let content = TypebarApp.practiceContent(settings: settings,
       account: AccountSession(defaults: defaults), announcements: RemoteAnnouncementCenter(defaults: defaults),
       hotkey: GlobalHotkeyMonitor(), systemKeyboardGuide: SystemKeyboardGuideMonitor(observesInputSourceChanges: false),
@@ -60,15 +60,15 @@ import XCTest
     func views<T: NSView>(_ type: T.Type, in view: NSView) -> [T] {
       (view as? T).map { [$0] } ?? view.subviews.flatMap { views(type, in: $0) }
     }
-    func waitUntil(_ condition: () -> Bool) {
+    func waitUntil(_ condition: () -> Bool) async {
       let deadline = Date().addingTimeInterval(15)
       repeat {
         host.layoutSubtreeIfNeeded()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        try? await Task.sleep(for: .milliseconds(20))
       } while !condition() && Date() < deadline
       XCTAssertTrue(condition())
     }
-    waitUntil {
+    await waitUntil {
       guard let prompt = preparation.prompt else { return false }
       return views(PromptFieldNativeView.self, in: host).contains { $0.accessibilityValue() as? String == prompt }
         && views(TypingInputView.self, in: host).first?.acceptsTextInput == true
@@ -82,7 +82,7 @@ import XCTest
     let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
     let first = try XCTUnwrap(words.first)
     input.insertText(String(first) + " ", replacementRange: NSRange(location: NSNotFound, length: 0))
-    waitUntil { preparation.typed == String(first) + " " }
+    await waitUntil { preparation.typed == String(first) + " " }
     XCTAssertTrue(views(TypingInputView.self, in: host).first === input)
     XCTAssertEqual(preparation.calls, 1)
     XCTAssertFalse(window.isVisible)

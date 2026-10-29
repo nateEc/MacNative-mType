@@ -12489,6 +12489,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEnglish450kWeakSpotUsesTheIndexedCorpus() throws {
     let target = StarterLexicon.english450kLexicon[2]
+    let weakCharacter = try XCTUnwrap(target.first)
     let mistyped = "x" + target.dropFirst()
     let result = CompletedTestResult(
       id: UUID(), configuration: .words(1, language: .english450k), outcome: .completed,
@@ -12503,7 +12504,14 @@ final class TypingEngineTests: XCTestCase {
         suggestionLimit: 8))
 
     XCTAssertEqual(report.suggestedWords.count, 8)
-    XCTAssertTrue(report.suggestedWords.allSatisfy { $0.first == target.first })
+    XCTAssertEqual(report.characters.map(\.character), [weakCharacter])
+    XCTAssertEqual(report.totalMistakeCount, 1)
+    // A weak character contributes at every word position. Equal scores keep
+    // corpus order; real candidates need not start with that character.
+    let expected = Array(StarterLexicon.english450kLexicon.lazy
+      .filter { $0.contains(weakCharacter) }.prefix(8))
+    XCTAssertEqual(report.suggestedWords, expected)
+    XCTAssertTrue(report.suggestedWords.allSatisfy { $0.contains(weakCharacter) })
   }
 
   func testSpanishScaleChoicesPreserveIndependentIDsAndCurrentCorpusShapes() throws {

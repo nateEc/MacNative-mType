@@ -1,6 +1,36 @@
 # 客户端完整测试范围的本地基线
 
-`GATE-CLIENT-BASELINE-39`，冻结起点 `1ee242d7f74be670025afa7018c106263558f7ec`。本记录不是完整重写验收通过声明。
+`GATE-CLIENT-BASELINE-39`，历史基线起点 `1ee242d7f74be670025afa7018c106263558f7ec`。最新完整范围为 6,867 项／一失败；最后夹具修正后扩大 1,205 项及 146 项必需源证据通过，未再次完整运行。本记录不是完整重写验收通过声明。
+
+## 第一次重跑终态（起点 2b33c52d，中断）
+
+最新源码独立运行 `/tmp/typebar-client-2b33c52d-baseline-20261029-driver.py`，保留旧运行及日志；冻结 1,361 个非 Markdown 输入，启用两种耐久开关及同样三项显式窗口排除。六个历史模型写入器串行准备成功。驱动已终止，退出码 1、516.286 秒，测试阶段 509.417 秒，输入全部未变；没有全套 XCTest 完成摘要。日志明确记录 1,592 个方法 passed、一个方法 failed，随后 SIGTRAP 中断，不能称已执行全部客户端。必需源证据汇总未执行。
+
+`BritishWordGenerationTests.testLazyNormalizationRunsBeforeBritishReplacement` 失败：`cólór` 未变为旧断言要求的 `colour`。源代码及语言元数据表明基本 English 禁用 Lazy、custom 有例外、English Legal 允许；旧夹具的资格前提需修正并补足两边反例，不能恢复无条件去重音以迎合旧断言。随后 `IncompletePracticeEvidenceTests.testInMemoryStoreRecreatesTheSnapshotAndRetainsCorruptExplicitBytes` 第 211 行保存触发 SIGTRAP；`xctest-2026-10-29-204940.ips` 在 SwiftData／SwiftUI 保存通知路径，偏移与此前宿主问题相同，但未据此认定相同修复充分。
+
+单独 German 隐藏宿主加该保存方法仍崩溃，`/tmp/typebar-host-incomplete-red-20261029.log`，7.751 秒。仅等待 onDisappear／布局并延长容器生命仍失败（green 文件名不代表通过，29.578 秒）；外层自动释放池对照也失败（26.451 秒）。随后仅改 async、保留同步轮询会阻塞准备；改成异步轮询但仅 yield 一次也仍崩溃。各实验终态保留，不能将文件名或 onDisappear 等同于根视图及其排队任务已经释放。
+
+调试器在 SwiftData 保存通知路径观察到 swift_weakLoadStrong 返回 nil，紧接 brk；目标元数据为 ModelContext。独立简单 Query 隐藏宿主加保存对照通过，故不能推为所有 Query 或生产存储必然崩溃。German 实际宿主改为异步状态轮询，并在方法退出后保留容器、等待弱 preparation 回调所有者真正释放，原独立保存方法保持不变；`/tmp/typebar-host-incomplete-callback-release-20261029.log` 两方法通过，4.928 秒，驱动 30.238 秒，输入未变。
+
+将这一有界生命周期约束抽为测试专用 PracticeHostLifetime，十类练习夹具保留全部原页面断言，等待期间向 MainActor 让出执行。新增正常／抛出原异常两条生命周期检查。英式拼写原次序断言改用允许 Lazy 的 English Legal，另补基本 English 拒绝、custom 例外，生产资格策略不变。`/tmp/typebar-host-lifetime-focused-20261029.log` 82 项通过、18.257 秒，驱动 45.323 秒，冻结输入未变；这是局部通过，不能代替十类宿主或完整范围重跑。
+
+本轮十万词耐久实际通过，189.201 秒，历史磁盘迁移类也通过；这些不能代替尚未完成的客户端。运行期间没有修改代码、扩大排除、重启作业或启动主程序。当前没有新提交／推送或远端 CI 运行请求。
+
+## 生命周期修正后的独立重跑
+
+`/tmp/typebar-host-lifetime-all-hosts-20261029.log` 扩大检查终态为 60 项、零失败／运行时跳过，XCTest 181.072 秒、驱动 186.310 秒，非 Markdown 输入哈希保持。包含全部十类语言宿主、正常／异常生命周期、IncompletePracticeEvidence 与 OrdinarySourceUnitStats 的原保存方法，以及 ViewportPracticeHostTests；原生滚轮显示前提记录为 wasAsleep=false、drawable=true。这不替代所有客户端方法。
+
+新完整范围记录为 `/tmp/typebar-client-lifetime-fixed-20261029.json`，驱动同前缀 `-driver.py`，日志 `.log`。实际终态为退出 1、驱动 3,793.146 秒、测试阶段 3,785.608 秒；XCTest 共 6,867 项，6,866 passed、一项 failed、零运行时跳过，同样三个显式窗口排除另计。1,362 个非 Markdown 输入保持。六个历史写入器重新串行准备成功，十万词耐久通过（197.769 秒）；原保存方法在完整顺序中通过（0.006 秒），未再触发 SIGTRAP。运行中未改代码、扩大排除或启动第二个原生作业。
+
+组合输入阶段日志缓冲时，`/tmp/typebar-client-lifetime-fixed-20261029-composition.sample` 显示实际已推进到尼泊尔文混排，未因旧尾行重启；一次采样不作为性能根因结论。
+
+唯一失败为 TypingEngineTests.testEnglish450kWeakSpotUsesTheIndexedCorpus 的“所有推荐词以错字符开头”断言。WeakSpotPractice 评分检查词中任意位置的字符，同分保留词库顺序；不能将此前合成词形的共同前缀继续当成真实语料契约。单独原方法在 `/tmp/typebar-english450k-weakspot-red-20261029.log` 再现一处失败，XCTest 0.997 秒、驱动 4.263 秒、输入保持。后续修正保留八词断言，并直接验证唯一错字符、一次错误及实际索引词库中包含该字符的前八词；生产评分不变。
+
+完整红日志的正式源证据汇总明确拒绝通过：top-level XCTest run did not pass the required scope。不能把其中来源方法的 passed 记录升级为汇总通过；修正后的定向及包含全部必需源方法的扩大回归需另取独立终态。
+
+修正后 `/tmp/typebar-english450k-weakspot-fixed-20261029.log` 65 项通过、零失败，XCTest 2.774 秒、驱动 56.663 秒、输入保持。随后 `/tmp/typebar-lifetime-regression-20261029.log` 扩大回归实际终止，退出 0，1,205 项通过、零失败／运行时跳过，驱动 3,782.550 秒，全部非 Markdown 输入保持；同前缀 `.evidence.log` 正式确认 146 项必需源方法通过、汇总退出 0。此集合包括全部十类语言宿主、原独立保存、英式拼写、弱项与生命周期、语料及回放／源对照。日志未刷新时采样显示实际已推进到官方挑战脚本输入，没有重启；采样不作性能结论。
+
+当前结论是已修正本轮发现的夹具与宿主生命周期问题，并取得上述定向／扩大通过证据。没有在最后一次弱项夹具改动后再次执行完整 6,867 项，因此不将完整红基线改为全绿；同样三项实体窗口检查及整体重写未覆盖事项仍开放。生产代码、资源、CI 触发条件和通知设置均未在本轮改动。
 
 ## 冻结与范围
 
