@@ -2,6 +2,8 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-GERMAN-SCALES-44 | German 三档字面词形、长词、ß 与旧历史 | 单个隔离实例逐一选择 1k／10k／250k，输入大写名词、Straße／weiß 和最长词，切换 Lazy Latin、No Space、Backwards；完成多词表达、标点及超百词续批后重复，重开旧合成提示结果。 | 保留来源拼写与德语大小写规则，转换按现有规则执行；旧提示／事件／成绩保持，基本 German 与 Swiss German 基本池不变。 | 待验收（原生核心及三档隐藏生产宿主见 GERMAN_SCALES_CORPUS_CONTRACT.md；语言质量／分布、物理输入和完整性能仍开放） |
+| LANG-GERMAN-LICENSE-44 | Deutsch 完整许可与逐词来源映射随包交付 | 同一个隔离实例打开 About，查看 German 署名并选择 Deutsch 许可，检查本地完整说明、关闭恢复；核对包内来源映射与原页／贡献者历史链接。 | 原生许可文档可读，逐词来源随应用交付；丢失／截断署名或映射不能被自洽的新 manifest 校验值掩盖。 | 待验收（源复现、反例和包字节保护见 GERMAN_SCALES_CORPUS_CONTRACT.md；实体按钮／sheet、VoiceOver 和人工来源审校仍开放） |
 | LANG-ENGLISH-LARGE-43 | English 450k 的实际词汇和旧练习 | 单个隔离实例选择大档，输入带大小写、撇号、连字符及句点的词，切换 Backwards／No Space，完成超过百词并重复；打开旧合成提示的结果。 | 新练习来自独立语料，续批／重复保留目标，旧捕获提示／事件／成绩不回算；小档保持既有数据。 | 待验收（固定来源复现、原生生成和隐藏生产宿主首词输入见 ENGLISH_LARGE_CORPUS_CONTRACT.md；语言质量、物理输入及完整性能仍开放） |
 | LANG-ENGLISH-LICENSE-43 | About 显著版权和完整本地许可 | 同一个隔离实例打开 About，检查首屏完整 UKACD 版权，点击完整许可，逐项选择七个文档、滚动至底部、复制文字并关闭。 | 首屏版权清晰可见；大档完整 SCOWL 和 wordfreq 文档本地可读，关闭恢复原窗口；缺失资源明确报错。 | 待验收（隐藏首屏／文档末尾像素和包内字节证据见 ENGLISH_LARGE_CORPUS_CONTRACT.md；实体按钮／sheet、VoiceOver 及文本选择仍开放） |
 | KEYMAP-CLOCK-38 | 键帽动画毫秒边界、重复及淡出 | 单个隔离实例开启完整配置 React／Next，重复按键、离开 Next 并在淡出中继续输入，改变帧率及重开；对照中间色和清理时点。 | 起点和 tick 分别使用整数毫秒，创建态零进度、同毫秒真实 tick 保留提前量；旧动画不清新输入，正常完成后清理。 | 待验收（2,406 个固定来源帧及隐藏组件见 KEYMAP_INTEGER_CLOCK_CONTRACT.md；全局栅格、实体刷新／跨屏和输入设备仍开放） |

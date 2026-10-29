@@ -44,6 +44,8 @@ cp "$project_root/Resources/EnglishLargeCorpusNotices.txt" "$app_path/Contents/R
 cp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/FrenchFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/FrenchFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/ItalianFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/ItalianFrequencyCorpusNotices.txt"
+cp "$project_root/Resources/GermanFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/GermanFrequencyCorpusNotices.txt"
+cp "$project_root/Resources/GermanCorpusSources.txt" "$app_path/Contents/Resources/GermanCorpusSources.txt"
 if [[ -n "$bundle_identifier" ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $bundle_identifier" "$app_path/Contents/Info.plist"
 fi

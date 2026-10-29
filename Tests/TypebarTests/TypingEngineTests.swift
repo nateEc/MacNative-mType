@@ -15245,11 +15245,11 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testGermanScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testGermanScaleChoicesPreserveIndependentIDsAndAuditedOwnedShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
-      ("german1k", 988, 2, 17, 415, 11, 3, 8, 109),
-      ("german10k", 9_994, 2, 27, 5_447, 65, 25, 40, 1_599),
-      ("german250k", 239_243, 2, 35, 181_917, 0, 0, 0, 45_170),
+      ("german1k", 988, 2, 17, 415, 11, 3, 8, 78),
+      ("german10k", 9_994, 2, 27, 5_045, 65, 25, 40, 1_432),
+      ("german250k", 239_243, 2, 35, 142_421, 0, 0, 0, 47_774),
     ]
 
     for (rawValue, count, minimum, maximum, uppercase, nonLetters, punctuation, spaces, nonASCII) in cases {

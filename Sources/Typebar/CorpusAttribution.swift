@@ -7,6 +7,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case spanishFrequency = "SpanishFrequencyCorpusNotices"
   case frenchFrequency = "FrenchFrequencyCorpusNotices"
   case italianFrequency = "ItalianFrequencyCorpusNotices"
+  case germanFrequency = "GermanFrequencyCorpusNotices"
   case unicode = "UnicodeNotice"
   case other = "ThirdPartyNotices"
 
@@ -18,6 +19,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     case .spanishFrequency: "Spanish 频率词库"
     case .frenchFrequency: "French 频率词库"
     case .italianFrequency: "Italian 频率词库"
+    case .germanFrequency: "Deutsch 词库"
     case .unicode: "Unicode"
     case .other: "其他开源组件"
     }
@@ -50,6 +52,8 @@ struct CorpusAttributionSummary: View {
       Text(LargeEnglishAttribution.copyright)
         .font(.callout)
         .textSelection(.enabled)
+        .fixedSize(horizontal: false, vertical: true)
+      Text("German 大档语料来自 German Wiktionary contributors，经 Kaikki.org / Wiktextract 提取。")
         .fixedSize(horizontal: false, vertical: true)
       Button("查看完整许可…") { showingNotices = true }
         .buttonStyle(.link)

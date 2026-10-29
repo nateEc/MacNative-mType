@@ -1,0 +1,119 @@
+{
+  "available": {
+    "letters": 903490,
+    "phrases": 14051,
+    "punctuated": 10523
+  },
+  "dataLicense": "CC-BY-SA-4.0 adapted selection; retain source credits and entry map",
+  "dictionary": {
+    "languageCode": "de",
+    "retrievedDate": "2026-10-29",
+    "sha256": "04f07bd9d54277d79e0c6e1478fe86a13ac9db7c292cdec13b961b59a505f79b",
+    "url": "https://kaikki.org/dictionary/downloads/de/de-extract.jsonl.gz"
+  },
+  "editorialPunctuation": {
+    "10k": [
+      "E-Mail",
+      "U-Bahn",
+      "S-Bahn",
+      "U-Boot",
+      "T-Shirt",
+      "CD-ROM",
+      "Know-how",
+      "Make-up",
+      "O-Beine",
+      "X-Beine",
+      "i-Punkt",
+      "usw.",
+      "z.B.",
+      "u.a.",
+      "bzw.",
+      "Dr.",
+      "Prof.",
+      "wenn’s",
+      "wird’s",
+      "E-Mails",
+      "U-Bahnen",
+      "S-Bahnen",
+      "U-Boote",
+      "T-Shirts",
+      "E-Bike"
+    ],
+    "1k": [
+      "E-Mail",
+      "usw.",
+      "wenn’s"
+    ],
+    "250k": []
+  },
+  "filesSHA256": {
+    "Resources/GermanCorpusSources.txt": "431443cbaf20c9351b8a6ad2cf42ddf09a1e75c6b2067872116bd8a95a00eee6",
+    "Resources/GermanFrequencyCorpusNotices.txt": "4a1b02e3cc09ed9a2d78d26511b181fbdf68f280ab2ccf8abe2beed060f13136",
+    "Sources/Typebar/GermanFrequencyCorpus.generated.swift": "6f298b1d62650633ee02368b3ecf01f21ef3d62438fa76ce884f5f4035882091",
+    "Sources/Typebar/GermanLargeCorpus.generated.swift": "187cb96907da3755f31f7008ff47e7b1133c2bc233eb17d1d517913cf485fd17"
+  },
+  "limits": "Literal dictionary attestation and aggregate counts do not prove extraction quality, difficulty or distribution parity.",
+  "longFormCoverage": {
+    "10k": "Weltgesundheitsorganisation",
+    "1k": "unterschiedlichen",
+    "250k": "Elektrizitätsversorgungsunternehmen"
+  },
+  "preparation": {
+    "msgpackVersion": "1.1.2",
+    "runtimeDependencies": [],
+    "unicodeVersion": "15.0.0"
+  },
+  "revision": "kaikki-de-20261029-wordfreq-3.1.1-v1",
+  "scales": {
+    "10k": {
+      "shape": {
+        "count": 9994,
+        "maximumLength": 27,
+        "minimumLength": 2,
+        "nonASCIICount": 1432,
+        "nonLetterCount": 65,
+        "punctuationCount": 25,
+        "spaceCount": 40,
+        "uniqueCount": 9994,
+        "uppercaseCount": 5045
+      },
+      "wordsSHA256": "8f7574893ed17df50c58801441f159a0e04d3622bb3c76effe3f21fcc82e94c6"
+    },
+    "1k": {
+      "shape": {
+        "count": 988,
+        "maximumLength": 17,
+        "minimumLength": 2,
+        "nonASCIICount": 78,
+        "nonLetterCount": 11,
+        "punctuationCount": 3,
+        "spaceCount": 8,
+        "uniqueCount": 988,
+        "uppercaseCount": 415
+      },
+      "wordsSHA256": "d2cea3f886167e249b438177ee00bcc478e89220e1650b6c608e4028a526ca16"
+    },
+    "250k": {
+      "shape": {
+        "count": 239243,
+        "maximumLength": 35,
+        "minimumLength": 2,
+        "nonASCIICount": 47774,
+        "nonLetterCount": 0,
+        "punctuationCount": 0,
+        "spaceCount": 0,
+        "uniqueCount": 239243,
+        "uppercaseCount": 142421
+      },
+      "wordsSHA256": "ca74b2b71791f169de73afc0c29d948ae394117e3bff05a212ae712c34bdcaac"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceMapCount": 239308,
+  "wordfreq": {
+    "member": "wordfreq/data/large_de.msgpack.gz",
+    "memberSHA256": "8ef04d3f4a28fb48d800d25fa80a96d90a5f80c8496c9a453f99f887c6ad3c12",
+    "version": "3.1.1",
+    "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+  }
+}

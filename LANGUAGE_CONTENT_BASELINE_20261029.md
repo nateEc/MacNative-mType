@@ -6,7 +6,9 @@
 
 `LANG-ENGLISH-LARGE-43` 已将 English 450k 的 450,029 个合成候选替换为独立实际来源选集，移除 `englishScaleLexicon`；来源、原生输入、旧记录及署名边界见 ENGLISH_LARGE_CORPUS_CONTRACT.md。按下列历史 118 项逐入口复核，目前同范围仍有 117 个直接合成入口，声明数量之和为 3,740,882。复核记录 `/tmp/typebar-english-large-remaining-synthetic-20261029.json`，当前 TypingEngine SHA-256 `ed4df6fd2ff445465c6708c51c148b22d1e23c17f6b494311e3008cf54fa240d`。该数字不是全部语言缺口总量。
 
-以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English 行已迁移，但其语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
+随后 `LANG-GERMAN-SCALES-44` 将 German 1k／10k／250k 的 250,225 个候选迁至独立字面词形，移除 `germanScaleLexicon`，来源和实际输入见 GERMAN_SCALES_CORPUS_CONTRACT.md。当前同一历史范围余 114 个直接合成入口，声明数量之和 3,490,657；复核 `/tmp/typebar-german-remaining-synthetic-20261029.json`，当前 TypingEngine SHA-256 `a62cc92a8867e9429d997b0262ed153c2f484924a197424485c77ff71e06db40`。
+
+以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English 与 German 行已迁移，但语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
 
 ## 历史起点确认的范围
 
@@ -47,9 +49,9 @@ Italian 四档已经改用独立实际观察语料，相关数据、编辑、复
 | english450k（后续已迁移，见 LANG-ENGLISH-LARGE-43） | 450029 | 历史 englishScaleLexicon | yu |
 | spanish650k | 646579 | spanishScaleLexicon | qzv |
 | french600k | 633941 | frenchScaleLexicon | qvfr |
-| german1k | 988 | germanScaleLexicon | qgd |
-| german10k | 9994 | germanScaleLexicon | wgd |
-| german250k | 239243 | germanScaleLexicon | xgd |
+| german1k（已迁移，见 LANG-GERMAN-SCALES-44） | 988 | 历史 germanScaleLexicon | qgd |
+| german10k（已迁移，见 LANG-GERMAN-SCALES-44） | 9994 | 历史 germanScaleLexicon | wgd |
+| german250k（已迁移，见 LANG-GERMAN-SCALES-44） | 239243 | 历史 germanScaleLexicon | xgd |
 | romanian1k | 1000 | romanianScaleLexicon | qro |
 | romanian5k | 5000 | romanianScaleLexicon | wro |
 | romanian10k | 10000 | romanianScaleLexicon | xro |

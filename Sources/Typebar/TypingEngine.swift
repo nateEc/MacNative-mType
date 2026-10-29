@@ -11168,56 +11168,14 @@ enum StarterLexicon {
   static var french10kWords: [String] { french10kLexicon.materialized() }
   static var french600kWords: [String] { french600kLexicon.materialized() }
 
-  private static let germanScaleRoots = [
-    "hain", "ufer", "spur", "klang", "pfad", "licht", "wind", "feld",
-  ]
-
-  private static func germanScaleLexicon(
-    marker: String, count: Int, minimumToken: String, maximumLength: Int,
-    uppercaseCount: Int, punctuationCount: Int, spaceCount: Int, nonASCIICount: Int
-  ) -> IndexedLexicon {
-    precondition(count > max(uppercaseCount + 2, nonASCIICount + 2))
-    precondition(punctuationCount + spaceCount < count)
-    return IndexedLexicon(count: count) { index in
-      var entry = marker + germanScaleRoots[index % germanScaleRoots.count]
-        + alphabeticIndex(index)
-      if index == 0 {
-        entry = minimumToken
-      } else if index == 1 {
-        entry = String(repeating: marker.first!, count: maximumLength)
-      } else {
-        if index < uppercaseCount + 2 {
-          entry = entry.prefix(1).uppercased() + entry.dropFirst()
-        }
-        if index < nonASCIICount + 2 {
-          entry += "ü"
-        }
-      }
-      if index >= count - spaceCount {
-        entry += " x"
-      } else if index >= count - spaceCount - punctuationCount {
-        entry += "-"
-      }
-      return entry
-    }
-  }
-
   static var german1kLexicon: IndexedLexicon {
-    germanScaleLexicon(
-      marker: "qgd", count: 988, minimumToken: "qz", maximumLength: 17,
-      uppercaseCount: 415, punctuationCount: 3, spaceCount: 8, nonASCIICount: 109)
+    IndexedLexicon(count: 988) { GermanFrequencyCorpus.words1k[$0] }
   }
   static var german10kLexicon: IndexedLexicon {
-    germanScaleLexicon(
-      marker: "wgd", count: 9_994, minimumToken: "wx", maximumLength: 27,
-      uppercaseCount: 5_447, punctuationCount: 25, spaceCount: 40,
-      nonASCIICount: 1_599)
+    IndexedLexicon(count: 9_994) { GermanFrequencyCorpus.words10k[$0] }
   }
   static var german250kLexicon: IndexedLexicon {
-    germanScaleLexicon(
-      marker: "xgd", count: 239_243, minimumToken: "vx", maximumLength: 35,
-      uppercaseCount: 181_917, punctuationCount: 0, spaceCount: 0,
-      nonASCIICount: 45_170)
+    IndexedLexicon(count: 239_243) { GermanLargeCorpus.words250k[$0] }
   }
 
   static var german1kWords: [String] { german1kLexicon.materialized() }

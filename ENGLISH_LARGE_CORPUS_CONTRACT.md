@@ -36,6 +36,8 @@ SCOWL 的大档包含 UK Advanced Cryptics Dictionary；其来源许可要求应
 
 文档包含 SCOWL 完整 Copyright，原段 SHA-256 `090575a131b4260926c7a6b30a90aca0f5db5fbb5c46778e0c5855227bf6ebc3`，并保留完整 wordfreq 来源说明及 Typebar 改编选集的 CC BY-SA 4.0 署名。打包和包检查逐字节复制／比较该文件，不能只在仓库放许可却漏装应用。
 
+后续 `LANG-GERMAN-SCALES-44` 在同一原生阅读器新增第八个 Deutsch 许可选项，并随包加入 German 的逐词来源映射；本节原始七个文档及首次包检查保留为本项落地时的历史范围，新增部分另见 GERMAN_SCALES_CORPUS_CONTRACT.md。
+
 隐藏 NSHostingView 不导出有效 AX 树，首次测试的空标签失败不说明界面缺字。改为识别实际缓存像素，不给 Vision 预设词表或自定义词；About 中来源全名与完整版权行均须原样识别且位于首屏上半部。阅读器先检查实际文档开头，再通过真实 NSScrollView 滚至末尾检查最终 DOI；完整文档字节另由读取／打包／源复现保护。截图 `/tmp/typebar-large-english-about.png`、`/tmp/typebar-large-english-license-reader.png` 和末尾截图已保留；人工查看首两张确认实际内容。此证据不等于实体窗口、VoiceOver、按钮打开 sheet 的完整人工验收。
 
 ## 验证与开放范围
