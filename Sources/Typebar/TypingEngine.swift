@@ -11052,42 +11052,6 @@ enum StarterLexicon {
   static var english25kWords: [String] { english25kLexicon.materialized() }
   static var english450kWords: [String] { english450kLexicon.materialized() }
 
-  private static let spanishScaleRoots = [
-    "brisa", "claro", "faro", "jardin", "luna", "mar",
-    "nube", "papel", "puente", "ruta", "sendero", "sol",
-  ]
-
-  private static func spanishScaleLexicon(
-    marker: String, count: Int, minimumToken: String, maximumLength: Int,
-    uppercaseCount: Int, punctuationCount: Int, spaceCount: Int, nonASCIICount: Int
-  ) -> IndexedLexicon {
-    let minimumUsesNonASCII = minimumToken.unicodeScalars.contains { !$0.isASCII }
-    let generatedNonASCIICount = nonASCIICount - (minimumUsesNonASCII ? 1 : 0)
-    precondition(count > max(uppercaseCount + 2, generatedNonASCIICount + 2))
-    precondition((0...punctuationCount).contains(spaceCount))
-    return IndexedLexicon(count: count) { index in
-      var entry = marker + spanishScaleRoots[index % spanishScaleRoots.count]
-        + alphabeticIndex(index)
-      if index == 0 {
-        entry = minimumToken
-      } else if index == 1 {
-        entry = String(repeating: marker.last!, count: maximumLength)
-      } else {
-        if index < uppercaseCount + 2 {
-          entry = entry.prefix(1).uppercased() + entry.dropFirst()
-        }
-        if index < generatedNonASCIICount + 2 {
-          entry += "ñ"
-        }
-      }
-      if index >= count - spaceCount {
-        entry += " roca"
-      } else if index >= count - punctuationCount {
-        entry += "-"
-      }
-      return entry
-    }
-  }
 
   static var spanish1kLexicon: IndexedLexicon {
     IndexedLexicon(SpanishFrequencyCorpus.words)
@@ -11096,9 +11060,7 @@ enum StarterLexicon {
     IndexedLexicon(SpanishFrequencyCorpus.extendedWords)
   }
   static var spanish650kLexicon: IndexedLexicon {
-    spanishScaleLexicon(
-      marker: "qzv", count: 646_579, minimumToken: "á", maximumLength: 26,
-      uppercaseCount: 3, punctuationCount: 239, spaceCount: 162, nonASCIICount: 247_122)
+    IndexedLexicon(count: 646_579) { SpanishLargeCorpus.words[$0] }
   }
 
   static var spanish1kWords: [String] { spanish1kLexicon.materialized() }

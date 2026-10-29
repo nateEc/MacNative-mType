@@ -12508,11 +12508,10 @@ final class TypingEngineTests: XCTestCase {
 
   func testSpanishScaleChoicesPreserveIndependentIDsAndCurrentCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int)] = [
-      // Independent observed/edited 1k and 10k corpora. The 650k pool still
-      // preserves only aggregate shapes with synthetic entries.
+      // Independently sourced corpora; these are owned selection statistics.
       ("spanish1k", 998, 1, 14, 0, 0, 0, 152),
       ("spanish10k", 9_990, 1, 18, 111, 1, 0, 1_728),
-      ("spanish650k", 646_579, 1, 26, 3, 239, 162, 247_122),
+      ("spanish650k", 646_579, 1, 26, 3, 239, 162, 238_831),
     ]
 
     for (rawValue, count, minimum, maximum, uppercase, punctuation, spaces, nonASCII) in cases {

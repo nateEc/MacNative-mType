@@ -10,7 +10,9 @@
 
 随后 `LANG-FRENCH-LARGE-45` 将 French 600k 的 633,941 个候选迁至独立词典形式／有词典对应的实际观察拼写，移除 `frenchScaleLexicon`。当前同范围余 113 个直接合成入口，声明数量之和 2,856,716；复核 `/tmp/typebar-french-large-remaining-synthetic-20261029.json`，当前 TypingEngine SHA-256 `780143d6df4742232172ba58b68690702dba1228bbcdb7a5c0f1b4f98d549bd8`。以上 English／German 数字保留为各自迁移时的阶段证据。
 
-以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English、German 与 French 行已迁移，但语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
+随后 `LANG-SPANISH-LARGE-46` 移除 Spanish 650k 的合成构造器，使用 646,566 个独立字面词形和 13 个明确标注的书写／排版练习改编。同范围余 112 个直接合成入口，声明数量之和 2,210,137；复核 `/tmp/typebar-spanish-large-remaining-synthetic-20261029.json`，TypingEngine SHA-256 `b4b596d35c331deeaffcf08de9577712e528d30ed03fdc53dd287b8d2685b620`。来源与限制见 SPANISH_LARGE_CORPUS_CONTRACT.md。
+
+以下 118 项表及此前临时候选过程保留为固定起点的历史证据，不再代表全部当前实现；English、German、French 与 Spanish 大档行已迁移，但语言质量、词频／难度和分布等价仍未验收。其余历史项继续开放。
 
 ## 历史起点确认的范围
 
@@ -49,7 +51,7 @@ Italian 四档已经改用独立实际观察语料，相关数据、编辑、复
 | 入口 | 声明数量 | 当前构造器 | marker |
 | --- | ---: | --- | --- |
 | english450k（后续已迁移，见 LANG-ENGLISH-LARGE-43） | 450029 | 历史 englishScaleLexicon | yu |
-| spanish650k | 646579 | spanishScaleLexicon | qzv |
+| spanish650k（已迁移，见 LANG-SPANISH-LARGE-46） | 646579 | 历史 spanishScaleLexicon | qzv |
 | french600k（已迁移，见 LANG-FRENCH-LARGE-45） | 633941 | 历史 frenchScaleLexicon | qvfr |
 | german1k（已迁移，见 LANG-GERMAN-SCALES-44） | 988 | 历史 germanScaleLexicon | qgd |
 | german10k（已迁移，见 LANG-GERMAN-SCALES-44） | 9994 | 历史 germanScaleLexicon | wgd |

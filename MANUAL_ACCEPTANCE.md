@@ -2,6 +2,8 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-SPANISH-LARGE-46 | Spanish 650k 重音、多词、标点与旧记录 | 单个隔离实例选择大档，输入 niño／corazón、多词候选及 ‒、连字符、冒号、括号、斜线，切换 Lazy Latin／No Space／Backwards；超百词续批并重复，打开旧记录。 | 候选拆成实际字段，保留特殊标点，旧提示／事件／成绩和小档不变。 | 待验收（自动化见 SPANISH_LARGE_CORPUS_CONTRACT.md；实体键盘／IME、语言质量及完整性能仍开放） |
+| LANG-SPANISH-LICENSE-46 | Spanish 大档来源和编辑声明 | 同一个隔离实例打开 About、Español · 650k 许可；核对来源页／贡献者历史映射、13 个明确声明的改编及字典字面形式的区别。 | 完整许可／逐词映射随包交付，编辑练习不冒充字典拼写或独立观察频率。 | 待验收（复现与包字节保护见 SPANISH_LARGE_CORPUS_CONTRACT.md；实体 sheet、VoiceOver 和人工审校仍开放） |
 | LANG-FRENCH-LARGE-45 | French 600k 的重音／连字、ASCII 撇号和旧记录 | 单个隔离实例选择大档，输入 être／cœur、长词及 ASCII 撇号候选，切换 Lazy Latin／No Space／Backwards；完成超百词并重复，打开旧结果。 | 保留字面词形与普通键盘撇号，旧提示／事件／成绩和小档数据保持。 | 待验收（原生核心／隐藏宿主见 FRENCH_LARGE_CORPUS_CONTRACT.md；质量、物理键盘／IME 和完整性能仍开放） |
 | LANG-FRENCH-LICENSE-45 | French 600k 本地许可和逐词来源 | 同一个隔离实例打开 About 和 Français · 600k 许可，核对署名、源页／贡献者历史映射及观察拼写对应证据；关闭返回练习。 | 许可和映射随包，删改后重算清单仍被拒绝；大映射不整段挂入许可布局。 | 待验收（复现、负对照和包保护见 FRENCH_LARGE_CORPUS_CONTRACT.md；实体 sheet、VoiceOver 和语言审校仍开放） |
 | LANG-GERMAN-SCALES-44 | German 三档字面词形、长词、ß 与旧历史 | 单个隔离实例逐一选择 1k／10k／250k，输入大写名词、Straße／weiß 和最长词，切换 Lazy Latin、No Space、Backwards；完成多词表达、标点及超百词续批后重复，重开旧合成提示结果。 | 保留来源拼写与德语大小写规则，转换按现有规则执行；旧提示／事件／成绩保持，基本 German 与 Swiss German 基本池不变。 | 待验收（原生核心及三档隐藏生产宿主见 GERMAN_SCALES_CORPUS_CONTRACT.md；语言质量／分布、物理输入和完整性能仍开放） |

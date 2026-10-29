@@ -1,0 +1,188 @@
+{
+  "available": {
+    "cased": 33961,
+    "lower": 893414,
+    "phrases": 9126,
+    "punctuated": 885
+  },
+  "dataLicense": "CC-BY-SA-4.0 adapted selection; retain notices and entry map",
+  "dictionaries": {
+    "es": {
+      "languageCode": "es",
+      "retrievedDate": "2026-10-29",
+      "sha256": "9bca1b9e3d4573825f196aff7aaa1a640503430df248f5a82f6602177abf6853",
+      "url": "https://kaikki.org/dictionary/downloads/es/es-extract.jsonl.gz"
+    },
+    "fr": {
+      "languageCode": "es",
+      "retrievedDate": "2026-10-29",
+      "sha256": "823fa6f488e23850075747762d946c730c798d971e93b37fe645863b8f25e377",
+      "url": "https://kaikki.org/dictionary/downloads/fr/fr-extract.jsonl.gz"
+    }
+  },
+  "editorialForms": [
+    {
+      "base": "-able",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-able"
+      ],
+      "word": "‒able"
+    },
+    {
+      "base": "-al",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-al"
+      ],
+      "word": "‒al"
+    },
+    {
+      "base": "-ano",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-ano"
+      ],
+      "word": "‒ano"
+    },
+    {
+      "base": "-ario",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-ario"
+      ],
+      "word": "‒ario"
+    },
+    {
+      "base": "-dor",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-dor"
+      ],
+      "word": "‒dor"
+    },
+    {
+      "base": "-ero",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-ero"
+      ],
+      "word": "‒ero"
+    },
+    {
+      "base": "-ismo",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-ismo"
+      ],
+      "word": "‒ismo"
+    },
+    {
+      "base": "-ista",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-ista"
+      ],
+      "word": "‒ista"
+    },
+    {
+      "base": "-ito",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-ito"
+      ],
+      "word": "‒ito"
+    },
+    {
+      "base": "-mente",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-mente"
+      ],
+      "word": "‒mente"
+    },
+    {
+      "base": "-oso",
+      "kind": "figureDashTypography",
+      "owner": [
+        "es",
+        "-oso"
+      ],
+      "word": "‒oso"
+    },
+    {
+      "base": "neurorretroalimentaciones",
+      "kind": "topicLabel",
+      "owner": [
+        "es",
+        "neurorretroalimentaciones"
+      ],
+      "word": "neurorretroalimentaciones:"
+    },
+    {
+      "base": "amigo",
+      "kind": "parentheticalTerm",
+      "owner": [
+        "es",
+        "amigo"
+      ],
+      "word": "(amigo)"
+    }
+  ],
+  "filesSHA256": {
+    "Resources/SpanishLargeCorpusNotices.txt": "9ec3b4cbb7c5f0487f6e9e40e272233df9954f0032baf24d9e19bb0d12d107f2",
+    "Resources/SpanishLargeCorpusSources.txt": "11aa61f95f2d6696a2755213a54ad507fb6f5e2cabe939bb80df253048737feb",
+    "Sources/Typebar/SpanishLargeCorpus.generated.swift": "3decad6ed3e0d3b1bcd6bbb6985b898c2c05bb281dec0446a437a6f8be17866a"
+  },
+  "limits": "Literal forms and declared writing adaptations do not prove quality, difficulty or distribution parity.",
+  "literalProperNames": [
+    "España",
+    "México",
+    "Madrid"
+  ],
+  "preparation": {
+    "msgpackVersion": "1.1.2",
+    "runtimeDependencies": [],
+    "unicodeVersion": "15.0.0"
+  },
+  "revision": "kaikki-es-fr-20261029-wordfreq-3.1.1-large-v1",
+  "schemaVersion": 1,
+  "shape": {
+    "count": 646579,
+    "maximumLength": 26,
+    "maximumLetterLength": 24,
+    "minimumLength": 1,
+    "nonASCIICount": 238831,
+    "nonLetterCount": 239,
+    "punctuationEntries": 77,
+    "punctuationScalars": {
+      "(": 1,
+      ")": 1,
+      "-": 62,
+      "/": 2,
+      ":": 1,
+      "‒": 11
+    },
+    "spaceEntries": 162,
+    "uniqueCount": 646579,
+    "uppercaseCount": 3
+  },
+  "sourceMapCount": 646579,
+  "wordfreq": {
+    "member": "wordfreq/data/large_es.msgpack.gz",
+    "memberSHA256": "14f326b4f68d517f9b8b99c1e26ef56a508d2dc8d0ee7a9e6e8732ddab1aa65e",
+    "version": "3.1.1",
+    "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+  },
+  "wordsSHA256": "7e514588116a662b6260954c1287a68b16a2c50cad1e0b2eb62657edb98989b1"
+}
