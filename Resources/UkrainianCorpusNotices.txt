@@ -1,5 +1,5 @@
 Typebar independently prepared Ukrainian corpus
-Revision: kaikki-en-uk-20261030-stress-trace-wordfreq-v1
+Revision: kaikki-en-uk-20261030-stress-trace-wordfreq-v2
 
 English and Russian Wiktionary contributors; extracted by Kaikki.org / Wiktextract.
 Source: https://kaikki.org/dictionary/Ukrainian/kaikki.org-dictionary-Ukrainian.jsonl
@@ -17,7 +17,7 @@ Changes: remove only vowel-adjacent U+0301 dictionary stress annotations; retain
 original forms and titles in the per-word mapping. Never strip the letters ї, й, є or ґ,
 casefold spellings, synthesize suffixes or pad candidate lengths. These adaptations
 are not represented as unchanged source literals. Basic words use observed literal forms.
-Four literal text tokens were manually checked in Ukrainian Wikipedia; tokens
+Five literal text tokens were manually checked in Ukrainian Wikipedia; tokens
 already present in a dictionary keep their dictionary evidence. These include two
 long compounds and two numeric forms. The curated evidence contains
 short transcribed excerpts and pinned revisions, not full downloaded articles.
@@ -25,6 +25,8 @@ short transcribed excerpts and pinned revisions, not full downloaded articles.
 https://uk.wikipedia.org/w/index.php?title=Адміністративний_устрій_України&oldid=48940305
 1990-ті
 https://uk.wikipedia.org/w/index.php?title=1990-ті&oldid=47625455
+Пізнання
+https://uk.wikipedia.org/w/index.php?title=Пізнання&oldid=48450573
 
 wordfreq 3.1.1 wheel SHA-256: 4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473
 Member: wordfreq/data/large_uk.msgpack.gz

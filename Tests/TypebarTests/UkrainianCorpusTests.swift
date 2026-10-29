@@ -6,10 +6,16 @@ final class UkrainianCorpusTests: XCTestCase {
   static let choices: [(TypingLanguage, Int)] = [
     (.ukrainian, 199), (.ukrainian1k, 1_000), (.ukrainian10k, 9_998), (.ukrainian50k, 49_991),
   ]
+
+  func test50kIncludesIndependentlyAttestedDoubleApostropheHyphenForm() {
+    let word = "суб'єктно-об'єктне"
+    XCTAssertEqual(word.count, 18)
+    XCTAssertTrue(TypingLanguage.ukrainian50k.ownedPracticeWords().contains(word))
+  }
   private let hashes = ["28b34fa6d3f7f668f35903344be277114bc6f26b635540943411ab7c8444e37b",
     "1351d532f43780a71936fa9376e4f4a82f6635edc66d6cb4717d2d70d4e10e00",
     "83a0d65d93552dba877b7991c5f41db9ea4068a1fbd73d6454ae5140d814690e",
-    "5b535a7733aa9417ec7ffaad719a21c0356c070d08e30a4baa50f6b1a61c0624"]
+    "db9bda20b369a727c24f24abdaf56f7af3eaac3a0dad82709759c2351410fd8f"]
 
   func testCyrillicChoicesHaveLiteralModernUkrainianCandidates() {
     let alphabet = Set("абвгґдеєжзиіїйклмнопрстуфхцчшщьюяАБВГҐДЕЄЖЗИІЇЙКЛМНОПРСТУФХЦЧШЩЬЮЯ0123456789'-")
@@ -87,7 +93,7 @@ final class UkrainianCorpusTests: XCTestCase {
     return key.isEmpty ? "L" : key
   }
 
-  func testAllClassCountsAndLengthBoundsRemainPinnedWhileThe50kCombinationGapIsExplicit() {
+  func testAllClassCountsLengthBoundsAndPunctuationCombinationsRemainPinned() {
     let specs: [[String: [Int]]] = [
       ["L": [199, 1, 12]],
       ["L": [985, 1, 16], "P": [15, 4, 18]],
@@ -99,14 +105,13 @@ final class UkrainianCorpusTests: XCTestCase {
       for word in item.0.ownedPracticeWords() { groups[category(word), default: []].append(word.count) }
       XCTAssertEqual(groups.mapValues { [$0.count, $0.min()!, $0.max()!] }, specs[index])
     }
-    for (language, apostrophes, hyphens) in [(TypingLanguage.ukrainian1k, 13, 2), (.ukrainian10k, 130, 85), (.ukrainian50k, 660, 1370)] {
+    for (language, apostrophes, hyphens) in [(TypingLanguage.ukrainian1k, 13, 2), (.ukrainian10k, 130, 85), (.ukrainian50k, 661, 1371)] {
       let words = language.ownedPracticeWords()
       XCTAssertEqual(words.reduce(0) { $0 + $1.filter { $0 == "'" }.count }, apostrophes)
       XCTAssertEqual(words.reduce(0) { $0 + $1.filter { $0 == "-" }.count }, hyphens)
     }
-    // Reference 50k totals are 661 / 1371. No source-supported double-apostrophe
-    // plus hyphen token was found; its quota is explicitly not fabricated.
-    XCTAssertFalse(TypingLanguage.ukrainian50k.ownedPracticeWords().contains {
+    // The independently attested Wikipedia form supplies the missing combination.
+    XCTAssertTrue(TypingLanguage.ukrainian50k.ownedPracticeWords().contains {
       $0.filter { $0 == "'" }.count == 2 && $0.contains("-")
     })
   }
@@ -131,7 +136,11 @@ final class UkrainianCorpusTests: XCTestCase {
       mapped.append(row[0]); traces[row[0]] = row
     }
     XCTAssertEqual(mapped, TypingLanguage.ukrainian50k.ownedPracticeWords())
-    XCTAssertEqual(rows.filter { $0[1] == "curated-text" }.count, 3)
+    XCTAssertEqual(rows.filter { $0[1] == "curated-text" }.count, 4)
+    let compound = try XCTUnwrap(rows.first { $0[0] == "суб'єктно-об'єктне" })
+    XCTAssertEqual(compound[1], "curated-text")
+    XCTAssertEqual(compound[2], "https://uk.wikipedia.org/w/index.php?title=Пізнання&oldid=48450573")
+    XCTAssertEqual(compound[3], compound[0])
     for word in TypingLanguage.ukrainian.ownedPracticeWords() {
       let row = try XCTUnwrap(traces[word]); XCTAssertEqual(row[3], word); XCTAssertFalse(row[4].isEmpty)
     }

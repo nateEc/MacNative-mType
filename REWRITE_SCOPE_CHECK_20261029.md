@@ -9,7 +9,7 @@
 | 原生实现与独立代码／资产 | Package.swift、Sources/Typebar、签名包及 originality 检查；当前产品目录搜索未发现 WKWebView／WebView 或参考 QA 环境入口，应用使用 SwiftUI／AppKit／SwiftData。固定参考只用于 QA。 | 原创性检查针对受保护资源和长字面内容，不能单独证明所有代码／资产独立或全部运行路径。仍需保留逐项来源与产品边界。 |
 | 配置行为完整 | Compatibility/official-configs.json：94 项，89 mapped、4 partial、1 ads 不适用，无遗漏 ID。 | compositionDisplay、tapeMode、showAllLines、fontFamily 仍明确 partial。Mapped 是原生入口关联，不能代替全部选择、交互、实时应用、错误及持久化行为证明。 |
 | 页面及弹层完整 | official-page-modal-surfaces.json：53 项，47 mapped、6 明确不适用；mapped 描述本身仍列部分覆盖。 | 各真实入口的展示、提交、取消、失败、异步时序和跨窗口行为；不能由文件／符号存在直接升级为完整验收。 |
-| 语言内容与输入完整 | official-languages.json：446 个身份均映射独立原生 ID。乌克兰语西里尔改动后，直接具名 ScaleLexicon 扫描仍有 119 路／1,029,000 个声明位置，源哈希及只读报告见 UKRAINIAN_CORPUS_CONTRACT.md。 | 声明位置不是实际词数，结构扫描不覆盖所有构造器或基本池。独立真实语料、最长字段、特殊标点／文字、实际观察与质量仍有已知差距，例如 Russian 375k 46／49、撇号／prime、Ukrainian 50k 的双撇号＋连字符组合。各基础池的独立扩充单列追踪；词值、频率、难度及语义质量仍需证明。 |
+| 语言内容与输入完整 | official-languages.json：446 个身份均映射独立原生 ID。乌克兰语西里尔改动后，直接具名 ScaleLexicon 扫描仍有 119 路／1,029,000 个声明位置，源哈希及只读报告见 UKRAINIAN_CORPUS_CONTRACT.md。 | 声明位置不是实际词数，结构扫描不覆盖所有构造器或基本池。独立真实语料、最长字段、特殊标点／文字、实际观察与质量仍有已知差距，例如 Russian 375k 46／49、撇号／prime；Ukrainian 50k 的双撇号＋连字符组合已以真实文本补齐。各基础池的独立扩充单列追踪；词值、频率、难度及语义质量仍需证明。 |
 | 键盘与实体输入 | official-layouts.json：239 个 nativeExact 身份，完整四层审计开关在本轮全范围运行中启用。 | 映射数不等于所有实体按键、IME、显示器、布局切换和辅助功能验收。最终结果及具体比较点应从本次实际测试日志读取。 |
 | 主题与显示 | official-themes.json：187 个参考名称、188 个原生内置主题；0 exactMappings、187 relatedMappings。 | 名称／相关配色不能证明完整颜色、预览、保存、随机、系统切换和所有显示行为；独立设计与参考差异仍需明确验收。 |
 | 挑战规则及受限入口 | official-challenges.json：58 项，57 nativeEquivalent、1 pending。 | mobileWarrior 原条件为移动设备一小时测试，macOS 不能满足该设备条件；当前导入解释限制，不颁发冒充等价的原生成就。该限制仍须在整体兼容结论中保留。 |

@@ -1,13 +1,13 @@
 {
-  "boundaryEvidenceSHA256": "52cc152df8ad908bd34da16258cb74b5f0d1b5213ab79794208944249f5bfc7d",
+  "boundaryEvidenceSHA256": "3b603794d5f1869f79c0253f4498d9dbdad369bc0e44083a6490f537a096f60e",
   "filesSHA256": {
-    "Resources/UkrainianCorpusNotices.txt": "3535ebf9215e068656825fe9f62949099108d1bca9567559acdabb115c744024",
-    "Resources/UkrainianCorpusSources.txt": "34cf1897b6864b3b121bac034b8392afbdb2b6f5ae6e3f74d8e89a242a149f89",
-    "Sources/Typebar/UkrainianCorpus.generated.swift": "321c2e2994779b2a195c9c881acd3f9f61f6192c31ebd33ce0da44fab10dc0bb"
+    "Resources/UkrainianCorpusNotices.txt": "8e306cbe3ea0e4f2c7516331fcf06d93e819fd84dca35fc0bc46f15f764089a8",
+    "Resources/UkrainianCorpusSources.txt": "6a27d86a644e250081c5c4e58d81513dfe79dd6f45f54005df30a2252d269e7a",
+    "Sources/Typebar/UkrainianCorpus.generated.swift": "ea61bdd683ce82cdac4b0e096cbb67f33c65728a784b25890fbabc2ef1d2b26a"
   },
   "frequencyMemberSHA256": "0a7d525ef5b9d2c84cd3ccd1064b02eb6a07232e5d1e465df40cc00168fdaac2",
   "frequencyWheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473",
-  "literalOrStressAdaptedForms": 468626,
+  "literalOrStressAdaptedForms": 468627,
   "pools": {
     "10k": {
       "curatedText": 0,
@@ -17,7 +17,7 @@
       },
       "eligibleByClass": {
         "L": 439032,
-        "P": 8721
+        "P": 8722
       },
       "punctuationSignatures": {
         "'": 126,
@@ -58,7 +58,7 @@
       },
       "eligibleByClass": {
         "L": 431852,
-        "P": 7817
+        "P": 7818
       },
       "punctuationSignatures": {
         "'": 13,
@@ -90,21 +90,22 @@
       "wordsSHA256": "1351d532f43780a71936fa9376e4f4a82f6635edc66d6cb4717d2d70d4e10e00"
     },
     "50k": {
-      "curatedText": 3,
+      "curatedText": 4,
       "dictionaryEditions": {
-        "curated-text": 3,
-        "dictionary": 46942,
+        "curated-text": 4,
+        "dictionary": 46941,
         "ru-dictionary": 3046
       },
       "eligibleByClass": {
         "C": 890,
         "CP": 125,
         "L": 439063,
-        "P": 8722,
+        "P": 8723,
         "PN": 2
       },
       "punctuationSignatures": {
-        "'": 632,
+        "'": 631,
+        "''-": 1,
         "'-": 25,
         "'--": 3,
         "-": 1296,
@@ -141,14 +142,14 @@
         },
         "maximumHyphens": 2,
         "punctuationScalars": {
-          "'": 660,
-          "-": 1370
+          "'": 661,
+          "-": 1371
         },
         "uniqueCount": 49991
       },
       "stressAdapted": 24815,
-      "wholeObserved": 48643,
-      "wordsSHA256": "5b535a7733aa9417ec7ffaad719a21c0356c070d08e30a4baa50f6b1a61c0624"
+      "wholeObserved": 48642,
+      "wordsSHA256": "db9bda20b369a727c24f24abdaf56f7af3eaac3a0dad82709759c2351410fd8f"
     },
     "basic": {
       "curatedText": 0,
@@ -286,7 +287,7 @@
     "єдність",
     "ґрунт"
   ],
-  "revision": "kaikki-en-uk-20261030-stress-trace-wordfreq-v1",
+  "revision": "kaikki-en-uk-20261030-stress-trace-wordfreq-v2",
   "runtimeDependencies": [],
   "russianEditionSourceSHA256": "7e30fc4e4b21ff16cde09a501494f25287ae66f9a0f94e770ae826e5003c7698",
   "russianEditionSourceURL": "https://kaikki.org/dictionary/downloads/ru/ru-extract.jsonl.gz",
