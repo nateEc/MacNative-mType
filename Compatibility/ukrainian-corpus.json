@@ -1,0 +1,300 @@
+{
+  "boundaryEvidenceSHA256": "52cc152df8ad908bd34da16258cb74b5f0d1b5213ab79794208944249f5bfc7d",
+  "filesSHA256": {
+    "Resources/UkrainianCorpusNotices.txt": "3535ebf9215e068656825fe9f62949099108d1bca9567559acdabb115c744024",
+    "Resources/UkrainianCorpusSources.txt": "34cf1897b6864b3b121bac034b8392afbdb2b6f5ae6e3f74d8e89a242a149f89",
+    "Sources/Typebar/UkrainianCorpus.generated.swift": "321c2e2994779b2a195c9c881acd3f9f61f6192c31ebd33ce0da44fab10dc0bb"
+  },
+  "frequencyMemberSHA256": "0a7d525ef5b9d2c84cd3ccd1064b02eb6a07232e5d1e465df40cc00168fdaac2",
+  "frequencyWheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473",
+  "literalOrStressAdaptedForms": 468626,
+  "pools": {
+    "10k": {
+      "curatedText": 0,
+      "dictionaryEditions": {
+        "dictionary": 9839,
+        "ru-dictionary": 159
+      },
+      "eligibleByClass": {
+        "L": 439032,
+        "P": 8721
+      },
+      "punctuationSignatures": {
+        "'": 126,
+        "'-": 3,
+        "'--": 1,
+        "-": 80
+      },
+      "shape": {
+        "count": 9998,
+        "groups": {
+          "L": {
+            "count": 9788,
+            "max": 22,
+            "min": 1
+          },
+          "P": {
+            "count": 210,
+            "max": 30,
+            "min": 4
+          }
+        },
+        "maximumHyphens": 2,
+        "punctuationScalars": {
+          "'": 130,
+          "-": 85
+        },
+        "uniqueCount": 9998
+      },
+      "stressAdapted": 2611,
+      "wholeObserved": 9914,
+      "wordsSHA256": "83a0d65d93552dba877b7991c5f41db9ea4068a1fbd73d6454ae5140d814690e"
+    },
+    "1k": {
+      "curatedText": 0,
+      "dictionaryEditions": {
+        "dictionary": 998,
+        "ru-dictionary": 2
+      },
+      "eligibleByClass": {
+        "L": 431852,
+        "P": 7817
+      },
+      "punctuationSignatures": {
+        "'": 13,
+        "-": 2
+      },
+      "shape": {
+        "count": 1000,
+        "groups": {
+          "L": {
+            "count": 985,
+            "max": 16,
+            "min": 1
+          },
+          "P": {
+            "count": 15,
+            "max": 18,
+            "min": 4
+          }
+        },
+        "maximumHyphens": 1,
+        "punctuationScalars": {
+          "'": 13,
+          "-": 2
+        },
+        "uniqueCount": 1000
+      },
+      "stressAdapted": 35,
+      "wholeObserved": 998,
+      "wordsSHA256": "1351d532f43780a71936fa9376e4f4a82f6635edc66d6cb4717d2d70d4e10e00"
+    },
+    "50k": {
+      "curatedText": 3,
+      "dictionaryEditions": {
+        "curated-text": 3,
+        "dictionary": 46942,
+        "ru-dictionary": 3046
+      },
+      "eligibleByClass": {
+        "C": 890,
+        "CP": 125,
+        "L": 439063,
+        "P": 8722,
+        "PN": 2
+      },
+      "punctuationSignatures": {
+        "'": 632,
+        "'-": 25,
+        "'--": 3,
+        "-": 1296,
+        "--": 19
+      },
+      "shape": {
+        "count": 49991,
+        "groups": {
+          "C": {
+            "count": 7,
+            "max": 4,
+            "min": 2
+          },
+          "CP": {
+            "count": 3,
+            "max": 12,
+            "min": 7
+          },
+          "L": {
+            "count": 48004,
+            "max": 23,
+            "min": 1
+          },
+          "P": {
+            "count": 1975,
+            "max": 31,
+            "min": 4
+          },
+          "PN": {
+            "count": 2,
+            "max": 7,
+            "min": 6
+          }
+        },
+        "maximumHyphens": 2,
+        "punctuationScalars": {
+          "'": 660,
+          "-": 1370
+        },
+        "uniqueCount": 49991
+      },
+      "stressAdapted": 24815,
+      "wholeObserved": 48643,
+      "wordsSHA256": "5b535a7733aa9417ec7ffaad719a21c0356c070d08e30a4baa50f6b1a61c0624"
+    },
+    "basic": {
+      "curatedText": 0,
+      "dictionaryEditions": {
+        "dictionary": 199
+      },
+      "eligibleByClass": {
+        "L": 54329
+      },
+      "punctuationSignatures": {},
+      "shape": {
+        "count": 199,
+        "groups": {
+          "L": {
+            "count": 199,
+            "max": 12,
+            "min": 1
+          }
+        },
+        "maximumHyphens": 0,
+        "punctuationScalars": {},
+        "uniqueCount": 199
+      },
+      "stressAdapted": 0,
+      "wholeObserved": 199,
+      "wordsSHA256": "28b34fa6d3f7f668f35903344be277114bc6f26b635540943411ab7c8444e37b"
+    }
+  },
+  "referenceAggregate": {
+    "10k": {
+      "L": [
+        9788,
+        1,
+        22
+      ],
+      "P": [
+        210,
+        4,
+        30
+      ]
+    },
+    "1k": {
+      "L": [
+        985,
+        1,
+        16
+      ],
+      "P": [
+        15,
+        4,
+        18
+      ]
+    },
+    "50k": {
+      "C": [
+        7,
+        2,
+        4
+      ],
+      "CP": [
+        3,
+        7,
+        12
+      ],
+      "L": [
+        48004,
+        1,
+        23
+      ],
+      "P": [
+        1975,
+        4,
+        31
+      ],
+      "PN": [
+        2,
+        6,
+        7
+      ]
+    },
+    "basic": {
+      "L": [
+        199,
+        1,
+        12
+      ]
+    }
+  },
+  "referencePunctuationQuotas": {
+    "10k": {
+      "'": 126,
+      "'-": 3,
+      "'--": 1,
+      "-": 80
+    },
+    "1k": {
+      "'": 13,
+      "-": 2
+    },
+    "50k": {
+      "'": 631,
+      "''-": 1,
+      "'-": 25,
+      "'--": 3,
+      "-": 1296,
+      "--": 19
+    }
+  },
+  "retainedAuthored": [
+    "ранок",
+    "вікно",
+    "папір",
+    "берег",
+    "вітер",
+    "вправа",
+    "увага",
+    "спокій",
+    "ясно",
+    "озеро",
+    "вулиця",
+    "стіл",
+    "світло",
+    "дорога",
+    "терпіння",
+    "хвилина",
+    "місто",
+    "дощ",
+    "тиша",
+    "напрямок",
+    "зірка",
+    "нотатка",
+    "сад",
+    "подих",
+    "їжа",
+    "єдність",
+    "ґрунт"
+  ],
+  "revision": "kaikki-en-uk-20261030-stress-trace-wordfreq-v1",
+  "runtimeDependencies": [],
+  "russianEditionSourceSHA256": "7e30fc4e4b21ff16cde09a501494f25287ae66f9a0f94e770ae826e5003c7698",
+  "russianEditionSourceURL": "https://kaikki.org/dictionary/downloads/ru/ru-extract.jsonl.gz",
+  "schemaVersion": 1,
+  "sourceRows": {
+    "englishEdition": 60297,
+    "russianEdition": 2729136
+  },
+  "sourceSHA256": "31e8e39f48feae391478f1fe2c37d003053cf88f2dd4f2d97d5d19c7bc432a90",
+  "sourceURL": "https://kaikki.org/dictionary/Ukrainian/kaikki.org-dictionary-Ukrainian.jsonl"
+}

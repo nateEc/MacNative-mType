@@ -4,6 +4,7 @@ import SwiftUI
 enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case englishLarge = "EnglishLargeCorpusNotices"
   case englishFiveLetter = "EnglishFiveLetterCorpusNotices"
+  case ukrainian = "UkrainianCorpusNotices"
   case englishFrequency = "EnglishFrequencyCorpusNotices"
   case spanishFrequency = "SpanishFrequencyCorpusNotices"
   case spanishLarge = "SpanishLargeCorpusNotices"
@@ -27,6 +28,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     switch self {
     case .englishLarge: "English 450k"
     case .englishFiveLetter: "English · Five Letter"
+    case .ukrainian: "Українська"
     case .englishFrequency: "基础 English 与频率词库"
     case .spanishFrequency: "Spanish 频率词库"
     case .spanishLarge: "Español · 650k"
@@ -92,6 +94,8 @@ struct CorpusAttributionSummary: View {
       Text("Norsk bokmål／nynorsk 规模词库来自 Norsk ordbank，由 Nasjonalbiblioteket / Språkbanken 发布；两种书面语分别按其官方 unigram 数据选编。")
         .fixedSize(horizontal: false, vertical: true)
       Text("Русский 规模词库来自 Russian Wiktionary contributors、Kaikki.org / Wiktextract，按独立 wordfreq 观察频率编排，保留实际词形与大小写。")
+        .fixedSize(horizontal: false, vertical: true)
+      Text("Українська 词库来自 English／Russian Wiktionary、Kaikki.org 和 Wikipedia contributors；保留注音改编与逐词出处。")
         .fixedSize(horizontal: false, vertical: true)
       Button("查看完整许可…") { showingNotices = true }
         .buttonStyle(.link)

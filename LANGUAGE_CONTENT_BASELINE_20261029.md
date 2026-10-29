@@ -4,7 +4,9 @@
 
 ## 后续迁移状态
 
-最新 `LANG-ENGLISH-FIVE-55` 移除五字母英语 1k 的编号合成，并将基础 40 项扩为 201 项，使用字典与整词观察交集。当前全部直接具名 ScaleLexicon 属性路由余 122 项／1,089,989 个声明位置，复核 /tmp/typebar-english-five-letter-scale-audit-20261030.json；TypingEngine SHA-256 `d763249482238ea6cf67db68549bec1c710a4a013c0e0a26b8a7734086c96025`。此范围不是全部构造器、实际词数或语言质量证明，详情见 ENGLISH_FIVE_LETTER_CORPUS_CONTRACT.md。默认俄语和挪威语基础池的后续扩充分别见各 BASIC 合同；下文均保留迁移时的历史数字。
+最新 `LANG-UKRAINIAN-CYRILLIC-56` 移除西里尔乌克兰语三档 60,989 个合成位置，使用两版词典的 uk 词条及有出处的少量文本形式，基础 27→199；注音改编保留原始追踪。当前直接具名 ScaleLexicon 属性路由余 119 项／1,029,000 个声明位置，复核 /tmp/typebar-ukrainian-scale-audit-20261030.json，TypingEngine SHA-256 `f5297d0810d61931d59f2569c66d6a7ed998498515025555d98936bc40bb1cda`。50k 一种双撇号＋连字符组合、分布及语言质量仍开放，详见 UKRAINIAN_CORPUS_CONTRACT.md。该结构范围不覆盖全部构造器、基础池或实际词数；下文保留迁移时的历史数字。
+
+此前 `LANG-ENGLISH-FIVE-55` 移除五字母英语 1k 的编号合成，并将基础 40 项扩为 201 项，使用字典与整词观察交集。该阶段直接具名 ScaleLexicon 属性路由余 122 项／1,089,989 个声明位置，复核 /tmp/typebar-english-five-letter-scale-audit-20261030.json；TypingEngine SHA-256 `d763249482238ea6cf67db68549bec1c710a4a013c0e0a26b8a7734086c96025`。详情见 ENGLISH_FIVE_LETTER_CORPUS_CONTRACT.md。默认俄语和挪威语基础池的后续扩充分别见各 BASIC 合同。
 
 此前 `LANG-RUSSIAN-SCALES-52` 移除 Russian 六档 469,774 个编号／重复字符占位位置，改用独立字典词形和 wordfreq，专名、多词、5k 句点及各类字段有实际候选。375k 长词 46／参考 49、撇号／prime、分布／语言质量仍开放，基本池后续单列 RUSSIAN_BASIC_CORPUS_CONTRACT.md。该阶段扩大具名范围余 123 项／1,090,989，旧历史范围 82 项／438,685 不变；复核 `/tmp/typebar-russian-all-scale-helper-audit-20261029.json`，TypingEngine SHA-256 `97b14206b658597f5ac75d86dc95012220a9fac22cbc14ec1fec8aa39fb2dd92`。详情见 RUSSIAN_SCALES_CORPUS_CONTRACT.md。
 

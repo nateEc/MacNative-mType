@@ -78,6 +78,12 @@ cmp "$project_root/Resources/EnglishFiveLetterCorpusNotices.txt" \
 cmp "$project_root/Resources/EnglishFiveLetterCorpusSources.txt" \
   "$app_path/Contents/Resources/EnglishFiveLetterCorpusSources.txt" \
   || fail "Five-letter English spelling sources missing or modified"
+cmp "$project_root/Resources/UkrainianCorpusNotices.txt" \
+  "$app_path/Contents/Resources/UkrainianCorpusNotices.txt" \
+  || fail "Ukrainian corpus attribution missing or modified"
+cmp "$project_root/Resources/UkrainianCorpusSources.txt" \
+  "$app_path/Contents/Resources/UkrainianCorpusSources.txt" \
+  || fail "Ukrainian spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

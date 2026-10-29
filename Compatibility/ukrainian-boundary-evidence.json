@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "method": "Manually transcribed short excerpts verified through the web reader; these are not complete article downloads. Tokens remain literal, including case and punctuation.",
+  "license": "CC BY-SA 4.0; Ukrainian Wikipedia contributors",
+  "sources": [
+    {
+      "id": "ukwiki-admin-48940305",
+      "title": "Адміністративний устрій України",
+      "url": "https://uk.wikipedia.org/w/index.php?title=Адміністративний_устрій_України&oldid=48940305",
+      "excerpts": [
+        "історія адміністративно-територіальний устрою",
+        "у системі адміністративно-територіального устрою України",
+        "У 1920-х роках в УСРР"
+      ],
+      "tokens": [
+        "адміністративно-територіальний",
+        "адміністративно-територіального",
+        "1920-х"
+      ]
+    },
+    {
+      "id": "ukwiki-decade-47625455",
+      "title": "1990-ті",
+      "url": "https://uk.wikipedia.org/w/index.php?title=1990-ті&oldid=47625455",
+      "excerpts": ["1990-ті стають рядом трансформаційних етапів економік"],
+      "tokens": ["1990-ті"]
+    }
+  ]
+}

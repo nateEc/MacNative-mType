@@ -11615,73 +11615,19 @@ enum StarterLexicon {
     })).sorted()
   }()
 
-  // Original Typebar content for Ukrainian Cyrillic practice. The final
-  // entries deliberately cover Ukrainian-specific ї, є, and ґ.
-  static let ukrainianWords = [
-    "ранок", "вікно", "папір", "берег", "вітер", "вправа", "увага", "спокій",
-    "ясно", "озеро", "вулиця", "стіл", "світло", "дорога", "терпіння", "хвилина",
-    "місто", "дощ", "тиша", "напрямок", "зірка", "нотатка", "сад", "подих",
-    "їжа", "єдність", "ґрунт",
-  ]
-
-  private struct UkrainianScaleSpecification {
-    let marker: Character
-    let minimumToken: String
-    let count: Int
-    let maximumLength: Int
-    let punctuationCount: Int
-    let uppercasePlainCount: Int
-    let uppercasePunctuationCount: Int
-    let numericPunctuationCount: Int
-  }
-
-  private static func ukrainianScaleLexicon(
-    _ specification: UkrainianScaleSpecification
-  ) -> IndexedLexicon {
-    let uppercasePlainEnd = 2 + specification.uppercasePlainCount
-    let uppercasePunctuationEnd = uppercasePlainEnd + specification.uppercasePunctuationCount
-    let numericPunctuationEnd = uppercasePunctuationEnd + specification.numericPunctuationCount
-    let lowerPunctuationEnd = numericPunctuationEnd + specification.punctuationCount
-      - specification.uppercasePunctuationCount - specification.numericPunctuationCount
-    precondition(lowerPunctuationEnd <= specification.count)
-
-    return IndexedLexicon(count: specification.count) { index in
-      if index == 0 { return specification.minimumToken }
-      if index == 1 {
-        return String(repeating: specification.marker, count: specification.maximumLength)
-      }
-      let entry = String(specification.marker) + cyrillicIndex(index)
-      if index < uppercasePlainEnd {
-        return entry.prefix(1).uppercased() + entry.dropFirst()
-      }
-      if index < uppercasePunctuationEnd {
-        return entry.prefix(1).uppercased() + entry.dropFirst() + "-"
-      }
-      if index < numericPunctuationEnd { return entry + "-1" }
-      if index < lowerPunctuationEnd { return entry + "-" }
-      return entry
-    }
-  }
+  // Independently sourced Ukrainian spellings; source adaptations are traced.
+  static let ukrainianWords = UkrainianCorpus.basic
 
   static var ukrainian1kLexicon: IndexedLexicon {
-    ukrainianScaleLexicon(.init(
-      marker: "ꙑ", minimumToken: "ꙮ", count: 1_000, maximumLength: 18,
-      punctuationCount: 15, uppercasePlainCount: 0,
-      uppercasePunctuationCount: 0, numericPunctuationCount: 0))
+    IndexedLexicon(count: 1_000) { UkrainianCorpus.words1k[$0] }
   }
 
   static var ukrainian10kLexicon: IndexedLexicon {
-    ukrainianScaleLexicon(.init(
-      marker: "ꙓ", minimumToken: "ꙙ", count: 9_998, maximumLength: 30,
-      punctuationCount: 210, uppercasePlainCount: 0,
-      uppercasePunctuationCount: 0, numericPunctuationCount: 0))
+    IndexedLexicon(count: 9_998) { UkrainianCorpus.words10k[$0] }
   }
 
   static var ukrainian50kLexicon: IndexedLexicon {
-    ukrainianScaleLexicon(.init(
-      marker: "ꙕ", minimumToken: "ꙛ", count: 49_991, maximumLength: 31,
-      punctuationCount: 1_980, uppercasePlainCount: 7,
-      uppercasePunctuationCount: 3, numericPunctuationCount: 2))
+    IndexedLexicon(count: 49_991) { UkrainianCorpus.words50k[$0] }
   }
 
   static var ukrainian1kWords: [String] { ukrainian1kLexicon.materialized() }
