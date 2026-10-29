@@ -2,6 +2,8 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-ENGLISH-FIVE-55 | 五字母英语两池与旧历史 | 单个隔离实例选择基础／1k 档，练习新词与旧 40 词，切换 No Space／Backwards、超过百词并重复，再打开旧合成池时期的结果。 | 新候选均为独立来源的五字母真实形式；无空格仍保留字段，旧提示与指标／回放不按新池重算。 | 待验收（见 ENGLISH_FIVE_LETTER_CORPUS_CONTRACT.md；实体输入、辅助功能、语料质量及完整性能开放） |
+| LANG-ENGLISH-FIVE-LICENSE-55 | 五字母英语完整许可与来源 | 同一实例打开 About 和 English · Five Letter 许可，核对醒目 UKACD 名称／版权、完整 SCOWL／wordfreq 许可及 1,000 行词形／字典级别／band 映射。 | 来源和改编明确；band 不冒充次数，五字母词典收录不冒充 Wordle 答案资格或与原选集完全等价。 | 待验收（离屏像素及文件读取不代替实体 sheet、VoiceOver 和人工语言审校） |
 | LANG-NORWEGIAN-BASIC-54 | 两种挪威语基础池与旧历史 | 单个隔离实例分别选择默认 Bokmål／Nynorsk，练习 200／250 池的短词、长词、æ／ø／å 和各自拼写，切换 Lazy Latin／No Space／Backwards，再打开旧长词与 andning 结果。 | 新练习边界分别 1–9／1–10，简化输入按现有规则呈现；三个退出新池的旧词仍保留在历史提示、指标与回放。 | 待验收（见 NORWEGIAN_BASIC_CORPUS_CONTRACT.md；实体输入、VoiceOver、语言质量与完整性能开放） |
 | LANG-NORWEGIAN-BASIC-LICENSE-54 | 基础挪威语来源与各自整词次数 | 同一实例打开“Norsk · 基础词库”，核对各自字典／unigram 快照、CC BY／CC0、450 行标准／词形／lemma／行号／整词次数。 | 两种书面语不借对方次数，所有新候选有自身标准的正数整词观察；不以历史次数或候选量冒充当下规范与语言质量等价。 | 待验收（自动化资源读取不是实体许可 sheet 和人工审校） |
 | LANG-RUSSIAN-BASIC-53 | 默认俄语 200 词与旧历史 | 单个隔离实例选择默认 Русский，练习新旧候选及单字／12 字长词，切换 No Space／Backwards、重复并打开旧 24 词时期的结果。 | 新候选真实可输入，旧自有词仍可选，提示与重复一致；旧提示、指标、回放不按新词库回算。 | 待验收（见 RUSSIAN_BASIC_CORPUS_CONTRACT.md；实体键盘／IME、VoiceOver、语言质量及完整性能开放） |

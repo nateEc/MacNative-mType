@@ -3,6 +3,7 @@ import SwiftUI
 
 enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case englishLarge = "EnglishLargeCorpusNotices"
+  case englishFiveLetter = "EnglishFiveLetterCorpusNotices"
   case englishFrequency = "EnglishFrequencyCorpusNotices"
   case spanishFrequency = "SpanishFrequencyCorpusNotices"
   case spanishLarge = "SpanishLargeCorpusNotices"
@@ -25,6 +26,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .englishLarge: "English 450k"
+    case .englishFiveLetter: "English · Five Letter"
     case .englishFrequency: "基础 English 与频率词库"
     case .spanishFrequency: "Spanish 频率词库"
     case .spanishLarge: "Español · 650k"
@@ -65,7 +67,7 @@ struct CorpusAttributionSummary: View {
     VStack(alignment: .leading, spacing: 10) {
       Label("词库与开源署名", systemImage: "text.book.closed")
         .font(.headline)
-      Text("English 450k 的独立语料来自 SCOWL、wordfreq 和 UK Advanced Cryptics Dictionary。")
+      Text("English 五字母／450k 的独立语料来自 SCOWL、wordfreq 和 UK Advanced Cryptics Dictionary。")
         .fixedSize(horizontal: false, vertical: true)
       Text(LargeEnglishAttribution.sourceName)
         .font(.body.weight(.semibold))

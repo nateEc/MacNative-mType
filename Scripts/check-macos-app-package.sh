@@ -72,6 +72,12 @@ cmp "$project_root/Resources/EnglishFrequencyCorpusNotices.txt" \
 cmp "$project_root/Resources/EnglishLargeCorpusNotices.txt" \
   "$app_path/Contents/Resources/EnglishLargeCorpusNotices.txt" \
   || fail "large English corpus attribution missing or modified"
+cmp "$project_root/Resources/EnglishFiveLetterCorpusNotices.txt" \
+  "$app_path/Contents/Resources/EnglishFiveLetterCorpusNotices.txt" \
+  || fail "Five-letter English corpus attribution missing or modified"
+cmp "$project_root/Resources/EnglishFiveLetterCorpusSources.txt" \
+  "$app_path/Contents/Resources/EnglishFiveLetterCorpusSources.txt" \
+  || fail "Five-letter English spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

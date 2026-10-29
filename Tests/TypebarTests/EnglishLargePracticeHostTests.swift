@@ -13,12 +13,14 @@ import XCTest
   }
 
   func testActualPracticePagePreparesTheLargeChoiceAndAcceptsItsFirstWord() async throws {
-    try await PracticeHostLifetime.withModelContainer { container, track in
-      try await verifyActualPage(container: container, trackCallbacks: track)
+    for language: TypingLanguage in [.english450k, .englishFiveLetter, .englishFiveLetter1k] {
+      try await PracticeHostLifetime.withModelContainer { container, track in
+        try await verifyActualPage(language: language, container: container, trackCallbacks: track)
+      }
     }
   }
 
-  private func verifyActualPage(container: ModelContainer, trackCallbacks: (AnyObject) -> Void) async throws {
+  private func verifyActualPage(language: TypingLanguage, container: ModelContainer, trackCallbacks: (AnyObject) -> Void) async throws {
     _ = NSApplication.shared
     let suite = "EnglishLargePracticeHostTests.\(UUID())"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -28,7 +30,7 @@ import XCTest
     settings.reducePracticeMotion = true
     settings.showAllPracticeLines = true
     // Whole-preview preparation is used only beyond the initial 100-word batch.
-    let configuration = TestConfiguration.words(153, language: .english450k)
+    let configuration = TestConfiguration.words(153, language: language)
     XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: configuration),
       testParameterMemory: .legacyDefaults(configuration: configuration))))
     let preparation = Preparation()
@@ -71,11 +73,11 @@ import XCTest
       return views(PromptFieldNativeView.self, in: host).contains { $0.accessibilityValue() as? String == prompt }
         && views(TypingInputView.self, in: host).first?.acceptsTextInput == true
     }
-    XCTAssertEqual(preparation.configuration?.language, .english450k)
+    XCTAssertEqual(preparation.configuration?.language, language)
     let prompt = try XCTUnwrap(preparation.prompt)
     let words = prompt.split(separator: " ")
     XCTAssertEqual(words.count, 153)
-    let owned = Set(EnglishLargeCorpus.words.map { $0.lowercased() })
+    let owned = Set(language.ownedPracticeWords().map { $0.lowercased() })
     XCTAssertTrue(words.allSatisfy { owned.contains(String($0)) })
     let input = try XCTUnwrap(views(TypingInputView.self, in: host).first)
     let first = try XCTUnwrap(words.first)

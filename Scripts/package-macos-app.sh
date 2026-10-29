@@ -41,6 +41,8 @@ cp "$project_root/Resources/ThirdPartyNotices.txt" "$app_path/Contents/Resources
 cp "$project_root/Resources/UnicodeNotice.txt" "$app_path/Contents/Resources/UnicodeNotice.txt"
 cp "$project_root/Resources/EnglishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/EnglishFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/EnglishLargeCorpusNotices.txt" "$app_path/Contents/Resources/EnglishLargeCorpusNotices.txt"
+cp "$project_root/Resources/EnglishFiveLetterCorpusNotices.txt" "$app_path/Contents/Resources/EnglishFiveLetterCorpusNotices.txt"
+cp "$project_root/Resources/EnglishFiveLetterCorpusSources.txt" "$app_path/Contents/Resources/EnglishFiveLetterCorpusSources.txt"
 cp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/SpanishLargeCorpusNotices.txt" "$app_path/Contents/Resources/SpanishLargeCorpusNotices.txt"
 cp "$project_root/Resources/SpanishLargeCorpusSources.txt" "$app_path/Contents/Resources/SpanishLargeCorpusSources.txt"

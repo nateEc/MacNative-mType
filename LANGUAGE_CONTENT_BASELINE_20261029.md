@@ -4,7 +4,9 @@
 
 ## 后续迁移状态
 
-最新 `LANG-RUSSIAN-SCALES-52` 移除 Russian 六档 469,774 个编号／重复字符占位位置，改用独立字典词形和 wordfreq，专名、多词、5k 句点及各类字段有实际候选。375k 长词 46／参考 49、撇号／prime、分布／语言质量和基本池仍开放。扩大具名范围余 123 项／1,090,989，旧历史范围 82 项／438,685 不变；复核 `/tmp/typebar-russian-all-scale-helper-audit-20261029.json`，TypingEngine SHA-256 `97b14206b658597f5ac75d86dc95012220a9fac22cbc14ec1fec8aa39fb2dd92`。详情见 RUSSIAN_SCALES_CORPUS_CONTRACT.md；下文为各阶段历史数字。
+最新 `LANG-ENGLISH-FIVE-55` 移除五字母英语 1k 的编号合成，并将基础 40 项扩为 201 项，使用字典与整词观察交集。当前全部直接具名 ScaleLexicon 属性路由余 122 项／1,089,989 个声明位置，复核 /tmp/typebar-english-five-letter-scale-audit-20261030.json；TypingEngine SHA-256 `d763249482238ea6cf67db68549bec1c710a4a013c0e0a26b8a7734086c96025`。此范围不是全部构造器、实际词数或语言质量证明，详情见 ENGLISH_FIVE_LETTER_CORPUS_CONTRACT.md。默认俄语和挪威语基础池的后续扩充分别见各 BASIC 合同；下文均保留迁移时的历史数字。
+
+此前 `LANG-RUSSIAN-SCALES-52` 移除 Russian 六档 469,774 个编号／重复字符占位位置，改用独立字典词形和 wordfreq，专名、多词、5k 句点及各类字段有实际候选。375k 长词 46／参考 49、撇号／prime、分布／语言质量仍开放，基本池后续单列 RUSSIAN_BASIC_CORPUS_CONTRACT.md。该阶段扩大具名范围余 123 项／1,090,989，旧历史范围 82 项／438,685 不变；复核 `/tmp/typebar-russian-all-scale-helper-audit-20261029.json`，TypingEngine SHA-256 `97b14206b658597f5ac75d86dc95012220a9fac22cbc14ec1fec8aa39fb2dd92`。详情见 RUSSIAN_SCALES_CORPUS_CONTRACT.md。
 
 此前 `LANG-NORWEGIAN-SCALES-51` 移除两种 Norwegian 各五档、共 1,305,311 个词根编号占位位置。独立官方字典及各自 unigram 选集保留真实字面大小写、数字／标点／多词交集和最长字段；基本池与历史保持，分布／语言质量仍开放。该阶段扩大具名路由范围余 129 项、声明数量之和 1,560,763；旧历史范围仍为 82 项／438,685，因为本轮十项来自之前扩展发现的额外路由。复核 `/tmp/typebar-norwegian-all-scale-helper-audit-20261029.json`，TypingEngine SHA-256 `eec384229642daca1185d31e9c6bac08360f5211bff39fd481bc0ea03a7dcbad`。详情见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md；以下保留各自阶段数字。
 

@@ -1,0 +1,71 @@
+{
+  "basicSubsetOfLarge": true,
+  "eligibleCandidates": 8241,
+  "filesSHA256": {
+    "Resources/EnglishFiveLetterCorpusNotices.txt": "2f7247673678da0787cbb446ace1f76ecbb594e558d5ef162664414d4b500067",
+    "Resources/EnglishFiveLetterCorpusSources.txt": "323c697094922c25a6821cda7641cf7d18a18782756b6b6d3f0e53cbd221969d",
+    "Sources/Typebar/EnglishFiveLetterCorpus.generated.swift": "11e0bd3a7215fbadd22801cb4063a3ed062ac2467d92be5b9bdcf532801dbce9"
+  },
+  "frequencyMemberSHA256": "dffae8066b78dce0a6667cf5f58e567054f902674667090a7ac8a8a44628b05c",
+  "frequencyWheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473",
+  "pools": {
+    "basic": {
+      "count": 201,
+      "wordsSHA256": "5add56d4ed9ccd3fee407210a9eb7738dda650e822a3003d5bca099f7cf1b957"
+    },
+    "large": {
+      "count": 1000,
+      "wordsSHA256": "32011a773407ef7cc728597d1d2fef7105af92dce6e561c01a1fba026590a54e"
+    }
+  },
+  "rawSHA256": "c8f999c724e322801d94348a90f940e28f8bbbd19e53a4ffed18346d83ae52ad",
+  "retainedAuthored": [
+    "amber",
+    "quiet",
+    "paper",
+    "drift",
+    "cabin",
+    "cedar",
+    "flint",
+    "glass",
+    "grain",
+    "shore",
+    "trail",
+    "bloom",
+    "crane",
+    "field",
+    "light",
+    "ocean",
+    "river",
+    "stone",
+    "cloud",
+    "maple",
+    "wheat",
+    "slope",
+    "spark",
+    "frame",
+    "brush",
+    "clock",
+    "prism",
+    "sound",
+    "green",
+    "dream",
+    "swift",
+    "focus",
+    "learn",
+    "write",
+    "clear",
+    "paths",
+    "hands",
+    "lines",
+    "shape",
+    "steps"
+  ],
+  "revision": "scowl95-wordfreq-3.1.1-five-letter-v1",
+  "runtimeDependencies": [],
+  "schemaVersion": 1,
+  "scowlCommit": "7e99edab8e32f9f9ea2b15f249ca8d4d67237410",
+  "scowlCopyrightSHA256": "090575a131b4260926c7a6b30a90aca0f5db5fbb5c46778e0c5855227bf6ebc3",
+  "sharedReaderSHA256": "94b7036c27bbff858fee1731a7925192aa39d3e6f96772ee16259cf66990523b",
+  "wholeTokenObservationsRequired": true
+}

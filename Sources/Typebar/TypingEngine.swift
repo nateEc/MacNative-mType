@@ -11164,15 +11164,8 @@ enum StarterLexicon {
     "ripple", "thunder", "willow", "tangent", "pocket", "marble", "voyage", "bright",
   ]
 
-  // This Typebar-authored selection contains only five-letter English words.
-  // It recreates the visible length constraint without importing a Wordle list.
-  static let englishFiveLetterWords = [
-    "amber", "quiet", "paper", "drift", "cabin", "cedar", "flint", "glass",
-    "grain", "shore", "trail", "bloom", "crane", "field", "light", "ocean",
-    "river", "stone", "cloud", "maple", "wheat", "slope", "spark", "frame",
-    "brush", "clock", "prism", "sound", "green", "dream", "swift", "focus",
-    "learn", "write", "clear", "paths", "hands", "lines", "shape", "steps",
-  ]
+  // Independent dictionary forms with whole-token observations; all five letters.
+  static let englishFiveLetterWords = EnglishFiveLetterCorpus.basic
 
   // Typebar-authored compact specialty sets. They reproduce the visible
   // practice constraints without reading the reference-project word values.
@@ -14801,9 +14794,7 @@ enum StarterLexicon {
   }
 
   static var englishFiveLetter1kLexicon: IndexedLexicon {
-    europeanScaleLexicon(.init(
-      marker: "q", prefix: "qz", nonASCIICharacter: "ā", count: 1_000,
-      maximumLength: 5, minimumLength: 5, buckets: []))
+    IndexedLexicon(count: 1_000) { EnglishFiveLetterCorpus.large[$0] }
   }
 
   static var xhosa3kLexicon: IndexedLexicon {
