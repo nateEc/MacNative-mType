@@ -46,7 +46,10 @@ import XCTest
   }
 
   func testNormalWhitespaceEngineProbeWithoutOpeningWindow() throws {
-    let candidates = ["a\nb", "a\r\nb", "首行\n次行", "سلام\nשלום", "a\n\n b", "a\u{200B}\nb", "a\rb", " \u{0301}b"]
+    let candidates = ["a\nb", "a\r\nb", "首行\n次行", "سلام\nשלום", "a\n\n b", "a\u{200B}\nb", "a\rb", " \u{0301}b",
+      "a \r b", " \r b", "a \r ", "a\u{2028}b", "a\u{2029}b",
+      "a \u{2028} b", " \u{2028} b", "a \u{2028} ",
+      "a \u{2029} b", " \u{2029} b", "a \u{2029} "]
     let json = try String(decoding: JSONEncoder().encode(candidates), as: UTF8.self)
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .nonPersistent()
@@ -72,11 +75,14 @@ import XCTest
     let values = try XCTUnwrap(probe.values)
     print("COMPOSITION WHITESPACE WEBKIT \(values.debugDescription)")
     XCTAssertEqual(values.count, candidates.count)
-    XCTAssertEqual(values, ["a b", "a\r b", "首行 次行", "سلام שלום", "a b", "a\u{200B} b", "a\rb", "\u{0301}b"])
+    XCTAssertEqual(values, ["a b", "a\r b", "首行 次行", "سلام שלום", "a b", "a\u{200B} b", "a\rb", "\u{0301}b",
+      "a \r b", "\r b", "a \r", "a\u{2028}b", "a\u{2029}b",
+      "a \u{2028} b", "\u{2028} b", "a \u{2028}",
+      "a \u{2029} b", "\u{2029} b", "a \u{2029}"])
     for row in try XCTUnwrap(probe.geometry) {
       let ranges = try XCTUnwrap(row["ranges"] as? [[String: Any]])
       let firstY = try XCTUnwrap(ranges.first?["y"] as? Double)
-      for range in ranges where range["unit"] as? Int == 13 {
+      for range in ranges where [13, 0x2028, 0x2029].contains(range["unit"] as? Int ?? -1) {
         XCTAssertEqual(try XCTUnwrap(range["width"] as? Double), 0)
         XCTAssertEqual(try XCTUnwrap(range["y"] as? Double), firstY)
       }
@@ -97,11 +103,12 @@ import XCTest
       }
       let field = try XCTUnwrap(fields(host).first)
       if singleLineHeight == nil { singleLineHeight = field.bounds.height }
-      if candidate.contains("\r") {
+      if candidate.unicodeScalars.contains(where: { [13, 0x2028, 0x2029].contains(Int($0.value)) }) {
         XCTAssertEqual(field.bounds.height, try XCTUnwrap(singleLineHeight), accuracy: 1)
       }
-      // WebKit innerText retains dynamic CR, but its measured glyph has no advance.
+      // The measured zero-advance controls remain in innerText, not in the native display string.
       let visibleText = displayed.replacingOccurrences(of: "\r", with: "")
+        .replacingOccurrences(of: "\u{2028}", with: "").replacingOccurrences(of: "\u{2029}", with: "")
       XCTAssertEqual(Array(field.stringValue.utf16), Array(visibleText.utf16))
       XCTAssertEqual(field.accessibilityLabel(), "正在组合：\(candidate)")
       XCTAssertNil(host.window)

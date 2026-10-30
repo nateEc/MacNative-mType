@@ -18,7 +18,6 @@ struct BelowCompositionProjection {
       sourceUnit += raw.length
       scalarSources.append(raw); scalarDisplays.append(nil); scalarActuals.append(raw)
       let index = scalarSources.count - 1
-      if scalar == "\r" { continue }
       if scalar == " " || scalar == "\t" || scalar == "\n" {
         if hasLineContent { pending.append(index) }
         continue
@@ -30,6 +29,12 @@ struct BelowCompositionProjection {
         output.append(" "); displayUnit += 1
         for pendingIndex in pending { scalarDisplays[pendingIndex] = space; scalarActuals[pendingIndex] = group }
         pending.removeAll(keepingCapacity: true)
+      }
+      // These dynamic DOM controls have no advance, but separate collapsible
+      // whitespace runs. Flush the preceding run before omitting the control.
+      if scalar == "\r" || scalar == "\u{2028}" || scalar == "\u{2029}" {
+        hasLineContent = true
+        continue
       }
       scalarDisplays[index] = NSRange(location: displayUnit, length: raw.length)
       output.append(scalar); displayUnit += raw.length
