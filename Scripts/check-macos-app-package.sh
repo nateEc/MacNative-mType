@@ -90,6 +90,12 @@ cmp "$project_root/Resources/UkrainianLatynkaCorpusNotices.txt" \
 cmp "$project_root/Resources/UkrainianLatynkaCorpusSources.txt" \
   "$app_path/Contents/Resources/UkrainianLatynkaCorpusSources.txt" \
   || fail "Ukrainian Latynka spelling sources missing or modified"
+cmp "$project_root/Resources/GreekCorpusNotices.txt" \
+  "$app_path/Contents/Resources/GreekCorpusNotices.txt" \
+  || fail "Greek corpus attribution missing or modified"
+cmp "$project_root/Resources/GreekCorpusSources.txt" \
+  "$app_path/Contents/Resources/GreekCorpusSources.txt" \
+  || fail "Greek spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

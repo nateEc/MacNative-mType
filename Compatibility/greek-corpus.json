@@ -1,0 +1,63 @@
+{
+  "artifacts": {
+    "Resources/GreekCorpusNotices.txt": "6114b322cfea791f73db6deda897225cbe6b33889b6f83be1e51006573787ab2",
+    "Resources/GreekCorpusSources.txt": "d4293d9beacfb0f55073de7fbc97a9d3646aa88b78e7c2212fb9b6f823d455a2",
+    "Sources/Typebar/GreekCorpus.generated.swift": "09c349f3439d6fd802034fa3d5298ab89ba197e26e8318475699484a5b9b8034"
+  },
+  "dictionaryRows": 85425,
+  "frequencyLookup": "literal NFC spelling then Unicode casefold; display unchanged",
+  "frequencyMember": "wordfreq/data/small_el.msgpack.gz",
+  "frequencyMemberSHA256": "9ec327293a1657eac51518d6506e387dda453b548e506f47ef6e720592c1d9c9",
+  "pools": {
+    "10k": {
+      "characters": "ΐάέήίαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώ",
+      "count": 9936,
+      "eligibleLiteralForms": 249301,
+      "maximumLength": 21,
+      "minimumLength": 1,
+      "wholeObserved": 9936,
+      "wordsSHA256": "2bb83ffcc7cdf25137fd9bea5ce88bd841f8f86263b55f66aebf7b1460f84701"
+    },
+    "1k": {
+      "characters": "άέήίαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώ",
+      "count": 993,
+      "eligibleLiteralForms": 245144,
+      "maximumLength": 16,
+      "minimumLength": 1,
+      "wholeObserved": 993,
+      "wordsSHA256": "e95c78be8ca89cd1f7095a57cf743f076f76b785a4d678182d2f30979a36bdc8"
+    },
+    "25k": {
+      "characters": "ΐάέήίαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώ",
+      "count": 24836,
+      "eligibleLiteralForms": 249301,
+      "maximumLength": 21,
+      "minimumLength": 1,
+      "wholeObserved": 24836,
+      "wordsSHA256": "8de592ff5c356f305a527d39a46402766d7e396ee7ec46f299e056adfc74f896"
+    },
+    "5k": {
+      "characters": "ΐάέήίαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώ",
+      "count": 4963,
+      "eligibleLiteralForms": 249229,
+      "maximumLength": 20,
+      "minimumLength": 1,
+      "wholeObserved": 4963,
+      "wordsSHA256": "98bf323de9504b0788f99b3b059714f20b909872003aed458a755f1192724a39"
+    },
+    "basic": {
+      "characters": "άέήίαβγδεζηθικλμνξοπρςστυφχψωόύώ",
+      "count": 209,
+      "eligibleLiteralForms": 27620,
+      "maximumLength": 12,
+      "minimumLength": 1,
+      "wholeObserved": 209,
+      "wordsSHA256": "b27bc21d93504f5b6e85782aefd8f7b40df76810230748c540e93eaeaabb2e70"
+    }
+  },
+  "revision": "kaikki-en-el-20261030-literal-wordfreq-v1",
+  "schemaVersion": 1,
+  "sourceSHA256": "acd0c0ead297157e4092934198bebd525f4cef6d4aea8361a56a6ecaadfb9696",
+  "sourceURL": "https://kaikki.org/dictionary/Greek/kaikki.org-dictionary-Greek.jsonl",
+  "wordfreqWheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+}

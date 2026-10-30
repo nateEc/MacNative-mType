@@ -12809,14 +12809,8 @@ enum StarterLexicon {
     "אָנהייב", "שריט", "וואָרט", "פֿראַגע", "ענטפֿער", "בוים",
   ]
 
-  // Typebar-authored Greek starter words. Accented forms exercise the native
-  // Greek input source without importing a third-party word list.
-  static let greekWords = [
-    "πρωί", "παράθυρο", "χαρτί", "ακτή", "άνεμος", "άσκηση", "προσοχή", "ήρεμος",
-    "καθαρός", "λίμνη", "δρόμος", "τραπέζι", "φως", "ταξίδι", "υπομονή", "στιγμή",
-    "πόλη", "βροχή", "σιωπή", "κατεύθυνση", "αστέρι", "σημείωση", "κήπος", "ανάσα",
-    "μικρός", "χρόνος", "άνοιξη", "νησί", "φίλος", "βιβλίο",
-  ]
+  // Literal independent modern Greek forms; full source titles are retained.
+  static var greekWords: [String] { GreekCorpus.basic }
 
   // Typebar-authored Koine Greek starter words preserve polytonic Greek
   // input independently of the reference word list.
@@ -12838,31 +12832,6 @@ enum StarterLexicon {
     "kleidi", "karekla", "ergasia", "skia", "spiti", "mathitis", "dasos", "elpida",
   ]
 
-  // These indexed streams preserve only the pinned configurations' aggregate
-  // shape. Their generated values are Typebar-authored and never read from the
-  // reference word lists.
-  private static let greekScaleAlphabet = Array("αβγδεζηθικλμνξοπρστυφχψω")
-
-  private static func greekScaleIndex(_ index: Int) -> String {
-    var value = index
-    var characters: [Character] = []
-    repeat {
-      characters.append(greekScaleAlphabet[value % greekScaleAlphabet.count])
-      value /= greekScaleAlphabet.count
-    } while value > 0
-    return String(characters.reversed())
-  }
-
-  private static func greekScaleLexicon(
-    marker: Character, count: Int, maximumLength: Int
-  ) -> IndexedLexicon {
-    IndexedLexicon(count: count) { index in
-      if index == 0 { return "ϙ" }
-      if index == 1 { return String(repeating: "ϙ", count: maximumLength) }
-      return "ϙ" + String(marker) + greekScaleIndex(index + 576)
-    }
-  }
-
   private static func greeklishScaleLexicon(
     marker: String, count: Int, maximumLength: Int, nonASCIICount: Int
   ) -> IndexedLexicon {
@@ -12878,16 +12847,16 @@ enum StarterLexicon {
   }
 
   static var greek1kLexicon: IndexedLexicon {
-    greekScaleLexicon(marker: "α", count: 993, maximumLength: 16)
+    IndexedLexicon(count: 993) { GreekCorpus.words1k[$0] }
   }
   static var greek5kLexicon: IndexedLexicon {
-    greekScaleLexicon(marker: "β", count: 4_963, maximumLength: 20)
+    IndexedLexicon(count: 4_963) { GreekCorpus.words5k[$0] }
   }
   static var greek10kLexicon: IndexedLexicon {
-    greekScaleLexicon(marker: "γ", count: 9_936, maximumLength: 21)
+    IndexedLexicon(count: 9_936) { GreekCorpus.words10k[$0] }
   }
   static var greek25kLexicon: IndexedLexicon {
-    greekScaleLexicon(marker: "δ", count: 24_836, maximumLength: 21)
+    IndexedLexicon(count: 24_836) { GreekCorpus.words25k[$0] }
   }
   static var greeklish1kLexicon: IndexedLexicon {
     greeklishScaleLexicon(marker: "a", count: 990, maximumLength: 16, nonASCIICount: 12)

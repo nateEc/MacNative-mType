@@ -6,6 +6,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case englishFiveLetter = "EnglishFiveLetterCorpusNotices"
   case ukrainian = "UkrainianCorpusNotices"
   case ukrainianLatynka = "UkrainianLatynkaCorpusNotices"
+  case greek = "GreekCorpusNotices"
   case englishFrequency = "EnglishFrequencyCorpusNotices"
   case spanishFrequency = "SpanishFrequencyCorpusNotices"
   case spanishLarge = "SpanishLargeCorpusNotices"
@@ -31,6 +32,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     case .englishFiveLetter: "English · Five Letter"
     case .ukrainian: "Українська"
     case .ukrainianLatynka: "Українська (Latynka)"
+    case .greek: "Ελληνικά"
     case .englishFrequency: "基础 English 与频率词库"
     case .spanishFrequency: "Spanish 频率词库"
     case .spanishLarge: "Español · 650k"
@@ -99,6 +101,7 @@ struct CorpusAttributionSummary: View {
         .fixedSize(horizontal: false, vertical: true)
       Text("Українська 词库来自 English／Russian Wiktionary、Kaikki.org 和 Wikipedia contributors；保留注音改编与逐词出处。")
       Text("Українська (Latynka) 为上述独立西里尔语料的明确拉丁化改编，参照 Vakulenko 的现代字母规则并保留原词；频率证据仅指西里尔原形。")
+      Text("Ελληνικά 词库来自 English Wiktionary contributors、Kaikki.org 与 wordfreq；保留原样声调、分音符及词尾 sigma，不改写拼写。")
         .fixedSize(horizontal: false, vertical: true)
       Button("查看完整许可…") { showingNotices = true }
         .buttonStyle(.link)
