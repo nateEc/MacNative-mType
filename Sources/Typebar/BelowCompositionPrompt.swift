@@ -13,11 +13,15 @@ struct BelowCompositionProjection {
     var output = String.UnicodeScalarView()
     var scalarSources: [NSRange] = [], scalarDisplays: [NSRange?] = [], scalarActuals: [NSRange] = []
     var sourceUnit = 0, displayUnit = 0, pending: [Int] = [], hasLineContent = false
+    // A normal-whitespace DOM text node containing only ASCII whitespace has
+    // no rendered content. FF inside a nonempty node remains a missing glyph.
+    let onlyASCIIWhitespace = source.utf16.allSatisfy { [9, 10, 12, 13, 32].contains(Int($0)) }
     for scalar in source.unicodeScalars {
       let raw = NSRange(location: sourceUnit, length: String(scalar).utf16.count)
       sourceUnit += raw.length
       scalarSources.append(raw); scalarDisplays.append(nil); scalarActuals.append(raw)
       let index = scalarSources.count - 1
+      if onlyASCIIWhitespace { continue }
       if scalar == " " || scalar == "\t" || scalar == "\n" {
         if hasLineContent { pending.append(index) }
         continue
@@ -111,7 +115,8 @@ struct BelowCompositionProjection {
     paragraph.lineBreakMode = .byWordWrapping
     let storage = NSTextStorage(string: projection.displayed,
       attributes: [.font: font, .paragraphStyle: paragraph])
-    let layout = NSLayoutManager()
+    let layout: NSLayoutManager = BelowCompositionControlLayout.containsControl(projection.displayed)
+      ? BelowCompositionControlLayout() : NSLayoutManager()
     // Include one extra line because TextKit's line height can be a few
     // points taller than NSCell's, but do not lay out an unbounded tail.
     let visibleHeight = drawing.height + max(font.boundingRectForFont.height, font.ascender - font.descender)
@@ -178,6 +183,15 @@ struct BelowCompositionPrompt: NSViewRepresentable {
 
   func makeNSView(context: Context) -> BelowCompositionField {
     let view = BelowCompositionField(wrappingLabelWithString: " ")
+    let cell = BelowCompositionControlCell(textCell: " ")
+    cell.isBordered = false
+    cell.drawsBackground = false
+    cell.isEditable = false
+    cell.isSelectable = false
+    cell.wraps = true
+    cell.isScrollable = false
+    cell.usesSingleLineMode = false
+    view.cell = cell
     view.alignment = .center
     view.isSelectable = false
     view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)

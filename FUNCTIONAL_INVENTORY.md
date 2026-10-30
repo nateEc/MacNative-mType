@@ -2,6 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| TST-BELOW-ADVANCING-CONTROL-65 | 下方候选缺字框与全节点空白 | 固定 below 普通 div 行为、自有本地 WebKit 几何／快照及本机字体 glyph 实验；无原实现或资产复用 | VT／FF／NEL 同源绘制与测量、真实字体缺字框；ASCII 全空白节点不制造矩形；BELOW_COMPOSITION_ADVANCING_CONTROL_INVESTIGATION.md | 部分完成：先行九处几何与九处墨迹失败、纯空白 23 处失败后，9 项聚焦、395 项扩大及 146 项必需源码合同通过，含 42 项生产组合宿主；Debug 包、严格签名、41 份资源与原创性边界通过。更多字体／窄行、实体 IME、辅助功能及性能仍开放。 |
 | LANG-TRADITIONAL-CHINESE-64 | 繁体五档独立原形选编 | 固定 CC-CEDICT 繁体字段与分域 wordfreq 观察；六个旧自有词、三项书写改编，参考只核对聚合 | 基础 24→200；四档 65,890 个合成位置退出路由；五档完整词长配额、独立基础及四大档嵌套；TRADITIONAL_CHINESE_CORPUS_PREPARATION.md | 部分完成：23 项聚焦及 171 项扩大／146 必需源码合同通过；49,984 行源行／改编核验及普通／优化生成一致；Debug 包、严格签名、41 份资源与原创性边界通过。实体 IME、字形、语言／频率质量及性能仍开放。 |
 | LANG-SIMPLIFIED-CHINESE-63 | 简体中文五档独立真实选编 | 固定 CC-CEDICT／wordfreq，七个旧自有词及三项明确书写改编；参考仅聚合 | 基础 26→200、四档 66,000 合成位置退出路由，50k 唯一词形与逐词来源；SIMPLIFIED_CHINESE_CORPUS_PREPARATION.md | 部分完成：最终 169 项／146 必需源码对照、50,000 行独立来源及目标 band、完整重建一致性通过；Debug 包、严格签名、39 份资源与原创性边界通过。实体 IME、字形、语言／分布质量及性能仍开放。 |
 | UI-PRACTICE-PHASE-62 | 首键后的阶段提示与重开恢复 | 当前真实原生窗口的状态反例；不改上游规则或素材 | 根据 session.hasStarted 区分待开始与练习中，保留快捷键和长测试保护；PRACTICE_RESTART_INSTRUCTION_CONTRACT.md | 先行三项 17 处失败后，10 项定向、94 项相关及 Debug 包／37 份资源通过；真实窗口开始→首键→⌘R 重开验证通过。所有模式／组合、VoiceOver、物理键盘及性能仍开放。 |
