@@ -1,0 +1,162 @@
+{
+  "status": "preparation-only-not-installed",
+  "referenceCommit": "91bd24bb8513785c7364cbea29296ff7adafac41",
+  "referenceValueBoundary": "Only counts, lengths and character-code aggregates; no reference word values",
+  "referenceAggregates": [
+    {
+      "id": "chinese_simplified",
+      "count": 200,
+      "unique": 200,
+      "min": 2,
+      "max": 3,
+      "alphabetCount": 255,
+      "numericTokens": 0,
+      "uppercaseTokens": 0,
+      "punctuationTokens": 0,
+      "nonHanCharacters": [],
+      "lengthDistribution": {
+        "2": 199,
+        "3": 1
+      },
+      "sha256": "e983d6058becb78a8027d990514e2aab2c8e1b71b67aaaa949ca40aa723071b2"
+    },
+    {
+      "id": "chinese_simplified_1k",
+      "count": 1000,
+      "unique": 1000,
+      "min": 2,
+      "max": 5,
+      "alphabetCount": 770,
+      "numericTokens": 0,
+      "uppercaseTokens": 0,
+      "punctuationTokens": 0,
+      "nonHanCharacters": [],
+      "lengthDistribution": {
+        "2": 986,
+        "3": 11,
+        "4": 2,
+        "5": 1
+      },
+      "sha256": "5ac6223f944b7f83c4e87254cc50150ef3e4ef99c375eac0bf5dbb71a549df16"
+    },
+    {
+      "id": "chinese_simplified_5k",
+      "count": 5000,
+      "unique": 5000,
+      "min": 2,
+      "max": 6,
+      "alphabetCount": 1840,
+      "numericTokens": 0,
+      "uppercaseTokens": 0,
+      "punctuationTokens": 0,
+      "nonHanCharacters": [],
+      "lengthDistribution": {
+        "2": 4638,
+        "3": 275,
+        "4": 76,
+        "5": 9,
+        "6": 2
+      },
+      "sha256": "64a68850be196df7f061ae779e4994fbdc28dfcf9e4f4521eb0881293b1e549a"
+    },
+    {
+      "id": "chinese_simplified_10k",
+      "count": 10000,
+      "unique": 10000,
+      "min": 2,
+      "max": 7,
+      "alphabetCount": 2572,
+      "numericTokens": 0,
+      "uppercaseTokens": 0,
+      "punctuationTokens": 0,
+      "nonHanCharacters": [],
+      "lengthDistribution": {
+        "2": 9054,
+        "3": 680,
+        "4": 244,
+        "5": 16,
+        "6": 5,
+        "7": 1
+      },
+      "sha256": "8910bbafd9252e21082c2126be2e28742298b8d01e6794a06ba89d25a42c48ec"
+    },
+    {
+      "id": "chinese_simplified_50k",
+      "count": 50000,
+      "unique": 50000,
+      "min": 2,
+      "max": 9,
+      "alphabetCount": 4833,
+      "numericTokens": 0,
+      "uppercaseTokens": 0,
+      "punctuationTokens": 11,
+      "nonHanCharacters": [
+        "U+002C",
+        "U+00B7",
+        "U+FF0C",
+        "U+FF2B",
+        "U+FF2F",
+        "U+FF31"
+      ],
+      "lengthDistribution": {
+        "2": 38152,
+        "3": 6118,
+        "4": 5584,
+        "5": 103,
+        "6": 27,
+        "7": 6,
+        "9": 10
+      },
+      "sha256": "567001fe367af604b5342e58a0052a88dd534cdeb83104480221356c7a64e1c2"
+    }
+  ],
+  "independentSourceFeasibility": {
+    "download": "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz",
+    "gzipBytes": 3982205,
+    "gzipSHA256": "06d0d0e23362867f00ed399a634af016954d14cf3e074b1a937088db6837fb74",
+    "decodedBytes": 9868613,
+    "decodedSHA256": "727d728364b8dbb14880f21a242d9a1c3591b855bfb8841d06afa1f2a068cf0d",
+    "entries": 125324,
+    "literalHanTermsLength2Through9": 109790,
+    "lengthCounts": {
+      "2": 61311,
+      "3": 24349,
+      "4": 19184,
+      "5": 2832,
+      "6": 1102,
+      "7": 680,
+      "8": 238,
+      "9": 94
+    },
+    "legacyCount": 26,
+    "legacyLiteralAttested": 19,
+    "candidateCountsByMaximum": {
+      "3": 85660,
+      "5": 107676,
+      "6": 108778,
+      "7": 109458,
+      "9": 109790
+    },
+    "rawWholeTokenFrequencyObservation": {
+      "member": "wordfreq/data/large_zh.msgpack.gz",
+      "memberSHA256": "e079d7aaff1cfb92874850cb3ffbc7b611af939d9d671c1cbda932d968467cdd",
+      "candidatesWithExactKey": 77442,
+      "byMaximum": {
+        "3": 66391,
+        "5": 76880,
+        "6": 77116,
+        "7": 77345,
+        "9": 77442
+      },
+      "scope": "Exact raw table keys only, no segmentation or preprocessing parity claim"
+    },
+    "dictionaryBoundaryCounts": {
+      "U+002C": 0,
+      "U+00B7": 176,
+      "U+FF0C": 444,
+      "U+FF2B": 0,
+      "U+FF2F": 0,
+      "U+FF31": 0
+    }
+  }
+}

@@ -171,6 +171,8 @@ cmp "$project_root/Resources/RussianBasicCorpusNotices.txt" \
 cmp "$project_root/Resources/RussianBasicCorpusSources.txt" \
   "$app_path/Contents/Resources/RussianBasicCorpusSources.txt" \
   || fail "Basic Russian spelling sources missing or modified"
+  cmp "$project_root/Resources/SimplifiedChineseCorpusNotices.txt" "$app_path/Contents/Resources/SimplifiedChineseCorpusNotices.txt" || fail "Simplified Chinese attribution missing or modified"
+  cmp "$project_root/Resources/SimplifiedChineseCorpusSources.txt" "$app_path/Contents/Resources/SimplifiedChineseCorpusSources.txt" || fail "Simplified Chinese sources missing or modified"
 if [[ -n "$reference_root" ]]; then
   zsh "$project_root/Scripts/check-originality-boundaries.sh" \
     --reference "$reference_root" \

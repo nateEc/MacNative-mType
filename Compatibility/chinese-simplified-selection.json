@@ -1,0 +1,144 @@
+{
+  "status": "selected-not-installed",
+  "writingAdaptationsAndLiteralBoundaries": {
+    "卡拉ＯＫ": {
+      "sourceForm": "卡拉OK",
+      "sourceLine": 17492,
+      "change": "explicit fullwidth Latin writing adaptation",
+      "targetBand": null
+    },
+    "阿Ｑ": {
+      "sourceForm": "阿Q",
+      "sourceLine": 114518,
+      "change": "explicit fullwidth Latin writing adaptation",
+      "targetBand": null
+    },
+    "一不做，二不休": {
+      "sourceForm": "一不做，二不休",
+      "sourceLine": 381,
+      "change": "literal",
+      "targetBand": null
+    },
+    "一不做,二不休": {
+      "sourceForm": "一不做，二不休",
+      "sourceLine": 381,
+      "change": "explicit ASCII-comma writing adaptation",
+      "targetBand": null
+    },
+    "乔治·华盛顿": {
+      "sourceForm": "乔治·华盛顿",
+      "sourceLine": 22761,
+      "change": "literal",
+      "targetBand": null
+    },
+    "乔治·奥威尔": {
+      "sourceForm": "乔治·奥威尔",
+      "sourceLine": 22758,
+      "change": "literal",
+      "targetBand": null
+    },
+    "乔治·布尔": {
+      "sourceForm": "乔治·布尔",
+      "sourceLine": 22759,
+      "change": "literal",
+      "targetBand": null
+    },
+    "乔治·索罗斯": {
+      "sourceForm": "乔治·索罗斯",
+      "sourceLine": 22760,
+      "change": "literal",
+      "targetBand": null
+    },
+    "亚历山大·杜布切克": {
+      "sourceForm": "亚历山大·杜布切克",
+      "sourceLine": 5252,
+      "change": "literal",
+      "targetBand": null
+    },
+    "亚当·斯密": {
+      "sourceForm": "亚当·斯密",
+      "sourceLine": 5277,
+      "change": "literal",
+      "targetBand": null
+    },
+    "亚西尔·阿拉法特": {
+      "sourceForm": "亚西尔·阿拉法特",
+      "sourceLine": 5310,
+      "change": "literal",
+      "targetBand": null
+    },
+    "亨利·哈德逊": {
+      "sourceForm": "亨利·哈德逊",
+      "sourceLine": 5554,
+      "change": "literal",
+      "targetBand": null
+    },
+    "伊娃·门德斯": {
+      "sourceForm": "伊娃·门德斯",
+      "sourceLine": 6752,
+      "change": "literal",
+      "targetBand": null
+    }
+  },
+  "legacyAuthoredWithoutDictionaryEvidence": [
+    "晨光",
+    "窗边",
+    "远山",
+    "湖面",
+    "街角",
+    "木桌",
+    "灯影"
+  ],
+  "pools": {
+    "basic": {
+      "count": 200,
+      "minimum": 2,
+      "maximum": 3,
+      "alphabetCount": 269,
+      "exactWholeFrequencyKeys": 200,
+      "punctuationTokens": 0,
+      "uppercaseTokens": 0,
+      "sha256": "baa1a8f94f8b227f3c96e41aeb524a4ab6482d64bbb3d58ba5827cbe2e471205"
+    },
+    "1k": {
+      "count": 1000,
+      "minimum": 2,
+      "maximum": 5,
+      "alphabetCount": 786,
+      "exactWholeFrequencyKeys": 1000,
+      "punctuationTokens": 0,
+      "uppercaseTokens": 0,
+      "sha256": "e1be9b2ed2d0b706b0a1818f1887fe5d3daa5eaf6eb9606d936b56f59177fe97"
+    },
+    "5k": {
+      "count": 5000,
+      "minimum": 2,
+      "maximum": 6,
+      "alphabetCount": 1845,
+      "exactWholeFrequencyKeys": 5000,
+      "punctuationTokens": 0,
+      "uppercaseTokens": 0,
+      "sha256": "a109d70408a1efd38ac354f9f8599aff42b19266232c6dd5ead69198a9f0243c"
+    },
+    "10k": {
+      "count": 10000,
+      "minimum": 2,
+      "maximum": 7,
+      "alphabetCount": 2572,
+      "exactWholeFrequencyKeys": 10000,
+      "punctuationTokens": 0,
+      "uppercaseTokens": 0,
+      "sha256": "5267d370f881ef8715d74001b77dd0be55eea23121e710144aad73f7f8851e08"
+    },
+    "50k": {
+      "count": 50000,
+      "minimum": 2,
+      "maximum": 9,
+      "alphabetCount": 4833,
+      "exactWholeFrequencyKeys": 49987,
+      "punctuationTokens": 11,
+      "uppercaseTokens": 2,
+      "sha256": "174830e69694aaa5bd551bc500d569147ef8cdd796f6d7d726f92eef5ae60a69"
+    }
+  }
+}

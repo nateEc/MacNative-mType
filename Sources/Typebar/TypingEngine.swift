@@ -11254,11 +11254,7 @@ enum StarterLexicon {
     BritishEnglishPolicy.transformed($0, context: .init(configuration: .words(1, englishVariant: .british)))
   }
 
-  static let simplifiedChineseWords = [
-    "晨光", "窗边", "纸张", "远山", "微风", "练习", "专注", "慢慢", "清晰", "湖面",
-    "街角", "木桌", "灯影", "旅程", "耐心", "片刻", "城市", "雨声", "安静", "方向",
-    "星光", "消息", "花园", "呼吸", "日常", "节奏",
-  ]
+  static let simplifiedChineseWords = SimplifiedChineseCorpus.basic
 
   private struct SimplifiedChineseScaleSpecification {
     let marker: Character
@@ -11386,24 +11382,16 @@ enum StarterLexicon {
   }
 
   static var simplifiedChinese1kLexicon: IndexedLexicon {
-    simplifiedChineseScaleLexicon(.init(
-      marker: "甲", count: 1_000, maximumLength: 5, numericCount: 28,
-      uppercaseCount: 0, punctuationCount: 0))
+    IndexedLexicon(SimplifiedChineseCorpus.words1k)
   }
   static var simplifiedChinese5kLexicon: IndexedLexicon {
-    simplifiedChineseScaleLexicon(.init(
-      marker: "乙", count: 5_000, maximumLength: 6, numericCount: 121,
-      uppercaseCount: 0, punctuationCount: 0))
+    IndexedLexicon(SimplifiedChineseCorpus.words5k)
   }
   static var simplifiedChinese10kLexicon: IndexedLexicon {
-    simplifiedChineseScaleLexicon(.init(
-      marker: "丙", count: 10_000, maximumLength: 7, numericCount: 222,
-      uppercaseCount: 0, punctuationCount: 0))
+    IndexedLexicon(SimplifiedChineseCorpus.words10k)
   }
   static var simplifiedChinese50kLexicon: IndexedLexicon {
-    simplifiedChineseScaleLexicon(.init(
-      marker: "丁", count: 50_000, maximumLength: 9, numericCount: 1_445,
-      uppercaseCount: 2, punctuationCount: 11))
+    IndexedLexicon(SimplifiedChineseCorpus.allWords)
   }
 
   static var simplifiedChinese1kWords: [String] { simplifiedChinese1kLexicon.materialized() }
