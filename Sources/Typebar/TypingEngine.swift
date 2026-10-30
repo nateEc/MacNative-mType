@@ -5821,13 +5821,25 @@ struct TypingSession {
   func promptViewportCompletedIndices(in cells: [PromptViewportTargetDirectory.Cell],
     separatorOffsets: [Int]) -> Set<Int>? {
     let typedCharacters = Array(typed)
-    guard typedTargetIndices.count == typedCharacters.count else { return nil }
-    let separatorTargets = Set(separatorOffsets)
+    let targets = typedTargetIndices
+    guard targets.count == typedCharacters.count else { return nil }
+    guard !typedCharacters.isEmpty, !separatorOffsets.isEmpty else { return [] }
+    // The directory owns ordered separator offsets. Query only actual input
+    // targets instead of rebuilding a whole-prompt set for every small window.
+    func isSeparatorTarget(_ target: Int) -> Bool {
+      var lower = 0, upper = separatorOffsets.count
+      while lower < upper {
+        let middle = lower + (upper - lower) / 2
+        if separatorOffsets[middle] < target { lower = middle + 1 }
+        else { upper = middle }
+      }
+      return lower < separatorOffsets.count && separatorOffsets[lower] == target
+    }
     var seen = Set<Int>()
     var accepted = Set<Int>()
     var lastAccepted: Int?
-    for (index, target) in typedTargetIndices.enumerated() {
-      guard let target, separatorTargets.contains(target), seen.insert(target).inserted else { continue }
+    for (index, target) in targets.enumerated() {
+      guard let target, isSeparatorTarget(target), seen.insert(target).inserted else { continue }
       if isPromptWordSeparator(typedCharacters[index]) {
         accepted.insert(target)
         lastAccepted = max(lastAccepted ?? target, target)
