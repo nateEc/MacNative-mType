@@ -5200,21 +5200,8 @@ private struct ContentView: View {
   }
 
   private var restartInstruction: String {
-    if quickRestartRequiresProtection {
-      let bailout = "双击 Shift+Enter 中止并显示结果"
-      switch practiceQuickRestartKey {
-      case .escape: return "按任意键开始，Shift+Esc 可重新开始；\(bailout)"
-      case .tab: return "按任意键开始，Shift+Tab 可重新开始；\(bailout)"
-      case .enter: return "按任意键开始，⌘R 可重开；\(bailout)"
-      case .off: return "按任意键开始，可用 ⌘R 重开；\(bailout)"
-      }
-    }
-    switch practiceQuickRestartKey {
-    case .off: return "按任意键开始，可使用 ⌘R 重新开始"
-    case .escape: return "按任意键开始，Esc 可重新开始"
-    case .tab: return "按任意键开始，Tab 可重新开始"
-    case .enter: return "按任意键开始，Enter 可重新开始"
-    }
+    PracticeRestartInstruction.text(hasStarted: session.hasStarted,
+      key: practiceQuickRestartKey, requiresProtection: quickRestartRequiresProtection)
   }
 
   @ViewBuilder private var practiceKeyTips: some View {

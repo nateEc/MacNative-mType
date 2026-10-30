@@ -13,3 +13,5 @@
 实际不可见组件的 /tmp/typebar-license-switch-new-selection.png 已确认新 Greek 文档标题显示在顶部；/tmp/typebar-license-reader-empty.png 显示原安装包警告。先行失败图像另存 /tmp/typebar-license-reader-red-retained-tail-20261030.png 与 /tmp/typebar-license-reader-red-empty-20261030.png。这些像素只证明文档与警告内容，不替代原生 Picker 菜单、完成按钮、实体键盘、焦点、VoiceOver、不同缩放、系统 sheet 关闭／重开与安装后运行的人工验证。
 
 最终 /tmp/typebar-license-reader-package-20261030.log 的 Debug 包、严格签名、37 份来源／许可资源逐字节核对与原创性边界检查通过，驱动 42.171 秒，作业终态为成功、非 Markdown 输入保持。没有启动 Typebar 主程序。手工矩阵结构检查通过，现有 1,466 个唯一场景。整体重写 goal 保持 active，其他内容质量、用户流程和性能缺口不因本批通过而关闭。
+
+后续 c1c0d78c 的实际菜单、键盘选择、Esc／完成、损坏 QA 安装包和恢复补证见 CORPUS_LICENSE_NATIVE_UI_ACCEPTANCE.md。只启动一个隔离实例并正常退出，未改原资源或偏好域；不把这次可见运行反写为原批次已启动应用，也不升级 VoiceOver、全焦点或其他缩放验收。

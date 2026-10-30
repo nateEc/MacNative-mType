@@ -14,7 +14,7 @@
 | 主题与显示 | official-themes.json：187 个参考名称、188 个原生内置主题；0 exactMappings、187 relatedMappings。 | 名称／相关配色不能证明完整颜色、预览、保存、随机、系统切换和所有显示行为；独立设计与参考差异仍需明确验收。 |
 | 挑战规则及受限入口 | official-challenges.json：58 项，57 nativeEquivalent、1 pending。 | mobileWarrior 原条件为移动设备一小时测试，macOS 不能满足该设备条件；当前导入解释限制，不颁发冒充等价的原生成就。该限制仍须在整体兼容结论中保留。 |
 | 远端／自托管服务 | official-service-surfaces.json：14 模块，12 mapped，dev／webhooks 两项不适用。 | 模块关联不足以证明所有请求、响应、权限、账户、缓存、故障和恢复行为。当前客户端结果不外推为当前服务端全部通过。 |
-| 用户流程与性能 | MANUAL_ACCEPTANCE.md 现有 1,467 个唯一场景，结构检查通过。各专项有隐藏宿主、源对照及局部性能证据。 | 实体窗口、键盘／IME、VoiceOver、全部组合、完整 Release／最低设备性能仍开放。结构检查和 getter 探针不是这些条件的证明。 |
+| 用户流程与性能 | MANUAL_ACCEPTANCE.md 现有 1,468 个唯一场景，结构检查通过。各专项有隐藏宿主、源对照及局部性能证据。 | 实体窗口、键盘／IME、VoiceOver、全部组合、完整 Release／最低设备性能仍开放。结构检查和 getter 探针不是这些条件的证明。 |
 
 行为关联索引为 47 direct、119 个原生测试符号、17 support；它证明关联与方法存在，实际执行由源证据日志验证。最近希腊语最终数据相关 1,269 项扩大回归／其中 146 项必需源对照通过，见 GREEK_CORPUS_CONTRACT.md；不是全部客户端或完整重写验收。
 
