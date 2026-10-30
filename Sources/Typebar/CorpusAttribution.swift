@@ -71,8 +71,13 @@ struct CorpusAttributionSummary: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Label("词库与开源署名", systemImage: "text.book.closed")
-        .font(.headline)
+      HStack(alignment: .firstTextBaseline) {
+        Label("词库与开源署名", systemImage: "text.book.closed")
+          .font(.headline)
+        Spacer(minLength: 12)
+        Button("查看完整许可…") { showingNotices = true }
+          .buttonStyle(.link)
+      }
       Text("English 五字母／450k 的独立语料来自 SCOWL、wordfreq 和 UK Advanced Cryptics Dictionary。")
         .fixedSize(horizontal: false, vertical: true)
       Text(LargeEnglishAttribution.sourceName)
@@ -103,8 +108,6 @@ struct CorpusAttributionSummary: View {
       Text("Українська (Latynka) 为上述独立西里尔语料的明确拉丁化改编，参照 Vakulenko 的现代字母规则并保留原词；频率证据仅指西里尔原形。")
       Text("Ελληνικά 词库来自 English Wiktionary contributors、Kaikki.org 与 wordfreq；保留原样声调、分音符及词尾 sigma，不改写拼写。")
         .fixedSize(horizontal: false, vertical: true)
-      Button("查看完整许可…") { showingNotices = true }
-        .buttonStyle(.link)
     }
     .sheet(isPresented: $showingNotices) { CorpusLicensesView() }
   }

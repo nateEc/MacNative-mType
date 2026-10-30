@@ -26,14 +26,15 @@ import XCTest
 
   // An unshown SwiftUI host has no exported AX tree. Read its actual rendered
   // pixels instead, without seeding Vision with the expected credit strings.
-  private func visibleLines(in host: NSView, capture: String) throws -> [VNRecognizedTextObservation] {
+  private func visibleLines(in host: NSView, capture: String,
+    languages: [String] = ["en-US"]) throws -> [VNRecognizedTextObservation] {
     let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
     host.cacheDisplay(in: host.bounds, to: bitmap)
     try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
       .write(to: URL(fileURLWithPath: capture))
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
-    request.recognitionLanguages = ["en-US"]
+    request.recognitionLanguages = languages
     request.usesLanguageCorrection = false
     try VNImageRequestHandler(cgImage: XCTUnwrap(bitmap.cgImage)).perform([request])
     return request.results ?? []
@@ -83,6 +84,26 @@ import XCTest
       let line = try XCTUnwrap(lines.first { $0.topCandidates(1).first?.string == expected })
       XCTAssertGreaterThan(line.boundingBox.minY, 0.5, "Credit must be prominent in the first viewport")
     }
+    XCTAssertFalse(window.isVisible)
+    XCTAssertNil(window.attachedSheet)
+  }
+
+  func testFullLicenseEntryIsFullyVisibleNearTheSourceHeadingInTheFirstAboutViewport() throws {
+    let suite = "CorpusLicenseEntry.\(UUID())"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defaults.set("", forKey: "remoteAccount.endpoint.v1")
+    let (host, window) = mount(AboutTypebarView(metadata: .init(info: [:]),
+      account: AccountSession(defaults: defaults)), size: .init(width: 620, height: 760))
+    defer {
+      host.rootView = AnyView(EmptyView()); window.contentView = nil; window.close()
+      defaults.removePersistentDomain(forName: suite)
+    }
+    let lines = try visibleLines(in: host, capture: "/tmp/typebar-license-entry-about.png",
+      languages: ["zh-Hans", "en-US"])
+    let entry = try XCTUnwrap(lines.first {
+      $0.topCandidates(1).first?.string.filter { !$0.isWhitespace && !$0.isPunctuation } == "查看完整许可"
+    }, "The entire license entry must be readable without scrolling")
+    XCTAssertGreaterThan(entry.boundingBox.minY, 0.65)
     XCTAssertFalse(window.isVisible)
     XCTAssertNil(window.attachedSheet)
   }
