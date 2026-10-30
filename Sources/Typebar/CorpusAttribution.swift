@@ -55,8 +55,9 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
 
   func read(resourceDirectory: URL?) -> String? {
     guard let resourceDirectory else { return nil }
-    return try? String(contentsOf: resourceDirectory.appendingPathComponent(rawValue + ".txt"),
-      encoding: .utf8)
+    guard let text = try? String(contentsOf: resourceDirectory.appendingPathComponent(rawValue + ".txt"),
+      encoding: .utf8), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+    return text
   }
 }
 
@@ -115,13 +116,27 @@ struct CorpusAttributionSummary: View {
 
 struct CorpusLicensesView: View {
   let resourceDirectory: URL?
-  @Environment(\.dismiss) private var dismiss
   @State private var selectedNotice = CorpusLicenseNotice.englishLarge
-  @State private var text: String?
-  @State private var hasLoaded = false
 
   init(resourceDirectory: URL? = Bundle.main.resourceURL) {
     self.resourceDirectory = resourceDirectory
+  }
+
+  var body: some View {
+    CorpusLicenseReader(resourceDirectory: resourceDirectory, selectedNotice: $selectedNotice)
+  }
+}
+
+struct CorpusLicenseReader: View {
+  let resourceDirectory: URL?
+  @Binding var selectedNotice: CorpusLicenseNotice
+  @Environment(\.dismiss) private var dismiss
+  @State private var text: String?
+  @State private var hasLoaded = false
+
+  init(resourceDirectory: URL?, selectedNotice: Binding<CorpusLicenseNotice>) {
+    self.resourceDirectory = resourceDirectory
+    self._selectedNotice = selectedNotice
   }
 
   var body: some View {
@@ -145,6 +160,7 @@ struct CorpusLicensesView: View {
           ProgressView("正在读取许可…")
         }
       }
+      .id(selectedNotice)
       HStack {
         Spacer()
         Button("完成") { dismiss() }.keyboardShortcut(.cancelAction)

@@ -47,7 +47,9 @@ import XCTest
 
   func testAllNoticeChoicesReadTheirActualLocalFilesAndKeepTheFullCredit() throws {
     for notice in CorpusLicenseNotice.allCases {
-      XCTAssertFalse(try XCTUnwrap(notice.read(resourceDirectory: resources)).isEmpty)
+      let text = try XCTUnwrap(notice.read(resourceDirectory: resources))
+      XCTAssertFalse(text.isEmpty)
+      XCTAssertEqual(text, try String(contentsOf: resources.appendingPathComponent(notice.rawValue + ".txt"), encoding: .utf8))
     }
     let notice = try XCTUnwrap(CorpusLicenseNotice.englishLarge.read(resourceDirectory: resources))
     XCTAssertTrue(notice.contains(LargeEnglishAttribution.sourceName))
@@ -65,6 +67,77 @@ import XCTest
     XCTAssertNil(CorpusLicenseNotice.englishLarge.read(resourceDirectory: directory))
     try Data([0xff]).write(to: directory.appendingPathComponent("EnglishLargeCorpusNotices.txt"))
     XCTAssertNil(CorpusLicenseNotice.englishLarge.read(resourceDirectory: directory))
+    for text in ["", " \t\r\n"] {
+      try text.write(to: directory.appendingPathComponent("EnglishLargeCorpusNotices.txt"), atomically: true, encoding: .utf8)
+      XCTAssertNil(CorpusLicenseNotice.englishLarge.read(resourceDirectory: directory))
+    }
+  }
+
+  private final class NoticeSelection: ObservableObject {
+    @Published var value: CorpusLicenseNotice = .englishLarge
+  }
+
+  private struct BoundReader: View {
+    @ObservedObject var selection: NoticeSelection
+    let resources: URL
+    var body: some View {
+      CorpusLicenseReader(resourceDirectory: resources, selectedNotice: $selection.value)
+    }
+  }
+
+  func testChangingNoticeAfterReadingTheTailStartsAtTheNewDocumentHeading() throws {
+    let selection = NoticeSelection()
+    let (host, window) = mount(BoundReader(selection: selection, resources: resources),
+      size: .init(width: 608, height: 668))
+    defer { host.rootView = AnyView(EmptyView()); window.contentView = nil; window.close() }
+    let scroll = try XCTUnwrap(scrollView(in: host))
+    let document = try XCTUnwrap(scroll.documentView)
+    let bottom = document.isFlipped ? document.bounds.maxY - scroll.contentView.bounds.height : 0
+    scroll.contentView.scroll(to: .init(x: 0, y: bottom))
+    scroll.reflectScrolledClipView(scroll.contentView)
+    host.layoutSubtreeIfNeeded()
+    let tail = try visibleLines(in: host, capture: "/tmp/typebar-license-switch-old-tail.png")
+      .compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+    XCTAssertTrue(tail.contains("10.1080/17470218.2013.850521"), tail)
+    selection.value = .greek
+    for _ in 0..<20 {
+      host.layoutSubtreeIfNeeded()
+      RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+    }
+    let changed = try visibleLines(in: host, capture: "/tmp/typebar-license-switch-new-selection.png")
+      .compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+      .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    XCTAssertTrue(changed.contains("Typebar independent modern Greek corpus"), changed)
+    // Independently prove the new document loaded even when its header was offscreen.
+    let updatedScroll = try XCTUnwrap(scrollView(in: host))
+    let updatedDocument = try XCTUnwrap(updatedScroll.documentView)
+    let top = updatedDocument.isFlipped ? updatedDocument.bounds.minY
+      : updatedDocument.bounds.maxY - updatedScroll.contentView.bounds.height
+    updatedScroll.contentView.scroll(to: .init(x: 0, y: max(0, top)))
+    updatedScroll.reflectScrolledClipView(updatedScroll.contentView)
+    host.layoutSubtreeIfNeeded()
+    let recovered = try visibleLines(in: host, capture: "/tmp/typebar-license-switch-manual-top.png")
+      .compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+      .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    XCTAssertTrue(recovered.contains("Typebar independent modern Greek corpus"), recovered)
+    XCTAssertFalse(window.isVisible)
+    XCTAssertNil(window.attachedSheet)
+  }
+
+  func testEmptyNoticeShowsTheInstallationWarningInsteadOfABlankDocument() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    try "".write(to: directory.appendingPathComponent("EnglishLargeCorpusNotices.txt"), atomically: true, encoding: .utf8)
+    let (host, window) = mount(CorpusLicensesView(resourceDirectory: directory),
+      size: .init(width: 608, height: 668))
+    defer { host.rootView = AnyView(EmptyView()); window.contentView = nil; window.close() }
+    let text = try visibleLines(in: host, capture: "/tmp/typebar-license-reader-empty.png", languages: ["zh-Hans", "en-US"])
+      .compactMap { $0.topCandidates(1).first?.string }.joined()
+      .filter { !$0.isWhitespace && !$0.isPunctuation }
+    XCTAssertTrue(text.contains("许可文件无法读取") && text.contains("请重新安装"), text)
+    XCTAssertFalse(window.isVisible)
+    XCTAssertNil(window.attachedSheet)
   }
 
   func testActualAboutIncludesProminentAttributionWithoutShowingAWindow() throws {
