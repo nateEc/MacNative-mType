@@ -1,0 +1,187 @@
+{
+  "status": "traditional-selected-not-installed",
+  "boundarySources": {
+    "卡拉ＯＫ": {
+      "sourceForm": "卡拉OK",
+      "simplifiedSourceForm": "卡拉OK",
+      "sourceLine": 17492,
+      "kind": "explicit fullwidth Latin writing adaptation",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "阿Ｑ": {
+      "sourceForm": "阿Q",
+      "simplifiedSourceForm": "阿Q",
+      "sourceLine": 114518,
+      "kind": "explicit fullwidth Latin writing adaptation",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "一不做，二不休": {
+      "sourceForm": "一不做，二不休",
+      "simplifiedSourceForm": "一不做，二不休",
+      "sourceLine": 381,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "一人得道，雞犬升天": {
+      "sourceForm": "一人得道，雞犬升天",
+      "simplifiedSourceForm": "一人得道，鸡犬升天",
+      "sourceLine": 400,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "一個天南，一個地北": {
+      "sourceForm": "一個天南，一個地北",
+      "simplifiedSourceForm": "一个天南，一个地北",
+      "sourceLine": 416,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "一不做,二不休": {
+      "sourceForm": "一不做，二不休",
+      "simplifiedSourceForm": "一不做，二不休",
+      "sourceLine": 381,
+      "kind": "explicit ASCII-comma writing adaptation",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "亞歷山大·杜布切克": {
+      "sourceForm": "亞歷山大·杜布切克",
+      "simplifiedSourceForm": "亚历山大·杜布切克",
+      "sourceLine": 5252,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "亞當·斯密": {
+      "sourceForm": "亞當·斯密",
+      "simplifiedSourceForm": "亚当·斯密",
+      "sourceLine": 5277,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "亨利·哈德遜": {
+      "sourceForm": "亨利·哈德遜",
+      "simplifiedSourceForm": "亨利·哈德逊",
+      "sourceLine": 5554,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "伊娃·門德斯": {
+      "sourceForm": "伊娃·門德斯",
+      "simplifiedSourceForm": "伊娃·门德斯",
+      "sourceLine": 6752,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "伽利略·伽利雷": {
+      "sourceForm": "伽利略·伽利雷",
+      "simplifiedSourceForm": "伽利略·伽利雷",
+      "sourceLine": 7074,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "傑克·倫敦": {
+      "sourceForm": "傑克·倫敦",
+      "simplifiedSourceForm": "杰克·伦敦",
+      "sourceLine": 9558,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    },
+    "傑夫·金尼": {
+      "sourceForm": "傑夫·金尼",
+      "simplifiedSourceForm": "杰夫·金尼",
+      "sourceLine": 9565,
+      "kind": "literal",
+      "targetRawBand": null,
+      "simplifiedSourceBand": null
+    }
+  },
+  "legacyAuthoredWithoutDictionaryEvidence": [
+    "晨霧",
+    "微雨",
+    "松林",
+    "茶香",
+    "木門",
+    "山徑"
+  ],
+  "pools": {
+    "basic": {
+      "count": 200,
+      "alphabetCount": 235,
+      "lengthDistribution": {
+        "1": 60,
+        "2": 138,
+        "3": 2
+      },
+      "targetRawObservations": 98,
+      "sha256": "00c85de3c74f9f97dc4ac971db258586cfebebc36955541906ab16e967c89a16"
+    },
+    "1k": {
+      "count": 1000,
+      "alphabetCount": 792,
+      "lengthDistribution": {
+        "2": 986,
+        "3": 11,
+        "4": 2,
+        "5": 1
+      },
+      "targetRawObservations": 384,
+      "sha256": "b41f9c9fda980f4f8fe6fc8e7df429fc55ddaf173251ea8311c34f80d8214592"
+    },
+    "5k": {
+      "count": 4991,
+      "alphabetCount": 1879,
+      "lengthDistribution": {
+        "2": 4624,
+        "3": 278,
+        "4": 77,
+        "5": 10,
+        "6": 2
+      },
+      "targetRawObservations": 1977,
+      "sha256": "9915dc91632d8695b11fefb07880bf12128f91a7f85effb29fec072810132364"
+    },
+    "10k": {
+      "count": 9974,
+      "alphabetCount": 2652,
+      "lengthDistribution": {
+        "2": 9022,
+        "3": 685,
+        "4": 246,
+        "5": 15,
+        "6": 5,
+        "7": 1
+      },
+      "targetRawObservations": 3923,
+      "sha256": "b7242f13622313238523a480693e0c7433a9ed844afb31dbe68f0d481724a1fb"
+    },
+    "50k": {
+      "count": 49925,
+      "alphabetCount": 4978,
+      "lengthDistribution": {
+        "1": 1,
+        "2": 38062,
+        "3": 6125,
+        "4": 5591,
+        "5": 102,
+        "6": 28,
+        "7": 6,
+        "9": 10
+      },
+      "targetRawObservations": 19064,
+      "sha256": "4f1f844cb137ed9644991e0b84b050dddf431c0c0ca85afaf62ecc33511bbb29"
+    }
+  },
+  "selectedSourcesSHA256": "6bd13cc4c71b9555a20299fb7bd35b481b395629d214d2c6b80b79912a992884",
+  "uniqueSelectedTerms": 49984
+}

@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "byteIdenticalFiles": 9,
+  "sourceRowsVerified": 49984,
+  "kinds": {
+    "Typebar authored legacy": 6,
+    "literal": 49975,
+    "explicit fullwidth Latin writing adaptation": 2,
+    "explicit ASCII-comma writing adaptation": 1
+  },
+  "exactLengthDistributions": 5,
+  "uniqueMembershipVerified": true,
+  "nestedLargePools": true,
+  "productInstalled": false
+}

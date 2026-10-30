@@ -1,0 +1,147 @@
+{
+  "status": "preparation-not-installed",
+  "referenceCommit": "91bd24bb8513785c7364cbea29296ff7adafac41",
+  "referenceBoundary": "Aggregate metadata only, no reference word values",
+  "referenceAggregates": [
+    {
+      "id": "chinese_traditional",
+      "count": 200,
+      "unique": 200,
+      "minimum": 1,
+      "maximum": 3,
+      "alphabetCount": 221,
+      "lengthDistribution": {
+        "1": 60,
+        "2": 138,
+        "3": 2
+      },
+      "nonHanCodepoints": [],
+      "punctuationTokens": 0,
+      "sha256": "f42e2111efb37a4193de3f3688081edb204831066f164cb4d609dcc8a3d38252"
+    },
+    {
+      "id": "chinese_traditional_1k",
+      "count": 1000,
+      "unique": 1000,
+      "minimum": 2,
+      "maximum": 5,
+      "alphabetCount": 779,
+      "lengthDistribution": {
+        "2": 986,
+        "3": 11,
+        "4": 2,
+        "5": 1
+      },
+      "nonHanCodepoints": [],
+      "punctuationTokens": 0,
+      "sha256": "2ba773b835d5dd12ff400efcd3cc8e731cdd9238c35fdde1eb543269aff0d4be"
+    },
+    {
+      "id": "chinese_traditional_5k",
+      "count": 4991,
+      "unique": 4991,
+      "minimum": 2,
+      "maximum": 6,
+      "alphabetCount": 1879,
+      "lengthDistribution": {
+        "2": 4624,
+        "3": 278,
+        "4": 77,
+        "5": 10,
+        "6": 2
+      },
+      "nonHanCodepoints": [],
+      "punctuationTokens": 0,
+      "sha256": "08bc38a212978c2e16ed968e0529ec1591222a0e98b0f76d4dd8680bb93453f9"
+    },
+    {
+      "id": "chinese_traditional_10k",
+      "count": 9974,
+      "unique": 9974,
+      "minimum": 2,
+      "maximum": 7,
+      "alphabetCount": 2652,
+      "lengthDistribution": {
+        "2": 9022,
+        "3": 685,
+        "4": 246,
+        "5": 15,
+        "6": 5,
+        "7": 1
+      },
+      "nonHanCodepoints": [],
+      "punctuationTokens": 0,
+      "sha256": "e773c6bdde3b99ec4a4bc3be5d8b27a1aa07a1e720351b5ac2240be1458943c2"
+    },
+    {
+      "id": "chinese_traditional_50k",
+      "count": 49925,
+      "unique": 49925,
+      "minimum": 1,
+      "maximum": 9,
+      "alphabetCount": 4978,
+      "lengthDistribution": {
+        "1": 1,
+        "2": 38062,
+        "3": 6125,
+        "4": 5591,
+        "5": 102,
+        "6": 28,
+        "7": 6,
+        "9": 10
+      },
+      "nonHanCodepoints": [
+        "U+002C",
+        "U+00B7",
+        "U+FF0C",
+        "U+FF2B",
+        "U+FF2F",
+        "U+FF31"
+      ],
+      "punctuationTokens": 11,
+      "sha256": "f5a9454fcd339d71d87156894b6f94e29a9b81379adfe989cc27bf2e4ea97bb4"
+    }
+  ],
+  "independentSource": {
+    "status": "traditional-candidates-not-installed",
+    "sourceURL": "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz",
+    "sourceSHA256": "06d0d0e23362867f00ed399a634af016954d14cf3e074b1a937088db6837fb74",
+    "rawSHA256": "727d728364b8dbb14880f21a242d9a1c3591b855bfb8841d06afa1f2a068cf0d",
+    "frequencyWheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473",
+    "frequencyMemberSHA256": "e079d7aaff1cfb92874850cb3ffbc7b611af939d9d671c1cbda932d968467cdd",
+    "candidateCount": 119150,
+    "singleCharacterCandidates": 10261,
+    "exactTraditionalRawKeys": 33174,
+    "observedSimplifiedSourceKeys": 85017,
+    "legacyDictionaryAttested": [
+      "海灣",
+      "筆記",
+      "專注",
+      "緩步",
+      "清楚",
+      "河岸",
+      "街燈",
+      "書頁",
+      "旅途",
+      "耐心",
+      "片刻",
+      "風鈴",
+      "安靜",
+      "方向",
+      "星群",
+      "畫布",
+      "庭院",
+      "呼吸"
+    ],
+    "legacyAuthoredWithoutDictionaryEvidence": [
+      "晨霧",
+      "微雨",
+      "松林",
+      "茶香",
+      "木門",
+      "山徑"
+    ],
+    "rowsSHA256": "19ef4e5af8680986745141c22004c8d8a55827b54ee5a67aa3261f440d343cb2",
+    "observationScope": "Traditional raw key and simplified source-form key are separate; neither is a segmentation/transliteration parity claim"
+  }
+}

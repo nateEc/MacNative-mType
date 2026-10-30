@@ -12825,12 +12825,12 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testTraditionalChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+  func testTraditionalChineseChoicesPreserveIDsAndIndependentCorpusShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int, Int)] = [
-      ("traditionalChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000, 0),
-      ("traditionalChinese5k", 4_991, 2, 6, 0, 0, 121, 4_991, 4_991, 0),
-      ("traditionalChinese10k", 9_974, 2, 7, 0, 0, 220, 9_974, 9_974, 0),
-      ("traditionalChinese50k", 49_925, 1, 9, 2, 11, 1_427, 49_925, 49_912, 4),
+      ("traditionalChinese1k", 1_000, 2, 5, 0, 0, 29, 1_000, 1_000, 0),
+      ("traditionalChinese5k", 4_991, 2, 6, 0, 0, 159, 4_991, 4_991, 0),
+      ("traditionalChinese10k", 9_974, 2, 7, 0, 0, 293, 9_974, 9_974, 0),
+      ("traditionalChinese50k", 49_925, 1, 9, 2, 11, 1_585, 49_925, 49_912, 4),
     ]
 
     for (

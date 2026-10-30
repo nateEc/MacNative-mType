@@ -11399,13 +11399,8 @@ enum StarterLexicon {
   static var simplifiedChinese10kWords: [String] { simplifiedChinese10kLexicon.materialized() }
   static var simplifiedChinese50kWords: [String] { simplifiedChinese50kLexicon.materialized() }
 
-  // Original Typebar content for traditional Chinese practice. It is authored
-  // separately from the simplified Chinese starter corpus.
-  static let traditionalChineseWords = [
-    "晨霧", "海灣", "筆記", "微雨", "松林", "專注", "緩步", "清楚", "河岸", "茶香",
-    "街燈", "木門", "書頁", "旅途", "耐心", "片刻", "山徑", "風鈴", "安靜", "方向",
-    "星群", "畫布", "庭院", "呼吸",
-  ]
+  // Literal traditional source fields; the earlier authored entries are retained.
+  static let traditionalChineseWords = TraditionalChineseCorpus.basic
 
   private struct TraditionalChineseScaleSpecification {
     let marker: Character
@@ -11463,28 +11458,16 @@ enum StarterLexicon {
   }
 
   static var traditionalChinese1kLexicon: IndexedLexicon {
-    traditionalChineseScaleLexicon(.init(
-      marker: "曦", count: 1_000, minimumToken: "鬱龘", maximumLength: 5,
-      numericCount: 28, uppercaseCount: 0, punctuationCount: 0,
-      punctuationNumberOverlap: 0))
+    IndexedLexicon(TraditionalChineseCorpus.words1k)
   }
   static var traditionalChinese5kLexicon: IndexedLexicon {
-    traditionalChineseScaleLexicon(.init(
-      marker: "嵐", count: 4_991, minimumToken: "鬱龘", maximumLength: 6,
-      numericCount: 121, uppercaseCount: 0, punctuationCount: 0,
-      punctuationNumberOverlap: 0))
+    IndexedLexicon(TraditionalChineseCorpus.words5k)
   }
   static var traditionalChinese10kLexicon: IndexedLexicon {
-    traditionalChineseScaleLexicon(.init(
-      marker: "澄", count: 9_974, minimumToken: "鬱龘", maximumLength: 7,
-      numericCount: 220, uppercaseCount: 0, punctuationCount: 0,
-      punctuationNumberOverlap: 0))
+    IndexedLexicon(TraditionalChineseCorpus.words10k)
   }
   static var traditionalChinese50kLexicon: IndexedLexicon {
-    traditionalChineseScaleLexicon(.init(
-      marker: "曜", count: 49_925, minimumToken: "鬱", maximumLength: 9,
-      numericCount: 1_427, uppercaseCount: 2, punctuationCount: 11,
-      punctuationNumberOverlap: 4))
+    IndexedLexicon(TraditionalChineseCorpus.allWords)
   }
 
   static var traditionalChinese1kWords: [String] { traditionalChinese1kLexicon.materialized() }

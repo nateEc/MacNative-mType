@@ -51,6 +51,8 @@ cp "$project_root/Resources/GreekCorpusNotices.txt" "$app_path/Contents/Resource
 cp "$project_root/Resources/GreekCorpusSources.txt" "$app_path/Contents/Resources/GreekCorpusSources.txt"
 cp "$project_root/Resources/SimplifiedChineseCorpusNotices.txt" "$app_path/Contents/Resources/SimplifiedChineseCorpusNotices.txt"
 cp "$project_root/Resources/SimplifiedChineseCorpusSources.txt" "$app_path/Contents/Resources/SimplifiedChineseCorpusSources.txt"
+cp "$project_root/Resources/TraditionalChineseCorpusNotices.txt" "$app_path/Contents/Resources/TraditionalChineseCorpusNotices.txt"
+cp "$project_root/Resources/TraditionalChineseCorpusSources.txt" "$app_path/Contents/Resources/TraditionalChineseCorpusSources.txt"
 cp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt"
 cp "$project_root/Resources/SpanishLargeCorpusNotices.txt" "$app_path/Contents/Resources/SpanishLargeCorpusNotices.txt"
 cp "$project_root/Resources/SpanishLargeCorpusSources.txt" "$app_path/Contents/Resources/SpanishLargeCorpusSources.txt"

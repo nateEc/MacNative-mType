@@ -3,3 +3,4 @@ Resources/UkrainianCorpusSources.txt whitespace=-blank-at-eol
 Resources/UkrainianLatynkaCorpusSources.txt whitespace=-blank-at-eol
 # Preserve literal upstream CC-CEDICT comment lines and wordfreq license ending.
 Resources/SimplifiedChineseCorpusNotices.txt whitespace=-blank-at-eol,-blank-at-eof
+Resources/TraditionalChineseCorpusNotices.txt whitespace=-blank-at-eol,-blank-at-eof
