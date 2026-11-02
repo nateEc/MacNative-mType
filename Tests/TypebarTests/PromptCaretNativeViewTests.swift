@@ -16,6 +16,65 @@ import XCTest
       frameRate: 30, attemptID: attempt, coordinator: motion)
   }
 
+  func testMeasuredFieldGeometryKeepsRefreshProviderButSkipsUnneededGlyphLookup() throws {
+    let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+    let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 360, height: 200))
+    let window = NSWindow(contentRect: view.frame, styleMask: .borderless,
+      backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = view
+    defer { view.stop(); window.contentView = nil; window.close() }
+    var rect: CGRect? = .init(x: 18, y: 40, width: 17, height: 32)
+    var renderingReads = 0, glyphReads = 0
+    var config = configuration(motion, attempt: attempt)
+    config.automaticallyPresents = false
+    config.latestInput = { .init(attemptID: attempt, typed: "o", composition: "", glyphID: nil) }
+    config.latestRendering = {
+      renderingReads += 1
+      return .init(text: AttributedString("oak"), glyphCharacterOffsets: [0: 0])
+    }
+    config.latestGlyphID = { glyphReads += 1; return 0 }
+    config.fieldMainRect = { _ in rect }
+    config.fieldMainDirection = { true }
+    view.update(config); view.layout(); view.present(at: 0)
+    XCTAssertEqual(motion.main.position, rect)
+    let initialRect = try XCTUnwrap(rect)
+    XCTAssertEqual(view.insertionScreenRect(), window.convertToScreen(view.convert(
+      .init(x: initialRect.maxX, y: initialRect.minY, width: 0, height: initialRect.height), to: nil)))
+    rect = .init(x: 36, y: 80, width: 17, height: 32)
+    config.fieldMainDirection = nil
+    config.geometryRevision += 1
+    view.update(config); view.present(at: 0.1)
+    XCTAssertEqual(motion.main.position, rect)
+    let nextRect = try XCTUnwrap(rect)
+    XCTAssertEqual(view.insertionScreenRect(), window.convertToScreen(view.convert(
+      .init(x: nextRect.minX, y: nextRect.minY, width: 0, height: nextRect.height), to: nil)))
+    let lastPosition = motion.main.position
+    rect = nil; config.geometryRevision += 1
+    view.update(config); view.present(at: 0.2)
+    XCTAssertEqual(motion.main.position, lastPosition)
+    XCTAssertNil(view.insertionScreenRect())
+    XCTAssertEqual(renderingReads, 6, "The provider can refresh candidate geometry before each query")
+    XCTAssertEqual(glyphReads, 0)
+    XCTAssertFalse(window.isVisible)
+  }
+
+  func testFieldGeometryRetainsGlyphLookupWhenDirectionDependsOnTheGlyph() throws {
+    let motion = PromptCaretMotionCoordinator(), attempt = UUID()
+    let view = PromptCaretNativeView(frame: .init(x: 0, y: 0, width: 360, height: 200))
+    defer { view.stop() }
+    var reads = 0, directions: [Int] = []
+    let rect = CGRect(x: 18, y: 40, width: 17, height: 32)
+    var config = configuration(motion, attempt: attempt)
+    config.automaticallyPresents = false
+    config.fieldMainRect = { _ in rect }
+    config.latestGlyphID = { reads += 1; return 7 }
+    config.glyphIsRightToLeft = { directions.append($0); return true }
+    view.update(config); view.layout(); view.present(at: 0)
+    XCTAssertEqual(motion.main.position, rect)
+    XCTAssertEqual(reads, 1)
+    XCTAssertEqual(directions, [7])
+  }
+
   func testTranslationMovesNativeFrameWithoutReplacingMarkerContent() throws {
     for style in TypingCaretStyle.allCases where style.drawsMarker {
       let motion = PromptCaretMotionCoordinator(), attempt = UUID()

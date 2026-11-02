@@ -13,6 +13,7 @@ import XCTest
     var presentation: WebsiteConfigPublishedPresentation
     var usesPublished = true
     var generations = 0
+    @ObservationIgnored var fullCaretTargetUnits: [Int] = []
     init(_ presentation: WebsiteConfigPublishedPresentation) { self.presentation = presentation }
   }
   @MainActor private final class Fixture {
@@ -107,6 +108,9 @@ import XCTest
         network: network, systemAppearance: appearance,
         wholePreviewPrepare: { configuration, _, _ in
           state.generations += 1; return TypingSession(configuration: configuration, prompt: prompt)
+        }, promptCaretIndex: { session in
+          if session.prompt == prompt { state.fullCaretTargetUnits.append(session.prompt.utf16.count) }
+          return session.promptCaretGlyphIndex
         }, wholePreviewViewportEnabled: !state.usesPublished,
         publishedPresentation: state.usesPublished ? state.presentation : nil,
         practiceSessionStore: state.page)
@@ -125,6 +129,8 @@ import XCTest
     XCTAssertEqual(viewport.viewport.layoutWidth, 512.4, accuracy: 1)
     input.onInsert("0", false)
     f.wait { !f.settings.allowsRestartingConfigurationChange }
+    XCTAssertFalse(f.state.fullCaretTargetUnits.contains(f.prompt.utf16.count),
+      "The published viewport already owns exact caret geometry")
     let attempt = try XCTUnwrap(input.insertionAttemptID)
     let second = try Fixture.publish(f.coordinator, width: 900)
     f.state.presentation = try .init(publication: second, owner: f.owner, systemIsDark: false)
@@ -137,6 +143,8 @@ import XCTest
     input.setMarkedText("中", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
     f.wait { f.views(PromptViewportPracticeNativeView.self).isEmpty
       && f.views(PromptFieldNativeView.self).contains { ($0.accessibilityValue() as? String)?.contains("中") == true } }
+    XCTAssertTrue(f.state.fullCaretTargetUnits.contains(f.prompt.utf16.count),
+      "The composition fallback must retain its canonical resolver")
     XCTAssertTrue(input.hasMarkedText()); XCTAssertTrue(f.views(TypingInputView.self).first === input)
     XCTAssertEqual(input.insertionAttemptID, attempt); XCTAssertEqual(f.state.generations, 1)
     let third = try Fixture.publish(f.coordinator, width: 600)

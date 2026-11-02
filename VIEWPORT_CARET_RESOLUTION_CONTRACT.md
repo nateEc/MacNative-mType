@@ -1,5 +1,7 @@
 # 单目标视口光标解析
 
+后续：VIEWPORT_MEASURED_CARET_PROVIDER_CONTRACT.md 处理下文仍开放的普通／完整配置视口父视图索引查询，以及原生光标已有精确几何时的冗余 provider 读取。下文保留前批范围与实测，不代表后续查询策略仍未变化。
+
 2026-11-02，起点 80cc152f2cf759f4c6242dee99228b18ff8e2323。延续 VIEWPORT_INPUT_GEOMETRY_CONTRACT.md。该批保留几何后，每份新序列仍通过 promptCaretGlyphIndex 构造全文 acceptedPromptGlyphs。本批只消除已准入视口的此项全文目标扫描；普通入口默认值及不支持投影的完整规则保持不变。
 
 ## 先行成本反例

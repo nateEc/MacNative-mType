@@ -12,6 +12,7 @@ import XCTest
     var preparedRenders = 0
     var completeRenderTargetUnits: [Int] = []
     var preparedRenderTargetUnits: [Int] = []
+    var fullCaretTargetUnits: [Int] = []
     var sourceReplies: [CheckedContinuation<Void, Never>] = []
     func finishFirstSource() { if !sourceReplies.isEmpty { sourceReplies.removeFirst().resume() } }
     func finishAllSources() { while !sourceReplies.isEmpty { finishFirstSource() } }
@@ -69,6 +70,9 @@ import XCTest
           counts.completeRenders += 1
           counts.completeRenderTargetUnits.append(session.prompt.utf16.count)
           return PromptRenderPlan(session: session, composition: composition, style: style).render()
+        }, promptCaretIndex: { session in
+          if session.prompt == prompt { counts.fullCaretTargetUnits.append(session.prompt.utf16.count) }
+          return session.promptCaretGlyphIndex
         }, wholePreviewViewportEnabled: viewportEnabled).modelContainer(container)
       host = NSHostingView(rootView: AnyView(content.frame(width: hostSize.width, height: hostSize.height)))
       window = NSWindow(contentRect: .init(origin: .zero, size: hostSize),
@@ -123,6 +127,29 @@ import XCTest
       window.close()
       defaults.removePersistentDomain(forName: suite)
       withExtendedLifetime(container) {}
+    }
+  }
+
+  func testViewportParentAvoidsFullCaretQueriesAndFallbackRetainsItsResolver() throws {
+    let count = 201, prompt = Array(repeating: "oak", count: 201).joined(separator: " ")
+    for enabled in [false, true] {
+      let fixture = try Fixture(promptOverride: prompt, viewportEnabled: enabled, wordCount: count)
+      defer { fixture.close() }
+      fixture.waitUntil { enabled ? fixture.promptReady : fixture.completePromptReady }
+      let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+      XCTAssertTrue(input.acceptsTextInput)
+      input.onInsert("o", false)
+      fixture.flush()
+      if enabled {
+        let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+        fixture.waitUntil { native.viewport.canvas.measuredMainCaretRect(style: .bar)
+          == native.viewport.canvas.measuredRect(for: 1) }
+        XCTAssertTrue(native.viewport.canvas.hasCompleteHeight)
+        XCTAssertEqual(fixture.counts.fullCaretTargetUnits.filter { $0 == prompt.utf16.count }.count, 0)
+      } else {
+        XCTAssertTrue(fixture.counts.fullCaretTargetUnits.contains(prompt.utf16.count))
+      }
+      XCTAssertFalse(fixture.window.isVisible)
     }
   }
 

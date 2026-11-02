@@ -339,6 +339,11 @@ final class PromptCaretNativeView: NSView {
 
   private func mainGeometry(config: Configuration, rendering: PromptRendering?,
     latest: PromptCaretInputIdentity?, style: TypingCaretStyle) -> (rect: CGRect?, rightToLeft: Bool) {
+    if let resolver = config.fieldMainRect,
+      config.fieldMainDirection != nil || config.glyphIsRightToLeft == nil {
+      let rightToLeft = config.fieldMainDirection?() ?? config.rightToLeft
+      return (resolver(style), rightToLeft)
+    }
     let glyphID = config.latestGlyphID?() ?? latest?.glyphID ?? config.mainGlyphID
     let offset = latest.flatMap { _ in rendering?.characterOffset(forGlyphAt: glyphID) }
       ?? (latest == nil ? config.mainOffset : nil)

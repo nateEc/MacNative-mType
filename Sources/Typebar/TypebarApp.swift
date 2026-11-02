@@ -110,7 +110,8 @@ struct TypebarApp: App {
         lineSpacing: $3, rightToLeft: $4, joinsLetters: $5)
     }, promptRender: @escaping @MainActor (TypingSession, String?, PromptRenderStyle) -> PromptRendering = {
       PromptRenderPlan(session: $0, composition: $1, style: $2).render()
-    }, wholePreviewViewportEnabled: Bool = false,
+    }, promptCaretIndex: @escaping @MainActor (TypingSession) -> Int? = { $0.promptCaretGlyphIndex },
+    wholePreviewViewportEnabled: Bool = false,
     publishedPresentation: WebsiteConfigPublishedPresentation? = nil,
     practiceSessionStore: PracticePageSessionStore? = nil,
     websiteConfigStartup: WebsiteConfigStartupOptions? = nil,
@@ -121,7 +122,7 @@ struct TypebarApp: App {
       livePromptPrepare: livePromptPrepare,
       liveSessionPrepare: liveSessionPrepare,
       wholePreviewPrepare: wholePreviewPrepare, wholePreviewRender: wholePreviewRender,
-      wholePreviewLayout: wholePreviewLayout, promptRender: promptRender,
+      wholePreviewLayout: wholePreviewLayout, promptRender: promptRender, promptCaretIndex: promptCaretIndex,
       wholePreviewViewportEnabled: wholePreviewViewportEnabled, incomingPublishedPresentation: publishedPresentation,
       providedPageSessionStore: practiceSessionStore, websiteConfigStartup: websiteConfigStartup,
       providedConfigClipboardExport: configClipboardExport)
@@ -1254,6 +1255,7 @@ private struct ContentView: View {
   let wholePreviewRender: @MainActor (TypingSession, PromptRenderStyle) async throws -> PromptRendering
   let wholePreviewLayout: @MainActor (PromptCompositionTextMap, CGFloat, NSFont, CGFloat, Bool, Bool) async throws -> PromptFieldTextLayout
   let promptRender: @MainActor (TypingSession, String?, PromptRenderStyle) -> PromptRendering
+  let promptCaretIndex: @MainActor (TypingSession) -> Int?
   let wholePreviewViewportEnabled: Bool
   let incomingPublishedPresentation: WebsiteConfigPublishedPresentation?
   let providedPageSessionStore: PracticePageSessionStore?
@@ -3916,7 +3918,7 @@ private struct ContentView: View {
     do {
       if usesWholePreviewViewport {
         return AnyView(try presentation.wholePreview(session: session, fontPreview: fontPreview, themePreview: themePreview,
-          carets: { font, p in publishedCarets(font: font, presentation: p) },
+          carets: { font, p in publishedCarets(font: font, presentation: p, usesMeasuredCaretGeometry: true) },
           wrapLayout: promptInputWrapLayout, fallbackPosition: viewportFallbackPosition,
           onFailure: { attempt in
             guard let renderedFont, renderedFont == practicePromptNSFont(size: settings.fontSize),
@@ -3952,7 +3954,8 @@ private struct ContentView: View {
       .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers))
   }
 
-  private func publishedCarets(font: NSFont, presentation p: WebsiteConfigNativePresentation) -> PromptCaretNativeView.Configuration {
+  private func publishedCarets(font: NSFont, presentation p: WebsiteConfigNativePresentation,
+    usesMeasuredCaretGeometry: Bool = false) -> PromptCaretNativeView.Configuration {
     var config = PromptCaretNativeView.Configuration(text: AttributedString(), mainOffset: nil, paceOffset: nil,
       mainStyle: p.caretStyle, paceStyle: p.paceCaretStyle, font: font,
       lineSpacing: session.configuration.usesJoiningScriptPrompt ? 8 : 12,
@@ -3964,14 +3967,14 @@ private struct ContentView: View {
       firstRetainedWordIndex: session.firstRetainedPromptWordIndex,
       latestInput: { .init(attemptID: session.automaticInputAttemptID,
         typed: session.typed, composition: compositionText, glyphID: nil) },
-      latestGlyphID: { currentPromptGlyphIndex },
+      latestGlyphID: usesMeasuredCaretGeometry ? nil : { currentPromptGlyphIndex },
       paceFrame: session.paceCaretTargetWpm != nil ? { paceCaretInterpolation() } : nil,
       paceUsesSessionCallbacks: true,
       paceIsVisible: { session.paceCaretIsVisible },
       mainPresentation: { .init(
         isVisible: (inputHasFocus || showsVirtualKeyboard) && typingWindowHasFocus && !session.isFinished,
         isBlinking: visualFocus.caretIsBlinking, revision: visualFocus.caretBlinkRevision) },
-      mainGlyphID: currentPromptGlyphIndex)
+      mainGlyphID: usesMeasuredCaretGeometry ? nil : currentPromptGlyphIndex)
     config.fieldDirectionPerGlyph = session.configuration.mode == .zen
       || session.configuration.mode == .custom || session.configuration.language == .mixedLanguages
     config.automaticallyPresents = p.caretStyle.drawsMarker || p.paceCaretStyle.drawsMarker || session.paceCaretIsVisible
@@ -4001,7 +4004,7 @@ private struct ContentView: View {
       if usesWholePreviewViewport {
         PromptViewportPracticePrompt(session: session, style: promptRenderStyle,
           font: practicePromptNSFont(size: settings.fontSize),
-          carets: makeSpecialPromptCaretConfiguration(rightToLeft: isRightToLeft),
+          carets: makeSpecialPromptCaretConfiguration(rightToLeft: isRightToLeft, usesMeasuredCaretGeometry: true),
           wrapLayout: promptInputWrapLayout,
           fallbackPosition: viewportFallbackPosition,
           onFailure: { attempt in
@@ -4355,7 +4358,7 @@ private struct ContentView: View {
   }
 
   private var currentPromptGlyphIndex: Int? {
-    session.promptCaretGlyphIndex
+    promptCaretIndex(session)
   }
 
   private var specialPromptGlyphIDs: [Int] {
@@ -4369,6 +4372,11 @@ private struct ContentView: View {
   }
 
   private func makeSpecialPromptCaretConfiguration(rightToLeft: Bool = false) -> PromptCaretNativeView.Configuration {
+    makeSpecialPromptCaretConfiguration(rightToLeft: rightToLeft, usesMeasuredCaretGeometry: false)
+  }
+
+  private func makeSpecialPromptCaretConfiguration(rightToLeft: Bool,
+    usesMeasuredCaretGeometry: Bool) -> PromptCaretNativeView.Configuration {
     var configuration = PromptCaretNativeView.Configuration(text: AttributedString(), mainOffset: nil, paceOffset: nil,
       mainStyle: settings.caretStyle, paceStyle: settings.paceCaretStyle,
       font: practicePromptNSFont(size: settings.fontSize), lineSpacing: 12,
@@ -4380,13 +4388,13 @@ private struct ContentView: View {
       attemptID: session.automaticInputAttemptID, coordinator: promptCaretMotion,
       latestInput: { .init(attemptID: session.automaticInputAttemptID,
         typed: session.typed, composition: compositionText, glyphID: nil) },
-      latestGlyphID: { currentPromptGlyphIndex }, paceFrame: paceCaretFrameProvider,
+      latestGlyphID: usesMeasuredCaretGeometry ? nil : { currentPromptGlyphIndex }, paceFrame: paceCaretFrameProvider,
       paceUsesSessionCallbacks: true,
       paceIsVisible: { session.paceCaretIsVisible },
       mainPresentation: { .init(
         isVisible: (inputHasFocus || showsVirtualKeyboard) && typingWindowHasFocus && !session.isFinished,
         isBlinking: visualFocus.caretIsBlinking, revision: visualFocus.caretBlinkRevision) },
-      mainGlyphID: currentPromptGlyphIndex)
+      mainGlyphID: usesMeasuredCaretGeometry ? nil : currentPromptGlyphIndex)
     configuration.fieldDirectionPerGlyph = session.configuration.mode == .zen
       || session.configuration.mode == .custom || session.configuration.language == .mixedLanguages
     configuration.automaticallyPresents = settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker || session.paceCaretIsVisible
