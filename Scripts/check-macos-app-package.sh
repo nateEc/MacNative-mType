@@ -96,6 +96,12 @@ cmp "$project_root/Resources/GreekCorpusNotices.txt" \
 cmp "$project_root/Resources/GreekCorpusSources.txt" \
   "$app_path/Contents/Resources/GreekCorpusSources.txt" \
   || fail "Greek spelling sources missing or modified"
+cmp "$project_root/Resources/IndonesianCorpusNotices.txt" \
+  "$app_path/Contents/Resources/IndonesianCorpusNotices.txt" \
+  || fail "Indonesian corpus attribution missing or modified"
+cmp "$project_root/Resources/IndonesianCorpusSources.txt" \
+  "$app_path/Contents/Resources/IndonesianCorpusSources.txt" \
+  || fail "Indonesian spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

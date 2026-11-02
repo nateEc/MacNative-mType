@@ -12921,37 +12921,15 @@ enum StarterLexicon {
     "petit", "temps", "primavera", "barca", "amic", "confiança",
   ]
 
-  // Typebar-authored Indonesian starter words are compact local practice
-  // content, not an imported word list or a transformed reference corpus.
-  static let indonesianWords = [
-    "pagi", "jendela", "kertas", "pantai", "angin", "latihan", "perhatian", "tenang",
-    "jelas", "danau", "jalan", "meja", "cahaya", "perjalanan", "kesabaran", "sejenak",
-    "kota", "hujan", "hening", "arah", "bintang", "catatan", "taman", "napas",
-    "kecil", "waktu", "musim", "perahu", "teman", "harapan",
-  ]
-
-  private static func indonesianScaleLexicon(
-    count: Int, maximumLength: Int, uppercaseCount: Int, punctuationCount: Int
-  ) -> IndexedLexicon {
-    let uppercaseEnd = 2 + uppercaseCount
-    let punctuationEnd = uppercaseEnd + punctuationCount
-    precondition(punctuationEnd <= count)
-    return IndexedLexicon(count: count) { index in
-      if index == 0 { return "qx" }
-      if index == 1 { return String(repeating: "q", count: maximumLength) }
-      let entry = "qz" + alphabeticIndex(index + 676)
-      if index < uppercaseEnd { return entry.prefix(1).uppercased() + entry.dropFirst() }
-      if index < punctuationEnd { return entry + "-" }
-      return entry
-    }
-  }
+  // Independent literal forms with pinned provenance; old starter words remain.
+  static var indonesianWords: [String] { IndonesianCorpus.basic }
 
   static var indonesian1kLexicon: IndexedLexicon {
-    indonesianScaleLexicon(count: 1_020, maximumLength: 14, uppercaseCount: 2, punctuationCount: 2)
+    IndexedLexicon(count: 1_020) { IndonesianCorpus.words1k[$0] }
   }
 
   static var indonesian10kLexicon: IndexedLexicon {
-    indonesianScaleLexicon(count: 13_769, maximumLength: 13, uppercaseCount: 0, punctuationCount: 494)
+    IndexedLexicon(count: 13_769) { IndonesianCorpus.words10k[$0] }
   }
 
   static var indonesian1kWords: [String] { indonesian1kLexicon.materialized() }

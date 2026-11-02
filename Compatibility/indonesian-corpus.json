@@ -1,0 +1,46 @@
+{
+  "artifacts": {
+    "Resources/IndonesianCorpusNotices.txt": "98e8a634b0c4ce73e61c9a6039ecc1c5c7be9d440e6e4df1a5a959a7c3510b6c",
+    "Resources/IndonesianCorpusSources.txt": "7cd3fa91e630540e10247be3156a64bd9dcabc619fc36894aff343e694dd7175",
+    "Sources/Typebar/IndonesianCorpus.generated.swift": "a0953937edc6546cf4416079f1b3d93ddfe5f727cbe112feac810a3c8b5d4200"
+  },
+  "member": "wordfreq/data/small_id.msgpack.gz",
+  "memberSHA256": "6fd891027cd6395b5c038c0e6402fa7e107ffd8973f862053246b897beb1bcd3",
+  "pools": {
+    "10k": {
+      "characters": "-abcdefghijklmnopqrstuvwxyz",
+      "count": 13769,
+      "maximumLength": 13,
+      "minimumLength": 2,
+      "punctuationCount": 494,
+      "uppercaseCount": 0,
+      "wholeObserved": 11143,
+      "wordsSHA256": "0903faa7829f88e7172b978e713dc6085bc15d699196dbcaf2f0df815281b170"
+    },
+    "1k": {
+      "characters": "-ITabcdefghijklmnoprstuvwyz",
+      "count": 1020,
+      "maximumLength": 14,
+      "minimumLength": 2,
+      "punctuationCount": 2,
+      "uppercaseCount": 2,
+      "wholeObserved": 1018,
+      "wordsSHA256": "3d6e3567d49b18e71bdd964ad40c6400dd8652cd308bf2acec6a82e2ec924f19"
+    },
+    "basic": {
+      "characters": "abcdefghijklmnoprstuwy",
+      "count": 310,
+      "maximumLength": 11,
+      "minimumLength": 2,
+      "punctuationCount": 0,
+      "uppercaseCount": 0,
+      "wholeObserved": 310,
+      "wordsSHA256": "f01c127d4b1838e34d6178b103812e16e057d1c8375f99e0c4619cee022d3d6d"
+    }
+  },
+  "revision": "kaikki-en-id-20261102-literal-wordfreq-v1",
+  "schemaVersion": 1,
+  "source": "https://kaikki.org/dictionary/Indonesian/kaikki.org-dictionary-Indonesian.jsonl",
+  "sourceSHA256": "3ebda79fc5ed7abd1995e2a46294362f3f9282bcf74b892b4d9588d76bdc97f5",
+  "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+}

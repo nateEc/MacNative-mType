@@ -7,6 +7,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case ukrainian = "UkrainianCorpusNotices"
   case ukrainianLatynka = "UkrainianLatynkaCorpusNotices"
   case greek = "GreekCorpusNotices"
+  case indonesian = "IndonesianCorpusNotices"
   case simplifiedChinese = "SimplifiedChineseCorpusNotices"
   case traditionalChinese = "TraditionalChineseCorpusNotices"
   case englishFrequency = "EnglishFrequencyCorpusNotices"
@@ -35,6 +36,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     case .ukrainian: "Українська"
     case .ukrainianLatynka: "Українська (Latynka)"
     case .greek: "Ελληνικά"
+    case .indonesian: "Bahasa Indonesia · 三档词库"
     case .simplifiedChinese: "简体中文 · 五档词库"
     case .traditionalChinese: "繁體中文 · 五檔詞庫"
     case .englishFrequency: "基础 English 与频率词库"
@@ -112,6 +114,7 @@ struct CorpusAttributionSummary: View {
       Text("Українська 词库来自 English／Russian Wiktionary、Kaikki.org 和 Wikipedia contributors；保留注音改编与逐词出处。")
       Text("Українська (Latynka) 为上述独立西里尔语料的明确拉丁化改编，参照 Vakulenko 的现代字母规则并保留原词；频率证据仅指西里尔原形。")
       Text("Ελληνικά 词库来自 English Wiktionary contributors、Kaikki.org 与 wordfreq；保留原样声调、分音符及词尾 sigma，不改写拼写。")
+      Text("Bahasa Indonesia 三档词库来自 English Wiktionary contributors、Kaikki.org 与 wordfreq；保留原样大小写、连字符和旧自有词，并提供逐词来源。")
       Text("简体中文五档词库来自 MDBG／CC-CEDICT 与 wordfreq；保留旧自有词，并逐词标明三项书写改编及原始出处。")
         .fixedSize(horizontal: false, vertical: true)
       Text("繁體中文五檔詞庫直接採用 CC-CEDICT 的繁體原形；保留舊自有詞，逐詞標明來源與書寫改編。簡體對應詞的頻率觀察不代表繁體詞頻。")
