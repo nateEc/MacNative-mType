@@ -1,0 +1,1256 @@
+Typebar independent Turkish corpus
+Revision: kaikki-en-tr-20261102-literal-wordfreq-v1
+English Wiktionary contributors, extracted by Kaikki.org / Wiktextract.
+Source: https://kaikki.org/dictionary/Turkish/kaikki.org-dictionary-Turkish.jsonl
+Snapshot SHA-256: 4adb303b621cdc2d52c7748b137508a946fee7c5f51ffabf404f266f19ee6109
+Index reports extraction 2026-10-30 from enwiktionary dump 2026-10-01,
+using extractor revisions 19f9a30 and 6f96ddf.
+Only literal NFC alphabetic titles/forms of lang_code=tr and declared lexical
+parts of speech are selected. Phrases must be literal dictionary headwords,
+not variants produced by inflection tables. Up to three components use single ASCII spaces.
+No recasing, affix synthesis, numbered padding, definitions, examples or
+original Monkeytype words. Phrase strings remain whole source options.
+Misspelling/proscribed/nonstandard-only senses and tagged extraction/template/
+romanization forms are excluded. These filters do not certify linguistic quality.
+Per-word contributor page: https://en.wiktionary.org/wiki/ + encoded sourceTitle.
+Selection is adapted by filtering/ranking; displayed spellings are unchanged.
+All 24 old Typebar authored starter words remain in all three pools.
+Legacy words without selected lexical attestation: (none).
+This reports lexical selection, not absence of other raw dictionary entries.
+Unattested retained starters are marked typebar-legacy, not dictionary forms.
+The basic pool is retained in both larger pools. The 1k and 5k pools are not
+nested: 1k must cover lowercase j, which is absent from the 5k typing alphabet.
+Only the 5k pool admits one uppercase-H, non-ASCII, single-component option.
+Its 36 phrase options include exactly one three-component non-ASCII phrase;
+there are no invented adjacent spaces. These are not 36 single target fields:
+the runtime factory consumes phrase components in consecutive word slots.
+Dictionary selection and frequency data: CC BY-SA 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+Source mapping: TurkishCorpusSources.txt; reproducible selection in the repository.
+Vocabulary, ordering, distribution and linguistic quality are not certified
+equivalent to Monkeytype. The original source provides aggregate constraints only.
+
+wordfreq 3.1.1 wheel SHA-256: 4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473
+Member: wordfreq/data/small_tr.msgpack.gz
+Member SHA-256: 10980704ee3ac5b52f226579251905412a04ead57092a12182dd0b8be6a765df
+Single-word ranking uses whole-token lowercase lookup. H is the only allowed uppercase
+scalar, so this lookup never changes Turkish dotted i or dotless ı.
+Missing observations remain NA, not zero or an estimate from components.
+Bands are observations, not usage counts or runtime Zipf support.
+
+Tatoeba Turkish contributors, phrase observation evidence only.
+Source: https://downloads.tatoeba.org/exports/per_language/tur/tur_sentences_detailed.tsv.bz2
+Snapshot SHA-256: 9809a3f64bc277063e3331ab7c6f77d41af54267af90dcbe45881d41ad857462
+Sentence rows: 750083; contributor identifiers: 1062.
+License for sentence data: CC BY 2.0 France.
+https://creativecommons.org/licenses/by/2.0/fr/
+https://tatoeba.org/en/downloads
+Phrase ranking uses matching sentence counts, one count per sentence. Exact
+Unicode word boundaries and single ASCII internal spaces are required; no
+cross-punctuation, adjacent-space or component-frequency estimates. Turkish
+case lookup maps I to ı and İ to i without merging the two lowercase letters.
+Sentence IDs/first author accompany observed selected phrases; absent evidence
+is NA. Single words are explicitly not queried in this phrase-only source.
+No sentence text, translations or audio is bundled. These statistics do not
+certify linguistic quality. All contributor identifiers in the processed
+snapshot are credited below; unknown/unowned rows retain an explicit label.
+
+(unowned)
+19841984tk https://tatoeba.org/en/user/profile/19841984tk
+332oymak https://tatoeba.org/en/user/profile/332oymak
+34kosova https://tatoeba.org/en/user/profile/34kosova
+3dsart https://tatoeba.org/en/user/profile/3dsart
+6askan https://tatoeba.org/en/user/profile/6askan
+81tayfun https://tatoeba.org/en/user/profile/81tayfun
+94tuba https://tatoeba.org/en/user/profile/94tuba
+ABChessel https://tatoeba.org/en/user/profile/ABChessel
+AKINCI81 https://tatoeba.org/en/user/profile/AKINCI81
+ANANASA https://tatoeba.org/en/user/profile/ANANASA
+APOLLON https://tatoeba.org/en/user/profile/APOLLON
+ATES https://tatoeba.org/en/user/profile/ATES
+Abcormal https://tatoeba.org/en/user/profile/Abcormal
+Abeotat1948 https://tatoeba.org/en/user/profile/Abeotat1948
+Acn22 https://tatoeba.org/en/user/profile/Acn22
+Adazul77 https://tatoeba.org/en/user/profile/Adazul77
+Adelpa https://tatoeba.org/en/user/profile/Adelpa
+Adem https://tatoeba.org/en/user/profile/Adem
+AdemEFRAZ https://tatoeba.org/en/user/profile/AdemEFRAZ
+Adogaoo https://tatoeba.org/en/user/profile/Adogaoo
+Adopter https://tatoeba.org/en/user/profile/Adopter
+Ahmet https://tatoeba.org/en/user/profile/Ahmet
+Ahmet123 https://tatoeba.org/en/user/profile/Ahmet123
+Aksener https://tatoeba.org/en/user/profile/Aksener
+Alanya https://tatoeba.org/en/user/profile/Alanya
+Albert1980 https://tatoeba.org/en/user/profile/Albert1980
+Ali1234 https://tatoeba.org/en/user/profile/Ali1234
+Ali7 https://tatoeba.org/en/user/profile/Ali7
+AliSami https://tatoeba.org/en/user/profile/AliSami
+Alichar https://tatoeba.org/en/user/profile/Alichar
+Alpaslan_25 https://tatoeba.org/en/user/profile/Alpaslan_25
+Alperimmmmmmm https://tatoeba.org/en/user/profile/Alperimmmmmmm
+Amastan https://tatoeba.org/en/user/profile/Amastan
+AnBtheCoD https://tatoeba.org/en/user/profile/AnBtheCoD
+Antechinus https://tatoeba.org/en/user/profile/Antechinus
+Antrio https://tatoeba.org/en/user/profile/Antrio
+AqQoyriq https://tatoeba.org/en/user/profile/AqQoyriq
+AqQoyriq_1 https://tatoeba.org/en/user/profile/AqQoyriq_1
+Archibald https://tatoeba.org/en/user/profile/Archibald
+Arizmenti https://tatoeba.org/en/user/profile/Arizmenti
+Arraroak https://tatoeba.org/en/user/profile/Arraroak
+Arsal https://tatoeba.org/en/user/profile/Arsal
+Arslan https://tatoeba.org/en/user/profile/Arslan
+Asemi https://tatoeba.org/en/user/profile/Asemi
+AtKafasi https://tatoeba.org/en/user/profile/AtKafasi
+Ats4 https://tatoeba.org/en/user/profile/Ats4
+Aylin https://tatoeba.org/en/user/profile/Aylin
+Aylmz https://tatoeba.org/en/user/profile/Aylmz
+AzukarTR https://tatoeba.org/en/user/profile/AzukarTR
+BAYS https://tatoeba.org/en/user/profile/BAYS
+BURAK2121 https://tatoeba.org/en/user/profile/BURAK2121
+BUSRA16 https://tatoeba.org/en/user/profile/BUSRA16
+Bahceli https://tatoeba.org/en/user/profile/Bahceli
+Baki https://tatoeba.org/en/user/profile/Baki
+Bakis https://tatoeba.org/en/user/profile/Bakis
+Balamax https://tatoeba.org/en/user/profile/Balamax
+BarbarossaC https://tatoeba.org/en/user/profile/BarbarossaC
+Bashir https://tatoeba.org/en/user/profile/Bashir
+Batko https://tatoeba.org/en/user/profile/Batko
+Bdogdu https://tatoeba.org/en/user/profile/Bdogdu
+Berkay https://tatoeba.org/en/user/profile/Berkay
+Berkayy https://tatoeba.org/en/user/profile/Berkayy
+Berke https://tatoeba.org/en/user/profile/Berke
+Bilgi https://tatoeba.org/en/user/profile/Bilgi
+Bitirim https://tatoeba.org/en/user/profile/Bitirim
+BlockeeR https://tatoeba.org/en/user/profile/BlockeeR
+Borbie https://tatoeba.org/en/user/profile/Borbie
+Bratched https://tatoeba.org/en/user/profile/Bratched
+BraveSentry https://tatoeba.org/en/user/profile/BraveSentry
+Buacity10 https://tatoeba.org/en/user/profile/Buacity10
+BurakBerat https://tatoeba.org/en/user/profile/BurakBerat
+Burak_ https://tatoeba.org/en/user/profile/Burak_
+BuzulkusuPenguin https://tatoeba.org/en/user/profile/BuzulkusuPenguin
+CVTR https://tatoeba.org/en/user/profile/CVTR
+Cabo https://tatoeba.org/en/user/profile/Cabo
+CakmaTurk https://tatoeba.org/en/user/profile/CakmaTurk
+CannedBread https://tatoeba.org/en/user/profile/CannedBread
+CansuVarol https://tatoeba.org/en/user/profile/CansuVarol
+Cemil https://tatoeba.org/en/user/profile/Cemil
+Cibrani https://tatoeba.org/en/user/profile/Cibrani
+Cihanxtr https://tatoeba.org/en/user/profile/Cihanxtr
+Ciks https://tatoeba.org/en/user/profile/Ciks
+ConqueRRoR https://tatoeba.org/en/user/profile/ConqueRRoR
+Cookiejardino https://tatoeba.org/en/user/profile/Cookiejardino
+Cos https://tatoeba.org/en/user/profile/Cos
+CoskunAlp https://tatoeba.org/en/user/profile/CoskunAlp
+CrowdsourceKurdish https://tatoeba.org/en/user/profile/CrowdsourceKurdish
+Cumle_Kurucu https://tatoeba.org/en/user/profile/Cumle_Kurucu
+DEADMAN https://tatoeba.org/en/user/profile/DEADMAN
+Danika_Dakika https://tatoeba.org/en/user/profile/Danika_Dakika
+Def2Easy https://tatoeba.org/en/user/profile/Def2Easy
+Delayedecholalia https://tatoeba.org/en/user/profile/Delayedecholalia
+DenizErtekin https://tatoeba.org/en/user/profile/DenizErtekin
+Denizar https://tatoeba.org/en/user/profile/Denizar
+DetErMinNavn https://tatoeba.org/en/user/profile/DetErMinNavn
+DoJiHan https://tatoeba.org/en/user/profile/DoJiHan
+Doaa_Ashraf24 https://tatoeba.org/en/user/profile/Doaa_Ashraf24
+Dogukhan48 https://tatoeba.org/en/user/profile/Dogukhan48
+Doolotbek https://tatoeba.org/en/user/profile/Doolotbek
+DostKaplan https://tatoeba.org/en/user/profile/DostKaplan
+Draig https://tatoeba.org/en/user/profile/Draig
+DunariAlbastru https://tatoeba.org/en/user/profile/DunariAlbastru
+Ebruli https://tatoeba.org/en/user/profile/Ebruli
+Efsun https://tatoeba.org/en/user/profile/Efsun
+Ekim https://tatoeba.org/en/user/profile/Ekim
+Ekselans https://tatoeba.org/en/user/profile/Ekselans
+Eldad https://tatoeba.org/en/user/profile/Eldad
+Eleni https://tatoeba.org/en/user/profile/Eleni
+Elusive https://tatoeba.org/en/user/profile/Elusive
+ErdemTan https://tatoeba.org/en/user/profile/ErdemTan
+Erdenurdas https://tatoeba.org/en/user/profile/Erdenurdas
+Erenenen https://tatoeba.org/en/user/profile/Erenenen
+EritronX https://tatoeba.org/en/user/profile/EritronX
+Ertim https://tatoeba.org/en/user/profile/Ertim
+Esra https://tatoeba.org/en/user/profile/Esra
+EsraaTawfik https://tatoeba.org/en/user/profile/EsraaTawfik
+Eugell https://tatoeba.org/en/user/profile/Eugell
+FabianRoad https://tatoeba.org/en/user/profile/FabianRoad
+FatihUst https://tatoeba.org/en/user/profile/FatihUst
+Ferdi https://tatoeba.org/en/user/profile/Ferdi
+FeuDRenais https://tatoeba.org/en/user/profile/FeuDRenais
+FussTritt https://tatoeba.org/en/user/profile/FussTritt
+GabrielPires https://tatoeba.org/en/user/profile/GabrielPires
+Galadedrid https://tatoeba.org/en/user/profile/Galadedrid
+Gavbigav https://tatoeba.org/en/user/profile/Gavbigav
+Gokdem https://tatoeba.org/en/user/profile/Gokdem
+Goldoon https://tatoeba.org/en/user/profile/Goldoon
+Gulnihal https://tatoeba.org/en/user/profile/Gulnihal
+Gulo_Luscus https://tatoeba.org/en/user/profile/Gulo_Luscus
+Guney https://tatoeba.org/en/user/profile/Guney
+HAGNi https://tatoeba.org/en/user/profile/HAGNi
+HadiPourmousa https://tatoeba.org/en/user/profile/HadiPourmousa
+Haluk https://tatoeba.org/en/user/profile/Haluk
+Hans07 https://tatoeba.org/en/user/profile/Hans07
+Hanyuu https://tatoeba.org/en/user/profile/Hanyuu
+Harry_Styles https://tatoeba.org/en/user/profile/Harry_Styles
+Hatfanz https://tatoeba.org/en/user/profile/Hatfanz
+Hatta https://tatoeba.org/en/user/profile/Hatta
+HedefTuran https://tatoeba.org/en/user/profile/HedefTuran
+Hellenike https://tatoeba.org/en/user/profile/Hellenike
+Htop https://tatoeba.org/en/user/profile/Htop
+Humble_Man https://tatoeba.org/en/user/profile/Humble_Man
+Huntiger https://tatoeba.org/en/user/profile/Huntiger
+Huseyino https://tatoeba.org/en/user/profile/Huseyino
+IERT https://tatoeba.org/en/user/profile/IERT
+ILIMAN https://tatoeba.org/en/user/profile/ILIMAN
+Igider https://tatoeba.org/en/user/profile/Igider
+Imamoglu https://tatoeba.org/en/user/profile/Imamoglu
+Imp https://tatoeba.org/en/user/profile/Imp
+Ince https://tatoeba.org/en/user/profile/Ince
+Inego https://tatoeba.org/en/user/profile/Inego
+Interpreter_c4nsu https://tatoeba.org/en/user/profile/Interpreter_c4nsu
+Iscan https://tatoeba.org/en/user/profile/Iscan
+Ivanovb https://tatoeba.org/en/user/profile/Ivanovb
+Ivanovich https://tatoeba.org/en/user/profile/Ivanovich
+Iye_Tete https://tatoeba.org/en/user/profile/Iye_Tete
+JackSparrow https://tatoeba.org/en/user/profile/JackSparrow
+Jangal https://tatoeba.org/en/user/profile/Jangal
+Josefwintzent https://tatoeba.org/en/user/profile/Josefwintzent
+Jum https://tatoeba.org/en/user/profile/Jum
+KD https://tatoeba.org/en/user/profile/KD
+KUL https://tatoeba.org/en/user/profile/KUL
+Kaa938637 https://tatoeba.org/en/user/profile/Kaa938637
+KaanGogcay https://tatoeba.org/en/user/profile/KaanGogcay
+Kaann https://tatoeba.org/en/user/profile/Kaann
+Kanto https://tatoeba.org/en/user/profile/Kanto
+Kar https://tatoeba.org/en/user/profile/Kar
+Katabasis https://tatoeba.org/en/user/profile/Katabasis
+Kathereenah https://tatoeba.org/en/user/profile/Kathereenah
+Kattsk https://tatoeba.org/en/user/profile/Kattsk
+Katubeltza https://tatoeba.org/en/user/profile/Katubeltza
+KazGoose https://tatoeba.org/en/user/profile/KazGoose
+Kedice https://tatoeba.org/en/user/profile/Kedice
+Keloglan https://tatoeba.org/en/user/profile/Keloglan
+Kilicdaroglu https://tatoeba.org/en/user/profile/Kilicdaroglu
+Koku https://tatoeba.org/en/user/profile/Koku
+Konanen https://tatoeba.org/en/user/profile/Konanen
+LB https://tatoeba.org/en/user/profile/LB
+Ladin https://tatoeba.org/en/user/profile/Ladin
+LanguageExpert https://tatoeba.org/en/user/profile/LanguageExpert
+Languageahmetadar https://tatoeba.org/en/user/profile/Languageahmetadar
+Laudemilson https://tatoeba.org/en/user/profile/Laudemilson
+Lawliet https://tatoeba.org/en/user/profile/Lawliet
+Lazlord https://tatoeba.org/en/user/profile/Lazlord
+Leedihuzur https://tatoeba.org/en/user/profile/Leedihuzur
+Lenin_1917 https://tatoeba.org/en/user/profile/Lenin_1917
+Lillita https://tatoeba.org/en/user/profile/Lillita
+LoRdS https://tatoeba.org/en/user/profile/LoRdS
+Lort https://tatoeba.org/en/user/profile/Lort
+MaVi https://tatoeba.org/en/user/profile/MaVi
+Malape https://tatoeba.org/en/user/profile/Malape
+Marissa https://tatoeba.org/en/user/profile/Marissa
+Max_Hydrogen https://tatoeba.org/en/user/profile/Max_Hydrogen
+Mayday https://tatoeba.org/en/user/profile/Mayday
+Mcahid https://tatoeba.org/en/user/profile/Mcahid
+Mehmety https://tatoeba.org/en/user/profile/Mehmety
+Melihyildiz https://tatoeba.org/en/user/profile/Melihyildiz
+Merttolunay https://tatoeba.org/en/user/profile/Merttolunay
+MichaelS1 https://tatoeba.org/en/user/profile/MichaelS1
+Miremir https://tatoeba.org/en/user/profile/Miremir
+MissSyzygy https://tatoeba.org/en/user/profile/MissSyzygy
+MoiSerenai https://tatoeba.org/en/user/profile/MoiSerenai
+Monicarojasaislado https://tatoeba.org/en/user/profile/Monicarojasaislado
+Morsy_tatoeba https://tatoeba.org/en/user/profile/Morsy_tatoeba
+MostAssertive https://tatoeba.org/en/user/profile/MostAssertive
+MrSener95 https://tatoeba.org/en/user/profile/MrSener95
+MuadDib https://tatoeba.org/en/user/profile/MuadDib
+MuhammedAliMuftuzade https://tatoeba.org/en/user/profile/MuhammedAliMuftuzade
+MunaSenwar https://tatoeba.org/en/user/profile/MunaSenwar
+Murasame https://tatoeba.org/en/user/profile/Murasame
+NIKOLAS https://tatoeba.org/en/user/profile/NIKOLAS
+NUTUK https://tatoeba.org/en/user/profile/NUTUK
+Nalan https://tatoeba.org/en/user/profile/Nalan
+NativesAlliance https://tatoeba.org/en/user/profile/NativesAlliance
+Navixer https://tatoeba.org/en/user/profile/Navixer
+Neslihan https://tatoeba.org/en/user/profile/Neslihan
+NoPainNoGain https://tatoeba.org/en/user/profile/NoPainNoGain
+NovaYear https://tatoeba.org/en/user/profile/NovaYear
+Nurullah21 https://tatoeba.org/en/user/profile/Nurullah21
+Nylez https://tatoeba.org/en/user/profile/Nylez
+OA https://tatoeba.org/en/user/profile/OA
+OMER25 https://tatoeba.org/en/user/profile/OMER25
+Oldboy https://tatoeba.org/en/user/profile/Oldboy
+OmerY https://tatoeba.org/en/user/profile/OmerY
+Onur488 https://tatoeba.org/en/user/profile/Onur488
+Onurkizildag https://tatoeba.org/en/user/profile/Onurkizildag
+Orange https://tatoeba.org/en/user/profile/Orange
+Ozturkce https://tatoeba.org/en/user/profile/Ozturkce
+Pandaa https://tatoeba.org/en/user/profile/Pandaa
+Pars https://tatoeba.org/en/user/profile/Pars
+Perincek https://tatoeba.org/en/user/profile/Perincek
+Predok https://tatoeba.org/en/user/profile/Predok
+Punisher https://tatoeba.org/en/user/profile/Punisher
+R0b3rt0 https://tatoeba.org/en/user/profile/R0b3rt0
+RTE https://tatoeba.org/en/user/profile/RTE
+RaindeLion https://tatoeba.org/en/user/profile/RaindeLion
+Rastgele https://tatoeba.org/en/user/profile/Rastgele
+Redmanskiy https://tatoeba.org/en/user/profile/Redmanskiy
+Reonaato https://tatoeba.org/en/user/profile/Reonaato
+Rexmgns https://tatoeba.org/en/user/profile/Rexmgns
+Ricardo14 https://tatoeba.org/en/user/profile/Ricardo14
+Roddern https://tatoeba.org/en/user/profile/Roddern
+Rok https://tatoeba.org/en/user/profile/Rok
+Rovo https://tatoeba.org/en/user/profile/Rovo
+Roxyy https://tatoeba.org/en/user/profile/Roxyy
+Rvs https://tatoeba.org/en/user/profile/Rvs
+SAVAS https://tatoeba.org/en/user/profile/SAVAS
+SSibelty https://tatoeba.org/en/user/profile/SSibelty
+Saban https://tatoeba.org/en/user/profile/Saban
+SadeceTurkce https://tatoeba.org/en/user/profile/SadeceTurkce
+Sakuranboga https://tatoeba.org/en/user/profile/Sakuranboga
+SalihCan https://tatoeba.org/en/user/profile/SalihCan
+Sancar https://tatoeba.org/en/user/profile/Sancar
+Serafettin https://tatoeba.org/en/user/profile/Serafettin
+Serif https://tatoeba.org/en/user/profile/Serif
+Sharaf78 https://tatoeba.org/en/user/profile/Sharaf78
+Shishir https://tatoeba.org/en/user/profile/Shishir
+ShivMantra https://tatoeba.org/en/user/profile/ShivMantra
+Siempremesientobien https://tatoeba.org/en/user/profile/Siempremesientobien
+Sobieski https://tatoeba.org/en/user/profile/Sobieski
+Soylem https://tatoeba.org/en/user/profile/Soylem
+Spannungsbogen https://tatoeba.org/en/user/profile/Spannungsbogen
+StoneDraconis https://tatoeba.org/en/user/profile/StoneDraconis
+Stroffeld https://tatoeba.org/en/user/profile/Stroffeld
+Sumru https://tatoeba.org/en/user/profile/Sumru
+Susmaz https://tatoeba.org/en/user/profile/Susmaz
+TATAR1 https://tatoeba.org/en/user/profile/TATAR1
+TR724 https://tatoeba.org/en/user/profile/TR724
+TRli https://tatoeba.org/en/user/profile/TRli
+Talhabkaya02 https://tatoeba.org/en/user/profile/Talhabkaya02
+Tamtam https://tatoeba.org/en/user/profile/Tamtam
+Tamy https://tatoeba.org/en/user/profile/Tamy
+Tamy2 https://tatoeba.org/en/user/profile/Tamy2
+Tartar https://tatoeba.org/en/user/profile/Tartar
+Tatar https://tatoeba.org/en/user/profile/Tatar
+Tempoacc https://tatoeba.org/en/user/profile/Tempoacc
+TestimoVida https://tatoeba.org/en/user/profile/TestimoVida
+Themis06 https://tatoeba.org/en/user/profile/Themis06
+TicTacToe https://tatoeba.org/en/user/profile/TicTacToe
+Tickler https://tatoeba.org/en/user/profile/Tickler
+Tigin https://tatoeba.org/en/user/profile/Tigin
+Tlustulimu https://tatoeba.org/en/user/profile/Tlustulimu
+TolgaArkun https://tatoeba.org/en/user/profile/TolgaArkun
+Tom12345 https://tatoeba.org/en/user/profile/Tom12345
+Tom123456 https://tatoeba.org/en/user/profile/Tom123456
+Tom13 https://tatoeba.org/en/user/profile/Tom13
+Topkek https://tatoeba.org/en/user/profile/Topkek
+Toprak_Pamuk https://tatoeba.org/en/user/profile/Toprak_Pamuk
+Translate28 https://tatoeba.org/en/user/profile/Translate28
+TrumanBurbank https://tatoeba.org/en/user/profile/TrumanBurbank
+Trumanb https://tatoeba.org/en/user/profile/Trumanb
+TurkishReform https://tatoeba.org/en/user/profile/TurkishReform
+Turkish_Bible https://tatoeba.org/en/user/profile/Turkish_Bible
+Tyler https://tatoeba.org/en/user/profile/Tyler
+Ufuk https://tatoeba.org/en/user/profile/Ufuk
+Ugr https://tatoeba.org/en/user/profile/Ugr
+Ugur https://tatoeba.org/en/user/profile/Ugur
+UmutBalacli https://tatoeba.org/en/user/profile/UmutBalacli
+Unomohito https://tatoeba.org/en/user/profile/Unomohito
+User105223 https://tatoeba.org/en/user/profile/User105223
+User20656 https://tatoeba.org/en/user/profile/User20656
+User66083 https://tatoeba.org/en/user/profile/User66083
+User95519 https://tatoeba.org/en/user/profile/User95519
+Uzosis https://tatoeba.org/en/user/profile/Uzosis
+VdtGnl https://tatoeba.org/en/user/profile/VdtGnl
+VolkanAtalan https://tatoeba.org/en/user/profile/VolkanAtalan
+Voltaireee https://tatoeba.org/en/user/profile/Voltaireee
+Vortarulo https://tatoeba.org/en/user/profile/Vortarulo
+W1ndz https://tatoeba.org/en/user/profile/W1ndz
+Weasel https://tatoeba.org/en/user/profile/Weasel
+XZJqz https://tatoeba.org/en/user/profile/XZJqz
+Y4K4M0Z https://tatoeba.org/en/user/profile/Y4K4M0Z
+YakupEmre https://tatoeba.org/en/user/profile/YakupEmre
+Yaseminsel https://tatoeba.org/en/user/profile/Yaseminsel
+Yaser https://tatoeba.org/en/user/profile/Yaser
+YasinLa https://tatoeba.org/en/user/profile/YasinLa
+Yassan https://tatoeba.org/en/user/profile/Yassan
+Yerdeniz https://tatoeba.org/en/user/profile/Yerdeniz
+YersinKZ https://tatoeba.org/en/user/profile/YersinKZ
+Yildiray https://tatoeba.org/en/user/profile/Yildiray
+Yilmaz9157 https://tatoeba.org/en/user/profile/Yilmaz9157
+Zetsuji https://tatoeba.org/en/user/profile/Zetsuji
+ZeynepDuruCevirgen https://tatoeba.org/en/user/profile/ZeynepDuruCevirgen
+Ziwanhez https://tatoeba.org/en/user/profile/Ziwanhez
+_livraria https://tatoeba.org/en/user/profile/_livraria
+abdullahkasit https://tatoeba.org/en/user/profile/abdullahkasit
+abiniz https://tatoeba.org/en/user/profile/abiniz
+acan https://tatoeba.org/en/user/profile/acan
+ada_b https://tatoeba.org/en/user/profile/ada_b
+adamtrousers https://tatoeba.org/en/user/profile/adamtrousers
+ahesitant https://tatoeba.org/en/user/profile/ahesitant
+ahmetakcal https://tatoeba.org/en/user/profile/ahmetakcal
+ahmetbacakk https://tatoeba.org/en/user/profile/ahmetbacakk
+ahmettalha https://tatoeba.org/en/user/profile/ahmettalha
+airman https://tatoeba.org/en/user/profile/airman
+ajje https://tatoeba.org/en/user/profile/ajje
+akanh9403 https://tatoeba.org/en/user/profile/akanh9403
+akaragoz https://tatoeba.org/en/user/profile/akaragoz
+akil_ustasi https://tatoeba.org/en/user/profile/akil_ustasi
+akle https://tatoeba.org/en/user/profile/akle
+alanood https://tatoeba.org/en/user/profile/alanood
+aliata_adam https://tatoeba.org/en/user/profile/aliata_adam
+alihan https://tatoeba.org/en/user/profile/alihan
+alisahin1 https://tatoeba.org/en/user/profile/alisahin1
+alopare https://tatoeba.org/en/user/profile/alopare
+alpaycom https://tatoeba.org/en/user/profile/alpaycom
+alper https://tatoeba.org/en/user/profile/alper
+alper069 https://tatoeba.org/en/user/profile/alper069
+alt169 https://tatoeba.org/en/user/profile/alt169
+altan1995 https://tatoeba.org/en/user/profile/altan1995
+alternatif https://tatoeba.org/en/user/profile/alternatif
+altugmustafa https://tatoeba.org/en/user/profile/altugmustafa
+ambarbuz https://tatoeba.org/en/user/profile/ambarbuz
+amcolu https://tatoeba.org/en/user/profile/amcolu
+amrbekhit https://tatoeba.org/en/user/profile/amrbekhit
+andreigromit https://tatoeba.org/en/user/profile/andreigromit
+anemone https://tatoeba.org/en/user/profile/anemone
+animyrch https://tatoeba.org/en/user/profile/animyrch
+ardagedik https://tatoeba.org/en/user/profile/ardagedik
+aresblade https://tatoeba.org/en/user/profile/aresblade
+arslanbakan https://tatoeba.org/en/user/profile/arslanbakan
+astaga https://tatoeba.org/en/user/profile/astaga
+asuman https://tatoeba.org/en/user/profile/asuman
+asveja https://tatoeba.org/en/user/profile/asveja
+asvp54 https://tatoeba.org/en/user/profile/asvp54
+atacan91 https://tatoeba.org/en/user/profile/atacan91
+atay https://tatoeba.org/en/user/profile/atay
+atitarev https://tatoeba.org/en/user/profile/atitarev
+atminyum https://tatoeba.org/en/user/profile/atminyum
+austere https://tatoeba.org/en/user/profile/austere
+avnidal https://tatoeba.org/en/user/profile/avnidal
+aydincan77 https://tatoeba.org/en/user/profile/aydincan77
+aydink https://tatoeba.org/en/user/profile/aydink
+ayhankorays https://tatoeba.org/en/user/profile/ayhankorays
+aykutalpgul https://tatoeba.org/en/user/profile/aykutalpgul
+aytac90 https://tatoeba.org/en/user/profile/aytac90
+azulhana https://tatoeba.org/en/user/profile/azulhana
+baedyo https://tatoeba.org/en/user/profile/baedyo
+balaca https://tatoeba.org/en/user/profile/balaca
+balkanbalkan https://tatoeba.org/en/user/profile/balkanbalkan
+bandeirante https://tatoeba.org/en/user/profile/bandeirante
+banu https://tatoeba.org/en/user/profile/banu
+barbaros505 https://tatoeba.org/en/user/profile/barbaros505
+bardamu1894 https://tatoeba.org/en/user/profile/bardamu1894
+barisozkiran https://tatoeba.org/en/user/profile/barisozkiran
+barisyz https://tatoeba.org/en/user/profile/barisyz
+barrima https://tatoeba.org/en/user/profile/barrima
+bartbartez https://tatoeba.org/en/user/profile/bartbartez
+batuhan https://tatoeba.org/en/user/profile/batuhan
+baypilot https://tatoeba.org/en/user/profile/baypilot
+bayram61 https://tatoeba.org/en/user/profile/bayram61
+bbajed https://tatoeba.org/en/user/profile/bbajed
+bendovafrdys https://tatoeba.org/en/user/profile/bendovafrdys
+bengisuuzmani https://tatoeba.org/en/user/profile/bengisuuzmani
+benimadimebruli https://tatoeba.org/en/user/profile/benimadimebruli
+berrak https://tatoeba.org/en/user/profile/berrak
+berrbahr https://tatoeba.org/en/user/profile/berrbahr
+beyazguvercin47 https://tatoeba.org/en/user/profile/beyazguvercin47
+bghelper https://tatoeba.org/en/user/profile/bghelper
+biber https://tatoeba.org/en/user/profile/biber
+bilginhalil https://tatoeba.org/en/user/profile/bilginhalil
+bilimdan https://tatoeba.org/en/user/profile/bilimdan
+birsevda https://tatoeba.org/en/user/profile/birsevda
+bixen65039 https://tatoeba.org/en/user/profile/bixen65039
+bkay https://tatoeba.org/en/user/profile/bkay
+blackdove https://tatoeba.org/en/user/profile/blackdove
+blackmamba https://tatoeba.org/en/user/profile/blackmamba
+blueboy https://tatoeba.org/en/user/profile/blueboy
+bluepie88 https://tatoeba.org/en/user/profile/bluepie88
+bluwy https://tatoeba.org/en/user/profile/bluwy
+bookworm https://tatoeba.org/en/user/profile/bookworm
+boracasli2 https://tatoeba.org/en/user/profile/boracasli2
+borke10 https://tatoeba.org/en/user/profile/borke10
+boston2390 https://tatoeba.org/en/user/profile/boston2390
+bozkurt https://tatoeba.org/en/user/profile/bozkurt
+brauchinet https://tatoeba.org/en/user/profile/brauchinet
+bubu https://tatoeba.org/en/user/profile/bubu
+buketla https://tatoeba.org/en/user/profile/buketla
+burak https://tatoeba.org/en/user/profile/burak
+burakayz https://tatoeba.org/en/user/profile/burakayz
+burakkolver4 https://tatoeba.org/en/user/profile/burakkolver4
+busra https://tatoeba.org/en/user/profile/busra
+busraordu1 https://tatoeba.org/en/user/profile/busraordu1
+byyfatih https://tatoeba.org/en/user/profile/byyfatih
+bzvbzy https://tatoeba.org/en/user/profile/bzvbzy
+cadininbiri https://tatoeba.org/en/user/profile/cadininbiri
+cagdaseksi https://tatoeba.org/en/user/profile/cagdaseksi
+cagri https://tatoeba.org/en/user/profile/cagri
+candan https://tatoeba.org/en/user/profile/candan
+canerj https://tatoeba.org/en/user/profile/canerj
+carlosalberto https://tatoeba.org/en/user/profile/carlosalberto
+carsi https://tatoeba.org/en/user/profile/carsi
+cartals https://tatoeba.org/en/user/profile/cartals
+cburgmer https://tatoeba.org/en/user/profile/cburgmer
+cem https://tatoeba.org/en/user/profile/cem
+cemail https://tatoeba.org/en/user/profile/cemail
+cemcemii https://tatoeba.org/en/user/profile/cemcemii
+cemkutay https://tatoeba.org/en/user/profile/cemkutay
+cengistan https://tatoeba.org/en/user/profile/cengistan
+ceviri_atolyesi https://tatoeba.org/en/user/profile/ceviri_atolyesi
+ceydo https://tatoeba.org/en/user/profile/ceydo
+ceyenna https://tatoeba.org/en/user/profile/ceyenna
+chaala https://tatoeba.org/en/user/profile/chaala
+charcoalis https://tatoeba.org/en/user/profile/charcoalis
+chnky https://tatoeba.org/en/user/profile/chnky
+chtaktrk https://tatoeba.org/en/user/profile/chtaktrk
+cigdemsencan https://tatoeba.org/en/user/profile/cigdemsencan
+cihanaxu https://tatoeba.org/en/user/profile/cihanaxu
+cimbommatik https://tatoeba.org/en/user/profile/cimbommatik
+cinali https://tatoeba.org/en/user/profile/cinali
+cincin1 https://tatoeba.org/en/user/profile/cincin1
+civiricus https://tatoeba.org/en/user/profile/civiricus
+ckarakuzu https://tatoeba.org/en/user/profile/ckarakuzu
+cnkygt https://tatoeba.org/en/user/profile/cnkygt
+codex360 https://tatoeba.org/en/user/profile/codex360
+curlysu https://tatoeba.org/en/user/profile/curlysu
+cymanteg https://tatoeba.org/en/user/profile/cymanteg
+dalgacik https://tatoeba.org/en/user/profile/dalgacik
+damascene https://tatoeba.org/en/user/profile/damascene
+dauntless https://tatoeba.org/en/user/profile/dauntless
+ddt https://tatoeba.org/en/user/profile/ddt
+defnegokcemmm https://tatoeba.org/en/user/profile/defnegokcemmm
+dehset21 https://tatoeba.org/en/user/profile/dehset21
+demremustafa https://tatoeba.org/en/user/profile/demremustafa
+deniko https://tatoeba.org/en/user/profile/deniko
+denizakdeniz https://tatoeba.org/en/user/profile/denizakdeniz
+denizleelee https://tatoeba.org/en/user/profile/denizleelee
+deyta https://tatoeba.org/en/user/profile/deyta
+dgknkilic https://tatoeba.org/en/user/profile/dgknkilic
+dhalsim https://tatoeba.org/en/user/profile/dhalsim
+dilan https://tatoeba.org/en/user/profile/dilan
+dilek https://tatoeba.org/en/user/profile/dilek
+dilmen https://tatoeba.org/en/user/profile/dilmen
+diluzmani https://tatoeba.org/en/user/profile/diluzmani
+dioynizos https://tatoeba.org/en/user/profile/dioynizos
+diviner https://tatoeba.org/en/user/profile/diviner
+dogukand https://tatoeba.org/en/user/profile/dogukand
+dontstaystray https://tatoeba.org/en/user/profile/dontstaystray
+drjuly https://tatoeba.org/en/user/profile/drjuly
+drowsykush https://tatoeba.org/en/user/profile/drowsykush
+dryaco https://tatoeba.org/en/user/profile/dryaco
+dtted https://tatoeba.org/en/user/profile/dtted
+dundoshuil https://tatoeba.org/en/user/profile/dundoshuil
+duran https://tatoeba.org/en/user/profile/duran
+dursun https://tatoeba.org/en/user/profile/dursun
+dvdemirel https://tatoeba.org/en/user/profile/dvdemirel
+dzerjinskifelix https://tatoeba.org/en/user/profile/dzerjinskifelix
+eaytekin https://tatoeba.org/en/user/profile/eaytekin
+eb2520 https://tatoeba.org/en/user/profile/eb2520
+ebirben1 https://tatoeba.org/en/user/profile/ebirben1
+ebrubilir https://tatoeba.org/en/user/profile/ebrubilir
+ederlezi https://tatoeba.org/en/user/profile/ederlezi
+egebeste https://tatoeba.org/en/user/profile/egebeste
+egeli21 https://tatoeba.org/en/user/profile/egeli21
+egencer https://tatoeba.org/en/user/profile/egencer
+ei4un https://tatoeba.org/en/user/profile/ei4un
+ekalyoncu https://tatoeba.org/en/user/profile/ekalyoncu
+ekayaaslan https://tatoeba.org/en/user/profile/ekayaaslan
+ekenek https://tatoeba.org/en/user/profile/ekenek
+ekran https://tatoeba.org/en/user/profile/ekran
+ekremaras https://tatoeba.org/en/user/profile/ekremaras
+elenacristina260 https://tatoeba.org/en/user/profile/elenacristina260
+elifak https://tatoeba.org/en/user/profile/elifak
+elifaktastr https://tatoeba.org/en/user/profile/elifaktastr
+elifcakir https://tatoeba.org/en/user/profile/elifcakir
+elifecem10 https://tatoeba.org/en/user/profile/elifecem10
+emc https://tatoeba.org/en/user/profile/emc
+emel82 https://tatoeba.org/en/user/profile/emel82
+emigonza https://tatoeba.org/en/user/profile/emigonza
+emine06 https://tatoeba.org/en/user/profile/emine06
+eminko https://tatoeba.org/en/user/profile/eminko
+eminyilmazki https://tatoeba.org/en/user/profile/eminyilmazki
+emir156 https://tatoeba.org/en/user/profile/emir156
+emirhandmr https://tatoeba.org/en/user/profile/emirhandmr
+emrag https://tatoeba.org/en/user/profile/emrag
+emre https://tatoeba.org/en/user/profile/emre
+emre0066 https://tatoeba.org/en/user/profile/emre0066
+emre2573 https://tatoeba.org/en/user/profile/emre2573
+emrejoy https://tatoeba.org/en/user/profile/emrejoy
+emrekargi https://tatoeba.org/en/user/profile/emrekargi
+enebi https://tatoeba.org/en/user/profile/enebi
+enesaygun https://tatoeba.org/en/user/profile/enesaygun
+enescagdur https://tatoeba.org/en/user/profile/enescagdur
+engin https://tatoeba.org/en/user/profile/engin
+engin1321 https://tatoeba.org/en/user/profile/engin1321
+enris https://tatoeba.org/en/user/profile/enris
+eospol https://tatoeba.org/en/user/profile/eospol
+epigrafya https://tatoeba.org/en/user/profile/epigrafya
+erayavci https://tatoeba.org/en/user/profile/erayavci
+erayavcih https://tatoeba.org/en/user/profile/erayavcih
+erdeniz https://tatoeba.org/en/user/profile/erdeniz
+erdi https://tatoeba.org/en/user/profile/erdi
+erditirpan https://tatoeba.org/en/user/profile/erditirpan
+erencik2005 https://tatoeba.org/en/user/profile/erencik2005
+erendevrimci https://tatoeba.org/en/user/profile/erendevrimci
+erikv https://tatoeba.org/en/user/profile/erikv
+erk https://tatoeba.org/en/user/profile/erk
+ersan https://tatoeba.org/en/user/profile/ersan
+ertukrm96 https://tatoeba.org/en/user/profile/ertukrm96
+eses https://tatoeba.org/en/user/profile/eses
+esiray https://tatoeba.org/en/user/profile/esiray
+esperantisticxo https://tatoeba.org/en/user/profile/esperantisticxo
+esperanturk https://tatoeba.org/en/user/profile/esperanturk
+esso https://tatoeba.org/en/user/profile/esso
+estambul https://tatoeba.org/en/user/profile/estambul
+estambulista https://tatoeba.org/en/user/profile/estambulista
+esveledes https://tatoeba.org/en/user/profile/esveledes
+everylanguage https://tatoeba.org/en/user/profile/everylanguage
+evetyeah https://tatoeba.org/en/user/profile/evetyeah
+evka https://tatoeba.org/en/user/profile/evka
+eylemin https://tatoeba.org/en/user/profile/eylemin
+eymeylaydoe https://tatoeba.org/en/user/profile/eymeylaydoe
+ezgidurna https://tatoeba.org/en/user/profile/ezgidurna
+ezgita https://tatoeba.org/en/user/profile/ezgita
+fahrettinonder https://tatoeba.org/en/user/profile/fahrettinonder
+faruk https://tatoeba.org/en/user/profile/faruk
+fatih https://tatoeba.org/en/user/profile/fatih
+fatih18 https://tatoeba.org/en/user/profile/fatih18
+fatma27 https://tatoeba.org/en/user/profile/fatma27
+fearless https://tatoeba.org/en/user/profile/fearless
+ferdiaydogann https://tatoeba.org/en/user/profile/ferdiaydogann
+fgedikli https://tatoeba.org/en/user/profile/fgedikli
+firat https://tatoeba.org/en/user/profile/firat
+fjrjdk https://tatoeba.org/en/user/profile/fjrjdk
+fkalafat https://tatoeba.org/en/user/profile/fkalafat
+fkfikret https://tatoeba.org/en/user/profile/fkfikret
+flitz https://tatoeba.org/en/user/profile/flitz
+freecudi https://tatoeba.org/en/user/profile/freecudi
+freefighter https://tatoeba.org/en/user/profile/freefighter
+frt https://tatoeba.org/en/user/profile/frt
+fsmskr https://tatoeba.org/en/user/profile/fsmskr
+fuattatar https://tatoeba.org/en/user/profile/fuattatar
+furkan89 https://tatoeba.org/en/user/profile/furkan89
+futurk https://tatoeba.org/en/user/profile/futurk
+g_cerrah https://tatoeba.org/en/user/profile/g_cerrah
+ganbatte https://tatoeba.org/en/user/profile/ganbatte
+gargamel https://tatoeba.org/en/user/profile/gargamel
+gencmevtoo https://tatoeba.org/en/user/profile/gencmevtoo
+gin https://tatoeba.org/en/user/profile/gin
+gipastekstil https://tatoeba.org/en/user/profile/gipastekstil
+gizem https://tatoeba.org/en/user/profile/gizem
+glavkos https://tatoeba.org/en/user/profile/glavkos
+glavsaltulo https://tatoeba.org/en/user/profile/glavsaltulo
+gocmenhakan https://tatoeba.org/en/user/profile/gocmenhakan
+gokayburuc https://tatoeba.org/en/user/profile/gokayburuc
+gokhanaksu https://tatoeba.org/en/user/profile/gokhanaksu
+goksun https://tatoeba.org/en/user/profile/goksun
+gokturker https://tatoeba.org/en/user/profile/gokturker
+gokustan https://tatoeba.org/en/user/profile/gokustan
+gozdee https://tatoeba.org/en/user/profile/gozdee
+grafikopat https://tatoeba.org/en/user/profile/grafikopat
+grebultur https://tatoeba.org/en/user/profile/grebultur
+greenmile https://tatoeba.org/en/user/profile/greenmile
+grindeldore https://tatoeba.org/en/user/profile/grindeldore
+gubidiko https://tatoeba.org/en/user/profile/gubidiko
+gulsen https://tatoeba.org/en/user/profile/gulsen
+gulserdogan https://tatoeba.org/en/user/profile/gulserdogan
+haciahmet https://tatoeba.org/en/user/profile/haciahmet
+hahahahaha https://tatoeba.org/en/user/profile/hahahahaha
+hakkikonu https://tatoeba.org/en/user/profile/hakkikonu
+halidtunc https://tatoeba.org/en/user/profile/halidtunc
+halime https://tatoeba.org/en/user/profile/halime
+halit007 https://tatoeba.org/en/user/profile/halit007
+hamit https://tatoeba.org/en/user/profile/hamit
+han1 https://tatoeba.org/en/user/profile/han1
+hansolo https://tatoeba.org/en/user/profile/hansolo
+harkurkof https://tatoeba.org/en/user/profile/harkurkof
+haruka https://tatoeba.org/en/user/profile/haruka
+hasan123 https://tatoeba.org/en/user/profile/hasan123
+hasana https://tatoeba.org/en/user/profile/hasana
+hasanyildiz https://tatoeba.org/en/user/profile/hasanyildiz
+haus https://tatoeba.org/en/user/profile/haus
+haydar1908 https://tatoeba.org/en/user/profile/haydar1908
+hayvan https://tatoeba.org/en/user/profile/hayvan
+hd92 https://tatoeba.org/en/user/profile/hd92
+herbertmarcuse https://tatoeba.org/en/user/profile/herbertmarcuse
+herotato https://tatoeba.org/en/user/profile/herotato
+hesaplarinkrali https://tatoeba.org/en/user/profile/hesaplarinkrali
+heyneyhey https://tatoeba.org/en/user/profile/heyneyhey
+hiroy https://tatoeba.org/en/user/profile/hiroy
+hmdctn https://tatoeba.org/en/user/profile/hmdctn
+hrkucuk https://tatoeba.org/en/user/profile/hrkucuk
+hsndmr https://tatoeba.org/en/user/profile/hsndmr
+human600 https://tatoeba.org/en/user/profile/human600
+husamalalloush https://tatoeba.org/en/user/profile/husamalalloush
+hyaku https://tatoeba.org/en/user/profile/hyaku
+iamziya https://tatoeba.org/en/user/profile/iamziya
+ibkose https://tatoeba.org/en/user/profile/ibkose
+ibrahm91 https://tatoeba.org/en/user/profile/ibrahm91
+icfindik https://tatoeba.org/en/user/profile/icfindik
+ihar https://tatoeba.org/en/user/profile/ihar
+ihtapu https://tatoeba.org/en/user/profile/ihtapu
+ilhanmertalan https://tatoeba.org/en/user/profile/ilhanmertalan
+ilkeraltinok https://tatoeba.org/en/user/profile/ilkeraltinok
+ilkeraltinok365 https://tatoeba.org/en/user/profile/ilkeraltinok365
+ilkfatelf https://tatoeba.org/en/user/profile/ilkfatelf
+ilknurozdal https://tatoeba.org/en/user/profile/ilknurozdal
+ilovetechno https://tatoeba.org/en/user/profile/ilovetechno
+incelemeelemani https://tatoeba.org/en/user/profile/incelemeelemani
+incibey https://tatoeba.org/en/user/profile/incibey
+ingilizcedelisi https://tatoeba.org/en/user/profile/ingilizcedelisi
+insularis https://tatoeba.org/en/user/profile/insularis
+ismet https://tatoeba.org/en/user/profile/ismet
+isomail https://tatoeba.org/en/user/profile/isomail
+ispinoz https://tatoeba.org/en/user/profile/ispinoz
+isutanburucu https://tatoeba.org/en/user/profile/isutanburucu
+itsakidrauhl https://tatoeba.org/en/user/profile/itsakidrauhl
+iyibirinsan https://tatoeba.org/en/user/profile/iyibirinsan
+jacquiceung https://tatoeba.org/en/user/profile/jacquiceung
+janTuki https://tatoeba.org/en/user/profile/janTuki
+jestor https://tatoeba.org/en/user/profile/jestor
+jj07 https://tatoeba.org/en/user/profile/jj07
+jlake https://tatoeba.org/en/user/profile/jlake
+johnnysinsinyigeni https://tatoeba.org/en/user/profile/johnnysinsinyigeni
+jorro https://tatoeba.org/en/user/profile/jorro
+josematrix https://tatoeba.org/en/user/profile/josematrix
+josh612 https://tatoeba.org/en/user/profile/josh612
+josph https://tatoeba.org/en/user/profile/josph
+jungnet https://tatoeba.org/en/user/profile/jungnet
+kabalfuture https://tatoeba.org/en/user/profile/kabalfuture
+kabbuk https://tatoeba.org/en/user/profile/kabbuk
+kabu https://tatoeba.org/en/user/profile/kabu
+kacmaz https://tatoeba.org/en/user/profile/kacmaz
+kadirsaglam https://tatoeba.org/en/user/profile/kadirsaglam
+kafa1500 https://tatoeba.org/en/user/profile/kafa1500
+kamilfatsa https://tatoeba.org/en/user/profile/kamilfatsa
+kara_melek https://tatoeba.org/en/user/profile/kara_melek
+karabat https://tatoeba.org/en/user/profile/karabat
+karstenenh https://tatoeba.org/en/user/profile/karstenenh
+katonatiti https://tatoeba.org/en/user/profile/katonatiti
+kayra https://tatoeba.org/en/user/profile/kayra
+kby https://tatoeba.org/en/user/profile/kby
+kcglr https://tatoeba.org/en/user/profile/kcglr
+kemalkaraca https://tatoeba.org/en/user/profile/kemalkaraca
+kenn https://tatoeba.org/en/user/profile/kenn
+kerbear407 https://tatoeba.org/en/user/profile/kerbear407
+keremcik https://tatoeba.org/en/user/profile/keremcik
+kimse999 https://tatoeba.org/en/user/profile/kimse999
+kiryopi https://tatoeba.org/en/user/profile/kiryopi
+klncadil https://tatoeba.org/en/user/profile/klncadil
+koala https://tatoeba.org/en/user/profile/koala
+kolver_emre06 https://tatoeba.org/en/user/profile/kolver_emre06
+konhuruk https://tatoeba.org/en/user/profile/konhuruk
+konserve https://tatoeba.org/en/user/profile/konserve
+korsan0693 https://tatoeba.org/en/user/profile/korsan0693
+kozan https://tatoeba.org/en/user/profile/kozan
+krfz41 https://tatoeba.org/en/user/profile/krfz41
+krgym https://tatoeba.org/en/user/profile/krgym
+krolsobieski https://tatoeba.org/en/user/profile/krolsobieski
+kukunku https://tatoeba.org/en/user/profile/kukunku
+kuyabiye https://tatoeba.org/en/user/profile/kuyabiye
+kybelehul https://tatoeba.org/en/user/profile/kybelehul
+kyusufsami https://tatoeba.org/en/user/profile/kyusufsami
+landano https://tatoeba.org/en/user/profile/landano
+langbaqa https://tatoeba.org/en/user/profile/langbaqa
+languagelerner https://tatoeba.org/en/user/profile/languagelerner
+lawyer https://tatoeba.org/en/user/profile/lawyer
+learngreek https://tatoeba.org/en/user/profile/learngreek
+leipziger https://tatoeba.org/en/user/profile/leipziger
+leka159 https://tatoeba.org/en/user/profile/leka159
+letyphon https://tatoeba.org/en/user/profile/letyphon
+leyla https://tatoeba.org/en/user/profile/leyla
+lilmerman https://tatoeba.org/en/user/profile/lilmerman
+loor4s https://tatoeba.org/en/user/profile/loor4s
+ltempa https://tatoeba.org/en/user/profile/ltempa
+luchfilip https://tatoeba.org/en/user/profile/luchfilip
+lucifergo https://tatoeba.org/en/user/profile/lucifergo
+lugal https://tatoeba.org/en/user/profile/lugal
+lumimi https://tatoeba.org/en/user/profile/lumimi
+luna12 https://tatoeba.org/en/user/profile/luna12
+lunasb https://tatoeba.org/en/user/profile/lunasb
+m_rv https://tatoeba.org/en/user/profile/m_rv
+maaster https://tatoeba.org/en/user/profile/maaster
+madoromi https://tatoeba.org/en/user/profile/madoromi
+magnet1c9o3 https://tatoeba.org/en/user/profile/magnet1c9o3
+mahri_gurbanova https://tatoeba.org/en/user/profile/mahri_gurbanova
+maku https://tatoeba.org/en/user/profile/maku
+malisson https://tatoeba.org/en/user/profile/malisson
+maqnus https://tatoeba.org/en/user/profile/maqnus
+marllboro06 https://tatoeba.org/en/user/profile/marllboro06
+masgun13 https://tatoeba.org/en/user/profile/masgun13
+maydoo https://tatoeba.org/en/user/profile/maydoo
+mayok https://tatoeba.org/en/user/profile/mayok
+mayon https://tatoeba.org/en/user/profile/mayon
+mbadreamer https://tatoeba.org/en/user/profile/mbadreamer
+mcpehlivan https://tatoeba.org/en/user/profile/mcpehlivan
+mecasa90 https://tatoeba.org/en/user/profile/mecasa90
+mecheng https://tatoeba.org/en/user/profile/mecheng
+medeor https://tatoeba.org/en/user/profile/medeor
+meinung44 https://tatoeba.org/en/user/profile/meinung44
+melbyy https://tatoeba.org/en/user/profile/melbyy
+melike https://tatoeba.org/en/user/profile/melike
+melisszr https://tatoeba.org/en/user/profile/melisszr
+melo497 https://tatoeba.org/en/user/profile/melo497
+melodram https://tatoeba.org/en/user/profile/melodram
+memet https://tatoeba.org/en/user/profile/memet
+merakli51 https://tatoeba.org/en/user/profile/merakli51
+meri12 https://tatoeba.org/en/user/profile/meri12
+meric https://tatoeba.org/en/user/profile/meric
+merkur https://tatoeba.org/en/user/profile/merkur
+mert356575 https://tatoeba.org/en/user/profile/mert356575
+mertcanerden https://tatoeba.org/en/user/profile/mertcanerden
+mertnuhoglu https://tatoeba.org/en/user/profile/mertnuhoglu
+meru https://tatoeba.org/en/user/profile/meru
+mervee https://tatoeba.org/en/user/profile/mervee
+merveekeskin https://tatoeba.org/en/user/profile/merveekeskin
+mervegorus https://tatoeba.org/en/user/profile/mervegorus
+mervert1 https://tatoeba.org/en/user/profile/mervert1
+mesut37 https://tatoeba.org/en/user/profile/mesut37
+metinyurtbasi https://tatoeba.org/en/user/profile/metinyurtbasi
+mfw https://tatoeba.org/en/user/profile/mfw
+mgsmus https://tatoeba.org/en/user/profile/mgsmus
+mhsary https://tatoeba.org/en/user/profile/mhsary
+miharbi https://tatoeba.org/en/user/profile/miharbi
+mihriban https://tatoeba.org/en/user/profile/mihriban
+milaket https://tatoeba.org/en/user/profile/milaket
+mirajune https://tatoeba.org/en/user/profile/mirajune
+misal20 https://tatoeba.org/en/user/profile/misal20
+misi2991 https://tatoeba.org/en/user/profile/misi2991
+misshii https://tatoeba.org/en/user/profile/misshii
+mitokondri https://tatoeba.org/en/user/profile/mitokondri
+mk3br https://tatoeba.org/en/user/profile/mk3br
+mlktmbz https://tatoeba.org/en/user/profile/mlktmbz
+mmanyak https://tatoeba.org/en/user/profile/mmanyak
+mmikailugur https://tatoeba.org/en/user/profile/mmikailugur
+mns https://tatoeba.org/en/user/profile/mns
+moman https://tatoeba.org/en/user/profile/moman
+monser https://tatoeba.org/en/user/profile/monser
+moonlight6472 https://tatoeba.org/en/user/profile/moonlight6472
+mrtaistoi https://tatoeba.org/en/user/profile/mrtaistoi
+mrv678 https://tatoeba.org/en/user/profile/mrv678
+mrve https://tatoeba.org/en/user/profile/mrve
+msami https://tatoeba.org/en/user/profile/msami
+msdolmus https://tatoeba.org/en/user/profile/msdolmus
+muatik https://tatoeba.org/en/user/profile/muatik
+mugdul https://tatoeba.org/en/user/profile/mugdul
+murad63 https://tatoeba.org/en/user/profile/murad63
+murtaza https://tatoeba.org/en/user/profile/murtaza
+musgndz https://tatoeba.org/en/user/profile/musgndz
+mustafa836 https://tatoeba.org/en/user/profile/mustafa836
+mxtxo https://tatoeba.org/en/user/profile/mxtxo
+myasinpak https://tatoeba.org/en/user/profile/myasinpak
+mygoodomen https://tatoeba.org/en/user/profile/mygoodomen
+myth https://tatoeba.org/en/user/profile/myth
+n0lla https://tatoeba.org/en/user/profile/n0lla
+nataliemeow https://tatoeba.org/en/user/profile/nataliemeow
+navigare https://tatoeba.org/en/user/profile/navigare
+necesejpapero https://tatoeba.org/en/user/profile/necesejpapero
+nedim https://tatoeba.org/en/user/profile/nedim
+nedir https://tatoeba.org/en/user/profile/nedir
+nedirlife https://tatoeba.org/en/user/profile/nedirlife
+nefertarii https://tatoeba.org/en/user/profile/nefertarii
+nergis https://tatoeba.org/en/user/profile/nergis
+nesibe https://tatoeba.org/en/user/profile/nesibe
+neumann https://tatoeba.org/en/user/profile/neumann
+nevermore https://tatoeba.org/en/user/profile/nevermore
+newton55 https://tatoeba.org/en/user/profile/newton55
+neytiri https://tatoeba.org/en/user/profile/neytiri
+nil https://tatoeba.org/en/user/profile/nil
+nilay62 https://tatoeba.org/en/user/profile/nilay62
+ninefi https://tatoeba.org/en/user/profile/ninefi
+nodir https://tatoeba.org/en/user/profile/nodir
+nowtatoeba https://tatoeba.org/en/user/profile/nowtatoeba
+nurlanaze https://tatoeba.org/en/user/profile/nurlanaze
+o10449825 https://tatoeba.org/en/user/profile/o10449825
+obracadabra https://tatoeba.org/en/user/profile/obracadabra
+ocos https://tatoeba.org/en/user/profile/ocos
+odien16 https://tatoeba.org/en/user/profile/odien16
+oguzosis https://tatoeba.org/en/user/profile/oguzosis
+ok_alp https://tatoeba.org/en/user/profile/ok_alp
+oksanask https://tatoeba.org/en/user/profile/oksanask
+oldfashioned https://tatoeba.org/en/user/profile/oldfashioned
+olger https://tatoeba.org/en/user/profile/olger
+oligophile https://tatoeba.org/en/user/profile/oligophile
+olmeca https://tatoeba.org/en/user/profile/olmeca
+omer55 https://tatoeba.org/en/user/profile/omer55
+omerfarukckmk https://tatoeba.org/en/user/profile/omerfarukckmk
+onbil https://tatoeba.org/en/user/profile/onbil
+ondal30 https://tatoeba.org/en/user/profile/ondal30
+one_turk https://tatoeba.org/en/user/profile/one_turk
+onurtombalak https://tatoeba.org/en/user/profile/onurtombalak
+onurussia https://tatoeba.org/en/user/profile/onurussia
+opradyus https://tatoeba.org/en/user/profile/opradyus
+orko https://tatoeba.org/en/user/profile/orko
+oscarguille https://tatoeba.org/en/user/profile/oscarguille
+osmanizbat https://tatoeba.org/en/user/profile/osmanizbat
+otodidak https://tatoeba.org/en/user/profile/otodidak
+oxyii https://tatoeba.org/en/user/profile/oxyii
+ozg https://tatoeba.org/en/user/profile/ozg
+ozgea https://tatoeba.org/en/user/profile/ozgea
+ozgeakd https://tatoeba.org/en/user/profile/ozgeakd
+ozkan_baser https://tatoeba.org/en/user/profile/ozkan_baser
+ozkozturk https://tatoeba.org/en/user/profile/ozkozturk
+ozlemos https://tatoeba.org/en/user/profile/ozlemos
+oznslck https://tatoeba.org/en/user/profile/oznslck
+oznurr https://tatoeba.org/en/user/profile/oznurr
+ozx https://tatoeba.org/en/user/profile/ozx
+ozzie https://tatoeba.org/en/user/profile/ozzie
+palpurul https://tatoeba.org/en/user/profile/palpurul
+pantera https://tatoeba.org/en/user/profile/pantera
+papillon https://tatoeba.org/en/user/profile/papillon
+particle https://tatoeba.org/en/user/profile/particle
+pathem https://tatoeba.org/en/user/profile/pathem
+pekka123 https://tatoeba.org/en/user/profile/pekka123
+perejoseph https://tatoeba.org/en/user/profile/perejoseph
+pessoa https://tatoeba.org/en/user/profile/pessoa
+phasmida https://tatoeba.org/en/user/profile/phasmida
+piksea https://tatoeba.org/en/user/profile/piksea
+pil https://tatoeba.org/en/user/profile/pil
+pilaru https://tatoeba.org/en/user/profile/pilaru
+pinkyshoes https://tatoeba.org/en/user/profile/pinkyshoes
+plover https://tatoeba.org/en/user/profile/plover
+pnberk https://tatoeba.org/en/user/profile/pnberk
+podcast https://tatoeba.org/en/user/profile/podcast
+polna https://tatoeba.org/en/user/profile/polna
+postacinedim https://tatoeba.org/en/user/profile/postacinedim
+prdx63 https://tatoeba.org/en/user/profile/prdx63
+prokofyev https://tatoeba.org/en/user/profile/prokofyev
+pstamato https://tatoeba.org/en/user/profile/pstamato
+ptqelcr https://tatoeba.org/en/user/profile/ptqelcr
+purple https://tatoeba.org/en/user/profile/purple
+quagliarella https://tatoeba.org/en/user/profile/quagliarella
+r728 https://tatoeba.org/en/user/profile/r728
+raton https://tatoeba.org/en/user/profile/raton
+raydin https://tatoeba.org/en/user/profile/raydin
+rdgscratch https://tatoeba.org/en/user/profile/rdgscratch
+reblica https://tatoeba.org/en/user/profile/reblica
+rengistann https://tatoeba.org/en/user/profile/rengistann
+reputation https://tatoeba.org/en/user/profile/reputation
+revista https://tatoeba.org/en/user/profile/revista
+ridvan https://tatoeba.org/en/user/profile/ridvan
+rimzone https://tatoeba.org/en/user/profile/rimzone
+rishimahope https://tatoeba.org/en/user/profile/rishimahope
+ritualesatanum https://tatoeba.org/en/user/profile/ritualesatanum
+riyanabyn https://tatoeba.org/en/user/profile/riyanabyn
+roj https://tatoeba.org/en/user/profile/roj
+root https://tatoeba.org/en/user/profile/root
+rosemiller https://tatoeba.org/en/user/profile/rosemiller
+ruhizi https://tatoeba.org/en/user/profile/ruhizi
+rul https://tatoeba.org/en/user/profile/rul
+ruth_tatoeba https://tatoeba.org/en/user/profile/ruth_tatoeba
+ryanwoo https://tatoeba.org/en/user/profile/ryanwoo
+sabri3296 https://tatoeba.org/en/user/profile/sabri3296
+sakar420 https://tatoeba.org/en/user/profile/sakar420
+sakirasci https://tatoeba.org/en/user/profile/sakirasci
+saladin https://tatoeba.org/en/user/profile/saladin
+samimdeger https://tatoeba.org/en/user/profile/samimdeger
+sanane https://tatoeba.org/en/user/profile/sanane
+savci https://tatoeba.org/en/user/profile/savci
+sayment https://tatoeba.org/en/user/profile/sayment
+sbakcaci https://tatoeba.org/en/user/profile/sbakcaci
+sblylmz https://tatoeba.org/en/user/profile/sblylmz
+sebastian61st https://tatoeba.org/en/user/profile/sebastian61st
+secokit https://tatoeba.org/en/user/profile/secokit
+secretkingdom https://tatoeba.org/en/user/profile/secretkingdom
+sefathewolf https://tatoeba.org/en/user/profile/sefathewolf
+sefatocny https://tatoeba.org/en/user/profile/sefatocny
+selcuk83 https://tatoeba.org/en/user/profile/selcuk83
+selcukbasak https://tatoeba.org/en/user/profile/selcukbasak
+selfish https://tatoeba.org/en/user/profile/selfish
+selim0618 https://tatoeba.org/en/user/profile/selim0618
+semih71 https://tatoeba.org/en/user/profile/semih71
+sencay https://tatoeba.org/en/user/profile/sencay
+senol00732 https://tatoeba.org/en/user/profile/senol00732
+sepo https://tatoeba.org/en/user/profile/sepo
+seraphine https://tatoeba.org/en/user/profile/seraphine
+serefsaid https://tatoeba.org/en/user/profile/serefsaid
+serenbay https://tatoeba.org/en/user/profile/serenbay
+serok47 https://tatoeba.org/en/user/profile/serok47
+sevilay https://tatoeba.org/en/user/profile/sevilay
+seyyarteyyare https://tatoeba.org/en/user/profile/seyyarteyyare
+sezerpicak https://tatoeba.org/en/user/profile/sezerpicak
+shaylla https://tatoeba.org/en/user/profile/shaylla
+shazar https://tatoeba.org/en/user/profile/shazar
+shekitten https://tatoeba.org/en/user/profile/shekitten
+shodsor https://tatoeba.org/en/user/profile/shodsor
+shuhratullo https://tatoeba.org/en/user/profile/shuhratullo
+silence001 https://tatoeba.org/en/user/profile/silence001
+sinaancakirr https://tatoeba.org/en/user/profile/sinaancakirr
+sinanbilek https://tatoeba.org/en/user/profile/sinanbilek
+sinanz https://tatoeba.org/en/user/profile/sinanz
+sinirliadam https://tatoeba.org/en/user/profile/sinirliadam
+sixtynine https://tatoeba.org/en/user/profile/sixtynine
+slckozts https://tatoeba.org/en/user/profile/slckozts
+slymenstra https://tatoeba.org/en/user/profile/slymenstra
+smtylmz84 https://tatoeba.org/en/user/profile/smtylmz84
+snsk https://tatoeba.org/en/user/profile/snsk
+sodi https://tatoeba.org/en/user/profile/sodi
+sok1625 https://tatoeba.org/en/user/profile/sok1625
+sokratis https://tatoeba.org/en/user/profile/sokratis
+soliloquist https://tatoeba.org/en/user/profile/soliloquist
+soloman1997 https://tatoeba.org/en/user/profile/soloman1997
+sonokta https://tatoeba.org/en/user/profile/sonokta
+soulofwarrior https://tatoeba.org/en/user/profile/soulofwarrior
+spesific https://tatoeba.org/en/user/profile/spesific
+spiritofwonder https://tatoeba.org/en/user/profile/spiritofwonder
+springfield https://tatoeba.org/en/user/profile/springfield
+starcan https://tatoeba.org/en/user/profile/starcan
+starrynight https://tatoeba.org/en/user/profile/starrynight
+static https://tatoeba.org/en/user/profile/static
+stregoica https://tatoeba.org/en/user/profile/stregoica
+suatatan https://tatoeba.org/en/user/profile/suatatan
+sude_ https://tatoeba.org/en/user/profile/sude_
+suenos https://tatoeba.org/en/user/profile/suenos
+sukru https://tatoeba.org/en/user/profile/sukru
+sultan1601 https://tatoeba.org/en/user/profile/sultan1601
+sumeyye https://tatoeba.org/en/user/profile/sumeyye
+sumeyyepie https://tatoeba.org/en/user/profile/sumeyyepie
+sunclara https://tatoeba.org/en/user/profile/sunclara
+svetico https://tatoeba.org/en/user/profile/svetico
+sysko https://tatoeba.org/en/user/profile/sysko
+t_hbilgin https://tatoeba.org/en/user/profile/t_hbilgin
+tacab https://tatoeba.org/en/user/profile/tacab
+tahaniyazikaraca https://tatoeba.org/en/user/profile/tahaniyazikaraca
+tahatugyan https://tatoeba.org/en/user/profile/tahatugyan
+tahtabiti https://tatoeba.org/en/user/profile/tahtabiti
+tanramazan https://tatoeba.org/en/user/profile/tanramazan
+tarim222 https://tatoeba.org/en/user/profile/tarim222
+tartarusgaia https://tatoeba.org/en/user/profile/tartarusgaia
+teaizm https://tatoeba.org/en/user/profile/teaizm
+tecdet https://tatoeba.org/en/user/profile/tecdet
+tekinosman https://tatoeba.org/en/user/profile/tekinosman
+temel https://tatoeba.org/en/user/profile/temel
+teosos https://tatoeba.org/en/user/profile/teosos
+tetuan https://tatoeba.org/en/user/profile/tetuan
+thbaero https://tatoeba.org/en/user/profile/thbaero
+thecreep https://tatoeba.org/en/user/profile/thecreep
+tikan0 https://tatoeba.org/en/user/profile/tikan0
+timurmercan https://tatoeba.org/en/user/profile/timurmercan
+timurmercansky https://tatoeba.org/en/user/profile/timurmercansky
+tmrszr https://tatoeba.org/en/user/profile/tmrszr
+tnnglue https://tatoeba.org/en/user/profile/tnnglue
+tokipona https://tatoeba.org/en/user/profile/tokipona
+tolgaseyrek https://tatoeba.org/en/user/profile/tolgaseyrek
+toplukonut https://tatoeba.org/en/user/profile/toplukonut
+tornado https://tatoeba.org/en/user/profile/tornado
+traeton https://tatoeba.org/en/user/profile/traeton
+trilliona https://tatoeba.org/en/user/profile/trilliona
+ttboy3 https://tatoeba.org/en/user/profile/ttboy3
+tugba https://tatoeba.org/en/user/profile/tugba
+tulin https://tatoeba.org/en/user/profile/tulin
+turan https://tatoeba.org/en/user/profile/turan
+turco https://tatoeba.org/en/user/profile/turco
+turepo https://tatoeba.org/en/user/profile/turepo
+turgayatli https://tatoeba.org/en/user/profile/turgayatli
+turita https://tatoeba.org/en/user/profile/turita
+turk2234 https://tatoeba.org/en/user/profile/turk2234
+turkgucu https://tatoeba.org/en/user/profile/turkgucu
+turkiccorpus https://tatoeba.org/en/user/profile/turkiccorpus
+turkinsani https://tatoeba.org/en/user/profile/turkinsani
+turklehceleri https://tatoeba.org/en/user/profile/turklehceleri
+turkujoesperanto https://tatoeba.org/en/user/profile/turkujoesperanto
+tuubaersoy https://tatoeba.org/en/user/profile/tuubaersoy
+ubarun https://tatoeba.org/en/user/profile/ubarun
+ukocum https://tatoeba.org/en/user/profile/ukocum
+ulkuocaklari https://tatoeba.org/en/user/profile/ulkuocaklari
+umitao https://tatoeba.org/en/user/profile/umitao
+umut243 https://tatoeba.org/en/user/profile/umut243
+unalmucoo https://tatoeba.org/en/user/profile/unalmucoo
+unixd https://tatoeba.org/en/user/profile/unixd
+uptonpark1973 https://tatoeba.org/en/user/profile/uptonpark1973
+user66 https://tatoeba.org/en/user/profile/user66
+user_ https://tatoeba.org/en/user/profile/user_
+usmaan https://tatoeba.org/en/user/profile/usmaan
+ustaugvey1 https://tatoeba.org/en/user/profile/ustaugvey1
+usuyus https://tatoeba.org/en/user/profile/usuyus
+utkudogan https://tatoeba.org/en/user/profile/utkudogan
+veganesta https://tatoeba.org/en/user/profile/veganesta
+velatsonmez https://tatoeba.org/en/user/profile/velatsonmez
+venturo https://tatoeba.org/en/user/profile/venturo
+vhbtrz https://tatoeba.org/en/user/profile/vhbtrz
+violetanka https://tatoeba.org/en/user/profile/violetanka
+vo_gne https://tatoeba.org/en/user/profile/vo_gne
+vodka https://tatoeba.org/en/user/profile/vodka
+volkan https://tatoeba.org/en/user/profile/volkan
+volkanvarol https://tatoeba.org/en/user/profile/volkanvarol
+vowelharmony https://tatoeba.org/en/user/profile/vowelharmony
+vvv123 https://tatoeba.org/en/user/profile/vvv123
+wabisabi https://tatoeba.org/en/user/profile/wabisabi
+whitekite https://tatoeba.org/en/user/profile/whitekite
+winchesters https://tatoeba.org/en/user/profile/winchesters
+woldemort12 https://tatoeba.org/en/user/profile/woldemort12
+wraptolga https://tatoeba.org/en/user/profile/wraptolga
+wreka https://tatoeba.org/en/user/profile/wreka
+wwkudu https://tatoeba.org/en/user/profile/wwkudu
+xallace https://tatoeba.org/en/user/profile/xallace
+xarxes https://tatoeba.org/en/user/profile/xarxes
+xenpc https://tatoeba.org/en/user/profile/xenpc
+yagizmardin https://tatoeba.org/en/user/profile/yagizmardin
+yakakadir https://tatoeba.org/en/user/profile/yakakadir
+yakup https://tatoeba.org/en/user/profile/yakup
+yanilguk https://tatoeba.org/en/user/profile/yanilguk
+yasinbalci https://tatoeba.org/en/user/profile/yasinbalci
+yasmnckr https://tatoeba.org/en/user/profile/yasmnckr
+yavuz https://tatoeba.org/en/user/profile/yavuz
+yavuzb https://tatoeba.org/en/user/profile/yavuzb
+yavuzt https://tatoeba.org/en/user/profile/yavuzt
+yazoku https://tatoeba.org/en/user/profile/yazoku
+yesil https://tatoeba.org/en/user/profile/yesil
+yigitpia https://tatoeba.org/en/user/profile/yigitpia
+yilmazulusoy https://tatoeba.org/en/user/profile/yilmazulusoy
+yldz06 https://tatoeba.org/en/user/profile/yldz06
+yoaria https://tatoeba.org/en/user/profile/yoaria
+yoldy35 https://tatoeba.org/en/user/profile/yoldy35
+ysmn33 https://tatoeba.org/en/user/profile/ysmn33
+ytasliel https://tatoeba.org/en/user/profile/ytasliel
+ytugen https://tatoeba.org/en/user/profile/ytugen
+yunusalperen https://tatoeba.org/en/user/profile/yunusalperen
+yunusemredgn https://tatoeba.org/en/user/profile/yunusemredgn
+yurterol https://tatoeba.org/en/user/profile/yurterol
+yusufartuc https://tatoeba.org/en/user/profile/yusufartuc
+yusufbileci https://tatoeba.org/en/user/profile/yusufbileci
+yusufco https://tatoeba.org/en/user/profile/yusufco
+yusufsarici https://tatoeba.org/en/user/profile/yusufsarici
+yvz https://tatoeba.org/en/user/profile/yvz
+yyaasinaslan https://tatoeba.org/en/user/profile/yyaasinaslan
+zelis01 https://tatoeba.org/en/user/profile/zelis01
+zeyde https://tatoeba.org/en/user/profile/zeyde
+zeynp https://tatoeba.org/en/user/profile/zeynp
+zozcan https://tatoeba.org/en/user/profile/zozcan
+zulmetefza https://tatoeba.org/en/user/profile/zulmetefza
+
+## License
+
+`wordfreq` is freely redistributable under the Apache license (see
+`LICENSE.txt`), and it includes data files that may be
+redistributed under a Creative Commons Attribution-ShareAlike 4.0
+license (<https://creativecommons.org/licenses/by-sa/4.0/>).
+
+`wordfreq` contains data extracted from Google Books Ngrams
+(<http://books.google.com/ngrams>) and Google Books Syntactic Ngrams
+(<http://commondatastorage.googleapis.com/books/syntactic-ngrams/index.html>).
+The terms of use of this data are:
+
+    Ngram Viewer graphs and data may be freely used for any purpose, although
+    acknowledgement of Google Books Ngram Viewer as the source, and inclusion
+    of a link to http://books.google.com/ngrams, would be appreciated.
+
+`wordfreq` also contains data derived from the following Creative Commons-licensed
+sources:
+
+- The Leeds Internet Corpus, from the University of Leeds Centre for Translation
+  Studies (<http://corpus.leeds.ac.uk/list.html>)
+
+- Wikipedia, the free encyclopedia (<http://www.wikipedia.org>)
+
+- ParaCrawl, a multilingual Web crawl (<https://paracrawl.eu>)
+
+It contains data from OPUS OpenSubtitles 2018
+(<http://opus.nlpl.eu/OpenSubtitles.php>), whose data originates from the
+OpenSubtitles project (<http://www.opensubtitles.org/>) and may be used with
+attribution to OpenSubtitles.
+
+It contains data from various SUBTLEX word lists: SUBTLEX-US, SUBTLEX-UK,
+SUBTLEX-CH, SUBTLEX-DE, and SUBTLEX-NL, created by Marc Brysbaert et al.
+(see citations below) and available at
+<http://crr.ugent.be/programs-data/subtitle-frequencies>.
+
+I (Robyn Speer) have obtained permission by e-mail from Marc Brysbaert to
+distribute these wordlists in wordfreq, to be used for any purpose, not just
+for academic use, under these conditions:
+
+- Wordfreq and code derived from it must credit the SUBTLEX authors.
+- It must remain clear that SUBTLEX is freely available data.
+
+These terms are similar to the Creative Commons Attribution-ShareAlike license.
+
+Some additional data was collected by a custom application that watches the
+streaming Twitter API, in accordance with Twitter's Developer Agreement &
+Policy. This software gives statistics about words that are commonly used on
+Twitter; it does not display or republish any Twitter content.
+
+## Citing wordfreq
+
+If you use wordfreq in your research, please cite it! We publish the code
+through Zenodo so that it can be reliably cited using a DOI. The current
+citation is:
+
+> Robyn Speer. (2022). rspeer/wordfreq: v3.0 (v3.0.2). Zenodo. https://doi.org/10.5281/zenodo.7199437
+
+The same citation in BibTex format:
+
+```
+@software{robyn_speer_2022_7199437,
+  author       = {Robyn Speer},
+  title        = {rspeer/wordfreq: v3.0},
+  month        = sep,
+  year         = 2022,
+  publisher    = {Zenodo},
+  version      = {v3.0.2},
+  doi          = {10.5281/zenodo.7199437},
+  url          = {https://doi.org/10.5281/zenodo.7199437}
+}
+```
+
+## Citations to work that wordfreq is built on
+
+- Bojar, O., Chatterjee, R., Federmann, C., Haddow, B., Huck, M., Hokamp, C.,
+  Koehn, P., Logacheva, V., Monz, C., Negri, M., Post, M., Scarton, C.,
+  Specia, L., & Turchi, M. (2015). Findings of the 2015 Workshop on Statistical
+  Machine Translation.
+  <http://www.statmt.org/wmt15/results.html>
+
+- Brysbaert, M. & New, B. (2009). Moving beyond Kucera and Francis: A Critical
+  Evaluation of Current Word Frequency Norms and the Introduction of a New and
+  Improved Word Frequency Measure for American English. Behavior Research
+  Methods, 41 (4), 977-990.
+  <http://sites.google.com/site/borisnew/pub/BrysbaertNew2009.pdf>
+
+- Brysbaert, M., Buchmeier, M., Conrad, M., Jacobs, A.M., Bölte, J., & Böhl, A.
+  (2011). The word frequency effect: A review of recent developments and
+  implications for the choice of frequency estimates in German. Experimental
+  Psychology, 58, 412-424.
+
+- Cai, Q., & Brysbaert, M. (2010). SUBTLEX-CH: Chinese word and character
+  frequencies based on film subtitles. PLoS One, 5(6), e10729.
+  <http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0010729>
+
+- Davis, M. (2012). Unicode text segmentation. Unicode Standard Annex, 29.
+  <http://unicode.org/reports/tr29/>
+
+- Halácsy, P., Kornai, A., Németh, L., Rung, A., Szakadát, I., & Trón, V.
+  (2004). Creating open language resources for Hungarian. In Proceedings of the
+  4th international conference on Language Resources and Evaluation (LREC2004).
+  <http://mokk.bme.hu/resources/webcorpus/>
+
+- Keuleers, E., Brysbaert, M. & New, B. (2010). SUBTLEX-NL: A new frequency
+  measure for Dutch words based on film subtitles. Behavior Research Methods,
+  42(3), 643-650.
+  <http://crr.ugent.be/papers/SUBTLEX-NL_BRM.pdf>
+
+- Kudo, T. (2005). Mecab: Yet another part-of-speech and morphological
+  analyzer.
+  <http://mecab.sourceforge.net/>
+
+- Lin, Y., Michel, J.-B., Aiden, E. L., Orwant, J., Brockman, W., and Petrov,
+  S. (2012). Syntactic annotations for the Google Books Ngram Corpus.
+  Proceedings of the ACL 2012 system demonstrations, 169-174.
+  <http://aclweb.org/anthology/P12-3029>
+
+- Lison, P. and Tiedemann, J. (2016). OpenSubtitles2016: Extracting Large
+  Parallel Corpora from Movie and TV Subtitles. In Proceedings of the 10th
+  International Conference on Language Resources and Evaluation (LREC 2016).
+  <http://stp.lingfil.uu.se/~joerg/paper/opensubs2016.pdf>
+
+- Ortiz Suárez, P. J., Sagot, B., and Romary, L. (2019). Asynchronous pipelines
+  for processing huge corpora on medium to low resource infrastructures. In
+  Proceedings of the Workshop on Challenges in the Management of Large Corpora
+  (CMLC-7) 2019.
+  <https://oscar-corpus.com/publication/2019/clmc7/asynchronous/>
+
+- ParaCrawl (2018). Provision of Web-Scale Parallel Corpora for Official
+  European Languages. <https://paracrawl.eu/>
+
+- van Heuven, W. J., Mandera, P., Keuleers, E., & Brysbaert, M. (2014).
+  SUBTLEX-UK: A new and improved word frequency database for British English.
+  The Quarterly Journal of Experimental Psychology, 67(6), 1176-1190.
+  <http://www.tandfonline.com/doi/pdf/10.1080/17470218.2013.850521>

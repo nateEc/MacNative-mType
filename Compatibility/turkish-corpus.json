@@ -1,0 +1,79 @@
+{
+  "artifacts": {
+    "Resources/TurkishCorpusNotices.txt": "c9b278dee112d496f8070a9f6e569b722d7534dd6d728cd3793f325f544533c9",
+    "Resources/TurkishCorpusSources.txt": "73db4573ac26711cc1de29ecc723cdd3cd0b83c82a52cce2c199cae1ec8e897d",
+    "Sources/Typebar/TurkishCorpus.generated.swift": "f5989eb795197a4d24c9ca41c744cc60888ae53b80fd012c7d3604bbb7883010"
+  },
+  "legacyAttestationScope": "Selected lexical parts of speech; raw romanization entries are excluded.",
+  "legacyUnattested": [],
+  "member": "wordfreq/data/small_tr.msgpack.gz",
+  "memberSHA256": "10980704ee3ac5b52f226579251905412a04ead57092a12182dd0b8be6a765df",
+  "pools": {
+    "1k": {
+      "characters": " abcdefghijklmnoprstuvyzçöüğış",
+      "count": 1026,
+      "jointCategories": {
+        "0/0/0": 563,
+        "0/0/1": 1,
+        "1/0/0": 462
+      },
+      "legacyExtraCharacters": "",
+      "maximumLength": 13,
+      "minimumLength": 1,
+      "nonASCIIOptions": 462,
+      "phraseHeadwordOptions": 1,
+      "referenceCharacters": " abcdefghijklmnoprstuvyzçöüğış",
+      "tatoebaObservedPhrases": 1,
+      "wholeObserved": 1025,
+      "wordsSHA256": "26431965a162fb0c96f0688f68f42643fba75486f4fbfc6781a5d91523c07a09"
+    },
+    "5k": {
+      "characters": " Habcdefghijklmnoprstuvyzçöüğış",
+      "count": 5016,
+      "jointCategories": {
+        "0/0/0": 2848,
+        "0/0/1": 13,
+        "1/0/0": 2131,
+        "1/0/1": 22,
+        "1/0/2": 1,
+        "1/1/0": 1
+      },
+      "legacyExtraCharacters": "",
+      "maximumLength": 17,
+      "minimumLength": 1,
+      "nonASCIIOptions": 2155,
+      "phraseHeadwordOptions": 36,
+      "referenceCharacters": " Habcdefghijklmnoprstuvyzçöüğış",
+      "tatoebaObservedPhrases": 36,
+      "wholeObserved": 4980,
+      "wordsSHA256": "dc3154fd31c22f32ec5d9ad2624ed4c38c10f58ba510149c73254f0cde215b69"
+    },
+    "basic": {
+      "characters": " abcdefghiklmnoprstuvyzçöüğış",
+      "count": 299,
+      "jointCategories": {
+        "0/0/0": 174,
+        "0/0/1": 1,
+        "1/0/0": 124
+      },
+      "legacyExtraCharacters": "",
+      "maximumLength": 11,
+      "minimumLength": 1,
+      "nonASCIIOptions": 124,
+      "phraseHeadwordOptions": 1,
+      "referenceCharacters": " abcdefghiklmnoprstuvyzçöüğış",
+      "tatoebaObservedPhrases": 1,
+      "wholeObserved": 298,
+      "wordsSHA256": "099283700158e2460482f076222a2f8da5248db061d8c158ab523b5c3e343167"
+    }
+  },
+  "revision": "kaikki-en-tr-20261102-literal-wordfreq-v1",
+  "schemaVersion": 1,
+  "source": "https://kaikki.org/dictionary/Turkish/kaikki.org-dictionary-Turkish.jsonl",
+  "sourceSHA256": "4adb303b621cdc2d52c7748b137508a946fee7c5f51ffabf404f266f19ee6109",
+  "tatoebaContributorIdentifiers": 1062,
+  "tatoebaSHA256": "9809a3f64bc277063e3331ab7c6f77d41af54267af90dcbe45881d41ad857462",
+  "tatoebaSentenceRows": 750083,
+  "tatoebaSource": "https://downloads.tatoeba.org/exports/per_language/tur/tur_sentences_detailed.tsv.bz2",
+  "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+}

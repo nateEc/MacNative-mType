@@ -11752,38 +11752,15 @@ enum StarterLexicon {
 
   static var korean5kWords: [String] { korean5kLexicon.materialized() }
 
-  // Original Typebar content for Turkish practice, including dotted and
-  // dotless i plus commonly used Turkish diacritics.
-  static let turkishWords = [
-    "sabah", "pencere", "kağıt", "kıyı", "rüzgar", "alıştırma", "odak", "sakin",
-    "açık", "göl", "sokak", "masa", "ışık", "yolculuk", "sabır", "an",
-    "şehir", "yağmur", "sessiz", "yön", "yıldız", "not", "bahçe", "nefes",
-  ]
+  // Independent literal forms and headword phrases; old starters remain.
+  static var turkishWords: [String] { TurkishCorpus.basic }
 
   static var turkish1kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 1_026) { index in
-      if index == 0 { return "ƛ" }
-      if index == 1 { return "qtr" + String(repeating: "a", count: 9) + "ğ" }
-      var entry = "qtr" + alphabeticIndex(index)
-      if index < 462 { entry += "ğ" }
-      if index == 462 { entry += " a" }
-      return entry
-    }
+    IndexedLexicon(count: 1_026) { TurkishCorpus.words1k[$0] }
   }
 
   static var turkish5kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 5_016) { index in
-      if index == 0 { return "Ƶ" }
-      if index == 1 { return "xtr" + String(repeating: "a", count: 13) + "ğ" }
-      var entry = "xtr" + alphabeticIndex(index)
-      if index < 2_155 { entry += "ğ" }
-      if (2...24).contains(index) {
-        entry += String(repeating: " ", count: index == 2 ? 2 : 1) + "a"
-      } else if (2_155...2_167).contains(index) {
-        entry += " a"
-      }
-      return entry
-    }
+    IndexedLexicon(count: 5_016) { TurkishCorpus.words5k[$0] }
   }
 
   static var turkish1kWords: [String] { turkish1kLexicon.materialized() }

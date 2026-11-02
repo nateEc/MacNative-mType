@@ -114,6 +114,12 @@ cmp "$project_root/Resources/VietnameseCorpusNotices.txt" \
 cmp "$project_root/Resources/VietnameseCorpusSources.txt" \
   "$app_path/Contents/Resources/VietnameseCorpusSources.txt" \
   || fail "Vietnamese spelling sources missing or modified"
+cmp "$project_root/Resources/TurkishCorpusNotices.txt" \
+  "$app_path/Contents/Resources/TurkishCorpusNotices.txt" \
+  || fail "Turkish corpus attribution missing or modified"
+cmp "$project_root/Resources/TurkishCorpusSources.txt" \
+  "$app_path/Contents/Resources/TurkishCorpusSources.txt" \
+  || fail "Turkish spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"
