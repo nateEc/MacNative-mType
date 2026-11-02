@@ -2,6 +2,7 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| FUN-MEMORY-ACCESSIBILITY-74 | Memory 的答案朗读与输入 | 单个隔离实例以 VoiceOver 阅读预览，输入后尝试按字符／词／行阅读及选择；删除全部输入、组合输入并重开，普通／完整配置与视觉变体分别检查。 | 预览可读，开始后答案及其选区／范围不暴露，输入控件仍可操作；删除不恢复答案，重开恢复预览，无过期朗读。 | 待验收（原生公开 API 与源码生命周期证据见 MEMORY_PROMPT_ACCESSIBILITY_CONTRACT.md；真实 VoiceOver、IME、浏览器 AX 与全部变体未验） |
 | FUN-EMBEDDED-LF-NAVIGATION-73 | 字段内换行输入导航 | 单个隔离实例以内部、连续和开头 LF 字段，在 off／word／letter 下逐键及整段输入；实际 Enter、IME 确认／取消、错误纠正并查看回放。 | 字段推进遵循原版配置；原始输入、当前字段及回放提交／停止标记保持；忽略的前导空格不启动尝试。 | 待验收（144 个有限普通模式源码对照见 EMBEDDED_LF_NAVIGATION_SOURCE_CONTRACT.md；实体输入／IME 和全部组合待验） |
 | FUN-READ-AHEAD-INK-72 | readAhead／Simon 文字与主光标 | 单个隔离实例逐档输入首词、后续词及错误，切换高亮关闭和盲模式；错误后退格、空格／Enter／粘贴、重开与新窗口；包含结构换行和 Tape 退休，再检查 IME 候选及辅助功能。 | 文字颜色与独立光标分别遵循源规则，首 DIV 豁免和相邻节点边界正确；临时显示在编辑前改变，同页重开与新页隔离，拒绝空格恢复隐藏；内容／输入／选择保持。 | 待验收（源码及原生自动对照见 READ_AHEAD_VISIBILITY_SOURCE_CONTRACT.md；实体输入、IME、VoiceOver、浏览器像素、完整 LF 输入与滚动瞬态待验） |
 | PERF-VIEWPORT-PROVIDER-71 | 页面光标、方向与组合回退 | 单个隔离实例在普通及完整配置全文中输入、纠错、换字体及方向，检查插入点／配速；启用组合输入后核对候选坐标，取消并继续。 | 已测光标使用当前字格位置和方向，真实主光标与插入点一致；组合回退、标记范围及按字格方向仍准确，同一输入控件／尝试保持。 | 待验收（实际隐藏 ContentView 与原生 provider 对照见 VIEWPORT_MEASURED_CARET_PROVIDER_CONTRACT.md；实体键盘、IME、VoiceOver、可见帧及完整组合待验） |

@@ -32,6 +32,43 @@ import XCTest
       style: style, width: width, font: font))
   }
 
+  func testConcealingSameTargetClearsAllAnswerQueriesAndRestoresWithoutStaleSelection() throws {
+    let prompt = Array(repeating: "oak", count: 20).joined(separator: " ")
+    let session = TypingSession(configuration: .words(20), prompt: prompt)
+    let layout = try sequence(session)
+    let window = try XCTUnwrap(layout.append(fields: 0..<20))
+    var snapshot = try XCTUnwrap(layout.drawingSnapshot(windows: [window]))
+    let canvas = PromptViewportNativeCanvas(frame: .init(x: 0, y: 0, width: 180, height: 100))
+    defer { canvas.clear() }
+    let range = NSRange(location: 0, length: 3)
+    XCTAssertTrue(canvas.configure(snapshot: snapshot))
+    canvas.restoreAccessibilitySelection(range)
+    XCTAssertEqual(canvas.accessibilitySelectedText(), "oak")
+    snapshot.concealsAccessibilityText = true
+    XCTAssertTrue(canvas.configure(snapshot: snapshot))
+    XCTAssertFalse(canvas.isAccessibilityElement())
+    XCTAssertEqual(canvas.accessibilityValue() as? String, "")
+    XCTAssertEqual(canvas.accessibilityNumberOfCharacters(), 0)
+    XCTAssertNil(canvas.accessibilityString(for: range))
+    XCTAssertNil(canvas.accessibilityAttributedString(for: range))
+    XCTAssertNil(canvas.accessibilitySelectedText())
+    XCTAssertEqual(canvas.accessibilitySelectedTextRange().location, NSNotFound)
+    XCTAssertEqual(canvas.accessibilityVisibleCharacterRange().location, NSNotFound)
+    XCTAssertEqual(canvas.accessibilityRange(for: 0).location, NSNotFound)
+    XCTAssertEqual(canvas.accessibilityLine(for: 0), NSNotFound)
+    XCTAssertEqual(canvas.accessibilityRange(forLine: 0).location, NSNotFound)
+    XCTAssertEqual(canvas.accessibilityFrame(for: range), .zero)
+    canvas.restoreAccessibilitySelection(range)
+    XCTAssertEqual(canvas.accessibilitySelectedTextRange().location, NSNotFound)
+    snapshot.concealsAccessibilityText = false
+    XCTAssertTrue(canvas.configure(snapshot: snapshot))
+    XCTAssertTrue(canvas.isAccessibilityElement())
+    XCTAssertEqual(canvas.accessibilityValue() as? String, prompt)
+    XCTAssertEqual(canvas.accessibilityString(for: range), "oak")
+    XCTAssertEqual(canvas.accessibilityNumberOfCharacters(), prompt.utf16.count)
+    XCTAssertEqual(canvas.accessibilitySelectedTextRange().location, NSNotFound)
+  }
+
   func testUnmeasuredRangeReportsFullTextAndExactScreenFrameThenSelectionRevealsIt() async throws {
     let prompt = (0..<60).map { "word\($0)" }.joined(separator: " ")
     let session = TypingSession(configuration: .words(60), prompt: prompt)

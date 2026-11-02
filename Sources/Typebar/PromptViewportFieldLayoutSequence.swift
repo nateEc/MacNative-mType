@@ -19,6 +19,7 @@ import AppKit
     let measuredHeight: CGFloat
     let hasCompleteHeight: Bool
     let accessibilityText: String
+    var concealsAccessibilityText = false
   }
 
   struct MeasuredSpan {
@@ -215,6 +216,6 @@ import AppKit
       windows: requested, width: width,
       measuredHeight: checkpoint.contentHeight,
       hasCompleteHeight: nextField == directory.fieldCount,
-      accessibilityText: session.prompt)
+      accessibilityText: session.prompt, concealsAccessibilityText: session.concealsMemoryPrompt)
   }
 }

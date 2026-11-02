@@ -5419,6 +5419,10 @@ struct TypingSession {
     websiteKeymapHighlightWasUpdated = true; websiteKeymapUpdatedHighlight = nil
   }
 
+  var concealsMemoryPrompt: Bool {
+    configuration.modifiers.contains(.memory) && hasStarted && !isFinished
+  }
+
   var promptGlyphs: [TypingPromptGlyph] {
     var glyphs = acceptedPromptGlyphs
     guard let stoppedPromptInput, !configuration.rules.blindMode else { return glyphs }

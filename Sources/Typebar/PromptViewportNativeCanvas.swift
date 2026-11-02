@@ -33,6 +33,7 @@ import AppKit
     caret.stop()
     caret.isHidden = true
     accessibilitySource = nil
+    setAccessibilityElement(false)
     accessibilitySelection = .init(location: NSNotFound, length: 0)
     setAccessibilityValue("")
     invalidateIntrinsicContentSize()
@@ -64,17 +65,21 @@ import AppKit
     else { return false }
     let oldSize = intrinsicContentSize
     let targetChanged = snapshot?.promptTargetID != next.promptTargetID
-    if targetChanged { accessibilitySource = next.accessibilityText as NSString }
-    if targetChanged || snapshot?.attemptID != next.attemptID {
+    let visibilityChanged = snapshot?.concealsAccessibilityText != next.concealsAccessibilityText
+    if targetChanged || visibilityChanged {
+      accessibilitySource = next.concealsAccessibilityText ? nil : next.accessibilityText as NSString
+    }
+    if targetChanged || visibilityChanged || snapshot?.attemptID != next.attemptID {
       accessibilitySelection = .init(location: NSNotFound, length: 0)
     }
     snapshot = next
     geometryRevision &+= 1
     applyCaretConfiguration()
-    setAccessibilityValue(next.accessibilityText)
+    setAccessibilityElement(!next.concealsAccessibilityText)
+    setAccessibilityValue(next.concealsAccessibilityText ? "" : next.accessibilityText)
     needsDisplay = true
     if intrinsicContentSize != oldSize { invalidateIntrinsicContentSize() }
-    if targetChanged { NSAccessibility.post(element: self, notification: .valueChanged) }
+    if targetChanged || visibilityChanged { NSAccessibility.post(element: self, notification: .valueChanged) }
     return true
   }
 
@@ -192,6 +197,7 @@ import AppKit
     return accessibilityLineRangeProvider?(line) ?? .init(location: NSNotFound, length: 0)
   }
   override func accessibilityVisibleCharacterRange() -> NSRange {
+    guard accessibilitySource != nil else { return .init(location: NSNotFound, length: 0) }
     let visible = visibleRect
     let ids = snapshot?.windows.flatMap { window in
       window.layout.cellFrames.compactMap { visible.intersects($0.value) ? $0.key : nil }
@@ -200,7 +206,7 @@ import AppKit
     return .init(location: lower, length: upper + 1 - lower)
   }
   override func accessibilityRange(for point: NSPoint) -> NSRange {
-    guard let window else { return .init(location: NSNotFound, length: 0) }
+    guard accessibilitySource != nil, let window else { return .init(location: NSNotFound, length: 0) }
     let local = convert(window.convertFromScreen(.init(origin: point, size: .zero)).origin, from: nil)
     guard visibleRect.contains(local), let id = snapshot?.windows.lazy.compactMap({ window in
       window.layout.cellFrames.first(where: { $0.value.contains(local) })?.key

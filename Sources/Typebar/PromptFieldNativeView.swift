@@ -12,6 +12,7 @@ struct PromptFieldPracticePrompt: View {
   var viewportLineCount: Int? = nil
   var preparedLayout: PromptFieldTextLayout? = nil
   var accessibilityText: String? = nil
+  var concealsAccessibilityText = false
   var wrapLayout: PromptInputWrapLayout? = nil
   var fallbackPosition: PromptViewportFallbackPosition? = nil
   var fallbackTargetID: UUID? = nil
@@ -24,6 +25,7 @@ struct PromptFieldPracticePrompt: View {
     lineScroll: PromptLineScrollContext? = nil, viewportLineCount: Int? = nil,
     preparedLayout: PromptFieldTextLayout? = nil,
     accessibilityText: String? = nil,
+    concealsAccessibilityText: Bool = false,
     wrapLayout: PromptInputWrapLayout? = nil,
     fallbackPosition: PromptViewportFallbackPosition? = nil, fallbackTargetID: UUID? = nil,
     allowsFallbackRestoration: Bool = true,
@@ -34,6 +36,7 @@ struct PromptFieldPracticePrompt: View {
     self.carets = carets; self.lineScroll = lineScroll
     self.viewportLineCount = viewportLineCount; self.preparedLayout = preparedLayout
     self.accessibilityText = accessibilityText
+    self.concealsAccessibilityText = concealsAccessibilityText
     self.wrapLayout = wrapLayout
     self.fallbackPosition = fallbackPosition; self.fallbackTargetID = fallbackTargetID
     self.allowsFallbackRestoration = allowsFallbackRestoration
@@ -44,7 +47,7 @@ struct PromptFieldPracticePrompt: View {
     PromptFieldBridge(renderingSnapshot: renderingSnapshot, font: font, lineSpacing: lineSpacing,
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
-      accessibilityText: accessibilityText, wrapLayout: wrapLayout,
+      accessibilityText: accessibilityText, concealsAccessibilityText: concealsAccessibilityText, wrapLayout: wrapLayout,
       fallbackPosition: fallbackPosition, fallbackTargetID: fallbackTargetID,
       allowsFallbackRestoration: allowsFallbackRestoration,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: { viewportHeight = $0 })
@@ -70,6 +73,7 @@ private struct PromptFieldBridge: NSViewRepresentable {
   let viewportLineCount: Int?
   let preparedLayout: PromptFieldTextLayout?
   let accessibilityText: String?
+  let concealsAccessibilityText: Bool
   let wrapLayout: PromptInputWrapLayout?
   let fallbackPosition: PromptViewportFallbackPosition?
   let fallbackTargetID: UUID?
@@ -82,6 +86,7 @@ private struct PromptFieldBridge: NSViewRepresentable {
       rightToLeft: rightToLeft, joinsLetters: joinsLetters, carets: carets, lineScroll: lineScroll,
       viewportLineCount: viewportLineCount, preparedLayout: preparedLayout,
       accessibilityText: accessibilityText,
+      concealsAccessibilityText: concealsAccessibilityText,
       fallbackPosition: fallbackPosition, fallbackTargetID: fallbackTargetID,
       allowsFallbackRestoration: allowsFallbackRestoration,
       onMeasuredWidth: onMeasuredWidth, onViewportHeight: onViewportHeight)
@@ -115,6 +120,7 @@ final class PromptFieldNativeView: NSView {
   private var onViewportHeight: ((CGFloat?) -> Void)?
   private var onMeasuredWidth: ((CGFloat) -> Void)?
   private var accessibilityTextOverride: String?
+  private var concealsAccessibilityText = false
   private var fallbackPosition: PromptViewportFallbackPosition?
   private var fallbackTargetID: UUID?
   private var allowsFallbackRestoration = true
@@ -137,6 +143,7 @@ final class PromptFieldNativeView: NSView {
     lineScroll: PromptLineScrollContext? = nil, viewportLineCount: Int? = nil,
     preparedLayout: PromptFieldTextLayout? = nil,
     accessibilityText: String? = nil,
+    concealsAccessibilityText: Bool = false,
     fallbackPosition: PromptViewportFallbackPosition? = nil, fallbackTargetID: UUID? = nil,
     allowsFallbackRestoration: Bool = true,
     onMeasuredWidth: ((CGFloat) -> Void)? = nil,
@@ -156,6 +163,8 @@ final class PromptFieldNativeView: NSView {
     self.configuration = carets; self.lineScroll = lineScroll
     self.preparedLayout = preparedLayout; self.onMeasuredWidth = onMeasuredWidth
     accessibilityTextOverride = accessibilityText
+    self.concealsAccessibilityText = concealsAccessibilityText
+    setAccessibilityElement(!concealsAccessibilityText)
     self.fallbackPosition = fallbackPosition; self.fallbackTargetID = fallbackTargetID
     self.allowsFallbackRestoration = allowsFallbackRestoration
     self.viewportLineCount = viewportLineCount; self.onViewportHeight = onViewportHeight
@@ -164,7 +173,7 @@ final class PromptFieldNativeView: NSView {
     deliverHeight()
     configureControllers()
     if fallbackPosition?.hasPendingPosition == true { needsLayout = true }
-    setAccessibilityValue(accessibilityTextOverride ?? String(rendering.text.characters))
+    setAccessibilityValue(concealsAccessibilityText ? "" : accessibilityTextOverride ?? String(rendering.text.characters))
     needsDisplay = true
     if intrinsicContentSize != previousSize {
       invalidateIntrinsicContentSize()
@@ -232,7 +241,7 @@ final class PromptFieldNativeView: NSView {
           invalidateIntrinsicContentSize()
           needsLayout = true
         }
-        setAccessibilityValue(accessibilityTextOverride ?? String(next.text.characters))
+        setAccessibilityValue(concealsAccessibilityText ? "" : accessibilityTextOverride ?? String(next.text.characters))
       }
     }
     return rendering
@@ -335,6 +344,8 @@ final class PromptFieldNativeView: NSView {
     notificationRevision &+= 1; configuration = nil; onViewportHeight = nil
     onMeasuredWidth = nil; preparedLayout = nil; reportedWidth = nil
     accessibilityTextOverride = nil
+    setAccessibilityElement(false)
+    setAccessibilityValue("")
     caret.stop(); follower.cancelCaretMotion(); follower.stopLineScroll()
     lineScroll = nil
     follower.update(text: AttributedString(), characterOffset: nil, font: font,

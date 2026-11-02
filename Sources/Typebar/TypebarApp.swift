@@ -4070,6 +4070,7 @@ private struct ContentView: View {
           lineScroll: showsAllPracticeLines ? nil : practiceLineScrollContext(rendering),
           viewportLineCount: showsAllPracticeLines ? nil : (session.configuration.mode == .zen ? 2 : 3),
           preparedLayout: preparedWholePreviewLayout,
+          concealsAccessibilityText: session.concealsMemoryPrompt,
           wrapLayout: promptInputWrapLayout,
           fallbackPosition: showsAllPracticeLines ? viewportFallbackPosition : nil,
           fallbackTargetID: session.promptTargetID,
@@ -4136,6 +4137,7 @@ private struct ContentView: View {
           }
       }
     }
+    .accessibilityHidden(session.concealsMemoryPrompt)
     .font(Font(practicePromptNSFont(size: settings.fontSize)))
     .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
     .frame(

@@ -131,6 +131,52 @@ import XCTest
     }
   }
 
+  func testMemoryConcealsAnswerFromAccessibilityUntilRestartWithoutReplacingInput() throws {
+    for viewport in [false, true] {
+      let page = PracticePageSessionStore()
+      let fixture = try Fixture(promptOverride: Array(repeating: "oak", count: 201).joined(separator: " "),
+        viewportEnabled: viewport, modifiers: [.memory], pageStore: page)
+      defer { fixture.close() }
+      fixture.waitUntil { viewport ? fixture.promptReady : fixture.completePromptReady }
+      func answerView() throws -> NSView {
+        if viewport { return try XCTUnwrap(fixture.views(PromptViewportNativeCanvas.self).first) }
+        return try XCTUnwrap(fixture.views(PromptFieldNativeView.self).first)
+      }
+      let preview = try answerView()
+      XCTAssertTrue(preview.isAccessibilityElement())
+      XCTAssertEqual(preview.accessibilityValue() as? String, fixture.prompt)
+      let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+      input.onInsert("o", false)
+      fixture.flush()
+      XCTAssertTrue(page.state.session.hasStarted)
+      let hidden = try answerView()
+      XCTAssertFalse(hidden.isAccessibilityElement(), "Memory hides the answer container, not only its ink")
+      XCTAssertEqual(hidden.accessibilityValue() as? String, "")
+      if let canvas = hidden as? PromptViewportNativeCanvas {
+        XCTAssertEqual(canvas.accessibilityNumberOfCharacters(), 0)
+        XCTAssertNil(canvas.accessibilityString(for: .init(location: 0, length: 3)))
+        XCTAssertEqual(canvas.accessibilityVisibleCharacterRange().location, NSNotFound)
+      }
+      input.onDelete()
+      fixture.flush()
+      XCTAssertTrue(page.state.session.hasStarted)
+      // Empty input may switch back to the SwiftUI text renderer; all native
+      // answer providers that remain attached must stay concealed as well.
+      let attached: [NSView] = fixture.views(PromptFieldNativeView.self)
+        + fixture.views(PromptViewportNativeCanvas.self)
+      for view in attached {
+        XCTAssertFalse(view.isAccessibilityElement())
+        XCTAssertEqual(view.accessibilityValue() as? String, "")
+      }
+      XCTAssertTrue(fixture.views(TypingInputView.self).first === input)
+      input.onRestart()
+      fixture.waitUntil { (viewport ? fixture.promptReady : fixture.completePromptReady) && !page.state.session.hasStarted }
+      XCTAssertTrue(try answerView().isAccessibilityElement())
+      XCTAssertEqual(try answerView().accessibilityValue() as? String, fixture.prompt)
+      XCTAssertFalse(fixture.window.isVisible)
+    }
+  }
+
   func testReadAheadNativeKeyBridgeRevealsAndRehidesAfterARejectedSpace() throws {
     let page = PracticePageSessionStore()
     let fixture = try Fixture(promptOverride: Array(repeating: "oak", count: 201).joined(separator: " "),
