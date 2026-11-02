@@ -203,7 +203,7 @@ import AppKit
     return true
   }
 
-  /// Rebuilds the measured prefix from the current input before publishing.
+  /// Repaints stable target geometry, otherwise rebuilds the measured prefix.
   /// Unsupported ink leaves the old host intact for the complete fallback.
   @discardableResult func replaceVisibleSession(_ session: TypingSession,
     style: PromptRenderStyle) -> Bool {

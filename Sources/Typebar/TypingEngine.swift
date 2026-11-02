@@ -5460,6 +5460,10 @@ struct TypingSession {
 
   /// Error color and cursor ownership are independent. A transient extra
   /// belongs before the source separator, with the caret at its leading edge.
+  /// Input navigation only. A viewport must still evaluate the target glyph's
+  /// visibility/state before treating this position as a drawable caret.
+  var promptViewportInputTargetIndex: Int { nextTargetIndex }
+
   var promptCaretGlyphIndex: Int? {
     guard !isFinished else { return nil }
     let glyphs = acceptedPromptGlyphs

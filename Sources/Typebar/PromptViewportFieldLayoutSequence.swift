@@ -61,9 +61,13 @@ import AppKit
       directory.attemptID == session.automaticInputAttemptID,
       directory.promptTargetID == session.promptTargetID else { return nil }
     self.session = session
-    // This sequence owns one immutable session. Preserve the exact canonical
-    // caret policy without constructing whole-target glyphs per small window.
-    caretGlyphIndex = session.promptCaretGlyphIndex
+    // Resolve one admitted target with the same ink policy. Hidden/end targets
+    // intentionally have no caret; unsupported projections keep full policy.
+    if let resolved = directory.resolveCaret(session: session) {
+      caretGlyphIndex = resolved.glyphIndex
+    } else {
+      caretGlyphIndex = session.promptCaretGlyphIndex
+    }
     self.directory = directory
     self.style = style
     self.width = width

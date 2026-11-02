@@ -29,6 +29,11 @@ struct PromptViewportTargetDirectory {
     let glyph: TypingPromptGlyph
   }
 
+  /// Outer nil means unsupported; a supported hidden/end target has no caret.
+  struct CaretResolution {
+    let glyphIndex: Int?
+  }
+
   struct IndexedWord: Equatable {
     let index: Int
     let value: TypingPromptWordPresentation
@@ -110,6 +115,27 @@ struct PromptViewportTargetDirectory {
       }
     }
     return .init(attemptID: attemptID, fields: fields, cells: cells)
+  }
+
+  /// Use the same admitted glyph policy as window ink, for one canonical
+  /// target only. Never scan or materialize a whole source field for a caret.
+  func resolveCaret(session: TypingSession) -> CaretResolution? {
+    guard session.automaticInputAttemptID == attemptID, session.promptTargetID == promptTargetID,
+      !targetUTF16.isEmpty else { return nil }
+    let active = session.promptViewportInputTargetIndex
+    guard active >= 0 else { return nil }
+    let probe = min(active, targetUTF16.count - 1)
+    guard let field = fieldIndex(containingUTF16: probe) else { return nil }
+    var lower = 0, upper = separatorOffsets.count
+    while lower < upper {
+      let middle = lower + (upper - lower) / 2
+      if separatorOffsets[middle] < probe { lower = middle + 1 }
+      else { upper = middle }
+    }
+    let cell = Cell(id: probe, unit: targetUTF16[probe], fieldIndex: field, wordOrdinal: lower)
+    guard let glyph = session.promptViewportTargetGlyphs(in: [cell],
+      targetUTF16: targetUTF16, separatorOffsets: separatorOffsets)?.first else { return nil }
+    return .init(glyphIndex: active < targetUTF16.count && glyph.state == .current ? active : nil)
   }
 
   /// A strictly admitted first step toward window coloring. Unsupported
