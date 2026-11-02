@@ -2,8 +2,8 @@ import Foundation
 
 /// Accepted input, not a rendering string. Unpaired UTF-16 units are legal
 /// intermediate states; decoding is exclusively a presentation operation.
-struct AcceptedUnitInput {
-  struct Entry {
+struct AcceptedUnitInput: Equatable {
+  struct Entry: Equatable {
     let unit: UInt16
     let target: Int?
     let date: Date

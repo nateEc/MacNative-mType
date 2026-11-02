@@ -1,5 +1,7 @@
 # 全文准备的重复快照与逐窗口全量光标查询
 
+后续：2026-11-02 的 VIEWPORT_STARTED_SNAPSHOT_CONTRACT.md 将无变化快照复用扩展到已开始的受支持呈现，替换下文历史 canReuseUnstartedViewportSource 条件。下文保留上一批实测与当时边界，不能当作后续实现仍只支持初始状态。
+
 起点 001504fbaea501dffc446ac2fbe37fbcc8d68d00。上一批只证明准入计算更快；本批比较实际 ContentView 两条入口，不将 18.6 秒画笔准入当作整页首键收益。普通原生入口默认 false、完整配置或显式 true 的分段入口及所有回退条件保持不变，不切换默认入口。
 
 ## 实际页面反例

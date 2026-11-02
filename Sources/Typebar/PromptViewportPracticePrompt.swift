@@ -138,9 +138,9 @@ private struct PromptViewportPracticeBridge: NSViewRepresentable {
       && applied?.lineSpacing == snapshot.lineSpacing && applied?.rightToLeft == snapshot.rightToLeft
       && applied?.joinsLetters == snapshot.joinsLetters
     if sameTarget && sameMetrics && viewport.measuredFieldCount > 0 {
-      let unchangedInitialSource = applied?.style == snapshot.style
-        && applied.map { snapshot.session.canReuseUnstartedViewportSource($0.session) } == true
-      if !unchangedInitialSource {
+      let unchangedSource = applied?.style == snapshot.style
+        && applied.map { snapshot.session.canReuseViewportSource($0.session) } == true
+      if !unchangedSource {
         guard viewport.replaceVisibleSession(snapshot.session, style: snapshot.style) else { reportFailure(); return }
       }
     } else {

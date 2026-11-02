@@ -5815,22 +5815,30 @@ struct TypingSession {
     return .init(activeWordIndex: active, words: words)
   }
 
-  /// A parent UI refresh can carry the same unstarted source again. Only a
-  /// pristine presentation may retain in-flight viewport measurement; input,
-  /// rejected input, navigation and configuration changes must still rebuild.
-  func canReuseUnstartedViewportSource(_ previous: TypingSession) -> Bool {
-    func pristine(_ value: TypingSession) -> Bool {
-      guard !value.hasStarted, !value.isFinished, value.typed.isEmpty,
-        value.nextTargetIndex == 0, value.stoppedPromptInput == nil,
-        value.firstRetainedPromptWordIndex == 0, value.removedTapePromptWordIndices.isEmpty,
-        value.committedErrorWordStarts.isEmpty, value.blindCommittedMissingTargetIndices.isEmpty,
-        value.acceptedUnits.map({ $0.fieldIndex == 0 && $0.entries.isEmpty }) ?? true else { return false }
-      let input = value.promptPresentationInput
-      return input.targets.isEmpty && input.forcedErrors.isEmpty && input.extraErrors.isEmpty
-    }
-    return automaticInputAttemptID == previous.automaticInputAttemptID
-      && promptTargetID == previous.promptTargetID && configuration == previous.configuration
-      && pristine(self) && pristine(previous)
+  /// Retain measured windows only for the same admitted presentation. Compare
+  /// accepted input metadata as well as text: navigation, forced errors and
+  /// blind commits can change ink without changing the accepted string.
+  /// Unsupported projections still rebuild and use the existing fallback.
+  func canReuseViewportSource(_ previous: TypingSession) -> Bool {
+    guard automaticInputAttemptID == previous.automaticInputAttemptID,
+      promptTargetID == previous.promptTargetID, configuration == previous.configuration,
+      hasStarted == previous.hasStarted, !isFinished, !previous.isFinished,
+      stoppedPromptInput == nil, previous.stoppedPromptInput == nil,
+      firstRetainedPromptWordIndex == 0, previous.firstRetainedPromptWordIndex == 0,
+      removedTapePromptWordIndices.isEmpty, previous.removedTapePromptWordIndices.isEmpty,
+      !isAtEmptyNoSpaceWord, !previous.isAtEmptyNoSpaceWord
+    else { return false }
+    return typed.utf8.elementsEqual(previous.typed.utf8)
+      && acceptedUnits == previous.acceptedUnits
+      && typedTargetIndices == previous.typedTargetIndices
+      && retainedWordSeparatorTypedIndices == previous.retainedWordSeparatorTypedIndices
+      && forcedErrorIndices == previous.forcedErrorIndices
+      && extraErrorTypedIndices == previous.extraErrorTypedIndices
+      && blindCommittedMissingTargetIndices == previous.blindCommittedMissingTargetIndices
+      && committedErrorWordStarts == previous.committedErrorWordStarts
+      && replayCommittedSeparatorCount == previous.replayCommittedSeparatorCount
+      && nextTargetIndex == previous.nextTargetIndex
+      && paceCaretFrame() == previous.paceCaretFrame()
   }
 
   /// The existing typed-effect rule colors every target before the last
