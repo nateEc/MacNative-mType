@@ -1,0 +1,55 @@
+{
+  "artifacts": {
+    "Resources/KazakhCorpusNotices.txt": "215e30485974317456d0ca91a234570f4ee30e83d93cdca3cb5ab28e3c5ff0f9",
+    "Resources/KazakhCorpusSources.txt": "bdd384af2d9e6c135cf581ee860d2487042000d6e57600bce5f0e821437f9837",
+    "Sources/Typebar/KazakhCorpus.generated.swift": "abefb43becae340936f13197f9861248a1e033b7b26768d84b44e821e5376153"
+  },
+  "contributorIdentifiers": 51,
+  "dictionary": "https://kaikki.org/dictionary/Kazakh/kaikki.org-dictionary-Kazakh.jsonl",
+  "dictionarySHA256": "a1655f3a9fefbe802a63e44536d925097a076ce77809103da426ffc2f4ea9dc0",
+  "legacyUnattested": [
+    "тепе"
+  ],
+  "pools": {
+    "1k": {
+      "categories": {
+        "hyphen": 4,
+        "phrase": 3,
+        "plain": 983
+      },
+      "characters": " -абвгдежзийклмнопрстуфхцчшыьэюяіғқңүұәө",
+      "count": 990,
+      "legacyLengthExceptions": [],
+      "maximumLength": 16,
+      "minimumLength": 2,
+      "observedHyphens": 4,
+      "observedOptions": 981,
+      "observedPhrases": 3,
+      "wordsSHA256": "81b7e8565cfb60974b2b9588aa37953573a0a1046a75d2bad3afa24f13e35687"
+    },
+    "basic": {
+      "categories": {
+        "plain": 202
+      },
+      "characters": "абгдежзийклмнопрстухшыюяіғқңүұәө",
+      "count": 202,
+      "legacyLengthExceptions": [
+        "көзқарас",
+        "тыныштық",
+        "тәжірибе",
+        "қашықтық"
+      ],
+      "maximumLength": 8,
+      "minimumLength": 2,
+      "observedHyphens": 0,
+      "observedOptions": 194,
+      "observedPhrases": 0,
+      "wordsSHA256": "dcb6f83f338e3f3aa98272d2ed577ffcbd1d2b5a60540ca2a68ae870fb303179"
+    }
+  },
+  "revision": "kaikki-en-kk-tatoeba-kaz-20261102-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 4575,
+  "sentences": "https://downloads.tatoeba.org/exports/per_language/kaz/kaz_sentences_detailed.tsv.bz2",
+  "sentencesSHA256": "60de70798d3f0857a361d1d3daa4cf373da1e6cc394b0feca1070d7c67c7020c"
+}

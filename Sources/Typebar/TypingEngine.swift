@@ -12523,24 +12523,11 @@ enum StarterLexicon {
     "трпение", "рамнотежа", "село", "дожд", "ѕвезда", "пријател", "надеж", "работа", "река", "пролет",
   ]
 
-  // Typebar-authored Kazakh starter words provide local practice without
-  // importing the reference dictionary or word list.
-  static let kazakhWords = [
-    "кітап", "есік", "жол", "жарық", "көпір", "таң", "бет", "орын", "бұлт", "тыныштық",
-    "тау", "тұқым", "дауыс", "үстел", "ой", "сөйлем", "көзқарас", "тәжірибе", "қашықтық", "қадам",
-    "сабыр", "тепе", "теңдік", "ауыл", "жаңбыр", "жұлдыз", "дос", "үміт", "еңбек", "өзен",
-  ]
+  // Independent literal Kazakh forms; all old Typebar starters remain.
+  static var kazakhWords: [String] { KazakhCorpus.basic }
 
   static var kazakh1kLexicon: IndexedLexicon {
-    let marker: Character = "ԛ"
-    return IndexedLexicon(count: 990) { index in
-      if index == 0 { return String(repeating: marker, count: 2) }
-      if index == 1 { return String(repeating: marker, count: 16) }
-      var entry = String(marker) + cyrillicIndex(index)
-      if (2...5).contains(index) { entry += "." }
-      if (6...8).contains(index) { entry += " " + String(marker) }
-      return entry
-    }
+    IndexedLexicon(count: 990) { KazakhCorpus.words1k[$0] }
   }
 
   static var kazakh1kWords: [String] { kazakh1kLexicon.materialized() }

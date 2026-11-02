@@ -1,0 +1,95 @@
+Typebar independent Kazakh corpus
+Revision: kaikki-en-kk-tatoeba-kaz-20261102-literal-v1
+English Wiktionary contributors via Kaikki.org / Wiktextract.
+Dictionary: https://kaikki.org/dictionary/Kazakh/kaikki.org-dictionary-Kazakh.jsonl
+Snapshot SHA-256: a1655f3a9fefbe802a63e44536d925097a076ce77809103da426ffc2f4ea9dc0
+Index reports extraction 2026-10-30, enwiktionary dump 2026-10-01,
+extractor revisions 19f9a30 and 6f96ddf.
+Dictionary selection: CC BY-SA 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+Per-word contributor page: https://en.wiktionary.org/wiki/ + encoded sourceTitle.
+Selection filters/ranks unchanged literal NFC lowercase Cyrillic forms of kk
+lexical entries. Misspelling/proscribed/nonstandard-only senses and tagged
+romanization/template/error forms are excluded. Hyphens and phrases must be
+literal headword titles; inflection tables cannot synthesize them for quotas.
+All 30 old Typebar starters remain in both pools; selected lexical attestation
+missing for: тепе.
+This reports selected lexical forms, not absence of other raw entries.
+The basic pool has 202 options and the original typing alphabet. Four retained
+old words exceed the reference basic maximum of 7 letters: тыныштық, көзқарас,
+тәжірибе, қашықтық (8 letters). All newly selected basic words have at most 7.
+The 990-option pool retains the basic pool, four literal hyphenated options,
+three two-word headwords, length 2-16 and its separate complete typing alphabet.
+Phrase components consume separate runtime word slots; hyphens remain literal.
+No spelling synthesis, numbered padding, definitions, sentence text, examples,
+translations, audio or original Monkeytype words are bundled.
+Per-word provenance: KazakhCorpusSources.txt; reproduction script in repository.
+
+Tatoeba Kazakh contributors, observation evidence only.
+Sentences: https://downloads.tatoeba.org/exports/per_language/kaz/kaz_sentences_detailed.tsv.bz2
+Snapshot SHA-256: 60de70798d3f0857a361d1d3daa4cf373da1e6cc394b0feca1070d7c67c7020c
+Sentence rows: 4575; contributor identifiers: 51.
+Sentence data: CC BY 2.0 France.
+https://creativecommons.org/licenses/by/2.0/fr/
+https://tatoeba.org/en/downloads
+Ranking counts whole-option matching sentences (once per sentence), using NFC
+lowercase Unicode token boundaries. Hyphens, apostrophes, digits, underscores
+and combining marks stay inside boundaries; phrases require one ASCII space.
+Missing observations remain NA, never zero or component-frequency estimates.
+Unobserved dictionary options prefer headword titles over inflected forms.
+These sentence observations are not runtime Zipf support, a representative
+frequency model or a certification of linguistic quality. Vocabulary and
+frequency distribution are not claimed equivalent to Monkeytype.
+All processed snapshot contributor identifiers follow; unknown rows are explicit.
+
+(unowned)
+ABChessel https://tatoeba.org/en/user/profile/ABChessel
+AqQoyriq_1 https://tatoeba.org/en/user/profile/AqQoyriq_1
+Arai987 https://tatoeba.org/en/user/profile/Arai987
+AslanKZ https://tatoeba.org/en/user/profile/AslanKZ
+Badabaka https://tatoeba.org/en/user/profile/Badabaka
+Balamax https://tatoeba.org/en/user/profile/Balamax
+Bauyrjan https://tatoeba.org/en/user/profile/Bauyrjan
+FeuDRenais https://tatoeba.org/en/user/profile/FeuDRenais
+Gaeltacht https://tatoeba.org/en/user/profile/Gaeltacht
+Koari https://tatoeba.org/en/user/profile/Koari
+Lehceler https://tatoeba.org/en/user/profile/Lehceler
+Malape https://tatoeba.org/en/user/profile/Malape
+Meruert https://tatoeba.org/en/user/profile/Meruert
+Qaztat https://tatoeba.org/en/user/profile/Qaztat
+SadeceTurkce https://tatoeba.org/en/user/profile/SadeceTurkce
+Salburyn https://tatoeba.org/en/user/profile/Salburyn
+Serzha https://tatoeba.org/en/user/profile/Serzha
+TATAR1 https://tatoeba.org/en/user/profile/TATAR1
+TurkishReform https://tatoeba.org/en/user/profile/TurkishReform
+YelenaRomanenko https://tatoeba.org/en/user/profile/YelenaRomanenko
+YersinKZ https://tatoeba.org/en/user/profile/YersinKZ
+abiniz https://tatoeba.org/en/user/profile/abiniz
+abylay https://tatoeba.org/en/user/profile/abylay
+afyodor https://tatoeba.org/en/user/profile/afyodor
+akoshant https://tatoeba.org/en/user/profile/akoshant
+alibek010 https://tatoeba.org/en/user/profile/alibek010
+almazitto https://tatoeba.org/en/user/profile/almazitto
+andrei https://tatoeba.org/en/user/profile/andrei
+atitarev https://tatoeba.org/en/user/profile/atitarev
+boracasli2 https://tatoeba.org/en/user/profile/boracasli2
+bozkurt https://tatoeba.org/en/user/profile/bozkurt
+carenas https://tatoeba.org/en/user/profile/carenas
+dulat_baimurat https://tatoeba.org/en/user/profile/dulat_baimurat
+emmaR https://tatoeba.org/en/user/profile/emmaR
+enebi https://tatoeba.org/en/user/profile/enebi
+janTuki https://tatoeba.org/en/user/profile/janTuki
+kamshat https://tatoeba.org/en/user/profile/kamshat
+koala https://tatoeba.org/en/user/profile/koala
+lemeoejubsmgt https://tatoeba.org/en/user/profile/lemeoejubsmgt
+maus07 https://tatoeba.org/en/user/profile/maus07
+miflhanc https://tatoeba.org/en/user/profile/miflhanc
+mkaktau https://tatoeba.org/en/user/profile/mkaktau
+ninefi https://tatoeba.org/en/user/profile/ninefi
+sjwknc https://tatoeba.org/en/user/profile/sjwknc
+soliloquist https://tatoeba.org/en/user/profile/soliloquist
+sunpromise https://tatoeba.org/en/user/profile/sunpromise
+tabor https://tatoeba.org/en/user/profile/tabor
+tokipona https://tatoeba.org/en/user/profile/tokipona
+toplukonut https://tatoeba.org/en/user/profile/toplukonut
+turan https://tatoeba.org/en/user/profile/turan

@@ -11,6 +11,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case malay = "MalayCorpusNotices"
   case vietnamese = "VietnameseCorpusNotices"
   case turkish = "TurkishCorpusNotices"
+  case kazakh = "KazakhCorpusNotices"
   case simplifiedChinese = "SimplifiedChineseCorpusNotices"
   case traditionalChinese = "TraditionalChineseCorpusNotices"
   case englishFrequency = "EnglishFrequencyCorpusNotices"
@@ -43,6 +44,7 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     case .malay: "Bahasa Melayu · 两档词库"
     case .vietnamese: "Tiếng Việt · 三档词库"
     case .turkish: "Türkçe · 三档词库"
+    case .kazakh: "Қазақша · 两档词库"
     case .simplifiedChinese: "简体中文 · 五档词库"
     case .traditionalChinese: "繁體中文 · 五檔詞庫"
     case .englishFrequency: "基础 English 与频率词库"
@@ -124,6 +126,7 @@ struct CorpusAttributionSummary: View {
       Text("Bahasa Melayu 两档词库来自 English Wiktionary contributors／Kaikki.org，并按 Tatoeba 的标准马来语语料选编；保留旧自有词和逐词出处。")
       Text("Tiếng Việt 三档词库来自 English Wiktionary contributors／Kaikki.org 与 wordfreq；保留 30 个旧自有词、完整重音键集和逐词出处，基础额外保留 nhẫn 的 ẫ。")
       Text("Türkçe 三档词库来自 English Wiktionary contributors／Kaikki.org 与 wordfreq；短语按 Tatoeba 整短语观察选编，保留旧自有词和逐词出处。")
+      Text("Қазақша 两档词库来自 English Wiktionary contributors／Kaikki.org，按 Tatoeba 完整词项观察选编；保留旧词、连字符和短语，并提供逐词出处。")
       Text("简体中文五档词库来自 MDBG／CC-CEDICT 与 wordfreq；保留旧自有词，并逐词标明三项书写改编及原始出处。")
         .fixedSize(horizontal: false, vertical: true)
       Text("繁體中文五檔詞庫直接採用 CC-CEDICT 的繁體原形；保留舊自有詞，逐詞標明來源與書寫改編。簡體對應詞的頻率觀察不代表繁體詞頻。")

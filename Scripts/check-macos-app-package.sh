@@ -120,6 +120,12 @@ cmp "$project_root/Resources/TurkishCorpusNotices.txt" \
 cmp "$project_root/Resources/TurkishCorpusSources.txt" \
   "$app_path/Contents/Resources/TurkishCorpusSources.txt" \
   || fail "Turkish spelling sources missing or modified"
+cmp "$project_root/Resources/KazakhCorpusNotices.txt" \
+  "$app_path/Contents/Resources/KazakhCorpusNotices.txt" \
+  || fail "Kazakh corpus attribution missing or modified"
+cmp "$project_root/Resources/KazakhCorpusSources.txt" \
+  "$app_path/Contents/Resources/KazakhCorpusSources.txt" \
+  || fail "Kazakh spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"
