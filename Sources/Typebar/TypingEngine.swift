@@ -12701,25 +12701,11 @@ enum StarterLexicon {
     "འགོ་", "རིམ་པ་", "ཚིག་", "དྲི་བ་", "ལན་", "སང་ཉིན་", "དེ་རིང་", "ཡིད་",
   ]
 
-  // Typebar-authored Kyrgyz starter words keep the selected `ky-KY` path
-  // without importing a reference wordset.
-  static let kyrgyzWords = [
-    "салам", "мен", "сен", "биз", "китеп", "калем", "үй", "жол", "жарык", "убакыт",
-    "суу", "деңиз", "күн", "түн", "ай", "дос", "эртең", "бүгүн", "көз", "барак",
-    "ой", "иш", "баштоо", "кадам", "сөз", "суроо", "жооп", "тоо",
-  ]
+  // Independent literal Kyrgyz forms and source comma excerpts; old starters remain.
+  static var kyrgyzWords: [String] { KyrgyzCorpus.basic }
 
   static var kyrgyz1kLexicon: IndexedLexicon {
-    let marker: Character = "ԝ"
-    return IndexedLexicon(count: 849) { index in
-      if index == 0 { return String(repeating: marker, count: 2) }
-      if index == 1 { return String(repeating: marker, count: 13) }
-      var entry = String(marker) + cyrillicIndex(index)
-      if index == 2 || index == 23 { entry = "Ө" + entry }
-      if (2...12).contains(index) { entry += "." }
-      if (13...22).contains(index) { entry += " " + String(marker) }
-      return entry
-    }
+    IndexedLexicon(count: 849) { KyrgyzCorpus.words1k[$0] }
   }
 
   static var kyrgyz1kWords: [String] { kyrgyz1kLexicon.materialized() }

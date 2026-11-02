@@ -1,0 +1,56 @@
+{
+  "artifacts": {
+    "Resources/KyrgyzCorpusNotices.txt": "e7990c994a7ff1fce2210c8e81fa508185140c4e3e6ebb63e22233b486830089",
+    "Resources/KyrgyzCorpusSources.txt": "3b1f5777c3b5224594a3c14dc29d1d67a3e335f5fefa97f94c53e06409fd33b1",
+    "Sources/Typebar/KyrgyzCorpus.generated.swift": "8d5587328d25101930e7410c0482947507b562506f56653b7d90b79d701b4b33"
+  },
+  "contributorIdentifiers": 31,
+  "dictionary": "https://kaikki.org/dictionary/Kyrgyz/kaikki.org-dictionary-Kyrgyz.jsonl",
+  "dictionarySHA256": "1d9ccd82e6ac3215a77806be47b933a209a8cc087353576f92ccc43cc022859c",
+  "legacyUnattested": [
+    "кадам"
+  ],
+  "pools": {
+    "1k": {
+      "categories": {
+        "comma": 2,
+        "hyphen": 8,
+        "phrase": 10,
+        "plain": 827,
+        "upper": 1,
+        "upper-comma": 1
+      },
+      "characters": " ,-МОабвгдежзийклмнопрстуфхцчшыьэюяңүө",
+      "count": 849,
+      "legacyLengthExceptions": [],
+      "maximumLength": 13,
+      "minimumLength": 2,
+      "observedCommaOptions": 3,
+      "observedHyphens": 0,
+      "observedOptions": 499,
+      "observedPhrases": 6,
+      "wordsSHA256": "1cd0e1ae84cc6affaf9268a757b8ff981665717499b0f3a2cd5d97f063e20fd5"
+    },
+    "basic": {
+      "categories": {
+        "hyphen": 1,
+        "plain": 233
+      },
+      "characters": "-абгдежзийклмнопрстучшыэюяңүө",
+      "count": 234,
+      "legacyLengthExceptions": [],
+      "maximumLength": 9,
+      "minimumLength": 2,
+      "observedCommaOptions": 0,
+      "observedHyphens": 0,
+      "observedOptions": 225,
+      "observedPhrases": 0,
+      "wordsSHA256": "6a4060488370fd5225f74fae7735e80428ff6ed45242d752453de50a6a17c0d0"
+    }
+  },
+  "revision": "kaikki-en-ky-tatoeba-kir-20261102-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 809,
+  "sentences": "https://downloads.tatoeba.org/exports/per_language/kir/kir_sentences_detailed.tsv.bz2",
+  "sentencesSHA256": "d667a6b75f9a3e4c4fad3225f60c029cbb6d100da21484361e1482eac0c2f874"
+}

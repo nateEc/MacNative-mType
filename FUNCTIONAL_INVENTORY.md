@@ -2,6 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-KYRGYZ-LITERAL-82 | 吉尔吉斯语基础／1k 字面词库、大小写与逗号 | 独立固定 Kaikki／English Wiktionary 和 Tatoeba kir；原版仅聚合约束 | 234／849 项，保留旧 28 词、完整键集和联合类别；逗号项为原样句子摘录，分开署名；KYRGYZ_CORPUS_CONTRACT.md | 部分完成：四项先行反例十三处失败后接入字面词库；56 项定向、705 项扩大／152 项源码对照、来源重建与显式 Release 包通过；语言质量、分布、实体输入和 VoiceOver 仍开放。 |
 | LANG-KAZAKH-LITERAL-81 | 哈萨克语基础／1k 字面词库、连字符与双词槽 | 独立固定 Kaikki／English Wiktionary 和 Tatoeba kaz；原版只读聚合约束 | 202／990 项、旧 30 词及完整键集；基础四个旧词保留 8 字母长度例外；KAZAKH_CORPUS_CONTRACT.md | 部分完成：四项先行反例九处失败后接入字面项及完整来源；50 项定向、697 项扩大／152 项源对照、来源重建及显式 Release 包通过；语言质量、分布／实体输入仍开放。剩余合成入口范围见 INDEXED_LEXICON_IMPLEMENTATION_AUDIT.md。 |
 | LANG-TURKISH-LITERAL-80 | 土耳其语基础／1k／5k 字面词库与短语槽 | 独立固定 Kaikki／English Wiktionary、wordfreq tr 和 Tatoeba tur；原版仅聚合约束 | 299／1026／5016、旧 24 词与独立字符集；原样短语与句子观察；TURKISH_CORPUS_CONTRACT.md | 部分完成：四项先行测试 16 处失败后接入字面词池及署名；47 项定向、690 项扩大／152 项必需源对照、固定来源重建与显式 Release 包通过；语言质量、分布、实体输入及 VoiceOver 未验。 |
 | LANG-VIETNAMESE-LITERAL-79 | 越南语基础／1k／5k 字面词库 | 独立固定 Kaikki／English Wiktionary 与 wordfreq vi；原版只读聚合形状和字符集合 | 319／1000／5000 字面项、完整键集与旧 30 词；基础额外保留 ẫ，旧结果不重写；VIETNAMESE_CORPUS_CONTRACT.md | 部分完成：十处先行失败后，44 项定向、675 项扩大及来源澄清后的 44 项复核零失败／跳过，152 项源码证据通过；新 Release 签名、资源／来源交付、原创性和诊断排除通过。语言质量、分布及实体输入仍开放。 |

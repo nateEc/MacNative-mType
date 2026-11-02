@@ -1,0 +1,77 @@
+Typebar independent Kyrgyz corpus
+Revision: kaikki-en-ky-tatoeba-kir-20261102-literal-v1
+English Wiktionary contributors via Kaikki.org / Wiktextract.
+Dictionary: https://kaikki.org/dictionary/Kyrgyz/kaikki.org-dictionary-Kyrgyz.jsonl
+Snapshot SHA-256: 1d9ccd82e6ac3215a77806be47b933a209a8cc087353576f92ccc43cc022859c
+Index reports extraction 2026-10-25, enwiktionary dump 2026-10-01,
+extractor revisions f9fe161 and 6f96ddf.
+Dictionary selection: CC BY-SA 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+Dictionary contributor page: https://en.wiktionary.org/wiki/ + encoded sourceTitle.
+Only unchanged NFC lexical titles/forms with lang_code=ky are selected;
+misspelling/proscribed/nonstandard-only senses and tagged romanization,
+template or error forms are excluded. Hyphens and phrases must be literal
+headword titles; no multiword inflection-table variants are used for quotas.
+All 28 Typebar old starters remain in both pools. Selected lexical attestation
+missing for: кадам.
+This reports selected lexical forms, not absence of other raw entries.
+The basic pool has 234 entries, length 2-9 and one hyphenated option.
+The 849-entry pool retains the basic pool, length 2-13, eight hyphenated
+options, ten two-word headwords, two lowercase comma options, one uppercase-M
+single word and one uppercase-O comma option. Spellings are never recased.
+Phrases consume separate runtime word slots; literal punctuation is retained.
+No numbered padding, spelling synthesis or original Monkeytype words.
+Per-word source and first observed sentence/author: KyrgyzCorpusSources.txt.
+
+Tatoeba Kyrgyz contributors: CC BY 2.0 France.
+Sentences: https://downloads.tatoeba.org/exports/per_language/kir/kir_sentences_detailed.tsv.bz2
+Snapshot SHA-256: d667a6b75f9a3e4c4fad3225f60c029cbb6d100da21484361e1482eac0c2f874
+Sentence rows: 809; contributor identifiers: 31.
+https://creativecommons.org/licenses/by/2.0/fr/
+https://tatoeba.org/en/downloads
+The three comma options are unchanged literal token excerpts from this
+snapshot, not dictionary headwords or dictionary spelling adaptations.
+Their sourceKind is tatoeba-literal and sourceTitle names a source sentence.
+Only selected short options and provenance are bundled, not the whole archive,
+translations or audio. Comma observation queries preserve exact source case.
+Other word/phrase observations use lowercase lookup; one match per sentence.
+Unicode letters/digits, combining marks, hyphens, underscores and apostrophes
+remain inside token boundaries. Phrases require one ASCII space and cannot
+cross punctuation, adjacent spaces or tabs. No component-frequency estimates.
+Unobserved dictionary options prefer headword titles over inflected forms.
+Missing observations stay NA, never zero; these are not runtime Zipf values.
+Vocabulary quality and frequency distribution are not certified equivalent
+to Monkeytype. All processed contributor identifiers follow; unknown rows
+are explicit. Observation evidence is not linguistic or device acceptance.
+
+(unowned)
+AsemaKanatova11 https://tatoeba.org/en/user/profile/AsemaKanatova11
+Balamax https://tatoeba.org/en/user/profile/Balamax
+Doolotbek https://tatoeba.org/en/user/profile/Doolotbek
+Iye_Tete https://tatoeba.org/en/user/profile/Iye_Tete
+Jumagul https://tatoeba.org/en/user/profile/Jumagul
+Lehceler https://tatoeba.org/en/user/profile/Lehceler
+Ler https://tatoeba.org/en/user/profile/Ler
+Maksatt https://tatoeba.org/en/user/profile/Maksatt
+Meka https://tatoeba.org/en/user/profile/Meka
+Nursultan https://tatoeba.org/en/user/profile/Nursultan
+SadeceTurkce https://tatoeba.org/en/user/profile/SadeceTurkce
+TheOdThing https://tatoeba.org/en/user/profile/TheOdThing
+TurkishReform https://tatoeba.org/en/user/profile/TurkishReform
+abiniz https://tatoeba.org/en/user/profile/abiniz
+atitarev https://tatoeba.org/en/user/profile/atitarev
+beangsweets https://tatoeba.org/en/user/profile/beangsweets
+boracasli2 https://tatoeba.org/en/user/profile/boracasli2
+bozkurt https://tatoeba.org/en/user/profile/bozkurt
+enebi https://tatoeba.org/en/user/profile/enebi
+firespeaker https://tatoeba.org/en/user/profile/firespeaker
+janTuki https://tatoeba.org/en/user/profile/janTuki
+koala https://tatoeba.org/en/user/profile/koala
+kyrgy https://tatoeba.org/en/user/profile/kyrgy
+maya_o6 https://tatoeba.org/en/user/profile/maya_o6
+ninefi https://tatoeba.org/en/user/profile/ninefi
+ruslanch https://tatoeba.org/en/user/profile/ruslanch
+tokipona https://tatoeba.org/en/user/profile/tokipona
+toplukonut https://tatoeba.org/en/user/profile/toplukonut
+turan https://tatoeba.org/en/user/profile/turan
+turklehceleri https://tatoeba.org/en/user/profile/turklehceleri

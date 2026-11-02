@@ -59,6 +59,8 @@ cp "$project_root/Resources/TurkishCorpusNotices.txt" "$app_path/Contents/Resour
 cp "$project_root/Resources/TurkishCorpusSources.txt" "$app_path/Contents/Resources/TurkishCorpusSources.txt"
 cp "$project_root/Resources/KazakhCorpusNotices.txt" "$app_path/Contents/Resources/KazakhCorpusNotices.txt"
 cp "$project_root/Resources/KazakhCorpusSources.txt" "$app_path/Contents/Resources/KazakhCorpusSources.txt"
+cp "$project_root/Resources/KyrgyzCorpusNotices.txt" "$app_path/Contents/Resources/KyrgyzCorpusNotices.txt"
+cp "$project_root/Resources/KyrgyzCorpusSources.txt" "$app_path/Contents/Resources/KyrgyzCorpusSources.txt"
 cp "$project_root/Resources/SimplifiedChineseCorpusNotices.txt" "$app_path/Contents/Resources/SimplifiedChineseCorpusNotices.txt"
 cp "$project_root/Resources/SimplifiedChineseCorpusSources.txt" "$app_path/Contents/Resources/SimplifiedChineseCorpusSources.txt"
 cp "$project_root/Resources/TraditionalChineseCorpusNotices.txt" "$app_path/Contents/Resources/TraditionalChineseCorpusNotices.txt"

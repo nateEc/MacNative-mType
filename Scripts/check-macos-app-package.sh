@@ -126,6 +126,12 @@ cmp "$project_root/Resources/KazakhCorpusNotices.txt" \
 cmp "$project_root/Resources/KazakhCorpusSources.txt" \
   "$app_path/Contents/Resources/KazakhCorpusSources.txt" \
   || fail "Kazakh spelling sources missing or modified"
+cmp "$project_root/Resources/KyrgyzCorpusNotices.txt" \
+  "$app_path/Contents/Resources/KyrgyzCorpusNotices.txt" \
+  || fail "Kyrgyz corpus attribution missing or modified"
+cmp "$project_root/Resources/KyrgyzCorpusSources.txt" \
+  "$app_path/Contents/Resources/KyrgyzCorpusSources.txt" \
+  || fail "Kyrgyz spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"
