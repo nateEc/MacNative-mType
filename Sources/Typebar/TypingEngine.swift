@@ -12568,13 +12568,8 @@ enum StarterLexicon {
 
   static var kazakh1kWords: [String] { kazakh1kLexicon.materialized() }
 
-  // Typebar-authored Vietnamese starter words provide local practice without
-  // importing the reference dictionary or word list.
-  static let vietnameseWords = [
-    "sách", "cửa", "đường", "ánh", "sáng", "cầu", "buổi", "trang", "nơi", "mây",
-    "yên", "lặng", "núi", "hạt", "giọng", "bàn", "ý", "câu", "nhìn", "trải",
-    "nghiệm", "khoảng", "cách", "bước", "kiên", "nhẫn", "cân", "bằng", "làng", "mưa",
-  ]
+  // Independent literal forms with per-word provenance; all old starters remain.
+  static var vietnameseWords: [String] { VietnameseCorpus.basic }
 
   // Typebar-authored Jyutping starter words retain ASCII tone-number input
   // without importing the reference dictionary or word list.
@@ -14331,15 +14326,11 @@ enum StarterLexicon {
   }
 
   static var vietnamese1kLexicon: IndexedLexicon {
-    europeanScaleLexicon(.init(
-      marker: "ƌ", prefix: "qvi", nonASCIICharacter: "ă", count: 1_000, maximumLength: 7,
-      buckets: [.init(count: 869, nonASCII: true)]))
+    IndexedLexicon(count: 1_000) { VietnameseCorpus.words1k[$0] }
   }
 
   static var vietnamese5kLexicon: IndexedLexicon {
-    europeanScaleLexicon(.init(
-      marker: "ɖ", prefix: "xvi", nonASCIICharacter: "ơ", count: 5_000, maximumLength: 7,
-      buckets: [.init(count: 4_449, nonASCII: true)]))
+    IndexedLexicon(count: 5_000) { VietnameseCorpus.words5k[$0] }
   }
 
   static var pinyin1kLexicon: IndexedLexicon {

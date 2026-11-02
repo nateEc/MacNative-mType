@@ -322,6 +322,9 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       // callbacks before clearing the marked range and disposing of conversion:
       // either action may synchronously call back into the departing client.
       acceptsTextInput = false
+      #if DEBUG
+      NativeTextInputDiagnostics.observe(.retired, input: self)
+      #endif
     }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
@@ -446,6 +449,9 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyDown(with event: NSEvent) {
+        #if DEBUG
+        NativeTextInputDiagnostics.keyDown(event, input: self)
+        #endif
         let defersEscapeToComposition = hasMarkedText()
           && event.charactersIgnoringModifiers == "\u{1B}"
           && event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty
@@ -685,6 +691,9 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func insertText(_ string: Any, replacementRange: NSRange) {
+        #if DEBUG
+        NativeTextInputDiagnostics.observe(.insert, value: string, input: self)
+        #endif
         guard !isRetired, acceptsTextInput else { return }
         let text: String
         if let attributed = string as? NSAttributedString {
@@ -701,6 +710,9 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        #if DEBUG
+        NativeTextInputDiagnostics.observe(.marked, value: string, input: self)
+        #endif
         guard !isRetired, acceptsTextInput else { return }
         let startsComposition = composition.length == 0
         if let attributed = string as? NSAttributedString {
@@ -733,6 +745,9 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func unmarkText() {
+        #if DEBUG
+        NativeTextInputDiagnostics.observe(.unmark, input: self)
+        #endif
         composition = NSAttributedString()
         compositionSelection = NSRange(location: 0, length: 0)
         onCompositionChanged("")

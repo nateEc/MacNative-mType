@@ -31,3 +31,5 @@ Apple 的 [discardMarkedText 文档](https://developer.apple.com/documentation/a
 冻结的 `NativeTypingInput.swift` SHA-256 为 c9edbb5dbe2f70f8447cb0ed5d313a810a06a82cf6f24b93c6e427fafec8f882。以上是本批局部／扩大验证与打包证据，不是新一次完整 CI 门禁，也不升级 `compositionDisplay` 的部分状态。
 
 四项配置部分分类、全部物理 IME／VoiceOver／呈现组合验收及完整原生重写 goal 均保持开放。
+
+后续事件层排查见 [死键调查](NATIVE_INPUT_EVENT_INVESTIGATION.md)：有效死键事件到达时应用、窗口、第一响应者及当前输入上下文归属均正确，标准编辑框也出现同样的普通 `e` 结果。该证据排除焦点缺失这一假设，尚不归因于某个系统／工具内部机制，更不把本项销毁修复当作死键问题的解决方案。

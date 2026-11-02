@@ -1,0 +1,53 @@
+{
+  "artifacts": {
+    "Resources/VietnameseCorpusNotices.txt": "f04e2a8a62a46673e6e2de6ea3720c8bdb646fd65f10a8e1e41bd8aa78aacf12",
+    "Resources/VietnameseCorpusSources.txt": "a38b9321d243ba4222647b0def6e208e98067b75d6fdb45c817cb56359662400",
+    "Sources/Typebar/VietnameseCorpus.generated.swift": "4fab9a4fe33d2af9f467e64957cf5a10cae2aed09d222bd02d32f69bfba6a2cb"
+  },
+  "legacyAttestationScope": "Selected lexical parts of speech; raw romanization entries are excluded.",
+  "legacyUnattested": [
+    "kiên"
+  ],
+  "member": "wordfreq/data/small_vi.msgpack.gz",
+  "memberSHA256": "bde76e2846f38fc8f4ad5112493d524c0c7f5e5545072b4de773d0a83159f15f",
+  "pools": {
+    "1k": {
+      "characters": "abcdeghiklmnopqrstuvxyàáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹ",
+      "count": 1000,
+      "legacyExtraCharacters": "",
+      "maximumLength": 7,
+      "minimumLength": 1,
+      "nonASCIIOptions": 870,
+      "referenceCharacters": "abcdeghiklmnopqrstuvxyàáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹ",
+      "wholeObserved": 999,
+      "wordsSHA256": "f9b430709828aae5977885fa480754fca5093dbf7fef576d2d9af72386b839d3"
+    },
+    "5k": {
+      "characters": "abcdefghiklmnopqrstuvxyàáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ",
+      "count": 5000,
+      "legacyExtraCharacters": "",
+      "maximumLength": 7,
+      "minimumLength": 1,
+      "nonASCIIOptions": 4450,
+      "referenceCharacters": "abcdefghiklmnopqrstuvxyàáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ",
+      "wholeObserved": 4135,
+      "wordsSHA256": "c53b0e592886e87a2c99bb6c899f3eafd32e6fec0b484a6d35993fb23faf3270"
+    },
+    "basic": {
+      "characters": "abcdeghiklmnopqrstuvxyàáâãéêìíòóôùúýăđĩũơưạảấầẩẫậắằẳặẹẻẽếểễệỉịọỏốồổỗộớờởợủứừửữự",
+      "count": 319,
+      "legacyExtraCharacters": "ẫ",
+      "maximumLength": 6,
+      "minimumLength": 1,
+      "nonASCIIOptions": 270,
+      "referenceCharacters": "abcdeghiklmnopqrstuvxyàáâãéêìíòóôùúýăđĩũơưạảấầẩậắằẳặẹẻẽếểễệỉịọỏốồổỗộớờởợủứừửữự",
+      "wholeObserved": 318,
+      "wordsSHA256": "844efd8be75913bf77954c2f3ceee5c55ffdc16da3586a066508e3b5b7e80161"
+    }
+  },
+  "revision": "kaikki-en-vi-20261102-literal-wordfreq-v1",
+  "schemaVersion": 1,
+  "source": "https://kaikki.org/dictionary/Vietnamese/kaikki.org-dictionary-Vietnamese.jsonl",
+  "sourceSHA256": "186cd0a62d876dada70c9761bc05e598c8cf7b9a48e0aa518bab6c649e28d945",
+  "wheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473"
+}
