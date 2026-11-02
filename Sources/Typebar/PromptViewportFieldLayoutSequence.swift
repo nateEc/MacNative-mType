@@ -33,6 +33,7 @@ import AppKit
 
   private let ownerID = UUID()
   private let session: TypingSession
+  private let caretGlyphIndex: Int?
   private let directory: PromptViewportTargetDirectory
   private let style: PromptRenderStyle
   private let width: CGFloat
@@ -60,6 +61,9 @@ import AppKit
       directory.attemptID == session.automaticInputAttemptID,
       directory.promptTargetID == session.promptTargetID else { return nil }
     self.session = session
+    // This sequence owns one immutable session. Preserve the exact canonical
+    // caret policy without constructing whole-target glyphs per small window.
+    caretGlyphIndex = session.promptCaretGlyphIndex
     self.directory = directory
     self.style = style
     self.width = width
@@ -158,7 +162,7 @@ import AppKit
     guard let runs = PromptRenderPlan.renderIndependentFieldWindow(
       directory: directory, session: session, fields: fields, style: style) else { return nil }
     let layout: PromptFieldTextLayout
-    let anchor = session.promptCaretGlyphIndex.map {
+    let anchor = caretGlyphIndex.map {
       PromptCompositionProjection.Anchor(cellID: $0, after: false)
     }
     if let start {

@@ -10,6 +10,8 @@ import XCTest
     var generation = 0
     var completeRenders = 0
     var preparedRenders = 0
+    var completeRenderTargetUnits: [Int] = []
+    var preparedRenderTargetUnits: [Int] = []
     var sourceReplies: [CheckedContinuation<Void, Never>] = []
     func finishFirstSource() { if !sourceReplies.isEmpty { sourceReplies.removeFirst().resume() } }
     func finishAllSources() { while !sourceReplies.isEmpty { finishFirstSource() } }
@@ -60,10 +62,12 @@ import XCTest
           return TypingSession(configuration: configuration, prompt: prompt)
         }, wholePreviewRender: { session, style in
           counts.preparedRenders += 1
+          counts.preparedRenderTargetUnits.append(session.prompt.utf16.count)
           let plan = try await PromptRenderPlan.prepareCooperatively(session: session, composition: "", style: style)
           return try await plan.renderCooperatively()
         }, promptRender: { session, composition, style in
           counts.completeRenders += 1
+          counts.completeRenderTargetUnits.append(session.prompt.utf16.count)
           return PromptRenderPlan(session: session, composition: composition, style: style).render()
         }, wholePreviewViewportEnabled: viewportEnabled).modelContainer(container)
       host = NSHostingView(rootView: AnyView(content.frame(width: hostSize.width, height: hostSize.height)))
@@ -104,9 +108,10 @@ import XCTest
         installedFontName: settings.installedPracticeFontName, language: session.configuration.language)
       return PromptFieldTextLayout(map: map, width: width, font: font)
     }
-    func waitUntil(_ ready: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
+    func waitUntil(_ ready: () -> Bool, timeout: TimeInterval = 15,
+      file: StaticString = #filePath, line: UInt = #line) {
       flush()
-      let deadline = Date().addingTimeInterval(15)
+      let deadline = Date().addingTimeInterval(timeout)
       while !ready() && Date() < deadline { flush() }
       let native = views(PromptViewportPracticeNativeView.self).first
       XCTAssertTrue(ready(), "Practice page did not reach the expected renderer: complete=\(native?.viewport.canvas.hasCompleteHeight as Any), frame=\(native?.frame as Any), measuredHeight=\(native?.measuredHeight as Any), input=\(views(TypingInputView.self).first?.acceptsTextInput as Any), pageBounds=\(native?.enclosingScrollView?.contentView.bounds as Any), pageDocument=\(native?.enclosingScrollView?.documentView?.frame as Any)", file: file, line: line)
@@ -118,6 +123,61 @@ import XCTest
       window.close()
       defaults.removePersistentDomain(forName: suite)
       withExtendedLifetime(container) {}
+    }
+  }
+
+  func testHundredThousandWordDefaultAndViewportPublishCompleteInputAndCaret() throws {
+    try XCTSkipUnless(ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
+      "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
+    let count = 100_001
+    let prompt = Array(repeating: "oak", count: count).joined(separator: " ")
+    for enabled in [false, true] {
+      let started = ProcessInfo.processInfo.systemUptime
+      let fixture = try Fixture(promptOverride: prompt, viewportEnabled: enabled, wordCount: count)
+      defer { fixture.close() }
+      fixture.waitUntil({ enabled ? fixture.promptReady : fixture.completePromptReady }, timeout: 180)
+      guard enabled ? fixture.promptReady : fixture.completePromptReady else { return }
+      let readyElapsed = ProcessInfo.processInfo.systemUptime - started
+      let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+      let native = fixture.views(PromptViewportPracticeNativeView.self).first
+      let full = fixture.views(PromptFieldNativeView.self).first
+      XCTAssertEqual(fixture.counts.generation, 1)
+      if enabled {
+        XCTAssertNotNil(native)
+        XCTAssertEqual(native?.viewport.measuredFieldCount, count)
+        XCTAssertFalse(fixture.counts.preparedRenderTargetUnits.contains(prompt.utf16.count))
+        XCTAssertFalse(fixture.counts.completeRenderTargetUnits.contains(prompt.utf16.count))
+      } else {
+        XCTAssertNil(native)
+        XCTAssertNotNil(full)
+        XCTAssertGreaterThan(fixture.counts.preparedRenders, 0)
+      }
+      func cellText() -> AttributedString? {
+        enabled ? native?.viewport.canvas.renderedCellText(for: 0) : full?.renderedCellText(for: 0)
+      }
+      func caret() -> CGRect? {
+        enabled ? native?.viewport.canvas.measuredMainCaretRect(style: .bar) : full?.measuredMainCaretRect()
+      }
+      func target(_ index: Int) -> CGRect? {
+        enabled ? native?.viewport.canvas.measuredRect(for: index) : full?.measuredRect(for: index)
+      }
+      let initialInk = try XCTUnwrap(cellText())
+      for (index, character) in "oa".enumerated() {
+        let firstKey = ProcessInfo.processInfo.systemUptime
+        input.onInsert(String(character), false)
+        let callback = ProcessInfo.processInfo.systemUptime - firstKey
+        fixture.waitUntil({
+          guard let expected = target(index + 1) else { return false }
+          return caret() == expected && input.acceptsTextInput
+        }, timeout: 60)
+        XCTAssertNotEqual(cellText(), initialInk)
+        XCTAssertFalse(fixture.settings.allowsRestartingConfigurationChange)
+        XCTAssertTrue(fixture.views(TypingInputView.self).first === input)
+        print("VIEWPORT HOST COMPARISON viewport=\(enabled) words=\(count) ready=\(readyElapsed) key=\(index + 1) callback=\(callback) presentation=\(ProcessInfo.processInfo.systemUptime - firstKey)")
+      }
+      XCTAssertEqual(enabled ? native?.viewport.canvas.accessibilityValue() as? String : full?.accessibilityValue() as? String, prompt)
+      XCTAssertEqual(fixture.counts.generation, 1)
+      XCTAssertFalse(fixture.window.isVisible)
     }
   }
 

@@ -5815,6 +5815,24 @@ struct TypingSession {
     return .init(activeWordIndex: active, words: words)
   }
 
+  /// A parent UI refresh can carry the same unstarted source again. Only a
+  /// pristine presentation may retain in-flight viewport measurement; input,
+  /// rejected input, navigation and configuration changes must still rebuild.
+  func canReuseUnstartedViewportSource(_ previous: TypingSession) -> Bool {
+    func pristine(_ value: TypingSession) -> Bool {
+      guard !value.hasStarted, !value.isFinished, value.typed.isEmpty,
+        value.nextTargetIndex == 0, value.stoppedPromptInput == nil,
+        value.firstRetainedPromptWordIndex == 0, value.removedTapePromptWordIndices.isEmpty,
+        value.committedErrorWordStarts.isEmpty, value.blindCommittedMissingTargetIndices.isEmpty,
+        value.acceptedUnits.map({ $0.fieldIndex == 0 && $0.entries.isEmpty }) ?? true else { return false }
+      let input = value.promptPresentationInput
+      return input.targets.isEmpty && input.forcedErrors.isEmpty && input.extraErrors.isEmpty
+    }
+    return automaticInputAttemptID == previous.automaticInputAttemptID
+      && promptTargetID == previous.promptTargetID && configuration == previous.configuration
+      && pristine(self) && pristine(previous)
+  }
+
   /// The existing typed-effect rule colors every target before the last
   /// accepted separator, except the accepted separator glyphs themselves.
   /// Resolve that rule only for requested target IDs.
