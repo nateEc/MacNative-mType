@@ -4,6 +4,8 @@
 
 ## 后续迁移状态
 
+2026-11-02 `LANG-MALAY-LITERAL-76` 将 Malay 1k 的 1000 个内联 q 编号占位迁至独立 Malay 词典原形与 Tatoeba zsm 观察，基础 30→228，保留旧 30 词、原版字符集合、S／12 个连字符词／一个短语候选。该内联构造器不在“直接具名 ScaleLexicon 属性”结构范围内，不能从旧计数重复扣除；该范围仍为 102 条／780604 个声明位置。持久 QA 的 malay-scale-audit.json 记录当前 TypingEngine SHA-256 69c41f84825314a754ac986000dd71dfba0ab6cf5becd598e1a15b4346286775。源生成器拆词与输入接纳纠偏、独立来源及未验语言质量／分布见 MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md；不是全部语言缺口的完成证明。
+
 2026-11-02 `LANG-INDONESIAN-LITERAL-75` 将 Indonesian 两大档的 14789 个 qz 占位位置迁至独立词典字面词形，基础 30→310；保留全部旧词，其中两项明确为旧自有词而非词典收录。当前直接具名 ScaleLexicon 属性结构范围余 102 条／780604 个声明位置；复核持久 QA 的 indonesian-scale-audit.json，TypingEngine SHA-256 22c8f55eca8c7edc471dc958468c937ff3f70e3437fac1aa51c395ee904e3a52。独立词汇／分布、质量和实体输入未验，见 INDONESIAN_CORPUS_CONTRACT.md。下文数字保留为历史阶段，不是当前总数。
 
 最新 `LANG-GREEK-LITERAL-58` 移除现代希腊语四档 40,728 个合成位置，基础 30→209；全部五池使用带完整整词观察的原样词典形式，NFC 拼写、声调、分音符和词尾 sigma 不改。保留 Koine／Greeklish 与旧历史。当前直接具名 ScaleLexicon 路由余 112 项／927,283 个声明位置；复核 /tmp/typebar-greek-scale-audit-20261030.json，TypingEngine SHA `e00e18c77373113887d9c0a35c1c4237b6799f46ef358c5476f34d2c1d79f68b`。语言／分布质量、实体输入及性能仍开放，详见 GREEK_CORPUS_CONTRACT.md。

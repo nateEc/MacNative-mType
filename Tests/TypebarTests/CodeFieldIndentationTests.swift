@@ -223,7 +223,11 @@ final class CodeFieldIndentationTests: XCTestCase {
 
   func testEmptyPreviousFieldIsReopenedWithoutDeletingEarlierWords() throws {
     for whole in [false, true] {
-      var input = TypingSession(configuration: configuration(), prompt: "first  \tgo() tail")
+      // Source before-insert admits an empty-input separator under hard
+      // recovery. Ordinary normal input ignores it, even at a blank target.
+      var allowed = configuration()
+      allowed.rules.deleteOnErrorMode = .letterHard
+      var input = TypingSession(configuration: allowed, prompt: "first  \tgo() tail")
       input.insertBatch("first  ", at: start)
       XCTAssertEqual(input.typed, "first  \t")
       if whole { input.deleteWordBackward(at: start.addingTimeInterval(1)) }
@@ -231,6 +235,18 @@ final class CodeFieldIndentationTests: XCTestCase {
       XCTAssertEqual(input.typed, "first ")
       XCTAssertEqual(TypingReplay.typedText(events: try ended(input).replayEvents, through: 1), "first ")
     }
+  }
+
+  func testOrdinaryEmptySourceSpaceCannotScheduleIndentOrCreateInputHistory() throws {
+    var input = TypingSession(configuration: configuration(), prompt: "first  \tgo() tail")
+    input.insertBatch("first ", at: start)
+    let before = try ended(input)
+    input.insert(" ", at: start.addingTimeInterval(1))
+    XCTAssertEqual(input.typed, "first ")
+    let after = try ended(input)
+    XCTAssertEqual(after.replayEvents, before.replayEvents)
+    XCTAssertEqual(after.inputMetrics, before.inputMetrics)
+    XCTAssertFalse(after.replayEvents.contains(where: \.automatic))
   }
 
   func testConfidenceMaximumBlocksFieldDeletionButOnAllowsTabNavigation() {

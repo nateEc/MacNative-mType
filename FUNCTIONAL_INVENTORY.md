@@ -2,6 +2,8 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-MALAY-LITERAL-76 | 马来语基础／1k 字面词库 | 独立固定 English Wiktionary／Kaikki 与 Tatoeba zsm，原版仅聚合形状 | 228／1000 个选项、旧 30 词和完整字符集合，真实连字符／短语／S；MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md | 部分完成：16 项初次定向、25 项修正定向及最终 612 项扩大零失败／跳过，152 项源码合同、来源／过滤／重建与精确形状通过。语言质量、分布和实体输入／性能未验。 |
+| FUN-EMPTY-SPACE-ADMISSION-77 | 目标开头空格与空输入接纳 | 固定源完整输入／验证／导航／事件模块，自有字段夹具 | 去掉普通空输入因目标为空格而放行的例外；MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md | 部分完成：144 场景红测 526 处差异后修正，同范围及旧 LF 对照通过；25 项修正定向与最终 612 项扩大零失败／跳过，152 项源码合同通过，删除夹具保留合法放行条件。实际浏览器／IME 和全部配置组合未验。 |
 | LANG-INDONESIAN-LITERAL-75 | 印尼语基础／1k／10k 字面词库 | 独立固定 English Wiktionary／Kaikki 与 wordfreq；原版只取聚合形状和字符集合 | 310／1020／13769 个候选，保留旧 30 词与逐词来源，移除 qz 编号；INDONESIAN_CORPUS_CONTRACT.md | 部分完成：先行占位及字母覆盖反例后修正，11 项定向与最终 222 项扩大零失败／跳过，151 项源码合同及固定来源重建通过。词汇／频率分布差异、语言质量、实体输入与性能仍开放。 |
 | FUN-MEMORY-ACCESSIBILITY-74 | Memory 答案的辅助功能隐藏 | 固定源完整重启／开始与 UI 生命周期；原生公开辅助功能接口 | 提示分支隐藏、普通字段撤销元素和值、同目标视口清理文本源／范围／选区；MEMORY_PROMPT_ACCESSIBILITY_CONTRACT.md | 部分完成：直接 API 红测复现，11 项定向与 589 项扩大零失败／跳过，151 项源码合同通过。树遍历基线不足，实体 VoiceOver／IME、全部视觉变体未验。 |
 | FUN-EMBEDDED-LF-NAVIGATION-73 | 字段内 LF 输入与回放 | 固定源完整输入／验证／导航／事件模块；明确自有字段与 UI 适配器 | 144 个逐键／整段、三种 LF 结构与三档停止错误对照；EMBEDDED_LF_NAVIGATION_SOURCE_CONTRACT.md | 部分完成：活动字段、UTF-16、开始／终态和逐事件提交／停止等对照通过，未发现需改产品逻辑的差异；实体输入／IME、全部模式与组合未验。 |

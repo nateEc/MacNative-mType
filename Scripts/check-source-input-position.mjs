@@ -160,15 +160,19 @@ if(process.argv[3]==='--hidden-word-navigation-fixtures'){
  assert.equal(execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
  console.log(JSON.stringify({fixtures}));process.exit(0);
 }
-if(process.argv[3]==='--embedded-lf-navigation-fixtures'){
+if(['--embedded-lf-navigation-fixtures','--internal-space-navigation-fixtures'].includes(process.argv[3])){
+ const internalSpace=process.argv[3]==='--internal-space-navigation-fixtures';
  for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',()=>false);
  const units=text=>Array.from({length:text.length},(_,i)=>text.charCodeAt(i));
  const fixtures=[];
- for(const words of [['ab\ncd ','ef ','tail'],['ab\n\ncd ','ef ','tail'],['\nab ','ef ','tail']]){
-  const prefix=words[0].slice(0,words[0].indexOf('\n'));
+ const wordSets=internalSpace?[['ab cd ','ef ','tail'],['ab  cd ','ef ','tail'],[' ab ','ef ','tail']]
+  :[['ab\ncd ','ef ','tail'],['ab\n\ncd ','ef ','tail'],['\nab ','ef ','tail']];
+ const separator=internalSpace?' ':'\n';
+ for(const words of wordSets){
+  const prefix=words[0].slice(0,words[0].indexOf(separator));
   const complete=words.join('');
-  for(const input of [prefix+'\n',words[0],complete,'\n',prefix+' ',
-    'x'+complete.slice(1),complete.replaceAll('\n',''),'\n\n'+words.at(-1)]){
+  for(const input of [prefix+separator,words[0],complete,separator,prefix+(internalSpace?'\n':' '),
+    'x'+complete.slice(1),complete.replaceAll(separator,''),separator+separator+words.at(-1)]){
    for(const stop of ['off','word','letter'])for(const batched of [false,true]){
     reset(words,{stop});Object.assign(Config,{blindMode:false,difficulty:'normal',quickEnd:false,keymapMode:'off',language:'english'});
     const chunks=batched?[input]:Array.from(input);

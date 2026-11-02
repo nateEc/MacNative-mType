@@ -1,0 +1,103 @@
+Typebar independent Malay corpus
+Revision: kaikki-en-ms-tatoeba-zsm-20261102-literal-v1
+English Wiktionary contributors, extracted by Kaikki.org / Wiktextract.
+Source: https://kaikki.org/dictionary/Malay/kaikki.org-dictionary-Malay.jsonl
+Snapshot SHA-256: d4b211c01a2206ae4136a6b35ca0cd1412e053cf95bcb639837a4f4559d3c592
+Index: extraction 2026-10-30, enwiktionary dump 2026-10-01.
+Dictionary selection: Creative Commons Attribution-ShareAlike 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+Dictionary rows link to https://en.wiktionary.org/wiki/ + encoded sourceTitle.
+Only lang_code=ms lexical entries, original ASCII forms and declared character sets.
+No inflection, recasing, numbered padding or Indonesian frequency substitution.
+Romanization/template/error forms and exclusively rejected lexical senses excluded.
+Filters do not certify normative/semantic quality of every word.
+All 30 Typebar authored starter words retained. latihan and harapan have legacy
+provenance, not dictionary attestations. Missing observations are NA, not zero frequency.
+
+Frequency observations: Tatoeba standard Malay (zsm) contributors.
+Source: https://downloads.tatoeba.org/exports/per_language/zsm/zsm_sentences_detailed.tsv.bz2
+Snapshot SHA-256: 3e4701bc8b673a278a30a084be3c87deaa449da9ed011082a06bda1e27821d20
+Sentences: 7791. CC BY 2.0 France (CC0 records may also be included).
+https://creativecommons.org/licenses/by/2.0/fr/
+https://tatoeba.org/en/downloads
+Whole Unicode word runs after NFC; complete ASCII tokens only, internal hyphens kept.
+Phrase observations require exactly one literal space between adjacent full tokens.
+Lookup is lowercased; practice forms are unchanged. Counts describe this snapshot,
+not general usage, Monkeytype's distribution or native runtime Zipf support.
+MalayCorpusSources.txt records per-form title, count and first observing sentence ID.
+Sentence attribution page: https://tatoeba.org/en/sentences/show/ + sentence ID.
+No sentences, translations, definitions, images, audio or original Monkeytype lists bundled.
+Selection changes filtering/order, not literal spellings. Source generator in repository.
+
+Public Tatoeba contributor handles in the fixed snapshot (\N means unknown/unowned):
+- ABChessel
+- Adou_Fr
+- BB__031216
+- Balamax
+- Bilmanda
+- Cheng
+- Chenweijun
+- ColawithIce
+- DostKaplan
+- Dusun_Les
+- EchoZulu
+- HAGNi
+- Joutsentaika
+- Kazuki278
+- LeeSooHa
+- LiuJL47
+- Mojo
+- Notppl4469
+- Ricardo14
+- Skaty
+- Spheniscine
+- Tanama
+- Ummi
+- Versuss
+- \N
+- aizuddineismail
+- aslakg
+- azmanayob
+- bakaveka9
+- bcmoney
+- buddy6621
+- by_you
+- dbahasa
+- demoanokkelate
+- dtynewydd
+- duran
+- exodream
+- fadzli
+- falcons84
+- farisha
+- feudalism
+- frogprincess
+- glavsaltulo
+- golden
+- hakimsopiak
+- hayabusa_future
+- hrllscrt
+- ibrahimovic
+- imperiex
+- j0rd4nkzf
+- janTuki
+- jessie0422
+- joethesupercow
+- jonlam
+- jovan
+- jrafraf73998
+- mayok
+- mercindustries
+- peacetou
+- pryo
+- qana
+- reitnorf
+- rizkym389
+- sestersparrow
+- sopheaswift13
+- syaido
+- sysko
+- turklehceleri
+- usmaan
+- yuan
+- yuuri_wolfram

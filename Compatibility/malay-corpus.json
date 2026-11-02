@@ -1,0 +1,38 @@
+{
+  "artifacts": {
+    "Resources/MalayCorpusNotices.txt": "992628474b6322278824a0570cb72bad2001136b1d7e9f36ed6f07156cf8de10",
+    "Resources/MalayCorpusSources.txt": "9a78f6b05bf07ba85efc6ed84891f2e97b0e2a3636ff2864b5b10df475f1c22d",
+    "Sources/Typebar/MalayCorpus.generated.swift": "9f904015b7e754d37c62d164806781a4d9a02912d1327ad0c88dec45893d0ebf"
+  },
+  "dictionary": "https://kaikki.org/dictionary/Malay/kaikki.org-dictionary-Malay.jsonl",
+  "dictionarySHA256": "d4b211c01a2206ae4136a6b35ca0cd1412e053cf95bcb639837a4f4559d3c592",
+  "pools": {
+    "1k": {
+      "characters": " -Sabcdefghijklmnoprstuvwyz",
+      "count": 1000,
+      "hyphenCount": 12,
+      "maximumLength": 16,
+      "minimumLength": 2,
+      "spaceCount": 1,
+      "uppercaseCount": 1,
+      "wholeObserved": 997,
+      "wordsSHA256": "c09492082f5234a704d49ab0833535f3ad8adddb460db8e3b2a4a5715dc269c0"
+    },
+    "basic": {
+      "characters": "abcdefghijklmnoprstuwy",
+      "count": 228,
+      "hyphenCount": 0,
+      "maximumLength": 12,
+      "minimumLength": 2,
+      "spaceCount": 0,
+      "uppercaseCount": 0,
+      "wholeObserved": 226,
+      "wordsSHA256": "d97db70461ccd6695cd7fe2f8f827dd97ca98fdaa75aebbc2e262268bc1d3138"
+    }
+  },
+  "revision": "kaikki-en-ms-tatoeba-zsm-20261102-literal-v1",
+  "schemaVersion": 1,
+  "sentenceCount": 7791,
+  "sentences": "https://downloads.tatoeba.org/exports/per_language/zsm/zsm_sentences_detailed.tsv.bz2",
+  "sentencesSHA256": "3e4701bc8b673a278a30a084be3c87deaa449da9ed011082a06bda1e27821d20"
+}

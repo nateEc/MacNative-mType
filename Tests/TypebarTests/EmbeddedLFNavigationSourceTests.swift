@@ -18,6 +18,14 @@ final class EmbeddedLFNavigationSourceTests: XCTestCase {
   private struct Output: Decodable { let fixtures: [Fixture] }
 
   func testInternalLFNavigationAndCapturedInputAgainstCompletePinnedHandlers() throws {
+    try check(mode: "--embedded-lf-navigation-fixtures")
+  }
+
+  func testInternalSpaceNavigationAndCapturedInputAgainstCompletePinnedHandlers() throws {
+    try check(mode: "--internal-space-navigation-fixtures")
+  }
+
+  private func check(mode: String) throws {
     guard let reference = ProcessInfo.processInfo.environment["TYPEBAR_REFERENCE_ROOT"] else {
       throw XCTSkip("Requires pinned reference")
     }
@@ -27,7 +35,7 @@ final class EmbeddedLFNavigationSourceTests: XCTestCase {
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = ["node", "--experimental-vm-modules",
       root.appendingPathComponent("Scripts/check-source-input-position.mjs").path,
-      reference, "--embedded-lf-navigation-fixtures"]
+      reference, mode]
     process.standardOutput = pipe
     try process.run()
     let data = pipe.fileHandleForReading.readDataToEndOfFile()

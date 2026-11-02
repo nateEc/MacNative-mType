@@ -7390,9 +7390,7 @@ struct TypingSession {
       && (configuration.rules.strictSpace || configuration.difficulty != .normal)
     // Ignore an ordinary leading space before word-stop can retain it.
     // Strict space and expert/master instead keep it in the current field.
-    if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator,
-      acceptedUnits?.terminalElementCleared == true || currentTargetIndex >= promptCharacters.count
-        || promptCharacters[currentTargetIndex] != " " { return false }
+    if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator { return false }
     let retainsStoppedSeparator = configuration.rules.stopOnErrorMode == .word
       && !retainsLeadingSeparator
       && usesWordCommitInput && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
@@ -12935,25 +12933,11 @@ enum StarterLexicon {
   static var indonesian1kWords: [String] { indonesian1kLexicon.materialized() }
   static var indonesian10kWords: [String] { indonesian10kLexicon.materialized() }
 
-  // Typebar-authored Malay starter words are compact local practice content,
-  // not an imported word list or a transformed reference corpus.
-  static let malayWords = [
-    "pagi", "tingkap", "kertas", "pantai", "angin", "latihan", "perhatian", "tenang",
-    "jelas", "tasik", "jalan", "meja", "cahaya", "perjalanan", "kesabaran", "seketika",
-    "bandar", "hujan", "sunyi", "arah", "bintang", "catatan", "taman", "nafas",
-    "kecil", "masa", "musim", "perahu", "sahabat", "harapan",
-  ]
+  // Independent Malay dictionary forms with Malay-only observations and legacy provenance.
+  static var malayWords: [String] { MalayCorpus.basic }
 
   static var malay1kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 1_000) { index in
-      if index == 0 { return "qz" }
-      if index == 1 { return String(repeating: "q", count: 16) }
-      let suffix = alphabeticIndex(index + 676)
-      if index == 2 { return "Q" + suffix }
-      if index < 15 { return "q" + suffix + "-" }
-      if index == 15 { return "q" + suffix + " q" }
-      return "q" + suffix
-    }
+    IndexedLexicon(count: 1_000) { MalayCorpus.words1k[$0] }
   }
 
   static var malay1kWords: [String] { malay1kLexicon.materialized() }

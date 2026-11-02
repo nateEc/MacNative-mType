@@ -3,6 +3,10 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.EmbeddedLFNavigationSourceTests/testInternalSpaceNavigationAndCapturedInputAgainstCompletePinnedHandlers",
+      "file": "Tests/TypebarTests/EmbeddedLFNavigationSourceTests.swift"
+    },
+    {
       "id": "TypebarTests.WebsiteConfigMemoryLifecycleTests/testActualPinnedRestartCancelsPreviewTimerBeforeInputAndNativeSessionMatches",
       "file": "Tests/TypebarTests/WebsiteConfigMemoryLifecycleTests.swift"
     },
