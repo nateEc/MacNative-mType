@@ -299,6 +299,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     /// AppKit may retain a detached input beyond its SwiftUI page's lifetime.
     /// Native callbacks must not keep that page's queries or context alive.
     func retirePageCallbacks() {
+      guard !isRetired else { return }
       keyboardInputMappingProvider = nil
       oppositeShiftContextProvider = nil
       isRetired = true
@@ -317,6 +318,10 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       onPhysicalKey = { _, _, _ in }
       onLogicalKeyDown = { _ in }
       bailoutClock = { .now }
+      // AppKit can retain this text client after SwiftUI dismantles it. Retire
+      // callbacks before clearing the marked range and disposing of conversion:
+      // either action may synchronously call back into the departing client.
+      acceptsTextInput = false
     }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
@@ -680,7 +685,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func insertText(_ string: Any, replacementRange: NSRange) {
-        guard acceptsTextInput else { return }
+        guard !isRetired, acceptsTextInput else { return }
         let text: String
         if let attributed = string as? NSAttributedString {
             text = attributed.string
@@ -696,7 +701,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        guard acceptsTextInput else { return }
+        guard !isRetired, acceptsTextInput else { return }
         let startsComposition = composition.length == 0
         if let attributed = string as? NSAttributedString {
             // Input methods may reuse mutable attributed buffers. Own the

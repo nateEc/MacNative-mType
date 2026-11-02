@@ -2,6 +2,7 @@
 
 | ID | 场景 | 操作 | 期望结果 | 状态 |
 | --- | --- | --- | --- | --- |
+| INP-CLIENT-RETIREMENT-78 | 组合未确认时离开练习页 | 单个隔离实例用实际输入法建立候选，切换页面后继续确认／取消，再返回建立新候选；检查旧会话不提交且候选窗口消失。 | 旧页不再接纳文本或残留候选，新页可独立组合；不改系统输入源设置。 | 待验收（客户端清理与同步重入回归见 INPUT_CLIENT_RETIREMENT_CONTRACT.md；CUA 死键对照尚未定位，不能当作此修复的实体 IME 证明） |
 | LANG-MALAY-LITERAL-76 | 马来语两档与短语候选 | 单个隔离实例逐档练习最长词、连字符、带空格候选和标点开启后的大写 S；检查一／二词配额、重复、旧结果与完整署名。 | 候选按源规则拆词，边界与输入完整；旧 30 词保留，观察缺失显示 NA 不冒充零，结果目标不重写。 | 待验收（固定来源与原生证据见 MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md；语言质量、分布、实体输入／IME／VoiceOver 与性能未验） |
 | FUN-EMPTY-SPACE-ADMISSION-77 | 空输入与目标开头空格 | 单个隔离实例使用有开头空格／连续空格的目标，以 normal、严格、expert／master 和 hard delete 分别按 Space／Enter；检查计时、No Quit、声音、回放及 IME 空格。 | 普通空输入忽略 Space，不因目标为空格启动尝试；独立条件、Return 与恢复动作仍按原版处理，回放不记录不存在的插入。 | 待验收（144 个源码对照及相邻回归见 MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md；实体输入／IME 和完整组合未验） |
 | LANG-INDONESIAN-LITERAL-75 | 印尼语三档词汇与旧历史 | 单个隔离实例逐档练习，含最长词、大小写及内部连字符；完成、重复、切换和读取旧合成时期结果／署名，实体印尼语键盘及 IME 确认／取消。 | 独立字面词形完整，大小写／连字符不拆失，旧 30 词保留，旧结果目标及指标不重算；来源类型、缺失频率与许可可读。 | 待验收（固定来源及原生自动证据见 INDONESIAN_CORPUS_CONTRACT.md；语言质量／分布、实体输入、VoiceOver 和性能未验） |
