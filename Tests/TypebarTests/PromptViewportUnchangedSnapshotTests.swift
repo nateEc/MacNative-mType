@@ -151,11 +151,9 @@ import XCTest
     session.insert(started ? "a" : "o", at: Date(timeIntervalSinceReferenceDate: 920_500_001))
     host.rootView = AnyView(root(4))
     host.layoutSubtreeIfNeeded()
-    let inputDeadline = Date().addingTimeInterval(10)
-    while original.viewport.canvas.hasCompleteHeight != true && Date() < inputDeadline {
-      host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.02))
-    }
-    XCTAssertTrue(original.viewport.canvas.hasCompleteHeight)
+    XCTAssertTrue(original.viewport.canvas.hasCompleteHeight,
+      "Color-only input must retain the exact complete page height")
+    XCTAssertEqual(original.viewport.measuredFieldCount, count)
     XCTAssertEqual(original.viewport.canvas.measuredMainCaretRect(style: .bar),
       original.viewport.canvas.measuredRect(for: started ? 2 : 1),
       "Actual input must publish a new caret rather than reuse old ink")

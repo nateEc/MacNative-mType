@@ -208,6 +208,7 @@ import AppKit
   @discardableResult func replaceVisibleSession(_ session: TypingSession,
     style: PromptRenderStyle) -> Bool {
     guard let sequence else { return false }
+    if replaceRetainingTargetGeometry(session, style: style, from: sequence) { return true }
     if visibleDocumentRect.minY >= 0.001 {
       return replaceRemoteSession(session, style: style, from: sequence)
     }
@@ -219,6 +220,29 @@ import AppKit
     retained = [first.fields.lowerBound: first]
     canvas.frame = .init(x: 0, y: 0, width: next.layoutWidth,
       height: max(1, clip.bounds.height, snapshot.measuredHeight))
+    guard canvas.configure(snapshot: snapshot) else { return false }
+    requestMoreIfNeeded()
+    return true
+  }
+
+  private func replaceRetainingTargetGeometry(_ session: TypingSession, style: PromptRenderStyle,
+    from old: PromptViewportFieldLayoutSequence) -> Bool {
+    guard let next = old.replacingSessionRetainingTargetGeometry(session, style: style) else { return false }
+    let visible = visibleDocumentRect
+    let spans = old.measuredSpans.filter { span in
+      guard let ink = span.inkY else { return false }
+      return ink.lowerBound <= visible.maxY && ink.upperBound >= visible.minY
+    }
+    let selected = spans.isEmpty ? Array(old.measuredSpans.suffix(1)) : spans
+    var windows: [PromptViewportFieldLayoutSequence.Window] = []
+    for span in selected {
+      guard let window = next.revisit(fields: span.fields) else { return false }
+      windows.append(window)
+    }
+    guard let snapshot = next.drawingSnapshot(windows: windows) else { return false }
+    cancelPreparation()
+    sequence = next
+    retained = Dictionary(uniqueKeysWithValues: windows.map { ($0.fields.lowerBound, $0) })
     guard canvas.configure(snapshot: snapshot) else { return false }
     requestMoreIfNeeded()
     return true

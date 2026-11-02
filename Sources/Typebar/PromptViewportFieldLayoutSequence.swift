@@ -82,6 +82,24 @@ import AppKit
       rightToLeft: rightToLeft, joinsLetters: joinsLetters)
   }
 
+  /// In the independent-cell renderer, admitted target-only ink can change
+  /// colors/underlines without changing any advance. Preserve exact measured
+  /// boundaries, but give new ink and caret a new immutable sequence owner.
+  /// Replacement typos, dot glyphs and joining-script shaping still reflow.
+  func replacingSessionRetainingTargetGeometry(_ next: TypingSession,
+    style nextStyle: PromptRenderStyle) -> PromptViewportFieldLayoutSequence? {
+    guard nextStyle == style, !joinsLetters,
+      style.typoIndicatorStyle == .off, style.typedCharacterEffect != .dots,
+      directory.materializeStates(fields: 0..<1, session: next) != nil,
+      let replacement = replacingSession(next, style: nextStyle) else { return nil }
+    replacement.checkpoint = checkpoint
+    replacement.checkpointsByField = checkpointsByField
+    replacement.nextField = nextField
+    replacement.measuredSpans = measuredSpans
+    replacement.measuredTextLines = measuredTextLines
+    return replacement
+  }
+
   /// A failed or skipped window never advances the flow checkpoint.
   func append(fields: Range<Int>) -> Window? {
     guard !fields.isEmpty, fields.lowerBound == nextField,
