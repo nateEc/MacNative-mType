@@ -2865,8 +2865,7 @@ enum TypingPromptPresentation {
     blindCommittedMissingTargetIndices: Set<Int> = [],
     typedTargetIndices: [Int?]? = nil, currentTargetIndex: Int? = nil,
     hideExtraLetters: Bool = false,
-    visibleFutureWords: Int? = nil, concealAll: Bool = false,
-    concealedCurrentAndFutureWords: Int? = nil, concealPendingCharacters: Bool = false
+    visibleFutureWords: Int? = nil, concealAll: Bool = false
   ) -> [TypingPromptGlyph] {
     let targetCharacters = Array(target)
     let typedCharacters = Array(typed)
@@ -2920,28 +2919,6 @@ enum TypingPromptPresentation {
     if concealAll {
       output = output.map {
         .init(character: $0.character, state: .hidden, typedCharacter: $0.typedCharacter)
-      }
-    }
-
-    if concealPendingCharacters && !isFinished {
-      output = output.enumerated().map { index, glyph in
-        index >= activeTargetIndex
-          ? .init(character: glyph.character, state: .hidden, typedCharacter: glyph.typedCharacter)
-          : glyph
-      }
-    }
-
-    if let concealedCurrentAndFutureWords, !isFinished {
-      let currentWord = targetCharacters.prefix(activeTargetIndex)
-        .filter(isPromptWordSeparator).count
-      var word = 0
-      for index in output.indices {
-        if index > 0, isPromptWordSeparator(targetCharacters[index - 1]) { word += 1 }
-        if (currentWord...(currentWord + concealedCurrentAndFutureWords - 1)).contains(word) {
-          output[index] = .init(
-            character: targetCharacters[index], state: .hidden,
-            typedCharacter: output[index].typedCharacter)
-        }
       }
     }
 
@@ -4539,6 +4516,7 @@ enum PromptHighlightPolicy {
 
 struct TypingSession {
   private var inputWrapAdmission: TypingInputWrapAdmission?
+  private(set) var readAheadRevealEnabled = false
   private(set) var firstRetainedPromptWordIndex = 0
   private(set) var removedTapePromptWordIndices: Set<Int> = []
 
@@ -5688,9 +5666,7 @@ struct TypingSession {
       hideExtraLetters: configuration.rules.hideExtraLetters,
       visibleFutureWords: usesWordCommitInput
         ? configuration.visibleFutureWordCount : nil,
-      concealAll: configuration.modifiers.contains(.memory) && hasStarted && !isFinished,
-      concealedCurrentAndFutureWords: hasStarted ? configuration.readAheadConcealedWordCount : nil,
-      concealPendingCharacters: configuration.modifiers.contains(.simonSays)
+      concealAll: configuration.modifiers.contains(.memory) && hasStarted && !isFinished
     )
     // The active empty field owns no visible target. Do not highlight the
     // first glyph of a later word as if it could be entered now.
@@ -5733,9 +5709,7 @@ struct TypingSession {
     }
     let currentWord = lower
     let visibleFutureWords = usesWordCommitInput ? configuration.visibleFutureWordCount : nil
-    let concealedWords = hasStarted ? configuration.readAheadConcealedWordCount : nil
     let concealAll = configuration.modifiers.contains(.memory) && hasStarted
-    let concealPending = configuration.modifiers.contains(.simonSays)
     return cells.map { cell in
       let wordOrdinal = cell.wordOrdinal
       let id = cell.id
@@ -5756,10 +5730,7 @@ struct TypingSession {
       }
       if let visibleFutureWords, id >= active,
         wordOrdinal > currentWord + visibleFutureWords { state = .hidden }
-      if concealAll || (concealPending && id >= active) { state = .hidden }
-      if let concealedWords, concealedWords > 0,
-        wordOrdinal >= currentWord,
-        wordOrdinal < currentWord + concealedWords { state = .hidden }
+      if concealAll { state = .hidden }
       return .init(character: character, state: state,
         typedCharacter: wrongInput ? input : nil)
     }
@@ -5841,8 +5812,34 @@ struct TypingSession {
       && blindCommittedMissingTargetIndices == previous.blindCommittedMissingTargetIndices
       && committedErrorWordStarts == previous.committedErrorWordStarts
       && replayCommittedSeparatorCount == previous.replayCommittedSeparatorCount
+      && readAheadRevealEnabled == previous.readAheadRevealEnabled
       && nextTargetIndex == previous.nextTargetIndex
       && paceCaretFrame() == previous.paceCaretFrame()
+  }
+
+  /// CSS changes untyped ink, not navigation/caret state. The first displayed
+  /// word exemption and retained-word ordering belong to the render plan.
+  var readAheadUntypedConcealCount: Int? {
+    !isFinished && !readAheadRevealEnabled ? configuration.readAheadConcealedWordCount : nil
+  }
+
+  func retainingPageReadAheadVisibility(from previous: TypingSession) -> TypingSession {
+    var copy = self
+    copy.readAheadRevealEnabled = previous.readAheadRevealEnabled
+    return copy
+  }
+
+  /// The pinned handler runs before editing and compares raw UTF-16 units.
+  /// Paste/IME insertion alone is not a physical Space/Backspace event.
+  mutating func observeReadAheadKeyDown(_ key: String) {
+    guard !isFinished, configuration.readAheadConcealedWordCount != nil,
+      key == " " || key == "Backspace", let field = promptCompositionField else { return }
+    if key == " " { readAheadRevealEnabled = false; return }
+    guard let entered = field.inputUTF16.last else { return }
+    let position = field.inputUTF16.count - 1
+    if !field.targetUTF16.indices.contains(position) || field.targetUTF16[position] != entered {
+      readAheadRevealEnabled = true
+    }
   }
 
   /// The existing typed-effect rule colors every target before the last

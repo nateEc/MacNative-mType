@@ -1,5 +1,7 @@
 # 单目标视口光标解析
 
+来源校正：READ_AHEAD_VISIBILITY_SOURCE_CONTRACT.md 对照原版 CSS 和独立 caret 控制器，推翻了本批曾将 readAhead／Simon 透明墨迹视作无光标的断言。后续在颜色层隐藏文字，逻辑位置和独立锚点保留；原生完整 getter 与局部 getter 相等只证明内部一致，不能代替该来源核对。
+
 后续：VIEWPORT_MEASURED_CARET_PROVIDER_CONTRACT.md 处理下文仍开放的普通／完整配置视口父视图索引查询，以及原生光标已有精确几何时的冗余 provider 读取。下文保留前批范围与实测，不代表后续查询策略仍未变化。
 
 2026-11-02，起点 80cc152f2cf759f4c6242dee99228b18ff8e2323。延续 VIEWPORT_INPUT_GEOMETRY_CONTRACT.md。该批保留几何后，每份新序列仍通过 promptCaretGlyphIndex 构造全文 acceptedPromptGlyphs。本批只消除已准入视口的此项全文目标扫描；普通入口默认值及不支持投影的完整规则保持不变。

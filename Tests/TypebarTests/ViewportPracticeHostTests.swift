@@ -34,7 +34,8 @@ import XCTest
     let prompt: String
     init(unicode: Bool = false, promptOverride: String? = nil,
       gatesSource: Bool = false, viewportEnabled: Bool = true, wordCount: Int = 201,
-      hostSize: CGSize = .init(width: 1000, height: 720)) throws {
+      hostSize: CGSize = .init(width: 1000, height: 720), modifiers: [TestModifier] = [.noQuit],
+      pageStore: PracticePageSessionStore? = nil) throws {
       // XCTest does not run NSApplicationMain. Initialize AppKit before the
       // hidden hierarchy so native wheel handling never depends on test order.
       _ = NSApplication.shared
@@ -42,8 +43,8 @@ import XCTest
       settings = AppSettings(defaults: defaults)
       settings.reducePracticeMotion = true
       settings.showAllPracticeLines = true
-      settings.testModifiers = [.noQuit]
-      let configuration = TestConfiguration.words(wordCount).with(modifiers: [.noQuit])
+      settings.testModifiers = modifiers
+      let configuration = TestConfiguration.words(wordCount).with(modifiers: modifiers)
       XCTAssertTrue(settings.saveActiveTestSelection(.init(preset: .init(configuration: configuration),
         testParameterMemory: .legacyDefaults(configuration: configuration))))
       container = try ModelContainer(for: TestResultRecord.self, TestPresetRecord.self,
@@ -73,7 +74,7 @@ import XCTest
         }, promptCaretIndex: { session in
           if session.prompt == prompt { counts.fullCaretTargetUnits.append(session.prompt.utf16.count) }
           return session.promptCaretGlyphIndex
-        }, wholePreviewViewportEnabled: viewportEnabled).modelContainer(container)
+        }, wholePreviewViewportEnabled: viewportEnabled, practiceSessionStore: pageStore).modelContainer(container)
       host = NSHostingView(rootView: AnyView(content.frame(width: hostSize.width, height: hostSize.height)))
       window = NSWindow(contentRect: .init(origin: .zero, size: hostSize),
         styleMask: .borderless, backing: .buffered, defer: false)
@@ -128,6 +129,40 @@ import XCTest
       defaults.removePersistentDomain(forName: suite)
       withExtendedLifetime(container) {}
     }
+  }
+
+  func testReadAheadNativeKeyBridgeRevealsAndRehidesAfterARejectedSpace() throws {
+    let page = PracticePageSessionStore()
+    let fixture = try Fixture(promptOverride: Array(repeating: "oak", count: 201).joined(separator: " "),
+      modifiers: [.readAhead], pageStore: page)
+    defer { fixture.close() }
+    fixture.waitUntil { fixture.promptReady }
+    let input = try XCTUnwrap(fixture.views(TypingInputView.self).first)
+    let native = try XCTUnwrap(fixture.views(PromptViewportPracticeNativeView.self).first)
+    func alpha(_ id: Int) -> CGFloat? {
+      native.viewport.canvas.renderedCellText(for: id)?.foregroundColor
+        .flatMap { NSColor($0).usingColorSpace(.deviceRGB)?.alphaComponent }
+    }
+    input.onInsert("oak x", false)
+    fixture.waitUntil { page.state.session.typed == "oak x" && alpha(5) == 0 }
+    let attempt = page.state.session.automaticInputAttemptID
+    func key(_ code: UInt16, _ characters: String) throws -> NSEvent {
+      try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+        timestamp: 1, windowNumber: fixture.window.windowNumber, context: nil,
+        characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code))
+    }
+    input.keyDown(with: try key(51, "\u{7f}"))
+    fixture.waitUntil { page.state.session.typed == "oak " && (alpha(5) ?? 0) > 0 }
+    XCTAssertTrue(page.state.session.readAheadRevealEnabled)
+    XCTAssertEqual(native.viewport.canvas.measuredMainCaretRect(style: .bar),
+      native.viewport.canvas.measuredRect(for: 4))
+    input.keyDown(with: try key(49, " "))
+    fixture.waitUntil { !page.state.session.readAheadRevealEnabled && alpha(5) == 0 }
+    XCTAssertEqual(page.state.session.typed, "oak ", "A rejected empty-word Space still resets source CSS")
+    XCTAssertEqual(page.state.session.automaticInputAttemptID, attempt)
+    XCTAssertTrue(fixture.views(TypingInputView.self).first === input)
+    XCTAssertTrue(native.viewport.canvas.hasCompleteHeight)
+    XCTAssertFalse(fixture.window.isVisible)
   }
 
   func testViewportParentAvoidsFullCaretQueriesAndFallbackRetainsItsResolver() throws {

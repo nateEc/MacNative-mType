@@ -83,6 +83,7 @@ struct PromptGlyphAppearance: Equatable {
 
   private static func applyWord(_ word: TypingPromptWordPresentation,
     wordColor: PromptGlyphColor?, blindMode: Bool, typedEffect: TypedCharacterEffect,
+    concealsUntyped: Bool = false,
     to appearance: inout Self) {
     guard appearance.color != .hidden else { return }
     if typedEffect == .hide && word.phase == .committed {
@@ -91,25 +92,39 @@ struct PromptGlyphAppearance: Equatable {
     }
     if let wordColor { appearance.color = wordColor }
     appearance.hasErrorUnderline = word.phase == .committed && word.hasCommitError && !blindMode
+    if concealsUntyped, appearance.color == .future { appearance.color = .hidden }
   }
 
   static func plan(
     glyphs: [TypingPromptGlyph], words: [TypingPromptWordPresentation],
     mode: PromptHighlightMode, blindMode: Bool, typedEffect: TypedCharacterEffect = .keep,
-    hidesUntypedGlyphs: Bool = false
+    hidesUntypedGlyphs: Bool = false, concealedUntypedWordCount: Int? = nil,
+    visibleWordIndices: [Int]? = nil, structuralBreakIndices: Set<Int> = [],
+    leadingStructuralMarker: Bool = false
   ) -> [Self] {
     var output = glyphs.map { initial($0, mode: mode) }
     let activeWord = words.firstIndex { $0.phase == .active }
+    var concealedWords = Set<Int>()
+    if let count = concealedUntypedWordCount, count > 0, let activeWord {
+      let visible = visibleWordIndices ?? Array(words.indices)
+      if let position = visible.firstIndex(of: activeWord), position > 0 || leadingStructuralMarker {
+        var previous: Int?
+        for word in visible.dropFirst(position).prefix(count) {
+          if let previous, structuralBreakIndices.contains(where: { $0 >= previous && $0 < word }) { break }
+          concealedWords.insert(word); previous = word
+        }
+      }
+    }
     for (wordIndex, word) in words.enumerated() {
       let ink = wordColor(index: wordIndex, word: word, activeWord: activeWord,
         mode: mode, blindMode: blindMode)
       for index in word.range where output.indices.contains(index) {
         applyWord(word, wordColor: ink, blindMode: blindMode,
-          typedEffect: typedEffect, to: &output[index])
+          typedEffect: typedEffect, concealsUntyped: concealedWords.contains(wordIndex), to: &output[index])
       }
       for index in word.extraGlyphIndices where output.indices.contains(index) {
         applyWord(word, wordColor: ink, blindMode: blindMode,
-          typedEffect: typedEffect, to: &output[index])
+          typedEffect: typedEffect, concealsUntyped: concealedWords.contains(wordIndex), to: &output[index])
       }
     }
     if hidesUntypedGlyphs {
@@ -123,7 +138,7 @@ struct PromptGlyphAppearance: Equatable {
   static func planWindow(glyphs: [TypingPromptGlyph], globalIndices: [Int],
     words: [(index: Int, value: TypingPromptWordPresentation)], activeWordIndex: Int?,
     mode: PromptHighlightMode, blindMode: Bool, typedEffect: TypedCharacterEffect = .keep,
-    hidesUntypedGlyphs: Bool = false) -> [Self]? {
+    hidesUntypedGlyphs: Bool = false, concealedUntypedWordIndices: Set<Int> = []) -> [Self]? {
     guard glyphs.count == globalIndices.count,
       globalIndices.allSatisfy({ $0 >= 0 }), Set(globalIndices).count == globalIndices.count
     else { return nil }
@@ -134,7 +149,7 @@ struct PromptGlyphAppearance: Equatable {
       for (local, global) in globalIndices.enumerated()
         where word.range.contains(global) || word.extraGlyphIndices.contains(global) {
         applyWord(word, wordColor: ink, blindMode: blindMode,
-          typedEffect: typedEffect, to: &output[local])
+          typedEffect: typedEffect, concealsUntyped: concealedUntypedWordIndices.contains(index), to: &output[local])
       }
     }
     if hidesUntypedGlyphs {

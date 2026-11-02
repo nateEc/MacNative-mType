@@ -49,15 +49,15 @@ import XCTest
     try assertCanonical(blind)
   }
 
-  func testHiddenCurrentTargetIsResolvedWithoutInventingAnAnchor() throws {
-    for modifier in [TestModifier.memory, .simonSays, .readAheadEasy, .readAheadHard] {
+  func testInkConcealmentKeepsCaretExceptForWholePromptMemoryConcealment() throws {
+    for modifier in [TestModifier.memory, .simonSays, .readAheadEasy, .readAhead, .readAheadHard] {
       var session = TypingSession(configuration: .words(3).with(modifiers: [modifier]),
         prompt: "oak ash elm")
       session.insert("o", at: date)
       let directory = try XCTUnwrap(PromptViewportTargetDirectory(session: session))
       let resolved = try XCTUnwrap(directory.resolveCaret(session: session))
-      XCTAssertNil(resolved.glyphIndex)
-      XCTAssertNil(session.promptCaretGlyphIndex)
+      XCTAssertEqual(resolved.glyphIndex, modifier == .memory ? nil : 1)
+      XCTAssertEqual(session.promptCaretGlyphIndex, modifier == .memory ? nil : 1)
     }
   }
 

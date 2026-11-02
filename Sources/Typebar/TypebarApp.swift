@@ -3685,6 +3685,12 @@ private struct ContentView: View {
         if isKeyDown { session.recordKeyboardActivity() }
         guard practiceAppearance.showTypingCompanion else { return }
         typingCompanionHands.handle(keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
+      },
+      onLogicalKeyDown: { [attemptID = session.automaticInputAttemptID] key in
+        guard pageSessionStore.acceptsInput(for: attemptID), !isPreparingPracticePrompt,
+          session.configuration.readAheadConcealedWordCount != nil,
+          key == "Backspace" || key == " " else { return }
+        session.observeReadAheadKeyDown(key)
       }
     )
     .opacity(0.01)

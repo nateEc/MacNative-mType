@@ -16,7 +16,11 @@ final class PracticePageSessionStore {
       return snapshot
     }
     set {
-      withMutation(keyPath: \.state) { storedState = newValue }
+      var next = newValue
+      if next.session.automaticInputAttemptID != storedState.session.automaticInputAttemptID {
+        next.session = next.session.retainingPageReadAheadVisibility(from: storedState.session)
+      }
+      withMutation(keyPath: \.state) { storedState = next }
       synchronizePaceTimer()
     }
   }

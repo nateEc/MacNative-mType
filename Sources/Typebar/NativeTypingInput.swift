@@ -152,6 +152,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void
     let onKeyDown: (UInt16, String?, NSEvent.ModifierFlags, Bool) -> Void
     let onPhysicalKey: (UInt16, Bool, Bool) -> Void
+    var onLogicalKeyDown: (String) -> Void = { _ in }
 
     final class Coordinator {
         var appliedFocusRequest = -1
@@ -203,6 +204,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onModifierFlagsChanged = onModifierFlagsChanged
         view.onKeyDown = onKeyDown
         view.onPhysicalKey = onPhysicalKey
+        view.onLogicalKeyDown = onLogicalKeyDown
         view.acceptsTextInput = acceptsTextInput
         view.refreshWindowFocusState()
         guard context.coordinator.appliedFocusRequest != focusRequest else { return }
@@ -265,6 +267,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var shouldFinishWithComposition: (String, Bool) -> Bool = { _, _ in false }
     var onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void = { _ in }
     var onKeyDown: (UInt16, String?, NSEvent.ModifierFlags, Bool) -> Void = { _, _, _, _ in }
+    var onLogicalKeyDown: (String) -> Void = { _ in }
     var onPhysicalKey: (UInt16, Bool, Bool) -> Void = { _, _, _ in }
 
     private var composition = NSAttributedString()
@@ -312,6 +315,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       onModifierFlagsChanged = { _ in }
       onKeyDown = { _, _, _, _ in }
       onPhysicalKey = { _, _, _ in }
+      onLogicalKeyDown = { _ in }
       bailoutClock = { .now }
     }
 
@@ -450,6 +454,10 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             event.charactersIgnoringModifiers,
             event.modifierFlags,
             event.isARepeat)
+        let logicalKey = event.keyCode == 51 ? "Backspace" : event.keyCode == 117 ? "Delete"
+          : (event.modifierFlags.contains(.control) && !event.modifierFlags.contains(.option)
+            ? event.charactersIgnoringModifiers : event.characters) ?? ""
+        onLogicalKeyDown(logicalKey)
         onModifierFlagsChanged(event.modifierFlags)
         if defersEscapeToComposition {
             compositionEscapeKeyCode = event.keyCode

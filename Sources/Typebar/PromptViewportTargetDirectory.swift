@@ -50,6 +50,7 @@ struct PromptViewportTargetDirectory {
   private let fieldRanges: [Range<Int>]
   private let wordOrdinalsAtFieldStart: [Int]
   private let separatorOffsets: [Int]
+  private let structuralBreakFields: Set<Int>
   var fieldCount: Int { fieldRanges.count }
 
   func fieldIndex(containingUTF16 offset: Int) -> Int? {
@@ -83,16 +84,29 @@ struct PromptViewportTargetDirectory {
     var ordinal = 0
     var starts: [Int] = []
     var separators: [Int] = []
+    var breaks = Set<Int>()
     starts.reserveCapacity(fieldRanges.count)
-    for range in fieldRanges {
+    for (field, range) in fieldRanges.enumerated() {
       starts.append(ordinal)
       for index in range where units[index] == 32 || units[index] == 10 {
         separators.append(index)
+        if units[index] == 10 { breaks.insert(field) }
         ordinal += 1
       }
     }
     wordOrdinalsAtFieldStart = starts
     separatorOffsets = separators
+    structuralBreakFields = breaks
+  }
+
+  func readAheadConcealedFields(active: Int?, count: Int?) -> Set<Int> {
+    guard let active, let count, count > 0, active > 0, active < fieldCount else { return [] }
+    var result = Set<Int>()
+    for field in active..<fieldCount {
+      result.insert(field)
+      if result.count == count || structuralBreakFields.contains(field) { break }
+    }
+    return result
   }
 
   func materialize(fields requested: Range<Int>) -> Slice? {

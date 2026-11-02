@@ -3,6 +3,18 @@
   "referenceRevision": "91bd24bb8513785c7364cbea29296ff7adafac41",
   "tests": [
     {
+      "id": "TypebarTests.ReadAheadSourceVisibilityTests/testHiddenTargetInkAndIndependentCaretAgainstPinnedSelectorsAndController",
+      "file": "Tests/TypebarTests/ReadAheadSourceVisibilityTests.swift"
+    },
+    {
+      "id": "TypebarTests.ReadAheadSourceVisibilityTests/testRevealKeyStateAgainstCompletePinnedPreEditHandler",
+      "file": "Tests/TypebarTests/ReadAheadSourceVisibilityTests.swift"
+    },
+    {
+      "id": "TypebarTests.ReadAheadSourceVisibilityTests/testReadAheadClassRetentionMatchesWordRebuildAndRemainsPageLocal",
+      "file": "Tests/TypebarTests/ReadAheadSourceVisibilityTests.swift"
+    },
+    {
       "id": "TypebarTests.FreshLazyEligibilityTests/testPinnedWordGeneratorHonorsPerComponentEligibility",
       "file": "Tests/TypebarTests/FreshLazyEligibilityTests.swift"
     },

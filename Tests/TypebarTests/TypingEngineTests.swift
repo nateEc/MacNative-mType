@@ -21759,30 +21759,34 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.modifiers, [.memory])
   }
 
-  func testSimonSaysHidesPendingCharactersButKeepsTheNextExpectedInputAvailable() {
+  func testSimonSaysKeepsLogicalInputAndIndependentCaretAvailable() {
     let configuration = TestConfiguration.words(2).with(modifiers: [.simonSays])
     var session = TypingSession(configuration: configuration, prompt: "amber bay")
 
-    XCTAssertTrue(session.promptGlyphs.allSatisfy { $0.state == .hidden })
+    XCTAssertEqual(session.promptGlyphs.first?.state, .current)
+    XCTAssertEqual(session.promptCaretGlyphIndex, 0)
     XCTAssertEqual(session.nextExpectedCharacter, "a")
     session.insert("a", at: start)
     XCTAssertEqual(session.promptGlyphs[0].state, .correct)
-    XCTAssertTrue(session.promptGlyphs.dropFirst().allSatisfy { $0.state == .hidden })
+    XCTAssertEqual(session.promptGlyphs[1].state, .current)
+    XCTAssertEqual(session.promptCaretGlyphIndex, 1)
     XCTAssertEqual(TestModifierPolicy.toggling(.simonSays, in: [.memory]), [.simonSays])
   }
 
-  func testReadAheadModifiersConcealTheConfiguredCurrentAndFutureWordsAfterStarting() {
+  func testReadAheadModifiersKeepLogicalGlyphAndCaretStates() {
     var session = TypingSession(
       configuration: TestConfiguration.words(4).with(modifiers: [.readAhead]),
       prompt: "amber harbor quiet moss")
     XCTAssertEqual(session.promptGlyphs.first?.state, .current)
     session.insert("a", at: start)
-    XCTAssertEqual(session.promptGlyphs[0].state, .hidden)
-    XCTAssertEqual(session.promptGlyphs[6].state, .hidden)
+    XCTAssertEqual(session.promptGlyphs[0].state, .correct)
+    XCTAssertEqual(session.promptGlyphs[1].state, .current)
+    XCTAssertEqual(session.promptGlyphs[6].state, .pending)
     XCTAssertEqual(session.promptGlyphs[13].state, .pending)
     session.insert("mber ", at: start)
-    XCTAssertEqual(session.promptGlyphs[6].state, .hidden)
-    XCTAssertEqual(session.promptGlyphs[13].state, .hidden)
+    XCTAssertEqual(session.promptGlyphs[6].state, .current)
+    XCTAssertEqual(session.promptCaretGlyphIndex, 6)
+    XCTAssertEqual(session.promptGlyphs[13].state, .pending)
     XCTAssertEqual(session.promptGlyphs[19].state, .pending)
     XCTAssertEqual(
       TestModifierPolicy.toggling(.readAheadHard, in: [.memory, .focusNextWord]), [.readAheadHard])

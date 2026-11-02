@@ -603,8 +603,14 @@ import XCTest
       XCTAssertEqual(pending.cancelled, 1)
       XCTAssertFalse(target().contains("owned1"))
       pending.finishFirst()
-      flush()
-      XCTAssertEqual(target(), Array(repeating: "owned2", count: 201).joined(separator: " "))
+      // Releasing generation does not complete the asynchronous render and
+      // publication stages. Observe publication, as the actual-generator
+      // scenario does, rather than treating one run-loop turn as a barrier.
+      let expected = Array(repeating: "owned2", count: 201).joined(separator: " ")
+      let publicationDeadline = Date().addingTimeInterval(20)
+      while target() != expected && Date() < publicationDeadline { flush() }
+      XCTAssertEqual(target(), expected,
+        "Replacement publication: calls=\(pending.calls) cancelled=\(pending.cancelled) projection=\(String(describing: pending.projectionElapsed)) rendering=\(String(describing: pending.renderingElapsed))")
     case .publish:
       pending.finishFirst()
       flush()

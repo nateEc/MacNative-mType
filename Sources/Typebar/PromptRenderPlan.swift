@@ -87,10 +87,42 @@ struct PromptRenderStyle: Equatable {
     indices = PromptGlyphLayout.indices(glyphs: glyphs, words: words,
       hideExtraLetters: session.configuration.rules.hideExtraLetters,
       firstRetainedWordIndex: session.firstRetainedPromptWordIndex)
+    var visibleWords: [Int]?
+    var structuralBreaks = Set<Int>()
+    var leadingStructuralMarker = false
+    if session.readAheadUntypedConcealCount != nil {
+      var retained: [Int] = []
+      if let projection = presentation?.projection {
+        for (index, field) in projection.fields.enumerated() {
+          if field.hasStructuralReturn { structuralBreaks.insert(index) }
+          if !field.isRetired && !field.isRemoved { retained.append(index) }
+        }
+      } else {
+        for index in words.indices where index >= session.firstRetainedPromptWordIndex
+          && !session.removedTapePromptWordIndices.contains(index) { retained.append(index) }
+        for (word, value) in words.enumerated() {
+          for id in value.range where glyphs.indices.contains(id) && glyphs[id].character == "\n" {
+            structuralBreaks.insert(word)
+          }
+          if glyphs.indices.contains(value.range.upperBound), glyphs[value.range.upperBound].character == "\n" {
+            structuralBreaks.insert(word)
+          }
+        }
+      }
+      visibleWords = retained
+      if let active = words.firstIndex(where: { $0.phase == .active }) {
+        leadingStructuralMarker = structuralBreaks.contains(session.firstRetainedPromptWordIndex - 1)
+          || structuralBreaks.contains(where: { $0 >= session.firstRetainedPromptWordIndex && $0 < active
+            && session.removedTapePromptWordIndices.contains($0) })
+      }
+    }
     appearances = PromptGlyphAppearance.plan(glyphs: glyphs, words: words,
       mode: sessionPolicy.highlightMode, blindMode: session.configuration.rules.blindMode,
       typedEffect: style.typedCharacterEffect,
-      hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
+      hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening)
+        || (session.configuration.modifiers.contains(.simonSays) && !session.isFinished),
+      concealedUntypedWordCount: session.readAheadUntypedConcealCount, visibleWordIndices: visibleWords,
+      structuralBreakIndices: structuralBreaks, leadingStructuralMarker: leadingStructuralMarker)
     emptyWordPlaceholder = presentation?.emptyPlaceholderIndex ?? session.zenEmptyWordPlaceholderGlyphIndex
     completedPromptColor = Self.promptColor(.completed, style: style)
     futurePromptColor = Self.promptColor(.future, style: style)
@@ -149,7 +181,10 @@ struct PromptRenderStyle: Equatable {
       activeWordIndex: localWords.activeWordIndex,
       mode: policy.highlightMode, blindMode: session.configuration.rules.blindMode,
       typedEffect: style.typedCharacterEffect,
-      hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening))
+      hidesUntypedGlyphs: session.configuration.modifiers.contains(.listening)
+        || (session.configuration.modifiers.contains(.simonSays) && !session.isFinished),
+      concealedUntypedWordIndices: directory.readAheadConcealedFields(active: localWords.activeWordIndex,
+        count: session.readAheadUntypedConcealCount))
     else { return nil }
     let caret = states.first { $0.glyph.state == .current }?.id
     let context = Self(windowSession: session, style: style,
