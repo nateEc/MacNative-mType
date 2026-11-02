@@ -160,6 +160,31 @@ if(process.argv[3]==='--hidden-word-navigation-fixtures'){
  assert.equal(execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
  console.log(JSON.stringify({fixtures}));process.exit(0);
 }
+if(process.argv[3]==='--embedded-lf-navigation-fixtures'){
+ for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',()=>false);
+ const units=text=>Array.from({length:text.length},(_,i)=>text.charCodeAt(i));
+ const fixtures=[];
+ for(const words of [['ab\ncd ','ef ','tail'],['ab\n\ncd ','ef ','tail'],['\nab ','ef ','tail']]){
+  const prefix=words[0].slice(0,words[0].indexOf('\n'));
+  const complete=words.join('');
+  for(const input of [prefix+'\n',words[0],complete,'\n',prefix+' ',
+    'x'+complete.slice(1),complete.replaceAll('\n',''),'\n\n'+words.at(-1)]){
+   for(const stop of ['off','word','letter'])for(const batched of [false,true]){
+    reset(words,{stop});Object.assign(Config,{blindMode:false,difficulty:'normal',quickEnd:false,keymapMode:'off',language:'english'});
+    const chunks=batched?[input]:Array.from(input);
+    for(const data of chunks){if(completed||failed)break;await main.namespace.emulateInsertText({data,now:1});}
+    fixtures.push({words,chunks,stop,started:active,finished:completed,failed,wordIndex,inputUnits:units(element),
+     events:inputEvents().map(e=>({payload:units(e.data??''),value:units(e.inputValue),
+      field:e.wordIndex,charIndex:e.charIndex,correct:e.correct,stopped:!!e.inputStopped,
+      commit:!!e.commitsWord,last:!!e.lastWord}))});
+   }
+  }
+ }
+ assert.equal(fixtures.length,144);
+ assert.equal(execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
+ await new Promise((resolve,reject)=>process.stdout.write(JSON.stringify({fixtures})+'\n',error=>error?reject(error):resolve()));
+ process.exit(0);
+}
 if(process.argv[3]==='--word-navigation-fixtures'){
  for(const id of ['test/funbox/list','test/funbox/active'])modules.get(id)?.setExport('isFunboxActiveWithProperty',()=>false);
  let navigation=[];
