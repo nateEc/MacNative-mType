@@ -64,12 +64,12 @@ final class ReplayInputTextView: NSTextView {
 
   @discardableResult
   func update(glyphs: [TypingPromptGlyph]) -> Bool {
-    guard !hasRendered || glyphs != renderedGlyphs else { return false }
+    guard !hasRendered || !ReplayGlyphIdentity.matches(glyphs, renderedGlyphs) else { return false }
     guard let storage = textStorage else { return false }
 
     var matchingPrefix = 0
     while matchingPrefix < min(renderedGlyphs.count, glyphs.count),
-      renderedGlyphs[matchingPrefix] == glyphs[matchingPrefix]
+      ReplayGlyphIdentity.matches(renderedGlyphs[matchingPrefix], glyphs[matchingPrefix])
     {
       matchingPrefix += 1
     }

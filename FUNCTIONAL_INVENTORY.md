@@ -2,6 +2,8 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| REPLAY-TEXT-IDENTITY-102 | 回放原始编码、增量偏移和规范等价更新 | 固定参考原始字符串边界；AppKit 文本存储 | REPLAY_TEXT_IDENTITY_CONTRACT.md，七项新增与实际隐藏 SwiftUI 桥接 | 已修正，201 项回放相关回归及 Debug 包通过；实体输入与 VoiceOver 待验，不代表全套通过。 |
+| CODE-SCAFFOLD-SPACE-103 | 多行代码脚手架缩进与完成 | 现有原创代码自定义会话的两项测试 | CODE_SCAFFOLD_INPUT_GAP.md，八个语言分支、24 处失败 | 未解决，需继续定位行首空格丢失；原测试及失败证据保留。 |
 | LANG-EGYPT-BASIC-99 | 埃及阿拉伯语基础独立词形与短语 | 固定 arz 词典／原句、旧自写词；原版只读聚合 | 210 项，7 双词字段，全单位直方图与键集；ARABIC_DIALECT_CORPUS_CONTRACT.md | 已接入，重建、78 项回归与 Debug 包通过；语言质量与实体输入待验。 |
 | LANG-EGYPT-1K-100 | 埃及 1k 字面内容和四词／前导空格框架 | 独立方言词条与完整原句片段 | 1141 项，联合空格类别、逐词续段与历史；ARABIC_DIALECT_CORPUS_CONTRACT.md | 已接入，78 项回归、框架及 Debug 包通过；其他合成语言仍开放。 |
 | LANG-MOROCCO-BASIC-101 | 摩洛哥词形、Tatweel 与有见证的组件标记 | 固定 ary 词典／原句，两种证据明确区分 | 229 项，6 标记字段、原生几何与完成；ARABIC_DIALECT_CORPUS_CONTRACT.md | 已接入，来源、几何及 78 项／Debug 包通过；标记写法审校及 VoiceOver 未验。 |

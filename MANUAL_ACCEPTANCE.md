@@ -25,6 +25,8 @@
 | LANG-EGYPT-BASIC-99 | 埃及基础短语的输入与重复 | 单个隔离实例选择双词字段，用物理键盘完成两个组件并重复；检查保存的旧目标仍原样。 | 字段切分、词数、评分与重复一致；词形是否自然另行审校。 | 待验收（ARABIC_DIALECT_CORPUS_CONTRACT.md 的自动生成证据不替代方言与实体输入验收） |
 | LANG-EGYPT-1K-100 | 埃及四词字段与前导空格 | 单个隔离实例选择四词条目及带前导空格条目，逐词输入，重复并核对结果记录。 | 多词和裁边不多占词槽，队列继续正确，历史目标不被新词库改写。 | 待验收（自动续段与工厂回归见 ARABIC_DIALECT_CORPUS_CONTRACT.md） |
 | LANG-MOROCCO-BASIC-101 | 摩洛哥标记与延长符 | 单个隔离实例输入含 Tatweel、shadda 和 fathatan 的字段，观察候选、连接字形和光标，并用 VoiceOver 朗读目标。 | 原字符与标记可输入并正确完成，字格和读序可用；组件标记变换仍需语言审校。 | 待验收（原生几何验证不能替代物理输入法或 VoiceOver，见 ARABIC_DIALECT_CORPUS_CONTRACT.md） |
+| REPLAY-TEXT-IDENTITY-102 | 回放原始编码与样式偏移 | 单个隔离实例回放重音与韩文原始编码不同的目标，追加／回拨，定位后一错误字符并用 VoiceOver 检查。 | 真实文本随编码变化刷新，后续样式与索引一致；相同文本不多余重绘滚动。 | 待验收（201 项自动化及隐藏原生桥接通过，本轮未启动可见窗口，见 REPLAY_TEXT_IDENTITY_CONTRACT.md） |
+| CODE-SCAFFOLD-SPACE-103 | 多行代码缩进完成 | 待修正后在单个隔离实例逐字符输入八个失败分支的完整原创脚手架，检查行首空格、完成结果、保存与重复。 | 行首缩进按目标保留，输入完整文本后正常完成，归档及重复保持原目标。 | 待验收（当前两项自动化仍有 24 处失败，根因待定位，见 CODE_SCAFFOLD_INPUT_GAP.md） |
 | INP-ADMISSION-RETIREMENT-95 | 输入接纳关闭与离场迟到输入 | 单个隔离实例在准备／离场边界尝试字面输入、删除与候选确认，重开后继续新目标。 | 关闭接纳期间不提交或删除，显式重开可用，旧页不接收迟到操作。 | 待验收（原生受控回归不能替代实体 IME 或焦点交错验收） |
 | LANG-MALAY-LITERAL-76 | 马来语两档与短语候选 | 单个隔离实例逐档练习最长词、连字符、带空格候选和标点开启后的大写 S；检查一／二词配额、重复、旧结果与完整署名。 | 候选按源规则拆词，边界与输入完整；旧 30 词保留，观察缺失显示 NA 不冒充零，结果目标不重写。 | 待验收（固定来源与原生证据见 MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md；语言质量、分布、实体输入／IME／VoiceOver 与性能未验） |
 | FUN-EMPTY-SPACE-ADMISSION-77 | 空输入与目标开头空格 | 单个隔离实例使用有开头空格／连续空格的目标，以 normal、严格、expert／master 和 hard delete 分别按 Space／Enter；检查计时、No Quit、声音、回放及 IME 空格。 | 普通空输入忽略 Space，不因目标为空格启动尝试；独立条件、Return 与恢复动作仍按原版处理，回放不记录不存在的插入。 | 待验收（144 个源码对照及相邻回归见 MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md；实体输入／IME 和完整组合未验） |

@@ -131,8 +131,10 @@ final class ReplayCharacterTextView: NSTextView {
     let validGlyphs = glyphs.flatMap {
       String($0.map(\.character)).utf16.elementsEqual(text.utf16) ? $0 : nil
     }
-    guard renderedText != text || self.reachableIndices != reachableIndices
-      || renderedSelection != selectedIndex || renderedGlyphs != validGlyphs || renderedErrors != errorIndices
+    let sameText = renderedText.map { InputTextIdentity.matches($0, text) } ?? false
+    guard !sameText || self.reachableIndices != reachableIndices
+      || renderedSelection != selectedIndex || !ReplayGlyphIdentity.matches(renderedGlyphs, validGlyphs)
+      || renderedErrors != errorIndices
     else { return }
     let characters = validGlyphs?.map(\.character) ?? Array(text)
     utf16Index = ReplayCharacterUTF16Index(characters: characters)
