@@ -13905,10 +13905,10 @@ final class TypingEngineTests: XCTestCase {
        .unknown, "telugu", "te", "te-IN", "ఴ", 0x0C00...0x0C7F),
       ("bangla10k", "বাংলা · 10k · Typebar", 9_734, 1, 16, 1, 10, 9_392, 15, 0,
        .unknown, "bangla", "bn", "bn-BD", "ৱ", 0x0980...0x09FF),
-      ("hindi1k", "हिन्दी · 1k · Typebar", 999, 1, 12, 1, 7, 956, 0, 0,
-       .unknown, "hindi", "hi", "hi-IN", "ॹ", 0x0900...0x097F),
+      ("hindi1k", "हिन्दी · 1k · Typebar", 999, 1, 12, 1, 6, 956, 0, 0,
+       .unknown, "hindi", "hi", "hi-IN", "", 0x0900...0x097F),
       ("gujarati1k", "ગુજરાતી · 1k · Typebar", 1_004, 1, 19, 1, 12, 900, 0, 33,
-       .unknown, "gujarati", "gu", "gu-IN", "ૹ", 0x0A80...0x0AFF),
+       .unknown, "gujarati", "gu", "gu-IN", "", 0x0A80...0x0AFF),
     ]
 
     for (
@@ -13934,7 +13934,9 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
-      XCTAssertTrue(words.allSatisfy { $0.contains(originalMarker) }, rawValue)
+      if !originalMarker.isEmpty {
+        XCTAssertTrue(words.allSatisfy { $0.contains(originalMarker) }, rawValue)
+      }
       XCTAssertEqual(words.lazy.map(\.unicodeScalars.count).min(), minimumScalars, rawValue)
       XCTAssertEqual(words.lazy.map(\.unicodeScalars.count).max(), maximumScalars, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), minimumCharacters, rawValue)

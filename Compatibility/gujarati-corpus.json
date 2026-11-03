@@ -1,0 +1,78 @@
+{
+  "artifacts": {
+    "Resources/GujaratiCorpusNotices.txt": "03be99a46c365e3d7a2cbdde823bd1687dfcb7b6769dde676fa2b88470d82211",
+    "Resources/GujaratiCorpusSources.txt": "4fa618a7b7864bfa38e7b5568e57125f343a2d53eaed1a1e04b507a261018257",
+    "Sources/Typebar/GujaratiCorpus.generated.swift": "017576cabb0f55d2f978933893e81936314726c6e11e8323aeccd0d3d963c0da"
+  },
+  "contributorIdentifiers": 7,
+  "dictionarySHA256": "8811fd6d77cf380066a01c0b5df4d784651101b923f9e4cf62401f2d0fda8405",
+  "dictionaryURL": "https://kaikki.org/dictionary/Gujarati/kaikki.org-dictionary-Gujarati.jsonl",
+  "frequencyMember": null,
+  "frequencyMemberSHA256": null,
+  "frequencyWheelSHA256": null,
+  "legacyUnattested": [
+    "ધીરજ",
+    "નોંધપોથી",
+    "પર્ણ",
+    "પુલ",
+    "પ્રયત્ન",
+    "વિરામ",
+    "સરળતા",
+    "હિંમત"
+  ],
+  "pools": {
+    "1k": {
+      "categories": {
+        "mark spaces=0": 868,
+        "mark spaces=1": 27,
+        "mark spaces=2": 3,
+        "mark spaces=3": 2,
+        "plain spaces=0": 103,
+        "plain spaces=1": 1
+      },
+      "characters": " ંઃઅઆઇઈઉઊએઐઓઔકખગઘઙચછજઝઞટઠડઢણતથદધનપફબભમયરલળવશષસહાિીુૂૃેૈૉોૌ્",
+      "count": 1004,
+      "leadingSpaces": 1,
+      "maximumGraphemeCount": 12,
+      "maximumUTF16Length": 19,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 1,
+      "sentenceObserved": 245,
+      "sourceKinds": {
+        "dictionary": 960,
+        "dictionary-character": 4,
+        "sentence-fragment": 32,
+        "typebar-legacy": 8
+      },
+      "trailingSpaces": 1,
+      "wordfreqObserved": 0,
+      "wordsSHA256": "cd4726c78e0f90dcaeb74ce412c461930d351305ece72ba379ff6531d252f342"
+    },
+    "basic": {
+      "categories": {
+        "mark spaces=0": 199,
+        "plain spaces=0": 15
+      },
+      "characters": "ંઅઆઈઉએઓકખગઘચછજટઠડણતથદધનપફબભમયરલળવશષસહાિીુૂૃેો્",
+      "count": 214,
+      "leadingSpaces": 0,
+      "maximumGraphemeCount": 6,
+      "maximumUTF16Length": 12,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 1,
+      "sentenceObserved": 185,
+      "sourceKinds": {
+        "dictionary": 202,
+        "dictionary-character": 4,
+        "typebar-legacy": 8
+      },
+      "trailingSpaces": 0,
+      "wordfreqObserved": 0,
+      "wordsSHA256": "bca8552b5d3ce1b53eb7c7451ff41968be3e76769e5f93c010171489b5cb2791"
+    }
+  },
+  "revision": "kaikki-gu-20261103-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 168,
+  "sentencesSHA256": "5702f42ba49c53a570f6550285254acea0a4d8dbfb80a9d9d0d6d7652edce04b"
+}

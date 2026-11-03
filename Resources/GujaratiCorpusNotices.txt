@@ -1,0 +1,53 @@
+Typebar independent Gujarati literal entries
+Revision: kaikki-gu-20261103-literal-v1
+English Wiktionary contributors via Kaikki.org / Wiktextract.
+Dictionary: https://kaikki.org/dictionary/Gujarati/kaikki.org-dictionary-Gujarati.jsonl
+Snapshot SHA-256: 8811fd6d77cf380066a01c0b5df4d784651101b923f9e4cf62401f2d0fda8405
+Index reports extraction 2026-10-30; enwiktionary dump 2026-10-01;
+Wiktextract 19f9a30 / 6f96ddf.
+Dictionary selection: CC BY-SA 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+Contributor pages: https://en.wiktionary.org/wiki/ + encoded sourceTitle.
+Only unchanged NFC titles/forms of lang_code=gu are selected.
+Nonstandard/proscribed/misspelling-only senses, romanizations, template/error
+forms are excluded. Dictionary character/symbol entries are single characters
+and explicitly identified as dictionary-character; they are character practice,
+not claimed to be complete lexical words. Other entries retain their source POS.
+All 24 old Typebar starters remain in both pools; no old-word length exceptions.
+Selected lexical attestation missing for: ધીરજ, નોંધપોથી, પર્ણ, પુલ, પ્રયત્ન, વિરામ, સરળતા, હિંમત.
+This concerns selected lexical categories, not all raw dictionary occurrences.
+No artificial spelling, case edits, numbered padding, or original Monkeytype
+word values, source code or assets are used. Reference character sets and shape
+counts alone constrain selection. Runtime Zipf support remains unknown.
+Source units are BMP UTF-16 units, not graphemes. Pinned Node v24.19.0 /
+Unicode 17.0 segmentation is required: maximum Hindi basic/1k 5/6 graphemes,
+Gujarati basic/1k 6/12. Native Swift independently checks selected-word maxima.
+Per-item provenance: GujaratiCorpusSources.txt.
+
+Tatoeba Gujarati contributors: CC BY 2.0 France.
+https://creativecommons.org/licenses/by/2.0/fr/
+https://tatoeba.org/en/downloads
+Sentences: https://downloads.tatoeba.org/exports/per_language/guj/guj_sentences_detailed.tsv.bz2
+Snapshot SHA-256: 5702f42ba49c53a570f6550285254acea0a4d8dbfb80a9d9d0d6d7652edce04b
+Sentence rows: 168; contributor identifiers: 7.
+Whole-token observations preserve digits, hyphens, underscores, apostrophes,
+marks and controls within token boundaries. Tokens and contiguous excerpts
+are used unchanged; no normalization creates an observation. One observation
+per sentence; missing data is NA, never zero or estimated component frequency.
+Gujarati multiword and border-space options may be literal contiguous sentence
+excerpts, identified as sentence-fragment and credited separately. Their exact
+spaces remain in the corpus; normal word generation trims borders and consumes
+one slot per component, as it did before this corpus change. No artificial
+spaces or sentence concatenation is used. Only selected excerpts are bundled;
+no full sentence collection, translations or audio is distributed.
+
+Tatoeba contributor identifiers (all processed rows):
+Balamax https://tatoeba.org/en/user/profile/Balamax
+Rav https://tatoeba.org/en/user/profile/Rav
+deejeypatel https://tatoeba.org/en/user/profile/deejeypatel
+pinkmoon https://tatoeba.org/en/user/profile/pinkmoon
+prathmeshpune https://tatoeba.org/en/user/profile/prathmeshpune
+rOhit https://tatoeba.org/en/user/profile/rOhit
+smettems https://tatoeba.org/en/user/profile/smettems
+
+No wordfreq dataset is used for Gujarati.

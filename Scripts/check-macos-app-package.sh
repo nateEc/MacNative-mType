@@ -156,6 +156,18 @@ cmp "$project_root/Resources/NepaliCorpusNotices.txt" \
 cmp "$project_root/Resources/NepaliCorpusSources.txt" \
   "$app_path/Contents/Resources/NepaliCorpusSources.txt" \
   || fail "Nepali spelling sources missing or modified"
+cmp "$project_root/Resources/HindiCorpusNotices.txt" \
+  "$app_path/Contents/Resources/HindiCorpusNotices.txt" \
+  || fail "Hindi corpus attribution missing or modified"
+cmp "$project_root/Resources/HindiCorpusSources.txt" \
+  "$app_path/Contents/Resources/HindiCorpusSources.txt" \
+  || fail "Hindi spelling sources missing or modified"
+cmp "$project_root/Resources/GujaratiCorpusNotices.txt" \
+  "$app_path/Contents/Resources/GujaratiCorpusNotices.txt" \
+  || fail "Gujarati corpus attribution missing or modified"
+cmp "$project_root/Resources/GujaratiCorpusSources.txt" \
+  "$app_path/Contents/Resources/GujaratiCorpusSources.txt" \
+  || fail "Gujarati spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

@@ -13186,27 +13186,11 @@ enum StarterLexicon {
     "nanban", "friend", "medhuva", "quick", "kathuko", "practice", "ezhuthu", "read",
   ]
 
-  // Typebar-authored Hindi starter words exercise normal macOS composed-text
-  // input without importing a third-party or reference word list.
-  static let hindiWords = [
-    "पुस्तक", "कलम", "खिड़की", "रास्ता", "रोशनी", "पुल", "सुबह", "कागज़", "बगीचा", "बादल",
-    "शांति", "दीपक", "पहाड़", "बीज", "संगीत", "मेज़", "विचार", "टिप्पणी", "कल्पना", "प्रयास",
-    "दूरी", "कदम", "धैर्य", "संतुलन",
-  ]
-
-  private static let hindi1kAlphabet = Array("कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह")
+  // Independent dictionary spellings and explicit character entries retain old starters.
+  static var hindiWords: [String] { HindiCorpus.basic }
 
   static var hindi1kLexicon: IndexedLexicon {
-    let marker: Character = "ॹ"
-    let mark = "ा"
-    return IndexedLexicon(count: 999) { index in
-      if index == 0 { return String(marker) }
-      if index == 1 {
-        return String(repeating: marker, count: 7) + String(repeating: mark, count: 5)
-      }
-      let base = String(marker) + nativeScriptScaleIndex(index, alphabet: hindi1kAlphabet)
-      return index <= 956 ? base + mark : base
-    }
+    IndexedLexicon(count: 999) { HindiCorpus.words1k[$0] }
   }
 
   static var hindi1kWords: [String] { hindi1kLexicon.materialized() }
@@ -13219,40 +13203,11 @@ enum StarterLexicon {
     "dost", "friend", "jaldi", "slow", "seekho", "practice", "likho", "read",
   ]
 
-  // Typebar-authored Gujarati starter words exercise normal macOS composed-text
-  // input without importing a third-party or reference word list.
-  static let gujaratiWords = [
-    "બારી", "પતંગ", "નદી", "દીવો", "પર્ણ", "રંગ", "ચિત્ર", "ઘડિયાળ", "સફર", "સૂરજ",
-    "વાદળ", "પુલ", "કિનારો", "સંગીત", "પ્રશ્ન", "જવાબ", "કલ્પના", "નોંધપોથી", "પ્રયત્ન", "વિરામ",
-    "હિંમત", "ધીરજ", "સરળતા", "તાલ",
-  ]
-
-  private static let gujarati1kAlphabet = Array("કખગઘઙચછજઝઞટઠડઢણતથદધનપફબભમયરલવશષસહળ")
+  // Literal dictionary entries and credited sentence excerpts preserve phrase shapes.
+  static var gujaratiWords: [String] { GujaratiCorpus.basic }
 
   static var gujarati1kLexicon: IndexedLexicon {
-    let marker: Character = "ૹ"
-    let mark = "ા"
-    return IndexedLexicon(count: 1_004) { index in
-      if index == 0 { return String(marker) }
-      if index == 1 {
-        return String(repeating: marker, count: 12) + String(repeating: mark, count: 7)
-      }
-      var entry = String(marker)
-        + nativeScriptScaleIndex(index, alphabet: gujarati1kAlphabet)
-      if index <= 900 { entry += mark }
-      let spaceOrdinal: Int? = if (2...33).contains(index) {
-        index - 2
-      } else if index == 901 {
-        32
-      } else {
-        nil
-      }
-      if let spaceOrdinal {
-        let spaces = spaceOrdinal < 28 ? 1 : (spaceOrdinal < 31 ? 2 : 3)
-        entry += String(repeating: " ", count: spaces) + String(marker)
-      }
-      return entry
-    }
+    IndexedLexicon(count: 1_004) { GujaratiCorpus.words1k[$0] }
   }
 
   static var gujarati1kWords: [String] { gujarati1kLexicon.materialized() }

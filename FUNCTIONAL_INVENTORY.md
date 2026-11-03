@@ -2,6 +2,8 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-HINDI-LITERAL-87 | Hindi 基础／1k 真实词形与字符练习 | 固定独立 Wiktionary／Kaikki、wordfreq hi、Tatoeba hin；原版只取聚合 | 200／999，完整字符集合，旧词保留，字素最长 5／6；HI_GU_CORPUS_CONTRACT.md | 已接入，来源重建、79 项定向、733 项扩大／152 项源码对照和显式 Release 包通过；语言质量／分布、实体 IME 和 VoiceOver 待验。 |
+| LANG-GUJARATI-LITERAL-88 | Gujarati 基础／1k、组合标记与多词／边缘空格 | 独立词典及原样 Tatoeba guj 连续摘录，字符项分开标注 | 214／1004，联合类别与 33 个空格项，前导／尾随各一；HI_GU_CORPUS_CONTRACT.md | 已接入，来源重建、79 项定向、733 项扩大／152 项源码对照和显式 Release 包通过；生产词槽与成绩回归通过，语言质量／实体操作待验。 |
 | LANG-KOREAN-LITERAL-85 | 韩语基础／1k／5k 真实音节词项 | 独立 Kaikki／English Wiktionary、wordfreq ko 与 Tatoeba kor 观察；原版只取聚合 | 470／975／4201；独立键集及旧词额外音节明示；KO_NE_CORPUS_CONTRACT.md | 已接入生产，来源重建、73 项定向、727 项扩大回归、152 项源码对照及 Release 包通过；设备／语言质量待验收。 |
 | LANG-NEPALI-LITERAL-86 | 尼泊尔语基础／1k 字面词库与组合标记 | 独立词典及 Tatoeba npi 观察；分开验证 UTF-16 和字素 | 200／1000，182／927 含标记；旧基础额外 ङ 保留，字素上限 5／6；KO_NE_CORPUS_CONTRACT.md | 已接入生产，来源重建及组合标记／成绩回归通过，727 项扩大、152 项源码对照及 Release 包通过；真实 IME／设备待验收。 |
 | LANG-AZERBAIJANI-LITERAL-83 | 阿塞拜疆语基础／1k、组合点与旧词 | 独立 Kaikki／English Wiktionary、Tatoeba aze；原版仅聚合约束 | 199／989 项及完整键集；两个 İ 默认小写改编，旧词长度例外明示；AZ_MN_CORPUS_CONTRACT.md | 部分完成：先行反例后 63 项定向、714 项扩大／152 项源对照、来源重建、署名与显式 Release 包通过；语言质量、分布、实体输入和 VoiceOver 待验。 |

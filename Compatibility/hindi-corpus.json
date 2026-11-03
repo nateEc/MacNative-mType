@@ -1,0 +1,61 @@
+{
+  "artifacts": {
+    "Resources/HindiCorpusNotices.txt": "398121a277b6c82e396cf611e5dabf2e207f7ec15bb8b0ce36edd2f6f7dfb6c5",
+    "Resources/HindiCorpusSources.txt": "338114066d72c01fa415839528f61a638d1eb24df3cd60baa59109662a7419d4",
+    "Sources/Typebar/HindiCorpus.generated.swift": "aaf17114ed66a55990edd27d084594e935cb2cd475327476171c12ddac02145e"
+  },
+  "contributorIdentifiers": 113,
+  "dictionarySHA256": "f4a417e93e7d494712a974e0ce167d071d01a75898917e194f4ca58ec7817e6c",
+  "dictionaryURL": "https://kaikki.org/dictionary/Hindi/kaikki.org-dictionary-Hindi.jsonl",
+  "frequencyMember": "wordfreq/data/small_hi.msgpack.gz",
+  "frequencyMemberSHA256": "92ccbf70297d28e97af55a2a517b95c3d8b599e4cc943fb6d4612a3d44a86992",
+  "frequencyWheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473",
+  "legacyUnattested": [],
+  "pools": {
+    "1k": {
+      "categories": {
+        "mark spaces=0": 956,
+        "plain spaces=0": 43
+      },
+      "characters": "ँंःअआइईउऊएऐओऔकखगघचछजझञटठडढणतथदधनपफबभमयरलवशषसह़ािीुूृेैोौ्ॐ",
+      "count": 999,
+      "leadingSpaces": 0,
+      "maximumGraphemeCount": 6,
+      "maximumUTF16Length": 12,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 1,
+      "sentenceObserved": 913,
+      "sourceKinds": {
+        "dictionary": 997,
+        "dictionary-character": 2
+      },
+      "trailingSpaces": 0,
+      "wordfreqObserved": 995,
+      "wordsSHA256": "d54a620f8c1345605fac07734f912446a356c83120977286bc05b2d2d42eadcb"
+    },
+    "basic": {
+      "categories": {
+        "mark spaces=0": 193,
+        "plain spaces=0": 7
+      },
+      "characters": "ँंअआइईउऊएऐकखगचछजटठडणतथदधनपफबभमयरलवशषसह़ािीुूृेैो्",
+      "count": 200,
+      "leadingSpaces": 0,
+      "maximumGraphemeCount": 5,
+      "maximumUTF16Length": 10,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 2,
+      "sentenceObserved": 192,
+      "sourceKinds": {
+        "dictionary": 200
+      },
+      "trailingSpaces": 0,
+      "wordfreqObserved": 198,
+      "wordsSHA256": "6bdb315e2b07ac598c1b2cb83d864aeb8ca2a28189da5476f11e261e0fda6f70"
+    }
+  },
+  "revision": "kaikki-hi-20261103-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 16475,
+  "sentencesSHA256": "596c48494d1e76ac7d5954d53a930342628cae9f4c884ae10c080986834bc10f"
+}

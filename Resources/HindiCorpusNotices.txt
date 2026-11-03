@@ -1,0 +1,301 @@
+Typebar independent Hindi literal entries
+Revision: kaikki-hi-20261103-literal-v1
+English Wiktionary contributors via Kaikki.org / Wiktextract.
+Dictionary: https://kaikki.org/dictionary/Hindi/kaikki.org-dictionary-Hindi.jsonl
+Snapshot SHA-256: f4a417e93e7d494712a974e0ce167d071d01a75898917e194f4ca58ec7817e6c
+Index reports extraction 2026-10-30; enwiktionary dump 2026-10-01;
+Wiktextract 19f9a30 / 6f96ddf.
+Dictionary selection: CC BY-SA 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+Contributor pages: https://en.wiktionary.org/wiki/ + encoded sourceTitle.
+Only unchanged NFC titles/forms of lang_code=hi are selected.
+Nonstandard/proscribed/misspelling-only senses, romanizations, template/error
+forms are excluded. Dictionary character/symbol entries are single characters
+and explicitly identified as dictionary-character; they are character practice,
+not claimed to be complete lexical words. Other entries retain their source POS.
+All 24 old Typebar starters remain in both pools; no old-word length exceptions.
+Selected lexical attestation missing for: (none).
+This concerns selected lexical categories, not all raw dictionary occurrences.
+No artificial spelling, case edits, numbered padding, or original Monkeytype
+word values, source code or assets are used. Reference character sets and shape
+counts alone constrain selection. Runtime Zipf support remains unknown.
+Source units are BMP UTF-16 units, not graphemes. Pinned Node v24.19.0 /
+Unicode 17.0 segmentation is required: maximum Hindi basic/1k 5/6 graphemes,
+Gujarati basic/1k 6/12. Native Swift independently checks selected-word maxima.
+Per-item provenance: HindiCorpusSources.txt.
+
+Tatoeba Hindi contributors: CC BY 2.0 France.
+https://creativecommons.org/licenses/by/2.0/fr/
+https://tatoeba.org/en/downloads
+Sentences: https://downloads.tatoeba.org/exports/per_language/hin/hin_sentences_detailed.tsv.bz2
+Snapshot SHA-256: 596c48494d1e76ac7d5954d53a930342628cae9f4c884ae10c080986834bc10f
+Sentence rows: 16475; contributor identifiers: 113.
+Whole-token observations preserve digits, hyphens, underscores, apostrophes,
+marks and controls within token boundaries. Tokens and contiguous excerpts
+are used unchanged; no normalization creates an observation. One observation
+per sentence; missing data is NA, never zero or estimated component frequency.
+Gujarati multiword and border-space options may be literal contiguous sentence
+excerpts, identified as sentence-fragment and credited separately. Their exact
+spaces remain in the corpus; normal word generation trims borders and consumes
+one slot per component, as it did before this corpus change. No artificial
+spaces or sentence concatenation is used. Only selected excerpts are bundled;
+no full sentence collection, translations or audio is distributed.
+
+wordfreq 3.1.1 observations: https://pypi.org/project/wordfreq/3.1.1/
+Wheel SHA-256: 4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473
+Member: wordfreq/data/small_hi.msgpack.gz
+Member SHA-256: 92ccbf70297d28e97af55a2a517b95c3d8b599e4cc943fb6d4612a3d44a86992
+26653 observed whole tokens; bands rank independently attested spellings,
+not usage counts or runtime Zipf values. No frequency-only entries are added.
+
+Tatoeba contributor identifiers (all processed rows):
+(unowned)
+ABChessel https://tatoeba.org/en/user/profile/ABChessel
+Abcormal https://tatoeba.org/en/user/profile/Abcormal
+Adelpa https://tatoeba.org/en/user/profile/Adelpa
+AnjaliNoronha https://tatoeba.org/en/user/profile/AnjaliNoronha
+Arraroak https://tatoeba.org/en/user/profile/Arraroak
+Balamax https://tatoeba.org/en/user/profile/Balamax
+BijendraHansda https://tatoeba.org/en/user/profile/BijendraHansda
+Casmurro https://tatoeba.org/en/user/profile/Casmurro
+Dianochka https://tatoeba.org/en/user/profile/Dianochka
+ElClonguero https://tatoeba.org/en/user/profile/ElClonguero
+HAGNi https://tatoeba.org/en/user/profile/HAGNi
+JohnKnaphus https://tatoeba.org/en/user/profile/JohnKnaphus
+Josephlingo https://tatoeba.org/en/user/profile/Josephlingo
+Kedron_Brook https://tatoeba.org/en/user/profile/Kedron_Brook
+LanguageExpert https://tatoeba.org/en/user/profile/LanguageExpert
+LeeSooHa https://tatoeba.org/en/user/profile/LeeSooHa
+MukundChaskar https://tatoeba.org/en/user/profile/MukundChaskar
+NigerianSmiths https://tatoeba.org/en/user/profile/NigerianSmiths
+NoahAB https://tatoeba.org/en/user/profile/NoahAB
+Poliglotski https://tatoeba.org/en/user/profile/Poliglotski
+Prakash_Baski https://tatoeba.org/en/user/profile/Prakash_Baski
+PrasantaHembram https://tatoeba.org/en/user/profile/PrasantaHembram
+Priyesh https://tatoeba.org/en/user/profile/Priyesh
+RadiumCat https://tatoeba.org/en/user/profile/RadiumCat
+Ramona https://tatoeba.org/en/user/profile/Ramona
+Rovo https://tatoeba.org/en/user/profile/Rovo
+Saumya https://tatoeba.org/en/user/profile/Saumya
+Serg_K1ng https://tatoeba.org/en/user/profile/Serg_K1ng
+ShivMantra https://tatoeba.org/en/user/profile/ShivMantra
+Sorcien https://tatoeba.org/en/user/profile/Sorcien
+SunnyMoon https://tatoeba.org/en/user/profile/SunnyMoon
+SwamiAman https://tatoeba.org/en/user/profile/SwamiAman
+Vikas https://tatoeba.org/en/user/profile/Vikas
+Yepthatscool https://tatoeba.org/en/user/profile/Yepthatscool
+abhu https://tatoeba.org/en/user/profile/abhu
+aboi https://tatoeba.org/en/user/profile/aboi
+abracadebby https://tatoeba.org/en/user/profile/abracadebby
+adamtrousers https://tatoeba.org/en/user/profile/adamtrousers
+agrao https://tatoeba.org/en/user/profile/agrao
+amirkarger https://tatoeba.org/en/user/profile/amirkarger
+anubhav93 https://tatoeba.org/en/user/profile/anubhav93
+anushka https://tatoeba.org/en/user/profile/anushka
+atitarev https://tatoeba.org/en/user/profile/atitarev
+basim14 https://tatoeba.org/en/user/profile/basim14
+bcmoney https://tatoeba.org/en/user/profile/bcmoney
+biber https://tatoeba.org/en/user/profile/biber
+coolazice https://tatoeba.org/en/user/profile/coolazice
+cuttlefish997 https://tatoeba.org/en/user/profile/cuttlefish997
+dcarthik https://tatoeba.org/en/user/profile/dcarthik
+dfordivam https://tatoeba.org/en/user/profile/dfordivam
+dhananjay https://tatoeba.org/en/user/profile/dhananjay
+eeyinn https://tatoeba.org/en/user/profile/eeyinn
+ektura https://tatoeba.org/en/user/profile/ektura
+fafdasdf https://tatoeba.org/en/user/profile/fafdasdf
+fastrizwaan https://tatoeba.org/en/user/profile/fastrizwaan
+gauravjiii https://tatoeba.org/en/user/profile/gauravjiii
+gauravjiiii https://tatoeba.org/en/user/profile/gauravjiiii
+glitter23 https://tatoeba.org/en/user/profile/glitter23
+hackerman https://tatoeba.org/en/user/profile/hackerman
+harshnisar https://tatoeba.org/en/user/profile/harshnisar
+iiujik https://tatoeba.org/en/user/profile/iiujik
+intazar https://tatoeba.org/en/user/profile/intazar
+jamesforsyth https://tatoeba.org/en/user/profile/jamesforsyth
+janTuki https://tatoeba.org/en/user/profile/janTuki
+juris https://tatoeba.org/en/user/profile/juris
+kadnahyusoff https://tatoeba.org/en/user/profile/kadnahyusoff
+kakul https://tatoeba.org/en/user/profile/kakul
+kbharat1307 https://tatoeba.org/en/user/profile/kbharat1307
+kjoseph https://tatoeba.org/en/user/profile/kjoseph
+kuldeeparya https://tatoeba.org/en/user/profile/kuldeeparya
+languagelearner https://tatoeba.org/en/user/profile/languagelearner
+langue https://tatoeba.org/en/user/profile/langue
+lokmatnewsrajasthan https://tatoeba.org/en/user/profile/lokmatnewsrajasthan
+mayok https://tatoeba.org/en/user/profile/mayok
+minshirui https://tatoeba.org/en/user/profile/minshirui
+mishigun https://tatoeba.org/en/user/profile/mishigun
+mohitr https://tatoeba.org/en/user/profile/mohitr
+morevikram42 https://tatoeba.org/en/user/profile/morevikram42
+nagasiva https://tatoeba.org/en/user/profile/nagasiva
+napsternxg https://tatoeba.org/en/user/profile/napsternxg
+negativeclock https://tatoeba.org/en/user/profile/negativeclock
+ninefi https://tatoeba.org/en/user/profile/ninefi
+nurendra https://tatoeba.org/en/user/profile/nurendra
+nusrat https://tatoeba.org/en/user/profile/nusrat
+pallavshah https://tatoeba.org/en/user/profile/pallavshah
+pharhana_02 https://tatoeba.org/en/user/profile/pharhana_02
+prakhar https://tatoeba.org/en/user/profile/prakhar
+pranjal710 https://tatoeba.org/en/user/profile/pranjal710
+quanat_kt https://tatoeba.org/en/user/profile/quanat_kt
+raj_rezzy https://tatoeba.org/en/user/profile/raj_rezzy
+rajeshbiswas https://tatoeba.org/en/user/profile/rajeshbiswas
+rajneesh1315 https://tatoeba.org/en/user/profile/rajneesh1315
+rdgscratch https://tatoeba.org/en/user/profile/rdgscratch
+richke https://tatoeba.org/en/user/profile/richke
+rkmohapatra2 https://tatoeba.org/en/user/profile/rkmohapatra2
+rsankarpillai https://tatoeba.org/en/user/profile/rsankarpillai
+sabretou https://tatoeba.org/en/user/profile/sabretou
+saurml https://tatoeba.org/en/user/profile/saurml
+sharmadhruv741 https://tatoeba.org/en/user/profile/sharmadhruv741
+shivamv https://tatoeba.org/en/user/profile/shivamv
+simranbansal https://tatoeba.org/en/user/profile/simranbansal
+sixtynine https://tatoeba.org/en/user/profile/sixtynine
+skanne https://tatoeba.org/en/user/profile/skanne
+smettems https://tatoeba.org/en/user/profile/smettems
+taro https://tatoeba.org/en/user/profile/taro
+tatoebaman https://tatoeba.org/en/user/profile/tatoebaman
+thevikas https://tatoeba.org/en/user/profile/thevikas
+vedant123 https://tatoeba.org/en/user/profile/vedant123
+vijaysharma https://tatoeba.org/en/user/profile/vijaysharma
+vinay https://tatoeba.org/en/user/profile/vinay
+vishalgade18 https://tatoeba.org/en/user/profile/vishalgade18
+yashtib1995 https://tatoeba.org/en/user/profile/yashtib1995
+
+## License
+
+`wordfreq` is freely redistributable under the Apache license (see
+`LICENSE.txt`), and it includes data files that may be
+redistributed under a Creative Commons Attribution-ShareAlike 4.0
+license (<https://creativecommons.org/licenses/by-sa/4.0/>).
+
+`wordfreq` contains data extracted from Google Books Ngrams
+(<http://books.google.com/ngrams>) and Google Books Syntactic Ngrams
+(<http://commondatastorage.googleapis.com/books/syntactic-ngrams/index.html>).
+The terms of use of this data are:
+
+    Ngram Viewer graphs and data may be freely used for any purpose, although
+    acknowledgement of Google Books Ngram Viewer as the source, and inclusion
+    of a link to http://books.google.com/ngrams, would be appreciated.
+
+`wordfreq` also contains data derived from the following Creative Commons-licensed
+sources:
+
+- The Leeds Internet Corpus, from the University of Leeds Centre for Translation
+  Studies (<http://corpus.leeds.ac.uk/list.html>)
+
+- Wikipedia, the free encyclopedia (<http://www.wikipedia.org>)
+
+- ParaCrawl, a multilingual Web crawl (<https://paracrawl.eu>)
+
+It contains data from OPUS OpenSubtitles 2018
+(<http://opus.nlpl.eu/OpenSubtitles.php>), whose data originates from the
+OpenSubtitles project (<http://www.opensubtitles.org/>) and may be used with
+attribution to OpenSubtitles.
+
+It contains data from various SUBTLEX word lists: SUBTLEX-US, SUBTLEX-UK,
+SUBTLEX-CH, SUBTLEX-DE, and SUBTLEX-NL, created by Marc Brysbaert et al.
+(see citations below) and available at
+<http://crr.ugent.be/programs-data/subtitle-frequencies>.
+
+I (Robyn Speer) have obtained permission by e-mail from Marc Brysbaert to
+distribute these wordlists in wordfreq, to be used for any purpose, not just
+for academic use, under these conditions:
+
+- Wordfreq and code derived from it must credit the SUBTLEX authors.
+- It must remain clear that SUBTLEX is freely available data.
+
+These terms are similar to the Creative Commons Attribution-ShareAlike license.
+
+Some additional data was collected by a custom application that watches the
+streaming Twitter API, in accordance with Twitter's Developer Agreement &
+Policy. This software gives statistics about words that are commonly used on
+Twitter; it does not display or republish any Twitter content.
+
+## Citing wordfreq
+
+If you use wordfreq in your research, please cite it! We publish the code
+through Zenodo so that it can be reliably cited using a DOI. The current
+citation is:
+
+> Robyn Speer. (2022). rspeer/wordfreq: v3.0 (v3.0.2). Zenodo. https://doi.org/10.5281/zenodo.7199437
+
+The same citation in BibTex format:
+
+```
+@software{robyn_speer_2022_7199437,
+  author       = {Robyn Speer},
+  title        = {rspeer/wordfreq: v3.0},
+  month        = sep,
+  year         = 2022,
+  publisher    = {Zenodo},
+  version      = {v3.0.2},
+  doi          = {10.5281/zenodo.7199437},
+  url          = {https://doi.org/10.5281/zenodo.7199437}
+}
+```
+
+## Citations to work that wordfreq is built on
+
+- Bojar, O., Chatterjee, R., Federmann, C., Haddow, B., Huck, M., Hokamp, C.,
+  Koehn, P., Logacheva, V., Monz, C., Negri, M., Post, M., Scarton, C.,
+  Specia, L., & Turchi, M. (2015). Findings of the 2015 Workshop on Statistical
+  Machine Translation.
+  <http://www.statmt.org/wmt15/results.html>
+
+- Brysbaert, M. & New, B. (2009). Moving beyond Kucera and Francis: A Critical
+  Evaluation of Current Word Frequency Norms and the Introduction of a New and
+  Improved Word Frequency Measure for American English. Behavior Research
+  Methods, 41 (4), 977-990.
+  <http://sites.google.com/site/borisnew/pub/BrysbaertNew2009.pdf>
+
+- Brysbaert, M., Buchmeier, M., Conrad, M., Jacobs, A.M., Bölte, J., & Böhl, A.
+  (2011). The word frequency effect: A review of recent developments and
+  implications for the choice of frequency estimates in German. Experimental
+  Psychology, 58, 412-424.
+
+- Cai, Q., & Brysbaert, M. (2010). SUBTLEX-CH: Chinese word and character
+  frequencies based on film subtitles. PLoS One, 5(6), e10729.
+  <http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0010729>
+
+- Davis, M. (2012). Unicode text segmentation. Unicode Standard Annex, 29.
+  <http://unicode.org/reports/tr29/>
+
+- Halácsy, P., Kornai, A., Németh, L., Rung, A., Szakadát, I., & Trón, V.
+  (2004). Creating open language resources for Hungarian. In Proceedings of the
+  4th international conference on Language Resources and Evaluation (LREC2004).
+  <http://mokk.bme.hu/resources/webcorpus/>
+
+- Keuleers, E., Brysbaert, M. & New, B. (2010). SUBTLEX-NL: A new frequency
+  measure for Dutch words based on film subtitles. Behavior Research Methods,
+  42(3), 643-650.
+  <http://crr.ugent.be/papers/SUBTLEX-NL_BRM.pdf>
+
+- Kudo, T. (2005). Mecab: Yet another part-of-speech and morphological
+  analyzer.
+  <http://mecab.sourceforge.net/>
+
+- Lin, Y., Michel, J.-B., Aiden, E. L., Orwant, J., Brockman, W., and Petrov,
+  S. (2012). Syntactic annotations for the Google Books Ngram Corpus.
+  Proceedings of the ACL 2012 system demonstrations, 169-174.
+  <http://aclweb.org/anthology/P12-3029>
+
+- Lison, P. and Tiedemann, J. (2016). OpenSubtitles2016: Extracting Large
+  Parallel Corpora from Movie and TV Subtitles. In Proceedings of the 10th
+  International Conference on Language Resources and Evaluation (LREC 2016).
+  <http://stp.lingfil.uu.se/~joerg/paper/opensubs2016.pdf>
+
+- Ortiz Suárez, P. J., Sagot, B., and Romary, L. (2019). Asynchronous pipelines
+  for processing huge corpora on medium to low resource infrastructures. In
+  Proceedings of the Workshop on Challenges in the Management of Large Corpora
+  (CMLC-7) 2019.
+  <https://oscar-corpus.com/publication/2019/clmc7/asynchronous/>
+
+- ParaCrawl (2018). Provision of Web-Scale Parallel Corpora for Official
+  European Languages. <https://paracrawl.eu/>
+
+- van Heuven, W. J., Mandera, P., Keuleers, E., & Brysbaert, M. (2014).
+  SUBTLEX-UK: A new and improved word frequency database for British English.
+  The Quarterly Journal of Experimental Psychology, 67(6), 1176-1190.
+  <http://www.tandfonline.com/doi/pdf/10.1080/17470218.2013.850521>
