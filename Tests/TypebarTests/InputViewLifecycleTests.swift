@@ -10,6 +10,52 @@ import XCTest
     func called() { probe.calls += 1 }
   }
 
+  func testRetiredReceiverRejectsLateFocusAcquisitionAndDoesNotPublishResignation() {
+    let input = TypingInputView()
+    input.retirePageCallbacks()
+    var focus: [Bool] = [], modifiers: [NSEvent.ModifierFlags] = []
+    input.onFocusChanged = { focus.append($0) }
+    input.onModifierFlagsChanged = { modifiers.append($0) }
+    XCTAssertFalse(input.becomeFirstResponder())
+    XCTAssertTrue(input.resignFirstResponder())
+    XCTAssertTrue(focus.isEmpty)
+    XCTAssertTrue(modifiers.isEmpty)
+  }
+
+  func testRetirementDuringFocusCallbackRejectsTheAcquisitionInProgress() {
+    let input = TypingInputView()
+    var focusCalls = 0
+    input.onFocusChanged = { focused in
+      focusCalls += 1
+      XCTAssertTrue(focused)
+      input.retirePageCallbacks()
+    }
+    XCTAssertFalse(input.becomeFirstResponder())
+    XCTAssertEqual(focusCalls, 1)
+    XCTAssertFalse(input.acceptsFirstResponder)
+  }
+
+  func testRetiredReceiverAttachedToHiddenWindowCannotPublishFocusRefresh() {
+    let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 320, height: 180),
+      styleMask: [.borderless], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    defer { window.contentView = nil; window.close() }
+    let input = TypingInputView()
+    input.retirePageCallbacks()
+    var focusCalls = 0
+    input.onWindowFocusChanged = { _, _ in focusCalls += 1 }
+    window.contentView = input
+    XCTAssertFalse(window.isVisible)
+    input.refreshWindowFocusState()
+    NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+    NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+    input.refreshWindowFocusState()
+    XCTAssertEqual(focusCalls, 0)
+    _ = window.makeFirstResponder(input)
+    XCTAssertFalse(window.firstResponder === input)
+    XCTAssertFalse(window.isVisible)
+  }
+
   func testDismantlingRetainedInputReleasesEveryPageCallbackAndRejectsLateEvents() {
     let view = TypingInputView()
     XCTAssertTrue(view.acceptsFirstResponder)

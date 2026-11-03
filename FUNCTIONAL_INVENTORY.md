@@ -2,6 +2,7 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| INP-RETIRED-FOCUS-96 | 退休接收器拒绝真实焦点交接和迟到焦点报告 | AppKit NSWindow／NSResponder 生命周期边界 | 隐藏窗口、直接交接及焦点回调同步销毁反例；INPUT_RETIRED_FOCUS_CONTRACT.md | 已修正，实际身份红测、98 项相关回归及 Debug 包／原创性检查通过；实体窗口交接与 IME 待验。 |
 | INP-SHIFT-STATE-94 | 原生左右 Shift 设备状态与漏事件恢复 | AppKit flagsChanged／keyDown 及安装 SDK 设备掩码；不改 Opposite Shift 规则 | 实际输入接收器与会话的孤立释放、重复按下、左右侧快照和焦点切换回归；NATIVE_SHIFT_ADMISSION_CONTRACT.md | 已修正，68 项定向、630 项扩大／152 项源码对照及显式 Release 包通过；实体键盘仍待验收。 |
 | INP-ADMISSION-RETIREMENT-95 | 模拟文字与编辑命令的接纳、迟到原始回调销毁边界 | 平台资源边界，补充 INP-CLIENT-RETIREMENT-78 | 关闭／重开接纳、保留重开、退休后恢复配置及迟到命令回归；NATIVE_SHIFT_ADMISSION_CONTRACT.md | 已修正，68／630 项回归和 Release 诊断排除通过；物理 IME 与死键现象仍开放。 |
 | LANG-BANGLA-LITERAL-92 | Bangla 基础／10k 的真实内容、完整长度与标点 | 固定独立词典、wordfreq bn、Tatoeba ben，Unicode danda；原版仅聚合 | 199／9734，完整 UTF-16 直方图、联合类别、键集和旧词；BANGLA_CORPUS_CONTRACT.md | 已接入，来源重建、105 项最终定向、756 项扩大／152 项源码对照及显式 Release 包通过；语言质量／分布与设备待验收。 |

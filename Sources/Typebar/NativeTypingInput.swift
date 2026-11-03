@@ -360,7 +360,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     private func reportWindowFocus(isKey: Bool, hasAttachedSheet: Bool) {
-      guard let window else { return }
+      guard !isRetired, let window else { return }
       let state = WindowFocusState(window: ObjectIdentifier(window), isKey: isKey,
         hasAttachedSheet: hasAttachedSheet)
       guard state != lastWindowFocusState else { return }
@@ -420,9 +420,9 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func becomeFirstResponder() -> Bool {
-        guard super.becomeFirstResponder() else { return false }
+        guard !isRetired, super.becomeFirstResponder() else { return false }
         onFocusChanged(true)
-        return true
+        return !isRetired
     }
 
     override func resignFirstResponder() -> Bool {
@@ -430,6 +430,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       leftShiftPressed = false
       rightShiftPressed = false
       pendingForcedError = false
+      guard !isRetired else { return true }
       onModifierFlagsChanged([])
       onFocusChanged(false)
       return true
