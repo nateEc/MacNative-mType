@@ -20,6 +20,8 @@
 | INP-CLIENT-RETIREMENT-78 | 组合未确认时离开练习页 | 单个隔离实例用实际输入法建立候选，切换页面后继续确认／取消，再返回建立新候选；检查旧会话不提交且候选窗口消失。 | 旧页不再接纳文本或残留候选，新页可独立组合；不改系统输入源设置。 | 待验收（客户端清理与同步重入回归见 INPUT_CLIENT_RETIREMENT_CONTRACT.md；CUA 死键对照尚未定位，不能当作此修复的实体 IME 证明） |
 | INP-SHIFT-STATE-94 | 左右 Shift 状态恢复 | 单个隔离实例开启 Opposite Shift，用物理键盘交替正确／错误手；按住 Shift 切换焦点、释放后返回继续。 | 正确手及无 Shift 输入继续，错误手被拒绝，释放不产生粘滞状态。 | 待验收（自动设备事件快照回归见 NATIVE_SHIFT_ADMISSION_CONTRACT.md，不是实体键盘证明） |
 | INP-RETIRED-FOCUS-96 | 离场输入接收器的迟到焦点交接 | 单个隔离实例在组合／普通输入时切换页面与窗口，再返回新练习并输入；核对旧页面不抢回焦点，新页面可正常获得焦点。 | 旧输入接收器不能重新成为第一响应者，离场回调不改变新页面状态。 | 待验收（隐藏 NSWindow 的交接反例和同步销毁见 INPUT_RETIRED_FOCUS_CONTRACT.md，不替代实体窗口／输入法） |
+| LANG-ARABIC-LITERAL-97 | 阿拉伯语元音与最长词输入 | 单个隔离实例切换基础／10k，用物理输入法输入带元音、shadda、最长词；分别开启／关闭阿拉伯语简化。 | 关闭简化保留原标记并正确完成，开启简化按现有规则处理；重复与历史保留原目标。 | 待验收（字面内容和受控输入回归见 ARABIC_CORPUS_CONTRACT.md，不替代实体输入法） |
+| LANG-ARABIC-10K-LITERAL-98 | 原始前导空格及混合字符方向 | 单个隔离实例在 10k 抽样含 H／ی 的字符练习及其他词形，观察目标裁边、光标方向并输入；核对旧基础词历史仍可重复。 | 原始框架不产生额外词槽，混排目标可正确完成，旧目标不被新词库改写。 | 待验收（生成／记录与布局对照范围见 ARABIC_CORPUS_CONTRACT.md，实体键盘与 VoiceOver 仍待验证） |
 | INP-ADMISSION-RETIREMENT-95 | 输入接纳关闭与离场迟到输入 | 单个隔离实例在准备／离场边界尝试字面输入、删除与候选确认，重开后继续新目标。 | 关闭接纳期间不提交或删除，显式重开可用，旧页不接收迟到操作。 | 待验收（原生受控回归不能替代实体 IME 或焦点交错验收） |
 | LANG-MALAY-LITERAL-76 | 马来语两档与短语候选 | 单个隔离实例逐档练习最长词、连字符、带空格候选和标点开启后的大写 S；检查一／二词配额、重复、旧结果与完整署名。 | 候选按源规则拆词，边界与输入完整；旧 30 词保留，观察缺失显示 NA 不冒充零，结果目标不重写。 | 待验收（固定来源与原生证据见 MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md；语言质量、分布、实体输入／IME／VoiceOver 与性能未验） |
 | FUN-EMPTY-SPACE-ADMISSION-77 | 空输入与目标开头空格 | 单个隔离实例使用有开头空格／连续空格的目标，以 normal、严格、expert／master 和 hard delete 分别按 Space／Enter；检查计时、No Quit、声音、回放及 IME 空格。 | 普通空输入忽略 Space，不因目标为空格启动尝试；独立条件、Return 与恢复动作仍按原版处理，回放不记录不存在的插入。 | 待验收（144 个源码对照及相邻回归见 MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md；实体输入／IME 和完整组合未验） |

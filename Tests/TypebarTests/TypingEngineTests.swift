@@ -12604,7 +12604,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testArabicScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, String)] = [
-      ("arabic10k", 9_281, 2, 21, 1, 9_281, 0, 9_281, 9_281, 0, 9_281, "ar-SA"),
+      ("arabic10k", 9_281, 2, 15, 1, 9_281, 0, 9_281, 9_281, 0, 9_281, "ar-SA"),
       ("arabicEgypt1k", 1_141, 2, 16, 0, 63, 0, 63, 1, 7, 1_141, "ar-EG"),
     ]
 

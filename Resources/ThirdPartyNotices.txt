@@ -46,3 +46,10 @@ https://creativecommons.org/licenses/by-sa/4.0/
 See FrenchFrequencyCorpusNotices.txt for full attribution, source credits,
 SUBTLEX terms and the changes made to the corpus.
 These data licenses are separate from the license of Typebar's native code.
+
+Arabic basic / 10k practice content
+Independent English Wiktionary contributors via Kaikki.org / Wiktextract,
+ranked with wordfreq 3.1.1 by Robyn Speer; adapted data CC BY-SA 4.0.
+See ArabicCorpusNotices.txt and ArabicCorpusSources.txt for snapshot pins,
+per-entry witnesses, canonical-equivalent adaptations, prior Typebar spellings
+and the explicitly authored mixed-script character exercise.

@@ -2,6 +2,8 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-ARABIC-LITERAL-97 | 阿拉伯语基础的真实带元音词形与完整长度分布 | 独立固定 Wiktionary／Kaikki 及 wordfreq ar，原版仅聚合 | 199 项，保留完整单位直方图、字符集和 198 项组合标记；ARABIC_CORPUS_CONTRACT.md | 已接入，独立重建、最终 210 项回归和 Debug 包通过；四个旧词只退出新基础抽样，语言质量与实体输入待验。 |
+| LANG-ARABIC-10K-LITERAL-98 | 阿拉伯语 10k 的实际词形、前导空格与混合字符 | 独立词典见证、旧自写词和明确混合字符练习；不复用原版词值 | 9281 项，8988 项标记，独立来源与框架；ARABIC_CORPUS_CONTRACT.md | 已接入，210 项含 25 项生产混排宿主和 Debug 包通过；完整字素／词频分布、质量和设备未验，其他阿拉伯语入口仍开放。 |
 | INP-RETIRED-FOCUS-96 | 退休接收器拒绝真实焦点交接和迟到焦点报告 | AppKit NSWindow／NSResponder 生命周期边界 | 隐藏窗口、直接交接及焦点回调同步销毁反例；INPUT_RETIRED_FOCUS_CONTRACT.md | 已修正，实际身份红测、98 项相关回归及 Debug 包／原创性检查通过；实体窗口交接与 IME 待验。 |
 | INP-SHIFT-STATE-94 | 原生左右 Shift 设备状态与漏事件恢复 | AppKit flagsChanged／keyDown 及安装 SDK 设备掩码；不改 Opposite Shift 规则 | 实际输入接收器与会话的孤立释放、重复按下、左右侧快照和焦点切换回归；NATIVE_SHIFT_ADMISSION_CONTRACT.md | 已修正，68 项定向、630 项扩大／152 项源码对照及显式 Release 包通过；实体键盘仍待验收。 |
 | INP-ADMISSION-RETIREMENT-95 | 模拟文字与编辑命令的接纳、迟到原始回调销毁边界 | 平台资源边界，补充 INP-CLIENT-RETIREMENT-78 | 关闭／重开接纳、保留重开、退休后恢复配置及迟到命令回归；NATIVE_SHIFT_ADMISSION_CONTRACT.md | 已修正，68／630 项回归和 Release 诊断排除通过；物理 IME 与死键现象仍开放。 |

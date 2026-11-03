@@ -186,6 +186,12 @@ cmp "$project_root/Resources/BanglaCorpusNotices.txt" \
 cmp "$project_root/Resources/BanglaCorpusSources.txt" \
   "$app_path/Contents/Resources/BanglaCorpusSources.txt" \
   || fail "Bangla spelling and Unicode sources missing or modified"
+cmp "$project_root/Resources/ArabicCorpusNotices.txt" \
+  "$app_path/Contents/Resources/ArabicCorpusNotices.txt" \
+  || fail "Arabic corpus attribution missing or modified"
+cmp "$project_root/Resources/ArabicCorpusSources.txt" \
+  "$app_path/Contents/Resources/ArabicCorpusSources.txt" \
+  || fail "Arabic spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

@@ -297,7 +297,7 @@ import XCTest
         network: NetworkConnectivityMonitor(), systemAppearance: SystemAppearanceMonitor()
       )
       .modelContainer(container)
-      let root = content.frame(width: hostWidth, height: 720)
+      let root = AnyView(content.frame(width: hostWidth, height: 720))
       let host = PracticeLayoutCountingHost(rootView: root)
       if !automaticSizing { host.sizingOptions = [] }
       let window = NSWindow(
@@ -306,6 +306,12 @@ import XCTest
       window.isReleasedWhenClosed = false
       window.contentView = host
       defer {
+        // Unmount queries while their container is still alive. Detaching the
+        // NSView alone can leave the SwiftUI graph observing later contexts.
+        host.rootView = AnyView(EmptyView())
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        host.layoutSubtreeIfNeeded()
         window.contentView = nil
         window.close()
       }
@@ -472,7 +478,7 @@ import XCTest
               if checksBelowResize {
                 let originalHeight = candidate.bounds.height
                 for width: CGFloat in [640, 1000] {
-                  host.rootView = content.frame(width: width, height: 720)
+                  host.rootView = AnyView(content.frame(width: width, height: 720))
                   window.setContentSize(.init(width: width, height: 720))
                   flush()
                   XCTAssertEqual(host.bounds.width, width, accuracy: 1)

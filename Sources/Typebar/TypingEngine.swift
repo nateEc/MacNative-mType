@@ -12856,14 +12856,9 @@ enum StarterLexicon {
 
   static var malay1kWords: [String] { malay1kLexicon.materialized() }
 
-  // Typebar-authored Arabic starter words use direct Unicode text and short
-  // vowel marks for macOS Arabic input sources; they are not an imported
-  // word list. Arabic simplified input can independently remove those marks.
-  static let arabicWords = [
-    "كِتاب", "قَلَم", "نافِذة", "طَريق", "ضَوْء", "جِسْر", "صَباح", "وَرَقة", "حَديقة", "سَحابة",
-    "هُدوء", "مَنارة", "جَبَل", "بِذرة", "إيقاع", "مَكْتَب", "تَأَمُّل", "مُلاحَظة", "فِكْرة", "تَجْرِبة",
-    "مَسافة", "خُطْوة", "صَبْر", "تَوازُن",
-  ]
+  // Independently licensed literal content; prior spellings and the single
+  // mixed-script character exercise are identified in bundled provenance.
+  static let arabicWords = ArabicCorpus.basic
 
   private static let arabicScaleAlphabet = Array(
     "ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
@@ -12883,13 +12878,7 @@ enum StarterLexicon {
   ]
 
   static var arabic10kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 9_281) { index in
-      if index == 0 { return " ڗ" }
-      if index == 1 { return " " + String(repeating: "ڗ", count: 20) }
-      if index == 2 { return " Zڗ" }
-      return " ظق" + arabicScaleRoots[index % arabicScaleRoots.count]
-        + arabicScaleIndex(index)
-    }
+    IndexedLexicon(ArabicCorpus.words10k)
   }
 
   static var arabic10kWords: [String] { arabic10kLexicon.materialized() }

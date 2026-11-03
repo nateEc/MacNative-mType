@@ -1,5 +1,7 @@
 # 官方语言覆盖审计
 
+2026-11-03 Arabic 基础／10k 接入独立字面内容（LANG-ARABIC-LITERAL-97／98）：199／9281 项、完整 UTF-16 直方图、字符与标记数量保留，字素与单位长度分别核对。来源、四项旧基础抽样退休、原始前导空格、混合字符练习和质量限制见 ARABIC_CORPUS_CONTRACT.md。当前全部静态 IndexedLexicon 范围仍有 109 个合成属性／887,846 个声明位置，见 INDEXED_LEXICON_IMPLEMENTATION_AUDIT.md；埃及阿拉伯语 1k 仍为占位，本批不升级所有阿拉伯语或全部语言完成度。
+
 最新 `LANG-RUSSIAN-SCALES-52` 将 Russian 六档 469,774 个占位位置迁至独立 Russian Wiktionary／wordfreq，实际专名、多词、句点缩写及各类字段有独立来源。375k 最长 46／参考 49、撇号／prime、分布和基本池 24／参考 200 仍开放，见 RUSSIAN_SCALES_CORPUS_CONTRACT.md。当前扩大具名范围余 123 项／1,090,989，不能据此声称全部语言完成。
 
 此前 `LANG-NORWEGIAN-SCALES-51` 将两种 Norwegian 各五档的根词编号占位迁至独立官方 Norsk ordbank／unigram 选集，合计 1,305,311 个候选位置；大小写／标点／数字／多词交集、各类最长字段有实际字面候选，基础短词池和历史保持。该阶段扩大具名路由范围余 129 项／1,560,763，旧历史范围的 82 项／438,685 不变。词频／语言质量／分布、基本池 28／32 对参考 200／250 项及实体验收仍开放，见 NORWEGIAN_SCALES_CORPUS_CONTRACT.md。
