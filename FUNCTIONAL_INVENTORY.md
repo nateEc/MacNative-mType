@@ -2,6 +2,8 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-KOREAN-LITERAL-85 | 韩语基础／1k／5k 真实音节词项 | 独立 Kaikki／English Wiktionary、wordfreq ko 与 Tatoeba kor 观察；原版只取聚合 | 470／975／4201；独立键集及旧词额外音节明示；KO_NE_CORPUS_CONTRACT.md | 已接入生产，来源重建、73 项定向、727 项扩大回归、152 项源码对照及 Release 包通过；设备／语言质量待验收。 |
+| LANG-NEPALI-LITERAL-86 | 尼泊尔语基础／1k 字面词库与组合标记 | 独立词典及 Tatoeba npi 观察；分开验证 UTF-16 和字素 | 200／1000，182／927 含标记；旧基础额外 ङ 保留，字素上限 5／6；KO_NE_CORPUS_CONTRACT.md | 已接入生产，来源重建及组合标记／成绩回归通过，727 项扩大、152 项源码对照及 Release 包通过；真实 IME／设备待验收。 |
 | LANG-AZERBAIJANI-LITERAL-83 | 阿塞拜疆语基础／1k、组合点与旧词 | 独立 Kaikki／English Wiktionary、Tatoeba aze；原版仅聚合约束 | 199／989 项及完整键集；两个 İ 默认小写改编，旧词长度例外明示；AZ_MN_CORPUS_CONTRACT.md | 部分完成：先行反例后 63 项定向、714 项扩大／152 项源对照、来源重建、署名与显式 Release 包通过；语言质量、分布、实体输入和 VoiceOver 待验。 |
 | LANG-MONGOLIAN-LITERAL-84 | 蒙古语基础／10k 与完整大写键集 | 独立词典及 Tatoeba mon 原样词项；一个 Ё 首字母改编明示 | 1085／9219 项、897 大写、旧 30 词；原词／句子／词典见证分开记录；AZ_MN_CORPUS_CONTRACT.md | 部分完成：63 项定向、714 项扩大／152 项源对照、来源重建、293 个原样词项见证与显式 Release 包通过；分布／语言质量、实体输入与 VoiceOver 未验。 |
 | LANG-KYRGYZ-LITERAL-82 | 吉尔吉斯语基础／1k 字面词库、大小写与逗号 | 独立固定 Kaikki／English Wiktionary 和 Tatoeba kir；原版仅聚合约束 | 234／849 项，保留旧 28 词、完整键集和联合类别；逗号项为原样句子摘录，分开署名；KYRGYZ_CORPUS_CONTRACT.md | 部分完成：四项先行反例十三处失败后接入字面词库；56 项定向、705 项扩大／152 项源码对照、来源重建与显式 Release 包通过；语言质量、分布、实体输入和 VoiceOver 仍开放。 |

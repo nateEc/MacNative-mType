@@ -1,0 +1,77 @@
+{
+  "artifacts": {
+    "Resources/NepaliCorpusNotices.txt": "c80ab7841f43e81a021da4eea27900ed826e85cafa003746b0de99a6796c3e39",
+    "Resources/NepaliCorpusSources.txt": "1f72cceda9b4bae603c831184affd19e1dc9e4211366fe90e04e6d20eb418738",
+    "Sources/Typebar/NepaliCorpus.generated.swift": "8f143a70352d3891ac6b05767b49b32004e9f7743b3bfe3a15981e61cffcdfcc"
+  },
+  "contributorIdentifiers": 12,
+  "dictionary": "https://kaikki.org/dictionary/Nepali/kaikki.org-dictionary-Nepali.jsonl",
+  "dictionarySHA256": "c5a83fae6720d60ef9107c55e993e7bfe6f67e991a2b82633375f60a064c9a0f",
+  "frequencyMember": null,
+  "frequencyMemberSHA256": null,
+  "frequencyWheelSHA256": null,
+  "legacyUnattested": [
+    "उज्यालो",
+    "कदम",
+    "कल्पना",
+    "टिपोट",
+    "टेबल",
+    "दूरी",
+    "धैर्य",
+    "पुल",
+    "प्रयास",
+    "बगैँचा",
+    "विचार",
+    "शान्ति",
+    "सन्तुलन"
+  ],
+  "pools": {
+    "1k": {
+      "categories": {
+        "mark": 927,
+        "plain": 73
+      },
+      "characters": "ँंअआइईउऊएऐओऔकखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसहािीुूृेैोौ्",
+      "count": 1000,
+      "legacyExtraCharacters": "",
+      "maximumGraphemeCount": 6,
+      "maximumUTF16Length": 11,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 1,
+      "referenceCharacters": "ँंअआइईउऊएऐओऔकखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसहािीुूृेैोौ्",
+      "sentenceObserved": 965,
+      "sourceKinds": {
+        "dictionary": 987,
+        "typebar-legacy": 13
+      },
+      "wordfreqObserved": 0,
+      "wordsSHA256": "55bae83ee1573484f1039392d067a49b5c47b5d2b45a24d683386370cbef1869"
+    },
+    "basic": {
+      "categories": {
+        "mark": 182,
+        "plain": 18
+      },
+      "characters": "ँंअआइईउएओकखगघङचछजझटठडढणतथदधनपफबभमयरलवशषसहािीुूृेैोौ्",
+      "count": 200,
+      "legacyExtraCharacters": "ङ",
+      "maximumGraphemeCount": 5,
+      "maximumUTF16Length": 10,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 1,
+      "referenceCharacters": "ँंअआइईउएओकखगघचछजझटठडढणतथदधनपफबभमयरलवशषसहािीुूृेैोौ्",
+      "sentenceObserved": 188,
+      "sourceKinds": {
+        "dictionary": 187,
+        "typebar-legacy": 13
+      },
+      "wordfreqObserved": 0,
+      "wordsSHA256": "25810abf4ea50874e3e40d1247c1bf112ff9edd8255b4d9be6ea177a7d2a8b35"
+    }
+  },
+  "revision": "kaikki-ne-20261103-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 4504,
+  "sentences": "https://downloads.tatoeba.org/exports/per_language/npi/npi_sentences_detailed.tsv.bz2",
+  "sentencesSHA256": "cfb9e1b2f990f6eb12d4395451dfba44729fef092690e10ffdb0c8f588c051c2"
+}

@@ -144,6 +144,18 @@ cmp "$project_root/Resources/MongolianCorpusNotices.txt" \
 cmp "$project_root/Resources/MongolianCorpusSources.txt" \
   "$app_path/Contents/Resources/MongolianCorpusSources.txt" \
   || fail "Mongolian spelling sources missing or modified"
+cmp "$project_root/Resources/KoreanCorpusNotices.txt" \
+  "$app_path/Contents/Resources/KoreanCorpusNotices.txt" \
+  || fail "Korean corpus attribution missing or modified"
+cmp "$project_root/Resources/KoreanCorpusSources.txt" \
+  "$app_path/Contents/Resources/KoreanCorpusSources.txt" \
+  || fail "Korean spelling sources missing or modified"
+cmp "$project_root/Resources/NepaliCorpusNotices.txt" \
+  "$app_path/Contents/Resources/NepaliCorpusNotices.txt" \
+  || fail "Nepali corpus attribution missing or modified"
+cmp "$project_root/Resources/NepaliCorpusSources.txt" \
+  "$app_path/Contents/Resources/NepaliCorpusSources.txt" \
+  || fail "Nepali spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

@@ -12928,7 +12928,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(words.count, 1_000)
     XCTAssertEqual(Set(words).count, 1_000)
     XCTAssertEqual(words.lazy.map(\.count).min(), 1)
-    XCTAssertEqual(words.lazy.map(\.count).max(), 7)
+    // Complete reference aggregation in both Swift and Unicode-17 Intl gives 6.
+    XCTAssertEqual(words.lazy.map(\.count).max(), 6)
     XCTAssertEqual(words.lazy.map { $0.unicodeScalars.count }.min(), 1)
     XCTAssertEqual(words.lazy.map { $0.unicodeScalars.count }.max(), 11)
     XCTAssertEqual(words.filter { word in

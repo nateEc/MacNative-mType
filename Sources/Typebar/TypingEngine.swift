@@ -11706,48 +11706,17 @@ enum StarterLexicon {
     "machi", "ame", "yukkuri", "houkou", "hoshi", "tegami", "niwa", "kokyuu",
   ]
 
-  // Original Typebar content for Hangul keyboard practice.
-  static let koreanWords = [
-    "아침", "창문", "종이", "해변", "바람", "연습", "집중", "천천히", "분명히", "호수",
-    "거리", "책상", "빛", "여행", "인내", "잠시", "도시", "비", "고요", "방향",
-    "별빛", "쪽지", "정원", "호흡",
-  ]
-
-  private static let koreanScaleAlphabet = Array(
-    "가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허")
-
-  private static func koreanScaleIndex(_ index: Int) -> String {
-    var value = index
-    var characters: [Character] = []
-    repeat {
-      characters.append(koreanScaleAlphabet[value % koreanScaleAlphabet.count])
-      value /= koreanScaleAlphabet.count
-    } while value > 0
-    return String(characters.reversed())
-  }
-
-  private static let koreanScaleRoots = [
-    "빛", "길", "숲", "별", "물", "꿈", "결", "봄",
-  ]
+  // Independently selected dictionary/frequency spellings; all old starters remain.
+  static var koreanWords: [String] { KoreanCorpus.basic }
 
   static var korean1kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 975) { index in
-      if index == 0 { return "힣" }
-      if index == 1 { return String(repeating: "훠", count: 5) }
-      return "쟈" + koreanScaleRoots[index % koreanScaleRoots.count]
-        + koreanScaleIndex(index)
-    }
+    IndexedLexicon(count: 975) { KoreanCorpus.words1k[$0] }
   }
 
   static var korean1kWords: [String] { korean1kLexicon.materialized() }
 
   static var korean5kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 4_201) { index in
-      if index == 0 { return "힣" }
-      if index == 1 { return String(repeating: "훠", count: 6) }
-      return "쟈쵸" + koreanScaleRoots[index % koreanScaleRoots.count]
-        + koreanScaleIndex(index)
-    }
+    IndexedLexicon(count: 4_201) { KoreanCorpus.words5k[$0] }
   }
 
   static var korean5kWords: [String] { korean5kLexicon.materialized() }
@@ -13459,34 +13428,11 @@ enum StarterLexicon {
   static var thai50kWords: [String] { thai50kLexicon.materialized() }
   static var thai60kWords: [String] { thai60kLexicon.materialized() }
 
-  // Typebar-authored Nepali starter words exercise normal macOS composed-text
-  // input without importing a third-party or reference word list.
-  static let nepaliWords = [
-    "किताब", "कलम", "झ्याल", "बाटो", "उज्यालो", "पुल", "बिहान", "कागज", "बगैँचा", "बादल",
-    "शान्ति", "दियो", "पहाड", "बीउ", "सङ्गीत", "टेबल", "विचार", "टिपोट", "कल्पना", "प्रयास",
-    "दूरी", "कदम", "धैर्य", "सन्तुलन",
-  ]
-
-  private static let nepali1kAlphabet =
-    Array("कखगघङचछजझञटठडढणतथदधनपफबभमयरऱलळवशषसह")
-
-  private static func nepali1kIndex(_ index: Int) -> String {
-    let radix = nepali1kAlphabet.count
-    precondition(index < radix * radix)
-    return String([
-      nepali1kAlphabet[index / radix],
-      nepali1kAlphabet[index % radix],
-    ])
-  }
+  // Independent literal words retain old vocabulary and real combining sequences.
+  static var nepaliWords: [String] { NepaliCorpus.basic }
 
   static var nepali1kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 1_000) { index in
-      if index == 0 { return "क" }
-      if index == 1 { return "काकाकाकाककक" }
-      let suffix = nepali1kIndex(index)
-      if index < 74 { return "ञ" + suffix }
-      return "ट" + suffix + "ा"
-    }
+    IndexedLexicon(count: 1_000) { NepaliCorpus.words1k[$0] }
   }
 
   static var nepali1kWords: [String] { nepali1kLexicon.materialized() }
