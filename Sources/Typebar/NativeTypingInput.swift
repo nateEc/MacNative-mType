@@ -1,5 +1,6 @@
 @preconcurrency import AppKit
 import SwiftUI
+import IOKit.hidsystem
 
 enum TypingInputAutofocusDisposition: Equatable {
     case ignore
@@ -434,13 +435,30 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       return true
     }
 
+    private func synchronizeShiftState(_ flags: NSEvent.ModifierFlags, changedKey: UInt16? = nil) {
+      let leftMask = UInt(NX_DEVICELSHIFTKEYMASK)
+      let rightMask = UInt(NX_DEVICERSHIFTKEYMASK)
+      if flags.rawValue & (leftMask | rightMask) != 0 {
+        leftShiftPressed = flags.rawValue & leftMask != 0
+        rightShiftPressed = flags.rawValue & rightMask != 0
+      } else if !flags.contains(.shift) {
+        leftShiftPressed = false
+        rightShiftPressed = false
+      } else {
+        // Synthetic events may expose only aggregate flags. Preserve their
+        // transition fallback without inventing a side for ordinary keys.
+        if changedKey == 56 { leftShiftPressed.toggle() }
+        if changedKey == 60 { rightShiftPressed.toggle() }
+      }
+    }
+
     override func flagsChanged(with event: NSEvent) {
+      guard !isRetired else { return }
+      synchronizeShiftState(event.modifierFlags, changedKey: event.keyCode)
       switch event.keyCode {
       case 56:
-        leftShiftPressed.toggle()
         onPhysicalKey(event.keyCode, leftShiftPressed, false)
       case 60:
-        rightShiftPressed.toggle()
         onPhysicalKey(event.keyCode, rightShiftPressed, false)
       default: break
       }
@@ -452,6 +470,8 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         #if DEBUG
         NativeTextInputDiagnostics.keyDown(event, input: self)
         #endif
+        guard !isRetired else { return }
+        synchronizeShiftState(event.modifierFlags)
         let defersEscapeToComposition = hasMarkedText()
           && event.charactersIgnoringModifiers == "\u{1B}"
           && event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty
@@ -523,7 +543,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
                 interpretKeyEvents([event])
                 return
             }
-            onInsert("\n", false)
+            if acceptsTextInput { onInsert("\n", false) }
             return
         }
         if acceptsTabInput, event.charactersIgnoringModifiers == "\t" {
@@ -531,7 +551,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
                 if !event.isARepeat { onRestart() }
                 return
             }
-            onInsert("\t", false)
+            if acceptsTextInput { onInsert("\t", false) }
             return
         }
         if quickRestartKey.matches(charactersIgnoringModifiers: event.charactersIgnoringModifiers) {
@@ -547,6 +567,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             onRestart()
             return
         }
+        guard acceptsTextInput else { return }
         if mapsArrowKeysToInput, let arrow = ArrowKeyInputPolicy.character(forKeyCode: event.keyCode) {
             guard !event.isARepeat else { return }
             onInsert(String(arrow), false)
@@ -580,6 +601,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyUp(with event: NSEvent) {
+        guard !isRetired else { return }
         if compositionEscapeKeyCode == event.keyCode {
             compositionEscapeKeyCode = nil
         } else if opensCommandPalette(event) {
@@ -654,6 +676,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func doCommand(by selector: Selector) {
+      guard !isRetired else { return }
       pendingForcedError = false
       if TypingInputNavigationPolicy.shouldIntercept(selector) { return }
       switch selector {
@@ -673,18 +696,18 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         case #selector(selectAll(_:)):
           guard !interceptsEditingCommand(.selectAll) else { return }
         case #selector(NSResponder.deleteWordBackward(_:)):
-            onDeleteWord()
+            if acceptsTextInput { onDeleteWord() }
         case #selector(deleteBackward(_:)):
-            onDelete()
+            if acceptsTextInput { onDelete() }
         case #selector(deleteForward(_:)):
             // The practice cursor is fixed at the input end. The reference
             // only processes backward deletion events, so Forward Delete
             // must not erase the preceding typed character.
             break
         case #selector(insertNewline(_:)), #selector(insertLineBreak(_:)):
-            if acceptsNewlineInput { onInsert("\n", false) }
+            if acceptsTextInput, acceptsNewlineInput { onInsert("\n", false) }
         case #selector(insertTab(_:)):
-            if acceptsTabInput { onInsert("\t", false) }
+            if acceptsTextInput, acceptsTabInput { onInsert("\t", false) }
         default:
             super.doCommand(by: selector)
         }
@@ -750,7 +773,7 @@ class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         #endif
         composition = NSAttributedString()
         compositionSelection = NSRange(location: 0, length: 0)
-        onCompositionChanged("")
+        if !isRetired { onCompositionChanged("") }
     }
 
     func selectedRange() -> NSRange { compositionSelection }

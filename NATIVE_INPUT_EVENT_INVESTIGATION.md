@@ -29,3 +29,5 @@ QA 包的 [LSEnvironment](https://developer.apple.com/documentation/bundleresour
 - 本轮没有用先前 645 项回归宣称新诊断版本跑过相同套件。
 
 诊断及本文与越南语字面词库合并为一批交付，避免为诊断单独推送。该批新 Release 包与诊断排除检查也通过，详见 [越南语合同](VIETNAMESE_CORPUS_CONTRACT.md)；上述较早二进制哈希保留其对应历史版本。物理键盘、CJK IME、VoiceOver 和完整功能等价仍未证明，goal 保持 active。
+
+2026-11-03 以 794a2501 构建单个 Typebar-QA-InputAudit 隔离实例再次对照，仍未在自动 Option+E／E 路径看到候选，后续 e 计错；普通编辑器自动输入 é 也未成功。没有收到物理键盘验证结果，实例已退出。调查期间另发现并修正的 Shift 快照与接纳边界见 [独立合同](NATIVE_SHIFT_ADMISSION_CONTRACT.md)，它们有单独红测，不解释本节死键现象，也没有用新产品版本重复启动可见应用。

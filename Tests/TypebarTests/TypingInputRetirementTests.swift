@@ -83,4 +83,38 @@ final class TypingInputRetirementTests: XCTestCase {
     XCTAssertFalse(input.hasMarkedText())
     XCTAssertFalse(input.acceptsFirstResponder)
   }
+
+  func testLateRawKeyAndModifierEventsCannotReopenRetiredPageCallbacks() throws {
+    let input = TypingInputView(); input.retirePageCallbacks()
+    input.acceptsTextInput = true
+    input.keyboardInputMapping = .builtIn(.ansiQwerty)
+    var callbacks = 0
+    input.onInsert = { _, _ in callbacks += 1 }
+    input.onRestart = { callbacks += 1 }
+    input.onKeyDown = { _, _, _, _ in callbacks += 1 }
+    input.onLogicalKeyDown = { _ in callbacks += 1 }
+    input.onPhysicalKey = { _, _, _ in callbacks += 1 }
+    input.onModifierFlagsChanged = { _ in callbacks += 1 }
+    for (type, code, flags, text) in [(NSEvent.EventType.keyDown, UInt16(0), NSEvent.ModifierFlags(), "a"),
+      (.keyUp, 0, [], "a"), (.flagsChanged, 56, [], ""), (.keyDown, 15, .command, "r")] {
+      let event = try XCTUnwrap(NSEvent.keyEvent(with: type, location: .zero,
+        modifierFlags: flags, timestamp: 1, windowNumber: 0, context: nil,
+        characters: text, charactersIgnoringModifiers: text, isARepeat: false, keyCode: code))
+      switch type {
+      case .keyDown: input.keyDown(with: event)
+      case .keyUp: input.keyUp(with: event)
+      default: input.flagsChanged(with: event)
+      }
+    }
+    input.onCompositionChanged = { _ in callbacks += 1 }
+    input.onDelete = { callbacks += 1 }
+    input.onDeleteWord = { callbacks += 1 }
+    input.acceptsNewlineInput = true
+    input.acceptsTabInput = true
+    for command in [#selector(NSResponder.deleteBackward(_:)),
+      #selector(NSResponder.deleteWordBackward(_:)), #selector(NSResponder.insertNewline(_:)),
+      #selector(NSResponder.insertTab(_:))] { input.doCommand(by: command) }
+    input.unmarkText()
+    XCTAssertEqual(callbacks, 0)
+  }
 }

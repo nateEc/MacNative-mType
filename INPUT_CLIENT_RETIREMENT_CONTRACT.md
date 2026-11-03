@@ -32,4 +32,6 @@ Apple 的 [discardMarkedText 文档](https://developer.apple.com/documentation/a
 
 四项配置部分分类、全部物理 IME／VoiceOver／呈现组合验收及完整原生重写 goal 均保持开放。
 
+后续补充见 [Shift 与输入接纳边界](NATIVE_SHIFT_ADMISSION_CONTRACT.md)：迟到配置恢复闭包后，原始按下／释放、修饰键、编辑命令和 unmark 也必须保持退休边界。本文件上面的 645 项与打包结果仍只属于原版本，不能作为该补充修正的运行证据。
+
 后续事件层排查见 [死键调查](NATIVE_INPUT_EVENT_INVESTIGATION.md)：有效死键事件到达时应用、窗口、第一响应者及当前输入上下文归属均正确，标准编辑框也出现同样的普通 `e` 结果。该证据排除焦点缺失这一假设，尚不归因于某个系统／工具内部机制，更不把本项销毁修复当作死键问题的解决方案。
