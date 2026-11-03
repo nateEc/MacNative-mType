@@ -2,6 +2,9 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-TAMIL-LITERAL-89 | Tamil 基础／1k 真实词形和组合标记 | 独立固定词典、wordfreq ta 及 Tatoeba tam 整词观察；原版只取聚合 | 366／951，完整键集、旧 24 项，原有 Zipf 资格保持；TA_TE_CORPUS_CONTRACT.md | 已接入，来源重建、99 项最终定向、750 项扩大／152 项源码对照及显式 Release 包通过；语言质量／分布和实体验收待完成。 |
+| LANG-TAMIL-OLD-LITERAL-90 | Tamil old 独立字面内容与双词项 | 独立词典及三个明确旧自有练习，替换拼接闭包 | 460 项，字素 2–8，保留旧词、原双词项和历史目标；TA_TE_CORPUS_CONTRACT.md | 已接入，来源及生产生成／成绩通过；旧排序夹具修正后 99／750 项回归和 Release 包通过，语言质量／设备待验。 |
+| LANG-TELUGU-LITERAL-91 | Telugu 基础／1k、真实多词项与元音标记 | 独立词典和原样 Tatoeba tel 摘录；前后空格明确排除 | 201／901，完整键集、基础旧词额外 ఊ，字素最长 8／9；TA_TE_CORPUS_CONTRACT.md | 已接入，来源重建、99 项定向、750 项扩大／152 项源码对照及 Release 包通过；实体 IME、语言质量和 VoiceOver 未验。 |
 | LANG-HINDI-LITERAL-87 | Hindi 基础／1k 真实词形与字符练习 | 固定独立 Wiktionary／Kaikki、wordfreq hi、Tatoeba hin；原版只取聚合 | 200／999，完整字符集合，旧词保留，字素最长 5／6；HI_GU_CORPUS_CONTRACT.md | 已接入，来源重建、79 项定向、733 项扩大／152 项源码对照和显式 Release 包通过；语言质量／分布、实体 IME 和 VoiceOver 待验。 |
 | LANG-GUJARATI-LITERAL-88 | Gujarati 基础／1k、组合标记与多词／边缘空格 | 独立词典及原样 Tatoeba guj 连续摘录，字符项分开标注 | 214／1004，联合类别与 33 个空格项，前导／尾随各一；HI_GU_CORPUS_CONTRACT.md | 已接入，来源重建、79 项定向、733 项扩大／152 项源码对照和显式 Release 包通过；生产词槽与成绩回归通过，语言质量／实体操作待验。 |
 | LANG-KOREAN-LITERAL-85 | 韩语基础／1k／5k 真实音节词项 | 独立 Kaikki／English Wiktionary、wordfreq ko 与 Tatoeba kor 观察；原版只取聚合 | 470／975／4201；独立键集及旧词额外音节明示；KO_NE_CORPUS_CONTRACT.md | 已接入生产，来源重建、73 项定向、727 项扩大回归、152 项源码对照及 Release 包通过；设备／语言质量待验收。 |

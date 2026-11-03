@@ -1,0 +1,91 @@
+{
+  "artifacts": {
+    "Resources/TamilCorpusNotices.txt": "2cee3272afab96dc24b84f861501f9485ed57f5358697fec5fe8ee59d6475b7b",
+    "Resources/TamilCorpusSources.txt": "def008a8f00bc93e8bc2bf30849e0278d210683d89726c79edfc0ac18aa1e23d",
+    "Sources/Typebar/TamilCorpus.generated.swift": "fc20800bc0c58e36b0acfff3d124909287b7310bfb884f8c4f03c2893db0c4f7"
+  },
+  "contributorIdentifiers": 15,
+  "dictionarySHA256": "14277cb7a242b2609905ae285920e6f85aa97668bb1df9f37df5bcfac64ff24a",
+  "dictionaryURL": "https://kaikki.org/dictionary/Tamil/kaikki.org-dictionary-Tamil.jsonl",
+  "frequencyMember": "wordfreq/data/small_ta.msgpack.gz",
+  "frequencyMemberSHA256": "68ed68a8bd703e1aafe8c0adc3827dada57eb3226837dabf26716187fb796547",
+  "frequencyWheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473",
+  "legacyUnattested": [
+    "அகா",
+    "இசை நடை",
+    "சமநிலை",
+    "சிந்தனை",
+    "நீளமானபயிற்சி"
+  ],
+  "pools": {
+    "1k": {
+      "categories": {
+        "mark spaces=0": 942,
+        "plain spaces=0": 9
+      },
+      "characters": "ஃஅஆஇஈஉஊஎஏஐஒஓகஙசஜஞடணதநனபமயரறலளழவஷஸாிீுூெேைொோௌ்",
+      "count": 951,
+      "leadingSpaces": 0,
+      "maximumGraphemeCount": 11,
+      "maximumUTF16Length": 19,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 1,
+      "sentenceObserved": 267,
+      "sourceKinds": {
+        "dictionary": 944,
+        "dictionary-character": 5,
+        "typebar-legacy": 2
+      },
+      "trailingSpaces": 0,
+      "wordfreqObserved": 950,
+      "wordsSHA256": "c23b53e9ba3d5f8cdc48730a125a7a24cd2c09cd5a2e62476939fe80cc1a10bc"
+    },
+    "basic": {
+      "categories": {
+        "mark spaces=0": 363,
+        "plain spaces=0": 3
+      },
+      "characters": "அஆஇஉஊஎஏஒஓகஙசஜடணதநனபமயரறலளழவஷஸாிீுூெேைொோ்",
+      "count": 366,
+      "leadingSpaces": 0,
+      "maximumGraphemeCount": 10,
+      "maximumUTF16Length": 17,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 2,
+      "sentenceObserved": 157,
+      "sourceKinds": {
+        "dictionary": 364,
+        "typebar-legacy": 2
+      },
+      "trailingSpaces": 0,
+      "wordfreqObserved": 365,
+      "wordsSHA256": "14672ca096205c6f35f6d4cfc41fad7d9b4c77c6efdf05f20f9c98e990bae26e"
+    },
+    "old": {
+      "categories": {
+        "mark spaces=0": 458,
+        "mark spaces=1": 1,
+        "plain spaces=0": 1
+      },
+      "characters": " அஆஇஉஊஎஏஐஒஓஔகஙசஜஞடணதநனபமயரறலளழவஷஸாிீுூெேைொோ்",
+      "count": 460,
+      "leadingSpaces": 0,
+      "maximumGraphemeCount": 8,
+      "maximumUTF16Length": 13,
+      "minimumGraphemeCount": 2,
+      "minimumUTF16Length": 3,
+      "sentenceObserved": 178,
+      "sourceKinds": {
+        "dictionary": 455,
+        "typebar-legacy": 5
+      },
+      "trailingSpaces": 0,
+      "wordfreqObserved": 454,
+      "wordsSHA256": "5af4fe68484b40248379a10b8d00d674f8477c9d8e2f7836f2b2874dad7e530b"
+    }
+  },
+  "revision": "kaikki-ta-20261103-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 597,
+  "sentencesSHA256": "642d33db96131bf4aa7a5fa72bc3a1acc63d1d2c57d1a0a373a4cb667ecb8144"
+}

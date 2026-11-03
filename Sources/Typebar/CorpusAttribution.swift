@@ -19,6 +19,8 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case nepali = "NepaliCorpusNotices"
   case hindi = "HindiCorpusNotices"
   case gujarati = "GujaratiCorpusNotices"
+  case tamil = "TamilCorpusNotices"
+  case telugu = "TeluguCorpusNotices"
   case simplifiedChinese = "SimplifiedChineseCorpusNotices"
   case traditionalChinese = "TraditionalChineseCorpusNotices"
   case englishFrequency = "EnglishFrequencyCorpusNotices"
@@ -59,6 +61,8 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     case .nepali: "नेपाली · 两档词库"
     case .hindi: "हिन्दी · 两档词库"
     case .gujarati: "ગુજરાતી · 两档词库"
+    case .tamil: "தமிழ் · 三档内容"
+    case .telugu: "తెలుగు · 两档内容"
     case .simplifiedChinese: "简体中文 · 五档词库"
     case .traditionalChinese: "繁體中文 · 五檔詞庫"
     case .englishFrequency: "基础 English 与频率词库"
@@ -148,6 +152,8 @@ struct CorpusAttributionSummary: View {
       Text("नेपाली 两档词库使用独立词典与 Tatoeba 整词观察，保留旧词和组合标记；UTF-16 与字素边界分别验证，旧词出处缺失明确标记。")
       Text("हिन्दी 两档内容来自独立词典，按 wordfreq 与 Tatoeba 整词观察排序；字符练习与词汇分开标注，保留旧词和组合标记。")
       Text("ગુજરાતી 两档内容使用独立词典与有出处的 Tatoeba 原样摘录，保留多词项及边缘空格；字符练习和八个旧自有词单独标明。")
+      Text("தமிழ் 三档内容使用独立词典、wordfreq 与 Tatoeba 整词观察；旧版三个自有练习保留，字符项与旧词来源单独标注。")
+      Text("తెలుగు 两档内容保留组合标记、原样多词项和旧词；词典字符与 Tatoeba 摘录分别提供来源和许可。")
       Text("简体中文五档词库来自 MDBG／CC-CEDICT 与 wordfreq；保留旧自有词，并逐词标明三项书写改编及原始出处。")
         .fixedSize(horizontal: false, vertical: true)
       Text("繁體中文五檔詞庫直接採用 CC-CEDICT 的繁體原形；保留舊自有詞，逐詞標明來源與書寫改編。簡體對應詞的頻率觀察不代表繁體詞頻。")

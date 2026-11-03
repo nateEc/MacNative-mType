@@ -168,6 +168,18 @@ cmp "$project_root/Resources/GujaratiCorpusNotices.txt" \
 cmp "$project_root/Resources/GujaratiCorpusSources.txt" \
   "$app_path/Contents/Resources/GujaratiCorpusSources.txt" \
   || fail "Gujarati spelling sources missing or modified"
+cmp "$project_root/Resources/TamilCorpusNotices.txt" \
+  "$app_path/Contents/Resources/TamilCorpusNotices.txt" \
+  || fail "Tamil corpus attribution missing or modified"
+cmp "$project_root/Resources/TamilCorpusSources.txt" \
+  "$app_path/Contents/Resources/TamilCorpusSources.txt" \
+  || fail "Tamil spelling sources missing or modified"
+cmp "$project_root/Resources/TeluguCorpusNotices.txt" \
+  "$app_path/Contents/Resources/TeluguCorpusNotices.txt" \
+  || fail "Telugu corpus attribution missing or modified"
+cmp "$project_root/Resources/TeluguCorpusSources.txt" \
+  "$app_path/Contents/Resources/TeluguCorpusSources.txt" \
+  || fail "Telugu spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

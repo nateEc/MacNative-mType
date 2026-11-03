@@ -13900,9 +13900,9 @@ final class TypingEngineTests: XCTestCase {
       ZipfFrequencySupport, String, String, String, String, ClosedRange<UInt32>
     )] = [
       ("tamil1k", "தமிழ் · 1k · Typebar", 951, 1, 19, 1, 11, 942, 0, 0,
-       .supported, "tamil", "ta", "ta-IN", "ஶ", 0x0B80...0x0BFF),
-      ("telugu1k", "తెలుగు · 1k · Typebar", 901, 1, 18, 1, 11, 879, 0, 5,
-       .unknown, "telugu", "te", "te-IN", "ఴ", 0x0C00...0x0C7F),
+       .supported, "tamil", "ta", "ta-IN", "", 0x0B80...0x0BFF),
+      ("telugu1k", "తెలుగు · 1k · Typebar", 901, 1, 18, 1, 9, 879, 0, 5,
+       .unknown, "telugu", "te", "te-IN", "", 0x0C00...0x0C7F),
       ("bangla10k", "বাংলা · 10k · Typebar", 9_734, 1, 16, 1, 10, 9_392, 15, 0,
        .unknown, "bangla", "bn", "bn-BD", "ৱ", 0x0980...0x09FF),
       ("hindi1k", "हिन्दी · 1k · Typebar", 999, 1, 12, 1, 6, 956, 0, 0,

@@ -1,0 +1,72 @@
+{
+  "artifacts": {
+    "Resources/TeluguCorpusNotices.txt": "73cd1eda69edd8c6ed98f926329e0aecff326ea573c0ede8808d24d4c5c2736c",
+    "Resources/TeluguCorpusSources.txt": "1d9e46ff813a4f02a0a7cf7c0148b6e96d8fc0cfd8e5dab6bb91fdd55ac5b6cf",
+    "Sources/Typebar/TeluguCorpus.generated.swift": "c5348f5f3be11a7db9515df781f67221203d78e122d34da121229993b861851c"
+  },
+  "contributorIdentifiers": 13,
+  "dictionarySHA256": "f6a7c32ea73d125d7a2a93ae5a38c44ffa27a8a2c35f0b4073c59a6d69cb7194",
+  "dictionaryURL": "https://kaikki.org/dictionary/Telugu/kaikki.org-dictionary-Telugu.jsonl",
+  "frequencyMember": null,
+  "frequencyMemberSHA256": null,
+  "frequencyWheelSHA256": null,
+  "legacyUnattested": [
+    "గమనిక",
+    "సమతుల్యం"
+  ],
+  "pools": {
+    "1k": {
+      "categories": {
+        "mark spaces=0": 874,
+        "mark spaces=1": 4,
+        "mark spaces=2": 1,
+        "plain spaces=0": 22
+      },
+      "characters": " ంఅఆఇఈఉఊఎఏఐఒఓకఖగఘచజటఠడణతథదధనపఫబభమయరలళవశషసహాిీుూృెేైొోౌ్",
+      "count": 901,
+      "leadingSpaces": 0,
+      "maximumGraphemeCount": 9,
+      "maximumUTF16Length": 18,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 1,
+      "sentenceObserved": 277,
+      "sourceKinds": {
+        "dictionary": 891,
+        "dictionary-character": 4,
+        "sentence-fragment": 4,
+        "typebar-legacy": 2
+      },
+      "trailingSpaces": 0,
+      "wordfreqObserved": 0,
+      "wordsSHA256": "38887dbddfb7133a355ff4bce4166af9b7a876c1c9be063d312f260b5c2e52c6"
+    },
+    "basic": {
+      "categories": {
+        "mark spaces=0": 192,
+        "mark spaces=1": 1,
+        "plain spaces=0": 8
+      },
+      "characters": " ంఅఆఇఈఉఊఎఏఒకఖగఘచజటఠడణతథదధనపఫబభమయరలళవశషసహాిీుూెేైొోౌ్",
+      "count": 201,
+      "leadingSpaces": 0,
+      "maximumGraphemeCount": 8,
+      "maximumUTF16Length": 15,
+      "minimumGraphemeCount": 1,
+      "minimumUTF16Length": 1,
+      "sentenceObserved": 177,
+      "sourceKinds": {
+        "dictionary": 196,
+        "dictionary-character": 2,
+        "sentence-fragment": 1,
+        "typebar-legacy": 2
+      },
+      "trailingSpaces": 0,
+      "wordfreqObserved": 0,
+      "wordsSHA256": "0af5f5d9de17bd9896cfcef6f7444a41899cb4dcde0a93aaf66d907cc302b12d"
+    }
+  },
+  "revision": "kaikki-te-20261103-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 318,
+  "sentencesSHA256": "833268b5ac5b18f69903594a8e8c5ab7cbfdaa9f1d6f69e6dc927282cdc9da9c"
+}

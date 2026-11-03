@@ -1,0 +1,61 @@
+Typebar independent Telugu literal entries
+Revision: kaikki-te-20261103-literal-v1
+English Wiktionary contributors via Kaikki.org / Wiktextract.
+Dictionary: https://kaikki.org/dictionary/Telugu/kaikki.org-dictionary-Telugu.jsonl
+Snapshot SHA-256: f6a7c32ea73d125d7a2a93ae5a38c44ffa27a8a2c35f0b4073c59a6d69cb7194
+Index reports extraction 2026-10-25; enwiktionary dump 2026-10-01;
+Wiktextract f9fe161 / 6f96ddf.
+Dictionary selection: CC BY-SA 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+Contributor pages: https://en.wiktionary.org/wiki/ + encoded sourceTitle.
+Only unchanged NFC titles/forms of lang_code=te are selected.
+Nonstandard/proscribed/misspelling-only senses, romanizations, template/error
+forms are excluded. Dictionary character/symbol entries are single characters
+and explicitly identified as dictionary-character; they are character practice,
+not claimed to be complete lexical words. Other entries retain their source POS.
+All 24 original Typebar starters remain in every pool; three explicit original
+Tamil-old exercises also remain in the old pool. No old-word length exceptions.
+Selected lexical attestation missing for: గమనిక, సమతుల్యం.
+This concerns selected lexical categories, not all raw dictionary occurrences.
+No artificial spelling, case edits, numbered padding, or original Monkeytype
+word values, source code or assets are used. Reference character sets and shape
+counts alone constrain selection. Runtime Zipf support is unchanged: Tamil basic/1k supported; Tamil old and
+Telugu unknown. Observation bands do not create new runtime support.
+Source units are BMP UTF-16 units, not graphemes. Pinned Node v24.19.0 /
+Unicode 17.0 segmentation is required: maximum Tamil basic/1k/old 10/11/8 graphemes,
+Telugu basic/1k 8/9. Native Swift independently checks selected-word maxima.
+Per-item provenance: TeluguCorpusSources.txt.
+
+Tatoeba Telugu contributors: CC BY 2.0 France.
+https://creativecommons.org/licenses/by/2.0/fr/
+https://tatoeba.org/en/downloads
+Sentences: https://downloads.tatoeba.org/exports/per_language/tel/tel_sentences_detailed.tsv.bz2
+Snapshot SHA-256: 833268b5ac5b18f69903594a8e8c5ab7cbfdaa9f1d6f69e6dc927282cdc9da9c
+Sentence rows: 318; contributor identifiers: 13.
+Whole-token observations preserve digits, hyphens, underscores, apostrophes,
+marks and controls wittam token boundaries. Tokens and contiguous excerpts
+are used unchanged; no normalization creates an observation. One observation
+per sentence; missing data is NA, never zero or estimated component frequency.
+Telugu multiword options may be literal contiguous sentence excerpts, marked
+sentence-fragment and credited separately. The original Tamil-old phrase is
+explicitly retained as authored legacy practice. Exact internal spaces remain; normal word generation trims borders and consumes
+one slot per component, as it did before this corpus change. No border spaces, repeated spaces, artificial spelling or sentence
+concatenation is added. Only selected excerpts are bundled;
+no full sentence collection, translations or audio is distributed.
+
+Tatoeba contributor identifiers (all processed rows):
+AlphaSteppeNomad https://tatoeba.org/en/user/profile/AlphaSteppeNomad
+Balamax https://tatoeba.org/en/user/profile/Balamax
+Hari https://tatoeba.org/en/user/profile/Hari
+NigerianSmiths https://tatoeba.org/en/user/profile/NigerianSmiths
+bharath https://tatoeba.org/en/user/profile/bharath
+cntrational https://tatoeba.org/en/user/profile/cntrational
+epraneeth98 https://tatoeba.org/en/user/profile/epraneeth98
+frpzzd https://tatoeba.org/en/user/profile/frpzzd
+nurendra https://tatoeba.org/en/user/profile/nurendra
+ramanirudh https://tatoeba.org/en/user/profile/ramanirudh
+rarmdhyymm https://tatoeba.org/en/user/profile/rarmdhyymm
+simley https://tatoeba.org/en/user/profile/simley
+strykerami https://tatoeba.org/en/user/profile/strykerami
+
+No wordfreq dataset is used for Telugu.

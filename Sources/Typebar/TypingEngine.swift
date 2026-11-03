@@ -13115,13 +13115,8 @@ enum StarterLexicon {
     "dost", "friend", "jaldi", "slow", "seekho", "practice", "likho", "read",
   ]
 
-  // Typebar-authored Tamil starter words exercise normal macOS composed-text
-  // input without importing a third-party or reference word list.
-  static let tamilWords = [
-    "புத்தகம்", "பேனா", "சாளரம்", "பாதை", "ஒளி", "பாலம்", "காலை", "காகிதம்", "தோட்டம்", "மேகம்",
-    "அமைதி", "விளக்கு", "மலை", "விதை", "இசை", "மேசை", "சிந்தனை", "குறிப்பு", "யோசனை", "முயற்சி",
-    "தூரம்", "அடி", "பொறுமை", "சமநிலை",
-  ]
+  // Independent literal Tamil entries retain the original starter vocabulary.
+  static var tamilWords: [String] { TamilCorpus.basic }
 
   private static func nativeScriptScaleIndex(
     _ index: Int, alphabet: [Character]
@@ -13135,44 +13130,14 @@ enum StarterLexicon {
     return String(characters.reversed())
   }
 
-  private static let tamil1kAlphabet = Array("கஙசஞடணதநபமயரலவழளறனஜஷஸஹ")
-
   static var tamil1kLexicon: IndexedLexicon {
-    let marker: Character = "ஶ"
-    let mark = "ா"
-    return IndexedLexicon(count: 951) { index in
-      if index == 0 { return String(marker) }
-      if index == 1 {
-        return String(repeating: marker, count: 11) + String(repeating: mark, count: 8)
-      }
-      let base = String(marker) + nativeScriptScaleIndex(index, alphabet: tamil1kAlphabet)
-      return index <= 942 ? base + mark : base
-    }
+    IndexedLexicon(count: 951) { TamilCorpus.words1k[$0] }
   }
 
   static var tamil1kWords: [String] { tamil1kLexicon.materialized() }
 
-  // Typebar-authored Tamil joining-script drills for the independent legacy
-  // catalog choice. The combinations reproduce only aggregate shape metadata;
-  // no reference words or external dictionary values are included.
-  static let tamilOldWords: [String] = {
-    let stems = [
-      "அக", "இச", "உர", "எழ", "ஒல", "கட", "சர", "தள", "நட", "பட", "மல", "வழ",
-      "விட", "திற", "நில", "புத", "மொழ", "வின", "கர", "சுட", "தொட", "பய", "மன",
-    ]
-    let endings = [
-      "ம்", "ல்", "ன்", "டு", "தி", "வு", "மை", "கம்", "நம்", "ரம்",
-      "சல்", "பு", "கு", "டை", "வி", "து", "யல்", "றம்", "ஞ்சி", "ட்டி",
-    ]
-    var entries = stems.flatMap { stem in endings.map { stem + $0 } }
-    entries[0] = "அகா"
-    entries[1] = "நீளமானபயிற்சி"
-    entries[2] = "இசை நடை"
-    for index in [101, 114, 192, 280] {
-      entries[index] += "ஃ"
-    }
-    return entries
-  }()
+  // The legacy catalog keeps independently sourced entries and three authored exercises.
+  static var tamilOldWords: [String] { TamilCorpus.wordsOld }
 
   static let tamilOldTokens: [String] = {
     Array(Set(tamilOldWords.flatMap { $0.split(whereSeparator: \.isWhitespace).map(String.init) })).sorted()
@@ -13408,31 +13373,11 @@ enum StarterLexicon {
     "ದೂರ", "ಹೆಜ್ಜೆ", "ತಾಳ್ಮೆ", "ಸಮತೋಲನ",
   ]
 
-  // Typebar-authored Telugu starter words exercise normal macOS composed-text
-  // input without importing a third-party or reference word list.
-  static let teluguWords = [
-    "పుస్తకం", "కలం", "కిటికీ", "దారి", "వెలుగు", "వంతెన", "ఉదయం", "కాగితం", "తోట", "మేఘం",
-    "శాంతి", "దీపం", "కొండ", "విత్తనం", "సంగీతం", "బల్ల", "ఆలోచన", "గమనిక", "ఊహ", "ప్రయత్నం",
-    "దూరం", "అడుగు", "సహనం", "సమతుల్యం",
-  ]
-
-  private static let telugu1kAlphabet = Array("కఖగఘఙచఛజఝఞటఠడఢణతథదధనపఫబభమయరలవశషసహళఱ")
+  // Dictionary spellings and credited literal phrases retain the old Telugu starters.
+  static var teluguWords: [String] { TeluguCorpus.basic }
 
   static var telugu1kLexicon: IndexedLexicon {
-    let marker: Character = "ఴ"
-    let mark = "ా"
-    return IndexedLexicon(count: 901) { index in
-      if index == 0 { return String(marker) }
-      if index == 1 {
-        return String(repeating: marker, count: 11) + String(repeating: mark, count: 7)
-      }
-      var entry = String(marker) + nativeScriptScaleIndex(index, alphabet: telugu1kAlphabet)
-      if index <= 879 { entry += mark }
-      if (2...6).contains(index) {
-        entry += String(repeating: " ", count: index == 6 ? 2 : 1) + String(marker)
-      }
-      return entry
-    }
+    IndexedLexicon(count: 901) { TeluguCorpus.words1k[$0] }
   }
 
   static var telugu1kWords: [String] { telugu1kLexicon.materialized() }

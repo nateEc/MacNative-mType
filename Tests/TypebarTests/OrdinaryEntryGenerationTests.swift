@@ -2,12 +2,14 @@ import XCTest
 @testable import Typebar
 
 final class OrdinaryEntryGenerationTests: XCTestCase {
-  func testFactoryUsesOwnedEntryRanksAndCountsEmittedWordsForAllFourEntryPaths() {
+  func testFactoryUsesOwnedEntryRanksAndCountsEmittedWordsForAllFourEntryPaths() throws {
+    let tamilPhrase = "இசை நடை"
+    let tamilRank = try XCTUnwrap(StarterLexicon.tamilOldWords.firstIndex(of: tamilPhrase))
     let cases: [(TypingLanguage, Int, String, ContentOptions)] = [
       (.typingOfTheDead, 0, "The hallway", .init(includePunctuation: true)),
       (.pokemon1k, 0, "ash cub", .init()),
       (.arenaStrategy, 53, StarterLexicon.arenaStrategyEntries[53].lowercased(), .init()),
-      (.tamilOld, 2, StarterLexicon.tamilOldWords[2], .init()),
+      (.tamilOld, tamilRank, tamilPhrase, .init()),
     ]
     for (language, rank, expected, options) in cases {
       var draws = 0
@@ -109,8 +111,9 @@ final class OrdinaryEntryGenerationTests: XCTestCase {
   }
 
   func testFourEntryFactoriesCompleteHiddenWordsAndRoundTripActualResults() throws {
+    let tamilRank = try XCTUnwrap(StarterLexicon.tamilOldWords.firstIndex(of: "இசை நடை"))
     for (language, rank, options) in [(TypingLanguage.typingOfTheDead, 0, ContentOptions(includePunctuation: true)),
-      (.pokemon1k, 0, .init()), (.arenaStrategy, 53, .init()), (.tamilOld, 2, .init())] {
+      (.pokemon1k, 0, .init()), (.arenaStrategy, 53, .init()), (.tamilOld, tamilRank, .init())] {
       var session = TestSessionFactory.make(configuration: .words(2, language: language, contentOptions: options)
         .with(modifiers: [.noSpaces]), nextRandomWordIndex: { rank })
       XCTAssertFalse(session.prompt.contains(" "), language.rawValue)
