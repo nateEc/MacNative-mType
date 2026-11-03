@@ -2,6 +2,8 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-BANGLA-LITERAL-92 | Bangla 基础／10k 的真实内容、完整长度与标点 | 固定独立词典、wordfreq bn、Tatoeba ben，Unicode danda；原版仅聚合 | 199／9734，完整 UTF-16 直方图、联合类别、键集和旧词；BANGLA_CORPUS_CONTRACT.md | 已接入，来源重建、105 项最终定向、756 项扩大／152 项源码对照及显式 Release 包通过；语言质量／分布与设备待验收。 |
+| LANG-BANGLA-LETTERS-93 | Bangla 字母入口缺失数字／nukta 与规范编码 | Unicode 17.0 字符事实、自有连写和独立词典 কর্ম；不复制原版字母数组 | 保持 62 项，补齐 ৪–৯、规范序列和完整键集，旧原始编码不迁移；BANGLA_CORPUS_CONTRACT.md | 已修正，全部数字／规范序列的工厂输入、保存／重复和旧编码回放通过；105／756 项回归与 Release 包通过，实体 IME／VoiceOver 未验。 |
 | LANG-TAMIL-LITERAL-89 | Tamil 基础／1k 真实词形和组合标记 | 独立固定词典、wordfreq ta 及 Tatoeba tam 整词观察；原版只取聚合 | 366／951，完整键集、旧 24 项，原有 Zipf 资格保持；TA_TE_CORPUS_CONTRACT.md | 已接入，来源重建、99 项最终定向、750 项扩大／152 项源码对照及显式 Release 包通过；语言质量／分布和实体验收待完成。 |
 | LANG-TAMIL-OLD-LITERAL-90 | Tamil old 独立字面内容与双词项 | 独立词典及三个明确旧自有练习，替换拼接闭包 | 460 项，字素 2–8，保留旧词、原双词项和历史目标；TA_TE_CORPUS_CONTRACT.md | 已接入，来源及生产生成／成绩通过；旧排序夹具修正后 99／750 项回归和 Release 包通过，语言质量／设备待验。 |
 | LANG-TELUGU-LITERAL-91 | Telugu 基础／1k、真实多词项与元音标记 | 独立词典和原样 Tatoeba tel 摘录；前后空格明确排除 | 201／901，完整键集、基础旧词额外 ఊ，字素最长 8／9；TA_TE_CORPUS_CONTRACT.md | 已接入，来源重建、99 项定向、750 项扩大／152 项源码对照及 Release 包通过；实体 IME、语言质量和 VoiceOver 未验。 |

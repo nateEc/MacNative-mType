@@ -13118,18 +13118,6 @@ enum StarterLexicon {
   // Independent literal Tamil entries retain the original starter vocabulary.
   static var tamilWords: [String] { TamilCorpus.basic }
 
-  private static func nativeScriptScaleIndex(
-    _ index: Int, alphabet: [Character]
-  ) -> String {
-    var value = index
-    var characters: [Character] = []
-    repeat {
-      characters.append(alphabet[value % alphabet.count])
-      value /= alphabet.count
-    } while value > 0
-    return String(characters.reversed())
-  }
-
   static var tamil1kLexicon: IndexedLexicon {
     IndexedLexicon(count: 951) { TamilCorpus.words1k[$0] }
   }
@@ -13177,45 +13165,17 @@ enum StarterLexicon {
 
   static var gujarati1kWords: [String] { gujarati1kLexicon.materialized() }
 
-  // Typebar-authored Bangla starter words exercise normal macOS composed-text
-  // input without importing a third-party or reference word list.
-  static let banglaWords = [
-    "আলো", "নদী", "পাতা", "ঘুড়ি", "মেঘ", "বই", "কলম", "জানালা", "সেতু", "বাগান",
-    "সকাল", "সুর", "চিঠি", "পথ", "তারা", "ছবি", "প্রশ্ন", "উত্তর", "কল্পনা", "বিরতি",
-    "সাহস", "ধৈর্য", "ছন্দ", "যাত্রা",
-  ]
-
-  private static let bangla10kAlphabet = Array("কখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহ")
+  // Independent dictionary entries retain the full length and character distributions.
+  static var banglaWords: [String] { BanglaCorpus.basic }
 
   static var bangla10kLexicon: IndexedLexicon {
-    let marker: Character = "ৱ"
-    let mark = "া"
-    return IndexedLexicon(count: 9_734) { index in
-      if index == 0 { return String(marker) }
-      if index == 1 {
-        return String(repeating: marker, count: 10) + String(repeating: mark, count: 6)
-      }
-      var entry = String(marker) + nativeScriptScaleIndex(index, alphabet: bangla10kAlphabet)
-      if index <= 9_392 { entry += mark }
-      if (2...15).contains(index) || index == 9_393 { entry += "।" }
-      return entry
-    }
+    IndexedLexicon(count: 9_734) { BanglaCorpus.words10k[$0] }
   }
 
   static var bangla10kWords: [String] { bangla10kLexicon.materialized() }
 
-  // Typebar-authored Bengali character practice is derived from the Unicode
-  // Bengali block, not from a reference word list. It includes independent
-  // letters and signs plus a small set of composed keyboard sequences.
-  static let banglaLetterWords = [
-    "অ", "আ", "ই", "ঈ", "উ", "ঊ", "ঋ", "এ", "ঐ", "ও", "ঔ",
-    "ক", "খ", "গ", "ঘ", "ঙ", "চ", "ছ", "জ", "ঝ", "ঞ",
-    "ট", "ঠ", "ড", "ঢ", "ণ", "ত", "থ", "দ", "ধ", "ন",
-    "প", "ফ", "ব", "ভ", "ম", "য", "র", "ল", "শ", "ষ", "স", "হ", "ৎ",
-    "ঌ", "\u{09DC}", "\u{09DD}", "\u{09DF}", "\u{09E0}", "\u{09E1}",
-    "০", "১", "২", "৩", "৳", "।",
-    "কা", "গি", "সু", "ক্ষ", "ক্র", "ক্ষা",
-  ]
+  // Independent Unicode facts and existing conjuncts cover digits and canonical nukta.
+  static var banglaLetterWords: [String] { BanglaCorpus.letters }
 
   // Typebar-authored Thai starter words use the reference-compatible space
   // commit path with normal macOS input, not an imported word list.

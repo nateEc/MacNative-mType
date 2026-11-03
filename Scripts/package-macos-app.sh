@@ -77,6 +77,8 @@ cp "$project_root/Resources/TamilCorpusNotices.txt" "$app_path/Contents/Resource
 cp "$project_root/Resources/TamilCorpusSources.txt" "$app_path/Contents/Resources/TamilCorpusSources.txt"
 cp "$project_root/Resources/TeluguCorpusNotices.txt" "$app_path/Contents/Resources/TeluguCorpusNotices.txt"
 cp "$project_root/Resources/TeluguCorpusSources.txt" "$app_path/Contents/Resources/TeluguCorpusSources.txt"
+cp "$project_root/Resources/BanglaCorpusNotices.txt" "$app_path/Contents/Resources/BanglaCorpusNotices.txt"
+cp "$project_root/Resources/BanglaCorpusSources.txt" "$app_path/Contents/Resources/BanglaCorpusSources.txt"
 cp "$project_root/Resources/SimplifiedChineseCorpusNotices.txt" "$app_path/Contents/Resources/SimplifiedChineseCorpusNotices.txt"
 cp "$project_root/Resources/SimplifiedChineseCorpusSources.txt" "$app_path/Contents/Resources/SimplifiedChineseCorpusSources.txt"
 cp "$project_root/Resources/TraditionalChineseCorpusNotices.txt" "$app_path/Contents/Resources/TraditionalChineseCorpusNotices.txt"

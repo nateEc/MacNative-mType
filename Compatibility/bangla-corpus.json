@@ -1,0 +1,121 @@
+{
+  "artifacts": {
+    "Resources/BanglaCorpusNotices.txt": "fa6c2f4e42eb26d6c83a8331b0140df26ef622f4e03419bf52edae53b2dff2a3",
+    "Resources/BanglaCorpusSources.txt": "53fa1a37c54b00aeb8e65d8b9bafbba562811215c5f4a9db348a803d08052c3a",
+    "Sources/Typebar/BanglaCorpus.generated.swift": "649bff4125b356545719defea1907af44369079e5fe89e4e23885da0b7962bc6"
+  },
+  "contributorIdentifiers": 31,
+  "dictionarySHA256": "3670f2c7607799ca9ae545f9903a59d0715c39ecaf432e21cdbe76d5a9615d70",
+  "frequencyMember": "wordfreq/data/large_bn.msgpack.gz",
+  "frequencyMemberSHA256": "d10ed5ca1e61a6bf210324424ee25c53ff71175398833067d810ccc6c826d581",
+  "frequencyWheelSHA256": "4b1c6ecffc6198be3396d5cf871c4423ca71c907c231348d352dd54d62b97473",
+  "legacyUnattested": [
+    "ছন্দ",
+    "বিরতি",
+    "সুর"
+  ],
+  "pools": {
+    "10k": {
+      "UTF16Histogram": {
+        "1": 5,
+        "2": 211,
+        "3": 866,
+        "4": 1624,
+        "5": 2190,
+        "6": 1797,
+        "7": 1300,
+        "8": 831,
+        "9": 454,
+        "10": 242,
+        "11": 116,
+        "12": 59,
+        "13": 23,
+        "14": 11,
+        "15": 2,
+        "16": 3
+      },
+      "categories": {
+        "mark punctuation=False spaces=0": 9378,
+        "mark punctuation=True spaces=0": 14,
+        "plain punctuation=False spaces=0": 341,
+        "plain punctuation=True spaces=0": 1
+      },
+      "characters": "-.।ঁংঃঅআইঈউঊঋএঐওঔকখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহ়ািীুূৃেৈোৌ্ৎ",
+      "count": 9734,
+      "maximumGraphemeCount": 8,
+      "minimumGraphemeCount": 1,
+      "sentenceObserved": 4971,
+      "sourceKinds": {
+        "dictionary": 9726,
+        "dictionary-character": 4,
+        "typebar-legacy": 3,
+        "unicode-sign": 1
+      },
+      "wordfreqObserved": 9667,
+      "wordsSHA256": "320e21bfc172a5d9e96e935ba3722b0bbe0d6e46b9bb52f0f78a63ca20c14717"
+    },
+    "basic": {
+      "UTF16Histogram": {
+        "1": 3,
+        "2": 23,
+        "3": 60,
+        "4": 64,
+        "5": 29,
+        "6": 15,
+        "7": 5
+      },
+      "categories": {
+        "mark punctuation=False spaces=0": 176,
+        "plain punctuation=False spaces=0": 22,
+        "plain punctuation=True spaces=0": 1
+      },
+      "characters": "।ঁংঃঅআইউএঐওকখগঘচছজঝটঠডণতথদধনপফবভমযরলশষসহ়ািীুেৈো্",
+      "count": 199,
+      "maximumGraphemeCount": 4,
+      "minimumGraphemeCount": 1,
+      "sentenceObserved": 194,
+      "sourceKinds": {
+        "dictionary": 193,
+        "dictionary-character": 2,
+        "typebar-legacy": 3,
+        "unicode-sign": 1
+      },
+      "wordfreqObserved": 198,
+      "wordsSHA256": "213a251fc232295753e16564c0d44af9e6b506c58057ada7f59c63e8f4b073e2"
+    },
+    "letters": {
+      "UTF16Histogram": {
+        "1": 56,
+        "2": 3,
+        "3": 2,
+        "4": 1
+      },
+      "categories": {
+        "mark punctuation=False spaces=0": 6,
+        "plain punctuation=False spaces=0": 55,
+        "plain punctuation=True spaces=0": 1
+      },
+      "characters": "।অআইঈউঊঋএঐওঔকখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহ়্ৎ০১২৩৪৫৬৭৮৯৳",
+      "count": 62,
+      "maximumGraphemeCount": 2,
+      "minimumGraphemeCount": 1,
+      "sentenceObserved": 7,
+      "sourceKinds": {
+        "dictionary": 3,
+        "dictionary-character": 42,
+        "typebar-conjunct": 2,
+        "unicode-canonical": 3,
+        "unicode-character": 1,
+        "unicode-digit": 10,
+        "unicode-sign": 1
+      },
+      "wordfreqObserved": 60,
+      "wordsSHA256": "ece50f2abab5886101b8153c53b33197ce7478ec470bcc9948a4cd74354f025d"
+    }
+  },
+  "revision": "kaikki-bn-20261103-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 15812,
+  "sentencesSHA256": "8fb9bd01929e1a263ab73536b847c46de9f139c64dbda0fbf69899e8edfe80dd",
+  "unicodeSHA256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c"
+}

@@ -180,6 +180,12 @@ cmp "$project_root/Resources/TeluguCorpusNotices.txt" \
 cmp "$project_root/Resources/TeluguCorpusSources.txt" \
   "$app_path/Contents/Resources/TeluguCorpusSources.txt" \
   || fail "Telugu spelling sources missing or modified"
+cmp "$project_root/Resources/BanglaCorpusNotices.txt" \
+  "$app_path/Contents/Resources/BanglaCorpusNotices.txt" \
+  || fail "Bangla corpus attribution missing or modified"
+cmp "$project_root/Resources/BanglaCorpusSources.txt" \
+  "$app_path/Contents/Resources/BanglaCorpusSources.txt" \
+  || fail "Bangla spelling and Unicode sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

@@ -13897,24 +13897,24 @@ final class TypingEngineTests: XCTestCase {
   func testSouthAsianScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(
       String, String, Int, Int, Int, Int, Int, Int, Int, Int,
-      ZipfFrequencySupport, String, String, String, String, ClosedRange<UInt32>
+      ZipfFrequencySupport, String, String, String, ClosedRange<UInt32>
     )] = [
       ("tamil1k", "தமிழ் · 1k · Typebar", 951, 1, 19, 1, 11, 942, 0, 0,
-       .supported, "tamil", "ta", "ta-IN", "", 0x0B80...0x0BFF),
+       .supported, "tamil", "ta", "ta-IN", 0x0B80...0x0BFF),
       ("telugu1k", "తెలుగు · 1k · Typebar", 901, 1, 18, 1, 9, 879, 0, 5,
-       .unknown, "telugu", "te", "te-IN", "", 0x0C00...0x0C7F),
-      ("bangla10k", "বাংলা · 10k · Typebar", 9_734, 1, 16, 1, 10, 9_392, 15, 0,
-       .unknown, "bangla", "bn", "bn-BD", "ৱ", 0x0980...0x09FF),
+       .unknown, "telugu", "te", "te-IN", 0x0C00...0x0C7F),
+      ("bangla10k", "বাংলা · 10k · Typebar", 9_734, 1, 16, 1, 8, 9_392, 15, 0,
+       .unknown, "bangla", "bn", "bn-BD", 0x0980...0x09FF),
       ("hindi1k", "हिन्दी · 1k · Typebar", 999, 1, 12, 1, 6, 956, 0, 0,
-       .unknown, "hindi", "hi", "hi-IN", "", 0x0900...0x097F),
+       .unknown, "hindi", "hi", "hi-IN", 0x0900...0x097F),
       ("gujarati1k", "ગુજરાતી · 1k · Typebar", 1_004, 1, 19, 1, 12, 900, 0, 33,
-       .unknown, "gujarati", "gu", "gu-IN", "", 0x0A80...0x0AFF),
+       .unknown, "gujarati", "gu", "gu-IN", 0x0A80...0x0AFF),
     ]
 
     for (
       rawValue, displayName, count, minimumScalars, maximumScalars, minimumCharacters,
       maximumCharacters, markedCount, punctuationCount, spaceCount, zipfSupport,
-      quoteSourceRawValue, wikipediaCode, speechLocale, originalMarker, scriptRange
+      quoteSourceRawValue, wikipediaCode, speechLocale, scriptRange
     ) in cases {
       let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
       let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: quoteSourceRawValue))
@@ -13934,9 +13934,6 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
-      if !originalMarker.isEmpty {
-        XCTAssertTrue(words.allSatisfy { $0.contains(originalMarker) }, rawValue)
-      }
       XCTAssertEqual(words.lazy.map(\.unicodeScalars.count).min(), minimumScalars, rawValue)
       XCTAssertEqual(words.lazy.map(\.unicodeScalars.count).max(), maximumScalars, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), minimumCharacters, rawValue)
@@ -13959,6 +13956,7 @@ final class TypingEngineTests: XCTestCase {
         word.unicodeScalars.allSatisfy { scalar in
           scriptRange.contains(scalar.value) || scalar.properties.isWhitespace
             || scalar.properties.generalCategory == .otherPunctuation
+            || (language == .bangla10k && scalar.value == 0x2D)
         }
       }, rawValue)
 
