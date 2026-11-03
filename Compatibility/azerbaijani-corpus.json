@@ -1,0 +1,59 @@
+{
+  "artifacts": {
+    "Resources/AzerbaijaniCorpusNotices.txt": "1b6a5e479487fafbe95de3fcd6c765306b2fe668a314d954ffee1687d1ac6f8f",
+    "Resources/AzerbaijaniCorpusSources.txt": "9bd2ac4fcf0737c6ba8a546955c164b5540abd1cac3c97c709f3c2d832dea96e",
+    "Sources/Typebar/AzerbaijaniCorpus.generated.swift": "039042c905bc1b796ebb18a3bef4777989d5f7a836e1661a64ecf6c8d9e38c36"
+  },
+  "contributorIdentifiers": 80,
+  "dictionary": "https://kaikki.org/dictionary/Azerbaijani/kaikki.org-dictionary-Azerbaijani.jsonl",
+  "dictionarySHA256": "8b17fec6310f7285fcbd8a08aa09f1c65fe3b98778bc1fa129b3de20bb50321e",
+  "legacyUnattested": [],
+  "pools": {
+    "1k": {
+      "categories": {
+        "accent": 666,
+        "ascii": 321,
+        "dot": 2
+      },
+      "characters": "abcdefghijklmnopqrstuvxyzçöüğışə̇",
+      "count": 989,
+      "legacyLengthExceptions": [
+        "sakitlik"
+      ],
+      "maximumUTF16Length": 8,
+      "minimumUTF16Length": 2,
+      "observedOptions": 984,
+      "sourceKinds": {
+        "dictionary": 987,
+        "dictionary-lowercase": 2
+      },
+      "wordsSHA256": "4648d6aad57498434d90edb3c88877471d2dd85779e41831d7ef0112c1f1bdf9"
+    },
+    "basic": {
+      "categories": {
+        "accent": 126,
+        "ascii": 73
+      },
+      "characters": "abcdefghijklmnopqrstuvxyzçöüğışə",
+      "count": 199,
+      "legacyLengthExceptions": [
+        "gələcək",
+        "iş",
+        "pəncərə",
+        "sakitlik"
+      ],
+      "maximumUTF16Length": 8,
+      "minimumUTF16Length": 2,
+      "observedOptions": 194,
+      "sourceKinds": {
+        "dictionary": 199
+      },
+      "wordsSHA256": "2072e4f0e450f3cd4bba00b41242c719893896024f0c0643793023d23596e460"
+    }
+  },
+  "revision": "kaikki-az-tatoeba-20261102-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 13544,
+  "sentences": "https://downloads.tatoeba.org/exports/per_language/aze/aze_sentences_detailed.tsv.bz2",
+  "sentencesSHA256": "315a666a6103209c6c435b5352e247db105f0e9a4a84149d88b0cb93a746bc33"
+}

@@ -132,6 +132,18 @@ cmp "$project_root/Resources/KyrgyzCorpusNotices.txt" \
 cmp "$project_root/Resources/KyrgyzCorpusSources.txt" \
   "$app_path/Contents/Resources/KyrgyzCorpusSources.txt" \
   || fail "Kyrgyz spelling sources missing or modified"
+cmp "$project_root/Resources/AzerbaijaniCorpusNotices.txt" \
+  "$app_path/Contents/Resources/AzerbaijaniCorpusNotices.txt" \
+  || fail "Azerbaijani corpus attribution missing or modified"
+cmp "$project_root/Resources/AzerbaijaniCorpusSources.txt" \
+  "$app_path/Contents/Resources/AzerbaijaniCorpusSources.txt" \
+  || fail "Azerbaijani spelling sources missing or modified"
+cmp "$project_root/Resources/MongolianCorpusNotices.txt" \
+  "$app_path/Contents/Resources/MongolianCorpusNotices.txt" \
+  || fail "Mongolian corpus attribution missing or modified"
+cmp "$project_root/Resources/MongolianCorpusSources.txt" \
+  "$app_path/Contents/Resources/MongolianCorpusSources.txt" \
+  || fail "Mongolian spelling sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

@@ -13624,32 +13624,11 @@ enum StarterLexicon {
     "მანძილი", "ნაბიჯი", "მოთმინება", "წონასწორობა",
   ]
 
-  // Typebar-authored Azerbaijani starter words exercise normal macOS composed-
-  // text input without importing a third-party or reference word list.
-  static let azerbaijaniWords = [
-    "kitab", "qələm", "pəncərə", "yol", "işıq", "körpü", "səhər", "kağız", "bağ", "bulud",
-    "sakitlik", "lampa", "dağ", "toxum", "musiqi", "masa", "fikir", "qeyd", "iş", "cəhd",
-    "dost", "şəhər", "dəniz", "kənd", "vaxt", "səs", "sual", "cavab", "ümid", "gələcək",
-  ]
-
-  private static let azerbaijani1kAlphabet = Array("abcdefghijklmnopqrstuvwxyz")
-
-  private static func azerbaijani1kIndex(_ index: Int) -> String {
-    let radix = azerbaijani1kAlphabet.count
-    precondition(index < radix * radix)
-    return String([
-      azerbaijani1kAlphabet[index / radix],
-      azerbaijani1kAlphabet[index % radix],
-    ])
-  }
+  // Independent dictionary spellings and explicitly credited casing adaptations.
+  static var azerbaijaniWords: [String] { AzerbaijaniCorpus.basic }
 
   static var azerbaijani1kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 989) { index in
-      if index == 0 { return "qz" }
-      if index == 1 { return "qxqxqxq" }
-      if index < 321 { return "qx" + azerbaijani1kIndex(index) }
-      return "əx" + azerbaijani1kIndex(index - 321)
-    }
+    IndexedLexicon(count: 989) { AzerbaijaniCorpus.words1k[$0] }
   }
 
   static var azerbaijani1kWords: [String] { azerbaijani1kLexicon.materialized() }
@@ -13745,22 +13724,11 @@ enum StarterLexicon {
     "pilsēta", "upe", "vējš", "laiks", "balss", "jautājums", "atbilde", "cerība", "nākotne", "solis",
   ]
 
-  // Typebar-authored Mongolian starter words retain the reference language's
-  // LTR, space-delimited behavior without importing its word list.
-  static let mongolianWords = [
-    "ном", "цонх", "зам", "гэрэл", "гүүр", "өглөө", "цаас", "цэцэрлэг", "үүл", "тайван",
-    "гэр", "уул", "үр", "хөгжим", "ширээ", "санаа", "тэмдэглэл", "ажил", "оролдлого", "найз",
-    "хот", "гол", "салхи", "цаг", "дуу", "асуулт", "хариулт", "найдвар", "ирээдүй", "алхам",
-  ]
+  // Independent lexical forms, literal sentence tokens and one credited Ё adaptation.
+  static var mongolianWords: [String] { MongolianCorpus.basic }
 
   static var mongolian10kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 9_219) { index in
-      if index == 0 { return "ꙮ" }
-      if index == 1 { return String(repeating: "ӿ", count: 18) }
-      let entry = "ӿ" + cyrillicIndex(index)
-      if index < 899 { return entry.prefix(1).uppercased() + entry.dropFirst() }
-      return entry
-    }
+    IndexedLexicon(count: 9_219) { MongolianCorpus.words10k[$0] }
   }
 
   static var mongolian10kWords: [String] { mongolian10kLexicon.materialized() }

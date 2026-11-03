@@ -1,0 +1,60 @@
+{
+  "artifacts": {
+    "Resources/MongolianCorpusNotices.txt": "9eb03d75e031ba0769b62be56dd95881756da3e255b79f2ac3a667dcd39694c5",
+    "Resources/MongolianCorpusSources.txt": "398804d24fe18f769b81f06f8c7d881e2ea6424460a34106f6c0da18994eb0ca",
+    "Sources/Typebar/MongolianCorpus.generated.swift": "13f6995d5f32e060ee58e8c2f5fd66b91fc88ff8c2998290ef2f2da94a999ac9"
+  },
+  "contributorIdentifiers": 27,
+  "dictionary": "https://kaikki.org/dictionary/Mongolian/kaikki.org-dictionary-Mongolian.jsonl",
+  "dictionarySHA256": "6ccd2cafc023ea5d1bf0310bef9e8abf059174212dbd66cc91dbed6fca38dac7",
+  "legacyUnattested": [
+    "асуулт",
+    "найдвар",
+    "оролдлого",
+    "санаа",
+    "тэмдэглэл",
+    "хариулт"
+  ],
+  "pools": {
+    "10k": {
+      "categories": {
+        "lower": 8322,
+        "upper": 897
+      },
+      "characters": "ЁАБВГДЕЖЗИЛМНОПРСТУХЦЧШЭЮЯабвгдежзийклмнопрстуфхцчшъыьэюяёҮүӨө",
+      "count": 9219,
+      "legacyLengthExceptions": [],
+      "maximumUTF16Length": 18,
+      "minimumUTF16Length": 1,
+      "observedOptions": 1407,
+      "sourceKinds": {
+        "dictionary": 8919,
+        "dictionary-initial-uppercase": 1,
+        "tatoeba-literal": 293,
+        "typebar-legacy": 6
+      },
+      "wordsSHA256": "c2a940d2089981f94a5923161b9ecaede58c644c4ca89dbd8cfc1d3460988891"
+    },
+    "basic": {
+      "categories": {
+        "lower": 1085
+      },
+      "characters": "абвгдежзийклмнопрстуфхцчшыьэюяёүө",
+      "count": 1085,
+      "legacyLengthExceptions": [],
+      "maximumUTF16Length": 15,
+      "minimumUTF16Length": 2,
+      "observedOptions": 1069,
+      "sourceKinds": {
+        "dictionary": 1079,
+        "typebar-legacy": 6
+      },
+      "wordsSHA256": "1084c1afe53bc6fb0cd0a9343abd683ea69775a9a087ca9320b54150a37b8bca"
+    }
+  },
+  "revision": "kaikki-mn-tatoeba-20261102-literal-v1",
+  "schemaVersion": 1,
+  "sentenceRows": 2791,
+  "sentences": "https://downloads.tatoeba.org/exports/per_language/mon/mon_sentences_detailed.tsv.bz2",
+  "sentencesSHA256": "5056ffc65661b7633d8a1a38bde442c9a59640366eccb384617c44e600a0bfb6"
+}

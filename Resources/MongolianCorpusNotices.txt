@@ -1,0 +1,75 @@
+Typebar independent Mongolian corpus
+Revision: kaikki-mn-tatoeba-20261102-literal-v1
+English Wiktionary contributors via Kaikki.org / Wiktextract.
+Dictionary: https://kaikki.org/dictionary/Mongolian/kaikki.org-dictionary-Mongolian.jsonl
+Snapshot SHA-256: 6ccd2cafc023ea5d1bf0310bef9e8abf059174212dbd66cc91dbed6fca38dac7
+Index reports: 2026-10-25; enwiktionary dump 2026-10-01; f9fe161 / 6f96ddf.
+Dictionary selection/adaptations: CC BY-SA 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+Dictionary contributor pages: https://en.wiktionary.org/wiki/ + encoded sourceTitle.
+Selected lexical titles/forms use lang_code=mn; nonstandard/proscribed/
+misspelling-only senses, romanization/template/error forms are excluded.
+Ordinary spellings remain unchanged. Two Azerbaijani combining-dot options
+use explicit Unicode default lowercase of independently sourced initial İ.
+This is a compatibility adaptation, not a claim of normative Azerbaijani casing.
+The raw source form, entry and exact rule accompany each adaptation below.
+One Mongolian option capitalizes only an independently sourced initial ё to
+cover uppercase Ё, absent from the literal candidate snapshots. This is marked
+dictionary-initial-uppercase, not claimed as original source capitalization.
+No arbitrary numbered padding, spelling synthesis or original Monkeytype words.
+All 30 old Typebar starters remain in both pools; basic is retained in larger.
+Selected lexical attestation missing for: асуулт, найдвар, оролдлого, санаа, тэмдэглэл, хариулт.
+This does not claim absence of other categories in the raw dictionary.
+Retained old-word length exceptions: {"10k": [], "basic": []}.
+No other new word may exceed the declared source length bounds.
+Code points/UTF-16 and Swift graphemes are distinct for combining-dot options.
+Per-option source mapping: MongolianCorpusSources.txt.
+Adaptations for this language: Ёстой <- ёстой (entry ёс).
+
+Tatoeba Mongolian contributors: CC BY 2.0 France.
+Sentences: https://downloads.tatoeba.org/exports/per_language/mon/mon_sentences_detailed.tsv.bz2
+Snapshot SHA-256: 5056ffc65661b7633d8a1a38bde442c9a59640366eccb384617c44e600a0bfb6
+Sentence rows: 2791; contributor identifiers: 27.
+https://creativecommons.org/licenses/by/2.0/fr/
+https://tatoeba.org/en/downloads
+Mongolian additional capitalized options are unchanged literal sentence tokens,
+with a lowercase dictionary lexical witness. They are marked tatoeba-literal,
+not dictionary headwords or artificial recasing; source sentence and lexical
+entry are separate fields. Their observation mode is exact-case. Other word
+observations use NFC lowercase lookup without altering delivered spelling.
+Only selected short tokens and provenance are bundled, not the full archive,
+translations or audio. Whole Unicode token boundaries keep hyphens, apostrophes,
+underscores, digits and combining marks inside tokens; no partial-word matches.
+One observation per option per sentence; missing observations stay NA, never
+zero or component-frequency estimates. Unobserved options prefer headwords.
+Observation counts are not representative frequencies or runtime Zipf values.
+Vocabulary quality/distribution and device input are not certified equivalent
+to Monkeytype. All processed contributor identifiers are credited below.
+
+(unowned)
+Alkrasnov https://tatoeba.org/en/user/profile/Alkrasnov
+Amastan https://tatoeba.org/en/user/profile/Amastan
+AqQoyriq_1 https://tatoeba.org/en/user/profile/AqQoyriq_1
+Balamax https://tatoeba.org/en/user/profile/Balamax
+Haliuka https://tatoeba.org/en/user/profile/Haliuka
+Jin_Dehong https://tatoeba.org/en/user/profile/Jin_Dehong
+Julien_PDC https://tatoeba.org/en/user/profile/Julien_PDC
+Katjo_Mencanto https://tatoeba.org/en/user/profile/Katjo_Mencanto
+Naminania https://tatoeba.org/en/user/profile/Naminania
+Sbm3 https://tatoeba.org/en/user/profile/Sbm3
+SirCourgette https://tatoeba.org/en/user/profile/SirCourgette
+Tsetseg https://tatoeba.org/en/user/profile/Tsetseg
+Ynhockey https://tatoeba.org/en/user/profile/Ynhockey
+altaar https://tatoeba.org/en/user/profile/altaar
+atitarev https://tatoeba.org/en/user/profile/atitarev
+bold600 https://tatoeba.org/en/user/profile/bold600
+ermess https://tatoeba.org/en/user/profile/ermess
+gracehero https://tatoeba.org/en/user/profile/gracehero
+janTuki https://tatoeba.org/en/user/profile/janTuki
+jeltzz https://tatoeba.org/en/user/profile/jeltzz
+kaisbe https://tatoeba.org/en/user/profile/kaisbe
+sartuul https://tatoeba.org/en/user/profile/sartuul
+sharavsambuu https://tatoeba.org/en/user/profile/sharavsambuu
+tsogokimchi https://tatoeba.org/en/user/profile/tsogokimchi
+yoyo_yo https://tatoeba.org/en/user/profile/yoyo_yo
+yujin https://tatoeba.org/en/user/profile/yujin

@@ -13,6 +13,8 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
   case turkish = "TurkishCorpusNotices"
   case kazakh = "KazakhCorpusNotices"
   case kyrgyz = "KyrgyzCorpusNotices"
+  case azerbaijani = "AzerbaijaniCorpusNotices"
+  case mongolian = "MongolianCorpusNotices"
   case simplifiedChinese = "SimplifiedChineseCorpusNotices"
   case traditionalChinese = "TraditionalChineseCorpusNotices"
   case englishFrequency = "EnglishFrequencyCorpusNotices"
@@ -47,6 +49,8 @@ enum CorpusLicenseNotice: String, CaseIterable, Identifiable {
     case .turkish: "Türkçe · 三档词库"
     case .kazakh: "Қазақша · 两档词库"
     case .kyrgyz: "Кыргызча · 两档词库"
+    case .azerbaijani: "Azərbaycanca · 两档词库"
+    case .mongolian: "Монгол · 两档词库"
     case .simplifiedChinese: "简体中文 · 五档词库"
     case .traditionalChinese: "繁體中文 · 五檔詞庫"
     case .englishFrequency: "基础 English 与频率词库"
@@ -130,6 +134,8 @@ struct CorpusAttributionSummary: View {
       Text("Türkçe 三档词库来自 English Wiktionary contributors／Kaikki.org 与 wordfreq；短语按 Tatoeba 整短语观察选编，保留旧自有词和逐词出处。")
       Text("Қазақша 两档词库来自 English Wiktionary contributors／Kaikki.org，按 Tatoeba 完整词项观察选编；保留旧词、连字符和短语，并提供逐词出处。")
       Text("Кыргызча 两档词库来自 English Wiktionary contributors／Kaikki.org；三个逗号词项直接节选自 Tatoeba，保留原样大小写、旧词与逐项出处。")
+      Text("Azərbaycanca 两档词库来自 English Wiktionary contributors／Kaikki.org；两个组合点词项明确记录 Unicode 大小写改编与原始拼写，并保留旧词。")
+      Text("Монгол 两档词库使用独立词典和 Tatoeba 原样大写词项；一个 Ё 首字母改编单独标明，逐项提供原词、句子出处及署名。")
       Text("简体中文五档词库来自 MDBG／CC-CEDICT 与 wordfreq；保留旧自有词，并逐词标明三项书写改编及原始出处。")
         .fixedSize(horizontal: false, vertical: true)
       Text("繁體中文五檔詞庫直接採用 CC-CEDICT 的繁體原形；保留舊自有詞，逐詞標明來源與書寫改編。簡體對應詞的頻率觀察不代表繁體詞頻。")
