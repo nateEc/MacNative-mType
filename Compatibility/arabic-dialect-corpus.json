@@ -1,0 +1,315 @@
+{
+  "revision": "kaikki-dialects-20261103-literal-v1",
+  "sourceSha256": {
+    "Egyptian-Arabic.jsonl": "fe499e5af052d9f78602ca12b75792b7fc5aab7348bcacd439ed67db0a9d419e",
+    "Moroccan-Arabic.jsonl": "2161dec55655817c8e519fb4d2a3e1d54eae0f35f53bfb0343266e14467b1ab3",
+    "arz_sentences_detailed.tsv.bz2": "9f1126f2c0338cf0d7b4a8d8c1a1289ab6c4c0ee1b90d3da8c48d7c7e89d5def",
+    "ary_sentences_detailed.tsv.bz2": "d09ee6b556be3424587c8d4607bfd240d5e16a114fad75334b420041872ab9cc"
+  },
+  "referenceAggregates": {
+    "arabic_egypt": {
+      "count": 210,
+      "keys": " ءابةتجحخدرزسشصضطعغفقكلمنهوىي",
+      "histogram": {
+        "2": 15,
+        "3": 83,
+        "4": 71,
+        "5": 21,
+        "6": 13,
+        "7": 1,
+        "8": 6
+      },
+      "categories": [
+        [
+          [
+            0,
+            false,
+            false
+          ],
+          203
+        ],
+        [
+          [
+            1,
+            false,
+            false
+          ],
+          7
+        ]
+      ],
+      "graphemeHistogram": {
+        "2": 15,
+        "3": 83,
+        "4": 71,
+        "5": 21,
+        "6": 13,
+        "7": 1,
+        "8": 6
+      }
+    },
+    "arabic_egypt_1k": {
+      "count": 1141,
+      "keys": " ءأإئابةتثجحخدذرزسشصضطظعغفقكلمنهوىي",
+      "histogram": {
+        "2": 46,
+        "3": 253,
+        "4": 304,
+        "5": 301,
+        "6": 115,
+        "7": 69,
+        "8": 32,
+        "9": 9,
+        "10": 3,
+        "11": 1,
+        "12": 2,
+        "13": 3,
+        "14": 2,
+        "16": 1
+      },
+      "categories": [
+        [
+          [
+            0,
+            false,
+            false
+          ],
+          1078
+        ],
+        [
+          [
+            1,
+            false,
+            false
+          ],
+          55
+        ],
+        [
+          [
+            2,
+            false,
+            false
+          ],
+          6
+        ],
+        [
+          [
+            3,
+            false,
+            false
+          ],
+          1
+        ],
+        [
+          [
+            1,
+            true,
+            false
+          ],
+          1
+        ]
+      ],
+      "graphemeHistogram": {
+        "2": 46,
+        "3": 253,
+        "4": 304,
+        "5": 301,
+        "6": 115,
+        "7": 69,
+        "8": 32,
+        "9": 9,
+        "10": 3,
+        "11": 1,
+        "12": 2,
+        "13": 3,
+        "14": 2,
+        "16": 1
+      }
+    },
+    "arabic_morocco": {
+      "count": 229,
+      "keys": " آأئابةتثجحخدرزسشصضطعغـفقكلمنهوىيًّ",
+      "histogram": {
+        "2": 12,
+        "3": 56,
+        "4": 91,
+        "5": 48,
+        "6": 17,
+        "7": 4,
+        "8": 1
+      },
+      "categories": [
+        [
+          [
+            0,
+            false,
+            false
+          ],
+          221
+        ],
+        [
+          [
+            0,
+            false,
+            true
+          ],
+          5
+        ],
+        [
+          [
+            1,
+            false,
+            true
+          ],
+          1
+        ],
+        [
+          [
+            1,
+            false,
+            false
+          ],
+          2
+        ]
+      ],
+      "graphemeHistogram": {
+        "2": 12,
+        "3": 57,
+        "4": 93,
+        "5": 46,
+        "6": 16,
+        "7": 5
+      }
+    }
+  },
+  "legacy": {
+    "arz": [
+      "دلوقتي",
+      "بكرة",
+      "شباك",
+      "شارع",
+      "قهوة",
+      "شغل",
+      "صاحب",
+      "مركب",
+      "بحر",
+      "نور",
+      "صوت",
+      "هدوء",
+      "خطوة",
+      "مساحة",
+      "فكرة",
+      "كراسة",
+      "رسالة",
+      "وقت",
+      "حكاية",
+      "مكان",
+      "طريق",
+      "موسيقى",
+      "صورة",
+      "تجربة",
+      "راحة",
+      "لمحة",
+      "مفتاح",
+      "نقطة",
+      "اختيار",
+      "محاولة"
+    ],
+    "ary": [
+      "اليوم",
+      "غدا",
+      "شرجم",
+      "درب",
+      "أتاي",
+      "خدمة",
+      "صاحبي",
+      "فلوكة",
+      "بحر",
+      "ضو",
+      "صوت",
+      "سكون",
+      "خطوة",
+      "بلاصة",
+      "فكرة",
+      "كناش",
+      "رسالة",
+      "وقت",
+      "حكاية",
+      "مكان",
+      "زنقة",
+      "موسيقى",
+      "تصويرة",
+      "تجربة",
+      "راحة",
+      "لمحة",
+      "مفتاح",
+      "نقطة",
+      "اختيار",
+      "محاولة"
+    ]
+  },
+  "pools": {
+    "arabic_egypt": {
+      "count": 210,
+      "kindCounts": {
+        "dictionary": 107,
+        "sentence": 89,
+        "typebar-legacy": 14
+      },
+      "graphemeHistogram": {
+        "2": 15,
+        "3": 83,
+        "4": 71,
+        "5": 21,
+        "6": 13,
+        "7": 1,
+        "8": 6
+      }
+    },
+    "arabic_egypt_1k": {
+      "count": 1141,
+      "kindCounts": {
+        "dictionary": 338,
+        "sentence": 789,
+        "typebar-legacy": 14
+      },
+      "graphemeHistogram": {
+        "2": 46,
+        "3": 253,
+        "4": 304,
+        "5": 301,
+        "6": 115,
+        "7": 69,
+        "8": 32,
+        "9": 9,
+        "10": 3,
+        "11": 1,
+        "12": 2,
+        "13": 3,
+        "14": 2,
+        "16": 1
+      }
+    },
+    "arabic_morocco": {
+      "count": 229,
+      "kindCounts": {
+        "dictionary": 99,
+        "sentence": 115,
+        "sentence-dictionary-pointing": 1,
+        "typebar-legacy": 14
+      },
+      "graphemeHistogram": {
+        "2": 12,
+        "3": 56,
+        "4": 92,
+        "5": 51,
+        "6": 15,
+        "7": 3
+      }
+    }
+  },
+  "artifactSha256": {
+    "Sources/Typebar/ArabicDialectCorpus.generated.swift": "8569c436833cf333b04aeaf152da1de5f00ee58d1860818160812dc1209104b2",
+    "Resources/ArabicDialectCorpusNotices.txt": "a98f4d61aafa3235952c70eda58d1d515d15c2275b73a9359495893f85d09f17",
+    "Resources/ArabicDialectCorpusSources.txt": "5117660b94d23b9910b023748813819d5e15b11f7ac3262268746214f3686d66"
+  }
+}

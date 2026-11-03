@@ -22,6 +22,9 @@
 | INP-RETIRED-FOCUS-96 | 离场输入接收器的迟到焦点交接 | 单个隔离实例在组合／普通输入时切换页面与窗口，再返回新练习并输入；核对旧页面不抢回焦点，新页面可正常获得焦点。 | 旧输入接收器不能重新成为第一响应者，离场回调不改变新页面状态。 | 待验收（隐藏 NSWindow 的交接反例和同步销毁见 INPUT_RETIRED_FOCUS_CONTRACT.md，不替代实体窗口／输入法） |
 | LANG-ARABIC-LITERAL-97 | 阿拉伯语元音与最长词输入 | 单个隔离实例切换基础／10k，用物理输入法输入带元音、shadda、最长词；分别开启／关闭阿拉伯语简化。 | 关闭简化保留原标记并正确完成，开启简化按现有规则处理；重复与历史保留原目标。 | 待验收（字面内容和受控输入回归见 ARABIC_CORPUS_CONTRACT.md，不替代实体输入法） |
 | LANG-ARABIC-10K-LITERAL-98 | 原始前导空格及混合字符方向 | 单个隔离实例在 10k 抽样含 H／ی 的字符练习及其他词形，观察目标裁边、光标方向并输入；核对旧基础词历史仍可重复。 | 原始框架不产生额外词槽，混排目标可正确完成，旧目标不被新词库改写。 | 待验收（生成／记录与布局对照范围见 ARABIC_CORPUS_CONTRACT.md，实体键盘与 VoiceOver 仍待验证） |
+| LANG-EGYPT-BASIC-99 | 埃及基础短语的输入与重复 | 单个隔离实例选择双词字段，用物理键盘完成两个组件并重复；检查保存的旧目标仍原样。 | 字段切分、词数、评分与重复一致；词形是否自然另行审校。 | 待验收（ARABIC_DIALECT_CORPUS_CONTRACT.md 的自动生成证据不替代方言与实体输入验收） |
+| LANG-EGYPT-1K-100 | 埃及四词字段与前导空格 | 单个隔离实例选择四词条目及带前导空格条目，逐词输入，重复并核对结果记录。 | 多词和裁边不多占词槽，队列继续正确，历史目标不被新词库改写。 | 待验收（自动续段与工厂回归见 ARABIC_DIALECT_CORPUS_CONTRACT.md） |
+| LANG-MOROCCO-BASIC-101 | 摩洛哥标记与延长符 | 单个隔离实例输入含 Tatweel、shadda 和 fathatan 的字段，观察候选、连接字形和光标，并用 VoiceOver 朗读目标。 | 原字符与标记可输入并正确完成，字格和读序可用；组件标记变换仍需语言审校。 | 待验收（原生几何验证不能替代物理输入法或 VoiceOver，见 ARABIC_DIALECT_CORPUS_CONTRACT.md） |
 | INP-ADMISSION-RETIREMENT-95 | 输入接纳关闭与离场迟到输入 | 单个隔离实例在准备／离场边界尝试字面输入、删除与候选确认，重开后继续新目标。 | 关闭接纳期间不提交或删除，显式重开可用，旧页不接收迟到操作。 | 待验收（原生受控回归不能替代实体 IME 或焦点交错验收） |
 | LANG-MALAY-LITERAL-76 | 马来语两档与短语候选 | 单个隔离实例逐档练习最长词、连字符、带空格候选和标点开启后的大写 S；检查一／二词配额、重复、旧结果与完整署名。 | 候选按源规则拆词，边界与输入完整；旧 30 词保留，观察缺失显示 NA 不冒充零，结果目标不重写。 | 待验收（固定来源与原生证据见 MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md；语言质量、分布、实体输入／IME／VoiceOver 与性能未验） |
 | FUN-EMPTY-SPACE-ADMISSION-77 | 空输入与目标开头空格 | 单个隔离实例使用有开头空格／连续空格的目标，以 normal、严格、expert／master 和 hard delete 分别按 Space／Enter；检查计时、No Quit、声音、回放及 IME 空格。 | 普通空输入忽略 Space，不因目标为空格启动尝试；独立条件、Return 与恢复动作仍按原版处理，回放不记录不存在的插入。 | 待验收（144 个源码对照及相邻回归见 MALAY_CORPUS_AND_SPACE_ADMISSION_CONTRACT.md；实体输入／IME 和完整组合未验） |

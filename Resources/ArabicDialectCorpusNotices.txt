@@ -1,0 +1,51 @@
+Typebar independent Egyptian and Moroccan Arabic practice
+Revision: kaikki-dialects-20261103-literal-v1
+English Wiktionary contributors via Kaikki.org / Wiktextract.
+https://kaikki.org/dictionary/Egyptian%20Arabic/index.html
+https://kaikki.org/dictionary/Moroccan%20Arabic/index.html
+Both index snapshots report extraction 2026-10-25, enwiktionary dump 2026-10-01,
+Wiktextract f9fe161 / 6f96ddf. Fixed inputs:
+Egyptian-Arabic.jsonl SHA-256: fe499e5af052d9f78602ca12b75792b7fc5aab7348bcacd439ed67db0a9d419e
+Moroccan-Arabic.jsonl SHA-256: 2161dec55655817c8e519fb4d2a3e1d54eae0f35f53bfb0343266e14467b1ab3
+arz_sentences_detailed.tsv.bz2 SHA-256: 9f1126f2c0338cf0d7b4a8d8c1a1289ab6c4c0ee1b90d3da8c48d7c7e89d5def
+ary_sentences_detailed.tsv.bz2 SHA-256: d09ee6b556be3424587c8d4607bfd240d5e16a114fad75334b420041872ab9cc
+
+Dictionary content and its adaptations: CC BY-SA 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+Contributor pages: https://en.wiktionary.org/wiki/ + encoded sourceTitle.
+Only explicit lang_code=arz / ary entries are used, never generic Arabic
+entries relabeled as a dialect. NFC is applied first. Egyptian content removes
+combining marks; Moroccan content removes marks other than fathatan/shadda.
+Original titles/forms and each adaptation remain in the per-entry JSON lines.
+Nonstandard/proscribed/misspelling-only senses and romanization/template/error
+forms are excluded. Spaces are not used to invent new combinations.
+All 30 prior Typebar starter spellings remain in their respective pools.
+Unattested legacy spellings are explicitly typebar-legacy, not dictionary claims.
+
+Tatoeba contributors: CC BY 2.0 France.
+https://creativecommons.org/licenses/by/2.0/fr/
+https://tatoeba.org/en/downloads
+https://downloads.tatoeba.org/exports/per_language/arz/arz_sentences_detailed.tsv.bz2
+https://downloads.tatoeba.org/exports/per_language/ary/ary_sentences_detailed.tsv.bz2
+Rows: arz=1593, ary=117.
+Only contiguous whole ASCII-space-separated token spans are selected. Punctuation
+and unsupported characters are never stripped to create smaller word matches.
+One normalized, unpointed observation per sentence; absent observations are null,
+not measured zero or runtime Zipf values. Ranked within fixed shape quotas.
+Moroccan marked phrases may point one component using an independently attested
+dialect dictionary form. The unpointed letter sequence must equal the original
+sentence span; both sentence and component witnesses are retained. Such derived
+phrases are never labeled unchanged sentence text or full-phrase dictionary entries.
+Contributors used by selected sentence witnesses:
+arz: ANANASA, Adelpa, Ahmed_Waleed, AsmaaElhelaly, AzizFarouqi, IntiKissed, KeEichi, MohamedAlian, Osama_Azab, Safa_Alfulaij, Samer, UpDownUp, User105223, Waseemonline, abdallahaly, aboubasha, alxw, amrbekhit, asmaf, atitarev, blazem, damascene, enteka, hasenj, hubakry, kokogans, meriem2036, mily73, orion17, outes, rul, saeb, shekitten, yue_dongchen
+ary: AyourAchtouk, MIMOO, Seddahby, User77813, elmassoudi, faridmaakni, sandale, warmaksen, zineeb
+
+Full source-unit histograms, letter sets, joint space/leading/mark categories
+and grapheme extrema match the fixed reference aggregates. Full Moroccan
+grapheme, usage, difficulty and linguistic quality distributions are not proven
+equivalent. Complete unmarked Egyptian grapheme histograms follow their unit
+histograms. Public download URLs are mutable; reconstruction requires pinned inputs.
+One Egyptian 1k entry adds a leading ASCII space as explicit raw framing.
+Actual generation retains existing collapse/trim/component and pending-word rules.
+Stored prior targets are never regenerated or normalized during replay/repeat.
+No Monkeytype word values, code, fonts or assets are imported.

@@ -1343,6 +1343,27 @@ import XCTest
     XCTAssertGreaterThanOrEqual(try XCTUnwrap(isolated.fieldFrames[1]).minX, try XCTUnwrap(isolated.fieldFrames[0]).maxX)
   }
 
+  func testMoroccanLiteralTatweelAndPointedPhraseKeepNativeCellGeometry() throws {
+    let words = TypingLanguage.arabicMorocco.ownedPracticeLexicon()
+    let extended = try XCTUnwrap(words.first(where: { $0.contains("ـ") }))
+    let pointed = try XCTUnwrap(words.first(where: {
+      $0.contains(" ") && $0.unicodeScalars.contains(where: { $0.value == 0x0651 })
+    }))
+    for target in [extended, pointed] {
+      let result = try render(TypingSession(configuration: .words(3, language: .arabicMorocco),
+        prompt: target))
+      let map = try XCTUnwrap(result.compositionTextMap)
+      let layout = PromptFieldTextLayout(map: map, width: 300, font: font,
+        rightToLeft: true, joinsLetters: true)
+      XCTAssertEqual(layout.cellFrames.count, map.cellTexts.count)
+      for rect in layout.cellFrames.values {
+        XCTAssertTrue(rect.minX.isFinite && rect.minY.isFinite && rect.width.isFinite && rect.height.isFinite)
+        XCTAssertGreaterThan(rect.width, 0)
+        XCTAssertGreaterThan(rect.height, 0)
+      }
+    }
+  }
+
   func testArabicJoiningInLTRFieldFlowRetainsLigatureAndCanonicalSlots() throws {
     let result = try render(TypingSession(configuration: .words(3), prompt: "ab سلام cd"), marked: "中文")
     let map = try XCTUnwrap(result.compositionTextMap)

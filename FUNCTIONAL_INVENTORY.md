@@ -2,6 +2,9 @@
 
 | ID | 功能 | 来源／边界 | 实现／证据 | 状态 |
 | --- | --- | --- | --- | --- |
+| LANG-EGYPT-BASIC-99 | 埃及阿拉伯语基础独立词形与短语 | 固定 arz 词典／原句、旧自写词；原版只读聚合 | 210 项，7 双词字段，全单位直方图与键集；ARABIC_DIALECT_CORPUS_CONTRACT.md | 已接入，重建、78 项回归与 Debug 包通过；语言质量与实体输入待验。 |
+| LANG-EGYPT-1K-100 | 埃及 1k 字面内容和四词／前导空格框架 | 独立方言词条与完整原句片段 | 1141 项，联合空格类别、逐词续段与历史；ARABIC_DIALECT_CORPUS_CONTRACT.md | 已接入，78 项回归、框架及 Debug 包通过；其他合成语言仍开放。 |
+| LANG-MOROCCO-BASIC-101 | 摩洛哥词形、Tatweel 与有见证的组件标记 | 固定 ary 词典／原句，两种证据明确区分 | 229 项，6 标记字段、原生几何与完成；ARABIC_DIALECT_CORPUS_CONTRACT.md | 已接入，来源、几何及 78 项／Debug 包通过；标记写法审校及 VoiceOver 未验。 |
 | LANG-ARABIC-LITERAL-97 | 阿拉伯语基础的真实带元音词形与完整长度分布 | 独立固定 Wiktionary／Kaikki 及 wordfreq ar，原版仅聚合 | 199 项，保留完整单位直方图、字符集和 198 项组合标记；ARABIC_CORPUS_CONTRACT.md | 已接入，独立重建、最终 210 项回归和 Debug 包通过；四个旧词只退出新基础抽样，语言质量与实体输入待验。 |
 | LANG-ARABIC-10K-LITERAL-98 | 阿拉伯语 10k 的实际词形、前导空格与混合字符 | 独立词典见证、旧自写词和明确混合字符练习；不复用原版词值 | 9281 项，8988 项标记，独立来源与框架；ARABIC_CORPUS_CONTRACT.md | 已接入，210 项含 25 项生产混排宿主和 Debug 包通过；完整字素／词频分布、质量和设备未验，其他阿拉伯语入口仍开放。 |
 | INP-RETIRED-FOCUS-96 | 退休接收器拒绝真实焦点交接和迟到焦点报告 | AppKit NSWindow／NSResponder 生命周期边界 | 隐藏窗口、直接交接及焦点回调同步销毁反例；INPUT_RETIRED_FOCUS_CONTRACT.md | 已修正，实际身份红测、98 项相关回归及 Debug 包／原创性检查通过；实体窗口交接与 IME 待验。 |

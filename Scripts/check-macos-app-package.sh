@@ -192,6 +192,12 @@ cmp "$project_root/Resources/ArabicCorpusNotices.txt" \
 cmp "$project_root/Resources/ArabicCorpusSources.txt" \
   "$app_path/Contents/Resources/ArabicCorpusSources.txt" \
   || fail "Arabic spelling sources missing or modified"
+cmp "$project_root/Resources/ArabicDialectCorpusNotices.txt" \
+  "$app_path/Contents/Resources/ArabicDialectCorpusNotices.txt" \
+  || fail "Arabic dialect corpus attribution missing or modified"
+cmp "$project_root/Resources/ArabicDialectCorpusSources.txt" \
+  "$app_path/Contents/Resources/ArabicDialectCorpusSources.txt" \
+  || fail "Arabic dialect word and phrase sources missing or modified"
 cmp "$project_root/Resources/SpanishFrequencyCorpusNotices.txt" \
   "$app_path/Contents/Resources/SpanishFrequencyCorpusNotices.txt" \
   || fail "Spanish corpus attribution missing or modified"

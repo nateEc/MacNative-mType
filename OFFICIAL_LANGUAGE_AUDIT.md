@@ -1,5 +1,7 @@
 # 官方语言覆盖审计
 
+2026-11-03 方言批次接入 Egyptian 基础 210／1k 1141 与 Moroccan 基础 229 项独立内容（LANG-EGYPT-BASIC-99／LANG-EGYPT-1K-100／LANG-MOROCCO-BASIC-101）。方言词典和相同语言的原句来源分别保留，标记去除、组件标记、四词字段与前导空格变换明确记录；不把普通阿拉伯语词条冒充方言。全部旧 30 项起始词保留，完整单位直方图及空格／标记联合类别通过。见 ARABIC_DIALECT_CORPUS_CONTRACT.md。当前静态索引范围余 108 个合成属性／886705 个声明位置；语言质量、实体输入与其余语言未完成。
+
 2026-11-03 Arabic 基础／10k 接入独立字面内容（LANG-ARABIC-LITERAL-97／98）：199／9281 项、完整 UTF-16 直方图、字符与标记数量保留，字素与单位长度分别核对。来源、四项旧基础抽样退休、原始前导空格、混合字符练习和质量限制见 ARABIC_CORPUS_CONTRACT.md。当前全部静态 IndexedLexicon 范围仍有 109 个合成属性／887,846 个声明位置，见 INDEXED_LEXICON_IMPLEMENTATION_AUDIT.md；埃及阿拉伯语 1k 仍为占位，本批不升级所有阿拉伯语或全部语言完成度。
 
 最新 `LANG-RUSSIAN-SCALES-52` 将 Russian 六档 469,774 个占位位置迁至独立 Russian Wiktionary／wordfreq，实际专名、多词、句点缩写及各类字段有独立来源。375k 最长 46／参考 49、撇号／prime、分布和基本池 24／参考 200 仍开放，见 RUSSIAN_SCALES_CORPUS_CONTRACT.md。当前扩大具名范围余 123 项／1,090,989，不能据此声称全部语言完成。

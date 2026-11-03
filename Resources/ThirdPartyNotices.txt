@@ -53,3 +53,9 @@ ranked with wordfreq 3.1.1 by Robyn Speer; adapted data CC BY-SA 4.0.
 See ArabicCorpusNotices.txt and ArabicCorpusSources.txt for snapshot pins,
 per-entry witnesses, canonical-equivalent adaptations, prior Typebar spellings
 and the explicitly authored mixed-script character exercise.
+
+Egyptian and Moroccan Arabic practice content
+Independent English Wiktionary / Kaikki dialect entries (CC BY-SA 4.0) and
+Tatoeba dialect contributor spans (CC BY 2.0 France), with recorded adaptations.
+See ArabicDialectCorpusNotices.txt and ArabicDialectCorpusSources.txt for pins,
+contributors, mark removal and separately evidenced component pointing.

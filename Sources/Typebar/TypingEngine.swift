@@ -12873,56 +12873,22 @@ enum StarterLexicon {
     return String(characters.reversed())
   }
 
-  private static let arabicScaleRoots = [
-    "نور", "درب", "موج", "فجر", "سهل", "وتر", "حقل", "نهر",
-  ]
-
   static var arabic10kLexicon: IndexedLexicon {
     IndexedLexicon(ArabicCorpus.words10k)
   }
 
   static var arabic10kWords: [String] { arabic10kLexicon.materialized() }
 
-  // Typebar-authored Egyptian Arabic starter words are an independent local
-  // dialect practice corpus. They do not import Monkeytype's word lists;
-  // macOS supplies the Arabic joining glyph shaping for this RTL prompt.
-  static let arabicEgyptWords = [
-    "دلوقتي", "بكرة", "شباك", "شارع", "قهوة", "شغل", "صاحب", "مركب", "بحر", "نور",
-    "صوت", "هدوء", "خطوة", "مساحة", "فكرة", "كراسة", "رسالة", "وقت", "حكاية", "مكان",
-    "طريق", "موسيقى", "صورة", "تجربة", "راحة", "لمحة", "مفتاح", "نقطة", "اختيار", "محاولة",
-  ]
+  // Independently attested dialect content; see bundled sources and licenses.
+  static let arabicEgyptWords = ArabicDialectCorpus.egyptBasic
 
   static var arabicEgypt1kLexicon: IndexedLexicon {
-    IndexedLexicon(count: 1_141) { index in
-      var entry: String
-      if index == 0 {
-        entry = "ڗڗ"
-      } else if index == 1 {
-        entry = String(repeating: "ڗ", count: 16)
-      } else {
-        entry = "غظ" + arabicScaleRoots[index % arabicScaleRoots.count]
-          + arabicScaleIndex(index)
-      }
-      if index == 1_140 {
-        entry = " " + entry
-      } else if index >= 1_078 {
-        entry += " من"
-        if index >= 1_133 { entry += " بيت" }
-      }
-      return entry
-    }
+    IndexedLexicon(ArabicDialectCorpus.egypt1k)
   }
 
   static var arabicEgypt1kWords: [String] { arabicEgypt1kLexicon.materialized() }
 
-  // Typebar-authored Moroccan Arabic starter words are an independent local
-  // dialect practice corpus. They do not import Monkeytype's word lists;
-  // macOS supplies the Arabic joining glyph shaping for this RTL prompt.
-  static let arabicMoroccoWords = [
-    "اليوم", "غدا", "شرجم", "درب", "أتاي", "خدمة", "صاحبي", "فلوكة", "بحر", "ضو",
-    "صوت", "سكون", "خطوة", "بلاصة", "فكرة", "كناش", "رسالة", "وقت", "حكاية", "مكان",
-    "زنقة", "موسيقى", "تصويرة", "تجربة", "راحة", "لمحة", "مفتاح", "نقطة", "اختيار", "محاولة",
-  ]
+  static let arabicMoroccoWords = ArabicDialectCorpus.moroccoBasic
 
   // Typebar-authored Pashto starter words are an independent local practice
   // corpus. They do not import Monkeytype's word lists; macOS supplies the
